@@ -16,6 +16,7 @@ public class ManagementServerInfrastructure {
     public ManagementServerInfrastructure(WebContext webContext, String basePath) {
         this.mappingRegistry = new ManagementMappingRegistry();
         this.dispatcherHandler = new ManagementDispatcherHandler(webContext, basePath, mappingRegistry);
+        webContext.registerWebComponent(dispatcherHandler);
     }
 
     public ManagementDispatcherHandler getDispatcherHandler() {

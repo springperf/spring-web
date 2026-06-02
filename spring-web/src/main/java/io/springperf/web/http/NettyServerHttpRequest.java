@@ -42,28 +42,6 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
         super(webContext, request.uri(), resolvedPath);
         this.ctx = ctx;
         this.request = request;
-        request.retain();
-    }
-
-    @Override
-    public void complete() {
-        if (isCompleted()) {
-            return;
-        }
-        super.complete();
-
-        // 先销毁解码器再释放请求，避免 decoder.destroy() 访问已释放数据
-        if (request instanceof NettyMultipartWebRequest) {
-            try {
-                HttpPostRequestDecoder decoder = ((NettyMultipartWebRequest) request).getDecoder();
-                if (decoder != null) {
-                    decoder.destroy();
-                }
-            } catch (Exception ignored) {
-                // decoder 销毁失败无需额外处理
-            }
-        }
-        ReferenceCountUtil.release(request);
     }
 
     public FullHttpRequest getNativeRequest() {
@@ -248,6 +226,16 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
     @Override
     public int getContentLength() {
         return request.content().readableBytes();
+    }
+
+    @Override
+    public void acquire() {
+        ReferenceCountUtil.retain(request);
+    }
+
+    @Override
+    public boolean release() {
+        return ReferenceCountUtil.release(request);
     }
 
 }

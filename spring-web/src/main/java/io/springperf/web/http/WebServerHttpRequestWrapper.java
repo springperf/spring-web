@@ -53,6 +53,6 @@ public class WebServerHttpRequestWrapper implements WebServerHttpRequest {
     @Override public HttpHeaders getHeaders() { return request.getHeaders(); }
     @Override public InputStream getBody() throws IOException { return request.getBody(); }
     @Override public boolean hasBody() { return request.hasBody(); }
-    @Override public void complete() { request.complete(); }
-    @Override public boolean isCompleted() { return request.isCompleted(); }
+    @Override public void acquire() { request.acquire(); }
+    @Override public boolean release() { return request.release(); }
 }
