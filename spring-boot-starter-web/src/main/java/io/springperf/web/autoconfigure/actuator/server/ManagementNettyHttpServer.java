@@ -64,7 +64,7 @@ public class ManagementNettyHttpServer implements SmartLifecycle {
         bossGroup = new NioEventLoopGroup(1);
         workerGroup = new NioEventLoopGroup();
 
-        NettyHttpHandler nettyHttpHandler = new NettyHttpHandler(webContext, contextPath, handler);
+        NettyHttpHandler nettyHttpHandler = new NettyHttpHandler(webContext, "", handler);
 
         ServerBootstrap bootstrap = new ServerBootstrap();
         bootstrap.group(bossGroup, workerGroup)
