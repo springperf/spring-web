@@ -95,7 +95,7 @@ public class PerfEndpointAutoConfiguration {
             WebEndpointProperties webEndpointProperties, Environment environment) {
         int mgmtPort = environment.getProperty("management.server.port", int.class, 0);
         SslContext sslContext = SslContextFactory.createServerSslContext(environment, "management.server.ssl.");
-        return new ManagementNettyHttpServer(webContext, "",
+        return new ManagementNettyHttpServer(webContext, webEndpointProperties.getBasePath(),
                 managementServerInfrastructure.getDispatcherHandler(), mgmtPort,
                 environment.getProperty("server.http.max-content-length", int.class, 1048576), sslContext);
     }

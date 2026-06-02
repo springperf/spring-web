@@ -56,19 +56,16 @@ public class NettyHttpHandler extends SimpleChannelInboundHandler<FullHttpReques
                 } else if (requestPath.startsWith(contextPath + "/")) {
                     resolvedPath = requestPath.substring(contextPath.length());
                 } else {
-                    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Not Found");
+                    resp.sendError(HttpStatus.NOT_FOUND, "Not Found");
+                    return;
                 }
             }
 
             // 3. 用预解析的 path 创建请求，跳过 BaseWebServerHttpRequest 中的 contextPath 校验
             NettyServerHttpRequest req = new NettyServerHttpRequest(webContext, ctxNetty, msg, resolvedPath);
-            // NettyServerHttpRequest 构造时已 retain()，防止 msg 在异步/池化处理中被释放
             resp.setTimeout();
-
             // 4. 委托给实际处理逻辑
             handler.httpHandle(req, resp);
-        } catch (ResponseStatusException e) {
-            resp.sendError(e.getStatus(), e.getReason());
         } catch (Throwable e) {
             log.error("Unhandled exception processing request", e);
             try {

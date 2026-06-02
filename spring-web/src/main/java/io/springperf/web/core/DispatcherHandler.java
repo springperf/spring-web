@@ -24,6 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * Central dispatcher: route lookup, optional offload to business thread pool, argument resolution, handler method invocation, and return value processing.
@@ -35,14 +36,14 @@ public class DispatcherHandler extends BaseWebComponent {
 
     protected boolean threadContextInheritable = false;
 
-    private MappingRegistry mappingRegistry;
-    private ExceptionRegistry exceptionRegistry;
-    private ArgumentResolverRegistry argumentResolverRegistry;
-    private ReturnValueResolverRegistry returnValueResolverRegistry;
+    protected MappingRegistry mappingRegistry;
+    protected ExceptionRegistry exceptionRegistry;
+    protected ArgumentResolverRegistry argumentResolverRegistry;
+    protected ReturnValueResolverRegistry returnValueResolverRegistry;
     protected CorsRegistry corsRegistry;
-    private InterceptorRegistry interceptorRegistry;
-    private AsyncSupportRegistry asyncSupportRegistry;
-    private BizPoolRegistry bizPoolRegistry;
+    protected InterceptorRegistry interceptorRegistry;
+    protected AsyncSupportRegistry asyncSupportRegistry;
+    protected BizPoolRegistry bizPoolRegistry;
 
     @Override
     public void initWithWebContext(WebContext webContext) {
@@ -61,35 +62,55 @@ public class DispatcherHandler extends BaseWebComponent {
         // 路由匹配（EventLoop 中执行，路径查找 O(1)~O(n) 足够快）
         MappingResult result = mappingRegistry.mapping(req);
         if (result.isMatched()) {
-            PathMappingContext mappingContext = result.getMatchedContext();
-            // 通过 BizPoolRegistry 使用 Phase3 预缓存的线程池，无注解时为 null → 在 EventLoop 中同步处理
-            ExecutorService executor = bizPoolRegistry.determinePool(mappingContext);
-            if (executor != null) {
-                executor.execute(() -> processRequest(req, resp, mappingContext));
+            handleWithPathMappingContext(req, resp, result.getMatchedContext());
+            return;
+        }
+        try {
+            // CORS 预检：路径匹配即可处理，不经过异常/拦截器管线
+            if (corsRegistry != null && CorsUtils.isPreFlightRequest(req)) {
+                handleCorsPreflight(req, resp, result.isPathMatched() ? result.getPathMatchedContexts() : null);
             } else {
-                processRequest(req, resp, mappingContext);
+                handleOnNoMatchMappingContext(req, resp, result);
             }
-            return;
+        } catch (Throwable e) {
+            log.error("dispatcher error", e);
+            sendError(resp, HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error");
         }
-        // CORS 预检：路径匹配即可处理，不经过异常/拦截器管线
-        if (CorsUtils.isPreFlightRequest(req)) {
-            handleCorsPreflight(req, resp, result.isPathMatched() ? result.getPathMatchedContexts() : null);
-            req.complete();
-            return;
+    }
+
+    protected void handleWithPathMappingContext(WebServerHttpRequest req, WebServerHttpResponse resp, PathMappingContext mappingContext) {
+        // 通过 BizPoolRegistry 使用 Phase3 预缓存的线程池，无注解时为 null → 在 EventLoop 中同步处理
+        ExecutorService executor = bizPoolRegistry.determinePool(mappingContext);
+        if (executor != null) {
+            req.acquire();
+            try {
+                executor.execute(() -> {
+                    try {
+                        processRequest(req, resp, mappingContext);
+                    } finally {
+                        req.release();
+                    }
+                });
+            } catch (RejectedExecutionException e) {
+                req.release();
+                throw e;
+            }
+        } else {
+            processRequest(req, resp, mappingContext);
         }
+    }
+
+    protected void handleOnNoMatchMappingContext(WebServerHttpRequest req, WebServerHttpResponse resp, MappingResult result) {
         // 404/405：抛出异常走 exceptionRegistry，与 doHandle 中异常路径行为一致
-        ResponseStatusException ex = result.isMethodMismatch()
-                ? METHOD_NOT_ALLOWED_EXCEPTION
-                : NOT_FOUND_EXCEPTION;
+        ResponseStatusException ex = result.isMethodMismatch() ? METHOD_NOT_ALLOWED_EXCEPTION : NOT_FOUND_EXCEPTION;
         try {
             exceptionRegistry.handle(ex, req, resp);
         } finally {
             interceptorRegistry.afterCompletion(req, resp, ex);
-            req.complete();
         }
     }
 
-    private void handleCorsPreflight(WebServerHttpRequest req, WebServerHttpResponse resp,
+    protected void handleCorsPreflight(WebServerHttpRequest req, WebServerHttpResponse resp,
                                      PathMappingContext[] pathMatchedContexts) {
         try {
             // 从路径命中的 context 中取第一个用于读取 @CrossOrigin 配置
@@ -118,7 +139,6 @@ public class DispatcherHandler extends BaseWebComponent {
             if (initContext) {
                 removeContextHolders(req, resp);
             }
-            req.complete();
         }
     }
 
@@ -140,8 +160,11 @@ public class DispatcherHandler extends BaseWebComponent {
             // resolve args
             Object[] args = argumentResolverRegistry.resolveArguments(mappingContext, req, resp);
 
-            // invoke + return value
-            result = doInvokeCore(req, resp, mappingContext, args);
+            // invoke
+            result = mappingContext.invoke(args, req, resp);
+
+            // return value
+            returnValueResolverRegistry.resolveReturnValue(result, mappingContext, req, resp);
         } catch (Throwable ex) {
             exception = ex;
             handleException(ex, req, resp);
@@ -165,17 +188,6 @@ public class DispatcherHandler extends BaseWebComponent {
         } finally {
             flushResponse(resp);
         }
-    }
-
-    /**
-     * 核心调用管线：invoke → returnValue。
-     * <p>供子类复用，跳过拦截器和参数解析等步骤。</p>
-     */
-    protected Object doInvokeCore(WebServerHttpRequest req, WebServerHttpResponse resp,
-                                   PathMappingContext mappingContext, Object[] args) throws Throwable {
-        Object result = mappingContext.invoke(args, req, resp);
-        returnValueResolverRegistry.resolveReturnValue(result, mappingContext, req, resp);
-        return result;
     }
 
     /**
@@ -237,5 +249,13 @@ public class DispatcherHandler extends BaseWebComponent {
 
     protected LocaleContext buildLocaleContext(WebServerHttpRequest req, WebServerHttpResponse resp) {
         return null;
+    }
+
+    protected static void sendError(WebServerHttpResponse resp, HttpStatus status, String reason) {
+        try {
+            resp.sendError(status, reason);
+        } catch (Exception ignored) {
+            log.warn("Failed to send error response", ignored);
+        }
     }
 }

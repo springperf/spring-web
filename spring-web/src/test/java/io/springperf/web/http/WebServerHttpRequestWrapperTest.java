@@ -67,6 +67,6 @@ class WebServerHttpRequestWrapperTest {
     @Test void getHeaders_delegates() { HttpHeaders h = new HttpHeaders(); when(delegate.getHeaders()).thenReturn(h); assertSame(h, wrapper.getHeaders()); }
     @Test void getBody_delegates() throws Exception { InputStream s = mock(InputStream.class); when(delegate.getBody()).thenReturn(s); assertSame(s, wrapper.getBody()); }
     @Test void hasBody_delegates() { when(delegate.hasBody()).thenReturn(true); assertTrue(wrapper.hasBody()); }
-    @Test void complete_delegates() { wrapper.complete(); verify(delegate).complete(); }
-    @Test void isCompleted_delegates() { when(delegate.isCompleted()).thenReturn(true); assertTrue(wrapper.isCompleted()); }
+    @Test void acquire_delegates() { wrapper.acquire(); verify(delegate).acquire(); }
+    @Test void release_delegates() { when(delegate.release()).thenReturn(true); assertTrue(wrapper.release()); }
 }

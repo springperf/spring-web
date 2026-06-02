@@ -24,7 +24,6 @@ public abstract class BaseWebServerHttpRequest implements WebServerHttpRequest, 
     protected final Map<String, Object> attributes = new ConcurrentHashMap<>();
     protected final Object[] fastAttributes = new Object[RequestAttribute.getMaxSize()];
     protected int filterIndex = 0;
-    private boolean lifecycleCompleted;
 
     protected BaseWebServerHttpRequest(WebContext webContext, String uriStrWithQuery, String resolvedPath) {
         this.webContext = webContext;
@@ -68,8 +67,6 @@ public abstract class BaseWebServerHttpRequest implements WebServerHttpRequest, 
     public <T> void setAttribute(RequestAttribute<T> key, T value) { fastAttributes[key.getIndex()] = value; }
     public WebContext getWebContext() { return webContext; }
     public RequestContext getRequestContext() { return this; }
-    public void complete() { this.lifecycleCompleted = true; }
-    public boolean isCompleted() { return lifecycleCompleted; }
     public int getFilterIndexAndIncrement() { return filterIndex++; }
 
     @Override public Principal getPrincipal() { return null; }

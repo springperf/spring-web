@@ -54,7 +54,7 @@ public interface WebServerHttpRequest extends ServerHttpRequest, BodyHttpInputMe
 
     RequestContext getRequestContext();
 
-    void complete();
+    void acquire();
 
-    boolean isCompleted();
+    boolean release();
 }

@@ -104,7 +104,6 @@ class DispatcherHandlerTest {
 
         verify(exceptionRegistry).handle(any(ResponseStatusException.class), eq(req), eq(resp));
         verify(interceptorRegistry).afterCompletion(eq(req), eq(resp), any(ResponseStatusException.class));
-        verify(req).complete();
     }
 
     @Test
@@ -117,7 +116,6 @@ class DispatcherHandlerTest {
 
         verify(exceptionRegistry).handle(any(ResponseStatusException.class), eq(req), eq(resp));
         verify(interceptorRegistry).afterCompletion(eq(req), eq(resp), any(ResponseStatusException.class));
-        verify(req).complete();
     }
 
     @Test
@@ -131,6 +129,7 @@ class DispatcherHandlerTest {
 
         handler.handle(req, resp);
 
+        verify(req).acquire();
         verify(executor).execute(any(Runnable.class));
     }
 
