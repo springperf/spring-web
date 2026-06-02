@@ -43,9 +43,6 @@ classes
 .mtj.tmp/
 .metadata
 .git
-/docs/
-# 设计文档
-/docs/superpowers/
 # AI 辅助配置文件
 /.claude/
 
