@@ -1,0 +1,39 @@
+{
+  "properties": [
+    {
+      "name": "server.port",
+      "type": "java.lang.Integer",
+      "description": "Netty server HTTP port.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": 8080
+    },
+    {
+      "name": "server.servlet.context-path",
+      "type": "java.lang.String",
+      "description": "Context path of the application.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "/"
+    },
+    {
+      "name": "server.http.max-content-length",
+      "type": "java.lang.Integer",
+      "description": "Max content length of an HTTP request in bytes.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": 1048576
+    },
+    {
+      "name": "server.http.timeout",
+      "type": "java.lang.Long",
+      "description": "HTTP request timeout in milliseconds.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": 60000
+    },
+    {
+      "name": "server.check-on-startup",
+      "type": "java.lang.Boolean",
+      "description": "Check handler mappings on startup.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": true
+    }
+  ]
+}
