@@ -45,7 +45,6 @@ VERIFY -> COMPLETE
 必须读取：
 
 - .claude/context/project.md
-- .claude/context/architecture.md
 
 ## 涉及具体模块
 
