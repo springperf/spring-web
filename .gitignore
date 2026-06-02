@@ -44,7 +44,9 @@ classes
 .metadata
 .git
 # AI 辅助配置文件
-/.claude/
+/.claude/hook/
+/.claude/settings.local.json
+
 
 # 密钥和证书
 *.p12
