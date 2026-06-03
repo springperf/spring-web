@@ -10,7 +10,7 @@
 
 ### 报告 Bug
 
-1. 在 [Issues](TODO) 中搜索是否已有相同问题
+1. 在 [Issues](https://github.com/springperf/spring-web/issues  ) 中搜索是否已有相同问题
 2. 如果没有，创建新 Issue 并选择 Bug Report 模板
 3. 请包含：
    - 运行环境（JDK 版本、操作系统）
@@ -20,7 +20,7 @@
 
 ### 提议新功能
 
-1. 在 [Issues](TODO) 中搜索是否已有类似提议
+1. 在 [Issues](https://github.com/springperf/spring-web/issues  ) 中搜索是否已有类似提议
 2. 创建 Feature Request Issue，描述：
    - 使用场景
    - 期望 API 或行为
