@@ -11,6 +11,8 @@
     <packaging>jar</packaging>
 
     <name>perf-spring-web</name>
+    <description>Spring Perf Web 核心模块，基于 Netty 的高性能 Web 框架核心实现</description>
+    <url>https://github.com/springperf/spring-web</url>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
