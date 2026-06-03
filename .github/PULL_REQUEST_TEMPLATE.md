@@ -4,7 +4,7 @@
 
 ## 关联 Issue
 
-关闭 #TODO
+关闭 #ISSUE_NUMBER
 
 ## 改动类型
 

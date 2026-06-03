@@ -192,7 +192,7 @@ APPENDIX: How to apply the Apache License to your work
     on the same "printed page" as the copyright notice for easier
     identification within third-party archives.
 
-        Copyright [TODO: 请替换为实际的版权所有者和年份，例如：2024 Your Name]
+        Copyright [2026 huangcanda]
 
         Licensed under the Apache License, Version 2.0 (the "License");
         you may not use this file except in compliance with the License.
