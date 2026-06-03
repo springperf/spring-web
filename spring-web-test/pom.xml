@@ -11,7 +11,7 @@
     <packaging>jar</packaging>
 
     <name>perf-spring-web-test</name>
-    <!-- TODO: 替换为实际项目地址 -->
+    <description>Spring Perf Web 测试模块，提供集成测试基类和测试工具</description>
     <url>https://github.com/springperf/spring-web</url>
 
     <properties>
@@ -26,6 +26,7 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -8,6 +8,8 @@
     </parent>
     <artifactId>spring-web-support-test</artifactId>
     <name>perf-spring-web-support-test</name>
+    <description>Spring Perf Web Support 测试模块，提供支持模块的集成测试基类</description>
+    <url>https://github.com/springperf/spring-web</url>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -26,6 +28,7 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>javax.servlet</groupId>

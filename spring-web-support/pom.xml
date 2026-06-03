@@ -10,6 +10,8 @@
     <packaging>jar</packaging>
 
     <name>perf-spring-web-support</name>
+    <description>Spring Perf Web 支持模块，提供 Servlet 兼容层等扩展功能</description>
+    <url>https://github.com/springperf/spring-web</url>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

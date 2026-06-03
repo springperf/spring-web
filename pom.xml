@@ -15,7 +15,8 @@
     <packaging>pom</packaging>
 
     <name>Spring Web Parent</name>
-    <description>基于 Netty 的高性能自定义SpringWeb 框架，SpringMVC 的替代方案</description>
+    <description>基于 Netty 的高性能自定义 SpringWeb 框架，SpringMVC 的替代方案</description>
+    <url>https://github.com/springperf/spring-web</url>
 
     <licenses>
         <license>
@@ -28,13 +29,10 @@
     <scm>
         <connection>scm:git:git://github.com/springperf/spring-web.git</connection>
         <developerConnection>scm:git:ssh://github.com/springperf/spring-web.git</developerConnection>
-        <url>https://github.com/springperf/web</url>
+        <url>https://github.com/springperf/spring-web</url>
         <tag>HEAD</tag>
     </scm>
 
-    <!-- TODO: 替换为实际开发者信息 -->
-    <!-- TODO: 发布到 Maven Central 时需配置 distributionManagement，参考 https://central.sonatype.org/publish/publish-guide/ -->
-    <!--
     <distributionManagement>
         <snapshotRepository>
             <id>ossrh</id>
@@ -45,7 +43,6 @@
             <url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2</url>
         </repository>
     </distributionManagement>
-    -->
 
     <developers>
         <developer>
@@ -64,6 +61,7 @@
 
     <properties>
         <java.version>8</java.version>
+        <spring-web.version>1.0.0</spring-web.version>
 
         <!-- 第三方依赖版本统一管理 -->
         <netty.version>4.1.110.Final</netty.version>
@@ -100,41 +98,68 @@
                         </annotationProcessorPaths>
                     </configuration>
                 </plugin>
-                <!-- TODO: 发布到 Maven Central 时需启用以下插件
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-source-plugin</artifactId>
-                    <executions>
-                        <execution>
-                            <id>attach-sources</id>
-                            <goals><goal>jar-no-fork</goal></goals>
-                        </execution>
-                    </executions>
-                </plugin>
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-javadoc-plugin</artifactId>
-                    <executions>
-                        <execution>
-                            <id>attach-javadocs</id>
-                            <goals><goal>jar</goal></goals>
-                        </execution>
-                    </executions>
-                </plugin>
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-gpg-plugin</artifactId>
-                    <executions>
-                        <execution>
-                            <id>sign-artifacts</id>
-                            <goals><goal>sign</goal></goals>
-                        </execution>
-                    </executions>
-                </plugin>
-                -->
             </plugins>
         </pluginManagement>
     </build>
+
+    <profiles>
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals><goal>jar-no-fork</goal></goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <configuration>
+                            <source>${java.version}</source>
+                            <failOnError>false</failOnError>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals><goal>jar</goal></goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <configuration>
+                            <keyname>${gpg.keyname}</keyname>
+                            <passphrase>${gpg.passphrase}</passphrase>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <goals><goal>sign</goal></goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.sonatype.plugins</groupId>
+                        <artifactId>nexus-staging-maven-plugin</artifactId>
+                        <version>1.7.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <serverId>ossrh</serverId>
+                            <nexusUrl>https://s01.oss.sonatype.org/</nexusUrl>
+                            <autoReleaseAfterClose>false</autoReleaseAfterClose>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
     <dependencyManagement>
         <dependencies>
@@ -142,17 +167,17 @@
             <dependency>
                 <groupId>io.github.springperf</groupId>
                 <artifactId>spring-web</artifactId>
-                <version>1.0.0</version>
+                <version>${spring-web.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.github.springperf</groupId>
                 <artifactId>spring-web-support</artifactId>
-                <version>1.0.0</version>
+                <version>${spring-web.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.github.springperf</groupId>
                 <artifactId>spring-boot-starter-web</artifactId>
-                <version>1.0.0</version>
+                <version>${spring-web.version}</version>
             </dependency>
 
             <!-- 第三方依赖 -->
