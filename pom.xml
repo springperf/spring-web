@@ -43,8 +43,8 @@
         <module>spring-web</module>
         <module>spring-web-support</module>
         <module>spring-boot-starter-web</module>
-        <module>spring-web-test</module>
-        <module>spring-web-support-test</module>
+        <!--<module>spring-web-test</module>
+        <module>spring-web-support-test</module>-->
     </modules>
 
     <properties>
@@ -146,6 +146,7 @@
                         <groupId>org.sonatype.central</groupId>
                         <artifactId>central-publishing-maven-plugin</artifactId>
                         <version>0.5.0</version>
+                        <extensions>true</extensions>
                         <configuration>
                             <publishingServerId>spring-web</publishingServerId>
                             <autoPublish>true</autoPublish>

@@ -2,8 +2,8 @@
 
 基于 Netty 的高性能 REST Web 框架，Spring MVC 的替代方案。
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](TODO)
-[![Maven Central](https://img.shields.io/maven-central/v/io.github.springperf/spring-web)](TODO)
+[![CI](https://github.com/springperf/spring-web/actions/workflows/ci.yml/badge.svg)](https://github.com/springperf/spring-web/actions/workflows/ci.yml)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.springperf/spring-web)](https://central.sonatype.com/artifact/io.github.springperf/spring-web)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE.md)
 
 ---
