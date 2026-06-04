@@ -1,6 +1,6 @@
 # Spring Web
 
-基于 Netty 的高性能 REST Web 框架，Spring MVC 的替代方案。
+基于 Netty 的高性能 Web 框架，Spring MVC 的替代方案。
 
 [![CI](https://github.com/springperf/spring-web/actions/workflows/ci.yml/badge.svg)](https://github.com/springperf/spring-web/actions/workflows/ci.yml)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.springperf/spring-web)](https://central.sonatype.com/artifact/io.github.springperf/spring-web)
