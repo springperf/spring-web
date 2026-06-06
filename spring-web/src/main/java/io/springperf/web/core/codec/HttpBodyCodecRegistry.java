@@ -58,8 +58,8 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
     }
 
     @Override
-    public void initComponentPhase1() throws Exception {
-        super.initComponentPhase1();
+    public void initComponentPhase2() throws Exception {
+        super.initComponentPhase2();
         initRealComponentList(converters, HttpBodyConverter.class);
         this.allSupportedMediaTypes = getAllSupportedMediaTypes(converters);
     }
@@ -238,5 +238,11 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
 
     public List<HttpBodyConverter> getConverters() {
         return converters;
+    }
+
+    public void registerConverter(HttpBodyConverter converter) {
+        registerWebComponent(converter);
+        initRealComponentList(converters, HttpBodyConverter.class);
+        this.allSupportedMediaTypes = getAllSupportedMediaTypes(converters);
     }
 }

@@ -114,7 +114,7 @@ public class MetaUtils {
                 }
             }
         }
-        if (defaultValue == ValueConstants.DEFAULT_NONE) {
+        if (ValueConstants.DEFAULT_NONE.equals(defaultValue)) {
             defaultValue = null;
         }
         return defaultValue;

@@ -47,6 +47,42 @@ class ReturnValueResolverRegistryTest {
     }
 
     @Test
+    void skipResolve_voidMethod_setsHandled() throws Exception {
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        when(resp.isHandled()).thenReturn(false);
+        Method method = TestController.class.getMethod("voidMethod");
+        MappingHandlerMethod mapping = new MappingHandlerMethod(new TestController(), method);
+
+        boolean skipped = registry.skipResolve(null, mapping, null, resp);
+
+        assertTrue(skipped);
+        verify(resp).setHandled();
+    }
+
+    @Test
+    void skipResolve_nullMethodReturnValue_nonVoid_doesNotSetHandled() {
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+
+        boolean skipped = registry.skipResolve(null, null, null, resp);
+
+        assertTrue(skipped);
+        verify(resp, never()).setHandled();
+    }
+
+    @Test
+    void skipResolve_voidMethod_handledResponse_doesNotDoubleSet() throws Exception {
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        when(resp.isHandled()).thenReturn(true);
+        Method method = TestController.class.getMethod("voidMethod");
+        MappingHandlerMethod mapping = new MappingHandlerMethod(new TestController(), method);
+
+        boolean skipped = registry.skipResolve(null, mapping, null, resp);
+
+        assertTrue(skipped);
+        verify(resp, never()).setHandled();
+    }
+
+    @Test
     void skipResolve_handledResponse_returnsTrue() {
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
         when(resp.isHandled()).thenReturn(true);
@@ -116,6 +152,19 @@ class ReturnValueResolverRegistryTest {
         registry.resolveReturnValue(null, null, req, resp);
 
         verify(resp, never()).setHandled();
+    }
+
+    @Test
+    void resolveReturnValue_voidMethod_setsHandled() throws Exception {
+        registry.initReturnValueResolver();
+        WebServerHttpRequest req = mock(WebServerHttpRequest.class);
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        Method method = TestController.class.getMethod("voidMethod");
+        MappingHandlerMethod mapping = new MappingHandlerMethod(new TestController(), method);
+
+        registry.resolveReturnValue(null, mapping, req, resp);
+
+        verify(resp).setHandled();
     }
 
     @Test
@@ -206,5 +255,6 @@ class ReturnValueResolverRegistryTest {
     static class TestController {
         public String handle() { return "ok"; }
         public String other() { return "other"; }
+        public void voidMethod() {}
     }
 }

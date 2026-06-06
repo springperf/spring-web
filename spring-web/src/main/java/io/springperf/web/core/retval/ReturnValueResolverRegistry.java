@@ -87,7 +87,13 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
     }
 
     protected boolean skipResolve(Object returnValue, MappingHandlerMethod mappingContext, WebServerHttpRequest req, WebServerHttpResponse resp) {
-        return returnValue == null || resp.isHandled();
+        if (returnValue == null) {
+            if (mappingContext != null && mappingContext.getBridgedMethod().getReturnType() == void.class && !resp.isHandled()) {
+                resp.setHandled();
+            }
+            return true;
+        }
+        return resp.isHandled();
     }
 
 

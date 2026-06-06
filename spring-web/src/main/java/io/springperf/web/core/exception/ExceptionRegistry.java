@@ -31,15 +31,17 @@ public class ExceptionRegistry extends WebComponentContainer {
     }
 
     @Override
-    public void initComponentPhase1() throws Exception {
-        super.initComponentPhase1();
+    public void initComponentPhase2() throws Exception {
+        super.initComponentPhase2();
         initRealComponentList(resolvers, HandlerExceptionResolver.class);
     }
 
     public void handle(Throwable ex, WebServerHttpRequest req, WebServerHttpResponse resp) {
         try {
             boolean handled = doHandle(ex, req, resp);
-            if (!handled) {
+            if (handled) {
+                resp.setHandled();
+            } else {
                 resp.sendError(INTERNAL_SERVER_ERROR, ex.getClass().getSimpleName() + ": " + ex.getMessage());
             }
         } catch (Exception e) {
@@ -56,5 +58,10 @@ public class ExceptionRegistry extends WebComponentContainer {
             }
         }
         return false;
+    }
+
+    public void addResolver(HandlerExceptionResolver resolver) {
+        registerWebComponent(resolver);
+        initRealComponentList(resolvers, HandlerExceptionResolver.class);
     }
 }

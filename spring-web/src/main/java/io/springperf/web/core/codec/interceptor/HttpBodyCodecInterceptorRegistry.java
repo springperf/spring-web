@@ -47,8 +47,8 @@ public class HttpBodyCodecInterceptorRegistry extends WebComponentContainer {
     }
 
     @Override
-    public void initComponentPhase1() throws Exception {
-        super.initComponentPhase1();
+    public void initComponentPhase2() throws Exception {
+        super.initComponentPhase2();
         initRealComponentList((List) codecInterceptors, WebComponentControllerAdviceBean.class);
     }
 

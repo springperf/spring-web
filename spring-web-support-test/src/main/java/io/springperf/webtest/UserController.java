@@ -69,5 +69,10 @@ public class UserController {
     public String protectedEndpoint() {
         return "authorized";
     }
+
+    @GetMapping("/void-test")
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
+    public void voidReturn() {
+    }
 }
 

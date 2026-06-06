@@ -7,24 +7,19 @@ import io.springperf.web.core.mapping.PathMappingContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.actuate.autoconfigure.endpoint.web.CorsEndpointProperties;
 import org.springframework.boot.actuate.autoconfigure.endpoint.web.WebEndpointProperties;
-import org.springframework.boot.actuate.endpoint.web.EndpointMediaTypes;
-import org.springframework.boot.actuate.endpoint.web.ExposableWebEndpoint;
-import org.springframework.boot.actuate.endpoint.web.WebOperation;
-import org.springframework.boot.actuate.endpoint.web.WebOperationRequestPredicate;
-import org.springframework.boot.actuate.endpoint.web.WebEndpointHttpMethod;
-import org.springframework.boot.actuate.endpoint.web.WebEndpointsSupplier;
+import org.springframework.boot.actuate.endpoint.web.*;
 import org.springframework.web.cors.CorsConfiguration;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -44,7 +39,7 @@ class ManagementConfigPropertiesTest {
     }
 
     @Test
-    void basePath_customValue_isUsedForRouteValidation() {
+    void basePath_customValue_isUsedForRouteValidation() throws Exception {
         // Given: custom base-path "/management"
         WebEndpointProperties properties = new WebEndpointProperties();
         properties.setBasePath("/management");
@@ -59,10 +54,10 @@ class ManagementConfigPropertiesTest {
         setupEndpoint("health", predicate);
         when(endpointsSupplier.getEndpoints()).thenReturn(Collections.singletonList(endpoint));
 
-        PerfEndpointHandlerMapping mapping = new PerfEndpointHandlerMapping(
-                endpointsSupplier, EndpointMediaTypes.DEFAULT, properties, webContext, null, infrastructure);
-
-        mapping.afterPropertiesSet();
+        ActuatorEndpointHandlerMapping mapping = new ActuatorEndpointHandlerMapping(
+                endpointsSupplier, EndpointMediaTypes.DEFAULT, properties, null, infrastructure);
+        mapping.initWithWebContext(webContext);
+        mapping.initComponentPhase1();
 
         // Then: 路由应注册在 /management/health 而非 /actuator/health
         List<String> paths = registry.getMappingContextList().stream()
@@ -76,7 +71,7 @@ class ManagementConfigPropertiesTest {
     }
 
     @Test
-    void corsConfiguration_isBoundAndPassedToCorsRegistry() {
+    void corsConfiguration_isBoundAndPassedToCorsRegistry() throws Exception {
         // Given: simulated CorsRegistry
         CorsRegistry corsRegistry = mock(CorsRegistry.class);
         when(webContext.getWebComponent(CorsRegistry.class)).thenReturn(corsRegistry);
@@ -95,10 +90,10 @@ class ManagementConfigPropertiesTest {
                 Collections.emptyList(), Collections.singletonList("application/json")));
         when(endpointsSupplier.getEndpoints()).thenReturn(Collections.singletonList(endpoint));
 
-        PerfEndpointHandlerMapping mapping = new PerfEndpointHandlerMapping(
-                endpointsSupplier, EndpointMediaTypes.DEFAULT, properties, webContext, corsProps, null);
-
-        mapping.afterPropertiesSet();
+        ActuatorEndpointHandlerMapping mapping = new ActuatorEndpointHandlerMapping(
+                endpointsSupplier, EndpointMediaTypes.DEFAULT, properties, corsProps, null);
+        mapping.initWithWebContext(webContext);
+        mapping.initComponentPhase1();
 
         // Then: CorsRegistry.addActuatorCorsConfiguration 被调用
         verify(corsRegistry, times(1))
@@ -106,7 +101,7 @@ class ManagementConfigPropertiesTest {
     }
 
     @Test
-    void basePath_defaultIsActuator() {
+    void basePath_defaultIsActuator() throws Exception {
         // Given: default base-path (not set)
         WebEndpointProperties properties = new WebEndpointProperties();
 
@@ -119,10 +114,10 @@ class ManagementConfigPropertiesTest {
         setupEndpoint("health", predicate);
         when(endpointsSupplier.getEndpoints()).thenReturn(Collections.singletonList(endpoint));
 
-        PerfEndpointHandlerMapping mapping = new PerfEndpointHandlerMapping(
-                endpointsSupplier, EndpointMediaTypes.DEFAULT, properties, webContext, null, infrastructure);
-
-        mapping.afterPropertiesSet();
+        ActuatorEndpointHandlerMapping mapping = new ActuatorEndpointHandlerMapping(
+                endpointsSupplier, EndpointMediaTypes.DEFAULT, properties, null, infrastructure);
+        mapping.initWithWebContext(webContext);
+        mapping.initComponentPhase1();
 
         // Then: 默认路由为 /actuator/health
         List<String> paths = registry.getMappingContextList().stream()

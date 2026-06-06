@@ -8,9 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Objects;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class CoreFeaturesParamReturnTest extends BaseE2ETest {
 
@@ -94,6 +92,17 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
             assertEquals(200, resp.code());
             String body = resp.body().string();
             assertEquals("Hello, Stream!", body);
+        }
+    }
+
+    @Test
+    void voidReturn_returns204() throws Exception {
+        Request req = new Request.Builder()
+                .url(baseUrl + "/void")
+                .post(RequestBody.create(MediaType.parse("text/plain"), ""))
+                .build();
+        try (Response resp = CLIENT.newCall(req).execute()) {
+            assertEquals(204, resp.code());
         }
     }
 }

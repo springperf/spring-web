@@ -12,11 +12,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.core.convert.support.DefaultConversionService;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AbstractNamedValueNullableResolverTest {
@@ -71,7 +73,7 @@ class AbstractNamedValueNullableResolverTest {
         MethodParameter mp = new MethodParameter(method, 0);
 
         AbstractNamedValueNullableResolver resolver = createResolver(mp, null, true, null);
-        assertThrows(IllegalStateException.class,
+        assertThrows(ResponseStatusException.class,
                 () -> resolver.resolveArgument(request, response));
     }
 
@@ -85,10 +87,10 @@ class AbstractNamedValueNullableResolverTest {
         AbstractNamedValueNullableResolver resolver = createResolver(mp, null, true, null);
         try {
             resolver.resolveArgument(request, response);
-            fail("Expected IllegalStateException");
-        } catch (IllegalStateException e) {
-            assertTrue(e.getMessage().contains("Missing argument"));
-            assertTrue(e.getMessage().contains("String"));
+            fail("Expected ResponseStatusException");
+        } catch (ResponseStatusException e) {
+            assertEquals(org.springframework.http.HttpStatus.BAD_REQUEST, e.getStatus());
+            assertTrue(e.getReason().contains("Missing required argument")); assertTrue(e.getReason().contains("String"));
         }
     }
 

@@ -12,23 +12,20 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.util.concurrent.ListenableFuture;
 import org.springframework.util.concurrent.SettableListenableFuture;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.context.request.async.DeferredResult;
+import org.springframework.web.context.request.async.WebAsyncTask;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CompletionStage;
 
 @RestController
 @RequestMapping("/core")
@@ -167,6 +164,14 @@ public class CoreFeaturesController {
         throw new ResourceNotFoundException();
     }
 
+    // ==================== void 返回值 ====================
+
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PostMapping("/void")
+    public void voidReturn() {
+        // void method - should return 204 No Content
+    }
+
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, Object>> handleControllerException(IllegalStateException e) {
         Map<String, Object> m = new HashMap<>();
@@ -224,6 +229,121 @@ public class CoreFeaturesController {
         Map<String, Object> m = new HashMap<>();
         m.put("name", obj.getName());
         m.put("age", obj.getAge());
+        return m;
+    }
+
+    // ==================== @RequestParam 高级特性 ====================
+
+    @GetMapping("/param-advanced")
+    public Map<String, Object> paramAdvanced(
+            @RequestParam("req") String required,
+            @RequestParam(value = "opt", required = false) String optional,
+            @RequestParam(value = "def", defaultValue = "defaultVal") String withDefault) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("required", required);
+        m.put("optional", optional);
+        m.put("withDefault", withDefault);
+        return m;
+    }
+
+    // ==================== @RequestHeader 高级特性 ====================
+
+    @GetMapping("/header-advanced")
+    public Map<String, Object> headerAdvanced(
+            @RequestHeader("X-Required") String required,
+            @RequestHeader(value = "X-Optional", required = false) String optional,
+            @RequestHeader(value = "X-With-Default", defaultValue = "defaultHeaderVal") String withDefault) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("required", required);
+        m.put("optional", optional);
+        m.put("withDefault", withDefault);
+        return m;
+    }
+
+    // ==================== Consumes/Produces 内容协商 ====================
+
+    @PostMapping(value = "/consumes-json", consumes = "application/json")
+    public String consumesJson(@RequestBody String body) {
+        return "json:" + body;
+    }
+
+    @PostMapping(value = "/consumes-xml", consumes = "application/xml")
+    public String consumesXml(@RequestBody String body) {
+        return "xml:" + body;
+    }
+
+    @GetMapping(value = "/produces-json", produces = "application/json")
+    public Map<String, Object> producesJson() {
+        Map<String, Object> m = new HashMap<>();
+        m.put("format", "json");
+        return m;
+    }
+
+    @GetMapping(value = "/produces-xml", produces = "application/xml")
+    public String producesXml() {
+        return "<response>xml</response>";
+    }
+
+    // ==================== Headers 条件匹配 ====================
+
+    @GetMapping(value = "/headers-custom", headers = "X-Custom=myvalue")
+    public String headersCustom() {
+        return "header-matched";
+    }
+
+    // ==================== Params 条件不匹配（负向） ====================
+
+    @GetMapping(value = "/params-mismatch", params = "x=y")
+    public String paramsMismatch() {
+        return "params-matched";
+    }
+
+    // ==================== 返回值高级 ====================
+
+    @GetMapping("/file-download")
+    public File fileDownload() {
+        return new File("pom.xml");
+    }
+
+    @GetMapping("/completion-stage")
+    public CompletionStage<String> completionStage() {
+        return java.util.concurrent.CompletableFuture.supplyAsync(() -> "completion-stage-result");
+    }
+
+    @GetMapping("/async-task")
+    public WebAsyncTask<String> asyncTask() {
+        return new WebAsyncTask<>(5000L, () -> {
+            Thread.sleep(50);
+            return "async-task-result";
+        });
+    }
+
+    // ==================== 异步超时 ====================
+
+    @GetMapping("/async-timeout")
+    public WebAsyncTask<String> asyncTimeout() {
+        return new WebAsyncTask<>(100L, () -> {
+            Thread.sleep(500);
+            return "too-late";
+        });
+    }
+
+    // ==================== 日期序列化 ====================
+
+    @GetMapping("/date-format")
+    public Map<String, Object> dateFormat() {
+        Map<String, Object> m = new HashMap<>();
+        m.put("date", new Date());
+        m.put("message", "date-test");
+        return m;
+    }
+
+    // ==================== 拦截器生命周期测试 ====================
+
+    @GetMapping("/lifecycle/check")
+    public Map<String, Object> lifecycleCheck() {
+        Map<String, Object> m = new HashMap<>();
+        m.put("status", "ok");
         return m;
     }
 }

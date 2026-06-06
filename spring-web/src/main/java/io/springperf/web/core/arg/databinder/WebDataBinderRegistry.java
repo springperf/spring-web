@@ -53,7 +53,9 @@ public class WebDataBinderRegistry extends BaseWebComponent {
             }
         }
         defaultConversionService = WebComponentWrapperUtils.getComponentWithDefault(webContext, ConversionService.class, new DefaultFormattingConversionService());
-        defaultValidator = webContext.getBeanFromCtx(Validator.class);
+        if (defaultValidator == null) {
+            defaultValidator = webContext.getBeanFromCtx(Validator.class);
+        }
         messageCodesResolver = webContext.getBeanFromCtx(MessageCodesResolver.class);
     }
 
@@ -140,5 +142,13 @@ public class WebDataBinderRegistry extends BaseWebComponent {
 
     public MessageCodesResolver getMessageCodesResolver() {
         return messageCodesResolver;
+    }
+
+    /**
+     * Set a default validator to use for model data validation.
+     * Overrides any validator discovered from the Spring context.
+     */
+    public void setDefaultValidator(Validator validator) {
+        this.defaultValidator = validator;
     }
 }

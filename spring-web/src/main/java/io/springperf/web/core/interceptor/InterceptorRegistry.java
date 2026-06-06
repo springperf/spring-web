@@ -29,8 +29,8 @@ public class InterceptorRegistry extends WebComponentContainer {
     }
 
     @Override
-    public void initComponentPhase1() throws Exception {
-        super.initComponentPhase1();
+    public void initComponentPhase2() throws Exception {
+        super.initComponentPhase2();
         initRealComponentList(registrations, InterceptorRegistration.class);
         runtimeMappingInterceptors.clear();
         registrations.stream().map(this::getRuntimeMappingInterceptor).forEach(runtimeMappingInterceptors::add);

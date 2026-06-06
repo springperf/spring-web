@@ -10,7 +10,6 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
-import io.netty.handler.ssl.NotSslRecordException;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.util.concurrent.Future;
@@ -61,6 +60,9 @@ public class ManagementNettyHttpServer implements SmartLifecycle {
 
     @Override
     public void start() {
+        // 触发 WebContext 生命周期（WebComponent 初始化），AtomicBoolean 保证幂等
+        webContext.startLifecycle();
+
         bossGroup = new NioEventLoopGroup(1);
         workerGroup = new NioEventLoopGroup();
 

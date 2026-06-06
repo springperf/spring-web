@@ -1,8 +1,8 @@
 package io.springperf.web.context;
 
 import io.springperf.web.core.DispatcherHandler;
-import lombok.Data;
 import io.springperf.web.util.WebUtils;
+import lombok.Data;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
@@ -14,6 +14,7 @@ import org.springframework.util.ObjectUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Central web application context that holds the Spring {@link ApplicationContext},
@@ -31,19 +32,42 @@ public class WebContext extends WebComponentContainer implements InitializingBea
 
     private DispatcherHandler dispatcherHandler;
 
+    private final AtomicBoolean lifecycleStarted = new AtomicBoolean(false);
+
     public WebContext(DispatcherHandler dispatcherHandler, ApplicationProperties props) {
         this.dispatcherHandler = dispatcherHandler;
         this.props = props;
         this.contextPath = WebUtils.formatPath(props.get(PropertiesConstant.CONTEXT_PATH, "/"));
+        this.webContext = this;
         registerWebComponent(dispatcherHandler);
     }
 
+    /**
+     * No-op: lifecycle is now deferred to {@link #startLifecycle()},
+     * triggered by {@link io.springperf.web.server.NettyHttpServer#start()}.
+     */
     @Override
-    public void afterPropertiesSet() throws Exception {
-        this.initWithWebContext(this);
-        this.initComponentPhase1();
-        this.initComponentPhase2();
-        this.initComponentPhase3();
+    public void afterPropertiesSet() {
+    }
+
+    /**
+     * Trigger the full WebComponent lifecycle: init contexts, then Phase 1/2/3.
+     * <p>Called from {@link io.springperf.web.server.NettyHttpServer#start()} after
+     * the Spring context is fully loaded and all beans (including the bridge)
+     * have been registered as WebComponents.</p>
+     */
+    public void startLifecycle() {
+        if (!lifecycleStarted.compareAndSet(false, true)) {
+            return;
+        }
+        try {
+            this.initWithWebContext(this);
+            this.initComponentPhase1();
+            this.initComponentPhase2();
+            this.initComponentPhase3();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to start WebContext lifecycle", e);
+        }
     }
 
     @Override

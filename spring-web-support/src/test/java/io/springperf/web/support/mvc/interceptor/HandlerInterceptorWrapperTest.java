@@ -152,11 +152,11 @@ class HandlerInterceptorWrapperTest {
     }
 
     @Test
-    void constructor_acceptsNullRequestAttributes() throws Exception {
-        // Don't set up RequestContextHolder - should produce NPE when trying to use it
+    void preHandle_nullRequestAttributes_returnsTrue() throws Exception {
+        // Don't set up RequestContextHolder - wrapper should log a warning and return true
         HandlerInterceptorWrapper wrapper = new HandlerInterceptorWrapper(springInterceptor);
 
-        assertThrows(NullPointerException.class,
-                () -> wrapper.preHandle(serverRequest, serverResponse, "handler"));
+        boolean result = wrapper.preHandle(serverRequest, serverResponse, "handler");
+        assertTrue(result, "preHandle should return true when RequestAttributes is null");
     }
 }

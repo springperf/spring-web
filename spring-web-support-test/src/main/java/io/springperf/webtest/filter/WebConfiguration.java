@@ -14,4 +14,5 @@ public class WebConfiguration {
         registration.addUrlPatterns("/health");
         return registration;
     }
+
 }

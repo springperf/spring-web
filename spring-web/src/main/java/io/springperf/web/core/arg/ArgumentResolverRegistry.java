@@ -222,4 +222,8 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
         registerWebComponent(provider);
         initRealComponentList(staticArgumentResolverProviders, StaticArgumentResolverProvider.class);
     }
+
+    public WebDataBinderRegistry getWebDataBinderRegistry() {
+        return webDataBinderRegistry;
+    }
 }

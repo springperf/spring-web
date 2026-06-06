@@ -1,13 +1,13 @@
 package io.springperf.web.context;
 
 import io.springperf.web.core.DispatcherHandler;
-import static io.springperf.web.context.PropertiesConstant.CONTEXT_PATH;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationContext;
 
 import java.util.Collections;
 
+import static io.springperf.web.context.PropertiesConstant.CONTEXT_PATH;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -47,22 +47,22 @@ class WebContextTest {
     }
 
     @Test
-    void afterPropertiesSet_triggersFullLifecycle() throws Exception {
-        webContext.afterPropertiesSet();
+    void startLifecycle_triggersFullLifecycle() {
+        webContext.startLifecycle();
         // Lifecycle should have run through phase3
         assertNotNull(webContext.getWebContext());
     }
 
     @Test
-    void afterPropertiesSet_initsDispatcherHandler() throws Exception {
-        webContext.afterPropertiesSet();
+    void startLifecycle_initsDispatcherHandler() {
+        webContext.startLifecycle();
         // DispatcherHandler's initWithWebContext should have been called during init
         verify(handler, atLeast(1)).initWithWebContext(webContext);
     }
 
     @Test
     void destroy_triggersDestroy() throws Exception {
-        webContext.afterPropertiesSet();
+        webContext.startLifecycle();
 
         LifecycleWebComponent extra = mock(LifecycleWebComponent.class);
         when(extra.getComponentName()).thenReturn("extra");
@@ -117,9 +117,9 @@ class WebContextTest {
     }
 
     @Test
-    void lifecycle_doubleInitIsIdempotent() throws Exception {
-        webContext.afterPropertiesSet();
-        webContext.afterPropertiesSet();
-        // Should not throw - second call is no-op due to state machine
+    void lifecycle_doubleInitIsIdempotent() {
+        webContext.startLifecycle();
+        webContext.startLifecycle();
+        // Should not throw - second call is no-op due to AtomicBoolean guard
     }
 }

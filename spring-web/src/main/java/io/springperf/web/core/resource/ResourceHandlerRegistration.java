@@ -60,7 +60,7 @@ public class ResourceHandlerRegistration implements WebComponent {
         return cacheControl;
     }
 
-    protected List<PathMappingContext> buildPathMappingContext() {
+    public List<PathMappingContext> buildPathMappingContext() {
         List<PathMappingContext> pathMappingContexts = new ArrayList<>();
         ResourceRequestHandler resourceRequestHandler = getResourceRequestHandler();
         for (String pathPattern : pathPatterns) {

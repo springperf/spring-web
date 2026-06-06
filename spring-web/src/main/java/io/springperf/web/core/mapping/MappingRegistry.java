@@ -97,7 +97,7 @@ public class MappingRegistry extends WebComponentContainer {
         optimizers.add(0, fallback);
     }
 
-    public void initComponentPhase2() {
+    public void initComponentPhase3() {
         optimizeMapping(mappingContextList);
     }
 
@@ -114,7 +114,7 @@ public class MappingRegistry extends WebComponentContainer {
         for (String path : paths) {
             String fullPath = WebUtils.pathJoin(prefix, path);
             PathMappingContext methodMappingContext = new PathMappingContext(hm, matchers, fullPath);
-            mappingContextList.add(methodMappingContext);
+            registerMapping(methodMappingContext);
             log.info("Mapped {} -> {}#{}", methodMappingContext, bean.getClass().getSimpleName(), method.getName());
         }
     }

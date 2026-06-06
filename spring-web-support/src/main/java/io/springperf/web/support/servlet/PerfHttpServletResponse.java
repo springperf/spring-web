@@ -1,7 +1,7 @@
 package io.springperf.web.support.servlet;
 
-import io.springperf.web.http.WebServerHttpResponse;
 import io.netty.handler.codec.http.HttpHeaders;
+import io.springperf.web.http.WebServerHttpResponse;
 import org.springframework.http.HttpStatus;
 
 import javax.servlet.ServletOutputStream;
@@ -45,7 +45,14 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
         };
     }
 
-    @Override public PrintWriter getWriter() throws IOException { return new PrintWriter(new OutputStreamWriter(response.getBody(), getCharacterEncoding()), true); }
+    private PrintWriter cachedWriter;
+
+    @Override public PrintWriter getWriter() throws IOException {
+        if (cachedWriter == null) {
+            cachedWriter = new PrintWriter(new OutputStreamWriter(response.getBody(), getCharacterEncoding()), true);
+        }
+        return cachedWriter;
+    }
     @Override public void flushBuffer() { try { response.flush(); } catch (IOException e) { throw new RuntimeException(e); } }
     @Override public int getBufferSize() { return response.getBufferSize(); }
     @Override public void setBufferSize(int size) { }

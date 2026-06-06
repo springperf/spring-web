@@ -82,6 +82,7 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
     public WebContext getWebContext() { return webContext; }
     public void setWriteRespEventListener(WriteRespEventListener writeRespEventListener) { this.writeRespEventListener = writeRespEventListener; }
     public boolean setHandled() { return handled.compareAndSet(false, true); }
+    public void resetHandled() { handled.set(false); }
 
     protected boolean setCommitted() {
         setHandled();

@@ -14,6 +14,7 @@ import io.springperf.web.core.mapping.MappingResult;
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.core.pool.BizPoolRegistry;
 import io.springperf.web.core.retval.ReturnValueResolverRegistry;
+import io.springperf.web.http.BaseWebServerHttpResponse;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -149,11 +150,13 @@ public class DispatcherHandler extends BaseWebComponent {
         try {
             // cors
             if (corsRegistry.corsHandle(req, resp)) {
+                resp.flush();
                 return;
             }
 
             // --- preHandle ---
             if (!interceptorRegistry.preHandle(req, resp)) {
+                resp.flush();
                 return;
             }
 
@@ -216,6 +219,13 @@ public class DispatcherHandler extends BaseWebComponent {
     }
 
     public void asyncDispatch(WebServerHttpRequest req, WebServerHttpResponse resp, Object concurrentResult) {
+        // Reset the handled flag — the initial request processing marked the response
+        // as handled when the Callable/DeferredResult return value was resolved, but
+        // the actual body hasn't been written yet.
+        if (resp instanceof BaseWebServerHttpResponse) {
+            ((BaseWebServerHttpResponse) resp).resetHandled();
+        }
+
         Object result = null;
         Throwable exception = null;
         try {
@@ -225,7 +235,10 @@ public class DispatcherHandler extends BaseWebComponent {
                 exceptionRegistry.handle(exception, req, resp);
             } else {
                 result = concurrentResult;
-                returnValueResolverRegistry.resolveReturnValue(concurrentResult, PathMappingContext.get(req), req, resp);
+                PathMappingContext ctx = PathMappingContext.get(req);
+                if (ctx != null) {
+                    returnValueResolverRegistry.resolveReturnValue(concurrentResult, ctx, req, resp);
+                }
             }
         } catch (Throwable e) {
             log.error(e.getMessage(), e);

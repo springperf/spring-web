@@ -6,12 +6,16 @@ import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.support.servlet.PerfHttpServletRequest;
 import io.springperf.web.support.servlet.PerfHttpServletResponse;
 import io.springperf.web.support.servlet.context.ServletAdapterContext;
-import org.springframework.core.annotation.Order;
+import org.springframework.core.Ordered;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
-@Order(0)
 public class SupportDispatcherHandler extends DispatcherHandler {
+
+    @Override
+    public int getOrder() {
+        return Ordered.LOWEST_PRECEDENCE - 30000;
+    }
 
     @Override
     protected boolean initContextHolders(WebServerHttpRequest req, WebServerHttpResponse resp) {

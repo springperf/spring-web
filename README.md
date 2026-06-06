@@ -30,7 +30,7 @@ Spring Web 是一个基于 **Netty** 构建的高性能 Web 框架，定位为 S
 <dependency>
     <groupId>io.github.springperf</groupId>
     <artifactId>spring-boot-starter-web</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
 </dependency>
 ```
 

@@ -15,15 +15,20 @@ import org.springframework.web.context.request.async.*;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 
 public class AsyncSupportRegistry extends WebComponentContainer {
-    private List<CallableProcessingInterceptor> callableInterceptors = new ArrayList<>();
-    private List<DeferredResultProcessingInterceptor> deferredResultInterceptors = new ArrayList<>();
+    private final List<CallableProcessingInterceptor> callableInterceptors = new ArrayList<>();
+    private final List<DeferredResultProcessingInterceptor> deferredResultInterceptors = new ArrayList<>();
 
     private JsonConverter jsonConverter;
 
     private AsyncTaskExecutor defaultTaskExecutor;
+
+    private long defaultTimeout = 30000L; // 30 seconds, matching Spring MVC default
 
     @Override
     public void initWithWebContext(WebContext webContext) {
@@ -38,19 +43,34 @@ public class AsyncSupportRegistry extends WebComponentContainer {
     }
 
     @Override
-    public void initComponentPhase1() throws Exception {
-        super.initComponentPhase1();
+    public void initComponentPhase2() throws Exception {
         WebComponentWrapperUtils.initRealComponentList(this, callableInterceptors, CallableProcessingInterceptor.class);
         WebComponentWrapperUtils.initRealComponentList(this, deferredResultInterceptors, DeferredResultProcessingInterceptor.class);
-    }
-
-    @Override
-    public void initComponentPhase2() throws Exception {
         BizPoolRegistry bizPoolRegistry = webContext.getWebComponent(BizPoolRegistry.class);
         if (bizPoolRegistry != null) {
             ExecutorService defaultPool = bizPoolRegistry.getDefaultPool();
             defaultTaskExecutor = defaultPool != null ? new ConcurrentTaskExecutor(defaultPool) : null;
         }
+    }
+
+    public void setDefaultTimeout(long defaultTimeout) {
+        this.defaultTimeout = defaultTimeout;
+    }
+
+    public long getDefaultTimeout() {
+        return defaultTimeout;
+    }
+
+    public void setTaskExecutor(AsyncTaskExecutor taskExecutor) {
+        this.defaultTaskExecutor = taskExecutor;
+    }
+
+    public void addCallableInterceptors(List<CallableProcessingInterceptor> interceptors) {
+        this.callableInterceptors.addAll(interceptors);
+    }
+
+    public void addDeferredResultInterceptors(List<DeferredResultProcessingInterceptor> interceptors) {
+        this.deferredResultInterceptors.addAll(interceptors);
     }
 
     public JsonConverter getJsonConverter() {
@@ -66,6 +86,8 @@ public class AsyncSupportRegistry extends WebComponentContainer {
         Long timeout = webAsyncTask.getTimeout();
         if (timeout != null) {
             asyncWebRequest.setTimeout(timeout);
+        } else {
+            asyncWebRequest.setTimeout(defaultTimeout);
         }
         AsyncTaskExecutor executor = webAsyncTask.getExecutor();
         if (executor == null) {

@@ -13,6 +13,7 @@ import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.core.retval.ReturnValueResolverRegistry;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.MethodParameter;
 import org.springframework.lang.Nullable;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -26,7 +27,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import lombok.extern.slf4j.Slf4j;
 
 import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 
@@ -65,8 +65,8 @@ public class ExceptionHandlerExceptionResolver extends WebComponentContainer imp
     }
 
     @Override
-    public void initComponentPhase1() throws Exception {
-        super.initComponentPhase1();
+    public void initComponentPhase2() throws Exception {
+        super.initComponentPhase2();
         initRealComponentList(exceptionHandlerAdvices, ExceptionHandlerAdvice.class);
     }
 

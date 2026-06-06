@@ -21,8 +21,8 @@ public class ResourceHandlerRegistry extends WebComponentContainer {
     }
 
     @Override
-    public void initComponentPhase1() throws Exception {
-        super.initComponentPhase1();
+    public void initComponentPhase2() throws Exception {
+        super.initComponentPhase2();
         initRealComponentList(registrations, ResourceHandlerRegistration.class);
         for (ResourceHandlerRegistration registration : registrations) {
             for (PathMappingContext mappingContext : registration.buildPathMappingContext()) {

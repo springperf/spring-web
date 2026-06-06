@@ -51,6 +51,8 @@ public abstract class AbstractNamedValueNullableResolver extends AbstractNamedVa
     }
 
     protected void handleMissingValue(String name, Class<?> paramType) {
-        throw new IllegalStateException("Missing argument '" + name + "' for method parameter of type " + paramType.getSimpleName());
+        throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.BAD_REQUEST,
+                "Missing required argument '" + name + "' for method parameter of type " + paramType.getSimpleName());
     }
 }

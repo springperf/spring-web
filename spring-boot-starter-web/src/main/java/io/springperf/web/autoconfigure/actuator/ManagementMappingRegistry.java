@@ -12,7 +12,7 @@ import java.util.List;
  * <p>继承 {@link MappingRegistry} 复用其路由优化管线（optimizer pipeline），
  * 但覆盖 {@link #initComponentPhase1()} 和 {@link #initComponentPhase2()}，
  * 不从 ApplicationContext 扫描 {@code @Controller}，不参与主 WebContext 生命周期。</p>
- * <p>路由由 {@link PerfEndpointHandlerMapping#afterPropertiesSet()} 通过
+ * <p>路由由 {@link ActuatorEndpointHandlerMapping#afterPropertiesSet()} 通过
  * {@link #registerMapping(PathMappingContext)} 注入，注册完成后显式调用
  * {@link #buildOptimizerPipeline()} 触发优化。</p>
  */

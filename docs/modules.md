@@ -199,7 +199,7 @@ destroyComponent()     → 资源释放
 <dependency>
     <groupId>io.github.springperf</groupId>
     <artifactId>spring-web-support</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
 </dependency>
 ```
 
@@ -209,7 +209,7 @@ destroyComponent()     → 资源释放
 
 ### 核心自动配置
 
-`PerfAutoConfiguration` 自动装配：
+`SpringWebAutoConfiguration` 自动装配：
 
 - `ApplicationProperties` — 从 `Environment` 读取配置
 - `WebContext` — 应用上下文，驱动组件生命周期
@@ -218,15 +218,15 @@ destroyComponent()     → 资源释放
 
 ### Support 自动配置
 
-`PerfSupportAutoConfiguration` 在 `spring-web-support` 存在时自动装配支持模块组件。
+`SpringWebSupportAutoConfiguration` 在 `spring-web-support` 存在时自动装配支持模块组件。
 
 ### Actuator 自动配置
 
-`PerfEndpointAutoConfiguration` 在 Actuator 存在时自动配置端点：
+`ActuatorEndpointAutoConfiguration` 在 Actuator 存在时自动配置端点：
 - 将 `ExposableWebEndpoint` 注册为框架路由
 - 支持独立管理端口（`management.server.port`）
 - 独立的 Management Netty 服务器
 
 ### 应用上下文
 
-`PerfWebServerApplicationContextFactory` 强制使用 `AnnotationConfigApplicationContext`，替代 Spring Boot 默认的 `AnnotationConfigServletWebServerApplicationContext`。
+`WebServerApplicationContextFactory` 强制使用 `AnnotationConfigApplicationContext`，替代 Spring Boot 默认的 `AnnotationConfigServletWebServerApplicationContext`。
