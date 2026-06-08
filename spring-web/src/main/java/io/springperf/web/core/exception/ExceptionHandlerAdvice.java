@@ -39,6 +39,9 @@ public class ExceptionHandlerAdvice extends BaseWebComponent {
 
     /**
      * Returns whether this advice applies to the specified bean type.
+     *
+     * @param beanType the bean type to check
+     * @return {@code true} if this advice applies to the given bean type
      */
     public boolean isApplicableToBeanType(Class<?> beanType) {
         if (adviceBean == null) {
@@ -51,6 +54,7 @@ public class ExceptionHandlerAdvice extends BaseWebComponent {
      * Resolves and returns the {@link MappingHandlerMethod} for the given exception.
      * <p>Resolved handler methods are cached for subsequent invocations.
      *
+     * @param exception the exception to resolve a handler for
      * @return the resolved handler method, or {@code null} if no suitable handler exists
      */
     public MappingHandlerMethod resolveHandlerMethod(Throwable exception) {
@@ -73,6 +77,8 @@ public class ExceptionHandlerAdvice extends BaseWebComponent {
 
     /**
      * Returns the underlying advice bean instance, resolving it lazily if needed.
+     *
+     * @return the resolved advice bean
      */
     public Object getRealBean() {
         if (realBean == null) {

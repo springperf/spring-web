@@ -19,7 +19,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.IOException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -338,6 +340,88 @@ class DispatcherHandlerTest {
     @Test
     void initWithWebContext_setsWebContext() {
         assertNotNull(handler.getWebContext());
+    }
+
+    // ==================== handleException() ====================
+
+    @Test
+    void handleException_exceptionRegistryThrows_doesNotPropagate() {
+        WebServerHttpRequest req = createRequest();
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        RuntimeException originalEx = new RuntimeException("original");
+        doThrow(new RuntimeException("handler failed")).when(exceptionRegistry).handle(any(), any(), any());
+
+        assertDoesNotThrow(() -> handler.handleException(originalEx, req, resp));
+        verify(exceptionRegistry).handle(originalEx, req, resp);
+    }
+
+    // ==================== doHandle() - error paths ====================
+
+    @Test
+    void doHandle_preHandleThrowsException_caughtByExceptionRegistry() throws Exception {
+        WebServerHttpRequest req = createRequest();
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        PathMappingContext mappingContext = mock(PathMappingContext.class);
+        when(corsRegistry.corsHandle(req, resp)).thenReturn(false);
+        RuntimeException ex = new RuntimeException("preHandle error");
+        when(interceptorRegistry.preHandle(req, resp)).thenThrow(ex);
+
+        handler.doHandle(req, resp, mappingContext);
+
+        verify(exceptionRegistry).handle(ex, req, resp);
+    }
+
+    @Test
+    void doHandle_resolveReturnValueThrowsException_caughtByExceptionRegistry() throws Throwable {
+        WebServerHttpRequest req = createRequest();
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        PathMappingContext mappingContext = mock(PathMappingContext.class);
+        when(corsRegistry.corsHandle(req, resp)).thenReturn(false);
+        when(interceptorRegistry.preHandle(req, resp)).thenReturn(true);
+        when(argumentResolverRegistry.resolveArguments(mappingContext, req, resp)).thenReturn(new Object[0]);
+        Object result = new Object();
+        when(mappingContext.invoke(any(), eq(req), eq(resp))).thenReturn(result);
+        RuntimeException ex = new RuntimeException("return value resolver error");
+        doThrow(ex).when(returnValueResolverRegistry).resolveReturnValue(any(), any(), any(), any());
+
+        handler.doHandle(req, resp, mappingContext);
+
+        verify(exceptionRegistry).handle(ex, req, resp);
+    }
+
+    // ==================== invokeWithRealResult() ====================
+
+    @Test
+    void invokeWithRealResult_flushFailure_stillCallsInterceptors() throws Exception {
+        WebServerHttpRequest req = createRequest();
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        Object result = new Object();
+        when(resp.isHandled()).thenReturn(true);
+        doThrow(new IOException("flush failed")).when(resp).flush();
+
+        handler.invokeWithRealResult(req, resp, result, null);
+
+        verify(interceptorRegistry).postHandle(req, resp, result);
+        verify(interceptorRegistry).afterCompletion(req, resp, null);
+        verify(resp).flush();
+    }
+
+    // ==================== handleWithPathMappingContext() ====================
+
+    @Test
+    void handleWithPathMappingContext_executorRejects_releasesRequest() {
+        WebServerHttpRequest req = createRequest();
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        PathMappingContext mappingContext = mock(PathMappingContext.class);
+        ExecutorService executor = mock(ExecutorService.class);
+        when(bizPoolRegistry.determinePool(mappingContext)).thenReturn(executor);
+        doThrow(new RejectedExecutionException("pool full")).when(executor).execute(any(Runnable.class));
+
+        assertThrows(RejectedExecutionException.class,
+                () -> handler.handleWithPathMappingContext(req, resp, mappingContext));
+
+        verify(req).acquire();
+        verify(req).release();
     }
 
     @Test

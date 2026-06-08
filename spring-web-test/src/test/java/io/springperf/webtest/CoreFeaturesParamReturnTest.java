@@ -43,6 +43,14 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
     }
 
     @Test
+    void testDeferredResultError() throws Exception {
+        Request req = new Request.Builder().url(baseUrl + "/deferred-result-error").get().build();
+        try (Response resp = CLIENT.newCall(req).execute()) {
+            assertEquals(500, resp.code());
+        }
+    }
+
+    @Test
     void testDeferredResult() throws Exception {
         Request req = new Request.Builder().url(baseUrl + "/deferred-result").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {

@@ -2,6 +2,7 @@ package io.springperf.web.core.mapping;
 
 import io.springperf.web.core.invoker.InvokableHandlerMethod;
 import org.springframework.aop.framework.AopProxyUtils;
+import org.springframework.aop.support.AopUtils;
 import org.springframework.util.ClassUtils;
 import org.springframework.web.method.HandlerMethod;
 
@@ -13,7 +14,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class MappingHandlerMethod extends InvokableHandlerMethod {
     private static final Map<Class<?>, Object[]> classCacheInstanceMap = new ConcurrentHashMap<>();
     private static final Map<Method, Object[]> methodCacheInstanceMap = new ConcurrentHashMap<>();
-    protected Class<?> userClass;
+    protected final Method userMethod;
+    protected final Class<?> userClass;
     private Object[] methodCache;
     private Object[] classCache;
 
@@ -21,12 +23,14 @@ public class MappingHandlerMethod extends InvokableHandlerMethod {
         super(bean, method);
         Class<?> targetClass = AopProxyUtils.ultimateTargetClass(bean);
         userClass = ClassUtils.getUserClass(targetClass);
+        userMethod = AopUtils.getMostSpecificMethod(getBridgedMethod(), userClass);
     }
 
     public MappingHandlerMethod(HandlerMethod handlerMethod) {
         super(handlerMethod);
         Class<?> targetClass = AopProxyUtils.ultimateTargetClass(handlerMethod.getBean());
         userClass = ClassUtils.getUserClass(targetClass);
+        userMethod = AopUtils.getMostSpecificMethod(getBridgedMethod(), userClass);
     }
 
     public <T> T get(MappingCacheKey<T> key) {
@@ -60,7 +64,7 @@ public class MappingHandlerMethod extends InvokableHandlerMethod {
             return classCache;
         } else {
             if (methodCache == null) {
-                methodCache = methodCacheInstanceMap.computeIfAbsent(getBridgedMethod(), k -> new Object[key.index + 1]);
+                methodCache = methodCacheInstanceMap.computeIfAbsent(userMethod, k -> new Object[key.index + 1]);
             }
             return methodCache;
         }
@@ -72,7 +76,7 @@ public class MappingHandlerMethod extends InvokableHandlerMethod {
             classCacheInstanceMap.put(userClass, cache);
         } else {
             methodCache = cache;
-            methodCacheInstanceMap.put(getBridgedMethod(), cache);
+            methodCacheInstanceMap.put(userMethod, cache);
         }
     }
 

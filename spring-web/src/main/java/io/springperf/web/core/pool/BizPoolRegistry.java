@@ -3,6 +3,7 @@ package io.springperf.web.core.pool;
 import io.springperf.web.annotation.RunInPool;
 import io.springperf.web.context.BaseWebComponent;
 import io.springperf.web.context.LifecycleWebComponent;
+import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.mapping.MappingCacheKey;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
@@ -46,18 +47,24 @@ public class BizPoolRegistry extends BaseWebComponent {
      * 从 ApplicationProperties 读取配置，创建 "default" 线程池。
      */
     private void initDefaultPoolFromConfig() {
-        int corePoolSize = webContext.getProps().getInt("pool.core-pool-size", 50);
-        int maxPoolSize = webContext.getProps().getInt("pool.max-pool-size", 200);
-        int keepAliveTime = webContext.getProps().getInt("pool.keep-alive-time", 60);
+        int corePoolSize = webContext.getProps().getInt(PropertiesConstant.POOL_CORE_POOL_SIZE, 50);
+        int maxPoolSize = webContext.getProps().getInt(PropertiesConstant.POOL_MAX_POOL_SIZE, 200);
+        int keepAliveTime = webContext.getProps().getInt(PropertiesConstant.POOL_KEEP_ALIVE_TIME, 60);
+        int queueCapacity = webContext.getProps().getInt(PropertiesConstant.POOL_QUEUE_CAPACITY, Integer.MAX_VALUE);
 
         if (corePoolSize < 0 || maxPoolSize < 0) {
             log.warn("pool.core-pool-size or pool.max-pool-size < 0, skip default pool creation");
             return;
         }
 
+        if (queueCapacity <= 0) {
+            queueCapacity = 1; // 至少为 1，避免 DirectHandoffQueue
+            log.warn("pool.queue-capacity <= 0, adjusted to 1");
+        }
+
         ThreadPoolExecutor executor = new ThreadPoolExecutor(
                 corePoolSize, maxPoolSize, keepAliveTime,
-                TimeUnit.SECONDS, new LinkedBlockingQueue<>());
+                TimeUnit.SECONDS, new LinkedBlockingQueue<>(queueCapacity));
         register("default", executor);
     }
 
@@ -123,15 +130,31 @@ public class BizPoolRegistry extends BaseWebComponent {
         return pools.keySet();
     }
 
-    @Override
-    public void destroyComponent() {
+    /**
+     * 优雅关闭所有池：先 {@link ThreadPoolExecutor#shutdown()} 再等待任务完成。
+     *
+     * @param timeout 最大等待时间
+     * @param unit    时间单位
+     */
+    public void shutdownPools(long timeout, TimeUnit unit) {
         pools.values().forEach(pool -> {
             try {
                 pool.shutdown();
-            } catch (Exception ignored) {
-                // shutdown 异常无需额外处理
+                if (!pool.awaitTermination(timeout, unit)) {
+                    log.warn("BizPool did not terminate within timeout, forcing shutdown");
+                    pool.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                log.warn("BizPool shutdown interrupted", e);
+                pool.shutdownNow();
+                Thread.currentThread().interrupt();
             }
         });
+    }
+
+    @Override
+    public void destroyComponent() {
+        shutdownPools(30, TimeUnit.SECONDS);
         pools.clear();
         log.info("BizPoolRegistry destroyed");
     }

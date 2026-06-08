@@ -12,11 +12,14 @@ import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.util.concurrent.Future;
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
+import io.springperf.web.core.pool.BizPoolRegistry;
 import io.springperf.web.filter.WebFilterRegistry;
 import io.springperf.web.http.BackpressureHandler;
 import io.springperf.web.http.support.SupportMultipartAggregator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.SmartLifecycle;
+
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 public class NettyHttpServer implements SmartLifecycle {
@@ -29,6 +32,7 @@ public class NettyHttpServer implements SmartLifecycle {
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
     private Channel serverChannel;
+    private NettyHttpHandler httpHandler;
 
     public NettyHttpServer(WebContext webContext) {
         this(webContext, null);
@@ -46,7 +50,7 @@ public class NettyHttpServer implements SmartLifecycle {
         // 在启动阶段（单线程、Netty 未接受连接前）注册 WebFilterRegistry
         // 确保 NettyHttpHandler 运行时只需做纯读操作，线程安全
         WebFilterRegistry registry = webContext.getWebComponentWithDefault(WebFilterRegistry.class, new WebFilterRegistry());
-        NettyHttpHandler httpHandler = new NettyHttpHandler(webContext, webContext.getContextPath(), registry);
+        this.httpHandler = new NettyHttpHandler(webContext, webContext.getContextPath(), registry);
         int port = webContext.getProps().getInt(PropertiesConstant.SERVER_PORT, 8080);
         bossGroup = new NioEventLoopGroup(1);
         workerGroup = new NioEventLoopGroup();
@@ -94,16 +98,31 @@ public class NettyHttpServer implements SmartLifecycle {
     @Override
     public void stop(Runnable callback) {
         try {
-            // 1. 停止接受新连接
-            serverChannel.close().sync();
+            // 1. 通知 handler 拒绝新请求（503 Service Unavailable）
+            httpHandler.setShuttingDown();
 
-            // 2. 优雅关闭事件循环组
-            Future<?> bossFuture = bossGroup.shutdownGracefully();
-            Future<?> workerFuture = workerGroup.shutdownGracefully();
+            // 2. 停止接受新连接
+            if (serverChannel != null) {
+                serverChannel.close().sync();
+            }
 
-            // 3. 等待完整关闭
-            bossFuture.sync();
-            workerFuture.sync();
+            // 3. 等待业务线程池排空（此时 EventLoop 仍在运行，BizPool 可正常写响应）
+            BizPoolRegistry bizPoolRegistry = webContext.getWebComponent(BizPoolRegistry.class);
+            if (bizPoolRegistry != null) {
+                int timeout = webContext.getProps().getInt(PropertiesConstant.SERVER_SHUTDOWN_TIMEOUT, 30000);
+                bizPoolRegistry.shutdownPools(timeout, TimeUnit.MILLISECONDS);
+            }
+
+            // 4. 优雅关闭事件循环组
+            Future<?> bossFuture = bossGroup != null ? bossGroup.shutdownGracefully() : null;
+            Future<?> workerFuture = workerGroup != null ? workerGroup.shutdownGracefully() : null;
+
+            if (bossFuture != null) {
+                bossFuture.sync();
+            }
+            if (workerFuture != null) {
+                workerFuture.sync();
+            }
         } catch (Exception e) {
             log.error(e.getMessage(), e);
         } finally {

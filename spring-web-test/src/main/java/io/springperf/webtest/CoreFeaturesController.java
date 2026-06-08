@@ -65,6 +65,19 @@ public class CoreFeaturesController {
         return result;
     }
 
+    @GetMapping("/deferred-result-error")
+    public DeferredResult<Map<String, Object>> testDeferredResultError() {
+        DeferredResult<Map<String, Object>> result = new DeferredResult<>(5000L);
+        new Thread(() -> {
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException ignored) {
+            }
+            result.setErrorResult(new RuntimeException("async-error-occurred"));
+        }).start();
+        return result;
+    }
+
     @GetMapping("/callable")
     public Callable<Map<String, Object>> testCallable() {
         return () -> {
@@ -180,6 +193,18 @@ public class CoreFeaturesController {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(m);
     }
 
+    // ============ @ExceptionHandler 方法自身抛异常 ============
+
+    @GetMapping("/exception/failing-handler")
+    public String triggerFailingExceptionHandler() {
+        throw new UnsupportedOperationException("trigger");
+    }
+
+    @ExceptionHandler(UnsupportedOperationException.class)
+    public String failingExceptionHandler(UnsupportedOperationException e) {
+        throw new RuntimeException("intentional handler failure");
+    }
+
     // ==================== CORS ====================
 
     @CrossOrigin(origins = "http://example.com")
@@ -217,6 +242,15 @@ public class CoreFeaturesController {
     @GetMapping("/pool/biz-pool")
     @RunInPool
     public Map<String, Object> runInBizPool() {
+        Map<String, Object> m = new HashMap<>();
+        m.put("thread", Thread.currentThread().getName());
+        return m;
+    }
+
+    // 预期行为：请求到达时 BizPoolRegistry.determinePool() 抛出 IllegalStateException
+    @GetMapping("/pool/bad-pool")
+    @RunInPool("non-existent-pool-name")
+    public Map<String, Object> runInBadPool() {
         Map<String, Object> m = new HashMap<>();
         m.put("thread", Thread.currentThread().getName());
         return m;

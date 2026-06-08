@@ -189,8 +189,8 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
     /**
      * 初始化静态参数解析器
      *
-     * @param methodMappingContext
-     * @param methodArgContext
+     * @param methodMappingContext the handler method metadata
+     * @param methodArgContext     the method argument context
      */
     protected void initStaticArgResolverSupport(MappingHandlerMethod methodMappingContext, MethodArgContext methodArgContext) {
         MethodParameter parameter = methodArgContext.getMethodParameter();

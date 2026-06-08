@@ -12,14 +12,14 @@ import java.lang.annotation.Target;
  * <p>
  * 默认值 "default" 对应全局配置 {@code pool.*} 创建的线程池。
  * 不标注此注解的方法直接在 Netty EventLoop 中执行（非阻塞处理）。
- * <pre>{@code
- * @GetMapping("/report")
- * @RunInPool("io")
+ * <pre><code>
+ * &#64;GetMapping("/report")
+ * &#64;RunInPool("io")
  * public Report generate() { ... }
  *
- * @GetMapping("/fast")
+ * &#64;GetMapping("/fast")
  * public String fast() { ... }  // event loop
- * }</pre>
+ * </code></pre>
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
@@ -27,6 +27,8 @@ public @interface RunInPool {
 
     /**
      * 线程池名称，对应 {@link BizPoolRegistry} 中注册的池。
+     *
+     * @return the pool name
      */
     String value() default "default";
 }

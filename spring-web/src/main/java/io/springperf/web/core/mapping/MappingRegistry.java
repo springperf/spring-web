@@ -12,8 +12,10 @@ import io.springperf.web.util.WebUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.core.env.PropertyResolver;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Controller;
+import org.springframework.util.ClassUtils;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
@@ -22,6 +24,8 @@ import org.springframework.web.method.HandlerMethod;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static java.util.Collections.emptyList;
 
 /**
  * Scans ApplicationContext for @Controller/@RestController beans and registers their mappings.
@@ -46,21 +50,27 @@ public class MappingRegistry extends WebComponentContainer {
         beans.putAll(ctx.getBeansWithAnnotation(Controller.class));
         for (Object bean : new HashSet<>(beans.values())) {
             Class<?> clazz = bean.getClass();
-            String prefix = "";
-            if (clazz.isAnnotationPresent(RequestMapping.class)) {
-                RequestMapping crm = clazz.getAnnotation(RequestMapping.class);
+            // 使用真实类而非代理类的方法，确保 @RequestMapping/@PostMapping 等注解可被正常读取
+            Class<?> targetClass = ClassUtils.getUserClass(clazz);
+            String[] prefix = new String[]{""};
+            List<Matcher> classMatchers = emptyList();
+            RequestMapping crm = AnnotatedElementUtils.findMergedAnnotation(targetClass, RequestMapping.class);
+            if (crm != null) {
                 if (crm.value().length > 0) {
-                    prefix = WebUtils.pathJoin(prefix, crm.value()[0]);
+                    prefix = crm.value();
+                } else if (crm.path().length > 0) {
+                    prefix = crm.path();
                 }
+                classMatchers = initMatcher(crm);
             }
-
-            Method[] methods = clazz.getDeclaredMethods();
+            prefix = resolvePlaceholders(prefix);
+            Method[] methods = targetClass.getDeclaredMethods();
             for (Method m : methods) {
                 RequestMapping requestMapping = AnnotatedElementUtils.findMergedAnnotation(m, RequestMapping.class);
                 if (requestMapping == null) {
                     continue;
                 }
-                initMethodMappingContext(bean, m, prefix, requestMapping);
+                initMethodMappingContext(bean, m, prefix, requestMapping, classMatchers);
             }
         }
 
@@ -70,38 +80,11 @@ public class MappingRegistry extends WebComponentContainer {
         mappingContextList.add(mappingContext);
     }
 
-    /**
-     * 在初始化完成后注册新的 Mapping，直接加入已构建的优化器。
-     * <p>适用于框架初始化后动态添加路由的场景（如 Actuator 端点）。
-     * 仅支持无通配符的简单路径；通配符路径需要重新执行 optimizeMapping。</p>
-     */
-    public synchronized void registerMappingAfterInit(PathMappingContext mappingContext) {
-        registerMapping(mappingContext);
-        String pathRule = mappingContext.getPathRule();
-        if (PathPatternUtils.pathHaveWildcard(pathRule)) {
-            log.warn("registerMappingAfterInit does not support wildcard path: {}", pathRule);
-            return;
-        }
-        for (RouterOptimizer optimizer : optimizers) {
-            if (optimizer instanceof FullPathRouterOptimizer) {
-                FullPathRouterOptimizer.putSimpleUrl(
-                        ((FullPathRouterOptimizer) optimizer).getRouteMap(),
-                        mappingContext);
-                return;
-            }
-        }
-        // 没有 FullPathRouterOptimizer → 创建一个新的（兜底）
-        FullPathRouterOptimizer fallback = new FullPathRouterOptimizer();
-        FullPathRouterOptimizer.putSimpleUrl(fallback.getRouteMap(), mappingContext);
-        fallback.init(Collections.singletonList(mappingContext));
-        optimizers.add(0, fallback);
-    }
-
     public void initComponentPhase3() {
         optimizeMapping(mappingContextList);
     }
 
-    protected void initMethodMappingContext(Object bean, Method method, String prefix, RequestMapping requestMapping) {
+    protected void initMethodMappingContext(Object bean, Method method, String[] prefixArray, RequestMapping requestMapping, List<Matcher> classMatchers) {
         String[] paths = requestMapping.path();
         if (paths.length == 0) {
             paths = requestMapping.value();
@@ -109,13 +92,17 @@ public class MappingRegistry extends WebComponentContainer {
         if (paths.length == 0) {
             paths = new String[]{""};
         }
+        paths = resolvePlaceholders(paths);
         HandlerMethod hm = new HandlerMethod(bean, method);
         List<Matcher> matchers = initMatcher(requestMapping);
-        for (String path : paths) {
-            String fullPath = WebUtils.pathJoin(prefix, path);
-            PathMappingContext methodMappingContext = new PathMappingContext(hm, matchers, fullPath);
-            registerMapping(methodMappingContext);
-            log.info("Mapped {} -> {}#{}", methodMappingContext, bean.getClass().getSimpleName(), method.getName());
+        mergeMatchers(matchers, classMatchers);
+        for (String prefix : prefixArray) {
+            for (String path : paths) {
+                String fullPath = WebUtils.pathJoin(prefix, path);
+                PathMappingContext methodMappingContext = new PathMappingContext(hm, matchers, fullPath);
+                registerMapping(methodMappingContext);
+                log.info("Mapped {} -> {}#{}", methodMappingContext, bean.getClass().getSimpleName(), method.getName());
+            }
         }
     }
 
@@ -128,25 +115,90 @@ public class MappingRegistry extends WebComponentContainer {
         }
         String[] params = requestMapping.params();
         if (params.length > 0) {
+            params = resolvePlaceholders(params);
             List<NameValueExpressionSupport> expressionList = Arrays.stream(params).map(NameValueExpressionSupport::build).collect(Collectors.toList());
             matchers.add(new ParamOrHeaderMatcher(false, expressionList));
         }
         String[] headers = requestMapping.headers();
         if (headers.length > 0) {
+            headers = resolvePlaceholders(headers);
             List<NameValueExpressionSupport> expressionList = Arrays.stream(headers).map(NameValueExpressionSupport::build).collect(Collectors.toList());
             matchers.add(new ParamOrHeaderMatcher(true, expressionList));
         }
         String[] consumes = requestMapping.consumes();
         if (consumes.length > 0) {
+            consumes = resolvePlaceholders(consumes);
             List<MediaTypeExpressionSupport> mediaTypeRuleList = Arrays.stream(consumes).map(MediaTypeExpressionSupport::build).collect(Collectors.toList());
             matchers.add(new ConsumeOrProduceMatcher(false, mediaTypeRuleList));
         }
         String[] produces = requestMapping.produces();
         if (produces.length > 0) {
+            produces = resolvePlaceholders(produces);
             List<MediaTypeExpressionSupport> mediaTypeRuleList = Arrays.stream(produces).map(MediaTypeExpressionSupport::build).collect(Collectors.toList());
             matchers.add(new ConsumeOrProduceMatcher(true, mediaTypeRuleList));
         }
         return matchers;
+    }
+
+    /**
+     * 将类级别的 Matcher 约束合并到方法级别的 Matcher 列表中。
+     * 同类型的 Matcher 合并内部约束列表，不同类型则直接追加。
+     */
+    protected void mergeMatchers(List<Matcher> methodMatchers, List<Matcher> classMatchers) {
+        for (Matcher classMatcher : classMatchers) {
+            boolean merged = false;
+            for (int i = 0; i < methodMatchers.size(); i++) {
+                if (methodMatchers.get(i).isSameTypeMatcher(classMatcher)) {
+                    methodMatchers.set(i, mergeMatcherPair(methodMatchers.get(i), classMatcher));
+                    merged = true;
+                    break;
+                }
+            }
+            if (!merged) {
+                methodMatchers.add(classMatcher);
+            }
+        }
+    }
+
+    /**
+     * 合并两个同类型的 Matcher 实例中的约束列表。
+     */
+    protected static Matcher mergeMatcherPair(Matcher methodMatcher, Matcher classMatcher) {
+        if (methodMatcher instanceof HttpMethodMatcher && classMatcher instanceof HttpMethodMatcher) {
+            HttpMethodMatcher m = (HttpMethodMatcher) methodMatcher;
+            HttpMethodMatcher c = (HttpMethodMatcher) classMatcher;
+            EnumSet<HttpMethod> combined = EnumSet.copyOf(m.getHttpMethods());
+            combined.addAll(c.getHttpMethods());
+            return new HttpMethodMatcher(combined.toArray(new HttpMethod[0]));
+        }
+        if (methodMatcher instanceof ParamOrHeaderMatcher && classMatcher instanceof ParamOrHeaderMatcher) {
+            ParamOrHeaderMatcher m = (ParamOrHeaderMatcher) methodMatcher;
+            ParamOrHeaderMatcher c = (ParamOrHeaderMatcher) classMatcher;
+            List<NameValueExpressionSupport> combined = new ArrayList<>(m.getExpressions());
+            combined.addAll(c.getExpressions());
+            return new ParamOrHeaderMatcher(m.isHeader(), combined);
+        }
+        if (methodMatcher instanceof ConsumeOrProduceMatcher && classMatcher instanceof ConsumeOrProduceMatcher) {
+            ConsumeOrProduceMatcher m = (ConsumeOrProduceMatcher) methodMatcher;
+            ConsumeOrProduceMatcher c = (ConsumeOrProduceMatcher) classMatcher;
+            List<MediaTypeExpressionSupport> combined = new ArrayList<>(m.getMediaTypeExpressions());
+            combined.addAll(c.getMediaTypeExpressions());
+            return new ConsumeOrProduceMatcher(m.isProduce(), combined);
+        }
+        return methodMatcher;
+    }
+
+    private String[] resolvePlaceholders(String[] values) {
+        WebContext wc = getWebContext();
+        if (wc == null) {
+            return values;
+        }
+        PropertyResolver resolver = wc.getCtx().getEnvironment();
+        String[] result = new String[values.length];
+        for (int i = 0; i < values.length; i++) {
+            result[i] = resolver.resolvePlaceholders(values[i]);
+        }
+        return result;
     }
 
     protected List<RouterOptimizer> getOptimizerTemplate() {

@@ -195,6 +195,10 @@ public class DispatcherHandler extends BaseWebComponent {
 
     /**
      * 统一异常处理（catch-safe）。
+     *
+     * @param ex   the exception to handle
+     * @param req  the current HTTP request
+     * @param resp the current HTTP response
      */
     protected void handleException(Throwable ex, WebServerHttpRequest req, WebServerHttpResponse resp) {
         log.error(ex.getMessage(), ex);
@@ -207,6 +211,8 @@ public class DispatcherHandler extends BaseWebComponent {
 
     /**
      * 刷新响应（catch-safe）。
+     *
+     * @param resp the HTTP response to flush
      */
     protected void flushResponse(WebServerHttpResponse resp) {
         try {

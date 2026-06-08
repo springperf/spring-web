@@ -1,7 +1,5 @@
 package io.springperf.web.core.async.stream;
 
-import io.springperf.web.core.async.PerfAsyncWebRequest;
-import io.springperf.web.http.NettyServerHttpResponse;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
@@ -12,6 +10,8 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.internal.shaded.org.jctools.queues.MpscUnboundedArrayQueue;
+import io.springperf.web.core.async.PerfAsyncWebRequest;
+import io.springperf.web.http.NettyServerHttpResponse;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
@@ -175,8 +175,8 @@ public class NettyStreamSender implements StreamSender {
     /**
      * 将 CharSequence 写入 ByteBuf
      *
-     * @param charSequence
-     * @return
+     * @param charSequence the character sequence to write
+     * @return the buffer containing the encoded bytes
      */
     protected ByteBuf writeCharSequence(CharSequence charSequence) {
         Charset charset = resp.getCharacterEncoding();

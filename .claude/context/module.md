@@ -277,7 +277,8 @@ spring-web-support
 │
 ├── arg/provider/
 │   ├── HttpServletRequestProvider         解析 HttpServletRequest
-│   └── HttpServletResponseProvider        解析 HttpServletResponse
+│   ├── HttpServletResponseProvider        解析 HttpServletResponse
+│   └── WebRequestArgumentResolverProvider 解析 WebRequest / NativeWebRequest
 │
 ├── async/stream/
 │   └── ResponseBodyEmitterReturnValueResolver  支持 Spring MVC ResponseBodyEmitter
@@ -287,9 +288,22 @@ spring-web-support
 │   ├── RequestBodyAdviceCodecInterceptor        适配 RequestBodyAdvice → HttpBodyCodecInterceptor
 │   └── ResponseBodyAdviceCodecInterceptor       适配 ResponseBodyAdvice → HttpBodyCodecInterceptor
 │
-├── mvc/interceptor/
-│   ├── SupportInterceptorRegistry         扩展 InterceptorRegistry，扫描 Spring MVC HandlerInterceptor
-│   └── HandlerInterceptorWrapper          适配 Spring MVC HandlerInterceptor → 框架 HandlerInterceptor
+├── mvc/
+│   ├── config/
+│   │   └── WebMvcConfigurerBridge          桥接 Spring WebMvcConfigurer → 框架各 Registry
+│   │
+│   ├── interceptor/
+│   │   ├── SupportInterceptorRegistry         扩展 InterceptorRegistry，扫描 Spring MVC HandlerInterceptor
+│   │   └── HandlerInterceptorWrapper          适配 Spring MVC HandlerInterceptor → 框架 HandlerInterceptor
+│   │
+│   ├── arg/
+│   │   └── SpringHandlerMethodArgumentResolverAdapter  适配 Spring HandlerMethodArgumentResolver
+│   │
+│   ├── retval/
+│   │   └── SpringHandlerMethodReturnValueHandlerAdapter  适配 Spring HandlerMethodReturnValueHandler
+│   │
+│   └── exception/
+│       └── SpringHandlerExceptionResolverAdapter  适配 Spring HandlerExceptionResolver
 │
 └── servlet/                              Servlet 桥接
     ├── AbstractFastFailHttpServletRequest/ServletResponse  快速失败的 Servlet 包装
@@ -306,18 +320,30 @@ org.springframework.web.servlet/         （src/main/java 内重写）
 ├── HandlerInterceptor, AsyncHandlerInterceptor
 ├── ModelAndView, View
 ├── LocaleResolver, LocaleContextResolver
-└── NoHandlerFoundException
+├── NoHandlerFoundException
+└── HandlerExceptionResolver
 
 org.springframework.web.servlet.handler/
 ├── MappedInterceptor
 └── WebRequestHandlerInterceptorAdapter
 
 org.springframework.web.servlet.config.annotation/
-└── InterceptorRegistration
+├── InterceptorRegistration
+├── WebMvcConfigurer
+├── CorsRegistry, CorsRegistration
+├── ResourceHandlerRegistry, ResourceHandlerRegistration
+├── PathMatchConfigurer
+├── AsyncSupportConfigurer
+├── ContentNegotiationConfigurer
+├── DefaultServletHandlerConfigurer
+├── ViewControllerRegistry
+├── ViewResolverRegistry
+└── ValidatorRegistration
 
 org.springframework.web.servlet.mvc.method.annotation/
 ├── RequestBodyAdvice, ResponseBodyAdvice
 ├── ResponseBodyEmitter, SseEmitter, StreamingResponseBody
+├── ResponseEntityExceptionHandler
 └── AdapterUtil
 ```
 
@@ -328,34 +354,47 @@ org.springframework.web.servlet.mvc.method.annotation/
 ```
 spring-boot-starter-web
 ├── autoconfigure/
-│   ├── PerfAutoConfiguration              核心自动装配
+│   ├── SpringWebAutoConfiguration              核心自动装配
 │   │   ├── ApplicationProperties
 │   │   ├── WebContext → 驱动整个组件生命周期
 │   │   ├── 所有 Registry 组件
-│   │   └── NettyHttpServer + 可选 SSL
+│   │   ├── NettyHttpServer + 可选 SSL
+│   │   ├── Validator（条件：javax.validation.Validator 在 classpath）
+│   │   └── 启动时检测 SpringMVC 冲突并抛出 IllegalStateException
 │   │
-│   ├── PerfSupportAutoConfiguration       Support 模块自动装配（条件：spring-web-support 在 classpath）
+│   ├── SpringWebSupportAutoConfiguration       Support 模块自动装配（条件：spring-web-support 在 classpath）
 │   │   ├── SupportDispatcherHandler
 │   │   ├── SupportInterceptorRegistry
 │   │   ├── SupportHttpBodyCodecInterceptorRegistry
 │   │   ├── HttpServletRequest/Response Provider
+│   │   ├── WebRequestArgumentResolverProvider
 │   │   ├── SupportWebFilterRegistry + FilterWrapper
-│   │   └── ResponseBodyEmitterReturnValueResolver
+│   │   ├── ResponseBodyEmitterReturnValueResolver
+│   │   ├── WebMvcConfigurerBridge（桥接 WebMvcConfigurer 实现）
+│   │   ├── SpringHandlerMethodArgumentResolverAdapter
+│   │   ├── SpringHandlerMethodReturnValueHandlerAdapter
+│   │   └── SpringHandlerExceptionResolverAdapter
 │   │
-│   ├── PerfEndpointAutoConfiguration      Actuator 端点自动装配（条件：ExposableWebEndpoint 在 classpath）
+│   ├── SpringDataWebCompatibilityAutoConfiguration  Spring Data 兼容（条件：ProjectingArgumentResolverRegistrar 在 classpath）
+│   │   └── 启动时移除 ProjectingArgumentResolverRegistrar 的 BPP
+│   │      防止因缺少 RequestMappingHandlerAdapter 引发 NoClassDefFoundError
+│   │      投影解析仍通过 WebMvcConfigurerBridge 桥接
+│   │
+│   ├── ActuatorEndpointAutoConfiguration      Actuator 端点自动装配（条件：ExposableWebEndpoint 在 classpath）
 │   │   ├── WebEndpointDiscoverer
-│   │   ├── PerfEndpointHandlerMapping     将 Actuator 端点注册为框架路由
-│   │   ├── ManagementServerInfrastructure  管理端口组件容器
-│   │   ├── ManagementDispatcherHandler    管理端口分发器
-│   │   ├── ManagementNettyHttpServer      独立 Netty 服务器
-│   │   ├── OperationHandlerInvoker        端点操作调用器
-│   │   └── LinksOperationInvoker          根路径 links 处理
+│   │   ├── ActuatorEndpointHandlerMapping      将 Actuator 端点注册为框架路由
+│   │   ├── ManagementServerInfrastructure      管理端口组件容器
+│   │   ├── ManagementDispatcherHandler         管理端口分发器
+│   │   ├── ManagementNettyHttpServer           独立 Netty 服务器
+│   │   ├── OperationHandlerInvoker             端点操作调用器
+│   │   └── LinksOperationInvoker               根路径 links 处理
 │   │
 │   └── support/
 │       └── WebServerApplicationContextFactory  强制 AnnotationConfigApplicationContext
 │
 └── resources/META-INF/
-    └── spring.factories                  注册 3 个 AutoConfiguration + ApplicationContextFactory
+    ├── spring.factories                  注册 4 个 AutoConfiguration + ApplicationContextFactory
+    └── additional-spring-configuration-metadata.json  配置元数据（IDE 提示）
 ```
 
 ---

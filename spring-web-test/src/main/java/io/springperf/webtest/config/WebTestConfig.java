@@ -5,6 +5,7 @@ import io.springperf.web.core.interceptor.InterceptorRegistration;
 import io.springperf.web.core.resource.ResourceHandlerRegistration;
 import io.springperf.webtest.interceptor.LifecycleInterceptor;
 import io.springperf.webtest.interceptor.LoginInterceptor;
+import io.springperf.webtest.interceptor.P0ReturnFalseInterceptor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -43,6 +44,18 @@ public class WebTestConfig {
                 return "LifecycleInterceptorRegistration";
             }
         }.addPathPatterns("/**").order(200);
+    }
+
+    @Bean
+    public InterceptorRegistration webP0ReturnFalseInterceptorRegistration() {
+        // Use a custom subclass to avoid component name conflict
+        // with other InterceptorRegistration beans
+        return new InterceptorRegistration(new P0ReturnFalseInterceptor()) {
+            @Override
+            public String getComponentName() {
+                return "P0ReturnFalseInterceptorRegistration";
+            }
+        }.addPathPatterns("/p0/interceptor-return-false").order(300);
     }
 
     @Bean

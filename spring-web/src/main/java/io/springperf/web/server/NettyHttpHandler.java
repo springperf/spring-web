@@ -1,18 +1,15 @@
 package io.springperf.web.server;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.http.NettyServerHttpRequest;
-import io.springperf.web.http.NettyServerHttpResponse;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpUtil;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.http.NettyServerHttpRequest;
+import io.springperf.web.http.NettyServerHttpResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Netty 入站处理器。职责仅限于：
@@ -31,6 +28,7 @@ public class NettyHttpHandler extends SimpleChannelInboundHandler<FullHttpReques
     private final WebContext webContext;
     private final String contextPath;
     private final HttpHandler handler;
+    private volatile boolean shuttingDown;
 
     public NettyHttpHandler(WebContext webContext, String contextPath, HttpHandler handler) {
         this.webContext = webContext;
@@ -38,8 +36,29 @@ public class NettyHttpHandler extends SimpleChannelInboundHandler<FullHttpReques
         this.handler = handler;
     }
 
+    /**
+     * 标记服务器进入关闭状态。此后新到达的请求直接返回 503 Service Unavailable。
+     */
+    public void setShuttingDown() {
+        this.shuttingDown = true;
+    }
+
+    public boolean isShuttingDown() {
+        return shuttingDown;
+    }
+
     @Override
     protected void channelRead0(ChannelHandlerContext ctxNetty, FullHttpRequest msg) {
+        // 关闭中：拒绝新请求
+        if (shuttingDown) {
+            NettyServerHttpResponse resp = new NettyServerHttpResponse(webContext, ctxNetty, false);
+            try {
+                resp.sendError(HttpStatus.SERVICE_UNAVAILABLE, "Server is shutting down");
+            } catch (Exception ignored) {
+            }
+            return;
+        }
+
         NettyServerHttpResponse resp = new NettyServerHttpResponse(webContext, ctxNetty, HttpUtil.isKeepAlive(msg));
         try {
             // 1. 解析 URI，提取路径（去掉 query string）

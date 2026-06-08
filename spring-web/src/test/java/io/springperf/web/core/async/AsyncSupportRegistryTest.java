@@ -1,5 +1,6 @@
 package io.springperf.web.core.async;
 
+import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.pool.BizPoolRegistry;
 import io.springperf.web.http.WebServerHttpRequest;
@@ -19,7 +20,7 @@ import org.springframework.web.context.request.async.DeferredResultProcessingInt
 import java.util.Collections;
 import java.util.concurrent.Executors;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -45,6 +46,7 @@ class AsyncSupportRegistryTest {
     @BeforeEach
     void setUp() {
         registry = new AsyncSupportRegistry();
+        lenient().when(webContext.getProps()).thenReturn(mock(ApplicationProperties.class));
     }
 
     @Test

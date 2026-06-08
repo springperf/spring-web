@@ -1,6 +1,7 @@
 package io.springperf.web.core.async;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebComponentContainer;
 import io.springperf.web.context.WebComponentWrapperUtils;
 import io.springperf.web.context.WebContext;
@@ -33,6 +34,7 @@ public class AsyncSupportRegistry extends WebComponentContainer {
     @Override
     public void initWithWebContext(WebContext webContext) {
         super.initWithWebContext(webContext);
+        this.defaultTimeout = webContext.getProps().getLong(PropertiesConstant.ASYNC_TIMEOUT, 30000L);
         WebComponentWrapperUtils.registerComponent(this, CallableProcessingInterceptor.class);
         WebComponentWrapperUtils.registerComponent(this, DeferredResultProcessingInterceptor.class);
         ObjectMapper objectMapper = webContext.getBeanFromCtx(ObjectMapper.class);

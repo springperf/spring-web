@@ -14,6 +14,8 @@ public interface HttpBodyConverter<T> extends GenericHttpMessageConverter<T>, We
 
     /**
      * Returns the concrete {@link HttpMessageConverter} class that this converter wraps.
+     *
+     * @return the converter class
      */
     Class<? extends HttpMessageConverter> getConverterClass();
 }

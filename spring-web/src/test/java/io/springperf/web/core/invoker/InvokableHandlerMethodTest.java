@@ -7,7 +7,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.aop.framework.ProxyFactory;
+import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
 import java.lang.reflect.Method;
@@ -247,6 +252,143 @@ class InvokableHandlerMethodTest {
         Object result = hm.invoke(new Object[]{"World"}, request, response);
 
         assertEquals("Fast World", result);
+    }
+
+    // ==================== createMethodParameters with CGLIB proxy ====================
+
+    @Test
+    void createMethodParameters_withCglibProxy_resolvesToClassMethod() throws Exception {
+        // 通过 HandlerMethodParameter 从接口合并参数注解
+        Object proxy = createCglibProxy(new ApiImpl());
+        Method proxyMethod = proxy.getClass().getMethod("save", String.class, String.class);
+        InvokableHandlerMethod hm = new InvokableHandlerMethod(proxy, proxyMethod);
+
+        MethodParameter[] params = hm.createMethodParameters();
+
+        assertEquals(2, params.length);
+        assertEquals(1, params[0].getParameterAnnotations().length);
+        assertTrue(params[0].hasParameterAnnotation(RequestBody.class));
+        assertEquals(1, params[1].getParameterAnnotations().length);
+        assertTrue(params[1].hasParameterAnnotation(RequestParam.class));
+    }
+
+    @Test
+    void createMethodParameters_withCglibProxy_preservesMetadata() throws Exception {
+        Object proxy = createCglibProxy(new ApiImpl());
+        Method proxyMethod = proxy.getClass().getMethod("save", String.class, String.class);
+        InvokableHandlerMethod hm = new InvokableHandlerMethod(proxy, proxyMethod);
+
+        MethodParameter[] params = hm.createMethodParameters();
+
+        assertEquals(2, params.length);
+        assertEquals(String.class, params[0].getParameterType());
+        assertEquals(String.class, params[1].getParameterType());
+    }
+
+    @Test
+    void createMethodParameters_withCglibProxy_noAnnotations_returnsMethodAsIs() throws Exception {
+        Object proxy = createCglibProxy(new PlainController());
+        Method proxyMethod = proxy.getClass().getMethod("hello", String.class);
+        InvokableHandlerMethod hm = new InvokableHandlerMethod(proxy, proxyMethod);
+
+        MethodParameter[] params = hm.createMethodParameters();
+
+        assertEquals(1, params.length);
+        assertEquals(0, params[0].getParameterAnnotations().length);
+    }
+
+    @Test
+    void createMethodParameters_withCglibProxy_zeroParams_returnsEmpty() throws Exception {
+        Object proxy = createCglibProxy(new NoOpController());
+        Method proxyMethod = proxy.getClass().getMethod("noop");
+        InvokableHandlerMethod hm = new InvokableHandlerMethod(proxy, proxyMethod);
+
+        MethodParameter[] params = hm.createMethodParameters();
+
+        assertEquals(0, params.length);
+    }
+
+    @Test
+    void createMethodParameters_withMultiLevelInterface_resolvesToClassMethod() throws Exception {
+        // 通过 HandlerMethodParameter 从多级接口层级查找注解
+        Object proxy = createCglibProxy(new DeepApiImpl());
+        Method proxyQueryMethod = proxy.getClass().getMethod("query", String.class, String.class, String.class);
+        InvokableHandlerMethod hm = new InvokableHandlerMethod(proxy, proxyQueryMethod);
+
+        MethodParameter[] params = hm.createMethodParameters();
+
+        assertEquals(3, params.length);
+        assertEquals(String.class, params[0].getParameterType());
+        assertEquals(String.class, params[1].getParameterType());
+        assertEquals(String.class, params[2].getParameterType());
+        // 多级接口 DeepApi → ExtendedApi → AnnotatedApi，注解应从继承链合并
+        assertEquals(0, params[0].getParameterAnnotations().length);
+        assertEquals(0, params[1].getParameterAnnotations().length);
+        assertEquals(1, params[2].getParameterAnnotations().length);
+        assertTrue(params[2].hasParameterAnnotation(RequestParam.class));
+    }
+
+    @Test
+    void createMethodParameters_withDirectClass_stillWorks() throws Exception {
+        // 非代理场景回归测试
+        Method method = MultiParamController.class.getMethod("multi", String.class, int.class, boolean.class);
+        InvokableHandlerMethod hm = new InvokableHandlerMethod(new MultiParamController(), method);
+
+        MethodParameter[] params = hm.createMethodParameters();
+
+        assertEquals(3, params.length);
+        assertEquals(String.class, params[0].getParameterType());
+        assertEquals(int.class, params[1].getParameterType());
+        assertEquals(boolean.class, params[2].getParameterType());
+    }
+
+    private static Object createCglibProxy(Object target) {
+        ProxyFactory factory = new ProxyFactory(target);
+        factory.setProxyTargetClass(true);
+        return factory.getProxy();
+    }
+
+    // ==================== helper classes for proxy tests ====================
+
+    interface AnnotatedApi {
+        String save(@RequestBody String body, @RequestParam("id") String id);
+    }
+
+    @SuppressWarnings("unused")
+    static class ApiImpl implements AnnotatedApi {
+        @Override
+        public String save(String body, String id) { return body + id; }
+    }
+
+    interface PathApi {
+        String get(@PathVariable("name") String name);
+    }
+
+    @SuppressWarnings("unused")
+    static class PathApiImpl implements PathApi {
+        @Override
+        public String get(String name) { return name; }
+    }
+
+    // 三层接口继承：DeepApi → ExtendedApi → AnnotatedApi
+    interface ExtendedApi extends AnnotatedApi {
+        String find(@PathVariable("name") String name);
+    }
+
+    interface DeepApi extends ExtendedApi {
+        String query(String key, String value, @RequestParam("q") String q);
+    }
+
+    @SuppressWarnings("unused")
+    static class DeepApiImpl implements DeepApi {
+        @Override public String save(String body, String id) { return body + id; }
+        @Override public String find(String name) { return name; }
+        @Override public String query(String key, String value, String q) { return q; }
+    }
+
+    @SuppressWarnings("unused")
+    static class NoOpController {
+        public void noop() {}
     }
 
     // ==================== helper classes ====================

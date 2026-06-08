@@ -55,7 +55,12 @@ public abstract class AbstractNamedValueResolver extends AbstractSupportOptional
     }
 
     /**
-     * A {@code null} results in a {@code false} value for {@code boolean}s or an exception for other primitives.
+     * Handle a null value for the named parameter.
+     * <p>A {@code null} results in a {@code false} value for {@code boolean}s or an exception for other primitives.</p>
+     *
+     * @param name      the parameter name
+     * @param paramType the parameter type
+     * @return the value to use for null (Boolean.FALSE for booleans, null for others)
      */
     @Nullable
     protected Object handleNullValue(String name, Class<?> paramType) {

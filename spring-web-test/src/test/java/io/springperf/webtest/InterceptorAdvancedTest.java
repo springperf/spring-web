@@ -18,6 +18,24 @@ public class InterceptorAdvancedTest extends BaseE2ETest {
     }
 
     @Test
+    void interceptorLifecycle_postHandleAndAfterCompletion_withException() throws Exception {
+        // 请求一个抛异常的端点，验证 afterCompletion 仍被调用
+        Request req = new Request.Builder()
+                .url(baseUrl + "/core/exception/illegal-argument")
+                .get()
+                .build();
+        try (Response resp = CLIENT.newCall(req).execute()) {
+            assertEquals(400, resp.code());
+        }
+
+        // postHandle 在异常时也被调用（result 为 null），afterCompletion 携带异常
+        assertEquals(1, LifecycleInterceptor.postHandleCount,
+                "postHandle should still be called when controller throws (with null result)");
+        assertEquals(1, LifecycleInterceptor.afterCompletionCount,
+                "afterCompletion should be called even when controller throws");
+    }
+
+    @Test
     void interceptorExcludedPath_shouldPassWithoutInterception() throws Exception {
         // /demo/echo is in the excludePathPatterns of LoginInterceptor
         // So it should return 302 (the echo GET response) instead of 401

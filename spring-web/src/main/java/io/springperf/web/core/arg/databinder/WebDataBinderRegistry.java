@@ -147,6 +147,8 @@ public class WebDataBinderRegistry extends BaseWebComponent {
     /**
      * Set a default validator to use for model data validation.
      * Overrides any validator discovered from the Spring context.
+     *
+     * @param validator the validator to set
      */
     public void setDefaultValidator(Validator validator) {
         this.defaultValidator = validator;

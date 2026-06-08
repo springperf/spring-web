@@ -4,7 +4,7 @@
     <parent>
         <groupId>io.github.springperf</groupId>
         <artifactId>spring-web-parent</artifactId>
-        <version>1.0.1</version>
+        <version>1.0.2</version>
     </parent>
 
     <artifactId>spring-web-test</artifactId>
@@ -16,6 +16,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.deploy.skip>true</maven.deploy.skip>
     </properties>
 
     <dependencies>

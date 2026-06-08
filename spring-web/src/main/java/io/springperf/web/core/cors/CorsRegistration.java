@@ -27,6 +27,9 @@ public class CorsRegistration implements WebComponent {
      * 使用预构建的 {@link CorsConfiguration} 创建注册项。
      * <p>适用于从 {@code CorsEndpointProperties} 等外部配置源导入 CORS 配置的场景。
      * 注意：不会调用 {@code applyPermitDefaultValues()}，调用方需确保配置完整。</p>
+     *
+     * @param pathPattern       the path pattern to match
+     * @param corsConfiguration the pre-built CORS configuration
      */
     public CorsRegistration(String pathPattern, CorsConfiguration corsConfiguration) {
         this.pathPattern = pathPattern;
@@ -56,6 +59,9 @@ public class CorsRegistration implements WebComponent {
      * Consider using the {@code ForwardedHeaderFilter} in order to choose from a
      * central place whether to extract and use, or to discard such headers.
      * See the Spring Framework reference for more on this filter.
+     *
+     * @param origins the allowed origins
+     * @return this registration for chaining
      */
     public CorsRegistration allowedOrigins(String... origins) {
         this.config.setAllowedOrigins(Arrays.asList(origins));
@@ -68,6 +74,9 @@ public class CorsRegistration implements WebComponent {
      * <p>The special value {@code "*"} allows all methods.
      * <p>By default "simple" methods {@code GET}, {@code HEAD}, and {@code POST}
      * are allowed.
+     *
+     * @param methods the allowed HTTP methods
+     * @return this registration for chaining
      */
     public CorsRegistration allowedMethods(String... methods) {
         this.config.setAllowedMethods(Arrays.asList(methods));
@@ -82,6 +91,9 @@ public class CorsRegistration implements WebComponent {
      * {@code Cache-Control}, {@code Content-Language}, {@code Expires},
      * {@code Last-Modified}, or {@code Pragma} as per the CORS spec.
      * <p>By default all headers are allowed.
+     *
+     * @param headers the allowed headers
+     * @return this registration for chaining
      */
     public CorsRegistration allowedHeaders(String... headers) {
         this.config.setAllowedHeaders(Arrays.asList(headers));
@@ -96,6 +108,9 @@ public class CorsRegistration implements WebComponent {
      * <p>The special value {@code "*"} allows all headers to be exposed for
      * non-credentialed requests.
      * <p>By default this is not set.
+     *
+     * @param headers the headers to expose
+     * @return this registration for chaining
      */
     public CorsRegistration exposedHeaders(String... headers) {
         this.config.setExposedHeaders(Arrays.asList(headers));
@@ -114,6 +129,9 @@ public class CorsRegistration implements WebComponent {
      * <p>By default this is not set in which case the
      * {@code Access-Control-Allow-Credentials} header is also not set and
      * credentials are therefore not allowed.
+     *
+     * @param allowCredentials whether to allow credentials
+     * @return this registration for chaining
      */
     public CorsRegistration allowCredentials(boolean allowCredentials) {
         this.config.setAllowCredentials(allowCredentials);
@@ -124,6 +142,9 @@ public class CorsRegistration implements WebComponent {
      * Configure how long in seconds the response from a pre-flight request
      * can be cached by clients.
      * <p>By default this is set to 1800 seconds (30 minutes).
+     *
+     * @param maxAge the maximum age in seconds
+     * @return this registration for chaining
      */
     public CorsRegistration maxAge(long maxAge) {
         this.config.setMaxAge(maxAge);

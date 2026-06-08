@@ -14,6 +14,10 @@ public abstract class CorsUtils {
 
     /**
      * Returns {@code true} if the request is a valid CORS one by checking
+     * the {@code Origin} header against the request URI.
+     *
+     * @param request the HTTP request to check
+     * @return {@code true} if the request has a cross-origin {@code Origin} header
      */
     @SuppressWarnings("deprecation")
     public static boolean isCorsRequest(ServerHttpRequest request) {
@@ -40,6 +44,9 @@ public abstract class CorsUtils {
     /**
      * Returns {@code true} if the request is a valid CORS pre-flight one by checking {@code OPTIONS} method with
      * {@code Origin} and {@code Access-Control-Request-Method} headers presence.
+     *
+     * @param request the HTTP request to check
+     * @return {@code true} if the request is a CORS preflight
      */
     public static boolean isPreFlightRequest(ServerHttpRequest request) {
         HttpHeaders headers = request.getHeaders();

@@ -83,6 +83,8 @@ public class WebContext extends WebComponentContainer implements InitializingBea
     /**
      * Retrieves the highest-priority bean of the specified type from the Spring {@link ApplicationContext}.
      *
+     * @param clazz the bean type to look up
+     * @param <T>   the bean type
      * @return the bean, or {@code null} if no bean of the given type exists
      */
     public <T> T getBeanFromCtx(Class<T> clazz) {

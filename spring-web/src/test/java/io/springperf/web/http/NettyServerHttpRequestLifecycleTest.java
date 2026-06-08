@@ -1,6 +1,5 @@
 package io.springperf.web.http;
 
-import io.springperf.web.context.WebContext;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
@@ -8,6 +7,8 @@ import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpVersion;
+import io.netty.util.IllegalReferenceCountException;
+import io.springperf.web.context.WebContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -168,6 +169,75 @@ class NettyServerHttpRequestLifecycleTest {
         wrapper.release();
 
         assertEquals(1, nativeRequest.refCnt());
+    }
+
+    // ---------------------------------------------------------------
+    // 边缘场景：双释放、释放后 acquire
+    // ---------------------------------------------------------------
+
+    @Test
+    void doubleRelease_throwsIllegalReferenceCountException() {
+        FullHttpRequest nativeRequest = newRequest();
+        NettyServerHttpRequest req = new NettyServerHttpRequest(webContext, ctx, nativeRequest, "/test");
+        // 第一次 release: refCnt 1→0, 返回 true
+        assertTrue(req.release());
+        assertEquals(0, nativeRequest.refCnt());
+        // 第二次 release: refCnt=0 应抛出 IllegalReferenceCountException
+        assertThrows(IllegalReferenceCountException.class, req::release);
+    }
+
+    @Test
+    void acquireAfterRelease_throwsIllegalReferenceCountException() {
+        FullHttpRequest nativeRequest = newRequest();
+        NettyServerHttpRequest req = new NettyServerHttpRequest(webContext, ctx, nativeRequest, "/test");
+        req.release();
+        assertEquals(0, nativeRequest.refCnt());
+        assertThrows(IllegalReferenceCountException.class, req::acquire);
+    }
+
+    @Test
+    void partialRelease_doesNotFree() {
+        FullHttpRequest nativeRequest = newRequest();
+        NettyServerHttpRequest req = new NettyServerHttpRequest(webContext, ctx, nativeRequest, "/test");
+        req.acquire();
+        int before = nativeRequest.refCnt();
+        // release 一次但未全部释放
+        req.release();
+        assertEquals(before - 1, nativeRequest.refCnt());
+    }
+
+    // ---------------------------------------------------------------
+    // 并发 acquire/release
+    // ---------------------------------------------------------------
+
+    @Test
+    void concurrentAcquireRelease_maintainsCorrectRefCnt() throws Exception {
+        FullHttpRequest nativeRequest = newRequest();
+        NettyServerHttpRequest req = new NettyServerHttpRequest(webContext, ctx, nativeRequest, "/test");
+        int threadCount = 4;
+        int opsPerThread = 100;
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch latch = new CountDownLatch(threadCount);
+
+        for (int i = 0; i < threadCount; i++) {
+            executor.execute(() -> {
+                try {
+                    for (int j = 0; j < opsPerThread; j++) {
+                        req.acquire();
+                    }
+                    for (int j = 0; j < opsPerThread; j++) {
+                        req.release();
+                    }
+                } finally {
+                    latch.countDown();
+                }
+            });
+        }
+
+        latch.await();
+        executor.shutdown();
+
+        assertEquals(1, nativeRequest.refCnt(), "并发 acquire/release 后应回到初始 refCnt");
     }
 
     // ---------------------------------------------------------------

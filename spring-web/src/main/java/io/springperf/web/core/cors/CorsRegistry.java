@@ -64,6 +64,9 @@ public class CorsRegistry extends WebComponentContainer implements EmbeddedValue
      * <p>适用于框架初始化后动态添加路由 CORS 配置的场景（如 Actuator 端点）。
      * 与 {@link #addMapping(String)} 不同，该方法会直接写入已构建的 registrations 列表，
      * 因为 {@link #initComponentPhase1()} 已将列表固化。</p>
+     *
+     * @param pathPattern       the path pattern to match
+     * @param corsConfiguration the CORS configuration
      */
     public synchronized void addActuatorCorsConfiguration(String pathPattern, CorsConfiguration corsConfiguration) {
         CorsRegistration registration = new CorsRegistration(pathPattern, corsConfiguration);

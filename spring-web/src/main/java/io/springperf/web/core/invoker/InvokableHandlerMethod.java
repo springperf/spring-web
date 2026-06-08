@@ -89,11 +89,7 @@ public class InvokableHandlerMethod extends HandlerMethod {
     }
 
     public MethodParameter[] createMethodParameters() {
-        MethodParameter[] result = new MethodParameter[getBridgedMethod().getParameterCount()];
-        for (int i = 0; i < result.length; i++) {
-            result[i] = new MethodParameter(getBridgedMethod(), i);
-        }
-        return result;
+        return getMethodParameters();
     }
 
     public void setResponseStatus(WebServerHttpRequest request, WebServerHttpResponse response) {

@@ -1,18 +1,21 @@
 package io.springperf.web.http;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.http.support.HttpInputMessagePart;
-import io.springperf.web.http.support.NettyAttributeMessage;
-import io.springperf.web.http.support.NettyMultipartWebRequest;
-import io.netty.buffer.ByteBufInputStream;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.QueryStringDecoder;
-import io.netty.handler.codec.http.multipart.*;
+import io.netty.handler.codec.http.multipart.Attribute;
+import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory;
+import io.netty.handler.codec.http.multipart.HttpPostStandardRequestDecoder;
+import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.ReferenceCountUtil;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.http.support.HttpInputMessagePart;
+import io.springperf.web.http.support.NettyAttributeMessage;
+import io.springperf.web.http.support.NettyMultipartWebRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.util.LinkedMultiValueMap;
@@ -20,6 +23,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.util.MultiValueMapAdapter;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -33,6 +37,7 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
     private final FullHttpRequest request;
     private HttpHeaders headers;
     private URI uri;
+    private volatile byte[] body;
 
     /**
      * 使用已解析的 path 构造，跳过 context-path 校验。
@@ -205,12 +210,23 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
 
     @Override
     public InputStream getBody() {
-        return new ByteBufInputStream(request.content());
+        return new ByteArrayInputStream(getBodyBytes());
+    }
+
+    protected byte[] getBodyBytes() {
+        if (body == null) {
+            synchronized (this) {
+                if (body == null) {
+                    body = ByteBufUtil.getBytes(request.content());
+                }
+            }
+        }
+        return body;
     }
 
     @Override
     public boolean hasBody() {
-        return request.content().isReadable();
+        return getBodyBytes().length > 0;
     }
 
     @Override

@@ -34,6 +34,48 @@
       "description": "Check handler mappings on startup.",
       "sourceType": "io.springperf.web.context.ApplicationProperties",
       "defaultValue": true
+    },
+    {
+      "name": "server.async.timeout",
+      "type": "java.lang.Long",
+      "description": "Async request timeout in milliseconds.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": 30000
+    },
+    {
+      "name": "server.shutdown.timeout",
+      "type": "java.lang.Integer",
+      "description": "Graceful shutdown max wait time in milliseconds.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": 30000
+    },
+    {
+      "name": "pool.core-pool-size",
+      "type": "java.lang.Integer",
+      "description": "Default business thread pool core pool size.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": 50
+    },
+    {
+      "name": "pool.max-pool-size",
+      "type": "java.lang.Integer",
+      "description": "Default business thread pool max pool size.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": 200
+    },
+    {
+      "name": "pool.keep-alive-time",
+      "type": "java.lang.Integer",
+      "description": "Business thread pool thread keep-alive time in seconds.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": 60
+    },
+    {
+      "name": "pool.queue-capacity",
+      "type": "java.lang.Integer",
+      "description": "Business thread pool queue capacity (unbounded if not set).",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "Integer.MAX_VALUE"
     }
   ]
 }
