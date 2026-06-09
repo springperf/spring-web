@@ -320,4 +320,17 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
                     "Biz pool thread should NOT be event loop thread, got: " + threadName);
         }
     }
+
+    // ==================== 11. @RunInPool 不存在的池名 ====================
+
+    @Test
+    void runInNonExistentPool_returns500() throws Exception {
+        Request req = new Request.Builder()
+                .url(coreUrl + "/pool/bad-pool")
+                .get()
+                .build();
+        try (Response resp = CLIENT.newCall(req).execute()) {
+            assertEquals(500, resp.code());
+        }
+    }
 }

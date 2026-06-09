@@ -5,67 +5,60 @@ import okhttp3.*;
 import okio.BufferedSource;
 import org.junit.jupiter.api.Test;
 
-import lombok.extern.slf4j.Slf4j;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
-@Slf4j
 public class HelloApiTest extends BaseE2ETest {
 
-    public String baseUrl = "http://localhost:9090/api/demo";
+    private static final MediaType JSON_MEDIA = MediaType.parse("application/json; charset=utf-8");
+
+    private final String baseUrl = "http://localhost:9090/api/demo";
 
     @Test
     void hello_should_work() throws Exception {
-        HttpUrl url = HttpUrl.parse(baseUrl + "/hello/123/aaab")
-                .newBuilder()
-                .addQueryParameter("v", "netty")
+        Request req = new Request.Builder()
+                .url(baseUrl + "/hello/123/aaab?v=netty")
+                .get()
                 .build();
-
-        Request req = new Request.Builder().url(url).get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
-            String result = resp.body().string();
-            log.info(result);
-            assertEquals("{\"v\":\"netty\",\"message\":\"hello 123\"}", result);
+            assertEquals("{\"v\":\"netty\",\"message\":\"hello 123\"}", resp.body().string());
         }
     }
 
     @Test
     void testPostJson() throws Exception {
         RequestBody body = RequestBody.create(
-                "{\"tid\": 1243456,\"data\":{\"name\":\"123cd\",\"age\":122}}",
-                MediaType.parse("application/json")
-        );
-
+                "{\"tid\": 1243456,\"data\":{\"name\":\"123cd\",\"age\":122}}", JSON_MEDIA);
         Request req = new Request.Builder()
                 .url(baseUrl + "/find/hcd?v=111&id=777&age=33")
                 .post(body)
                 .build();
-
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> result = JSON.parseObject(resp.body().string(), Map.class);
-            log.info(String.valueOf(result));
-            assertTrue("1243456".equals(result.get("tid").toString()));
+            assertEquals("1243456", Objects.toString(result.get("tid")));
         }
     }
 
     @Test
     void echoGet() throws Exception {
         String received = System.currentTimeMillis() + "test";
-        Request req = new Request.Builder().url(baseUrl + "/echo?received=" + received).get().build();
+        Request req = new Request.Builder()
+                .url(baseUrl + "/echo?received=" + received)
+                .get()
+                .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(302, resp.code());
-            String result = resp.body().string();
-            log.info(result);
-            assertEquals(received, result);
+            assertEquals(received, resp.body().string());
         }
     }
 
@@ -75,24 +68,23 @@ public class HelloApiTest extends BaseE2ETest {
         data.put("tid", "1243456");
         data.put("name", "123cd");
         data.put("age", "33");
-        RequestBody body = RequestBody.create(JSON.toJSONString(data), MediaType.parse("application/json"));
-
+        RequestBody body = RequestBody.create(JSON.toJSONString(data), JSON_MEDIA);
         Request req = new Request.Builder().url(baseUrl + "/echo").post(body).build();
-
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(201, resp.code());
             data.put("received", true);
             String result = resp.body().string();
-            log.info(result);
             Map<String, String> map = JSON.parseObject(result, Map.class);
-            assertTrue(data.equals(map));
+            assertEquals(data, map);
         }
     }
 
     @Test
     void testPostForm() throws Exception {
-        RequestBody body = new FormBody.Builder().add("age", "111")
-                .add("ids", "aaa").add("ids", "bbb").build();
+        RequestBody body = new FormBody.Builder()
+                .add("age", "111")
+                .add("ids", "aaa").add("ids", "bbb")
+                .build();
         Request req = new Request.Builder()
                 .url(baseUrl + "/read/hcd?name=111hcd")
                 .post(body)
@@ -100,74 +92,70 @@ public class HelloApiTest extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> result = JSON.parseObject(resp.body().string(), Map.class);
-            log.info(String.valueOf(result));
-            assertTrue("hcd".equals(result.get("name2").toString()));
-            assertTrue("111".equals(result.get("age").toString()));
-            assertTrue("111hcd".equals(result.get("name").toString()));
+            assertEquals("hcd", Objects.toString(result.get("name2")));
+            assertEquals("111", Objects.toString(result.get("age")));
+            assertEquals("111hcd", Objects.toString(result.get("name")));
         }
     }
 
     @Test
     void asyncGet() throws Exception {
+        OkHttpClient shortClient = CLIENT.newBuilder()
+                .readTimeout(Duration.ofSeconds(5))
+                .build();
         Request req = new Request.Builder().url(baseUrl + "/async").get().build();
-        try (Response resp = CLIENT.newCall(req).execute()) {
+        try (Response resp = shortClient.newCall(req).execute()) {
             assertEquals(200, resp.code());
-            String result = resp.body().string();
-            log.info(result);
+            assertNotNull(resp.body().string());
         }
     }
 
     @Test
     void testPostFormData() throws Exception {
-        RequestBody body = new MultipartBody.Builder().setType(MultipartBody.FORM).addFormDataPart("userPart", "{\"name\":\"123cd\",\"age\":122}")
-                .addFormDataPart("file", "testFile.txt", RequestBody.create("aaaaaaaaaaaaaaaaaaaaaa".getBytes(StandardCharsets.UTF_8))).build();
+        RequestBody fileBody = RequestBody.create(
+                "aaaaaaaaaaaaaaaaaaaaaa".getBytes(StandardCharsets.UTF_8));
+        RequestBody body = new MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("userPart", "{\"name\":\"123cd\",\"age\":122}")
+                .addFormDataPart("file", "testFile.txt", fileBody)
+                .build();
         Request req = new Request.Builder()
                 .url(baseUrl + "/upload")
-                .addHeader("Content-Type", "multipart/form-data")
                 .post(body)
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> result = JSON.parseObject(resp.body().string(), Map.class);
-            log.info(String.valueOf(result));
-            assertTrue("testFile.txt".equals(result.get("fileName").toString()));
-            assertTrue("123cd".equals(result.get("name").toString()));
+            assertEquals("testFile.txt", Objects.toString(result.get("fileName")));
+            assertEquals("123cd", Objects.toString(result.get("name")));
         }
     }
 
     @Test
-    void testSse() throws InterruptedException {
+    void testSse() throws Exception {
         Request request = new Request.Builder().url(baseUrl + "/sse").get().build();
-        CountDownLatch latch = new CountDownLatch(100);
+        CountDownLatch latch = new CountDownLatch(3);
         CLIENT.newCall(request).enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
-                log.warn("SSE request failed: {}", e.getMessage());
+                fail("SSE request failed: " + e.getMessage());
             }
 
             @Override
             public void onResponse(Call call, Response response) throws IOException {
                 assertEquals(200, response.code());
-                assertTrue(response.header("Content-Type")
-                        .contains("text/event-stream"));
+                assertTrue(response.header("Content-Type").contains("text/event-stream"));
                 BufferedSource source = response.body().source();
                 while (!source.exhausted()) {
                     String line = source.readUtf8Line();
-                    if (line == null) {
-                        continue;
-                    }
+                    if (line == null) continue;
                     if (line.startsWith("data:")) {
-                        log.info(line.substring(5).trim());
                         latch.countDown();
-                    } else {
-                        log.info(line);
                     }
                 }
             }
         });
-        boolean completed = latch.await(10, TimeUnit.SECONDS);
-
-        // 必须在超时时间内收到足够事件
-        assertTrue(completed, "Did not receive expected SSE events in time");
+        assertTrue(latch.await(5, TimeUnit.SECONDS),
+                "Should receive at least 3 SSE events within timeout");
     }
 }

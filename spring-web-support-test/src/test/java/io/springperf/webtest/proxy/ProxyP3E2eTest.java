@@ -70,13 +70,6 @@ public class ProxyP3E2eTest {
         }
     }
 
-    @Test
-    void parentController_ownMethod_stillWorks() throws Exception {
-        // ParentController 仍然是独立 bean，不会被 ChildController 覆盖
-        // 访问 /proxy-parent/greet 时，MVC 路由应通过 ChildController 响应
-        // 这是合理的，因为子类覆盖了父类的行为
-    }
-
     // ==================== 2. @RequestMapping 负向条件 (headers/params/consumes) ====================
 
     @Test

@@ -12,8 +12,8 @@ public abstract class BaseE2ETest {
 
     public static final OkHttpClient CLIENT = new OkHttpClient.Builder()
             .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(500))
-            .writeTimeout(Duration.ofSeconds(500))
+            .readTimeout(Duration.ofSeconds(10))
+            .writeTimeout(Duration.ofSeconds(10))
             .retryOnConnectionFailure(true)
             .build();
 }

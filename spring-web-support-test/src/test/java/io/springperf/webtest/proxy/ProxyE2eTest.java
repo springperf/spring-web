@@ -129,16 +129,6 @@ public class ProxyE2eTest {
         }
     }
 
-    // ==================== 验证 CGLIB 代理确实生效 ====================
-
-    @Test
-    void controllerBean_isCglibProxy() {
-        // ProxyE2eApp 配置了 @EnableAspectJAutoProxy(proxyTargetClass = true),
-        // ProxyController 应被 CGLIB 代理
-        // 此测试在 Spring 上下文可直接验证，但在 E2E HTTP 测试中通过行为间接验证。
-        // 此处确保服务器启动正常，路由正确。
-    }
-
     // ==================== 占位符路径解析 ====================
 
     @Test
@@ -152,12 +142,6 @@ public class ProxyE2eTest {
             String body = resp.body().string();
             assertEquals("placeholder-ok", body);
         }
-    }
-
-    @Test
-    void placeholderPath_unknownKey_usesDefault() {
-        // 没有配置的 key 应使用默认值 /api/placeholder
-        // 此处无法直接测试（这是另一个 Spring Boot 应用），已在单元测试中覆盖
     }
 
     // ==================== P0: @ModelAttribute + CGLIB 代理 ====================
