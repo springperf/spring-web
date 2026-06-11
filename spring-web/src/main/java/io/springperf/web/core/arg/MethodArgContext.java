@@ -45,7 +45,11 @@ public class MethodArgContext {
             if (validatedAnn != null || ann.annotationType().getSimpleName().startsWith("Valid")) {
                 haveValidateAnnotation = true;
                 Object hints = (validatedAnn != null ? validatedAnn.value() : AnnotationUtils.getValue(ann));
-                validationHints = (hints instanceof Object[] ? (Object[]) hints : new Object[]{hints});
+                if(hints instanceof Object[]){
+                    validationHints = (Object[]) hints;
+                }else{
+                    validationHints = new Object[]{hints};
+                }
                 break;
             }
         }

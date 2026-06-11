@@ -53,7 +53,8 @@ public class NettyHttpServer implements SmartLifecycle {
         this.httpHandler = new NettyHttpHandler(webContext, webContext.getContextPath(), registry);
         int port = webContext.getProps().getInt(PropertiesConstant.SERVER_PORT, 8080);
         bossGroup = new NioEventLoopGroup(1);
-        workerGroup = new NioEventLoopGroup();
+        int workerThreads = webContext.getProps().getInt(PropertiesConstant.SERVER_NETTY_WORKERS, 0);
+        workerGroup = workerThreads > 0 ? new NioEventLoopGroup(workerThreads) : new NioEventLoopGroup();
         ServerBootstrap bootstrap = new ServerBootstrap();
         bootstrap.group(bossGroup, workerGroup).channel(NioServerSocketChannel.class).childHandler(new ChannelInitializer<SocketChannel>() {
             @Override

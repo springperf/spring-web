@@ -126,6 +126,17 @@ public interface WebServerHttpResponse extends ServerHttpResponse {
     void writeStream(InputStream input);
 
     /**
+     * Write a byte array to the response body with {@code Content-Length} header
+     * in a single write-and-flush operation.
+     * <p>Unlike {@link #writeStream}, this method avoids chunked transfer encoding
+     * and sends headers + body in one TCP segment, which is significantly more
+     * efficient for small known-size payloads.</p>
+     *
+     * @param data the byte array to write
+     */
+    void writeBytes(byte[] data);
+
+    /**
      * Write a {@link File} to the response body.
      *
      * @param file the file to write

@@ -32,6 +32,7 @@ public class WebServerHttpResponseWrapper implements WebServerHttpResponse {
     @Override public void sendError(HttpStatus statusCode) { response.sendError(statusCode); }
     @Override public void sendError(HttpStatus statusCode, String message) { response.sendError(statusCode, message); }
     @Override public void writeStream(InputStream input) { response.writeStream(input); }
+    @Override public void writeBytes(byte[] data) { response.writeBytes(data); }
     @Override public void writeFile(File file) { response.writeFile(file); }
     @Override public void setStatusCode(HttpStatus status) { response.setStatusCode(status); }
     @Override public void flush() throws IOException { response.flush(); }

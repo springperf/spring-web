@@ -45,6 +45,7 @@
         <module>spring-boot-starter-web</module>
         <module>spring-web-test</module>
         <module>spring-web-support-test</module>
+        <module>spring-web-benchmark</module>
     </modules>
 
     <properties>
@@ -66,6 +67,7 @@
         <okhttp.version>4.12.0</okhttp.version>
         <servlet-api.version>4.0.1</servlet-api.version>
         <hutool.version>5.8.23</hutool.version>
+        <jmh.version>1.37</jmh.version>
     </properties>
 
     <build>
@@ -93,6 +95,16 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-gpg-plugin</artifactId>
                     <version>1.6</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>build-helper-maven-plugin</artifactId>
+                    <version>3.6.0</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.openjdk.jmh</groupId>
+                    <artifactId>jmh-maven-plugin</artifactId>
+                    <version>${jmh.version}</version>
                 </plugin>
             </plugins>
         </pluginManagement>
@@ -221,6 +233,18 @@
                 <groupId>com.squareup.okhttp3</groupId>
                 <artifactId>okhttp</artifactId>
                 <version>${okhttp.version}</version>
+            </dependency>
+
+            <!-- JMH -->
+            <dependency>
+                <groupId>org.openjdk.jmh</groupId>
+                <artifactId>jmh-core</artifactId>
+                <version>${jmh.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.openjdk.jmh</groupId>
+                <artifactId>jmh-generator-annprocess</artifactId>
+                <version>${jmh.version}</version>
             </dependency>
 
             <!-- 测试依赖 -->

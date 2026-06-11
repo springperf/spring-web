@@ -47,3 +47,5 @@ classes
 /.claude/hook/
 /.claude/settings.local.json
 .env
+/spring-web-benchmark/benchmark-reports/
+/docs/superpowers/

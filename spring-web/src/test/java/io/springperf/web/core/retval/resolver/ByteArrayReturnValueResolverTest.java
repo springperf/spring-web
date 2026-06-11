@@ -7,11 +7,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.MethodParameter;
 
-import java.io.ByteArrayInputStream;
 import java.lang.reflect.Method;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class ByteArrayReturnValueResolverTest {
@@ -42,10 +42,10 @@ class ByteArrayReturnValueResolverTest {
     }
 
     @Test
-    void resolveReturnValue_callsWriteStream() throws Exception {
+    void resolveReturnValue_callsWriteBytes() throws Exception {
         byte[] data = "hello".getBytes();
         resolver.resolveReturnValue(data, null, null, response);
-        verify(response).writeStream(any(ByteArrayInputStream.class));
+        verify(response).writeBytes(data);
     }
 
     private MethodParameter returnParam(String methodName, Class<?> returnType) throws Exception {

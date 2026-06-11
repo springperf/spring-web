@@ -1,8 +1,8 @@
 package io.springperf.web.http;
 
-import io.springperf.web.context.WebContext;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufOutputStream;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
@@ -10,6 +10,7 @@ import io.netty.channel.DefaultFileRegion;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.stream.ChunkedStream;
 import io.netty.util.AttributeKey;
+import io.springperf.web.context.WebContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 
@@ -148,6 +149,34 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
                 // input 关闭失败无需额外处理
             }
             throw new RuntimeException(ex);
+        }
+    }
+
+    // ---------- byte array: Content-Length + single flush ----------
+    @Override
+    public void writeBytes(byte[] data) {
+        if (!setCommitted()) {
+            return;
+        }
+        ByteBuf body = Unpooled.wrappedBuffer(data);
+        HttpResponse response = new DefaultFullHttpResponse(
+                HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()), body);
+        for (Map.Entry<String, List<String>> e : headers.entrySet()) {
+            for (String v : e.getValue()) {
+                response.headers().add(e.getKey(), v);
+            }
+        }
+        response.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/octet-stream");
+        response.headers().setInt(HttpHeaderNames.CONTENT_LENGTH, data.length);
+        if (keepAlive) {
+            response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+        } else {
+            response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+        }
+        ChannelFuture f = ctx.writeAndFlush(response);
+        addRespEventListener(f, true);
+        if (!keepAlive) {
+            f.addListener(ChannelFutureListener.CLOSE);
         }
     }
 

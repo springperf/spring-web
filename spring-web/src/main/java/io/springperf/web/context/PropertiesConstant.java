@@ -47,4 +47,7 @@ public final class PropertiesConstant {
 
     /** Graceful shutdown max wait time in milliseconds. */
     public static final String SERVER_SHUTDOWN_TIMEOUT = "server.shutdown.timeout";
+
+    /** Netty worker event loop thread count (default: 2 * CPU cores). */
+    public static final String SERVER_NETTY_WORKERS = "server.netty.workers";
 }

@@ -7,10 +7,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.validation.Valid;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,7 +40,7 @@ public class UserController {
 
     @PostMapping(value = "/find/{name}", params = "v=111")
     @Optimize
-    public ResponseEntity<Map<String, Object>> find(@Validated @RequestBody RequestObj<User> req, BindingResult result, @PathVariable("name") String name, @RequestParam("v") String v, int id, @ModelAttribute User user) {
+    public ResponseEntity<Map<String, Object>> find(@Valid @RequestBody RequestObj<User> req, BindingResult result, @PathVariable("name") String name, @RequestParam("v") String v, int id, @ModelAttribute User user) {
         Map<String, Object> m = new HashMap<>();
         m.put("id", id);
         m.put("tid", req.getTid());

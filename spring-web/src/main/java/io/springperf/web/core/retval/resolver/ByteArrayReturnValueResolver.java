@@ -6,8 +6,6 @@ import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import org.springframework.core.MethodParameter;
 
-import java.io.ByteArrayInputStream;
-
 public class ByteArrayReturnValueResolver implements ReturnValueResolver {
     @Override
     public boolean supportsReturnType(MethodParameter returnType, MappingHandlerMethod mappingContext) {
@@ -22,7 +20,6 @@ public class ByteArrayReturnValueResolver implements ReturnValueResolver {
     @Override
     public void resolveReturnValue(Object returnValue, MethodParameter returnType, WebServerHttpRequest req, WebServerHttpResponse resp) throws Exception {
         byte[] bytes = (byte[]) returnValue;
-        ByteArrayInputStream input = new ByteArrayInputStream(bytes);
-        resp.writeStream(input);
+        resp.writeBytes(bytes);
     }
 }
