@@ -3,6 +3,7 @@ package io.springperf.webtest;
 import io.springperf.web.annotation.Optimize;
 import io.springperf.web.core.async.stream.SseEmitter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
@@ -97,6 +98,12 @@ public class UserController {
         return m;
     }
 
+    private final TaskExecutor taskExecutor;
+
+    public UserController(TaskExecutor taskExecutor) {
+        this.taskExecutor = taskExecutor;
+    }
+
     @GetMapping(value = "/sse")
     public SseEmitter sse() {
         SseEmitter emitter = new SseEmitter();
@@ -114,6 +121,25 @@ public class UserController {
             }
             emitter.complete();
         }).start();
+        return emitter;
+    }
+
+    /**
+     * 模拟 benchmark 快速发送模式：TaskExecutor + 0间隔，触发 complete() before initialize() 竞态场景
+     */
+    @GetMapping(value = "/sse-fast")
+    public SseEmitter sseFast() {
+        SseEmitter emitter = new SseEmitter(60000L);
+        taskExecutor.execute(() -> {
+            try {
+                for (int i = 0; i < 10; i++) {
+                    emitter.send("fast-" + i);
+                }
+                emitter.complete();
+            } catch (Exception e) {
+                emitter.completeWithError(e);
+            }
+        });
         return emitter;
     }
 }

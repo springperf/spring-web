@@ -62,7 +62,7 @@ public class AbstractServerBenchmark {
         serverState = new BenchServerState(appClass, props);
         serverState.start();
         clientState = new BenchClientState();
-        clientState.setup();
+        clientState.setup(serverState.getActualPort());
     }
 
     @TearDown(Level.Trial)
@@ -169,6 +169,13 @@ public class AbstractServerBenchmark {
     @Benchmark
     public void validatePost(Blackhole blackhole) throws Exception {
         blackhole.consume(clientState.executeAndConsume(clientState.validatePostRequest));
+    }
+
+    // ==================== SSE Stream ====================
+
+    @Benchmark
+    public void sseStream(Blackhole blackhole) throws Exception {
+        blackhole.consume(clientState.executeAndConsumeStream(clientState.sseStreamRequest));
     }
 
     // ==================== P0 新场景 ====================

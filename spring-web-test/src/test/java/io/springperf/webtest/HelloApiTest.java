@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -157,5 +158,36 @@ public class HelloApiTest extends BaseE2ETest {
         });
         assertTrue(latch.await(5, TimeUnit.SECONDS),
                 "Should receive at least 3 SSE events within timeout");
+    }
+
+    @Test
+    void testSseFast() throws Exception {
+        // 测试 TaskExecutor 快速发送场景（0间隔），验证 complete() before initialize() 竞态已修复
+        Request request = new Request.Builder().url(baseUrl + "/sse-fast").get().build();
+        AtomicInteger count = new AtomicInteger(0);
+        CountDownLatch latch = new CountDownLatch(1);
+        CLIENT.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                fail("SSE fast request failed: " + e.getMessage());
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                assertEquals(200, response.code());
+                assertTrue(response.header("Content-Type").contains("text/event-stream"));
+                BufferedSource source = response.body().source();
+                while (!source.exhausted()) {
+                    String line = source.readUtf8Line();
+                    if (line == null) continue;
+                    if (line.startsWith("data:")) {
+                        count.incrementAndGet();
+                    }
+                }
+                latch.countDown();
+            }
+        });
+        assertTrue(latch.await(5, TimeUnit.SECONDS), "SSE fast should complete within timeout");
+        assertTrue(count.get() >= 10, "Should receive all 10 fast SSE events, got: " + count.get());
     }
 }

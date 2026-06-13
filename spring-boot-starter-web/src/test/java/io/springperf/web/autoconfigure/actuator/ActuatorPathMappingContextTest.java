@@ -7,10 +7,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.boot.actuate.endpoint.http.ApiVersion;
+import org.springframework.boot.actuate.endpoint.ApiVersion;
 import org.springframework.boot.actuate.endpoint.web.EndpointMediaTypes;
 import org.springframework.boot.actuate.endpoint.web.WebEndpointHttpMethod;
 import org.springframework.boot.actuate.endpoint.web.WebOperationRequestPredicate;
+import org.springframework.boot.actuate.endpoint.web.WebServerNamespace;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
@@ -39,7 +40,7 @@ class ActuatorPathMappingContextTest {
         LinksOperationInvoker invoker = new LinksOperationInvoker();
         ActuatorPathMappingContext ctx = new ActuatorPathMappingContext(
                 invoker, "/actuator", null, null,
-                null, mediaTypes, "/actuator");
+                null, mediaTypes, "/actuator", WebServerNamespace.SERVER);
 
         assertNull(ctx.getOperation());
         assertNull(ctx.getPredicate());
@@ -50,7 +51,7 @@ class ActuatorPathMappingContextTest {
         OperationHandlerInvoker invoker = new OperationHandlerInvoker(null, predicate, Collections.emptyList());
         ActuatorPathMappingContext ctx = new ActuatorPathMappingContext(
                 invoker, "/actuator/health", null, predicate,
-                null, mediaTypes, "/actuator");
+                null, mediaTypes, "/actuator", WebServerNamespace.SERVER);
 
         assertNull(ctx.getOperation());
         assertSame(predicate, ctx.getPredicate());
@@ -61,7 +62,7 @@ class ActuatorPathMappingContextTest {
         OperationHandlerInvoker invoker = new OperationHandlerInvoker(null, predicate, Collections.emptyList());
         ActuatorPathMappingContext ctx = new ActuatorPathMappingContext(
                 invoker, "/actuator/health", null, predicate,
-                null, mediaTypes, "/actuator");
+                null, mediaTypes, "/actuator", WebServerNamespace.SERVER);
 
         HttpHeaders headers = new HttpHeaders();
         when(request.getHeaders()).thenReturn(headers);
@@ -79,7 +80,7 @@ class ActuatorPathMappingContextTest {
         LinksOperationInvoker invoker = new LinksOperationInvoker();
         ActuatorPathMappingContext ctx = new ActuatorPathMappingContext(
                 invoker, "/actuator", null, null,
-                null, mediaTypes, "/actuator");
+                null, mediaTypes, "/actuator", WebServerNamespace.SERVER);
 
         List<MediaType> accepts = Collections.singletonList(
                 MediaType.parseMediaType("application/vnd.spring-boot.actuator.v2+json"));
@@ -93,7 +94,7 @@ class ActuatorPathMappingContextTest {
         LinksOperationInvoker invoker = new LinksOperationInvoker();
         ActuatorPathMappingContext ctx = new ActuatorPathMappingContext(
                 invoker, "/actuator", null, null,
-                null, mediaTypes, "/actuator");
+                null, mediaTypes, "/actuator", WebServerNamespace.SERVER);
 
         List<MediaType> accepts = Collections.singletonList(
                 MediaType.parseMediaType("application/vnd.spring-boot.actuator.v3+json"));
@@ -107,7 +108,7 @@ class ActuatorPathMappingContextTest {
         LinksOperationInvoker invoker = new LinksOperationInvoker();
         ActuatorPathMappingContext ctx = new ActuatorPathMappingContext(
                 invoker, "/actuator", null, null,
-                null, mediaTypes, "/actuator");
+                null, mediaTypes, "/actuator", WebServerNamespace.SERVER);
 
         ApiVersion version = invokeResolveApiVersion(ctx, null);
         assertEquals(ApiVersion.LATEST, version);
@@ -118,7 +119,7 @@ class ActuatorPathMappingContextTest {
         LinksOperationInvoker invoker = new LinksOperationInvoker();
         ActuatorPathMappingContext ctx = new ActuatorPathMappingContext(
                 invoker, "/actuator", null, null,
-                null, mediaTypes, "/actuator");
+                null, mediaTypes, "/actuator", WebServerNamespace.SERVER);
 
         ApiVersion version = invokeResolveApiVersion(ctx, Collections.<MediaType>emptyList());
         assertEquals(ApiVersion.LATEST, version);
@@ -129,7 +130,7 @@ class ActuatorPathMappingContextTest {
         OperationHandlerInvoker invoker = new OperationHandlerInvoker(null, predicate, Collections.emptyList());
         ActuatorPathMappingContext ctx = new ActuatorPathMappingContext(
                 invoker, "/actuator/health", null, predicate,
-                null, mediaTypes, "/actuator");
+                null, mediaTypes, "/actuator", WebServerNamespace.SERVER);
 
         assertNull(ctx.getOperation());
     }
@@ -139,7 +140,7 @@ class ActuatorPathMappingContextTest {
         OperationHandlerInvoker invoker = new OperationHandlerInvoker(null, predicate, Collections.emptyList());
         ActuatorPathMappingContext ctx = new ActuatorPathMappingContext(
                 invoker, "/actuator/health", null, predicate,
-                null, mediaTypes, "/actuator");
+                null, mediaTypes, "/actuator", WebServerNamespace.SERVER);
 
         assertSame(predicate, ctx.getPredicate());
     }

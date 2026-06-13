@@ -46,6 +46,17 @@ public final class BenchmarkConstants {
     /** 大响应体路径 */
     public static final String LARGE_RESPONSE_PATH = "/core/large-response";
 
+    // ==================== SSE 流式模拟 ====================
+
+    /** SSE 块数 */
+    public static final int SSE_CHUNK_COUNT = 100;
+    /** 每块字符数 */
+    public static final int SSE_CHUNK_SIZE = 200;
+    /** 块间隔毫秒（0 = 无间隔，测试框架原始吞吐能力） */
+    public static final int SSE_CHUNK_INTERVAL_MS = 0;
+    /** SSE 流式接口路径 */
+    public static final String SSE_PATH = "/core/sse/stream";
+
     static {
         StringBuilder sb = new StringBuilder(105 * 1024);
         sb.append("{\"data\":\"");

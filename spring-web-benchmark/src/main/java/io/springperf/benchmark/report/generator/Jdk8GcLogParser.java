@@ -17,15 +17,15 @@ import java.util.regex.Pattern;
 public class Jdk8GcLogParser implements GcLogParser {
 
     private static final Pattern GC_PATTERN =
-            Pattern.compile("^\\[GC\\s.*?([\\d.]+)\\s+secs\\]", Pattern.MULTILINE);
+            Pattern.compile("\\[GC\\s.*?(\\d+\\.\\d+)\\s+secs\\]");
     private static final Pattern FULL_GC_PATTERN =
-            Pattern.compile("^\\[Full GC\\s.*?([\\d.]+)\\s+secs\\]", Pattern.MULTILINE);
+            Pattern.compile("\\[Full GC\\s.*?(\\d+\\.\\d+)\\s+secs\\]");
 
     @Override
     public boolean supports(Path logFile) {
         try (java.util.stream.Stream<String> lines = Files.lines(logFile)) {
-            return lines.limit(5).anyMatch(line ->
-                    line.startsWith("[GC") || line.startsWith("[Full GC"));
+            return lines.limit(50).anyMatch(line ->
+                    line.contains("[GC") || line.contains("[Full GC"));
         } catch (IOException e) {
             return false;
         }

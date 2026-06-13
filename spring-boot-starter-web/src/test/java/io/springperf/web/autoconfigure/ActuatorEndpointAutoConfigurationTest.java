@@ -10,6 +10,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.actuate.autoconfigure.endpoint.expose.IncludeExcludeEndpointFilter;
 import org.springframework.boot.actuate.autoconfigure.endpoint.web.WebEndpointProperties;
+import org.springframework.boot.actuate.endpoint.ApiVersion;
 import org.springframework.boot.actuate.endpoint.web.EndpointMediaTypes;
 import org.springframework.boot.actuate.endpoint.web.ExposableWebEndpoint;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -41,7 +42,9 @@ class ActuatorEndpointAutoConfigurationTest {
     void configuration_hasConditionalOnClass() {
         ConditionalOnClass annotation = ActuatorEndpointAutoConfiguration.class.getAnnotation(ConditionalOnClass.class);
         assertNotNull(annotation);
+        assertEquals(2, annotation.value().length);
         assertEquals(ExposableWebEndpoint.class, annotation.value()[0]);
+        assertEquals(ApiVersion.class, annotation.value()[1]);
     }
 
     @Test

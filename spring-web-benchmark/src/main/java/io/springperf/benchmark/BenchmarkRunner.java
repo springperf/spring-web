@@ -9,6 +9,9 @@ import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.TimeValue;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * JMH 程序化运行器（开发调试用）。
  * <p>
@@ -66,11 +69,27 @@ public class BenchmarkRunner {
         optBuilder.result(resultFile);
         optBuilder.shouldDoGC(true);
 
-        // 如果有 GC 日志参数，追加到 fork 的 JVM 参数中
+        // 收集传递给 forked JVM 的额外 JVM 参数
+        List<String> extraJvmArgs = new ArrayList<>();
+
+        // GC 日志参数
         if (!gcLogArg.isEmpty()) {
-            String[] jvmArgs = gcLogArg.split("\\s+");
-            optBuilder.jvmArgsAppend(jvmArgs);
-            System.out.println("[BenchmarkRunner] JVM args append: " + java.util.Arrays.toString(jvmArgs));
+            String[] parts = gcLogArg.split("\\s+");
+            java.util.Collections.addAll(extraJvmArgs, parts);
+            System.out.println("[BenchmarkRunner] JVM args append: " + java.util.Arrays.toString(parts));
+        }
+
+        // 传递 benchmark.* 系统属性到 forked JVM（内存快照、端口、profile名等需要）
+        String[] propNames = {"benchmark.port", "benchmark.profile.name", "benchmark.output.dir"};
+        for (String propName : propNames) {
+            String propValue = System.getProperty(propName);
+            if (propValue != null && !propValue.isEmpty()) {
+                extraJvmArgs.add("-D" + propName + "=" + propValue);
+            }
+        }
+
+        if (!extraJvmArgs.isEmpty()) {
+            optBuilder.jvmArgsAppend(extraJvmArgs.toArray(new String[0]));
         }
 
         Options opt = optBuilder.build();

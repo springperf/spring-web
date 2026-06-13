@@ -78,6 +78,10 @@ public abstract class StreamEmitter<T> {
         } finally {
             earlySendDataList.clear();
         }
+        if (complete.get() && this.streamSender != null) {
+            deferredResult.setResult(null);
+            this.streamSender.complete(true, null);
+        }
     }
 
     protected synchronized void initializeWithError(Throwable ex) {
@@ -89,8 +93,8 @@ public abstract class StreamEmitter<T> {
 
     public synchronized void complete() {
         if (complete.compareAndSet(false, true)) {
-            deferredResult.setResult(null);
             if (this.streamSender != null) {
+                deferredResult.setResult(null);
                 this.streamSender.complete(true, null);
             }
         }

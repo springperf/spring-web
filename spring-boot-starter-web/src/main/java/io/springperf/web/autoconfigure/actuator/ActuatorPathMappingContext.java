@@ -6,10 +6,10 @@ import io.springperf.web.core.mapping.route.PathPatternRouter;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.actuate.endpoint.ApiVersion;
 import org.springframework.boot.actuate.endpoint.InvocationContext;
 import org.springframework.boot.actuate.endpoint.OperationArgumentResolver;
 import org.springframework.boot.actuate.endpoint.SecurityContext;
-import org.springframework.boot.actuate.endpoint.http.ApiVersion;
 import org.springframework.boot.actuate.endpoint.web.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -31,11 +31,13 @@ public class ActuatorPathMappingContext extends PathMappingContext {
     private final EndpointMediaTypes endpointMediaTypes;
     private final String basePath;
     private final boolean linksEndpoint;
+    private final WebServerNamespace serverNamespace;
 
     public ActuatorPathMappingContext(CustomInvoker invoker, String pathRule,
                                       WebOperation operation, WebOperationRequestPredicate predicate,
                                       EndpointLinksResolver linksResolver,
-                                      EndpointMediaTypes endpointMediaTypes, String basePath) {
+                                      EndpointMediaTypes endpointMediaTypes, String basePath,
+                                      WebServerNamespace serverNamespace) {
         super(invoker, pathRule);
         this.operation = operation;
         this.predicate = predicate;
@@ -43,11 +45,13 @@ public class ActuatorPathMappingContext extends PathMappingContext {
         this.endpointMediaTypes = endpointMediaTypes;
         this.basePath = basePath;
         this.linksEndpoint = false;
+        this.serverNamespace = serverNamespace;
     }
 
     ActuatorPathMappingContext(CustomInvoker invoker, String pathRule,
                                EndpointLinksResolver linksResolver,
-                               EndpointMediaTypes endpointMediaTypes, String basePath) {
+                               EndpointMediaTypes endpointMediaTypes, String basePath,
+                               WebServerNamespace serverNamespace) {
         super(invoker, pathRule);
         this.operation = null;
         this.predicate = null;
@@ -55,6 +59,7 @@ public class ActuatorPathMappingContext extends PathMappingContext {
         this.endpointMediaTypes = endpointMediaTypes;
         this.basePath = basePath;
         this.linksEndpoint = true;
+        this.serverNamespace = serverNamespace;
     }
 
     @Override
@@ -82,7 +87,8 @@ public class ActuatorPathMappingContext extends PathMappingContext {
         Map<String, Object> arguments = buildActuatorArguments(request);
         ApiVersion apiVersion = resolveApiVersion(request.getHeaders().getAccept());
         return operation.invoke(new InvocationContext(SecurityContext.NONE, arguments,
-                OperationArgumentResolver.of(ApiVersion.class, () -> apiVersion)));
+                OperationArgumentResolver.of(ApiVersion.class, () -> apiVersion),
+                OperationArgumentResolver.of(WebServerNamespace.class, () -> serverNamespace)));
     }
 
     private ApiVersion resolveApiVersion(List<MediaType> acceptHeaders) {

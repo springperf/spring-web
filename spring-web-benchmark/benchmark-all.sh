@@ -4,9 +4,12 @@
 #
 # 直接绕过 jmh-maven-plugin，使用 java -cp 运行 BenchmarkRunner。
 # 每个 profile: clean compile → classpath → run (fork=1) 在单次循环中完成。
+# 每个 scenario (接口) 单独 fork JVM，结果文件独立。
 # 用法:
-#   ./benchmark-all.sh                           # 默认: 全部 10 profile
-#   ./benchmark-all.sh --profiles perf,tomcat    # 只跑指定 profile
+#   ./benchmark-all.sh                                    # 默认: 全部 10 profile × 7 场景
+#   ./benchmark-all.sh --profiles perf-filter,perf-support-filter,tomcat-filter,undertow-filter             # 只跑指定 profile
+#   ./benchmark-all.sh --scenario jsonEcho                # 只跑指定场景
+#   ./benchmark-all.sh --scenarios jsonEcho,bytes         # 跑指定多个场景
 #
 # 输出: benchmark-reports/{run-id}/report.md
 
@@ -40,16 +43,37 @@ DEFAULT_PROFILES=(
   "webflux-filter:9122:WebFluxFilterBenchmark"
 )
 
+# 默认场景列表（与 AbstractServerBenchmark 中的 @Benchmark 方法名一致）
+DEFAULT_SCENARIOS=(
+  "jsonEcho"
+  "helloGet"
+  "asyncDeferredResult"
+  "bytes"
+  "validatePost"
+  "jsonEchoLarge"
+  "largeResponse"
+  "sseStream"
+)
+
 # 解析参数
 PROFILES_LIST=()
+SCENARIOS_LIST=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --profiles)
       IFS=',' read -ra PROFILES_LIST <<< "$2"
       shift 2
       ;;
+    --scenario)
+      SCENARIOS_LIST=("$2")
+      shift 2
+      ;;
+    --scenarios)
+      IFS=',' read -ra SCENARIOS_LIST <<< "$2"
+      shift 2
+      ;;
     *)
-      echo "Usage: $0 [--profiles perf,tomcat,...]"
+      echo "Usage: $0 [--profiles perf,tomcat,...] [--scenario name|--scenarios a,b,c]"
       exit 1
       ;;
   esac
@@ -101,20 +125,47 @@ else
   PROFILES_TO_RUN=("${DEFAULT_PROFILES[@]}")
 fi
 
-# ========== Step 2+3: 逐个 profile 编译 → 构建 classpath → 运行 ==========
+# 确定要执行的 scenarios
+if [ ${#SCENARIOS_LIST[@]} -gt 0 ]; then
+  SCENARIOS_TO_RUN=("${SCENARIOS_LIST[@]}")
+else
+  SCENARIOS_TO_RUN=("${DEFAULT_SCENARIOS[@]}")
+fi
+
+TOTAL_PROFILES=${#PROFILES_TO_RUN[@]}
+TOTAL_SCENARIOS=${#SCENARIOS_TO_RUN[@]}
+TOTAL=$((TOTAL_PROFILES * TOTAL_SCENARIOS))
+
+echo "  Profiles: ${TOTAL_PROFILES}, Scenarios: ${TOTAL_SCENARIOS}, Total runs: ${TOTAL}"
+
+# ========== 端口可用性预检 ==========
+check_port() {
+  local port=$1
+  # local proto=$2 (unused, removed for set -u compat)
+  # Windows (Git Bash) 下用 netstat 检测，Linux/macOS 用 ss 或 /dev/tcp
+  if uname | grep -iq "mingw\|cygwin\|msys"; then
+    netstat -ano 2>/dev/null | grep -qE ":${port}\s" && return 0 || return 1
+  else
+    timeout 1 bash -c "echo > /dev/tcp/127.0.0.1/$port" 2>/dev/null && return 0 || return 1
+  fi
+}
+
+port_warn() {
+  local port=$1
+  echo "    [WARN] Port ${port} is already in use. Benchmark may fail with BindException."
+  echo "    [WARN] Try: kill stale Java processes before running."
+}
+
+# ========== Step 2+3: 逐个 profile 编译 → 构建 classpath → 逐个 scenario 运行 ==========
 echo ""
-echo "[2/4] 逐个 profile 编译、构建 classpath 并运行..."
-TOTAL=${#PROFILES_TO_RUN[@]}
+echo "[2/4] 逐个 profile 编译、构建 classpath 并按 scenario 运行..."
 COUNT=0
 
 for ENTRY in "${PROFILES_TO_RUN[@]}"; do
   IFS=':' read -r PROFILE PORT BENCH_CLASS <<< "$ENTRY"
-  COUNT=$((COUNT + 1))
-
-  echo "  [$COUNT/$TOTAL] $PROFILE (port $PORT)"
 
   # 编译（clean compile 确保 JMH 桩代码正确生成）
-  echo "    [compile] benchmark-$PROFILE..."
+  echo "  [$PROFILE] compile..."
   mvn -P"benchmark-$PROFILE" clean compile -q
   if [ $? -ne 0 ]; then
     echo "    -> COMPILE FAIL"
@@ -122,36 +173,54 @@ for ENTRY in "${PROFILES_TO_RUN[@]}"; do
   fi
 
   # 构建 classpath
-  echo "    [classpath] benchmark-$PROFILE..."
+  echo "  [$PROFILE] classpath..."
   mvn -P"benchmark-$PROFILE" dependency:build-classpath -Dmdep.outputFile="target/cp-$PROFILE.txt" -q
-
-  # GC 日志参数
-  GC_LOG_PATH="$(pwd)/$RESULTS_DIR/gc-$PROFILE.log"
-  if [ "$GC_MODE" = "jdk8" ]; then
-    GC_ARG="-XX:+PrintGCDetails -Xloggc:${GC_LOG_PATH} -XX:+PrintGCDateStamps"
-  else
-    GC_ARG="-Xlog:gc*=info:file=${GC_LOG_PATH}:time,uptime,level,tags"
-  fi
 
   # 读取 classpath
   CP=$(head -1 "target/cp-$PROFILE.txt" 2>/dev/null || echo "")
 
-  # 运行基准测试（fork=1 隔离 JVM）
-  echo "    [benchmark] $PROFILE..."
-  java -cp "target/classes${CP_SEP}${CP}" \
-    -Djmh.forks=1 \
-    -Dbenchmark.port="$PORT" \
-    -Dbenchmark.profile.name="$PROFILE" \
-    -Dbenchmark.output.dir="$(pwd)/$RESULTS_DIR" \
-    -Dbenchmark.gc.log.arg="$GC_ARG" \
-    -Dbenchmark.include=".*${BENCH_CLASS}.*" \
-    io.springperf.benchmark.BenchmarkRunner
+  # 逐个 scenario 运行
+  for SCENARIO in "${SCENARIOS_TO_RUN[@]}"; do
+    COUNT=$((COUNT + 1))
+    SCENARIO_PROFILE="${PROFILE}-${SCENARIO}"
 
-  if [ $? -eq 0 ]; then
-    echo "    -> SUCCESS"
-  else
-    echo "    -> FAIL"
-  fi
+    echo "  [$COUNT/$TOTAL] $SCENARIO_PROFILE (port $PORT)"
+
+    # GC 日志参数（文件名含 scenario）
+    GC_LOG_PATH="$(pwd)/$RESULTS_DIR/gc-${PROFILE}-${SCENARIO}.log"
+    # Windows (Git Bash/MSYS/CYGWIN) 下转换为 Windows 原生路径
+    if echo "$CP_SEP" | grep -q ";"; then
+      if command -v cygpath &>/dev/null; then
+        GC_LOG_PATH="$(cygpath -m "$GC_LOG_PATH")"
+      fi
+    fi
+    if [ "$GC_MODE" = "jdk8" ]; then
+      GC_ARG="-XX:+PrintGCDetails -Xloggc:${GC_LOG_PATH} -XX:+PrintGCDateStamps"
+    else
+      GC_ARG="-Xlog:gc*=info:file=${GC_LOG_PATH}:time,uptime,level,tags"
+    fi
+
+    # 运行基准测试（fork=1 隔离 JVM，只匹配当前 scenario）
+    # 端口可用性检查（防止上一进程残留导致 BindException）
+    if check_port "$PORT"; then
+      port_warn "$PORT"
+    fi
+    echo "    [benchmark] $SCENARIO_PROFILE..."
+    java -cp "target/classes${CP_SEP}${CP}" \
+      -Djmh.forks=1 \
+      -Dbenchmark.port="$PORT" \
+      -Dbenchmark.profile.name="${SCENARIO_PROFILE}" \
+      -Dbenchmark.output.dir="$(pwd)/$RESULTS_DIR" \
+      -Dbenchmark.gc.log.arg="$GC_ARG" \
+      -Dbenchmark.include=".*${BENCH_CLASS}\.${SCENARIO}$" \
+      io.springperf.benchmark.BenchmarkRunner
+
+    if [ $? -eq 0 ]; then
+      echo "    -> SUCCESS"
+    else
+      echo "    -> FAIL"
+    fi
+  done
 done
 
 # ========== Step 4: 生成报告 ==========

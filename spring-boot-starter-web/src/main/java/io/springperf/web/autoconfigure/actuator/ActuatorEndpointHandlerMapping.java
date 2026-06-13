@@ -44,12 +44,15 @@ public class ActuatorEndpointHandlerMapping extends BaseWebComponent {
         if (mappingRegistry == null) { log.warn("MappingRegistry not available, Actuator endpoints will not be registered"); return; }
         String basePath = properties.getBasePath();
         registerCorsConfiguration(basePath);
+        WebServerNamespace serverNamespace = managementServerInfrastructure != null
+                ? WebServerNamespace.MANAGEMENT : WebServerNamespace.SERVER;
         EndpointMapping endpointMapping = new EndpointMapping(basePath);
         Collection<ExposableWebEndpoint> endpoints = endpointsSupplier.getEndpoints();
         EndpointLinksResolver linksResolver = new EndpointLinksResolver(endpoints, basePath);
         LinksOperationInvoker linksInvoker = new LinksOperationInvoker();
         ActuatorPathMappingContext linksCtx = new ActuatorPathMappingContext(
-                linksInvoker, endpointMapping.createSubPath(""), linksResolver, endpointMediaTypes, basePath);
+                linksInvoker, endpointMapping.createSubPath(""), linksResolver, endpointMediaTypes, basePath,
+                serverNamespace);
         registerRoute(linksCtx, mappingRegistry);
         if (endpoints.isEmpty()) { log.info("No Actuator endpoints discovered"); return; }
         for (ExposableWebEndpoint endpoint : endpoints) {
@@ -62,7 +65,8 @@ public class ActuatorEndpointHandlerMapping extends BaseWebComponent {
                 String fullPath = endpointMapping.createSubPath(predicatePath);
                 OperationHandlerInvoker invoker = new OperationHandlerInvoker(operation, predicate, endpointMediaTypes.getConsumed());
                 ActuatorPathMappingContext mappingContext = new ActuatorPathMappingContext(
-                        invoker, fullPath, operation, predicate, linksResolver, endpointMediaTypes, basePath);
+                        invoker, fullPath, operation, predicate, linksResolver, endpointMediaTypes, basePath,
+                        serverNamespace);
                 registerRoute(mappingContext, mappingRegistry);
             }
         }

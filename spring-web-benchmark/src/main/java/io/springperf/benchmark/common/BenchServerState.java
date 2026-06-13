@@ -19,6 +19,8 @@ public class BenchServerState {
     private final Properties defaultProperties;
 
     private ConfigurableApplicationContext context;
+    /** 实际绑定的端口（可能不同于配置值，当端口被占用时 fallback 到随机端口） */
+    private int actualPort = -1;
 
     public BenchServerState(Class<?> applicationClass, Properties defaultProperties) {
         this.applicationClass = applicationClass;
@@ -26,14 +28,40 @@ public class BenchServerState {
     }
 
     public void start() {
+        int configPort = BenchmarkConstants.PORT;
         System.out.println("[Benchmark] Starting server: " + applicationClass.getSimpleName()
-                + " on port " + BenchmarkConstants.PORT);
+                + " on port " + configPort);
         SpringApplication app = new SpringApplication(applicationClass);
         app.setDefaultProperties(defaultProperties);
         app.setBannerMode(Banner.Mode.OFF);
         app.setLogStartupInfo(false);
-        context = app.run();
-        System.out.println("[Benchmark] Server started: " + applicationClass.getSimpleName());
+        try {
+            context = app.run();
+        } catch (Exception e) {
+            // 如果配置的端口被占用，尝试随机端口
+            System.out.println("[Benchmark] Port " + configPort + " bind failed: "
+                    + e.getMessage() + ", trying random port");
+            Properties fallbackProps = new Properties();
+            fallbackProps.putAll(defaultProperties);
+            fallbackProps.setProperty("server.port", "0");
+            app.setDefaultProperties(fallbackProps);
+            context = app.run();
+        }
+        // 获取实际绑定的端口
+        if (context != null && context.isRunning()) {
+            String portStr = context.getEnvironment().getProperty("server.port");
+            if (portStr != null && !portStr.isEmpty()) {
+                actualPort = Integer.parseInt(portStr);
+            } else {
+                actualPort = configPort;
+            }
+        }
+        System.out.println("[Benchmark] Server started: " + applicationClass.getSimpleName()
+                + " on port " + actualPort);
+    }
+
+    public int getActualPort() {
+        return actualPort > 0 ? actualPort : BenchmarkConstants.PORT;
     }
 
     public void stop() {

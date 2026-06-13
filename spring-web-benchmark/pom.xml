@@ -383,7 +383,7 @@
                                 <configuration>
                                     <sources>
                                         <source>src/benchmark-perf-support-filter/java</source>
-                                    </sources>
+                                        </sources>
                                 </configuration>
                             </execution>
                             <execution>
@@ -464,7 +464,7 @@
                                 <configuration>
                                     <sources>
                                         <source>src/benchmark-tomcat/java</source>
-                                    </sources>
+                                        </sources>
                                 </configuration>
                             </execution>
                             <execution>
@@ -536,7 +536,7 @@
                                 <configuration>
                                     <sources>
                                         <source>src/benchmark-tomcat-filter/java</source>
-                                    </sources>
+                                        </sources>
                                 </configuration>
                             </execution>
                             <execution>
@@ -618,7 +618,7 @@
                                 <configuration>
                                     <sources>
                                         <source>src/benchmark-undertow/java</source>
-                                    </sources>
+                                        </sources>
                                 </configuration>
                             </execution>
                             <execution>
@@ -700,7 +700,7 @@
                                 <configuration>
                                     <sources>
                                         <source>src/benchmark-undertow-filter/java</source>
-                                    </sources>
+                                        </sources>
                                 </configuration>
                             </execution>
                             <execution>
@@ -709,7 +709,7 @@
                                 <configuration>
                                     <sources>
                                         <source>src/benchmark-tomcat-filter/java</source>
-                                    </sources>
+                                        </sources>
                                 </configuration>
                             </execution>
                             <execution>
@@ -853,6 +853,7 @@
                                 <configuration>
                                     <sources>
                                         <source>src/benchmark-webflux-filter/java</source>
+                                        <source>src/benchmark-webflux/java</source>
                                     </sources>
                                 </configuration>
                             </execution>

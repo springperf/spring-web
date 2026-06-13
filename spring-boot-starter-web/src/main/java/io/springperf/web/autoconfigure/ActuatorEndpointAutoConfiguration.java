@@ -11,6 +11,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.actuate.autoconfigure.endpoint.expose.IncludeExcludeEndpointFilter;
 import org.springframework.boot.actuate.autoconfigure.endpoint.web.CorsEndpointProperties;
 import org.springframework.boot.actuate.autoconfigure.endpoint.web.WebEndpointProperties;
+import org.springframework.boot.actuate.endpoint.ApiVersion;
 import org.springframework.boot.actuate.endpoint.EndpointFilter;
 import org.springframework.boot.actuate.endpoint.invoke.OperationInvokerAdvisor;
 import org.springframework.boot.actuate.endpoint.invoke.ParameterValueMapper;
@@ -35,7 +36,7 @@ import java.util.stream.Collectors;
  * <p>当 classpath 中存在 {@link ExposableWebEndpoint}（即引入了 spring-boot-actuator）时自动生效。</p>
  */
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnClass(ExposableWebEndpoint.class)
+@ConditionalOnClass({ExposableWebEndpoint.class, ApiVersion.class})
 @EnableConfigurationProperties({WebEndpointProperties.class, CorsEndpointProperties.class})
 public class ActuatorEndpointAutoConfiguration {
 

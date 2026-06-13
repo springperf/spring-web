@@ -222,6 +222,23 @@ class StreamEmitterTest {
     }
 
     @Test
+    void complete_beforeInitialize_delaysDeferredResult() throws Exception {
+        StreamEmitter emitter = createEmitter();
+        emitter.send("early");
+
+        emitter.complete(); // streamSender=null, should NOT trigger deferredResult or streamSender
+
+        assertTrue(emitter.complete.get());
+        assertFalse(emitter.deferredResult.hasResult());
+        assertEquals(1, emitter.earlySendDataList.size());
+
+        emitter.initialize(streamSender);
+
+        verify(streamSender).send("early");
+        verify(streamSender, timeout(100)).complete(true, null);
+    }
+
+    @Test
     void encodeToString_throwsUnsupportedOperation() {
         StreamEmitter emitter = createEmitter();
 

@@ -1,7 +1,10 @@
 package io.springperf.benchmark.common;
 
 import okhttp3.*;
-import org.openjdk.jmh.annotations.*;
+import org.openjdk.jmh.annotations.Level;
+import org.openjdk.jmh.annotations.Scope;
+import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.TearDown;
 
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
@@ -31,8 +34,13 @@ public class BenchClientState {
     public Request jsonEchoLargeRequest;
     public Request largeResponseGetRequest;
 
-    @Setup(Level.Trial)
-    public void setup() {
+    // SSE
+    public Request sseStreamRequest;
+
+    /**
+     * @param actualPort 服务器实际绑定的端口（可能因 fallback 不同于配置端口）
+     */
+    public void setup(int actualPort) {
         client = new OkHttpClient.Builder()
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
@@ -41,7 +49,7 @@ public class BenchClientState {
                 .protocols(Collections.singletonList(Protocol.HTTP_1_1))
                 .build();
 
-        String base = BenchmarkConstants.BASE_URL;
+        String base = "http://localhost:" + actualPort + BenchmarkConstants.CONTEXT_PATH;
 
         jsonEchoRequest = new Request.Builder()
                 .url(base + "/demo/echo")
@@ -83,6 +91,11 @@ public class BenchClientState {
                 .url(base + BenchmarkConstants.LARGE_RESPONSE_PATH)
                 .get()
                 .build();
+
+        sseStreamRequest = new Request.Builder()
+                .url(base + BenchmarkConstants.SSE_PATH)
+                .get()
+                .build();
     }
 
     @TearDown(Level.Trial)
@@ -103,6 +116,28 @@ public class BenchClientState {
                         + response.code() + " " + body);
             }
             return body;
+        }
+    }
+
+    /**
+     * 执行 SSE 流式请求，消费流式响应体。
+     * 以 8KB 块读取 InputStream 并丢弃，模拟真实 SSE 客户端消费行为。
+     */
+    public String executeAndConsumeStream(Request request) throws Exception {
+        try (Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new RuntimeException("Unexpected SSE response: "
+                        + response.code());
+            }
+            byte[] buffer = new byte[8192];
+            int total = 0;
+            try (java.io.InputStream is = response.body().byteStream()) {
+                int read;
+                while ((read = is.read(buffer)) != -1) {
+                    total += read;
+                }
+            }
+            return "SSE:" + total + "bytes";
         }
     }
 }

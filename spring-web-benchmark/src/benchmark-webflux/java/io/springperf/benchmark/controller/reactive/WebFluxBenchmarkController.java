@@ -1,7 +1,9 @@
 package io.springperf.benchmark.controller.reactive;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -9,12 +11,14 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -81,6 +85,29 @@ public class WebFluxBenchmarkController {
     @GetMapping("/core/large-response")
     public Mono<byte[]> largeResponse() {
         return Mono.just(LARGE_RESPONSE_BODY);
+    }
+
+    // ==================== SSE Stream (模拟 LLM 流式返回) ====================
+
+    private static final int SSE_CHUNK_COUNT = 100;
+    private static final int SSE_CHUNK_SIZE = 200;
+    private static final int SSE_CHUNK_INTERVAL_MS = 0;
+
+    @GetMapping(value = "/core/sse/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ServerSentEvent<String>> sseStream() {
+        return Flux.range(0, SSE_CHUNK_COUNT)
+                .map(i -> {
+                    StringBuilder sb = new StringBuilder(SSE_CHUNK_SIZE);
+                    sb.append("{\"chunk\":").append(i).append(",\"data\":\"");
+                    while (sb.length() < SSE_CHUNK_SIZE - 2) {
+                        sb.append("0123456789");
+                    }
+                    sb.append("\"}");
+                    sb.setLength(SSE_CHUNK_SIZE);
+                    return ServerSentEvent.<String>builder()
+                            .data(sb.toString())
+                            .build();
+                });
     }
 
     public static class ValidDto {
