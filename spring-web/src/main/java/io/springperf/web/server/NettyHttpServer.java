@@ -3,19 +3,14 @@ package io.springperf.web.server;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.ssl.NotSslRecordException;
 import io.netty.handler.ssl.SslContext;
-import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.util.concurrent.Future;
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.pool.BizPoolRegistry;
 import io.springperf.web.filter.WebFilterRegistry;
-import io.springperf.web.http.BackpressureHandler;
-import io.springperf.web.http.support.SupportMultipartAggregator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.SmartLifecycle;
 
@@ -33,6 +28,7 @@ public class NettyHttpServer implements SmartLifecycle {
     private EventLoopGroup workerGroup;
     private Channel serverChannel;
     private NettyHttpHandler httpHandler;
+    private boolean http2Enabled;
 
     public NettyHttpServer(WebContext webContext) {
         this(webContext, null);
@@ -47,6 +43,7 @@ public class NettyHttpServer implements SmartLifecycle {
     public void start() {
         // 在 Netty 启动前触发 WebContext 生命周期，确保所有 WebComponent 已完成初始化
         webContext.startLifecycle();
+        this.http2Enabled = webContext.getProps().getBoolean(PropertiesConstant.HTTP2_ENABLED, false);
         // 在启动阶段（单线程、Netty 未接受连接前）注册 WebFilterRegistry
         // 确保 NettyHttpHandler 运行时只需做纯读操作，线程安全
         WebFilterRegistry registry = webContext.getWebComponentWithDefault(WebFilterRegistry.class, new WebFilterRegistry());
@@ -56,26 +53,33 @@ public class NettyHttpServer implements SmartLifecycle {
         int workerThreads = webContext.getProps().getInt(PropertiesConstant.SERVER_NETTY_WORKERS, 0);
         workerGroup = workerThreads > 0 ? new NioEventLoopGroup(workerThreads) : new NioEventLoopGroup();
         ServerBootstrap bootstrap = new ServerBootstrap();
-        bootstrap.group(bossGroup, workerGroup).channel(NioServerSocketChannel.class).childHandler(new ChannelInitializer<SocketChannel>() {
-            @Override
-            protected void initChannel(SocketChannel ch) {
-                ChannelPipeline p = ch.pipeline();
-                if (sslContext != null) {
-                    p.addLast(sslContext.newHandler(ch.alloc()));
-                    p.addLast(SslExceptionHandler.INSTANCE);
-                }
-                p.addLast(new HttpServerCodec());
-                p.addLast(new ChunkedWriteHandler());
-                p.addLast(new SupportMultipartAggregator(webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_CONTENT_LENGTH, 1048576)));
-                p.addLast(BackpressureHandler.INSTANCE);
-                p.addLast(httpHandler);
-            }
-        });
+        bootstrap.group(bossGroup, workerGroup)
+                .channel(NioServerSocketChannel.class)
+                .childOption(ChannelOption.TCP_NODELAY, true)
+                .childOption(ChannelOption.WRITE_BUFFER_WATER_MARK,
+                        new WriteBufferWaterMark(
+                                webContext.getProps().getInt(PropertiesConstant.WRITE_BUFFER_LOW_WATERMARK, 8192),
+                                webContext.getProps().getInt(PropertiesConstant.WRITE_BUFFER_HIGH_WATERMARK, 32768)
+                        ))
+                .childHandler(new Http2ChannelInitializer(
+                        http2Enabled,
+                        sslContext,
+                        webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_CONTENT_LENGTH, 1048576),
+                        true, // supportMultipart = true for main server
+                        httpHandler
+                ));
         try {
             serverChannel = bootstrap.bind(port).sync().channel();
             running = true;
             log.info("Netty Server started on port {}", port);
         } catch (Exception e) {
+            // 绑定失败时及时清理 EventLoopGroup，否则线程残留会阻止 JVM 退出
+            if (bossGroup != null) {
+                bossGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
+            }
+            if (workerGroup != null) {
+                workerGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
+            }
             throw new IllegalStateException("Failed to start Netty", e);
         }
     }

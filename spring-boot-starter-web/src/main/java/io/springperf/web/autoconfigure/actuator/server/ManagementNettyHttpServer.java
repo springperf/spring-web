@@ -2,22 +2,20 @@ package io.springperf.web.autoconfigure.actuator.server;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.http.HttpObjectAggregator;
-import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.ssl.SslContext;
-import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.util.concurrent.Future;
+import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
+import io.springperf.web.server.Http2ChannelInitializer;
 import io.springperf.web.server.HttpHandler;
 import io.springperf.web.server.NettyHttpHandler;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.SmartLifecycle;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * 管理端口 Netty 服务器。
@@ -38,6 +36,7 @@ public class ManagementNettyHttpServer implements SmartLifecycle {
     private final int port;
     private final int maxContentLength;
     private final SslContext sslContext;
+    private boolean http2Enabled;
 
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
@@ -60,6 +59,7 @@ public class ManagementNettyHttpServer implements SmartLifecycle {
 
     @Override
     public void start() {
+        this.http2Enabled = webContext.getProps().getBoolean(PropertiesConstant.HTTP2_ENABLED, false);
         // 触发 WebContext 生命周期（WebComponent 初始化），AtomicBoolean 保证幂等
         webContext.startLifecycle();
 
@@ -71,26 +71,26 @@ public class ManagementNettyHttpServer implements SmartLifecycle {
         ServerBootstrap bootstrap = new ServerBootstrap();
         bootstrap.group(bossGroup, workerGroup)
                 .channel(NioServerSocketChannel.class)
-                .childHandler(new ChannelInitializer<SocketChannel>() {
-                    @Override
-                    protected void initChannel(SocketChannel ch) {
-                        ChannelPipeline p = ch.pipeline();
-                        if (sslContext != null) {
-                            p.addLast(sslContext.newHandler(ch.alloc()));
-                            p.addLast(io.springperf.web.server.NettyHttpServer.SslExceptionHandler.INSTANCE);
-                        }
-                        p.addLast(new HttpServerCodec());
-                        p.addLast(new ChunkedWriteHandler());
-                        p.addLast(new HttpObjectAggregator(maxContentLength));
-                        p.addLast(nettyHttpHandler);
-                    }
-                });
+                .childHandler(new Http2ChannelInitializer(
+                        http2Enabled,
+                        sslContext,
+                        maxContentLength,
+                        false, // supportMultipart = false (management port uses HttpObjectAggregator)
+                        nettyHttpHandler
+                ));
 
         try {
             serverChannel = bootstrap.bind(port).sync().channel();
             running = true;
             log.info("Management server started on port {} (actuator only)", port);
         } catch (Exception e) {
+            // 绑定失败时及时清理 EventLoopGroup，否则线程残留会阻止 JVM 退出
+            if (bossGroup != null) {
+                bossGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
+            }
+            if (workerGroup != null) {
+                workerGroup.shutdownGracefully(0, 0, TimeUnit.SECONDS);
+            }
             throw new IllegalStateException("Failed to start management server on port " + port, e);
         }
     }

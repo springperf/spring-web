@@ -32,7 +32,8 @@ public class SpringWebAutoConfiguration {
 
     @Bean
     public NettyHttpServer nettyHttpServer(WebContext webContext, Environment environment) {
-        SslContext sslContext = SslContextFactory.createServerSslContext(environment, "server.ssl.");
+        boolean http2Enabled = environment.getProperty("server.http2.enabled", boolean.class, false);
+        SslContext sslContext = SslContextFactory.createServerSslContext(environment, "server.ssl.", http2Enabled);
         return new NettyHttpServer(webContext, sslContext);
     }
 

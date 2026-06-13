@@ -116,9 +116,9 @@ public class ResponseBodyEmitter extends StreamEmitter {
      */
     public synchronized void send(Object object, @Nullable MediaType mediaType) throws IOException {
         if (mediaType == null) {
-            send(object);
+            super.send(object);
         } else {
-            send(new DataWithMediaType(object, mediaType));
+            super.send(new DataWithMediaType(object, mediaType));
         }
     }
 

@@ -50,4 +50,15 @@ public final class PropertiesConstant {
 
     /** Netty worker event loop thread count (default: 2 * CPU cores). */
     public static final String SERVER_NETTY_WORKERS = "server.netty.workers";
+
+    /** Write buffer low watermark in bytes (default: 8192). Triggers writability recovery. */
+    public static final String WRITE_BUFFER_LOW_WATERMARK = "server.netty.write-buffer-low-watermark";
+
+    /** Write buffer high watermark in bytes (default: 32768). Triggers backpressure. */
+    public static final String WRITE_BUFFER_HIGH_WATERMARK = "server.netty.write-buffer-high-watermark";
+
+    // ---- HTTP/2 ----
+
+    /** Enable HTTP/2 support (requires SSL for browser clients). */
+    public static final String HTTP2_ENABLED = "server.http2.enabled";
 }

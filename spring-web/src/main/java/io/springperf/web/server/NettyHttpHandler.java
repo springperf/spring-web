@@ -86,7 +86,7 @@ public class NettyHttpHandler extends SimpleChannelInboundHandler<FullHttpReques
             // 4. 委托给实际处理逻辑
             handler.httpHandle(req, resp);
         } catch (Throwable e) {
-            log.error("Unhandled exception processing request", e);
+            log.error("NH EXCEPTION", e);
             try {
                 resp.sendError(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error");
             } catch (Exception ignored) {

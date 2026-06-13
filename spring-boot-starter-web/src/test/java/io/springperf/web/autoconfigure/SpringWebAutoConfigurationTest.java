@@ -50,6 +50,7 @@ class SpringWebAutoConfigurationTest {
     void nettyHttpServer_createsNettyHttpServer() {
         io.springperf.web.context.WebContext webContext = mock(io.springperf.web.context.WebContext.class);
         Environment environment = mock(Environment.class);
+        when(environment.getProperty("server.http2.enabled", boolean.class, false)).thenReturn(false);
 
         NettyHttpServer server = config.nettyHttpServer(webContext, environment);
         assertNotNull(server);

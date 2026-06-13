@@ -23,9 +23,9 @@ import static org.junit.jupiter.api.Assertions.*;
  * 管理端口通过 HTTPS 提供 Actuator 端点，主端口仍然通过 HTTP 提供业务服务。</p>
  */
 @SpringBootTest(classes = TestApplication.class, properties = {
-        "server.port=9099",
+        "server.port=9095",
         "server.servlet.context-path=/api",
-        "management.server.port=9098",
+        "management.server.port=9094",
         "management.server.ssl.enabled=true",
         "management.server.ssl.key-store=classpath:test-keystore.p12",
         "management.server.ssl.key-store-password=changeit",
@@ -52,7 +52,7 @@ public class SslManagementPortTest {
     @Test
     void managementPortHttps_shouldServeHealth() throws Exception {
         Request req = new Request.Builder()
-                .url("https://localhost:9098/actuator/health")
+                .url("https://localhost:9094/actuator/health")
                 .get()
                 .build();
         try (Response resp = SSL_CLIENT.newCall(req).execute()) {
@@ -66,7 +66,7 @@ public class SslManagementPortTest {
     void mainPortHttp_shouldStillWork() throws Exception {
         // 管理端口隔离模式下主端口不提供 Actuator 端点，验证 HTTP 服务器本身可达
         Request req = new Request.Builder()
-                .url("http://localhost:9099/api/core/hello")
+                .url("http://localhost:9095/api/core/hello")
                 .get()
                 .build();
         try (Response resp = PLAIN_CLIENT.newCall(req).execute()) {
@@ -79,7 +79,7 @@ public class SslManagementPortTest {
     @Test
     void managementPortHttp_shouldBeRejected() {
         Request req = new Request.Builder()
-                .url("http://localhost:9098/actuator/health")
+                .url("http://localhost:9094/actuator/health")
                 .get()
                 .build();
         assertThrows(Exception.class, () -> {

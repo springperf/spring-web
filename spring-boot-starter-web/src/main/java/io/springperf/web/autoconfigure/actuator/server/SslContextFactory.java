@@ -1,8 +1,6 @@
 package io.springperf.web.autoconfigure.actuator.server;
 
-import io.netty.handler.ssl.ClientAuth;
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.*;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.Resource;
@@ -50,6 +48,18 @@ public final class SslContextFactory {
      * @return SslContext，未配置 SSL 时返回 null
      */
     public static SslContext createServerSslContext(Environment env, String prefix) {
+        return createServerSslContext(env, prefix, false);
+    }
+
+    /**
+     * 创建 SslContext，可选配置 ALPN 用于 HTTP/2 协议协商。
+     *
+     * @param env          Spring Environment
+     * @param prefix       SSL 属性前缀
+     * @param http2Enabled 是否启用 HTTP/2（配置 ALPN）
+     * @return SslContext，未配置 SSL 时返回 null
+     */
+    public static SslContext createServerSslContext(Environment env, String prefix, boolean http2Enabled) {
         if (env == null || !isSslEnabled(env, prefix)) {
             return null;
         }
@@ -80,6 +90,17 @@ public final class SslContextFactory {
                 KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
                 kmf.init(keyStore, keyPassword != null ? keyPassword.toCharArray() : null);
                 builder = SslContextBuilder.forServer(kmf);
+            }
+
+            // ALPN 配置（HTTP/2 协议协商）
+            if (http2Enabled) {
+                builder.applicationProtocolConfig(new ApplicationProtocolConfig(
+                        ApplicationProtocolConfig.Protocol.ALPN,
+                        ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
+                        ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
+                        ApplicationProtocolNames.HTTP_2,
+                        ApplicationProtocolNames.HTTP_1_1
+                ));
             }
 
             // 可选：启用的协议列表（如 "TLSv1.2,TLSv1.3"），不设置则使用 JDK 默认
