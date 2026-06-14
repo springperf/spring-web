@@ -50,6 +50,11 @@ public class BenchServerState {
         // 获取实际绑定的端口
         if (context != null && context.isRunning()) {
             String portStr = context.getEnvironment().getProperty("server.port");
+            // 当 server.port=0（随机端口）时，getProperty 返回 "0" 而不是实际端口
+            // 实际端口会写入 "local.server.port" 属性
+            if ("0".equals(portStr)) {
+                portStr = context.getEnvironment().getProperty("local.server.port");
+            }
             if (portStr != null && !portStr.isEmpty()) {
                 actualPort = Integer.parseInt(portStr);
             } else {

@@ -17,6 +17,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 
 public class ResponseBodyEmitterReturnValueResolver extends StreamEmitterReturnValueResolver implements LifecycleWebComponent {
 
@@ -39,19 +40,27 @@ public class ResponseBodyEmitterReturnValueResolver extends StreamEmitterReturnV
     }
 
     protected byte[] encodeToBytes(HttpHeaders mutableHeaders, Object data) throws IOException {
-        StreamingHttpOutputMessage outputMessage = new StreamingHttpOutputMessage(mutableHeaders);
+        MediaType selectedMediaType = null;
+        if (data instanceof ResponseBodyEmitter.DataWithMediaType) {
+            ResponseBodyEmitter.DataWithMediaType dataWithMediaType = (ResponseBodyEmitter.DataWithMediaType) data;
+            selectedMediaType = dataWithMediaType.getMediaType();
+            data = dataWithMediaType.getData();
+        }
         for (HttpBodyConverter converter : codecRegistry.getConverters()) {
-            MediaType selectedMediaType = null;
-            if (data instanceof ResponseBodyEmitter.DataWithMediaType) {
-                selectedMediaType = ((ResponseBodyEmitter.DataWithMediaType) data).getMediaType();
-                data = ((ResponseBodyEmitter.DataWithMediaType) data).getData();
-            }
             if (converter.canWrite(null, data.getClass(), selectedMediaType)) {
-                converter.write(data, null, selectedMediaType, outputMessage);
+                StreamingHttpOutputMessage outputMessage = new StreamingHttpOutputMessage(mutableHeaders);
+                converter.write(data, null, null, outputMessage);
                 return outputMessage.getBytes();
             }
         }
-        throw new IllegalArgumentException("No suitable converter for " + data.getClass());
+        if (data instanceof String) {
+            return ((String) data).getBytes(StandardCharsets.UTF_8);
+        }
+        if (data instanceof byte[]) {
+            return (byte[]) data;
+        }
+        throw new IllegalArgumentException("No suitable converter for " + data.getClass()
+                + " and no fallback encoding available");
     }
 
     @Override

@@ -19,6 +19,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 RUN_ID=$(date +"%Y%m%d-%H%M%S")
 REPORTS_DIR="benchmark-reports"
+EXTRA_JVM_ARGS=""
 
 # 检测 OS 类型，选择正确的 classpath 分隔符
 # Windows (Git Bash/MSYS/CYGWIN): mvn dependency:build-classpath 输出 ; 分隔
@@ -70,6 +71,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --scenarios)
       IFS=',' read -ra SCENARIOS_LIST <<< "$2"
+      shift 2
+      ;;
+    --threads)
+      EXTRA_JVM_ARGS="$EXTRA_JVM_ARGS -Dbenchmark.threads=$2"
       shift 2
       ;;
     *)
@@ -204,6 +209,14 @@ for ENTRY in "${PROFILES_TO_RUN[@]}"; do
     # 端口可用性检查（防止上一进程残留导致 BindException）
     if check_port "$PORT"; then
       port_warn "$PORT"
+      # 尝试杀掉占用端口的进程（Windows: netstat 末列为 PID）
+      if uname | grep -iq "mingw\|cygwin\|msys"; then
+        pid=$(netstat -ano 2>/dev/null | grep ":${PORT}\s.*LISTENING" | awk '{print $NF}' | sort -u | head -1)
+        if [ -n "$pid" ] && [ "$pid" != "0" ]; then
+          echo "    [WARN] Killing process $pid on port $PORT..."
+          taskkill //F //PID "$pid" 2>/dev/null && sleep 2
+        fi
+      fi
     fi
     echo "    [benchmark] $SCENARIO_PROFILE..."
     java -cp "target/classes${CP_SEP}${CP}" \
@@ -213,6 +226,7 @@ for ENTRY in "${PROFILES_TO_RUN[@]}"; do
       -Dbenchmark.output.dir="$(pwd)/$RESULTS_DIR" \
       -Dbenchmark.gc.log.arg="$GC_ARG" \
       -Dbenchmark.include=".*${BENCH_CLASS}\.${SCENARIO}$" \
+      ${EXTRA_JVM_ARGS:-} \
       io.springperf.benchmark.BenchmarkRunner
 
     if [ $? -eq 0 ]; then

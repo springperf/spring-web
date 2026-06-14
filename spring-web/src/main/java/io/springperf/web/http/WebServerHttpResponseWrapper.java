@@ -34,6 +34,7 @@ public class WebServerHttpResponseWrapper implements WebServerHttpResponse {
     @Override public void writeStream(InputStream input) { response.writeStream(input); }
     @Override public void writeBytes(byte[] data) { response.writeBytes(data); }
     @Override public void writeFile(File file) { response.writeFile(file); }
+    @Override public void flush(boolean chunked) throws IOException {response.flush(chunked);}
     @Override public void setStatusCode(HttpStatus status) { response.setStatusCode(status); }
     @Override public void flush() throws IOException { response.flush(); }
     @Override public void close() { response.close(); }

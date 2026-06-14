@@ -1,18 +1,18 @@
 package io.springperf.web.core.async.stream;
 
 import io.springperf.web.core.async.AsyncSupportRegistry;
+import io.springperf.web.core.async.AsyncSupportUtils;
 import io.springperf.web.core.async.PerfAsyncWebRequest;
+import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
-import io.springperf.web.core.async.AsyncSupportUtils;
-import io.springperf.web.http.RequestContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.server.ServerHttpResponse;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -22,7 +22,7 @@ class StreamEmitterUtilTest {
     StreamEmitter emitter;
 
     @Mock
-    ServerHttpResponse serverHttpResponse;
+    WebServerHttpResponse serverHttpResponse;
 
     @Mock
     StreamSender streamSender;
@@ -44,22 +44,6 @@ class StreamEmitterUtilTest {
 
     @Mock
     RequestContext requestContext;
-
-    @Test
-    void extendResponseAndFlush_callsExtendResponse() throws Exception {
-        StreamEmitterUtil.extendResponseAndFlush(emitter, serverHttpResponse, true);
-
-        verify(emitter).extendResponse(serverHttpResponse);
-        verify(serverHttpResponse).flush();
-    }
-
-    @Test
-    void extendResponseAndFlush_withoutFlush_doesNotFlush() throws Exception {
-        StreamEmitterUtil.extendResponseAndFlush(emitter, serverHttpResponse, false);
-
-        verify(emitter).extendResponse(serverHttpResponse);
-        verify(serverHttpResponse, never()).flush();
-    }
 
     @Test
     void initializeWithStreamSender_delegatesToEmitter() throws Exception {

@@ -5,6 +5,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.server.ServerHttpResponse;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.util.concurrent.ScheduledFuture;
@@ -142,4 +143,11 @@ public interface WebServerHttpResponse extends ServerHttpResponse {
      * @param file the file to write
      */
     void writeFile(File file);
+
+    /**
+     * Flush the response body.
+     *
+     * @param chunked whether the response is chunked
+     */
+    void flush(boolean chunked) throws IOException;
 }

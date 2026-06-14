@@ -1,6 +1,7 @@
 package io.springperf.benchmark.controller;
 
 import io.springperf.web.core.async.stream.SseEmitter;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -15,7 +16,7 @@ public class PerfSseController {
     private final TaskExecutor taskExecutor;
 
     public PerfSseController(TaskExecutor taskExecutor) {
-        this.taskExecutor = taskExecutor;
+        this.taskExecutor = taskExecutor != null ? taskExecutor : new SimpleAsyncTaskExecutor("sse-");
     }
 
     @GetMapping("/api/core/sse/stream")

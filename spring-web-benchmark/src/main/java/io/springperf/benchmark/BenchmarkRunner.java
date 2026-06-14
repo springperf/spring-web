@@ -61,7 +61,8 @@ public class BenchmarkRunner {
         optBuilder.warmupTime(TimeValue.seconds(BenchmarkConstants.WARMUP_TIME_SECONDS));
         optBuilder.measurementIterations(BenchmarkConstants.MEASUREMENT_ITERATIONS);
         optBuilder.measurementTime(TimeValue.seconds(BenchmarkConstants.MEASUREMENT_TIME_SECONDS));
-        optBuilder.threads(BenchmarkConstants.THREADS);
+        int threads = Integer.getInteger("benchmark.threads", BenchmarkConstants.THREADS);
+	        optBuilder.threads(threads);
         optBuilder.mode(Mode.Throughput);
         optBuilder.mode(Mode.SampleTime);
         optBuilder.addProfiler(GCProfiler.class);
@@ -87,6 +88,9 @@ public class BenchmarkRunner {
                 extraJvmArgs.add("-D" + propName + "=" + propValue);
             }
         }
+
+        // SSE 调试期间启用 DEBUG 日志
+        extraJvmArgs.add("-Dlogging.level.io.springperf=DEBUG");
 
         if (!extraJvmArgs.isEmpty()) {
             optBuilder.jvmArgsAppend(extraJvmArgs.toArray(new String[0]));

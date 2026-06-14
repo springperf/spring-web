@@ -5,16 +5,15 @@ import io.springperf.web.core.async.AsyncSupportUtils;
 import io.springperf.web.core.async.PerfAsyncWebRequest;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
-import org.springframework.http.server.ServerHttpResponse;
 
 import java.io.IOException;
 
 public class StreamEmitterUtil {
 
-    public static void extendResponseAndFlush(StreamEmitter emitter, ServerHttpResponse response, boolean flush) throws IOException {
+    public static void extendResponseAndFlush(StreamEmitter emitter, WebServerHttpResponse response, boolean flush) throws IOException {
         emitter.extendResponse(response);
         if (flush) {
-            response.flush();
+            response.flush(true);
         }
     }
 

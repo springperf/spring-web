@@ -42,7 +42,7 @@ public class Http2ServerTest {
                 .build();
 
         try (Response response = client.newCall(request).execute()) {
-            System.err.println("Test1 Status: " + response.code() + " Body: " + response.body().string());
+            System.out.println("Test1 Status: " + response.code() + " Body: " + response.body().string());
             assertTrue(response.isSuccessful());
             assertEquals(Protocol.H2_PRIOR_KNOWLEDGE, response.protocol());
         }
@@ -63,7 +63,7 @@ public class Http2ServerTest {
                 .build();
 
         try (Response response = client.newCall(request).execute()) {
-            System.err.println("POST Status: " + response.code() + " Body: " + response.body().string());
+            System.out.println("POST Status: " + response.code() + " Body: " + response.body().string());
         }
     }
 
@@ -81,7 +81,7 @@ public class Http2ServerTest {
                 .build();
 
         try (Response response = client.newCall(request).execute()) {
-            System.err.println("GET Status: " + response.code() + " Body: " + response.body().string());
+            System.out.println("GET Status: " + response.code() + " Body: " + response.body().string());
             assertTrue(response.isSuccessful());
         }
     }

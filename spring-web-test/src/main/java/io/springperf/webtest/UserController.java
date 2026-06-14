@@ -107,15 +107,15 @@ public class UserController {
     @GetMapping(value = "/sse")
     public SseEmitter sse() {
         SseEmitter emitter = new SseEmitter();
-        emitter.onError(e -> log.error(e.getMessage(), e));
+        emitter.onError(e -> log.error("fail :" + e.getMessage(), e));
         emitter.onTimeout(() -> log.info("timeout"));
         new Thread(() -> {
-            for (int i = 0; i < 100; i++) {
+            for (int i = 0; i < 10; i++) {
                 try {
                     Thread.sleep(50);
                     emitter.send("world + " + i);
                 } catch (Exception e) {
-                    log.error(e.getMessage(), e);
+                    log.error("sendFail" + e.getMessage(), e);
                     emitter.completeWithError(e);
                 }
             }

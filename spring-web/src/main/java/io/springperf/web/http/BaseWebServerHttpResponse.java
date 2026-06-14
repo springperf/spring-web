@@ -36,13 +36,27 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
         this.keepAlive = keepAlive;
     }
 
-    public boolean isHandled() { return handled.get(); }
-    public boolean isCommitted() { return committed.get(); }
+    public boolean isHandled() {
+        return handled.get();
+    }
+
+    public boolean isCommitted() {
+        return committed.get();
+    }
 
     @Override
-    public void setStatusCode(HttpStatus status) { if (status != null) this.status = status; }
-    public HttpStatus getStatus() { return status; }
-    @Override public HttpHeaders getHeaders() { return headers; }
+    public void setStatusCode(HttpStatus status) {
+        if (status != null) this.status = status;
+    }
+
+    public HttpStatus getStatus() {
+        return status;
+    }
+
+    @Override
+    public HttpHeaders getHeaders() {
+        return headers;
+    }
 
     @Override
     public OutputStream getBody() {
@@ -50,9 +64,17 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
         return body;
     }
 
-    public Charset getCharacterEncoding() { return characterEncoding; }
-    public void setCharacterEncoding(Charset characterEncoding) { this.characterEncoding = characterEncoding; }
-    public int getBufferSize() { return body == null ? 0 : body.size(); }
+    public Charset getCharacterEncoding() {
+        return characterEncoding;
+    }
+
+    public void setCharacterEncoding(Charset characterEncoding) {
+        this.characterEncoding = characterEncoding;
+    }
+
+    public int getBufferSize() {
+        return body == null ? 0 : body.size();
+    }
 
     public boolean resetBuffer() {
         if (body == null) return false;
@@ -63,12 +85,28 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
 
     @Override
     public void close() {
-        try { flush(); } catch (IOException ignore) {}
+        try {
+            flush();
+        } catch (IOException ignore) {
+        }
     }
 
-    protected void defaultHandleTimeout() { sendError(HttpStatus.GATEWAY_TIMEOUT, "timeout"); }
+    public boolean isKeepAlive() {
+        return keepAlive;
+    }
 
-    public ScheduledFuture setTimeout() { return setTimeout(this::defaultHandleTimeout, webContext.getProps().getLong(PropertiesConstant.HTTP_TIMEOUT, 60000)); }
+    @Override
+    public void flush() throws IOException {
+        flush(false);
+    }
+
+    protected void defaultHandleTimeout() {
+        sendError(HttpStatus.GATEWAY_TIMEOUT, "timeout");
+    }
+
+    public ScheduledFuture setTimeout() {
+        return setTimeout(this::defaultHandleTimeout, webContext.getProps().getLong(PropertiesConstant.HTTP_TIMEOUT, 60000));
+    }
 
     public ScheduledFuture setTimeout(Runnable task, long delay) {
         if (timeoutFuture != null) timeoutFuture.cancel(false);
@@ -78,11 +116,24 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
     }
 
     abstract void runOnEventLoop(Runnable task);
+
     abstract ScheduledFuture scheduleOnEventLoop(Runnable task, long delay, TimeUnit unit);
-    public WebContext getWebContext() { return webContext; }
-    public void setWriteRespEventListener(WriteRespEventListener writeRespEventListener) { this.writeRespEventListener = writeRespEventListener; }
-    public boolean setHandled() { return handled.compareAndSet(false, true); }
-    public void resetHandled() { handled.set(false); }
+
+    public WebContext getWebContext() {
+        return webContext;
+    }
+
+    public void setWriteRespEventListener(WriteRespEventListener writeRespEventListener) {
+        this.writeRespEventListener = writeRespEventListener;
+    }
+
+    public boolean setHandled() {
+        return handled.compareAndSet(false, true);
+    }
+
+    public void resetHandled() {
+        handled.set(false);
+    }
 
     protected boolean setCommitted() {
         setHandled();
@@ -91,7 +142,9 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
         return result;
     }
 
-    public void sendError(HttpStatus statusCode) { sendError(statusCode, statusCode.getReasonPhrase()); }
+    public void sendError(HttpStatus statusCode) {
+        sendError(statusCode, statusCode.getReasonPhrase());
+    }
 
     @SneakyThrows
     public void sendError(HttpStatus statusCode, String message) {
@@ -101,11 +154,16 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
 
     @SneakyThrows
     protected void writeDataAndFlush(byte[] data, MediaType contentType, HttpStatus statusCode) {
-        if (!setHandled()) { log.warn("response has been handled. status:{}", statusCode); return; }
+        if (!setHandled()) {
+            log.warn("response has been handled. status:{}", statusCode);
+            return;
+        }
         try {
             setStatusCode(statusCode);
             headers.setContentType(contentType);
             if (data != null) getBody().write(data);
-        } finally { flush(); }
+        } finally {
+            flush();
+        }
     }
 }

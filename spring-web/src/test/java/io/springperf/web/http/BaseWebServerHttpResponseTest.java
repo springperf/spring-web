@@ -28,10 +28,13 @@ class BaseWebServerHttpResponseTest {
 
         @Override void runOnEventLoop(Runnable task) {}
         @Override ScheduledFuture scheduleOnEventLoop(Runnable task, long delay, TimeUnit unit) { return null; }
-        @Override public void flush() throws IOException { flushed = true; }
         @Override public void writeStream(InputStream input) {}
         @Override public void writeBytes(byte[] data) {}
         @Override public void writeFile(File file) {}
+        @Override
+        public void flush(boolean chunked) throws IOException {
+            flushed = true;
+        }
     }
 
     private WebContext webContext;

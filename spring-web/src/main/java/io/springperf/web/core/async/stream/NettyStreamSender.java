@@ -7,12 +7,14 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.internal.shaded.org.jctools.queues.MpscUnboundedArrayQueue;
 import io.springperf.web.core.async.PerfAsyncWebRequest;
 import io.springperf.web.http.NettyServerHttpResponse;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -22,12 +24,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-@Slf4j
 public class NettyStreamSender implements StreamSender {
+
+    protected static final Logger log = LoggerFactory.getLogger(NettyStreamSender.class);
 
     protected static final ConcurrentMap<Charset, Float> charsetToMaxBytesPerChar = new ConcurrentHashMap<>(3);
 
-    protected final ChannelHandlerContext ctx;
     private final Channel channel;
     private final EventExecutor eventLoop;
     private final ByteBufAllocator bufAllocator;
@@ -43,7 +45,9 @@ public class NettyStreamSender implements StreamSender {
     private final AtomicInteger wip = new AtomicInteger(0);
     private volatile boolean completed;
 
-    private volatile boolean closeChannelOnComplete = true;
+    private boolean lastHttpContentWritten;
+
+    private volatile boolean closeChannelOnComplete = false;
     private final ChannelFutureListener completeListener = future -> {
         if (future.isSuccess()) {
             onCompleteSuccess();
@@ -55,7 +59,7 @@ public class NettyStreamSender implements StreamSender {
     public NettyStreamSender(StreamEmitter emitter, PerfAsyncWebRequest asyncWebRequest) {
         this.emitter = emitter;
         this.resp = (NettyServerHttpResponse) asyncWebRequest.getNativeResponse();
-        this.ctx = this.resp.getCtx();
+        ChannelHandlerContext ctx = this.resp.getCtx();
         this.channel = ctx.channel();
         this.eventLoop = ctx.executor();
         this.bufAllocator = ctx.alloc();
@@ -89,6 +93,7 @@ public class NettyStreamSender implements StreamSender {
         }
 
         if (!queue.offer(buf)) {
+            log.warn("[SSE] queue full, releasing buf");
             buf.release();
             return;
         }
@@ -128,12 +133,11 @@ public class NettyStreamSender implements StreamSender {
                     break;
                 }
                 int size = buf.readableBytes();
-                //如果这一条就超预算且已经写了一些了，留到下次
                 if (writtenBytes > 0 && writtenBytes + size > maxFlushBytes) {
                     break;
                 }
                 buf = queue.poll();
-                ChannelFuture f = channel.write(buf);
+                ChannelFuture f = channel.write(new DefaultHttpContent(buf));
                 resp.addRespEventListener(f, false);
                 writtenBytes += size;
             }
@@ -145,39 +149,44 @@ public class NettyStreamSender implements StreamSender {
                 break;
             }
         }
-        if (completed && queue.isEmpty()) {
+        // wip 归零但队列仍有数据：重调度 drain，防止数据永远留在队列中
+        if (!queue.isEmpty()) {
+            if (channel.isWritable() && wip.compareAndSet(0, 1)) {
+                eventLoop.execute(this::drain);
+            } else if (completed && !lastHttpContentWritten) {
+                // channel 不可写但 complete 已调用：强制重调度 drain，
+                if (wip.compareAndSet(0, 1)) {
+                    eventLoop.execute(this::drain);
+                }
+            }
+            return;
+        }
+        if (completed && !lastHttpContentWritten) {
+            lastHttpContentWritten = true;
             onAllDataWritten();
         }
     }
 
     protected void onAllDataWritten() {
-        ChannelFuture f = ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
+        this.resp.setWritableCallback(null);
+        ChannelFuture f = channel.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
         resp.addRespEventListener(f, true);
         f.addListener(completeListener);
     }
 
     protected void onCompleteSuccess() {
-        if (closeChannelOnComplete) {
+        if (closeChannelOnComplete || !resp.isKeepAlive()) {
             this.channel.close();
-        } else {
-            this.resp.setWritableCallback(null);
         }
     }
 
     protected void onCompleteError(Throwable t) {
-        if (closeChannelOnComplete) {
+        log.warn("[SSE] write ERROR: {}", t.getMessage());
+        if (closeChannelOnComplete || !resp.isKeepAlive()) {
             this.channel.close();
-        } else {
-            this.resp.setWritableCallback(null);
         }
     }
 
-    /**
-     * 将 CharSequence 写入 ByteBuf
-     *
-     * @param charSequence the character sequence to write
-     * @return the buffer containing the encoded bytes
-     */
     protected ByteBuf writeCharSequence(CharSequence charSequence) {
         Charset charset = resp.getCharacterEncoding();
         int capacity = calculateCapacity(charSequence, charset);

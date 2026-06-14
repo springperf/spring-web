@@ -1,13 +1,14 @@
+
 package io.springperf.benchmark.controller;
 
+import io.springperf.web.core.async.stream.SseEmitter;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
-public class PerfSupportSseController {
+public class PerfSseController {
 
     private static final int SSE_CHUNK_COUNT = 100;
     private static final int SSE_CHUNK_SIZE = 200;
@@ -15,7 +16,7 @@ public class PerfSupportSseController {
 
     private final TaskExecutor taskExecutor;
 
-    public PerfSupportSseController(TaskExecutor taskExecutor) {
+    public PerfSseController(TaskExecutor taskExecutor) {
         this.taskExecutor = taskExecutor != null ? taskExecutor : new SimpleAsyncTaskExecutor("sse-");
     }
 
@@ -33,7 +34,7 @@ public class PerfSupportSseController {
                     }
                     chunkBuf.append("\"}");
                     chunkBuf.setLength(SSE_CHUNK_SIZE);
-                    emitter.send(SseEmitter.event().data(chunkBuf.toString()));
+                    emitter.send(chunkBuf.toString());
                     Thread.sleep(SSE_CHUNK_INTERVAL_MS);
                 }
                 emitter.complete();

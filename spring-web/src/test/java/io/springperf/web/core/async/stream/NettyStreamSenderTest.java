@@ -5,6 +5,7 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.concurrent.EventExecutor;
 import io.springperf.web.core.async.PerfAsyncWebRequest;
@@ -46,7 +47,7 @@ class NettyStreamSenderTest {
     ChannelFuture channelFuture;
 
     @Captor
-    ArgumentCaptor<ByteBuf> byteBufCaptor;
+    ArgumentCaptor<DefaultHttpContent> httpContentCaptor;
     @Captor
     ArgumentCaptor<LastHttpContent> lastHttpContentCaptor;
 
@@ -70,6 +71,7 @@ class NettyStreamSenderTest {
         when(eventLoop.inEventLoop()).thenReturn(true);
         when(channel.isActive()).thenReturn(true);
         when(channel.isWritable()).thenReturn(true);
+        when(channel.writeAndFlush(any())).thenReturn(channelFuture);
 
         sender = new NettyStreamSender(emitter, asyncWebRequest);
     }
@@ -83,12 +85,12 @@ class NettyStreamSenderTest {
     @Test
     void send_stringData_encodesAndWritesToChannel() throws Exception {
         when(emitter.encodeToString(any())).thenReturn("hello");
-        when(channel.write(any(ByteBuf.class))).thenReturn(channelFuture);
+        when(channel.write(any())).thenReturn(channelFuture);
 
         sender.send("hello");
 
-        verify(channel, atLeastOnce()).write(byteBufCaptor.capture());
-        ByteBuf written = byteBufCaptor.getValue();
+        verify(channel, atLeastOnce()).write(httpContentCaptor.capture());
+        ByteBuf written = httpContentCaptor.getValue().content();
         assertEquals("hello", written.toString(StandardCharsets.UTF_8));
     }
 
@@ -97,12 +99,12 @@ class NettyStreamSenderTest {
         encodeField.setBoolean(emitter, false); // 切换到字节模式
         byte[] data = "world".getBytes(StandardCharsets.UTF_8);
         when(emitter.encodeToBytes(any())).thenReturn(data);
-        when(channel.write(any(ByteBuf.class))).thenReturn(channelFuture);
+        when(channel.write(any())).thenReturn(channelFuture);
 
         sender.send(data);
 
-        verify(channel, atLeastOnce()).write(byteBufCaptor.capture());
-        ByteBuf written = byteBufCaptor.getValue();
+        verify(channel, atLeastOnce()).write(httpContentCaptor.capture());
+        ByteBuf written = httpContentCaptor.getValue().content();
         assertEquals("world", written.toString(StandardCharsets.UTF_8));
     }
 
@@ -112,7 +114,7 @@ class NettyStreamSenderTest {
 
         sender.send("");
 
-        verify(channel, never()).write(any(ByteBuf.class));
+        verify(channel, never()).write(any());
     }
 
     @Test
@@ -121,7 +123,7 @@ class NettyStreamSenderTest {
 
         sender.send("data");
 
-        verify(channel, never()).write(any(ByteBuf.class));
+        verify(channel, never()).write(any());
     }
 
     @Test
@@ -134,7 +136,7 @@ class NettyStreamSenderTest {
     @Test
     void drain_flushesChannel() throws Exception {
         when(emitter.encodeToString(any())).thenReturn("data");
-        when(channel.write(any(ByteBuf.class))).thenReturn(channelFuture);
+        when(channel.write(any())).thenReturn(channelFuture);
 
         sender.send("data");
 
@@ -143,11 +145,9 @@ class NettyStreamSenderTest {
 
     @Test
     void complete_writesLastContent() {
-        when(ctx.writeAndFlush(any())).thenReturn(channelFuture);
-
         sender.complete(true, null);
 
-        verify(ctx).writeAndFlush(lastHttpContentCaptor.capture());
+        verify(channel).writeAndFlush(lastHttpContentCaptor.capture());
         assertTrue(lastHttpContentCaptor.getValue() instanceof LastHttpContent);
     }
 
@@ -161,7 +161,7 @@ class NettyStreamSenderTest {
     @Test
     void send_completedEmitter_throws() throws Exception {
         when(emitter.encodeToString(any())).thenReturn("data");
-        when(channel.write(any(ByteBuf.class))).thenReturn(channelFuture);
+        when(channel.write(any())).thenReturn(channelFuture);
         when(ctx.writeAndFlush(any())).thenReturn(channelFuture);
 
         sender.send("data");

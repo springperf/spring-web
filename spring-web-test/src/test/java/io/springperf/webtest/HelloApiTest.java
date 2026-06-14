@@ -135,7 +135,7 @@ public class HelloApiTest extends BaseE2ETest {
     @Test
     void testSse() throws Exception {
         Request request = new Request.Builder().url(baseUrl + "/sse").get().build();
-        CountDownLatch latch = new CountDownLatch(3);
+        CountDownLatch latch = new CountDownLatch(8);
         CLIENT.newCall(request).enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
@@ -149,6 +149,7 @@ public class HelloApiTest extends BaseE2ETest {
                 BufferedSource source = response.body().source();
                 while (!source.exhausted()) {
                     String line = source.readUtf8Line();
+                    System.out.println("line: " + line);
                     if (line == null) continue;
                     if (line.startsWith("data:")) {
                         latch.countDown();
@@ -157,7 +158,7 @@ public class HelloApiTest extends BaseE2ETest {
             }
         });
         assertTrue(latch.await(5, TimeUnit.SECONDS),
-                "Should receive at least 3 SSE events within timeout");
+                "Should receive at least 8 SSE events within timeout");
     }
 
     @Test
@@ -180,6 +181,7 @@ public class HelloApiTest extends BaseE2ETest {
                 while (!source.exhausted()) {
                     String line = source.readUtf8Line();
                     if (line == null) continue;
+                    System.out.println(line);
                     if (line.startsWith("data:")) {
                         count.incrementAndGet();
                     }

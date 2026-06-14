@@ -80,7 +80,7 @@ public abstract class StreamEmitter<T> {
         }
         if (complete.get() && this.streamSender != null) {
             deferredResult.setResult(null);
-            this.streamSender.complete(true, null);
+            this.streamSender.complete(false, null);
         }
     }
 
@@ -95,7 +95,7 @@ public abstract class StreamEmitter<T> {
         if (complete.compareAndSet(false, true)) {
             if (this.streamSender != null) {
                 deferredResult.setResult(null);
-                this.streamSender.complete(true, null);
+                this.streamSender.complete(false, null);
             }
         }
     }
@@ -104,7 +104,7 @@ public abstract class StreamEmitter<T> {
         if (complete.compareAndSet(false, true)) {
             deferredResult.setErrorResult(ex);
             if (this.streamSender != null) {
-                this.streamSender.complete(true, ex);
+                this.streamSender.complete(false, ex);
             }
         }
     }

@@ -118,7 +118,7 @@ class StreamEmitterTest {
         emitter.complete();
 
         // complete triggers deferredResult.setResult(null) first, then streamSender.complete
-        verify(streamSender, timeout(100)).complete(true, null);
+        verify(streamSender, timeout(100)).complete(false, null);
     }
 
     @Test
@@ -130,7 +130,7 @@ class StreamEmitterTest {
         emitter.completeWithError(ex);
 
         // completeWithError triggers deferredResult.setErrorResult(ex) first, then streamSender.complete
-        verify(streamSender, timeout(100)).complete(true, ex);
+        verify(streamSender, timeout(100)).complete(false, ex);
     }
 
     @Test
@@ -235,7 +235,7 @@ class StreamEmitterTest {
         emitter.initialize(streamSender);
 
         verify(streamSender).send("early");
-        verify(streamSender, timeout(100)).complete(true, null);
+        verify(streamSender, timeout(100)).complete(false, null);
     }
 
     @Test

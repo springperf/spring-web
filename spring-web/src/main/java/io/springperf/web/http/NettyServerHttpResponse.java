@@ -63,10 +63,10 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
     }
 
     @Override
-    public void flush() throws IOException {
+    public void flush(boolean chunked) throws IOException {
         ByteBuf buf = this.buf;
         try {
-            writeAndFlush(buf, null, null);
+            writeAndFlush(buf, null, null, chunked);
         } catch (Exception e) {
             // make sure to release buffer on error
             if (buf != null && buf.refCnt() > 0) {
@@ -76,12 +76,12 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
         }
     }
 
-    private HttpResponse initHttpResponse(ByteBuf buf, String contentType, HttpStatus statusCode, boolean stream) {
+    private HttpResponse initHttpResponse(ByteBuf buf, String contentType, HttpStatus statusCode, boolean chunked) {
         setStatusCode(statusCode);
         HttpResponse response;
         if (buf != null) {
             response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()), buf);
-        } else if (stream) {
+        } else if (chunked) {
             response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()));
         } else {
             response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()));
@@ -96,7 +96,7 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
         }
         if (buf != null) {
             response.headers().setInt(HttpHeaderNames.CONTENT_LENGTH, buf.readableBytes());
-        } else if (stream) {
+        } else if (chunked) {
             HttpUtil.setTransferEncodingChunked(response, true);
         } else {
             response.headers().setInt(HttpHeaderNames.CONTENT_LENGTH, 0);
@@ -110,12 +110,11 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
     }
 
 
-    protected void writeAndFlush(ByteBuf buf, String contentType, HttpStatus statusCode) {
-        boolean stream = setHandled();
+    protected void writeAndFlush(ByteBuf buf, String contentType, HttpStatus statusCode, boolean chunked) {
         if (!setCommitted()) {
             return;
         }
-        HttpResponse response = initHttpResponse(buf, contentType, statusCode, stream);
+        HttpResponse response = initHttpResponse(buf, contentType, statusCode, chunked);
         ChannelFuture f = ctx.writeAndFlush(response);
         addRespEventListener(f, response instanceof FullHttpResponse);
         if (!keepAlive) {

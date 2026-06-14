@@ -33,8 +33,6 @@ public class BenchClientState {
     // P0 新增
     public Request jsonEchoLargeRequest;
     public Request largeResponseGetRequest;
-
-    // SSE
     public Request sseStreamRequest;
 
     /**
@@ -120,22 +118,23 @@ public class BenchClientState {
     }
 
     /**
-     * 执行 SSE 流式请求，消费流式响应体。
+     * 同步执行 SSE 流式请求，消费流式响应体。
      * 以 8KB 块读取 InputStream 并丢弃，模拟真实 SSE 客户端消费行为。
+     * 使用同步 execute() 避免 async 模式下的线程管理和超时竞态。
      */
     public String executeAndConsumeStream(Request request) throws Exception {
         try (Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) {
-                throw new RuntimeException("Unexpected SSE response: "
-                        + response.code());
+                throw new RuntimeException("Unexpected SSE response: " + response.code());
             }
-            byte[] buffer = new byte[8192];
-            int total = 0;
-            try (java.io.InputStream is = response.body().byteStream()) {
-                int read;
-                while ((read = is.read(buffer)) != -1) {
-                    total += read;
-                }
+            ResponseBody body = response.body();
+            if (body == null) {
+                throw new RuntimeException("SSE response body is null");
+            }
+            String bodyStr = body.string();
+            int total = bodyStr.length();
+            if (total < 10000) {
+                throw new RuntimeException("SSE response too short: " + total + " bytes (expected ~20700)");
             }
             return "SSE:" + total + "bytes";
         }
