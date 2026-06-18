@@ -1,5 +1,7 @@
 package io.springperf.web.http;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpRequest;
@@ -37,7 +39,11 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
     private final FullHttpRequest request;
     private HttpHeaders headers;
     private URI uri;
+    private static final int LARGE_BODY_LIMIT = 4096;
+    private static final byte[] EMPTY_BODY = new byte[0];
+
     private volatile byte[] body;
+    private ByteBuf largeBodyBuf;
 
     /**
      * 使用已解析的 path 构造，跳过 context-path 校验。
@@ -210,14 +216,25 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
 
     @Override
     public InputStream getBody() {
-        return new ByteArrayInputStream(getBodyBytes());
+        getBodyBytes();
+        if (largeBodyBuf != null) {
+            return new ByteBufInputStream(largeBodyBuf.duplicate(), false);
+        }
+        return new ByteArrayInputStream(body);
     }
 
     protected byte[] getBodyBytes() {
         if (body == null) {
             synchronized (this) {
                 if (body == null) {
-                    body = ByteBufUtil.getBytes(request.content());
+                    ByteBuf content = request.content();
+                    int size = content.readableBytes();
+                    if (size <= LARGE_BODY_LIMIT) {
+                        body = ByteBufUtil.getBytes(content);
+                    } else {
+                        largeBodyBuf = content.retainedDuplicate();
+                        body = EMPTY_BODY;
+                    }
                 }
             }
         }
@@ -226,7 +243,7 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
 
     @Override
     public boolean hasBody() {
-        return getBodyBytes().length > 0;
+        return request.content().readableBytes() > 0;
     }
 
     @Override
@@ -251,6 +268,10 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
 
     @Override
     public boolean release() {
+        if (largeBodyBuf != null) {
+            largeBodyBuf.release();
+            largeBodyBuf = null;
+        }
         return ReferenceCountUtil.release(request);
     }
 

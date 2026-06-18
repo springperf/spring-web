@@ -115,7 +115,7 @@ class ResponseBodyEmitterReturnValueResolverTest {
         when(codecRegistry.getConverters()).thenReturn(Collections.emptyList());
 
         assertThrows(IllegalArgumentException.class,
-                () -> resolver.encodeToBytes(new HttpHeaders(), "data"));
+                () -> resolver.encodeToBytes(new HttpHeaders(), new Object()));
     }
 
     @Test

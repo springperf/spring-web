@@ -15,7 +15,7 @@ import org.springframework.http.HttpStatus;
  * Netty 入站处理器。职责仅限于：
  * <ol>
  *   <li>解析 URI、校验 contextPath</li>
- *   <li>创建 request/response 对象（NettyServerHttpRequest 构造时自动 retain）</li>
+ *   <li>创建 request/response 对象（msg.retain() + 构造 req，finally 中 req.release()）</li>
  *   <li>委托 {@link HttpHandler#httpHandle} 执行实际处理</li>
  *   <li>异常兜底（ResponseStatusException → 特定状态码，其余 → 500）</li>
  * </ol>
@@ -81,10 +81,15 @@ public class NettyHttpHandler extends SimpleChannelInboundHandler<FullHttpReques
             }
 
             // 3. 用预解析的 path 创建请求，跳过 BaseWebServerHttpRequest 中的 contextPath 校验
+            msg.retain();
             NettyServerHttpRequest req = new NettyServerHttpRequest(webContext, ctxNetty, msg, resolvedPath);
             resp.setTimeout();
             // 4. 委托给实际处理逻辑
-            handler.httpHandle(req, resp);
+            try {
+                handler.httpHandle(req, resp);
+            } finally {
+                req.release();
+            }
         } catch (Throwable e) {
             log.error("NH EXCEPTION", e);
             try {

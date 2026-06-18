@@ -49,7 +49,7 @@ public class ResponseBodyEmitterReturnValueResolver extends StreamEmitterReturnV
         for (HttpBodyConverter converter : codecRegistry.getConverters()) {
             if (converter.canWrite(null, data.getClass(), selectedMediaType)) {
                 StreamingHttpOutputMessage outputMessage = new StreamingHttpOutputMessage(mutableHeaders);
-                converter.write(data, null, null, outputMessage);
+                converter.write(data, null, selectedMediaType, outputMessage);
                 return outputMessage.getBytes();
             }
         }

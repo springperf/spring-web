@@ -2,6 +2,23 @@
 
 本项目遵循 [语义化版本控制](https://semver.org/lang/zh-CN/)。
 
+## [1.0.3] - 20260618
+
+### 新增
+
+- **HTTP/2 支持**：新增 `Http2ChannelInitializer` 统一管理 HTTP/1.1 和 HTTP/2 的 ChannelInitializer，支持 h2（TLS ALPN）和 h2c（明文 prior knowledge）自动协商；新增 `server.http2.enabled` 配置开关
+- **Netty worker 线程池可配置**：新增 `server.netty.workers` 配置项，允许自定义 worker EventLoopGroup 线程数，默认 2 × CPU 核数
+- **WriteBufferWaterMark 可配置**：新增 `server.netty.write-buffer-low-watermark` / `write-buffer-high-watermark` 配置项，支持背压阈值调优（默认低水位 8KB、高水位 32KB）
+- **`writeBytes(byte[])` 高效写入**：`WebServerHttpResponse` 新增 `writeBytes()` 方法，Content-Length + 单次 writeAndFlush，避免 chunked 编码，对已知大小的小负载显著提升性能
+- **JMH 基准测试模块**：新增 `spring-web-benchmark` 模块，覆盖 Perf/Tomcat/Undertow/WebFlux 四种服务器，含裸机/Filter/Interceptor/SSE 对比场景及自动报告生成（GC 日志解析、内存快照）
+- **文档**：新增 `docs/benchmark.md` 基准测试说明文档、README 补充
+
+### 优化
+
+- **SSE drain() 竞态修复**：wip 归零但队列仍有数据时主动重调度 drain，防止 `NettyStreamSender` 在生产者快于 drain 时数据残留丢失；使用 `DefaultHttpContent` 包装每个 SSE 写入块
+- **NettyHttpServer 绑定失败安全清理**：端口绑定失败时及时 shutdown boss/worker EventLoopGroup，防止线程残留阻止 JVM 退出
+- **代码风格统一**：`BaseWebServerHttpResponse` / `NettyServerHttpResponse` 多处格式化及方法提取
+
 ## [1.0.2] - 20260608
 
 ### 修复
