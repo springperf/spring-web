@@ -52,8 +52,8 @@ public class SpringWebSupportAutoConfiguration {
     protected WebFilter createFilterWrapper(FilterRegistrationBean filterRegistrationBean) {
         String[] supportedPathRules = StringUtils.toStringArray(filterRegistrationBean.getUrlPatterns());
         Integer order = AnnotationAwareOrderUtils.findOrder(filterRegistrationBean);
-        return order != null ? new FilterWrapper(filterRegistrationBean.getFilter(), supportedPathRules, order)
-                             : new FilterWrapper(filterRegistrationBean.getFilter(), supportedPathRules);
+        return FilterWrapper.create(filterRegistrationBean.getFilter(), supportedPathRules,
+                order != null ? order : WebFilter.defaultOrder);
     }
 
     @Bean @ConditionalOnMissingBean

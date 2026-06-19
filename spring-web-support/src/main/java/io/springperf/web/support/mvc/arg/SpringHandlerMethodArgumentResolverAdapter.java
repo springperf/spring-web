@@ -5,6 +5,7 @@ import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.support.servlet.PerfHttpServletRequest;
 import io.springperf.web.support.servlet.PerfHttpServletResponse;
+import io.springperf.web.support.servlet.ServletAttribute;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.Ordered;
 import org.springframework.web.context.request.NativeWebRequest;
@@ -49,8 +50,12 @@ public class SpringHandlerMethodArgumentResolverAdapter implements RuntimeArgume
 
     @Override
     public Object resolveArgument(MethodParameter parameter, WebServerHttpRequest request, WebServerHttpResponse response) throws Exception {
-        HttpServletRequest servletRequest = new PerfHttpServletRequest(request);
-        HttpServletResponse servletResponse = new PerfHttpServletResponse(response);
+        HttpServletRequest servletRequest = ServletAttribute.getRequest(request.getRequestContext());
+        HttpServletResponse servletResponse = ServletAttribute.getResponse(request.getRequestContext());
+        if (servletRequest == null) {
+            servletRequest = new PerfHttpServletRequest(request);
+            servletResponse = new PerfHttpServletResponse(response);
+        }
         NativeWebRequest webRequest = new ServletWebRequest(servletRequest, servletResponse);
         return resolver.resolveArgument(parameter, null, webRequest, null);
     }

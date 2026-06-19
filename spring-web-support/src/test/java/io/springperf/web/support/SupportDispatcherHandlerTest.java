@@ -5,6 +5,7 @@ import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.support.servlet.PerfHttpServletRequest;
 import io.springperf.web.support.servlet.PerfHttpServletResponse;
+import io.springperf.web.support.servlet.ServletAttribute;
 import io.springperf.web.support.servlet.context.ServletAdapterContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -15,7 +16,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class SupportDispatcherHandlerTest {
@@ -53,7 +54,7 @@ class SupportDispatcherHandlerTest {
     @Test
     void buildRequestAttributes_withAdapterContext_usesExistingServletWrappers() {
         when(req.getRequestContext()).thenReturn(requestContext);
-        when(requestContext.getAttribute(ServletAdapterContext.REQUEST_ATTRIBUTE_NAME)).thenReturn(adapterContext);
+        when(requestContext.getAttribute(ServletAttribute.getAttributeKey())).thenReturn(adapterContext);
         when(adapterContext.getRequest()).thenReturn(restRequest);
         when(adapterContext.getResponse()).thenReturn(restResponse);
 
@@ -68,7 +69,7 @@ class SupportDispatcherHandlerTest {
     @Test
     void buildRequestAttributes_withoutAdapterContext_createsNewServletWrappers() {
         when(req.getRequestContext()).thenReturn(requestContext);
-        when(requestContext.getAttribute(ServletAdapterContext.REQUEST_ATTRIBUTE_NAME)).thenReturn(null);
+        when(requestContext.getAttribute(ServletAttribute.getAttributeKey())).thenReturn(null);
 
         SupportDispatcherHandler handler = new SupportDispatcherHandler();
         ServletRequestAttributes attrs = handler.buildRequestAttributes(req, resp);

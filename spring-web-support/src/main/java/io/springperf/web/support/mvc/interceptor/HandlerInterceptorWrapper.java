@@ -1,14 +1,19 @@
 package io.springperf.web.support.mvc.interceptor;
 
 import io.springperf.web.core.interceptor.HandlerInterceptor;
+import io.springperf.web.http.RequestContext;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
+import io.springperf.web.support.servlet.ServletAttribute;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.server.ServerHttpRequest;
-import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.servlet.AsyncHandlerInterceptor;
 import org.springframework.web.util.NestedServletException;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 public class HandlerInterceptorWrapper implements HandlerInterceptor {
 
@@ -21,40 +26,66 @@ public class HandlerInterceptorWrapper implements HandlerInterceptor {
     }
 
     @Override
-    public boolean preHandle(ServerHttpRequest request, ServerHttpResponse response, Object handler) throws Exception {
-        ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-        if (attributes == null) {
-            log.warn("HandlerInterceptorWrapper.preHandle: RequestAttributes is null, skipping interceptor {}", interceptor);
+    public boolean preHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler) throws Exception {
+        HttpServletRequest servletRequest = extractRequest(request);
+        HttpServletResponse servletResponse = extractResponse(request);
+        if (servletRequest == null || servletResponse == null) {
+            log.warn("HandlerInterceptorWrapper.preHandle: Servlet request/response not available, skipping interceptor {}", interceptor);
             return true;
         }
-        boolean result = interceptor.preHandle(attributes.getRequest(), attributes.getResponse(), handler);
+        boolean result = interceptor.preHandle(servletRequest, servletResponse, handler);
         log.info("HandlerInterceptorWrapper.preHandle: interceptor={}, handler={}, result={}",
                 interceptor.getClass().getSimpleName(), handler, result);
         return result;
     }
 
     @Override
-    public void postHandle(ServerHttpRequest request, ServerHttpResponse response, Object handler, Object result) throws Exception {
-        ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-        if (attributes == null) return;
-        interceptor.postHandle(attributes.getRequest(), attributes.getResponse(), handler, null);
+    public void postHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler, Object result) throws Exception {
+        HttpServletRequest servletRequest = extractRequest(request);
+        HttpServletResponse servletResponse = extractResponse(request);
+        if (servletRequest == null || servletResponse == null) return;
+        interceptor.postHandle(servletRequest, servletResponse, handler, null);
     }
 
     @Override
-    public void afterCompletion(ServerHttpRequest request, ServerHttpResponse response, Object handler, Throwable ex) throws Exception {
-        ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-        if (attributes == null) return;
-        interceptor.afterCompletion(attributes.getRequest(), attributes.getResponse(), handler, ex instanceof Exception ? (Exception) ex : new NestedServletException("Handler dispatch failed", ex));
+    public void afterCompletion(WebServerHttpRequest request, WebServerHttpResponse response, Object handler, Throwable ex) throws Exception {
+        HttpServletRequest servletRequest = extractRequest(request);
+        HttpServletResponse servletResponse = extractResponse(request);
+        if (servletRequest == null || servletResponse == null) return;
+        interceptor.afterCompletion(servletRequest, servletResponse, handler,
+                ex instanceof Exception ? (Exception) ex : new NestedServletException("Handler dispatch failed", ex));
     }
 
     @Override
-    public void afterConcurrentHandlingStarted(ServerHttpRequest request, ServerHttpResponse response, Object handler) throws Exception {
+    public void afterConcurrentHandlingStarted(WebServerHttpRequest request, WebServerHttpResponse response, Object handler) throws Exception {
         if (interceptor instanceof AsyncHandlerInterceptor) {
-            AsyncHandlerInterceptor asyncInterceptor = (AsyncHandlerInterceptor) interceptor;
-            ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-            if (attributes == null) return;
-            asyncInterceptor.afterConcurrentHandlingStarted(attributes.getRequest(), attributes.getResponse(), handler);
+            HttpServletRequest servletRequest = extractRequest(request);
+            HttpServletResponse servletResponse = extractResponse(request);
+            if (servletRequest == null || servletResponse == null) return;
+            ((AsyncHandlerInterceptor) interceptor).afterConcurrentHandlingStarted(servletRequest, servletResponse, handler);
         }
+    }
+
+    private static HttpServletRequest extractRequest(WebServerHttpRequest request) {
+        RequestContext ctx = request.getRequestContext();
+        if (ctx != null) {
+            HttpServletRequest sr = ServletAttribute.getRequest(ctx);
+            if (sr != null) return sr;
+        }
+        ServletRequestAttributes attrs = (ServletRequestAttributes)
+                RequestContextHolder.getRequestAttributes();
+        return attrs != null ? attrs.getRequest() : null;
+    }
+
+    private static HttpServletResponse extractResponse(WebServerHttpRequest request) {
+        RequestContext ctx = request.getRequestContext();
+        if (ctx != null) {
+            HttpServletResponse sr = ServletAttribute.getResponse(ctx);
+            if (sr != null) return sr;
+        }
+        ServletRequestAttributes attrs = (ServletRequestAttributes)
+                RequestContextHolder.getRequestAttributes();
+        return attrs != null ? attrs.getResponse() : null;
     }
 
     @Override

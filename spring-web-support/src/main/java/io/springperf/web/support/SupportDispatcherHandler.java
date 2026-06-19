@@ -5,6 +5,7 @@ import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.support.servlet.PerfHttpServletRequest;
 import io.springperf.web.support.servlet.PerfHttpServletResponse;
+import io.springperf.web.support.servlet.ServletAttribute;
 import io.springperf.web.support.servlet.context.ServletAdapterContext;
 import org.springframework.core.Ordered;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -34,7 +35,7 @@ public class SupportDispatcherHandler extends DispatcherHandler {
     }
 
     protected ServletRequestAttributes buildRequestAttributes(WebServerHttpRequest req, WebServerHttpResponse resp) {
-        ServletAdapterContext adapterContext = (ServletAdapterContext) req.getRequestContext().getAttribute(ServletAdapterContext.REQUEST_ATTRIBUTE_NAME);
+        ServletAdapterContext adapterContext = ServletAttribute.getAdapterContext(req.getRequestContext());
         if (adapterContext != null) {
             return new ServletRequestAttributes(adapterContext.getRequest(), adapterContext.getResponse());
         }

@@ -1,7 +1,9 @@
 package io.springperf.web.support.mvc.arg;
 
+import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
+import io.springperf.web.support.servlet.ServletAttribute;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,6 +31,9 @@ class SpringHandlerMethodArgumentResolverAdapterTest {
 
     @Mock
     WebServerHttpResponse response;
+
+    @Mock
+    RequestContext requestContext;
 
     SpringHandlerMethodArgumentResolverAdapter adapter;
 
@@ -62,6 +67,8 @@ class SpringHandlerMethodArgumentResolverAdapterTest {
 
     @Test
     void resolveArgument_createsServletWrappersAndDelegates() throws Exception {
+        when(request.getRequestContext()).thenReturn(requestContext);
+        when(requestContext.getAttribute(ServletAttribute.getAttributeKey())).thenReturn(null);
         when(delegate.resolveArgument(any(), any(), any(), any())).thenReturn("resolved");
 
         Object result = adapter.resolveArgument(methodParameter, request, response);

@@ -1,5 +1,7 @@
 package io.springperf.web.support.mvc.interceptor;
 
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -7,8 +9,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.server.ServerHttpRequest;
-import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.servlet.AsyncHandlerInterceptor;
@@ -26,10 +26,10 @@ class HandlerInterceptorWrapperTest {
     org.springframework.web.servlet.HandlerInterceptor springInterceptor;
 
     @Mock
-    ServerHttpRequest serverRequest;
+    WebServerHttpRequest serverRequest;
 
     @Mock
-    ServerHttpResponse serverResponse;
+    WebServerHttpResponse serverResponse;
 
     @Mock
     HttpServletRequest servletRequest;

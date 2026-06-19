@@ -1,7 +1,7 @@
 package io.springperf.web.core.interceptor;
 
-import org.springframework.http.server.ServerHttpRequest;
-import org.springframework.http.server.ServerHttpResponse;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 /**
  * Contract for intercepting HTTP request processing at the handler level.
@@ -31,7 +31,7 @@ public interface HandlerInterceptor {
      * @return {@code true} to continue processing, {@code false} to abort
      * @throws Exception if pre-processing fails
      */
-    default boolean preHandle(ServerHttpRequest request, ServerHttpResponse response, Object handler) throws Exception {
+    default boolean preHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler) throws Exception {
         return true;
     }
 
@@ -44,7 +44,7 @@ public interface HandlerInterceptor {
      * @param result   the return value from the handler (may be {@code null})
      * @throws Exception if post-processing fails
      */
-    default void postHandle(ServerHttpRequest request, ServerHttpResponse response, Object handler, Object result) throws Exception {
+    default void postHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler, Object result) throws Exception {
     }
 
     /**
@@ -56,7 +56,7 @@ public interface HandlerInterceptor {
      * @param ex       the exception that occurred, or {@code null} if none
      * @throws Exception if completion processing fails
      */
-    default void afterCompletion(ServerHttpRequest request, ServerHttpResponse response, Object handler, Throwable ex) throws Exception {
+    default void afterCompletion(WebServerHttpRequest request, WebServerHttpResponse response, Object handler, Throwable ex) throws Exception {
     }
 
     /**
@@ -67,6 +67,6 @@ public interface HandlerInterceptor {
      * @param handler  the handler method for the request
      * @throws Exception if the callback fails
      */
-    default void afterConcurrentHandlingStarted(ServerHttpRequest request, ServerHttpResponse response, Object handler) throws Exception {
+    default void afterConcurrentHandlingStarted(WebServerHttpRequest request, WebServerHttpResponse response, Object handler) throws Exception {
     }
 }

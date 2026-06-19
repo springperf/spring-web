@@ -9,8 +9,6 @@ import javax.servlet.FilterChain;
 @Getter
 public class ServletAdapterContext {
 
-    public static final String REQUEST_ATTRIBUTE_NAME = "spring.web.rest.ServletAdapterContext";
-
     private PerfHttpServletRequest request;
 
     private PerfHttpServletResponse response;

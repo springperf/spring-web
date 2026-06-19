@@ -1,8 +1,8 @@
 package io.springperf.web.core.interceptor;
 
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.util.PathPatternUtils;
-import org.springframework.http.server.ServerHttpRequest;
-import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.lang.Nullable;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.PathMatcher;
@@ -82,22 +82,22 @@ public class RuntimeMappingInterceptor implements HandlerInterceptor {
     }
 
     @Override
-    public boolean preHandle(ServerHttpRequest request, ServerHttpResponse response, Object handler) throws Exception {
+    public boolean preHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler) throws Exception {
         return interceptor.preHandle(request, response, handler);
     }
 
     @Override
-    public void postHandle(ServerHttpRequest request, ServerHttpResponse response, Object handler, Object result) throws Exception {
+    public void postHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler, Object result) throws Exception {
         interceptor.postHandle(request, response, handler, result);
     }
 
     @Override
-    public void afterCompletion(ServerHttpRequest request, ServerHttpResponse response, Object handler, Throwable ex) throws Exception {
+    public void afterCompletion(WebServerHttpRequest request, WebServerHttpResponse response, Object handler, Throwable ex) throws Exception {
         interceptor.afterCompletion(request, response, handler, ex);
     }
 
     @Override
-    public void afterConcurrentHandlingStarted(ServerHttpRequest request, ServerHttpResponse response, Object handler) throws Exception {
+    public void afterConcurrentHandlingStarted(WebServerHttpRequest request, WebServerHttpResponse response, Object handler) throws Exception {
         interceptor.afterConcurrentHandlingStarted(request, response, handler);
     }
 }

@@ -1,10 +1,10 @@
 package io.springperf.webtest.interceptor;
 
 import io.springperf.web.core.interceptor.HandlerInterceptor;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.server.ServerHttpRequest;
-import org.springframework.http.server.ServerHttpResponse;
 
 public class LifecycleInterceptor implements HandlerInterceptor {
 
@@ -19,18 +19,18 @@ public class LifecycleInterceptor implements HandlerInterceptor {
     }
 
     @Override
-    public boolean preHandle(ServerHttpRequest request, ServerHttpResponse response, Object handler) throws Exception {
+    public boolean preHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler) throws Exception {
         return true;
     }
 
     @Override
-    public void postHandle(ServerHttpRequest request, ServerHttpResponse response, Object handler, Object result) throws Exception {
+    public void postHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler, Object result) throws Exception {
         log.info("LifecycleInterceptor.postHandle called");
         postHandleCount++;
     }
 
     @Override
-    public void afterCompletion(ServerHttpRequest request, ServerHttpResponse response, Object handler, Throwable ex) throws Exception {
+    public void afterCompletion(WebServerHttpRequest request, WebServerHttpResponse response, Object handler, Throwable ex) throws Exception {
         log.info("LifecycleInterceptor.afterCompletion called");
         afterCompletionCount++;
     }

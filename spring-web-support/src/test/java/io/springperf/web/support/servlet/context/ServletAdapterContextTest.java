@@ -9,7 +9,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import javax.servlet.FilterChain;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 @ExtendWith(MockitoExtension.class)
 class ServletAdapterContextTest {
@@ -30,11 +31,6 @@ class ServletAdapterContextTest {
         assertSame(request, ctx.getRequest());
         assertSame(response, ctx.getResponse());
         assertSame(filterChain, ctx.getFilterChain());
-    }
-
-    @Test
-    void requestAttributeName_constantIsCorrect() {
-        assertEquals("spring.web.rest.ServletAdapterContext", ServletAdapterContext.REQUEST_ATTRIBUTE_NAME);
     }
 
     @Test

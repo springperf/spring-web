@@ -1,8 +1,8 @@
 package io.springperf.webtest.proxy;
 
 import io.springperf.web.core.interceptor.HandlerInterceptor;
-import org.springframework.http.server.ServerHttpRequest;
-import org.springframework.http.server.ServerHttpResponse;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 import org.springframework.stereotype.Component;
 
 /**
@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 public class ProxyTestInterceptor implements HandlerInterceptor {
 
     @Override
-    public boolean preHandle(ServerHttpRequest request, ServerHttpResponse response, Object handler) throws Exception {
+    public boolean preHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler) throws Exception {
         response.getHeaders().add("X-Test-Interceptor", "called");
         return true;
     }

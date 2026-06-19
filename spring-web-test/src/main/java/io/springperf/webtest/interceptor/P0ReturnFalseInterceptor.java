@@ -1,9 +1,9 @@
 package io.springperf.webtest.interceptor;
 
 import io.springperf.web.core.interceptor.HandlerInterceptor;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.server.ServerHttpRequest;
-import org.springframework.http.server.ServerHttpResponse;
 
 /**
  * 测试 Interceptor preHandle 返回 false 的场景。
@@ -13,7 +13,7 @@ import org.springframework.http.server.ServerHttpResponse;
 public class P0ReturnFalseInterceptor implements HandlerInterceptor {
 
     @Override
-    public boolean preHandle(ServerHttpRequest request, ServerHttpResponse response, Object handler) throws Exception {
+    public boolean preHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler) throws Exception {
         response.setStatusCode(HttpStatus.OK);
         response.getBody().write(new byte[0]);
         return false;

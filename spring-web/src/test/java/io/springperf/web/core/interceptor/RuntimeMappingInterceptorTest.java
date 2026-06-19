@@ -1,8 +1,8 @@
 package io.springperf.web.core.interceptor;
 
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.server.ServerHttpRequest;
-import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.util.PathMatcher;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -123,8 +123,8 @@ class RuntimeMappingInterceptorTest {
 
     @Test
     void preHandle_delegatesAndReturnsResult() throws Exception {
-        ServerHttpRequest request = mock(ServerHttpRequest.class);
-        ServerHttpResponse response = mock(ServerHttpResponse.class);
+        WebServerHttpRequest request = mock(WebServerHttpRequest.class);
+        WebServerHttpResponse response = mock(WebServerHttpResponse.class);
         Object handler = new Object();
         doReturn(false).when(spyDelegate).preHandle(request, response, handler);
 
@@ -136,8 +136,8 @@ class RuntimeMappingInterceptorTest {
 
     @Test
     void postHandle_delegates() throws Exception {
-        ServerHttpRequest request = mock(ServerHttpRequest.class);
-        ServerHttpResponse response = mock(ServerHttpResponse.class);
+        WebServerHttpRequest request = mock(WebServerHttpRequest.class);
+        WebServerHttpResponse response = mock(WebServerHttpResponse.class);
         Object handler = new Object();
         Object result = "result";
 
@@ -149,8 +149,8 @@ class RuntimeMappingInterceptorTest {
 
     @Test
     void afterCompletion_delegates() throws Exception {
-        ServerHttpRequest request = mock(ServerHttpRequest.class);
-        ServerHttpResponse response = mock(ServerHttpResponse.class);
+        WebServerHttpRequest request = mock(WebServerHttpRequest.class);
+        WebServerHttpResponse response = mock(WebServerHttpResponse.class);
         Object handler = new Object();
         Throwable ex = new RuntimeException("test");
 
@@ -162,8 +162,8 @@ class RuntimeMappingInterceptorTest {
 
     @Test
     void afterConcurrentHandlingStarted_delegates() throws Exception {
-        ServerHttpRequest request = mock(ServerHttpRequest.class);
-        ServerHttpResponse response = mock(ServerHttpResponse.class);
+        WebServerHttpRequest request = mock(WebServerHttpRequest.class);
+        WebServerHttpResponse response = mock(WebServerHttpResponse.class);
         Object handler = new Object();
 
         RuntimeMappingInterceptor interceptor = new RuntimeMappingInterceptor(null, null, spyDelegate);
