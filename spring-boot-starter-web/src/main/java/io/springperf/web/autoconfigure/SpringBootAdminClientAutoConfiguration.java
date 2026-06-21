@@ -25,7 +25,7 @@ import org.springframework.core.env.Environment;
  * 并排除 {@code spring-boot-starter-web}（避免 Tomcat 冲突）。</p>
  *
  * @author huangcanda
- * @since 1.0.3
+ * @since 1.0.4
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnClass(name = "de.codecentric.boot.admin.client.registration.ApplicationFactory")

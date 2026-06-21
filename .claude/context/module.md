@@ -3,7 +3,7 @@
 ## 5 个模块
 
 ```
-spring-web-parent (io.github.springperf:spring-web-parent:1.0.1)
+spring-web-parent
 │  Spring Boot 2.6.15 parent, Java 8
 │
 ├── spring-web                     核心框架

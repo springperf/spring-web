@@ -24,7 +24,7 @@ import java.net.UnknownHostException;
  * </ol>
  *
  * @author huangcanda
- * @since 1.0.3
+ * @since 1.0.4
  */
 public class PerfApplicationFactory implements ApplicationFactory {
 

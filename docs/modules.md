@@ -199,7 +199,7 @@ destroyComponent()     → 资源释放
 <dependency>
     <groupId>io.github.springperf</groupId>
     <artifactId>spring-web-support</artifactId>
-    <version>1.0.2</version>
+    <version>${spring-web.version}</version>
 </dependency>
 ```
 

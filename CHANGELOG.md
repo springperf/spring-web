@@ -2,6 +2,14 @@
 
 本项目遵循 [语义化版本控制](https://semver.org/lang/zh-CN/)。
 
+## [1.0.4] - 20260621
+
+### 新增
+
+- **Spring Cloud 服务注册发现兼容**：在 Netty 服务器启动后发射 `WebServerInitializedEvent`，使 Nacos/Eureka/Consul 等服务注册组件能正确感知服务器就绪状态；使用 JDK 动态代理包装 `WebServerApplicationContext`，无需 Servlet 容器
+- **Spring Boot Admin 兼容**：新增 `PerfApplicationFactory` 替代 SBA Client 的 `DefaultApplicationFactory`，从本框架配置自动计算 serviceUrl/managementUrl/healthUrl，不依赖 `HttpServletRequest`；新增 `SpringBootAdminClientAutoConfiguration` 自动配置，仅当用户引入 `spring-boot-admin-starter-client` 时激活
+- **`NettyHttpServer.getActualPort()`**：暴露实际绑定的端口号，支持随机端口场景
+
 ## [1.0.3] - 20260618
 
 ### 新增

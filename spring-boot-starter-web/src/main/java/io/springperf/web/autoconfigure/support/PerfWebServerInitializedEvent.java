@@ -19,7 +19,7 @@ import java.lang.reflect.Proxy;
  * {@link WebServerApplicationContext#getWebServer()} 返回本框架的 WebServer 实现。</p>
  *
  * @author huangcanda
- * @since 1.0.3
+ * @since 1.0.4
  */
 public class PerfWebServerInitializedEvent extends WebServerInitializedEvent {
 
@@ -48,6 +48,9 @@ public class PerfWebServerInitializedEvent extends WebServerInitializedEvent {
                     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
                         if ("getWebServer".equals(method.getName()) && method.getParameterCount() == 0) {
                             return webServer;
+                        }
+                        if ("getServerNamespace".equals(method.getName()) && method.getParameterCount() == 0) {
+                            return null;
                         }
                         // equals/hashCode/toString 也委托给真实上下文
                         return method.invoke(delegate, args);
