@@ -2,12 +2,18 @@ package io.springperf.web.autoconfigure;
 
 import io.netty.handler.ssl.SslContext;
 import io.springperf.web.autoconfigure.actuator.server.SslContextFactory;
+import io.springperf.web.autoconfigure.support.PerfWebServer;
+import io.springperf.web.autoconfigure.support.PerfWebServerInitializedEvent;
 import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.DispatcherHandler;
 import io.springperf.web.server.NettyHttpServer;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.boot.web.server.WebServer;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.env.Environment;
 import org.springframework.validation.Validator;
@@ -35,6 +41,21 @@ public class SpringWebAutoConfiguration {
         boolean http2Enabled = environment.getProperty("server.http2.enabled", boolean.class, false);
         SslContext sslContext = SslContextFactory.createServerSslContext(environment, "server.ssl.", http2Enabled);
         return new NettyHttpServer(webContext, sslContext);
+    }
+
+    /**
+     * 在 Netty 服务器启动完成后发射 {@link WebServerInitializedEvent}，
+     * 使 Spring Cloud 服务注册（Nacos/Eureka/Consul）等组件正确感知服务器就绪。
+     */
+    @Bean
+    public ApplicationListener<ApplicationReadyEvent> webServerInitializedEventPublisher(
+            NettyHttpServer nettyHttpServer, ApplicationContext applicationContext) {
+        return event -> {
+            if (nettyHttpServer.isRunning()) {
+                WebServer webServer = new PerfWebServer(nettyHttpServer.getActualPort(), nettyHttpServer);
+                applicationContext.publishEvent(new PerfWebServerInitializedEvent(webServer, applicationContext));
+            }
+        };
     }
 
     @Bean @ConditionalOnMissingBean @ConditionalOnClass(name = "javax.validation.Validator")

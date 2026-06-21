@@ -14,6 +14,7 @@ import io.springperf.web.filter.WebFilterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.SmartLifecycle;
 
+import java.net.InetSocketAddress;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -29,6 +30,7 @@ public class NettyHttpServer implements SmartLifecycle {
     private Channel serverChannel;
     private NettyHttpHandler httpHandler;
     private boolean http2Enabled;
+    private volatile int actualPort;
 
     public NettyHttpServer(WebContext webContext) {
         this(webContext, null);
@@ -70,8 +72,9 @@ public class NettyHttpServer implements SmartLifecycle {
                 ));
         try {
             serverChannel = bootstrap.bind(port).sync().channel();
+            this.actualPort = ((InetSocketAddress) serverChannel.localAddress()).getPort();
             running = true;
-            log.info("Netty Server started on port {}", port);
+            log.info("Netty Server started on port {}", this.actualPort);
         } catch (Exception e) {
             // 绑定失败时及时清理 EventLoopGroup，否则线程残留会阻止 JVM 退出
             if (bossGroup != null) {
@@ -140,6 +143,14 @@ public class NettyHttpServer implements SmartLifecycle {
     public void stop() {
         stop(() -> {
         });
+    }
+
+    /**
+     * 返回 Netty 实际绑定的端口。
+     * 在 start() 之前调用返回 0，绑定后返回实际端口（可能不同于配置值，如随机端口）。
+     */
+    public int getActualPort() {
+        return actualPort;
     }
 
     @Override
