@@ -340,6 +340,8 @@ management.endpoints.web.base-path=/actuator
 
 ## 性能建议
 
+> 性能原理的详细分析见 [性能原理文档](performance-principles.md)
+
 1. **避免在 EventLoop 中阻塞**：DB/RPC/IO 操作使用 `@RunInPool`
 2. **合理配置线程池**：根据业务场景调整 `pool.core-pool-size` 和 `pool.max-pool-size`
 3. **使用异步返回值**：长耗时操作优先使用 `DeferredResult` 或 `StreamEmitter`

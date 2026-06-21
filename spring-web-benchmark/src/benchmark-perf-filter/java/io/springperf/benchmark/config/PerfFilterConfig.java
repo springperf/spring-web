@@ -6,6 +6,7 @@ import io.springperf.web.filter.WebFilter;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class PerfFilterConfig {

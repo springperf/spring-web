@@ -4,7 +4,7 @@
 
 ## 特点
 
-- **高性能** — 基于 Netty 4.1 事件循环，无阻塞 IO，无 Servlet 容器开销
+- **高性能** — 启动时预缓存全部元数据，运行时零反射零匹配；ASM 字节码生成替代反射调用；O(1) 路由；按需在 EventLoop 或业务线程处理
 - **零侵入** — 复用 `@RequestMapping`、`@RequestParam`、`@RequestBody`、`@ExceptionHandler`、`HandlerInterceptor` 等 Spring 注解与抽象
 - **可伸缩** — 支持 `@RunInPool` 将业务逻辑按需调度到业务线程池，避免阻塞 EventLoop
 - **异步原生** — 内置 DeferredResult、Callable、StreamEmitter、SSE、响应式流（Reactive Streams）支持

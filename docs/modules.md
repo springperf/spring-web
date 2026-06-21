@@ -15,7 +15,7 @@ spring-web-parent
 
 ### server — Netty 服务器
 
-基于 Netty 4.1 的非阻塞 HTTP 服务器。
+基于 Netty 4.1 的非阻塞传输层，请求在 EventLoop 上同步处理。
 
 - **NettyHttpServer** 实现 `SmartLifecycle`，随 Spring 容器自动启停
 - 使用 `HttpServerCodec` + `ChunkedWriteHandler` 处理 HTTP 协议

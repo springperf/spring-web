@@ -14,9 +14,9 @@ Spring Web 是一个基于 **Netty** 构建的高性能 Web 框架，定位为 S
 
 ### 核心特性
 
-- **Netty 驱动**：基于 Netty 4.1 的事件驱动架构，非阻塞 I/O
+- **Netty 驱动**：基于 Netty 4.1 的事件驱动 I/O，请求在 EventLoop 上同步处理，无需切换到业务线程
 - **Spring 生态兼容**：支持 Spring 注解（`@RestController`、`@RequestMapping`、`@ExceptionHandler` 等）
-- **高性能**：相比传统 Servlet 容器，资源占用更低、吞吐量更高
+- **高性能** — 启动时预缓存参数/返回值解析器、拦截器等全部元数据，运行时零反射零匹配；ASM 字节码生成替代反射调用；O(1) HashMap 路由；按需在 EventLoop 或业务线程处理
 - **独立管理端口**：内置 Actuator 支持，可配置独立的管理端口
 - **灵活扩展**：支持拦截器、过滤器、异常处理器、参数解析器等扩展点
 
@@ -83,7 +83,7 @@ public class Application {
 | 特性 | Spring web | Spring MVC |
 |------|---------------|------------|
 | 底层引擎 | Netty 4.1 | Servlet 容器（Tomcat/Jetty/Undertow） |
-| I/O 模型 | 非阻塞事件驱动 | 同步请求-响应 |
+| I/O 模型 | Netty 非阻塞传输 + EventLoop 同步处理 | Servlet 阻塞 I/O + 容器线程处理 |
 | 编程模型 | 注解驱动（兼容 Spring MVC 注解） | 注解驱动 |
 | 依赖注入 | Spring 容器 | Spring 容器 |
 | Servlet API | 通过 support 模块兼容 | 原生支持 |
@@ -134,6 +134,7 @@ mvn clean test
 ## 基准测试
 
 > 详细报告见 [Benchmark 文档](docs/benchmark.md)
+> 性能原理分析见 [性能原理文档](docs/performance-principles.md)
 
 基于 JDK 1.8 + G1GC (1GB heap) 的 JMH 基准测试结果：
 

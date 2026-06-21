@@ -81,12 +81,12 @@
 
 ### 分析
 
-- **小包场景 (helloGet/jsonEcho/validatePost)**: perf 达到 26K~28K ops/s，是 Servlet 容器的 **1.5~1.8x**。优势来自 Netty 事件驱动架构避免 Servlet 请求/响应对象池化和线程上下文切换开销。
+- **小包场景 (helloGet/jsonEcho/validatePost)**: perf 达到 26K~28K ops/s，是 Servlet 容器的 **1.5~1.8x**。优势来自三方面：① 启动时预缓存参数/返回值解析器，运行时零匹配（每请求受益）；② ASM/MethodHandle 替代反射调用控制器方法（每请求受益）；③ 纯 CPU 场景下 EventLoop 直接处理省掉了线程切换。注意第③项仅在无 IO 阻塞的端点生效。
 - **bytes 场景**: perf 达 30K ops/s，优势缩小至 **1.3x**。所有框架在此场景均无序列化开销，趋近于原始吞吐上限。
-- **largeResponse (100KB)**: perf 达 11.6K ops/s，是 tomcat 的 **2x**，与 undertow/webflux 接近（零拷贝 `Unpooled.wrappedBuffer` 抵消了部分差异）。
-- **jsonEchoLarge (100KB POST)**: perf 达 2,814 ops/s，是 tomcat 的 **1.25x**。大请求体场景下反序列化开销成为瓶颈，框架间差距缩小，但仍保持领先。
-- **sseStream**: perf 达 1,432 ops/s，是 Servlet 容器的 **3.8x**。Netty 原生 pipeline 的 SSE 推送避免了 Servlet 异步上下文的创建和线程调度开销。
-- **asyncDeferredResult**: perf 达 29K ops/s，是 tomcat 的 **1.78x**、webflux 的 **1.26x**。perf 的异步处理直接在 Netty event loop 上完成，无需跨线程调度。
+- **largeResponse (100KB)**: perf 达 11.6K ops/s，是 tomcat 的 **2x**，与 undertow/webflux 接近。`Unpooled.wrappedBuffer` 零拷贝 + `DefaultFileRegion` sendfile 减少了数据传输环节的内存拷贝。
+- **jsonEchoLarge (100KB POST)**: perf 达 2,814 ops/s，是 tomcat 的 **1.25x**。大请求体场景下 Jackson 反序列化开销成为瓶颈，框架间差距缩小，但仍保持领先。
+- **sseStream**: perf 达 1,432 ops/s，是 Servlet 容器的 **3.8x**。核心在于 `MpscUnboundedArrayQueue` + 无锁 Drain Loop 的背压设计：生产者不阻塞、EventLoop 饱和写入、`BackpressureHandler` 精确控制水位。Tomcat SSE 每个连接独占一个线程，线程数上限限制了并发量。
+- **asyncDeferredResult**: perf 达 29K ops/s，是 tomcat 的 **1.78x**、webflux 的 **1.26x**。异步只在 DeferredResult 结果到达时触发一次 EventLoop 调度，前期路由、参数解析、拦截器均在 EventLoop 中完成，避免线程切换。
 - **filter/interceptor 开销**: perf-filter 对比 perf 在各场景降幅约 3%~10%，开销可控。
 
 ---
