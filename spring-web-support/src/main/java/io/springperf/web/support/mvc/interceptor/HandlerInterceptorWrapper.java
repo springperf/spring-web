@@ -33,10 +33,7 @@ public class HandlerInterceptorWrapper implements HandlerInterceptor {
             log.warn("HandlerInterceptorWrapper.preHandle: Servlet request/response not available, skipping interceptor {}", interceptor);
             return true;
         }
-        boolean result = interceptor.preHandle(servletRequest, servletResponse, handler);
-        log.info("HandlerInterceptorWrapper.preHandle: interceptor={}, handler={}, result={}",
-                interceptor.getClass().getSimpleName(), handler, result);
-        return result;
+        return interceptor.preHandle(servletRequest, servletResponse, handler);
     }
 
     @Override

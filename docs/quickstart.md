@@ -1,14 +1,12 @@
-# 快速上手
+# 从 Spring MVC 迁移
 
-## 环境要求
+本文面向已有 Spring MVC 项目的团队，说明如何将底层 Web 框架替换为本框架。
 
-- JDK 8+
-- Spring Boot 2.6.x
-- Maven 3.5+
+---
 
-## 添加依赖
+## 一、替换依赖
 
-在 `pom.xml` 中替换 Spring MVC 依赖：
+### 1. 修改 pom.xml
 
 ```xml
 <!-- 移除 spring-boot-starter-web（内嵌 Tomcat） -->
@@ -19,7 +17,7 @@
 </dependency>
 -->
 
-<!-- 添加 spring-boot-starter-web -->
+<!-- 添加本框架的 Starter -->
 <dependency>
     <groupId>io.github.springperf</groupId>
     <artifactId>spring-boot-starter-web</artifactId>
@@ -27,11 +25,27 @@
 </dependency>
 ```
 
-框架会自动装配，无需额外配置类。
+### 2. 排除冲突依赖（如有）
 
-## 编写控制器
+如果项目显式依赖了 Tomcat（如 `spring-boot-starter-tomcat`），也需要移除。
 
-完全兼容 Spring MVC 的注解风格：
+### 3. 验证启动
+
+启动项目，看到以下日志说明迁移成功：
+
+```
+NettyHttpServer  - Netty started on port(s): 8080
+```
+
+框架自动使用 `AnnotationConfigApplicationContext`，无需手动配置。
+
+---
+
+## 二、兼容的部分（无需改动）
+
+以下代码在迁移中**不需要做任何修改**：
+
+### 控制器
 
 ```java
 @RestController
@@ -56,49 +70,26 @@ public class UserController {
 }
 ```
 
-## 配置
-
-在 `application.properties` 中配置：
-
-```properties
-# 基本配置
-server.port=8080
-server.servlet.context-path=/api
-
-# 请求体大小限制（默认 1MB）
-server.http.max-content-length=2097152
-
-# 请求超时（毫秒，默认无超时）
-server.http.timeout=30000
-
-# 业务线程池
-pool.core-pool-size=50
-pool.max-pool-size=200
-pool.keep-alive-time=60
-```
-
-完整配置项见[配置参考](configuration.md)。
-
-## 启动应用
-
-与普通 Spring Boot 应用完全相同：
+### 异常处理
 
 ```java
-@SpringBootApplication
-public class Application {
-    public static void main(String[] args) {
-        SpringApplication.run(Application.class, args);
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(ValidationException.class)
+    public Result<Void> handleValidation(ValidationException e) {
+        return Result.fail(400, e.getMessage());
+    }
+
+    @ExceptionHandler(NotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public Result<Void> handleNotFound(NotFoundException e) {
+        return Result.fail(404, e.getMessage());
     }
 }
 ```
 
-框架自动使用 `AnnotationConfigApplicationContext`（非 Servlet 容器），启动后可看到：
-
-```
-NettyHttpServer  - Netty started on port(s): 8080
-```
-
-## 使用拦截器
+### 拦截器
 
 ```java
 @Component
@@ -122,43 +113,120 @@ public class LogInterceptor implements HandlerInterceptor {
 }
 ```
 
-## 使用过滤器
+### 过滤器（需 support 模块）
+
+需要引入 `spring-web-support` 后，`javax.servlet.Filter` 通过桥接自动适配。
+
+---
+
+## 三、需要调整的部分
+
+### Servlet API 依赖
+
+如果控制器方法中直接使用了 `HttpServletRequest` / `HttpServletResponse`，需要：
+
+**方法一：引入 support 模块（推荐，渐进迁移）**
+
+```xml
+<dependency>
+    <groupId>io.github.springperf</groupId>
+    <artifactId>spring-web-support</artifactId>
+    <version>${spring-web.version}</version>
+</dependency>
+```
+
+然后 `HttpServletRequest` / `HttpServletResponse` 依然可以作为参数注入。
+
+**方法二：改用框架原生接口**
 
 ```java
-@Component
-public class AccessLogFilter implements WebFilter {
+// 之前
+public Result<User> getUser(HttpServletRequest req) {
+    String token = req.getHeader("Authorization");
+    // ...
+}
 
-    @Override
-    public void doFilter(WebServerHttpRequest request, WebServerHttpResponse response,
-                         FilterChain chain) {
-        log.info("→ {} {}", request.getMethod(), request.getURI());
-        chain.doFilter(request, response);
-        log.info("← {} {}", response.getStatusCode(), request.getURI());
-    }
+// 之后
+public Result<User> getUser(WebServerHttpRequest request) {
+    String token = request.getHeaders().getFirst("Authorization");
+    // ...
 }
 ```
 
-## 异常处理
+### RequestBodyAdvice / ResponseBodyAdvice
+
+需引入 support 模块，框架自动扫描并适配。
+
+### 静态资源路径
+
+如果使用了 Spring MVC 的静态资源配置（`WebMvcConfigurer.addResourceHandlers`），需改为使用 `ResourceHandlerRegistration` Bean：
 
 ```java
-@RestControllerAdvice
-public class GlobalExceptionHandler {
-
-    @ExceptionHandler(ValidationException.class)
-    public Result<Void> handleValidation(ValidationException e) {
-        return Result.fail(400, e.getMessage());
-    }
-
-    @ExceptionHandler(NotFoundException.class)
-    @ResponseStatus(HttpStatus.NOT_FOUND)
-    public Result<Void> handleNotFound(NotFoundException e) {
-        return Result.fail(404, e.getMessage());
-    }
+@Bean
+public ResourceHandlerRegistration resourceHandlerRegistration() {
+    return new ResourceHandlerRegistration("/static/**")
+            .addResourceLocations("classpath:/public/");
 }
 ```
+
+---
+
+## 四、配置迁移
+
+### application.properties
+
+大部分 Spring Boot 配置项不变，仅 Web 容器相关配置需调整：
+
+| 配置项 | 说明 | 变化 |
+|--------|------|------|
+| `server.port` | 监听端口 | 不变 |
+| `server.servlet.context-path` | 上下文路径 | 不变 |
+| `server.ssl.*` | SSL 配置 | 不变 |
+| `server.http.max-content-length` | 最大请求体 | 不变 |
+| `management.*` | Actuator 配置 | 不变 |
+
+新增的本框架特有配置：
+
+```properties
+# 业务线程池
+pool.core-pool-size=50
+pool.max-pool-size=200
+pool.keep-alive-time=60
+
+# 启动时校验所有 Mapping（fail-fast）
+server.check-on-startup=true
+```
+
+完整配置项见[配置参考](configuration.md)。
+
+---
+
+## 五、常见问题
+
+### Q: 启动报错与 Servlet 容器相关的 ClassNotFoundException
+
+确认 `pom.xml` 中已移除 `spring-boot-starter-web` 或 `spring-boot-starter-tomcat`。
+
+### Q: Spring Security 还能用吗？
+
+能。Spring Security 的 Filter Chain 通过 `spring-web-support` 模块桥接，`SecurityFilterChain` 可正常工作。
+
+### Q: 性能提升在什么场景最明显？
+
+- 小请求场景（JSON 回显、参数查询）：1.6~2.1x
+- SSE / 流式推送：3.8x
+- 资源受限环境（1c1g、2c2g）：差距更大
+- 大请求体 / 大响应场景：提升较小（序列化/反序列化成为瓶颈）
+
+### Q: 迁移后有风险吗？
+
+框架在启动时会做 fail-fast 校验（`server.check-on-startup=true`），Mapping 配置错误会在启动阶段发现而非运行时。建议先在非核心业务上灰度验证。
+
+---
 
 ## 下一步
 
-- 阅读[模块详解](modules.md)了解框架架构
-- 阅读[扩展点指南](extensions.md)了解如何自定义
-- 阅读[高级主题](advanced.md)了解异步和流式支持
+- [模块详解](modules.md) — 了解框架内部架构
+- [扩展点指南](extensions.md) — 自定义过滤器、拦截器、参数解析器等
+- [高级主题](advanced.md) — 异步处理、流式响应、响应式支持
+- [性能原理](performance-principles.md) — 了解性能优化背后的技术

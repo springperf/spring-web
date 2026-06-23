@@ -10,8 +10,9 @@ import org.springframework.http.server.ServerHttpRequest;
 
 import java.net.URI;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class CorsUtilsTest {
@@ -96,7 +97,6 @@ class CorsUtilsTest {
 
     @Test
     void isPreFlightRequest_notOptions_returnsFalse() {
-        when(request.getHeaders()).thenReturn(headers);
         when(request.getMethod()).thenReturn(HttpMethod.GET);
 
         assertFalse(CorsUtils.isPreFlightRequest(request));

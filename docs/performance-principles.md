@@ -258,7 +258,7 @@ void drain() {
 
 ### 适用范围
 
-仅 SSE 和流式响应场景。Benchmark 中 perf 的 SSE 吞吐达到 Tomcat 的 3.85x。
+仅 SSE 和流式响应场景。Benchmark 中 perf 的 SSE 吞吐达到 Tomcat 的 4.51x。
 
 ---
 
@@ -343,7 +343,7 @@ void drain() {
 | SSE 实现 | **`NettyStreamSender`** → `MpscUnboundedArrayQueue` + 无锁 Drain Loop | `SseEmitter` → 每个连接一个线程，同步阻塞写 | `Flux<ServerSentEvent>` → Reactor 背压 |
 | 背压机制 | **`channel.isWritable()` + `BackpressureHandler`** → 水位线精确控制 | **无** → 生产者过快直接阻塞线程 | Reactor `request(n)` → operator 链传播 |
 | 线程占用 | **EventLoop 统一写入** → 线程数 = CPU 核，不随连接增长 | **每连接一线程** → 线程数 = 连接数 | EventLoop 统一写入 |
-| 流式吞吐 | **Tomcat 的 3.85x** | 基准 | 接近，但无锁队列优势在小消息场景更显著 |
+| 流式吞吐 | **Tomcat 的 4.51x** | 基准 | 接近，但无锁队列优势在小消息场景更显著 |
 
 ### 对象分配与内存
 
@@ -364,7 +364,7 @@ void drain() {
 | `javax.validation` | 支持 | 支持 | 支持 |
 | Spring Data | 桥接兼容 | 原生 | 原生 |
 | 最小堆占用 | **~15MB** | ~20MB | ~19MB |
-| P50 延迟 (小包) | **0.13-0.15ms** | 0.22-0.25ms | 0.17-0.22ms |
+| P50 延迟 (小包) | **0.11-0.14ms** | 0.17-0.26ms | 0.18-0.24ms |
 
 ---
 
@@ -378,7 +378,7 @@ void drain() {
 | ★★★★☆ | GC 友好无临时分配 | 100% | 每分钟减少百万级对象分配 |
 | ★★★★☆ | ByteBuf 零拷贝 | 100% | 消除 1-2 次数据拷贝 |
 | ★★★★☆ | EventLoop 直接处理 | 可选——三种模型 | 响应式编程 / 虚拟线程的基础 |
-| ★★☆☆☆ | 无锁 Drain Loop | 仅 SSE | SSE 场景 3.85x |
+| ★★☆☆☆ | 无锁 Drain Loop | 仅 SSE | SSE 场景 4.51x |
 | ★★☆☆☆ | Netty 传输优化 | 边际 | 所有 Netty 框架共享 |
 
 **核心结论**：本框架通过**启动时确定性解析**消除了运行时所有"查找"和"匹配"开销，配合**字节码生成**消除反射——这两项是 100% 请求受益的核心手段。"EventLoop 直接处理"的真正价值不在省线程切换，而是为响应式编程和未来虚拟线程提供了基础设施——业务方自主选择编程模型，框架不强制。

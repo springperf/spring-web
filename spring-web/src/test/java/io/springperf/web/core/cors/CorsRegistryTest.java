@@ -1,6 +1,5 @@
 package io.springperf.web.core.cors;
 
-import io.springperf.web.context.WebContext;
 import io.springperf.web.core.cors.provider.CorsConfigurationProvider;
 import io.springperf.web.core.cors.provider.NoneCorsConfigurationProvider;
 import io.springperf.web.core.cors.provider.SimpleCorsConfigurationProvider;
@@ -102,9 +101,6 @@ class CorsRegistryTest {
 
     @Test
     void corsHandle_nonPreflightWithConfig_callsProcessor() throws Exception {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setOrigin("http://example.com");
-        when(request.getHeaders()).thenReturn(headers);
         when(request.getMethod()).thenReturn(HttpMethod.GET);
         when(processor.process(any(), any(), any())).thenReturn(true);
 
@@ -143,9 +139,6 @@ class CorsRegistryTest {
 
     @Test
     void corsHandle_actualRequestConfigDenied_processorReturnsFalse() throws Exception {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setOrigin("http://evil.com");
-        when(request.getHeaders()).thenReturn(headers);
         when(request.getMethod()).thenReturn(HttpMethod.GET);
         when(processor.process(any(), any(), any())).thenReturn(false);
 

@@ -67,7 +67,16 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
         boolean check = webContext.getProps().getBoolean(PropertiesConstant.CHECK_ON_STARTUP, true);
         for (PathMappingContext mappingContext : mappingRegistry.getMappingContextList()) {
             if (mappingContext.isOptimize() || check) {
-                getMethodReturnValueContext(mappingContext, mappingContext.isOptimize());
+                MethodReturnValueContext ctx = getMethodReturnValueContext(mappingContext, true);
+                // 预选解析器：通过静态 supportsReturnType 匹配，避免运行时线性扫描
+                if (ctx != null && ctx.getReturnValueResolver() == null) {
+                    for (ReturnValueResolver r : resolvers) {
+                        if (r.supportsReturnType(ctx.getReturnType(), mappingContext)) {
+                            ctx.setReturnValueResolver(r);
+                            break;
+                        }
+                    }
+                }
             }
         }
     }

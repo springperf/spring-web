@@ -49,9 +49,12 @@ public abstract class CorsUtils {
      * @return {@code true} if the request is a CORS preflight
      */
     public static boolean isPreFlightRequest(ServerHttpRequest request) {
+        if (request.getMethod() != HttpMethod.OPTIONS) {
+            return false;
+        }
         HttpHeaders headers = request.getHeaders();
-        return (request.getMethod() == HttpMethod.OPTIONS && headers.containsKey(HttpHeaders.ORIGIN)
-                && headers.containsKey(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD));
+        return headers.containsKey(HttpHeaders.ORIGIN)
+                && headers.containsKey(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD);
     }
 
     private static int getPort(@Nullable String scheme, int port) {

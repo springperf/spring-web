@@ -3,6 +3,7 @@ package io.springperf.benchmark;
 import io.springperf.benchmark.common.BenchmarkConstants;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.profile.GCProfiler;
+import org.openjdk.jmh.profile.StackProfiler;
 import org.openjdk.jmh.results.format.ResultFormatType;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
@@ -66,6 +67,18 @@ public class BenchmarkRunner {
         optBuilder.mode(Mode.Throughput);
         optBuilder.mode(Mode.SampleTime);
         optBuilder.addProfiler(GCProfiler.class);
+        // StackProfiler：benchmark.stack=true 时启用 ThreadMXBean CPU 采样
+        String stackEnabled = System.getProperty("benchmark.stack");
+        String stackParams = System.getProperty("benchmark.stack.params", "");
+        if ("true".equalsIgnoreCase(stackEnabled)) {
+            if (!stackParams.isEmpty()) {
+                optBuilder.addProfiler(StackProfiler.class, stackParams);
+                System.out.println("[BenchmarkRunner] StackProfiler enabled with params: " + stackParams);
+            } else {
+                optBuilder.addProfiler(StackProfiler.class);
+                System.out.println("[BenchmarkRunner] StackProfiler enabled");
+            }
+        }
         optBuilder.resultFormat(ResultFormatType.JSON);
         optBuilder.result(resultFile);
         optBuilder.shouldDoGC(true);
@@ -78,6 +91,21 @@ public class BenchmarkRunner {
             String[] parts = gcLogArg.split("\\s+");
             java.util.Collections.addAll(extraJvmArgs, parts);
             System.out.println("[BenchmarkRunner] JVM args append: " + java.util.Arrays.toString(parts));
+        }
+
+        // JFR 录音参数：benchmark.jfr=true 时对 forked JVM 启用飞行记录
+        String jfrEnabled = System.getProperty("benchmark.jfr");
+        if ("true".equalsIgnoreCase(jfrEnabled)) {
+            String jfrFile = baseDir + "/jfr-" + profileName.replace('/', '-') + ".jfr";
+            // JDK 8 需要额外解锁商业特性，JDK 11+ 直接可用
+            String javaVersion = System.getProperty("java.version", "");
+            if (javaVersion.startsWith("1.")) {
+                extraJvmArgs.add("-XX:+UnlockCommercialFeatures");
+                extraJvmArgs.add("-XX:+FlightRecorder");
+            }
+            extraJvmArgs.add("-XX:StartFlightRecording=duration=300s,filename=" + jfrFile
+                    + ",settings=profile,maxsize=256m");
+            System.out.println("[BenchmarkRunner] JFR recording enabled: " + jfrFile);
         }
 
         // 传递 benchmark.* 系统属性到 forked JVM（内存快照、端口、profile名等需要）
