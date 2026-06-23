@@ -191,7 +191,7 @@ destroyComponent()     → 资源释放
 
 - 需要复用已有的 Servlet Filter（如 Spring Security Filter Chain）
 - 需要复用已有的 `RequestBodyAdvice` / `ResponseBodyAdvice`
-- 需要迁移已有的 Spring MVC `HandlerInterceptor`
+- 需要复用已有的 Spring MVC `HandlerInterceptor`
 
 添加依赖：
 

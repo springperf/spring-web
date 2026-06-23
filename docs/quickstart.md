@@ -159,7 +159,7 @@ public Result<User> getUser(WebServerHttpRequest request) {
 
 ### 静态资源路径
 
-如果使用了 Spring MVC 的静态资源配置（`WebMvcConfigurer.addResourceHandlers`），需改为使用 `ResourceHandlerRegistration` Bean：
+Spring MVC 的静态资源配置（`WebMvcConfigurer.addResourceHandlers`）可继续使用。也可以改用 `ResourceHandlerRegistration` Bean 方式，效果相同：
 
 ```java
 @Bean
