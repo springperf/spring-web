@@ -36,7 +36,7 @@ class ActuatorMappingDescriptionProviderTest {
     @Test
     void getMappingName_returnsPerfMappings() {
         ActuatorMappingDescriptionProvider provider = new ActuatorMappingDescriptionProvider(webContext);
-        assertEquals("perfMappings", provider.getMappingName());
+        assertEquals("dispatcherServlets", provider.getMappingName());
     }
 
     @Test
@@ -68,8 +68,8 @@ class ActuatorMappingDescriptionProviderTest {
 
         assertInstanceOf(Map.class, result);
         Map<String, Object> wrapper = (Map<String, Object>) result;
-        assertTrue(wrapper.containsKey("dispatcherHandler"));
-        assertTrue(((List<Object>) wrapper.get("dispatcherHandler")).isEmpty());
+        assertTrue(wrapper.containsKey("dispatcherServlet"));
+        assertTrue(((List<Object>) wrapper.get("dispatcherServlet")).isEmpty());
     }
 
     @Test

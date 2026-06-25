@@ -15,6 +15,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.SmartLifecycle;
 
 import java.net.InetSocketAddress;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -31,14 +33,20 @@ public class NettyHttpServer implements SmartLifecycle {
     private NettyHttpHandler httpHandler;
     private boolean http2Enabled;
     private volatile int actualPort;
+    private final PipelineCustomizer pipelineCustomizer;
 
     public NettyHttpServer(WebContext webContext) {
-        this(webContext, null);
+        this(webContext, null, null);
     }
 
     public NettyHttpServer(WebContext webContext, SslContext sslContext) {
+        this(webContext, sslContext, null);
+    }
+
+    public NettyHttpServer(WebContext webContext, SslContext sslContext, PipelineCustomizer pipelineCustomizer) {
         this.webContext = webContext;
         this.sslContext = sslContext;
+        this.pipelineCustomizer = pipelineCustomizer;
     }
 
     @Override
@@ -54,6 +62,11 @@ public class NettyHttpServer implements SmartLifecycle {
         bossGroup = new NioEventLoopGroup(1);
         int workerThreads = webContext.getProps().getInt(PropertiesConstant.SERVER_NETTY_WORKERS, 0);
         workerGroup = workerThreads > 0 ? new NioEventLoopGroup(workerThreads) : new NioEventLoopGroup();
+        // 收集模块注入的额外 ChannelHandler（如 WebSocket 握手处理器）
+        List<ChannelHandler> beforeAggHandlers = pipelineCustomizer != null
+                ? pipelineCustomizer.getBeforeAggregatorHandlers() : Collections.emptyList();
+        List<ChannelHandler> afterAggHandlers = pipelineCustomizer != null
+                ? pipelineCustomizer.getAfterAggregatorHandlers() : Collections.emptyList();
         ServerBootstrap bootstrap = new ServerBootstrap();
         bootstrap.group(bossGroup, workerGroup)
                 .channel(NioServerSocketChannel.class)
@@ -68,7 +81,9 @@ public class NettyHttpServer implements SmartLifecycle {
                         sslContext,
                         webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_CONTENT_LENGTH, 1048576),
                         true, // supportMultipart = true for main server
-                        httpHandler
+                        httpHandler,
+                        beforeAggHandlers,
+                        afterAggHandlers
                 ));
         try {
             serverChannel = bootstrap.bind(port).sync().channel();

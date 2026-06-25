@@ -4,6 +4,7 @@ io.springperf.web.autoconfigure.SpringWebAutoConfiguration,\
 io.springperf.web.autoconfigure.SpringWebSupportAutoConfiguration,\
 io.springperf.web.autoconfigure.ActuatorEndpointAutoConfiguration,\
 io.springperf.web.autoconfigure.SpringDataWebCompatibilityAutoConfiguration,\
-io.springperf.web.autoconfigure.SpringBootAdminClientAutoConfiguration
+io.springperf.web.autoconfigure.SpringBootAdminClientAutoConfiguration,\
+io.springperf.web.autoconfigure.OpenApiAutoConfiguration
 org.springframework.boot.ApplicationContextFactory=\
 io.springperf.web.autoconfigure.support.WebServerApplicationContextFactory

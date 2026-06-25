@@ -386,6 +386,50 @@ public class CustomRouterOptimizer implements RouterOptimizer {
 
 ---
 
+## 集成案例：SpringDoc OpenAPI
+
+本框架不使用 Spring MVC，因此 SpringDoc 默认无法通过 `RequestMappingHandlerMapping` 发现路由。框架通过实现 `OpenApiCustomizer` SPI，从 `MappingRegistry` 中构建 OpenAPI 文档。
+
+### 使用
+
+```xml
+<dependency>
+    <groupId>org.springdoc</groupId>
+    <artifactId>springdoc-openapi-ui</artifactId>
+    <version>1.7.0</version>
+</dependency>
+```
+
+添加依赖后 `OpenApiAutoConfiguration` 自动激活（`@ConditionalOnClass(OpenApiCustomizer.class)`），无需手动配置。
+
+### 架构
+
+```
+SpringDoc 启动 → 扫描 RequestMappingHandlerMapping → 无（本框架无 Spring MVC）
+           ↓
+OpenApiAdapter.customize(OpenAPI)
+           ↓
+遍历 MappingRegistry → 构建 PathItem → openApi.path(path, pathItem)
+           ↓
+Swagger UI 显示完整 API 文档
+```
+
+Swagger 注解（`@Tag`、`@Operation`、`@Schema`）直接可用。
+
+### 局限性
+
+| 功能 | 支持情况 |
+|------|---------|
+| 路由发现 | ✅ 全部自动扫描 |
+| 路径/Query/Header 参数 | ✅ 自动解析 |
+| RequestBody | ✅ application/json |
+| 响应类型 | ✅ 基础类型映射 |
+| 泛型类型 | ⚠️ `ApiResult<T>` 映射为 object |
+| Swagger 注解 | ✅ 原生支持 |
+| 模型 Schema | ⚠️ 复杂对象需补充 `@Schema` |
+
+---
+
 ## 汇总：SPI 接口一览
 
 | 接口 | 注册方式 | 用途 |

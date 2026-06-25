@@ -1,0 +1,2 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+io.springperf.web.websocket.config.WebSocketAutoConfiguration

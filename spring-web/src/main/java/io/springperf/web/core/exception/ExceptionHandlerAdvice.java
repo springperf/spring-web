@@ -37,11 +37,13 @@ public class ExceptionHandlerAdvice extends BaseWebComponent {
         this.resolver = resolver;
     }
 
+    @Override
+    public String getComponentName() {
+        return getClass().getSimpleName() + ":" + getRealBean().getClass().getName();
+    }
+
     /**
      * Returns whether this advice applies to the specified bean type.
-     *
-     * @param beanType the bean type to check
-     * @return {@code true} if this advice applies to the given bean type
      */
     public boolean isApplicableToBeanType(Class<?> beanType) {
         if (adviceBean == null) {

@@ -80,7 +80,8 @@ public class ActuatorPathMappingContext extends PathMappingContext {
     }
 
     private Object resolveLinks(WebServerHttpRequest request) {
-        return Collections.singletonMap("_links", linksResolver.resolveLinks(request.getUriStrWithQuery()));
+        String uri = request.getURI().toString();
+        return Collections.singletonMap("_links", linksResolver.resolveLinks(uri));
     }
 
     private Object invokeOperation(WebServerHttpRequest request, WebServerHttpResponse response) {

@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
  */
 public class ActuatorMappingDescriptionProvider implements MappingDescriptionProvider {
 
-    private static final String MAPPING_NAME = "perfMappings";
+    private static final String MAPPING_NAME = "dispatcherServlets";
     private final WebContext webContext;
 
     public ActuatorMappingDescriptionProvider(WebContext webContext) { this.webContext = webContext; }
@@ -33,7 +33,7 @@ public class ActuatorMappingDescriptionProvider implements MappingDescriptionPro
         List<Map<String, Object>> result = new ArrayList<>();
         for (PathMappingContext route : routes) result.add(describeRoute(route));
         Map<String, List<Map<String, Object>>> wrapper = new LinkedHashMap<>();
-        wrapper.put("dispatcherHandler", result);
+        wrapper.put("dispatcherServlet", result);
         return wrapper;
     }
 

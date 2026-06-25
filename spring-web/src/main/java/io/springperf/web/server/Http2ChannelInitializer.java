@@ -17,6 +17,8 @@ import io.springperf.web.http.BackpressureHandler;
 import io.springperf.web.http.support.SupportMultipartAggregator;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.List;
 
 public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
 
@@ -25,15 +27,38 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
     private final int maxContentLength;
     private final boolean supportMultipart;
     private final NettyHttpHandler httpHandler;
+    private final List<ChannelHandler> beforeAggregatorHandlers;
+    private final List<ChannelHandler> afterAggregatorHandlers;
 
     public Http2ChannelInitializer(boolean http2Enabled, SslContext sslContext,
                                     int maxContentLength, boolean supportMultipart,
                                     NettyHttpHandler httpHandler) {
+        this(http2Enabled, sslContext, maxContentLength, supportMultipart, httpHandler,
+                Collections.emptyList(), Collections.emptyList());
+    }
+
+    public Http2ChannelInitializer(boolean http2Enabled, SslContext sslContext,
+                                    int maxContentLength, boolean supportMultipart,
+                                    NettyHttpHandler httpHandler,
+                                    List<ChannelHandler> beforeAggregatorHandlers) {
+        this(http2Enabled, sslContext, maxContentLength, supportMultipart, httpHandler,
+                beforeAggregatorHandlers, Collections.emptyList());
+    }
+
+    public Http2ChannelInitializer(boolean http2Enabled, SslContext sslContext,
+                                    int maxContentLength, boolean supportMultipart,
+                                    NettyHttpHandler httpHandler,
+                                    List<ChannelHandler> beforeAggregatorHandlers,
+                                    List<ChannelHandler> afterAggregatorHandlers) {
         this.http2Enabled = http2Enabled;
         this.sslContext = sslContext;
         this.maxContentLength = maxContentLength;
         this.supportMultipart = supportMultipart;
         this.httpHandler = httpHandler;
+        this.beforeAggregatorHandlers = beforeAggregatorHandlers != null
+                ? beforeAggregatorHandlers : Collections.emptyList();
+        this.afterAggregatorHandlers = afterAggregatorHandlers != null
+                ? afterAggregatorHandlers : Collections.emptyList();
     }
 
     @Override
@@ -44,7 +69,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
             p.addLast(sslContext.newHandler(ch.alloc()));
             p.addLast(NettyHttpServer.SslExceptionHandler.INSTANCE);
             if (http2Enabled) {
-                p.addLast(new Http2OrHttp1Handler(maxContentLength, supportMultipart, httpHandler));
+                p.addLast(new Http2OrHttp1Handler(maxContentLength, supportMultipart, httpHandler, beforeAggregatorHandlers, afterAggregatorHandlers));
             } else {
                 addHttp11Handlers(p);
             }
@@ -58,7 +83,13 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
     private void addHttp11Handlers(ChannelPipeline p) {
         p.addLast(new HttpServerCodec());
         p.addLast(new ChunkedWriteHandler());
+        for (ChannelHandler h : beforeAggregatorHandlers) {
+            p.addLast(h);
+        }
         addAggregator(p);
+        for (ChannelHandler h : afterAggregatorHandlers) {
+            p.addLast(h);
+        }
         p.addLast(BackpressureHandler.INSTANCE);
         p.addLast(httpHandler);
     }
@@ -149,7 +180,13 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
         // HTTP/1.1 fallback pipeline
         p.addLast(sourceCodec);
         p.addLast(new ChunkedWriteHandler());
+        for (ChannelHandler h : beforeAggregatorHandlers) {
+            p.addLast(h);
+        }
         addAggregator(p);
+        for (ChannelHandler h : afterAggregatorHandlers) {
+            p.addLast(h);
+        }
         p.addLast(BackpressureHandler.INSTANCE);
         p.addLast(httpHandler);
     }
@@ -206,13 +243,21 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
         private final int maxContentLength;
         private final boolean supportMultipart;
         private final NettyHttpHandler httpHandler;
+        private final List<ChannelHandler> beforeAggregatorHandlers;
+        private final List<ChannelHandler> afterAggregatorHandlers;
 
         Http2OrHttp1Handler(int maxContentLength, boolean supportMultipart,
-                            NettyHttpHandler httpHandler) {
+                            NettyHttpHandler httpHandler,
+                            List<ChannelHandler> beforeAggregatorHandlers,
+                            List<ChannelHandler> afterAggregatorHandlers) {
             super(ApplicationProtocolNames.HTTP_1_1);
             this.maxContentLength = maxContentLength;
             this.supportMultipart = supportMultipart;
             this.httpHandler = httpHandler;
+            this.beforeAggregatorHandlers = beforeAggregatorHandlers != null
+                    ? beforeAggregatorHandlers : Collections.emptyList();
+            this.afterAggregatorHandlers = afterAggregatorHandlers != null
+                    ? afterAggregatorHandlers : Collections.emptyList();
         }
 
         @Override
@@ -228,10 +273,16 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
                 // http/1.1: add standard h1.1 pipeline
                 p.addLast(new HttpServerCodec());
                 p.addLast(new ChunkedWriteHandler());
+                for (ChannelHandler h : beforeAggregatorHandlers) {
+                    p.addLast(h);
+                }
                 if (supportMultipart) {
                     p.addLast(new SupportMultipartAggregator(maxContentLength));
                 } else {
                     p.addLast(new HttpObjectAggregator(maxContentLength));
+                }
+                for (ChannelHandler h : afterAggregatorHandlers) {
+                    p.addLast(h);
                 }
                 p.addLast(BackpressureHandler.INSTANCE);
                 p.addLast(httpHandler);

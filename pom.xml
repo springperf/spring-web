@@ -41,6 +41,7 @@
 
     <modules>
         <module>spring-web</module>
+        <module>spring-web-websocket</module>
         <module>spring-web-support</module>
         <module>spring-boot-starter-web</module>
         <module>spring-web-test</module>
@@ -68,6 +69,7 @@
         <servlet-api.version>4.0.1</servlet-api.version>
         <hutool.version>5.8.23</hutool.version>
         <jmh.version>1.37</jmh.version>
+        <springdoc.version>1.7.0</springdoc.version>
     </properties>
 
     <build>
@@ -184,6 +186,11 @@
             </dependency>
             <dependency>
                 <groupId>io.github.springperf</groupId>
+                <artifactId>spring-web-websocket</artifactId>
+                <version>${spring-web.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.springperf</groupId>
                 <artifactId>spring-boot-starter-web</artifactId>
                 <version>${spring-web.version}</version>
             </dependency>
@@ -250,6 +257,13 @@
                 <groupId>org.openjdk.jmh</groupId>
                 <artifactId>jmh-generator-annprocess</artifactId>
                 <version>${jmh.version}</version>
+            </dependency>
+
+            <!-- SpringDoc OpenAPI (optional, for auto-configuration) -->
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-common</artifactId>
+                <version>${springdoc.version}</version>
             </dependency>
 
             <!-- 测试依赖 -->

@@ -7,6 +7,7 @@ import okhttp3.Response;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.DirtiesContext;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
@@ -15,14 +16,15 @@ import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * 主端口 SSL 集成测试。
  * <p>验证 {@code server.ssl.*} 配置对主端口生效，HTTPS 请求可达、HTTP 被拒绝。</p>
  */
 @SpringBootTest(classes = TestApplication.class, properties = {
-        "server.port=9097",
+        "server.port=9096",
         "server.servlet.context-path=/api",
         "server.ssl.enabled=true",
         "server.ssl.key-store=classpath:test-keystore.p12",
@@ -31,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.*;
         "management.endpoints.web.exposure.include=health"
 })
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@DirtiesContext
 public class SslServerTest {
 
     private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
@@ -44,7 +47,7 @@ public class SslServerTest {
     @Test
     void httpsHealthEndpoint_shouldReturnUp() throws Exception {
         Request req = new Request.Builder()
-                .url("https://localhost:9097/api/actuator/health")
+                .url("https://localhost:9096/api/actuator/health")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -57,7 +60,7 @@ public class SslServerTest {
     @Test
     void httpRequest_shouldBeRejected() {
         Request req = new Request.Builder()
-                .url("http://localhost:9097/api/actuator/health")
+                .url("http://localhost:9096/api/actuator/health")
                 .get()
                 .build();
         assertThrows(Exception.class, () -> {

@@ -4,6 +4,7 @@ import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.core.DispatcherHandler;
 import io.springperf.web.server.NettyHttpServer;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.env.Environment;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -52,7 +53,7 @@ class SpringWebAutoConfigurationTest {
         Environment environment = mock(Environment.class);
         when(environment.getProperty("server.http2.enabled", boolean.class, false)).thenReturn(false);
 
-        NettyHttpServer server = config.nettyHttpServer(webContext, environment);
+        NettyHttpServer server = config.nettyHttpServer(webContext, environment, mock(ObjectProvider.class));
         assertNotNull(server);
         assertInstanceOf(NettyHttpServer.class, server);
     }

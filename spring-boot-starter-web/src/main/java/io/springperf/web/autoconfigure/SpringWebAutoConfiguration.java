@@ -8,6 +8,8 @@ import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.DispatcherHandler;
 import io.springperf.web.server.NettyHttpServer;
+import io.springperf.web.server.PipelineCustomizer;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -37,10 +39,11 @@ public class SpringWebAutoConfiguration {
     }
 
     @Bean
-    public NettyHttpServer nettyHttpServer(WebContext webContext, Environment environment) {
+    public NettyHttpServer nettyHttpServer(WebContext webContext, Environment environment,
+                                           ObjectProvider<PipelineCustomizer> pipelineCustomizerProvider) {
         boolean http2Enabled = environment.getProperty("server.http2.enabled", boolean.class, false);
         SslContext sslContext = SslContextFactory.createServerSslContext(environment, "server.ssl.", http2Enabled);
-        return new NettyHttpServer(webContext, sslContext);
+        return new NettyHttpServer(webContext, sslContext, pipelineCustomizerProvider.getIfAvailable());
     }
 
     /**
