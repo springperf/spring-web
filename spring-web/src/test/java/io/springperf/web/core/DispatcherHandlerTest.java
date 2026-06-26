@@ -11,6 +11,7 @@ import io.springperf.web.core.mapping.MappingResult;
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.core.pool.BizPoolRegistry;
 import io.springperf.web.core.retval.ReturnValueResolverRegistry;
+import io.springperf.web.filter.WebFilterRegistry;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
@@ -24,6 +25,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class DispatcherHandlerTest {
@@ -38,6 +41,7 @@ class DispatcherHandlerTest {
     private InterceptorRegistry interceptorRegistry;
     private BizPoolRegistry bizPoolRegistry;
     private AsyncSupportRegistry asyncSupportRegistry;
+    private WebFilterRegistry webFilterRegistry;
 
     private WebServerHttpRequest createRequest() {
         WebServerHttpRequest req = mock(WebServerHttpRequest.class);
@@ -47,7 +51,7 @@ class DispatcherHandlerTest {
 
     @BeforeEach
     @SuppressWarnings("unchecked")
-    void setUp() {
+    void setUp() throws Exception {
         handler = new DispatcherHandler();
         webContext = mock(WebContext.class);
         mappingRegistry = mock(MappingRegistry.class);
@@ -58,6 +62,7 @@ class DispatcherHandlerTest {
         interceptorRegistry = mock(InterceptorRegistry.class);
         bizPoolRegistry = mock(BizPoolRegistry.class);
         asyncSupportRegistry = mock(AsyncSupportRegistry.class);
+        webFilterRegistry = mock(WebFilterRegistry.class);
 
         when(webContext.getWebComponentWithDefault(eq(MappingRegistry.class), any(MappingRegistry.class)))
                 .thenReturn(mappingRegistry);
@@ -75,6 +80,25 @@ class DispatcherHandlerTest {
                 .thenReturn(bizPoolRegistry);
         when(webContext.getWebComponentWithDefault(eq(AsyncSupportRegistry.class), any(AsyncSupportRegistry.class)))
                 .thenReturn(asyncSupportRegistry);
+        when(webContext.getWebComponentWithDefault(eq(WebFilterRegistry.class), any(WebFilterRegistry.class)))
+                .thenReturn(webFilterRegistry);
+        // doFilter 走完 chain 后调用 terminal(mappingResult)
+        try {
+            doAnswer(invocation -> {
+                WebFilterRegistry.FilterChainTerminal terminal = invocation.getArgument(3);
+                WebServerHttpRequest req = invocation.getArgument(0);
+                WebServerHttpResponse resp = invocation.getArgument(1);
+                MappingResult mappingResult = invocation.getArgument(2);
+                try {
+                    terminal.doFilter(req, resp, mappingResult);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+                return null;
+            }).when(webFilterRegistry).doFilter(any(), any(), any(MappingResult.class), any(WebFilterRegistry.FilterChainTerminal.class));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 
         handler.initWithWebContext(webContext);
     }
@@ -409,7 +433,7 @@ class DispatcherHandlerTest {
     // ==================== handleWithPathMappingContext() ====================
 
     @Test
-    void handleWithPathMappingContext_executorRejects_releasesRequest() {
+    void handleWithFUllMatch_executorRejects_releasesRequest() {
         WebServerHttpRequest req = createRequest();
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
         PathMappingContext mappingContext = mock(PathMappingContext.class);
@@ -418,7 +442,7 @@ class DispatcherHandlerTest {
         doThrow(new RejectedExecutionException("pool full")).when(executor).execute(any(Runnable.class));
 
         assertThrows(RejectedExecutionException.class,
-                () -> handler.handleWithPathMappingContext(req, resp, mappingContext));
+                () -> handler.handleWithFUllMatch(req, resp, MappingResult.matched(mappingContext)));
 
         verify(req).acquire();
         verify(req).release();

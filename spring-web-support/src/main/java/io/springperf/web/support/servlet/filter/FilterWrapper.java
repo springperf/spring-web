@@ -20,24 +20,9 @@ public class FilterWrapper implements WebFilter {
         this.order = WebFilter.defaultOrder;
     }
 
-    /**
-     * Create a FilterWrapper with optional path-based matching.
-     * <p>Returns a plain {@link FilterWrapper} when no path rules are given
-     * (avoiding match overhead), or a {@link MatchFilterWrapper} when
-     * path rules are present.</p>
-     *
-     * @param filter             the servlet filter to wrap
-     * @param supportedPathRules URL path patterns, may be {@code null} or empty
-     * @param order              the filter order
-     * @return a FilterWrapper (with or without path matching)
-     */
-    public static FilterWrapper create(javax.servlet.Filter filter, String[] supportedPathRules, int order) {
-        if (supportedPathRules == null || supportedPathRules.length == 0) {
-            FilterWrapper w = new FilterWrapper(filter);
-            w.order = order;
-            return w;
-        }
-        return new MatchFilterWrapper(filter, supportedPathRules, order);
+    public FilterWrapper(javax.servlet.Filter filter, int order) {
+        this.filter = filter;
+        this.order = order;
     }
 
     public int getOrder() {

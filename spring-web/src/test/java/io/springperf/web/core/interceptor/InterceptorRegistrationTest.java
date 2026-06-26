@@ -7,7 +7,7 @@ import org.springframework.util.PathMatcher;
 import java.util.Arrays;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
 
 class InterceptorRegistrationTest {
 
@@ -183,5 +183,22 @@ class InterceptorRegistrationTest {
         registration.excludePathPatterns("/api/**");
 
         assertEquals(ContainmentResult.NEVER, registration.matchPathRuleToCached("/api/users"));
+    }
+
+    @Test
+    void matchPathRuleToCached_includeAlwaysExcludeIntersect_returnsRuntime() {
+        InterceptorRegistration registration = new InterceptorRegistration(interceptor);
+        registration.addPathPatterns("/api/**");
+        registration.excludePathPatterns("/api/secret");
+
+        assertEquals(ContainmentResult.RUNTIME, registration.matchPathRuleToCached("/api/{id}"));
+    }
+
+    @Test
+    void matchPathRuleToCached_onlyExcludeDisjoint_returnsAlways() {
+        InterceptorRegistration registration = new InterceptorRegistration(interceptor);
+        registration.excludePathPatterns("/admin/**");
+
+        assertEquals(ContainmentResult.ALWAYS, registration.matchPathRuleToCached("/api/users"));
     }
 }

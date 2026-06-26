@@ -7,6 +7,7 @@ import io.springperf.web.core.interceptor.InterceptorRegistry;
 import io.springperf.web.core.mapping.MappingResult;
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.core.retval.ReturnValueResolverRegistry;
+import io.springperf.web.filter.WebFilterRegistry;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +32,7 @@ class ManagementDispatcherHandlerTest {
     @Mock ReturnValueResolverRegistry returnValueResolverRegistry;
     @Mock ExceptionRegistry exceptionRegistry;
     @Mock InterceptorRegistry interceptorRegistry;
+    @Mock WebFilterRegistry webFilterRegistry;
     @Mock WebServerHttpRequest request;
     @Mock WebServerHttpResponse response;
     @Mock PathMappingContext mappingContext;
@@ -48,6 +50,22 @@ class ManagementDispatcherHandlerTest {
                 .thenReturn(exceptionRegistry);
         when(webContext.getWebComponentWithDefault(eq(InterceptorRegistry.class), any(InterceptorRegistry.class)))
                 .thenReturn(interceptorRegistry);
+        when(webContext.getWebComponentWithDefault(eq(WebFilterRegistry.class), any(WebFilterRegistry.class)))
+                .thenReturn(webFilterRegistry);
+
+        // doFilter 走完 chain 后调用 terminal(mappingResult)
+        try {
+            doAnswer(invocation -> {
+                WebFilterRegistry.FilterChainTerminal terminal = invocation.getArgument(3);
+                WebServerHttpRequest req = invocation.getArgument(0);
+                WebServerHttpResponse resp = invocation.getArgument(1);
+                MappingResult mappingResult = invocation.getArgument(2);
+                terminal.doFilter(req, resp, mappingResult);
+                return null;
+            }).when(webFilterRegistry).doFilter(any(), any(), any(MappingResult.class), any(WebFilterRegistry.FilterChainTerminal.class));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 
         handler = new ManagementDispatcherHandler(webContext, "/actuator", managementMappingRegistry);
         handler.initComponentPhase2();
@@ -106,7 +124,7 @@ class ManagementDispatcherHandlerTest {
     }
 
     @Test
-    void handle_matched_delegatesToHandleWithPathMappingContext() throws Throwable {
+    void handle_matched_delegatesToHandleWithFUllMatch() throws Throwable {
         when(managementMappingRegistry.mapping(request)).thenReturn(mappingResult);
         when(mappingResult.isMatched()).thenReturn(true);
         when(mappingResult.getMatchedContext()).thenReturn(mappingContext);
@@ -120,10 +138,10 @@ class ManagementDispatcherHandlerTest {
     }
 
     @Test
-    void handleWithPathMappingContext_corsPreflight_returnsEarly() throws Throwable {
+    void handleWithFUllMatch_corsPreflight_returnsEarly() throws Throwable {
         when(corsRegistry.corsHandle(request, response)).thenReturn(true);
 
-        handler.handleWithPathMappingContext(request, response, mappingContext);
+        handler.handleWithFUllMatch(request, response, MappingResult.matched(mappingContext));
 
         verify(corsRegistry).corsHandle(request, response);
         verify(mappingContext, never()).invoke(any(), any(), any());
@@ -131,24 +149,24 @@ class ManagementDispatcherHandlerTest {
     }
 
     @Test
-    void handleWithPathMappingContext_normalFlow_invokesAndResolves() throws Throwable {
+    void handleWithFUllMatch_normalFlow_invokesAndResolves() throws Throwable {
         when(corsRegistry.corsHandle(request, response)).thenReturn(false);
         Object expectedResult = new Object();
         when(mappingContext.invoke(null, request, response)).thenReturn(expectedResult);
 
-        handler.handleWithPathMappingContext(request, response, mappingContext);
+        handler.handleWithFUllMatch(request, response, MappingResult.matched(mappingContext));
 
         verify(mappingContext).invoke(null, request, response);
         verify(returnValueResolverRegistry).resolveReturnValue(expectedResult, mappingContext, request, response);
     }
 
     @Test
-    void handleWithPathMappingContext_exception_callsHandleException() throws Throwable {
+    void handleWithFUllMatch_exception_callsHandleException() throws Throwable {
         when(corsRegistry.corsHandle(request, response)).thenReturn(false);
         RuntimeException ex = new RuntimeException("test error");
         when(mappingContext.invoke(null, request, response)).thenThrow(ex);
 
-        handler.handleWithPathMappingContext(request, response, mappingContext);
+        handler.handleWithFUllMatch(request, response, MappingResult.matched(mappingContext));
 
         verify(exceptionRegistry).handle(eq(ex), eq(request), eq(response));
     }

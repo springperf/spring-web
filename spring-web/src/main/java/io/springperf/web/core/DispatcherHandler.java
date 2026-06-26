@@ -14,9 +14,11 @@ import io.springperf.web.core.mapping.MappingResult;
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.core.pool.BizPoolRegistry;
 import io.springperf.web.core.retval.ReturnValueResolverRegistry;
+import io.springperf.web.filter.WebFilterRegistry;
 import io.springperf.web.http.BaseWebServerHttpResponse;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
+import io.springperf.web.server.HttpHandler;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.i18n.LocaleContext;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -31,7 +33,7 @@ import java.util.concurrent.RejectedExecutionException;
  * Central dispatcher: route lookup, optional offload to business thread pool, argument resolution, handler method invocation, and return value processing.
  */
 @Slf4j
-public class DispatcherHandler extends BaseWebComponent {
+public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
     private static final ResponseStatusException NOT_FOUND_EXCEPTION = new ResponseStatusException(HttpStatus.NOT_FOUND);
     private static final ResponseStatusException METHOD_NOT_ALLOWED_EXCEPTION = new ResponseStatusException(HttpStatus.METHOD_NOT_ALLOWED);
 
@@ -45,6 +47,7 @@ public class DispatcherHandler extends BaseWebComponent {
     protected InterceptorRegistry interceptorRegistry;
     protected AsyncSupportRegistry asyncSupportRegistry;
     protected BizPoolRegistry bizPoolRegistry;
+    protected WebFilterRegistry webFilterRegistry;
 
     @Override
     public void initWithWebContext(WebContext webContext) {
@@ -57,37 +60,39 @@ public class DispatcherHandler extends BaseWebComponent {
         this.interceptorRegistry = webContext.getWebComponentWithDefault(InterceptorRegistry.class, new InterceptorRegistry());
         this.asyncSupportRegistry = webContext.getWebComponentWithDefault(AsyncSupportRegistry.class, new AsyncSupportRegistry());
         this.bizPoolRegistry = webContext.getWebComponentWithDefault(BizPoolRegistry.class, new BizPoolRegistry());
+        this.webFilterRegistry = webContext.getWebComponentWithDefault(WebFilterRegistry.class, new WebFilterRegistry());
+    }
+
+    @Override
+    public void httpHandle(WebServerHttpRequest req, WebServerHttpResponse resp) {
+        handle(req, resp);
     }
 
     public void handle(WebServerHttpRequest req, WebServerHttpResponse resp) {
         // 路由匹配（EventLoop 中执行，路径查找 O(1)~O(n) 足够快）
         MappingResult result = mappingRegistry.mapping(req);
         if (result.isMatched()) {
-            handleWithPathMappingContext(req, resp, result.getMatchedContext());
+            handleWithFUllMatch(req, resp, result);
             return;
         }
         try {
-            // CORS 预检：路径匹配即可处理，不经过异常/拦截器管线
-            if (corsRegistry != null && CorsUtils.isPreFlightRequest(req)) {
-                handleCorsPreflight(req, resp, result.isPathMatched() ? result.getPathMatchedContexts() : null);
-            } else {
-                handleOnNoMatchMappingContext(req, resp, result);
-            }
+            // 未匹配的请求先走 Filter 链（如 HealthFilter 等直接处理请求的 Filter）
+            webFilterRegistry.doFilter(req, resp, result, this::handleWithNoFUllMatch);
         } catch (Throwable e) {
             log.error("dispatcher error", e);
             sendError(resp, HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error");
         }
     }
 
-    protected void handleWithPathMappingContext(WebServerHttpRequest req, WebServerHttpResponse resp, PathMappingContext mappingContext) {
+    protected void handleWithFUllMatch(WebServerHttpRequest req, WebServerHttpResponse resp, MappingResult mappingResult) {
         // 通过 BizPoolRegistry 使用 Phase3 预缓存的线程池，无注解时为 null → 在 EventLoop 中同步处理
-        ExecutorService executor = bizPoolRegistry.determinePool(mappingContext);
+        ExecutorService executor = bizPoolRegistry.determinePool(mappingResult.getMatchedContext());
         if (executor != null) {
             req.acquire();
             try {
                 executor.execute(() -> {
                     try {
-                        processRequest(req, resp, mappingContext);
+                        processRequest(req, resp, mappingResult);
                     } finally {
                         req.release();
                     }
@@ -97,9 +102,25 @@ public class DispatcherHandler extends BaseWebComponent {
                 throw e;
             }
         } else {
-            processRequest(req, resp, mappingContext);
+            processRequest(req, resp, mappingResult);
         }
     }
+
+    protected void handleWithNoFUllMatch(WebServerHttpRequest rq, WebServerHttpResponse rs, MappingResult mr) {
+        // CORS 预检：路径匹配即可处理
+        try {
+            if (corsRegistry != null && CorsUtils.isPreFlightRequest(rq)) {
+                handleCorsPreflight(rq, rs, mr.isPathMatched() ? mr.getPathMatchedContexts() : null);
+            } else {
+                handleOnNoMatchMappingContext(rq, rs, mr);
+            }
+        } catch (Throwable e) {
+            log.error("dispatcher error", e);
+            sendError(rs, HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error");
+        }
+    }
+
+
 
     protected void handleOnNoMatchMappingContext(WebServerHttpRequest req, WebServerHttpResponse resp, MappingResult result) {
         // 404/405：抛出异常走 exceptionRegistry，与 doHandle 中异常路径行为一致
@@ -128,14 +149,18 @@ public class DispatcherHandler extends BaseWebComponent {
     }
 
     /**
-     * 在目标线程中执行完整的请求处理：上下文初始化 → doHandle → 清理。
+     * 在目标线程中执行完整的请求处理：上下文初始化 → Filter 链 → doHandle → 清理。
      */
     private void processRequest(WebServerHttpRequest req, WebServerHttpResponse resp,
-                                 PathMappingContext mappingContext) {
+                                MappingResult mappingResult) {
         boolean initContext = false;
         try {
             initContext = initContextHolders(req, resp);
-            doHandle(req, resp, mappingContext);
+            webFilterRegistry.doFilter(req, resp, mappingResult, (rq, rs, mr) -> doHandle(rq, rs, mr.getMatchedContext()));
+        } catch (Throwable ex) {
+            // Filter 链中抛出的异常，与 doHandle 中异常路径行为一致
+            handleException(ex, req, resp);
+            invokeWithRealResult(req, resp, null, ex);
         } finally {
             if (initContext) {
                 removeContextHolders(req, resp);

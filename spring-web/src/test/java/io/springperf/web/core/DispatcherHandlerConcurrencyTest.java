@@ -11,6 +11,7 @@ import io.springperf.web.core.mapping.MappingResult;
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.core.pool.BizPoolRegistry;
 import io.springperf.web.core.retval.ReturnValueResolverRegistry;
+import io.springperf.web.filter.WebFilterRegistry;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
@@ -38,6 +39,7 @@ class DispatcherHandlerConcurrencyTest {
     private CorsRegistry corsRegistry;
     private InterceptorRegistry interceptorRegistry;
     private BizPoolRegistry bizPoolRegistry;
+    private WebFilterRegistry webFilterRegistry;
 
     @BeforeEach
     @SuppressWarnings("unchecked")
@@ -68,6 +70,27 @@ class DispatcherHandlerConcurrencyTest {
                 .thenReturn(mock(AsyncSupportRegistry.class));
         when(webContext.getWebComponentWithDefault(eq(BizPoolRegistry.class), any(BizPoolRegistry.class)))
                 .thenReturn(bizPoolRegistry);
+
+        webFilterRegistry = mock(WebFilterRegistry.class);
+        when(webContext.getWebComponentWithDefault(eq(WebFilterRegistry.class), any(WebFilterRegistry.class)))
+                .thenReturn(webFilterRegistry);
+        // doFilter 走完 chain 后调用 terminal(mappingResult)
+        try {
+            doAnswer(invocation -> {
+                WebFilterRegistry.FilterChainTerminal terminal = invocation.getArgument(3);
+                WebServerHttpRequest req = invocation.getArgument(0);
+                WebServerHttpResponse resp = invocation.getArgument(1);
+                MappingResult mappingResult = invocation.getArgument(2);
+                try {
+                    terminal.doFilter(req, resp, mappingResult);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+                return null;
+            }).when(webFilterRegistry).doFilter(any(), any(), any(MappingResult.class), any(WebFilterRegistry.FilterChainTerminal.class));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 
         handler.initWithWebContext(webContext);
     }

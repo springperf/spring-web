@@ -2,6 +2,7 @@ package io.springperf.web.autoconfigure;
 
 import io.springperf.web.context.WebContext;
 import io.springperf.web.filter.WebFilter;
+import io.springperf.web.filter.WebFilterRegistration;
 import io.springperf.web.support.SupportDispatcherHandler;
 import io.springperf.web.support.arg.provider.HttpServletRequestProvider;
 import io.springperf.web.support.arg.provider.HttpServletResponseProvider;
@@ -49,11 +50,16 @@ public class SpringWebSupportAutoConfiguration {
         return supportWebFilterRegistry;
     }
 
-    protected WebFilter createFilterWrapper(FilterRegistrationBean filterRegistrationBean) {
-        String[] supportedPathRules = StringUtils.toStringArray(filterRegistrationBean.getUrlPatterns());
+    protected WebFilterRegistration createFilterWrapper(FilterRegistrationBean filterRegistrationBean) {
+        FilterWrapper wrapper = new FilterWrapper(filterRegistrationBean.getFilter());
         Integer order = AnnotationAwareOrderUtils.findOrder(filterRegistrationBean);
-        return FilterWrapper.create(filterRegistrationBean.getFilter(), supportedPathRules,
-                order != null ? order : WebFilter.defaultOrder);
+        WebFilterRegistration registration = new WebFilterRegistration(wrapper)
+                .order(order != null ? order : WebFilter.defaultOrder);
+        String[] urlPatterns = StringUtils.toStringArray(filterRegistrationBean.getUrlPatterns());
+        if (urlPatterns.length > 0) {
+            registration.addPathPatterns(urlPatterns);
+        }
+        return registration;
     }
 
     @Bean @ConditionalOnMissingBean

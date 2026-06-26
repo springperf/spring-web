@@ -4,9 +4,9 @@ import io.springperf.web.context.WebContext;
 import io.springperf.web.core.DispatcherHandler;
 import io.springperf.web.core.mapping.MappingResult;
 import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.filter.WebFilterRegistry;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
-import io.springperf.web.server.HttpHandler;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 
@@ -19,7 +19,7 @@ import org.springframework.http.HttpStatus;
  * {@link ActuatorEndpointHandlerMapping#afterPropertiesSet()} 在初始化阶段注入。</p>
  */
 @Slf4j
-public class ManagementDispatcherHandler extends DispatcherHandler implements HttpHandler {
+public class ManagementDispatcherHandler extends DispatcherHandler {
 
     private final ManagementMappingRegistry managementMappingRegistry;
     private final String basePath;
@@ -35,6 +35,13 @@ public class ManagementDispatcherHandler extends DispatcherHandler implements Ht
     public void initComponentPhase2() throws Exception {
         super.initComponentPhase2();
         mappingRegistry = managementMappingRegistry;
+        this.webFilterRegistry = new WebFilterRegistry(){
+
+            @Override
+            public void doFilter(WebServerHttpRequest request, WebServerHttpResponse response, MappingResult mappingResult, FilterChainTerminal terminal) throws Exception {
+                terminal.doFilter(request, response, mappingResult);
+            }
+        };
     }
 
     /**
@@ -52,19 +59,12 @@ public class ManagementDispatcherHandler extends DispatcherHandler implements Ht
         managementMappingRegistry.buildOptimizerPipeline();
     }
 
-    /**
-     * HttpHandler 接口实现，直接委托给 {@link #handle}。
-     */
-    @Override
-    public void httpHandle(WebServerHttpRequest request, WebServerHttpResponse response) throws Exception {
-        handle(request, response);
-    }
-
-    protected void handleWithPathMappingContext(WebServerHttpRequest req, WebServerHttpResponse resp, PathMappingContext mappingContext) {
+    protected void handleWithFUllMatch(WebServerHttpRequest req, WebServerHttpResponse resp, MappingResult mappingResult) {
         try {
             if (corsRegistry.corsHandle(req, resp)) {
                 return;
             }
+            PathMappingContext mappingContext = mappingResult.getMatchedContext();
             Object result = mappingContext.invoke(null, req, resp);
             returnValueResolverRegistry.resolveReturnValue(result, mappingContext, req, resp);
         } catch (Throwable ex) {

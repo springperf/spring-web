@@ -158,9 +158,12 @@ public class InterceptorRegistry extends WebComponentContainer {
         return interceptors;
     }
 
-    protected RuntimeMappingInterceptor getRuntimeMappingInterceptor(InterceptorRegistration registration) {
+    protected HandlerInterceptor getRuntimeMappingInterceptor(InterceptorRegistration registration) {
         String[] include = StringUtils.toStringArray(registration.getIncludePatterns());
         String[] exclude = StringUtils.toStringArray(registration.getExcludePatterns());
+        if (include.length == 0 && exclude.length == 0) {
+            return registration.getInterceptor();
+        }
         if (registration.getPathMatcher() == null) {
             return new RuntimeMappingInterceptor(include, exclude, registration.getInterceptor());
         } else {

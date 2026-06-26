@@ -151,4 +151,88 @@ class PathPatternUtilsTest {
     void getMatcher_returnsNonNull() {
         assertNotNull(PathPatternUtils.getMatcher());
     }
+
+    // ---- matchPathRuleToCached ----
+
+    @Test
+    void matchPathRuleToCached_emptyPatterns_returnsAlways() {
+        assertEquals(ContainmentResult.ALWAYS,
+                PathPatternUtils.matchPathRuleToCached(Collections.emptyList(), Collections.emptyList(), "/api/users"));
+    }
+
+    @Test
+    void matchPathRuleToCached_includeMatches_returnsAlways() {
+        assertEquals(ContainmentResult.ALWAYS,
+                PathPatternUtils.matchPathRuleToCached(Arrays.asList("/api/**"), Collections.emptyList(), "/api/users"));
+    }
+
+    @Test
+    void matchPathRuleToCached_includeNever_returnsNever() {
+        assertEquals(ContainmentResult.NEVER,
+                PathPatternUtils.matchPathRuleToCached(Arrays.asList("/api/**"), Collections.emptyList(), "/other"));
+    }
+
+    @Test
+    void matchPathRuleToCached_excludeAlways_returnsNever() {
+        assertEquals(ContainmentResult.NEVER,
+                PathPatternUtils.matchPathRuleToCached(
+                        Arrays.asList("/**"), Arrays.asList("/api/**"), "/api/users"));
+    }
+
+    @Test
+    void matchPathRuleToCached_includeAlwaysExcludeDisjoint_returnsAlways() {
+        assertEquals(ContainmentResult.ALWAYS,
+                PathPatternUtils.matchPathRuleToCached(
+                        Arrays.asList("/api/**"), Arrays.asList("/admin/**"), "/api/users"));
+    }
+
+    @Test
+    void matchPathRuleToCached_includeAlwaysExcludeIntersect_returnsRuntime() {
+        assertEquals(ContainmentResult.RUNTIME,
+                PathPatternUtils.matchPathRuleToCached(
+                        Arrays.asList("/api/**"), Arrays.asList("/api/secret"), "/api/{id}"));
+    }
+
+    @Test
+    void matchPathRuleToCached_onlyExcludeDisjoint_returnsAlways() {
+        assertEquals(ContainmentResult.ALWAYS,
+                PathPatternUtils.matchPathRuleToCached(
+                        Collections.emptyList(), Arrays.asList("/admin/**"), "/api/users"));
+    }
+
+    @Test
+    void matchPathRuleToCached_includeRuntime_returnsRuntime() {
+        assertEquals(ContainmentResult.RUNTIME,
+                PathPatternUtils.matchPathRuleToCached(
+                        Arrays.asList("/api/*"), Collections.emptyList(), "/api/**"));
+    }
+
+    @Test
+    void matchPathRuleToCached_onlyExcludeIntersects_returnsRuntime() {
+        assertEquals(ContainmentResult.RUNTIME,
+                PathPatternUtils.matchPathRuleToCached(
+                        Collections.emptyList(), Arrays.asList("/api/secret"), "/api/{id}"));
+    }
+
+    // ---- patternsDisjoint ----
+
+    @Test
+    void patternsDisjoint_literalMismatch_returnsTrue() {
+        assertTrue(PathPatternUtils.patternsDisjoint("/api/users", "/admin/users"));
+    }
+
+    @Test
+    void patternsDisjoint_literalWithWildcard_returnsFalse() {
+        assertFalse(PathPatternUtils.patternsDisjoint("/api/users", "/api/{id}"));
+    }
+
+    @Test
+    void patternsDisjoint_literalVsRegexMismatch_returnsTrue() {
+        assertTrue(PathPatternUtils.patternsDisjoint("/api/abc", "/api/{id:\\d+}"));
+    }
+
+    @Test
+    void patternsDisjoint_literalVsRegexMatch_returnsFalse() {
+        assertFalse(PathPatternUtils.patternsDisjoint("/api/123", "/api/{id:\\d+}"));
+    }
 }

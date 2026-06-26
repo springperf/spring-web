@@ -73,17 +73,17 @@ spring-web
 ├── filter/                      WebFilter 过滤器链
 │   ├── WebFilter                SPI 接口（extends WebComponent），doFilter(request, response, chain)
 │   ├── FilterChain              过滤器链接口
-│   ├── DefaultFilterChain       默认实现
-│   └── WebFilterRegistry        管理 WebFilter 列表（extends WebComponentContainer implements HttpHandler）
+│   ├── DefaultFilterChain       默认实现，终端通过 FilterChainTerminal 回调
+│   └── WebFilterRegistry        管理 WebFilter 列表（extends WebComponentContainer）
 │       ├── 支持 Ordered 排序
 │       ├── 自动注册 Spring 中 WebFilter 类型的 Bean
-│       └── 末端委托给 DispatcherHandler
+│       └── 被 DispatcherHandler 在 processRequest 中调用（路由匹配后、同线程执行）
 │
 ├── core/                        核心请求处理
 │   │
-│   ├── DispatcherHandler        中央分发器
-│   │   请求管线:
-│   │     1. MappingRegistry           — 路由匹配 @RequestMapping
+│   ├── DispatcherHandler        中央分发器，根 HttpHandler
+│   │   请求管线（同线程执行 Filter → doHandle）:
+│   │     1. WebFilterRegistry         — Filter 链（路由匹配后、参数解析前，与 Handler 同线程）
 │   │     2. CorsRegistry              — CORS 检查
 │   │     3. InterceptorRegistry       — preHandle
 │   │     4. ArgumentResolverRegistry  — 参数解析
@@ -451,7 +451,7 @@ WebComponent (interface)
 
 | SPI 接口 | 注册方式 | 切入点 | 对应 Registry |
 |----------|----------|--------|---------------|
-| `WebFilter` | Spring Bean | 请求进入 DispatcherHandler 前 | `WebFilterRegistry` |
+| `WebFilter` | Spring Bean | DispatcherHandler 内路由匹配后、doHandle 前（同线程） | `WebFilterRegistry` |
 | `HandlerInterceptor` | Spring Bean / `InterceptorRegistration` | 控制器方法前后 | `InterceptorRegistry` |
 | `HttpBodyCodecInterceptor` | Spring Bean | 请求体读/响应体写 | `HttpBodyCodecInterceptorRegistry` |
 | `HandlerExceptionResolver` | Spring Bean | 任何步骤的异常 | `ExceptionRegistry` |
@@ -492,26 +492,33 @@ Netty I/O 线程
   ▼
 BackpressureHandler
   ▼
-WebFilterRegistry (有序 WebFilter 链)
-  ▼
-DispatcherHandler
+DispatcherHandler (根 HttpHandler)
   ├── MappingRegistry.match(request)
   │   └── RouterOptimizer 链 → Matcher 链 → PathMappingContext
-  ├── CorsRegistry.getProvider(mapping) → preProcess()
-  ├── InterceptorRegistry.getInterceptors(mapping) → preHandle()
-  ├── ArgumentResolverRegistry.resolveArguments(method, request, response)
-  │   ├── 静态解析器（预创建）: @PathVariable, @RequestParam, @RequestBody 等
-  │   └── 运行时解析器: RuntimeArgumentResolver
-  ├── InvokableHandlerMethod.invoke(args)
-  │   └── 可选: FastInvokerGenerator 字节码调用
-  ├── ReturnValueResolverRegistry.resolve(returnValue)
-  │   ├── JSON: JsonBodyReturnValueResolver → HttpBodyCodecRegistry.writeBody()
-  │   ├── 异步: DeferredResult/Callable → AsyncSupportRegistry
-  │   └── 流式: StreamEmitter → NettyStreamSender
-  ├── InterceptorRegistry.postHandle()
-  ├── InterceptorRegistry.afterCompletion()
-  └── ExceptionRegistry.resolveException()
-      └── @ExceptionHandler / ResponseStatusException / 自定义 HandlerExceptionResolver
+  │
+  ├── [404/405/CORS 预检] 直接返回，不走后续步骤
+  │
+  └── handleWithPathMappingContext()
+      └── @RunInPool ?
+          ├── YES: executor.execute(() -> processRequest())  ← 业务线程池
+          └── NO:  processRequest()                          ← EventLoop
+                      │
+                      ├── WebFilterRegistry (有序 WebFilter 链)   ← 同线程！
+                      ├── CorsRegistry.getProvider(mapping) → preProcess()
+                      ├── InterceptorRegistry.getInterceptors(mapping) → preHandle()
+                      ├── ArgumentResolverRegistry.resolveArguments(method, request, response)
+                      │   ├── 静态解析器（预创建）: @PathVariable, @RequestParam, @RequestBody 等
+                      │   └── 运行时解析器: RuntimeArgumentResolver
+                      ├── InvokableHandlerMethod.invoke(args)
+                      │   └── 可选: FastInvokerGenerator 字节码调用
+                      ├── ReturnValueResolverRegistry.resolve(returnValue)
+                      │   ├── JSON: JsonBodyReturnValueResolver → HttpBodyCodecRegistry.writeBody()
+                      │   ├── 异步: DeferredResult/Callable → AsyncSupportRegistry
+                      │   └── 流式: StreamEmitter → NettyStreamSender
+                      ├── InterceptorRegistry.postHandle()
+                      ├── InterceptorRegistry.afterCompletion()
+                      └── ExceptionRegistry.resolveException()
+                          └── @ExceptionHandler / ResponseStatusException / 自定义 HandlerExceptionResolver
 ```
 
 ---

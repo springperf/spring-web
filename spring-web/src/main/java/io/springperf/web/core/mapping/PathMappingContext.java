@@ -5,10 +5,10 @@ import io.springperf.web.core.interceptor.HandlerInterceptor;
 import io.springperf.web.core.invoker.CustomInvoker;
 import io.springperf.web.core.mapping.match.ConsumeOrProduceMatcher;
 import io.springperf.web.core.mapping.match.Matcher;
+import io.springperf.web.filter.WebFilter;
 import io.springperf.web.http.RequestAttribute;
 import io.springperf.web.http.WebServerHttpRequest;
 import org.springframework.http.MediaType;
-
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.method.HandlerMethod;
 
@@ -30,6 +30,7 @@ public class PathMappingContext extends MappingHandlerMethod {
     private final List<MediaType> producibleMediaTypes;
     private List<HandlerInterceptor> cachedInterceptors;
     private CorsConfigurationProvider corsConfigurationProvider;
+    private List<WebFilter> cachedFilters;
 
 
     public PathMappingContext(HandlerMethod handlerMethod, List<Matcher> matchers, String pathRule) {
@@ -76,6 +77,14 @@ public class PathMappingContext extends MappingHandlerMethod {
 
     public void setCachedInterceptors(List<HandlerInterceptor> cachedInterceptors) {
         this.cachedInterceptors = cachedInterceptors;
+    }
+
+    public List<WebFilter> getCachedFilters() {
+        return cachedFilters;
+    }
+
+    public void setCachedFilters(List<WebFilter> cachedFilters) {
+        this.cachedFilters = cachedFilters;
     }
 
     public List<MediaType> getProducibleMediaTypes() {

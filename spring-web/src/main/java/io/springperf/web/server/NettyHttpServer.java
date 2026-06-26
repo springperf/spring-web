@@ -9,8 +9,8 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.util.concurrent.Future;
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
+import io.springperf.web.core.DispatcherHandler;
 import io.springperf.web.core.pool.BizPoolRegistry;
-import io.springperf.web.filter.WebFilterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.SmartLifecycle;
 
@@ -54,10 +54,10 @@ public class NettyHttpServer implements SmartLifecycle {
         // 在 Netty 启动前触发 WebContext 生命周期，确保所有 WebComponent 已完成初始化
         webContext.startLifecycle();
         this.http2Enabled = webContext.getProps().getBoolean(PropertiesConstant.HTTP2_ENABLED, false);
-        // 在启动阶段（单线程、Netty 未接受连接前）注册 WebFilterRegistry
+        // 在启动阶段（单线程、Netty 未接受连接前）获取 DispatcherHandler
         // 确保 NettyHttpHandler 运行时只需做纯读操作，线程安全
-        WebFilterRegistry registry = webContext.getWebComponentWithDefault(WebFilterRegistry.class, new WebFilterRegistry());
-        this.httpHandler = new NettyHttpHandler(webContext, webContext.getContextPath(), registry);
+        DispatcherHandler dispatcher = webContext.getWebComponent(DispatcherHandler.class);
+        this.httpHandler = new NettyHttpHandler(webContext, webContext.getContextPath(), dispatcher);
         int port = webContext.getProps().getInt(PropertiesConstant.SERVER_PORT, 8080);
         bossGroup = new NioEventLoopGroup(1);
         int workerThreads = webContext.getProps().getInt(PropertiesConstant.SERVER_NETTY_WORKERS, 0);

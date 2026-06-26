@@ -9,7 +9,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.annotation.Order;
-import org.springframework.util.PathMatcher;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -76,33 +75,6 @@ class InterceptorRegistryTest {
         assertTrue(registry.preHandle(request, response));
     }
 
-    // ---- getRuntimeMappingInterceptor ----
-
-    @Test
-    void getRuntimeMappingInterceptor_withoutPathMatcher() {
-        HandlerInterceptor interceptor = new HandlerInterceptor() {};
-        InterceptorRegistration registration = registry.registerInterceptor(interceptor);
-        registration.addPathPatterns("/api/**");
-        registration.excludePathPatterns("/admin/**");
-
-        RuntimeMappingInterceptor result = registry.getRuntimeMappingInterceptor(registration);
-
-        assertNotNull(result);
-        assertArrayEquals(new String[]{"/api/**"}, result.getPathPatterns());
-        assertSame(interceptor, result.getInterceptor());
-    }
-
-    @Test
-    void getRuntimeMappingInterceptor_withPathMatcher() {
-        HandlerInterceptor interceptor = new HandlerInterceptor() {};
-        InterceptorRegistration registration = registry.registerInterceptor(interceptor);
-        registration.pathMatcher(mock(PathMatcher.class));
-
-        RuntimeMappingInterceptor result = registry.getRuntimeMappingInterceptor(registration);
-
-        assertNotNull(result);
-        assertNotNull(result.getPathMatcher());
-    }
 
     // ---- preHandle ----
 

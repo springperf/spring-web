@@ -113,28 +113,7 @@ public class InterceptorRegistration implements WebComponent {
     }
 
     protected ContainmentResult matchPathRuleToCached(String pathRule) {
-        if (this.includePatterns.isEmpty() && this.excludePatterns.isEmpty()) {
-            return ContainmentResult.ALWAYS;
-        }
-        ContainmentResult includeResult = PathPatternUtils.patternListContains(includePatterns, pathRule);
-        if (this.includePatterns.isEmpty()) {
-            includeResult = ContainmentResult.ALWAYS;
-        }
-        if (includeResult == ContainmentResult.NEVER) {
-            // mapping 永远不可能命中 include
-            return ContainmentResult.NEVER;
-        }
-
-        ContainmentResult excludeResult = PathPatternUtils.patternListContains(excludePatterns, pathRule);
-        if (excludeResult == ContainmentResult.ALWAYS) {
-            // mapping 必然被 exclude
-            return ContainmentResult.NEVER;
-        }
-        if (includeResult == ContainmentResult.ALWAYS
-                && excludeResult == ContainmentResult.NEVER) {
-            return ContainmentResult.ALWAYS;
-        }
-        return ContainmentResult.RUNTIME;
+        return PathPatternUtils.matchPathRuleToCached(this.includePatterns, this.excludePatterns, pathRule);
     }
 
 
