@@ -1,14 +1,14 @@
 package io.springperf.web.http;
 
-import io.springperf.web.context.ApplicationProperties;
-import io.springperf.web.context.PropertiesConstant;
-import io.springperf.web.context.WebContext;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.EventLoop;
+import io.springperf.web.context.ApplicationProperties;
+import io.springperf.web.context.PropertiesConstant;
+import io.springperf.web.context.WebContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

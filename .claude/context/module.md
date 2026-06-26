@@ -70,16 +70,18 @@ spring-web
 │       ├── SupportMultipartAggregator, SupportMultipartResolver
 │       └── NettyAttributeMessage
 │
-├── filter/                      WebFilter 过滤器链
-│   ├── WebFilter                SPI 接口（extends WebComponent），doFilter(request, response, chain)
-│   ├── FilterChain              过滤器链接口
-│   ├── DefaultFilterChain       默认实现，终端通过 FilterChainTerminal 回调
-│   └── WebFilterRegistry        管理 WebFilter 列表（extends WebComponentContainer）
-│       ├── 支持 Ordered 排序
-│       ├── 自动注册 Spring 中 WebFilter 类型的 Bean
-│       └── 被 DispatcherHandler 在 processRequest 中调用（路由匹配后、同线程执行）
-│
 ├── core/                        核心请求处理
+│   │
+│   ├── filter/                  WebFilter 过滤器链
+│   │   ├── WebFilter                SPI 接口（extends WebComponent），doFilter(request, response, chain)
+│   │   ├── FilterChain              过滤器链接口
+│   │   ├── DefaultFilterChain       默认实现，终端通过 FilterChainTerminal 回调
+│   │   ├── WebFilterRegistry        管理 WebFilter 列表（extends WebComponentContainer）
+│   │   │   ├── 支持 Ordered 排序
+│   │   │   ├── 自动注册 Spring 中 WebFilter 类型的 Bean
+│   │   │   └── 被 DispatcherHandler 在 processRequest 中调用（路由匹配后、同线程执行）
+│   │   ├── WebFilterRegistration    WebFilter 注册（路径包含/排除 + 排序）
+│   │   └── RuntimeMappingWebFilter  运行时路径匹配的 Filter 包装
 │   │
 │   ├── DispatcherHandler        中央分发器，根 HttpHandler
 │   │   请求管线（同线程执行 Filter → doHandle）:
@@ -498,7 +500,7 @@ DispatcherHandler (根 HttpHandler)
   │
   ├── [404/405/CORS 预检] 直接返回，不走后续步骤
   │
-  └── handleWithPathMappingContext()
+  └── handleWithFullMatch()
       └── @RunInPool ?
           ├── YES: executor.execute(() -> processRequest())  ← 业务线程池
           └── NO:  processRequest()                          ← EventLoop

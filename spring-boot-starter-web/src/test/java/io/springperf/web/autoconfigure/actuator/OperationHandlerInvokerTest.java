@@ -7,7 +7,6 @@ import org.springframework.boot.actuate.endpoint.web.WebEndpointHttpMethod;
 import org.springframework.boot.actuate.endpoint.web.WebOperationRequestPredicate;
 
 import java.util.Collections;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 

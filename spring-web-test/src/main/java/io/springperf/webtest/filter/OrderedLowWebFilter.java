@@ -1,6 +1,6 @@
 package io.springperf.webtest.filter;
 
-import io.springperf.web.filter.WebFilter;
+import io.springperf.web.core.filter.WebFilter;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import org.springframework.core.annotation.Order;
@@ -18,7 +18,7 @@ public class OrderedLowWebFilter implements WebFilter {
 
     @Override
     public void doFilter(WebServerHttpRequest request, WebServerHttpResponse response,
-                         io.springperf.web.filter.FilterChain chain) throws Exception {
+                         io.springperf.web.core.filter.FilterChain chain) throws Exception {
         response.getHeaders().add(HEADER_NAME, "executed");
         chain.doFilter(request, response);
     }

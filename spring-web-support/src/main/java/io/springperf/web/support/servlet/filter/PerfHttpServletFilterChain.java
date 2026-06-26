@@ -12,9 +12,9 @@ public class PerfHttpServletFilterChain implements FilterChain {
 
     private final WebServerHttpRequest request;
     private final WebServerHttpResponse response;
-    private io.springperf.web.filter.FilterChain filterChain;
+    private io.springperf.web.core.filter.FilterChain filterChain;
 
-    public PerfHttpServletFilterChain(WebServerHttpRequest request, WebServerHttpResponse response, io.springperf.web.filter.FilterChain filterChain) {
+    public PerfHttpServletFilterChain(WebServerHttpRequest request, WebServerHttpResponse response, io.springperf.web.core.filter.FilterChain filterChain) {
         this.request = request;
         this.response = response;
         this.filterChain = filterChain;

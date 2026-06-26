@@ -1,7 +1,7 @@
 package io.springperf.web.support.servlet.filter;
 
-import io.springperf.web.filter.FilterChain;
-import io.springperf.web.filter.WebFilter;
+import io.springperf.web.core.filter.FilterChain;
+import io.springperf.web.core.filter.WebFilter;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;

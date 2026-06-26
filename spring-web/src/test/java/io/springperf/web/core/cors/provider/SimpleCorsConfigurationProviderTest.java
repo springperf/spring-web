@@ -8,7 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.cors.CorsConfiguration;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 @ExtendWith(MockitoExtension.class)
 class SimpleCorsConfigurationProviderTest {

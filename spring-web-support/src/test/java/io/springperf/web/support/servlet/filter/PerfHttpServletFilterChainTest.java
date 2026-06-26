@@ -1,6 +1,6 @@
 package io.springperf.web.support.servlet.filter;
 
-import io.springperf.web.filter.FilterChain;
+import io.springperf.web.core.filter.FilterChain;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import org.junit.jupiter.api.Test;

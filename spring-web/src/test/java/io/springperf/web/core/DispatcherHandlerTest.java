@@ -5,13 +5,13 @@ import io.springperf.web.core.arg.ArgumentResolverRegistry;
 import io.springperf.web.core.async.AsyncSupportRegistry;
 import io.springperf.web.core.cors.CorsRegistry;
 import io.springperf.web.core.exception.ExceptionRegistry;
+import io.springperf.web.core.filter.WebFilterRegistry;
 import io.springperf.web.core.interceptor.InterceptorRegistry;
 import io.springperf.web.core.mapping.MappingRegistry;
 import io.springperf.web.core.mapping.MappingResult;
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.core.pool.BizPoolRegistry;
 import io.springperf.web.core.retval.ReturnValueResolverRegistry;
-import io.springperf.web.filter.WebFilterRegistry;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
@@ -433,7 +433,7 @@ class DispatcherHandlerTest {
     // ==================== handleWithPathMappingContext() ====================
 
     @Test
-    void handleWithFUllMatch_executorRejects_releasesRequest() {
+    void handleWithFullMatch_executorRejects_releasesRequest() {
         WebServerHttpRequest req = createRequest();
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
         PathMappingContext mappingContext = mock(PathMappingContext.class);
@@ -442,7 +442,7 @@ class DispatcherHandlerTest {
         doThrow(new RejectedExecutionException("pool full")).when(executor).execute(any(Runnable.class));
 
         assertThrows(RejectedExecutionException.class,
-                () -> handler.handleWithFUllMatch(req, resp, MappingResult.matched(mappingContext)));
+                () -> handler.handleWithFullMatch(req, resp, MappingResult.matched(mappingContext)));
 
         verify(req).acquire();
         verify(req).release();

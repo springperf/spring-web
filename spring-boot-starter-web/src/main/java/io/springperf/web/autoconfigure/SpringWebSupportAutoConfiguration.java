@@ -1,8 +1,8 @@
 package io.springperf.web.autoconfigure;
 
 import io.springperf.web.context.WebContext;
-import io.springperf.web.filter.WebFilter;
-import io.springperf.web.filter.WebFilterRegistration;
+import io.springperf.web.core.filter.WebFilter;
+import io.springperf.web.core.filter.WebFilterRegistration;
 import io.springperf.web.support.SupportDispatcherHandler;
 import io.springperf.web.support.arg.provider.HttpServletRequestProvider;
 import io.springperf.web.support.arg.provider.HttpServletResponseProvider;

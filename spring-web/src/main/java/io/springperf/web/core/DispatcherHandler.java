@@ -8,13 +8,13 @@ import io.springperf.web.core.async.AsyncSupportUtils;
 import io.springperf.web.core.cors.CorsRegistry;
 import io.springperf.web.core.cors.CorsUtils;
 import io.springperf.web.core.exception.ExceptionRegistry;
+import io.springperf.web.core.filter.WebFilterRegistry;
 import io.springperf.web.core.interceptor.InterceptorRegistry;
 import io.springperf.web.core.mapping.MappingRegistry;
 import io.springperf.web.core.mapping.MappingResult;
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.core.pool.BizPoolRegistry;
 import io.springperf.web.core.retval.ReturnValueResolverRegistry;
-import io.springperf.web.filter.WebFilterRegistry;
 import io.springperf.web.http.BaseWebServerHttpResponse;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
@@ -72,19 +72,19 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
         // 路由匹配（EventLoop 中执行，路径查找 O(1)~O(n) 足够快）
         MappingResult result = mappingRegistry.mapping(req);
         if (result.isMatched()) {
-            handleWithFUllMatch(req, resp, result);
+            handleWithFullMatch(req, resp, result);
             return;
         }
         try {
             // 未匹配的请求先走 Filter 链（如 HealthFilter 等直接处理请求的 Filter）
-            webFilterRegistry.doFilter(req, resp, result, this::handleWithNoFUllMatch);
+            webFilterRegistry.doFilter(req, resp, result, this::handleWithNoFullMatch);
         } catch (Throwable e) {
             log.error("dispatcher error", e);
             sendError(resp, HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error");
         }
     }
 
-    protected void handleWithFUllMatch(WebServerHttpRequest req, WebServerHttpResponse resp, MappingResult mappingResult) {
+    protected void handleWithFullMatch(WebServerHttpRequest req, WebServerHttpResponse resp, MappingResult mappingResult) {
         // 通过 BizPoolRegistry 使用 Phase3 预缓存的线程池，无注解时为 null → 在 EventLoop 中同步处理
         ExecutorService executor = bizPoolRegistry.determinePool(mappingResult.getMatchedContext());
         if (executor != null) {
@@ -106,7 +106,7 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
         }
     }
 
-    protected void handleWithNoFUllMatch(WebServerHttpRequest rq, WebServerHttpResponse rs, MappingResult mr) {
+    protected void handleWithNoFullMatch(WebServerHttpRequest rq, WebServerHttpResponse rs, MappingResult mr) {
         // CORS 预检：路径匹配即可处理
         try {
             if (corsRegistry != null && CorsUtils.isPreFlightRequest(rq)) {

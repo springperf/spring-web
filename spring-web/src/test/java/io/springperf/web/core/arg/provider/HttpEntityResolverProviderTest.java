@@ -15,7 +15,7 @@ import org.springframework.http.RequestEntity;
 import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doReturn;
 
 @ExtendWith(MockitoExtension.class)
 class HttpEntityResolverProviderTest {

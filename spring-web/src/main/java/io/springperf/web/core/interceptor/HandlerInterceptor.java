@@ -12,13 +12,13 @@ import io.springperf.web.http.WebServerHttpResponse;
  * ({@link #afterCompletion}), and when asynchronous processing starts
  * ({@link #afterConcurrentHandlingStarted}).</p>
  *
- * <p>Unlike {@link io.springperf.web.filter.WebFilter}, interceptors operate
+ * <p>Unlike {@link io.springperf.web.core.filter.WebFilter}, interceptors operate
  * within the dispatcher pipeline and have access to the resolved handler
  * method. They are the preferred mechanism for cross-cutting concerns such
  * as authentication checks, logging, and locale resolution.</p>
  *
  * @since 1.0.0
- * @see io.springperf.web.filter.WebFilter
+ * @see io.springperf.web.core.filter.WebFilter
  */
 public interface HandlerInterceptor {
     /**

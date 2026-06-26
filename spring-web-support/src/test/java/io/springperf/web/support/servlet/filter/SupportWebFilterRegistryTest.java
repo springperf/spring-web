@@ -1,9 +1,10 @@
 package io.springperf.web.support.servlet.filter;
 
-import io.springperf.web.filter.WebFilterRegistry;
+import io.springperf.web.core.filter.WebFilterRegistry;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 class SupportWebFilterRegistryTest {
 

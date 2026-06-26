@@ -1,11 +1,10 @@
-package io.springperf.web.filter;
+package io.springperf.web.core.filter;
 
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
-import io.springperf.web.util.PathPatternUtils;
+import io.springperf.web.util.ServletFilterPatternUtils;
 import org.springframework.lang.Nullable;
 import org.springframework.util.ObjectUtils;
-import org.springframework.util.PathMatcher;
 
 public class RuntimeMappingWebFilter implements WebFilter {
 
@@ -17,25 +16,21 @@ public class RuntimeMappingWebFilter implements WebFilter {
     @Nullable
     private final String[] excludePatterns;
 
-    @Nullable
-    private PathMatcher pathMatcher;
-
     private final int order;
 
     public RuntimeMappingWebFilter(WebFilter filter, String[] includePatterns, String[] excludePatterns,
-                                    @Nullable PathMatcher pathMatcher, int order) {
+                                    int order) {
         this.delegate = filter;
         this.includePatterns = includePatterns;
         this.excludePatterns = excludePatterns;
-        this.pathMatcher = pathMatcher;
         this.order = order;
     }
 
     /**
-     * Runtime-only constructor; pathMatcher will use the default from PathPatternUtils.
+     * Runtime-only constructor; order defaults to 0.
      */
     public RuntimeMappingWebFilter(WebFilter filter, String[] includePatterns, String[] excludePatterns) {
-        this(filter, includePatterns, excludePatterns, null, 0);
+        this(filter, includePatterns, excludePatterns, 0);
     }
 
     /**
@@ -45,7 +40,6 @@ public class RuntimeMappingWebFilter implements WebFilter {
         this(registration.getFilter(),
                 registration.getIncludePatterns().toArray(new String[0]),
                 registration.getExcludePatterns().toArray(new String[0]),
-                registration.getPathMatcher(),
                 registration.getOrder());
     }
 
@@ -59,16 +53,15 @@ public class RuntimeMappingWebFilter implements WebFilter {
     }
 
     /**
-     * Determine a match for the given lookup path.
+     * Determine a match for the given lookup path using Servlet 规范路径匹配。
      *
      * @param lookupPath the current request path
      * @return {@code true} if the filter applies to the given request path
      */
     public boolean matches(String lookupPath) {
-        PathMatcher pathMatcherToUse = this.pathMatcher == null ? PathPatternUtils.getMatcher() : this.pathMatcher;
         if (!ObjectUtils.isEmpty(this.excludePatterns)) {
             for (String pattern : this.excludePatterns) {
-                if (pathMatcherToUse.match(pattern, lookupPath)) {
+                if (ServletFilterPatternUtils.matches(pattern, lookupPath)) {
                     return false;
                 }
             }
@@ -77,7 +70,7 @@ public class RuntimeMappingWebFilter implements WebFilter {
             return true;
         }
         for (String pattern : this.includePatterns) {
-            if (pathMatcherToUse.match(pattern, lookupPath)) {
+            if (ServletFilterPatternUtils.matches(pattern, lookupPath)) {
                 return true;
             }
         }

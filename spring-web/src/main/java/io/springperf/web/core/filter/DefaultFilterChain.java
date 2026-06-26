@@ -1,4 +1,4 @@
-package io.springperf.web.filter;
+package io.springperf.web.core.filter;
 
 import io.springperf.web.core.mapping.MappingResult;
 import io.springperf.web.http.BaseWebServerHttpRequest;

@@ -15,7 +15,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class JsonBodyReturnValueResolverTest {

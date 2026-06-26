@@ -1,7 +1,6 @@
 package io.springperf.web.context;
 
 import io.springperf.web.core.DispatcherHandler;
-import static io.springperf.web.context.PropertiesConstant.CONTEXT_PATH;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.Ordered;
@@ -9,6 +8,7 @@ import org.springframework.core.Ordered;
 import java.util.Collections;
 import java.util.List;
 
+import static io.springperf.web.context.PropertiesConstant.CONTEXT_PATH;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 

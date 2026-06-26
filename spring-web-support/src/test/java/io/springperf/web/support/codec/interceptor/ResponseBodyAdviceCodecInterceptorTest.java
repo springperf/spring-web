@@ -16,7 +16,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 import java.lang.reflect.Type;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ResponseBodyAdviceCodecInterceptorTest {

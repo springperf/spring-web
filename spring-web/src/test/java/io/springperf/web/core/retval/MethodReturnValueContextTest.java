@@ -8,7 +8,8 @@ import org.springframework.core.MethodParameter;
 
 import java.lang.reflect.Method;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 class MethodReturnValueContextTest {
 

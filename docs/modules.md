@@ -25,9 +25,9 @@ spring-web-parent
 
 ### filter — WebFilter 过滤器链
 
-- `WebFilter` — SPI 接口，在请求到达 `DispatcherHandler` 之前执行
+- `WebFilter` — SPI 接口，在 DispatcherHandler 内路由匹配后、doHandle 前执行
 - `WebFilterRegistry` 管理过滤器列表，支持排序
-- 过滤器链以 `DispatcherHandler` 作为末端处理器
+- 过滤器链通过 `FilterChainTerminal` 回调触发后续处理
 - 自动注册 Spring 容器中所有 `WebFilter` 类型的 Bean
 
 ### core — 核心处理管线

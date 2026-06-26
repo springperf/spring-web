@@ -1,17 +1,17 @@
-package io.springperf.web.filter;
+package io.springperf.web.core.filter;
 
 import io.springperf.web.context.WebComponent;
-import io.springperf.web.util.PathPatternUtils;
+import io.springperf.web.util.ServletFilterPatternUtils;
 import io.springperf.web.util.support.ContainmentResult;
-import org.springframework.lang.Nullable;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.Assert;
 import org.springframework.util.ObjectUtils;
-import org.springframework.util.PathMatcher;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+@Slf4j
 public class WebFilterRegistration implements WebComponent {
 
     private final WebFilter filter;
@@ -19,9 +19,6 @@ public class WebFilterRegistration implements WebComponent {
     private final List<String> includePatterns = new ArrayList<>();
 
     private final List<String> excludePatterns = new ArrayList<>();
-
-    @Nullable
-    private PathMatcher pathMatcher;
 
     private int order = 0;
 
@@ -51,6 +48,7 @@ public class WebFilterRegistration implements WebComponent {
      * List-based variant of {@link #addPathPatterns(String...)}.
      */
     public WebFilterRegistration addPathPatterns(List<String> patterns) {
+        validatePatterns(patterns);
         this.includePatterns.addAll(patterns);
         return this;
     }
@@ -66,19 +64,18 @@ public class WebFilterRegistration implements WebComponent {
      * List-based variant of {@link #excludePathPatterns(String...)}.
      */
     public WebFilterRegistration excludePathPatterns(List<String> patterns) {
+        validatePatterns(patterns);
         this.excludePatterns.addAll(patterns);
         return this;
     }
 
-    /**
-     * A PathMatcher implementation to use with this filter. This is an optional,
-     * advanced property required only if using custom PathMatcher implementations
-     * that support mapping metadata other than the Ant path patterns supported
-     * by default.
-     */
-    public WebFilterRegistration pathMatcher(PathMatcher pathMatcher) {
-        this.pathMatcher = pathMatcher;
-        return this;
+    private static void validatePatterns(List<String> patterns) {
+        for (String pattern : patterns) {
+            String msg = ServletFilterPatternUtils.validateServletPattern(pattern);
+            if (msg != null) {
+                log.warn("{}", msg);
+            }
+        }
     }
 
     /**
@@ -108,27 +105,21 @@ public class WebFilterRegistration implements WebComponent {
         return this.excludePatterns;
     }
 
-    @Nullable
-    protected PathMatcher getPathMatcher() {
-        return this.pathMatcher;
-    }
-
     protected ContainmentResult matchPathRuleToCached(String pathRule) {
-        return PathPatternUtils.matchPathRuleToCached(this.includePatterns, this.excludePatterns, pathRule);
+        return ServletFilterPatternUtils.matchPathRuleToCached(this.includePatterns, this.excludePatterns, pathRule);
     }
 
     /**
      * Runtime path matching: check if this filter should apply to the given request path.
-     * Uses {@link PathMatcher} (AntPathMatcher by default) for path pattern matching.
+     * Uses Servlet 规范路径匹配语义。
      *
      * @param lookupPath the actual request path
      * @return {@code true} if this filter applies
      */
     public boolean matches(String lookupPath) {
-        PathMatcher pathMatcherToUse = this.pathMatcher != null ? this.pathMatcher : PathPatternUtils.getMatcher();
         if (!ObjectUtils.isEmpty(this.excludePatterns)) {
             for (String pattern : this.excludePatterns) {
-                if (pathMatcherToUse.match(pattern, lookupPath)) {
+                if (ServletFilterPatternUtils.matches(pattern, lookupPath)) {
                     return false;
                 }
             }
@@ -137,7 +128,7 @@ public class WebFilterRegistration implements WebComponent {
             return true;
         }
         for (String pattern : this.includePatterns) {
-            if (pathMatcherToUse.match(pattern, lookupPath)) {
+            if (ServletFilterPatternUtils.matches(pattern, lookupPath)) {
                 return true;
             }
         }

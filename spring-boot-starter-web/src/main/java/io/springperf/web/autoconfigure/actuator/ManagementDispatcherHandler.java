@@ -2,9 +2,9 @@ package io.springperf.web.autoconfigure.actuator;
 
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.DispatcherHandler;
+import io.springperf.web.core.filter.WebFilterRegistry;
 import io.springperf.web.core.mapping.MappingResult;
 import io.springperf.web.core.mapping.PathMappingContext;
-import io.springperf.web.filter.WebFilterRegistry;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -59,7 +59,7 @@ public class ManagementDispatcherHandler extends DispatcherHandler {
         managementMappingRegistry.buildOptimizerPipeline();
     }
 
-    protected void handleWithFUllMatch(WebServerHttpRequest req, WebServerHttpResponse resp, MappingResult mappingResult) {
+    protected void handleWithFullMatch(WebServerHttpRequest req, WebServerHttpResponse resp, MappingResult mappingResult) {
         try {
             if (corsRegistry.corsHandle(req, resp)) {
                 return;

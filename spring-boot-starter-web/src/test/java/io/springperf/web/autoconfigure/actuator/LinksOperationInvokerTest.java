@@ -3,7 +3,6 @@ package io.springperf.web.autoconfigure.actuator;
 import io.springperf.web.core.mapping.match.HttpMethodMatcher;
 import io.springperf.web.core.mapping.match.Matcher;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpMethod;
 
 import java.util.List;
 

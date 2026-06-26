@@ -2,7 +2,7 @@ package io.springperf.benchmark.config;
 
 import io.springperf.web.core.interceptor.HandlerInterceptor;
 import io.springperf.web.core.interceptor.InterceptorRegistration;
-import io.springperf.web.filter.WebFilter;
+import io.springperf.web.core.filter.WebFilter;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import org.springframework.context.annotation.Bean;

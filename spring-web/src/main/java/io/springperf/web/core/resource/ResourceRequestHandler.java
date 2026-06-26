@@ -5,17 +5,14 @@ import io.springperf.web.core.mapping.match.HttpMethodMatcher;
 import io.springperf.web.core.mapping.match.Matcher;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.MediaTypeFactory;
+import org.springframework.http.*;
 import org.springframework.lang.Nullable;
-import org.springframework.util.ResourceUtils;
 import org.springframework.util.ReflectionUtils;
+import org.springframework.util.ResourceUtils;
 import org.springframework.util.StringUtils;
 
 import java.io.File;
@@ -25,7 +22,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class ResourceRequestHandler implements CustomInvoker {

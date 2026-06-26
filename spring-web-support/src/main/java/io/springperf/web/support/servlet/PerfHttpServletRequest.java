@@ -1,7 +1,7 @@
 package io.springperf.web.support.servlet;
 
-import io.springperf.web.http.WebServerHttpRequest;
 import io.netty.handler.codec.http.HttpHeaders;
+import io.springperf.web.http.WebServerHttpRequest;
 
 import javax.servlet.ReadListener;
 import javax.servlet.ServletInputStream;

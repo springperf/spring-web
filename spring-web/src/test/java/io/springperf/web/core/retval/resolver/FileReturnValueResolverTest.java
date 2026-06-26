@@ -12,8 +12,9 @@ import java.lang.reflect.Method;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class FileReturnValueResolverTest {

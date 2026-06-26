@@ -190,7 +190,7 @@ try {
 
 ### 手段
 
-`DispatcherHandler.handleWithPathMappingContext()`（第 84-101 行）中，如果控制器**没有**标注 `@RunInPool`，则直接在 Netty EventLoop 线程中执行整个请求管线。
+`DispatcherHandler.handleWithFullMatch()`（第 87-107 行）中，如果控制器**没有**标注 `@RunInPool`，则直接在 Netty EventLoop 线程中执行整个请求管线。
 
 ### 关键理解：这不是"替你做优化"，而是"给你选择权"
 

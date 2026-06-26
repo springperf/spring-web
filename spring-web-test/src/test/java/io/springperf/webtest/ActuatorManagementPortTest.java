@@ -11,7 +11,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import java.time.Duration;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Actuator 管理端口隔离集成测试。

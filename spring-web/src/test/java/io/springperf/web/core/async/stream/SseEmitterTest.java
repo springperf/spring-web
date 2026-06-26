@@ -9,7 +9,8 @@ import org.springframework.http.server.ServerHttpResponse;
 import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class SseEmitterTest {
 
