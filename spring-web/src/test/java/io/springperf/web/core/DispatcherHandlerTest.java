@@ -12,6 +12,7 @@ import io.springperf.web.core.mapping.MappingResult;
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.core.pool.BizPoolRegistry;
 import io.springperf.web.core.retval.ReturnValueResolverRegistry;
+import io.springperf.web.http.RequestAttribute;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
@@ -21,6 +22,8 @@ import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 
@@ -45,7 +48,12 @@ class DispatcherHandlerTest {
 
     private WebServerHttpRequest createRequest() {
         WebServerHttpRequest req = mock(WebServerHttpRequest.class);
-        when(req.getRequestContext()).thenReturn(mock(RequestContext.class));
+        RequestContext reqCtx = mock(RequestContext.class);
+        when(req.getRequestContext()).thenReturn(reqCtx);
+        // 模拟 fastAttributes 以支持 RequestAttribute 存取
+        Map<RequestAttribute<?>, Object> fastAttrs = new HashMap<>();
+        when(reqCtx.getAttribute(any(RequestAttribute.class))).thenAnswer(inv -> fastAttrs.get(inv.getArgument(0)));
+        doAnswer(inv -> { fastAttrs.put(inv.getArgument(0), inv.getArgument(1)); return null; }).when(reqCtx).setAttribute(any(RequestAttribute.class), any());
         return req;
     }
 
@@ -82,23 +90,17 @@ class DispatcherHandlerTest {
                 .thenReturn(asyncSupportRegistry);
         when(webContext.getWebComponentWithDefault(eq(WebFilterRegistry.class), any(WebFilterRegistry.class)))
                 .thenReturn(webFilterRegistry);
-        // doFilter 走完 chain 后调用 terminal(mappingResult)
-        try {
-            doAnswer(invocation -> {
-                WebFilterRegistry.FilterChainTerminal terminal = invocation.getArgument(3);
-                WebServerHttpRequest req = invocation.getArgument(0);
-                WebServerHttpResponse resp = invocation.getArgument(1);
-                MappingResult mappingResult = invocation.getArgument(2);
-                try {
-                    terminal.doFilter(req, resp, mappingResult);
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-                return null;
-            }).when(webFilterRegistry).doFilter(any(), any(), any(MappingResult.class), any(WebFilterRegistry.FilterChainTerminal.class));
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+
+        // doFilter 模拟：新流程中 DefaultFilterChain 调用 handleAfterFilter
+        doAnswer(invocation -> {
+            WebServerHttpRequest req = invocation.getArgument(0);
+            WebServerHttpResponse resp = invocation.getArgument(1);
+            MappingResult mr = MappingResult.get(req);
+            if (mr != null) {
+                handler.handleAfterFilter(req, resp, mr);
+            }
+            return null;
+        }).when(webFilterRegistry).doFilter(any(), any());
 
         handler.initWithWebContext(webContext);
     }
@@ -110,7 +112,9 @@ class DispatcherHandlerTest {
         WebServerHttpRequest req = createRequest();
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
         PathMappingContext mappingContext = mock(PathMappingContext.class);
-        when(mappingRegistry.mapping(req)).thenReturn(MappingResult.matched(mappingContext));
+        MappingResult matched = MappingResult.matched(mappingContext);
+        MappingResult.set(req, matched);
+        when(mappingRegistry.mapping(req)).thenReturn(matched);
         when(corsRegistry.corsHandle(any(), any())).thenReturn(false);
         when(interceptorRegistry.preHandle(any(), any())).thenReturn(true);
         when(argumentResolverRegistry.resolveArguments(any(), any(), any())).thenReturn(new Object[0]);
@@ -124,7 +128,9 @@ class DispatcherHandlerTest {
     void handle_mappingNotFound_sends404() {
         WebServerHttpRequest req = createRequest();
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
-        when(mappingRegistry.mapping(req)).thenReturn(MappingResult.notFound());
+        MappingResult notFound = MappingResult.notFound();
+        MappingResult.set(req, notFound);
+        when(mappingRegistry.mapping(req)).thenReturn(notFound);
 
         handler.handle(req, resp);
 
@@ -136,7 +142,9 @@ class DispatcherHandlerTest {
     void handle_methodMismatch_sends405() {
         WebServerHttpRequest req = createRequest();
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
-        when(mappingRegistry.mapping(req)).thenReturn(MappingResult.pathMatched(new PathMappingContext[0], true));
+        MappingResult pathMatched = MappingResult.pathMatched(new PathMappingContext[0], true);
+        MappingResult.set(req, pathMatched);
+        when(mappingRegistry.mapping(req)).thenReturn(pathMatched);
 
         handler.handle(req, resp);
 
@@ -149,9 +157,11 @@ class DispatcherHandlerTest {
         WebServerHttpRequest req = createRequest();
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
         PathMappingContext mappingContext = mock(PathMappingContext.class);
-        when(mappingRegistry.mapping(req)).thenReturn(MappingResult.matched(mappingContext));
+        MappingResult matched = MappingResult.matched(mappingContext);
+        MappingResult.set(req, matched);
+        when(mappingRegistry.mapping(req)).thenReturn(matched);
         ExecutorService executor = mock(ExecutorService.class);
-        when(bizPoolRegistry.determinePool(mappingContext)).thenReturn(executor);
+        when(bizPoolRegistry.determinePool(req, matched)).thenReturn(executor);
 
         handler.handle(req, resp);
 
@@ -164,8 +174,10 @@ class DispatcherHandlerTest {
         WebServerHttpRequest req = createRequest();
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
         PathMappingContext mappingContext = mock(PathMappingContext.class);
-        when(mappingRegistry.mapping(req)).thenReturn(MappingResult.matched(mappingContext));
-        when(bizPoolRegistry.determinePool(mappingContext)).thenReturn(null);
+        MappingResult matched = MappingResult.matched(mappingContext);
+        MappingResult.set(req, matched);
+        when(mappingRegistry.mapping(req)).thenReturn(matched);
+        when(bizPoolRegistry.determinePool(req, matched)).thenReturn(null);
         when(corsRegistry.corsHandle(any(), any())).thenReturn(false);
         when(interceptorRegistry.preHandle(any(), any())).thenReturn(true);
         when(argumentResolverRegistry.resolveArguments(any(), any(), any())).thenReturn(new Object[0]);
@@ -292,7 +304,8 @@ class DispatcherHandlerTest {
         WebServerHttpRequest req = createRequest();
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
         PathMappingContext mappingContext = mock(PathMappingContext.class);
-        when(PathMappingContext.get(req)).thenReturn(mappingContext);
+        MappingResult matched = MappingResult.matched(mappingContext);
+        MappingResult.set(req, matched);
         Object concurrentResult = new Object();
 
         handler.asyncDispatch(req, resp, concurrentResult);
@@ -316,7 +329,8 @@ class DispatcherHandlerTest {
         WebServerHttpRequest req = createRequest();
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
         PathMappingContext mappingContext = mock(PathMappingContext.class);
-        when(PathMappingContext.get(req)).thenReturn(mappingContext);
+        MappingResult matched = MappingResult.matched(mappingContext);
+        MappingResult.set(req, matched);
         doThrow(new RuntimeException("resolver error")).when(returnValueResolverRegistry)
                 .resolveReturnValue(any(), any(), any(), any());
 
@@ -430,19 +444,21 @@ class DispatcherHandlerTest {
         verify(resp).flush();
     }
 
-    // ==================== handleWithPathMappingContext() ====================
+    // ==================== handleWithMappingResult() ====================
 
     @Test
-    void handleWithFullMatch_executorRejects_releasesRequest() {
+    void handleWithMappingResult_executorRejects_releasesRequest() {
         WebServerHttpRequest req = createRequest();
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
         PathMappingContext mappingContext = mock(PathMappingContext.class);
+        MappingResult matched = MappingResult.matched(mappingContext);
+        MappingResult.set(req, matched);
         ExecutorService executor = mock(ExecutorService.class);
-        when(bizPoolRegistry.determinePool(mappingContext)).thenReturn(executor);
+        when(bizPoolRegistry.determinePool(req, matched)).thenReturn(executor);
         doThrow(new RejectedExecutionException("pool full")).when(executor).execute(any(Runnable.class));
 
         assertThrows(RejectedExecutionException.class,
-                () -> handler.handleWithFullMatch(req, resp, MappingResult.matched(mappingContext)));
+                () -> handler.handleWithMappingResult(req, resp, matched));
 
         verify(req).acquire();
         verify(req).release();
@@ -456,8 +472,12 @@ class DispatcherHandlerTest {
         WebServerHttpResponse resp2 = mock(WebServerHttpResponse.class);
         PathMappingContext ctx1 = mock(PathMappingContext.class);
         PathMappingContext ctx2 = mock(PathMappingContext.class);
-        when(mappingRegistry.mapping(req1)).thenReturn(MappingResult.matched(ctx1));
-        when(mappingRegistry.mapping(req2)).thenReturn(MappingResult.matched(ctx2));
+        MappingResult matched1 = MappingResult.matched(ctx1);
+        MappingResult matched2 = MappingResult.matched(ctx2);
+        MappingResult.set(req1, matched1);
+        MappingResult.set(req2, matched2);
+        when(mappingRegistry.mapping(req1)).thenReturn(matched1);
+        when(mappingRegistry.mapping(req2)).thenReturn(matched2);
         when(corsRegistry.corsHandle(any(), any())).thenReturn(false);
         when(interceptorRegistry.preHandle(any(), any())).thenReturn(true);
         when(argumentResolverRegistry.resolveArguments(any(), any(), any())).thenReturn(new Object[0]);

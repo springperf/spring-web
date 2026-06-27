@@ -6,6 +6,7 @@ import io.springperf.web.core.cors.provider.CorsConfigurationProvider;
 import io.springperf.web.core.cors.provider.NoneCorsConfigurationProvider;
 import io.springperf.web.core.cors.provider.RuntimeMappingCorsConfigurationProvider;
 import io.springperf.web.core.cors.provider.SimpleCorsConfigurationProvider;
+import io.springperf.web.core.mapping.MappingResult;
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.core.mapping.match.HttpMethodMatcher;
 import io.springperf.web.core.mapping.match.Matcher;
@@ -96,7 +97,18 @@ public class CorsRegistry extends WebComponentContainer implements EmbeddedValue
     }
 
     protected CorsConfigurationProvider getCorsConfigurationProvider(WebServerHttpRequest request) {
-        PathMappingContext context = PathMappingContext.get(request);
+        MappingResult mr = MappingResult.get(request);
+        if (mr == null) {
+            return DEFAULT_CORS_CONFIGURATION_PROVIDER;
+        }
+        PathMappingContext context;
+        if(mr.isMatched()){
+            context = mr.getMatchedContext();
+        }else if(mr.isPathMatched()){
+            context = mr.getPathMatchedContexts()[0];
+        }else{
+            context = null;
+        }
         if (context == null) {
             return DEFAULT_CORS_CONFIGURATION_PROVIDER;
         }

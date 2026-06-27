@@ -38,6 +38,16 @@ public final class PropertiesConstant {
     /** Biz pool queue capacity (unbounded by default). */
     public static final String POOL_QUEUE_CAPACITY = "pool.queue-capacity";
 
+    /**
+     * 无 {@code @RunInPool} 注解时方法的默认执行位置。
+     * 值 "eventloop"（默认）表示在 Netty EventLoop 执行，
+     * 其他字符串被视为线程池名称。
+     */
+    public static final String POOL_DEFAULT_EXECUTE_MODE = "pool.default-execute-mode";
+
+    /** {@link #POOL_DEFAULT_EXECUTE_MODE} 的默认值：走 default 线程池（含 IO 操作的常规 handler） */
+    public static final String POOL_DEFAULT_EXECUTE_MODE_DEFAULT = "default";
+
     // ---- 异步支持 ----
 
     /** Async request timeout in milliseconds. */

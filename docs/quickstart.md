@@ -192,6 +192,8 @@ public ResourceHandlerRegistration resourceHandlerRegistration() {
 pool.core-pool-size=50
 pool.max-pool-size=200
 pool.keep-alive-time=60
+# 无 @RunInPool 时的默认执行位置：eventloop 或线程池名称（默认 default）
+pool.default-execute-mode=default
 
 # 启动时校验所有 Mapping（fail-fast）
 server.check-on-startup=true

@@ -7,16 +7,17 @@ import io.springperf.web.core.DispatcherHandler;
 import io.springperf.web.core.mapping.MappingResult;
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.http.BaseWebServerHttpRequest;
+import io.springperf.web.http.RequestAttribute;
 import io.springperf.web.http.WebServerHttpResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationContext;
 
 import java.util.Collections;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class WebFilterRegistryTest {
@@ -32,56 +33,77 @@ class WebFilterRegistryTest {
         return wc;
     }
 
-    @Test
-    void constructor_doesNotThrow() {
-        assertNotNull(new WebFilterRegistry());
-    }
-
-    @Test
-    void doFilter_beforePhase3_emptyFilters_callsTerminal() throws Exception {
-        WebFilterRegistry registry = new WebFilterRegistry();
-        WebFilterRegistry.FilterChainTerminal terminal = mock(WebFilterRegistry.FilterChainTerminal.class);
-        MappingResult mappingResult = MappingResult.notFound();
-
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private BaseWebServerHttpRequest createMockRequest() {
         BaseWebServerHttpRequest request = mock(BaseWebServerHttpRequest.class);
         when(request.getRequestContext()).thenReturn(request);
+        Map attrs = new HashMap<>();
+        Map<RequestAttribute<?>, Object> fastAttrs = new HashMap<>();
+        when(request.getAttribute(anyString())).thenAnswer(inv -> attrs.get(inv.getArgument(0)));
+        doAnswer(inv -> { attrs.put(inv.getArgument(0), inv.getArgument(1)); return null; }).when(request).setAttribute(anyString(), any());
+        when(request.getAttribute(any(RequestAttribute.class))).thenAnswer(inv -> fastAttrs.get(inv.getArgument(0)));
+        doAnswer(inv -> { fastAttrs.put(inv.getArgument(0), inv.getArgument(1)); return null; }).when(request).setAttribute(any(RequestAttribute.class), any());
         when(request.getFilterIndexAndIncrement()).thenReturn(0);
-        WebServerHttpResponse response = mock(WebServerHttpResponse.class);
-
-        registry.doFilter(request, response, mappingResult, terminal);
-        verify(terminal).doFilter(request, response, mappingResult);
+        return request;
     }
 
     @Test
-    void initPhase3_withNoFilters_callsTerminalDirectly() throws Exception {
-        WebFilterRegistry.FilterChainTerminal terminal = mock(WebFilterRegistry.FilterChainTerminal.class);
+    void constructor_doesNotThrow() {
+        assertNotNull(new WebFilterRegistry(mock(DispatcherHandler.class)));
+    }
+
+    @Test
+    void doFilter_beforePhase3_noFilters_callHandleAfterFilter() throws Exception {
+        DispatcherHandler dh = mock(DispatcherHandler.class);
+        WebFilterRegistry registry = new WebFilterRegistry(dh);
         MappingResult mappingResult = MappingResult.notFound();
+
+        BaseWebServerHttpRequest request = createMockRequest();
+        when(request.getPath()).thenReturn("/test");
+        WebServerHttpResponse response = mock(WebServerHttpResponse.class);
+
+        MappingResult.set(request, mappingResult);
+
+        registry.doFilter(request, response);
+        verify(dh).handleAfterFilter(request, response, mappingResult);
+    }
+
+    @Test
+    void initPhase3_withNoFilters_callHandleAfterFilterDirectly() throws Exception {
         WebContext webContext = createWebContext();
-        WebFilterRegistry registry = new WebFilterRegistry();
+        DispatcherHandler dh = mock(DispatcherHandler.class);
+        WebFilterRegistry registry = new WebFilterRegistry(dh);
 
         registry.initWithWebContext(webContext);
         registry.initComponentPhase1();
         registry.initComponentPhase2();
         registry.initComponentPhase3();
 
-        BaseWebServerHttpRequest request = mock(BaseWebServerHttpRequest.class);
-        when(request.getRequestContext()).thenReturn(request);
-        when(request.getFilterIndexAndIncrement()).thenReturn(0);
+        MappingResult mappingResult = MappingResult.notFound();
+
+        BaseWebServerHttpRequest request = createMockRequest();
+        when(request.getPath()).thenReturn("/test");
         WebServerHttpResponse response = mock(WebServerHttpResponse.class);
 
-        registry.doFilter(request, response, mappingResult, terminal);
-        verify(terminal).doFilter(request, response, mappingResult);
+        MappingResult.set(request, mappingResult);
+
+        registry.doFilter(request, response);
+        verify(dh).handleAfterFilter(request, response, mappingResult);
     }
 
     @Test
-    void initPhase3_withOneFilter_runsFilterThenTerminal() throws Exception {
-        WebFilterRegistry.FilterChainTerminal terminal = mock(WebFilterRegistry.FilterChainTerminal.class);
-        MappingResult mappingResult = MappingResult.notFound();
+    void initPhase3_withOneFilter_runsFilterThenHandleAfterFilter() throws Exception {
         WebContext webContext = createWebContext();
-        WebFilterRegistry registry = new WebFilterRegistry();
+        DispatcherHandler dh = mock(DispatcherHandler.class);
+        WebFilterRegistry registry = new WebFilterRegistry(dh);
 
         WebFilter filter = mock(WebFilter.class);
         when(filter.getComponentName()).thenReturn("testFilter");
+        doAnswer(invocation -> {
+            FilterChain chain = invocation.getArgument(2);
+            chain.doFilter(invocation.getArgument(0), invocation.getArgument(1));
+            return null;
+        }).when(filter).doFilter(any(), any(), any());
         registry.registerWebComponent(new WebFilterRegistration(filter));
 
         registry.initWithWebContext(webContext);
@@ -89,20 +111,23 @@ class WebFilterRegistryTest {
         registry.initComponentPhase2();
         registry.initComponentPhase3();
 
-        BaseWebServerHttpRequest request = mock(BaseWebServerHttpRequest.class);
-        when(request.getRequestContext()).thenReturn(request);
+        BaseWebServerHttpRequest request = createMockRequest();
         when(request.getFilterIndexAndIncrement()).thenReturn(0, 1);
         when(request.getPath()).thenReturn("/test");
         WebServerHttpResponse response = mock(WebServerHttpResponse.class);
 
-        registry.doFilter(request, response, mappingResult, terminal);
+        MappingResult mr = MappingResult.notFound();
+        MappingResult.set(request, mr);
+
+        registry.doFilter(request, response);
         verify(filter).doFilter(eq(request), eq(response), any(DefaultFilterChain.class));
+        verify(dh).handleAfterFilter(request, response, mr);
     }
 
     @Test
     void initPhase3_withMultipleFilters_runsAllInOrder() throws Exception {
         WebContext webContext = createWebContext();
-        WebFilterRegistry registry = new WebFilterRegistry();
+        WebFilterRegistry registry = new WebFilterRegistry(mock(DispatcherHandler.class));
 
         WebFilter filter1 = mock(WebFilter.class);
         when(filter1.getComponentName()).thenReturn("filter1");
@@ -122,26 +147,32 @@ class WebFilterRegistryTest {
     }
 
     @Test
-    void resolveFilters_cachedHit_returnsDirectly() throws Exception {
-        WebFilterRegistry registry = new WebFilterRegistry();
-        WebFilter filter = mock(WebFilter.class);
-        when(filter.getComponentName()).thenReturn("testFilter");
-        List<WebFilter> cached = Collections.singletonList(filter);
+    void resolveFilterChain_cachedHit_returnsDirectly() throws Exception {
+        DispatcherHandler dh = mock(DispatcherHandler.class);
+        WebFilterRegistry registry = new WebFilterRegistry(dh);
+        DefaultFilterChain cached = new DefaultFilterChain(mock(DispatcherHandler.class), Collections.emptyList());
 
         PathMappingContext mappingContext = mock(PathMappingContext.class);
-        when(mappingContext.getCachedFilters()).thenReturn(cached);
+        when(mappingContext.getCachedFilterChain()).thenReturn(cached);
 
         BaseWebServerHttpRequest request = mock(BaseWebServerHttpRequest.class);
         when(request.getPath()).thenReturn("/test");
+        when(request.getRequestContext()).thenReturn(request);
+        Map<RequestAttribute<?>, Object> fastAttrs = new HashMap<>();
+        when(request.getAttribute(any(RequestAttribute.class))).thenAnswer(inv -> fastAttrs.get(inv.getArgument(0)));
+        doAnswer(inv -> { fastAttrs.put(inv.getArgument(0), inv.getArgument(1)); return null; })
+                .when(request).setAttribute(any(RequestAttribute.class), any());
+        MappingResult.set(request, MappingResult.matched(mappingContext));
 
-        List<WebFilter> resolved = registry.resolveFilters(MappingResult.matched(mappingContext), request);
+        DefaultFilterChain resolved = registry.resolveFilterChain(request);
         assertSame(cached, resolved);
     }
 
     @Test
-    void resolveFilters_emptyCache_recomputesAndCaches() throws Exception {
+    void resolveFilterChain_emptyCache_recomputesAndCaches() throws Exception {
         WebContext webContext = createWebContext();
-        WebFilterRegistry registry = new WebFilterRegistry();
+        DispatcherHandler dh = mock(DispatcherHandler.class);
+        WebFilterRegistry registry = new WebFilterRegistry(dh);
         WebFilter filter = mock(WebFilter.class);
         when(filter.getComponentName()).thenReturn("testFilter");
         registry.registerWebComponent(new WebFilterRegistration(filter));
@@ -152,22 +183,27 @@ class WebFilterRegistryTest {
         registry.initComponentPhase3();
 
         PathMappingContext mappingContext = mock(PathMappingContext.class);
-        when(mappingContext.getCachedFilters()).thenReturn(null);
+        when(mappingContext.getCachedFilterChain()).thenReturn(null);
         when(mappingContext.getPathRule()).thenReturn("/test");
 
         BaseWebServerHttpRequest request = mock(BaseWebServerHttpRequest.class);
         when(request.getPath()).thenReturn("/test");
+        when(request.getRequestContext()).thenReturn(request);
+        Map<RequestAttribute<?>, Object> fastAttrs = new HashMap<>();
+        when(request.getAttribute(any(RequestAttribute.class))).thenAnswer(inv -> fastAttrs.get(inv.getArgument(0)));
+        doAnswer(inv -> { fastAttrs.put(inv.getArgument(0), inv.getArgument(1)); return null; })
+                .when(request).setAttribute(any(RequestAttribute.class), any());
+        MappingResult.set(request, MappingResult.matched(mappingContext));
 
-        List<WebFilter> resolved = registry.resolveFilters(MappingResult.matched(mappingContext), request);
-        assertFalse(resolved.isEmpty());
-        assertSame(filter, resolved.get(0));
-        verify(mappingContext).setCachedFilters(any());
+        DefaultFilterChain resolved = registry.resolveFilterChain(request);
+        assertNotNull(resolved);
+        verify(mappingContext).setCachedFilterChain(any());
     }
 
     @Test
     void getWebFilter_afterPhase3_returnsSortedFilters() throws Exception {
         WebContext webContext = createWebContext();
-        WebFilterRegistry registry = new WebFilterRegistry();
+        WebFilterRegistry registry = new WebFilterRegistry(mock(DispatcherHandler.class));
 
         WebFilter lowPriority = mock(WebFilter.class);
         when(lowPriority.getComponentName()).thenReturn("low");

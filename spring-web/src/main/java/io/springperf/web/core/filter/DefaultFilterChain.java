@@ -1,5 +1,6 @@
 package io.springperf.web.core.filter;
 
+import io.springperf.web.core.DispatcherHandler;
 import io.springperf.web.core.mapping.MappingResult;
 import io.springperf.web.http.BaseWebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpRequest;
@@ -9,15 +10,12 @@ import java.util.List;
 
 public class DefaultFilterChain implements FilterChain {
 
+    private final DispatcherHandler dispatcherHandler;
     private final List<WebFilter> filters;
-    private final WebFilterRegistry.FilterChainTerminal terminal;
-    private final MappingResult mappingResult;
 
-    public DefaultFilterChain(List<WebFilter> filters, MappingResult mappingResult,
-                              WebFilterRegistry.FilterChainTerminal terminal) {
+    public DefaultFilterChain(DispatcherHandler dispatcherHandler, List<WebFilter> filters) {
+        this.dispatcherHandler = dispatcherHandler;
         this.filters = filters;
-        this.mappingResult = mappingResult;
-        this.terminal = terminal;
     }
 
     @Override
@@ -28,7 +26,7 @@ public class DefaultFilterChain implements FilterChain {
             WebFilter next = filters.get(index);
             next.doFilter(request, response, this);
         } else {
-            terminal.doFilter(request, response, mappingResult);
+            dispatcherHandler.handleAfterFilter(request, response, MappingResult.get(request));
         }
     }
 }

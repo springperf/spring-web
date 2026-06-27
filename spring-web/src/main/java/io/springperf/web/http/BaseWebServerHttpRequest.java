@@ -63,8 +63,23 @@ public abstract class BaseWebServerHttpRequest implements WebServerHttpRequest, 
     public Object getAttribute(String name) { return attributes.get(name); }
     public void setAttribute(String name, Object o) { attributes.put(name, o); }
     public Object removeAttribute(String name) { return attributes.remove(name); }
-    public <T> T getAttribute(RequestAttribute<T> key) { return (T) fastAttributes[key.getIndex()]; }
-    public <T> void setAttribute(RequestAttribute<T> key, T value) { fastAttributes[key.getIndex()] = value; }
+    private static final String FAST_ATTR_PREFIX = BaseWebServerHttpRequest.class.getName() + ".FAST_ATTR.";
+
+    public <T> T getAttribute(RequestAttribute<T> key) {
+        int idx = key.getIndex();
+        if (idx < fastAttributes.length) {
+            return (T) fastAttributes[idx];
+        }
+        return (T) attributes.get(FAST_ATTR_PREFIX + idx);
+    }
+    public <T> void setAttribute(RequestAttribute<T> key, T value) {
+        int idx = key.getIndex();
+        if (idx < fastAttributes.length) {
+            fastAttributes[idx] = value;
+        } else {
+            attributes.put(FAST_ATTR_PREFIX + idx, value);
+        }
+    }
     public WebContext getWebContext() { return webContext; }
     public RequestContext getRequestContext() { return this; }
     public int getFilterIndexAndIncrement() { return filterIndex++; }

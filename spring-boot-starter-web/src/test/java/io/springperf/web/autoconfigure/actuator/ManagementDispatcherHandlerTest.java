@@ -53,20 +53,6 @@ class ManagementDispatcherHandlerTest {
         when(webContext.getWebComponentWithDefault(eq(WebFilterRegistry.class), any(WebFilterRegistry.class)))
                 .thenReturn(webFilterRegistry);
 
-        // doFilter 走完 chain 后调用 terminal(mappingResult)
-        try {
-            doAnswer(invocation -> {
-                WebFilterRegistry.FilterChainTerminal terminal = invocation.getArgument(3);
-                WebServerHttpRequest req = invocation.getArgument(0);
-                WebServerHttpResponse resp = invocation.getArgument(1);
-                MappingResult mappingResult = invocation.getArgument(2);
-                terminal.doFilter(req, resp, mappingResult);
-                return null;
-            }).when(webFilterRegistry).doFilter(any(), any(), any(MappingResult.class), any(WebFilterRegistry.FilterChainTerminal.class));
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-
         handler = new ManagementDispatcherHandler(webContext, "/actuator", managementMappingRegistry);
         handler.initComponentPhase2();
     }
@@ -124,7 +110,7 @@ class ManagementDispatcherHandlerTest {
     }
 
     @Test
-    void handle_matched_delegatesToHandleWithFullMatch() throws Throwable {
+    void handle_matched_delegatesToHandleWithMappingResult() throws Throwable {
         when(managementMappingRegistry.mapping(request)).thenReturn(mappingResult);
         when(mappingResult.isMatched()).thenReturn(true);
         when(mappingResult.getMatchedContext()).thenReturn(mappingContext);
@@ -138,10 +124,10 @@ class ManagementDispatcherHandlerTest {
     }
 
     @Test
-    void handleWithFullMatch_corsPreflight_returnsEarly() throws Throwable {
+    void handleWithMappingResult_corsPreflight_returnsEarly() throws Throwable {
         when(corsRegistry.corsHandle(request, response)).thenReturn(true);
 
-        handler.handleWithFullMatch(request, response, MappingResult.matched(mappingContext));
+        handler.handleWithMappingResult(request, response, MappingResult.matched(mappingContext));
 
         verify(corsRegistry).corsHandle(request, response);
         verify(mappingContext, never()).invoke(any(), any(), any());
@@ -149,24 +135,24 @@ class ManagementDispatcherHandlerTest {
     }
 
     @Test
-    void handleWithFullMatch_normalFlow_invokesAndResolves() throws Throwable {
+    void handleWithMappingResult_normalFlow_invokesAndResolves() throws Throwable {
         when(corsRegistry.corsHandle(request, response)).thenReturn(false);
         Object expectedResult = new Object();
         when(mappingContext.invoke(null, request, response)).thenReturn(expectedResult);
 
-        handler.handleWithFullMatch(request, response, MappingResult.matched(mappingContext));
+        handler.handleWithMappingResult(request, response, MappingResult.matched(mappingContext));
 
         verify(mappingContext).invoke(null, request, response);
         verify(returnValueResolverRegistry).resolveReturnValue(expectedResult, mappingContext, request, response);
     }
 
     @Test
-    void handleWithFullMatch_exception_callsHandleException() throws Throwable {
+    void handleWithMappingResult_exception_callsHandleException() throws Throwable {
         when(corsRegistry.corsHandle(request, response)).thenReturn(false);
         RuntimeException ex = new RuntimeException("test error");
         when(mappingContext.invoke(null, request, response)).thenThrow(ex);
 
-        handler.handleWithFullMatch(request, response, MappingResult.matched(mappingContext));
+        handler.handleWithMappingResult(request, response, MappingResult.matched(mappingContext));
 
         verify(exceptionRegistry).handle(eq(ex), eq(request), eq(response));
     }

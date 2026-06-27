@@ -23,6 +23,8 @@ import org.springframework.mock.env.MockEnvironment;
 import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class ActuatorEndpointAutoConfigurationTest {
@@ -36,6 +38,7 @@ class ActuatorEndpointAutoConfigurationTest {
     void setUp() {
         environment = new MockEnvironment();
         environment.setProperty("server.port", "8080");
+        lenient().when(webContext.getWebComponentWithDefault(any(Class.class), any())).thenAnswer(inv -> inv.getArgument(1));
     }
 
     @Test

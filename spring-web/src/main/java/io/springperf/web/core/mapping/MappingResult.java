@@ -1,5 +1,8 @@
 package io.springperf.web.core.mapping;
 
+import io.springperf.web.http.RequestAttribute;
+import io.springperf.web.http.WebServerHttpRequest;
+
 /**
  * Mapping 查找结果封装。
  * <p>替代 {@code PathMappingContext} 的 null 返回值，携带三种状态：</p>
@@ -10,6 +13,8 @@ package io.springperf.web.core.mapping;
  * </ul>
  */
 public class MappingResult {
+
+    private static final RequestAttribute<MappingResult> REQUEST_ATTRIBUTE = RequestAttribute.createAttribute(MappingResult.class);
 
     private final PathMappingContext matchedContext;
     private final PathMappingContext[] pathMatchedContexts;
@@ -67,5 +72,15 @@ public class MappingResult {
      */
     public PathMappingContext[] getPathMatchedContexts() {
         return pathMatchedContexts != null ? pathMatchedContexts : EMPTY_ARRAY;
+    }
+
+    // ---- request attribute binding ----
+
+    public static void set(WebServerHttpRequest req, MappingResult result) {
+        req.getRequestContext().setAttribute(REQUEST_ATTRIBUTE, result);
+    }
+
+    public static MappingResult get(WebServerHttpRequest req) {
+        return req.getRequestContext().getAttribute(REQUEST_ATTRIBUTE);
     }
 }

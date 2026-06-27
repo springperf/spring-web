@@ -36,6 +36,7 @@ class ManagementConfigPropertiesTest {
     void setUp() {
         MappingRegistry dummy = mock(MappingRegistry.class);
         when(webContext.getWebComponent(MappingRegistry.class)).thenReturn(dummy);
+        lenient().when(webContext.getWebComponentWithDefault(any(Class.class), any())).thenAnswer(inv -> inv.getArgument(1));
     }
 
     @Test

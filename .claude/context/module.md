@@ -241,6 +241,7 @@ spring-web
 │   │   └── BizPoolRegistry       管理命名 ThreadPoolExecutor（extends BaseWebComponent）
 │   │       ├── 默认池: core=50, max=200, keepAlive=60s
 │   │       ├── register(name, executor) 注册自定义线程池
+│   │       ├── 无 @RunInPool 默认走 default 池（可配置 pool.default-execute-mode=eventloop 切回 EventLoop）
 │   │       └── 配合 @RunInPool 注解将处理器调度到指定池
 │   │
 │   └── invoker/                  方法调用

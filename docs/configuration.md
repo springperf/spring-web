@@ -29,6 +29,8 @@
 | `pool.core-pool-size` | `50` | 核心线程数 |
 | `pool.max-pool-size` | `200` | 最大线程数 |
 | `pool.keep-alive-time` | `60` | 空闲线程存活时间（秒） |
+| `pool.queue-capacity` | 无界 | 任务队列容量（≤0 时设为 1） |
+| `pool.default-execute-mode` | `default` | 无 `@RunInPool` 时方法的执行位置。`eventloop`=EventLoop，其他值为线程池名称 |
 
 ## SSL 配置
 
@@ -70,6 +72,8 @@ server.ssl.enabled=false
 pool.core-pool-size=100
 pool.max-pool-size=500
 pool.keep-alive-time=120
+pool.queue-capacity=10000
+pool.default-execute-mode=eventloop  # 或线程池名称
 
 # 启动校验
 server.check-on-startup=true

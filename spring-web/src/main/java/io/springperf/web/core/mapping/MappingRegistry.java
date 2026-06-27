@@ -247,9 +247,7 @@ public class MappingRegistry extends WebComponentContainer {
      */
     public MappingResult mapping(WebServerHttpRequest req) {
         MappingResult result = doMapping(req);
-        if (result.isMatched()) {
-            PathMappingContext.set(req, result.getMatchedContext());
-        }
+        MappingResult.set(req, result);
         return result;
     }
 

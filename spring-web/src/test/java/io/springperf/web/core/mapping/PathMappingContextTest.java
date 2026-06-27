@@ -15,9 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.method.HandlerMethod;
 
 import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -166,15 +164,37 @@ class PathMappingContextTest {
     }
 
     @Test
-    void staticSetAndGet_roundTrip() {
+    void staticGet_returnsNull_whenNoMappingResult() {
         WebServerHttpRequest req = mock(WebServerHttpRequest.class);
         RequestContext reqCtx = mock(RequestContext.class);
         when(req.getRequestContext()).thenReturn(reqCtx);
 
-        PathMappingContext ctx = mock(PathMappingContext.class);
-        PathMappingContext.set(req, ctx);
+        assertNull(PathMappingContext.get(req));
+    }
 
-        PathMappingContext.get(req);
-        verify(reqCtx, atLeastOnce()).setAttribute(any(RequestAttribute.class), any());
+    @Test
+    void staticGet_delegatesToMappingResult_whenMatched() {
+        WebServerHttpRequest req = mock(WebServerHttpRequest.class);
+        RequestContext reqCtx = mock(RequestContext.class, withSettings().defaultAnswer(invocation -> null));
+        when(req.getRequestContext()).thenReturn(reqCtx);
+
+        // 模拟 fastAttributes 以支持 RequestAttribute 存取
+        Map<Integer, Object> fastAttrs = new HashMap<>();
+        when(reqCtx.getAttribute(any(RequestAttribute.class))).thenAnswer(invocation -> {
+            RequestAttribute<?> attr = invocation.getArgument(0);
+            return fastAttrs.get(attr.getIndex());
+        });
+        doAnswer(invocation -> {
+            RequestAttribute<?> attr = invocation.getArgument(0);
+            Object value = invocation.getArgument(1);
+            fastAttrs.put(attr.getIndex(), value);
+            return null;
+        }).when(reqCtx).setAttribute(any(RequestAttribute.class), any());
+
+        PathMappingContext ctx = mock(PathMappingContext.class);
+        MappingResult matched = MappingResult.matched(ctx);
+        MappingResult.set(req, matched);
+
+        assertSame(ctx, PathMappingContext.get(req));
     }
 }

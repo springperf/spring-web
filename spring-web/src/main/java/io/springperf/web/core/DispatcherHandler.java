@@ -60,7 +60,7 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
         this.interceptorRegistry = webContext.getWebComponentWithDefault(InterceptorRegistry.class, new InterceptorRegistry());
         this.asyncSupportRegistry = webContext.getWebComponentWithDefault(AsyncSupportRegistry.class, new AsyncSupportRegistry());
         this.bizPoolRegistry = webContext.getWebComponentWithDefault(BizPoolRegistry.class, new BizPoolRegistry());
-        this.webFilterRegistry = webContext.getWebComponentWithDefault(WebFilterRegistry.class, new WebFilterRegistry());
+        this.webFilterRegistry = webContext.getWebComponentWithDefault(WebFilterRegistry.class, new WebFilterRegistry(this));
     }
 
     @Override
@@ -71,22 +71,12 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
     public void handle(WebServerHttpRequest req, WebServerHttpResponse resp) {
         // 路由匹配（EventLoop 中执行，路径查找 O(1)~O(n) 足够快）
         MappingResult result = mappingRegistry.mapping(req);
-        if (result.isMatched()) {
-            handleWithFullMatch(req, resp, result);
-            return;
-        }
-        try {
-            // 未匹配的请求先走 Filter 链（如 HealthFilter 等直接处理请求的 Filter）
-            webFilterRegistry.doFilter(req, resp, result, this::handleWithNoFullMatch);
-        } catch (Throwable e) {
-            log.error("dispatcher error", e);
-            sendError(resp, HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error");
-        }
+        handleWithMappingResult(req, resp, result);
     }
 
-    protected void handleWithFullMatch(WebServerHttpRequest req, WebServerHttpResponse resp, MappingResult mappingResult) {
-        // 通过 BizPoolRegistry 使用 Phase3 预缓存的线程池，无注解时为 null → 在 EventLoop 中同步处理
-        ExecutorService executor = bizPoolRegistry.determinePool(mappingResult.getMatchedContext());
+    protected void handleWithMappingResult(WebServerHttpRequest req, WebServerHttpResponse resp, MappingResult mappingResult) {
+        // 通过 BizPoolRegistry 使用 Phase3 预缓存的线程池，无映射或未标注 @RunInPool 时为 null → EventLoop 同步处理
+        ExecutorService executor = bizPoolRegistry.determinePool(req, mappingResult);
         if (executor != null) {
             req.acquire();
             try {
@@ -106,11 +96,22 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
         }
     }
 
+    /**
+     * Filter 链处理完成后固定调用，根据映射结果决定走 doHandle 或 404/405。
+     */
+    public void handleAfterFilter(WebServerHttpRequest req, WebServerHttpResponse resp, MappingResult mappingResult) {
+        if (mappingResult.isMatched()) {
+            doHandle(req, resp, mappingResult.getMatchedContext());
+        } else {
+            handleWithNoFullMatch(req, resp, mappingResult);
+        }
+    }
+
     protected void handleWithNoFullMatch(WebServerHttpRequest rq, WebServerHttpResponse rs, MappingResult mr) {
         // CORS 预检：路径匹配即可处理
         try {
             if (corsRegistry != null && CorsUtils.isPreFlightRequest(rq)) {
-                handleCorsPreflight(rq, rs, mr.isPathMatched() ? mr.getPathMatchedContexts() : null);
+                handleCorsPreflight(rq, rs);
             } else {
                 handleOnNoMatchMappingContext(rq, rs, mr);
             }
@@ -132,13 +133,8 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
         }
     }
 
-    protected void handleCorsPreflight(WebServerHttpRequest req, WebServerHttpResponse resp,
-                                     PathMappingContext[] pathMatchedContexts) {
+    protected void handleCorsPreflight(WebServerHttpRequest req, WebServerHttpResponse resp) {
         try {
-            // 从路径命中的 context 中取第一个用于读取 @CrossOrigin 配置
-            if (pathMatchedContexts != null && pathMatchedContexts.length > 0) {
-                PathMappingContext.set(req, pathMatchedContexts[0]);
-            }
             if (corsRegistry.corsHandle(req, resp)) {
                 resp.getBody().write(new byte[0]);
                 resp.flush();
@@ -149,14 +145,14 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
     }
 
     /**
-     * 在目标线程中执行完整的请求处理：上下文初始化 → Filter 链 → doHandle → 清理。
+     * 在目标线程中执行完整的请求处理：上下文初始化 → Filter 链 → handleAfterFilter → 清理。
      */
     private void processRequest(WebServerHttpRequest req, WebServerHttpResponse resp,
                                 MappingResult mappingResult) {
         boolean initContext = false;
         try {
             initContext = initContextHolders(req, resp);
-            webFilterRegistry.doFilter(req, resp, mappingResult, (rq, rs, mr) -> doHandle(rq, rs, mr.getMatchedContext()));
+            webFilterRegistry.doFilter(req, resp);
         } catch (Throwable ex) {
             // Filter 链中抛出的异常，与 doHandle 中异常路径行为一致
             handleException(ex, req, resp);

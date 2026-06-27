@@ -190,17 +190,17 @@ try {
 
 ### 手段
 
-`DispatcherHandler.handleWithFullMatch()`（第 87-107 行）中，如果控制器**没有**标注 `@RunInPool`，则直接在 Netty EventLoop 线程中执行整个请求管线。
+`DispatcherHandler.handleWithFullMatch()` 中，如果控制器**没有**标注 `@RunInPool`，默认在 `default` 业务线程池中执行（通过 `pool.*` 配置）。轻量端点可通过 `@RunInPool(RunInPool.EVENTLOOP)` 显式切换到 EventLoop，或通过 `pool.default-execute-mode=eventloop` 全局配置。
 
 ### 关键理解：这不是"替你做优化"，而是"给你选择权"
 
 传统 Servlet 容器（Tomcat）强制将所有请求交给容器线程池，业务代码无法选择在哪里执行。本框架允许请求直接在 EventLoop 上执行，业务方自主决定是否切到线程池——提供的真正价值是**编程模型的选择自由**：
 
-**选择一：同步阻塞**
+**选择一：同步阻塞（默认）**
 
-保持熟悉的编程模型，使用 `@RunInPool` 将阻塞操作调度到业务线程池（与 Tomcat 容器线程池类似但可按方法粒度控制）。
+无 `@RunInPool` 时方法默认在 `default` 业务线程池执行（通过 `pool.*` 配置）。使用 `@RunInPool("custom")` 可调度到自定义线程池。
 
-**选择二：响应式编程（无 `@RunInPool`）**
+**选择二：响应式编程（`@RunInPool(RunInPool.EVENTLOOP)`）**
 
 ```java
 @GetMapping("/reactive")
@@ -218,14 +218,14 @@ public Publisher<Data> reactiveEndpoint() {
 **选择三：JDK 21 虚拟线程（未来）**
 
 ```java
-// 不需要 @RunInPool，虚拟线程自动处理阻塞
 @GetMapping("/future-ready")
+@RunInPool(RunInPool.EVENTLOOP) // 虚拟线程 + EventLoop 无阻塞切换
 public Result<Data> query() {
-    return Result.ok(repository.findById(1L)); // 在 EventLoop 上执行
+    return Result.ok(repository.findById(1L));
 }
 ```
 
-此框架的同步编程模型与虚拟线程天然兼容。当 JDK 21+ 虚拟线程普及后，业务代码可以直接在 EventLoop 上执行阻塞操作——虚拟线程的 `park`/`unpark` 机制让阻塞不再阻塞操作系统线程，`@RunInPool` 不再需要业务线程池。框架架构无需改动即可无缝过渡。
+此框架的同步编程模型与虚拟线程天然兼容。当 JDK 21+ 虚拟线程普及后，`@RunInPool` + `EventLoop` 组合允许虚拟线程直接在 EventLoop 上执行阻塞操作——虚拟线程的 `park`/`unpark` 机制让阻塞不再阻塞操作系统线程，无需额外业务线程池。
 
 ### 当前收益 vs 架构意义
 
@@ -381,4 +381,4 @@ void drain() {
 | ★★☆☆☆ | 无锁 Drain Loop | 仅 SSE | SSE 场景 4.51x |
 | ★★☆☆☆ | Netty 传输优化 | 边际 | 所有 Netty 框架共享 |
 
-**核心结论**：本框架通过**启动时确定性解析**消除了运行时所有"查找"和"匹配"开销，配合**字节码生成**消除反射——这两项是 100% 请求受益的核心手段。"EventLoop 直接处理"的真正价值不在省线程切换，而是为响应式编程和未来虚拟线程提供了基础设施——业务方自主选择编程模型，框架不强制。
+**核心结论**：本框架通过**启动时确定性解析**消除了运行时所有"查找"和"匹配"开销，配合**字节码生成**消除反射——这两项是 100% 请求受益的核心手段。默认走 `default` 业务线程池让大多数 IO handler 免于注解，轻量端点可通过 `@RunInPool(RunInPool.EVENTLOOP)` 显式切换到 EventLoop。这是"业务方自主选择编程模型"设计理念的落地：框架提供灵活控制，不强制单一模型。

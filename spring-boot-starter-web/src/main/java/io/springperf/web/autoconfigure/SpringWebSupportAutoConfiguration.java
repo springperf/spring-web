@@ -44,8 +44,8 @@ public class SpringWebSupportAutoConfiguration {
     public WebRequestArgumentResolverProvider webRequestArgumentResolverProvider() { return new WebRequestArgumentResolverProvider(); }
 
     @Bean @ConditionalOnMissingBean
-    public SupportWebFilterRegistry supportWebFilterRegistry() {
-        SupportWebFilterRegistry supportWebFilterRegistry = new SupportWebFilterRegistry();
+    public SupportWebFilterRegistry supportWebFilterRegistry(WebContext webContext) {
+        SupportWebFilterRegistry supportWebFilterRegistry = new SupportWebFilterRegistry(webContext.getDispatcherHandler());
         supportWebFilterRegistry.autoRegisterWebComponent(FilterRegistrationBean.class, this::createFilterWrapper);
         return supportWebFilterRegistry;
     }

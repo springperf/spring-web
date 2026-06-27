@@ -216,8 +216,9 @@ public class ReactiveController {
 
 ### 默认行为
 
-- 没有 `@RunInPool` 注解时，处理器方法在 Netty EventLoop 线程中执行
-- **警告**：不要在 EventLoop 线程中执行阻塞操作（DB 查询、RPC 调用、文件 IO、Thread.sleep）
+- 没有 `@RunInPool` 注解时，处理器方法默认在 `default` 业务线程池中执行（通过 `pool.*` 配置）
+- 轻量/纯 CPU 端点可使用 `@RunInPool(RunInPool.EVENTLOOP)` 在 Netty EventLoop 中执行
+- 可通过配置 `pool.default-execute-mode=eventloop` 全局切换回 EventLoop
 
 ### @RunInPool
 
@@ -233,6 +234,12 @@ public Result<Data> queryDatabase() {
 @RunInPool("compute") // 使用名为 "compute" 的自定义线程池
 public Result<Data> heavyCompute() {
     return Result.ok(computeExpensiveResult());
+}
+
+@GetMapping("/health")
+@RunInPool(RunInPool.EVENTLOOP) // 轻量端点直接在 EventLoop 执行
+public String health() {
+    return "OK";
 }
 ```
 

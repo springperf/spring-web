@@ -3,6 +3,7 @@ package io.springperf.web.core.codec;
 import io.springperf.web.context.WebComponentContainer;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.codec.interceptor.HttpBodyCodecInterceptorRegistry;
+import io.springperf.web.core.mapping.MappingCacheKey;
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
@@ -34,6 +35,8 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
 
     private static final Object NO_VALUE = new Object();
     protected final List<HttpBodyConverter> converters = new ArrayList<>();
+
+    public static final MappingCacheKey<Type> TARGET_TYPE_CACHE_KEY = MappingCacheKey.createMethodCacheKey(Type.class);
 
     protected List<MediaType> allSupportedMediaTypes = new ArrayList<>();
 
@@ -139,7 +142,14 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
         } else {
             body = value;
             valueType = body.getClass();
-            targetType = GenericTypeResolver.resolveType(getGenericType(returnType), returnType.getContainingClass());
+            PathMappingContext ctx = PathMappingContext.get(request);
+            targetType = ctx != null ? ctx.get(TARGET_TYPE_CACHE_KEY) : null;
+            if (targetType == null) {
+                targetType = GenericTypeResolver.resolveType(getGenericType(returnType), returnType.getContainingClass());
+                if (ctx != null) {
+                    ctx.set(TARGET_TYPE_CACHE_KEY, targetType);
+                }
+            }
         }
         MediaType selectedMediaType = chooseWriteMediaType(body, valueType, targetType, request, response);
         if (selectedMediaType == null) {

@@ -233,6 +233,7 @@ public class CoreFeaturesController {
     // ==================== @RunInPool 线程行为 ====================
 
     @GetMapping("/pool/event-loop")
+    @RunInPool(RunInPool.EVENTLOOP)
     public Map<String, Object> runInEventLoop() {
         Map<String, Object> m = new HashMap<>();
         m.put("thread", Thread.currentThread().getName());

@@ -1,7 +1,7 @@
 package io.springperf.web.core.mapping;
 
 import io.springperf.web.core.cors.provider.CorsConfigurationProvider;
-import io.springperf.web.core.filter.WebFilter;
+import io.springperf.web.core.filter.DefaultFilterChain;
 import io.springperf.web.core.interceptor.HandlerInterceptor;
 import io.springperf.web.core.invoker.CustomInvoker;
 import io.springperf.web.core.mapping.match.ConsumeOrProduceMatcher;
@@ -17,8 +17,6 @@ import java.util.List;
 
 public class PathMappingContext extends MappingHandlerMethod {
 
-    private static final RequestAttribute<PathMappingContext> REQUEST_ATTRIBUTE = RequestAttribute.createAttribute(PathMappingContext.class);
-
     private static final RequestAttribute<PathMappingContext[]> REQUEST_ATTRIBUTE_ARRAY = RequestAttribute.createAttribute(PathMappingContext[].class);
 
     private static final Matcher[] EMPTY_MATCHERS = new Matcher[0];
@@ -30,7 +28,7 @@ public class PathMappingContext extends MappingHandlerMethod {
     private final List<MediaType> producibleMediaTypes;
     private List<HandlerInterceptor> cachedInterceptors;
     private CorsConfigurationProvider corsConfigurationProvider;
-    private List<WebFilter> cachedFilters;
+    private DefaultFilterChain cachedFilterChain;
 
 
     public PathMappingContext(HandlerMethod handlerMethod, List<Matcher> matchers, String pathRule) {
@@ -79,12 +77,12 @@ public class PathMappingContext extends MappingHandlerMethod {
         this.cachedInterceptors = cachedInterceptors;
     }
 
-    public List<WebFilter> getCachedFilters() {
-        return cachedFilters;
+    public DefaultFilterChain getCachedFilterChain() {
+        return cachedFilterChain;
     }
 
-    public void setCachedFilters(List<WebFilter> cachedFilters) {
-        this.cachedFilters = cachedFilters;
+    public void setCachedFilterChain(DefaultFilterChain cachedFilterChain) {
+        this.cachedFilterChain = cachedFilterChain;
     }
 
     public List<MediaType> getProducibleMediaTypes() {
@@ -109,11 +107,11 @@ public class PathMappingContext extends MappingHandlerMethod {
     }
 
     public static PathMappingContext get(WebServerHttpRequest request) {
-        return request.getRequestContext().getAttribute(REQUEST_ATTRIBUTE);
-    }
-
-    public static void set(WebServerHttpRequest request, PathMappingContext mappingContext) {
-        request.getRequestContext().setAttribute(REQUEST_ATTRIBUTE, mappingContext);
+        MappingResult mr = MappingResult.get(request);
+        if (mr != null && mr.isMatched()) {
+            return mr.getMatchedContext();
+        }
+        return null;
     }
 
     public static PathMappingContext[] getMatchPathMappingContexts(WebServerHttpRequest request) {

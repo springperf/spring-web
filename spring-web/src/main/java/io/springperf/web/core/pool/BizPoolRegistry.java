@@ -1,12 +1,11 @@
 package io.springperf.web.core.pool;
 
 import io.springperf.web.annotation.RunInPool;
-import io.springperf.web.context.BaseWebComponent;
-import io.springperf.web.context.LifecycleWebComponent;
-import io.springperf.web.context.PropertiesConstant;
-import io.springperf.web.context.WebContext;
+import io.springperf.web.context.*;
 import io.springperf.web.core.mapping.MappingCacheKey;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.core.mapping.MappingResult;
+import io.springperf.web.http.WebServerHttpRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 
@@ -37,10 +36,16 @@ public class BizPoolRegistry extends BaseWebComponent {
 
     private final Map<String, ThreadPoolExecutor> pools = new ConcurrentHashMap<>();
 
+    /** 预缓存的默认执行策略：null 表示未初始化（降级为 EventLoop），"eventloop" 表示 EventLoop，其他值为池名。 */
+    private volatile String defaultExecuteMode;
+
     @Override
     public void initWithWebContext(WebContext webContext) {
         super.initWithWebContext(webContext);
         initDefaultPoolFromConfig();
+        // 缓存默认执行策略，避免请求路径上查询配置
+        this.defaultExecuteMode = webContext.getProps().get(
+                PropertiesConstant.POOL_DEFAULT_EXECUTE_MODE, PropertiesConstant.POOL_DEFAULT_EXECUTE_MODE_DEFAULT);
     }
 
     /**
@@ -70,10 +75,16 @@ public class BizPoolRegistry extends BaseWebComponent {
 
     /**
      * 注册一个命名线程池。
+     *
+     * @throws IllegalArgumentException 当名称为保留关键字 "eventloop" 时
      */
     public void register(String name, ThreadPoolExecutor executor) {
         if (name == null || executor == null) {
             return;
+        }
+        if (RunInPool.EVENTLOOP.equalsIgnoreCase(name)) {
+            throw new IllegalArgumentException(
+                    "'" + RunInPool.EVENTLOOP + "' is a reserved keyword and cannot be used as a pool name");
         }
         pools.put(name, executor);
         log.info("BizPool [{}] registered: core={}, max={}", name, executor.getCorePoolSize(), executor.getMaximumPoolSize());
@@ -94,8 +105,13 @@ public class BizPoolRegistry extends BaseWebComponent {
      * 延迟解析并缓存：先查 {@link MappingCacheKey}，未命中时解析 {@link RunInPool} 注解，
      * 校验池名称存在后写入缓存。仅首次调用有注解反射开销。
      * <p>
-     * 未标注 {@link RunInPool} 的方法同样缓存 {@link #NO_POOL} 标记，后续请求无需反复反射。
-     * 返回 null 表示直接在 EventLoop 中执行。
+     * 解析优先级（高 → 低）：
+     * <ol>
+     *   <li>{@code @RunInPool(RunInPool.EVENTLOOP)} → EventLoop</li>
+     *   <li>{@code @RunInPool("poolName")} → 对应线程池</li>
+     *   <li>无注解 → 读取 {@code pool.default-execute-mode} 配置
+     *       （默认 "default"，即 default 线程池；设 "eventloop" 可切回 EventLoop）</li>
+     * </ol>
      */
     public ExecutorService determinePool(MappingHandlerMethod mappingContext) {
         Object cached = mappingContext.get(BIZ_POOL_KEY);
@@ -105,22 +121,52 @@ public class BizPoolRegistry extends BaseWebComponent {
         if (cached != null) {
             return (ExecutorService) cached;
         }
+
         // 缓存未命中：解析 @RunInPool
         RunInPool annotation = AnnotatedElementUtils.findMergedAnnotation(
                 mappingContext.getBridgedMethod(), RunInPool.class);
-        if (annotation == null) {
-            mappingContext.set(BIZ_POOL_KEY, NO_POOL);  // 缓存 null 结果
+        if (annotation != null) {
+            String poolName = annotation.value();
+            if (RunInPool.EVENTLOOP.equalsIgnoreCase(poolName)) {
+                mappingContext.set(BIZ_POOL_KEY, NO_POOL);
+                return null;
+            }
+            return resolvePool(poolName, mappingContext);
+        }
+
+        // 无注解：使用全局默认策略（启动时已缓存到 this.defaultExecuteMode）
+        String strategy = this.defaultExecuteMode;
+        if (strategy == null || RunInPool.EVENTLOOP.equalsIgnoreCase(strategy)) {
+            mappingContext.set(BIZ_POOL_KEY, NO_POOL);
             return null;
         }
-        String poolName = annotation.value();
+        return resolvePool(strategy, mappingContext);
+    }
+
+    /**
+     * 根据池名称解析并缓存 {@link ExecutorService}。
+     * 名称 "eventloop" 不会到达此方法，调用前已由 {@link #determinePool(MappingHandlerMethod)} 拦截处理。
+     */
+    private ExecutorService resolvePool(String poolName, MappingHandlerMethod mappingContext) {
         ExecutorService executor = pools.get(poolName);
         if (executor == null) {
             throw new IllegalStateException(
-                    "@RunInPool(\"" + poolName + "\") on " + mappingContext.getBridgedMethod().toGenericString()
-                            + " references non-existent pool. Available pools: " + getPoolNames());
+                    "Pool '" + poolName + "' referenced on " + mappingContext.getBridgedMethod().toGenericString()
+                            + " does not exist. Available pools: " + getPoolNames());
         }
         mappingContext.set(BIZ_POOL_KEY, executor);
         return executor;
+    }
+
+    /**
+     * 根据 {@link MappingResult} 确定线程池。有映射时委托给 {@link #determinePool(MappingHandlerMethod)}，
+     * 无映射时返回 null（直接在 EventLoop 中执行）。
+     */
+    public ExecutorService determinePool(WebServerHttpRequest req, MappingResult mappingResult) {
+        if (mappingResult.isMatched()) {
+            return determinePool(mappingResult.getMatchedContext());
+        }
+        return null;
     }
 
     /**

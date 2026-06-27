@@ -35,13 +35,7 @@ public class ManagementDispatcherHandler extends DispatcherHandler {
     public void initComponentPhase2() throws Exception {
         super.initComponentPhase2();
         mappingRegistry = managementMappingRegistry;
-        this.webFilterRegistry = new WebFilterRegistry(){
-
-            @Override
-            public void doFilter(WebServerHttpRequest request, WebServerHttpResponse response, MappingResult mappingResult, FilterChainTerminal terminal) throws Exception {
-                terminal.doFilter(request, response, mappingResult);
-            }
-        };
+        this.webFilterRegistry = new WebFilterRegistry(this);
     }
 
     /**
@@ -59,7 +53,12 @@ public class ManagementDispatcherHandler extends DispatcherHandler {
         managementMappingRegistry.buildOptimizerPipeline();
     }
 
-    protected void handleWithFullMatch(WebServerHttpRequest req, WebServerHttpResponse resp, MappingResult mappingResult) {
+    @Override
+    protected void handleWithMappingResult(WebServerHttpRequest req, WebServerHttpResponse resp, MappingResult mappingResult) {
+        if (!mappingResult.isMatched()) {
+            handleWithNoFullMatch(req, resp, mappingResult);
+            return;
+        }
         try {
             if (corsRegistry.corsHandle(req, resp)) {
                 return;

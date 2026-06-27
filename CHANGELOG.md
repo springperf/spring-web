@@ -2,6 +2,21 @@
 
 本项目遵循 [语义化版本控制](https://semver.org/lang/zh-CN/)。
 
+## [1.0.5] - 20260625
+
+### 新增
+
+- **WebSocket 模块**：新增 `spring-web-websocket` 模块，`WebSocketConfigurer` / `WebSocketHandlerRegistration` / `WebSocketHandlerRegistry` 注册 API；`NettyWebSocketSession` 全双工通信；`WebSocketRoutingHandler` 路由分发；`WebSocketAutoConfiguration` 自动配置；E2E 测试覆盖文本、二进制、路径路由场景
+- **OpenAPI 集成**：新增 `OpenApiAutoConfiguration` 自动配置 + `OpenApiAdapter`，将框架端点元数据映射为 OpenAPI 3.0 规范 JSON，支持 Swagger UI 展示；E2E 测试覆盖完整请求链路
+- **`PipelineCustomizer`**：Netty ChannelPipeline 自定义扩展点，允许用户在 HTTP/1.1 和 HTTP/2 的 ChannelInitializer 中注入自定义 handler
+- **`ExceptionHandlerAdvice` 增强**：处理 `HttpMediaTypeNotAcceptableException` 等更多异常类型
+- **`ServletFilterPatternUtils`**：统一 Servlet Filter 路径匹配工具类，支持精确/前缀/后缀/路径匹配模式
+- **`pool.default-execute-mode` 配置**：无 `@RunInPool` 时方法的默认执行策略，默认 `default`（线程池），设为 `eventloop` 可全局切回 EventLoop
+
+### 重构
+
+- **WebFilter 架构重构**：`WebFilter` / `WebFilterRegistration` / `WebFilterRegistry` / `DefaultFilterChain` / `RuntimeMappingWebFilter` 整体迁移到 `core/filter` 包；删除旧的 `match` 包（`ExactMatch` / `PathMatch` / `PrefixMatch` / `SuffixMatch`），统一使用 `ServletFilterPatternUtils`
+
 ## [1.0.4] - 20260621
 
 ### 新增
