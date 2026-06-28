@@ -50,3 +50,5 @@ classes
 /spring-web-benchmark/benchmark-reports/
 /docs/superpowers/
 /docs/feature/
+__pycache__/
+*.pyc

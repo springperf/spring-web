@@ -6,12 +6,12 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>2.6.15</version>
+        <version>2.7.18</version>
         <relativePath/>
     </parent>
     <groupId>io.github.springperf</groupId>
     <artifactId>spring-web-parent</artifactId>
-    <version>1.0.5</version>
+    <version>2.7.0</version>
     <packaging>pom</packaging>
 
     <name>Spring Web Parent</name>
@@ -51,7 +51,7 @@
 
     <properties>
         <java.version>8</java.version>
-        <spring-web.version>1.0.5</spring-web.version>
+        <spring-web.version>2.7.0</spring-web.version>
         <gpg.executable>gpg</gpg.executable>
         <gpg.keyname>${env.GPG_KEY}</gpg.keyname>
         <gpg.passphrase>${env.GPG_PASSPHRASE}</gpg.passphrase>
@@ -234,7 +234,7 @@
             <dependency>
                 <groupId>de.codecentric</groupId>
                 <artifactId>spring-boot-admin-client</artifactId>
-                <version>2.6.7</version>
+                <version>2.7.10</version>
             </dependency>
             <dependency>
                 <groupId>cn.hutool</groupId>
