@@ -73,7 +73,7 @@ public class OpenApiAdapter {
             String tagName = extractTagName(ctx);
             tagNames.add(tagName);
 
-            Method method = ctx.getBridgedMethod();
+            Method method = ctx.getMethod();
             method = AopUtils.getMostSpecificMethod(method, ctx.getBeanType());
 
             for (HttpMethod httpMethod : httpMethods) {
@@ -311,15 +311,20 @@ public class OpenApiAdapter {
     }
 
     private void setPathItemOperation(PathItem pathItem, HttpMethod httpMethod, Operation operation) {
-        switch (httpMethod) {
-            case GET: pathItem.setGet(operation); break;
-            case POST: pathItem.setPost(operation); break;
-            case PUT: pathItem.setPut(operation); break;
-            case DELETE: pathItem.setDelete(operation); break;
-            case PATCH: pathItem.setPatch(operation); break;
-            case HEAD: pathItem.setHead(operation); break;
-            case OPTIONS: pathItem.setOptions(operation); break;
-            default: break;
+        if (HttpMethod.GET.equals(httpMethod)) {
+            pathItem.setGet(operation);
+        } else if (HttpMethod.POST.equals(httpMethod)) {
+            pathItem.setPost(operation);
+        } else if (HttpMethod.PUT.equals(httpMethod)) {
+            pathItem.setPut(operation);
+        } else if (HttpMethod.DELETE.equals(httpMethod)) {
+            pathItem.setDelete(operation);
+        } else if (HttpMethod.PATCH.equals(httpMethod)) {
+            pathItem.setPatch(operation);
+        } else if (HttpMethod.HEAD.equals(httpMethod)) {
+            pathItem.setHead(operation);
+        } else if (HttpMethod.OPTIONS.equals(httpMethod)) {
+            pathItem.setOptions(operation);
         }
     }
 

@@ -54,7 +54,8 @@ public class ResponseStatusExceptionResolver implements HandlerExceptionResolver
 
     protected boolean resolveResponseStatusException(ResponseStatusException ex, WebServerHttpRequest request, WebServerHttpResponse response, @Nullable HandlerMethod handler) {
         ex.getResponseHeaders().forEach((name, values) -> values.forEach(value -> response.getHeaders().add(name, value)));
-        return applyStatusAndReason(ex.getStatus(), ex.getReason(), response);
+        HttpStatus statusCode = HttpStatus.resolve(ex.getStatusCode().value());
+        return applyStatusAndReason(statusCode, ex.getReason(), response);
     }
 
     protected boolean resolveResponseStatus(ResponseStatus responseStatus, WebServerHttpRequest request, WebServerHttpResponse response, @Nullable HandlerMethod handler, Throwable ex) {

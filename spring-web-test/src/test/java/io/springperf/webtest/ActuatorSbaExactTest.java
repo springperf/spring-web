@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 精确模拟：无 context-path，独立管理端口，SBA v2 Accept 头。
  * 验证所有 actuator 端点可被 SBA 2.3.0.1 正常访问。
  */
-@SpringBootTest(classes = TestApplication.class, properties = {
+@SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT, properties = {
         "server.port=9097",
         "management.endpoints.web.exposure.include=*",
         "management.server.port=9098"

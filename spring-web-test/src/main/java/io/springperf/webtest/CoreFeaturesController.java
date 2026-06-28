@@ -237,6 +237,7 @@ public class CoreFeaturesController {
     public Map<String, Object> runInEventLoop() {
         Map<String, Object> m = new HashMap<>();
         m.put("thread", Thread.currentThread().getName());
+        m.put("isVirtual", isVirtualThread(Thread.currentThread()));
         return m;
     }
 
@@ -249,6 +250,17 @@ public class CoreFeaturesController {
     }
 
     // 预期行为：请求到达时 BizPoolRegistry.determinePool() 抛出 IllegalStateException
+    @GetMapping("/pool/virtual-thread")
+    @RunInPool
+    public Map<String, Object> runInVirtualThreadPool() {
+        Map<String, Object> m = new HashMap<>();
+        Thread t = Thread.currentThread();
+        m.put("thread", t.getName());
+        m.put("isVirtual", isVirtualThread(t));
+        m.put("threadGroup", t.getThreadGroup() != null ? t.getThreadGroup().getName() : null);
+        return m;
+    }
+
     @GetMapping("/pool/bad-pool")
     @RunInPool("non-existent-pool-name")
     public Map<String, Object> runInBadPool() {
@@ -380,5 +392,16 @@ public class CoreFeaturesController {
         Map<String, Object> m = new HashMap<>();
         m.put("status", "ok");
         return m;
+    }
+
+    /**
+     * 反射调用 Thread.isVirtual() 以兼容 JDK 17 编译。
+     */
+    private static boolean isVirtualThread(Thread t) {
+        try {
+            return (boolean) Thread.class.getMethod("isVirtual").invoke(t);
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

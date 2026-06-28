@@ -1,8 +1,8 @@
 package io.springperf.web.support.servlet;
 
+import jakarta.servlet.DispatcherType;
 import org.junit.jupiter.api.Test;
 
-import javax.servlet.DispatcherType;
 import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.*;

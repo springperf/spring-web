@@ -5,17 +5,15 @@ import io.springperf.web.http.WebServerHttpRequest;
 import org.springframework.http.HttpMethod;
 
 import java.util.Arrays;
-import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.Set;
 
 public class HttpMethodMatcher implements Matcher {
 
-    private EnumSet<HttpMethod> httpMethods;
+    private Set<HttpMethod> httpMethods;
 
     public HttpMethodMatcher(HttpMethod[] httpMethods) {
-        this.httpMethods = EnumSet.noneOf(HttpMethod.class);
-        for (HttpMethod httpMethod : httpMethods) {
-            this.httpMethods.add(httpMethod);
-        }
+        this.httpMethods = new HashSet<>(Arrays.asList(httpMethods));
     }
 
 
@@ -38,13 +36,13 @@ public class HttpMethodMatcher implements Matcher {
         return false;
     }
 
-    public EnumSet<HttpMethod> getHttpMethods() {
+    public Set<HttpMethod> getHttpMethods() {
         return httpMethods;
     }
 
     @Override
     public String toString() {
-        String[] methods = httpMethods.stream().map(HttpMethod::name).toArray(String[]::new);
+        String[] methods = httpMethods.stream().map(HttpMethod::toString).toArray(String[]::new);
         if (methods.length == 1) {
             return methods[0];
         }

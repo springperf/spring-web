@@ -6,6 +6,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 
 import java.io.ByteArrayOutputStream;
@@ -45,8 +46,12 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
     }
 
     @Override
-    public void setStatusCode(HttpStatus status) {
-        if (status != null) this.status = status;
+    public void setStatusCode(HttpStatusCode statusCode) {
+        if (statusCode != null) {
+            this.status = (statusCode instanceof HttpStatus)
+                    ? (HttpStatus) statusCode
+                    : HttpStatus.valueOf(statusCode.value());
+        }
     }
 
     public HttpStatus getStatus() {

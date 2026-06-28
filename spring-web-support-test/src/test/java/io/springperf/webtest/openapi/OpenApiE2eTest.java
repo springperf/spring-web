@@ -5,7 +5,7 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
 import org.junit.jupiter.api.Test;
-import org.springdoc.core.customizers.OpenApiCustomiser;
+import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.Map;
@@ -15,20 +15,20 @@ import static org.junit.jupiter.api.Assertions.*;
 class OpenApiE2eTest extends BaseE2ETest {
 
     @Autowired(required = false)
-    private OpenApiCustomiser openApiCustomiser;
+    private OpenApiCustomizer openApiCustomizer;
 
     private OpenAPI buildApi() {
-        assertNotNull(openApiCustomiser);
+        assertNotNull(openApiCustomizer);
         OpenAPI api = new OpenAPI();
         api.setPaths(new io.swagger.v3.oas.models.Paths());
-        openApiCustomiser.customise(api);
+        openApiCustomizer.customise(api);
         return api;
     }
 
     @Test
-    void openApiCustomiserBean_exists() {
-        assertNotNull(openApiCustomiser,
-                "OpenApiCustomiser bean should exist when springdoc-openapi-common is on classpath");
+    void openApiCustomizerBean_exists() {
+        assertNotNull(openApiCustomizer,
+                "OpenApiCustomizer bean should exist when springdoc-openapi-common is on classpath");
     }
 
     // ========= 路径覆盖 =========

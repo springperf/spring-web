@@ -9,12 +9,11 @@ import io.springperf.web.support.servlet.PerfHttpServletRequest;
 import io.springperf.web.support.servlet.PerfHttpServletResponse;
 import io.springperf.web.support.servlet.ServletAttribute;
 import io.springperf.web.support.servlet.context.ServletAdapterContext;
+import jakarta.servlet.Filter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import javax.servlet.Filter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -64,14 +63,14 @@ class FilterWrapperTest {
         wrapper.doFilter(request, response, chain);
 
         verify(requestContext).setAttribute(eq(ServletAttribute.getAttributeKey()), any());
-        verify(servletFilter).doFilter(any(javax.servlet.ServletRequest.class), any(javax.servlet.ServletResponse.class), any(javax.servlet.FilterChain.class));
+        verify(servletFilter).doFilter(any(jakarta.servlet.ServletRequest.class), any(jakarta.servlet.ServletResponse.class), any(jakarta.servlet.FilterChain.class));
     }
 
     @Test
     void doFilterInternal_reusesExistingServletAdapterContext() throws Exception {
         PerfHttpServletRequest restRequest = mock(PerfHttpServletRequest.class);
         PerfHttpServletResponse restResponse = mock(PerfHttpServletResponse.class);
-        javax.servlet.FilterChain servletFilterChain = mock(javax.servlet.FilterChain.class);
+        jakarta.servlet.FilterChain servletFilterChain = mock(jakarta.servlet.FilterChain.class);
 
         ServletAdapterContext existingCtx = mock(ServletAdapterContext.class);
         when(existingCtx.getRequest()).thenReturn(restRequest);
@@ -119,11 +118,11 @@ class FilterWrapperTest {
 
     static class TestFilter implements Filter {
         @Override
-        public void doFilter(javax.servlet.ServletRequest request, javax.servlet.ServletResponse response, javax.servlet.FilterChain chain) {
+        public void doFilter(jakarta.servlet.ServletRequest request, jakarta.servlet.ServletResponse response, jakarta.servlet.FilterChain chain) {
         }
 
         @Override
-        public void init(javax.servlet.FilterConfig filterConfig) {
+        public void init(jakarta.servlet.FilterConfig filterConfig) {
         }
 
         @Override

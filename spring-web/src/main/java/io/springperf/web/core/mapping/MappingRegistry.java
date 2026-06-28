@@ -110,7 +110,7 @@ public class MappingRegistry extends WebComponentContainer {
         List<Matcher> matchers = new ArrayList<>();
         RequestMethod[] methods = requestMapping.method();
         if (methods.length > 0) {
-            HttpMethod[] httpMethods = Arrays.stream(methods).map(x -> HttpMethod.resolve(x.name())).toArray(HttpMethod[]::new);
+            HttpMethod[] httpMethods = Arrays.stream(methods).map(x -> HttpMethod.valueOf(x.name())).toArray(HttpMethod[]::new);
             matchers.add(new HttpMethodMatcher(httpMethods));
         }
         String[] params = requestMapping.params();
@@ -167,7 +167,7 @@ public class MappingRegistry extends WebComponentContainer {
         if (methodMatcher instanceof HttpMethodMatcher && classMatcher instanceof HttpMethodMatcher) {
             HttpMethodMatcher m = (HttpMethodMatcher) methodMatcher;
             HttpMethodMatcher c = (HttpMethodMatcher) classMatcher;
-            EnumSet<HttpMethod> combined = EnumSet.copyOf(m.getHttpMethods());
+            Set<HttpMethod> combined = new HashSet<>(m.getHttpMethods());
             combined.addAll(c.getHttpMethods());
             return new HttpMethodMatcher(combined.toArray(new HttpMethod[0]));
         }

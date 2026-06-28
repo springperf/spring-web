@@ -37,7 +37,7 @@ class SpringMvcTypesTest {
     void noHandlerFoundException_extendsServletException() {
         NoHandlerFoundException ex = new NoHandlerFoundException("GET", "/", new HttpHeaders());
 
-        assertInstanceOf(javax.servlet.ServletException.class, ex);
+        assertInstanceOf(jakarta.servlet.ServletException.class, ex);
     }
 
     @Test

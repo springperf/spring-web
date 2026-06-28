@@ -5,7 +5,7 @@
     <parent>
         <groupId>io.github.springperf</groupId>
         <artifactId>spring-web-parent</artifactId>
-        <version>2.7.0</version>
+        <version>3.2.0</version>
     </parent>
 
     <artifactId>spring-web-benchmark</artifactId>
@@ -57,9 +57,8 @@
 
         <!-- Bean Validation API (annotations only, implementation provided by profile) -->
         <dependency>
-            <groupId>javax.validation</groupId>
-            <artifactId>validation-api</artifactId>
-            <version>2.0.1.Final</version>
+            <groupId>jakarta.validation</groupId>
+            <artifactId>jakarta.validation-api</artifactId>
             <scope>provided</scope>
         </dependency>
 
@@ -280,8 +279,8 @@
                     <scope>compile</scope>
                 </dependency>
                 <dependency>
-                    <groupId>javax.servlet</groupId>
-                    <artifactId>javax.servlet-api</artifactId>
+                    <groupId>jakarta.servlet</groupId>
+                    <artifactId>jakarta.servlet-api</artifactId>
                     <scope>provided</scope>
                 </dependency>
                 <dependency>
@@ -362,8 +361,8 @@
                     <scope>compile</scope>
                 </dependency>
                 <dependency>
-                    <groupId>javax.servlet</groupId>
-                    <artifactId>javax.servlet-api</artifactId>
+                    <groupId>jakarta.servlet</groupId>
+                    <artifactId>jakarta.servlet-api</artifactId>
                     <scope>provided</scope>
                 </dependency>
                 <dependency>

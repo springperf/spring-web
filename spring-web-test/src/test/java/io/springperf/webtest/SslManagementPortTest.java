@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>验证 {@code management.server.ssl.*} 配置对管理端口生效，
  * 管理端口通过 HTTPS 提供 Actuator 端点，主端口仍然通过 HTTP 提供业务服务。</p>
  */
-@SpringBootTest(classes = TestApplication.class, properties = {
+@SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT, properties = {
         "server.port=9095",
         "server.servlet.context-path=/api",
         "management.server.port=9094",

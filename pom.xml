@@ -6,12 +6,12 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>2.7.18</version>
+        <version>3.2.12</version>
         <relativePath/>
     </parent>
     <groupId>io.github.springperf</groupId>
     <artifactId>spring-web-parent</artifactId>
-    <version>2.7.0</version>
+    <version>3.2.0</version>
     <packaging>pom</packaging>
 
     <name>Spring Web Parent</name>
@@ -50,8 +50,8 @@
     </modules>
 
     <properties>
-        <java.version>8</java.version>
-        <spring-web.version>2.7.0</spring-web.version>
+        <java.version>17</java.version>
+        <spring-web.version>3.2.0</spring-web.version>
         <gpg.executable>gpg</gpg.executable>
         <gpg.keyname>${env.GPG_KEY}</gpg.keyname>
         <gpg.passphrase>${env.GPG_PASSPHRASE}</gpg.passphrase>
@@ -59,17 +59,11 @@
         <!-- 第三方依赖版本统一管理 -->
         <netty.version>4.1.110.Final</netty.version>
         <jackson.version>2.17.2</jackson.version>
-        <lombok.version>1.18.24</lombok.version>
         <fastjson2.version>2.0.60</fastjson2.version>
-        <junit-jupiter.version>5.8.2</junit-jupiter.version>
-        <mockito.version>4.11.0</mockito.version>
-        <byte-buddy.version>1.12.22</byte-buddy.version>
-        <assertj.version>3.25.3</assertj.version>
         <okhttp.version>4.12.0</okhttp.version>
-        <servlet-api.version>4.0.1</servlet-api.version>
         <hutool.version>5.8.23</hutool.version>
         <jmh.version>1.37</jmh.version>
-        <springdoc.version>1.7.0</springdoc.version>
+        <springdoc.version>2.3.0</springdoc.version>
     </properties>
 
     <build>
@@ -227,14 +221,14 @@
                 <version>${fastjson2.version}</version>
             </dependency>
             <dependency>
-                <groupId>javax.servlet</groupId>
-                <artifactId>javax.servlet-api</artifactId>
-                <version>${servlet-api.version}</version>
+                <groupId>jakarta.servlet</groupId>
+                <artifactId>jakarta.servlet-api</artifactId>
+                <version>6.0.0</version>
             </dependency>
             <dependency>
                 <groupId>de.codecentric</groupId>
                 <artifactId>spring-boot-admin-client</artifactId>
-                <version>2.7.10</version>
+                <version>3.2.0</version>
             </dependency>
             <dependency>
                 <groupId>cn.hutool</groupId>
@@ -262,7 +256,7 @@
             <!-- SpringDoc OpenAPI (optional, for auto-configuration) -->
             <dependency>
                 <groupId>org.springdoc</groupId>
-                <artifactId>springdoc-openapi-common</artifactId>
+                <artifactId>springdoc-openapi-starter-common</artifactId>
                 <version>${springdoc.version}</version>
             </dependency>
 

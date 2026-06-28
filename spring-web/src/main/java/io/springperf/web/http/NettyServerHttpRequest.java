@@ -20,6 +20,7 @@ import io.springperf.web.http.support.NettyAttributeMessage;
 import io.springperf.web.http.support.NettyMultipartWebRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.MultiValueMapAdapter;
@@ -127,6 +128,11 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
             return ((NettyMultipartWebRequest) request).getParts();
         }
         return null;
+    }
+
+    @Override
+    public HttpMethod getMethod() {
+        return HttpMethod.valueOf(request.method().name());
     }
 
     @Override

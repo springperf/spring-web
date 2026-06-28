@@ -3,13 +3,12 @@ package io.springperf.web.support.servlet.filter;
 import io.springperf.web.core.filter.FilterChain;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
 
 import static org.mockito.Mockito.*;
 

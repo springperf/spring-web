@@ -1,0 +1,353 @@
+[
+  {
+    "name": "io.springperf.web.context.WebContext",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "io.springperf.web.context.WebComponentContainer",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.springperf.web.context.BaseWebComponent",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.context.WebComponentWrapper",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.springperf.web.core.DispatcherHandler",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.springperf.web.core.mapping.MappingRegistry",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.springperf.web.core.mapping.MappingHandlerMethod",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.springperf.web.core.mapping.PathMappingContext",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.springperf.web.core.invoker.InvokableHandlerMethod",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.springperf.web.core.invoker.Invoker",
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.springperf.web.core.invoker.MethodHandleInvoker",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.invoker.FastInvokerGenerator",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.springperf.web.core.retval.ReturnValueResolverRegistry",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.springperf.web.core.retval.resolver.JsonBodyReturnValueResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.retval.resolver.HttpEntityReturnValueResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.retval.resolver.ByteArrayReturnValueResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.retval.resolver.ResourceReturnValueResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.retval.resolver.InputStreamReturnValueResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.retval.resolver.FileReturnValueResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.retval.resolver.WrapMessageConverterReturnValueResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.retval.resolver.async.DeferredResultReturnValueResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.retval.resolver.async.ListenableFutureReturnValueResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.retval.resolver.async.CompletionStageReturnValueResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.retval.resolver.async.AsyncTaskReturnValueResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.retval.resolver.async.CallableReturnValueResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.arg.ArgumentResolverRegistry",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.springperf.web.core.arg.provider.RequestResolverProvider",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.arg.provider.ResponseResolverProvider",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.arg.provider.RequestParamResolverProvider",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.arg.provider.RequestHeaderResolverProvider",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.arg.provider.RequestBodyResolverProvider",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.arg.provider.RequestPartResolverProvider",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.arg.provider.ModelAttributeResolverProvider",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.arg.provider.MultipartFileResolverProvider",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.arg.provider.HttpEntityResolverProvider",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.arg.provider.ErrorsResolverProvider",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.arg.provider.LocaleResolverProvider",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.codec.HttpBodyCodecRegistry",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.springperf.web.core.codec.AdaptedHttpBodyConverter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.codec.WrappedHttpBodyConverter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.codec.interceptor.HttpBodyCodecInterceptorRegistry",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.exception.ExceptionRegistry",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.springperf.web.core.exception.ExceptionHandlerExceptionResolver",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.springperf.web.core.exception.ResponseStatusExceptionResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.exception.ExceptionHandlerAdvice",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.interceptor.InterceptorRegistry",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.springperf.web.core.filter.WebFilterRegistry",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.springperf.web.core.filter.WebFilterRegistration",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.filter.RuntimeMappingWebFilter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.cors.CorsRegistry",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.springperf.web.core.cors.CorsRegistration",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.resource.ResourceHandlerRegistry",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.resource.ResourceHandlerRegistration",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.pool.BizPoolRegistry",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.springperf.web.core.async.AsyncSupportRegistry",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.springperf.web.core.arg.databinder.WebDataBinderRegistry",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.http.NettyServerHttpRequest",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.http.NettyServerHttpResponse",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.http.BaseWebServerHttpRequest",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.http.BaseWebServerHttpResponse",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.http.WebServerHttpRequestWrapper",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.http.WebServerHttpResponseWrapper",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.server.NettyHttpServer",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.springperf.web.context.ApplicationProperties",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.async.stream.StreamEmitterReturnValueResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.core.async.reactive.ReactiveReturnValueResolver",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.support.servlet.PerfHttpServletRequest",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.support.servlet.PerfHttpServletResponse",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.support.servlet.AbstractFastFailHttpServletRequest",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.support.servlet.AbstractFastFailHttpServletResponse",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.support.arg.provider.HttpServletRequestProvider",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.support.arg.provider.HttpServletResponseProvider",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.support.arg.provider.WebRequestArgumentResolverProvider",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.support.mvc.arg.SpringHandlerMethodArgumentResolverAdapter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.support.mvc.retval.SpringHandlerMethodReturnValueHandlerAdapter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.support.mvc.exception.SpringHandlerExceptionResolverAdapter",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.support.mvc.interceptor.HandlerInterceptorWrapper",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.autoconfigure.SpringWebAutoConfiguration",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.autoconfigure.SpringWebSupportAutoConfiguration",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.autoconfigure.OpenApiAutoConfiguration",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.autoconfigure.openapi.OpenApiAdapter",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "io.springperf.web.autoconfigure.actuator.ManagementDispatcherHandler",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  }
+]

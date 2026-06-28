@@ -20,7 +20,18 @@ public class FastInvokerGenerator {
 
     private static final Map<Method, Class<?>> invokerClassCache = new ConcurrentHashMap<>();
 
+    /**
+     * GraalVM native-image 运行时会在系统属性中设置此值，用于检测原生镜像环境。
+     */
+    private static final boolean IN_NATIVE_IMAGE =
+            System.getProperty("org.graalvm.nativeimage.imagecode") != null;
+
     public static Invoker createInvoker(Object controller, Class controllerClass, Method method) throws Throwable {
+        if (IN_NATIVE_IMAGE) {
+            throw new UnsupportedOperationException(
+                    "FastInvokerGenerator is not supported in GraalVM native-image, " +
+                            "falling back to MethodHandleInvoker");
+        }
         Class<?> invokerClass = invokerClassCache.computeIfAbsent(method, (m) -> generateClass(controllerClass, m));
         Constructor<?> ctor = invokerClass.getConstructor(controllerClass);
         return (Invoker) ctor.newInstance(controller);

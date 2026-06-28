@@ -3,6 +3,7 @@ package io.springperf.web.http;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.http.support.BodyHttpInputMessage;
 import io.springperf.web.http.support.HttpInputMessagePart;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.multipart.MultipartFile;
@@ -138,6 +139,17 @@ public interface WebServerHttpRequest extends ServerHttpRequest, BodyHttpInputMe
      * @return the request context
      */
     RequestContext getRequestContext();
+
+    /**
+     * Return the HTTP method value as a String.
+     * <p>Default implementation derives the value from {@link #getMethod()}.</p>
+     *
+     * @return the HTTP method value (e.g. "GET", "POST"), or {@code null} if not available
+     */
+    default String getMethodValue() {
+        HttpMethod method = getMethod();
+        return method != null ? method.name() : null;
+    }
 
     /**
      * Retain the underlying Netty ByteBuf reference count.

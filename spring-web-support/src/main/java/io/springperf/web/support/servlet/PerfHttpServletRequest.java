@@ -2,9 +2,9 @@ package io.springperf.web.support.servlet;
 
 import io.netty.handler.codec.http.HttpHeaders;
 import io.springperf.web.http.WebServerHttpRequest;
+import jakarta.servlet.ReadListener;
+import jakarta.servlet.ServletInputStream;
 
-import javax.servlet.ReadListener;
-import javax.servlet.ServletInputStream;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;

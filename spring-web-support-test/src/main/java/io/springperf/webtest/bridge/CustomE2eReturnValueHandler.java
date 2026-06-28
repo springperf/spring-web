@@ -1,11 +1,10 @@
 package io.springperf.webtest.bridge;
 
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.core.MethodParameter;
 import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodReturnValueHandler;
 import org.springframework.web.method.support.ModelAndViewContainer;
-
-import javax.servlet.http.HttpServletResponse;
 
 /**
  * A custom {@link HandlerMethodReturnValueHandler} registered via

@@ -8,14 +8,13 @@ import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.support.servlet.PerfHttpServletRequest;
 import io.springperf.web.support.servlet.PerfHttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.core.MethodParameter;
 import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.method.support.HandlerMethodReturnValueHandler;
 import org.springframework.web.method.support.ModelAndViewContainer;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 
 /**
  * Adapts a Spring MVC {@link HandlerMethodReturnValueHandler} to the framework's
@@ -53,7 +52,7 @@ public class SpringHandlerMethodReturnValueHandlerAdapter
         }
         PathMappingContext mappingContext = PathMappingContext.get(req);
         if (mappingContext != null) {
-            MethodParameter returnType = new MethodParameter(mappingContext.getBridgedMethod(), -1);
+            MethodParameter returnType = new MethodParameter(mappingContext.getMethod(), -1);
             return getComponent().supportsReturnType(returnType);
         }
         return true;

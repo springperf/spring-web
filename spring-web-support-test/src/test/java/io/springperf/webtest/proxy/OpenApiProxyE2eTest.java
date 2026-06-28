@@ -6,7 +6,7 @@ import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.springdoc.core.customizers.OpenApiCustomiser;
+import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -38,23 +38,23 @@ import static org.junit.jupiter.api.Assertions.*;
 public class OpenApiProxyE2eTest {
 
     @Autowired(required = false)
-    private OpenApiCustomiser openApiCustomiser;
+    private OpenApiCustomizer openApiCustomizer;
 
     private OpenAPI buildApi() {
-        assertNotNull(openApiCustomiser,
-                "OpenApiCustomiser bean should exist when springdoc-openapi-common is on classpath");
+        assertNotNull(openApiCustomizer,
+                "OpenApiCustomizer bean should exist when springdoc-openapi-common is on classpath");
         OpenAPI api = new OpenAPI();
         api.setPaths(new io.swagger.v3.oas.models.Paths());
-        openApiCustomiser.customise(api);
+        openApiCustomizer.customise(api);
         return api;
     }
 
-    // ============ OpenApiCustomiser Bean ============
+    // ============ OpenApiCustomizer Bean ============
 
     @Test
-    void openApiCustomiserBean_exists() {
-        assertNotNull(openApiCustomiser,
-                "OpenApiCustomiser should be available in proxy test context");
+    void openApiCustomizerBean_exists() {
+        assertNotNull(openApiCustomizer,
+                "OpenApiCustomizer should be available in proxy test context");
     }
 
     // ============ 路径覆盖 ============

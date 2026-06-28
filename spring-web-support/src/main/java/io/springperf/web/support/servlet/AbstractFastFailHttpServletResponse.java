@@ -1,8 +1,9 @@
 package io.springperf.web.support.servlet;
 
-import javax.servlet.ServletOutputStream;
-import javax.servlet.http.Cookie;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletResponse;
+
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Collection;
@@ -122,15 +123,7 @@ public abstract class AbstractFastFailHttpServletResponse
         return url;
     }
 
-    @Override
-    public String encodeUrl(String url) {
-        return url;
-    }
-
-    @Override
-    public String encodeRedirectUrl(String url) {
-        return url;
-    }
+    // encodeUrl and encodeRedirectUrl were removed in Servlet 6.0
 
     @Override
     public void sendError(int sc, String msg) {
@@ -182,10 +175,7 @@ public abstract class AbstractFastFailHttpServletResponse
         throw unsupported("setStatus");
     }
 
-    @Override
-    public void setStatus(int sc, String sm) {
-        throw unsupported("setStatus");
-    }
+    // setStatus(int, String) removed in Servlet 6.0
 
     @Override
     public int getStatus() {

@@ -2,9 +2,8 @@ package io.springperf.web.support.servlet.context;
 
 import io.springperf.web.support.servlet.PerfHttpServletRequest;
 import io.springperf.web.support.servlet.PerfHttpServletResponse;
+import jakarta.servlet.FilterChain;
 import lombok.Getter;
-
-import javax.servlet.FilterChain;
 
 @Getter
 public class ServletAdapterContext {

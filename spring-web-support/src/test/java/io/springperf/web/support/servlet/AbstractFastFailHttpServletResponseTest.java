@@ -1,8 +1,8 @@
 package io.springperf.web.support.servlet;
 
+import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.Test;
 
-import javax.servlet.http.HttpServletResponse;
 import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.*;

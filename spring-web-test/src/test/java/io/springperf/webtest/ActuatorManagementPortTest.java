@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * </ul>
  * </p>
  */
-@SpringBootTest(classes = TestApplication.class, properties = {
+@SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT, properties = {
         "server.port=9091",
         "server.servlet.context-path=/api",
         "management.endpoints.web.exposure.include=*",

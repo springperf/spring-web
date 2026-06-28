@@ -6,6 +6,7 @@ import io.springperf.web.http.WebServerHttpResponse;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.util.StringUtils;
 import org.springframework.web.method.HandlerMethod;
 
@@ -15,6 +16,13 @@ import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Method;
 
 public class InvokableHandlerMethod extends HandlerMethod {
+
+    /**
+     * GraalVM native-image 检测：运行时动态生成字节码在封闭世界中不可用。
+     * 提前检查避免 {@link FastInvokerGenerator} 的异常开销。
+     */
+    private static final boolean IN_NATIVE_IMAGE =
+            System.getProperty("org.graalvm.nativeimage.imagecode") != null;
 
     private final Invoker invoker;
 
@@ -42,7 +50,7 @@ public class InvokableHandlerMethod extends HandlerMethod {
     }
 
     private Invoker initInvoker() {
-        if (optimized) {
+        if (optimized && !IN_NATIVE_IMAGE) {
             try {
                 return createFastInvoker();
             } catch (Throwable e) {
@@ -58,11 +66,6 @@ public class InvokableHandlerMethod extends HandlerMethod {
             return methodAnnotation;
         }
         return AnnotatedElementUtils.findMergedAnnotation(getBeanType(), annotationType);
-    }
-
-    @Override
-    public Method getBridgedMethod() {
-        return super.getBridgedMethod();
     }
 
     public Object invoke(Object[] args, WebServerHttpRequest request, WebServerHttpResponse response) throws Throwable {
@@ -93,16 +96,16 @@ public class InvokableHandlerMethod extends HandlerMethod {
     }
 
     public void setResponseStatus(WebServerHttpRequest request, WebServerHttpResponse response) {
-        HttpStatus status = getResponseStatus();
-        if (status == null) {
+        HttpStatusCode statusCode = getResponseStatus();
+        if (statusCode == null) {
             return;
         }
         if (response != null) {
             String reason = getResponseStatusReason();
             if (StringUtils.hasText(reason)) {
-                response.sendError(status, reason);
+                response.sendError(HttpStatus.resolve(statusCode.value()), reason);
             } else {
-                response.setStatusCode(status);
+                response.setStatusCode(statusCode);
             }
         }
     }

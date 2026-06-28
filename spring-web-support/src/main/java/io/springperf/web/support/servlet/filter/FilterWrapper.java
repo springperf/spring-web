@@ -11,16 +11,16 @@ import io.springperf.web.support.servlet.context.ServletAdapterContext;
 
 public class FilterWrapper implements WebFilter {
 
-    protected javax.servlet.Filter filter;
+    protected jakarta.servlet.Filter filter;
 
     protected int order;
 
-    public FilterWrapper(javax.servlet.Filter filter) {
+    public FilterWrapper(jakarta.servlet.Filter filter) {
         this.filter = filter;
         this.order = WebFilter.defaultOrder;
     }
 
-    public FilterWrapper(javax.servlet.Filter filter, int order) {
+    public FilterWrapper(jakarta.servlet.Filter filter, int order) {
         this.filter = filter;
         this.order = order;
     }

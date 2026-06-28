@@ -2,11 +2,10 @@ package io.springperf.web.support.servlet.filter;
 
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
 import lombok.SneakyThrows;
-
-import javax.servlet.FilterChain;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
 
 public class PerfHttpServletFilterChain implements FilterChain {
 

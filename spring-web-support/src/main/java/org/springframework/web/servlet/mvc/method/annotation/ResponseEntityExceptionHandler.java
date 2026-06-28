@@ -237,7 +237,7 @@ public class ResponseEntityExceptionHandler {
             HttpHeaders headers, HttpStatus status, WebRequest request) {
 
         if (HttpStatus.INTERNAL_SERVER_ERROR.equals(status)) {
-            request.setAttribute("javax.servlet.error.exception", ex, 0 /* SCOPE_REQUEST */);
+            request.setAttribute("jakarta.servlet.error.exception", ex, 0 /* SCOPE_REQUEST */);
         }
         return new ResponseEntity<>(body, headers, status);
     }

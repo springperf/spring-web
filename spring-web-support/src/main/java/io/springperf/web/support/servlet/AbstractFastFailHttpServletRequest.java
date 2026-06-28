@@ -1,7 +1,8 @@
 package io.springperf.web.support.servlet;
 
-import javax.servlet.*;
-import javax.servlet.http.*;
+import jakarta.servlet.*;
+import jakarta.servlet.http.*;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -144,10 +145,7 @@ public abstract class AbstractFastFailHttpServletRequest
         throw unsupported("getRequestDispatcher");
     }
 
-    @Override
-    public String getRealPath(String path) {
-        throw unsupported("getRealPath");
-    }
+    // getRealPath(String) removed in Servlet 6.0
 
     @Override
     public int getRemotePort() {
@@ -204,6 +202,21 @@ public abstract class AbstractFastFailHttpServletRequest
     @Override
     public DispatcherType getDispatcherType() {
         return DispatcherType.REQUEST;
+    }
+
+    @Override
+    public String getProtocolRequestId() {
+        return null;
+    }
+
+    @Override
+    public String getRequestId() {
+        return null;
+    }
+
+    @Override
+    public ServletConnection getServletConnection() {
+        throw unsupported("getServletConnection");
     }
 
     // ================= HttpServletRequest =================
@@ -333,10 +346,7 @@ public abstract class AbstractFastFailHttpServletRequest
         throw unsupported("getSession");
     }
 
-    @Override
-    public boolean isRequestedSessionIdFromUrl() {
-        throw unsupported("getSession");
-    }
+    // isRequestedSessionIdFromUrl() removed in Servlet 6.0
 
     @Override
     public boolean authenticate(HttpServletResponse httpServletResponse) throws IOException, ServletException {

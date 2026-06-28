@@ -7,6 +7,6 @@ public class SupportWebFilterRegistry extends WebFilterRegistry {
 
     public SupportWebFilterRegistry(DispatcherHandler dispatcherHandler) {
         super(dispatcherHandler);
-        autoRegisterWebComponent(javax.servlet.Filter.class, filter -> wrapFilterToRegistration(new FilterWrapper(filter)));
+        autoRegisterWebComponent(jakarta.servlet.Filter.class, filter -> wrapFilterToRegistration(new FilterWrapper(filter)));
     }
 }

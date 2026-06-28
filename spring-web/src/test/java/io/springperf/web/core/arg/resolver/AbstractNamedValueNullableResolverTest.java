@@ -89,7 +89,7 @@ class AbstractNamedValueNullableResolverTest {
             resolver.resolveArgument(request, response);
             fail("Expected ResponseStatusException");
         } catch (ResponseStatusException e) {
-            assertEquals(org.springframework.http.HttpStatus.BAD_REQUEST, e.getStatus());
+            assertEquals(400, e.getStatusCode().value());
             assertTrue(e.getReason().contains("Missing required argument")); assertTrue(e.getReason().contains("String"));
         }
     }

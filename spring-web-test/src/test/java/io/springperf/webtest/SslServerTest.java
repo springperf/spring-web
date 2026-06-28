@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * 主端口 SSL 集成测试。
  * <p>验证 {@code server.ssl.*} 配置对主端口生效，HTTPS 请求可达、HTTP 被拒绝。</p>
  */
-@SpringBootTest(classes = TestApplication.class, properties = {
+@SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT, properties = {
         "server.port=9096",
         "server.servlet.context-path=/api",
         "server.ssl.enabled=true",

@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>验证 {@code management.endpoints.web.cors.*} 配置属性对 Actuator 端点生效。
  * 使用独立的 Spring 上下文以避免影响其他测试。</p>
  */
-@SpringBootTest(classes = TestApplication.class, properties = {
+@SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT, properties = {
         "server.port=9092",
         "server.servlet.context-path=/api",
         "management.endpoints.web.exposure.include=*",

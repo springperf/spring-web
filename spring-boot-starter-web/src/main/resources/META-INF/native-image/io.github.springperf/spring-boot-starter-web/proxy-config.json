@@ -1,0 +1,13 @@
+[
+  ["io.springperf.web.context.WebComponent"],
+  ["io.springperf.web.core.filter.WebFilter"],
+  ["io.springperf.web.core.invoker.Invoker"],
+  ["io.springperf.web.core.retval.ReturnValueResolver"],
+  ["io.springperf.web.core.arg.RuntimeArgumentResolver"],
+  ["io.springperf.web.core.arg.StaticArgumentResolverProvider"],
+  ["io.springperf.web.core.exception.HandlerExceptionResolver"],
+  ["io.springperf.web.core.codec.HttpBodyConverter"],
+  ["io.springperf.web.context.LifecycleWebComponent"],
+  ["io.springperf.web.http.WebServerHttpRequest"],
+  ["io.springperf.web.http.WebServerHttpResponse"]
+]

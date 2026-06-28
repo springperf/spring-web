@@ -1,0 +1,8 @@
+{
+  "resources": [
+    {"pattern": "\\QMETA-INF/spring.factories\\E"},
+    {"pattern": "\\QMETA-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports\\E"},
+    {"pattern": "\\QMETA-INF/spring/\\E"},
+    {"pattern": "application\\.properties$"}
+  ]
+}

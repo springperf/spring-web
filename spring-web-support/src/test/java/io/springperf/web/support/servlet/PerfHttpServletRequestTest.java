@@ -5,6 +5,7 @@ import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
+import jakarta.servlet.ServletInputStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,7 +14,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
 import org.springframework.util.MultiValueMap;
 
-import javax.servlet.ServletInputStream;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -93,7 +93,7 @@ class PerfHttpServletRequestTest {
     @Test void getProtocol_returnsHttp11() { assertEquals("HTTP/1.1", servletRequest.getProtocol()); }
     @Test void getCookies_returnsEmptyArray() { assertEquals(0, servletRequest.getCookies().length); }
     @Test void isSecure_returnsFalse() { assertFalse(servletRequest.isSecure()); }
-    @Test void getDispatcherType_returnsRequest() { assertEquals(javax.servlet.DispatcherType.REQUEST, servletRequest.getDispatcherType()); }
+    @Test void getDispatcherType_returnsRequest() { assertEquals(jakarta.servlet.DispatcherType.REQUEST, servletRequest.getDispatcherType()); }
     @Test void getServletPath_returnsEmptyString() { assertEquals("", servletRequest.getServletPath()); }
     @Test void getRemotePort_returnsMinusOne() { assertEquals(-1, servletRequest.getRemotePort()); }
     @Test void getLocalPort_returnsMinusOne() { assertEquals(-1, servletRequest.getLocalPort()); }

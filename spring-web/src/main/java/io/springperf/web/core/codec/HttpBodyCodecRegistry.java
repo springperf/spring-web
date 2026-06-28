@@ -31,7 +31,7 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
 
     private static final List<MediaType> ALL_APPLICATION_MEDIA_TYPES = Arrays.asList(MediaType.ALL, new MediaType("application"));
 
-    private static final Set<HttpMethod> SUPPORTED_METHODS = EnumSet.of(HttpMethod.POST, HttpMethod.PUT, HttpMethod.PATCH);
+    private static final Set<HttpMethod> SUPPORTED_METHODS = Set.of(HttpMethod.POST, HttpMethod.PUT, HttpMethod.PATCH);
 
     private static final Object NO_VALUE = new Object();
     protected final List<HttpBodyConverter> converters = new ArrayList<>();

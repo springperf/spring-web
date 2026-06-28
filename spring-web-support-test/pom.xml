@@ -4,7 +4,7 @@
     <parent>
         <groupId>io.github.springperf</groupId>
         <artifactId>spring-web-parent</artifactId>
-        <version>2.7.0</version>
+        <version>3.2.0</version>
     </parent>
     <artifactId>spring-web-support-test</artifactId>
     <name>perf-spring-web-support-test</name>
@@ -43,7 +43,7 @@
         <!-- OpenAPI E2E 测试 -->
         <dependency>
             <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-common</artifactId>
+            <artifactId>springdoc-openapi-starter-common</artifactId>
         </dependency>
 
         <dependency>
@@ -52,8 +52,9 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>javax.servlet</groupId>
-            <artifactId>javax.servlet-api</artifactId>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <version>6.0.0</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -65,11 +66,7 @@
             <artifactId>hutool-all</artifactId>
         </dependency>
 
-        <!-- JDK 11 兼容: javax.annotation-api 在 JDK 11 中被移除，需显式声明 -->
-        <dependency>
-            <groupId>javax.annotation</groupId>
-            <artifactId>javax.annotation-api</artifactId>
-        </dependency>
+        <!-- JDK 17+ 下不再需要显式声明，Spring Boot 3.x 管理 jakarta.annotation-api -->
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -97,7 +97,7 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
 
     protected boolean skipResolve(Object returnValue, MappingHandlerMethod mappingContext, WebServerHttpRequest req, WebServerHttpResponse resp) {
         if (returnValue == null) {
-            if (mappingContext != null && mappingContext.getBridgedMethod().getReturnType() == void.class && !resp.isHandled()) {
+            if (mappingContext != null && mappingContext.getMethod().getReturnType() == void.class && !resp.isHandled()) {
                 resp.setHandled();
             }
             return true;
@@ -134,7 +134,7 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
         MethodReturnValueContext methodReturnValueContext = mappingContext.get(MAPPING_CACHE_KEY);
         if (methodReturnValueContext == null) {
             methodReturnValueContext = new MethodReturnValueContext();
-            MethodParameter returnType = new MethodParameter(mappingContext.getBridgedMethod(), -1);
+            MethodParameter returnType = new MethodParameter(mappingContext.getMethod(), -1);
             methodReturnValueContext.setReturnType(returnType);
             if (cache) {
                 mappingContext.set(MAPPING_CACHE_KEY, methodReturnValueContext);

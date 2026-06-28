@@ -16,10 +16,9 @@
 
 package org.springframework.web.servlet;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.method.HandlerMethod;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 
 /**
  * Extends {@code HandlerInterceptor} with a callback method invoked after the
@@ -38,7 +37,7 @@ import javax.servlet.http.HttpServletResponse;
  * invokes {@code preHandle}, {@code postHandle}, and {@code afterCompletion}.
  * To distinguish between the initial request and the subsequent dispatch
  * after asynchronous handling completes, interceptors can check whether the
- * {@code javax.servlet.DispatcherType} of {@link javax.servlet.ServletRequest}
+ * {@code jakarta.servlet.DispatcherType} of {@link jakarta.servlet.ServletRequest}
  * is {@code "REQUEST"} or {@code "ASYNC"}.
  *
  * <p>Note that {@code HandlerInterceptor} implementations may need to do work

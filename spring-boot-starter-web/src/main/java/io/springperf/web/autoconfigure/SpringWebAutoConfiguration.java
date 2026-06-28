@@ -61,7 +61,7 @@ public class SpringWebAutoConfiguration {
         };
     }
 
-    @Bean @ConditionalOnMissingBean @ConditionalOnClass(name = "javax.validation.Validator")
+    @Bean @ConditionalOnMissingBean @ConditionalOnClass(name = "jakarta.validation.Validator")
     public Validator validator() { return new OptionalValidatorFactoryBean(); }
 
     private static void assertNoSpringMvcConflict() {

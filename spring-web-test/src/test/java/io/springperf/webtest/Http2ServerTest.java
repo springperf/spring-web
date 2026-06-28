@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>Verifies that when {@code server.http2.enabled=true}, the server
  * accepts h2c connections and processes requests correctly.</p>
  */
-@SpringBootTest(classes = TestApplication.class, properties = {
+@SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT, properties = {
         "server.port=9099",
         "server.http2.enabled=true",
         "server.servlet.context-path="

@@ -9,6 +9,7 @@ import io.springperf.web.http.WebServerHttpRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 
+import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.*;
@@ -34,24 +35,76 @@ public class BizPoolRegistry extends BaseWebComponent {
             MappingCacheKey.createMethodCacheKey(Object.class);
     private static final Object NO_POOL = new Object();
 
-    private final Map<String, ThreadPoolExecutor> pools = new ConcurrentHashMap<>();
+    private static final boolean VIRTUAL_THREADS_AVAILABLE = detectVirtualThreads();
+
+    private final Map<String, ExecutorService> pools = new ConcurrentHashMap<>();
 
     /** 预缓存的默认执行策略：null 表示未初始化（降级为 EventLoop），"eventloop" 表示 EventLoop，其他值为池名。 */
     private volatile String defaultExecuteMode;
 
+    private boolean virtualThreadEnabled;
+
     @Override
     public void initWithWebContext(WebContext webContext) {
         super.initWithWebContext(webContext);
+        this.virtualThreadEnabled = isVirtualThreadEnabled();
         initDefaultPoolFromConfig();
         // 缓存默认执行策略，避免请求路径上查询配置
         this.defaultExecuteMode = webContext.getProps().get(
                 PropertiesConstant.POOL_DEFAULT_EXECUTE_MODE, PropertiesConstant.POOL_DEFAULT_EXECUTE_MODE_DEFAULT);
     }
 
+    private boolean isVirtualThreadEnabled() {
+        return webContext.getProps().getBoolean("spring.threads.virtual.enabled", false);
+    }
+
+    /**
+     * 检测 JDK 21+ 是否可用。
+     */
+    private static boolean detectVirtualThreads() {
+        try {
+            Thread.class.getMethod("ofVirtual");
+            return true;
+        } catch (NoSuchMethodException e) {
+            return false;
+        }
+    }
+
+    /**
+     * 通过反射创建虚拟线程 {@link ThreadFactory}（兼容 JDK 17 编译）。
+     * 在 JDK 21+ 上调用 {@code Thread.ofVirtual().name("perf-virtual-").factory()}。
+     * 通过公开接口 {@code java.lang.Thread.Builder.OfVirtual} 反射，避免模块系统限制。
+     */
+    private static ThreadFactory createVirtualThreadFactory() {
+        try {
+            Object ofVirtual = Thread.class.getMethod("ofVirtual").invoke(null);
+            // Thread.Builder.OfVirtual 是公开接口，方法可访问
+            Class<?> ofVirtualIface = Class.forName("java.lang.Thread$Builder$OfVirtual");
+            Method nameMethod = ofVirtualIface.getMethod("name", String.class);
+            Object named = nameMethod.invoke(ofVirtual, "perf-virtual-");
+            Method factoryMethod = ofVirtualIface.getMethod("factory");
+            return (ThreadFactory) factoryMethod.invoke(named);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to create virtual thread factory (JDK 21+ required)", e);
+        }
+    }
+
     /**
      * 从 ApplicationProperties 读取配置，创建 "default" 线程池。
      */
     private void initDefaultPoolFromConfig() {
+        if (virtualThreadEnabled) {
+            if (VIRTUAL_THREADS_AVAILABLE) {
+                ThreadFactory factory = createVirtualThreadFactory();
+                ExecutorService executor = new ThreadPoolExecutor(0, Integer.MAX_VALUE, 60L,
+                        TimeUnit.SECONDS, new SynchronousQueue<>(), factory);
+                pools.put("default", executor);
+                log.info("BizPool [default] created with virtual threads");
+                return;
+            } else {
+                log.warn("spring.threads.virtual.enabled=true but JDK 21+ is not available, fallback to platform threads");
+            }
+        }
         int corePoolSize = webContext.getProps().getInt(PropertiesConstant.POOL_CORE_POOL_SIZE, 50);
         int maxPoolSize = webContext.getProps().getInt(PropertiesConstant.POOL_MAX_POOL_SIZE, 200);
         int keepAliveTime = webContext.getProps().getInt(PropertiesConstant.POOL_KEEP_ALIVE_TIME, 60);
@@ -70,7 +123,8 @@ public class BizPoolRegistry extends BaseWebComponent {
         ThreadPoolExecutor executor = new ThreadPoolExecutor(
                 corePoolSize, maxPoolSize, keepAliveTime,
                 TimeUnit.SECONDS, new LinkedBlockingQueue<>(queueCapacity));
-        register("default", executor);
+        pools.put("default", executor);
+        log.info("BizPool [default] created: core={}, max={}", corePoolSize, maxPoolSize);
     }
 
     /**
@@ -88,6 +142,19 @@ public class BizPoolRegistry extends BaseWebComponent {
         }
         pools.put(name, executor);
         log.info("BizPool [{}] registered: core={}, max={}", name, executor.getCorePoolSize(), executor.getMaximumPoolSize());
+    }
+
+    /**
+     * 注册一个已创建的 {@link ExecutorService}。
+     */
+    public void registerExecutor(String name, ExecutorService executor) {
+        if (name == null || executor == null) return;
+        if (RunInPool.EVENTLOOP.equalsIgnoreCase(name)) {
+            throw new IllegalArgumentException(
+                    "'" + RunInPool.EVENTLOOP + "' is a reserved keyword and cannot be used as a pool name");
+        }
+        pools.put(name, executor);
+        log.info("BizPool [{}] registered as ExecutorService", name);
     }
 
     /**
@@ -124,7 +191,7 @@ public class BizPoolRegistry extends BaseWebComponent {
 
         // 缓存未命中：解析 @RunInPool
         RunInPool annotation = AnnotatedElementUtils.findMergedAnnotation(
-                mappingContext.getBridgedMethod(), RunInPool.class);
+                mappingContext.getMethod(), RunInPool.class);
         if (annotation != null) {
             String poolName = annotation.value();
             if (RunInPool.EVENTLOOP.equalsIgnoreCase(poolName)) {
@@ -151,7 +218,7 @@ public class BizPoolRegistry extends BaseWebComponent {
         ExecutorService executor = pools.get(poolName);
         if (executor == null) {
             throw new IllegalStateException(
-                    "Pool '" + poolName + "' referenced on " + mappingContext.getBridgedMethod().toGenericString()
+                    "Pool '" + poolName + "' referenced on " + mappingContext.getMethod().toGenericString()
                             + " does not exist. Available pools: " + getPoolNames());
         }
         mappingContext.set(BIZ_POOL_KEY, executor);
@@ -177,7 +244,7 @@ public class BizPoolRegistry extends BaseWebComponent {
     }
 
     /**
-     * 优雅关闭所有池：先 {@link ThreadPoolExecutor#shutdown()} 再等待任务完成。
+     * 优雅关闭所有池：先 {@link ExecutorService#shutdown()} 再等待任务完成。
      *
      * @param timeout 最大等待时间
      * @param unit    时间单位

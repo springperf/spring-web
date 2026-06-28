@@ -16,11 +16,10 @@
 
 package org.springframework.web.servlet;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.lang.Nullable;
 import org.springframework.web.method.HandlerMethod;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 
 /**
  * Workflow interface that allows for customized handler execution chains.
@@ -70,7 +69,7 @@ import javax.servlet.http.HttpServletResponse;
  * @see org.springframework.web.servlet.handler.UserRoleAuthorizationInterceptor
  * @see org.springframework.web.servlet.i18n.LocaleChangeInterceptor
  * @see org.springframework.web.servlet.theme.ThemeChangeInterceptor
- * @see javax.servlet.Filter
+ * @see jakarta.servlet.Filter
  * @since 20.06.2003
  */
 public interface HandlerInterceptor {

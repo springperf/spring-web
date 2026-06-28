@@ -3,6 +3,7 @@ package io.springperf.web.http;
 import io.springperf.web.context.WebContext;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 
 import java.io.File;
 import java.io.IOException;
@@ -35,7 +36,7 @@ public class WebServerHttpResponseWrapper implements WebServerHttpResponse {
     @Override public void writeBytes(byte[] data) { response.writeBytes(data); }
     @Override public void writeFile(File file) { response.writeFile(file); }
     @Override public void flush(boolean chunked) throws IOException {response.flush(chunked);}
-    @Override public void setStatusCode(HttpStatus status) { response.setStatusCode(status); }
+    @Override public void setStatusCode(HttpStatusCode statusCode) { response.setStatusCode(statusCode); }
     @Override public void flush() throws IOException { response.flush(); }
     @Override public void close() { response.close(); }
     @Override public OutputStream getBody() throws IOException { return response.getBody(); }

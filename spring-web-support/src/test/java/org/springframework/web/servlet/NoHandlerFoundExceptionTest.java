@@ -37,6 +37,6 @@ class NoHandlerFoundExceptionTest {
     @Test
     void extendsServletException() {
         NoHandlerFoundException ex = new NoHandlerFoundException("GET", "/test", new HttpHeaders());
-        assertInstanceOf(javax.servlet.ServletException.class, ex);
+        assertInstanceOf(jakarta.servlet.ServletException.class, ex);
     }
 }

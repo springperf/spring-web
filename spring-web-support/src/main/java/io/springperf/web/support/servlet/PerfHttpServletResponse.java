@@ -2,10 +2,10 @@ package io.springperf.web.support.servlet;
 
 import io.netty.handler.codec.http.HttpHeaders;
 import io.springperf.web.http.WebServerHttpResponse;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.WriteListener;
 import org.springframework.http.HttpStatus;
 
-import javax.servlet.ServletOutputStream;
-import javax.servlet.WriteListener;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;

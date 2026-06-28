@@ -14,6 +14,8 @@ import io.springperf.web.core.mapping.MappingRegistry;
 import io.springperf.web.core.resource.ResourceHandlerRegistry;
 import io.springperf.web.core.retval.ReturnValueResolver;
 import io.springperf.web.core.retval.ReturnValueResolverRegistry;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,8 +46,6 @@ import org.springframework.web.servlet.config.annotation.AsyncSupportConfigurer;
 import org.springframework.web.servlet.config.annotation.ValidatorRegistration;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;

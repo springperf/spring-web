@@ -50,7 +50,7 @@ class ResponseEntityExceptionHandlerTest {
 
         handler.handleExceptionInternal(ex, null, new HttpHeaders(), HttpStatus.INTERNAL_SERVER_ERROR, request);
 
-        assertSame(ex, request.getAttribute("javax.servlet.error.exception", 0));
+        assertSame(ex, request.getAttribute("jakarta.servlet.error.exception", 0));
     }
 
     @Test
