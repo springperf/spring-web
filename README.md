@@ -22,20 +22,7 @@ Spring Web 是一个基于 **Netty** 构建的高性能 Web 框架，定位为 S
 
 ---
 
-## 版本选择
-
-本项目按 Spring Boot 大版本管理两个分支。`master` 为开发基线，新功能优先合入后再同步到 `3.2.x`。
-
-| 分支 | Spring Boot | Spring Framework | JDK | Servlet API | 状态 |
-|------|------------|----------------|-----|-------------|------|
-| `master` / `2.7.x` | 2.7.x | 5.3.x | 8 / 11 / 17 | javax.servlet 4.0 | **开发基线**（功能迭代 + bugfix） |
-| `3.2.x` | 3.2.x | 6.1.x | 17 / 21 | jakarta.servlet 6.0 | 主力版本（从 master fork，适配 Jakarta） |
-
-> 详细兼容性信息见 [版本兼容性说明](docs/compatibility.md)。
->
-> **分支选择建议**：现有 Servlet 项目、JDK 8/11 选 `master`/`2.7.x`；新项目或 JDK 17+ 选 `3.2.x`（支持虚拟线程、GraalVM native-image）。
-
-### 核心特性
+## 核心特性
 
 - **高性能** — 启动时预缓存全部元数据，运行时零反射零匹配；ASM 字节码生成替代反射调用；O(1) HashMap 路由；GC 友好设计
 - **Netty 驱动** — 基于 Netty 4.1 事件驱动 I/O，请求默认在 EventLoop 处理，可按方法粒度通过 `@RunInPool` 调度到业务线程池
@@ -100,6 +87,21 @@ management:
   server:
     port: 8081  # 独立管理端口（可选）
 ```
+
+---
+
+## 版本选择
+
+本项目按 Spring Boot 大版本管理两个分支。`master` 为开发基线，新功能优先合入后再同步到 `3.2.x`。
+
+| 分支 | Spring Boot | Spring Framework | JDK | Servlet API | 状态 |
+|------|------------|----------------|-----|-------------|------|
+| `master` / `2.7.x` | 2.7.x | 5.3.x | 8 / 11 / 17 | javax.servlet 4.0 | **开发基线**（功能迭代 + bugfix） |
+| `3.2.x` | 3.2.x | 6.1.x | 17 / 21 | jakarta.servlet 6.0 | 主力版本（从 master fork，适配 Jakarta） |
+
+> 详细兼容性信息见 [版本兼容性说明](docs/compatibility.md)。
+>
+> **分支选择建议**：现有 Servlet 项目、JDK 8/11 选 `master`/`2.7.x`；新项目或 JDK 17+ 选 `3.2.x`（支持虚拟线程、GraalVM native-image）。
 
 ---
 

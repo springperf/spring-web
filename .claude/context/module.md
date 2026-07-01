@@ -1,6 +1,6 @@
 # 模块架构
 
-## 5 个模块
+## 7 个模块
 
 ```
 spring-web-parent
@@ -8,6 +8,8 @@ spring-web-parent
 │
 ├── spring-web                     核心框架
 ├── spring-web-support             可选 Servlet/SpringMVC 桥接层
+├── spring-web-batch               批量请求处理（可选）
+├── spring-web-websocket           WebSocket 支持（可选）
 ├── spring-boot-starter-web        Spring Boot 自动配置
 ├── spring-web-test                核心框架的示例/E2E测试应用
 └── spring-web-support-test        桥接层的示例/E2E测试应用
@@ -349,6 +351,18 @@ org.springframework.web.servlet.mvc.method.annotation/
 ├── ResponseEntityExceptionHandler
 └── AdapterUtil
 ```
+
+---
+
+## spring-web-websocket（WebSocket 支持）
+
+基于 Spring WebSocket API + Netty 的可选模块。通过 `WebSocketConfigurer` SPI 注册端点，`WebSocketRoutingHandler` 拦截 Netty pipeline 中的 HTTP Upgrade 请求完成握手，后续帧委托给 Spring `WebSocketHandler`。
+
+核心类：
+- `WebSocketConfigurer` — SPI，用户实现此接口注册端点
+- `WebSocketHandlerRegistry` — 注册中心，管理路径 → handler 映射
+- `WebSocketRoutingHandler` — Netty pipeline handler，完成握手 + 帧路由
+- `NettyWebSocketSession` — 包装 Netty Channel 为 Spring WebSocketSession
 
 ---
 
