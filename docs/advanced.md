@@ -84,6 +84,196 @@ public class AsyncMonitorInterceptor implements DeferredResultProcessingIntercep
 
 ---
 
+## 批量处理
+
+通过 `spring-web-batch` 模块，可以将高并发的单请求透明聚合为批量，由批量处理方法一次处理完所有请求，适合 IO 密集型场景（批量 DB 查询、批量 RPC 调用）。
+
+### 引入依赖
+
+```xml
+<dependency>
+    <groupId>io.github.springperf</groupId>
+    <artifactId>spring-web-batch</artifactId>
+    <version>${spring-web.version}</version>
+</dependency>
+```
+
+### 快速上手
+
+**第 1 步：定义 BatchRequest 子类**
+
+```java
+public class GetUserRequest extends BatchRequest<UserResp> {
+    Long id;
+    String lang;
+}
+```
+
+字段名与单方法的参数名匹配，框架自动注入。
+
+**第 2 步：编写单请求端点**
+
+```java
+@RestController
+@RequestMapping("/api/users")
+public class UserController {
+
+    @GetMapping("/{id}")
+    public BatchRequest<UserResp> getUser(@PathVariable Long id,
+                                           @RequestParam String lang) {
+        return null; // 方法体不会被执行，由框架接管
+    }
+}
+```
+
+返回值类型改为 `BatchRequest<R>`（即 `DeferredResult` 的子类），方法体不会实际执行。
+
+**第 3 步：编写批量处理方法**
+
+```java
+@BatchMapping(method = "getUser")
+public void batchGetUser(List<GetUserRequest> batch) {
+    Map<Long, UserResp> dbResult = userService.batchQuery(batch);
+    for (GetUserRequest req : batch) {
+        UserResp resp = dbResult.get(req.id);
+        if (resp != null) {
+            req.setResult(resp);
+        } else {
+            req.setError(new NotFoundException("user not found: " + req.id));
+        }
+    }
+}
+```
+
+- `@BatchMapping(method = "getUser")` 关联到单请求端点 `getUser`
+- **唯一参数**必须为 `List<? extends BatchRequest<?>>`，即待处理的批量请求
+- 通过 `req.fieldName` 读取已注入的参数值（`req.id`、`req.lang`）
+- 逐个调用 `req.setResult()` 或 `req.setError()` 完成每个请求
+
+### 完整请求流转
+
+```
+请求到达 EventLoop
+  │
+  ├── WebFilter → Cors → Interceptor.preHandle → 参数解析
+  │
+  ├── InvokableHandlerMethod.invoke()
+  │     └── BatchInvoker 创建 GetUserRequest 实例（按构造函数参数位置注入）
+  │     └── 入队 RingBuffer
+  │     └── 返回 BatchRequest（即 DeferredResult）
+  │
+  ├── AsyncSupportRegistry 挂起请求
+  │
+  ════════════════════════════════════════════════
+  │
+  ├── 1 个 Disruptor 消费者线程积累事件
+  │     ├── endOfBatch 或 buffer 满 → 提交到 bizExecutor
+  │     └── bizExecutor 饱和 → CallerRunsPolicy → 消费者自执行 → RingBuffer 背压
+  │
+  ├── bizExecutor 线程执行 batchGetUser(List<GetUserRequest>)
+  │
+  └── req.setResult(resp) → asyncDispatch → 写响应
+```
+
+### @BatchMapping 注解
+
+```java
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface BatchMapping {
+
+    /** RingBuffer 容量，必须为 2 的幂。默认 4096。 */
+    int ringBufferSize() default 4096;
+
+    /** Disruptor 等待策略。默认 YIELDING。 */
+    WaitStrategy waitStrategy() default WaitStrategy.BLOCKING;
+
+    /** RingBuffer 满时的背压策略。默认 BLOCK。 */
+    Backpressure backpressure() default Backpressure.BLOCK;
+
+    /** 被关联的单请求方法名。默认与批量处理方法同名。 */
+    String method() default "";
+
+    /** 单次批处理最大请求数。<= 0 表示依赖 Disruptor endOfBatch 信号。 */
+    int maxBatchSize() default 0;
+
+    /** 最大并发处理线程数，包括 Disruptor 消费者线程在内。默认 CPU 核数。 */
+    int consumerSize() default -1;
+}
+```
+
+#### 背压策略
+
+| 策略 | 行为 |
+|------|------|
+| `BLOCK` | EventLoop 阻塞等待 RingBuffer 槽位 |
+| `DROP` | 直接丢弃请求（无响应） |
+| `THROW` | 抛出 `BatchOverflowException` → ExceptionRegistry → **429** |
+
+#### 等待策略
+
+| 策略 | 说明 |
+|------|------|
+| `BLOCKING`（默认） | 使用锁 + Condition，节省 CPU，推荐 |
+| `YIELDING` | 消费者忙等 + Thread.yield()，低延迟 |
+| `SLEEPING` | 忙等 + sleep，平衡延迟与 CPU |
+| `BUSY_SPIN` | 纯忙等，最低延迟，最高 CPU 占用 |
+
+#### maxBatchSize
+
+累积一定数量的请求后再触发批处理，而非仅依赖 Disruptor 的 `endOfBatch` 信号。
+`<= 0` 表示完全依赖 `endOfBatch`。
+
+#### consumerSize 与线程模型
+
+`@BatchMapping` 为每个方法创建独立的 Disruptor 队列，内部线程模型：
+
+- **1 个 Disruptor 消费者线程**：负责从 RingBuffer 拉取事件、累积 buffer、触发批处理
+- **ThreadPoolExecutor(0, consumerSize, SynchronousQueue + CallerRunsPolicy)**：实际执行业务方法的线程池
+
+当 TPE 所有线程繁忙时，`CallerRunsPolicy` 使消费者线程直接执行任务，从而阻塞 RingBuffer 消费 → 生产者被背压。这是一种自动、无需配置的反压机制。
+
+无需使用 `@RunInPool` 注解——`@BatchMapping` 拥有独立的线程池管理。
+
+### 构造函数匹配规则
+
+框架在运行时直接调用 `BatchRequest` 子类的构造函数，将单方法已解析的参数值按位置传递。构造函数参数类型必须与单方法参数类型**按序完全一致**：
+
+```java
+// 单方法参数
+UserResp getUser(@PathVariable Long id,
+                 @RequestParam String lang)
+
+// BatchRequest 子类 — 构造参数按位置匹配
+public class GetUserRequest extends BatchRequest<UserResp> {
+    private final Long id;
+    private final String lang;
+
+    public GetUserRequest(Long id, String lang) {
+        this.id = id;
+        this.lang = lang;
+    }
+}
+```
+
+- 匹配方式：参数类型按位置一一对应
+- 启动期严格校验构造函数的参数类型列表与单方法一致，不匹配直接抛出 `IllegalStateException`
+- 无需依赖字段名、无需 `-parameters` 编译参数
+- 批量处理方法中通过 `req.id`、`req.lang` 读取值
+
+### 错误处理
+
+| 场景 | 行为 | HTTP 状态码 |
+|------|------|-------------|
+| RingBuffer 满，背压 BLOCK | EventLoop 阻塞等待槽位 | - |
+| RingBuffer 满，背压 DROP | 丢弃请求 | - |
+| RingBuffer 满，背压 THROW | `BatchOverflowException` → ExceptionRegistry | **429** |
+| 批量处理异常 | 遍历所有未完成的 request 调用 setError(e) | 500 |
+| 重复调用 setResult | 静默忽略（completed 守卫） | - |
+| 参数名/类型不匹配 | 启动时 IllegalStateException | - |
+
+---
+
 ## 流式响应
 
 ### StreamEmitter

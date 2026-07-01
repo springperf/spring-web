@@ -52,3 +52,4 @@ classes
 /docs/feature/
 __pycache__/
 *.pyc
+*.jfr

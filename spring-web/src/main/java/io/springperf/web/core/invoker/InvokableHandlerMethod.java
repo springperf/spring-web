@@ -3,7 +3,9 @@ package io.springperf.web.core.invoker;
 import io.springperf.web.annotation.Optimize;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
+import org.springframework.core.DefaultParameterNameDiscoverer;
 import org.springframework.core.MethodParameter;
+import org.springframework.core.ParameterNameDiscoverer;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.util.StringUtils;
@@ -16,7 +18,9 @@ import java.lang.reflect.Method;
 
 public class InvokableHandlerMethod extends HandlerMethod {
 
-    private final Invoker invoker;
+    protected static ParameterNameDiscoverer parameterNameDiscoverer = new DefaultParameterNameDiscoverer();
+
+    private Invoker invoker;
 
     private final boolean optimized;
 
@@ -29,12 +33,18 @@ public class InvokableHandlerMethod extends HandlerMethod {
             this.optimized = hasOptimizeAnnotation();
             this.invoker = initInvoker();
         }
+        for (MethodParameter methodParameter : getMethodParameters()) {
+            methodParameter.initParameterNameDiscovery(parameterNameDiscoverer);
+        }
     }
 
     public InvokableHandlerMethod(HandlerMethod handlerMethod) {
         super(handlerMethod);
         this.optimized = hasOptimizeAnnotation();
         this.invoker = initInvoker();
+        for (MethodParameter methodParameter : getMethodParameters()) {
+            methodParameter.initParameterNameDiscovery(parameterNameDiscoverer);
+        }
     }
 
     private boolean hasOptimizeAnnotation() {
@@ -69,6 +79,14 @@ public class InvokableHandlerMethod extends HandlerMethod {
         Object value = invoker.invoke(args);
         setResponseStatus(request, response);
         return value;
+    }
+
+    public void setInvoker(Invoker invoker) {
+        this.invoker = invoker;
+    }
+
+    public Invoker getInvoker() {
+        return invoker;
     }
 
     protected Invoker createFastInvoker() {
@@ -109,9 +127,5 @@ public class InvokableHandlerMethod extends HandlerMethod {
 
     public boolean isOptimize() {
         return optimized;
-    }
-
-    public Invoker getInvoker() {
-        return invoker;
     }
 }

@@ -1,6 +1,5 @@
 package io.springperf.web.core.exception;
 
-import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebComponentContainer;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.arg.ArgumentResolverRegistry;
@@ -8,7 +7,6 @@ import io.springperf.web.core.arg.StaticArgumentResolver;
 import io.springperf.web.core.arg.provider.StaticArgumentResolverProvider;
 import io.springperf.web.core.mapping.MappingCacheKey;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
-import io.springperf.web.core.mapping.MappingRegistry;
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.core.retval.ReturnValueResolverRegistry;
 import io.springperf.web.http.WebServerHttpRequest;
@@ -70,21 +68,6 @@ public class ExceptionHandlerExceptionResolver extends WebComponentContainer imp
         initRealComponentList(exceptionHandlerAdvices, ExceptionHandlerAdvice.class);
     }
 
-    @Override
-    public void initComponentPhase3() throws Exception {
-        super.initComponentPhase3();
-        MappingRegistry mappingRegistry = webContext.getWebComponent(MappingRegistry.class);
-        if (mappingRegistry == null) {
-            return;
-        }
-        boolean check = webContext.getProps().getBoolean(PropertiesConstant.CHECK_ON_STARTUP, true);
-        for (PathMappingContext mappingContext : mappingRegistry.getMappingContextList()) {
-            if (mappingContext.isOptimize() || check) {
-                getCachedExceptionHandlerAdvices(mappingContext, mappingContext.isOptimize());
-            }
-        }
-    }
-
 
     /**
      * ResponseStatusException 是框架内部信号异常，不应被宽泛的父类匹配意外拦截。
@@ -118,7 +101,7 @@ public class ExceptionHandlerExceptionResolver extends WebComponentContainer imp
 
     @Override
     public boolean resolveException(WebServerHttpRequest request, WebServerHttpResponse response, @Nullable HandlerMethod handler, Throwable ex) {
-        ExceptionHandlerAdvice[] cachedAdvices = getCachedExceptionHandlerAdvices(PathMappingContext.get(request), true);
+        ExceptionHandlerAdvice[] cachedAdvices = getCachedExceptionHandlerAdvices(PathMappingContext.get(request));
         if (cachedAdvices != null) {
             for (ExceptionHandlerAdvice exceptionHandlerAdvice : cachedAdvices) {
                 MappingHandlerMethod handlerMethod = exceptionHandlerAdvice.resolveHandlerMethod(ex);
@@ -170,7 +153,7 @@ public class ExceptionHandlerExceptionResolver extends WebComponentContainer imp
         }
     }
 
-    protected ExceptionHandlerAdvice[] getCachedExceptionHandlerAdvices(MappingHandlerMethod handlerMethod, boolean cache) {
+    protected ExceptionHandlerAdvice[] getCachedExceptionHandlerAdvices(MappingHandlerMethod handlerMethod) {
         if (handlerMethod == null) {
             return null;
         }
@@ -195,9 +178,7 @@ public class ExceptionHandlerExceptionResolver extends WebComponentContainer imp
                 }
             }
             cachedExceptionHandlerAdvices = exceptionHandlerAdvices.toArray(new ExceptionHandlerAdvice[0]);
-            if (cache) {
-                handlerMethod.set(MAPPING_CACHE_KEY, cachedExceptionHandlerAdvices);
-            }
+            handlerMethod.set(MAPPING_CACHE_KEY, cachedExceptionHandlerAdvices);
         }
         return cachedExceptionHandlerAdvices;
     }

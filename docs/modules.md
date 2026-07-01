@@ -4,6 +4,8 @@
 spring-web-parent
 ├── spring-web                  核心框架
 ├── spring-web-support          可选 Servlet 桥接层
+├── spring-web-batch            批量请求处理（可选）
+├── spring-web-websocket        WebSocket 支持（可选）
 ├── spring-boot-starter-web     Spring Boot 自动配置
 ├── spring-web-test             测试应用
 └── spring-web-support-test     支持模块测试
@@ -230,3 +232,85 @@ destroyComponent()     → 资源释放
 ### 应用上下文
 
 `WebServerApplicationContextFactory` 强制使用 `AnnotationConfigApplicationContext`，替代 Spring Boot 默认的 `AnnotationConfigServletWebServerApplicationContext`。
+
+---
+
+## spring-web-batch（批量请求处理）
+
+透明聚合批量处理模块，将高并发同类型请求合并为一批，一次批量业务逻辑处理完所有请求，显著提升 IO 密集型场景的吞吐。
+
+### 核心思想
+
+- **不改管线语义** — Filter、Interceptor 逐请求执行，不受影响
+- **异步复用** — `BatchRequest<R>` 继承 `DeferredResult<R>`，利用框架已有的异步处理机制挂起/恢复请求
+- **无主动攒批** — 不设时间窗口，消费者处理速度慢于生产时自然积压
+- **无侵入** — 引入依赖后即可使用，无需改动现有代码结构
+
+### 架构
+
+```
+请求 → EventLoop → BatchInvoker 构造实例入队 → RingBuffer
+                                                                              │
+                                                                        Disruptor 消费者
+                                                                              │
+                                                                        提交到业务线程池
+                                                                              │
+                                                                     BatchHandler 批量处理
+                                                                              │
+                                                   逐个 req.setResult() → asyncDispatch → 写响应
+```
+
+### 核心类
+
+| 类 | 说明 |
+|------|------|
+| `BatchRequest<R>` | 继承 `DeferredResult<R>`，用户扩展的请求基类，通过构造参数位置匹配接收方法参数 |
+| `@BatchMapping` | 标注在批量处理方法上，关联对应的单请求方法 |
+| `BatchRegistry` | 管理所有 RingBuffer 的生命周期（初始化/销毁），安装 `BatchInvoker` |
+| `BatchInvoker` | 替换原 Controller 方法调用，直接根据构造参数创建 `BatchRequest` 实例并入队 |
+| `BatchRequestMetaData` | 存储单方法参数类型列表、批量方法引用、RingBuffer 配置等元数据 |
+
+### 依赖
+
+```xml
+<dependency>
+    <groupId>io.github.springperf</groupId>
+    <artifactId>spring-web-batch</artifactId>
+    <version>${spring-web.version}</version>
+</dependency>
+```
+
+添加依赖后，Spring Boot 自动配置会自动装配 `BatchRegistry`。
+
+---
+
+## spring-web-websocket（WebSocket 支持）
+
+轻量 WebSocket 模块，基于 Spring WebSocket API + Netty，将 WebSocket 升级请求接入 Netty pipeline。
+
+`WebSocketRoutingHandler` 作为 `ChannelInboundHandler` 注入 Netty pipeline，拦截 `Upgrade: websocket` 请求完成握手，随后将 pipeline 从 HTTP 模式切换为 WebSocket 帧模式。握手后创建 `NettyWebSocketSession`（实现 Spring 的 `WebSocketSession`），后续帧直接委托给用户定义的 `WebSocketHandler`。
+
+支持路径模式匹配（含 `{pathVariable}`）、per-handler 覆盖的 Origin 校验/空闲超时/心跳保活、以及背压队列。
+
+### 使用
+
+实现 `WebSocketConfigurer` 接口注册端点：
+
+```java
+@Configuration
+public class MyWsConfig implements WebSocketConfigurer {
+    public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
+        registry.addHandler(myHandler(), "/ws/echo");
+    }
+}
+```
+
+### 依赖
+
+```xml
+<dependency>
+    <groupId>io.github.springperf</groupId>
+    <artifactId>spring-web-websocket</artifactId>
+    <version>${spring-web.version}</version>
+</dependency>
+```

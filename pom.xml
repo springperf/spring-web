@@ -11,7 +11,7 @@
     </parent>
     <groupId>io.github.springperf</groupId>
     <artifactId>spring-web-parent</artifactId>
-    <version>2.7.0</version>
+    <version>2.7.1</version>
     <packaging>pom</packaging>
 
     <name>Spring Web Parent</name>
@@ -47,11 +47,12 @@
         <module>spring-web-test</module>
         <module>spring-web-support-test</module>
         <module>spring-web-benchmark</module>
+        <module>spring-web-batch</module>
     </modules>
 
     <properties>
         <java.version>8</java.version>
-        <spring-web.version>2.7.0</spring-web.version>
+        <spring-web.version>2.7.1</spring-web.version>
         <gpg.executable>gpg</gpg.executable>
         <gpg.keyname>${env.GPG_KEY}</gpg.keyname>
         <gpg.passphrase>${env.GPG_PASSPHRASE}</gpg.passphrase>
@@ -70,6 +71,7 @@
         <hutool.version>5.8.23</hutool.version>
         <jmh.version>1.37</jmh.version>
         <springdoc.version>1.7.0</springdoc.version>
+        <disruptor.version>3.4.4</disruptor.version>
     </properties>
 
     <build>
@@ -191,6 +193,11 @@
             </dependency>
             <dependency>
                 <groupId>io.github.springperf</groupId>
+                <artifactId>spring-web-batch</artifactId>
+                <version>${spring-web.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.springperf</groupId>
                 <artifactId>spring-boot-starter-web</artifactId>
                 <version>${spring-web.version}</version>
             </dependency>
@@ -257,6 +264,13 @@
                 <groupId>org.openjdk.jmh</groupId>
                 <artifactId>jmh-generator-annprocess</artifactId>
                 <version>${jmh.version}</version>
+            </dependency>
+
+            <!-- Disruptor -->
+            <dependency>
+                <groupId>com.lmax</groupId>
+                <artifactId>disruptor</artifactId>
+                <version>${disruptor.version}</version>
             </dependency>
 
             <!-- SpringDoc OpenAPI (optional, for auto-configuration) -->

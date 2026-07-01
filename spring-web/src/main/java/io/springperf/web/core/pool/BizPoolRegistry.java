@@ -170,6 +170,23 @@ public class BizPoolRegistry extends BaseWebComponent {
     }
 
     /**
+     * 为指定 handler 设置默认线程池，仅在用户未通过 {@link RunInPool} 显式指定时生效。
+     * 用于 {@code @BatchMapping} 等需要修改默认线程模型但尊重用户显式配置的场景。
+     * <p>
+     * 传入 {@code null} 表示默认走 EventLoop（不入业务线程池）。
+     *
+     * @param mappingContext 目标 handler
+     * @param executor       默认线程池，{@code null} 表示 EventLoop
+     */
+    public void setDefaultPool(MappingHandlerMethod mappingContext, ExecutorService executor) {
+        RunInPool annotation = AnnotatedElementUtils.findMergedAnnotation(
+                mappingContext.getBridgedMethod(), RunInPool.class);
+        if (annotation == null) {
+            mappingContext.set(BIZ_POOL_KEY, executor == null ? NO_POOL : executor);
+        }
+    }
+
+    /**
      * 返回所有已注册线程池的名称。
      */
     public Set<String> getPoolNames() {

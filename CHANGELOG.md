@@ -2,6 +2,46 @@
 
 本项目遵循 [语义化版本控制](https://semver.org/lang/zh-CN/)。
 
+## [2.7.1] - 20260701
+
+### 新增
+
+- **批量请求处理模块**：新增 `spring-web-batch` 模块，透明聚合高并发同类型请求为批量处理；`BatchRequest` / `@BatchMapping` / `BatchRegistry` / `BatchInvoker` 等核心组件；基于 Disruptor RingBuffer 实现背压与流量控制；自动批处理无需时间窗口
+- **文档补充**：新增 `docs/advanced.md` 高级主题文档（异步处理、批量处理、流式响应、响应式支持、线程模型、CORS、SSL、Actuator、性能建议）；新增 `docs/compatibility.md` 版本兼容性说明；`docs/modules.md` 补充 batch 模块详细说明；`docs/overview.md` 结构调整（AI 时代意义移至末尾）
+- **Batch 自动配置**：`SpringWebBatchAutoConfiguration` 自动装配 `BatchRegistry`，依赖 Disruptor 时自动激活
+- **Batch E2E 测试**：`BatchE2ETest` / `BatchEchoController` / `EchoBatchRequest` 覆盖批量请求完整链路
+
+## [3.2.0] - 20260628
+
+### 重构
+
+- **Jakarta EE 迁移**：`javax.servlet` → `jakarta.servlet` 6.0，Servlet API 从 4.0.1 升级到 6.0.0；`javax.validation` → `jakarta.validation`；所有桥接层代码适配 Jakarta API
+- **Spring Boot 3.2.12 升级**：父 POM 从 2.7.18 升级至 3.2.12，JDK 基线从 8 提升至 17；移除显式管理的 `lombok`/`junit-jupiter`/`mockito`/`byte-buddy`/`assertj`/`servlet-api` 等版本，委托给 Spring Boot BOM 管理
+- **SpringDoc OpenAPI 升级**：从 `springdoc-openapi-common` 1.7.0 迁移到 `springdoc-openapi-starter-common` 2.3.0，适配 Spring Boot 3.x 包结构
+- **Spring Boot Admin 升级**：Client 版本从 2.7.10 升级到 3.2.0，适配 Jakarta API
+
+### 新增
+
+- **GraalVM native-image 支持**：新增 `reflect-config.json` / `resource-config.json` / `proxy-config.json` native-image 预配置，支持 GraalVM 原生镜像编译；新增 `GraalVmNativeImageConfigTest` 验证配置正确性
+- **虚拟线程 E2E 测试**：新增 `VirtualThreadE2ETest`，覆盖 JDK 21 虚拟线程场景下的请求处理链路
+
+### 优化
+
+- **代码兼容性适配**：全局调整 `javax.*` 引用为 `jakarta.*`，包括所有 Filter/Servlet/Session 相关类及测试代码
+- **Fallback 响应优化**：`ReturnValueResolverRegistry` / `BaseWebServerHttpResponse` 增加 fallback 兜底处理
+- **CI 构建流升级**：JDK 17 基线构建流程适配
+
+## [2.7.0] - 20260628
+
+### 重构
+
+- **版本号体系重构**：主版本号从 1.x.x 升级为 2.7.x，与 Spring Boot 主版本号对齐；项目版本从 1.0.5 升级到 2.7.0；所有子模块 parent version 同步升级
+
+### 优化
+
+- **Spring Boot 升级到 2.7.18**：父 POM 从 2.6.15 升级至 2.7.18，同步升级 Spring Boot Admin Client 至 2.7.10
+- **CI 配置更新**：适配 Spring Boot 2.7.18 构建环境
+
 ## [1.0.5] - 20260625
 
 ### 新增

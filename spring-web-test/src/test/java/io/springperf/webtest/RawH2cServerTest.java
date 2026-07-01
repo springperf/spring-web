@@ -102,7 +102,7 @@ public class RawH2cServerTest {
                             p.addLast(new SimpleChannelInboundHandler<FullHttpRequest>() {
                                 @Override
                                 protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest req) {
-                                    System.err.println("HTTP/1.1 FALLBACK: " + req.uri());
+                                    System.out.println("HTTP/1.1 FALLBACK: " + req.uri());
                                     FullHttpResponse resp = new DefaultFullHttpResponse(
                                             HttpVersion.HTTP_1_1, HttpResponseStatus.OK,
                                             ctx.alloc().buffer().writeBytes("http11".getBytes()));
@@ -128,7 +128,7 @@ public class RawH2cServerTest {
                     .build();
 
             try (Response response = client.newCall(request).execute()) {
-                System.err.println("Status: " + response.code() + " Body: " + response.body().string());
+                System.out.println("Status: " + response.code() + " Body: " + response.body().string());
                 assertTrue(response.isSuccessful());
                 assertEquals(Protocol.H2_PRIOR_KNOWLEDGE, response.protocol());
             }
