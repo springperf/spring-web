@@ -55,4 +55,11 @@ public class WebServerHttpRequestWrapper implements WebServerHttpRequest {
     @Override public boolean hasBody() { return request.hasBody(); }
     @Override public void acquire() { request.acquire(); }
     @Override public boolean release() { return request.release(); }
+
+    /**
+     * Spring 6.2+ HttpRequest.getAttributes(). 不加 @Override 以兼容 Spring 6.1。
+     */
+    public Map<String, Object> getAttributes() {
+        return request.getAttributes();
+    }
 }

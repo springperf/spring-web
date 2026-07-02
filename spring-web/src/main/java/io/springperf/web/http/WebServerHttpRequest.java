@@ -141,6 +141,14 @@ public interface WebServerHttpRequest extends ServerHttpRequest, BodyHttpInputMe
     RequestContext getRequestContext();
 
     /**
+     * Return the attributes map for this request.
+     *
+     * <p>Spring 6.2+ {@code HttpRequest} declares this method as abstract.
+     * This declaration ensures cross-version compatibility without {@code @Override}.
+     */
+    Map<String, Object> getAttributes();
+
+    /**
      * Return the HTTP method value as a String.
      * <p>Default implementation derives the value from {@link #getMethod()}.</p>
      *

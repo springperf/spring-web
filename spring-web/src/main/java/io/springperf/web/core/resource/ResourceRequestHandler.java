@@ -181,7 +181,6 @@ public class ResourceRequestHandler implements CustomInvoker {
                 for (String clientEtag : ifNoneMatch) {
                     if (clientEtag.equals(eTag) || clientEtag.equals("*")) {
                         resp.setStatusCode(HttpStatus.NOT_MODIFIED);
-                        resp.getHeaders().setContentLength(-1);
                         return true;
                     }
                 }
@@ -191,7 +190,6 @@ public class ResourceRequestHandler implements CustomInvoker {
             long ifModifiedSince = req.getHeaders().getIfModifiedSince();
             if (ifModifiedSince >= 0 && (lastModified / 1000 * 1000) <= ifModifiedSince) {
                 resp.setStatusCode(HttpStatus.NOT_MODIFIED);
-                resp.getHeaders().setContentLength(-1);
                 return true;
             }
         } catch (Exception e) {
