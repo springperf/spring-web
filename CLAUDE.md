@@ -70,6 +70,12 @@ VERIFY -> COMPLETE
 
 - .claude/rule/review.md
 
+## 涉及 2.7.x → 3.2.x 分支合并
+
+必须读取：
+
+- .claude/context/3.2.x-migration-checklist.md
+
 # 语言规则
 
 - 默认响应语言：简体中文
