@@ -38,6 +38,9 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
 
     public static final MappingCacheKey<Type> TARGET_TYPE_CACHE_KEY = MappingCacheKey.createMethodCacheKey(Type.class);
 
+    public static final MappingCacheKey<HttpBodyConverter> READ_BODY_CONVERTER_CACHE_KEY =
+            MappingCacheKey.createMethodCacheKey(HttpBodyConverter.class);
+
     protected List<MediaType> allSupportedMediaTypes = new ArrayList<>();
 
     protected HttpBodyCodecInterceptorRegistry interceptorRegistry;
@@ -105,16 +108,31 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
         contentType = resetContentTypeWithCharset(msg.getHeaders(), contentType, request.getCharacterEncoding());
         Object body = NO_VALUE;
         try {
-            for (HttpBodyConverter converter : this.converters) {
-                if (converter.canRead(targetType, parameter.getContainingClass(), contentType)) {
-                    if (msg.hasBody()) {
-                        HttpInputMessage msgToUse = interceptorRegistry.beforeBodyRead(request, msg, parameter, targetType, converter);
-                        body = converter.read(targetType, parameter.getContainingClass(), msgToUse);
-                        body = interceptorRegistry.afterBodyRead(request, body, msgToUse, parameter, targetType, converter);
-                    } else {
-                        body = interceptorRegistry.handleEmptyBodyRead(request, null, msg, parameter, targetType, converter);
+            PathMappingContext ctx = PathMappingContext.get(request);
+            HttpBodyConverter cachedConverter = ctx != null ? ctx.get(READ_BODY_CONVERTER_CACHE_KEY) : null;
+            if (cachedConverter != null && cachedConverter.canRead(targetType, parameter.getContainingClass(), contentType)) {
+                if (msg.hasBody()) {
+                    HttpInputMessage msgToUse = interceptorRegistry.beforeBodyRead(request, msg, parameter, targetType, cachedConverter);
+                    body = cachedConverter.read(targetType, parameter.getContainingClass(), msgToUse);
+                    body = interceptorRegistry.afterBodyRead(request, body, msgToUse, parameter, targetType, cachedConverter);
+                } else {
+                    body = interceptorRegistry.handleEmptyBodyRead(request, null, msg, parameter, targetType, cachedConverter);
+                }
+            } else {
+                for (HttpBodyConverter converter : this.converters) {
+                    if (converter.canRead(targetType, parameter.getContainingClass(), contentType)) {
+                        if (ctx != null) {
+                            ctx.set(READ_BODY_CONVERTER_CACHE_KEY, converter);
+                        }
+                        if (msg.hasBody()) {
+                            HttpInputMessage msgToUse = interceptorRegistry.beforeBodyRead(request, msg, parameter, targetType, converter);
+                            body = converter.read(targetType, parameter.getContainingClass(), msgToUse);
+                            body = interceptorRegistry.afterBodyRead(request, body, msgToUse, parameter, targetType, converter);
+                        } else {
+                            body = interceptorRegistry.handleEmptyBodyRead(request, null, msg, parameter, targetType, converter);
+                        }
+                        break;
                     }
-                    break;
                 }
             }
         } catch (IOException ex) {

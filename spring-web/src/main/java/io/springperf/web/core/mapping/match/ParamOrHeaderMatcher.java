@@ -20,7 +20,12 @@ public class ParamOrHeaderMatcher implements Matcher {
 
     @Override
     public boolean match(WebServerHttpRequest req, PathMappingContext mappingContext) {
-        return expressionList.stream().anyMatch(x -> checkExpression(x, req));
+        for (NameValueExpressionSupport x : expressionList) {
+            if (checkExpression(x, req)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean checkExpression(NameValueExpressionSupport expressionSupport, WebServerHttpRequest req) {
