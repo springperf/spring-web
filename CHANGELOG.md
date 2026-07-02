@@ -6,10 +6,17 @@
 
 ### 新增
 
+- **Examples 模块**：新增 `spring-web-examples` 聚合模块及 5 个示例子模块：
+  - `spring-web-example-rest` — REST API 综合示例（Controller/Filter/Interceptor/异常处理）
+  - `spring-web-example-batch` — 批量请求处理示例（`BatchUserController` CRUD）
+  - `spring-web-example-realtime` — 实时通信示例（WebSocket 聊天 + SSE 推送）
+  - `spring-web-example-servlet-bridge` — Servlet 桥接示例（Filter/Interceptor 桥接）
+  - `spring-web-example-upload` — 文件上传示例（单/多文件上传、存储服务）
 - **批量请求处理模块**：新增 `spring-web-batch` 模块，透明聚合高并发同类型请求为批量处理；`BatchRequest` / `@BatchMapping` / `BatchRegistry` / `BatchInvoker` 等核心组件；基于 Disruptor RingBuffer 实现背压与流量控制；自动批处理无需时间窗口
-- **文档补充**：新增 `docs/advanced.md` 高级主题文档（异步处理、批量处理、流式响应、响应式支持、线程模型、CORS、SSL、Actuator、性能建议）；新增 `docs/compatibility.md` 版本兼容性说明；`docs/modules.md` 补充 batch 模块详细说明；`docs/overview.md` 结构调整（AI 时代意义移至末尾）
-- **Batch 自动配置**：`SpringWebBatchAutoConfiguration` 自动装配 `BatchRegistry`，依赖 Disruptor 时自动激活
-- **Batch E2E 测试**：`BatchE2ETest` / `BatchEchoController` / `EchoBatchRequest` 覆盖批量请求完整链路
+
+### 优化
+
+- **配置属性重构**：`ApplicationProperties` / `PropertiesConstant` 提取公共方法，重构大小/时间配置解析，新增 `WebServerProperties` 配置类
 
 ## [3.2.0] - 20260628
 

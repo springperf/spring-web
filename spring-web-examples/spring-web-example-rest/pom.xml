@@ -1,0 +1,32 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>io.github.springperf</groupId>
+        <artifactId>spring-web-examples</artifactId>
+        <version>2.7.1</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>spring-web-example-rest</artifactId>
+
+    <name>perf-spring-web-example-rest</name>
+    <description>Spring Perf Web 基础 REST 示例 - 演示 @RestController、参数校验、全局异常、Filter/Interceptor</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.github.springperf</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>

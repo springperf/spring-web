@@ -48,6 +48,7 @@
         <module>spring-web-support-test</module>
         <module>spring-web-benchmark</module>
         <module>spring-web-batch</module>
+        <module>spring-web-examples</module>
     </modules>
 
     <properties>

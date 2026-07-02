@@ -1,0 +1,5 @@
+server:
+  port: 8083
+upload:
+  dir: ./uploaded-files
+server.http.max-content-length: 10485760       # 10MB max upload
