@@ -105,10 +105,10 @@ public class BizPoolRegistry extends BaseWebComponent {
                 log.warn("spring.threads.virtual.enabled=true but JDK 21+ is not available, fallback to platform threads");
             }
         }
-        int corePoolSize = webContext.getProps().getInt(PropertiesConstant.POOL_CORE_POOL_SIZE, 50);
-        int maxPoolSize = webContext.getProps().getInt(PropertiesConstant.POOL_MAX_POOL_SIZE, 200);
-        int keepAliveTime = webContext.getProps().getInt(PropertiesConstant.POOL_KEEP_ALIVE_TIME, 60);
-        int queueCapacity = webContext.getProps().getInt(PropertiesConstant.POOL_QUEUE_CAPACITY, Integer.MAX_VALUE);
+        int corePoolSize = webContext.getProps().getInt(PropertiesConstant.POOL_CORE_POOL_SIZE);
+        int maxPoolSize = webContext.getProps().getInt(PropertiesConstant.POOL_MAX_POOL_SIZE);
+        int keepAliveTime = webContext.getProps().getInt(PropertiesConstant.POOL_KEEP_ALIVE_TIME);
+        int queueCapacity = webContext.getProps().getInt(PropertiesConstant.POOL_QUEUE_CAPACITY);
 
         if (corePoolSize < 0 || maxPoolSize < 0) {
             log.warn("pool.core-pool-size or pool.max-pool-size < 0, skip default pool creation");

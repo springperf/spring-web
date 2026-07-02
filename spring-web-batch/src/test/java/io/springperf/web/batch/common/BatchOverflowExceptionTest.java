@@ -11,7 +11,7 @@ class BatchOverflowExceptionTest {
     @Test
     void httpStatusIs429() {
         BatchOverflowException ex = new BatchOverflowException("test-queue");
-        assertThat(ex.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
     }
 
     @Test
