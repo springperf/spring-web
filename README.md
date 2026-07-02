@@ -92,16 +92,22 @@ management:
 
 ## 版本选择
 
-本项目按 Spring Boot 大版本管理两个分支。`master` 为开发基线，新功能优先合入后再同步到 `3.2.x`。
+本项目按 Spring Boot 大版本管理两个分支。
+
+`master` / `2.7.x` 分支通过 Maven Profile 支持 **Spring Boot 2.4.x ~ 2.7.x** 的版本范围（Spring Framework 5.3.x），切换 Profile 即可在不同版本之间编译和测试。
+
+`3.2.x` 分支通过 Maven Profile 支持 **Spring Boot 3.0.x ~ 3.5.x**（Spring Framework 6.0.x ~ 6.2.x）以及 **Spring Boot 4.0.x ~ 4.1.x**（Spring Framework 7.0.x），需 JDK 17+，基于 `jakarta.servlet` 6.0，同时支持虚拟线程（JDK 21）和 GraalVM native-image。
 
 | 分支 | Spring Boot | Spring Framework | JDK | Servlet API | 状态 |
 |------|------------|----------------|-----|-------------|------|
-| `master` / `2.7.x` | 2.7.x | 5.3.x | 8 / 11 / 17 | javax.servlet 4.0 | **开发基线**（功能迭代 + bugfix） |
-| `3.2.x` | 3.2.x | 6.1.x | 17 / 21 | jakarta.servlet 6.0 | 主力版本（从 master fork，适配 Jakarta） |
+| `master` / `2.7.x` | 2.4.x ~ 2.7.x | 5.3.x | 8 / 11 / 17 | javax.servlet 4.0 | **开发基线**（功能迭代 + bugfix） |
+| `3.2.x` | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | 6.0.x ~ 6.2.x / 7.0.x | 17 / 21 | jakarta.servlet 6.0 | 主力版本（多版本兼容，切换 Profile） |
+
+> **版本下限说明**：本项目曾尝试兼容 Spring Boot 2.3.x（Spring Framework 5.2.x），但 Spring 5.2 年代久远，缺少 `MultiValueMapAdapter`、`getSupportedMediaTypes(Class)` 等 API，且 `MethodHandles.lookup()` 对包私有方法的访问受限难以绕过。这些限制使得兼容维护成本远高于收益，故 **2.3.x 及以下版本不再支持**，曾有兼容代码已清理退回。
+>
+> **分支选择建议**：JDK 8/11 现有项目选 `master`/`2.7.x`，使用 `-Pspring-boot-2.6` / `-Pspring-boot-2.5` / `-Pspring-boot-2.4` 切换目标版本；JDK 17+ 新项目选 `3.2.x`（支持虚拟线程、GraalVM native-image）。
 
 > 详细兼容性信息见 [版本兼容性说明](docs/compatibility.md)。
->
-> **分支选择建议**：现有 Servlet 项目、JDK 8/11 选 `master`/`2.7.x`；新项目或 JDK 17+ 选 `3.2.x`（支持虚拟线程、GraalVM native-image）。
 
 ---
 
