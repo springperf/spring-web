@@ -3,15 +3,9 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.12</version>
-        <relativePath/>
-    </parent>
     <groupId>io.github.springperf</groupId>
     <artifactId>spring-web-parent</artifactId>
-<version>3.2.1</version>
+    <version>3.2.1</version>
     <packaging>pom</packaging>
 
     <name>Spring Web Parent</name>
@@ -52,7 +46,11 @@
     </modules>
 
     <properties>
-<java.version>17</java.version>
+        <!-- Spring Boot 版本（默认 3.2.x），可通过 profile 切换 -->
+        <spring-boot.version>3.2.12</spring-boot.version>
+
+        <java.version>17</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring-web.version>3.2.1</spring-web.version>
         <gpg.executable>gpg</gpg.executable>
         <gpg.keyname>${env.GPG_KEY}</gpg.keyname>
@@ -65,9 +63,171 @@
         <okhttp.version>4.12.0</okhttp.version>
         <hutool.version>5.8.23</hutool.version>
         <jmh.version>1.37</jmh.version>
-<springdoc.version>2.3.0</springdoc.version>
+        <springdoc.version>2.3.0</springdoc.version>
         <disruptor.version>3.4.4</disruptor.version>
+
+        <!-- 以下属性从 spring-boot-starter-parent 继承，因移除 parent 改为显式定义 -->
+        <lombok.version>1.18.36</lombok.version>
+        <junit-jupiter.version>5.10.5</junit-jupiter.version>
+        <mockito.version>5.7.0</mockito.version>
+        <byte-buddy.version>1.14.19</byte-buddy.version>
+        <assertj.version>3.24.2</assertj.version>
+        <snakeyaml.version>2.2</snakeyaml.version>
+
+        <!-- Maven 插件版本（原由 spring-boot-starter-parent 管理） -->
+        <maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>
+        <maven-surefire-plugin.version>3.1.2</maven-surefire-plugin.version>
+        <maven-resources-plugin.version>3.3.1</maven-resources-plugin.version>
+        <maven-jar-plugin.version>3.3.0</maven-jar-plugin.version>
     </properties>
+
+    <!-- 通过 BOM import 替代 parent 继承 -->
+    <dependencyManagement>
+        <dependencies>
+            <!-- Spring Boot BOM（版本由 ${spring-boot.version} 控制） -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- 内部模块 -->
+            <dependency>
+                <groupId>io.github.springperf</groupId>
+                <artifactId>spring-web</artifactId>
+                <version>${spring-web.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.springperf</groupId>
+                <artifactId>spring-web-support</artifactId>
+                <version>${spring-web.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.springperf</groupId>
+                <artifactId>spring-web-websocket</artifactId>
+                <version>${spring-web.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.springperf</groupId>
+                <artifactId>spring-web-batch</artifactId>
+                <version>${spring-web.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.springperf</groupId>
+                <artifactId>spring-boot-starter-web</artifactId>
+                <version>${spring-web.version}</version>
+            </dependency>
+
+            <!-- 第三方依赖（覆盖 BOM 版本） -->
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-all</artifactId>
+                <version>${netty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-core</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-annotations</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.alibaba.fastjson2</groupId>
+                <artifactId>fastjson2</artifactId>
+                <version>${fastjson2.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>de.codecentric</groupId>
+                <artifactId>spring-boot-admin-client</artifactId>
+                <version>3.2.0</version>
+            </dependency>
+            <dependency>
+                <groupId>cn.hutool</groupId>
+                <artifactId>hutool-all</artifactId>
+                <version>${hutool.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>okhttp</artifactId>
+                <version>${okhttp.version}</version>
+            </dependency>
+
+            <!-- JMH -->
+            <dependency>
+                <groupId>org.openjdk.jmh</groupId>
+                <artifactId>jmh-core</artifactId>
+                <version>${jmh.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.openjdk.jmh</groupId>
+                <artifactId>jmh-generator-annprocess</artifactId>
+                <version>${jmh.version}</version>
+            </dependency>
+
+            <!-- Disruptor -->
+            <dependency>
+                <groupId>com.lmax</groupId>
+                <artifactId>disruptor</artifactId>
+                <version>${disruptor.version}</version>
+            </dependency>
+
+            <!-- SpringDoc OpenAPI (optional, for auto-configuration) -->
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-common</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+
+            <!-- jakarta.servlet-api 由 Spring Boot BOM 管理版本，此处不显式声明 -->
+
+            <!-- 测试依赖（由 BOM 管理版本，此处仅做依赖管理声明） -->
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter</artifactId>
+                <version>${junit-jupiter.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mockito</groupId>
+                <artifactId>mockito-core</artifactId>
+                <version>${mockito.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mockito</groupId>
+                <artifactId>mockito-junit-jupiter</artifactId>
+                <version>${mockito.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.bytebuddy</groupId>
+                <artifactId>byte-buddy</artifactId>
+                <version>${byte-buddy.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.bytebuddy</groupId>
+                <artifactId>byte-buddy-agent</artifactId>
+                <version>${byte-buddy.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.assertj</groupId>
+                <artifactId>assertj-core</artifactId>
+                <version>${assertj.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <build>
         <pluginManagement>
@@ -75,6 +235,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven-compiler-plugin.version}</version>
                     <configuration>
                         <source>${java.version}</source>
                         <target>${java.version}</target>
@@ -89,6 +250,21 @@
                             </path>
                         </annotationProcessorPaths>
                     </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>${maven-surefire-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <version>${maven-jar-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-resources-plugin</artifactId>
+                    <version>${maven-resources-plugin.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -110,6 +286,51 @@
     </build>
 
     <profiles>
+        <!-- Spring Boot 3.2.x（默认，无需显式激活） -->
+        <profile>
+            <id>spring-boot-3.2</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <!-- 使用默认值即可 -->
+            </properties>
+        </profile>
+
+        <!-- Spring Boot 3.1.x -->
+        <profile>
+            <id>spring-boot-3.1</id>
+            <properties>
+                <spring-boot.version>3.1.12</spring-boot.version>
+                <lombok.version>1.18.32</lombok.version>
+                <junit-jupiter.version>5.9.3</junit-jupiter.version>
+                <mockito.version>5.3.1</mockito.version>
+                <byte-buddy.version>1.14.16</byte-buddy.version>
+                <assertj.version>3.24.2</assertj.version>
+                <snakeyaml.version>1.33</snakeyaml.version>
+                <okhttp.version>4.10.0</okhttp.version>
+                <maven-surefire-plugin.version>3.1.2</maven-surefire-plugin.version>
+            </properties>
+        </profile>
+
+        <!-- Spring Boot 3.0.x -->
+        <profile>
+            <id>spring-boot-3.0</id>
+            <properties>
+                <spring-boot.version>3.0.13</spring-boot.version>
+                <lombok.version>1.18.30</lombok.version>
+                <junit-jupiter.version>5.9.3</junit-jupiter.version>
+                <mockito.version>4.8.1</mockito.version>
+                <byte-buddy.version>1.12.23</byte-buddy.version>
+                <assertj.version>3.23.1</assertj.version>
+                <netty.version>4.1.101.Final</netty.version>
+                <snakeyaml.version>1.33</snakeyaml.version>
+                <okhttp.version>4.10.0</okhttp.version>
+                <jackson.version>2.15.4</jackson.version>
+                <maven-surefire-plugin.version>3.1.2</maven-surefire-plugin.version>
+            </properties>
+        </profile>
+
         <profile>
             <id>release</id>
             <build>
@@ -167,145 +388,4 @@
             </build>
         </profile>
     </profiles>
-
-    <dependencyManagement>
-        <dependencies>
-            <!-- 内部模块 -->
-            <dependency>
-                <groupId>io.github.springperf</groupId>
-                <artifactId>spring-web</artifactId>
-                <version>${spring-web.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.github.springperf</groupId>
-                <artifactId>spring-web-support</artifactId>
-                <version>${spring-web.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.github.springperf</groupId>
-                <artifactId>spring-web-websocket</artifactId>
-                <version>${spring-web.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.github.springperf</groupId>
-                <artifactId>spring-web-batch</artifactId>
-                <version>${spring-web.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.github.springperf</groupId>
-                <artifactId>spring-boot-starter-web</artifactId>
-                <version>${spring-web.version}</version>
-            </dependency>
-
-            <!-- 第三方依赖 -->
-            <dependency>
-                <groupId>io.netty</groupId>
-                <artifactId>netty-all</artifactId>
-                <version>${netty.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.fasterxml.jackson.core</groupId>
-                <artifactId>jackson-databind</artifactId>
-                <version>${jackson.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.fasterxml.jackson.core</groupId>
-                <artifactId>jackson-core</artifactId>
-                <version>${jackson.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.fasterxml.jackson.core</groupId>
-                <artifactId>jackson-annotations</artifactId>
-                <version>${jackson.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.projectlombok</groupId>
-                <artifactId>lombok</artifactId>
-                <version>${lombok.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.alibaba.fastjson2</groupId>
-                <artifactId>fastjson2</artifactId>
-                <version>${fastjson2.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>jakarta.servlet</groupId>
-                <artifactId>jakarta.servlet-api</artifactId>
-                <version>6.0.0</version>
-            </dependency>
-            <dependency>
-                <groupId>de.codecentric</groupId>
-                <artifactId>spring-boot-admin-client</artifactId>
-                <version>3.2.0</version>
-            </dependency>
-            <dependency>
-                <groupId>cn.hutool</groupId>
-                <artifactId>hutool-all</artifactId>
-                <version>${hutool.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.squareup.okhttp3</groupId>
-                <artifactId>okhttp</artifactId>
-                <version>${okhttp.version}</version>
-            </dependency>
-
-            <!-- JMH -->
-            <dependency>
-                <groupId>org.openjdk.jmh</groupId>
-                <artifactId>jmh-core</artifactId>
-                <version>${jmh.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.openjdk.jmh</groupId>
-                <artifactId>jmh-generator-annprocess</artifactId>
-                <version>${jmh.version}</version>
-            </dependency>
-
-            <!-- Disruptor -->
-            <dependency>
-                <groupId>com.lmax</groupId>
-                <artifactId>disruptor</artifactId>
-                <version>${disruptor.version}</version>
-            </dependency>
-
-            <!-- SpringDoc OpenAPI (optional, for auto-configuration) -->
-            <dependency>
-                <groupId>org.springdoc</groupId>
-                <artifactId>springdoc-openapi-starter-common</artifactId>
-                <version>${springdoc.version}</version>
-            </dependency>
-
-            <!-- 测试依赖 -->
-            <dependency>
-                <groupId>org.junit.jupiter</groupId>
-                <artifactId>junit-jupiter</artifactId>
-                <version>${junit-jupiter.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.mockito</groupId>
-                <artifactId>mockito-core</artifactId>
-                <version>${mockito.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.mockito</groupId>
-                <artifactId>mockito-junit-jupiter</artifactId>
-                <version>${mockito.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>net.bytebuddy</groupId>
-                <artifactId>byte-buddy</artifactId>
-                <version>${byte-buddy.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>net.bytebuddy</groupId>
-                <artifactId>byte-buddy-agent</artifactId>
-                <version>${byte-buddy.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.assertj</groupId>
-                <artifactId>assertj-core</artifactId>
-                <version>${assertj.version}</version>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
 </project>
