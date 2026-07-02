@@ -19,7 +19,6 @@ import org.springframework.core.ResolvableType;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.ServerSentEvent;
-import org.springframework.util.MimeType;
 import org.springframework.web.context.request.async.DeferredResult;
 
 import java.lang.reflect.Constructor;
@@ -143,9 +142,21 @@ public class ReactiveReturnValueResolver extends BaseAsyncReturnValueResolver {
             return true;
         }
         List<MediaType> supportMediaTypeList = getSupportMediaTypeList(request);
-        if (supportMediaTypeList.stream().anyMatch(mediaType::includes)) {
+        boolean matched = false;
+        for (MediaType supported : supportMediaTypeList) {
+            if (mediaType.includes(supported)) {
+                matched = true;
+                break;
+            }
+        }
+        if (matched) {
             if (contentType == null) {
-                supportMediaTypeList.stream().filter(MimeType::isConcrete).findFirst().ifPresent(x -> response.getHeaders().setContentType(x));
+                for (MediaType supported : supportMediaTypeList) {
+                    if (supported.isConcrete()) {
+                        response.getHeaders().setContentType(supported);
+                        break;
+                    }
+                }
             }
             return true;
         }

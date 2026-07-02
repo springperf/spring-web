@@ -76,7 +76,7 @@ class PerfHttpServletRequestTest {
     @Test void setAttribute_delegatesToRequestContext() { servletRequest.setAttribute("key", "value"); verify(requestContext).setAttribute("key", "value"); }
     @Test void removeAttribute_delegatesToRequestContext() { servletRequest.removeAttribute("key"); verify(requestContext).removeAttribute("key"); }
     @Test void getAttributeNames_delegatesToRequestContext() { Map<String, Object> attrs = new HashMap<>(); attrs.put("k1", "v1"); attrs.put("k2", "v2"); when(requestContext.getAttributes()).thenReturn(attrs); Set<String> nameSet = new HashSet<>(Collections.list(servletRequest.getAttributeNames())); assertTrue(nameSet.containsAll(Arrays.asList("k1", "k2"))); }
-    @Test void getServerPort_returnsFromProps() { when(props.getInt(PropertiesConstant.SERVER_PORT, 8080)).thenReturn(9090); assertEquals(9090, servletRequest.getServerPort()); }
+    @Test void getServerPort_returnsFromProps() { when(props.getInt(PropertiesConstant.SERVER_PORT)).thenReturn(9090); assertEquals(9090, servletRequest.getServerPort()); }
     @Test void getScheme_alwaysHttp() { assertEquals("http", servletRequest.getScheme()); }
     @Test void getServerName_fromHostHeader() { when(headers.getFirst("Host")).thenReturn("example.com"); assertEquals("example.com", servletRequest.getServerName()); }
     @Test void getServerName_withoutHostHeader_defaultsToLocalhost() { when(headers.getFirst("Host")).thenReturn(null); assertEquals("localhost", servletRequest.getServerName()); }

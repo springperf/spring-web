@@ -11,6 +11,12 @@ class ApplicationPropertiesTest {
     private ApplicationProperties createProperties(String key, String value) {
         ApplicationProperties props = new ApplicationProperties();
         Environment env = mock(Environment.class);
+        // 1-arg getProperty(key) — 用于 getLong/getInt 内部
+        when(env.getProperty(anyString())).thenAnswer(invocation -> {
+            String k = invocation.getArgument(0);
+            return k.equals(key) ? value : null;
+        });
+        // 2-arg getProperty(key, defaultValue) — 用于 get(key, defaultValue)
         when(env.getProperty(anyString(), anyString())).thenAnswer(invocation -> {
             String k = invocation.getArgument(0);
             String def = invocation.getArgument(1);
@@ -23,13 +29,13 @@ class ApplicationPropertiesTest {
     @Test
     void get_usingServerPortConstant_returns8080() {
         ApplicationProperties props = createProperties("nonexistent", null);
-        assertEquals(8080, props.getInt(PropertiesConstant.SERVER_PORT, 8080));
+        assertEquals(8080, props.getInt(PropertiesConstant.SERVER_PORT));
     }
 
     @Test
     void get_usingServerPortConstant_custom_returnsConfigured() {
         ApplicationProperties props = createProperties(PropertiesConstant.SERVER_PORT, "9090");
-        assertEquals(9090, props.getInt(PropertiesConstant.SERVER_PORT, 8080));
+        assertEquals(9090, props.getInt(PropertiesConstant.SERVER_PORT));
     }
 
     @Test
@@ -47,25 +53,25 @@ class ApplicationPropertiesTest {
     @Test
     void get_usingHttpMaxContentLengthConstant_default_returns1048576() {
         ApplicationProperties props = createProperties("nonexistent", null);
-        assertEquals(1048576, props.getInt(PropertiesConstant.HTTP_MAX_CONTENT_LENGTH, 1048576));
+        assertEquals(1048576, props.getInt(PropertiesConstant.HTTP_MAX_CONTENT_LENGTH));
     }
 
     @Test
     void get_usingHttpMaxContentLengthConstant_custom_returnsConfigured() {
         ApplicationProperties props = createProperties(PropertiesConstant.HTTP_MAX_CONTENT_LENGTH, "2097152");
-        assertEquals(2097152, props.getInt(PropertiesConstant.HTTP_MAX_CONTENT_LENGTH, 1048576));
+        assertEquals(2097152, props.getInt(PropertiesConstant.HTTP_MAX_CONTENT_LENGTH));
     }
 
     @Test
     void get_usingHttpTimeoutConstant_default_returns60000() {
         ApplicationProperties props = createProperties("nonexistent", null);
-        assertEquals(60000, props.getLong(PropertiesConstant.HTTP_TIMEOUT, 60000));
+        assertEquals(60000, props.getLong(PropertiesConstant.HTTP_TIMEOUT));
     }
 
     @Test
     void get_usingHttpTimeoutConstant_custom_returnsConfigured() {
         ApplicationProperties props = createProperties(PropertiesConstant.HTTP_TIMEOUT, "30000");
-        assertEquals(30000, props.getLong(PropertiesConstant.HTTP_TIMEOUT, 60000));
+        assertEquals(30000, props.getLong(PropertiesConstant.HTTP_TIMEOUT));
     }
 
     @Test
@@ -95,13 +101,13 @@ class ApplicationPropertiesTest {
     @Test
     void getInt_custom_returnsParsed() {
         ApplicationProperties props = createProperties("int.key", "42");
-        assertEquals(42, props.getInt("int.key", 0));
+        assertEquals(42, props.getInt("int.key"));
     }
 
     @Test
     void getInt_missing_returnsDefault() {
         ApplicationProperties props = createProperties("nonexistent", null);
-        assertEquals(99, props.getInt("missing", 99));
+        assertEquals(0, props.getInt("missing"));
     }
 
     @Test
@@ -119,13 +125,13 @@ class ApplicationPropertiesTest {
     @Test
     void getLong_custom_returnsParsed() {
         ApplicationProperties props = createProperties("long.key", "10000000000");
-        assertEquals(10000000000L, props.getLong("long.key", 0L));
+        assertEquals(10000000000L, props.getLong("long.key"));
     }
 
     @Test
     void getLong_missing_returnsDefault() {
         ApplicationProperties props = createProperties("nonexistent", null);
-        assertEquals(123L, props.getLong("missing", 123L));
+        assertEquals(0L, props.getLong("missing"));
     }
 
     @Test

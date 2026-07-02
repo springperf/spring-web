@@ -103,9 +103,12 @@ public class BenchmarkRunner {
                 extraJvmArgs.add("-XX:+UnlockCommercialFeatures");
                 extraJvmArgs.add("-XX:+FlightRecorder");
             }
-            extraJvmArgs.add("-XX:StartFlightRecording=duration=300s,filename=" + jfrFile
-                    + ",settings=profile,maxsize=256m");
-            System.out.println("[BenchmarkRunner] JFR recording enabled: " + jfrFile);
+            String jfrDuration = System.getProperty("benchmark.jfr.duration", "600s");
+            String jfrSettings = System.getProperty("benchmark.jfr.settings", "profile");
+            extraJvmArgs.add("-XX:StartFlightRecording=duration=" + jfrDuration + ",filename=" + jfrFile
+                    + ",settings=" + jfrSettings + ",maxsize=256m");
+            System.out.println("[BenchmarkRunner] JFR recording enabled: " + jfrFile
+                    + ", duration=" + jfrDuration + ", settings=" + jfrSettings);
         }
 
         // 传递 benchmark.* 系统属性到 forked JVM（内存快照、端口、profile名等需要）

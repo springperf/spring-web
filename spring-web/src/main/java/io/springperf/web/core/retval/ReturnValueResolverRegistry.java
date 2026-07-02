@@ -1,6 +1,5 @@
 package io.springperf.web.core.retval;
 
-import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebComponentContainer;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.async.reactive.ReactiveReturnValueResolver;
@@ -8,8 +7,6 @@ import io.springperf.web.core.async.stream.StreamEmitterReturnValueResolver;
 import io.springperf.web.core.codec.HttpBodyCodecRegistry;
 import io.springperf.web.core.mapping.MappingCacheKey;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
-import io.springperf.web.core.mapping.MappingRegistry;
-import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.core.retval.resolver.*;
 import io.springperf.web.core.retval.resolver.async.*;
 import io.springperf.web.http.WebServerHttpRequest;
@@ -57,30 +54,6 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
         initRealComponentList(resolvers, ReturnValueResolver.class);
     }
 
-    @Override
-    public void initComponentPhase3() throws Exception {
-        super.initComponentPhase3();
-        MappingRegistry mappingRegistry = webContext.getWebComponent(MappingRegistry.class);
-        if (mappingRegistry == null) {
-            return;
-        }
-        boolean check = webContext.getProps().getBoolean(PropertiesConstant.CHECK_ON_STARTUP, true);
-        for (PathMappingContext mappingContext : mappingRegistry.getMappingContextList()) {
-            if (mappingContext.isOptimize() || check) {
-                MethodReturnValueContext ctx = getMethodReturnValueContext(mappingContext, true);
-                // 预选解析器：通过静态 supportsReturnType 匹配，避免运行时线性扫描
-                if (ctx != null && ctx.getReturnValueResolver() == null) {
-                    for (ReturnValueResolver r : resolvers) {
-                        if (r.supportsReturnType(ctx.getReturnType(), mappingContext)) {
-                            ctx.setReturnValueResolver(r);
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     public void addResolver(ReturnValueResolver resolver) {
         registerWebComponent(resolver);
         initRealComponentList(resolvers, ReturnValueResolver.class);
@@ -107,7 +80,7 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
 
 
     protected boolean doResolveReturnValue(Object returnValue, MappingHandlerMethod mappingContext, WebServerHttpRequest req, WebServerHttpResponse resp) throws Exception {
-        MethodReturnValueContext returnValueContext = getMethodReturnValueContext(mappingContext, true);
+        MethodReturnValueContext returnValueContext = getMethodReturnValueContext(mappingContext);
         MethodParameter returnType = returnValueContext == null ? null : returnValueContext.getReturnType();
         if (returnValueContext != null) {
             ReturnValueResolver resolver = returnValueContext.getReturnValueResolver();
@@ -127,7 +100,7 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
         return false;
     }
 
-    protected MethodReturnValueContext getMethodReturnValueContext(MappingHandlerMethod mappingContext, boolean cache) {
+    protected MethodReturnValueContext getMethodReturnValueContext(MappingHandlerMethod mappingContext) {
         if (mappingContext == null) {
             return null;
         }
@@ -136,9 +109,7 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
             methodReturnValueContext = new MethodReturnValueContext();
             MethodParameter returnType = new MethodParameter(mappingContext.getMethod(), -1);
             methodReturnValueContext.setReturnType(returnType);
-            if (cache) {
-                mappingContext.set(MAPPING_CACHE_KEY, methodReturnValueContext);
-            }
+            mappingContext.set(MAPPING_CACHE_KEY, methodReturnValueContext);
         }
         return methodReturnValueContext;
     }

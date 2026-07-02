@@ -1,6 +1,5 @@
 package io.springperf.web.core.arg;
 
-import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebComponentContainer;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.arg.databinder.WebDataBinderRegistry;
@@ -8,14 +7,10 @@ import io.springperf.web.core.arg.provider.*;
 import io.springperf.web.core.codec.HttpBodyCodecRegistry;
 import io.springperf.web.core.mapping.MappingCacheKey;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
-import io.springperf.web.core.mapping.MappingRegistry;
-import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import org.springframework.beans.BeanUtils;
-import org.springframework.core.DefaultParameterNameDiscoverer;
 import org.springframework.core.MethodParameter;
-import org.springframework.core.ParameterNameDiscoverer;
 import org.springframework.util.ObjectUtils;
 import org.springframework.validation.*;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -40,8 +35,6 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
     protected RequestParamResolverProvider requestParamResolverProvider;
 
     protected ModelAttributeResolverProvider modelAttributeResolverProvider;
-
-    protected ParameterNameDiscoverer parameterNameDiscoverer = new DefaultParameterNameDiscoverer();
 
     public void initWithWebContext(WebContext webContext) {
         super.initWithWebContext(webContext);
@@ -75,23 +68,8 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
         initRealComponentList(runtimeArgumentResolvers, RuntimeArgumentResolver.class);
     }
 
-    @Override
-    public void initComponentPhase3() throws Exception {
-        super.initComponentPhase3();
-        MappingRegistry mappingRegistry = webContext.getWebComponent(MappingRegistry.class);
-        if (mappingRegistry == null) {
-            return;
-        }
-        boolean check = webContext.getProps().getBoolean(PropertiesConstant.CHECK_ON_STARTUP, true);
-        for (PathMappingContext mappingContext : mappingRegistry.getMappingContextList()) {
-            if (mappingContext.isOptimize() || check) {
-                getMethodArgContexts(mappingContext, mappingContext.isOptimize());
-            }
-        }
-    }
-
     public Object[] resolveArguments(MappingHandlerMethod mappingContext, WebServerHttpRequest request, WebServerHttpResponse response) throws Exception {
-        MethodArgContext[] methodArgContexts = getMethodArgContexts(mappingContext, true);
+        MethodArgContext[] methodArgContexts = getMethodArgContexts(mappingContext);
         Object[] args = new Object[methodArgContexts.length];
         for (int i = 0; i < methodArgContexts.length; i++) {
             MethodArgContext methodArgContext = methodArgContexts[i];
@@ -122,7 +100,7 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
         return args;
     }
 
-    protected MethodArgContext[] getMethodArgContexts(MappingHandlerMethod mappingContext, boolean cache) {
+    protected MethodArgContext[] getMethodArgContexts(MappingHandlerMethod mappingContext) {
         MethodArgContext[] methodArgContexts = mappingContext.get(MAPPING_CACHE_KEY);
         if (methodArgContexts == null) {
             MethodParameter[] methodParameters = mappingContext.createMethodParameters();
@@ -194,7 +172,6 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
      */
     protected void initStaticArgResolverSupport(MappingHandlerMethod methodMappingContext, MethodArgContext methodArgContext) {
         MethodParameter parameter = methodArgContext.getMethodParameter();
-        parameter.initParameterNameDiscovery(parameterNameDiscoverer);
         for (StaticArgumentResolverProvider provider : staticArgumentResolverProviders) {
             if (provider.supports(parameter, methodMappingContext)) {
                 methodArgContext.defaultArgumentResolver = provider.getResolver(parameter, methodMappingContext, webContext);

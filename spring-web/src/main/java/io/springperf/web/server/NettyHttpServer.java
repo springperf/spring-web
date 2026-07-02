@@ -58,9 +58,9 @@ public class NettyHttpServer implements SmartLifecycle {
         // 确保 NettyHttpHandler 运行时只需做纯读操作，线程安全
         DispatcherHandler dispatcher = webContext.getWebComponent(DispatcherHandler.class);
         this.httpHandler = new NettyHttpHandler(webContext, webContext.getContextPath(), dispatcher);
-        int port = webContext.getProps().getInt(PropertiesConstant.SERVER_PORT, 8080);
+        int port = webContext.getProps().getInt(PropertiesConstant.SERVER_PORT);
         bossGroup = new NioEventLoopGroup(1);
-        int workerThreads = webContext.getProps().getInt(PropertiesConstant.SERVER_NETTY_WORKERS, 0);
+        int workerThreads = webContext.getProps().getInt(PropertiesConstant.SERVER_NETTY_WORKERS);
         workerGroup = workerThreads > 0 ? new NioEventLoopGroup(workerThreads) : new NioEventLoopGroup();
         // 收集模块注入的额外 ChannelHandler（如 WebSocket 握手处理器）
         List<ChannelHandler> beforeAggHandlers = pipelineCustomizer != null
@@ -73,13 +73,13 @@ public class NettyHttpServer implements SmartLifecycle {
                 .childOption(ChannelOption.TCP_NODELAY, true)
                 .childOption(ChannelOption.WRITE_BUFFER_WATER_MARK,
                         new WriteBufferWaterMark(
-                                webContext.getProps().getInt(PropertiesConstant.WRITE_BUFFER_LOW_WATERMARK, 8192),
-                                webContext.getProps().getInt(PropertiesConstant.WRITE_BUFFER_HIGH_WATERMARK, 32768)
+                                webContext.getProps().getInt(PropertiesConstant.WRITE_BUFFER_LOW_WATERMARK),
+                                webContext.getProps().getInt(PropertiesConstant.WRITE_BUFFER_HIGH_WATERMARK)
                         ))
                 .childHandler(new Http2ChannelInitializer(
                         http2Enabled,
                         sslContext,
-                        webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_CONTENT_LENGTH, 1048576),
+                        webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_CONTENT_LENGTH),
                         true, // supportMultipart = true for main server
                         httpHandler,
                         beforeAggHandlers,
@@ -132,7 +132,7 @@ public class NettyHttpServer implements SmartLifecycle {
             // 3. 等待业务线程池排空（此时 EventLoop 仍在运行，BizPool 可正常写响应）
             BizPoolRegistry bizPoolRegistry = webContext.getWebComponent(BizPoolRegistry.class);
             if (bizPoolRegistry != null) {
-                int timeout = webContext.getProps().getInt(PropertiesConstant.SERVER_SHUTDOWN_TIMEOUT, 30000);
+                int timeout = webContext.getProps().getInt(PropertiesConstant.SERVER_SHUTDOWN_TIMEOUT);
                 bizPoolRegistry.shutdownPools(timeout, TimeUnit.MILLISECONDS);
             }
 

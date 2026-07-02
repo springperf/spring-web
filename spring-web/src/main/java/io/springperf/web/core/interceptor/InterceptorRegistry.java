@@ -182,7 +182,13 @@ public class InterceptorRegistry extends WebComponentContainer {
         if (interceptors.isEmpty()) {
             return interceptors;
         }
-        boolean haveRealTimeMappingInterceptor = interceptors.stream().anyMatch(i -> i instanceof RuntimeMappingInterceptor);
+        boolean haveRealTimeMappingInterceptor = false;
+        for (HandlerInterceptor i : interceptors) {
+            if (i instanceof RuntimeMappingInterceptor) {
+                haveRealTimeMappingInterceptor = true;
+                break;
+            }
+        }
         if (haveRealTimeMappingInterceptor) {
             String path = request.getPath();
             List<HandlerInterceptor> runtimeInterceptors = new ArrayList<>();

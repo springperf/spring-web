@@ -38,7 +38,7 @@ class NettyServerHttpResponseTest {
     void setUp() {
         webContext = mock(WebContext.class);
         ApplicationProperties props = mock(ApplicationProperties.class);
-        when(props.getLong(PropertiesConstant.HTTP_TIMEOUT, 60000)).thenReturn(60000L);
+        when(props.getLong(PropertiesConstant.HTTP_TIMEOUT)).thenReturn(60000L);
         when(webContext.getProps()).thenReturn(props);
 
         ctx = mock(ChannelHandlerContext.class);

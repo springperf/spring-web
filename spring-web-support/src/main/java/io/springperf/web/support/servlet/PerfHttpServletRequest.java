@@ -72,7 +72,7 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
     @Override public Enumeration<String> getAttributeNames() { return Collections.enumeration(request.getRequestContext().getAttributes().keySet()); }
     @Override public void setAttribute(String name, Object o) { request.getRequestContext().setAttribute(name, o); }
     @Override public void removeAttribute(String name) { request.getRequestContext().removeAttribute(name); }
-    @Override public int getServerPort() { return request.getWebContext().getProps().getInt(io.springperf.web.context.PropertiesConstant.SERVER_PORT, 8080); }
+    @Override public int getServerPort() { return request.getWebContext().getProps().getInt(io.springperf.web.context.PropertiesConstant.SERVER_PORT); }
     @Override public String getScheme() { return "http"; }
     @Override public String getServerName() { String host = getHeader("Host"); return host != null ? host : "localhost"; }
     @Override public String getLocalAddr() { return "127.0.0.1"; }

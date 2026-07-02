@@ -34,7 +34,7 @@ public class AsyncSupportRegistry extends WebComponentContainer {
     @Override
     public void initWithWebContext(WebContext webContext) {
         super.initWithWebContext(webContext);
-        this.defaultTimeout = webContext.getProps().getLong(PropertiesConstant.ASYNC_TIMEOUT, 30000L);
+        this.defaultTimeout = webContext.getProps().getLong(PropertiesConstant.ASYNC_TIMEOUT);
         WebComponentWrapperUtils.registerComponent(this, CallableProcessingInterceptor.class);
         WebComponentWrapperUtils.registerComponent(this, DeferredResultProcessingInterceptor.class);
         ObjectMapper objectMapper = webContext.getBeanFromCtx(ObjectMapper.class);

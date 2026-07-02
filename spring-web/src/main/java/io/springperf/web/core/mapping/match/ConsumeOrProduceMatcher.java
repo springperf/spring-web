@@ -47,11 +47,21 @@ public class ConsumeOrProduceMatcher implements Matcher {
         if (isProduce) {
             List<MediaType> mediaTypes = req.getHeaders().getAccept();
             List<MediaType> acceptedMediaTypes = CollectionUtils.isEmpty(mediaTypes) ? DEFAULT_ACCEPT : mediaTypes;
-            return mediaTypeRuleList.stream().anyMatch(x -> checkAccept(x, acceptedMediaTypes));
+            for (MediaTypeExpressionSupport x : mediaTypeRuleList) {
+                if (checkAccept(x, acceptedMediaTypes)) {
+                    return true;
+                }
+            }
+            return false;
         } else {
             MediaType mediaType = req.getHeaders().getContentType();
             MediaType contentType = mediaType != null ? mediaType : MediaType.APPLICATION_OCTET_STREAM;
-            return mediaTypeRuleList.stream().anyMatch(x -> checkContentType(x, contentType));
+            for (MediaTypeExpressionSupport x : mediaTypeRuleList) {
+                if (checkContentType(x, contentType)) {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 
