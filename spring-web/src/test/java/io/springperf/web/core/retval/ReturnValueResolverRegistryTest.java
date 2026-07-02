@@ -102,7 +102,7 @@ class ReturnValueResolverRegistryTest {
 
     @Test
     void getMethodReturnValueContext_nullMapping_returnsNull() {
-        assertNull(registry.getMethodReturnValueContext(null, true));
+        assertNull(registry.getMethodReturnValueContext(null));
     }
 
     @Test
@@ -111,7 +111,7 @@ class ReturnValueResolverRegistryTest {
         Method method = TestController.class.getMethod("handle");
         MappingHandlerMethod mapping = new MappingHandlerMethod(new TestController(), method);
 
-        MethodReturnValueContext ctx = registry.getMethodReturnValueContext(mapping, true);
+        MethodReturnValueContext ctx = registry.getMethodReturnValueContext(mapping);
 
         assertNotNull(ctx);
         assertNotNull(ctx.getReturnType());
@@ -124,8 +124,8 @@ class ReturnValueResolverRegistryTest {
         Method method = TestController.class.getMethod("handle");
         MappingHandlerMethod mapping = new MappingHandlerMethod(new TestController(), method);
 
-        MethodReturnValueContext first = registry.getMethodReturnValueContext(mapping, true);
-        MethodReturnValueContext second = registry.getMethodReturnValueContext(mapping, true);
+        MethodReturnValueContext first = registry.getMethodReturnValueContext(mapping);
+        MethodReturnValueContext second = registry.getMethodReturnValueContext(mapping);
 
         assertSame(first, second);
     }
@@ -136,10 +136,10 @@ class ReturnValueResolverRegistryTest {
         Method method = TestController.class.getMethod("other");
         MappingHandlerMethod mapping = new MappingHandlerMethod(new TestController(), method);
 
-        MethodReturnValueContext ctx = registry.getMethodReturnValueContext(mapping, false);
+        MethodReturnValueContext ctx = registry.getMethodReturnValueContext(mapping);
 
         assertNotNull(ctx);
-        assertNull(mapping.get(ReturnValueResolverRegistry.MAPPING_CACHE_KEY));
+        assertNotNull(mapping.get(ReturnValueResolverRegistry.MAPPING_CACHE_KEY));
     }
 
     // ==================== resolveReturnValue ====================
@@ -175,7 +175,7 @@ class ReturnValueResolverRegistryTest {
         WebServerHttpRequest req = mock(WebServerHttpRequest.class);
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
 
-        MethodReturnValueContext ctx = registry.getMethodReturnValueContext(mapping, true);
+        MethodReturnValueContext ctx = registry.getMethodReturnValueContext(mapping);
         ReturnValueResolver resolver = mock(ReturnValueResolver.class);
         when(resolver.supportsReturnValue("test", req, resp)).thenReturn(true);
         ctx.setReturnValueResolver(resolver);
@@ -194,7 +194,7 @@ class ReturnValueResolverRegistryTest {
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
 
         // Cached resolver (default mock, supportsReturnValue returns false)
-        MethodReturnValueContext ctx = registry.getMethodReturnValueContext(mapping, true);
+        MethodReturnValueContext ctx = registry.getMethodReturnValueContext(mapping);
         ctx.setReturnValueResolver(mock(ReturnValueResolver.class));
 
         // Add a fallback resolver that supports the value

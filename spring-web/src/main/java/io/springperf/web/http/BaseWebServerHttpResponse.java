@@ -105,7 +105,7 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
     }
 
     public ScheduledFuture setTimeout() {
-        return setTimeout(this::defaultHandleTimeout, webContext.getProps().getLong(PropertiesConstant.HTTP_TIMEOUT, 60000));
+        return setTimeout(this::defaultHandleTimeout, webContext.getProps().getLong(PropertiesConstant.HTTP_TIMEOUT));
     }
 
     public ScheduledFuture setTimeout(Runnable task, long delay) {
