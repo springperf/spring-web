@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.lang.reflect.Method;
 import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -234,7 +235,7 @@ class SimpleResolverProvidersTest {
         MultiValueMap<String, ?> result = p.getMultiValueMapResolver()
                 .resolveMultiValueMap(null, null, mockRequest, mockResponse);
 
-        assertSame(mockHeaders, result);
+        assertEquals(List.of("application/json"), result.get("Accept"));
     }
 
     // ===== @PathVariable resolver behavior =====

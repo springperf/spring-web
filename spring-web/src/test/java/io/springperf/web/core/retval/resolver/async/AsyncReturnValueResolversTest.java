@@ -8,8 +8,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.MethodParameter;
-import org.springframework.util.concurrent.ListenableFuture;
-import org.springframework.util.concurrent.SettableListenableFuture;
 import org.springframework.web.context.request.async.DeferredResult;
 import org.springframework.web.context.request.async.WebAsyncTask;
 
@@ -19,6 +17,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -125,21 +124,36 @@ class AsyncReturnValueResolversTest {
 
     @Test
     void listenableFuture_supportsReturnType() throws Exception {
+        assumeTrue(ListenableFutureAdapter.isAvailable(), "ListenableFuture not available in this Spring version");
         ListenableFutureReturnValueResolver r = new ListenableFutureReturnValueResolver();
-        assertTrue(r.supportsReturnType(param("listenableFutureParam", ListenableFuture.class), null));
+        Class<?> listenableFutureClass = Class.forName("org.springframework.util.concurrent.ListenableFuture");
+        Method method = getClass().getDeclaredMethod("listenableFutureParam", Object.class);
+        // Anonymous subclass to return the runtime-resolved ListenableFuture type
+        MethodParameter mp = new MethodParameter(method, 0) {
+            @Override
+            public Class<?> getParameterType() {
+                return listenableFutureClass;
+            }
+        };
+        assertTrue(r.supportsReturnType(mp, null));
     }
 
     @Test
-    void listenableFuture_supportsReturnValue() {
+    void listenableFuture_supportsReturnValue() throws Exception {
+        assumeTrue(ListenableFutureAdapter.isAvailable(), "ListenableFuture not available in this Spring version");
         ListenableFutureReturnValueResolver r = new ListenableFutureReturnValueResolver();
-        assertTrue(r.supportsReturnValue(new SettableListenableFuture<>(), null, null));
+        Class<?> settableFutureClass = Class.forName("org.springframework.util.concurrent.SettableListenableFuture");
+        Object future = settableFutureClass.getDeclaredConstructor().newInstance();
+        assertTrue(r.supportsReturnValue(future, null, null));
     }
 
     @Test
     void listenableFuture_resolve_delegatesToRegistry() throws Exception {
+        assumeTrue(ListenableFutureAdapter.isAvailable(), "ListenableFuture not available in this Spring version");
         ListenableFutureReturnValueResolver r = new ListenableFutureReturnValueResolver();
         initAsyncSupport(r);
-        SettableListenableFuture<String> future = new SettableListenableFuture<>();
+        Class<?> settableFutureClass = Class.forName("org.springframework.util.concurrent.SettableListenableFuture");
+        Object future = settableFutureClass.getDeclaredConstructor().newInstance();
 
         r.resolveReturnValue(future, null, request, response);
 
@@ -148,25 +162,41 @@ class AsyncReturnValueResolversTest {
 
     @Test
     void listenableFuture_adapt_onSuccess_setsResult() throws Exception {
+        assumeTrue(ListenableFutureAdapter.isAvailable(), "ListenableFuture not available in this Spring version");
         ListenableFutureReturnValueResolver r = new ListenableFutureReturnValueResolver();
-        SettableListenableFuture<String> future = new SettableListenableFuture<>();
+        Class<?> settableFutureClass = Class.forName("org.springframework.util.concurrent.SettableListenableFuture");
+        Object future = settableFutureClass.getDeclaredConstructor().newInstance();
 
-        DeferredResult<Object> result = r.adaptListenableFuture(future);
-        future.set("success");
+        DeferredResult<Object> result = ListenableFutureAdapter.adapt(future);
+
+        // set result via reflection: SettableListenableFuture.set(value)
+        settableFutureClass.getMethod("set", Object.class).invoke(future, "success");
 
         assertEquals("success", result.getResult());
     }
 
     @Test
     void listenableFuture_adapt_onFailure_setsErrorResult() throws Exception {
+        assumeTrue(ListenableFutureAdapter.isAvailable(), "ListenableFuture not available in this Spring version");
         ListenableFutureReturnValueResolver r = new ListenableFutureReturnValueResolver();
-        SettableListenableFuture<String> future = new SettableListenableFuture<>();
+        Class<?> settableFutureClass = Class.forName("org.springframework.util.concurrent.SettableListenableFuture");
+        Object future = settableFutureClass.getDeclaredConstructor().newInstance();
 
-        DeferredResult<Object> result = r.adaptListenableFuture(future);
+        DeferredResult<Object> result = ListenableFutureAdapter.adapt(future);
+
         IllegalStateException error = new IllegalStateException("failed");
-        future.setException(error);
+        // set exception via reflection: SettableListenableFuture.setException(Throwable)
+        settableFutureClass.getMethod("setException", Throwable.class).invoke(future, error);
 
         assertSame(error, result.getResult());
+    }
+
+    @Test
+    void listenableFuture_notAvailable_returnsFalse() {
+        // When ListenableFuture is not available (SB 4.x+), verify the resolver correctly rejects types
+        ListenableFutureReturnValueResolver r = new ListenableFutureReturnValueResolver();
+        assertFalse(r.supportsReturnType(null, null));
+        assertFalse(r.supportsReturnValue(new Object(), null, null));
     }
 
     // ==================== CompletionStageReturnValueResolver ====================
@@ -212,7 +242,7 @@ class AsyncReturnValueResolversTest {
     @SuppressWarnings("unused")
     public void callableParam(Callable<?> c) {}
     @SuppressWarnings("unused")
-    public void listenableFutureParam(ListenableFuture<?> f) {}
+    public void listenableFutureParam(Object f) {}
     @SuppressWarnings("unused")
     public void completionStageParam(CompletableFuture<?> f) {}
     @SuppressWarnings("unused")

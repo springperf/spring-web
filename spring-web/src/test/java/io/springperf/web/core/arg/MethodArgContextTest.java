@@ -27,10 +27,9 @@ class MethodArgContextTest {
 
     @Test
     void constructor_withUnresolvableParameterName_usesFallbackName() throws Exception {
-        // Without debug info, parameter name may be null
         Method method = getClass().getMethod("namedParam", String.class);
         MethodParameter mp = new MethodParameter(method, 0);
-        // Don't init parameter name discovery -> name is null
+        mp.initParameterNameDiscovery(null);  // clear default discoverer (Spring 7.x sets one by default)
         MethodArgContext ctx = new MethodArgContext(mp);
         String paramName = ctx.getParamName();
         assertTrue(paramName.startsWith("Arg "));
@@ -49,6 +48,7 @@ class MethodArgContextTest {
     void getDefaultParamName_withoutName_returnsFallback() throws Exception {
         Method method = getClass().getMethod("namedParam", String.class);
         MethodParameter mp = new MethodParameter(method, 0);
+        mp.initParameterNameDiscovery(null);  // clear default discoverer (Spring 7.x sets one by default)
         String fallback = MethodArgContext.getDefaultParamName(mp);
         assertTrue(fallback.startsWith("Arg "));
     }

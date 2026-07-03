@@ -31,7 +31,7 @@ public class RequestBodyResolver extends AbstractSupportOptionalResolver impleme
             return httpBodyCodecRegistry.readBody(targetType, parameter, request, request);
         } catch (Exception e) {
             if (required) {
-                throw new HttpMessageNotReadableException("Failed to parse @RequestBody data", e);
+                throw new HttpMessageNotReadableException("Failed to parse @RequestBody data", e, request);
             } else {
                 return null;
             }

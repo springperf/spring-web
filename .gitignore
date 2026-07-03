@@ -53,4 +53,4 @@ classes
 __pycache__/
 *.pyc
 *.jfr
-jfr_samples.txt
+*.txt

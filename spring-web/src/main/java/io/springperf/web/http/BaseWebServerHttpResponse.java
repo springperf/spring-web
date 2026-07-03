@@ -23,7 +23,7 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
 
     protected final WebContext webContext;
     protected final boolean keepAlive;
-    protected final HttpHeaders headers = new HttpHeaders();
+    protected final HttpHeaders headers = new WebHttpHeaders();
     protected HttpStatus status = HttpStatus.OK;
     protected ByteArrayOutputStream body;
     protected Charset characterEncoding = StandardCharsets.UTF_8;

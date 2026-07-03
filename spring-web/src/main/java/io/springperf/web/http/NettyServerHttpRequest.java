@@ -143,7 +143,7 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
     @Override
     public HttpHeaders getHeaders() {
         if (headers == null) {
-            headers = new HttpHeaders();
+            headers = new WebHttpHeaders();
             for (String name : request.headers().names()) {
                 for (String v : request.headers().getAll(name)) {
                     headers.add(name, v);

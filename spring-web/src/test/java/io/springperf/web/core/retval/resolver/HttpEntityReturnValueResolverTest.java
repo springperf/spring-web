@@ -2,6 +2,7 @@ package io.springperf.web.core.retval.resolver;
 
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.codec.HttpBodyCodecRegistry;
+import io.springperf.web.http.WebHttpHeaders;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -86,7 +87,7 @@ class HttpEntityReturnValueResolverTest {
 
     @Test
     void resolveReturnValue_httpEntity_noStatus_doesNotSetStatusCode() throws Exception {
-        HttpEntity<String> entity = new HttpEntity<>("body", null);
+        HttpEntity<String> entity = new HttpEntity<>("body", new WebHttpHeaders());
         HttpHeaders respHeaders = new HttpHeaders();
         doReturn(respHeaders).when(response).getHeaders();
 

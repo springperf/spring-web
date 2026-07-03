@@ -360,6 +360,22 @@
             </properties>
         </profile>
 
+        <!-- Spring Boot 4.0.x -->
+        <profile>
+            <id>spring-boot-4.0</id>
+            <properties>
+                <spring-boot.version>4.0.7</spring-boot.version>
+            </properties>
+        </profile>
+
+        <!-- Spring Boot 4.1.x -->
+        <profile>
+            <id>spring-boot-4.1</id>
+            <properties>
+                <spring-boot.version>4.1.0</spring-boot.version>
+            </properties>
+        </profile>
+
         <profile>
             <id>release</id>
             <build>

@@ -315,9 +315,9 @@ class HttpBodyCodecRegistryTest {
         when(response.getCharacterEncoding()).thenReturn(null);
         when(converter1.canWrite(any(Type.class), any(), any())).thenReturn(true);
         when(converter1.getSupportedMediaTypes())
-                .thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON_UTF8));
+                .thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON));
         registry.converters.add(converter1);
-        registry.allSupportedMediaTypes = Collections.singletonList(MediaType.APPLICATION_JSON_UTF8);
+        registry.allSupportedMediaTypes = Collections.singletonList(MediaType.APPLICATION_JSON);
         when(request.getHeaders()).thenReturn(new HttpHeaders());
 
         registry.writeBody("hello", parameter, request, response);
@@ -334,9 +334,9 @@ class HttpBodyCodecRegistryTest {
         when(parameter.getParameterType()).thenReturn((Class) Object.class);
         when(converter1.canWrite(any(Type.class), any(), any())).thenReturn(true);
         when(converter1.getSupportedMediaTypes())
-                .thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON_UTF8));
+                .thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON));
         registry.converters.add(converter1);
-        registry.allSupportedMediaTypes = Collections.singletonList(MediaType.APPLICATION_JSON_UTF8);
+        registry.allSupportedMediaTypes = Collections.singletonList(MediaType.APPLICATION_JSON);
         when(request.getHeaders()).thenReturn(new HttpHeaders());
 
         registry.writeBody(new Object(), parameter, request, response);
@@ -371,10 +371,10 @@ class HttpBodyCodecRegistryTest {
         when(converter1.canWrite(any(Type.class), any(), any())).thenReturn(false);
         when(converter2.canWrite(any(Type.class), any(), any())).thenReturn(true);
         when(converter2.getSupportedMediaTypes())
-                .thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON_UTF8));
+                .thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON));
         registry.converters.add(converter1);
         registry.converters.add(converter2);
-        registry.allSupportedMediaTypes = Collections.singletonList(MediaType.APPLICATION_JSON_UTF8);
+        registry.allSupportedMediaTypes = Collections.singletonList(MediaType.APPLICATION_JSON);
         when(request.getHeaders()).thenReturn(new HttpHeaders());
 
         registry.writeBody("test", parameter, request, response);

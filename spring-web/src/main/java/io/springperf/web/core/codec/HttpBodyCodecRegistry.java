@@ -8,6 +8,7 @@ import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.http.support.BodyHttpInputMessage;
+import io.springperf.web.util.MediaTypeUtils;
 import org.springframework.core.GenericTypeResolver;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.ResolvableType;
@@ -52,7 +53,13 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
             allSupportedMediaTypes.addAll(messageConverter.getSupportedMediaTypes());
         }
         List<MediaType> result = new ArrayList<>(allSupportedMediaTypes);
-        MediaType.sortBySpecificity(result);
+        result.sort((a, b) -> {
+            int paramsComp = Integer.compare(b.getParameters().size(), a.getParameters().size());
+            if (paramsComp != 0) return paramsComp;
+            int typeComp = a.getType().compareToIgnoreCase(b.getType());
+            if (typeComp != 0) return typeComp;
+            return a.getSubtype().compareToIgnoreCase(b.getSubtype());
+        });
         return Collections.unmodifiableList(result);
     }
 
@@ -144,7 +151,7 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
                     (noContentType && !request.hasBody())) {
                 return null;
             }
-            throw new HttpMessageNotReadableException("not support contentType :" + contentType);
+            throw new HttpMessageNotReadableException("not support contentType :" + contentType, null, request);
         }
         return body;
     }
@@ -213,13 +220,21 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
         if (mediaTypesToUse.isEmpty()) {
             return null;
         }
-        MediaType.sortBySpecificityAndQuality(mediaTypesToUse);
+        mediaTypesToUse.sort((a, b) -> {
+            int qualityComp = Double.compare(b.getQualityValue(), a.getQualityValue());
+            if (qualityComp != 0) return qualityComp;
+            int paramsComp = Integer.compare(b.getParameters().size(), a.getParameters().size());
+            if (paramsComp != 0) return paramsComp;
+            int typeComp = a.getType().compareToIgnoreCase(b.getType());
+            if (typeComp != 0) return typeComp;
+            return a.getSubtype().compareToIgnoreCase(b.getSubtype());
+        });
 
         for (MediaType mediaType : mediaTypesToUse) {
             if (mediaType.isConcrete()) {
                 return mediaType;
             } else if (mediaType.isPresentIn(ALL_APPLICATION_MEDIA_TYPES)) {
-                return MediaType.APPLICATION_JSON_UTF8;
+                return MediaType.APPLICATION_JSON;
             }
         }
         return null;
@@ -253,7 +268,11 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
 
     protected MediaType getMostSpecificMediaType(MediaType acceptType, MediaType produceType) {
         MediaType produceTypeToUse = produceType.copyQualityValue(acceptType);
-        return (MediaType.SPECIFICITY_COMPARATOR.compare(acceptType, produceTypeToUse) <= 0 ? acceptType : produceTypeToUse);
+        return (compareSpecificity(acceptType, produceTypeToUse) <= 0 ? acceptType : produceTypeToUse);
+    }
+
+    private static int compareSpecificity(MediaType a, MediaType b) {
+        return MediaTypeUtils.compareSpecificity(a, b);
     }
 
     protected Type getGenericType(MethodParameter returnType) {

@@ -1,6 +1,7 @@
 package io.springperf.web.core.async.stream;
 
 import io.springperf.web.json.JsonConverter;
+import io.springperf.web.util.MediaTypeUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -28,7 +29,7 @@ class StreamJsonEmitterTest {
         StreamJsonEmitter emitter = new StreamJsonEmitter(jsonConverter);
         emitter.extendResponse(response);
 
-        assertEquals(MediaType.APPLICATION_STREAM_JSON, headers.getContentType());
+        assertEquals(MediaTypeUtils.APPLICATION_STREAM_JSON, headers.getContentType());
     }
 
     @Test

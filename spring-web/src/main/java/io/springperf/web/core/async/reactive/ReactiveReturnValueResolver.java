@@ -11,6 +11,7 @@ import io.springperf.web.core.retval.resolver.async.BaseAsyncReturnValueResolver
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.json.JsonConverter;
+import io.springperf.web.util.MediaTypeUtils;
 import lombok.SneakyThrows;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.ReactiveAdapter;
@@ -110,7 +111,7 @@ public class ReactiveReturnValueResolver extends BaseAsyncReturnValueResolver {
             if (CharSequence.class.isAssignableFrom(elementClass)) {
                 return new TextStreamEmitter(reactiveConfig.getTimeout());
             }
-            if (containMediaType(MediaType.APPLICATION_STREAM_JSON, request, response)) {
+            if (containMediaType(MediaTypeUtils.APPLICATION_STREAM_JSON, request, response)) {
                 return new StreamJsonEmitter(reactiveConfig.getTimeout(), asyncSupportRegistry.getJsonConverter());
             }
         }
