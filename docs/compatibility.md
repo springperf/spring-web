@@ -1,3 +1,5 @@
+> [English](en/compatibility.md) | 中文
+
 # 版本兼容性说明
 
 本项目维护两个主线分支，分别对应 Spring Boot 2.x 和 Spring Boot 3.x。

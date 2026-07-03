@@ -1,3 +1,5 @@
+> [English](en/configuration.md) | 中文
+
 # 配置参考
 
 所有配置项在 `application.properties` 中设置。
@@ -14,13 +16,39 @@
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
 | `server.http.max-content-length` | `1048576` (1MB) | 最大请求体大小（字节） |
-| `server.http.timeout` | 无超时 | HTTP 请求超时时间（毫秒） |
+| `server.http.timeout` | `60000` (60s) | HTTP 请求超时时间（毫秒） |
+
+## 异步配置
+
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `server.async.timeout` | `30000` (30s) | 异步请求（DeferredResult/Callable）超时时间（毫秒） |
+
+## 优雅关闭
+
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `server.shutdown.timeout` | `30000` (30s) | 优雅关闭最大等待时间（毫秒） |
 
 ## 启动配置
 
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
 | `server.check-on-startup` | `true` | 启动时校验所有 Mapping（fail-fast） |
+
+## Netty 调优
+
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `server.netty.workers` | `0` (自动) | Netty worker EventLoop 线程数，0 表示自动计算（CPU 核数 × 2） |
+| `server.netty.write-buffer-low-watermark` | `8192` (8KB) | 写缓冲区低水位（字节） |
+| `server.netty.write-buffer-high-watermark` | `32768` (32KB) | 写缓冲区高水位（字节） |
+
+## HTTP/2
+
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `server.http2.enabled` | `false` | 启用 HTTP/2 支持（浏览器客户端需配合 SSL） |
 
 ## 业务线程池
 
@@ -43,6 +71,8 @@ server.ssl.key-store-password=changeit
 server.ssl.key-store-type=PKCS12
 ```
 
+管理端口也支持独立 SSL 配置（前缀 `management.server.ssl.*`），配置方式同上。
+
 ## 管理端口（Actuator）
 
 ```properties
@@ -53,6 +83,20 @@ management.endpoints.web.base-path=/actuator
 # 暴露的端点
 management.endpoints.web.exposure.include=health,info,metrics
 ```
+
+## OpenAPI 文档
+
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `springperf.openapi.title` | `Spring Perf Web API` | API 文档标题 |
+| `springperf.openapi.version` | `1.0.0` | API 文档版本 |
+| `springperf.openapi.description` | `Spring Perf Web API` | API 文档描述 |
+
+## Swagger UI
+
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `springperf.swagger-ui.webjar-version` | `5.2.0` | Swagger UI webjar 版本，需匹配 `org.webjars:swagger-ui` 依赖版本 |
 
 ## 完整配置示例
 
@@ -65,8 +109,22 @@ server.servlet.context-path=/api
 server.http.max-content-length=5242880
 server.http.timeout=15000
 
+# 异步
+server.async.timeout=30000
+
+# 优雅关闭
+server.shutdown.timeout=30000
+
 # SSL
 server.ssl.enabled=false
+
+# Netty
+server.netty.workers=0
+server.netty.write-buffer-low-watermark=8192
+server.netty.write-buffer-high-watermark=32768
+
+# HTTP/2
+server.http2.enabled=false
 
 # 线程池
 pool.core-pool-size=100
@@ -81,4 +139,9 @@ server.check-on-startup=true
 # 管理端口
 management.server.port=9090
 management.endpoints.web.exposure.include=health,info
+
+# OpenAPI
+springperf.openapi.title=My API
+springperf.openapi.version=2.0.0
+springperf.openapi.description=My API Description
 ```

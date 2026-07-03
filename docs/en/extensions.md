@@ -1,14 +1,14 @@
-> [English](en/extensions.md) | 中文
+> English | [中文](../extensions.md)
 
-# 扩展点指南
+# Extension Points Guide
 
-框架在请求处理管线的各个关键节点均提供了 SPI 接口，允许用户在不需要修改框架代码的情况下扩展功能。
+The framework provides SPI interfaces at every key point in the request processing pipeline, allowing users to extend functionality without modifying framework code.
 
 ---
 
-## 1. WebFilter — 过滤器
+## 1. WebFilter — Filters
 
-在请求到达控制器前/响应返回后执行通用逻辑。
+Execute common logic before the request reaches the controller / after the response returns.
 
 ```java
 @Component
@@ -17,25 +17,25 @@ public class CustomFilter implements WebFilter {
     @Override
     public void doFilter(WebServerHttpRequest request, WebServerHttpResponse response,
                          FilterChain chain) {
-        // 请求前处理
+        // Pre-processing
         chain.doFilter(request, response);
-        // 响应后处理
+        // Post-processing
     }
 
     @Override
     public int getOrder() {
-        return 0; // 控制执行顺序
+        return 0; // Controls execution order
     }
 }
 ```
 
-**自动注册**：实现 `WebFilter` 并声明为 Spring Bean 即可。
+**Auto-registration**: implement `WebFilter` and declare it as a Spring Bean.
 
 ---
 
-## 2. HandlerInterceptor — 拦截器
+## 2. HandlerInterceptor — Interceptors
 
-在处理器方法执行前后切入，支持按路径匹配。
+Intercept around handler method execution with path matching support.
 
 ```java
 @Component
@@ -44,31 +44,31 @@ public class CustomInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(WebServerHttpRequest request, WebServerHttpResponse response,
                              Object handler) {
-        // 处理器执行前
-        return true; // false 则中断请求
+        // Before handler execution
+        return true; // return false to interrupt the request
     }
 
     @Override
     public void postHandle(WebServerHttpRequest request, WebServerHttpResponse response,
                            Object handler, Object result) {
-        // 处理器执行后、返回值写入前
+        // After handler execution, before return value writing
     }
 
     @Override
     public void afterCompletion(WebServerHttpRequest request, WebServerHttpResponse response,
                                 Object handler, Throwable ex) {
-        // 请求完成（无论是否异常）
+        // After request completion (regardless of exception)
     }
 
     @Override
     public void afterConcurrentHandlingStarted(WebServerHttpRequest request, WebServerHttpResponse response,
                                                Object handler) {
-        // 异步处理开始时调用
+        // Called when async processing starts
     }
 }
 ```
 
-**带路径匹配的注册**：
+**Registration with path matching**:
 
 ```java
 @Configuration
@@ -83,13 +83,13 @@ public class WebConfig {
 }
 ```
 
-**自动注册**：`HandlerInterceptor` 或 `InterceptorRegistration` 的 Spring Bean 均会被自动注册。
+**Auto-registration**: both `HandlerInterceptor` and `InterceptorRegistration` Spring Beans are automatically registered.
 
 ---
 
-## 3. HttpBodyCodecInterceptor — 请求/响应体拦截
+## 3. HttpBodyCodecInterceptor — Request/Response Body Interception
 
-在请求体读取和响应体写入时拦截，适合做加密、解密、日志等。
+Intercept during request body reading and response body writing, suitable for encryption, decryption, logging, etc.
 
 ```java
 @Component
@@ -98,20 +98,20 @@ public class CryptoInterceptor implements HttpBodyCodecInterceptor {
     @Override
     public boolean supportBodyRead(MethodParameter methodParameter, Type targetType,
                                     HttpBodyConverter converter) {
-        return true; // 可指定对哪些参数生效
+        return true; // Can specify which parameters to affect
     }
 
     @Override
     public HttpInputMessage beforeBodyRead(HttpInputMessage inputMessage, MethodParameter parameter,
                                            Type targetType, HttpBodyConverter converter) {
-        // 对请求体做解密等处理
+        // Decrypt or process the input message
         return inputMessage;
     }
 
     @Override
     public Object afterBodyRead(Object body, HttpInputMessage inputMessage,
                                 MethodParameter parameter, Type targetType, HttpBodyConverter converter) {
-        // 对读取的请求体做解密等处理
+        // Decrypt or process the read body
         return body;
     }
 
@@ -123,26 +123,26 @@ public class CryptoInterceptor implements HttpBodyCodecInterceptor {
 
     @Override
     public boolean supportBodyWrite(MethodParameter returnType, HttpBodyConverter converter) {
-        return true; // 可指定对哪些返回值生效
+        return true; // Can specify which return types to affect
     }
 
     @Override
     public Object beforeBodyWrite(Object body, MethodParameter returnType,
                                   MediaType selectedContentType, HttpBodyConverter converter,
                                   ServerHttpRequest request, ServerHttpResponse response) {
-        // 对响应体做加密等处理
+        // Encrypt or process the response body
         return body;
     }
 }
 ```
 
-**关联 `@ControllerAdvice`**：可以将拦截器与 `@ControllerAdvice` 关联，实现对特定控制器的拦截。
+**Associating with `@ControllerAdvice`**: interceptors can be associated with `@ControllerAdvice` for targeted controller interception.
 
 ---
 
-## 4. HandlerExceptionResolver — 异常解析器
+## 4. HandlerExceptionResolver — Exception Resolver
 
-统一处理控制器抛出的异常。
+Unified handling of exceptions thrown by controllers.
 
 ```java
 @Component
@@ -153,25 +153,25 @@ public class CustomExceptionResolver implements HandlerExceptionResolver {
                                     WebServerHttpResponse response,
                                     HandlerMethod handler, Throwable ex) {
         if (ex instanceof BusinessException) {
-            // 自定义错误响应
+            // Custom error response
             response.setHandled(true);
-            // 写入错误 JSON
-            return true; // 返回 true 表示已处理
+            // Write error JSON
+            return true; // Return true to indicate handled
         }
-        return false; // 返回 false 表示未处理，交给下一个解析器
+        return false; // Return false to pass to next resolver
     }
 }
 ```
 
-框架内置异常解析器：
-- `ExceptionHandlerExceptionResolver` — 处理 `@ExceptionHandler` 注解
-- `ResponseStatusExceptionResolver` — 处理 `@ResponseStatus` 和 `ResponseStatusException`
+Built-in exception resolvers:
+- `ExceptionHandlerExceptionResolver` — Handles `@ExceptionHandler` annotations
+- `ResponseStatusExceptionResolver` — Handles `@ResponseStatus` and `ResponseStatusException`
 
 ---
 
-## 5. ReturnValueResolver — 返回值解析器
+## 5. ReturnValueResolver — Return Value Resolver
 
-自定义控制器方法的返回值处理方式。
+Customize how controller method return values are handled.
 
 ```java
 @Component
@@ -191,19 +191,19 @@ public class CustomReturnValueResolver implements ReturnValueResolver {
     public void resolveReturnValue(Object returnValue, MethodParameter returnType,
                                    WebServerHttpRequest req, WebServerHttpResponse resp) throws Exception {
         CustomResult result = (CustomResult) returnValue;
-        // 自定义写入逻辑
+        // Custom write logic
         resp.getBody().write(JsonUtils.toJsonBytes(result));
     }
 }
 ```
 
-**自动注册**：实现 `ReturnValueResolver` 并声明为 Spring Bean 即可。
+**Auto-registration**: implement `ReturnValueResolver` and declare it as a Spring Bean.
 
 ---
 
-## 6. RuntimeArgumentResolver — 运行时参数解析器
+## 6. RuntimeArgumentResolver — Runtime Argument Resolver
 
-解析自定义类型的控制器方法参数（每个请求动态判断）。
+Resolve custom controller method parameters (dynamic per-request decision).
 
 ```java
 @Component
@@ -221,18 +221,18 @@ public class CurrentUserResolver implements RuntimeArgumentResolver {
                                   WebServerHttpRequest request,
                                   WebServerHttpResponse response) {
         String token = request.getHeaders().getFirst("Authorization");
-        return parseToken(token); // 从 Token 解析当前用户
+        return parseToken(token); // Parse current user from Token
     }
 }
 ```
 
-**自动注册**：实现 `RuntimeArgumentResolver` 并声明为 Spring Bean 即可。
+**Auto-registration**: implement `RuntimeArgumentResolver` and declare it as a Spring Bean.
 
 ---
 
-## 7. StaticArgumentResolverProvider — 静态参数解析器提供者
+## 7. StaticArgumentResolverProvider — Static Argument Resolver Provider
 
-为特定注解的参数提供解析器（在初始化阶段决定，提高运行时性能）。
+Provide resolvers for annotated parameters (determined at initialization for better runtime performance).
 
 ```java
 @Component
@@ -258,28 +258,28 @@ public class CustomAnnotationResolverProvider implements StaticArgumentResolverP
 
 ---
 
-## 8. HttpBodyConverter — HTTP 消息转换器
+## 8. HttpBodyConverter — HTTP Message Converter
 
-扩展框架支持的 HTTP 消息格式。
+Extend the supported HTTP message formats.
 
 ```java
-// 实现 HttpBodyConverter（继承 Spring 的 GenericHttpMessageConverter）
+// Implement HttpBodyConverter (extend Spring's GenericHttpMessageConverter)
 public class XmlHttpBodyConverter extends HttpBodyConverter<Object> {
 
     public XmlHttpBodyConverter() {
-        super(new XmlSpringConverter()); // 包装 Spring 转换器
+        super(new XmlSpringConverter()); // Wrap Spring converter
         super.setSupportedMediaTypes(Collections.singletonList(MediaType.APPLICATION_XML));
     }
 }
 ```
 
-**自动注册**：`HttpBodyConverter` 或 Spring `HttpMessageConverter` 类型的 Bean 会被自动注册。
+**Auto-registration**: both `HttpBodyConverter` and Spring `HttpMessageConverter` beans are automatically registered.
 
 ---
 
-## 9. JsonConverter — JSON 转换器
+## 9. JsonConverter — JSON Converter
 
-替换 JSON 序列化/反序列化实现。
+Replace the JSON serialization/deserialization implementation.
 
 ```java
 @Component
@@ -287,12 +287,12 @@ public class CustomJsonConverter implements JsonConverter {
 
     @Override
     public String toJson(Object obj) {
-        // 自定义序列化
+        // Custom serialization
     }
 
     @Override
     public <T> T fromJson(String json, Class<T> clazz) {
-        // 自定义反序列化
+        // Custom deserialization
     }
 
     @Override
@@ -302,18 +302,18 @@ public class CustomJsonConverter implements JsonConverter {
 
     @Override
     public <T> T fromJson(InputStream json, Class<T> clazz) {
-        // 从输入流反序列化
+        // Deserialize from input stream
     }
 }
 ```
 
-**注意**：需要从 Spring 容器中排除默认的 `JacksonConverter`。
+**Note**: the default `JacksonConverter` must be excluded from the Spring container when using a custom implementation.
 
 ---
 
-## 10. WebComponent — 框架组件
+## 10. WebComponent — Framework Component
 
-实现自定义框架级组件，参与框架的生命周期管理。
+Implement custom framework-level components that participate in the framework lifecycle.
 
 ```java
 @Component
@@ -321,31 +321,31 @@ public class CustomComponent extends BaseWebComponent {
 
     @Override
     public void initComponentPhase1() {
-        // 阶段1：扫描、注册
+        // Phase 1: Scanning, registration
     }
 
     @Override
     public void initComponentPhase2() {
-        // 阶段2：构建内部结构
+        // Phase 2: Building internal structures
     }
 
     @Override
     public void initComponentPhase3() {
-        // 阶段3：预热、校验
+        // Phase 3: Warmup, validation
     }
 
     @Override
     public void destroyComponent() {
-        // 资源清理
+        // Resource cleanup
     }
 }
 ```
 
 ---
 
-## 11. BizPoolRegistry — 自定义业务线程池
+## 11. BizPoolRegistry — Custom Business Thread Pool
 
-通过 `@RunInPool` 将处理器方法调度到指定线程池。框架自动发现 Spring 容器中的 `ThreadPoolExecutor` Bean，Bean 名称即池名称。
+Schedule handler methods to specific thread pools via `@RunInPool`. The framework auto-discovers `ThreadPoolExecutor` beans from the Spring container — the bean name is used as the pool name.
 
 ```java
 @Configuration
@@ -360,7 +360,7 @@ public class ThreadPoolConfig {
 }
 ```
 
-也可通过配置文件定义默认线程池：
+The default thread pool can also be configured via properties:
 
 ```yaml
 pool:
@@ -368,28 +368,28 @@ pool:
   max-pool-size: 200
   keep-alive-time: 60
   queue-capacity: 500
-  default-execute-mode: default # "eventloop" 表示走 EventLoop
+  default-execute-mode: default # "eventloop" to use EventLoop directly
 ```
 
-在控制器中使用：
+Usage in a controller:
 
 ```java
 @RestController
 public class HeavyController {
 
     @GetMapping("/heavy-report")
-    @RunInPool("heavy-io") // 调度到 heavy-io 线程池执行
+    @RunInPool("heavy-io") // Schedule to heavy-io thread pool
     public Result<Report> generateReport() {
-        // 耗时操作，不会阻塞 Netty EventLoop
+        // Time-consuming operation, won't block Netty EventLoop
     }
 }
 ```
 
 ---
 
-## 12. RouterOptimizer — 路由优化器
+## 12. RouterOptimizer — Route Optimizer
 
-实现自定义路由优化策略（高级）。
+Implement custom route optimization strategies (advanced).
 
 ```java
 @Component
@@ -402,7 +402,7 @@ public class CustomRouterOptimizer implements RouterOptimizer {
 
     @Override
     public Router optimizeRoute(WebServerHttpRequest req) {
-        // 为请求选择最佳路由
+        // Select the best route for the request
         return null;
     }
 }
@@ -410,11 +410,11 @@ public class CustomRouterOptimizer implements RouterOptimizer {
 
 ---
 
-## 集成案例：SpringDoc OpenAPI
+## Integration Example: SpringDoc OpenAPI
 
-本框架不使用 Spring MVC，因此 SpringDoc 默认无法通过 `RequestMappingHandlerMapping` 发现路由。框架通过实现 `OpenApiCustomizer` SPI，从 `MappingRegistry` 中构建 OpenAPI 文档。
+This framework does not use Spring MVC, so SpringDoc cannot discover routes through `RequestMappingHandlerMapping` by default. The framework implements the `OpenApiCustomizer` SPI to build OpenAPI documentation from `MappingRegistry`.
 
-### 使用
+### Usage
 
 ```xml
 <dependency>
@@ -424,50 +424,50 @@ public class CustomRouterOptimizer implements RouterOptimizer {
 </dependency>
 ```
 
-添加依赖后 `OpenApiAutoConfiguration` 自动激活（`@ConditionalOnClass(OpenApiCustomizer.class)`），无需手动配置。
+After adding the dependency, `OpenApiAutoConfiguration` activates automatically (`@ConditionalOnClass(OpenApiCustomizer.class)`), no manual configuration required.
 
-### 架构
+### Architecture
 
 ```
-SpringDoc 启动 → 扫描 RequestMappingHandlerMapping → 无（本框架无 Spring MVC）
+SpringDoc starts → scans RequestMappingHandlerMapping → none (this framework has no Spring MVC)
            ↓
 OpenApiAdapter.customize(OpenAPI)
            ↓
-遍历 MappingRegistry → 构建 PathItem → openApi.path(path, pathItem)
+Iterates MappingRegistry → builds PathItem → openApi.path(path, pathItem)
            ↓
-Swagger UI 显示完整 API 文档
+Swagger UI displays complete API documentation
 ```
 
-Swagger 注解（`@Tag`、`@Operation`、`@Schema`）直接可用。
+Swagger annotations (`@Tag`, `@Operation`, `@Schema`) work directly.
 
-### 局限性
+### Limitations
 
-| 功能 | 支持情况 |
-|------|---------|
-| 路由发现 | ✅ 全部自动扫描 |
-| 路径/Query/Header 参数 | ✅ 自动解析 |
+| Feature | Status |
+|---------|--------|
+| Route discovery | ✅ Auto-scanned |
+| Path/Query/Header parameters | ✅ Auto-resolved |
 | RequestBody | ✅ application/json |
-| 响应类型 | ✅ 基础类型映射 |
-| 泛型类型 | ⚠️ `ApiResult<T>` 映射为 object |
-| Swagger 注解 | ✅ 原生支持 |
-| 模型 Schema | ⚠️ 复杂对象需补充 `@Schema` |
+| Response types | ✅ Basic type mapping |
+| Generic types | ⚠️ `ApiResult<T>` maps as object |
+| Swagger annotations | ✅ Native support |
+| Model Schema | ⚠️ Complex objects need `@Schema` |
 
 ---
 
-## 汇总：SPI 接口一览
+## Summary: SPI Interface Overview
 
-| 接口 | 注册方式 | 用途 |
-|------|----------|------|
-| `WebFilter` | Spring Bean | 请求过滤器 |
-| `HandlerInterceptor` | Spring Bean | 处理器拦截器 |
-| `InterceptorRegistration` | Spring Bean | 带路径匹配的拦截器注册 |
-| `HttpBodyCodecInterceptor` | Spring Bean | 请求/响应体读写拦截 |
-| `HandlerExceptionResolver` | Spring Bean | 异常解析器 |
-| `ReturnValueResolver` | Spring Bean | 返回值解析器 |
-| `RuntimeArgumentResolver` | Spring Bean | 运行时参数解析 |
-| `StaticArgumentResolverProvider` | Spring Bean | 静态参数解析器提供者 |
-| `HttpBodyConverter` | Spring Bean | HTTP 消息格式转换 |
-| `JsonConverter` | Spring Bean | JSON 序列化实现 |
-| `WebComponent` / `BaseWebComponent` | Spring Bean | 框架级组件（参与生命周期） |
-| `RouterOptimizer` | Spring Bean | 路由优化策略 |
-| `WebCorsProcessor` | Spring Bean | CORS 处理策略 |
+| Interface | Registration | Purpose |
+|-----------|-------------|---------|
+| `WebFilter` | Spring Bean | Request filter |
+| `HandlerInterceptor` | Spring Bean | Handler interceptor |
+| `InterceptorRegistration` | Spring Bean | Path-matched interceptor registration |
+| `HttpBodyCodecInterceptor` | Spring Bean | Request/response body read/write interception |
+| `HandlerExceptionResolver` | Spring Bean | Exception resolver |
+| `ReturnValueResolver` | Spring Bean | Return value resolver |
+| `RuntimeArgumentResolver` | Spring Bean | Runtime argument resolver |
+| `StaticArgumentResolverProvider` | Spring Bean | Static argument resolver provider |
+| `HttpBodyConverter` | Spring Bean | HTTP message format conversion |
+| `JsonConverter` | Spring Bean | JSON serialization implementation |
+| `WebComponent` / `BaseWebComponent` | Spring Bean | Framework-level component (participates in lifecycle) |
+| `RouterOptimizer` | Spring Bean | Route optimization strategy |
+| `WebCorsProcessor` | Spring Bean | CORS processing strategy |
