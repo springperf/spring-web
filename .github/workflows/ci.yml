@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: [8, 11]
+        java: [8, 11, 17]
 
     steps:
       - uses: actions/checkout@v4
@@ -23,8 +23,13 @@ jobs:
           distribution: temurin
           cache: maven
 
-      - name: Build and test
+      - name: Build and test (PR to any branch, or push to 2.7.x)
         run: mvn clean test -q
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/2.7.x')
+
+      - name: Build only (push to master)
+        run: mvn clean compile -q
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
 
       - name: Upload test reports
         if: failure()

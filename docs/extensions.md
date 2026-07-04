@@ -1,3 +1,5 @@
+> [English](en/extensions.md) | 中文
+
 # 扩展点指南
 
 框架在请求处理管线的各个关键节点均提供了 SPI 接口，允许用户在不需要修改框架代码的情况下扩展功能。
@@ -48,14 +50,20 @@ public class CustomInterceptor implements HandlerInterceptor {
 
     @Override
     public void postHandle(WebServerHttpRequest request, WebServerHttpResponse response,
-                           Object handler, Object... returnValues) {
+                           Object handler, Object result) {
         // 处理器执行后、返回值写入前
     }
 
     @Override
     public void afterCompletion(WebServerHttpRequest request, WebServerHttpResponse response,
-                                Object handler, Exception ex) {
+                                Object handler, Throwable ex) {
         // 请求完成（无论是否异常）
+    }
+
+    @Override
+    public void afterConcurrentHandlingStarted(WebServerHttpRequest request, WebServerHttpResponse response,
+                                               Object handler) {
+        // 异步处理开始时调用
     }
 }
 ```
@@ -88,34 +96,42 @@ public class WebConfig {
 public class CryptoInterceptor implements HttpBodyCodecInterceptor {
 
     @Override
-    public boolean beforeBodyRead(HttpInputMessage inputMessage, MethodParameter parameter,
-                                  Type targetType, Class<?> converterType) {
-        return true;
+    public boolean supportBodyRead(MethodParameter methodParameter, Type targetType,
+                                    HttpBodyConverter converter) {
+        return true; // 可指定对哪些参数生效
+    }
+
+    @Override
+    public HttpInputMessage beforeBodyRead(HttpInputMessage inputMessage, MethodParameter parameter,
+                                           Type targetType, HttpBodyConverter converter) {
+        // 对请求体做解密等处理
+        return inputMessage;
     }
 
     @Override
     public Object afterBodyRead(Object body, HttpInputMessage inputMessage,
-                                MethodParameter parameter, Type targetType, Class<?> converterType) {
+                                MethodParameter parameter, Type targetType, HttpBodyConverter converter) {
         // 对读取的请求体做解密等处理
         return body;
     }
 
     @Override
-    public Object beforeBodyWrite(Object body, MethodParameter returnType,
-                                  MediaType selectedContentType, Class<?> converterType) {
-        // 对响应体做加密等处理
+    public Object handleEmptyBodyRead(Object body, HttpInputMessage inputMessage,
+                                       MethodParameter parameter, Type targetType, HttpBodyConverter converter) {
         return body;
     }
 
     @Override
-    public boolean handleEmptyBodyRead(Object body, HttpInputMessage inputMessage,
-                                       MethodParameter parameter, Type targetType, Class<?> converterType) {
-        return true;
+    public boolean supportBodyWrite(MethodParameter returnType, HttpBodyConverter converter) {
+        return true; // 可指定对哪些返回值生效
     }
 
     @Override
-    public boolean supports(MethodParameter parameter, Type targetType, Class<?> converterType) {
-        return true; // 可指定对哪些处理器生效
+    public Object beforeBodyWrite(Object body, MethodParameter returnType,
+                                  MediaType selectedContentType, HttpBodyConverter converter,
+                                  ServerHttpRequest request, ServerHttpResponse response) {
+        // 对响应体做加密等处理
+        return body;
     }
 }
 ```
@@ -133,16 +149,16 @@ public class CryptoInterceptor implements HttpBodyCodecInterceptor {
 public class CustomExceptionResolver implements HandlerExceptionResolver {
 
     @Override
-    public ModelAndView resolveException(WebServerHttpRequest request,
-                                         WebServerHttpResponse response,
-                                         Object handler, Exception ex) {
+    public boolean resolveException(WebServerHttpRequest request,
+                                    WebServerHttpResponse response,
+                                    HandlerMethod handler, Throwable ex) {
         if (ex instanceof BusinessException) {
             // 自定义错误响应
             response.setHandled(true);
             // 写入错误 JSON
-            return new ModelAndView(); // 返回空 ModelAndView 表示已处理
+            return true; // 返回 true 表示已处理
         }
-        return null; // 返回 null 表示未处理，交给下一个解析器
+        return false; // 返回 false 表示未处理，交给下一个解析器
     }
 }
 ```
@@ -162,22 +178,21 @@ public class CustomExceptionResolver implements HandlerExceptionResolver {
 public class CustomReturnValueResolver implements ReturnValueResolver {
 
     @Override
-    public boolean supportsReturnType(MethodParameter returnType) {
+    public boolean supportsReturnType(MethodParameter returnType, MappingHandlerMethod mappingContext) {
         return CustomResult.class.isAssignableFrom(returnType.getParameterType());
     }
 
     @Override
-    public boolean supportsReturnValue(Object returnValue) {
+    public boolean supportsReturnValue(Object returnValue, WebServerHttpRequest req, WebServerHttpResponse resp) {
         return returnValue instanceof CustomResult;
     }
 
     @Override
-    public void resolveReturnValue(WebServerHttpRequest request, WebServerHttpResponse response,
-                                   Object returnValue, MethodParameter returnType,
-                                   MethodReturnValueContext context) {
+    public void resolveReturnValue(Object returnValue, MethodParameter returnType,
+                                   WebServerHttpRequest req, WebServerHttpResponse resp) throws Exception {
         CustomResult result = (CustomResult) returnValue;
         // 自定义写入逻辑
-        response.getBody().write(JsonUtils.toJsonBytes(result));
+        resp.getBody().write(JsonUtils.toJsonBytes(result));
     }
 }
 ```
@@ -224,13 +239,13 @@ public class CurrentUserResolver implements RuntimeArgumentResolver {
 public class CustomAnnotationResolverProvider implements StaticArgumentResolverProvider {
 
     @Override
-    public boolean supports(MethodParameter parameter, PathMappingContext mappingContext) {
+    public boolean supports(MethodParameter parameter, MappingHandlerMethod mappingContext) {
         return parameter.hasParameterAnnotation(CustomParam.class);
     }
 
     @Override
     public StaticArgumentResolver getResolver(MethodParameter parameter,
-                                              PathMappingContext mappingContext,
+                                              MappingHandlerMethod mappingContext,
                                               WebContext webContext) {
         CustomParam annotation = parameter.getParameterAnnotation(CustomParam.class);
         return (request, response) -> {
@@ -330,21 +345,30 @@ public class CustomComponent extends BaseWebComponent {
 
 ## 11. BizPoolRegistry — 自定义业务线程池
 
-通过 `@RunInPool` 将处理器方法调度到指定线程池。
+通过 `@RunInPool` 将处理器方法调度到指定线程池。框架自动发现 Spring 容器中的 `ThreadPoolExecutor` Bean，Bean 名称即池名称。
 
 ```java
 @Configuration
 public class ThreadPoolConfig {
 
-    @Bean
-    public BizPoolRegistry bizPoolRegistry() {
-        BizPoolRegistry registry = new BizPoolRegistry();
-        registry.register("heavy-io", new ThreadPoolExecutor(
+    @Bean("heavy-io")
+    public ThreadPoolExecutor heavyIoPool() {
+        return new ThreadPoolExecutor(
             20, 100, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<>(500)
-        ));
-        return registry;
+        );
     }
 }
+```
+
+也可通过配置文件定义默认线程池：
+
+```yaml
+pool:
+  core-pool-size: 50
+  max-pool-size: 200
+  keep-alive-time: 60
+  queue-capacity: 500
+  default-execute-mode: default # "eventloop" 表示走 EventLoop
 ```
 
 在控制器中使用：
@@ -372,14 +396,14 @@ public class HeavyController {
 public class CustomRouterOptimizer implements RouterOptimizer {
 
     @Override
-    public boolean supports(List<PathMappingContext> mappings) {
+    public boolean support(List<PathMappingContext> list) {
         return true;
     }
 
     @Override
-    public Router optimize(List<PathMappingContext> mappings) {
-        // 构建自定义路由结构
-        return new CustomRouter(mappings);
+    public Router optimizeRoute(WebServerHttpRequest req) {
+        // 为请求选择最佳路由
+        return null;
     }
 }
 ```

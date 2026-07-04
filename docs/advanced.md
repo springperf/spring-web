@@ -1,3 +1,5 @@
+> [English](en/advanced.md) | 中文
+
 # 高级主题
 
 ---

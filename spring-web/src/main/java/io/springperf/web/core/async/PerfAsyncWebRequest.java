@@ -61,7 +61,7 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
         if (!state.compareAndSet(State.NEW, State.ASYNC_STARTED)) {
             throw new IllegalStateException("Async already started");
         }
-        response.setWriteRespEventListener(this);
+        response.addWriteRespEventListener(this);
         scheduleTimeoutIfNecessary();
     }
 

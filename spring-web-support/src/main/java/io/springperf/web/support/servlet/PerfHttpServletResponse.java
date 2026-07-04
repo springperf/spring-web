@@ -1,11 +1,15 @@
 package io.springperf.web.support.servlet;
 
 import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.cookie.CookieHeaderNames;
+import io.netty.handler.codec.http.cookie.DefaultCookie;
+import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
 import io.springperf.web.http.WebServerHttpResponse;
 import org.springframework.http.HttpStatus;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
+import javax.servlet.http.Cookie;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
@@ -14,14 +18,52 @@ import java.util.Collection;
 
 public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse {
 
-    private final WebServerHttpResponse response;
+    private WebServerHttpResponse response;
+    private volatile String sameSite;
 
     public PerfHttpServletResponse(WebServerHttpResponse response) {
         this.response = response;
     }
 
+    /**
+     * 重新绑定底层的 {@link WebServerHttpResponse} 委托对象。
+     * 当 WebFilter 包装了响应后调用。
+     */
+    public void rebind(WebServerHttpResponse response) {
+        if (this.response != response) {
+            this.response = response;
+            this.cachedWriter = null;
+        }
+    }
+
+    /**
+     * 设置 SameSite 属性，作用于后续所有通过 {@link #addCookie(Cookie)} 添加的 Cookie。
+     * 值为 {@code "Lax"}、{@code "Strict"} 或 {@code "None"}。
+     */
+    public void setSameSite(String sameSite) {
+        this.sameSite = sameSite;
+    }
+
     @Override public void setStatus(int sc) { response.setStatusCode(HttpStatus.valueOf(sc)); }
     @Override public int getStatus() { return response.getStatus().value(); }
+
+    @Override
+    public void addCookie(Cookie cookie) {
+        DefaultCookie nettyCookie = new DefaultCookie(cookie.getName(), cookie.getValue() != null ? cookie.getValue() : "");
+        if (cookie.getDomain() != null) {
+            nettyCookie.setDomain(cookie.getDomain());
+        }
+        if (cookie.getPath() != null) {
+            nettyCookie.setPath(cookie.getPath());
+        }
+        nettyCookie.setMaxAge(cookie.getMaxAge());
+        nettyCookie.setSecure(cookie.getSecure());
+        nettyCookie.setHttpOnly(cookie.isHttpOnly());
+        if (sameSite != null) {
+            nettyCookie.setSameSite(CookieHeaderNames.SameSite.valueOf(sameSite));
+        }
+        response.getHeaders().add(HttpHeaders.Names.SET_COOKIE, ServerCookieEncoder.STRICT.encode(nettyCookie));
+    }
     @Override public void setHeader(String name, String value) { response.getHeaders().set(name, value); }
     @Override public void addHeader(String name, String value) { response.getHeaders().add(name, value); }
     @Override public String getHeader(String name) { return response.getHeaders().getFirst(name); }

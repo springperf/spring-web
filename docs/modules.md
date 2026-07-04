@@ -1,14 +1,18 @@
+> [English](en/modules.md) | 中文
+
 # 模块详解
 
 ```
-spring-web-parent
+spring-web-parent (聚合 POM)
 ├── spring-web                  核心框架
 ├── spring-web-support          可选 Servlet 桥接层
 ├── spring-web-batch            批量请求处理（可选）
 ├── spring-web-websocket        WebSocket 支持（可选）
 ├── spring-boot-starter-web     Spring Boot 自动配置
 ├── spring-web-test             测试应用
-└── spring-web-support-test     支持模块测试
+├── spring-web-support-test     支持模块测试
+├── spring-web-benchmark        JMH 性能基准测试
+└── spring-web-examples         可运行示例应用聚合
 ```
 
 ---
@@ -27,9 +31,9 @@ spring-web-parent
 
 ### filter — WebFilter 过滤器链
 
-- `WebFilter` — SPI 接口，在 DispatcherHandler 内路由匹配后、doHandle 前执行
+- `WebFilter` — SPI 接口，路由匹配后由 handleWithFilter() 触发 Filter 链，完成后回调 handleAfterFilter()
 - `WebFilterRegistry` 管理过滤器列表，支持排序
-- 过滤器链通过 `FilterChainTerminal` 回调触发后续处理
+- 过滤器链完成后通过 `DefaultFilterChain` 回调 `DispatcherHandler.handleAfterFilter()`
 - 自动注册 Spring 容器中所有 `WebFilter` 类型的 Bean
 
 ### core — 核心处理管线
@@ -41,17 +45,24 @@ spring-web-parent
 ```
 请求进入
   ↓
-WebFilterRegistry 过滤器链
+DispatcherHandler.handle()
   ↓
-DispatcherHandler:
-  1. MappingRegistry   — 路由匹配，查找 @RequestMapping 处理器
-  2. CorsRegistry      — CORS 跨域检查
-  3. InterceptorRegistry — preHandle 拦截前置处理
-  4. ArgumentResolverRegistry — 参数解析
-  5. InvokableHandlerMethod  — 处理器方法调用
-  6. ReturnValueResolverRegistry — 返回值处理
-  7. InterceptorRegistry — postHandle → afterCompletion
-  8. ExceptionRegistry  — 任意步骤异常的统一处理
+MappingRegistry — 路由匹配，查找 @RequestMapping 处理器
+  ↓
+BizPoolRegistry — @RunInPool 线程池判断（可选）
+  ↓
+handleWithFilter() → WebFilterRegistry 过滤器链
+  ↓  Filter 链完成后回调
+handleAfterFilter() — 初始化上下文
+  ↓
+  ├── doHandle() (完全匹配):
+  │   ├── CorsRegistry              — CORS 检查
+  │   ├── InterceptorRegistry       — preHandle
+  │   ├── ArgumentResolverRegistry  — 参数解析
+  │   ├── InvokableHandlerMethod    — 处理器调用
+  │   └── ReturnValueResolverRegistry — 返回值处理
+  │   └── InterceptorRegistry       — postHandle → afterCompletion
+  └── 404/405 → ExceptionRegistry + afterCompletion
 ```
 
 #### mapping — 请求映射
@@ -222,12 +233,28 @@ destroyComponent()     → 资源释放
 
 `SpringWebSupportAutoConfiguration` 在 `spring-web-support` 存在时自动装配支持模块组件。
 
+### Batch 自动配置
+
+`SpringWebBatchAutoConfiguration` 在 `spring-web-batch` 存在时自动装配批量处理支持。
+
 ### Actuator 自动配置
 
 `ActuatorEndpointAutoConfiguration` 在 Actuator 存在时自动配置端点：
 - 将 `ExposableWebEndpoint` 注册为框架路由
 - 支持独立管理端口（`management.server.port`）
 - 独立的 Management Netty 服务器
+
+### SBA 客户端自动配置
+
+`SpringBootAdminClientAutoConfiguration` 在 SBA 客户端存在时自动发射 `WebServerInitializedEvent`，以支持 Spring Boot Admin 心跳注册。
+
+### OpenAPI 自动配置
+
+`OpenApiAutoConfiguration` 在 `springdoc-openapi` 存在时自动生成 OpenAPI 文档端点。
+
+### Swagger UI 自动配置
+
+`SwaggerUiAutoConfiguration` 在 Swagger UI 存在时自动注册 Swagger UI 静态资源路由。
 
 ### 应用上下文
 

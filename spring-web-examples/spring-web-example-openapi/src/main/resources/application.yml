@@ -1,0 +1,12 @@
+server:
+  port: 8080
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+logging:
+  level:
+    io.springperf.web.support.mvc.config: INFO
