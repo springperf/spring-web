@@ -7,7 +7,6 @@ import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 public class ResourceHandlerRegistration implements WebComponent {
@@ -28,7 +27,12 @@ public class ResourceHandlerRegistration implements WebComponent {
     }
 
     public ResourceHandlerRegistration addResourceLocations(String... resourceLocations) {
-        this.locationValues.addAll(Arrays.asList(resourceLocations));
+        for (String location : resourceLocations) {
+            if (location.endsWith("/")) {
+                location = location.substring(0, location.length() - 1);
+            }
+            this.locationValues.add(location);
+        }
         return this;
     }
 

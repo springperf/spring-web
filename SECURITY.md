@@ -1,29 +1,29 @@
-# 安全策略
+# Security Policy
 
-## 报告安全漏洞
+## Reporting a Vulnerability
 
-如果您发现了安全漏洞，**请勿在 GitHub Issues 中公开报告**。请通过以下方式私下报告：
+If you discover a security vulnerability, **please do not report it publicly via GitHub Issues**. Instead, report it privately by sending an email to:
 
-- 发送邮件至 hcd0614@gmail.com
+- hcd0614@gmail.com
 
-我们会尽快回复并处理。
+We will respond and address the issue as soon as possible.
 
-## 处理流程
+## Process
 
-1. 确认漏洞并评估影响范围
-2. 开发修复方案
-3. 发布修复版本
-4. 公开披露（在修复发布后）
+1. Confirm the vulnerability and assess its impact
+2. Develop a fix
+3. Release a patched version
+4. Public disclosure (after the fix is released)
 
-## 支持的版本
+## Supported Versions
 
-| 版本 | 支持状态 |
-|------|---------|
-| 1.0.x | 支持 |
+| Version | Supported |
+|---------|-----------|
+| 1.0.x   | Yes       |
 
-## 安全相关配置
+## Security-Related Configuration
 
-### 生产环境建议
+### Production Recommendations
 
-- 启用管理端口时，配置独立的端口并使用防火墙限制访问
-- 使用 HTTPS 保护通信（支持配置 SSL 证书）
+- When enabling the management port, configure a separate port and restrict access using a firewall
+- Use HTTPS to protect communications (SSL certificate configuration is supported)

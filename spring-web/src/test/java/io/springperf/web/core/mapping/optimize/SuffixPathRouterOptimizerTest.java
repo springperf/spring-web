@@ -1,6 +1,7 @@
 package io.springperf.web.core.mapping.optimize;
 
 import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import org.junit.jupiter.api.Test;
 
@@ -60,7 +61,7 @@ class SuffixPathRouterOptimizerTest {
         SuffixPathRouterOptimizer optimizer = new SuffixPathRouterOptimizer();
         WebServerHttpRequest req = mock(WebServerHttpRequest.class);
         when(req.getPath()).thenReturn("/api/v1/user/detail");
-        when(req.getRequestContext()).thenReturn(mock());
+        when(req.getRequestContext()).thenReturn(mock(RequestContext.class));
         assertThrows(ArrayIndexOutOfBoundsException.class, () -> optimizer.optimizeRoute(req));
     }
 }

@@ -150,6 +150,9 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
     }
 
     public void writeBody(Object value, MethodParameter returnType, WebServerHttpRequest request, WebServerHttpResponse response) throws IOException {
+        if (value == null) {
+            return;
+        }
         Object body;
         Class<?> valueType;
         Type targetType;

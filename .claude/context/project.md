@@ -7,7 +7,7 @@
 ## 项目配置
 
 - Java 8 源码兼容
-- Spring Boot 2.6.15 父 POM
+- 多版本兼容：Spring Boot 2.7.x / 2.6.x / 2.5.x / 2.4.x（BOM + Profile 切换）
 - Netty 4.1.110.Final
 - Jackson 2.17.2、Fastjson 2.0.60（provided）
 - Lombok 1.18.24
