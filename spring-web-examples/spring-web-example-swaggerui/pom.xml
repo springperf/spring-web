@@ -1,0 +1,45 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>io.github.springperf</groupId>
+        <artifactId>spring-web-examples</artifactId>
+        <version>2.7.1</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>spring-web-example-swaggerui</artifactId>
+
+    <name>perf-spring-web-example-swaggerui</name>
+    <description>Spring Perf Web Swagger UI 示例 - 演示 Swagger UI 自动集成</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.github.springperf</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <!-- springdoc-openapi-common: OpenAPI 规范生成 + 触发 SwaggerUiAutoConfiguration -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-common</artifactId>
+            <version>${springdoc.version}</version>
+        </dependency>
+        <!-- Swagger UI 纯静态资源，由 SwaggerUiAutoConfiguration 自动装配 -->
+        <dependency>
+            <groupId>org.webjars</groupId>
+            <artifactId>swagger-ui</artifactId>
+            <version>5.2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

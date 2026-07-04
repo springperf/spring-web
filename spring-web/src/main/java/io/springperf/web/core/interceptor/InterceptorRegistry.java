@@ -2,6 +2,7 @@ package io.springperf.web.core.interceptor;
 
 import io.springperf.web.context.WebComponentContainer;
 import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.http.RequestAttribute;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.util.support.ContainmentResult;
@@ -18,7 +19,8 @@ import java.util.List;
 @Slf4j
 public class InterceptorRegistry extends WebComponentContainer {
 
-    public static final String INTERCEPTORS_ATTRIBUTE = HandlerInterceptor.class.getSimpleName() + "_KEY";
+    public static final RequestAttribute<List<HandlerInterceptor>> INTERCEPTORS_ATTRIBUTE =
+            (RequestAttribute) RequestAttribute.createAttribute(List.class);
     private final List<InterceptorRegistration> registrations = new ArrayList<>();
 
     private final List<HandlerInterceptor> runtimeMappingInterceptors = new ArrayList<>();
@@ -106,7 +108,7 @@ public class InterceptorRegistry extends WebComponentContainer {
 
 
     protected List<HandlerInterceptor> getInterceptors(WebServerHttpRequest request) {
-        List<HandlerInterceptor> interceptors = (List<HandlerInterceptor>) request.getRequestContext().getAttribute(INTERCEPTORS_ATTRIBUTE);
+        List<HandlerInterceptor> interceptors = request.getRequestContext().getAttribute(INTERCEPTORS_ATTRIBUTE);
         if (interceptors == null) {
             interceptors = realGetInterceptors(request);
             request.getRequestContext().setAttribute(INTERCEPTORS_ATTRIBUTE, interceptors);

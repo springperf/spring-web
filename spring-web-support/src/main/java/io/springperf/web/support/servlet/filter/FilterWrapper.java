@@ -39,7 +39,11 @@ public class FilterWrapper implements WebFilter {
         if (adapterContext == null) {
             adapterContext = createServletAdapterContext(request, response, chain);
             ServletAttribute.setAdapterContext(request.getRequestContext(), adapterContext);
+        } else if (adapterContext.getFilterChain() == null) {
+            adapterContext.setFilterChain(new PerfHttpServletFilterChain(request, response, chain));
         }
+        adapterContext.rebindFrameworkRequest(request);
+        adapterContext.rebindFrameworkResponse(response);
         filter.doFilter(adapterContext.getRequest(), adapterContext.getResponse(), adapterContext.getFilterChain());
     }
 

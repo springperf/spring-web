@@ -13,17 +13,30 @@ import io.springperf.web.support.mvc.config.WebMvcConfigurerBridge;
 import io.springperf.web.support.mvc.interceptor.SupportInterceptorRegistry;
 import io.springperf.web.support.servlet.filter.FilterWrapper;
 import io.springperf.web.support.servlet.filter.SupportWebFilterRegistry;
+import io.springperf.web.support.servlet.session.PerfHttpSessionManager;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeansException;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import org.springframework.boot.web.servlet.AbstractFilterRegistrationBean;
+import org.springframework.boot.web.servlet.DelegatingFilterProxyRegistrationBean;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.AnnotationAwareOrderUtils;
+import org.springframework.lang.Nullable;
+import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
 
+import java.lang.reflect.Method;
+
+@Slf4j
 @Configuration
 @ConditionalOnClass(name = "io.springperf.web.support.servlet.context.ServletAdapterContext")
-public class SpringWebSupportAutoConfiguration {
+public class SpringWebSupportAutoConfiguration implements ApplicationContextAware {
+
+    private ApplicationContext applicationContext;
 
     @Bean @ConditionalOnMissingBean
     public SupportDispatcherHandler supportDispatcherHandler() { return new SupportDispatcherHandler(); }
@@ -46,12 +59,33 @@ public class SpringWebSupportAutoConfiguration {
     @Bean @ConditionalOnMissingBean
     public SupportWebFilterRegistry supportWebFilterRegistry(WebContext webContext) {
         SupportWebFilterRegistry supportWebFilterRegistry = new SupportWebFilterRegistry(webContext.getDispatcherHandler());
-        supportWebFilterRegistry.autoRegisterWebComponent(FilterRegistrationBean.class, this::createFilterWrapper);
+        supportWebFilterRegistry.autoRegisterWebComponent(AbstractFilterRegistrationBean.class, this::createFilterWrapper);
         return supportWebFilterRegistry;
     }
 
-    protected WebFilterRegistration createFilterWrapper(FilterRegistrationBean filterRegistrationBean) {
-        FilterWrapper wrapper = new FilterWrapper(filterRegistrationBean.getFilter());
+    protected WebFilterRegistration createFilterWrapper(AbstractFilterRegistrationBean<?> filterRegistrationBean) {
+        javax.servlet.Filter filter;
+        try {
+            filter = filterRegistrationBean.getFilter();
+        } catch (IllegalArgumentException e) {
+            if (filterRegistrationBean instanceof DelegatingFilterProxyRegistrationBean) {
+                try {
+                    String targetBeanName = resolveTargetBeanName((DelegatingFilterProxyRegistrationBean) filterRegistrationBean);
+                    if (targetBeanName == null) {
+                        log.warn("DelegatingFilterProxyRegistrationBean has no targetBeanName, skipping");
+                        return null;
+                    }
+                    filter = applicationContext.getBean(targetBeanName, javax.servlet.Filter.class);
+                    log.debug("Resolved DelegatingFilterProxy target bean: {} -> {}", targetBeanName, filter.getClass().getName());
+                } catch (Exception e2) {
+                    log.error("Failed to resolve filter from DelegatingFilterProxyRegistrationBean", e2);
+                    return null;
+                }
+            } else {
+                return null;
+            }
+        }
+        FilterWrapper wrapper = new FilterWrapper(filter);
         Integer order = AnnotationAwareOrderUtils.findOrder(filterRegistrationBean);
         WebFilterRegistration registration = new WebFilterRegistration(wrapper)
                 .order(order != null ? order : WebFilter.defaultOrder);
@@ -62,16 +96,36 @@ public class SpringWebSupportAutoConfiguration {
         return registration;
     }
 
+    @Nullable
+    private String resolveTargetBeanName(DelegatingFilterProxyRegistrationBean registration) {
+        // getTargetBeanName() is protected in AbstractDelegatingFilterRegistrationBean
+        Method method = ReflectionUtils.findMethod(DelegatingFilterProxyRegistrationBean.class, "getTargetBeanName");
+        if (method != null) {
+            ReflectionUtils.makeAccessible(method);
+            return (String) ReflectionUtils.invokeMethod(method, registration);
+        }
+        return null;
+    }
+
     @Bean @ConditionalOnMissingBean
     public ResponseBodyEmitterReturnValueResolver responseBodyEmitterReturnValueResolver() { return new ResponseBodyEmitterReturnValueResolver(); }
 
     @Bean @ConditionalOnMissingBean
     public WebMvcConfigurerBridge webMvcConfigurerBridge(WebContext webContext) {
         WebMvcConfigurerBridge bridge = new WebMvcConfigurerBridge();
-        bridge.initWithWebContext(webContext);
-        // Register into WebContext so its initComponentPhase1() gets called
-        // by WebComponentContainer during lifecycle
         webContext.registerWebComponent(bridge);
         return bridge;
+    }
+
+    @Bean @ConditionalOnMissingBean
+    public PerfHttpSessionManager perfHttpSessionManager(WebContext webContext) {
+        PerfHttpSessionManager manager = new PerfHttpSessionManager();
+        webContext.registerWebComponent(manager);
+        return manager;
+    }
+
+    @Override
+    public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
+        this.applicationContext = applicationContext;
     }
 }
