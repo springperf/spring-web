@@ -263,12 +263,11 @@ public class CustomAnnotationResolverProvider implements StaticArgumentResolverP
 Extend the supported HTTP message formats.
 
 ```java
-// Implement HttpBodyConverter (extend Spring's GenericHttpMessageConverter)
-public class XmlHttpBodyConverter extends HttpBodyConverter<Object> {
+// Extend WrappedHttpBodyConverter, wrapping a Spring GenericHttpMessageConverter
+public class XmlHttpBodyConverter extends WrappedHttpBodyConverter<Object> {
 
     public XmlHttpBodyConverter() {
         super(new XmlSpringConverter()); // Wrap Spring converter
-        super.setSupportedMediaTypes(Collections.singletonList(MediaType.APPLICATION_XML));
     }
 }
 ```
@@ -291,23 +290,28 @@ public class CustomJsonConverter implements JsonConverter {
     }
 
     @Override
-    public <T> T fromJson(String json, Class<T> clazz) {
+    public void toJson(OutputStream outputStream, Object obj) {
+        // Custom serialization to output stream
+    }
+
+    @Override
+    public Object fromJson(String json, Type type) {
         // Custom deserialization
     }
 
     @Override
-    public <T> T fromJson(byte[] json, Class<T> clazz) {
-        return fromJson(new String(json, StandardCharsets.UTF_8), clazz);
+    public Object fromJson(byte[] json, Type type) {
+        return fromJson(new String(json, StandardCharsets.UTF_8), type);
     }
 
     @Override
-    public <T> T fromJson(InputStream json, Class<T> clazz) {
+    public Object fromJson(InputStream json, Type type) {
         // Deserialize from input stream
     }
 }
 ```
 
-**Note**: the default `JacksonConverter` must be excluded from the Spring container when using a custom implementation.
+**Note**: when replacing the default JSON implementation, ensure your custom `JsonConverter` bean has higher priority than the default `JacksonConverter` (use `@Primary` or `@Order`).
 
 ---
 
@@ -424,7 +428,7 @@ This framework does not use Spring MVC, so SpringDoc cannot discover routes thro
 </dependency>
 ```
 
-After adding the dependency, `OpenApiAutoConfiguration` activates automatically (`@ConditionalOnClass(OpenApiCustomizer.class)`), no manual configuration required.
+After adding the dependency, `OpenApiAutoConfiguration` activates automatically (`@ConditionalOnClass(OpenApiCustomiser.class)`), no manual configuration required.
 
 ### Architecture
 

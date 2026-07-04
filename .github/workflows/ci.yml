@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: [8, 11, 17]
+        java: [8, 11, 17, 21]
 
     steps:
       - uses: actions/checkout@v4
@@ -23,13 +23,17 @@ jobs:
           distribution: temurin
           cache: maven
 
-      - name: Build and test (PR to any branch, or push to 2.7.x)
+      - name: Build and test (push to any branch, or any PR)
         run: mvn clean test -q
-        if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/2.7.x')
-
-      - name: Build only (push to master)
-        run: mvn clean compile -q
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        if: |
+          (github.event_name == 'pull_request' || github.event_name == 'push')
+          && (
+            contains(fromJSON('["8", "11", "17"]'), matrix.java)
+            && (github.ref == 'refs/heads/2.7.x' || github.base_ref == '2.7.x')
+            ||
+            contains(fromJSON('["17", "21"]'), matrix.java)
+            && !(github.ref == 'refs/heads/2.7.x' || github.base_ref == '2.7.x')
+          )
 
       - name: Upload test reports
         if: failure()

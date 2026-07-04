@@ -102,18 +102,9 @@ Through the `spring-web-batch` module, high-concurrency single requests can be t
 
 ### Quick Start
 
-**Step 1: Define a BatchRequest subclass**
+**Step 1: Write the single-request endpoint**
 
-```java
-public class GetUserRequest extends BatchRequest<UserResp> {
-    Long id;
-    String lang;
-}
-```
-
-Field names match single-method parameter names; the framework injects values automatically.
-
-**Step 2: Write the single-request endpoint**
+Change the return type to `BatchRequest<R>` (a subclass of `DeferredResult`). The method body will not actually execute:
 
 ```java
 @RestController
@@ -128,7 +119,21 @@ public class UserController {
 }
 ```
 
-Change the return type to `BatchRequest<R>` (a subclass of `DeferredResult`). The method body will not actually execute.
+**Step 2: Define a BatchRequest subclass**
+
+Constructor parameter types must match the single-request endpoint parameters by position. The framework creates instances via reflection:
+
+```java
+public class GetUserRequest extends BatchRequest<UserResp> {
+    private final Long id;
+    private final String lang;
+
+    public GetUserRequest(Long id, String lang) {
+        this.id = id;
+        this.lang = lang;
+    }
+}
+```
 
 **Step 3: Write the batch handler method**
 
@@ -187,7 +192,7 @@ public @interface BatchMapping {
     /** RingBuffer capacity, must be power of 2. Default 4096. */
     int ringBufferSize() default 4096;
 
-    /** Disruptor wait strategy. Default YIELDING. */
+    /** Disruptor wait strategy. Default BLOCKING. */
     WaitStrategy waitStrategy() default WaitStrategy.BLOCKING;
 
     /** Backpressure strategy when RingBuffer is full. Default BLOCK. */
@@ -196,8 +201,8 @@ public @interface BatchMapping {
     /** Associated single-request method name. Default: same as batch method name. */
     String method() default "";
 
-    /** Max batch size. <= 0 means rely on Disruptor endOfBatch signal. */
-    int maxBatchSize() default 0;
+    /** Max batch size. When reached, triggers batch processing. Also triggered by Disruptor endOfBatch signal. Default 100. */
+    int maxBatchSize() default 100;
 
     /** Max concurrent processing threads, including the Disruptor consumer thread. Default: CPU cores. */
     int consumerSize() default -1;
@@ -223,7 +228,7 @@ public @interface BatchMapping {
 
 #### maxBatchSize
 
-Accumulate a certain number of requests before triggering batch processing, instead of relying solely on Disruptor's `endOfBatch` signal. `<= 0` means fully reliant on `endOfBatch`.
+Accumulate a certain number of requests before triggering batch processing, instead of relying solely on Disruptor's `endOfBatch` signal. Default 100. `<= 0` means fully reliant on `endOfBatch`.
 
 #### consumerSize and Thread Model
 
@@ -277,44 +282,6 @@ public class GetUserRequest extends BatchRequest<UserResp> {
 
 ## Streaming Responses
 
-### StreamEmitter
-
-Send data in chunks:
-
-```java
-@GetMapping("/stream")
-public StreamEmitter streamData() {
-    StreamEmitter emitter = new StreamEmitter();
-
-    taskQueue.execute(() -> {
-        try {
-            for (int i = 0; i < 100; i++) {
-                emitter.send("chunk-" + i + "\n");
-                Thread.sleep(100);
-            }
-            emitter.complete();
-        } catch (Exception e) {
-            emitter.completeWithError(e);
-        }
-    });
-
-    return emitter;
-}
-```
-
-### Custom Streaming JSON
-
-```java
-@GetMapping("/stream-json")
-public StreamJsonEmitter streamJson() {
-    return (StreamJsonEmitter) new StreamJsonEmitter()
-            .onStarted((emitter, request, response) -> {
-                response.getHeaders().setContentType(MediaType.APPLICATION_NDJSON);
-            });
-    // Returning StreamJsonEmitter — framework handles streaming automatically
-}
-```
-
 ### SSE (Server-Sent Events)
 
 ```java
@@ -325,10 +292,11 @@ public SseEmitter sseEvents() {
     taskQueue.execute(() -> {
         try {
             for (int i = 0; i < 10; i++) {
-                emitter.send(SseEmitter.event()
+                emitter.send(ServerSentEvent.builder()
                     .id(String.valueOf(i))
-                    .name("message")
-                    .data("Hello " + i));
+                    .event("message")
+                    .data("Hello " + i)
+                    .build());
                 Thread.sleep(1000);
             }
             emitter.complete();
@@ -350,9 +318,9 @@ public TextStreamEmitter textStream() {
 
     taskQueue.execute(() -> {
         try {
-            for (int i = 0; i < 5; i++) {
-                emitter.send("Line " + i + "\n");
-                Thread.sleep(500);
+            for (int i = 0; i < 100; i++) {
+                emitter.send("chunk-" + i);
+                Thread.sleep(100);
             }
             emitter.complete();
         } catch (Exception e) {
@@ -361,6 +329,16 @@ public TextStreamEmitter textStream() {
     });
 
     return emitter;
+}
+```
+
+### Custom Streaming JSON
+
+```java
+@GetMapping("/stream-json")
+public StreamJsonEmitter streamJson() {
+    return new StreamJsonEmitter(jsonConverter);
+    // StreamJsonEmitter automatically sets Content-Type: application/stream+json
 }
 ```
 

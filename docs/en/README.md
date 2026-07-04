@@ -78,38 +78,35 @@ public class Application {
 }
 ```
 
-### 4. Configure
+### 4. Configuration
 
 ```yaml
 server:
   port: 8080
-  boss-threads: 2
-  worker-threads: 16
+  servlet:
+    context-path: /api               # Application context path (optional)
+  http:
+    max-content-length: 5242880      # Max request body, default 1MB
+    timeout: 15000                   # Request timeout, default 60s (milliseconds)
 management:
   server:
-    port: 8081  # Standalone management port (optional)
+    port: 8081                       # Actuator standalone management port (optional)
 ```
+
+> See [Configuration Reference](configuration.md) for the full list.
 
 ---
 
 ## Version Selection
 
-This project manages two branches aligned with Spring Boot major versions.
-
-The `master` / `2.7.x` branch supports **Spring Boot 2.4.x ~ 2.7.x** (Spring Framework 5.3.x) via Maven profiles. Switch profiles to compile and test against different versions.
-
-The `3.2.x` branch supports **Spring Boot 3.0.x ~ 3.5.x** (Spring Framework 6.0.x ~ 6.2.x) and **Spring Boot 4.0.x ~ 4.1.x** (Spring Framework 7.0.x) via Maven profiles. Requires JDK 17+, based on `jakarta.servlet` 6.0, with support for virtual threads (JDK 21) and GraalVM native-image.
+This project manages two branches aligned with Spring Boot major versions. Minimum supported: **Spring Boot 2.4.x**.
 
 | Branch | Spring Boot | Spring Framework | JDK | Servlet API | Status |
 |--------|------------|----------------|-----|-------------|--------|
-| `master` / `2.7.x` | 2.4.x ~ 2.7.x | 5.3.x | 8 / 11 / 17 | javax.servlet 4.0 | **Development baseline** (features + bugfix) |
-| `3.2.x` | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | 6.0.x ~ 6.2.x / 7.0.x | 17 / 21 | jakarta.servlet 6.0 | Main version (multi-version via profiles) |
+| `2.7.x` | 2.4.x ~ 2.7.x | 5.3.x | 8 / 11 / 17 | javax.servlet 4.0 | Maintenance branch (features + bugfix) |
+| `master` | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | 6.0.x ~ 6.2.x / 7.0.x | 17 / 21 | jakarta.servlet 6.0 | **Development baseline** (multi-version via profiles) |
 
-> **Version floor note**: The project previously attempted compatibility with Spring Boot 2.3.x (Spring Framework 5.2.x), but Spring 5.2 lacks APIs such as `MultiValueMapAdapter`, `getSupportedMediaTypes(Class)` and has restrictions around `MethodHandles.lookup()` for package-private methods. These issues made maintenance cost outweigh benefits, so **2.3.x and below are no longer supported**.
->
-> **Branch recommendation**: For JDK 8/11 existing projects, choose `master`/`2.7.x` and use `-Pspring-boot-2.6` / `-Pspring-boot-2.5` / `-Pspring-boot-2.4` to switch target versions. For JDK 17+ new projects, choose `3.2.x` (supports virtual threads, GraalVM native-image).
-
-> See [Version Compatibility](compatibility.md) for details.
+> See [Version Compatibility](compatibility.md) for version floor notes, branch recommendations, and detailed compatibility information.
 
 ---
 
@@ -155,13 +152,16 @@ The perf framework delivers **1.3~4.5x** throughput over Servlet containers, wit
 
 ## Modules
 
-| Module | Description | Scope |
-|--------|-------------|-------|
-| `spring-web` | Core: Netty server, request dispatch, mapping registration, exception handling | Compile |
-| `spring-web-support` | Spring MVC compatibility: `HandlerInterceptor`, `View` adapters, etc. ¹ | provided |
-| `spring-boot-starter-web` | Spring Boot Starter: auto-configuration, Actuator support | Compile |
-| `spring-web-test` | Integration tests | - |
-| `spring-web-support-test` | Compatibility tests | - |
+| Module | Description |
+|--------|-------------|
+| `spring-web` | Core: Netty server, request dispatch, mapping registration, exception handling |
+| `spring-web-support` | Spring MVC compatibility: `HandlerInterceptor`, `View` adapters, etc. ¹ |
+| `spring-web-websocket` | WebSocket support: Spring WebSocket + Netty |
+| `spring-web-batch` | Batch processing: high-performance message aggregation via Disruptor |
+| `spring-boot-starter-web` | Spring Boot Starter: auto-configuration, Actuator support |
+| `spring-web-test` | Integration tests |
+| `spring-web-support-test` | Spring MVC compatibility tests |
+| `spring-web-examples` | Usage examples for various scenarios |
 
 > ¹ Some classes in the support module use `org.springframework.web.servlet` package paths (e.g., `HandlerInterceptor`), intentionally matching Spring WebMVC's official package paths — code written against Spring MVC interfaces can run without import changes. Since Spring Web does not depend on `spring-webmvc`, there is no classpath conflict at runtime. Under Java 9+ module system, depending on both will trigger split package warnings; choose one.
 

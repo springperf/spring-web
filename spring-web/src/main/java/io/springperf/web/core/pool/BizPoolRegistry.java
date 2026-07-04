@@ -7,6 +7,7 @@ import io.springperf.web.core.mapping.MappingHandlerMethod;
 import io.springperf.web.core.mapping.MappingResult;
 import io.springperf.web.http.WebServerHttpRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 
 import java.util.Map;
@@ -34,7 +35,7 @@ public class BizPoolRegistry extends BaseWebComponent {
             MappingCacheKey.createMethodCacheKey(Object.class);
     private static final Object NO_POOL = new Object();
 
-    private final Map<String, ThreadPoolExecutor> pools = new ConcurrentHashMap<>();
+    private final Map<String, ExecutorService> pools = new ConcurrentHashMap<>();
 
     /** 预缓存的默认执行策略：null 表示未初始化（降级为 EventLoop），"eventloop" 表示 EventLoop，其他值为池名。 */
     private volatile String defaultExecuteMode;
@@ -46,6 +47,27 @@ public class BizPoolRegistry extends BaseWebComponent {
         // 缓存默认执行策略，避免请求路径上查询配置
         this.defaultExecuteMode = webContext.getProps().get(
                 PropertiesConstant.POOL_DEFAULT_EXECUTE_MODE, PropertiesConstant.POOL_DEFAULT_EXECUTE_MODE_DEFAULT);
+    }
+
+    @Override
+    public void initComponentPhase3() throws Exception {
+        // 自动发现 Spring 容器中 ThreadPoolExecutor Bean，注册到池
+        ApplicationContext ctx = webContext.getCtx();
+        Map<String, ThreadPoolExecutor> executorBeans = ctx.getBeansOfType(ThreadPoolExecutor.class);
+        for (Map.Entry<String, ThreadPoolExecutor> entry : executorBeans.entrySet()) {
+            String beanName = entry.getKey();
+            // 不覆盖已注册的同名池（如配置创建的 "default" 池优先）
+            if (!pools.containsKey(beanName)) {
+                register(beanName, entry.getValue());
+            }
+        }
+
+        // check-on-startup：pools 仍为空则告警
+        if (webContext.getProps().getBoolean(PropertiesConstant.CHECK_ON_STARTUP, true)
+                && pools.isEmpty()) {
+            log.warn("No thread pools registered — consider configuring pool.* properties "
+                    + "or declaring ThreadPoolExecutor beans");
+        }
     }
 
     /**
@@ -78,7 +100,7 @@ public class BizPoolRegistry extends BaseWebComponent {
      *
      * @throws IllegalArgumentException 当名称为保留关键字 "eventloop" 时
      */
-    public void register(String name, ThreadPoolExecutor executor) {
+    public void register(String name, ExecutorService executor) {
         if (name == null || executor == null) {
             return;
         }
@@ -87,7 +109,7 @@ public class BizPoolRegistry extends BaseWebComponent {
                     "'" + RunInPool.EVENTLOOP + "' is a reserved keyword and cannot be used as a pool name");
         }
         pools.put(name, executor);
-        log.info("BizPool [{}] registered: core={}, max={}", name, executor.getCorePoolSize(), executor.getMaximumPoolSize());
+        log.info("BizPool [{}] registered: executor={}", name, executor.getClass().getSimpleName());
     }
 
     /**
@@ -145,10 +167,22 @@ public class BizPoolRegistry extends BaseWebComponent {
 
     /**
      * 根据池名称解析并缓存 {@link ExecutorService}。
+     * 本地 pools 未命中时，兜底到 Spring 容器按 bean 名称查找并自动注册。
      * 名称 "eventloop" 不会到达此方法，调用前已由 {@link #determinePool(MappingHandlerMethod)} 拦截处理。
      */
     private ExecutorService resolvePool(String poolName, MappingHandlerMethod mappingContext) {
         ExecutorService executor = pools.get(poolName);
+        if (executor == null) {
+            // 兜底：从 Spring 容器按 bean 名称查找
+            if (webContext != null && webContext.getCtx() != null) {
+                try {
+                    executor = webContext.getCtx().getBean(poolName, ExecutorService.class);
+                    register(poolName, executor);
+                } catch (Exception ignored) {
+                    // bean 不存在，继续走原有报错
+                }
+            }
+        }
         if (executor == null) {
             throw new IllegalStateException(
                     "Pool '" + poolName + "' referenced on " + mappingContext.getBridgedMethod().toGenericString()

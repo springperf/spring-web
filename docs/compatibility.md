@@ -10,8 +10,14 @@
 
 | 分支 | 对应 Spring Boot | 状态 | 维护策略 |
 |------|-----------------|------|---------|
-| `master` / `2.7.x` | 2.4.x ~ 2.7.x | **开发基线** | 功能迭代 + bugfix，新功能优先合入此处 |
-| `3.2.x` | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | 主力版本 | 从 master fork，通过 Maven Profile 多版本兼容 |
+| `2.7.x` | 2.4.x ~ 2.7.x | 维护分支 | 功能迭代 + bugfix，基于 javax.servlet |
+| `master` | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | **开发基线** | 新功能优先合入此处，通过 Maven Profile 多版本兼容 |
+
+---
+
+## 版本下限说明
+
+本项目曾尝试兼容 Spring Boot 2.3.x（Spring Framework 5.2.x），但 Spring 5.2 年代久远，缺少 `MultiValueMapAdapter`、`getSupportedMediaTypes(Class)` 等 API，且 `MethodHandles.lookup()` 对包私有方法的访问受限难以绕过。这些限制使得兼容维护成本远高于收益，故 **2.3.x 及以下版本不再支持**，曾有兼容代码已清理退回。
 
 ---
 
@@ -34,11 +40,11 @@
 
 - **不支持 `jakarta.servlet`**：2.7.x 基于 `javax.servlet`，与 Jakarta EE 不兼容
 - **不支持虚拟线程**：JDK 8/11 无虚拟线程能力
-- **不支持 GraalVM native-image**：AOT 编译为 3.2.x 分支特性
+- **不支持 GraalVM native-image**：AOT 编译为 master 分支特性
 
 ---
 
-## 3.2.x 分支
+## master 分支
 
 ### 版本矩阵
 
@@ -66,28 +72,20 @@
 | 你的场景 | 推荐分支 |
 |---------|---------|
 | 现有项目基于 Servlet 容器，JDK 8/11 | `2.7.x` |
-| 新项目或已迁移到 JDK 17+ | `3.2.x` |
-| 需要使用虚拟线程（JDK 21） | `3.2.x` |
-| 需要 GraalVM native-image 编译 | `3.2.x` |
-| 需要 WebSocket 支持 | `3.2.x` |
+| 新项目或已迁移到 JDK 17+ | `master` |
+| 需要使用虚拟线程（JDK 21） | `master` |
+| 需要 GraalVM native-image 编译 | `master` |
+
+> **分支选择建议**：JDK 8/11 现有项目选 `master`/`2.7.x`，使用 `-Pspring-boot-2.6` / `-Pspring-boot-2.5` / `-Pspring-boot-2.4` 切换目标版本；JDK 17+ 新项目选 `master`（支持虚拟线程、GraalVM native-image）。
 
 ---
 
-## 跨分支迁移
+## 分支差异摘要
 
-### 从 2.7.x 迁移到 3.2.x
-
-主要差异：
-
-1. **JDK 要求**：8+ → 17+
-2. **Servlet API**：`javax.servlet` → `jakarta.servlet`（import 需批量替换）
-3. **Hibernate Validator**：`javax.validation` → `jakarta.validation`
-4. **@PostConstruct 等**：`javax.annotation` → `jakarta.annotation`
-
-### 从 3.2.x 迁移到 Spring Boot 4.x
-
-主要差异：
-
-1. **Spring Framework 7.x**：`MediaType.APPLICATION_STREAM_JSON` 等常量移除，使用 `MediaTypeUtils` 适配
-2. **HttpHeaders 不再继承 MultiValueMap**：使用 `WebHttpHeaders` 替代，通过 `MethodHandle` 调用 `asMultiValueMap()`
-3. **MediaType 比较器**：`MediaType.SPECIFICITY_COMPARATOR`、`MediaType.sortBySpecificity()` 等方法移除，使用 `MediaTypeUtils` 替代
+| 维度 | `2.7.x` | `master` |
+|------|---------|----------|
+| JDK 最低要求 | 8 | 17 |
+| Servlet API | `javax.servlet` | `jakarta.servlet` |
+| 虚拟线程 | 不支持 | 支持（JDK 21+） |
+| GraalVM native-image | 不支持 | 支持 |
+| 核心开发基线 | 维护分支（bugfix + 功能迭代） | **开发基线**（新功能优先） |

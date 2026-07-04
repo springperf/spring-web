@@ -10,8 +10,14 @@ This project maintains two main branches corresponding to Spring Boot 2.x and Sp
 
 | Branch | Spring Boot | Status | Maintenance Strategy |
 |--------|-------------|--------|---------------------|
-| `master` / `2.7.x` | 2.4.x ~ 2.7.x | **Development baseline** | Features + bugfixes; new features merged here first |
-| `3.2.x` | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | Main version | Forked from master, multi-version via Maven profiles |
+| `2.7.x` | 2.4.x ~ 2.7.x | Maintenance branch | Features + bugfixes; based on javax.servlet |
+| `master` | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | **Development baseline** | New features merged here first; multi-version via Maven profiles |
+
+---
+
+## Version Floor Note
+
+The project previously attempted compatibility with Spring Boot 2.3.x (Spring Framework 5.2.x), but Spring 5.2 lacks APIs such as `MultiValueMapAdapter`, `getSupportedMediaTypes(Class)` and has restrictions around `MethodHandles.lookup()` for package-private methods. These issues made maintenance cost outweigh benefits, so **2.3.x and below are no longer supported** — the previously implemented compatibility code has been cleaned up.
 
 ---
 
@@ -34,11 +40,11 @@ This project maintains two main branches corresponding to Spring Boot 2.x and Sp
 
 - **`jakarta.servlet` not supported**: 2.7.x is based on `javax.servlet`, incompatible with Jakarta EE
 - **No virtual thread support**: JDK 8/11 don't have virtual thread capabilities
-- **No GraalVM native-image**: AOT compilation is a 3.2.x branch feature
+- **No GraalVM native-image**: AOT compilation is a master branch feature
 
 ---
 
-## 3.2.x Branch
+## master Branch
 
 ### Version Matrix
 
@@ -66,28 +72,20 @@ This project maintains two main branches corresponding to Spring Boot 2.x and Sp
 | Your Scenario | Recommended Branch |
 |--------------|-------------------|
 | Existing project on Servlet container, JDK 8/11 | `2.7.x` |
-| New project or already migrated to JDK 17+ | `3.2.x` |
-| Need virtual threads (JDK 21) | `3.2.x` |
-| Need GraalVM native-image | `3.2.x` |
-| Need WebSocket support | `3.2.x` |
+| New project or already migrated to JDK 17+ | `master` |
+| Need virtual threads (JDK 21) | `master` |
+| Need GraalVM native-image | `master` |
+
+> **Branch recommendation**: For JDK 8/11 existing projects, choose `master`/`2.7.x` and use `-Pspring-boot-2.6` / `-Pspring-boot-2.5` / `-Pspring-boot-2.4` to switch target versions. For JDK 17+ new projects, choose `master` (supports virtual threads, GraalVM native-image).
 
 ---
 
-## Cross-Branch Migration
+## Branch Differences at a Glance
 
-### Migrating from 2.7.x to 3.2.x
-
-Key differences:
-
-1. **JDK requirement**: 8+ → 17+
-2. **Servlet API**: `javax.servlet` → `jakarta.servlet` (imports need bulk replacement)
-3. **Hibernate Validator**: `javax.validation` → `jakarta.validation`
-4. **@PostConstruct etc.**: `javax.annotation` → `jakarta.annotation`
-
-### Migrating from 3.2.x to Spring Boot 4.x
-
-Key differences:
-
-1. **Spring Framework 7.x**: constants like `MediaType.APPLICATION_STREAM_JSON` removed; use `MediaTypeUtils` instead
-2. **HttpHeaders no longer extends MultiValueMap**: use `WebHttpHeaders` as replacement; call `asMultiValueMap()` via `MethodHandle`
-3. **MediaType comparators**: `MediaType.SPECIFICITY_COMPARATOR`, `MediaType.sortBySpecificity()` removed; use `MediaTypeUtils` instead
+| Dimension | `2.7.x` | `master` |
+|-----------|---------|----------|
+| Minimum JDK | 8 | 17 |
+| Servlet API | `javax.servlet` | `jakarta.servlet` |
+| Virtual threads | Not supported | Supported (JDK 21+) |
+| GraalVM native-image | Not supported | Supported |
+| Development baseline | Maintenance branch (bugfix + features) | **Development baseline** (new features first) |

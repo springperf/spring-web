@@ -263,12 +263,11 @@ public class CustomAnnotationResolverProvider implements StaticArgumentResolverP
 扩展框架支持的 HTTP 消息格式。
 
 ```java
-// 实现 HttpBodyConverter（继承 Spring 的 GenericHttpMessageConverter）
-public class XmlHttpBodyConverter extends HttpBodyConverter<Object> {
+// 继承 WrappedHttpBodyConverter，包装 Spring 的 GenericHttpMessageConverter
+public class XmlHttpBodyConverter extends WrappedHttpBodyConverter<Object> {
 
     public XmlHttpBodyConverter() {
         super(new XmlSpringConverter()); // 包装 Spring 转换器
-        super.setSupportedMediaTypes(Collections.singletonList(MediaType.APPLICATION_XML));
     }
 }
 ```
@@ -291,23 +290,28 @@ public class CustomJsonConverter implements JsonConverter {
     }
 
     @Override
-    public <T> T fromJson(String json, Class<T> clazz) {
+    public void toJson(OutputStream outputStream, Object obj) {
+        // 自定义序列化到输出流
+    }
+
+    @Override
+    public Object fromJson(String json, Type type) {
         // 自定义反序列化
     }
 
     @Override
-    public <T> T fromJson(byte[] json, Class<T> clazz) {
-        return fromJson(new String(json, StandardCharsets.UTF_8), clazz);
+    public Object fromJson(byte[] json, Type type) {
+        return fromJson(new String(json, StandardCharsets.UTF_8), type);
     }
 
     @Override
-    public <T> T fromJson(InputStream json, Class<T> clazz) {
+    public Object fromJson(InputStream json, Type type) {
         // 从输入流反序列化
     }
 }
 ```
 
-**注意**：需要从 Spring 容器中排除默认的 `JacksonConverter`。
+**注意**：替换默认 JSON 实现时，确保自定义 `JsonConverter` 的 Bean 优先级高于框架默认的 `JacksonConverter`（可通过 `@Primary` 或 `@Order` 控制）。
 
 ---
 
@@ -424,7 +428,7 @@ public class CustomRouterOptimizer implements RouterOptimizer {
 </dependency>
 ```
 
-添加依赖后 `OpenApiAutoConfiguration` 自动激活（`@ConditionalOnClass(OpenApiCustomizer.class)`），无需手动配置。
+添加依赖后 `OpenApiAutoConfiguration` 自动激活（`@ConditionalOnClass(OpenApiCustomiser.class)`），无需手动配置。
 
 ### 架构
 
