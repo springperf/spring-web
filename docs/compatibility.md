@@ -1,3 +1,5 @@
+> [English](en/compatibility.md) | 中文
+
 # 版本兼容性说明
 
 本项目维护两个主线分支，分别对应 Spring Boot 2.x 和 Spring Boot 3.x。
@@ -8,8 +10,14 @@
 
 | 分支 | 对应 Spring Boot | 状态 | 维护策略 |
 |------|-----------------|------|---------|
-| `master` / `2.7.x` | 2.x 系列 | **开发基线** | 功能迭代 + bugfix，新功能优先合入此处 |
-| `3.2.x` | 3.x 系列（未来可升级至 4.x） | 主力版本 | 从 master fork，适配 Jakarta 命名空间后同步新功能 |
+| `2.7.x` | 2.4.x ~ 2.7.x | 维护分支 | 功能迭代 + bugfix，基于 javax.servlet |
+| `master` | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | **开发基线** | 新功能优先合入此处，通过 Maven Profile 多版本兼容 |
+
+---
+
+## 版本下限说明
+
+本项目曾尝试兼容 Spring Boot 2.3.x（Spring Framework 5.2.x），但 Spring 5.2 年代久远，缺少 `MultiValueMapAdapter`、`getSupportedMediaTypes(Class)` 等 API，且 `MethodHandles.lookup()` 对包私有方法的访问受限难以绕过。这些限制使得兼容维护成本远高于收益，故 **2.3.x 及以下版本不再支持**，曾有兼容代码已清理退回。
 
 ---
 
@@ -19,7 +27,7 @@
 
 | 依赖 | 当前版本 | 已验证兼容范围 | 说明 |
 |------|---------|---------------|------|
-| Spring Boot | **2.7.18** | 2.7.x 全线（2.7.0 ~ 2.7.18） | 当前 parent 为 2.7.18（2.7 最终版） |
+| Spring Boot | **2.7.18** | 2.4.x ~ 2.7.x | 通过 Maven Profile 切换（`-Pspring-boot-2.4` ~ `-Pspring-boot-2.7`） |
 | Spring Framework | **5.3.x** | 随 Spring Boot 管理 |  |
 | JDK | **8、11、17** | 8、11、17 已验证 | 编译目标 `java.version=8` |
 | Servlet API | **javax.servlet 4.0.1** | 4.0.x |  |
@@ -32,18 +40,18 @@
 
 - **不支持 `jakarta.servlet`**：2.7.x 基于 `javax.servlet`，与 Jakarta EE 不兼容
 - **不支持虚拟线程**：JDK 8/11 无虚拟线程能力
-- **不支持 GraalVM native-image**：AOT 编译为 3.2.x 分支特性
+- **不支持 GraalVM native-image**：AOT 编译为 master 分支特性
 
 ---
 
-## 3.2.x 分支
+## master 分支
 
 ### 版本矩阵
 
 | 依赖 | 当前版本 | 已验证兼容范围 | 说明 |
 |------|---------|---------------|------|
-| Spring Boot | **3.2.12** | 3.2.x 全线（3.2.0 ~ 3.2.x） | 4.x 发布后可升级适配 |
-| Spring Framework | **6.1.x** | 随 Spring Boot 管理 |  |
+| Spring Boot | **3.2.12** | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | 通过 Maven Profile 切换（`-Pspring-boot-3.0` ~ `-Pspring-boot-4.1`） |
+| Spring Framework | **6.1.x** | 6.0.x ~ 6.2.x / 7.0.x | 随 Spring Boot 管理 |
 | JDK | **17、21** | 17、21 已验证 | 编译目标 `java.version=17`，21 提供虚拟线程支持 |
 | Servlet API | **jakarta.servlet 6.0** | 6.0.x | javax.servlet 不兼容 |
 | Netty | **4.1.110.Final** | 4.1.x |  |
@@ -64,24 +72,20 @@
 | 你的场景 | 推荐分支 |
 |---------|---------|
 | 现有项目基于 Servlet 容器，JDK 8/11 | `2.7.x` |
-| 新项目或已迁移到 JDK 17+ | `3.2.x` |
-| 需要使用虚拟线程（JDK 21） | `3.2.x` |
-| 需要 GraalVM native-image 编译 | `3.2.x` |
-| 需要 WebSocket 支持 | `3.2.x` |
+| 新项目或已迁移到 JDK 17+ | `master` |
+| 需要使用虚拟线程（JDK 21） | `master` |
+| 需要 GraalVM native-image 编译 | `master` |
+
+> **分支选择建议**：JDK 8/11 现有项目选 `master`/`2.7.x`，使用 `-Pspring-boot-2.6` / `-Pspring-boot-2.5` / `-Pspring-boot-2.4` 切换目标版本；JDK 17+ 新项目选 `master`（支持虚拟线程、GraalVM native-image）。
 
 ---
 
-## 跨分支迁移
+## 分支差异摘要
 
-### 从 2.7.x 迁移到 3.2.x
-
-主要差异：
-
-1. **JDK 要求**：8+ → 17+
-2. **Servlet API**：`javax.servlet` → `jakarta.servlet`（import 需批量替换）
-3. **Hibernate Validator**：`javax.validation` → `jakarta.validation`
-4. **@PostConstruct 等**：`javax.annotation` → `jakarta.annotation`
-
-### 从 3.2.x 迁移到 Spring Boot 4.x
-
-目前无已知 breaking change（无命名空间级别的变更）。预计只需升级 parent 版本和对应依赖版本。
+| 维度 | `2.7.x` | `master` |
+|------|---------|----------|
+| JDK 最低要求 | 8 | 17 |
+| Servlet API | `javax.servlet` | `jakarta.servlet` |
+| 虚拟线程 | 不支持 | 支持（JDK 21+） |
+| GraalVM native-image | 不支持 | 支持 |
+| 核心开发基线 | 维护分支（bugfix + 功能迭代） | **开发基线**（新功能优先） |

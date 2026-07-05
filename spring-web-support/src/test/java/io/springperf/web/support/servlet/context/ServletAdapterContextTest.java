@@ -1,5 +1,7 @@
 package io.springperf.web.support.servlet.context;
 
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.support.servlet.PerfHttpServletRequest;
 import io.springperf.web.support.servlet.PerfHttpServletResponse;
 import jakarta.servlet.FilterChain;
@@ -23,6 +25,12 @@ class ServletAdapterContextTest {
     @Mock
     FilterChain filterChain;
 
+    @Mock
+    WebServerHttpRequest webRequest;
+
+    @Mock
+    WebServerHttpResponse webResponse;
+
     @Test
     void constructor_setsAllFields() {
         ServletAdapterContext ctx = new ServletAdapterContext(request, response, filterChain);
@@ -33,11 +41,13 @@ class ServletAdapterContextTest {
     }
 
     @Test
-    void constructor_acceptsNullFields() {
-        ServletAdapterContext ctx = new ServletAdapterContext(null, null, null);
+    void rebindFramework_updatesPerfRequestAndResponse() {
+        ServletAdapterContext ctx = new ServletAdapterContext(request, response, filterChain);
 
-        assertNull(ctx.getRequest());
-        assertNull(ctx.getResponse());
-        assertNull(ctx.getFilterChain());
+        ctx.rebindFrameworkRequest(webRequest);
+        ctx.rebindFrameworkResponse(webResponse);
+
+        assertSame(request, ctx.getRequest());
+        assertSame(response, ctx.getResponse());
     }
 }

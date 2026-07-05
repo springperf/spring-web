@@ -34,7 +34,7 @@ class PerfAsyncWebRequestTest {
     @Test void startAsync_transitionsToStarted() {
         asyncWebRequest.startAsync();
         assertTrue(asyncWebRequest.isAsyncStarted());
-        verify(response).setWriteRespEventListener(asyncWebRequest);
+        verify(response).addWriteRespEventListener(asyncWebRequest);
     }
 
     @Test void startAsync_whenAlreadyStarted_throwsISE() {

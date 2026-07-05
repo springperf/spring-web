@@ -82,7 +82,7 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
             try {
                 executor.execute(() -> {
                     try {
-                        processRequest(req, resp, mappingResult);
+                        handleWithFilter(req, resp, mappingResult);
                     } finally {
                         req.release();
                     }
@@ -92,18 +92,28 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
                 throw e;
             }
         } else {
-            processRequest(req, resp, mappingResult);
+            handleWithFilter(req, resp, mappingResult);
         }
     }
 
     /**
      * Filter 链处理完成后固定调用，根据映射结果决定走 doHandle 或 404/405。
+     * 在此初始化上下文（如 LocaleContextHolder、RequestContextHolder），
+     * 确保 Filter 链中对 request 的包装能被后续处理器正确获取。
      */
     public void handleAfterFilter(WebServerHttpRequest req, WebServerHttpResponse resp, MappingResult mappingResult) {
-        if (mappingResult.isMatched()) {
-            doHandle(req, resp, mappingResult.getMatchedContext());
-        } else {
-            handleWithNoFullMatch(req, resp, mappingResult);
+        boolean initContext = false;
+        try {
+            initContext = initContextHolders(req, resp);
+            if (mappingResult.isMatched()) {
+                doHandle(req, resp, mappingResult.getMatchedContext());
+            } else {
+                handleWithNoFullMatch(req, resp, mappingResult);
+            }
+        } finally {
+            if (initContext) {
+                removeContextHolders(req, resp);
+            }
         }
     }
 
@@ -145,22 +155,15 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
     }
 
     /**
-     * 在目标线程中执行完整的请求处理：上下文初始化 → Filter 链 → handleAfterFilter → 清理。
+     * 在目标线程中执行完整的请求处理：Filter 链 → handleAfterFilter（含上下文初始化+清理）。
      */
-    private void processRequest(WebServerHttpRequest req, WebServerHttpResponse resp,
+    private void handleWithFilter(WebServerHttpRequest req, WebServerHttpResponse resp,
                                 MappingResult mappingResult) {
-        boolean initContext = false;
         try {
-            initContext = initContextHolders(req, resp);
             webFilterRegistry.doFilter(req, resp);
         } catch (Throwable ex) {
-            // Filter 链中抛出的异常，与 doHandle 中异常路径行为一致
             handleException(ex, req, resp);
             invokeWithRealResult(req, resp, null, ex);
-        } finally {
-            if (initContext) {
-                removeContextHolders(req, resp);
-            }
         }
     }
 

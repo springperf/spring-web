@@ -4,4 +4,5 @@ io.springperf.web.autoconfigure.ActuatorEndpointAutoConfiguration
 io.springperf.web.autoconfigure.SpringDataWebCompatibilityAutoConfiguration
 io.springperf.web.autoconfigure.SpringBootAdminClientAutoConfiguration
 io.springperf.web.autoconfigure.OpenApiAutoConfiguration
+io.springperf.web.autoconfigure.SwaggerUiAutoConfiguration
 io.springperf.web.autoconfigure.SpringWebBatchAutoConfiguration

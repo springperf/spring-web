@@ -15,7 +15,6 @@ public class SpringWebBatchAutoConfiguration {
     @ConditionalOnBean(WebContext.class)
     public BatchRegistry batchRegistry(WebContext webContext) {
         BatchRegistry registry = new BatchRegistry();
-        registry.initWithWebContext(webContext);
         webContext.registerWebComponent(registry);
         return registry;
     }

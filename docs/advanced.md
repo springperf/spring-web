@@ -1,3 +1,5 @@
+> [English](en/advanced.md) | 中文
+
 # 高级主题
 
 ---
@@ -100,18 +102,9 @@ public class AsyncMonitorInterceptor implements DeferredResultProcessingIntercep
 
 ### 快速上手
 
-**第 1 步：定义 BatchRequest 子类**
+**第 1 步：编写单请求端点**
 
-```java
-public class GetUserRequest extends BatchRequest<UserResp> {
-    Long id;
-    String lang;
-}
-```
-
-字段名与单方法的参数名匹配，框架自动注入。
-
-**第 2 步：编写单请求端点**
+将普通 Controller 方法的返回值类型改为 `BatchRequest<R>`（即 `DeferredResult` 的子类），方法体不会实际执行：
 
 ```java
 @RestController
@@ -126,7 +119,21 @@ public class UserController {
 }
 ```
 
-返回值类型改为 `BatchRequest<R>`（即 `DeferredResult` 的子类），方法体不会实际执行。
+**第 2 步：定义 BatchRequest 子类**
+
+构造器参数类型与单请求端点的参数按位置匹配，框架通过反射调用构造器注入：
+
+```java
+public class GetUserRequest extends BatchRequest<UserResp> {
+    private final Long id;
+    private final String lang;
+
+    public GetUserRequest(Long id, String lang) {
+        this.id = id;
+        this.lang = lang;
+    }
+}
+```
 
 **第 3 步：编写批量处理方法**
 
@@ -185,7 +192,7 @@ public @interface BatchMapping {
     /** RingBuffer 容量，必须为 2 的幂。默认 4096。 */
     int ringBufferSize() default 4096;
 
-    /** Disruptor 等待策略。默认 YIELDING。 */
+    /** Disruptor 等待策略。默认 BLOCKING。 */
     WaitStrategy waitStrategy() default WaitStrategy.BLOCKING;
 
     /** RingBuffer 满时的背压策略。默认 BLOCK。 */
@@ -194,8 +201,8 @@ public @interface BatchMapping {
     /** 被关联的单请求方法名。默认与批量处理方法同名。 */
     String method() default "";
 
-    /** 单次批处理最大请求数。<= 0 表示依赖 Disruptor endOfBatch 信号。 */
-    int maxBatchSize() default 0;
+    /** 单次批处理最大请求数。达到该值时触发批量处理。Disruptor endOfBatch 信号也会触发。默认 100。 */
+    int maxBatchSize() default 100;
 
     /** 最大并发处理线程数，包括 Disruptor 消费者线程在内。默认 CPU 核数。 */
     int consumerSize() default -1;
@@ -221,8 +228,7 @@ public @interface BatchMapping {
 
 #### maxBatchSize
 
-累积一定数量的请求后再触发批处理，而非仅依赖 Disruptor 的 `endOfBatch` 信号。
-`<= 0` 表示完全依赖 `endOfBatch`。
+累积一定数量的请求后再触发批处理，而非仅依赖 Disruptor 的 `endOfBatch` 信号。默认 100，`<= 0` 表示完全依赖 `endOfBatch`。
 
 #### consumerSize 与线程模型
 
@@ -276,44 +282,6 @@ public class GetUserRequest extends BatchRequest<UserResp> {
 
 ## 流式响应
 
-### StreamEmitter
-
-逐块发送数据：
-
-```java
-@GetMapping("/stream")
-public StreamEmitter streamData() {
-    StreamEmitter emitter = new StreamEmitter();
-
-    taskQueue.execute(() -> {
-        try {
-            for (int i = 0; i < 100; i++) {
-                emitter.send("chunk-" + i + "\n");
-                Thread.sleep(100);
-            }
-            emitter.complete();
-        } catch (Exception e) {
-            emitter.completeWithError(e);
-        }
-    });
-
-    return emitter;
-}
-```
-
-### 自定义流式 JSON
-
-```java
-@GetMapping("/stream-json")
-public StreamJsonEmitter streamJson() {
-    return (StreamJsonEmitter) new StreamJsonEmitter()
-            .onStarted((emitter, request, response) -> {
-                response.getHeaders().setContentType(MediaType.APPLICATION_NDJSON);
-            });
-    // 返回 StreamJsonEmitter 后框架会自动处理流式写入
-}
-```
-
 ### SSE（服务端推送）
 
 ```java
@@ -324,10 +292,11 @@ public SseEmitter sseEvents() {
     taskQueue.execute(() -> {
         try {
             for (int i = 0; i < 10; i++) {
-                emitter.send(SseEmitter.event()
+                emitter.send(ServerSentEvent.builder()
                     .id(String.valueOf(i))
-                    .name("message")
-                    .data("Hello " + i));
+                    .event("message")
+                    .data("Hello " + i)
+                    .build());
                 Thread.sleep(1000);
             }
             emitter.complete();
@@ -349,9 +318,9 @@ public TextStreamEmitter textStream() {
 
     taskQueue.execute(() -> {
         try {
-            for (int i = 0; i < 5; i++) {
-                emitter.send("Line " + i + "\n");
-                Thread.sleep(500);
+            for (int i = 0; i < 100; i++) {
+                emitter.send("chunk-" + i);
+                Thread.sleep(100);
             }
             emitter.complete();
         } catch (Exception e) {
@@ -360,6 +329,16 @@ public TextStreamEmitter textStream() {
     });
 
     return emitter;
+}
+```
+
+### 自定义流式 JSON
+
+```java
+@GetMapping("/stream-json")
+public StreamJsonEmitter streamJson() {
+    return new StreamJsonEmitter(jsonConverter);
+    // StreamJsonEmitter 自动设置 Content-Type: application/stream+json
 }
 ```
 

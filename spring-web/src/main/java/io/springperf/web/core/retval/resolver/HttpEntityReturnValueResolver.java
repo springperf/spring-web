@@ -43,6 +43,9 @@ public class HttpEntityReturnValueResolver extends BaseWebComponent implements R
         if (httpEntity.getHeaders() != null) {
             resp.getHeaders().putAll(httpEntity.getHeaders());
         }
-        httpBodyCodecRegistry.writeBody(httpEntity.getBody(), returnType, req, resp);
+        Object body = httpEntity.getBody();
+        if (body != null) {
+            httpBodyCodecRegistry.writeBody(body, returnType, req, resp);
+        }
     }
 }

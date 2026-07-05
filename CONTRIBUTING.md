@@ -1,56 +1,56 @@
-# 贡献指南
+# Contributing Guide
 
-感谢您对 perf-spring-web 的关注！我们欢迎各种形式的贡献——提交 Bug、提议新功能、改进文档或提交代码。
+Thank you for your interest in Spring Web! We welcome all forms of contribution — reporting bugs, proposing features, improving documentation, or submitting code.
 
-## 行为准则
+## Code of Conduct
 
-请阅读并遵守我们的 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)。
+Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
-## 如何贡献
+## How to Contribute
 
-### 报告 Bug
+### Reporting Bugs
 
-1. 在 [Issues](https://github.com/springperf/spring-web/issues  ) 中搜索是否已有相同问题
-2. 如果没有，创建新 Issue 并选择 Bug Report 模板
-3. 请包含：
-   - 运行环境（JDK 版本、操作系统）
-   - 复现步骤
-   - 期望行为和实际行为
-   - 相关日志或堆栈信息
+1. Search [Issues](https://github.com/springperf/spring-web/issues) to check if the issue already exists
+2. If not, create a new Issue and select the Bug Report template
+3. Please include:
+   - Environment (JDK version, OS)
+   - Steps to reproduce
+   - Expected and actual behavior
+   - Relevant logs or stack traces
 
-### 提议新功能
+### Proposing New Features
 
-1. 在 [Issues](https://github.com/springperf/spring-web/issues  ) 中搜索是否已有类似提议
-2. 创建 Feature Request Issue，描述：
-   - 使用场景
-   - 期望 API 或行为
-   - 是否愿意参与实现
+1. Search [Issues](https://github.com/springperf/spring-web/issues) for similar proposals
+2. Create a Feature Request Issue describing:
+   - Use case
+   - Expected API or behavior
+   - Whether you are willing to participate in implementation
 
-### 提交代码
+### Submitting Code
 
-1. Fork 本仓库
-2. 创建功能分支：`git checkout -b feature/your-feature`
-3. 提交代码：
-   - 遵循现有代码风格
-   - 为核心公共接口添加 JavaDoc（英文）
-   - 为新功能添加测试
-   - 确保 `mvn clean test` 通过
-4. 提交 Pull Request
-5. 等待 Code Review
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/your-feature`
+3. Commit your code:
+   - Follow the existing code style
+   - Add JavaDoc (in English) for public API interfaces
+   - Add tests for new functionality
+   - Ensure `mvn clean test` passes
+4. Submit a Pull Request
+5. Wait for Code Review
 
-### 代码规范
+### Code Style
 
-- Java 8 兼容
-- 遵循 Spring Framework 的命名约定
-- 公共 API 必须有英文 JavaDoc
-- 中文注释用于复杂的业务逻辑说明
-- 包命名：`io.github.spring.web.*`
+- Java 8 compatibility (2.7.x branch) / Java 17+ (master branch)
+- Follow Spring Framework naming conventions
+- Public API must have English JavaDoc
+- Chinese comments may be used for complex business logic explanations
+- Package naming: `io.github.spring.web.*`
 
-### PR 提交检查清单
+### PR Checklist
 
-- [ ] 代码编译通过：`mvn clean compile`
-- [ ] 测试通过：`mvn clean test`
-- [ ] 已添加或更新相关测试
-- [ ] 公共 API 已添加 JavaDoc
-- [ ] 无空 catch 块（资源清理场景除外）
-- [ ] 无 System.out.println 调试代码
+- [ ] Code compiles: `mvn clean compile`
+- [ ] Tests pass: `mvn clean test`
+- [ ] Related tests have been added or updated
+- [ ] Public API has JavaDoc
+- [ ] No empty catch blocks (except for resource cleanup scenarios)
+- [ ] No `System.out.println` debug code

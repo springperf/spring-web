@@ -2,6 +2,7 @@ package io.springperf.web.core.arg.resolver;
 
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.http.RequestAttribute;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
@@ -45,7 +46,7 @@ class ModelAttributeResolverTest {
 
     private void stubRequestContext() {
         when(request.getRequestContext()).thenReturn(requestContext);
-        when(requestContext.getAttribute(anyString())).thenReturn(null);
+        when(requestContext.getAttribute(any(RequestAttribute.class))).thenReturn(null);
     }
 
     @Test

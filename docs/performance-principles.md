@@ -1,3 +1,5 @@
+> [English](en/performance-principles.md) | 中文
+
 # 性能原理
 
 本项目的性能不是来自"Netty 比 Tomcat 快"这种泛泛的说法。Netty 只是一个事件驱动 I/O 框架，真正的高性能来自框架设计层面的工程取舍。

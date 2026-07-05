@@ -29,6 +29,7 @@ public class WebServerHttpResponseWrapper implements WebServerHttpResponse {
     @Override public ScheduledFuture setTimeout(Runnable task, long delay) { return response.setTimeout(task, delay); }
     @Override public WebContext getWebContext() { return response.getWebContext(); }
     @Override public void setWriteRespEventListener(WriteRespEventListener writeRespEventListener) { response.setWriteRespEventListener(writeRespEventListener); }
+    @Override public void addWriteRespEventListener(WriteRespEventListener writeRespEventListener) { response.addWriteRespEventListener(writeRespEventListener); }
     @Override public boolean setHandled() { return response.setHandled(); }
     @Override public void sendError(HttpStatus statusCode) { response.sendError(statusCode); }
     @Override public void sendError(HttpStatus statusCode, String message) { response.sendError(statusCode, message); }

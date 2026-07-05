@@ -92,10 +92,20 @@ public interface WebServerHttpResponse extends ServerHttpResponse {
 
     /**
      * Set the event listener for response writing lifecycle callbacks.
+     * 替换所有已注册的监听器。
      *
      * @param writeRespEventListener the listener to set
      */
     void setWriteRespEventListener(WriteRespEventListener writeRespEventListener);
+
+    /**
+     * 添加一个 response 写入事件监听器，追加到已有监听器列表。
+     * 与 {@link #setWriteRespEventListener} 不同，此方法不会覆盖已有监听器。
+     */
+    default void addWriteRespEventListener(WriteRespEventListener writeRespEventListener) {
+        // 默认实现：直接替换（兼容尚未覆写此方法的实现）
+        setWriteRespEventListener(writeRespEventListener);
+    }
 
     /**
      * Mark the response as handled.
