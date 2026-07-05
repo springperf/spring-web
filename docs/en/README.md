@@ -94,6 +94,8 @@ management:
 ```
 
 > See [Configuration Reference](configuration.md) for the full list.
+>
+> Migrating from Spring MVC? See the [Migration Guide](quickstart.md).
 
 ---
 
@@ -163,7 +165,9 @@ The perf framework delivers **1.3~4.5x** throughput over Servlet containers, wit
 | `spring-web-support-test` | Spring MVC compatibility tests |
 | `spring-web-examples` | Usage examples for various scenarios |
 
-> ¹ Some classes in the support module use `org.springframework.web.servlet` package paths (e.g., `HandlerInterceptor`), intentionally matching Spring WebMVC's official package paths — code written against Spring MVC interfaces can run without import changes. Since Spring Web does not depend on `spring-webmvc`, there is no classpath conflict at runtime. Under Java 9+ module system, depending on both will trigger split package warnings; choose one.
+> ¹ Some classes in the support module use `org.springframework.web.servlet` package paths (e.g., `HandlerInterceptor`), intentionally matching Spring WebMVC's official package paths — code written against Spring MVC interfaces can run without import changes. However, this means the support module and `spring-webmvc` **cannot coexist** — having both on the classpath will cause class conflicts at runtime. Under Java 9+ module system this also triggers split package errors. Choose one or the other.
+>
+> Further reading: [Modules](modules.md) · [Extension Points](extensions.md) · [Advanced Topics](advanced.md)
 
 ---
 
