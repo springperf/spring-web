@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [master, 2.7.x, 3.2.x]
+    branches: [master, 2.7.x]
   pull_request:
-    branches: [master, 2.7.x, 3.2.x]
+    branches: [master, 2.7.x]
 
 jobs:
   build:
@@ -32,7 +32,7 @@ jobs:
             && (github.ref == 'refs/heads/2.7.x' || github.base_ref == '2.7.x')
             ||
             contains(fromJSON('["17", "21"]'), matrix.java)
-            && !(github.ref == 'refs/heads/2.7.x' || github.base_ref == '2.7.x')
+            && (github.ref == 'refs/heads/master' || github.base_ref == 'master')
           )
 
       - name: Upload test reports
