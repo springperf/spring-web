@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 <groupId>io.github.springperf</groupId>
     <artifactId>spring-web-parent</artifactId>
-    <version>3.2.1</version>
+    <version>3.2.2</version>
     <packaging>pom</packaging>
 
     <name>Spring Web Parent</name>
@@ -51,7 +51,7 @@
 
         <java.version>17</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <spring-web.version>3.2.1</spring-web.version>
+        <spring-web.version>3.2.2</spring-web.version>
         <gpg.executable>gpg</gpg.executable>
         <gpg.keyname>${env.GPG_KEY}</gpg.keyname>
         <gpg.passphrase>${env.GPG_PASSPHRASE}</gpg.passphrase>
