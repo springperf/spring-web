@@ -37,8 +37,8 @@ class ResourceHandlerRegistrationTest {
         registration.addResourceLocations("classpath:/static/", "file:/opt/static/");
 
         assertEquals(2, registration.getLocationValues().size());
-        assertTrue(registration.getLocationValues().contains("classpath:/static/"));
-        assertTrue(registration.getLocationValues().contains("file:/opt/static/"));
+        assertTrue(registration.getLocationValues().contains("classpath:/static"));
+        assertTrue(registration.getLocationValues().contains("file:/opt/static"));
     }
 
     @Test

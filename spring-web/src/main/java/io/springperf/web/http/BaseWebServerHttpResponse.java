@@ -14,6 +14,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -130,6 +132,65 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
 
     public void setWriteRespEventListener(WriteRespEventListener writeRespEventListener) {
         this.writeRespEventListener = writeRespEventListener;
+    }
+
+    /**
+     * 追加 response 写入事件监听器，与已有监听器共存。
+     * 若已有监听器，自动用 {@link CompositeWriteRespEventListener} 合并。
+     */
+    public void addWriteRespEventListener(WriteRespEventListener listener) {
+        if (this.writeRespEventListener == null) {
+            this.writeRespEventListener = listener;
+        } else if (this.writeRespEventListener instanceof CompositeWriteRespEventListener) {
+            ((CompositeWriteRespEventListener) this.writeRespEventListener).add(listener);
+        } else {
+            this.writeRespEventListener = new CompositeWriteRespEventListener(this.writeRespEventListener, listener);
+        }
+    }
+
+    /**
+     * 合并多个 {@link WriteRespEventListener} 的复合监听器。
+     * 将回调事件广播到所有子监听器。
+     */
+    private static class CompositeWriteRespEventListener implements WriteRespEventListener {
+        private final List<WriteRespEventListener> listeners = new ArrayList<>(2);
+
+        CompositeWriteRespEventListener(WriteRespEventListener first, WriteRespEventListener second) {
+            listeners.add(first);
+            listeners.add(second);
+        }
+
+        void add(WriteRespEventListener listener) {
+            listeners.add(listener);
+        }
+
+        @Override
+        public void completeSuccessCallback() {
+            for (WriteRespEventListener l : listeners) {
+                l.completeSuccessCallback();
+            }
+        }
+
+        @Override
+        public void completeErrorCallback(Throwable throwable) {
+            for (WriteRespEventListener l : listeners) {
+                l.completeErrorCallback(throwable);
+            }
+        }
+
+        @Override
+        public void writeStreamSuccessCallback() {
+            for (WriteRespEventListener l : listeners) {
+                l.writeStreamSuccessCallback();
+            }
+        }
+
+        @Override
+        public void writeStreamErrorCallback(Throwable throwable) {
+            for (WriteRespEventListener l : listeners) {
+                l.writeStreamErrorCallback(throwable);
+            }
+        }
     }
 
     public boolean setHandled() {

@@ -1,5 +1,7 @@
 # 变更日志
 
+> [English Version](docs/en/changelog.md)
+
 本项目遵循 [语义化版本控制](https://semver.org/lang/zh-CN/)。
 
 ## [3.2.1] - 20260702
@@ -18,6 +20,32 @@
 
 - **配置属性重构**：`ApplicationProperties` / `PropertiesConstant` 提取公共方法，重构大小/时间配置解析，新增 `WebServerProperties` 配置类
 - **Lombok 版本修复**：annotation processor 路径从硬编码 1.18.24 改为 ${lombok.version}（1.18.36），修复 JDK 21 CI 构建失败问题
+
+## [2.7.2] - 20260704
+
+### 新增
+
+- **Servlet 会话支持**：桥接模块完整实现 `javax.servlet.http.HttpSession` 接口
+  - `PerfHttpSession` — 基于框架请求上下文的 Servlet HttpSession 实现，支持属性存取、过期跟踪和失效生命周期
+  - `PerfHttpSessionManager` — 会话管理器，支持创建/获取/失效操作
+  - `HttpSessionStorage` / `InMemoryHttpSessionStorage` — 可插拔的会话存储 SPI 及默认内存实现
+  - `ServletAdapterContext` 增强，将会话传播到 Servlet API 包装器
+- **示例模块扩展**：从 5 个增加到 12 个可运行的示例子模块
+  - `spring-web-example-actuator` — Actuator 端点监控示例
+  - `spring-web-example-async` — 异步请求处理（Callable/DeferredResult/SSE）示例
+  - `spring-web-example-data` — Spring Data JPA 仓储集成示例
+  - `spring-web-example-openapi` — OpenAPI 3.0 文档自动生成示例
+  - `spring-web-example-swaggerui` — Swagger UI 静态资源服务示例
+  - `spring-web-example-shiro` — Apache Shiro 认证与会话管理示例
+  - `spring-web-example-spring-security` — Spring Security 认证与会话管理示例
+- **英文文档**：完整翻译全部项目文档（10 篇，涵盖概述、快速开始、高级用法、性能基准、配置、扩展、模块、性能原则、兼容性），维护于 `docs/en/` 目录
+- **Swagger UI 自动配置**：新增 `SwaggerUiAutoConfiguration`，当 `swagger-ui` 在 classpath 时自动提供静态资源；`SwaggerUiProperties` 配置路径和资源位置
+- **OpenAPI 文档端点**：新增 `OpenApiDocController`，在可配置路径提供 OpenAPI JSON 规范
+
+### 优化
+
+- **`DispatcherHandler` 优化**：精简过滤器链流程和错误路径处理
+- **多版本兼容性验证**：通过 Maven profiles 验证 Spring Boot 2.4.x ~ 2.7.x 兼容性
 
 ## [2.7.1] - 20260701
 

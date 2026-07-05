@@ -1,10 +1,10 @@
 # 模块架构
 
-## 7 个模块
+## 9 个模块
 
 ```
-spring-web-parent
-│  Spring Boot 2.6.15 parent, Java 8
+spring-web-parent (聚合 POM)
+│  Spring Boot 2.7.18 (默认)，多版本兼容 2.4.x/2.5.x/2.6.x，Java 8
 │
 ├── spring-web                     核心框架
 ├── spring-web-support             可选 Servlet/SpringMVC 桥接层
@@ -12,7 +12,9 @@ spring-web-parent
 ├── spring-web-websocket           WebSocket 支持（可选）
 ├── spring-boot-starter-web        Spring Boot 自动配置
 ├── spring-web-test                核心框架的示例/E2E测试应用
-└── spring-web-support-test        桥接层的示例/E2E测试应用
+├── spring-web-support-test        桥接层的示例/E2E测试应用
+├── spring-web-benchmark           JMH 性能基准测试
+└── spring-web-examples            可运行示例应用聚合
 ```
 
 ---
@@ -81,20 +83,27 @@ spring-web
 │   │   ├── WebFilterRegistry        管理 WebFilter 列表（extends WebComponentContainer）
 │   │   │   ├── 支持 Ordered 排序
 │   │   │   ├── 自动注册 Spring 中 WebFilter 类型的 Bean
-│   │   │   └── 被 DispatcherHandler 在 processRequest 中调用（路由匹配后、同线程执行）
+│   │   │   └── 由 handleWithFilter() 触发，Filter 链完成后回调 handleAfterFilter()
 │   │   ├── WebFilterRegistration    WebFilter 注册（路径包含/排除 + 排序）
 │   │   └── RuntimeMappingWebFilter  运行时路径匹配的 Filter 包装
 │   │
 │   ├── DispatcherHandler        中央分发器，根 HttpHandler
-│   │   请求管线（同线程执行 Filter → doHandle）:
-│   │     1. WebFilterRegistry         — Filter 链（路由匹配后、参数解析前，与 Handler 同线程）
-│   │     2. CorsRegistry              — CORS 检查
-│   │     3. InterceptorRegistry       — preHandle
-│   │     4. ArgumentResolverRegistry  — 参数解析
-│   │     5. InvokableHandlerMethod    — 处理器调用
-│   │     6. ReturnValueResolverRegistry — 返回值处理
-│   │     7. InterceptorRegistry       — postHandle → afterCompletion
-│   │     8. ExceptionRegistry         — 所有异常的兜底处理
+│   │   请求管线:
+│   │     1. MappingRegistry           — 路由匹配（Filter 链前执行）
+│   │     2. BizPoolRegistry           — @RunInPool 线程池判断
+│   │     3. handleWithFilter()        — 触发 WebFilter 链
+│   │     4. DefaultFilterChain        — 逐 Filter 执行，完成后回调
+│   │     5. handleAfterFilter()       — 初始化上下文，分发：
+│   │        ├── doHandle() (匹配):
+│   │        │   ├── CorsRegistry              — CORS 检查
+│   │        │   ├── InterceptorRegistry       — preHandle
+│   │        │   ├── ArgumentResolverRegistry  — 参数解析
+│   │        │   ├── InvokableHandlerMethod    — 处理器调用
+│   │        │   ├── ReturnValueResolverRegistry — 返回值处理
+│   │        │   └── InterceptorRegistry       — postHandle → afterCompletion
+│   │        └── 404/405 (不匹配):
+│   │            ├── ExceptionRegistry         — 异常处理
+│   │            └── InterceptorRegistry       — afterCompletion
 │   │
 │   ├── mapping/                 请求映射
 │   │   ├── MappingRegistry      扫描 @Controller/@RestController，构建路径映射
@@ -406,11 +415,18 @@ spring-boot-starter-web
 │   │   ├── OperationHandlerInvoker             端点操作调用器
 │   │   └── LinksOperationInvoker               根路径 links 处理
 │   │
+│   ├── SpringWebBatchAutoConfiguration         Batch 模块自动装配（条件：spring-web-batch 在 classpath）
+│   ├── SpringBootAdminClientAutoConfiguration  SBA 客户端自动装配（条件：spring-boot-admin-starter-client 在 classpath）
+│   │   └── 发射 WebServerInitializedEvent 以支持 SBA 心跳注册
+│   ├── OpenApiAutoConfiguration                OpenAPI 文档自动装配（条件：springdoc-openapi 在 classpath）
+│   ├── SwaggerUiAutoConfiguration              Swagger UI 静态资源自动装配（条件：swagger-ui 在 classpath）
+│   │
 │   └── support/
-│       └── WebServerApplicationContextFactory  强制 AnnotationConfigApplicationContext
+│       ├── WebServerApplicationContextFactory  强制 AnnotationConfigApplicationContext
+│       └── PerfWebServer                       WebServer 适配
 │
 └── resources/META-INF/
-    ├── spring.factories                  注册 4 个 AutoConfiguration + ApplicationContextFactory
+    ├── spring.factories                  注册 8 个 AutoConfiguration + ApplicationContextFactory
     └── additional-spring-configuration-metadata.json  配置元数据（IDE 提示）
 ```
 
@@ -509,32 +525,44 @@ Netty I/O 线程
   ▼
 BackpressureHandler
   ▼
-DispatcherHandler (根 HttpHandler)
-  ├── MappingRegistry.match(request)
+DispatcherHandler.handle() (根 HttpHandler)
+  ├── MappingRegistry.match(request) → MappingResult
   │   └── RouterOptimizer 链 → Matcher 链 → PathMappingContext
   │
-  ├── [404/405/CORS 预检] 直接返回，不走后续步骤
-  │
-  └── handleWithFullMatch()
+  └── handleWithMappingResult()
       └── @RunInPool ?
-          ├── YES: executor.execute(() -> processRequest())  ← 业务线程池
-          └── NO:  processRequest()                          ← EventLoop
+          ├── YES: executor.execute(() -> handleWithFilter())  ← 业务线程池
+          └── NO:  handleWithFilter()                          ← EventLoop
                       │
-                      ├── WebFilterRegistry (有序 WebFilter 链)   ← 同线程！
-                      ├── CorsRegistry.getProvider(mapping) → preProcess()
-                      ├── InterceptorRegistry.getInterceptors(mapping) → preHandle()
-                      ├── ArgumentResolverRegistry.resolveArguments(method, request, response)
-                      │   ├── 静态解析器（预创建）: @PathVariable, @RequestParam, @RequestBody 等
-                      │   └── 运行时解析器: RuntimeArgumentResolver
-                      ├── InvokableHandlerMethod.invoke(args)
-                      │   └── 可选: FastInvokerGenerator 字节码调用
-                      ├── ReturnValueResolverRegistry.resolve(returnValue)
-                      │   ├── JSON: JsonBodyReturnValueResolver → HttpBodyCodecRegistry.writeBody()
-                      │   ├── 异步: DeferredResult/Callable → AsyncSupportRegistry
-                      │   └── 流式: StreamEmitter → NettyStreamSender
-                      ├── InterceptorRegistry.postHandle()
-                      ├── InterceptorRegistry.afterCompletion()
-                      └── ExceptionRegistry.resolveException()
+                      ├── WebFilterRegistry.doFilter()
+                      │   └── DefaultFilterChain
+                      │       ├── WebFilter 1..N
+                      │       └── → DispatcherHandler.handleAfterFilter() (回调)
+                      │
+                      ├── handleAfterFilter()
+                      │   ├── 初始化 LocaleContextHolder
+                      │   │
+                      │   ├── [完全匹配] → doHandle():
+                      │   │   ├── CorsRegistry.corsHandle()
+                      │   │   ├── InterceptorRegistry.preHandle()
+                      │   │   ├── ArgumentResolverRegistry.resolveArguments()
+                      │   │   │   ├── 静态解析器: @PathVariable, @RequestParam, @RequestBody 等
+                      │   │   │   └── 运行时解析器: RuntimeArgumentResolver
+                      │   │   ├── InvokableHandlerMethod.invoke(args)
+                      │   │   │   └── 可选: FastInvokerGenerator 字节码调用
+                      │   │   ├── ReturnValueResolverRegistry.resolve(returnValue)
+                      │   │   │   ├── JSON: JsonBodyReturnValueResolver → HttpBodyCodecRegistry.writeBody()
+                      │   │   │   ├── 异步: DeferredResult/Callable → AsyncSupportRegistry
+                      │   │   │   └── 流式: StreamEmitter → NettyStreamSender
+                      │   │   ├── InterceptorRegistry.postHandle()
+                      │   │   ├── InterceptorRegistry.afterCompletion()
+                      │   │   └── flushResponse()
+                      │   │
+                      │   └── [不匹配] → handleWithNoFullMatch():
+                      │       ├── CORS 预检 → CorsRegistry.corsHandle()
+                      │       └── 404/405 → ExceptionRegistry + afterCompletion
+                      │
+                      └── [异常] → ExceptionRegistry.resolveException()
                           └── @ExceptionHandler / ResponseStatusException / 自定义 HandlerExceptionResolver
 ```
 

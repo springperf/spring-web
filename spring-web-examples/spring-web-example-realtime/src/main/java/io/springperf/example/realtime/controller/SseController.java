@@ -53,10 +53,17 @@ public class SseController {
     @GetMapping("/sse/broadcast")
     public String broadcast(@RequestParam String data) throws IOException {
         ServerSentEvent<Object> event = ServerSentEvent.builder().event("broadcast").data(data).build();
-        for (SseEmitter emitter : emitters.values()) {
-            emitter.send(event);
+        int success = 0;
+        for (Map.Entry<String, SseEmitter> entry : emitters.entrySet()) {
+            try {
+                entry.getValue().send(event);
+                success++;
+            } catch (IOException e) {
+                log.warn("SSE broadcast failed to client {}, removing: {}", entry.getKey(), e.getMessage());
+                emitters.remove(entry.getKey());
+            }
         }
-        log.info("SSE broadcast to {} clients: {}", emitters.size(), data);
-        return "ok, sent to " + emitters.size() + " clients";
+        log.info("SSE broadcast to {}/{} clients: {}", success, emitters.size(), data);
+        return "ok, sent to " + success + " clients";
     }
 }

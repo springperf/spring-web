@@ -98,7 +98,7 @@ class PerfHttpServletRequestTest {
     @Test void getRemotePort_returnsMinusOne() { assertEquals(-1, servletRequest.getRemotePort()); }
     @Test void getLocalPort_returnsMinusOne() { assertEquals(-1, servletRequest.getLocalPort()); }
     @Test void getAuthType_returnsNull() { assertNull(servletRequest.getAuthType()); }
-    @Test void getSession_throwsUnsupported() { assertThrows(UnsupportedOperationException.class, () -> servletRequest.getSession()); assertThrows(UnsupportedOperationException.class, () -> servletRequest.getSession(true)); }
+    @Test void getSession_throwsIllegalStateWithoutManager() { assertThrows(IllegalStateException.class, () -> servletRequest.getSession()); assertThrows(IllegalStateException.class, () -> servletRequest.getSession(true)); }
     @Test void getRequestDispatcher_throwsUnsupported() { assertThrows(UnsupportedOperationException.class, () -> servletRequest.getRequestDispatcher("/path")); }
     @Test void startAsync_throwsUnsupported() { assertThrows(UnsupportedOperationException.class, () -> servletRequest.startAsync()); }
     @Test void getServletContext_throwsUnsupported() { assertThrows(UnsupportedOperationException.class, () -> servletRequest.getServletContext()); }

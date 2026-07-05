@@ -40,6 +40,9 @@ import java.util.stream.Collectors;
 @EnableConfigurationProperties({WebEndpointProperties.class, CorsEndpointProperties.class})
 public class ActuatorEndpointAutoConfiguration {
 
+    private static final String DEFAULT_EXPOSED_ENDPOINTS = "info";
+    private static final int DEFAULT_MAX_CONTENT_LENGTH = 1024 * 1024;
+
     @Bean @ConditionalOnMissingBean
     public ActuatorMappingDescriptionProvider perfMappingDescriptionProvider(WebContext webContext) {
         return new ActuatorMappingDescriptionProvider(webContext);
@@ -62,7 +65,7 @@ public class ActuatorEndpointAutoConfiguration {
 
     @Bean @ConditionalOnMissingBean
     public IncludeExcludeEndpointFilter<ExposableWebEndpoint> perfExposeExcludePropertyEndpointFilter(Environment environment) {
-        return new IncludeExcludeEndpointFilter<>(ExposableWebEndpoint.class, environment, "management.endpoints.web.exposure", "info");
+        return new IncludeExcludeEndpointFilter<>(ExposableWebEndpoint.class, environment, "management.endpoints.web.exposure", DEFAULT_EXPOSED_ENDPOINTS);
     }
 
     @Bean @ConditionalOnMissingBean
@@ -74,7 +77,6 @@ public class ActuatorEndpointAutoConfiguration {
         ManagementServerInfrastructure infrastructure = managementServerInfrastructureProvider.getIfAvailable();
         ActuatorEndpointHandlerMapping mapping = new ActuatorEndpointHandlerMapping(endpointsSupplier, endpointMediaTypes, webEndpointProperties,
                 corsEndpointProperties, infrastructure);
-        mapping.initWithWebContext(webContext);
         webContext.registerWebComponent(mapping);
         return mapping;
     }
@@ -102,6 +104,6 @@ public class ActuatorEndpointAutoConfiguration {
         SslContext sslContext = SslContextFactory.createServerSslContext(environment, "management.server.ssl.", http2Enabled);
         return new ManagementNettyHttpServer(webContext, webEndpointProperties.getBasePath(),
                 managementServerInfrastructure.getDispatcherHandler(), mgmtPort,
-                environment.getProperty("server.http.max-content-length", int.class, 1048576), sslContext);
+                environment.getProperty("server.http.max-content-length", int.class, DEFAULT_MAX_CONTENT_LENGTH), sslContext);
     }
 }

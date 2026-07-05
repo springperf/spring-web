@@ -2,6 +2,8 @@ package io.springperf.web.support.servlet;
 
 import io.springperf.web.http.RequestAttribute;
 import io.springperf.web.http.RequestContext;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.support.servlet.context.ServletAdapterContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -34,6 +36,24 @@ public final class ServletAttribute {
 
     public static void setAdapterContext(RequestContext ctx, ServletAdapterContext adapterContext) {
         ctx.setAttribute(ADAPTER_CTX, adapterContext);
+    }
+
+    /**
+     * 获取当前请求的 {@link ServletAdapterContext}，如果不存在则创建并存入。
+     * 如果已存在，检测 WebFilter 是否包装了请求并更新委托引用。
+     * <p>项目可能没有 {@code FilterWrapper}（无 javax.servlet.Filter），
+     * 此方法确保始终能拿到有效的 adapter context。</p>
+     */
+    public static ServletAdapterContext getAdapterContext(WebServerHttpRequest request, WebServerHttpResponse response) {
+        RequestContext ctx = request.getRequestContext();
+        ServletAdapterContext adapterContext = getAdapterContext(ctx);
+        if (adapterContext == null) {
+            adapterContext = new ServletAdapterContext(new PerfHttpServletRequest(request), new PerfHttpServletResponse(response), null);
+            setAdapterContext(ctx, adapterContext);
+        }
+        adapterContext.rebindFrameworkRequest(request);
+        adapterContext.rebindFrameworkResponse(response);
+        return adapterContext;
     }
 
     public static HttpServletRequest getRequest(RequestContext ctx) {
