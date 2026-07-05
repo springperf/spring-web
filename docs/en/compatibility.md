@@ -76,7 +76,7 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 | Need virtual threads (JDK 21) | `master` |
 | Need GraalVM native-image | `master` |
 
-> **Branch recommendation**: For JDK 8/11 existing projects, choose `master`/`2.7.x` and use `-Pspring-boot-2.6` / `-Pspring-boot-2.5` / `-Pspring-boot-2.4` to switch target versions. For JDK 17+ new projects, choose `master` (supports virtual threads, GraalVM native-image).
+> **Branch recommendation**: For JDK 8/11 existing projects, choose `2.7.x` and use `-Pspring-boot-2.6` / `-Pspring-boot-2.5` / `-Pspring-boot-2.4` to switch target versions. For JDK 17+ new projects, choose `master` (supports virtual threads, GraalVM native-image).
 
 ---
 

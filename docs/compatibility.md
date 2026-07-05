@@ -76,7 +76,7 @@
 | 需要使用虚拟线程（JDK 21） | `master` |
 | 需要 GraalVM native-image 编译 | `master` |
 
-> **分支选择建议**：JDK 8/11 现有项目选 `master`/`2.7.x`，使用 `-Pspring-boot-2.6` / `-Pspring-boot-2.5` / `-Pspring-boot-2.4` 切换目标版本；JDK 17+ 新项目选 `master`（支持虚拟线程、GraalVM native-image）。
+> **分支选择建议**：JDK 8/11 现有项目选 `2.7.x`，使用 `-Pspring-boot-2.6` / `-Pspring-boot-2.5` / `-Pspring-boot-2.4` 切换目标版本；JDK 17+ 新项目选 `master`（支持虚拟线程、GraalVM native-image）。
 
 ---
 
