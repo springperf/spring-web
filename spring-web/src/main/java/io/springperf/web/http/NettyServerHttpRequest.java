@@ -72,7 +72,7 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
                         try {
                             result.add(name, attr.getValue());
                         } catch (Exception e) {
-                            log.error("Failed to parse form field: " + attr.getName(), e);
+                            log.error("Failed to parse form field: {}", attr.getName(), e);
                         }
                     }
                 }
@@ -95,7 +95,7 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
                             try {
                                 result.add(attr.getName(), attr.getValue());
                             } catch (Exception ex) {
-                                log.error("Failed to parse form field: " + attr.getName(), ex);
+                                log.error("Failed to parse form field: {}", attr.getName(), ex);
                             }
                         }
                     }

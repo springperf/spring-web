@@ -60,7 +60,7 @@ public class LogErrorFilter extends OncePerRequestFilter {
         try {
             response.reset();
         } catch (IllegalStateException ignore) {
-
+            log.debug("response reset failed", ignore);
         }
     }
 

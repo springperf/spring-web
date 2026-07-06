@@ -71,7 +71,7 @@ public class InterceptorRegistry extends WebComponentContainer {
                 i.postHandle(request, response, mappingContext, result);
             }
         } catch (Throwable e) {
-            log.error(e.getMessage(), e);
+            log.error("Interceptor postHandle failed", e);
         }
 
     }
@@ -87,7 +87,7 @@ public class InterceptorRegistry extends WebComponentContainer {
                 i.afterCompletion(request, response, mappingContext, exception);
             }
         } catch (Throwable e) {
-            log.error(e.getMessage(), e);
+            log.error("Interceptor afterCompletion failed", e);
         }
     }
 
@@ -102,7 +102,7 @@ public class InterceptorRegistry extends WebComponentContainer {
                 i.afterConcurrentHandlingStarted(request, response, mappingContext);
             }
         } catch (Throwable e) {
-            log.error(e.getMessage(), e);
+            log.error("Interceptor afterConcurrentHandlingStarted failed", e);
         }
     }
 

@@ -225,7 +225,7 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
      * @param resp the current HTTP response
      */
     protected void handleException(Throwable ex, WebServerHttpRequest req, WebServerHttpResponse resp) {
-        log.error(ex.getMessage(), ex);
+        log.error("Unhandled exception from request processing: {}", ex.getMessage(), ex);
         try {
             exceptionRegistry.handle(ex, req, resp);
         } catch (Throwable handleEx) {
@@ -244,7 +244,7 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
                 resp.flush();
             }
         } catch (IOException e) {
-            log.error(e.getMessage(), e);
+            log.error("flushResponse failed: {}", e.getMessage(), e);
         }
     }
 
@@ -261,7 +261,7 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
         try {
             if (concurrentResult instanceof Throwable) {
                 exception = (Throwable) concurrentResult;
-                log.error(exception.getMessage(), exception);
+                log.error("Async dispatch exception: {}", exception.getMessage(), exception);
                 exceptionRegistry.handle(exception, req, resp);
             } else {
                 result = concurrentResult;

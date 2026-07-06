@@ -179,7 +179,7 @@ public class BizPoolRegistry extends BaseWebComponent {
                     executor = webContext.getCtx().getBean(poolName, ExecutorService.class);
                     register(poolName, executor);
                 } catch (Exception ignored) {
-                    // bean 不存在，继续走原有报错
+                    log.debug("bean {} not found or error", poolName, ignored);
                 }
             }
         }

@@ -45,8 +45,8 @@ public class ExceptionRegistry extends WebComponentContainer {
                 resp.sendError(INTERNAL_SERVER_ERROR, ex.getClass().getSimpleName() + ": " + ex.getMessage());
             }
         } catch (Exception e) {
-            log.error(e.getMessage(), e);
-            log.error("Failed to handle exception: " + ex.getClass().getSimpleName() + ": " + ex.getMessage(), ex);
+            log.error("ExceptionRegistry.doHandle/sendError failed for original [{}] {}",
+                    ex.getClass().getSimpleName(), ex.getMessage(), e);
         }
     }
 

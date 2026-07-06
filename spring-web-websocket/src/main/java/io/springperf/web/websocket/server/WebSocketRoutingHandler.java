@@ -208,7 +208,8 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
             log.error("WebSocketHandler.afterConnectionEstablished failed", e);
             try {
                 session.close(CloseStatus.SERVER_ERROR);
-            } catch (IOException ignored) {
+            } catch (IOException ex) {
+                log.debug("session.close(SERVER_ERROR) failed", ex);
             }
         }
 
@@ -322,7 +323,8 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
                 }
                 try {
                     session.close(CloseStatus.SESSION_NOT_RELIABLE);
-                } catch (IOException ignored) {
+                } catch (IOException e) {
+                    log.debug("session.close(SESSION_NOT_RELIABLE) failed", e);
                 }
             }
             ctx.close();
