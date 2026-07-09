@@ -52,7 +52,7 @@ class ExceptionRegistryTest {
     void handle_noResolver_sendsError500() {
         registry.handle(new RuntimeException("test error"), request, response);
 
-        verify(response).sendError(HttpStatus.INTERNAL_SERVER_ERROR, "RuntimeException: test error");
+        verify(response).sendError(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error");
     }
 
     @Test

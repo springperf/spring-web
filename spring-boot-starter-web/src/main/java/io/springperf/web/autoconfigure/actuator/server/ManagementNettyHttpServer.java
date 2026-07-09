@@ -15,6 +15,7 @@ import io.springperf.web.server.NettyHttpHandler;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.SmartLifecycle;
 
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -75,8 +76,14 @@ public class ManagementNettyHttpServer implements SmartLifecycle {
                         http2Enabled,
                         sslContext,
                         maxContentLength,
+                        webContext.getProps().getLong(PropertiesConstant.HTTP_READ_TIMEOUT),
                         false, // supportMultipart = false (management port uses HttpObjectAggregator)
-                        nettyHttpHandler
+                        nettyHttpHandler,
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_INITIAL_LINE_LENGTH),
+                        webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_HEADER_SIZE),
+                        webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_CHUNK_SIZE)
                 ));
 
         try {

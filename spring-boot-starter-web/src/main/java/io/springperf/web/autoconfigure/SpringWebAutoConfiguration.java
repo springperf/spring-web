@@ -7,11 +7,13 @@ import io.springperf.web.autoconfigure.support.PerfWebServerInitializedEvent;
 import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.DispatcherHandler;
+import io.springperf.web.core.filter.AccessLogWebFilter;
 import io.springperf.web.server.NettyHttpServer;
 import io.springperf.web.server.PipelineCustomizer;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.boot.web.server.WebServer;
 import org.springframework.context.ApplicationContext;
@@ -44,6 +46,12 @@ public class SpringWebAutoConfiguration {
         boolean http2Enabled = environment.getProperty("server.http2.enabled", boolean.class, false);
         SslContext sslContext = SslContextFactory.createServerSslContext(environment, "server.ssl.", http2Enabled);
         return new NettyHttpServer(webContext, sslContext, pipelineCustomizerProvider.getIfAvailable());
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "server.accesslog.enabled", havingValue = "true")
+    public AccessLogWebFilter accessLogWebFilter() {
+        return new AccessLogWebFilter();
     }
 
     /**

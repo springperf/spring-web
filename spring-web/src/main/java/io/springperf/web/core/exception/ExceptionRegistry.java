@@ -42,7 +42,7 @@ public class ExceptionRegistry extends WebComponentContainer {
             if (handled) {
                 resp.setHandled();
             } else {
-                resp.sendError(INTERNAL_SERVER_ERROR, ex.getClass().getSimpleName() + ": " + ex.getMessage());
+                resp.sendError(INTERNAL_SERVER_ERROR, "Internal Server Error");
             }
         } catch (Exception e) {
             log.error("ExceptionRegistry.doHandle/sendError failed for original [{}] {}",

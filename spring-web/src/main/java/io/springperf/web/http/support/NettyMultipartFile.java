@@ -91,11 +91,15 @@ public class NettyMultipartFile implements MultipartFile, HttpInputMessagePart {
 
     protected static String buildContentDisposition(String name, String filename) {
         StringBuilder sb = new StringBuilder("form-data; ");
-        sb.append("name=\"").append(name).append("\"");
+        sb.append("name=\"").append(sanitize(name)).append("\"");
         if (filename != null) {
-            sb.append("; filename=\"").append(filename).append("\"");
+            sb.append("; filename=\"").append(sanitize(filename)).append("\"");
         }
         return sb.toString();
+    }
+
+    private static String sanitize(String value) {
+        return value.replace("\r", "").replace("\n", "");
     }
 
     @Override

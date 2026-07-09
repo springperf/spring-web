@@ -56,7 +56,7 @@
         <gpg.passphrase>${env.GPG_PASSPHRASE}</gpg.passphrase>
 
         <!-- 第三方依赖版本统一管理 -->
-        <netty.version>4.1.110.Final</netty.version>
+        <netty.version>4.1.115.Final</netty.version>
         <jackson.version>2.17.2</jackson.version>
         <lombok.version>1.18.24</lombok.version>
         <fastjson2.version>2.0.60</fastjson2.version>

@@ -80,10 +80,14 @@ public class NettyHttpServer implements SmartLifecycle {
                         http2Enabled,
                         sslContext,
                         webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_CONTENT_LENGTH),
+                        webContext.getProps().getLong(PropertiesConstant.HTTP_READ_TIMEOUT),
                         true, // supportMultipart = true for main server
                         httpHandler,
                         beforeAggHandlers,
-                        afterAggHandlers
+                        afterAggHandlers,
+                        webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_INITIAL_LINE_LENGTH),
+                        webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_HEADER_SIZE),
+                        webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_CHUNK_SIZE)
                 ));
         try {
             serverChannel = bootstrap.bind(port).sync().channel();
