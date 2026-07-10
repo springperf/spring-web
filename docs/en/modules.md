@@ -249,6 +249,10 @@ Add dependency:
 
 `SpringBootAdminClientAutoConfiguration` emits `WebServerInitializedEvent` when SBA client is present, enabling Spring Boot Admin heartbeat registration.
 
+### Metrics Auto-Configuration
+
+`MicrometerWebMetrics` is automatically registered as the `WebMetrics` implementation when `spring-boot-starter-actuator` is on the classpath. It collects request duration, exception counts, and thread pool metrics. See [Configuration Reference](configuration.md#observability-metrics) for details.
+
 ### OpenAPI Auto-Configuration
 
 `OpenApiAutoConfiguration` generates OpenAPI documentation endpoints when `springdoc-openapi` is on the classpath.

@@ -1,5 +1,6 @@
 package io.springperf.web.core.exception;
 
+import io.springperf.web.core.metrics.WebMetrics;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
@@ -18,6 +19,7 @@ import static org.mockito.Mockito.*;
 class ExceptionRegistryTest {
 
     ExceptionRegistry registry;
+    WebMetrics metrics;
 
     @Mock
     WebServerHttpRequest request;
@@ -34,15 +36,17 @@ class ExceptionRegistryTest {
     @BeforeEach
     void setUp() {
         registry = new ExceptionRegistry();
+        metrics = mock(WebMetrics.class);
+        registry.metrics = metrics;
         when(request.getRequestContext()).thenReturn(requestContext);
     }
 
     @Test
     void handle_resolverTrue_doesNotSendError() {
         registry.resolvers.add(resolver);
-        when(resolver.resolveException(request, response, null, null)).thenReturn(true);
+        when(resolver.resolveException(any(), any(), any(), any())).thenReturn(true);
 
-        registry.handle(null, request, response);
+        registry.handle(new RuntimeException("test"), request, response);
 
         verify(response, never()).sendError(any(HttpStatus.class));
         verify(response, never()).sendError(any(HttpStatus.class), anyString());
@@ -85,6 +89,25 @@ class ExceptionRegistryTest {
         when(resolver.resolveException(request, response, null, null)).thenReturn(false);
 
         assertFalse(registry.doHandle(null, request, response));
+    }
+
+    // ==================== metrics recording ====================
+
+    @Test
+    void handle_resolverTrue_recordsExceptionResolved() {
+        registry.resolvers.add(resolver);
+        when(resolver.resolveException(any(), any(), any(), any())).thenReturn(true);
+
+        registry.handle(new RuntimeException("test"), request, response);
+
+        verify(metrics).recordException(RuntimeException.class.getName(), true);
+    }
+
+    @Test
+    void handle_noResolver_recordsExceptionUnresolved() {
+        registry.handle(new RuntimeException("test error"), request, response);
+
+        verify(metrics).recordException(RuntimeException.class.getName(), false);
     }
 
     }

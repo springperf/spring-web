@@ -3,6 +3,8 @@ package io.springperf.web.core.exception;
 import io.springperf.web.context.WebComponentContainer;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.core.metrics.NoOpWebMetrics;
+import io.springperf.web.core.metrics.WebMetrics;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -21,10 +23,12 @@ import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 public class ExceptionRegistry extends WebComponentContainer {
 
     protected final List<HandlerExceptionResolver> resolvers = new ArrayList<>();
+    protected WebMetrics metrics;
 
     @Override
     public void initWithWebContext(WebContext webContext) {
         super.initWithWebContext(webContext);
+        this.metrics = webContext.getWebComponentWithDefault(WebMetrics.class, NoOpWebMetrics.INSTANCE);
         registerWebComponent(new ExceptionHandlerExceptionResolver());
         registerWebComponent(new ResponseStatusExceptionResolver());
         registerWebComponent(HandlerExceptionResolver.class);
@@ -39,6 +43,7 @@ public class ExceptionRegistry extends WebComponentContainer {
     public void handle(Throwable ex, WebServerHttpRequest req, WebServerHttpResponse resp) {
         try {
             boolean handled = doHandle(ex, req, resp);
+            metrics.recordException(ex.getClass().getName(), handled);
             if (handled) {
                 resp.setHandled();
             } else {

@@ -4,6 +4,7 @@ import io.springperf.web.annotation.RunInPool;
 import io.springperf.web.context.BaseWebComponent;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.core.metrics.WebMetrics;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -16,7 +17,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.*;
 
 /**
  * 注意：各测试用例使用独立的 controller method name，
@@ -209,6 +210,33 @@ class BizPoolRegistryTest {
     }
 
     // ---------------------------------------------------------------
+    // register() — metrics gauge registration
+    // ---------------------------------------------------------------
+
+    @Test
+    void register_withThreadPoolExecutor_registersPoolGauges() {
+        WebMetrics metrics = mock(WebMetrics.class);
+        setMetrics(registry, metrics);
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 0,
+                TimeUnit.SECONDS, new LinkedBlockingQueue<>());
+
+        registry.register("myPool", executor);
+
+        verify(metrics).registerPoolGauges("myPool", executor);
+    }
+
+    @Test
+    void register_withNonThreadPoolExecutor_doesNotRegisterGauges() {
+        WebMetrics metrics = mock(WebMetrics.class);
+        setMetrics(registry, metrics);
+        ExecutorService executor = mock(ExecutorService.class);
+
+        registry.register("myPool", executor);
+
+        verify(metrics, never()).registerPoolGauges(any(), any());
+    }
+
+    // ---------------------------------------------------------------
     // 辅助
     // ---------------------------------------------------------------
 
@@ -232,6 +260,16 @@ class BizPoolRegistryTest {
             field = BizPoolRegistry.class.getDeclaredField("defaultExecuteMode");
             field.setAccessible(true);
             field.set(registry, defaultMode);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static void setMetrics(BizPoolRegistry registry, WebMetrics metrics) {
+        try {
+            Field field = BizPoolRegistry.class.getDeclaredField("metrics");
+            field.setAccessible(true);
+            field.set(registry, metrics);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

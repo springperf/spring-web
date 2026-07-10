@@ -3,6 +3,8 @@ package io.springperf.web.batch.queue;
 import com.lmax.disruptor.EventHandler;
 import io.springperf.web.batch.common.BatchRequest;
 import io.springperf.web.batch.common.BatchRequestMetaData;
+import io.springperf.web.batch.metrics.BatchMetrics;
+import io.springperf.web.batch.metrics.NoOpBatchMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,6 +21,7 @@ public class BufferingBatchHandler implements EventHandler<BatchEvent> {
     private final BatchRequestMetaData meta;
     private final Object bean;
     private final int maxBatchSize;
+    private final BatchMetrics metrics;
 
     private List<BatchRequest<?>> buffer = new ArrayList<>();
 
@@ -26,10 +29,19 @@ public class BufferingBatchHandler implements EventHandler<BatchEvent> {
                                  BatchRequestMetaData meta,
                                  Object bean,
                                  int maxBatchSize) {
+        this(executor, meta, bean, maxBatchSize, NoOpBatchMetrics.INSTANCE);
+    }
+
+    public BufferingBatchHandler(Executor executor,
+                                 BatchRequestMetaData meta,
+                                 Object bean,
+                                 int maxBatchSize,
+                                 BatchMetrics metrics) {
         this.executor = executor;
         this.meta = meta;
         this.bean = bean;
         this.maxBatchSize = maxBatchSize;
+        this.metrics = metrics != null ? metrics : NoOpBatchMetrics.INSTANCE;
     }
 
     @Override
@@ -62,14 +74,22 @@ public class BufferingBatchHandler implements EventHandler<BatchEvent> {
     }
 
     private void processBatch(List<BatchRequest<?>> batch) {
+        long start = System.nanoTime();
+        int batchSize = batch.size();
+        boolean success = false;
         try {
             Object[] args = new Object[]{batch};
             meta.batchMethod().invoke(bean, args);
+            success = true;
+            metrics.recordRequestCompleted(meta.queueName(), batchSize);
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause() != null ? e.getCause() : e;
             handleBatchError(batch, cause);
         } catch (Throwable e) {
             handleBatchError(batch, e);
+        } finally {
+            metrics.recordBatchProcessed(meta.queueName(), batchSize,
+                    System.nanoTime() - start, success);
         }
     }
 

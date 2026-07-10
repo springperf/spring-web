@@ -248,6 +248,10 @@ destroyComponent()     → 资源释放
 
 `SpringBootAdminClientAutoConfiguration` 在 SBA 客户端存在时自动发射 `WebServerInitializedEvent`，以支持 Spring Boot Admin 心跳注册。
 
+### Metrics 自动配置
+
+`MicrometerWebMetrics` 在 `spring-boot-starter-actuator` 存在时自动注册为 `WebMetrics` 实现，收集请求耗时、异常计数和线程池指标。详见[配置参考](configuration.md#可观测性指标)。
+
 ### OpenAPI 自动配置
 
 `OpenApiAutoConfiguration` 在 `springdoc-openapi` 存在时自动生成 OpenAPI 文档端点。

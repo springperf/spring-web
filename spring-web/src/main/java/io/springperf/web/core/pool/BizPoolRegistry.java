@@ -5,6 +5,8 @@ import io.springperf.web.context.*;
 import io.springperf.web.core.mapping.MappingCacheKey;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
 import io.springperf.web.core.mapping.MappingResult;
+import io.springperf.web.core.metrics.NoOpWebMetrics;
+import io.springperf.web.core.metrics.WebMetrics;
 import io.springperf.web.http.WebServerHttpRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationContext;
@@ -40,9 +42,12 @@ public class BizPoolRegistry extends BaseWebComponent {
     /** 预缓存的默认执行策略：null 表示未初始化（降级为 EventLoop），"eventloop" 表示 EventLoop，其他值为池名。 */
     private volatile String defaultExecuteMode;
 
+    private WebMetrics metrics;
+
     @Override
     public void initWithWebContext(WebContext webContext) {
         super.initWithWebContext(webContext);
+        this.metrics = webContext.getWebComponentWithDefault(WebMetrics.class, NoOpWebMetrics.INSTANCE);
         initDefaultPoolFromConfig();
         // 缓存默认执行策略，避免请求路径上查询配置
         this.defaultExecuteMode = webContext.getProps().get(
@@ -109,6 +114,9 @@ public class BizPoolRegistry extends BaseWebComponent {
                     "'" + RunInPool.EVENTLOOP + "' is a reserved keyword and cannot be used as a pool name");
         }
         pools.put(name, executor);
+        if (metrics != null && executor instanceof ThreadPoolExecutor) {
+            metrics.registerPoolGauges(name, (ThreadPoolExecutor) executor);
+        }
         log.info("BizPool [{}] registered: executor={}", name, executor.getClass().getSimpleName());
     }
 

@@ -3,6 +3,7 @@ package io.springperf.web.server;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.ssl.NotSslRecordException;
 import io.netty.handler.ssl.SslContext;
@@ -76,7 +77,10 @@ public class NettyHttpServer implements SmartLifecycle {
                                 webContext.getProps().getInt(PropertiesConstant.WRITE_BUFFER_LOW_WATERMARK),
                                 webContext.getProps().getInt(PropertiesConstant.WRITE_BUFFER_HIGH_WATERMARK)
                         ))
-                .childHandler(new Http2ChannelInitializer(
+                .childHandler(new ChannelInitializer<SocketChannel>() {
+                    @Override
+                    protected void initChannel(SocketChannel ch) {
+                        Http2ChannelInitializer innerInit = new Http2ChannelInitializer(
                         http2Enabled,
                         sslContext,
                         webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_CONTENT_LENGTH),
@@ -88,7 +92,11 @@ public class NettyHttpServer implements SmartLifecycle {
                         webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_INITIAL_LINE_LENGTH),
                         webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_HEADER_SIZE),
                         webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_CHUNK_SIZE)
-                ));
+                );
+                        ch.pipeline().addLast(NettyMetricsHandler.INSTANCE);
+                        innerInit.initChannel(ch);
+                    }
+                });
         try {
             serverChannel = bootstrap.bind(port).sync().channel();
             this.actualPort = ((InetSocketAddress) serverChannel.localAddress()).getPort();
@@ -170,6 +178,23 @@ public class NettyHttpServer implements SmartLifecycle {
      */
     public int getActualPort() {
         return actualPort;
+    }
+
+    /**
+     * Returns the current number of active TCP connections tracked by
+     * {@link NettyMetricsHandler}. This includes connections from both the
+     * main server and the management server (if configured).
+     */
+    public int getActiveConnectionCount() {
+        return NettyMetricsHandler.INSTANCE.getActiveConnectionCount();
+    }
+
+    /**
+     * Returns the worker {@link EventLoopGroup} used for processing I/O events.
+     * Exposed for metrics registration (e.g., pending tasks gauge).
+     */
+    public EventLoopGroup getWorkerGroup() {
+        return workerGroup;
     }
 
     @Override

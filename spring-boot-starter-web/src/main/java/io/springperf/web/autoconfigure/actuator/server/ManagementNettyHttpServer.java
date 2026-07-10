@@ -2,8 +2,10 @@ package io.springperf.web.autoconfigure.actuator.server;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelInitializer;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.ssl.SslContext;
 import io.netty.util.concurrent.Future;
@@ -12,6 +14,7 @@ import io.springperf.web.context.WebContext;
 import io.springperf.web.server.Http2ChannelInitializer;
 import io.springperf.web.server.HttpHandler;
 import io.springperf.web.server.NettyHttpHandler;
+import io.springperf.web.server.NettyMetricsHandler;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.SmartLifecycle;
 
@@ -42,6 +45,7 @@ public class ManagementNettyHttpServer implements SmartLifecycle {
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
     private Channel serverChannel;
+    private NettyHttpHandler nettyHttpHandler;
 
     public ManagementNettyHttpServer(WebContext webContext, String contextPath, HttpHandler handler,
                                      int port, int maxContentLength) {
@@ -68,23 +72,31 @@ public class ManagementNettyHttpServer implements SmartLifecycle {
         workerGroup = new NioEventLoopGroup();
 
         NettyHttpHandler nettyHttpHandler = new NettyHttpHandler(webContext, "", handler);
+        this.nettyHttpHandler = nettyHttpHandler;
 
         ServerBootstrap bootstrap = new ServerBootstrap();
         bootstrap.group(bossGroup, workerGroup)
                 .channel(NioServerSocketChannel.class)
-                .childHandler(new Http2ChannelInitializer(
-                        http2Enabled,
-                        sslContext,
-                        maxContentLength,
-                        webContext.getProps().getLong(PropertiesConstant.HTTP_READ_TIMEOUT),
-                        false, // supportMultipart = false (management port uses HttpObjectAggregator)
-                        nettyHttpHandler,
-                        Collections.emptyList(),
-                        Collections.emptyList(),
-                        webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_INITIAL_LINE_LENGTH),
-                        webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_HEADER_SIZE),
-                        webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_CHUNK_SIZE)
-                ));
+                .childHandler(new ChannelInitializer<SocketChannel>() {
+                    @Override
+                    protected void initChannel(SocketChannel ch) {
+                        Http2ChannelInitializer innerInit = new Http2ChannelInitializer(
+                                http2Enabled,
+                                sslContext,
+                                maxContentLength,
+                                webContext.getProps().getLong(PropertiesConstant.HTTP_READ_TIMEOUT),
+                                false, // supportMultipart = false (management port uses HttpObjectAggregator)
+                                nettyHttpHandler,
+                                Collections.emptyList(),
+                                Collections.emptyList(),
+                                webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_INITIAL_LINE_LENGTH),
+                                webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_HEADER_SIZE),
+                                webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_CHUNK_SIZE)
+                        );
+                        ch.pipeline().addLast(NettyMetricsHandler.INSTANCE);
+                        ch.pipeline().addLast(innerInit);
+                    }
+                });
 
         try {
             serverChannel = bootstrap.bind(port).sync().channel();
@@ -105,11 +117,26 @@ public class ManagementNettyHttpServer implements SmartLifecycle {
     @Override
     public void stop(Runnable callback) {
         try {
-            serverChannel.close().sync();
-            Future<?> bossFuture = bossGroup.shutdownGracefully();
-            Future<?> workerFuture = workerGroup.shutdownGracefully();
-            bossFuture.sync();
-            workerFuture.sync();
+            // 1. 拒绝新请求（503 Service Unavailable）
+            if (nettyHttpHandler != null) {
+                nettyHttpHandler.setShuttingDown();
+            }
+
+            // 2. 停止接受新连接
+            if (serverChannel != null) {
+                serverChannel.close().sync();
+            }
+
+            // 3. 优雅关闭事件循环组
+            Future<?> bossFuture = bossGroup != null ? bossGroup.shutdownGracefully() : null;
+            Future<?> workerFuture = workerGroup != null ? workerGroup.shutdownGracefully() : null;
+
+            if (bossFuture != null) {
+                bossFuture.sync();
+            }
+            if (workerFuture != null) {
+                workerFuture.sync();
+            }
         } catch (Exception e) {
             log.error("Management server shutdown error", e);
         } finally {
