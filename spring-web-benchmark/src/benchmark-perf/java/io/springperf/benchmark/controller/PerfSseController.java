@@ -1,3 +1,4 @@
+
 package io.springperf.benchmark.controller;
 
 import io.springperf.web.core.async.stream.SseEmitter;
@@ -21,6 +22,10 @@ public class PerfSseController {
 
     @GetMapping("/api/core/sse/stream")
     public SseEmitter sseStream() {
+        return createSseEmitter(0);
+    }
+
+    private SseEmitter createSseEmitter(int intervalMs) {
         SseEmitter emitter = new SseEmitter(60000L);
         taskExecutor.execute(() -> {
             try {
@@ -34,7 +39,9 @@ public class PerfSseController {
                     chunkBuf.append("\"}");
                     chunkBuf.setLength(SSE_CHUNK_SIZE);
                     emitter.send(chunkBuf.toString());
-                    Thread.sleep(SSE_CHUNK_INTERVAL_MS);
+                    if (intervalMs > 0) {
+                        Thread.sleep(intervalMs);
+                    }
                 }
                 emitter.complete();
             } catch (Exception e) {

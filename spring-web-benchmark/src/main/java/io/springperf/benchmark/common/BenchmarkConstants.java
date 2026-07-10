@@ -14,7 +14,7 @@ public final class BenchmarkConstants {
     public static final String BASE_URL = "http://localhost:" + PORT + CONTEXT_PATH;
     public static final MediaType JSON_MEDIA_TYPE = MediaType.get("application/json; charset=utf-8");
 
-    public static final int WARMUP_ITERATIONS = 5;
+    public static final int WARMUP_ITERATIONS = 10;
     public static final int WARMUP_TIME_SECONDS = 10;
     public static final int MEASUREMENT_ITERATIONS = 10;
     public static final int MEASUREMENT_TIME_SECONDS = 10;
@@ -32,16 +32,13 @@ public final class BenchmarkConstants {
     public static final String PROFILE_NAME = System.getProperty(
             "benchmark.profile.name", "unknown");
 
-    /** 基准 JSON 请求体 */
+    /** 基准 JSON 请求体（UserReq 格式） */
     public static final String ECHO_BODY =
-            "{\"message\":\"hello\",\"value\":42,\"nested\":{\"flag\":true}}";
+            "{\"name\":\"张三\",\"age\":25,\"email\":\"zhangsan@example.com\"}";
 
-    /** 基准校验请求体 */
+    /** 基准校验请求体（与 json 相同，但端点启用 @Valid 验证） */
     public static final String VALIDATE_BODY =
-            "{\"name\":\"test\",\"age\":25}";
-
-    /** 大请求体 JSON (~100KB)，测试 JSON 反序列化吞吐 */
-    public static final String ECHO_BODY_LARGE;
+            "{\"name\":\"test\",\"age\":25,\"email\":\"test@example.com\"}";
 
     /** 大响应体路径 */
     public static final String LARGE_RESPONSE_PATH = "/core/large-response";
@@ -56,16 +53,6 @@ public final class BenchmarkConstants {
     public static final int SSE_CHUNK_INTERVAL_MS = 0;
     /** SSE 流式接口路径 */
     public static final String SSE_PATH = "/core/sse/stream";
-
-    static {
-        StringBuilder sb = new StringBuilder(105 * 1024);
-        sb.append("{\"data\":\"");
-        for (int i = 0; i < 10240; i++) {
-            sb.append("abcdefghij");
-        }
-        sb.append("\",\"count\":10240}");
-        ECHO_BODY_LARGE = sb.toString();
-    }
 
     private BenchmarkConstants() {
     }

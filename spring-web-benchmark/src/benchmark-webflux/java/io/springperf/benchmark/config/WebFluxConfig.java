@@ -7,7 +7,7 @@ import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 
 @Configuration
-public class WebFluxFilterConfig {
+public class WebFluxConfig {
 
     @Bean
     public WebFilter webFluxBenchFilter1() { return passThrough(); }

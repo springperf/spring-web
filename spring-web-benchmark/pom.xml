@@ -113,15 +113,16 @@
     </build>
 
     <profiles>
+        
         <!-- ============================================================ -->
-        <!-- Profile: benchmark-perf (自定义框架 + Netty)                     -->
+        <!-- Profile: benchmark-perf (Perf + 5Filter + 3Interceptor) -->
         <!-- ============================================================ -->
         <profile>
             <id>benchmark-perf</id>
             <properties>
                 <benchmark.server.type>perf</benchmark.server.type>
                 <benchmark.main.class>io.springperf.benchmark.app.PerfApplication</benchmark.main.class>
-                <benchmark.port>9091</benchmark.port>
+                <benchmark.port>9092</benchmark.port>
                 <benchmark.profile.name>perf</benchmark.profile.name>
                 <benchmark.gc.log.arg>-Xlog:gc*=info:file=target/benchmark-reports/gc-perf.log:time,uptime,level,tags</benchmark.gc.log.arg>
             </properties>
@@ -185,87 +186,16 @@
             </build>
         </profile>
 
+        
         <!-- ============================================================ -->
-        <!-- Profile: benchmark-perf-filter (Perf + 5Filter + 3Interceptor) -->
-        <!-- ============================================================ -->
-        <profile>
-            <id>benchmark-perf-filter</id>
-            <properties>
-                <benchmark.server.type>perf-filter</benchmark.server.type>
-                <benchmark.main.class>io.springperf.benchmark.app.PerfFilterApplication</benchmark.main.class>
-                <benchmark.port>9092</benchmark.port>
-                <benchmark.profile.name>perf-filter</benchmark.profile.name>
-                <benchmark.gc.log.arg>-Xlog:gc*=info:file=target/benchmark-reports/gc-perf-filter.log:time,uptime,level,tags</benchmark.gc.log.arg>
-            </properties>
-            <dependencies>
-                <dependency>
-                    <groupId>io.github.springperf</groupId>
-                    <artifactId>spring-boot-starter-web</artifactId>
-                </dependency>
-                <dependency>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-validation</artifactId>
-                </dependency>
-            </dependencies>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>build-helper-maven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>add-perf-filter-source</id>
-                                <goals><goal>add-source</goal></goals>
-                                <configuration>
-                                    <sources>
-                                        <source>src/benchmark-perf-filter/java</source>
-                                    </sources>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>add-perf-filter-resources</id>
-                                <goals><goal>add-resource</goal></goals>
-                                <configuration>
-                                    <resources>
-                                        <resource>
-                                            <directory>src/benchmark-perf-filter/resources</directory>
-                                        </resource>
-                                    </resources>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.openjdk.jmh</groupId>
-                        <artifactId>jmh-maven-plugin</artifactId>
-                        <configuration>
-                            <includes>
-                                <include>io.springperf.benchmark.servlet.PerfFilterBenchmark</include>
-                            </includes>
-                            <resultFile>target/jmh-results-perf-filter.json</resultFile>
-                            <resultFormat>JSON</resultFormat>
-                            <fork>1</fork>
-                            <jvmArgsAppend>
-                                <jvmArg>${benchmark.gc.log.arg}</jvmArg>
-                            </jvmArgsAppend>
-                            <jmhProfilers>
-                                <profiler>gc</profiler>
-                            </jmhProfilers>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-
-        <!-- ============================================================ -->
-        <!-- Profile: benchmark-perf-support (Perf + spring-web-support)     -->
+        <!-- Profile: benchmark-perf-support (Perf+Support + Servlet Filter/Interceptor) -->
         <!-- ============================================================ -->
         <profile>
             <id>benchmark-perf-support</id>
             <properties>
                 <benchmark.server.type>perf-support</benchmark.server.type>
                 <benchmark.main.class>io.springperf.benchmark.app.PerfSupportApplication</benchmark.main.class>
-                <benchmark.port>9093</benchmark.port>
+                <benchmark.port>9094</benchmark.port>
                 <benchmark.profile.name>perf-support</benchmark.profile.name>
                 <benchmark.gc.log.arg>-Xlog:gc*=info:file=target/benchmark-reports/gc-perf-support.log:time,uptime,level,tags</benchmark.gc.log.arg>
             </properties>
@@ -301,6 +231,15 @@
                                 <configuration>
                                     <sources>
                                         <source>src/benchmark-perf-support/java</source>
+                                        </sources>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>add-perf-support-config-source</id>
+                                <goals><goal>add-source</goal></goals>
+                                <configuration>
+                                    <sources>
+                                        <source>src/benchmark-tomcat/java</source>
                                     </sources>
                                 </configuration>
                             </execution>
@@ -339,106 +278,16 @@
             </build>
         </profile>
 
+        
         <!-- ============================================================ -->
-        <!-- Profile: benchmark-perf-support-filter (Perf+Support + Servlet Filter/Interceptor) -->
-        <!-- ============================================================ -->
-        <profile>
-            <id>benchmark-perf-support-filter</id>
-            <properties>
-                <benchmark.server.type>perf-support-filter</benchmark.server.type>
-                <benchmark.main.class>io.springperf.benchmark.app.PerfSupportFilterApplication</benchmark.main.class>
-                <benchmark.port>9094</benchmark.port>
-                <benchmark.profile.name>perf-support-filter</benchmark.profile.name>
-                <benchmark.gc.log.arg>-Xlog:gc*=info:file=target/benchmark-reports/gc-perf-support-filter.log:time,uptime,level,tags</benchmark.gc.log.arg>
-            </properties>
-            <dependencies>
-                <dependency>
-                    <groupId>io.github.springperf</groupId>
-                    <artifactId>spring-boot-starter-web</artifactId>
-                </dependency>
-                <dependency>
-                    <groupId>io.github.springperf</groupId>
-                    <artifactId>spring-web-support</artifactId>
-                    <scope>compile</scope>
-                </dependency>
-                <dependency>
-                    <groupId>javax.servlet</groupId>
-                    <artifactId>javax.servlet-api</artifactId>
-                    <scope>provided</scope>
-                </dependency>
-                <dependency>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-validation</artifactId>
-                </dependency>
-            </dependencies>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>build-helper-maven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>add-perf-support-filter-source</id>
-                                <goals><goal>add-source</goal></goals>
-                                <configuration>
-                                    <sources>
-                                        <source>src/benchmark-perf-support-filter/java</source>
-                                        </sources>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>add-perf-support-filter-config-source</id>
-                                <goals><goal>add-source</goal></goals>
-                                <configuration>
-                                    <sources>
-                                        <source>src/benchmark-tomcat-filter/java</source>
-                                    </sources>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>add-perf-support-filter-resources</id>
-                                <goals><goal>add-resource</goal></goals>
-                                <configuration>
-                                    <resources>
-                                        <resource>
-                                            <directory>src/benchmark-perf-support-filter/resources</directory>
-                                        </resource>
-                                    </resources>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.openjdk.jmh</groupId>
-                        <artifactId>jmh-maven-plugin</artifactId>
-                        <configuration>
-                            <includes>
-                                <include>io.springperf.benchmark.servlet.PerfSupportFilterBenchmark</include>
-                            </includes>
-                            <resultFile>target/jmh-results-perf-support-filter.json</resultFile>
-                            <resultFormat>JSON</resultFormat>
-                            <fork>1</fork>
-                            <jvmArgsAppend>
-                                <jvmArg>${benchmark.gc.log.arg}</jvmArg>
-                            </jvmArgsAppend>
-                            <jmhProfilers>
-                                <profiler>gc</profiler>
-                            </jmhProfilers>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-
-        <!-- ============================================================ -->
-        <!-- Profile: benchmark-tomcat (Spring MVC + Tomcat)                -->
+        <!-- Profile: benchmark-tomcat (Tomcat + 5Filter + 3Interceptor) -->
         <!-- ============================================================ -->
         <profile>
             <id>benchmark-tomcat</id>
             <properties>
                 <benchmark.server.type>tomcat</benchmark.server.type>
                 <benchmark.main.class>io.springperf.benchmark.app.TomcatApplication</benchmark.main.class>
-                <benchmark.port>9101</benchmark.port>
+                <benchmark.port>9102</benchmark.port>
                 <benchmark.profile.name>tomcat</benchmark.profile.name>
                 <benchmark.gc.log.arg>-Xlog:gc*=info:file=target/benchmark-reports/gc-tomcat.log:time,uptime,level,tags</benchmark.gc.log.arg>
             </properties>
@@ -502,87 +351,16 @@
             </build>
         </profile>
 
+        
         <!-- ============================================================ -->
-        <!-- Profile: benchmark-tomcat-filter (Tomcat + 5Filter + 3Interceptor) -->
-        <!-- ============================================================ -->
-        <profile>
-            <id>benchmark-tomcat-filter</id>
-            <properties>
-                <benchmark.server.type>tomcat-filter</benchmark.server.type>
-                <benchmark.main.class>io.springperf.benchmark.app.TomcatFilterApplication</benchmark.main.class>
-                <benchmark.port>9102</benchmark.port>
-                <benchmark.profile.name>tomcat-filter</benchmark.profile.name>
-                <benchmark.gc.log.arg>-Xlog:gc*=info:file=target/benchmark-reports/gc-tomcat-filter.log:time,uptime,level,tags</benchmark.gc.log.arg>
-            </properties>
-            <dependencies>
-                <dependency>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-web</artifactId>
-                </dependency>
-                <dependency>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-validation</artifactId>
-                </dependency>
-            </dependencies>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>build-helper-maven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>add-tomcat-filter-source</id>
-                                <goals><goal>add-source</goal></goals>
-                                <configuration>
-                                    <sources>
-                                        <source>src/benchmark-tomcat-filter/java</source>
-                                        </sources>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>add-tomcat-filter-resources</id>
-                                <goals><goal>add-resource</goal></goals>
-                                <configuration>
-                                    <resources>
-                                        <resource>
-                                            <directory>src/benchmark-tomcat-filter/resources</directory>
-                                        </resource>
-                                    </resources>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.openjdk.jmh</groupId>
-                        <artifactId>jmh-maven-plugin</artifactId>
-                        <configuration>
-                            <includes>
-                                <include>io.springperf.benchmark.servlet.TomcatFilterBenchmark</include>
-                            </includes>
-                            <resultFile>target/jmh-results-tomcat-filter.json</resultFile>
-                            <resultFormat>JSON</resultFormat>
-                            <fork>1</fork>
-                            <jvmArgsAppend>
-                                <jvmArg>${benchmark.gc.log.arg}</jvmArg>
-                            </jvmArgsAppend>
-                            <jmhProfilers>
-                                <profiler>gc</profiler>
-                            </jmhProfilers>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-
-        <!-- ============================================================ -->
-        <!-- Profile: benchmark-undertow (Spring MVC + Undertow)            -->
+        <!-- Profile: benchmark-undertow (Undertow + 5Filter + 3Interceptor) -->
         <!-- ============================================================ -->
         <profile>
             <id>benchmark-undertow</id>
             <properties>
                 <benchmark.server.type>undertow</benchmark.server.type>
                 <benchmark.main.class>io.springperf.benchmark.app.UndertowApplication</benchmark.main.class>
-                <benchmark.port>9111</benchmark.port>
+                <benchmark.port>9112</benchmark.port>
                 <benchmark.profile.name>undertow</benchmark.profile.name>
                 <benchmark.gc.log.arg>-Xlog:gc*=info:file=target/benchmark-reports/gc-undertow.log:time,uptime,level,tags</benchmark.gc.log.arg>
             </properties>
@@ -622,6 +400,15 @@
                                 </configuration>
                             </execution>
                             <execution>
+                                <id>add-undertow-config-source</id>
+                                <goals><goal>add-source</goal></goals>
+                                <configuration>
+                                    <sources>
+                                        <source>src/benchmark-tomcat/java</source>
+                                        </sources>
+                                </configuration>
+                            </execution>
+                            <execution>
                                 <id>add-undertow-resources</id>
                                 <goals><goal>add-resource</goal></goals>
                                 <configuration>
@@ -656,106 +443,16 @@
             </build>
         </profile>
 
+        
         <!-- ============================================================ -->
-        <!-- Profile: benchmark-undertow-filter (Undertow + 5Filter + 3Interceptor) -->
-        <!-- ============================================================ -->
-        <profile>
-            <id>benchmark-undertow-filter</id>
-            <properties>
-                <benchmark.server.type>undertow-filter</benchmark.server.type>
-                <benchmark.main.class>io.springperf.benchmark.app.UndertowFilterApplication</benchmark.main.class>
-                <benchmark.port>9112</benchmark.port>
-                <benchmark.profile.name>undertow-filter</benchmark.profile.name>
-                <benchmark.gc.log.arg>-Xlog:gc*=info:file=target/benchmark-reports/gc-undertow-filter.log:time,uptime,level,tags</benchmark.gc.log.arg>
-            </properties>
-            <dependencies>
-                <dependency>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-web</artifactId>
-                    <exclusions>
-                        <exclusion>
-                            <groupId>org.springframework.boot</groupId>
-                            <artifactId>spring-boot-starter-tomcat</artifactId>
-                        </exclusion>
-                    </exclusions>
-                </dependency>
-                <dependency>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-undertow</artifactId>
-                </dependency>
-                <dependency>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-validation</artifactId>
-                </dependency>
-            </dependencies>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>build-helper-maven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>add-undertow-filter-source</id>
-                                <goals><goal>add-source</goal></goals>
-                                <configuration>
-                                    <sources>
-                                        <source>src/benchmark-undertow-filter/java</source>
-                                        </sources>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>add-undertow-filter-config-source</id>
-                                <goals><goal>add-source</goal></goals>
-                                <configuration>
-                                    <sources>
-                                        <source>src/benchmark-tomcat-filter/java</source>
-                                        </sources>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>add-undertow-filter-resources</id>
-                                <goals><goal>add-resource</goal></goals>
-                                <configuration>
-                                    <resources>
-                                        <resource>
-                                            <directory>src/benchmark-undertow-filter/resources</directory>
-                                        </resource>
-                                    </resources>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.openjdk.jmh</groupId>
-                        <artifactId>jmh-maven-plugin</artifactId>
-                        <configuration>
-                            <includes>
-                                <include>io.springperf.benchmark.servlet.UndertowFilterBenchmark</include>
-                            </includes>
-                            <resultFile>target/jmh-results-undertow-filter.json</resultFile>
-                            <resultFormat>JSON</resultFormat>
-                            <fork>1</fork>
-                            <jvmArgsAppend>
-                                <jvmArg>${benchmark.gc.log.arg}</jvmArg>
-                            </jvmArgsAppend>
-                            <jmhProfilers>
-                                <profiler>gc</profiler>
-                            </jmhProfilers>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-
-        <!-- ============================================================ -->
-        <!-- Profile: benchmark-webflux (Spring WebFlux + Netty)            -->
+        <!-- Profile: benchmark-webflux (WebFlux + 8Filter)          -->
         <!-- ============================================================ -->
         <profile>
             <id>benchmark-webflux</id>
             <properties>
                 <benchmark.server.type>webflux</benchmark.server.type>
                 <benchmark.main.class>io.springperf.benchmark.app.WebFluxApplication</benchmark.main.class>
-                <benchmark.port>9121</benchmark.port>
+                <benchmark.port>9122</benchmark.port>
                 <benchmark.profile.name>webflux</benchmark.profile.name>
                 <benchmark.gc.log.arg>-Xlog:gc*=info:file=target/benchmark-reports/gc-webflux.log:time,uptime,level,tags</benchmark.gc.log.arg>
             </properties>
@@ -805,79 +502,6 @@
                                 <include>io.springperf.benchmark.servlet.WebFluxBenchmark</include>
                             </includes>
                             <resultFile>target/jmh-results-webflux.json</resultFile>
-                            <resultFormat>JSON</resultFormat>
-                            <fork>1</fork>
-                            <jvmArgsAppend>
-                                <jvmArg>${benchmark.gc.log.arg}</jvmArg>
-                            </jvmArgsAppend>
-                            <jmhProfilers>
-                                <profiler>gc</profiler>
-                            </jmhProfilers>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-
-        <!-- ============================================================ -->
-        <!-- Profile: benchmark-webflux-filter (WebFlux + 8Filter)          -->
-        <!-- ============================================================ -->
-        <profile>
-            <id>benchmark-webflux-filter</id>
-            <properties>
-                <benchmark.server.type>webflux-filter</benchmark.server.type>
-                <benchmark.main.class>io.springperf.benchmark.app.WebFluxFilterApplication</benchmark.main.class>
-                <benchmark.port>9122</benchmark.port>
-                <benchmark.profile.name>webflux-filter</benchmark.profile.name>
-                <benchmark.gc.log.arg>-Xlog:gc*=info:file=target/benchmark-reports/gc-webflux-filter.log:time,uptime,level,tags</benchmark.gc.log.arg>
-            </properties>
-            <dependencies>
-                <dependency>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-webflux</artifactId>
-                </dependency>
-                <dependency>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-validation</artifactId>
-                </dependency>
-            </dependencies>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>build-helper-maven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>add-webflux-filter-source</id>
-                                <goals><goal>add-source</goal></goals>
-                                <configuration>
-                                    <sources>
-                                        <source>src/benchmark-webflux-filter/java</source>
-                                        <source>src/benchmark-webflux/java</source>
-                                    </sources>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>add-webflux-filter-resources</id>
-                                <goals><goal>add-resource</goal></goals>
-                                <configuration>
-                                    <resources>
-                                        <resource>
-                                            <directory>src/benchmark-webflux-filter/resources</directory>
-                                        </resource>
-                                    </resources>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.openjdk.jmh</groupId>
-                        <artifactId>jmh-maven-plugin</artifactId>
-                        <configuration>
-                            <includes>
-                                <include>io.springperf.benchmark.servlet.WebFluxFilterBenchmark</include>
-                            </includes>
-                            <resultFile>target/jmh-results-webflux-filter.json</resultFile>
                             <resultFormat>JSON</resultFormat>
                             <fork>1</fork>
                             <jvmArgsAppend>
