@@ -29,7 +29,8 @@ Spring Web is a high-performance web framework built on **Netty 4.1**, designed 
 - **High Performance** — Pre-caches all metadata at startup, zero reflection and zero matching at runtime; ASM bytecode generation replaces reflective invocation; O(1) HashMap routing; GC-friendly design
 - **Netty-Driven** — Built on Netty 4.1 event-driven I/O; requests execute on EventLoop by default, with method-level `@RunInPool` scheduling to business thread pools as needed
 - **Spring Ecosystem Compatible** — Supports `@RestController`, `@RequestMapping`, `@Validated`, `@ExceptionHandler`, `HandlerInterceptor`, and other Spring annotations and abstractions — zero-code migration
-- **Async Native** — Built-in support for DeferredResult, Callable, SseEmitter, StreamEmitter, Reactive Streams; SSE throughput reaches 4.51x of Tomcat
+- **Async Native** — Built-in support for DeferredResult, Callable, SseEmitter, StreamEmitter, Reactive Streams; SSE throughput reaches 3.89x of Spring MVC, scaling to 6.37x under high concurrency
+- **Batch Processing** — Disruptor-based request aggregation that transparently merges concurrent requests into batch operations, boosting throughput by multiple times; supports backpressure strategies, wait strategies, and thread pool isolation
 - **Extensible** — SPI at every key juncture: argument resolvers, return value handlers, codec interceptors, filters, interceptors
 - **Ecosystem Bridge** — The `support` module bridges Servlet Filters, Spring MVC `HandlerInterceptor`, `RequestBodyAdvice` / `ResponseBodyAdvice`
 - **Actuator Integration** — Supports Spring Boot Actuator with optional standalone management port
@@ -117,20 +118,21 @@ This project manages two branches aligned with Spring Boot major versions. Minim
 > Full report: [Benchmark Document](benchmark.md)
 > Performance analysis: [Performance Principles](performance-principles.md)
 
-JMH benchmark results on JDK 1.8 + G1GC (1GB heap):
+JMH benchmark results on JDK 1.8 + G1GC (1GB heap, 4 threads):
 
-| Scenario | perf throughput | vs Tomcat | vs Undertow | vs WebFlux |
-|----------|---------------|-----------|-------------|-------------|
-| helloGet | **30,697** ops/s | **2.05x** | **1.90x** | **1.88x** |
-| jsonEcho | **28,831** ops/s | **1.80x** | **1.82x** | **1.63x** |
-| bytes | **35,699** ops/s | **1.61x** | **1.59x** | **1.66x** |
-| validatePost | **28,599** ops/s | **1.72x** | **1.78x** | **1.66x** |
-| largeResponse | **11,796** ops/s | **2.10x** | **1.30x** | **1.32x** |
-| sseStream | **1,546** ops/s | **4.51x** | **4.44x** | **1.77x** |
-| jsonEchoLarge | **2,669** ops/s | **1.29x** | **1.13x** | **1.07x** |
-| asyncDeferredResult | **31,659** ops/s | **2.04x** | **2.22x** | **1.51x** |
+| API | perf throughput | vs Spring MVC (Tomcat) | vs Spring MVC (Undertow) | vs WebFlux |
+|-----|---------------|-----------|-------------|-------------|
+| json | **26,718** ops/s | **1.90x** | **2.59x** | **1.73x** |
+| get | **27,398** ops/s | **2.19x** | **2.04x** | **2.08x** |
+| bytes | **34,232** ops/s | **1.71x** | **2.92x** | **1.99x** |
+| valid | **26,706** ops/s | **1.84x** | **1.95x** | **1.71x** |
+| async | **28,354** ops/s | **2.11x** | **2.79x** | **1.55x** |
+| bytesLarge | **11,508** ops/s | **2.31x** | **1.48x** | **1.49x** |
+| sse | **1,226** ops/s | **3.89x** | FAIL¹ | **1.30x** |
 
-The perf framework delivers **1.3~4.5x** throughput over Servlet containers, with **0.11ms** p50 latency (lowest among peers). See [full comparison report](benchmark.md).
+The perf framework delivers **1.7~3.9x** throughput over Servlet containers, with **0.12~0.15ms** p50 latency (lowest among peers). SSE scales to **6.37x** Spring MVC under high concurrency. See [full comparison report](benchmark.md).
+
+> ¹ Undertow SSE implementation limitation.
 
 ---
 
@@ -139,9 +141,9 @@ The perf framework delivers **1.3~4.5x** throughput over Servlet containers, wit
 | Dimension | Spring Web | Spring MVC (Tomcat) |
 |-----------|-----------|---------------------|
 | Engine | Netty 4.1 | Servlet container (Tomcat/Jetty/Undertow) |
-| Throughput (helloGet) | **30,697** ops/s | 14,949 ops/s (2.05x) |
-| P50 Latency (helloGet) | **0.13ms** | 0.26ms |
-| Steady-state heap | **15MB** | 20MB |
+| Throughput (json 4t) | **26,718** ops/s | 14,061 ops/s (1.90x) |
+| P50 Latency (bytes 4t) | **0.12ms** | 0.19ms |
+| Steady-state heap (4t) | **20MB** | 23MB |
 | I/O model | Netty non-blocking transport + EventLoop | Servlet blocking I/O + container threads |
 | Thread model | EventLoop direct or `@RunInPool` on-demand | Fixed container thread pool |
 | Method invocation | ASM / MethodHandle (~10-30ns) | `Method.invoke()` reflection (~200ns) |

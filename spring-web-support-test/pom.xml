@@ -4,6 +4,7 @@
     <parent>
         <groupId>io.github.springperf</groupId>
         <artifactId>spring-web-parent</artifactId>
+
 <version>3.2.2</version>
     </parent>
     <artifactId>spring-web-support-test</artifactId>

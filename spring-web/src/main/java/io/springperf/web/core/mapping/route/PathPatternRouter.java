@@ -77,7 +77,7 @@ public class PathPatternRouter implements Router {
         if (PathPatternUtils.supportPatternParse(pathRule)) {
             routeMatcher = PathPatternUtils.getPatternRouteMatcher();
         } else {
-            log.warn("PathPatternRouter not support pathRule : " + pathRule);
+            log.warn("PathPatternRouter not support pathRule : {}", pathRule);
             routeMatcher = PathPatternUtils.getPathRouteMatcher();
         }
     }

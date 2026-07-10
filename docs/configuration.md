@@ -84,6 +84,22 @@ management.endpoints.web.base-path=/actuator
 management.endpoints.web.exposure.include=health,info,metrics
 ```
 
+## 可观测性指标
+
+当 `spring-boot-starter-actuator` 在类路径上时，框架自动注册 `MicrometerWebMetrics`，收集以下指标：
+
+| 指标名 | 类型 | 标签 | 说明 |
+|--------|------|------|------|
+| `dispatcher.request.duration` | Timer | `method`, `path`, `status` | 请求处理耗时分布 |
+| `dispatcher.exception` | Counter | `type`, `resolved` | 异常计数，按异常类型和是否被 `@ExceptionHandler` 处理分类 |
+| `pool.{name}.active.threads` | Gauge | — | 指定线程池的活跃线程数 |
+| `pool.{name}.queue.size` | Gauge | — | 指定线程池的排队任务数 |
+| `pool.{name}.completed.tasks` | Gauge | — | 指定线程池的已完成任务数 |
+| `netty.connections.active` | Gauge | — | 当前活跃 TCP 连接数 |
+| `netty.eventloop.pending.tasks` | Gauge | — | Netty EventLoop 待处理任务总数 |
+
+`{name}` 为线程池名称，对应 `register()` 时传入的名称或 Spring Bean 名称。
+
 ## OpenAPI 文档
 
 | 配置项 | 默认值 | 说明 |

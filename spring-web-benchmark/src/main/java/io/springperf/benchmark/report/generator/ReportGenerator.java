@@ -14,18 +14,14 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 /**
- * JMH 多维指标报告生成器（Per-Scenario 版）。
+ * JMH 多维指标报告生成器（Per-API 版）。
  * <p>
  * 从 benchmark-reports/{run-id}/{jdk-version}/ 目录动态发现所有
- * {@code jmh-results-{profile}-{scenario}.json} 文件，按 scenario 维度
- * 组织数据并生成 Markdown 报告。不依赖硬编码 profile/scenario 列表。
+ * {@code jmh-results-{profile}-{api}.json} 文件，按 api 维度
+ * 组织数据并生成 Markdown 报告。不依赖硬编码 profile/api 列表。
  * <p>
- * 文件命名解析规则：去掉前缀 "jmh-results-" 和后缀 ".json"，
- * 按最后一个 "-" 分割，左侧为 profile 名，右侧为 scenario 名。
- * 例如 {@code jmh-results-perf-filter-jsonEcho.json} →
- * profile="perf-filter", scenario="jsonEcho"。
- * <p>
- * 用法: ReportGenerator {@code <benchmark-reports-dir>}
+ * 支持多线程并发测试：检测 runDir 下 threads-N 子目录结构，
+ * 自动生成并发伸缩性对比矩阵。
  */
 public class ReportGenerator {
 
@@ -35,11 +31,10 @@ public class ReportGenerator {
             new Jdk8GcLogParser()
     };
 
-    /** 已知场景顺序参考，用于报告排序 */
-    private static final List<String> KNOWN_SCENARIOS = Arrays.asList(
-            "jsonEcho", "helloGet", "asyncDeferredResult",
-            "bytes", "validatePost", "jsonEchoLarge", "largeResponse",
-            "sseStream"
+    private static final List<String> KNOWN_APIS = Arrays.asList(
+            "json", "get", "async",
+            "bytes", "valid", "bytesLarge",
+            "sse"
     );
 
     public static void main(String[] args) throws IOException {
@@ -59,13 +54,21 @@ public class ReportGenerator {
             System.exit(1);
         }
 
-        Path jdkDir = findJdkDir(runDir);
-        if (jdkDir == null) {
-            System.err.println("No JDK subdirectory found in " + runDir);
-            System.exit(1);
+        // 检测多线程并发测试结构
+        List<Path> threadDirs = findThreadDirs(runDir);
+        String report;
+        if (!threadDirs.isEmpty()) {
+            report = generateScalabilityReport(runDir, threadDirs);
+        } else {
+            // 单线程模式（向后兼容）
+            Path jdkDir = findJdkDir(runDir);
+            if (jdkDir == null) {
+                System.err.println("No JDK subdirectory found in " + runDir);
+                System.exit(1);
+            }
+            report = generateReport(jdkDir);
         }
 
-        String report = generateReport(jdkDir);
         Path reportPath = runDir.resolve("report.md");
         Files.write(reportPath, report.getBytes("UTF-8"));
         System.out.println("Report generated: " + reportPath.toAbsolutePath());
@@ -104,112 +107,161 @@ public class ReportGenerator {
         return runDir;
     }
 
-    // ==================== 新：动态文件发现 ====================
+    // ==================== 多线程并发测试检测 ====================
 
     /**
-     * 扫描 JDK 目录下所有 jmh-results-*.json 文件，从文件名提取 profile+scenario。
-     * <p>
-     * 返回 {@code scenario -> profile -> ProfileData} 的两层 Map。
+     * 检测 runDir 下是否有 threads-N 子目录结构。
+     * 返回按目录名排序的列表（如 threads-1, threads-4, threads-16, threads-64）。
      */
+    private static List<Path> findThreadDirs(Path runDir) throws IOException {
+        List<Path> dirs = new ArrayList<>();
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(runDir,
+                entry -> Files.isDirectory(entry) && entry.getFileName().toString().matches("threads-\\d+"))) {
+            for (Path dir : stream) {
+                dirs.add(dir);
+            }
+        }
+        Collections.sort(dirs); // lexicographic sort works for thread counts (1, 16, 4, 64 → 1, 16, 4, 64 numerically sorted later)
+        return dirs;
+    }
+
+    // ==================== 数据发现 ====================
+
     private static Map<String, Map<String, ProfileData>> discoverAllData(Path jdkDir) throws IOException {
-        // scenario -> profile -> ProfileData
-        Map<String, Map<String, ProfileData>> byScenario = new LinkedHashMap<>();
+        Map<String, Map<String, ProfileData>> byApi = new LinkedHashMap<>();
 
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(jdkDir, "jmh-results-*.json")) {
             for (Path jmhFile : stream) {
                 String fileName = jmhFile.getFileName().toString();
-                // "jmh-results-perf-filter-jsonEcho.json"
                 String stem = fileName.substring("jmh-results-".length());
                 stem = stem.substring(0, stem.length() - ".json".length());
-                // stem = "perf-filter-jsonEcho"
 
-                String profile, scenario;
-                int lastHyphen = stem.lastIndexOf('-');
-                if (lastHyphen > 0) {
-                    profile = stem.substring(0, lastHyphen);
-                    scenario = stem.substring(lastHyphen + 1);
-                } else {
-                    // 旧格式 jmh-results-{profile}.json，无 scenario
+                JsonNode root = MAPPER.readTree(jmhFile.toFile());
+                if (!root.isArray()) continue;
+
+                Map<String, ProfileData> perApiData = new LinkedHashMap<>();
+                Set<String> apisInFile = new LinkedHashSet<>();
+
+                for (JsonNode bench : root) {
+                    String fullName = bench.has("benchmark") ? bench.get("benchmark").asText() : "";
+                    String shortName = extractShortName(fullName);
+                    if (shortName.isEmpty()) continue;
+                    apisInFile.add(shortName);
+
+                    ProfileData data = perApiData.get(shortName);
+                    if (data == null) {
+                        data = new ProfileData();
+                        data.api = shortName;
+                        perApiData.put(shortName, data);
+                    }
+                    parseBenchmarkEntry(bench, data);
+                }
+
+                if (perApiData.isEmpty()) continue;
+
+                String profile;
+                if (apisInFile.size() > 1 || !stem.contains("-")) {
                     profile = stem;
-                    scenario = "_default";
+                } else {
+                    int lastHyphen = stem.lastIndexOf('-');
+                    profile = stem.substring(0, lastHyphen);
                 }
 
-                ProfileData data = new ProfileData();
-                data.profileName = profile;
-                data.scenario = scenario;
-                try {
-                    parseJmhResults(jmhFile, data);
-                    data.success = true;
-                } catch (Exception e) {
-                    data.failReason = "JMH parse error: " + e.getMessage();
-                    System.err.println("[WARN] Failed to parse " + fileName + ": " + e.getMessage());
-                }
-
-                // 加载 GC 日志 gc-{profile}-{scenario}.log
-                Path gcFile = jdkDir.resolve("gc-" + profile + "-" + scenario + ".log");
-                if (Files.exists(gcFile)) {
+                Path gcFileShared = jdkDir.resolve("gc-" + profile + ".log");
+                GcMetrics sharedGcMetrics = null;
+                if (Files.exists(gcFileShared)) {
                     for (GcLogParser parser : GC_PARSERS) {
-                        if (parser.supports(gcFile)) {
-                            data.gcMetrics = parser.parse(gcFile);
+                        if (parser.supports(gcFileShared)) {
+                            sharedGcMetrics = parser.parse(gcFileShared);
                             break;
                         }
                     }
                 }
 
-                // 加载内存快照 memory-{profile}-{scenario}.json
-                Path memFile = jdkDir.resolve("memory-" + profile + "-" + scenario + ".json");
-                if (Files.exists(memFile)) {
+                Path memFileShared = jdkDir.resolve("memory-" + profile + ".json");
+                MemorySnapshot sharedMemorySnapshot = null;
+                if (Files.exists(memFileShared)) {
                     try {
-                        data.memorySnapshot = MAPPER.readValue(memFile.toFile(), MemorySnapshot.class);
+                        sharedMemorySnapshot = MAPPER.readValue(memFileShared.toFile(), MemorySnapshot.class);
                     } catch (Exception e) {
                         System.err.println("[WARN] Failed to parse memory snapshot for "
                                 + fileName + ": " + e.getMessage());
                     }
                 }
 
-                byScenario.computeIfAbsent(scenario, k -> new LinkedHashMap<>())
-                        .put(profile, data);
+                for (Map.Entry<String, ProfileData> entry : perApiData.entrySet()) {
+                    ProfileData data = entry.getValue();
+                    data.profileName = profile;
+                    data.success = true;
+
+                    if (sharedGcMetrics != null) {
+                        data.gcMetrics = sharedGcMetrics;
+                    } else {
+                        Path gcFile = jdkDir.resolve("gc-" + profile + "-" + data.api + ".log");
+                        if (Files.exists(gcFile)) {
+                            for (GcLogParser parser : GC_PARSERS) {
+                                if (parser.supports(gcFile)) {
+                                    data.gcMetrics = parser.parse(gcFile);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (sharedMemorySnapshot != null) {
+                        data.memorySnapshot = sharedMemorySnapshot;
+                    } else {
+                        Path memFile = jdkDir.resolve("memory-" + profile + "-" + data.api + ".json");
+                        if (Files.exists(memFile)) {
+                            try {
+                                data.memorySnapshot = MAPPER.readValue(memFile.toFile(), MemorySnapshot.class);
+                            } catch (Exception e) {
+                                System.err.println("[WARN] Failed to parse memory snapshot for "
+                                        + fileName + ": " + e.getMessage());
+                            }
+                        }
+                    }
+
+                    byApi.computeIfAbsent(data.api, k -> new LinkedHashMap<>())
+                            .put(profile, data);
+                }
             }
         }
 
-        return byScenario;
+        return byApi;
     }
 
-    private static String generateReport(Path jdkDir) throws IOException {
-        Map<String, Map<String, ProfileData>> byScenario = discoverAllData(jdkDir);
+    // ==================== 单线程报告（向后兼容） ====================
 
-        // 构建有序的 profiles 和 scenarios 列表
+    private static String generateReport(Path jdkDir) throws IOException {
+        Map<String, Map<String, ProfileData>> byApi = discoverAllData(jdkDir);
+
         LinkedHashSet<String> allProfiles = new LinkedHashSet<>();
-        LinkedHashSet<String> allScenarios = new LinkedHashSet<>();
-        for (Map.Entry<String, Map<String, ProfileData>> entry : byScenario.entrySet()) {
-            String scenario = entry.getKey();
-            // 按 KNOWN_SCENARIOS 顺序插入；未知 scenario 按发现顺序
-            if (KNOWN_SCENARIOS.contains(scenario)) {
-                allScenarios.add(scenario);
+        LinkedHashSet<String> allApis = new LinkedHashSet<>();
+        for (Map.Entry<String, Map<String, ProfileData>> entry : byApi.entrySet()) {
+            String api = entry.getKey();
+            if (KNOWN_APIS.contains(api)) {
+                allApis.add(api);
             }
             allProfiles.addAll(entry.getValue().keySet());
         }
-        // 确保已知 scenario 按定义顺序
-        for (String known : KNOWN_SCENARIOS) {
-            if (byScenario.containsKey(known)) {
-                allScenarios.add(known);
+        for (String known : KNOWN_APIS) {
+            if (byApi.containsKey(known)) {
+                allApis.add(known);
             }
         }
-        // 未知 scenario 追加到末尾
-        for (String key : byScenario.keySet()) {
-            if (!KNOWN_SCENARIOS.contains(key)) {
-                allScenarios.add(key);
+        for (String key : byApi.keySet()) {
+            if (!KNOWN_APIS.contains(key)) {
+                allApis.add(key);
             }
         }
 
         String[] profiles = allProfiles.toArray(new String[0]);
-        String[] scenarios = allScenarios.toArray(new String[0]);
+        String[] apis = allApis.toArray(new String[0]);
 
-        int totalScenarios = scenarios.length;
-        int totalProfiles = profiles.length;
         int successCount = 0;
         int failCount = 0;
-        for (Map<String, ProfileData> profileMap : byScenario.values()) {
+        for (Map<String, ProfileData> profileMap : byApi.values()) {
             for (ProfileData d : profileMap.values()) {
                 if (d.success) successCount++;
                 else failCount++;
@@ -226,19 +278,280 @@ public class ReportGenerator {
         w.println();
 
         w.println("## 执行摘要\n");
-        w.printf("发现 **%d** 个场景 × **%d** 个容器，总计 **%d/%d** 成功，**%d** 失败\n\n",
-                totalScenarios, totalProfiles, successCount,
-                totalScenarios * totalProfiles, failCount);
+        w.printf("发现 **%d** 个 API × **%d** 个容器，总计 **%d/%d** 成功，**%d** 失败\n\n",
+                totalApis(apis.length, false), profiles.length, successCount,
+                apis.length * profiles.length, failCount);
 
-        // 1. 吞吐量
-        w.println("## 1. 吞吐量 (ops/sec, 越高越好)\n");
-        printTableHeader(w, profiles);
-        for (String sc : scenarios) {
-            w.printf("| %s", sc);
+        writeThroughputSection(w, byApi, profiles, apis, false);
+        int sectionNum = 1;
+        boolean hasLatency = hasAnyPercentiles(byApi, profiles, apis);
+        if (hasLatency) {
+            w.printf("## %d. 延迟 (ms, 越低越好)\n\n", ++sectionNum);
+            writeLatencySections(w, byApi, profiles, apis);
+        }
+        w.printf("## %d. GC 行为\n\n", ++sectionNum);
+        writeGcSections(w, byApi, profiles, apis, false);
+        w.printf("## %d. 内存占用 (稳态)\n\n", ++sectionNum);
+        writeMemorySections(w, byApi, profiles, apis);
+
+        if (failCount > 0) {
+            w.println("## 5. 失败项\n");
+            for (Map.Entry<String, Map<String, ProfileData>> se : byApi.entrySet()) {
+                String api = se.getKey();
+                for (Map.Entry<String, ProfileData> pe : se.getValue().entrySet()) {
+                    ProfileData data = pe.getValue();
+                    if (!data.success) {
+                        w.printf("- **%s / %s**: %s\n", api, pe.getKey(), data.failReason);
+                    }
+                }
+            }
+            w.println();
+        }
+
+        w.flush();
+        return sw.toString();
+    }
+
+    // ==================== 多线程伸缩性报告 ====================
+
+    /**
+     * 生成多线程并发伸缩性报告。
+     * 检测 runDir 下所有 threads-N 子目录，收集各并发度的数据，
+     * 生成吞吐量随线程数变化的矩阵，并以中间线程数做详细对比。
+     */
+    private static String generateScalabilityReport(Path runDir, List<Path> threadDirs) throws IOException {
+        // threadCount -> jdkVersion -> api -> profile -> ProfileData
+        LinkedHashMap<String, LinkedHashMap<String, Map<String, Map<String, ProfileData>>>> allData = new LinkedHashMap<>();
+        List<String> threadCounts = new ArrayList<>();
+        LinkedHashSet<String> allJdkVersions = new LinkedHashSet<>();
+
+        for (Path threadDir : threadDirs) {
+            String dirName = threadDir.getFileName().toString();
+            String threadCount = dirName.substring("threads-".length());
+            threadCounts.add(threadCount);
+
+            LinkedHashMap<String, Map<String, Map<String, ProfileData>>> jdkData = new LinkedHashMap<>();
+            List<Path> jdkDirs = findAllJdkDirs(threadDir);
+            for (Path jdkDir : jdkDirs) {
+                String jdkName = jdkDir.getFileName().toString()
+                        .replace("jdk-", "").replace("_", ".");
+                allJdkVersions.add(jdkName);
+
+                Map<String, Map<String, ProfileData>> byApi = discoverAllData(jdkDir);
+                if (!byApi.isEmpty()) {
+                    jdkData.put(jdkName, byApi);
+                }
+            }
+
+            if (!jdkData.isEmpty()) {
+                allData.put(threadCount, jdkData);
+            }
+        }
+
+        if (allData.isEmpty()) {
+            return "# 无可用数据\n\n未在任何 threads-N 子目录中发现基准结果。\n";
+        }
+
+        // 数字排序
+        threadCounts.sort(Comparator.comparingInt(Integer::parseInt));
+        List<String> jdkVersions = new ArrayList<>(allJdkVersions);
+
+        // 收集所有 API 和 profile
+        LinkedHashSet<String> allProfiles = new LinkedHashSet<>();
+        LinkedHashSet<String> allApis = new LinkedHashSet<>();
+        for (LinkedHashMap<String, Map<String, Map<String, ProfileData>>> jdkMap : allData.values()) {
+            for (Map<String, Map<String, ProfileData>> byApi : jdkMap.values()) {
+                for (String api : byApi.keySet()) {
+                    if (KNOWN_APIS.contains(api)) allApis.add(api);
+                    for (Map<String, ProfileData> profileMap : byApi.values()) {
+                        allProfiles.addAll(profileMap.keySet());
+                    }
+                }
+            }
+        }
+
+        String[] profiles = allProfiles.toArray(new String[0]);
+        String[] apis = allApis.toArray(new String[0]);
+
+        java.io.StringWriter sw = new java.io.StringWriter(8192);
+        PrintWriter w = new PrintWriter(sw);
+
+        w.println("# Spring Web 性能对比报告（多线程并发测试）\n");
+        w.println("**生成时间:** " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        w.println();
+        w.println("**线程数:** " + String.join(", ", threadCounts));
+        w.println("**JDK:** " + String.join(", ", jdkVersions));
+        w.println();
+
+        w.println("## 执行摘要\n");
+        w.printf("**%d** 个容器 × **%d** 个 API × **%d** 个并发度 × **%d** 个 JDK\n\n",
+                profiles.length, apis.length, threadCounts.size(), jdkVersions.size());
+
+        // ==================== 1. 并发伸缩性 ====================
+        w.println("## 1. 并发伸缩性 (ops/sec, 越高越好)\n");
+        for (String api : apis) {
+            w.printf("### %s\n\n", api);
+            w.print("| 容器 | JDK");
+            for (String tc : threadCounts) {
+                w.printf(" | %s线程", tc);
+            }
+            w.println(" |");
+            w.print("|------|-----");
+            for (String tc : threadCounts) {
+                w.print("|--------");
+            }
+            w.println("|");
+
             for (String p : profiles) {
-                ProfileData data = getData(byScenario, sc, p);
+                for (String jdk : jdkVersions) {
+                    w.printf("| %s | %s", p, jdk);
+                    for (String tc : threadCounts) {
+                        ProfileData data = getScalabilityData(allData.get(tc), jdk, api, p);
+                        if (data != null && data.success && !data.throughputs.isEmpty()) {
+                            w.printf(" | %.0f", data.throughputs.values().iterator().next());
+                        } else {
+                            w.print(" | FAIL");
+                        }
+                    }
+                    w.println(" |");
+                }
+            }
+            w.println();
+        }
+
+        // ==================== 2-4: 详细分析 ====================
+        String[] threadArr = threadCounts.toArray(new String[0]);
+        int sectionNum = 1;
+
+        // 2. 延迟分析（仅在有延迟数据时输出）
+        boolean hasLatency = hasAnyPercentiles(allData, threadCounts, profiles, apis, jdkVersions);
+        if (hasLatency) {
+            w.printf("## %d. 延迟分析 (ms)\n\n", ++sectionNum);
+            for (String api : apis) {
+                if ("_default".equals(api)) continue;
+                w.printf("### %s\n\n", api);
+                w.println("| 容器 | JDK | 线程 | p50 | p90 | p99 | p99.9 | p99.99 |");
+                w.println("|------|-----|------|-----|-----|-----|-------|--------|");
+                for (String p : profiles) {
+                    for (String jdk : jdkVersions) {
+                        for (String tc : threadArr) {
+                            ProfileData data = getScalabilityData(allData.get(tc), jdk, api, p);
+                            if (data != null && data.success && !data.percentiles.isEmpty()) {
+                                PercentileInfo pi = data.percentiles.values().iterator().next();
+                                w.printf("| %s | %s | %s | %.2f | %.2f | %.2f | %.2f | %.2f |\n",
+                                        p, jdk, tc, pi.p50, pi.p90, pi.p99, pi.p999, pi.p9999);
+                            } else {
+                                w.printf("| %s | %s | %s | FAIL | FAIL | FAIL | FAIL | FAIL |\n", p, jdk, tc);
+                            }
+                        }
+                    }
+                }
+                w.println();
+            }
+        }
+
+        // 3. GC 行为
+        w.printf("## %d. GC行为\n\n", ++sectionNum);
+        for (String api : apis) {
+            if ("_default".equals(api)) continue;
+            w.printf("### %s\n\n", api);
+            w.println("| 容器 | JDK | 线程 | Young GC | 平均暂停 | 分配率 | 每请求分配 | Full GC |");
+            w.println("|------|-----|------|----------|---------|-------|-----------|---------|");
+            for (String p : profiles) {
+                for (String jdk : jdkVersions) {
+                    for (String tc : threadArr) {
+                        ProfileData data = getScalabilityData(allData.get(tc), jdk, api, p);
+                        if (data != null && data.success && data.gcMetrics != null) {
+                            GcMetrics gc = data.gcMetrics;
+                            double tp = data.throughputs.isEmpty() ? 0 : data.throughputs.values().iterator().next();
+                            String perReq = "N/A";
+                            if (gc.getAllocationRateMbPerSec() > 0 && tp > 0) {
+                                perReq = String.format("%.1fKB", (gc.getAllocationRateMbPerSec() * 1024) / tp);
+                            }
+                            String rate = gc.getAllocationRateMbPerSec() > 0.001
+                                    ? String.format("%.0fMB/s", gc.getAllocationRateMbPerSec()) : "N/A";
+                            w.printf("| %s | %s | %s | %d | %.1fms | %s | %s | %d |\n",
+                                    p, jdk, tc, gc.getYoungGcCount(), gc.getYoungGcAvgMs(),
+                                    rate, perReq, gc.getFullGcCount());
+                        } else {
+                            w.printf("| %s | %s | %s | FAIL | FAIL | FAIL | FAIL | FAIL |\n", p, jdk, tc);
+                        }
+                    }
+                }
+            }
+            w.println();
+        }
+
+        // 4. 内存占用
+        w.printf("## %d. 内存占用\n\n", ++sectionNum);
+        for (String api : apis) {
+            if ("_default".equals(api)) continue;
+            w.printf("### %s\n\n", api);
+            w.println("| 容器 | JDK | 线程 | Heap Used | Metaspace | Code Cache |");
+            w.println("|------|-----|------|-----------|-----------|------------|");
+            for (String p : profiles) {
+                for (String jdk : jdkVersions) {
+                    for (String tc : threadArr) {
+                        ProfileData data = getScalabilityData(allData.get(tc), jdk, api, p);
+                        if (data != null && data.success && data.memorySnapshot != null) {
+                            String heapStr = data.memorySnapshot.getHeapUsedMb();
+                            String metaStr = extractMemValue(data.memorySnapshot.getNonHeap(), "metaspace");
+                            String codeStr = extractMemValue(data.memorySnapshot.getNonHeap(), "code_cache");
+                            w.printf("| %s | %s | %s | %s | %s | %s |\n", p, jdk, tc, heapStr, metaStr, codeStr);
+                        } else {
+                            w.printf("| %s | %s | %s | FAIL | FAIL | FAIL |\n", p, jdk, tc);
+                        }
+                    }
+                }
+            }
+            w.println();
+        }
+
+        w.flush();
+        return sw.toString();
+    }
+
+    /** 查找 threadDir 下所有 JDK 子目录 */
+    private static List<Path> findAllJdkDirs(Path threadDir) throws IOException {
+        List<Path> dirs = new ArrayList<>();
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(threadDir,
+                entry -> Files.isDirectory(entry) && entry.getFileName().toString().matches("jdk-.*|1\\..*"))) {
+            for (Path dir : stream) {
+                dirs.add(dir);
+            }
+        }
+        Collections.sort(dirs);
+        return dirs;
+    }
+
+    /** 从 3 级 Map 中按 jdk → api → profile 链路获取数据 */
+    private static ProfileData getScalabilityData(
+            LinkedHashMap<String, Map<String, Map<String, ProfileData>>> jdkMap,
+            String jdk, String api, String profile) {
+        if (jdkMap == null) return null;
+        Map<String, Map<String, ProfileData>> byApi = jdkMap.get(jdk);
+        if (byApi == null) return null;
+        Map<String, ProfileData> profileMap = byApi.get(api);
+        return profileMap != null ? profileMap.get(profile) : null;
+    }
+
+    
+    // ==================== 报告节选共享方法 ====================
+
+    private static int totalApis(int count, boolean multiThread) {
+        return count;
+    }
+
+    private static void writeThroughputSection(PrintWriter w,
+            Map<String, Map<String, ProfileData>> byApi,
+            String[] profiles, String[] apis, boolean multiThread) {
+        w.println("## 1. 吞吐量 (ops/sec, 越高越好)\n");
+        printTableHeader(w, profiles, multiThread);
+        for (String api : apis) {
+            w.printf("| %s", api);
+            for (String p : profiles) {
+                ProfileData data = getData(byApi, api, p);
                 if (data != null && data.success && !data.throughputs.isEmpty()) {
-                    // 取第一个（也是唯一一个）throughput 值
                     double val = data.throughputs.values().iterator().next();
                     w.printf(" | %.0f", val);
                 } else {
@@ -248,16 +561,18 @@ public class ReportGenerator {
             w.println(" |");
         }
         w.println();
+    }
 
-        // 2. 延迟
-        w.println("## 2. 延迟 (ms, 越低越好)\n");
-        for (String sc : scenarios) {
-            if ("_default".equals(sc)) continue; // 旧格式无 scenario，跳过延迟表
-            w.printf("### %s\n\n", sc);
+    private static void writeLatencySections(PrintWriter w,
+            Map<String, Map<String, ProfileData>> byApi,
+            String[] profiles, String[] apis) {
+        for (String api : apis) {
+            if ("_default".equals(api)) continue;
+            w.printf("### %s\n\n", api);
             w.println("| 容器 | p50 | p90 | p99 | p99.9 | p99.99 |");
             w.println("|------|-----|-----|-----|-------|--------|");
             for (String p : profiles) {
-                ProfileData data = getData(byScenario, sc, p);
+                ProfileData data = getData(byApi, api, p);
                 if (data != null && data.success && !data.percentiles.isEmpty()) {
                     PercentileInfo pi = data.percentiles.values().iterator().next();
                     w.printf("| %s | %.2f | %.2f | %.2f | %.2f | %.2f |\n",
@@ -268,40 +583,60 @@ public class ReportGenerator {
             }
             w.println();
         }
+    }
 
-        // 3. GC 行为（按 scenario）
-        w.println("## 3. GC 行为\n");
-        for (String sc : scenarios) {
-            if ("_default".equals(sc)) continue;
-            w.printf("### %s\n\n", sc);
-            w.println("| 容器 | Young GC 次数 | 平均暂停 | 最大暂停 | 总暂停时间 | Full GC |");
-            w.println("|------|-------------|---------|---------|-----------|---------|");
+    private static void writeGcSections(PrintWriter w,
+            Map<String, Map<String, ProfileData>> byApi,
+            String[] profiles, String[] apis, boolean multiThread) {
+        for (String api : apis) {
+            if ("_default".equals(api)) continue;
+            w.printf("### %s\n\n", api);
+            w.println("| 容器 | Young GC | 平均暂停 | 分配率 | 每请求分配 | Full GC |");
+            w.println("|------|----------|---------|-------|-----------|---------|");
             for (String p : profiles) {
-                ProfileData data = getData(byScenario, sc, p);
+                ProfileData data = getData(byApi, api, p);
                 if (data != null && data.success && data.gcMetrics != null) {
                     GcMetrics gc = data.gcMetrics;
-                    w.printf("| %s | %d | %.1fms | %.1fms | %.1fms | %d |\n",
+                    double throughput = 0;
+                    if (!data.throughputs.isEmpty()) {
+                        throughput = data.throughputs.values().iterator().next();
+                    }
+                    String perReq = "N/A";
+                    if (gc.getAllocationRateMbPerSec() > 0 && throughput > 0) {
+                        double kbPerReq = (gc.getAllocationRateMbPerSec() * 1024) / throughput;
+                        perReq = String.format("%.1fKB", kbPerReq);
+                    }
+                    String allocRate;
+                    double rawRate = gc.getAllocationRateMbPerSec();
+                    if (rawRate > 0.001) {
+                        allocRate = String.format("%.0fMB/s", rawRate);
+                    } else {
+                        allocRate = "N/A";
+                    }
+                    w.printf("| %s | %d | %.1fms | %s | %s | %d |\n",
                             p, gc.getYoungGcCount(), gc.getYoungGcAvgMs(),
-                            gc.getYoungGcMaxMs(), gc.getYoungGcTotalMs(), gc.getFullGcCount());
+                            allocRate, perReq, gc.getFullGcCount());
                 } else if (data != null && data.success && data.gcProfilerCount >= 0) {
-                    w.printf("| %s | %.0f | N/A(GCProfiler) | N/A | %.0fms | N/A |\n",
-                            p, data.gcProfilerCount, data.gcProfilerTimeMs);
+                    w.printf("| %s | %.0f | N/A(GCProfiler) | N/A | N/A | N/A |\n",
+                            p, data.gcProfilerCount);
                 } else {
                     w.printf("| %s | FAIL | FAIL | FAIL | FAIL | FAIL |\n", p);
                 }
             }
             w.println();
         }
+    }
 
-        // 4. 内存占用（按 scenario）
-        w.println("## 4. 内存占用 (稳态)\n");
-        for (String sc : scenarios) {
-            if ("_default".equals(sc)) continue;
-            w.printf("### %s\n\n", sc);
+    private static void writeMemorySections(PrintWriter w,
+            Map<String, Map<String, ProfileData>> byApi,
+            String[] profiles, String[] apis) {
+        for (String api : apis) {
+            if ("_default".equals(api)) continue;
+            w.printf("### %s\n\n", api);
             w.println("| 容器 | Heap Used | Metaspace Used | Code Cache |");
             w.println("|------|-----------|----------------|------------|");
             for (String p : profiles) {
-                ProfileData data = getData(byScenario, sc, p);
+                ProfileData data = getData(byApi, api, p);
                 if (data != null && data.success && data.memorySnapshot != null) {
                     String heapStr = data.memorySnapshot.getHeapUsedMb();
                     String metaStr = extractMemValue(data.memorySnapshot.getNonHeap(), "metaspace");
@@ -313,34 +648,55 @@ public class ReportGenerator {
             }
             w.println();
         }
+    }
 
-        // 5. 失败列表
-        if (failCount > 0) {
-            w.println("## 5. 失败项\n");
-            for (Map.Entry<String, Map<String, ProfileData>> se : byScenario.entrySet()) {
-                String sc = se.getKey();
-                for (Map.Entry<String, ProfileData> pe : se.getValue().entrySet()) {
-                    ProfileData data = pe.getValue();
-                    if (!data.success) {
-                        w.printf("- **%s / %s**: %s\n", sc, pe.getKey(), data.failReason);
+    /** 检查是否有任何数据包含百分位信息（用于判断是否显示延迟章节） */
+    private static boolean hasAnyPercentiles(
+            Map<String, Map<String, ProfileData>> byApi,
+            String[] profiles, String[] apis) {
+        for (String api : apis) {
+            if ("_default".equals(api)) continue;
+            for (String p : profiles) {
+                ProfileData data = getData(byApi, api, p);
+                if (data != null && data.success && !data.percentiles.isEmpty()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** 多线程版：遍历所有 threadCount × jdk × api × profile */
+    private static boolean hasAnyPercentiles(
+            Map<String, LinkedHashMap<String, Map<String, Map<String, ProfileData>>>> allData,
+            List<String> threadCounts, String[] profiles, String[] apis, List<String> jdkVersions) {
+        for (String tc : threadCounts) {
+            LinkedHashMap<String, Map<String, Map<String, ProfileData>>> jdkMap = allData.get(tc);
+            if (jdkMap == null) continue;
+            for (String jdk : jdkVersions) {
+                for (String api : apis) {
+                    if ("_default".equals(api)) continue;
+                    for (String p : profiles) {
+                        ProfileData data = getScalabilityData(jdkMap, jdk, api, p);
+                        if (data != null && data.success && !data.percentiles.isEmpty()) {
+                            return true;
+                        }
                     }
                 }
             }
-            w.println();
         }
-
-        w.flush();
-        return sw.toString();
+        return false;
     }
 
-    private static ProfileData getData(Map<String, Map<String, ProfileData>> byScenario,
-                                        String scenario, String profile) {
-        Map<String, ProfileData> profileMap = byScenario.get(scenario);
+    private static ProfileData getData(Map<String, Map<String, ProfileData>> byApi,
+                                        String api, String profile) {
+        if (byApi == null) return null;
+        Map<String, ProfileData> profileMap = byApi.get(api);
         return profileMap != null ? profileMap.get(profile) : null;
     }
 
-    private static void printTableHeader(PrintWriter w, String[] profiles) {
-        w.print("| 场景");
+    private static void printTableHeader(PrintWriter w, String[] profiles, boolean multiThread) {
+        w.print("| API");
         for (String p : profiles) {
             w.printf(" | %s", p);
         }
@@ -369,46 +725,39 @@ public class ReportGenerator {
         return "N/A";
     }
 
-    private static void parseJmhResults(Path jmhFile, ProfileData data) throws IOException {
-        JsonNode root = MAPPER.readTree(jmhFile.toFile());
-        if (!root.isArray()) return;
+    private static void parseBenchmarkEntry(JsonNode bench, ProfileData data) {
+        String fullName = bench.has("benchmark") ? bench.get("benchmark").asText() : "";
+        String shortName = extractShortName(fullName);
+        if (shortName.isEmpty()) return;
+        String mode = bench.has("mode") ? bench.get("mode").asText() : "";
 
-        for (JsonNode bench : root) {
-            String fullName = bench.has("benchmark") ? bench.get("benchmark").asText() : "";
-            String shortName = extractShortName(fullName);
-            if (shortName.isEmpty()) continue;
-            String mode = bench.has("mode") ? bench.get("mode").asText() : "";
+        JsonNode primaryMetric = bench.get("primaryMetric");
 
-            JsonNode primaryMetric = bench.get("primaryMetric");
+        if ("thrpt".equals(mode) && primaryMetric != null && primaryMetric.has("score")) {
+            data.throughputs.put(shortName, primaryMetric.get("score").asDouble());
+        }
 
-            if ("thrpt".equals(mode) && primaryMetric != null && primaryMetric.has("score")) {
-                data.throughputs.put(shortName, primaryMetric.get("score").asDouble());
-            }
+        if ("sample".equals(mode) && primaryMetric != null && primaryMetric.has("scorePercentiles")) {
+            JsonNode pcts = primaryMetric.get("scorePercentiles");
+            PercentileInfo pi = new PercentileInfo();
+            pi.p50 = getJsonDouble(pcts, "50.0") * 1000;
+            pi.p90 = getJsonDouble(pcts, "90.0") * 1000;
+            pi.p99 = getJsonDouble(pcts, "99.0") * 1000;
+            pi.p999 = getJsonDouble(pcts, "99.9") * 1000;
+            pi.p9999 = getJsonDouble(pcts, "99.99") * 1000;
+            data.percentiles.put(shortName, pi);
+        }
 
-            if ("sample".equals(mode) && primaryMetric != null && primaryMetric.has("scorePercentiles")) {
-                JsonNode pcts = primaryMetric.get("scorePercentiles");
-                PercentileInfo pi = new PercentileInfo();
-                // 百分位值单位是 s/op，转为毫秒
-                pi.p50 = getJsonDouble(pcts, "50.0") * 1000;
-                pi.p90 = getJsonDouble(pcts, "90.0") * 1000;
-                pi.p99 = getJsonDouble(pcts, "99.0") * 1000;
-                pi.p999 = getJsonDouble(pcts, "99.9") * 1000;
-                pi.p9999 = getJsonDouble(pcts, "99.99") * 1000;
-                data.percentiles.put(shortName, pi);
-            }
-
-            // 从 GCProfiler secondaryMetrics 提取 GC 指标（所有 mode 都包含，只取一次）
-            JsonNode secondaryMetrics = bench.get("secondaryMetrics");
-            if (secondaryMetrics != null && data.gcProfilerCount < 0) {
-                for (java.util.Iterator<String> it = secondaryMetrics.fieldNames(); it.hasNext(); ) {
-                    String key = it.next();
-                    if (key.equals("gc.count")) {
-                        JsonNode sr = secondaryMetrics.get(key);
-                        if (sr.has("score")) data.gcProfilerCount = sr.get("score").asDouble();
-                    } else if (key.equals("gc.time")) {
-                        JsonNode sr = secondaryMetrics.get(key);
-                        if (sr.has("score")) data.gcProfilerTimeMs = sr.get("score").asDouble();
-                    }
+        JsonNode secondaryMetrics = bench.get("secondaryMetrics");
+        if (secondaryMetrics != null && data.gcProfilerCount < 0) {
+            for (java.util.Iterator<String> it = secondaryMetrics.fieldNames(); it.hasNext(); ) {
+                String key = it.next();
+                if (key.equals("gc.count")) {
+                    JsonNode sr = secondaryMetrics.get(key);
+                    if (sr.has("score")) data.gcProfilerCount = sr.get("score").asDouble();
+                } else if (key.equals("gc.time")) {
+                    JsonNode sr = secondaryMetrics.get(key);
+                    if (sr.has("score")) data.gcProfilerTimeMs = sr.get("score").asDouble();
                 }
             }
         }
@@ -424,16 +773,17 @@ public class ReportGenerator {
         return idx >= 0 ? fullName.substring(idx + 1) : fullName;
     }
 
+    // ==================== 内联数据类型 ====================
+
     static class ProfileData {
         String profileName;
-        String scenario;
+        String api;
         boolean success;
         String failReason;
         Map<String, Double> throughputs = new LinkedHashMap<String, Double>();
         Map<String, PercentileInfo> percentiles = new LinkedHashMap<String, PercentileInfo>();
         GcMetrics gcMetrics;
         MemorySnapshot memorySnapshot;
-        /** GCProfiler 兜底数据（当外部 GC 日志不可用时使用） */
         double gcProfilerCount = -1;
         double gcProfilerTimeMs = -1;
     }

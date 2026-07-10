@@ -4,6 +4,8 @@ import io.springperf.web.batch.common.BatchHandlerRegistration;
 import io.springperf.web.batch.common.BatchRequestMetaData;
 import io.springperf.web.batch.common.BatchScanner;
 import io.springperf.web.batch.invoker.BatchInvoker;
+import io.springperf.web.batch.metrics.BatchMetrics;
+import io.springperf.web.batch.metrics.NoOpBatchMetrics;
 import io.springperf.web.batch.queue.DisruptorQueue;
 import io.springperf.web.context.BaseWebComponent;
 import io.springperf.web.core.mapping.MappingCacheKey;
@@ -25,6 +27,17 @@ public class BatchRegistry extends BaseWebComponent {
 
     private final Map<String, DisruptorQueue> queues = new ConcurrentHashMap<>();
     private final List<BatchHandlerRegistration> registrations = new ArrayList<>();
+    private BatchMetrics metrics = NoOpBatchMetrics.INSTANCE;
+
+    /**
+     * Set a custom metrics collector for all batch queues.
+     * Must be called before {@link #initComponentPhase2()} takes effect.
+     *
+     * @param metrics metrics collector, or {@code null} to disable
+     */
+    public void setMetrics(BatchMetrics metrics) {
+        this.metrics = metrics != null ? metrics : NoOpBatchMetrics.INSTANCE;
+    }
 
     // ------------------------------------------------------------------
     // Lifecycle
@@ -66,7 +79,7 @@ public class BatchRegistry extends BaseWebComponent {
 
         // create a dedicated Disruptor queue per @BatchMapping method
         String queueName = meta.queueName();
-        DisruptorQueue queue = new DisruptorQueue(queueName, meta, reg.bean());
+        DisruptorQueue queue = new DisruptorQueue(queueName, meta, reg.bean(), metrics);
         DisruptorQueue existing = queues.putIfAbsent(queueName, queue);
         if (existing != null) {
             throw new IllegalStateException(

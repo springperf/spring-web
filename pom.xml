@@ -5,6 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 <groupId>io.github.springperf</groupId>
     <artifactId>spring-web-parent</artifactId>
+
     <version>3.2.2</version>
     <packaging>pom</packaging>
 
@@ -51,13 +52,14 @@
 
         <java.version>17</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
         <spring-web.version>3.2.2</spring-web.version>
         <gpg.executable>gpg</gpg.executable>
         <gpg.keyname>${env.GPG_KEY}</gpg.keyname>
         <gpg.passphrase>${env.GPG_PASSPHRASE}</gpg.passphrase>
 
         <!-- 第三方依赖版本统一管理 -->
-        <netty.version>4.1.110.Final</netty.version>
+        <netty.version>4.1.115.Final</netty.version>
         <jackson.version>2.17.2</jackson.version>
         <fastjson2.version>2.0.60</fastjson2.version>
 <okhttp.version>4.12.0</okhttp.version>

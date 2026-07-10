@@ -147,46 +147,39 @@ public class AbstractServerBenchmark {
     // ==================== Benchmark Methods ====================
 
     @Benchmark
-    public void jsonEcho(Blackhole blackhole) throws Exception {
-        blackhole.consume(clientState.executeAndConsume(clientState.jsonEchoRequest));
+    public void json(Blackhole blackhole) throws Exception {
+        blackhole.consume(clientState.executeAndConsume(clientState.jsonRequest));
     }
 
     @Benchmark
-    public void helloGet(Blackhole blackhole) throws Exception {
-        blackhole.consume(clientState.executeAndConsume(clientState.helloGetRequest));
+    public void get(Blackhole blackhole) throws Exception {
+        blackhole.consume(clientState.executeAndConsume(clientState.getRequest));
     }
 
     @Benchmark
-    public void asyncDeferredResult(Blackhole blackhole) throws Exception {
-        blackhole.consume(clientState.executeAndConsume(clientState.asyncGetRequest));
+    public void async(Blackhole blackhole) throws Exception {
+        blackhole.consume(clientState.executeAndConsume(clientState.asyncRequest));
     }
 
     @Benchmark
     public void bytes(Blackhole blackhole) throws Exception {
-        blackhole.consume(clientState.executeAndConsume(clientState.bytesGetRequest));
+        blackhole.consume(clientState.executeAndConsume(clientState.bytesRequest));
     }
 
     @Benchmark
-    public void validatePost(Blackhole blackhole) throws Exception {
-        blackhole.consume(clientState.executeAndConsume(clientState.validatePostRequest));
+    public void valid(Blackhole blackhole) throws Exception {
+        blackhole.consume(clientState.executeAndConsume(clientState.validRequest));
     }
 
     // ==================== SSE Stream ====================
 
     @Benchmark
-    public void sseStream(Blackhole blackhole) throws Exception {
-        blackhole.consume(clientState.executeAndConsumeStream(clientState.sseStreamRequest));
-    }
-
-    // ==================== P0 新场景 ====================
-
-    @Benchmark
-    public void jsonEchoLarge(Blackhole blackhole) throws Exception {
-        blackhole.consume(clientState.executeAndConsume(clientState.jsonEchoLargeRequest));
+    public void sse(Blackhole blackhole) throws Exception {
+        blackhole.consume(clientState.executeAndConsumeStream(clientState.sseRequest));
     }
 
     @Benchmark
-    public void largeResponse(Blackhole blackhole) throws Exception {
-        blackhole.consume(clientState.executeAndConsume(clientState.largeResponseGetRequest));
+    public void bytesLarge(Blackhole blackhole) throws Exception {
+        blackhole.consume(clientState.executeAndConsume(clientState.bytesLargeRequest));
     }
 }

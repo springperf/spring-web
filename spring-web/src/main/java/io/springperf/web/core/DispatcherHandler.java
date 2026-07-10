@@ -13,15 +13,19 @@ import io.springperf.web.core.interceptor.InterceptorRegistry;
 import io.springperf.web.core.mapping.MappingRegistry;
 import io.springperf.web.core.mapping.MappingResult;
 import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.core.metrics.NoOpWebMetrics;
+import io.springperf.web.core.metrics.WebMetrics;
 import io.springperf.web.core.pool.BizPoolRegistry;
 import io.springperf.web.core.retval.ReturnValueResolverRegistry;
 import io.springperf.web.http.BaseWebServerHttpResponse;
+import io.springperf.web.http.RequestAttribute;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.server.HttpHandler;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.i18n.LocaleContext;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -48,6 +52,10 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
     protected AsyncSupportRegistry asyncSupportRegistry;
     protected BizPoolRegistry bizPoolRegistry;
     protected WebFilterRegistry webFilterRegistry;
+    protected WebMetrics metrics;
+
+    private static final RequestAttribute<Long> METRICS_START_ATTR =
+            RequestAttribute.createAttribute(Long.class);
 
     @Override
     public void initWithWebContext(WebContext webContext) {
@@ -61,6 +69,7 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
         this.asyncSupportRegistry = webContext.getWebComponentWithDefault(AsyncSupportRegistry.class, new AsyncSupportRegistry());
         this.bizPoolRegistry = webContext.getWebComponentWithDefault(BizPoolRegistry.class, new BizPoolRegistry());
         this.webFilterRegistry = webContext.getWebComponentWithDefault(WebFilterRegistry.class, new WebFilterRegistry(this));
+        this.metrics = webContext.getWebComponentWithDefault(WebMetrics.class, NoOpWebMetrics.INSTANCE);
     }
 
     @Override
@@ -89,7 +98,15 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
                 });
             } catch (RejectedExecutionException e) {
                 req.release();
-                throw e;
+                if (!executor.isShutdown()) {
+                    // 业务线程池负载过高（队列满 + 线程数已达上限），返回 503
+                    // 不在 EventLoop 重试，避免阻塞 I/O 线程拖垮服务器
+                    resp.getHeaders().set(HttpHeaders.RETRY_AFTER, "5");
+                    sendError(resp, HttpStatus.SERVICE_UNAVAILABLE, "Too many requests");
+                } else {
+                    // 优雅关闭中，业务线程池已关闭，直接在 EventLoop 兜底执行
+                    handleWithFilter(req, resp, mappingResult);
+                }
             }
         } else {
             handleWithFilter(req, resp, mappingResult);
@@ -171,6 +188,7 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
                              PathMappingContext mappingContext) {
         Object result = null;
         Throwable exception = null;
+        long start = metrics.getNanoTime();
         try {
             // cors
             if (corsRegistry.corsHandle(req, resp)) {
@@ -198,8 +216,11 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
         } finally {
             if (AsyncSupportUtils.isAsyncRequest(req)) {
                 interceptorRegistry.afterConcurrentHandlingStarted(req, resp);
+                req.getRequestContext().setAttribute(METRICS_START_ATTR, start);
             } else {
                 invokeWithRealResult(req, resp, result, exception);
+                metrics.recordRequest(req.getMethodValue(), mappingContext.getPathRule(),
+                        resp.getStatus().value(), metrics.getNanoTime() - start);
             }
         }
     }
@@ -225,7 +246,7 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
      * @param resp the current HTTP response
      */
     protected void handleException(Throwable ex, WebServerHttpRequest req, WebServerHttpResponse resp) {
-        log.error(ex.getMessage(), ex);
+        log.error("Unhandled exception from request processing: {}", ex.getMessage(), ex);
         try {
             exceptionRegistry.handle(ex, req, resp);
         } catch (Throwable handleEx) {
@@ -244,7 +265,7 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
                 resp.flush();
             }
         } catch (IOException e) {
-            log.error(e.getMessage(), e);
+            log.error("flushResponse failed: {}", e.getMessage(), e);
         }
     }
 
@@ -261,7 +282,7 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
         try {
             if (concurrentResult instanceof Throwable) {
                 exception = (Throwable) concurrentResult;
-                log.error(exception.getMessage(), exception);
+                log.error("Async dispatch exception: {}", exception.getMessage(), exception);
                 exceptionRegistry.handle(exception, req, resp);
             } else {
                 result = concurrentResult;
@@ -274,6 +295,13 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
             log.error(e.getMessage(), e);
         } finally {
             invokeWithRealResult(req, resp, result, exception);
+            Long start = req.getRequestContext().getAttribute(METRICS_START_ATTR);
+            if (start != null) {
+                PathMappingContext ctx = PathMappingContext.get(req);
+                metrics.recordRequest(req.getMethodValue(),
+                        ctx != null ? ctx.getPathRule() : null,
+                        resp.getStatus().value(), metrics.getNanoTime() - start);
+            }
         }
     }
 

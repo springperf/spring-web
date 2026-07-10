@@ -19,7 +19,7 @@ We will respond and address the issue as soon as possible.
 
 | Version | Supported |
 |---------|-----------|
-| 1.0.x   | Yes       |
+| 2.7.x   | Yes       |
 
 ## Security-Related Configuration
 

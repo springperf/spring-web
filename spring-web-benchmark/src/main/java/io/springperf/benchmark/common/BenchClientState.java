@@ -24,16 +24,14 @@ public class BenchClientState {
 
     public OkHttpClient client;
 
-    public Request jsonEchoRequest;
-    public Request helloGetRequest;
-    public Request asyncGetRequest;
-    public Request bytesGetRequest;
-    public Request validatePostRequest;
+    public Request jsonRequest;
+    public Request getRequest;
+    public Request asyncRequest;
+    public Request bytesRequest;
+    public Request validRequest;
 
-    // P0 新增
-    public Request jsonEchoLargeRequest;
-    public Request largeResponseGetRequest;
-    public Request sseStreamRequest;
+    public Request bytesLargeRequest;
+    public Request sseRequest;
 
     /**
      * @param actualPort 服务器实际绑定的端口（可能因 fallback 不同于配置端口）
@@ -49,52 +47,45 @@ public class BenchClientState {
 
         String base = "http://localhost:" + actualPort + BenchmarkConstants.CONTEXT_PATH;
 
-        jsonEchoRequest = new Request.Builder()
+        jsonRequest = new Request.Builder()
                 .url(base + "/demo/echo")
                 .post(RequestBody.create(BenchmarkConstants.JSON_MEDIA_TYPE,
                         BenchmarkConstants.ECHO_BODY))
                 .build();
 
-        helloGetRequest = new Request.Builder()
+        getRequest = new Request.Builder()
                 .url(base + "/demo/hello/nameValue/aaaxxx"
-                        + "?p1=v1&p2=v2&p3=v3&p4=v4&p5=v5")
+                        + "?p1=1&p2=v2&p3=v3&p4=v4&p5=v5")
                 .get()
                 .build();
 
-        asyncGetRequest = new Request.Builder()
+        asyncRequest = new Request.Builder()
                 .url(base + "/core/deferred-result")
                 .get()
                 .build();
 
-        bytesGetRequest = new Request.Builder()
+        bytesRequest = new Request.Builder()
                 .url(base + "/core/bytes")
                 .get()
                 .build();
 
-        validatePostRequest = new Request.Builder()
+        validRequest = new Request.Builder()
                 .url(base + "/core/validate")
                 .post(RequestBody.create(BenchmarkConstants.JSON_MEDIA_TYPE,
                         BenchmarkConstants.VALIDATE_BODY))
                 .build();
 
-        // ========== P0 新场景 ==========
-
-        jsonEchoLargeRequest = new Request.Builder()
-                .url(base + "/demo/echo")
-                .post(RequestBody.create(BenchmarkConstants.JSON_MEDIA_TYPE,
-                        BenchmarkConstants.ECHO_BODY_LARGE))
-                .build();
-
-        largeResponseGetRequest = new Request.Builder()
+        bytesLargeRequest = new Request.Builder()
                 .url(base + BenchmarkConstants.LARGE_RESPONSE_PATH)
                 .get()
                 .build();
 
-        sseStreamRequest = new Request.Builder()
+        sseRequest = new Request.Builder()
                 .url(base + BenchmarkConstants.SSE_PATH)
                 .get()
                 .build();
-    }
+
+        }
 
     @TearDown(Level.Trial)
     public void cleanup() {

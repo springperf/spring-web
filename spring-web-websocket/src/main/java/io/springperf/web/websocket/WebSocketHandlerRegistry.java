@@ -61,7 +61,9 @@ public class WebSocketHandlerRegistry {
 
     /**
      * 设置允许的 Origin 来源列表，用于 WebSocket 握手请求的 {@code Origin} 头校验。
-     * <p>为空或未设置时不做校验（允许所有来源）。设置后浏览器发起跨域连接时将被校验。</p>
+     * <p>不调用此方法时（null）不做校验，允许所有来源。
+     * 显式传入空列表时拒绝所有带 Origin 头的跨域请求（仅允许同源和没有 Origin 头的非浏览器客户端）。
+     * 设置具体来源后浏览器发起跨域连接时将被校验。</p>
      */
     public WebSocketHandlerRegistry setAllowedOrigins(String... origins) {
         this.allowedOrigins = origins != null ? Arrays.asList(origins) : null;

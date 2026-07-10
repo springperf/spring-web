@@ -55,6 +55,7 @@ public class NettyHttpHandler extends SimpleChannelInboundHandler<FullHttpReques
             try {
                 resp.sendError(HttpStatus.SERVICE_UNAVAILABLE, "Server is shutting down");
             } catch (Exception ignored) {
+                log.debug("sendError 503 failed", ignored);
             }
             return;
         }
@@ -95,7 +96,7 @@ public class NettyHttpHandler extends SimpleChannelInboundHandler<FullHttpReques
             try {
                 resp.sendError(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error");
             } catch (Exception ignored) {
-                // sendError 失败无需额外处理
+                log.debug("sendError 500 failed", ignored);
             }
         }
     }

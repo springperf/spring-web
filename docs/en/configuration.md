@@ -84,6 +84,22 @@ management.endpoints.web.base-path=/actuator
 management.endpoints.web.exposure.include=health,info,metrics
 ```
 
+## Observability Metrics
+
+When `spring-boot-starter-actuator` is on the classpath, the framework auto-registers `MicrometerWebMetrics` and collects the following metrics:
+
+| Metric | Type | Tags | Description |
+|--------|------|------|-------------|
+| `dispatcher.request.duration` | Timer | `method`, `path`, `status` | Request processing duration distribution |
+| `dispatcher.exception` | Counter | `type`, `resolved` | Exception count, categorized by exception type and whether handled by `@ExceptionHandler` |
+| `pool.{name}.active.threads` | Gauge | — | Active thread count for the named pool |
+| `pool.{name}.queue.size` | Gauge | — | Queue size for the named pool |
+| `pool.{name}.completed.tasks` | Gauge | — | Completed task count for the named pool |
+| `netty.connections.active` | Gauge | — | Active TCP connections |
+| `netty.eventloop.pending.tasks` | Gauge | — | Pending tasks across all EventLoops |
+
+`{name}` is the pool name, matching the name passed to `register()` or the Spring bean name.
+
 ## OpenAPI Documentation
 
 | Property | Default | Description |

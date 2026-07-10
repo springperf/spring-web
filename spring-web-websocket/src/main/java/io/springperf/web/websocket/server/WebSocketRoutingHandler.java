@@ -208,7 +208,8 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
             log.error("WebSocketHandler.afterConnectionEstablished failed", e);
             try {
                 session.close(CloseStatus.SERVER_ERROR);
-            } catch (IOException ignored) {
+            } catch (IOException ex) {
+                log.debug("session.close(SERVER_ERROR) failed", ex);
             }
         }
 
@@ -322,7 +323,8 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
                 }
                 try {
                     session.close(CloseStatus.SESSION_NOT_RELIABLE);
-                } catch (IOException ignored) {
+                } catch (IOException e) {
+                    log.debug("session.close(SESSION_NOT_RELIABLE) failed", e);
                 }
             }
             ctx.close();
@@ -399,7 +401,8 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
 
     /**
      * 校验 WebSocket 握手请求的 Origin 头。
-     * <p>未配置 allowedOrigins 时跳过校验（兼容非浏览器客户端）。
+     * <p>未配置 allowedOrigins（null）时跳过校验（兼容非浏览器客户端）。
+     * 显式配置为空列表时拒绝所有带 Origin 头的跨域请求。
      * 复用 {@link CorsUtils} 的 origin 解析逻辑。</p>
      *
      * @param effectiveOrigins 优先使用 per-path 配置，null 时使用全局默认
@@ -407,8 +410,12 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
     private boolean checkOrigin(HttpRequest req, ChannelHandlerContext ctx,
                                 @Nullable List<String> effectiveOrigins) {
         List<String> origins = effectiveOrigins != null ? effectiveOrigins : allowedOrigins;
-        if (origins == null || origins.isEmpty()) {
-            return true;
+        if (origins == null) {
+            return true; // 未配置，允许所有来源
+        }
+        if (origins.isEmpty()) {
+            // 显式配置为空列表 = 拒绝所有跨域请求（仅允许无 Origin 头的同源/非浏览器客户端）
+            return req.headers().get(HttpHeaderNames.ORIGIN) == null;
         }
         String origin = req.headers().get(HttpHeaderNames.ORIGIN);
         if (origin == null) {

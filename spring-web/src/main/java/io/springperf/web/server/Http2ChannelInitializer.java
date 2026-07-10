@@ -13,52 +13,77 @@ import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.stream.ChunkedWriteHandler;
+import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.springperf.web.http.BackpressureHandler;
 import io.springperf.web.http.support.SupportMultipartAggregator;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
 
     private final boolean http2Enabled;
     private final SslContext sslContext;
     private final int maxContentLength;
+    private final long readTimeout;
     private final boolean supportMultipart;
     private final NettyHttpHandler httpHandler;
     private final List<ChannelHandler> beforeAggregatorHandlers;
     private final List<ChannelHandler> afterAggregatorHandlers;
+    private final int maxInitialLineLength;
+    private final int maxHeaderSize;
+    private final int maxChunkSize;
 
     public Http2ChannelInitializer(boolean http2Enabled, SslContext sslContext,
-                                    int maxContentLength, boolean supportMultipart,
+                                    int maxContentLength, long readTimeout,
+                                    boolean supportMultipart,
                                     NettyHttpHandler httpHandler) {
-        this(http2Enabled, sslContext, maxContentLength, supportMultipart, httpHandler,
+        this(http2Enabled, sslContext, maxContentLength, readTimeout, supportMultipart, httpHandler,
                 Collections.emptyList(), Collections.emptyList());
     }
 
     public Http2ChannelInitializer(boolean http2Enabled, SslContext sslContext,
-                                    int maxContentLength, boolean supportMultipart,
+                                    int maxContentLength, long readTimeout,
+                                    boolean supportMultipart,
                                     NettyHttpHandler httpHandler,
                                     List<ChannelHandler> beforeAggregatorHandlers) {
-        this(http2Enabled, sslContext, maxContentLength, supportMultipart, httpHandler,
+        this(http2Enabled, sslContext, maxContentLength, readTimeout, supportMultipart, httpHandler,
                 beforeAggregatorHandlers, Collections.emptyList());
     }
 
     public Http2ChannelInitializer(boolean http2Enabled, SslContext sslContext,
-                                    int maxContentLength, boolean supportMultipart,
+                                    int maxContentLength, long readTimeout,
+                                    boolean supportMultipart,
                                     NettyHttpHandler httpHandler,
                                     List<ChannelHandler> beforeAggregatorHandlers,
                                     List<ChannelHandler> afterAggregatorHandlers) {
+        this(http2Enabled, sslContext, maxContentLength, readTimeout, supportMultipart, httpHandler,
+                beforeAggregatorHandlers, afterAggregatorHandlers,
+                4096, 8192, 8192);
+    }
+
+    public Http2ChannelInitializer(boolean http2Enabled, SslContext sslContext,
+                                    int maxContentLength, long readTimeout,
+                                    boolean supportMultipart,
+                                    NettyHttpHandler httpHandler,
+                                    List<ChannelHandler> beforeAggregatorHandlers,
+                                    List<ChannelHandler> afterAggregatorHandlers,
+                                    int maxInitialLineLength, int maxHeaderSize, int maxChunkSize) {
         this.http2Enabled = http2Enabled;
         this.sslContext = sslContext;
         this.maxContentLength = maxContentLength;
+        this.readTimeout = readTimeout;
         this.supportMultipart = supportMultipart;
         this.httpHandler = httpHandler;
         this.beforeAggregatorHandlers = beforeAggregatorHandlers != null
                 ? beforeAggregatorHandlers : Collections.emptyList();
         this.afterAggregatorHandlers = afterAggregatorHandlers != null
                 ? afterAggregatorHandlers : Collections.emptyList();
+        this.maxInitialLineLength = maxInitialLineLength;
+        this.maxHeaderSize = maxHeaderSize;
+        this.maxChunkSize = maxChunkSize;
     }
 
     @Override
@@ -69,7 +94,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
             p.addLast(sslContext.newHandler(ch.alloc()));
             p.addLast(NettyHttpServer.SslExceptionHandler.INSTANCE);
             if (http2Enabled) {
-                p.addLast(new Http2OrHttp1Handler(maxContentLength, supportMultipart, httpHandler, beforeAggregatorHandlers, afterAggregatorHandlers));
+                p.addLast(new Http2OrHttp1Handler(maxContentLength, readTimeout, supportMultipart, httpHandler, beforeAggregatorHandlers, afterAggregatorHandlers, maxInitialLineLength, maxHeaderSize, maxChunkSize));
             } else {
                 addHttp11Handlers(p);
             }
@@ -81,7 +106,10 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
     }
 
     private void addHttp11Handlers(ChannelPipeline p) {
-        p.addLast(new HttpServerCodec());
+        p.addLast(new HttpServerCodec(maxInitialLineLength, maxHeaderSize, maxChunkSize));
+        if (readTimeout > 0) {
+            p.addLast(new ReadTimeoutHandler(readTimeout, TimeUnit.MILLISECONDS));
+        }
         p.addLast(new ChunkedWriteHandler());
         for (ChannelHandler h : beforeAggregatorHandlers) {
             p.addLast(h);
@@ -100,7 +128,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
     private void addCleartextHttp2Handlers(ChannelPipeline p) {
         // h2c prior knowledge: use a preface detector that switches to HTTP/2
         // when it detects the "PRI * HTTP/2.0" preface, or falls through to HTTP/1.1.
-        HttpServerCodec sourceCodec = new HttpServerCodec();
+        HttpServerCodec sourceCodec = new HttpServerCodec(maxInitialLineLength, maxHeaderSize, maxChunkSize);
         Http2FrameCodec frameCodec = Http2FrameCodecBuilder.forServer().build();
         Http2MultiplexHandler multiplexHandler = new Http2MultiplexHandler(
                 new Http2ChildChannelInitializer(maxContentLength, supportMultipart, httpHandler));
@@ -179,6 +207,9 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
         });
         // HTTP/1.1 fallback pipeline
         p.addLast(sourceCodec);
+        if (readTimeout > 0) {
+            p.addLast(new ReadTimeoutHandler(readTimeout, TimeUnit.MILLISECONDS));
+        }
         p.addLast(new ChunkedWriteHandler());
         for (ChannelHandler h : beforeAggregatorHandlers) {
             p.addLast(h);
@@ -241,23 +272,32 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
     private static class Http2OrHttp1Handler extends ApplicationProtocolNegotiationHandler {
 
         private final int maxContentLength;
+        private final long readTimeout;
         private final boolean supportMultipart;
         private final NettyHttpHandler httpHandler;
         private final List<ChannelHandler> beforeAggregatorHandlers;
         private final List<ChannelHandler> afterAggregatorHandlers;
+        private final int maxInitialLineLength;
+        private final int maxHeaderSize;
+        private final int maxChunkSize;
 
-        Http2OrHttp1Handler(int maxContentLength, boolean supportMultipart,
+        Http2OrHttp1Handler(int maxContentLength, long readTimeout, boolean supportMultipart,
                             NettyHttpHandler httpHandler,
                             List<ChannelHandler> beforeAggregatorHandlers,
-                            List<ChannelHandler> afterAggregatorHandlers) {
+                            List<ChannelHandler> afterAggregatorHandlers,
+                            int maxInitialLineLength, int maxHeaderSize, int maxChunkSize) {
             super(ApplicationProtocolNames.HTTP_1_1);
             this.maxContentLength = maxContentLength;
+            this.readTimeout = readTimeout;
             this.supportMultipart = supportMultipart;
             this.httpHandler = httpHandler;
             this.beforeAggregatorHandlers = beforeAggregatorHandlers != null
                     ? beforeAggregatorHandlers : Collections.emptyList();
             this.afterAggregatorHandlers = afterAggregatorHandlers != null
                     ? afterAggregatorHandlers : Collections.emptyList();
+            this.maxInitialLineLength = maxInitialLineLength;
+            this.maxHeaderSize = maxHeaderSize;
+            this.maxChunkSize = maxChunkSize;
         }
 
         @Override
@@ -271,7 +311,10 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
                         new Http2ChildChannelInitializer(maxContentLength, supportMultipart, httpHandler)));
             } else {
                 // http/1.1: add standard h1.1 pipeline
-                p.addLast(new HttpServerCodec());
+                p.addLast(new HttpServerCodec(maxInitialLineLength, maxHeaderSize, maxChunkSize));
+                if (readTimeout > 0) {
+                    p.addLast(new ReadTimeoutHandler(readTimeout, TimeUnit.MILLISECONDS));
+                }
                 p.addLast(new ChunkedWriteHandler());
                 for (ChannelHandler h : beforeAggregatorHandlers) {
                     p.addLast(h);

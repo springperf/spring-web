@@ -136,10 +136,10 @@ So I launched the **Spring Performance Engineering** project. Core idea: resolve
 
 In JMH benchmarks on JDK 1.8 + G1GC (1GB heap), this framework leads across all 8 scenarios:
 
-- Small-payload throughput **28K~35K** ops/s, **1.6~2.1x** of Spring MVC
-- P50 latency **0.11~0.14ms**, approximately **50%** of Spring MVC
-- Steady-state heap **15MB**, approximately **75%** of Spring MVC
-- SSE streaming throughput **1,546** ops/s, reaching **4.51x** of Tomcat
+- Small-payload throughput **26K~34K** ops/s (4 threads), **1.71x~2.11x** of Spring MVC
+- P50 latency **0.12~0.15ms**, approximately **50-60%** of Spring MVC
+- Steady-state heap **20MB** (4 threads), approximately **87%** of Spring MVC
+- SSE streaming throughput **1,226** ops/s (4 threads), reaching **3.89x** of Spring MVC, scaling to **6.37x** under high concurrency
 
 > Detailed data: [Benchmark Report](benchmark.md). Technical deep-dive: [Performance Principles](performance-principles.md).
 
@@ -188,9 +188,9 @@ This framework doesn't demand "all or nothing." Through the `spring-web-support`
 | Scenario | Reason |
 |----------|--------|
 | **Resource-constrained environments** (1c1g, 2c2g) | Low framework overhead; 1.6~2.1x throughput of Spring MVC with same resources |
-| **High-throughput API services** | 28K~35K ops/s capacity |
-| **Latency-sensitive workloads** | P50 0.11~0.14ms, ~50% of Spring MVC |
-| **SSE / streaming push** | Lock-free Drain Loop design; 4.51x Tomcat throughput |
+| **High-throughput API services** | 26K~34K ops/s capacity |
+| **Latency-sensitive workloads** | P50 0.12~0.15ms, ~50% of Spring MVC |
+| **SSE / streaming push** | Lock-free Drain Loop design; 3.89x Spring MVC throughput (4 threads), scaling to 6.37x under high concurrency |
 | **Greenfield projects** | Zero migration cost |
 | **IoT / device ingestion** | High volume of small requests, resource-constrained — the original use case |
 
@@ -262,7 +262,7 @@ This means: AI can optimize your business layer to the extreme, but if the under
 
 The core interaction pattern of LLM applications is **streaming output**: tokens generated one by one, pushed in real-time. Whether it's ChatGPT's word-by-word replies, Agent task status streams, or RAG retrieval progress feedback, they all rely on **SSE (Server-Sent Events)** protocol.
 
-However, SSE performs poorly on traditional Servlet containers — Tomcat's SSE throughput is only ~**342 ops/s**, making it a bottleneck in AI application pipelines. This project's SSE throughput reaches **1,546 ops/s**, **4.51x** of Tomcat. This is powered by **NettyStreamSender**'s lock-free Drain Loop design: write operations don't depend on thread pool scheduling, completing batch flushes directly on EventLoop, avoiding the problem of SSE connections occupying threads in traditional Servlet containers.
+However, SSE performs poorly on traditional Servlet containers — Spring MVC's SSE throughput is only ~**315 ops/s** (4 threads), making it a bottleneck in AI application pipelines. This project's SSE throughput reaches **1,226 ops/s**, **3.89x** of Spring MVC, scaling to **6.37x** under high concurrency. This is powered by **NettyStreamSender**'s lock-free Drain Loop design: write operations don't depend on thread pool scheduling, completing batch flushes directly on EventLoop, avoiding the problem of SSE connections occupying threads in traditional Servlet containers.
 
 This means:
 

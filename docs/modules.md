@@ -248,6 +248,10 @@ destroyComponent()     → 资源释放
 
 `SpringBootAdminClientAutoConfiguration` 在 SBA 客户端存在时自动发射 `WebServerInitializedEvent`，以支持 Spring Boot Admin 心跳注册。
 
+### Metrics 自动配置
+
+`MicrometerWebMetrics` 在 `spring-boot-starter-actuator` 存在时自动注册为 `WebMetrics` 实现，收集请求耗时、异常计数和线程池指标。详见[配置参考](configuration.md#可观测性指标)。
+
 ### OpenAPI 自动配置
 
 `OpenApiAutoConfiguration` 在 `springdoc-openapi` 存在时自动生成 OpenAPI 文档端点。
@@ -266,6 +270,8 @@ destroyComponent()     → 资源释放
 
 透明聚合批量处理模块，将高并发同类型请求合并为一批，一次批量业务逻辑处理完所有请求，显著提升 IO 密集型场景的吞吐。
 
+> 详细文档：[Batch 批处理模块](batch.md) — 包含完整示例、@BatchMapping 详解、可观测性指标、配置调优指南
+
 ### 核心思想
 
 - **不改管线语义** — Filter、Interceptor 逐请求执行，不受影响
@@ -277,14 +283,14 @@ destroyComponent()     → 资源释放
 
 ```
 请求 → EventLoop → BatchInvoker 构造实例入队 → RingBuffer
-                                                                              │
-                                                                        Disruptor 消费者
-                                                                              │
-                                                                        提交到业务线程池
-                                                                              │
-                                                                     BatchHandler 批量处理
-                                                                              │
-                                                   逐个 req.setResult() → asyncDispatch → 写响应
+                                                │
+                                          Disruptor 消费者
+                                                │
+                                          提交到业务线程池
+                                                │
+                                       BatchHandler 批量处理
+                                                │
+                     逐个 req.setResult() → asyncDispatch → 写响应
 ```
 
 ### 核心类

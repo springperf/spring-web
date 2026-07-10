@@ -29,7 +29,7 @@ public final class BackpressureHandler extends ChannelInboundHandlerAdapter {
         if (!last && writable) {
             Runnable cb = conn.getOnWritable();
             if (cb != null) {
-                log.info("onWritable ,channel:{}", ch);
+                log.debug("onWritable channel:{}", ch);
                 cb.run();
             }
         }

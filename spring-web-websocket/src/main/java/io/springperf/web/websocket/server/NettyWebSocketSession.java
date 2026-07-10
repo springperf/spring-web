@@ -155,7 +155,7 @@ public class NettyWebSocketSession implements WebSocketSession {
                 log.error("handleTransportError failed on session {}", id, ex);
             }
         } else {
-            log.warn("Write failed on session {}: {}", id, cause.getMessage());
+            log.warn("Write failed on session {}: {}", id, cause.getMessage(), cause);
         }
     }
 

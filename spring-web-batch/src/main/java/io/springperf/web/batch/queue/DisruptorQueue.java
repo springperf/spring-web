@@ -7,6 +7,8 @@ import io.springperf.web.batch.annotation.BatchMapping;
 import io.springperf.web.batch.common.BatchOverflowException;
 import io.springperf.web.batch.common.BatchRequest;
 import io.springperf.web.batch.common.BatchRequestMetaData;
+import io.springperf.web.batch.metrics.BatchMetrics;
+import io.springperf.web.batch.metrics.NoOpBatchMetrics;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.concurrent.SynchronousQueue;
@@ -25,11 +27,20 @@ public class DisruptorQueue {
     private final AtomicBoolean halted = new AtomicBoolean(false);
     private final String queueName;
     private final BufferingBatchHandler batchHandler;
+    private final BatchMetrics metrics;
 
     public DisruptorQueue(String queueName,
                           BatchRequestMetaData meta,
                           Object bean) {
+        this(queueName, meta, bean, NoOpBatchMetrics.INSTANCE);
+    }
+
+    public DisruptorQueue(String queueName,
+                          BatchRequestMetaData meta,
+                          Object bean,
+                          BatchMetrics metrics) {
         this.queueName = queueName;
+        this.metrics = metrics != null ? metrics : NoOpBatchMetrics.INSTANCE;
         int size = normalizeRingBufferSize(meta.ringBufferSize());
         int consumerSize = meta.consumerSize();
 
@@ -67,7 +78,7 @@ public class DisruptorQueue {
                 }
         );
 
-        this.batchHandler = new BufferingBatchHandler(bizExecutor, meta, bean, meta.maxBatchSize());
+        this.batchHandler = new BufferingBatchHandler(bizExecutor, meta, bean, meta.maxBatchSize(), metrics);
         this.disruptor.handleEventsWith(this.batchHandler);
         this.disruptor.handleExceptionsWith(new BatchExceptionHandler(queueName));
         this.disruptor.start();
@@ -81,12 +92,14 @@ public class DisruptorQueue {
 
     public void enqueue(BatchRequest<?> request) {
         if (halted.get()) {
+            metrics.recordEnqueue(queueName, false);
             request.setError(new IllegalStateException("Queue [" + queueName + "] is shutting down"));
             return;
         }
         switch (backpressure) {
             case DROP:
                 if (!ringBuffer.tryPublishEvent(translator, request)) {
+                    metrics.recordDrop(queueName);
                     if (request.isCompleted()) {
                         log.warn("Queue [{}] drop failed — request already completed (likely timed out), "
                                         + "client will not receive overflow signal",
@@ -94,22 +107,41 @@ public class DisruptorQueue {
                     } else {
                         request.setError(new BatchOverflowException(queueName));
                     }
+                } else {
+                    metrics.recordEnqueue(queueName, true);
                 }
                 break;
             case THROW:
                 if (!ringBuffer.tryPublishEvent(translator, request)) {
+                    metrics.recordOverflow(queueName);
                     throw new BatchOverflowException(queueName);
                 }
+                metrics.recordEnqueue(queueName, true);
                 break;
             case BLOCK:
             default:
                 ringBuffer.publishEvent(translator, request);
+                metrics.recordEnqueue(queueName, true);
                 break;
         }
     }
 
     public String queueName() {
         return queueName;
+    }
+
+    /**
+     * Returns the number of remaining (free) slots in the ring buffer.
+     */
+    public int remainingCapacity() {
+        return (int) ringBuffer.remainingCapacity();
+    }
+
+    /**
+     * Returns the total capacity of the ring buffer.
+     */
+    public int bufferSize() {
+        return ringBuffer.getBufferSize();
     }
 
     public void shutdown() {
