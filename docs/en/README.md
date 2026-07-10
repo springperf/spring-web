@@ -96,7 +96,9 @@ management:
 
 > See [Configuration Reference](configuration.md) for the full list.
 >
-> Migrating from Spring MVC? See the [Migration Guide](quickstart.md).
+> Migrating from Spring Boot (Spring MVC)? See the [Migration Guide](quickstart.md).
+>
+> Migrating from Spring AI? See the [AI Integration Guide](ai-guide.md).
 
 ---
 

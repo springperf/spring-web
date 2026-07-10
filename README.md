@@ -96,7 +96,9 @@ management:
 
 > 完整配置参考见 [配置文档](docs/configuration.md)。
 >
-> 从 Spring MVC 迁移？查看[迁移指南](docs/quickstart.md)。
+> 从 Spring Boot（Spring MVC）项目迁移？查看[迁移指南](docs/quickstart.md)。
+>
+> 从 Spring AI 项目迁移？查看[AI 集成指南](docs/ai-guide.md)。
 
 ---
 

@@ -1,0 +1,12 @@
+spring:
+  main:
+    web-application-type: none
+  ai:
+    openai:
+      base-url: ${AI_BASE_URL:https://token.sensenova.cn}
+      api-key: ${AI_API_KEY:sk-your-key-here}
+      chat:
+        options:
+          model: ${AI_MODEL:deepseek-v4-flash}
+server:
+  port: 8080

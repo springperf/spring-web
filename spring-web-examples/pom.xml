@@ -35,6 +35,7 @@
         <module>spring-web-example-actuator</module>
         <module>spring-web-example-openapi</module>
         <module>spring-web-example-swaggerui</module>
+        <module>spring-web-example-ai</module>
     </modules>
 
     <build>
