@@ -3,6 +3,8 @@ package io.springperf.web.core;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.arg.ArgumentResolverRegistry;
 import io.springperf.web.core.async.AsyncSupportRegistry;
+import io.springperf.web.core.async.AsyncSupportUtils;
+import io.springperf.web.core.async.PerfAsyncWebRequest;
 import io.springperf.web.core.cors.CorsRegistry;
 import io.springperf.web.core.exception.ExceptionRegistry;
 import io.springperf.web.core.filter.WebFilterRegistry;
@@ -10,6 +12,7 @@ import io.springperf.web.core.interceptor.InterceptorRegistry;
 import io.springperf.web.core.mapping.MappingRegistry;
 import io.springperf.web.core.mapping.MappingResult;
 import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.core.metrics.WebMetrics;
 import io.springperf.web.core.pool.BizPoolRegistry;
 import io.springperf.web.core.retval.ReturnValueResolverRegistry;
 import io.springperf.web.http.RequestAttribute;
@@ -19,6 +22,8 @@ import io.springperf.web.http.WebServerHttpResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
@@ -45,6 +50,7 @@ class DispatcherHandlerTest {
     private BizPoolRegistry bizPoolRegistry;
     private AsyncSupportRegistry asyncSupportRegistry;
     private WebFilterRegistry webFilterRegistry;
+    private WebMetrics metrics;
 
     private WebServerHttpRequest createRequest() {
         WebServerHttpRequest req = mock(WebServerHttpRequest.class);
@@ -71,6 +77,7 @@ class DispatcherHandlerTest {
         bizPoolRegistry = mock(BizPoolRegistry.class);
         asyncSupportRegistry = mock(AsyncSupportRegistry.class);
         webFilterRegistry = mock(WebFilterRegistry.class);
+        metrics = mock(WebMetrics.class);
 
         when(webContext.getWebComponentWithDefault(eq(MappingRegistry.class), any(MappingRegistry.class)))
                 .thenReturn(mappingRegistry);
@@ -90,6 +97,8 @@ class DispatcherHandlerTest {
                 .thenReturn(asyncSupportRegistry);
         when(webContext.getWebComponentWithDefault(eq(WebFilterRegistry.class), any(WebFilterRegistry.class)))
                 .thenReturn(webFilterRegistry);
+        when(webContext.getWebComponentWithDefault(eq(WebMetrics.class), any()))
+                .thenReturn(metrics);
 
         // doFilter 模拟：新流程中 DefaultFilterChain 调用 handleAfterFilter
         doAnswer(invocation -> {
@@ -195,6 +204,7 @@ class DispatcherHandlerTest {
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
         PathMappingContext mappingContext = mock(PathMappingContext.class);
         when(corsRegistry.corsHandle(req, resp)).thenReturn(true);
+        when(resp.getStatus()).thenReturn(HttpStatus.OK);
 
         handler.doHandle(req, resp, mappingContext);
 
@@ -210,6 +220,7 @@ class DispatcherHandlerTest {
         PathMappingContext mappingContext = mock(PathMappingContext.class);
         when(corsRegistry.corsHandle(req, resp)).thenReturn(false);
         when(interceptorRegistry.preHandle(req, resp)).thenReturn(false);
+        when(resp.getStatus()).thenReturn(HttpStatus.OK);
 
         handler.doHandle(req, resp, mappingContext);
 
@@ -223,6 +234,7 @@ class DispatcherHandlerTest {
         PathMappingContext mappingContext = mock(PathMappingContext.class);
         when(corsRegistry.corsHandle(req, resp)).thenReturn(false);
         when(interceptorRegistry.preHandle(req, resp)).thenReturn(true);
+        when(resp.getStatus()).thenReturn(HttpStatus.OK);
         Object[] args = new Object[]{};
         when(argumentResolverRegistry.resolveArguments(mappingContext, req, resp)).thenReturn(args);
         Object result = new Object();
@@ -240,6 +252,7 @@ class DispatcherHandlerTest {
         PathMappingContext mappingContext = mock(PathMappingContext.class);
         when(corsRegistry.corsHandle(req, resp)).thenReturn(false);
         when(interceptorRegistry.preHandle(req, resp)).thenReturn(true);
+        when(resp.getStatus()).thenReturn(HttpStatus.OK);
         when(argumentResolverRegistry.resolveArguments(mappingContext, req, resp)).thenThrow(new RuntimeException("test error"));
 
         handler.doHandle(req, resp, mappingContext);
@@ -247,7 +260,154 @@ class DispatcherHandlerTest {
         verify(exceptionRegistry).handle(any(RuntimeException.class), eq(req), eq(resp));
     }
 
-    // ==================== invokeWithRealResult() ====================
+    // ==================== doHandle() — metrics recording ====================
+
+    @Test
+    void doHandle_normalFlow_recordsMetrics() throws Throwable {
+        WebServerHttpRequest req = createRequest();
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        PathMappingContext mappingContext = mock(PathMappingContext.class);
+        when(corsRegistry.corsHandle(req, resp)).thenReturn(false);
+        when(interceptorRegistry.preHandle(req, resp)).thenReturn(true);
+        when(req.getMethodValue()).thenReturn("GET");
+        when(mappingContext.getPathRule()).thenReturn("/api/users/{id}");
+        when(resp.getStatus()).thenReturn(HttpStatus.OK);
+        Object[] args = new Object[]{};
+        when(argumentResolverRegistry.resolveArguments(mappingContext, req, resp)).thenReturn(args);
+        when(mappingContext.invoke(args, req, resp)).thenReturn(new Object());
+
+        handler.doHandle(req, resp, mappingContext);
+
+        verify(metrics).recordRequest(eq("GET"), eq("/api/users/{id}"), eq(200), anyLong());
+    }
+
+    @Test
+    void doHandle_exception_recordsMetrics() throws Throwable {
+        WebServerHttpRequest req = createRequest();
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        PathMappingContext mappingContext = mock(PathMappingContext.class);
+        when(corsRegistry.corsHandle(req, resp)).thenReturn(false);
+        when(interceptorRegistry.preHandle(req, resp)).thenReturn(true);
+        when(req.getMethodValue()).thenReturn("GET");
+        when(mappingContext.getPathRule()).thenReturn("/api/users/{id}");
+        when(resp.getStatus()).thenReturn(HttpStatus.INTERNAL_SERVER_ERROR);
+        when(argumentResolverRegistry.resolveArguments(mappingContext, req, resp))
+                .thenThrow(new RuntimeException("test error"));
+
+        handler.doHandle(req, resp, mappingContext);
+
+        verify(metrics).recordRequest(eq("GET"), eq("/api/users/{id}"), eq(500), anyLong());
+    }
+
+    @Test
+    void doHandle_asyncRequest_doesNotRecordMetrics() throws Throwable {
+        WebServerHttpRequest req = createRequest();
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        PathMappingContext mappingContext = mock(PathMappingContext.class);
+        when(corsRegistry.corsHandle(req, resp)).thenReturn(false);
+        when(interceptorRegistry.preHandle(req, resp)).thenReturn(true);
+        when(resp.getStatus()).thenReturn(HttpStatus.OK);
+        Object[] args = new Object[]{};
+        when(argumentResolverRegistry.resolveArguments(mappingContext, req, resp)).thenReturn(args);
+        when(mappingContext.invoke(args, req, resp)).thenReturn(new Object());
+
+        // 模拟异步请求
+        PerfAsyncWebRequest asyncWebRequest = mock(PerfAsyncWebRequest.class);
+        when(asyncWebRequest.isAsyncStarted()).thenReturn(true);
+        req.getRequestContext().setAttribute(AsyncSupportUtils.WEB_ASYNC_REQUEST_ATTRIBUTE, asyncWebRequest);
+
+        handler.doHandle(req, resp, mappingContext);
+
+        verify(metrics, never()).recordRequest(any(), any(), anyInt(), anyLong());
+        verify(interceptorRegistry).afterConcurrentHandlingStarted(req, resp);
+    }
+
+    // ==================== asyncDispatch() — metrics recording ====================
+
+    @Test
+    void asyncDispatch_concurrentResultNormal_recordsEndToEndMetrics() throws Throwable {
+        WebServerHttpRequest req = createRequest();
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        PathMappingContext mappingContext = mock(PathMappingContext.class);
+        MappingResult matched = MappingResult.matched(mappingContext);
+        MappingResult.set(req, matched);
+        when(corsRegistry.corsHandle(req, resp)).thenReturn(false);
+        when(interceptorRegistry.preHandle(req, resp)).thenReturn(true);
+        when(req.getMethodValue()).thenReturn("GET");
+        when(mappingContext.getPathRule()).thenReturn("/api/users/{id}");
+        when(resp.getStatus()).thenReturn(HttpStatus.OK);
+        Object[] args = new Object[]{};
+        when(argumentResolverRegistry.resolveArguments(mappingContext, req, resp)).thenReturn(args);
+        when(mappingContext.invoke(args, req, resp)).thenReturn(new Object());
+
+        // 模拟异步请求
+        PerfAsyncWebRequest asyncWebRequest = mock(PerfAsyncWebRequest.class);
+        when(asyncWebRequest.isAsyncStarted()).thenReturn(true);
+        req.getRequestContext().setAttribute(AsyncSupportUtils.WEB_ASYNC_REQUEST_ATTRIBUTE, asyncWebRequest);
+
+        // Step 1: doHandle — 存储 start time，不记录 metrics
+        when(metrics.getNanoTime()).thenReturn(100L);
+        handler.doHandle(req, resp, mappingContext);
+
+        verify(metrics, never()).recordRequest(any(), any(), anyInt(), anyLong());
+
+        // Step 2: asyncDispatch — 取出 start time，记录端到端耗时
+        when(metrics.getNanoTime()).thenReturn(500L);
+        Object concurrentResult = new Object();
+        handler.asyncDispatch(req, resp, concurrentResult);
+
+        verify(metrics).recordRequest("GET", "/api/users/{id}", 200, 400L);
+        verify(returnValueResolverRegistry).resolveReturnValue(concurrentResult, mappingContext, req, resp);
+    }
+
+    @Test
+    void asyncDispatch_throwableResult_recordsEndToEndMetrics() throws Throwable {
+        WebServerHttpRequest req = createRequest();
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        PathMappingContext mappingContext = mock(PathMappingContext.class);
+        MappingResult matched = MappingResult.matched(mappingContext);
+        MappingResult.set(req, matched);
+        when(corsRegistry.corsHandle(req, resp)).thenReturn(false);
+        when(interceptorRegistry.preHandle(req, resp)).thenReturn(true);
+        when(req.getMethodValue()).thenReturn("GET");
+        when(mappingContext.getPathRule()).thenReturn("/api/users/{id}");
+        when(resp.getStatus()).thenReturn(HttpStatus.INTERNAL_SERVER_ERROR);
+        Object[] args = new Object[]{};
+        when(argumentResolverRegistry.resolveArguments(mappingContext, req, resp)).thenReturn(args);
+        when(mappingContext.invoke(args, req, resp)).thenReturn(new Object());
+
+        // 模拟异步请求，使 doHandle 存储 start time
+        PerfAsyncWebRequest asyncWebRequest = mock(PerfAsyncWebRequest.class);
+        when(asyncWebRequest.isAsyncStarted()).thenReturn(true);
+        req.getRequestContext().setAttribute(AsyncSupportUtils.WEB_ASYNC_REQUEST_ATTRIBUTE, asyncWebRequest);
+
+        // Step 1: doHandle → 存储 start time
+        when(metrics.getNanoTime()).thenReturn(100L);
+        handler.doHandle(req, resp, mappingContext);
+
+        verify(metrics, never()).recordRequest(any(), any(), anyInt(), anyLong());
+
+        // Step 2: asyncDispatch 抛异常 → 仍记录端到端耗时
+        when(metrics.getNanoTime()).thenReturn(500L);
+        handler.asyncDispatch(req, resp, new RuntimeException("async error"));
+
+        verify(metrics).recordRequest("GET", "/api/users/{id}", 500, 400L);
+    }
+
+    // ==================== handle() — NOT found ====================
+
+    @Test
+    void handle_notFound_doesNotRecordMetrics() {
+        WebServerHttpRequest req = createRequest();
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        MappingResult notFound = MappingResult.notFound();
+        MappingResult.set(req, notFound);
+        when(mappingRegistry.mapping(req)).thenReturn(notFound);
+
+        handler.handle(req, resp);
+
+        verify(metrics, never()).recordRequest(any(), any(), anyInt(), anyLong());
+    }
 
     @Test
     void invokeWithRealResult_callsPostHandleAndAfterCompletion() throws Exception {
@@ -401,6 +561,7 @@ class DispatcherHandlerTest {
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
         PathMappingContext mappingContext = mock(PathMappingContext.class);
         when(corsRegistry.corsHandle(req, resp)).thenReturn(false);
+        when(resp.getStatus()).thenReturn(HttpStatus.OK);
         RuntimeException ex = new RuntimeException("preHandle error");
         when(interceptorRegistry.preHandle(req, resp)).thenThrow(ex);
 
@@ -416,6 +577,7 @@ class DispatcherHandlerTest {
         PathMappingContext mappingContext = mock(PathMappingContext.class);
         when(corsRegistry.corsHandle(req, resp)).thenReturn(false);
         when(interceptorRegistry.preHandle(req, resp)).thenReturn(true);
+        when(resp.getStatus()).thenReturn(HttpStatus.OK);
         when(argumentResolverRegistry.resolveArguments(mappingContext, req, resp)).thenReturn(new Object[0]);
         Object result = new Object();
         when(mappingContext.invoke(any(), eq(req), eq(resp))).thenReturn(result);
@@ -447,7 +609,31 @@ class DispatcherHandlerTest {
     // ==================== handleWithMappingResult() ====================
 
     @Test
-    void handleWithMappingResult_executorRejects_releasesRequest() {
+    void handleWithMappingResult_executorOverloaded_returns503() throws Exception {
+        WebServerHttpRequest req = createRequest();
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        HttpHeaders headers = new HttpHeaders();
+        when(resp.getHeaders()).thenReturn(headers);
+        PathMappingContext mappingContext = mock(PathMappingContext.class);
+        MappingResult matched = MappingResult.matched(mappingContext);
+        MappingResult.set(req, matched);
+        ExecutorService executor = mock(ExecutorService.class);
+        when(bizPoolRegistry.determinePool(req, matched)).thenReturn(executor);
+        when(executor.isShutdown()).thenReturn(false);
+        doThrow(new RejectedExecutionException("pool full")).when(executor).execute(any(Runnable.class));
+
+        handler.handleWithMappingResult(req, resp, matched);
+
+        verify(req).acquire();
+        verify(req).release();
+        // 负载过高：Retry-After 5秒 + 返回 503，不执行 Filter 链
+        assertEquals("5", headers.getFirst("Retry-After"));
+        verify(resp).sendError(HttpStatus.SERVICE_UNAVAILABLE, "Too many requests");
+        verify(webFilterRegistry, never()).doFilter(any(), any());
+    }
+
+    @Test
+    void handleWithMappingResult_executorShuttingDown_fallsBackToEventLoop() throws Exception {
         WebServerHttpRequest req = createRequest();
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
         PathMappingContext mappingContext = mock(PathMappingContext.class);
@@ -455,13 +641,15 @@ class DispatcherHandlerTest {
         MappingResult.set(req, matched);
         ExecutorService executor = mock(ExecutorService.class);
         when(bizPoolRegistry.determinePool(req, matched)).thenReturn(executor);
-        doThrow(new RejectedExecutionException("pool full")).when(executor).execute(any(Runnable.class));
+        when(executor.isShutdown()).thenReturn(true);
+        doThrow(new RejectedExecutionException("pool shutdown")).when(executor).execute(any(Runnable.class));
 
-        assertThrows(RejectedExecutionException.class,
-                () -> handler.handleWithMappingResult(req, resp, matched));
+        handler.handleWithMappingResult(req, resp, matched);
 
+        // 优雅关闭中：回退到 EventLoop 兜底执行
         verify(req).acquire();
         verify(req).release();
+        verify(webFilterRegistry).doFilter(req, resp);
     }
 
     @Test

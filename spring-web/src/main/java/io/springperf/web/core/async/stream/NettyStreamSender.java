@@ -175,13 +175,15 @@ public class NettyStreamSender implements StreamSender {
     }
 
     protected void onCompleteSuccess() {
+        this.resp.setTimeout(null, -1);
         if (closeChannelOnComplete || !resp.isKeepAlive()) {
             this.channel.close();
         }
     }
 
     protected void onCompleteError(Throwable t) {
-        log.warn("[SSE] write ERROR: {}", t.getMessage());
+        this.resp.setTimeout(null, -1);
+        log.warn("[SSE] write ERROR: {}", t.getMessage(), t);
         if (closeChannelOnComplete || !resp.isKeepAlive()) {
             this.channel.close();
         }

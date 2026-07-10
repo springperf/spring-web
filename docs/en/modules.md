@@ -249,6 +249,10 @@ Add dependency:
 
 `SpringBootAdminClientAutoConfiguration` emits `WebServerInitializedEvent` when SBA client is present, enabling Spring Boot Admin heartbeat registration.
 
+### Metrics Auto-Configuration
+
+`MicrometerWebMetrics` is automatically registered as the `WebMetrics` implementation when `spring-boot-starter-actuator` is on the classpath. It collects request duration, exception counts, and thread pool metrics. See [Configuration Reference](configuration.md#observability-metrics) for details.
+
 ### OpenAPI Auto-Configuration
 
 `OpenApiAutoConfiguration` generates OpenAPI documentation endpoints when `springdoc-openapi` is on the classpath.
@@ -267,6 +271,8 @@ Add dependency:
 
 Transparent aggregation batch processing module. Merges high-concurrency same-type requests into a batch, processing all requests with a single batch business logic execution, significantly improving throughput for IO-intensive scenarios.
 
+> Full documentation: [Batch Processing Module](batch.md) — complete examples, @BatchMapping reference, observability metrics, tuning guide
+
 ### Core Concepts
 
 - **Pipeline semantics unchanged** — Filters, interceptors execute per-request, unaffected
@@ -278,14 +284,14 @@ Transparent aggregation batch processing module. Merges high-concurrency same-ty
 
 ```
 Request → EventLoop → BatchInvoker creates instance enqueued → RingBuffer
-                                                                              │
-                                                                        Disruptor consumer
-                                                                              │
-                                                                        Submitted to business thread pool
-                                                                              │
-                                                                        BatchHandler batch processing
-                                                                              │
-                                                   Per req.setResult() → asyncDispatch → write response
+                                                                  │
+                                                            Disruptor consumer
+                                                                  │
+                                                            Submitted to business thread pool
+                                                                  │
+                                                            BatchHandler batch processing
+                                                                  │
+                                       Per req.setResult() → asyncDispatch → write response
 ```
 
 ### Core Classes

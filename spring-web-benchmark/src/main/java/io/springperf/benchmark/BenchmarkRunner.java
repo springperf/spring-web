@@ -65,7 +65,10 @@ public class BenchmarkRunner {
         int threads = Integer.getInteger("benchmark.threads", BenchmarkConstants.THREADS);
 	        optBuilder.threads(threads);
         optBuilder.mode(Mode.Throughput);
-        optBuilder.mode(Mode.SampleTime);
+        if (Boolean.getBoolean("benchmark.sampleTime")) {
+            optBuilder.mode(Mode.SampleTime);
+            System.out.println("[BenchmarkRunner] SampleTime mode enabled (latency data)");
+        }
         optBuilder.addProfiler(GCProfiler.class);
         // StackProfiler：benchmark.stack=true 时启用 ThreadMXBean CPU 采样
         String stackEnabled = System.getProperty("benchmark.stack");
@@ -111,8 +114,8 @@ public class BenchmarkRunner {
                     + ", duration=" + jfrDuration + ", settings=" + jfrSettings);
         }
 
-        // 传递 benchmark.* 系统属性到 forked JVM（内存快照、端口、profile名等需要）
-        String[] propNames = {"benchmark.port", "benchmark.profile.name", "benchmark.output.dir"};
+        // 传递 benchmark.* 系统属性到 forked JVM（内存快照、端口、profile名、线程数等需要）
+        String[] propNames = {"benchmark.port", "benchmark.profile.name", "benchmark.output.dir", "benchmark.threads"};
         for (String propName : propNames) {
             String propValue = System.getProperty(propName);
             if (propValue != null && !propValue.isEmpty()) {

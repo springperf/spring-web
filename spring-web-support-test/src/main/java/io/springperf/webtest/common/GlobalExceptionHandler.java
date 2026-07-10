@@ -92,7 +92,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.OK)
     @ResponseBody
     public ApiResult<?> handleError(IllegalArgumentException e) {
-        log.error("IllegalArgumentException 参数校验失败：{}", e.getMessage());
+        log.error("IllegalArgumentException 参数校验失败：{}", e.getMessage(), e);
         return ApiResult.failed(PARAM_ERROR);
     }
 
@@ -105,7 +105,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.OK)
     @ResponseBody
     public ApiResult<?> handleError(HttpMessageNotReadableException ex) {
-        log.error("消息不能读取：{}", ex.getMessage());
+        log.error("消息不能读取：{}", ex.getMessage(), ex);
         return ApiResult.failed(PARAM_ERROR);
     }
 
@@ -113,7 +113,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.OK)
     @ResponseBody
     public ApiResult<?> handleError(HttpRequestMethodNotSupportedException e) {
-        log.error("不支持当前请求方法：{}", e.getMessage());
+        log.error("不支持当前请求方法：{}", e.getMessage(), e);
         return ApiResult.failed(METHOD_NOT_SUPPORTED);
     }
 
@@ -121,7 +121,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.OK)
     @ResponseBody
     public ApiResult<?> handleError(HttpMediaTypeNotSupportedException e) {
-        log.error("不支持当前媒体类型：{}", e.getMessage());
+        log.error("不支持当前媒体类型：{}", e.getMessage(), e);
         return ApiResult.failed(MEDIA_TYPE_NOT_SUPPORTED);
     }
 
@@ -129,7 +129,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.OK)
     @ResponseBody
     public ApiResult<?> handleError(MethodArgumentTypeMismatchException ex) {
-        log.error("服务器异常：{}", ex.getMessage());
+        log.error("服务器异常：{}", ex.getMessage(), ex);
         return ApiResult.failed(PARAM_ERROR);
     }
 

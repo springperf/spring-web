@@ -145,7 +145,7 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
             try {
                 input.close();
             } catch (IOException ignored) {
-                // input 关闭失败无需额外处理
+                log.debug("input close failed", ignored);
             }
             throw new RuntimeException(ex);
         }
@@ -201,7 +201,7 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
                 try {
                     toClose.close();
                 } catch (IOException ignored) {
-                    // FileChannel 关闭失败无需额外处理
+                    log.debug("toClose FileChannel close failed", ignored);
                 }
             });
             addRespEventListener(future, true);
@@ -213,7 +213,7 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
                 try {
                     fc.close();
                 } catch (IOException ignored) {
-                    // FileChannel 关闭失败无需额外处理
+                    log.debug("fc FileChannel close failed", ignored);
                 }
             }
             throw new RuntimeException(ex);

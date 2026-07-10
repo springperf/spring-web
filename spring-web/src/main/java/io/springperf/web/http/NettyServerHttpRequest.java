@@ -14,6 +14,7 @@ import io.netty.handler.codec.http.multipart.HttpPostStandardRequestDecoder;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.ReferenceCountUtil;
+import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.http.support.HttpInputMessagePart;
 import io.springperf.web.http.support.NettyAttributeMessage;
@@ -73,7 +74,7 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
                         try {
                             result.add(name, attr.getValue());
                         } catch (Exception e) {
-                            log.error("Failed to parse form field: " + attr.getName(), e);
+                            log.error("Failed to parse form field: {}", attr.getName(), e);
                         }
                     }
                 }
@@ -96,7 +97,7 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
                             try {
                                 result.add(attr.getName(), attr.getValue());
                             } catch (Exception ex) {
-                                log.error("Failed to parse form field: " + attr.getName(), ex);
+                                log.error("Failed to parse form field: {}", attr.getName(), ex);
                             }
                         }
                     }
@@ -171,25 +172,31 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
     /**
      * 按优先级确定请求 scheme：
      * <ol>
-     *   <li>RFC 7239 {@code Forwarded} 头（{@code proto=https}）</li>
-     *   <li>{@code X-Forwarded-Proto} 头（Nginx / AWS ALB 等代理）</li>
+     *   <li>RFC 7239 {@code Forwarded} 头（仅当 {@code server.use-forwarded-headers=true}）</li>
+     *   <li>{@code X-Forwarded-Proto} 头（仅当 {@code server.use-forwarded-headers=true}）</li>
      *   <li>Netty pipeline 中存在 {@link SslHandler}（TLS 在 Java 层终结）</li>
      *   <li>兜底 {@code http}</li>
      * </ol>
+     * <p>转发头默认不信任，防止客户端伪造 scheme。部署在反向代理后方时
+     * 需设置 {@code server.use-forwarded-headers=true} 并确保代理已清理上游转发头。</p>
      */
     private String resolveScheme() {
-        // 1. RFC 7239 Forwarded
-        String forwarded = request.headers().get("Forwarded");
-        if (forwarded != null) {
-            String proto = parseForwardedProto(forwarded);
-            if (proto != null) {
-                return proto;
+        boolean useForwarded = getWebContext().getProps()
+                .getBoolean(PropertiesConstant.USE_FORWARDED_HEADERS, false);
+        if (useForwarded) {
+            // 1. RFC 7239 Forwarded
+            String forwarded = request.headers().get("Forwarded");
+            if (forwarded != null) {
+                String proto = parseForwardedProto(forwarded);
+                if (proto != null) {
+                    return proto;
+                }
             }
-        }
-        // 2. X-Forwarded-Proto
-        String forwardedProto = request.headers().get("X-Forwarded-Proto");
-        if (forwardedProto != null && !forwardedProto.isEmpty()) {
-            return forwardedProto;
+            // 2. X-Forwarded-Proto
+            String forwardedProto = request.headers().get("X-Forwarded-Proto");
+            if (forwardedProto != null && !forwardedProto.isEmpty()) {
+                return forwardedProto;
+            }
         }
         // 3. SSL 在 Java 层终结
         if (ctx.pipeline().get(SslHandler.class) != null) {
