@@ -40,6 +40,9 @@ public class ReactiveReturnValueResolver extends BaseAsyncReturnValueResolver {
         asyncSupportRegistry = webContext.getWebComponentWithDefault(AsyncSupportRegistry.class, new AsyncSupportRegistry());
         streamSenderFactory = webContext.getWebComponentWithDefault(StreamSenderFactory.class, new DefaultStreamSenderFactory());
         adapterRegistry = webContext.getBeanFromCtx(ReactiveAdapterRegistry.class);
+        if (adapterRegistry == null) {
+            adapterRegistry = ReactiveAdapterRegistry.getSharedInstance();
+        }
     }
 
     @Override
