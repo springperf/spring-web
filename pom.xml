@@ -6,7 +6,7 @@
 
     <groupId>io.github.springperf</groupId>
     <artifactId>spring-web-parent</artifactId>
-    <version>2.7.2</version>
+    <version>2.7.3</version>
     <packaging>pom</packaging>
 
     <name>Spring Web Parent</name>
@@ -49,7 +49,7 @@
     <properties>
         <java.version>8</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <spring-web.version>2.7.2</spring-web.version>
+        <spring-web.version>2.7.3</spring-web.version>
         <spring-boot.version>2.7.18</spring-boot.version>
         <gpg.executable>gpg</gpg.executable>
         <gpg.keyname>${env.GPG_KEY}</gpg.keyname>

@@ -4,6 +4,56 @@
 
 本项目遵循 [语义化版本控制](https://semver.org/lang/zh-CN/)。
 
+## [2.7.3] - 20260710
+
+### 新增
+
+- **Metrics SPI 机制**：新增 `WebMetrics` / `NoOpWebMetrics` 核心指标 SPI，在请求路径零开销（NoOp 通过 JIT 常量折叠消除计时路径）
+  - `MicrometerWebMetrics` — 基于 Micrometer 的实现，记录 `dispatcher.request.duration`（Timer，按 method/path/status 标签）、`dispatcher.exception`（Counter，按 type/resolved 标签）
+  - `BatchMetrics` / `NoOpBatchMetrics` — 批处理模块指标 SPI
+  - `MicrometerBatchMetrics` — 基于 Micrometer 的批处理指标实现，记录入队/丢弃/溢出/处理耗时/批次大小/队列容量等指标
+  - 自动装配：`spring-boot-starter-web` 引入 Micrometer 时自动激活，无需额外配置
+- **BizPoolRegistry 增强**：自动发现 Spring 容器中的 `ThreadPoolExecutor` Bean 并注册为线程池；`@RunInPool("beanName")` 未命中本地 pools 时兜底到 Spring 容器按名称查找
+- **BizPoolRegistry Micrometer Gauges**：自动为已注册的线程池注册 active threads / queue size / completed tasks 三个 Gauge
+- **Netty 层指标**：新增 `NettyMetricsHandler`（Sharable ChannelHandler），通过 `channelActive`/`channelInactive` 追踪活跃 TCP 连接数
+  - 自动注册 `netty.connections.active` Gauge（当前活跃 TCP 连接数）
+  - 自动注册 `netty.eventloop.pending.tasks` Gauge（所有 EventLoop 待处理任务总数）
+  - 暴露 `NettyHttpServer.getWorkerGroup()` / `getActiveConnectionCount()` 用于指标注册
+
+### 重构
+
+- **Benchmark 模块重构**：消除冗余的 `*-filter` 独立子模块（perf-filter / tomcat-filter / undertow-filter / webflux-filter），将 filter 场景合并到对应主模块中，Maven profiles 从 10 个精简到 5 个；删除 Windows 批处理脚本，统一为 shell 脚本
+- **Benchmark 场景重命名**：`validatePost` → `valid`、`sseStream` → `sse`、`jsonEchoLarge` / `largeResponse` → `bytesLarge`，语义更清晰
+- **Benchmark DTO**：新增 `UserReq` / `UserResp` DTO 类，统一请求/响应模型
+- **报告生成器增强**：`ReportGenerator` 重构，`GcMetrics` / `Jdk8GcLogParser` / `Jdk11GcLogParser` 增强 GC 日志解析
+
+### 安全
+
+- **转发头保护**：`Forwarded` / `X-Forwarded-Proto` 头默认不信任，新增 `server.use-forwarded-headers=false` 配置开关；部署在反向代理后方时需显式开启，防止客户端伪造 scheme
+- **CRLF 注入防护**：`NettyMultipartFile.buildContentDisposition()` 对 name/filename 进行 `\r` / `\n` 清洗，防止 multipart 文件上传时 HTTP 响应头分裂攻击
+- **HTTP 解析器限制**：新增 `server.http.max-initial-line-length`（默认 4KB）、`server.http.max-header-size`（默认 8KB）、`server.http.max-chunk-size`（默认 8KB）配置项，防止超大请求行/头部/chunk DoS 攻击
+- **读超时保护**：新增 `server.http.read-timeout`（默认 30s）配置项，请求体聚合前防止慢速客户端无限期占用连接
+- **WebSocket Origin 校验增强**：`setAllowedOrigins` 传入空列表时拒绝所有带 Origin 头的跨域请求（之前空列表等同于未配置）
+- **异常信息收敛**：`ExceptionRegistry.handle()` 未处理异常时返回通用 `Internal Server Error` 而非将异常类名/消息暴露给客户端
+
+### 优化
+
+- **访问日志**：新增 `AccessLogWebFilter`，通过 `server.accesslog.enabled=true` 开启，以最早 Order 在 Filter 链最外层统计完整请求耗时；日志格式：`remoteAddr method uri statusCode elapsedMs "user-agent"`
+- **日志参数化**：全局使用 SLF4J `{}` 占位符替代字符串拼接（InterceptorRegistry、PathPatternRouter、NettyServerHttpResponse、BackpressureHandler 等），消除日志关闭时的字符串构造开销
+- **异常日志增强**：关键路径异常日志包含完整堆栈（`NettyStreamSender`、SSE 超时清理异常等），便于问题定位
+- **`BizPoolRegistry.register()`**：接受 `ExecutorService` 而非 `ThreadPoolExecutor`，支持更广泛的线程池类型
+- **优雅关闭**：新增 `NettyHttpHandler.setShuttingDown()`，关闭时新到达请求直接返回 503 `Service Unavailable`；`ManagementNettyHttpServer.stop()` 先拒绝新请求再关闭 EventLoopGroup，避免优雅关闭过程中处理新请求
+- **应用层背压**：`DispatcherHandler.handleWithMappingResult()` 捕获 `RejectedExecutionException`，业务线程池满载时返回 503 + `Retry-After: 5` 头，避免阻塞 EventLoop 线程；优雅关闭中线程池已关闭时回退到 EventLoop 兜底执行
+
+### 修复
+
+- **SSE 超时监测任务未清除**：`NettyStreamSender.onCompleteSuccess()` / `onCompleteError()` 中调用 `resp.setTimeout(null, -1)` 取消超时调度任务，防止流结束后超时任务残留导致连接泄漏
+
+### 文档
+
+- **README / CONTRIBUTING / SECURITY 文档更新**
+- **文档内容纠正**
+
 ## [2.7.2] - 20260704
 
 ### 新增
