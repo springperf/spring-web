@@ -77,15 +77,9 @@ perf leads across all dimensions: highest throughput, lowest latency, lowest all
 
 ### 1.1 4-Thread Baseline (ops/sec)
 
-| API | perf | Spring MVC (Tomcat) | Spring MVC (Undertow) | WebFlux |
-|-----|------|--------|----------|---------|
-| json | 26718 | 14061 | 10305 | 15460 |
-| get | 27398 | 12502 | 13425 | 13174 |
-| bytes | 34232 | 20045 | 11737 | 17211 |
-| valid | 26706 | 14544 | 13662 | 15621 |
-| async | 28354 | 13407 | 10169 | 18283 |
-| bytesLarge | 11508 | 4979 | 7764 | 7737 |
-| sse | 1226 | 315 | FAIL | 944 |
+<p align="center">
+<img src="../images/benchmark-throughput-4t-en.svg" alt="4-Thread Throughput Comparison"/>
+</p>
 
 #### perf Advantage (4-thread, vs Spring MVC)
 
@@ -112,6 +106,10 @@ Throughput growth from 4 → 64 threads, measuring the framework's concurrency s
 
 ### 1.3 perf Advantage vs Spring MVC Across Thread Levels
 
+<p align="center">
+<img src="../images/benchmark-multiple-trend-en.svg" alt="perf Advantage vs Concurrency"/>
+</p>
+
 | API | 4 threads | 16 threads | 64 threads |
 |----------|-----------|------------|------------|
 | json | 26718/14061 (**1.90x**) | 36245/22596 (**1.60x**) | 45328/20319 (**2.23x**) |
@@ -135,6 +133,10 @@ Throughput growth from 4 → 64 threads, measuring the framework's concurrency s
 ## 2. Latency (ms)
 
 ### 2.1 4 Threads p50 / p99 / p99.9
+
+<p align="center">
+<img src="../images/benchmark-latency-p50-en.svg" alt="4-Thread p50 Latency Comparison"/>
+</p>
 
 | API | perf | Spring MVC (Tomcat) | Spring MVC (Undertow) | WebFlux |
 |-----|------|--------|----------|---------|
@@ -170,7 +172,11 @@ bytes API perf p50 is only **0.25ms** (1/9 of Spring MVC's 2.36ms), delivering e
 
 ## 3. GC Behavior
 
-GC data comes from JVM-level logs, identical across all APIs within the same profile. Per-request allocation varies by throughput — the table shows json, get, and SSE as representative examples.
+GC data comes from JVM-level logs, identical across all APIs within the same profile.
+
+<p align="center">
+<img src="../images/benchmark-memory-allocation-en.svg" alt="Per-Request Memory Allocation"/>
+</p>
 
 | Container | Threads | Young GC Count | Avg Pause | Allocation Rate | Per-request Alloc (json) | Per-request Alloc (get) | SSE Per-request Alloc |
 |-----------|---------|---------------|-----------|-----------------|-------------------------|------------------------|----------------------|

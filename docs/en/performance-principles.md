@@ -102,6 +102,10 @@ return methodHandle.invokeExact(args);
 
 > Note: this benefit is independent of which thread executes the call — even when dispatched to a business thread pool, the invocation is still `INVOKEVIRTUAL`/`MethodHandle`.
 
+<p align="center">
+<img src="../images/perf-call-cost-en.svg" alt="Method Call Cost Comparison"/>
+</p>
+
 ---
 
 ## 3. O(1) Routing — Multi-Level Optimizer Chain
@@ -129,6 +133,10 @@ SuffixPathRouterOptimizer (suffix match → HashMap.get(suffix) O(1))
   ↓ miss
 LoopPathPatternRouterOptimizer (iterate PathPatternRouter[]  O(n))
 ```
+
+<p align="center">
+<img src="../images/perf-routing-flow-en.svg" alt="O(1) Routing — Multi-Level Optimizer Chain"/>
+</p>
 
 ### Why It's Faster
 

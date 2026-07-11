@@ -22,6 +22,10 @@ Same business logic — only the transport layer changed from a message queue to
 
 The common characteristic of these overheads: **runtime recomputation instead of startup-time precomputation**. All the information needed is known before a request arrives, yet Spring re-looks-up, re-matches, and re-creates at runtime. This framework resolves all metadata at startup and does only table lookups at runtime — none of the following overheads exist in this project.
 
+<p align="center">
+<img src="../images/perf-cpu-breakdown-en.svg" alt="Where Does the CPU Go? — Framework Runtime Overhead"/>
+</p>
+
 #### Spring MVC Runtime Overhead
 
 CPU sampling of a business-logic endpoint (4,170 samples), then CPU sampling of an empty handler (8,974 samples) to exclude business logic dilution — revealing the true framework overhead:
@@ -123,6 +127,10 @@ This overhead exists in both frameworks:
 - `HttpObjectDecoder.readHeaders` (2.40%)
 - `DefaultHeaders.add` + validation (validateToken/validateAsciiStringToken ~1.2%)
 - `ByteToMessageDecoder.decodeRemovalReentryProtection` (3.67%)
+
+<p align="center">
+<img src="../images/perf-runtime-vs-startup-en.svg" alt="Startup Precomputation vs Runtime Matching — Request Path Comparison"/>
+</p>
 
 ### From Insight to Action
 

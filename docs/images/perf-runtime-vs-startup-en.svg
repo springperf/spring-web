@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="540" viewBox="0 0 720 540">
+<style>
+ .card { fill: #f8fafc; }
+ .title { font: bold 15px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; }
+ .subtitle { font: 12px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; }
+ .colHeader { font: bold 13px -apple-system,BlinkMacSystemFont,sans-serif; text-anchor: middle; }
+ .rowNum { font: bold 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #fff; text-anchor: middle; }
+ .catLabel { font: bold 12px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; }
+ .mvcLabel { font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; }
+ .mvcCost { font: bold 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #dc2626; }
+ .webLabel { font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; }
+ .webSavings { font: bold 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #16a34a; }
+ .divider { stroke: #e5e7eb; stroke-width: 1; }
+ .header-line { stroke: #e5e7eb; stroke-width: 1.5; }
+ .mvc-box { fill: #fef2f2; stroke: #fca5a5; stroke-width: 1; rx: 4; }
+ .web-box { fill: #f0fdf4; stroke: #86efac; stroke-width: 1; rx: 4; }
+ .circle-mvc { fill: #ef4444; }
+ .circle-web { fill: #22c55e; }
+ .arrow-diag { stroke: #94a3b8; stroke-width: 1.5; fill: none; }
+ .vs-text { font: bold 14px -apple-system,BlinkMacSystemFont,sans-serif; fill: #d1d5db; text-anchor: middle; }
+</style>
+
+<rect class="card" x="0" y="0" width="720" height="540" rx="12"/>
+
+<text x="30" y="30" class="title">Startup Precomputation vs Runtime Matching — Request Path Comparison</text>
+<text x="30" y="50" class="subtitle">Same business logic, comparing Spring Web and Spring MVC request processing</text>
+
+<!-- Column headers -->
+<rect x="20" y="65" width="330" height="32" rx="6" class="mvc-box"/>
+<text x="185" y="85" class="colHeader" fill="#dc2626">Spring MVC (runtime matching per request)</text>
+
+<rect x="370" y="65" width="330" height="32" rx="6" class="web-box"/>
+<text x="535" y="85" class="colHeader" fill="#16a34a">Spring Web (precompute at startup, lookup at runtime)</text>
+
+<!-- VS divider -->
+<text x="360" y="85" class="vs-text">VS</text>
+
+<!-- Row 1: Route Matching -->
+<rect x="20" y="112" width="330" height="70" rx="4" class="mvc-box"/>
+<circle cx="38" cy="130" r="10" class="circle-mvc"/>
+<text x="38" y="134" class="rowNum">1</text>
+<text x="56" y="130" class="catLabel">Route Matching</text>
+<text x="56" y="147" class="mvcLabel">AntPathMatcher.match() iterates all routes</text>
+<text x="56" y="162" class="mvcLabel">O(n) pattern matching per request</text>
+<text x="310" y="130" class="mvcCost">~4%</text>
+
+<rect x="370" y="112" width="330" height="70" rx="4" class="web-box"/>
+<circle cx="388" cy="130" r="10" class="circle-web"/>
+<text x="388" y="134" class="rowNum">1</text>
+<text x="406" y="130" class="catLabel">Route Matching</text>
+<text x="406" y="147" class="webLabel">Multi-level optimizer: FullPath → Prefix → Suffix → Loop</text>
+<text x="406" y="162" class="webLabel">HashMap.get() O(1), 90%+ hit rate</text>
+<text x="660" y="130" class="webSavings">Zero</text>
+
+<line x1="360" y1="185" x2="360" y2="190" stroke="#94a3b8" stroke-width="1.5"/>
+
+<!-- Row 2: Parameter Resolution -->
+<rect x="20" y="192" width="330" height="70" rx="4" class="mvc-box"/>
+<circle cx="38" cy="210" r="10" class="circle-mvc"/>
+<text x="38" y="214" class="rowNum">2</text>
+<text x="56" y="210" class="catLabel">Parameter Resolution + Deserialization</text>
+<text x="56" y="227" class="mvcLabel">Iterate HandlerMethodArgumentResolver list</text>
+<text x="56" y="242" class="mvcLabel">+ synchronized cache guard</text>
+<text x="310" y="210" class="mvcCost">16-24%</text>
+
+<rect x="370" y="192" width="330" height="70" rx="4" class="web-box"/>
+<circle cx="388" cy="210" r="10" class="circle-web"/>
+<text x="388" y="214" class="rowNum">2</text>
+<text x="406" y="210" class="catLabel">Parameter Resolution + Deserialization</text>
+<text x="406" y="227" class="webLabel">Resolver bound to MappingCacheKey at startup</text>
+<text x="406" y="242" class="webLabel">Array index direct call, no iteration, no lock</text>
+<text x="660" y="210" class="webSavings">Zero</text>
+
+<line x1="360" y1="265" x2="360" y2="270" stroke="#94a3b8" stroke-width="1.5"/>
+
+<!-- Row 3: Validation -->
+<rect x="20" y="272" width="330" height="70" rx="4" class="mvc-box"/>
+<circle cx="38" cy="290" r="10" class="circle-mvc"/>
+<text x="38" y="294" class="rowNum">3</text>
+<text x="56" y="290" class="catLabel">Data Validation</text>
+<text x="56" y="307" class="mvcLabel">Recreates DataBinder per request</text>
+<text x="56" y="322" class="mvcLabel">Full Hibernate Validator chain</text>
+<text x="310" y="290" class="mvcCost">1-7%</text>
+
+<rect x="370" y="272" width="330" height="70" rx="4" class="web-box"/>
+<circle cx="388" cy="290" r="10" class="circle-web"/>
+<text x="388" y="294" class="rowNum">3</text>
+<text x="406" y="290" class="catLabel">Data Validation</text>
+<text x="406" y="307" class="webLabel">Validation determined at startup</text>
+<text x="406" y="322" class="webLabel">Skips empty validation chain at runtime</text>
+<text x="660" y="290" class="webSavings">Zero</text>
+
+<line x1="360" y1="345" x2="360" y2="350" stroke="#94a3b8" stroke-width="1.5"/>
+
+<!-- Row 4: Method Invocation -->
+<rect x="20" y="352" width="330" height="70" rx="4" class="mvc-box"/>
+<circle cx="38" cy="370" r="10" class="circle-mvc"/>
+<text x="38" y="374" class="rowNum">4</text>
+<text x="56" y="370" class="catLabel">Controller Method Invocation</text>
+<text x="56" y="387" class="mvcLabel">Method.invoke() reflection call</text>
+<text x="56" y="402" class="mvcLabel">Includes access check + boxing + type validation</text>
+<text x="310" y="370" class="mvcCost">~200ns</text>
+
+<rect x="370" y="352" width="330" height="70" rx="4" class="web-box"/>
+<circle cx="388" cy="370" r="10" class="circle-web"/>
+<text x="388" y="374" class="rowNum">4</text>
+<text x="406" y="370" class="catLabel">Controller Method Invocation</text>
+<text x="406" y="387" class="webLabel">ASM bytecode / MethodHandle</text>
+<text x="406" y="402" class="webLabel">INVOKEVIRTUAL ~10ns / MethodHandle ~30ns</text>
+<text x="660" y="370" class="webSavings">~10-30ns</text>
+
+<line x1="360" y1="425" x2="360" y2="430" stroke="#94a3b8" stroke-width="1.5"/>
+
+<!-- Row 5: Return Value -->
+<rect x="20" y="432" width="330" height="70" rx="4" class="mvc-box"/>
+<circle cx="38" cy="450" r="10" class="circle-mvc"/>
+<text x="38" y="454" class="rowNum">5</text>
+<text x="56" y="450" class="catLabel">Return Value Serialization</text>
+<text x="56" y="467" class="mvcLabel">Iterate ReturnValueHandler list to find match</text>
+<text x="56" y="482" class="mvcLabel">+ content negotiation + type inference</text>
+<text x="310" y="450" class="mvcCost">17-27%</text>
+
+<rect x="370" y="432" width="330" height="70" rx="4" class="web-box"/>
+<circle cx="388" cy="450" r="10" class="circle-web"/>
+<text x="388" y="454" class="rowNum">5</text>
+<text x="406" y="450" class="catLabel">Return Value Serialization</text>
+<text x="406" y="467" class="webLabel">Handler determined and cached at startup</text>
+<text x="406" y="482" class="webLabel">Direct call at runtime, zero orchestration</text>
+<text x="660" y="450" class="webSavings">Zero</text>
+
+<!-- Bottom annotation -->
+<text x="360" y="525" class="subtitle" text-anchor="middle">Total: Spring MVC framework overhead ~49-63%  →  Spring Web: all eliminated</text>
+
+</svg>

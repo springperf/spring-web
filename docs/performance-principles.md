@@ -102,6 +102,10 @@ return methodHandle.invokeExact(args);
 
 > 注意：此收益与调用发生的线程无关，即使调度到业务线程执行，调用方式仍然是 `INVOKEVIRTUAL`/`MethodHandle`。
 
+<p align="center">
+<img src="images/perf-call-cost.svg" alt="方法调用耗时对比"/>
+</p>
+
 ---
 
 ## 3. O(1) 路由——多级优化器链
@@ -129,6 +133,10 @@ SuffixPathRouterOptimizer (后缀匹配 → HashMap.get(suffix) O(1))
   ↓ 未命中
 LoopPathPatternRouterOptimizer (遍历 PathPatternRouter[]  O(n))
 ```
+
+<p align="center">
+<img src="images/perf-routing-flow.svg" alt="O(1) 路由——多级优化器链"/>
+</p>
 
 ### 为什么快
 

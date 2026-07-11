@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="540" viewBox="0 0 720 540">
+<style>
+ .card { fill: #f8fafc; }
+ .title { font: bold 15px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; }
+ .subtitle { font: 12px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; }
+ .colHeader { font: bold 13px -apple-system,BlinkMacSystemFont,sans-serif; text-anchor: middle; }
+ .rowNum { font: bold 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #fff; text-anchor: middle; }
+ .catLabel { font: bold 12px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; }
+ .mvcLabel { font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; }
+ .mvcCost { font: bold 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #dc2626; }
+ .webLabel { font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; }
+ .webSavings { font: bold 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #16a34a; }
+ .divider { stroke: #e5e7eb; stroke-width: 1; }
+ .header-line { stroke: #e5e7eb; stroke-width: 1.5; }
+ .mvc-box { fill: #fef2f2; stroke: #fca5a5; stroke-width: 1; rx: 4; }
+ .web-box { fill: #f0fdf4; stroke: #86efac; stroke-width: 1; rx: 4; }
+ .circle-mvc { fill: #ef4444; }
+ .circle-web { fill: #22c55e; }
+ .arrow-diag { stroke: #94a3b8; stroke-width: 1.5; fill: none; }
+ .vs-text { font: bold 14px -apple-system,BlinkMacSystemFont,sans-serif; fill: #d1d5db; text-anchor: middle; }
+</style>
+
+<rect class="card" x="0" y="0" width="720" height="540" rx="12"/>
+
+<text x="30" y="30" class="title">启动时预计算 vs 运行时匹配——请求处理路径对比</text>
+<text x="30" y="50" class="subtitle">相同业务逻辑，Spring Web 与 Spring MVC 的关键差异</text>
+
+<!-- Column headers -->
+<rect x="20" y="65" width="330" height="32" rx="6" class="mvc-box"/>
+<text x="185" y="85" class="colHeader" fill="#dc2626">Spring MVC (每次请求运行时匹配)</text>
+
+<rect x="370" y="65" width="330" height="32" rx="6" class="web-box"/>
+<text x="535" y="85" class="colHeader" fill="#16a34a">Spring Web (启动时预计算，运行时查表)</text>
+
+<!-- VS divider -->
+<text x="360" y="85" class="vs-text">VS</text>
+
+<!-- Row 1: 路由匹配 -->
+<rect x="20" y="112" width="330" height="70" rx="4" class="mvc-box"/>
+<circle cx="38" cy="130" r="10" class="circle-mvc"/>
+<text x="38" y="134" class="rowNum">1</text>
+<text x="56" y="130" class="catLabel">路由匹配</text>
+<text x="56" y="147" class="mvcLabel">AntPathMatcher.match() 遍历所有注册路由</text>
+<text x="56" y="162" class="mvcLabel">每次请求 O(n) 模式匹配</text>
+<text x="310" y="130" class="mvcCost">~4%</text>
+
+<rect x="370" y="112" width="330" height="70" rx="4" class="web-box"/>
+<circle cx="388" cy="130" r="10" class="circle-web"/>
+<text x="388" y="134" class="rowNum">1</text>
+<text x="406" y="130" class="catLabel">路由匹配</text>
+<text x="406" y="147" class="webLabel">多级优化器链：FullPath → Prefix → Suffix → Loop</text>
+<text x="406" y="162" class="webLabel">HashMap.get() O(1) 命中 90%+ 请求</text>
+<text x="660" y="130" class="webSavings">零</text>
+
+<line x1="360" y1="185" x2="360" y2="190" stroke="#94a3b8" stroke-width="1.5"/>
+
+<!-- Row 2: 参数解析 -->
+<rect x="20" y="192" width="330" height="70" rx="4" class="mvc-box"/>
+<circle cx="38" cy="210" r="10" class="circle-mvc"/>
+<text x="38" y="214" class="rowNum">2</text>
+<text x="56" y="210" class="catLabel">参数解析 + 反序列化</text>
+<text x="56" y="227" class="mvcLabel">遍历 HandlerMethodArgumentResolver 列表</text>
+<text x="56" y="242" class="mvcLabel">+ synchronized 缓存保护</text>
+<text x="310" y="210" class="mvcCost">16-24%</text>
+
+<rect x="370" y="192" width="330" height="70" rx="4" class="web-box"/>
+<circle cx="388" cy="210" r="10" class="circle-web"/>
+<text x="388" y="214" class="rowNum">2</text>
+<text x="406" y="210" class="catLabel">参数解析 + 反序列化</text>
+<text x="406" y="227" class="webLabel">启动时绑定解析器到 MappingCacheKey</text>
+<text x="406" y="242" class="webLabel">数组索引直接调用，无遍历无锁</text>
+<text x="660" y="210" class="webSavings">零</text>
+
+<line x1="360" y1="265" x2="360" y2="270" stroke="#94a3b8" stroke-width="1.5"/>
+
+<!-- Row 3: 数据校验 -->
+<rect x="20" y="272" width="330" height="70" rx="4" class="mvc-box"/>
+<circle cx="38" cy="290" r="10" class="circle-mvc"/>
+<text x="38" y="294" class="rowNum">3</text>
+<text x="56" y="290" class="catLabel">数据校验 (Validation)</text>
+<text x="56" y="307" class="mvcLabel">每次请求重建 DataBinder</text>
+<text x="56" y="322" class="mvcLabel">完整 Hibernate Validator 校验链</text>
+<text x="310" y="290" class="mvcCost">1-7%</text>
+
+<rect x="370" y="272" width="330" height="70" rx="4" class="web-box"/>
+<circle cx="388" cy="290" r="10" class="circle-web"/>
+<text x="388" y="294" class="rowNum">3</text>
+<text x="406" y="290" class="catLabel">数据校验 (Validation)</text>
+<text x="406" y="307" class="webLabel">启动时确定是否需要校验</text>
+<text x="406" y="322" class="webLabel">运行时跳过空校验链</text>
+<text x="660" y="290" class="webSavings">零</text>
+
+<line x1="360" y1="345" x2="360" y2="350" stroke="#94a3b8" stroke-width="1.5"/>
+
+<!-- Row 4: 方法调用 -->
+<rect x="20" y="352" width="330" height="70" rx="4" class="mvc-box"/>
+<circle cx="38" cy="370" r="10" class="circle-mvc"/>
+<text x="38" y="374" class="rowNum">4</text>
+<text x="56" y="370" class="catLabel">Controller 方法调用</text>
+<text x="56" y="387" class="mvcLabel">Method.invoke() 反射调用</text>
+<text x="56" y="402" class="mvcLabel">包含 access check + 装箱 + 类型校验</text>
+<text x="310" y="370" class="mvcCost">~200ns</text>
+
+<rect x="370" y="352" width="330" height="70" rx="4" class="web-box"/>
+<circle cx="388" cy="370" r="10" class="circle-web"/>
+<text x="388" y="374" class="rowNum">4</text>
+<text x="406" y="370" class="catLabel">Controller 方法调用</text>
+<text x="406" y="387" class="webLabel">ASM 字节码生成 / MethodHandle</text>
+<text x="406" y="402" class="webLabel">INVOKEVIRTUAL ~10ns / MethodHandle ~30ns</text>
+<text x="660" y="370" class="webSavings">~10-30ns</text>
+
+<line x1="360" y1="425" x2="360" y2="430" stroke="#94a3b8" stroke-width="1.5"/>
+
+<!-- Row 5: 返回值处理 -->
+<rect x="20" y="432" width="330" height="70" rx="4" class="mvc-box"/>
+<circle cx="38" cy="450" r="10" class="circle-mvc"/>
+<text x="38" y="454" class="rowNum">5</text>
+<text x="56" y="450" class="catLabel">返回值序列化编排</text>
+<text x="56" y="467" class="mvcLabel">遍历 ReturnValueHandler 列表匹配</text>
+<text x="56" y="482" class="mvcLabel">+ 内容协商 + 类型推断</text>
+<text x="310" y="450" class="mvcCost">17-27%</text>
+
+<rect x="370" y="432" width="330" height="70" rx="4" class="web-box"/>
+<circle cx="388" cy="450" r="10" class="circle-web"/>
+<text x="388" y="454" class="rowNum">5</text>
+<text x="406" y="450" class="catLabel">返回值序列化编排</text>
+<text x="406" y="467" class="webLabel">启动时确定处理器并缓存</text>
+<text x="406" y="482" class="webLabel">运行时直接调用，零编排开销</text>
+<text x="660" y="450" class="webSavings">零</text>
+
+<!-- Bottom annotation -->
+<text x="360" y="525" class="subtitle" text-anchor="middle">合计：Spring MVC 框架开销 ~49-63%  →  Spring Web 全部消除</text>
+
+</svg>
