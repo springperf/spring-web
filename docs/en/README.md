@@ -137,7 +137,7 @@ JMH benchmark results on JDK 1.8 + G1GC (1GB heap, 4 threads):
 | bytesLarge | **11,508** ops/s | **2.31x** | **1.48x** | **1.49x** |
 | sse | **1,226** ops/s | **3.89x** | — | **1.30x** |
 
-The perf framework delivers **1.7~3.9x** throughput over Servlet containers, with **0.12~0.15ms** p50 latency (lowest among peers). SSE scales to **6.64x** Spring MVC under high concurrency. See [full comparison report](benchmark.md).
+The perf framework delivers **1.7\~3.9x** throughput over Servlet containers, with **0.12\~0.15ms** p50 latency (lowest among peers). SSE scales to **6.64x** Spring MVC under high concurrency. See [full comparison report](benchmark.md).
 
 ---
 

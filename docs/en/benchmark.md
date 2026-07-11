@@ -122,7 +122,7 @@ Throughput growth from 4 → 64 threads, measuring the framework's concurrency s
 
 ### 1.4 Analysis
 
-- **Small payload (json/get/bytes/valid/async)**: perf reaches 26K~34K ops/s at 4 threads, **1.7~2.2x** of Spring MVC. As threads increase to 64, perf throughput grows continuously (json +70%, get +63%), while Spring MVC plateaus after 16 threads — thread pool contention becomes the bottleneck. The get API shows the highest advantage ratio (**2.19x** at 4t), as perf's pre-caching of path parameters and query parameters delivers the most benefit.
+- **Small payload (json/get/bytes/valid/async)**: perf reaches 26K~34K ops/s at 4 threads, **1.7\~2.2x** of Spring MVC. As threads increase to 64, perf throughput grows continuously (json +70%, get +63%), while Spring MVC plateaus after 16 threads — thread pool contention becomes the bottleneck. The get API shows the highest advantage ratio (**2.19x** at 4t), as perf's pre-caching of path parameters and query parameters delivers the most benefit.
 - **SSE**: perf's scalability advantage peaks here — throughput grows **117%** from 4→64 threads (1226→2655), while Spring MVC grows only **27%** (315→400). perf's advantage expands from 3.89x at 4t to **6.64x** at 64t. Root cause: perf's EventLoop (Netty I/O thread model — a single thread handles events across multiple connections, eliminating context switches) + lock-free Drain Loop (a data push loop that requires no locking, with writes completed entirely on the EventLoop thread) model doesn't block threads, while Spring MVC's thread-per-connection model is severely constrained at 64 threads.
 - **bytesLarge (100KB)**: perf peaks at 16 threads (17,257 ops/s, 2.60x vs Spring MVC), maintaining 14,641 ops/s at 64 threads.
 - **perf-support bridge overhead**: See Section 7 for detailed bridge layer overhead analysis.
@@ -148,7 +148,7 @@ Throughput growth from 4 → 64 threads, measuring the framework's concurrency s
 | bytesLarge | **0.34 / 0.51 / 2.61** | 0.75 / 1.17 / 3.33 | 0.42 / 1.23 / 15.98 | 0.44 / 1.20 / 3.21 |
 | sse | **3.57 / 4.24 / 6.25** | 12.65 / 17.07 / 22.64 | FAIL | 4.25 / 6.86 / 9.80 |
 
-perf p50 latency is **0.12~0.15ms** (small payload), 50-60% of Spring MVC. p99 is **0.22ms** and p99.9 is **0.29~0.35ms** — the EventLoop model's tail latency is very stable under low concurrency.
+perf p50 latency is **0.12\~0.15ms** (small payload), 50-60% of Spring MVC. p99 is **0.22ms** and p99.9 is **0.29~0.35ms** — the EventLoop model's tail latency is very stable under low concurrency.
 
 SSE: perf p50 is **3.57ms**, far below Spring MVC's 12.65ms and better than WebFlux's 4.25ms.
 
@@ -193,9 +193,9 @@ GC data comes from JVM-level logs, identical across all APIs within the same pro
 | webflux | 16 | 245 | 2.6ms | 682MB/s | 31.3KB | 51.0KB | 643.5KB |
 | webflux | 64 | 282 | 3.0ms | 766MB/s | 34.9KB | 42.0KB | 762.4KB |
 
-perf allocates only **15.2~17.7KB** per request for json, significantly lower than Spring MVC's 27.4~29.9KB and webflux's 31.3~36.0KB. Lower allocation = fewer GC pauses, better cache locality.
+perf allocates only **15.2\~17.7KB** per request for json, significantly lower than Spring MVC's 27.4~29.9KB and webflux's 31.3~36.0KB. Lower allocation = fewer GC pauses, better cache locality.
 
-The allocation gap is even wider for the get API — perf uses only **15.4~16.9KB** per request, while Spring MVC uses **32.9~40.3KB** (2.1~2.4x of perf) and webflux uses **42.0~56.1KB** (2.7~3.3x of perf). perf's startup pre-caching eliminates the per-request parameter name parsing overhead that Spring MVC incurs for each of the 5 query parameters.
+The allocation gap is even wider for the get API — perf uses only **15.4\~16.9KB** per request, while Spring MVC uses **32.9\~40.3KB** (2.1~2.4x of perf) and webflux uses **42.0\~56.1KB** (2.7~3.3x of perf). perf's startup pre-caching eliminates the per-request parameter name parsing overhead that Spring MVC incurs for each of the 5 query parameters.
 
 For SSE, perf's per-request allocation drops from 386.7KB (4t) to **260.0KB** (64t) — a 33% decrease — as the EventLoop reuses buffers under higher concurrency. In contrast, Spring MVC ranges 1335~1563KB and webflux's allocation increases with concurrency (588.5→762.4KB).
 
