@@ -139,7 +139,7 @@ In JMH benchmarks on JDK 1.8 + G1GC (1GB heap), this framework leads across all 
 - Small-payload throughput **26K~34K** ops/s (4 threads), **1.71x~2.11x** of Spring MVC
 - P50 latency **0.12~0.15ms**, approximately **50-60%** of Spring MVC
 - Steady-state heap **20MB** (4 threads), approximately **87%** of Spring MVC
-- SSE streaming throughput **1,226** ops/s (4 threads), reaching **3.89x** of Spring MVC, scaling to **6.37x** under high concurrency
+- SSE streaming throughput **1,226** ops/s (4 threads), reaching **3.89x** of Spring MVC, scaling to **6.64x** under high concurrency
 
 > Detailed data: [Benchmark Report](benchmark.md). Technical deep-dive: [Performance Principles](performance-principles.md).
 
@@ -262,7 +262,7 @@ This means: AI can optimize your business layer to the extreme, but if the under
 
 The core interaction pattern of LLM applications is **streaming output**: tokens generated one by one, pushed in real-time. Whether it's ChatGPT's word-by-word replies, Agent task status streams, or RAG retrieval progress feedback, they all rely on **SSE (Server-Sent Events)** protocol.
 
-However, SSE performs poorly on traditional Servlet containers — Spring MVC's SSE throughput is only ~**315 ops/s** (4 threads), making it a bottleneck in AI application pipelines. This project's SSE throughput reaches **1,226 ops/s**, **3.89x** of Spring MVC, scaling to **6.37x** under high concurrency. This is powered by **NettyStreamSender**'s lock-free Drain Loop design: write operations don't depend on thread pool scheduling, completing batch flushes directly on EventLoop, avoiding the problem of SSE connections occupying threads in traditional Servlet containers.
+However, SSE performs poorly on traditional Servlet containers — Spring MVC's SSE throughput is only ~**315 ops/s** (4 threads), making it a bottleneck in AI application pipelines. This project's SSE throughput reaches **1,226 ops/s**, **3.89x** of Spring MVC, scaling to **6.64x** under high concurrency. This is powered by **NettyStreamSender**'s lock-free Drain Loop design: write operations don't depend on thread pool scheduling, completing batch flushes directly on EventLoop, avoiding the problem of SSE connections occupying threads in traditional Servlet containers.
 
 This means:
 
