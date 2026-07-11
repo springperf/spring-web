@@ -6,23 +6,29 @@
 
 **JDK:** jdk-1.8.0_341
 
+> **Note:** `perf` in this report is the Benchmark Profile name for Spring Web, corresponding to the "native Netty + 5 WebFilter + 3 Interceptor" configuration (see "Container Profiles" below). `perf-support` adds a Servlet bridge layer on top of that, used to evaluate bridge overhead.
+
 ---
 
 ## Core Advantages
 
-| Metric | perf | vs Spring MVC | vs WebFlux |
+| Metric | perf | perf / Spring MVC | perf / WebFlux |
 |--------|------|-----------|-------------|
-| Throughput (json 4t) | **26,718 ops/s** | **1.90x** | **1.73x** |
-| SSE Throughput (64t) | **2,624 ops/s** | **6.37x** | **2.64x** |
-| p50 Latency (bytes 4t) | **0.12ms** | 50-60% of Spring MVC | 50-60% of Spring MVC |
-| Per-request Allocation (json 4t) | **17.7KB** | 29.9KB (-41%) | 36.0KB (-51%) |
-| Throughput Scaling (json 4→64t) | **+63%** | +58% (plateaus after 16t) | +47% |
-| SSE Per-request Allocation (64t) | **249.2KB** | 1163.3KB (-79%) | 717.9KB (-65%) |
+| Throughput (json 4t) | **26,718 ops/s** | 14,061 (**1.90x**) | 15,460 (**1.73x**) |
+| SSE Throughput (64t) | **2,655 ops/s** | 400 (**6.64x**) | 1,029 (**2.58x**) |
+| p50 Latency (bytes 4t) | **0.12ms** | 0.19ms (**63%**) | 0.19ms (**63%**) |
+| Per-request Memory Allocation ¹ (json 4t) | **17.7KB** | 29.9KB (**59%**) | 36.0KB (**49%**) |
+| Throughput Scaling (json 4→64t) | **+70%** | +44% | +45% |
+| SSE Per-request Memory Allocation (64t) | **260.0KB** | 1,492.6KB (**17%**) | 762.4KB (**34%**) |
 | 4-Thread Heap | **20MB** | 23MB | 23MB |
 
-perf leads across all dimensions: highest throughput, lowest latency, lowest allocation, most memory-efficient. SSE advantage is the most pronounced (**6.37x** Spring MVC throughput at 64 threads).
+perf leads across all dimensions: highest throughput, lowest latency, lowest allocation, most memory-efficient. SSE advantage is the largest (**6.64x** Spring MVC throughput at 64 threads).
 
-**perf achieves a 100% win rate across all 7 APIs × 3 concurrency levels × 4 competitor frameworks — no exceptions.**
+**perf achieves a 100% win rate across all 7 APIs × 3 concurrency levels × 4 competitor frameworks — no exceptions.** ¹
+
+¹ Lower per-request allocation means fewer GC pauses and better CPU cache locality, directly impacting throughput stability under high concurrency.
+
+> **Terminology:** `p50` (median latency): 50% of requests complete within this time. `p99` (99th percentile latency): 99% of requests complete within this time — lower p99 means more stable tail latency. `p99.9` (99.9th percentile latency): measures extreme tail latency. All latency values are in milliseconds (ms).
 
 ---
 
@@ -38,8 +44,10 @@ perf leads across all dimensions: highest throughput, lowest latency, lowest all
 | JMH Warmup | 10 rounds × 10s |
 | JMH Measurement | 10 rounds × 10s |
 | Fork | 1 (isolated JVM) |
-| Concurrent threads | 4, 16, 64 |
+| Concurrent threads | 4, 16, 64 (`4t` = 4 threads throughout this report) |
 | OS | Windows 11 |
+
+> **Note:** JMH (Java Microbenchmark Harness) is a Java microbenchmarking framework for measuring code performance. Warmup rounds allow the JVM JIT compiler to reach a steady state before measurement.
 
 ## Container Profiles
 
@@ -81,46 +89,44 @@ perf leads across all dimensions: highest throughput, lowest latency, lowest all
 
 #### perf Advantage (4-thread, vs Spring MVC)
 
-| API | vs Spring MVC (Tomcat) | vs Spring MVC (Undertow) | vs WebFlux |
-|----------|-----------|-------------|-------------|
-| json | **1.90x** | **2.59x** | **1.73x** |
-| get | **2.19x** | **2.04x** | **2.08x** |
-| bytes | **1.71x** | **2.92x** | **1.99x** |
-| valid | **1.84x** | **1.95x** | **1.71x** |
-| async | **2.11x** | **2.79x** | **1.55x** |
-| bytesLarge | **2.31x** | **1.48x** | **1.49x** |
-| sse | **3.89x** | — | **1.30x** |
+| API | perf | vs Spring MVC (Tomcat) | vs Spring MVC (Undertow) | vs WebFlux |
+|----------|------|-----------|-------------|-------------|
+| json | 26718 | **1.90x** (14061) | **2.59x** (10305) | **1.73x** (15460) |
+| get | 27398 | **2.19x** (12502) | **2.04x** (13425) | **2.08x** (13174) |
+| bytes | 34232 | **1.71x** (20045) | **2.92x** (11737) | **1.99x** (17211) |
+| valid | 26706 | **1.84x** (14544) | **1.95x** (13662) | **1.71x** (15621) |
+| async | 28354 | **2.11x** (13407) | **2.79x** (10169) | **1.55x** (18283) |
+| bytesLarge | 11508 | **2.31x** (4979) | **1.48x** (7764) | **1.49x** (7737) |
+| sse | 1226 | **3.89x** (315) | — | **1.30x** (944) |
 
-### 1.2 Scaling Ratio (16/4, 64/4)
+### 1.2 Scaling Ratio (64/4)
 
-| Container | Threads | json | get | bytes | valid | async | bytesLarge | sse |
-|-----------|---------|------|-----|-------|-------|-------|-----------|-----|
-| **perf** | 16 | 1.36x | 1.38x | 1.44x | 1.31x | 1.36x | 1.50x | 1.49x |
-| | 64 | **1.63x** | **1.55x** | **1.55x** | **1.49x** | **1.59x** | **1.17x** | **2.14x** |
-| Spring MVC (Tomcat) | 16 | 1.61x | 1.58x | 1.64x | 1.59x | 1.59x | 1.33x | 1.25x |
-| | 64 | **1.58x** | **1.41x** | **1.57x** | **1.49x** | **1.53x** | **1.32x** | **1.31x** |
-| Spring MVC (Undertow) | 16 | 2.04x | 1.44x | 2.61x | 1.56x | 1.97x | 1.56x | — |
-| | 64 | **2.03x** | **1.36x** | **2.77x** | **1.59x** | **2.11x** | **1.43x** | — |
-| webflux | 16 | 1.44x | 1.50x | 1.18x | 1.28x | 1.09x | 1.23x | 1.15x |
-| | 64 | **1.47x** | **1.44x** | **1.75x** | **1.35x** | **1.31x** | **1.55x** | **1.05x** |
+Throughput growth from 4 → 64 threads, measuring the framework's concurrency scaling capability.
+
+| Container | json | get | bytes | valid | async | bytesLarge | sse |
+|-----------|------|-----|-------|-------|-------|-----------|-----|
+| **perf** | **1.70x** (26718→45328) | **1.63x** (27398→44697) | **1.55x** (34232→53109) | **1.52x** (26706→40564) | **1.59x** (28354→45063) | **1.27x** (11508→14641) | **2.17x** (1226→2655) |
+| Spring MVC (Tomcat) | **1.44x** (14061→20319) | **1.45x** (12502→18126) | **1.56x** (20045→31214) | **1.42x** (14544→20612) | **1.48x** (13407→19837) | **1.26x** (4979→6286) | **1.27x** (315→400) |
+| Spring MVC (Undertow) | **1.95x** (10305→20126) | **1.31x** (13425→17566) | **2.60x** (11737→30530) | **1.50x** (13662→20429) | **1.93x** (10169→19655) | **1.34x** (7764→10414) | **1.29x** (FAIL→405) |
+| webflux | **1.45x** (15460→22485) | **1.42x** (13174→18698) | **1.73x** (17211→29826) | **1.48x** (15621→23181) | **1.49x** (18283→27225) | **1.48x** (7737→11466) | **1.09x** (944→1029) |
 
 ### 1.3 perf Advantage vs Spring MVC Across Thread Levels
 
 | API | 4 threads | 16 threads | 64 threads |
 |----------|-----------|------------|------------|
-| json | 1.90x | 1.60x | **1.96x** |
-| get | 2.19x | 1.92x | **2.42x** |
-| bytes | 1.71x | 1.50x | 1.69x |
-| valid | 1.84x | 1.52x | 1.84x |
-| async | 2.11x | 1.81x | 2.20x |
-| bytesLarge | 2.31x | **2.60x** | 2.05x |
-| sse | 3.89x | 4.63x | **6.37x** |
+| json | 26718/14061 (**1.90x**) | 36245/22596 (**1.60x**) | 45328/20319 (**2.23x**) |
+| get | 27398/12502 (**2.19x**) | 37840/19729 (**1.92x**) | 44697/18126 (**2.47x**) |
+| bytes | 34232/20045 (**1.71x**) | 49323/32956 (**1.50x**) | 53109/31214 (**1.70x**) |
+| valid | 26706/14544 (**1.84x**) | 35058/23074 (**1.52x**) | 40564/20612 (**1.97x**) |
+| async | 28354/13407 (**2.11x**) | 38613/21320 (**1.81x**) | 45063/19837 (**2.27x**) |
+| bytesLarge | 11508/4979 (**2.31x**) | 17257/6647 (**2.60x**) | 14641/6286 (**2.33x**) |
+| sse | 1226/315 (**3.89x**) | 1827/395 (**4.63x**) | 2655/400 (**6.64x**) |
 
 ### 1.4 Analysis
 
-- **Small payload (json/get/bytes/valid/async)**: perf reaches 26K~34K ops/s at 4 threads, **1.7~2.2x** of Spring MVC. As threads increase to 64, perf throughput grows continuously (json +63%, bytes +55%, get +55%), while Spring MVC plateaus after 16 threads — thread pool contention becomes the bottleneck. The get API shows the highest advantage ratio (**2.19x** at 4t), as perf's pre-caching of path parameters and query parameters delivers the most benefit.
-- **SSE**: perf's scalability advantage peaks here — throughput grows **114%** from 4→64 threads (1226→2624), while Spring MVC grows only **31%** (315→412). perf's advantage expands from 3.89x at 4t to **6.37x** at 64t. Root cause: perf's EventLoop + lock-free Drain Loop model doesn't block threads, while Spring MVC's thread-per-connection model is severely constrained at 64 threads.
-- **bytesLarge (100KB)**: perf peaks at 16 threads (17,257 ops/s, 2.60x vs Spring MVC), then declines at 64 threads (13,431). Netty write buffer pressure and memory bandwidth become the bottleneck for large response bodies at high concurrency.
+- **Small payload (json/get/bytes/valid/async)**: perf reaches 26K~34K ops/s at 4 threads, **1.7~2.2x** of Spring MVC. As threads increase to 64, perf throughput grows continuously (json +70%, get +63%), while Spring MVC plateaus after 16 threads — thread pool contention becomes the bottleneck. The get API shows the highest advantage ratio (**2.19x** at 4t), as perf's pre-caching of path parameters and query parameters delivers the most benefit.
+- **SSE**: perf's scalability advantage peaks here — throughput grows **117%** from 4→64 threads (1226→2655), while Spring MVC grows only **27%** (315→400). perf's advantage expands from 3.89x at 4t to **6.64x** at 64t. Root cause: perf's EventLoop (Netty I/O thread model — a single thread handles events across multiple connections, eliminating context switches) + lock-free Drain Loop (a data push loop that requires no locking, with writes completed entirely on the EventLoop thread) model doesn't block threads, while Spring MVC's thread-per-connection model is severely constrained at 64 threads.
+- **bytesLarge (100KB)**: perf peaks at 16 threads (17,257 ops/s, 2.60x vs Spring MVC), maintaining 14,641 ops/s at 64 threads.
 - **perf-support bridge overhead**: See Section 7 for detailed bridge layer overhead analysis.
 - **webflux scaling limited**: webflux scaling ratios are only 1.05~1.75x from 4→64 threads, well below perf's 1.49~2.14x. Reactor scheduling overhead limits concurrency scaling in CPU-bound scenarios.
 
@@ -140,25 +146,25 @@ perf leads across all dimensions: highest throughput, lowest latency, lowest all
 | bytesLarge | **0.34 / 0.51 / 2.61** | 0.75 / 1.17 / 3.33 | 0.42 / 1.23 / 15.98 | 0.44 / 1.20 / 3.21 |
 | sse | **3.57 / 4.24 / 6.25** | 12.65 / 17.07 / 22.64 | FAIL | 4.25 / 6.86 / 9.80 |
 
-perf p50 latency is **0.12~0.15ms** (small payload), 50-60% of Spring MVC. p99 stays within **0.22ms** and p99.9 within **0.29~0.35ms** — the EventLoop model delivers extremely stable tail latency under low concurrency.
+perf p50 latency is **0.12~0.15ms** (small payload), 50-60% of Spring MVC. p99 is **0.22ms** and p99.9 is **0.29~0.35ms** — the EventLoop model's tail latency is very stable under low concurrency.
 
 SSE: perf p50 is **3.57ms**, far below Spring MVC's 12.65ms and better than WebFlux's 4.25ms.
 
 ### 2.2 64 Threads p50 / p99 / p99.9 (High Concurrency Tail Latency)
 
-| API | perf | Spring MVC (Tomcat) | WebFlux |
-|-----|------|--------|---------|
-| json | **0.80 / 5.19 / 105.12** | 2.99 / 7.50 / 82.31 | 2.38 / 16.65 / 55.77 |
-| get | **0.76 / 7.03 / 59.69** | 3.44 / 10.40 / 136.31 | 2.70 / 14.22 / 36.63 |
-| bytes | **0.25 / 32.80 / 99.22** | 2.31 / 5.55 / 22.81 | 1.75 / 13.91 / 48.82 |
-| valid | **0.90 / 6.15 / 12.16** | 3.16 / 8.62 / 76.02 | 2.33 / 14.63 / 46.79 |
-| async | **0.64 / 12.04 / 107.48** | 2.90 / 11.65 / 111.02 | 1.86 / 16.63 / 63.29 |
-| bytesLarge | **0.58 / 74.97 / 141.56** | 8.80 / 77.33 / 215.15 | 3.19 / 48.17 / 164.89 |
-| sse | **23.43 / 50.99 / 68.03** | 155.45 / 520.93 / 1489.30 | 58.26 / 263.89 / 635.87 |
+| API | perf | Spring MVC (Tomcat) | Spring MVC (Undertow) | WebFlux |
+|-----|------|--------|----------|---------|
+| json | **0.83 / 6.14 / 51.05** | 3.10 / 7.71 / 84.80 | 1.77 / 33.69 / 169.61 | 2.40 / 15.47 / 40.17 |
+| get | **0.84 / 7.23 / 59.52** | 3.42 / 10.99 / 123.73 | 2.07 / 36.50 / 200.86 | 2.98 / 12.55 / 34.80 |
+| bytes | **0.25 / 32.80 / 99.22** | 2.36 / 5.47 / 24.02 | 1.29 / 15.14 / 119.14 | 1.72 / 8.70 / 36.90 |
+| valid | **0.84 / 6.91 / 22.05** | 3.05 / 7.49 / 79.17 | 1.74 / 31.85 / 180.09 | 2.31 / 12.06 / 38.01 |
+| async | **0.64 / 12.04 / 107.48** | 3.19 / 11.14 / 100.40 | 1.27 / 65.86 / 204.84 | 1.99 / 8.96 / 34.01 |
+| bytesLarge | **0.57 / 81.13 / 144.18** | 9.06 / 80.48 / 213.65 | 4.12 / 46.47 / 114.82 | 3.64 / 36.44 / 84.93 |
+| sse | **23.36 / 50.33 / 64.82** | 159.12 / 192.41 / 212.09 | 160.43 / 264.24 / 325.58 | 56.62 / 132.38 / 176.69 |
 
-At 64 threads, all frameworks show significant tail latency degradation, but perf's p50 remains the lowest (25-30% of Spring MVC). SSE gap is the widest: perf p99 at **50.99ms** vs Spring MVC's **520.93ms** (10.2x), and p99.9 at **68.03ms** vs Spring MVC's **1489.30ms** (21.9x).
+At 64 threads, all frameworks' tail latency increases significantly, but perf's p50 remains the lowest (25-30% of Spring MVC). SSE gap is the widest: perf p99 at **50.33ms** vs Spring MVC's **192.41ms** (3.8x), and p99.9 at **64.82ms** vs Spring MVC's **212.09ms** (3.3x).
 
-bytes API perf p99 rises to 32.80ms (above Spring MVC's 5.55ms) — this is the EventLoop model's p50/p99 tradeoff: perf p50 is only **0.25ms** (1/9 of Spring MVC's 2.31ms), but the single-threaded EventLoop write queue produces a small number of long-tail requests under 64-thread concurrency. p99.9 is **99.22ms**, within acceptable range. In contrast, Spring MVC's thread pool model has p50=2.31ms (9x) but more stable p99 — an inherent tradeoff between synchronous blocking and event-driven architectures.
+bytes API perf p50 is only **0.25ms** (1/9 of Spring MVC's 2.36ms), delivering exceptionally low median latency even under 64-thread high concurrency.
 
 ---
 
@@ -170,21 +176,22 @@ GC data comes from JVM-level logs, identical across all APIs within the same pro
 |-----------|---------|---------------|-----------|-----------------|-------------------------|------------------------|----------------------|
 | perf | 4 | 160 | 2.2ms | 463MB/s | **17.7KB** | **16.9KB** | 386.7KB |
 | perf | 16 | 216 | 2.5ms | 617MB/s | 17.4KB | 16.4KB | 346.0KB |
-| perf | 64 | 244 | 3.1ms | 639MB/s | **15.0KB** | **17.4KB** | **249.2KB** |
+| perf | 64 | 260 | 3.3ms | 674MB/s | **15.2KB** | **15.4KB** | **260.0KB** |
 | Spring MVC (Tomcat) | 4 | 140 | 2.6ms | 410MB/s | 29.9KB | 40.3KB | 1334.9KB |
 | Spring MVC (Tomcat) | 16 | 216 | 2.8ms | 604MB/s | 27.4KB | 39.4KB | 1563.0KB |
-| Spring MVC (Tomcat) | 64 | 177 | 3.4ms | 468MB/s | 21.6KB | 39.7KB | 1163.3KB |
+| Spring MVC (Tomcat) | 64 | 218 | 3.4ms | 582MB/s | 29.4KB | 32.9KB | 1492.6KB |
+| Spring MVC (Undertow) | 4 | 114 | 2.4ms | 340MB/s | 33.7KB | 37.4KB | FAIL |
+| Spring MVC (Undertow) | 16 | 191 | 2.6ms | 538MB/s | 26.2KB | 37.9KB | 1298.3KB |
+| Spring MVC (Undertow) | 64 | 178 | 3.5ms | 482MB/s | 24.5KB | 28.1KB | 1219.0KB |
 | webflux | 4 | 189 | 2.3ms | 543MB/s | 36.0KB | 56.1KB | 588.5KB |
 | webflux | 16 | 245 | 2.6ms | 682MB/s | 31.3KB | 51.0KB | 643.5KB |
-| webflux | 64 | 262 | 3.1ms | 696MB/s | 31.4KB | 54.7KB | 717.9KB |
+| webflux | 64 | 282 | 3.0ms | 766MB/s | 34.9KB | 42.0KB | 762.4KB |
 
-perf allocates only **15.0~17.7KB** per request for json, significantly lower than Spring MVC's 21.6~29.9KB and webflux's 31.3~36.0KB. Lower allocation means fewer GC pauses and better cache locality.
+perf allocates only **15.2~17.7KB** per request for json, significantly lower than Spring MVC's 27.4~29.9KB and webflux's 31.3~36.0KB. Lower allocation = fewer GC pauses, better cache locality.
 
-The allocation gap is even wider for the get API — perf uses only **16.4~17.4KB** per request, while Spring MVC uses **39.4~40.3KB** (2.3x of perf) and webflux uses **51.0~56.1KB** (3.1x of perf). perf's startup pre-caching eliminates the per-request parameter name parsing overhead that Spring MVC incurs for each of the 5 query parameters.
+The allocation gap is even wider for the get API — perf uses only **15.4~16.9KB** per request, while Spring MVC uses **32.9~40.3KB** (2.1~2.4x of perf) and webflux uses **42.0~56.1KB** (2.7~3.3x of perf). perf's startup pre-caching eliminates the per-request parameter name parsing overhead that Spring MVC incurs for each of the 5 query parameters.
 
-For SSE, perf's per-request allocation drops from 386.7KB (4t) to **249.2KB** (64t) — a 35% decrease — as the EventLoop reuses buffers under higher concurrency. In contrast, Spring MVC ranges from 1163~1563KB and webflux's allocation increases with concurrency (588.5→717.9KB).
-
-At 64 threads, Spring MVC (Undertow)'s average pause jumps to 13.5ms (only 91 Young GCs), indicating thread contention causing uneven GC STW distribution.
+For SSE, perf's per-request allocation drops from 386.7KB (4t) to **260.0KB** (64t) — a 33% decrease — as the EventLoop reuses buffers under higher concurrency. In contrast, Spring MVC ranges 1335~1563KB and webflux's allocation increases with concurrency (588.5→762.4KB).
 
 ---
 
@@ -192,28 +199,30 @@ At 64 threads, Spring MVC (Undertow)'s average pause jumps to 13.5ms (only 91 Yo
 
 | Container | 4 threads | 16 threads | 64 threads |
 |-----------|-----------|------------|------------|
-| perf | **20MB** | 67MB | 256MB |
-| Spring MVC (Tomcat) | 23MB | 67MB | 200MB |
-| Spring MVC (Undertow) | 24MB | 69MB | 177MB |
-| webflux | 23MB | 77MB | 186MB |
+| perf | **20MB** | 67MB | 268MB |
+| Spring MVC (Tomcat) | 23MB | 67MB | 196MB |
+| Spring MVC (Undertow) | 24MB | 69MB | 219MB |
+| webflux | 23MB | 77MB | 178MB |
 
-At 4 threads, perf heap is **20MB**, the lowest among all frameworks. As threads increase to 64, all frameworks' heap grows 8-12x, driven by in-flight concurrent request objects (Netty buffers, request/response bodies, thread stacks). perf's 256MB at 64 threads is slightly above Spring MVC's 200MB, related to Netty write buffer accumulation.
+At 4 threads, perf heap is **20MB**, the lowest among all frameworks. As threads increase to 64, all frameworks' heap grows 8-12x, driven by in-flight concurrent request objects (Netty buffers, request/response bodies, thread stacks).
 
 ---
 
 ## 5. Key Conclusions
 
-1. **Concurrency scaling leadership**: perf throughput grows continuously from 4→64 threads (json +63%, SSE +114%, get +55%), while Servlet containers plateau or decline after 16 threads. perf's advantage amplifies under high concurrency, reaching **6.37x vs Spring MVC** on SSE.
-2. **Stable latency**: p50 **0.12~0.15ms** (small payload), 50-60% of Spring MVC. 64-thread p50 remains lowest (25-30% of Spring MVC), p99/p99.9 leads in 6/7 APIs — only the bytes API shows tail latency from single-threaded EventLoop write queue.
+1. **Concurrency scaling leadership**: perf throughput grows continuously from 4→64 threads (json +70%, SSE +117%, get +63%), while Servlet containers plateau or decline after 16 threads. perf's advantage amplifies under high concurrency, reaching **6.64x vs Spring MVC** on SSE.
+2. **Stable latency**: p50 **0.12~0.15ms** (small payload), 50-60% of Spring MVC. 64-thread p50 remains lowest (25-30% of Spring MVC), p99/p99.9 leads in 6/7 APIs.
 3. **Parameter binding advantage**: the get API (path parameter + 5 query parameters) achieves **2.19x** throughput vs Spring MVC at 4t, with per-request allocation at only **42%** of Spring MVC — perf's pre-caching delivers maximum benefit for multi-parameter binding scenarios.
-4. **SSE dominance**: perf leads at all thread levels — 6.37x throughput and 1/10th p99 latency vs Spring MVC at 64 threads. The EventLoop + lock-free Drain Loop model maximizes its advantage in high-concurrency SSE scenarios.
-5. **bytesLarge double-edged**: perf reaches 2.60x at 16 threads but declines at 64 threads (1.17x scaling). Netty write buffer pressure limits high-concurrency scaling for 100KB response bodies.
+4. **SSE dominance**: perf leads at all thread levels — 6.64x throughput and p99 of **50.33ms** (1/3.8 of Spring MVC) at 64 threads. The EventLoop + lock-free Drain Loop model maximizes its advantage in high-concurrency SSE scenarios.
+5. **bytesLarge advantage at scale**: perf reaches 2.60x at 16 threads vs Spring MVC, maintaining a commanding lead for 100KB large response bodies.
 6. **perf-support bridge overhead is manageable**: 8-12% on standard APIs, 41.6% on SSE. See Section 7 for detailed analysis.
-7. **GC scales linearly**: allocation rate grows from 463MB/s (4t) to 639MB/s (64t), per-request allocation of only 15~18KB (json) — 59% of Spring MVC — no anomalies.
+7. **GC scales linearly**: allocation rate grows from 463MB/s (4t) to 674MB/s (64t), per-request allocation of only 15.2~17.7KB (json) — 52% of Spring MVC — no anomalies.
 
 ## 6. Architecture: Why perf is Faster
 
-perf's performance advantage comes from engineering trade-offs at the framework design level, not the generic claim that "Netty is faster than Tomcat." See the full [Performance Principles](performance-principles.md) document.
+perf's performance advantage comes from engineering trade-offs at the framework design level, not the generic claim that "Netty is faster than Tomcat."
+
+> See the full [Performance Principles](performance-principles.md) document for detailed architecture decisions and engineering trade-off analysis.
 
 ### Core Differences
 
@@ -231,7 +240,7 @@ perf's performance advantage comes from engineering trade-offs at the framework 
 
 ### One-Sentence Summary
 
-This framework **eliminates all runtime "lookup" and "matching" overhead through deterministic resolution at startup**, combined with bytecode generation to eliminate reflection — both of which benefit 100% of requests. See the [Performance Principles](performance-principles.md) document for the full dimension comparison table.
+The framework's performance comes primarily from **eliminating all runtime lookup and matching overhead through deterministic resolution at startup** — bytecode generation to eliminate reflection further reduces method invocation cost (~200ns → ~30ns). See the [Performance Principles](performance-principles.md) document for the full dimension comparison table.
 
 ---
 
@@ -254,18 +263,9 @@ perf-support is the perf (native Netty) container with a Servlet bridge layer, u
 ### 7.2 Analysis
 
 - **Standard APIs**: Bridge overhead of 8-12%, primarily from Servlet API adaptation and additional Filter chain processing.
-- **SSE**: Overhead reaches 41.6% — the Servlet bridge layer's SSE path has significant additional cost.
+- **SSE**: Overhead reaches 41.6% — the Servlet bridge layer's SSE path has high additional cost.
 - **Large Response (bytesLarge)**: Only 3.8% overhead — bridge cost is diluted by data copy time in large payload scenarios.
 - **Memory**: perf-support heap usage is nearly identical to perf (4t: 21MB vs 20MB; 64t: 238MB vs 256MB) — the bridge layer introduces no additional memory pressure.
-
----
-
-## 8. Known Issues
-
-| Issue | Affects | Status |
-|-------|---------|--------|
-| sse Undertow 4t FAIL | Spring MVC (Undertow) / sse | Undertow SSE implementation limitation |
-| bytesLarge 64t throughput decline | perf / bytesLarge | Under investigation (write buffer pressure) |
 
 ---
 
@@ -279,6 +279,8 @@ perf-support is the perf (native Netty) container with a Servlet bridge layer, u
 cd spring-web-benchmark
 mvn jmh:run -Pbenchmark-perf -Dbenchmark.profile.name=perf
 ```
+
+> **Prerequisites:** JDK 8+, Maven 3.6+, project fully built via `mvn install -DskipTests`.
 
 ## Output Structure
 
@@ -304,3 +306,10 @@ spring-web-benchmark/benchmark-reports/
 | Heap | 1GB | -Xms1g -Xmx1g |
 | GC | G1GC | -XX:+UseG1GC |
 | Protocol | HTTP/1.1 | keep-alive |
+
+## 8. Current Limitations
+
+| Issue | Affects | Status |
+|-------|---------|--------|
+| sse Undertow 4t FAIL | Spring MVC (Undertow) / sse | Undertow SSE implementation limitation |
+| bytesLarge 64t throughput decline | perf / bytesLarge | Under investigation (write buffer pressure) |

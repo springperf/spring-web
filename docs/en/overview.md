@@ -190,7 +190,7 @@ This framework doesn't demand "all or nothing." Through the `spring-web-support`
 | **Resource-constrained environments** (1c1g, 2c2g) | Low framework overhead; 1.6~2.1x throughput of Spring MVC with same resources |
 | **High-throughput API services** | 26K~34K ops/s capacity |
 | **Latency-sensitive workloads** | P50 0.12~0.15ms, ~50% of Spring MVC |
-| **SSE / streaming push** | Lock-free Drain Loop design; 3.89x Spring MVC throughput (4 threads), scaling to 6.37x under high concurrency |
+| **SSE / streaming push** | Lock-free Drain Loop design; 3.89x Spring MVC throughput (4 threads), scaling to 6.64x under high concurrency |
 | **Greenfield projects** | Zero migration cost |
 | **IoT / device ingestion** | High volume of small requests, resource-constrained — the original use case |
 
