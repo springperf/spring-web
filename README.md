@@ -29,7 +29,7 @@ Spring Web 是一个基于 **Netty** 构建的高性能 Web 框架，定位为 S
 - **高性能** — 启动时预缓存全部元数据，运行时零反射零匹配；ASM 字节码生成替代反射调用；O(1) HashMap 路由；GC 友好设计
 - **Netty 驱动** — 基于 Netty 4.1 事件驱动 I/O，请求默认在 EventLoop 处理，可按方法粒度通过 `@RunInPool` 调度到业务线程池
 - **Spring 生态兼容** — 支持 `@RestController`、`@RequestMapping`、`@Validated`、`@ExceptionHandler`、`HandlerInterceptor` 等 Spring 注解与抽象，零侵入迁移
-- **异步原生** — 内置 DeferredResult、Callable、SseEmitter、StreamEmitter、Reactive Streams 支持，SSE 吞吐达 Spring MVC 的 3.89x，高并发下扩展至 6.37x
+- **异步原生** — 内置 DeferredResult、Callable、SseEmitter、StreamEmitter、Reactive Streams 支持，SSE 吞吐达 Spring MVC 的 3.89x，高并发下扩展至 6.64x
 - **批量处理** — 基于 Disruptor 的请求聚合批处理，透明地将并发请求合并为批量操作，吞吐量可提升数倍；支持背压策略、等待策略、线程池隔离
 - **灵活扩展** — 参数解析器、返回值处理器、编解码 Advice、拦截器、过滤器等关键节点均提供 SPI
 - **生态桥接** — 可通过 support 模块桥接 Servlet Filter、Spring MVC `HandlerInterceptor`、`RequestBodyAdvice` / `ResponseBodyAdvice`
@@ -128,11 +128,9 @@ management:
 | valid | **26,706** ops/s | **1.84x** | **1.95x** | **1.71x** |
 | async | **28,354** ops/s | **2.11x** | **2.79x** | **1.55x** |
 | bytesLarge | **11,508** ops/s | **2.31x** | **1.48x** | **1.49x** |
-| sse | **1,226** ops/s | **3.89x** | FAIL¹ | **1.30x** |
+| sse | **1,226** ops/s | **3.89x** | — | **1.30x** |
 
-perf 框架吞吐是 Servlet 容器的 **1.7~3.9x**，p50 延迟 **0.12~0.15ms**（同类框架最低）。SSE 高并发下扩展至 Spring MVC 的 **6.37x**。详情见 [完整对比报告](docs/benchmark.md)。
-
-> ¹ Undertow SSE 实现限制。
+perf 框架吞吐是 Servlet 容器的 **1.7~3.9x**，p50 延迟 **0.12~0.15ms**（同类框架最低）。SSE 高并发下扩展至 Spring MVC 的 **6.64x**。详情见 [完整对比报告](docs/benchmark.md)。
 
 ---
 

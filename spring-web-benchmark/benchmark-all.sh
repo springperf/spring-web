@@ -12,7 +12,6 @@
 #   ./benchmark-all.sh --jdk /path/to/jdk17     # 用指定 JDK 运行（JDK8 编译，多 JDK 跑）
 #   ./benchmark-all.sh --jdk java,/path/to/jdk17  # 同时跑默认 JDK 和指定 JDK
 #   ./benchmark-all.sh --thread-list 1,4,16,64  # 多线程并发度测试
-#
 # 输出: benchmark-reports/{run-id}/report.md
 
 set -uo pipefail

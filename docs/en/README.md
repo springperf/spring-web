@@ -29,7 +29,7 @@ Spring Web is a high-performance web framework built on **Netty 4.1**, designed 
 - **High Performance** — Pre-caches all metadata at startup, zero reflection and zero matching at runtime; ASM bytecode generation replaces reflective invocation; O(1) HashMap routing; GC-friendly design
 - **Netty-Driven** — Built on Netty 4.1 event-driven I/O; requests execute on EventLoop by default, with method-level `@RunInPool` scheduling to business thread pools as needed
 - **Spring Ecosystem Compatible** — Supports `@RestController`, `@RequestMapping`, `@Validated`, `@ExceptionHandler`, `HandlerInterceptor`, and other Spring annotations and abstractions — zero-code migration
-- **Async Native** — Built-in support for DeferredResult, Callable, SseEmitter, StreamEmitter, Reactive Streams; SSE throughput reaches 3.89x of Spring MVC, scaling to 6.37x under high concurrency
+- **Async Native** — Built-in support for DeferredResult, Callable, SseEmitter, StreamEmitter, Reactive Streams; SSE throughput reaches 3.89x of Spring MVC, scaling to 6.64x under high concurrency
 - **Batch Processing** — Disruptor-based request aggregation that transparently merges concurrent requests into batch operations, boosting throughput by multiple times; supports backpressure strategies, wait strategies, and thread pool isolation
 - **Extensible** — SPI at every key juncture: argument resolvers, return value handlers, codec interceptors, filters, interceptors
 - **Ecosystem Bridge** — The `support` module bridges Servlet Filters, Spring MVC `HandlerInterceptor`, `RequestBodyAdvice` / `ResponseBodyAdvice`
@@ -128,11 +128,9 @@ JMH benchmark results on JDK 1.8 + G1GC (1GB heap, 4 threads):
 | valid | **26,706** ops/s | **1.84x** | **1.95x** | **1.71x** |
 | async | **28,354** ops/s | **2.11x** | **2.79x** | **1.55x** |
 | bytesLarge | **11,508** ops/s | **2.31x** | **1.48x** | **1.49x** |
-| sse | **1,226** ops/s | **3.89x** | FAIL¹ | **1.30x** |
+| sse | **1,226** ops/s | **3.89x** | — | **1.30x** |
 
-The perf framework delivers **1.7~3.9x** throughput over Servlet containers, with **0.12~0.15ms** p50 latency (lowest among peers). SSE scales to **6.37x** Spring MVC under high concurrency. See [full comparison report](benchmark.md).
-
-> ¹ Undertow SSE implementation limitation.
+The perf framework delivers **1.7~3.9x** throughput over Servlet containers, with **0.12~0.15ms** p50 latency (lowest among peers). SSE scales to **6.64x** Spring MVC under high concurrency. See [full comparison report](benchmark.md).
 
 ---
 
