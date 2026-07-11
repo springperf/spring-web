@@ -137,7 +137,7 @@ management:
 | bytesLarge | **11,508** ops/s | **2.31x** | **1.48x** | **1.49x** |
 | sse | **1,226** ops/s | **3.89x** | — | **1.30x** |
 
-perf 框架吞吐是 Servlet 容器的 **1.7~3.9x**，p50 延迟 **0.12~0.15ms**（同类框架最低）。SSE 高并发下扩展至 Spring MVC 的 **6.64x**。详情见 [完整对比报告](docs/benchmark.md)。
+perf 框架吞吐是 Servlet 容器的 **1.7\~3.9x**，p50 延迟 **0.12\~0.15ms**（同类框架最低）。SSE 高并发下扩展至 Spring MVC 的 **6.64x**。详情见 [完整对比报告](docs/benchmark.md)。
 
 ---
 

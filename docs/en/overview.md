@@ -144,7 +144,7 @@ So I launched the **Spring Performance Engineering** project. Core idea: resolve
 
 In JMH benchmarks on JDK 1.8 + G1GC (1GB heap), this framework leads across all 8 scenarios:
 
-- Small-payload throughput **26K~34K** ops/s (4 threads), **1.71x~2.11x** of Spring MVC
+- Small-payload throughput **26K\~34K** ops/s (4 threads), **1.71x\~2.11x** of Spring MVC
 - P50 latency **0.12~0.15ms**, approximately **50-60%** of Spring MVC
 - Steady-state heap **20MB** (4 threads), approximately **87%** of Spring MVC
 - SSE streaming throughput **1,226** ops/s (4 threads), reaching **3.89x** of Spring MVC, scaling to **6.64x** under high concurrency
