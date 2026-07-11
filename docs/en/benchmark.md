@@ -271,38 +271,126 @@ perf-support is the perf (native Netty) container with a Servlet bridge layer, u
 
 ## How to Run
 
+### Prerequisites
+
+JDK 8+, Maven 3.6+, project fully built via `mvn install -DskipTests`.
+
+### Script (Recommended)
+
+Use `benchmark-all.sh` for a one-click run — it handles compilation, classpath building, multi-profile server startup, and report generation automatically.
+
 ```bash
-# Full run (multi-thread concurrency test)
+# Full run (5 profiles × 7 APIs, 4 threads)
+./spring-web-benchmark/benchmark-all.sh
+
+# Multi-thread concurrency test (auto-generates scalability matrix)
 ./spring-web-benchmark/benchmark-all.sh --thread-list 4,16,64
 
-# Single profile
+# Filter by profile and API
+./spring-web-benchmark/benchmark-all.sh --profiles perf,tomcat --apis json,sse
+
+# Multi-JDK comparison (default JDK + specified JDK)
+./spring-web-benchmark/benchmark-all.sh --jdk java,/path/to/jdk17 --thread-list 4,16,64
+
+# Enable SampleTime mode (outputs p50/p90/p99/p99.9/p99.99 latency percentiles)
+./spring-web-benchmark/benchmark-all.sh --sampleTime
+```
+
+#### CLI Parameters
+
+| Parameter | Description | Default | Example |
+|-----------|-------------|---------|---------|
+| `--profiles` | Comma-separated profile list | `perf,perf-support,tomcat,undertow,webflux` | `--profiles perf,tomcat` |
+| `--api` | Run a single API | All 7 APIs | `--api sse` |
+| `--apis` | Run multiple APIs (comma-separated) | All 7 APIs | `--apis json,sse` |
+| `--jdk` / `--jdks` | JDK path(s), comma-separated for multiple | System default `java` | `--jdk /path/to/jdk17` or `--jdk java,/path/to/jdk17` |
+| `--thread-list` | Thread counts for concurrency scaling test (comma-separated) | Single run at 4 threads | `--thread-list 1,4,16,64` |
+| `--threads` | JMH threads for a single run (no subdirectory created) | 4 | `--threads 8` |
+| `--sampleTime` | Enable SampleTime mode (includes percentile latency data) | Off (Throughput) | `--sampleTime` |
+
+> **`--thread-list` vs `--threads`**: `--thread-list` creates separate `threads-N` subdirectories for each thread count, and the report generates a scalability comparison matrix. `--threads` only sets the JMH threads parameter for a single run, without creating multi-level directories.
+
+#### Built-in Profiles
+
+| Profile | Port | Benchmark Class | Description |
+|---------|------|----------------|-------------|
+| `perf` | 9092 | PerfBenchmark | Spring Web native Netty + 5 WebFilter + 3 Interceptor |
+| `perf-support` | 9094 | PerfSupportBenchmark | perf + spring-web-support (Servlet bridge) + 5 Filter + 3 Interceptor |
+| `tomcat` | 9102 | TomcatBenchmark | Spring MVC + Tomcat + 5 Filter + 3 Interceptor |
+| `undertow` | 9112 | UndertowBenchmark | Spring MVC + Undertow + 5 Filter + 3 Interceptor |
+| `webflux` | 9122 | WebFluxBenchmark | Spring WebFlux + Reactor Netty + 8 WebFilter |
+
+#### Built-in APIs
+
+| API | Endpoint | Description |
+|-----|----------|-------------|
+| `json` | POST /api/demo/echo | Small JSON request body (~50B) + echo |
+| `get` | GET /api/demo/hello/{name} | Path variable + 5 query parameters |
+| `bytes` | GET /api/core/bytes | Raw byte response (26B) |
+| `valid` | POST /api/core/validate | @Validated Bean Validation |
+| `async` | GET /api/core/deferred-result | Async DeferredResult return |
+| `bytesLarge` | GET /api/core/large-response | 100KB byte[] response |
+| `sse` | GET /api/core/sse | SSE streaming (100 messages × 200 chars) |
+
+#### Workflow
+
+The script executes in 4 steps:
+
+1. **Full compilation**: `mvn clean install -DskipTests` builds all modules
+2. **Classpath build**: Each profile exports its dependency list via `mvn dependency:build-classpath`
+3. **Compile + run matrix**: Compiles each profile, starts the server, runs JMH benchmarks. Each combination gets its own GC log
+4. **Report generation**: `ReportGenerator` aggregates all JSON results and produces a Markdown report
+
+#### Advanced Usage
+
+Pass JVM system properties directly to the benchmark process via `-D` flags:
+
+| Property | Type | Description | Example |
+|----------|------|-------------|---------|
+| `benchmark.jfr` | boolean | Enable JFR flight recording | `-Dbenchmark.jfr=true` |
+| `benchmark.jfr.duration` | duration | JFR recording duration | `-Dbenchmark.jfr.duration=600s` |
+| `benchmark.jfr.settings` | string | JFR config (profile/default) | `-Dbenchmark.jfr.settings=profile` |
+| `benchmark.stack` | boolean | Enable StackProfiler (ThreadMXBean CPU sampling) | `-Dbenchmark.stack=true` |
+| `jmh.forks` | int | JMH fork count (default `0`, script overrides to `1`) | `-Djmh.forks=3` |
+
+### Maven (Single Profile Debugging)
+
+```bash
 cd spring-web-benchmark
 mvn jmh:run -Pbenchmark-perf -Dbenchmark.profile.name=perf
 ```
 
-> **Prerequisites:** JDK 8+, Maven 3.6+, project fully built via `mvn install -DskipTests`.
+Available profiles: `benchmark-perf`, `benchmark-perf-support`, `benchmark-tomcat`, `benchmark-undertow`, `benchmark-webflux`.
 
-## Output Structure
+### Output Structure
 
 ```
 spring-web-benchmark/benchmark-reports/
 ├── latest/
-│   ├── report.md              ← Latest report
-│   └── gc-*.log               ← GC logs
-└── YYYYMMDD-HHMMSS/           ← Historical snapshots
-    ├── threads-4/
-    ├── threads-16/
-    └── threads-64/
+│   └── report.md                            ← Latest report (symlink, auto-overwritten)
+├── YYYYMMDD-HHMMSS/                         ← Historical snapshot (by timestamp)
+│   ├── report.md                            ← Report for this run
+│   ├── threads-4/                           ← Created when --thread-list is used
+│   │   └── jdk-1.8.0_341/                  ← Per-JDK subdirectory
+│   │       ├── jmh-results-perf-json.json  ← Raw JMH JSON per Profile × API
+│   │       ├── jmh-results-perf-get.json
+│   │       ├── gc-perf.log                  ← GC log
+│   │       └── memory-perf.json             ← Memory snapshot
+│   ├── threads-16/
+│   │   └── jdk-1.8.0_341/
+│   ├── threads-64/
+│   │   └── jdk-1.8.0_341/
+│   └── .cp/                                 ← Cached classpath files (survives mvn clean)
 ```
 
-## Configuration Parameters
+### Configuration Parameters (JMH Benchmark)
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | JMH Warmup | 10 × 10s | 10 rounds × 10 seconds |
 | JMH Measurement | 10 × 10s | 10 rounds × 10 seconds |
 | Fork | 1 | Fork JVM isolation |
-| Threads | 4, 16, 64 | Concurrent thread counts |
+| Threads | 4 | Concurrent threads (`--thread-list` for multiple) |
 | Heap | 1GB | -Xms1g -Xmx1g |
 | GC | G1GC | -XX:+UseG1GC |
 | Protocol | HTTP/1.1 | keep-alive |
