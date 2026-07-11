@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="530" viewBox="0 0 720 530">
+<style>
+ .card { fill: #f8fafc; }
+ .title { font: bold 15px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; }
+ .subtitle { font: 12px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; }
+ .sectionLabel { font: bold 13px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; }
+ .barLabel { font: bold 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #fff; text-anchor: middle; }
+ .barPct { font: 10px -apple-system,BlinkMacSystemFont,sans-serif; fill: #fff; text-anchor: middle; }
+ .legendLabel { font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #374151; }
+ .overheadBracket { font: bold 12px -apple-system,BlinkMacSystemFont,sans-serif; fill: #dc2626; text-anchor: middle; }
+ .calloutVal { font: bold 14px -apple-system,BlinkMacSystemFont,sans-serif; fill: #16a34a; }
+ .calloutLabel { font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; }
+ .arrowLabel { font: 12px -apple-system,BlinkMacSystemFont,sans-serif; fill: #2563eb; text-anchor: middle; }
+</style>
+<rect class="card" x="0" y="0" width="720" height="530" rx="12"/>
+
+<text x="30" y="30" class="title">CPU 去哪儿了？——框架运行时开销分解</text>
+<text x="30" y="50" class="subtitle">1c1g 环境，设备数据上报 + 校验 + Redis/ClickHouse 写入</text>
+
+<!-- ============ Before: Spring MVC ============ -->
+<text x="30" y="80" class="sectionLabel">Before: Spring MVC (Tomcat)</text>
+
+<!-- Stacked bar segments -->
+<!-- 参数解析 + 反序列化 23.6% = 118px -->
+<rect x="30" y="95" width="118" height="36" rx="2" fill="#ef4444"/>
+<text x="89" y="111" class="barLabel" font-size="10">参数解析</text>
+<text x="89" y="124" class="barPct">23.6%</text>
+
+<!-- 返回值序列化编排 17.1% = 85px -->
+<rect x="148" y="95" width="85" height="36" rx="2" fill="#f97316"/>
+<text x="191" y="111" class="barLabel" font-size="10">返回值编排</text>
+<text x="191" y="124" class="barPct">17.1%</text>
+
+<!-- 反射 Method.invoke 12.1% = 60px -->
+<rect x="233" y="95" width="60" height="36" rx="2" fill="#f59e0b"/>
+<text x="263" y="111" class="barLabel" font-size="10">反射调用</text>
+<text x="263" y="124" class="barPct">12.1%</text>
+
+<!-- Validation 6.6% = 33px -->
+<rect x="293" y="95" width="33" height="36" rx="2" fill="#eab308"/>
+<text x="310" y="111" class="barLabel" font-size="9">验证</text>
+<text x="310" y="124" class="barPct">6.6%</text>
+
+<!-- 路由匹配 3.8% = 19px -->
+<rect x="326" y="95" width="19" height="36" rx="2" fill="#ec4899"/>
+<text x="335" y="118" class="barLabel" font-size="7">路由</text>
+
+<!-- 内容协商 0.7% = 4px -->
+<rect x="345" y="95" width="4" height="36" fill="#a855f7"/>
+
+<!-- 业务逻辑 ~37% = 182px -->
+<rect x="349" y="95" width="182" height="36" rx="2" fill="#22c55e"/>
+<text x="440" y="111" class="barLabel" font-size="10">业务逻辑 + IO + 其他</text>
+<text x="440" y="124" class="barPct">~37%</text>
+
+<!-- Bracket for framework overhead -->
+<line x1="30" y1="145" x2="30" y2="155" stroke="#dc2626" stroke-width="1.5"/>
+<line x1="30" y1="155" x2="349" y2="155" stroke="#dc2626" stroke-width="1.5"/>
+<line x1="349" y1="145" x2="349" y2="155" stroke="#dc2626" stroke-width="1.5"/>
+<polygon points="349,148 343,148 346,141" fill="#dc2626"/>
+<polygon points="30,148 36,148 33,141" fill="#dc2626"/>
+<text x="190" y="168" class="overheadBracket">框架运行时开销  63%</text>
+
+<!-- ============ 箭头：消除开销 ============ -->
+<line x1="190" y1="178" x2="190" y2="218" class="arrow" stroke="#2563eb" stroke-width="2"/>
+<polygon points="190,218 182,208 198,208" fill="#2563eb"/>
+<text x="190" y="235" class="arrowLabel">消除框架运行时开销 —— 启动时预计算，运行时零反射零匹配</text>
+
+<!-- ============ After: Spring Web ============ -->
+<text x="30" y="265" class="sectionLabel">After: Spring Web (Netty)</text>
+
+<!-- Bar showing reclaimed CPU -->
+<rect x="30" y="280" width="500" height="36" rx="2" fill="#22c55e"/>
+<text x="280" y="296" class="barLabel" font-size="10">CPU 回归业务 + IO + 其他</text>
+<text x="280" y="309" class="barPct" font-size="11">框架运行时开销已消除</text>
+
+<!-- Bar annotation: eliminated items shown as reclaimed -->
+<rect x="30" y="280" width="118" height="36" rx="2" fill="#22c55e" opacity="0.7" stroke="#86efac" stroke-width="1" stroke-dasharray="4,3"/>
+<text x="89" y="300" class="barLabel" font-size="9" fill="#86efac" text-decoration="line-through">参数解析</text>
+
+<rect x="148" y="280" width="85" height="36" rx="2" fill="#22c55e" opacity="0.7" stroke="#86efac" stroke-width="1" stroke-dasharray="4,3"/>
+<text x="191" y="300" class="barLabel" font-size="9" fill="#86efac" text-decoration="line-through">返回值编排</text>
+
+<rect x="233" y="280" width="60" height="36" rx="2" fill="#22c55e" opacity="0.7" stroke="#86efac" stroke-width="1" stroke-dasharray="4,3"/>
+<text x="263" y="300" class="barLabel" font-size="9" fill="#86efac" text-decoration="line-through">反射</text>
+
+<rect x="293" y="280" width="56" height="36" rx="2" fill="#22c55e" opacity="0.7" stroke="#86efac" stroke-width="1" stroke-dasharray="4,3"/>
+<text x="321" y="300" class="barLabel" font-size="9" fill="#86efac" text-decoration="line-through">其他</text>
+
+<!-- Key results callouts -->
+<rect x="560" y="120" width="135" height="50" rx="6" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+<text x="627" y="140" class="calloutVal" text-anchor="middle">1.7 - 6.6x</text>
+<text x="627" y="157" class="calloutLabel" text-anchor="middle">吞吐提升（4 线程）</text>
+
+<rect x="560" y="185" width="135" height="50" rx="6" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+<text x="627" y="205" class="calloutVal" text-anchor="middle">-37%</text>
+<text x="627" y="222" class="calloutLabel" text-anchor="middle">P50 延迟降低</text>
+
+<rect x="560" y="250" width="135" height="50" rx="6" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+<text x="627" y="270" class="calloutVal" text-anchor="middle">-13%</text>
+<text x="627" y="287" class="calloutLabel" text-anchor="middle">堆占用减少</text>
+
+<!-- Legend at bottom -->
+<text x="30" y="355" class="subtitle">CPU 采样数据来源：空方法接口（排除业务逻辑稀释），8,974 样本</text>
+<text x="30" y="373" class="subtitle">有业务逻辑时框架开销占 ~49%；空方法暴露真实框架开销占 ~63%，剩余 ~37% 为 IO + 网络 + 不可避免的底层开销</text>
+
+<line x1="30" y1="390" x2="690" y2="390" stroke="#e5e7eb" stroke-width="1"/>
+
+<!-- Bottom: legend for colors -->
+<text x="30" y="410" class="legendLabel">图例：</text>
+<rect x="70" y="398" width="12" height="12" rx="2" fill="#ef4444"/>
+<text x="86" y="409" class="legendLabel">参数解析</text>
+<rect x="150" y="398" width="12" height="12" rx="2" fill="#f97316"/>
+<text x="166" y="409" class="legendLabel">返回值编排</text>
+<rect x="240" y="398" width="12" height="12" rx="2" fill="#f59e0b"/>
+<text x="256" y="409" class="legendLabel">反射调用</text>
+<rect x="320" y="398" width="12" height="12" rx="2" fill="#eab308"/>
+<text x="336" y="409" class="legendLabel">验证</text>
+<rect x="380" y="398" width="12" height="12" rx="2" fill="#ec4899"/>
+<text x="396" y="409" class="legendLabel">路由</text>
+<rect x="440" y="398" width="12" height="12" rx="2" fill="#22c55e"/>
+<text x="456" y="409" class="legendLabel">业务逻辑 + IO + 其他</text>
+
+</svg>

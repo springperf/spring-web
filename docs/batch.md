@@ -172,27 +172,9 @@ bizExecutor 线程池（0 ~ consumerSize 个）
 
 ### 请求流转
 
-```
-HTTP 请求
-  ↓
-EventLoop → DispatcherHandler 路由匹配
-  ↓
-BatchInvoker 实例化 BatchRequest 子类（按构造函数参数位置注入参数值）
-  ↓
-DisruptorQueue.enqueue() → RingBuffer 暂存
-  ↓ 返回 BatchRequest（即 DeferredResult）
-HTTP 响应挂起
-  ↓
-Disruptor 消费者线程:
-  ├── onEvent() 累积请求到 buffer
-  ├── endOfBatch 或 buffer 满 → 提交到 bizExecutor
-  ↓
-bizExecutor 线程执行 @BatchMapping 方法
-  ↓
-遍历 batch 调用 req.setResult() → DeferredResult 完成
-  ↓
-EventLoop 写回 HTTP 响应
-```
+<p align="center">
+<img src="images/batch-arch.svg" alt="Disruptor 批处理架构——三线程模型"/>
+</p>
 
 ### 核心组件
 

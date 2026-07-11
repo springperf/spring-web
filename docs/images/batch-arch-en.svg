@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="560" viewBox="0 0 800 560">
+<style>
+ .card { fill: #f8fafc; }
+ .title { font: bold 15px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; }
+ .laneLabel { font: bold 12px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; }
+ .nodeLabel { font: 12px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; }
+ .nodeDesc { font: 10px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; }
+ .arrowLabel { font: 10px -apple-system,BlinkMacSystemFont,sans-serif; fill: #9ca3af; }
+ .lane-eventloop { fill: #eff6ff; stroke: #93c5fd; stroke-width: 1; }
+ .lane-disruptor { fill: #fff7ed; stroke: #fdba74; stroke-width: 1; }
+ .lane-biz { fill: #f0fdf4; stroke: #86efac; stroke-width: 1; }
+ .node-req { fill: #ffffff; stroke: #60a5fa; stroke-width: 1.5; }
+ .node-prod { fill: #ffffff; stroke: #93c5fd; stroke-width: 1.5; }
+ .node-queue { fill: #fffbeb; stroke: #f59e0b; stroke-width: 1.5; }
+ .node-cons { fill: #ffffff; stroke: #fb923c; stroke-width: 1.5; }
+ .node-biz { fill: #ffffff; stroke: #4ade80; stroke-width: 1.5; }
+ .node-resp { fill: #ffffff; stroke: #a78bfa; stroke-width: 1.5; }
+ .arrow { stroke: #94a3b8; stroke-width: 1.5; fill: none; }
+ .arrow-dash { stroke: #94a3b8; stroke-width: 1.5; fill: none; stroke-dasharray: 5,4; }
+ .arrow-return { stroke: #a78bfa; stroke-width: 1.5; fill: none; stroke-dasharray: 5,4; }
+ .swimlane-title { font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; }
+</style>
+<rect class="card" x="0" y="0" width="800" height="560" rx="12"/>
+
+<text x="30" y="30" class="title">Disruptor Batch Architecture — Three-Thread Model</text>
+
+<!-- ============ Lane 1: EventLoop ============ -->
+<rect x="20" y="55" width="760" height="120" rx="6" class="lane-eventloop"/>
+<text x="30" y="75" class="laneLabel">EventLoop Thread</text>
+<text x="30" y="89" class="swimlane-title">Producer — single-threaded write to RingBuffer</text>
+
+<!-- Lane 1 nodes -->
+<rect x="45" y="100" width="90" height="40" rx="6" class="node-req"/>
+<text x="90" y="124" class="nodeLabel" text-anchor="middle">HTTP Request</text>
+
+<line x1="135" y1="120" x2="165" y2="120" class="arrow"/>
+<polygon points="165,120 157,115 157,125" fill="#94a3b8"/>
+
+<rect x="170" y="100" width="120" height="40" rx="6" class="node-prod"/>
+<text x="230" y="117" class="nodeLabel" text-anchor="middle">DispatcherHandler</text>
+<text x="230" y="130" class="nodeDesc" text-anchor="middle">Route matching</text>
+
+<line x1="290" y1="120" x2="320" y2="120" class="arrow"/>
+<polygon points="320,120 312,115 312,125" fill="#94a3b8"/>
+
+<rect x="325" y="100" width="110" height="40" rx="6" class="node-prod"/>
+<text x="380" y="117" class="nodeLabel" text-anchor="middle">BatchInvoker</text>
+<text x="380" y="130" class="nodeDesc" text-anchor="middle">Creates BatchRequest</text>
+
+<line x1="435" y1="120" x2="465" y2="120" class="arrow"/>
+<polygon points="465,120 457,115 457,125" fill="#94a3b8"/>
+
+<rect x="470" y="100" width="105" height="40" rx="6" class="node-prod"/>
+<text x="522" y="117" class="nodeLabel" text-anchor="middle">enqueue()</text>
+<text x="522" y="130" class="nodeDesc" text-anchor="middle">To RingBuffer</text>
+
+<!-- Arrow: enqueue ↓ to RingBuffer -->
+<line x1="522" y1="140" x2="522" y2="170" class="arrow"/>
+<polygon points="522,170 514,160 530,160" fill="#94a3b8"/>
+<text x="538" y="158" class="arrowLabel">publish event</text>
+
+<!-- Response suspended annotation -->
+<text x="580" y="108" class="nodeDesc">Returns BatchRequest (DeferredResult)</text>
+<text x="580" y="122" class="nodeDesc">HTTP response suspended</text>
+<text x="580" y="136" class="nodeDesc">Waiting for batch processing</text>
+
+<!-- ============ Lane 2: Disruptor Consumer ============ -->
+<rect x="20" y="210" width="760" height="120" rx="6" class="lane-disruptor"/>
+<text x="30" y="230" class="laneLabel">Disruptor Consumer</text>
+<text x="30" y="244" class="swimlane-title">Single consumer thread — accumulate and submit</text>
+
+<rect x="470" y="245" width="105" height="40" rx="6" class="node-queue"/>
+<text x="522" y="262" class="nodeLabel" text-anchor="middle">RingBuffer</text>
+<text x="522" y="275" class="nodeDesc" text-anchor="middle">Pre-allocated slots</text>
+
+<line x1="470" y1="265" x2="440" y2="265" class="arrow"/>
+<polygon points="440,265 448,260 448,270" fill="#94a3b8"/>
+<text x="455" y="258" class="arrowLabel">poll</text>
+
+<rect x="305" y="245" width="130" height="40" rx="6" class="node-cons"/>
+<text x="370" y="262" class="nodeLabel" text-anchor="middle">onEvent()</text>
+<text x="370" y="275" class="nodeDesc" text-anchor="middle">Accumulate to buffer</text>
+
+<line x1="305" y1="265" x2="275" y2="265" class="arrow"/>
+<polygon points="275,265 283,260 283,270" fill="#94a3b8"/>
+
+<rect x="140" y="245" width="130" height="40" rx="6" class="node-cons"/>
+<text x="205" y="262" class="nodeLabel" text-anchor="middle">endOfBatch / Full</text>
+<text x="205" y="275" class="nodeDesc" text-anchor="middle">Submit to bizExecutor</text>
+
+<!-- Arrow: submit ↓ to bizExecutor -->
+<line x1="205" y1="285" x2="205" y2="315" class="arrow"/>
+<polygon points="205,315 197,305 213,305" fill="#94a3b8"/>
+<text x="222" y="303" class="arrowLabel">submit batch</text>
+
+<!-- ============ Lane 3: bizExecutor ============ -->
+<rect x="20" y="365" width="760" height="120" rx="6" class="lane-biz"/>
+<text x="30" y="385" class="laneLabel">bizExecutor Pool</text>
+<text x="30" y="399" class="swimlane-title">0~N threads — execute batch handler method</text>
+
+<rect x="140" y="400" width="130" height="40" rx="6" class="node-biz"/>
+<text x="205" y="417" class="nodeLabel" text-anchor="middle">@BatchMapping</text>
+<text x="205" y="430" class="nodeDesc" text-anchor="middle">Batch handler executes</text>
+
+<line x1="270" y1="420" x2="300" y2="420" class="arrow"/>
+<polygon points="300,420 292,415 292,425" fill="#94a3b8"/>
+
+<rect x="305" y="400" width="130" height="40" rx="6" class="node-biz"/>
+<text x="370" y="417" class="nodeLabel" text-anchor="middle">Iterate batch</text>
+<text x="370" y="430" class="nodeDesc" text-anchor="middle">req.setResult()</text>
+
+<line x1="435" y1="420" x2="465" y2="420" class="arrow"/>
+<polygon points="465,420 457,415 457,425" fill="#94a3b8"/>
+
+<rect x="470" y="400" width="105" height="40" rx="6" class="node-biz"/>
+<text x="522" y="417" class="nodeLabel" text-anchor="middle">DeferredResult</text>
+<text x="522" y="430" class="nodeDesc" text-anchor="middle">Complete</text>
+
+<!-- Return arrow: DeferredResult ↑ to EventLoop HTTP Response -->
+<line x1="522" y1="400" x2="522" y2="350" class="arrow-return"/>
+<line x1="522" y1="350" x2="682" y2="350" class="arrow-return"/>
+<line x1="682" y1="350" x2="682" y2="140" class="arrow-return"/>
+<polygon points="682,140 674,150 690,150" fill="#a78bfa"/>
+<text x="605" y="344" class="arrowLabel" fill="#a78bfa">callback to EventLoop</text>
+
+<!-- Write HTTP Response (Lane 1, right side) -->
+<rect x="610" y="100" width="145" height="40" rx="6" class="node-resp"/>
+<text x="682" y="117" class="nodeLabel" text-anchor="middle">EventLoop</text>
+<text x="682" y="130" class="nodeDesc" text-anchor="middle">Writes HTTP Response</text>
+
+</svg>

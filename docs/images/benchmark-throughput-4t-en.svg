@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="520" viewBox="0 0 1100 520">
+<style>
+ .bg { fill: #f8fafc; }
+ .title { font: bold 16px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; }
+ .axisLabel { font: 12px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; }
+ .tickLabel { font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #9ca3af; }
+ .apiLabel { font: 12px -apple-system,BlinkMacSystemFont,sans-serif; fill: #374151; text-anchor: middle; }
+ .dataLabel { font: 10px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; text-anchor: middle; }
+ .legendText { font: 12px -apple-system,BlinkMacSystemFont,sans-serif; fill: #374151; }
+ .gridline { stroke: #e5e7eb; stroke-width: 1; }
+ .baseline { stroke: #d1d5db; stroke-width: 1; }
+ .bar-perf { fill: #22c55e; }
+ .bar-tomcat { fill: #3b82f6; }
+ .bar-undertow { fill: #f59e0b; }
+ .bar-webflux { fill: #8b5cf6; }
+</style>
+<rect class="bg" x="0" y="0" width="1100" height="520" rx="12"/>
+<text x="30" y="32" class="title">4-Thread Throughput (ops/sec)</text>
+
+<!-- Y-axis gridlines -->
+<line x1="80" y1="430" x2="1060" y2="430" class="baseline"/>
+<line x1="80" y1="335" x2="1060" y2="335" class="gridline"/>
+<line x1="80" y1="240" x2="1060" y2="240" class="gridline"/>
+<line x1="80" y1="145" x2="1060" y2="145" class="gridline"/>
+<line x1="80" y1="50" x2="1060" y2="50" class="gridline"/>
+
+<!-- Y-axis labels -->
+<text x="68" y="434" class="tickLabel" text-anchor="end">0</text>
+<text x="68" y="339" class="tickLabel" text-anchor="end">9,000</text>
+<text x="68" y="244" class="tickLabel" text-anchor="end">18,000</text>
+<text x="68" y="149" class="tickLabel" text-anchor="end">27,000</text>
+<text x="68" y="54" class="tickLabel" text-anchor="end">36,000</text>
+
+<!-- Legend -->
+<rect x="720" y="16" width="14" height="14" rx="2" class="bar-perf"/>
+<text x="740" y="28" class="legendText">perf</text>
+<rect x="790" y="16" width="14" height="14" rx="2" class="bar-tomcat"/>
+<text x="810" y="28" class="legendText">Tomcat</text>
+<rect x="870" y="16" width="14" height="14" rx="2" class="bar-undertow"/>
+<text x="890" y="28" class="legendText">Undertow</text>
+<rect x="960" y="16" width="14" height="14" rx="2" class="bar-webflux"/>
+<text x="980" y="28" class="legendText">WebFlux</text>
+
+<!-- Helper: each group at x, with bars at x, x+29, x+58, x+87. Bar width=22 -->
+<!-- Bar height scale: 370px / 36000 = 0.010278 -->
+
+<!-- Group 1: json - base x=100 -->
+<rect x="100" y="155" width="22" height="275" class="bar-perf"/>
+<text x="111" y="149" class="dataLabel">26,718</text>
+<rect x="129" y="285" width="22" height="145" class="bar-tomcat"/>
+<text x="140" y="279" class="dataLabel">14,061</text>
+<rect x="158" y="324" width="22" height="106" class="bar-undertow"/>
+<text x="169" y="318" class="dataLabel">10,305</text>
+<rect x="187" y="271" width="22" height="159" class="bar-webflux"/>
+<text x="198" y="265" class="dataLabel">15,460</text>
+<text x="144" y="455" class="apiLabel">json</text>
+
+<!-- Group 2: get - base x=239 -->
+<rect x="239" y="148" width="22" height="282" class="bar-perf"/>
+<text x="250" y="142" class="dataLabel">27,398</text>
+<rect x="268" y="302" width="22" height="128" class="bar-tomcat"/>
+<text x="279" y="296" class="dataLabel">12,502</text>
+<rect x="297" y="292" width="22" height="138" class="bar-undertow"/>
+<text x="308" y="286" class="dataLabel">13,425</text>
+<rect x="326" y="295" width="22" height="135" class="bar-webflux"/>
+<text x="337" y="289" class="dataLabel">13,174</text>
+<text x="283" y="455" class="apiLabel">get</text>
+
+<!-- Group 3: bytes - base x=378 -->
+<rect x="378" y="78" width="22" height="352" class="bar-perf"/>
+<text x="389" y="72" class="dataLabel">34,232</text>
+<rect x="407" y="224" width="22" height="206" class="bar-tomcat"/>
+<text x="418" y="218" class="dataLabel">20,045</text>
+<rect x="436" y="309" width="22" height="121" class="bar-undertow"/>
+<text x="447" y="303" class="dataLabel">11,737</text>
+<rect x="465" y="253" width="22" height="177" class="bar-webflux"/>
+<text x="476" y="247" class="dataLabel">17,211</text>
+<text x="422" y="455" class="apiLabel">bytes</text>
+
+<!-- Group 4: valid - base x=517 -->
+<rect x="517" y="156" width="22" height="274" class="bar-perf"/>
+<text x="528" y="150" class="dataLabel">26,706</text>
+<rect x="546" y="281" width="22" height="149" class="bar-tomcat"/>
+<text x="557" y="275" class="dataLabel">14,544</text>
+<rect x="575" y="290" width="22" height="140" class="bar-undertow"/>
+<text x="586" y="284" class="dataLabel">13,662</text>
+<rect x="604" y="269" width="22" height="161" class="bar-webflux"/>
+<text x="615" y="263" class="dataLabel">15,621</text>
+<text x="561" y="455" class="apiLabel">valid</text>
+
+<!-- Group 5: async - base x=656 -->
+<rect x="656" y="139" width="22" height="291" class="bar-perf"/>
+<text x="667" y="133" class="dataLabel">28,354</text>
+<rect x="685" y="292" width="22" height="138" class="bar-tomcat"/>
+<text x="696" y="286" class="dataLabel">13,407</text>
+<rect x="714" y="325" width="22" height="105" class="bar-undertow"/>
+<text x="725" y="319" class="dataLabel">10,169</text>
+<rect x="743" y="242" width="22" height="188" class="bar-webflux"/>
+<text x="754" y="236" class="dataLabel">18,283</text>
+<text x="700" y="455" class="apiLabel">async</text>
+
+<!-- Group 6: bytesLarge - base x=795 -->
+<rect x="795" y="312" width="22" height="118" class="bar-perf"/>
+<text x="806" y="306" class="dataLabel">11,508</text>
+<rect x="824" y="379" width="22" height="51" class="bar-tomcat"/>
+<text x="835" y="373" class="dataLabel">4,979</text>
+<rect x="853" y="350" width="22" height="80" class="bar-undertow"/>
+<text x="864" y="344" class="dataLabel">7,764</text>
+<rect x="882" y="350" width="22" height="80" class="bar-webflux"/>
+<text x="893" y="344" class="dataLabel">7,737</text>
+<text x="839" y="455" class="apiLabel">bytesLarge</text>
+
+<!-- Group 7: sse - base x=934 -->
+<rect x="934" y="417" width="22" height="13" class="bar-perf"/>
+<text x="945" y="411" class="dataLabel">1,226</text>
+<rect x="963" y="427" width="22" height="3" class="bar-tomcat"/>
+<text x="974" y="421" class="dataLabel">315</text>
+<!-- Undertow SSE = FAIL, skip -->
+<rect x="1021" y="420" width="22" height="10" class="bar-webflux"/>
+<text x="1032" y="414" class="dataLabel">944</text>
+<text x="978" y="455" class="apiLabel">sse</text>
+</svg>

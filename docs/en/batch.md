@@ -163,27 +163,9 @@ bizExecutor pool (0 ~ consumerSize threads)
 
 ### Request Flow
 
-```
-HTTP Request
-  ↓
-EventLoop → DispatcherHandler route matching
-  ↓
-BatchInvoker creates BatchRequest instance (constructor arg injection)
-  ↓
-DisruptorQueue.enqueue() → RingBuffer
-  ↓  Returns BatchRequest (DeferredResult)
-HTTP response suspended
-  ↓
-Disruptor consumer:
-  ├── onEvent() accumulates to buffer
-  ├── endOfBatch or buffer full → submit to bizExecutor
-  ↓
-bizExecutor thread executes @BatchMapping method
-  ↓
-Iterate batch, call req.setResult() → DeferredResult completes
-  ↓
-EventLoop writes HTTP response
-```
+<p align="center">
+<img src="../images/batch-arch-en.svg" alt="Disruptor Batch Architecture — Three-Thread Model"/>
+</p>
 
 ### Core Components
 
