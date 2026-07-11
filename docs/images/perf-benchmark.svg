@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="300" viewBox="0 0 640 300">
+<style>
+ .title { font: bold 15px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; }
+ .label { font: 13px -apple-system,BlinkMacSystemFont,sans-serif; fill: #374151; }
+ .value { font: bold 13px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; }
+ .sub { font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; }
+ .unit { font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; }
+ .legend { font: 12px -apple-system,BlinkMacSystemFont,sans-serif; fill: #374151; }
+ .baseline { stroke: #d1d5db; stroke-dasharray: 4,4; }
+</style>
+<rect x="0" y="0" width="640" height="300" rx="12" fill="#f8fafc"/>
+<text x="30" y="32" class="title">Spring Web 性能对比 — vs Spring MVC (Tomcat)</text>
+<text x="480" y="32" class="sub">数值越大越好</text>
+<rect x="30" y="48" width="12" height="12" rx="2" fill="#22c55e"/>
+<text x="48" y="59" class="legend">4 线程</text>
+<rect x="110" y="48" width="12" height="12" rx="2" fill="#16a34a"/>
+<text x="128" y="59" class="legend">64 线程（高并发）</text>
+<line x1="140" y1="72" x2="140" y2="275" stroke="#e5e7eb" stroke-width="1"/>
+<!-- JSON -->
+<text x="16" y="98" class="label">JSON 吞吐</text>
+<rect x="140" y="100" width="90" height="14" rx="3" fill="#22c55e"/>
+<text x="235" y="112" class="value">1.90x</text>
+<text x="285" y="112" class="unit">26,718 ops/s</text>
+<rect x="140" y="118" width="106" height="14" rx="3" fill="#16a34a"/>
+<text x="251" y="132" class="value">2.23x</text>
+<text x="301" y="132" class="unit">45,328 ops/s</text>
+<!-- GET -->
+<text x="16" y="158" class="label">GET 吞吐</text>
+<rect x="140" y="160" width="103" height="14" rx="3" fill="#22c55e"/>
+<text x="248" y="172" class="value">2.19x</text>
+<text x="298" y="172" class="unit">27,398 ops/s</text>
+<rect x="140" y="178" width="117" height="14" rx="3" fill="#16a34a"/>
+<text x="262" y="192" class="value">2.47x</text>
+<text x="312" y="192" class="unit">44,697 ops/s</text>
+<!-- SSE -->
+<text x="16" y="218" class="label">SSE 吞吐</text>
+<rect x="140" y="220" width="185" height="14" rx="3" fill="#22c55e"/>
+<text x="330" y="232" class="value">3.89x</text>
+<text x="380" y="232" class="unit">1,226 ops/s</text>
+<rect x="140" y="238" width="316" height="14" rx="3" fill="#16a34a"/>
+<text x="461" y="252" class="value">6.64x</text>
+<text x="511" y="252" class="unit">2,655 ops/s</text>
+<line x1="140" y1="72" x2="140" y2="252" class="baseline"/>
+<text x="145" y="290" class="sub">Spring MVC 基线 &#160; 1.0x</text>
+</svg>
