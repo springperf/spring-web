@@ -49,6 +49,7 @@ class RealtimeSseE2eTest {
     void sse_subscribeAndSend_receivesEvent() throws Exception {
         String clientId = "sse-test-client-" + System.currentTimeMillis();
 
+        CountDownLatch connectedLatch = new CountDownLatch(1);
         CountDownLatch eventLatch = new CountDownLatch(1);
         AtomicReference<String> receivedEvent = new AtomicReference<>();
         AtomicReference<String> failure = new AtomicReference<>();
@@ -59,6 +60,11 @@ class RealtimeSseE2eTest {
 
         EventSource.Factory factory = EventSources.createFactory(httpClient);
         EventSource eventSource = factory.newEventSource(sseRequest, new EventSourceListener() {
+            @Override
+            public void onOpen(EventSource eventSource, Response response) {
+                connectedLatch.countDown();
+            }
+
             @Override
             public void onEvent(EventSource eventSource, @Nullable String id, @Nullable String type, String data) {
                 receivedEvent.set(data);
@@ -72,8 +78,10 @@ class RealtimeSseE2eTest {
             }
         });
 
-        // Give subscription time to register
-        Thread.sleep(300);
+        // Wait for SSE connection to be established (instead of fixed sleep)
+        assertThat(connectedLatch.await(5, TimeUnit.SECONDS))
+                .as("SSE connection should be established within 5s")
+                .isTrue();
 
         // Send event
         rest.getForEntity("/sse/send?clientId=" + clientId + "&data=hello-sse", String.class);
