@@ -190,7 +190,7 @@ Servlet API 有二十年的生态积累：Spring Security Filter Chain、`Reques
 | **资源受限环境**（1c1g、2c2g） | 框架开销低，同等资源下吞吐是 Spring MVC 的 1.6~2.1x |
 | **高吞吐 API 服务** | 26K~34K ops/s 的吞吐能力，适合接口层卸载 |
 | **延迟敏感业务** | P50 0.12~0.15ms，是 Spring MVC 的 50% |
-| **SSE / 流式推送** | 无锁 Drain Loop 设计，吞吐达 Spring MVC 的 3.89x（4 线程），高并发下扩展至 6.37x |
+| **SSE / 流式推送** | 无锁 Drain Loop 设计，吞吐达 Spring MVC 的 3.89x（4 线程），高并发下扩展至 6.64x |
 | **新启动的项目** | 从零开始的项目可以直接选用，无需迁移成本 |
 | **IoT / 设备接入** | 大量小请求、资源受限的典型场景（也是本项目缘起的场景） |
 

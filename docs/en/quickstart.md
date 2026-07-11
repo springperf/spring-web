@@ -220,7 +220,7 @@ Yes. Spring Security's Filter Chain is bridged via the `spring-web-support` modu
 - Small request scenarios (JSON echo, parameter queries): 1.6~2.1x
 - SSE / streaming push: 3.8x
 - Resource-constrained environments (1c1g, 2c2g): even larger gap
-- Large request/response scenarios: smaller improvement (serialization/deserialization becomes bottleneck)
+- Large request/response scenarios: 2.3x (2.31x for 100KB response body)
 
 ### Q: Are there any risks after migration?
 
