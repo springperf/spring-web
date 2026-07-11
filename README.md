@@ -7,8 +7,26 @@
 [![CI](https://github.com/springperf/spring-web/actions/workflows/ci.yml/badge.svg)](https://github.com/springperf/spring-web/actions/workflows/ci.yml)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.springperf/spring-web)](https://central.sonatype.com/artifact/io.github.springperf/spring-web)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE.md)
+[![Throughput](https://img.shields.io/badge/Throughput-1.7~6.6x_vs_Spring_MVC-brightgreen?style=flat-square)](docs/benchmark.md)
+[![SSE](https://img.shields.io/badge/SSE-6.64x_under_high_concurrency-blue?style=flat-square)](docs/benchmark.md)
 
-> **缘起**：一次 1c1g 环境的性能测试中，同样的业务逻辑（设备数据上报 + 校验 + Redis/ClickHouse 写入），Kafka 消费端 TPS 接近 **15,000**，而 Spring MVC 接口不到 **4,000**。CPU 热点分析显示，Spring MVC 框架自身消耗了大量 CPU——参数解析、路由匹配、反射调用……这些开销与业务无关，却吞噬了绝大部分性能。Spring WebFlux 也存在类似的框架层开销。
+---
+
+## 性能概览
+
+<p align="center">
+<img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='640' height='300' viewBox='0 0 640 300'%3E%3Cstyle%3E .title %7B font: bold 15px -apple-system,BlinkMacSystemFont,sans-serif; fill: %231f2937; %7D .label %7B font: 13px -apple-system,BlinkMacSystemFont,sans-serif; fill: %23374151; %7D .value %7B font: bold 13px -apple-system,BlinkMacSystemFont,sans-serif; fill: %231f2937; %7D .sub %7B font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: %236b7280; %7D .unit %7B font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: %236b7280; %7D .legend %7B font: 12px -apple-system,BlinkMacSystemFont,sans-serif; fill: %23374151; %7D .baseline %7B stroke: %23d1d5db; stroke-dasharray: 4,4; %7D %3C/style%3E%3Crect x='0' y='0' width='640' height='300' rx='12' fill='%23f8fafc'/%3E%3Ctext x='30' y='32' class='title'%3ESpring Web 性能对比 — vs Spring MVC (Tomcat)%3C/text%3E%3Ctext x='480' y='32' class='sub'%3E数值越大越好%3C/text%3E%3Crect x='30' y='48' width='12' height='12' rx='2' fill='%2322c55e'/%3E%3Ctext x='48' y='59' class='legend'%3E4 线程%3C/text%3E%3Crect x='110' y='48' width='12' height='12' rx='2' fill='%2316a34a'/%3E%3Ctext x='128' y='59' class='legend'%3E64 线程（高并发）%3C/text%3E%3Cline x1='140' y1='72' x2='140' y2='275' stroke='%23e5e7eb' stroke-width='1'/%3E%3C!-- JSON --%3E%3Ctext x='16' y='95' class='label'%3EJSON 吞吐%3C/text%3E%3Crect x='140' y='100' width='90' height='14' rx='3' fill='%2322c55e'/%3E%3Ctext x='235' y='112' class='value'%3E1.90x%3C/text%3E%3Ctext x='285' y='112' class='unit'%3E26,718 ops/s%3C/text%3E%3Crect x='140' y='118' width='106' height='14' rx='3' fill='%2316a34a'/%3E%3Ctext x='251' y='132' class='value'%3E2.23x%3C/text%3E%3Ctext x='301' y='132' class='unit'%3E45,328 ops/s%3C/text%3E%3C!-- GET --%3E%3Ctext x='16' y='155' class='label'%3EGET 吞吐%3C/text%3E%3Crect x='140' y='160' width='103' height='14' rx='3' fill='%2322c55e'/%3E%3Ctext x='248' y='172' class='value'%3E2.19x%3C/text%3E%3Ctext x='298' y='172' class='unit'%3E27,398 ops/s%3C/text%3E%3Crect x='140' y='178' width='117' height='14' rx='3' fill='%2316a34a'/%3E%3Ctext x='262' y='192' class='value'%3E2.47x%3C/text%3E%3Ctext x='312' y='192' class='unit'%3E44,697 ops/s%3C/text%3E%3C!-- SSE --%3E%3Ctext x='16' y='215' class='label'%3ESSE 吞吐%3C/text%3E%3Crect x='140' y='220' width='185' height='14' rx='3' fill='%2322c55e'/%3E%3Ctext x='330' y='232' class='value'%3E3.89x%3C/text%3E%3Ctext x='380' y='232' class='unit'%3E1,226 ops/s%3C/text%3E%3Crect x='140' y='238' width='316' height='14' rx='3' fill='%2316a34a'/%3E%3Ctext x='461' y='252' class='value'%3E6.64x%3C/text%3E%3Ctext x='511' y='252' class='unit'%3E2,655 ops/s%3C/text%3E%3Cline x1='140' y1='72' x2='140' y2='252' class='baseline'/%3E%3Ctext x='145' y='290' class='sub'%3ESpring MVC 基线 %26nbsp%3B 1.0x%3C/text%3E%3C/svg%3E" alt="Performance Benchmark Chart"/>
+</p>
+
+> 全部 7 个接口 x 3 个并发度 x 4 个对比框架，**100% 胜率，无一例外**。延迟低 37%、内存分配少 41%、堆占用少 13%。
+>
+> [完整 Benchmark 报告](docs/benchmark.md) · [性能原理详解](docs/performance-principles.md)
+
+---
+
+## 缘起
+
+> 一次 1c1g 环境的性能测试中，同样的业务逻辑（设备数据上报 + 校验 + Redis/ClickHouse 写入），Kafka 消费端 TPS 接近 **15,000**，而 Spring MVC 接口不到 **4,000**。CPU 热点分析显示，Spring MVC 框架自身消耗了大量 CPU——参数解析、路由匹配、反射调用……这些开销与业务无关，却吞噬了绝大部分性能。Spring WebFlux 也存在类似的框架层开销。
 >
 > 这引发了一个思考：如果把 Spring MVC 主流功能中那些不必要的运行时开销全部消除，性能能提升多少？
 >
@@ -102,19 +120,6 @@ management:
 
 ---
 
-## 版本选择
-
-本项目按 Spring Boot 大版本管理两个分支。最低支持 **Spring Boot 2.4.x**。
-
-| 分支 | Spring Boot | Spring Framework | JDK | Servlet API | 状态 |
-|------|------------|----------------|-----|-------------|------|
-| `2.7.x` | 2.4.x ~ 2.7.x | 5.3.x | 8 / 11 / 17 | javax.servlet 4.0 | 维护分支（功能迭代 + bugfix） |
-| `master` | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | 6.0.x ~ 6.2.x / 7.0.x | 17 / 21 | jakarta.servlet 6.0 | **开发基线**（多版本兼容，切换 Profile） |
-
-> 版本下限说明、分支选择建议及详细兼容性信息见 [版本兼容性说明](docs/compatibility.md)。
-
----
-
 ## 基准测试
 
 > 详细报告见 [Benchmark 文档](docs/benchmark.md)
@@ -151,6 +156,19 @@ perf 框架吞吐是 Servlet 容器的 **1.7~3.9x**，p50 延迟 **0.12~0.15ms**
 | 路由 | O(1) HashMap 多级优化器 | `AntPathMatcher` 线性遍历 |
 | Servlet API | 通过 support 模块桥接 | 原生支持 |
 | Actuator | 原生支持 | 原生支持 |
+
+---
+
+## 版本选择
+
+本项目按 Spring Boot 大版本管理两个分支。最低支持 **Spring Boot 2.4.x**。
+
+| 分支 | Spring Boot | Spring Framework | JDK | Servlet API | 状态 |
+|------|------------|----------------|-----|-------------|------|
+| `2.7.x` | 2.4.x ~ 2.7.x | 5.3.x | 8 / 11 / 17 | javax.servlet 4.0 | 维护分支（功能迭代 + bugfix） |
+| `master` | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | 6.0.x ~ 6.2.x / 7.0.x | 17 / 21 | jakarta.servlet 6.0 | **开发基线**（多版本兼容，切换 Profile） |
+
+> 版本下限说明、分支选择建议及详细兼容性信息见 [版本兼容性说明](docs/compatibility.md)。
 
 ---
 
