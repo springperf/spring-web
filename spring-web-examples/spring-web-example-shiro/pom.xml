@@ -6,7 +6,7 @@
         <groupId>io.github.springperf</groupId>
         <artifactId>spring-web-examples</artifactId>
 
-        <version>3.2.2</version>
+        <version>3.2.3</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
