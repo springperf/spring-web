@@ -2,7 +2,7 @@
 
 # Spring-Perf Web
 
-A high-performance Netty-based web framework compatible with the Spring programming model, designed as a drop-in replacement for Spring MVC.
+A high-performance Netty-based web framework, compatible with the Spring MVC programming model — high performance, zero compromise.
 
 ## Origin
 
