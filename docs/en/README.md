@@ -2,7 +2,7 @@
 
 # Spring Web
 
-A high-performance Netty-based web framework, designed as a drop-in replacement for Spring MVC.
+A high-performance Netty-based web framework, compatible with Spring MVC programming model — high performance, zero compromise.
 
 [![CI](https://github.com/springperf/spring-web/actions/workflows/ci.yml/badge.svg)](https://github.com/springperf/spring-web/actions/workflows/ci.yml)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.springperf/spring-web)](https://central.sonatype.com/artifact/io.github.springperf/spring-web)
@@ -22,6 +22,10 @@ A high-performance Netty-based web framework, designed as a drop-in replacement 
 >
 > [Full Benchmark Report](benchmark.md) · [Performance Principles](performance-principles.md)
 
+> **Why this approach?** — A three-layer argument: why batching beats non-blocking, why CPU optimization is the next frontier, and why combining both is the complete solution.
+>
+> [The Complete Path to High-Performance Java Web →](philosophy.md)
+
 ---
 
 ## Origin
@@ -38,7 +42,7 @@ A high-performance Netty-based web framework, designed as a drop-in replacement 
 
 ## Introduction
 
-Spring Web is a high-performance web framework built on **Netty 4.1**, designed as a high-performance alternative to Spring MVC. It preserves the familiar Spring programming model (annotation-driven, dependency injection, interceptors, etc.), but replaces the Servlet container with Netty under the hood, delivering higher throughput and lower resource consumption while staying compatible with the Spring ecosystem.
+Spring Web is a high-performance web framework built on **Netty 4.1**, designed as a high-performance alternative to Spring MVC. It preserves the familiar Spring programming model (annotation-driven, dependency injection, interceptors, etc.), but through startup pre-caching, zero-reflection runtime, and other engineering optimizations, delivering higher throughput and lower resource consumption while staying compatible with the Spring ecosystem.
 
 ---
 

@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="400" viewBox="0 0 720 400">
+<style>
+ .card { fill: #f8fafc; }
+ .title { font: bold 15px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; }
+ .subtitle { font: 12px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; }
+ .sectionLabel { font: bold 13px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; text-anchor: middle; }
+ .desc { font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; text-anchor: middle; }
+ .ioBlock { font: 10px -apple-system,BlinkMacSystemFont,sans-serif; fill: #fff; text-anchor: middle; }
+ .resultLabel { font: bold 13px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; }
+ .resultVal { font: bold 18px -apple-system,BlinkMacSystemFont,sans-serif; fill: #16a34a; }
+ .resultUnit { font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; }
+ .vs { font: bold 20px -apple-system,BlinkMacSystemFont,sans-serif; fill: #d1d5db; text-anchor: middle; }
+</style>
+
+<rect class="card" x="0" y="0" width="720" height="400" rx="12"/>
+
+<text x="360" y="28" class="title" text-anchor="middle">Non-blocking vs Batching: Same 1000 Requests</text>
+
+<!-- ===== LEFT: Non-blocking IO ===== -->
+<text x="200" y="55" class="sectionLabel">Non-blocking IO</text>
+<text x="200" y="70" class="desc">Still 1000 IO operations, just "hidden"</text>
+
+<!-- IO blocks row 1 -->
+<rect x="50" y="85" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="80" y="85" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="110" y="85" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="140" y="85" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="170" y="85" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="200" y="85" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="230" y="85" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="260" y="85" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="290" y="85" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="320" y="85" width="26" height="14" rx="2" fill="#ef4444"/>
+<text x="355" y="96" class="desc">...</text>
+
+<!-- Row 2 -->
+<rect x="50" y="103" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="80" y="103" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="110" y="103" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="140" y="103" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="170" y="103" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="200" y="103" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="230" y="103" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="260" y="103" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="290" y="103" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="320" y="103" width="26" height="14" rx="2" fill="#ef4444"/>
+
+<!-- Row 3 -->
+<rect x="50" y="121" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="80" y="121" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="110" y="121" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="140" y="121" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="170" y="121" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="200" y="121" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="230" y="121" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="260" y="121" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="290" y="121" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="320" y="121" width="26" height="14" rx="2" fill="#ef4444"/>
+
+<text x="200" y="155" class="desc">...（1000 individual IO operations total）</text>
+
+<text x="200" y="178" class="resultLabel" fill="#dc2626">IO count: 1000</text>
+<text x="200" y="195" class="resultLabel" fill="#dc2626">Total time: 1000 × 10ms = ~10000ms</text>
+
+<!-- ===== VS ===== -->
+<text x="370" y="140" class="vs">VS</text>
+
+<!-- ===== RIGHT: Batching ===== -->
+<text x="540" y="55" class="sectionLabel">Batching</text>
+<text x="540" y="70" class="desc">IO count drops from 1000 to 10 — fundamental reduction</text>
+
+<!-- Batch blocks -->
+<rect x="430" y="85" width="38" height="28" rx="4" fill="#16a34a"/>
+<text x="449" y="103" class="ioBlock">Batch 1</text>
+<rect x="478" y="85" width="38" height="28" rx="4" fill="#16a34a"/>
+<text x="497" y="103" class="ioBlock">Batch 2</text>
+<rect x="526" y="85" width="38" height="28" rx="4" fill="#16a34a"/>
+<text x="545" y="103" class="ioBlock">Batch 3</text>
+<rect x="574" y="85" width="38" height="28" rx="4" fill="#16a34a"/>
+<text x="593" y="103" class="ioBlock">Batch 4</text>
+<rect x="622" y="85" width="38" height="28" rx="4" fill="#16a34a"/>
+<text x="641" y="103" class="ioBlock">Batch 5</text>
+
+<rect x="430" y="123" width="38" height="28" rx="4" fill="#16a34a"/>
+<text x="449" y="141" class="ioBlock">Batch 6</text>
+<rect x="478" y="123" width="38" height="28" rx="4" fill="#16a34a"/>
+<text x="497" y="141" class="ioBlock">Batch 7</text>
+<rect x="526" y="123" width="38" height="28" rx="4" fill="#16a34a"/>
+<text x="545" y="141" class="ioBlock">Batch 8</text>
+<rect x="574" y="123" width="38" height="28" rx="4" fill="#16a34a"/>
+<text x="593" y="141" class="ioBlock">Batch 9</text>
+<rect x="622" y="123" width="38" height="28" rx="4" fill="#16a34a"/>
+<text x="641" y="141" class="ioBlock">Batch 10</text>
+
+<text x="540" y="170" class="resultLabel" fill="#16a34a">IO count: 10 (100:1 aggregation)</text>
+<text x="540" y="187" class="resultLabel" fill="#16a34a">Total time: 10 × 20ms = ~200ms</text>
+
+<!-- Bottom explanation -->
+<rect x="50" y="220" width="620" height="80" rx="8" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+<text x="360" y="245" class="sectionLabel" fill="#16a34a">Why Batching Wins</text>
+<text x="360" y="265" class="desc" fill="#374151">Fewer IO ops = fewer syscalls + fewer network round-trips + less downstream pressure</text>
+<text x="360" y="285" class="desc" fill="#374151">Non-blocking "hides" wait time; batching prevents wait from happening in the first place</text>
+
+<line x1="540" y1="195" x2="360" y2="218" stroke="#86efac" stroke-width="1.5" stroke-dasharray="4,3"/>
+<polygon points="360,218 367,213 367,223" fill="#86efac"/>
+
+</svg>

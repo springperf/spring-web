@@ -50,7 +50,7 @@ class RealtimeSseE2eTest {
         String clientId = "sse-test-client-" + System.currentTimeMillis();
 
         CountDownLatch connectedLatch = new CountDownLatch(1);
-        CountDownLatch eventLatch = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(1);
         AtomicReference<String> receivedEvent = new AtomicReference<>();
         AtomicReference<String> failure = new AtomicReference<>();
 
@@ -68,13 +68,13 @@ class RealtimeSseE2eTest {
             @Override
             public void onEvent(EventSource eventSource, @Nullable String id, @Nullable String type, String data) {
                 receivedEvent.set(data);
-                eventLatch.countDown();
+                doneLatch.countDown();
             }
 
             @Override
             public void onFailure(EventSource eventSource, @Nullable Throwable t, @Nullable Response response) {
                 failure.set(t != null ? t.getMessage() : "unknown failure");
-                eventLatch.countDown();
+                doneLatch.countDown();
             }
         });
 
@@ -86,12 +86,16 @@ class RealtimeSseE2eTest {
         // Send event
         rest.getForEntity("/sse/send?clientId=" + clientId + "&data=hello-sse", String.class);
 
-        // Verify SSE stream received the event
-        boolean received = eventLatch.await(10, TimeUnit.SECONDS);
+        // Wait for either event or failure
+        boolean done = doneLatch.await(10, TimeUnit.SECONDS);
+
+        // Check failure BEFORE cancel — cancel may trigger onFailure in some OkHttp versions,
+        // which would falsely set failure after the event was successfully received
+        assertThat(failure.get()).as("SSE connection should not fail").isNull();
+
         eventSource.cancel();
 
-        assertThat(failure.get()).as("SSE connection should not fail").isNull();
-        assertThat(received).as("SSE client should receive event within timeout").isTrue();
+        assertThat(done).as("SSE client should receive event within timeout").isTrue();
         assertThat(receivedEvent.get()).isEqualTo("hello-sse");
     }
 
@@ -106,16 +110,15 @@ class RealtimeSseE2eTest {
         CountDownLatch event2 = new CountDownLatch(1);
         AtomicReference<String> data1 = new AtomicReference<>();
         AtomicReference<String> data2 = new AtomicReference<>();
-
-        SubscribeResultHandler handler1 = new SubscribeResultHandler(connected1, event1, data1);
-        SubscribeResultHandler handler2 = new SubscribeResultHandler(connected2, event2, data2);
+        AtomicReference<String> failure1 = new AtomicReference<>();
+        AtomicReference<String> failure2 = new AtomicReference<>();
 
         EventSource.Factory factory = EventSources.createFactory(httpClient);
 
         Request req1 = new Request.Builder()
                 .url("http://localhost:" + actualPort + "/sse/subscribe?clientId=" + clientId1)
                 .build();
-        factory.newEventSource(req1, handler1);
+        EventSource es1 = factory.newEventSource(req1, new BroadcastResultHandler(connected1, event1, data1, failure1));
         assertThat(connected1.await(5, TimeUnit.SECONDS))
                 .as("Client 1 should connect within 5s")
                 .isTrue();
@@ -123,7 +126,7 @@ class RealtimeSseE2eTest {
         Request req2 = new Request.Builder()
                 .url("http://localhost:" + actualPort + "/sse/subscribe?clientId=" + clientId2)
                 .build();
-        factory.newEventSource(req2, handler2);
+        EventSource es2 = factory.newEventSource(req2, new BroadcastResultHandler(connected2, event2, data2, failure2));
         assertThat(connected2.await(5, TimeUnit.SECONDS))
                 .as("Client 2 should connect within 5s")
                 .isTrue();
@@ -135,10 +138,16 @@ class RealtimeSseE2eTest {
         boolean r1 = event1.await(10, TimeUnit.SECONDS);
         boolean r2 = event2.await(10, TimeUnit.SECONDS);
 
+        assertThat(failure1.get()).as("Client 1 SSE connection should not fail").isNull();
+        assertThat(failure2.get()).as("Client 2 SSE connection should not fail").isNull();
         assertThat(r1).as("Client 1 should receive broadcast").isTrue();
         assertThat(r2).as("Client 2 should receive broadcast").isTrue();
         assertThat(data1.get()).isEqualTo("broadcast-msg");
         assertThat(data2.get()).isEqualTo("broadcast-msg");
+
+        // Clean up to prevent emitter leakage between tests
+        es1.cancel();
+        es2.cancel();
     }
 
     @Test
@@ -149,16 +158,18 @@ class RealtimeSseE2eTest {
         assertThat(resp).isEqualTo("client not found: nonexist-client");
     }
 
-    private static class SubscribeResultHandler extends EventSourceListener {
+    private static class BroadcastResultHandler extends EventSourceListener {
         final CountDownLatch connected;
         final CountDownLatch eventReceived;
         final AtomicReference<String> data;
+        final AtomicReference<String> failure;
 
-        SubscribeResultHandler(CountDownLatch connected, CountDownLatch eventReceived,
-                               AtomicReference<String> data) {
+        BroadcastResultHandler(CountDownLatch connected, CountDownLatch eventReceived,
+                               AtomicReference<String> data, AtomicReference<String> failure) {
             this.connected = connected;
             this.eventReceived = eventReceived;
             this.data = data;
+            this.failure = failure;
         }
 
         @Override
@@ -174,7 +185,7 @@ class RealtimeSseE2eTest {
 
         @Override
         public void onFailure(EventSource eventSource, @Nullable Throwable t, @Nullable Response response) {
-            eventReceived.countDown();
+            failure.set(t != null ? t.getMessage() : "unknown failure");
         }
     }
 }

@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="460" viewBox="0 0 720 460">
+<style>
+ .card { fill: #f8fafc; }
+ .title { font: bold 16px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; }
+ .subtitle { font: 13px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; }
+ .layerLabel { font: bold 15px -apple-system,BlinkMacSystemFont,sans-serif; fill: #fff; text-anchor: middle; }
+ .layerDesc { font: 12px -apple-system,BlinkMacSystemFont,sans-serif; fill: rgba(255,255,255,0.85); text-anchor: middle; }
+ .arrowLabel { font: 13px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; text-anchor: end; }
+ .footnote { font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #9ca3af; text-anchor: middle; }
+</style>
+<rect class="card" x="0" y="0" width="720" height="460" rx="12"/>
+
+<text x="360" y="28" class="title" text-anchor="middle">逐层瓶颈消除</text>
+<text x="360" y="45" class="subtitle" text-anchor="middle">从 IO 到 CPU，再到完整的高性能方案</text>
+
+<!-- Layer 1 (top, narrowest) — IO瓶颈 -->
+<path d="M230,110 L490,110 L450,60 L270,60 Z" fill="#ef4444" opacity="0.95"/>
+<text x="360" y="78" class="layerLabel">第一层：IO 瓶颈</text>
+<text x="360" y="95" class="layerDesc">批处理减少 IO 次数，从根源消除 IO 等待</text>
+
+<!-- Arrow from layer 1 to 2 -->
+<line x1="360" y1="110" x2="360" y2="160" stroke="#6b7280" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="345" y="138" class="arrowLabel" text-anchor="end">IO 消除 → 瓶颈浮出水面</text>
+
+<!-- Layer 2 (middle) — CPU瓶颈 -->
+<path d="M170,220 L550,220 L510,160 L210,160 Z" fill="#f97316" opacity="0.95"/>
+<text x="360" y="183" class="layerLabel">第二层：CPU 瓶颈</text>
+<text x="360" y="200" class="layerDesc">批量消除 IO 后，框架 CPU 开销成为新瓶颈</text>
+
+<!-- Arrow from layer 2 to 3 -->
+<line x1="360" y1="220" x2="360" y2="270" stroke="#6b7280" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="345" y="248" class="arrowLabel" text-anchor="end">瓶颈转移：IO 消除 → CPU 暴露</text>
+
+<!-- Layer 3 (bottom, widest) — 完整方案 -->
+<path d="M110,330 L610,330 L570,270 L150,270 Z" fill="#2563eb" opacity="0.95"/>
+<text x="360" y="293" class="layerLabel">第三层：完整方案</text>
+<text x="360" y="310" class="layerDesc">批量处理 + 基础优化，两者叠加释放全部性能</text>
+
+<!-- Right side annotations -->
+<rect x="560" y="360" width="135" height="75" rx="6" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+<text x="627" y="382" class="title" font-size="12" text-anchor="middle" fill="#16a34a">最终效果</text>
+<text x="627" y="400" class="layerDesc" fill="#16a34a" text-anchor="middle">- 吞吐提升 1.7~6.6x</text>
+<text x="627" y="416" class="layerDesc" fill="#16a34a" text-anchor="middle">- 延迟降低 37%</text>
+
+<line x1="610" y1="330" x2="627" y2="360" stroke="#86efac" stroke-width="1.5" stroke-dasharray="4,3"/>
+<polygon points="627,360 620,355 620,365" fill="#86efac"/>
+
+<defs>
+<marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+<path d="M0,0 L10,4 L0,8 Z" fill="#6b7280"/>
+</marker>
+</defs>
+</svg>

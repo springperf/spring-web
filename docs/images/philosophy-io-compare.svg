@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="400" viewBox="0 0 720 400">
+<style>
+ .card { fill: #f8fafc; }
+ .title { font: bold 15px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; }
+ .subtitle { font: 12px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; }
+ .sectionLabel { font: bold 13px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; text-anchor: middle; }
+ .desc { font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; text-anchor: middle; }
+ .ioBlock { font: 10px -apple-system,BlinkMacSystemFont,sans-serif; fill: #fff; text-anchor: middle; }
+ .resultLabel { font: bold 13px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; }
+ .resultVal { font: bold 18px -apple-system,BlinkMacSystemFont,sans-serif; fill: #16a34a; }
+ .resultUnit { font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; }
+ .vs { font: bold 20px -apple-system,BlinkMacSystemFont,sans-serif; fill: #d1d5db; text-anchor: middle; }
+</style>
+
+<rect class="card" x="0" y="0" width="720" height="400" rx="12"/>
+
+<text x="360" y="28" class="title" text-anchor="middle">非阻塞 vs 批量处理：同样 1000 个请求</text>
+
+<!-- ===== LEFT: 非阻塞 IO ===== -->
+<text x="200" y="55" class="sectionLabel">非阻塞 IO</text>
+<text x="200" y="70" class="desc">仍然是 1000 次 IO，只是"藏"起来了</text>
+
+<!-- IO blocks row 1 (10 blocks示意) -->
+<rect x="50" y="85" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="80" y="85" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="110" y="85" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="140" y="85" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="170" y="85" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="200" y="85" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="230" y="85" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="260" y="85" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="290" y="85" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="320" y="85" width="26" height="14" rx="2" fill="#ef4444"/>
+<text x="355" y="96" class="desc">...</text>
+
+<!-- Row 2 -->
+<rect x="50" y="103" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="80" y="103" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="110" y="103" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="140" y="103" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="170" y="103" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="200" y="103" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="230" y="103" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="260" y="103" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="290" y="103" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="320" y="103" width="26" height="14" rx="2" fill="#ef4444"/>
+
+<!-- Row 3 -->
+<rect x="50" y="121" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="80" y="121" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="110" y="121" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="140" y="121" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="170" y="121" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="200" y="121" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="230" y="121" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="260" y="121" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="290" y="121" width="26" height="14" rx="2" fill="#ef4444"/>
+<rect x="320" y="121" width="26" height="14" rx="2" fill="#ef4444"/>
+
+<text x="200" y="155" class="desc">...（共 1000 次独立的 IO 操作）</text>
+
+<text x="200" y="178" class="resultLabel" fill="#dc2626">IO 次数：1000 次</text>
+<text x="200" y="195" class="resultLabel" fill="#dc2626">总耗时：1000 × 10ms = ~10000ms</text>
+
+<!-- ===== VS ===== -->
+<text x="370" y="140" class="vs">VS</text>
+
+<!-- ===== RIGHT: 批量处理 ===== -->
+<text x="540" y="55" class="sectionLabel">批量处理</text>
+<text x="540" y="70" class="desc">IO 次数从 1000 降到 10，本质减少</text>
+
+<!-- Large batch blocks (10 blocks representing 100:1 aggregation) -->
+<rect x="430" y="85" width="38" height="28" rx="4" fill="#16a34a"/>
+<text x="449" y="103" class="ioBlock">批1</text>
+<rect x="478" y="85" width="38" height="28" rx="4" fill="#16a34a"/>
+<text x="497" y="103" class="ioBlock">批2</text>
+<rect x="526" y="85" width="38" height="28" rx="4" fill="#16a34a"/>
+<text x="545" y="103" class="ioBlock">批3</text>
+<rect x="574" y="85" width="38" height="28" rx="4" fill="#16a34a"/>
+<text x="593" y="103" class="ioBlock">批4</text>
+<rect x="622" y="85" width="38" height="28" rx="4" fill="#16a34a"/>
+<text x="641" y="103" class="ioBlock">批5</text>
+
+<rect x="430" y="123" width="38" height="28" rx="4" fill="#16a34a"/>
+<text x="449" y="141" class="ioBlock">批6</text>
+<rect x="478" y="123" width="38" height="28" rx="4" fill="#16a34a"/>
+<text x="497" y="141" class="ioBlock">批7</text>
+<rect x="526" y="123" width="38" height="28" rx="4" fill="#16a34a"/>
+<text x="545" y="141" class="ioBlock">批8</text>
+<rect x="574" y="123" width="38" height="28" rx="4" fill="#16a34a"/>
+<text x="593" y="141" class="ioBlock">批9</text>
+<rect x="622" y="123" width="38" height="28" rx="4" fill="#16a34a"/>
+<text x="641" y="141" class="ioBlock">批10</text>
+
+<text x="540" y="170" class="resultLabel" fill="#16a34a">IO 次数：10 次（100:1 聚合）</text>
+<text x="540" y="187" class="resultLabel" fill="#16a34a">总耗时：10 × 20ms = ~200ms</text>
+
+<!-- Bottom explanation -->
+<rect x="50" y="220" width="620" height="80" rx="8" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+<text x="360" y="245" class="sectionLabel" fill="#16a34a">批量处理的本质优势</text>
+<text x="360" y="265" class="desc" fill="#374151">减少 IO 次数 = 减少 syscall 次数 + 减少网络来回 + 减少下游服务压力</text>
+<text x="360" y="285" class="desc" fill="#374151">非阻塞 IO 是"分摊等待成本"，批量处理是"不让等待发生"</text>
+
+<!-- Arrow annotation pointing to callout -->
+<line x1="540" y1="195" x2="360" y2="218" stroke="#86efac" stroke-width="1.5" stroke-dasharray="4,3"/>
+<polygon points="360,218 367,213 367,223" fill="#86efac"/>
+
+</svg>

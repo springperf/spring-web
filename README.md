@@ -2,7 +2,7 @@
 
 # Spring Web
 
-基于 Netty 的高性能 Web 框架，Spring MVC 的替代方案。
+基于 Netty 的高性能 Web 框架，兼容 Spring MVC 编程模型，零妥协的性能方案。
 
 [![CI](https://github.com/springperf/spring-web/actions/workflows/ci.yml/badge.svg)](https://github.com/springperf/spring-web/actions/workflows/ci.yml)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.springperf/spring-web)](https://central.sonatype.com/artifact/io.github.springperf/spring-web)
@@ -22,6 +22,10 @@
 >
 > [完整 Benchmark 报告](docs/benchmark.md) · [性能原理详解](docs/performance-principles.md)
 
+> **为什么是这个方案？** —— 三层论证：批处理为何优于非阻塞、CPU 优化为何是下一关、两者叠加为何才是完整方案。
+> 
+> [高性能 Java Web 的完整路径 →](docs/philosophy.md)
+
 ---
 
 ## 缘起
@@ -38,7 +42,7 @@
 
 ## 简介
 
-Spring Web 是一个基于 **Netty** 构建的高性能 Web 框架，定位为 Spring MVC 的高性能替代方案。它保留了 Spring 开发者熟悉的编程模型（注解驱动、依赖注入、拦截器等），但底层使用 Netty 替代 Servlet 容器，在兼容 Spring 生态的前提下提供更高的吞吐量和更低的资源占用。
+Spring Web 是一个基于 **Netty** 构建的高性能 Web 框架，定位为 Spring MVC 的高性能替代方案。它保留了 Spring 开发者熟悉的编程模型（注解驱动、依赖注入、拦截器等），但通过启动时预缓存、零反射运行时等优化手段，在兼容 Spring 生态的前提下提供更高的吞吐量和更低的资源占用。
 
 ---
 
