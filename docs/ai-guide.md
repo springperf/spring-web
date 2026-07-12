@@ -113,7 +113,7 @@ export AI_API_KEY=sk-your-real-key
 如果 `/chat/stream` 返回 `{"scanAvailable":true,"prefetch":-1}` 而非流式内容，说明 `ReactiveAdapterRegistry` 未正确加载。确认：
 
 1. `reactor-core` 在 classpath 上（Spring AI 的传递依赖）
-2. 本框架版本 >= 3.2.2（含 `ReactiveReturnValueResolver` 的 `getSharedInstance()` 兜底）
+2. 本框架版本 >= 3.2.3（含 `ReactiveReturnValueResolver` 的 `getSharedInstance()` 兜底）
 
 ### 启动类
 

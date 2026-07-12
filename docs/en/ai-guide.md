@@ -113,7 +113,7 @@ export AI_API_KEY=sk-your-real-key
 If `/chat/stream` returns `{"scanAvailable":true,"prefetch":-1}` instead of streaming content, the `ReactiveAdapterRegistry` is not loaded correctly. Verify:
 
 1. `reactor-core` is on the classpath (transitive dependency of Spring AI)
-2. Framework version >= 3.2.2 (includes `ReactiveReturnValueResolver` fallback to `getSharedInstance()`)
+2. Framework version >= 3.2.3 (includes `ReactiveReturnValueResolver` fallback to `getSharedInstance()`)
 
 ### Application Class
 
