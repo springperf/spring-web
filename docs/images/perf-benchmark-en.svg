@@ -10,7 +10,7 @@
  .baseline { stroke: #d1d5db; stroke-dasharray: 4,4; }
 </style>
 <rect x="0" y="0" width="800" height="300" rx="12" fill="#f8fafc"/>
-<text x="30" y="32" class="title">Spring Web vs Spring MVC (Tomcat)</text>
+<text x="30" y="32" class="title">WebPerf vs Spring MVC (Tomcat)</text>
 <text x="620" y="32" class="sub">Higher is better</text>
 <rect x="30" y="48" width="12" height="12" rx="2" fill="#22c55e"/>
 <text x="48" y="59" class="legend">4 threads</text>

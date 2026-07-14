@@ -67,7 +67,7 @@
 <text x="190" y="235" class="arrowLabel">Eliminate framework overhead — precompute at startup, zero reflection at runtime</text>
 
 <!-- ============ After: Spring Web ============ -->
-<text x="30" y="265" class="sectionLabel">After: Spring Web (Netty)</text>
+<text x="30" y="265" class="sectionLabel">After: WebPerf (Netty)</text>
 
 <!-- Bar showing reclaimed CPU -->
 <rect x="30" y="280" width="500" height="36" rx="2" fill="#22c55e"/>
