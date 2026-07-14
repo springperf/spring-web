@@ -1,6 +1,6 @@
 > English | [中文](../../README.md)
 
-# Spring Web
+# Spring WebPerf
 
 A high-performance Netty-based web framework, compatible with Spring MVC programming model — high performance, zero compromise.
 
@@ -34,7 +34,7 @@ A high-performance Netty-based web framework, compatible with Spring MVC program
 >
 > This raised a question: what if we eliminated all unnecessary runtime overhead from the mainstream Spring MVC feature set? How much could performance improve?
 >
-> **Spring Web was born from this question.** Goal: maximize web framework performance while remaining fully compatible with the Spring ecosystem.
+> **Spring WebPerf was born from this question.** Goal: maximize web framework performance while remaining fully compatible with the Spring ecosystem.
 >
 > [View Benchmark Report](benchmark.md) · [Performance Principles](performance-principles.md) · [Full Origin Story](overview.md)
 
@@ -42,7 +42,7 @@ A high-performance Netty-based web framework, compatible with Spring MVC program
 
 ## Introduction
 
-Spring Web is a high-performance web framework built on **Netty 4.1**, designed as a high-performance alternative to Spring MVC. It preserves the familiar Spring programming model (annotation-driven, dependency injection, interceptors, etc.), but through startup pre-caching, zero-reflection runtime, and other engineering optimizations, delivering higher throughput and lower resource consumption while staying compatible with the Spring ecosystem.
+Spring WebPerf is a high-performance web framework built on **Netty 4.1**, designed as a high-performance alternative to Spring MVC. It preserves the familiar Spring programming model (annotation-driven, dependency injection, interceptors, etc.), but through startup pre-caching, zero-reflection runtime, and other engineering optimizations, delivering higher throughput and lower resource consumption while staying compatible with the Spring ecosystem.
 
 ---
 
@@ -147,7 +147,7 @@ The perf framework delivers **1.7\~3.9x** throughput over Servlet containers, wi
 
 ## Comparison with Spring MVC
 
-| Dimension | Spring Web | Spring MVC (Tomcat) |
+| Dimension | WebPerf | Spring MVC (Tomcat) |
 |-----------|-----------|---------------------|
 | Engine | Netty 4.1 | Servlet container (Tomcat/Jetty/Undertow) |
 | Throughput (json 4t) | **26,718** ops/s | 14,061 ops/s (1.90x) |

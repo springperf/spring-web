@@ -1,6 +1,6 @@
 # Contributing Guide
 
-Thank you for your interest in Spring Web! We welcome all forms of contribution — reporting bugs, proposing features, improving documentation, or submitting code.
+Thank you for your interest in Spring WebPerf! We welcome all forms of contribution — reporting bugs, proposing features, improving documentation, or submitting code.
 
 ## Code of Conduct
 

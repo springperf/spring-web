@@ -154,7 +154,7 @@ Only with both does the entire pipeline run clean.
 
 ### Programming Model Comparison
 
-| Dimension | Spring Web (this project) | Spring WebFlux | Vert.x |
+| Dimension | WebPerf (this project) | Spring WebFlux | Vert.x |
 |-----------|--------------------------|----------------|--------|
 | Programming style | Synchronous Spring MVC | Reactive Reactor | Callback/Future |
 | Learning curve | Zero | High | Medium-high |
@@ -180,7 +180,7 @@ There's a fundamental philosophical difference between this project and "other h
 
 - **WebFlux** says: Want performance? Learn Reactor.
 - **Vert.x** says: Want performance? Write callbacks and futures.
-- **Spring Web** says: **Let the framework do the heavy lifting.**
+- **WebPerf** says: **Let the framework do the heavy lifting.**
 
 All it takes is one dependency change in your `pom.xml`:
 

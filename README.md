@@ -1,6 +1,6 @@
 > [English](docs/en/README.md) | 中文
 
-# Spring Web
+# Spring WebPerf
 
 基于 Netty 的高性能 Web 框架，兼容 Spring MVC 编程模型，零妥协的性能方案。
 
@@ -34,7 +34,7 @@
 >
 > 这引发了一个思考：如果把 Spring MVC 主流功能中那些不必要的运行时开销全部消除，性能能提升多少？
 >
-> **Spring Web 由此而生。** 目标：在兼容 Spring 生态的前提下，最大程度释放 Web 框架的性能。
+> **Spring WebPerf 由此而生。** 目标：在兼容 Spring 生态的前提下，最大程度释放 Web 框架的性能。
 >
 > [查看 Benchmark 报告](docs/benchmark.md) · [性能原理详解](docs/performance-principles.md) · [项目缘起全文](docs/overview.md)
 
@@ -42,7 +42,7 @@
 
 ## 简介
 
-Spring Web 是一个基于 **Netty** 构建的高性能 Web 框架，定位为 Spring MVC 的高性能替代方案。它保留了 Spring 开发者熟悉的编程模型（注解驱动、依赖注入、拦截器等），但通过启动时预缓存、零反射运行时等优化手段，在兼容 Spring 生态的前提下提供更高的吞吐量和更低的资源占用。
+Spring WebPerf 是一个基于 **Netty** 构建的高性能 Web 框架，定位为 Spring MVC 的高性能替代方案。它保留了 Spring 开发者熟悉的编程模型（注解驱动、依赖注入、拦截器等），但通过启动时预缓存、零反射运行时等优化手段，在兼容 Spring 生态的前提下提供更高的吞吐量和更低的资源占用。
 
 ---
 
@@ -147,7 +147,7 @@ perf 框架吞吐是 Servlet 容器的 **1.7\~3.9x**，p50 延迟 **0.12\~0.15ms
 
 ## 与 Spring MVC 对比
 
-| 维度 | Spring Web | Spring MVC (Tomcat) |
+| 维度 | WebPerf | Spring MVC (Tomcat) |
 |------|-----------|---------------------|
 | 底层引擎 | Netty 4.1 | Servlet 容器（Tomcat/Jetty/Undertow） |
 | 吞吐量 (json 4t) | **26,718** ops/s | 14,061 ops/s (1.90x) |

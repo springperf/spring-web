@@ -1,6 +1,6 @@
 > [English](en/overview.md) | 中文
 
-# Spring-Perf Web
+# Spring WebPerf
 
 基于 Netty 构建的高性能 Web 框架，兼容 Spring MVC 编程模型，零妥协的性能方案。
 

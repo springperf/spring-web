@@ -55,3 +55,4 @@ __pycache__/
 *.jfr
 *.txt
 *.py
+/promotion/

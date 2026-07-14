@@ -1,6 +1,6 @@
 > English | [中文](../overview.md)
 
-# Spring-Perf Web
+# Spring WebPerf
 
 A high-performance Netty-based web framework, compatible with the Spring MVC programming model — high performance, zero compromise.
 
