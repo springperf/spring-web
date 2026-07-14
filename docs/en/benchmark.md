@@ -1,12 +1,12 @@
 > English | [中文](../benchmark.md)
 
-# Spring Web Performance Benchmark Report
+# Spring WebPerf Performance Benchmark Report
 
 **Generated:** 2026-07-09 16:54:37
 
 **JDK:** jdk-1.8.0_341
 
-> **Note:** `perf` in this report is the Benchmark Profile name for Spring Web, corresponding to the "native Netty + 5 WebFilter + 3 Interceptor" configuration (see "Container Profiles" below). `perf-support` adds a Servlet bridge layer on top of that, used to evaluate bridge overhead.
+> **Note:** `perf` in this report is the Benchmark Profile name for Spring WebPerf, corresponding to the "native Netty + 5 WebFilter + 3 Interceptor" configuration (see "Container Profiles" below). `perf-support` adds a Servlet bridge layer on top of that, used to evaluate bridge overhead.
 
 ---
 
@@ -53,7 +53,7 @@ perf leads across all dimensions: highest throughput, lowest latency, lowest all
 
 | Profile | Port | Description |
 |---------|------|-------------|
-| perf | 9092 | Spring Web native Netty + 5 WebFilter + 3 Interceptor |
+| perf | 9092 | WebPerf native Netty + 5 WebFilter + 3 Interceptor |
 | perf-support | 9094 | perf + spring-web-support (Servlet bridge) + 5 Filter + 3 Interceptor |
 | tomcat | 9102 | Spring MVC + Tomcat + 5 Filter + 3 Interceptor |
 | undertow | 9112 | Spring MVC + Undertow + 5 Filter + 3 Interceptor |
@@ -232,7 +232,7 @@ perf's performance advantage comes from engineering trade-offs at the framework 
 
 ### Core Differences
 
-| Dimension | Spring Web (perf) | Spring MVC + Tomcat | Spring WebFlux |
+| Dimension | WebPerf (perf) | Spring MVC + Tomcat | Spring WebFlux |
 |-----------|-------------------|-------------------|-----------------|
 | Engine | **Netty Native** | Tomcat Servlet Container | Reactor Netty |
 | Programming Model | **Synchronous + Optional Reactive** | Synchronous Blocking | Reactive (Mono/Flux) |
@@ -320,7 +320,7 @@ Use `benchmark-all.sh` for a one-click run — it handles compilation, classpath
 
 | Profile | Port | Benchmark Class | Description |
 |---------|------|----------------|-------------|
-| `perf` | 9092 | PerfBenchmark | Spring Web native Netty + 5 WebFilter + 3 Interceptor |
+| `perf` | 9092 | PerfBenchmark | WebPerf native Netty + 5 WebFilter + 3 Interceptor |
 | `perf-support` | 9094 | PerfSupportBenchmark | perf + spring-web-support (Servlet bridge) + 5 Filter + 3 Interceptor |
 | `tomcat` | 9102 | TomcatBenchmark | Spring MVC + Tomcat + 5 Filter + 3 Interceptor |
 | `undertow` | 9112 | UndertowBenchmark | Spring MVC + Undertow + 5 Filter + 3 Interceptor |

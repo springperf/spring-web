@@ -71,8 +71,8 @@
 
 <!-- Bar showing reclaimed CPU -->
 <rect x="30" y="280" width="500" height="36" rx="2" fill="#22c55e"/>
-<text x="280" y="296" class="barLabel" font-size="10">CPU Freed for Business + IO + Other</text>
-<text x="280" y="309" class="barPct" font-size="11">Framework runtime overhead eliminated</text>
+<text x="440" y="296" class="barLabel" font-size="10">All CPU Used for I/O &amp; Network</text>
+<text x="440" y="309" class="barPct" font-size="11">Framework overhead reduced to noise level</text>
 
 <!-- Bar annotation: eliminated items shown as reclaimed -->
 <rect x="30" y="280" width="118" height="36" rx="2" fill="#22c55e" opacity="0.7" stroke="#86efac" stroke-width="1" stroke-dasharray="4,3"/>

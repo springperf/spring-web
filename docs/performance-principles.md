@@ -287,7 +287,7 @@ void drain() {
 
 ### 说明
 
-- **Spring Web** = 本项目（spring-boot-starter-web）
+- **Spring WebPerf** = 本项目（spring-boot-starter-web）
 - **MVC+Tomcat** = Spring MVC + Tomcat（spring-boot-starter-web 默认）
 - **WebFlux** = Spring WebFlux + Reactor Netty
 
@@ -297,7 +297,7 @@ void drain() {
 
 ### 核心架构
 
-| 维度 | Spring Web | MVC+Tomcat | WebFlux |
+| 维度 | WebPerf | MVC+Tomcat | WebFlux |
 |------|-----------|------------|---------|
 | 底层引擎 | **Netty 4.1**（原生） | Tomcat 9/10（Servlet 容器） | Reactor Netty |
 | 编程模型 | **同步 + 可选响应式** | 同步阻塞 | 响应式（Mono/Flux） |
@@ -308,7 +308,7 @@ void drain() {
 
 ### 请求生命周期
 
-| 维度 | Spring Web | MVC+Tomcat | WebFlux |
+| 维度 | WebPerf | MVC+Tomcat | WebFlux |
 |------|-----------|------------|---------|
 | 请求对象 | **`NettyServerHttpRequest`** → 包装 `FullHttpRequest`，引用计数管理 ByteBuf | `HttpServletRequest` → Tomcat 内部对象 | `ServerHttpRequest` → 包装 Netty `HttpRequest` |
 | 请求体读取 | **`ByteBuf` 零拷贝** → ≤4KB heap 拷贝，>4KB `retainedDuplicate()` | `InputStream.read()` → heap → direct 拷贝 | `DataBuffer` → `ByteBuf` 包装 |
@@ -317,7 +317,7 @@ void drain() {
 
 ### 请求处理管线
 
-| 维度 | Spring Web | MVC+Tomcat | WebFlux |
+| 维度 | WebPerf | MVC+Tomcat | WebFlux |
 |------|-----------|------------|---------|
 | 过滤器 | **`WebFilter`** SPI → 启动时构建有序链 | `javax.servlet.Filter` → 容器管理的 Filter Chain | `WebFilter` → 响应式链 |
 | 路径映射 | **多级 RouterOptimizer 链** → 精确路径 HashMap O(1)，前缀/后缀索引，兜底遍历 | **`AntPathMatcher`** → 遍历匹配，O(n) | **`PathPatternParser`** → 编译后匹配，近似 O(log n) |
@@ -327,7 +327,7 @@ void drain() {
 
 ### 参数与返回值
 
-| 维度 | Spring Web | MVC+Tomcat | WebFlux |
+| 维度 | WebPerf | MVC+Tomcat | WebFlux |
 |------|-----------|------------|---------|
 | 参数解析 | **启动时预缓存 `StaticArgumentResolver`** → 运行时直接调用，数组索引，零遍历 | **运行时匹配** → `HandlerMethodArgumentResolverComposite` + `synchronized` 缓存 | **运行时匹配** → 遍历 `HandlerMethodArgumentResolver` |
 | `@PathVariable` | 启动时预解析 → 运行时从 `Map<String,String>` 取值 | 每次请求从 `HandlerMethod` 取路径变量 | 每次请求从 `PathPattern` 取路径变量 |
@@ -339,7 +339,7 @@ void drain() {
 
 ### 拦截器与异常
 
-| 维度 | Spring Web | MVC+Tomcat | WebFlux |
+| 维度 | WebPerf | MVC+Tomcat | WebFlux |
 |------|-----------|------------|---------|
 | 拦截器 | **`HandlerInterceptor`** → 启动时预匹配到 Mapping，运行时直接迭代 | `HandlerInterceptor` → `MappedInterceptor` 运行时路径匹配 | **无拦截器概念** → 全部用 `WebFilter` 替代 |
 | 拦截器缓存 | **`InterceptorRegistry` 预匹配** → 每个 Mapping 的拦截器列表在 Phase3 确定 | `MappedInterceptor` → 每次请求遍历 include/exclude 模式 | — |
@@ -348,7 +348,7 @@ void drain() {
 
 ### SSE / 流式
 
-| 维度 | Spring Web | MVC+Tomcat | WebFlux |
+| 维度 | WebPerf | MVC+Tomcat | WebFlux |
 |------|-----------|------------|---------|
 | SSE 实现 | **`NettyStreamSender`** → `MpscUnboundedArrayQueue` + 无锁 Drain Loop | `SseEmitter` → 每个连接一个线程，同步阻塞写 | `Flux<ServerSentEvent>` → Reactor 背压 |
 | 背压机制 | **`channel.isWritable()` + `BackpressureHandler`** → 水位线精确控制 | **无** → 生产者过快直接阻塞线程 | Reactor `request(n)` → operator 链传播 |
@@ -357,7 +357,7 @@ void drain() {
 
 ### 对象分配与内存
 
-| 维度 | Spring Web | MVC+Tomcat | WebFlux |
+| 维度 | WebPerf | MVC+Tomcat | WebFlux |
 |------|-----------|------------|---------|
 | 属性容器 | **`Object[]` 数组** → `fastAttributes[i]`，零创建零哈希 | `ConcurrentHashMap` → Entry + String 对象分配 | `HashMap` → 哈希分配 |
 | 响应体缓冲 | **延迟分配** → 首次 `getBuf()` 才创建 ByteBuf | 内置缓冲区 → Tomcat 内部 `OutputStream` | `DataBufferFactory` → 可配置 |
@@ -366,7 +366,7 @@ void drain() {
 
 ### 生态兼容
 
-| 维度 | Spring Web | MVC+Tomcat | WebFlux |
+| 维度 | WebPerf | MVC+Tomcat | WebFlux |
 |------|-----------|------------|---------|
 | Servlet API | **桥接兼容**（`spring-web-support` 模块） | 原生支持 | 不支持 |
 | Actuator | **原生支持** + 独立管理端口 | 原生支持 | 原生支持 |

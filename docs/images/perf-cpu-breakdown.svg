@@ -71,8 +71,8 @@
 
 <!-- Bar showing reclaimed CPU -->
 <rect x="30" y="280" width="500" height="36" rx="2" fill="#22c55e"/>
-<text x="280" y="296" class="barLabel" font-size="10">CPU 回归业务 + IO + 其他</text>
-<text x="280" y="309" class="barPct" font-size="11">框架运行时开销已消除</text>
+<text x="440" y="296" class="barLabel" font-size="10">CPU 100% 用于 IO 与网络传输</text>
+<text x="440" y="309" class="barPct" font-size="11">框架运行时开销降至噪声水平</text>
 
 <!-- Bar annotation: eliminated items shown as reclaimed -->
 <rect x="30" y="280" width="118" height="36" rx="2" fill="#22c55e" opacity="0.7" stroke="#86efac" stroke-width="1" stroke-dasharray="4,3"/>
