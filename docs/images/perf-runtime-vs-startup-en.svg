@@ -23,14 +23,14 @@
 <rect class="card" x="0" y="0" width="720" height="540" rx="12"/>
 
 <text x="30" y="30" class="title">Startup Precomputation vs Runtime Matching — Request Path Comparison</text>
-<text x="30" y="50" class="subtitle">Same business logic, comparing Spring Web and Spring MVC request processing</text>
+<text x="30" y="50" class="subtitle">Same business logic, comparing WebPerf and Spring MVC request processing</text>
 
 <!-- Column headers -->
 <rect x="20" y="65" width="330" height="32" rx="6" class="mvc-box"/>
 <text x="185" y="85" class="colHeader" fill="#dc2626">Spring MVC (runtime matching per request)</text>
 
 <rect x="370" y="65" width="330" height="32" rx="6" class="web-box"/>
-<text x="535" y="85" class="colHeader" fill="#16a34a">Spring Web (precompute at startup, lookup at runtime)</text>
+<text x="535" y="85" class="colHeader" fill="#16a34a">WebPerf (precompute at startup, lookup at runtime)</text>
 
 <!-- VS divider -->
 <text x="360" y="85" class="vs-text">VS</text>
@@ -129,6 +129,6 @@
 <text x="660" y="450" class="webSavings">Zero</text>
 
 <!-- Bottom annotation -->
-<text x="360" y="525" class="subtitle" text-anchor="middle">Total: Spring MVC framework overhead ~49-63%  →  Spring Web: all eliminated</text>
+<text x="360" y="525" class="subtitle" text-anchor="middle">Total: Spring MVC framework overhead ~49-63%  →  WebPerf: all eliminated</text>
 
 </svg>

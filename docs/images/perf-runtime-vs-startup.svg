@@ -23,14 +23,14 @@
 <rect class="card" x="0" y="0" width="720" height="540" rx="12"/>
 
 <text x="30" y="30" class="title">启动时预计算 vs 运行时匹配——请求处理路径对比</text>
-<text x="30" y="50" class="subtitle">相同业务逻辑，Spring Web 与 Spring MVC 的关键差异</text>
+<text x="30" y="50" class="subtitle">相同业务逻辑，WebPerf 与 Spring MVC 的关键差异</text>
 
 <!-- Column headers -->
 <rect x="20" y="65" width="330" height="32" rx="6" class="mvc-box"/>
 <text x="185" y="85" class="colHeader" fill="#dc2626">Spring MVC (每次请求运行时匹配)</text>
 
 <rect x="370" y="65" width="330" height="32" rx="6" class="web-box"/>
-<text x="535" y="85" class="colHeader" fill="#16a34a">Spring Web (启动时预计算，运行时查表)</text>
+<text x="535" y="85" class="colHeader" fill="#16a34a">WebPerf (启动时预计算，运行时查表)</text>
 
 <!-- VS divider -->
 <text x="360" y="85" class="vs-text">VS</text>
@@ -129,6 +129,6 @@
 <text x="660" y="450" class="webSavings">零</text>
 
 <!-- Bottom annotation -->
-<text x="360" y="525" class="subtitle" text-anchor="middle">合计：Spring MVC 框架开销 ~49-63%  →  Spring Web 全部消除</text>
+<text x="360" y="525" class="subtitle" text-anchor="middle">合计：Spring MVC 框架开销 ~49-63%  →  WebPerf 全部消除</text>
 
 </svg>
