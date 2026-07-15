@@ -271,7 +271,7 @@ public class ReportGenerator {
         java.io.StringWriter sw = new java.io.StringWriter(4096);
         PrintWriter w = new PrintWriter(sw);
 
-        w.println("# Spring Web 性能对比报告\n");
+        w.println("# Spring WebPerf 性能对比报告\n");
         w.println("**生成时间:** " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         w.println();
         w.println("**JDK:** " + jdkDir.getFileName().toString());
@@ -376,7 +376,7 @@ public class ReportGenerator {
         java.io.StringWriter sw = new java.io.StringWriter(8192);
         PrintWriter w = new PrintWriter(sw);
 
-        w.println("# Spring Web 性能对比报告（多线程并发测试）\n");
+        w.println("# Spring WebPerf 性能对比报告（多线程并发测试）\n");
         w.println("**生成时间:** " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         w.println();
         w.println("**线程数:** " + String.join(", ", threadCounts));

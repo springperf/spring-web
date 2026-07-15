@@ -9,7 +9,7 @@
     <version>3.2.3</version>
     <packaging>pom</packaging>
 
-    <name>Spring Web Parent</name>
+    <name>Spring WebPerf Parent</name>
     <description>基于 Netty 的高性能自定义 SpringWeb 框架，SpringMVC 的替代方案</description>
     <url>https://github.com/springperf/spring-web</url>
 
