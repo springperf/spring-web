@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="420" viewBox="0 0 1100 420">
+<style>
+ .bg { fill: #f8fafc; }
+ .title { font: bold 14px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; }
+ .sectionTitle { font: bold 13px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; text-anchor: middle; }
+ .tickLabel { font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #9ca3af; }
+ .groupLabel { font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #374151; text-anchor: middle; }
+ .dataLabel { font: 9px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; text-anchor: middle; }
+ .legendText { font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #374151; }
+ .gridline { stroke: #e5e7eb; stroke-width: 1; }
+ .baseline { stroke: #d1d5db; stroke-width: 1; }
+ .bar-perf { fill: #22c55e; }
+ .bar-tomcat { fill: #3b82f6; }
+ .bar-undertow { fill: #f59e0b; }
+ .bar-webflux { fill: #8b5cf6; }
+</style>
+<rect class="bg" x="0" y="0" width="1100" height="420" rx="12"/>
+<text x="30" y="28" class="title">4线程 p50 延迟对比 (ms) — 越低越好</text>
+
+<!-- Legend -->
+<rect x="560" y="14" width="12" height="12" rx="2" class="bar-perf"/>
+<text x="576" y="24" class="legendText">perf</text>
+<rect x="615" y="14" width="12" height="12" rx="2" class="bar-tomcat"/>
+<text x="631" y="24" class="legendText">Tomcat</text>
+<rect x="685" y="14" width="12" height="12" rx="2" class="bar-undertow"/>
+<text x="701" y="24" class="legendText">Undertow</text>
+<rect x="760" y="14" width="12" height="12" rx="2" class="bar-webflux"/>
+<text x="776" y="24" class="legendText">WebFlux</text>
+
+<!-- ========== LEFT PANEL: 6 regular APIs ========== -->
+<!-- Chart: x=40 to x=730, y=55 to y=335, 690x280 -->
+<!-- Scale: 280px / 1.0ms = 280 px/ms, y = 335 - ms * 280 -->
+
+<text x="385" y="55" class="sectionTitle">常规接口</text>
+
+<line x1="60" y1="335" x2="60" y2="55" stroke="#d1d5db" stroke-width="1"/>
+<line x1="60" y1="335" x2="730" y2="335" class="baseline"/>
+<line x1="60" y1="280" x2="730" y2="280" class="gridline"/>
+<line x1="60" y1="225" x2="730" y2="225" class="gridline"/>
+<line x1="60" y1="170" x2="730" y2="170" class="gridline"/>
+<line x1="60" y1="115" x2="730" y2="115" class="gridline"/>
+<line x1="60" y1="60" x2="730" y2="60" class="gridline"/>
+
+<text x="48" y="339" class="tickLabel" text-anchor="end">0</text>
+<text x="48" y="284" class="tickLabel" text-anchor="end">0.2</text>
+<text x="48" y="229" class="tickLabel" text-anchor="end">0.4</text>
+<text x="48" y="174" class="tickLabel" text-anchor="end">0.6</text>
+<text x="48" y="119" class="tickLabel" text-anchor="end">0.8</text>
+<text x="48" y="64" class="tickLabel" text-anchor="end">1.0ms</text>
+
+<!-- 6 groups: each group center at c, bars at c-38, c-13, c+12, c+37, width=18px -->
+<!-- Group 1: json, center=112 -->
+<!-- perf 0.15: h=42, y=293 -->
+<rect x="74" y="293" width="18" height="42" class="bar-perf"/>
+<text x="83" y="287" class="dataLabel">0.15</text>
+<rect x="99" y="259" width="18" height="76" class="bar-tomcat"/>
+<text x="108" y="253" class="dataLabel">0.27</text>
+<rect x="124" y="259" width="18" height="76" class="bar-undertow"/>
+<text x="133" y="253" class="dataLabel">0.27</text>
+<rect x="149" y="265" width="18" height="70" class="bar-webflux"/>
+<text x="158" y="259" class="dataLabel">0.25</text>
+<text x="112" y="365" class="groupLabel">json</text>
+
+<!-- Group 2: get, center=240 -->
+<rect x="202" y="296" width="18" height="39" class="bar-perf"/>
+<text x="211" y="290" class="dataLabel">0.14</text>
+<rect x="227" y="248" width="18" height="87" class="bar-tomcat"/>
+<text x="236" y="242" class="dataLabel">0.31</text>
+<rect x="252" y="254" width="18" height="81" class="bar-undertow"/>
+<text x="261" y="248" class="dataLabel">0.29</text>
+<rect x="277" y="254" width="18" height="81" class="bar-webflux"/>
+<text x="286" y="248" class="dataLabel">0.29</text>
+<text x="240" y="365" class="groupLabel">get</text>
+
+<!-- Group 3: bytes, center=368 -->
+<rect x="330" y="301" width="18" height="34" class="bar-perf"/>
+<text x="339" y="295" class="dataLabel">0.12</text>
+<rect x="355" y="282" width="18" height="53" class="bar-tomcat"/>
+<text x="364" y="276" class="dataLabel">0.19</text>
+<rect x="380" y="282" width="18" height="53" class="bar-undertow"/>
+<text x="389" y="276" class="dataLabel">0.19</text>
+<rect x="405" y="282" width="18" height="53" class="bar-webflux"/>
+<text x="414" y="276" class="dataLabel">0.19</text>
+<text x="368" y="365" class="groupLabel">bytes</text>
+
+<!-- Group 4: valid, center=496 -->
+<rect x="458" y="293" width="18" height="42" class="bar-perf"/>
+<text x="467" y="287" class="dataLabel">0.15</text>
+<rect x="483" y="259" width="18" height="76" class="bar-tomcat"/>
+<text x="492" y="253" class="dataLabel">0.27</text>
+<rect x="508" y="265" width="18" height="70" class="bar-undertow"/>
+<text x="517" y="259" class="dataLabel">0.25</text>
+<rect x="533" y="265" width="18" height="70" class="bar-webflux"/>
+<text x="542" y="259" class="dataLabel">0.25</text>
+<text x="496" y="365" class="groupLabel">valid</text>
+
+<!-- Group 5: async, center=624 -->
+<rect x="586" y="296" width="18" height="39" class="bar-perf"/>
+<text x="595" y="290" class="dataLabel">0.14</text>
+<rect x="611" y="257" width="18" height="78" class="bar-tomcat"/>
+<text x="620" y="251" class="dataLabel">0.28</text>
+<rect x="636" y="254" width="18" height="81" class="bar-undertow"/>
+<text x="645" y="248" class="dataLabel">0.29</text>
+<rect x="661" y="279" width="18" height="56" class="bar-webflux"/>
+<text x="670" y="273" class="dataLabel">0.20</text>
+<text x="624" y="365" class="groupLabel">async</text>
+
+<!-- Group 6: bytesLarge, center=752 -->
+<rect x="714" y="240" width="18" height="95" class="bar-perf"/>
+<text x="723" y="234" class="dataLabel">0.34</text>
+<rect x="739" y="125" width="18" height="210" class="bar-tomcat"/>
+<text x="748" y="119" class="dataLabel">0.75</text>
+<rect x="764" y="217" width="18" height="118" class="bar-undertow"/>
+<text x="773" y="211" class="dataLabel">0.42</text>
+<rect x="789" y="212" width="18" height="123" class="bar-webflux"/>
+<text x="798" y="206" class="dataLabel">0.44</text>
+<text x="752" y="365" class="groupLabel">bytesLarge</text>
+
+<!-- ========== RIGHT PANEL: SSE ========== -->
+<!-- Chart: x=780 to x=1060, y=55 to y=335, 280x280 -->
+<!-- Scale: 280px / 14ms = 20 px/ms, y = 335 - ms * 20 -->
+
+<text x="920" y="55" class="sectionTitle">SSE</text>
+
+<line x1="800" y1="335" x2="800" y2="55" stroke="#d1d5db" stroke-width="1"/>
+<line x1="800" y1="335" x2="1060" y2="335" class="baseline"/>
+<line x1="800" y1="275" x2="1060" y2="275" class="gridline"/>
+<line x1="800" y1="215" x2="1060" y2="215" class="gridline"/>
+<line x1="800" y1="155" x2="1060" y2="155" class="gridline"/>
+<line x1="800" y1="95" x2="1060" y2="95" class="gridline"/>
+
+<text x="788" y="339" class="tickLabel" text-anchor="end">0</text>
+<text x="788" y="279" class="tickLabel" text-anchor="end">3ms</text>
+<text x="788" y="219" class="tickLabel" text-anchor="end">6ms</text>
+<text x="788" y="159" class="tickLabel" text-anchor="end">9ms</text>
+<text x="788" y="99" class="tickLabel" text-anchor="end">12ms</text>
+
+<!-- SSE group: center=930, bars at 892, 917, 942 -->
+<!-- perf 3.57: h=71, y=264 -->
+<rect x="892" y="264" width="22" height="71" class="bar-perf"/>
+<text x="903" y="258" class="dataLabel">3.57</text>
+<!-- tomcat 12.65: h=253, y=82 -->
+<rect x="917" y="82" width="22" height="253" class="bar-tomcat"/>
+<text x="928" y="76" class="dataLabel">12.65</text>
+<!-- webflux 4.25: h=85, y=250 -->
+<rect x="942" y="250" width="22" height="85" class="bar-webflux"/>
+<text x="953" y="244" class="dataLabel">4.25</text>
+<text x="930" y="365" class="groupLabel">sse</text>
+
+<!-- Separator -->
+<line x1="750" y1="50" x2="750" y2="370" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4,4"/>
+</svg>

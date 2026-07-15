@@ -1,18 +1,40 @@
 > [English](docs/en/README.md) | 中文
 
-# Spring Web
+# Spring WebPerf
 
-基于 Netty 的高性能 Web 框架，Spring MVC 的替代方案。
+基于 Netty 的高性能 Web 框架，兼容 Spring MVC 编程模型，零妥协的性能方案。
 
 [![CI](https://github.com/springperf/spring-web/actions/workflows/ci.yml/badge.svg)](https://github.com/springperf/spring-web/actions/workflows/ci.yml)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.springperf/spring-web)](https://central.sonatype.com/artifact/io.github.springperf/spring-web)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE.md)
+[![Throughput](https://img.shields.io/badge/Throughput-1.7~6.6x_vs_Spring_MVC-brightgreen?style=flat-square)](docs/benchmark.md)
+[![SSE](https://img.shields.io/badge/SSE-6.64x_under_high_concurrency-blue?style=flat-square)](docs/benchmark.md)
 
-> **缘起**：一次 1c1g 环境的性能测试中，同样的业务逻辑（设备数据上报 + 校验 + Redis/ClickHouse 写入），Kafka 消费端 TPS 接近 **15,000**，而 Spring MVC 接口不到 **4,000**。CPU 热点分析显示，Spring MVC 框架自身消耗了大量 CPU——参数解析、路由匹配、反射调用……这些开销与业务无关，却吞噬了绝大部分性能。Spring WebFlux 也存在类似的框架层开销。
+---
+
+## 性能概览
+
+<p align="center">
+<img src="docs/images/perf-benchmark.svg" alt="Performance Benchmark Chart"/>
+</p>
+
+> 全部 7 个接口 x 3 个并发度 x 4 个对比框架，**100% 胜率，无一例外**。延迟低 37%、内存分配少 41%、堆占用少 13%。
+>
+> [完整 Benchmark 报告](docs/benchmark.md) · [性能原理详解](docs/performance-principles.md)
+
+> **为什么是这个方案？** —— 三层论证：批处理为何优于非阻塞、CPU 优化为何是下一关、两者叠加为何才是完整方案。
+> 
+> [高性能 Java Web 的完整路径 →](docs/philosophy.md)
+
+---
+
+## 缘起
+
+> 一次 1c1g 环境的性能测试中，同样的业务逻辑（设备数据上报 + 校验 + Redis/ClickHouse 写入），Kafka 消费端 TPS 接近 **15,000**，而 Spring MVC 接口不到 **4,000**。CPU 热点分析显示，Spring MVC 框架自身消耗了大量 CPU——参数解析、路由匹配、反射调用……这些开销与业务无关，却吞噬了绝大部分性能。Spring WebFlux 也存在类似的框架层开销。
 >
 > 这引发了一个思考：如果把 Spring MVC 主流功能中那些不必要的运行时开销全部消除，性能能提升多少？
 >
-> **Spring Web 由此而生。** 目标：在兼容 Spring 生态的前提下，最大程度释放 Web 框架的性能。
+> **Spring WebPerf 由此而生。** 目标：在兼容 Spring 生态的前提下，最大程度释放 Web 框架的性能。
 >
 > [查看 Benchmark 报告](docs/benchmark.md) · [性能原理详解](docs/performance-principles.md) · [项目缘起全文](docs/overview.md)
 
@@ -20,7 +42,7 @@
 
 ## 简介
 
-Spring Web 是一个基于 **Netty** 构建的高性能 Web 框架，定位为 Spring MVC 的高性能替代方案。它保留了 Spring 开发者熟悉的编程模型（注解驱动、依赖注入、拦截器等），但底层使用 Netty 替代 Servlet 容器，在兼容 Spring 生态的前提下提供更高的吞吐量和更低的资源占用。
+Spring WebPerf 是一个基于 **Netty** 构建的高性能 Web 框架，定位为 Spring MVC 的高性能替代方案。它保留了 Spring 开发者熟悉的编程模型（注解驱动、依赖注入、拦截器等），但通过启动时预缓存、零反射运行时等优化手段，在兼容 Spring 生态的前提下提供更高的吞吐量和更低的资源占用。
 
 ---
 
@@ -100,19 +122,6 @@ management:
 
 ---
 
-## 版本选择
-
-本项目按 Spring Boot 大版本管理两个分支。最低支持 **Spring Boot 2.4.x**。
-
-| 分支 | Spring Boot | Spring Framework | JDK | Servlet API | 状态 |
-|------|------------|----------------|-----|-------------|------|
-| `2.7.x` | 2.4.x ~ 2.7.x | 5.3.x | 8 / 11 / 17 | javax.servlet 4.0 | 维护分支（功能迭代 + bugfix） |
-| `master` | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | 6.0.x ~ 6.2.x / 7.0.x | 17 / 21 | jakarta.servlet 6.0 | **开发基线**（多版本兼容，切换 Profile） |
-
-> 版本下限说明、分支选择建议及详细兼容性信息见 [版本兼容性说明](docs/compatibility.md)。
-
----
-
 ## 基准测试
 
 > 详细报告见 [Benchmark 文档](docs/benchmark.md)
@@ -130,13 +139,13 @@ management:
 | bytesLarge | **11,508** ops/s | **2.31x** | **1.48x** | **1.49x** |
 | sse | **1,226** ops/s | **3.89x** | — | **1.30x** |
 
-perf 框架吞吐是 Servlet 容器的 **1.7~3.9x**，p50 延迟 **0.12~0.15ms**（同类框架最低）。SSE 高并发下扩展至 Spring MVC 的 **6.64x**。详情见 [完整对比报告](docs/benchmark.md)。
+perf 框架吞吐是 Servlet 容器的 **1.7\~3.9x**，p50 延迟 **0.12\~0.15ms**（同类框架最低）。SSE 高并发下扩展至 Spring MVC 的 **6.64x**。详情见 [完整对比报告](docs/benchmark.md)。
 
 ---
 
 ## 与 Spring MVC 对比
 
-| 维度 | Spring Web | Spring MVC (Tomcat) |
+| 维度 | WebPerf | Spring MVC (Tomcat) |
 |------|-----------|---------------------|
 | 底层引擎 | Netty 4.1 | Servlet 容器（Tomcat/Jetty/Undertow） |
 | 吞吐量 (json 4t) | **26,718** ops/s | 14,061 ops/s (1.90x) |
@@ -149,6 +158,19 @@ perf 框架吞吐是 Servlet 容器的 **1.7~3.9x**，p50 延迟 **0.12~0.15ms**
 | 路由 | O(1) HashMap 多级优化器 | `AntPathMatcher` 线性遍历 |
 | Servlet API | 通过 support 模块桥接 | 原生支持 |
 | Actuator | 原生支持 | 原生支持 |
+
+---
+
+## 版本选择
+
+本项目按 Spring Boot 大版本管理两个分支。最低支持 **Spring Boot 2.4.x**。
+
+| 分支 | Spring Boot | Spring Framework | JDK | Servlet API | 状态 |
+|------|------------|----------------|-----|-------------|------|
+| `2.7.x` | 2.4.x ~ 2.7.x | 5.3.x | 8 / 11 / 17 | javax.servlet 4.0 | 维护分支（功能迭代 + bugfix） |
+| `master` | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | 6.0.x ~ 6.2.x / 7.0.x | 17 / 21 | jakarta.servlet 6.0 | **开发基线**（多版本兼容，切换 Profile） |
+
+> 版本下限说明、分支选择建议及详细兼容性信息见 [版本兼容性说明](docs/compatibility.md)。
 
 ---
 

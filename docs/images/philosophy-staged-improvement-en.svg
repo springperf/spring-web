@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="420" viewBox="0 0 720 420">
+<style>
+ .card { fill: #f8fafc; }
+ .title { font: bold 15px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; }
+ .subtitle { font: 12px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; text-anchor: middle; }
+ .label { font: 12px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; text-anchor: middle; }
+ .barLabel { font: bold 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; text-anchor: middle; }
+ .gain { font: bold 14px -apple-system,BlinkMacSystemFont,sans-serif; fill: #16a34a; text-anchor: middle; }
+ .gainSmall { font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: rgba(255,255,255,0.9); text-anchor: middle; }
+ .stageLabel { font: 12px -apple-system,BlinkMacSystemFont,sans-serif; fill: #374151; text-anchor: middle; }
+ .footnote { font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #9ca3af; text-anchor: middle; }
+ .bracketLabel { font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; text-anchor: middle; }
+</style>
+
+<rect class="card" x="0" y="0" width="720" height="420" rx="12"/>
+
+<text x="360" y="28" class="title" text-anchor="middle">Two-Phase Optimization: Cumulative Effect</text>
+<text x="360" y="46" class="subtitle">Each phase eliminates one bottleneck; combined, they unlock full performance</text>
+
+<!-- Baseline line -->
+<line x1="100" y1="340" x2="680" y2="340" stroke="#e5e7eb" stroke-width="1.5" stroke-dasharray="4,3"/>
+<text x="680" y="337" class="barLabel" fill="#9ca3af">1x (Spring MVC baseline)</text>
+
+<!-- Bar 1: 原生 Spring MVC (baseline) -->
+<rect x="120" y="320" width="100" height="40" rx="4" fill="#d1d5db"/>
+<text x="170" y="345" class="barLabel" fill="#6b7280">1x</text>
+<text x="170" y="378" class="stageLabel">Spring MVC</text>
+
+<!-- Bar 2: + Batching -->
+<rect x="250" y="250" width="100" height="110" rx="4" fill="#2563eb"/>
+<text x="300" y="300" class="gain">2~3x</text>
+<text x="300" y="318" class="gainSmall">IO-intensive</text>
+<text x="300" y="378" class="stageLabel">+ Batching</text>
+<text x="300" y="392" class="subtitle">Eliminates IO bottleneck</text>
+
+<!-- Bar 3: + Foundational Optimization -->
+<rect x="380" y="150" width="100" height="210" rx="4" fill="#f97316"/>
+<text x="430" y="230" class="gain">1.7~6.6x</text>
+<text x="430" y="250" class="gainSmall">All requests</text>
+<text x="430" y="378" class="stageLabel">+ Foundational Opt.</text>
+<text x="430" y="392" class="subtitle">Eliminates CPU framework tax</text>
+
+<!-- Bracket indicating benchmark-proven data -->
+<line x1="380" y1="135" x2="480" y2="135" stroke="#f97316" stroke-width="1.5"/>
+<line x1="380" y1="135" x2="380" y2="145" stroke="#f97316" stroke-width="1.5"/>
+<line x1="480" y1="135" x2="480" y2="145" stroke="#f97316" stroke-width="1.5"/>
+<text x="430" y="130" class="gainSmall" fill="#f97316">Benchmark-proven</text>
+
+<!-- Bar 4: Both Combined -->
+<rect x="510" y="70" width="100" height="290" rx="6" fill="#16a34a" stroke="#86efac" stroke-width="2"/>
+<text x="560" y="180" class="gain">Higher</text>
+<text x="560" y="198" class="gainSmall">Cumulative</text>
+<text x="560" y="378" class="stageLabel" font-weight="bold" fill="#16a34a">Combined</text>
+<text x="560" y="392" class="subtitle" fill="#16a34a">Complete solution</text>
+
+<!-- Arrows -->
+<line x1="350" y1="245" x2="510" y2="200" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.4"/>
+<line x1="480" y1="250" x2="510" y2="200" stroke="#f97316" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.4"/>
+
+<!-- Explanation callout -->
+<rect x="620" y="100" width="90" height="70" rx="6" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+<text x="665" y="120" class="bracketLabel" fill="#16a34a">Why higher?</text>
+<text x="665" y="140" class="footnote" fill="#374151">Batching and</text>
+<text x="665" y="155" class="footnote" fill="#374151">foundational opt.</text>
+<text x="665" y="168" class="footnote" fill="#374151">address different</text>
+<text x="665" y="181" class="footnote" fill="#374151">dimensions</text>
+
+<line x1="610" y1="215" x2="625" y2="170" stroke="#86efac" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+<!-- Bottom note -->
+<text x="360" y="412" class="footnote">Foundational optimization data: all 7 endpoints × 3 concurrency levels × 4 frameworks, 100% win rate — see Benchmark Report</text>
+
+</svg>

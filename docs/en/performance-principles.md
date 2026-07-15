@@ -102,6 +102,10 @@ return methodHandle.invokeExact(args);
 
 > Note: this benefit is independent of which thread executes the call — even when dispatched to a business thread pool, the invocation is still `INVOKEVIRTUAL`/`MethodHandle`.
 
+<p align="center">
+<img src="../images/perf-call-cost-en.svg" alt="Method Call Cost Comparison"/>
+</p>
+
 ---
 
 ## 3. O(1) Routing — Multi-Level Optimizer Chain
@@ -129,6 +133,10 @@ SuffixPathRouterOptimizer (suffix match → HashMap.get(suffix) O(1))
   ↓ miss
 LoopPathPatternRouterOptimizer (iterate PathPatternRouter[]  O(n))
 ```
+
+<p align="center">
+<img src="../images/perf-routing-flow-en.svg" alt="O(1) Routing — Multi-Level Optimizer Chain"/>
+</p>
 
 ### Why It's Faster
 
@@ -279,7 +287,7 @@ These are general benefits shared by all Netty-based frameworks, not unique to t
 
 ### Notes
 
-- **Spring Web** = this project (spring-boot-starter-web)
+- **Spring WebPerf** = this project (spring-boot-starter-web)
 - **MVC+Tomcat** = Spring MVC + Tomcat (spring-boot-starter-web default)
 - **WebFlux** = Spring WebFlux + Reactor Netty
 
@@ -289,7 +297,7 @@ When two descriptions are separated by `→` in the same cell, the left side is 
 
 ### Core Architecture
 
-| Dimension | Spring Web | MVC+Tomcat | WebFlux |
+| Dimension | WebPerf | MVC+Tomcat | WebFlux |
 |-----------|-----------|------------|---------|
 | Engine | **Netty 4.1** (native) | Tomcat 9/10 (Servlet container) | Reactor Netty |
 | Programming model | **Synchronous + optional reactive** | Synchronous blocking | Reactive (Mono/Flux) |
@@ -300,7 +308,7 @@ When two descriptions are separated by `→` in the same cell, the left side is 
 
 ### Request Lifecycle
 
-| Dimension | Spring Web | MVC+Tomcat | WebFlux |
+| Dimension | WebPerf | MVC+Tomcat | WebFlux |
 |-----------|-----------|------------|---------|
 | Request object | **`NettyServerHttpRequest`** → wraps `FullHttpRequest`, ref-counted ByteBuf | `HttpServletRequest` → Tomcat internal object | `ServerHttpRequest` → wraps Netty `HttpRequest` |
 | Body reading | **`ByteBuf` zero-copy** → ≤4KB heap copy, >4KB `retainedDuplicate()` | `InputStream.read()` → heap → direct copy | `DataBuffer` → `ByteBuf` wrapper |
@@ -309,7 +317,7 @@ When two descriptions are separated by `→` in the same cell, the left side is 
 
 ### Request Processing Pipeline
 
-| Dimension | Spring Web | MVC+Tomcat | WebFlux |
+| Dimension | WebPerf | MVC+Tomcat | WebFlux |
 |-----------|-----------|------------|---------|
 | Filters | **`WebFilter` SPI** → ordered chain built at startup | `javax.servlet.Filter` → container-managed Filter Chain | `WebFilter` → reactive chain |
 | Path mapping | **Multi-level RouterOptimizer chain** → exact path HashMap O(1), prefix/suffix index, fallback iteration | **`AntPathMatcher`** → iterative matching, O(n) | **`PathPatternParser`** → compiled matching, ~O(log n) |
@@ -319,7 +327,7 @@ When two descriptions are separated by `→` in the same cell, the left side is 
 
 ### Arguments & Return Values
 
-| Dimension | Spring Web | MVC+Tomcat | WebFlux |
+| Dimension | WebPerf | MVC+Tomcat | WebFlux |
 |-----------|-----------|------------|---------|
 | Argument resolution | **Startup pre-cached `StaticArgumentResolver`** → direct call at runtime, array index, zero iteration | **Runtime matching** → `HandlerMethodArgumentResolverComposite` + `synchronized` cache | **Runtime matching** → iterate `HandlerMethodArgumentResolver` |
 | `@PathVariable` | Parsed at startup → read from `Map<String,String>` at runtime | Per-request path variable extraction from `HandlerMethod` | Per-request path variable extraction from `PathPattern` |
@@ -331,7 +339,7 @@ When two descriptions are separated by `→` in the same cell, the left side is 
 
 ### Interceptors & Exceptions
 
-| Dimension | Spring Web | MVC+Tomcat | WebFlux |
+| Dimension | WebPerf | MVC+Tomcat | WebFlux |
 |-----------|-----------|------------|---------|
 | Interceptors | **`HandlerInterceptor`** → pre-matched to Mapping at startup, direct iteration at runtime | `HandlerInterceptor` → `MappedInterceptor` runtime path matching | **No interceptor concept** → all done via `WebFilter` |
 | Interceptor caching | **`InterceptorRegistry` pre-matching** → per-Mapping interceptor list determined in Phase3 | `MappedInterceptor` → per-request include/exclude pattern iteration | — |
@@ -340,7 +348,7 @@ When two descriptions are separated by `→` in the same cell, the left side is 
 
 ### SSE / Streaming
 
-| Dimension | Spring Web | MVC+Tomcat | WebFlux |
+| Dimension | WebPerf | MVC+Tomcat | WebFlux |
 |-----------|-----------|------------|---------|
 | SSE implementation | **`NettyStreamSender`** → `MpscUnboundedArrayQueue` + lock-free Drain Loop | `SseEmitter` → one thread per connection, synchronous blocking write | `Flux<ServerSentEvent>` → Reactor backpressure |
 | Backpressure mechanism | **`channel.isWritable()` + `BackpressureHandler`** → precise watermarks | **None** → fast producer directly blocks thread | Reactor `request(n)` → operator chain propagation |
@@ -349,7 +357,7 @@ When two descriptions are separated by `→` in the same cell, the left side is 
 
 ### Object Allocation & Memory
 
-| Dimension | Spring Web | MVC+Tomcat | WebFlux |
+| Dimension | WebPerf | MVC+Tomcat | WebFlux |
 |-----------|-----------|------------|---------|
 | Attribute container | **`Object[]` array** → `fastAttributes[i]`, zero allocation, zero hashing | `ConcurrentHashMap` → Entry + String allocation | `HashMap` → hash allocation |
 | Response buffer | **Deferred allocation** → `getBuf()` creates ByteBuf on first access | Built-in buffer → Tomcat internal `OutputStream` | `DataBufferFactory` → configurable |
@@ -358,7 +366,7 @@ When two descriptions are separated by `→` in the same cell, the left side is 
 
 ### Ecosystem Compatibility
 
-| Dimension | Spring Web | MVC+Tomcat | WebFlux |
+| Dimension | WebPerf | MVC+Tomcat | WebFlux |
 |-----------|-----------|------------|---------|
 | Servlet API | **Bridge compatible** (`spring-web-support` module) | Native | Not supported |
 | Actuator | **Native support** + standalone management port | Native | Native |

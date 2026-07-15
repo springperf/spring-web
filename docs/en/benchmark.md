@@ -1,12 +1,12 @@
 > English | [中文](../benchmark.md)
 
-# Spring Web Performance Benchmark Report
+# Spring WebPerf Performance Benchmark Report
 
 **Generated:** 2026-07-09 16:54:37
 
 **JDK:** jdk-1.8.0_341
 
-> **Note:** `perf` in this report is the Benchmark Profile name for Spring Web, corresponding to the "native Netty + 5 WebFilter + 3 Interceptor" configuration (see "Container Profiles" below). `perf-support` adds a Servlet bridge layer on top of that, used to evaluate bridge overhead.
+> **Note:** `perf` in this report is the Benchmark Profile name for Spring WebPerf, corresponding to the "native Netty + 5 WebFilter + 3 Interceptor" configuration (see "Container Profiles" below). `perf-support` adds a Servlet bridge layer on top of that, used to evaluate bridge overhead.
 
 ---
 
@@ -53,7 +53,7 @@ perf leads across all dimensions: highest throughput, lowest latency, lowest all
 
 | Profile | Port | Description |
 |---------|------|-------------|
-| perf | 9092 | Spring Web native Netty + 5 WebFilter + 3 Interceptor |
+| perf | 9092 | WebPerf native Netty + 5 WebFilter + 3 Interceptor |
 | perf-support | 9094 | perf + spring-web-support (Servlet bridge) + 5 Filter + 3 Interceptor |
 | tomcat | 9102 | Spring MVC + Tomcat + 5 Filter + 3 Interceptor |
 | undertow | 9112 | Spring MVC + Undertow + 5 Filter + 3 Interceptor |
@@ -77,15 +77,9 @@ perf leads across all dimensions: highest throughput, lowest latency, lowest all
 
 ### 1.1 4-Thread Baseline (ops/sec)
 
-| API | perf | Spring MVC (Tomcat) | Spring MVC (Undertow) | WebFlux |
-|-----|------|--------|----------|---------|
-| json | 26718 | 14061 | 10305 | 15460 |
-| get | 27398 | 12502 | 13425 | 13174 |
-| bytes | 34232 | 20045 | 11737 | 17211 |
-| valid | 26706 | 14544 | 13662 | 15621 |
-| async | 28354 | 13407 | 10169 | 18283 |
-| bytesLarge | 11508 | 4979 | 7764 | 7737 |
-| sse | 1226 | 315 | FAIL | 944 |
+<p align="center">
+<img src="../images/benchmark-throughput-4t-en.svg" alt="4-Thread Throughput Comparison"/>
+</p>
 
 #### perf Advantage (4-thread, vs Spring MVC)
 
@@ -112,6 +106,10 @@ Throughput growth from 4 → 64 threads, measuring the framework's concurrency s
 
 ### 1.3 perf Advantage vs Spring MVC Across Thread Levels
 
+<p align="center">
+<img src="../images/benchmark-multiple-trend-en.svg" alt="perf Advantage vs Concurrency"/>
+</p>
+
 | API | 4 threads | 16 threads | 64 threads |
 |----------|-----------|------------|------------|
 | json | 26718/14061 (**1.90x**) | 36245/22596 (**1.60x**) | 45328/20319 (**2.23x**) |
@@ -124,7 +122,7 @@ Throughput growth from 4 → 64 threads, measuring the framework's concurrency s
 
 ### 1.4 Analysis
 
-- **Small payload (json/get/bytes/valid/async)**: perf reaches 26K~34K ops/s at 4 threads, **1.7~2.2x** of Spring MVC. As threads increase to 64, perf throughput grows continuously (json +70%, get +63%), while Spring MVC plateaus after 16 threads — thread pool contention becomes the bottleneck. The get API shows the highest advantage ratio (**2.19x** at 4t), as perf's pre-caching of path parameters and query parameters delivers the most benefit.
+- **Small payload (json/get/bytes/valid/async)**: perf reaches 26K~34K ops/s at 4 threads, **1.7\~2.2x** of Spring MVC. As threads increase to 64, perf throughput grows continuously (json +70%, get +63%), while Spring MVC plateaus after 16 threads — thread pool contention becomes the bottleneck. The get API shows the highest advantage ratio (**2.19x** at 4t), as perf's pre-caching of path parameters and query parameters delivers the most benefit.
 - **SSE**: perf's scalability advantage peaks here — throughput grows **117%** from 4→64 threads (1226→2655), while Spring MVC grows only **27%** (315→400). perf's advantage expands from 3.89x at 4t to **6.64x** at 64t. Root cause: perf's EventLoop (Netty I/O thread model — a single thread handles events across multiple connections, eliminating context switches) + lock-free Drain Loop (a data push loop that requires no locking, with writes completed entirely on the EventLoop thread) model doesn't block threads, while Spring MVC's thread-per-connection model is severely constrained at 64 threads.
 - **bytesLarge (100KB)**: perf peaks at 16 threads (17,257 ops/s, 2.60x vs Spring MVC), maintaining 14,641 ops/s at 64 threads.
 - **perf-support bridge overhead**: See Section 7 for detailed bridge layer overhead analysis.
@@ -136,6 +134,10 @@ Throughput growth from 4 → 64 threads, measuring the framework's concurrency s
 
 ### 2.1 4 Threads p50 / p99 / p99.9
 
+<p align="center">
+<img src="../images/benchmark-latency-p50-en.svg" alt="4-Thread p50 Latency Comparison"/>
+</p>
+
 | API | perf | Spring MVC (Tomcat) | Spring MVC (Undertow) | WebFlux |
 |-----|------|--------|----------|---------|
 | json | **0.15 / 0.22 / 0.35** | 0.27 / 0.47 / 0.75 | 0.27 / 0.63 / 2.17 | 0.25 / 0.66 / 2.11 |
@@ -146,7 +148,7 @@ Throughput growth from 4 → 64 threads, measuring the framework's concurrency s
 | bytesLarge | **0.34 / 0.51 / 2.61** | 0.75 / 1.17 / 3.33 | 0.42 / 1.23 / 15.98 | 0.44 / 1.20 / 3.21 |
 | sse | **3.57 / 4.24 / 6.25** | 12.65 / 17.07 / 22.64 | FAIL | 4.25 / 6.86 / 9.80 |
 
-perf p50 latency is **0.12~0.15ms** (small payload), 50-60% of Spring MVC. p99 is **0.22ms** and p99.9 is **0.29~0.35ms** — the EventLoop model's tail latency is very stable under low concurrency.
+perf p50 latency is **0.12\~0.15ms** (small payload), 50-60% of Spring MVC. p99 is **0.22ms** and p99.9 is **0.29~0.35ms** — the EventLoop model's tail latency is very stable under low concurrency.
 
 SSE: perf p50 is **3.57ms**, far below Spring MVC's 12.65ms and better than WebFlux's 4.25ms.
 
@@ -170,7 +172,11 @@ bytes API perf p50 is only **0.25ms** (1/9 of Spring MVC's 2.36ms), delivering e
 
 ## 3. GC Behavior
 
-GC data comes from JVM-level logs, identical across all APIs within the same profile. Per-request allocation varies by throughput — the table shows json, get, and SSE as representative examples.
+GC data comes from JVM-level logs, identical across all APIs within the same profile.
+
+<p align="center">
+<img src="../images/benchmark-memory-allocation-en.svg" alt="Per-Request Memory Allocation"/>
+</p>
 
 | Container | Threads | Young GC Count | Avg Pause | Allocation Rate | Per-request Alloc (json) | Per-request Alloc (get) | SSE Per-request Alloc |
 |-----------|---------|---------------|-----------|-----------------|-------------------------|------------------------|----------------------|
@@ -187,9 +193,9 @@ GC data comes from JVM-level logs, identical across all APIs within the same pro
 | webflux | 16 | 245 | 2.6ms | 682MB/s | 31.3KB | 51.0KB | 643.5KB |
 | webflux | 64 | 282 | 3.0ms | 766MB/s | 34.9KB | 42.0KB | 762.4KB |
 
-perf allocates only **15.2~17.7KB** per request for json, significantly lower than Spring MVC's 27.4~29.9KB and webflux's 31.3~36.0KB. Lower allocation = fewer GC pauses, better cache locality.
+perf allocates only **15.2\~17.7KB** per request for json, significantly lower than Spring MVC's 27.4~29.9KB and webflux's 31.3~36.0KB. Lower allocation = fewer GC pauses, better cache locality.
 
-The allocation gap is even wider for the get API — perf uses only **15.4~16.9KB** per request, while Spring MVC uses **32.9~40.3KB** (2.1~2.4x of perf) and webflux uses **42.0~56.1KB** (2.7~3.3x of perf). perf's startup pre-caching eliminates the per-request parameter name parsing overhead that Spring MVC incurs for each of the 5 query parameters.
+The allocation gap is even wider for the get API — perf uses only **15.4\~16.9KB** per request, while Spring MVC uses **32.9\~40.3KB** (2.1~2.4x of perf) and webflux uses **42.0\~56.1KB** (2.7~3.3x of perf). perf's startup pre-caching eliminates the per-request parameter name parsing overhead that Spring MVC incurs for each of the 5 query parameters.
 
 For SSE, perf's per-request allocation drops from 386.7KB (4t) to **260.0KB** (64t) — a 33% decrease — as the EventLoop reuses buffers under higher concurrency. In contrast, Spring MVC ranges 1335~1563KB and webflux's allocation increases with concurrency (588.5→762.4KB).
 
@@ -226,7 +232,7 @@ perf's performance advantage comes from engineering trade-offs at the framework 
 
 ### Core Differences
 
-| Dimension | Spring Web (perf) | Spring MVC + Tomcat | Spring WebFlux |
+| Dimension | WebPerf (perf) | Spring MVC + Tomcat | Spring WebFlux |
 |-----------|-------------------|-------------------|-----------------|
 | Engine | **Netty Native** | Tomcat Servlet Container | Reactor Netty |
 | Programming Model | **Synchronous + Optional Reactive** | Synchronous Blocking | Reactive (Mono/Flux) |
@@ -271,38 +277,126 @@ perf-support is the perf (native Netty) container with a Servlet bridge layer, u
 
 ## How to Run
 
+### Prerequisites
+
+JDK 8+, Maven 3.6+, project fully built via `mvn install -DskipTests`.
+
+### Script (Recommended)
+
+Use `benchmark-all.sh` for a one-click run — it handles compilation, classpath building, multi-profile server startup, and report generation automatically.
+
 ```bash
-# Full run (multi-thread concurrency test)
+# Full run (5 profiles × 7 APIs, 4 threads)
+./spring-web-benchmark/benchmark-all.sh
+
+# Multi-thread concurrency test (auto-generates scalability matrix)
 ./spring-web-benchmark/benchmark-all.sh --thread-list 4,16,64
 
-# Single profile
+# Filter by profile and API
+./spring-web-benchmark/benchmark-all.sh --profiles perf,tomcat --apis json,sse
+
+# Multi-JDK comparison (default JDK + specified JDK)
+./spring-web-benchmark/benchmark-all.sh --jdk java,/path/to/jdk17 --thread-list 4,16,64
+
+# Enable SampleTime mode (outputs p50/p90/p99/p99.9/p99.99 latency percentiles)
+./spring-web-benchmark/benchmark-all.sh --sampleTime
+```
+
+#### CLI Parameters
+
+| Parameter | Description | Default | Example |
+|-----------|-------------|---------|---------|
+| `--profiles` | Comma-separated profile list | `perf,perf-support,tomcat,undertow,webflux` | `--profiles perf,tomcat` |
+| `--api` | Run a single API | All 7 APIs | `--api sse` |
+| `--apis` | Run multiple APIs (comma-separated) | All 7 APIs | `--apis json,sse` |
+| `--jdk` / `--jdks` | JDK path(s), comma-separated for multiple | System default `java` | `--jdk /path/to/jdk17` or `--jdk java,/path/to/jdk17` |
+| `--thread-list` | Thread counts for concurrency scaling test (comma-separated) | Single run at 4 threads | `--thread-list 1,4,16,64` |
+| `--threads` | JMH threads for a single run (no subdirectory created) | 4 | `--threads 8` |
+| `--sampleTime` | Enable SampleTime mode (includes percentile latency data) | Off (Throughput) | `--sampleTime` |
+
+> **`--thread-list` vs `--threads`**: `--thread-list` creates separate `threads-N` subdirectories for each thread count, and the report generates a scalability comparison matrix. `--threads` only sets the JMH threads parameter for a single run, without creating multi-level directories.
+
+#### Built-in Profiles
+
+| Profile | Port | Benchmark Class | Description |
+|---------|------|----------------|-------------|
+| `perf` | 9092 | PerfBenchmark | WebPerf native Netty + 5 WebFilter + 3 Interceptor |
+| `perf-support` | 9094 | PerfSupportBenchmark | perf + spring-web-support (Servlet bridge) + 5 Filter + 3 Interceptor |
+| `tomcat` | 9102 | TomcatBenchmark | Spring MVC + Tomcat + 5 Filter + 3 Interceptor |
+| `undertow` | 9112 | UndertowBenchmark | Spring MVC + Undertow + 5 Filter + 3 Interceptor |
+| `webflux` | 9122 | WebFluxBenchmark | Spring WebFlux + Reactor Netty + 8 WebFilter |
+
+#### Built-in APIs
+
+| API | Endpoint | Description |
+|-----|----------|-------------|
+| `json` | POST /api/demo/echo | Small JSON request body (~50B) + echo |
+| `get` | GET /api/demo/hello/{name} | Path variable + 5 query parameters |
+| `bytes` | GET /api/core/bytes | Raw byte response (26B) |
+| `valid` | POST /api/core/validate | @Validated Bean Validation |
+| `async` | GET /api/core/deferred-result | Async DeferredResult return |
+| `bytesLarge` | GET /api/core/large-response | 100KB byte[] response |
+| `sse` | GET /api/core/sse | SSE streaming (100 messages × 200 chars) |
+
+#### Workflow
+
+The script executes in 4 steps:
+
+1. **Full compilation**: `mvn clean install -DskipTests` builds all modules
+2. **Classpath build**: Each profile exports its dependency list via `mvn dependency:build-classpath`
+3. **Compile + run matrix**: Compiles each profile, starts the server, runs JMH benchmarks. Each combination gets its own GC log
+4. **Report generation**: `ReportGenerator` aggregates all JSON results and produces a Markdown report
+
+#### Advanced Usage
+
+Pass JVM system properties directly to the benchmark process via `-D` flags:
+
+| Property | Type | Description | Example |
+|----------|------|-------------|---------|
+| `benchmark.jfr` | boolean | Enable JFR flight recording | `-Dbenchmark.jfr=true` |
+| `benchmark.jfr.duration` | duration | JFR recording duration | `-Dbenchmark.jfr.duration=600s` |
+| `benchmark.jfr.settings` | string | JFR config (profile/default) | `-Dbenchmark.jfr.settings=profile` |
+| `benchmark.stack` | boolean | Enable StackProfiler (ThreadMXBean CPU sampling) | `-Dbenchmark.stack=true` |
+| `jmh.forks` | int | JMH fork count (default `0`, script overrides to `1`) | `-Djmh.forks=3` |
+
+### Maven (Single Profile Debugging)
+
+```bash
 cd spring-web-benchmark
 mvn jmh:run -Pbenchmark-perf -Dbenchmark.profile.name=perf
 ```
 
-> **Prerequisites:** JDK 8+, Maven 3.6+, project fully built via `mvn install -DskipTests`.
+Available profiles: `benchmark-perf`, `benchmark-perf-support`, `benchmark-tomcat`, `benchmark-undertow`, `benchmark-webflux`.
 
-## Output Structure
+### Output Structure
 
 ```
 spring-web-benchmark/benchmark-reports/
 ├── latest/
-│   ├── report.md              ← Latest report
-│   └── gc-*.log               ← GC logs
-└── YYYYMMDD-HHMMSS/           ← Historical snapshots
-    ├── threads-4/
-    ├── threads-16/
-    └── threads-64/
+│   └── report.md                            ← Latest report (symlink, auto-overwritten)
+├── YYYYMMDD-HHMMSS/                         ← Historical snapshot (by timestamp)
+│   ├── report.md                            ← Report for this run
+│   ├── threads-4/                           ← Created when --thread-list is used
+│   │   └── jdk-1.8.0_341/                  ← Per-JDK subdirectory
+│   │       ├── jmh-results-perf-json.json  ← Raw JMH JSON per Profile × API
+│   │       ├── jmh-results-perf-get.json
+│   │       ├── gc-perf.log                  ← GC log
+│   │       └── memory-perf.json             ← Memory snapshot
+│   ├── threads-16/
+│   │   └── jdk-1.8.0_341/
+│   ├── threads-64/
+│   │   └── jdk-1.8.0_341/
+│   └── .cp/                                 ← Cached classpath files (survives mvn clean)
 ```
 
-## Configuration Parameters
+### Configuration Parameters (JMH Benchmark)
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | JMH Warmup | 10 × 10s | 10 rounds × 10 seconds |
 | JMH Measurement | 10 × 10s | 10 rounds × 10 seconds |
 | Fork | 1 | Fork JVM isolation |
-| Threads | 4, 16, 64 | Concurrent thread counts |
+| Threads | 4 | Concurrent threads (`--thread-list` for multiple) |
 | Heap | 1GB | -Xms1g -Xmx1g |
 | GC | G1GC | -XX:+UseG1GC |
 | Protocol | HTTP/1.1 | keep-alive |

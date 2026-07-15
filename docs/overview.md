@@ -1,8 +1,8 @@
 > [English](en/overview.md) | 中文
 
-# Spring-Perf Web
+# Spring WebPerf
 
-基于 Netty 构建的高性能 Web 框架，兼容 Spring 编程模型，可作为 Spring MVC 的即换即用替代方案。
+基于 Netty 构建的高性能 Web 框架，兼容 Spring MVC 编程模型，零妥协的性能方案。
 
 ## 缘起
 
@@ -21,6 +21,10 @@
 ### 热点分析
 
 这些开销的共同特征：**运行时重计算而非启动时预计算**。信息在请求到达前就已确定，但 Spring 在运行时重新查找、匹配、创建。本项目在启动阶段完成所有元数据解析和匹配，运行时只做查表，以下每项开销在本项目中均不存在。
+
+<p align="center">
+<img src="images/perf-cpu-breakdown.svg" alt="CPU 去哪儿了？——框架运行时开销分解"/>
+</p>
 
 #### Spring MVC 运行时开销
 
@@ -124,6 +128,10 @@ WebFlux（Netty 运行时，4,173 样本）与 MVC 问题模式高度相似，�
 - `DefaultHeaders.add` + 校验（validateToken/validateAsciiStringToken ~1.2%）
 - `ByteToMessageDecoder.decodeRemovalReentryProtection`（3.67%）
 
+<p align="center">
+<img src="images/perf-runtime-vs-startup.svg" alt="启动时预计算 vs 运行时匹配——请求处理路径对比"/>
+</p>
+
 ### 从洞察到行动
 
 这个问题不是换个 Servlet 容器能解决的——Tomcat 换成 Undertow 或 Jetty 改善有限，WebFlux 也有类似的框架开销。
@@ -136,10 +144,10 @@ WebFlux（Netty 运行时，4,173 样本）与 MVC 问题模式高度相似，�
 
 在 JDK 1.8 + G1GC (1GB heap) 的基准测试中，本框架在 8 个场景下全面领先：
 
-- 小包场景吞吐 **26K~34K** ops/s（4 线程），是 Spring MVC 的 **1.71x~2.11x**
+- 小包场景吞吐 **26K\~34K** ops/s（4 线程），是 Spring MVC 的 **1.71x\~2.11x**
 - P50 延迟 **0.12~0.15ms**，约为 Spring MVC 的 **50-60%**
 - 稳态堆占用 **20MB**（4 线程），约为 Spring MVC 的 **87%**
-- SSE 流式场景吞吐 **1,226** ops/s（4 线程），达到 Spring MVC 的 **3.89x**，高并发下扩展至 **6.37x**
+- SSE 流式场景吞吐 **1,226** ops/s（4 线程），达到 Spring MVC 的 **3.89x**，高并发下扩展至 **6.64x**
 
 > 详细数据见 [Benchmark 报告](benchmark.md)，技术原理见 [性能原理](performance-principles.md)。
 
@@ -262,7 +270,7 @@ AI 编程（Copilot、Cursor、Claude Code 等）已深度融入日常开发。�
 
 大模型应用的核心交互模式是**流式输出**：Token 逐个生成、实时推送。无论是 ChatGPT 的逐字回复、Agent 的任务状态流，还是 RAG 的检索进度反馈，底层都依赖 **SSE (Server-Sent Events)** 协议。
 
-然而 SSE 在传统 Servlet 容器上性能表现不佳——Spring MVC 的 SSE 吞吐仅约 **315 ops/s**（4 线程），成为 AI 应用链路的瓶颈。本项目的 SSE 吞吐达到 **1,226 ops/s**，是 Spring MVC 的 **3.89x**，高并发下扩展至 **6.37x**。支撑这一性能的是 **NettyStreamSender** 的无锁 Drain Loop 设计：写入操作不依赖线程池调度，直接在 EventLoop 上完成批量刷新，避免传统 Servlet 容器中 SSE 连接独占线程的问题。
+然而 SSE 在传统 Servlet 容器上性能表现不佳——Spring MVC 的 SSE 吞吐仅约 **315 ops/s**（4 线程），成为 AI 应用链路的瓶颈。本项目的 SSE 吞吐达到 **1,226 ops/s**，是 Spring MVC 的 **3.89x**，高并发下扩展至 **6.64x**。支撑这一性能的是 **NettyStreamSender** 的无锁 Drain Loop 设计：写入操作不依赖线程池调度，直接在 EventLoop 上完成批量刷新，避免传统 Servlet 容器中 SSE 连接独占线程的问题。
 
 这意味着：
 

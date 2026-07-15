@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="330" viewBox="0 0 720 330">
+<style>
+ .card { fill: #f8fafc; }
+ .title { font: bold 15px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; }
+ .subtitle { font: 12px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; }
+ .sectionLabel { font: bold 13px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; }
+ .barLabel { font: bold 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #fff; text-anchor: middle; }
+ .arrowLabel { font: 12px -apple-system,BlinkMacSystemFont,sans-serif; fill: #2563eb; text-anchor: middle; }
+ .calloutText { font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #374151; }
+</style>
+
+<rect class="card" x="0" y="0" width="720" height="330" rx="12"/>
+
+<text x="30" y="28" class="title">Bottleneck Shift: IO → CPU</text>
+<text x="30" y="46" class="subtitle">Once batching eliminates the IO bottleneck, framework CPU overhead becomes the ceiling</text>
+
+<!-- ===== BEFORE: IO is bottleneck ===== -->
+<text x="30" y="75" class="sectionLabel">Before: IO Is the Bottleneck</text>
+
+<rect x="30" y="90" width="400" height="32" rx="3" fill="#ef4444"/>
+<text x="230" y="110" class="barLabel">IO BOTTLENECK</text>
+
+<rect x="430" y="90" width="120" height="32" rx="3" fill="#22c55e"/>
+<text x="490" y="110" class="barLabel" font-size="9" fill="#1f2937">CPU OK</text>
+
+<text x="30" y="142" class="subtitle">IO masks the CPU problem — "everything's waiting on IO anyway, CPU isn't the bottleneck"</text>
+
+<!-- ===== Arrow ===== -->
+<line x1="230" y1="155" x2="230" y2="180" stroke="#2563eb" stroke-width="2" stroke-dasharray="4,3"/>
+<polygon points="230,180 222,170 238,170" fill="#2563eb"/>
+<text x="110" y="170" class="arrowLabel" text-anchor="end">Batching eliminates IO bottleneck</text>
+
+<!-- ===== AFTER: CPU is bottleneck ===== -->
+<text x="30" y="205" class="sectionLabel">After: CPU Is the New Bottleneck</text>
+
+<rect x="30" y="220" width="120" height="32" rx="3" fill="#22c55e"/>
+<text x="90" y="240" class="barLabel" font-size="9" fill="#1f2937">IO OPTIMIZED</text>
+
+<rect x="150" y="220" width="400" height="32" rx="3" fill="#f97316"/>
+<text x="350" y="240" class="barLabel">CPU BOTTLENECK</text>
+
+<text x="30" y="272" class="subtitle">IO no longer blocks → CPU overhead exposed → foundational optimization needed to eliminate framework CPU cost</text>
+
+<!-- Right side annotation -->
+<rect x="565" y="75" width="130" height="90" rx="6" fill="#fff7ed" stroke="#fdba74" stroke-width="1.5"/>
+<text x="630" y="95" class="barLabel" fill="#c2410c" text-anchor="middle">Key Insight</text>
+<text x="630" y="115" class="calloutText" text-anchor="middle">IO optimization</text>
+<text x="630" y="130" class="calloutText" text-anchor="middle">exposes the</text>
+<text x="630" y="148" class="calloutText" text-anchor="middle">next bottleneck</text>
+
+<line x1="550" y1="120" x2="565" y2="120" stroke="#fdba74" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+</svg>

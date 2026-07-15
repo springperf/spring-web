@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# benchmark-all.sh — Spring Web Benchmark 一键全量运行脚本 (Linux / macOS / WSL)
+# benchmark-all.sh — Spring WebPerf Benchmark 一键全量运行脚本 (Linux / macOS / WSL)
 #
 # 直接绕过 jmh-maven-plugin，使用 java -cp 运行 BenchmarkRunner。
 # 每个 profile 编译并运行一次服务器实例，所有 API 在同一 JVM 中顺序执行。
@@ -94,7 +94,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 echo "=========================================="
-echo " Spring Web Benchmark — $RUN_ID"
+echo " Spring WebPerf Benchmark — $RUN_ID"
 echo "=========================================="
 
 # ========== 确定执行参数 ==========

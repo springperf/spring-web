@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="260" viewBox="0 0 600 260">
+<style>
+ .card { fill: #f8fafc; }
+ .title { font: bold 14px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; }
+ .axisLabel { font: 13px -apple-system,BlinkMacSystemFont,sans-serif; fill: #374151; }
+ .value { font: bold 13px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; }
+ .note { font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #6b7280; }
+ .bar-invokevirtual { fill: #22c55e; }
+ .bar-methodhandle { fill: #3b82f6; }
+ .bar-reflect { fill: #ef4444; }
+</style>
+<rect class="card" x="0" y="0" width="600" height="260" rx="12"/>
+
+<text x="30" y="30" class="title">方法调用耗时对比</text>
+<text x="500" y="30" class="note" text-anchor="end">耗时越低越好</text>
+
+<!-- X-axis -->
+<line x1="150" y1="220" x2="570" y2="220" stroke="#d1d5db" stroke-width="1"/>
+<text x="150" y="240" class="note" text-anchor="middle">0ns</text>
+<text x="360" y="240" class="note" text-anchor="middle">100ns</text>
+<text x="570" y="240" class="note" text-anchor="middle">220ns</text>
+
+<!-- Gridlines -->
+<line x1="150" y1="60" x2="150" y2="220" stroke="#e5e7eb" stroke-width="1"/>
+<line x1="360" y1="60" x2="360" y2="220" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="3,3"/>
+
+<!-- INVOKEVIRTUAL bar - scale: 210px/220ns = 0.955 px/ns -->
+<!-- 10ns → 10px -->
+<text x="140" y="95" class="axisLabel" text-anchor="end">INVOKEVIRTUAL</text>
+<rect x="150" y="80" width="10" height="20" rx="3" class="bar-invokevirtual"/>
+<text x="165" y="94" class="value">~10ns</text>
+<text x="260" y="94" class="note">无开销，JIT 可直接内联</text>
+
+<!-- MethodHandle - 30ns → 29px -->
+<text x="140" y="135" class="axisLabel" text-anchor="end">MethodHandle</text>
+<rect x="150" y="120" width="29" height="20" rx="3" class="bar-methodhandle"/>
+<text x="184" y="134" class="value">~30ns</text>
+<text x="310" y="134" class="note">JVM intrinsic，无访问检查</text>
+
+<!-- Method.invoke - 200ns → 191px -->
+<text x="140" y="175" class="axisLabel" text-anchor="end">Method.invoke()</text>
+<rect x="150" y="160" width="191" height="20" rx="3" class="bar-reflect"/>
+<text x="346" y="174" class="value">~200ns</text>
+<text x="450" y="174" class="note">access check + 装箱 + 类型校验</text>
+</svg>
