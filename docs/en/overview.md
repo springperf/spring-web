@@ -1,8 +1,8 @@
 > English | [中文](../overview.md)
 
-# Spring-Perf Web
+# Spring WebPerf
 
-A high-performance Netty-based web framework compatible with the Spring programming model, designed as a drop-in replacement for Spring MVC.
+A high-performance Netty-based web framework, compatible with the Spring MVC programming model — high performance, zero compromise.
 
 ## Origin
 
@@ -21,6 +21,10 @@ Same business logic — only the transport layer changed from a message queue to
 ### Hotspot Analysis
 
 The common characteristic of these overheads: **runtime recomputation instead of startup-time precomputation**. All the information needed is known before a request arrives, yet Spring re-looks-up, re-matches, and re-creates at runtime. This framework resolves all metadata at startup and does only table lookups at runtime — none of the following overheads exist in this project.
+
+<p align="center">
+<img src="../images/perf-cpu-breakdown-en.svg" alt="Where Does the CPU Go? — Framework Runtime Overhead"/>
+</p>
 
 #### Spring MVC Runtime Overhead
 
@@ -124,6 +128,10 @@ This overhead exists in both frameworks:
 - `DefaultHeaders.add` + validation (validateToken/validateAsciiStringToken ~1.2%)
 - `ByteToMessageDecoder.decodeRemovalReentryProtection` (3.67%)
 
+<p align="center">
+<img src="../images/perf-runtime-vs-startup-en.svg" alt="Startup Precomputation vs Runtime Matching — Request Path Comparison"/>
+</p>
+
 ### From Insight to Action
 
 This problem couldn't be solved by switching Servlet containers — switching Tomcat to Undertow or Jetty yields marginal improvement, and WebFlux has similar framework overhead.
@@ -136,10 +144,10 @@ So I launched the **Spring Performance Engineering** project. Core idea: resolve
 
 In JMH benchmarks on JDK 1.8 + G1GC (1GB heap), this framework leads across all 8 scenarios:
 
-- Small-payload throughput **26K~34K** ops/s (4 threads), **1.71x~2.11x** of Spring MVC
+- Small-payload throughput **26K\~34K** ops/s (4 threads), **1.71x\~2.11x** of Spring MVC
 - P50 latency **0.12~0.15ms**, approximately **50-60%** of Spring MVC
 - Steady-state heap **20MB** (4 threads), approximately **87%** of Spring MVC
-- SSE streaming throughput **1,226** ops/s (4 threads), reaching **3.89x** of Spring MVC, scaling to **6.37x** under high concurrency
+- SSE streaming throughput **1,226** ops/s (4 threads), reaching **3.89x** of Spring MVC, scaling to **6.64x** under high concurrency
 
 > Detailed data: [Benchmark Report](benchmark.md). Technical deep-dive: [Performance Principles](performance-principles.md).
 
@@ -262,7 +270,7 @@ This means: AI can optimize your business layer to the extreme, but if the under
 
 The core interaction pattern of LLM applications is **streaming output**: tokens generated one by one, pushed in real-time. Whether it's ChatGPT's word-by-word replies, Agent task status streams, or RAG retrieval progress feedback, they all rely on **SSE (Server-Sent Events)** protocol.
 
-However, SSE performs poorly on traditional Servlet containers — Spring MVC's SSE throughput is only ~**315 ops/s** (4 threads), making it a bottleneck in AI application pipelines. This project's SSE throughput reaches **1,226 ops/s**, **3.89x** of Spring MVC, scaling to **6.37x** under high concurrency. This is powered by **NettyStreamSender**'s lock-free Drain Loop design: write operations don't depend on thread pool scheduling, completing batch flushes directly on EventLoop, avoiding the problem of SSE connections occupying threads in traditional Servlet containers.
+However, SSE performs poorly on traditional Servlet containers — Spring MVC's SSE throughput is only ~**315 ops/s** (4 threads), making it a bottleneck in AI application pipelines. This project's SSE throughput reaches **1,226 ops/s**, **3.89x** of Spring MVC, scaling to **6.64x** under high concurrency. This is powered by **NettyStreamSender**'s lock-free Drain Loop design: write operations don't depend on thread pool scheduling, completing batch flushes directly on EventLoop, avoiding the problem of SSE connections occupying threads in traditional Servlet containers.
 
 This means:
 

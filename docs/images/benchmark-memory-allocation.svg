@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="400" viewBox="0 0 960 400">
+<style>
+ .bg { fill: #f8fafc; }
+ .title { font: bold 14px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; }
+ .sectionTitle { font: bold 13px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; text-anchor: middle; }
+ .tickLabel { font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #9ca3af; }
+ .groupLabel { font: 12px -apple-system,BlinkMacSystemFont,sans-serif; fill: #374151; text-anchor: middle; }
+ .dataLabel { font: 10px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; text-anchor: middle; }
+ .legendText { font: 11px -apple-system,BlinkMacSystemFont,sans-serif; fill: #374151; }
+ .gridline { stroke: #e5e7eb; stroke-width: 1; }
+ .baseline { stroke: #d1d5db; stroke-width: 1; }
+ .bar-perf { fill: #22c55e; }
+ .bar-tomcat { fill: #3b82f6; }
+ .bar-undertow { fill: #f59e0b; }
+ .bar-webflux { fill: #8b5cf6; }
+</style>
+<rect class="bg" x="0" y="0" width="960" height="400" rx="12"/>
+<!-- Title -->
+<text x="30" y="28" class="title">每请求内存分配对比 (KB)</text>
+
+<!-- Legend -->
+<rect x="580" y="14" width="12" height="12" rx="2" class="bar-perf"/>
+<text x="596" y="24" class="legendText">perf</text>
+<rect x="635" y="14" width="12" height="12" rx="2" class="bar-tomcat"/>
+<text x="651" y="24" class="legendText">Tomcat</text>
+<rect x="705" y="14" width="12" height="12" rx="2" class="bar-undertow"/>
+<text x="721" y="24" class="legendText">Undertow</text>
+<rect x="780" y="14" width="12" height="12" rx="2" class="bar-webflux"/>
+<text x="796" y="24" class="legendText">WebFlux</text>
+
+<!-- ========== LEFT PANEL: json + get ========== -->
+<!-- Chart area: x=40 to x=430, y=55 to y=335, 390x280 -->
+<!-- Scale: 280px / 60KB = 4.667 px/KB, y = 335 - KB * 4.667 -->
+
+<text x="235" y="55" class="sectionTitle">小请求 (json / get)</text>
+
+<!-- Y-axis -->
+<line x1="60" y1="335" x2="60" y2="55" stroke="#d1d5db" stroke-width="1"/>
+<line x1="60" y1="335" x2="420" y2="335" class="baseline"/>
+<line x1="60" y1="280" x2="420" y2="280" class="gridline"/>
+<line x1="60" y1="225" x2="420" y2="225" class="gridline"/>
+<line x1="60" y1="170" x2="420" y2="170" class="gridline"/>
+<line x1="60" y1="115" x2="420" y2="115" class="gridline"/>
+<line x1="60" y1="60" x2="420" y2="60" class="gridline"/>
+
+<text x="48" y="339" class="tickLabel" text-anchor="end">0</text>
+<text x="48" y="284" class="tickLabel" text-anchor="end">12KB</text>
+<text x="48" y="229" class="tickLabel" text-anchor="end">24KB</text>
+<text x="48" y="174" class="tickLabel" text-anchor="end">36KB</text>
+<text x="48" y="119" class="tickLabel" text-anchor="end">48KB</text>
+<text x="48" y="64" class="tickLabel" text-anchor="end">60KB</text>
+
+<!-- json group: center x=140, 4 bars (20px wide), gap 6px -->
+<!-- perf: x=140-38=102, tomcat: x=140-12=128, undertow: x=140+14=154, webflux: x=140+40=180 -->
+
+<!-- json 4t data -->
+<!-- perf 17.7KB: h=83, y=252 -->
+<rect x="102" y="252" width="20" height="83" class="bar-perf"/>
+<text x="112" y="246" class="dataLabel">17.7</text>
+<!-- tomcat 29.9KB: h=140, y=195 -->
+<rect x="128" y="195" width="20" height="140" class="bar-tomcat"/>
+<text x="138" y="189" class="dataLabel">29.9</text>
+<!-- undertow 33.7KB: h=157, y=178 -->
+<rect x="154" y="178" width="20" height="157" class="bar-undertow"/>
+<text x="164" y="172" class="dataLabel">33.7</text>
+<!-- webflux 36.0KB: h=168, y=167 -->
+<rect x="180" y="167" width="20" height="168" class="bar-webflux"/>
+<text x="190" y="161" class="dataLabel">36.0</text>
+<text x="152" y="365" class="groupLabel">json</text>
+
+<!-- get group: center x=310 -->
+<!-- perf: x=272, tomcat: x=298, undertow: x=324, webflux: x=350 -->
+
+<!-- get 4t data -->
+<!-- perf 16.9KB: h=79, y=256 -->
+<rect x="272" y="256" width="20" height="79" class="bar-perf"/>
+<text x="282" y="250" class="dataLabel">16.9</text>
+<!-- tomcat 40.3KB: h=188, y=147 -->
+<rect x="298" y="147" width="20" height="188" class="bar-tomcat"/>
+<text x="308" y="141" class="dataLabel">40.3</text>
+<!-- undertow 37.4KB: h=175, y=160 -->
+<rect x="324" y="160" width="20" height="175" class="bar-undertow"/>
+<text x="334" y="154" class="dataLabel">37.4</text>
+<!-- webflux 56.1KB: h=262, y=73 -->
+<rect x="350" y="73" width="20" height="262" class="bar-webflux"/>
+<text x="360" y="67" class="dataLabel">56.1</text>
+<text x="322" y="365" class="groupLabel">get</text>
+
+<!-- ========== RIGHT PANEL: SSE ========== -->
+<!-- Chart area: x=480 to x=920, y=55 to y=335, 440x280 -->
+<!-- Scale: 280px / 1600KB = 0.175 px/KB, y = 335 - KB * 0.175 -->
+
+<text x="700" y="55" class="sectionTitle">SSE 每请求分配</text>
+
+<!-- Y-axis -->
+<line x1="500" y1="335" x2="500" y2="55" stroke="#d1d5db" stroke-width="1"/>
+<line x1="500" y1="335" x2="920" y2="335" class="baseline"/>
+<line x1="500" y1="270" x2="920" y2="270" class="gridline"/>
+<line x1="500" y1="205" x2="920" y2="205" class="gridline"/>
+<line x1="500" y1="140" x2="920" y2="140" class="gridline"/>
+<line x1="500" y1="75" x2="920" y2="75" class="gridline"/>
+
+<text x="488" y="339" class="tickLabel" text-anchor="end">0</text>
+<text x="488" y="274" class="tickLabel" text-anchor="end">400KB</text>
+<text x="488" y="209" class="tickLabel" text-anchor="end">800KB</text>
+<text x="488" y="144" class="tickLabel" text-anchor="end">1,200KB</text>
+<text x="488" y="79" class="tickLabel" text-anchor="end">1,600KB</text>
+
+<!-- SSE 4t group: center x=600 -->
+<!-- perf 386.7KB: h=68, y=267 -->
+<rect x="562" y="267" width="20" height="68" class="bar-perf"/>
+<text x="572" y="261" class="dataLabel">386.7KB</text>
+<!-- tomcat 1334.9KB: h=234, y=101 -->
+<rect x="588" y="101" width="20" height="234" class="bar-tomcat"/>
+<text x="598" y="95" class="dataLabel">1,334.9KB</text>
+<!-- webflux 588.5KB: h=103, y=232 -->
+<rect x="614" y="232" width="20" height="103" class="bar-webflux"/>
+<text x="624" y="226" class="dataLabel">588.5KB</text>
+<text x="596" y="365" class="groupLabel">SSE 4t</text>
+
+<!-- SSE 64t group: center x=760 -->
+<!-- perf 260KB: h=46, y=289 -->
+<rect x="722" y="289" width="20" height="46" class="bar-perf"/>
+<text x="732" y="283" class="dataLabel">260.0KB</text>
+<!-- tomcat 1492.6KB: h=261, y=74 -->
+<rect x="748" y="74" width="20" height="261" class="bar-tomcat"/>
+<text x="758" y="68" class="dataLabel">1,492.6KB</text>
+<!-- webflux 762.4KB: h=133, y=202 -->
+<rect x="774" y="202" width="20" height="133" class="bar-webflux"/>
+<text x="784" y="196" class="dataLabel">762.4KB</text>
+<text x="756" y="365" class="groupLabel">SSE 64t</text>
+
+<!-- Separator between panels -->
+<line x1="450" y1="50" x2="450" y2="370" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4,4"/>
+</svg>

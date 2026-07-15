@@ -1,12 +1,12 @@
 > [English](en/benchmark.md) | 中文
 
-# Spring Web 性能对比报告
+# Spring WebPerf 性能对比报告
 
 **生成时间:** 2026-07-09 16:54:37
 
 **JDK:** jdk-1.8.0_341
 
-> **说明：** 本文中的 `perf` 是本项目 Spring Web 的 Benchmark Profile 代号，对应"原生 Netty + 5 WebFilter + 3 Interceptor"配置（详见下方"容器说明"）。`perf-support` 是在此基础上叠加 Servlet 桥接层的配置，用于评估桥接开销。
+> **说明：** 本文中的 `perf` 是本项目 Spring WebPerf 的 Benchmark Profile 代号，对应"原生 Netty + 5 WebFilter + 3 Interceptor"配置（详见下方"容器说明"）。`perf-support` 是在此基础上叠加 Servlet 桥接层的配置，用于评估桥接开销。
 
 ---
 
@@ -53,7 +53,7 @@ perf 在所有维度均领先：吞吐量最高、延迟最低、分配最少、
 
 | Profile | 端口 | 说明 |
 |---------|------|------|
-| perf | 9092 | Spring Web 原生 Netty + 5 WebFilter + 3 Interceptor |
+| perf | 9092 | WebPerf 原生 Netty + 5 WebFilter + 3 Interceptor |
 | perf-support | 9094 | perf + spring-web-support (Servlet 桥接) + 5 Filter + 3 Interceptor |
 | tomcat | 9102 | Spring MVC + Tomcat + 5 Filter + 3 Interceptor |
 | undertow | 9112 | Spring MVC + Undertow + 5 Filter + 3 Interceptor |
@@ -77,15 +77,9 @@ perf 在所有维度均领先：吞吐量最高、延迟最低、分配最少、
 
 ### 1.1 4线程基线 (ops/sec)
 
-| 接口 | perf | Spring MVC (Tomcat) | Spring MVC (Undertow) | WebFlux |
-|------|------|--------|----------|---------|
-| json | 26718 | 14061 | 10305 | 15460 |
-| get | 27398 | 12502 | 13425 | 13174 |
-| bytes | 34232 | 20045 | 11737 | 17211 |
-| valid | 26706 | 14544 | 13662 | 15621 |
-| async | 28354 | 13407 | 10169 | 18283 |
-| bytesLarge | 11508 | 4979 | 7764 | 7737 |
-| sse | 1226 | 315 | FAIL | 944 |
+<p align="center">
+<img src="images/benchmark-throughput-4t.svg" alt="4线程吞吐量对比"/>
+</p>
 
 #### perf 优势倍数 (4线程, vs Spring MVC)
 
@@ -112,6 +106,10 @@ perf 在所有维度均领先：吞吐量最高、延迟最低、分配最少、
 
 ### 1.3 perf 优势倍数随线程变化 (vs Spring MVC)
 
+<p align="center">
+<img src="images/benchmark-multiple-trend.svg" alt="perf 优势倍数随线程变化"/>
+</p>
+
 | 接口 | 4线程 | 16线程 | 64线程 |
 |------|-------|--------|--------|
 | json | 26718/14061 (**1.90x**) | 36245/22596 (**1.60x**) | 45328/20319 (**2.23x**) |
@@ -124,7 +122,7 @@ perf 在所有维度均领先：吞吐量最高、延迟最低、分配最少、
 
 ### 1.4 分析
 
-- **小包接口 (json/get/bytes/valid/async)**: perf 在 4 线程时达到 26K~34K ops/s，是 Spring MVC 的 **1.7~2.2x**。随线程增加到 64，perf 吞吐持续增长（json +70%, get +63%），而 Spring MVC 在 16 线程见顶后持平或反降，线程池争抢成为瓶颈。get 接口优势倍数最高（4t 达 **2.19x**），因为 perf 对路径参数和查询参数的预缓存效果最显著。
+- **小包接口 (json/get/bytes/valid/async)**: perf 在 4 线程时达到 26K~34K ops/s，是 Spring MVC 的 **1.7\~2.2x**。随线程增加到 64，perf 吞吐持续增长（json +70%, get +63%），而 Spring MVC 在 16 线程见顶后持平或反降，线程池争抢成为瓶颈。get 接口优势倍数最高（4t 达 **2.19x**），因为 perf 对路径参数和查询参数的预缓存效果最显著。
 - **SSE 接口**: perf 的并发伸缩性优势最显著——从 4→64 线程吞吐增长 **117%**（1226→2655），而 Spring MVC 仅增长 **27%**（315→400）。perf 优势倍数从 4t 的 3.89x 扩大到 64t 的 **6.64x**。核心原因：perf 的 EventLoop（Netty 的 I/O 线程模型，单线程处理多连接事件，消除线程上下文切换）+ 无锁 Drain Loop（无需加锁的数据推送循环，写入完全在 EventLoop 线程完成）模型不阻塞线程；而 Spring MVC 的线程-连接绑定模型在 64 线程下严重受限。
 - **bytesLarge (100KB)**: perf 在 16 线程达到峰值 17,257 ops/s（2.60x vs Spring MVC），64 线程仍保持 14,641 ops/s 的高吞吐。
 - **perf-support 桥接损耗**: 详见第 7 节桥接层损耗分析。普通接口损耗 8-12%，SSE 接口损耗达 41.6%。
@@ -136,6 +134,10 @@ perf 在所有维度均领先：吞吐量最高、延迟最低、分配最少、
 
 ### 2.1 4线程 p50 / p99 / p99.9
 
+<p align="center">
+<img src="images/benchmark-latency-p50.svg" alt="4线程 p50 延迟对比"/>
+</p>
+
 | 接口 | perf | Spring MVC (Tomcat) | Spring MVC (Undertow) | WebFlux |
 |------|------|--------|----------|---------|
 | json | **0.15 / 0.22 / 0.35** | 0.27 / 0.47 / 0.75 | 0.27 / 0.63 / 2.17 | 0.25 / 0.66 / 2.11 |
@@ -146,7 +148,7 @@ perf 在所有维度均领先：吞吐量最高、延迟最低、分配最少、
 | bytesLarge | **0.34 / 0.51 / 2.61** | 0.75 / 1.17 / 3.33 | 0.42 / 1.23 / 15.98 | 0.44 / 1.20 / 3.21 |
 | sse | **3.57 / 4.24 / 6.25** | 12.65 / 17.07 / 22.64 | FAIL | 4.25 / 6.86 / 9.80 |
 
-perf p50 延迟为 **0.12~0.15ms**（小包场景），是 Spring MVC 的 50-60%。p99 仅 **0.22ms**，p99.9 同样最低（0.29~0.35ms），EventLoop 模型在低并发下尾延迟很稳定。
+perf p50 延迟为 **0.12\~0.15ms**（小包场景），是 Spring MVC 的 50-60%。p99 仅 **0.22ms**，p99.9 同样最低（0.29~0.35ms），EventLoop 模型在低并发下尾延迟很稳定。
 
 SSE 场景 perf p50 仅 **3.57ms**，远低于 Spring MVC 的 12.65ms，也优于 WebFlux 的 4.25ms。
 
@@ -170,9 +172,13 @@ bytes 接口 perf p50 仅 **0.25ms**（Spring MVC 的 1/9），在 64 线程高�
 
 ## 3. GC 行为
 
-GC 数据来自 JVM 级别日志，同一 profile 下各接口一致。每请求分配因各接口吞吐不同而异，下表以 json、get 和 SSE 为代表。
+GC 数据来自 JVM 级别日志，同一 profile 下各接口一致。
 
-| 框架 | 线程 | Young GC 次数 | 平均暂停 | 分配率     | 每请求分配 (json) | 每请求分配 (get) | SSE 每请求分配 |
+<p align="center">
+<img src="images/benchmark-memory-allocation.svg" alt="每请求内存分配对比"/>
+</p>
+
+| 框架 | 线程 | Young GC 次数 | 平均暂停 | 分配率 | 每请求分配 (json) | 每请求分配 (get) | SSE 每请求分配 |
 |------|------|--------------|---------|---------|-----------------|----------------|--------------|
 | perf | 4 | 160 | 2.2ms | 463MB/s | **17.7KB** | **16.9KB** | 386.7KB |
 | perf | 16 | 216 | 2.5ms | 617MB/s | 17.4KB | 16.4KB | 346.0KB |
@@ -187,9 +193,9 @@ GC 数据来自 JVM 级别日志，同一 profile 下各接口一致。每请求
 | webflux | 16 | 245 | 2.6ms | 682MB/s | 31.3KB | 51.0KB | 643.5KB |
 | webflux | 64 | 282 | 3.0ms | 766MB/s | 34.9KB | 42.0KB | 762.4KB |
 
-perf 在 json 场景下每请求仅分配 **15.2~17.7KB**，显著低于 Spring MVC 的 27.4~29.9KB 和 webflux 的 31.3~36.0KB。低分配率 = 更少的 GC 暂停、更高的缓存局部性。
+perf 在 json 场景下每请求仅分配 **15.2\~17.7KB**，显著低于 Spring MVC 的 27.4~29.9KB 和 webflux 的 31.3~36.0KB。低分配率 = 更少的 GC 暂停、更高的缓存局部性。
 
-get 接口每请求分配的差距更为显著——perf 仅 **15.4~16.9KB**，Spring MVC 高达 **32.9~40.3KB**（perf 的 2.1~2.4 倍），webflux 达 **42.0~56.1KB**（perf 的 2.7~3.3 倍）。多参数绑定场景下框架预缓存机制的优势被放大，Spring MVC 每请求构造参数名解析临时对象，而 perf 启动时已完成绑定。
+get 接口每请求分配的差距更为显著——perf 仅 **15.4\~16.9KB**，Spring MVC 高达 **32.9\~40.3KB**（perf 的 2.1~2.4 倍），webflux 达 **42.0\~56.1KB**（perf 的 2.7~3.3 倍）。多参数绑定场景下框架预缓存机制的优势被放大，Spring MVC 每请求构造参数名解析临时对象，而 perf 启动时已完成绑定。
 
 SSE 场景下 perf 的每请求分配从 386.7KB(4t) 降至 **260.0KB(64t)**（降幅 33%），而 Spring MVC 高达 1335~1563KB、webflux 的分配不降反升（588.5→762.4KB）。perf 的 EventLoop 在高并发下复用缓冲区，分配效率提升；Reactor 调度开销则随并发增长。
 
@@ -226,7 +232,7 @@ perf 的性能优势来自框架设计层面的工程取舍，而非"Netty 比 T
 
 ### 核心差异
 
-| 维度 | Spring Web (perf) | Spring MVC + Tomcat | Spring WebFlux |
+| 维度 | WebPerf (perf) | Spring MVC + Tomcat | Spring WebFlux |
 |------|-------------------|-------------------|-----------------|
 | 底层引擎 | **Netty 原生** | Tomcat Servlet 容器 | Reactor Netty |
 | 编程模型 | **同步 + 可选响应式** | 同步阻塞 | 响应式（Mono/Flux） |
@@ -271,38 +277,126 @@ perf-support 是在 perf（原生 Netty）之上叠加 Servlet 桥接层的容�
 
 ## 如何运行
 
+### 前置条件
+
+JDK 8+、Maven 3.6+，项目已执行 `mvn install -DskipTests` 完成整体构建。
+
+### 脚本方式（推荐）
+
+使用 `benchmark-all.sh` 一键运行，自动完成编译、classpath 构建、多 profile 启动和报告生成。
+
 ```bash
-# 全量运行（多线程并发测试）
+# 全量运行（5 profile × 7 API，4 线程）
+./spring-web-benchmark/benchmark-all.sh
+
+# 多线程并发测试（自动生成伸缩性对比矩阵）
 ./spring-web-benchmark/benchmark-all.sh --thread-list 4,16,64
 
-# 单 profile 运行
+# 指定 profile + API 子集
+./spring-web-benchmark/benchmark-all.sh --profiles perf,tomcat --apis json,sse
+
+# 多 JDK 对比（默认 JDK + 指定 JDK）
+./spring-web-benchmark/benchmark-all.sh --jdk java,/path/to/jdk17 --thread-list 4,16,64
+
+# 启用 SampleTime 模式（输出 p50/p90/p99/p99.9/p99.99 延迟百分位数据）
+./spring-web-benchmark/benchmark-all.sh --sampleTime
+```
+
+#### CLI 参数一览
+
+| 参数 | 说明 | 默认值 | 示例 |
+|------|------|--------|------|
+| `--profiles` | 指定运行的 profile 列表（逗号分隔） | `perf,perf-support,tomcat,undertow,webflux` | `--profiles perf,tomcat` |
+| `--api` | 运行单个 API | 全部 7 个 | `--api sse` |
+| `--apis` | 运行多个 API（逗号分隔） | 全部 7 个 | `--apis json,sse` |
+| `--jdk` / `--jdks` | 指定 JDK 路径，多 JDK 逗号分隔 | 系统默认 `java` | `--jdk /path/to/jdk17` 或 `--jdk java,/path/to/jdk17` |
+| `--thread-list` | 多线程并发度（逗号分隔），启用伸缩性报告 | 单次 4 线程 | `--thread-list 1,4,16,64` |
+| `--threads` | 单次运行的 JMH 线程数（不启用多线程子目录） | 4 | `--threads 8` |
+| `--sampleTime` | 启用 SampleTime 模式（附带百分位延迟数据） | 关闭（Throughput） | `--sampleTime` |
+
+> **`--thread-list` vs `--threads` 区别**：`--thread-list` 会为每个线程数创建独立的 threads-N 子目录，报告自动生成伸缩性对比矩阵；`--threads` 仅设置 JMH 单次运行的 threads 参数，不产生多级目录结构。
+
+#### 内置 Profiles
+
+| Profile | 端口 | Benchmark 类 | 说明 |
+|---------|------|-------------|------|
+| `perf` | 9092 | PerfBenchmark | WebPerf 原生 Netty + 5 WebFilter + 3 Interceptor |
+| `perf-support` | 9094 | PerfSupportBenchmark | perf + spring-web-support (Servlet 桥接) + 5 Filter + 3 Interceptor |
+| `tomcat` | 9102 | TomcatBenchmark | Spring MVC + Tomcat + 5 Filter + 3 Interceptor |
+| `undertow` | 9112 | UndertowBenchmark | Spring MVC + Undertow + 5 Filter + 3 Interceptor |
+| `webflux` | 9122 | WebFluxBenchmark | Spring WebFlux + Reactor Netty + 8 WebFilter |
+
+#### 内置 API
+
+| API | 端点 | 说明 |
+|-----|------|------|
+| `json` | POST /api/demo/echo | 小 JSON 请求体 (约 50B) + 回显 |
+| `get` | GET /api/demo/hello/{name} | 路径参数 + 5 个查询参数绑定 |
+| `bytes` | GET /api/core/bytes | 原始字节响应 (26B) |
+| `valid` | POST /api/core/validate | @Validated Bean Validation |
+| `async` | GET /api/core/deferred-result | 异步 DeferredResult 返回 |
+| `bytesLarge` | GET /api/core/large-response | 100KB byte[] 响应体 |
+| `sse` | GET /api/core/sse | SSE 流式推送 (100 条消息 × 200 字符) |
+
+#### 工作流程说明
+
+脚本执行分 4 步：
+
+1. **全量编译**：`mvn clean install -DskipTests` 编译所有模块
+2. **构建 classpath**：各 profile 通过 `mvn dependency:build-classpath` 导出依赖列表
+3. **编译 + 运行矩阵**：逐 profile 编译、启动服务器、运行 JMH 基准测试。支持各组合的独立 GC 日志
+4. **生成报告**：`ReportGenerator` 汇总所有 JSON 结果，生成 Markdown 报告
+
+#### 高级用法
+
+通过 `-D` 参数直接向 benchmark 进程传递 JVM 属性（需配合脚本或直接运行 `BenchmarkRunner`）：
+
+| 系统属性 | 类型 | 说明 | 示例值 |
+|---------|------|------|--------|
+| `benchmark.jfr` | boolean | 启用 JFR 飞行记录 | `-Dbenchmark.jfr=true` |
+| `benchmark.jfr.duration` | duration | JFR 录音时长 | `-Dbenchmark.jfr.duration=600s` |
+| `benchmark.jfr.settings` | string | JFR 配置（profile/default） | `-Dbenchmark.jfr.settings=profile` |
+| `benchmark.stack` | boolean | 启用 StackProfiler（ThreadMXBean CPU 采样） | `-Dbenchmark.stack=true` |
+| `jmh.forks` | int | JMH fork 次数（默认 `0`，脚本覆盖为 `1`） | `-Djmh.forks=3` |
+
+### Maven 方式（单 profile 调试）
+
+```bash
 cd spring-web-benchmark
 mvn jmh:run -Pbenchmark-perf -Dbenchmark.profile.name=perf
 ```
 
-> **前置条件：** JDK 8+、Maven 3.6+，项目已执行 `mvn install -DskipTests` 完成整体构建。
+可用 profile：`benchmark-perf`、`benchmark-perf-support`、`benchmark-tomcat`、`benchmark-undertow`、`benchmark-webflux`。
 
-## 输出结构
+### 输出结构
 
 ```
 spring-web-benchmark/benchmark-reports/
 ├── latest/
-│   └── report.md                  ← 最新报告
-├── YYYYMMDD-HHMMSS/               ← 历史快照
-│   ├── report.md
-│   ├── threads-4/
+│   └── report.md                     ← 最新报告（软链，自动覆盖）
+├── YYYYMMDD-HHMMSS/                  ← 历史快照（按时间戳）
+│   ├── report.md                     ← 当前 Run 的报告
+│   ├── threads-4/                    ← --thread-list 时生成，各并发度独立子目录
+│   │   └── jdk-1.8.0_341/           ← 各 JDK 独立子目录
+│   │       ├── jmh-results-perf-json.json     ← 各 Profile × API 的原始 JMH JSON
+│   │       ├── jmh-results-perf-get.json
+│   │       ├── gc-perf.log                     ← GC 日志
+│   │       └── memory-perf.json                ← 内存快照
 │   ├── threads-16/
-│   └── threads-64/
+│   │   └── jdk-1.8.0_341/
+│   ├── threads-64/
+│   │   └── jdk-1.8.0_341/
+│   └── .cp/                         ← 缓存的 classpath 文件（避免被 mvn clean 删除）
 ```
 
-## 配置参数
+### 配置参数（JMH 基准测试）
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
 | JMH 预热 | 10 × 10s | 10 轮 × 10 秒 |
 | JMH 测量 | 10 × 10s | 10 轮 × 10 秒 |
 | Fork | 1 | fork JVM 隔离 |
-| 线程 | 4, 16, 64 | 并发线程数 |
+| 线程 | 4 | 并发线程数（`--thread-list` 可指定多组） |
 | 堆内存 | 1GB | -Xms1g -Xmx1g |
 | GC | G1GC | -XX:+UseG1GC |
 | 协议 | HTTP/1.1 | keep-alive |

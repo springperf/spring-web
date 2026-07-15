@@ -1,18 +1,40 @@
 > English | [中文](../../README.md)
 
-# Spring Web
+# Spring WebPerf
 
-A high-performance Netty-based web framework, designed as a drop-in replacement for Spring MVC.
+A high-performance Netty-based web framework, compatible with Spring MVC programming model — high performance, zero compromise.
 
 [![CI](https://github.com/springperf/spring-web/actions/workflows/ci.yml/badge.svg)](https://github.com/springperf/spring-web/actions/workflows/ci.yml)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.springperf/spring-web)](https://central.sonatype.com/artifact/io.github.springperf/spring-web)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](../LICENSE.md)
+[![Throughput](https://img.shields.io/badge/Throughput-1.7~6.6x_vs_Spring_MVC-brightgreen?style=flat-square)](benchmark.md)
+[![SSE](https://img.shields.io/badge/SSE-6.64x_under_high_concurrency-blue?style=flat-square)](benchmark.md)
 
-> **Origin**: During performance testing in a 1c1g environment, the same business logic (device data ingestion + validation + Redis/ClickHouse writes) achieved ~**15,000** TPS on the Kafka consumer side, but less than **4,000** TPS on the Spring MVC endpoint. CPU hotspot analysis revealed that the Spring MVC framework itself consumed the majority of CPU cycles — parameter resolution, route matching, reflective invocation — overhead unrelated to business logic yet dominating performance. Spring WebFlux exhibited similar framework-level costs.
+---
+
+## Performance at a Glance
+
+<p align="center">
+<img src="../images/perf-benchmark-en.svg" alt="Performance Benchmark Chart"/>
+</p>
+
+> **100% win rate** across all 7 APIs x 3 concurrency levels x 4 comparative frameworks. 37% lower latency, 41% less memory per request, 13% less heap usage.
+>
+> [Full Benchmark Report](benchmark.md) · [Performance Principles](performance-principles.md)
+
+> **Why this approach?** — A three-layer argument: why batching beats non-blocking, why CPU optimization is the next frontier, and why combining both is the complete solution.
+>
+> [The Complete Path to High-Performance Java Web →](philosophy.md)
+
+---
+
+## Origin
+
+> During performance testing in a 1c1g environment, the same business logic (device data ingestion + validation + Redis/ClickHouse writes) achieved ~**15,000** TPS on the Kafka consumer side, but less than **4,000** TPS on the Spring MVC endpoint. CPU hotspot analysis revealed that the Spring MVC framework itself consumed the majority of CPU cycles — parameter resolution, route matching, reflective invocation — overhead unrelated to business logic yet dominating performance. Spring WebFlux exhibited similar framework-level costs.
 >
 > This raised a question: what if we eliminated all unnecessary runtime overhead from the mainstream Spring MVC feature set? How much could performance improve?
 >
-> **Spring Web was born from this question.** Goal: maximize web framework performance while remaining fully compatible with the Spring ecosystem.
+> **Spring WebPerf was born from this question.** Goal: maximize web framework performance while remaining fully compatible with the Spring ecosystem.
 >
 > [View Benchmark Report](benchmark.md) · [Performance Principles](performance-principles.md) · [Full Origin Story](overview.md)
 
@@ -20,7 +42,7 @@ A high-performance Netty-based web framework, designed as a drop-in replacement 
 
 ## Introduction
 
-Spring Web is a high-performance web framework built on **Netty 4.1**, designed as a high-performance alternative to Spring MVC. It preserves the familiar Spring programming model (annotation-driven, dependency injection, interceptors, etc.), but replaces the Servlet container with Netty under the hood, delivering higher throughput and lower resource consumption while staying compatible with the Spring ecosystem.
+Spring WebPerf is a high-performance web framework built on **Netty 4.1**, designed as a high-performance alternative to Spring MVC. It preserves the familiar Spring programming model (annotation-driven, dependency injection, interceptors, etc.), but through startup pre-caching, zero-reflection runtime, and other engineering optimizations, delivering higher throughput and lower resource consumption while staying compatible with the Spring ecosystem.
 
 ---
 
@@ -100,19 +122,6 @@ management:
 
 ---
 
-## Version Selection
-
-This project manages two branches aligned with Spring Boot major versions. Minimum supported: **Spring Boot 2.4.x**.
-
-| Branch | Spring Boot | Spring Framework | JDK | Servlet API | Status |
-|--------|------------|----------------|-----|-------------|--------|
-| `2.7.x` | 2.4.x ~ 2.7.x | 5.3.x | 8 / 11 / 17 | javax.servlet 4.0 | Maintenance branch (features + bugfix) |
-| `master` | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | 6.0.x ~ 6.2.x / 7.0.x | 17 / 21 | jakarta.servlet 6.0 | **Development baseline** (multi-version via profiles) |
-
-> See [Version Compatibility](compatibility.md) for version floor notes, branch recommendations, and detailed compatibility information.
-
----
-
 ## Benchmark
 
 > Full report: [Benchmark Document](benchmark.md)
@@ -130,13 +139,13 @@ JMH benchmark results on JDK 1.8 + G1GC (1GB heap, 4 threads):
 | bytesLarge | **11,508** ops/s | **2.31x** | **1.48x** | **1.49x** |
 | sse | **1,226** ops/s | **3.89x** | — | **1.30x** |
 
-The perf framework delivers **1.7~3.9x** throughput over Servlet containers, with **0.12~0.15ms** p50 latency (lowest among peers). SSE scales to **6.64x** Spring MVC under high concurrency. See [full comparison report](benchmark.md).
+The perf framework delivers **1.7\~3.9x** throughput over Servlet containers, with **0.12\~0.15ms** p50 latency (lowest among peers). SSE scales to **6.64x** Spring MVC under high concurrency. See [full comparison report](benchmark.md).
 
 ---
 
 ## Comparison with Spring MVC
 
-| Dimension | Spring Web | Spring MVC (Tomcat) |
+| Dimension | WebPerf | Spring MVC (Tomcat) |
 |-----------|-----------|---------------------|
 | Engine | Netty 4.1 | Servlet container (Tomcat/Jetty/Undertow) |
 | Throughput (json 4t) | **26,718** ops/s | 14,061 ops/s (1.90x) |
@@ -149,6 +158,19 @@ The perf framework delivers **1.7~3.9x** throughput over Servlet containers, wit
 | Routing | O(1) HashMap multi-level optimizer | `AntPathMatcher` linear traversal |
 | Servlet API | Bridged via support module | Native |
 | Actuator | Native | Native |
+
+---
+
+## Version Selection
+
+This project manages two branches aligned with Spring Boot major versions. Minimum supported: **Spring Boot 2.4.x**.
+
+| Branch | Spring Boot | Spring Framework | JDK | Servlet API | Status |
+|--------|------------|----------------|-----|-------------|--------|
+| `2.7.x` | 2.4.x ~ 2.7.x | 5.3.x | 8 / 11 / 17 | javax.servlet 4.0 | Maintenance branch (features + bugfix) |
+| `master` | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | 6.0.x ~ 6.2.x / 7.0.x | 17 / 21 | jakarta.servlet 6.0 | **Development baseline** (multi-version via profiles) |
+
+> See [Version Compatibility](compatibility.md) for version floor notes, branch recommendations, and detailed compatibility information.
 
 ---
 
