@@ -11,6 +11,7 @@ import io.springperf.web.batch.metrics.BatchMetrics;
 import io.springperf.web.batch.metrics.NoOpBatchMetrics;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.Collections;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -93,7 +94,8 @@ public class DisruptorQueue {
     public void enqueue(BatchRequest<?> request) {
         if (halted.get()) {
             metrics.recordEnqueue(queueName, false);
-            request.setError(new IllegalStateException("Queue [" + queueName + "] is shutting down"));
+            // 停机期间零星请求不走 Disruptor，直接调 batch 方法处理
+            batchHandler.processDirectly(Collections.singletonList(request));
             return;
         }
         switch (backpressure) {
