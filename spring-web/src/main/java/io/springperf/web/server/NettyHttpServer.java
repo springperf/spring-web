@@ -7,13 +7,13 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.ssl.NotSslRecordException;
 import io.netty.handler.ssl.SslContext;
-import io.netty.util.concurrent.Future;
+import io.springperf.web.context.LifecycleWebComponent;
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.DispatcherHandler;
-import io.springperf.web.core.pool.BizPoolRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.SmartLifecycle;
+import org.springframework.core.Ordered;
 
 import java.net.InetSocketAddress;
 import java.util.Collections;
@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
-public class NettyHttpServer implements SmartLifecycle {
+public class NettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
 
     private volatile boolean running = false;
 
@@ -141,23 +141,7 @@ public class NettyHttpServer implements SmartLifecycle {
                 serverChannel.close().sync();
             }
 
-            // 3. 等待业务线程池排空（此时 EventLoop 仍在运行，BizPool 可正常写响应）
-            BizPoolRegistry bizPoolRegistry = webContext.getWebComponent(BizPoolRegistry.class);
-            if (bizPoolRegistry != null) {
-                int timeout = webContext.getProps().getInt(PropertiesConstant.SERVER_SHUTDOWN_TIMEOUT);
-                bizPoolRegistry.shutdownPools(timeout, TimeUnit.MILLISECONDS);
-            }
-
-            // 4. 优雅关闭事件循环组
-            Future<?> bossFuture = bossGroup != null ? bossGroup.shutdownGracefully() : null;
-            Future<?> workerFuture = workerGroup != null ? workerGroup.shutdownGracefully() : null;
-
-            if (bossFuture != null) {
-                bossFuture.sync();
-            }
-            if (workerFuture != null) {
-                workerFuture.sync();
-            }
+            // EventLoop 关闭已移至 destroyComponent()，在 BatchRegistry / BizPoolRegistry 等组件排空后执行
         } catch (Exception e) {
             log.error(e.getMessage(), e);
         } finally {
@@ -205,5 +189,21 @@ public class NettyHttpServer implements SmartLifecycle {
     @Override
     public int getPhase() {
         return Integer.MAX_VALUE;
+    }
+
+    @Override
+    public int getOrder() {
+        return Ordered.LOWEST_PRECEDENCE;
+    }
+
+    @Override
+    public void destroyComponent() throws Exception {
+        if (bossGroup != null) {
+            bossGroup.shutdownGracefully().sync();
+        }
+        if (workerGroup != null) {
+            workerGroup.shutdownGracefully().sync();
+        }
+        log.info("Netty Server EventLoop shut down");
     }
 }

@@ -102,8 +102,10 @@ public class ActuatorEndpointAutoConfiguration {
         int mgmtPort = environment.getProperty("management.server.port", int.class, 0);
         boolean http2Enabled = environment.getProperty("server.http2.enabled", boolean.class, false);
         SslContext sslContext = SslContextFactory.createServerSslContext(environment, "management.server.ssl.", http2Enabled);
-        return new ManagementNettyHttpServer(webContext, webEndpointProperties.getBasePath(),
+        ManagementNettyHttpServer server = new ManagementNettyHttpServer(webContext, webEndpointProperties.getBasePath(),
                 managementServerInfrastructure.getDispatcherHandler(), mgmtPort,
                 environment.getProperty("server.http.max-content-length", int.class, DEFAULT_MAX_CONTENT_LENGTH), sslContext);
+        webContext.registerWebComponent(server);
+        return server;
     }
 }
