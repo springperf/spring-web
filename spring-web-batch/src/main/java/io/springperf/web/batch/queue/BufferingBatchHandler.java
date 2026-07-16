@@ -73,6 +73,11 @@ public class BufferingBatchHandler implements EventHandler<BatchEvent> {
         executor.execute(() -> processBatch(batch));
     }
 
+    /** 包级可见：优雅停机兜底时由 DisruptorQueue 直接调用 */
+    void processDirectly(List<BatchRequest<?>> batch) {
+        processBatch(batch);
+    }
+
     private void processBatch(List<BatchRequest<?>> batch) {
         long start = System.nanoTime();
         int batchSize = batch.size();

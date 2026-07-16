@@ -52,7 +52,9 @@ public class SpringWebAutoConfiguration {
                                            ObjectProvider<PipelineCustomizer> pipelineCustomizerProvider) {
         boolean http2Enabled = environment.getProperty("server.http2.enabled", boolean.class, false);
         SslContext sslContext = SslContextFactory.createServerSslContext(environment, "server.ssl.", http2Enabled);
-        return new NettyHttpServer(webContext, sslContext, pipelineCustomizerProvider.getIfAvailable());
+        NettyHttpServer server = new NettyHttpServer(webContext, sslContext, pipelineCustomizerProvider.getIfAvailable());
+        webContext.registerWebComponent(server);
+        return server;
     }
 
     @Bean
