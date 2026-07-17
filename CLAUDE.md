@@ -70,6 +70,11 @@ VERIFY -> COMPLETE
 
 - .claude/rule/review.md
 
+## 涉及 master → 2.7.x backport
+
+必须读取：
+
+- .claude/context/2.7.x-migration-checklist.md
 # 语言规则
 
 - 默认响应语言：简体中文
