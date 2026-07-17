@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: [8, 11, 17, 21]
+        java: [8, 11, 17, 21, 25]
 
     steps:
       - uses: actions/checkout@v4
@@ -31,7 +31,7 @@ jobs:
             contains(fromJSON('["8", "11", "17"]'), matrix.java)
             && (github.ref == 'refs/heads/2.7.x' || github.base_ref == '2.7.x')
             ||
-            contains(fromJSON('["17", "21"]'), matrix.java)
+            contains(fromJSON('["17", "21", "25"]'), matrix.java)
             && (github.ref == 'refs/heads/master' || github.base_ref == 'master')
           )
 

@@ -1,67 +1,67 @@
-> [English](docs/en/README.md) | 中文
+> English | [中文](README_CN.md)
 
 # Spring WebPerf
 
-基于 Netty 的高性能 Web 框架，兼容 Spring MVC 编程模型，零妥协的性能方案。
+A high-performance Netty-based web framework, compatible with Spring MVC programming model — high performance, zero compromise.
 
 [![CI](https://github.com/springperf/spring-web/actions/workflows/ci.yml/badge.svg)](https://github.com/springperf/spring-web/actions/workflows/ci.yml)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.springperf/spring-web)](https://central.sonatype.com/artifact/io.github.springperf/spring-web)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE.md)
-[![Throughput](https://img.shields.io/badge/Throughput-1.7~6.6x_vs_Spring_MVC-brightgreen?style=flat-square)](docs/benchmark.md)
-[![SSE](https://img.shields.io/badge/SSE-6.64x_under_high_concurrency-blue?style=flat-square)](docs/benchmark.md)
+[![Throughput](https://img.shields.io/badge/Throughput-1.7~6.6x_vs_Spring_MVC-brightgreen?style=flat-square)](docs/en/benchmark.md)
+[![SSE](https://img.shields.io/badge/SSE-6.64x_under_high_concurrency-blue?style=flat-square)](docs/en/benchmark.md)
 
 ---
 
-## 性能概览
+## Performance at a Glance
 
 <p align="center">
-<img src="docs/images/perf-benchmark.svg" alt="Performance Benchmark Chart"/>
+<img src="docs/images/perf-benchmark-en.svg" alt="Performance Benchmark Chart"/>
 </p>
 
-> 全部 7 个接口 x 3 个并发度 x 4 个对比框架，**100% 胜率，无一例外**。延迟低 37%、内存分配少 41%、堆占用少 13%。
+> **100% win rate** across all 7 APIs x 3 concurrency levels x 4 comparative frameworks. 37% lower latency, 41% less memory per request, 13% less heap usage.
 >
-> [完整 Benchmark 报告](docs/benchmark.md) · [性能原理详解](docs/performance-principles.md)
+> [Full Benchmark Report](docs/en/benchmark.md) · [Performance Principles](docs/en/performance-principles.md)
 
-> **为什么是这个方案？** —— 三层论证：批处理为何优于非阻塞、CPU 优化为何是下一关、两者叠加为何才是完整方案。
-> 
-> [高性能 Java Web 的完整路径 →](docs/philosophy.md)
+> **Why this approach?** — A three-layer argument: why batching beats non-blocking, why CPU optimization is the next frontier, and why combining both is the complete solution.
+>
+> [The Complete Path to High-Performance Java Web →](docs/en/philosophy.md)
 
 ---
 
-## 缘起
+## Origin
 
-> 一次 1c1g 环境的性能测试中，同样的业务逻辑（设备数据上报 + 校验 + Redis/ClickHouse 写入），Kafka 消费端 TPS 接近 **15,000**，而 Spring MVC 接口不到 **4,000**。CPU 热点分析显示，Spring MVC 框架自身消耗了大量 CPU——参数解析、路由匹配、反射调用……这些开销与业务无关，却吞噬了绝大部分性能。Spring WebFlux 也存在类似的框架层开销。
+> During performance testing in a 1c1g environment, the same business logic (device data ingestion + validation + Redis/ClickHouse writes) achieved ~**15,000** TPS on the Kafka consumer side, but less than **4,000** TPS on the Spring MVC endpoint. CPU hotspot analysis revealed that the Spring MVC framework itself consumed the majority of CPU cycles — parameter resolution, route matching, reflective invocation — overhead unrelated to business logic yet dominating performance. Spring WebFlux exhibited similar framework-level costs.
 >
-> 这引发了一个思考：如果把 Spring MVC 主流功能中那些不必要的运行时开销全部消除，性能能提升多少？
+> This raised a question: what if we eliminated all unnecessary runtime overhead from the mainstream Spring MVC feature set? How much could performance improve?
 >
-> **Spring WebPerf 由此而生。** 目标：在兼容 Spring 生态的前提下，最大程度释放 Web 框架的性能。
+> **Spring WebPerf was born from this question.** Goal: maximize web framework performance while remaining fully compatible with the Spring ecosystem.
 >
-> [查看 Benchmark 报告](docs/benchmark.md) · [性能原理详解](docs/performance-principles.md) · [项目缘起全文](docs/overview.md)
+> [View Benchmark Report](docs/en/benchmark.md) · [Performance Principles](docs/en/performance-principles.md) · [Full Origin Story](docs/en/overview.md)
 
 ---
 
-## 简介
+## Introduction
 
-Spring WebPerf 是一个基于 **Netty** 构建的高性能 Web 框架，定位为 Spring MVC 的高性能替代方案。它保留了 Spring 开发者熟悉的编程模型（注解驱动、依赖注入、拦截器等），但通过启动时预缓存、零反射运行时等优化手段，在兼容 Spring 生态的前提下提供更高的吞吐量和更低的资源占用。
-
----
-
-## 核心特性
-
-- **高性能** — 启动时预缓存全部元数据，运行时零反射零匹配；ASM 字节码生成替代反射调用；O(1) HashMap 路由；GC 友好设计
-- **Netty 驱动** — 基于 Netty 4.1 事件驱动 I/O，请求默认在 EventLoop 处理，可按方法粒度通过 `@RunInPool` 调度到业务线程池
-- **Spring 生态兼容** — 支持 `@RestController`、`@RequestMapping`、`@Validated`、`@ExceptionHandler`、`HandlerInterceptor` 等 Spring 注解与抽象，零侵入迁移
-- **异步原生** — 内置 DeferredResult、Callable、SseEmitter、StreamEmitter、Reactive Streams 支持，SSE 吞吐达 Spring MVC 的 3.89x，高并发下扩展至 6.64x
-- **批量处理** — 基于 Disruptor 的请求聚合批处理，透明地将并发请求合并为批量操作，吞吐量可提升数倍；支持背压策略、等待策略、线程池隔离
-- **灵活扩展** — 参数解析器、返回值处理器、编解码 Advice、拦截器、过滤器等关键节点均提供 SPI
-- **生态桥接** — 可通过 support 模块桥接 Servlet Filter、Spring MVC `HandlerInterceptor`、`RequestBodyAdvice` / `ResponseBodyAdvice`
-- **Actuator 集成** — 支持 Spring Boot Actuator，可配置独立管理端口
+Spring WebPerf is a high-performance web framework built on **Netty 4.1**, designed as a high-performance alternative to Spring MVC. It preserves the familiar Spring programming model (annotation-driven, dependency injection, interceptors, etc.), but through startup pre-caching, zero-reflection runtime, and other engineering optimizations, delivering higher throughput and lower resource consumption while staying compatible with the Spring ecosystem.
 
 ---
 
-## 快速开始
+## Key Features
 
-### 1. 添加依赖
+- **High Performance** — Pre-caches all metadata at startup, zero reflection and zero matching at runtime; ASM bytecode generation replaces reflective invocation; O(1) HashMap routing; GC-friendly design
+- **Netty-Driven** — Built on Netty 4.1 event-driven I/O; requests execute on EventLoop by default, with method-level `@RunInPool` scheduling to business thread pools as needed
+- **Spring Ecosystem Compatible** — Supports `@RestController`, `@RequestMapping`, `@Validated`, `@ExceptionHandler`, `HandlerInterceptor`, and other Spring annotations and abstractions — zero-code migration
+- **Async Native** — Built-in support for DeferredResult, Callable, SseEmitter, StreamEmitter, Reactive Streams; SSE throughput reaches 3.89x of Spring MVC, scaling to 6.64x under high concurrency
+- **Batch Processing** — Disruptor-based request aggregation that transparently merges concurrent requests into batch operations, boosting throughput by multiple times; supports backpressure strategies, wait strategies, and thread pool isolation
+- **Extensible** — SPI at every key juncture: argument resolvers, return value handlers, codec interceptors, filters, interceptors
+- **Ecosystem Bridge** — The `support` module bridges Servlet Filters, Spring MVC `HandlerInterceptor`, `RequestBodyAdvice` / `ResponseBodyAdvice`
+- **Actuator Integration** — Supports Spring Boot Actuator with optional standalone management port
+
+---
+
+## Quick Start
+
+### 1. Add Dependency
 
 ```xml
 <dependency>
@@ -71,7 +71,7 @@ Spring WebPerf 是一个基于 **Netty** 构建的高性能 Web 框架，定位�
 </dependency>
 ```
 
-### 2. 编写 Controller
+### 2. Write a Controller
 
 ```java
 @RestController
@@ -90,7 +90,7 @@ public class HelloController {
 }
 ```
 
-### 3. 启动
+### 3. Start
 
 ```java
 @SpringBootApplication
@@ -101,38 +101,38 @@ public class Application {
 }
 ```
 
-### 4. 配置
+### 4. Configuration
 
 ```yaml
 server:
   port: 8080
   servlet:
-    context-path: /api               # 应用上下文路径（可选）
+    context-path: /api               # Application context path (optional)
   http:
-    max-content-length: 5242880      # 最大请求体，默认 1MB
-    timeout: 15000                   # 请求超时，默认 60s（毫秒）
+    max-content-length: 5242880      # Max request body, default 1MB
+    timeout: 15000                   # Request timeout, default 60s (milliseconds)
 management:
   server:
-    port: 8081                       # Actuator 独立管理端口（可选）
+    port: 8081                       # Actuator standalone management port (optional)
 ```
 
-> 完整配置参考见 [配置文档](docs/configuration.md)。
+> See [Configuration Reference](docs/en/configuration.md) for the full list.
 >
-> 从 Spring Boot（Spring MVC）项目迁移？查看[迁移指南](docs/quickstart.md)。
+> Migrating from Spring Boot (Spring MVC)? See the [Migration Guide](docs/en/quickstart.md).
 >
-> 从 Spring AI 项目迁移？查看[AI 集成指南](docs/ai-guide.md)。
+> Migrating from Spring AI? See the [AI Integration Guide](docs/en/ai-guide.md).
 
 ---
 
-## 基准测试
+## Benchmark
 
-> 详细报告见 [Benchmark 文档](docs/benchmark.md)
-> 性能原理分析见 [性能原理文档](docs/performance-principles.md)
+> Full report: [Benchmark Document](docs/en/benchmark.md)
+> Performance analysis: [Performance Principles](docs/en/performance-principles.md)
 
-基于 JDK 1.8 + G1GC (1GB heap) 的 JMH 基准测试结果（4 线程）：
+JMH benchmark results on JDK 1.8 + G1GC (1GB heap, 4 threads):
 
-| 接口 | perf 吞吐 | vs Spring MVC (Tomcat) | vs Spring MVC (Undertow) | vs WebFlux |
-|------|-----------|-----------|-------------|-------------|
+| API | perf throughput | vs Spring MVC (Tomcat) | vs Spring MVC (Undertow) | vs WebFlux |
+|-----|---------------|-----------|-------------|-------------|
 | json | **26,718** ops/s | **1.90x** | **2.59x** | **1.73x** |
 | get | **27,398** ops/s | **2.19x** | **2.04x** | **2.08x** |
 | bytes | **34,232** ops/s | **1.71x** | **2.92x** | **1.99x** |
@@ -141,66 +141,66 @@ management:
 | bytesLarge | **11,508** ops/s | **2.31x** | **1.48x** | **1.49x** |
 | sse | **1,226** ops/s | **3.89x** | — | **1.30x** |
 
-perf 框架吞吐是 Servlet 容器的 **1.7\~3.9x**，p50 延迟 **0.12\~0.15ms**（同类框架最低）。SSE 高并发下扩展至 Spring MVC 的 **6.64x**。详情见 [完整对比报告](docs/benchmark.md)。
+The perf framework delivers **1.7\~3.9x** throughput over Servlet containers, with **0.12\~0.15ms** p50 latency (lowest among peers). SSE scales to **6.64x** Spring MVC under high concurrency. See [full comparison report](docs/en/benchmark.md).
 
 ---
 
-## 与 Spring MVC 对比
+## Comparison with Spring MVC
 
-| 维度 | WebPerf | Spring MVC (Tomcat) |
-|------|-----------|---------------------|
-| 底层引擎 | Netty 4.1 | Servlet 容器（Tomcat/Jetty/Undertow） |
-| 吞吐量 (json 4t) | **26,718** ops/s | 14,061 ops/s (1.90x) |
-| P50 延迟 (bytes 4t) | **0.12ms** | 0.19ms |
-| 稳态堆占用 (4t) | **20MB** | 23MB |
-| I/O 模型 | Netty 非阻塞传输 + EventLoop 处理 | Servlet 阻塞 I/O + 容器线程 |
-| 线程模型 | EventLoop 直接处理或 `@RunInPool` 按需切换 | 固定容器线程池 |
-| 方法调用 | ASM / MethodHandle（~10-30ns） | `Method.invoke()` 反射（~200ns） |
-| 参数解析 | 启动时预缓存，运行时直接调用 | 每次请求遍历 + `synchronized` 缓存 |
-| 路由 | O(1) HashMap 多级优化器 | `AntPathMatcher` 线性遍历 |
-| Servlet API | 通过 support 模块桥接 | 原生支持 |
-| Actuator | 原生支持 | 原生支持 |
-
----
-
-## 版本选择
-
-本项目按 Spring Boot 大版本管理两个分支。最低支持 **Spring Boot 2.4.x**。
-
-| 分支 | Spring Boot | Spring Framework | JDK | Servlet API | 状态 |
-|------|------------|----------------|-----|-------------|------|
-| `2.7.x` | 2.4.x ~ 2.7.x | 5.3.x | 8 / 11 / 17 | javax.servlet 4.0 | 维护分支（功能迭代 + bugfix） |
-| `master` | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | 6.0.x ~ 6.2.x / 7.0.x | 17 / 21 | jakarta.servlet 6.0 | **开发基线**（多版本兼容，切换 Profile） |
-
-> 版本下限说明、分支选择建议及详细兼容性信息见 [版本兼容性说明](docs/compatibility.md)。
+| Dimension | WebPerf | Spring MVC (Tomcat) |
+|-----------|-----------|---------------------|
+| Engine | Netty 4.1 | Servlet container (Tomcat/Jetty/Undertow) |
+| Throughput (json 4t) | **26,718** ops/s | 14,061 ops/s (1.90x) |
+| P50 Latency (bytes 4t) | **0.12ms** | 0.19ms |
+| Steady-state heap (4t) | **20MB** | 23MB |
+| I/O model | Netty non-blocking transport + EventLoop | Servlet blocking I/O + container threads |
+| Thread model | EventLoop direct or `@RunInPool` on-demand | Fixed container thread pool |
+| Method invocation | ASM / MethodHandle (~10-30ns) | `Method.invoke()` reflection (~200ns) |
+| Argument resolution | Pre-cached at startup, direct call at runtime | Per-request iteration + `synchronized` cache |
+| Routing | O(1) HashMap multi-level optimizer | `AntPathMatcher` linear traversal |
+| Servlet API | Bridged via support module | Native |
+| Actuator | Native | Native |
 
 ---
 
-## 模块说明
+## Version Selection
 
-| 模块 | 说明 |
-|------|------|
-| `spring-web` | 核心模块：Netty 服务器、请求分发、映射注册、异常处理等 |
-| `spring-web-support` | Spring MVC 兼容模块：提供 `HandlerInterceptor`、`View` 等适配类 ¹ |
-| `spring-web-websocket` | WebSocket 支持模块：基于 Spring WebSocket + Netty |
-| `spring-web-batch` | 批处理模块：基于 Disruptor 的高性能消息聚合与批量处理 |
-| `spring-boot-starter-web` | Spring Boot Starter：自动配置、Actuator 支持 |
-| `spring-web-test` | 集成测试模块 |
-| `spring-web-support-test` | Spring MVC 兼容测试模块 |
-| `spring-web-examples` | 各场景使用示例 |
+This project manages two branches aligned with Spring Boot major versions. Minimum supported: **Spring Boot 2.4.x**.
 
-> ¹ support 模块中部分类使用了 `org.springframework.web.servlet` 包路径（如 `HandlerInterceptor`），与 Spring WebMVC 官方包路径相同。这是有意为之——基于 Spring MVC 接口编写的代码可不改 import 直接运行。但这也意味着本模块与 `spring-webmvc` **二者不能同时存在**，否则运行时会产生类冲突。Java 9+ 模块化系统下也会触发 split package 错误，请务必二选一。
+| Branch | Spring Boot | Spring Framework | JDK | Servlet API | Status |
+|--------|------------|----------------|-----|-------------|--------|
+| `2.7.x` | 2.4.x ~ 2.7.x | 5.3.x | 8 / 11 / 17 | javax.servlet 4.0 | Maintenance branch (features + bugfix) |
+| `master` | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | 6.0.x ~ 6.2.x / 7.0.x | 17 / 21 | jakarta.servlet 6.0 | **Development baseline** (multi-version via profiles) |
+
+> See [Version Compatibility](docs/en/compatibility.md) for version floor notes, branch recommendations, and detailed compatibility information.
+
+---
+
+## Modules
+
+| Module | Description |
+|--------|-------------|
+| `spring-web` | Core: Netty server, request dispatch, mapping registration, exception handling |
+| `spring-web-support` | Spring MVC compatibility: `HandlerInterceptor`, `View` adapters, etc. ¹ |
+| `spring-web-websocket` | WebSocket support: Spring WebSocket + Netty |
+| `spring-web-batch` | Batch processing: high-performance message aggregation via Disruptor |
+| `spring-boot-starter-web` | Spring Boot Starter: auto-configuration, Actuator support |
+| `spring-web-test` | Integration tests |
+| `spring-web-support-test` | Spring MVC compatibility tests |
+| `spring-web-examples` | Usage examples for various scenarios |
+
+> ¹ Some classes in the support module use `org.springframework.web.servlet` package paths (e.g., `HandlerInterceptor`), intentionally matching Spring WebMVC's official package paths — code written against Spring MVC interfaces can run without import changes. However, this means the support module and `spring-webmvc` **cannot coexist** — having both on the classpath will cause class conflicts at runtime. Under Java 9+ module system this also triggers split package errors. Choose one or the other.
 >
-> 更多说明：[模块详解](docs/modules.md) · [扩展点指南](docs/extensions.md) · [高级主题](docs/advanced.md)
+> Further reading: [Modules](docs/en/modules.md) · [Extension Points](docs/en/extensions.md) · [Advanced Topics](docs/en/advanced.md)
 
 ---
 
-## 如何贡献
+## Contributing
 
-请参阅 [CONTRIBUTING.md](CONTRIBUTING.md)。
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
-## 许可证
+## License
 
 [Apache License 2.0](LICENSE.md)

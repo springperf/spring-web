@@ -70,7 +70,7 @@ VERIFY -> COMPLETE
 
 - .claude/rule/review.md
 
-## 涉及 2.7.x → master 分支合并
+## 涉及 master → 2.7.x backport
 
 必须读取：
 
