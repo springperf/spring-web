@@ -242,6 +242,40 @@ class InvokableHandlerMethodTest {
         assertNotNull(hm.getInvoker());
     }
 
+    // ==================== effectiveReturnType ====================
+
+    @Test
+    void effectiveReturnType_initialState_isNull() throws Exception {
+        Method method = PlainController.class.getMethod("hello", String.class);
+        InvokableHandlerMethod hm = new InvokableHandlerMethod(new PlainController(), method);
+
+        assertNull(hm.getEffectiveReturnType());
+    }
+
+    @Test
+    void effectiveReturnType_setAndGet() throws Exception {
+        Method method = PlainController.class.getMethod("hello", String.class);
+        InvokableHandlerMethod hm = new InvokableHandlerMethod(new PlainController(), method);
+
+        MethodParameter mp = new MethodParameter(method, -1);
+        hm.setEffectiveReturnType(mp);
+
+        assertSame(mp, hm.getEffectiveReturnType());
+    }
+
+    @Test
+    void effectiveReturnType_setNull_clearsOverride() throws Exception {
+        Method method = PlainController.class.getMethod("hello", String.class);
+        InvokableHandlerMethod hm = new InvokableHandlerMethod(new PlainController(), method);
+
+        MethodParameter mp = new MethodParameter(method, -1);
+        hm.setEffectiveReturnType(mp);
+        assertNotNull(hm.getEffectiveReturnType());
+
+        hm.setEffectiveReturnType(null);
+        assertNull(hm.getEffectiveReturnType());
+    }
+
     // ==================== integration: fast invoker correctness ====================
 
     @Test

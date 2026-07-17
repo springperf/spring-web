@@ -1,6 +1,7 @@
 package io.springperf.web.batch;
 
 import io.springperf.web.batch.common.BatchHandlerRegistration;
+import io.springperf.web.batch.common.BatchRequest;
 import io.springperf.web.batch.common.BatchRequestMetaData;
 import io.springperf.web.batch.common.BatchScanner;
 import io.springperf.web.batch.invoker.BatchInvoker;
@@ -13,7 +14,9 @@ import io.springperf.web.core.mapping.MappingRegistry;
 import io.springperf.web.core.pool.BizPoolRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationContext;
+import org.springframework.core.MethodParameter;
 
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -94,10 +97,31 @@ public class BatchRegistry extends BaseWebComponent {
                 reg.singleCtx().getMethod().toGenericString());
         reg.singleCtx().setInvoker(new BatchInvoker(meta, queue));
 
+        // 矫正返回值类型为 BatchRequest 子类，让 ReturnValueResolverRegistry 能正确解析泛型内联类型
+        reg.singleCtx().setEffectiveReturnType(createEffectiveReturnType(meta));
+
         // 默认在 EventLoop 完成入队列前处理；用户指定 @RunInPool 时尊重其选择
         BizPoolRegistry poolRegistry = webContext.getWebComponent(BizPoolRegistry.class);
         if (poolRegistry != null) {
             poolRegistry.setDefaultPool(reg.singleCtx(), null);
         }
+    }
+
+    /**
+     * 创建 BatchRequest 子类的合成返回类型，使 ReturnValueResolverRegistry
+     * 能正确解析泛型内联类型（如 EchoBatchRequest extends BatchRequest<String> 中的 String）。
+     */
+    private static MethodParameter createEffectiveReturnType(BatchRequestMetaData meta) {
+        Class<? extends BatchRequest<?>> requestType = meta.requestType();
+        return new MethodParameter(meta.batchMethod(), -1) {
+            @Override
+            public Class<?> getParameterType() {
+                return requestType;
+            }
+            @Override
+            public Type getGenericParameterType() {
+                return requestType.getGenericSuperclass();
+            }
+        };
     }
 }

@@ -22,6 +22,9 @@ public class InvokableHandlerMethod extends HandlerMethod {
 
     private Invoker invoker;
 
+    /** 有效返回类型，null = 使用声明类型。由替换 invoker 的模块设置。 */
+    private MethodParameter effectiveReturnType;
+
     private final boolean optimized;
 
     public InvokableHandlerMethod(Object bean, Method method) {
@@ -87,6 +90,14 @@ public class InvokableHandlerMethod extends HandlerMethod {
 
     public Invoker getInvoker() {
         return invoker;
+    }
+
+    public void setEffectiveReturnType(MethodParameter returnType) {
+        this.effectiveReturnType = returnType;
+    }
+
+    public MethodParameter getEffectiveReturnType() {
+        return effectiveReturnType;
     }
 
     protected Invoker createFastInvoker() {
