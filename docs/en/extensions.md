@@ -201,32 +201,34 @@ public class CustomReturnValueResolver implements ReturnValueResolver {
 
 ---
 
-## 6. RuntimeArgumentResolver — Runtime Argument Resolver
+## 6. StaticArgumentResolverProvider — Argument Resolver Provider (Recommended)
 
-Resolve custom controller method parameters (dynamic per-request decision).
+Resolve custom controller method parameters. During initialization, the provider matches parameters and caches the resolver — zero runtime overhead.
 
 ```java
 @Component
-public class CurrentUserResolver implements RuntimeArgumentResolver {
+public class CurrentUserResolverProvider implements StaticArgumentResolverProvider {
 
     @Override
-    public boolean supportsParameter(MethodParameter parameter,
-                                     WebServerHttpRequest request,
-                                     WebServerHttpResponse response) {
+    public boolean supports(MethodParameter parameter, MappingHandlerMethod mappingContext) {
         return parameter.getParameterType() == CurrentUser.class;
     }
 
     @Override
-    public Object resolveArgument(MethodParameter parameter,
-                                  WebServerHttpRequest request,
-                                  WebServerHttpResponse response) {
-        String token = request.getHeaders().getFirst("Authorization");
-        return parseToken(token); // Parse current user from Token
+    public StaticArgumentResolver getResolver(MethodParameter parameter,
+                                              MappingHandlerMethod mappingContext,
+                                              WebContext webContext) {
+        return (request, response) -> {
+            String token = request.getHeaders().getFirst("Authorization");
+            return parseToken(token); // Parse current user from Token
+        };
     }
 }
 ```
 
-**Auto-registration**: implement `RuntimeArgumentResolver` and declare it as a Spring Bean.
+**Auto-registration**: implement `StaticArgumentResolverProvider` and declare it as a Spring Bean.
+
+To bridge Spring MVC's `HandlerMethodArgumentResolver`, the framework automatically adapts them via `SpringHandlerMethodArgumentResolverProvider`. Just use `WebMvcConfigurer.addArgumentResolvers()` — no additional configuration needed.
 
 ---
 
@@ -468,7 +470,7 @@ Swagger annotations (`@Tag`, `@Operation`, `@Schema`) work directly.
 | `HttpBodyCodecInterceptor` | Spring Bean | Request/response body read/write interception |
 | `HandlerExceptionResolver` | Spring Bean | Exception resolver |
 | `ReturnValueResolver` | Spring Bean | Return value resolver |
-| `RuntimeArgumentResolver` | Spring Bean | Runtime argument resolver |
+| `StaticArgumentResolverProvider` | Spring Bean | Argument resolver provider | `ArgumentResolverRegistry` |
 | `StaticArgumentResolverProvider` | Spring Bean | Static argument resolver provider |
 | `HttpBodyConverter` | Spring Bean | HTTP message format conversion |
 | `JsonConverter` | Spring Bean | JSON serialization implementation |

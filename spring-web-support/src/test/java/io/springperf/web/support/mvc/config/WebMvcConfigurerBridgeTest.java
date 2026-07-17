@@ -2,8 +2,8 @@ package io.springperf.web.support.mvc.config;
 
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.arg.ArgumentResolverRegistry;
-import io.springperf.web.core.arg.RuntimeArgumentResolver;
 import io.springperf.web.core.arg.databinder.WebDataBinderRegistry;
+import io.springperf.web.core.arg.provider.StaticArgumentResolverProvider;
 import io.springperf.web.core.async.AsyncSupportRegistry;
 import io.springperf.web.core.codec.HttpBodyCodecRegistry;
 import io.springperf.web.core.codec.HttpBodyConverter;
@@ -483,7 +483,7 @@ class WebMvcConfigurerBridgeTest {
 
         bridge.initComponentPhase1();
 
-        assertFalse(argRegistry.getWebComponents(RuntimeArgumentResolver.class).isEmpty());
+        assertFalse(argRegistry.getWebComponents(StaticArgumentResolverProvider.class).isEmpty());
     }
 
     @Test
@@ -515,7 +515,7 @@ class WebMvcConfigurerBridgeTest {
 
         bridge.initComponentPhase1();
 
-        assertTrue(argRegistry.getWebComponents(RuntimeArgumentResolver.class).isEmpty());
+        assertTrue(argRegistry.getWebComponents(StaticArgumentResolverProvider.class).isEmpty());
     }
 
     // ========== New bridge method tests: extendMessageConverters ==========

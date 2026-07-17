@@ -3,8 +3,8 @@ package io.springperf.web.support.mvc.config;
 import io.springperf.web.context.BaseWebComponent;
 import io.springperf.web.context.WebComponentWrapper;
 import io.springperf.web.core.arg.ArgumentResolverRegistry;
-import io.springperf.web.core.arg.RuntimeArgumentResolver;
 import io.springperf.web.core.arg.databinder.WebDataBinderRegistry;
+import io.springperf.web.core.arg.provider.StaticArgumentResolverProvider;
 import io.springperf.web.core.async.AsyncSupportRegistry;
 import io.springperf.web.core.codec.AdaptedHttpBodyConverter;
 import io.springperf.web.core.codec.HttpBodyCodecRegistry;
@@ -15,7 +15,7 @@ import io.springperf.web.core.exception.ExceptionRegistry;
 import io.springperf.web.core.interceptor.InterceptorRegistry;
 import io.springperf.web.core.resource.ResourceHandlerRegistry;
 import io.springperf.web.core.retval.ReturnValueResolverRegistry;
-import io.springperf.web.support.mvc.arg.SpringHandlerMethodArgumentResolverAdapter;
+import io.springperf.web.support.mvc.arg.SpringHandlerMethodArgumentResolverProvider;
 import io.springperf.web.support.mvc.exception.SpringHandlerExceptionResolverAdapter;
 import io.springperf.web.support.mvc.interceptor.HandlerInterceptorWrapper;
 import io.springperf.web.support.mvc.retval.SpringHandlerMethodReturnValueHandlerAdapter;
@@ -301,8 +301,8 @@ public class WebMvcConfigurerBridge extends BaseWebComponent {
         }
 
         for (HandlerMethodArgumentResolver resolver : resolvers) {
-            RuntimeArgumentResolver adapter = new SpringHandlerMethodArgumentResolverAdapter(resolver);
-            argRegistry.addRuntimeArgumentResolver(adapter);
+            StaticArgumentResolverProvider provider = new SpringHandlerMethodArgumentResolverProvider(resolver);
+            argRegistry.addStaticArgumentResolverProvider(provider);
             log.debug("Bridged argument resolver: {}", resolver.getClass().getName());
         }
     }
