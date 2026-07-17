@@ -22,7 +22,6 @@ import org.springframework.core.MethodParameter;
  *
  * @since 1.0.0
  * @see StaticArgumentResolver
- * @see io.springperf.web.core.arg.RuntimeArgumentResolver
  */
 public interface StaticArgumentResolverProvider extends WebComponent {
 
