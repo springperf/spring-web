@@ -130,10 +130,8 @@ spring-web
 │   ├── arg/                     参数解析
 │   │   ├── ArgumentResolverRegistry  管理所有参数解析器
 │   │   │   ├── StaticArgumentResolverProvider 列表 → 启动时预创建解析器
-│   │   │   ├── RuntimeArgumentResolver 列表 → 每次请求动态判断
 │   │   │   └── 支持校验（Validation）
-│   │   ├── StaticArgumentResolver     简单解析接口
-│   │   ├── RuntimeArgumentResolver    运行时解析接口（extends WebComponent）
+│   │   ├── StaticArgumentResolver               简单解析接口
 │   │   ├── MethodArgContext            每方法参数元数据缓存
 │   │   ├── StaticArgumentResolverProvider  SPI → 为带注解参数提供解析器
 │   │   ├── provider/                   内置注解解析器提供者
@@ -311,7 +309,7 @@ spring-web-support
 │   │   └── HandlerInterceptorWrapper          适配 Spring MVC HandlerInterceptor → 框架 HandlerInterceptor
 │   │
 │   ├── arg/
-│   │   └── SpringHandlerMethodArgumentResolverAdapter  适配 Spring HandlerMethodArgumentResolver
+│   │   └── SpringHandlerMethodArgumentResolverProvider  适配 Spring HandlerMethodArgumentResolver
 │   │
 │   ├── retval/
 │   │   └── SpringHandlerMethodReturnValueHandlerAdapter  适配 Spring HandlerMethodReturnValueHandler
@@ -397,7 +395,7 @@ spring-boot-starter-web
 │   │   ├── SupportWebFilterRegistry + FilterWrapper
 │   │   ├── ResponseBodyEmitterReturnValueResolver
 │   │   ├── WebMvcConfigurerBridge（桥接 WebMvcConfigurer 实现）
-│   │   ├── SpringHandlerMethodArgumentResolverAdapter
+│   │   ├── SpringHandlerMethodArgumentResolverProvider
 │   │   ├── SpringHandlerMethodReturnValueHandlerAdapter
 │   │   └── SpringHandlerExceptionResolverAdapter
 │   │
@@ -489,7 +487,6 @@ WebComponent (interface)
 | `HttpBodyCodecInterceptor` | Spring Bean | 请求体读/响应体写 | `HttpBodyCodecInterceptorRegistry` |
 | `HandlerExceptionResolver` | Spring Bean | 任何步骤的异常 | `ExceptionRegistry` |
 | `ReturnValueResolver` | Spring Bean | 控制器返回值 | `ReturnValueResolverRegistry` |
-| `RuntimeArgumentResolver` | Spring Bean | 每次请求参数解析 | `ArgumentResolverRegistry` |
 | `StaticArgumentResolverProvider` | Spring Bean | 为注解参数提供解析器 | `ArgumentResolverRegistry` |
 | `HttpBodyConverter` | Spring Bean | HTTP 消息格式转换 | `HttpBodyCodecRegistry` |
 | `JsonConverter` | Spring Bean | JSON 序列化/反序列化 | 通过 `AsyncSupportRegistry` 引用 |
@@ -547,7 +544,7 @@ DispatcherHandler.handle() (根 HttpHandler)
                       │   │   ├── InterceptorRegistry.preHandle()
                       │   │   ├── ArgumentResolverRegistry.resolveArguments()
                       │   │   │   ├── 静态解析器: @PathVariable, @RequestParam, @RequestBody 等
-                      │   │   │   └── 运行时解析器: RuntimeArgumentResolver
+                      │   │   │   └── 兜底: @RequestParam / @ModelAttribute 解析
                       │   │   ├── InvokableHandlerMethod.invoke(args)
                       │   │   │   └── 可选: FastInvokerGenerator 字节码调用
                       │   │   ├── ReturnValueResolverRegistry.resolve(returnValue)

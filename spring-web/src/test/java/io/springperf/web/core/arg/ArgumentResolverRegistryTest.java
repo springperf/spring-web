@@ -41,7 +41,6 @@ class ArgumentResolverRegistryTest {
         f.set(registry, webContextMock);
 
         registry.initStaticArgumentResolverProviders();
-        registry.initRuntimeArgumentResolvers();
         registry.webDataBinderRegistry = mock(WebDataBinderRegistry.class);
 
         registry.requestParamResolverProvider = registry.getWebComponent(RequestParamResolverProvider.class);
@@ -56,11 +55,6 @@ class ArgumentResolverRegistryTest {
     @Test
     void initWithWebContext_initializesProviders() {
         assertFalse(registry.staticArgumentResolverProviders.isEmpty());
-    }
-
-    @Test
-    void initWithWebContext_initializesRuntimeResolvers() {
-        assertNotNull(registry.runtimeArgumentResolvers);
     }
 
     @Test
@@ -147,15 +141,6 @@ class ArgumentResolverRegistryTest {
 
         assertNotNull(argCtx.defaultArgumentResolver);
         assertFalse(argCtx.isStaticArgResolved);
-    }
-
-    // ----- addRuntimeArgumentResolver -----
-
-    @Test
-    void addRuntimeArgumentResolver_addsToList() {
-        RuntimeArgumentResolver resolver = mock(RuntimeArgumentResolver.class);
-        registry.addRuntimeArgumentResolver(resolver);
-        assertTrue(registry.runtimeArgumentResolvers.contains(resolver));
     }
 
     // ----- addStaticArgumentResolverProvider -----

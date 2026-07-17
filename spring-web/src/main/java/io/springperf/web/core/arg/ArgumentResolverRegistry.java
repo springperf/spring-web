@@ -1,5 +1,6 @@
 package io.springperf.web.core.arg;
 
+import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebComponentContainer;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.arg.databinder.WebDataBinderRegistry;
@@ -7,8 +8,11 @@ import io.springperf.web.core.arg.provider.*;
 import io.springperf.web.core.codec.HttpBodyCodecRegistry;
 import io.springperf.web.core.mapping.MappingCacheKey;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.core.mapping.MappingRegistry;
+import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.core.MethodParameter;
 import org.springframework.util.ObjectUtils;
@@ -22,13 +26,12 @@ import java.util.List;
 /**
  * Manages a set of argument resolvers, similar to Spring's HandlerMethodArgumentResolver.
  */
+@Slf4j
 public class ArgumentResolverRegistry extends WebComponentContainer {
 
     public static final MappingCacheKey<MethodArgContext[]> MAPPING_CACHE_KEY = MappingCacheKey.createMethodCacheKey(MethodArgContext[].class);
 
     protected final List<StaticArgumentResolverProvider> staticArgumentResolverProviders = new ArrayList<>();
-
-    protected final List<RuntimeArgumentResolver> runtimeArgumentResolvers = new ArrayList<>();
 
     protected WebDataBinderRegistry webDataBinderRegistry;
 
@@ -40,7 +43,6 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
         super.initWithWebContext(webContext);
         webContext.getWebComponentWithDefault(HttpBodyCodecRegistry.class, new HttpBodyCodecRegistry());
         initStaticArgumentResolverProviders();
-        initRuntimeArgumentResolvers();
         webDataBinderRegistry = getWebComponentWithDefault(WebDataBinderRegistry.class, new WebDataBinderRegistry());
         requestParamResolverProvider = getWebComponent(RequestParamResolverProvider.class);
         modelAttributeResolverProvider = getWebComponent(ModelAttributeResolverProvider.class);
@@ -63,9 +65,63 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
         initRealComponentList(staticArgumentResolverProviders, StaticArgumentResolverProvider.class);
     }
 
-    protected void initRuntimeArgumentResolvers() {
-        registerWebComponent(RuntimeArgumentResolver.class);
-        initRealComponentList(runtimeArgumentResolvers, RuntimeArgumentResolver.class);
+    @Override
+    public void initComponentPhase3() throws Exception {
+        super.initComponentPhase3();
+        if (webContext.getProps().getBoolean(PropertiesConstant.CHECK_ON_STARTUP, true)) {
+            validateAllParametersResolvable();
+        }
+    }
+
+    /**
+     * Phase 3 validation: checks that every controller method parameter can be resolved
+     * by at least one registered provider or the fallback resolver.
+     * <p>This only checks {@link StaticArgumentResolverProvider#supports} — it does NOT
+     * create or cache any resolver, keeping memory footprint zero for endpoints that
+     * are never called.</p>
+     */
+    protected void validateAllParametersResolvable() {
+        MappingRegistry mappingRegistry = webContext.getWebComponent(MappingRegistry.class);
+        if (mappingRegistry == null) {
+            return;
+        }
+        List<PathMappingContext> mappings = mappingRegistry.getMappingContextList();
+        if (mappings.isEmpty()) {
+            return;
+        }
+        List<String> unresolvable = new ArrayList<>();
+        for (PathMappingContext mapping : mappings) {
+            MethodParameter[] methodParameters = mapping.createMethodParameters();
+            for (MethodParameter parameter : methodParameters) {
+                if (!isParameterResolvable(parameter, mapping)) {
+                    unresolvable.add(parameter.getParameterName()
+                            + " (" + parameter.getNestedParameterType().getName() + ")"
+                            + " in " + mapping.getUserClass().getSimpleName() + "#" + mapping.getMethod().getName());
+                }
+            }
+        }
+        if (!unresolvable.isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            sb.append(unresolvable.size()).append(" parameter(s) have no matching resolver:")
+                    .append(System.lineSeparator());
+            for (String param : unresolvable) {
+                sb.append("  - ").append(param).append(System.lineSeparator());
+            }
+            throw new IllegalStateException(sb.toString());
+        }
+    }
+
+    protected boolean isParameterResolvable(MethodParameter parameter, MappingHandlerMethod mappingContext) {
+        for (StaticArgumentResolverProvider provider : staticArgumentResolverProviders) {
+            if (provider.supports(parameter, mappingContext)) {
+                return true;
+            }
+        }
+        // Check fallback
+        if (BeanUtils.isSimpleProperty(parameter.getNestedParameterType())) {
+            return requestParamResolverProvider != null;
+        }
+        return modelAttributeResolverProvider != null;
     }
 
     public Object[] resolveArguments(MappingHandlerMethod mappingContext, WebServerHttpRequest request, WebServerHttpResponse response) throws Exception {
@@ -73,25 +129,8 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
         Object[] args = new Object[methodArgContexts.length];
         for (int i = 0; i < methodArgContexts.length; i++) {
             MethodArgContext methodArgContext = methodArgContexts[i];
-            boolean handled = false;
-            if (methodArgContext.isStaticArgResolved) {
+            if (methodArgContext.defaultArgumentResolver != null) {
                 args[i] = methodArgContext.defaultArgumentResolver.resolveArgument(request, response);
-                handled = true;
-            } else {
-                for (RuntimeArgumentResolver r : runtimeArgumentResolvers) {
-                    MethodParameter mp = methodArgContext.getMethodParameter();
-                    if (r.supportsParameter(mp, request, response)) {
-                        args[i] = r.resolveArgument(mp, request, response);
-                        handled = true;
-                        break;
-                    }
-                }
-                if (!handled && methodArgContext.defaultArgumentResolver != null) {
-                    args[i] = methodArgContext.defaultArgumentResolver.resolveArgument(request, response);
-                    handled = true;
-                }
-            }
-            if (handled) {
                 validateIfApplicable(args[i], methodArgContext, request, mappingContext);
             } else {
                 args[i] = null;
@@ -188,11 +227,6 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
             methodArgContext.defaultArgumentResolver = modelAttributeResolverProvider.getResolver(parameter, methodMappingContext, webContext);
         }
         methodArgContext.isStaticArgResolved = false;
-    }
-
-    public void addRuntimeArgumentResolver(RuntimeArgumentResolver argumentResolver) {
-        registerWebComponent(argumentResolver);
-        initRealComponentList(runtimeArgumentResolvers, RuntimeArgumentResolver.class);
     }
 
     public void addStaticArgumentResolverProvider(StaticArgumentResolverProvider provider) {

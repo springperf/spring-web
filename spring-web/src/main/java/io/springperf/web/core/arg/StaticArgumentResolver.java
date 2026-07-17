@@ -7,9 +7,8 @@ import io.springperf.web.http.WebServerHttpResponse;
  * Strategy interface for resolving controller method arguments without
  * parameter metadata.
  *
- * <p>Unlike {@link RuntimeArgumentResolver}, static resolvers do not have
- * access to {@link org.springframework.core.MethodParameter} information.
- * They are used for arguments that can be resolved purely from the request
+ * <p>Static resolvers do not have access to {@link org.springframework.core.MethodParameter}
+ * information. They are used for arguments that can be resolved purely from the request
  * and response objects, independent of the handler method signature.</p>
  *
  * <p>Common examples include resolving the {@code HttpServletRequest},
@@ -18,7 +17,6 @@ import io.springperf.web.http.WebServerHttpResponse;
  * method, a single static resolver handles all such parameters.</p>
  *
  * @since 1.0.0
- * @see RuntimeArgumentResolver
  * @see io.springperf.web.core.arg.provider.StaticArgumentResolverProvider
  */
 public interface StaticArgumentResolver {
