@@ -201,32 +201,34 @@ public class CustomReturnValueResolver implements ReturnValueResolver {
 
 ---
 
-## 6. RuntimeArgumentResolver — 运行时参数解析器
+## 6. StaticArgumentResolverProvider — 参数解析器提供者（推荐）
 
-解析自定义类型的控制器方法参数（每个请求动态判断）。
+解析自定义类型的控制器方法参数。在初始化阶段匹配参数并缓存解析器，运行时零开销。
 
 ```java
 @Component
-public class CurrentUserResolver implements RuntimeArgumentResolver {
+public class CurrentUserResolverProvider implements StaticArgumentResolverProvider {
 
     @Override
-    public boolean supportsParameter(MethodParameter parameter,
-                                     WebServerHttpRequest request,
-                                     WebServerHttpResponse response) {
+    public boolean supports(MethodParameter parameter, MappingHandlerMethod mappingContext) {
         return parameter.getParameterType() == CurrentUser.class;
     }
 
     @Override
-    public Object resolveArgument(MethodParameter parameter,
-                                  WebServerHttpRequest request,
-                                  WebServerHttpResponse response) {
-        String token = request.getHeaders().getFirst("Authorization");
-        return parseToken(token); // 从 Token 解析当前用户
+    public StaticArgumentResolver getResolver(MethodParameter parameter,
+                                              MappingHandlerMethod mappingContext,
+                                              WebContext webContext) {
+        return (request, response) -> {
+            String token = request.getHeaders().getFirst("Authorization");
+            return parseToken(token); // 从 Token 解析当前用户
+        };
     }
 }
 ```
 
-**自动注册**：实现 `RuntimeArgumentResolver` 并声明为 Spring Bean 即可。
+**自动注册**：实现 `StaticArgumentResolverProvider` 并声明为 Spring Bean 即可。
+
+如果需要桥接 Spring MVC 的 `HandlerMethodArgumentResolver`，框架会自动通过 `SpringHandlerMethodArgumentResolverProvider` 适配。使用 `WebMvcConfigurer.addArgumentResolvers()` 添加即可，无需额外配置。
 
 ---
 
@@ -468,7 +470,7 @@ Swagger 注解（`@Tag`、`@Operation`、`@Schema`）直接可用。
 | `HttpBodyCodecInterceptor` | Spring Bean | 请求/响应体读写拦截 |
 | `HandlerExceptionResolver` | Spring Bean | 异常解析器 |
 | `ReturnValueResolver` | Spring Bean | 返回值解析器 |
-| `RuntimeArgumentResolver` | Spring Bean | 运行时参数解析 |
+| `StaticArgumentResolverProvider` | Spring Bean | 参数解析器提供者 | `ArgumentResolverRegistry` |
 | `StaticArgumentResolverProvider` | Spring Bean | 静态参数解析器提供者 |
 | `HttpBodyConverter` | Spring Bean | HTTP 消息格式转换 |
 | `JsonConverter` | Spring Bean | JSON 序列化实现 |

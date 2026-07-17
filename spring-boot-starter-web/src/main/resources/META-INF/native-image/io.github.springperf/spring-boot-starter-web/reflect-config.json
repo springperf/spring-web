@@ -313,7 +313,7 @@
     "allDeclaredConstructors": true
   },
   {
-    "name": "io.springperf.web.support.mvc.arg.SpringHandlerMethodArgumentResolverAdapter",
+    "name": "io.springperf.web.support.mvc.arg.SpringHandlerMethodArgumentResolverProvider",
     "allDeclaredConstructors": true
   },
   {

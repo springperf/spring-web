@@ -70,7 +70,7 @@ class GraalVmNativeImageConfigTest {
         assertClassExists("io.springperf.web.http.WebServerHttpRequest");
         assertClassExists("io.springperf.web.http.WebServerHttpResponse");
         assertClassExists("io.springperf.web.core.retval.ReturnValueResolver");
-        assertClassExists("io.springperf.web.core.arg.RuntimeArgumentResolver");
+        assertClassExists("io.springperf.web.support.mvc.arg.SpringHandlerMethodArgumentResolverProvider");
         assertClassExists("io.springperf.web.core.exception.HandlerExceptionResolver");
         assertClassExists("io.springperf.web.core.codec.HttpBodyConverter");
         assertClassExists("io.springperf.web.context.LifecycleWebComponent");

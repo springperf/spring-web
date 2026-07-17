@@ -1,0 +1,99 @@
+package io.springperf.web.support.mvc.arg;
+
+import io.springperf.web.core.arg.StaticArgumentResolver;
+import io.springperf.web.core.mapping.MappingHandlerMethod;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.MethodParameter;
+import org.springframework.core.Ordered;
+import org.springframework.web.method.support.HandlerMethodArgumentResolver;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class SpringHandlerMethodArgumentResolverProviderTest {
+
+    @Mock
+    HandlerMethodArgumentResolver delegate;
+
+    @Mock
+    MethodParameter methodParameter;
+
+    @Mock
+    MappingHandlerMethod mappingContext;
+
+    SpringHandlerMethodArgumentResolverProvider provider;
+
+    @BeforeEach
+    void setUp() {
+        provider = new SpringHandlerMethodArgumentResolverProvider(delegate);
+    }
+
+    @Test
+    void componentName_containsDelegateClassName() {
+        assertTrue(provider.getComponentName().contains(delegate.getClass().getName()));
+    }
+
+    @Test
+    void supports_delegatesToResolver() {
+        when(delegate.supportsParameter(methodParameter)).thenReturn(true);
+        assertTrue(provider.supports(methodParameter, mappingContext));
+        verify(delegate).supportsParameter(methodParameter);
+    }
+
+    @Test
+    void supports_whenDelegateReturnsFalse() {
+        when(delegate.supportsParameter(methodParameter)).thenReturn(false);
+        assertFalse(provider.supports(methodParameter, mappingContext));
+    }
+
+    @Test
+    void getResolver_returnsResolverThatDelegates() throws Exception {
+        StaticArgumentResolver staticResolver = provider.getResolver(methodParameter, mappingContext, null);
+        assertNotNull(staticResolver);
+    }
+
+    @Test
+    void getOrder_defaultsToLowestPrecedence_whenResolverHasNoOrder() {
+        assertEquals(Ordered.LOWEST_PRECEDENCE, provider.getOrder());
+    }
+
+    @Test
+    void getOrder_usesResolverOrder_whenResolverImplementsOrdered() {
+        HandlerMethodArgumentResolver orderedResolver = new OrderedHandlerMethodArgumentResolver(50);
+        SpringHandlerMethodArgumentResolverProvider orderedProvider =
+                new SpringHandlerMethodArgumentResolverProvider(orderedResolver);
+        assertEquals(50, orderedProvider.getOrder());
+    }
+
+    private static class OrderedHandlerMethodArgumentResolver implements HandlerMethodArgumentResolver, Ordered {
+        private final int order;
+
+        OrderedHandlerMethodArgumentResolver(int order) {
+            this.order = order;
+        }
+
+        @Override
+        public int getOrder() {
+            return order;
+        }
+
+        @Override
+        public boolean supportsParameter(MethodParameter parameter) {
+            return false;
+        }
+
+        @Override
+        public Object resolveArgument(MethodParameter parameter,
+                                       org.springframework.web.method.support.ModelAndViewContainer mavContainer,
+                                       org.springframework.web.context.request.NativeWebRequest webRequest,
+                                       org.springframework.web.bind.support.WebDataBinderFactory binderFactory) {
+            return null;
+        }
+    }
+}
