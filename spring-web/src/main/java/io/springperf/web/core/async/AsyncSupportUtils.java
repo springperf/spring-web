@@ -14,7 +14,7 @@ public class AsyncSupportUtils {
         if (asyncWebRequest == null) {
             return false;
         }
-        return asyncWebRequest.isAsyncStarted();
+        return asyncWebRequest.isAsyncStarted() || asyncWebRequest.isAsyncDispatched();
     }
 
     public static PerfAsyncWebRequest getAsyncWebRequest(WebServerHttpRequest request, WebServerHttpResponse response) {
