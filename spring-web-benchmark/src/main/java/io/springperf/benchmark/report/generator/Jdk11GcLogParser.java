@@ -105,17 +105,14 @@ public class Jdk11GcLogParser implements GcLogParser {
     /**
      * 从 GC 日志行提取绝对时间（秒）。
      * JDK 11+ unified logging 格式: {@code [2026-07-06T18:59:44.202+0800][2.116s][info][gc...}
+     * <p>
+     * 注意：wall clock 时间戳 {@code [2026-07-06T18:59:44.202+0800]} 不包含 "s]" 后缀，
+     * 不会被 {@code \d+\.\d+s]} 匹配。唯一匹配的是 JVM uptime {@code [2.116s]}。
      */
     private static double extractAbsTime(String line) {
-        // 匹配第二个时间戳字段：[2.116s]
         java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\[(\\d+\\.\\d+)s\\]").matcher(line);
-        // 第一个是 wall clock 时间，第二个是 JVM uptime
-        int count = 0;
-        while (m.find()) {
-            if (count == 1) {
-                return Double.parseDouble(m.group(1));
-            }
-            count++;
+        if (m.find()) {
+            return Double.parseDouble(m.group(1));
         }
         return 0;
     }
