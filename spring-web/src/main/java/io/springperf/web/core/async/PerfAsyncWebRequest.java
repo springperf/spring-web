@@ -136,6 +136,10 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
         return state.get() == State.COMPLETED;
     }
 
+    public boolean isAsyncDispatched() {
+        return state.get() == State.DISPATCHED;
+    }
+
     @Override
     public void addTimeoutHandler(Runnable handler) {
         this.timeoutHandler = handler;
