@@ -82,12 +82,16 @@ while [[ $# -gt 0 ]]; do
 	      EXTRA_JVM_ARGS="$EXTRA_JVM_ARGS -Dbenchmark.sampleTime=true"
 	      shift
 	      ;;
+    --jfr)
+	      EXTRA_JVM_ARGS="$EXTRA_JVM_ARGS -Dbenchmark.jfr=true"
+	      shift
+	      ;;
 	    --threads)
       EXTRA_JVM_ARGS="$EXTRA_JVM_ARGS -Dbenchmark.threads=$2"
       shift 2
       ;;
     *)
-      echo "Usage: $0 [--profiles perf,tomcat,...] [--api name|--apis a,b,c] [--jdk /path/to/jdk11,/path/to/jdk17] [--thread-list 1,4,16,64] [--sampleTime]"
+      echo "Usage: $0 [--profiles perf,tomcat,...] [--api name|--apis a,b,c] [--jdk /path/to/jdk11,/path/to/jdk17] [--thread-list 1,4,16,64] [--sampleTime] [--jfr]"
       exit 1
       ;;
   esac

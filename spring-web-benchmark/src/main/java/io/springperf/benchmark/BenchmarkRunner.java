@@ -108,6 +108,7 @@ public class BenchmarkRunner {
             }
             String jfrDuration = System.getProperty("benchmark.jfr.duration", "600s");
             String jfrSettings = System.getProperty("benchmark.jfr.settings", "profile");
+            extraJvmArgs.add("-XX:FlightRecorderOptions=stackdepth=1024");
             extraJvmArgs.add("-XX:StartFlightRecording=duration=" + jfrDuration + ",filename=" + jfrFile
                     + ",settings=" + jfrSettings + ",maxsize=256m");
             System.out.println("[BenchmarkRunner] JFR recording enabled: " + jfrFile

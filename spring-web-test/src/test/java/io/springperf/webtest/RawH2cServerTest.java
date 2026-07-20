@@ -58,7 +58,7 @@ public class RawH2cServerTest {
                                                     new SimpleChannelInboundHandler<FullHttpRequest>() {
                                                         @Override
                                                         protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest req) {
-                                                            System.err.println("H2-ECHO: " + req.method() + " " + req.uri());
+                                                            System.out.println("H2-ECHO: " + req.method() + " " + req.uri());
                                                             FullHttpResponse resp = new DefaultFullHttpResponse(
                                                                     HttpVersion.HTTP_1_1, HttpResponseStatus.OK,
                                                                     ctx.alloc().buffer().writeBytes("hello".getBytes()));
