@@ -1,6 +1,7 @@
 package io.springperf.web.http;
 
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.util.MultiValueMap;
 
 import java.lang.invoke.MethodHandle;
@@ -30,6 +31,9 @@ import java.util.Set;
  * <p><b>Performance:</b> Eliminates O(n) copies at call sites that previously
  * used {@code toSingleValueMap().keySet()} to work around the type mismatch,
  * and removes the reflective compatibility code in {@code RequestHeaderResolverProvider}.
+ *
+ * <p>Also caches {@link #getContentType()} result to avoid repeated
+ * {@code MediaType.parseMediaType()} calls.</p>
  */
 @SuppressWarnings("deprecation")
 public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String, String> {
@@ -63,6 +67,9 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
      * {@code null} on Spring 6.x where {@code this} IS the delegate.
      */
     private final MultiValueMap<String, String> delegateMap;
+
+    /** 缓存 {@link #getContentType()} 的解析结果，避免重复 {@link MediaType#parseMediaType} */
+    private MediaType cachedContentType;
 
     public WebHttpHeaders() {
         if (HEADERS_IS_MULTI_VALUE_MAP) {
@@ -250,5 +257,17 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
             return super.entrySet();
         }
         return delegateMap.entrySet();
+    }
+
+    // ========================================================================
+    // 缓存解析结果
+    // ========================================================================
+
+    @Override
+    public MediaType getContentType() {
+        if (cachedContentType == null) {
+            cachedContentType = super.getContentType();
+        }
+        return cachedContentType;
     }
 }
