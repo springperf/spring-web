@@ -85,19 +85,19 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
         MethodReturnValueContext returnValueContext = getMethodReturnValueContext(mappingContext);
         MethodParameter returnType = returnValueContext == null ? null : returnValueContext.getReturnType();
         if (returnValueContext != null) {
-            // Fast path 1: 异步 dispatch 时，内联泛型解析器匹配
+            // Fast path 1: 缓存的主解析器匹配（优先于异步内联解析器）
+            ReturnValueResolver resolver = returnValueContext.getReturnValueResolver();
+            if (resolver != null && resolver.supportsReturnValue(returnValue, req, resp)) {
+                resolver.resolveReturnValue(returnValue, returnType, req, resp);
+                return true;
+            }
+            // Fast path 2: 异步 dispatch 时，内联泛型解析器匹配
             if (returnValueContext.isAsyncType()) {
                 ReturnValueResolver innerResolver = returnValueContext.getInnerReturnValueResolver();
                 if (innerResolver != null && innerResolver.supportsReturnValue(returnValue, req, resp)) {
                     innerResolver.resolveReturnValue(returnValue, returnValueContext.getInnerReturnType(), req, resp);
                     return true;
                 }
-            }
-            // Fast path 2: 缓存的主解析器匹配
-            ReturnValueResolver resolver = returnValueContext.getReturnValueResolver();
-            if (resolver != null && resolver.supportsReturnValue(returnValue, req, resp)) {
-                resolver.resolveReturnValue(returnValue, returnType, req, resp);
-                return true;
             }
         }
         // 线性扫描（缓存 miss 或两个缓存均不匹配）
