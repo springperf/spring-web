@@ -21,11 +21,11 @@ public class ParamOrHeaderMatcher implements Matcher {
     @Override
     public boolean match(WebServerHttpRequest req, PathMappingContext mappingContext) {
         for (NameValueExpressionSupport x : expressionList) {
-            if (checkExpression(x, req)) {
-                return true;
+            if (!checkExpression(x, req)) {
+                return false;
             }
         }
-        return false;
+        return true;
     }
 
     private boolean checkExpression(NameValueExpressionSupport expressionSupport, WebServerHttpRequest req) {
