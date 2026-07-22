@@ -13,6 +13,11 @@ public class FastjsonConverter implements JsonConverter {
     }
 
     @Override
+    public byte[] toJsonBytes(Object obj) {
+        return JSON.toJSONBytes(obj);
+    }
+
+    @Override
     public void toJson(OutputStream outputStream, Object obj) {
         JSON.writeTo(outputStream, obj);
     }
