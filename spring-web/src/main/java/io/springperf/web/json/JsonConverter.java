@@ -19,6 +19,11 @@ public interface JsonConverter extends WebComponent {
     String toJson(Object obj);
 
     /**
+     * Serializes the given object to a JSON byte array (UTF-8 encoded).
+     */
+    byte[] toJsonBytes(Object obj);
+
+    /**
      * Serializes the given object and writes the JSON to the specified output stream.
      */
     void toJson(OutputStream outputStream, Object obj);
