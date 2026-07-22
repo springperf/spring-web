@@ -42,8 +42,19 @@ public class NameValueExpressionSupport {
             name = (isNegated ? expression.substring(1) : expression);
             value = null;
         } else {
+            boolean negByExclamation = expression.charAt(0) == '!';
             isNegated = (separator > 0) && (expression.charAt(separator - 1) == '!');
-            name = (isNegated ? expression.substring(0, separator - 1) : expression.substring(0, separator));
+            if (isNegated) {
+                // name!=value
+                name = expression.substring(0, separator - 1);
+            } else if (negByExclamation) {
+                // !name=value
+                isNegated = true;
+                name = expression.substring(1, separator);
+            } else {
+                // name=value
+                name = expression.substring(0, separator);
+            }
             value = expression.substring(separator + 1);
         }
         return new NameValueExpressionSupport(name, value, isNegated);
