@@ -26,6 +26,12 @@ public class JacksonConverter implements JsonConverter {
         return mapper.writeValueAsString(obj);
     }
 
+    @SneakyThrows
+    @Override
+    public byte[] toJsonBytes(Object obj) {
+        return mapper.writeValueAsBytes(obj);
+    }
+
     @Override
     @SneakyThrows
     public void toJson(OutputStream outputStream, Object obj) {
