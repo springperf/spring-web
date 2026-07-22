@@ -162,22 +162,22 @@ class ParamOrHeaderMatcherTest {
     }
 
     @Test
-    void match_multipleExpressions_anyMatchReturnsTrue() {
+    void match_multipleExpressions_allMatchReturnsTrue() {
         ParamOrHeaderMatcher matcher = new ParamOrHeaderMatcher(false,
                 Arrays.asList(
-                        NameValueExpressionSupport.build("foo=nonexistent"),
+                        NameValueExpressionSupport.build("foo=value"),
                         NameValueExpressionSupport.build("bar=value")
                 ));
 
         WebServerHttpRequest req = mock(WebServerHttpRequest.class);
-        when(req.getParameter("foo")).thenReturn("other");
+        when(req.getParameter("foo")).thenReturn("value");
         when(req.getParameter("bar")).thenReturn("value");
 
         assertTrue(matcher.match(req, null));
     }
 
     @Test
-    void match_multipleExpressions_noneMatchReturnsFalse() {
+    void match_multipleExpressions_anyMismatchReturnsFalse() {
         ParamOrHeaderMatcher matcher = new ParamOrHeaderMatcher(false,
                 Arrays.asList(
                         NameValueExpressionSupport.build("foo=nonexistent"),
@@ -186,7 +186,7 @@ class ParamOrHeaderMatcherTest {
 
         WebServerHttpRequest req = mock(WebServerHttpRequest.class);
         when(req.getParameter("foo")).thenReturn("other");
-        when(req.getParameter("bar")).thenReturn("other");
+        when(req.getParameter("bar")).thenReturn("value"); // bar matches but foo doesn't → should be false
 
         assertFalse(matcher.match(req, null));
     }

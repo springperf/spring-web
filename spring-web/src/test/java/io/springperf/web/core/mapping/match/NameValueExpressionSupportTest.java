@@ -54,6 +54,14 @@ class NameValueExpressionSupportTest {
     }
 
     @Test
+    void build_exclamationPrefixWithValue_parsesCorrectly() {
+        NameValueExpressionSupport expr = NameValueExpressionSupport.build("!name=value");
+        assertEquals("name", expr.getName());
+        assertEquals("value", expr.getValue());
+        assertTrue(expr.isNegated());
+    }
+
+    @Test
     void equals_sameValues_returnsTrue() {
         NameValueExpressionSupport a = NameValueExpressionSupport.build("name=value");
         NameValueExpressionSupport b = NameValueExpressionSupport.build("name=value");
