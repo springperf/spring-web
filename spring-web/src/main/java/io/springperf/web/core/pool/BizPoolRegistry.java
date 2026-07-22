@@ -166,7 +166,11 @@ private boolean isVirtualThreadEnabled() {
             throw new IllegalArgumentException(
                     "'" + RunInPool.EVENTLOOP + "' is a reserved keyword and cannot be used as a pool name");
         }
-        pools.put(name, executor);
+        ExecutorService old = pools.put(name, executor);
+        if (old != null && old != executor) {
+            log.warn("BizPool [{}] replaced. Shutting down old pool: {}", name, old);
+            shutdownPool(old);
+        }
         if (metrics != null && executor instanceof ThreadPoolExecutor) {
             metrics.registerPoolGauges(name, (ThreadPoolExecutor) executor);
         }
@@ -182,8 +186,27 @@ private boolean isVirtualThreadEnabled() {
             throw new IllegalArgumentException(
                     "'" + RunInPool.EVENTLOOP + "' is a reserved keyword and cannot be used as a pool name");
         }
-        pools.put(name, executor);
+        ExecutorService old = pools.put(name, executor);
+        if (old != null && old != executor) {
+            log.warn("BizPool [{}] replaced. Shutting down old pool: {}", name, old);
+            shutdownPool(old);
+        }
         log.info("BizPool [{}] registered as ExecutorService", name);
+    }
+
+    /**
+     * 关闭单个线程池，等待任务完成。
+     */
+    private static void shutdownPool(ExecutorService pool) {
+        pool.shutdown();
+        try {
+            if (!pool.awaitTermination(5, TimeUnit.SECONDS)) {
+                pool.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            pool.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 
     /**
