@@ -8,6 +8,7 @@ import io.springperf.web.core.async.AsyncSupportUtils;
 import io.springperf.web.core.cors.CorsRegistry;
 import io.springperf.web.core.cors.CorsUtils;
 import io.springperf.web.core.exception.ExceptionRegistry;
+import io.springperf.web.core.exception.StacklessResponseStatusException;
 import io.springperf.web.core.filter.WebFilterRegistry;
 import io.springperf.web.core.interceptor.InterceptorRegistry;
 import io.springperf.web.core.mapping.MappingRegistry;
@@ -38,8 +39,8 @@ import java.util.concurrent.RejectedExecutionException;
  */
 @Slf4j
 public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
-    private static final ResponseStatusException NOT_FOUND_EXCEPTION = new ResponseStatusException(HttpStatus.NOT_FOUND);
-    private static final ResponseStatusException METHOD_NOT_ALLOWED_EXCEPTION = new ResponseStatusException(HttpStatus.METHOD_NOT_ALLOWED);
+    private static final StacklessResponseStatusException NOT_FOUND_EXCEPTION = new StacklessResponseStatusException(HttpStatus.NOT_FOUND);
+    private static final StacklessResponseStatusException METHOD_NOT_ALLOWED_EXCEPTION = new StacklessResponseStatusException(HttpStatus.METHOD_NOT_ALLOWED);
 
     protected boolean threadContextInheritable = false;
 
