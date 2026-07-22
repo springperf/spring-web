@@ -162,7 +162,11 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
         if (!methodArgContext.isHaveValidateAnnotation() || target == null) {
             return;
         }
-        Validator validator = getValidator(target, mappingContext);
+        Validator validator = methodArgContext.validator;
+        if (validator == null) {
+            validator = getValidator(target, mappingContext);
+            methodArgContext.validator = validator;
+        }
         if (validator == null) {
             return;
         }
