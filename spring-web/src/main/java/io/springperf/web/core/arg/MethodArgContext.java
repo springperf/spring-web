@@ -5,6 +5,7 @@ import org.springframework.core.MethodParameter;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.Errors;
+import org.springframework.validation.Validator;
 import org.springframework.validation.annotation.Validated;
 
 import java.lang.annotation.Annotation;
@@ -27,6 +28,9 @@ public class MethodArgContext {
     protected boolean hasBindingResult;
 
     protected String bindingResultAttrKey;
+
+    /** 参数校验器，首次调用时懒加载 */
+    protected Validator validator;
 
     public MethodArgContext(MethodParameter methodParameter) {
         this.methodParameter = methodParameter;
