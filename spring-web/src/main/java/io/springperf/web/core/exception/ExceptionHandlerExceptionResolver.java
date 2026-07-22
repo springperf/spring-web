@@ -161,14 +161,10 @@ public class ExceptionHandlerExceptionResolver extends WebComponentContainer imp
         ExceptionHandlerAdvice[] cachedExceptionHandlerAdvices = handlerMethod.get(MAPPING_CACHE_KEY);
         if (cachedExceptionHandlerAdvices == null) {
             List<ExceptionHandlerAdvice> exceptionHandlerAdvices = new ArrayList<>();
-            ExceptionHandlerMethodResolver resolver = exceptionHandlerCache.get(handlerType);
-            if (resolver == null) {
-                resolver = new ExceptionHandlerMethodResolver(handlerType);
-                if (!resolver.hasExceptionMappings()) {
-                    resolver = NO_MATCH;
-                }
-                exceptionHandlerCache.put(handlerType, resolver);
-            }
+            ExceptionHandlerMethodResolver resolver = exceptionHandlerCache.computeIfAbsent(handlerType, type -> {
+                ExceptionHandlerMethodResolver r = new ExceptionHandlerMethodResolver(type);
+                return r.hasExceptionMappings() ? r : NO_MATCH;
+            });
             if (resolver.hasExceptionMappings()) {
                 exceptionHandlerAdvices.add(new ExceptionHandlerAdvice(handlerMethod.getBean(), resolver));
             }

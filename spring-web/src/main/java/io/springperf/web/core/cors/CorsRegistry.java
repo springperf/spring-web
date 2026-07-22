@@ -105,7 +105,8 @@ public class CorsRegistry extends WebComponentContainer implements EmbeddedValue
         if(mr.isMatched()){
             context = mr.getMatchedContext();
         }else if(mr.isPathMatched()){
-            context = mr.getPathMatchedContexts()[0];
+            PathMappingContext[] pathMatchedContexts = mr.getPathMatchedContexts();
+            context = (pathMatchedContexts != null && pathMatchedContexts.length > 0) ? pathMatchedContexts[0] : null;
         }else{
             context = null;
         }
