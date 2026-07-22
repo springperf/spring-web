@@ -63,7 +63,7 @@ public class SuffixPathRouterOptimizer implements RouterOptimizer {
     public boolean initAndRemove(PathMappingContext mappingContext) {
         String pathRule = mappingContext.getPathRule();
         int[] slashIndexList = WebUtils.findAllSlashIndices(pathRule);
-        if (slashIndexList.length <= suffixPathIndex) {
+        if (slashIndexList.length <= suffixPathIndex || suffixPathIndex == 0) {
             return false;
         }
         String suffixPath = pathRule.substring(slashIndexList[suffixPathIndex - 1]);
@@ -78,6 +78,9 @@ public class SuffixPathRouterOptimizer implements RouterOptimizer {
     public Router optimizeRoute(WebServerHttpRequest req) {
         String path = req.getPath();
         int[] slashIndexList = PrefixPathRouterOptimizer.getSlashIndexList(req);
+        if (suffixPathIndex < 0 || suffixPathIndex >= slashIndexList.length) {
+            return null;
+        }
         String suffixPath = path.substring(slashIndexList[suffixPathIndex]);
         Router router = routeMap.get(suffixPath);
         return router;

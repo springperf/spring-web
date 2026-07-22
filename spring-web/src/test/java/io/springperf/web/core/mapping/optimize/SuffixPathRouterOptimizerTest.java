@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -57,11 +57,11 @@ class SuffixPathRouterOptimizerTest {
     }
 
     @Test
-    void optimizeRoute_noOptimizerData_throwsArrayIndexOutOfBounds() {
+    void optimizeRoute_noOptimizerData_returnsNull() {
         SuffixPathRouterOptimizer optimizer = new SuffixPathRouterOptimizer();
         WebServerHttpRequest req = mock(WebServerHttpRequest.class);
         when(req.getPath()).thenReturn("/api/v1/user/detail");
         when(req.getRequestContext()).thenReturn(mock(RequestContext.class));
-        assertThrows(ArrayIndexOutOfBoundsException.class, () -> optimizer.optimizeRoute(req));
+        assertNull(optimizer.optimizeRoute(req));
     }
 }
