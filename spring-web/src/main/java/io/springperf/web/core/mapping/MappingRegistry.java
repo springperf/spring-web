@@ -18,7 +18,6 @@ import org.springframework.stereotype.Controller;
 import org.springframework.util.ClassUtils;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.method.HandlerMethod;
 
 import java.lang.reflect.Method;
@@ -28,7 +27,7 @@ import java.util.stream.Collectors;
 import static java.util.Collections.emptyList;
 
 /**
- * Scans ApplicationContext for @Controller/@RestController beans and registers their mappings.
+ * Scans ApplicationContext for @Controller beans and registers their mappings.
  */
 @Slf4j
 public class MappingRegistry extends WebComponentContainer {
@@ -46,7 +45,6 @@ public class MappingRegistry extends WebComponentContainer {
     public void initComponentPhase1() {
         Map<String, Object> beans = new HashMap<>();
         ApplicationContext ctx = getWebContext().getCtx();
-        beans.putAll(ctx.getBeansWithAnnotation(RestController.class));
         beans.putAll(ctx.getBeansWithAnnotation(Controller.class));
         for (Object bean : new HashSet<>(beans.values())) {
             Class<?> clazz = bean.getClass();
