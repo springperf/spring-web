@@ -131,34 +131,44 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
         }
     }
 
-    // ==================== 5. @RequestMapping params 多条件（OR） ====================
+    // ==================== 5. @RequestMapping params 多条件（AND 语义） ====================
 
     @Test
-    void multiParamOr_firstConditionMatches_returns200() throws Exception {
+    void multiParamAnd_bothConditionsMatch_returns200() throws Exception {
+        Request req = new Request.Builder()
+                .url(p0Url + "/multi-param?a=1&b=2")
+                .get()
+                .build();
+        try (Response resp = CLIENT.newCall(req).execute()) {
+            assertEquals(200, resp.code());
+            assertEquals("multi-param-matched", resp.body().string());
+        }
+    }
+
+    @Test
+    void multiParamAnd_firstConditionMissing_returns404() throws Exception {
         Request req = new Request.Builder()
                 .url(p0Url + "/multi-param?a=1")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            assertEquals(200, resp.code());
-            assertEquals("multi-param-matched", resp.body().string());
+            assertEquals(404, resp.code());
         }
     }
 
     @Test
-    void multiParamOr_secondConditionMatches_returns200() throws Exception {
+    void multiParamAnd_secondConditionMissing_returns404() throws Exception {
         Request req = new Request.Builder()
                 .url(p0Url + "/multi-param?b=2")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            assertEquals(200, resp.code());
-            assertEquals("multi-param-matched", resp.body().string());
+            assertEquals(404, resp.code());
         }
     }
 
     @Test
-    void multiParamOr_neitherConditionMatches_returns404() throws Exception {
+    void multiParamAnd_neitherConditionMatches_returns404() throws Exception {
         Request req = new Request.Builder()
                 .url(p0Url + "/multi-param?a=3&b=3")
                 .get()
@@ -168,25 +178,13 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
         }
     }
 
-    // ==================== 6. @RequestMapping headers 多条件（OR） ====================
+    // ==================== 6. @RequestMapping headers 多条件（AND 语义） ====================
 
     @Test
-    void multiHeaderOr_firstConditionMatches_returns200() throws Exception {
+    void multiHeaderAnd_bothConditionsMatch_returns200() throws Exception {
         Request req = new Request.Builder()
                 .url(p0Url + "/multi-header")
                 .header("X-A", "1")
-                .get()
-                .build();
-        try (Response resp = CLIENT.newCall(req).execute()) {
-            assertEquals(200, resp.code());
-            assertEquals("multi-header-matched", resp.body().string());
-        }
-    }
-
-    @Test
-    void multiHeaderOr_secondConditionMatches_returns200() throws Exception {
-        Request req = new Request.Builder()
-                .url(p0Url + "/multi-header")
                 .header("X-B", "2")
                 .get()
                 .build();
@@ -197,7 +195,31 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     }
 
     @Test
-    void multiHeaderOr_neitherConditionMatches_returns404() throws Exception {
+    void multiHeaderAnd_firstConditionMissing_returns404() throws Exception {
+        Request req = new Request.Builder()
+                .url(p0Url + "/multi-header")
+                .header("X-A", "1")
+                .get()
+                .build();
+        try (Response resp = CLIENT.newCall(req).execute()) {
+            assertEquals(404, resp.code());
+        }
+    }
+
+    @Test
+    void multiHeaderAnd_secondConditionMissing_returns404() throws Exception {
+        Request req = new Request.Builder()
+                .url(p0Url + "/multi-header")
+                .header("X-B", "2")
+                .get()
+                .build();
+        try (Response resp = CLIENT.newCall(req).execute()) {
+            assertEquals(404, resp.code());
+        }
+    }
+
+    @Test
+    void multiHeaderAnd_neitherConditionMatches_returns404() throws Exception {
         Request req = new Request.Builder()
                 .url(p0Url + "/multi-header")
                 .header("X-A", "3")
