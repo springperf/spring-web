@@ -41,17 +41,17 @@ public class P0TestController {
         return "multi-method-ok";
     }
 
-    // ============ 5. @RequestMapping params 多条件（OR 语义） ============
+    // ============ 5. @RequestMapping params 多条件（AND 语义） ============
 
     @GetMapping(value = "/multi-param", params = {"a=1", "b=2"})
-    public String multiParamOr() {
+    public String multiParam() {
         return "multi-param-matched";
     }
 
-    // ============ 6. @RequestMapping headers 多条件（OR 语义） ============
+    // ============ 6. @RequestMapping headers 多条件（AND 语义） ============
 
     @GetMapping(value = "/multi-header", headers = {"X-A=1", "X-B=2"})
-    public String multiHeaderOr() {
+    public String multiHeader() {
         return "multi-header-matched";
     }
 
