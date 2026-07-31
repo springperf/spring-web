@@ -16,7 +16,7 @@ public abstract class StreamEmitter<T> {
     protected final boolean encodeToString;
     protected AtomicBoolean complete = new AtomicBoolean(false);
     protected List<T> earlySendDataList = new ArrayList<>();
-    protected StreamSender streamSender;
+    protected volatile StreamSender streamSender;
     protected Consumer<Throwable> writeCallbackHandler;
 
     public StreamEmitter() {
@@ -42,9 +42,14 @@ public abstract class StreamEmitter<T> {
     }
 
     public void send(T data) throws IOException {
+        StreamSender s = this.streamSender;
+        if (s != null) {
+            s.send(data);
+            return;
+        }
         synchronized (this) {
-            if (streamSender != null) {
-                streamSender.send(data);
+            if (this.streamSender != null) {
+                this.streamSender.send(data);
             } else {
                 earlySendDataList.add(data);
             }
@@ -93,9 +98,10 @@ public abstract class StreamEmitter<T> {
 
     public synchronized void complete() {
         if (complete.compareAndSet(false, true)) {
-            if (this.streamSender != null) {
+            StreamSender s = this.streamSender;
+            if (s != null) {
                 deferredResult.setResult(null);
-                this.streamSender.complete(false, null);
+                s.complete(false, null);
             }
         }
     }
@@ -103,8 +109,9 @@ public abstract class StreamEmitter<T> {
     public synchronized void completeWithError(Throwable ex) {
         if (complete.compareAndSet(false, true)) {
             deferredResult.setErrorResult(ex);
-            if (this.streamSender != null) {
-                this.streamSender.complete(false, ex);
+            StreamSender s = this.streamSender;
+            if (s != null) {
+                s.complete(false, ex);
             }
         }
     }
