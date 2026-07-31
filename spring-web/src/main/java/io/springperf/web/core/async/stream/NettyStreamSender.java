@@ -2,7 +2,6 @@ package io.springperf.web.core.async.stream;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
@@ -10,45 +9,51 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.concurrent.EventExecutor;
-import io.netty.util.internal.shaded.org.jctools.queues.MpscUnboundedArrayQueue;
+import io.netty.util.internal.shaded.org.jctools.queues.MpscArrayQueue;
 import io.springperf.web.core.async.PerfAsyncWebRequest;
 import io.springperf.web.http.NettyServerHttpResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
-import java.nio.charset.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.LockSupport;
 
-public class NettyStreamSender implements StreamSender {
+/**
+ * 异步流式发送器的抽象基类。
+ * <p>
+ * 子类决定队列中存放的数据类型：
+ * <ul>
+ *   <li>{@link StringNettyStreamSender} — 队列 {@code CharSequence}，走 {@code encodeToString} 路径</li>
+ *   <li>{@link BytesNettyStreamSender} — 队列 {@code byte[]}，走 {@code encodeToBytes} 路径</li>
+ * </ul>
+ * 编码在 {@link #send(Object)} 中完成，入队不可变数据，消除外部突变风险。
+ * {@link #drain()} 在 EventLoop 线程批量写入 ByteBuf，避免跨线程 ByteBuf 缓存。
+ *
+ * @param <T> 队列元素类型，{@code byte[]} 或 {@code CharSequence}
+ */
+public abstract class NettyStreamSender<T> implements StreamSender {
 
     protected static final Logger log = LoggerFactory.getLogger(NettyStreamSender.class);
 
-    protected static final ConcurrentMap<Charset, Float> charsetToMaxBytesPerChar = new ConcurrentHashMap<>(3);
+    private static final int MAX_QUEUED_EVENTS = 65536;
 
-    private final Channel channel;
-    private final EventExecutor eventLoop;
-    private final ByteBufAllocator bufAllocator;
-    private final StreamEmitter emitter;
-    private final NettyServerHttpResponse resp;
-    private final MpscUnboundedArrayQueue<ByteBuf> queue;
+    protected final Channel channel;
+    protected final EventExecutor eventLoop;
+    protected final ByteBufAllocator bufAllocator;
+    protected final StreamEmitter emitter;
+    protected final NettyServerHttpResponse resp;
+    protected final MpscArrayQueue<T> queue;
 
-    /**
-     * 单次 drain 最多写多少条，防止 EventLoop 饿死
-     */
-    private final int maxFlushBytes;
+    protected final int maxFlushBytes;
 
-    private final AtomicInteger wip = new AtomicInteger(0);
-    private volatile boolean completed;
+    protected final AtomicInteger wip = new AtomicInteger(0);
+    protected volatile boolean completed;
 
-    private boolean lastHttpContentWritten;
+    protected boolean lastHttpContentWritten;
 
-    private volatile boolean closeChannelOnComplete = false;
-    private final ChannelFutureListener completeListener = future -> {
+    protected volatile boolean closeChannelOnComplete = false;
+    protected final ChannelFutureListener completeListener = future -> {
         if (future.isSuccess()) {
             onCompleteSuccess();
         } else {
@@ -63,42 +68,27 @@ public class NettyStreamSender implements StreamSender {
         this.channel = ctx.channel();
         this.eventLoop = ctx.executor();
         this.bufAllocator = ctx.alloc();
-        this.queue = new MpscUnboundedArrayQueue<>(64);
+        this.queue = new MpscArrayQueue<>(MAX_QUEUED_EVENTS);
         this.maxFlushBytes = emitter.getMaxFlushBytes();
         this.resp.setWritableCallback(this::scheduleDrain);
     }
 
-    @Override
-    public void send(Object data) throws IOException {
+    /**
+     * 子类 {@link #send(Object)} 前置检查：channel 状态和 completed 标志。
+     */
+    protected final void preSendCheck() throws IOException {
         if (!channel.isActive()) {
             throw new IOException("Stream closed");
         }
         if (completed) {
             throw new IOException("Stream completed");
         }
-        ByteBuf buf;
-        if (emitter.encodeToString) {
-            CharSequence charSequence = emitter.encodeToString(data);
-            if (charSequence == null || charSequence.length() == 0) {
-                return;
-            }
-            buf = writeCharSequence(charSequence);
-        } else {
-            byte[] bytes = emitter.encodeToBytes(data);
-            if (bytes == null || bytes.length == 0) {
-                return;
-            }
-            buf = bufAllocator.buffer(bytes.length);
-            buf.writeBytes(bytes);
-        }
-
-        if (!queue.offer(buf)) {
-            log.warn("[SSE] queue full, releasing buf");
-            buf.release();
-            return;
-        }
-        scheduleDrain();
     }
+
+    /**
+     * 将编码后的数据项写入 ByteBuf（由子类实现，无需 instanceof 判断）。
+     */
+    protected abstract void drainWrite(ByteBuf buf, T item);
 
     @Override
     public void complete(boolean closeChannelOnComplete, Throwable failure) {
@@ -112,6 +102,22 @@ public class NettyStreamSender implements StreamSender {
         return queue.size();
     }
 
+    /**
+     * 入队背压等待，由子类 {@link #send(Object)} 调用。
+     */
+    protected void backpressureWait(T item) throws IOException {
+        int spins = 0;
+        while (!queue.offer(item)) {
+            preSendCheck();
+            if (spins++ < 10) {
+                Thread.yield();
+            } else {
+                LockSupport.parkNanos(1000);
+            }
+        }
+        scheduleDrain();
+    }
+
     protected void scheduleDrain() {
         if (eventLoop.inEventLoop()) {
             drain();
@@ -121,27 +127,54 @@ public class NettyStreamSender implements StreamSender {
     }
 
     /**
-     * 只能在 EventLoop 线程执行
+     * 只能在 EventLoop 线程执行。
+     * 从队列取出已编码数据，批量写入 ByteBuf 后 flush。
+     * 依赖 batchBuf.writableBytes() 自然切分 HTTP chunk，无需 writtenBytes 阈值。
      */
     protected void drain() {
+        if (!channel.isActive()) {
+            T remaining;
+            while ((remaining = queue.poll()) != null) {
+                // channel 已关闭，直接丢弃
+            }
+            if (completed && !lastHttpContentWritten) {
+                lastHttpContentWritten = true;
+                onAllDataWritten();
+            }
+            return;
+        }
         int missed = 1;
         for (; ; ) {
-            int writtenBytes = 0;
+            boolean flushed = false;
+            ByteBuf batchBuf = null;
+
             while (channel.isWritable()) {
-                ByteBuf buf = queue.peek();
-                if (buf == null) {
+                T item = queue.poll();
+                if (item == null) {
                     break;
                 }
-                int size = buf.readableBytes();
-                if (writtenBytes > 0 && writtenBytes + size > maxFlushBytes) {
-                    break;
+                try {
+                    if (batchBuf == null) {
+                        batchBuf = bufAllocator.buffer(maxFlushBytes);
+                    }
+                    drainWrite(batchBuf, item);
+                    flushed = true;
+
+                    if (batchBuf.writerIndex() >= maxFlushBytes) {
+                        ChannelFuture f = channel.write(new DefaultHttpContent(batchBuf));
+                        resp.addRespEventListener(f, false);
+                        batchBuf = null;
+                    }
+                } catch (Exception e) {
+                    log.warn("[SSE] drain write error: {}", e.getMessage(), e);
                 }
-                buf = queue.poll();
-                ChannelFuture f = channel.write(new DefaultHttpContent(buf));
-                resp.addRespEventListener(f, false);
-                writtenBytes += size;
             }
-            if (writtenBytes > 0) {
+
+            if (batchBuf != null && batchBuf.readableBytes() > 0) {
+                ChannelFuture f = channel.write(new DefaultHttpContent(batchBuf));
+                resp.addRespEventListener(f, false);
+            }
+            if (flushed) {
                 channel.flush();
             }
             missed = wip.addAndGet(-missed);
@@ -149,12 +182,10 @@ public class NettyStreamSender implements StreamSender {
                 break;
             }
         }
-        // wip 归零但队列仍有数据：重调度 drain，防止数据永远留在队列中
         if (!queue.isEmpty()) {
             if (channel.isWritable() && wip.compareAndSet(0, 1)) {
                 eventLoop.execute(this::drain);
             } else if (completed && !lastHttpContentWritten) {
-                // channel 不可写但 complete 已调用：强制重调度 drain，
                 if (wip.compareAndSet(0, 1)) {
                     eventLoop.execute(this::drain);
                 }
@@ -187,50 +218,5 @@ public class NettyStreamSender implements StreamSender {
         if (closeChannelOnComplete || !resp.isKeepAlive()) {
             this.channel.close();
         }
-    }
-
-    protected ByteBuf writeCharSequence(CharSequence charSequence) {
-        Charset charset = resp.getCharacterEncoding();
-        int capacity = calculateCapacity(charSequence, charset);
-        ByteBuf byteBuf = bufAllocator.buffer(capacity);
-        try {
-            if (StandardCharsets.UTF_8.equals(charset)) {
-                ByteBufUtil.writeUtf8(byteBuf, charSequence);
-            } else if (StandardCharsets.US_ASCII.equals(charset)) {
-                ByteBufUtil.writeAscii(byteBuf, charSequence);
-            } else {
-                CharsetEncoder charsetEncoder = charset.newEncoder().onMalformedInput(CodingErrorAction.REPLACE).onUnmappableCharacter(CodingErrorAction.REPLACE);
-                CharBuffer inBuffer = CharBuffer.wrap(charSequence);
-                int estimatedSize = (int) (inBuffer.remaining() * charsetEncoder.averageBytesPerChar());
-                ByteBuffer outBuffer = byteBuf.ensureWritable(estimatedSize).nioBuffer(byteBuf.writerIndex(), byteBuf.writableBytes());
-                while (true) {
-                    CoderResult cr = (inBuffer.hasRemaining() ? charsetEncoder.encode(inBuffer, outBuffer, true) : CoderResult.UNDERFLOW);
-                    if (cr.isUnderflow()) {
-                        cr = charsetEncoder.flush(outBuffer);
-                    }
-                    if (cr.isUnderflow()) {
-                        break;
-                    }
-                    if (cr.isOverflow()) {
-                        byteBuf.writerIndex(byteBuf.writerIndex() + outBuffer.position());
-                        int maximumSize = (int) (inBuffer.remaining() * charsetEncoder.maxBytesPerChar());
-                        byteBuf.ensureWritable(maximumSize);
-                        outBuffer = byteBuf.nioBuffer(byteBuf.writerIndex(), byteBuf.writableBytes());
-                    }
-                }
-                byteBuf.writerIndex(byteBuf.writerIndex() + outBuffer.position());
-            }
-            return byteBuf;
-        } catch (Throwable t) {
-            byteBuf.release();
-            throw t;
-        }
-    }
-
-    protected int calculateCapacity(CharSequence sequence, Charset charset) {
-        float maxBytesPerChar = this.charsetToMaxBytesPerChar
-                .computeIfAbsent(charset, cs -> cs.newEncoder().maxBytesPerChar());
-        float maxBytesForSequence = sequence.length() * maxBytesPerChar;
-        return (int) Math.ceil(maxBytesForSequence);
     }
 }

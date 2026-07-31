@@ -51,16 +51,13 @@ class NettyStreamSenderTest {
     @Captor
     ArgumentCaptor<LastHttpContent> lastHttpContentCaptor;
 
-    NettyStreamSender sender;
     private Field encodeField;
 
     @BeforeEach
     void setUp() throws Exception {
         when(emitter.getMaxFlushBytes()).thenReturn(4096);
-        // encodeToString 是字段，不是方法，需要通过反射设置
         encodeField = StreamEmitter.class.getDeclaredField("encodeToString");
         encodeField.setAccessible(true);
-        encodeField.setBoolean(emitter, true);
 
         when(asyncWebRequest.getNativeResponse()).thenReturn(nativeResponse);
         when(nativeResponse.getCtx()).thenReturn(ctx);
@@ -72,20 +69,24 @@ class NettyStreamSenderTest {
         when(channel.isActive()).thenReturn(true);
         when(channel.isWritable()).thenReturn(true);
         when(channel.writeAndFlush(any())).thenReturn(channelFuture);
-
-        sender = new NettyStreamSender(emitter, asyncWebRequest);
     }
 
+    // ==================== StringNettyStreamSender ====================
+
     @Test
-    void constructor_wiresChannelAndQueue() {
+    void stringSender_constructor_wiresChannelAndQueue() throws Exception {
+        encodeField.setBoolean(emitter, true);
+        StringNettyStreamSender sender = new StringNettyStreamSender(emitter, asyncWebRequest);
         assertEquals(0, sender.queueSize());
         assertNotNull(sender);
     }
 
     @Test
-    void send_stringData_encodesAndWritesToChannel() throws Exception {
+    void stringSender_send_encodesAndWritesToChannel() throws Exception {
+        encodeField.setBoolean(emitter, true);
         when(emitter.encodeToString(any())).thenReturn("hello");
         when(channel.write(any())).thenReturn(channelFuture);
+        StringNettyStreamSender sender = new StringNettyStreamSender(emitter, asyncWebRequest);
 
         sender.send("hello");
 
@@ -95,11 +96,107 @@ class NettyStreamSenderTest {
     }
 
     @Test
-    void send_byteData_writesToChannel() throws Exception {
-        encodeField.setBoolean(emitter, false); // 切换到字节模式
+    void stringSender_send_emptyString_skips() throws Exception {
+        encodeField.setBoolean(emitter, true);
+        when(emitter.encodeToString(any())).thenReturn("");
+        StringNettyStreamSender sender = new StringNettyStreamSender(emitter, asyncWebRequest);
+
+        sender.send("");
+
+        verify(channel, never()).write(any());
+    }
+
+    @Test
+    void stringSender_send_nullEncodeResult_skips() throws Exception {
+        encodeField.setBoolean(emitter, true);
+        when(emitter.encodeToString(any())).thenReturn(null);
+        StringNettyStreamSender sender = new StringNettyStreamSender(emitter, asyncWebRequest);
+
+        sender.send("data");
+
+        verify(channel, never()).write(any());
+    }
+
+    @Test
+    void stringSender_send_closedChannel_throws() throws Exception {
+        encodeField.setBoolean(emitter, true);
+        when(channel.isActive()).thenReturn(false);
+        StringNettyStreamSender sender = new StringNettyStreamSender(emitter, asyncWebRequest);
+
+        assertThrows(IOException.class, () -> sender.send("data"));
+    }
+
+    @Test
+    void stringSender_drain_flushesChannel() throws Exception {
+        encodeField.setBoolean(emitter, true);
+        when(emitter.encodeToString(any())).thenReturn("data");
+        when(channel.write(any())).thenReturn(channelFuture);
+        StringNettyStreamSender sender = new StringNettyStreamSender(emitter, asyncWebRequest);
+
+        sender.send("data");
+
+        verify(channel, atLeastOnce()).flush();
+    }
+
+    @Test
+    void stringSender_complete_writesLastContent() throws Exception {
+        encodeField.setBoolean(emitter, true);
+        when(emitter.encodeToString(any())).thenReturn("data");
+        when(channel.write(any())).thenReturn(channelFuture);
+        when(ctx.writeAndFlush(any())).thenReturn(channelFuture);
+        StringNettyStreamSender sender = new StringNettyStreamSender(emitter, asyncWebRequest);
+
+        sender.send("data");
+        sender.complete(true, null);
+
+        verify(channel).writeAndFlush(lastHttpContentCaptor.capture());
+        assertTrue(lastHttpContentCaptor.getValue() instanceof LastHttpContent);
+    }
+
+    @Test
+    void stringSender_completed_throws() throws Exception {
+        encodeField.setBoolean(emitter, true);
+        when(emitter.encodeToString(any())).thenReturn("data");
+        when(channel.write(any())).thenReturn(channelFuture);
+        when(ctx.writeAndFlush(any())).thenReturn(channelFuture);
+        StringNettyStreamSender sender = new StringNettyStreamSender(emitter, asyncWebRequest);
+
+        sender.send("data");
+        sender.complete(true, null);
+
+        assertThrows(IOException.class, () -> sender.send("more"));
+    }
+
+    @Test
+    void stringSender_writeCharSequence_utf8() throws Exception {
+        encodeField.setBoolean(emitter, true);
+        StringNettyStreamSender sender = new StringNettyStreamSender(emitter, asyncWebRequest);
+        ByteBuf buf = ByteBufAllocator.DEFAULT.buffer(64);
+        sender.writeCharSequence(buf, "你好");
+        assertEquals("你好", buf.toString(StandardCharsets.UTF_8));
+        buf.release();
+    }
+
+    @Test
+    void stringSender_writeCharSequence_ascii() throws Exception {
+        encodeField.setBoolean(emitter, true);
+        when(nativeResponse.getCharacterEncoding()).thenReturn(StandardCharsets.US_ASCII);
+        StringNettyStreamSender sender = new StringNettyStreamSender(emitter, asyncWebRequest);
+        ByteBuf buf = ByteBufAllocator.DEFAULT.buffer(64);
+        sender.writeCharSequence(buf, "hello");
+        assertEquals("hello", buf.toString(StandardCharsets.US_ASCII));
+        buf.release();
+    }
+
+    // ==================== BytesNettyStreamSender ====================
+
+    @Test
+    void bytesSender_send_writesToChannel() throws Exception {
+        encodeField.setBoolean(emitter, false);
         byte[] data = "world".getBytes(StandardCharsets.UTF_8);
         when(emitter.encodeToBytes(any())).thenReturn(data);
         when(channel.write(any())).thenReturn(channelFuture);
+        BytesNettyStreamSender sender = new BytesNettyStreamSender(emitter, asyncWebRequest);
 
         sender.send(data);
 
@@ -109,17 +206,10 @@ class NettyStreamSenderTest {
     }
 
     @Test
-    void send_emptyString_skips() throws Exception {
-        when(emitter.encodeToString(any())).thenReturn("");
-
-        sender.send("");
-
-        verify(channel, never()).write(any());
-    }
-
-    @Test
-    void send_nullEncodeResult_skips() throws Exception {
-        when(emitter.encodeToString(any())).thenReturn(null);
+    void bytesSender_send_empty_skips() throws Exception {
+        encodeField.setBoolean(emitter, false);
+        when(emitter.encodeToBytes(any())).thenReturn(new byte[0]);
+        BytesNettyStreamSender sender = new BytesNettyStreamSender(emitter, asyncWebRequest);
 
         sender.send("data");
 
@@ -127,24 +217,35 @@ class NettyStreamSenderTest {
     }
 
     @Test
-    void send_closedChannel_throws() {
+    void bytesSender_send_null_skips() throws Exception {
+        encodeField.setBoolean(emitter, false);
+        when(emitter.encodeToBytes(any())).thenReturn(null);
+        BytesNettyStreamSender sender = new BytesNettyStreamSender(emitter, asyncWebRequest);
+
+        sender.send("data");
+
+        verify(channel, never()).write(any());
+    }
+
+    @Test
+    void bytesSender_send_closedChannel_throws() throws Exception {
+        encodeField.setBoolean(emitter, false);
         when(channel.isActive()).thenReturn(false);
+        BytesNettyStreamSender sender = new BytesNettyStreamSender(emitter, asyncWebRequest);
 
         assertThrows(IOException.class, () -> sender.send("data"));
     }
 
     @Test
-    void drain_flushesChannel() throws Exception {
-        when(emitter.encodeToString(any())).thenReturn("data");
+    void bytesSender_complete_writesLastContent() throws Exception {
+        encodeField.setBoolean(emitter, false);
+        byte[] data = "test".getBytes(StandardCharsets.UTF_8);
+        when(emitter.encodeToBytes(any())).thenReturn(data);
         when(channel.write(any())).thenReturn(channelFuture);
+        when(ctx.writeAndFlush(any())).thenReturn(channelFuture);
+        BytesNettyStreamSender sender = new BytesNettyStreamSender(emitter, asyncWebRequest);
 
-        sender.send("data");
-
-        verify(channel, atLeastOnce()).flush();
-    }
-
-    @Test
-    void complete_writesLastContent() {
+        sender.send("test");
         sender.complete(true, null);
 
         verify(channel).writeAndFlush(lastHttpContentCaptor.capture());
@@ -152,46 +253,17 @@ class NettyStreamSenderTest {
     }
 
     @Test
-    void complete_doesNotCloseChannelWhenDisabled() {
-        when(ctx.writeAndFlush(any())).thenReturn(channelFuture);
-        sender.complete(false, null);
-        // closeChannelOnComplete=false, 关闭在 onCompleteSuccess 回调中处理
-    }
-
-    @Test
-    void send_completedEmitter_throws() throws Exception {
-        when(emitter.encodeToString(any())).thenReturn("data");
+    void bytesSender_completed_throws() throws Exception {
+        encodeField.setBoolean(emitter, false);
+        byte[] data = "test".getBytes(StandardCharsets.UTF_8);
+        when(emitter.encodeToBytes(any())).thenReturn(data);
         when(channel.write(any())).thenReturn(channelFuture);
         when(ctx.writeAndFlush(any())).thenReturn(channelFuture);
+        BytesNettyStreamSender sender = new BytesNettyStreamSender(emitter, asyncWebRequest);
 
-        sender.send("data");
+        sender.send("test");
         sender.complete(true, null);
 
         assertThrows(IOException.class, () -> sender.send("more"));
-    }
-
-    @Test
-    void writeCharSequence_utf8_encodesCorrectly() {
-        ByteBuf result = sender.writeCharSequence("你好");
-        assertEquals("你好", result.toString(StandardCharsets.UTF_8));
-        result.release();
-    }
-
-    @Test
-    void writeCharSequence_ascii_encodesCorrectly() {
-        when(nativeResponse.getCharacterEncoding()).thenReturn(StandardCharsets.US_ASCII);
-
-        ByteBuf result = sender.writeCharSequence("hello");
-        assertEquals("hello", result.toString(StandardCharsets.US_ASCII));
-        result.release();
-    }
-
-    @Test
-    void calculateCapacity_cachesPerCharset() {
-        int capacity = sender.calculateCapacity("hello", StandardCharsets.UTF_8);
-        assertTrue(capacity >= 5);
-
-        int cached = sender.calculateCapacity("hello", StandardCharsets.UTF_8);
-        assertEquals(capacity, cached);
     }
 }
