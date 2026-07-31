@@ -104,31 +104,24 @@ public class WebFluxBenchmarkController {
     // ==================== SSE Stream ====================
 
     private static final int SSE_CHUNK_COUNT = 100;
-    private static final int SSE_CHUNK_SIZE = 200;
-    private static final int SSE_CHUNK_INTERVAL_MS = 0;
+    private static final String SSE_DATA;
+
+    static {
+        StringBuilder sb = new StringBuilder(200);
+        sb.append("{\"chunk\":0,\"data\":\"");
+        while (sb.length() < 198) {
+            sb.append("0123456789");
+        }
+        sb.append("\"}");
+        sb.setLength(200);
+        SSE_DATA = sb.toString();
+    }
 
     @GetMapping(value = "/core/sse/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> sseStream() {
-        return buildSseFlux(0);
-    }
-
-    private Flux<ServerSentEvent<String>> buildSseFlux(long intervalMs) {
-        Flux<ServerSentEvent<String>> flux = Flux.range(0, SSE_CHUNK_COUNT)
-                .map(i -> {
-                    StringBuilder sb = new StringBuilder(SSE_CHUNK_SIZE);
-                    sb.append("{\"chunk\":").append(i).append(",\"data\":\"");
-                    while (sb.length() < SSE_CHUNK_SIZE - 2) {
-                        sb.append("0123456789");
-                    }
-                    sb.append("\"}");
-                    sb.setLength(SSE_CHUNK_SIZE);
-                    return ServerSentEvent.<String>builder()
-                            .data(sb.toString())
-                            .build();
-                });
-        if (intervalMs > 0) {
-            flux = flux.delayElements(java.time.Duration.ofMillis(intervalMs));
-        }
-        return flux;
+        return Flux.range(0, SSE_CHUNK_COUNT)
+                .map(i -> ServerSentEvent.<String>builder()
+                        .data(SSE_DATA)
+                        .build());
     }
 }

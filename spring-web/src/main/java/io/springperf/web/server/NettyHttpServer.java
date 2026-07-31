@@ -12,6 +12,7 @@ import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.DispatcherHandler;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.core.Ordered;
 
@@ -101,6 +102,11 @@ public class NettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
             serverChannel = bootstrap.bind(port).sync().channel();
             this.actualPort = ((InetSocketAddress) serverChannel.localAddress()).getPort();
             running = true;
+	    if (webContext.getCtx() instanceof ConfigurableApplicationContext) {
+	        ((ConfigurableApplicationContext) webContext.getCtx())
+	                .getEnvironment().getSystemProperties()
+	                .put("local.server.port", String.valueOf(this.actualPort));
+	    }
             log.info("Netty Server started on port {}", this.actualPort);
         } catch (Exception e) {
             // 绑定失败时及时清理 EventLoopGroup，否则线程残留会阻止 JVM 退出
