@@ -22,7 +22,7 @@ import static org.mockito.Mockito.when;
 class WrappedHttpBodyConverterTest {
 
     @Mock
-    GenericHttpMessageConverter<String> delegate;
+    GenericHttpMessageConverter<Object> delegate;
 
     @Mock
     HttpInputMessage inputMessage;
@@ -32,7 +32,7 @@ class WrappedHttpBodyConverterTest {
 
     @Test
     void constructor_storesDelegate() {
-        WrappedHttpBodyConverter<String> converter = new WrappedHttpBodyConverter<>(delegate);
+        WrappedHttpBodyConverter converter = new WrappedHttpBodyConverter(delegate);
 
         assertSame(delegate, converter.getComponent());
     }
@@ -41,7 +41,7 @@ class WrappedHttpBodyConverterTest {
     void canRead_withType_delegates() {
         when(delegate.canRead((Type) String.class, null, MediaType.APPLICATION_JSON)).thenReturn(true);
 
-        WrappedHttpBodyConverter<String> converter = new WrappedHttpBodyConverter<>(delegate);
+        WrappedHttpBodyConverter converter = new WrappedHttpBodyConverter(delegate);
 
         assertTrue(converter.canRead((Type) String.class, null, MediaType.APPLICATION_JSON));
         verify(delegate).canRead((Type) String.class, null, MediaType.APPLICATION_JSON);
@@ -51,8 +51,8 @@ class WrappedHttpBodyConverterTest {
     void read_withType_delegates() throws IOException {
         when(delegate.read((Type) String.class, null, inputMessage)).thenReturn("test body");
 
-        WrappedHttpBodyConverter<String> converter = new WrappedHttpBodyConverter<>(delegate);
-        String result = converter.read((Type) String.class, null, inputMessage);
+        WrappedHttpBodyConverter converter = new WrappedHttpBodyConverter(delegate);
+        Object result = converter.read((Type) String.class, null, inputMessage);
 
         assertEquals("test body", result);
         verify(delegate).read((Type) String.class, null, inputMessage);
@@ -62,7 +62,7 @@ class WrappedHttpBodyConverterTest {
     void canWrite_withType_delegates() {
         when(delegate.canWrite((Type) String.class, String.class, MediaType.APPLICATION_JSON)).thenReturn(true);
 
-        WrappedHttpBodyConverter<String> converter = new WrappedHttpBodyConverter<>(delegate);
+        WrappedHttpBodyConverter converter = new WrappedHttpBodyConverter(delegate);
 
         assertTrue(converter.canWrite((Type) String.class, String.class, MediaType.APPLICATION_JSON));
         verify(delegate).canWrite((Type) String.class, String.class, MediaType.APPLICATION_JSON);
@@ -70,7 +70,7 @@ class WrappedHttpBodyConverterTest {
 
     @Test
     void write_withType_delegates() throws IOException {
-        WrappedHttpBodyConverter<String> converter = new WrappedHttpBodyConverter<>(delegate);
+        WrappedHttpBodyConverter converter = new WrappedHttpBodyConverter(delegate);
         converter.write("body", (Type) String.class, MediaType.APPLICATION_JSON, outputMessage);
 
         verify(delegate).write("body", (Type) String.class, MediaType.APPLICATION_JSON, outputMessage);
@@ -80,7 +80,7 @@ class WrappedHttpBodyConverterTest {
     void canRead_withClass_delegates() {
         when(delegate.canRead(String.class, MediaType.APPLICATION_JSON)).thenReturn(true);
 
-        WrappedHttpBodyConverter<String> converter = new WrappedHttpBodyConverter<>(delegate);
+        WrappedHttpBodyConverter converter = new WrappedHttpBodyConverter(delegate);
 
         assertTrue(converter.canRead(String.class, MediaType.APPLICATION_JSON));
         verify(delegate).canRead(String.class, MediaType.APPLICATION_JSON);
@@ -90,7 +90,7 @@ class WrappedHttpBodyConverterTest {
     void canWrite_withClass_delegates() {
         when(delegate.canWrite(String.class, MediaType.APPLICATION_JSON)).thenReturn(true);
 
-        WrappedHttpBodyConverter<String> converter = new WrappedHttpBodyConverter<>(delegate);
+        WrappedHttpBodyConverter converter = new WrappedHttpBodyConverter(delegate);
 
         assertTrue(converter.canWrite(String.class, MediaType.APPLICATION_JSON));
         verify(delegate).canWrite(String.class, MediaType.APPLICATION_JSON);
@@ -100,7 +100,7 @@ class WrappedHttpBodyConverterTest {
     void read_withClass_delegates() throws IOException {
         when(delegate.read(String.class, inputMessage)).thenReturn("test");
 
-        WrappedHttpBodyConverter<String> converter = new WrappedHttpBodyConverter<>(delegate);
+        WrappedHttpBodyConverter converter = new WrappedHttpBodyConverter(delegate);
 
         assertEquals("test", converter.read(String.class, inputMessage));
         verify(delegate).read(String.class, inputMessage);
@@ -108,7 +108,7 @@ class WrappedHttpBodyConverterTest {
 
     @Test
     void write_withClass_delegates() throws IOException {
-        WrappedHttpBodyConverter<String> converter = new WrappedHttpBodyConverter<>(delegate);
+        WrappedHttpBodyConverter converter = new WrappedHttpBodyConverter(delegate);
         converter.write("body", MediaType.APPLICATION_JSON, outputMessage);
 
         verify(delegate).write("body", MediaType.APPLICATION_JSON, outputMessage);
@@ -119,7 +119,7 @@ class WrappedHttpBodyConverterTest {
         List<MediaType> expected = Collections.singletonList(MediaType.APPLICATION_JSON);
         when(delegate.getSupportedMediaTypes()).thenReturn(expected);
 
-        WrappedHttpBodyConverter<String> converter = new WrappedHttpBodyConverter<>(delegate);
+        WrappedHttpBodyConverter converter = new WrappedHttpBodyConverter(delegate);
 
         assertSame(expected, converter.getSupportedMediaTypes());
     }
@@ -129,14 +129,14 @@ class WrappedHttpBodyConverterTest {
         List<MediaType> expected = Collections.singletonList(MediaType.APPLICATION_JSON);
         when(delegate.getSupportedMediaTypes(String.class)).thenReturn(expected);
 
-        WrappedHttpBodyConverter<String> converter = new WrappedHttpBodyConverter<>(delegate);
+        WrappedHttpBodyConverter converter = new WrappedHttpBodyConverter(delegate);
 
         assertSame(expected, converter.getSupportedMediaTypes(String.class));
     }
 
     @Test
     void getConverterClass_returnsDelegateClass() {
-        WrappedHttpBodyConverter<String> converter = new WrappedHttpBodyConverter<>(delegate);
+        WrappedHttpBodyConverter converter = new WrappedHttpBodyConverter(delegate);
 
         assertEquals(delegate.getClass(), converter.getConverterClass());
     }
