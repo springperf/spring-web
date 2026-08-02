@@ -34,8 +34,7 @@ class RequestBodyAdviceCodecInterceptorTest {
     @Mock
     HttpInputMessage inputMessage;
 
-    private final Class<? extends HttpMessageConverter<?>> converterClass =
-            (Class<? extends HttpMessageConverter<?>>) (Class) HttpMessageConverter.class;
+    private final Class converterClass =  HttpMessageConverter.class;
 
     private RequestBodyAdviceCodecInterceptor createInterceptor() {
         return new RequestBodyAdviceCodecInterceptor(advice);

@@ -23,6 +23,7 @@ import java.lang.reflect.Type;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.function.Function;
 
 /**
  * Manages HttpBodyConverters and media type negotiation for reading request bodies and writing response bodies.
@@ -60,7 +61,10 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
     public void initWithWebContext(WebContext webContext) {
         super.initWithWebContext(webContext);
         interceptorRegistry = webContext.getWebComponentWithDefault(HttpBodyCodecInterceptorRegistry.class, new HttpBodyCodecInterceptorRegistry());
+        // 注册高性能 Jackson 转换器
+        registerWebComponent(new JacksonHttpBodyConverter());
         registerWebComponent(HttpMessageConverter.class, this::toHttpBodyConverter);
+        registerWebComponent(HttpBodyConverter.class, Function.identity());
     }
 
     @Override
@@ -110,23 +114,23 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
         try {
             PathMappingContext ctx = PathMappingContext.get(request);
             HttpBodyConverter cachedConverter = ctx != null ? ctx.get(READ_BODY_CONVERTER_CACHE_KEY) : null;
-            if (cachedConverter != null && cachedConverter.canRead(targetType, parameter.getContainingClass(), contentType)) {
+            if (cachedConverter != null && cachedConverter.canRead(targetType, parameter.getContainingClass(), contentType, request, ctx)) {
                 if (msg.hasBody()) {
                     HttpInputMessage msgToUse = interceptorRegistry.beforeBodyRead(request, msg, parameter, targetType, cachedConverter);
-                    body = cachedConverter.read(targetType, parameter.getContainingClass(), msgToUse);
+                    body = cachedConverter.read(targetType, parameter.getContainingClass(), msgToUse, request, ctx);
                     body = interceptorRegistry.afterBodyRead(request, body, msgToUse, parameter, targetType, cachedConverter);
                 } else {
                     body = interceptorRegistry.handleEmptyBodyRead(request, null, msg, parameter, targetType, cachedConverter);
                 }
             } else {
                 for (HttpBodyConverter converter : this.converters) {
-                    if (converter.canRead(targetType, parameter.getContainingClass(), contentType)) {
+                    if (converter.canRead(targetType, parameter.getContainingClass(), contentType, request, ctx)) {
                         if (ctx != null) {
                             ctx.set(READ_BODY_CONVERTER_CACHE_KEY, converter);
                         }
                         if (msg.hasBody()) {
                             HttpInputMessage msgToUse = interceptorRegistry.beforeBodyRead(request, msg, parameter, targetType, converter);
-                            body = converter.read(targetType, parameter.getContainingClass(), msgToUse);
+                            body = converter.read(targetType, parameter.getContainingClass(), msgToUse, request, ctx);
                             body = interceptorRegistry.afterBodyRead(request, body, msgToUse, parameter, targetType, converter);
                         } else {
                             body = interceptorRegistry.handleEmptyBodyRead(request, null, msg, parameter, targetType, converter);
@@ -153,6 +157,14 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
         if (value == null) {
             return;
         }
+        // 运行时 Optional 解包（方法签名未声明 Optional 但实际返回了）
+        if (value instanceof Optional<?> opt) {
+            if (opt.isEmpty()) {
+                return;
+            }
+            value = opt.get();
+        }
+        PathMappingContext ctx = PathMappingContext.get(request);
         Object body;
         Class<?> valueType;
         Type targetType;
@@ -163,7 +175,6 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
         } else {
             body = value;
             valueType = body.getClass();
-            PathMappingContext ctx = PathMappingContext.get(request);
             targetType = ctx != null ? ctx.get(TARGET_TYPE_CACHE_KEY) : null;
             if (targetType == null) {
                 targetType = GenericTypeResolver.resolveType(getGenericType(returnType), returnType.getContainingClass());
@@ -180,11 +191,14 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
             return;
         }
         selectedMediaType = resetContentTypeWithCharset(response.getHeaders(), selectedMediaType, response.getCharacterEncoding());
+        if (response.getHeaders().getContentType() == null) {
+            response.getHeaders().setContentType(selectedMediaType);
+        }
         for (HttpBodyConverter converter : converters) {
-            if (converter.canWrite(targetType, valueType, selectedMediaType)) {
+            if (converter.canWrite(targetType, valueType, selectedMediaType, request, response, ctx)) {
                 body = interceptorRegistry.beforeBodyWrite(body, returnType, selectedMediaType, converter, request, response);
                 if (body != null) {
-                    converter.write(body, targetType, selectedMediaType, response);
+                    converter.write(body, targetType, selectedMediaType, response, request, response, ctx);
                     break;
                 }
             }
@@ -244,7 +258,7 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
         if (!this.allSupportedMediaTypes.isEmpty()) {
             List<MediaType> result = new ArrayList<>();
             for (HttpBodyConverter converter : this.converters) {
-                if (converter.canWrite(targetType, valueClass, null)) {
+                if (converter.canWrite(targetType, valueClass, null, request, null, mappingContext)) {
                     result.addAll(converter.getSupportedMediaTypes());
                 }
             }

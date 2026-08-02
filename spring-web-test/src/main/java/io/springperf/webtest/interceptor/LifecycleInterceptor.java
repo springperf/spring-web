@@ -25,6 +25,7 @@ public class LifecycleInterceptor implements HandlerInterceptor {
 
     @Override
     public void postHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler, Object result) throws Exception {
+
         log.info("LifecycleInterceptor.postHandle called");
         postHandleCount++;
     }

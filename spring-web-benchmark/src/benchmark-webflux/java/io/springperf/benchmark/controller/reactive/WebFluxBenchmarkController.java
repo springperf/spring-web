@@ -18,8 +18,6 @@ import reactor.core.publisher.Mono;
 
 import javax.validation.Valid;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 
 @RestController
 @RequestMapping("/api")
@@ -29,11 +27,11 @@ public class WebFluxBenchmarkController {
     public Mono<ResponseEntity<UserResp>> echo(@RequestBody Mono<UserReq> req) {
         return req.map(r -> {
             UserResp resp = new UserResp();
-            resp.setId(System.currentTimeMillis());
+            resp.setId(1L);
             resp.setName(r.getName());
             resp.setAge(r.getAge());
             resp.setEmail(r.getEmail());
-            resp.setCreatedAt(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            resp.setCreatedAt("2026-01-01T00:00:00");
             return ResponseEntity.status(HttpStatus.CREATED).body(resp);
         });
     }
@@ -46,22 +44,22 @@ public class WebFluxBenchmarkController {
                                 @RequestParam("p4") String p4,
                                 @RequestParam("p5") String p5) {
         UserResp resp = new UserResp();
-        resp.setId(System.currentTimeMillis());
+        resp.setId(1L);
         resp.setName(name);
         resp.setAge(Integer.parseInt(p1));
         resp.setEmail(p2 + "@" + p3 + ".com");
-        resp.setCreatedAt(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+        resp.setCreatedAt("2026-01-01T00:00:00");
         return Mono.just(resp);
     }
 
     @GetMapping("/core/deferred-result")
     public Mono<UserResp> asyncResult() {
         UserResp resp = new UserResp();
-        resp.setId(System.currentTimeMillis());
+        resp.setId(1L);
         resp.setName("async");
         resp.setAge(0);
         resp.setEmail("async@test.com");
-        resp.setCreatedAt(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+        resp.setCreatedAt("2026-01-01T00:00:00");
         return Mono.just(resp);
     }
 
@@ -74,11 +72,11 @@ public class WebFluxBenchmarkController {
     public Mono<UserResp> validate(@Valid @RequestBody Mono<UserReq> req) {
         return req.map(r -> {
             UserResp resp = new UserResp();
-            resp.setId(System.currentTimeMillis());
+            resp.setId(1L);
             resp.setName(r.getName());
             resp.setAge(r.getAge());
             resp.setEmail(r.getEmail());
-            resp.setCreatedAt(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            resp.setCreatedAt("2026-01-01T00:00:00");
             return resp;
         });
     }

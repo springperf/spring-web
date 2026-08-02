@@ -323,8 +323,8 @@ public class WebMvcConfigurerBridge extends BaseWebComponent {
             return;
         }
 
-        for (HttpMessageConverter<?> converter : converters) {
-            HttpBodyConverter<?> bodyConverter;
+        for (HttpMessageConverter converter : converters) {
+            HttpBodyConverter bodyConverter;
             if (converter instanceof GenericHttpMessageConverter) {
                 bodyConverter = new WrappedHttpBodyConverter((GenericHttpMessageConverter) converter);
             } else {
