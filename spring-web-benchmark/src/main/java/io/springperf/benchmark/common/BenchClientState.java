@@ -42,7 +42,9 @@ public class BenchClientState {
                 .readTimeout(30, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .retryOnConnectionFailure(false)
+                .followRedirects(false)
                 .protocols(Collections.singletonList(Protocol.HTTP_1_1))
+                .connectionPool(new ConnectionPool(128, 30, TimeUnit.SECONDS))
                 .build();
 
         String base = "http://localhost:" + actualPort + BenchmarkConstants.CONTEXT_PATH;

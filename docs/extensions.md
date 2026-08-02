@@ -266,7 +266,7 @@ public class CustomAnnotationResolverProvider implements StaticArgumentResolverP
 
 ```java
 // 继承 WrappedHttpBodyConverter，包装 Spring 的 GenericHttpMessageConverter
-public class XmlHttpBodyConverter extends WrappedHttpBodyConverter<Object> {
+public class XmlHttpBodyConverter extends WrappedHttpBodyConverter {
 
     public XmlHttpBodyConverter() {
         super(new XmlSpringConverter()); // 包装 Spring 转换器
