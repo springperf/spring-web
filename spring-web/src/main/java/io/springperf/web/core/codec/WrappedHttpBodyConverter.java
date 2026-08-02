@@ -13,18 +13,18 @@ import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.List;
 
-public class WrappedHttpBodyConverter<T> extends WebComponentWrapper<GenericHttpMessageConverter<T>> implements HttpBodyConverter<T> {
+public class WrappedHttpBodyConverter extends WebComponentWrapper<GenericHttpMessageConverter<Object>> implements HttpBodyConverter {
 
-    protected final GenericHttpMessageConverter<T> genericConverter;
+    protected final GenericHttpMessageConverter<Object> genericConverter;
 
-    public WrappedHttpBodyConverter(GenericHttpMessageConverter<T> genericConverter) {
+    public WrappedHttpBodyConverter(GenericHttpMessageConverter<Object> genericConverter) {
         super(genericConverter);
         this.genericConverter = genericConverter;
     }
 
     @Override
-    public Class<? extends HttpMessageConverter> getConverterClass() {
-        return genericConverter.getClass();
+    public Class<? extends HttpMessageConverter<?>> getConverterClass() {
+        return (Class<? extends HttpMessageConverter<?>>) genericConverter.getClass();
     }
 
     @Override
@@ -33,7 +33,7 @@ public class WrappedHttpBodyConverter<T> extends WebComponentWrapper<GenericHttp
     }
 
     @Override
-    public T read(Type type, Class<?> contextClass, HttpInputMessage inputMessage) throws IOException, HttpMessageNotReadableException {
+    public Object read(Type type, Class<?> contextClass, HttpInputMessage inputMessage) throws IOException, HttpMessageNotReadableException {
         return genericConverter.read(type, contextClass, inputMessage);
     }
 
@@ -43,7 +43,7 @@ public class WrappedHttpBodyConverter<T> extends WebComponentWrapper<GenericHttp
     }
 
     @Override
-    public void write(T t, Type type, MediaType contentType, HttpOutputMessage outputMessage) throws IOException, HttpMessageNotWritableException {
+    public void write(Object t, Type type, MediaType contentType, HttpOutputMessage outputMessage) throws IOException, HttpMessageNotWritableException {
         genericConverter.write(t, type, contentType, outputMessage);
     }
 
@@ -68,12 +68,12 @@ public class WrappedHttpBodyConverter<T> extends WebComponentWrapper<GenericHttp
     }
 
     @Override
-    public T read(Class<? extends T> clazz, HttpInputMessage inputMessage) throws IOException, HttpMessageNotReadableException {
+    public Object read(Class<?> clazz, HttpInputMessage inputMessage) throws IOException, HttpMessageNotReadableException {
         return genericConverter.read(clazz, inputMessage);
     }
 
     @Override
-    public void write(T t, MediaType contentType, HttpOutputMessage outputMessage) throws IOException, HttpMessageNotWritableException {
+    public void write(Object t, MediaType contentType, HttpOutputMessage outputMessage) throws IOException, HttpMessageNotWritableException {
         genericConverter.write(t, contentType, outputMessage);
     }
 }

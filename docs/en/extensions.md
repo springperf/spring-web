@@ -266,7 +266,7 @@ Extend the supported HTTP message formats.
 
 ```java
 // Extend WrappedHttpBodyConverter, wrapping a Spring GenericHttpMessageConverter
-public class XmlHttpBodyConverter extends WrappedHttpBodyConverter<Object> {
+public class XmlHttpBodyConverter extends WrappedHttpBodyConverter {
 
     public XmlHttpBodyConverter() {
         super(new XmlSpringConverter()); // Wrap Spring converter

@@ -23,7 +23,7 @@ import static org.mockito.Mockito.when;
 class AdaptedHttpBodyConverterTest {
 
     @Mock
-    HttpMessageConverter<String> delegate;
+    HttpMessageConverter<Object> delegate;
 
     @Mock
     HttpInputMessage inputMessage;
@@ -33,7 +33,7 @@ class AdaptedHttpBodyConverterTest {
 
     @Test
     void constructor_storesDelegate() {
-        AdaptedHttpBodyConverter<String> converter = new AdaptedHttpBodyConverter<>(delegate);
+        AdaptedHttpBodyConverter converter = new AdaptedHttpBodyConverter(delegate);
 
         assertSame(delegate, converter.getComponent());
     }
@@ -42,7 +42,7 @@ class AdaptedHttpBodyConverterTest {
     void canRead_withType_delegates() {
         when(delegate.canRead(String.class, MediaType.APPLICATION_JSON)).thenReturn(true);
 
-        AdaptedHttpBodyConverter<String> converter = new AdaptedHttpBodyConverter<>(delegate);
+        AdaptedHttpBodyConverter converter = new AdaptedHttpBodyConverter(delegate);
 
         assertTrue(converter.canRead((Type) String.class, null, MediaType.APPLICATION_JSON));
         verify(delegate).canRead(String.class, MediaType.APPLICATION_JSON);
@@ -52,7 +52,7 @@ class AdaptedHttpBodyConverterTest {
     void canRead_withType_delegatesFalse() {
         when(delegate.canRead(String.class, MediaType.APPLICATION_JSON)).thenReturn(false);
 
-        AdaptedHttpBodyConverter<String> converter = new AdaptedHttpBodyConverter<>(delegate);
+        AdaptedHttpBodyConverter converter = new AdaptedHttpBodyConverter(delegate);
 
         assertFalse(converter.canRead((Type) String.class, null, MediaType.APPLICATION_JSON));
     }
@@ -61,8 +61,8 @@ class AdaptedHttpBodyConverterTest {
     void read_withType_delegates() throws IOException {
         when(delegate.read(String.class, inputMessage)).thenReturn("test body");
 
-        AdaptedHttpBodyConverter<String> converter = new AdaptedHttpBodyConverter<>(delegate);
-        String result = converter.read((Type) String.class, null, inputMessage);
+        AdaptedHttpBodyConverter converter = new AdaptedHttpBodyConverter(delegate);
+        Object result = converter.read((Type) String.class, null, inputMessage);
 
         assertEquals("test body", result);
         verify(delegate).read(String.class, inputMessage);
@@ -72,7 +72,7 @@ class AdaptedHttpBodyConverterTest {
     void canRead_withClass_delegates() {
         when(delegate.canRead(String.class, MediaType.APPLICATION_JSON)).thenReturn(true);
 
-        AdaptedHttpBodyConverter<String> converter = new AdaptedHttpBodyConverter<>(delegate);
+        AdaptedHttpBodyConverter converter = new AdaptedHttpBodyConverter(delegate);
 
         assertTrue(converter.canRead(String.class, MediaType.APPLICATION_JSON));
         verify(delegate).canRead(String.class, MediaType.APPLICATION_JSON);
@@ -82,7 +82,7 @@ class AdaptedHttpBodyConverterTest {
     void read_withClass_delegates() throws IOException {
         when(delegate.read(String.class, inputMessage)).thenReturn("test");
 
-        AdaptedHttpBodyConverter<String> converter = new AdaptedHttpBodyConverter<>(delegate);
+        AdaptedHttpBodyConverter converter = new AdaptedHttpBodyConverter(delegate);
 
         assertEquals("test", converter.read(String.class, inputMessage));
         verify(delegate).read(String.class, inputMessage);
@@ -92,7 +92,7 @@ class AdaptedHttpBodyConverterTest {
     void canWrite_withClass_delegates() {
         when(delegate.canWrite(String.class, MediaType.APPLICATION_JSON)).thenReturn(true);
 
-        AdaptedHttpBodyConverter<String> converter = new AdaptedHttpBodyConverter<>(delegate);
+        AdaptedHttpBodyConverter converter = new AdaptedHttpBodyConverter(delegate);
 
         assertTrue(converter.canWrite(String.class, MediaType.APPLICATION_JSON));
         verify(delegate).canWrite(String.class, MediaType.APPLICATION_JSON);
@@ -103,7 +103,7 @@ class AdaptedHttpBodyConverterTest {
         List<MediaType> expected = Collections.singletonList(MediaType.APPLICATION_JSON);
         when(delegate.getSupportedMediaTypes()).thenReturn(expected);
 
-        AdaptedHttpBodyConverter<String> converter = new AdaptedHttpBodyConverter<>(delegate);
+        AdaptedHttpBodyConverter converter = new AdaptedHttpBodyConverter(delegate);
 
         assertSame(expected, converter.getSupportedMediaTypes());
     }
@@ -113,14 +113,14 @@ class AdaptedHttpBodyConverterTest {
         List<MediaType> expected = Collections.singletonList(MediaType.APPLICATION_JSON);
         when(delegate.getSupportedMediaTypes(String.class)).thenReturn(expected);
 
-        AdaptedHttpBodyConverter<String> converter = new AdaptedHttpBodyConverter<>(delegate);
+        AdaptedHttpBodyConverter converter = new AdaptedHttpBodyConverter(delegate);
 
         assertSame(expected, converter.getSupportedMediaTypes(String.class));
     }
 
     @Test
     void write_withType_delegates() throws IOException {
-        AdaptedHttpBodyConverter<String> converter = new AdaptedHttpBodyConverter<>(delegate);
+        AdaptedHttpBodyConverter converter = new AdaptedHttpBodyConverter(delegate);
         converter.write("body", (Type) String.class, MediaType.APPLICATION_JSON, outputMessage);
 
         verify(delegate).write("body", MediaType.APPLICATION_JSON, outputMessage);
@@ -128,7 +128,7 @@ class AdaptedHttpBodyConverterTest {
 
     @Test
     void write_withClass_delegates() throws IOException {
-        AdaptedHttpBodyConverter<String> converter = new AdaptedHttpBodyConverter<>(delegate);
+        AdaptedHttpBodyConverter converter = new AdaptedHttpBodyConverter(delegate);
         converter.write("body", MediaType.APPLICATION_JSON, outputMessage);
 
         verify(delegate).write("body", MediaType.APPLICATION_JSON, outputMessage);
@@ -138,7 +138,7 @@ class AdaptedHttpBodyConverterTest {
     void canWrite_withType_delegates() {
         when(delegate.canWrite(String.class, MediaType.APPLICATION_JSON)).thenReturn(true);
 
-        AdaptedHttpBodyConverter<String> converter = new AdaptedHttpBodyConverter<>(delegate);
+        AdaptedHttpBodyConverter converter = new AdaptedHttpBodyConverter(delegate);
 
         assertTrue(converter.canWrite((Type) String.class, String.class, MediaType.APPLICATION_JSON));
         verify(delegate).canWrite(String.class, MediaType.APPLICATION_JSON);
@@ -146,14 +146,14 @@ class AdaptedHttpBodyConverterTest {
 
     @Test
     void getConverterClass_returnsDelegateClass() {
-        AdaptedHttpBodyConverter<String> converter = new AdaptedHttpBodyConverter<>(delegate);
+        AdaptedHttpBodyConverter converter = new AdaptedHttpBodyConverter(delegate);
 
         assertEquals(delegate.getClass(), converter.getConverterClass());
     }
 
     @Test
     void defaultOrder_isLowestPrecedenceMinus15000() {
-        AdaptedHttpBodyConverter<String> converter = new AdaptedHttpBodyConverter<>(delegate);
+        AdaptedHttpBodyConverter converter = new AdaptedHttpBodyConverter(delegate);
 
         assertEquals(Ordered.LOWEST_PRECEDENCE - 15000, converter.getOrder());
     }

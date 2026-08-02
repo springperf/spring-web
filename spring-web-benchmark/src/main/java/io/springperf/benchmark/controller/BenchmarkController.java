@@ -1,18 +1,14 @@
 package io.springperf.benchmark.controller;
 
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
 import io.springperf.benchmark.dto.UserReq;
 import io.springperf.benchmark.dto.UserResp;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.context.request.async.DeferredResult;
 
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 
 /**
  * 通用基准测试 Controller — 适用于 servlet 栈（Perf/Tomcat/Undertow）。
@@ -26,11 +22,11 @@ public class BenchmarkController {
     @PostMapping("/demo/echo")
     public ResponseEntity<UserResp> echo(@RequestBody UserReq req) {
         UserResp resp = new UserResp();
-        resp.setId(System.currentTimeMillis());
+        resp.setId(1L);
         resp.setName(req.getName());
         resp.setAge(req.getAge());
         resp.setEmail(req.getEmail());
-        resp.setCreatedAt(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+        resp.setCreatedAt("2026-01-01T00:00:00");
         return ResponseEntity.status(HttpStatus.CREATED).body(resp);
     }
 
@@ -44,11 +40,11 @@ public class BenchmarkController {
                           @RequestParam("p4") String p4,
                           @RequestParam("p5") String p5) {
         UserResp resp = new UserResp();
-        resp.setId(System.currentTimeMillis());
+        resp.setId(1L);
         resp.setName(name);
         resp.setAge(Integer.parseInt(p1));
         resp.setEmail(p2 + "@" + p3 + ".com");
-        resp.setCreatedAt(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+        resp.setCreatedAt("2026-01-01T00:00:00");
         return resp;
     }
 
@@ -58,11 +54,11 @@ public class BenchmarkController {
     public DeferredResult<UserResp> deferredResult() {
         DeferredResult<UserResp> result = new DeferredResult<>(5000L);
         UserResp resp = new UserResp();
-        resp.setId(System.currentTimeMillis());
+        resp.setId(1L);
         resp.setName("async");
         resp.setAge(0);
         resp.setEmail("async@test.com");
-        resp.setCreatedAt(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+        resp.setCreatedAt("2026-01-01T00:00:00");
         result.setResult(resp);
         return result;
     }
@@ -80,11 +76,11 @@ public class BenchmarkController {
     public UserResp validate(@Valid @RequestBody UserReq req) {
         // 包含 Bean Validation 验证开销
         UserResp resp = new UserResp();
-        resp.setId(System.currentTimeMillis());
+        resp.setId(1L);
         resp.setName(req.getName());
         resp.setAge(req.getAge());
         resp.setEmail(req.getEmail());
-        resp.setCreatedAt(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+        resp.setCreatedAt("2026-01-01T00:00:00");
         return resp;
     }
 

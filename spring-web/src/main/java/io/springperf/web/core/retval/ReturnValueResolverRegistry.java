@@ -17,6 +17,7 @@ import org.springframework.core.ResolvableType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Manages a chain of ReturnValueResolvers that process handler method return values into HTTP responses.
@@ -84,6 +85,25 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
     protected boolean doResolveReturnValue(Object returnValue, MappingHandlerMethod mappingContext, WebServerHttpRequest req, WebServerHttpResponse resp) throws Exception {
         MethodReturnValueContext returnValueContext = getMethodReturnValueContext(mappingContext);
         MethodParameter returnType = returnValueContext == null ? null : returnValueContext.getReturnType();
+
+        // Optional 解包：声明式或运行时
+        if (returnValue instanceof Optional<?> opt) {
+            if (opt.isEmpty()) {
+                return true; // Optional.empty() → 无响应体
+            }
+            returnValue = opt.get();
+            if (returnValueContext != null && returnValueContext.isOptionalType()) {
+                // 声明式 Optional：使用内联类型，尝试内联解析器缓存
+                returnType = returnValueContext.getOptionalInnerReturnType();
+                ReturnValueResolver innerResolver = returnValueContext.getOptionalInnerReturnValueResolver();
+                if (innerResolver != null && innerResolver.supportsReturnValue(returnValue, req, resp)) {
+                    innerResolver.resolveReturnValue(returnValue, returnType, req, resp);
+                    return true;
+                }
+            }
+            // 运行时 Optional（方法签名未声明）：returnType 保持原样，走正常流程
+        }
+
         if (returnValueContext != null) {
             // Fast path 1: 缓存的主解析器匹配（优先于异步内联解析器）
             ReturnValueResolver resolver = returnValueContext.getReturnValueResolver();
@@ -106,7 +126,12 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
                 resolver.resolveReturnValue(returnValue, returnType, req, resp);
                 // 懒缓存：将匹配的解析器缓存到 context
                 if (returnValueContext != null) {
-                    returnValueContext.setReturnValueResolver(resolver);
+                    if (returnValueContext.isOptionalType()) {
+                        // 声明式 Optional：缓存内联解析器，后续请求直接命中 fast path
+                        returnValueContext.setOptionalInnerReturnValueResolver(resolver);
+                    } else {
+                        returnValueContext.setReturnValueResolver(resolver);
+                    }
                     if (resolver instanceof BaseAsyncReturnValueResolver) {
                         resolveInnerReturnValueContext(returnValueContext, mappingContext);
                     }
@@ -167,6 +192,14 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
                 returnType = new MethodParameter(mappingContext.getMethod(), -1);
             }
             methodReturnValueContext.setReturnType(returnType);
+
+            // 检测声明式 Optional 返回类型
+            if (returnType.getParameterType() == Optional.class) {
+                methodReturnValueContext.setOptionalType(true);
+                MethodParameter innerReturnType = returnType.nestedIfOptional();
+                methodReturnValueContext.setOptionalInnerReturnType(innerReturnType);
+            }
+
             mappingContext.set(MAPPING_CACHE_KEY, methodReturnValueContext);
         }
         return methodReturnValueContext;
