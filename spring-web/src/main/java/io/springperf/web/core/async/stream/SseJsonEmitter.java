@@ -3,6 +3,7 @@ package io.springperf.web.core.async.stream;
 import io.springperf.web.json.JsonConverter;
 
 import java.io.IOException;
+import java.io.OutputStream;
 
 public class SseJsonEmitter extends SseEmitter {
 
@@ -19,12 +20,7 @@ public class SseJsonEmitter extends SseEmitter {
     }
 
     @Override
-    protected String encodeEventData(Object data) {
-        return jsonConverter.toJson(data);
-    }
-
-    @Override
-    protected byte[] encodeEventDataAsBytes(Object data) throws IOException {
-        return jsonConverter.toJsonBytes(data);
+    protected void encodeEventDataAsBytes(Object data, OutputStream out) throws IOException {
+        jsonConverter.toJson(out, data);
     }
 }

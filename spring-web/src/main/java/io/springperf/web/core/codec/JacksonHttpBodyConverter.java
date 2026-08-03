@@ -236,15 +236,16 @@ public class JacksonHttpBodyConverter extends BaseWebComponent implements HttpBo
         Object writeValue = value;
         Class<?> viewClass = null;
         FilterProvider filters = null;
-        if (value instanceof MappingJacksonValue mjv) {
+        if (value instanceof MappingJacksonValue) {
+            MappingJacksonValue mjv = (MappingJacksonValue) value;
             writeValue = mjv.getValue();
             viewClass = mjv.getSerializationView();
             filters = mjv.getFilters();
         }
 
         // String fast path: skip JSON serialization entirely
-        if (writeValue instanceof String str) {
-            outputMessage.getBody().write(str.getBytes(StandardCharsets.UTF_8));
+        if (writeValue instanceof String) {
+            outputMessage.getBody().write(((String) writeValue).getBytes(StandardCharsets.UTF_8));
             return;
         }
 

@@ -9,8 +9,14 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.ServerHttpResponse;
 
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -45,20 +51,27 @@ class StreamJsonEmitterTest {
     }
 
     @Test
-    void encodeToString_null_returnsNewline() {
+    void encode_null_returnsNewline() throws Exception {
         StreamJsonEmitter emitter = new StreamJsonEmitter(jsonConverter);
-        assertEquals("\n", emitter.encodeToString(null).toString());
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        emitter.encode(null, baos);
+        assertEquals("\n", baos.toString(StandardCharsets.UTF_8));
     }
 
     @Test
-    void encodeToString_data_returnsJsonWithNewline() {
-        when(jsonConverter.toJson("hello")).thenReturn("\"hello\"");
+    void encode_data_returnsJsonWithNewline() throws Exception {
+        byte[] jsonBytes = "\"hello\"".getBytes(StandardCharsets.UTF_8);
+        doAnswer(invocation -> {
+            ((OutputStream) invocation.getArgument(0)).write(jsonBytes);
+            return null;
+        }).when(jsonConverter).toJson(any(OutputStream.class), eq("hello"));
 
         StreamJsonEmitter emitter = new StreamJsonEmitter(jsonConverter);
-        CharSequence result = emitter.encodeToString("hello");
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        emitter.encode("hello", baos);
 
-        assertEquals("\"hello\"\n", result.toString());
-        verify(jsonConverter).toJson("hello");
+        assertEquals("\"hello\"\n", baos.toString(StandardCharsets.UTF_8));
+        verify(jsonConverter).toJson(any(OutputStream.class), eq("hello"));
     }
 
     @Test

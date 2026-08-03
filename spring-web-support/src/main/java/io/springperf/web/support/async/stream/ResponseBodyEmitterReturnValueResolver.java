@@ -14,7 +14,6 @@ import org.springframework.http.MediaType;
 import org.springframework.web.servlet.mvc.method.annotation.AdapterUtil;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -35,11 +34,11 @@ public class ResponseBodyEmitterReturnValueResolver extends StreamEmitterReturnV
         if (emitter instanceof ResponseBodyEmitter) {
             ResponseBodyEmitter responseBodyEmitter = (ResponseBodyEmitter) emitter;
             HttpHeaders mutableHeaders = new HttpHeaders(resp.getHeaders());
-            AdapterUtil.setEncodeToBytesFunction(responseBodyEmitter, (data) -> encodeToBytes(mutableHeaders, data));
+            AdapterUtil.setEncodeFunction(responseBodyEmitter, (data, out) -> encodeToStream(mutableHeaders, data, out));
         }
     }
 
-    protected byte[] encodeToBytes(HttpHeaders mutableHeaders, Object data) throws IOException {
+    protected void encodeToStream(HttpHeaders mutableHeaders, Object data, OutputStream out) throws IOException {
         MediaType selectedMediaType = null;
         if (data instanceof ResponseBodyEmitter.DataWithMediaType) {
             ResponseBodyEmitter.DataWithMediaType dataWithMediaType = (ResponseBodyEmitter.DataWithMediaType) data;
@@ -48,16 +47,18 @@ public class ResponseBodyEmitterReturnValueResolver extends StreamEmitterReturnV
         }
         for (HttpBodyConverter converter : codecRegistry.getConverters()) {
             if (converter.canWrite(null, data.getClass(), selectedMediaType)) {
-                StreamingHttpOutputMessage outputMessage = new StreamingHttpOutputMessage(mutableHeaders);
+                StreamingHttpOutputMessage outputMessage = new StreamingHttpOutputMessage(mutableHeaders, out);
                 converter.write(data, null, selectedMediaType, outputMessage);
-                return outputMessage.getBytes();
+                return;
             }
         }
         if (data instanceof String) {
-            return ((String) data).getBytes(StandardCharsets.UTF_8);
+            out.write(((String) data).getBytes(StandardCharsets.UTF_8));
+            return;
         }
         if (data instanceof byte[]) {
-            return (byte[]) data;
+            out.write((byte[]) data);
+            return;
         }
         throw new IllegalArgumentException("No suitable converter for " + data.getClass()
                 + " and no fallback encoding available");
@@ -72,10 +73,11 @@ public class ResponseBodyEmitterReturnValueResolver extends StreamEmitterReturnV
 
         private final HttpHeaders mutableHeaders;
 
-        private final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        private final OutputStream outputStream;
 
-        public StreamingHttpOutputMessage(HttpHeaders mutableHeaders) {
+        public StreamingHttpOutputMessage(HttpHeaders mutableHeaders, OutputStream outputStream) {
             this.mutableHeaders = mutableHeaders;
+            this.outputStream = outputStream;
         }
 
         @Override
@@ -86,10 +88,6 @@ public class ResponseBodyEmitterReturnValueResolver extends StreamEmitterReturnV
         @Override
         public HttpHeaders getHeaders() {
             return mutableHeaders;
-        }
-
-        public byte[] getBytes() {
-            return outputStream.toByteArray();
         }
     }
 }

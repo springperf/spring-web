@@ -3,6 +3,9 @@ package org.springframework.web.servlet.mvc.method.annotation;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class ResponseBodyEmitterTest {
@@ -84,12 +87,13 @@ class ResponseBodyEmitterTest {
     }
 
     @Test
-    void encodeToBytes_delegatesToFunction() throws Exception {
+    void encode_delegatesToFunction() throws Exception {
         ResponseBodyEmitter emitter = new ResponseBodyEmitter();
-        emitter.setEncodeToBytesFunction(data -> "encoded".getBytes());
+        emitter.setEncodeFunction((data, out) -> out.write("encoded".getBytes(StandardCharsets.UTF_8)));
 
-        byte[] result = emitter.encodeToBytes("test");
-        assertArrayEquals("encoded".getBytes(), result);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        emitter.encode("test", baos);
+        assertArrayEquals("encoded".getBytes(StandardCharsets.UTF_8), baos.toByteArray());
     }
 
     @Test
