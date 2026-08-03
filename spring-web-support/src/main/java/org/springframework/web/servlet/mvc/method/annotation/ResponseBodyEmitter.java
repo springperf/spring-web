@@ -24,6 +24,7 @@ import org.springframework.util.ObjectUtils;
 import org.springframework.web.context.request.async.WebAsyncSupportUtils;
 
 import java.io.IOException;
+import java.io.OutputStream;
 
 /**
  * A controller method return value type for asynchronous request processing
@@ -61,13 +62,13 @@ import java.io.IOException;
  */
 public class ResponseBodyEmitter extends StreamEmitter {
 
-    private EncodeToBytesFunction encodeToBytesFunction;
+    private EncodeFunction encodeFunction;
 
     /**
      * Create a new ResponseBodyEmitter instance.
      */
     public ResponseBodyEmitter() {
-        super(false);
+        super();
     }
 
     /**
@@ -79,7 +80,7 @@ public class ResponseBodyEmitter extends StreamEmitter {
      * @param timeout the timeout value in milliseconds
      */
     public ResponseBodyEmitter(Long timeout) {
-        super(timeout, false);
+        super(timeout);
     }
 
 
@@ -97,12 +98,14 @@ public class ResponseBodyEmitter extends StreamEmitter {
     }
 
     @Override
-    protected byte[] encodeToBytes(Object data) throws IOException {
-        return encodeToBytesFunction.apply(data);
+    public void encode(Object data, OutputStream out) throws IOException {
+        if (encodeFunction != null) {
+            encodeFunction.encode(data, out);
+        }
     }
 
-    protected void setEncodeToBytesFunction(EncodeToBytesFunction encodeToBytesFunction) {
-        this.encodeToBytesFunction = encodeToBytesFunction;
+    protected void setEncodeFunction(EncodeFunction encodeFunction) {
+        this.encodeFunction = encodeFunction;
     }
 
     /**
@@ -129,8 +132,8 @@ public class ResponseBodyEmitter extends StreamEmitter {
     }
 
     @FunctionalInterface
-    public interface EncodeToBytesFunction {
-        byte[] apply(Object data) throws IOException;
+    public interface EncodeFunction {
+        void encode(Object data, OutputStream out) throws IOException;
     }
 
     /**
@@ -159,4 +162,3 @@ public class ResponseBodyEmitter extends StreamEmitter {
         }
     }
 }
-

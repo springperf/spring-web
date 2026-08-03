@@ -5,6 +5,9 @@ import io.springperf.web.util.MediaTypeUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.server.ServerHttpResponse;
 
+import java.io.IOException;
+import java.io.OutputStream;
+
 public class StreamJsonEmitter extends StreamEmitter<Object> {
 
     private final JsonConverter jsonConverter;
@@ -28,13 +31,12 @@ public class StreamJsonEmitter extends StreamEmitter<Object> {
     }
 
     @Override
-    protected CharSequence encodeToString(Object data) {
+    public void encode(Object data, OutputStream out) throws IOException {
         if (data == null) {
-            return "\n";
+            out.write('\n');
+            return;
         }
-        String str = jsonConverter.toJson(data);
-        StringBuilder sb = new StringBuilder(str);
-        sb.append('\n');
-        return sb;
+        jsonConverter.toJson(out, data);
+        out.write('\n');
     }
 }

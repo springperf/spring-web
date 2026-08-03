@@ -38,6 +38,10 @@ class StreamEmitterTest {
     private StreamEmitter createEmitter() {
         return new StreamEmitter<Object>() {
             @Override
+            public void encode(Object data, java.io.OutputStream out) {
+                throw new UnsupportedOperationException();
+            }
+            @Override
             protected void extendResponse(ServerHttpResponse response) {
             }
         };
@@ -180,17 +184,9 @@ class StreamEmitterTest {
     void constructor_withTimeout() {
         StreamEmitter emitter = new StreamEmitter<Object>(5000L) {
             @Override
-            protected void extendResponse(ServerHttpResponse response) {
+            public void encode(Object data, java.io.OutputStream out) {
+                throw new UnsupportedOperationException();
             }
-        };
-
-        assertNotNull(emitter.deferredResult);
-        assertTrue(emitter.encodeToString);
-    }
-
-    @Test
-    void constructor_noTimeout() {
-        StreamEmitter emitter = new StreamEmitter<Object>(null, true) {
             @Override
             protected void extendResponse(ServerHttpResponse response) {
             }
@@ -200,8 +196,12 @@ class StreamEmitterTest {
     }
 
     @Test
-    void constructor_withTimeoutAndEncodeFlag() {
-        StreamEmitter emitter = new StreamEmitter<Object>(3000L, false) {
+    void constructor_noTimeout() {
+        StreamEmitter emitter = new StreamEmitter<Object>((Long) null) {
+            @Override
+            public void encode(Object data, java.io.OutputStream out) {
+                throw new UnsupportedOperationException();
+            }
             @Override
             protected void extendResponse(ServerHttpResponse response) {
             }
@@ -212,7 +212,11 @@ class StreamEmitterTest {
 
     @Test
     void constructor_nonPositiveTimeout_usesNoTimeout() {
-        StreamEmitter emitter = new StreamEmitter<Object>(0L, true) {
+        StreamEmitter emitter = new StreamEmitter<Object>(0L) {
+            @Override
+            public void encode(Object data, java.io.OutputStream out) {
+                throw new UnsupportedOperationException();
+            }
             @Override
             protected void extendResponse(ServerHttpResponse response) {
             }
@@ -239,16 +243,9 @@ class StreamEmitterTest {
     }
 
     @Test
-    void encodeToString_throwsUnsupportedOperation() {
+    void encode_throwsUnsupportedOperation() {
         StreamEmitter emitter = createEmitter();
 
-        assertThrows(UnsupportedOperationException.class, () -> emitter.encodeToString("test"));
-    }
-
-    @Test
-    void encodeToBytes_throwsUnsupportedOperation() {
-        StreamEmitter emitter = createEmitter();
-
-        assertThrows(UnsupportedOperationException.class, () -> emitter.encodeToBytes("test".getBytes()));
+        assertThrows(UnsupportedOperationException.class, () -> emitter.encode("test", new java.io.ByteArrayOutputStream()));
     }
 }

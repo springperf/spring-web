@@ -6,6 +6,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.http.server.ServerHttpResponse;
 
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -42,7 +44,7 @@ class SseEmitterTest {
     }
 
     @Test
-    void encodeToString_withServerSentEvent_allFields() {
+    void encode_withServerSentEvent_allFields() throws Exception {
         ServerSentEvent<Object> event = ServerSentEvent.builder()
                 .id("1")
                 .event("message")
@@ -51,89 +53,83 @@ class SseEmitterTest {
                 .data("hello")
                 .build();
 
-        CharSequence result = emitter.encodeToString(event);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        emitter.encode(event, baos);
+        String result = baos.toString(StandardCharsets.UTF_8);
 
-        assertTrue(result.toString().contains("id:1"));
-        assertTrue(result.toString().contains("event:message"));
-        assertTrue(result.toString().contains("retry:3000"));
-        assertTrue(result.toString().contains(":test comment"));
-        assertTrue(result.toString().contains("data:hello"));
-        assertTrue(result.toString().endsWith("\n\n"));
+        assertTrue(result.contains("id:1"));
+        assertTrue(result.contains("event:message"));
+        assertTrue(result.contains("retry:3000"));
+        assertTrue(result.contains(":test comment"));
+        assertTrue(result.contains("data:hello"));
+        assertTrue(result.endsWith("\n\n"));
     }
 
     @Test
-    void encodeToString_withPlainData() {
+    void encode_withPlainData() throws Exception {
         String data = "hello world";
 
-        CharSequence result = emitter.encodeToString(data);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        emitter.encode(data, baos);
+        String result = baos.toString(StandardCharsets.UTF_8);
 
-        String str = result.toString();
-        assertTrue(str.contains("data:hello world"));
-        assertTrue(str.endsWith("\n\n"));
+        assertTrue(result.contains("data:hello world"));
+        assertTrue(result.endsWith("\n\n"));
     }
 
     @Test
-    void encodeToString_withNullData() {
-        CharSequence result = emitter.encodeToString((Object) null);
+    void encode_withNullData() throws Exception {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        emitter.encode((Object) null, baos);
 
-        assertNotNull(result);
-        assertEquals("\n", result.toString());
+        String result = baos.toString(StandardCharsets.UTF_8);
+        assertEquals("\n", result);
     }
 
     @Test
-    void encodeToString_multilineData() {
+    void encode_multilineData() throws Exception {
         String data = "line1\nline2";
 
-        CharSequence result = emitter.encodeToString(data);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        emitter.encode(data, baos);
+        String result = baos.toString(StandardCharsets.UTF_8);
 
-        String str = result.toString();
-        assertTrue(str.contains("data:line1"));
-        assertTrue(str.contains("data:line2"));
+        assertTrue(result.contains("data:line1"));
+        assertTrue(result.contains("data:line2"));
     }
 
     @Test
-    void encodeToString_withServerSentEvent_onlyData() {
+    void encode_withServerSentEvent_onlyData() throws Exception {
         ServerSentEvent<Object> event = ServerSentEvent.builder().data("hello").build();
 
-        CharSequence result = emitter.encodeToString(event);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        emitter.encode(event, baos);
+        String result = baos.toString(StandardCharsets.UTF_8);
 
-        assertFalse(result.toString().contains("id:"));
-        assertFalse(result.toString().contains("event:"));
-        assertFalse(result.toString().contains("retry:"));
-        assertTrue(result.toString().contains("data:hello"));
+        assertFalse(result.contains("id:"));
+        assertFalse(result.contains("event:"));
+        assertFalse(result.contains("retry:"));
+        assertTrue(result.contains("data:hello"));
     }
 
     @Test
-    void encodeToString_withCommentOnly() {
+    void encode_withCommentOnly() throws Exception {
         ServerSentEvent<Object> event = ServerSentEvent.builder()
                 .comment("keepalive")
                 .data("ping")
                 .build();
 
-        CharSequence result = emitter.encodeToString(event);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        emitter.encode(event, baos);
+        String result = baos.toString(StandardCharsets.UTF_8);
 
-        String str = result.toString();
-        assertTrue(str.contains(":keepalive"));
-        assertTrue(str.contains("data:ping"));
+        assertTrue(result.contains(":keepalive"));
+        assertTrue(result.contains("data:ping"));
     }
 
     @Test
     void getMaxFlushBytes_returns4096() {
         assertEquals(4096, emitter.getMaxFlushBytes());
-    }
-
-    @Test
-    void writeField_appendsField() {
-        StringBuilder sb = new StringBuilder();
-        emitter.writeField("test", "value", sb);
-        assertEquals("test:value\n", sb.toString());
-    }
-
-    @Test
-    void writeField_withNumberValue_appendsField() {
-        StringBuilder sb = new StringBuilder();
-        emitter.writeField("retry", 3000L, sb);
-        assertEquals("retry:3000\n", sb.toString());
     }
 
     @Test

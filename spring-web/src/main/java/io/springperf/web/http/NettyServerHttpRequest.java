@@ -145,10 +145,8 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
     public HttpHeaders getHeaders() {
         if (headers == null) {
             headers = new WebHttpHeaders();
-            for (String name : request.headers().names()) {
-                for (String v : request.headers().getAll(name)) {
-                    headers.add(name, v);
-                }
+            for (Map.Entry<String, String> header : request.headers()) {
+                headers.add(header.getKey(), header.getValue());
             }
         }
         return headers;

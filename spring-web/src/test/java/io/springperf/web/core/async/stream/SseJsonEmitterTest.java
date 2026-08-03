@@ -6,10 +6,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class SseJsonEmitterTest {
@@ -18,26 +24,21 @@ class SseJsonEmitterTest {
     JsonConverter jsonConverter;
 
     @Test
-    void encodeEventData_returnsJson() {
-        when(jsonConverter.toJson("test")).thenReturn("\"test\"");
-
-        SseJsonEmitter emitter = new SseJsonEmitter(jsonConverter);
-        String result = emitter.encodeEventData("test");
-
-        assertEquals("\"test\"", result);
-        verify(jsonConverter).toJson("test");
-    }
-
-    @Test
-    void encodeEventData_withObject_returnsJson() {
+    void encode_withObject_usesJsonConverter() throws Exception {
         Object data = new Object();
-        when(jsonConverter.toJson(data)).thenReturn("{}");
+        byte[] jsonBytes = "{\"key\":\"value\"}".getBytes(StandardCharsets.UTF_8);
+        doAnswer(invocation -> {
+            ((OutputStream) invocation.getArgument(0)).write(jsonBytes);
+            return null;
+        }).when(jsonConverter).toJson(any(OutputStream.class), eq(data));
 
         SseJsonEmitter emitter = new SseJsonEmitter(jsonConverter);
-        String result = emitter.encodeEventData(data);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        emitter.encode(data, baos);
 
-        assertEquals("{}", result);
-        verify(jsonConverter).toJson(data);
+        String output = baos.toString(StandardCharsets.UTF_8);
+        assertTrue(output.contains("data:{\"key\":\"value\"}"));
+        verify(jsonConverter).toJson(any(OutputStream.class), eq(data));
     }
 
     @Test

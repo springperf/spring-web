@@ -4,17 +4,19 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.http.server.ServerHttpResponse;
-import org.springframework.util.StringUtils;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+
+import static io.springperf.web.util.IoUtils.writeCharSequence;
 
 public class SseEmitter extends StreamEmitter<Object> {
 
     private static final byte[] DATA_PREFIX = "data:".getBytes(StandardCharsets.UTF_8);
     private static final byte[] NEWLINE_DATA = "\ndata:".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] NEWLINE_COMMENT = "\n:".getBytes(StandardCharsets.UTF_8);
     private static final byte[] TERMINATOR = "\n\n".getBytes(StandardCharsets.UTF_8);
     private static final byte[] NEWLINE = "\n".getBytes(StandardCharsets.UTF_8);
     private static final byte[] FIELD_ID = "id:".getBytes(StandardCharsets.UTF_8);
@@ -22,19 +24,19 @@ public class SseEmitter extends StreamEmitter<Object> {
     private static final byte[] FIELD_RETRY = "retry:".getBytes(StandardCharsets.UTF_8);
 
     public SseEmitter() {
-        super(true);
-    }
-
-    protected SseEmitter(boolean encodeToString) {
-        super(encodeToString);
+        super();
     }
 
     public SseEmitter(Long timeout) {
-        super(timeout, true);
+        super(timeout);
     }
 
-    protected SseEmitter(Long timeout, boolean encodeToString) {
-        super(timeout, encodeToString);
+    public SseEmitter(boolean earlyEncode) {
+        super(earlyEncode);
+    }
+
+    public SseEmitter(Long timeout, boolean earlyEncode) {
+        super(timeout, earlyEncode);
     }
 
     @Override
@@ -52,130 +54,89 @@ public class SseEmitter extends StreamEmitter<Object> {
     }
 
     @Override
-    protected CharSequence encodeToString(Object data) {
-        if (data instanceof ServerSentEvent) {
-            ServerSentEvent sse = (ServerSentEvent) data;
-            return encodeToString(sse.id(), sse.event(), sse.retry(), sse.comment(), sse.data());
+    public void encode(Object data, OutputStream out) throws IOException {
+        if (data instanceof ServerSentEvent sse) {
+            encodeServerSentEvent(sse, out);
         } else {
-            return encodeToString(null, null, null, null, data);
+            encodeData(data, out);
         }
-    }
-
-    protected CharSequence encodeToString(String id, String event, Duration retry, String comment, Object data) {
-        StringBuilder sb;
-        if (data instanceof CharSequence) {
-            sb = new StringBuilder(((CharSequence) data).length() + 64);
-        } else {
-            sb = new StringBuilder(256);
-        }
-        if (id != null) {
-            writeField("id", id, sb);
-        }
-        if (event != null) {
-            writeField("event", event, sb);
-        }
-        if (retry != null) {
-            writeField("retry", retry.toMillis(), sb);
-        }
-        if (comment != null) {
-            sb.append(':').append(StringUtils.replace(comment, "\n", "\n:")).append("\n");
-        }
-        if (data == null) {
-            sb.append("\n");
-            return sb;
-        }
-        sb.append("data:");
-        String dataStr;
-        if (data instanceof CharSequence) {
-            dataStr = data.toString();
-        } else {
-            dataStr = encodeEventData(data);
-        }
-        dataStr = StringUtils.replace(dataStr, "\n", "\ndata:");
-        sb.append(dataStr).append("\n\n");
-        return sb;
-    }
-
-    @Override
-    protected byte[] encodeToBytes(Object data) throws IOException {
-        if (data instanceof ServerSentEvent) {
-            ServerSentEvent sse = (ServerSentEvent) data;
-            return encodeToBytes(sse.id(), sse.event(), sse.retry(), sse.comment(), sse.data());
-        } else {
-            return encodeToBytes(null, null, null, null, data);
-        }
-    }
-
-    protected byte[] encodeToBytes(String id, String event, Duration retry, String comment, Object data) throws IOException {
-        ByteArrayOutputStream os = new ByteArrayOutputStream(256);
-
-        if (id != null) {
-            writeFieldBytes(os, FIELD_ID, id.getBytes(StandardCharsets.UTF_8));
-        }
-        if (event != null) {
-            writeFieldBytes(os, FIELD_EVENT, event.getBytes(StandardCharsets.UTF_8));
-        }
-        if (retry != null) {
-            writeFieldBytes(os, FIELD_RETRY, Long.toString(retry.toMillis()).getBytes(StandardCharsets.UTF_8));
-        }
-        if (comment != null) {
-            os.write(':');
-            String commentReplaced = StringUtils.replace(comment, "\n", "\n:");
-            os.write(commentReplaced.getBytes(StandardCharsets.UTF_8));
-            os.write(NEWLINE);
-        }
-        if (data == null) {
-            os.write(NEWLINE);
-            return os.toByteArray();
-        }
-
-        // 获取 data 的 UTF-8 字节
-        byte[] dataBytes;
-        if (data instanceof CharSequence) {
-            dataBytes = data.toString().getBytes(StandardCharsets.UTF_8);
-        } else {
-            dataBytes = encodeEventDataAsBytes(data);
-        }
-
-        // 写入 "data:"
-        os.write(DATA_PREFIX);
-
-        // 替换 data 中的 \n 为 \ndata:（字节级扫描）
-        int start = 0;
-        for (int i = 0; i < dataBytes.length; i++) {
-            if (dataBytes[i] == '\n') {
-                os.write(dataBytes, start, i - start);
-                os.write(NEWLINE_DATA);
-                start = i + 1;
-            }
-        }
-        os.write(dataBytes, start, dataBytes.length - start);
-
-        // 以 \n\n 终止
-        os.write(TERMINATOR);
-
-        return os.toByteArray();
-    }
-
-    protected String encodeEventData(Object data) {
-        throw new UnsupportedOperationException();
     }
 
     /**
-     * 将数据编码为 UTF-8 字节，供 {@link #encodeToBytes(Object)} 使用。
+     * 编码 SSE data 字段。
+     * <ul>
+     *   <li>{@link CharSequence} 数据：经由 {@code getBytes()} 编码为 byte[] 后扫描
+     *       {@code \n} 并用 {@code \ndata:} 续行，满足 SSE 协议要求。</li>
+     *   <li>非 {@link CharSequence} 数据：直接通过 {@link #encodeEventDataAsBytes(Object, OutputStream)}
+     *       写入，不做 {@code \n} 扫描。非 CharSequence 数据（如 JSON）通常不含裸 {@code \n}，
+     *       若子类数据可能包含 {@code \n}，需自行在 {@code encodeEventDataAsBytes} 中处理续行。</li>
+     * </ul>
      */
-    protected byte[] encodeEventDataAsBytes(Object data) throws IOException {
+    protected void encodeData(Object data, OutputStream out) throws IOException {
+        if (data == null) {
+            out.write(NEWLINE);
+            return;
+        }
+        out.write(DATA_PREFIX);
+        if (data instanceof CharSequence) {
+            byte[] bytes = data.toString().getBytes(StandardCharsets.UTF_8);
+            writeBytesWithNewline(out, bytes, NEWLINE_DATA);
+        } else {
+            encodeEventDataAsBytes(data, out);
+        }
+        out.write(TERMINATOR);
+    }
+
+    protected void encodeServerSentEvent(ServerSentEvent sse, OutputStream out) throws IOException {
+        String id = sse.id();
+        if (id != null) {
+            out.write(FIELD_ID);
+            writeCharSequence(out, id, StandardCharsets.UTF_8);
+            out.write(NEWLINE);
+        }
+        String event = sse.event();
+        if (event != null) {
+            out.write(FIELD_EVENT);
+            writeCharSequence(out, event, StandardCharsets.UTF_8);
+            out.write(NEWLINE);
+        }
+        Duration retry = sse.retry();
+        if (retry != null) {
+            out.write(FIELD_RETRY);
+            writeCharSequence(out, Long.toString(retry.toMillis()), StandardCharsets.UTF_8);
+            out.write(NEWLINE);
+        }
+        String comment = sse.comment();
+        if (comment != null) {
+            out.write(':');
+            byte[] commentBytes = comment.getBytes(StandardCharsets.UTF_8);
+            writeBytesWithNewline(out, commentBytes, NEWLINE_COMMENT);
+            out.write(NEWLINE);
+        }
+        encodeData(sse.data(), out);
+    }
+
+    private static void writeBytesWithNewline(OutputStream out, byte[] bytes, byte[] continuation) throws IOException {
+        int start = 0;
+        for (int i = 0; i < bytes.length; i++) {
+            if (bytes[i] == '\n') {
+                out.write(bytes, start, i - start);
+                out.write(continuation);
+                start = i + 1;
+            }
+        }
+        out.write(bytes, start, bytes.length - start);
+    }
+
+
+    /**
+     * 子类可重写此方法来自定义数据序列化（如 {@link SseJsonEmitter}）。
+     * <p>
+     * 注意：此方法写入的数据不会经过 {@code \n} 续行处理。
+     * 若子类数据可能包含 {@code \n}，需自行在此方法中处理续行逻辑。
+     */
+    protected void encodeEventDataAsBytes(Object data, OutputStream out) throws IOException {
         throw new UnsupportedOperationException();
-    }
-
-    protected void writeField(String fieldName, Object fieldValue, StringBuilder sb) {
-        sb.append(fieldName).append(':').append(fieldValue).append("\n");
-    }
-
-    private void writeFieldBytes(ByteArrayOutputStream os, byte[] prefix, byte[] value) {
-        os.write(prefix, 0, prefix.length);
-        os.write(value, 0, value.length);
-        os.write(NEWLINE, 0, NEWLINE.length);
     }
 
     @Override

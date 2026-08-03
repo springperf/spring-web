@@ -1,9 +1,13 @@
 package io.springperf.web.core.async.stream;
 
-import lombok.SneakyThrows;
+import io.springperf.web.util.IoUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.ServerHttpResponse;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 
 public class TextStreamEmitter extends StreamEmitter<CharSequence> {
 
@@ -12,6 +16,14 @@ public class TextStreamEmitter extends StreamEmitter<CharSequence> {
 
     public TextStreamEmitter(Long timeout) {
         super(timeout);
+    }
+
+    public TextStreamEmitter(boolean earlyEncode) {
+        super(earlyEncode);
+    }
+
+    public TextStreamEmitter(Long timeout, boolean earlyEncode) {
+        super(timeout, earlyEncode);
     }
 
     @Override
@@ -23,17 +35,14 @@ public class TextStreamEmitter extends StreamEmitter<CharSequence> {
         headers.setCacheControl("no-cache");
     }
 
-    @SneakyThrows
-    protected CharSequence encodeToString(CharSequence data) {
+    @Override
+    public void encode(Object data, OutputStream out) throws IOException {
         if (data == null) {
-            return "\n";
+            out.write('\n');
+            return;
         }
-        if (data instanceof Appendable) {
-            ((Appendable) data).append('\n');
-        } else {
-            data = data.toString() + '\n';
-        }
-        return data;
+        IoUtils.writeCharSequence(out, (CharSequence) data, StandardCharsets.UTF_8);
+        out.write('\n');
     }
 
     @Override

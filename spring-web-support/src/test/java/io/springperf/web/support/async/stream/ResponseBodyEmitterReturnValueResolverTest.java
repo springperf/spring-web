@@ -16,6 +16,7 @@ import org.springframework.http.MediaType;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter;
 
 import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -74,57 +75,51 @@ class ResponseBodyEmitterReturnValueResolverTest {
     }
 
     @Test
-    void encodeToBytes_withMatchingConverter_returnsBytes() throws Exception {
+    void encodeToStream_withMatchingConverter_writesToStream() throws Exception {
         HttpBodyConverter converter = mock(HttpBodyConverter.class);
         when(converter.canWrite(null, String.class, null)).thenReturn(true);
         doAnswer(invocation -> {
-            HttpOutputMessageCaptor outputMessage = new HttpOutputMessageCaptor();
-            // write the data to the output message
-            ByteArrayOutputStream baos = (ByteArrayOutputStream) invocation.getArgument(3, org.springframework.http.HttpOutputMessage.class).getBody();
-            baos.write("converted".getBytes());
+            java.io.OutputStream body = invocation.getArgument(3, org.springframework.http.HttpOutputMessage.class).getBody();
+            body.write("converted".getBytes(StandardCharsets.UTF_8));
             return null;
         }).when(converter).write(eq("data"), isNull(), isNull(), any());
         when(codecRegistry.getConverters()).thenReturn(Collections.singletonList(converter));
 
-        byte[] result = resolver.encodeToBytes(new HttpHeaders(), "data");
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        resolver.encodeToStream(new HttpHeaders(), "data", baos);
 
-        assertNotNull(result);
-        assertTrue(result.length > 0);
+        assertTrue(baos.size() > 0);
     }
 
     @Test
-    void encodeToBytes_withDataWithMediaType_unwrapsAndEncodes() throws Exception {
+    void encodeToStream_withDataWithMediaType_unwrapsAndEncodes() throws Exception {
         HttpBodyConverter converter = mock(HttpBodyConverter.class);
         when(converter.canWrite(null, String.class, MediaType.TEXT_PLAIN)).thenReturn(true);
         doAnswer(invocation -> {
-            ByteArrayOutputStream baos = (ByteArrayOutputStream) invocation.getArgument(3, org.springframework.http.HttpOutputMessage.class).getBody();
-            baos.write("encoded".getBytes());
+            java.io.OutputStream body = invocation.getArgument(3, org.springframework.http.HttpOutputMessage.class).getBody();
+            body.write("encoded".getBytes(StandardCharsets.UTF_8));
             return null;
         }).when(converter).write(any(), isNull(), eq(MediaType.TEXT_PLAIN), any());
         when(codecRegistry.getConverters()).thenReturn(Collections.singletonList(converter));
 
         ResponseBodyEmitter.DataWithMediaType dataWithType =
                 new ResponseBodyEmitter.DataWithMediaType("data", MediaType.TEXT_PLAIN);
-        byte[] result = resolver.encodeToBytes(new HttpHeaders(), dataWithType);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        resolver.encodeToStream(new HttpHeaders(), dataWithType, baos);
 
-        assertNotNull(result);
+        assertTrue(baos.size() > 0);
     }
 
     @Test
-    void encodeToBytes_noMatchingConverter_throwsIllegalArgumentException() {
+    void encodeToStream_noMatchingConverter_throwsIllegalArgumentException() {
         when(codecRegistry.getConverters()).thenReturn(Collections.emptyList());
 
         assertThrows(IllegalArgumentException.class,
-                () -> resolver.encodeToBytes(new HttpHeaders(), new Object()));
+                () -> resolver.encodeToStream(new HttpHeaders(), new Object(), new ByteArrayOutputStream()));
     }
 
     @Test
     void getComponentName_returnsStreamEmitterReturnValueResolver() {
         assertEquals("StreamEmitterReturnValueResolver", resolver.getComponentName());
-    }
-
-    // Helper to capture output message
-    private static class HttpOutputMessageCaptor {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
     }
 }
