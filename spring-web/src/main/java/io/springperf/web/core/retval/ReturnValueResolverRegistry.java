@@ -87,8 +87,9 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
         MethodParameter returnType = returnValueContext == null ? null : returnValueContext.getReturnType();
 
         // Optional 解包：声明式或运行时
-        if (returnValue instanceof Optional<?> opt) {
-            if (opt.isEmpty()) {
+        if (returnValue instanceof Optional) {
+            Optional<?> opt = (Optional<?>) returnValue;
+            if (!opt.isPresent()) {
                 return true; // Optional.empty() → 无响应体
             }
             returnValue = opt.get();

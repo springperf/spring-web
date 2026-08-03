@@ -5,6 +5,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.ServerHttpResponse;
 
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
@@ -40,21 +43,24 @@ class TextStreamEmitterTest {
     }
 
     @Test
-    void encodeToString_null_returnsNewline() {
-        CharSequence result = emitter.encodeToString(null);
-        assertEquals("\n", result.toString());
+    void encode_null_returnsNewline() throws Exception {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        emitter.encode(null, baos);
+        assertEquals("\n", baos.toString(StandardCharsets.UTF_8));
     }
 
     @Test
-    void encodeToString_string_returnsStringWithNewline() {
-        CharSequence result = emitter.encodeToString("hello");
-        assertEquals("hello\n", result.toString());
+    void encode_string_returnsStringWithNewline() throws Exception {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        emitter.encode("hello", baos);
+        assertEquals("hello\n", baos.toString(StandardCharsets.UTF_8));
     }
 
     @Test
-    void encodeToString_emptyString_returnsNewline() {
-        CharSequence result = emitter.encodeToString("");
-        assertEquals("\n", result.toString());
+    void encode_emptyString_returnsNewline() throws Exception {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        emitter.encode("", baos);
+        assertEquals("\n", baos.toString(StandardCharsets.UTF_8));
     }
 
     @Test

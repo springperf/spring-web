@@ -1,12 +1,10 @@
 package io.springperf.web.core.async.stream;
 
-import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.internal.shaded.org.jctools.queues.MpscArrayQueue;
@@ -17,33 +15,28 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.LockSupport;
 
 /**
- * 异步流式发送器的抽象基类。
+ * Netty 流式发送器的抽象基类。
  * <p>
- * 子类决定队列中存放的数据类型：
- * <ul>
- *   <li>{@link StringNettyStreamSender} — 队列 {@code CharSequence}，走 {@code encodeToString} 路径</li>
- *   <li>{@link BytesNettyStreamSender} — 队列 {@code byte[]}，走 {@code encodeToBytes} 路径</li>
- * </ul>
- * 编码在 {@link #send(Object)} 中完成，入队不可变数据，消除外部突变风险。
- * {@link #drain()} 在 EventLoop 线程批量写入 ByteBuf，避免跨线程 ByteBuf 缓存。
+ * 提供公共的构造器、校验、完成、调度、drain 后置处理等逻辑。
+ * 子类只需实现 {@link #send(Object)} 和 {@link #drain()} 两个方法。
  *
- * @param <T> 队列元素类型，{@code byte[]} 或 {@code CharSequence}
+ * @see DefaultNettyStreamSender  EventLoop 延迟编码（默认）
+ * @see EarlyEncodeNettyStreamSender  App 线程早编码
  */
-public abstract class NettyStreamSender<T> implements StreamSender {
+public abstract class AbstractNettyStreamSender implements StreamSender {
 
-    protected static final Logger log = LoggerFactory.getLogger(NettyStreamSender.class);
+    protected static final Logger log = LoggerFactory.getLogger(AbstractNettyStreamSender.class);
 
-    private static final int MAX_QUEUED_EVENTS = 65536;
+    protected static final int MAX_QUEUED_EVENTS = 65536;
 
     protected final Channel channel;
     protected final EventExecutor eventLoop;
     protected final ByteBufAllocator bufAllocator;
     protected final StreamEmitter emitter;
     protected final NettyServerHttpResponse resp;
-    protected final MpscArrayQueue<T> queue;
+    protected final MpscArrayQueue<Object> queue;
 
     protected final int maxFlushBytes;
 
@@ -61,7 +54,7 @@ public abstract class NettyStreamSender<T> implements StreamSender {
         }
     };
 
-    public NettyStreamSender(StreamEmitter emitter, PerfAsyncWebRequest asyncWebRequest) {
+    public AbstractNettyStreamSender(StreamEmitter emitter, PerfAsyncWebRequest asyncWebRequest) {
         this.emitter = emitter;
         this.resp = (NettyServerHttpResponse) asyncWebRequest.getNativeResponse();
         ChannelHandlerContext ctx = this.resp.getCtx();
@@ -73,9 +66,6 @@ public abstract class NettyStreamSender<T> implements StreamSender {
         this.resp.setWritableCallback(this::scheduleDrain);
     }
 
-    /**
-     * 子类 {@link #send(Object)} 前置检查：channel 状态和 completed 标志。
-     */
     protected final void preSendCheck() throws IOException {
         if (!channel.isActive()) {
             throw new IOException("Stream closed");
@@ -84,11 +74,6 @@ public abstract class NettyStreamSender<T> implements StreamSender {
             throw new IOException("Stream completed");
         }
     }
-
-    /**
-     * 将编码后的数据项写入 ByteBuf（由子类实现，无需 instanceof 判断）。
-     */
-    protected abstract void drainWrite(ByteBuf buf, T item);
 
     @Override
     public void complete(boolean closeChannelOnComplete, Throwable failure) {
@@ -102,22 +87,6 @@ public abstract class NettyStreamSender<T> implements StreamSender {
         return queue.size();
     }
 
-    /**
-     * 入队背压等待，由子类 {@link #send(Object)} 调用。
-     */
-    protected void backpressureWait(T item) throws IOException {
-        int spins = 0;
-        while (!queue.offer(item)) {
-            preSendCheck();
-            if (spins++ < 10) {
-                Thread.yield();
-            } else {
-                LockSupport.parkNanos(1000);
-            }
-        }
-        scheduleDrain();
-    }
-
     protected void scheduleDrain() {
         if (eventLoop.inEventLoop()) {
             drain();
@@ -127,61 +96,18 @@ public abstract class NettyStreamSender<T> implements StreamSender {
     }
 
     /**
-     * 只能在 EventLoop 线程执行。
-     * 从队列取出已编码数据，批量写入 ByteBuf 后 flush。
-     * 依赖 batchBuf.writableBytes() 自然切分 HTTP chunk，无需 writtenBytes 阈值。
+     * 子类实现 drain 逻辑，末尾必须调用 {@link #afterDrain()}。
      */
-    protected void drain() {
-        if (!channel.isActive()) {
-            T remaining;
-            while ((remaining = queue.poll()) != null) {
-                // channel 已关闭，直接丢弃
-            }
-            if (completed && !lastHttpContentWritten) {
-                lastHttpContentWritten = true;
-                onAllDataWritten();
-            }
-            return;
-        }
-        int missed = 1;
-        for (; ; ) {
-            boolean flushed = false;
-            ByteBuf batchBuf = null;
+    protected abstract void drain();
 
-            while (channel.isWritable()) {
-                T item = queue.poll();
-                if (item == null) {
-                    break;
-                }
-                try {
-                    if (batchBuf == null) {
-                        batchBuf = bufAllocator.buffer(maxFlushBytes);
-                    }
-                    drainWrite(batchBuf, item);
-                    flushed = true;
-
-                    if (batchBuf.writerIndex() >= maxFlushBytes) {
-                        ChannelFuture f = channel.write(new DefaultHttpContent(batchBuf));
-                        resp.addRespEventListener(f, false);
-                        batchBuf = null;
-                    }
-                } catch (Exception e) {
-                    log.warn("[SSE] drain write error: {}", e.getMessage(), e);
-                }
-            }
-
-            if (batchBuf != null && batchBuf.readableBytes() > 0) {
-                ChannelFuture f = channel.write(new DefaultHttpContent(batchBuf));
-                resp.addRespEventListener(f, false);
-            }
-            if (flushed) {
-                channel.flush();
-            }
-            missed = wip.addAndGet(-missed);
-            if (missed == 0) {
-                break;
-            }
-        }
+    /**
+     * drain 末尾的 re-drain 检查。子类 drain 方法末尾调用。
+     * <ul>
+     *   <li>队列非空 → 重新调度 drain</li>
+     *   <li>completed 且未写 LastHttpContent → 写入</li>
+     * </ul>
+     */
+    protected void afterDrain() {
         if (!queue.isEmpty()) {
             if (channel.isWritable() && wip.compareAndSet(0, 1)) {
                 eventLoop.execute(this::drain);

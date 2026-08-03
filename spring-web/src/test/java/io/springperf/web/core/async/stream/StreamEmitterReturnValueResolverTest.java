@@ -74,7 +74,9 @@ class StreamEmitterReturnValueResolverTest {
     @Test
     void supportsReturnValue_streamEmitterInstance() {
         assertTrue(resolver.supportsReturnValue(
-                new StreamEmitter(true) {
+                new StreamEmitter() {
+                    @Override
+                    public void encode(Object data, java.io.OutputStream out) {}
                     @Override
                     protected void extendResponse(ServerHttpResponse response) {}
                 }, null, null));
@@ -82,7 +84,9 @@ class StreamEmitterReturnValueResolverTest {
 
     @Test
     void supportsReturnValue_responseEntityBody() {
-        StreamEmitter emitter = new StreamEmitter(true) {
+        StreamEmitter emitter = new StreamEmitter() {
+            @Override
+            public void encode(Object data, java.io.OutputStream out) {}
             @Override
             protected void extendResponse(ServerHttpResponse response) {}
         };
@@ -118,7 +122,9 @@ class StreamEmitterReturnValueResolverTest {
         factoryField.setAccessible(true);
         factoryField.set(resolver, mock(StreamSenderFactory.class));
 
-        StreamEmitter emitter = new StreamEmitter(true) {
+        StreamEmitter emitter = new StreamEmitter() {
+            @Override
+            public void encode(Object data, java.io.OutputStream out) {}
             @Override
             protected void extendResponse(ServerHttpResponse response) {}
         };

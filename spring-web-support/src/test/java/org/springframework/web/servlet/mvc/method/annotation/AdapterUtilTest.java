@@ -8,20 +8,20 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 class AdapterUtilTest {
 
     @Test
-    void setEncodeToBytesFunction_setsFunctionOnEmitter() {
+    void setEncodeFunction_setsFunctionOnEmitter() {
         ResponseBodyEmitter emitter = new ResponseBodyEmitter();
-        ResponseBodyEmitter.EncodeToBytesFunction encodeFn = data -> new byte[0];
+        ResponseBodyEmitter.EncodeFunction encodeFn = (data, out) -> out.write(new byte[0]);
 
-        AdapterUtil.setEncodeToBytesFunction(emitter, encodeFn);
+        AdapterUtil.setEncodeFunction(emitter, encodeFn);
 
         // No exception means success
         assertNotNull(emitter);
     }
 
     @Test
-    void setEncodeToBytesFunction_withNullFunction() {
+    void setEncodeFunction_withNullFunction() {
         ResponseBodyEmitter emitter = new ResponseBodyEmitter();
 
-        assertDoesNotThrow(() -> AdapterUtil.setEncodeToBytesFunction(emitter, null));
+        assertDoesNotThrow(() -> AdapterUtil.setEncodeFunction(emitter, null));
     }
 }

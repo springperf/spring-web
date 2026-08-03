@@ -158,8 +158,9 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
             return;
         }
         // 运行时 Optional 解包（方法签名未声明 Optional 但实际返回了）
-        if (value instanceof Optional<?> opt) {
-            if (opt.isEmpty()) {
+        if (value instanceof Optional) {
+            Optional<?> opt = (Optional<?>) value;
+            if (!opt.isPresent()) {
                 return;
             }
             value = opt.get();
