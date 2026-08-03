@@ -71,12 +71,15 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
     /** 缓存 {@link #getContentType()} 的解析结果，避免重复 {@link MediaType#parseMediaType} */
     private MediaType cachedContentType;
 
+    private static final MediaType NOT_SET = new MediaType("application", "x-not-set");
+
     public WebHttpHeaders() {
         if (HEADERS_IS_MULTI_VALUE_MAP) {
             this.delegateMap = null;
         } else {
             this.delegateMap = resolveDelegate();
         }
+        this.cachedContentType = NOT_SET;
     }
 
     private MultiValueMap<String, String> resolveDelegate() {
@@ -265,9 +268,19 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
 
     @Override
     public MediaType getContentType() {
-        if (cachedContentType == null) {
+        if (cachedContentType == NOT_SET) {
             cachedContentType = super.getContentType();
+            if (cachedContentType == null) {
+                cachedContentType = NOT_SET;
+            }
         }
-        return cachedContentType;
+        return cachedContentType == NOT_SET ? null : cachedContentType;
+    }
+
+    @Override
+    public void setContentType(MediaType mediaType) {
+        super.setContentType(mediaType);
+        // 清空缓存，下次 getContentType() 重新解析
+        cachedContentType = NOT_SET;
     }
 }

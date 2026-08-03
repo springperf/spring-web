@@ -1,45 +1,26 @@
-package io.springperf.web.core.async.stream;
+package io.springperf.web.util;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufOutputStream;
 import io.netty.buffer.ByteBufUtil;
-import io.springperf.web.core.async.PerfAsyncWebRequest;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.*;
 
-/**
- * {@link NettyStreamSender} 的字符串实现，队列存放 {@link CharSequence}。
- * 走 {@link StreamEmitter#encodeToString(Object)} 路径。
- */
-public class StringNettyStreamSender extends NettyStreamSender<CharSequence> {
+public class IoUtils {
 
-    public StringNettyStreamSender(StreamEmitter emitter, PerfAsyncWebRequest asyncWebRequest) {
-        super(emitter, asyncWebRequest);
-    }
-
-    @Override
-    public void send(Object data) throws IOException {
-        preSendCheck();
-        CharSequence cs = emitter.encodeToString(data);
-        if (cs == null || cs.length() == 0) {
-            return;
+    public static void writeCharSequence(OutputStream out, CharSequence charSequence, Charset charset) throws IOException {
+        if (out instanceof ByteBufOutputStream) {
+            writeCharSequence(((ByteBufOutputStream) out).buffer(), charSequence, charset);
+        } else {
+            out.write(charSequence.toString().getBytes(charset));
         }
-        if (!queue.offer(cs)) {
-            backpressureWait(cs);
-            return;
-        }
-        scheduleDrain();
     }
 
-    @Override
-    protected void drainWrite(ByteBuf buf, CharSequence item) {
-        writeCharSequence(buf, item);
-    }
-
-    protected void writeCharSequence(ByteBuf buf, CharSequence charSequence) {
-        Charset charset = resp.getCharacterEncoding();
+    public static void writeCharSequence(ByteBuf buf, CharSequence charSequence, Charset charset) {
         if (StandardCharsets.UTF_8.equals(charset)) {
             ByteBufUtil.writeUtf8(buf, charSequence);
         } else if (StandardCharsets.US_ASCII.equals(charset)) {
