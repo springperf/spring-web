@@ -4,6 +4,102 @@
 
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.4] - 20260805
+
+### Added
+
+- **`JsonConverter.toJsonBytes()` API**: New `toJsonBytes()` method on `JsonConverter`, implemented by Jackson / Fastjson converters to emit `byte[]` directly, skipping intermediate `String` copies and reducing serialization overhead
+- **Spring Boot 4.x event adapter**: New `Boot4WebServerInitializedEventBridge` and `Boot4WebServerInitializedEventAutoConfiguration` to fire `WebServerInitializedEvent` correctly under SB4
+- **GraalVM native-image runtime hints**: New `SpringWebRuntimeHints` for reflection registration in SB4 / native-image scenarios
+- **SSE test coverage expanded**: `DefaultNettyStreamSenderTest`, `EarlyEncodeNettyStreamSenderTest`, `HttpBodyCodecRegistryWriteNegotiationTest`, `NettyHttpHeadersAdapterTest`, etc.
+- **One-click JFR flame graph scripts**: `spring-web-benchmark/jfr-hotspot.sh` / `analyze-jfr2.sh` for batch CPU hotspot flame graphs; `analyze_jfr.py` hotspot analyzer now tracked in version control
+
+### Changed
+
+- **SSE streaming refactor**: `NettyStreamSender` split into `DefaultNettyStreamSender` (EventLoop lazy encoding) and `EarlyEncodeNettyStreamSender` (App-thread early-encoded `byte[]` snapshots) so data can be frozen in advance
+- **Zero-copy HTTP header view**: New `NettyHttpHeadersAdapter` — `WebHttpHeaders` delegates directly to Netty header storage, eliminating O(n) request header copies
+- **Body content negotiation rewritten**: `HttpBodyCodecRegistry` write-path negotiation refactored with dedicated negotiation tests
+- **Arg module optimized**: `SpringHandlerMethodArgumentResolverAdapter` refactored into a `Provider`; validator cached in method-argument context
+- **Retval module optimized**: `ReturnValueResolverRegistry` / `MethodReturnValueContext` refactored
+- **Stackless 404/405**: `StacklessResponseStatusException` used to reduce exception construction overhead on the request path
+- **Safe pool replacement**: `BizPoolRegistry` supports safe replacement of existing pools
+
+### Optimized
+
+- **Jackson converter**: serialization path optimization
+- **CORS exception mapping**: streamlined `CorsRegistry` / exception-resolver mapping
+
+### Fixed
+
+- **SSE single-message overflow**: `EarlyEncodeNettyStreamSender` writes oversized messages independently instead of throwing `IndexOutOfBoundsException`
+- **`sendError()` JSON escaping**: error messages now escape quotes / backslashes / control chars to avoid malformed JSON
+- **`NettyServerHttpResponse.flush()` buffer nulling**: prevents returning a released `ByteBuf` after flush failure
+- **Routing array out-of-bounds**: `NameValueExpressionSupport` / `ParamOrHeaderMatcher` / `SuffixPathRouterOptimizer` fixes
+- **Async state validation**: corrected `AsyncSupportUtils` / `PerfAsyncWebRequest` state checks
+- **Error message fixes**: 10 copy-paste error messages in `AbstractFastFailHttpServletRequest` corrected to their method names
+- **Actuator management beans**: added `@ConditionalOnMissingBean`
+- **Batch graceful shutdown**: refined `DisruptorQueue` / `NettyHttpServer` shutdown flow
+
+### Build
+
+- **`spring-boot-maven-plugin` version managed** in root pom `pluginManagement`, aligned with `${spring-boot.version}`
+
+### Documentation
+
+- **README default language switched to English**, added `README_CN.md`
+- **`module.md` and other AI context docs updated**
+
+## [3.2.3] - 20260710
+
+### Added
+
+- **AI/LLM integration example**: New `spring-web-example-ai` example submodule demonstrating synchronous chat and SSE streaming with Spring AI (OpenAI-compatible API)
+- **Metrics SPI**: New `WebMetrics` / `NoOpWebMetrics` core metrics SPI with zero overhead on the request path (NoOp eliminates timing via JIT constant folding and dead-code elimination)
+  - `MicrometerWebMetrics` — Micrometer-based implementation recording `dispatcher.request.duration` (Timer, tagged by method/path/status), `dispatcher.exception` (Counter, tagged by type/resolved)
+  - `BatchMetrics` / `NoOpBatchMetrics` — Batch processing metrics SPI
+  - `MicrometerBatchMetrics` — Micrometer-based batch metrics recording enqueue/drop/overflow counts, process duration, batch size distribution, and queue capacity
+  - Auto-configuration: automatically activated when Micrometer is on the classpath via `spring-boot-starter-web`
+- **BizPoolRegistry enhancements**: Auto-discovers `ThreadPoolExecutor` beans from Spring context and registers them as pools; `@RunInPool("beanName")` falls back to Spring context bean lookup when pool name is not found locally
+- **BizPoolRegistry Micrometer Gauges**: Automatically registers active threads / queue size / completed tasks gauges for each registered thread pool
+- **Netty-level metrics**: New `NettyMetricsHandler` (Sharable ChannelHandler) tracking active TCP connections via `channelActive`/`channelInactive`
+  - Auto-registers `netty.connections.active` Gauge (active TCP connection count)
+  - Auto-registers `netty.eventloop.pending.tasks` Gauge (pending tasks across all EventLoops)
+  - Exposes `NettyHttpServer.getWorkerGroup()` / `getActiveConnectionCount()` for metrics registration
+
+### Changed
+
+- **Benchmark module refactored**: Eliminated redundant `*-filter` submodules (perf-filter / tomcat-filter / undertow-filter / webflux-filter), merged filter scenarios into corresponding main modules; Maven profiles reduced from 10 to 5; removed Windows batch script, unified to shell script
+- **Benchmark scenarios renamed**: `validatePost` → `valid`, `sseStream` → `sse`, `jsonEchoLarge` / `largeResponse` → `bytesLarge` for clearer semantics
+- **Benchmark DTOs**: Added `UserReq` / `UserResp` DTO classes for unified request/response models
+- **Report generator enhanced**: `ReportGenerator` refactored, `GcMetrics` / `Jdk8GcLogParser` / `Jdk11GcLogParser` improved GC log parsing
+
+### Security
+
+- **Forwarded headers protection**: `Forwarded` / `X-Forwarded-Proto` headers are now untrusted by default; added `server.use-forwarded-headers=false` toggle. Must be explicitly enabled when deployed behind a reverse proxy to prevent client-side scheme spoofing
+- **CRLF injection protection**: `NettyMultipartFile.buildContentDisposition()` sanitizes `\r` / `\n` from name/filename values to prevent HTTP response splitting attacks during multipart file upload
+- **HTTP parser limits**: Added `server.http.max-initial-line-length` (default 4KB), `server.http.max-header-size` (default 8KB), `server.http.max-chunk-size` (default 8KB) to prevent DoS attacks with oversized request lines/headers/chunks
+- **Read timeout protection**: Added `server.http.read-timeout` (default 30s) to prevent slow clients from holding connections indefinitely before request body aggregation
+- **WebSocket Origin validation**: Empty `setAllowedOrigins` list now rejects all cross-origin requests with an Origin header (previously treated the same as unconfigured, allowing all)
+- **Exception info sanitization**: `ExceptionRegistry.handle()` returns generic `Internal Server Error` for unhandled exceptions instead of exposing exception class name and message to the client
+
+### Optimized
+
+- **Access log**: New `AccessLogWebFilter` enabled via `server.accesslog.enabled=true`, wrapping at the outermost filter layer (lowest Order) for full request lifecycle timing; log format: `remoteAddr method uri statusCode elapsedMs "user-agent"`
+- **Parameterized logging**: Global migration from string concatenation to SLF4J `{}` placeholders (InterceptorRegistry, PathPatternRouter, NettyServerHttpResponse, BackpressureHandler, etc.), eliminating string construction overhead when logging is disabled
+- **Exception logging enhanced**: Critical-path exception logs include full stack traces (`NettyStreamSender`, SSE timeout cleanup exceptions, etc.) for easier troubleshooting
+- **`BizPoolRegistry.register()`**: Accepts `ExecutorService` instead of `ThreadPoolExecutor`, supporting a wider range of executor types
+- **Graceful shutdown**: Added `NettyHttpHandler.setShuttingDown()` — new requests during shutdown return 503 `Service Unavailable`; `ManagementNettyHttpServer.stop()` rejects new requests before closing EventLoopGroup, preventing new requests from being processed during graceful shutdown
+- **Application-level backpressure**: `DispatcherHandler.handleWithMappingResult()` catches `RejectedExecutionException` — returns 503 with `Retry-After: 5` header when thread pool is overloaded, avoiding EventLoop blocking; falls back to EventLoop execution when pool is shutting down
+
+### Fixed
+
+- **SSE timeout task not cleaned up**: `NettyStreamSender.onCompleteSuccess()` / `onCompleteError()` now calls `resp.setTimeout(null, -1)` to cancel the scheduled timeout task, preventing connection leaks after stream completion
+
+### Documentation
+
+- **README / CONTRIBUTING / SECURITY updated**
+- **Documentation content corrections**
+
 ## [2.7.3] - 20260710
 
 ### Added
@@ -54,6 +150,32 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - **README / CONTRIBUTING / SECURITY updated**
 - **Documentation content corrections**
+
+## [3.2.2] - 20260705
+
+### Added
+
+- **Session support**: Full `jakarta.servlet.http.HttpSession` implementation in servlet bridge module
+  - `PerfHttpSession` — Servlet HttpSession implementation backed by framework request context; supports attributes, expiration tracking, and invalidate lifecycle
+  - `PerfHttpSessionManager` — Session lifecycle manager with create/get/invalidate operations
+  - `HttpSessionStorage` / `InMemoryHttpSessionStorage` — Pluggable session storage SPI with default in-memory implementation
+  - `ServletAdapterContext` enhanced to propagate session to Servlet API wrappers
+- **Example modules expanded**: From 5 to 12 runnable example submodules
+  - `spring-web-example-actuator` — Actuator endpoint monitoring example
+  - `spring-web-example-async` — Async request processing (Callable/DeferredResult/SSE) example
+  - `spring-web-example-data` — Spring Data JPA repository integration example
+  - `spring-web-example-openapi` — OpenAPI 3.0 documentation auto-generation example
+  - `spring-web-example-swaggerui` — Swagger UI static resource serving example
+  - `spring-web-example-shiro` — Apache Shiro authentication and session management example
+  - `spring-web-example-spring-security` — Spring Security authentication and session management example
+- **English documentation**: Full English translation of all project documentation (10 documents covering overview, quickstart, advanced usage, benchmarking, configuration, extensions, modules, performance principles, compatibility), maintained under `docs/en/`
+- **Swagger UI auto-configuration**: New `SwaggerUiAutoConfiguration` serving Swagger UI static resources when `swagger-ui` is on classpath; `SwaggerUiProperties` for path and resource location configuration
+- **OpenAPI doc endpoint**: New `OpenApiDocController` serving the OpenAPI JSON specification at a configurable path
+
+### Optimized
+
+- **`DispatcherHandler` optimized**: Refined filter chain flow and error path handling
+- **Multi-version compatibility verified**: Confirmed compatibility across Spring Boot 3.0.x through 4.1.x via Maven profiles
 
 ## [2.7.2] - 20260704
 
