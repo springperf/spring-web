@@ -247,6 +247,9 @@ public class JacksonHttpBodyConverter extends BaseWebComponent implements HttpBo
         if (writeValue instanceof String) {
             outputMessage.getBody().write(((String) writeValue).getBytes(StandardCharsets.UTF_8));
             return;
+        } else if (writeValue instanceof byte[]) {
+            outputMessage.getBody().write((byte[]) writeValue);
+            return;
         }
 
         ObjectMapper writeMapper = getWriteObjectMapper(request, mappingContext);
@@ -297,11 +300,15 @@ public class JacksonHttpBodyConverter extends BaseWebComponent implements HttpBo
         if (mediaType == null) {
             return true;
         }
-        for (MediaType supported : SUPPORTED_MEDIA_TYPES) {
-            if (supported.isCompatibleWith(mediaType)) {
-                return true;
-            }
+        // 与遍历 SUPPORTED_MEDIA_TYPES isCompatibleWith 等价：
+        // 通配类型；或 application 的 json / * / *+json 子类型。
+        if (mediaType.isWildcardType()) {
+            return true;
         }
-        return false;
+        if (!"application".equals(mediaType.getType())) {
+            return false;
+        }
+        String subtype = mediaType.getSubtype();
+        return "json".equals(subtype) || "*".equals(subtype) || "*+json".equals(subtype);
     }
 }
