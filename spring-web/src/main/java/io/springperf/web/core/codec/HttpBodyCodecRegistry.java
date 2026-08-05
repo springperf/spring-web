@@ -344,9 +344,12 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
     /**
      * Accept 头归一为缓存 key：缺失/空白统一为通配类型，大小写归一。
      * （MediaType 解析对 type/subtype 不区分大小写，raw 字符串归一后可复用同一条目。）
+     * <p>必须用规范大小写 "Accept" 读取：旧拷贝到大小写敏感的 LinkedMultiValueMap 后，
+     * 小写 key 读取永远 miss（Netty 迭代保留原始大小写），导致缓存 key 恒为通配类型，
+     * 多格式 endpoint 下不同 Accept 会跨条目复用错误 converter。</p>
      */
     private static String normalizeAcceptKey(WebServerHttpRequest request) {
-        String accept = request.getHeaders().getFirst("accept");
+        String accept = request.getHeaders().getFirst("Accept");
         if (accept == null) {
             return "*/*";
         }

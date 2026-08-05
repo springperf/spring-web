@@ -24,7 +24,8 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
 
     protected final WebContext webContext;
     protected final boolean keepAlive;
-    protected final HttpHeaders headers = new HttpHeaders();
+    /** Spring headers 视图，由子类构造方法注入（Netty 子类传可写适配器视图，与 Netty 响应对象共享底层存储） */
+    protected final HttpHeaders headers;
     protected HttpStatus status = HttpStatus.OK;
     protected ByteArrayOutputStream body;
     protected Charset characterEncoding = StandardCharsets.UTF_8;
@@ -33,9 +34,10 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
     protected WriteRespEventListener writeRespEventListener;
     protected ScheduledFuture<?> timeoutFuture;
 
-    public BaseWebServerHttpResponse(WebContext webContext, boolean keepAlive) {
+    public BaseWebServerHttpResponse(WebContext webContext, boolean keepAlive, HttpHeaders headers) {
         this.webContext = webContext;
         this.keepAlive = keepAlive;
+        this.headers = headers;
     }
 
     public boolean isHandled() {

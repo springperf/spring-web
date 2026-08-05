@@ -6,11 +6,13 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.EventLoop;
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -273,5 +275,45 @@ class NettyServerHttpResponseTest {
 
         InputStream input = new ByteArrayInputStream("x".getBytes(StandardCharsets.UTF_8));
         assertDoesNotThrow(() -> response.writeStream(input));
+    }
+
+    // ========== 响应侧零拷贝：框架视图与 Netty 响应共享 DefaultHttpHeaders 存储 ==========
+
+    @Test
+    void writeBytes_nettyResponseSharesHeaderStorage() {
+        when(ctx.writeAndFlush(any())).thenReturn(mock(ChannelFuture.class));
+        response.getHeaders().set("X-Custom", "before");
+
+        response.writeBytes("data".getBytes(StandardCharsets.UTF_8));
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(ctx).writeAndFlush(captor.capture());
+        FullHttpResponse nettyResp = (FullHttpResponse) captor.getValue();
+        // commit 前框架视图写入的 header，在 Netty 响应对象中直接可见（同一存储）
+        assertEquals("before", nettyResp.headers().get("X-Custom"));
+
+        // commit 后继续写框架视图，同一存储上对 Netty 响应也可见
+        response.getHeaders().set("X-After", "after");
+        assertEquals("after", nettyResp.headers().get("X-After"));
+    }
+
+    @Test
+    void flush_nettyResponseSharesHeaderStorage() throws Exception {
+        ByteBuf buf = mock(ByteBuf.class);
+        when(allocator.buffer(256)).thenReturn(buf);
+        when(ctx.writeAndFlush(any())).thenReturn(mock(ChannelFuture.class));
+        when(buf.readableBytes()).thenReturn(0);
+        response.getHeaders().set("X-Custom", "before");
+
+        response.getBuf();
+        response.flush();
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(ctx).writeAndFlush(captor.capture());
+        FullHttpResponse nettyResp = (FullHttpResponse) captor.getValue();
+        assertEquals("before", nettyResp.headers().get("X-Custom"));
+
+        response.getHeaders().set("X-After", "after");
+        assertEquals("after", nettyResp.headers().get("X-After"));
     }
 }
