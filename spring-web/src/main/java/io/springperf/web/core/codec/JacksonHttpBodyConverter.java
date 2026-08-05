@@ -201,7 +201,7 @@ public class JacksonHttpBodyConverter extends BaseWebComponent implements HttpBo
 
     @Override
     public boolean canWrite(Type type, Class<?> valueType, MediaType mediaType,
-                             WebServerHttpRequest request, WebServerHttpResponse response,
+                             WebServerHttpRequest request, @Nullable WebServerHttpResponse response,
                              PathMappingContext mappingContext) {
         if (!isJsonMediaType(mediaType)) {
             return false;

@@ -44,6 +44,11 @@ public final class Boot4WebServerInitializedEventBridge {
     private static final String CTOR_DESC = "(" + WEBSERVER_DESC + CONTEXT_DESC + ")V";
     private static final String SUPER_CTOR_DESC = "(" + WEBSERVER_DESC + ")V";
 
+    /** 缓存生成的子类字节码（仅生成一次，避免重复 ASM 开销） */
+    private static volatile byte[] generatedBytes;
+    /** 缓存生成的子类 Class（仅 defineClass 一次，第二次抛 LinkageError） */
+    private static volatile Class<?> generatedEventClass;
+
     private Boot4WebServerInitializedEventBridge() {
     }
 
@@ -83,10 +88,17 @@ public final class Boot4WebServerInitializedEventBridge {
     /** 生成子类字节码并定义到桥接所在包/类加载器，再反射实例化 */
     private static Object createEvent(Class<?> contextInterface, Class<?> webServerInterface,
                                       PerfWebServer webServer, Object contextProxy) throws Exception {
-        byte[] bytes = generateEventSubclass();
-        // defineClass 要求生成类与 Lookup 所在类同包；GENERATED_NAME 与桥接同包，满足
-        Class<?> generated = MethodHandles.lookup().defineClass(bytes);
-
+        Class<?> generated = generatedEventClass;
+        if (generated == null) {
+            byte[] bytes = generatedBytes;
+            if (bytes == null) {
+                bytes = generateEventSubclass();
+                generatedBytes = bytes;
+            }
+            // defineClass 要求生成类与 Lookup 所在类同包；GENERATED_NAME 与桥接同包，满足
+            generated = MethodHandles.lookup().defineClass(bytes);
+            generatedEventClass = generated;
+        }
         Constructor<?> constructor = generated.getDeclaredConstructor(webServerInterface, contextInterface);
         return constructor.newInstance(webServer, contextProxy);
     }

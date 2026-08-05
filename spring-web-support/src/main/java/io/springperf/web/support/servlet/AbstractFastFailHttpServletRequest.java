@@ -328,54 +328,54 @@ public abstract class AbstractFastFailHttpServletRequest
 
     @Override
     public String changeSessionId() {
-        throw unsupported("getSession");
+        throw unsupported("changeSessionId");
     }
 
     @Override
     public boolean isRequestedSessionIdValid() {
-        throw unsupported("getSession");
+        throw unsupported("isRequestedSessionIdValid");
     }
 
     @Override
     public boolean isRequestedSessionIdFromCookie() {
-        throw unsupported("getSession");
+        throw unsupported("isRequestedSessionIdFromCookie");
     }
 
     @Override
     public boolean isRequestedSessionIdFromURL() {
-        throw unsupported("getSession");
+        throw unsupported("isRequestedSessionIdFromURL");
     }
 
     // isRequestedSessionIdFromUrl() removed in Servlet 6.0
 
     @Override
     public boolean authenticate(HttpServletResponse httpServletResponse) throws IOException, ServletException {
-        throw unsupported("getSession");
+        throw unsupported("authenticate");
     }
 
     @Override
     public void login(String s, String s1) throws ServletException {
-        throw unsupported("getSession");
+        throw unsupported("login");
     }
 
     @Override
     public void logout() throws ServletException {
-        throw unsupported("getSession");
+        throw unsupported("logout");
     }
 
     @Override
     public Collection<Part> getParts() throws IOException, ServletException {
-        throw unsupported("getSession");
+        throw unsupported("getParts");
     }
 
     @Override
     public Part getPart(String s) throws IOException, ServletException {
-        throw unsupported("getSession");
+        throw unsupported("getPart");
     }
 
     @Override
     public <T extends HttpUpgradeHandler> T upgrade(Class<T> aClass) throws IOException, ServletException {
-        throw unsupported("getSession");
+        throw unsupported("upgrade");
     }
 }
 

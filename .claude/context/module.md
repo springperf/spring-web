@@ -4,7 +4,7 @@
 
 ```
 spring-web-parent (聚合 POM)
-│  Spring Boot 2.7.18 (默认)，多版本兼容 2.4.x/2.5.x/2.6.x，Java 8
+│  Spring Boot 3.2.12 (默认)，多版本兼容 2.4.x~4.1.x（Profile 切换），Java 17
 │
 ├── spring-web                     核心框架
 ├── spring-web-support             可选 Servlet/SpringMVC 桥接层
@@ -322,7 +322,7 @@ spring-web-support
     ├── PerfHttpServletRequest/ServletResponse              基于框架请求/响应的 Servlet 包装
     ├── context/ServletAdapterContext                       持有 Servlet 请求/响应/FilterChain
     └── filter/
-        ├── FilterWrapper                   包装 javax.servlet.Filter → WebFilter
+        ├── FilterWrapper                   包装 jakarta.servlet.Filter → WebFilter
         ├── SupportWebFilterRegistry        扩展 WebFilterRegistry，自动注册 Filter Bean
         ├── PerfHttpServletFilterChain      适配 FilterChain → javax.servlet.FilterChain
         └── match/                          路径匹配工具 (Exact/Prefix/Suffix/PathMatch)
@@ -383,7 +383,7 @@ spring-boot-starter-web
 │   │   ├── WebContext → 驱动整个组件生命周期
 │   │   ├── 所有 Registry 组件
 │   │   ├── NettyHttpServer + 可选 SSL
-│   │   ├── Validator（条件：javax.validation.Validator 在 classpath）
+│   │   ├── Validator（条件：jakarta.validation.Validator 在 classpath）
 │   │   └── 启动时检测 SpringMVC 冲突并抛出 IllegalStateException
 │   │
 │   ├── SpringWebSupportAutoConfiguration       Support 模块自动装配（条件：spring-web-support 在 classpath）
@@ -424,7 +424,7 @@ spring-boot-starter-web
 │       └── PerfWebServer                       WebServer 适配
 │
 └── resources/META-INF/
-    ├── spring.factories                  注册 8 个 AutoConfiguration + ApplicationContextFactory
+    ├── spring.factories                  注册 10 个 AutoConfiguration + ApplicationContextFactory
     └── additional-spring-configuration-metadata.json  配置元数据（IDE 提示）
 ```
 

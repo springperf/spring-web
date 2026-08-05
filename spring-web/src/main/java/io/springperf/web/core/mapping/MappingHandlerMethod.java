@@ -16,8 +16,8 @@ public class MappingHandlerMethod extends InvokableHandlerMethod {
     private static final Map<Method, Object[]> methodCacheInstanceMap = new ConcurrentHashMap<>();
     protected final Method userMethod;
     protected final Class<?> userClass;
-    private Object[] methodCache;
-    private Object[] classCache;
+    private volatile Object[] methodCache;
+    private volatile Object[] classCache;
 
     public MappingHandlerMethod(Object bean, Method method) {
         super(bean, method);

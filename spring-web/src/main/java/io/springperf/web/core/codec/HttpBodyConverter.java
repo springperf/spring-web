@@ -5,6 +5,7 @@ import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import org.springframework.http.HttpInputMessage;
+import org.springframework.lang.Nullable;
 import org.springframework.http.HttpOutputMessage;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.GenericHttpMessageConverter;
@@ -48,7 +49,7 @@ public interface HttpBodyConverter extends GenericHttpMessageConverter<Object>, 
      * Subclasses may override to leverage request/response/mappingContext for optimized decisions.
      */
     default boolean canWrite(Type type, Class<?> valueType, MediaType mediaType,
-                              WebServerHttpRequest request, WebServerHttpResponse response,
+                              WebServerHttpRequest request, @Nullable WebServerHttpResponse response,
                               PathMappingContext mappingContext) {
         return canWrite(type, valueType, mediaType);
     }

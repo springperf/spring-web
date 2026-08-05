@@ -73,6 +73,7 @@ public class DefaultNettyStreamSender extends AbstractNettyStreamSender {
                 } catch (Exception e) {
                     batchBuf.writerIndex(before);
                     log.warn("[SSE] encode error: {}", e.getMessage(), e);
+                    emitter.onEncodeError(data, e);
                 }
                 if (batchBuf.writerIndex() >= maxFlushBytes) {
                     channel.writeAndFlush(new DefaultHttpContent(batchBuf));

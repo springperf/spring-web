@@ -93,6 +93,18 @@ public abstract class StreamEmitter<T> {
 
     public abstract void encode(Object data, OutputStream out) throws IOException;
 
+    /**
+     * encode 失败回调。子类可覆写此方法决定如何处理编码失败的数据。
+     * <p>
+     * 默认实现为空（仅打日志），编码失败的数据被静默丢弃，不会中断流。
+     * 子类可改为发送 SSE 错误帧、标记流为错误状态等。
+     *
+     * @param data 编码失败的数据（原始值，未编码）
+     * @param ex   编码异常
+     */
+    protected void onEncodeError(Object data, Exception ex) {
+    }
+
     protected abstract void extendResponse(ServerHttpResponse response);
 
     protected int getMaxFlushBytes() {
