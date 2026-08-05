@@ -74,12 +74,27 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
     private static final MediaType NOT_SET = new MediaType("application", "x-not-set");
 
     public WebHttpHeaders() {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            this.delegateMap = null;
-        } else {
-            this.delegateMap = resolveDelegate();
-        }
+        this.delegateMap = resolveDelegateForVersion();
         this.cachedContentType = NOT_SET;
+    }
+
+    /**
+     * 用已存在的 {@code MultiValueMap} 视图构造，持有引用而非拷贝（零拷贝）。
+     * <p>5.3/6.x/7.x 的 {@code HttpHeaders(MultiValueMap)} 均为引用持有
+     * （已反编译验证 {@code putfield headers} 无拷贝循环）。传入
+     * {@link NettyHttpHeadersAdapter} 即可获得 Netty headers 的只读零拷贝视图。</p>
+     */
+    public WebHttpHeaders(MultiValueMap<String, String> headers) {
+        super(headers);
+        this.delegateMap = resolveDelegateForVersion();
+        this.cachedContentType = NOT_SET;
+    }
+
+    private MultiValueMap<String, String> resolveDelegateForVersion() {
+        if (HEADERS_IS_MULTI_VALUE_MAP) {
+            return null;
+        }
+        return resolveDelegate();
     }
 
     private MultiValueMap<String, String> resolveDelegate() {

@@ -144,10 +144,10 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
     @Override
     public HttpHeaders getHeaders() {
         if (headers == null) {
-            headers = new WebHttpHeaders();
-            for (Map.Entry<String, String> header : request.headers()) {
-                headers.add(header.getKey(), header.getValue());
-            }
+            // 零拷贝可写视图：直接委托 Netty headers，免去 O(n) 拷贝；
+            // 对齐 Spring ServerHttpRequest.getHeaders() 契约（可写），写操作穿透到 Netty 请求对象；
+            // Netty 大小写不敏感解析同时修复了旧拷贝下小写 key 读取 miss 的问题。
+            headers = new WebHttpHeaders(new NettyHttpHeadersAdapter(request.headers(), true));
         }
         return headers;
     }

@@ -211,7 +211,7 @@ class HttpBodyCodecRegistryWriteNegotiationTest {
         setMatchedContext(optimizedContext());
 
         write("a", optimizeReturnType);          // Accept 缺失 → "*/*"
-        requestHeaders.set("accept", "application/json");
+        requestHeaders.set("Accept", "application/json");
         write("b", optimizeReturnType);
 
         ArgumentCaptor<MediaType> mediaTypeCaptor = ArgumentCaptor.forClass(MediaType.class);
@@ -226,9 +226,9 @@ class HttpBodyCodecRegistryWriteNegotiationTest {
         registry.converters.add(converter);
         setMatchedContext(optimizedContext());
 
-        requestHeaders.set("accept", "Application/JSON");
+        requestHeaders.set("Accept", "Application/JSON");
         write("a", optimizeReturnType);
-        requestHeaders.set("accept", "application/json");
+        requestHeaders.set("Accept", "application/json");
         write("b", optimizeReturnType);
 
         ArgumentCaptor<MediaType> mediaTypeCaptor = ArgumentCaptor.forClass(MediaType.class);
@@ -243,9 +243,9 @@ class HttpBodyCodecRegistryWriteNegotiationTest {
         registry.converters.add(converter);
         setMatchedContext(optimizedContext());
 
-        requestHeaders.set("accept", "   ");
+        requestHeaders.set("Accept", "   ");
         write("a", optimizeReturnType);
-        requestHeaders.set("accept", "*/*");
+        requestHeaders.set("Accept", "*/*");
         write("b", optimizeReturnType);
 
         ArgumentCaptor<MediaType> mediaTypeCaptor = ArgumentCaptor.forClass(MediaType.class);
@@ -368,7 +368,7 @@ class HttpBodyCodecRegistryWriteNegotiationTest {
         HttpBodyConverter converter = jsonConverter();
         registry.converters.add(converter);
         setMatchedContext(optimizedProduceContext());
-        requestHeaders.set("accept", "text/plain");
+        requestHeaders.set("Accept", "text/plain");
 
         // Accept 与 produces 无交集 → findBestMatch 返回 null → 抛 HttpMessageNotWritableException
         assertThrows(HttpMessageNotWritableException.class, () -> write("a", optimizeReturnType));
