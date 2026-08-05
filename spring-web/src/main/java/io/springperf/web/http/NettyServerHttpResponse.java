@@ -79,6 +79,8 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
             if (buf != null && buf.refCnt() > 0) {
                 buf.release();
             }
+            // 置空已释放的 buffer，防止后续 getBuf()/getBody() 返回已释放的 ByteBuf
+            this.buf = null;
             throw new RuntimeException(e);
         }
     }

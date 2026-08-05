@@ -216,8 +216,37 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
 
     @SneakyThrows
     public void sendError(HttpStatus statusCode, String message) {
-        String error = "{\"error\":\"" + message + "\"}";
+        String error = "{\"error\":\"" + escapeJson(message) + "\"}";
         writeDataAndFlush(error.getBytes(characterEncoding), MediaType.APPLICATION_JSON, statusCode);
+    }
+
+    /**
+     * 对写入 JSON 字符串字面量的 message 做转义，防止 {@code "}、{@code \} 及控制字符破坏响应体 JSON。
+     */
+    private static String escapeJson(String s) {
+        if (s == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder(s.length() + 16);
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '"': sb.append("\\\""); break;
+                case '\\': sb.append("\\\\"); break;
+                case '\b': sb.append("\\b"); break;
+                case '\f': sb.append("\\f"); break;
+                case '\n': sb.append("\\n"); break;
+                case '\r': sb.append("\\r"); break;
+                case '\t': sb.append("\\t"); break;
+                default:
+                    if (c < 0x20) {
+                        sb.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        sb.append(c);
+                    }
+            }
+        }
+        return sb.toString();
     }
 
     @SneakyThrows
