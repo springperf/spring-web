@@ -24,7 +24,10 @@ import org.springframework.http.converter.HttpMessageNotWritableException;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -382,94 +385,252 @@ class HttpBodyCodecRegistryTest {
         verify(converter2).write(eq("test"), any(Type.class), any(), eq(response), any(), any(), any());
     }
 
-    // ---- chooseWriteMediaType ----
+    // ---- writeBody : Content-Type already set ----
 
     @Test
-    void chooseWriteMediaType_contentTypeAlreadySet_returnsIt() {
+    void writeBody_contentTypeAlreadySet_usesIt() throws Exception {
         stubPathMapping();
         HttpHeaders respHeaders = new HttpHeaders();
         respHeaders.setContentType(MediaType.APPLICATION_XML);
-        lenient().when(response.getHeaders()).thenReturn(respHeaders);
+        when(response.getHeaders()).thenReturn(respHeaders);
+        when(converter1.canWrite(any(Type.class), any(), eq(MediaType.APPLICATION_XML), any(), any(), any())).thenReturn(true);
+        registry.converters.add(converter1);
 
-        MediaType result = registry.chooseWriteMediaType("body", String.class, String.class, request, response);
+        registry.writeBody("body", parameter, request, response);
 
-        assertEquals(MediaType.APPLICATION_XML, result);
+        verify(converter1).write(eq("body"), any(), eq(MediaType.APPLICATION_XML), eq(response), any(), any(), any());
     }
 
+    // ---- writeBody : content negotiation ----
+
     @Test
-    void chooseWriteMediaType_noAcceptableTypes_fallbackToAll() {
+    void writeBody_noAcceptableTypes_negotiatesJson() throws Exception {
         stubPathMapping();
         when(response.getHeaders()).thenReturn(new HttpHeaders());
+        when(response.getCharacterEncoding()).thenReturn(null);
         when(request.getHeaders()).thenReturn(new HttpHeaders());
-        registry.allSupportedMediaTypes = Collections.singletonList(MediaType.APPLICATION_JSON);
-        registry.converters.add(converter1);
-        when(converter1.canWrite(any(Type.class), eq(String.class), isNull(), any(), any(), any())).thenReturn(true);
+        when(parameter.getGenericParameterType()).thenReturn((Type) Object.class);
+        when(parameter.getParameterType()).thenReturn((Class) Object.class);
+        when(converter1.canWrite(any(Type.class), any(), isNull(), any(), any(), any())).thenReturn(true);
         when(converter1.getSupportedMediaTypes()).thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON));
-
-        MediaType result = registry.chooseWriteMediaType("body", String.class, String.class, request, response);
-
-        assertNotNull(result);
-        assertTrue(result.isConcrete());
-    }
-
-    @Test
-    void chooseWriteMediaType_noMatch_returnsNull() {
-        stubPathMapping();
-        when(response.getHeaders()).thenReturn(new HttpHeaders());
-        HttpHeaders reqHeaders = new HttpHeaders();
-        reqHeaders.setAccept(Collections.singletonList(MediaType.APPLICATION_ATOM_XML));
-        when(request.getHeaders()).thenReturn(reqHeaders);
         registry.converters.add(converter1);
-        when(converter1.canWrite(any(Type.class), eq(String.class), isNull(), any(), any(), any())).thenReturn(true);
-        when(converter1.getSupportedMediaTypes())
-                .thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON));
-        registry.allSupportedMediaTypes = Collections.singletonList(MediaType.APPLICATION_JSON);
 
-        MediaType result = registry.chooseWriteMediaType("body", String.class, String.class, request, response);
+        registry.writeBody(new Object(), parameter, request, response);
 
-        assertNull(result);
+        verify(converter1).write(any(), any(), eq(MediaType.APPLICATION_JSON), eq(response), any(), any(), any());
     }
 
     @Test
-    void chooseWriteMediaType_negotiation_returnsConcreteType() {
+    void writeBody_negotiation_selectsJson() throws Exception {
         stubPathMapping();
         when(response.getHeaders()).thenReturn(new HttpHeaders());
+        when(response.getCharacterEncoding()).thenReturn(null);
         HttpHeaders reqHeaders = new HttpHeaders();
         reqHeaders.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
         when(request.getHeaders()).thenReturn(reqHeaders);
-        registry.allSupportedMediaTypes = Collections.singletonList(MediaType.APPLICATION_JSON);
-        registry.converters.add(converter1);
-        when(converter1.canWrite(any(Type.class), eq(String.class), isNull(), any(), any(), any())).thenReturn(true);
+        when(parameter.getGenericParameterType()).thenReturn((Type) Object.class);
+        when(parameter.getParameterType()).thenReturn((Class) Object.class);
+        when(converter1.canWrite(any(Type.class), any(), isNull(), any(), any(), any())).thenReturn(true);
         when(converter1.getSupportedMediaTypes()).thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON));
-
-        MediaType result = registry.chooseWriteMediaType("body", String.class, String.class, request, response);
-
-        assertEquals(MediaType.APPLICATION_JSON, result);
-    }
-
-    // ---- getProducibleMediaTypes ----
-
-    @Test
-    void getProducibleMediaTypes_returnsFromConverters() {
-        stubPathMapping();
-        registry.allSupportedMediaTypes = Arrays.asList(MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML);
         registry.converters.add(converter1);
-        when(converter1.canWrite(any(Type.class), eq(String.class), isNull(), any(), any(), any())).thenReturn(true);
-        when(converter1.getSupportedMediaTypes())
-                .thenReturn(Arrays.asList(MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML));
 
-        List<MediaType> result = registry.getProducibleMediaTypes(request, String.class, String.class);
+        registry.writeBody(new Object(), parameter, request, response);
 
-        assertTrue(result.contains(MediaType.APPLICATION_JSON));
+        verify(converter1).write(any(), any(), eq(MediaType.APPLICATION_JSON), eq(response), any(), any(), any());
     }
 
     @Test
-    void getProducibleMediaTypes_emptySupported_returnsAll() {
+    void writeBody_noAccept_converterSupportsJsonSuffixWildcard_usesJson() throws Exception {
         stubPathMapping();
+        when(response.getHeaders()).thenReturn(new HttpHeaders());
+        when(response.getCharacterEncoding()).thenReturn(null);
+        when(request.getHeaders()).thenReturn(new HttpHeaders());
+        when(parameter.getGenericParameterType()).thenReturn((Type) Object.class);
+        when(parameter.getParameterType()).thenReturn((Class) Object.class);
+        // converter 同时支持 application/json 与 application/*+json（Spring 判为 wildcard subtype、非 concrete）
+        when(converter1.canWrite(any(Type.class), any(), isNull(), any(), any(), any())).thenReturn(true);
+        when(converter1.getSupportedMediaTypes()).thenReturn(Arrays.asList(
+                MediaType.APPLICATION_JSON, new MediaType("application", "*+json")));
+        registry.converters.add(converter1);
 
-        List<MediaType> result = registry.getProducibleMediaTypes(request, String.class, String.class);
+        registry.writeBody(new Object(), parameter, request, response);
 
-        assertEquals(Collections.singletonList(MediaType.ALL), result);
+        // 回归：修复前 findBestMatch 会选中 application/*+json，随后 isPresentIn(ALL) 失败抛出异常
+        verify(converter1).write(any(), any(), eq(MediaType.APPLICATION_JSON), eq(response), any(), any(), any());
+    }
+
+    @Test
+    void writeBody_firstConverterCanWrite_acceptCompatible_usesFirst() throws Exception {
+        stubPathMapping();
+        when(response.getHeaders()).thenReturn(new HttpHeaders());
+        when(response.getCharacterEncoding()).thenReturn(null);
+        when(request.getHeaders()).thenReturn(new HttpHeaders());
+        when(parameter.getGenericParameterType()).thenReturn((Type) Object.class);
+        when(parameter.getParameterType()).thenReturn((Class) Object.class);
+        // 两个 converter 都能写，但第一个匹配
+        when(converter1.canWrite(any(Type.class), any(), isNull(), any(), any(), any())).thenReturn(true);
+        when(converter1.getSupportedMediaTypes()).thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON));
+        registry.converters.add(converter1);
+        registry.converters.add(converter2);
+
+        registry.writeBody(new Object(), parameter, request, response);
+
+        verify(converter1).write(any(), any(), any(), eq(response), any(), any(), any());
+        verify(converter2, never()).write(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void writeBody_acceptCompatibleWithJackson_usesFirstConverter() throws Exception {
+        stubPathMapping();
+        when(response.getHeaders()).thenReturn(new HttpHeaders());
+        when(response.getCharacterEncoding()).thenReturn(null);
+        HttpHeaders reqHeaders = new HttpHeaders();
+        reqHeaders.setAccept(Arrays.asList(MediaType.APPLICATION_JSON, MediaType.parseMediaType("text/plain")));
+        when(request.getHeaders()).thenReturn(reqHeaders);
+        when(parameter.getGenericParameterType()).thenReturn((Type) Object.class);
+        when(parameter.getParameterType()).thenReturn((Class) Object.class);
+        // 第一个 converter 能写且 Accept 中 application/json 兼容
+        when(converter1.canWrite(any(Type.class), any(), isNull(), any(), any(), any())).thenReturn(true);
+        when(converter1.getSupportedMediaTypes()).thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON));
+        registry.converters.add(converter1);
+
+        registry.writeBody(new Object(), parameter, request, response);
+
+        verify(converter1).write(any(), any(), eq(MediaType.APPLICATION_JSON), eq(response), any(), any(), any());
+    }
+
+    @Test
+    void writeBody_allConcreteAccept_firstAcceptableNotMatching_secondMatches() throws Exception {
+        stubPathMapping();
+        when(response.getHeaders()).thenReturn(new HttpHeaders());
+        when(response.getCharacterEncoding()).thenReturn(null);
+        HttpHeaders reqHeaders = new HttpHeaders();
+        // 两个 concrete Accept：第一个 text/plain 与 converter 不兼容，第二个 application/json 兼容
+        reqHeaders.setAccept(Arrays.asList(MediaType.TEXT_PLAIN, MediaType.APPLICATION_JSON));
+        when(request.getHeaders()).thenReturn(reqHeaders);
+        when(parameter.getGenericParameterType()).thenReturn((Type) Object.class);
+        when(parameter.getParameterType()).thenReturn((Class) Object.class);
+        when(converter1.canWrite(any(Type.class), any(), isNull(), any(), any(), any())).thenReturn(true);
+        when(converter1.getSupportedMediaTypes()).thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON));
+        registry.converters.add(converter1);
+
+        registry.writeBody(new Object(), parameter, request, response);
+
+        verify(converter1).write(any(), any(), eq(MediaType.APPLICATION_JSON), eq(response), any(), any(), any());
+    }
+
+    // ---- writeBody : produces 声明 ----
+
+    @Test
+    void writeBody_producesDeclared_acceptCompatible_negotiatesAndWrites() throws Exception {
+        PathMappingContext ctx = mock(PathMappingContext.class);
+        when(ctx.getProducibleMediaTypes()).thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON));
+        MappingResult mr = MappingResult.matched(ctx);
+        setupRequestContextWithStorage();
+        MappingResult.set(request, mr);
+
+        HttpHeaders respHeaders = new HttpHeaders();
+        when(response.getHeaders()).thenReturn(respHeaders);
+        when(response.getCharacterEncoding()).thenReturn(null);
+        HttpHeaders reqHeaders = new HttpHeaders();
+        reqHeaders.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+        when(request.getHeaders()).thenReturn(reqHeaders);
+        when(parameter.getGenericParameterType()).thenReturn((Type) Object.class);
+        when(parameter.getParameterType()).thenReturn((Class) Object.class);
+        when(converter1.canWrite(any(Type.class), any(), eq(MediaType.APPLICATION_JSON), any(), any(), any())).thenReturn(true);
+        registry.converters.add(converter1);
+        registry.converters.add(converter2);
+
+        registry.writeBody(new Object(), parameter, request, response);
+
+        verify(converter1).write(any(), any(), eq(MediaType.APPLICATION_JSON), eq(response), any(), any(), any());
+        verify(converter2, never()).write(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void writeBody_producesDeclared_acceptNotCompatible_throwsException() {
+        PathMappingContext ctx = mock(PathMappingContext.class);
+        when(ctx.getProducibleMediaTypes()).thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON));
+        MappingResult mr = MappingResult.matched(ctx);
+        setupRequestContextWithStorage();
+        MappingResult.set(request, mr);
+
+        HttpHeaders respHeaders = new HttpHeaders();
+        when(response.getHeaders()).thenReturn(respHeaders);
+        HttpHeaders reqHeaders = new HttpHeaders();
+        reqHeaders.setAccept(Collections.singletonList(MediaType.APPLICATION_ATOM_XML));
+        when(request.getHeaders()).thenReturn(reqHeaders);
+        when(parameter.getGenericParameterType()).thenReturn((Type) Object.class);
+        when(parameter.getParameterType()).thenReturn((Class) Object.class);
+        registry.converters.add(converter1);
+
+        assertThrows(HttpMessageNotWritableException.class,
+                () -> registry.writeBody(new Object(), parameter, request, response));
+    }
+
+    // ---- writeBody : 边界情况 ----
+
+    @Test
+    void writeBody_contentTypeAlreadySet_noConverter_silentlySkips() throws Exception {
+        stubPathMapping();
+        HttpHeaders respHeaders = new HttpHeaders();
+        respHeaders.setContentType(MediaType.APPLICATION_XML);
+        when(response.getHeaders()).thenReturn(respHeaders);
+        when(converter1.canWrite(any(Type.class), any(), eq(MediaType.APPLICATION_XML), any(), any(), any())).thenReturn(false);
+        registry.converters.add(converter1);
+
+        // 等价旧实现：content-type 已设置但无匹配 converter → 静默不写、不抛异常
+        registry.writeBody("body", parameter, request, response);
+
+        verify(converter1, never()).write(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void writeBody_firstConverterCanWriteButAcceptNotMatch_secondConverterMatches() throws Exception {
+        stubPathMapping();
+        when(response.getHeaders()).thenReturn(new HttpHeaders());
+        when(response.getCharacterEncoding()).thenReturn(null);
+        HttpHeaders reqHeaders = new HttpHeaders();
+        reqHeaders.setAccept(Collections.singletonList(MediaType.APPLICATION_ATOM_XML));
+        when(request.getHeaders()).thenReturn(reqHeaders);
+        when(parameter.getGenericParameterType()).thenReturn((Type) Object.class);
+        when(parameter.getParameterType()).thenReturn((Class) Object.class);
+        when(converter1.canWrite(any(Type.class), any(), isNull(), any(), any(), any())).thenReturn(true);
+        when(converter1.getSupportedMediaTypes()).thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON));
+        when(converter2.canWrite(any(Type.class), any(), isNull(), any(), any(), any())).thenReturn(true);
+        when(converter2.getSupportedMediaTypes()).thenReturn(Collections.singletonList(MediaType.APPLICATION_ATOM_XML));
+        registry.converters.add(converter1);
+        registry.converters.add(converter2);
+
+        registry.writeBody(new Object(), parameter, request, response);
+
+        verify(converter1, never()).write(any(), any(), any(), any(), any(), any(), any());
+        verify(converter2).write(any(), any(), eq(MediaType.APPLICATION_ATOM_XML), eq(response), any(), any(), any());
+    }
+
+    @Test
+    void writeBody_acceptWithHigherQuality_wins() throws Exception {
+        stubPathMapping();
+        when(response.getHeaders()).thenReturn(new HttpHeaders());
+        when(response.getCharacterEncoding()).thenReturn(null);
+        HttpHeaders reqHeaders = new HttpHeaders();
+        reqHeaders.setAccept(Arrays.asList(
+                new MediaType("application", "json", Collections.singletonMap("q", "0.8")),
+                new MediaType("application", "xml")));
+        when(request.getHeaders()).thenReturn(reqHeaders);
+        when(parameter.getGenericParameterType()).thenReturn((Type) Object.class);
+        when(parameter.getParameterType()).thenReturn((Class) Object.class);
+        when(converter1.canWrite(any(Type.class), any(), isNull(), any(), any(), any())).thenReturn(true);
+        when(converter1.getSupportedMediaTypes()).thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON));
+        when(converter2.canWrite(any(Type.class), any(), isNull(), any(), any(), any())).thenReturn(true);
+        when(converter2.getSupportedMediaTypes()).thenReturn(Collections.singletonList(MediaType.APPLICATION_XML));
+        registry.converters.add(converter1);
+        registry.converters.add(converter2);
+
+        registry.writeBody(new Object(), parameter, request, response);
+
+        verify(converter1, never()).write(any(), any(), any(), any(), any(), any(), any());
+        verify(converter2).write(any(), any(), eq(MediaType.APPLICATION_XML), eq(response), any(), any(), any());
     }
 
     // ---- getGenericType ----

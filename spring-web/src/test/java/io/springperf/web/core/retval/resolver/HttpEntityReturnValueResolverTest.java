@@ -88,12 +88,24 @@ class HttpEntityReturnValueResolverTest {
     @Test
     void resolveReturnValue_httpEntity_noStatus_doesNotSetStatusCode() throws Exception {
         HttpEntity<String> entity = new HttpEntity<>("body", new WebHttpHeaders());
-        HttpHeaders respHeaders = new HttpHeaders();
-        doReturn(respHeaders).when(response).getHeaders();
 
         resolver.resolveReturnValue(entity, null, request, response);
 
         verify(response, never()).setStatusCode(any());
+        verify(response, never()).getHeaders();
+        verify(codecRegistry).writeBody("body", null, request, response);
+    }
+
+    @Test
+    void resolveReturnValue_responseEntity_emptyHeaders_skipsPutAll() throws Exception {
+        // ResponseEntity.status(...).body(...) 无自定义 headers
+        ResponseEntity<String> entity = ResponseEntity.status(HttpStatus.CREATED).body("body");
+
+        resolver.resolveReturnValue(entity, null, request, response);
+
+        verify(response).setStatusCode(HttpStatus.CREATED);
+        // 空 headers 短路：不访问响应 headers（无 putAll）
+        verify(response, never()).getHeaders();
         verify(codecRegistry).writeBody("body", null, request, response);
     }
 
