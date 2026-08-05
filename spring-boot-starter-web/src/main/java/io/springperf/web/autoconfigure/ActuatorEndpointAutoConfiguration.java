@@ -82,6 +82,7 @@ public class ActuatorEndpointAutoConfiguration {
     }
 
     @Bean(destroyMethod = "")
+    @ConditionalOnMissingBean
     @ConditionalOnProperty(value = "management.server.port", matchIfMissing = false)
     public ManagementServerInfrastructure managementServerInfrastructure(WebContext webContext,
                                                                          WebEndpointProperties webEndpointProperties,
@@ -95,6 +96,7 @@ public class ActuatorEndpointAutoConfiguration {
     }
 
     @Bean(destroyMethod = "")
+    @ConditionalOnMissingBean
     @ConditionalOnProperty(value = "management.server.port", matchIfMissing = false)
     public ManagementNettyHttpServer managementNettyHttpServer(
             WebContext webContext, ManagementServerInfrastructure managementServerInfrastructure,

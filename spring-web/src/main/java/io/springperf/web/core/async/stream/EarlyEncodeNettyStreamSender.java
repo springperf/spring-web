@@ -1,6 +1,7 @@
 package io.springperf.web.core.async.stream;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.springperf.web.core.async.PerfAsyncWebRequest;
 
@@ -67,6 +68,16 @@ public class EarlyEncodeNettyStreamSender extends AbstractNettyStreamSender {
                 }
                 byte[] bytes = (byte[]) data;
                 if (bytes.length == 0) {
+                    continue;
+                }
+                if (bytes.length > maxFlushBytes) {
+                    // 单条消息超过 batch 容量：先刷掉已有批数据，再直接独立写入，
+                    // 避免 writeBytes 超出 batchBuf 容量抛 IndexOutOfBoundsException。
+                    if (batchBuf != null) {
+                        channel.writeAndFlush(new DefaultHttpContent(batchBuf));
+                        batchBuf = null;
+                    }
+                    channel.writeAndFlush(new DefaultHttpContent(Unpooled.wrappedBuffer(bytes)));
                     continue;
                 }
                 if (batchBuf == null) {

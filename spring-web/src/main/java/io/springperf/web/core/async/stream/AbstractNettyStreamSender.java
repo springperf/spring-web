@@ -103,18 +103,22 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
     /**
      * drain 末尾的 re-drain 检查。子类 drain 方法末尾调用。
      * <ul>
-     *   <li>队列非空 → 重新调度 drain</li>
-     *   <li>completed 且未写 LastHttpContent → 写入</li>
+     *   <li>队列非空 → 尝试重新调度 drain</li>
+     *   <li>已 completed 且未写 LastHttpContent → 直接写入关闭连接</li>
      * </ul>
      */
     protected void afterDrain() {
         if (!queue.isEmpty()) {
             if (channel.isWritable() && wip.compareAndSet(0, 1)) {
                 eventLoop.execute(this::drain);
-            } else if (completed && !lastHttpContentWritten) {
-                if (wip.compareAndSet(0, 1)) {
-                    eventLoop.execute(this::drain);
-                }
+                return;
+            }
+            // 队列非空但 channel 不可写或 reschedule 失败（wip 已被其他线程设置）：
+            // 若已 completed 则直接关闭连接，防止 LastHttpContent 永不写入导致连接挂起。
+            // 队列中剩余数据将被丢弃（send 端已 completed，不会再生产数据）。
+            if (completed && !lastHttpContentWritten) {
+                lastHttpContentWritten = true;
+                onAllDataWritten();
             }
             return;
         }

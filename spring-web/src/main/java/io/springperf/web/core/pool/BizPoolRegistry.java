@@ -128,17 +128,7 @@ public class BizPoolRegistry extends BaseWebComponent {
      * 注册一个已创建的 {@link ExecutorService}。
      */
     public void registerExecutor(String name, ExecutorService executor) {
-        if (name == null || executor == null) return;
-        if (RunInPool.EVENTLOOP.equalsIgnoreCase(name)) {
-            throw new IllegalArgumentException(
-                    "'" + RunInPool.EVENTLOOP + "' is a reserved keyword and cannot be used as a pool name");
-        }
-        ExecutorService old = pools.put(name, executor);
-        if (old != null && old != executor) {
-            log.warn("BizPool [{}] replaced. Shutting down old pool: {}", name, old);
-            shutdownPool(old);
-        }
-        log.info("BizPool [{}] registered as ExecutorService", name);
+        register(name, executor);
     }
 
     /**
