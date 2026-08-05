@@ -1,5 +1,6 @@
 package io.springperf.web.http;
 
+import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
@@ -23,7 +24,8 @@ class BaseWebServerHttpResponseTest {
         boolean flushed = false;
 
         TestResponse(WebContext webContext, boolean keepAlive) {
-            super(webContext, keepAlive);
+            super(webContext, keepAlive,
+                    new WebHttpHeaders(new NettyHttpHeadersAdapter(new DefaultHttpHeaders(false), true)));
         }
 
         @Override void runOnEventLoop(Runnable task) {}

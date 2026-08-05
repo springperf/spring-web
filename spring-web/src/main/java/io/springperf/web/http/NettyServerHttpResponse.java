@@ -17,8 +17,6 @@ import org.springframework.http.HttpStatus;
 import java.io.*;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -43,11 +41,20 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
 
     protected final ChannelHandlerContext ctx;
 
+    /** 实际 header 存储：框架 headers 视图与 Netty 响应对象共享，commit 时零拷贝 */
+    protected final io.netty.handler.codec.http.HttpHeaders nettyHeaders;
+
     protected volatile ByteBuf buf;
 
     public NettyServerHttpResponse(WebContext webContext, ChannelHandlerContext ctx, boolean keepAlive) {
-        super(webContext, keepAlive);
+        this(webContext, ctx, keepAlive, new DefaultHttpHeaders(false));
+    }
+
+    private NettyServerHttpResponse(WebContext webContext, ChannelHandlerContext ctx, boolean keepAlive,
+                                    io.netty.handler.codec.http.HttpHeaders nettyHeaders) {
+        super(webContext, keepAlive, new WebHttpHeaders(new NettyHttpHeadersAdapter(nettyHeaders, true)));
         this.ctx = ctx;
+        this.nettyHeaders = nettyHeaders;
     }
 
     public ByteBuf getBuf() {
@@ -82,17 +89,17 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
         // 响应头由框架/业务内部构造，非用户输入直达，CRLF 注入面可控。
         HttpResponse response;
         if (buf != null) {
-            response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()), buf, false);
+            response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()), buf, nettyHeaders, EmptyHttpHeaders.INSTANCE);
         } else if (chunked) {
-            response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()), false);
+            response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()), nettyHeaders);
         } else {
-            response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()), false);
+            // 无 body 分支：DefaultFullHttpResponse 无 (version,status,headers,trailingHeaders) 构造器，
+            // 用空 content 补位；该分支随后设 Content-Length: 0，语义与原 null content 一致。
+            response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()), Unpooled.EMPTY_BUFFER, nettyHeaders, EmptyHttpHeaders.INSTANCE);
         }
-        for (Map.Entry<String, List<String>> e : headers.entrySet()) {
-            for (String v : e.getValue()) {
-                response.headers().add(e.getKey(), v);
-            }
-        }
+        // 零拷贝：nettyHeaders 即框架 headers 视图底层存储，commit 前所有框架写入已落到位，无需逐条拷贝。
+        // 注意：直接 response.headers().set 写入不走 WebHttpHeaders.setContentType，不会清 Content-Type 缓存；
+        // 但此处 contentType 参数仅 writeStream/writeFile 传入（octet-stream，已提交），commit 后无人再读 getContentType()。
         if (contentType != null) {
             response.headers().set(HttpHeaderNames.CONTENT_TYPE, contentType);
         }
@@ -161,12 +168,8 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
         }
         ByteBuf body = Unpooled.wrappedBuffer(data);
         HttpResponse response = new DefaultFullHttpResponse(
-                HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()), body, false);
-        for (Map.Entry<String, List<String>> e : headers.entrySet()) {
-            for (String v : e.getValue()) {
-                response.headers().add(e.getKey(), v);
-            }
-        }
+                HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()), body, nettyHeaders, EmptyHttpHeaders.INSTANCE);
+        // 零拷贝：nettyHeaders 即框架 headers 视图底层存储，无需逐条拷贝
         response.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/octet-stream");
         response.headers().setInt(HttpHeaderNames.CONTENT_LENGTH, data.length);
         if (keepAlive) {
