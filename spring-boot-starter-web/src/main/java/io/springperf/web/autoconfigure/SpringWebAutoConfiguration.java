@@ -6,8 +6,6 @@ import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.SingleThreadEventExecutor;
 import io.springperf.web.autoconfigure.actuator.server.SslContextFactory;
 import io.springperf.web.autoconfigure.metrics.MicrometerWebMetrics;
-import io.springperf.web.autoconfigure.support.PerfWebServer;
-import io.springperf.web.autoconfigure.support.PerfWebServerInitializedEvent;
 import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.DispatcherHandler;
@@ -20,10 +18,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.boot.web.server.WebServer;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -61,21 +55,6 @@ public class SpringWebAutoConfiguration {
     @ConditionalOnProperty(name = "server.accesslog.enabled", havingValue = "true")
     public AccessLogWebFilter accessLogWebFilter() {
         return new AccessLogWebFilter();
-    }
-
-    /**
-     * 在 Netty 服务器启动完成后发射 {@link WebServerInitializedEvent}，
-     * 使 Spring Cloud 服务注册（Nacos/Eureka/Consul）等组件正确感知服务器就绪。
-     */
-    @Bean
-    public ApplicationListener<ApplicationReadyEvent> webServerInitializedEventPublisher(
-            NettyHttpServer nettyHttpServer, ApplicationContext applicationContext) {
-        return event -> {
-            if (nettyHttpServer.isRunning()) {
-                WebServer webServer = new PerfWebServer(nettyHttpServer.getActualPort(), nettyHttpServer);
-                applicationContext.publishEvent(new PerfWebServerInitializedEvent(webServer, applicationContext));
-            }
-        };
     }
 
     @Bean @ConditionalOnMissingBean @ConditionalOnClass(name = "jakarta.validation.Validator")

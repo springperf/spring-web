@@ -61,6 +61,8 @@
         <!-- 第三方依赖版本统一管理 -->
         <netty.version>4.1.115.Final</netty.version>
         <jackson.version>2.17.2</jackson.version>
+        <!-- Jackson 注解组件可独立于 core/databind 对齐版本（SB4 生态 annotations=2.21、core/databind=2.21.4） -->
+        <jackson-annotations.version>2.17.2</jackson-annotations.version>
         <fastjson2.version>2.0.60</fastjson2.version>
 <okhttp.version>4.12.0</okhttp.version>
         <hutool.version>5.8.23</hutool.version>
@@ -155,7 +157,7 @@
             <dependency>
                 <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-annotations</artifactId>
-                <version>${jackson.version}</version>
+                <version>${jackson-annotations.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.projectlombok</groupId>
@@ -396,6 +398,12 @@
             <id>spring-boot-4.0</id>
             <properties>
                 <spring-boot.version>4.0.7</spring-boot.version>
+                <!-- SB4 生态：Jackson 3（tools.jackson）依赖 Jackson 2 注解兼容层 2.21。
+                     本框架的 Jackson 2 组件需对齐 SB4 BOM 的 jackson-2-bom 2.21.4
+                     （annotations=2.21、core/databind=2.21.4），避免覆盖回旧版导致
+                     Jackson 3 databind 初始化失败（缺 JsonSerializeAs）。 -->
+                <jackson.version>2.21.4</jackson.version>
+                <jackson-annotations.version>2.21</jackson-annotations.version>
             </properties>
         </profile>
 
@@ -404,6 +412,8 @@
             <id>spring-boot-4.1</id>
             <properties>
                 <spring-boot.version>4.1.0</spring-boot.version>
+                <jackson.version>2.21.4</jackson.version>
+                <jackson-annotations.version>2.21</jackson-annotations.version>
             </properties>
         </profile>
 
