@@ -9,6 +9,7 @@ import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 
 public class HttpEntityReturnValueResolver extends BaseWebComponent implements ReturnValueResolver {
@@ -40,8 +41,10 @@ public class HttpEntityReturnValueResolver extends BaseWebComponent implements R
                 resp.setStatusCode(responseEntity.getStatusCode());
             }
         }
-        if (httpEntity.getHeaders() != null) {
-            resp.getHeaders().putAll(httpEntity.getHeaders());
+        // 空 headers 时跳过 putAll，避免空 map 的无谓遍历
+        HttpHeaders entityHeaders = httpEntity.getHeaders();
+        if (entityHeaders != null && !entityHeaders.isEmpty()) {
+            resp.getHeaders().putAll(entityHeaders);
         }
         Object body = httpEntity.getBody();
         if (body != null) {

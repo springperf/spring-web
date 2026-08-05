@@ -70,29 +70,30 @@ echo ""
 echo "========================================"
 echo " BENCHMARK 吞吐量汇总"
 echo "========================================"
-# 从 JFR 目录中查找 JMH 结果文件
-shopt -s nullglob
-JMH_FILES=("$(dirname "$(pwd)")"/*/jmh-results-*.json 2>/dev/null)
-if [ ${#JMH_FILES[@]} -eq 0 ]; then
-    JMH_FILES=(./jmh-results-*.json 2>/dev/null)
+# 优先当前 JFR 目录（分析流程已把 jmh-results 复制到该目录）
+JMH_FILES=$(find . -maxdepth 1 -name 'jmh-results-*.json' 2>/dev/null)
+if [ -z "$JMH_FILES" ]; then
+    # fallback: 上级目录取最新 run 目录 (2xxxxxxx-xxxxxx)，避免 find 遍历全部历史造成重复
+    LATEST_RUN=$(ls -td "$(dirname "$(pwd)")"/2[0-9]* 2>/dev/null | head -1)
+    if [ -n "$LATEST_RUN" ]; then
+        JMH_FILES=$(find "$LATEST_RUN" -name 'jmh-results-*.json' 2>/dev/null)
+    fi
 fi
-if [ ${#JMH_FILES[@]} -gt 0 ]; then
+if [ -n "$JMH_FILES" ]; then
     # 提取所有 profile+api 组合
-    for JMH_FILE in ./jmh-results-*.json; do
-        [ -f "$JMH_FILE" ] || continue
+    while IFS= read -r JMH_FILE; do
         # 从文件名提取 container 和 api: jmh-results-perf-get.json
         BASENAME=$(basename "$JMH_FILE" .json)
         PART="${BASENAME#jmh-results-}"  # perf-get
         CONTAINER="${PART%%-*}"
         API="${PART#*-}"
         SCORE=$(grep -o '"score" : [0-9.]*' "$JMH_FILE" | head -1 | sed 's/"score" : //')
-        ERROR=$(grep -o '"scoreError" : "[^"]*"' "$JMH_FILE" | head -1 | sed 's/"scoreError" : "//;s/"//')
+        ERROR=$(grep -o '"scoreError" : [0-9.]*' "$JMH_FILE" | head -1 | sed 's/"scoreError" : //')
         echo "  $CONTAINER / $API: $SCORE +- $ERROR ops/s"
-    done
+    done <<< "$JMH_FILES"
 else
     echo "  (未找到 JMH 结果文件)"
 fi
-shopt -u nullglob
 
 echo ""
 echo "分析完成!"

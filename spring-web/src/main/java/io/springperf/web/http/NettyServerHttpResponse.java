@@ -78,13 +78,15 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
 
     private HttpResponse initHttpResponse(ByteBuf buf, String contentType, HttpStatus statusCode, boolean chunked) {
         setStatusCode(statusCode);
+        // validate=false 跳过 Netty 对响应头 name/value 的逐字符校验（HttpUtil.validateToken 热点）。
+        // 响应头由框架/业务内部构造，非用户输入直达，CRLF 注入面可控。
         HttpResponse response;
         if (buf != null) {
-            response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()), buf);
+            response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()), buf, false);
         } else if (chunked) {
-            response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()));
+            response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()), false);
         } else {
-            response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()));
+            response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()), false);
         }
         for (Map.Entry<String, List<String>> e : headers.entrySet()) {
             for (String v : e.getValue()) {
@@ -159,7 +161,7 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
         }
         ByteBuf body = Unpooled.wrappedBuffer(data);
         HttpResponse response = new DefaultFullHttpResponse(
-                HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()), body);
+                HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()), body, false);
         for (Map.Entry<String, List<String>> e : headers.entrySet()) {
             for (String v : e.getValue()) {
                 response.headers().add(e.getKey(), v);
