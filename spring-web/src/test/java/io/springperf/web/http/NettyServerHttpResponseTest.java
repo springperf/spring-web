@@ -236,4 +236,42 @@ class NettyServerHttpResponseTest {
         File nonexistent = new File("should_not_exist_12345");
         assertThrows(RuntimeException.class, () -> response.writeFile(nonexistent));
     }
+
+    // ========== P2-A: 关闭响应头 validateHeaders 校验 ==========
+    // Netty validate 开启时，非法 header name/value 会在 add 时抛 IllegalArgumentException。
+
+    @Test
+    void writeBytes_illegalHeaderNameAndValue_validateDisabled_doesNotThrow() {
+        when(ctx.writeAndFlush(any())).thenReturn(mock(ChannelFuture.class));
+        // name 含空格、value 含 NUL 均为非法字符
+        response.getHeaders().set("Bad Header", "bad\u0000value");
+
+        assertDoesNotThrow(() -> response.writeBytes("data".getBytes(StandardCharsets.UTF_8)));
+        verify(ctx).writeAndFlush(any());
+    }
+
+    @Test
+    void flush_illegalHeaderValue_validateDisabled_doesNotThrow() {
+        ByteBuf buf = mock(ByteBuf.class);
+        when(allocator.buffer(256)).thenReturn(buf);
+        when(ctx.writeAndFlush(any())).thenReturn(mock(ChannelFuture.class));
+        when(buf.readableBytes()).thenReturn(0);
+        response.getHeaders().set("X-Custom", "bad\u0000value");
+
+        response.getBuf();
+        assertDoesNotThrow(() -> response.flush());
+        verify(ctx).writeAndFlush(any());
+    }
+
+    @Test
+    void writeStream_illegalHeaderValue_validateDisabled_doesNotThrow() {
+        ChannelFuture future = mock(ChannelFuture.class);
+        when(ctx.writeAndFlush(any())).thenReturn(future);
+        when(future.isSuccess()).thenReturn(true);
+        when(future.addListener(any())).thenReturn(future);
+        response.getHeaders().set("X-Custom", "bad\u0000value");
+
+        InputStream input = new ByteArrayInputStream("x".getBytes(StandardCharsets.UTF_8));
+        assertDoesNotThrow(() -> response.writeStream(input));
+    }
 }
