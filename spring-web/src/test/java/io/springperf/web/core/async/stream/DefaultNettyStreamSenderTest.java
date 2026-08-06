@@ -200,4 +200,39 @@ class DefaultNettyStreamSenderTest {
 
         verify(channel, never()).writeAndFlush(any(DefaultHttpContent.class));
     }
+
+    @Test
+    void complete_notWritable_mustNotDiscardQueuedData_waitsForWritable() throws Exception {
+        // 背压场景：channel 不可写（写缓冲越过高水位），且生产者已完成
+        when(channel.isWritable()).thenReturn(false);
+        doAnswer(invocation -> {
+            OutputStream out = invocation.getArgument(1);
+            out.write("hello".getBytes(StandardCharsets.UTF_8));
+            return null;
+        }).when(emitter).encode(any(), any());
+        DefaultNettyStreamSender sender = new DefaultNettyStreamSender(emitter, asyncWebRequest);
+
+        sender.send("a");
+        sender.send("b");
+        sender.complete(false, null);
+
+        // 期望：数据保留在队列等待 writable 恢复，绝不丢弃、不提前写 LastHttpContent
+        assertEquals(2, sender.queueSize());
+        verify(channel, never()).writeAndFlush(any(DefaultHttpContent.class));
+        verify(channel, never()).writeAndFlush(any(LastHttpContent.class));
+
+        // 模拟 BackpressureHandler false->true 触发 writable callback (= scheduleDrain)
+        when(channel.isWritable()).thenReturn(true);
+        sender.scheduleDrain();
+
+        // 期望：恢复后完整写出全部数据 + LastHttpContent，无截断
+        verify(channel, atLeastOnce()).writeAndFlush(httpContentCaptor.capture());
+        verify(channel, atLeastOnce()).writeAndFlush(lastHttpContentCaptor.capture());
+        assertEquals(0, sender.queueSize());
+        int written = 0;
+        for (DefaultHttpContent c : httpContentCaptor.getAllValues()) {
+            written += c.content().readableBytes();
+        }
+        assertEquals(10, written, "所有已发送数据必须完整写出，不允许截断");
+    }
 }

@@ -282,7 +282,11 @@ for ENTRY in "${PROFILES_TO_RUN[@]}"; do
           echo "    [benchmark] $PROFILE / $SINGLE_API..."
         else
           API_SUFFIX=""
-          INCLUDE_ARG=""
+          # 跑全部 API 时也必须限定到当前 profile 的 benchmark 类。
+          # 若 INCLUDE_ARG 留空，BenchmarkRunner 默认 include=.* 会匹配 classpath 上
+          # 所有 @Benchmark 类——perf-support/undertow 的 pom 复用了 src/benchmark-tomcat/java，
+          # 会把 TomcatBenchmark 一起跑进来，污染结果并让运行时间翻倍。
+          INCLUDE_ARG="-Dbenchmark.include=.*${BENCH_CLASS}\..*"
           PROFILE_NAME="${PROFILE}"
           echo "    [benchmark] $PROFILE (all APIs)..."
         fi
