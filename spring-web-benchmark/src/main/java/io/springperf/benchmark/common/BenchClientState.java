@@ -6,6 +6,7 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
@@ -18,6 +19,13 @@ import java.util.concurrent.TimeUnit;
  * <p>
  * 在 @Setup(Level.Trial) 中预构建 Request 对象，避免基准测试期间的序列化开销。
  * 强制使用 HTTP/1.1 保证公平对比（自定义框架仅支持 HTTP/1.1）。
+ * <p>
+ * 优化说明：
+ * <ul>
+ *   <li>请求体预编码为 byte[]，避免 OkHttp 运行时 {@code writeUtf8} 开销</li>
+ *   <li>响应体用 {@code bytes()} 替代 {@code string()}，避免 String 分配 + UTF-8 解码</li>
+ *   <li>SSE 流同用 {@code bytes()} 校验长度，避免 String 分配</li>
+ * </ul>
  */
 @State(Scope.Thread)
 public class BenchClientState {
@@ -32,6 +40,12 @@ public class BenchClientState {
 
     public Request bytesLargeRequest;
     public Request sseRequest;
+
+    // 预编码请求体，避免每次请求 OkHttp 的 writeUtf8 开销
+    private static final byte[] ECHO_BODY_BYTES =
+            BenchmarkConstants.ECHO_BODY.getBytes(StandardCharsets.UTF_8);
+    private static final byte[] VALIDATE_BODY_BYTES =
+            BenchmarkConstants.VALIDATE_BODY.getBytes(StandardCharsets.UTF_8);
 
     /**
      * @param actualPort 服务器实际绑定的端口（可能因 fallback 不同于配置端口）
@@ -49,10 +63,10 @@ public class BenchClientState {
 
         String base = "http://localhost:" + actualPort + BenchmarkConstants.CONTEXT_PATH;
 
+        // byte[] 请求体避免 writeUtf8 开销
         jsonRequest = new Request.Builder()
                 .url(base + "/demo/echo")
-                .post(RequestBody.create(BenchmarkConstants.JSON_MEDIA_TYPE,
-                        BenchmarkConstants.ECHO_BODY))
+                .post(RequestBody.create(BenchmarkConstants.JSON_MEDIA_TYPE, ECHO_BODY_BYTES))
                 .build();
 
         getRequest = new Request.Builder()
@@ -73,8 +87,7 @@ public class BenchClientState {
 
         validRequest = new Request.Builder()
                 .url(base + "/core/validate")
-                .post(RequestBody.create(BenchmarkConstants.JSON_MEDIA_TYPE,
-                        BenchmarkConstants.VALIDATE_BODY))
+                .post(RequestBody.create(BenchmarkConstants.JSON_MEDIA_TYPE, VALIDATE_BODY_BYTES))
                 .build();
 
         bytesLargeRequest = new Request.Builder()
@@ -96,15 +109,16 @@ public class BenchClientState {
     }
 
     /**
-     * 执行 HTTP 请求并完全消费响应体。
-     * 返回 body 字符串供 Blackhole.consume() 消费，防止 JIT 消除副作用。
+     * 执行 HTTP 请求并消费响应体。
+     * 返回 byte[] 供 Blackhole.consume() 消费，防止 JIT 消除副作用。
+     * 使用 {@code body.bytes()} 替代 {@code body.string()} 以消除 String 分配 + UTF-8 解码开销。
      */
-    public String executeAndConsume(Request request) throws Exception {
+    public byte[] executeAndConsume(Request request) throws Exception {
         try (Response response = client.newCall(request).execute()) {
-            String body = response.body().string();
+            byte[] body = response.body().bytes();
             if (!response.isSuccessful()) {
                 throw new RuntimeException("Unexpected response: "
-                        + response.code() + " " + body);
+                        + response.code() + " " + body.length + "bytes");
             }
             return body;
         }
@@ -112,10 +126,10 @@ public class BenchClientState {
 
     /**
      * 同步执行 SSE 流式请求，消费流式响应体。
-     * 以 8KB 块读取 InputStream 并丢弃，模拟真实 SSE 客户端消费行为。
-     * 使用同步 execute() 避免 async 模式下的线程管理和超时竞态。
+     * 使用 {@code body.bytes()} 校验长度（≥10000 字节），替代 {@code body.string()} 避免 String 分配。
+     * 返回总字节数供 Blackhole 消费。
      */
-    public String executeAndConsumeStream(Request request) throws Exception {
+    public long executeAndConsumeStream(Request request) throws Exception {
         try (Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 throw new RuntimeException("Unexpected SSE response: " + response.code());
@@ -124,12 +138,12 @@ public class BenchClientState {
             if (body == null) {
                 throw new RuntimeException("SSE response body is null");
             }
-            String bodyStr = body.string();
-            int total = bodyStr.length();
+            byte[] bodyBytes = body.bytes();
+            int total = bodyBytes.length;
             if (total < 10000) {
                 throw new RuntimeException("SSE response too short: " + total + " bytes (expected ~20700)");
             }
-            return "SSE:" + total + "bytes";
+            return total;
         }
     }
 }
