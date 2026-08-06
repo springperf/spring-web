@@ -109,16 +109,12 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
      */
     protected void afterDrain() {
         if (!queue.isEmpty()) {
+            // 队列仍有数据：channel 可写则继续 drain。
+            // channel 不可写或 reschedule 失败（wip 已被其他线程设置）时什么都不做：
+            // 依赖 BackpressureHandler 的 writable callback（不可写 -> 可写）触发
+            // scheduleDrain() 恢复排空。严禁丢弃队列数据或提前结束流，否则会截断 SSE 响应。
             if (channel.isWritable() && wip.compareAndSet(0, 1)) {
                 eventLoop.execute(this::drain);
-                return;
-            }
-            // 队列非空但 channel 不可写或 reschedule 失败（wip 已被其他线程设置）：
-            // 若已 completed 则直接关闭连接，防止 LastHttpContent 永不写入导致连接挂起。
-            // 队列中剩余数据将被丢弃（send 端已 completed，不会再生产数据）。
-            if (completed && !lastHttpContentWritten) {
-                lastHttpContentWritten = true;
-                onAllDataWritten();
             }
             return;
         }
