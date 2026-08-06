@@ -6,6 +6,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultHttpContent;
+import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.concurrent.EventExecutor;
 import io.springperf.web.core.async.PerfAsyncWebRequest;
@@ -47,7 +48,11 @@ class DefaultNettyStreamSenderTest {
     ChannelFuture channelFuture;
 
     @Captor
-    ArgumentCaptor<DefaultHttpContent> httpContentCaptor;
+    // 用 HttpContent（DefaultHttpContent/LastHttpContent 的父接口）作为捕获类型：
+    // Mockito 4（SB 2.7）的 ArgumentCaptor 捕获所有参数（包括 LastHttpContent），
+    // 而 Mockito 5（master）只捕获匹配类型的参数。统一用父接口捕获 + instanceof 过滤，
+    // 保证两种 Mockito 版本下行为一致。
+    ArgumentCaptor<HttpContent> httpContentCaptor;
     @Captor
     ArgumentCaptor<LastHttpContent> lastHttpContentCaptor;
 
@@ -149,7 +154,7 @@ class DefaultNettyStreamSenderTest {
         sender.send("bad");
 
         verify(channel, atLeastOnce()).writeAndFlush(httpContentCaptor.capture());
-        DefaultHttpContent content = httpContentCaptor.getValue();
+        DefaultHttpContent content = (DefaultHttpContent) httpContentCaptor.getValue();
         assertEquals("good", content.content().toString(StandardCharsets.UTF_8));
     }
 
@@ -230,8 +235,11 @@ class DefaultNettyStreamSenderTest {
         verify(channel, atLeastOnce()).writeAndFlush(lastHttpContentCaptor.capture());
         assertEquals(0, sender.queueSize());
         int written = 0;
-        for (DefaultHttpContent c : httpContentCaptor.getAllValues()) {
-            written += c.content().readableBytes();
+        for (HttpContent c : httpContentCaptor.getAllValues()) {
+            // 只统计数据帧，排除 LastHttpContent（Mockito 4 的 captor 会捕获到它）
+            if (c instanceof DefaultHttpContent) {
+                written += c.content().readableBytes();
+            }
         }
         assertEquals(10, written, "所有已发送数据必须完整写出，不允许截断");
     }
