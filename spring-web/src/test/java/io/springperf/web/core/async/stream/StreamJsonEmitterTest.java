@@ -55,7 +55,7 @@ class StreamJsonEmitterTest {
         StreamJsonEmitter emitter = new StreamJsonEmitter(jsonConverter);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         emitter.encode(null, baos);
-        assertEquals("\n", baos.toString(StandardCharsets.UTF_8));
+        assertEquals("\n", new String(baos.toByteArray(), StandardCharsets.UTF_8));
     }
 
     @Test
@@ -70,7 +70,7 @@ class StreamJsonEmitterTest {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         emitter.encode("hello", baos);
 
-        assertEquals("\"hello\"\n", baos.toString(StandardCharsets.UTF_8));
+        assertEquals("\"hello\"\n", new String(baos.toByteArray(), StandardCharsets.UTF_8));
         verify(jsonConverter).toJson(any(OutputStream.class), eq("hello"));
     }
 

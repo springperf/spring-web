@@ -46,21 +46,21 @@ class TextStreamEmitterTest {
     void encode_null_returnsNewline() throws Exception {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         emitter.encode(null, baos);
-        assertEquals("\n", baos.toString(StandardCharsets.UTF_8));
+        assertEquals("\n", new String(baos.toByteArray(), StandardCharsets.UTF_8));
     }
 
     @Test
     void encode_string_returnsStringWithNewline() throws Exception {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         emitter.encode("hello", baos);
-        assertEquals("hello\n", baos.toString(StandardCharsets.UTF_8));
+        assertEquals("hello\n", new String(baos.toByteArray(), StandardCharsets.UTF_8));
     }
 
     @Test
     void encode_emptyString_returnsNewline() throws Exception {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         emitter.encode("", baos);
-        assertEquals("\n", baos.toString(StandardCharsets.UTF_8));
+        assertEquals("\n", new String(baos.toByteArray(), StandardCharsets.UTF_8));
     }
 
     @Test
