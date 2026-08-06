@@ -335,7 +335,7 @@ public abstract class AbstractFastFailHttpServletRequest
 
     @Override
     public boolean isRequestedSessionIdFromUrl() {
-        throw unsupported("getSession");
+        throw unsupported("isRequestedSessionIdFromUrl");
     }
 
     @Override

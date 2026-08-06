@@ -121,17 +121,17 @@ class HttpBodyCodecRegistryWriteNegotiationTest {
 
     private static ConsumeOrProduceMatcher jsonProduceMatcher() {
         return new ConsumeOrProduceMatcher(true,
-                List.of(new MediaTypeExpressionSupport(MediaType.APPLICATION_JSON, false)));
+                Collections.singletonList(new MediaTypeExpressionSupport(MediaType.APPLICATION_JSON, false)));
     }
 
     private PathMappingContext optimizedProduceContext() {
         return new PathMappingContext(new HandlerMethod(new OptimizeController(), optimizeEcho),
-                List.of(jsonProduceMatcher()), "/optimize-produce");
+                Collections.singletonList(jsonProduceMatcher()), "/optimize-produce");
     }
 
     private PathMappingContext plainProduceContext() {
         return new PathMappingContext(new HandlerMethod(new PlainController(), plainEcho),
-                List.of(jsonProduceMatcher()), "/plain-produce");
+                Collections.singletonList(jsonProduceMatcher()), "/plain-produce");
     }
 
     private void setMatchedContext(PathMappingContext ctx) {
@@ -140,7 +140,7 @@ class HttpBodyCodecRegistryWriteNegotiationTest {
 
     private HttpBodyConverter jsonConverter() {
         HttpBodyConverter converter = mock(HttpBodyConverter.class);
-        when(converter.getSupportedMediaTypes()).thenReturn(List.of(MediaType.APPLICATION_JSON));
+        when(converter.getSupportedMediaTypes()).thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON));
         when(converter.canWrite(any(), any(), any(), any(), any(), any())).thenReturn(true);
         return converter;
     }
@@ -181,7 +181,7 @@ class HttpBodyCodecRegistryWriteNegotiationTest {
     @Test
     void writeBody_optimizeMethod_cacheCanWriteFail_fallsBackAndDoesNotCache() throws Exception {
         HttpBodyConverter converter = mock(HttpBodyConverter.class);
-        when(converter.getSupportedMediaTypes()).thenReturn(List.of(MediaType.APPLICATION_JSON));
+        when(converter.getSupportedMediaTypes()).thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON));
         when(converter.canWrite(any(), any(), isNull(), any(), any(), any())).thenReturn(true);   // 全量 loop
         when(converter.canWrite(any(), any(), notNull(), any(), any(), any())).thenReturn(false); // 命中二次校验失败
         registry.converters.add(converter);

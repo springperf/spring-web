@@ -11,6 +11,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -76,7 +78,7 @@ class NettyHttpHeadersAdapterTest {
 
         headers.add("X-Multi", "a");
         headers.add("X-Multi", "b");
-        assertEquals(List.of("a", "b"), nativeRequest.headers().getAll("X-Multi"));
+        assertEquals(Arrays.asList("a", "b"), nativeRequest.headers().getAll("X-Multi"));
 
         // 反向：直接写 Netty 请求头，视图可见（同一存储）
         nativeRequest.headers().set("Y", "z");
@@ -106,13 +108,13 @@ class NettyHttpHeadersAdapterTest {
         view.add("X-Multi", "b");
 
         assertEquals("application/json", nettyHeaders.get("Content-Type"));
-        assertEquals(List.of("a", "b"), nettyHeaders.getAll("X-Multi"));
+        assertEquals(Arrays.asList("a", "b"), nettyHeaders.getAll("X-Multi"));
 
         // 反向：直接写 Netty，视图可见（同一存储）
         nettyHeaders.set("Y", "z");
         assertEquals("z", view.getFirst("Y"));
         nettyHeaders.add("Y", "w");
-        assertEquals(List.of("z", "w"), view.get("Y"));
+        assertEquals(Arrays.asList("z", "w"), view.get("Y"));
     }
 
     @Test
@@ -122,7 +124,7 @@ class NettyHttpHeadersAdapterTest {
 
         view.set("A", "1");
         view.set("B", "2");
-        assertEquals(List.of("1"), view.remove("A"));
+        assertEquals(Collections.singletonList("1"), view.remove("A"));
         assertNull(nettyHeaders.get("A"));
         assertNull(view.get("A"));
 
