@@ -292,6 +292,7 @@ public class ReportGenerator {
         w.printf("## %d. GC 行为\n\n", ++sectionNum);
         writeGcSections(w, byApi, profiles, apis, false);
         w.printf("## %d. 内存占用 (稳态)\n\n", ++sectionNum);
+        w.println("*内存为容器级稳态快照（同一容器所有 API 共享同一 JVM），非 per-API 数据。*\n");
         writeMemorySections(w, byApi, profiles, apis);
 
         if (failCount > 0) {
@@ -452,30 +453,25 @@ public class ReportGenerator {
 
         // 3. GC 行为
         w.printf("## %d. GC行为\n\n", ++sectionNum);
+        w.println("*GC 数据优先取 JMH GCProfiler 的 per-API 指标；仅在缺失时回退到容器级 gc.log 聚合解析。*\n");
         for (String api : apis) {
             if ("_default".equals(api)) continue;
             w.printf("### %s\n\n", api);
-            w.println("| 容器 | JDK | 线程 | Young GC | 平均暂停 | 分配率 | 每请求分配 | Full GC |");
-            w.println("|------|-----|------|----------|---------|-------|-----------|---------|");
+            w.println("| 容器 | JDK | 线程 | GC 次数 | 平均暂停 | 分配率 | 每请求分配 | Full GC |");
+            w.println("|------|-----|------|---------|---------|-------|-----------|---------|");
             for (String p : profiles) {
                 for (String jdk : jdkVersions) {
                     for (String tc : threadArr) {
                         ProfileData data = getScalabilityData(allData.get(tc), jdk, api, p);
-                        if (data != null && data.success && data.gcMetrics != null) {
-                            GcMetrics gc = data.gcMetrics;
-                            double tp = data.throughputs.isEmpty() ? 0 : data.throughputs.values().iterator().next();
-                            String perReq = "N/A";
-                            if (gc.getAllocationRateMbPerSec() > 0 && tp > 0) {
-                                perReq = String.format("%.1fKB", (gc.getAllocationRateMbPerSec() * 1024) / tp);
+                        if (data != null && data.success) {
+                            String[] cells = gcCellTexts(data);
+                            if (cells != null) {
+                                w.printf("| %s | %s | %s | %s | %s | %s | %s | %s |\n",
+                                        p, jdk, tc, cells[0], cells[1], cells[2], cells[3], cells[4]);
+                                continue;
                             }
-                            String rate = gc.getAllocationRateMbPerSec() > 0.001
-                                    ? String.format("%.0fMB/s", gc.getAllocationRateMbPerSec()) : "N/A";
-                            w.printf("| %s | %s | %s | %d | %.1fms | %s | %s | %d |\n",
-                                    p, jdk, tc, gc.getYoungGcCount(), gc.getYoungGcAvgMs(),
-                                    rate, perReq, gc.getFullGcCount());
-                        } else {
-                            w.printf("| %s | %s | %s | FAIL | FAIL | FAIL | FAIL | FAIL |\n", p, jdk, tc);
                         }
+                        w.printf("| %s | %s | %s | FAIL | FAIL | FAIL | FAIL | FAIL |\n", p, jdk, tc);
                     }
                 }
             }
@@ -484,6 +480,7 @@ public class ReportGenerator {
 
         // 4. 内存占用
         w.printf("## %d. 内存占用\n\n", ++sectionNum);
+        w.println("*内存为容器级稳态快照（同一容器所有 API 共享同一 JVM），非 per-API 数据。*\n");
         for (String api : apis) {
             if ("_default".equals(api)) continue;
             w.printf("### %s\n\n", api);
@@ -591,37 +588,19 @@ public class ReportGenerator {
         for (String api : apis) {
             if ("_default".equals(api)) continue;
             w.printf("### %s\n\n", api);
-            w.println("| 容器 | Young GC | 平均暂停 | 分配率 | 每请求分配 | Full GC |");
-            w.println("|------|----------|---------|-------|-----------|---------|");
+            w.println("| 容器 | GC 次数 | 平均暂停 | 分配率 | 每请求分配 | Full GC |");
+            w.println("|------|---------|---------|-------|-----------|---------|");
             for (String p : profiles) {
                 ProfileData data = getData(byApi, api, p);
-                if (data != null && data.success && data.gcMetrics != null) {
-                    GcMetrics gc = data.gcMetrics;
-                    double throughput = 0;
-                    if (!data.throughputs.isEmpty()) {
-                        throughput = data.throughputs.values().iterator().next();
+                if (data != null && data.success) {
+                    String[] cells = gcCellTexts(data);
+                    if (cells != null) {
+                        w.printf("| %s | %s | %s | %s | %s | %s |\n",
+                                p, cells[0], cells[1], cells[2], cells[3], cells[4]);
+                        continue;
                     }
-                    String perReq = "N/A";
-                    if (gc.getAllocationRateMbPerSec() > 0 && throughput > 0) {
-                        double kbPerReq = (gc.getAllocationRateMbPerSec() * 1024) / throughput;
-                        perReq = String.format("%.1fKB", kbPerReq);
-                    }
-                    String allocRate;
-                    double rawRate = gc.getAllocationRateMbPerSec();
-                    if (rawRate > 0.001) {
-                        allocRate = String.format("%.0fMB/s", rawRate);
-                    } else {
-                        allocRate = "N/A";
-                    }
-                    w.printf("| %s | %d | %.1fms | %s | %s | %d |\n",
-                            p, gc.getYoungGcCount(), gc.getYoungGcAvgMs(),
-                            allocRate, perReq, gc.getFullGcCount());
-                } else if (data != null && data.success && data.gcProfilerCount >= 0) {
-                    w.printf("| %s | %.0f | N/A(GCProfiler) | N/A | N/A | N/A |\n",
-                            p, data.gcProfilerCount);
-                } else {
-                    w.printf("| %s | FAIL | FAIL | FAIL | FAIL | FAIL |\n", p);
                 }
+                w.printf("| %s | FAIL | FAIL | FAIL | FAIL | FAIL |\n", p);
             }
             w.println();
         }
@@ -752,12 +731,19 @@ public class ReportGenerator {
         if (secondaryMetrics != null && data.gcProfilerCount < 0) {
             for (java.util.Iterator<String> it = secondaryMetrics.fieldNames(); it.hasNext(); ) {
                 String key = it.next();
+                JsonNode sr = secondaryMetrics.get(key);
+                if (sr == null || !sr.has("score")) continue;
+                double score = sr.get("score").asDouble();
                 if (key.equals("gc.count")) {
-                    JsonNode sr = secondaryMetrics.get(key);
-                    if (sr.has("score")) data.gcProfilerCount = sr.get("score").asDouble();
+                    data.gcProfilerCount = score;
                 } else if (key.equals("gc.time")) {
-                    JsonNode sr = secondaryMetrics.get(key);
-                    if (sr.has("score")) data.gcProfilerTimeMs = sr.get("score").asDouble();
+                    data.gcProfilerTimeMs = score;
+                } else if (key.equals("gc.alloc.rate")) {
+                    // MB/sec，该 benchmark 迭代期间分配率（per-API 准确）
+                    data.gcAllocRateMbPerSec = score;
+                } else if (key.equals("gc.alloc.rate.norm")) {
+                    // B/op，每操作分配字节（per-API 准确）
+                    data.gcAllocRateNormBytes = score;
                 }
             }
         }
@@ -784,8 +770,45 @@ public class ReportGenerator {
         Map<String, PercentileInfo> percentiles = new LinkedHashMap<String, PercentileInfo>();
         GcMetrics gcMetrics;
         MemorySnapshot memorySnapshot;
+        /** JMH GCProfiler per-benchmark 数据（per-API 准确），<0 表示缺失 */
         double gcProfilerCount = -1;
         double gcProfilerTimeMs = -1;
+        double gcAllocRateMbPerSec = -1;
+        double gcAllocRateNormBytes = -1;
+    }
+
+    /**
+     * 生成 GC 表格单元格 {GC次数, 平均暂停, 分配率, 每请求分配, FullGC}。
+     * <p>
+     * 优先使用 JMH GCProfiler 的 per-benchmark 数据（同一容器内各 API 独立、准确）；
+     * 缺失时回退到 gc.log 聚合解析（容器级，同一容器所有 API 共享同一份 JVM GC 活动）。
+     * 均缺失返回 {@code null}。
+     */
+    private static String[] gcCellTexts(ProfileData data) {
+        if (data.gcProfilerCount >= 0) {
+            int gcCount = (int) Math.round(data.gcProfilerCount);
+            String avgPause = gcCount > 0
+                    ? String.format("%.1fms", data.gcProfilerTimeMs / gcCount) : "0.0ms";
+            String rate = data.gcAllocRateMbPerSec > 0.001
+                    ? String.format("%.0fMB/s", data.gcAllocRateMbPerSec) : "N/A";
+            String perReq = data.gcAllocRateNormBytes > 0
+                    ? String.format("%.1fKB", data.gcAllocRateNormBytes / 1024.0) : "N/A";
+            return new String[]{String.valueOf(gcCount), avgPause, rate, perReq, "N/A"};
+        }
+        if (data.gcMetrics != null) {
+            GcMetrics gc = data.gcMetrics;
+            double throughput = data.throughputs.isEmpty() ? 0 : data.throughputs.values().iterator().next();
+            String perReq = "N/A";
+            if (gc.getAllocationRateMbPerSec() > 0 && throughput > 0) {
+                perReq = String.format("%.1fKB", (gc.getAllocationRateMbPerSec() * 1024) / throughput);
+            }
+            String rate = gc.getAllocationRateMbPerSec() > 0.001
+                    ? String.format("%.0fMB/s", gc.getAllocationRateMbPerSec()) : "N/A";
+            return new String[]{String.valueOf(gc.getYoungGcCount()),
+                    String.format("%.1fms", gc.getYoungGcAvgMs()), rate, perReq,
+                    String.valueOf(gc.getFullGcCount())};
+        }
+        return null;
     }
 
     static class PercentileInfo {
