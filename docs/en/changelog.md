@@ -43,6 +43,7 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Build
 
 - **`spring-boot-maven-plugin` version managed** in root pom `pluginManagement`, aligned with `${spring-boot.version}`
+- **JDK 25 build support**: Lombok upgraded to 1.18.46, Mockito to 5.19.0, ByteBuddy to 1.18.11 to fix the Lombok annotation-processing crash (`TypeTag::UNKNOWN`) and test-phase compatibility on JDK 25
 
 ### Documentation
 

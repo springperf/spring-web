@@ -43,6 +43,7 @@
 ### 构建
 
 - **`spring-boot-maven-plugin` 版本纳入根 pom `pluginManagement`**：子模块插件版本与 `${spring-boot.version}` 对齐
+- **JDK 25 构建支持**：Lombok 升级至 1.18.46、Mockito 升级至 5.19.0、ByteBuddy 升级至 1.18.11，修复 JDK 25 下 Lombok 注解处理崩溃（`TypeTag::UNKNOWN`）及测试期兼容性
 
 ### 文档
 

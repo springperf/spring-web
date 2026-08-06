@@ -72,10 +72,10 @@
         <spring-ai.version>1.1.8</spring-ai.version>
 
         <!-- 以下属性从 spring-boot-starter-parent 继承，因移除 parent 改为显式定义 -->
-        <lombok.version>1.18.36</lombok.version>
+        <lombok.version>1.18.46</lombok.version>
         <junit-jupiter.version>5.10.5</junit-jupiter.version>
-        <mockito.version>5.7.0</mockito.version>
-        <byte-buddy.version>1.14.19</byte-buddy.version>
+        <mockito.version>5.19.0</mockito.version>
+        <byte-buddy.version>1.18.11</byte-buddy.version>
         <assertj.version>3.24.2</assertj.version>
         <snakeyaml.version>2.2</snakeyaml.version>
 
@@ -345,7 +345,7 @@
             <id>spring-boot-3.1</id>
             <properties>
                 <spring-boot.version>3.1.12</spring-boot.version>
-                <lombok.version>1.18.32</lombok.version>
+                <lombok.version>1.18.46</lombok.version>
                 <junit-jupiter.version>5.9.3</junit-jupiter.version>
                 <mockito.version>5.3.1</mockito.version>
                 <byte-buddy.version>1.14.16</byte-buddy.version>
@@ -361,7 +361,7 @@
             <id>spring-boot-3.0</id>
             <properties>
                 <spring-boot.version>3.0.13</spring-boot.version>
-                <lombok.version>1.18.30</lombok.version>
+                <lombok.version>1.18.46</lombok.version>
                 <junit-jupiter.version>5.9.3</junit-jupiter.version>
                 <mockito.version>4.8.1</mockito.version>
                 <byte-buddy.version>1.12.23</byte-buddy.version>
