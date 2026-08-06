@@ -4,6 +4,49 @@
 
 本项目遵循 [语义化版本控制](https://semver.org/lang/zh-CN/)。
 
+## [2.7.4] - 20260806
+
+### 新增
+
+- **`JsonConverter.toJsonBytes()` API**：`JsonConverter` 接口新增直接输出 `byte[]` 的方法，Jackson / Fastjson 转换器实现，跳过中间 `String` 拷贝，降低响应序列化开销
+- **SSE 测试体系扩充**：新增 `DefaultNettyStreamSenderTest`、`EarlyEncodeNettyStreamSenderTest`、`HttpBodyCodecRegistryWriteNegotiationTest`、`NettyHttpHeadersAdapterTest` 等
+- **一键 JFR flame graph 脚本**：`spring-web-benchmark/jfr-hotspot.sh` / `analyze-jfr2.sh`，批量生成 CPU 热点火焰图；`analyze_jfr.py` CPU 热点分析脚本纳入版本控制
+
+### 重构
+
+- **SSE 流式发送重构**：`NettyStreamSender` 拆分为 `DefaultNettyStreamSender`（EventLoop 延迟编码）与 `EarlyEncodeNettyStreamSender`（App 线程早编码 byte[] 快照），支持数据提前冻结
+- **HTTP 头零拷贝视图**：新增 `NettyHttpHeadersAdapter`，`WebHttpHeaders` 直接委托 Netty 头存储，消除请求头 O(n) 拷贝
+- **Body 内容协商重写**：`HttpBodyCodecRegistry` 写路径协商逻辑重构，新增写协商专项测试
+- **Arg 模块优化**：`SpringHandlerMethodArgumentResolverAdapter` 重构为 `Provider` 形式；validator 在方法参数上下文缓存
+- **Retval 模块优化**：`ReturnValueResolverRegistry` / `MethodReturnValueContext` 重构
+- **404/405 免栈异常**：改用 `StacklessResponseStatusException`，降低请求路径异常构造开销
+- **线程池安全替换**：`BizPoolRegistry` 支持安全替换旧线程池
+
+### 优化
+
+- **Jackson converter**：序列化路径优化
+- **CORS 异常映射**：`CorsRegistry` / 异常解析器异常映射精简
+
+### 修复
+
+- **SSE 单条消息溢出**：`EarlyEncodeNettyStreamSender` 单条消息超过 `maxFlushBytes` 时直接独立写入，不再抛 `IndexOutOfBoundsException`
+- **`sendError()` JSON 转义**：错误响应 message 转义引号 / 反斜杠 / 控制字符，避免畸形 JSON
+- **`NettyServerHttpResponse.flush()` 失败后 buffer 置空**：防止返回已释放的 ByteBuf
+- **路由匹配数组越界**：`NameValueExpressionSupport` / `ParamOrHeaderMatcher` / `SuffixPathRouterOptimizer` 修复
+- **Async 状态校验**：`AsyncSupportUtils` / `PerfAsyncWebRequest` 状态校验逻辑修正
+- **错误信息修正**：`AbstractFastFailHttpServletRequest` 10 处复制粘贴错误信息改为对应方法名
+- **Actuator 管理端口 Bean**：补 `@ConditionalOnMissingBean`
+- **Batch 优雅停机**：`DisruptorQueue` / `NettyHttpServer` 停机流程完善
+
+### 构建
+
+- **`spring-boot-maven-plugin` 版本纳入根 pom `pluginManagement`**：子模块插件版本与 `${spring-boot.version}` 对齐
+
+### 文档
+
+- **README 默认语言改为英文**，新增 `README_CN.md`
+- **同步 master 的 `2.7.x-migration-checklist.md`** backport 降级适配指南
+
 ## [2.7.3] - 20260710
 
 ### 新增
