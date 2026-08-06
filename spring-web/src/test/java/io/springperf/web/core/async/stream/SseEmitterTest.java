@@ -55,7 +55,7 @@ class SseEmitterTest {
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         emitter.encode(event, baos);
-        String result = baos.toString(StandardCharsets.UTF_8);
+        String result = new String(baos.toByteArray(), StandardCharsets.UTF_8);
 
         assertTrue(result.contains("id:1"));
         assertTrue(result.contains("event:message"));
@@ -71,7 +71,7 @@ class SseEmitterTest {
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         emitter.encode(data, baos);
-        String result = baos.toString(StandardCharsets.UTF_8);
+        String result = new String(baos.toByteArray(), StandardCharsets.UTF_8);
 
         assertTrue(result.contains("data:hello world"));
         assertTrue(result.endsWith("\n\n"));
@@ -82,7 +82,7 @@ class SseEmitterTest {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         emitter.encode((Object) null, baos);
 
-        String result = baos.toString(StandardCharsets.UTF_8);
+        String result = new String(baos.toByteArray(), StandardCharsets.UTF_8);
         assertEquals("\n", result);
     }
 
@@ -92,7 +92,7 @@ class SseEmitterTest {
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         emitter.encode(data, baos);
-        String result = baos.toString(StandardCharsets.UTF_8);
+        String result = new String(baos.toByteArray(), StandardCharsets.UTF_8);
 
         assertTrue(result.contains("data:line1"));
         assertTrue(result.contains("data:line2"));
@@ -104,7 +104,7 @@ class SseEmitterTest {
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         emitter.encode(event, baos);
-        String result = baos.toString(StandardCharsets.UTF_8);
+        String result = new String(baos.toByteArray(), StandardCharsets.UTF_8);
 
         assertFalse(result.contains("id:"));
         assertFalse(result.contains("event:"));
@@ -121,7 +121,7 @@ class SseEmitterTest {
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         emitter.encode(event, baos);
-        String result = baos.toString(StandardCharsets.UTF_8);
+        String result = new String(baos.toByteArray(), StandardCharsets.UTF_8);
 
         assertTrue(result.contains(":keepalive"));
         assertTrue(result.contains("data:ping"));

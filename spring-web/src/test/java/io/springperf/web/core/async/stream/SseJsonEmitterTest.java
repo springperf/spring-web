@@ -36,7 +36,7 @@ class SseJsonEmitterTest {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         emitter.encode(data, baos);
 
-        String output = baos.toString(StandardCharsets.UTF_8);
+        String output = new String(baos.toByteArray(), StandardCharsets.UTF_8);
         assertTrue(output.contains("data:{\"key\":\"value\"}"));
         verify(jsonConverter).toJson(any(OutputStream.class), eq(data));
     }
