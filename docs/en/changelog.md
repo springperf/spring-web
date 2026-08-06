@@ -4,6 +4,49 @@
 
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.4] - 20260806
+
+### Added
+
+- **`JsonConverter.toJsonBytes()` API**: New `toJsonBytes()` method on `JsonConverter`, implemented by Jackson / Fastjson converters to emit `byte[]` directly, skipping intermediate `String` copies and reducing serialization overhead
+- **SSE test coverage expanded**: `DefaultNettyStreamSenderTest`, `EarlyEncodeNettyStreamSenderTest`, `HttpBodyCodecRegistryWriteNegotiationTest`, `NettyHttpHeadersAdapterTest`, etc.
+- **One-click JFR flame graph scripts**: `spring-web-benchmark/jfr-hotspot.sh` / `analyze-jfr2.sh` for batch CPU hotspot flame graphs; `analyze_jfr.py` hotspot analyzer now tracked in version control
+
+### Changed
+
+- **SSE streaming refactor**: `NettyStreamSender` split into `DefaultNettyStreamSender` (EventLoop lazy encoding) and `EarlyEncodeNettyStreamSender` (App-thread early-encoded `byte[]` snapshots) so data can be frozen in advance
+- **Zero-copy HTTP header view**: New `NettyHttpHeadersAdapter` — `WebHttpHeaders` delegates directly to Netty header storage, eliminating O(n) request header copies
+- **Body content negotiation rewritten**: `HttpBodyCodecRegistry` write-path negotiation refactored with dedicated negotiation tests
+- **Arg module optimized**: `SpringHandlerMethodArgumentResolverAdapter` refactored into a `Provider`; validator cached in method-argument context
+- **Retval module optimized**: `ReturnValueResolverRegistry` / `MethodReturnValueContext` refactored
+- **Stackless 404/405**: `StacklessResponseStatusException` used to reduce exception construction overhead on the request path
+- **Safe pool replacement**: `BizPoolRegistry` supports safe replacement of existing pools
+
+### Optimized
+
+- **Jackson converter**: serialization path optimization
+- **CORS exception mapping**: streamlined `CorsRegistry` / exception-resolver mapping
+
+### Fixed
+
+- **SSE single-message overflow**: `EarlyEncodeNettyStreamSender` writes oversized messages independently instead of throwing `IndexOutOfBoundsException`
+- **`sendError()` JSON escaping**: error messages now escape quotes / backslashes / control chars to avoid malformed JSON
+- **`NettyServerHttpResponse.flush()` buffer nulling**: prevents returning a released `ByteBuf` after flush failure
+- **Routing array out-of-bounds**: `NameValueExpressionSupport` / `ParamOrHeaderMatcher` / `SuffixPathRouterOptimizer` fixes
+- **Async state validation**: corrected `AsyncSupportUtils` / `PerfAsyncWebRequest` state checks
+- **Error message fixes**: 10 copy-paste error messages in `AbstractFastFailHttpServletRequest` corrected to their method names
+- **Actuator management beans**: added `@ConditionalOnMissingBean`
+- **Batch graceful shutdown**: refined `DisruptorQueue` / `NettyHttpServer` shutdown flow
+
+### Build
+
+- **`spring-boot-maven-plugin` version managed** in root pom `pluginManagement`, aligned with `${spring-boot.version}`
+
+### Documentation
+
+- **README default language switched to English**, added `README_CN.md`
+- **Synced the `2.7.x-migration-checklist.md`** backport downgrade guide from master
+
 ## [2.7.3] - 20260710
 
 ### Added
