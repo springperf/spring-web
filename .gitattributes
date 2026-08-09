@@ -1,0 +1,4 @@
+# Shell 脚本强制 LF 行尾：WSL 内 Debian bash 对 CRLF 的 `set -euo pipefail\r`
+# 会报 invalid option name（Git Bash 的 bash 容忍 CRLF，WSL 内严格报错）。
+# autocrlf=true 会把 git 存储的 LF 检出为 CRLF，这里用 eol=lf 覆盖。
+*.sh text eol=lf
