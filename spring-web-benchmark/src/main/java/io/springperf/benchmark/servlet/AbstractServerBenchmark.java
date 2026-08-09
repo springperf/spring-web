@@ -56,20 +56,31 @@ public class AbstractServerBenchmark {
 
     @Setup(Level.Trial)
     public void setup() {
-        Class<?> appClass = getApplicationClass();
-        Properties props = new Properties();
-        props.setProperty("server.port", String.valueOf(BenchmarkConstants.PORT));
-        serverState = new BenchServerState(appClass, props);
-        serverState.start();
         clientState = new BenchClientState();
-        clientState.setup(serverState.getActualPort());
+        String targetHost = BenchmarkConstants.TARGET_HOST;
+        if (targetHost.isEmpty()) {
+            // 进程内模式（默认，现状）：JMH JVM 内启动服务端
+            Class<?> appClass = getApplicationClass();
+            Properties props = new Properties();
+            props.setProperty("server.port", String.valueOf(BenchmarkConstants.PORT));
+            serverState = new BenchServerState(appClass, props);
+            serverState.start();
+            clientState.setup(BenchmarkConstants.buildBaseUrl("localhost", serverState.getActualPort()));
+        } else {
+            // external 模式：服务端已在远端（如 WSL 2c 限制环境）运行，直接连接
+            clientState.setup(BenchmarkConstants.buildBaseUrl(targetHost, BenchmarkConstants.PORT));
+        }
     }
 
     @TearDown(Level.Trial)
     public void teardown() {
-        collectMemorySnapshot();
+        if (serverState != null) {
+            // 仅进程内模式：本 JVM 含服务端，内存快照才有意义
+            collectMemorySnapshot();
+            serverState.stop();
+        }
+        // external 模式：服务端由 WSL 侧脚本管理，本 JVM 仅客户端，跳过内存快照
         clientState.cleanup();
-        serverState.stop();
     }
 
     // ==================== Memory Snapshot ====================

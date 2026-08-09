@@ -11,7 +11,8 @@ public final class BenchmarkConstants {
     public static final int PORT = Integer.parseInt(
             System.getProperty("benchmark.port", "9090"));
     public static final String CONTEXT_PATH = "/api";
-    public static final String BASE_URL = "http://localhost:" + PORT + CONTEXT_PATH;
+    /** external 模式服务端主机（如 WSL IP 172.x.x.x）；空 = 进程内启动服务端 */
+    public static final String TARGET_HOST = System.getProperty("benchmark.target", "");
     public static final MediaType JSON_MEDIA_TYPE = MediaType.get("application/json; charset=utf-8");
 
     public static final int WARMUP_ITERATIONS = 10;
@@ -53,6 +54,11 @@ public final class BenchmarkConstants {
     public static final int SSE_CHUNK_INTERVAL_MS = 0;
     /** SSE 流式接口路径 */
     public static final String SSE_PATH = "/core/sse/stream";
+
+    /** 构造 base URL：http://host:port + CONTEXT_PATH */
+    public static String buildBaseUrl(String host, int port) {
+        return "http://" + host + ":" + port + CONTEXT_PATH;
+    }
 
     private BenchmarkConstants() {
     }

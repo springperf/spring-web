@@ -48,9 +48,10 @@ public class BenchClientState {
             BenchmarkConstants.VALIDATE_BODY.getBytes(StandardCharsets.UTF_8);
 
     /**
-     * @param actualPort 服务器实际绑定的端口（可能因 fallback 不同于配置端口）
+     * @param base 目标服务端 base URL，如 {@code http://localhost:9092/api}。
+     *             由调用方构造：in-process 模式传 localhost，external 模式传远端 host（如 WSL IP）。
      */
-    public void setup(int actualPort) {
+    public void setup(String base) {
         client = new OkHttpClient.Builder()
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
@@ -60,8 +61,6 @@ public class BenchClientState {
                 .protocols(Collections.singletonList(Protocol.HTTP_1_1))
                 .connectionPool(new ConnectionPool(128, 30, TimeUnit.SECONDS))
                 .build();
-
-        String base = "http://localhost:" + actualPort + BenchmarkConstants.CONTEXT_PATH;
 
         // byte[] 请求体避免 writeUtf8 开销
         jsonRequest = new Request.Builder()
