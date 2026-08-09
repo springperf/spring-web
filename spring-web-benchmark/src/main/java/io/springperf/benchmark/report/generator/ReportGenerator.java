@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -56,9 +57,12 @@ public class ReportGenerator {
 
         // 检测多线程并发测试结构
         List<Path> threadDirs = findThreadDirs(runDir);
+        String runMeta = readRunMeta(runDir);
+        // run-meta.txt 记录的期望容器列表；非空时用于校验缺失容器（不再静默丢失）
+        List<String> expectedProfiles = readExpectedProfiles(runDir);
         String report;
         if (!threadDirs.isEmpty()) {
-            report = generateScalabilityReport(runDir, threadDirs);
+            report = generateScalabilityReport(runDir, threadDirs, runMeta, expectedProfiles);
         } else {
             // 单线程模式（向后兼容）
             Path jdkDir = findJdkDir(runDir);
@@ -66,7 +70,7 @@ public class ReportGenerator {
                 System.err.println("No JDK subdirectory found in " + runDir);
                 System.exit(1);
             }
-            report = generateReport(jdkDir);
+            report = generateReport(jdkDir, runMeta, expectedProfiles);
         }
 
         Path reportPath = runDir.resolve("report.md");
@@ -105,6 +109,56 @@ public class ReportGenerator {
             }
         }
         return runDir;
+    }
+
+    /**
+     * 读取 run 根目录的 run-meta.txt（wsl-run-all.sh 写入的运行参数），
+     * 拼成单行描述（如 mode=thrpt | threads=4 | profiles=... | apis=...）；
+     * 无 meta 文件（如历史 run）返回空串，报告不显示该行。
+     */
+    private static String readRunMeta(Path runDir) {
+        Path metaFile = runDir.resolve("run-meta.txt");
+        if (!Files.exists(metaFile)) return "";
+        try {
+            StringBuilder sb = new StringBuilder();
+            for (String line : Files.readAllLines(metaFile, StandardCharsets.UTF_8)) {
+                String t = line.trim();
+                if (!t.isEmpty()) {
+                    if (sb.length() > 0) sb.append(" | ");
+                    sb.append(t);
+                }
+            }
+            return sb.toString();
+        } catch (IOException e) {
+            System.err.println("[WARN] Failed to read run-meta.txt: " + e.getMessage());
+            return "";
+        }
+    }
+
+    /**
+     * 解析 run-meta.txt 的 profiles 字段（wsl-run-all.sh 记录的期望容器列表）。
+     * 无 meta 文件、无 profiles 字段或解析失败返回空列表；空列表 = 不校验缺失。
+     */
+    private static List<String> readExpectedProfiles(Path runDir) {
+        Path metaFile = runDir.resolve("run-meta.txt");
+        if (!Files.exists(metaFile)) return Collections.emptyList();
+        try {
+            for (String line : Files.readAllLines(metaFile, StandardCharsets.UTF_8)) {
+                String t = line.trim();
+                if (t.startsWith("profiles=")) {
+                    List<String> list = new ArrayList<>();
+                    for (String p : t.substring("profiles=".length()).split(",")) {
+                        String s = p.trim();
+                        if (!s.isEmpty()) list.add(s);
+                    }
+                    return list;
+                }
+            }
+            return Collections.emptyList();
+        } catch (IOException e) {
+            System.err.println("[WARN] Failed to read run-meta.txt profiles: " + e.getMessage());
+            return Collections.emptyList();
+        }
     }
 
     // ==================== 多线程并发测试检测 ====================
@@ -163,8 +217,16 @@ public class ReportGenerator {
                 if (apisInFile.size() > 1 || !stem.contains("-")) {
                     profile = stem;
                 } else {
+                    // 单 API：文件名可能为 <profile>-<api>，但 profile 名本身可能含连字符
+                    // （如 perf-support）。仅当最后一个 '-' 后是已知 API 名时才按
+                    // "profile-api" 拆分，否则把整个 stem 当 profile 名。
                     int lastHyphen = stem.lastIndexOf('-');
-                    profile = stem.substring(0, lastHyphen);
+                    String tail = stem.substring(lastHyphen + 1);
+                    if (KNOWN_APIS.contains(tail)) {
+                        profile = stem.substring(0, lastHyphen);
+                    } else {
+                        profile = stem;
+                    }
                 }
 
                 Path gcFileShared = jdkDir.resolve("gc-" + profile + ".log");
@@ -233,7 +295,7 @@ public class ReportGenerator {
 
     // ==================== 单线程报告（向后兼容） ====================
 
-    private static String generateReport(Path jdkDir) throws IOException {
+    private static String generateReport(Path jdkDir, String runMeta, List<String> expectedProfiles) throws IOException {
         Map<String, Map<String, ProfileData>> byApi = discoverAllData(jdkDir);
 
         LinkedHashSet<String> allProfiles = new LinkedHashSet<>();
@@ -273,14 +335,39 @@ public class ReportGenerator {
 
         w.println("# Spring WebPerf 性能对比报告\n");
         w.println("**生成时间:** " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        if (runMeta != null && !runMeta.isEmpty()) {
+            w.println();
+            w.println("**运行参数:** " + runMeta);
+        }
         w.println();
         w.println("**JDK:** " + jdkDir.getFileName().toString());
         w.println();
 
+        // 期望容器：run-meta 指定时用它做分母，缺失容器计入失败（不再静默丢失）
+        List<String> expected = (expectedProfiles == null || expectedProfiles.isEmpty())
+                ? Arrays.asList(profiles) : expectedProfiles;
+        LinkedHashSet<String> foundSet = new LinkedHashSet<>(Arrays.asList(profiles));
+        List<String> missing = new ArrayList<>();
+        for (String exp : expected) {
+            if (!foundSet.contains(exp)) missing.add(exp);
+        }
+        int effectiveProfiles = expected.size();
+        int effectiveFail = failCount + missing.size() * apis.length;
+
         w.println("## 执行摘要\n");
-        w.printf("发现 **%d** 个 API × **%d** 个容器，总计 **%d/%d** 成功，**%d** 失败\n\n",
-                totalApis(apis.length, false), profiles.length, successCount,
-                apis.length * profiles.length, failCount);
+        w.printf("发现 **%d** 个 API × **%d** 个容器，总计 **%d/%d** 成功，**%d** 失败",
+                totalApis(apis.length, false), effectiveProfiles, successCount,
+                apis.length * effectiveProfiles, effectiveFail);
+        if (!missing.isEmpty()) {
+            w.printf("（期望 %d 个容器，缺失 %d 个）", expected.size(), missing.size());
+        }
+        w.println();
+        w.println();
+        if (!missing.isEmpty()) {
+            w.println("**⚠️ 缺失容器:** " + String.join(", ", missing)
+                    + "（数据未生成，可能是服务端启动失败或压测未执行）");
+            w.println();
+        }
 
         writeThroughputSection(w, byApi, profiles, apis, false);
         int sectionNum = 1;
@@ -292,7 +379,7 @@ public class ReportGenerator {
         w.printf("## %d. GC 行为\n\n", ++sectionNum);
         writeGcSections(w, byApi, profiles, apis, false);
         w.printf("## %d. 内存占用 (稳态)\n\n", ++sectionNum);
-        w.println("*内存为容器级稳态快照（同一容器所有 API 共享同一 JVM），非 per-API 数据。*\n");
+        w.println("*内存为容器级稳态快照（同一容器所有 API 共享同一 JVM），非 per-API 数据；external 模式（服务端在远端 JVM）无法采集时显示 N/A。*\n");
         writeMemorySections(w, byApi, profiles, apis);
 
         if (failCount > 0) {
@@ -320,7 +407,8 @@ public class ReportGenerator {
      * 检测 runDir 下所有 threads-N 子目录，收集各并发度的数据，
      * 生成吞吐量随线程数变化的矩阵，并以中间线程数做详细对比。
      */
-    private static String generateScalabilityReport(Path runDir, List<Path> threadDirs) throws IOException {
+    private static String generateScalabilityReport(Path runDir, List<Path> threadDirs, String runMeta,
+                                                    List<String> expectedProfiles) throws IOException {
         // threadCount -> jdkVersion -> api -> profile -> ProfileData
         LinkedHashMap<String, LinkedHashMap<String, Map<String, Map<String, ProfileData>>>> allData = new LinkedHashMap<>();
         List<String> threadCounts = new ArrayList<>();
@@ -379,14 +467,33 @@ public class ReportGenerator {
 
         w.println("# Spring WebPerf 性能对比报告（多线程并发测试）\n");
         w.println("**生成时间:** " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        if (runMeta != null && !runMeta.isEmpty()) {
+            w.println();
+            w.println("**运行参数:** " + runMeta);
+        }
         w.println();
         w.println("**线程数:** " + String.join(", ", threadCounts));
         w.println("**JDK:** " + String.join(", ", jdkVersions));
         w.println();
 
+        // 期望容器：run-meta 指定时校验缺失（多线程模式下同样不静默丢失）
+        List<String> expected = (expectedProfiles == null || expectedProfiles.isEmpty())
+                ? Arrays.asList(profiles) : expectedProfiles;
+        LinkedHashSet<String> foundSet = new LinkedHashSet<>(Arrays.asList(profiles));
+        List<String> missing = new ArrayList<>();
+        for (String exp : expected) {
+            if (!foundSet.contains(exp)) missing.add(exp);
+        }
+
         w.println("## 执行摘要\n");
-        w.printf("**%d** 个容器 × **%d** 个 API × **%d** 个并发度 × **%d** 个 JDK\n\n",
-                profiles.length, apis.length, threadCounts.size(), jdkVersions.size());
+        w.printf("**%d** 个容器 × **%d** 个 API × **%d** 个并发度 × **%d** 个 JDK",
+                expected.size(), apis.length, threadCounts.size(), jdkVersions.size());
+        if (!missing.isEmpty()) {
+            w.printf("（期望 %d 个容器，缺失 %d 个：%s）",
+                    expected.size(), missing.size(), String.join(", ", missing));
+        }
+        w.println();
+        w.println();
 
         // ==================== 1. 并发伸缩性 ====================
         w.println("## 1. 并发伸缩性 (ops/sec, 越高越好)\n");
@@ -480,7 +587,7 @@ public class ReportGenerator {
 
         // 4. 内存占用
         w.printf("## %d. 内存占用\n\n", ++sectionNum);
-        w.println("*内存为容器级稳态快照（同一容器所有 API 共享同一 JVM），非 per-API 数据。*\n");
+        w.println("*内存为容器级稳态快照（同一容器所有 API 共享同一 JVM），非 per-API 数据；external 模式（服务端在远端 JVM）无法采集时显示 N/A。*\n");
         for (String api : apis) {
             if ("_default".equals(api)) continue;
             w.printf("### %s\n\n", api);
@@ -496,7 +603,7 @@ public class ReportGenerator {
                             String codeStr = extractMemValue(data.memorySnapshot.getNonHeap(), "code_cache");
                             w.printf("| %s | %s | %s | %s | %s | %s |\n", p, jdk, tc, heapStr, metaStr, codeStr);
                         } else {
-                            w.printf("| %s | %s | %s | FAIL | FAIL | FAIL |\n", p, jdk, tc);
+                            w.printf("| %s | %s | %s | N/A | N/A | N/A |\n", p, jdk, tc);
                         }
                     }
                 }
@@ -622,7 +729,7 @@ public class ReportGenerator {
                     String codeStr = extractMemValue(data.memorySnapshot.getNonHeap(), "code_cache");
                     w.printf("| %s | %s | %s | %s |\n", p, heapStr, metaStr, codeStr);
                 } else {
-                    w.printf("| %s | FAIL | FAIL | FAIL |\n", p);
+                    w.printf("| %s | N/A | N/A | N/A |\n", p);
                 }
             }
             w.println();
