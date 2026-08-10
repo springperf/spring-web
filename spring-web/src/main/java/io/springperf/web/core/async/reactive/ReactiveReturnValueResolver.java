@@ -181,7 +181,8 @@ public class ReactiveReturnValueResolver extends BaseAsyncReturnValueResolver {
             if (reactiveConfig == null) {
                 ReactiveSupport reactiveSupport = handlerMethod.getMethodAndClassAnnotation(ReactiveSupport.class);
                 if (reactiveSupport != null) {
-                    reactiveConfig = new ReactiveConfig(reactiveSupport.streamEmitterType(), selectBestConstructor(reactiveConfig.getStreamEmitterType()), reactiveSupport.highWaterMark(), reactiveSupport.lowWaterMark(), reactiveSupport.timeout());
+                    // 修复：此前误用仍为 null 的 reactiveConfig 取 streamEmitterType，首次请求必 NPE
+                    reactiveConfig = new ReactiveConfig(reactiveSupport.streamEmitterType(), selectBestConstructor(reactiveSupport.streamEmitterType()), reactiveSupport.highWaterMark(), reactiveSupport.lowWaterMark(), reactiveSupport.timeout());
                 } else {
                     reactiveConfig = ReactiveConfig.DEFAULT;
                 }
@@ -205,6 +206,11 @@ public class ReactiveReturnValueResolver extends BaseAsyncReturnValueResolver {
             return null;
         }
         List<Constructor<?>> supportedConstructor = Arrays.stream(streamEmitterType.getDeclaredConstructors()).filter(this::isConstructorSupported).collect(Collectors.toList());
+        if (supportedConstructor.isEmpty()) {
+            // 自定义 streamEmitterType 无受支持构造器时给出明确错误，避免 IndexOutOfBoundsException
+            throw new IllegalStateException("No supported constructor in " + streamEmitterType.getName()
+                    + " for ReactiveSupport streamEmitterType; expected a (Long) or (JsonConverter) constructor");
+        }
         supportedConstructor.sort(Comparator.comparingInt(Constructor::getParameterCount));
         Constructor<?> best = supportedConstructor.get(supportedConstructor.size() - 1);
         if (supportedConstructor.size() > 1 && supportedConstructor.get(supportedConstructor.size() - 2).getParameterCount() == best.getParameterCount()) {
