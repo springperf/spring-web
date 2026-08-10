@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.MethodParameter;
+import org.springframework.format.support.DefaultFormattingConversionService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpOutputMessage;
@@ -223,6 +224,56 @@ class SimpleResolverProvidersTest {
         assertSame(mockMap, result);
     }
 
+    /**
+     * 回归 R2-3：{@code @RequestParam List<Integer>} 的元素级转换。
+     * 解析结果来自 {@code request.getParameterMap()}（{@code List<String>}），形参为
+     * {@code List<Integer>}。修复前 {@code convert()} 因 {@code List.isAssignableFrom(ArrayList)}
+     * 短路返回原 {@code List<String>}，业务层遍历时抛 ClassCastException。
+     */
+    @Test
+    void requestParamProvider_collectionResolver_convertsGenericElements() throws Exception {
+        stubWebContext();
+        RequestParamResolverProvider p = new RequestParamResolverProvider();
+        when(webDataBinderRegistry.getConversionService(mappingContext))
+                .thenReturn(new DefaultFormattingConversionService());
+
+        LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("ids", "1");
+        params.add("ids", "2");
+        when(mockRequest.getParameterMap()).thenReturn(params);
+
+        StaticArgumentResolver r = p.getResolver(
+                param("annotatedRequestParamList", List.class, RequestParam.class), mappingContext, webContext);
+        Object result = r.resolveArgument(mockRequest, mockResponse);
+
+        assertTrue(result instanceof List);
+        List<?> list = (List<?>) result;
+        assertEquals(2, list.size());
+        assertEquals(Integer.valueOf(1), list.get(0));
+        assertEquals(Integer.valueOf(2), list.get(1));
+    }
+
+    /**
+     * 回归保护：单值标量（String → Integer）转换不受容器分支影响。
+     */
+    @Test
+    void requestParamProvider_singleValueResolver_convertsScalar() throws Exception {
+        stubWebContext();
+        RequestParamResolverProvider p = new RequestParamResolverProvider();
+        when(webDataBinderRegistry.getConversionService(mappingContext))
+                .thenReturn(new DefaultFormattingConversionService());
+
+        LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("id", "42");
+        when(mockRequest.getParameterMap()).thenReturn(params);
+
+        StaticArgumentResolver r = p.getResolver(
+                param("annotatedRequestParamInt", Integer.class, RequestParam.class), mappingContext, webContext);
+        Object result = r.resolveArgument(mockRequest, mockResponse);
+
+        assertEquals(Integer.valueOf(42), result);
+    }
+
     // ===== @RequestHeader resolver behavior =====
 
     @Test
@@ -349,6 +400,10 @@ class SimpleResolverProvidersTest {
     public void stringParam(String s) {}
     @SuppressWarnings("unused")
     public void annotatedRequestParam(@RequestParam String s) {}
+    @SuppressWarnings("unused")
+    public void annotatedRequestParamList(@RequestParam("ids") List<Integer> ids) {}
+    @SuppressWarnings("unused")
+    public void annotatedRequestParamInt(@RequestParam("id") Integer id) {}
     @SuppressWarnings("unused")
     public void annotatedRequestHeader(@RequestHeader String s) {}
     @SuppressWarnings("unused")

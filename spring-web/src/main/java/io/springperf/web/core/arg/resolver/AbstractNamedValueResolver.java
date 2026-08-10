@@ -8,9 +8,12 @@ import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.util.MetaUtils;
 import org.springframework.core.MethodParameter;
+import org.springframework.core.convert.TypeDescriptor;
 import org.springframework.lang.Nullable;
 
 import java.lang.annotation.Annotation;
+import java.util.Collection;
+import java.util.Map;
 
 public abstract class AbstractNamedValueResolver extends AbstractSupportOptionalResolver implements StaticArgumentResolver {
 
@@ -48,10 +51,26 @@ public abstract class AbstractNamedValueResolver extends AbstractSupportOptional
 
     protected Object convert(Object arg) {
         if (arg == null) return null;
-        if (paramType.isAssignableFrom(arg.getClass())) {
+        if (paramType.isAssignableFrom(arg.getClass()) && !isContainer(arg)) {
             return arg;
         }
-        return webDataBinderRegistry.getConversionService(mappingContext).convert(arg, paramType);
+        return convertWithGenericType(arg);
+    }
+
+    /**
+     * Collection/Map/数组 参数：即使运行时类型与 {@code paramType} 兼容（如 List→List），
+     * 泛型元素类型也可能不匹配（解析结果 {@code List<String>} → 形参 {@code List<Integer>}）。
+     * 必须携带方法参数的完整泛型信息（{@link TypeDescriptor}）做元素级转换，
+     * 由 ConversionService 的 CollectionToCollectionConverter / ArrayToArrayConverter 完成。
+     * 修复前短路返回原集合，业务层遍历时抛 ClassCastException。
+     */
+    protected Object convertWithGenericType(Object arg) {
+        TypeDescriptor targetType = new TypeDescriptor(parameter.nestedIfOptional());
+        return webDataBinderRegistry.getConversionService(mappingContext).convert(arg, targetType);
+    }
+
+    protected boolean isContainer(Object arg) {
+        return arg instanceof Collection || arg instanceof Map || arg.getClass().isArray();
     }
 
     /**
