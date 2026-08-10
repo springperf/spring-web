@@ -145,7 +145,8 @@ public class ReactiveReturnValueResolver extends BaseAsyncReturnValueResolver {
 
     protected boolean containMediaType(MediaType mediaType, WebServerHttpRequest request, WebServerHttpResponse response) {
         MediaType contentType = response.getHeaders().getContentType();
-        if (contentType != null && contentType.includes(contentType)) {
+        // application/json 不包含在 text/event-stream 中 → 不命中，继续走 produces/accept 判断）。
+        if (contentType != null && mediaType.includes(contentType)) {
             return true;
         }
         List<MediaType> supportMediaTypeList = getSupportMediaTypeList(request);
