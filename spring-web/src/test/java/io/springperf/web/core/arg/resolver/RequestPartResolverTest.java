@@ -56,7 +56,8 @@ class RequestPartResolverTest {
         mp.initParameterNameDiscovery(new org.springframework.core.DefaultParameterNameDiscoverer());
 
         MultiValueMap<String, HttpInputMessagePart> partMap = new LinkedMultiValueMap<>();
-        partMap.add("stringParam", part);
+        // name 解析自参数名（无注解时用 parameter.getParameterName()），key 须用 "part"
+        partMap.add("part", part);
 
         lenient().when(httpBodyCodecRegistry.readBody(any(), any(), any(), any())).thenReturn("resolved-value");
         when(request.getPartMap()).thenReturn(partMap);
@@ -94,6 +95,43 @@ class RequestPartResolverTest {
 
         assertNull(result);
     }
+
+    @Test
+    void resolveByName_missingPart_doesNotInvokeCodec() throws Exception {
+        Method method = getClass().getMethod("stringParam", String.class);
+        MethodParameter mp = new MethodParameter(method, 0);
+        mp.initParameterNameDiscovery(new org.springframework.core.DefaultParameterNameDiscoverer());
+
+        MultiValueMap<String, HttpInputMessagePart> partMap = new LinkedMultiValueMap<>();
+        when(request.getPartMap()).thenReturn(partMap);
+
+        RequestPartResolver resolver = new RequestPartResolver(webContext, mappingContext, mp);
+        resolver.resolveArgument(request, response);
+
+        // 回归 R3 P1-7：part 缺失必须短路返回 null（由父类处理 required 语义），
+        // 不得把 null part 传给 readBody —— 真实 HttpBodyCodecRegistry 会对 null 解引用 NPE 500。
+        // 修复前这里会调用 readBody（mock 掩盖了 NPE），verify never 反证。
+        verify(httpBodyCodecRegistry, never()).readBody(any(), any(), any(), any());
+    }
+
+    @Test
+    void resolveByName_missingPart_requiredTrue_throwsBadRequest() throws Exception {
+        Method method = getClass().getMethod("requiredParam", String.class);
+        MethodParameter mp = new MethodParameter(method, 0);
+        mp.initParameterNameDiscovery(new org.springframework.core.DefaultParameterNameDiscoverer());
+
+        MultiValueMap<String, HttpInputMessagePart> partMap = new LinkedMultiValueMap<>();
+        when(request.getPartMap()).thenReturn(partMap);
+
+        RequestPartResolver resolver = new RequestPartResolver(webContext, mappingContext, mp);
+        org.springframework.web.server.ResponseStatusException ex =
+                assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                        () -> resolver.resolveArgument(request, response));
+        assertEquals(org.springframework.http.HttpStatus.BAD_REQUEST, ex.getStatusCode());
+    }
+
+    @SuppressWarnings("unused")
+    public void requiredParam(@org.springframework.web.bind.annotation.RequestPart(required = true) String part) {}
 
     @SuppressWarnings("unused")
     public void stringParam(String part) {}
