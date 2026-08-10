@@ -32,6 +32,11 @@ public class RequestPartResolver extends AbstractNamedValueNullableResolver {
             throw new MultipartException("Current request is not a multipart request");
         }
         HttpInputMessagePart part = partMap.getFirst(name);
+        if (part == null) {
+            // part 缺失：返回 null，由父类 doResolveArgument 统一走 handleNullValue 处理 required 语义
+            // （required=true → 400，false → null）。修复前把 null part 传给 readBody → 内部 NPE 500。
+            return null;
+        }
         return httpBodyCodecRegistry.readBody(targetType, parameter, part, request);
     }
 }
