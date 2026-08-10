@@ -76,14 +76,14 @@ public class DefaultNettyStreamSender extends AbstractNettyStreamSender {
                     emitter.onEncodeError(data, e);
                 }
                 if (batchBuf.writerIndex() >= maxFlushBytes) {
-                    channel.writeAndFlush(new DefaultHttpContent(batchBuf));
+                    flushContent(batchBuf);
                     batchBuf = null;
                     batchOut = null;
                 }
             }
             if (batchBuf != null) {
                 if (batchBuf.readableBytes() > 0) {
-                    channel.writeAndFlush(new DefaultHttpContent(batchBuf));
+                    flushContent(batchBuf);
                 } else {
                     batchBuf.release();
                 }

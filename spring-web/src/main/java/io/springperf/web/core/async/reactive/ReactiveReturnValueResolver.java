@@ -91,6 +91,9 @@ public class ReactiveReturnValueResolver extends BaseAsyncReturnValueResolver {
             StreamSender sender = StreamEmitterUtil.initStreamSenderAndStartAsync(emitter, streamSenderFactory, asyncSupportRegistry, req, resp);
             PublisherToStreamEmitterAdapter streamEmitterAdapter = new PublisherToStreamEmitterAdapter(emitter, sender, reactiveConfig);
             streamEmitterAdapter.subscribe(adapter, returnValue);
+            // 订阅建立后 emitter 的写回调才注册完成：此时同步给 asyncWebRequest，
+            // 写完成后才能触发背压补充请求（修复前绑定过早，拿到 null 回调）
+            StreamEmitterUtil.bindWriteCallbackHandler(emitter, req, resp);
             StreamEmitterUtil.initializeWithStreamSender(emitter, sender);
         } else {
             DeferredResult deferredResult = reactiveConfig.getTimeout() < 0 ? new DeferredResult() : new DeferredResult(reactiveConfig.getTimeout());

@@ -11,6 +11,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.function.Consumer;
+
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.*;
@@ -62,9 +64,24 @@ class StreamEmitterUtilTest {
                 emitter, streamSenderFactory, asyncSupportRegistry, request, response);
 
         assertSame(streamSender, result);
-        verify(asyncWebRequest).addWriteCallbackHandler(any());
         verify(asyncSupportRegistry).startDeferredResultProcessing(asyncWebRequest, emitter.getDeferredResult());
         verify(emitter, never()).initializeWithError(any());
+    }
+
+    @Test
+    void bindWriteCallbackHandler_syncsEmitterHandlerToAsyncWebRequest() {
+        // 回归：写回调必须在订阅建立（onSubscribe 注册 onWriteCallback）之后才同步给
+        // asyncWebRequest；修复前在 initStreamSenderAndStartAsync 中过早绑定 null 回调，
+        // 写完成时背压补充请求永不触发。
+        Consumer<Throwable> handler = t -> {
+        };
+        when(emitter.getWriteCallbackHandler()).thenReturn(handler);
+        when(request.getRequestContext()).thenReturn(requestContext);
+        when(requestContext.getAttribute(AsyncSupportUtils.WEB_ASYNC_REQUEST_ATTRIBUTE)).thenReturn(asyncWebRequest);
+
+        StreamEmitterUtil.bindWriteCallbackHandler(emitter, request, response);
+
+        verify(asyncWebRequest).addWriteCallbackHandler(handler);
     }
 
     @Test
