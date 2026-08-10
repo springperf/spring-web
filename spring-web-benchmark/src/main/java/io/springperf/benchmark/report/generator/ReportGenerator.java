@@ -181,7 +181,7 @@ public class ReportGenerator {
 
     // ==================== 数据发现 ====================
 
-    private static Map<String, Map<String, ProfileData>> discoverAllData(Path jdkDir) throws IOException {
+    static Map<String, Map<String, ProfileData>> discoverAllData(Path jdkDir) throws IOException {
         Map<String, Map<String, ProfileData>> byApi = new LinkedHashMap<>();
 
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(jdkDir, "jmh-results-*.json")) {
@@ -190,8 +190,17 @@ public class ReportGenerator {
                 String stem = fileName.substring("jmh-results-".length());
                 stem = stem.substring(0, stem.length() - ".json".length());
 
-                JsonNode root = MAPPER.readTree(jmhFile.toFile());
-                if (!root.isArray()) continue;
+                JsonNode root;
+                try {
+                    root = MAPPER.readTree(jmhFile.toFile());
+                } catch (IOException e) {
+                    // fork 失败/中断可能残留空文件或截断 JSON：跳过并告警，而不是让整个报告生成崩溃
+                    System.err.println("[WARN] Skipping unreadable benchmark result " + jmhFile.getFileName()
+                            + ": " + e.getMessage());
+                    continue;
+                }
+                // 空文件：部分 Jackson 版本 readTree 返回 Java null，需一并防御
+                if (root == null || !root.isArray()) continue;
 
                 Map<String, ProfileData> perApiData = new LinkedHashMap<>();
                 Set<String> apisInFile = new LinkedHashSet<>();
@@ -321,14 +330,41 @@ public class ReportGenerator {
         String[] profiles = allProfiles.toArray(new String[0]);
         String[] apis = allApis.toArray(new String[0]);
 
+        // 期望容器：run-meta 指定时用它做分母，缺失容器计入失败（不再静默丢失）
+        List<String> expected = (expectedProfiles == null || expectedProfiles.isEmpty())
+                ? Arrays.asList(profiles) : expectedProfiles;
+        LinkedHashSet<String> foundSet = new LinkedHashSet<>(Arrays.asList(profiles));
+        List<String> missing = new ArrayList<>();
+        for (String exp : expected) {
+            if (!foundSet.contains(exp)) missing.add(exp);
+        }
+        int effectiveProfiles = expected.size();
+
+        // 成功/失败统计。修复：此前 failCount 只遍历实际发现的 byApi 数据，
+        // 缺失的 profile×api 组合（表格渲染为 FAIL 的格子）既不进成功也不进失败，
+        // 导致摘要 "33/35 成功，0 失败" 与表格 FAIL 自相矛盾。
+        // 现在：success = 发现且含可用数据（吞吐或延迟）；fail = 发现但无可用数据
+        //       + 期望组合中无数据的所有格子（表格 FAIL 数 = effectiveFail）。
         int successCount = 0;
         int failCount = 0;
         for (Map<String, ProfileData> profileMap : byApi.values()) {
             for (ProfileData d : profileMap.values()) {
-                if (d.success) successCount++;
-                else failCount++;
+                if (d.success && (!d.throughputs.isEmpty() || !d.percentiles.isEmpty())) {
+                    successCount++;
+                } else {
+                    failCount++;
+                }
             }
         }
+        List<String> missingCombos = new ArrayList<>();
+        for (String exp : expected) {
+            for (String api : apis) {
+                if (getData(byApi, api, exp) == null) {
+                    missingCombos.add(api + " / " + exp);
+                }
+            }
+        }
+        int effectiveFail = failCount + missingCombos.size();
 
         java.io.StringWriter sw = new java.io.StringWriter(4096);
         PrintWriter w = new PrintWriter(sw);
@@ -342,17 +378,6 @@ public class ReportGenerator {
         w.println();
         w.println("**JDK:** " + jdkDir.getFileName().toString());
         w.println();
-
-        // 期望容器：run-meta 指定时用它做分母，缺失容器计入失败（不再静默丢失）
-        List<String> expected = (expectedProfiles == null || expectedProfiles.isEmpty())
-                ? Arrays.asList(profiles) : expectedProfiles;
-        LinkedHashSet<String> foundSet = new LinkedHashSet<>(Arrays.asList(profiles));
-        List<String> missing = new ArrayList<>();
-        for (String exp : expected) {
-            if (!foundSet.contains(exp)) missing.add(exp);
-        }
-        int effectiveProfiles = expected.size();
-        int effectiveFail = failCount + missing.size() * apis.length;
 
         w.println("## 执行摘要\n");
         w.printf("发现 **%d** 个 API × **%d** 个容器，总计 **%d/%d** 成功，**%d** 失败",
@@ -382,16 +407,21 @@ public class ReportGenerator {
         w.println("*内存为容器级稳态快照（同一容器所有 API 共享同一 JVM），非 per-API 数据；external 模式（服务端在远端 JVM）无法采集时显示 N/A。*\n");
         writeMemorySections(w, byApi, profiles, apis);
 
-        if (failCount > 0) {
-            w.println("## 5. 失败项\n");
+        if (effectiveFail > 0) {
+            w.printf("## %d. 失败项\n\n", ++sectionNum);
             for (Map.Entry<String, Map<String, ProfileData>> se : byApi.entrySet()) {
                 String api = se.getKey();
                 for (Map.Entry<String, ProfileData> pe : se.getValue().entrySet()) {
                     ProfileData data = pe.getValue();
-                    if (!data.success) {
-                        w.printf("- **%s / %s**: %s\n", api, pe.getKey(), data.failReason);
+                    if (!data.success || (data.throughputs.isEmpty() && data.percentiles.isEmpty())) {
+                        w.printf("- **%s / %s**: %s\n", api, pe.getKey(),
+                                data.failReason != null ? data.failReason : "无可用数据（吞吐/延迟均缺失）");
                     }
                 }
+            }
+            // 缺失组合：表格渲染 FAIL 但 byApi 中无对应数据（JMH 结果未生成）
+            for (String combo : missingCombos) {
+                w.printf("- **%s**: 数据缺失（JMH 结果未生成，可能是该基准未执行或 fork 失败）\n", combo);
             }
             w.println();
         }
