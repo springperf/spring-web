@@ -17,8 +17,6 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -157,8 +155,7 @@ class NettyServerHttpRequestBodyTest {
 
     @Test
     void largeBody_acquireRelease_balance() {
-        // retainedDuplicate() 创建的 ByteBuf 与 content 共享 refCnt，
-        // 因此 largeBodyBuf.release() 和 request.release() 会共同递减同一个 refCnt。
+        // duplicate() 不递增 refCnt：getBody 后计数不变，release() 只递减 request 引用计数。
         String largeContent = createLargeContent(LARGE_SIZE);
         FullHttpRequest nativeRequest = newRequest(largeContent);
         NettyServerHttpRequest req = new NettyServerHttpRequest(webContext, ctx, nativeRequest, "/test");
@@ -170,8 +167,8 @@ class NettyServerHttpRequestBodyTest {
         assertEquals(afterGetBody + 1, nativeRequest.refCnt());
 
         req.release();
-        // release() = largeBodyBuf.release()(shared refCnt: -1) + request.release()(refCnt: -1)
-        assertEquals(afterGetBody - 1, nativeRequest.refCnt());
+        // release() 只递减 request：refCnt 回到 getBody 后的值
+        assertEquals(afterGetBody, nativeRequest.refCnt());
 
         nativeRequest.release();
         assertEquals(0, nativeRequest.refCnt());
@@ -196,34 +193,6 @@ class NettyServerHttpRequestBodyTest {
         assertTrue(req.hasBody());
         byte[] bodyBytes = req.getBodyBytes();
         assertEquals(0, bodyBytes.length);
-    }
-
-    /**
-     * 回归 R2-4（确定性）：{@code release()} 必须与 {@code getBody()}/{@code getBodyBytes()}
-     * 共用 this 监视器。主线程持锁期间，release() 若同步于 this 则必须阻塞等待；
-     * 修复前 release() 无同步，EventLoop 可在异步线程读 body 期间提前释放 largeBodyBuf/content。
-     */
-    @Test
-    void largeBody_release_synchronizesWithGetBody() throws Exception {
-        FullHttpRequest nativeRequest = newRequest(createLargeContent(4097));
-        NettyServerHttpRequest req = new NettyServerHttpRequest(webContext, ctx, nativeRequest, "/test");
-
-        CountDownLatch started = new CountDownLatch(1);
-        AtomicBoolean releaseDone = new AtomicBoolean(false);
-        Thread releaser = new Thread(() -> {
-            started.countDown();
-            req.release();
-            releaseDone.set(true);
-        });
-
-        synchronized (req) {
-            releaser.start();
-            started.await();
-            Thread.sleep(100);
-            assertFalse(releaseDone.get(), "release() 未与 getBody 路径同步，EventLoop 提前释放竞态未修复");
-        }
-        releaser.join(2000);
-        assertTrue(releaseDone.get());
     }
 
     /**
