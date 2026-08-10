@@ -339,6 +339,10 @@ public class ReportGenerator {
             if (!foundSet.contains(exp)) missing.add(exp);
         }
         int effectiveProfiles = expected.size();
+        // 表格列集与摘要分母（effectiveProfiles）保持一致：缺失 profile 也要渲染 FAIL 列，
+        // 否则摘要 effectiveFail 计入缺失组合，但表格无对应 FAIL 格，两者自相矛盾。
+        // 无期望列表时 expected == profiles，行为不变（向后兼容）。
+        String[] tableProfiles = expected.toArray(new String[0]);
 
         // 成功/失败统计。修复：此前 failCount 只遍历实际发现的 byApi 数据，
         // 缺失的 profile×api 组合（表格渲染为 FAIL 的格子）既不进成功也不进失败，
@@ -394,18 +398,18 @@ public class ReportGenerator {
             w.println();
         }
 
-        writeThroughputSection(w, byApi, profiles, apis, false);
+        writeThroughputSection(w, byApi, tableProfiles, apis, false);
         int sectionNum = 1;
-        boolean hasLatency = hasAnyPercentiles(byApi, profiles, apis);
+        boolean hasLatency = hasAnyPercentiles(byApi, tableProfiles, apis);
         if (hasLatency) {
             w.printf("## %d. 延迟 (ms, 越低越好)\n\n", ++sectionNum);
-            writeLatencySections(w, byApi, profiles, apis);
+            writeLatencySections(w, byApi, tableProfiles, apis);
         }
         w.printf("## %d. GC 行为\n\n", ++sectionNum);
-        writeGcSections(w, byApi, profiles, apis, false);
+        writeGcSections(w, byApi, tableProfiles, apis, false);
         w.printf("## %d. 内存占用 (稳态)\n\n", ++sectionNum);
         w.println("*内存为容器级稳态快照（同一容器所有 API 共享同一 JVM），非 per-API 数据；external 模式（服务端在远端 JVM）无法采集时显示 N/A。*\n");
-        writeMemorySections(w, byApi, profiles, apis);
+        writeMemorySections(w, byApi, tableProfiles, apis);
 
         if (effectiveFail > 0) {
             w.printf("## %d. 失败项\n\n", ++sectionNum);

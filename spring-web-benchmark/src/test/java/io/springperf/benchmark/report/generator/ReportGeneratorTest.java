@@ -4,9 +4,12 @@ import io.springperf.benchmark.report.generator.ReportGenerator.ProfileData;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -43,5 +46,46 @@ class ReportGeneratorTest {
         Map<String, ProfileData> profileMap = byApi.get("json");
         assertTrue(profileMap.containsKey("perf"), "valid file 的 profile 应存在");
         assertEquals(1234.0, profileMap.get("perf").throughputs.get("json"), 0.001);
+    }
+
+    /**
+     * 回归 P2（diff 专项）：期望容器中整容器缺失时，主表格必须渲染该 profile 的 FAIL 列，
+     * 与摘要分母（effectiveProfiles）一致。修复前表格只用实际发现的 profiles 作列，
+     * 缺失 profile 无列 → 表格 FAIL 格数 ≠ 摘要 effectiveFail，两者自相矛盾。
+     */
+    @Test
+    void generateReport_tableRendersFailRow_forMissingProfile() throws Exception {
+        // 实际发现：perf + tomcat 两个容器（均成功）
+        String perf = "[{\"benchmark\":\"io.springperf.benchmark.servlet.PerfBenchmark.json\","
+                + "\"mode\":\"thrpt\",\"primaryMetric\":{\"score\":1234.0}}]";
+        String tomcat = "[{\"benchmark\":\"io.springperf.benchmark.servlet.TomcatBenchmark.json\","
+                + "\"mode\":\"thrpt\",\"primaryMetric\":{\"score\":2000.0}}]";
+        Files.write(tempDir.resolve("jmh-results-perf.json"), perf.getBytes(StandardCharsets.UTF_8));
+        Files.write(tempDir.resolve("jmh-results-tomcat.json"), tomcat.getBytes(StandardCharsets.UTF_8));
+
+        // 期望容器含 undertow（整容器缺失）
+        List<String> expectedProfiles = Arrays.asList("perf", "tomcat", "undertow");
+
+        String report = invokeGenerateReport(tempDir, "mode=thrpt", expectedProfiles);
+
+        // 摘要：缺失组合计入失败（2 成功 / 3 总数，1 失败）
+        assertTrue(report.contains("总计 **2/3** 成功，**1** 失败"),
+                "缺失 profile×api 应计入 effectiveFail。实际摘要: " + summaryLine(report));
+        // 表格：缺失 profile 必须渲染 FAIL 列，与摘要分母一致（修复前无 undertow 列，此处 FAIL 不存在）
+        assertTrue(report.contains("| json | 1234 | 2000 | FAIL |"),
+                "表格应渲染缺失 profile 的 FAIL 列（表格 FAIL 数 = effectiveFail）");
+    }
+
+    private static String invokeGenerateReport(Path jdkDir, String runMeta, List<String> expectedProfiles) throws Exception {
+        Method m = ReportGenerator.class.getDeclaredMethod("generateReport", Path.class, String.class, List.class);
+        m.setAccessible(true);
+        return (String) m.invoke(null, jdkDir, runMeta, expectedProfiles);
+    }
+
+    private static String summaryLine(String report) {
+        for (String line : report.split("\n")) {
+            if (line.contains("总计")) return line;
+        }
+        return "(摘要行未找到)";
     }
 }
