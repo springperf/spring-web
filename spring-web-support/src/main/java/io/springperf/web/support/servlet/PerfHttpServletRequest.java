@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -75,7 +76,13 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
         try { return new NettyServletInputStream(request.getBody()); } catch (IOException e) { throw new RuntimeException(e); }
     }
 
-    @Override public BufferedReader getReader() throws IOException { return new BufferedReader(new InputStreamReader(getInputStream(), getCharacterEncoding())); }
+    @Override
+    public BufferedReader getReader() throws IOException {
+        // 请求无 charset 时回退框架默认 UTF-8（与 BaseWebServerHttpRequest 一致）。
+        // 修复前 getCharacterEncoding() 返回 null → InputStreamReader(stream, null) → IllegalArgumentException。
+        String encoding = getCharacterEncoding();
+        return new BufferedReader(new InputStreamReader(getInputStream(), encoding != null ? encoding : StandardCharsets.UTF_8.name()));
+    }
     @Override public String getCharacterEncoding() { return request.getCharacterEncoding() == null ? null : request.getCharacterEncoding().name(); }
     @Override public void setCharacterEncoding(String env) { request.setCharacterEncoding(Charset.forName(env)); }
     @Override public Locale getLocale() { return request.getLocales().get(0); }
