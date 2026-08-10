@@ -9,6 +9,7 @@ import org.springframework.core.MethodIntrospector;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.format.support.DefaultFormattingConversionService;
+import org.springframework.lang.Nullable;
 import org.springframework.util.ReflectionUtils;
 import org.springframework.validation.MessageCodesResolver;
 import org.springframework.validation.Validator;
@@ -70,7 +71,17 @@ public class WebDataBinderRegistry extends BaseWebComponent {
             WebDataBinder dataBinder = webDataBinderFactory.createBinder(null, null, "");
             conversionService = dataBinder.getConversionService();
         } catch (Exception e) {
-            log.warn("getConversionService error", e);
+            // createBinder(null, null, "") 在 @InitBinder 方法需要 request 时抛 NPE；
+            // 兜底到 WebBindingInitializer 级裸 binder，避免丢失全局 binder 配置。
+            WebDataBinder fallbackBinder = createWebBindingInitializerBinder();
+            if (fallbackBinder != null) {
+                conversionService = fallbackBinder.getConversionService();
+            }
+            if (conversionService == null) {
+                log.warn("getConversionService error", e);
+            } else {
+                log.debug("getConversionService fell back to webBindingInitializer binder", e);
+            }
         }
         if (conversionService == null) {
             conversionService = defaultConversionService;
@@ -90,7 +101,15 @@ public class WebDataBinderRegistry extends BaseWebComponent {
             WebDataBinder dataBinder = webDataBinderFactory.createBinder(null, null, "");
             validators.addAll(dataBinder.getValidators());
         } catch (Exception e) {
-            log.warn("getValidators error", e);
+            WebDataBinder fallbackBinder = createWebBindingInitializerBinder();
+            if (fallbackBinder != null) {
+                validators.addAll(fallbackBinder.getValidators());
+            }
+            if (fallbackBinder == null) {
+                log.warn("getValidators error", e);
+            } else {
+                log.debug("getValidators fell back to webBindingInitializer binder", e);
+            }
         }
         if (defaultValidator != null) {
             validators.add(defaultValidator);
@@ -142,6 +161,21 @@ public class WebDataBinderRegistry extends BaseWebComponent {
 
     public MessageCodesResolver getMessageCodesResolver() {
         return messageCodesResolver;
+    }
+
+    /**
+     * 工厂级 {@link WebDataBinderFactory#createBinder} 失败时，用全局 {@link WebBindingInitializer}
+     * 构造一个裸 binder 兜底，保留其 conversion service 与 validators。
+     * {@code webBindingInitializer} 为 null 时返回 null（调用方回退到默认值）。
+     */
+    @Nullable
+    protected WebDataBinder createWebBindingInitializerBinder() {
+        if (webBindingInitializer == null) {
+            return null;
+        }
+        WebDataBinder binder = new PerfDataBinder(null, "");
+        webBindingInitializer.initBinder(binder);
+        return binder;
     }
 
     /**

@@ -88,16 +88,25 @@ public final class Boot4WebServerInitializedEventBridge {
     /** 生成子类字节码并定义到桥接所在包/类加载器，再反射实例化 */
     private static Object createEvent(Class<?> contextInterface, Class<?> webServerInterface,
                                       PerfWebServer webServer, Object contextProxy) throws Exception {
+        // C6：defineClass 幂等瓶颈——同一名称的类只能定义一次，并发二次 define 抛 LinkageError。
+        // generatedBytes 的 volatile 双检锁只保证字节码生成一次，无法阻止两个线程同时进入
+        // defineClass（第二个线程读到的 generatedEventClass 仍为 null 时也会 define）。
+        // 故对"生成字节码 + defineClass + 发布"整体加锁，使并发发布退化为单次定义。
         Class<?> generated = generatedEventClass;
         if (generated == null) {
-            byte[] bytes = generatedBytes;
-            if (bytes == null) {
-                bytes = generateEventSubclass();
-                generatedBytes = bytes;
+            synchronized (Boot4WebServerInitializedEventBridge.class) {
+                generated = generatedEventClass;
+                if (generated == null) {
+                    byte[] bytes = generatedBytes;
+                    if (bytes == null) {
+                        bytes = generateEventSubclass();
+                        generatedBytes = bytes;
+                    }
+                    // defineClass 要求生成类与 Lookup 所在类同包；GENERATED_NAME 与桥接同包，满足
+                    generated = MethodHandles.lookup().defineClass(bytes);
+                    generatedEventClass = generated;
+                }
             }
-            // defineClass 要求生成类与 Lookup 所在类同包；GENERATED_NAME 与桥接同包，满足
-            generated = MethodHandles.lookup().defineClass(bytes);
-            generatedEventClass = generated;
         }
         Constructor<?> constructor = generated.getDeclaredConstructor(webServerInterface, contextInterface);
         return constructor.newInstance(webServer, contextProxy);

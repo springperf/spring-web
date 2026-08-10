@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpMethod;
+import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.method.HandlerMethod;
@@ -21,6 +22,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -385,6 +387,74 @@ class MappingRegistryTest {
         assertEquals(1, consumeMatchers, "class-level consume should be present in context");
     }
 
+    /* ==================== C1: 父类 @RequestMapping 方法注册 ==================== */
+
+    @Test
+    void initComponentPhase1_inheritedRequestMapping_registered() throws Exception {
+        // 回归 P2 正确性组 C1：getDeclaredMethods 不含父类声明的方法，
+        // 改用 ReflectionUtils.getUniqueDeclaredMethods 后父类 @RequestMapping 必须被注册。
+        MappingRegistry registry = new MappingRegistry();
+        when(webContext.getCtx()).thenReturn(applicationContext);
+        when(applicationContext.getBeansWithAnnotation(Controller.class))
+                .thenReturn(Collections.singletonMap("child", new ChildController()));
+        when(applicationContext.getEnvironment()).thenReturn(environment);
+        when(environment.resolvePlaceholders(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        // initWithWebContext 经 mock webContext.getWebComponentWithDefault 返回 null，不扫 bean
+        registry.initWithWebContext(webContext);
+
+        registry.initComponentPhase1();
+
+        List<PathMappingContext> mappings = registry.getMappingContextList();
+        assertEquals(1, mappings.size(), "父类声明的 @RequestMapping 方法必须被注册");
+        assertEquals("/base", mappings.get(0).getPathRule());
+        assertEquals(BaseController.class, mappings.get(0).getMethod().getDeclaringClass());
+    }
+
+    /* ==================== D4: 歧义映射检测 ==================== */
+
+    @Test
+    void registerMapping_duplicatePathAndMethod_throws() {
+        MappingRegistry registry = new MappingRegistry();
+        registry.registerMapping(createPathMappingContext("/dup",
+                Collections.singletonList(new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET}))));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> registry.registerMapping(createPathMappingContext("/dup",
+                        Collections.singletonList(new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET})))));
+        assertTrue(ex.getMessage().contains("/dup"));
+    }
+
+    @Test
+    void registerMapping_duplicateNoMethodRestriction_throws() {
+        MappingRegistry registry = new MappingRegistry();
+        registry.registerMapping(createPathMappingContext("/dup", Collections.<Matcher>emptyList()));
+
+        assertThrows(IllegalStateException.class,
+                () -> registry.registerMapping(createPathMappingContext("/dup", Collections.<Matcher>emptyList())));
+    }
+
+    @Test
+    void registerMapping_samePathDifferentMethod_allowed() {
+        MappingRegistry registry = new MappingRegistry();
+        registry.registerMapping(createPathMappingContext("/dup",
+                Collections.singletonList(new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET}))));
+        registry.registerMapping(createPathMappingContext("/dup",
+                Collections.singletonList(new HttpMethodMatcher(new HttpMethod[]{HttpMethod.POST}))));
+
+        assertEquals(2, registry.getMappingContextList().size());
+    }
+
+    @Test
+    void registerMapping_samePathNoMethodRestrictionVsSpecified_allowed() {
+        // 无 HttpMethodMatcher（匹配所有方法）与指定 GET 是子集式歧义，注册期不检测
+        MappingRegistry registry = new MappingRegistry();
+        registry.registerMapping(createPathMappingContext("/dup", Collections.<Matcher>emptyList()));
+        registry.registerMapping(createPathMappingContext("/dup",
+                Collections.singletonList(new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET}))));
+
+        assertEquals(2, registry.getMappingContextList().size());
+    }
+
     /* ==================== helpers ==================== */
 
     private static PathMappingContext createPathMappingContext(String pathRule) {
@@ -418,5 +488,15 @@ class MappingRegistryTest {
 
         @RequestMapping
         public void noMethod() {}
+    }
+
+    @Controller
+    static class ChildController extends BaseController {
+    }
+
+    static class BaseController {
+        @RequestMapping("/base")
+        @SuppressWarnings("unused")
+        public void baseMethod() {}
     }
 }

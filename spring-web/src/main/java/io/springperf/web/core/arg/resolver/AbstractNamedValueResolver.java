@@ -8,8 +8,10 @@ import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.util.MetaUtils;
 import org.springframework.core.MethodParameter;
+import org.springframework.core.convert.ConversionFailedException;
 import org.springframework.core.convert.TypeDescriptor;
 import org.springframework.lang.Nullable;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.lang.annotation.Annotation;
 import java.util.Collection;
@@ -54,7 +56,13 @@ public abstract class AbstractNamedValueResolver extends AbstractSupportOptional
         if (paramType.isAssignableFrom(arg.getClass()) && !isContainer(arg)) {
             return arg;
         }
-        return convertWithGenericType(arg);
+        try {
+            return convertWithGenericType(arg);
+        } catch (ConversionFailedException e) {
+            // 对齐 Spring 语义：类型转换失败抛 MethodArgumentTypeMismatchException，
+            // 由 ResponseStatusExceptionResolver 映射为 400 而非 500。
+            throw new MethodArgumentTypeMismatchException(arg, paramType, name, parameter, e);
+        }
     }
 
     /**

@@ -56,7 +56,10 @@ public class FilterWrapper implements WebFilter {
 
     @Override
     public String getComponentName() {
-        return filter.getClass().getName();
+        // C4：实例级唯一标识。同类不同实例（不同 bean 名/order/urlPattern，如 Spring Security
+        // 同 filter 类的多实例）不得被 WebComponentContainer 按类名去重误杀；
+        // 同一 filter 实例重复包装时 identityHashCode 相同，仍会被去重（保留高 order）。
+        return filter.getClass().getName() + "@" + System.identityHashCode(filter);
     }
 
     @Override

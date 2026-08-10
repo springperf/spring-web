@@ -4,11 +4,16 @@ import io.springperf.web.core.mapping.MappingHandlerMethod;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
+import io.springperf.web.support.servlet.ServletAttribute;
+import io.springperf.web.support.servlet.context.ServletAdapterContext;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.Ordered;
 import org.springframework.web.context.request.NativeWebRequest;
+import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.method.support.HandlerMethodReturnValueHandler;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
@@ -77,5 +82,33 @@ class SpringHandlerMethodReturnValueHandlerAdapterTest {
         adapter.resolveReturnValue("val", returnType, request, response);
 
         verify(delegate).handleReturnValue(any(), any(), argThat(mav -> mav.isRequestHandled()), any());
+    }
+
+    @Test
+    void resolveReturnValue_reusesServletWrappersFromContext() throws Exception {
+        // 回归 P2 正确性组 C5：已缓存的 Servlet 包装必须复用，不再每次 new
+        ServletAdapterContext adapterCtx = mock(ServletAdapterContext.class);
+        HttpServletRequest servletRequest = mock(HttpServletRequest.class);
+        HttpServletResponse servletResponse = mock(HttpServletResponse.class);
+        when(adapterCtx.getRequest()).thenReturn(servletRequest);
+        when(adapterCtx.getResponse()).thenReturn(servletResponse);
+        when(requestContext.getAttribute(ServletAttribute.getAttributeKey())).thenReturn(adapterCtx);
+
+        adapter.resolveReturnValue("val", returnType, request, response);
+
+        verify(delegate).handleReturnValue(any(), any(), any(), argThat(wr -> {
+            ServletWebRequest swr = (ServletWebRequest) wr;
+            return swr.getRequest() == servletRequest && swr.getResponse() == servletResponse;
+        }));
+    }
+
+    @Test
+    void resolveReturnValue_noExistingContext_createsAndCaches() throws Exception {
+        when(requestContext.getAttribute(ServletAttribute.getAttributeKey())).thenReturn(null);
+
+        adapter.resolveReturnValue("val", returnType, request, response);
+
+        verify(requestContext).setAttribute(eq(ServletAttribute.getAttributeKey()), any(ServletAdapterContext.class));
+        verify(delegate).handleReturnValue(any(), any(), any(), any(NativeWebRequest.class));
     }
 }

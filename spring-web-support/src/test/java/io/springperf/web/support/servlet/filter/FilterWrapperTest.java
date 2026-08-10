@@ -16,7 +16,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -87,12 +89,24 @@ class FilterWrapperTest {
     }
 
     @Test
-    void getComponentName_returnsFilterClassName() {
+    void getComponentName_containsClassNameAndInstanceIdentity() {
+        // 回归 P2 正确性组 C4：同类不同实例不得被按类名去重误杀；
+        // 同一实例重复包装时 identityHashCode 相同，名字相同（仍去重）。
         Filter servletFilter = new TestFilter();
         FilterWrapper wrapper = new FilterWrapper(servletFilter);
 
-        assertEquals("io.springperf.web.support.servlet.filter.FilterWrapperTest$TestFilter",
-                wrapper.getComponentName());
+        String name = wrapper.getComponentName();
+        assertTrue(name.startsWith("io.springperf.web.support.servlet.filter.FilterWrapperTest$TestFilter@"));
+        assertEquals(name, new FilterWrapper(servletFilter).getComponentName());
+    }
+
+    @Test
+    void getComponentName_differentInstances_distinct() {
+        FilterWrapper w1 = new FilterWrapper(new TestFilter());
+        FilterWrapper w2 = new FilterWrapper(new TestFilter());
+
+        assertNotEquals(w1.getComponentName(), w2.getComponentName(),
+                "不同 filter 实例必须持有不同 componentName，否则低 order 者被静默销毁");
     }
 
     @Test

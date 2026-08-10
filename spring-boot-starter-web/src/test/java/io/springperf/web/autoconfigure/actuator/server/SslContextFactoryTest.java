@@ -1,11 +1,13 @@
 package io.springperf.web.autoconfigure.actuator.server;
 
+import io.netty.handler.ssl.SslContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.env.Environment;
 
+import java.io.InputStream;
 import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -104,6 +106,35 @@ class SslContextFactoryTest {
     void splitByComma_emptyString() throws Exception {
         String[] result = invokeSplitByComma("");
         assertArrayEquals(new String[0], result);
+    }
+
+    /* ==================== C7: PEM stream-based 加载（JAR 内资源 getFile() 不可用） ==================== */
+
+    @Test
+    void openInputStream_classpathResource_returnsReadableStream() throws Exception {
+        // 回归 C7：classpath: 前缀必须走 Resource.getInputStream()（stream-based），
+        // 而非 resource.getFile()——后者在 JAR 内抛 FileNotFoundException。
+        Method m = SslContextFactory.class.getDeclaredMethod("openInputStream", String.class);
+        m.setAccessible(true);
+
+        try (InputStream in = (InputStream) m.invoke(null, "classpath:ssl/cert.pem")) {
+            assertNotNull(in);
+            assertTrue(in.available() > 0, "classpath 证书资源必须可读");
+        }
+    }
+
+    @Test
+    void createServerSslContext_pemFromClasspath_streamBased() {
+        when(env.getProperty(eq("server.ssl.enabled"), eq(Boolean.class))).thenReturn(null);
+        when(env.containsProperty("server.ssl.key-store")).thenReturn(false);
+        when(env.containsProperty("server.ssl.certificate")).thenReturn(true);
+        when(env.getProperty(eq("server.ssl.certificate"))).thenReturn("classpath:ssl/cert.pem");
+        when(env.getProperty(eq("server.ssl.certificate-private-key"))).thenReturn("classpath:ssl/key.pem");
+        // key-password / enabled-protocols / ciphers / client-auth 均未配置（mock 默认 null）
+
+        SslContext ctx = SslContextFactory.createServerSslContext(env, "server.ssl.");
+
+        assertNotNull(ctx, "classpath PEM 配置应能成功构建 SslContext");
     }
 
     private static boolean invokeIsSslEnabled(Environment env, String prefix) throws Exception {

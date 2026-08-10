@@ -97,7 +97,9 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
                     unresolvable.add(parameter.getParameterName()
                             + " (" + parameter.getNestedParameterType().getName() + ")"
                             + " in " + mapping.getUserClass().getSimpleName() + "#" + mapping.getMethod().getName());
+                    continue;
                 }
+                validateModelAttributeConstructor(parameter, mapping, unresolvable);
             }
         }
         if (!unresolvable.isEmpty()) {
@@ -122,6 +124,24 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
             return requestParamResolverProvider != null;
         }
         return modelAttributeResolverProvider != null;
+    }
+
+    /**
+     * D3 fail-fast：无默认构造器的 @ModelAttribute 在首个请求才 500（resolver lazy 创建）。
+     * 启动校验阶段预创建 resolver，配置错误立即暴露为启动失败。
+     */
+    protected void validateModelAttributeConstructor(MethodParameter parameter, MappingHandlerMethod mapping, List<String> unresolvable) {
+        if (modelAttributeResolverProvider == null || !modelAttributeResolverProvider.supports(parameter, mapping)) {
+            return;
+        }
+        try {
+            modelAttributeResolverProvider.getResolver(parameter, mapping, webContext);
+        } catch (IllegalStateException e) {
+            unresolvable.add(parameter.getParameterName()
+                    + " (" + parameter.getNestedParameterType().getName() + ")"
+                    + " in " + mapping.getUserClass().getSimpleName() + "#" + mapping.getMethod().getName()
+                    + ": " + e.getMessage());
+        }
     }
 
     public Object[] resolveArguments(MappingHandlerMethod mappingContext, WebServerHttpRequest request, WebServerHttpResponse response) throws Exception {

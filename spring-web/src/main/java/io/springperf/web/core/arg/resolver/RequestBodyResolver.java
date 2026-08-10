@@ -27,8 +27,9 @@ public class RequestBodyResolver extends AbstractSupportOptionalResolver impleme
 
     @Override
     protected Object doResolveArgument(WebServerHttpRequest request, WebServerHttpResponse response) throws Exception {
+        Object body;
         try {
-            return httpBodyCodecRegistry.readBody(targetType, parameter, request, request);
+            body = httpBodyCodecRegistry.readBody(targetType, parameter, request, request);
         } catch (Exception e) {
             if (required) {
                 throw new HttpMessageNotReadableException("Failed to parse @RequestBody data", e, request);
@@ -36,5 +37,11 @@ public class RequestBodyResolver extends AbstractSupportOptionalResolver impleme
                 return null;
             }
         }
+        if (body == null && required) {
+            // readBody 对「无匹配 converter / 空 body」静默返回 null；
+            // 必需 @RequestBody 缺失时对齐 Spring 语义抛 400，而非放行 null 进业务层。
+            throw new HttpMessageNotReadableException("Required @RequestBody is missing", request);
+        }
+        return body;
     }
 }

@@ -14,8 +14,10 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.core.env.PropertyResolver;
 import org.springframework.http.HttpMethod;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Controller;
 import org.springframework.util.ClassUtils;
+import org.springframework.util.ReflectionUtils;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.method.HandlerMethod;
@@ -62,7 +64,9 @@ public class MappingRegistry extends WebComponentContainer {
                 classMatchers = initMatcher(crm);
             }
             prefix = resolvePlaceholders(prefix);
-            Method[] methods = targetClass.getDeclaredMethods();
+            // getDeclaredMethods 不含父类声明的 @RequestMapping 方法；
+            // getUniqueDeclaredMethods 收集继承/接口方法并按 override 去重。
+            Method[] methods = ReflectionUtils.getUniqueDeclaredMethods(targetClass);
             for (Method m : methods) {
                 RequestMapping requestMapping = AnnotatedElementUtils.findMergedAnnotation(m, RequestMapping.class);
                 if (requestMapping == null) {
@@ -75,7 +79,55 @@ public class MappingRegistry extends WebComponentContainer {
     }
 
     public void registerMapping(PathMappingContext mappingContext) {
+        assertNoDuplicateMapping(mappingContext);
         mappingContextList.add(mappingContext);
+    }
+
+    /**
+     * 注册时检测「完全重复」的映射：path 相同且 HTTP 方法约束语义相同
+     * （均无 HttpMethodMatcher，或 HttpMethodMatcher 的方法集合相等）。
+     * 复制粘贴出的同名 mapping 属配置错误，启动即抛，避免首个请求才暴露。
+     * <p>子集/超集式歧义（无 method 限制 vs 指定 method、通配符重叠）属 Spring
+     * AmbiguousMapping 的运行时检测领域，不在注册期检测。</p>
+     */
+    protected void assertNoDuplicateMapping(PathMappingContext newMapping) {
+        String pathRule = newMapping.getPathRule();
+        for (PathMappingContext existing : mappingContextList) {
+            if (existing.getPathRule().equals(pathRule) && sameMethodConstraint(existing, newMapping)) {
+                throw new IllegalStateException("Ambiguous mapping. Cannot map '" + pathRule + "' ("
+                        + formatMethods(newMapping) + ") to both "
+                        + existing.getMethod().getDeclaringClass().getName() + "#" + existing.getMethod().getName()
+                        + " and " + newMapping.getMethod().getDeclaringClass().getName() + "#" + newMapping.getMethod().getName());
+            }
+        }
+    }
+
+    /**
+     * 两个 mapping 的 HTTP 方法约束是否语义相同。{@code null} 表示无 HttpMethodMatcher
+     * （匹配所有方法）；{@code null vs 集合} 不视为相同，避免把合法的「全方法 + 特定方法」误报。
+     */
+    protected static boolean sameMethodConstraint(PathMappingContext a, PathMappingContext b) {
+        Set<HttpMethod> methodsA = extractHttpMethods(a);
+        Set<HttpMethod> methodsB = extractHttpMethods(b);
+        if (methodsA == null || methodsB == null) {
+            return methodsA == methodsB;
+        }
+        return methodsA.equals(methodsB);
+    }
+
+    @Nullable
+    protected static Set<HttpMethod> extractHttpMethods(PathMappingContext mapping) {
+        for (Matcher matcher : mapping.getMatchers()) {
+            if (matcher instanceof HttpMethodMatcher) {
+                return new HashSet<>(((HttpMethodMatcher) matcher).getHttpMethods());
+            }
+        }
+        return null;
+    }
+
+    protected static String formatMethods(PathMappingContext mapping) {
+        Set<HttpMethod> methods = extractHttpMethods(mapping);
+        return methods == null ? "any method" : String.join(", ", methods.stream().map(HttpMethod::name).collect(Collectors.toList()));
     }
 
     public void initComponentPhase3() {

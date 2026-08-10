@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.core.convert.support.DefaultConversionService;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.lang.reflect.Method;
 
@@ -131,6 +132,21 @@ class AbstractNamedValueResolverTest {
         Object result = resolver.resolveArgument(request, response);
 
         assertEquals(42, result);
+    }
+
+    // ----- C2: 类型转换失败对齐 Spring 语义（→ MethodArgumentTypeMismatchException → 400） -----
+
+    @Test
+    void convert_conversionFailure_throwsMethodArgumentTypeMismatch() throws Exception {
+        stubWebContext();
+        stubConversionService();
+
+        Method method = getClass().getMethod("intParam", int.class);
+        MethodParameter mp = new MethodParameter(method, 0);
+
+        AbstractNamedValueResolver resolver = createResolver(mp, "not-a-number");
+        assertThrows(MethodArgumentTypeMismatchException.class,
+                () -> resolver.resolveArgument(request, response));
     }
 
     // ----- name field access (same package resolver) -----
