@@ -6,7 +6,10 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.EventLoop;
+import io.netty.channel.FileRegion;
 import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpResponse;
 import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
@@ -229,6 +232,34 @@ class NettyServerHttpResponseTest {
         response.getBuf();
         assertThrows(RuntimeException.class, () -> response.flush());
         verify(buf).release();
+    }
+
+    @Test
+    void writeFile_usesContentLengthFraming_only() throws Exception {
+        File testFile = java.nio.file.Files.createTempFile("test", ".bin").toFile();
+        byte[] content = "file content".getBytes(StandardCharsets.UTF_8);
+        java.nio.file.Files.write(testFile.toPath(), content);
+
+        ChannelFuture future = mock(ChannelFuture.class);
+        when(ctx.writeAndFlush(any())).thenReturn(future);
+        when(future.addListener(any())).thenReturn(future);
+
+        response.writeFile(testFile);
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(ctx, atLeast(2)).writeAndFlush(captor.capture());
+        // 头部响应：仅 Content-Length，绝不能同时带 Transfer-Encoding（双帧非法/客户端错乱）
+        HttpResponse headers = (HttpResponse) captor.getAllValues().get(0);
+        assertFalse(headers instanceof FullHttpResponse, "file body is streamed separately, headers must not be full");
+        assertNull(headers.headers().get(HttpHeaderNames.TRANSFER_ENCODING),
+                "file download must not set Transfer-Encoding: chunked");
+        assertEquals(content.length, headers.headers().getInt(HttpHeaderNames.CONTENT_LENGTH),
+                "Content-Length must match file size");
+        // 文件体：零拷贝 FileRegion（非 chunk 编码）
+        assertTrue(captor.getAllValues().get(1) instanceof FileRegion,
+                "file body should be written as zero-copy FileRegion");
+
+        testFile.delete();
     }
 
     @Test
