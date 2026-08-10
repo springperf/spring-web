@@ -8,6 +8,7 @@ import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.AttributeKey;
+import io.netty.util.ReferenceCountUtil;
 import io.springperf.web.core.cors.CorsUtils;
 import io.springperf.web.server.NettyHttpHandler;
 import io.springperf.web.util.PathPatternUtils;
@@ -146,6 +147,8 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
 
         if (handshaker == null) {
             WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(ctx.channel());
+            // 拒绝路径不将请求透传下游，释放 FullHttpRequest 引用（含 content ByteBuf）
+            ReferenceCountUtil.release(req);
             return;
         }
 
@@ -442,6 +445,9 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
             resp.headers().set(io.netty.handler.codec.http.HttpHeaderNames.CONNECTION, "close");
         }
         ctx.writeAndFlush(resp).addListener(ChannelFutureListener.CLOSE);
+        // 拒绝路径不将请求透传下游，释放 FullHttpRequest 引用（含 content ByteBuf）。
+        // （握手成功路径由 WebSocketServerHandshaker.handshake 接管并释放，此处只处理拒绝路径。）
+        ReferenceCountUtil.release(req);
     }
 
     private static final class PathMatchResult {

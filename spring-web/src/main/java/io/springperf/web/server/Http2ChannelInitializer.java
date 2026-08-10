@@ -165,6 +165,9 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
                     accumulator = ctx.alloc().buffer(H2_PREFACE_BYTES.length);
                 }
                 accumulator.writeBytes(buf);
+                // 内容已拷贝进 accumulator，buf 不再被传递（整包路径 fireChannelRead(msg) 转移所有权，
+                // 分片路径仅拷贝），必须立即释放引用，否则每个 fragment 泄漏一个 ByteBuf。
+                buf.release();
 
                 if (accumulator.readableBytes() < H2_PREFACE_BYTES.length) {
                     return; // wait for more fragments
