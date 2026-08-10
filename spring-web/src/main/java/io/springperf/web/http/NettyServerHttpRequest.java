@@ -42,6 +42,7 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
     private URI uri;
     private static final int LARGE_BODY_LIMIT = 4096;
     private static final byte[] EMPTY_BODY = new byte[0];
+    private static final String FORM_URLENCODED = HttpHeaderValues.APPLICATION_X_WWW_FORM_URLENCODED.toString();
 
     private volatile byte[] body;
     private ByteBuf largeBodyBuf;
@@ -82,15 +83,15 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
             }
         }
         String contentType = request.headers().get(HttpHeaderNames.CONTENT_TYPE);
-        if (contentType != null && contentType.toLowerCase().startsWith(HttpHeaderValues.APPLICATION_X_WWW_FORM_URLENCODED.toString())) {
+        if (contentType != null && contentType.regionMatches(true, 0, FORM_URLENCODED, 0, FORM_URLENCODED.length())) {
             HttpPostStandardRequestDecoder decoder = null;
             try {
                 decoder = new HttpPostStandardRequestDecoder(new DefaultHttpDataFactory(false), request);
                 List<InterfaceHttpData> bodyHttpDataList = decoder.getBodyHttpDatas();
                 if (!bodyHttpDataList.isEmpty()) {
                     MultiValueMap<String, String> result = new LinkedMultiValueMap<>();
-                    // 遍历解析结果
-                    for (InterfaceHttpData data : decoder.getBodyHttpDatas()) {
+                    // 遍历解析结果（复用上面已取的 bodyHttpDataList，避免二次解析）
+                    for (InterfaceHttpData data : bodyHttpDataList) {
                         if (data.getHttpDataType() == InterfaceHttpData.HttpDataType.Attribute) {
                             Attribute attr = (Attribute) data;
                             try {

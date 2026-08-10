@@ -53,14 +53,18 @@ public class InMemoryHttpSessionStorage implements HttpSessionStorage {
 
     private static final java.security.SecureRandom SESSION_ID_RANDOM = new java.security.SecureRandom();
 
+    private static final char[] HEX = "0123456789abcdef".toCharArray();
+
     private static String generateSessionId() {
         byte[] bytes = new byte[32];
         SESSION_ID_RANDOM.nextBytes(bytes);
-        StringBuilder sb = new StringBuilder(64);
-        for (byte b : bytes) {
-            sb.append(String.format("%02x", b));
+        char[] hex = new char[bytes.length * 2];
+        for (int i = 0, j = 0; i < bytes.length; i++) {
+            int b = bytes[i] & 0xFF;
+            hex[j++] = HEX[b >>> 4];
+            hex[j++] = HEX[b & 0x0F];
         }
-        return sb.toString();
+        return new String(hex);
     }
 
     void clear() {

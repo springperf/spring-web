@@ -50,29 +50,23 @@ public class MicrometerWebMetrics extends BaseWebComponent implements WebMetrics
     @Override
     public void recordRequest(String method, String pathPattern, int statusCode, long durationNanos) {
         String key = method + "|" + (pathPattern != null ? pathPattern : "") + "|" + statusCode;
-        Timer timer = requestTimers.get(key);
-        if (timer == null) {
-            timer = Timer.builder("dispatcher.request.duration")
-                    .tags(TAG_METHOD, method,
-                          TAG_PATH, pathPattern != null ? pathPattern : "",
-                          TAG_STATUS, String.valueOf(statusCode))
-                    .register(meterRegistry);
-            requestTimers.put(key, timer);
-        }
+        // computeIfAbsent 原子建缓存：修复前 get-then-put 并发下同 key 重复 register，
+        // Micrometer 会对同名同 tag 二次注册抛异常。
+        Timer timer = requestTimers.computeIfAbsent(key, k -> Timer.builder("dispatcher.request.duration")
+                .tags(TAG_METHOD, method,
+                      TAG_PATH, pathPattern != null ? pathPattern : "",
+                      TAG_STATUS, String.valueOf(statusCode))
+                .register(meterRegistry));
         timer.record(durationNanos, TimeUnit.NANOSECONDS);
     }
 
     @Override
     public void recordException(String exceptionType, boolean resolved) {
         String key = exceptionType + "|" + resolved;
-        Counter counter = exceptionCounters.get(key);
-        if (counter == null) {
-            counter = Counter.builder("dispatcher.exception")
-                    .tags(TAG_TYPE, exceptionType,
-                          TAG_RESOLVED, String.valueOf(resolved))
-                    .register(meterRegistry);
-            exceptionCounters.put(key, counter);
-        }
+        Counter counter = exceptionCounters.computeIfAbsent(key, k -> Counter.builder("dispatcher.exception")
+                .tags(TAG_TYPE, exceptionType,
+                      TAG_RESOLVED, String.valueOf(resolved))
+                .register(meterRegistry));
         counter.increment();
     }
 
