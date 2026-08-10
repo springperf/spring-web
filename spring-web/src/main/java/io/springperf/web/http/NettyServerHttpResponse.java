@@ -193,8 +193,12 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
         }
         FileChannel fc = null;
         try {
-            HttpResponse response = initHttpResponse(null, "application/octet-stream", null, true);
             long fileLen = file.length();
+            // 用 Content-Length 帧：文件长度已知，原始 DefaultFileRegion 零拷贝直发。
+            // initHttpResponse(..., chunked=true) 会设 Transfer-Encoding: chunked，但文件体是
+            // 原始字节而非 chunk 编码——双帧共存非法（RFC 7230 §3.3.2），客户端会按 chunked 解析错乱。
+            HttpResponse response = initHttpResponse(null, "application/octet-stream", null, true);
+            response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
             response.headers().set(HttpHeaderNames.CONTENT_LENGTH, fileLen);
             // write headers
             addRespEventListener(ctx.writeAndFlush(response), false);
