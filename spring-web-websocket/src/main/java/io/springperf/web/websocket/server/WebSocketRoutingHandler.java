@@ -234,6 +234,9 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
         safeRemove(pipeline, io.netty.handler.stream.ChunkedWriteHandler.class);
         safeRemove(pipeline, io.netty.handler.codec.http.HttpObjectAggregator.class);
         safeRemove(pipeline, io.netty.handler.codec.http.HttpServerCodec.class);
+        // HTTP 层 ReadTimeoutHandler（Http2ChannelInitializer 在 readTimeout>0 时添加）在 WS
+        // 升级后必须移除，否则空闲 WebSocket 会被 ReadTimeoutException 误杀。
+        safeRemove(pipeline, io.netty.handler.timeout.ReadTimeoutHandler.class);
     }
 
     private static void safeRemove(ChannelPipeline pipeline, Class<? extends ChannelHandler> handlerType) {

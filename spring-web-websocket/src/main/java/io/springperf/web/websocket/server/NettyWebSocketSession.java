@@ -182,7 +182,14 @@ public class NettyWebSocketSession implements WebSocketSession {
         if (queue == null) {
             Queue<WebSocketFrame> newQueue = new LinkedList<>();
             channel.attr(BACKPRESSURE_QUEUE_KEY).set(newQueue);
-            channel.closeFuture().addListener(f -> newQueue.clear());
+            // 通道关闭时释放队列中未写出的帧（Binary/Text 帧持有 ByteBuf 引用）。
+            // 仅 clear() 会泄漏引用；帧始终由 eventLoop 线程串行入队/排空，此处同样安全。
+            channel.closeFuture().addListener(f -> {
+                WebSocketFrame pending;
+                while ((pending = newQueue.poll()) != null) {
+                    pending.release();
+                }
+            });
             queue = newQueue;
         }
         WebSocketFrame frame = toFrame(message);

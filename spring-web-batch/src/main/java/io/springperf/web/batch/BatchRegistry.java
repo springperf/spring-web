@@ -85,6 +85,9 @@ public class BatchRegistry extends BaseWebComponent {
         DisruptorQueue queue = new DisruptorQueue(queueName, meta, reg.bean(), metrics);
         DisruptorQueue existing = queues.putIfAbsent(queueName, queue);
         if (existing != null) {
+            // 同 queueName 重复安装：刚创建的 queue 其 Disruptor 线程与 bizExecutor 已启动，
+            // 必须先 shutdown 释放资源再抛异常（修复前直接抛导致线程泄漏）。
+            queue.shutdown();
             throw new IllegalStateException(
                     "Queue [" + queueName + "] already exists — each @BatchMapping must have a unique queue. "
                             + "Conflict detected on @BatchMapping method [" + meta.batchMethod().getName()
