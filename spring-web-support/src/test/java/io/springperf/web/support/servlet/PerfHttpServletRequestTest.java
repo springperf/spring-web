@@ -63,6 +63,14 @@ class PerfHttpServletRequestTest {
     @Test void getContentLength_returnsValue() { when(request.getContentLength()).thenReturn(100); assertEquals(100, servletRequest.getContentLength()); assertEquals(100L, servletRequest.getContentLengthLong()); }
     @Test void getInputStream_returnsServletInputStream() throws Exception { when(request.getBody()).thenReturn(new ByteArrayInputStream("hello".getBytes(StandardCharsets.UTF_8))); ServletInputStream in = servletRequest.getInputStream(); byte[] buf = new byte[5]; assertEquals(5, in.read(buf)); assertEquals("hello", new String(buf, StandardCharsets.UTF_8)); }
     @Test void getReader_returnsBufferedReader() throws Exception { when(request.getBody()).thenReturn(new ByteArrayInputStream("test".getBytes(StandardCharsets.UTF_8))); when(request.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8); assertEquals("test", servletRequest.getReader().readLine()); }
+    @Test void getReader_noCharset_fallsBackToUtf8() throws Exception {
+        // 回归 R3 P1-14：请求无 charset 时 getCharacterEncoding() 返回 null，
+        // 修复前 new InputStreamReader(stream, null) → IllegalArgumentException。
+        // 回退框架默认 UTF-8（BaseWebServerHttpRequest 同款），多字节字符须正确读出。
+        when(request.getBody()).thenReturn(new ByteArrayInputStream("中文".getBytes(StandardCharsets.UTF_8)));
+        when(request.getCharacterEncoding()).thenReturn(null);
+        assertEquals("中文", servletRequest.getReader().readLine());
+    }
     @Test void getCharacterEncoding_returnsFromRequest() { when(request.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8); assertEquals("UTF-8", servletRequest.getCharacterEncoding()); }
     @Test void getCharacterEncoding_null_returnsNull() { when(request.getCharacterEncoding()).thenReturn(null); assertNull(servletRequest.getCharacterEncoding()); }
     @Test void setCharacterEncoding_delegatesToRequest() { servletRequest.setCharacterEncoding("ISO-8859-1"); verify(request).setCharacterEncoding(Charset.forName("ISO-8859-1")); }
