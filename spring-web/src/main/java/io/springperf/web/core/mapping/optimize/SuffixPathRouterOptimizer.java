@@ -66,7 +66,9 @@ public class SuffixPathRouterOptimizer implements RouterOptimizer {
         if (slashIndexList.length <= suffixPathIndex || suffixPathIndex == 0) {
             return false;
         }
-        String suffixPath = pathRule.substring(slashIndexList[suffixPathIndex - 1]);
+        // suffixPathIndex 从末尾锚定尾部非通配段数：后缀起始 slash 应为 倒数第 suffixPathIndex 个。
+        // 修复前误用 slashIndexList[suffixPathIndex - 1]（从头数），substring 必含通配段，routeMap 永不填充。
+        String suffixPath = pathRule.substring(slashIndexList[slashIndexList.length - suffixPathIndex]);
         if (PathPatternUtils.pathHaveWildcard(suffixPath)) {
             return false;
         }
@@ -78,10 +80,12 @@ public class SuffixPathRouterOptimizer implements RouterOptimizer {
     public Router optimizeRoute(WebServerHttpRequest req) {
         String path = req.getPath();
         int[] slashIndexList = PrefixPathRouterOptimizer.getSlashIndexList(req);
-        if (suffixPathIndex < 0 || suffixPathIndex >= slashIndexList.length) {
+        // suffixPathIndex <= 0：尾部即通配段，无后缀可摘（且 length - suffixPathIndex 会越界）；必须显式拒绝
+        if (suffixPathIndex <= 0 || suffixPathIndex >= slashIndexList.length) {
             return null;
         }
-        String suffixPath = path.substring(slashIndexList[suffixPathIndex]);
+        // 与 initAndRemove 对称：查询 key 取请求路径倒数第 suffixPathIndex 段
+        String suffixPath = path.substring(slashIndexList[slashIndexList.length - suffixPathIndex]);
         Router router = routeMap.get(suffixPath);
         return router;
     }
