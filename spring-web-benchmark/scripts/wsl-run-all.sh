@@ -13,6 +13,8 @@
 #   ./scripts/wsl-run-all.sh --apis json,bytes        # 只跑指定 API（逗号分隔，与老脚本 --apis 一致）
 #   ./scripts/wsl-run-all.sh --threads 8              # 指定客户端并发线程（单轮）
 #   ./scripts/wsl-run-all.sh --thread-list 1,4,16,64  # 多并发度测试（threads-N 子目录，自动出并发矩阵报告）
+#   ./scripts/wsl-run-all.sh --jfr                     # 服务端开 JFR 录制（热点分析用；默认关，
+#                                                      #  实测 JFR profile 拖慢服务端 ~38% 吞吐）
 #   ./scripts/wsl-run-all.sh -- -w 1 -wi 1 -i 1 -r 1s # 透传 JMH 参数（冒烟用短迭代）
 #                                                      # 注意: -- 后所有参数原样透传给每个 profile 的 JMH
 #
@@ -27,9 +29,9 @@
 # 产物:
 #   - benchmark-reports/{run-id}/report.md          主报告（含 latest/report.md 同步）
 #   - benchmark-reports/{run-id}/jdk-*/jmh-results-<profile>.json  JMH 原始 JSON
-#   - benchmark-reports/{run-id}/<profile>-server.jfr  各服务端 JFR 录音
-#                                                    （落盘 Windows /mnt/d，
-#                                                     防 WSL VM 空闲关闭清空 /tmp）
+#   - benchmark-reports/{run-id}/<profile>-server.jfr  各服务端 JFR 录音（仅 --jfr 时生成；
+#                                                   默认关闭避免拖慢吞吐；落盘 Windows /mnt/d，
+#                                                   防 WSL VM 空闲关闭清空 /tmp）
 #   - benchmark-reports/{run-id}/<profile>-server.log  各服务端日志
 #
 # 模式控制（参照 benchmark-all.sh 的 --sampleTime 开关）:
@@ -67,6 +69,7 @@ APIS_LIST=()          # --apis 限定 API（默认空=全部 API）
 THREADS=""            # --threads 单轮并发线程（默认用 @Threads(4)）
 THREAD_LIST=()        # --thread-list 多并发度
 USE_THREAD_SUBDIRS=false
+ENABLE_JFR=false      # --jfr 开启服务端 JFR 录制（默认关，实测拖慢服务端 ~38% 吞吐）
 JMH_EXTRA=()          # -- 之后原样透传给 JMH 的额外参数
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -91,13 +94,17 @@ while [[ $# -gt 0 ]]; do
       USE_THREAD_SUBDIRS=true
       shift 2
       ;;
+    --jfr)
+      ENABLE_JFR=true
+      shift
+      ;;
     --)
       shift
       JMH_EXTRA=("$@")
       break
       ;;
     *)
-      echo "用法: $0 [--sampleTime] [--profiles perf,tomcat,...] [--apis a,b,c] [--threads N] [--thread-list 1,4,16] [-- JMH额外参数]"
+      echo "用法: $0 [--sampleTime] [--jfr] [--profiles perf,tomcat,...] [--apis a,b,c] [--threads N] [--thread-list 1,4,16] [-- JMH额外参数]"
       exit 1
       ;;
   esac
@@ -131,7 +138,7 @@ fi
 # ========== 前置检查 ==========
 echo "=========================================="
 echo " Spring WebPerf WSL 全量压测 — $RUN_ID"
-echo " 模式: $MODE  |  profiles: ${#PROFILES_TO_RUN[@]}"
+echo " 模式: $MODE  |  profiles: ${#PROFILES_TO_RUN[@]}  |  JFR: ${ENABLE_JFR:-off}"
 echo "=========================================="
 
 if ! command -v wsl >/dev/null 2>&1; then
@@ -182,11 +189,13 @@ fi
 PROFILE_NAMES=()
 for E in "${PROFILES_TO_RUN[@]}"; do PROFILE_NAMES+=("${E%%:*}"); done
 PROFILES_STR="$(IFS=,; echo "${PROFILE_NAMES[*]}")"
+if [ "$ENABLE_JFR" = true ]; then JFR_STR=on; else JFR_STR=off; fi
 cat > "$REPORTS_DIR/$RUN_ID/run-meta.txt" <<EOF
 mode=$MODE
 threads=$THREADS_STR
 profiles=$PROFILES_STR
 apis=$APIS_STR
+jfr=$JFR_STR
 EOF
 echo "  运行元信息: mode=$MODE, threads=$THREADS_STR, profiles=$PROFILES_STR, apis=$APIS_STR"
 
@@ -263,11 +272,17 @@ for ENTRY in "${PROFILES_TO_RUN[@]}"; do
     # 清理 WSL 内残留同端口 java 进程（防上次 run 残留）
     wsl -e bash -c "ps aux | grep -E 'server.port=${PORT}\$' | grep -v grep | awk '{print \$2}' | xargs -r kill -9" 2>/dev/null
     sleep 1
-    JFR_WSL="$(wsl -e wslpath -a "$BENCH/$REPORTS_DIR/$RUN_ID/$P-server.jfr")"
     LOG_WSL="$(wsl -e wslpath -a "$BENCH/$REPORTS_DIR/$RUN_ID/$P-server.log")"
     PID_WSL="/tmp/${P}-server.pid"   # pid 文件小、瞬时使用，tmpfs 可接受
-    echo "    [server] 启动 $APP_CLASS:$PORT in WSL (attempt $1) ..."
-    wsl -e bash -c "nohup java -Xms${HEAP_MB}m -Xmx${HEAP_MB}m -XX:+UseG1GC -XX:+AlwaysPreTouch -XX:FlightRecorderOptions=stackdepth=512 -XX:StartFlightRecording=filename=${JFR_WSL},settings=profile -cp '${CP_WSL}:${CLASSES_WSL}' ${APP_CLASS} --server.port=${PORT} > ${LOG_WSL} 2>&1 & echo \$! > ${PID_WSL}; wait" &
+    # JFR 可选：默认关闭（实测 profile 模式拖慢服务端 ~38% 吞吐，TPS 数据不受影响——
+    # 吞吐来自 JMH 客户端结果 JSON）。--jfr 开启供热点分析。
+    JFR_OPTS=""
+    if [ "$ENABLE_JFR" = true ]; then
+      JFR_WSL="$(wsl -e wslpath -a "$BENCH/$REPORTS_DIR/$RUN_ID/$P-server.jfr")"
+      JFR_OPTS="-XX:FlightRecorderOptions=stackdepth=512 -XX:StartFlightRecording=filename=${JFR_WSL},settings=profile"
+    fi
+    echo "    [server] 启动 $APP_CLASS:$PORT in WSL (attempt $1, JFR=$([ "$ENABLE_JFR" = true ] && echo on || echo off)) ..."
+    wsl -e bash -c "nohup java -Xms${HEAP_MB}m -Xmx${HEAP_MB}m -XX:+UseG1GC -XX:+AlwaysPreTouch ${JFR_OPTS} -cp '${CP_WSL}:${CLASSES_WSL}' ${APP_CLASS} --server.port=${PORT} > ${LOG_WSL} 2>&1 & echo \$! > ${PID_WSL}; wait" &
     SERVER_WRAPPER_PID=$!
     sleep 3
     WRAPPERS+=("$SERVER_WRAPPER_PID")
@@ -366,15 +381,17 @@ for ENTRY in "${PROFILES_TO_RUN[@]}"; do
   fi
 done
 
-# ========== Step 3.5: JFR 落盘检查 ==========
+# ========== Step 3.5: JFR 落盘检查（仅 --jfr 开启时）==========
 # 0 字节 JFR = 服务端未优雅关闭（VM 关闭/强杀），热点分析数据缺失，显式告警。
-ZERO_JFR=()
-for f in "$REPORTS_DIR/$RUN_ID"/*.jfr; do
-  [ -f "$f" ] && [ ! -s "$f" ] && ZERO_JFR+=("$(basename "$f")")
-done
-if [ ${#ZERO_JFR[@]} -gt 0 ]; then
-  echo ""
-  echo "  [WARN] JFR 未落盘（0 字节，服务端未优雅关闭）: ${ZERO_JFR[*]}"
+if [ "$ENABLE_JFR" = true ]; then
+  ZERO_JFR=()
+  for f in "$REPORTS_DIR/$RUN_ID"/*.jfr; do
+    [ -f "$f" ] && [ ! -s "$f" ] && ZERO_JFR+=("$(basename "$f")")
+  done
+  if [ ${#ZERO_JFR[@]} -gt 0 ]; then
+    echo ""
+    echo "  [WARN] JFR 未落盘（0 字节，服务端未优雅关闭）: ${ZERO_JFR[*]}"
+  fi
 fi
 
 # ========== Step 4: 生成报告 ==========
