@@ -51,13 +51,35 @@ public class InterceptorRegistry extends WebComponentContainer {
     public boolean preHandle(WebServerHttpRequest request, WebServerHttpResponse response) throws Exception {
         List<HandlerInterceptor> interceptors = getInterceptors(request);
         PathMappingContext mappingContext = PathMappingContext.get(request);
+        int passed = 0;
         for (HandlerInterceptor i : interceptors) {
             if (!i.preHandle(request, response, mappingContext)) {
-                afterCompletion(request, response, null);
+                // Spring 语义：preHandle 返回 false 时仅对已通过 preHandle 的拦截器执行
+                // afterCompletion（HandlerExecutionChain.triggerAfterCompletion 只覆盖到
+                // interceptorIndex）。未进入的拦截器未持有资源，不应收到回调；修复前对
+                // 所有拦截器调用会误触发尚未 preHandle 的拦截器的回调。
+                afterCompletionForPassed(request, response, null, interceptors, passed);
                 return false;
             }
+            passed++;
         }
         return true;
+    }
+
+    /**
+     * 仅对已通过 preHandle 的拦截器逆序调用 afterCompletion（preHandle 提前返回 false 时用）。
+     * 正常请求完成路径仍走 {@link #afterCompletion} 全量回调。
+     */
+    private void afterCompletionForPassed(WebServerHttpRequest request, WebServerHttpResponse response,
+                                          Throwable exception, List<HandlerInterceptor> interceptors, int passed) {
+        PathMappingContext mappingContext = PathMappingContext.get(request);
+        try {
+            for (int i = passed - 1; i >= 0; i--) {
+                interceptors.get(i).afterCompletion(request, response, mappingContext, exception);
+            }
+        } catch (Throwable e) {
+            log.error("Interceptor afterCompletion failed", e);
+        }
     }
 
     /**

@@ -116,6 +116,46 @@ class InterceptorRegistryTest {
     }
 
     @Test
+    void preHandle_middleInterceptorReturnsFalse_onlyPassedOnesGetAfterCompletion() throws Exception {
+        // 回归 P2 并发组 #1：preHandle=false 时仅对已通过 preHandle 的拦截器执行
+        // afterCompletion。未进入的 i3 与自身返回 false 的 i2 都不得收到回调；
+        // 修复前对所有拦截器调用会误触发 i2/i3 的 afterCompletion。
+        HandlerInterceptor i1 = mock(HandlerInterceptor.class);
+        HandlerInterceptor i2 = mock(HandlerInterceptor.class);
+        HandlerInterceptor i3 = mock(HandlerInterceptor.class);
+        when(i1.preHandle(any(), any(), any())).thenReturn(true);
+        when(i2.preHandle(any(), any(), any())).thenReturn(false);
+
+        when(request.getRequestContext()).thenReturn(requestContext);
+        when(requestContext.getAttribute(InterceptorRegistry.INTERCEPTORS_ATTRIBUTE))
+                .thenReturn(Arrays.asList(i1, i2, i3));
+
+        assertFalse(registry.preHandle(request, response));
+        verify(i1).preHandle(any(), any(), any());
+        verify(i2).preHandle(any(), any(), any());
+        verify(i3, never()).preHandle(any(), any(), any());
+        // 已通过的 i1 收到 afterCompletion（异常为 null）；i2 本身与 i3 均不回调
+        verify(i1).afterCompletion(any(), any(), any(), isNull());
+        verify(i2, never()).afterCompletion(any(), any(), any(), any());
+        verify(i3, never()).afterCompletion(any(), any(), any(), any());
+    }
+
+    @Test
+    void preHandle_firstInterceptorReturnsFalse_noAfterCompletion() throws Exception {
+        // 第一个拦截器即返回 false：没有任何拦截器通过 preHandle，
+        // afterCompletion 一个都不应调用（对齐 Spring interceptorIndex 从 -1 开始）。
+        HandlerInterceptor i1 = mock(HandlerInterceptor.class);
+        when(i1.preHandle(any(), any(), any())).thenReturn(false);
+
+        when(request.getRequestContext()).thenReturn(requestContext);
+        when(requestContext.getAttribute(InterceptorRegistry.INTERCEPTORS_ATTRIBUTE))
+                .thenReturn(Arrays.asList(i1, mock(HandlerInterceptor.class)));
+
+        assertFalse(registry.preHandle(request, response));
+        verify(i1, never()).afterCompletion(any(), any(), any(), any());
+    }
+
+    @Test
     void preHandle_throwsException_propagates() throws Exception {
         HandlerInterceptor interceptor = mock(HandlerInterceptor.class);
         when(interceptor.preHandle(any(), any(), any())).thenThrow(new RuntimeException("interceptor error"));
