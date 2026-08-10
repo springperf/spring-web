@@ -74,24 +74,24 @@ public class EarlyEncodeNettyStreamSender extends AbstractNettyStreamSender {
                     // 单条消息超过 batch 容量：先刷掉已有批数据，再直接独立写入，
                     // 避免 writeBytes 超出 batchBuf 容量抛 IndexOutOfBoundsException。
                     if (batchBuf != null) {
-                        channel.writeAndFlush(new DefaultHttpContent(batchBuf));
+                        flushContent(batchBuf);
                         batchBuf = null;
                     }
-                    channel.writeAndFlush(new DefaultHttpContent(Unpooled.wrappedBuffer(bytes)));
+                    flushContent(Unpooled.wrappedBuffer(bytes));
                     continue;
                 }
                 if (batchBuf == null) {
                     batchBuf = bufAllocator.buffer(maxFlushBytes);
                 }
                 if (batchBuf.writableBytes() < bytes.length) {
-                    channel.writeAndFlush(new DefaultHttpContent(batchBuf));
+                    flushContent(batchBuf);
                     batchBuf = bufAllocator.buffer(maxFlushBytes);
                 }
                 batchBuf.writeBytes(bytes);
             }
             if (batchBuf != null) {
                 if (batchBuf.readableBytes() > 0) {
-                    channel.writeAndFlush(new DefaultHttpContent(batchBuf));
+                    flushContent(batchBuf);
                 } else {
                     batchBuf.release();
                 }

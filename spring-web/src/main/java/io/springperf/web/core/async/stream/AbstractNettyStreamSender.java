@@ -1,10 +1,12 @@
 package io.springperf.web.core.async.stream;
 
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.internal.shaded.org.jctools.queues.MpscArrayQueue;
@@ -85,6 +87,17 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
     @Override
     public int queueSize() {
         return queue.size();
+    }
+
+    /**
+     * 批量写出一个 HttpContent 帧并挂写完成监听器（isComplete=false）：
+     * 写成功 → writeStreamSuccessCallback → asyncWebRequest 的写回调（背压补充订阅请求）；
+     * 写失败 → writeStreamErrorCallback → 终止流。修复前 drain 直写 channel 不挂监听器，
+     * 遵守背压的冷 Publisher 在 highWaterMark 条后永不再被补充请求，流静默停滞。
+     */
+    protected void flushContent(ByteBuf buf) {
+        ChannelFuture f = channel.writeAndFlush(new DefaultHttpContent(buf));
+        resp.addRespEventListener(f, false);
     }
 
     protected void scheduleDrain() {
