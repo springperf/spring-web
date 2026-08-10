@@ -16,6 +16,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -192,6 +196,71 @@ class NettyServerHttpRequestBodyTest {
         assertTrue(req.hasBody());
         byte[] bodyBytes = req.getBodyBytes();
         assertEquals(0, bodyBytes.length);
+    }
+
+    /**
+     * 回归 R2-4（确定性）：{@code release()} 必须与 {@code getBody()}/{@code getBodyBytes()}
+     * 共用 this 监视器。主线程持锁期间，release() 若同步于 this 则必须阻塞等待；
+     * 修复前 release() 无同步，EventLoop 可在异步线程读 body 期间提前释放 largeBodyBuf/content。
+     */
+    @Test
+    void largeBody_release_synchronizesWithGetBody() throws Exception {
+        FullHttpRequest nativeRequest = newRequest(createLargeContent(4097));
+        NettyServerHttpRequest req = new NettyServerHttpRequest(webContext, ctx, nativeRequest, "/test");
+
+        CountDownLatch started = new CountDownLatch(1);
+        AtomicBoolean releaseDone = new AtomicBoolean(false);
+        Thread releaser = new Thread(() -> {
+            started.countDown();
+            req.release();
+            releaseDone.set(true);
+        });
+
+        synchronized (req) {
+            releaser.start();
+            started.await();
+            Thread.sleep(100);
+            assertFalse(releaseDone.get(), "release() 未与 getBody 路径同步，EventLoop 提前释放竞态未修复");
+        }
+        releaser.join(2000);
+        assertTrue(releaseDone.get());
+    }
+
+    /**
+     * 回归 R2-4（并发冒烟）：模拟真实异步流——入池前 acquire、异步线程读 body、
+     * 主线程（模拟 EventLoop）提交后立即 release。修复前 release 并发 null 掉
+     * largeBodyBuf → 大 POST 读到空 body，或对已释放 content 抛 IllegalReferenceCountException。
+     */
+    @Test
+    void largeBody_concurrentEventLoopRelease_whileAsyncRead_ok() throws Exception {
+        for (int i = 0; i < 1000; i++) {
+            FullHttpRequest nativeRequest = newRequest(createLargeContent(4097));
+            NettyServerHttpRequest req = new NettyServerHttpRequest(webContext, ctx, nativeRequest, "/test");
+            req.acquire(); // DispatcherHandler 入池前 retain，平衡 EventLoop 的 release
+            CountDownLatch start = new CountDownLatch(1);
+            AtomicReference<Throwable> error = new AtomicReference<>();
+            Thread async = new Thread(() -> {
+                try {
+                    start.await();
+                    String read = readAll(req.getBody());
+                    if (read.length() != 4097) {
+                        error.set(new AssertionError("empty/truncated body len=" + read.length()));
+                    }
+                } catch (Throwable t) {
+                    error.set(t);
+                } finally {
+                    req.release();
+                }
+            });
+            async.start();
+            start.countDown();
+            req.release(); // EventLoop finally：提交后立即执行
+            async.join(2000);
+            if (error.get() != null) {
+                throw new AssertionError("iteration " + i + ": " + error.get().getMessage(), error.get());
+            }
+            assertEquals(0, nativeRequest.refCnt(), "iteration " + i);
+        }
     }
 
     // ==================== 边界场景 ====================
