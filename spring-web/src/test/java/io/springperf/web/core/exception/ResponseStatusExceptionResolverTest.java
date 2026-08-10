@@ -8,11 +8,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.server.ResponseStatusException;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
@@ -62,6 +64,47 @@ class ResponseStatusExceptionResolverTest {
 
         assertTrue(result);
         verify(response).sendError(HttpStatus.NOT_FOUND, "not found");
+    }
+
+    @Test
+    void resolveException_responseStatusException_headersEmpty_noHeaderCopy() {
+        // 回归 R3 P1-13：headers 经 ResponseStatusExceptionAdapter 跨版本桥接。
+        // 6.1 中 ResponseStatusException 构造器不接收 headers，getHeaders() 恒返回 EMPTY，
+        // 复制逻辑必须为空操作——不得因 Adapter 桥接引入 NPE 或误加响应头。
+        ResponseStatusException ex = new ResponseStatusException(HttpStatus.BAD_REQUEST, "bad");
+        HttpHeaders respHeaders = new HttpHeaders();
+        // 6.1 下 EMPTY headers 空迭代，getHeaders() 不会真正被访问 → lenient 声明避免 UnnecessaryStubbing
+        lenient().when(response.getHeaders()).thenReturn(respHeaders);
+
+        boolean result = resolver.resolveException(request, response, handler, ex);
+
+        assertTrue(result);
+        assertTrue(respHeaders.isEmpty(), "headers 为空时不得复制任何响应头");
+        verify(response).sendError(HttpStatus.BAD_REQUEST, "bad");
+    }
+
+    @Test
+    void resolveException_responseStatusException_withHeaders_addsToResponse() {
+        // P1-13 反向验证：headers 复制逻辑本身——构造一个确实携带 headers 的 ResponseStatusException
+        // 子类（6.1 基类构造器不接收 headers，但 protected 字段/方法可被子类填充），
+        // 经 Adapter 桥接后必须复制到响应头。若 Adapter 失效或改回 getResponseHeaders() 直呼，
+        // 此测试在 Spring 7 上即编译失败（getResponseHeaders 被移除），反向锁定 P1-13。
+        HttpHeaders respHeaders = new HttpHeaders();
+        when(response.getHeaders()).thenReturn(respHeaders);
+
+        ResponseStatusException ex = new ResponseStatusException(HttpStatus.BAD_REQUEST, "bad") {
+            @Override
+            public HttpHeaders getHeaders() {
+                HttpHeaders hs = new HttpHeaders();
+                hs.add("X-Custom", "v1");
+                return hs;
+            }
+        };
+
+        boolean result = resolver.resolveException(request, response, handler, ex);
+
+        assertTrue(result);
+        assertEquals(java.util.List.of("v1"), respHeaders.get("X-Custom"));
     }
 
     @ResponseStatus(HttpStatus.NOT_FOUND)
