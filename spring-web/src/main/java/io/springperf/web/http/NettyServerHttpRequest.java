@@ -221,11 +221,19 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
 
     @Override
     public InputStream getBody() {
-        getBodyBytes();
-        if (largeBodyBuf != null) {
-            return new ByteBufInputStream(largeBodyBuf.duplicate(), false);
+        // 与 getBodyBytes()/release() 共用 this 监视器：修复前 getBodyBytes() 是同步的，但
+        // release() 在异步任务入池后由 EventLoop 立即执行，并发 null 掉 largeBodyBuf →
+        // 大 POST 读到空 body，或对已释放的 content 调 readableBytes()/duplicate() 抛
+        // IllegalReferenceCountException（500）。锁内完成判空+duplicate，二者不可再交错。
+        synchronized (this) {
+            getBodyBytes();
+            if (largeBodyBuf != null) {
+                // duplicate() 不递增 refCnt：读取期由 request 的 retain/acquire + retainedDuplicate
+                // 共同保证 content 存活（见 getBodyBytes），InputStream 仅请求处理期有效
+                return new ByteBufInputStream(largeBodyBuf.duplicate(), false);
+            }
+            return new ByteArrayInputStream(body);
         }
-        return new ByteArrayInputStream(body);
     }
 
     protected byte[] getBodyBytes() {
@@ -273,11 +281,15 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
 
     @Override
     public boolean release() {
-        if (largeBodyBuf != null) {
-            largeBodyBuf.release();
-            largeBodyBuf = null;
+        // 与 getBody()/getBodyBytes() 共用 this 监视器：防止异步线程读 body 期间 EventLoop
+        // 提前释放 largeBodyBuf/content（大 POST 空 body / IllegalReferenceCountException）
+        synchronized (this) {
+            if (largeBodyBuf != null) {
+                largeBodyBuf.release();
+                largeBodyBuf = null;
+            }
+            return ReferenceCountUtil.release(request);
         }
-        return ReferenceCountUtil.release(request);
     }
 
 }
