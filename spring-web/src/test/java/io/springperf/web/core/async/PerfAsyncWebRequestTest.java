@@ -164,7 +164,25 @@ class PerfAsyncWebRequestTest {
         verify(response).setTimeout(captor.capture(), eq(100L));
         captor.getValue().run();
         verify(timeoutHandler).run();
-        assertTrue(asyncWebRequest.isAsyncComplete());
+        // 回归 R3-A5：超时回调不占用状态——修复前先 CAS 到 COMPLETED，timeoutHandler 内的
+        // setConcurrentResultAndDispatch 因 isAsyncComplete() 直接 return，超时结果被丢弃、响应悬挂。
+        // 修复后状态保持 ASYNC_STARTED，由 setConcurrentResultAndDispatch 走正常 dispatch 推进完成。
+        assertFalse(asyncWebRequest.isAsyncComplete());
+    }
+
+    @Test void timeoutFires_thenSetConcurrentResultAndDispatch_dispatches() {
+        when(request.getWebContext()).thenReturn(webContext);
+        when(webContext.getDispatcherHandler()).thenReturn(dispatcherHandler);
+        asyncWebRequest.addTimeoutHandler(() ->
+                asyncWebRequest.setConcurrentResultAndDispatch(new RuntimeException("timeout")));
+        asyncWebRequest.setTimeout(100L);
+        asyncWebRequest.startAsync();
+        ArgumentCaptor<Runnable> captor = ArgumentCaptor.forClass(Runnable.class);
+        verify(response).setTimeout(captor.capture(), eq(100L));
+        captor.getValue().run();
+        // 超时结果经正常 dispatch 路径到达 dispatcher（修复前被 COMPLETED 状态短路，永远到不了）
+        verify(dispatcherHandler).asyncDispatch(same(request), same(response), any(Throwable.class));
+        assertTrue(asyncWebRequest.isErrorHandlingInProgress());
     }
 
     @Test void timeoutHandler_whenAlreadyCompleted_doesNotRunHandler() {

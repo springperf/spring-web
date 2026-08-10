@@ -70,7 +70,12 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
             return;
         }
         response.setTimeout(() -> {
-            if (!state.compareAndSet(State.ASYNC_STARTED, State.COMPLETED)) {
+            // 仅当仍处于 ASYNC_STARTED（尚未 dispatch/complete）才触发超时。
+            // 修复前先 CAS(ASYNC_STARTED→COMPLETED) 再跑 timeoutHandler，而 timeoutHandler
+            // 内部 setConcurrentResultAndDispatch 因 isAsyncComplete() 直接 return——
+            // 超时结果被丢弃、响应悬挂。这里不占用状态，由 setConcurrentResultAndDispatch
+            // 的 concurrentResult 检查 + dispatch 的 CAS 与业务线程完成线性化。
+            if (state.get() != State.ASYNC_STARTED) {
                 return;
             }
             if (timeoutHandler != null) {
