@@ -18,6 +18,8 @@ public interface ParamTestApi {
 
     String emptyBody(@RequestBody String body);
 
+    String emptyBodyOptional(@RequestBody(required = false) String body);
+
     String multiHeader(@RequestHeader("X-Multi") List<String> values,
                        @RequestHeader(value = "X-Optional", required = false) String opt);
 

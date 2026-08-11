@@ -19,7 +19,9 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -410,47 +412,39 @@ class MappingRegistryTest {
         assertEquals(BaseController.class, mappings.get(0).getMethod().getDeclaringClass());
     }
 
-    /* ==================== D4: 歧义映射检测 ==================== */
+    /* ==================== D4: bean 扫描顺序确定性 ==================== */
 
     @Test
-    void registerMapping_duplicatePathAndMethod_throws() {
+    void initComponentPhase1_preservesBeanScanOrder_deterministic() throws Exception {
+        // 回归 D4：歧义映射存在时选择必须确定。修复前 new HashMap + new HashSet 打乱
+        // getBeansWithAnnotation 的注册顺序 → 跨 controller 重复路径选谁不确定。
+        // LinkedHashMap 保序 + 直接遍历 values 后，选择 = 注册顺序（先注册者胜出），
+        // 且重复映射不再被启动期拒绝（框架容忍，与 P1TestController 场景一致）。
         MappingRegistry registry = new MappingRegistry();
-        registry.registerMapping(createPathMappingContext("/dup",
-                Collections.singletonList(new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET}))));
+        when(webContext.getCtx()).thenReturn(applicationContext);
+        Map<String, Object> orderedBeans = new LinkedHashMap<>();
+        orderedBeans.put("controllerA", new OrderControllerA());
+        orderedBeans.put("controllerB", new OrderControllerB());
+        when(applicationContext.getBeansWithAnnotation(Controller.class)).thenReturn(orderedBeans);
+        when(applicationContext.getEnvironment()).thenReturn(environment);
+        when(environment.resolvePlaceholders(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        registry.initWithWebContext(webContext);
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> registry.registerMapping(createPathMappingContext("/dup",
-                        Collections.singletonList(new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET})))));
-        assertTrue(ex.getMessage().contains("/dup"));
+        registry.initComponentPhase1();
+
+        List<PathMappingContext> mappings = registry.getMappingContextList();
+        assertEquals(2, mappings.size());
+        // 确定性断言：controllerA 的映射先于 controllerB（与扫描顺序一致，不允许 HashSet 随机化）
+        assertEquals("/order-a", mappings.get(0).getPathRule());
+        assertEquals("/order-b", mappings.get(1).getPathRule());
     }
 
     @Test
-    void registerMapping_duplicateNoMethodRestriction_throws() {
+    void registerMapping_duplicatePathAllowed_registersBoth() {
+        // D4 宽容语义：重复映射不拒绝、不抛异常，两个 context 都注册（运行时先注册者胜出）。
         MappingRegistry registry = new MappingRegistry();
         registry.registerMapping(createPathMappingContext("/dup", Collections.<Matcher>emptyList()));
-
-        assertThrows(IllegalStateException.class,
-                () -> registry.registerMapping(createPathMappingContext("/dup", Collections.<Matcher>emptyList())));
-    }
-
-    @Test
-    void registerMapping_samePathDifferentMethod_allowed() {
-        MappingRegistry registry = new MappingRegistry();
-        registry.registerMapping(createPathMappingContext("/dup",
-                Collections.singletonList(new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET}))));
-        registry.registerMapping(createPathMappingContext("/dup",
-                Collections.singletonList(new HttpMethodMatcher(new HttpMethod[]{HttpMethod.POST}))));
-
-        assertEquals(2, registry.getMappingContextList().size());
-    }
-
-    @Test
-    void registerMapping_samePathNoMethodRestrictionVsSpecified_allowed() {
-        // 无 HttpMethodMatcher（匹配所有方法）与指定 GET 是子集式歧义，注册期不检测
-        MappingRegistry registry = new MappingRegistry();
         registry.registerMapping(createPathMappingContext("/dup", Collections.<Matcher>emptyList()));
-        registry.registerMapping(createPathMappingContext("/dup",
-                Collections.singletonList(new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET}))));
 
         assertEquals(2, registry.getMappingContextList().size());
     }
@@ -492,6 +486,20 @@ class MappingRegistryTest {
 
     @Controller
     static class ChildController extends BaseController {
+    }
+
+    @Controller
+    static class OrderControllerA {
+        @RequestMapping("/order-a")
+        @SuppressWarnings("unused")
+        public void orderA() {}
+    }
+
+    @Controller
+    static class OrderControllerB {
+        @RequestMapping("/order-b")
+        @SuppressWarnings("unused")
+        public void orderB() {}
     }
 
     static class BaseController {

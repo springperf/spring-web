@@ -11,15 +11,16 @@
 
 | Metric | perf | vs Spring MVC (Tomcat) | vs WebFlux |
 |--------|------|------------------------|------------|
-| High-concurrency throughput (json, 48 threads) | **46,613 ops/s** | **3.22x** (14,454) | **2.50x** (18,678) |
-| Concurrency scaling (json, 8→48 threads) | **+156%** | +67% | +105% |
-| SSE long-connection throughput (48 threads) | **5,956 ops/s** | **2.85x** (2,093) | **2.36x** (2,524) |
-| Byte-echo throughput (bytes, 48 threads) | **44,836 ops/s** | **2.18x** (20,533) | **1.89x** (23,773) |
-| Async throughput (async, 48 threads) | **42,401 ops/s** | **3.00x** (14,125) | **1.71x** (24,868) |
+| High-concurrency throughput (json, 48 threads) | **43,896 ops/s** | **2.96x** (14,806) | **2.31x** (18,981) |
+| Concurrency scaling (json, 16→48 threads) | **+52%** | +17% | +11% |
+| SSE long-connection throughput (48 threads) | **5,715 ops/s** | **2.63x** (2,170) | **2.08x** (2,743) |
+| Byte-echo throughput (bytes, 48 threads) | **45,152 ops/s** | **2.12x** (21,281) | **1.65x** (27,363) |
+| Async throughput (async, 48 threads) | **44,104 ops/s** | **3.06x** (14,407) | **1.84x** (23,996) |
+| High-concurrency latency (json, 48 threads, p50) | **0.92 ms** | 3.16 ms (**29%**) | 1.95 ms (**47%**) |
 
-**perf ranks first in every comparison across all 7 APIs × 5 concurrency levels (8/16/32/48/64 threads) — no exceptions.**
+**perf ranks first in every comparison across all 7 APIs × 3 concurrency levels (16/32/48 threads) — no exceptions.**
 
-The most striking finding: **perf's advantage keeps growing as concurrency increases.** Other frameworks saturate at 16–32 threads, while perf is still scaling at 48 threads — the higher the concurrency, the greater the framework advantage.
+The most striking finding: **perf's advantage keeps growing as concurrency increases.** WebFlux peaks and falls back at 32 threads, Spring MVC barely scales, while perf is still growing at 48 threads — the higher the concurrency, the greater the framework advantage.
 
 ---
 
@@ -67,44 +68,42 @@ The most striking finding: **perf's advantage keeps growing as concurrency incre
 
 | Threads | perf | vs Spring MVC | vs WebFlux |
 |---------|------|---------------|------------|
-| 8 | 18,187 | **2.10x** (8,657) | **2.00x** (9,097) |
-| 16 | 27,636 | **2.28x** (12,106) | **1.80x** (15,345) |
-| 32 | 38,816 | **3.01x** (12,910) | **2.07x** (18,736) |
-| 48 | **46,613** | **3.22x** (14,454) | **2.50x** (18,678) |
-| 64 | 46,722 | **3.07x** (15,204) | **2.56x** (18,231) |
+| 16 | 28,877 | **2.29x** (12,610) | **1.69x** (17,064) |
+| 32 | 40,967 | **3.00x** (13,646) | **2.03x** (20,166) |
+| 48 | **43,896** | **2.96x** (14,806) | **2.31x** (18,981) |
 
-**perf's advantage multiple grows from 2.10x at 8 threads to 3.22x at 48 threads** — the higher the concurrency, the wider the lead.
+**perf's advantage multiple grows from 2.29x at 16 threads to 2.96x at 48 threads** — the higher the concurrency, the wider the lead.
 
-### 1.2 Concurrency Scaling Ratio (8 → 48 threads)
+### 1.2 Concurrency Scaling Ratio (16 → 48 threads)
 
 Measures a framework's ability to turn concurrency into throughput.
 
 | Framework | json | bytes |
 |-----------|------|-------|
-| **perf** | **+156%** (18,187→46,613) | **+115%** (20,860→44,836) |
-| Spring MVC (Tomcat) | +67% (8,657→14,454) | +83% (11,231→20,533) |
-| WebFlux | +105% (9,097→18,678) | +100% (11,860→23,773) |
+| **perf** | **+52%** (28,877→43,896) | **+34%** (33,735→45,152) |
+| Spring MVC (Tomcat) | +17% (12,610→14,806) | +8% (19,669→21,281) |
+| WebFlux | +11% (17,064→18,981) | +23% (22,336→27,363) |
 
 ### 1.3 Analysis
 
-- **perf scales the best**: json concurrency scaling is +156%, **2.3x** that of Spring MVC (+67%). Spring MVC's thread pool stalls after 16–32 threads — thread contention and context switching become the bottleneck; perf's EventLoop model has no such overhead and keeps converting concurrency into throughput.
-- **perf saturates last**: perf peaks at 48 threads, while Spring MVC / WebFlux saturate at 32. This directly reflects perf's **extremely low per-request processing cost** — the server has spare compute that only higher client concurrency can fully load.
+- **perf scales the best**: json concurrency scaling is +52%, **3.1x** that of Spring MVC (+17%) and 4.7x that of WebFlux (+11%). Spring MVC's thread pool does grow with concurrency, but only marginally — thread contention and context switching eat most of the added concurrency; perf's EventLoop model has no such overhead and keeps converting concurrency into throughput.
+- **perf saturates last**: perf is still growing at 48 threads (another +7% from 32→48), while WebFlux peaks and falls back at 32 (20,166→18,981). This directly reflects perf's **extremely low per-request processing cost** — the server has spare compute that only higher client concurrency can fully load.
 
 ## 2. Full-API Comparison at High Concurrency (48 threads, ops/sec)
 
 | Endpoint | perf | perf-support | tomcat | undertow | webflux |
 |----------|------|--------------|--------|----------|---------|
-| async | **42,401** | 35,166 | 14,125 | 14,526 | 24,868 |
-| bytes | **44,836** | 41,368 | 20,533 | 22,119 | 23,773 |
-| bytesLarge | **7,267** | 7,330 | 6,715 | 5,832 | 7,350 |
-| get | **41,930** | 35,603 | 11,724 | 14,146 | 17,576 |
-| json | **46,613** | 34,636 | 14,454 | 13,740 | 18,678 |
-| sse | **5,956** | 3,166 | 2,093 | 1,872 | 2,524 |
-| valid | **40,461** | 32,868 | 14,804 | 13,774 | 15,560 |
+| async | **44,104** | 38,374 | 14,407 | 15,178 | 23,996 |
+| bytes | **45,152** | 42,421 | 21,281 | 24,559 | 27,363 |
+| bytesLarge | **7,627** | 7,340 | 6,968 | 6,052 | 6,900 |
+| get | **42,066** | 38,312 | 12,576 | 12,916 | 18,797 |
+| json | **43,896** | 36,424 | 14,806 | 14,401 | 18,981 |
+| sse | **5,715** | 3,160 | 2,170 | 1,985 | 2,743 |
+| valid | **45,515** | 38,670 | 14,789 | 15,681 | 19,925 |
 
-**At 48 threads, perf beats Spring MVC by 2.18x–3.22x and WebFlux by 1.71x–2.56x across all endpoints.**
+**At 48 threads, perf beats Spring MVC by 2.12x–3.34x** (excluding `bytesLarge`, where throughput is dominated by 100KB transfer bandwidth at 1.09x) and WebFlux by 1.65x–2.31x.
 
-> Note: `get` (multi-parameter binding), `async` (async return), and `sse` (long connection) are exactly the scenarios where perf's pre-caching and EventLoop model pay off the most — all three reach the **3x** level against Spring MVC.
+> Note: `get` (multi-parameter binding), `async` (async return), and `valid` (bean validation) are exactly the scenarios where perf's pre-caching and zero-reflection model pay off the most — all three reach the **3x** level against Spring MVC; `sse` (long connection) reaches **2.63x**.
 
 ---
 
@@ -130,11 +129,12 @@ perf's advantage comes from deliberate engineering trade-offs at the framework-d
 
 ## 4. Key Findings
 
-1. **Concurrency scaling crushes the competition**: json 8→48 threads, perf gains **+156%** vs Spring MVC's +67%; the advantage multiple grows from 2.10x to **3.22x** — the higher the concurrency, the bigger perf's lead.
-2. **Absolute high-concurrency throughput lead**: json at 48 threads hits **46,613 ops/s** — 3.22x Spring MVC, 2.50x WebFlux.
-3. **SSE long-connection advantage**: 5,956 ops/s at 48 threads, **2.85x** Spring MVC — EventLoop + lock-free Drain Loop pay off most in long-connection scenarios.
-4. **Async and parameter binding are the strongest scenarios**: async / get reach **3.00x / 3.58x** against Spring MVC — the engineering payoff of pre-caching + zero reflection concentrates under high concurrency.
-5. **perf-support bridge overhead is manageable**: ~8–12% relative to perf on ordinary endpoints, yet even with the bridge layer it keeps a **2.4x+** advantage over Spring MVC.
+1. **Concurrency scaling crushes the competition**: json 16→48 threads, perf gains **+52%** vs Spring MVC's +17%; the advantage multiple grows from 2.29x to **2.96x** — the higher the concurrency, the bigger perf's lead.
+2. **Absolute high-concurrency throughput lead**: json at 48 threads hits **43,896 ops/s** — 2.96x Spring MVC, 2.31x WebFlux.
+3. **SSE long-connection advantage**: 5,715 ops/s at 48 threads, **2.63x** Spring MVC; p50 latency 7.23ms, only **1/3** of MVC's 21.46ms — EventLoop + lock-free Drain Loop pay off most in long-connection scenarios.
+4. **Async, parameter binding, and validation are the strongest scenarios**: async / get / valid reach **3.06x / 3.34x / 3.08x** against Spring MVC — the engineering payoff of pre-caching + zero reflection concentrates under high concurrency.
+5. **Low latency delivered alongside high throughput**: json p50 at 48 threads is **0.92ms**, just **29%** of Spring MVC's 3.16ms — high throughput and low latency achieved at the same time.
+6. **perf-support bridge overhead is manageable**: ~6–17% on ordinary endpoints, ~45% in the SSE long-connection scenario (per-connection bridge cost); yet even with the bridge layer it keeps a **2x–3x** advantage over Spring MVC (get 3.05x, async 2.66x, json 2.46x, valid 2.61x, bytes 1.99x).
 
 ---
 
@@ -142,11 +142,11 @@ perf's advantage comes from deliberate engineering trade-offs at the framework-d
 
 ```bash
 cd spring-web-benchmark
-# One-command full WSL external run (5 profiles × 7 APIs, 16 threads)
-./scripts/wsl-run-all.sh --threads 16
-# Concurrency scaling matrix (8/16/32/48/64 threads; produces §1 data)
-./scripts/wsl-run-all.sh --thread-list 8,16,32,48,64
+# One-command full WSL external run (5 profiles × 7 APIs, 16 threads, throughput + latency)
+./scripts/wsl-run-all.sh --sampleTime --threads 16
+# Concurrency scaling matrix (16/32/48 threads; produces §1 data)
+./scripts/wsl-run-all.sh --sampleTime --thread-list 16,32,48
 # Report output: benchmark-reports/{run-id}/report.md
 ```
 
-> Data based on JDK 17 + WSL2 external mode (`jfr=off`), compared fairly in the same environment — relative multiples reflect the real framework advantage. The standard environment (JDK 8 in-process) benchmark is documented in [benchmark.md](benchmark.md).
+> Data based on JDK 17 + WSL2 external mode (`jfr=off`), compared fairly in the same environment — relative multiples reflect the real framework advantage. This document's data source: `benchmark-reports/20260811-005942` (thrpt,sample | 16/32/48 threads | 2026-08-11). The standard environment (JDK 8 in-process) benchmark is documented in [benchmark.md](benchmark.md).

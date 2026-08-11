@@ -207,7 +207,7 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
             final FileChannel toClose = fc;
             DefaultFileRegion region =
                     new DefaultFileRegion(fc, 0, file.length());
-            ChannelFuture future = ctx.writeAndFlush(region);
+            ChannelFuture future = ctx.write(region);
             future.addListener(f -> {
                 try {
                     toClose.close();
@@ -215,10 +215,16 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
                     log.debug("toClose FileChannel close failed", ignored);
                 }
             });
-            addRespEventListener(future, true);
             if (!keepAlive) {
                 future.addListener(ChannelFutureListener.CLOSE);
             }
+            // FileRegion 不是 HttpObject，HttpObjectEncoder 不因它重置内部 state；
+            // 必须补发 LastHttpContent 让编码器 state 从 ST_CONTENT 归位到 ST_INIT，
+            // 否则 keep-alive 连接被污染——下个请求复用该连接写 DefaultHttpResponse
+            // 会抛 "unexpected message type: DefaultHttpResponse, state: 1"，
+            // headers 丢失、body 裸写（客户端把文件内容当状态行）。
+            ChannelFuture lastFuture = ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
+            addRespEventListener(lastFuture, true);
         } catch (Exception ex) {
             if (fc != null) {
                 try {
