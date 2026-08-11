@@ -92,17 +92,25 @@ public class NettyMultipartWebRequest extends DefaultFullHttpRequest {
 
     public boolean release() {
         try {
-            for (InterfaceHttpData interfaceHttpData : interfaceHttpDataList) {
-                interfaceHttpData.release();
+            // 只在引用归零（last=true）时清理 Attribute 与 decoder。
+            // 修复前每次 release() 都调 decoder.destroy()：异步卸载下 NettyHttpHandler
+            // 在 httpHandle() 返回后立即 release（业务线程可能刚开始读），destroy() 内部
+            // cleanFiles() 会把 Attribute 数据清空（byteBuf=null）→ 业务读 hasBody/getValue
+            // 抛 NPE、POJO 绑定字段丢失。现在生命周期对齐 request 引用计数，
+            // 业务线程 acquire/release 对称期间 Attribute 始终有效，归零时才释放。
+            boolean last = super.release();
+            if (last) {
+                for (InterfaceHttpData interfaceHttpData : interfaceHttpDataList) {
+                    interfaceHttpData.release();
+                }
+                // 销毁 decoder：释放 undecodedChunk 池化缓冲与磁盘临时文件。
+                // destroy() 幂等（对 refCnt<=0 的数据跳过、undecodedChunk 为 null 跳过），
+                // 故 retain 多持引用时多次 release 不会双重释放。
+                if (decoder != null) {
+                    decoder.destroy();
+                }
             }
-            super.release();
-            // 销毁 decoder：释放 undecodedChunk 池化缓冲与磁盘临时文件。
-            // destroy() 幂等（对 refCnt<=0 的数据跳过、undecodedChunk 为 null 跳过），
-            // 故 retain 多持引用时多次 release 不会双重释放。
-            if (decoder != null) {
-                decoder.destroy();
-            }
-            return true;
+            return last;
         } catch (Exception ignored) {
             log.debug("release failed", ignored);
             return false;

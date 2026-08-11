@@ -10,6 +10,7 @@ import io.netty.channel.FileRegion;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.LastHttpContent;
 import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
@@ -123,10 +124,12 @@ class NettyServerHttpResponseTest {
 
         ChannelFuture future = mock(ChannelFuture.class);
         when(ctx.writeAndFlush(any())).thenReturn(future);
+        when(ctx.write(any())).thenReturn(future);
         when(future.addListener(any())).thenReturn(future);
 
         assertDoesNotThrow(() -> response.writeFile(testFile));
         verify(ctx, atLeast(2)).writeAndFlush(any());
+        verify(ctx).write(any());
 
         testFile.delete();
     }
@@ -242,22 +245,29 @@ class NettyServerHttpResponseTest {
 
         ChannelFuture future = mock(ChannelFuture.class);
         when(ctx.writeAndFlush(any())).thenReturn(future);
+        when(ctx.write(any())).thenReturn(future);
         when(future.addListener(any())).thenReturn(future);
 
         response.writeFile(testFile);
 
-        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
-        verify(ctx, atLeast(2)).writeAndFlush(captor.capture());
+        ArgumentCaptor<Object> headersCaptor = ArgumentCaptor.forClass(Object.class);
+        ArgumentCaptor<Object> bodyCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(ctx, atLeast(2)).writeAndFlush(headersCaptor.capture());
+        verify(ctx).write(bodyCaptor.capture());
         // 头部响应：仅 Content-Length，绝不能同时带 Transfer-Encoding（双帧非法/客户端错乱）
-        HttpResponse headers = (HttpResponse) captor.getAllValues().get(0);
+        HttpResponse headers = (HttpResponse) headersCaptor.getAllValues().get(0);
         assertFalse(headers instanceof FullHttpResponse, "file body is streamed separately, headers must not be full");
         assertNull(headers.headers().get(HttpHeaderNames.TRANSFER_ENCODING),
                 "file download must not set Transfer-Encoding: chunked");
         assertEquals(content.length, headers.headers().getInt(HttpHeaderNames.CONTENT_LENGTH),
                 "Content-Length must match file size");
         // 文件体：零拷贝 FileRegion（非 chunk 编码）
-        assertTrue(captor.getAllValues().get(1) instanceof FileRegion,
+        assertTrue(bodyCaptor.getValue() instanceof FileRegion,
                 "file body should be written as zero-copy FileRegion");
+        // 终结：FileRegion 后必须补 LastHttpContent，让 HttpObjectEncoder 状态从 ST_CONTENT 归位，
+        // 否则 keep-alive 连接被污染（下个请求写 DefaultHttpResponse 抛 state:1 异常）。
+        assertTrue(headersCaptor.getAllValues().get(1) instanceof LastHttpContent,
+                "file body must be terminated by LastHttpContent to reset encoder state");
 
         testFile.delete();
     }

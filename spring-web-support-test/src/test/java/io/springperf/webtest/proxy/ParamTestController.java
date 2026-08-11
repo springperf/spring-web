@@ -33,6 +33,12 @@ public class ParamTestController implements ParamTestApi {
         return "got:" + (body == null ? "null" : body);
     }
 
+    @PostMapping("/empty-body-optional")
+    @Override
+    public String emptyBodyOptional(String body) {
+        return "got:" + (body == null ? "null" : body);
+    }
+
     @GetMapping("/headers")
     @Override
     public String multiHeader(List<String> values, String opt) {

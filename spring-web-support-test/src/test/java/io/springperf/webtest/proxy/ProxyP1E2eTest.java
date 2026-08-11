@@ -93,17 +93,33 @@ public class ProxyP1E2eTest {
     // ==================== @RequestBody 空 body ====================
 
     @Test
-    void postEmptyBody_withProxy_returnsGotNull() throws Exception {
-        // Content-Length 为 0 的 POST 请求
+    void postEmptyBody_withProxy_returns400() throws Exception {
+        // Content-Length 为 0 的 POST + @RequestBody(required=true)：
+        // 对齐 Spring 语义抛 400（RequestBodyResolver: readBody 空 body 返回 null
+        // → required 缺失 → HttpMessageNotReadableException）。见 RequestBodyResolverTest。
         Request req = new Request.Builder()
                 .url(baseUrl + "/proxy-p1/empty-body")
                 .post(RequestBody.create(new byte[0]))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
+            assertEquals(400, resp.code());
+            String body = resp.body().string();
+            assertNotNull(body);
+        }
+    }
+
+    @Test
+    void postEmptyBodyOptional_withProxy_returnsGotNull() throws Exception {
+        // @RequestBody(required=false)：空 body 不抛 400，body 解析为 null → "got:null"
+        Request req = new Request.Builder()
+                .url(baseUrl + "/proxy-p1/empty-body-optional")
+                .post(RequestBody.create(new byte[0]))
+                .build();
+        try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
-            // 框架可能返回 null 或空字符串，都接受
-            assertNotNull(body);
+            assertTrue(body.contains("got:null"),
+                    "required=false empty body should bind null: " + body);
         }
     }
 
