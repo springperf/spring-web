@@ -228,6 +228,30 @@ class DispatcherHandlerTest {
     }
 
     @Test
+    void doHandle_preHandleReturnsFalse_skipsPostHandleAndAfterCompletion() throws Exception {
+        // 回归 #41：preHandle=false 时 DispatcherHandler 不得再经 finally 的
+        // invokeWithRealResult 对拦截器全量回调 postHandle/afterCompletion
+        // （对齐 Spring HandlerExecutionChain.applyPreHandle 返回 false 后 doDispatch
+        // 直接 return，无二次回调）。修复前已通过 preHandle 的拦截器被 afterCompletion
+        // 双调、未进入的拦截器误收回调。
+        WebServerHttpRequest req = createRequest();
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        PathMappingContext mappingContext = mock(PathMappingContext.class);
+        when(corsRegistry.corsHandle(req, resp)).thenReturn(false);
+        when(interceptorRegistry.preHandle(req, resp)).thenReturn(false);
+        when(req.getMethodValue()).thenReturn("GET");
+        when(mappingContext.getPathRule()).thenReturn("/api/x");
+        when(resp.getStatus()).thenReturn(HttpStatus.UNAUTHORIZED);
+
+        handler.doHandle(req, resp, mappingContext);
+
+        verify(interceptorRegistry, never()).postHandle(any(), any(), any());
+        verify(interceptorRegistry, never()).afterCompletion(any(), any(), any());
+        // metrics 记录行为保持不变（preHandle=false 仍记录）
+        verify(metrics).recordRequest(eq("GET"), eq("/api/x"), eq(401), anyLong());
+    }
+
+    @Test
     void doHandle_normalFlow_invokesHandlerAndResolvesReturnValue() throws Throwable {
         WebServerHttpRequest req = createRequest();
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);

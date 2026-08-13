@@ -107,9 +107,25 @@ class NettyMultipartWebRequestReleaseTest {
         resolver.consume(req);
         NettyMultipartWebRequest multipart = resolver.finish();
 
-        // 模拟持有额外引用（如 async 卸载场景），release 两次都不得抛异常
+        // 模拟持有额外引用（如 async 卸载场景），release 都不得抛异常。
+        // 用 K=3（retain 三次）：修复前 release 仅在 last 时对 data release 一次，
+        // destroy() 内部的兜底递减（cleanFiles delete + bodyListHttpData loop）恰好能
+        // 补上 K≤2 的引用，K=3 时 data.refCnt = 1+3 - 3 = 1，泄漏 1 个引用。
+        // 对称修复后每次 release 递减 data.refCnt，归零时 deallocate 自动释放 content。
+        multipart.retain();
+        multipart.retain();
         multipart.retain();
         multipart.release();
         multipart.release();
+        multipart.release();
+        multipart.release();
+
+        // 关键回归断言：retain K 次后对称 release，每个 part data 的 refCnt 必须归零。
+        // 修复前 K=3 时 data.refCnt 停留在 1（泄漏），此处断言失败即暴露该泄漏。
+        for (io.netty.handler.codec.http.multipart.InterfaceHttpData data
+                : multipart.getInterfaceHttpDataList()) {
+            assertEquals(0, data.refCnt(),
+                    "retain 3 次后对称 release，part data 引用应归零（修复前泄漏 1 个引用）");
+        }
     }
 }

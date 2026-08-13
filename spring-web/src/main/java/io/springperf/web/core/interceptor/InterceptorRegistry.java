@@ -52,16 +52,24 @@ public class InterceptorRegistry extends WebComponentContainer {
         List<HandlerInterceptor> interceptors = getInterceptors(request);
         PathMappingContext mappingContext = PathMappingContext.get(request);
         int passed = 0;
-        for (HandlerInterceptor i : interceptors) {
-            if (!i.preHandle(request, response, mappingContext)) {
-                // Spring 语义：preHandle 返回 false 时仅对已通过 preHandle 的拦截器执行
-                // afterCompletion（HandlerExecutionChain.triggerAfterCompletion 只覆盖到
-                // interceptorIndex）。未进入的拦截器未持有资源，不应收到回调；修复前对
-                // 所有拦截器调用会误触发尚未 preHandle 的拦截器的回调。
-                afterCompletionForPassed(request, response, null, interceptors, passed);
-                return false;
+        try {
+            for (HandlerInterceptor i : interceptors) {
+                if (!i.preHandle(request, response, mappingContext)) {
+                    // Spring 语义：preHandle 返回 false 时仅对已通过 preHandle 的拦截器执行
+                    // afterCompletion（HandlerExecutionChain.triggerAfterCompletion 只覆盖到
+                    // interceptorIndex）。未进入的拦截器未持有资源，不应收到回调；修复前对
+                    // 所有拦截器调用会误触发尚未 preHandle 的拦截器的回调。
+                    afterCompletionForPassed(request, response, null, interceptors, passed);
+                    return false;
+                }
+                passed++;
             }
-            passed++;
+        } catch (Exception e) {
+            // 对齐 Spring（HandlerExecutionChain.applyPreHandle 抛异常 → doDispatch catch →
+            // processDispatchResult → triggerAfterCompletion）：interceptorIndex 覆盖的已通过者
+            // 仍应收到一次 afterCompletion(exception)，随后重新抛出交给上层异常处理。
+            afterCompletionForPassed(request, response, e, interceptors, passed);
+            throw e;
         }
         return true;
     }

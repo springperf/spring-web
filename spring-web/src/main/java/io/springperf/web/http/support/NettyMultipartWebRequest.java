@@ -92,17 +92,19 @@ public class NettyMultipartWebRequest extends DefaultFullHttpRequest {
 
     public boolean release() {
         try {
-            // 只在引用归零（last=true）时清理 Attribute 与 decoder。
-            // 修复前每次 release() 都调 decoder.destroy()：异步卸载下 NettyHttpHandler
-            // 在 httpHandle() 返回后立即 release（业务线程可能刚开始读），destroy() 内部
-            // cleanFiles() 会把 Attribute 数据清空（byteBuf=null）→ 业务读 hasBody/getValue
-            // 抛 NPE、POJO 绑定字段丢失。现在生命周期对齐 request 引用计数，
-            // 业务线程 acquire/release 对称期间 Attribute 始终有效，归零时才释放。
+            // 与 retain() 完全对称：每次 release() 都对应地对每个 part data release 一次。
+            // 修复前仅在 last=true 时 release 一次：acquire/retain K≥1 次后 data.refCnt
+            // 保留 K 个引用不归零（K≥2 时泄漏 K-1），Netty 引用计数 LEAK 检测会告警。
+            // refCnt()>0 守卫保证幂等重复 release（destroy 内部的 release 同样有此守卫）。
+            // destroy 仍只在 last 时执行：过早 destroy 会 cleanFiles 清空 Attribute 数据，
+            // 破坏业务线程读取（历史 bug 根因）。
             boolean last = super.release();
-            if (last) {
-                for (InterfaceHttpData interfaceHttpData : interfaceHttpDataList) {
+            for (InterfaceHttpData interfaceHttpData : interfaceHttpDataList) {
+                if (interfaceHttpData.refCnt() > 0) {
                     interfaceHttpData.release();
                 }
+            }
+            if (last) {
                 // 销毁 decoder：释放 undecodedChunk 池化缓冲与磁盘临时文件。
                 // destroy() 幂等（对 refCnt<=0 的数据跳过、undecodedChunk 为 null 跳过），
                 // 故 retain 多持引用时多次 release 不会双重释放。

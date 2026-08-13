@@ -167,6 +167,30 @@ class InterceptorRegistryTest {
         assertThrows(RuntimeException.class, () -> registry.preHandle(request, response));
     }
 
+    @Test
+    void preHandle_interceptorThrows_onlyPassedOnesGetAfterCompletionWithException() throws Exception {
+        // 回归 #41：preHandle 抛异常时仅已通过 preHandle 的拦截器收到一次 afterCompletion(exception)，
+        // 与 Spring applyPreHandle 抛异常 → doDispatch catch → processDispatchResult →
+        // triggerAfterCompletion（interceptorIndex 只覆盖已通过者）语义一致。
+        // 修复前 DispatcherHandler finally 会全量回调，未进入的拦截器也误收回调。
+        HandlerInterceptor i1 = mock(HandlerInterceptor.class);
+        HandlerInterceptor i2 = mock(HandlerInterceptor.class);
+        HandlerInterceptor i3 = mock(HandlerInterceptor.class);
+        when(i1.preHandle(any(), any(), any())).thenReturn(true);
+        when(i2.preHandle(any(), any(), any())).thenThrow(new RuntimeException("preHandle error"));
+
+        when(request.getRequestContext()).thenReturn(requestContext);
+        when(requestContext.getAttribute(InterceptorRegistry.INTERCEPTORS_ATTRIBUTE))
+                .thenReturn(Arrays.asList(i1, i2, i3));
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> registry.preHandle(request, response));
+        assertEquals("preHandle error", ex.getMessage());
+        // 已通过的 i1 收到 afterCompletion(exception)；抛异常的 i2 与未进入的 i3 均不回调
+        verify(i1).afterCompletion(any(), any(), any(), eq(ex));
+        verify(i2, never()).afterCompletion(any(), any(), any(), any());
+        verify(i3, never()).afterCompletion(any(), any(), any(), any());
+    }
+
     // ---- postHandle ----
 
     @Test

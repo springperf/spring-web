@@ -190,6 +190,7 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
         Object result = null;
         Throwable exception = null;
         long start = metrics.getNanoTime();
+        boolean preHandlePassed = false;
         try {
             // cors
             if (corsRegistry.corsHandle(req, resp)) {
@@ -198,7 +199,12 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
             }
 
             // --- preHandle ---
-            if (!interceptorRegistry.preHandle(req, resp)) {
+            preHandlePassed = interceptorRegistry.preHandle(req, resp);
+            if (!preHandlePassed) {
+                // Spring 语义（HandlerExecutionChain.applyPreHandle）：preHandle 返回 false 时
+                // afterCompletion 仅对已通过的拦截器执行（已在 InterceptorRegistry.preHandle 内
+                // 完成），不执行 postHandle，也不再次全量调用 afterCompletion。修复前 finally 里的
+                // invokeWithRealResult 无条件再回调一次 → 已通过者双调、未进入者误收回调。
                 resp.flush();
                 return;
             }
@@ -219,7 +225,11 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
                 interceptorRegistry.afterConcurrentHandlingStarted(req, resp);
                 req.getRequestContext().setAttribute(METRICS_START_ATTR, start);
             } else {
-                invokeWithRealResult(req, resp, result, exception);
+                // preHandle 未通过（返回 false 或抛异常）时，afterCompletion 已由
+                // InterceptorRegistry.preHandle 对已通过者回调完毕，此处跳过全量回调
+                if (preHandlePassed) {
+                    invokeWithRealResult(req, resp, result, exception);
+                }
                 metrics.recordRequest(req.getMethodValue(), mappingContext.getPathRule(),
                         resp.getStatus().value(), metrics.getNanoTime() - start);
             }
