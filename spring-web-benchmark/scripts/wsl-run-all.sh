@@ -45,7 +45,10 @@ BENCH="$(cd "$SCRIPT_DIR/.." && pwd)"   # <project>/spring-web-benchmark 模块�
 PROJECT="$(dirname "$BENCH")"           # <project> 项目根（聚合 POM 所在）
 
 RUN_ID=$(date +"%Y%m%d-%H%M%S")
-REPORTS_DIR="benchmark-reports"
+# REPORTS_DIR 固定为绝对路径：修复前是相对路径但部分用法加了 $BENCH/ 前缀（绝对）、
+# 部分没加（相对，依赖 cwd）——从模块目录外调用脚本时，JMH 结果写到 cwd 下
+# benchmark-reports，而 ReportGenerator/服务端日志读到 $BENCH/benchmark-reports，报告找不到数据。
+REPORTS_DIR="$BENCH/benchmark-reports"
 CP_DIR="$REPORTS_DIR/.cp"               # classpath 放这，避免被 mvn clean 删除
 HEAP_MB=768                             # 服务端堆（配合 WSL 1GB 严格口径）
 # 强制 Maven 离线（-o）：断网挂机时依赖必须全在本地 .m2，
@@ -245,20 +248,20 @@ for ENTRY in "${PROFILES_TO_RUN[@]}"; do
   # 2b. 生成 Windows classpath（放 .cp 避免被 clean 删除）
   echo "    [classpath] dependency:build-classpath ..."
   (cd "$BENCH" && mvn "${MVN_FLAGS[@]}" -P"benchmark-$P" dependency:build-classpath \
-      -Dmdep.outputFile="$BENCH/$CP_DIR/cp-$P-raw.txt" -Dmdep.pathSeparator=';')
-  if [ $? -ne 0 ] || [ ! -s "$BENCH/$CP_DIR/cp-$P-raw.txt" ]; then
+      -Dmdep.outputFile="$CP_DIR/cp-$P-raw.txt" -Dmdep.pathSeparator=';')
+  if [ $? -ne 0 ] || [ ! -s "$CP_DIR/cp-$P-raw.txt" ]; then
     echo "    -> CLASSPATH FAIL, skipping $P"
     FAILED_PROFILES+=("$P")
     continue
   fi
 
   # 2c. 转换 WSL 侧 classpath（Git Bash 对 sed 有 MSYS 干扰，转换在 WSL 内做）
-  CP_RAW_WSL="$(wsl -e wslpath -a "$BENCH/$CP_DIR/cp-$P-raw.txt")"
-  CP_OUT_WSL="$(wsl -e wslpath -a "$BENCH/$CP_DIR/wsl-cp-$P.txt")"
+  CP_RAW_WSL="$(wsl -e wslpath -a "$CP_DIR/cp-$P-raw.txt")"
+  CP_OUT_WSL="$(wsl -e wslpath -a "$CP_DIR/wsl-cp-$P.txt")"
   CONV_WSL="$(wsl -e wslpath -a "$BENCH/scripts/wsl-convert-cp.sh")"
   MSYS_NO_PATHCONV=1 wsl -e bash "$CONV_WSL" "$CP_RAW_WSL" "$CP_OUT_WSL"
   CLASSES_WSL="$(wsl -e wslpath -a "$BENCH/target/classes")"
-  CP_WSL="$(cat "$BENCH/$CP_DIR/wsl-cp-$P.txt")"
+  CP_WSL="$(cat "$CP_DIR/wsl-cp-$P.txt")"
 
   # 2e. WSL 后台启动服务端 + 就绪探测（封装为函数，失败自动重试一次）。
   # 关键1：WSL2 的 wsl.exe 调用一退出就会清理其后代进程（nohup/setsid 都无法脱离），
@@ -272,13 +275,13 @@ for ENTRY in "${PROFILES_TO_RUN[@]}"; do
     # 清理 WSL 内残留同端口 java 进程（防上次 run 残留）
     wsl -e bash -c "ps aux | grep -E 'server.port=${PORT}\$' | grep -v grep | awk '{print \$2}' | xargs -r kill -9" 2>/dev/null
     sleep 1
-    LOG_WSL="$(wsl -e wslpath -a "$BENCH/$REPORTS_DIR/$RUN_ID/$P-server.log")"
+    LOG_WSL="$(wsl -e wslpath -a "$REPORTS_DIR/$RUN_ID/$P-server.log")"
     PID_WSL="/tmp/${P}-server.pid"   # pid 文件小、瞬时使用，tmpfs 可接受
     # JFR 可选：默认关闭（实测 profile 模式拖慢服务端 ~38% 吞吐，TPS 数据不受影响——
     # 吞吐来自 JMH 客户端结果 JSON）。--jfr 开启供热点分析。
     JFR_OPTS=""
     if [ "$ENABLE_JFR" = true ]; then
-      JFR_WSL="$(wsl -e wslpath -a "$BENCH/$REPORTS_DIR/$RUN_ID/$P-server.jfr")"
+      JFR_WSL="$(wsl -e wslpath -a "$REPORTS_DIR/$RUN_ID/$P-server.jfr")"
       JFR_OPTS="-XX:FlightRecorderOptions=stackdepth=512 -XX:StartFlightRecording=filename=${JFR_WSL},settings=profile"
     fi
     echo "    [server] 启动 $APP_CLASS:$PORT in WSL (attempt $1, JFR=$([ "$ENABLE_JFR" = true ] && echo on || echo off)) ..."
@@ -328,7 +331,7 @@ for ENTRY in "${PROFILES_TO_RUN[@]}"; do
   fi
   echo "    [benchmark] JMH $BENCH_CLASS (mode=$MODE) ..."
   BENCH_CLASSES_WIN="$(cygpath -m "$BENCH/target/classes")"
-  CP_WIN_FILE="$BENCH/$CP_DIR/cp-$P-raw.txt"
+  CP_WIN_FILE="$CP_DIR/cp-$P-raw.txt"
   CP_WIN="$BENCH_CLASSES_WIN;$(cat "$CP_WIN_FILE")"
   # --thread-list 多并发度：每轮 -t N，结果写 threads-N/jdk-*/ 子目录
   # （ReportGenerator 检测到 threads-N 结构自动生成并发伸缩性矩阵报告）。
@@ -399,11 +402,11 @@ echo ""
 echo "[3/3] 生成报告..."
 # ReportGenerator 用默认 profile classpath（含 jackson）
 (cd "$BENCH" && mvn "${MVN_FLAGS[@]}" dependency:build-classpath \
-    -Dmdep.outputFile="$BENCH/$CP_DIR/cp-report.txt" -Dmdep.pathSeparator=';')
-if [ -s "$BENCH/$CP_DIR/cp-report.txt" ]; then
-  CP_REPORT="$(cygpath -m "$BENCH/target/classes");$(cat "$BENCH/$CP_DIR/cp-report.txt")"
+    -Dmdep.outputFile="$CP_DIR/cp-report.txt" -Dmdep.pathSeparator=';')
+if [ -s "$CP_DIR/cp-report.txt" ]; then
+  CP_REPORT="$(cygpath -m "$BENCH/target/classes");$(cat "$CP_DIR/cp-report.txt")"
   java -cp "$CP_REPORT" \
-    io.springperf.benchmark.report.generator.ReportGenerator "$(cygpath -m "$BENCH/$REPORTS_DIR")"
+    io.springperf.benchmark.report.generator.ReportGenerator "$(cygpath -m "$REPORTS_DIR")"
 else
   echo "[WARN] 报告 classpath 缺失，跳过报告生成"
 fi
@@ -411,8 +414,8 @@ fi
 echo ""
 echo "=========================================="
 echo " 完成!"
-echo " 报告: $BENCH/$REPORTS_DIR/$RUN_ID/report.md"
-echo " 最新: $BENCH/$REPORTS_DIR/latest/report.md"
+echo " 报告: $REPORTS_DIR/$RUN_ID/report.md"
+echo " 最新: $REPORTS_DIR/latest/report.md"
 if [ ${#FAILED_PROFILES[@]} -gt 0 ]; then
   echo " 失败 profile: ${FAILED_PROFILES[*]}"
 else

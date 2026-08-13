@@ -519,6 +519,11 @@ public class ReportGenerator {
             if (!foundSet.contains(exp)) missing.add(exp);
         }
 
+        // 表格容器行与期望列表保持一致：缺失容器也渲染 FAIL 行（吞吐/延迟/GC）或 N/A（内存），
+        // 与摘要的缺失统计自洽——对齐单线程 generateReport 的 tableProfiles 修法。
+        // 修复前表格仅遍历实际发现的 profiles，缺失容器既无表格行也不标 FAIL，与摘要矛盾。
+        String[] tableProfiles = expected.toArray(new String[0]);
+
         w.println("## 执行摘要\n");
         w.printf("**%d** 个容器 × **%d** 个 API × **%d** 个并发度 × **%d** 个 JDK",
                 expected.size(), apis.length, threadCounts.size(), jdkVersions.size());
@@ -528,6 +533,11 @@ public class ReportGenerator {
         }
         w.println();
         w.println();
+        if (!missing.isEmpty()) {
+            w.println("**⚠️ 缺失容器:** " + String.join(", ", missing)
+                    + "（数据未生成，可能是服务端启动失败或压测未执行）");
+            w.println();
+        }
 
         // ==================== 1. 并发伸缩性 ====================
         w.println("## 1. 并发伸缩性 (ops/sec, 越高越好)\n");
@@ -544,7 +554,7 @@ public class ReportGenerator {
             }
             w.println("|");
 
-            for (String p : profiles) {
+            for (String p : tableProfiles) {
                 for (String jdk : jdkVersions) {
                     w.printf("| %s | %s", p, jdk);
                     for (String tc : threadCounts) {
@@ -574,7 +584,7 @@ public class ReportGenerator {
                 w.printf("### %s\n\n", api);
                 w.println("| 容器 | JDK | 线程 | p50 | p90 | p99 | p99.9 | p99.99 |");
                 w.println("|------|-----|------|-----|-----|-----|-------|--------|");
-                for (String p : profiles) {
+                for (String p : tableProfiles) {
                     for (String jdk : jdkVersions) {
                         for (String tc : threadArr) {
                             ProfileData data = getScalabilityData(allData.get(tc), jdk, api, p);
@@ -600,7 +610,7 @@ public class ReportGenerator {
             w.printf("### %s\n\n", api);
             w.println("| 容器 | JDK | 线程 | GC 次数 | 平均暂停 | 分配率 | 每请求分配 | Full GC |");
             w.println("|------|-----|------|---------|---------|-------|-----------|---------|");
-            for (String p : profiles) {
+            for (String p : tableProfiles) {
                 for (String jdk : jdkVersions) {
                     for (String tc : threadArr) {
                         ProfileData data = getScalabilityData(allData.get(tc), jdk, api, p);
@@ -627,7 +637,7 @@ public class ReportGenerator {
             w.printf("### %s\n\n", api);
             w.println("| 容器 | JDK | 线程 | Heap Used | Metaspace | Code Cache |");
             w.println("|------|-----|------|-----------|-----------|------------|");
-            for (String p : profiles) {
+            for (String p : tableProfiles) {
                 for (String jdk : jdkVersions) {
                     for (String tc : threadArr) {
                         ProfileData data = getScalabilityData(allData.get(tc), jdk, api, p);
