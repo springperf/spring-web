@@ -5,14 +5,10 @@ import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.springperf.web.core.async.PerfAsyncWebRequest;
 
-import java.io.IOException;
-import java.util.concurrent.locks.LockSupport;
-
 /**
  * 早编码流式发送器（App 线程编码）。
  * <p>
- * 接收 {@link StreamEmitter#sendEarlyEncodedData(byte[])} 已编码的 byte[]，
- * App 线程仅入队 byte[]，零 ByteBuf 分配。
+ * 接收已编码的 byte[]，App 线程仅入队 byte[]，零 ByteBuf 分配。
  * EventLoop 线程的 {@link #drain()} 分配 pooled batchBuf 将多个 byte[] 拷贝合并为
  * 单个 {@link DefaultHttpContent} 写入 channel，减少 pipeline 对象数。
  * <p>
@@ -25,23 +21,6 @@ public class EarlyEncodeNettyStreamSender extends AbstractNettyStreamSender {
 
     public EarlyEncodeNettyStreamSender(StreamEmitter emitter, PerfAsyncWebRequest asyncWebRequest) {
         super(emitter, asyncWebRequest);
-    }
-
-    @Override
-    public void send(Object data) throws IOException {
-        preSendCheck();
-        for (int spins = 0; ; spins++) {
-            if (queue.offer(data)) {
-                scheduleDrain();
-                return;
-            }
-            preSendCheck();
-            if (spins < 10) {
-                Thread.yield();
-            } else {
-                LockSupport.parkNanos(1000);
-            }
-        }
     }
 
     /**

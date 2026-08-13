@@ -81,16 +81,6 @@ public abstract class StreamEmitter<T> {
         }
     }
 
-    /**
-     * earlyEncode=true 时，从 {@link #earlySendDataList} 取出 byte[] 投递到发送器。
-     * <p>
-     * 与 {@link StreamSender#send(Object)} 的区别：明确接收已编码的 byte[]，
-     * 表明数据已冻结，无需再编码。
-     */
-    protected void sendEarlyEncodedData(byte[] data) throws IOException {
-        streamSender.send(data);
-    }
-
     public abstract void encode(Object data, OutputStream out) throws IOException;
 
     /**
@@ -118,15 +108,9 @@ public abstract class StreamEmitter<T> {
     protected synchronized void initialize(StreamSender streamSender) throws IOException {
         this.streamSender = streamSender;
         try {
-            if (earlyEncode) {
-                for (Object data : earlySendDataList) {
-                    sendEarlyEncodedData((byte[]) data);
-                }
-            } else {
-                for (Object data : earlySendDataList) {
-                    streamSender.send(data);
-                }
-            }
+            // 批量交付：逐条 send() 在 EventLoop 上会每条触发一次同步 drain 并单独
+            // flush，破坏 drain() 的 batchBuf 批量编码；sendAll 入队后仅调度一次 drain。
+            streamSender.sendAll(earlySendDataList);
         } finally {
             earlySendDataList.clear();
         }
