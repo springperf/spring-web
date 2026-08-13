@@ -10,6 +10,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.server.ServerHttpResponse;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -73,10 +76,12 @@ class StreamEmitterTest {
         emitter.send("queued1");
         emitter.send("queued2");
 
+        List<Object> captured = snapshotSendAll();
         emitter.initialize(streamSender);
 
-        verify(streamSender).send("queued1");
-        verify(streamSender).send("queued2");
+        // sendAll 收到的是 earlySendDataList 的同一引用，initialize 的 finally 会 clear，
+        // 所以必须用快照断言调用瞬间的内容
+        assertEquals(Arrays.asList("queued1", "queued2"), captured);
         assertTrue(emitter.earlySendDataList.isEmpty());
     }
 
@@ -84,7 +89,7 @@ class StreamEmitterTest {
     void initialize_sendError_clearEarlyData() throws Exception {
         StreamEmitter emitter = createEmitter();
         emitter.send("data");
-        doThrow(new IOException("send error")).when(streamSender).send(any());
+        doThrow(new IOException("send error")).when(streamSender).sendAll(any());
 
         try {
             emitter.initialize(streamSender);
@@ -92,6 +97,20 @@ class StreamEmitterTest {
         }
 
         assertTrue(emitter.earlySendDataList.isEmpty());
+    }
+
+    /**
+     * 让 mock 的 sendAll 在调用瞬间把参数内容快照到返回的 List。
+     * 因为 sendAll 接收 earlySendDataList 同一引用，事后读取已被 clear。
+     */
+    private List<Object> snapshotSendAll() throws Exception {
+        List<Object> captured = new ArrayList<>();
+        doAnswer(invocation -> {
+            List<?> batch = invocation.getArgument(0);
+            captured.addAll(batch);
+            return null;
+        }).when(streamSender).sendAll(any());
+        return captured;
     }
 
     @Test
@@ -236,9 +255,10 @@ class StreamEmitterTest {
         assertFalse(emitter.deferredResult.hasResult());
         assertEquals(1, emitter.earlySendDataList.size());
 
+        List<Object> captured = snapshotSendAll();
         emitter.initialize(streamSender);
 
-        verify(streamSender).send("early");
+        assertEquals(Arrays.asList("early"), captured);
         verify(streamSender, timeout(100)).complete(false, null);
     }
 

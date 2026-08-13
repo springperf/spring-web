@@ -5,9 +5,6 @@ import io.netty.buffer.ByteBufOutputStream;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.springperf.web.core.async.PerfAsyncWebRequest;
 
-import java.io.IOException;
-import java.util.concurrent.locks.LockSupport;
-
 /**
  * 延迟编码流式发送器（EventLoop 线程编码，默认实现）。
  * <p>
@@ -21,23 +18,6 @@ public class DefaultNettyStreamSender extends AbstractNettyStreamSender {
 
     public DefaultNettyStreamSender(StreamEmitter emitter, PerfAsyncWebRequest asyncWebRequest) {
         super(emitter, asyncWebRequest);
-    }
-
-    @Override
-    public void send(Object data) throws IOException {
-        preSendCheck();
-        for (int spins = 0; ; spins++) {
-            if (queue.offer(data)) {
-                scheduleDrain();
-                return;
-            }
-            preSendCheck();
-            if (spins < 10) {
-                Thread.yield();
-            } else {
-                LockSupport.parkNanos(1000);
-            }
-        }
     }
 
     /**

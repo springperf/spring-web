@@ -27,6 +27,9 @@ class PublisherToStreamEmitterAdapterTest {
     @Mock
     ReactiveAdapter adapter;
 
+    @Mock
+    PerfAsyncWebRequest asyncWebRequest;
+
     ReactiveConfig config;
     SseEmitter emitter;
     PublisherToStreamEmitterAdapter streamAdapter;
@@ -35,7 +38,7 @@ class PublisherToStreamEmitterAdapterTest {
     void setUp() {
         config = new ReactiveConfig(10, 3, -1);
         emitter = spy(new SseEmitter());
-        streamAdapter = new PublisherToStreamEmitterAdapter(emitter, sender, config);
+        streamAdapter = new PublisherToStreamEmitterAdapter(emitter, sender, config, asyncWebRequest);
     }
 
     @Test

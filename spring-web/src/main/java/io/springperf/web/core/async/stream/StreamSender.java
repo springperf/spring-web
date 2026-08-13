@@ -1,6 +1,7 @@
 package io.springperf.web.core.async.stream;
 
 import java.io.IOException;
+import java.util.Collection;
 
 /**
  * Contract for sending data chunks over an asynchronous streaming response.
@@ -22,6 +23,18 @@ public interface StreamSender {
      * @throws IOException if the underlying channel write fails
      */
     void send(Object data) throws IOException;
+
+    /**
+     * Send a batch of data chunks in one drain pass.
+     * <p>
+     * Implementations should enqueue all items and schedule a single
+     * {@code drain()} afterwards, so the batching of {@code flushContent}
+     * works across the whole batch instead of flushing one chunk per item.
+     *
+     * @param data the batch of data to send
+     * @throws IOException if the underlying channel write fails
+     */
+    void sendAll(Collection<?> data) throws IOException;
 
     /**
      * Complete the stream, optionally closing the channel.
