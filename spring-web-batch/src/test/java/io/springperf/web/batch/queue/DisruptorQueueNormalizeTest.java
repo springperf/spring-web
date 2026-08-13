@@ -66,15 +66,25 @@ class DisruptorQueueNormalizeTest {
 
     @Test
     void overflowSizeDoesNotSilentlyFallbackTo4096() {
-        // 回归 C8：Integer.MAX_VALUE 时 result <<= 1 溢出为负，
-        // 必须回退到最大合法 2 的幂 2^30，而非静默 4096
+        // 回归 C8+C12：Integer.MAX_VALUE 时 result <<= 1 溢出为负，
+        // 必须回退到安全上限 2^18（构造器 warn 声明的最大合理容量），
+        // 而非静默 4096、更非 2^30（2^30 槽位预分配 BatchEvent 必然 OOM）
         int result = DisruptorQueue.normalizeRingBufferSize(Integer.MAX_VALUE);
-        assertThat(result).isEqualTo(1 << 30);
+        assertThat(result).isEqualTo(1 << 18);
         assertThat(Integer.bitCount(result)).isEqualTo(1); // 是 2 的幂
     }
 
     @Test
-    void sizeAtMaxPowerOfTwoStays() {
-        assertThat(DisruptorQueue.normalizeRingBufferSize(1 << 30)).isEqualTo(1 << 30);
+    void sizeAtMaxPowerOfTwoFallsBackToSafeCeiling() {
+        // 回归 C12：恰好 2^30 不触发左移溢出，但 2^30 槽位同样必然 OOM，
+        // 必须钳制到安全上限 2^18（修复前返回 2^30）
+        assertThat(DisruptorQueue.normalizeRingBufferSize(1 << 30)).isEqualTo(1 << 18);
+    }
+
+    @Test
+    void largeButMemorySafePowerOfTwoStays() {
+        // 2^20（1M）槽位预分配约 24MB，构造器仅 warn 不阻止的有意大队列，
+        // 不在 C12 防御范围内，应原样保留
+        assertThat(DisruptorQueue.normalizeRingBufferSize(1 << 20)).isEqualTo(1 << 20);
     }
 }
