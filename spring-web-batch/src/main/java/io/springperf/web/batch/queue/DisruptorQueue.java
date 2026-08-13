@@ -192,8 +192,10 @@ public class DisruptorQueue {
         if (size < 64) return 64;
         int result = Integer.highestOneBit(size);
         if (result < size) result <<= 1;
-        // C8：result <<= 1 溢出为负（size > 2^30）时，回退到最大合法 2 的幂 2^30，
-        // 而非静默回退 4096（超出范围由构造器 warn [64, 262144] 提示）。
-        return result > 0 ? result : 1 << 30;
+        // C12：result 溢出为负（size > 2^30）或恰好等于 2^30 时都不能用——Disruptor
+        // RingBuffer 构造时按 capacity 预分配全部 BatchEvent 槽位，2^30 槽位 × ~24B
+        // ≈ 25GB+ 堆，任何 -Xmx 都必然 OOM（2^30 只是 int 里最大 2 的幂，不是内存安全
+        // 容量）。回退到构造器 warn 声明的最大合理容量 2^18（262144，预分配 ~6MB）。
+        return result > 0 && result < (1 << 30) ? result : 1 << 18;
     }
 }

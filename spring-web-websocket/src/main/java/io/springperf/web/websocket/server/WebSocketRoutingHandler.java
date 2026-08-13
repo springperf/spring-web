@@ -19,6 +19,7 @@ import org.springframework.web.socket.*;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.security.Principal;
@@ -156,6 +157,10 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
                 .addListener((ChannelFutureListener) future -> {
                     if (!future.isSuccess()) {
                         log.error("WebSocket handshake failed for {}", path, future.cause());
+                        // 握手失败：请求不再被使用，释放调用方持有的原始引用
+                        // （netty handshake 内部 retain 的引用由 WebSocketServerHandshaker$2
+                        // 在 fireChannelRead 时释放，此处释放原始引用）。
+                        ReferenceCountUtil.release(req);
                         ctx.close();
                         return;
                     }
@@ -169,8 +174,11 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
         // 构建 URI 和 Headers
         URI sessionUri = buildSessionUri(req);
         SpringHeadersAdapter springHeaders = new SpringHeadersAdapter(req.headers());
-        InetSocketAddress localAddr = (InetSocketAddress) ctx.channel().localAddress();
-        InetSocketAddress remoteAddr = (InetSocketAddress) ctx.channel().remoteAddress();
+        // SocketAddress 不保证是 InetSocketAddress（如 EmbeddedChannel 的 EmbeddedSocketAddress、
+        // 未绑定连接时为 null），强转会 CCE 中断握手完成回调。防御性转换，非 InetSocketAddress 时
+        // 返回 null（真实 TCP 连接下始终是 InetSocketAddress，行为不变）。
+        InetSocketAddress localAddr = toInetSocketAddress(ctx.channel().localAddress());
+        InetSocketAddress remoteAddr = toInetSocketAddress(ctx.channel().remoteAddress());
 
         // 从 TLS 提取客户端证书 Principal
         Principal principal = extractTlsPrincipal(ctx);
@@ -227,6 +235,12 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
                     }, effectiveHeartbeat, effectiveHeartbeat, java.util.concurrent.TimeUnit.MILLISECONDS);
             ctx.channel().closeFuture().addListener(f -> hbFuture.cancel(false));
         }
+
+        // 释放握手请求的原始引用。netty handshake 内部 retain 的引用由
+        // WebSocketServerHandshaker$2 在 fireChannelRead 时消费释放；此处释放调用方
+        // 持有的原始引用（HttpObjectAggregator fireChannelRead 转移的所有权）。
+        // 修复前不释放：每次 WS 握手泄漏 1 个 FullHttpRequest 引用，触发 Netty LEAK 检测。
+        ReferenceCountUtil.release(req);
     }
 
     private void removeHttpHandlers(ChannelPipeline pipeline) {
@@ -385,6 +399,11 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
             @Nullable io.springperf.web.websocket.WebSocketHandlerRegistration reg) {
         if (reg != null && reg.getHeartbeatInterval() != null) return reg.getHeartbeatInterval();
         return heartbeatInterval;
+    }
+
+    @Nullable
+    private static InetSocketAddress toInetSocketAddress(SocketAddress address) {
+        return address instanceof InetSocketAddress ? (InetSocketAddress) address : null;
     }
 
     /**
