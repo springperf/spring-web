@@ -51,10 +51,15 @@ bench_class_of() {
 }
 BENCH_CLASS="$(bench_class_of "$PROFILE")"
 
-CP_FILE="$BENCH/target/cp.txt"
+# classpath 按 profile 隔离：各 profile 依赖不同（perf 无 spring-web-support、perf-support
+# 引入、tomcat 用官方 starter、undertow 排除 tomcat），共享 cp.txt 会在切换 profile 后
+# 复用首个 profile 的 classpath → 依赖缺失/版本错误。
+# 修复：按规范化 profile 名独立缓存；且 pom.xml 比缓存新时自动重新生成（依赖变更不陈旧）。
+PROFILE_KEY="${PROFILE#benchmark-}"
+CP_FILE="$BENCH/target/cp-$PROFILE_KEY.txt"
 
-if [ ! -f "$CP_FILE" ]; then
-    echo "==> 生成 classpath（首次）"
+if [ ! -f "$CP_FILE" ] || [ "$BENCH/pom.xml" -nt "$CP_FILE" ]; then
+    echo "==> 生成 classpath（profile=$PROFILE）"
     (cd "$BENCH" && mvn -q -P"$PROFILE" dependency:build-classpath \
         -Dmdep.outputFile="$CP_FILE" -Dmdep.pathSeparator=';')
 fi
