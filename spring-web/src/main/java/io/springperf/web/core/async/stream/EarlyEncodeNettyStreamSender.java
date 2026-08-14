@@ -31,6 +31,12 @@ public class EarlyEncodeNettyStreamSender extends AbstractNettyStreamSender {
     protected void drain() {
         if (!channel.isActive()) {
             queue.clear();
+            // 失活分支 return 前复位 wip：修复前不递减 wip（残留非 0），后续 complete() 的
+            // scheduleDrain getAndIncrement 返回非 0 被吞，onAllDataWritten 永不执行，
+            // 异步请求挂起。须在 completed 检查【之前】复位：跨线程 complete() 的
+            // getAndIncrement 与本分支 set(0) 在同一 AtomicInteger 上构成全序，无论先后，
+            // 都能保证最终有一次 drain 观察到 completed=true 完成流（见类内 scheduleDrain 注释）。
+            wip.set(0);
             if (completed && !lastHttpContentWritten) {
                 lastHttpContentWritten = true;
                 onAllDataWritten();
