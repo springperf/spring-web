@@ -92,6 +92,12 @@ public class DisruptorQueue {
     }
 
     public void enqueue(BatchRequest<?> request) {
+        // 已知边界（Tier 1 评审确认，保持零锁热路径）：halted 检查与 publish 之间存在纳秒级
+        // 竞态窗口——enqueue 读到 halted=false 后，shutdown 恰好完成 disruptor.shutdown()
+        // （drain 全部已发布事件 + 停消费线程），随后本线程才发布 → 事件滞留环形缓冲无人
+        // 消费，该请求由 DeferredResult 30s 超时兜底。仅停机瞬间概率性发生，可接受。
+        // 如需彻底关闭窗口：用 enqueueLock 互斥「检查 halted → publish」与 shutdown 的
+        // halted 设置（synchronized 包裹），代价是每次 enqueue 一次 monitor 进入/退出。
         if (halted.get()) {
             metrics.recordEnqueue(queueName, false);
             // 停机期间零星请求不走 Disruptor，直接调 batch 方法处理
