@@ -110,6 +110,28 @@ class PublisherToStreamEmitterAdapterTest {
     }
 
     @Test
+    void onNext_afterTermination_isNoOp() throws Exception {
+        streamAdapter.onSubscribe(mock(Subscription.class));
+
+        streamAdapter.onComplete(); // terminates
+        streamAdapter.onNext("late");
+
+        // 修复前 onNext 在 terminated 后仍调 sender.send → 对已终止发送器无谓写；
+        // 若 sender 抛 IOException → tryCancel 但 terminated 已置位 → 仅打误导性 ERROR 日志
+        verify(sender, never()).send(any());
+    }
+
+    @Test
+    void onNext_afterError_isNoOp() throws Exception {
+        streamAdapter.onSubscribe(mock(Subscription.class));
+
+        streamAdapter.onError(new RuntimeException("boom"));
+        streamAdapter.onNext("late");
+
+        verify(sender, never()).send(any());
+    }
+
+    @Test
     void onError_completesWithError() {
         streamAdapter.onSubscribe(mock(Subscription.class));
 

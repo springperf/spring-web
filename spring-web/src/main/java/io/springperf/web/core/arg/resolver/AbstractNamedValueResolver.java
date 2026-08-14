@@ -8,7 +8,7 @@ import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.util.MetaUtils;
 import org.springframework.core.MethodParameter;
-import org.springframework.core.convert.ConversionFailedException;
+import org.springframework.core.convert.ConversionException;
 import org.springframework.core.convert.TypeDescriptor;
 import org.springframework.lang.Nullable;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -58,9 +58,11 @@ public abstract class AbstractNamedValueResolver extends AbstractSupportOptional
         }
         try {
             return convertWithGenericType(arg);
-        } catch (ConversionFailedException e) {
+        } catch (ConversionException e) {
             // 对齐 Spring 语义：类型转换失败抛 MethodArgumentTypeMismatchException，
             // 由 ResponseStatusExceptionResolver 映射为 400 而非 500。
+            // 修复前只 catch 子类 ConversionFailedException，漏平级 ConverterNotFoundException
+            // （目标类型无 String→T 转换器）导致该错误逸出为 500；catch 父类统一收敛为 400。
             throw new MethodArgumentTypeMismatchException(arg, paramType, name, parameter, e);
         }
     }

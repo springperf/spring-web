@@ -149,6 +149,23 @@ class AbstractNamedValueResolverTest {
                 () -> resolver.resolveArgument(request, response));
     }
 
+    @Test
+    void convert_noConverterForTargetType_throwsMethodArgumentTypeMismatch() throws Exception {
+        // C2 补丁：目标类型无 String→T 转换器时 DefaultConversionService 抛
+        // ConverterNotFoundException（ConversionFailedException 的平级子类）。修复前只 catch
+        // 后者，ConverterNotFoundException 逸出为 500；catch 父类 ConversionException 后
+        // 统一映射 MethodArgumentTypeMismatchException → 400（对齐 Spring binder 语义）。
+        stubWebContext();
+        stubConversionService();
+
+        Method method = getClass().getMethod("noConverterParam", Target.class);
+        MethodParameter mp = new MethodParameter(method, 0);
+
+        AbstractNamedValueResolver resolver = createResolver(mp, "value");
+        assertThrows(MethodArgumentTypeMismatchException.class,
+                () -> resolver.resolveArgument(request, response));
+    }
+
     // ----- name field access (same package resolver) -----
 
     @Test
@@ -183,4 +200,11 @@ class AbstractNamedValueResolverTest {
 
     @SuppressWarnings("unused")
     public void intParam(int count) {}
+
+    @SuppressWarnings("unused")
+    public void noConverterParam(Target target) {}
+
+    /** DefaultConversionService 无 String→Target 转换器（无 String 构造器 / valueOf factory）的目标类型。 */
+    static class Target {
+    }
 }
