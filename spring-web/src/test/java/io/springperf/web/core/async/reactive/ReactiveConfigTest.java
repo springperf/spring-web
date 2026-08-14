@@ -40,4 +40,35 @@ class ReactiveConfigTest {
         assertEquals(50, ReactiveConfig.DEFAULT.getLowWaterMark());
         assertEquals(-1, ReactiveConfig.DEFAULT.getTimeout());
     }
+
+    // ----- C14: 背压水位 fail-fast 校验 -----
+
+    @Test
+    void lowWaterMark_zero_throws() {
+        assertThrows(IllegalArgumentException.class, () -> new ReactiveConfig(150, 0, -1));
+    }
+
+    @Test
+    void lowWaterMark_negative_throws() {
+        assertThrows(IllegalArgumentException.class, () -> new ReactiveConfig(150, -1, -1));
+    }
+
+    @Test
+    void highWaterMark_equalsLowWaterMark_throws() {
+        assertThrows(IllegalArgumentException.class, () -> new ReactiveConfig(100, 100, -1));
+    }
+
+    @Test
+    void highWaterMark_belowLowWaterMark_throws() {
+        assertThrows(IllegalArgumentException.class, () -> new ReactiveConfig(20, 100, -1));
+    }
+
+    @Test
+    void fiveArgConstructor_invalidValues_throws() throws Exception {
+        Constructor<SseEmitter> constructor = SseEmitter.class.getConstructor();
+        assertThrows(IllegalArgumentException.class,
+                () -> new ReactiveConfig(SseEmitter.class, constructor, 50, 0, 5000L));
+        assertThrows(IllegalArgumentException.class,
+                () -> new ReactiveConfig(SseEmitter.class, constructor, 50, 50, 5000L));
+    }
 }

@@ -87,6 +87,14 @@ public class PublisherToStreamEmitterAdapter implements Subscriber<Object> {
 
     @Override
     public void onNext(Object o) {
+        // RS 规范：终止信号（onError/onComplete）后不得再投递 onNext。terminated 由
+        // onError/onComplete（Publisher 线程）或 tryCancel（EventLoop 写错误回调）设置，
+        // 跨线程竞态时迟到元素在此丢弃。修复前迟到元素走 sender.send(o)——channel 已
+        // 关闭抛 IOException → tryCancel → 误导性 ERROR 日志 "send data error"
+        // （实为正常终止后的尾随元素），且可能对已终止的发送器做无效写。
+        if (terminated) {
+            return;
+        }
         try {
             sender.send(o);
         } catch (IOException e) {
