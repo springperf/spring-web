@@ -1,11 +1,11 @@
 # WSL external 基准测试模式
 
-把被测服务端放进 WSL2（限 2c / 1g），客户端（OkHttp JMH）跑在 Windows 宿主机，两者资源隔离。相比 in-process 模式（服务端与客户端同 JVM 抢 CPU），external 模式服务端是 Linux + 受限资源，更接近生产（1c1g Linux）。
+把被测服务端放进 WSL2（限 4c / 2g），客户端（OkHttp JMH）跑在 Windows 宿主机，两者资源隔离。相比 in-process 模式（服务端与客户端同 JVM 抢 CPU），external 模式服务端是 Linux + 受限资源，更接近生产。
 
 ## 架构
 
 ```
-┌────────────── Windows 主机 ──────────────┐      ┌──── WSL2 VM (2c / 1g) ────┐
+┌────────────── Windows 主机 ──────────────┐      ┌──── WSL2 VM (4c / 2g) ────┐
 │  JMH JVM（客户端）                       │      │  java ... PerfApplication  │
 │  OkHttp N 线程 + JFR(客户端)             │ ◄──► │  Netty 服务端 + JFR(服务端) │
 │  -Dbenchmark.target=<WSL IP>             │  直连 │  -Xms768m G1GC            │
@@ -18,16 +18,15 @@
 
 ```
 [wsl2]
-processors=2
-memory=1GB
-swap=1GB
+processors=4
+memory=2GB
+swap=0
 ```
 
 生效：`wsl --shutdown` 后重启 WSL。
 
-> 内存口径：
-> - 严格 1g 环境（推荐）：`memory=1GB` + JVM `-Xmx768m`（堆 + Metaspace + 直接内存塞进 1G VM）
-> - 宽松档：`memory=1536MB` + JVM `-Xmx1g`（heap 足 1g，但 VM 稍大）
+> 内存口径（实测配置，与 docs/benchmark-wsl.md 数据来源一致）：
+> - `memory=2GB` + JVM `-Xmx768m`（堆 + Metaspace + 直接内存留足余量）
 >
 > 注意：`processors`/`memory` 限制的是**整个 WSL2 VM**（所有发行版共享），WSL 内只跑被测服务端，不要放 Docker Desktop 等。
 
@@ -64,15 +63,15 @@ echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> ~/.bashrc
 | 检查项 | 命令 | 期望 |
 |--------|------|------|
 | Windows 总 CPU | `typeperf "\Processor(_Total)\% Processor Time" -sc 30` | < 85%（留余量给 WSL2 vCPU） |
-| WSL 服务端 CPU | WSL 内 `top` 或 `htop` | 2c 吃满 ~200% = 服务端是瓶颈 |
+| WSL 服务端 CPU | WSL 内 `top` 或 `htop` | 4c 吃满 ~400% = 服务端是瓶颈 |
 | 客户端是否强占 | 若 Windows 打满且服务端 < 200% | 降并发 `-t` 或钉亲和性（见下） |
 
-若客户端抢占服务端（Windows 100%、服务端没吃满 2c）：
-1. 首选：减并发 `-t 16`（客户端线程少了 CPU 占用直线下降，仍能喂饱 2c 服务端）
+若客户端抢占服务端（Windows 100%、服务端没吃满 4c）：
+1. 首选：减并发 `-t 16`（客户端线程少了 CPU 占用直线下降，仍能喂饱 4c 服务端）
 2. 次选：钉客户端亲和性，物理空出核给 WSL2：
    ```powershell
    $p = Get-Process java   # JMH 进程
-   $p.ProcessorAffinity = 0x03FF   # 钉到核 2-9，留 0-1 给 WSL2 vCPU
+   $p.ProcessorAffinity = 0xFFF0   # 钉到核 4-15，留 0-3 给 WSL2 vCPU
    ```
 
 ## 4. 已知环境问题
@@ -92,6 +91,6 @@ echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> ~/.bashrc
 
 - **WSL2 IP 每次重启会变**：脚本自动 `wsl hostname -I` 动态获取，不要硬编码。
 - **localhost 转发有中继开销**：客户端直连 WSL IP，不走 `localhost`。
-- **in-process / external 结果不可横向直接对比**：前者 Windows 无约束、后者 Linux 2c1g，分开报告。
+- **in-process / external 结果不可横向直接对比**：前者 Windows 无约束、后者 Linux 4c2g，分开报告。
 - **两个 WSL2 发行版共享同一个 VM 资源限制**：客户端仍放 Windows，不要放第二个 WSL2。
 - **内存快照**：external 模式下 `memory-<profile>.json` 不再生成（服务端不在这台 JVM）。

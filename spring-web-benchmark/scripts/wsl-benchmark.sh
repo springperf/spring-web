@@ -59,8 +59,12 @@ PROFILE_KEY="${PROFILE#benchmark-}"
 CP_FILE="$BENCH/target/cp-$PROFILE_KEY.txt"
 
 if [ ! -f "$CP_FILE" ] || [ "$BENCH/pom.xml" -nt "$CP_FILE" ]; then
-    echo "==> 生成 classpath（profile=$PROFILE）"
-    (cd "$BENCH" && mvn -q -P"$PROFILE" dependency:build-classpath \
+    # profile 必须用完整名（benchmark-$PROFILE_KEY）：用户传简写 perf 时，mvn -P perf
+    # 匹配不到 pom 的 benchmark-perf profile，Maven 会【静默忽略未知 profile】（退出码仍 0）
+    # 并以默认 classpath 生成 cp 文件 → JMH fork 缺 profile 依赖（如 spring-web-support）
+    # 报 NoClassDefFoundError。CP_FILE 已按 PROFILE_KEY 命名，此处 mvn 参数统一补全前缀。
+    echo "==> 生成 classpath（profile=benchmark-$PROFILE_KEY）"
+    (cd "$BENCH" && mvn -q -P"benchmark-$PROFILE_KEY" dependency:build-classpath \
         -Dmdep.outputFile="$CP_FILE" -Dmdep.pathSeparator=';')
 fi
 

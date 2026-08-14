@@ -2,7 +2,7 @@
 # =============================================================================
 # WSL external 模式一键全量压测 + Markdown 报告。
 #
-# 服务端跑 WSL2（2c/1g 受限），客户端 OkHttp JMH 跑 Windows 宿主，
+# 服务端跑 WSL2（4c/2g 受限，见 scripts/WSL_SETUP.md），客户端 OkHttp JMH 跑 Windows 宿主，
 # 自动遍历全部 profile，跑完生成 benchmark-reports/{run-id}/report.md。
 # 睡一觉醒来直接看报告即可。
 #
@@ -19,7 +19,7 @@
 #                                                      # 注意: -- 后所有参数原样透传给每个 profile 的 JMH
 #
 # 前置条件:
-#   - WSL2 已启用且 .wslconfig 限 2c/1g（见 scripts/WSL_SETUP.md）
+#   - WSL2 已启用且 .wslconfig 限 4c/2g（见 scripts/WSL_SETUP.md）
 #   - WSL 内已装 JDK 17（JFR 需要），JAVA_HOME 指向它
 #   - Maven / JDK 在 Windows PATH
 #   - 端口 9092/9094/9102/9112/9122 空闲（脚本会自动清理 WSL 内残留 java）
@@ -50,7 +50,7 @@ RUN_ID=$(date +"%Y%m%d-%H%M%S")
 # benchmark-reports，而 ReportGenerator/服务端日志读到 $BENCH/benchmark-reports，报告找不到数据。
 REPORTS_DIR="$BENCH/benchmark-reports"
 CP_DIR="$REPORTS_DIR/.cp"               # classpath 放这，避免被 mvn clean 删除
-HEAP_MB=768                             # 服务端堆（配合 WSL 1GB 严格口径）
+HEAP_MB=768                             # 服务端堆（配合 WSL 2GB 口径，留余量给 Metaspace/直接内存）
 # 强制 Maven 离线（-o）：断网挂机时依赖必须全在本地 .m2，
 # 否则 mvn 会卡在连阿里云 http 上重试数分钟。离线模式缺依赖会立刻失败，
 # 比挂死更可诊断。运行前请确认已做过一次在线构建把所有依赖拉进本地仓库。
@@ -171,6 +171,13 @@ for KEEP_I in 1 2; do
 done
 echo "  WSL keepalive PIDs: ${WSL_KEEPALIVE_PIDS[*]}"
 
+# EXIT trap：从 keepalive 进程启动后【立即】安装，覆盖 Step 1 全量编译阶段——
+# 否则 mvn install 失败（exit 1）或用户 Ctrl+C 时，已启动的 keepalive wsl 进程与
+# no-sleep.ps1 全部泄漏（no-sleep 使 Windows 持续不睡眠）。trap 在 EXIT 时求值，
+# 此时 NOSLEEP_PID / WRAPPERS 均已定义，${VAR:-} 防御 set -u 对未定义变量的报错。
+WRAPPERS=()   # 已启动的服务端 wrapper (wsl.exe) PID；EXIT trap 兜底清理
+trap 'for w in ${WRAPPERS[@]+"${WRAPPERS[@]}"}; do kill -9 "$w" 2>/dev/null; done; for k in ${WSL_KEEPALIVE_PIDS[@]+"${WSL_KEEPALIVE_PIDS[@]}"}; do kill -9 "$k" 2>/dev/null; done; [ -n "${NOSLEEP_PID:-}" ] && kill "$NOSLEEP_PID" 2>/dev/null || true' EXIT
+
 JDK_VERSION="$(java -version 2>&1 | head -1 | cut -d'"' -f2)"
 JDK_DIR="jdk-${JDK_VERSION}"
 RESULTS_DIR="$REPORTS_DIR/$RUN_ID/$JDK_DIR"
@@ -227,9 +234,6 @@ fi
 echo ""
 echo "[2/3] 逐 profile 编译 + WSL 服务端 + Windows 压测..."
 FAILED_PROFILES=()
-WRAPPERS=()   # 已启动的服务端 wrapper (wsl.exe) PID；EXIT trap 兜底清理
-# EXIT trap：清理残留 wrapper + kill WSL keepalive + kill 防睡眠进程
-trap 'for w in ${WRAPPERS[@]+"${WRAPPERS[@]}"}; do kill -9 "$w" 2>/dev/null; done; for k in ${WSL_KEEPALIVE_PIDS[@]+"${WSL_KEEPALIVE_PIDS[@]}"}; do kill -9 "$k" 2>/dev/null; done; [ -n "${NOSLEEP_PID:-}" ] && kill "$NOSLEEP_PID" 2>/dev/null || true' EXIT
 
 for ENTRY in "${PROFILES_TO_RUN[@]}"; do
   IFS=':' read -r P PORT BENCH_CLASS APP_CLASS <<< "$ENTRY"
