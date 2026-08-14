@@ -10,8 +10,8 @@
 #   - WSL 内已装 JDK 17（推荐，JFR 需要），JAVA_HOME 指向它
 #   - %UserProfile%\.wslconfig 已配置（见 scripts/WSL_SETUP.md）:
 #       [wsl2]
-#       processors=2
-#       memory=1GB
+#       processors=4
+#       memory=2GB
 #   - Maven 在 Windows PATH 中
 #
 # 产物:
@@ -19,8 +19,7 @@
 #
 # 注意:
 #   - 不拷贝产物到 WSL，直接经 /mnt/c 访问 Windows 构建产物（启动慢一点，运行时无影响）
-#   - heap_mb 默认 768：配合 .wslconfig memory=1GB 即为「严格 1g 环境」口径。
-#     若想宽松档（-Xmx1g），需把 .wslconfig memory 提到 1536MB 且传 heap_mb=1024
+#   - heap_mb 默认 768：配合 .wslconfig memory=2GB（实测配置），留余量给 Metaspace/直接内存
 # =============================================================================
 set -euo pipefail
 # 脚本位于 <project>/spring-web-benchmark/scripts/
