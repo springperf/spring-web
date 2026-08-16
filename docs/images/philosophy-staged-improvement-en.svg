@@ -35,7 +35,7 @@
 
 <!-- Bar 3: + Foundational Optimization -->
 <rect x="380" y="150" width="100" height="210" rx="4" fill="#f97316"/>
-<text x="430" y="230" class="gain">1.7~6.6x</text>
+<text x="430" y="230" class="gain">1.2~12.6x</text>
 <text x="430" y="250" class="gainSmall">All requests</text>
 <text x="430" y="378" class="stageLabel">+ Foundational Opt.</text>
 <text x="430" y="392" class="subtitle">Eliminates CPU framework tax</text>

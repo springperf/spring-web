@@ -268,7 +268,7 @@ void drain() {
 
 ### Scope
 
-SSE and streaming response only. In benchmarks, perf SSE throughput reaches 3.89x of Spring MVC (4 threads), scaling to 6.64x under high concurrency.
+SSE and streaming response only. In benchmarks, perf SSE throughput reaches 12.63x of Spring MVC (4 threads) / 7.72x (16 threads).
 
 ---
 
@@ -353,7 +353,7 @@ When two descriptions are separated by `→` in the same cell, the left side is 
 | SSE implementation | **`NettyStreamSender`** → `MpscUnboundedArrayQueue` + lock-free Drain Loop | `SseEmitter` → one thread per connection, synchronous blocking write | `Flux<ServerSentEvent>` → Reactor backpressure |
 | Backpressure mechanism | **`channel.isWritable()` + `BackpressureHandler`** → precise watermarks | **None** → fast producer directly blocks thread | Reactor `request(n)` → operator chain propagation |
 | Thread usage | **EventLoop unified write** → thread count = CPU cores, doesn't grow with connections | **One thread per connection** → thread count = connection count | EventLoop unified write |
-| Streaming throughput | **3.89x(4t) / 6.64x(64t) Spring MVC** | Baseline | Comparable, but lock-free queue advantage more significant for small messages |
+| Streaming throughput | **12.63x(4t) / 7.72x(16t) Spring MVC** | Baseline | Comparable, but lock-free queue advantage more significant for small messages |
 
 ### Object Allocation & Memory
 
@@ -373,8 +373,8 @@ When two descriptions are separated by `→` in the same cell, the left side is 
 | `@RequestMapping` | **Fully compatible** | Native | Native |
 | `javax.validation` | Supported | Supported | Supported |
 | Spring Data | Bridge compatible | Native | Native |
-| Minimum heap | **~20MB** | ~23MB | ~23MB |
-| P50 latency (small payload) | **0.12-0.15ms** | 0.17-0.26ms | 0.18-0.24ms |
+| Minimum heap | **~24MB** | ~26MB | ~25MB |
+| P50 latency (small payload) | **0.10-0.11ms** | 0.15-0.22ms | 0.16-0.24ms |
 
 ---
 
@@ -388,7 +388,7 @@ When two descriptions are separated by `→` in the same cell, the left side is 
 | ★★★★☆ | GC-friendly, no temporary allocation | 100% | Millions fewer allocations per minute |
 | ★★★★☆ | ByteBuf zero-copy | 100% | Eliminates 1-2 data copies |
 | ★★★★☆ | EventLoop direct processing | Optional — three models | Foundation for reactive / virtual threads |
-| ★★☆☆☆ | Lock-free Drain Loop | SSE only | 3.89x(4t) / 6.64x(64t) in SSE scenarios |
+| ★★☆☆☆ | Lock-free Drain Loop | SSE only | 12.63x(4t) / 7.72x(16t) in SSE scenarios |
 | ★★☆☆☆ | Netty transport optimization | Marginal | Shared by all Netty frameworks |
 
 **Core conclusion**: the framework eliminates all runtime "find" and "match" overhead through **startup-time deterministic resolution** — this is the primary performance driver. Bytecode generation to eliminate reflection further reduces method invocation cost (~200ns → ~30ns). The default `default` business thread pool means most IO handlers don't need annotations; lightweight endpoints can explicitly switch to EventLoop via `@RunInPool(RunInPool.EVENTLOOP)`. This implements the "business chooses the programming model" design philosophy — the framework provides flexible control without mandating a single model.

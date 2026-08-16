@@ -10,43 +10,43 @@
  .baseline { stroke: #d1d5db; stroke-dasharray: 4,4; }
 </style>
 <rect x="0" y="0" width="800" height="300" rx="12" fill="#f8fafc"/>
-<text x="30" y="32" class="title">WebPerf vs Spring MVC (Tomcat)</text>
-<text x="620" y="32" class="sub">Higher is better</text>
+<text x="30" y="32" class="title">WebPerf Performance — vs Spring MVC (Tomcat)</text>
+<text x="620" y="32" class="sub">higher is better</text>
 <rect x="30" y="48" width="12" height="12" rx="2" fill="#22c55e"/>
 <text x="48" y="59" class="legend">4 threads</text>
-<rect x="125" y="48" width="12" height="12" rx="2" fill="#16a34a"/>
-<text x="143" y="59" class="legend">64 threads (high concurrency)</text>
+<rect x="110" y="48" width="12" height="12" rx="2" fill="#16a34a"/>
+<text x="128" y="59" class="legend">16 threads (high concurrency)</text>
 <line x1="140" y1="72" x2="140" y2="252" stroke="#e5e7eb" stroke-width="1"/>
 <!-- JSON -->
 <text x="16" y="98" class="label">JSON throughput</text>
-<rect x="140" y="100" width="90" height="14" rx="3" fill="#22c55e"/>
-<text x="235" y="112" class="value">1.90x</text>
-<text x="285" y="112" class="unit">26,718 ops/s</text>
-<text x="380" y="112" class="mvc">|  MVC: 14,061 ops/s</text>
-<rect x="140" y="118" width="106" height="14" rx="3" fill="#16a34a"/>
-<text x="251" y="132" class="value">2.23x</text>
-<text x="301" y="132" class="unit">45,328 ops/s</text>
-<text x="410" y="132" class="mvc">|  MVC: 20,319 ops/s</text>
+<rect x="140" y="100" width="75" height="14" rx="3" fill="#22c55e"/>
+<text x="221" y="112" class="value">1.88x</text>
+<text x="272" y="112" class="unit">37,508 ops/s</text>
+<text x="385" y="112" class="mvc">|  MVC: 19,900 ops/s</text>
+<rect x="140" y="118" width="64" height="14" rx="3" fill="#16a34a"/>
+<text x="210" y="132" class="value">1.61x</text>
+<text x="262" y="132" class="unit">73,286 ops/s</text>
+<text x="385" y="132" class="mvc">|  MVC: 45,481 ops/s</text>
 <!-- GET -->
 <text x="16" y="158" class="label">GET throughput</text>
-<rect x="140" y="160" width="103" height="14" rx="3" fill="#22c55e"/>
-<text x="248" y="172" class="value">2.19x</text>
-<text x="298" y="172" class="unit">27,398 ops/s</text>
-<text x="410" y="172" class="mvc">|  MVC: 12,502 ops/s</text>
-<rect x="140" y="178" width="117" height="14" rx="3" fill="#16a34a"/>
-<text x="262" y="192" class="value">2.47x</text>
-<text x="312" y="192" class="unit">44,697 ops/s</text>
-<text x="420" y="192" class="mvc">|  MVC: 18,126 ops/s</text>
+<rect x="140" y="160" width="90" height="14" rx="3" fill="#22c55e"/>
+<text x="236" y="172" class="value">2.26x</text>
+<text x="290" y="172" class="unit">38,538 ops/s</text>
+<text x="400" y="172" class="mvc">|  MVC: 17,051 ops/s</text>
+<rect x="140" y="178" width="74" height="14" rx="3" fill="#16a34a"/>
+<text x="220" y="192" class="value">1.84x</text>
+<text x="272" y="192" class="unit">72,636 ops/s</text>
+<text x="400" y="192" class="mvc">|  MVC: 39,398 ops/s</text>
 <!-- SSE -->
 <text x="16" y="218" class="label">SSE throughput</text>
-<rect x="140" y="220" width="185" height="14" rx="3" fill="#22c55e"/>
-<text x="330" y="232" class="value">3.89x</text>
-<text x="380" y="232" class="unit">1,226 ops/s</text>
-<text x="480" y="232" class="mvc">|  MVC: 315 ops/s</text>
-<rect x="140" y="238" width="316" height="14" rx="3" fill="#16a34a"/>
-<text x="461" y="252" class="value">6.64x</text>
-<text x="511" y="252" class="unit">2,655 ops/s</text>
-<text x="620" y="252" class="mvc">|  MVC: 400 ops/s</text>
+<rect x="140" y="220" width="505" height="14" rx="3" fill="#22c55e"/>
+<text x="152" y="232" class="value">12.63x</text>
+<text x="212" y="232" class="unit">13,323 ops/s</text>
+<text x="652" y="232" class="mvc">|  MVC: 1,055 ops/s</text>
+<rect x="140" y="238" width="309" height="14" rx="3" fill="#16a34a"/>
+<text x="455" y="252" class="value">7.72x</text>
+<text x="505" y="252" class="unit">14,920 ops/s</text>
+<text x="620" y="252" class="mvc">|  MVC: 1,933 ops/s</text>
 <line x1="140" y1="72" x2="140" y2="252" class="baseline"/>
 <text x="145" y="290" class="sub">Spring MVC baseline &#160; 1.0x</text>
 </svg>

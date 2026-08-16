@@ -7,8 +7,8 @@
 [![CI](https://github.com/springperf/spring-web/actions/workflows/ci.yml/badge.svg)](https://github.com/springperf/spring-web/actions/workflows/ci.yml)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.springperf/spring-web)](https://central.sonatype.com/artifact/io.github.springperf/spring-web)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE.md)
-[![Throughput](https://img.shields.io/badge/Throughput-1.7~6.6x_vs_Spring_MVC-brightgreen?style=flat-square)](docs/benchmark.md)
-[![SSE](https://img.shields.io/badge/SSE-6.64x_under_high_concurrency-blue?style=flat-square)](docs/benchmark.md)
+[![Throughput](https://img.shields.io/badge/Throughput-1.2~12.6x_vs_Spring_MVC-brightgreen?style=flat-square)](docs/benchmark.md)
+[![SSE](https://img.shields.io/badge/SSE-7.7x_under_high_concurrency-blue?style=flat-square)](docs/benchmark.md)
 
 ---
 
@@ -18,7 +18,7 @@
 <img src="docs/images/perf-benchmark.svg" alt="Performance Benchmark Chart"/>
 </p>
 
-> 全部 7 个接口 x 3 个并发度 x 4 个对比框架，**100% 胜率，无一例外**。延迟低 37%、内存分配少 41%、堆占用少 13%。
+> 全部 7 个接口 × 3 个并发度，对比 Spring MVC（Tomcat/Undertow）与 WebFlux **100% 领先，无一例外**。json 16t p50 延迟仅 Spring MVC 的 **69%**、每请求内存分配仅其 **43%**、4 线程堆占用 **24MB**（全场最低）。
 >
 > [完整 Benchmark 报告](docs/benchmark.md) · [性能原理详解](docs/performance-principles.md)
 
@@ -51,7 +51,7 @@ Spring WebPerf 是一个基于 **Netty** 构建的高性能 Web 框架，定位�
 - **高性能** — 启动时预缓存全部元数据，运行时零反射零匹配；ASM 字节码生成替代反射调用；O(1) HashMap 路由；GC 友好设计
 - **Netty 驱动** — 基于 Netty 4.1 事件驱动 I/O，请求默认在 EventLoop 处理，可按方法粒度通过 `@RunInPool` 调度到业务线程池
 - **Spring 生态兼容** — 支持 `@RestController`、`@RequestMapping`、`@Validated`、`@ExceptionHandler`、`HandlerInterceptor` 等 Spring 注解与抽象，零侵入迁移
-- **异步原生** — 内置 DeferredResult、Callable、SseEmitter、StreamEmitter、Reactive Streams 支持，SSE 吞吐达 Spring MVC 的 3.89x，高并发下扩展至 6.64x
+- **异步原生** — 内置 DeferredResult、Callable、SseEmitter、StreamEmitter、Reactive Streams 支持，SSE 吞吐达 Spring MVC 的 12.63x（4 线程）/ 7.72x（16 线程）
 - **批量处理** — 基于 Disruptor 的请求聚合批处理，透明地将并发请求合并为批量操作，吞吐量可提升数倍；支持背压策略、等待策略、线程池隔离
 - **灵活扩展** — 参数解析器、返回值处理器、编解码 Advice、拦截器、过滤器等关键节点均提供 SPI
 - **生态桥接** — 可通过 support 模块桥接 Servlet Filter、Spring MVC `HandlerInterceptor`、`RequestBodyAdvice` / `ResponseBodyAdvice`
@@ -129,19 +129,19 @@ management:
 > 详细报告见 [Benchmark 文档](docs/benchmark.md)
 > 性能原理分析见 [性能原理文档](docs/performance-principles.md)
 
-基于 JDK 1.8 + G1GC (1GB heap) 的 JMH 基准测试结果（4 线程）：
+基于 JDK 17 + G1GC (1GB heap) 的 JMH 基准测试结果（4 线程）：
 
 | 接口 | perf 吞吐 | vs Spring MVC (Tomcat) | vs Spring MVC (Undertow) | vs WebFlux |
 |------|-----------|-----------|-------------|-------------|
-| json | **26,718** ops/s | **1.90x** | **2.59x** | **1.73x** |
-| get | **27,398** ops/s | **2.19x** | **2.04x** | **2.08x** |
-| bytes | **34,232** ops/s | **1.71x** | **2.92x** | **1.99x** |
-| valid | **26,706** ops/s | **1.84x** | **1.95x** | **1.71x** |
-| async | **28,354** ops/s | **2.11x** | **2.79x** | **1.55x** |
-| bytesLarge | **11,508** ops/s | **2.31x** | **1.48x** | **1.49x** |
-| sse | **1,226** ops/s | **3.89x** | — | **1.30x** |
+| json | **37,508** ops/s | **1.88x** | **1.92x** | **2.07x** |
+| get | **38,538** ops/s | **2.26x** | **2.19x** | **2.49x** |
+| bytes | **42,017** ops/s | **1.56x** | **1.52x** | **1.69x** |
+| valid | **35,949** ops/s | **1.79x** | **1.81x** | **2.04x** |
+| async | **40,501** ops/s | **2.12x** | **2.31x** | **1.67x** |
+| bytesLarge | **18,250** ops/s | **1.82x** | **1.45x** | **1.55x** |
+| sse | **13,323** ops/s | **12.63x** | — | **5.08x** |
 
-perf 框架吞吐是 Servlet 容器的 **1.7\~3.9x**，p50 延迟 **0.12\~0.15ms**（同类框架最低）。SSE 高并发下扩展至 Spring MVC 的 **6.64x**。详情见 [完整对比报告](docs/benchmark.md)。
+perf 框架吞吐是 Servlet 容器的 **1.6\~12.6x**，p50 延迟 **0.10\~0.11ms**（同类框架最低）。SSE 4 线程达 Spring MVC 的 **12.63x**、16 线程 **7.72x**。详情见 [完整对比报告](docs/benchmark.md)。
 
 ---
 
@@ -149,10 +149,10 @@ perf 框架吞吐是 Servlet 容器的 **1.7\~3.9x**，p50 延迟 **0.12\~0.15ms
 
 | 维度 | WebPerf | Spring MVC (Tomcat) |
 |------|-----------|---------------------|
-| 底层引擎 | Netty 4.1 | Servlet 容器（Tomcat/Jetty/Undertow） |
-| 吞吐量 (json 4t) | **26,718** ops/s | 14,061 ops/s (1.90x) |
-| P50 延迟 (bytes 4t) | **0.12ms** | 0.19ms |
-| 稳态堆占用 (4t) | **20MB** | 23MB |
+| 底层引擎 | Netty 4.1.115.Final | Spring MVC 6.1.15 + Tomcat 10.1.33（Undertow 2.3.17.Final） |
+| 吞吐量 (json 4t) | **37,508** ops/s | 19,900 ops/s (1.88x) |
+| P50 延迟 (bytes 4t) | **0.10ms** | 0.15ms |
+| 稳态堆占用 (4t) | **24MB** | 26MB |
 | I/O 模型 | Netty 非阻塞传输 + EventLoop 处理 | Servlet 阻塞 I/O + 容器线程 |
 | 线程模型 | EventLoop 直接处理或 `@RunInPool` 按需切换 | 固定容器线程池 |
 | 方法调用 | ASM / MethodHandle（~10-30ns） | `Method.invoke()` 反射（~200ns） |

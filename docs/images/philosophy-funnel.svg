@@ -39,8 +39,8 @@
 <!-- Right side annotations -->
 <rect x="560" y="360" width="135" height="75" rx="6" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
 <text x="627" y="382" class="title" font-size="12" text-anchor="middle" fill="#16a34a">最终效果</text>
-<text x="627" y="400" class="layerDesc" fill="#16a34a" text-anchor="middle">- 吞吐提升 1.7~6.6x</text>
-<text x="627" y="416" class="layerDesc" fill="#16a34a" text-anchor="middle">- 延迟降低 37%</text>
+<text x="627" y="400" class="layerDesc" fill="#16a34a" text-anchor="middle">- 吞吐提升 1.2~12.6x</text>
+<text x="627" y="416" class="layerDesc" fill="#16a34a" text-anchor="middle">- 延迟最高降低 88%</text>
 
 <line x1="610" y1="330" x2="627" y2="360" stroke="#86efac" stroke-width="1.5" stroke-dasharray="4,3"/>
 <polygon points="627,360 620,355 620,365" fill="#86efac"/>

@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="800" height="480" viewBox="0 0 800 480">
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="560" viewBox="0 0 900 560">
 <style>
  .bg { fill: #f8fafc; }
  .title { font: bold 15px -apple-system,BlinkMacSystemFont,sans-serif; fill: #1f2937; }
@@ -14,120 +14,110 @@
  .line-normal { stroke: #94a3b8; stroke-width: 1.5; fill: none; }
  .label-sse { fill: #ef4444; font-weight: bold; font-size: 11px; }
 </style>
-<rect class="bg" x="0" y="0" width="800" height="480" rx="12"/>
+<rect class="bg" x="0" y="0" width="900" height="560" rx="12"/>
 <text x="30" y="32" class="title">perf Advantage vs Concurrency (vs Spring MVC Tomcat)</text>
 
-<!-- Y-axis gridlines -->
-<line x1="70" y1="380" x2="740" y2="380" class="baseline"/>
-<line x1="70" y1="333" x2="740" y2="333" class="gridline"/>
-<line x1="70" y1="286" x2="740" y2="286" class="gridline"/>
-<line x1="70" y1="239" x2="740" y2="239" class="gridline"/>
-<line x1="70" y1="192" x2="740" y2="192" class="gridline"/>
-<line x1="70" y1="145" x2="740" y2="145" class="gridline"/>
-<line x1="70" y1="98" x2="740" y2="98" class="gridline"/>
-<line x1="70" y1="51" x2="740" y2="51" class="gridline"/>
+<line x1="70" y1="430" x2="650" y2="430" class="baseline"/>
+<line x1="70" y1="378.57142857142856" x2="650" y2="378.57142857142856" class="gridline"/>
+<line x1="70" y1="327.1428571428571" x2="650" y2="327.1428571428571" class="gridline"/>
+<line x1="70" y1="275.7142857142857" x2="650" y2="275.7142857142857" class="gridline"/>
+<line x1="70" y1="224.28571428571428" x2="650" y2="224.28571428571428" class="gridline"/>
+<line x1="70" y1="172.85714285714283" x2="650" y2="172.85714285714283" class="gridline"/>
+<line x1="70" y1="121.42857142857144" x2="650" y2="121.42857142857144" class="gridline"/>
+<line x1="70" y1="70" x2="650" y2="70" class="gridline"/>
+<text x="58" y="434" class="tickLabel" text-anchor="end">0</text>
+<text x="58" y="382.57142857142856" class="tickLabel" text-anchor="end">2x</text>
+<text x="58" y="331.1428571428571" class="tickLabel" text-anchor="end">4x</text>
+<text x="58" y="279.7142857142857" class="tickLabel" text-anchor="end">6x</text>
+<text x="58" y="228.28571428571428" class="tickLabel" text-anchor="end">8x</text>
+<text x="58" y="176.85714285714283" class="tickLabel" text-anchor="end">10x</text>
+<text x="58" y="125.42857142857144" class="tickLabel" text-anchor="end">12x</text>
+<text x="58" y="74" class="tickLabel" text-anchor="end">14x</text>
+<line x1="70" y1="404" x2="650" y2="404" class="refLine"/>
+<text x="110" y="480" class="xLabel">4 threads</text>
+<text x="370" y="480" class="xLabel">8 threads</text>
+<text x="630" y="480" class="xLabel">16 threads</text>
+<text x="370" y="505" class="tickLabel" text-anchor="middle">Concurrent Threads</text>
 
-<!-- Reference line -->
-<line x1="100" y1="333" x2="740" y2="333" class="refLine"/>
-<text x="735" y="330" class="tickLabel" text-anchor="end">MVC baseline 1.0x</text>
+ <polyline class="line-sse" points="110,105 370,124 630,231"/>
+ <circle cx="110" cy="105" r="5" class="dot" fill="#ef4444"/>
+ <text x="110" y="99" class="dataLabel label-sse" text-anchor="middle">12.63x</text>
+ <circle cx="370" cy="124" r="5" class="dot" fill="#ef4444"/>
+ <text x="370" y="118" class="dataLabel label-sse" text-anchor="middle">11.90x</text>
+ <circle cx="630" cy="231" r="5" class="dot" fill="#ef4444"/>
+ <text x="630" y="225" class="dataLabel label-sse" text-anchor="middle">7.72x</text>
 
-<!-- Y-axis labels -->
-<text x="58" y="384" class="tickLabel" text-anchor="end">0</text>
-<text x="58" y="337" class="tickLabel" text-anchor="end">1x</text>
-<text x="58" y="290" class="tickLabel" text-anchor="end">2x</text>
-<text x="58" y="243" class="tickLabel" text-anchor="end">3x</text>
-<text x="58" y="196" class="tickLabel" text-anchor="end">4x</text>
-<text x="58" y="149" class="tickLabel" text-anchor="end">5x</text>
-<text x="58" y="102" class="tickLabel" text-anchor="end">6x</text>
-<text x="58" y="55" class="tickLabel" text-anchor="end">7x</text>
+ <polyline class="line-normal" points="110,382 370,380 630,389"/>
+ <circle cx="110" cy="382" r="3" class="dot" fill="#94a3b8"/>
+ <circle cx="370" cy="380" r="3" class="dot" fill="#94a3b8"/>
+ <circle cx="630" cy="389" r="3" class="dot" fill="#94a3b8"/>
 
-<!-- X-axis labels -->
-<text x="120" y="420" class="xLabel">4 threads</text>
-<text x="380" y="420" class="xLabel">16 threads</text>
-<text x="640" y="420" class="xLabel">64 threads</text>
-<text x="380" y="445" class="tickLabel" text-anchor="middle">Concurrent Threads</text>
+ <polyline class="line-normal" points="110,372 370,377 630,383"/>
+ <circle cx="110" cy="372" r="3" class="dot" fill="#94a3b8"/>
+ <circle cx="370" cy="377" r="3" class="dot" fill="#94a3b8"/>
+ <circle cx="630" cy="383" r="3" class="dot" fill="#94a3b8"/>
 
-<!-- Lines: x=120(4t), x=380(16t), x=640(64t), y = 380 - value * 47.14 -->
+ <polyline class="line-normal" points="110,390 370,390 630,399"/>
+ <circle cx="110" cy="390" r="3" class="dot" fill="#94a3b8"/>
+ <circle cx="370" cy="390" r="3" class="dot" fill="#94a3b8"/>
+ <circle cx="630" cy="399" r="3" class="dot" fill="#94a3b8"/>
 
-<!-- SSE red line -->
-<polyline class="line-sse" points="120,197 380,162 640,67"/>
-<circle cx="120" cy="197" r="5" class="dot" fill="#ef4444"/>
-<circle cx="380" cy="162" r="5" class="dot" fill="#ef4444"/>
-<circle cx="640" cy="67" r="5" class="dot" fill="#ef4444"/>
-<text x="120" y="190" class="dataLabel label-sse" text-anchor="middle">3.89x</text>
-<text x="380" y="155" class="dataLabel label-sse" text-anchor="middle">4.63x</text>
-<text x="640" y="60" class="dataLabel label-sse" text-anchor="middle">6.64x</text>
+ <polyline class="line-normal" points="110,384 370,382 630,388"/>
+ <circle cx="110" cy="384" r="3" class="dot" fill="#94a3b8"/>
+ <circle cx="370" cy="382" r="3" class="dot" fill="#94a3b8"/>
+ <circle cx="630" cy="388" r="3" class="dot" fill="#94a3b8"/>
 
-<!-- Other lines (gray) -->
-<polyline class="line-normal" points="120,290 380,305 640,275"/>
-<circle cx="120" cy="290" r="3" class="dot" fill="#94a3b8"/>
-<circle cx="380" cy="305" r="3" class="dot" fill="#94a3b8"/>
-<circle cx="640" cy="275" r="3" class="dot" fill="#94a3b8"/>
+ <polyline class="line-normal" points="110,375 370,376 630,386"/>
+ <circle cx="110" cy="375" r="3" class="dot" fill="#94a3b8"/>
+ <circle cx="370" cy="376" r="3" class="dot" fill="#94a3b8"/>
+ <circle cx="630" cy="386" r="3" class="dot" fill="#94a3b8"/>
 
-<polyline class="line-normal" points="120,277 380,289 640,264"/>
-<circle cx="120" cy="277" r="3" class="dot" fill="#94a3b8"/>
-<circle cx="380" cy="289" r="3" class="dot" fill="#94a3b8"/>
-<circle cx="640" cy="264" r="3" class="dot" fill="#94a3b8"/>
+ <polyline class="line-normal" points="110,383 370,386 630,395"/>
+ <circle cx="110" cy="383" r="3" class="dot" fill="#94a3b8"/>
+ <circle cx="370" cy="386" r="3" class="dot" fill="#94a3b8"/>
+ <circle cx="630" cy="395" r="3" class="dot" fill="#94a3b8"/>
 
-<polyline class="line-normal" points="120,299 380,309 640,300"/>
-<circle cx="120" cy="299" r="3" class="dot" fill="#94a3b8"/>
-<circle cx="380" cy="309" r="3" class="dot" fill="#94a3b8"/>
-<circle cx="640" cy="300" r="3" class="dot" fill="#94a3b8"/>
+ <!-- Legend -->
+ <rect x="30" y="52" width="12" height="12" rx="2" fill="#ef4444"/>
+ <text x="46" y="62" class="legendText label-sse">SSE</text>
+ <rect x="75" y="52" width="12" height="12" rx="2" fill="#94a3b8"/>
+ <text x="91" y="62" class="legendText">json / get / bytes / valid / async / bytesLarge</text>
+ <line x1="30" y1="84" x2="42" y2="84" stroke="#d1d5db" stroke-width="1.5" stroke-dasharray="6,3"/>
+ <text x="46" y="88" class="legendText">MVC baseline (1.0x)</text>
 
-<polyline class="line-normal" points="120,293 380,308 640,287"/>
-<circle cx="120" cy="293" r="3" class="dot" fill="#94a3b8"/>
-<circle cx="380" cy="308" r="3" class="dot" fill="#94a3b8"/>
-<circle cx="640" cy="287" r="3" class="dot" fill="#94a3b8"/>
-
-<polyline class="line-normal" points="120,281 380,295 640,273"/>
-<circle cx="120" cy="281" r="3" class="dot" fill="#94a3b8"/>
-<circle cx="380" cy="295" r="3" class="dot" fill="#94a3b8"/>
-<circle cx="640" cy="273" r="3" class="dot" fill="#94a3b8"/>
-
-<polyline class="line-normal" points="120,271 380,257 640,270"/>
-<circle cx="120" cy="271" r="3" class="dot" fill="#94a3b8"/>
-<circle cx="380" cy="257" r="3" class="dot" fill="#94a3b8"/>
-<circle cx="640" cy="270" r="3" class="dot" fill="#94a3b8"/>
-
-<!-- Legend -->
-<rect x="380" y="52" width="12" height="12" rx="2" fill="#ef4444"/>
-<text x="396" y="62" class="legendText label-sse">SSE</text>
-<rect x="430" y="52" width="12" height="12" rx="2" fill="#94a3b8"/>
-<text x="446" y="62" class="legendText">json / get / bytes / valid / async / bytesLarge</text>
-
-<!-- Data summary table -->
-<rect x="490" y="88" width="290" height="155" rx="6" fill="#f1f5f9"/>
-<text x="504" y="108" class="legendText" font-weight="bold">API</text>
-<text x="560" y="108" class="legendText" font-weight="bold" text-anchor="middle">4t</text>
-<text x="620" y="108" class="legendText" font-weight="bold" text-anchor="middle">16t</text>
-<text x="680" y="108" class="legendText" font-weight="bold" text-anchor="middle">64t</text>
-<line x1="500" y1="115" x2="768" y2="115" stroke="#e2e8f0" stroke-width="1"/>
-<text x="504" y="130" class="legendText" fill="#ef4444" font-weight="bold">SSE</text>
-<text x="560" y="130" class="legendText" text-anchor="middle" fill="#ef4444" font-weight="bold">3.89x</text>
-<text x="620" y="130" class="legendText" text-anchor="middle" fill="#ef4444" font-weight="bold">4.63x</text>
-<text x="680" y="130" class="legendText" text-anchor="middle" fill="#ef4444" font-weight="bold">6.64x</text>
-<text x="504" y="147" class="legendText">json</text>
-<text x="560" y="147" class="legendText" text-anchor="middle">1.90x</text>
-<text x="620" y="147" class="legendText" text-anchor="middle">1.60x</text>
-<text x="680" y="147" class="legendText" text-anchor="middle">2.23x</text>
-<text x="504" y="164" class="legendText">get</text>
-<text x="560" y="164" class="legendText" text-anchor="middle">2.19x</text>
-<text x="620" y="164" class="legendText" text-anchor="middle">1.92x</text>
-<text x="680" y="164" class="legendText" text-anchor="middle">2.47x</text>
-<text x="504" y="181" class="legendText">bytes</text>
-<text x="560" y="181" class="legendText" text-anchor="middle">1.71x</text>
-<text x="620" y="181" class="legendText" text-anchor="middle">1.50x</text>
-<text x="680" y="181" class="legendText" text-anchor="middle">1.70x</text>
-<text x="504" y="198" class="legendText">valid</text>
-<text x="560" y="198" class="legendText" text-anchor="middle">1.84x</text>
-<text x="620" y="198" class="legendText" text-anchor="middle">1.52x</text>
-<text x="680" y="198" class="legendText" text-anchor="middle">1.97x</text>
-<text x="504" y="215" class="legendText">async</text>
-<text x="560" y="215" class="legendText" text-anchor="middle">2.11x</text>
-<text x="620" y="215" class="legendText" text-anchor="middle">1.81x</text>
-<text x="680" y="215" class="legendText" text-anchor="middle">2.27x</text>
-<text x="504" y="232" class="legendText">bytesLarge</text>
-<text x="560" y="232" class="legendText" text-anchor="middle">2.31x</text>
-<text x="620" y="232" class="legendText" text-anchor="middle">2.60x</text>
-<text x="680" y="232" class="legendText" text-anchor="middle">2.33x</text>
+ <!-- Data summary table -->
+ <rect x="660" y="88" width="210" height="155" rx="6" fill="#f1f5f9"/>
+ <text x="672" y="108" class="legendText" font-weight="bold">API</text>
+ <text x="725" y="108" class="legendText" font-weight="bold" text-anchor="middle">4t</text>
+ <text x="775" y="108" class="legendText" font-weight="bold" text-anchor="middle">8t</text>
+ <text x="825" y="108" class="legendText" font-weight="bold" text-anchor="middle">16t</text>
+ <line x1="670" y1="115" x2="860" y2="115" stroke="#e2e8f0" stroke-width="1"/>
+ <text x="672" y="130" class="legendText" fill="#ef4444" font-weight="bold">SSE</text>
+ <text x="725" y="130" class="legendText" text-anchor="middle" fill="#ef4444" font-weight="bold">12.63x</text>
+ <text x="775" y="130" class="legendText" text-anchor="middle" fill="#ef4444" font-weight="bold">11.90x</text>
+ <text x="825" y="130" class="legendText" text-anchor="middle" fill="#ef4444" font-weight="bold">7.72x</text>
+ <text x="672" y="147" class="legendText">json</text>
+ <text x="725" y="147" class="legendText" text-anchor="middle">1.88x</text>
+ <text x="775" y="147" class="legendText" text-anchor="middle">1.93x</text>
+ <text x="825" y="147" class="legendText" text-anchor="middle">1.61x</text>
+ <text x="672" y="164" class="legendText">get</text>
+ <text x="725" y="164" class="legendText" text-anchor="middle">2.26x</text>
+ <text x="775" y="164" class="legendText" text-anchor="middle">2.08x</text>
+ <text x="825" y="164" class="legendText" text-anchor="middle">1.84x</text>
+ <text x="672" y="181" class="legendText">bytes</text>
+ <text x="725" y="181" class="legendText" text-anchor="middle">1.56x</text>
+ <text x="775" y="181" class="legendText" text-anchor="middle">1.54x</text>
+ <text x="825" y="181" class="legendText" text-anchor="middle">1.22x</text>
+ <text x="672" y="198" class="legendText">valid</text>
+ <text x="725" y="198" class="legendText" text-anchor="middle">1.79x</text>
+ <text x="775" y="198" class="legendText" text-anchor="middle">1.86x</text>
+ <text x="825" y="198" class="legendText" text-anchor="middle">1.65x</text>
+ <text x="672" y="215" class="legendText">async</text>
+ <text x="725" y="215" class="legendText" text-anchor="middle">2.12x</text>
+ <text x="775" y="215" class="legendText" text-anchor="middle">2.10x</text>
+ <text x="825" y="215" class="legendText" text-anchor="middle">1.73x</text>
+ <text x="672" y="232" class="legendText">bytesLarge</text>
+ <text x="725" y="232" class="legendText" text-anchor="middle">1.82x</text>
+ <text x="775" y="232" class="legendText" text-anchor="middle">1.73x</text>
+ <text x="825" y="232" class="legendText" text-anchor="middle">1.35x</text>
 </svg>
