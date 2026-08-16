@@ -268,7 +268,7 @@ void drain() {
 
 ### 适用范围
 
-仅 SSE 和流式响应场景。Benchmark 中 perf 的 SSE 吞吐达到 Spring MVC 的 3.89x（4 线程），高并发下扩展至 6.64x。
+仅 SSE 和流式响应场景。Benchmark 中 perf 的 SSE 吞吐达到 Spring MVC 的 12.63x（4 线程）/ 7.72x（16 线程）。
 
 ---
 
@@ -353,7 +353,7 @@ void drain() {
 | SSE 实现 | **`NettyStreamSender`** → `MpscUnboundedArrayQueue` + 无锁 Drain Loop | `SseEmitter` → 每个连接一个线程，同步阻塞写 | `Flux<ServerSentEvent>` → Reactor 背压 |
 | 背压机制 | **`channel.isWritable()` + `BackpressureHandler`** → 水位线精确控制 | **无** → 生产者过快直接阻塞线程 | Reactor `request(n)` → operator 链传播 |
 | 线程占用 | **EventLoop 统一写入** → 线程数 = CPU 核，不随连接增长 | **每连接一线程** → 线程数 = 连接数 | EventLoop 统一写入 |
-| 流式吞吐 | **Spring MVC 的 3.89x(4t) / 6.64x(64t)** | 基准 | 接近，但无锁队列优势在小消息场景更显著 |
+| 流式吞吐 | **Spring MVC 的 12.63x(4t) / 7.72x(16t)** | 基准 | 接近，但无锁队列优势在小消息场景更显著 |
 
 ### 对象分配与内存
 
@@ -373,8 +373,8 @@ void drain() {
 | `@RequestMapping` | **全兼容** | 原生 | 原生 |
 | `javax.validation` | 支持 | 支持 | 支持 |
 | Spring Data | 桥接兼容 | 原生 | 原生 |
-| 最小堆占用 | **~20MB** | ~23MB | ~23MB |
-| P50 延迟 (小包) | **0.12-0.15ms** | 0.17-0.26ms | 0.18-0.24ms |
+| 最小堆占用 | **~24MB** | ~26MB | ~25MB |
+| P50 延迟 (小包) | **0.10-0.11ms** | 0.15-0.22ms | 0.16-0.24ms |
 
 ---
 
@@ -388,7 +388,7 @@ void drain() {
 | ★★★★☆ | GC 友好无临时分配 | 100% | 每分钟减少百万级对象分配 |
 | ★★★★☆ | ByteBuf 零拷贝 | 100% | 消除 1-2 次数据拷贝 |
 | ★★★★☆ | EventLoop 直接处理 | 可选——三种模型 | 响应式编程 / 虚拟线程的基础 |
-| ★★☆☆☆ | 无锁 Drain Loop | 仅 SSE | SSE 场景 3.89x(4t) / 6.64x(64t) |
+| ★★☆☆☆ | 无锁 Drain Loop | 仅 SSE | SSE 场景 12.63x(4t) / 7.72x(16t) |
 | ★★☆☆☆ | Netty 传输优化 | 边际 | 所有 Netty 框架共享 |
 
 **核心结论**：本框架通过**启动时确定性解析**消除了运行时所有"查找"和"匹配"开销——这是性能提升的根本原因。字节码生成消除反射在此基础上进一步优化了方法调用（~200ns → ~30ns）。默认走 `default` 业务线程池让大多数 IO handler 免于注解，轻量端点可通过 `@RunInPool(RunInPool.EVENTLOOP)` 显式切换到 EventLoop。这是"业务方自主选择编程模型"设计理念的落地：框架提供灵活控制，不强制单一模型。

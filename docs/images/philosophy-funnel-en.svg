@@ -39,8 +39,8 @@
 <!-- Right side annotations -->
 <rect x="560" y="360" width="135" height="75" rx="6" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
 <text x="627" y="382" class="title" font-size="12" text-anchor="middle" fill="#16a34a">Final Result</text>
-<text x="627" y="400" class="layerDesc" fill="#16a34a" text-anchor="middle">- 1.7~6.6x throughput</text>
-<text x="627" y="416" class="layerDesc" fill="#16a34a" text-anchor="middle">- 37% lower latency</text>
+<text x="627" y="400" class="layerDesc" fill="#16a34a" text-anchor="middle">- 1.2~12.6x throughput</text>
+<text x="627" y="416" class="layerDesc" fill="#16a34a" text-anchor="middle">- up to 88% lower latency</text>
 
 <line x1="610" y1="330" x2="627" y2="360" stroke="#86efac" stroke-width="1.5" stroke-dasharray="4,3"/>
 <polygon points="627,360 620,355 620,365" fill="#86efac"/>

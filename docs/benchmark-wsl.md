@@ -48,6 +48,22 @@
 | undertow | 9112 | Spring MVC + Undertow + 5 Filter + 3 Interceptor |
 | webflux | 9122 | Spring WebFlux + Reactor Netty + 8 WebFilter |
 
+## 对比框架版本
+
+与 [benchmark.md](benchmark.md#对比框架版本) 相同的二进制（项目 `spring-boot-dependencies` **3.2.12** BOM 实际解析）：
+
+| 框架 | 版本 |
+|------|------|
+| Spring MVC | **6.1.15**（Spring Framework） |
+| Spring WebFlux | **6.1.15**（Spring Framework） |
+| Tomcat | **10.1.33**（jakarta.servlet 6.0.0） |
+| Undertow | **2.3.17.Final** |
+| Reactor Netty | **1.1.24**（reactor-bom 2023.0.12 / reactor-core 3.6.12） |
+| Netty | **4.1.115.Final** |
+| Jackson | **2.17.2** |
+| OkHttp（JMH 客户端） | **4.12.0** |
+| JMH | **1.37** |
+
 ## 测试接口
 
 | 方法 | 端点 | 说明 |
@@ -140,6 +156,8 @@ perf 的性能优势来自框架设计层面的工程取舍，而非"Netty 比 T
 
 ## 如何复现
 
+> 本框架基准测试有两种运行模式（in-process / WSL external），一键脚本完整用法见 [Benchmark 运行指南](benchmark-run.md)。
+
 ```bash
 cd spring-web-benchmark
 # WSL external 模式一键全量（5 profile × 7 API，16 线程，吞吐+延迟双模式）
@@ -149,4 +167,4 @@ cd spring-web-benchmark
 # 报告输出：benchmark-reports/{run-id}/report.md
 ```
 
-> 数据基于 JDK 17 + WSL2 external 模式（`jfr=off`），同一环境公平对比，相对倍数即真实框架优势。本文数据来源：`benchmark-reports/20260811-005942`（thrpt,sample | 16/32/48 线程 | 2026-08-11）。标准环境（JDK 8 in-process）展示见 [benchmark.md](benchmark.md)。
+> 数据基于 JDK 17 + WSL2 external 模式（`jfr=off`），同一环境公平对比，相对倍数即真实框架优势。本文数据来源：`benchmark-reports/20260811-005942`（thrpt,sample | 16/32/48 线程 | 2026-08-11）。标准环境（JDK 17 in-process）展示见 [benchmark.md](benchmark.md)。

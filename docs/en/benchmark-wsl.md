@@ -48,6 +48,22 @@ The most striking finding: **perf's advantage keeps growing as concurrency incre
 | undertow | 9112 | Spring MVC + Undertow + 5 Filter + 3 Interceptor |
 | webflux | 9122 | Spring WebFlux + Reactor Netty + 8 WebFilter |
 
+## Framework Versions
+
+Same binaries as [benchmark.md](benchmark.md#framework-versions) (actual artifacts resolved from the project's `spring-boot-dependencies` **3.2.12** BOM):
+
+| Framework | Version |
+|-----------|---------|
+| Spring MVC | **6.1.15** (Spring Framework) |
+| Spring WebFlux | **6.1.15** (Spring Framework) |
+| Tomcat | **10.1.33** (jakarta.servlet 6.0.0) |
+| Undertow | **2.3.17.Final** |
+| Reactor Netty | **1.1.24** (reactor-bom 2023.0.12 / reactor-core 3.6.12) |
+| Netty | **4.1.115.Final** |
+| Jackson | **2.17.2** |
+| OkHttp (JMH client) | **4.12.0** |
+| JMH | **1.37** |
+
 ## Test Endpoints
 
 | Method | Endpoint | Description |
@@ -140,6 +156,8 @@ perf's advantage comes from deliberate engineering trade-offs at the framework-d
 
 ## How to Reproduce
 
+> Benchmarking supports two run modes (in-process / WSL external); full one-command usage is documented in the [Benchmark Run Guide](benchmark-run.md).
+
 ```bash
 cd spring-web-benchmark
 # One-command full WSL external run (5 profiles × 7 APIs, 16 threads, throughput + latency)
@@ -149,4 +167,4 @@ cd spring-web-benchmark
 # Report output: benchmark-reports/{run-id}/report.md
 ```
 
-> Data based on JDK 17 + WSL2 external mode (`jfr=off`), compared fairly in the same environment — relative multiples reflect the real framework advantage. This document's data source: `benchmark-reports/20260811-005942` (thrpt,sample | 16/32/48 threads | 2026-08-11). The standard environment (JDK 8 in-process) benchmark is documented in [benchmark.md](benchmark.md).
+> Data based on JDK 17 + WSL2 external mode (`jfr=off`), compared fairly in the same environment — relative multiples reflect the real framework advantage. This document's data source: `benchmark-reports/20260811-005942` (thrpt,sample | 16/32/48 threads | 2026-08-11). The standard environment (JDK 17 in-process) benchmark is documented in [benchmark.md](benchmark.md).

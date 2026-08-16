@@ -7,8 +7,8 @@ A high-performance Netty-based web framework, compatible with Spring MVC program
 [![CI](https://github.com/springperf/spring-web/actions/workflows/ci.yml/badge.svg)](https://github.com/springperf/spring-web/actions/workflows/ci.yml)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.springperf/spring-web)](https://central.sonatype.com/artifact/io.github.springperf/spring-web)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE.md)
-[![Throughput](https://img.shields.io/badge/Throughput-1.7~6.6x_vs_Spring_MVC-brightgreen?style=flat-square)](docs/en/benchmark.md)
-[![SSE](https://img.shields.io/badge/SSE-6.64x_under_high_concurrency-blue?style=flat-square)](docs/en/benchmark.md)
+[![Throughput](https://img.shields.io/badge/Throughput-1.2~12.6x_vs_Spring_MVC-brightgreen?style=flat-square)](docs/en/benchmark.md)
+[![SSE](https://img.shields.io/badge/SSE-7.7x_under_high_concurrency-blue?style=flat-square)](docs/en/benchmark.md)
 
 ---
 
@@ -18,7 +18,7 @@ A high-performance Netty-based web framework, compatible with Spring MVC program
 <img src="docs/images/perf-benchmark-en.svg" alt="Performance Benchmark Chart"/>
 </p>
 
-> **100% win rate** across all 7 APIs x 3 concurrency levels x 4 comparative frameworks. 37% lower latency, 41% less memory per request, 13% less heap usage.
+> **100% win rate** — perf is **#1 on all 7 APIs × 3 concurrency levels** vs Spring MVC (Tomcat/Undertow) and WebFlux, no exceptions. json p50 at 16 threads is just **69%** of Spring MVC, allocation per request **43%** of it, and heap at 4 threads is **24MB** (the lowest).
 >
 > [Full Benchmark Report](docs/en/benchmark.md) · [Performance Principles](docs/en/performance-principles.md)
 
@@ -51,7 +51,7 @@ Spring WebPerf is a high-performance web framework built on **Netty 4.1**, desig
 - **High Performance** — Pre-caches all metadata at startup, zero reflection and zero matching at runtime; ASM bytecode generation replaces reflective invocation; O(1) HashMap routing; GC-friendly design
 - **Netty-Driven** — Built on Netty 4.1 event-driven I/O; requests execute on EventLoop by default, with method-level `@RunInPool` scheduling to business thread pools as needed
 - **Spring Ecosystem Compatible** — Supports `@RestController`, `@RequestMapping`, `@Validated`, `@ExceptionHandler`, `HandlerInterceptor`, and other Spring annotations and abstractions — zero-code migration
-- **Async Native** — Built-in support for DeferredResult, Callable, SseEmitter, StreamEmitter, Reactive Streams; SSE throughput reaches 3.89x of Spring MVC, scaling to 6.64x under high concurrency
+- **Async Native** — Built-in support for DeferredResult, Callable, SseEmitter, StreamEmitter, Reactive Streams; SSE throughput reaches 12.63x of Spring MVC at 4 threads / 7.72x at 16 threads
 - **Batch Processing** — Disruptor-based request aggregation that transparently merges concurrent requests into batch operations, boosting throughput by multiple times; supports backpressure strategies, wait strategies, and thread pool isolation
 - **Extensible** — SPI at every key juncture: argument resolvers, return value handlers, codec interceptors, filters, interceptors
 - **Ecosystem Bridge** — The `support` module bridges Servlet Filters, Spring MVC `HandlerInterceptor`, `RequestBodyAdvice` / `ResponseBodyAdvice`
@@ -129,19 +129,19 @@ management:
 > Full report: [Benchmark Document](docs/en/benchmark.md)
 > Performance analysis: [Performance Principles](docs/en/performance-principles.md)
 
-JMH benchmark results on JDK 1.8 + G1GC (1GB heap, 4 threads):
+JMH benchmark results on JDK 17 + G1GC (1GB heap, 4 threads):
 
 | API | perf throughput | vs Spring MVC (Tomcat) | vs Spring MVC (Undertow) | vs WebFlux |
 |-----|---------------|-----------|-------------|-------------|
-| json | **26,718** ops/s | **1.90x** | **2.59x** | **1.73x** |
-| get | **27,398** ops/s | **2.19x** | **2.04x** | **2.08x** |
-| bytes | **34,232** ops/s | **1.71x** | **2.92x** | **1.99x** |
-| valid | **26,706** ops/s | **1.84x** | **1.95x** | **1.71x** |
-| async | **28,354** ops/s | **2.11x** | **2.79x** | **1.55x** |
-| bytesLarge | **11,508** ops/s | **2.31x** | **1.48x** | **1.49x** |
-| sse | **1,226** ops/s | **3.89x** | — | **1.30x** |
+| json | **37,508** ops/s | **1.88x** | **1.92x** | **2.07x** |
+| get | **38,538** ops/s | **2.26x** | **2.19x** | **2.49x** |
+| bytes | **42,017** ops/s | **1.56x** | **1.52x** | **1.69x** |
+| valid | **35,949** ops/s | **1.79x** | **1.81x** | **2.04x** |
+| async | **40,501** ops/s | **2.12x** | **2.31x** | **1.67x** |
+| bytesLarge | **18,250** ops/s | **1.82x** | **1.45x** | **1.55x** |
+| sse | **13,323** ops/s | **12.63x** | — | **5.08x** |
 
-The perf framework delivers **1.7\~3.9x** throughput over Servlet containers, with **0.12\~0.15ms** p50 latency (lowest among peers). SSE scales to **6.64x** Spring MVC under high concurrency. See [full comparison report](docs/en/benchmark.md).
+The perf framework delivers **1.6\~12.6x** throughput over Servlet containers, with **0.10\~0.11ms** p50 latency (lowest among peers). SSE reaches **12.63x** of Spring MVC at 4 threads and **7.72x** at 16 threads. See [full comparison report](docs/en/benchmark.md).
 
 ---
 
@@ -149,10 +149,10 @@ The perf framework delivers **1.7\~3.9x** throughput over Servlet containers, wi
 
 | Dimension | WebPerf | Spring MVC (Tomcat) |
 |-----------|-----------|---------------------|
-| Engine | Netty 4.1 | Servlet container (Tomcat/Jetty/Undertow) |
-| Throughput (json 4t) | **26,718** ops/s | 14,061 ops/s (1.90x) |
-| P50 Latency (bytes 4t) | **0.12ms** | 0.19ms |
-| Steady-state heap (4t) | **20MB** | 23MB |
+| Engine | Netty 4.1.115.Final | Spring MVC 6.1.15 + Tomcat 10.1.33 (Undertow 2.3.17.Final) |
+| Throughput (json 4t) | **37,508** ops/s | 19,900 ops/s (1.88x) |
+| P50 Latency (bytes 4t) | **0.10ms** | 0.15ms |
+| Steady-state heap (4t) | **24MB** | 26MB |
 | I/O model | Netty non-blocking transport + EventLoop | Servlet blocking I/O + container threads |
 | Thread model | EventLoop direct or `@RunInPool` on-demand | Fixed container thread pool |
 | Method invocation | ASM / MethodHandle (~10-30ns) | `Method.invoke()` reflection (~200ns) |

@@ -142,14 +142,14 @@ WebFlux（Netty 运行时，4,173 样本）与 MVC 问题模式高度相似，�
 
 ### 成果
 
-在 JDK 1.8 + G1GC (1GB heap) 的基准测试中，本框架在 8 个场景下全面领先：
+在 JDK 17 + G1GC (1GB heap) 的基准测试中，本框架在 7 个场景下全面领先：
 
-- 小包场景吞吐 **26K\~34K** ops/s（4 线程），是 Spring MVC 的 **1.71x\~2.11x**
-- P50 延迟 **0.12~0.15ms**，约为 Spring MVC 的 **50-60%**
-- 稳态堆占用 **20MB**（4 线程），约为 Spring MVC 的 **87%**
-- SSE 流式场景吞吐 **1,226** ops/s（4 线程），达到 Spring MVC 的 **3.89x**，高并发下扩展至 **6.64x**
+- 小包场景吞吐 **36K\~42K** ops/s（4 线程），是 Spring MVC 的 **1.56x\~2.26x**
+- P50 延迟 **0.10~0.11ms**，约为 Spring MVC 的 **45-67%**
+- 稳态堆占用 **24MB**（4 线程），约为 Spring MVC 的 **92%**
+- SSE 流式场景吞吐 **13,323** ops/s（4 线程），达到 Spring MVC 的 **12.63x**，16 线程下 **7.72x**
 
-> 详细数据见 [Benchmark 报告](benchmark.md)，技术原理见 [性能原理](performance-principles.md)。
+> 详细数据见 [Benchmark 报告](benchmark.md)，运行方式见 [Benchmark 运行指南](benchmark-run.md)，技术原理见 [性能原理](performance-principles.md)。
 
 ---
 
@@ -195,10 +195,10 @@ Servlet API 有二十年的生态积累：Spring Security Filter Chain、`Reques
 
 | 场景 | 理由 |
 |------|------|
-| **资源受限环境**（1c1g、2c2g） | 框架开销低，同等资源下吞吐是 Spring MVC 的 1.6~2.1x |
-| **高吞吐 API 服务** | 26K~34K ops/s 的吞吐能力，适合接口层卸载 |
-| **延迟敏感业务** | P50 0.12~0.15ms，是 Spring MVC 的 50% |
-| **SSE / 流式推送** | 无锁 Drain Loop 设计，吞吐达 Spring MVC 的 3.89x（4 线程），高并发下扩展至 6.64x |
+| **资源受限环境**（1c1g、2c2g） | 框架开销低，同等资源下吞吐是 Spring MVC 的 1.6~2.3x |
+| **高吞吐 API 服务** | 36K~42K ops/s 的吞吐能力，适合接口层卸载 |
+| **延迟敏感业务** | P50 0.10~0.11ms，是 Spring MVC 的 45-67% |
+| **SSE / 流式推送** | 无锁 Drain Loop 设计，吞吐达 Spring MVC 的 12.63x（4 线程）/ 7.72x（16 线程） |
 | **新启动的项目** | 从零开始的项目可以直接选用，无需迁移成本 |
 | **IoT / 设备接入** | 大量小请求、资源受限的典型场景（也是本项目缘起的场景） |
 
@@ -270,11 +270,11 @@ AI 编程（Copilot、Cursor、Claude Code 等）已深度融入日常开发。�
 
 大模型应用的核心交互模式是**流式输出**：Token 逐个生成、实时推送。无论是 ChatGPT 的逐字回复、Agent 的任务状态流，还是 RAG 的检索进度反馈，底层都依赖 **SSE (Server-Sent Events)** 协议。
 
-然而 SSE 在传统 Servlet 容器上性能表现不佳——Spring MVC 的 SSE 吞吐仅约 **315 ops/s**（4 线程），成为 AI 应用链路的瓶颈。本项目的 SSE 吞吐达到 **1,226 ops/s**，是 Spring MVC 的 **3.89x**，高并发下扩展至 **6.64x**。支撑这一性能的是 **NettyStreamSender** 的无锁 Drain Loop 设计：写入操作不依赖线程池调度，直接在 EventLoop 上完成批量刷新，避免传统 Servlet 容器中 SSE 连接独占线程的问题。
+然而 SSE 在传统 Servlet 容器上性能表现不佳——Spring MVC 的 SSE 吞吐仅约 **1,055 ops/s**（4 线程），成为 AI 应用链路的瓶颈。本项目的 SSE 吞吐达到 **13,323 ops/s**，是 Spring MVC 的 **12.63x**，16 线程下 **7.72x**。支撑这一性能的是 **NettyStreamSender** 的无锁 Drain Loop 设计：写入操作不依赖线程池调度，直接在 EventLoop 上完成批量刷新，避免传统 Servlet 容器中 SSE 连接独占线程的问题。
 
 这意味着：
 
-- 同样的服务器资源，可以支撑 **4.5 倍**的并发 SSE 连接数
+- 同样的服务器资源，可以支撑 **12.6 倍**的并发 SSE 连接数
 - 每路 Token 推送的延迟更低，用户感知的"首字时间"更短
 - 在 AI Gateway、LLM Proxy、流式推理服务等场景中，本项目可以直接替代 Nginx/Envoy 等代理层，在应用层完成高性能流式转发
 
@@ -295,5 +295,6 @@ AI 时代比以往任何时候都更需要关注基础设施层的效率——�
 - [模块详解](modules.md) — 各模块职责与内部设计
 - [扩展点指南](extensions.md) — 所有 SPI 与自定义方式
 - [高级主题](advanced.md) — 异步、流式、响应式、性能优化
+- [Benchmark 运行指南](benchmark-run.md) — 两种模式一键运行
 - [Benchmark 报告](benchmark.md) — 完整性能对比数据
 - [性能原理](performance-principles.md) — 性能优化技术详解
