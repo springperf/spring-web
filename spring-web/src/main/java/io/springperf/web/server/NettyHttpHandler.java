@@ -2,9 +2,10 @@ package io.springperf.web.server;
 
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpUtil;
+import io.netty.util.ReferenceCountUtil;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.http.NettyServerHttpRequest;
 import io.springperf.web.http.NettyServerHttpResponse;
@@ -20,10 +21,13 @@ import org.springframework.http.HttpStatus;
  *   <li>异常兜底（ResponseStatusException → 特定状态码，其余 → 500）</li>
  * </ol>
  * <p>contextPath 为空字符串时不执行前缀校验。</p>
+ *
+ * <p>继承 {@link ChannelInboundHandlerAdapter} 手动管理消息释放，
+ * 配合 {@link ChannelHandler.Sharable} 在多 pipeline 中安全共享。</p>
  */
 @Slf4j
 @ChannelHandler.Sharable
-public class NettyHttpHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
+public class NettyHttpHandler extends ChannelInboundHandlerAdapter {
 
     private final WebContext webContext;
     private final String contextPath;
@@ -48,7 +52,20 @@ public class NettyHttpHandler extends SimpleChannelInboundHandler<FullHttpReques
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctxNetty, FullHttpRequest msg) {
+    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+        if (!(msg instanceof FullHttpRequest)) {
+            ctx.fireChannelRead(msg);
+            return;
+        }
+        FullHttpRequest request = (FullHttpRequest) msg;
+        try {
+            handleRequest(ctx, request);
+        } finally {
+            ReferenceCountUtil.release(request);
+        }
+    }
+
+    private void handleRequest(ChannelHandlerContext ctxNetty, FullHttpRequest msg) {
         // 关闭中：拒绝新请求
         if (shuttingDown) {
             NettyServerHttpResponse resp = new NettyServerHttpResponse(webContext, ctxNetty, false);
