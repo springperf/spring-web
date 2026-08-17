@@ -44,7 +44,7 @@ class NettyHttpHandlerErrorPathTest {
 
         DefaultFullHttpRequest request = new DefaultFullHttpRequest(
                 HttpVersion.HTTP_1_1, HttpMethod.GET, "/other");
-        nettyHandler.channelRead0(channel.pipeline().firstContext(), request);
+        nettyHandler.channelRead(channel.pipeline().firstContext(), request);
 
         verify(handler, never()).httpHandle(any(), any());
 
@@ -61,7 +61,7 @@ class NettyHttpHandlerErrorPathTest {
 
         DefaultFullHttpRequest request = new DefaultFullHttpRequest(
                 HttpVersion.HTTP_1_1, HttpMethod.GET, "/test");
-        nettyHandler.channelRead0(channel.pipeline().firstContext(), request);
+        nettyHandler.channelRead(channel.pipeline().firstContext(), request);
 
         verify(handler).httpHandle(any(WebServerHttpRequest.class), any(WebServerHttpResponse.class));
     }
@@ -74,7 +74,7 @@ class NettyHttpHandlerErrorPathTest {
 
         DefaultFullHttpRequest request = new DefaultFullHttpRequest(
                 HttpVersion.HTTP_1_1, HttpMethod.GET, "/app");
-        nettyHandler.channelRead0(channel.pipeline().firstContext(), request);
+        nettyHandler.channelRead(channel.pipeline().firstContext(), request);
 
         verify(handler).httpHandle(any(WebServerHttpRequest.class), any(WebServerHttpResponse.class));
     }
@@ -87,7 +87,7 @@ class NettyHttpHandlerErrorPathTest {
 
         DefaultFullHttpRequest request = new DefaultFullHttpRequest(
                 HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/hello");
-        nettyHandler.channelRead0(channel.pipeline().firstContext(), request);
+        nettyHandler.channelRead(channel.pipeline().firstContext(), request);
 
         verify(handler).httpHandle(any(WebServerHttpRequest.class), any(WebServerHttpResponse.class));
     }
@@ -103,7 +103,7 @@ class NettyHttpHandlerErrorPathTest {
 
         DefaultFullHttpRequest request = new DefaultFullHttpRequest(
                 HttpVersion.HTTP_1_1, HttpMethod.GET, "/test");
-        nettyHandler.channelRead0(channel.pipeline().firstContext(), request);
+        nettyHandler.channelRead(channel.pipeline().firstContext(), request);
 
         verify(handler).httpHandle(any(), any());
 
