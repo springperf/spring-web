@@ -25,6 +25,7 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
     private Consumer<Throwable> errorHandler;
     private Runnable completionHandler;
     private Consumer<Throwable> writeCallbackHandler;
+    private Runnable asyncReadyCallback;
 
     protected PerfAsyncWebRequest(WebServerHttpRequest request, WebServerHttpResponse response) {
         super(request, response);
@@ -62,19 +63,16 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
             throw new IllegalStateException("Async already started");
         }
         response.addWriteRespEventListener(this);
-        scheduleTimeoutIfNecessary();
     }
 
-    private void scheduleTimeoutIfNecessary() {
+    public void scheduleTimeoutIfNeeded() {
         if (timeoutMillis <= 0 || timeoutHandler == null) {
             return;
         }
+        if (state.get() != State.ASYNC_STARTED) {
+            return;
+        }
         response.setTimeout(() -> {
-            // 仅当仍处于 ASYNC_STARTED（尚未 dispatch/complete）才触发超时。
-            // 修复前先 CAS(ASYNC_STARTED→COMPLETED) 再跑 timeoutHandler，而 timeoutHandler
-            // 内部 setConcurrentResultAndDispatch 因 isAsyncComplete() 直接 return——
-            // 超时结果被丢弃、响应悬挂。这里不占用状态，由 setConcurrentResultAndDispatch
-            // 的 concurrentResult 检查 + dispatch 的 CAS 与业务线程完成线性化。
             if (state.get() != State.ASYNC_STARTED) {
                 return;
             }
@@ -178,6 +176,17 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
 
     public void addWriteCallbackHandler(Consumer<Throwable> handler) {
         this.writeCallbackHandler = handler;
+    }
+
+    public void setAsyncReadyCallback(Runnable callback) {
+        this.asyncReadyCallback = callback;
+    }
+
+    public void executeAsyncReadyCallback() {
+        if (asyncReadyCallback != null) {
+            asyncReadyCallback.run();
+            asyncReadyCallback = null;
+        }
     }
 
     @Override
