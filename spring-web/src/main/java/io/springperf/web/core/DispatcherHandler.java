@@ -85,7 +85,7 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
     }
 
     protected void handleWithMappingResult(WebServerHttpRequest req, WebServerHttpResponse resp, MappingResult mappingResult) {
-        // 通过 BizPoolRegistry 使用 Phase3 预缓存的线程池，无映射或未标注 @RunInPool 时为 null → EventLoop 同步处理
+        // 通过 BizPoolRegistry 用 Phase3 预缓存的线程池：返回 null（无映射 / @RunInPool(EVENTLOOP) / default-execute-mode=eventloop）→ EventLoop 同步；返回非 null（缺省 default 池 / @RunInPool 命名池）→ 切业务线程
         ExecutorService executor = bizPoolRegistry.determinePool(req, mappingResult);
         if (executor != null) {
             req.acquire();
@@ -224,6 +224,11 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
             if (AsyncSupportUtils.isAsyncRequest(req)) {
                 interceptorRegistry.afterConcurrentHandlingStarted(req, resp);
                 req.getRequestContext().setAttribute(METRICS_START_ATTR, start);
+                try {
+                    AsyncSupportUtils.getAsyncWebRequest(req, resp).executeAsyncReadyCallback();
+                } catch (Throwable ex) {
+                    handleException(ex, req, resp);
+                }
             } else {
                 // preHandle 未通过（返回 false 或抛异常）时，afterCompletion 已由
                 // InterceptorRegistry.preHandle 对已通过者回调完毕，此处跳过全量回调

@@ -92,9 +92,7 @@ public class AsyncSupportRegistry extends WebComponentContainer {
             asyncWebRequest.setTimeout(defaultTimeout);
         }
         AsyncTaskExecutor executor = webAsyncTask.getExecutor();
-        if (executor == null) {
-            executor = defaultTaskExecutor;
-        }
+        AsyncTaskExecutor effectiveExecutor = executor != null ? executor : defaultTaskExecutor;
 
         Callable<?> callable = webAsyncTask.getCallable();
         WebAsyncSupportUtils.CallableInterceptorChainAdapter interceptorChain = WebAsyncSupportUtils.newCallableInterceptorChain(webAsyncTask, callableInterceptors);
@@ -118,25 +116,27 @@ public class AsyncSupportRegistry extends WebComponentContainer {
 
         interceptorChain.applyBeforeConcurrentHandling(asyncWebRequest, callable);
         asyncWebRequest.startAsyncProcessing();
-        try {
-            Future<?> future = executor.submit(() -> {
-                Object result = null;
-                try {
-                    interceptorChain.applyPreProcess(asyncWebRequest, callable);
-                    result = callable.call();
-                } catch (Throwable ex) {
-                    result = ex;
-                } finally {
-                    result = interceptorChain.applyPostProcess(asyncWebRequest, callable, result);
-                }
+        asyncWebRequest.setAsyncReadyCallback(() -> {
+            try {
+                Future<?> future = effectiveExecutor.submit(() -> {
+                    Object result = null;
+                    try {
+                        interceptorChain.applyPreProcess(asyncWebRequest, callable);
+                        result = callable.call();
+                    } catch (Throwable ex) {
+                        result = ex;
+                    } finally {
+                        result = interceptorChain.applyPostProcess(asyncWebRequest, callable, result);
+                    }
+                    asyncWebRequest.setConcurrentResultAndDispatch(result);
+                });
+                interceptorChain.setTaskFuture(future);
+            } catch (RejectedExecutionException ex) {
+                Object result = interceptorChain.applyPostProcess(asyncWebRequest, callable, ex);
                 asyncWebRequest.setConcurrentResultAndDispatch(result);
-            });
-            interceptorChain.setTaskFuture(future);
-        } catch (RejectedExecutionException ex) {
-            Object result = interceptorChain.applyPostProcess(asyncWebRequest, callable, ex);
-            asyncWebRequest.setConcurrentResultAndDispatch(result);
-            throw ex;
-        }
+            }
+            asyncWebRequest.scheduleTimeoutIfNeeded();
+        });
     }
 
     public void startDeferredResultProcessing(WebServerHttpRequest req, WebServerHttpResponse resp, DeferredResult<?> deferredResult) throws Exception {
@@ -175,14 +175,17 @@ public class AsyncSupportRegistry extends WebComponentContainer {
 
         interceptorChain.applyBeforeConcurrentHandling(asyncWebRequest, deferredResult);
         asyncWebRequest.startAsyncProcessing();
-        try {
-            interceptorChain.applyPreProcess(asyncWebRequest, deferredResult);
-            deferredResult.setResultHandler(result -> {
-                result = interceptorChain.applyPostProcess(asyncWebRequest, deferredResult, result);
-                asyncWebRequest.setConcurrentResultAndDispatch(result);
-            });
-        } catch (Throwable ex) {
-            asyncWebRequest.setConcurrentResultAndDispatch(ex);
-        }
+        asyncWebRequest.setAsyncReadyCallback(() -> {
+            try {
+                interceptorChain.applyPreProcess(asyncWebRequest, deferredResult);
+                deferredResult.setResultHandler(result -> {
+                    result = interceptorChain.applyPostProcess(asyncWebRequest, deferredResult, result);
+                    asyncWebRequest.setConcurrentResultAndDispatch(result);
+                });
+            } catch (Throwable ex) {
+                asyncWebRequest.setConcurrentResultAndDispatch(ex);
+            }
+            asyncWebRequest.scheduleTimeoutIfNeeded();
+        });
     }
 }
