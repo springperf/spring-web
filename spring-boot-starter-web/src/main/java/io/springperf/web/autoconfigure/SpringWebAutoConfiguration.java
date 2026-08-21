@@ -59,8 +59,9 @@ public class SpringWebAutoConfiguration {
 
     @Bean
     @ConditionalOnProperty(name = "server.accesslog.enabled", havingValue = "true")
-    public AccessLogWebFilter accessLogWebFilter() {
-        return new AccessLogWebFilter();
+    public AccessLogWebFilter accessLogWebFilter(Environment environment) {
+        String format = environment.getProperty("server.accesslog.format");
+        return new AccessLogWebFilter(format);
     }
 
     /**

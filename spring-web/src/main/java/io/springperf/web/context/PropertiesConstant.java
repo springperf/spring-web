@@ -53,7 +53,8 @@ public final class PropertiesConstant {
 
     /**
      * 无 {@code @RunInPool} 注解时方法的默认执行位置。
-     * 值 "eventloop"（默认）表示在 Netty EventLoop 执行，
+     * 值 "default"（默认）表示在 default 业务线程池执行，
+     * 值 "eventloop" 表示在 Netty EventLoop 执行，
      * 其他字符串被视为线程池名称。
      */
     public static final String POOL_DEFAULT_EXECUTE_MODE = "pool.default-execute-mode";
@@ -111,10 +112,48 @@ public final class PropertiesConstant {
     public static final String HTTP_MAX_CHUNK_SIZE = "server.http.max-chunk-size";
     public static final int HTTP_MAX_CHUNK_SIZE_DEFAULT = 8192;
 
+    // ---- Netty ChannelOption ----
+
+    /** Netty boss event loop thread count (默认值：1). */
+    public static final String SERVER_NETTY_BOSS_THREADS = "server.netty.boss-threads";
+    public static final int SERVER_NETTY_BOSS_THREADS_DEFAULT = 1;
+
+    /** TCP listen backlog (默认值：128). */
+    public static final String SERVER_NETTY_SO_BACKLOG = "server.netty.so-backlog";
+    public static final int SERVER_NETTY_SO_BACKLOG_DEFAULT = 128;
+
+    /** TCP_NODELAY, disable Nagle's algorithm (默认值：true). */
+    public static final String SERVER_NETTY_TCP_NODELAY = "server.netty.tcp-nodelay";
+    public static final boolean SERVER_NETTY_TCP_NODELAY_DEFAULT = true;
+
+    /** SO_KEEPALIVE (默认值：false). */
+    public static final String SERVER_NETTY_SO_KEEPALIVE = "server.netty.so-keepalive";
+    public static final boolean SERVER_NETTY_SO_KEEPALIVE_DEFAULT = false;
+
+    /** SO_REUSEADDR (默认值：true). */
+    public static final String SERVER_NETTY_SO_REUSEADDR = "server.netty.so-reuseaddr";
+    public static final boolean SERVER_NETTY_SO_REUSEADDR_DEFAULT = true;
+
+    /** ByteBuf allocator type: "pooled" or "unpooled" (默认值：pooled). */
+    public static final String SERVER_NETTY_ALLOCATOR_TYPE = "server.netty.allocator-type";
+    public static final String SERVER_NETTY_ALLOCATOR_TYPE_DEFAULT = "pooled";
+
+    /** Max request body bytes kept in-memory before switching to ByteBuf duplicate (默认值：4KB). */
+    public static final String HTTP_MAX_IN_MEMORY_SIZE = "server.http.max-in-memory-size";
+    public static final int HTTP_MAX_IN_MEMORY_SIZE_DEFAULT = 4096;
+
     // ---- 访问日志 ----
 
     /** Enable access log. */
     public static final String ACCESSLOG_ENABLED = "server.accesslog.enabled";
+
+    /**
+     * Access log format pattern.
+     * Supported tokens: %h (remote addr), %m (method), %U (URI), %T (elapsed ms),
+     * %s (status), %u (user-agent), literal text otherwise.
+     * Default: "%h %m %U %Tms %s \"%u\""
+     */
+    public static final String ACCESSLOG_FORMAT = "server.accesslog.format";
 
     // ========== 默认值查询 ==========
 
@@ -136,6 +175,9 @@ public final class PropertiesConstant {
         DEFAULTS.put(HTTP_MAX_INITIAL_LINE_LENGTH, (long) HTTP_MAX_INITIAL_LINE_LENGTH_DEFAULT);
         DEFAULTS.put(HTTP_MAX_HEADER_SIZE, (long) HTTP_MAX_HEADER_SIZE_DEFAULT);
         DEFAULTS.put(HTTP_MAX_CHUNK_SIZE, (long) HTTP_MAX_CHUNK_SIZE_DEFAULT);
+        DEFAULTS.put(SERVER_NETTY_BOSS_THREADS, (long) SERVER_NETTY_BOSS_THREADS_DEFAULT);
+        DEFAULTS.put(SERVER_NETTY_SO_BACKLOG, (long) SERVER_NETTY_SO_BACKLOG_DEFAULT);
+        DEFAULTS.put(HTTP_MAX_IN_MEMORY_SIZE, (long) HTTP_MAX_IN_MEMORY_SIZE_DEFAULT);
     }
 
     /**

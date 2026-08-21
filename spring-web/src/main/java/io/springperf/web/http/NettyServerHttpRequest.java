@@ -38,11 +38,13 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
 
     private final ChannelHandlerContext ctx;
     private final FullHttpRequest request;
+    private final int largeBodyLimit;
     private HttpHeaders headers;
     private URI uri;
-    private static final int LARGE_BODY_LIMIT = 4096;
     private static final byte[] EMPTY_BODY = new byte[0];
     private static final String FORM_URLENCODED = HttpHeaderValues.APPLICATION_X_WWW_FORM_URLENCODED.toString();
+    /** 静态缓存，避免每个请求重复读取属性。首次构造时初始化一次。 */
+    private static int cachedLargeBodyLimit = -1;
 
     private volatile byte[] body;
     private ByteBuf largeBodyBuf;
@@ -55,6 +57,10 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
         super(webContext, request.uri(), resolvedPath);
         this.ctx = ctx;
         this.request = request;
+        if (cachedLargeBodyLimit == -1) {
+            cachedLargeBodyLimit = webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_IN_MEMORY_SIZE);
+        }
+        this.largeBodyLimit = cachedLargeBodyLimit;
     }
 
     public FullHttpRequest getNativeRequest() {
@@ -237,7 +243,7 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
                 if (body == null) {
                     ByteBuf content = request.content();
                     int size = content.readableBytes();
-                    if (size <= LARGE_BODY_LIMIT) {
+                    if (size <= largeBodyLimit) {
                         body = ByteBufUtil.getBytes(content);
                     } else {
                         // duplicate() 创建共享视图但不递增 refCnt：largeBodyBuf 不持有独立引用，
