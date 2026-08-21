@@ -44,8 +44,7 @@ classes
 .metadata
 .git
 # AI 辅助配置文件
-/.claude/hook/
-/.claude/settings.local.json
+/.claude/
 .env
 /spring-web-benchmark/benchmark-reports/
 /docs/superpowers/
