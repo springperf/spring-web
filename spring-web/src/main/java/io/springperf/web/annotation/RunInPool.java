@@ -9,6 +9,7 @@ import java.lang.annotation.Target;
 
 /**
  * 标注在 HandlerMethod 上，指定该方法应运行在哪个业务线程池中。
+ * 也可作为元注解，用于自定义组合注解（如 {@code @RunInEventloop}）。
  * <p>
  * 默认值 "default" 对应全局配置 {@code pool.*} 创建的线程池。
  * 不标注此注解的方法默认在 {@code default} 业务线程池中执行，
@@ -30,7 +31,7 @@ import java.lang.annotation.Target;
  *
  * @see BizPoolRegistry
  */
-@Target(ElementType.METHOD)
+@Target({ElementType.METHOD, ElementType.ANNOTATION_TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface RunInPool {
 

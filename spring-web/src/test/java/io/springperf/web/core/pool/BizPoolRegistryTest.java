@@ -1,5 +1,6 @@
 package io.springperf.web.core.pool;
 
+import io.springperf.web.annotation.RunInEventloop;
 import io.springperf.web.annotation.RunInPool;
 import io.springperf.web.context.BaseWebComponent;
 import io.springperf.web.context.WebContext;
@@ -120,6 +121,33 @@ class BizPoolRegistryTest {
     static class EventLoopCtrl {
         @RunInPool(RunInPool.EVENTLOOP)
         public void withEventLoopPool() {
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // @RunInEventloop（元注解）→ 等价于 @RunInPool(EVENTLOOP)
+    // ---------------------------------------------------------------
+
+    @Test
+    void determinePool_withRunInEventloopMetaAnnotation_returnsNull() {
+        registry.register("default", new ThreadPoolExecutor(1, 1, 0,
+                TimeUnit.SECONDS, new LinkedBlockingQueue<>()));
+        MappingHandlerMethod mhm = mappingHandler(RunInEventloopCtrl.class, "withRunInEventloop");
+        assertNull(registry.determinePool(mhm));
+    }
+
+    @Test
+    void determinePool_withRunInEventloopMetaAnnotation_resultIsCached() {
+        registry.register("default", new ThreadPoolExecutor(1, 1, 0,
+                TimeUnit.SECONDS, new LinkedBlockingQueue<>()));
+        MappingHandlerMethod mhm = mappingHandler(RunInEventloopCtrl.class, "withRunInEventloop");
+        assertNull(registry.determinePool(mhm));
+        assertNull(registry.determinePool(mhm));
+    }
+
+    static class RunInEventloopCtrl {
+        @RunInEventloop
+        public void withRunInEventloop() {
         }
     }
 
