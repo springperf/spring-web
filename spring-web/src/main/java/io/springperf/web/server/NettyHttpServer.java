@@ -1,6 +1,9 @@
 package io.springperf.web.server;
 
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
@@ -61,7 +64,8 @@ public class NettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
         DispatcherHandler dispatcher = webContext.getWebComponent(DispatcherHandler.class);
         this.httpHandler = new NettyHttpHandler(webContext, webContext.getContextPath(), dispatcher);
         int port = webContext.getProps().getInt(PropertiesConstant.SERVER_PORT);
-        bossGroup = new NioEventLoopGroup(1);
+        int bossThreads = webContext.getProps().getInt(PropertiesConstant.SERVER_NETTY_BOSS_THREADS);
+        bossGroup = new NioEventLoopGroup(bossThreads);
         int workerThreads = webContext.getProps().getInt(PropertiesConstant.SERVER_NETTY_WORKERS);
         workerGroup = workerThreads > 0 ? new NioEventLoopGroup(workerThreads) : new NioEventLoopGroup();
         // 收集模块注入的额外 ChannelHandler（如 WebSocket 握手处理器）
@@ -72,7 +76,16 @@ public class NettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
         ServerBootstrap bootstrap = new ServerBootstrap();
         bootstrap.group(bossGroup, workerGroup)
                 .channel(NioServerSocketChannel.class)
-                .childOption(ChannelOption.TCP_NODELAY, true)
+                .option(ChannelOption.SO_BACKLOG,
+                        webContext.getProps().getInt(PropertiesConstant.SERVER_NETTY_SO_BACKLOG))
+                .childOption(ChannelOption.TCP_NODELAY,
+                        webContext.getProps().getBoolean(PropertiesConstant.SERVER_NETTY_TCP_NODELAY, PropertiesConstant.SERVER_NETTY_TCP_NODELAY_DEFAULT))
+                .childOption(ChannelOption.SO_KEEPALIVE,
+                        webContext.getProps().getBoolean(PropertiesConstant.SERVER_NETTY_SO_KEEPALIVE, PropertiesConstant.SERVER_NETTY_SO_KEEPALIVE_DEFAULT))
+                .childOption(ChannelOption.SO_REUSEADDR,
+                        webContext.getProps().getBoolean(PropertiesConstant.SERVER_NETTY_SO_REUSEADDR, PropertiesConstant.SERVER_NETTY_SO_REUSEADDR_DEFAULT))
+                .childOption(ChannelOption.ALLOCATOR,
+                        resolveAllocator(webContext.getProps().get(PropertiesConstant.SERVER_NETTY_ALLOCATOR_TYPE, PropertiesConstant.SERVER_NETTY_ALLOCATOR_TYPE_DEFAULT)))
                 .childOption(ChannelOption.WRITE_BUFFER_WATER_MARK,
                         new WriteBufferWaterMark(
                                 webContext.getProps().getInt(PropertiesConstant.WRITE_BUFFER_LOW_WATERMARK),
@@ -147,7 +160,7 @@ public class NettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
                 serverChannel.close().sync();
             }
 
-            // EventLoop 关闭已移至 destroyComponent()，在 BatchRegistry / BizPoolRegistry 等组件排空后执行
+            // EventLoop 关闭已移至 destroyComponent()，在 BizPoolRegistry 等业务组件排空后执行
         } catch (Exception e) {
             log.error(e.getMessage(), e);
         } finally {
@@ -185,6 +198,16 @@ public class NettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
      */
     public EventLoopGroup getWorkerGroup() {
         return workerGroup;
+    }
+
+    /**
+     * Resolve ByteBufAllocator by type name.
+     * @param type "pooled" (default) or "unpooled"
+     */
+    private static ByteBufAllocator resolveAllocator(String type) {
+        return "unpooled".equalsIgnoreCase(type)
+                ? UnpooledByteBufAllocator.DEFAULT
+                : PooledByteBufAllocator.DEFAULT;
     }
 
     @Override
