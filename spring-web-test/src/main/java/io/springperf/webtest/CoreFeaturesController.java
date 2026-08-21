@@ -1,5 +1,6 @@
 package io.springperf.webtest;
 
+import io.springperf.web.annotation.RunInEventloop;
 import io.springperf.web.annotation.RunInPool;
 import io.springperf.web.core.async.stream.StreamJsonEmitter;
 import io.springperf.web.core.async.stream.TextStreamEmitter;
@@ -235,6 +236,15 @@ public class CoreFeaturesController {
     @GetMapping("/pool/event-loop")
     @RunInPool(RunInPool.EVENTLOOP)
     public Map<String, Object> runInEventLoop() {
+        Map<String, Object> m = new HashMap<>();
+        m.put("thread", Thread.currentThread().getName());
+        m.put("isVirtual", isVirtualThread(Thread.currentThread()));
+        return m;
+    }
+
+    @GetMapping("/pool/run-in-eventloop")
+    @RunInEventloop
+    public Map<String, Object> runInEventloopMetaAnnotation() {
         Map<String, Object> m = new HashMap<>();
         m.put("thread", Thread.currentThread().getName());
         m.put("isVirtual", isVirtualThread(Thread.currentThread()));

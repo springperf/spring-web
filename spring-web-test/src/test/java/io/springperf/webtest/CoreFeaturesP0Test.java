@@ -327,6 +327,23 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     }
 
     @Test
+    void runInEventloopMetaAnnotation_usesEventLoopThread() throws Exception {
+        Request req = new Request.Builder()
+                .url(coreUrl + "/pool/run-in-eventloop")
+                .get()
+                .build();
+        try (Response resp = CLIENT.newCall(req).execute()) {
+            assertEquals(200, resp.code());
+            Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
+            String threadName = (String) body.get("thread");
+            assertNotNull(threadName, "Thread name should be present");
+            assertTrue(threadName.contains("nioEventLoopGroup")
+                            || threadName.contains("eventLoop"),
+                    "Event loop thread should contain event loop identifier, got: " + threadName);
+        }
+    }
+
+    @Test
     void runInBizPool_usesBizPoolThread() throws Exception {
         Request req = new Request.Builder()
                 .url(coreUrl + "/pool/biz-pool")
