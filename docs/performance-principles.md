@@ -200,7 +200,7 @@ try {
 
 ### 手段
 
-`DispatcherHandler.handleWithFullMatch()` 中，如果控制器**没有**标注 `@RunInPool`，默认在 `default` 业务线程池中执行（通过 `pool.*` 配置）。轻量端点可通过 `@RunInPool(RunInPool.EVENTLOOP)` 显式切换到 EventLoop，或通过 `pool.default-execute-mode=eventloop` 全局配置。
+`DispatcherHandler.handleWithMappingResult()` 中，如果控制器**没有**标注 `@RunInPool`，默认在 `default` 业务线程池中执行（通过 `pool.*` 配置）。轻量端点可通过 `@RunInPool(RunInPool.EVENTLOOP)` 显式切换到 EventLoop，或通过 `pool.default-execute-mode=eventloop` 全局配置。
 
 ### 关键理解：这不是"替你做优化"，而是"给你选择权"
 
