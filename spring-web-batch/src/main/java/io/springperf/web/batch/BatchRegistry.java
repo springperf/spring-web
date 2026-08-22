@@ -15,6 +15,7 @@ import io.springperf.web.core.pool.BizPoolRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.MethodParameter;
+import org.springframework.core.ResolvableType;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
@@ -113,9 +114,11 @@ public class BatchRegistry extends BaseWebComponent {
     /**
      * 创建 BatchRequest 子类的合成返回类型，使 ReturnValueResolverRegistry
      * 能正确解析泛型内联类型（如 EchoBatchRequest extends BatchRequest<String> 中的 String）。
+     * 通过 ResolvableType 沿继承链向上查找，支持多层继承场景。
      */
     private static MethodParameter createEffectiveReturnType(BatchRequestMetaData meta) {
         Class<? extends BatchRequest<?>> requestType = meta.requestType();
+        Type effectiveGenericType = resolveBatchRequestGenericType(requestType);
         return new MethodParameter(meta.batchMethod(), -1) {
             @Override
             public Class<?> getParameterType() {
@@ -123,8 +126,13 @@ public class BatchRegistry extends BaseWebComponent {
             }
             @Override
             public Type getGenericParameterType() {
-                return requestType.getGenericSuperclass();
+                return effectiveGenericType != null ? effectiveGenericType : requestType.getGenericSuperclass();
             }
         };
+    }
+
+    private static Type resolveBatchRequestGenericType(Class<?> requestType) {
+        ResolvableType rt = ResolvableType.forClass(requestType).as(BatchRequest.class);
+        return rt.hasGenerics() ? rt.getType() : null;
     }
 }

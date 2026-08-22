@@ -23,6 +23,9 @@ public class BufferingBatchHandler implements EventHandler<BatchEvent> {
     private final int maxBatchSize;
     private final BatchMetrics metrics;
 
+    // 线程安全依赖：onEvent() 由 Disruptor 单消费者线程串行调用，
+    // flushRemaining() 在 disruptor.shutdown() 之后、事件处理器已停止时调用。
+    // 两者不会并发，因此 ArrayList 无需额外同步。
     private List<BatchRequest<?>> buffer = new ArrayList<>();
 
     public BufferingBatchHandler(Executor executor,
