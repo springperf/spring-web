@@ -82,9 +82,8 @@ class DisruptorQueueNormalizeTest {
     }
 
     @Test
-    void largeButMemorySafePowerOfTwoStays() {
-        // 2^20（1M）槽位预分配约 24MB，构造器仅 warn 不阻止的有意大队列，
-        // 不在 C12 防御范围内，应原样保留
-        assertThat(DisruptorQueue.normalizeRingBufferSize(1 << 20)).isEqualTo(1 << 20);
+    void largeButMemorySafePowerOfTwoClamped() {
+        // 超过 2^18 的尺寸一律钳制到安全上限 2^18（262144 槽位，预分配约 6MB）
+        assertThat(DisruptorQueue.normalizeRingBufferSize(1 << 20)).isEqualTo(1 << 18);
     }
 }

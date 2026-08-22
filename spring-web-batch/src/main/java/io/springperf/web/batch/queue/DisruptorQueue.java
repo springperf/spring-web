@@ -193,15 +193,11 @@ public class DisruptorQueue {
 
     static int normalizeRingBufferSize(int size) {
         if (size <= 0) return 4096;
-        // C8：禁止退化尺寸。ringBufferSize=1 意味着单槽队列，并发批处理下灾难性
-        // 背压/丢请求；<64 一律提升到最小可用尺寸 64。
         if (size < 64) return 64;
         int result = Integer.highestOneBit(size);
         if (result < size) result <<= 1;
-        // C12：result 溢出为负（size > 2^30）或恰好等于 2^30 时都不能用——Disruptor
-        // RingBuffer 构造时按 capacity 预分配全部 BatchEvent 槽位，2^30 槽位 × ~24B
-        // ≈ 25GB+ 堆，任何 -Xmx 都必然 OOM（2^30 只是 int 里最大 2 的幂，不是内存安全
-        // 容量）。回退到构造器 warn 声明的最大合理容量 2^18（262144，预分配 ~6MB）。
-        return result > 0 && result < (1 << 30) ? result : 1 << 18;
+        // 钳制到安全上限 2^18（262144 槽位，预分配约 6MB）。
+        // 左移溢出（result < 0）或超过上限时回退到最大合理容量。
+        return result > 0 && result <= (1 << 18) ? result : 1 << 18;
     }
 }

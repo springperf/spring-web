@@ -159,10 +159,17 @@ public class BatchScanner {
         if (!(raw instanceof Class) || !List.class.isAssignableFrom((Class<?>) raw)) return null;
 
         Type[] args = pType.getActualTypeArguments();
-        if (args.length > 0 && args[0] instanceof Class) {
-            Class<?> arg = (Class<?>) args[0];
-            if (BatchRequest.class.isAssignableFrom(arg)) {
-                return (Class<? extends BatchRequest<?>>) arg;
+        if (args.length == 0) return null;
+        Type arg = args[0];
+        if (arg instanceof Class) {
+            Class<?> argClass = (Class<?>) arg;
+            if (BatchRequest.class.isAssignableFrom(argClass)) {
+                return (Class<? extends BatchRequest<?>>) argClass;
+            }
+        } else if (arg instanceof ParameterizedType) {
+            Type rawArg = ((ParameterizedType) arg).getRawType();
+            if (rawArg instanceof Class && BatchRequest.class.isAssignableFrom((Class<?>) rawArg)) {
+                return (Class<? extends BatchRequest<?>>) rawArg;
             }
         }
         return null;
