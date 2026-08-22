@@ -7,7 +7,9 @@ import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpVersion;
+import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.WebContext;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -20,6 +22,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class NettyServerHttpRequestBodyTest {
@@ -28,8 +32,16 @@ class NettyServerHttpRequestBodyTest {
     private WebContext webContext;
     @Mock
     private ChannelHandlerContext ctx;
+    @Mock
+    private ApplicationProperties props;
 
     private static final String SMALL_BODY = "{\"message\":\"hello\"}";
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(webContext.getProps()).thenReturn(props);
+        lenient().when(props.getInt(anyString())).thenReturn(4096);
+    }
     private static final int LARGE_SIZE = 100 * 1024;
 
     // ==================== 小包路径 (=4KB) ====================

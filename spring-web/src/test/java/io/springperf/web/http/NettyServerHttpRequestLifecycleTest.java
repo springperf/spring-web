@@ -8,7 +8,9 @@ import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.util.IllegalReferenceCountException;
+import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.WebContext;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -20,6 +22,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class NettyServerHttpRequestLifecycleTest {
@@ -28,6 +32,14 @@ class NettyServerHttpRequestLifecycleTest {
     private WebContext webContext;
     @Mock
     private ChannelHandlerContext ctx;
+    @Mock
+    private ApplicationProperties props;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(webContext.getProps()).thenReturn(props);
+        lenient().when(props.getInt(anyString())).thenReturn(4096);
+    }
 
     // ---------------------------------------------------------------
     // 核心：acquire → release，refCnt 正确变化

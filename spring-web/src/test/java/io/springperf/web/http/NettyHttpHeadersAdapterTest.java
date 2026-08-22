@@ -3,6 +3,7 @@ package io.springperf.web.http;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;
+import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.WebContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,8 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 
 /**
  * 验证 {@link NettyHttpHeadersAdapter} 零拷贝只读视图接入
@@ -28,12 +31,16 @@ class NettyHttpHeadersAdapterTest {
     private WebContext webContext;
     @Mock
     private ChannelHandlerContext ctx;
+    @Mock
+    private ApplicationProperties props;
 
     private FullHttpRequest nativeRequest;
     private NettyServerHttpRequest req;
 
     @BeforeEach
     void setUp() {
+        lenient().when(webContext.getProps()).thenReturn(props);
+        lenient().when(props.getInt(anyString())).thenReturn(4096);
         nativeRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/test", Unpooled.buffer());
         nativeRequest.headers().add("Content-Type", "application/json");
         nativeRequest.headers().add("Accept", "application/json");

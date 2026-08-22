@@ -46,6 +46,7 @@ class PerfAsyncWebRequestTest {
         asyncWebRequest.setTimeout(1000L);
         asyncWebRequest.addTimeoutHandler(() -> {});
         asyncWebRequest.startAsync();
+        asyncWebRequest.scheduleTimeoutIfNeeded();
         verify(response).setTimeout(any(Runnable.class), eq(1000L));
     }
 
@@ -53,12 +54,14 @@ class PerfAsyncWebRequestTest {
         asyncWebRequest.setTimeout(-1L);
         asyncWebRequest.addTimeoutHandler(() -> {});
         asyncWebRequest.startAsync();
+        asyncWebRequest.scheduleTimeoutIfNeeded();
         verify(response, never()).setTimeout(any(), anyLong());
     }
 
     @Test void startAsync_noTimeoutHandler_doesNotScheduleTimeout() {
         asyncWebRequest.setTimeout(1000L);
         asyncWebRequest.startAsync();
+        asyncWebRequest.scheduleTimeoutIfNeeded();
         verify(response, never()).setTimeout(any(), anyLong());
     }
 
@@ -151,6 +154,7 @@ class PerfAsyncWebRequestTest {
         Runnable timeoutHandler = mock(Runnable.class);
         asyncWebRequest.addTimeoutHandler(timeoutHandler);
         asyncWebRequest.start(5000L);
+        asyncWebRequest.scheduleTimeoutIfNeeded();
         assertTrue(asyncWebRequest.isAsyncStarted());
         verify(response).setTimeout(any(Runnable.class), eq(5000L));
     }
@@ -160,6 +164,7 @@ class PerfAsyncWebRequestTest {
         asyncWebRequest.addTimeoutHandler(timeoutHandler);
         asyncWebRequest.setTimeout(100L);
         asyncWebRequest.startAsync();
+        asyncWebRequest.scheduleTimeoutIfNeeded();
         ArgumentCaptor<Runnable> captor = ArgumentCaptor.forClass(Runnable.class);
         verify(response).setTimeout(captor.capture(), eq(100L));
         captor.getValue().run();
@@ -177,6 +182,7 @@ class PerfAsyncWebRequestTest {
                 asyncWebRequest.setConcurrentResultAndDispatch(new RuntimeException("timeout")));
         asyncWebRequest.setTimeout(100L);
         asyncWebRequest.startAsync();
+        asyncWebRequest.scheduleTimeoutIfNeeded();
         ArgumentCaptor<Runnable> captor = ArgumentCaptor.forClass(Runnable.class);
         verify(response).setTimeout(captor.capture(), eq(100L));
         captor.getValue().run();
@@ -190,6 +196,7 @@ class PerfAsyncWebRequestTest {
         asyncWebRequest.addTimeoutHandler(timeoutHandler);
         asyncWebRequest.setTimeout(100L);
         asyncWebRequest.startAsync();
+        asyncWebRequest.scheduleTimeoutIfNeeded();
         ArgumentCaptor<Runnable> captor = ArgumentCaptor.forClass(Runnable.class);
         verify(response).setTimeout(captor.capture(), eq(100L));
         asyncWebRequest.completeSuccessCallback();
