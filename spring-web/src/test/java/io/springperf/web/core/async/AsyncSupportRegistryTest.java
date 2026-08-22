@@ -96,6 +96,12 @@ class AsyncSupportRegistryTest {
     void startDeferredResultProcessing_triggerResultHandler_dispatches() throws Exception {
         DeferredResult<String> deferredResult = new DeferredResult<>();
 
+        doAnswer(invocation -> {
+            Runnable callback = invocation.getArgument(0);
+            callback.run();
+            return null;
+        }).when(asyncWebRequest).setAsyncReadyCallback(any(Runnable.class));
+
         registry.startDeferredResultProcessing(asyncWebRequest, deferredResult);
 
         // Set a result on the deferredResult to trigger the result handler

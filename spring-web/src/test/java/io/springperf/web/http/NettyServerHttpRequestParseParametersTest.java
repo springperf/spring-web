@@ -3,13 +3,10 @@ package io.springperf.web.http;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.DefaultFullHttpRequest;
-import io.netty.handler.codec.http.FullHttpRequest;
-import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpHeaderValues;
-import io.netty.handler.codec.http.HttpMethod;
-import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.*;
+import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.WebContext;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -20,6 +17,8 @@ import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 
 /**
  * 回归 P2 性能组 #1：parseParameters 的 urlencoded 分支。
@@ -34,6 +33,14 @@ class NettyServerHttpRequestParseParametersTest {
     private WebContext webContext;
     @Mock
     private ChannelHandlerContext ctx;
+    @Mock
+    private ApplicationProperties props;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(webContext.getProps()).thenReturn(props);
+        lenient().when(props.getInt(anyString())).thenReturn(4096);
+    }
 
     @Test
     void parseParameters_urlencodedBody_parsesFields() {
