@@ -200,7 +200,7 @@ Large bodies (>4KB) use `retainedDuplicate()` zero-copy, avoiding extra heap mem
 
 ### How
 
-In `DispatcherHandler.handleWithFullMatch()`, if the controller does **not** have `@RunInPool`, the method executes on the `default` business thread pool by default (configured via `pool.*` properties). Lightweight endpoints can explicitly switch to EventLoop via `@RunInPool(RunInPool.EVENTLOOP)`, or globally via `pool.default-execute-mode=eventloop`.
+In `DispatcherHandler.handleWithMappingResult()`, if the controller does **not** have `@RunInPool`, the method executes on the `default` business thread pool by default (configured via `pool.*` properties). Lightweight endpoints can explicitly switch to EventLoop via `@RunInPool(RunInPool.EVENTLOOP)`, or globally via `pool.default-execute-mode=eventloop`.
 
 ### Key Understanding: It's Not "Optimizing for You" — It's "Giving You Choice"
 
