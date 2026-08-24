@@ -15,6 +15,9 @@ Spring MVC 的兼容层（如 Servlet 容器 + `spring-webmvc`）依赖的天然
 3. **`PerfHttpServletRequest/Response`** 包装框架的 `WebServerHttpRequest/Response` 为 `HttpServletRequest`/`HttpServletResponse`。
 4. **`FilterWrapper`/`HandlerInterceptorWrapper`** 把 Servlet Filter 和 Spring MVC Interceptor 适配为框架的 `WebFilter`/`HandlerInterceptor`。
 5. **Session 体系** 从零实现 `HttpSession` 接口，通过 `HttpSessionStorage` SPI 可插拔存储。
+6. **Servlet 规范完整桥接** 覆盖 `ServletContext`、`RequestDispatcher`（forward/include）、`AsyncContext`、认证（`Authenticator`）、WebSocket `upgrade` 等，让依赖 Servlet API 的代码无侵入运行。详见第五节 5.6~5.10。
+
+> 完整的支持矩阵、配置项与已知限制，见 `docs/feature/servlet-spec-support.md`（该目录 gitignored，仅本地维护）。
 
 ---
 
@@ -200,7 +203,15 @@ public String getComponentName() {
 
 注释记录了设计决策：`WebComponentContainer` 按 `getComponentName()` 去重。同类不同实例（不同 bean 名/order/urlPattern，如 Spring Security 同 filter 类的多实例）不得被按类名去重误杀。使用 `IdentityHashMap` 按实例身份分配唯一递增 ID——同实例同一 ID（去重语义不变），不同实例绝不碰撞。修复前用 `System.identityHashCode`，两个不同实例可能碰撞同一 hash，容器误判为同实例而静默销毁低 order 者（安全过滤器被丢 = 静默安全回归）。
 
-### 3.3 `PerfHttpServletFilterChain`：FilterChain 桥接
+### 3.3 Filter 生命周期与 `FilterConfig`
+
+`FilterWrapper` 实现 `LifecycleWebComponent`，补齐 `jakarta.servlet.Filter` 的完整生命周期：
+
+- **`init(FilterConfig)`**：`initWithWebContext()` 中调用，`FilterConfig` 由 `PerfFilterConfig` 提供，init-param 从 `@WebFilter(initParams=@WebInitParam(...))` 注解读取（`resolveInitParams()`）。
+- **`destroy()`**：`destroyComponent()` 中调用。
+- **`PerfFilterConfig`**：实现 `getFilterName()`（组件名）/`getServletContext()`/`getInitParameter()`/`getInitParameterNames()`。
+
+### 3.4 `PerfHttpServletFilterChain`：FilterChain 桥接
 
 `PerfHttpServletFilterChain`实现 `jakarta.servlet.FilterChain`，在 `doFilter` 尾端回调框架的 `FilterChain`：
 
@@ -286,26 +297,31 @@ public void afterConcurrentHandlingStarted(WebServerHttpRequest request, ...) th
 
 ## 五、`HttpServletRequest`/`HttpServletResponse`：`PerfHttpServletRequest`/`Response`
 
-### 5.1 `AbstractFastFailHttpServletRequest`：80+ 方法 fail-fast
+### 5.1 `AbstractFastFailHttpServletRequest`：基类 fail-fast
 
-`AbstractFastFailHttpServletRequest`是抽象基类，实现 `HttpServletRequest` 的 80+ 个方法，默认行为是：
+`AbstractFastFailHttpServletRequest`是抽象基类，实现 `HttpServletRequest` 的 80+ 个方法。**基类默认行为是 fail-fast**（`throw unsupported` 或返回 null/-1/空集合），但所有关键方法均由 `PerfHttpServletRequest`/`NettyHttpServletRequest` 覆盖实现。基类的 fail-fast 只兜底"直接持有基类引用"的边缘场景。
 
-- **关键方法**（`getMethod`/`getRequestURI`/`getSession`/`getInputStream`/`getReader`/`getCookies`/`getDateHeader`/`getIntHeader`/`getContextPath`/`getQueryString`/`getRemoteUser`/`isUserInRole`/`getUserPrincipal`/`getRequestedSessionId`/`changeSessionId`/`authenticate`/`login`/`logout`/`getParts`/`getPart`/`upgrade`/`startAsync`/`getAsyncContext`/`getServletContext`/`getRequestDispatcher`）：`throw unsupported("...")`——"not running in a Servlet container"。
-- **非关键方法**（`getContentLength`/`getContentType`/`getParameter`/`getParameterMap`/`getProtocol`/`getScheme`/`getServerName`/`getServerPort`/`getRemoteAddr`/`getRemoteHost`/`getLocale`/`getLocales`/`isSecure`/`getLocalName`/`getLocalAddr`/`getLocalPort`/`getAuthType`/`getPathInfo`/`getPathTranslated`/`getServletPath`/`getRequestedSessionId`/`isRequestedSessionIdFromCookie`/`isRequestedSessionIdFromURL`/`getDispatcherType`/`getRequestId`/`getProtocolRequestId`）：返回 null/-1/空集合/default。
+> 注：`AbstractFastFailHttpServletRequest` 提供 `requestId`（`AtomicLong` 递增）、`getServletConnection()` stub、`getProtocolRequestId()`，与 `PerfHttpServletRequest` 的 `getDispatcherType()/getInputStream()/getReader()` 互斥标志配合，构成完整的 Servlet API 层。
 
 ### 5.2 `PerfHttpServletRequest`：委托实现
 
-`PerfHttpServletRequest`继承 `AbstractFastFailHttpServletRequest`，覆盖关键方法委托给框架的 `WebServerHttpRequest`：
+`PerfHttpServletRequest`继承 `AbstractFastFailHttpServletRequest`，覆盖关键方法委托给框架的 `WebServerHttpRequest`。**额外实现的规范细节**：
 
-```java
-// PerfHttpServletRequest.java
-public void rebind(WebServerHttpRequest request) {
-    if (this.request != request) {
-        this.request = request;
-        this.cookies = null;  // 清除缓存
-    }
-}
-```
+| 能力 | 实现 |
+|------|------|
+| `getRequestURL()` | 从 scheme + host + port + URI 构造（HTTP 场景） |
+| `getInputStream()/getReader()` 互斥 | `volatile` 标志位，第二次调用抛 `IllegalStateException`（`NettyServletInputStream`） |
+| `getServletContext()` | 从 `WebContext` 的 WebComponent 获取 |
+| `getRequestDispatcher()` | 返回 `PerfRequestDispatcher` |
+| `getParts()/getPart()` | 委托 `request.getPartMap()`，包装为 `ServletPartAdapter` |
+| `upgrade()` | 见 5.10 WebSocket 升级 |
+| `startAsync()`/`getAsyncContext()` 等 | 见 5.8 AsyncContext |
+| `login()/logout()/authenticate()` | 见 5.9 认证与安全 |
+| `getDispatcherType()` | 可设置字段（`forward` 时 `FORWARD`、`include` 时 `INCLUDE`） |
+
+**`NettyHttpServletRequest extends PerfHttpServletRequest`**：在 Netty 环境覆盖网络/安全方法——`getRemoteAddr/getRemoteHost/getRemotePort/getLocalAddr/getLocalName/getLocalPort`（真实 `InetSocketAddress`）、`getScheme()/isSecure()`（从 URI 检测 HTTPS）、`getRequestURL()`（完整 URL）。由 `ServletAttribute.createPerfRequest()` 工厂方法根据请求类型选择。
+
+**`getDelegateRequest()`/`getDelegateResponse()`**：供子类和 dispatch 逻辑访问底层委托对象。
 
 `rebind()` 是关键——当 `WebFilter` 包装了请求后，调用此方法使 `PerfHttpServletRequest` 指向包装后的请求，而非创建新实例。
 
@@ -335,7 +351,20 @@ if (manager.getSameSite() != null && resp instanceof PerfHttpServletResponse) {
 
 ### 5.3 `PerfHttpServletResponse`：委托实现
 
-`PerfHttpServletResponse`继承 `AbstractFastFailHttpServletResponse`，覆盖关键方法委托给框架的 `WebServerHttpResponse`。
+`PerfHttpServletResponse`继承 `AbstractFastFailHttpServletResponse`，覆盖关键方法委托给框架的 `WebServerHttpResponse`。**额外实现的规范细节**：
+
+| 能力 | 实现 |
+|------|------|
+| `getOutputStream()/getWriter()` 互斥 | `volatile` 标志位，第二次调用抛 `IllegalStateException` |
+| `setContentType()` 提取 charset | 正则解析 `charset=xxx` 自动调用 `setCharacterEncoding()` |
+| `sendRedirect()` | 检查 `isCommitted` + 构造**绝对 URL**（scheme+host+port+contextPath） |
+| `sendError()` | 检查 `isCommitted`，委托框架 JSON 错误响应 |
+| `reset()` | 清除 headers + 恢复 status 200 + 清空 buffer |
+| `setContentLength/setContentLengthLong` | 设置 `Content-Length` 头 |
+| `setLocale()/getLocale()` | 设置 `Content-Language` 头 |
+| `isCommitted()/containsHeader()` | 委托 `WebServerHttpResponse` |
+| `setDateHeader/addDateHeader/setIntHeader/addIntHeader` | 格式化后设置头 |
+| `encodeURL/encodeRedirectURL` | session URL 重写（cookie 跟踪下恒不重写） |
 
 **Cookie 编码**：使用 Netty 的 `ServerCookieEncoder.STRICT.encode(nettyCookie)`，设置 SameSite 属性：
 
@@ -352,6 +381,8 @@ public void addCookie(Cookie cookie) {
 }
 ```
 
+> 简要验证写法：`PerfHttpServletResponseTest` 覆盖 50 个方法、`PerfHttpServletRequestTest` 覆盖 70+ 方法。
+
 ### 5.4 `ServletAttribute`：类型安全访问器
 
 `ServletAttribute`通过 `RequestAttribute` 在 `RequestContext` 的 `fastAttributes` 数组中存取 `ServletAdapterContext`，避免 `ConcurrentHashMap` 查找和 `ThreadLocal` 操作：
@@ -367,6 +398,53 @@ private static final RequestAttribute<ServletAdapterContext> ADAPTER_CTX =
 ### 5.5 `ServletAdapterContext`：包装上下文
 
 `ServletAdapterContext`持有 `PerfHttpServletRequest`、`PerfHttpServletResponse`、当前生效的 `HttpServletRequest`/`HttpServletResponse`（可能被 Servlet Filter 包装）、`FilterChain`。`rebindFrameworkRequest`/`rebindFrameworkResponse` 更新底层的 `PerfHttpServletRequest`/`PerfHttpServletResponse` 的委托引用，使包装后的请求/响应生效。
+
+### 5.6 `ServletContext`：`PerfServletContext`
+
+`PerfServletContext implements ServletContext, WebComponent`，注册为 `WebContext` 的 WebComponent：
+
+- **启动注册**：`PerfHttpSessionManager.initWithWebContext()` 创建并 `webContext.registerWebComponent()` 注册。
+- **获取方式**：`webContext.getWebComponent(PerfServletContext.class)` 直接获取，`request.getServletContext()` 优先走此路径。
+- **核心能力**：
+  - `getMimeType()` 内置 50+ 种扩展名映射（静态 Map）。
+  - `getResource()/getResourceAsStream()` classpath 查找（`META-INF/resources/` → `static/` → `public/` → 根 classpath）。
+  - `getInitParameter()` 从 `WebContext` 配置读取；`getSessionCookieConfig()` 返回可配置的 `SessionCookieConfig` 实现。
+  - `getRequestDispatcher()/getNamedDispatcher()` 返回 `PerfRequestDispatcher`。
+- **限制**：动态注册（`addServlet`/`addFilter`）返回 null、`getContext()` 返回 null（单上下文架构）。
+
+### 5.7 `RequestDispatcher`：forward / include
+
+`PerfRequestDispatcher implements RequestDispatcher`，配合 `SupportDispatcherHandler.forward()/include()`：
+
+- **`forward()`**：检查 `isCommitted`（已提交抛 `IllegalStateException`）→ 设置 `DispatcherType.FORWARD` → 清除 response（headers+status+buffer）→ 通过 `ForwardWebServerHttpRequest` 包装请求（覆盖 `getPath()/getUriStr()/getURI()`，保留/替换 query string）→ `mappingRegistry.mapping()` 重映射 → `handleAfterFilter()` 重新 dispatch（**跳过 filter 链**，与 Tomcat 一致）。
+- **`include()`**：设置并恢复 `DispatcherType.INCLUDE` → `IncludeResponseWrapper` 阻止 flush、隔离 status/header（`setStatusCode`/`sendError` 空操作，`getHeaders()` 返回独立实例）。
+- **context holders 保护**：forward/include 均在 `try/finally` 中保存恢复 `LocaleContextHolder`/`RequestContextHolder`，避免与原始请求双重初始化冲突。
+- **Filter 包装兼容**：`resolveWebRequest()/resolveWebResponse()` 解开 `HttpServletRequestWrapper`/`HttpServletResponseWrapper` 找到底层请求。
+
+### 5.8 `AsyncContext`：`PerfAsyncContext`
+
+`PerfAsyncContext`包装框架的 `PerfAsyncWebRequest`（异步状态机 `NEW → ASYNC_STARTED → DISPATCHED → COMPLETED`）：
+
+- **startAsync**：`PerfHttpServletRequest.startAsync()` 创建并缓存到 `RequestContext`（`RequestAttribute`），同一请求内复用。
+- **dispatch()**：委托 `asyncWebRequest.dispatch()`；**dispatch(path)** 通过 `SupportDispatcherHandler.forward()` 分派到指定路径。
+- **complete()**：委托 `asyncWebRequest.complete()`，触发 `onComplete`。
+- **监听器回调**：`CopyOnWriteArrayList` 线程安全。`onComplete`/`onTimeout`/`onError` 均触发。**懒注册**——仅当 `addListener()` 或 `setTimeout()` 时通过 `ensureHandlersRegistered()` 桥接底层 timeout/error handler，避免覆盖框架 Callable/DeferredResult 路径的 handler。
+- **setTimeout()**：委托并调用 `scheduleTimeoutIfNeeded()`。
+
+### 5.9 认证与安全
+
+- **`Authenticator`**（`@FunctionalInterface`）：`Principal authenticate(username, password)`。用户注入 Spring Bean 实现，`login()` 依赖它。
+- **`PerfHttpPrincipal implements Principal`**：持有 `name` + `Set<String> roles`（不可变）。
+- **`login()`/`logout()`**：`login` 通过 `Authenticator` 认证成功后把 `PerfHttpPrincipal` 存入 `HttpSession`（`PRINCIPAL_KEY`）；`logout` 移除。
+- **`getUserPrincipal()/getRemoteUser()/isUserInRole()`**：从 session 读取 principal。
+- **`authenticate()`**：已认证返回 true；否则发送 401 + `WWW-Authenticate: Basic`。
+- **限定**：认证是 session 级、由上层安全框架（Spring Security/Shiro）负责实际拦截，桥接层只提供 Servlet API 语义。
+
+### 5.10 WebSocket 升级
+
+- **`upgrade(Class<T extends HttpUpgradeHandler>)`**：发送 101 + `Upgrade: websocket` 头 → 创建 handler + `PerfWebConnection`（包装请求输入流/响应输出流）→ 新线程运行 `handler.init()`。
+- **`PerfWebConnection implements WebConnection`**：`getInputStream()/getOutputStream()/close()`。
+- **推荐使用 `spring-web-websocket` 模块**：该项目在 Netty pipeline 层拦截 `Upgrade: websocket`，完整支持 Spring `WebSocketHandler`。`upgrade()` 仅适用于 servlet 层自定义协议升级，不切换 Netty 编解码器。
 
 ---
 
@@ -439,9 +517,12 @@ public HttpSessionData getSession(String sessionId) {
 
 ### 6.5 `PerfHttpSession`：`HttpSession` 实现
 
-`PerfHttpSession`完整实现 `HttpSession` 接口，包含 `HttpSessionListener`/`HttpSessionAttributeListener` 事件触发。`invalidate()`设置 `invalid=true`、清空属性、触发 `onInvalidateCallback`（`storage.removeSession`）、触发 `sessionDestroyed` 事件。
+`PerfHttpSession`完整实现 `HttpSession` 接口，包含 `HttpSessionListener`/`HttpSessionAttributeListener` 事件触发。**额外实现**：
 
-`MinimalServletContext`是 `PerfHttpSession` 内部类，提供最小化 `ServletContext` 实现（仅保留 `getContextPath`/`getServerInfo`/`getMajorVersion`/`getMinorVersion`/`getAttribute`/`setAttribute`/`removeAttribute`/`getClassLoader` 等基础方法，其余返回 null/空/默认值）。
+- **`HttpSessionBindingListener` 支持**：`setAttribute`（替换时对旧值 `valueUnbound`、对新值 `valueBound`）、`removeAttribute`（`valueUnbound`）、`invalidate`（遍历所有属性 `valueUnbound`）。
+- **`invalidate()`**：设置 `invalid=true`、遍历属性触发 `valueUnbound`、触发 `onInvalidateCallback`（`storage.removeSession`）、触发 `sessionDestroyed` 事件。
+
+`PerfServletContext`（原 `MinimalServletContext` 从 `PerfHttpSession` 内部类迁移出来）是实现 `ServletContext` + `WebComponent` 的独立类，注册到 `WebContext`，供 `getServletContext()` 与 `HttpSession.getServletContext()` 共用。详见 5.6 ServletContext。
 
 ---
 
@@ -628,6 +709,7 @@ private void flushSession() {
 | Codec 拦截器 | `RequestBodyAdviceCodecInterceptor`/`ResponseBodyAdviceCodecInterceptor` | 原生 `RequestBodyAdvice`/`ResponseBodyAdvice` |
 | SSE 桥接 | `ResponseBodyEmitterReturnValueResolver`（`HttpMessageConverter` 兜底） | 原生 `ResponseBodyEmitter`/`SseEmitter` |
 | 标准异常处理 | `ResponseEntityExceptionHandler` 15 个标准异常处理 | 原生 `ResponseEntityExceptionHandler` |
+| Servlet 规范桥接 | `PerfServletContext`/`PerfRequestDispatcher`/`PerfAsyncContext`/`Authenticator`/`upgrade()` 等 | Servlet 容器原生提供 |
 | 同包同名覆盖 | 重写 `org.springframework.web.servlet.*` 40+ 类 | 不适用 |
 
 **核心差异**：Spring MVC 的兼容层依赖 Servlet 容器，所有组件（Session、Filter、`HttpServletRequest`）都是容器提供的。本框架的 support 模块在"没有 Servlet 容器"的前提下，从零实现 `HttpServletRequest`/`HttpServletResponse`/`HttpSession`/`FilterChain` 接口，通过 `WebMvcConfigurerBridge` 把 Spring MVC 的配置回调翻译为框架内部的 Registry 操作，通过 `FilterWrapper`/`HandlerInterceptorWrapper`/`SpringHandlerMethodArgumentResolverProvider` 等适配器把 Spring 生态的组件桥接到框架的 SPI 体系。
@@ -643,10 +725,11 @@ private void flushSession() {
 3. **`FilterWrapper` 实例级唯一标识** → `IdentityHashMap` + `AtomicLong` 确保同类不同实例不被去重误杀（修复 `System.identityHashCode` 碰撞）。
 4. **`HandlerInterceptorWrapper` 四阶段适配** → `preHandle`/`postHandle`(null modelAndView)/`afterCompletion`(NestedServletException)/(`AsyncHandlerInterceptor` 可选)。
 5. **`PerfHttpServletRequest`/`Response` 委托 + `rebind`** → 包装框架请求/响应为 `HttpServletRequest`/`HttpServletResponse`，`rebind` 支持 Filter 包装链。
-6. **Session 体系从零实现** → `HttpSessionStorage` SPI + `InMemoryHttpSessionStorage` 默认实现 + `PerfHttpSessionManager` 管理器 + `SessionFlushListener` 在 `ChannelFuture` 回调中持久化。
+6. **Session 体系从零实现** → `HttpSessionStorage` SPI + `InMemoryHttpSessionStorage` 默认实现 + `PerfHttpSessionManager` 管理器 + `SessionFlushListener` 在 `ChannelFuture` 回调中持久化（含 `HttpSessionBindingListener` 回调）。
 7. **桥接适配器启动期决策** → `SpringHandlerMethodArgumentResolverProvider` 的 `supports` 在启动期调用，消除每请求 dispatch（替代旧 `RuntimeArgumentResolver`）。
+8. **Servlet 规范桥接扩展** → `PerfServletContext`/`PerfRequestDispatcher`（forward/include）/`PerfAsyncContext`/`Authenticator`/`upgrade()` 等，补齐依赖 Servlet API 的上层框架所需语义。
 
-这一层的克制体现在：**不把"兼容性"变成"性能债务"。** `WebMvcConfigurerBridge` 在 Phase 1 一次性完成翻译，不参与运行时。`FilterWrapper` 的 `IdentityHashMap` 在启动期分配唯一 ID，运行时 `getComponentName()` 是 O(1) 查表。`PerfHttpServletRequest` 的 `getSession()` 缓存到 `RequestContext` 的 fastAttributes 数组，避免每次查找。`ResponseBodyEmitterReturnValueResolver` 的 `encodeToStream` 先尝试 `HttpBodyCodecRegistry` 的 converter 再兜底——`HttpMessageConverter` 存在时走框架的 `HttpBodyConverter` 路径，不存在时 String→UTF-8 零分配 fallback。
+这一层的克制体现在：**不把"兼容性"变成"性能债务"。** `WebMvcConfigurerBridge` 在 Phase 1 一次性完成翻译，不参与运行时。`FilterWrapper` 的 `IdentityHashMap` 在启动期分配唯一 ID，运行时 `getComponentName()` 是 O(1) 查表。`PerfHttpServletRequest` 的 `getSession()` 缓存到 `RequestContext` 的 fastAttributes 数组，避免每次查找。`ResponseBodyEmitterReturnValueResolver` 的 `encodeToStream` 先尝试 `HttpBodyCodecRegistry` 的 converter 再兜底——`HttpMessageConverter` 存在时走框架的 `HttpBodyConverter` 路径，不存在时 String→UTF-8 零分配 fallback。`forward/include` 只做**重映射**（`mappingRegistry.mapping`）而非重走 filter 链，`AsyncContext` 懒注册 handler 避免覆盖框架异步路径。
 
 ---
 
