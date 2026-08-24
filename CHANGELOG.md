@@ -4,6 +4,54 @@
 
 本项目遵循 [语义化版本控制](https://semver.org/lang/zh-CN/)。
 
+## [2.7.5] - 20260824
+
+### 新增
+
+- **Servlet 规范桥（servlet spec bridge）**：新增完整 Servlet 适配层，提供 `PerfServletContext`、`PerfAsyncContext`、`PerfRequestDispatcher`、`PerfWebConnection`、`PerfHttpPrincipal`、`ServletPartAdapter`、`PerfFilterConfig`、`ForwardWebServerHttpRequest`、`NettyHttpServletRequest` 等实现，支持在 Netty 上运行 Servlet 规范 Filter 链、`AsyncContext`、`RequestDispatcher` 转发、`HttpSession`、`Part` 等能力（配合 javax.servlet 适配）
+- **`@RunInEventloop` 元注解**：`@Optimize` / `@ReactiveSupport` 标注 `@RunInEventloop`，业务方法可直接在 EventLoop 上执行，减少线程切换
+- **Netty / Body / AccessLog 配置暴露**：`PropertiesConstant` 新增对应配置项，`NettyHttpServer` / `AccessLogWebFilter` 支持外部化配置
+- **WSL 一键基准测试**：新增 `wsl-run-all.sh` / `wsl-benchmark.sh` / `wsl-server.sh` / `wsl-convert-cp.sh` 脚本、`WSL_SETUP.md` 与 `no-sleep.ps1`，支持可选 JFR 采集
+- **报告生成器增强**：`ReportGenerator` 跳过损坏的结果 JSON，缺失容器在报告中渲染 FAIL 列并附带提示
+- **内部实现文档**：新增 `docs/internals/00~19` 全量架构、请求链路与设计决策文档
+
+### 重构
+
+- **Servlet 会话语义增强**：`PerfHttpSession` 对 `HttpSessionBindingListener` 的值绑定 / 解绑事件处理完善
+
+### 优化
+
+- **解析热路径分配削减**：请求参数解析、`InMemoryHttpSessionStorage`、`MicrometerWebMetrics` 路径减少中间对象分配
+- **批处理 SSE 发送**：`AbstractNettyStreamSender` 新增 `sendAll()` 批量发送，避免逐条 flush，并修复 drain 重入
+- **大请求体释放优化**：大体积请求体通过 `duplicate` 引用替代 refcount 加锁，消除锁开销
+
+### 修复
+
+- **Multipart**：`destroy()` 释放 decoder 以归还池化内存；修复 destroy 顺序、`undecodedChunk`、refcount 泄漏；`RequestPart` 缺失时返回 400 而非 500
+- **WebSocket**：升级被拒绝时释放请求；修复 h2c fragment buffer 泄漏与 WS upgrade 泄漏
+- **Async**：异步超时改为懒调度并修正 metrics 计时；`SSE emitter select`、`ReactiveSupport` 首个请求 NPE、冷流发布者背压 refill 修复
+- **路由与参数绑定**：`SuffixPathRouterOptimizer` off-by-one 修复；映射与参数解析启动期 fail-fast 校验；`AbstractNamedValueResolver` 支持泛型集合元素类型转换；`getReader` 回落 UTF-8 编码
+- **文件下载**：使用 `Content-Length` 定长帧，避免 chunked 传输
+- **大请求体**：异步读取与释放同步，避免已释放 `ByteBuf` 被访问
+- **管理端口隔离**：management dispatcher 不再参与主端口路由查找
+- **Interceptor**：`afterCompletion` 语义修正
+- **Netty 层**：`@Sharable` 处理器生命周期与 h2c buffer leak guard；`NettyHttpHandler` 请求路径 NPE 修复
+- **Batch 队列**：`DisruptorQueue` RingBuffer 大小 clamp、溢出保护；`BatchScanner` 泛型类型解析修复
+- **SSL PEM 解析**：`SslContextFactory` 支持 classpath 前缀与流式加载
+- **FilterWrapper**：实例级唯一 `id`，避免同类多实例被按类名去重误杀
+- **访问日志**：`AccessLogWebFilter` 错误状态记录与格式修正
+
+### 构建
+
+- **`.gitattributes`**：shell 脚本强制 LF 行尾
+- **基准模块**：支持可选 JFR 采集依赖
+
+### 文档
+
+- **AI 上下文迁移**：`CLAUDE.md` / `.claude` 迁移至 `AGENTS.md` / `.agent`
+- **benchmark 数据刷新**：WSL / 多实例趋势图数据更新
+- **内部实现文档**：servlet bridge / async 流式 / batch 模块文档补齐
+
 ## [2.7.4] - 20260806
 
 ### 新增

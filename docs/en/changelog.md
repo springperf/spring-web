@@ -4,6 +4,54 @@
 
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.5] - 20260824
+
+### Added
+
+- **Servlet spec bridge**: full Servlet adaptation layer — `PerfServletContext`, `PerfAsyncContext`, `PerfRequestDispatcher`, `PerfWebConnection`, `PerfHttpPrincipal`, `ServletPartAdapter`, `PerfFilterConfig`, `ForwardWebServerHttpRequest`, `NettyHttpServletRequest`, etc. — enabling Servlet-spec `Filter` chains, `AsyncContext`, `RequestDispatcher` forwards, `HttpSession`, and `Part` on top of Netty (adapted to `javax.servlet`)
+- **`@RunInEventloop` meta-annotation**: `@Optimize` / `@ReactiveSupport` are now annotated with `@RunInEventloop`, letting business methods run directly on the EventLoop and avoid thread hops
+- **Exposed Netty / Body / AccessLog config**: new keys in `PropertiesConstant` so `NettyHttpServer` / `AccessLogWebFilter` support externalized configuration
+- **One-click WSL benchmark**: new `wsl-run-all.sh` / `wsl-benchmark.sh` / `wsl-server.sh` / `wsl-convert-cp.sh` scripts, `WSL_SETUP.md`, and `no-sleep.ps1`, with optional JFR profiling
+- **Report generator improvements**: `ReportGenerator` skips corrupt result JSON and renders a FAIL column with hints for missing containers
+- **Internals documentation**: full `docs/internals/00~19` architecture, request-pipeline, and design-decision docs
+
+### Changed
+
+- **Servlet session semantics**: `PerfHttpSession` now fires `HttpSessionBindingListener` value bind / unbind events correctly
+
+### Optimized
+
+- **Hot-path allocation trimming**: reduced intermediate object allocations in request parameter parsing, `InMemoryHttpSessionStorage`, and `MicrometerWebMetrics`
+- **Batched SSE sends**: `AbstractNettyStreamSender` gains `sendAll()` to batch writes instead of flushing per item, plus a drain re-entry fix
+- **Large body release**: large request bodies now use a `duplicate` ref instead of refcount locking, removing lock overhead
+
+### Fixed
+
+- **Multipart**: `destroy()` releases the decoder to return pooled memory; fixed destroy order, `undecodedChunk`, and refcount leaks; missing `RequestPart` now returns 400 instead of 500
+- **WebSocket**: rejected upgrades release the request; fixed h2c fragment buffer and WS upgrade leaks
+- **Async**: lazy timeout scheduling with corrected metrics timing; fixed SSE emitter `select`, `ReactiveSupport` first-request NPE, and backpressure refill for cold publishers
+- **Routing & argument binding**: fixed `SuffixPathRouterOptimizer` off-by-one; fail-fast startup validation for mapping and argument resolvers; generic collection element type conversion in `AbstractNamedValueResolver`; `getReader` falls back to UTF-8
+- **File download**: uses `Content-Length` framing instead of chunked transfer
+- **Large bodies**: async read and release are synchronized to prevent accessing released `ByteBuf`
+- **Management port isolation**: the management dispatcher no longer participates in main-port routing lookups
+- **Interceptor**: `afterCompletion` semantics corrected
+- **Netty layer**: `@Sharable` handler lifecycle and h2c buffer leak guard; fixed `NettyHttpHandler` request-path NPE
+- **Batch queue**: `DisruptorQueue` RingBuffer size clamp and overflow protection; `BatchScanner` generic type resolution fix
+- **SSL PEM parsing**: `SslContextFactory` supports `classpath:` prefixes with stream-based loading
+- **FilterWrapper**: instance-level unique `id` so same-class multi-instance filters are not deduplicated by class name
+- **Access log**: corrected error-status recording and format in `AccessLogWebFilter`
+
+### Build
+
+- **`.gitattributes`**: shell scripts forced to LF line endings
+- **Benchmark module**: optional JFR profiling dependency
+
+### Documentation
+
+- **AI context migration**: `CLAUDE.md` / `.claude` moved to `AGENTS.md` / `.agent`
+- **Benchmark data refresh**: WSL / multi-instance trend data updated
+- **Internals**: servlet bridge / async streaming / batch module docs completed
+
 ## [2.7.4] - 20260806
 
 ### Added
