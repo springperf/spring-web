@@ -99,7 +99,7 @@ class PerfHttpSessionTest {
         session.setAttribute("k1", "v1");
         session.setAttribute("k2", "v2");
         List<String> names = new ArrayList<>();
-        session.getAttributeNames().asIterator().forEachRemaining(names::add);
+        java.util.Collections.list(session.getAttributeNames()).forEach(names::add);
         assertTrue(names.contains("k1"));
         assertTrue(names.contains("k2"));
         assertEquals(2, names.size());

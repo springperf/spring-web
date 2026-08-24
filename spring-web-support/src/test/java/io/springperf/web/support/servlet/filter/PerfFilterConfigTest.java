@@ -50,7 +50,7 @@ class PerfFilterConfigTest {
         params.put("key2", "value2");
         PerfFilterConfig config = new PerfFilterConfig("testFilter", servletContext, params);
         java.util.List<String> names = new java.util.ArrayList<>();
-        config.getInitParameterNames().asIterator().forEachRemaining(names::add);
+        java.util.Collections.list(config.getInitParameterNames()).forEach(names::add);
         assertEquals(2, names.size());
         assertTrue(names.contains("key1"));
         assertTrue(names.contains("key2"));
