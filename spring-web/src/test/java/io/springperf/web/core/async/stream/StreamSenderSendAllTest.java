@@ -198,7 +198,7 @@ class StreamSenderSendAllTest {
         when(channel.isActive()).thenReturn(false);
         DefaultNettyStreamSender sender = new DefaultNettyStreamSender(emitter, asyncWebRequest);
 
-        assertThrows(IOException.class, () -> sender.sendAll(List.of("a")));
+        assertThrows(IOException.class, () -> sender.sendAll(java.util.Collections.singletonList("a")));
     }
 
     @Test
@@ -206,7 +206,7 @@ class StreamSenderSendAllTest {
         DefaultNettyStreamSender sender = new DefaultNettyStreamSender(emitter, asyncWebRequest);
         sender.complete(true, null);
 
-        assertThrows(IOException.class, () -> sender.sendAll(List.of("a")));
+        assertThrows(IOException.class, () -> sender.sendAll(java.util.Collections.singletonList("a")));
     }
 
     @Test

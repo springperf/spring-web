@@ -41,7 +41,7 @@ class WebSocketRoutingHandlerUpgradeRemovalTest {
         channel.pipeline().addLast(new HttpObjectAggregator(64 * 1024));
         channel.pipeline().addLast(new ReadTimeoutHandler(1000, TimeUnit.MILLISECONDS));
         channel.pipeline().addLast(new WebSocketRoutingHandler(
-                Map.of("/ws", mock(WebSocketHandler.class)), null, false, null));
+                java.util.Collections.singletonMap("/ws", mock(WebSocketHandler.class)), null, false, null));
 
         FullHttpRequest req = upgradeRequest("/ws");
         // 直接 fireChannelRead 推入 pipeline：不经过 writeInbound 的 inbound 缓存，

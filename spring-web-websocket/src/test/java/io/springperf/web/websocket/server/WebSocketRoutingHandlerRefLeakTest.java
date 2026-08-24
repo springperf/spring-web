@@ -31,7 +31,7 @@ class WebSocketRoutingHandlerRefLeakTest {
 
     private static WebSocketRoutingHandler handler() {
         return new WebSocketRoutingHandler(
-                Map.of("/ws", mock(WebSocketHandler.class)),
+                Collections.singletonMap("/ws", mock(WebSocketHandler.class)),
                 null, false, Collections.emptyList());
     }
 
