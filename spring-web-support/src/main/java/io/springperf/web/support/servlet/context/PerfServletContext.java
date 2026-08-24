@@ -280,6 +280,11 @@ public class PerfServletContext implements ServletContext, WebComponent {
     }
 
     @Override
+    public void log(Exception exception, String msg) {
+        log.error(msg, exception);
+    }
+
+    @Override
     public void log(String message, Throwable throwable) {
         log.error(message, throwable);
     }
@@ -370,6 +375,21 @@ public class PerfServletContext implements ServletContext, WebComponent {
 
     @Override
     public <T extends EventListener> void addListener(T t) {
+    }
+
+    @Override
+    public javax.servlet.Servlet getServlet(String name) {
+        return null;
+    }
+
+    @Override
+    public java.util.Enumeration<javax.servlet.Servlet> getServlets() {
+        return java.util.Collections.emptyEnumeration();
+    }
+
+    @Override
+    public java.util.Enumeration<String> getServletNames() {
+        return java.util.Collections.emptyEnumeration();
     }
 
     // ===================== Session =====================
@@ -515,7 +535,6 @@ public class PerfServletContext implements ServletContext, WebComponent {
         private boolean httpOnly = true;
         private boolean secure;
         private int maxAge = -1;
-        private final Map<String, String> attributes = new HashMap<>();
 
         @Override
         public void setName(String name) {
@@ -585,25 +604,6 @@ public class PerfServletContext implements ServletContext, WebComponent {
         @Override
         public int getMaxAge() {
             return maxAge;
-        }
-
-        @Override
-        public String getAttribute(String name) {
-            return attributes.get(name);
-        }
-
-        @Override
-        public void setAttribute(String name, String value) {
-            if (value == null) {
-                attributes.remove(name);
-            } else {
-                attributes.put(name, value);
-            }
-        }
-
-        @Override
-        public Map<String, String> getAttributes() {
-            return Collections.unmodifiableMap(attributes);
         }
     }
 }

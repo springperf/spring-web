@@ -127,7 +127,7 @@ class RequestPartResolverTest {
         org.springframework.web.server.ResponseStatusException ex =
                 assertThrows(org.springframework.web.server.ResponseStatusException.class,
                         () -> resolver.resolveArgument(request, response));
-        assertEquals(org.springframework.http.HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals(org.springframework.http.HttpStatus.BAD_REQUEST, ex.getStatus());
     }
 
     @SuppressWarnings("unused")

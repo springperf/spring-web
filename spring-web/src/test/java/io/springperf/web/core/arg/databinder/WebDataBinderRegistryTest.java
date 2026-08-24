@@ -155,7 +155,10 @@ class WebDataBinderRegistryTest {
     }
 
     private static MappingHandlerMethod createHandlerMethod(Class<?> userClass) throws Exception {
-        return new MappingHandlerMethod(userClass.getDeclaredConstructor().newInstance(),
+        java.lang.reflect.Constructor<?> ctor = userClass.getDeclaredConstructor();
+        // JDK 9+ 对 private 嵌套类反射构造需显式 setAccessible
+        ctor.setAccessible(true);
+        return new MappingHandlerMethod(ctor.newInstance(),
                 userClass.getDeclaredMethod("handle"));
     }
 

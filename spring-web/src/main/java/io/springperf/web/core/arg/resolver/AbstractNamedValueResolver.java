@@ -76,7 +76,10 @@ public abstract class AbstractNamedValueResolver extends AbstractSupportOptional
      */
     protected Object convertWithGenericType(Object arg) {
         TypeDescriptor targetType = new TypeDescriptor(parameter.nestedIfOptional());
-        return webDataBinderRegistry.getConversionService(mappingContext).convert(arg, targetType);
+        // 兼容 Spring 5.3：ConversionService 接口无 convert(Object, TypeDescriptor) 单参重载，
+        // 使用带源类型描述符的三参重载（同样由 CollectionToCollectionConverter 等完成元素级转换）。
+        return webDataBinderRegistry.getConversionService(mappingContext)
+                .convert(arg, TypeDescriptor.forObject(arg), targetType);
     }
 
     protected boolean isContainer(Object arg) {

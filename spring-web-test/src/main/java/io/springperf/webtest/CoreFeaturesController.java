@@ -267,6 +267,14 @@ public class CoreFeaturesController {
         return m;
     }
 
+    private static boolean isVirtualThread(Thread t) {
+        try {
+            return (boolean) Thread.class.getMethod("isVirtual").invoke(t);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     // ==================== @Valid 校验 ====================
 
     @PostMapping("/validate")

@@ -18,7 +18,6 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -138,7 +137,7 @@ public class SupportDispatcherHandler extends DispatcherHandler {
         }
 
         @Override
-        public void setStatusCode(HttpStatusCode statusCode) {
+        public void setStatusCode(HttpStatus statusCode) {
         }
 
         @Override
