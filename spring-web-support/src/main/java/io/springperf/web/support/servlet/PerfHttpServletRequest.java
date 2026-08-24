@@ -2,11 +2,24 @@ package io.springperf.web.support.servlet;
 
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.cookie.ServerCookieDecoder;
+import io.springperf.web.core.async.AsyncSupportUtils;
+import io.springperf.web.core.async.PerfAsyncWebRequest;
 import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
+import io.springperf.web.http.support.HttpInputMessagePart;
 import io.springperf.web.support.servlet.session.PerfHttpSession;
 import io.springperf.web.support.servlet.session.PerfHttpSessionManager;
+import jakarta.servlet.AsyncContext;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.ReadListener;
+import jakarta.servlet.RequestDispatcher;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletInputStream;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
+import jakarta.servlet.http.HttpUpgradeHandler;
+import jakarta.servlet.http.WebConnection;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -16,6 +29,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.security.Principal;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -26,6 +40,9 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
 
     private WebServerHttpRequest request;
     private volatile Cookie[] cookies;
+    private DispatcherType dispatcherType = DispatcherType.REQUEST;
+    private volatile boolean calledInputStream;
+    private volatile boolean calledReader;
 
     public PerfHttpServletRequest(WebServerHttpRequest request) {
         this.request = request;
@@ -36,6 +53,24 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
      * 当 WebFilter 包装了请求后调用，使此 {@code PerfHttpServletRequest}
      * 后续操作指向包装后的请求，而非创建新实例。
      */
+    /**
+     * 供子类（如 {@link NettyHttpServletRequest}）访问底层委托对象。
+     */
+    protected WebServerHttpRequest getDelegateRequest() {
+        return request;
+    }
+
+    /**
+     * 供子类访问底层响应委托对象。
+     */
+    protected WebServerHttpResponse getDelegateResponse() {
+        HttpServletResponse resp = ServletAttribute.getResponse(request.getRequestContext());
+        if (resp instanceof PerfHttpServletResponse) {
+            return ((PerfHttpServletResponse) resp).getResponse();
+        }
+        return null;
+    }
+
     public void rebind(WebServerHttpRequest request) {
         if (this.request != request) {
             this.request = request;
@@ -45,6 +80,20 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
 
     @Override public String getMethod() { return request.getMethodValue(); }
     @Override public String getRequestURI() { return request.getUriStr(); }
+
+    @Override
+    public StringBuffer getRequestURL() {
+        StringBuffer sb = new StringBuffer();
+        sb.append(getScheme()).append("://");
+        sb.append(getServerName());
+        int port = getServerPort();
+        String scheme = getScheme();
+        if ((!"http".equals(scheme) || port != 80) && (!"https".equals(scheme) || port != 443)) {
+            sb.append(':').append(port);
+        }
+        sb.append(getRequestURI());
+        return sb;
+    }
 
     @Override
     public String getQueryString() {
@@ -72,15 +121,27 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
 
     @Override
     public ServletInputStream getInputStream() {
+        if (calledReader) {
+            throw new IllegalStateException("getReader() has already been called");
+        }
+        calledInputStream = true;
+        return createInputStream();
+    }
+
+    private NettyServletInputStream createInputStream() {
         try { return new NettyServletInputStream(request.getBody()); } catch (IOException e) { throw new RuntimeException(e); }
     }
 
     @Override
     public BufferedReader getReader() throws IOException {
+        if (calledInputStream) {
+            throw new IllegalStateException("getInputStream() has already been called");
+        }
+        calledReader = true;
         // 请求无 charset 时回退框架默认 UTF-8（与 BaseWebServerHttpRequest 一致）。
         // 修复前 getCharacterEncoding() 返回 null → InputStreamReader(stream, null) → IllegalArgumentException。
         String encoding = getCharacterEncoding();
-        return new BufferedReader(new InputStreamReader(getInputStream(), encoding != null ? encoding : StandardCharsets.UTF_8.name()));
+        return new BufferedReader(new InputStreamReader(createInputStream(), encoding != null ? encoding : StandardCharsets.UTF_8.name()));
     }
     @Override public String getCharacterEncoding() { return request.getCharacterEncoding() == null ? null : request.getCharacterEncoding().name(); }
     @Override public void setCharacterEncoding(String env) { request.setCharacterEncoding(Charset.forName(env)); }
@@ -111,6 +172,157 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
     @Override public String getLocalAddr() { return "127.0.0.1"; }
     @Override public String getRemoteAddr() { return "127.0.0.1"; }
     @Override public String getRemoteHost() { return getRemoteAddr(); }
+
+    @Override
+    public DispatcherType getDispatcherType() {
+        return dispatcherType;
+    }
+
+    public void setDispatcherType(DispatcherType dispatcherType) {
+        this.dispatcherType = dispatcherType;
+    }
+
+    @Override
+    public RequestDispatcher getRequestDispatcher(String path) {
+        if (path == null) {
+            return null;
+        }
+        return new PerfRequestDispatcher(path);
+    }
+
+    @Override
+    public ServletContext getServletContext() {
+        io.springperf.web.support.servlet.context.PerfServletContext ctx =
+                request.getWebContext().getWebComponent(io.springperf.web.support.servlet.context.PerfServletContext.class);
+        if (ctx != null) {
+            return ctx;
+        }
+        return super.getServletContext();
+    }
+
+    // ===================== Multipart (fallback) =====================
+
+    @Override
+    public Collection<jakarta.servlet.http.Part> getParts() throws IOException, ServletException {
+        org.springframework.util.MultiValueMap<String, HttpInputMessagePart> partMap = request.getPartMap();
+        if (partMap == null) {
+            throw new ServletException("Not a multipart request");
+        }
+        List<jakarta.servlet.http.Part> result = new java.util.ArrayList<>();
+        for (java.util.Map.Entry<String, List<HttpInputMessagePart>> entry : partMap.entrySet()) {
+            for (HttpInputMessagePart part : entry.getValue()) {
+                result.add(new ServletPartAdapter(part));
+            }
+        }
+        return result;
+    }
+
+    @Override
+    public jakarta.servlet.http.Part getPart(String name) throws IOException, ServletException {
+        org.springframework.util.MultiValueMap<String, HttpInputMessagePart> partMap = request.getPartMap();
+        if (partMap == null) {
+            throw new ServletException("Not a multipart request");
+        }
+        List<HttpInputMessagePart> parts = partMap.get(name);
+        if (parts == null || parts.isEmpty()) {
+            return null;
+        }
+        return new ServletPartAdapter(parts.get(0));
+    }
+
+    // ===================== Async =====================
+
+    @Override
+    public AsyncContext startAsync() throws IllegalStateException {
+        PerfAsyncContext existing = PerfAsyncContext.get(request.getRequestContext());
+        if (existing != null) {
+            return existing;
+        }
+        WebServerHttpResponse webResponse = getDelegateResponse();
+        if (webResponse == null) {
+            throw new IllegalStateException("Cannot start async: no WebServerHttpResponse available");
+        }
+        PerfAsyncWebRequest asyncWebRequest =
+                (PerfAsyncWebRequest) AsyncSupportUtils.getAsyncWebRequest(request, webResponse);
+        asyncWebRequest.startAsync();
+        PerfAsyncContext asyncContext = new PerfAsyncContext(asyncWebRequest,
+                request, webResponse, this, ServletAttribute.getResponse(request.getRequestContext()));
+        PerfAsyncContext.set(request.getRequestContext(), asyncContext);
+        return asyncContext;
+    }
+
+    @Override
+    public AsyncContext startAsync(ServletRequest servletRequest, ServletResponse servletResponse)
+            throws IllegalStateException {
+        PerfAsyncContext existing = PerfAsyncContext.get(request.getRequestContext());
+        if (existing != null) {
+            return existing;
+        }
+        WebServerHttpResponse webResponse = getDelegateResponse();
+        if (webResponse == null) {
+            throw new IllegalStateException("Cannot start async: no WebServerHttpResponse available");
+        }
+        PerfAsyncWebRequest asyncWebRequest =
+                (PerfAsyncWebRequest) AsyncSupportUtils.getAsyncWebRequest(request, webResponse);
+        asyncWebRequest.startAsync();
+        PerfAsyncContext asyncContext = new PerfAsyncContext(asyncWebRequest,
+                request, webResponse, servletRequest, servletResponse);
+        PerfAsyncContext.set(request.getRequestContext(), asyncContext);
+        return asyncContext;
+    }
+
+    @Override
+    public boolean isAsyncStarted() {
+        PerfAsyncContext ctx = PerfAsyncContext.get(request.getRequestContext());
+        return ctx != null;
+    }
+
+    @Override
+    public boolean isAsyncSupported() {
+        return true;
+    }
+
+    @Override
+    public AsyncContext getAsyncContext() {
+        PerfAsyncContext ctx = PerfAsyncContext.get(request.getRequestContext());
+        if (ctx == null) {
+            throw new IllegalStateException("Async not started");
+        }
+        return ctx;
+    }
+
+    // ===================== Upgrade =====================
+
+    @Override
+    public <T extends HttpUpgradeHandler> T upgrade(Class<T> handlerClass) throws IOException, ServletException {
+        try {
+            T handler = handlerClass.getDeclaredConstructor().newInstance();
+            WebServerHttpResponse webResponse = getDelegateResponse();
+            if (webResponse != null) {
+                webResponse.setStatusCode(org.springframework.http.HttpStatus.SWITCHING_PROTOCOLS);
+                webResponse.getHeaders().set(io.netty.handler.codec.http.HttpHeaderNames.CONNECTION.toString(),
+                        io.netty.handler.codec.http.HttpHeaderValues.UPGRADE.toString());
+                webResponse.getHeaders().set(io.netty.handler.codec.http.HttpHeaderNames.UPGRADE.toString(), "websocket");
+                webResponse.setHandled();
+            }
+            HttpServletResponse servletResp = ServletAttribute.getResponse(request.getRequestContext());
+            PerfWebConnection connection = new PerfWebConnection(
+                    getInputStream(),
+                    servletResp != null ? servletResp.getOutputStream() : null);
+            Thread handlerThread = new Thread(() -> {
+                try {
+                    handler.init(connection);
+                } catch (Exception e) {
+                    throw new RuntimeException("HttpUpgradeHandler.init failed", e);
+                }
+            }, "upgrade-handler-" + handlerClass.getSimpleName());
+            handlerThread.setDaemon(true);
+            handlerThread.start();
+            return handler;
+        } catch (Exception e) {
+            throw new ServletException("Failed to create HttpUpgradeHandler: " + handlerClass, e);
+        }
+    }
 
     // ===================== Cookies =====================
 
@@ -206,6 +418,11 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
     }
 
     @Override
+    public boolean isRequestedSessionIdFromURL() {
+        return false;
+    }
+
+    @Override
     public boolean isRequestedSessionIdValid() {
         // Use cached session if available — avoids redundant storage lookup
         PerfHttpSession cached = getCachedSession();
@@ -272,8 +489,81 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
         return request.getRequestContext().getAttribute(PerfHttpSessionManager.SESSION_ATTR_KEY);
     }
 
-    private PerfHttpSessionManager getSessionManager() {
+    protected PerfHttpSessionManager getSessionManager() {
         return request.getWebContext().getWebComponent(PerfHttpSessionManager.class);
+    }
+
+    // ===================== Security =====================
+
+    private PerfHttpPrincipal getPrincipalFromSession() {
+        HttpSession session = getSession(false);
+        if (session == null) {
+            return null;
+        }
+        return (PerfHttpPrincipal) session.getAttribute(PerfHttpSessionManager.PRINCIPAL_KEY);
+    }
+
+    @Override
+    public String getRemoteUser() {
+        PerfHttpPrincipal principal = getPrincipalFromSession();
+        return principal != null ? principal.getName() : null;
+    }
+
+    @Override
+    public Principal getUserPrincipal() {
+        return getPrincipalFromSession();
+    }
+
+    @Override
+    public boolean isUserInRole(String role) {
+        if (role == null) {
+            return false;
+        }
+        PerfHttpPrincipal principal = getPrincipalFromSession();
+        return principal != null && principal.hasRole(role);
+    }
+
+    @Override
+    public void login(String username, String password) throws ServletException {
+        PerfHttpSessionManager manager = getSessionManager();
+        if (manager == null) {
+            throw new ServletException("PerfHttpSessionManager not registered in WebContext");
+        }
+        Authenticator authenticator = manager.getAuthenticator();
+        if (authenticator == null) {
+            throw new ServletException("No Authenticator registered: define an Authenticator bean to enable login()");
+        }
+        Principal principal = authenticator.authenticate(username, password);
+        if (principal == null) {
+            throw new ServletException("Login failed for user: " + username);
+        }
+        PerfHttpPrincipal perfPrincipal = (principal instanceof PerfHttpPrincipal)
+                ? (PerfHttpPrincipal) principal
+                : new PerfHttpPrincipal(principal.getName());
+        HttpSession session = getSession(true);
+        session.setAttribute(PerfHttpSessionManager.PRINCIPAL_KEY, perfPrincipal);
+    }
+
+    @Override
+    public void logout() throws ServletException {
+        PerfHttpSessionManager manager = getSessionManager();
+        if (manager == null) {
+            return;
+        }
+        HttpSession session = getSession(false);
+        if (session != null) {
+            session.removeAttribute(PerfHttpSessionManager.PRINCIPAL_KEY);
+        }
+    }
+
+    @Override
+    public boolean authenticate(HttpServletResponse response) throws IOException {
+        if (getPrincipalFromSession() != null) {
+            return true;
+        }
+        response.setHeader("WWW-Authenticate", "Basic realm=\"spring-perf-web\"");
+        response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
+        return false;
     }
 
     // ===================== InputStream =====================
@@ -283,7 +573,7 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
         NettyServletInputStream(InputStream in) { this.in = in; }
         @Override public boolean isFinished() { try { return in.available() <= 0; } catch (IOException e) { return true; } }
         @Override public boolean isReady() { return true; }
-        @Override public void setReadListener(ReadListener readListener) { throw AbstractFastFailHttpServletRequest.unsupported("setReadListener"); }
+        @Override public void setReadListener(ReadListener readListener) { throw new UnsupportedOperationException("Non-blocking IO is not supported"); }
         @Override public int read() throws IOException { return in.read(); }
     }
 

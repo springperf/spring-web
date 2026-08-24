@@ -5,7 +5,9 @@ import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.support.HttpInputMessagePart;
 import jakarta.servlet.ServletInputStream;
+import jakarta.servlet.http.Part;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -107,9 +109,100 @@ class PerfHttpServletRequestTest {
     @Test void getLocalPort_returnsMinusOne() { assertEquals(-1, servletRequest.getLocalPort()); }
     @Test void getAuthType_returnsNull() { assertNull(servletRequest.getAuthType()); }
     @Test void getSession_throwsIllegalStateWithoutManager() { assertThrows(IllegalStateException.class, () -> servletRequest.getSession()); assertThrows(IllegalStateException.class, () -> servletRequest.getSession(true)); }
-    @Test void getRequestDispatcher_throwsUnsupported() { assertThrows(UnsupportedOperationException.class, () -> servletRequest.getRequestDispatcher("/path")); }
-    @Test void startAsync_throwsUnsupported() { assertThrows(UnsupportedOperationException.class, () -> servletRequest.startAsync()); }
+    @Test void getRequestDispatcher_returnsDispatcher() { assertNotNull(servletRequest.getRequestDispatcher("/path")); }
+    @Test void startAsync_throwsIllegalStateWithoutResponse() { assertThrows(IllegalStateException.class, () -> servletRequest.startAsync()); }
     @Test void getServletContext_throwsUnsupported() { assertThrows(UnsupportedOperationException.class, () -> servletRequest.getServletContext()); }
-    @Test void login_throwsUnsupported() { assertThrows(UnsupportedOperationException.class, () -> servletRequest.login("u", "p")); }
-    @Test void logout_throwsUnsupported() { assertThrows(UnsupportedOperationException.class, () -> servletRequest.logout()); }
+    @Test void login_throwsServletExceptionWithoutManager() {
+        assertThrows(jakarta.servlet.ServletException.class, () -> {
+            try { servletRequest.login("u", "p"); } catch (jakarta.servlet.ServletException e) { throw e; }
+        });
+    }
+    @Test void logout_doesNothing() throws jakarta.servlet.ServletException { servletRequest.logout(); }
+
+    @Test
+    void getRequestURL_constructsUrl() {
+        when(request.getUriStr()).thenReturn("/api/users");
+        when(headers.getFirst("Host")).thenReturn("example.com");
+        when(props.getInt(PropertiesConstant.SERVER_PORT)).thenReturn(8080);
+        assertEquals("http://example.com:8080/api/users", servletRequest.getRequestURL().toString());
+    }
+
+    @Test
+    void getRequestURL_defaultPort() {
+        when(request.getUriStr()).thenReturn("/test");
+        when(headers.getFirst("Host")).thenReturn("example.com");
+        when(props.getInt(PropertiesConstant.SERVER_PORT)).thenReturn(80);
+        assertEquals("http://example.com/test", servletRequest.getRequestURL().toString());
+    }
+
+    @Test
+    void isRequestedSessionIdFromURL_returnsFalse() {
+        assertFalse(servletRequest.isRequestedSessionIdFromURL());
+    }
+
+    @Test
+    void getInputStream_thenGetReader_throws() {
+        servletRequest.getInputStream();
+        assertThrows(IllegalStateException.class, () -> servletRequest.getReader());
+    }
+
+    @Test
+    void getReader_thenGetInputStream_throws() throws Exception {
+        when(request.getBody()).thenReturn(new ByteArrayInputStream("test".getBytes(StandardCharsets.UTF_8)));
+        when(request.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
+        servletRequest.getReader();
+        assertThrows(IllegalStateException.class, () -> servletRequest.getInputStream());
+    }
+
+    @Test
+    void getParts_returnsParts() throws Exception {
+        HttpInputMessagePart part = mock(HttpInputMessagePart.class);
+        when(part.getSubmittedFileName()).thenReturn("test.txt");
+        MultiValueMap<String, HttpInputMessagePart> partMap = new org.springframework.util.LinkedMultiValueMap<>();
+        partMap.add("file", part);
+        when(request.getPartMap()).thenReturn(partMap);
+        Collection<Part> parts = servletRequest.getParts();
+        assertEquals(1, parts.size());
+        assertEquals("test.txt", parts.iterator().next().getSubmittedFileName());
+    }
+
+    @Test
+    void getParts_notMultipart_throws() {
+        when(request.getPartMap()).thenReturn(null);
+        assertThrows(jakarta.servlet.ServletException.class, () -> servletRequest.getParts());
+    }
+
+    @Test
+    void getPart_returnsPart() throws Exception {
+        HttpInputMessagePart part = mock(HttpInputMessagePart.class);
+        when(part.getSubmittedFileName()).thenReturn("test.txt");
+        MultiValueMap<String, HttpInputMessagePart> partMap = new org.springframework.util.LinkedMultiValueMap<>();
+        partMap.add("file", part);
+        when(request.getPartMap()).thenReturn(partMap);
+        Part result = servletRequest.getPart("file");
+        assertNotNull(result);
+        assertEquals("test.txt", result.getSubmittedFileName());
+    }
+
+    @Test
+    void getPart_missing_returnsNull() throws Exception {
+        when(request.getPartMap()).thenReturn(new org.springframework.util.LinkedMultiValueMap<>());
+        assertNull(servletRequest.getPart("missing"));
+    }
+
+    @Test
+    void upgrade_createsHandler() throws Exception {
+        servletRequest.upgrade(TestHttpUpgradeHandler.class);
+    }
+
+    @Test
+    void setDispatcherType_updatesGetDispatcherType() {
+        servletRequest.setDispatcherType(jakarta.servlet.DispatcherType.FORWARD);
+        assertEquals(jakarta.servlet.DispatcherType.FORWARD, servletRequest.getDispatcherType());
+    }
+
+    static class TestHttpUpgradeHandler implements jakarta.servlet.http.HttpUpgradeHandler {
+        @Override public void init(jakarta.servlet.http.WebConnection wc) { }
+        @Override public void destroy() { }
+    }
 }

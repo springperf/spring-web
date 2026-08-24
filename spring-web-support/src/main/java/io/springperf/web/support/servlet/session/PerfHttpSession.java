@@ -5,8 +5,7 @@ import jakarta.servlet.http.*;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.util.Map;
 
 public class PerfHttpSession implements HttpSession {
 
@@ -81,27 +80,35 @@ public class PerfHttpSession implements HttpSession {
         checkValid();
         Object oldValue = data.getAttribute(name);
         data.setAttribute(name, value);
-        if (!attributeListeners.isEmpty()) {
-            if (oldValue != null) {
+        if (oldValue != null) {
+            unbindValue(name, oldValue);
+            if (!attributeListeners.isEmpty()) {
                 HttpSessionBindingEvent event = new HttpSessionBindingEvent(this, name, oldValue);
                 for (HttpSessionAttributeListener listener : attributeListeners) {
                     listener.attributeReplaced(event);
                 }
-            } else {
+            }
+        } else {
+            if (!attributeListeners.isEmpty()) {
                 HttpSessionBindingEvent event = new HttpSessionBindingEvent(this, name, value);
                 for (HttpSessionAttributeListener listener : attributeListeners) {
                     listener.attributeAdded(event);
                 }
             }
         }
+        bindValue(name, value);
     }
 
     @Override
     public void removeAttribute(String name) {
         checkValid();
         Object oldValue = data.getAttribute(name);
+        if (oldValue == null) {
+            return;
+        }
         data.removeAttribute(name);
-        if (oldValue != null && !attributeListeners.isEmpty()) {
+        unbindValue(name, oldValue);
+        if (!attributeListeners.isEmpty()) {
             HttpSessionBindingEvent event = new HttpSessionBindingEvent(this, name, oldValue);
             for (HttpSessionAttributeListener listener : attributeListeners) {
                 listener.attributeRemoved(event);
@@ -113,7 +120,11 @@ public class PerfHttpSession implements HttpSession {
     public void invalidate() {
         checkValid();
         this.invalid = true;
+        Map<String, Object> attrs = new java.util.HashMap<>(data.getAttributes());
         data.clearAttributes();
+        for (Map.Entry<String, Object> entry : attrs.entrySet()) {
+            unbindValue(entry.getKey(), entry.getValue());
+        }
         Runnable callback = this.onInvalidateCallback;
         if (callback != null) {
             callback.run();
@@ -123,6 +134,18 @@ public class PerfHttpSession implements HttpSession {
             for (HttpSessionListener listener : sessionListeners) {
                 listener.sessionDestroyed(event);
             }
+        }
+    }
+
+    private void bindValue(String name, Object value) {
+        if (value instanceof HttpSessionBindingListener) {
+            ((HttpSessionBindingListener) value).valueBound(new HttpSessionBindingEvent(this, name));
+        }
+    }
+
+    private void unbindValue(String name, Object value) {
+        if (value instanceof HttpSessionBindingListener) {
+            ((HttpSessionBindingListener) value).valueUnbound(new HttpSessionBindingEvent(this, name));
         }
     }
 
@@ -158,72 +181,4 @@ public class PerfHttpSession implements HttpSession {
         }
     }
 
-    // ==================== Minimal ServletContext stub ====================
-
-    public static ServletContext createMinimalServletContext() {
-        return new MinimalServletContext();
     }
-
-    private static class MinimalServletContext implements ServletContext {
-
-        private final ConcurrentMap<String, Object> attributes = new ConcurrentHashMap<>();
-
-        @Override public String getContextPath() { return ""; }
-        @Override public String getServletContextName() { return ""; }
-        @Override public String getServerInfo() { return "spring-perf-web"; }
-        @Override public int getMajorVersion() { return 4; }
-        @Override public int getMinorVersion() { return 0; }
-        @Override public int getEffectiveMajorVersion() { return 4; }
-        @Override public int getEffectiveMinorVersion() { return 0; }
-
-        @Override public Object getAttribute(String name) { return attributes.get(name); }
-        @Override public Enumeration<String> getAttributeNames() { return Collections.enumeration(attributes.keySet()); }
-        @Override public void setAttribute(String name, Object object) { attributes.put(name, object); }
-        @Override public void removeAttribute(String name) { attributes.remove(name); }
-
-        @Override public ServletContext getContext(String uripath) { return null; }
-        @Override public String getMimeType(String file) { return null; }
-        @Override public String getRealPath(String path) { return null; }
-        @Override public java.net.URL getResource(String path) { return null; }
-        @Override public java.io.InputStream getResourceAsStream(String path) { return null; }
-        @Override public java.util.Set<String> getResourcePaths(String path) { return null; }
-        @Override public jakarta.servlet.RequestDispatcher getRequestDispatcher(String path) { return null; }
-        @Override public jakarta.servlet.RequestDispatcher getNamedDispatcher(String name) { return null; }
-        @Override public String getInitParameter(String name) { return null; }
-        @Override public Enumeration<String> getInitParameterNames() { return Collections.emptyEnumeration(); }
-        @Override public boolean setInitParameter(String name, String value) { return false; }
-        @Override public void log(String msg) { }
-        @Override public void log(String message, Throwable throwable) { }
-        @Override public jakarta.servlet.ServletRegistration.Dynamic addServlet(String servletName, String className) { return null; }
-        @Override public jakarta.servlet.ServletRegistration.Dynamic addServlet(String servletName, jakarta.servlet.Servlet servlet) { return null; }
-        @Override public jakarta.servlet.ServletRegistration.Dynamic addServlet(String servletName, Class<? extends jakarta.servlet.Servlet> servletClass) { return null; }
-        @Override public jakarta.servlet.ServletRegistration.Dynamic addJspFile(String servletName, String jspFile) { return null; }
-        @Override public <T extends jakarta.servlet.Servlet> T createServlet(Class<T> c) { return null; }
-        @Override public jakarta.servlet.ServletRegistration getServletRegistration(String servletName) { return null; }
-        @Override public java.util.Map<String, ? extends jakarta.servlet.ServletRegistration> getServletRegistrations() { return Collections.emptyMap(); }
-        @Override public jakarta.servlet.FilterRegistration.Dynamic addFilter(String filterName, String className) { return null; }
-        @Override public jakarta.servlet.FilterRegistration.Dynamic addFilter(String filterName, jakarta.servlet.Filter filter) { return null; }
-        @Override public jakarta.servlet.FilterRegistration.Dynamic addFilter(String filterName, Class<? extends jakarta.servlet.Filter> filterClass) { return null; }
-        @Override public <T extends jakarta.servlet.Filter> T createFilter(Class<T> c) { return null; }
-        @Override public jakarta.servlet.FilterRegistration getFilterRegistration(String filterName) { return null; }
-        @Override public java.util.Map<String, ? extends jakarta.servlet.FilterRegistration> getFilterRegistrations() { return Collections.emptyMap(); }
-        @Override public void addListener(String className) { }
-        @Override public <T extends java.util.EventListener> T createListener(Class<T> c) { return null; }
-        @Override public void addListener(Class<? extends java.util.EventListener> listenerClass) { }
-        @Override public <T extends java.util.EventListener> void addListener(T t) { }
-        @Override public jakarta.servlet.SessionCookieConfig getSessionCookieConfig() { return null; }
-        @Override public void setSessionTrackingModes(java.util.Set<jakarta.servlet.SessionTrackingMode> sessionTrackingModes) { }
-        @Override public java.util.Set<jakarta.servlet.SessionTrackingMode> getDefaultSessionTrackingModes() { return null; }
-        @Override public java.util.Set<jakarta.servlet.SessionTrackingMode> getEffectiveSessionTrackingModes() { return null; }
-        @Override public String getVirtualServerName() { return null; }
-        @Override public int getSessionTimeout() { return 0; }
-        @Override public void setSessionTimeout(int sessionTimeout) { }
-        @Override public String getRequestCharacterEncoding() { return null; }
-        @Override public void setRequestCharacterEncoding(String encoding) { }
-        @Override public String getResponseCharacterEncoding() { return null; }
-        @Override public void setResponseCharacterEncoding(String encoding) { }
-        @Override public jakarta.servlet.descriptor.JspConfigDescriptor getJspConfigDescriptor() { return null; }
-        @Override public ClassLoader getClassLoader() { return Thread.currentThread().getContextClassLoader(); }
-        @Override public void declareRoles(String... roleNames) { }
-    }
-}

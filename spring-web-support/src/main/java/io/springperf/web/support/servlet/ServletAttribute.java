@@ -1,5 +1,6 @@
 package io.springperf.web.support.servlet;
 
+import io.springperf.web.http.NettyServerHttpRequest;
 import io.springperf.web.http.RequestAttribute;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
@@ -48,7 +49,10 @@ public final class ServletAttribute {
         RequestContext ctx = request.getRequestContext();
         ServletAdapterContext adapterContext = getAdapterContext(ctx);
         if (adapterContext == null) {
-            adapterContext = new ServletAdapterContext(new PerfHttpServletRequest(request), new PerfHttpServletResponse(response), null);
+            PerfHttpServletRequest perfRequest = createPerfRequest(request);
+            PerfHttpServletResponse perfResponse = new PerfHttpServletResponse(response);
+            adapterContext = new ServletAdapterContext(perfRequest, perfResponse, null);
+            perfResponse.setAdapterContext(adapterContext);
             setAdapterContext(ctx, adapterContext);
         }
         adapterContext.rebindFrameworkRequest(request);
@@ -64,5 +68,16 @@ public final class ServletAttribute {
     public static HttpServletResponse getResponse(RequestContext ctx) {
         ServletAdapterContext adapter = ctx.getAttribute(ADAPTER_CTX);
         return adapter != null ? adapter.getResponse() : null;
+    }
+
+    /**
+     * 根据底层 request 类型创建合适的 servlet request 包装。
+     * 如果是 Netty 实现，创建 {@link NettyHttpServletRequest} 以支持网络层方法。
+     */
+    public static PerfHttpServletRequest createPerfRequest(WebServerHttpRequest request) {
+        if (request instanceof NettyServerHttpRequest) {
+            return new NettyHttpServletRequest(request);
+        }
+        return new PerfHttpServletRequest(request);
     }
 }

@@ -1,5 +1,7 @@
 package io.springperf.web.support.servlet.filter;
 
+import io.springperf.web.context.LifecycleWebComponent;
+import io.springperf.web.context.WebContext;
 import io.springperf.web.core.filter.FilterChain;
 import io.springperf.web.core.filter.WebFilter;
 import io.springperf.web.http.WebServerHttpRequest;
@@ -7,6 +9,7 @@ import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.support.servlet.PerfHttpServletRequest;
 import io.springperf.web.support.servlet.PerfHttpServletResponse;
 import io.springperf.web.support.servlet.ServletAttribute;
+import io.springperf.web.support.servlet.context.PerfServletContext;
 import io.springperf.web.support.servlet.context.ServletAdapterContext;
 
 import java.util.Collections;
@@ -14,11 +17,13 @@ import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
-public class FilterWrapper implements WebFilter {
+public class FilterWrapper implements WebFilter, LifecycleWebComponent {
 
     protected jakarta.servlet.Filter filter;
 
     protected int order;
+
+    private volatile boolean initialized;
 
     public FilterWrapper(jakarta.servlet.Filter filter) {
         this.filter = filter;
@@ -30,8 +35,53 @@ public class FilterWrapper implements WebFilter {
         this.order = order;
     }
 
+    @Override
+    public void initWithWebContext(WebContext webContext) {
+        if (!initialized) {
+            initialized = true;
+            PerfServletContext servletCtx = webContext.getWebComponent(PerfServletContext.class);
+            String filterName = getComponentName();
+            jakarta.servlet.FilterConfig filterConfig = new PerfFilterConfig(
+                    filterName, servletCtx, resolveInitParams());
+            try {
+                filter.init(filterConfig);
+            } catch (jakarta.servlet.ServletException e) {
+                throw new RuntimeException("Failed to init filter: " + filterName, e);
+            }
+        }
+    }
+
+    /**
+     * 解析 Filter 的 init-param：
+     * <ol>
+     *   <li>从 {@link jakarta.servlet.annotation.WebFilter#initParams()} 读取</li>
+     *   <li>兜底空 Map</li>
+     * </ol>
+     */
+    protected Map<String, String> resolveInitParams() {
+        jakarta.servlet.annotation.WebFilter webFilter =
+                filter.getClass().getAnnotation(jakarta.servlet.annotation.WebFilter.class);
+        if (webFilter == null) {
+            return Collections.emptyMap();
+        }
+        jakarta.servlet.annotation.WebInitParam[] initParams = webFilter.initParams();
+        if (initParams == null || initParams.length == 0) {
+            return Collections.emptyMap();
+        }
+        Map<String, String> result = new java.util.HashMap<>(initParams.length);
+        for (jakarta.servlet.annotation.WebInitParam param : initParams) {
+            result.put(param.name(), param.value());
+        }
+        return result;
+    }
+
     public int getOrder() {
         return order;
+    }
+
+    @Override
+    public void destroyComponent() throws Exception {
+        filter.destroy();
     }
 
     @Override
@@ -53,10 +103,12 @@ public class FilterWrapper implements WebFilter {
     }
 
     protected ServletAdapterContext createServletAdapterContext(WebServerHttpRequest request, WebServerHttpResponse response, FilterChain chain) {
-        PerfHttpServletRequest restRequest = new PerfHttpServletRequest(request);
+        PerfHttpServletRequest restRequest = ServletAttribute.createPerfRequest(request);
         PerfHttpServletResponse restResponse = new PerfHttpServletResponse(response);
         PerfHttpServletFilterChain filterChain = new PerfHttpServletFilterChain(request, response, chain);
-        return new ServletAdapterContext(restRequest, restResponse, filterChain);
+        ServletAdapterContext ctx = new ServletAdapterContext(restRequest, restResponse, filterChain);
+        restResponse.setAdapterContext(ctx);
+        return ctx;
     }
 
     // C4：实例级唯一标识。同类不同实例（不同 bean 名/order/urlPattern，如 Spring Security

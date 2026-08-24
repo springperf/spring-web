@@ -8,9 +8,13 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class AbstractFastFailHttpServletRequest
         implements HttpServletRequest {
+
+    private static final AtomicLong REQUEST_ID_COUNTER = new AtomicLong(1);
+    private final String requestId = Long.toHexString(REQUEST_ID_COUNTER.getAndIncrement());
 
     protected static UnsupportedOperationException unsupported(String method) {
         return new UnsupportedOperationException(
@@ -206,17 +210,22 @@ public abstract class AbstractFastFailHttpServletRequest
 
     @Override
     public String getProtocolRequestId() {
-        return null;
+        return requestId;
     }
 
     @Override
     public String getRequestId() {
-        return null;
+        return requestId;
     }
 
     @Override
     public ServletConnection getServletConnection() {
-        throw unsupported("getServletConnection");
+        return new ServletConnection() {
+            @Override public String getConnectionId() { return requestId; }
+            @Override public String getProtocol() { return "HTTP/1.1"; }
+            @Override public String getProtocolConnectionId() { return requestId; }
+            @Override public boolean isSecure() { return false; }
+        };
     }
 
     // ================= HttpServletRequest =================
