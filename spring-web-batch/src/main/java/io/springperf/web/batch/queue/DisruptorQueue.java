@@ -187,8 +187,13 @@ public class DisruptorQueue {
 
     static int normalizeRingBufferSize(int size) {
         if (size <= 0) return 4096;
+        // C8：禁止退化尺寸。ringBufferSize=1 意味着单槽队列，并发批处理下灾难性
+        // 背压/丢请求；<64 一律提升到最小可用尺寸 64。
+        if (size < 64) return 64;
         int result = Integer.highestOneBit(size);
         if (result < size) result <<= 1;
-        return result > 0 ? result : 4096;
+        // C8：result <<= 1 溢出为负（size > 2^30）时，回退到最大合法 2 的幂 2^30，
+        // 而非静默回退 4096（超出范围由构造器 warn [64, 262144] 提示）。
+        return result > 0 ? result : 1 << 30;
     }
 }

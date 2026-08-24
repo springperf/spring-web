@@ -72,6 +72,37 @@ class RequestBodyResolverTest {
     }
 
     @Test
+    void resolveArgument_required_nullBody_throws() throws Exception {
+        // 回归 P2 正确性组 C3：readBody 对「无匹配 converter / 空 body」静默返回 null，
+        // required 时对齐 Spring 语义抛 HttpMessageNotReadableException（→400），而非放行 null。
+        stubCodecRegistry();
+        Method method = getClass().getMethod("stringParam", String.class);
+        MethodParameter mp = new MethodParameter(method, 0);
+
+        when(httpBodyCodecRegistry.readBody(any(), eq(mp), eq(request), eq(request)))
+                .thenReturn(null);
+
+        RequestBodyResolver resolver = new RequestBodyResolver(webContext, mappingContext, mp, true);
+        assertThrows(HttpMessageNotReadableException.class,
+                () -> resolver.resolveArgument(request, response));
+    }
+
+    @Test
+    void resolveArgument_notRequired_nullBody_returnsNull() throws Exception {
+        stubCodecRegistry();
+        Method method = getClass().getMethod("stringParam", String.class);
+        MethodParameter mp = new MethodParameter(method, 0);
+
+        when(httpBodyCodecRegistry.readBody(any(), eq(mp), eq(request), eq(request)))
+                .thenReturn(null);
+
+        RequestBodyResolver resolver = new RequestBodyResolver(webContext, mappingContext, mp, false);
+        Object result = resolver.resolveArgument(request, response);
+
+        assertNull(result);
+    }
+
+    @Test
     void resolveArgument_notRequired_failure_returnsNull() throws Exception {
         stubCodecRegistry();
         Method method = getClass().getMethod("stringParam", String.class);

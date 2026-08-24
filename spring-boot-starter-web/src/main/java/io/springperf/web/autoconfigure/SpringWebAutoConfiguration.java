@@ -17,6 +17,7 @@ import io.springperf.web.server.NettyHttpServer;
 import io.springperf.web.server.NettyMetricsHandler;
 import io.springperf.web.server.PipelineCustomizer;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -41,13 +42,12 @@ public class SpringWebAutoConfiguration {
     @Bean @ConditionalOnMissingBean
     public ApplicationProperties applicationProperties() { return new ApplicationProperties(); }
 
-    @Bean
+    @Bean @ConditionalOnMissingBean
     public WebContext webContext(List<DispatcherHandler> dispatcherHandlers, ApplicationProperties props) {
-        assertNoSpringMvcConflict();
         return new WebContext(dispatcherHandlers.get(0), props);
     }
 
-    @Bean
+    @Bean @ConditionalOnMissingBean
     public NettyHttpServer nettyHttpServer(WebContext webContext, Environment environment,
                                            ObjectProvider<PipelineCustomizer> pipelineCustomizerProvider) {
         boolean http2Enabled = environment.getProperty("server.http2.enabled", boolean.class, false);
@@ -111,6 +111,16 @@ public class SpringWebAutoConfiguration {
 
             return new MicrometerWebMetrics(meterRegistry);
         }
+    }
+
+    /**
+     * D9：冲突检测提前到容器初始化早期。BeanFactoryPostProcessor 在 bean 定义加载后、
+     * 实例化前执行，比原 webContext bean 方法（实例化阶段）更早暴露问题。
+     * 静态 @Bean 确保本类实例化前即可注册该 post-processor。
+     */
+    @Bean
+    public static BeanFactoryPostProcessor springMvcConflictGuard() {
+        return beanFactory -> assertNoSpringMvcConflict();
     }
 
     private static void assertNoSpringMvcConflict() {

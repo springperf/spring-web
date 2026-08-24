@@ -9,8 +9,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -126,6 +128,29 @@ class ResponseStatusExceptionResolverTest {
         assertTrue(result);
         // The resolver recurses to ex.getCause() and finds @ResponseStatus on ImUsedException
         verify(response).sendError(HttpStatus.IM_USED);
+    }
+
+    // ----- C2/C3: 参数绑定/消息体解析错误 → 400（对齐 Spring DefaultHandlerExceptionResolver） -----
+
+    @Test
+    void resolveException_methodArgumentTypeMismatch_resolvesToBadRequest() {
+        MethodArgumentTypeMismatchException ex = new MethodArgumentTypeMismatchException(
+                "abc", Integer.class, "count", null, new RuntimeException("convert"));
+
+        boolean result = resolver.resolveException(request, response, handler, ex);
+
+        assertTrue(result);
+        verify(response).sendError(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void resolveException_httpMessageNotReadable_resolvesToBadRequest() {
+        HttpMessageNotReadableException ex = new HttpMessageNotReadableException("missing body", request);
+
+        boolean result = resolver.resolveException(request, response, handler, ex);
+
+        assertTrue(result);
+        verify(response).sendError(HttpStatus.BAD_REQUEST);
     }
 
     @Test

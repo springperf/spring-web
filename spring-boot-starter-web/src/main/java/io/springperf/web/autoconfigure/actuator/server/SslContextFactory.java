@@ -6,7 +6,6 @@ import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.Resource;
 
 import javax.net.ssl.KeyManagerFactory;
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.security.KeyStore;
@@ -71,10 +70,13 @@ public final class SslContextFactory {
             String certificate = env.getProperty(prefix + "certificate");
             String privateKey = env.getProperty(prefix + "certificate-private-key");
             if (certificate != null && privateKey != null) {
-                File certFile = resolveFile(certificate);
-                File keyFile = resolveFile(privateKey);
                 String keyPassword = env.getProperty(prefix + "key-password");
-                builder = SslContextBuilder.forServer(certFile, keyFile, keyPassword);
+                // C7：stream-based 加载，支持 classpath: 前缀（JAR 内资源的
+                // getFile() 不可用，旧实现退化成把 "classpath:..." 当文件路径而误导报错）。
+                try (InputStream certIn = openInputStream(certificate);
+                     InputStream keyIn = openInputStream(privateKey)) {
+                    builder = SslContextBuilder.forServer(certIn, keyIn, keyPassword);
+                }
             } else {
                 // JKS / PKCS12 密钥库
                 String keyStorePath = env.getProperty(prefix + "key-store");
@@ -160,22 +162,9 @@ public final class SslContextFactory {
         return false;
     }
 
-    private static File resolveFile(String path) {
-        try {
-            Resource resource = RESOURCE_LOADER.getResource(path);
-            if (resource.exists()) {
-                return resource.getFile();
-            }
-            // 兜底：直接作为文件路径
-            return new File(path);
-        } catch (Exception e) {
-            return new File(path);
-        }
-    }
-
     private static InputStream openInputStream(String path) throws Exception {
         if (path == null) {
-            throw new IllegalArgumentException("key-store path must not be null");
+            throw new IllegalArgumentException("resource path must not be null");
         }
         Resource resource = RESOURCE_LOADER.getResource(path);
         if (resource.exists()) {

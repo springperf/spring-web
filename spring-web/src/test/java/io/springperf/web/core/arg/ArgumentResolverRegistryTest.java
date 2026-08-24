@@ -4,13 +4,19 @@ import io.springperf.web.context.WebContext;
 import io.springperf.web.core.arg.databinder.WebDataBinderRegistry;
 import io.springperf.web.core.arg.provider.*;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.core.mapping.MappingRegistry;
+import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.core.mapping.match.Matcher;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.MethodParameter;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.method.HandlerMethod;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -188,6 +194,25 @@ class ArgumentResolverRegistryTest {
                 registry.validateIfApplicable("test", argCtx, mock(WebServerHttpRequest.class), mock(MappingHandlerMethod.class)));
     }
 
+    // ----- D3: 无默认构造器 @ModelAttribute 启动即失败（fail-fast） -----
+
+    @Test
+    void validateAllParametersResolvable_modelAttributeWithoutDefaultCtor_throws() throws Exception {
+        MappingRegistry mappingRegistry = mock(MappingRegistry.class);
+        when(webContextMock.getWebComponent(MappingRegistry.class)).thenReturn(mappingRegistry);
+
+        NoDefaultCtorController bean = new NoDefaultCtorController();
+        Method method = NoDefaultCtorController.class.getMethod("modelAttrMethod", NoDefaultCtor.class);
+        HandlerMethod handlerMethod = new HandlerMethod(bean, method);
+        PathMappingContext ctx = new PathMappingContext(handlerMethod, Collections.<Matcher>emptyList(), "/model");
+        when(mappingRegistry.getMappingContextList()).thenReturn(Collections.singletonList(ctx));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> registry.validateAllParametersResolvable());
+        assertTrue(ex.getMessage().contains("No primary or default constructor"),
+                "启动校验必须暴露无默认构造器问题，而非等到首个请求 500");
+    }
+
     // ----- helper methods -----
 
     @SuppressWarnings("unused")
@@ -203,5 +228,16 @@ class ArgumentResolverRegistryTest {
         private String field;
         public String getField() { return field; }
         public void setField(String field) { this.field = field; }
+    }
+
+    @Controller
+    static class NoDefaultCtorController {
+        @SuppressWarnings("unused")
+        public void modelAttrMethod(@ModelAttribute("obj") NoDefaultCtor obj) {}
+    }
+
+    public static class NoDefaultCtor {
+        @SuppressWarnings("unused")
+        public NoDefaultCtor(String required) {}
     }
 }

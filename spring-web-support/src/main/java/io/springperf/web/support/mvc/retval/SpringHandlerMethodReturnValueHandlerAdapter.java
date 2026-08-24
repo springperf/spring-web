@@ -4,10 +4,11 @@ import io.springperf.web.context.WebComponentWrapper;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.core.retval.ReturnValueResolver;
+import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
-import io.springperf.web.support.servlet.PerfHttpServletRequest;
-import io.springperf.web.support.servlet.PerfHttpServletResponse;
+import io.springperf.web.support.servlet.ServletAttribute;
+import io.springperf.web.support.servlet.context.ServletAdapterContext;
 import org.springframework.core.MethodParameter;
 import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.context.request.ServletWebRequest;
@@ -62,8 +63,16 @@ public class SpringHandlerMethodReturnValueHandlerAdapter
     @Override
     public void resolveReturnValue(Object returnValue, MethodParameter returnType,
                                    WebServerHttpRequest request, WebServerHttpResponse response) throws Exception {
-        HttpServletRequest servletRequest = new PerfHttpServletRequest(request);
-        HttpServletResponse servletResponse = new PerfHttpServletResponse(response);
+        // C5：复用请求级已缓存的 Servlet 包装（ServletAttribute），避免每次返回都
+        // new PerfHttpServletRequest/Response（P2 正确性组 #12 热路径开销）。
+        RequestContext ctx = request.getRequestContext();
+        ServletAdapterContext adapterCtx = ServletAttribute.getAdapterContext(ctx);
+        if (adapterCtx == null) {
+            // 无 FilterWrapper 建立 adapter context（纯 MVC 路径）：创建并缓存到请求
+            adapterCtx = ServletAttribute.getAdapterContext(request, response);
+        }
+        HttpServletRequest servletRequest = adapterCtx.getRequest();
+        HttpServletResponse servletResponse = adapterCtx.getResponse();
         NativeWebRequest webRequest = new ServletWebRequest(servletRequest, servletResponse);
         ModelAndViewContainer mavContainer = new ModelAndViewContainer();
         mavContainer.setRequestHandled(true);

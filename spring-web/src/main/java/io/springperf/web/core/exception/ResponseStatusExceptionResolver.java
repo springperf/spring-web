@@ -7,11 +7,13 @@ import org.springframework.context.MessageSourceAware;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.lang.Nullable;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 
 public class ResponseStatusExceptionResolver implements HandlerExceptionResolver, MessageSourceAware {
@@ -37,7 +39,10 @@ public class ResponseStatusExceptionResolver implements HandlerExceptionResolver
                 return resolveResponseStatusException((ResponseStatusException) ex, request, response, handler);
             }
 
-            if (ex instanceof MethodArgumentNotValidException) {
+            if (ex instanceof MethodArgumentNotValidException
+                    || ex instanceof MethodArgumentTypeMismatchException
+                    || ex instanceof HttpMessageNotReadableException) {
+                // 对齐 Spring DefaultHandlerExceptionResolver：参数绑定/消息体解析错误 → 400
                 response.sendError(HttpStatus.BAD_REQUEST);
                 return true;
             }
