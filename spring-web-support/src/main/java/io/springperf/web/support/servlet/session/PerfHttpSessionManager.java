@@ -3,6 +3,8 @@ package io.springperf.web.support.servlet.session;
 import io.springperf.web.context.BaseWebComponent;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.http.RequestAttribute;
+import io.springperf.web.support.servlet.Authenticator;
+import io.springperf.web.support.servlet.context.PerfServletContext;
 import org.springframework.core.Ordered;
 
 import javax.servlet.ServletContext;
@@ -27,8 +29,12 @@ public class PerfHttpSessionManager extends BaseWebComponent {
     public static final String DEFAULT_SESSION_COOKIE_NAME = "JSESSIONID";
     static final String REQUESTED_SESSION_ID_ATTR = PerfHttpSessionManager.class.getName() + ".REQUESTED_SESSION_ID";
 
+    /** Session 属性名，用于存储当前已认证的 {@link java.security.Principal}。 */
+    public static final String PRINCIPAL_KEY = PerfHttpSessionManager.class.getName() + ".PRINCIPAL";
+
     private HttpSessionStorage storage;
     private ServletContext servletContext;
+    private Authenticator authenticator;
     private List<HttpSessionListener> sessionListeners = Collections.emptyList();
     private List<HttpSessionAttributeListener> attributeListeners = Collections.emptyList();
 
@@ -41,9 +47,13 @@ public class PerfHttpSessionManager extends BaseWebComponent {
     @Override
     public void initWithWebContext(WebContext webContext) {
         super.initWithWebContext(webContext);
-        this.servletContext = PerfHttpSession.createMinimalServletContext();
+        PerfServletContext servletCtx = new PerfServletContext(webContext);
+        webContext.registerWebComponent(servletCtx);
+        this.servletContext = servletCtx;
         HttpSessionStorage bean = webContext.getBeanFromCtx(HttpSessionStorage.class);
         this.storage = bean != null ? bean : new InMemoryHttpSessionStorage();
+        // Scan for Authenticator bean
+        this.authenticator = webContext.getBeanFromCtx(Authenticator.class);
         // Scan for HttpSessionListener and HttpSessionAttributeListener beans
         this.sessionListeners = new ArrayList<>(
                 webContext.getCtx().getBeansOfType(HttpSessionListener.class).values());
@@ -62,6 +72,14 @@ public class PerfHttpSessionManager extends BaseWebComponent {
     @Override
     public int getOrder() {
         return Ordered.LOWEST_PRECEDENCE - 10000;
+    }
+
+    public ServletContext getServletContext() {
+        return servletContext;
+    }
+
+    public Authenticator getAuthenticator() {
+        return authenticator;
     }
 
     public HttpSessionStorage getStorage() {

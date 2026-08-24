@@ -33,6 +33,14 @@ public class ServletAdapterContext {
         this.filterChain = filterChain;
     }
 
+    public PerfHttpServletRequest getPerfRequest() {
+        return perfRequest;
+    }
+
+    public PerfHttpServletResponse getPerfResponse() {
+        return perfResponse;
+    }
+
     public HttpServletRequest getRequest() {
         return request;
     }
