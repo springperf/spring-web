@@ -5,6 +5,7 @@ import io.springperf.web.context.WebContext;
 import io.springperf.web.core.codec.HttpBodyCodecRegistry;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
 import io.springperf.web.core.retval.ReturnValueResolver;
+import io.springperf.web.core.retval.ReturnValueResolverRegistry;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import org.springframework.core.MethodParameter;
@@ -15,11 +16,13 @@ import org.springframework.http.ResponseEntity;
 public class HttpEntityReturnValueResolver extends BaseWebComponent implements ReturnValueResolver {
 
     private HttpBodyCodecRegistry httpBodyCodecRegistry;
+    private ReturnValueResolverRegistry returnValueResolverRegistry;
 
     @Override
     public void initWithWebContext(WebContext webContext) {
         super.initWithWebContext(webContext);
         httpBodyCodecRegistry = webContext.getWebComponent(HttpBodyCodecRegistry.class);
+        returnValueResolverRegistry = webContext.getWebComponent(ReturnValueResolverRegistry.class);
     }
 
     @Override
@@ -29,7 +32,10 @@ public class HttpEntityReturnValueResolver extends BaseWebComponent implements R
 
     @Override
     public boolean supportsReturnValue(Object returnValue, WebServerHttpRequest req, WebServerHttpResponse resp) {
-        return returnValue instanceof HttpEntity;
+        if (!(returnValue instanceof HttpEntity)) return false;
+        Object body = ((HttpEntity<?>) returnValue).getBody();
+        return returnValueResolverRegistry == null
+                || !returnValueResolverRegistry.isAsyncReturnValue(body, req, resp);
     }
 
     @Override

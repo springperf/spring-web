@@ -18,6 +18,8 @@ import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * Manages a chain of ReturnValueResolvers that process handler method return values into HTTP responses.
@@ -27,6 +29,8 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
     public static final MappingCacheKey<MethodReturnValueContext> MAPPING_CACHE_KEY = MappingCacheKey.createMethodCacheKey(MethodReturnValueContext.class);
 
     private final List<ReturnValueResolver> resolvers = new ArrayList<>();
+    private final ConcurrentMap<Class<?>, Boolean> asyncReturnValueCache = new ConcurrentHashMap<>();
+    private volatile List<ReturnValueResolver> asyncResolvers;
 
     public void initWithWebContext(WebContext webContext) {
         super.initWithWebContext(webContext);
@@ -55,6 +59,44 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
         registerWebComponent(ReturnValueResolver.class);
         // 实际初始化resolvers
         initRealComponentList(resolvers, ReturnValueResolver.class);
+    }
+
+    /**
+     * 判断 returnValue 是否被任意 BaseAsyncReturnValueResolver 支持（即属于异步返回值）。
+     * 结果缓存到 asyncReturnValueCache，避免重复遍历。
+     */
+    public boolean isAsyncReturnValue(Object returnValue, WebServerHttpRequest req, WebServerHttpResponse resp) {
+        if (returnValue == null) return false;
+        Class<?> clazz = returnValue.getClass();
+        Boolean cached = asyncReturnValueCache.get(clazz);
+        if (cached != null) return cached;
+        for (ReturnValueResolver resolver : getAsyncResolvers()) {
+            if (resolver.supportsReturnValue(returnValue, req, resp)) {
+                asyncReturnValueCache.putIfAbsent(clazz, Boolean.TRUE);
+                return true;
+            }
+        }
+        asyncReturnValueCache.putIfAbsent(clazz, Boolean.FALSE);
+        return false;
+    }
+
+    private List<ReturnValueResolver> getAsyncResolvers() {
+        List<ReturnValueResolver> list = this.asyncResolvers;
+        if (list == null) {
+            synchronized (this) {
+                list = this.asyncResolvers;
+                if (list == null) {
+                    list = new ArrayList<>();
+                    for (ReturnValueResolver r : resolvers) {
+                        if (r instanceof BaseAsyncReturnValueResolver) {
+                            list.add(r);
+                        }
+                    }
+                    this.asyncResolvers = list;
+                }
+            }
+        }
+        return list;
     }
 
     public void addResolver(ReturnValueResolver resolver) {
