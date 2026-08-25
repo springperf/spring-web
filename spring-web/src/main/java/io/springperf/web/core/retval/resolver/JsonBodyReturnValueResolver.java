@@ -5,6 +5,7 @@ import io.springperf.web.context.WebContext;
 import io.springperf.web.core.codec.HttpBodyCodecRegistry;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
 import io.springperf.web.core.retval.ReturnValueResolver;
+import io.springperf.web.core.retval.ReturnValueResolverRegistry;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import org.springframework.core.MethodParameter;
@@ -14,11 +15,13 @@ import org.springframework.web.bind.annotation.ResponseBody;
 public class JsonBodyReturnValueResolver extends BaseWebComponent implements ReturnValueResolver {
 
     private HttpBodyCodecRegistry httpBodyCodecRegistry;
+    private ReturnValueResolverRegistry returnValueResolverRegistry;
 
     @Override
     public void initWithWebContext(WebContext webContext) {
         super.initWithWebContext(webContext);
         httpBodyCodecRegistry = webContext.getWebComponent(HttpBodyCodecRegistry.class);
+        returnValueResolverRegistry = webContext.getWebComponent(ReturnValueResolverRegistry.class);
     }
 
     @Override
@@ -29,7 +32,8 @@ public class JsonBodyReturnValueResolver extends BaseWebComponent implements Ret
 
     @Override
     public boolean supportsReturnValue(Object returnValue, WebServerHttpRequest req, WebServerHttpResponse resp) {
-        return true;
+        return returnValueResolverRegistry == null
+                || !returnValueResolverRegistry.isAsyncReturnValue(returnValue, req, resp);
     }
 
     @Override
