@@ -6,12 +6,15 @@ import io.springperf.web.core.filter.WebFilterRegistration;
 import io.springperf.web.support.SupportDispatcherHandler;
 import io.springperf.web.support.arg.provider.HttpServletRequestProvider;
 import io.springperf.web.support.arg.provider.HttpServletResponseProvider;
+import io.springperf.web.support.arg.provider.ServletRequestProvider;
+import io.springperf.web.support.arg.provider.ServletResponseProvider;
 import io.springperf.web.support.arg.provider.WebRequestArgumentResolverProvider;
 import io.springperf.web.support.async.stream.ResponseBodyEmitterReturnValueResolver;
 import io.springperf.web.support.codec.interceptor.SupportHttpBodyCodecInterceptorRegistry;
 import io.springperf.web.support.mvc.config.WebMvcConfigurerBridge;
 import io.springperf.web.support.mvc.interceptor.SupportInterceptorRegistry;
 import io.springperf.web.support.mvc.retval.ModelAndViewReturnValueResolver;
+import io.springperf.web.support.servlet.SupportServletRegistry;
 import io.springperf.web.support.servlet.filter.FilterWrapper;
 import io.springperf.web.support.servlet.filter.SupportWebFilterRegistry;
 import io.springperf.web.support.servlet.session.PerfHttpSessionManager;
@@ -57,6 +60,12 @@ public class SpringWebSupportAutoConfiguration implements ApplicationContextAwar
 
     @Bean @ConditionalOnMissingBean
     public HttpServletResponseProvider httpServletResponseProvider() { return new HttpServletResponseProvider(); }
+
+    @Bean @ConditionalOnMissingBean
+    public ServletRequestProvider servletRequestProvider() { return new ServletRequestProvider(); }
+
+    @Bean @ConditionalOnMissingBean
+    public ServletResponseProvider servletResponseProvider() { return new ServletResponseProvider(); }
 
     @Bean @ConditionalOnMissingBean
     public WebRequestArgumentResolverProvider webRequestArgumentResolverProvider() { return new WebRequestArgumentResolverProvider(); }
@@ -127,6 +136,13 @@ public class SpringWebSupportAutoConfiguration implements ApplicationContextAwar
         PerfHttpSessionManager manager = new PerfHttpSessionManager();
         webContext.registerWebComponent(manager);
         return manager;
+    }
+
+    @Bean @ConditionalOnMissingBean
+    public SupportServletRegistry supportServletRegistry(WebContext webContext) {
+        SupportServletRegistry registry = new SupportServletRegistry();
+        webContext.registerWebComponent(registry);
+        return registry;
     }
 
     @Override

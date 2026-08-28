@@ -152,4 +152,21 @@ class PerfHttpServletResponseTest {
     void encodeRedirectURL_returnsUrl() {
         assertEquals("/test", servletResponse.encodeRedirectURL("/test"));
     }
+
+    @Test
+    void flushBuffer_flushesWriterContentAndResponse() throws Exception {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        when(response.getBody()).thenReturn(baos);
+        when(response.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
+        servletResponse.getWriter().write("servlet content");
+        servletResponse.flushBuffer();
+        assertEquals("servlet content", baos.toString("UTF-8"));
+        verify(response).flush();
+    }
+
+    @Test
+    void flushBuffer_withoutWriter_stillFlushesResponse() throws Exception {
+        servletResponse.flushBuffer();
+        verify(response).flush();
+    }
 }
