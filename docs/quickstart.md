@@ -171,6 +171,42 @@ public ResourceHandlerRegistration resourceHandlerRegistration() {
 }
 ```
 
+### 视图渲染（Thymeleaf / FreeMarker 页面型项目）
+
+页面型项目（服务端渲染模板）迁移需引入 `spring-web-view` 模块：
+
+```xml
+<dependency>
+    <groupId>io.github.springperf</groupId>
+    <artifactId>spring-web-view</artifactId>
+    <version>${spring-web.version}</version>
+</dependency>
+<dependency>
+    <groupId>org.thymeleaf</groupId>
+    <artifactId>thymeleaf</artifactId>
+</dependency>
+```
+
+**可无缝迁移**（无需改代码）：
+
+- `@Controller` 方法返回无 `@ResponseBody` 的 String → 视图名
+- `Model` / `ModelMap` 参数注入、`ModelAndView` 返回
+- `redirect:` 前缀重定向
+- `@ExceptionHandler` 返回视图名渲染错误页
+- Thymeleaf `${...}` / `#{...}` / `@{...}` / `th:*` 表达式
+
+**迁移需调整**：
+
+| Spring MVC 写法 | 本框架行为 | 调整方案 |
+|----------------|-----------|---------|
+| `forward:` 前缀 | 不支持 | 改 `redirect:` 或直接返回视图 |
+| Thymeleaf `#session` / `#request` | 不可用 | 改用 model 属性 |
+| `redirect:/orders/{id}` 路径变量模板 | 不支持 | 显式拼接 query |
+
+**以下能力已对齐，无需改动**：`@ModelAttribute` 参数绑定自动入 model、`@ControllerAdvice @ModelAttribute` 提供者、`@PathVariable` 自动入 model、`BindingResult` 自动入 model、局部 `@ModelAttribute` 方法、`redirect:` 前缀。
+
+> 完整差异清单见 [视图渲染文档](view.md#五与-spring-mvc-的差异)。
+
 ---
 
 ## 四、配置迁移

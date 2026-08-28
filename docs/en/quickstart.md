@@ -171,6 +171,42 @@ public ResourceHandlerRegistration resourceHandlerRegistration() {
 }
 ```
 
+### View Rendering (Thymeleaf / FreeMarker page-oriented projects)
+
+Page-oriented (server-side rendered) projects need the `spring-web-view` module:
+
+```xml
+<dependency>
+    <groupId>io.github.springperf</groupId>
+    <artifactId>spring-web-view</artifactId>
+    <version>${spring-web.version}</version>
+</dependency>
+<dependency>
+    <groupId>org.thymeleaf</groupId>
+    <artifactId>thymeleaf</artifactId>
+</dependency>
+```
+
+**Migrates without changes:**
+
+- `@Controller` methods returning `String` without `@ResponseBody` → view names
+- `Model` / `ModelMap` parameter injection, `ModelAndView` returns
+- `redirect:` prefix
+- `@ExceptionHandler` returning view names to render error pages
+- Thymeleaf `${...}` / `#{...}` / `@{...}` / `th:*` expressions
+
+**Requires adaptation:**
+
+| Spring MVC pattern | This framework behavior | Mitigation |
+|--------------------|-------------------------|------------|
+| `forward:` prefix | Not supported | Use `redirect:` or return the view directly |
+| Thymeleaf `#session` / `#request` | Unavailable | Use model attributes |
+| `redirect:/orders/{id}` path-variable template | Not supported | Concatenate into query explicitly |
+
+**Already aligned, no changes needed**: `@ModelAttribute` parameter auto-merged into model, `@ControllerAdvice @ModelAttribute` providers, `@PathVariable` auto-merge, `BindingResult` auto-merge, local `@ModelAttribute` methods, `redirect:` prefix.
+
+> Full difference list: [View Rendering](view.md#5-differences-from-spring-mvc).
+
 ---
 
 ## 4. Configuration Migration

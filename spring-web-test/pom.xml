@@ -26,6 +26,42 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
         <dependency>
+            <groupId>io.github.springperf</groupId>
+            <artifactId>spring-web-support</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.springperf</groupId>
+            <artifactId>spring-web-view</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.thymeleaf</groupId>
+            <artifactId>thymeleaf</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.freemarker</groupId>
+            <artifactId>freemarker</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.ibeetl</groupId>
+            <artifactId>beetl-core</artifactId>
+            <version>3.21.2.RELEASE</version>
+        </dependency>
+        <dependency>
+            <groupId>com.ibeetl</groupId>
+            <artifactId>beetl-default-antlr4.9-support</artifactId>
+            <version>3.21.2.RELEASE</version>
+        </dependency>
+        <dependency>
+            <groupId>com.ibeetl</groupId>
+            <artifactId>beetl-ext</artifactId>
+            <version>3.21.2.RELEASE</version>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <scope>provided</scope>

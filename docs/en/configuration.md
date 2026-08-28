@@ -100,6 +100,24 @@ When `spring-boot-starter-actuator` is on the classpath, the framework auto-regi
 
 `{name}` is the pool name, matching the name passed to `register()` or the Spring bean name.
 
+## View Rendering (spring-web-view)
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `spring.web.view.engine` | none (all available) | Enabled template engines (comma-separated): `thymeleaf` / `freemarker` / `beetl`; **if unset, all engines on the classpath are registered** |
+| `spring.web.view.thymeleaf.prefix` | `templates/` | Thymeleaf template prefix (classpath-relative) |
+| `spring.web.view.thymeleaf.suffix` | `.html` | Thymeleaf template suffix |
+| `spring.web.view.thymeleaf.cache` | `true` | Template cache (set `false` in development for hot reload) |
+| `spring.web.view.freemarker.prefix` | `templates/` | FreeMarker template prefix (classpath-relative) |
+| `spring.web.view.freemarker.suffix` | `.ftl` | FreeMarker template suffix |
+| `spring.web.view.freemarker.cache` | `true` | Template cache |
+| `spring.web.view.beetl.prefix` | `templates/` | Beetl template prefix (classpath-relative) |
+| `spring.web.view.beetl.suffix` | `.btl` | Beetl template suffix |
+| `spring.web.view.beetl.cache` | `true` | Template cache |
+| `spring.web.view.encoding` | `UTF-8` | Rendering charset, also written to `Content-Type` |
+
+> Full usage: [View Rendering](view.md).
+
 ## OpenAPI Documentation
 
 | Property | Default | Description |

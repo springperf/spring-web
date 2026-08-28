@@ -100,6 +100,24 @@ management.endpoints.web.exposure.include=health,info,metrics
 
 `{name}` 为线程池名称，对应 `register()` 时传入的名称或 Spring Bean 名称。
 
+## 视图渲染（spring-web-view）
+
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `spring.web.view.engine` | 无（全部可用） | 启用的模板引擎列表（逗号分隔）：`thymeleaf` / `freemarker` / `beetl`；**不配置则注册所有 classpath 上可用的引擎** |
+| `spring.web.view.thymeleaf.prefix` | `templates/` | Thymeleaf 模板前缀（classpath 相对路径） |
+| `spring.web.view.thymeleaf.suffix` | `.html` | Thymeleaf 模板后缀 |
+| `spring.web.view.thymeleaf.cache` | `true` | 是否开启模板缓存（开发可设 `false` 热改） |
+| `spring.web.view.freemarker.prefix` | `templates/` | FreeMarker 模板前缀（classpath 相对路径） |
+| `spring.web.view.freemarker.suffix` | `.ftl` | FreeMarker 模板后缀 |
+| `spring.web.view.freemarker.cache` | `true` | 是否开启模板缓存 |
+| `spring.web.view.beetl.prefix` | `templates/` | Beetl 模板前缀（classpath 相对路径） |
+| `spring.web.view.beetl.suffix` | `.btl` | Beetl 模板后缀 |
+| `spring.web.view.beetl.cache` | `true` | 是否开启模板缓存 |
+| `spring.web.view.encoding` | `UTF-8` | 渲染字符集，同时写入 `Content-Type` |
+
+> 详细用法见 [视图渲染文档](view.md)。
+
 ## OpenAPI 文档
 
 | 配置项 | 默认值 | 说明 |
@@ -151,6 +169,13 @@ pool.default-execute-mode=eventloop  # 或线程池名称
 
 # 启动校验
 server.check-on-startup=true
+
+# 视图渲染
+spring.web.view.engine=thymeleaf
+spring.web.view.thymeleaf.prefix=templates/
+spring.web.view.thymeleaf.suffix=.html
+spring.web.view.thymeleaf.cache=true
+spring.web.view.encoding=UTF-8
 
 # 管理端口
 management.server.port=9090

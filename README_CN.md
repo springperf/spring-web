@@ -55,6 +55,7 @@ Spring WebPerf 是一个基于 **Netty** 构建的高性能 Web 框架，定位�
 - **批量处理** — 基于 Disruptor 的请求聚合批处理，透明地将并发请求合并为批量操作，吞吐量可提升数倍；支持背压策略、等待策略、线程池隔离
 - **灵活扩展** — 参数解析器、返回值处理器、编解码 Advice、拦截器、过滤器等关键节点均提供 SPI
 - **生态桥接** — 可通过 support 模块桥接 Servlet Filter、Spring MVC `HandlerInterceptor`、`RequestBodyAdvice` / `ResponseBodyAdvice`
+- **服务端渲染** — 可选 `spring-web-view` 模块支持 Thymeleaf / FreeMarker 模板引擎，`@Controller` + `Model` + 视图名编程模型与 Spring MVC 一致
 - **Actuator 集成** — 支持 Spring Boot Actuator，可配置独立管理端口
 
 ---
@@ -181,7 +182,8 @@ perf 框架吞吐是 Servlet 容器的 **1.6\~12.6x**，p50 延迟 **0.10\~0.11m
 | 模块 | 说明 |
 |------|------|
 | `spring-web` | 核心模块：Netty 服务器、请求分发、映射注册、异常处理等 |
-| `spring-web-support` | Spring MVC 兼容模块：提供 `HandlerInterceptor`、`View` 等适配类 ¹ |
+| `spring-web-view` | 视图渲染模块：Thymeleaf / FreeMarker 模板引擎（可选）¹ |
+| `spring-web-support` | Spring MVC 兼容模块：提供 `HandlerInterceptor`、`View` 等适配类 ² |
 | `spring-web-websocket` | WebSocket 支持模块：基于 Spring WebSocket + Netty |
 | `spring-web-batch` | 批处理模块：基于 Disruptor 的高性能消息聚合与批量处理 |
 | `spring-boot-starter-web` | Spring Boot Starter：自动配置、Actuator 支持 |
@@ -189,7 +191,9 @@ perf 框架吞吐是 Servlet 容器的 **1.6\~12.6x**，p50 延迟 **0.10\~0.11m
 | `spring-web-support-test` | Spring MVC 兼容测试模块 |
 | `spring-web-examples` | 各场景使用示例 |
 
-> ¹ support 模块中部分类使用了 `org.springframework.web.servlet` 包路径（如 `HandlerInterceptor`），与 Spring WebMVC 官方包路径相同。这是有意为之——基于 Spring MVC 接口编写的代码可不改 import 直接运行。但这也意味着本模块与 `spring-webmvc` **二者不能同时存在**，否则运行时会产生类冲突。Java 9+ 模块化系统下也会触发 split package 错误，请务必二选一。
+> ¹ 视图渲染用法见 [视图渲染文档](docs/view.md)，与 Spring MVC 的差异见该文档第五节。
+>
+> ² support 模块中部分类使用了 `org.springframework.web.servlet` 包路径（如 `HandlerInterceptor`），与 Spring WebMVC 官方包路径相同。这是有意为之——基于 Spring MVC 接口编写的代码可不改 import 直接运行。但这也意味着本模块与 `spring-webmvc` **二者不能同时存在**，否则运行时会产生类冲突。Java 9+ 模块化系统下也会触发 split package 错误，请务必二选一。
 >
 > 更多说明：[模块详解](docs/modules.md) · [扩展点指南](docs/extensions.md) · [高级主题](docs/advanced.md)
 

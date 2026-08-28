@@ -88,4 +88,27 @@
 | Servlet API | `javax.servlet` | `jakarta.servlet` |
 | 虚拟线程 | 不支持 | 支持（JDK 21+） |
 | GraalVM native-image | 不支持 | 支持 |
-| 核心开发基线 | 维护分支（bugfix + 功能迭代） | **开发基线**（新功能优先） |
+| `ModelMap` 与 `Model` 接口 | `ModelMap implements Model` | **`ModelMap` 不实现 `Model`**（需 `ExtendedModelMap`） |
+| `spring-web-view` | 视 Backport 情况 | 新功能基线 |
+
+---
+
+## spring-web-view 与 Model 类型差异
+
+视图渲染模块依赖 Spring 的 `org.springframework.ui` 类型。由于 Spring Framework 6.1（master 分支）与 5.3（2.7.x 分支）的类设计不同，**Model 参数注入的实现存在差异**：
+
+| 分支 | Spring Framework | `ModelMap` 是否实现 `Model` | 框架注入实现 | 备注 |
+|------|----------------|---------------------------|--------------|------|
+| `master` | 6.1.x | ❌ 否 | `ExtendedModelMap`（`ModelMap` 子类且实现 `Model`） | 统一注入 `ExtendedModelMap` 以兼容 `Model`/`ModelMap`/`ExtendedModelMap` 三种参数声明 |
+| `2.7.x` | 5.3.x | ✅ 是 | `ExtendedModelMap`（backport 时可简化） | `ModelMap` 本身即可 cast 到 `Model` |
+
+> **Backport 提示**：`spring-web-view` 的 `ModelSupport.getOrCreate()` 在 2.7.x 分支无需特别处理——Spring 5.3 的 `ModelMap` 已实现 `Model`，可复用同一实现。
+
+### Thymeleaf / FreeMarker 版本矩阵
+
+| 分支 | Thymeleaf（BOM 管理） | FreeMarker（BOM 管理） |
+|------|----------------------|------------------------|
+| `3.2.12`（master） | 3.1.2.RELEASE | 2.3.33 |
+| `2.7.18`（2.7.x） | 3.0.15.RELEASE | 2.3.32 |
+
+`spring-web-view` 对引擎为 `provided` 依赖，具体版本由用户侧 Spring Boot BOM 管理，无需模块内指定。
