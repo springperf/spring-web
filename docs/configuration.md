@@ -43,6 +43,7 @@
 | `server.netty.workers` | `0` (自动) | Netty worker EventLoop 线程数，0 表示自动计算（CPU 核数 × 2） |
 | `server.netty.write-buffer-low-watermark` | `8192` (8KB) | 写缓冲区低水位（字节） |
 | `server.netty.write-buffer-high-watermark` | `32768` (32KB) | 写缓冲区高水位（字节） |
+| `server.netty.transport` | `auto` | Netty transport 类型：`auto`（Linux 上自动用 native epoll，其他平台回退 NIO）、`nio`（强制 Java NIO）、`epoll`（强制 native epoll，不可用则启动失败） |
 
 ## HTTP/2
 

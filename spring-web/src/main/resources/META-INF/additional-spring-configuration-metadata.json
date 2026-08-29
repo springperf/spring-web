@@ -50,6 +50,13 @@
       "defaultValue": 30000
     },
     {
+      "name": "server.netty.transport",
+      "type": "java.lang.String",
+      "description": "Netty transport type: auto (default, use native epoll on Linux, fallback to NIO), nio (force Java NIO), epoll (force native epoll, fail on unsupported platform).",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "auto"
+    },
+    {
       "name": "pool.core-pool-size",
       "type": "java.lang.Integer",
       "description": "Default business thread pool core pool size.",

@@ -43,18 +43,20 @@ public void start() {
     // ③ 启动期（单线程、Netty 未接受连接前）获取 DispatcherHandler
     DispatcherHandler dispatcher = webContext.getWebComponent(DispatcherHandler.class);
     this.httpHandler = new NettyHttpHandler(webContext, webContext.getContextPath(), dispatcher);
-    // ④ boss/worker EventLoopGroup
+    // ④ boss/worker EventLoopGroup（transport 由 server.netty.transport 决定）
     int port = webContext.getProps().getInt(PropertiesConstant.SERVER_PORT);
-    bossGroup = new NioEventLoopGroup(1);
     int workerThreads = webContext.getProps().getInt(PropertiesConstant.SERVER_NETTY_WORKERS);
-    workerGroup = workerThreads > 0 ? new NioEventLoopGroup(workerThreads) : new NioEventLoopGroup();
+    String transportMode = webContext.getProps().get(
+            PropertiesConstant.SERVER_NETTY_TRANSPORT, PropertiesConstant.SERVER_NETTY_TRANSPORT_DEFAULT);
+    bossGroup = NettyTransport.newBossGroup(bossThreads, transportMode);
+    workerGroup = NettyTransport.newWorkerGroup(workerThreads, transportMode);
     // ⑤ 收集 PipelineCustomizer 注入的额外 handler
     List<ChannelHandler> beforeAggHandlers = ...;
     List<ChannelHandler> afterAggHandlers = ...;
     // ⑥ ServerBootstrap + ChannelOption + ChannelInitializer
     ServerBootstrap bootstrap = new ServerBootstrap();
     bootstrap.group(bossGroup, workerGroup)
-            .channel(NioServerSocketChannel.class)
+            .channel(NettyTransport.serverChannelClass(transportMode))
             .childOption(ChannelOption.TCP_NODELAY, true)
             .childOption(ChannelOption.WRITE_BUFFER_WATER_MARK,
                     new WriteBufferWaterMark(lowWatermark, highWatermark))
@@ -74,7 +76,7 @@ public void start() {
 
 **③ `DispatcherHandler` 在启动期单线程获取。** 注释写得清楚：在"单线程、Netty 未接受连接前"取一次，存进 `NettyHttpHandler` 字段。运行时多 EventLoop 线程并发调 `httpHandler.httpHandle(req, resp)`，只读这个引用，无需锁。如果改到每请求从 `webContext` 取，就要付 `ConcurrentHashMap.get` 的开销——又是一个"启动时确定、运行时查表"的体现。
 
-**④ boss=1 线程，worker 可配。** `bossGroup = new NioEventLoopGroup(1)`：accept 线程只需 1 个，单线程 accept 对绝大多数吞吐量绰绰有余（Linux `epoll_wait` 一次能取大量就绪连接）。`workerGroup`：`SERVER_NETTY_WORKERS > 0` 用指定数，否则 `new NioEventLoopGroup()`（默认 = CPU 核数 × 2）。
+**④ boss 线程、worker 可配、transport 自动选。** `bossGroup` 默认 1 线程：accept 线程只需 1 个，单线程 accept 对绝大多数吞吐量绰绰有余（Linux `epoll_wait` 一次能取大量就绪连接）。`workerGroup`：`SERVER_NETTY_WORKERS > 0` 用指定数，否则默认 = CPU 核数 × 2。transport 由 `server.netty.transport`（`auto`/`nio`/`epoll`）决定，经 `NettyTransport` 工厂选择 `NioEventLoopGroup`/`EpollEventLoopGroup` 及对应 Channel 实现——`auto` 在 Linux 上自动启用 native epoll（生产主场景），Windows/macOS 回退 NIO。
 
 **⑤ `PipelineCustomizer` SPI 留两个插入点。** 在 aggregator 前后留 `beforeAggHandlers`/`afterAggHandlers`，供其他模块注入 handler。WebSocket 模块用 `addAfterAggregator` 插握手处理器，确保收到的是聚合后的 `FullHttpRequest`（见 [§3.5](#35-pipelinecustomizer-spi两插入点)）。
 
