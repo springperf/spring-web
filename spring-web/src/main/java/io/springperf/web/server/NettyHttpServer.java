@@ -37,6 +37,8 @@ public class NettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
     private boolean http2Enabled;
     private volatile int actualPort;
     private final PipelineCustomizer pipelineCustomizer;
+    /** 本服务器独立的连接计数（与 ManagementNettyHttpServer 各自计数，不共享全局单例）。 */
+    private final NettyMetricsHandler metricsHandler = new NettyMetricsHandler();
 
     public NettyHttpServer(WebContext webContext) {
         this(webContext, null, null);
@@ -108,7 +110,7 @@ public class NettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
                         webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_HEADER_SIZE),
                         webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_CHUNK_SIZE)
                 );
-                        ch.pipeline().addLast(NettyMetricsHandler.INSTANCE);
+                        ch.pipeline().addLast(metricsHandler);
                         innerInit.initChannel(ch);
                     }
                 });
@@ -185,12 +187,12 @@ public class NettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
     }
 
     /**
-     * Returns the current number of active TCP connections tracked by
-     * {@link NettyMetricsHandler}. This includes connections from both the
-     * main server and the management server (if configured).
+     * Returns the current number of active TCP connections tracked by this
+     * server's own {@link NettyMetricsHandler}. This counts connections to the
+     * main server only (the management server counts separately).
      */
     public int getActiveConnectionCount() {
-        return NettyMetricsHandler.INSTANCE.getActiveConnectionCount();
+        return metricsHandler.getActiveConnectionCount();
     }
 
     /**
