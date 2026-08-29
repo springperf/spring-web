@@ -11,6 +11,7 @@ import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.json.JacksonConverter;
 import io.springperf.web.json.JsonConverter;
 import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.scheduling.concurrent.ConcurrentTaskExecutor;
 import org.springframework.web.context.request.async.*;
 
@@ -93,6 +94,12 @@ public class AsyncSupportRegistry extends WebComponentContainer {
         }
         AsyncTaskExecutor executor = webAsyncTask.getExecutor();
         AsyncTaskExecutor effectiveExecutor = executor != null ? executor : defaultTaskExecutor;
+        if (effectiveExecutor == null) {
+            // 无 default 业务线程池（如 pool.core-pool-size<0 禁用了默认池）且方法未显式指定
+            // executor 时兜底为 SimpleAsyncTaskExecutor，避免 NPE（对齐 Spring MVC WebAsyncManager）。
+            effectiveExecutor = new SimpleAsyncTaskExecutor();
+        }
+        final AsyncTaskExecutor executorToUse = effectiveExecutor;
 
         Callable<?> callable = webAsyncTask.getCallable();
         WebAsyncSupportUtils.CallableInterceptorChainAdapter interceptorChain = WebAsyncSupportUtils.newCallableInterceptorChain(webAsyncTask, callableInterceptors);
@@ -118,7 +125,7 @@ public class AsyncSupportRegistry extends WebComponentContainer {
         asyncWebRequest.startAsyncProcessing();
         asyncWebRequest.setAsyncReadyCallback(() -> {
             try {
-                Future<?> future = effectiveExecutor.submit(() -> {
+                Future<?> future = executorToUse.submit(() -> {
                     Object result = null;
                     try {
                         interceptorChain.applyPreProcess(asyncWebRequest, callable);
