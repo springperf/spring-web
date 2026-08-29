@@ -170,9 +170,19 @@ public class WebComponentContainer extends BaseWebComponent {
         }
     }
 
+    /**
+     * 销毁所有子组件并置状态为 {@link State#DESTROY}。
+     * <p>允许从任意已初始化状态（INIT_CONTEXT/PHASE1/PHASE2/PHASE3）进入销毁：
+     * 生命周期中途失败（如 startLifecycle 某 phase 抛异常）时也能清理已初始化的组件，
+     * 而不是停留在中间态无法回收资源。</p>
+     */
     @Override
     public void destroyComponent() throws Exception {
-        if (!state.compareAndSet(State.PHASE3, State.DESTROY)) {
+        State current = state.get();
+        if (current == State.NEW || current == State.DESTROY) {
+            return;
+        }
+        if (!state.compareAndSet(current, State.DESTROY)) {
             return;
         }
         super.destroyComponent();
@@ -183,6 +193,23 @@ public class WebComponentContainer extends BaseWebComponent {
                 log.error("{} destroyComponent fail", component.getComponentName(), e);
             }
         }
+    }
+
+    /**
+     * 状态机是否已处于 DESTROY（destroy 或启动失败清理后）。
+     * 用于支持 stop/restart 场景下重新初始化。
+     */
+    protected boolean isDestroyed() {
+        return state.get() == State.DESTROY;
+    }
+
+    /**
+     * 将状态机从 DESTROY 复位回 NEW，使组件可重新执行完整生命周期（stop/restart 支持）。
+     *
+     * @return 是否成功复位；非 DESTROY 状态返回 false（无需复位）
+     */
+    protected boolean resetAfterDestroy() {
+        return state.compareAndSet(State.DESTROY, State.NEW);
     }
 
     private void initComponentPhase1(WebComponent component) throws Exception {

@@ -3,9 +3,9 @@ package io.springperf.web.context;
 import io.springperf.web.core.DispatcherHandler;
 import io.springperf.web.util.WebUtils;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.DisposableBean;
-import org.springframework.beans.factory.InitializingBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
@@ -24,7 +24,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Initialization proceeds in three phases to respect component ordering dependencies.
  */
 @Data
-public class WebContext extends WebComponentContainer implements InitializingBean, DisposableBean, ApplicationContextAware {
+@Slf4j
+public class WebContext extends WebComponentContainer implements DisposableBean, ApplicationContextAware {
 
     private String contextPath;
     private ApplicationContext ctx;
@@ -43,20 +44,18 @@ public class WebContext extends WebComponentContainer implements InitializingBea
     }
 
     /**
-     * No-op: lifecycle is now deferred to {@link #startLifecycle()},
-     * triggered by {@link io.springperf.web.server.NettyHttpServer#start()}.
-     */
-    @Override
-    public void afterPropertiesSet() {
-    }
-
-    /**
      * Trigger the full WebComponent lifecycle: init contexts, then Phase 1/2/3.
      * <p>Called from {@link io.springperf.web.server.NettyHttpServer#start()} after
      * the Spring context is fully loaded and all beans (including the bridge)
      * have been registered as WebComponents.</p>
+     * <p>失败时清理已初始化的组件并复位 {@link #lifecycleStarted}，使启动失败后可以重试；
+     * 已 {@link #destroy()} 过的实例可通过再次调用本方法重新启动生命周期。</p>
      */
     public void startLifecycle() {
+        // 支持 destroy 后重新 start：状态机停留在 DESTROY，需复位到 NEW 才能重新初始化
+        if (isDestroyed()) {
+            resetAfterDestroy();
+        }
         if (!lifecycleStarted.compareAndSet(false, true)) {
             return;
         }
@@ -66,6 +65,14 @@ public class WebContext extends WebComponentContainer implements InitializingBea
             this.initComponentPhase2();
             this.initComponentPhase3();
         } catch (Exception e) {
+            // 启动失败：清理已初始化的组件（State 可能停在中间态，见 destroyComponent），
+            // 并复位 lifecycleStarted，保证同一实例可重试启动。fail-fast 语义保留（rethrow）。
+            try {
+                this.destroyComponent();
+            } catch (Exception cleanupEx) {
+                log.warn("WebContext cleanup after failed lifecycle start also failed", cleanupEx);
+            }
+            lifecycleStarted.set(false);
             throw new RuntimeException("Failed to start WebContext lifecycle", e);
         }
     }
@@ -78,6 +85,8 @@ public class WebContext extends WebComponentContainer implements InitializingBea
     @Override
     public void destroy() throws Exception {
         this.destroyComponent();
+        // 复位生命周期标记，支持 stop/restart 场景下再次 startLifecycle 重新初始化
+        this.lifecycleStarted.set(false);
     }
 
     /**

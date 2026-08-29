@@ -122,4 +122,66 @@ class WebContextTest {
         webContext.startLifecycle();
         // Should not throw - second call is no-op due to AtomicBoolean guard
     }
+
+    @Test
+    void startLifecycle_failure_cleansUpAndAllowsRetry() throws Exception {
+        // 注册一个 Phase1 抛异常的组件：第一次启动失败
+        LifecycleWebComponent failing = mock(LifecycleWebComponent.class);
+        when(failing.getComponentName()).thenReturn("failing");
+        doThrow(new IllegalStateException("phase1 boom"))
+                .doNothing() // 第二次调用不再抛异常，验证可重试
+                .when(failing).initComponentPhase1();
+        webContext.registerWebComponent(failing);
+
+        assertThrows(RuntimeException.class, () -> webContext.startLifecycle());
+
+        // 失败后应清理已初始化组件，并复位 lifecycleStarted
+        verify(failing).destroyComponent();
+
+        // 第二次启动（该组件不再抛异常）应成功
+        assertDoesNotThrow(() -> webContext.startLifecycle());
+        verify(failing, times(2)).initComponentPhase1();
+    }
+
+    @Test
+    void startLifecycle_failure_cleansUpOtherComponents() throws Exception {
+        // 一个正常组件 + 一个失败组件：失败清理应波及已初始化的正常组件
+        LifecycleWebComponent normal = mock(LifecycleWebComponent.class);
+        when(normal.getComponentName()).thenReturn("normal");
+        webContext.registerWebComponent(normal);
+
+        LifecycleWebComponent failing = mock(LifecycleWebComponent.class);
+        when(failing.getComponentName()).thenReturn("failing");
+        doThrow(new IllegalStateException("phase2 boom")).when(failing).initComponentPhase2();
+        webContext.registerWebComponent(failing);
+
+        assertThrows(RuntimeException.class, () -> webContext.startLifecycle());
+
+        verify(normal).destroyComponent();
+        verify(failing).destroyComponent();
+    }
+
+    @Test
+    void destroy_thenStartLifecycle_restartsCleanly() throws Exception {
+        // F：destroy 后应支持重新 start 完整生命周期
+        webContext.startLifecycle();
+        assertTrue(webContext.getWebContext() != null);
+
+        webContext.destroy();
+
+        // destroy 已复位 lifecycleStarted，再次 start 应重新初始化
+        assertDoesNotThrow(() -> webContext.startLifecycle());
+        verify(handler, atLeast(2)).initWithWebContext(webContext);
+    }
+
+    @Test
+    void destroy_beforeStart_doesNotThrow() throws Exception {
+        // 从未 startLifecycle 直接 destroy：State=NEW 时不应清理组件，也不应抛异常
+        LifecycleWebComponent comp = mock(LifecycleWebComponent.class);
+        when(comp.getComponentName()).thenReturn("unstarted");
+        webContext.registerWebComponent(comp);
+
+        assertDoesNotThrow(() -> webContext.destroy());
+        verify(comp, never()).destroyComponent();
+    }
 }
