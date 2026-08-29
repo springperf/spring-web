@@ -9,3 +9,4 @@ io.springperf.web.autoconfigure.OpenApiAutoConfiguration
 io.springperf.web.autoconfigure.SwaggerUiAutoConfiguration
 io.springperf.web.autoconfigure.SpringWebViewAutoConfiguration
 io.springperf.web.autoconfigure.SpringWebBatchAutoConfiguration
+io.springperf.web.autoconfigure.JspViewAutoConfiguration

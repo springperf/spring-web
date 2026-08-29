@@ -207,7 +207,67 @@ public String save(@ModelAttribute UserForm form) {
 
 ---
 
-## 六、与 Spring MVC 的差异
+## 六、JSP 视图（可选）
+
+除模板引擎外，`spring-web-support` 还通过集成 **Apache Jasper** 提供 JSP 渲染（依赖 `org.apache.tomcat.embed:tomcat-embed-jasper`，optional）。与模板引擎不同，JSP 是"编译成 servlet"的容器技术，必须走 servlet 桥接层，见 [support 桥接内部文档](internals/12-support-bridge.md#512-jsp-视图apache-jasper)。
+
+### 1. 依赖
+
+```xml
+<!-- JSP 引擎（Jasper） -->
+<dependency>
+    <groupId>org.apache.tomcat.embed</groupId>
+    <artifactId>tomcat-embed-jasper</artifactId>
+</dependency>
+<!-- 使用 JSTL 时再加： -->
+<dependency>
+    <groupId>jakarta.servlet.jsp.jstl</groupId>
+    <artifactId>jakarta.servlet.jsp.jstl-api</artifactId>
+    <version>3.0.0</version>
+</dependency>
+<dependency>
+    <groupId>org.glassfish.web</groupId>
+    <artifactId>jakarta.servlet.jsp.jstl</artifactId>
+    <version>3.0.1</version>
+</dependency>
+```
+
+同时存在 `tomcat-embed-jasper` 与 `spring-web-view` 时，`JspViewAutoConfiguration` 自动激活 `JspViewResolver` 并注册 `*.jsp` 路由。
+
+### 2. 视图名规则
+
+| 写法 | 解析路径 |
+|------|---------|
+| `jsp:hello`（前缀形式） | `/jsp/hello.jsp` |
+| `hello.jsp`（后缀形式） | `/jsp/hello.jsp` |
+
+不匹配的视图名返回 null，交其他 `ViewResolver`（Thymeleaf 等）处理。
+
+### 3. model 传递差异（与模板引擎不同）
+
+模板引擎把 model 直接传给渲染 API；**JSP 没有 model 概念，`JspView.render()` 会把 model 写入 request attribute**，JSP 页面用 EL（`${...}`）或 scriptlet 经 `request.getAttribute` 访问：
+
+```java
+@GetMapping("/jsp-view")
+public String jspView(Model model) {
+    model.addAttribute("name", "spring-perf");
+    return "jsp:hello";   // → /jsp/hello.jsp
+}
+```
+
+```jsp
+<%-- src/main/resources/jsp/hello.jsp --%>
+<p>name= ${name}</p>
+```
+
+### 4. 支持能力与局限
+
+- **已验证**：scriptlet、EL、`jsp:include` / `jsp:forward`、静态 `<%@ include %>`、JSTL（`c:forEach` / `c:if`）、复杂 model（Map/List/Bean）
+- **局限**：JSTL/自定义标签需依赖（`/WEB-INF/tld` 自定义标签扫不到，放 classpath `META-INF/`）；无 web.xml（`jsp-config`/`error-page` 不支持）；默认开发模式无预编译；仅 jakarta（Boot 3.x）
+
+---
+
+## 七、与 Spring MVC 的差异
 
 迁移页面型项目前请仔细阅读。**已对齐**的能力（视图名解析、Model 注入、ModelAndView、redirect、`@ResponseBody` 隔离、异常返回视图）不做改动即可迁移，以下差异需要适配：
 
@@ -236,7 +296,7 @@ public String save(@ModelAttribute UserForm form) {
 
 ---
 
-## 七、自定义 ViewResolver
+## 八、自定义 ViewResolver
 
 实现 `io.springperf.web.view.ViewResolver` 接口并注册为 Spring Bean，即被 `ViewResolverRegistry` 自动吸收（按 `getOrder()` 排序）：
 
@@ -258,7 +318,7 @@ public class MyViewResolver extends BaseWebComponent implements ViewResolver {
 
 ---
 
-## 八、相关文档
+## 九、相关文档
 
 - [模块详解](modules.md) — `spring-web-view` 模块架构
 - [配置参考](configuration.md) — 全部配置项

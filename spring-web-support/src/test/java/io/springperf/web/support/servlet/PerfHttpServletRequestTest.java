@@ -48,7 +48,8 @@ class PerfHttpServletRequestTest {
     @Test void getRequestURI_returnsUriStr() { when(request.getUriStr()).thenReturn("/api/users"); assertEquals("/api/users", servletRequest.getRequestURI()); }
     @Test void getQueryString_withQuery() { when(request.getUriStrWithQuery()).thenReturn("/api/users?page=1&size=10"); assertEquals("page=1&size=10", servletRequest.getQueryString()); }
     @Test void getQueryString_withoutQuery_returnsNull() { when(request.getUriStrWithQuery()).thenReturn("/api/users"); assertNull(servletRequest.getQueryString()); }
-    @Test void getPathInfo_returnsPath() { when(request.getPath()).thenReturn("/api/users"); assertEquals("/api/users", servletRequest.getPathInfo()); }
+    @Test void getPathInfo_returnsEmpty() { assertEquals("", servletRequest.getPathInfo()); }
+    @Test void getServletPath_returnsPath() { when(request.getPath()).thenReturn("/api/users"); assertEquals("/api/users", servletRequest.getServletPath()); }
     @Test void getContextPath_returnsWebContextPath() { when(webContext.getContextPath()).thenReturn("/app"); assertEquals("/app", servletRequest.getContextPath()); }
     @Test void getHeader_returnsFirstValue() { when(headers.getFirst("Accept")).thenReturn("application/json"); assertEquals("application/json", servletRequest.getHeader("Accept")); }
     @Test void getHeader_missing_returnsNull() { when(headers.getFirst("X-Missing")).thenReturn(null); assertNull(servletRequest.getHeader("X-Missing")); }
@@ -104,7 +105,6 @@ class PerfHttpServletRequestTest {
     @Test void getCookies_returnsEmptyArray() { assertEquals(0, servletRequest.getCookies().length); }
     @Test void isSecure_returnsFalse() { assertFalse(servletRequest.isSecure()); }
     @Test void getDispatcherType_returnsRequest() { assertEquals(jakarta.servlet.DispatcherType.REQUEST, servletRequest.getDispatcherType()); }
-    @Test void getServletPath_returnsEmptyString() { assertEquals("", servletRequest.getServletPath()); }
     @Test void getRemotePort_returnsMinusOne() { assertEquals(-1, servletRequest.getRemotePort()); }
     @Test void getLocalPort_returnsMinusOne() { assertEquals(-1, servletRequest.getLocalPort()); }
     @Test void getAuthType_returnsNull() { assertNull(servletRequest.getAuthType()); }

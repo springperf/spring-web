@@ -26,6 +26,28 @@
             <groupId>io.github.springperf</groupId>
             <artifactId>spring-web-support</artifactId>
         </dependency>
+        <!-- JSP 视图渲染依赖 spring-web-view（ViewResolver/View SPI） -->
+        <dependency>
+            <groupId>io.github.springperf</groupId>
+            <artifactId>spring-web-view</artifactId>
+        </dependency>
+
+        <!-- JSP E2E 测试（POC：集成 Apache Jasper 验证 JSP 支持） -->
+        <dependency>
+            <groupId>org.apache.tomcat.embed</groupId>
+            <artifactId>tomcat-embed-jasper</artifactId>
+        </dependency>
+        <!-- JSTL（JSP 标签库 POC 验证） -->
+        <dependency>
+            <groupId>jakarta.servlet.jsp.jstl</groupId>
+            <artifactId>jakarta.servlet.jsp.jstl-api</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.glassfish.web</groupId>
+            <artifactId>jakarta.servlet.jsp.jstl</artifactId>
+            <version>3.0.1</version>
+        </dependency>
 
         <!-- WebSocket E2E 测试 -->
         <dependency>

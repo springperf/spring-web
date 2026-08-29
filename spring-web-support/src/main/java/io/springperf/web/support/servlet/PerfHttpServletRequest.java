@@ -79,7 +79,8 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
     }
 
     @Override public String getMethod() { return request.getMethodValue(); }
-    @Override public String getRequestURI() { return request.getUriStr(); }
+      @Override public String getRequestURI() { return request.getUriStr(); }
+      @Override public String getServletPath() { return request.getPath(); }
 
     @Override
     public StringBuffer getRequestURL() {
@@ -102,7 +103,7 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
         return idx >= 0 ? uri.substring(idx + 1) : null;
     }
 
-    @Override public String getPathInfo() { return request.getPath(); }
+      @Override public String getPathInfo() { return ""; }
     @Override public String getContextPath() { return request.getWebContext().getContextPath(); }
     @Override public String getHeader(String name) { return request.getHeaders().getFirst(name); }
     @Override public Enumeration<String> getHeaders(String name) { return Collections.enumeration(request.getHeaders().get(name)); }

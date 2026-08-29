@@ -77,8 +77,8 @@ public class PerfRequestDispatcher implements RequestDispatcher {
         // Save include attributes in request context
         requestContext.setAttribute(RequestDispatcher.INCLUDE_REQUEST_URI, webRequest.getUriStr());
         requestContext.setAttribute(RequestDispatcher.INCLUDE_CONTEXT_PATH, webContext.getContextPath());
-        requestContext.setAttribute(RequestDispatcher.INCLUDE_SERVLET_PATH, "");
-        requestContext.setAttribute(RequestDispatcher.INCLUDE_PATH_INFO, webRequest.getPath());
+        requestContext.setAttribute(RequestDispatcher.INCLUDE_SERVLET_PATH, path);
+        requestContext.setAttribute(RequestDispatcher.INCLUDE_PATH_INFO, "");
         requestContext.setAttribute(RequestDispatcher.INCLUDE_QUERY_STRING, webRequest.getUriStrWithQuery());
 
         DispatcherHandler dispatcher = webContext.getDispatcherHandler();

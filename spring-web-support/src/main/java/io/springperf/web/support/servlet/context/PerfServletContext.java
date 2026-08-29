@@ -44,7 +44,21 @@ public class PerfServletContext implements ServletContext, WebComponent {
     public PerfServletContext(WebContext webContext) {
         this.webContext = webContext;
         this.mimeTypes = loadMimeTypes();
+        this.attributes.put(ServletContext.TEMPDIR, createTempDir());
         readConfig();
+    }
+
+    /**
+     * 创建应用级临时目录，作为 {@link ServletContext#TEMPDIR} 属性。
+     * 供 JSP 编译（Jasper scratchdir）等容器能力使用。
+     */
+    private static java.io.File createTempDir() {
+        java.io.File base = new java.io.File(System.getProperty("java.io.tmpdir"));
+        java.io.File dir = new java.io.File(base, "spring-perf-web-" + System.nanoTime());
+        if (!dir.exists() && !dir.mkdirs()) {
+            return base;
+        }
+        return dir;
     }
 
     private void readConfig() {
