@@ -319,9 +319,8 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
             String threadName = (String) body.get("thread");
             assertNotNull(threadName, "Thread name should be present");
-            // Event loop 线程名通常包含 "nioEventLoopGroup"
-            assertTrue(threadName.contains("nioEventLoopGroup")
-                            || threadName.contains("eventLoop"),
+            // Event loop 线程名包含 EventLoop 标识（NIO: nioEventLoopGroup-*, epoll: epollEventLoopGroup-*）
+            assertTrue(isEventLoopThreadName(threadName),
                     "Event loop thread should contain event loop identifier, got: " + threadName);
         }
     }
@@ -337,8 +336,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
             String threadName = (String) body.get("thread");
             assertNotNull(threadName, "Thread name should be present");
-            assertTrue(threadName.contains("nioEventLoopGroup")
-                            || threadName.contains("eventLoop"),
+            assertTrue(isEventLoopThreadName(threadName),
                     "Event loop thread should contain event loop identifier, got: " + threadName);
         }
     }
@@ -354,8 +352,8 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
             String threadName = (String) body.get("thread");
             assertNotNull(threadName, "Thread name should be present");
-            // Biz pool 线程名不应包含 event loop 标识
-            assertFalse(threadName.contains("nioEventLoopGroup"),
+            // Biz pool 线程名不应包含 event loop 标识（兼容 nio/epoll）
+            assertFalse(isEventLoopThreadName(threadName),
                     "Biz pool thread should NOT be event loop thread, got: " + threadName);
         }
     }
@@ -371,5 +369,14 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(500, resp.code());
         }
+    }
+
+    /**
+     * Event loop 线程名是否包含 EventLoop 标识。
+     * 兼容 NIO（nioEventLoopGroup-*）、epoll（epollEventLoopGroup-*）等不同 transport，
+     * 大小写不敏感匹配（Netty 各实现线程名均含 "EventLoop"）。
+     */
+    private static boolean isEventLoopThreadName(String threadName) {
+        return threadName != null && threadName.toLowerCase().contains("eventloop");
     }
 }
