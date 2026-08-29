@@ -39,9 +39,6 @@ import java.util.concurrent.RejectedExecutionException;
  */
 @Slf4j
 public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
-    private static final StacklessResponseStatusException NOT_FOUND_EXCEPTION = new StacklessResponseStatusException(HttpStatus.NOT_FOUND);
-    private static final StacklessResponseStatusException METHOD_NOT_ALLOWED_EXCEPTION = new StacklessResponseStatusException(HttpStatus.METHOD_NOT_ALLOWED);
-
     protected boolean threadContextInheritable = false;
 
     protected MappingRegistry mappingRegistry;
@@ -152,8 +149,11 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
 
 
     protected void handleOnNoMatchMappingContext(WebServerHttpRequest req, WebServerHttpResponse resp, MappingResult result) {
-        // 404/405：抛出异常走 exceptionRegistry，与 doHandle 中异常路径行为一致
-        ResponseStatusException ex = result.isMethodMismatch() ? METHOD_NOT_ALLOWED_EXCEPTION : NOT_FOUND_EXCEPTION;
+        // 404/405：每请求新建异常（fillInStackTrace 已禁用，零栈轨迹开销），
+        // 避免复用单例导致 @ExceptionHandler 修改 headers/body 污染后续请求。
+        ResponseStatusException ex = result.isMethodMismatch()
+                ? new StacklessResponseStatusException(HttpStatus.METHOD_NOT_ALLOWED)
+                : new StacklessResponseStatusException(HttpStatus.NOT_FOUND);
         try {
             exceptionRegistry.handle(ex, req, resp);
         } finally {
