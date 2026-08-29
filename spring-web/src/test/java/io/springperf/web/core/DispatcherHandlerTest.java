@@ -580,6 +580,35 @@ class DispatcherHandlerTest {
         assertNull(handler.buildLocaleContext(req, resp));
     }
 
+    // ==================== handleWithFilter 异常路径上下文对称管理 ====================
+
+    @Test
+    void handle_filterThrows_initsAndCleansUpContext() throws Exception {
+        WebServerHttpRequest req = createRequest();
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        PathMappingContext mappingContext = mock(PathMappingContext.class);
+        MappingResult matched = MappingResult.matched(mappingContext);
+        MappingResult.set(req, matched);
+        when(mappingRegistry.mapping(req)).thenReturn(matched);
+        // 无线程池：直接 EventLoop 执行，进入 handleWithFilter
+        when(bizPoolRegistry.determinePool(eq(req), eq(matched))).thenReturn(null);
+
+        RuntimeException filterEx = new RuntimeException("filter boom");
+        doThrow(filterEx).when(webFilterRegistry).doFilter(any(), any());
+
+        // spy 以观察上下文初始化/清理调用（buildLocaleContext 返回 null 时 initContextHolders=false，
+        // 无法验证 removeContextHolders，故 stub initContextHolders 返回 true）
+        DispatcherHandler spied = spy(handler);
+        when(spied.initContextHolders(any(), any())).thenReturn(true);
+
+        spied.handle(req, resp);
+
+        // Filter 抛异常时，上下文应与正常路径对称：初始化 + 异常处理 + 清理
+        verify(spied).initContextHolders(req, resp);
+        verify(spied).removeContextHolders(req, resp);
+        verify(exceptionRegistry).handle(filterEx, req, resp);
+    }
+
     // ==================== initWithWebContext ====================
 
     @Test

@@ -177,11 +177,22 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
      */
     private void handleWithFilter(WebServerHttpRequest req, WebServerHttpResponse resp,
                                 MappingResult mappingResult) {
+        boolean initContext = false;
         try {
             webFilterRegistry.doFilter(req, resp);
         } catch (Throwable ex) {
-            handleException(ex, req, resp);
-            invokeWithRealResult(req, resp, null, ex);
+            // Filter 链内抛异常时，handleAfterFilter（正常路径的上下文初始化点）不会执行。
+            // 这里与 handleAfterFilter 对称：初始化上下文后走异常处理与 afterCompletion，
+            // 结束时清理，避免异常处理器/拦截器读到 null 或上一线程残留的 ThreadLocal 值。
+            initContext = initContextHolders(req, resp);
+            try {
+                handleException(ex, req, resp);
+                invokeWithRealResult(req, resp, null, ex);
+            } finally {
+                if (initContext) {
+                    removeContextHolders(req, resp);
+                }
+            }
         }
     }
 
