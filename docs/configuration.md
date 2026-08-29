@@ -15,7 +15,7 @@
 
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
-| `server.http.max-content-length` | `1048576` (1MB) | 最大请求体大小（字节） |
+| `server.http.max-content-length` | `4194304` (4MB) | 最大请求体大小（字节） |
 | `server.http.timeout` | `60000` (60s) | HTTP 请求超时时间（毫秒） |
 
 ## 异步配置
@@ -44,6 +44,10 @@
 | `server.netty.write-buffer-low-watermark` | `8192` (8KB) | 写缓冲区低水位（字节） |
 | `server.netty.write-buffer-high-watermark` | `32768` (32KB) | 写缓冲区高水位（字节） |
 | `server.netty.transport` | `auto` | Netty transport 类型：`auto`（Linux 上自动用 native epoll，其他平台回退 NIO）、`nio`（强制 Java NIO）、`epoll`（强制 native epoll，不可用则启动失败） |
+| `server.netty.so-backlog` | `1024` | TCP listen backlog（生产 Linux 高并发建议值） |
+| `server.netty.so-keepalive` | `true` | 是否启用 TCP keepalive（生产长连接友好） |
+| `server.netty.tcp-nodelay` | `true` | 禁用 Nagle 算法，降低小包延迟 |
+| `server.netty.so-reuseaddr` | `true` | 允许端口重用 |
 
 ## HTTP/2
 

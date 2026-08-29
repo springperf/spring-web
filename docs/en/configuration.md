@@ -15,7 +15,7 @@ All configuration properties are set in `application.properties`.
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `server.http.max-content-length` | `1048576` (1MB) | Maximum request body size (bytes) |
+| `server.http.max-content-length` | `4194304` (4MB) | Maximum request body size (bytes) |
 | `server.http.timeout` | `60000` (60s) | HTTP request timeout (milliseconds) |
 
 ## Async Configuration
@@ -44,6 +44,10 @@ All configuration properties are set in `application.properties`.
 | `server.netty.write-buffer-low-watermark` | `8192` (8KB) | Write buffer low watermark (bytes) |
 | `server.netty.write-buffer-high-watermark` | `32768` (32KB) | Write buffer high watermark (bytes) |
 | `server.netty.transport` | `auto` | Netty transport type: `auto` (use native epoll on Linux, fallback to NIO on other platforms), `nio` (force Java NIO), `epoll` (force native epoll, fail on unsupported platform) |
+| `server.netty.so-backlog` | `1024` | TCP listen backlog (production Linux recommended) |
+| `server.netty.so-keepalive` | `true` | Enable TCP keepalive (production long-connection friendly) |
+| `server.netty.tcp-nodelay` | `true` | Disable Nagle's algorithm for lower latency |
+| `server.netty.so-reuseaddr` | `true` | Allow port reuse |
 
 ## HTTP/2
 
