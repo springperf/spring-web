@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
@@ -15,13 +16,15 @@ public class WebComponentContainer extends BaseWebComponent {
 
     /**
      * web组件容器
+     * <p>并发安全：启动期单线程注册 + 运行期动态注册（如 Actuator 端点）可能并发，
+     * 使用 ConcurrentHashMap 避免请求路径遍历读与动态注册写的竞争。</p>
      */
-    protected Map<String, WebComponent> webComponents = new HashMap<>();
+    protected Map<String, WebComponent> webComponents = new ConcurrentHashMap<>();
 
     /**
      * 添加自动从spring中自动注册的机制
      */
-    protected Map<Class, Function<?, ? extends WebComponent>> autoRegisterComponentMap = new HashMap<>();
+    protected Map<Class, Function<?, ? extends WebComponent>> autoRegisterComponentMap = new ConcurrentHashMap<>();
 
     public <T extends WebComponent> T getWebComponent(Class<T> clazz) {
         List<T> list = getWebComponents(clazz);
@@ -84,20 +87,24 @@ public class WebComponentContainer extends BaseWebComponent {
 
     @SneakyThrows
     public void registerWebComponent(WebComponent webComponent) {
-        if (webComponents.containsKey(webComponent.getComponentName())) {
-            WebComponent oldComponent = webComponents.get(webComponent.getComponentName());
+        String componentName = webComponent.getComponentName();
+        if (componentName == null) {
+            componentName = webComponent.getClass().getSimpleName();
+        }
+        if (webComponents.containsKey(componentName)) {
+            WebComponent oldComponent = webComponents.get(componentName);
             List<WebComponent> list = Arrays.asList(webComponent, oldComponent);
             AnnotationAwareOrderComparator.sort(list);
             WebComponent newComponent = list.get(0);
-            webComponents.put(webComponent.getComponentName(), newComponent);
-            log.warn("{} components have conflicts. Use {} and deprecate {}", webComponent.getComponentName(), newComponent, list.get(1));
+            webComponents.put(componentName, newComponent);
+            log.warn("{} components have conflicts. Use {} and deprecate {}", componentName, newComponent, list.get(1));
             if (newComponent == webComponent) {
                 destroyComponent(oldComponent);
             } else {
                 return;
             }
         } else {
-            webComponents.put(webComponent.getComponentName(), webComponent);
+            webComponents.put(componentName, webComponent);
         }
 
         if (state.get() == State.INIT_CONTEXT || state.get() == State.PHASE1 || state.get() == State.PHASE2 || state.get() == State.PHASE3) {
