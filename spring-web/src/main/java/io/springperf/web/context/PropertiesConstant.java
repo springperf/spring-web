@@ -48,8 +48,14 @@ public final class PropertiesConstant {
     public static final String POOL_KEEP_ALIVE_TIME = "pool.keep-alive-time";
     public static final int POOL_KEEP_ALIVE_TIME_DEFAULT = 60;
 
+    /**
+     * 默认业务线程池任务队列容量。必须为有界值：
+     * 无界队列下 {@code ThreadPoolExecutor} 的 maxPoolSize 永不生效（线程数封顶在 core），
+     * 且队列永不 reject，503 快速失败兜底形同虚设。有界队列让线程池可从 core 扩容到 max，
+     * 满员后请求被拒绝并返回 503（见 DispatcherHandler）。
+     */
     public static final String POOL_QUEUE_CAPACITY = "pool.queue-capacity";
-    public static final int POOL_QUEUE_CAPACITY_DEFAULT = Integer.MAX_VALUE;
+    public static final int POOL_QUEUE_CAPACITY_DEFAULT = 100;
 
     /**
      * 无 {@code @RunInPool} 注解时方法的默认执行位置。

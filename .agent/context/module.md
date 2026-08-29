@@ -658,7 +658,7 @@ DispatcherHandler.handle() (根 HttpHandler)
 
 1. **避免隐藏开销** — 请求路径上的所有操作都应是显式的
 2. **避免隐式对象创建** — 请求路径不 new ArrayList、不装箱
-3. **避免线程切换** — 不需要 `@RunInPool` 的情况下直接在 EventLoop 处理
+3. **避免线程切换** — 默认在 `default` 业务线程池执行（`pool.default-execute-mode=default`），保护 EventLoop 不被阻塞 handler 卡住；仅在显式 `@RunInPool(EVENTLOOP)` / `@RunInEventloop` / `pool.default-execute-mode=eventloop` 时直接 EventLoop 处理，此时业务代码必须非阻塞
 4. **避免阻塞** — EventLoop 线程不执行阻塞操作
 5. **避免反射** — 启动时一次性完成元数据解析 + 缓存，运行时零反射
 6. **避免魔法行为** — 每个扩展点都是显式 SPI

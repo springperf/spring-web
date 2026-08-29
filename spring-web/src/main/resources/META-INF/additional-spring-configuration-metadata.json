@@ -73,9 +73,9 @@
     {
       "name": "pool.queue-capacity",
       "type": "java.lang.Integer",
-      "description": "Business thread pool queue capacity (unbounded if not set).",
+      "description": "Default business thread pool queue capacity. Must be bounded so that maxPoolSize takes effect and overload returns 503 instead of queueing unboundedly.",
       "sourceType": "io.springperf.web.context.ApplicationProperties",
-      "defaultValue": "Integer.MAX_VALUE"
+      "defaultValue": 100
     }
   ]
 }

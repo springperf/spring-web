@@ -2,9 +2,12 @@ package io.springperf.web.core.pool;
 
 import io.springperf.web.annotation.RunInEventloop;
 import io.springperf.web.annotation.RunInPool;
+import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.BaseWebComponent;
+import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.core.metrics.NoOpWebMetrics;
 import io.springperf.web.core.metrics.WebMetrics;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.method.HandlerMethod;
 
 import java.lang.reflect.Field;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -262,6 +266,38 @@ class BizPoolRegistryTest {
         registry.register("myPool", executor);
 
         verify(metrics, never()).registerPoolGauges(any(), any());
+    }
+
+    // ---------------------------------------------------------------
+    // 默认池创建：任务队列必须有界（maxPoolSize 生效 + 503 兜底的前提）
+    // ---------------------------------------------------------------
+
+    @Test
+    void initDefaultPoolFromConfig_createsBoundedQueue() {
+        WebContext mockWebContext = mock(WebContext.class);
+        ApplicationProperties props = mock(ApplicationProperties.class);
+        when(mockWebContext.getProps()).thenReturn(props);
+        when(mockWebContext.getWebComponentWithDefault(eq(WebMetrics.class), any()))
+                .thenReturn(NoOpWebMetrics.INSTANCE);
+        when(props.getInt(PropertiesConstant.POOL_CORE_POOL_SIZE)).thenReturn(50);
+        when(props.getInt(PropertiesConstant.POOL_MAX_POOL_SIZE)).thenReturn(200);
+        when(props.getInt(PropertiesConstant.POOL_KEEP_ALIVE_TIME)).thenReturn(60);
+        when(props.getInt(PropertiesConstant.POOL_QUEUE_CAPACITY))
+                .thenReturn(PropertiesConstant.POOL_QUEUE_CAPACITY_DEFAULT);
+        when(props.getBoolean(eq("spring.threads.virtual.enabled"), eq(false))).thenReturn(false);
+        when(props.get(PropertiesConstant.POOL_DEFAULT_EXECUTE_MODE,
+                PropertiesConstant.POOL_DEFAULT_EXECUTE_MODE_DEFAULT)).thenReturn("default");
+
+        BizPoolRegistry freshRegistry = new BizPoolRegistry();
+        freshRegistry.initWithWebContext(mockWebContext);
+
+        ExecutorService pool = freshRegistry.getDefaultPool();
+        assertNotNull(pool, "default pool should be created from config");
+        assertTrue(pool instanceof ThreadPoolExecutor, "default pool should be a ThreadPoolExecutor");
+        BlockingQueue<Runnable> queue = ((ThreadPoolExecutor) pool).getQueue();
+        assertTrue(queue instanceof LinkedBlockingQueue, "default pool should use LinkedBlockingQueue");
+        assertEquals(PropertiesConstant.POOL_QUEUE_CAPACITY_DEFAULT, queue.remainingCapacity(),
+                "default pool queue must be bounded so maxPoolSize takes effect and overload returns 503");
     }
 
     // ---------------------------------------------------------------
