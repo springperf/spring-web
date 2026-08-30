@@ -117,4 +117,27 @@ class PerfServletContextTest {
     void getRealPath_returnsNullForNonFileResource() {
         assertNull(servletContext.getRealPath("/nonexistent"));
     }
+
+    @Test
+    void tempDir_createdAndAttributeSet() {
+        Object tempDir = servletContext.getAttribute(jakarta.servlet.ServletContext.TEMPDIR);
+        assertNotNull(tempDir);
+        assertTrue(((java.io.File) tempDir).isDirectory());
+    }
+
+    @Test
+    void destroyComponent_removesCreatedTempDir() {
+        java.io.File tempDir = (java.io.File) servletContext.getAttribute(jakarta.servlet.ServletContext.TEMPDIR);
+        assertTrue(tempDir.exists());
+
+        servletContext.destroyComponent();
+
+        assertFalse(tempDir.exists(), "自建临时目录应在销毁时被清理");
+    }
+
+    @Test
+    void destroyComponent_twice_isIdempotent() {
+        servletContext.destroyComponent();
+        assertDoesNotThrow(servletContext::destroyComponent);
+    }
 }

@@ -91,21 +91,22 @@ public class WebComponentContainer extends BaseWebComponent {
         if (componentName == null) {
             componentName = webComponent.getClass().getSimpleName();
         }
-        if (webComponents.containsKey(componentName)) {
-            WebComponent oldComponent = webComponents.get(componentName);
-            List<WebComponent> list = Arrays.asList(webComponent, oldComponent);
-            AnnotationAwareOrderComparator.sort(list);
-            WebComponent newComponent = list.get(0);
-            webComponents.put(componentName, newComponent);
-            log.warn("{} components have conflicts. Use {} and deprecate {}", componentName, newComponent, list.get(1));
-            if (newComponent == webComponent) {
-                destroyComponent(oldComponent);
-            } else {
-                return;
+        final String name = componentName;
+        // compute 原子合并：containsKey/get/put 合一，避免并发注册同名组件时的竞态（误 destroy / 丢失组件）
+        webComponents.compute(name, (key, oldComponent) -> {
+            if (oldComponent != null) {
+                List<WebComponent> list = Arrays.asList(webComponent, oldComponent);
+                AnnotationAwareOrderComparator.sort(list);
+                WebComponent newComponent = list.get(0);
+                log.warn("{} components have conflicts. Use {} and deprecate {}", name, newComponent, list.get(1));
+                if (newComponent == webComponent) {
+                    destroyOldComponentSneaky(oldComponent);
+                    return webComponent;
+                }
+                return oldComponent;
             }
-        } else {
-            webComponents.put(componentName, webComponent);
-        }
+            return webComponent;
+        });
 
         if (state.get() == State.INIT_CONTEXT || state.get() == State.PHASE1 || state.get() == State.PHASE2 || state.get() == State.PHASE3) {
             webComponent.initWithWebContext(webContext);
@@ -241,6 +242,12 @@ public class WebComponentContainer extends BaseWebComponent {
         if (component instanceof LifecycleWebComponent) {
             ((LifecycleWebComponent) component).destroyComponent();
         }
+    }
+
+    /** 供 {@code ConcurrentHashMap.compute} lambda 内调用，抹平受检异常。 */
+    @SneakyThrows
+    private void destroyOldComponentSneaky(WebComponent component) {
+        destroyComponent(component);
     }
 
     private enum State {

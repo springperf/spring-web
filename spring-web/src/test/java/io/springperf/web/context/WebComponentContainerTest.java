@@ -73,6 +73,64 @@ class WebComponentContainerTest {
     }
 
     @Test
+    void registerWebComponent_duplicateName_destroysDeprecatedComponent() throws Exception {
+        WebComponentContainer container = new WebComponentContainer();
+        WebContext webContext = createWebContext();
+        container.initWithWebContext(webContext);
+
+        LifecycleWebComponent highOrder = mock(LifecycleWebComponent.class);
+        when(highOrder.getComponentName()).thenReturn("same");
+        when(highOrder.getOrder()).thenReturn(10);
+
+        LifecycleWebComponent lowOrder = mock(LifecycleWebComponent.class);
+        when(lowOrder.getComponentName()).thenReturn("same");
+        when(lowOrder.getOrder()).thenReturn(20);
+
+        container.registerWebComponent(lowOrder);
+        container.initComponentPhase1();
+        container.registerWebComponent(highOrder);
+
+        assertSame(highOrder, container.webComponents.get("same"));
+        verify(lowOrder).destroyComponent();
+        verify(highOrder, never()).destroyComponent();
+    }
+
+    @Test
+    void registerWebComponent_concurrentSameName_noLostOrDoubleDestroy() throws Exception {
+        // 运行期动态注册（如 Actuator 端点）并发注册同名组件：compute 原子化保证
+        // 最终容器只有一个存活组件，且不会出现丢失或误双重 destroy。
+        WebComponentContainer container = new WebComponentContainer();
+        WebContext webContext = createWebContext();
+        container.initWithWebContext(webContext);
+
+        int threads = 8;
+        java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CyclicBarrier barrier = new java.util.concurrent.CyclicBarrier(threads);
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(threads);
+        java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(threads);
+        for (int i = 0; i < threads; i++) {
+            final int order = 100 + i;
+            pool.submit(() -> {
+                try {
+                    barrier.await();
+                    LifecycleWebComponent comp = mock(LifecycleWebComponent.class);
+                    when(comp.getComponentName()).thenReturn("same");
+                    when(comp.getOrder()).thenReturn(order);
+                    container.registerWebComponent(comp);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                } finally {
+                    done.countDown();
+                }
+            });
+        }
+        assertTrue(done.await(10, java.util.concurrent.TimeUnit.SECONDS));
+        pool.shutdownNow();
+
+        assertEquals(1, container.webComponents.size(), "并发同名注册后容器应只保留一个组件");
+    }
+
+    @Test
     void getWebComponent_returnsFirstMatch() {
         WebComponentContainer container = new WebComponentContainer();
         WebComponent comp = mock(WebComponent.class);

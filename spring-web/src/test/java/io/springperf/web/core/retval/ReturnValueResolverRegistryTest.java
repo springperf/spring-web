@@ -284,6 +284,38 @@ class ReturnValueResolverRegistryTest {
     }
 
     @Test
+    void addResolver_invalidatesAsyncCache_newAsyncResolverRecognized() throws Exception {
+        WebServerHttpRequest req = mock(WebServerHttpRequest.class);
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        Object asyncValue = new StringBuilder("async");
+
+        // 初始无异步解析器：isAsyncReturnValue 缓存 FALSE
+        assertFalse(registry.isAsyncReturnValue(asyncValue, req, resp));
+
+        // 动态注册一个支持 StringBuilder 的异步解析器
+        ReturnValueResolver newAsync = new io.springperf.web.core.retval.resolver.async.BaseAsyncReturnValueResolver() {
+            @Override
+            public boolean supportsReturnType(MethodParameter returnType, MappingHandlerMethod mappingContext) {
+                return false;
+            }
+
+            @Override
+            public boolean supportsReturnValue(Object returnValue, WebServerHttpRequest r, WebServerHttpResponse s) {
+                return returnValue instanceof StringBuilder;
+            }
+
+            @Override
+            public void resolveReturnValue(Object returnValue, MethodParameter returnType,
+                                           WebServerHttpRequest r, WebServerHttpResponse s) {
+            }
+        };
+        registry.addResolver(newAsync);
+
+        // addResolver 已失效缓存：新异步解析器应被识别
+        assertTrue(registry.isAsyncReturnValue(asyncValue, req, resp));
+    }
+
+    @Test
     void lazyCache_nonAsyncType_doesNotSetInnerCache() throws Exception {
         Method method = TestController.class.getMethod("lazyMethod");
         MappingHandlerMethod mapping = new MappingHandlerMethod(new TestController(), method);

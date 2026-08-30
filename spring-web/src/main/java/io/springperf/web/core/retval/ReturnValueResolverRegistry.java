@@ -102,6 +102,9 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
     public void addResolver(ReturnValueResolver resolver) {
         registerWebComponent(resolver);
         initRealComponentList(resolvers, ReturnValueResolver.class);
+        // 动态注册解析器后，失效异步解析器与按类型缓存，确保新注册的异步解析器被识别
+        this.asyncResolvers = null;
+        this.asyncReturnValueCache.clear();
     }
 
     public void resolveReturnValue(Object returnValue, MappingHandlerMethod mappingContext, WebServerHttpRequest req, WebServerHttpResponse resp) throws Exception {

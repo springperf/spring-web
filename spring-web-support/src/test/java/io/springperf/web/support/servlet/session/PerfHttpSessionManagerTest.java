@@ -9,6 +9,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -32,6 +33,21 @@ class PerfHttpSessionManagerTest {
     void getServletContext_returnsPerfServletContext() {
         assertNotNull(manager.getServletContext());
         assertInstanceOf(PerfServletContext.class, manager.getServletContext());
+    }
+
+    @Test
+    void initWithWebContext_reusesRegisteredServletContext() {
+        // ServletContext 已作为独立组件注册时，session 管理器应直接复用，不再新建
+        PerfServletContext registered = mock(PerfServletContext.class);
+        when(webContext.getWebComponent(PerfServletContext.class)).thenReturn(registered);
+        // 清除 @BeforeEach 中 manager.initWithWebContext 产生的历史调用，只统计本测试方法内的行为
+        clearInvocations(webContext);
+
+        PerfHttpSessionManager newManager = new PerfHttpSessionManager();
+        newManager.initWithWebContext(webContext);
+
+        assertSame(registered, newManager.getServletContext());
+        verify(webContext, never()).registerWebComponent(any(PerfServletContext.class));
     }
 
     @Test

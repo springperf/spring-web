@@ -47,8 +47,13 @@ public class PerfHttpSessionManager extends BaseWebComponent {
     @Override
     public void initWithWebContext(WebContext webContext) {
         super.initWithWebContext(webContext);
-        PerfServletContext servletCtx = new PerfServletContext(webContext);
-        webContext.registerWebComponent(servletCtx);
+        // ServletContext 由 auto-config 作为独立组件注册（必然存在）；
+        // 此处直接引用。兜底：未注册时创建并注册（如脱离 auto-config 单独使用）。
+        PerfServletContext servletCtx = webContext.getWebComponent(PerfServletContext.class);
+        if (servletCtx == null) {
+            servletCtx = new PerfServletContext(webContext);
+            webContext.registerWebComponent(servletCtx);
+        }
         this.servletContext = servletCtx;
         HttpSessionStorage bean = webContext.getBeanFromCtx(HttpSessionStorage.class);
         this.storage = bean != null ? bean : new InMemoryHttpSessionStorage();

@@ -1,7 +1,7 @@
 package io.springperf.web.support.servlet.context;
 
 import io.springperf.web.context.PropertiesConstant;
-import io.springperf.web.context.WebComponent;
+import io.springperf.web.context.LifecycleWebComponent;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.support.servlet.PerfRequestDispatcher;
 import jakarta.servlet.FilterRegistration;
@@ -27,7 +27,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-public class PerfServletContext implements ServletContext, WebComponent {
+public class PerfServletContext implements ServletContext, LifecycleWebComponent {
 
     private static final Logger log = LoggerFactory.getLogger(PerfServletContext.class);
 
@@ -36,6 +36,10 @@ public class PerfServletContext implements ServletContext, WebComponent {
     private final Map<String, String> initParameters = new ConcurrentHashMap<>();
     private final Map<String, String> mimeTypes;
     private final PerfSessionCookieConfig sessionCookieConfig = new PerfSessionCookieConfig();
+    /** 本实例实际创建的临时目录（仅此目录可安全删除；未创建成功时为 null）。 */
+    private final java.io.File tempDir;
+    /** 暴露给 {@link ServletContext#TEMPDIR} 的属性值（创建失败回退到系统临时目录，保持非空）。 */
+    private final java.io.File tempDirAttribute;
 
     private int sessionTimeout;
     private String requestCharacterEncoding = "UTF-8";
@@ -44,21 +48,44 @@ public class PerfServletContext implements ServletContext, WebComponent {
     public PerfServletContext(WebContext webContext) {
         this.webContext = webContext;
         this.mimeTypes = loadMimeTypes();
-        this.attributes.put(ServletContext.TEMPDIR, createTempDir());
+        java.io.File base = new java.io.File(System.getProperty("java.io.tmpdir"));
+        java.io.File dir = new java.io.File(base, "spring-perf-web-" + System.nanoTime());
+        if (dir.mkdirs()) {
+            this.tempDir = dir;
+            this.tempDirAttribute = dir;
+        } else {
+            // 创建失败回退到系统临时目录，保证 TEMPDIR 属性非空（Jasper scratchdir 需要）
+            this.tempDir = null;
+            this.tempDirAttribute = base;
+        }
+        this.attributes.put(ServletContext.TEMPDIR, tempDirAttribute);
         readConfig();
     }
 
     /**
-     * 创建应用级临时目录，作为 {@link ServletContext#TEMPDIR} 属性。
-     * 供 JSP 编译（Jasper scratchdir）等容器能力使用。
+     * 销毁时清理应用级临时目录，避免多次启动在系统临时目录中累积泄漏。
+     * <p>仅删除本实例实际创建的目录（{@code tempDir != null}）；创建失败回退到系统
+     * 临时目录时（{@code tempDir == null}）不执行删除，避免误删共享目录。</p>
      */
-    private static java.io.File createTempDir() {
-        java.io.File base = new java.io.File(System.getProperty("java.io.tmpdir"));
-        java.io.File dir = new java.io.File(base, "spring-perf-web-" + System.nanoTime());
-        if (!dir.exists() && !dir.mkdirs()) {
-            return base;
+    @Override
+    public void destroyComponent() {
+        if (tempDir != null && tempDir.exists()) {
+            deleteRecursively(tempDir);
+            log.debug("Cleaned up temp dir {}", tempDir.getAbsolutePath());
         }
-        return dir;
+    }
+
+    private static void deleteRecursively(java.io.File dir) {
+        java.io.File[] children = dir.listFiles();
+        if (children != null) {
+            for (java.io.File child : children) {
+                if (child.isDirectory()) {
+                    deleteRecursively(child);
+                }
+                child.delete();
+            }
+        }
+        dir.delete();
     }
 
     private void readConfig() {

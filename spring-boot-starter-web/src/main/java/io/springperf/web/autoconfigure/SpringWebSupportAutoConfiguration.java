@@ -15,6 +15,7 @@ import io.springperf.web.support.mvc.config.WebMvcConfigurerBridge;
 import io.springperf.web.support.mvc.interceptor.SupportInterceptorRegistry;
 import io.springperf.web.support.mvc.retval.ModelAndViewReturnValueResolver;
 import io.springperf.web.support.servlet.SupportServletRegistry;
+import io.springperf.web.support.servlet.context.PerfServletContext;
 import io.springperf.web.support.servlet.filter.FilterWrapper;
 import io.springperf.web.support.servlet.filter.SupportWebFilterRegistry;
 import io.springperf.web.support.servlet.session.PerfHttpSessionManager;
@@ -129,6 +130,17 @@ public class SpringWebSupportAutoConfiguration implements ApplicationContextAwar
         WebMvcConfigurerBridge bridge = new WebMvcConfigurerBridge();
         webContext.registerWebComponent(bridge);
         return bridge;
+    }
+
+    /**
+     * ServletContext 是 Servlet 桥接层的基础设施，作为独立组件注册（必然存在），
+     * 不依赖 session 管理器创建。JSP/FilterWrapper/SupportServletRegistry 等直接引用。
+     */
+    @Bean @ConditionalOnMissingBean
+    public PerfServletContext perfServletContext(WebContext webContext) {
+        PerfServletContext servletContext = new PerfServletContext(webContext);
+        webContext.registerWebComponent(servletContext);
+        return servletContext;
     }
 
     @Bean @ConditionalOnMissingBean

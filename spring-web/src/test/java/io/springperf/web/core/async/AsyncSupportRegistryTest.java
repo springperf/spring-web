@@ -22,6 +22,8 @@ import java.util.Collections;
 import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.*;
 
@@ -156,5 +158,43 @@ class AsyncSupportRegistryTest {
         WebAsyncTask<String> webAsyncTask = new WebAsyncTask<>(() -> "ok");
 
         assertDoesNotThrow(() -> registry.startCallableProcessing(asyncWebRequest, webAsyncTask));
+    }
+
+    @Test
+    void startCallableProcessing_withoutDefaultPool_createsReusableFallbackExecutor() throws Exception {
+        BizPoolRegistry bizPoolRegistry = mock(BizPoolRegistry.class);
+        when(bizPoolRegistry.getDefaultPool()).thenReturn(null);
+        when(webContext.getWebComponent(BizPoolRegistry.class)).thenReturn(bizPoolRegistry);
+        when(webContext.getCtx()).thenReturn(applicationContext);
+        when(applicationContext.getBeansOfType(CallableProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
+        when(applicationContext.getBeansOfType(DeferredResultProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
+        doReturn(null).when(webContext).getBeanFromCtx(com.fasterxml.jackson.databind.ObjectMapper.class);
+        when(webContext.getWebComponentWithDefault(eq(JsonConverter.class), any(JsonConverter.class)))
+                .thenReturn(mock(JsonConverter.class));
+
+        registry.initWithWebContext(webContext);
+        registry.initComponentPhase1();
+        registry.initComponentPhase2();
+
+        // 连续两次异步任务（均无显式 executor），兜底 executor 应懒加载且复用同一实例
+        for (int i = 0; i < 2; i++) {
+            doAnswer(invocation -> {
+                Runnable callback = invocation.getArgument(0);
+                callback.run();
+                return null;
+            }).when(asyncWebRequest).setAsyncReadyCallback(any(Runnable.class));
+            WebAsyncTask<String> task = new WebAsyncTask<>(() -> "ok");
+            assertDoesNotThrow(() -> registry.startCallableProcessing(asyncWebRequest, task));
+        }
+
+        Object fallback = getFallbackExecutor(registry);
+        assertNotNull(fallback, "无默认池时兜底 executor 应被懒加载创建");
+        assertInstanceOf(org.springframework.core.task.SimpleAsyncTaskExecutor.class, fallback);
+    }
+
+    private static Object getFallbackExecutor(AsyncSupportRegistry registry) throws Exception {
+        java.lang.reflect.Field field = AsyncSupportRegistry.class.getDeclaredField("fallbackExecutor");
+        field.setAccessible(true);
+        return field.get(registry);
     }
 }
