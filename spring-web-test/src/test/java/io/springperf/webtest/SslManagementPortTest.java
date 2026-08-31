@@ -64,25 +64,25 @@ public class SslManagementPortTest {
 
     @Test
     void mainPortHttp_shouldStillWork() throws Exception {
-        // 管理端口隔离模式下主端口不提供 Actuator 端点，验证 HTTP 服务器本身可达
+        // 管理端口隔离模式下主端口不提供 Actuator 端点，但业务 HTTP 服务应正常
         Request req = new Request.Builder()
-                .url("http://localhost:9095/api/core/hello")
+                .url("http://localhost:9095/api/core/bytes")
                 .get()
                 .build();
         try (Response resp = PLAIN_CLIENT.newCall(req).execute()) {
-            // 业务端点应正常响应
-            assertTrue(resp.code() == 200 || resp.code() == 404,
-                    "Main port should be reachable via HTTP, got " + resp.code());
+            assertEquals(200, resp.code(), "主端口业务端点应通过 HTTP 正常响应");
+            assertEquals("Hello, Bytes!", resp.body().string());
         }
     }
 
     @Test
     void managementPortHttp_shouldBeRejected() {
+        // 管理端口仅监听 HTTPS：明文 HTTP 请求应因 TLS 握手失败被拒绝（IO 层异常），而非返回 200
         Request req = new Request.Builder()
                 .url("http://localhost:9094/actuator/health")
                 .get()
                 .build();
-        assertThrows(Exception.class, () -> {
+        assertThrows(java.io.IOException.class, () -> {
             try (Response resp = new OkHttpClient.Builder()
                     .connectTimeout(Duration.ofSeconds(2))
                     .readTimeout(Duration.ofSeconds(2))

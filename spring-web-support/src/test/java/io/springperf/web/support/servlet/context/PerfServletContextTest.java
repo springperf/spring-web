@@ -1,6 +1,7 @@
 package io.springperf.web.support.servlet.context;
 
 import io.springperf.web.context.WebContext;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,6 +27,13 @@ class PerfServletContextTest {
         lenient().when(props.get(anyString(), anyString())).thenAnswer(invocation -> invocation.getArgument(1));
         lenient().when(webContext.getProps()).thenReturn(props);
         servletContext = new PerfServletContext(webContext);
+    }
+
+    @AfterEach
+    void tearDown() {
+        // 构造 PerfServletContext 会在系统临时目录创建 spring-perf-web-<nanoTime>，
+        // 除验证清理语义的用例（自行调用 destroy）外，统一清理避免残留目录
+        servletContext.destroyComponent();
     }
 
     @Test

@@ -61,9 +61,9 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
-            // 框架 LocaleResolver 解析 Accept-Language
+            // 框架 LocaleResolver 解析 Accept-Language，控制器返回 toLanguageTag()
             String body = resp.body().string();
-            assertNotNull(body, "Locale should be resolved");
+            assertEquals("zh-CN", body, "应解析 Accept-Language 为对应 Locale，实际: " + body);
         }
     }
 
@@ -75,7 +75,9 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
-            assertNotNull(resp.body().string(), "Default locale should be returned");
+            String body = resp.body().string();
+            assertNotNull(body, "Default locale should be returned");
+            assertFalse(body.isEmpty());
         }
     }
 

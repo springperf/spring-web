@@ -75,6 +75,9 @@ class SseEmitterTest {
     void eventBuilder_name_appendsEventLine() {
         Set<SseEmitter.DataWithMediaType> result = SseEmitter.event().name("user-update").build();
         assertFalse(result.isEmpty());
+        String content = result.iterator().next().getData().toString();
+        assertTrue(content.contains("event:user-update"),
+                "应生成 event: 行，实际: " + content);
     }
 
     @Test
@@ -88,12 +91,21 @@ class SseEmitterTest {
     void eventBuilder_comment_appendsCommentLine() {
         Set<SseEmitter.DataWithMediaType> result = SseEmitter.event().comment("heartbeat").build();
         assertFalse(result.isEmpty());
+        String content = result.iterator().next().getData().toString();
+        assertTrue(content.contains(":heartbeat"),
+                "应生成注释行(:heartbeat)，实际: " + content);
     }
 
     @Test
     void eventBuilder_data_only() {
         Set<SseEmitter.DataWithMediaType> result = SseEmitter.event().data("hello").build();
         assertFalse(result.isEmpty());
+        // data() 会把 "data:" 前缀与 object 分成多个 DataWithMediaType，需拼接全部内容校验
+        String content = result.stream()
+                .map(d -> d.getData().toString())
+                .reduce("", String::concat);
+        assertTrue(content.contains("data:"), "应含 data: 前缀，实际: " + content);
+        assertTrue(content.contains("hello"), "应含数据内容，实际: " + content);
     }
 
     @Test

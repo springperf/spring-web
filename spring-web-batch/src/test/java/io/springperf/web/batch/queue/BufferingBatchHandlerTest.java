@@ -174,13 +174,29 @@ class BufferingBatchHandlerTest {
     }
 
     @Test
-    void flush_whenEmpty_doesNothing() {
+    void onEvent_endOfBatch_flushesOnce() {
         BufferingBatchHandler handler = new BufferingBatchHandler(executor, meta, bean, 0);
-        // No events added, no onEvent call = buffer is empty
-        // The handler's flush() is called via onEvent with endOfBatch, but since no requests, should be noop
+        // endOfBatch=true 时单事件也应触发一次 flush（提交到 executor）
         handler.onEvent(newEvent(new BatchRequest<String>() {
         }), 0L, true);
-        // Actually with one event, it should flush once
+        verify(executor, times(1)).execute(any(Runnable.class));
+    }
+
+    @Test
+    void flushRemaining_emptyBuffer_doesNothing() {
+        BufferingBatchHandler handler = new BufferingBatchHandler(executor, meta, bean, 0);
+        // 空缓冲：flushRemaining 不应调度任何任务（提前 return）
+        handler.flushRemaining();
+        verify(executor, never()).execute(any(Runnable.class));
+    }
+
+    @Test
+    void flushRemaining_nonEmptyBuffer_flushes() {
+        BufferingBatchHandler handler = new BufferingBatchHandler(executor, meta, bean, 0);
+        // 优雅停机路径：缓冲非空时 flushRemaining 应把剩余请求提交执行
+        handler.onEvent(newEvent(new BatchRequest<String>() {
+        }), 0L, false);
+        handler.flushRemaining();
         verify(executor, times(1)).execute(any(Runnable.class));
     }
 

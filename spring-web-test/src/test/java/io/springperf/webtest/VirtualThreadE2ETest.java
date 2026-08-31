@@ -65,7 +65,7 @@ public class VirtualThreadE2ETest {
 
     @Test
     void runInPool_withDefaultPool_shouldUsePlatformThread() throws Exception {
-        // JDK 17 下虚拟线程不可用，验证 biz pool 使用平台线程
+        // JDK 17 下虚拟线程不可用，且虚拟线程命名前缀为 perf-virtual-：验证 biz pool 使用平台线程
         Request req = new Request.Builder()
                 .url(baseUrl + "/core/pool/biz-pool")
                 .get()
@@ -75,7 +75,9 @@ public class VirtualThreadE2ETest {
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
             assertNotNull(body);
             String threadName = (String) body.get("thread");
-            System.out.println("[VirtualThreadE2ETest] @RunInPool thread=" + threadName);
+            assertNotNull(threadName);
+            assertFalse(threadName.startsWith("perf-virtual-"),
+                    "@RunInPool 默认池应使用平台线程，实际线程名: " + threadName);
         }
     }
 

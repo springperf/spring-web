@@ -230,8 +230,11 @@ class PerfHttpSessionTest {
 
     @Test
     void markAccessed_updatesLastAccessedTime() {
+        long before = data.getLastAccessedTime();
         session.markAccessed();
-        assertTrue(session.getLastAccessedTime() >= 1000L);
+        assertTrue(session.getLastAccessedTime() > before,
+                "markAccessed 应把最后访问时间更新为当前时间（" + before + " -> "
+                        + session.getLastAccessedTime() + "）");
     }
 
     @Test

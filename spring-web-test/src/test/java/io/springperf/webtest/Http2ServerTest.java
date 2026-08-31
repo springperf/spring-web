@@ -63,7 +63,10 @@ public class Http2ServerTest {
                 .build();
 
         try (Response response = client.newCall(request).execute()) {
-            System.out.println("POST Status: " + response.code() + " Body: " + response.body().string());
+            assertTrue(response.isSuccessful(), "h2c POST 应成功，实际状态码: " + response.code());
+            assertEquals(Protocol.H2_PRIOR_KNOWLEDGE, response.protocol(), "请求应通过 h2c 传输");
+            String body = response.body().string();
+            assertTrue(body.contains("test"), "响应应回显请求体 name=test，实际: " + body);
         }
     }
 

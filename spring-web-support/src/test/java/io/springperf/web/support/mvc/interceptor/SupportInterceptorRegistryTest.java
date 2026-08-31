@@ -87,6 +87,9 @@ class SupportInterceptorRegistryTest {
         InterceptorRegistration result = registry.convert((HandlerInterceptor) mapped);
 
         assertNotNull(result);
+        // include/exclude 路径应从 MappedInterceptor 复制到注册项
+        assertEquals(java.util.List.of("/api/**"), readList(result, "includePatterns"));
+        assertEquals(java.util.List.of("/api/public/**"), readList(result, "excludePatterns"));
     }
 
     @Test
@@ -98,6 +101,19 @@ class SupportInterceptorRegistryTest {
         InterceptorRegistration result = registry.convert((HandlerInterceptor) mapped);
 
         assertNotNull(result);
+        assertEquals(java.util.List.of("/secure/*"), readList(result, "includePatterns"));
+        assertTrue(readList(result, "excludePatterns").isEmpty(), "无 exclude 时不应产生排除路径");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static java.util.List<String> readList(InterceptorRegistration registration, String fieldName) {
+        try {
+            java.lang.reflect.Field field = InterceptorRegistration.class.getDeclaredField(fieldName);
+            field.setAccessible(true);
+            return (java.util.List<String>) field.get(registration);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Test

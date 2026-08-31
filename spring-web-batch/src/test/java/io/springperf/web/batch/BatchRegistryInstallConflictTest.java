@@ -52,19 +52,22 @@ class BatchRegistryInstallConflictTest {
         Method install = BatchRegistry.class.getDeclaredMethod("install", BatchHandlerRegistration.class);
         install.setAccessible(true);
 
-        // 首次安装成功：Disruptor 线程启动
-        install.invoke(registry, newRegistration());
-        awaitDisruptorThreadCount(QUEUE, 1);
+        try {
+            // 首次安装成功：Disruptor 线程启动
+            install.invoke(registry, newRegistration());
+            awaitDisruptorThreadCount(QUEUE, 1);
 
-        // 二次同名安装：抛 IllegalStateException，且新建队列的线程被 shutdown
-        InvocationTargetException ex =
-                assertThrows(InvocationTargetException.class, () -> install.invoke(registry, newRegistration()));
-        assertTrue(ex.getCause() instanceof IllegalStateException, "冲突应抛 IllegalStateException");
+            // 二次同名安装：抛 IllegalStateException，且新建队列的线程被 shutdown
+            InvocationTargetException ex =
+                    assertThrows(InvocationTargetException.class, () -> install.invoke(registry, newRegistration()));
+            assertTrue(ex.getCause() instanceof IllegalStateException, "冲突应抛 IllegalStateException");
 
-        // 冲突路径新建的 queue 已被 shutdown，其 Disruptor 线程终止，只剩首次那个
-        awaitDisruptorThreadCount(QUEUE, 1);
-
-        shutdownQueues(registry);
+            // 冲突路径新建的 queue 已被 shutdown，其 Disruptor 线程终止，只剩首次那个
+            awaitDisruptorThreadCount(QUEUE, 1);
+        } finally {
+            // 无论如何都清理已安装的队列，避免非 daemon Disruptor 线程泄漏挂住测试 JVM
+            shutdownQueues(registry);
+        }
     }
 
     private static BatchHandlerRegistration newRegistration() throws Exception {

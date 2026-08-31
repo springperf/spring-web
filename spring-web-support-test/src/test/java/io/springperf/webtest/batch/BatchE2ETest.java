@@ -7,8 +7,8 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -29,7 +29,7 @@ public class BatchE2ETest extends BaseE2ETest {
         ExecutorService executor = Executors.newFixedThreadPool(requestCount);
         CountDownLatch latch = new CountDownLatch(requestCount);
         AtomicInteger successCount = new AtomicInteger(0);
-        List<String> failures = new ArrayList<>();
+        List<String> failures = new CopyOnWriteArrayList<>();
 
         for (int i = 0; i < requestCount; i++) {
             executor.submit(() -> {
@@ -103,7 +103,7 @@ public class BatchE2ETest extends BaseE2ETest {
         ExecutorService executor = Executors.newFixedThreadPool(requestCount);
         CountDownLatch latch = new CountDownLatch(requestCount);
         AtomicInteger successCount = new AtomicInteger(0);
-        List<String> failures = new ArrayList<>();
+        List<String> failures = new CopyOnWriteArrayList<>();
 
         for (int i = 0; i < requestCount; i++) {
             executor.submit(() -> {
@@ -142,7 +142,7 @@ public class BatchE2ETest extends BaseE2ETest {
         ExecutorService executor = Executors.newFixedThreadPool(requestCount);
         CountDownLatch latch = new CountDownLatch(requestCount);
         AtomicInteger errorCount = new AtomicInteger(0);
-        List<String> failures = new ArrayList<>();
+        List<String> failures = new CopyOnWriteArrayList<>();
 
         for (int i = 0; i < requestCount; i++) {
             executor.submit(() -> {
@@ -186,7 +186,7 @@ public class BatchE2ETest extends BaseE2ETest {
         ExecutorService executor = Executors.newFixedThreadPool(requestCount);
         CountDownLatch latch = new CountDownLatch(requestCount);
         AtomicInteger successCount = new AtomicInteger(0);
-        List<String> failures = new ArrayList<>();
+        List<String> failures = new CopyOnWriteArrayList<>();
 
         for (int i = 0; i < requestCount; i++) {
             executor.submit(() -> {

@@ -24,7 +24,7 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = Objects.toString(resp.body().string(), "");
-            assertTrue(body.contains("xCustomHeader") || body.contains("userAgent"));
+            assertTrue(body.contains("my-value"), "应回显 X-Custom-Header 值，实际: " + body);
         }
     }
 
@@ -55,6 +55,9 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
         Request req = new Request.Builder().url(baseUrl + "/deferred-result").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
+            String body = resp.body().string();
+            assertTrue(body.contains("\"status\"") && body.contains("\"ok\""),
+                    "DeferredResult 应返回异步结果 {\"status\":\"ok\"}，实际: " + body);
         }
     }
 
@@ -63,6 +66,9 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
         Request req = new Request.Builder().url(baseUrl + "/callable").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
+            String body = resp.body().string();
+            assertTrue(body.contains("\"from\"") && body.contains("callable"),
+                    "Callable 应返回异步结果 {\"from\":\"callable\"}，实际: " + body);
         }
     }
 
@@ -71,6 +77,9 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
         Request req = new Request.Builder().url(baseUrl + "/listenable-future").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
+            String body = resp.body().string();
+            assertTrue(body.contains("listenable-future-result"),
+                    "ListenableFuture 应返回异步结果，实际: " + body);
         }
     }
 
@@ -90,6 +99,10 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             assertNotNull(resp.header("Content-Type"));
+            // 读取 body 验证资源内容（static/test.txt）
+            String body = resp.body().string();
+            assertTrue(body.contains("Hello, Static Resource!"),
+                    "Resource 应返回文件内容，实际: " + body);
         }
     }
 
