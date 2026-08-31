@@ -22,10 +22,18 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
     private static final MediaType FORM = MediaType.parse("multipart/form-data");
 
-    private final String coreUrl = "http://localhost:9090/api/core";
-    private final String p1Url = "http://localhost:9090/api/p1";
-    private final String demoUrl = "http://localhost:9090/api/demo";
-    private final String baseUrl = "http://localhost:9090/api";
+    private String coreUrl() {
+        return url("/api/core");
+    }
+    private String p1Url() {
+        return url("/api/p1");
+    }
+    private String demoUrl() {
+        return url("/api/demo");
+    }
+    private String baseUrl() {
+        return url("/api");
+    }
 
     @BeforeEach
     void resetInterceptorCounts() {
@@ -37,7 +45,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
     @Test
     void patchMethod_returns200() throws Exception {
         Request req = new Request.Builder()
-                .url(p1Url + "/patch-test")
+                .url(p1Url() + "/patch-test")
                 .method("PATCH", RequestBody.create("", JSON))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -51,7 +59,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
     @Test
     void responseStatus201_returnsCreated() throws Exception {
         Request req = new Request.Builder()
-                .url(p1Url + "/status-201")
+                .url(p1Url() + "/status-201")
                 .post(RequestBody.create("", JSON))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -62,7 +70,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
     @Test
     void responseStatus202_returnsAccepted() throws Exception {
         Request req = new Request.Builder()
-                .url(p1Url + "/status-202")
+                .url(p1Url() + "/status-202")
                 .put(RequestBody.create("", JSON))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -75,7 +83,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
     @Test
     void typeMismatch_withNonNumericParam_returns400() throws Exception {
         Request req = new Request.Builder()
-                .url(p1Url + "/type-mismatch?id=abc")
+                .url(p1Url() + "/type-mismatch?id=abc")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -97,7 +105,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
                         RequestBody.create("content2", MediaType.parse("text/plain")))
                 .build();
         Request req = new Request.Builder()
-                .url(p1Url + "/multi-part")
+                .url(p1Url() + "/multi-part")
                 .post(multipartBody)
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -111,7 +119,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
     @Test
     void corsClassLevel_preflight_returnsAllowOrigin() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/p1/cors-class/test")
+                .url(baseUrl() + "/p1/cors-class/test")
                 .header("Origin", "http://class-level.example.com")
                 .header("Access-Control-Request-Method", "GET")
                 .method("OPTIONS", null)
@@ -128,7 +136,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
     @Test
     void corsClassLevel_actualRequest_returnsAllowOrigin() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/p1/cors-class/test")
+                .url(baseUrl() + "/p1/cors-class/test")
                 .header("Origin", "http://class-level.example.com")
                 .get()
                 .build();
@@ -145,7 +153,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
     @Test
     void sseJsonEmitter_receivesSseEvents() throws Exception {
         Request req = new Request.Builder()
-                .url(p1Url + "/sse-json")
+                .url(p1Url() + "/sse-json")
                 .get()
                 .build();
         CountDownLatch latch = new CountDownLatch(1);
@@ -183,7 +191,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
     @Test
     void optimizeEndpoint_returns200() throws Exception {
         Request req = new Request.Builder()
-                .url(p1Url + "/optimize-check")
+                .url(p1Url() + "/optimize-check")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -196,7 +204,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
     @Test
     void resourceDownload_returnsContent() throws Exception {
         Request req = new Request.Builder()
-                .url(p1Url + "/download-resource")
+                .url(p1Url() + "/download-resource")
                 .get()
                 .build();
         // Resource/FileReturnValueResolver 均设置 Content-Length + 结束帧，OkHttp 可完整读取，
@@ -211,7 +219,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
     @Test
     void fileDownload_returnsContent() throws Exception {
         Request req = new Request.Builder()
-                .url(p1Url + "/download-file")
+                .url(p1Url() + "/download-file")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -231,7 +239,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
         assertEquals(0, LifecycleInterceptor.afterCompletionCount);
 
         Request req = new Request.Builder()
-                .url(baseUrl + "/core/lifecycle/check")
+                .url(baseUrl() + "/core/lifecycle/check")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -249,7 +257,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
     @Test
     void nonexistentPath_returns404() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/nonexistent-route-xyz")
+                .url(baseUrl() + "/nonexistent-route-xyz")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -262,7 +270,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
     @Test
     void wrongMethod_returns405() throws Exception {
         Request req = new Request.Builder()
-                .url(coreUrl + "/bytes")
+                .url(coreUrl() + "/bytes")
                 .post(RequestBody.create("", JSON))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -276,7 +284,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
     void duplicateMapping_shouldNotCrash() throws Exception {
         // 两个 @GetMapping("/duplicate") 方法，框架应正常响应其中一个
         Request req = new Request.Builder()
-                .url(p1Url + "/duplicate")
+                .url(p1Url() + "/duplicate")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {

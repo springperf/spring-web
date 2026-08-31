@@ -11,12 +11,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class ExceptionHandlingTest extends BaseE2ETest {
 
-    private final String baseUrl = "http://localhost:9090/api/demo";
+    private String baseUrl() {
+        return url("/api/demo");
+    }
 
     @Test
     void testNotFoundEndpoint() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/nonexistent-path")
+                .url(baseUrl() + "/nonexistent-path")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -27,7 +29,7 @@ public class ExceptionHandlingTest extends BaseE2ETest {
     @Test
     void testMethodNotAllowed() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/echo")
+                .url(baseUrl() + "/echo")
                 .method("DELETE", RequestBody.create(MediaType.parse("text/plain"), ""))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {

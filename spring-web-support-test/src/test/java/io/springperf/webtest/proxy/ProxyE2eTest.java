@@ -4,6 +4,7 @@ import okhttp3.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
 
 import java.time.Duration;
 
@@ -21,9 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @SpringBootTest(
         classes = ProxyE2eApp.class,
-        webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT,
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
-                "server.port=9092",
                 "server.servlet.context-path=/api",
                 "proxy.placeholder.path=/proxy/placeholder-resolved"
         })
@@ -38,14 +38,23 @@ public class ProxyE2eTest {
 
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
-    private final String baseUrl = "http://localhost:9092/api";
+
+    @LocalServerPort
+    private int serverPort;
+
+    private String url(String path) {
+        return "http://localhost:" + serverPort + path;
+    }
+    private String baseUrl() {
+        return url("/api");
+    }
 
     // ==================== @RequestBody + @RequestParam ====================
 
     @Test
     void postSave_withBodyAndId_returnsConcatenated() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-api/save?id=abc")
+                .url(baseUrl() + "/proxy-api/save?id=abc")
                 .post(RequestBody.create(JSON, "\"test-body\""))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -61,7 +70,7 @@ public class ProxyE2eTest {
     @Test
     void get_withNameParam_returnsGreeting() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-api/get?name=world")
+                .url(baseUrl() + "/proxy-api/get?name=world")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -74,7 +83,7 @@ public class ProxyE2eTest {
     @Test
     void get_withoutRequiredParam_returns400() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-api/get")
+                .url(baseUrl() + "/proxy-api/get")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -88,7 +97,7 @@ public class ProxyE2eTest {
     @Test
     void get_withPathVariable_returnsProcessed() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-api/path/42")
+                .url(baseUrl() + "/proxy-api/path/42")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -103,7 +112,7 @@ public class ProxyE2eTest {
     @Test
     void postMixed_withAllParams_resolvesCorrectly() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-api/mixed/mytag?key=mykey")
+                .url(baseUrl() + "/proxy-api/mixed/mytag?key=mykey")
                 .post(RequestBody.create(JSON, "\"data\""))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -119,7 +128,7 @@ public class ProxyE2eTest {
     @Test
     void getEcho_withMsg_returnsSameValue() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-api/echo?msg=ping")
+                .url(baseUrl() + "/proxy-api/echo?msg=ping")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -134,7 +143,7 @@ public class ProxyE2eTest {
     @Test
     void placeholderPath_resolvesFromEnvironment() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy/placeholder-resolved/echo?msg=placeholder-ok")
+                .url(baseUrl() + "/proxy/placeholder-resolved/echo?msg=placeholder-ok")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -153,7 +162,7 @@ public class ProxyE2eTest {
                 .add("age", "25")
                 .build();
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-api/model-attr")
+                .url(baseUrl() + "/proxy-api/model-attr")
                 .post(formBody)
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -174,7 +183,7 @@ public class ProxyE2eTest {
                         RequestBody.create("hello world", MediaType.parse("text/plain")))
                 .build();
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-api/upload")
+                .url(baseUrl() + "/proxy-api/upload")
                 .post(multipartBody)
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -190,7 +199,7 @@ public class ProxyE2eTest {
     @Test
     void getTriggerError_withProxy_handledByControllerAdvice() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-api/trigger-error")
+                .url(baseUrl() + "/proxy-api/trigger-error")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -206,7 +215,7 @@ public class ProxyE2eTest {
     @Test
     void interceptor_isInvokedForProxyController() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-api/echo?msg=intercepted")
+                .url(baseUrl() + "/proxy-api/echo?msg=intercepted")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -222,7 +231,7 @@ public class ProxyE2eTest {
     @Test
     void webFilter_executedForProxyController() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-api/echo?msg=filter-test")
+                .url(baseUrl() + "/proxy-api/echo?msg=filter-test")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -238,7 +247,7 @@ public class ProxyE2eTest {
     @Test
     void initBinder_withProxy_appliesPropertyEditor() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-api/init-binder")
+                .url(baseUrl() + "/proxy-api/init-binder")
                 .post(RequestBody.create(
                         MediaType.parse("application/x-www-form-urlencoded"),
                         "name=hello"))

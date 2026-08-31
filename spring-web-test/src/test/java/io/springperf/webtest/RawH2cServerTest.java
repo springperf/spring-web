@@ -36,7 +36,6 @@ public class RawH2cServerTest {
     void testRawH2c() throws Exception {
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
         EventLoopGroup workerGroup = new NioEventLoopGroup();
-        int port = 9199;
 
         try {
             ServerBootstrap bootstrap = new ServerBootstrap();
@@ -114,7 +113,8 @@ public class RawH2cServerTest {
                         }
                     });
 
-            Channel serverChannel = bootstrap.bind(port).sync().channel();
+            Channel serverChannel = bootstrap.bind(0).sync().channel();
+            int port = ((java.net.InetSocketAddress) serverChannel.localAddress()).getPort();
 
             OkHttpClient client = new OkHttpClient.Builder()
                     .connectTimeout(Duration.ofSeconds(3))

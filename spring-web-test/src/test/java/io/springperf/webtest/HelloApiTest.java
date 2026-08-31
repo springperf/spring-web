@@ -21,12 +21,14 @@ public class HelloApiTest extends BaseE2ETest {
 
     private static final MediaType JSON_MEDIA = MediaType.parse("application/json; charset=utf-8");
 
-    private final String baseUrl = "http://localhost:9090/api/demo";
+    private String baseUrl() {
+        return url("/api/demo");
+    }
 
     @Test
     void hello_should_work() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/hello/123/aaab?v=netty")
+                .url(baseUrl() + "/hello/123/aaab?v=netty")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -40,7 +42,7 @@ public class HelloApiTest extends BaseE2ETest {
         RequestBody body = RequestBody.create(
                 "{\"tid\": 1243456,\"data\":{\"name\":\"123cd\",\"age\":122}}", JSON_MEDIA);
         Request req = new Request.Builder()
-                .url(baseUrl + "/find/hcd?v=111&id=777&age=33")
+                .url(baseUrl() + "/find/hcd?v=111&id=777&age=33")
                 .post(body)
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -54,7 +56,7 @@ public class HelloApiTest extends BaseE2ETest {
     void echoGet() throws Exception {
         String received = System.currentTimeMillis() + "test";
         Request req = new Request.Builder()
-                .url(baseUrl + "/echo?received=" + received)
+                .url(baseUrl() + "/echo?received=" + received)
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -70,7 +72,7 @@ public class HelloApiTest extends BaseE2ETest {
         data.put("name", "123cd");
         data.put("age", "33");
         RequestBody body = RequestBody.create(JSON.toJSONString(data), JSON_MEDIA);
-        Request req = new Request.Builder().url(baseUrl + "/echo").post(body).build();
+        Request req = new Request.Builder().url(baseUrl() + "/echo").post(body).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(201, resp.code());
             data.put("received", true);
@@ -87,7 +89,7 @@ public class HelloApiTest extends BaseE2ETest {
                 .add("ids", "aaa").add("ids", "bbb")
                 .build();
         Request req = new Request.Builder()
-                .url(baseUrl + "/read/hcd?name=111hcd")
+                .url(baseUrl() + "/read/hcd?name=111hcd")
                 .post(body)
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -104,7 +106,7 @@ public class HelloApiTest extends BaseE2ETest {
         OkHttpClient shortClient = CLIENT.newBuilder()
                 .readTimeout(Duration.ofSeconds(5))
                 .build();
-        Request req = new Request.Builder().url(baseUrl + "/async").get().build();
+        Request req = new Request.Builder().url(baseUrl() + "/async").get().build();
         try (Response resp = shortClient.newCall(req).execute()) {
             assertEquals(200, resp.code());
             assertNotNull(resp.body().string());
@@ -121,7 +123,7 @@ public class HelloApiTest extends BaseE2ETest {
                 .addFormDataPart("file", "testFile.txt", fileBody)
                 .build();
         Request req = new Request.Builder()
-                .url(baseUrl + "/upload")
+                .url(baseUrl() + "/upload")
                 .post(body)
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -134,7 +136,7 @@ public class HelloApiTest extends BaseE2ETest {
 
     @Test
     void testSse() throws Exception {
-        Request request = new Request.Builder().url(baseUrl + "/sse").get().build();
+        Request request = new Request.Builder().url(baseUrl() + "/sse").get().build();
         CountDownLatch latch = new CountDownLatch(8);
         CLIENT.newCall(request).enqueue(new Callback() {
             @Override
@@ -164,7 +166,7 @@ public class HelloApiTest extends BaseE2ETest {
     @Test
     void testSseFast() throws Exception {
         // 测试 TaskExecutor 快速发送场景（0间隔），验证 complete() before initialize() 竞态已修复
-        Request request = new Request.Builder().url(baseUrl + "/sse-fast").get().build();
+        Request request = new Request.Builder().url(baseUrl() + "/sse-fast").get().build();
         AtomicInteger count = new AtomicInteger(0);
         CountDownLatch latch = new CountDownLatch(1);
         CLIENT.newCall(request).enqueue(new Callback() {

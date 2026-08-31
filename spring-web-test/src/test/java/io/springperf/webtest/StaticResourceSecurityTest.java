@@ -15,14 +15,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 public class StaticResourceSecurityTest extends BaseE2ETest {
 
-    private static final String BASE = "http://localhost:9090/api";
+    private String base() {
+        return url("/api");
+    }
 
     // ======================== 正常回归 (200) ========================
 
     @Test
     void staticResource_shouldSucceed() throws Exception {
         Request req = new Request.Builder()
-                .url(BASE + "/static/test.txt")
+                .url(base() + "/static/test.txt")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -35,7 +37,7 @@ public class StaticResourceSecurityTest extends BaseE2ETest {
     @Test
     void subdirectoryResource_shouldSucceed() throws Exception {
         Request req = new Request.Builder()
-                .url(BASE + "/static/sub/index.html")
+                .url(base() + "/static/sub/index.html")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -51,7 +53,7 @@ public class StaticResourceSecurityTest extends BaseE2ETest {
     @Test
     void pathTraversal_basicDotDot_shouldReturn404() throws Exception {
         Request req = new Request.Builder()
-                .url(BASE + "/static/../test.txt")
+                .url(base() + "/static/../test.txt")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -63,7 +65,7 @@ public class StaticResourceSecurityTest extends BaseE2ETest {
     @Test
     void pathTraversal_deepDotDot_shouldReturn404() throws Exception {
         Request req = new Request.Builder()
-                .url(BASE + "/static/../../etc/passwd")
+                .url(base() + "/static/../../etc/passwd")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -80,7 +82,7 @@ public class StaticResourceSecurityTest extends BaseE2ETest {
     @Test
     void pathTraversal_deepMultipleLevels_shouldReturn404() throws Exception {
         Request req = new Request.Builder()
-                .url(BASE + "/static/../../../etc/passwd")
+                .url(base() + "/static/../../../etc/passwd")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -92,7 +94,7 @@ public class StaticResourceSecurityTest extends BaseE2ETest {
     @Test
     void pathTraversal_mixedDots_shouldReturn404() throws Exception {
         Request req = new Request.Builder()
-                .url(BASE + "/static/....//....//etc/passwd")
+                .url(base() + "/static/....//....//etc/passwd")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -105,7 +107,7 @@ public class StaticResourceSecurityTest extends BaseE2ETest {
     void pathTraversal_urlEncodedDotDot_shouldReturn404() throws Exception {
         // 使用 java.net.URL 避免 OkHttp 对路径二次编码
         Request req = new Request.Builder()
-                .url(new URL("http://localhost:9090/api/static/%2e%2e/test.txt"))
+                .url(new URL(url("/api/static/%2e%2e/test.txt")))
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -117,7 +119,7 @@ public class StaticResourceSecurityTest extends BaseE2ETest {
     @Test
     void pathTraversal_fullEncoded_shouldReturn404() throws Exception {
         Request req = new Request.Builder()
-                .url(new URL("http://localhost:9090/api/static/%2e%2e%2ftest.txt"))
+                .url(new URL(url("/api/static/%2e%2e%2ftest.txt")))
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -129,7 +131,7 @@ public class StaticResourceSecurityTest extends BaseE2ETest {
     @Test
     void pathTraversal_doubleEncoded_shouldReturn404() throws Exception {
         Request req = new Request.Builder()
-                .url(new URL("http://localhost:9090/api/static/%252e%252e/test.txt"))
+                .url(new URL(url("/api/static/%252e%252e/test.txt")))
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -142,7 +144,7 @@ public class StaticResourceSecurityTest extends BaseE2ETest {
     @Test
     void nonexistentResource_shouldReturn404() throws Exception {
         Request req = new Request.Builder()
-                .url(BASE + "/static/nonexistent.txt")
+                .url(base() + "/static/nonexistent.txt")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {

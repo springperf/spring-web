@@ -18,8 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>验证 {@code management.endpoints.web.cors.*} 配置属性对 Actuator 端点生效。
  * 使用独立的 Spring 上下文以避免影响其他测试。</p>
  */
-@SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT, properties = {
-        "server.port=9092",
+@SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "server.servlet.context-path=/api",
         "management.endpoints.web.exposure.include=*",
         "management.endpoints.web.cors.allowed-origins=http://example.com",
@@ -28,18 +27,23 @@ import static org.junit.jupiter.api.Assertions.*;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class ActuatorCorsTest {
 
+    @org.springframework.boot.test.web.server.LocalServerPort
+    private int serverPort;
+
     public static final okhttp3.OkHttpClient CLIENT = new okhttp3.OkHttpClient.Builder()
             .connectTimeout(java.time.Duration.ofSeconds(3))
             .readTimeout(java.time.Duration.ofSeconds(10))
             .writeTimeout(java.time.Duration.ofSeconds(10))
             .build();
 
-    private final String actuatorBase = "http://localhost:9092/api/actuator";
+    private String actuatorBase() {
+        return "http://localhost:" + serverPort + "/api/actuator";
+    }
 
     @Test
     void corsPreflight_shouldReturnAllowOrigin() throws Exception {
         Request req = new Request.Builder()
-                .url(actuatorBase + "/health")
+                .url(actuatorBase() + "/health")
                 .header("Origin", "http://example.com")
                 .header("Access-Control-Request-Method", "GET")
                 .method("OPTIONS", null)
@@ -56,7 +60,7 @@ public class ActuatorCorsTest {
     @Test
     void corsGet_shouldIncludeCorsHeaders() throws Exception {
         Request req = new Request.Builder()
-                .url(actuatorBase + "/health")
+                .url(actuatorBase() + "/health")
                 .header("Origin", "http://example.com")
                 .get()
                 .build();
@@ -72,7 +76,7 @@ public class ActuatorCorsTest {
     @Test
     void corsGet_withDisallowedOrigin_shouldBeRejected() throws Exception {
         Request req = new Request.Builder()
-                .url(actuatorBase + "/health")
+                .url(actuatorBase() + "/health")
                 .header("Origin", "http://evil.com")
                 .get()
                 .build();

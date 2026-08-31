@@ -11,7 +11,7 @@ public class ViewRenderTest extends BaseE2ETest {
     @Test
     void helloView_shouldRenderThymeleafTemplate() throws Exception {
         Request req = new Request.Builder()
-                .url("http://localhost:9090/api/view/hello?name=TestUser")
+                .url(url("/api/view/hello?name=TestUser"))
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -31,7 +31,7 @@ public class ViewRenderTest extends BaseE2ETest {
     @Test
     void helloView_defaultName() throws Exception {
         Request req = new Request.Builder()
-                .url("http://localhost:9090/api/view/hello")
+                .url(url("/api/view/hello"))
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -49,7 +49,7 @@ public class ViewRenderTest extends BaseE2ETest {
                 .followSslRedirects(false)
                 .build();
         Request req = new Request.Builder()
-                .url("http://localhost:9090/api/view/redirect")
+                .url(url("/api/view/redirect"))
                 .get()
                 .build();
         try (Response resp = noRedirectClient.newCall(req).execute()) {
@@ -64,7 +64,7 @@ public class ViewRenderTest extends BaseE2ETest {
     @Test
     void modelAndView_shouldRenderThymeleafTemplate() throws Exception {
         Request req = new Request.Builder()
-                .url("http://localhost:9090/api/view/mav?name=MVTest")
+                .url(url("/api/view/mav?name=MVTest"))
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -78,7 +78,7 @@ public class ViewRenderTest extends BaseE2ETest {
     @Test
     void modelAttribute_shouldMergeIntoModel() throws Exception {
         Request req = new Request.Builder()
-                .url("http://localhost:9090/api/view/model-attr?name=Alice&age=30")
+                .url(url("/api/view/model-attr?name=Alice&age=30"))
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -92,7 +92,7 @@ public class ViewRenderTest extends BaseE2ETest {
     @Test
     void controllerAdviceModelAttribute_shouldPopulateModel() throws Exception {
         Request req = new Request.Builder()
-                .url("http://localhost:9090/api/view/advice")
+                .url(url("/api/view/advice"))
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -106,7 +106,7 @@ public class ViewRenderTest extends BaseE2ETest {
     @Test
     void beetlView_shouldRenderBeetlTemplate() throws Exception {
         Request req = new Request.Builder()
-                .url("http://localhost:9090/api/view/hello-beetl?name=BeetlUser")
+                .url(url("/api/view/hello-beetl?name=BeetlUser"))
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -120,7 +120,7 @@ public class ViewRenderTest extends BaseE2ETest {
     @Test
     void freemarkerView_shouldRenderFreemarkerTemplate() throws Exception {
         Request req = new Request.Builder()
-                .url("http://localhost:9090/api/view/hello-ftl?name=FtlUser")
+                .url(url("/api/view/hello-ftl?name=FtlUser"))
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -134,7 +134,7 @@ public class ViewRenderTest extends BaseE2ETest {
     @Test
     void pathVariable_shouldInjectIntoModel() throws Exception {
         Request req = new Request.Builder()
-                .url("http://localhost:9090/api/view/hello-path/PathUser")
+                .url(url("/api/view/hello-path/PathUser"))
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -148,7 +148,7 @@ public class ViewRenderTest extends BaseE2ETest {
     @Test
     void bindingResult_shouldInjectIntoModel() throws Exception {
         Request req = new Request.Builder()
-                .url("http://localhost:9090/api/view/binding")
+                .url(url("/api/view/binding"))
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -162,7 +162,7 @@ public class ViewRenderTest extends BaseE2ETest {
     @Test
     void localModelAttribute_shouldPopulateModel() throws Exception {
         Request req = new Request.Builder()
-                .url("http://localhost:9090/api/view/local")
+                .url(url("/api/view/local"))
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -176,7 +176,7 @@ public class ViewRenderTest extends BaseE2ETest {
     @Test
     void exceptionHandler_shouldReturnViewName() throws Exception {
         Request req = new Request.Builder()
-                .url("http://localhost:9090/api/view/boom")
+                .url(url("/api/view/boom"))
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {

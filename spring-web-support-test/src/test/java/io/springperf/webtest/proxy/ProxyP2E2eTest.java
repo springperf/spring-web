@@ -4,6 +4,7 @@ import okhttp3.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
 
 import java.time.Duration;
 
@@ -17,9 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @SpringBootTest(
         classes = ProxyE2eApp.class,
-        webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT,
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
-                "server.port=9092",
                 "server.servlet.context-path=/api",
                 "proxy.placeholder.path=/proxy/placeholder-resolved"
         })
@@ -34,14 +34,23 @@ public class ProxyP2E2eTest {
 
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
-    private final String baseUrl = "http://localhost:9092/api";
+
+    @LocalServerPort
+    private int serverPort;
+
+    private String url(String path) {
+        return "http://localhost:" + serverPort + path;
+    }
+    private String baseUrl() {
+        return url("/api");
+    }
 
     // ==================== 多级接口继承 + CGLIB 代理 ====================
 
     @Test
     void postRootSave_withInheritedInterface_resolvesRequestBodyAndParam() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-inherit/root-save?id=abc")
+                .url(baseUrl() + "/proxy-inherit/root-save?id=abc")
                 .post(RequestBody.create(JSON, "\"data\""))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -56,7 +65,7 @@ public class ProxyP2E2eTest {
     @Test
     void getMiddleQuery_withInheritedInterface_resolvesRequestParam() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-inherit/middle-query?name=inherited")
+                .url(baseUrl() + "/proxy-inherit/middle-query?name=inherited")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -70,7 +79,7 @@ public class ProxyP2E2eTest {
     @Test
     void getPlaceholderWithPathVar_resolvesBothPlaceholderAndPathVariable() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy/placeholder-resolved/42")
+                .url(baseUrl() + "/proxy/placeholder-resolved/42")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -84,7 +93,7 @@ public class ProxyP2E2eTest {
     @Test
     void getMultiPlaceholder_resolvesAllSegments() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy/placeholder-resolved/multi/detail?q=abc")
+                .url(baseUrl() + "/proxy/placeholder-resolved/multi/detail?q=abc")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -98,7 +107,7 @@ public class ProxyP2E2eTest {
     @Test
     void getGreet_withLangParam_routesToCorrectMethod() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-cond/greet?lang=en")
+                .url(baseUrl() + "/proxy-cond/greet?lang=en")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -110,7 +119,7 @@ public class ProxyP2E2eTest {
     @Test
     void getGreet_withoutLangParam_routesToDefaultMethod() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-cond/greet")
+                .url(baseUrl() + "/proxy-cond/greet")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {

@@ -5,6 +5,7 @@ import okhttp3.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
 
 import java.time.Duration;
 import java.util.Map;
@@ -17,9 +18,8 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @SpringBootTest(
         classes = ProxyE2eApp.class,
-        webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT,
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
-                "server.port=9092",
                 "server.servlet.context-path=/api",
                 "proxy.placeholder.path=/proxy/placeholder-resolved"
         })
@@ -36,7 +36,16 @@ public class ProxyP5E2eTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final String baseUrl = "http://localhost:9092/api";
+
+    @LocalServerPort
+    private int serverPort;
+
+    private String url(String path) {
+        return "http://localhost:" + serverPort + path;
+    }
+    private String baseUrl() {
+        return url("/api");
+    }
 
     // ==================== 1. HttpEntity 参数 ====================
 
@@ -44,7 +53,7 @@ public class ProxyP5E2eTest {
     void httpEntityParam_receivesRequestBodyAndHeaders() throws Exception {
         String jsonBody = "{\"hello\":\"world\"}";
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p5/entity-body")
+                .url(baseUrl() + "/proxy-p5/entity-body")
                 .post(RequestBody.create(jsonBody, JSON_TYPE))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -60,7 +69,7 @@ public class ProxyP5E2eTest {
     @Test
     void callableReturn_asyncExecution_returnsDone() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p5/callable")
+                .url(baseUrl() + "/proxy-p5/callable")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -74,7 +83,7 @@ public class ProxyP5E2eTest {
     @Test
     void byteArrayReturn_returnsBytes() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p5/bytes")
+                .url(baseUrl() + "/proxy-p5/bytes")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -88,7 +97,7 @@ public class ProxyP5E2eTest {
     @Test
     void resourceReturn_returnsContent() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p5/resource")
+                .url(baseUrl() + "/proxy-p5/resource")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -102,7 +111,7 @@ public class ProxyP5E2eTest {
     @Test
     void multiPath_accessPathA_returnsOk() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p5/multi-path-a")
+                .url(baseUrl() + "/proxy-p5/multi-path-a")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -115,7 +124,7 @@ public class ProxyP5E2eTest {
     @Test
     void multiPath_accessPathB_returnsOk() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p5/multi-path-b")
+                .url(baseUrl() + "/proxy-p5/multi-path-b")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -130,7 +139,7 @@ public class ProxyP5E2eTest {
     @Test
     void multiMethod_getRequest_returnsOk() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p5/multi-method")
+                .url(baseUrl() + "/proxy-p5/multi-method")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -143,7 +152,7 @@ public class ProxyP5E2eTest {
     @Test
     void multiMethod_postRequest_returnsOk() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p5/multi-method")
+                .url(baseUrl() + "/proxy-p5/multi-method")
                 .post(RequestBody.create("{}", JSON_TYPE))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -158,7 +167,7 @@ public class ProxyP5E2eTest {
     @Test
     void responseStatusException_returns410() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p5/gone")
+                .url(baseUrl() + "/proxy-p5/gone")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -173,7 +182,7 @@ public class ProxyP5E2eTest {
     void requestEntityParam_receivesMethodAndBody() throws Exception {
         String jsonBody = "\"test-data\"";
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p5/request-entity")
+                .url(baseUrl() + "/proxy-p5/request-entity")
                 .post(RequestBody.create(jsonBody, JSON_TYPE))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {

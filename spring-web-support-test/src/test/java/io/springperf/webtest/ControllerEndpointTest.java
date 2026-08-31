@@ -15,7 +15,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class ControllerEndpointTest extends BaseE2ETest {
 
-    private final String baseUrl = "http://localhost:9090/api";
+    private String baseUrl() {
+        return url("/api");
+    }
 
     @Autowired(required = false)
     private ShimResponseEntityExceptionHandler shimHandler;
@@ -28,7 +30,7 @@ public class ControllerEndpointTest extends BaseE2ETest {
     @Test
     void voidReturn_returns204() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/demo/void-test")
+                .url(baseUrl() + "/demo/void-test")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -39,7 +41,7 @@ public class ControllerEndpointTest extends BaseE2ETest {
     @Test
     void testEchoGet() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/demo/echo?received=hello")
+                .url(baseUrl() + "/demo/echo?received=hello")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -54,7 +56,7 @@ public class ControllerEndpointTest extends BaseE2ETest {
         String json = "{\"message\":\"test\"}";
         RequestBody body = RequestBody.create(MediaType.parse("application/json"), json);
         Request req = new Request.Builder()
-                .url(baseUrl + "/demo/echo")
+                .url(baseUrl() + "/demo/echo")
                 .post(body)
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -65,7 +67,7 @@ public class ControllerEndpointTest extends BaseE2ETest {
     @Test
     void testAsyncEndpoint() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/demo/async")
+                .url(baseUrl() + "/demo/async")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {

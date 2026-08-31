@@ -13,12 +13,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class CoreFeaturesBinderTest extends BaseE2ETest {
 
-    private final String baseUrl = "http://localhost:9090/api/binder";
+    private String baseUrl() {
+        return url("/api/binder");
+    }
 
     @Test
     void initBinder_appliesPropertyEditor() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/test?value=hello")
+                .url(baseUrl() + "/test?value=hello")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {

@@ -11,12 +11,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ServletE2eTest extends BaseE2ETest {
 
-    private static final String BASE = "http://localhost:9090/api";
+    private String base() {
+        return url("/api");
+    }
 
     @Test
     void exactRoute_servesServletContent() throws IOException {
         Request request = new Request.Builder()
-                .url(BASE + "/e2e-servlet")
+                .url(base() + "/e2e-servlet")
                 .build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             String body = resp.body().string();
@@ -29,7 +31,7 @@ class ServletE2eTest extends BaseE2ETest {
     @Test
     void pathMappingRoute_servesNestedContent() throws IOException {
         Request request = new Request.Builder()
-                .url(BASE + "/e2e-servlet/sub/deep?echo=hi")
+                .url(base() + "/e2e-servlet/sub/deep?echo=hi")
                 .build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             String body = resp.body().string();
@@ -43,7 +45,7 @@ class ServletE2eTest extends BaseE2ETest {
     @Test
     void unmappedRoute_returns404() throws IOException {
         Request request = new Request.Builder()
-                .url(BASE + "/e2e-servlet-unknown")
+                .url(base() + "/e2e-servlet-unknown")
                 .build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             assertEquals(404, resp.code());

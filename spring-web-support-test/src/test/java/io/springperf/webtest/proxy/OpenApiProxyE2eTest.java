@@ -28,9 +28,8 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @SpringBootTest(
         classes = ProxyE2eApp.class,
-        webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT,
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
-                "server.port=9092",
                 "server.servlet.context-path=/api",
                 "proxy.placeholder.path=/proxy/placeholder-resolved"
         })

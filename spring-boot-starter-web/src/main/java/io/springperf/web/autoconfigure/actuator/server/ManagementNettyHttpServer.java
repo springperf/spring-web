@@ -46,6 +46,7 @@ public class ManagementNettyHttpServer implements SmartLifecycle, LifecycleWebCo
     private EventLoopGroup workerGroup;
     private Channel serverChannel;
     private NettyHttpHandler nettyHttpHandler;
+    private volatile int actualPort;
     /** 管理服务器独立的连接计数（与主服务器各自计数，不共享全局单例）。 */
     private final NettyMetricsHandler metricsHandler = new NettyMetricsHandler();
 
@@ -104,8 +105,9 @@ public class ManagementNettyHttpServer implements SmartLifecycle, LifecycleWebCo
 
         try {
             serverChannel = bootstrap.bind(port).sync().channel();
+            this.actualPort = ((java.net.InetSocketAddress) serverChannel.localAddress()).getPort();
             running = true;
-            log.info("Management server started on port {} (actuator only)", port);
+            log.info("Management server started on port {} (actuator only)", this.actualPort);
         } catch (Exception e) {
             // 绑定失败时及时清理 EventLoopGroup，否则线程残留会阻止 JVM 退出
             if (bossGroup != null) {
@@ -149,6 +151,13 @@ public class ManagementNettyHttpServer implements SmartLifecycle, LifecycleWebCo
     @Override
     public boolean isRunning() {
         return running;
+    }
+
+    /**
+     * 返回实际绑定的管理端口。start() 前返回 0，绑定后返回实际端口（可能为随机端口）。
+     */
+    public int getActualPort() {
+        return actualPort;
     }
 
     @Override

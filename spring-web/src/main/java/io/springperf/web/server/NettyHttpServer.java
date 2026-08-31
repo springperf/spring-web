@@ -16,10 +16,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.core.Ordered;
+import org.springframework.core.env.MapPropertySource;
 
 import java.net.InetSocketAddress;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -118,11 +121,7 @@ public class NettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
             serverChannel = bootstrap.bind(port).sync().channel();
             this.actualPort = ((InetSocketAddress) serverChannel.localAddress()).getPort();
             running = true;
-	    if (webContext.getCtx() instanceof ConfigurableApplicationContext) {
-	        ((ConfigurableApplicationContext) webContext.getCtx())
-	                .getEnvironment().getSystemProperties()
-	                .put("local.server.port", String.valueOf(this.actualPort));
-	    }
+            publishLocalServerPort();
             log.info("Netty Server started on port {}", this.actualPort);
         } catch (Exception e) {
             // 绑定失败时及时清理 EventLoopGroup，否则线程残留会阻止 JVM 退出
@@ -184,6 +183,23 @@ public class NettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
      */
     public int getActualPort() {
         return actualPort;
+    }
+
+    /**
+     * 将实际端口以 {@code local.server.port} 发布到当前 Spring 上下文的 Environment。
+     * <p>使用 context 级 {@link MapPropertySource} 而非 JVM 全局 {@code System.getProperties()}：
+     * 多 context（如主端口 + 管理端口隔离）各自绑定不同端口时，全局写入会互相覆盖，
+     * 导致 {@code @LocalServerPort} 注入到错误的端口。</p>
+     */
+    private void publishLocalServerPort() {
+        if (!(webContext.getCtx() instanceof ConfigurableApplicationContext)) {
+            return;
+        }
+        ConfigurableApplicationContext ctx = (ConfigurableApplicationContext) webContext.getCtx();
+        Map<String, Object> props = new HashMap<>();
+        props.put("local.server.port", String.valueOf(this.actualPort));
+        ctx.getEnvironment().getPropertySources()
+                .addFirst(new MapPropertySource("netty-local-server-port", props));
     }
 
     /**

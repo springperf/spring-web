@@ -18,12 +18,14 @@ import static org.junit.jupiter.api.Assertions.*;
 @Slf4j
 public class ActuatorHealthTest extends BaseE2ETest {
 
-    private final String actuatorBase = "http://localhost:9090/api/actuator";
+    private String actuatorBase() {
+        return url("/api/actuator");
+    }
 
     @Test
     void healthEndpoint_shouldReturnUp() throws Exception {
         Request req = new Request.Builder()
-                .url(actuatorBase + "/health")
+                .url(actuatorBase() + "/health")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -36,7 +38,7 @@ public class ActuatorHealthTest extends BaseE2ETest {
     @Test
     void linksEndpoint_shouldReturnLinks() throws Exception {
         Request req = new Request.Builder()
-                .url(actuatorBase)
+                .url(actuatorBase())
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -51,7 +53,7 @@ public class ActuatorHealthTest extends BaseE2ETest {
     @Test
     void unknownEndpoint_shouldReturn404() throws Exception {
         Request req = new Request.Builder()
-                .url(actuatorBase + "/nonexistent")
+                .url(actuatorBase() + "/nonexistent")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -62,7 +64,7 @@ public class ActuatorHealthTest extends BaseE2ETest {
     @Test
     void healthEndpoint_withApiV3AcceptHeader_shouldReturnV3Format() throws Exception {
         Request req = new Request.Builder()
-                .url(actuatorBase + "/health")
+                .url(actuatorBase() + "/health")
                 .header("Accept", "application/vnd.spring-boot.actuator.v3+json")
                 .get()
                 .build();
@@ -79,7 +81,7 @@ public class ActuatorHealthTest extends BaseE2ETest {
     @Test
     void healthEndpoint_withApiV2AcceptHeader_shouldReturnV2Format() throws Exception {
         Request req = new Request.Builder()
-                .url(actuatorBase + "/health")
+                .url(actuatorBase() + "/health")
                 .header("Accept", "application/vnd.spring-boot.actuator.v2+json")
                 .get()
                 .build();

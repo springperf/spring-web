@@ -4,6 +4,7 @@ import okhttp3.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
 
 import java.time.Duration;
 
@@ -17,9 +18,8 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @SpringBootTest(
         classes = ProxyE2eApp.class,
-        webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT,
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
-                "server.port=9092",
                 "server.servlet.context-path=/api",
                 "proxy.placeholder.path=/proxy/placeholder-resolved"
         })
@@ -34,14 +34,23 @@ public class ProxyP1E2eTest {
 
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
-    private final String baseUrl = "http://localhost:9092/api";
+
+    @LocalServerPort
+    private int serverPort;
+
+    private String url(String path) {
+        return "http://localhost:" + serverPort + path;
+    }
+    private String baseUrl() {
+        return url("/api");
+    }
 
     // ==================== 多参数组合：@RequestBody + @PathVariable + @RequestParam + @RequestHeader + optional + defaultValue ====================
 
     @Test
     void postMixedParams_withProxy_resolvesAllAnnotations() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p1/mixed/abc?key=k1&def=custom")
+                .url(baseUrl() + "/proxy-p1/mixed/abc?key=k1&def=custom")
                 .post(RequestBody.create(JSON, "\"req-body\""))
                 .addHeader("X-Custom", "hdr-val")
                 .build();
@@ -62,7 +71,7 @@ public class ProxyP1E2eTest {
     void postMixedParams_withProxy_usesDefaultValue() throws Exception {
         // 不传 def 参数，验证 defaultValue="fallback" 生效
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p1/mixed/xyz?key=k2")
+                .url(baseUrl() + "/proxy-p1/mixed/xyz?key=k2")
                 .post(RequestBody.create(JSON, "\"data\""))
                 .addHeader("X-Custom", "hdr")
                 .build();
@@ -80,7 +89,7 @@ public class ProxyP1E2eTest {
     void postMixedParams_withoutRequiredParam_returns400() throws Exception {
         // 缺少 required @RequestParam("key")
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p1/mixed/abc")
+                .url(baseUrl() + "/proxy-p1/mixed/abc")
                 .post(RequestBody.create(JSON, "\"body\""))
                 .addHeader("X-Custom", "hdr")
                 .build();
@@ -98,7 +107,7 @@ public class ProxyP1E2eTest {
         // 对齐 Spring 语义抛 400（RequestBodyResolver: readBody 空 body 返回 null
         // → required 缺失 → HttpMessageNotReadableException）。见 RequestBodyResolverTest。
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p1/empty-body")
+                .url(baseUrl() + "/proxy-p1/empty-body")
                 .post(RequestBody.create(new byte[0]))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -112,7 +121,7 @@ public class ProxyP1E2eTest {
     void postEmptyBodyOptional_withProxy_returnsGotNull() throws Exception {
         // @RequestBody(required=false)：空 body 不抛 400，body 解析为 null → "got:null"
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p1/empty-body-optional")
+                .url(baseUrl() + "/proxy-p1/empty-body-optional")
                 .post(RequestBody.create(new byte[0]))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -128,7 +137,7 @@ public class ProxyP1E2eTest {
     @Test
     void getMultiHeader_withProxy_resolvesList() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p1/headers")
+                .url(baseUrl() + "/proxy-p1/headers")
                 .get()
                 .addHeader("X-Multi", "val1")
                 .addHeader("X-Multi", "val2")
@@ -144,7 +153,7 @@ public class ProxyP1E2eTest {
     @Test
     void getRequiredHeader_withProxy_missing_returns400() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p1/required-header")
+                .url(baseUrl() + "/proxy-p1/required-header")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -158,7 +167,7 @@ public class ProxyP1E2eTest {
     @Test
     void getResponseEntity_withProxy_returnsCustomStatusAndHeaders() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p1/entity")
+                .url(baseUrl() + "/proxy-p1/entity")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {

@@ -16,7 +16,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ServletBridgeE2eTest extends BaseE2ETest {
 
-    private static final String BASE = "http://localhost:9090/api";
+    private String base() {
+        return url("/api");
+    }
 
     private static final OkHttpClient NO_REDIRECT_CLIENT = new OkHttpClient.Builder()
             .connectTimeout(Duration.ofSeconds(3))
@@ -28,12 +30,12 @@ class ServletBridgeE2eTest extends BaseE2ETest {
     @Test
     void getRequestURL_returnsFullUrl() throws IOException {
         Request request = new Request.Builder()
-                .url(BASE + "/servlet-bridge/request-url")
+                .url(base() + "/servlet-bridge/request-url")
                 .build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             assertTrue(resp.isSuccessful());
             String body = resp.body().string();
-            assertTrue(body.contains("\"requestURL\":\"http://localhost:9090/api/servlet-bridge/request-url\""));
+            assertTrue(body.contains("\"requestURL\":\"" + url("/api/servlet-bridge/request-url") + "\""));
             assertTrue(body.contains("\"scheme\":\"http\""));
             assertTrue(body.contains("\"remoteAddr\":\"127.0.0.1\""));
             assertTrue(body.contains("\"secure\":\"false\""));
@@ -44,7 +46,7 @@ class ServletBridgeE2eTest extends BaseE2ETest {
     @Test
     void sendRedirect_returns302WithLocation() throws IOException {
         Request request = new Request.Builder()
-                .url(BASE + "/servlet-bridge/redirect")
+                .url(base() + "/servlet-bridge/redirect")
                 .build();
         try (Response resp = NO_REDIRECT_CLIENT.newCall(request).execute()) {
             assertEquals(302, resp.code());
@@ -57,7 +59,7 @@ class ServletBridgeE2eTest extends BaseE2ETest {
     @Test
     void getMimeType_returnsCorrectType() throws IOException {
         Request request = new Request.Builder()
-                .url(BASE + "/servlet-bridge/mime-type?file=test.html")
+                .url(base() + "/servlet-bridge/mime-type?file=test.html")
                 .build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             assertTrue(resp.isSuccessful());
@@ -69,7 +71,7 @@ class ServletBridgeE2eTest extends BaseE2ETest {
     @Test
     void getServerInfo_returnsSpringPerfWeb() throws IOException {
         Request request = new Request.Builder()
-                .url(BASE + "/servlet-bridge/server-info")
+                .url(base() + "/servlet-bridge/server-info")
                 .build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             assertTrue(resp.isSuccessful());
@@ -82,7 +84,7 @@ class ServletBridgeE2eTest extends BaseE2ETest {
     @Test
     void getCharacterEncoding_returnsUtf8() throws IOException {
         Request request = new Request.Builder()
-                .url(BASE + "/servlet-bridge/character-encoding")
+                .url(base() + "/servlet-bridge/character-encoding")
                 .build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             assertTrue(resp.isSuccessful());
@@ -96,7 +98,7 @@ class ServletBridgeE2eTest extends BaseE2ETest {
         String requestBody = "{\"contentType\":\"text/plain\"}";
         okhttp3.RequestBody body = okhttp3.RequestBody.create(requestBody, okhttp3.MediaType.get("application/json"));
         Request request = new Request.Builder()
-                .url(BASE + "/servlet-bridge/content-type")
+                .url(base() + "/servlet-bridge/content-type")
                 .post(body)
                 .build();
         try (Response resp = CLIENT.newCall(request).execute()) {
@@ -107,7 +109,7 @@ class ServletBridgeE2eTest extends BaseE2ETest {
     @Test
     void getSession_createsSession() throws IOException {
         Request request = new Request.Builder()
-                .url(BASE + "/servlet-bridge/session")
+                .url(base() + "/servlet-bridge/session")
                 .build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             assertTrue(resp.isSuccessful());
@@ -120,7 +122,7 @@ class ServletBridgeE2eTest extends BaseE2ETest {
     @Test
     void getAuthType_returnsNull() throws IOException {
         Request request = new Request.Builder()
-                .url(BASE + "/servlet-bridge/auth-type")
+                .url(base() + "/servlet-bridge/auth-type")
                 .build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             assertTrue(resp.isSuccessful());
@@ -132,7 +134,7 @@ class ServletBridgeE2eTest extends BaseE2ETest {
     @Test
     void forward_dispatchesToTarget() throws IOException {
         Request request = new Request.Builder()
-                .url(BASE + "/servlet-bridge/do-forward")
+                .url(base() + "/servlet-bridge/do-forward")
                 .build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             assertTrue(resp.isSuccessful());
@@ -144,7 +146,7 @@ class ServletBridgeE2eTest extends BaseE2ETest {
     @Test
     void include_appendsContent() throws IOException {
         Request request = new Request.Builder()
-                .url(BASE + "/servlet-bridge/do-include")
+                .url(base() + "/servlet-bridge/do-include")
                 .build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             assertTrue(resp.isSuccessful());
@@ -161,7 +163,7 @@ class ServletBridgeE2eTest extends BaseE2ETest {
                 .addFormDataPart("file2", "test2.txt", RequestBody.create("content2", MediaType.parse("text/plain")))
                 .build();
         Request request = new Request.Builder()
-                .url(BASE + "/servlet-bridge/parts")
+                .url(base() + "/servlet-bridge/parts")
                 .post(multipartBody)
                 .build();
         try (Response resp = CLIENT.newCall(request).execute()) {

@@ -24,8 +24,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * </ul>
  * </p>
  */
-@SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT, properties = {
-        "server.port=9089",
+@SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "server.servlet.context-path=/api",
         "spring.threads.virtual.enabled=true",
         "pool.core-pool-size=10"
@@ -33,13 +32,22 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class VirtualThreadE2ETest {
 
+    @org.springframework.boot.test.web.server.LocalServerPort
+    private int serverPort;
+
     private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
             .connectTimeout(Duration.ofSeconds(3))
             .readTimeout(Duration.ofSeconds(10))
             .writeTimeout(Duration.ofSeconds(10))
             .build();
 
-    private final String baseUrl = "http://localhost:9089/api";
+    private String url(String path) {
+        return "http://localhost:" + serverPort + path;
+    }
+
+    private String baseUrl() {
+        return url("/api");
+    }
 
     @Test
     void bizPool_shouldUseVirtualThread() throws Exception {
@@ -47,7 +55,7 @@ public class VirtualThreadE2ETest {
                 "Virtual threads require JDK 21+, skipping on JDK " + Runtime.version().feature());
 
         Request req = new Request.Builder()
-                .url(baseUrl + "/core/pool/virtual-thread")
+                .url(baseUrl() + "/core/pool/virtual-thread")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -67,7 +75,7 @@ public class VirtualThreadE2ETest {
     void runInPool_withDefaultPool_shouldUsePlatformThread() throws Exception {
         // JDK 17 下虚拟线程不可用，且虚拟线程命名前缀为 perf-virtual-：验证 biz pool 使用平台线程
         Request req = new Request.Builder()
-                .url(baseUrl + "/core/pool/biz-pool")
+                .url(baseUrl() + "/core/pool/biz-pool")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -85,7 +93,7 @@ public class VirtualThreadE2ETest {
     void eventLoop_shouldNotUseVirtualThread() throws Exception {
         // EventLoop 不应使用虚拟线程（即使虚拟线程全局启用）
         Request req = new Request.Builder()
-                .url(baseUrl + "/core/pool/event-loop")
+                .url(baseUrl() + "/core/pool/event-loop")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -102,7 +110,7 @@ public class VirtualThreadE2ETest {
     @Test
     void badPool_shouldThrowException() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/core/pool/bad-pool")
+                .url(baseUrl() + "/core/pool/bad-pool")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {

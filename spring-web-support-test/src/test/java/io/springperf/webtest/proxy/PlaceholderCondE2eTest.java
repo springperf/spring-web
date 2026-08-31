@@ -5,6 +5,7 @@ import okhttp3.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
 
 import java.time.Duration;
 import java.util.Map;
@@ -19,9 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 @SpringBootTest(
         classes = ProxyE2eApp.class,
-        webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT,
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
-                "server.port=9094",
                 "server.servlet.context-path=/api",
                 "test.header.cond=X-Custom=present",
                 "test.param.cond=required-param",
@@ -42,14 +42,23 @@ public class PlaceholderCondE2eTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final String baseUrl = "http://localhost:9094/api";
+
+    @LocalServerPort
+    private int serverPort;
+
+    private String url(String path) {
+        return "http://localhost:" + serverPort + path;
+    }
+    private String baseUrl() {
+        return url("/api");
+    }
 
     // ==================== headers 占位符 ====================
 
     @Test
     void headerPlaceholder_withMatchingHeader_returns200() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/placeholder-cond/header-check")
+                .url(baseUrl() + "/placeholder-cond/header-check")
                 .header("X-Custom", "present")
                 .get()
                 .build();
@@ -63,7 +72,7 @@ public class PlaceholderCondE2eTest {
     @Test
     void headerPlaceholder_withoutMatchingHeader_returns404() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/placeholder-cond/header-check")
+                .url(baseUrl() + "/placeholder-cond/header-check")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -76,7 +85,7 @@ public class PlaceholderCondE2eTest {
     @Test
     void paramPlaceholder_withMatchingParam_returns200() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/placeholder-cond/param-check?required-param=any")
+                .url(baseUrl() + "/placeholder-cond/param-check?required-param=any")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -89,7 +98,7 @@ public class PlaceholderCondE2eTest {
     @Test
     void paramPlaceholder_withoutMatchingParam_returns404() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/placeholder-cond/param-check")
+                .url(baseUrl() + "/placeholder-cond/param-check")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -102,7 +111,7 @@ public class PlaceholderCondE2eTest {
     @Test
     void consumesPlaceholder_withJsonContentType_returns200() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/placeholder-cond/consume-check")
+                .url(baseUrl() + "/placeholder-cond/consume-check")
                 .post(RequestBody.create("{}", JSON_TYPE))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -115,7 +124,7 @@ public class PlaceholderCondE2eTest {
     @Test
     void consumesPlaceholder_withXmlContentType_returns404() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/placeholder-cond/consume-check")
+                .url(baseUrl() + "/placeholder-cond/consume-check")
                 .post(RequestBody.create("<r/>", XML_TYPE))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -128,7 +137,7 @@ public class PlaceholderCondE2eTest {
     @Test
     void producesPlaceholder_withJsonAccept_returns200() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/placeholder-cond/produce-check")
+                .url(baseUrl() + "/placeholder-cond/produce-check")
                 .header("Accept", "application/json")
                 .get()
                 .build();
@@ -142,7 +151,7 @@ public class PlaceholderCondE2eTest {
     @Test
     void producesPlaceholder_withXmlAccept_returns404() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/placeholder-cond/produce-check")
+                .url(baseUrl() + "/placeholder-cond/produce-check")
                 .header("Accept", "text/xml")
                 .get()
                 .build();

@@ -5,6 +5,7 @@ import okhttp3.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
 
 import java.time.Duration;
 import java.util.Map;
@@ -19,9 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @SpringBootTest(
         classes = ProxyE2eApp.class,
-        webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT,
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
-                "server.port=9092",
                 "server.servlet.context-path=/api",
                 "proxy.placeholder.path=/proxy/placeholder-resolved"
         })
@@ -39,7 +39,16 @@ public class ProxyP3E2eTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final String baseUrl = "http://localhost:9092/api";
+
+    @LocalServerPort
+    private int serverPort;
+
+    private String url(String path) {
+        return "http://localhost:" + serverPort + path;
+    }
+    private String baseUrl() {
+        return url("/api");
+    }
 
     // ==================== 1. Controller 类继承 (Child extends Parent) ====================
 
@@ -49,7 +58,7 @@ public class ProxyP3E2eTest {
         // getDeclaredMethods 只返回本类声明的方法，因此 greet 由 ParentController bean 注册
         // `/proxy-parent/greet` 路径通过 ParentController 处理
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-parent/greet?name=test")
+                .url(baseUrl() + "/proxy-parent/greet?name=test")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -61,7 +70,7 @@ public class ProxyP3E2eTest {
     @Test
     void childController_ownMethod_returnsStatus() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-parent/status")
+                .url(baseUrl() + "/proxy-parent/status")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -75,7 +84,7 @@ public class ProxyP3E2eTest {
     @Test
     void negativeCond_withoutBlockHeader_returns200() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-cond-extra/no-block-header")
+                .url(baseUrl() + "/proxy-cond-extra/no-block-header")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -86,7 +95,7 @@ public class ProxyP3E2eTest {
     @Test
     void negativeCond_withBlockHeader_returns404() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-cond-extra/no-block-header")
+                .url(baseUrl() + "/proxy-cond-extra/no-block-header")
                 .header("X-Block", "true")
                 .get()
                 .build();
@@ -98,7 +107,7 @@ public class ProxyP3E2eTest {
     @Test
     void negativeCond_withoutSkipParam_returns200() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-cond-extra/no-skip-param")
+                .url(baseUrl() + "/proxy-cond-extra/no-skip-param")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -109,7 +118,7 @@ public class ProxyP3E2eTest {
     @Test
     void negativeCond_withSkipParam_returns404() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-cond-extra/no-skip-param?skip=true")
+                .url(baseUrl() + "/proxy-cond-extra/no-skip-param?skip=true")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -120,7 +129,7 @@ public class ProxyP3E2eTest {
     @Test
     void negativeCond_notXmlConsumes_withJson_returns200() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-cond-extra/not-xml")
+                .url(baseUrl() + "/proxy-cond-extra/not-xml")
                 .post(RequestBody.create("{}", JSON_TYPE))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -131,7 +140,7 @@ public class ProxyP3E2eTest {
     @Test
     void negativeCond_notXmlConsumes_withXml_returns404() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-cond-extra/not-xml")
+                .url(baseUrl() + "/proxy-cond-extra/not-xml")
                 .post(RequestBody.create("<r/>", XML_TYPE))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -143,7 +152,7 @@ public class ProxyP3E2eTest {
     @Test
     void positiveHeaderCondition_withRequiredHeader_returns200() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-cond-extra/with-header")
+                .url(baseUrl() + "/proxy-cond-extra/with-header")
                 .header("X-Required", "present")
                 .get()
                 .build();
@@ -155,7 +164,7 @@ public class ProxyP3E2eTest {
     @Test
     void positiveHeaderCondition_withoutRequiredHeader_returns404() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-cond-extra/with-header")
+                .url(baseUrl() + "/proxy-cond-extra/with-header")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -168,7 +177,7 @@ public class ProxyP3E2eTest {
     @Test
     void childController_parentException_caughtByParentHandler() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-parent/parent-exception")
+                .url(baseUrl() + "/proxy-parent/parent-exception")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -183,7 +192,7 @@ public class ProxyP3E2eTest {
     @Test
     void childController_childException_caughtBySpecificHandler() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-parent/child-exception")
+                .url(baseUrl() + "/proxy-parent/child-exception")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -200,7 +209,7 @@ public class ProxyP3E2eTest {
     @Test
     void blockingFilter_withProxy_returns403() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-parent/blocked")
+                .url(baseUrl() + "/proxy-parent/blocked")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
