@@ -16,6 +16,10 @@ import org.springframework.http.HttpMethod;
 import org.springframework.web.cors.CorsConfiguration;
 
 import java.lang.reflect.Field;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -50,10 +54,17 @@ class CorsRegistryTest {
     }
 
     @Test
-    void addMapping_multipleRegistrations_allStored() {
-        registry.addMapping("/api/**");
-        registry.addMapping("/admin/**");
-        registry.addMapping("/public/**");
+    void addMapping_multipleRegistrations_eachBuildsIndependentRegistration() {
+        CorsRegistration r1 = registry.addMapping("/api/**");
+        CorsRegistration r2 = registry.addMapping("/admin/**");
+        CorsRegistration r3 = registry.addMapping("/public/**");
+
+        // addMapping 每次都构建独立注册（路径不同，实例不同）
+        assertNotSame(r1, r2);
+        assertNotSame(r2, r3);
+        assertEquals("/api/**", r1.getPathPattern());
+        assertEquals("/admin/**", r2.getPathPattern());
+        assertEquals("/public/**", r3.getPathPattern());
     }
 
     @Test
@@ -63,6 +74,11 @@ class CorsRegistryTest {
         config.addAllowedMethod("GET");
 
         registry.addActuatorCorsConfiguration("/actuator/**", config);
+
+        List<CorsRegistration> registrations = getRegistrations();
+        assertEquals(1, registrations.size());
+        assertEquals("/actuator/**", registrations.get(0).getPathPattern());
+        assertSame(config, registrations.get(0).getCorsConfiguration(), "预构建配置应原样保存");
     }
 
     @Test
@@ -74,6 +90,21 @@ class CorsRegistryTest {
 
         registry.addActuatorCorsConfiguration("/actuator/health", config1);
         registry.addActuatorCorsConfiguration("/actuator/info", config2);
+
+        List<CorsRegistration> registrations = getRegistrations();
+        assertEquals(2, registrations.size());
+        assertEquals(new HashSet<>(Arrays.asList("/actuator/health", "/actuator/info")),
+                registrations.stream().map(r -> r.getPathPattern()).collect(Collectors.toSet()));
+    }
+
+    private List<CorsRegistration> getRegistrations() {
+        try {
+            Field field = CorsRegistry.class.getDeclaredField("registrations");
+            field.setAccessible(true);
+            return (List<CorsRegistration>) field.get(registry);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Test

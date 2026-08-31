@@ -19,6 +19,7 @@ import org.springframework.web.context.request.async.DeferredResultProcessingInt
 import org.springframework.web.context.request.async.WebAsyncTask;
 
 import java.util.Collections;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -85,15 +86,18 @@ class AsyncSupportRegistryTest {
     }
 
     @Test
-    void startDeferredResultProcessing_noTimeout_doesNotSetTimeout() throws Exception {
+    void startDeferredResultProcessing_negativeTimeout_passesThroughToWebRequest() throws Exception {
+        // DeferredResult(-1L) 的 getTimeoutValue() 返回 -1L（非 null），
+        // 与 Spring MVC 语义一致：-1 表示「无限期」，setTimeout(-1) 后不会实际调度超时任务
         DeferredResult<String> deferredResult = new DeferredResult<>(-1L);
 
         registry.startDeferredResultProcessing(asyncWebRequest, deferredResult);
 
-        // timeout value -1L is non-null, but checking the code: timeout only set if timeout != null
-        // getTimeoutValue() returns long primitive, autoboxed to Long, never null
-        // actual check in code: only checks null, not value
+        verify(asyncWebRequest).setTimeout(-1L);
         verify(asyncWebRequest).startAsyncProcessing();
+        verify(asyncWebRequest).addTimeoutHandler(any(Runnable.class));
+        verify(asyncWebRequest).addErrorHandler(any());
+        verify(asyncWebRequest).addCompletionHandler(any(Runnable.class));
     }
 
     @Test
@@ -115,20 +119,30 @@ class AsyncSupportRegistryTest {
     }
 
     @Test
-    void initComponentPhase2_withBizPoolRegistry_doesNotThrow() throws Exception {
-        BizPoolRegistry bizPoolRegistry = mock(BizPoolRegistry.class);
-        when(bizPoolRegistry.getDefaultPool()).thenReturn(Executors.newSingleThreadExecutor());
-        when(webContext.getWebComponent(BizPoolRegistry.class)).thenReturn(bizPoolRegistry);
-        when(webContext.getCtx()).thenReturn(applicationContext);
-        when(applicationContext.getBeansOfType(CallableProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
-        when(applicationContext.getBeansOfType(DeferredResultProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
-        doReturn(null).when(webContext).getBeanFromCtx(com.fasterxml.jackson.databind.ObjectMapper.class);
-        when(webContext.getWebComponentWithDefault(eq(JsonConverter.class), any(JsonConverter.class)))
-                .thenReturn(mock(JsonConverter.class));
+    void initComponentPhase2_withBizPoolRegistry_usesDefaultPool() throws Exception {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            BizPoolRegistry bizPoolRegistry = mock(BizPoolRegistry.class);
+            when(bizPoolRegistry.getDefaultPool()).thenReturn(executor);
+            when(webContext.getWebComponent(BizPoolRegistry.class)).thenReturn(bizPoolRegistry);
+            when(webContext.getCtx()).thenReturn(applicationContext);
+            when(applicationContext.getBeansOfType(CallableProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
+            when(applicationContext.getBeansOfType(DeferredResultProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
+            doReturn(null).when(webContext).getBeanFromCtx(com.fasterxml.jackson.databind.ObjectMapper.class);
+            when(webContext.getWebComponentWithDefault(eq(JsonConverter.class), any(JsonConverter.class)))
+                    .thenReturn(mock(JsonConverter.class));
 
-        registry.initWithWebContext(webContext);
-        registry.initComponentPhase1();
-        registry.initComponentPhase2();
+            registry.initWithWebContext(webContext);
+            registry.initComponentPhase1();
+            registry.initComponentPhase2();
+
+            // 提供 default 池时，defaultTaskExecutor 应包装该池（非 null），保证异步任务不会走兜底
+            Object taskExecutor = getDefaultTaskExecutor(registry);
+            assertNotNull(taskExecutor, "提供 default 业务线程池时 defaultTaskExecutor 应被设置");
+            assertInstanceOf(org.springframework.core.task.AsyncTaskExecutor.class, taskExecutor);
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test
@@ -194,6 +208,12 @@ class AsyncSupportRegistryTest {
 
     private static Object getFallbackExecutor(AsyncSupportRegistry registry) throws Exception {
         java.lang.reflect.Field field = AsyncSupportRegistry.class.getDeclaredField("fallbackExecutor");
+        field.setAccessible(true);
+        return field.get(registry);
+    }
+
+    private static Object getDefaultTaskExecutor(AsyncSupportRegistry registry) throws Exception {
+        java.lang.reflect.Field field = AsyncSupportRegistry.class.getDeclaredField("defaultTaskExecutor");
         field.setAccessible(true);
         return field.get(registry);
     }

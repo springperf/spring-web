@@ -14,9 +14,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.MethodParameter;
 import org.springframework.stereotype.Controller;
+import org.springframework.validation.BindException;
+import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
+import org.springframework.validation.Validator;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -48,6 +54,9 @@ class ArgumentResolverRegistryTest {
 
         registry.initStaticArgumentResolverProviders();
         registry.webDataBinderRegistry = mock(WebDataBinderRegistry.class);
+        // validateIfApplicable/createBindingResult 依赖 conversion service，提供默认值
+        when(registry.webDataBinderRegistry.getConversionService(any()))
+                .thenReturn(new org.springframework.format.support.DefaultFormattingConversionService());
 
         registry.requestParamResolverProvider = registry.getWebComponent(RequestParamResolverProvider.class);
 
@@ -194,6 +203,64 @@ class ArgumentResolverRegistryTest {
                 registry.validateIfApplicable("test", argCtx, mock(WebServerHttpRequest.class), mock(MappingHandlerMethod.class)));
     }
 
+    @Test
+    void validateIfApplicable_withValidAnnotation_validatorErrors_throws() throws Exception {
+        // 覆盖 validateIfApplicable 的完整校验分支：@Validated + validator 报错 +
+        // 无相邻 BindingResult（ArgumentResolverRegistry.java:181-211）→ 抛 MethodArgumentNotValidException
+        Method method = getClass().getMethod("validatedReqBody", ValidTarget.class);
+        MethodParameter mp = new MethodParameter(method, 0);
+        MethodArgContext argCtx = new MethodArgContext(mp);
+        assertTrue(argCtx.isHaveValidateAnnotation());
+
+        Validator validator = mock(Validator.class);
+        when(validator.supports(ValidTarget.class)).thenReturn(true);
+        doAnswer(invocation -> {
+            org.springframework.validation.Errors errors = invocation.getArgument(1);
+            errors.rejectValue("name", "required", "name is required");
+            return null;
+        }).when(validator).validate(any(), any());
+        when(registry.webDataBinderRegistry.getValidators(any())).thenReturn(Collections.singletonList(validator));
+
+        WebServerHttpRequest request = mock(WebServerHttpRequest.class);
+        io.springperf.web.http.RequestContext requestContext = mock(io.springperf.web.http.RequestContext.class);
+        when(request.getRequestContext()).thenReturn(requestContext);
+
+        assertThrows(MethodArgumentNotValidException.class,
+                () -> registry.validateIfApplicable(new ValidTarget(), argCtx, request, mock(MappingHandlerMethod.class)));
+        // 校验失败时不应重复创建 BindingResult 写入请求属性（无相邻 BindingResult 参数，走抛异常）
+        verify(requestContext, never()).setAttribute(any(io.springperf.web.http.RequestAttribute.class), any());
+        verify(requestContext, never()).setAttribute(any(String.class), any());
+    }
+
+    @Test
+    void validateIfApplicable_withValidAnnotation_nextBindingResult_doesNotThrow() throws Exception {
+        // 相邻参数为 BindingResult 时：@Validated + validator 报错仍不抛，
+        // 且 BindingResult 已写入请求属性供后续参数使用（ArgumentResolverRegistry.java:183-186）
+        Method method = getClass().getMethod("validatedWithBindingResult", ValidTarget.class, BindingResult.class);
+        MethodParameter mp = new MethodParameter(method, 0);
+        MethodArgContext argCtx = new MethodArgContext(mp);
+        assertTrue(argCtx.isHaveValidateAnnotation());
+        assertTrue(argCtx.isHasBindingResult());
+
+        Validator validator = mock(Validator.class);
+        when(validator.supports(ValidTarget.class)).thenReturn(true);
+        doAnswer(invocation -> {
+            org.springframework.validation.Errors errors = invocation.getArgument(1);
+            errors.rejectValue("name", "required", "name is required");
+            return null;
+        }).when(validator).validate(any(), any());
+        when(registry.webDataBinderRegistry.getValidators(any())).thenReturn(Collections.singletonList(validator));
+
+        WebServerHttpRequest request = mock(WebServerHttpRequest.class);
+        io.springperf.web.http.RequestContext requestContext = mock(io.springperf.web.http.RequestContext.class);
+        when(request.getRequestContext()).thenReturn(requestContext);
+
+        assertDoesNotThrow(() ->
+                registry.validateIfApplicable(new ValidTarget(), argCtx, request, mock(MappingHandlerMethod.class)));
+        verify(requestContext).setAttribute(eq(argCtx.getBindingResultAttrKey()),
+                any(org.springframework.validation.BeanPropertyBindingResult.class));
+    }
+
     // ----- D3: 无默认构造器 @ModelAttribute 启动即失败（fail-fast） -----
 
     @Test
@@ -223,6 +290,19 @@ class ArgumentResolverRegistryTest {
 
     @SuppressWarnings("unused")
     public void unannotatedComplexParam(ComplexObj obj) {}
+
+    @SuppressWarnings("unused")
+    public void validatedReqBody(@Validated ValidTarget target) {}
+
+    @SuppressWarnings("unused")
+    public void validatedWithBindingResult(@Validated ValidTarget target, BindingResult result) {}
+
+    @SuppressWarnings("unused")
+    public static class ValidTarget {
+        private String name;
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+    }
 
     static class ComplexObj {
         private String field;

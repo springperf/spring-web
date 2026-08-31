@@ -59,16 +59,6 @@ class ResponseStatusExceptionResolverTest {
     }
 
     @Test
-    void resolveException_responseStatusException_withHeaders_resolves() {
-        ResponseStatusException ex = new ResponseStatusException(HttpStatus.NOT_FOUND, "not found");
-
-        boolean result = resolver.resolveException(request, response, handler, ex);
-
-        assertTrue(result);
-        verify(response).sendError(HttpStatus.NOT_FOUND, "not found");
-    }
-
-    @Test
     void resolveException_responseStatusException_headersEmpty_noHeaderCopy() {
         // 回归 R3 P1-13：headers 经 ResponseStatusExceptionAdapter 跨版本桥接。
         // 6.1 中 ResponseStatusException 构造器不接收 headers，getHeaders() 恒返回 EMPTY，

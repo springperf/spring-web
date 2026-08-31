@@ -92,10 +92,12 @@ class PrefixPathRouterOptimizerTest {
     }
 
     @Test
-    void optimizeRoute_noSupportCalled_throwsArrayIndexOutOfBounds() {
+    void optimizeRoute_noSupportCalled_returnsNull() {
+        // 未调用 support()/init() 时 prefixPathIndex 未初始化（<0），
+        // 与 SuffixPathRouterOptimizer 对称：优雅返回 null，而非访问 slashIndexList 越界
         PrefixPathRouterOptimizer optimizer = new PrefixPathRouterOptimizer();
         WebServerHttpRequest req = createMockRequest("/api/test");
-        assertThrows(ArrayIndexOutOfBoundsException.class, () -> optimizer.optimizeRoute(req));
+        assertNull(optimizer.optimizeRoute(req));
     }
 
     @Test
@@ -113,16 +115,15 @@ class PrefixPathRouterOptimizerTest {
 
     @Test
     void initAndRemove_prefixPathHasWildcard_returnsFalse() {
-        // This test uses the default RouterOptimizer.init() flow:
-        // Verify the prefix extraction considers wildcards in prefix area
+        // 构造三条共享 /a/b/ 前缀但通配段不同的路径，support() 会选中 prefixPathIndex=3；
+        // 再用前缀段含 {c} 的路径触发 initAndRemove 的 pathHaveWildcard(prefixPath) 分支
         PrefixPathRouterOptimizer optimizer = new PrefixPathRouterOptimizer();
         List<PathMappingContext> list = new ArrayList<>();
-        list.add(mockContext("/a/b/c/d/e"));
-        list.add(mockContext("/a/b/c/d/f"));
-        list.add(mockContext("/a/b/c/d/g"));
+        list.add(mockContext("/a/b/x/**"));
+        list.add(mockContext("/a/b/y/**"));
+        list.add(mockContext("/a/b/z/**"));
         optimizer.support(list);
-        PathMappingContext ctx = mockContext("/api/{var}/list");
-        assertFalse(optimizer.initAndRemove(ctx));
+        assertFalse(optimizer.initAndRemove(mockContext("/a/b/{c}/d")), "前缀段含通配符时不应建前缀路由");
     }
 
     @Test

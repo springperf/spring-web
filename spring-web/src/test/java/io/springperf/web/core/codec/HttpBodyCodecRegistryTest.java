@@ -22,6 +22,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.converter.HttpMessageNotWritableException;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -642,17 +643,26 @@ class HttpBodyCodecRegistryTest {
 
         Type result = registry.getGenericType(parameter);
 
-        assertNotNull(result);
+        assertEquals(String.class, result, "非 HttpEntity 直接返回声明泛型类型");
     }
 
     @Test
-    void getGenericType_httpEntity_returnsWrappedGenericType() {
-        MethodParameter httpEntityParam = mock(MethodParameter.class);
-        when(httpEntityParam.getParameterType()).thenReturn((Class) HttpEntity.class);
+    void getGenericType_httpEntity_returnsWrappedGenericType() throws Exception {
+        // 使用真实带泛型的 MethodParameter，验证 HttpEntity 泛型参数被正确提取（非仅非空）
+        Method method = getClass().getDeclaredMethod("httpEntityParam", HttpEntity.class);
+        MethodParameter httpEntityParam = new MethodParameter(method, 0);
 
         Type result = registry.getGenericType(httpEntityParam);
 
-        assertNotNull(result);
+        assertEquals(TestDto.class, result, "HttpEntity<TestDto> 应解包出 TestDto");
+    }
+
+    @SuppressWarnings("unused")
+    public void httpEntityParam(HttpEntity<TestDto> entity) {
+    }
+
+    @SuppressWarnings("unused")
+    public static class TestDto {
     }
 
     // ---- getMostSpecificMediaType ----
@@ -674,6 +684,6 @@ class HttpBodyCodecRegistryTest {
 
         MediaType result = registry.getMostSpecificMediaType(acceptType, produceType);
 
-        assertNotNull(result);
+        assertEquals(produceType, result, "produce 比 accept 更具体时应返回 produce 的实际媒体类型");
     }
 }

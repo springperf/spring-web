@@ -92,8 +92,7 @@ class FastInvokerGeneratorTest {
         Invoker invoker1 = FastInvokerGenerator.createInvoker(controller, FastController.class, method);
         Invoker invoker2 = FastInvokerGenerator.createInvoker(another, FastController.class, method);
 
-        assertNotNull(invoker1);
-        assertNotNull(invoker2);
+        assertNotSame(invoker1, invoker2, "同一方法应复用生成的类，但每次 new 出独立实例");
         assertEquals("Hello A", invoker1.invoke(new Object[]{"A"}));
         assertEquals("Hello B", invoker2.invoke(new Object[]{"B"}));
     }

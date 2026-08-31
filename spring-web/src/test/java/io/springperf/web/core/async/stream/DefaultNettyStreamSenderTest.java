@@ -88,6 +88,7 @@ class DefaultNettyStreamSenderTest {
         verify(channel, atLeastOnce()).writeAndFlush(httpContentCaptor.capture());
         ByteBuf written = httpContentCaptor.getValue().content();
         assertEquals("hello", written.toString(StandardCharsets.UTF_8));
+        written.release();
     }
 
     @Test
@@ -106,7 +107,10 @@ class DefaultNettyStreamSenderTest {
         sender.send("first");
         sender.send("second");
 
-        verify(channel, atLeast(2)).writeAndFlush(any(DefaultHttpContent.class));
+        verify(channel, atLeast(2)).writeAndFlush(httpContentCaptor.capture());
+        for (DefaultHttpContent content : httpContentCaptor.getAllValues()) {
+            content.content().release();
+        }
     }
 
     @Test
@@ -132,6 +136,7 @@ class DefaultNettyStreamSenderTest {
 
         verify(channel, atLeastOnce()).writeAndFlush(lastHttpContentCaptor.capture());
         assertTrue(lastHttpContentCaptor.getValue() instanceof LastHttpContent);
+        lastHttpContentCaptor.getValue().release();
     }
 
     @Test
@@ -151,6 +156,7 @@ class DefaultNettyStreamSenderTest {
         verify(channel, atLeastOnce()).writeAndFlush(httpContentCaptor.capture());
         DefaultHttpContent content = httpContentCaptor.getValue();
         assertEquals("good", content.content().toString(StandardCharsets.UTF_8));
+        content.content().release();
     }
 
     @Test
@@ -232,6 +238,10 @@ class DefaultNettyStreamSenderTest {
         int written = 0;
         for (DefaultHttpContent c : httpContentCaptor.getAllValues()) {
             written += c.content().readableBytes();
+            c.content().release();
+        }
+        for (LastHttpContent c : lastHttpContentCaptor.getAllValues()) {
+            c.release();
         }
         assertEquals(10, written, "所有已发送数据必须完整写出，不允许截断");
     }

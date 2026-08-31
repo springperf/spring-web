@@ -56,8 +56,10 @@ class NettyTransportTest {
 
     @Test
     void useEpoll_nullOrEmpty_fallsBackToAuto() {
-        assertFalse(NettyTransport.useEpoll(null));
-        assertFalse(NettyTransport.useEpoll(""));
+        // null/"" 语义与 auto 一致（NettyTransport.useEpoll 内部统一回退 auto），
+        // 断言二者返回结果相同，避免平台差异（Linux auto 为 true，Windows 为 false）
+        assertEquals(NettyTransport.useEpoll("auto"), NettyTransport.useEpoll(null));
+        assertEquals(NettyTransport.useEpoll("auto"), NettyTransport.useEpoll(""));
     }
 
     @Test

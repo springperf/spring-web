@@ -77,7 +77,9 @@ public class PrefixPathRouterOptimizer implements RouterOptimizer {
     public Router optimizeRoute(WebServerHttpRequest req) {
         String path = req.getPath();
         int[] slashIndexList = getSlashIndexList(req);
-        if (prefixPathIndex >= slashIndexList.length) {
+        // prefixPathIndex < 0：未调用 support()/init()（无有效前缀索引），必须显式拒绝，
+        // 避免访问 slashIndexList[-1] 越界（与 SuffixPathRouterOptimizer 对称）
+        if (prefixPathIndex < 0 || prefixPathIndex >= slashIndexList.length) {
             return null;
         }
         String prefixPath = path.substring(0, slashIndexList[prefixPathIndex]);

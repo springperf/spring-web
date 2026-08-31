@@ -91,13 +91,15 @@ class ModelAttributeResolverTest {
         when(binderFactory.createBinder(any(NativeWebRequest.class), any(), eq("modelParam")))
                 .thenReturn(dataBinder);
         when(dataBinder.getTarget()).thenReturn(new ModelAttrBean());
+        // 静态 PerfDataBinder.bind 走非 PerfDataBinder 分支：binder.bind(MutablePropertyValues)
+        when(request.getParameterMapArray()).thenReturn(java.util.Collections.emptyMap());
 
         ModelAttributeResolver resolver = new ModelAttributeResolver(
                 binderFactory, webContext, mappingContext, mp, "modelParam", true);
 
         Object result = resolver.resolveArgument(request, response);
-        assertNotNull(result);
         assertInstanceOf(ModelAttrBean.class, result);
+        verify(dataBinder).bind(any(org.springframework.beans.MutablePropertyValues.class));
     }
 
     @Test
@@ -114,8 +116,8 @@ class ModelAttributeResolverTest {
                 binderFactory, webContext, mappingContext, mp, "modelParam", false);
 
         Object result = resolver.resolveArgument(request, response);
-        assertNotNull(result);
         assertInstanceOf(ModelAttrBean.class, result);
+        verify(dataBinder, never()).bind(any(org.springframework.beans.MutablePropertyValues.class));
     }
 
     @SuppressWarnings("unused")

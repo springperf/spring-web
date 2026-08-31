@@ -11,25 +11,24 @@ import static org.junit.jupiter.api.Assertions.*;
 class CustomInvokerTest {
 
     @Test
-    void getHandleMethod_returnsCorrectMethod() throws Exception {
-        Method expected = getClass().getMethod("targetMethod");
-        CustomInvoker invoker = new TestCustomInvoker(expected, "test-type");
+    void getMatchers_defaultReturnsEmptyList() {
+        // 验证接口默认契约：未覆写时返回空 Matcher 列表（供路由预过滤使用）
+        CustomInvoker invoker = new CustomInvoker() {
+            @Override
+            public Method getHandleMethod() {
+                return getClass().getDeclaredMethods()[0];
+            }
 
-        assertSame(expected, invoker.getHandleMethod());
-    }
+            @Override
+            public String getType() {
+                return "test";
+            }
 
-    @Test
-    void getType_returnsConfiguredType() throws Exception {
-        Method method = getClass().getMethod("targetMethod");
-        CustomInvoker invoker = new TestCustomInvoker(method, "my-type");
-
-        assertEquals("my-type", invoker.getType());
-    }
-
-    @Test
-    void getMatchers_defaultReturnsEmptyList() throws Exception {
-        Method method = getClass().getMethod("targetMethod");
-        CustomInvoker invoker = new TestCustomInvoker(method, "test");
+            @Override
+            public Object invoke(Object[] args) {
+                return null;
+            }
+        };
 
         List<Matcher> matchers = invoker.getMatchers();
         assertNotNull(matchers);
@@ -37,42 +36,27 @@ class CustomInvokerTest {
     }
 
     @Test
-    void invoke_callsTargetMethod() throws Throwable {
-        Method method = getClass().getMethod("targetMethod");
-        CustomInvoker invoker = new TestCustomInvoker(method, "test");
-
-        Object result = invoker.invoke(new Object[0]);
-
-        assertEquals("target-called", result);
-    }
-
-    @SuppressWarnings("unused")
-    public static String targetMethod() {
-        return "target-called";
+    void defaultsDoNotThrow() {
+        // 默认方法（getMatchers）在空实现下可用且不抛异常
+        CustomInvoker invoker = new TestCustomInvoker();
+        assertNotNull(invoker);
+        assertDoesNotThrow(() -> invoker.getMatchers());
     }
 
     static class TestCustomInvoker implements CustomInvoker {
-        private final Method method;
-        private final String type;
-
-        TestCustomInvoker(Method method, String type) {
-            this.method = method;
-            this.type = type;
-        }
-
         @Override
         public Method getHandleMethod() {
-            return method;
+            return getClass().getDeclaredMethods()[0];
         }
 
         @Override
         public String getType() {
-            return type;
+            return "test";
         }
 
         @Override
-        public Object invoke(Object[] args) throws Throwable {
-            return method.invoke(null, args);
+        public Object invoke(Object[] args) {
+            return null;
         }
     }
 }

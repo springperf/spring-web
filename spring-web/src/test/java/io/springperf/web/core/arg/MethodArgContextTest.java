@@ -5,7 +5,6 @@ import org.springframework.core.MethodParameter;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.Errors;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.RequestBody;
 
 import java.lang.reflect.Method;
 
@@ -84,11 +83,33 @@ class MethodArgContextTest {
     }
 
     @Test
-    void constructor_withValidatedAnnotationEmptyHints_hasNoHints() throws Exception {
+    void constructor_withValidAnnotation_detectsValidation() throws Exception {
+        // 业务最常用的 @Valid（simpleName 以 Valid 开头）→ 触发前缀匹配分支（MethodArgContext.java:49）
+        Method method = getClass().getMethod("validParam", ValidParam.class);
+        MethodParameter mp = new MethodParameter(method, 0);
+        MethodArgContext ctx = new MethodArgContext(mp);
+        assertTrue(ctx.isHaveValidateAnnotation());
+        assertNotNull(ctx.getValidationHints());
+        assertEquals(1, ctx.getValidationHints().length, "@Valid 无 hints 时包装为单元素数组");
+    }
+
+    @Test
+    void constructor_withValidAnnotationNonArrayValue_wrapsAsSingleHint() throws Exception {
+        // 自定义名字以 Valid 开头的注解携带标量值：非 Object[] 兜底分支（MethodArgContext.java:54-55）
+        Method method = getClass().getMethod("customValidParam", ValidParam.class);
+        MethodParameter mp = new MethodParameter(method, 0);
+        MethodArgContext ctx = new MethodArgContext(mp);
+        assertTrue(ctx.isHaveValidateAnnotation());
+        assertEquals("scalar-hint", ctx.getValidationHints()[0]);
+    }
+
+    @Test
+    void constructor_withValidatedAnnotationEmptyHints_noHints() throws Exception {
         Method method = getClass().getMethod("validatedParam", ValidParam.class);
         MethodParameter mp = new MethodParameter(method, 0);
         MethodArgContext ctx = new MethodArgContext(mp);
-        assertNotNull(ctx.getValidationHints());
+        assertTrue(ctx.isHaveValidateAnnotation());
+        assertEquals(0, ctx.getValidationHints().length);
     }
 
     // ----- BindingResult detection -----
@@ -148,15 +169,27 @@ class MethodArgContextTest {
     public void validatedWithHintsParam(@Validated({Group1.class, Group2.class}) ValidParam param) {}
 
     @SuppressWarnings("unused")
+    public void validParam(@ValidScalarHint ValidParam param) {}
+
+    @SuppressWarnings("unused")
+    public void customValidParam(@ValidScalarHint ValidParam param) {}
+
+    @SuppressWarnings("unused")
     public void paramWithBindingResult(String name, BindingResult bindingResult) {}
 
     @SuppressWarnings("unused")
     public void paramWithErrorsSubclass(String name, Errors errors) {}
 
-    @SuppressWarnings("unused")
-    public void requestBodyParam(@RequestBody String body) {}
-
     static class ValidParam {}
     interface Group1 {}
     interface Group2 {}
+
+    /**
+     * 自定义注解名以 Valid 开头且携带标量属性，用于覆盖非 Object[] hints 兜底分支。
+     */
+    @java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME)
+    @java.lang.annotation.Target(java.lang.annotation.ElementType.PARAMETER)
+    public @interface ValidScalarHint {
+        String value() default "scalar-hint";
+    }
 }

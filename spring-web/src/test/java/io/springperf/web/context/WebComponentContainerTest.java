@@ -108,15 +108,16 @@ class WebComponentContainerTest {
         java.util.concurrent.CyclicBarrier barrier = new java.util.concurrent.CyclicBarrier(threads);
         java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(threads);
         java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(threads);
+        LifecycleWebComponent[] comps = new LifecycleWebComponent[threads];
         for (int i = 0; i < threads; i++) {
-            final int order = 100 + i;
+            final int idx = i;
+            comps[idx] = mock(LifecycleWebComponent.class);
+            when(comps[idx].getComponentName()).thenReturn("same");
+            when(comps[idx].getOrder()).thenReturn(100 + idx);
             pool.submit(() -> {
                 try {
                     barrier.await();
-                    LifecycleWebComponent comp = mock(LifecycleWebComponent.class);
-                    when(comp.getComponentName()).thenReturn("same");
-                    when(comp.getOrder()).thenReturn(order);
-                    container.registerWebComponent(comp);
+                    container.registerWebComponent(comps[idx]);
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 } finally {
@@ -128,6 +129,18 @@ class WebComponentContainerTest {
         pool.shutdownNow();
 
         assertEquals(1, container.webComponents.size(), "并发同名注册后容器应只保留一个组件");
+        // order 最小的 comps[0](100) 无论何时注册都会替换现存活者，且不会被更高 order 抢位，
+        // 因此终态存活者必为 comps[0]，绝不能被 destroy
+        assertSame(comps[0], container.webComponents.get("same"), "最高优先级组件应存活");
+        verify(comps[0], never()).destroyComponent();
+        // compute 原子合并保证：任何组件至多被 destroy 一次（无双 destroy、无丢失）；
+        // 注意并发时序下被替换次数不确定，故不断言精确次数
+        for (LifecycleWebComponent comp : comps) {
+            long destroyCount = mockingDetails(comp).getInvocations().stream()
+                    .filter(inv -> inv.getMethod().getName().equals("destroyComponent"))
+                    .count();
+            assertTrue(destroyCount <= 1, comp + " 不应被 destroy 超过一次，实际 " + destroyCount);
+        }
     }
 
     @Test

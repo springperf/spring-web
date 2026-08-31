@@ -1,18 +1,24 @@
 package io.springperf.web.core.interceptor;
 
+import io.springperf.web.core.mapping.MappingResult;
+import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.http.RequestAttribute;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.annotation.Order;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -67,12 +73,29 @@ class InterceptorRegistryTest {
         registry.registerInterceptor(i1);
         registry.registerInterceptor(i2);
 
-        // Verify both were added by checking preHandle behavior
-        List<HandlerInterceptor> prebuilt = Arrays.asList(i1, i2);
+        // 验证两个拦截器都进入 registrations（通过 realGetInterceptors 走 ALWAYS 匹配路径）
+        PathMappingContext mappingContext = mock(PathMappingContext.class);
+        when(mappingContext.getPathRule()).thenReturn("/api/**");
+        when(mappingContext.getCachedInterceptors()).thenReturn(null);
+        // 模拟 fastAttributes：让 MappingResult.set/get 能正确存取（保存于同一声明 attribute）
+        Map<RequestAttribute<?>, Object> fastAttrs = new HashMap<>();
         when(request.getRequestContext()).thenReturn(requestContext);
-        when(requestContext.getAttribute(InterceptorRegistry.INTERCEPTORS_ATTRIBUTE)).thenReturn(prebuilt);
+        when(requestContext.getAttribute(any(RequestAttribute.class)))
+                .thenAnswer(inv -> fastAttrs.get(inv.getArgument(0)));
+        doAnswer(inv -> {
+            fastAttrs.put(inv.getArgument(0), inv.getArgument(1));
+            return null;
+        }).when(requestContext).setAttribute(any(RequestAttribute.class), any());
 
-        assertTrue(registry.preHandle(request, response));
+        MappingResult matched = MappingResult.matched(mappingContext);
+        MappingResult.set(request, matched);
+
+        List<HandlerInterceptor> actual = registry.realGetInterceptors(request);
+
+        ArgumentCaptor<List<HandlerInterceptor>> captor = ArgumentCaptor.forClass(List.class);
+        verify(mappingContext).setCachedInterceptors(captor.capture());
+        assertTrue(actual.stream().anyMatch(h -> h == i1), "i1 应进入拦截器列表");
+        assertTrue(actual.stream().anyMatch(h -> h == i2), "i2 应进入拦截器列表");
     }
 
 

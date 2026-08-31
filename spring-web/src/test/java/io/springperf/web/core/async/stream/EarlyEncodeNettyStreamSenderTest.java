@@ -82,6 +82,7 @@ class EarlyEncodeNettyStreamSenderTest {
         verify(channel, atLeastOnce()).writeAndFlush(httpContentCaptor.capture());
         ByteBuf written = httpContentCaptor.getValue().content();
         assertEquals("hello", written.toString(StandardCharsets.UTF_8));
+        written.release();
     }
 
     @Test
@@ -108,7 +109,10 @@ class EarlyEncodeNettyStreamSenderTest {
 
         sender.send("data".getBytes(StandardCharsets.UTF_8));
 
-        verify(channel, atLeastOnce()).writeAndFlush(any(DefaultHttpContent.class));
+        verify(channel, atLeastOnce()).writeAndFlush(httpContentCaptor.capture());
+        for (DefaultHttpContent content : httpContentCaptor.getAllValues()) {
+            content.content().release();
+        }
     }
 
     @Test
@@ -122,6 +126,7 @@ class EarlyEncodeNettyStreamSenderTest {
 
         verify(channel, atLeastOnce()).writeAndFlush(lastHttpContentCaptor.capture());
         assertTrue(lastHttpContentCaptor.getValue() instanceof LastHttpContent);
+        lastHttpContentCaptor.getValue().release();
     }
 
     @Test

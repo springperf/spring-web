@@ -55,7 +55,7 @@ class WebDataBinderRegistryTest {
     @Test
     void getConversionService_usesDefaultWhenFactoryNotAvailable() throws Exception {
         WebDataBinderRegistry registry = new WebDataBinderRegistry();
-        MappingHandlerMethod handlerMethod = createHandlerMethod();
+        MappingHandlerMethod handlerMethod = createHandlerMethod(SlotA.class);
 
         ConversionService testService = new DefaultFormattingConversionService();
         setField(registry, "defaultConversionService", testService);
@@ -67,7 +67,7 @@ class WebDataBinderRegistryTest {
     @Test
     void getConversionService_cachesResult() throws Exception {
         WebDataBinderRegistry registry = new WebDataBinderRegistry();
-        MappingHandlerMethod handlerMethod = createHandlerMethod();
+        MappingHandlerMethod handlerMethod = createHandlerMethod(SlotB.class);
 
         ConversionService testService = new DefaultFormattingConversionService();
         setField(registry, "defaultConversionService", testService);
@@ -79,19 +79,19 @@ class WebDataBinderRegistryTest {
     }
 
     @Test
-    void getValidators_returnsEmptyListWhenNoDefaultValidator() {
+    void getValidators_returnsEmptyListWhenNoDefaultValidator() throws Exception {
         WebDataBinderRegistry registry = new WebDataBinderRegistry();
-        MappingHandlerMethod handlerMethod = createHandlerMethod();
+        MappingHandlerMethod handlerMethod = createHandlerMethod(SlotC.class);
 
         List<Validator> validators = registry.getValidators(handlerMethod);
 
-        assertNotNull(validators);
+        assertTrue(validators.isEmpty());
     }
 
     @Test
-    void getValidators_cachesResult() {
+    void getValidators_cachesResult() throws Exception {
         WebDataBinderRegistry registry = new WebDataBinderRegistry();
-        MappingHandlerMethod handlerMethod = createHandlerMethod();
+        MappingHandlerMethod handlerMethod = createHandlerMethod(SlotD.class);
 
         List<Validator> validators1 = registry.getValidators(handlerMethod);
         List<Validator> validators2 = registry.getValidators(handlerMethod);
@@ -164,6 +164,13 @@ class WebDataBinderRegistryTest {
     private static final class FallbackA { @SuppressWarnings("unused") public void handle() {} }
     private static final class FallbackB { @SuppressWarnings("unused") public void handle() {} }
     private static final class FallbackC { @SuppressWarnings("unused") public void handle() {} }
+
+    // 同样按 userClass 静态共享缓存，getConversionService/getValidators 的用例各自使用独立
+    // userClass 槽位，避免测试顺序导致缓存串扰。
+    private static final class SlotA { @SuppressWarnings("unused") public void handle() {} }
+    private static final class SlotB { @SuppressWarnings("unused") public void handle() {} }
+    private static final class SlotC { @SuppressWarnings("unused") public void handle() {} }
+    private static final class SlotD { @SuppressWarnings("unused") public void handle() {} }
 
     private static void setField(Object target, String fieldName, Object value) throws Exception {
         Field field = target.getClass().getDeclaredField(fieldName);
