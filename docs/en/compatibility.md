@@ -50,13 +50,13 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 
 | Dependency | Current Version | Verified Range | Notes |
 |------------|----------------|----------------|-------|
-| Spring Boot | **3.2.12** | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | Switch via Maven profile (`-Pspring-boot-3.0` ~ `-Pspring-boot-4.1`) |
-| Spring Framework | **6.1.x** | 6.0.x ~ 6.2.x / 7.0.x | Managed by Spring Boot |
+| Spring Boot | **3.5.16** | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | Switch via Maven profile (`-Pspring-boot-3.0` ~ `-Pspring-boot-4.1`) |
+| Spring Framework | **6.2.x** | 6.0.x ~ 6.2.x / 7.0.x | Managed by Spring Boot |
 | JDK | **17, 21** | 17, 21 verified | Compile target `java.version=17`; JDK 21 provides virtual thread support |
 | Servlet API | **jakarta.servlet 6.0** | 6.0.x | javax.servlet incompatible |
-| Netty | **4.1.110.Final** | 4.1.x | |
+| Netty | **4.1.137.Final** | 4.1.x | |
 | Jackson | **2.17.2** | 2.17.x | |
-| Lombok | **1.18.36** | 1.18.30+ | Higher version needed for JDK 17+ compatibility |
+| Lombok | **1.18.46** | 1.18.30+ | Higher version needed for JDK 17+ compatibility |
 | JMH | **1.37** | 1.37 | Benchmark module only |
 
 ### Additional Features
@@ -95,11 +95,11 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 
 ## spring-web-view and Model Type Differences
 
-The view rendering module depends on Spring's `org.springframework.ui` types. Because the class designs differ between Spring Framework 6.1 (master) and 5.3 (2.7.x), the **Model parameter injection implementation differs**:
+The view rendering module depends on Spring's `org.springframework.ui` types. Because the class designs differ between Spring Framework 6.2 (master) and 5.3 (2.7.x), the **Model parameter injection implementation differs**:
 
 | Branch | Spring Framework | `ModelMap` implements `Model`? | Framework injection type | Notes |
 |--------|-----------------|-------------------------------|--------------------------|-------|
-| `master` | 6.1.x | ❌ No | `ExtendedModelMap` (subclass of `ModelMap` and implements `Model`) | Always injects `ExtendedModelMap` to support `Model`/`ModelMap`/`ExtendedModelMap` declarations |
+| `master` | 6.2.x | ❌ No | `ExtendedModelMap` (subclass of `ModelMap` and implements `Model`) | Always injects `ExtendedModelMap` to support `Model`/`ModelMap`/`ExtendedModelMap` declarations |
 | `2.7.x` | 5.3.x | ✅ Yes | `ExtendedModelMap` (simpler on backport) | `ModelMap` itself is castable to `Model` |
 
 > **Backport note**: `ModelSupport.getOrCreate()` in `spring-web-view` needs no special handling on 2.7.x — Spring 5.3's `ModelMap` already implements `Model`, so the same implementation can be reused.
@@ -108,7 +108,7 @@ The view rendering module depends on Spring's `org.springframework.ui` types. Be
 
 | Branch | Thymeleaf (BOM-managed) | FreeMarker (BOM-managed) |
 |--------|-------------------------|--------------------------|
-| `3.2.12` (master) | 3.1.2.RELEASE | 2.3.33 |
+| `3.5.16` (master) | 3.1.5.RELEASE | 2.3.34 |
 | `2.7.18` (2.7.x) | 3.0.15.RELEASE | 2.3.32 |
 
 `spring-web-view` declares engines as `provided`; exact versions are managed by the user's Spring Boot BOM.

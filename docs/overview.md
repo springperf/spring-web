@@ -207,8 +207,8 @@ Servlet API 有二十年的生态积累：Spring Security Filter Chain、`Reques
 | 场景 | 原因 |
 |------|------|
 | **重度依赖 Servlet API** | 需要引入 `spring-web-support` 桥接模块，部分 Servlet API 可能不完全兼容 |
-| **需要使用 JSP** | JSP 是 Servlet 容器特性，不支持 |
-| **传统 WebSocket**（javax.websocket） | 不支持 Servlet 容器的 WebSocket API |
+| **需要使用 JSP** | 需引入 `spring-web-support` + `tomcat-embed-jasper`，经 `JasperJspServlet` 桥接执行 |
+| **传统 WebSocket**（javax.websocket） | 需引入 `spring-web-websocket`，经 JSR-356 `@ServerEndpoint` 桥接 |
 | **深度的 Servlet Filter 链** | 桥接模式会增加额外开销，建议逐步迁移到原生 WebFilter |
 
 ---
@@ -242,15 +242,15 @@ Servlet API 有二十年的生态积累：Spring Security Filter Chain、`Reques
 | `RequestBodyAdvice` / `ResponseBodyAdvice` | 需 `spring-web-support` 模块桥接 |
 | `HttpServletRequest` / `HttpServletResponse` | 需 `spring-web-support` 模块，提供参数级适配 |
 | `ResponseBodyEmitter` | 需 `spring-web-support` 模块 |
+| JSP | 需 `spring-web-support` + `tomcat-embed-jasper`（`JasperJspServlet` + `JspViewResolver`） |
+| Servlet WebSocket（JSR-356 `@ServerEndpoint`） | 需 `spring-web-websocket` 模块桥接 |
+| Spring MVC `View` / `ViewResolver` | 需 `spring-web-view`（Thymeleaf/FreeMarker）+ `spring-web-support` 的 `ModelAndView` 桥接 |
 
 ### 不支持
 
 | 功能 | 原因 |
 |------|------|
-| JSP | JSP 依赖 Servlet 容器编译和执行，不支持 |
-| Servlet WebSocket（`javax.websocket`） | 需使用 Netty WebSocket 或 Spring WebSocket |
 | `@SessionAttributes` / `@SessionScope` | 与 Session 相关的功能，如需可基于 `WebFilter` 自行实现 |
-| Spring MVC `View` / `ViewResolver` | JSP/模板渲染场景，如需可基于 `ReturnValueResolver` 自行实现 |
 
 ---
 

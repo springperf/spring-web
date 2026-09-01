@@ -16,7 +16,7 @@
 
 - Java 8 源码兼容
 - 多版本兼容：Spring Boot 2.7.x / 2.6.x / 2.5.x / 2.4.x（BOM + Profile 切换）
-- Netty 4.1.110.Final
+- Netty 4.1.137.Final
 - Jackson 2.17.2、Fastjson 2.0.60（provided）
 - Lombok 1.18.24
 - 测试：Spring Boot Test + JUnit 5.8.2 + OkHttp 4.12.0 + AssertJ 3.25.3 + Mockito 4.11.0 + Actuator

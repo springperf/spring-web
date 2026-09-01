@@ -49,7 +49,7 @@ Spring WebPerf is a high-performance web framework built on **Netty 4.1**, desig
 ## Key Features
 
 - **High Performance** — Pre-caches all metadata at startup, zero reflection and zero matching at runtime; ASM bytecode generation replaces reflective invocation; O(1) HashMap routing; GC-friendly design
-- **Netty-Driven** — Built on Netty 4.1 event-driven I/O; requests execute on EventLoop by default, with method-level `@RunInPool` scheduling to business thread pools as needed
+- **Netty-Driven** — Built on Netty 4.1 event-driven I/O; requests execute on the `default` business thread pool by default to protect the EventLoop, with method-level `@RunInPool` to schedule to a custom pool or directly to the EventLoop as needed
 - **Spring Ecosystem Compatible** — Supports `@RestController`, `@RequestMapping`, `@Validated`, `@ExceptionHandler`, `HandlerInterceptor`, and other Spring annotations and abstractions — zero-code migration
 - **Async Native** — Built-in support for DeferredResult, Callable, SseEmitter, StreamEmitter, Reactive Streams; SSE throughput reaches 12.63x of Spring MVC at 4 threads / 7.72x at 16 threads
 - **Batch Processing** — Disruptor-based request aggregation that transparently merges concurrent requests into batch operations, boosting throughput by multiple times; supports backpressure strategies, wait strategies, and thread pool isolation
@@ -150,7 +150,7 @@ The perf framework delivers **1.6\~12.6x** throughput over Servlet containers, w
 
 | Dimension | WebPerf | Spring MVC (Tomcat) |
 |-----------|-----------|---------------------|
-| Engine | Netty 4.1.115.Final | Spring MVC 6.1.15 + Tomcat 10.1.33 (Undertow 2.3.17.Final) |
+| Engine | Netty 4.1.137.Final | Spring MVC 6.1.15 + Tomcat 10.1.33 (Undertow 2.3.17.Final) |
 | Throughput (json 4t) | **37,508** ops/s | 19,900 ops/s (1.88x) |
 | P50 Latency (bytes 4t) | **0.10ms** | 0.15ms |
 | Steady-state heap (4t) | **24MB** | 26MB |

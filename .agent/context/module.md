@@ -4,7 +4,7 @@
 
 ```
 spring-web-parent (聚合 POM)
-│  Spring Boot 3.2.12 (默认)，多版本兼容 2.4.x~4.1.x（Profile 切换），Java 17
+│  Spring Boot 3.5.16 (默认)，多版本兼容 2.4.x~4.1.x（Profile 切换），Java 17
 │
 ├── spring-web                     核心框架
 ├── spring-web-view                视图渲染（Thymeleaf/FreeMarker，可选）

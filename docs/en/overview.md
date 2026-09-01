@@ -207,8 +207,8 @@ This framework doesn't demand "all or nothing." Through the `spring-web-support`
 | Scenario | Reason |
 |----------|--------|
 | **Heavily dependent on Servlet API** | Requires `spring-web-support` bridge module; some Servlet API may not be fully compatible |
-| **JSP required** | JSP is a Servlet container feature — not supported |
-| **Traditional WebSocket** (javax.websocket) | Servlet container WebSocket API not supported |
+| **JSP required** | Requires `spring-web-support` + `tomcat-embed-jasper`; executed via `JasperJspServlet` bridge |
+| **Traditional WebSocket** (javax.websocket) | Requires `spring-web-websocket`; bridged via JSR-356 `@ServerEndpoint` |
 | **Deep Servlet Filter chains** | Bridge mode adds overhead; migrate to native `WebFilter` gradually |
 
 ---
@@ -242,15 +242,15 @@ This framework doesn't demand "all or nothing." Through the `spring-web-support`
 | `RequestBodyAdvice` / `ResponseBodyAdvice` | Requires `spring-web-support` bridge |
 | `HttpServletRequest` / `HttpServletResponse` | Requires `spring-web-support` for parameter-level adaptation |
 | `ResponseBodyEmitter` | Requires `spring-web-support` |
+| JSP | Requires `spring-web-support` + `tomcat-embed-jasper` (`JasperJspServlet` + `JspViewResolver`) |
+| Servlet WebSocket (JSR-356 `@ServerEndpoint`) | Requires `spring-web-websocket` bridge |
+| Spring MVC `View` / `ViewResolver` | Requires `spring-web-view` (Thymeleaf/FreeMarker) + `ModelAndView` bridge in `spring-web-support` |
 
 ### Not Supported
 
 | Feature | Reason |
 |---------|--------|
-| JSP | JSP depends on Servlet container compilation and execution |
-| Servlet WebSocket (`javax.websocket`) | Use Netty WebSocket or Spring WebSocket instead |
 | `@SessionAttributes` / `@SessionScope` | Session-related features; implement via `WebFilter` if needed |
-| Spring MVC `View` / `ViewResolver` | JSP/template rendering scenarios; implement via `ReturnValueResolver` if needed |
 
 ---
 

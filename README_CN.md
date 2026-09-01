@@ -49,7 +49,7 @@ Spring WebPerf 是一个基于 **Netty** 构建的高性能 Web 框架，定位�
 ## 核心特性
 
 - **高性能** — 启动时预缓存全部元数据，运行时零反射零匹配；ASM 字节码生成替代反射调用；O(1) HashMap 路由；GC 友好设计
-- **Netty 驱动** — 基于 Netty 4.1 事件驱动 I/O，请求默认在 EventLoop 处理，可按方法粒度通过 `@RunInPool` 调度到业务线程池
+- **Netty 驱动** — 基于 Netty 4.1 事件驱动 I/O，请求默认在 `default` 业务线程池执行以保护 EventLoop，可按方法粒度通过 `@RunInPool` 调度到自定义线程池或直接到 EventLoop
 - **Spring 生态兼容** — 支持 `@RestController`、`@RequestMapping`、`@Validated`、`@ExceptionHandler`、`HandlerInterceptor` 等 Spring 注解与抽象，零侵入迁移
 - **异步原生** — 内置 DeferredResult、Callable、SseEmitter、StreamEmitter、Reactive Streams 支持，SSE 吞吐达 Spring MVC 的 12.63x（4 线程）/ 7.72x（16 线程）
 - **批量处理** — 基于 Disruptor 的请求聚合批处理，透明地将并发请求合并为批量操作，吞吐量可提升数倍；支持背压策略、等待策略、线程池隔离
@@ -150,7 +150,7 @@ perf 框架吞吐是 Servlet 容器的 **1.6\~12.6x**，p50 延迟 **0.10\~0.11m
 
 | 维度 | WebPerf | Spring MVC (Tomcat) |
 |------|-----------|---------------------|
-| 底层引擎 | Netty 4.1.115.Final | Spring MVC 6.1.15 + Tomcat 10.1.33（Undertow 2.3.17.Final） |
+| 底层引擎 | Netty 4.1.137.Final | Spring MVC 6.1.15 + Tomcat 10.1.33（Undertow 2.3.17.Final） |
 | 吞吐量 (json 4t) | **37,508** ops/s | 19,900 ops/s (1.88x) |
 | P50 延迟 (bytes 4t) | **0.10ms** | 0.15ms |
 | 稳态堆占用 (4t) | **24MB** | 26MB |

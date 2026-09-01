@@ -50,13 +50,13 @@
 
 | 依赖 | 当前版本 | 已验证兼容范围 | 说明 |
 |------|---------|---------------|------|
-| Spring Boot | **3.2.12** | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | 通过 Maven Profile 切换（`-Pspring-boot-3.0` ~ `-Pspring-boot-4.1`） |
-| Spring Framework | **6.1.x** | 6.0.x ~ 6.2.x / 7.0.x | 随 Spring Boot 管理 |
+| Spring Boot | **3.5.16** | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | 通过 Maven Profile 切换（`-Pspring-boot-3.0` ~ `-Pspring-boot-4.1`） |
+| Spring Framework | **6.2.x** | 6.0.x ~ 6.2.x / 7.0.x | 随 Spring Boot 管理 |
 | JDK | **17、21** | 17、21 已验证 | 编译目标 `java.version=17`，21 提供虚拟线程支持 |
 | Servlet API | **jakarta.servlet 6.0** | 6.0.x | javax.servlet 不兼容 |
-| Netty | **4.1.110.Final** | 4.1.x |  |
+| Netty | **4.1.137.Final** | 4.1.x |  |
 | Jackson | **2.17.2** | 2.17.x |  |
-| Lombok | **1.18.36** | 1.18.30+ | JDK 17+ 兼容性要求高版本 |
+| Lombok | **1.18.46** | 1.18.30+ | JDK 17+ 兼容性要求高版本 |
 | JMH | **1.37** | 1.37 | 仅 benchmark 模块使用 |
 
 ### 额外特性
@@ -95,11 +95,11 @@
 
 ## spring-web-view 与 Model 类型差异
 
-视图渲染模块依赖 Spring 的 `org.springframework.ui` 类型。由于 Spring Framework 6.1（master 分支）与 5.3（2.7.x 分支）的类设计不同，**Model 参数注入的实现存在差异**：
+视图渲染模块依赖 Spring 的 `org.springframework.ui` 类型。由于 Spring Framework 6.2（master 分支）与 5.3（2.7.x 分支）的类设计不同，**Model 参数注入的实现存在差异**：
 
 | 分支 | Spring Framework | `ModelMap` 是否实现 `Model` | 框架注入实现 | 备注 |
 |------|----------------|---------------------------|--------------|------|
-| `master` | 6.1.x | ❌ 否 | `ExtendedModelMap`（`ModelMap` 子类且实现 `Model`） | 统一注入 `ExtendedModelMap` 以兼容 `Model`/`ModelMap`/`ExtendedModelMap` 三种参数声明 |
+| `master` | 6.2.x | ❌ 否 | `ExtendedModelMap`（`ModelMap` 子类且实现 `Model`） | 统一注入 `ExtendedModelMap` 以兼容 `Model`/`ModelMap`/`ExtendedModelMap` 三种参数声明 |
 | `2.7.x` | 5.3.x | ✅ 是 | `ExtendedModelMap`（backport 时可简化） | `ModelMap` 本身即可 cast 到 `Model` |
 
 > **Backport 提示**：`spring-web-view` 的 `ModelSupport.getOrCreate()` 在 2.7.x 分支无需特别处理——Spring 5.3 的 `ModelMap` 已实现 `Model`，可复用同一实现。
@@ -108,7 +108,7 @@
 
 | 分支 | Thymeleaf（BOM 管理） | FreeMarker（BOM 管理） |
 |------|----------------------|------------------------|
-| `3.2.12`（master） | 3.1.2.RELEASE | 2.3.33 |
+| `3.5.16`（master） | 3.1.5.RELEASE | 2.3.34 |
 | `2.7.18`（2.7.x） | 3.0.15.RELEASE | 2.3.32 |
 
 `spring-web-view` 对引擎为 `provided` 依赖，具体版本由用户侧 Spring Boot BOM 管理，无需模块内指定。
