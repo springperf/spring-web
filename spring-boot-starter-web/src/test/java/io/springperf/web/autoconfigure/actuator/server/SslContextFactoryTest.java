@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.core.env.Environment;
 
 import java.io.InputStream;
@@ -15,6 +17,7 @@ import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class SslContextFactoryTest {
 
     @Mock Environment env;
@@ -135,6 +138,104 @@ class SslContextFactoryTest {
         SslContext ctx = SslContextFactory.createServerSslContext(env, "server.ssl.");
 
         assertNotNull(ctx, "classpath PEM 配置应能成功构建 SslContext");
+    }
+
+    // ==================== TLS 深度：client-auth / protocols / ciphers 分支 ====================
+
+    private void stubPemServer() {
+        org.mockito.Mockito.lenient().when(env.getProperty(eq("server.ssl.enabled"), eq(Boolean.class))).thenReturn(null);
+        org.mockito.Mockito.lenient().when(env.containsProperty("server.ssl.key-store")).thenReturn(false);
+        org.mockito.Mockito.lenient().when(env.containsProperty("server.ssl.certificate")).thenReturn(true);
+        org.mockito.Mockito.lenient().when(env.getProperty(eq("server.ssl.certificate"))).thenReturn("classpath:ssl/cert.pem");
+        org.mockito.Mockito.lenient().when(env.getProperty(eq("server.ssl.certificate-private-key"))).thenReturn("classpath:ssl/key.pem");
+    }
+
+    @Test
+    void createServerSslContext_clientAuthNeed_builds() {
+        stubPemServer();
+        when(env.getProperty(eq("server.ssl.client-auth"))).thenReturn("need");
+
+        SslContext ctx = SslContextFactory.createServerSslContext(env, "server.ssl.");
+        assertNotNull(ctx, "client-auth=need 应构建 SslContext（mTLS REQUIRE）");
+    }
+
+    @Test
+    void createServerSslContext_clientAuthWant_builds() {
+        stubPemServer();
+        when(env.getProperty(eq("server.ssl.client-auth"))).thenReturn("want");
+
+        SslContext ctx = SslContextFactory.createServerSslContext(env, "server.ssl.");
+        assertNotNull(ctx, "client-auth=want 应构建 SslContext（mTLS OPTIONAL）");
+    }
+
+    @Test
+    void createServerSslContext_clientAuthNone_builds() {
+        stubPemServer();
+        when(env.getProperty(eq("server.ssl.client-auth"))).thenReturn("none");
+
+        SslContext ctx = SslContextFactory.createServerSslContext(env, "server.ssl.");
+        assertNotNull(ctx, "client-auth=none 应构建 SslContext（无客户端认证）");
+    }
+
+    @Test
+    void createServerSslContext_clientAuthUnknown_buildsAsNone() {
+        stubPemServer();
+        when(env.getProperty(eq("server.ssl.client-auth"))).thenReturn("bogus");
+
+        assertDoesNotThrow(() -> SslContextFactory.createServerSslContext(env, "server.ssl."),
+                "未知 client-auth 值应回退为 NONE 而非抛异常");
+    }
+
+    @Test
+    void createServerSslContext_clientAuthNeed_withTrustStore_builds() throws Exception {
+        stubPemServer();
+        when(env.getProperty(eq("server.ssl.client-auth"))).thenReturn("need");
+        // 用 cert.pem 生成临时 PKCS12 trust-store（mTLS 验证客户端证书链用）
+        java.io.File trustStore = createPkcs12TrustStoreFromCert();
+        when(env.getProperty(eq("server.ssl.trust-store"))).thenReturn(trustStore.getAbsolutePath());
+        when(env.getProperty(eq("server.ssl.trust-store-password"))).thenReturn("changeit");
+        when(env.getProperty(eq("server.ssl.trust-store-type"), eq("PKCS12"))).thenReturn("PKCS12");
+
+        SslContext ctx = SslContextFactory.createServerSslContext(env, "server.ssl.");
+
+        assertNotNull(ctx, "client-auth=need + trust-store 应构建支持 mTLS 的 SslContext");
+        trustStore.delete();
+    }
+
+    /** 从 classpath ssl/cert.pem 读取证书并写入临时 PKCS12 信任库，供 mTLS trust-store 配置测试使用 */
+    private java.io.File createPkcs12TrustStoreFromCert() throws Exception {
+        java.security.cert.CertificateFactory cf =
+                java.security.cert.CertificateFactory.getInstance("X.509");
+        try (InputStream in = SslContextFactoryTest.class.getResourceAsStream("/ssl/cert.pem")) {
+            java.security.cert.Certificate cert = cf.generateCertificate(in);
+            java.security.KeyStore ks = java.security.KeyStore.getInstance("PKCS12");
+            ks.load(null, null);
+            ks.setCertificateEntry("test-ca", cert);
+            java.io.File f = java.io.File.createTempFile("truststore", ".p12");
+            f.deleteOnExit();
+            try (java.io.OutputStream os = new java.io.FileOutputStream(f)) {
+                ks.store(os, "changeit".toCharArray());
+            }
+            return f;
+        }
+    }
+
+    @Test
+    void createServerSslContext_enabledProtocols_builds() {
+        stubPemServer();
+        when(env.getProperty(eq("server.ssl.enabled-protocols"))).thenReturn("TLSv1.2,TLSv1.3");
+
+        assertDoesNotThrow(() -> SslContextFactory.createServerSslContext(env, "server.ssl."),
+                "enabled-protocols 应成功构建（版本协商配置）");
+    }
+
+    @Test
+    void createServerSslContext_ciphers_builds() {
+        stubPemServer();
+        when(env.getProperty(eq("server.ssl.ciphers"))).thenReturn("TLS_AES_128_GCM_SHA256");
+
+        assertDoesNotThrow(() -> SslContextFactory.createServerSslContext(env, "server.ssl."),
+                "ciphers 应成功构建（加密套件配置）");
     }
 
     private static boolean invokeIsSslEnabled(Environment env, String prefix) throws Exception {

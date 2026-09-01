@@ -6,6 +6,7 @@ import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.Resource;
 
 import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.TrustManagerFactory;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.security.KeyStore;
@@ -117,9 +118,9 @@ public final class SslContextFactory {
                 builder.ciphers(Arrays.asList(splitByComma(ciphers)));
             }
 
-            // 可选：客户端认证
+            // 可选：客户端认证（mTLS）。需配合 trust-store 提供可信 CA 验证客户端证书
             String clientAuth = env.getProperty(prefix + "client-auth");
-            if (clientAuth != null) {
+            if (clientAuth != null && !clientAuth.isEmpty()) {
                 switch (clientAuth.toLowerCase()) {
                     case "need":
                         builder.clientAuth(ClientAuth.REQUIRE);
@@ -130,6 +131,19 @@ public final class SslContextFactory {
                     default:
                         builder.clientAuth(ClientAuth.NONE);
                         break;
+                }
+                // 客户端认证开启时配置 trust-store，否则无法验证客户端证书链
+                String trustStorePath = env.getProperty(prefix + "trust-store");
+                if (trustStorePath != null && !trustStorePath.isEmpty()) {
+                    String trustStorePassword = env.getProperty(prefix + "trust-store-password");
+                    String trustStoreType = env.getProperty(prefix + "trust-store-type", "PKCS12");
+                    KeyStore trustStore = KeyStore.getInstance(trustStoreType);
+                    try (InputStream in = openInputStream(trustStorePath)) {
+                        trustStore.load(in, trustStorePassword != null ? trustStorePassword.toCharArray() : null);
+                    }
+                    TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+                    tmf.init(trustStore);
+                    builder.trustManager(tmf);
                 }
             }
 
