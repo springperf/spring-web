@@ -1,7 +1,6 @@
 package io.springperf.web.autoconfigure;
 
 import io.springperf.web.view.ViewProperties;
-import io.springperf.web.view.arg.ModelArgumentResolverProvider;
 import io.springperf.web.view.retval.ViewReturnValueResolver;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -19,12 +18,6 @@ public class SpringWebViewAutoConfiguration {
     @ConditionalOnMissingBean
     public ViewReturnValueResolver viewReturnValueResolver() {
         return new ViewReturnValueResolver();
-    }
-
-    @Bean
-    @ConditionalOnMissingBean
-    public ModelArgumentResolverProvider modelArgumentResolverProvider() {
-        return new ModelArgumentResolverProvider();
     }
 
     @Configuration

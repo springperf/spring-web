@@ -65,6 +65,13 @@ import java.util.Map;
 @Slf4j
 public class WebMvcConfigurerBridge extends BaseWebComponent {
 
+    /**
+     * 未显式设置 order 的桥接拦截器的默认排序步长：按添加顺序分配
+     * {@code 0, STEP, 2*STEP...}，使框架侧基于 order 的稳定排序保持用户定义顺序。
+     * 取较大值以在常见显式 order（小整数）与默认序列之间留出间隔。
+     */
+    static final int DEFAULT_INTERCEPTOR_ORDER_STEP = 100;
+
     @Override
     public int getOrder() {
         return Ordered.LOWEST_PRECEDENCE - 20000;
@@ -139,6 +146,9 @@ public class WebMvcConfigurerBridge extends BaseWebComponent {
             return;
         }
 
+        // 未显式设置 order 的拦截器：按添加顺序分配递增 order（默认 0, STEP, 2*STEP...），
+        // 使框架侧基于 order 的稳定排序保持用户定义的添加顺序。
+        int defaultSeq = 0;
         for (org.springframework.web.servlet.config.annotation.InterceptorRegistration shimReg : shimRegistrations) {
             HandlerInterceptorWrapper wrapper = new HandlerInterceptorWrapper(shimReg.getInterceptor());
             io.springperf.web.core.interceptor.InterceptorRegistration frameworkReg =
@@ -149,14 +159,18 @@ public class WebMvcConfigurerBridge extends BaseWebComponent {
             for (String excludePattern : shimReg.getExcludePatterns()) {
                 frameworkReg.excludePathPatterns(excludePattern);
             }
-            frameworkReg.order(shimReg.getOrder());
+            if (shimReg.isOrderSet()) {
+                frameworkReg.order(shimReg.getOrder());
+            } else {
+                frameworkReg.order(defaultSeq++ * DEFAULT_INTERCEPTOR_ORDER_STEP);
+            }
             if (shimReg.getPathMatcher() != null) {
                 frameworkReg.pathMatcher(shimReg.getPathMatcher());
             }
             frameworkRegistry.registerWebComponent(frameworkReg);
-            log.debug("Bridged interceptor: {} with patterns={}, exclude={}",
+            log.debug("Bridged interceptor: {} with patterns={}, exclude={}, order={}",
                     shimReg.getInterceptor().getClass().getSimpleName(),
-                    shimReg.getIncludePatterns(), shimReg.getExcludePatterns());
+                    shimReg.getIncludePatterns(), shimReg.getExcludePatterns(), frameworkReg.getOrder());
         }
     }
 

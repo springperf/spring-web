@@ -1,16 +1,15 @@
-package io.springperf.web.view.arg;
+package io.springperf.web.core.arg.provider;
 
 import io.springperf.web.context.BaseWebComponent;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.arg.MethodArgContext;
 import io.springperf.web.core.arg.StaticArgumentResolver;
-import io.springperf.web.core.arg.provider.StaticArgumentResolverProvider;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
 import io.springperf.web.core.mapping.route.PathPatternRouter;
+import io.springperf.web.core.model.ModelContext;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
-import io.springperf.web.view.ModelSupport;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.AnnotatedElementUtils;
@@ -30,6 +29,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * 解析 {@code Model}/{@code ModelMap}/{@code ExtendedModelMap} 参数并完成 Model 初始化
+ * （Model 为请求管线一等公民，容器为 {@link ModelContext}）：
+ * <ol>
+ *   <li>{@code @ControllerAdvice} {@code @ModelAttribute} 方法</li>
+ *   <li>局部 {@code @ModelAttribute} 方法</li>
+ *   <li>合并 {@code @ModelAttribute} 参数绑定结果</li>
+ *   <li>合并 {@code @PathVariable}</li>
+ *   <li>合并 {@code BindingResult}</li>
+ * </ol>
+ */
 public class ModelArgumentResolverProvider extends BaseWebComponent implements StaticArgumentResolverProvider {
 
     private List<ModelAttributeAdviceMethod> adviceMethods = new ArrayList<>();
@@ -107,7 +117,7 @@ public class ModelArgumentResolverProvider extends BaseWebComponent implements S
 
         @Override
         public Object resolveArgument(WebServerHttpRequest request, WebServerHttpResponse response) {
-            return ModelSupport.getOrCreate(request);
+            return ModelContext.getOrCreate(request);
         }
 
         @Override

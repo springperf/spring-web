@@ -7,14 +7,19 @@ import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.util.support.ContainmentResult;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.aop.support.AopUtils;
 import org.springframework.core.annotation.AnnotationAwareOrderUtils;
 import org.springframework.util.StringUtils;
+import org.springframework.web.method.ControllerAdviceBean;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Manages the registration and lifecycle of HandlerInterceptors, supporting path-pattern-based matching and runtime resolution.
+ * Manages the registration and lifecycle of HandlerInterceptors, supporting path-pattern-based
+ * matching and runtime resolution. 亦支持"方法级/类级"匹配：实现 {@link HandlerInterceptor} 并标注
+ * {@link org.springframework.web.bind.annotation.ControllerAdvice} 的拦截器，会被包装
+ * {@link ControllerAdviceBean}，按 handler 的 controller 类型（而非 path）匹配。
  */
 @Slf4j
 public class InterceptorRegistry extends WebComponentContainer {
@@ -35,17 +40,43 @@ public class InterceptorRegistry extends WebComponentContainer {
         super.initComponentPhase2();
         initRealComponentList(registrations, InterceptorRegistration.class);
         runtimeMappingInterceptors.clear();
-        registrations.stream().map(this::getRuntimeMappingInterceptor).forEach(runtimeMappingInterceptors::add);
+        // runtimeMappingInterceptors 仅在 mappingContext 为 null（404/405 无 handler）时兜底，
+        // 方法级拦截器（@ControllerAdvice 类级匹配）依赖 handler 的 controller 类型，此处一律跳过。
+        registrations.stream()
+                .filter(registration -> !registration.isControllerAdviceScoped())
+                .map(this::getRuntimeMappingInterceptor)
+                .forEach(runtimeMappingInterceptors::add);
     }
 
     protected InterceptorRegistration registerInterceptor(HandlerInterceptor interceptor) {
         InterceptorRegistration registration = new InterceptorRegistration(interceptor);
+        // 类级匹配：拦截器标注 @ControllerAdvice 时包装 ControllerAdviceBean（按 controller 类型匹配）
+        ControllerAdviceBean adviceBean = findControllerAdviceBean(interceptor);
+        if (adviceBean != null) {
+            registration.applyTo(adviceBean);
+        }
         registrations.add(registration);
         Integer order = AnnotationAwareOrderUtils.findOrder(interceptor);
         if (order != null) {
             registration.order(order);
         }
         return registration;
+    }
+
+    /**
+     * 查找与给定拦截器对应的 {@link ControllerAdviceBean}（拦截器本身标注 @ControllerAdvice 时）。
+     */
+    protected ControllerAdviceBean findControllerAdviceBean(HandlerInterceptor interceptor) {
+        if (webContext == null) {
+            return null;
+        }
+        Class<?> target = AopUtils.getTargetClass(interceptor);
+        for (ControllerAdviceBean adviceBean : ControllerAdviceBean.findAnnotatedBeans(webContext.getCtx())) {
+            if (adviceBean.getBeanType() != null && adviceBean.getBeanType().equals(target)) {
+                return adviceBean;
+            }
+        }
+        return null;
     }
 
     public boolean preHandle(WebServerHttpRequest request, WebServerHttpResponse response) throws Exception {
@@ -171,7 +202,9 @@ public class InterceptorRegistry extends WebComponentContainer {
     }
 
     /**
-     * 获取mappingContext对应的拦截器
+     * 获取mappingContext对应的拦截器（放入方法级缓存）。
+     * 类级匹配（@ControllerAdvice）的 registration 按 handler 的 controller 类型判定；
+     * 其余按 path 规则判定。
      *
      * @param mappingContext
      * @return
@@ -180,6 +213,12 @@ public class InterceptorRegistry extends WebComponentContainer {
         String pathRule = mappingContext.getPathRule();
         List<HandlerInterceptor> interceptors = new ArrayList<>();
         for (InterceptorRegistration registration : registrations) {
+            if (registration.isControllerAdviceScoped()) {
+                if (registration.matchesControllerType(mappingContext.getBeanType())) {
+                    interceptors.add(registration.getInterceptor());
+                }
+                continue;
+            }
             ContainmentResult containmentResult = registration.matchPathRuleToCached(pathRule);
             if (containmentResult == ContainmentResult.ALWAYS) {
                 interceptors.add(registration.getInterceptor());

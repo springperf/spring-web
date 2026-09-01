@@ -7,9 +7,9 @@ import io.springperf.web.core.mapping.MappingHandlerMethod;
 import io.springperf.web.core.mapping.MappingRegistry;
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.core.retval.ReturnValueResolver;
+import io.springperf.web.core.model.ModelContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
-import io.springperf.web.view.ModelSupport;
 import io.springperf.web.view.RedirectView;
 import io.springperf.web.view.View;
 import io.springperf.web.view.ViewProperties;
@@ -130,7 +130,7 @@ public class ViewReturnValueResolver extends BaseWebComponent implements ReturnV
             resp.getHeaders().set(HttpHeaders.CONTENT_TYPE, "text/html;charset=" + charset.name());
         }
         resp.setHandled();
-        view.render(ModelSupport.getOrCreate(req), req, resp);
+        view.render(ModelContext.getOrCreate(req), req, resp);
     }
 
     @Override

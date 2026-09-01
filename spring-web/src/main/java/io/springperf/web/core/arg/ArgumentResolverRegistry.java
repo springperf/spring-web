@@ -56,6 +56,7 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
         registerWebComponent(new RequestPartResolverProvider());
         registerWebComponent(new PathVariableResolverProvider());
         registerWebComponent(new ModelAttributeResolverProvider());
+        registerWebComponent(new ModelArgumentResolverProvider());
         registerWebComponent(new HttpEntityResolverProvider());
         registerWebComponent(new ErrorsResolverProvider());
         registerWebComponent(new RequestResolverProvider());

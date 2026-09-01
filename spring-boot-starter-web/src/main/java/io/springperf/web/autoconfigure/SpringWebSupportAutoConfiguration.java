@@ -8,9 +8,13 @@ import io.springperf.web.support.arg.provider.HttpServletRequestProvider;
 import io.springperf.web.support.arg.provider.HttpServletResponseProvider;
 import io.springperf.web.support.arg.provider.ServletRequestProvider;
 import io.springperf.web.support.arg.provider.ServletResponseProvider;
+import io.springperf.web.support.arg.provider.SessionAttributeArgumentResolverProvider;
+import io.springperf.web.support.arg.provider.SessionStatusArgumentResolverProvider;
 import io.springperf.web.support.arg.provider.WebRequestArgumentResolverProvider;
 import io.springperf.web.support.async.stream.ResponseBodyEmitterReturnValueResolver;
 import io.springperf.web.support.codec.interceptor.SupportHttpBodyCodecInterceptorRegistry;
+import io.springperf.web.support.context.SessionScopeBeanFactoryPostProcessor;
+import io.springperf.web.support.model.SessionAttributesInterceptor;
 import io.springperf.web.support.mvc.config.WebMvcConfigurerBridge;
 import io.springperf.web.support.mvc.interceptor.SupportInterceptorRegistry;
 import io.springperf.web.support.mvc.retval.ModelAndViewReturnValueResolver;
@@ -70,6 +74,27 @@ public class SpringWebSupportAutoConfiguration implements ApplicationContextAwar
 
     @Bean @ConditionalOnMissingBean
     public WebRequestArgumentResolverProvider webRequestArgumentResolverProvider() { return new WebRequestArgumentResolverProvider(); }
+
+    @Bean @ConditionalOnMissingBean
+    public SessionAttributeArgumentResolverProvider sessionAttributeArgumentResolverProvider() {
+        return new SessionAttributeArgumentResolverProvider();
+    }
+
+    @Bean @ConditionalOnMissingBean
+    public SessionAttributesInterceptor sessionAttributesInterceptor() {
+        return new SessionAttributesInterceptor();
+    }
+
+    @Bean @ConditionalOnMissingBean
+    public SessionStatusArgumentResolverProvider sessionStatusArgumentResolverProvider() {
+        return new SessionStatusArgumentResolverProvider();
+    }
+
+    // 返回 BeanFactoryPostProcessor 的 @Bean 方法必须为 static（避免 @Configuration 增强处理失效）
+    @Bean @ConditionalOnMissingBean
+    public static SessionScopeBeanFactoryPostProcessor sessionScopeBeanFactoryPostProcessor() {
+        return new SessionScopeBeanFactoryPostProcessor();
+    }
 
     @Bean @ConditionalOnMissingBean
     public SupportWebFilterRegistry supportWebFilterRegistry(WebContext webContext) {

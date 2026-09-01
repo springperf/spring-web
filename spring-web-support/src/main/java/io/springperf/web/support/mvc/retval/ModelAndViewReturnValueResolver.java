@@ -3,10 +3,10 @@ package io.springperf.web.support.mvc.retval;
 import io.springperf.web.context.BaseWebComponent;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.core.model.ModelContext;
 import io.springperf.web.core.retval.ReturnValueResolver;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
-import io.springperf.web.view.ModelSupport;
 import io.springperf.web.view.RedirectView;
 import io.springperf.web.view.View;
 import io.springperf.web.view.ViewResolverRegistry;
@@ -76,9 +76,9 @@ public class ModelAndViewReturnValueResolver extends BaseWebComponent implements
 
         Map<String, Object> model = mav.getModel();
         if (model != null && !model.isEmpty()) {
-            ModelSupport.getOrCreate(req).addAllAttributes(model);
+            ModelContext.getOrCreate(req).addAllAttributes(model);
         }
-        view.render(ModelSupport.getOrCreate(req), req, resp);
+        view.render(ModelContext.getOrCreate(req), req, resp);
     }
 
     @Override
