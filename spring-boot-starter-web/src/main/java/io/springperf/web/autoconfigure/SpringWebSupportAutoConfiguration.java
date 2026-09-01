@@ -82,7 +82,11 @@ public class SpringWebSupportAutoConfiguration implements ApplicationContextAwar
         jakarta.servlet.Filter filter;
         try {
             filter = filterRegistrationBean.getFilter();
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            // SB 3.2 的 DelegatingFilterProxyRegistrationBean.getWebApplicationContext() 用
+            // Assert.isInstanceOf（抛 IllegalArgumentException）；SB 3.5+ 改为 Assert.state（抛
+            // IllegalStateException）。非 WebApplicationContext（本框架强制 AnnotationConfigApplicationContext）
+            // 时两者都需走 fallback 直接从 Spring 容器解析目标 filter bean。
             if (filterRegistrationBean instanceof DelegatingFilterProxyRegistrationBean) {
                 try {
                     String targetBeanName = resolveTargetBeanName((DelegatingFilterProxyRegistrationBean) filterRegistrationBean);

@@ -15,8 +15,9 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
  *   <li>{@code nio}：强制 Java NIO</li>
  *   <li>{@code epoll}：强制 native epoll，不可用（如非 Linux 平台）时启动失败</li>
  * </ul>
- * <p>依赖：netty-all 已含 {@code netty-transport-classes-epoll}（编译期）与
- * {@code netty-transport-native-epoll:linux-x86_64:runtime}（运行期），无需额外引入。</p>
+ * <p>依赖：框架按具体 netty 模块依赖（不用 netty-all）。epoll 支持依赖
+ * {@code netty-transport-classes-epoll}（编译期类）与 {@code netty-transport-native-epoll}
+ * 及其 linux-x86_64/linux-aarch_64/linux-riscv64 native classifier（运行期，仅匹配平台加载）。</p>
  */
 public final class NettyTransport {
 
