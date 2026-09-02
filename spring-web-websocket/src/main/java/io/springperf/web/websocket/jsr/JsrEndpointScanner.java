@@ -64,6 +64,9 @@ public class JsrEndpointScanner {
         if (applicationContext instanceof ListableBeanFactory) {
             String[] names = ((ListableBeanFactory) applicationContext)
                     .getBeanNamesForAnnotation(ServerEndpoint.class);
+            if (names == null) {
+                return classes;
+            }
             for (String name : names) {
                 Class<?> type = applicationContext.getType(name);
                 if (type != null) {

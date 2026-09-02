@@ -35,6 +35,19 @@
             <version>3.21.2.RELEASE</version>
             <scope>provided</scope>
         </dependency>
+        <!-- Beetl 模板引擎渲染需要 antlr4 运行时与 ext 扩展（仅测试期提供） -->
+        <dependency>
+            <groupId>com.ibeetl</groupId>
+            <artifactId>beetl-default-antlr4.9-support</artifactId>
+            <version>3.21.2.RELEASE</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.ibeetl</groupId>
+            <artifactId>beetl-ext</artifactId>
+            <version>3.21.2.RELEASE</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
@@ -82,4 +95,13 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
 </project>

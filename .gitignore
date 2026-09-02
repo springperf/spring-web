@@ -45,6 +45,7 @@ classes
 .git
 # AI 辅助配置文件
 /.claude/
+/.opencode/
 .env
 /spring-web-benchmark/benchmark-reports/
 /docs/superpowers/

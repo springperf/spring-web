@@ -158,6 +158,95 @@ class WebMvcConfigurerBridgeTest {
                 io.springperf.web.core.interceptor.InterceptorRegistration.class).isEmpty());
     }
 
+    @Test
+    void addInterceptors_orderPreservedForDefaultOrder() throws Exception {
+        // 用户未显式设置 order 的多个拦截器，桥接后应按添加顺序获得递增 order
+        // （0, STEP, 2*STEP...），使框架侧稳定排序保持用户定义顺序。
+        InterceptorRegistry frameworkRegistry = new InterceptorRegistry();
+        when(webContext.getWebComponent(InterceptorRegistry.class)).thenReturn(frameworkRegistry);
+
+        when(applicationContext.getBeansOfType(WebMvcConfigurer.class))
+                .thenReturn(Collections.singletonMap("test", new WebMvcConfigurer() {
+                    @Override
+                    public void addInterceptors(
+                            org.springframework.web.servlet.config.annotation.InterceptorRegistry registry) {
+                        registry.addInterceptor(new TestHandlerInterceptor());
+                        registry.addInterceptor(new TestHandlerInterceptor());
+                        registry.addInterceptor(new TestHandlerInterceptor());
+                    }
+                }));
+
+        bridge.initComponentPhase1();
+
+        List<io.springperf.web.core.interceptor.InterceptorRegistration> regs =
+                frameworkRegistry.getWebComponents(
+                        io.springperf.web.core.interceptor.InterceptorRegistration.class);
+        assertEquals(3, regs.size());
+        int first = regs.get(0).getOrder();
+        int second = regs.get(1).getOrder();
+        int third = regs.get(2).getOrder();
+        assertTrue(first < second && second < third,
+                "默认 order 拦截器应按添加顺序递增: " + first + ", " + second + ", " + third);
+        assertEquals(0, first);
+        assertEquals(first + WebMvcConfigurerBridge.DEFAULT_INTERCEPTOR_ORDER_STEP, second);
+        assertEquals(second + WebMvcConfigurerBridge.DEFAULT_INTERCEPTOR_ORDER_STEP, third);
+    }
+
+    @Test
+    void addInterceptors_explicitOrderPreserved() throws Exception {
+        // 显式设置 order 的拦截器应保留用户给定的 order 值（不参与默认序列分配），
+        // framework registry 读取时按 order 升序返回。
+        InterceptorRegistry frameworkRegistry = new InterceptorRegistry();
+        when(webContext.getWebComponent(InterceptorRegistry.class)).thenReturn(frameworkRegistry);
+
+        when(applicationContext.getBeansOfType(WebMvcConfigurer.class))
+                .thenReturn(Collections.singletonMap("test", new WebMvcConfigurer() {
+                    @Override
+                    public void addInterceptors(
+                            org.springframework.web.servlet.config.annotation.InterceptorRegistry registry) {
+                        registry.addInterceptor(new TestHandlerInterceptor()).order(50);
+                        registry.addInterceptor(new TestHandlerInterceptor()).order(-10);
+                    }
+                }));
+
+        bridge.initComponentPhase1();
+
+        List<io.springperf.web.core.interceptor.InterceptorRegistration> regs =
+                frameworkRegistry.getWebComponents(
+                        io.springperf.web.core.interceptor.InterceptorRegistration.class);
+        assertEquals(2, regs.size());
+        assertEquals(-10, regs.get(0).getOrder());
+        assertEquals(50, regs.get(1).getOrder());
+    }
+
+    @Test
+    void addInterceptors_mixedDefaultAndExplicitOrder() throws Exception {
+        // 默认序与显式序混合：显式 order 透传，默认项按添序递增且落在显式值之外的区间
+        InterceptorRegistry frameworkRegistry = new InterceptorRegistry();
+        when(webContext.getWebComponent(InterceptorRegistry.class)).thenReturn(frameworkRegistry);
+
+        when(applicationContext.getBeansOfType(WebMvcConfigurer.class))
+                .thenReturn(Collections.singletonMap("test", new WebMvcConfigurer() {
+                    @Override
+                    public void addInterceptors(
+                            org.springframework.web.servlet.config.annotation.InterceptorRegistry registry) {
+                        registry.addInterceptor(new TestHandlerInterceptor());          // default -> 0
+                        registry.addInterceptor(new TestHandlerInterceptor()).order(10); // explicit 10
+                        registry.addInterceptor(new TestHandlerInterceptor());          // default -> 100
+                    }
+                }));
+
+        bridge.initComponentPhase1();
+
+        List<io.springperf.web.core.interceptor.InterceptorRegistration> regs =
+                frameworkRegistry.getWebComponents(
+                        io.springperf.web.core.interceptor.InterceptorRegistration.class);
+        assertEquals(3, regs.size());
+        assertEquals(0, regs.get(0).getOrder());   // 第一个默认项
+        assertEquals(10, regs.get(1).getOrder());   // 显式序保留
+        assertEquals(100, regs.get(2).getOrder());   // 第二个默认项 = 0 + 1*STEP
+    }
+
     // ---- CORS ----
 
     @Test

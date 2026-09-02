@@ -26,6 +26,11 @@ public class ResourceHandlerRegistration implements WebComponent {
         this.pathPatterns = pathPatterns;
     }
 
+    @Override
+    public String getComponentName() {
+        return "ResourceHandlerRegistration:" + String.join(",", pathPatterns);
+    }
+
     public ResourceHandlerRegistration addResourceLocations(String... resourceLocations) {
         for (String location : resourceLocations) {
             if (location.endsWith("/")) {
