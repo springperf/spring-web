@@ -160,6 +160,25 @@ public interface WebServerHttpRequest extends ServerHttpRequest, BodyHttpInputMe
     }
 
     /**
+     * 是否为 HEAD 请求（已按 RFC 7231 §4.3.2 映射到支持 GET 的处理器）。
+     * <p>由 {@link io.springperf.web.core.mapping.match.HttpMethodMatcher} 在路由匹配时统一标记，
+     * 后续处理（资源元数据、响应 body 抑制等）只需读此标志，无需重复判断 HTTP 方法。</p>
+     *
+     * @return {@code true} 表示当前是 HEAD 请求
+     */
+    default boolean isHeadRequest() {
+        return false;
+    }
+
+    /**
+     * 标记当前请求为 HEAD 请求。由路由层在匹配到支持 GET（或显式 HEAD）的处理器时调用。
+     * <p>默认空实现（对未实现字段的请求无害）；{@link BaseWebServerHttpRequest} 覆盖以记录标志。</p>
+     */
+    default void markAsHeadRequest() {
+        // 默认无操作
+    }
+
+    /**
      * Retain the underlying Netty ByteBuf reference count.
      *
      * <p>Must be called before offloading request processing to a separate

@@ -78,6 +78,10 @@ public class NettyHttpHandler extends ChannelInboundHandlerAdapter {
         }
 
         NettyServerHttpResponse resp = new NettyServerHttpResponse(webContext, ctxNetty, HttpUtil.isKeepAlive(msg));
+        // HEAD 请求：标记响应以抑制 body（RFC 7231 §4.3.2，与 Spring MVC 行为一致）
+        if (msg.method() == io.netty.handler.codec.http.HttpMethod.HEAD) {
+            resp.markAsHeadRequest();
+        }
         try {
             // 1. 解析 URI，提取路径（去掉 query string）
             String rawUri = msg.uri();

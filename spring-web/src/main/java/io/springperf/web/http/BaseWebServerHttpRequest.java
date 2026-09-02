@@ -24,6 +24,8 @@ public abstract class BaseWebServerHttpRequest implements WebServerHttpRequest, 
     protected final Map<String, Object> attributes = new ConcurrentHashMap<>();
     protected final Object[] fastAttributes = new Object[RequestAttribute.getMaxSize()];
     protected int filterIndex = 0;
+    /** HEAD 请求标志：由 HttpMethodMatcher 路由匹配时统一写入（RFC 7231 §4.3.2） */
+    protected boolean headRequest;
 
     protected BaseWebServerHttpRequest(WebContext webContext, String uriStrWithQuery, String resolvedPath) {
         this.webContext = webContext;
@@ -31,6 +33,16 @@ public abstract class BaseWebServerHttpRequest implements WebServerHttpRequest, 
         int queryIndex = uriStrWithQuery.indexOf('?');
         this.uriStr = queryIndex == -1 ? uriStrWithQuery : uriStrWithQuery.substring(0, queryIndex);
         this.path = resolvedPath;
+    }
+
+    /** 标记当前请求为 HEAD（由路由层在匹配到支持 GET 的处理器时调用）。 */
+    public void markAsHeadRequest() {
+        this.headRequest = true;
+    }
+
+    @Override
+    public boolean isHeadRequest() {
+        return headRequest;
     }
 
     public String getUriStrWithQuery() { return uriStrWithQuery; }

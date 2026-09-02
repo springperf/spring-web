@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.net.URL;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -149,6 +150,47 @@ public class StaticResourceSecurityTest extends BaseE2ETest {
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(404, resp.code());
+        }
+    }
+
+    // ======================== HTTP 方法限制（对齐 Spring MVC） ========================
+
+    /** 静态资源仅支持 GET/HEAD（Spring MVC ResourceHttpRequestHandler 语义），POST 应 405 */
+    @Test
+    void staticResource_withPost_shouldReturn405() throws Exception {
+        Request req = new Request.Builder()
+                .url(base() + "/static/test.txt")
+                .post(okhttp3.RequestBody.create("", okhttp3.MediaType.parse("text/plain; charset=utf-8")))
+                .build();
+        try (Response resp = CLIENT.newCall(req).execute()) {
+            assertEquals(405, resp.code(), "静态资源 POST 应返回 405 Method Not Allowed");
+        }
+    }
+
+    /** HEAD 应自动映射到 GET（RFC 7231 §4.3.2），返回 200 且无 body */
+    @Test
+    void staticResource_withHead_shouldReturn200NoBody() throws Exception {
+        Request req = new Request.Builder()
+                .url(base() + "/static/test.txt")
+                .head()
+                .build();
+        try (Response resp = CLIENT.newCall(req).execute()) {
+            assertEquals(200, resp.code(), "静态资源 HEAD 应自动映射到 GET 返回 200");
+            String body = resp.body() != null ? resp.body().string() : null;
+            assertTrue(body == null || body.isEmpty(), "HEAD 不应有 body，实际: " + body);
+            assertNotNull(resp.header("Content-Length"));
+        }
+    }
+
+    /** DELETE 静态资源同样应 405 */
+    @Test
+    void staticResource_withDelete_shouldReturn405() throws Exception {
+        Request req = new Request.Builder()
+                .url(base() + "/static/test.txt")
+                .delete()
+                .build();
+        try (Response resp = CLIENT.newCall(req).execute()) {
+            assertEquals(405, resp.code(), "静态资源 DELETE 应返回 405");
         }
     }
 }

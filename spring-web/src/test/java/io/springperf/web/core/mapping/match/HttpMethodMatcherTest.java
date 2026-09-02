@@ -6,6 +6,8 @@ import org.springframework.http.HttpMethod;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class HttpMethodMatcherTest {
@@ -104,5 +106,57 @@ class HttpMethodMatcherTest {
         String str = matcher.toString();
         assertTrue(str.contains("GET"));
         assertTrue(str.contains("POST"));
+    }
+
+    // ==================== HEAD 语义（RFC 7231 §4.3.2） ====================
+
+    @Test
+    void match_headToGet_mapsAndMarksRequest() {
+        HttpMethodMatcher matcher = new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET});
+        WebServerHttpRequest req = mock(WebServerHttpRequest.class);
+        when(req.getMethod()).thenReturn(HttpMethod.HEAD);
+
+        assertTrue(matcher.match(req, null), "HEAD 应映射到 GET");
+        verify(req).markAsHeadRequest();
+    }
+
+    @Test
+    void match_headExplicit_mapsAndMarksRequest() {
+        HttpMethodMatcher matcher = new HttpMethodMatcher(new HttpMethod[]{HttpMethod.HEAD});
+        WebServerHttpRequest req = mock(WebServerHttpRequest.class);
+        when(req.getMethod()).thenReturn(HttpMethod.HEAD);
+
+        assertTrue(matcher.match(req, null), "显式 HEAD 应匹配");
+        verify(req).markAsHeadRequest();
+    }
+
+    @Test
+    void match_headToUnsupportedMethod_returnsFalse_noMark() {
+        HttpMethodMatcher matcher = new HttpMethodMatcher(new HttpMethod[]{HttpMethod.POST});
+        WebServerHttpRequest req = mock(WebServerHttpRequest.class);
+        when(req.getMethod()).thenReturn(HttpMethod.HEAD);
+
+        assertFalse(matcher.match(req, null), "无 GET/HEAD 时 HEAD 不应匹配");
+        verify(req, never()).markAsHeadRequest();
+    }
+
+    @Test
+    void match_nonHeadMethod_doesNotMark() {
+        HttpMethodMatcher matcher = new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET});
+        WebServerHttpRequest req = mock(WebServerHttpRequest.class);
+        when(req.getMethod()).thenReturn(HttpMethod.GET);
+
+        assertTrue(matcher.match(req, null));
+        verify(req, never()).markAsHeadRequest();
+    }
+
+    @Test
+    void match_headWithGetAndPost_mapsAndMarks() {
+        HttpMethodMatcher matcher = new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET, HttpMethod.POST});
+        WebServerHttpRequest req = mock(WebServerHttpRequest.class);
+        when(req.getMethod()).thenReturn(HttpMethod.HEAD);
+
+        assertTrue(matcher.match(req, null));
+        verify(req).markAsHeadRequest();
     }
 }
