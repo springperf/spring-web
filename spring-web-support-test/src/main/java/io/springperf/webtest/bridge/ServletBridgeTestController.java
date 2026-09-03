@@ -88,6 +88,27 @@ public class ServletBridgeTestController {
         return result;
     }
 
+    @PostMapping("/login")
+    public Map<String, String> login(@RequestParam String username, @RequestParam String password,
+                                     HttpServletRequest request) throws jakarta.servlet.ServletException {
+        request.login(username, password);
+        Map<String, String> result = new HashMap<>();
+        jakarta.servlet.http.HttpSession session = request.getSession(false);
+        result.put("sessionId", session != null ? session.getId() : null);
+        result.put("remoteUser", request.getRemoteUser());
+        return result;
+    }
+
+    @PostMapping("/logout")
+    public Map<String, String> logout(HttpServletRequest request) throws jakarta.servlet.ServletException {
+        request.logout();
+        Map<String, String> result = new HashMap<>();
+        jakarta.servlet.http.HttpSession session = request.getSession(false);
+        result.put("sessionId", session != null ? session.getId() : null);
+        result.put("remoteUser", request.getRemoteUser());
+        return result;
+    }
+
     @GetMapping("/session")
     public Map<String, String> getSession(HttpServletRequest request) {
         jakarta.servlet.http.HttpSession session = request.getSession(true);

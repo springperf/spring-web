@@ -541,7 +541,10 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
         PerfHttpPrincipal perfPrincipal = (principal instanceof PerfHttpPrincipal)
                 ? (PerfHttpPrincipal) principal
                 : new PerfHttpPrincipal(principal.getName());
-        HttpSession session = getSession(true);
+        // 会话固定防护：登录成功后必须轮换 Session ID，防止攻击者预置的 session 在认证后继续有效
+        getSession(true);
+        changeSessionId();
+        HttpSession session = getSession(false);
         session.setAttribute(PerfHttpSessionManager.PRINCIPAL_KEY, perfPrincipal);
     }
 

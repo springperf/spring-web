@@ -137,4 +137,54 @@ class SupportMultipartAggregatorTest {
         assertFalse(resolver.isMultipartMode(), "异常后 multipart 状态应复位");
         channel.finishAndReleaseAll();
     }
+
+    /* ==================== 安全回归：multipart 大小限制 ==================== */
+
+    @Test
+    void multipartRequest_contentLengthHeaderExceedsLimit_rejectedWith413() {
+        SupportMultipartAggregator aggregator = new SupportMultipartAggregator(1024);
+        EmbeddedChannel channel = new EmbeddedChannel(aggregator);
+
+        DefaultHttpRequest head = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/upload");
+        head.headers().set("Content-Type", "multipart/form-data; boundary=boundary");
+        head.headers().set("Content-Length", "2048"); // 声明长度超过 1024 限制
+        channel.writeInbound(head);
+
+        Object out = channel.readOutbound();
+        assertTrue(out instanceof FullHttpResponse, "超限请求应返回 413，实际: "
+                + (out == null ? "null" : out.getClass().getName()));
+        assertEquals(HttpResponseStatus.REQUEST_ENTITY_TOO_LARGE, ((FullHttpResponse) out).status());
+        ((FullHttpResponse) out).release();
+        channel.finishAndReleaseAll();
+    }
+
+    @Test
+    void multipartRequest_chunkedExceedsLimit_rejectedWith413() {
+        SupportMultipartAggregator aggregator = new SupportMultipartAggregator(64);
+        EmbeddedChannel channel = new EmbeddedChannel(aggregator);
+
+        channel.writeInbound(multipartHead()); // chunked，无 Content-Length
+        channel.writeInbound(new DefaultHttpContent(Unpooled.copiedBuffer(multipartBody(), StandardCharsets.UTF_8)));
+
+        Object out = channel.readOutbound();
+        assertTrue(out instanceof FullHttpResponse, "chunked 超限请求应返回 413，实际: "
+                + (out == null ? "null" : out.getClass().getName()));
+        assertEquals(HttpResponseStatus.REQUEST_ENTITY_TOO_LARGE, ((FullHttpResponse) out).status());
+        ((FullHttpResponse) out).release();
+        channel.finishAndReleaseAll();
+    }
+
+    @Test
+    void multipartRequest_withinLimit_aggregatesNormally() {
+        SupportMultipartAggregator aggregator = new SupportMultipartAggregator(1024 * 1024);
+        EmbeddedChannel channel = new EmbeddedChannel(aggregator);
+        channel.writeInbound(multipartHead());
+        channel.writeInbound(new DefaultHttpContent(Unpooled.copiedBuffer(multipartBody(), StandardCharsets.UTF_8)));
+        channel.writeInbound(new DefaultLastHttpContent());
+
+        Object out = channel.readInbound();
+        assertTrue(out instanceof NettyMultipartWebRequest, "未超限请求应正常聚合");
+        ((NettyMultipartWebRequest) out).release();
+        channel.finishAndReleaseAll();
+    }
 }

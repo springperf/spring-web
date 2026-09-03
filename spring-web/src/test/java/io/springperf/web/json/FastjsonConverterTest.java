@@ -26,6 +26,28 @@ class FastjsonConverterTest {
         }
     }
 
+    /* ==================== 安全：autoType 反序列化防护 ==================== */
+
+    @Test
+    void fromJson_autoTypePayload_rejected() {
+        // fastjson 经典 gadget 攻击载荷：@type 指定任意类。
+        // 硬化后 SupportAutoType=false + ErrorOnNotSupportAutoType=true，
+        // 以 Object/接口等「可多态」目标反序列化时，@type 必须被拒绝而非实例化任意类。
+        FastjsonConverter converter = new FastjsonConverter();
+        String payload = "{\"@type\":\"java.lang.Runtime\"}";
+        assertThrows(Exception.class,
+                () -> converter.fromJson(payload, Object.class),
+                "含 @type 的载荷应被拒绝（ErrorOnNotSupportAutoType）");
+    }
+
+    @Test
+    void fromJson_mapWithAutoType_doesNotInstantiateArbitraryClass() {
+        // 即使以 Map 为目标类型，autoType 也应被关闭：@type 不应生效为任意类实例化。
+        FastjsonConverter converter = new FastjsonConverter();
+        String payload = "{\"@type\":\"java.util.HashMap\",\"k\":\"v\"}";
+        assertDoesNotThrow(() -> converter.fromJson(payload, Map.class));
+    }
+
     @Test
     void toJson_pojo_returnsValidJson() {
         FastjsonConverter converter = new FastjsonConverter();
