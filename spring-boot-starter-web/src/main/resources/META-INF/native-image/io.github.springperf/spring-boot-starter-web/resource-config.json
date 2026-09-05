@@ -3,6 +3,11 @@
     {"pattern": "\\QMETA-INF/spring.factories\\E"},
     {"pattern": "\\QMETA-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports\\E"},
     {"pattern": "\\QMETA-INF/spring/\\E"},
-    {"pattern": "application\\.properties$"}
+    {"pattern": "\\QMETA-INF/additional-spring-configuration-metadata.json\\E"},
+    {"pattern": "application\\.properties$"},
+    {"pattern": "\\Qtemplates/\\E.*"},
+    {"pattern": "\\Qstatic/\\E.*"},
+    {"pattern": "\\QMETA-INF/resources/\\E.*"},
+    {"pattern": "\\Qpublic/\\E.*"}
   ]
 }

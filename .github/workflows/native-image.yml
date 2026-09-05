@@ -1,0 +1,23 @@
+name: Native Image Smoke
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  native-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up GraalVM
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '17'
+          distribution: 'graalvm'
+          components: 'native-image'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Native smoke test (build + launch + assert)
+        run: ./scripts/native-smoke-test.sh

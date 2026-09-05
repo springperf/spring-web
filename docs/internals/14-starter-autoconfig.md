@@ -40,6 +40,8 @@ org.springframework.boot.ApplicationContextFactory=\
 io.springperf.web.autoconfigure.support.WebServerApplicationContextFactory
 ```
 
+`WebServerApplicationContextFactory`（`@Order(-10000)`）用 `AotDetector.useGeneratedArtifacts()` 区分上下文类型：AOT/native 下返回 `GenericApplicationContext`（AOT 初始化器直接注册 bean 定义，无需运行时注解扫描），否则返回 `AnnotationConfigApplicationContext`。**对齐 Spring Boot 官方行为**——若一律返回注解驱动上下文，native 下 refresh 时反射实例化 `ConfigurationClassPostProcessor` 会因缺 hints 崩溃（`NoSuchMethodException`）。
+
 ### 1.2 10 个配置类的职责分工
 
 | # | 配置类 | 条件 | 职责 |
@@ -365,6 +367,36 @@ public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
 ```
 
 `@ImportRuntimeHints` 挂在 SB3 专属配置上，SB3 下 AOT 构建期执行，SB4 下配置类不加载、registrar 不执行，避免编译期引用 SB3 类型在 SB4 classpath 缺失时引发类解析失败。
+
+**补齐内容（3.2.6+）**：除事件路径外，`SpringWebRuntimeHints` 还注册：
+- `ListenableFutureCallback` JDK 代理 + `ListenableFuture#addCallback` 反射（异步返回路径，`ListenableFutureAdapter` 需要）；
+- 框架强依赖资源：`additional-spring-configuration-metadata.json`、`templates/`/`static/`/`META-INF/resources/`/`public/`（经 `FilePatternResourceHintsRegistrar` 按实际存在文件注册）。
+
+### 5.6 用户控制器 AOT hints：`ControllerBeanFactoryInitializationAotProcessor`
+
+框架用自有 `MappingRegistry`（`getBeansWithAnnotation(Controller.class)` + `getUniqueDeclaredMethods`）扫描 `@Controller`，Spring Boot AOT 只为 Spring MVC 的 `RequestMappingHandlerMapping` 自动生成 hints——**感知不到本框架控制器**。因此在 `META-INF/spring/aot.factories` 注册了 `BeanFactoryInitializationAotProcessor`：
+
+```java
+// ControllerBeanFactoryInitializationAotProcessor.processAheadOfTime(beanFactory)
+// 1. beanFactory.getBeanNamesForAnnotation(Controller.class) → 目标类
+// 2. beanFactory.getBeanNamesForAnnotation(ControllerAdvice.class) → @ControllerAdvice
+// 3. getUniqueDeclaredMethods + @RequestMapping 过滤 → 处理方法
+//    @ControllerAdvice: @ExceptionHandler / @InitBinder / @ModelAttribute 反射调用方法
+// 4. applyTo: registerMethod(method, INVOKE) + 控制器/advice 类 INVOKE_*
+//              + BindingReflectionHintsRegistrar + DTO DECLARED_FIELDS
+//              + 泛型参数递归展开（ResponseEntity<Map<String, User>> → User）
+```
+
+`process-aot` 端到端效果（`spring-web-example-rest`）：`HealthController`/`UserController` 全部方法进入 `reflect-config.json` 的 `methods`（INVOKE）段，`User`/`ApiResult` DTO 注册字段/构造器 hints；`GlobalExceptionHandler`（`@RestControllerAdvice`）的 `handleValidation`/`handleIllegalArg`/`handleUnknown` 同样进入 `methods` 段。示例模块默认构建绑定 `process-aot`，原生编译用 `-Pnative`（`scripts/native-smoke-test.sh`，Linux + GraalVM）。
+
+### 5.7 WebSocket 端点 AOT hints：`ServerEndpointBeanFactoryInitializationAotProcessor`
+
+`spring-web-websocket` 模块经自身的 `aot.factories` 注册 `BeanFactoryInitializationAotProcessor`，为 Bean 发现的 `@ServerEndpoint` 端点注册反射 hints：
+
+- 无参构造器（`INVOKE_DECLARED_CONSTRUCTORS`）——`JsrEndpointWebSocketHandler.getDeclaredConstructor().newInstance()`；
+- `@OnOpen`/`@OnMessage`/`@OnClose`/`@OnError` 回调方法（`INVOKE`）——`setAccessible + invoke`。
+
+与运行时 `JsrEndpointScanner` 的 native 守卫配套：native 下跳过 classpath 扫描、只走 Bean 发现，故 `@ServerEndpoint` 端点需显式注册为 Spring Bean。
 
 ---
 

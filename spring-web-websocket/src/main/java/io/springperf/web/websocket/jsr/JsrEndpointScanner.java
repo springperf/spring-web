@@ -22,10 +22,19 @@ import java.util.Set;
  *   <li>补充 Spring 容器中注册为 Bean 的 {@code @ServerEndpoint} 类型（用户显式注册的端点）。</li>
  * </ol>
  *
+ * <p>GraalVM native-image：封闭世界下 classpath 运行时扫描不可用，
+ * 检测到 native 环境时跳过 {@code scanClasspath()}，仅依赖 Spring Bean 发现
+ * （{@code scanBeans()}）。因此 native 场景要求用户把 {@code @ServerEndpoint} 端点
+ * 显式注册为 Spring Bean。</p>
+ *
  * @author huangcanda
  * @since 3.2.5
  */
 public class JsrEndpointScanner {
+
+    /** GraalVM native-image 运行时会在系统属性中设置此值，用于检测原生镜像环境。 */
+    private static final boolean IN_NATIVE_IMAGE =
+            System.getProperty("org.graalvm.nativeimage.imagecode") != null;
 
     private final ApplicationContext applicationContext;
 
@@ -38,7 +47,9 @@ public class JsrEndpointScanner {
      */
     public List<Class<?>> scan() {
         Set<Class<?>> result = new LinkedHashSet<>();
-        result.addAll(scanClasspath());
+        if (!IN_NATIVE_IMAGE) {
+            result.addAll(scanClasspath());
+        }
         result.addAll(scanBeans());
         return new ArrayList<>(result);
     }

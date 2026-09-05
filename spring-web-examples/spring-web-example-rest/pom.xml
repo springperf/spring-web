@@ -35,4 +35,66 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <!-- GraalVM native-image 支持：process-aot 在 JVM 构建期采集可达性提示
+                 （含本框架 ControllerBeanFactoryInitializationAotProcessor 注册的
+                 @Controller 方法反射 + DTO 序列化 hints），默认构建即执行；
+                 nativeCompile 需激活 native profile（要求 GraalVM native-image 工具链）。 -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>process-aot</id>
+                        <goals>
+                            <goal>process-aot</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <!-- 原生镜像编译：mvn -Pnative verify
+             需 Linux 环境 + GraalVM（native-image 在 PATH），产物 target/<artifactId>。
+             Windows 自定义 MSVC 安装路径下 toolchain 检测可能失败，加 -H:-CheckToolchain
+             （跳过防御性校验，链接器仍由 PATH 中的 cl/link 提供；Linux 下无副作用）。 -->
+        <profile>
+            <id>native</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <version>0.10.4</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <buildArgs>
+                                <buildArg>-H:-CheckToolchain</buildArg>
+                            </buildArgs>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>native-test</id>
+                                <goals>
+                                    <goal>test</goal>
+                                </goals>
+                                <phase>test</phase>
+                            </execution>
+                            <execution>
+                                <id>build-native</id>
+                                <goals>
+                                    <goal>compile-no-fork</goal>
+                                </goals>
+                                <phase>package</phase>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

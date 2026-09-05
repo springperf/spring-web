@@ -62,8 +62,18 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 ### Additional Features
 
 - **Virtual threads**: enable with `spring.threads.virtual.enabled=true` on JDK 21+, business thread pool auto-switches to virtual threads
-- **GraalVM native-image**: `FastInvokerGenerator` degrades to `MethodHandle` calls under native-image; `reflect-config.json` is pre-configured
+- **GraalVM native-image**: `FastInvokerGenerator` degrades to `MethodHandle` calls under native-image; `SpringWebRuntimeHints` registers event-path/resource/async-callback reachability hints; `ControllerBeanFactoryInitializationAotProcessor` (via `META-INF/spring/aot.factories`) auto-registers reflection/serialization hints for user `@Controller` methods and DTOs at AOT build time
 - **WebSocket**: auto-configuration based on Jakarta WebSocket
+
+### GraalVM native-image Support Matrix
+
+| Scenario | Status | Notes |
+|----------|--------|-------|
+| SB3 (master default 3.5.x) | ✅ Usable | `SpringWebRuntimeHints` + `ControllerBeanFactoryInitializationAotProcessor`; no manual hints needed for user `@Controller`/DTO; example `spring-web-example-rest` binds `process-aot`; **Windows GraalVM 21.0.2 + MSVC native build & request flow verified end-to-end** |
+| SB4 (4.0.x/4.1.x) | ❌ Not supported | `Boot4WebServerInitializedEventBridge` needs runtime `defineClass` (forbidden in closed world), explicitly excluded |
+| epoll transport | ⚠️ Pending Linux verification | Netty epoll `.so` needs verification in Linux native build env; NIO transport verified on Windows native |
+| WebSocket `@ServerEndpoint` | ⚠️ Register as Bean | classpath scanning unavailable under native; `JsrEndpointScanner` auto-degrades to Bean discovery |
+| Native build verification | ✅ Windows verified / 🔧 Linux pending | Windows: `mvn -Pnative package` (GraalVM + MSVC, `vcvars64` env + `-H:-CheckToolchain`); Linux: `scripts/native-smoke-test.sh` |
 
 ---
 

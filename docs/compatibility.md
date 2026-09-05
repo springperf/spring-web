@@ -62,8 +62,18 @@
 ### 额外特性
 
 - **虚拟线程**：JDK 21+ 下 `spring.threads.virtual.enabled=true` 启用，业务线程池自动切换为虚拟线程
-- **GraalVM native-image**：`FastInvokerGenerator` 在 native-image 下自动降级为 `MethodHandle` 调用，`reflect-config.json` 已配置
+- **GraalVM native-image**：`FastInvokerGenerator` 在 native-image 下自动降级为 `MethodHandle` 调用；`SpringWebRuntimeHints` 注册事件路径/资源/异步回调可达性提示；`ControllerBeanFactoryInitializationAotProcessor`（经 `META-INF/spring/aot.factories`）在 AOT 构建期自动为 `@Controller` 处理方法与 DTO 注册反射/序列化 hints
 - **WebSocket**：基于 Jakarta WebSocket 的自动配置
+
+### GraalVM native-image 支持矩阵
+
+| 场景 | 状态 | 说明 |
+|------|------|------|
+| SB3（master 默认 3.5.x） | ✅ 可用级 | `SpringWebRuntimeHints` + `ControllerBeanFactoryInitializationAotProcessor`，用户 `@Controller`/DTO 无需手工 hints；示例 `spring-web-example-rest` 已绑定 `process-aot`；**Windows GraalVM 21.0.2 + MSVC 原生构建与请求链路端到端验证通过** |
+| SB4（4.0.x/4.1.x） | ❌ 不支持 | `Boot4WebServerInitializedEventBridge` 需运行时 `defineClass`（封闭世界禁止），显式文档化排除 |
+| epoll transport | ⚠️ 待 Linux 验证 | Netty epoll `.so` 需在 Linux 原生构建环境验证；NIO transport 已在 Windows native 验证通过 |
+| WebSocket `@ServerEndpoint` | ⚠️ 需注册为 Bean | native 下 classpath 扫描不可用，`JsrEndpointScanner` 自动降级为 Bean 发现，端点需显式注册为 Spring Bean |
+| 原生构建验证 | ✅ Windows 已验 / 🔧 Linux 待验 | Windows：`mvn -Pnative package`（GraalVM + MSVC，`vcvars64` 环境 + `-H:-CheckToolchain`）；Linux：`scripts/native-smoke-test.sh` |
 
 ---
 
