@@ -333,7 +333,11 @@
     "allDeclaredConstructors": true
   },
   {
-    "name": "io.springperf.web.autoconfigure.SpringWebSupportAutoConfiguration",
+    "name": "io.springperf.web.autoconfigure.SpringWebServletAutoConfiguration",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "io.springperf.web.autoconfigure.SpringWebMvcSupportAutoConfiguration",
     "allDeclaredConstructors": true
   },
   {

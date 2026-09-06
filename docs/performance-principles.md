@@ -368,7 +368,7 @@ void drain() {
 
 | 维度 | WebPerf | MVC+Tomcat | WebFlux |
 |------|-----------|------------|---------|
-| Servlet API | **桥接兼容**（`spring-web-support` 模块） | 原生支持 | 不支持 |
+| Servlet API | **桥接兼容**（`spring-web-servlet` 模块） | 原生支持 | 不支持 |
 | Actuator | **原生支持** + 独立管理端口 | 原生支持 | 原生支持 |
 | `@RequestMapping` | **全兼容** | 原生 | 原生 |
 | `javax.validation` | 支持 | 支持 | 支持 |

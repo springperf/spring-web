@@ -185,7 +185,7 @@ This framework chose to **directly reuse Spring's annotation system**: `@Request
 
 The Servlet API has accumulated two decades of ecosystem: Spring Security Filter Chain, `RequestBodyAdvice`, `ResponseBodyAdvice`, countless middleware based on `javax.servlet.Filter`.
 
-This framework doesn't demand "all or nothing." Through the `spring-web-support` bridge module, migration can be gradual: start by running on Netty via the support module reusing existing Filters, then gradually migrate to native `WebFilter`.
+This framework doesn't demand "all or nothing." Through the `spring-web-servlet` bridge module, migration can be gradual: start by running on Netty via the support module reusing existing Filters, then gradually migrate to native `WebFilter`.
 
 ---
 
@@ -206,8 +206,8 @@ This framework doesn't demand "all or nothing." Through the `spring-web-support`
 
 | Scenario | Reason |
 |----------|--------|
-| **Heavily dependent on Servlet API** | Requires `spring-web-support` bridge module; some Servlet API may not be fully compatible |
-| **JSP required** | Requires `spring-web-support` + `tomcat-embed-jasper`; executed via `JasperJspServlet` bridge |
+| **Heavily dependent on Servlet API** | Requires `spring-web-servlet` bridge module; some Servlet API may not be fully compatible |
+| **JSP required** | Requires `spring-web-servlet` + `tomcat-embed-jasper`; executed via `JasperJspServlet` bridge |
 | **Traditional WebSocket** (javax.websocket) | Requires `spring-web-websocket`; bridged via JSR-356 `@ServerEndpoint` |
 | **Deep Servlet Filter chains** | Bridge mode adds overhead; migrate to native `WebFilter` gradually |
 
@@ -238,13 +238,13 @@ This framework doesn't demand "all or nothing." Through the `spring-web-support`
 
 | Feature | Notes |
 |---------|-------|
-| Servlet Filter | Requires `spring-web-support` bridge |
-| `RequestBodyAdvice` / `ResponseBodyAdvice` | Requires `spring-web-support` bridge |
-| `HttpServletRequest` / `HttpServletResponse` | Requires `spring-web-support` for parameter-level adaptation |
-| `ResponseBodyEmitter` | Requires `spring-web-support` |
-| JSP | Requires `spring-web-support` + `tomcat-embed-jasper` (`JasperJspServlet` + `JspViewResolver`) |
+| Servlet Filter | Requires `spring-web-servlet` bridge |
+| `RequestBodyAdvice` / `ResponseBodyAdvice` | Requires `spring-web-mvc-support` bridge |
+| `HttpServletRequest` / `HttpServletResponse` | Requires `spring-web-servlet` for parameter-level adaptation |
+| `ResponseBodyEmitter` | Requires `spring-web-mvc-support` |
+| JSP | Requires `spring-web-servlet` + `tomcat-embed-jasper` (`JasperJspServlet` + `JspViewResolver`) |
 | Servlet WebSocket (JSR-356 `@ServerEndpoint`) | Requires `spring-web-websocket` bridge |
-| Spring MVC `View` / `ViewResolver` | Requires `spring-web-view` (Thymeleaf/FreeMarker) + `ModelAndView` bridge in `spring-web-support` |
+| Spring MVC `View` / `ViewResolver` | Requires `spring-web-view` (Thymeleaf/FreeMarker) + `ModelAndView` bridge in `spring-web-mvc-support` |
 
 ### Not Supported
 

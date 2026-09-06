@@ -1,7 +1,8 @@
 io.springperf.web.autoconfigure.SpringWebAutoConfiguration
 io.springperf.web.autoconfigure.WebServerInitializedEventAutoConfiguration
 io.springperf.web.autoconfigure.Boot4WebServerInitializedEventAutoConfiguration
-io.springperf.web.autoconfigure.SpringWebSupportAutoConfiguration
+io.springperf.web.autoconfigure.SpringWebServletAutoConfiguration
+io.springperf.web.autoconfigure.SpringWebMvcSupportAutoConfiguration
 io.springperf.web.autoconfigure.ActuatorEndpointAutoConfiguration
 io.springperf.web.autoconfigure.SpringDataWebCompatibilityAutoConfiguration
 io.springperf.web.autoconfigure.SpringBootAdminClientAutoConfiguration

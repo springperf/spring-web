@@ -117,7 +117,7 @@ public class LogInterceptor implements HandlerInterceptor {
 
 ### 过滤器（需 support 模块）
 
-需要引入 `spring-web-support` 后，`javax.servlet.Filter` 通过桥接自动适配。
+需要引入 `spring-web-servlet` 后，`javax.servlet.Filter` 通过桥接自动适配。
 
 ---
 
@@ -132,7 +132,7 @@ public class LogInterceptor implements HandlerInterceptor {
 ```xml
 <dependency>
     <groupId>io.github.springperf</groupId>
-    <artifactId>spring-web-support</artifactId>
+    <artifactId>spring-web-servlet</artifactId>
     <version>${spring-web.version}</version>
 </dependency>
 ```
@@ -157,7 +157,7 @@ public Result<User> getUser(WebServerHttpRequest request) {
 
 ### RequestBodyAdvice / ResponseBodyAdvice
 
-需引入 support 模块，框架自动扫描并适配。
+需引入 `spring-web-mvc-support` 模块，框架自动扫描并适配。
 
 ### 静态资源路径
 
@@ -249,7 +249,7 @@ server.check-on-startup=true
 
 ### Q: Spring Security 还能用吗？
 
-能。Spring Security 的 Filter Chain 通过 `spring-web-support` 模块桥接，`SecurityFilterChain` 可正常工作。
+能。Spring Security 的 Filter Chain 通过 `spring-web-servlet` 模块桥接，`SecurityFilterChain` 可正常工作。
 
 ### Q: 性能提升在什么场景最明显？
 

@@ -37,7 +37,8 @@
     <modules>
         <module>spring-web</module>
         <module>spring-web-websocket</module>
-        <module>spring-web-support</module>
+        <module>spring-web-servlet</module>
+        <module>spring-web-mvc-support</module>
         <module>spring-boot-starter-web</module>
         <module>spring-web-test</module>
         <module>spring-web-support-test</module>
@@ -123,7 +124,12 @@
             </dependency>
             <dependency>
                 <groupId>io.github.springperf</groupId>
-                <artifactId>spring-web-support</artifactId>
+                <artifactId>spring-web-servlet</artifactId>
+                <version>${spring-web.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.springperf</groupId>
+                <artifactId>spring-web-mvc-support</artifactId>
                 <version>${spring-web.version}</version>
             </dependency>
             <dependency>

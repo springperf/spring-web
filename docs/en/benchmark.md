@@ -52,7 +52,7 @@ Across **7 APIs × 3 concurrency levels (4/8/16 threads)**, perf is **#1 on ever
 | Profile | Port | Description |
 |---------|------|-------------|
 | perf | 9092 | WebPerf native Netty + 5 WebFilters + 3 Interceptors |
-| perf-support | 9094 | perf + spring-web-support (Servlet bridge) + 5 Filters + 3 Interceptors |
+| perf-support | 9094 | perf + spring-web-servlet (Servlet bridge) + 5 Filters + 3 Interceptors |
 | tomcat | 9102 | Spring MVC + Tomcat + 5 Filters + 3 Interceptors |
 | undertow | 9112 | Spring MVC + Undertow + 5 Filters + 3 Interceptors |
 | webflux | 9122 | Spring WebFlux + Reactor Netty + 8 WebFilters |
@@ -344,7 +344,7 @@ Use `benchmark-all.sh` for a one-shot run: compile, classpath build, multi-profi
 | Profile | Port | Benchmark class | Description |
 |---------|------|-----------------|-------------|
 | `perf` | 9092 | PerfBenchmark | WebPerf native Netty + 5 WebFilters + 3 Interceptors |
-| `perf-support` | 9094 | PerfSupportBenchmark | perf + spring-web-support (Servlet bridge) + 5 Filters + 3 Interceptors |
+| `perf-support` | 9094 | PerfSupportBenchmark | perf + spring-web-servlet (Servlet bridge) + 5 Filters + 3 Interceptors |
 | `tomcat` | 9102 | TomcatBenchmark | Spring MVC + Tomcat + 5 Filters + 3 Interceptors |
 | `undertow` | 9112 | UndertowBenchmark | Spring MVC + Undertow + 5 Filters + 3 Interceptors |
 | `webflux` | 9122 | WebFluxBenchmark | Spring WebFlux + Reactor Netty + 8 WebFilters |

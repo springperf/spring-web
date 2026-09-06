@@ -1,6 +1,6 @@
 # 11 · 异步与流式：DeferredResult / SSE / 响应式 / 无锁 Drain Loop
 
-> [← 返回索引](00-README.md) | 上一篇：[10 · 横切关注点：拦截器、Filter、CORS、异常](10-cross-cutting.md) | 下一篇：[12 · spring-web-support 桥接](12-support-bridge.md)
+> [← 返回索引](00-README.md) | 上一篇：[10 · 横切关注点：拦截器、Filter、CORS、异常](10-cross-cutting.md) | 下一篇：[12 · spring-web-servlet 与 spring-web-mvc-support 桥接](12-support-bridge.md)
 
 ---
 
@@ -1014,4 +1014,4 @@ public void setWritableCallback(Runnable callback) {
 
 ---
 
-> **下一篇**：[12 · spring-web-support 桥接](12-support-bridge.md)——Servlet API 桥接与 WebMvcConfigurer 翻译中枢。
+> **下一篇**：[12 · spring-web-servlet 与 spring-web-mvc-support 桥接](12-support-bridge.md)——Servlet API 桥接与 WebMvcConfigurer 翻译中枢。

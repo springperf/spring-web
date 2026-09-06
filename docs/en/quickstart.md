@@ -117,7 +117,7 @@ public class LogInterceptor implements HandlerInterceptor {
 
 ### Filters (requires support module)
 
-After adding `spring-web-support`, `javax.servlet.Filter` is automatically adapted via bridging.
+After adding `spring-web-servlet`, `javax.servlet.Filter` is automatically adapted via bridging.
 
 ---
 
@@ -132,7 +132,7 @@ If your controller methods directly use `HttpServletRequest` / `HttpServletRespo
 ```xml
 <dependency>
     <groupId>io.github.springperf</groupId>
-    <artifactId>spring-web-support</artifactId>
+    <artifactId>spring-web-servlet</artifactId>
     <version>${spring-web.version}</version>
 </dependency>
 ```
@@ -157,7 +157,7 @@ public Result<User> getUser(WebServerHttpRequest request) {
 
 ### RequestBodyAdvice / ResponseBodyAdvice
 
-Requires the support module. The framework automatically scans and adapts them.
+Requires the `spring-web-mvc-support` module. The framework automatically scans and adapts them.
 
 ### Static Resource Paths
 
@@ -249,7 +249,7 @@ Verify that `spring-boot-starter-web` or `spring-boot-starter-tomcat` has been r
 
 ### Q: Does Spring Security still work?
 
-Yes. Spring Security's Filter Chain is bridged via the `spring-web-support` module. `SecurityFilterChain` works normally.
+Yes. Spring Security's Filter Chain is bridged via the `spring-web-servlet` module. `SecurityFilterChain` works normally.
 
 ### Q: Which scenarios benefit most from performance improvements?
 

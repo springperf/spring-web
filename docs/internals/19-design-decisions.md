@@ -103,7 +103,7 @@ Netty 的 EventLoop 单线程模型天然适合 I/O 密集型场景，但若业�
 
 ### 背景
 
-`spring-web-support` 模块要替换 `spring-web` core 的 `DispatcherHandler`、`InterceptorRegistry`、`WebFilterRegistry`、`HttpBodyCodecInterceptorRegistry` 等 Registry 实现（support 版本增加了 Session flush、Servlet 适配、`WebMvcConfigurer` 翻译等能力）。两条路：① Spring Bean 层覆盖——`@Primary` 或 `@ConditionalOnMissingBean` 让 support 的 Bean 胜出；② 新 Java 包 + `WebComponent` 同名覆盖机制。
+`spring-web-servlet` 与 `spring-web-mvc-support` 模块要替换 `spring-web` core 的 `DispatcherHandler`、`InterceptorRegistry`、`WebFilterRegistry`、`HttpBodyCodecInterceptorRegistry` 等 Registry 实现（support 版本增加了 Session flush、Servlet 适配、`WebMvcConfigurer` 翻译等能力）。两条路：① Spring Bean 层覆盖——`@Primary` 或 `@ConditionalOnMissingBean` 让 support 的 Bean 胜出；② 新 Java 包 + `WebComponent` 同名覆盖机制。
 
 Bean 层覆盖有两个硬约束：其一，core 的 Registry 是 `WebComponent`（走 `WebContext.registerWebComponent` 注册时序），不是普通 Bean，Spring `@ConditionalOnMissingBean` 管不到 `WebComponent` 的注册时序；其二，Spring Boot 6.0 默认禁用 bean overriding（`spring.main.allow-bean-definition-overriding=false`），同名 Bean 直接报错。
 
@@ -111,7 +111,7 @@ Bean 层覆盖有两个硬约束：其一，core 的 Registry 是 `WebComponent`
 
 `SupportXxx` 放在 support 子包（**新 Java 包**），`extends` core 的 `XxxRegistry`，重写两点：① `getComponentName()` 返回**父类简单名**（`SupportDispatcherHandler.java` 返回 `DispatcherHandler.class.getSimpleName()` = "DispatcherHandler"，与 core 默认值同名）；② `getOrder()` 返回更高优先级（ `Ordered.LOWEST_PRECEDENCE - 30000`，比 core 默认 `LOWEST_PRECEDENCE - 10000` 更小 = 更高优先级）。
 
-注册流程：core 的 `DispatcherHandler` 由 `SpringWebAutoConfiguration.java` 注册为 Bean，support 的 `SupportDispatcherHandler` 由 `SpringWebSupportAutoConfiguration.java` 注册为 Bean。`WebContext` 初始化时 `getBeansOfType(DispatcherHandler.class)` 扫到两个子类型，`getComponentName` 同为 "DispatcherHandler" → `WebComponentContainer.registerWebComponent` 同名冲突 →  `AnnotationAwareOrderComparator.sort` 选 order 更小者为胜（support 胜），败者（core）`destroy`。同样模式覆盖 `SupportInterceptorRegistry`/`SupportWebFilterRegistry`/`SupportHttpBodyCodecInterceptorRegistry`。
+注册流程：core 的 `DispatcherHandler` 由 `SpringWebAutoConfiguration.java` 注册为 Bean，support 的 `SupportDispatcherHandler` 由 `SpringWebServletAutoConfiguration.java` 注册为 Bean。`WebContext` 初始化时 `getBeansOfType(DispatcherHandler.class)` 扫到两个子类型，`getComponentName` 同为 "DispatcherHandler" → `WebComponentContainer.registerWebComponent` 同名冲突 →  `AnnotationAwareOrderComparator.sort` 选 order 更小者为胜（support 胜），败者（core）`destroy`。同样模式覆盖 `SupportInterceptorRegistry`/`SupportWebFilterRegistry`/`SupportHttpBodyCodecInterceptorRegistry`。
 
 ### 后果
 

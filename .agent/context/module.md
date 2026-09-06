@@ -8,7 +8,8 @@ spring-web-parent (聚合 POM)
 │
 ├── spring-web                     核心框架
 ├── spring-web-view                视图渲染（Thymeleaf/FreeMarker，可选）
-├── spring-web-support             可选 Servlet/SpringMVC 桥接层
+├── spring-web-servlet             可选 Servlet 桥接层（零 SpringMVC 依赖）
+├── spring-web-mvc-support         可选 SpringMVC 兼容桥接层（依赖 spring-web-servlet）
 ├── spring-web-batch               批量请求处理（可选）
 ├── spring-web-websocket           WebSocket 支持（可选）
 ├── spring-boot-starter-web        Spring Boot 自动配置
@@ -283,27 +284,62 @@ org.springframework.web.context.request/  （src/main/java 内重写，无 Servl
 
 ---
 
-## spring-web-support（Servlet 桥接层）
+## spring-web-servlet（Servlet 桥接层）
+
+> 拆分自原 `spring-web-support`。**零 SpringMVC 依赖**——纯 Servlet 用户仅依赖本模块 + `spring-web` 即可，classpath 不引入任何 `org.springframework.web.servlet.*` 重写类。判定归属标准：不依赖 `org.springframework.web.servlet` 命名空间的类归本模块。
 
 ```
-spring-web-support
-├── SupportDispatcherHandler               扩展 DispatcherHandler，增加 RequestContextHolder 初始化
+spring-web-servlet
+├── SupportDispatcherHandler               扩展 DispatcherHandler，增加 RequestContextHolder 初始化 + Session flush
 │
 ├── arg/provider/
 │   ├── HttpServletRequestProvider         解析 HttpServletRequest
 │   ├── HttpServletResponseProvider        解析 HttpServletResponse
 │   ├── ServletRequestProvider             解析 ServletRequest（Servlet.service 参数）
 │   ├── ServletResponseProvider            解析 ServletResponse
-│   └── WebRequestArgumentResolverProvider 解析 WebRequest / NativeWebRequest
+│   ├── WebRequestArgumentResolverProvider 解析 WebRequest（ServletWebRequest，官方 spring-web 类）
+│   ├── SessionAttributeArgumentResolverProvider  解析 @SessionAttribute（注解在 org.springframework.web.bind.*，非 MVC 命名空间）
+│   └── SessionStatusArgumentResolverProvider     解析 SessionStatus（配合 SessionAttributesInterceptor）
 │
-├── async/stream/
-│   └── ResponseBodyEmitterReturnValueResolver  支持 Spring MVC ResponseBodyEmitter
+├── model/
+│   └── SessionAttributesInterceptor       基于 core HandlerInterceptor 实现 @SessionAttributes（官方 spring-web 注解语义）
 │
-├── codec/interceptor/
-│   ├── SupportHttpBodyCodecInterceptorRegistry  扫描 @ControllerAdvice 中的 RequestBodyAdvice/ResponseBodyAdvice
-│   ├── RequestBodyAdviceCodecInterceptor        适配 RequestBodyAdvice → HttpBodyCodecInterceptor
-│   └── ResponseBodyAdviceCodecInterceptor       适配 ResponseBodyAdvice → HttpBodyCodecInterceptor
+├── context/
+│   └── SessionScopeBeanFactoryPostProcessor  注册 session 作用域（基于 ServletRequestAttributes，非 MVC）
 │
+├── servlet/                              Servlet 桥接
+│   ├── AbstractFastFailHttpServletRequest/ServletResponse  快速失败的 Servlet 包装
+│   ├── PerfHttpServletRequest/ServletResponse              基于框架请求/响应的 Servlet 包装
+│   ├── ServletInvoker                    CustomInvoker：Servlet.service 调用（void 自动 setHandled）
+│   ├── SupportServletRegistry            扫描 Servlet Bean + @WebServlet 注册路由
+│   ├── PerfServletConfig                 ServletConfig 实现（仿 PerfFilterConfig）
+│   ├── JasperJspServlet                  JSP servlet（集成 Apache Jasper，补齐 JspFactory/InstanceManager/TldCache）
+│   ├── context/ServletAdapterContext                       持有 Servlet 请求/响应/FilterChain
+│   └── filter/
+│       ├── FilterWrapper                   包装 jakarta.servlet.Filter → WebFilter
+│       ├── SupportWebFilterRegistry        扩展 WebFilterRegistry，自动注册 Filter Bean
+│       ├── PerfHttpServletFilterChain      适配 FilterChain → javax.servlet.FilterChain
+│       └── match/                          路径匹配工具 (Exact/Prefix/Suffix/PathMatch)
+│
+├── session/                             HttpSession 存储
+│   ├── PerfHttpSession / PerfHttpSessionManager
+│   └── HttpSessionStorage / InMemoryHttpSessionStorage
+│
+└── view/                                   JSP 视图（依赖 spring-web-view + tomcat-embed-jasper）
+    ├── JspViewResolver                  ViewResolver SPI：jsp: 前缀 / .jsp 后缀 → JspView，Phase1 注册 *.jsp 路由
+    └── JspView                          View SPI：model → request attribute → RequestDispatcher.forward
+```
+
+依赖：`spring-web`、`spring-web-view`（provided）、`jakarta.servlet-api`（provided）、`tomcat-embed-jasper`（optional）。
+
+---
+
+## spring-web-mvc-support（SpringMVC 兼容桥接层）
+
+> 拆分自原 `spring-web-support`。桥接 Spring MVC 生态组件（`WebMvcConfigurer`、`HandlerInterceptor`、`RequestBodyAdvice` 等）。**依赖 `spring-web-servlet`**——Spring MVC API 构建于 Servlet 之上。判定归属标准：依赖 `org.springframework.web.servlet` 命名空间的类归本模块。
+
+```
+spring-web-mvc-support
 ├── mvc/
 │   ├── config/
 │   │   └── WebMvcConfigurerBridge          桥接 Spring WebMvcConfigurer → 框架各 Registry
@@ -316,60 +352,38 @@ spring-web-support
 │   │   └── SpringHandlerMethodArgumentResolverProvider  适配 Spring HandlerMethodArgumentResolver
 │   │
 │   ├── retval/
-│   │   └── SpringHandlerMethodReturnValueHandlerAdapter  适配 Spring HandlerMethodReturnValueHandler
+│   │   ├── SpringHandlerMethodReturnValueHandlerAdapter  适配 Spring HandlerMethodReturnValueHandler
+│   │   └── ModelAndViewReturnValueResolver    桥接 org.springframework.web.servlet.ModelAndView（直接依赖 spring-web-view 的 View/ViewResolverRegistry）
 │   │
 │   └── exception/
 │       └── SpringHandlerExceptionResolverAdapter  适配 Spring HandlerExceptionResolver
 │
-└── servlet/                              Servlet 桥接
-    ├── AbstractFastFailHttpServletRequest/ServletResponse  快速失败的 Servlet 包装
-    ├── PerfHttpServletRequest/ServletResponse              基于框架请求/响应的 Servlet 包装
-    ├── ServletInvoker                    CustomInvoker：Servlet.service 调用（void 自动 setHandled）
-    ├── SupportServletRegistry            扫描 Servlet Bean + @WebServlet 注册路由
-    ├── PerfServletConfig                 ServletConfig 实现（仿 PerfFilterConfig）
-    ├── JasperJspServlet                  JSP servlet（集成 Apache Jasper，补齐 JspFactory/InstanceManager/TldCache）
-    ├── context/ServletAdapterContext                       持有 Servlet 请求/响应/FilterChain
-    └── filter/
-        ├── FilterWrapper                   包装 jakarta.servlet.Filter → WebFilter
-        ├── SupportWebFilterRegistry        扩展 WebFilterRegistry，自动注册 Filter Bean
-        ├── PerfHttpServletFilterChain      适配 FilterChain → javax.servlet.FilterChain
-        └── match/                          路径匹配工具 (Exact/Prefix/Suffix/PathMatch)
-
-view/                                   JSP 视图（依赖 spring-web-view + tomcat-embed-jasper）
-    ├── JspViewResolver                  ViewResolver SPI：jsp: 前缀 / .jsp 后缀 → JspView，Phase1 注册 *.jsp 路由
-    └── JspView                          View SPI：model → request attribute → RequestDispatcher.forward
-
-
-org.springframework.web.servlet/         （src/main/java 内重写）
-├── HandlerInterceptor, AsyncHandlerInterceptor
-├── ModelAndView, View
-├── LocaleResolver, LocaleContextResolver
-├── NoHandlerFoundException
-└── HandlerExceptionResolver
-
-org.springframework.web.servlet.handler/
-├── MappedInterceptor
-└── WebRequestHandlerInterceptorAdapter
-
-org.springframework.web.servlet.config.annotation/
-├── InterceptorRegistration
-├── WebMvcConfigurer
-├── CorsRegistry, CorsRegistration
-├── ResourceHandlerRegistry, ResourceHandlerRegistration
-├── PathMatchConfigurer
-├── AsyncSupportConfigurer
-├── ContentNegotiationConfigurer
-├── DefaultServletHandlerConfigurer
-├── ViewControllerRegistry
-├── ViewResolverRegistry
-└── ValidatorRegistration
-
-org.springframework.web.servlet.mvc.method.annotation/
-├── RequestBodyAdvice, ResponseBodyAdvice
-├── ResponseBodyEmitter, SseEmitter, StreamingResponseBody
-├── ResponseEntityExceptionHandler
-└── AdapterUtil
+├── async/stream/
+│   └── ResponseBodyEmitterReturnValueResolver  支持 Spring MVC ResponseBodyEmitter
+│
+├── codec/interceptor/
+│   ├── SupportHttpBodyCodecInterceptorRegistry  扫描 @ControllerAdvice 中的 RequestBodyAdvice/ResponseBodyAdvice
+│   ├── RequestBodyAdviceCodecInterceptor        适配 RequestBodyAdvice → HttpBodyCodecInterceptor
+│   └── ResponseBodyAdviceCodecInterceptor       适配 ResponseBodyAdvice → HttpBodyCodecInterceptor
+│
+└── org.springframework.web.servlet/         （src/main/java 内重写）
+    ├── HandlerInterceptor, AsyncHandlerInterceptor
+    ├── ModelAndView, View
+    ├── LocaleResolver, LocaleContextResolver
+    ├── NoHandlerFoundException
+    ├── HandlerExceptionResolver
+    ├── handler/MappedInterceptor, WebRequestHandlerInterceptorAdapter
+    ├── config.annotation/InterceptorRegistration, WebMvcConfigurer, CorsRegistry, CorsRegistration,
+    │   ResourceHandlerRegistry, ResourceHandlerRegistration, PathMatchConfigurer, AsyncSupportConfigurer,
+    │   ContentNegotiationConfigurer, DefaultServletHandlerConfigurer, ViewControllerRegistry,
+    │   ViewResolverRegistry, ValidatorRegistration
+    └── mvc.method.annotation/RequestBodyAdvice, ResponseBodyAdvice, ResponseBodyEmitter, SseEmitter,
+        StreamingResponseBody, ResponseEntityExceptionHandler, AdapterUtil
 ```
+
+依赖：`spring-web`、`spring-web-servlet`、`spring-web-view`（provided）、`jakarta.servlet-api`（provided）。
+
+> **重写类与官方 spring-webmvc 的关系**：这些类在编译期与框架代码一起打包，classpath 上同包同名类优先于官方 `spring-webmvc`。仅引入 `spring-web-servlet` 的用户不会看到任何 `org.springframework.web.servlet.*` 类。
 
 ---
 
@@ -402,12 +416,12 @@ beetl/                              BeetlViewResolver（引擎，engine=beetl，
 
 **多引擎共存（方案 A）**：多个 ViewResolver 同时注册，每个 `resolveViewName` 通过 `ClassPathResource(prefix+viewName+suffix).exists()` 做模板存在性探测——存在返回 View，不存在返回 null 交给下一个 resolver。`spring.web.view.engine` 多选（逗号分隔，不配置则注册全部可用引擎），由 `ViewEngineCondition` 自定义 Condition 驱动。
 
-spring-web-support/mvc/retval/
+spring-web-mvc-support/mvc/retval/
 └── ModelAndViewReturnValueResolver  直接类型访问（非反射）桥接 org.springframework.web.servlet.ModelAndView
     └── @ConditionalOnClass(name="io.springperf.web.view.View") 条件注册
 ```
 
-> **ModelAndView 桥接归属**：`ModelAndView` 是 Spring MVC 概念（`org.springframework.web.servlet.ModelAndView`），属 support 桥接层。`ModelAndViewReturnValueResolver` 位于 `spring-web-support`，直接依赖 `org.springframework.web.servlet.ModelAndView`（无反射），依赖 `spring-web-view` 的 `View`/`ModelSupport`/`ViewResolverRegistry`/`RedirectView`。
+> **ModelAndView 桥接归属**：`ModelAndView` 是 Spring MVC 概念（`org.springframework.web.servlet.ModelAndView`），属 mvc 桥接层。`ModelAndViewReturnValueResolver` 位于 `spring-web-mvc-support`，直接依赖 `org.springframework.web.servlet.ModelAndView`（无反射），依赖 `spring-web-view` 的 `View`/`ModelSupport`/`ViewResolverRegistry`/`RedirectView`。
 
 **接入机制**（core SPI，无核心代码改动）：
 
@@ -468,20 +482,23 @@ spring-boot-starter-web
 │   │   ├── Validator（条件：jakarta.validation.Validator 在 classpath）
 │   │   └── 启动时检测 SpringMVC 冲突并抛出 IllegalStateException
 │   │
-│   ├── SpringWebSupportAutoConfiguration       Support 模块自动装配（条件：spring-web-support 在 classpath）
+│   ├── SpringWebServletAutoConfiguration       Servlet 桥接自动装配（条件：spring-web-servlet 在 classpath）
 │   │   ├── SupportDispatcherHandler
+│   │   ├── HttpServletRequest/Response Provider
+│   │   ├── ServletRequest/Response Provider
+│   │   ├── WebRequestArgumentResolverProvider
+│   │   ├── SessionAttribute/SessionStatus Provider + SessionAttributesInterceptor
+│   │   ├── SessionScopeBeanFactoryPostProcessor
+│   │   ├── SupportWebFilterRegistry + FilterWrapper
+│   │   ├── PerfServletContext + PerfHttpSessionManager
+│   │   └── SupportServletRegistry（Servlet Bean + @WebServlet 路由）
+│   │
+│   ├── SpringWebMvcSupportAutoConfiguration     SpringMVC 兼容自动装配（条件：spring-web-mvc-support 在 classpath）
 │   │   ├── SupportInterceptorRegistry
 │   │   ├── SupportHttpBodyCodecInterceptorRegistry
-│   │   ├── HttpServletRequest/Response Provider
-│   │   ├── WebRequestArgumentResolverProvider
-│   │   ├── SupportWebFilterRegistry + FilterWrapper
-│   │   ├── ServletRequest/Response Provider
-│   │   ├── SupportServletRegistry（Servlet Bean + @WebServlet 路由）
 │   │   ├── ResponseBodyEmitterReturnValueResolver
-│   │   ├── WebMvcConfigurerBridge（桥接 WebMvcConfigurer 实现）
-│   │   ├── SpringHandlerMethodArgumentResolverProvider
-│   │   ├── SpringHandlerMethodReturnValueHandlerAdapter
-│   │   └── SpringHandlerExceptionResolverAdapter
+│   │   ├── ModelAndViewReturnValueResolver（条件：spring-web-view 在 classpath）
+│   │   └── WebMvcConfigurerBridge（桥接 WebMvcConfigurer 实现）
 │   │
 │   ├── JspViewAutoConfiguration               JSP 视图自动装配（条件：Jasper + spring-web-view 在 classpath）
 │   │   └── JspViewResolver（注册 *.jsp 路由 + 视图名解析）

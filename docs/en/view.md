@@ -89,7 +89,7 @@ public String user(@PathVariable Long id, Model model) {
 
 ### 3. ModelAndView
 
-Return `org.springframework.web.servlet.ModelAndView` (provided by `spring-web-support`, no servlet dependency):
+Return `org.springframework.web.servlet.ModelAndView` (provided by `spring-web-mvc-support`, no servlet dependency):
 
 ```java
 @GetMapping("/mav")

@@ -37,7 +37,7 @@
 | 09 | `09-invoker-bytecode.md` | 方法调用器：ASM 字节码生成与 MethodHandle | 三·spring-web 深潜 |
 | 10 | `10-cross-cutting.md` | 横切关注点：拦截器 / 异常 / CORS / 数据绑定 / 静态资源 | 三·spring-web 深潜 |
 | 11 | `11-async-streaming.md` | 异步与流式：DeferredResult / SSE / 响应式 / 无锁 Drain Loop | 四·异步与流式 |
-| 12 | `12-support-bridge.md` | spring-web-support：Servlet API 桥接与 WebMvcConfigurer 翻译中枢 | 五·support 桥接 |
+| 12 | `12-support-bridge.md` | spring-web-servlet 与 spring-web-mvc-support：Servlet API 桥接与 WebMvcConfigurer 翻译中枢 | 五·support 桥接 |
 | 13 | `13-batch-module.md` | spring-web-batch：Disruptor 透明请求聚合内幕 | 六·batch 模块 |
 | 14 | `14-starter-autoconfig.md` | spring-boot-starter-web：自动装配与零冲突启动 | 七·starter |
 | 15 | `15-performance-optimizations.md` | 八大性能优化代码级三元组 | 八·性能与对比 |
@@ -78,7 +78,7 @@
 #### 02 · 模块拓扑与启动期全景 `02-architecture-overview.md`
 
 - **定位**：全系列的"地图"。一张图看懂四个 Maven 模块的依赖、职责、关键包结构，以及启动时它们如何协作。
-- **核心问题**：`spring-web` / `spring-web-support` / `spring-web-batch` / `spring-boot-starter-web` 各自边界在哪？一个 HTTP 请求从 Netty `Channel` 到业务方法再到响应字节，跨了哪些模块的哪些类？
+- **核心问题**：`spring-web` / `spring-web-servlet` / `spring-web-mvc-support` / `spring-web-batch` / `spring-boot-starter-web` 各自边界在哪？一个 HTTP 请求从 Netty `Channel` 到业务方法再到响应字节，跨了哪些模块的哪些类？
 - **覆盖要点**：
   1. 四模块职责矩阵（模块 / 依赖谁 / 被谁依赖 / 关键包 / 是否可选）。
   2. `spring-web` 核心包拓扑：`context`（`WebContext`）、`handler`（`DispatcherHandler`）、`registry`（十大 Registry）、`server`（Netty 服务器）、`http`（请求/响应适配）、`route`（路由优化器）、`argument`/`returnvalue`/`invoker`（解析与调用）、`filter`（`WebFilter` SPI）、`async`/`stream`（异步流式）、`cors`/`exception`/`binder`/`resource`（横切）。
@@ -242,7 +242,7 @@
 
 ### 部五·support 桥接
 
-#### 12 · spring-web-support：Servlet API 桥接与 WebMvcConfigurer 翻译中枢 `12-support-bridge.md`
+#### 12 · spring-web-servlet 与 spring-web-mvc-support：Servlet API 桥接与 WebMvcConfigurer 翻译中枢 `12-support-bridge.md`
 
 - **定位**：兼容层。讲清 support 如何用"同包同名覆盖 + Adapter/Wrapper/Provider"消除 `spring-webmvc` 依赖，同时让 `@ControllerAdvice`/`WebMvcConfigurer`/`Filter`/`HandlerInterceptor`/Session 等 Spring 生态件无缝接入。
 - **核心问题**：support 重写了哪些 `org.springframework.web.servlet.*` 类（纯接口/default 方法）？`WebMvcConfigurerBridge` 如何把 21 个 `WebMvcConfigurer` 回调翻译为框架内部 Registry 的注册动作？Servlet 请求/响应如何被 `PerfHttpServletRequest/Response` 适配？Filter 与拦截器如何被 Wrapper 桥接？
@@ -295,7 +295,7 @@
 - **覆盖要点**：
   1. `spring.factories` 注册的 10 个 `AutoConfiguration` 一览与各自条件。
   2. `SpringWebAutoConfiguration`：核心装配；冲突检测抛 `IllegalStateException`（记忆 `sba-web-server-initialized-event` 兼容背景）。
-  3. `SpringWebSupportAutoConfiguration`：装配 support 桥接。
+  3. `SpringWebServletAutoConfiguration` 与 `SpringWebMvcSupportAutoConfiguration`：装配 support 桥接。
   4. `SpringDataWebCompatibilityAutoConfiguration`：Spring Data 兼容（分页/排序）。
   5. `ActuatorEndpointAutoConfiguration`：独立 `ManagementNettyHttpServer` + `ManagementDispatcherHandler`，与主端口隔离。
   6. `SpringWebBatchAutoConfiguration`：条件装配 batch（`spring-web-batch` 在类路径）。

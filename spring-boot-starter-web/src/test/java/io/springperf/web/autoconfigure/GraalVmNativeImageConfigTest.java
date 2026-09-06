@@ -48,7 +48,8 @@ class GraalVmNativeImageConfigTest {
     void reflectConfig_autoConfigurationClassesExist() throws Exception {
         // 显式验证关键自动配置类
         assertClassExists("io.springperf.web.autoconfigure.SpringWebAutoConfiguration");
-        assertClassExists("io.springperf.web.autoconfigure.SpringWebSupportAutoConfiguration");
+        assertClassExists("io.springperf.web.autoconfigure.SpringWebServletAutoConfiguration");
+        assertClassExists("io.springperf.web.autoconfigure.SpringWebMvcSupportAutoConfiguration");
         assertClassExists("io.springperf.web.autoconfigure.OpenApiAutoConfiguration");
         assertClassExists("io.springperf.web.autoconfigure.ActuatorEndpointAutoConfiguration");
     }

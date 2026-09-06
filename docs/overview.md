@@ -185,7 +185,7 @@ WebFlux（Netty 运行时，4,173 样本）与 MVC 问题模式高度相似，�
 
 Servlet API 有二十年的生态积累：Spring Security Filter Chain、`RequestBodyAdvice`、`ResponseBodyAdvice`、大量基于 `javax.servlet.Filter` 的中间件。
 
-本框架不强制"全要或全不要"。通过 `spring-web-support` 桥接模块，可以渐进式迁移：项目先用 support 模块运行在 Netty 上复用现有 Filter，再逐步迁移到原生 WebFilter。
+本框架不强制"全要或全不要"。通过 `spring-web-servlet` 桥接模块，可以渐进式迁移：项目先用 support 模块运行在 Netty 上复用现有 Filter，再逐步迁移到原生 WebFilter。
 
 ---
 
@@ -206,8 +206,8 @@ Servlet API 有二十年的生态积累：Spring Security Filter Chain、`Reques
 
 | 场景 | 原因 |
 |------|------|
-| **重度依赖 Servlet API** | 需要引入 `spring-web-support` 桥接模块，部分 Servlet API 可能不完全兼容 |
-| **需要使用 JSP** | 需引入 `spring-web-support` + `tomcat-embed-jasper`，经 `JasperJspServlet` 桥接执行 |
+| **重度依赖 Servlet API** | 需要引入 `spring-web-servlet` 桥接模块，部分 Servlet API 可能不完全兼容 |
+| **需要使用 JSP** | 需引入 `spring-web-servlet` + `tomcat-embed-jasper`，经 `JasperJspServlet` 桥接执行 |
 | **传统 WebSocket**（javax.websocket） | 需引入 `spring-web-websocket`，经 JSR-356 `@ServerEndpoint` 桥接 |
 | **深度的 Servlet Filter 链** | 桥接模式会增加额外开销，建议逐步迁移到原生 WebFilter |
 
@@ -238,13 +238,13 @@ Servlet API 有二十年的生态积累：Spring Security Filter Chain、`Reques
 
 | 功能 | 说明 |
 |------|------|
-| Servlet Filter | 需 `spring-web-support` 模块桥接 |
-| `RequestBodyAdvice` / `ResponseBodyAdvice` | 需 `spring-web-support` 模块桥接 |
-| `HttpServletRequest` / `HttpServletResponse` | 需 `spring-web-support` 模块，提供参数级适配 |
-| `ResponseBodyEmitter` | 需 `spring-web-support` 模块 |
-| JSP | 需 `spring-web-support` + `tomcat-embed-jasper`（`JasperJspServlet` + `JspViewResolver`） |
+| Servlet Filter | 需 `spring-web-servlet` 模块桥接 |
+| `RequestBodyAdvice` / `ResponseBodyAdvice` | 需 `spring-web-mvc-support` 模块桥接 |
+| `HttpServletRequest` / `HttpServletResponse` | 需 `spring-web-servlet` 模块，提供参数级适配 |
+| `ResponseBodyEmitter` | 需 `spring-web-mvc-support` 模块 |
+| JSP | 需 `spring-web-servlet` + `tomcat-embed-jasper`（`JasperJspServlet` + `JspViewResolver`） |
 | Servlet WebSocket（JSR-356 `@ServerEndpoint`） | 需 `spring-web-websocket` 模块桥接 |
-| Spring MVC `View` / `ViewResolver` | 需 `spring-web-view`（Thymeleaf/FreeMarker）+ `spring-web-support` 的 `ModelAndView` 桥接 |
+| Spring MVC `View` / `ViewResolver` | 需 `spring-web-view`（Thymeleaf/FreeMarker）+ `spring-web-mvc-support` 的 `ModelAndView` 桥接 |
 
 ### 不支持
 

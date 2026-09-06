@@ -31,7 +31,8 @@ Set-StrictMode -Version Latest
 $modules = @(
     'spring-web',
     'spring-web-view',
-    'spring-web-support',
+    'spring-web-servlet',
+    'spring-web-mvc-support',
     'spring-web-batch',
     'spring-web-websocket',
     'spring-boot-starter-web'

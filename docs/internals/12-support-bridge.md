@@ -1,4 +1,4 @@
-# 12 · spring-web-support：Servlet API 桥接与 WebMvcConfigurer 翻译中枢
+# 12 · spring-web-servlet 与 spring-web-mvc-support：Servlet API 桥接与 WebMvcConfigurer 翻译中枢
 
 > [← 返回索引](00-README.md) | 上一篇：[11 · 异步流式支持](11-async-streaming.md) | 下一篇：[13 · spring-web-batch 模块](13-batch-module.md)
 
@@ -6,7 +6,7 @@
 
 ## 引子：兼容层不牺牲性能
 
-`spring-web-support` 是框架的兼容层。它的目标是：**让 Spring MVC 生态的组件（`WebMvcConfigurer`、`HandlerInterceptor`、`jakarta.servlet.Filter`、`@ControllerAdvice`、`HttpMessageConverter`、Session 等）不修改一行代码就能无缝工作在 Netty 容器上，同时不引入每请求的反射或类型推断。**
+`spring-web-servlet` 与 `spring-web-mvc-support` 是框架的兼容层。它的目标是：**让 Spring MVC 生态的组件（`WebMvcConfigurer`、`HandlerInterceptor`、`jakarta.servlet.Filter`、`@ControllerAdvice`、`HttpMessageConverter`、Session 等）不修改一行代码就能无缝工作在 Netty 容器上，同时不引入每请求的反射或类型推断。**
 
 Spring MVC 的兼容层（如 Servlet 容器 + `spring-webmvc`）依赖的天然假设是"运行在 Servlet 容器中"——`HttpServletRequest`/`HttpServletResponse`、`FilterChain`、`Session` 都是容器提供的。本框架用 Netty 替代了 Tomcat/Jetty，所以 support 的职责是：
 
@@ -57,7 +57,7 @@ Spring MVC 的兼容层（如 Servlet 容器 + `spring-webmvc`）依赖的天然
 | `ResponseEntityExceptionHandler` | `spring-webmvc` | `@ControllerAdvice` 15 个标准异常处理 |
 | `AdapterUtil` | `spring-webmvc` | 工具类（`setEncodeFunction`/`getEncodeFunction`） |
 
-**关键**：这些重写类在编译期与框架代码一起打包。当用户同时依赖 `spring-webmvc` 时，Maven 的类加载顺序决定谁先被加载——框架的 `spring-web-support` 中同包同名类优先于 `spring-webmvc` 中的类（因为 support 是直接依赖，`spring-webmvc` 可能被排除）。框架 starter 的 `autoconfigure` 通过 `spring.factories` 排除 `spring-webmvc` 的自动配置类。
+**关键**：这些重写类在编译期与框架代码一起打包。当用户同时依赖 `spring-webmvc` 时，Maven 的类加载顺序决定谁先被加载——框架的 `spring-web-mvc-support` 中同包同名类优先于 `spring-webmvc` 中的类（因为 support 是直接依赖，`spring-webmvc` 可能被排除）。框架 starter 的 `autoconfigure` 通过 `spring.factories` 排除 `spring-webmvc` 的自动配置类。
 
 ---
 

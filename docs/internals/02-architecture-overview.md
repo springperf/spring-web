@@ -21,7 +21,7 @@
 | 模块 | 职责 | 依赖谁 | 被谁依赖 | 关键包 | 可选性 |
 |------|------|--------|----------|--------|--------|
 | **spring-web** | 核心框架：Netty 服务器 + 路由 + 参数/返回值解析 + 调用器 + 横切 | Spring（context/core/beans/aop/web）+ Netty + Jackson；fastjson2/reactive-streams 为 `provided` | 其余三者 | `context` `core` `http` `server` `json` `annotation` `util` | **基石**，不可选 |
-| **spring-web-support** | Servlet API 与 SpringMVC 桥接层 | spring-web + `jakarta.servlet-api`(provided) | starter（provided） | `support.*` + 重写的 `org.springframework.web.servlet.*` | 可选 |
+| **spring-web-servlet** + **spring-web-mvc-support** | Servlet API 与 SpringMVC 桥接层 | spring-web + `spring-web-servlet` + `jakarta.servlet-api`(provided) | starter（provided） | `support.*` + 重写的 `org.springframework.web.servlet.*` | 可选 |
 | **spring-web-batch** | LMAX Disruptor 透明请求聚合 | spring-web + `disruptor` | starter（provided） | `batch.*` | 可选 |
 | **spring-boot-starter-web** | Spring Boot 自动装配 + 零冲突启动 | spring-web + support(provided) + batch(provided) + spring-boot-starter + starter-json + actuator(provided) | 用户业务应用 | `autoconfigure.*` | 入口，必选 |
 
@@ -48,10 +48,10 @@
 
 `reactive-streams` 是 `provided`——意味着核心的响应式支持（`ReactiveReturnValueResolver` 等）在 classpath 有 reactive 库时才真正生效，没有也不报错。这是"可选能力"的依赖表达。
 
-**spring-web-support**（[`spring-web-support/pom.xml`](../../spring-web-support/pom.xml)）只依赖 spring-web + `jakarta.servlet-api(provided)`：
+**spring-web-servlet**（[`spring-web-servlet/pom.xml`](../../spring-web-servlet/pom.xml)）只依赖 spring-web + `jakarta.servlet-api(provided)`：
 
 ```xml
-<!-- spring-web-support/pom.xml -->
+<!-- spring-web-servlet/pom.xml -->
 <dependency>
     <groupId>io.github.springperf</groupId>
     <artifactId>spring-web</artifactId>
@@ -71,7 +71,12 @@
 <!-- spring-boot-starter-web/pom.xml -->
 <dependency>
     <groupId>io.github.springperf</groupId>
-    <artifactId>spring-web-support</artifactId>
+    <artifactId>spring-web-servlet</artifactId>
+    <scope>provided</scope>
+</dependency>
+<dependency>
+    <groupId>io.github.springperf</groupId>
+    <artifactId>spring-web-mvc-support</artifactId>
     <scope>provided</scope>
 </dependency>
 <dependency>
@@ -86,7 +91,7 @@
 support 与 batch 对 starter 是 `provided`，这是一个有意的设计决策，不是疏忽：
 
 - **`provided` 的 Maven 语义**：编译期可见（starter 的 autoconfig 能引用 support 的类），但不传递到最终应用 classpath。
-- **实际效果**：用户应用的 `pom.xml` 若显式引入 `spring-web-support`，桥接层进 classpath，starter 的 `SpringWebSupportAutoConfiguration`（`@ConditionalOnClass` 命中）自动激活；若不引入，桥接层不存在，核心仍能独立运行。
+- **实际效果**：用户应用的 `pom.xml` 若显式引入 `spring-web-servlet` 或 `spring-web-mvc-support`，对应桥接层进 classpath，starter 的 `SpringWebServletAutoConfiguration` / `SpringWebMvcSupportAutoConfiguration`（`@ConditionalOnClass` 命中）自动激活；若不引入，桥接层不存在，核心仍能独立运行。
 - **哲学对应**：这恰好是 [01 篇 原则 6](01-design-philosophy.md#) "避免魔法行为——显式 SPI、显式 fail-fast"的反面印证——这里不是"靠条件猜测"，而是"依赖是否在场本身就是显式声明"。条件装配的触发条件（classpath 上有某个类）是用户用 Maven 坐标写明的，可追溯、可排查。
 
 ### 1.3 starter 排除 Tomcat 的"反向防线"
@@ -204,7 +209,7 @@ io.springperf.web
 
 ### 2.2 support 与 batch 的包拓扑（简表）
 
-support 的源码在 `io.springperf.web.support.*`（[`Glob` 结果](../../spring-web-support/src/main/java/io/springperf/web/support)），按桥接职责分包：
+support 的源码在 `io.springperf.web.support.*`（[`Glob` 结果](../../spring-web-servlet/src/main/java/io/springperf/web/support) 与 [`spring-web-mvc-support`](../../spring-web-mvc-support/src/main/java/io/springperf/web/support)），按桥接职责分包：
 
 | support 子包 | 职责 | 代表类 |
 |--------------|------|--------|
@@ -327,7 +332,7 @@ if (shuttingDown) {
 
 ## 四、一次请求的跨模块调用链
 
-下面是一次完整请求的 ASCII 调用链，**每一步标注其所属模块**（`[web]` = spring-web 核心，`[support]` = spring-web-support，`[batch]` = spring-web-batch，`[netty]` = Netty 库本身）：
+下面是一次完整请求的 ASCII 调用链，**每一步标注其所属模块**（`[web]` = spring-web 核心，`[support]` = spring-web-servlet 与 spring-web-mvc-support，`[batch]` = spring-web-batch，`[netty]` = Netty 库本身）：
 
 ```
 [netty]  TCP 连接到达 worker EventLoop
@@ -454,7 +459,7 @@ public void start() {
 
 > `servlet/filter/` 下含 `match/` 子包，路径匹配工具 `Exact/Prefix/Suffix/PathMatch`
 
-**源码事实**（`Glob spring-web-support/src/main/java/io/springperf/web/**/*.java` 全量结果）：
+**源码事实**（`Glob spring-web-servlet/src/main/java/io/springperf/web/**/*.java` 与 `spring-web-mvc-support/src/main/java/io/springperf/web/**/*.java` 全量结果）：
 
 support 的 `support.servlet.filter` 包下实际只有三个类，**无 `match/` 子包**：
 

@@ -3,22 +3,19 @@ package io.springperf.web.autoconfigure;
 import io.springperf.web.support.SupportDispatcherHandler;
 import io.springperf.web.support.arg.provider.HttpServletRequestProvider;
 import io.springperf.web.support.arg.provider.HttpServletResponseProvider;
-import io.springperf.web.support.async.stream.ResponseBodyEmitterReturnValueResolver;
-import io.springperf.web.support.codec.interceptor.SupportHttpBodyCodecInterceptorRegistry;
-import io.springperf.web.support.mvc.interceptor.SupportInterceptorRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 
-class SpringWebSupportAutoConfigurationTest {
+class SpringWebServletAutoConfigurationTest {
 
-    private final SpringWebSupportAutoConfiguration config = new SpringWebSupportAutoConfiguration();
+    private final SpringWebServletAutoConfiguration config = new SpringWebServletAutoConfiguration();
 
     @Test
     void configuration_hasConditionalOnClass() {
-        ConditionalOnClass annotation = SpringWebSupportAutoConfiguration.class.getAnnotation(ConditionalOnClass.class);
+        ConditionalOnClass annotation = SpringWebServletAutoConfiguration.class.getAnnotation(ConditionalOnClass.class);
         assertNotNull(annotation);
         assertTrue(annotation.name().length > 0);
         assertEquals("io.springperf.web.support.servlet.context.ServletAdapterContext", annotation.name()[0]);
@@ -37,20 +34,6 @@ class SpringWebSupportAutoConfigurationTest {
     }
 
     @Test
-    void supportInterceptorRegistry_createsBean() {
-        SupportInterceptorRegistry bean = config.supportInterceptorRegistry();
-        assertNotNull(bean);
-        assertInstanceOf(SupportInterceptorRegistry.class, bean);
-    }
-
-    @Test
-    void supportHttpBodyCodecInterceptorRegistry_createsBean() {
-        SupportHttpBodyCodecInterceptorRegistry bean = config.supportHttpBodyCodecInterceptorRegistry();
-        assertNotNull(bean);
-        assertInstanceOf(SupportHttpBodyCodecInterceptorRegistry.class, bean);
-    }
-
-    @Test
     void httpServletRequestProvider_createsBean() {
         HttpServletRequestProvider bean = config.httpServletRequestProvider();
         assertNotNull(bean);
@@ -62,19 +45,6 @@ class SpringWebSupportAutoConfigurationTest {
         HttpServletResponseProvider bean = config.httpServletResponseProvider();
         assertNotNull(bean);
         assertInstanceOf(HttpServletResponseProvider.class, bean);
-    }
-
-    @Test
-    void responseBodyEmitterReturnValueResolver_createsBean() {
-        ResponseBodyEmitterReturnValueResolver bean = config.responseBodyEmitterReturnValueResolver();
-        assertNotNull(bean);
-        assertInstanceOf(ResponseBodyEmitterReturnValueResolver.class, bean);
-    }
-
-    @Test
-    void modelAndViewReturnValueResolver_createsBean() {
-        assertInstanceOf(io.springperf.web.support.mvc.retval.ModelAndViewReturnValueResolver.class,
-                config.modelAndViewReturnValueResolver());
     }
 
     @Test
@@ -116,15 +86,7 @@ class SpringWebSupportAutoConfigurationTest {
     @Test
     void sessionScopeBeanFactoryPostProcessor_createsBean() {
         assertInstanceOf(io.springperf.web.support.context.SessionScopeBeanFactoryPostProcessor.class,
-                SpringWebSupportAutoConfiguration.sessionScopeBeanFactoryPostProcessor());
-    }
-
-    @Test
-    void webMvcConfigurerBridge_registersComponent() {
-        io.springperf.web.context.WebContext webContext = mock(io.springperf.web.context.WebContext.class);
-        io.springperf.web.support.mvc.config.WebMvcConfigurerBridge bridge = config.webMvcConfigurerBridge(webContext);
-        assertNotNull(bridge);
-        org.mockito.Mockito.verify(webContext).registerWebComponent(bridge);
+                SpringWebServletAutoConfiguration.sessionScopeBeanFactoryPostProcessor());
     }
 
     @Test

@@ -6,7 +6,8 @@
 spring-web-parent (聚合 POM)
 ├── spring-web                  核心框架
 ├── spring-web-view             视图渲染（Thymeleaf/FreeMarker，可选）
-├── spring-web-support          可选 Servlet 桥接层
+├── spring-web-servlet          Servlet API 桥接层
+├── spring-web-mvc-support     SpringMVC 兼容桥接层
 ├── spring-web-batch            批量请求处理（可选）
 ├── spring-web-websocket        WebSocket 支持（可选）
 ├── spring-boot-starter-web     Spring Boot 自动配置
@@ -187,7 +188,7 @@ destroyComponent()     → 资源释放
 
 ---
 
-## spring-web-support（Servlet 桥接层）
+## spring-web-servlet 与 spring-web-mvc-support（兼容桥接层）
 
 当需要与 Servlet API 生态集成时添加此模块。
 
@@ -215,10 +216,12 @@ destroyComponent()     → 资源释放
 ```xml
 <dependency>
     <groupId>io.github.springperf</groupId>
-    <artifactId>spring-web-support</artifactId>
+    <artifactId>spring-web-mvc-support</artifactId>
     <version>${spring-web.version}</version>
 </dependency>
 ```
+
+`spring-web-mvc-support` 依赖 `spring-web-servlet`；纯 Servlet 兼容场景只需引入 `spring-web-servlet`。
 
 ---
 
@@ -283,7 +286,7 @@ destroyComponent()     → 资源释放
 
 ### Support 自动配置
 
-`SpringWebSupportAutoConfiguration` 在 `spring-web-support` 存在时自动装配支持模块组件。
+`SpringWebServletAutoConfiguration` 与 `SpringWebMvcSupportAutoConfiguration` 分别在 `spring-web-servlet` 与 `spring-web-mvc-support` 存在时自动装配对应模块组件。
 
 ### View 自动配置
 

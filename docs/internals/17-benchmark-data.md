@@ -267,7 +267,7 @@
 2. **SSE 7.72x 归因"无锁 drain loop + EventLoop 串行化"**：`MpscArrayQueue` 的无锁 drain loop 消除了 Tomcat SSE 的每连接一线程模型开销，EventLoop 串行化写入避免锁竞争；perf 与 tomcat 均默认禁用 Nagle，非差异来源。
 3. **分配量 ~1/3 归因"零临时对象"**：预缓存使运行时零额外分配（`fastAttributes[]` 替代 `ConcurrentHashMap`、`StaticArgumentResolver[]` 替代遍历匹配），vs Tomcat 的运行时匹配创建 `StringBuilder` + Facade 包装器。
 4. **内存最低归因"精简结构"**：40+ 组件 + 桥接层 vs Spring MVC 的重量级类层级，Metaspace 39MB vs 42–47MB。
-5. **perf-support -15% 归因"兼容代价"**：Servlet 适配对象 + Session flush 是兼容 Spring MVC 的必要代价，用户可通过不引入 `spring-web-support` 规避。
+5. **perf-support -15% 归因"兼容代价"**：Servlet 适配对象 + Session flush 是兼容 Spring MVC 的必要代价，用户可通过不引入 `spring-web-servlet` 规避。
 
 这一层的克制体现在：**不把性能优势归因于"Netty 比 Tomcat 快"这种笼统结论，而是逐数据点映射到具体的代码机制。** 每个数字都有对应的篇章和优化条目，读者可以从数据点反向追溯到源码的 `file:line`。
 

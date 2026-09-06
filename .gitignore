@@ -56,5 +56,5 @@ __pycache__/
 *.txt
 *.py
 !/spring-web-benchmark/analyze_jfr.py
-!/spring-web-support/src/test/resources/perf-web/placeholder.txt
+!/spring-web-servlet/src/test/resources/perf-web/placeholder.txt
 /promotion/
