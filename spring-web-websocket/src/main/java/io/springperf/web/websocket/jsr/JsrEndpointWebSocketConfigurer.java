@@ -17,7 +17,7 @@ import java.util.List;
  * 从而复用现有 Netty 握手/帧路由管线，无需改动核心框架。</p>
  *
  * @author huangcanda
- * @since 3.2.5
+ * @since 3.5.6
  */
 @Slf4j
 public class JsrEndpointWebSocketConfigurer implements WebSocketConfigurer {

@@ -20,7 +20,7 @@ import java.util.Set;
  * 供 {@link JsrWebSocketSession} 查询。</p>
  *
  * @author huangcanda
- * @since 3.2.5
+ * @since 3.5.6
  */
 public class JsrWebSocketContainer implements WebSocketContainer {
 

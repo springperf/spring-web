@@ -4,6 +4,65 @@
 
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.6] - 20260906
+
+### Added
+
+- **View rendering module `spring-web-view`**: Model/View are now first-class citizens of the request pipeline (`ModelContext` request-scoped container + `View`/`ViewResolver` SPI), with `@ControllerAdvice @ModelAttribute` pre-population, local `@ModelAttribute` methods, and `@PathVariable` / `BindingResult` merging; multi-engine support (Thymeleaf / FreeMarker / Beetl) selected via `spring.web.view.engine`; `redirect:` view names and `ViewReturnValueResolver`
+- **JSP rendering**: Apache Jasper + JSTL integration (`JasperJspServlet`), `JspViewResolver` for `jsp:` prefix / `.jsp` suffix view names and automatic `/**/*.jsp` route registration; `spring-web-mvc-support` bridges `ModelAndView` / JSP views
+- **Servlet object routing**: `SupportServletRegistry` scans Servlet beans / `@WebServlet` `url-pattern`s and registers them as framework routes; `ServletInvoker`, `PerfServletConfig`
+- **JSR-356 `@ServerEndpoint` bridge** (`spring-web-websocket`): standard WebSocket endpoint annotation support — `@OnOpen`/`@OnMessage`/`@OnClose`/`@OnError`, `@PathParam`, Decoder/Encoder, custom `Configurator`, `JsrWebSocketContainer` endpoint lifecycle
+- **Method-level interceptors & `@SessionAttributes`**: `@ControllerAdvice` interceptors matched by handler controller type; `@SessionAttributes` syncs Model attributes across requests with `SessionStatus` cleanup; `@SessionAttribute` / `SessionStatus` argument resolution
+- **GraalVM native-image AOT support**: `ControllerBeanFactoryInitializationAotProcessor` registers reflection hints for controllers / generic DTOs, `SpringWebRuntimeHints` completes resource/reflection registration; `ServerEndpointBeanFactoryInitializationAotProcessor` covers endpoints; native-image CI workflow and `native-smoke-test.sh`
+- **HEAD semantics (RFC 7231 §4.3.2)**: HEAD requests map to GET handlers when no explicit HEAD handler exists, suppressing the body while preserving the real `Content-Length` (resource/file/stream/byte paths covered)
+- **Linux native transport**: new `server.netty.transport=auto/nio/epoll` (default `auto`) — native epoll enabled automatically on Linux; Netty dependencies split from `netty-all` into concrete modules with `linux-x86_64`/`aarch_64`/`riscv64` native classifiers
+- **Production-oriented Netty defaults**: `SO_BACKLOG` 1024, `SO_KEEPALIVE` true, `max-content-length` 4MB; bounded default business pool queue (100) so `maxPoolSize` scaling and 503 fast-fail actually take effect
+- **`server.port` isolation**: actual port published into the per-context `MapPropertySource` (`local.server.port`) so main and management ports never overwrite each other
+
+### Changed
+
+- **`spring-web-support` module split**: split into `spring-web-servlet` (pure Servlet bridge: Filter/Servlet/HttpSession/JSP/`@SessionAttribute` — official spring-web semantics, zero Spring MVC dependency) and `spring-web-mvc-support` (Spring MVC compatibility bridge: `org.springframework.web.servlet.*` shim classes, `WebMvcConfigurer`/`HandlerInterceptor`/`RequestBodyAdvice` adapters). Users needing only Servlet compatibility depend on `spring-web-servlet` alone, keeping `org.springframework.web.servlet.*` classes off the classpath; `spring-web-mvc-support` depends on `spring-web-servlet`. The starter auto-configuration is split into `SpringWebServletAutoConfiguration` + `SpringWebMvcSupportAutoConfiguration` (each conditional on its module's classes). The old coordinate `io.github.springperf:spring-web-support` is removed
+
+### Security
+
+- **Multipart DoS protection**: `SupportMultipartResolver` fail-fast on declared `Content-Length` plus streaming byte accounting (covers chunked); oversized requests return 413 aligned with `HttpObjectAggregator` instead of tearing down the connection
+- **Fastjson deserialization hardening**: `SupportAutoType` disabled by default with `ErrorOnNotSupportAutoType` enabled, blocking `@type` gadget chains
+- **Session fixation protection**: security audit fixes for session fixation and related attack vectors
+
+### Optimized
+
+- **Concurrent component registration**: `WebComponentContainer` now uses `ConcurrentHashMap` with atomic `compute` merging — no read/write races and no spurious destroys during dynamic registration
+- **Per-server connection metrics**: `NettyMetricsHandler` switched from a shared singleton to per-server instances so main and management ports count separately
+- **Locale argument resolution**: falls back to `Accept-Language` when no thread-bound Locale exists, honors interceptor/`ControllerAdvice` overrides, and never writes `ThreadLocal` (no pool residue)
+- **Exception injection fix**: when `@ExceptionHandler` matches through the cause chain, the most specific cause compatible with the handler parameter type is injected, preventing spurious `ClassCastException` → 500
+
+### Fixed
+
+- **Stale 404/405 shared state**: a new `StacklessResponseStatusException` is created per request (stack-trace disabled, zero overhead) so `@ExceptionHandler` header/body mutations can no longer leak into later requests
+- **Filter-chain exception path**: request context is initialized on exceptions thrown inside the filter chain, with full exception handling and `afterCompletion`, avoiding null/leaked `ThreadLocal` reads in interceptors
+- **`WebContext` lifecycle**: failed startup now cleans up initialized child components, keeps fail-fast, and supports retry; child states reset after `destroy()` so stop/restart re-initialization works
+- **Async fallback**: when no default business pool exists and no explicit executor is set, a lazily-created shared `SimpleAsyncTaskExecutor` is reused, eliminating NPEs
+- **Router boundaries**: `PrefixPathRouterOptimizer` explicitly rejects when no prefix index exists (avoids `ArrayIndexOutOfBounds`); `SuffixPathRouterOptimizer` guarded
+- **Async/streaming edge cases**: async exception handling and `AbstractNettyStreamSender` completion boundaries hardened
+- **Static resources restricted to GET**: `ResourceRequestHandler` allows GET only (HEAD auto-mapped by the router, returning metadata without file IO)
+- **JSR-356 lifecycle hardening**: Decoder/Encoder destroyed on `@OnOpen` failure and non-standard close codes; `@OnClose` exceptions no longer skip codec cleanup
+- **No more silent view failures**: unresolvable view names throw `IllegalArgumentException` (500 with context) instead of returning a blank 200; `ViewResolver` exceptions are logged
+- **`redirect:` alignment**: only active for view methods — `"redirect:/x"` returned from `@ResponseBody`/`@RestController` methods stays JSON instead of becoming a 302; URLs already containing a query now join with `&`
+- **Component name conflicts**: a losing component is no longer initialized (prevents duplicate routes and resource leaks)
+- **`Optional<Locale>` arg test**: uses a resolvable generic method carrier to verify wrapping semantics
+
+### Changed
+
+- **Spring Boot upgraded to 3.5.16** (default profile switched to `spring-boot-3.5`; 3.2.x kept as an optional profile); **Netty upgraded to 4.1.137**
+- **JaCoCo coverage gate**: total line coverage 92.09% (spring-web 91.58% / websocket 91.92% / support 93.44% / batch 91.96%) with new `coverage-report.sh/ps1` scripts
+- **E2E expansion**: random ports, graceful-shutdown drain, TLS depth / mTLS, native degradation and performance-gate tests, keep-alive reuse and request thickness tests
+- **GraalVM native-image CI**: AOT-build tests for `ControllerBeanFactoryInitializationAotProcessor`
+
+### Documentation
+
+- **View rendering**: `docs/view.md` (CN/EN) synced with 3.5.6
+- **Compatibility / configuration / modules docs**: updated for Spring Boot 3.5.16, Netty 4.1.137, and AOT support (CN/EN)
+
 ## [3.2.5] - 20260824
 
 ### Added

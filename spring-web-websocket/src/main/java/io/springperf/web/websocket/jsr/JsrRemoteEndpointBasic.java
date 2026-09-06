@@ -20,7 +20,7 @@ import java.nio.ByteBuffer;
  * / {@link #getSendWriter()}）与分片（last 参数）首期不支持。</p>
  *
  * @author huangcanda
- * @since 3.2.5
+ * @since 3.5.6
  */
 public class JsrRemoteEndpointBasic implements RemoteEndpoint.Basic {
 

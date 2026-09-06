@@ -19,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>元数据在启动时解析完成，此适配器仅做值拷贝，请求路径上无反射。</p>
  *
  * @author huangcanda
- * @since 3.2.5
+ * @since 3.5.6
  */
 public class JsrEndpointConfigAdapter implements ServerEndpointConfig {
 
