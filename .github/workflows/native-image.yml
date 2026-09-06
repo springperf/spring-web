@@ -20,4 +20,4 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Native smoke test (build + launch + assert)
-        run: ./scripts/native-smoke-test.sh
+        run: bash ./scripts/native-smoke-test.sh
