@@ -47,6 +47,17 @@ class JsrCodecRegistryTest {
         @Override public void destroy() {}
     }
 
+    public static class MySubBinaryDecoder implements Decoder.Binary<MyPojoSub> {
+        @Override public MyPojoSub decode(ByteBuffer b) {
+            byte[] arr = new byte[b.remaining()];
+            b.get(arr);
+            return new MyPojoSub(new String(arr, StandardCharsets.UTF_8));
+        }
+        @Override public boolean willDecode(ByteBuffer b) { return true; }
+        @Override public void init(EndpointConfig config) {}
+        @Override public void destroy() {}
+    }
+
     public static class MyPojo {
         private final String value;
         public MyPojo(String value) { this.value = value; }
@@ -166,20 +177,47 @@ class JsrCodecRegistryTest {
         }
     }
 
-    @Test
-    void decodeText_subtypeFallsBackToSupertypeDecoder() throws DecodeException {
-        // targetType 是 MyPojo 子类 → findTextDecoder 的 isAssignableFrom 兜底应命中 MyTextDecoder
-        JsrCodecRegistry registry = registry(Endpoint.class);
-        Object result = registry.decodeText("hello", MyPojoSub.class);
-        assertEquals("HELLO", ((MyPojo) result).getValue());
+    public static class MySubTextDecoder implements Decoder.Text<MyPojoSub> {
+        @Override public MyPojoSub decode(String s) { return new MyPojoSub(s.toUpperCase()); }
+        @Override public boolean willDecode(String s) { return true; }
+        @Override public void init(EndpointConfig config) {}
+        @Override public void destroy() {}
     }
 
     @Test
-    void decodeBinary_subtypeFallsBackToSupertypeDecoder() throws DecodeException {
+    void decodeText_supertypeParam_usesSubtypeDecoder() throws DecodeException {
+        // JSR-356：选中"解码类型 T 可赋值给消息参数类型 P"的 decoder（P.isAssignableFrom(T)）。
+        // Decoder.Text<MyPojoSub> 产出子类实例可注入 @OnMessage(MyPojo)，应命中兜底。
+        @ServerEndpoint(value = "/sub", decoders = {MySubTextDecoder.class})
+        class SubDecoder {}
+        JsrCodecRegistry registry = registry(SubDecoder.class);
+        Object result = registry.decodeText("hello", MyPojo.class);
+        assertTrue(result instanceof MyPojoSub);
+        assertEquals("HELLO", ((MyPojoSub) result).getValue());
+    }
+
+    @Test
+    void decodeText_subtypeParam_rejectsSupertypeDecoder() {
+        // 超类型 decoder（产出 MyPojo）无法注入子类型参数 @OnMessage(MyPojoSub)，必须拒绝
         JsrCodecRegistry registry = registry(Endpoint.class);
+        assertThrows(DecodeException.class, () -> registry.decodeText("hello", MyPojoSub.class));
+    }
+
+    @Test
+    void decodeBinary_supertypeParam_usesSubtypeDecoder() throws DecodeException {
+        @ServerEndpoint(value = "/subb", decoders = {MySubBinaryDecoder.class})
+        class SubBinDecoder {}
+        JsrCodecRegistry registry = registry(SubBinDecoder.class);
         Object result = registry.decodeBinary(
-                ByteBuffer.wrap("data".getBytes(StandardCharsets.UTF_8)), MyPojoSub.class);
-        assertTrue(result instanceof MyPojo);
+                ByteBuffer.wrap("data".getBytes(StandardCharsets.UTF_8)), MyPojo.class);
+        assertTrue(result instanceof MyPojoSub);
+    }
+
+    @Test
+    void decodeBinary_subtypeParam_rejectsSupertypeDecoder() {
+        JsrCodecRegistry registry = registry(Endpoint.class);
+        assertThrows(DecodeException.class,
+                () -> registry.decodeBinary(ByteBuffer.wrap(new byte[0]), MyPojoSub.class));
     }
 
     @Test

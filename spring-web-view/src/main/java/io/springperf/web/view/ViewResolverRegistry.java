@@ -73,7 +73,9 @@ public class ViewResolverRegistry extends WebComponentContainer {
                 if (view != null) {
                     return view;
                 }
-            } catch (Exception ignored) {
+            } catch (Exception ex) {
+                // 不吞异常：resolver 初始化失败/解析失败是配置或模板问题，必须可见，避免产出空白 200
+                log.warn("ViewResolver {} failed to resolve view '{}'", resolver.getClass().getName(), viewName, ex);
             }
         }
         return null;

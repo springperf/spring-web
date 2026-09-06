@@ -1,6 +1,7 @@
 package io.springperf.web.websocket.config;
 
 import io.springperf.web.websocket.jsr.JsrEndpointWebSocketConfigurer;
+import jakarta.websocket.ClientEndpointConfig;
 import jakarta.websocket.server.ServerEndpoint;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.context.ApplicationContext;
@@ -20,10 +21,10 @@ import org.springframework.web.socket.WebSocketHandler;
  * </ol>
  *
  * @author huangcanda
- * @since 3.2.5
+ * @since 3.5.6
  */
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnClass({ServerEndpoint.class, WebSocketHandler.class})
+@ConditionalOnClass({ServerEndpoint.class, WebSocketHandler.class, ClientEndpointConfig.class})
 public class JsrWebSocketAutoConfiguration {
 
     @Bean

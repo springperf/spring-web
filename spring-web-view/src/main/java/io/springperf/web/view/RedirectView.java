@@ -23,7 +23,8 @@ public class RedirectView implements View {
         String location = buildLocation(redirectUrl, req);
         String query = buildQueryString(model);
         if (!query.isEmpty()) {
-            location += "?" + query;
+            // 目标已含 query（redirect:/login?x=1）时用 & 续接，避免双 ? 丢失后续参数
+            location += (location.indexOf('?') >= 0 ? "&" : "?") + query;
         }
         resp.getHeaders().set(HttpHeaders.LOCATION, location);
     }

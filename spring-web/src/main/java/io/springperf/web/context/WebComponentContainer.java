@@ -93,7 +93,9 @@ public class WebComponentContainer extends BaseWebComponent {
         }
         final String name = componentName;
         // compute 原子合并：containsKey/get/put 合一，避免并发注册同名组件时的竞态（误 destroy / 丢失组件）
-        webComponents.compute(name, (key, oldComponent) -> {
+        // compute 返回最终保留的组件：若命名冲突且旧组件胜出（该入参组件落败），下方跳过生命周期初始化，
+        // 避免落败组件产生副作用（重复注册路由/扫描）且永不销毁的资源泄漏。
+        WebComponent kept = webComponents.compute(name, (key, oldComponent) -> {
             if (oldComponent != null) {
                 List<WebComponent> list = Arrays.asList(webComponent, oldComponent);
                 AnnotationAwareOrderComparator.sort(list);
@@ -108,6 +110,10 @@ public class WebComponentContainer extends BaseWebComponent {
             return webComponent;
         });
 
+        if (kept != webComponent) {
+            // 命名冲突且本组件落败：未进入容器，不做生命周期初始化，避免副作用（如重复注册路由）
+            return;
+        }
         if (state.get() == State.INIT_CONTEXT || state.get() == State.PHASE1 || state.get() == State.PHASE2 || state.get() == State.PHASE3) {
             webComponent.initWithWebContext(webContext);
         }
@@ -213,11 +219,22 @@ public class WebComponentContainer extends BaseWebComponent {
 
     /**
      * 将状态机从 DESTROY 复位回 NEW，使组件可重新执行完整生命周期（stop/restart 支持）。
+     * <p>递归复位所有子容器：destroy 会把子组件一并置为 DESTROY，
+     * 仅复位自身会令子组件后续 {@code init*} 的 CAS 全部失败（静默跳过初始化、路由表为空），
+     * 因此必须同步复位嵌套容器，destroy 后才可真正重新 start。</p>
      *
      * @return 是否成功复位；非 DESTROY 状态返回 false（无需复位）
      */
     protected boolean resetAfterDestroy() {
-        return state.compareAndSet(State.DESTROY, State.NEW);
+        boolean reset = state.compareAndSet(State.DESTROY, State.NEW);
+        if (reset) {
+            for (WebComponent component : getSortedWebComponents()) {
+                if (component instanceof WebComponentContainer) {
+                    ((WebComponentContainer) component).resetAfterDestroy();
+                }
+            }
+        }
+        return reset;
     }
 
     private void initComponentPhase1(WebComponent component) throws Exception {
