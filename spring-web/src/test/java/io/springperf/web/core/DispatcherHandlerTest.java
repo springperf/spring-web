@@ -26,6 +26,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
@@ -219,6 +220,54 @@ class DispatcherHandlerTest {
         handler.handle(req, resp);
 
         verify(interceptorRegistry).preHandle(req, resp);
+    }
+
+    @Test
+    void httpHandle_delegatesToHandle() throws Exception {
+        WebServerHttpRequest req = createRequest();
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        when(resp.getStatus()).thenReturn(HttpStatus.OK);
+        PathMappingContext mappingContext = mock(PathMappingContext.class);
+        MappingResult matched = MappingResult.matched(mappingContext);
+        MappingResult.set(req, matched);
+        when(mappingRegistry.mapping(req)).thenReturn(matched);
+        when(bizPoolRegistry.determinePool(req, matched)).thenReturn(null);
+        when(corsRegistry.corsHandle(any(), any())).thenReturn(false);
+        when(interceptorRegistry.preHandle(any(), any())).thenReturn(true);
+        when(argumentResolverRegistry.resolveArguments(any(), any(), any())).thenReturn(new Object[0]);
+
+        handler.httpHandle(req, resp);
+
+        verify(mappingRegistry).mapping(req);
+    }
+
+    // ==================== handleCorsPreflight() ====================
+
+    @Test
+    void handleCorsPreflight_corsProcessed_writesAndFlushes() throws Exception {
+        WebServerHttpRequest req = createRequest();
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        when(corsRegistry.corsHandle(req, resp)).thenReturn(true);
+        ByteArrayOutputStream body = new ByteArrayOutputStream();
+        when(resp.getBody()).thenReturn(body);
+
+        handler.handleCorsPreflight(req, resp);
+
+        verify(corsRegistry).corsHandle(req, resp);
+        verify(resp).flush();
+        assertEquals(0, body.size(), "预检响应体应为空");
+    }
+
+    @Test
+    void handleCorsPreflight_corsNotHandled_noFlush() throws Exception {
+        WebServerHttpRequest req = createRequest();
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        when(corsRegistry.corsHandle(req, resp)).thenReturn(false);
+
+        handler.handleCorsPreflight(req, resp);
+
+        verify(corsRegistry).corsHandle(req, resp);
+        verify(resp, never()).flush();
     }
 
     // ==================== doHandle() ====================

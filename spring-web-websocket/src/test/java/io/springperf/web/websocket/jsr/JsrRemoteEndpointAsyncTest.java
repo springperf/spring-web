@@ -116,4 +116,60 @@ class JsrRemoteEndpointAsyncTest {
         verify(springSession).sendMessage(new PingMessage(p));
         verify(springSession).sendMessage(new PongMessage(o));
     }
+
+    @Test
+    void sendBinary_future_failure() throws IOException {
+        doThrow(new IOException("boom")).when(springSession).sendMessage(any(BinaryMessage.class));
+        Future<Void> future = remote.sendBinary(ByteBuffer.wrap("x".getBytes(StandardCharsets.UTF_8)));
+        assertThrows(java.util.concurrent.ExecutionException.class, future::get);
+    }
+
+    @jakarta.websocket.server.ServerEndpoint(value = "/bin", encoders = {BinEncoder.class})
+    static class BinaryCodecEndpoint {
+    }
+
+    public static class BinEncoder implements jakarta.websocket.Encoder.Binary<byte[]> {
+        @Override
+        public ByteBuffer encode(byte[] o) {
+            return ByteBuffer.wrap(o);
+        }
+
+        @Override
+        public void init(jakarta.websocket.EndpointConfig config) {
+        }
+
+        @Override
+        public void destroy() {
+        }
+    }
+
+    private JsrRemoteEndpointAsync binaryRemote() {
+        JsrCodecRegistry binaryRegistry = new JsrCodecRegistry(
+                new JsrEndpointConfigAdapter(new JsrEndpointMetadata(BinaryCodecEndpoint.class)));
+        JsrWebSocketSession binarySession = new JsrWebSocketSession(springSession,
+                new JsrWebSocketContainer(), binaryRegistry, Collections.emptyMap());
+        return new JsrRemoteEndpointAsync(binarySession, binaryRegistry);
+    }
+
+    @Test
+    void sendObject_binaryEncoder_sendsBinaryMessage() throws Exception {
+        JsrRemoteEndpointAsync binRemote = binaryRemote();
+        Future<Void> future = binRemote.sendObject(new byte[]{1, 2, 3});
+        future.get();
+        verify(springSession).sendMessage(argThat(msg -> msg instanceof BinaryMessage));
+    }
+
+    @Test
+    void sendObject_future_failure_encodesCompletesExceptionally() {
+        // 无匹配 Encoder → EncodeException → future 异常完成
+        Future<Void> future = remote.sendObject(new Object());
+        assertThrows(java.util.concurrent.ExecutionException.class, future::get);
+    }
+
+    @Test
+    void sendObject_handler_failure_reportsError() throws IOException {
+        SendHandler handler = mock(SendHandler.class);
+        remote.sendObject(new Object(), handler);
+        verify(handler).onResult(argThat(result -> !result.isOK()));
+    }
 }

@@ -25,6 +25,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -203,5 +204,73 @@ class CorsRegistryProviderTest {
                 mock(io.springperf.web.http.WebServerHttpResponse.class));
         assertNotNull(config);
         assertTrue(config.getAllowedOrigins().contains("http://resolved.com"));
+    }
+
+    /* ==================== getCorsConfigurationProvider 全路径 ==================== */
+
+    private io.springperf.web.http.WebServerHttpRequest requestWithMapping(
+            io.springperf.web.core.mapping.MappingResult result) {
+        io.springperf.web.http.WebServerHttpRequest request =
+                mock(io.springperf.web.http.WebServerHttpRequest.class);
+        io.springperf.web.http.RequestContext requestContext =
+                mock(io.springperf.web.http.RequestContext.class);
+        java.util.Map<io.springperf.web.http.RequestAttribute<?>, Object> attrs = new java.util.HashMap<>();
+        when(requestContext.getAttribute(any(io.springperf.web.http.RequestAttribute.class)))
+                .thenAnswer(inv -> attrs.get(inv.getArgument(0)));
+        doAnswer(inv -> {
+            attrs.put(inv.getArgument(0), inv.getArgument(1));
+            return null;
+        }).when(requestContext).setAttribute(any(io.springperf.web.http.RequestAttribute.class), any());
+        when(request.getRequestContext()).thenReturn(requestContext);
+        if (result != null) {
+            io.springperf.web.core.mapping.MappingResult.set(request, result);
+        }
+        return request;
+    }
+
+    @Test
+    void getCorsConfiguration_noMappingResult_returnsDefaultProvider() throws Exception {
+        io.springperf.web.http.WebServerHttpRequest request = requestWithMapping(null);
+        CorsConfiguration config = registry.getCorsConfiguration(request,
+                mock(io.springperf.web.http.WebServerHttpResponse.class));
+        assertNull(config, "无 MappingResult 时应走 NoneCorsConfigurationProvider");
+    }
+
+    @Test
+    void getCorsConfiguration_matchedResult_usesMatchedContext() throws Exception {
+        PathMappingContext ctx = contextFor(new ClassLevelController(), "/c", Collections.emptyList());
+        io.springperf.web.http.WebServerHttpRequest request =
+                requestWithMapping(io.springperf.web.core.mapping.MappingResult.matched(ctx));
+
+        CorsConfiguration config = registry.getCorsConfiguration(request,
+                mock(io.springperf.web.http.WebServerHttpResponse.class));
+
+        assertNotNull(config, "matched 请求应按 @CrossOrigin 生成配置");
+        assertTrue(config.getAllowedOrigins().contains("http://a.com"));
+    }
+
+    @Test
+    void getCorsConfiguration_pathMatchedResult_usesFirstContext() throws Exception {
+        PathMappingContext ctx = contextFor(new MethodLevelController(), "/m", Collections.emptyList());
+        io.springperf.web.http.WebServerHttpRequest request =
+                requestWithMapping(io.springperf.web.core.mapping.MappingResult.pathMatched(
+                        new PathMappingContext[]{ctx}, true));
+
+        CorsConfiguration config = registry.getCorsConfiguration(request,
+                mock(io.springperf.web.http.WebServerHttpResponse.class));
+
+        assertNotNull(config, "pathMatched 请求应按首个 context 生成配置");
+        assertTrue(config.getAllowedOrigins().contains("http://b.com"));
+    }
+
+    @Test
+    void getCorsConfiguration_notFoundResult_returnsDefaultProvider() throws Exception {
+        io.springperf.web.http.WebServerHttpRequest request =
+                requestWithMapping(io.springperf.web.core.mapping.MappingResult.notFound());
+
+        CorsConfiguration config = registry.getCorsConfiguration(request,
+                mock(io.springperf.web.http.WebServerHttpResponse.class));
+
+        assertNull(config, "notFound 请求应走 NoneCorsConfigurationProvider");
     }
 }

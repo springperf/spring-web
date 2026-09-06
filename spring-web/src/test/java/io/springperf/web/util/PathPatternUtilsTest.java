@@ -235,4 +235,29 @@ class PathPatternUtilsTest {
     void patternsDisjoint_literalVsRegexMatch_returnsFalse() {
         assertFalse(PathPatternUtils.patternsDisjoint("/api/123", "/api/{id:\\d+}"));
     }
+
+    @Test
+    void patternsDisjoint_differentDepthAllLiterals_returnsTrue() {
+        // /a/b/c 与 /a/b 深度不同且剩余段均为字面量 → 确定不相交
+        assertTrue(PathPatternUtils.patternsDisjoint("/a/b/c", "/a/b"));
+    }
+
+    @Test
+    void patternsDisjoint_multiWildcard_notDisjoint() {
+        // ** 可匹配任意段 → 无法证明不相交
+        assertFalse(PathPatternUtils.patternsDisjoint("/a/**", "/a/b"));
+        assertFalse(PathPatternUtils.patternsDisjoint("/a/b", "/a/**"));
+    }
+
+    @Test
+    void patternsDisjoint_trailingWildcard_notDisjoint() {
+        // /a/* 也匹配 /a → 剩余的 * 非字面量 → 不相交为 false
+        assertFalse(PathPatternUtils.patternsDisjoint("/a/*", "/a"));
+    }
+
+    @Test
+    void patternsDisjoint_wildcardVsVar_notDisjoint() {
+        // 两个非字面量/非正则段组合 → 可能相交
+        assertFalse(PathPatternUtils.patternsDisjoint("/a/*", "/a/{id}"));
+    }
 }

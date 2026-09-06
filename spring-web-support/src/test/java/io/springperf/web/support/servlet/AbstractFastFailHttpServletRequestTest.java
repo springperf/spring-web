@@ -165,4 +165,70 @@ class AbstractFastFailHttpServletRequestTest {
         assertThrows(UnsupportedOperationException.class, () -> request.authenticate(null));
         assertThrows(UnsupportedOperationException.class, () -> request.getParts());
     }
+
+    @Test
+    void allFastFailMethods_verifySelfContainedBehavior() {
+        // ServletRequest
+        assertThrows(UnsupportedOperationException.class, () -> request.setCharacterEncoding("UTF-8"));
+        assertThrows(UnsupportedOperationException.class, () -> request.getServletContext());
+        assertThrows(UnsupportedOperationException.class, () -> request.startAsync());
+        assertThrows(UnsupportedOperationException.class, () -> request.startAsync(null, null));
+        assertThrows(UnsupportedOperationException.class, () -> request.getAsyncContext());
+        assertThrows(UnsupportedOperationException.class, () -> request.setAttribute("k", "v"));
+        assertThrows(UnsupportedOperationException.class, () -> request.removeAttribute("k"));
+        assertThrows(UnsupportedOperationException.class, () -> request.getRequestDispatcher("/x"));
+
+        // 返回 null 的访问器不应抛异常
+        assertNull(request.getServerName());
+        assertNull(request.getRemoteAddr());
+        assertNull(request.getRemoteHost());
+        assertNull(request.getLocalName());
+        assertNull(request.getLocalAddr());
+        assertNull(request.getPathInfo());
+        assertNull(request.getPathTranslated());
+        assertNull(request.getQueryString());
+        assertNull(request.getRemoteUser());
+        assertNull(request.getUserPrincipal());
+        assertNull(request.getRequestedSessionId());
+    }
+
+    @Test
+    void servlet6IdentityMethods_returnRequestId() {
+        String requestId = request.getRequestId();
+        assertNotNull(requestId);
+        assertEquals(requestId, request.getProtocolRequestId());
+        assertFalse(requestId.isEmpty());
+    }
+
+    @Test
+    void servlet6IdentityMethods_haveUniqueIds() {
+        AbstractFastFailHttpServletRequest other = new AbstractFastFailHttpServletRequest() {};
+        assertNotEquals(request.getRequestId(), other.getRequestId());
+    }
+
+    @Test
+    void getServletConnection_reportsConnectionInfo() {
+        jakarta.servlet.ServletConnection connection = request.getServletConnection();
+        assertNotNull(connection);
+        assertNotNull(connection.getConnectionId());
+        assertEquals("HTTP/1.1", connection.getProtocol());
+        assertNotNull(connection.getProtocolConnectionId());
+        assertFalse(connection.isSecure());
+    }
+
+    @Test
+    void sessionMethods_fastFail() {
+        assertThrows(UnsupportedOperationException.class, () -> request.changeSessionId());
+        assertThrows(UnsupportedOperationException.class, () -> request.isRequestedSessionIdValid());
+        assertThrows(UnsupportedOperationException.class, () -> request.isRequestedSessionIdFromCookie());
+        assertThrows(UnsupportedOperationException.class, () -> request.isRequestedSessionIdFromURL());
+    }
+
+    @Test
+    void authenticationMethods_fastFail() {
+        assertThrows(UnsupportedOperationException.class, () -> request.login("u", "p"));
+        assertThrows(UnsupportedOperationException.class, () -> request.logout());
+        assertThrows(UnsupportedOperationException.class, () -> request.getPart("p"));
+        assertThrows(UnsupportedOperationException.class, () -> request.upgrade(jakarta.servlet.http.HttpUpgradeHandler.class));
+    }
 }

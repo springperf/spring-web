@@ -1,5 +1,6 @@
 package io.springperf.web.core.codec.interceptor;
 
+import io.springperf.web.context.WebContext;
 import io.springperf.web.core.codec.HttpBodyConverter;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
@@ -316,5 +317,79 @@ class HttpBodyCodecInterceptorRegistryTest {
         registry.beforeBodyWrite("body", param, MediaType.APPLICATION_JSON, converter, request, response);
 
         verify(interceptor1, never()).beforeBodyWrite(any(), any(), any(), any(), any(), any());
+    }
+
+    /* ==================== 生命周期：initWithWebContext / initCodecInterceptors ==================== */
+
+    public static class CodecAdvice implements HttpBodyCodecInterceptor {
+        @Override
+        public boolean supportBodyRead(MethodParameter methodParameter, Type targetType, HttpBodyConverter converter) {
+            return true;
+        }
+
+        @Override
+        public HttpInputMessage beforeBodyRead(HttpInputMessage inputMessage, MethodParameter parameter, Type targetType, HttpBodyConverter converter) {
+            return inputMessage;
+        }
+
+        @Override
+        public Object afterBodyRead(Object body, HttpInputMessage inputMessage, MethodParameter parameter, Type targetType, HttpBodyConverter converter) {
+            return body;
+        }
+
+        @Override
+        public Object handleEmptyBodyRead(Object body, HttpInputMessage inputMessage, MethodParameter parameter, Type targetType, HttpBodyConverter converter) {
+            return body;
+        }
+
+        @Override
+        public boolean supportBodyWrite(MethodParameter methodParameter, HttpBodyConverter converter) {
+            return true;
+        }
+
+        @Override
+        public Object beforeBodyWrite(Object body, MethodParameter returnType, MediaType selectedContentType, HttpBodyConverter converter,
+                                      org.springframework.http.server.ServerHttpRequest request,
+                                      org.springframework.http.server.ServerHttpResponse response) {
+            return body;
+        }
+    }
+
+    public static class AnnotatedConfig {
+        @org.springframework.web.bind.annotation.ControllerAdvice
+        public static class AnnotatedAdvice extends CodecAdvice {
+        }
+
+        @org.springframework.context.annotation.Bean
+        public AnnotatedAdvice annotatedAdvice() {
+            return new AnnotatedAdvice();
+        }
+    }
+
+    @Test
+    void initWithWebContext_scansControllerAdviceAndInterceptors() throws Exception {
+        try (org.springframework.context.annotation.AnnotationConfigApplicationContext ctx =
+                     new org.springframework.context.annotation.AnnotationConfigApplicationContext(AnnotatedConfig.class)) {
+            WebContext webContext = mock(WebContext.class);
+            when(webContext.getCtx()).thenReturn(ctx);
+            HttpBodyCodecInterceptorRegistry reg = new HttpBodyCodecInterceptorRegistry();
+            reg.initWithWebContext(webContext);
+            reg.initComponentPhase2();
+
+            assertNotNull(reg.getWebContext());
+        }
+    }
+
+    @Test
+    void initWithWebContext_emptyContext_initializesWithoutBeans() {
+        try (org.springframework.context.annotation.AnnotationConfigApplicationContext ctx =
+                     new org.springframework.context.annotation.AnnotationConfigApplicationContext()) {
+            ctx.refresh();
+            WebContext webContext = mock(WebContext.class);
+            when(webContext.getCtx()).thenReturn(ctx);
+            HttpBodyCodecInterceptorRegistry reg = new HttpBodyCodecInterceptorRegistry();
+            reg.initWithWebContext(webContext);
+            assertNotNull(reg.getWebContext());
+        }
     }
 }

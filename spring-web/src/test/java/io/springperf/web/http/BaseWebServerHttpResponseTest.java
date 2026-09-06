@@ -139,4 +139,73 @@ class BaseWebServerHttpResponseTest {
         response.sendError(HttpStatus.SERVICE_UNAVAILABLE);
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatus());
     }
+
+    @Test void escapeJson_escapesSpecialCharacters() {
+        response.sendError(HttpStatus.BAD_REQUEST,
+                "quote\" back\\ new\n tab\t ff\f bs\b cr\r control\u0001 end");
+        String json = new String(response.body.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
+        assertTrue(json.contains("\\\""), "双引号应转义为 \\\"");
+        assertTrue(json.contains("\\\\"), "反斜杠应转义为 \\\\");
+        assertTrue(json.contains("\\n"), "换行应转义为 \\n");
+        assertTrue(json.contains("\\t"), "制表符应转义为 \\t");
+        assertTrue(json.contains("\\f"), "换页应转义为 \\f");
+        assertTrue(json.contains("\\b"), "退格应转义为 \\b");
+        assertTrue(json.contains("\\r"), "回车应转义为 \\r");
+        assertTrue(json.contains("\\u0001"), "控制字符应以 \\u 转义");
+    }
+
+    @Test void escapeJson_null_returnsEmpty() {
+        response.sendError(HttpStatus.BAD_REQUEST, null);
+        String json = new String(response.body.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
+        assertTrue(json.contains("\"error\":\"\""));
+    }
+
+    @Test void setStatusCode_nonHttpStatusInstance_usesValue() {
+        // 非标准状态码（299）→ HttpStatus.valueOf 抛 IAE（快速失败，防脏状态码写入响应）
+        org.springframework.http.HttpStatusCode custom =
+                org.springframework.http.HttpStatusCode.valueOf(299);
+        assertFalse(custom instanceof HttpStatus);
+        assertThrows(IllegalArgumentException.class, () -> response.setStatusCode(custom));
+    }
+
+    @Test void resetHandled_clearsHandledFlag() {
+        assertTrue(response.setHandled());
+        response.resetHandled();
+        assertFalse(response.isHandled());
+    }
+
+    @Test void defaultHandleTimeout_sendsGatewayTimeout() {
+        response.defaultHandleTimeout();
+        assertEquals(org.springframework.http.HttpStatus.GATEWAY_TIMEOUT, response.getStatus());
+        assertTrue(response.isHandled());
+    }
+
+    @Test void setTimeout_default_schedulesTimeoutHandler() {
+        // webContext.getProps().getLong(HTTP_TIMEOUT) 已在 @BeforeEach stub 为 60000
+        response.setTimeout();
+        assertTrue(response.flushed == false);
+    }
+
+    @Test void addWriteRespEventListener_single_thenComposite() {
+        WriteRespEventListener first = mock(WriteRespEventListener.class);
+        WriteRespEventListener second = mock(WriteRespEventListener.class);
+        WriteRespEventListener third = mock(WriteRespEventListener.class);
+        response.addWriteRespEventListener(first);
+        response.addWriteRespEventListener(second);
+        response.addWriteRespEventListener(third);
+
+        response.writeRespEventListener.completeSuccessCallback();
+        verify(first).completeSuccessCallback();
+        verify(second).completeSuccessCallback();
+        verify(third).completeSuccessCallback();
+
+        response.writeRespEventListener.completeErrorCallback(new RuntimeException("x"));
+        verify(first).completeErrorCallback(any());
+
+        response.writeRespEventListener.writeStreamSuccessCallback();
+        verify(second).writeStreamSuccessCallback();
+
+        response.writeRespEventListener.writeStreamErrorCallback(new RuntimeException("y"));
+        verify(second).writeStreamErrorCallback(any());
+    }
 }

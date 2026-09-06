@@ -1,12 +1,20 @@
 package io.springperf.web.support.servlet.session;
 
 import io.springperf.web.context.WebContext;
+import io.springperf.web.support.servlet.Authenticator;
 import io.springperf.web.support.servlet.context.PerfServletContext;
+import jakarta.servlet.http.HttpSessionAttributeListener;
+import jakarta.servlet.http.HttpSessionEvent;
+import jakarta.servlet.http.HttpSessionListener;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.Collections;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -123,5 +131,111 @@ class PerfHttpSessionManagerTest {
     @Test
     void getSession_null_returnsNull() {
         assertNull(manager.getSession(null));
+    }
+
+    @Test
+    void initWithWebContext_registersPerfServletContextWhenMissing() {
+        // manager 已由 @BeforeEach 初始化，且 webContext 未预注册 PerfServletContext
+        verify(webContext).registerWebComponent(any(PerfServletContext.class));
+    }
+
+    @Test
+    void getAuthenticator_returnsBean() {
+        Authenticator bean = mock(Authenticator.class);
+        lenient().when(webContext.getBeanFromCtx(Authenticator.class)).thenReturn(bean);
+
+        PerfHttpSessionManager newManager = new PerfHttpSessionManager();
+        newManager.initWithWebContext(webContext);
+        assertSame(bean, newManager.getAuthenticator());
+    }
+
+    @Test
+    void getSessionListeners_returnsScannedBeans() {
+        HttpSessionListener listener = mock(HttpSessionListener.class);
+        org.springframework.context.ApplicationContext ctx = mock(org.springframework.context.ApplicationContext.class);
+        lenient().when(ctx.getBeansOfType(HttpSessionListener.class)).thenReturn(Map.of("l", listener));
+        when(webContext.getCtx()).thenReturn(ctx);
+
+        PerfHttpSessionManager newManager = new PerfHttpSessionManager();
+        newManager.initWithWebContext(webContext);
+        assertEquals(1, newManager.getSessionListeners().size());
+        assertSame(listener, newManager.getSessionListeners().get(0));
+    }
+
+    @Test
+    void getAttributeListeners_returnsScannedBeans() {
+        HttpSessionAttributeListener listener = mock(HttpSessionAttributeListener.class);
+        org.springframework.context.ApplicationContext ctx = mock(org.springframework.context.ApplicationContext.class);
+        lenient().when(ctx.getBeansOfType(HttpSessionAttributeListener.class)).thenReturn(Map.of("l", listener));
+        when(webContext.getCtx()).thenReturn(ctx);
+
+        PerfHttpSessionManager newManager = new PerfHttpSessionManager();
+        newManager.initWithWebContext(webContext);
+        assertEquals(1, newManager.getAttributeListeners().size());
+        assertSame(listener, newManager.getAttributeListeners().get(0));
+    }
+
+    @Test
+    void createSession_firesSessionCreatedEvents() {
+        AtomicInteger creations = new AtomicInteger();
+        HttpSessionListener listener = new HttpSessionListener() {
+            @Override
+            public void sessionCreated(HttpSessionEvent event) {
+                creations.incrementAndGet();
+            }
+        };
+        org.springframework.context.ApplicationContext ctx = mock(org.springframework.context.ApplicationContext.class);
+        when(ctx.getBeansOfType(HttpSessionListener.class)).thenReturn(Collections.singletonMap("l", listener));
+        when(webContext.getCtx()).thenReturn(ctx);
+
+        PerfHttpSessionManager newManager = new PerfHttpSessionManager();
+        newManager.initWithWebContext(webContext);
+        newManager.createSession();
+        newManager.createSession();
+
+        assertEquals(2, creations.get());
+    }
+
+    @Test
+    void cookieConfig_customNamePathAndSecure() {
+        when(props.get(eq(PerfHttpSessionManager.COOKIE_NAME_KEY), anyString())).thenReturn("MYCOOKIE");
+        when(props.getBoolean(eq(PerfHttpSessionManager.COOKIE_SECURE_KEY), eq(false))).thenReturn(true);
+        when(webContext.getContextPath()).thenReturn("/api");
+
+        PerfHttpSessionManager newManager = new PerfHttpSessionManager();
+        newManager.initWithWebContext(webContext);
+
+        assertEquals("MYCOOKIE", newManager.getCookieName());
+        assertEquals("/api", newManager.getCookiePath());
+        assertTrue(newManager.isCookieSecure());
+    }
+
+    @Test
+    void cookieConfig_sameSite_uppercased() {
+        when(props.get(eq(PerfHttpSessionManager.COOKIE_SAME_SITE_KEY), anyString())).thenReturn("lax");
+        PerfHttpSessionManager newManager = new PerfHttpSessionManager();
+        newManager.initWithWebContext(webContext);
+        assertEquals("LAX", newManager.getSameSite());
+    }
+
+    @Test
+    void destroyComponent_shutsDownStorage() {
+        HttpSessionStorage storage = mock(HttpSessionStorage.class);
+        lenient().when(webContext.getBeanFromCtx(HttpSessionStorage.class)).thenReturn(storage);
+
+        PerfHttpSessionManager newManager = new PerfHttpSessionManager();
+        newManager.initWithWebContext(webContext);
+        assertDoesNotThrow(() -> newManager.destroyComponent());
+        verify(storage).shutdown();
+    }
+
+    @Test
+    void changeSessionId_removesOldSessionFromStorage() {
+        PerfHttpSession old = manager.createSession();
+        old.setAttribute("k", "v");
+        PerfHttpSession fresh = manager.changeSessionId(old);
+        assertNotNull(fresh);
+        assertNull(manager.getSession(old.getId()));
+        assertEquals("v", fresh.getAttribute("k"));
     }
 }

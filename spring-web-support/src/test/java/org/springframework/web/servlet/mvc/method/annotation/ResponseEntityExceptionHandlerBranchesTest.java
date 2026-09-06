@@ -114,4 +114,55 @@ class ResponseEntityExceptionHandlerBranchesTest {
         assertSame(ex, req.getAttribute("jakarta.servlet.error.exception", 0),
                 "500 时应设置 error.exception 请求属性");
     }
+
+    @Test
+    void missingServletRequestParameter_mapsTo400() throws Exception {
+        org.springframework.web.bind.MissingServletRequestParameterException ex =
+                new org.springframework.web.bind.MissingServletRequestParameterException("name", "String");
+        assertEquals(HttpStatus.BAD_REQUEST,
+                handler.handleException(ex, webRequest()).getStatusCode());
+    }
+
+    @Test
+    void servletRequestBindingException_mapsTo400() throws Exception {
+        org.springframework.web.bind.ServletRequestBindingException ex =
+                new org.springframework.web.bind.ServletRequestBindingException("binding failed");
+        assertEquals(HttpStatus.BAD_REQUEST,
+                handler.handleException(ex, webRequest()).getStatusCode());
+    }
+
+    @Test
+    void conversionNotSupported_mapsTo500() throws Exception {
+        org.springframework.beans.ConversionNotSupportedException ex =
+                new org.springframework.beans.ConversionNotSupportedException("value", (Class) Integer.class, null);
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR,
+                handler.handleException(ex, webRequest()).getStatusCode());
+    }
+
+    @Test
+    void messageNotReadable_mapsTo400() throws Exception {
+        org.springframework.http.converter.HttpMessageNotReadableException ex =
+                new org.springframework.http.converter.HttpMessageNotReadableException("cannot read");
+        assertEquals(HttpStatus.BAD_REQUEST,
+                handler.handleException(ex, webRequest()).getStatusCode());
+    }
+
+    @Test
+    void messageNotWritable_mapsTo500() throws Exception {
+        org.springframework.http.converter.HttpMessageNotWritableException ex =
+                new org.springframework.http.converter.HttpMessageNotWritableException("cannot write");
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR,
+                handler.handleException(ex, webRequest()).getStatusCode());
+    }
+
+    @Test
+    void methodArgumentNotValid_mapsTo400() throws Exception {
+        org.springframework.validation.BeanPropertyBindingResult br =
+                new org.springframework.validation.BeanPropertyBindingResult(new Object(), "target");
+        org.springframework.web.bind.MethodArgumentNotValidException ex =
+                new org.springframework.web.bind.MethodArgumentNotValidException(
+                        new org.springframework.core.MethodParameter(getClass().getMethods()[0], 0), br);
+        assertEquals(HttpStatus.BAD_REQUEST,
+                handler.handleException(ex, webRequest()).getStatusCode());
+    }
 }

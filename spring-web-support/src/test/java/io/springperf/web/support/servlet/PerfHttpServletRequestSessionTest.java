@@ -532,6 +532,96 @@ class PerfHttpServletRequestSessionTest {
         verify(resp).sendError(HttpServletResponse.SC_UNAUTHORIZED);
     }
 
+    /* ==================== 补充覆盖 ==================== */
+
+    @Test
+    void rebind_withDifferentRequest_resetsCookies() throws Exception {
+        when(request.getHeaders()).thenReturn(new HttpHeaders() {{
+            add("Cookie", "SESSION=old");
+        }});
+        PerfHttpServletRequest req = newReq();
+        Cookie[] before = req.getCookies();
+
+        WebServerHttpRequest newRequest = mock(WebServerHttpRequest.class);
+        when(newRequest.getRequestContext()).thenReturn(requestContext);
+        when(newRequest.getWebContext()).thenReturn(webContext);
+        when(newRequest.getHeaders()).thenReturn(new HttpHeaders() {{
+            add("Cookie", "SESSION=new");
+        }});
+        req.rebind(newRequest);
+        Cookie[] after = req.getCookies();
+        assertNotEquals(before[0].getValue(), after[0].getValue());
+    }
+
+    @Test
+    void isAsyncSupported_alwaysTrue() {
+        assertTrue(newReq().isAsyncSupported());
+    }
+
+    @Test
+    void getRequestURL_https443_omitsPort() {
+        // getScheme 固定 http，走 port!=80 分支附加端口；此处验证 scheme 为 http 时端口逻辑
+        headers("Host", "example.com:443");
+        when(request.getUriStr()).thenReturn("/secure");
+        when(webContext.getProps()).thenReturn(mock(io.springperf.web.context.ApplicationProperties.class));
+        when(webContext.getProps().getInt(PropertiesConstant.SERVER_PORT)).thenReturn(443);
+
+        assertEquals("http://example.com:443/secure", newReq().getRequestURL().toString());
+    }
+
+    @Test
+    void isRequestedSessionIdValid_existingSessionInStore_cachesAndReturnsTrue() {
+        PerfHttpSessionManager manager = sessionManager();
+        when(manager.getCookieName()).thenReturn("SESSION");
+        headers("Cookie", "SESSION=sid");
+        when(request.getHeaders()).thenReturn(new HttpHeaders() {{
+            add("Cookie", "SESSION=sid");
+        }});
+        PerfHttpSession session = mock(PerfHttpSession.class);
+        when(session.isInvalid()).thenReturn(false);
+        when(manager.getSession("sid")).thenReturn(session);
+
+        assertTrue(newReq().isRequestedSessionIdValid());
+        assertSame(session, fastAttrs.get(PerfHttpSessionManager.SESSION_ATTR_KEY));
+    }
+
+    @Test
+    void isRequestedSessionIdValid_noManager_false() {
+        headers("Cookie", "SESSION=sid");
+        when(request.getHeaders()).thenReturn(new HttpHeaders() {{
+            add("Cookie", "SESSION=sid");
+        }});
+        when(webContext.getWebComponent(PerfHttpSessionManager.class)).thenReturn(null);
+        assertFalse(newReq().isRequestedSessionIdValid());
+    }
+    /* ==================== 补充覆盖（续） ==================== */
+
+    @Test
+    void login_success_withPerfHttpPrincipal_reusesPrincipal() throws Exception {
+        PerfHttpSessionManager manager = sessionManager();
+        when(manager.getCookieName()).thenReturn("SESSION");
+        when(manager.getCookiePath()).thenReturn("/");
+        when(manager.isCookieSecure()).thenReturn(false);
+        when(manager.getSameSite()).thenReturn(null);
+        Authenticator authenticator = mock(Authenticator.class);
+        when(manager.getAuthenticator()).thenReturn(authenticator);
+        PerfHttpPrincipal authPrincipal = mock(PerfHttpPrincipal.class);
+        when(authPrincipal.getName()).thenReturn("carol");
+        when(authenticator.authenticate("carol", "pw")).thenReturn(authPrincipal);
+
+        PerfHttpSession oldSession = mock(PerfHttpSession.class);
+        when(oldSession.getId()).thenReturn("old-id");
+        when(manager.createSession()).thenReturn(oldSession);
+        PerfHttpSession newSession = mock(PerfHttpSession.class);
+        when(newSession.getId()).thenReturn("new-id");
+        when(manager.changeSessionId(oldSession)).thenReturn(newSession);
+        headers("Other", "x");
+
+        newReq().login("carol", "pw");
+
+        verify(newSession).setAttribute(eq(PerfHttpSessionManager.PRINCIPAL_KEY), same(authPrincipal));
+    }
+
     /* ==================== getRemoteUser with PerfHttpPrincipal principal ==================== */
 
     @Test

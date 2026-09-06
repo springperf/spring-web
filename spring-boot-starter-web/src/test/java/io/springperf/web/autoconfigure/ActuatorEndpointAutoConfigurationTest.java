@@ -25,6 +25,8 @@ import java.lang.reflect.Method;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class ActuatorEndpointAutoConfigurationTest {
@@ -126,5 +128,65 @@ class ActuatorEndpointAutoConfigurationTest {
         ManagementServerInfrastructure bean = config.managementServerInfrastructure(webContext, props, environment);
 
         assertNotNull(bean);
+    }
+
+    @Test
+    void webEndpointDiscoverer_createsBean() {
+        try (org.springframework.context.annotation.AnnotationConfigApplicationContext applicationContext =
+                     new org.springframework.context.annotation.AnnotationConfigApplicationContext()) {
+            applicationContext.refresh();
+            org.springframework.beans.factory.ObjectProvider<org.springframework.boot.actuate.endpoint.web.PathMapper> pathMappers =
+                    mock(org.springframework.beans.factory.ObjectProvider.class);
+            org.mockito.Mockito.when(pathMappers.orderedStream()).thenReturn(java.util.stream.Stream.empty());
+            org.springframework.beans.factory.ObjectProvider<org.springframework.boot.actuate.endpoint.invoke.OperationInvokerAdvisor> invokerAdvisors =
+                    mock(org.springframework.beans.factory.ObjectProvider.class);
+            org.mockito.Mockito.when(invokerAdvisors.orderedStream()).thenReturn(java.util.stream.Stream.empty());
+            org.springframework.beans.factory.ObjectProvider<org.springframework.boot.actuate.endpoint.EndpointFilter<org.springframework.boot.actuate.endpoint.web.ExposableWebEndpoint>> filters =
+                    mock(org.springframework.beans.factory.ObjectProvider.class);
+            org.mockito.Mockito.when(filters.orderedStream()).thenReturn(java.util.stream.Stream.empty());
+
+            org.springframework.boot.actuate.endpoint.web.annotation.WebEndpointDiscoverer bean =
+                    config.webEndpointDiscoverer(applicationContext,
+                            mock(org.springframework.boot.actuate.endpoint.invoke.ParameterValueMapper.class),
+                            EndpointMediaTypes.DEFAULT, pathMappers, invokerAdvisors, filters);
+
+            assertNotNull(bean);
+            assertTrue(bean.getEndpoints().isEmpty());
+        }
+    }
+
+    @Test
+    void perfEndpointHandlerMapping_createsAndRegistersMapping() {
+        org.springframework.boot.actuate.endpoint.web.WebEndpointsSupplier endpointsSupplier =
+                mock(org.springframework.boot.actuate.endpoint.web.WebEndpointsSupplier.class);
+        WebEndpointProperties props = new WebEndpointProperties();
+        org.springframework.boot.actuate.autoconfigure.endpoint.web.CorsEndpointProperties corsProps =
+                new org.springframework.boot.actuate.autoconfigure.endpoint.web.CorsEndpointProperties();
+        org.springframework.beans.factory.ObjectProvider<ManagementServerInfrastructure> infraProvider =
+                mock(org.springframework.beans.factory.ObjectProvider.class);
+
+        io.springperf.web.autoconfigure.actuator.ActuatorEndpointHandlerMapping mapping =
+                config.perfEndpointHandlerMapping(endpointsSupplier, EndpointMediaTypes.DEFAULT, props,
+                        corsProps, webContext, infraProvider);
+
+        assertNotNull(mapping);
+        org.mockito.Mockito.verify(webContext).registerWebComponent(mapping);
+    }
+
+    @Test
+    void managementNettyHttpServer_createsAndRegistersServer() {
+        environment.setProperty("management.server.port", "9091");
+        environment.setProperty("server.http2.enabled", "false");
+        WebEndpointProperties props = new WebEndpointProperties();
+        ManagementServerInfrastructure infra = mock(ManagementServerInfrastructure.class);
+        org.mockito.Mockito.when(infra.getDispatcherHandler())
+                .thenReturn(mock(io.springperf.web.autoconfigure.actuator.ManagementDispatcherHandler.class));
+
+        io.springperf.web.autoconfigure.actuator.server.ManagementNettyHttpServer server =
+                config.managementNettyHttpServer(webContext, infra, props, environment);
+
+        assertNotNull(server);
+        assertFalse(server.isRunning());
+        org.mockito.Mockito.verify(webContext).registerWebComponent(server);
     }
 }

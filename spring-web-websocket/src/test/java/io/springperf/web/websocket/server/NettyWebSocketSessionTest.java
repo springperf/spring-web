@@ -149,7 +149,61 @@ class NettyWebSocketSessionTest {
         assertNotEquals(s1, s2);
         assertEquals(s1, s1);
         assertEquals(s1.hashCode(), s1.hashCode());
+        assertNotEquals(s1, "not-a-session");
+        assertNotEquals(s1, null);
         c1.finishAndReleaseAll();
         c2.finishAndReleaseAll();
+    }
+
+    @Test
+    void closeDefault_writesNormalCloseFrame() throws Exception {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        NettyWebSocketSession session = newSession(channel);
+        session.close();
+        channel.runPendingTasks();
+        assertFalse(session.isOpen());
+        WebSocketFrame out = channel.readOutbound();
+        assertTrue(out instanceof CloseWebSocketFrame);
+        out.release();
+        channel.finishAndReleaseAll();
+    }
+
+    @Test
+    void toString_describesSession() {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        NettyWebSocketSession session = newSession(channel);
+        assertTrue(session.toString().contains("ws-"));
+        assertTrue(session.toString().contains("/ws"));
+        channel.finishAndReleaseAll();
+    }
+
+    @Test
+    void drainBackpressureQueue_flushesQueuedFrames() {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        NettyWebSocketSession session = newSession(channel);
+        // 通过反射拿到私有 handler 并非必要——直接触发 enqueue 需要通道不可写，此处改为
+        // 使用 channel attr 手动注入队列，验证 drain 逻辑本身。
+        java.util.Queue<io.netty.handler.codec.http.websocketx.WebSocketFrame> queue = new java.util.LinkedList<>();
+        queue.add(new TextWebSocketFrame("q1"));
+        queue.add(new TextWebSocketFrame("q2"));
+        channel.attr(io.netty.util.AttributeKey.<java.util.Queue<io.netty.handler.codec.http.websocketx.WebSocketFrame>>
+                valueOf("ws.backpressure.queue")).set(queue);
+
+        NettyWebSocketSession.drainBackpressureQueue(channel);
+        channel.runPendingTasks();
+
+        assertTrue(queue.isEmpty(), "drain 应清空背压队列");
+        Object out = channel.readOutbound();
+        assertNotNull(out);
+        io.netty.util.ReferenceCountUtil.release(out);
+        channel.finishAndReleaseAll();
+    }
+
+    @Test
+    void drainBackpressureQueue_emptyQueue_noop() {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        NettyWebSocketSession.drainBackpressureQueue(channel);
+        assertNull(channel.readOutbound());
+        channel.finishAndReleaseAll();
     }
 }

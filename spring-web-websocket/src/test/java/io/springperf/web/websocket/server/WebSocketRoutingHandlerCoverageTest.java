@@ -297,4 +297,56 @@ class WebSocketRoutingHandlerCoverageTest {
 
         verify(handler, timeout(2000)).afterConnectionEstablished(any(WebSocketSession.class));
     }
+
+    /* ==================== per-path 配置覆盖 ==================== */
+
+    @Test
+    void perPathConfig_registryOverridesGlobalSettings() throws Exception {
+        handler = mock(WebSocketHandler.class);
+        io.springperf.web.websocket.WebSocketHandlerRegistry registry =
+                new io.springperf.web.websocket.WebSocketHandlerRegistry();
+        registry.addHandler(handler, "/ws")
+                .setAllowedOrigins("http://perpath.com")
+                .setSubProtocols("chat")
+                .setAllowExtensions(true)
+                .setIdleTimeout(2000)
+                .setHeartbeatInterval(1000);
+        // 全局配置与 per-path 相悖，期望 per-path 覆盖生效
+        channel = newChannel(new WebSocketRoutingHandler(
+                Collections.singletonMap("/ws", handler), "global-proto", false,
+                Collections.singletonList("http://global.com"), 5000, 5000, registry));
+
+        channel.pipeline().fireChannelRead(upgradeRequest("/ws", "http://perpath.com"));
+        channel.runPendingTasks();
+
+        verify(handler, timeout(2000)).afterConnectionEstablished(any(WebSocketSession.class));
+        // per-path idleTimeout>0 → 应安装 IdleStateHandler
+        assertNotNull(channel.pipeline().get("ws-idle"), "per-path idleTimeout 应安装 IdleStateHandler");
+    }
+
+    @Test
+    void perPathConfig_disallowedOrigin_forbiddenEvenWhenGlobalAllows() throws Exception {
+        handler = mock(WebSocketHandler.class);
+        io.springperf.web.websocket.WebSocketHandlerRegistry registry =
+                new io.springperf.web.websocket.WebSocketHandlerRegistry();
+        registry.addHandler(handler, "/ws").setAllowedOrigins("http://perpath.com");
+        channel = newChannel(new WebSocketRoutingHandler(
+                Collections.singletonMap("/ws", handler), null, false,
+                Collections.singletonList("http://global.com"), -1, -1, registry));
+
+        channel.pipeline().fireChannelRead(upgradeRequest("/ws", "http://evil.com"));
+        channel.runPendingTasks();
+
+        verify(handler, never()).afterConnectionEstablished(any());
+    }
+
+    @Test
+    void channelWritabilityChanged_writable_drainsQueue() throws Exception {
+        handler = mock(WebSocketHandler.class);
+        channel = newChannel(new WebSocketRoutingHandler(
+                Collections.singletonMap("/ws", handler), null, false, null));
+
+        channel.pipeline().fireChannelWritabilityChanged();
+        assertNull(channel.pipeline().get("ws.session"));
+    }
 }
