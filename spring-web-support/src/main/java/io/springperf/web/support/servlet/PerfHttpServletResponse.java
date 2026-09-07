@@ -268,7 +268,17 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
         }
         return cachedWriter;
     }
-    @Override public void flushBuffer() { try { response.flush(); } catch (IOException e) { throw new RuntimeException(e); } }
+    @Override public void flushBuffer() {
+        try {
+            if (cachedWriter != null) {
+                cachedWriter.flush();
+            }
+            response.flush();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     @Override public int getBufferSize() { return response.getBufferSize(); }
     @Override
     public void reset() {
