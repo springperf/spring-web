@@ -1,4 +1,4 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0"
+﻿<project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
@@ -12,7 +12,7 @@
     <artifactId>spring-web-example-realtime</artifactId>
 
     <name>perf-spring-web-example-realtime</name>
-    <description>Spring Perf Web 实时推送示例 - 演示 SSE (SseEmitter) + WebSocket 实时通信</description>
+    <description>Spring Perf Web 瀹炴椂鎺ㄩ€佺ず渚?- 婕旂ず SSE (SseEmitter) + WebSocket 瀹炴椂閫氫俊</description>
 
     <dependencies>
         <dependency>
@@ -30,6 +30,15 @@
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-messaging</artifactId>
+        </dependency>
+        <!-- JSR-356 Servlet WebSocket 瑙勮寖 API锛氭縺娲?@ServerEndpoint 妗ユ帴 -->
+        <dependency>
+            <groupId>javax.websocket</groupId>
+            <artifactId>javax.websocket-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>javax.websocket</groupId>
+            <artifactId>javax.websocket-client-api</artifactId>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
