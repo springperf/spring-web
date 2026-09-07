@@ -13,6 +13,7 @@ import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.MethodParameter;
+import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.lang.Nullable;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.method.ControllerAdviceBean;
@@ -82,7 +83,7 @@ public class ExceptionHandlerExceptionResolver extends WebComponentContainer imp
         if (cached != null) return cached;
 
         Method method = handlerMethod.getMethod();
-        ExceptionHandler ann = method.getAnnotation(ExceptionHandler.class);
+        ExceptionHandler ann = AnnotatedElementUtils.findMergedAnnotation(method, ExceptionHandler.class);
         boolean result = false;
         if (ann != null) {
             for (Class<?> type : ann.value()) {

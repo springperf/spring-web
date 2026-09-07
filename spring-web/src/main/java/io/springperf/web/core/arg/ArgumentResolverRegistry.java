@@ -156,6 +156,12 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
                 args[i] = null;
             }
         }
+        for (int i = 0; i < methodArgContexts.length; i++) {
+            if (methodArgContexts[i].defaultArgumentResolver != null) {
+                methodArgContexts[i].defaultArgumentResolver.postProcess(
+                        args, methodArgContexts, i, request, response);
+            }
+        }
         return args;
     }
 

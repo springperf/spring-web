@@ -1,0 +1,70 @@
+{
+  "properties": [
+    {
+      "name": "spring.web.view.engine",
+      "type": "java.lang.String",
+      "defaultValue": "",
+      "description": "Template engines (comma-separated): thymeleaf, freemarker, beetl. Empty -> register all available on classpath."
+    },
+    {
+      "name": "spring.web.view.thymeleaf.prefix",
+      "type": "java.lang.String",
+      "defaultValue": "templates/",
+      "description": "Thymeleaf template prefix (classpath-relative path)."
+    },
+    {
+      "name": "spring.web.view.thymeleaf.suffix",
+      "type": "java.lang.String",
+      "defaultValue": ".html",
+      "description": "Thymeleaf template suffix."
+    },
+    {
+      "name": "spring.web.view.thymeleaf.cache",
+      "type": "java.lang.Boolean",
+      "defaultValue": true,
+      "description": "Enable Thymeleaf template cache."
+    },
+    {
+      "name": "spring.web.view.freemarker.prefix",
+      "type": "java.lang.String",
+      "defaultValue": "templates/",
+      "description": "FreeMarker template prefix (classpath-relative path)."
+    },
+    {
+      "name": "spring.web.view.freemarker.suffix",
+      "type": "java.lang.String",
+      "defaultValue": ".ftl",
+      "description": "FreeMarker template suffix."
+    },
+    {
+      "name": "spring.web.view.freemarker.cache",
+      "type": "java.lang.Boolean",
+      "defaultValue": true,
+      "description": "Enable FreeMarker template cache."
+    },
+    {
+      "name": "spring.web.view.beetl.prefix",
+      "type": "java.lang.String",
+      "defaultValue": "templates/",
+      "description": "Beetl template prefix (classpath-relative path)."
+    },
+    {
+      "name": "spring.web.view.beetl.suffix",
+      "type": "java.lang.String",
+      "defaultValue": ".btl",
+      "description": "Beetl template suffix."
+    },
+    {
+      "name": "spring.web.view.beetl.cache",
+      "type": "java.lang.Boolean",
+      "defaultValue": true,
+      "description": "Enable Beetl template cache."
+    },
+    {
+      "name": "spring.web.view.encoding",
+      "type": "java.lang.String",
+      "defaultValue": "UTF-8",
+      "description": "Character encoding for template rendering."
+    }
+  ]
+}

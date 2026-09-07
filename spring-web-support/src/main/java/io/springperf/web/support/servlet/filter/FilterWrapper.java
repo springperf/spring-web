@@ -11,6 +11,7 @@ import io.springperf.web.support.servlet.PerfHttpServletResponse;
 import io.springperf.web.support.servlet.ServletAttribute;
 import io.springperf.web.support.servlet.context.PerfServletContext;
 import io.springperf.web.support.servlet.context.ServletAdapterContext;
+import org.springframework.core.annotation.AnnotatedElementUtils;
 
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -59,8 +60,15 @@ public class FilterWrapper implements WebFilter, LifecycleWebComponent {
      * </ol>
      */
     protected Map<String, String> resolveInitParams() {
+<<<<<<< HEAD
         javax.servlet.annotation.WebFilter webFilter =
-                filter.getClass().getAnnotation(javax.servlet.annotation.WebFilter.class);
+                AnnotatedElementUtils.findMergedAnnotation(filter.getClass(),
+                        javax.servlet.annotation.WebFilter.class);
+=======
+        jakarta.servlet.annotation.WebFilter webFilter =
+                AnnotatedElementUtils.findMergedAnnotation(filter.getClass(),
+                        jakarta.servlet.annotation.WebFilter.class);
+>>>>>>> d6f746e (feat: view rendering module with model injection)
         if (webFilter == null) {
             return Collections.emptyMap();
         }

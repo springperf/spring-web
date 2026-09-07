@@ -42,6 +42,7 @@
         <module>spring-web-test</module>
         <module>spring-web-support-test</module>
         <module>spring-web-benchmark</module>
+        <module>spring-web-view</module>
         <module>spring-web-batch</module>
         <module>spring-web-examples</module>
     </modules>
@@ -307,6 +308,11 @@
             <dependency>
                 <groupId>io.github.springperf</groupId>
                 <artifactId>spring-web-websocket</artifactId>
+                <version>${spring-web.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.springperf</groupId>
+                <artifactId>spring-web-view</artifactId>
                 <version>${spring-web.version}</version>
             </dependency>
             <dependency>

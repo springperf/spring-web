@@ -88,4 +88,27 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 | Servlet API | `javax.servlet` | `jakarta.servlet` |
 | Virtual threads | Not supported | Supported (JDK 21+) |
 | GraalVM native-image | Not supported | Supported |
-| Development baseline | Maintenance branch (bugfix + features) | **Development baseline** (new features first) |
+| `ModelMap` vs `Model` | `ModelMap implements Model` | **`ModelMap` does NOT implement `Model`** (requires `ExtendedModelMap`) |
+| `spring-web-view` | Per backport status | New feature baseline |
+
+---
+
+## spring-web-view and Model Type Differences
+
+The view rendering module depends on Spring's `org.springframework.ui` types. Because the class designs differ between Spring Framework 6.1 (master) and 5.3 (2.7.x), the **Model parameter injection implementation differs**:
+
+| Branch | Spring Framework | `ModelMap` implements `Model`? | Framework injection type | Notes |
+|--------|-----------------|-------------------------------|--------------------------|-------|
+| `master` | 6.1.x | ❌ No | `ExtendedModelMap` (subclass of `ModelMap` and implements `Model`) | Always injects `ExtendedModelMap` to support `Model`/`ModelMap`/`ExtendedModelMap` declarations |
+| `2.7.x` | 5.3.x | ✅ Yes | `ExtendedModelMap` (simpler on backport) | `ModelMap` itself is castable to `Model` |
+
+> **Backport note**: `ModelSupport.getOrCreate()` in `spring-web-view` needs no special handling on 2.7.x — Spring 5.3's `ModelMap` already implements `Model`, so the same implementation can be reused.
+
+### Thymeleaf / FreeMarker Version Matrix
+
+| Branch | Thymeleaf (BOM-managed) | FreeMarker (BOM-managed) |
+|--------|-------------------------|--------------------------|
+| `3.2.12` (master) | 3.1.2.RELEASE | 2.3.33 |
+| `2.7.18` (2.7.x) | 3.0.15.RELEASE | 2.3.32 |
+
+`spring-web-view` declares engines as `provided`; exact versions are managed by the user's Spring Boot BOM.

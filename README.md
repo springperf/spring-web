@@ -55,6 +55,7 @@ Spring WebPerf is a high-performance web framework built on **Netty 4.1**, desig
 - **Batch Processing** — Disruptor-based request aggregation that transparently merges concurrent requests into batch operations, boosting throughput by multiple times; supports backpressure strategies, wait strategies, and thread pool isolation
 - **Extensible** — SPI at every key juncture: argument resolvers, return value handlers, codec interceptors, filters, interceptors
 - **Ecosystem Bridge** — The `support` module bridges Servlet Filters, Spring MVC `HandlerInterceptor`, `RequestBodyAdvice` / `ResponseBodyAdvice`
+- **Server-Side Rendering** — Optional `spring-web-view` module adds Thymeleaf / FreeMarker template rendering; `@Controller` + `Model` + view-name programming model matches Spring MVC
 - **Actuator Integration** — Supports Spring Boot Actuator with optional standalone management port
 
 ---
@@ -181,7 +182,8 @@ This project manages two branches aligned with Spring Boot major versions. Minim
 | Module | Description |
 |--------|-------------|
 | `spring-web` | Core: Netty server, request dispatch, mapping registration, exception handling |
-| `spring-web-support` | Spring MVC compatibility: `HandlerInterceptor`, `View` adapters, etc. ¹ |
+| `spring-web-view` | View rendering: Thymeleaf / FreeMarker template engines (optional) ¹ |
+| `spring-web-support` | Spring MVC compatibility: `HandlerInterceptor`, `View` adapters, etc. ² |
 | `spring-web-websocket` | WebSocket support: Spring WebSocket + Netty |
 | `spring-web-batch` | Batch processing: high-performance message aggregation via Disruptor |
 | `spring-boot-starter-web` | Spring Boot Starter: auto-configuration, Actuator support |
@@ -189,7 +191,9 @@ This project manages two branches aligned with Spring Boot major versions. Minim
 | `spring-web-support-test` | Spring MVC compatibility tests |
 | `spring-web-examples` | Usage examples for various scenarios |
 
-> ¹ Some classes in the support module use `org.springframework.web.servlet` package paths (e.g., `HandlerInterceptor`), intentionally matching Spring WebMVC's official package paths — code written against Spring MVC interfaces can run without import changes. However, this means the support module and `spring-webmvc` **cannot coexist** — having both on the classpath will cause class conflicts at runtime. Under Java 9+ module system this also triggers split package errors. Choose one or the other.
+> ¹ View rendering usage and Spring MVC differences: [View Rendering](docs/view.md).
+>
+> ² Some classes in the support module use `org.springframework.web.servlet` package paths (e.g., `HandlerInterceptor`), intentionally matching Spring WebMVC's official package paths — code written against Spring MVC interfaces can run without import changes. However, this means the support module and `spring-webmvc` **cannot coexist** — having both on the classpath will cause class conflicts at runtime. Under Java 9+ module system this also triggers split package errors. Choose one or the other.
 >
 > Further reading: [Modules](docs/en/modules.md) · [Extension Points](docs/en/extensions.md) · [Advanced Topics](docs/en/advanced.md)
 

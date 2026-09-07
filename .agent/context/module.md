@@ -1,12 +1,13 @@
 # 模块架构
 
-## 9 个模块
+## 10 个模块
 
 ```
 spring-web-parent (聚合 POM)
 │  Spring Boot 2.7.18 (默认)，多版本兼容 2.4.x/2.5.x/2.6.x，Java 8
 │
 ├── spring-web                     核心框架
+├── spring-web-view                视图渲染（Thymeleaf/FreeMarker，可选）
 ├── spring-web-support             可选 Servlet/SpringMVC 桥接层
 ├── spring-web-batch               批量请求处理（可选）
 ├── spring-web-websocket           WebSocket 支持（可选）
@@ -361,6 +362,76 @@ org.springframework.web.servlet.mvc.method.annotation/
 
 ---
 
+## spring-web-view（视图渲染）
+
+基于 Thymeleaf / FreeMarker 模板引擎的 SSR 视图渲染可选模块。**core 零改动**——完全通过核心 SPI 接入：`ReturnValueResolverRegistry` 的 `addResolver` / 自动吸收 `ReturnValueResolver` Bean、`ArgumentResolverRegistry` 自动吸收 `StaticArgumentResolverProvider` Bean。
+
+```
+spring-web-view
+├── View.java                       渲染 SPI：render(model, req, resp) 无 servlet
+├── ViewResolver.java               解析 SPI：resolveViewName(name, locale, req)
+├── ViewResolverRegistry            视图解析器注册中心（extends WebComponentContainer）
+│   ├── resolve() — 按 order 遍历 resolvers 直到返回非 null View
+│   ├── hasViewResolvers() — 空则 String 保持 JSON 行为（条件化开关）
+│   └── initComponentPhase3 — 校验并提示视图方法签名
+├── RedirectView.java               redirect: 前缀 → 302 + query 序列化
+├── ModelSupport.java               请求级 Model 容器（RequestAttribute<ModelMap>）
+│   └── getOrCreate() — 懒创建 ExtendedModelMap，挂 RequestContext，请求结束释放
+├── ViewProperties.java             配置键（spring.web.view.*）
+├── arg/ModelArgumentResolverProvider  Model 参数注入 + postProcess 5 步 Model 初始化
+│   └── order=HIGHEST_PRECEDENCE+100，先于 ModelAttributeResolver 兜底
+├── retval/ViewReturnValueResolver  无 @ResponseBody 的 String → 视图名
+│   └── order=MAX-200，低于 JsonBodyReturnValueResolver（MAX-100），supportsReturnValue 通过 PathMappingContext.get() 判断方法注解
+└── thymeleaf/                      基于模板引擎核心 API（零 servlet）
+    ├── ThymeleafViewResolver       ClassLoaderTemplateResolver + TemplateEngine 单例
+    └── ThymeleafWebContext         自实现 IWebContext/IWebExchange/IWebRequest/IWebApplication
+                                    contextPath 取自 getWebContext().getContextPath()，@{...} URL 方言经 transformURL 适配
+freemarker/                         FreemarkerViewResolver（备用引擎，engine=freemarker）
+beetl/                              BeetlViewResolver（引擎，engine=beetl，GroupTemplate + ClassLoader 显式绑定）
+
+**多引擎共存（方案 A）**：多个 ViewResolver 同时注册，每个 `resolveViewName` 通过 `ClassPathResource(prefix+viewName+suffix).exists()` 做模板存在性探测——存在返回 View，不存在返回 null 交给下一个 resolver。`spring.web.view.engine` 多选（逗号分隔，不配置则注册全部可用引擎），由 `ViewEngineCondition` 自定义 Condition 驱动。
+
+spring-web-support/mvc/retval/
+└── ModelAndViewReturnValueResolver  直接类型访问（非反射）桥接 org.springframework.web.servlet.ModelAndView
+    └── @ConditionalOnClass(name="io.springperf.web.view.View") 条件注册
+```
+
+> **ModelAndView 桥接归属**：`ModelAndView` 是 Spring MVC 概念（`org.springframework.web.servlet.ModelAndView`），属 support 桥接层。`ModelAndViewReturnValueResolver` 位于 `spring-web-support`，直接依赖 `org.springframework.web.servlet.ModelAndView`（无反射），依赖 `spring-web-view` 的 `View`/`ModelSupport`/`ViewResolverRegistry`/`RedirectView`。
+
+**接入机制**（core SPI，无核心代码改动）：
+
+| 插槽 | 注册方式 | 时机 |
+|------|---------|------|
+| `ViewReturnValueResolver` / `ModelAndViewReturnValueResolver` | Spring Bean → `ReturnValueResolverRegistry.registerWebComponent(ReturnValueResolver.class)` 自动吸入 | Phase1 |
+| `ModelArgumentResolverProvider` | Spring Bean → `ArgumentResolverRegistry.registerWebComponent(StaticArgumentResolverProvider.class)` 自动吸入 | INIT_CONTEXT |
+| `ThymeleafViewResolver` / `FreemarkerViewResolver` | Spring Bean → `ViewResolverRegistry.registerWebComponent(ViewResolver.class)` 自动吸入 | INIT_CONTEXT → Phase1 |
+| `ViewResolverRegistry` 本体 | `SpringWebViewAutoConfiguration` @Bean → `webContext.registerWebComponent()` | 构造时 |
+
+**请求管线落点**：
+
+```
+doHandle()
+  ├── ArgumentResolverRegistry.resolveArguments()
+  │   ├── ModelArgumentResolverProvider → ModelSupport.getOrCreate(req)   // 懒创建挂 RequestContext
+  │   └── postProcess: 5 步 Model 初始化（@ControllerAdvice/局部 @ModelAttribute 方法、@ModelAttribute 参数、@PathVariable、BindingResult）
+  ├── InvokableHandlerMethod.invoke()
+  └── ReturnValueResolverRegistry.resolveReturnValue()
+      ├── Fast path 缓存命中 → ViewReturnValueResolver
+      │   └── redirect: → RedirectView｜否则 ViewResolverRegistry.resolve(viewName)
+      │       ├── 设置 text/html 头 + resp.setHandled()
+      │       └── view.render(model, req, resp)  ← 渲染线程 = handler 当前线程（用户控制）
+      └── 未注册 ViewResolver → 保持 JSON 行为
+```
+
+**生命周期**：`ModelMap`（`ExtendedModelMap`）挂 `RequestContext` 的 `RequestAttribute`，请求结束随上下文释放；无 `Model` 参数且无视图返回时零创建。
+
+**设计要点**：
+- Spring 6.x 中 `ModelMap` 不再实现 `Model`，统一注入 `ExtendedModelMap`（二者兼取）——2.7.x backport 时 Spring 5.3 的 `ModelMap implements Model`，此点可简化
+- 异常路径天然支持：`ExceptionHandlerExceptionResolver` 已走 `resolveReturnValue`，`@ExceptionHandler` 返回视图名可渲染错误页
+- Spring Boot 3.x auto-config `SpringWebViewAutoConfiguration` 注册于 `AutoConfiguration.imports`
+
+---
+
 ## spring-web-websocket（WebSocket 支持）
 
 基于 Spring WebSocket API + Netty 的可选模块。通过 `WebSocketConfigurer` SPI 注册端点，`WebSocketRoutingHandler` 拦截 Netty pipeline 中的 HTTP Upgrade 请求完成握手，后续帧委托给 Spring `WebSocketHandler`。
@@ -495,6 +566,9 @@ WebComponent (interface)
 | `CorsConfigurationProvider` | 内部 | 每次请求 CORS 配置 | `CorsRegistry` |
 | `CustomInvoker` | 内部 | 非控制器方法调用 | `MappingRegistry` |
 | `WebComponent` / `BaseWebComponent` | Spring Bean | 自定义生命周期组件 | `WebComponentContainer` |
+| `ViewResolver` | Spring Bean | 视图名 → `View` 解析 | `ViewResolverRegistry` |
+| `View` | — | 视图渲染（render(model, req, resp)） | `ViewResolverRegistry` |
+| `Model` 参数 | — | 请求级 model 注入 | `ArgumentResolverRegistry`（via `ModelArgumentResolverProvider`） |
 
 ---
 

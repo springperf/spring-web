@@ -5,6 +5,7 @@
 ```
 spring-web-parent (聚合 POM)
 ├── spring-web                  核心框架
+├── spring-web-view             视图渲染（Thymeleaf/FreeMarker，可选）
 ├── spring-web-support          可选 Servlet 桥接层
 ├── spring-web-batch            批量请求处理（可选）
 ├── spring-web-websocket        WebSocket 支持（可选）
@@ -218,6 +219,54 @@ destroyComponent()     → 资源释放
 
 ---
 
+## spring-web-view（视图渲染）
+
+基于 Thymeleaf / FreeMarker 模板引擎的服务器端渲染（SSR）模块。**核心模块零改动**——完全通过核心 SPI（`ReturnValueResolver` / `StaticArgumentResolverProvider` / `ViewResolver`）接入，不注册任何视图解析器时 String 返回值保持 JSON 行为，纯 API 项目零惊扰。
+
+> 详细使用文档：[视图渲染](view.md)
+
+### 依赖
+
+`spring-web-view` 对模板引擎为 `provided` 依赖，需显式引入：
+
+```xml
+<dependency>
+    <groupId>io.github.springperf</groupId>
+    <artifactId>spring-web-view</artifactId>
+    <version>${spring-web.version}</version>
+</dependency>
+
+<!-- Thymeleaf（默认）或 freemarker -->
+<dependency>
+    <groupId>org.thymeleaf</groupId>
+    <artifactId>thymeleaf</artifactId>
+</dependency>
+```
+
+### 核心类
+
+| 类 | 说明 |
+|------|------|
+| `View` | 渲染 SPI：`render(model, req, resp)`，无 servlet 依赖 |
+| `ViewResolver` | 解析 SPI：`resolveViewName(name, locale, req)`，按 `getOrder()` 排序 |
+| `ViewResolverRegistry` | `ViewResolver` 注册中心，空则 String 保持 JSON |
+| `RedirectView` | `redirect:` 前缀 → 302 + query 参数序列化 |
+| `ModelSupport` | 请求级 Model 容器（`ExtendedModelMap`）挂 `RequestContext` |
+| `ModelArgumentResolverProvider` | `Model` / `ModelMap` / `ExtendedModelMap` 参数注入 + `postProcess` 5 步 Model 初始化（`@ControllerAdvice`/局部 `@ModelAttribute` 方法、`@ModelAttribute` 参数、`@PathVariable`、`BindingResult`） |
+| `ViewReturnValueResolver` | 无 `@ResponseBody` 的 String → 视图名（order=MAX-200，先于 JsonBody） |
+| `ThymeleafViewResolver` | Thymeleaf 引擎适配（核心 API，零 servlet） |
+| `FreemarkerViewResolver` | FreeMarker 引擎适配 |
+| `ThymeleafWebContext` | 自实现 `IWebContext` / `IWebExchange`，`@{...}` URL 方言经 `transformURL` 适配 `context-path` |
+
+### 接入机制
+
+- `ViewReturnValueResolver` / `ModelAndViewReturnValueResolver` 为 Spring Bean，被 `ReturnValueResolverRegistry` 自动吸收
+- `ModelArgumentResolverProvider` 为 Spring Bean，被 `ArgumentResolverRegistry` 自动吸收
+- `ThymeleafViewResolver` / `FreemarkerViewResolver` 为 Spring Bean，被 `ViewResolverRegistry` 自动吸收
+- 引擎选择由 `spring.web.view.engine` 配置项 + classpath 探测联合决定
+
+---
+
 ## spring-boot-starter-web（自动配置）
 
 ### 核心自动配置
@@ -232,6 +281,12 @@ destroyComponent()     → 资源释放
 ### Support 自动配置
 
 `SpringWebSupportAutoConfiguration` 在 `spring-web-support` 存在时自动装配支持模块组件。
+
+### View 自动配置
+
+`SpringWebViewAutoConfiguration` 在 `spring-web-view` 存在时自动装配：
+- `ViewResolverRegistry`、`ViewReturnValueResolver`、`ModelAndViewReturnValueResolver`、`ModelArgumentResolverProvider`
+- 引擎选择：`spring.web.view.engine`（默认 `thymeleaf`）+ classpath 探测 `TemplateEngine` / `freemarker.template.Configuration`
 
 ### Batch 自动配置
 

@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Binding Result</title>
+</head>
+<body>
+<h1>Binding Result Page</h1>
+<p>HasErrors: <span th:text="${hasErrors}"></span></p>
+<p>FormName: <span th:text="${validForm != null ? validForm.name : 'null'}">null</span></p>
+</body>
+</html>

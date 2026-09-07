@@ -416,6 +416,42 @@ public class CustomRouterOptimizer implements RouterOptimizer {
 
 ---
 
+## 13. ViewResolver / View — View Rendering (spring-web-view)
+
+The `spring-web-view` module provides Spring MVC-like server-side rendering SPIs. Implement and register as a Spring Bean to be absorbed by `ViewResolverRegistry` (sorted by `getOrder()`; returning `null` defers to the next resolver in the chain).
+
+```java
+@Component
+public class MarkdownViewResolver extends BaseWebComponent implements ViewResolver {
+    @Override
+    public View resolveViewName(String viewName, Locale locale, WebServerHttpRequest req) {
+        if (!viewName.startsWith("md:")) return null;
+        return (model, request, response) -> {
+            response.getHeaders().set(HttpHeaders.CONTENT_TYPE, "text/markdown;charset=UTF-8");
+            response.getBody().write(renderMarkdown(model).getBytes());
+        };
+    }
+}
+```
+
+Custom `View` rendering must set `Content-Type` and write to `response.getBody()`.
+
+### Model parameter injection
+
+Declaring `Model` / `ModelMap` / `ExtendedModelMap` parameters injects the request-scoped model automatically (via the Spring Bean `ModelArgumentResolverProvider`), with a lifecycle bound to `RequestContext`:
+
+```java
+@GetMapping("/page")
+public String page(Model model) {
+    model.addAttribute("user", userService.current());
+    return "page";
+}
+```
+
+> Full usage: [View Rendering](view.md).
+
+---
+
 ## Integration Example: SpringDoc OpenAPI
 
 This framework does not use Spring MVC, so SpringDoc cannot discover routes through `RequestMappingHandlerMapping` by default. The framework implements the `OpenApiCustomizer` SPI to build OpenAPI documentation from `MappingRegistry`.
@@ -477,3 +513,6 @@ Swagger annotations (`@Tag`, `@Operation`, `@Schema`) work directly.
 | `WebComponent` / `BaseWebComponent` | Spring Bean | Framework-level component (participates in lifecycle) |
 | `RouterOptimizer` | Spring Bean | Route optimization strategy |
 | `WebCorsProcessor` | Spring Bean | CORS processing strategy |
+| `ViewResolver` | Spring Bean | View-name → `View` resolution (spring-web-view) |
+| `View` | — | View rendering SPI (`render(model, req, resp)`) |
+| `Model` parameter | — | Request-scoped model injection (`ModelArgumentResolverProvider`) |

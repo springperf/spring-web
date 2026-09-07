@@ -416,6 +416,42 @@ public class CustomRouterOptimizer implements RouterOptimizer {
 
 ---
 
+## 13. ViewResolver / View — 视图渲染（spring-web-view）
+
+`spring-web-view` 模块提供类 Spring MVC 的服务端渲染 SPI。实现并注册为 Spring Bean 即被 `ViewResolverRegistry` 自动吸收（按 `getOrder()` 排序，返回 `null` 则交给链中下一个）。
+
+```java
+@Component
+public class MarkdownViewResolver extends BaseWebComponent implements ViewResolver {
+    @Override
+    public View resolveViewName(String viewName, Locale locale, WebServerHttpRequest req) {
+        if (!viewName.startsWith("md:")) return null;
+        return (model, request, response) -> {
+            response.getHeaders().set(HttpHeaders.CONTENT_TYPE, "text/markdown;charset=UTF-8");
+            response.getBody().write(renderMarkdown(model).getBytes());
+        };
+    }
+}
+```
+
+自定义 `View` 渲染时需自行设置 `Content-Type` 并写入 `response.getBody()`。
+
+### Model 参数注入
+
+控制器方法声明 `Model` / `ModelMap` / `ExtendedModelMap` 参数即自动注入请求级 model（Spring Bean `ModelArgumentResolverProvider` 提供），生命周期挂 `RequestContext`：
+
+```java
+@GetMapping("/page")
+public String page(Model model) {
+    model.addAttribute("user", userService.current());
+    return "page";
+}
+```
+
+> 详细用法见 [视图渲染文档](view.md)。
+
+---
+
 ## 集成案例：SpringDoc OpenAPI
 
 本框架不使用 Spring MVC，因此 SpringDoc 默认无法通过 `RequestMappingHandlerMapping` 发现路由。框架通过实现 `OpenApiCustomizer` SPI，从 `MappingRegistry` 中构建 OpenAPI 文档。
@@ -477,3 +513,6 @@ Swagger 注解（`@Tag`、`@Operation`、`@Schema`）直接可用。
 | `WebComponent` / `BaseWebComponent` | Spring Bean | 框架级组件（参与生命周期） |
 | `RouterOptimizer` | Spring Bean | 路由优化策略 |
 | `WebCorsProcessor` | Spring Bean | CORS 处理策略 |
+| `ViewResolver` | Spring Bean | 视图名 → `View` 解析（spring-web-view） |
+| `View` | — | 视图渲染 SPI（`render(model, req, resp)`） |
+| `Model` 参数 | — | 请求级 model 注入（`ModelArgumentResolverProvider`） |

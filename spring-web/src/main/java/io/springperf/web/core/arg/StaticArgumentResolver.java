@@ -30,5 +30,21 @@ public interface StaticArgumentResolver {
      * @throws Exception if argument resolution fails
      */
     Object resolveArgument(WebServerHttpRequest request, WebServerHttpResponse response) throws Exception;
-}
 
+    /**
+     * Post-process after all arguments have been resolved.
+     *
+     * <p>Invoked by {@link ArgumentResolverRegistry#resolveArguments} after every parameter's
+     * {@link #resolveArgument} completes, allowing a resolver to perform cross-parameter logic
+     * (e.g., merging {@code @ModelAttribute} bindings into the request Model).</p>
+     *
+     * @param args      all resolved argument values
+     * @param contexts  per-argument contexts (cached per handler method)
+     * @param index     the index of the argument handled by this resolver
+     * @param request   the current HTTP request
+     * @param response  the current HTTP response
+     */
+    default void postProcess(Object[] args, MethodArgContext[] contexts, int index,
+                             WebServerHttpRequest request, WebServerHttpResponse response) {
+    }
+}

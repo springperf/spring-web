@@ -11,6 +11,7 @@ import io.springperf.web.support.async.stream.ResponseBodyEmitterReturnValueReso
 import io.springperf.web.support.codec.interceptor.SupportHttpBodyCodecInterceptorRegistry;
 import io.springperf.web.support.mvc.config.WebMvcConfigurerBridge;
 import io.springperf.web.support.mvc.interceptor.SupportInterceptorRegistry;
+import io.springperf.web.support.mvc.retval.ModelAndViewReturnValueResolver;
 import io.springperf.web.support.servlet.filter.FilterWrapper;
 import io.springperf.web.support.servlet.filter.SupportWebFilterRegistry;
 import io.springperf.web.support.servlet.session.PerfHttpSessionManager;
@@ -46,6 +47,10 @@ public class SpringWebSupportAutoConfiguration implements ApplicationContextAwar
 
     @Bean @ConditionalOnMissingBean
     public SupportHttpBodyCodecInterceptorRegistry supportHttpBodyCodecInterceptorRegistry() { return new SupportHttpBodyCodecInterceptorRegistry(); }
+
+    @Bean @ConditionalOnMissingBean
+    @ConditionalOnClass(name = "io.springperf.web.view.View")
+    public ModelAndViewReturnValueResolver modelAndViewReturnValueResolver() { return new ModelAndViewReturnValueResolver(); }
 
     @Bean @ConditionalOnMissingBean
     public HttpServletRequestProvider httpServletRequestProvider() { return new HttpServletRequestProvider(); }

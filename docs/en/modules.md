@@ -5,6 +5,7 @@
 ```
 spring-web-parent (aggregate POM)
 ├── spring-web                  Core framework
+├── spring-web-view             View rendering (Thymeleaf/FreeMarker, optional)
 ├── spring-web-support          Optional Servlet bridge layer
 ├── spring-web-batch            Batch request processing (optional)
 ├── spring-web-websocket        WebSocket support (optional)
@@ -219,6 +220,54 @@ Add dependency:
 
 ---
 
+## spring-web-view (View Rendering)
+
+Server-side rendering (SSR) module built on Thymeleaf / FreeMarker template engines. **Zero changes to the core module** — wired purely through core SPIs (`ReturnValueResolver` / `StaticArgumentResolverProvider` / `ViewResolver`) so that without any registered view resolver, String return values keep their JSON behavior. Pure API projects are unaffected.
+
+> Full usage guide: [View Rendering](view.md)
+
+### Dependencies
+
+`spring-web-view` declares engines as `provided`; add the engine explicitly:
+
+```xml
+<dependency>
+    <groupId>io.github.springperf</groupId>
+    <artifactId>spring-web-view</artifactId>
+    <version>${spring-web.version}</version>
+</dependency>
+
+<!-- Thymeleaf (default) or freemarker -->
+<dependency>
+    <groupId>org.thymeleaf</groupId>
+    <artifactId>thymeleaf</artifactId>
+</dependency>
+```
+
+### Core Classes
+
+| Class | Description |
+|-------|-------------|
+| `View` | Rendering SPI: `render(model, req, resp)`, no servlet dependency |
+| `ViewResolver` | Resolution SPI: `resolveViewName(name, locale, req)`, sorted by `getOrder()` |
+| `ViewResolverRegistry` | Registration center; empty → String keeps JSON behavior |
+| `RedirectView` | `redirect:` prefix → 302 + query serialization |
+| `ModelSupport` | Request-scoped model container (`ExtendedModelMap`) bound to `RequestContext` |
+| `ModelArgumentResolverProvider` | `Model` / `ModelMap` / `ExtendedModelMap` parameter injection + `postProcess` 5-step Model initialization (`@ControllerAdvice`/local `@ModelAttribute` methods, `@ModelAttribute` params, `@PathVariable`, `BindingResult`) |
+| `ViewReturnValueResolver` | String without `@ResponseBody` → view name (order=MAX-200, before JsonBody) |
+| `ThymeleafViewResolver` | Thymeleaf engine adapter (core API, zero servlet) |
+| `FreemarkerViewResolver` | FreeMarker engine adapter |
+| `ThymeleafWebContext` | Custom `IWebContext` / `IWebExchange`; `@{...}` URL dialect adapted via `transformURL` to `context-path` |
+
+### Wiring
+
+- `ViewReturnValueResolver` / `ModelAndViewReturnValueResolver` are Spring Beans absorbed by `ReturnValueResolverRegistry`
+- `ModelArgumentResolverProvider` is a Spring Bean absorbed by `ArgumentResolverRegistry`
+- `ThymeleafViewResolver` / `FreemarkerViewResolver` are Spring Beans absorbed by `ViewResolverRegistry`
+- Engine selection is decided by the `spring.web.view.engine` property + classpath detection
+
+---
+
 ## spring-boot-starter-web (Auto-Configuration)
 
 ### Core Auto-Configuration
@@ -233,6 +282,12 @@ Add dependency:
 ### Support Auto-Configuration
 
 `SpringWebSupportAutoConfiguration` auto-assembles support module components when `spring-web-support` is on the classpath.
+
+### View Auto-Configuration
+
+`SpringWebViewAutoConfiguration` auto-assembles when `spring-web-view` is on the classpath:
+- `ViewResolverRegistry`, `ViewReturnValueResolver`, `ModelAndViewReturnValueResolver`, `ModelArgumentResolverProvider`
+- Engine selection: `spring.web.view.engine` (default `thymeleaf`) + classpath detection of `TemplateEngine` / `freemarker.template.Configuration`
 
 ### Batch Auto-Configuration
 
