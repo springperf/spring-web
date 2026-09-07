@@ -93,6 +93,7 @@ class DefaultNettyStreamSenderTest {
         verify(channel, atLeastOnce()).writeAndFlush(httpContentCaptor.capture());
         ByteBuf written = httpContentCaptor.getValue().content();
         assertEquals("hello", written.toString(StandardCharsets.UTF_8));
+        written.release();
     }
 
     @Test
@@ -111,7 +112,10 @@ class DefaultNettyStreamSenderTest {
         sender.send("first");
         sender.send("second");
 
-        verify(channel, atLeast(2)).writeAndFlush(any(DefaultHttpContent.class));
+        verify(channel, atLeast(2)).writeAndFlush(httpContentCaptor.capture());
+        for (DefaultHttpContent content : httpContentCaptor.getAllValues()) {
+            content.content().release();
+        }
     }
 
     @Test
@@ -137,6 +141,7 @@ class DefaultNettyStreamSenderTest {
 
         verify(channel, atLeastOnce()).writeAndFlush(lastHttpContentCaptor.capture());
         assertTrue(lastHttpContentCaptor.getValue() instanceof LastHttpContent);
+        lastHttpContentCaptor.getValue().release();
     }
 
     @Test
@@ -156,6 +161,7 @@ class DefaultNettyStreamSenderTest {
         verify(channel, atLeastOnce()).writeAndFlush(httpContentCaptor.capture());
         DefaultHttpContent content = (DefaultHttpContent) httpContentCaptor.getValue();
         assertEquals("good", content.content().toString(StandardCharsets.UTF_8));
+        content.content().release();
     }
 
     @Test
@@ -236,7 +242,7 @@ class DefaultNettyStreamSenderTest {
         assertEquals(0, sender.queueSize());
         int written = 0;
         for (HttpContent c : httpContentCaptor.getAllValues()) {
-            // 只统计数据帧，排除 LastHttpContent（Mockito 4 的 captor 会捕获到它）
+            // 只统计数据帧，排除 LastHttpContent（Mockito 4 下 captor 会捕获到它）
             if (c instanceof DefaultHttpContent) {
                 written += c.content().readableBytes();
             }

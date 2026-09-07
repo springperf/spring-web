@@ -132,6 +132,15 @@ class FastjsonConverterTest {
     }
 
     @Test
+    void fromJson_invalidJson_throwsException() {
+        FastjsonConverter converter = new FastjsonConverter();
+
+        assertThrows(Exception.class, () -> converter.fromJson("{invalid}", Map.class));
+        assertThrows(Exception.class, () ->
+                converter.fromJson("{invalid}".getBytes(), Map.class));
+    }
+
+    @Test
     void roundTrip_pojo() {
         FastjsonConverter converter = new FastjsonConverter();
         String json = converter.toJson(new TestBean("round", 555));

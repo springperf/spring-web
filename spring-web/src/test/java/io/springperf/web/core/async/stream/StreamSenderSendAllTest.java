@@ -116,6 +116,7 @@ class StreamSenderSendAllTest {
         assertEquals(50, written.readableBytes(), "5 条小数据必须合并进单次 flush");
         assertEquals("0123456789" + "0123456789" + "0123456789"
                 + "0123456789" + "0123456789", written.toString(StandardCharsets.UTF_8));
+        written.release();
     }
 
     @Test
@@ -140,7 +141,10 @@ class StreamSenderSendAllTest {
         }
         sender.sendAll(batch);
 
-        verify(channel, times(2)).writeAndFlush(any(DefaultHttpContent.class));
+        verify(channel, times(2)).writeAndFlush(httpContentCaptor.capture());
+        for (DefaultHttpContent content : httpContentCaptor.getAllValues()) {
+            content.content().release();
+        }
     }
 
     @Test
@@ -158,6 +162,7 @@ class StreamSenderSendAllTest {
         verify(emitter, never()).encode(any(), any());
         verify(channel, times(1)).writeAndFlush(httpContentCaptor.capture());
         assertEquals(50, httpContentCaptor.getValue().content().readableBytes());
+        httpContentCaptor.getValue().content().release();
     }
 
     @Test
@@ -229,5 +234,6 @@ class StreamSenderSendAllTest {
         // 3 条早发数据在 initialize 中批量 flush → 单次 writeAndFlush
         verify(channel, times(1)).writeAndFlush(httpContentCaptor.capture());
         assertEquals("ddd", httpContentCaptor.getValue().content().toString(StandardCharsets.UTF_8));
+        httpContentCaptor.getValue().content().release();
     }
 }

@@ -150,7 +150,9 @@ class PathPatternRouterTest {
 
         router.route(req);
         router.route(req);
-        verify(req, atLeast(1)).getPath();
+
+        // 首次 route 已把解析结果缓存到 ROUTE_REQUEST_ATTRIBUTE，第二次不再解析路径
+        verify(req, times(1)).getPath();
     }
 
     @Test
@@ -163,11 +165,18 @@ class PathPatternRouterTest {
     }
 
     @Test
-    void initRouteMatcher_withPatternPath_usesPatternRouteMatcher() {
+    void initRouteMatcher_withPatternPath_usesPatternRouteMatcher() throws Exception {
         PathMappingContext ctx = mockCtx("/api/{id}");
         PathPatternRouter router = new PathPatternRouter(new SimpleRouter(ctx));
 
         WebServerHttpRequest req = createMockRequest("/api/123");
         assertNotNull(router.route(req));
+
+        // 含 {id} 通配符的 pathRule 应使用 PathPatternRouteMatcher 而非 SimpleRouteMatcher
+        java.lang.reflect.Field field = PathPatternRouter.class.getDeclaredField("routeMatcher");
+        field.setAccessible(true);
+        Object routeMatcher = field.get(router);
+        assertTrue(routeMatcher instanceof org.springframework.web.util.pattern.PathPatternRouteMatcher,
+                "含通配符的路径应使用 PathPatternRouteMatcher，实际: " + routeMatcher.getClass());
     }
 }

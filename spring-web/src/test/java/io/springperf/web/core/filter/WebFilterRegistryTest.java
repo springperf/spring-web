@@ -133,8 +133,9 @@ class WebFilterRegistryTest {
         when(filter1.getComponentName()).thenReturn("filter1");
         WebFilter filter2 = mock(WebFilter.class);
         when(filter2.getComponentName()).thenReturn("filter2");
-        registry.registerWebComponent(new WebFilterRegistration(filter1));
-        registry.registerWebComponent(new WebFilterRegistration(filter2));
+        // 显式不同 order：避免同名/同序时依赖 ConcurrentHashMap 迭代序造成排序不确定
+        registry.registerWebComponent(new WebFilterRegistration(filter1).order(20));
+        registry.registerWebComponent(new WebFilterRegistration(filter2).order(10));
 
         registry.initWithWebContext(webContext);
         registry.initComponentPhase1();
@@ -142,8 +143,8 @@ class WebFilterRegistryTest {
         registry.initComponentPhase3();
 
         assertEquals(2, registry.registrations.size());
-        assertSame(filter1, registry.registrations.get(0).getFilter());
-        assertSame(filter2, registry.registrations.get(1).getFilter());
+        assertSame(filter2, registry.registrations.get(0).getFilter());
+        assertSame(filter1, registry.registrations.get(1).getFilter());
     }
 
     @Test
@@ -201,7 +202,7 @@ class WebFilterRegistryTest {
     }
 
     @Test
-    void getWebFilter_afterPhase3_returnsSortedFilters() throws Exception {
+    void initPhase3_registrationsSortedByOrder() throws Exception {
         WebContext webContext = createWebContext();
         WebFilterRegistry registry = new WebFilterRegistry(mock(DispatcherHandler.class));
 

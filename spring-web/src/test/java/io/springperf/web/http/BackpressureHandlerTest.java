@@ -20,8 +20,11 @@ class BackpressureHandlerTest {
     @Mock Attribute<ConnectionContext> attribute;
 
     @Test
-    void handler_isSingleton() {
+    void handler_isSingleton() throws Exception {
+        // INSTANCE 是框架共享实例（@Sharable），且类为 final：验证返回同一实例 + final 类
         assertSame(BackpressureHandler.INSTANCE, BackpressureHandler.INSTANCE);
+        assertTrue(java.lang.reflect.Modifier.isFinal(BackpressureHandler.class.getModifiers()));
+        assertTrue(java.lang.reflect.Modifier.isStatic(BackpressureHandler.class.getField("INSTANCE").getModifiers()));
     }
 
     @Test

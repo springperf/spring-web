@@ -133,15 +133,17 @@ class ReturnValueResolverRegistryTest {
     }
 
     @Test
-    void getMethodReturnValueContext_noCache_createsWithoutCaching() throws Exception {
+    void getMethodReturnValueContext_createsAndCaches() throws Exception {
         registry.initReturnValueResolver();
         Method method = TestController.class.getMethod("other");
         MappingHandlerMethod mapping = new MappingHandlerMethod(new TestController(), method);
 
-        MethodReturnValueContext ctx = registry.getMethodReturnValueContext(mapping);
+        MethodReturnValueContext first = registry.getMethodReturnValueContext(mapping);
+        MethodReturnValueContext second = registry.getMethodReturnValueContext(mapping);
 
-        assertNotNull(ctx);
-        assertNotNull(mapping.get(ReturnValueResolverRegistry.MAPPING_CACHE_KEY));
+        assertNotNull(first);
+        assertNotNull(mapping.get(ReturnValueResolverRegistry.MAPPING_CACHE_KEY), "首次解析后应写入方法级缓存");
+        assertSame(first, second, "二次调用应从缓存返回同一实例");
     }
 
     // ==================== resolveReturnValue ====================

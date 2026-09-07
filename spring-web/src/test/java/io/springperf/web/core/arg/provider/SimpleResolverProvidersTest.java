@@ -274,6 +274,41 @@ class SimpleResolverProvidersTest {
         assertEquals(Integer.valueOf(42), result);
     }
 
+    /**
+     * {@code @RequestParam(required=true)} 参数缺失 → 400 BAD_REQUEST。
+     * 覆盖 MetaUtils.getRequired 的 RequestParam 分支 +
+     * {@code AbstractNamedValueNullableResolver.handleMissingValue}（MissingServletRequestParameter 语义对齐）。
+     */
+    @Test
+    void requestParamProvider_requiredParamMissing_throws400() throws Exception {
+        stubWebContext();
+        RequestParamResolverProvider p = new RequestParamResolverProvider();
+        // 请求中不存在该参数
+        when(mockRequest.getParameterMap()).thenReturn(new LinkedMultiValueMap<>());
+
+        StaticArgumentResolver r = p.getResolver(
+                param("annotatedRequestParamRequired", String.class, RequestParam.class), mappingContext, webContext);
+
+        org.springframework.web.server.ResponseStatusException ex = assertThrows(
+                org.springframework.web.server.ResponseStatusException.class,
+                () -> r.resolveArgument(mockRequest, mockResponse));
+        assertEquals(400, ex.getStatusCode().value(), "缺少必填参数应映射为 400");
+        assertTrue(ex.getMessage().contains("name"), "400 消息应包含缺失的参数名");
+    }
+
+    @Test
+    void requestParamProvider_optionalParamMissing_returnsNull() throws Exception {
+        stubWebContext();
+        RequestParamResolverProvider p = new RequestParamResolverProvider();
+        when(mockRequest.getParameterMap()).thenReturn(new LinkedMultiValueMap<>());
+
+        StaticArgumentResolver r = p.getResolver(
+                param("annotatedRequestParamOptional", String.class, RequestParam.class), mappingContext, webContext);
+        Object result = r.resolveArgument(mockRequest, mockResponse);
+
+        assertNull(result, "required=false 的参数缺失时返回 null，不应抛 400");
+    }
+
     // ===== @RequestHeader resolver behavior =====
 
     @Test
@@ -400,6 +435,10 @@ class SimpleResolverProvidersTest {
     public void stringParam(String s) {}
     @SuppressWarnings("unused")
     public void annotatedRequestParam(@RequestParam String s) {}
+    @SuppressWarnings("unused")
+    public void annotatedRequestParamRequired(@RequestParam("name") String s) {}
+    @SuppressWarnings("unused")
+    public void annotatedRequestParamOptional(@RequestParam(value = "name", required = false) String s) {}
     @SuppressWarnings("unused")
     public void annotatedRequestParamList(@RequestParam("ids") List<Integer> ids) {}
     @SuppressWarnings("unused")

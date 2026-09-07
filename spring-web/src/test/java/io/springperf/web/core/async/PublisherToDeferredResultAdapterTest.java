@@ -56,6 +56,13 @@ class PublisherToDeferredResultAdapterTest {
 
         adapter.onNext("value1");
         adapter.onNext("value2");
+
+        // onComplete 前只累积不产出；多值源在 onComplete 时应汇总为 List
+        assertFalse(result.hasResult(), "onNext 仅累积，不立即设置结果");
+        adapter.onComplete();
+        assertTrue(result.hasResult());
+        assertTrue(result.getResult() instanceof java.util.List);
+        assertEquals(2, ((java.util.List<?>) result.getResult()).size());
     }
 
     @Test

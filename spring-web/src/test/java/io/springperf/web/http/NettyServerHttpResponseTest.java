@@ -99,11 +99,14 @@ class NettyServerHttpResponseTest {
     }
 
     @Test
-    void flush_withoutBuf_noWrite() {
+    void flush_withoutBuf_writesEmptyResponse() {
         when(ctx.writeAndFlush(any())).thenReturn(mock(ChannelFuture.class));
 
         assertDoesNotThrow(() -> response.flush());
-        verify(ctx).writeAndFlush(any());
+        // 无 buf 时仍应写出 Content-Length:0 的空响应（initHttpResponse 空 buffer 分支），不会静默跳过
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(ctx).writeAndFlush(captor.capture());
+        assertTrue(captor.getValue() instanceof io.netty.handler.codec.http.FullHttpResponse);
     }
 
     @Test

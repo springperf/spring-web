@@ -92,15 +92,27 @@ class WebContextTest {
     @Test
     void getBeanFromCtx_multipleBeans_returnsHighestPriority() {
         webContext.initWithWebContext(webContext);
-        String high = "high", low = "low";
-        java.util.Map<String, String> multiMap = new java.util.HashMap<>();
-        multiMap.put("bean1", low);
-        multiMap.put("bean2", high);
-        when(ctx.getBeansOfType(String.class)).thenReturn(multiMap);
-        String result = webContext.getBeanFromCtx(String.class);
-        // AnnotationAwareOrderComparator sorts; both Strings have default order
-        // The result order depends on comparator behavior
-        assertNotNull(result);
+        // 使用类级 @Order 的独立类型：排序确定性来自注解，不依赖 HashMap 迭代序
+        OrderedType high = new HighPriorityBean();
+        OrderedType low = new LowPriorityBean();
+        java.util.Map<String, OrderedType> multiMap = new java.util.HashMap<>();
+        multiMap.put("lowBean", low);
+        multiMap.put("highBean", high);
+        when(ctx.getBeansOfType(OrderedType.class)).thenReturn(multiMap);
+        OrderedType result = webContext.getBeanFromCtx(OrderedType.class);
+        assertTrue(result instanceof HighPriorityBean,
+                "AnnotationAwareOrderComparator 应返回 @Order 最小（优先级最高）的 Bean");
+    }
+
+    private interface OrderedType {
+    }
+
+    @org.springframework.core.annotation.Order(1)
+    private static class HighPriorityBean implements OrderedType {
+    }
+
+    @org.springframework.core.annotation.Order(100)
+    private static class LowPriorityBean implements OrderedType {
     }
 
     @Test

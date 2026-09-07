@@ -123,6 +123,7 @@ class DispatcherHandlerTest {
     void handle_mappingFound_processesRequest() throws Exception {
         WebServerHttpRequest req = createRequest();
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        when(resp.getStatus()).thenReturn(HttpStatus.OK);
         PathMappingContext mappingContext = mock(PathMappingContext.class);
         MappingResult matched = MappingResult.matched(mappingContext);
         MappingResult.set(req, matched);
@@ -205,6 +206,7 @@ class DispatcherHandlerTest {
     void handle_withoutExecutor_processesSynchronously() throws Exception {
         WebServerHttpRequest req = createRequest();
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        when(resp.getStatus()).thenReturn(HttpStatus.OK);
         PathMappingContext mappingContext = mock(PathMappingContext.class);
         MappingResult matched = MappingResult.matched(mappingContext);
         MappingResult.set(req, matched);
@@ -733,7 +735,9 @@ class DispatcherHandlerTest {
         WebServerHttpRequest req1 = createRequest();
         WebServerHttpRequest req2 = createRequest();
         WebServerHttpResponse resp1 = mock(WebServerHttpResponse.class);
+        when(resp1.getStatus()).thenReturn(HttpStatus.OK);
         WebServerHttpResponse resp2 = mock(WebServerHttpResponse.class);
+        when(resp2.getStatus()).thenReturn(HttpStatus.OK);
         PathMappingContext ctx1 = mock(PathMappingContext.class);
         PathMappingContext ctx2 = mock(PathMappingContext.class);
         MappingResult matched1 = MappingResult.matched(ctx1);

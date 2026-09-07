@@ -181,15 +181,21 @@ class StreamEmitterTest {
     }
 
     @Test
-    void onTimeout_calledWhenTimeoutFires() {
+    void onTimeout_calledWhenTimeoutFires() throws Exception {
         StreamEmitter emitter = createEmitter();
         Runnable timeoutHandler = mock(Runnable.class);
 
         emitter.onTimeout(timeoutHandler);
-        emitter.deferredResult.onTimeout(timeoutHandler);
 
-        // DeferredResult.onTimeout triggers the handler
-        emitter.deferredResult.setResult(null);
+        // 反射获取 DeferredResult 的 timeoutCallback，模拟 DeferredResult 超时触发回调
+        java.lang.reflect.Field field = org.springframework.web.context.request.async.DeferredResult.class
+                .getDeclaredField("timeoutCallback");
+        field.setAccessible(true);
+        Runnable invoked = (Runnable) field.get(emitter.deferredResult);
+        assertNotNull(invoked);
+        invoked.run();
+
+        verify(timeoutHandler).run();
     }
 
     @Test

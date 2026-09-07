@@ -57,13 +57,42 @@ class ResponseStatusExceptionResolverTest {
     }
 
     @Test
-    void resolveException_responseStatusException_withHeaders_resolves() {
-        ResponseStatusException ex = new ResponseStatusException(HttpStatus.NOT_FOUND, "not found");
+    void resolveException_responseStatusException_headersEmpty_noHeaderCopy() {
+        // 回归 R3 P1-13：headers 复制逻辑。构造器不接收 headers 时 getResponseHeaders() 恒返回 EMPTY，
+        // 复制逻辑必须为空操作——不得引入 NPE 或误加响应头。
+        ResponseStatusException ex = new ResponseStatusException(HttpStatus.BAD_REQUEST, "bad");
+        HttpHeaders respHeaders = new HttpHeaders();
+        // EMPTY headers 空迭代，getHeaders() 不会真正被访问 → lenient 声明避免 UnnecessaryStubbing
+        lenient().when(response.getHeaders()).thenReturn(respHeaders);
 
         boolean result = resolver.resolveException(request, response, handler, ex);
 
         assertTrue(result);
-        verify(response).sendError(HttpStatus.NOT_FOUND, "not found");
+        assertTrue(respHeaders.isEmpty(), "headers 为空时不得复制任何响应头");
+        verify(response).sendError(HttpStatus.BAD_REQUEST, "bad");
+    }
+
+    @Test
+    void resolveException_responseStatusException_withHeaders_addsToResponse() {
+        // P1-13 反向验证：headers 复制逻辑本身——构造一个确实携带 headers 的 ResponseStatusException
+        // 子类（构造器不接收 headers，但 getResponseHeaders() 可被子类覆盖），
+        // 复制逻辑必须把 headers 复制到响应头。
+        HttpHeaders respHeaders = new HttpHeaders();
+        when(response.getHeaders()).thenReturn(respHeaders);
+
+        ResponseStatusException ex = new ResponseStatusException(HttpStatus.BAD_REQUEST, "bad") {
+            @Override
+            public HttpHeaders getResponseHeaders() {
+                HttpHeaders hs = new HttpHeaders();
+                hs.add("X-Custom", "v1");
+                return hs;
+            }
+        };
+
+        boolean result = resolver.resolveException(request, response, handler, ex);
+
+        assertTrue(result);
+        assertEquals(java.util.Collections.singletonList("v1"), respHeaders.get("X-Custom"));
     }
 
     @ResponseStatus(HttpStatus.NOT_FOUND)

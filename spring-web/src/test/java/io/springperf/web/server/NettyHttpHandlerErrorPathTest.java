@@ -6,14 +6,19 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpVersion;
 import io.springperf.web.context.ApplicationProperties;
+import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
+import io.springperf.web.http.NettyServerHttpRequest;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.lang.reflect.Field;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -34,6 +39,16 @@ class NettyHttpHandlerErrorPathTest {
     void setUp() {
         handler = mock(HttpHandler.class);
         lenient().when(webContext.getProps()).thenReturn(appProperties);
+        // 固定合法的内存上限值：mock 默认返回 0 会永久污染 NettyServerHttpRequest 静态缓存
+        lenient().when(appProperties.getInt(PropertiesConstant.HTTP_MAX_IN_MEMORY_SIZE))
+                .thenReturn(PropertiesConstant.HTTP_MAX_IN_MEMORY_SIZE_DEFAULT);
+    }
+
+    @AfterEach
+    void resetStaticCache() throws Exception {
+        Field field = NettyServerHttpRequest.class.getDeclaredField("cachedLargeBodyLimit");
+        field.setAccessible(true);
+        field.setInt(null, -1);
     }
 
     @Test

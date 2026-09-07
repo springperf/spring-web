@@ -35,11 +35,33 @@ class MappingCacheKeyTest {
     }
 
     @Test
-    void methodAndClassKeys_useSeparateSequences() {
+    void methodAndClassKeys_useSeparateSequences() throws Exception {
+        // 两个序列由独立 AtomicInteger 驱动：创建 method 键不推进 class 计数，反之亦然
+        long methodBefore = counter("METHOD_CACHE_SEQ");
+        long classBefore = counter("CLASS_CACHE_SEQ");
+
         MappingCacheKey<?> mk = MappingCacheKey.createMethodCacheKey(String.class);
+        long methodAfterMethodKey = counter("METHOD_CACHE_SEQ");
+        long classAfterMethodKey = counter("CLASS_CACHE_SEQ");
+
         MappingCacheKey<?> ck = MappingCacheKey.createClassCacheKey(String.class);
-        // Both start from 0, so after creating one of each they should differ from their sequencers
+        long classAfterClassKey = counter("CLASS_CACHE_SEQ");
+        long methodAfterClassKey = counter("METHOD_CACHE_SEQ");
+
+        // method 键只推进 method 序列
+        assertEquals(methodBefore + 1, methodAfterMethodKey);
+        assertEquals(classBefore, classAfterMethodKey);
+        // class 键只推进 class 序列
+        assertEquals(classBefore + 1, classAfterClassKey);
+        assertEquals(methodAfterMethodKey, methodAfterClassKey);
+        // 两个键可并存（index 来自各自序列）
         assertNotNull(mk);
         assertNotNull(ck);
+    }
+
+    private static long counter(String fieldName) throws Exception {
+        java.lang.reflect.Field field = MappingCacheKey.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return ((java.util.concurrent.atomic.AtomicInteger) field.get(null)).longValue();
     }
 }

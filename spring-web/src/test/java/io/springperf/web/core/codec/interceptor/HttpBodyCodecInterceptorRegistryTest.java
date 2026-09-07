@@ -124,6 +124,48 @@ class HttpBodyCodecInterceptorRegistryTest {
         assertSame(interceptor1, result[0]);
     }
 
+    // ---- getCodecInterceptor (with PathMappingContext → 缓存分支) ----
+
+    @Test
+    void getCodecInterceptor_withMappingContext_cachesByMappingContext() throws Exception {
+        // 覆盖 MAPPING_CACHE_KEY 缓存分支（HttpBodyCodecInterceptorRegistry.java:60-64）：
+        // 首次 realGet 后写入 mappingContext 缓存，第二次直接命中缓存不再重新解析
+        stubPathMapping();
+        io.springperf.web.core.mapping.PathMappingContext mappingContext =
+                mock(io.springperf.web.core.mapping.PathMappingContext.class);
+        // 模拟真实缓存：set 保存数组，get 返回已缓存值
+        final HttpBodyCodecInterceptor[][] cached = new HttpBodyCodecInterceptor[1][];
+        when(mappingContext.get(HttpBodyCodecInterceptorRegistry.MAPPING_CACHE_KEY))
+                .thenAnswer(inv -> cached[0]);
+        doAnswer(inv -> {
+            cached[0] = inv.getArgument(1);
+            return null;
+        }).when(mappingContext).set(eq(HttpBodyCodecInterceptorRegistry.MAPPING_CACHE_KEY), any());
+        MethodParameter param = mock(MethodParameter.class);
+        when(param.getContainingClass()).thenReturn((Class) String.class);
+        addInterceptor(interceptor1);
+
+        // PathMappingContext.get(request) 依赖 MappingResult（存于 RequestContext attribute）
+        java.util.Map<io.springperf.web.http.RequestAttribute<?>, Object> fastAttrs = new java.util.HashMap<>();
+        when(requestContext.getAttribute(any(io.springperf.web.http.RequestAttribute.class)))
+                .thenAnswer(inv -> fastAttrs.get(inv.getArgument(0)));
+        doAnswer(inv -> {
+            fastAttrs.put(inv.getArgument(0), inv.getArgument(1));
+            return null;
+        }).when(requestContext).setAttribute(any(io.springperf.web.http.RequestAttribute.class), any());
+        io.springperf.web.core.mapping.MappingResult.set(request,
+                io.springperf.web.core.mapping.MappingResult.matched(mappingContext));
+
+        HttpBodyCodecInterceptor[] first = registry.getCodecInterceptor(request, param);
+        HttpBodyCodecInterceptor[] second = registry.getCodecInterceptor(request, param);
+
+        assertEquals(1, first.length);
+        assertSame(first, second, "第二次调用应命中 mappingContext 缓存返回同一数组");
+        verify(mappingContext).set(HttpBodyCodecInterceptorRegistry.MAPPING_CACHE_KEY, first);
+        // realGet 只执行了一次（第二次命中缓存直接返回）
+        verify(param, times(1)).getContainingClass();
+    }
+
     // ---- beforeBodyRead ----
 
     @Test

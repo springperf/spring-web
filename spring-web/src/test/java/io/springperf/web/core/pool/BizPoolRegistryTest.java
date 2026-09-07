@@ -9,12 +9,14 @@ import io.springperf.web.context.WebContext;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
 import io.springperf.web.core.metrics.NoOpWebMetrics;
 import io.springperf.web.core.metrics.WebMetrics;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.method.HandlerMethod;
 
 import java.lang.reflect.Field;
+import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -32,6 +34,20 @@ import static org.mockito.Mockito.*;
 class BizPoolRegistryTest {
 
     private final BizPoolRegistry registry = new BizPoolRegistry();
+
+    @AfterEach
+    void shutdownAllPools() {
+        // 清理注册进 registry 的线程池，避免测试间/跨测试泄漏非 daemon 线程
+        registry.shutdownPools(1, TimeUnit.SECONDS);
+        try {
+            Field field = BizPoolRegistry.class.getDeclaredField("pools");
+            field.setAccessible(true);
+            Map<String, ExecutorService> pools = (Map<String, ExecutorService>) field.get(registry);
+            pools.clear();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     // ---------------------------------------------------------------
     // @RunInPool 无注解，未初始化 WebContext：返回 null（降级 EventLoop）
@@ -289,15 +305,19 @@ class BizPoolRegistryTest {
                 PropertiesConstant.POOL_DEFAULT_EXECUTE_MODE_DEFAULT)).thenReturn("default");
 
         BizPoolRegistry freshRegistry = new BizPoolRegistry();
-        freshRegistry.initWithWebContext(mockWebContext);
+        try {
+            freshRegistry.initWithWebContext(mockWebContext);
 
-        ExecutorService pool = freshRegistry.getDefaultPool();
-        assertNotNull(pool, "default pool should be created from config");
-        assertTrue(pool instanceof ThreadPoolExecutor, "default pool should be a ThreadPoolExecutor");
-        BlockingQueue<Runnable> queue = ((ThreadPoolExecutor) pool).getQueue();
-        assertTrue(queue instanceof LinkedBlockingQueue, "default pool should use LinkedBlockingQueue");
-        assertEquals(PropertiesConstant.POOL_QUEUE_CAPACITY_DEFAULT, queue.remainingCapacity(),
-                "default pool queue must be bounded so maxPoolSize takes effect and overload returns 503");
+            ExecutorService pool = freshRegistry.getDefaultPool();
+            assertNotNull(pool, "default pool should be created from config");
+            assertTrue(pool instanceof ThreadPoolExecutor, "default pool should be a ThreadPoolExecutor");
+            BlockingQueue<Runnable> queue = ((ThreadPoolExecutor) pool).getQueue();
+            assertTrue(queue instanceof LinkedBlockingQueue, "default pool should use LinkedBlockingQueue");
+            assertEquals(PropertiesConstant.POOL_QUEUE_CAPACITY_DEFAULT, queue.remainingCapacity(),
+                    "default pool queue must be bounded so maxPoolSize takes effect and overload returns 503");
+        } finally {
+            freshRegistry.shutdownPools(1, TimeUnit.SECONDS);
+        }
     }
 
     // ---------------------------------------------------------------
