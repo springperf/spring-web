@@ -36,6 +36,12 @@ public abstract class BaseE2ETest {
                 .retryOnConnectionFailure(true)
                 .addInterceptor(logging)
                 .build();
+        // 共享 CLIENT 跨测试类复用，不能在每个类 @AfterAll 关闭（会破坏后续类执行）；
+        // 注册 JVM hook 仅在整个进程退出时清理连接池/调度线程，OkHttp 默认 daemon 线程不阻塞退出
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            CLIENT.dispatcher().executorService().shutdown();
+            CLIENT.connectionPool().evictAll();
+        }));
     }
 
     /** 鏋勯€犺闂矾寰勭殑瀹屾暣 URL锛堝惈娉ㄥ叆绔彛涓?context-path锛夈€?*/
