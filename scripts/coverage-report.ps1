@@ -40,7 +40,8 @@ $modules = @(
 # E2E 模块 / E2E modules
 $e2eModules = @('spring-web-test', 'spring-web-support-test')
 
-$repoRoot = $PSScriptRoot
+# 脚本位于 scripts/，仓库根为其父目录
+$repoRoot = Split-Path $PSScriptRoot -Parent
 if (-not $OutFile) {
     $OutFile = Join-Path $repoRoot 'coverage-report.md'
 }
