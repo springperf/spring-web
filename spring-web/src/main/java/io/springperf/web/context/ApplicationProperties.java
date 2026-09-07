@@ -14,35 +14,43 @@ import java.util.Map;
  * property keys are defined in {@link PropertiesConstant}.
  * <p>
  * long/int 使用 {@link Object2LongOpenHashMap} 直接缓存原始类型，消除每次调用的装箱和解析开销。
- * String/boolean 仍使用 {@link Map}{@code <String, String>} 缓存。
+ * String/boolean 使用 {@link Map}{@code <String, String>} 缓存。
+ * <p>
+ * 两个缓存均为 <b>volatile copy-on-write 发布</b>：读完全无锁（读到的是已发布、之后永不
+ * 改写的完整快照）；写仅在缓存未命中时发生（配置键有界），锁内拷贝一份 → 写入 → volatile
+ * 发布。消除了双检锁实现中「无锁读与锁内 put（rehash 分步替换字段）」的竞态。
  */
 @Slf4j
 public class ApplicationProperties implements EnvironmentAware {
 
     private PropertyResolver properties;
 
-    /** long/int 数值缓存，value 直接存原始 long 类型 */
-    private final Object2LongOpenHashMap longCache = new Object2LongOpenHashMap();
-    /** 字符串/布尔值缓存 */
-    private final Map<String, String> stringCache = new HashMap<>();
+    /** long/int 数值缓存，value 直接存原始 long 类型；volatile 快照，copy-on-write 发布 */
+    private volatile Object2LongOpenHashMap longCache = new Object2LongOpenHashMap(64);
+    /** 字符串/布尔值缓存；volatile 快照，copy-on-write 发布 */
+    private volatile Map<String, String> stringCache = new HashMap<>();
 
     /**
      * 获取 long 属性。默认值在 {@link PropertiesConstant} 中静态定义，调用方无需传入。
-     * 双检锁懒加载：先无锁检查缓存，未命中则同步后二次检查并写入。
+     * <p>copy-on-write 发布：读完全无锁（volatile 快照，已发布后永不改写）；
+     * 写仅在缓存未命中时发生（配置键有界），锁内拷贝一份新表 → put → volatile 发布。
+     * 消除了原双检锁实现中「无锁读与锁内 put（rehash 分步替换字段）」的竞态。</p>
      */
     public long getLong(String key) {
-        if (!longCache.containsKey(key)) {
-            synchronized (longCache) {
-                if (!longCache.containsKey(key)) {
+        Object2LongOpenHashMap cache = longCache;
+        if (!cache.containsKey(key)) {
+            synchronized (this) {
+                cache = longCache;
+                if (!cache.containsKey(key)) {
+                    Object2LongOpenHashMap next = new Object2LongOpenHashMap(cache);
                     String value = properties.getProperty(key);
-                    long longVal = value != null ? Long.parseLong(value)
-                                                 : PropertiesConstant.getDefault(key);
-                    longCache.put(key, longVal);
-                    return longVal;
+                    next.put(key, value != null ? Long.parseLong(value) : PropertiesConstant.getDefault(key));
+                    longCache = next;
+                    return next.get(key);
                 }
             }
         }
-        return longCache.get(key);
+        return cache.get(key);
     }
 
     /**
@@ -54,16 +62,23 @@ public class ApplicationProperties implements EnvironmentAware {
 
     /**
      * 获取 String 属性。
-     * 双检锁懒加载：先无锁检查缓存，未命中则同步后二次检查并写入。
+     * copy-on-write 发布（与 {@link #getLong(String)} 相同的并发模型）：
+     * null 值不缓存（与旧行为一致：缓存 null 会被当作未命中而每次重查）。
      */
     public String get(String key, String defaultValue) {
-        String value = stringCache.get(key);
+        Map<String, String> cache = stringCache;
+        String value = cache.get(key);
         if (value == null) {
-            synchronized (stringCache) {
-                value = stringCache.get(key);
+            synchronized (this) {
+                cache = stringCache;
+                value = cache.get(key);
                 if (value == null) {
                     value = properties.getProperty(key, defaultValue);
-                    stringCache.put(key, value);
+                    if (value != null) {
+                        Map<String, String> next = new HashMap<>(cache);
+                        next.put(key, value);
+                        stringCache = next;
+                    }
                 }
             }
         }

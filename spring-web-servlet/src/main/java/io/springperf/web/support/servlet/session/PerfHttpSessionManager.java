@@ -131,6 +131,13 @@ public class PerfHttpSessionManager extends BaseWebComponent {
 
     public PerfHttpSession createSession() {
         HttpSessionData data = storage.createSession();
+        // 应用 server.servlet.session.timeout：ServletContext.getSessionTimeout() 返回分钟，
+        // HttpSessionData.maxInactiveInterval 以秒为单位（isExpired 依赖它做过期清理）。
+        // 修复前 maxInactiveInterval 恒为 0，isExpired() 恒 false，in-memory session 永不过期 → 无界内存增长。
+        int sessionTimeout = servletContext.getSessionTimeout();
+        if (sessionTimeout >= 0) {
+            data.setMaxInactiveInterval(sessionTimeout * 60);
+        }
         PerfHttpSession session = new PerfHttpSession(data, servletContext, sessionListeners, attributeListeners);
         session.setOnInvalidateCallback(() -> storage.removeSession(data.getId()));
         // Fire sessionCreated event

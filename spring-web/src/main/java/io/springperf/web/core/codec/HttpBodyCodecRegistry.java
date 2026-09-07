@@ -24,6 +24,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 
 /**
@@ -36,7 +37,7 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
     private static final Set<HttpMethod> SUPPORTED_METHODS = Set.of(HttpMethod.POST, HttpMethod.PUT, HttpMethod.PATCH);
 
     private static final Object NO_VALUE = new Object();
-    protected final List<HttpBodyConverter> converters = new ArrayList<>();
+    protected final List<HttpBodyConverter> converters = new CopyOnWriteArrayList<>();
 
     public static final MappingCacheKey<Type> TARGET_TYPE_CACHE_KEY = MappingCacheKey.createMethodCacheKey(Type.class);
 

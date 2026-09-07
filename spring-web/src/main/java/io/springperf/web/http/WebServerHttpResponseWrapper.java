@@ -21,7 +21,7 @@ public class WebServerHttpResponseWrapper implements WebServerHttpResponse {
 
     @Override public boolean isHandled() { return response.isHandled(); }
     @Override public boolean isCommitted() { return response.isCommitted(); }
-    @Override public HttpStatus getStatus() { return response.getStatus(); }
+    @Override public HttpStatusCode getStatus() { return response.getStatus(); }
     @Override public Charset getCharacterEncoding() { return response.getCharacterEncoding(); }
     @Override public void setCharacterEncoding(Charset characterEncoding) { response.setCharacterEncoding(characterEncoding); }
     @Override public int getBufferSize() { return response.getBufferSize(); }
@@ -33,6 +33,7 @@ public class WebServerHttpResponseWrapper implements WebServerHttpResponse {
     @Override public boolean setHandled() { return response.setHandled(); }
     @Override public void sendError(HttpStatus statusCode) { response.sendError(statusCode); }
     @Override public void sendError(HttpStatus statusCode, String message) { response.sendError(statusCode, message); }
+    @Override public void sendError(HttpStatusCode statusCode, String message) { response.sendError(statusCode, message); }
     @Override public void writeStream(InputStream input) { response.writeStream(input); }
     @Override public void writeBytes(byte[] data) { response.writeBytes(data); }
     @Override public void writeFile(File file) { response.writeFile(file); }

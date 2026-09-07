@@ -11,6 +11,7 @@ import jakarta.servlet.WriteListener;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 
 import jakarta.servlet.http.Cookie;
 import java.io.IOException;
@@ -70,7 +71,7 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
         this.sameSite = sameSite;
     }
 
-    @Override public void setStatus(int sc) { response.setStatusCode(HttpStatus.valueOf(sc)); }
+    @Override public void setStatus(int sc) { response.setStatusCode(HttpStatusCode.valueOf(sc)); }
     @Override public int getStatus() { return response.getStatus().value(); }
     @Override public boolean isCommitted() { return response.isCommitted(); }
     @Override public boolean containsHeader(String name) { return response.getHeaders().containsKey(name); }
@@ -293,13 +294,24 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
         if (response.isCommitted()) {
             throw new IllegalStateException("Cannot send error: response already committed");
         }
-        response.sendError(HttpStatus.valueOf(sc));
+        HttpStatus status = HttpStatus.resolve(sc);
+        if (status != null) {
+            response.sendError(status);
+        } else {
+            // 非标准状态码（如 499/599/507）：HttpStatus 无法表示，按原始码值写入
+            response.sendError(HttpStatusCode.valueOf(sc), null);
+        }
     }
     @Override
     public void sendError(int sc, String msg) {
         if (response.isCommitted()) {
             throw new IllegalStateException("Cannot send error: response already committed");
         }
-        response.sendError(HttpStatus.valueOf(sc), msg);
+        HttpStatus status = HttpStatus.resolve(sc);
+        if (status != null) {
+            response.sendError(status, msg);
+        } else {
+            response.sendError(HttpStatusCode.valueOf(sc), msg);
+        }
     }
 }

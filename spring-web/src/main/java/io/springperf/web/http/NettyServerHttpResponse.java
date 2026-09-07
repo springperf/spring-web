@@ -12,7 +12,7 @@ import io.netty.handler.stream.ChunkedStream;
 import io.netty.util.AttributeKey;
 import io.springperf.web.context.WebContext;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 
 import java.io.*;
 import java.nio.channels.ClosedChannelException;
@@ -81,6 +81,22 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
         return new ByteBufOutputStream(getBuf());
     }
 
+    /**
+     * 清空已缓冲的响应体（resetBuffer 的真实实现）。
+     * 基类实现只重置从未被写入的 {@code ByteArrayOutputStream body}，对 Netty 响应是空操作；
+     * 此处直接清空底层 {@link ByteBuf}，使异常路径能丢弃序列化中途写入的部分内容。
+     */
+    @Override
+    public boolean resetBuffer() {
+        ByteBuf current = this.buf;
+        if (current == null) {
+            return false;
+        }
+        boolean haveData = current.readableBytes() > 0;
+        current.clear();
+        return haveData;
+    }
+
     @Override
     public void flush(boolean chunked) throws IOException {
         ByteBuf buf = this.buf;
@@ -98,7 +114,7 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
         }
     }
 
-    private HttpResponse initHttpResponse(ByteBuf buf, String contentType, HttpStatus statusCode, boolean chunked) {
+    private HttpResponse initHttpResponse(ByteBuf buf, String contentType, HttpStatusCode statusCode, boolean chunked) {
         setStatusCode(statusCode);
         // validate=false 跳过 Netty 对响应头 name/value 的逐字符校验（HttpUtil.validateToken 热点）。
         // 响应头由框架/业务内部构造，非用户输入直达，CRLF 注入面可控。
@@ -138,7 +154,7 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
     }
 
 
-    protected void writeAndFlush(ByteBuf buf, String contentType, HttpStatus statusCode, boolean chunked) {
+    protected void writeAndFlush(ByteBuf buf, String contentType, HttpStatusCode statusCode, boolean chunked) {
         if (!setCommitted()) {
             return;
         }

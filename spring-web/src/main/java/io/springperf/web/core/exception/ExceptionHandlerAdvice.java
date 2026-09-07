@@ -6,8 +6,8 @@ import org.springframework.web.method.ControllerAdviceBean;
 import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
 
 import java.lang.reflect.Method;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Wraps a {@link org.springframework.web.bind.annotation.ControllerAdvice @ControllerAdvice}
@@ -24,7 +24,7 @@ public class ExceptionHandlerAdvice extends BaseWebComponent {
 
     protected Object realBean;
 
-    private Map<Method, MappingHandlerMethod> handlerMethodMap = new HashMap<>();
+    private final Map<Method, MappingHandlerMethod> handlerMethodMap = new ConcurrentHashMap<>();
 
     public ExceptionHandlerAdvice(Object realBean, ExceptionHandlerMethodResolver resolver) {
         this.adviceBean = null;
@@ -64,16 +64,8 @@ public class ExceptionHandlerAdvice extends BaseWebComponent {
         if (method == null) {
             return null;
         }
-        MappingHandlerMethod handlerMethod = handlerMethodMap.get(method);
-        if (handlerMethod == null) {
-            synchronized (handlerMethodMap) {
-                handlerMethod = handlerMethodMap.get(method);
-                if (handlerMethod == null) {
-                    handlerMethod = new MappingHandlerMethod(getRealBean(), method);
-                    handlerMethodMap.put(method, handlerMethod);
-                }
-            }
-        }
+        MappingHandlerMethod handlerMethod = handlerMethodMap.computeIfAbsent(method,
+                m -> new MappingHandlerMethod(getRealBean(), m));
         return handlerMethod;
     }
 

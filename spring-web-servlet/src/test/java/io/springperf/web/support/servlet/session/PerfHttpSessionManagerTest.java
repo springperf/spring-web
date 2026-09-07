@@ -32,7 +32,7 @@ class PerfHttpSessionManagerTest {
     void setUp() {
         lenient().when(webContext.getProps()).thenReturn(props);
         lenient().when(webContext.getCtx()).thenReturn(mock(org.springframework.context.ApplicationContext.class));
-        lenient().when(props.get(anyString(), anyString())).thenAnswer(invocation -> invocation.getArgument(1));
+        lenient().when(props.get(any(), any())).thenAnswer(invocation -> invocation.getArgument(1));
         manager = new PerfHttpSessionManager();
         manager.initWithWebContext(webContext);
     }
@@ -64,6 +64,15 @@ class PerfHttpSessionManagerTest {
         assertNotNull(session);
         assertNotNull(session.getId());
         assertTrue(session.isNew());
+    }
+
+    @Test
+    void createSession_appliesSessionTimeoutToMaxInactiveInterval() {
+        // P0 回归：新 session 必须带上非零 maxInactiveInterval（默认 30 分钟），
+        // 否则 InMemoryHttpSessionStorage.isExpired() 恒为 false，session 永不过期 → 无界内存增长。
+        PerfHttpSession session = manager.createSession();
+        assertTrue(session.getMaxInactiveInterval() > 0);
+        assertEquals(30 * 60, session.getMaxInactiveInterval());
     }
 
     @Test

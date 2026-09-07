@@ -112,7 +112,7 @@ public class SupportDispatcherHandler extends DispatcherHandler {
      */
     private static class IncludeResponseWrapper extends WebServerHttpResponseWrapper {
 
-        private final HttpStatus originalStatus;
+        private final HttpStatusCode originalStatus;
 
         IncludeResponseWrapper(WebServerHttpResponse response) {
             super(response);
@@ -150,7 +150,7 @@ public class SupportDispatcherHandler extends DispatcherHandler {
         }
 
         @Override
-        public HttpStatus getStatus() {
+        public HttpStatusCode getStatus() {
             return originalStatus;
         }
 

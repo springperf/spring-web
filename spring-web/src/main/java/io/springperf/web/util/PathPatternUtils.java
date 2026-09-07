@@ -77,6 +77,45 @@ public class PathPatternUtils {
     }
 
     /**
+     * 路径模式特异性比较，用于重叠通配符路由（如 {@code /user/{id}} 与 {@code /user/*}）
+     * 在构建期排序，使最精确的模式优先匹配（对齐 Spring AntPathMatcher 的主排序）。
+     * <p>排序规则：{@code literal > {var} > * > **}，逐段比较；公共前缀相同时段数更少
+     * （如 {@code /user} 对 {@code /user/**}）更精确。同特异性返回 0，由稳定排序保持注册顺序。</p>
+     *
+     * @return 负值表示 {@code p1} 更精确（应排前面），0 表示等价，正值表示 {@code p2} 更精确
+     */
+    public static int comparePathRuleSpecificity(String p1, String p2) {
+        if (p1.equals(p2)) {
+            return 0;
+        }
+        String[] s1 = p1.split("/");
+        String[] s2 = p2.split("/");
+        int min = Math.min(s1.length, s2.length);
+        for (int i = 0; i < min; i++) {
+            int a = segmentSpecificity(s1[i]);
+            int b = segmentSpecificity(s2[i]);
+            if (a != b) {
+                return Integer.compare(b, a);
+            }
+        }
+        // 公共前缀相同：段数更少的（更精确，如 /user 对 /user/**）排前面
+        return Integer.compare(s1.length, s2.length);
+    }
+
+    private static int segmentSpecificity(String segment) {
+        if ("**".equals(segment)) {
+            return 0;
+        }
+        if ("*".equals(segment)) {
+            return 1;
+        }
+        if (segment.startsWith("{") && segment.endsWith("}")) {
+            return 2;
+        }
+        return 3;
+    }
+
+    /**
      * 判断两个路径模式是否确定不相交（没有请求路径能同时匹配二者）。
      * <p>仅在可编译期证明不相交时返回 {@code true}，否则保守返回 {@code false}。</p>
      */

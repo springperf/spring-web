@@ -99,6 +99,20 @@ class ApplicationPropertiesTest {
     }
 
     @Test
+    void get_missingKey_nullDefault_notCached() {
+        ApplicationProperties props = createProperties("nonexistent", null);
+        assertNull(props.get("missing.key", null));
+        assertNull(props.get("missing.key", null), "null 值不缓存，每次重查 Environment");
+    }
+
+    @Test
+    void getLong_readTimeoutDefault_returns30000() {
+        ApplicationProperties props = createProperties("nonexistent", null);
+        assertEquals(30000L, props.getLong(PropertiesConstant.HTTP_READ_TIMEOUT),
+                "read-timeout 默认 30s 应生效");
+    }
+
+    @Test
     void getInt_custom_returnsParsed() {
         ApplicationProperties props = createProperties("int.key", "42");
         assertEquals(42, props.getInt("int.key"));

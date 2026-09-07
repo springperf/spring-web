@@ -161,11 +161,21 @@ class BaseWebServerHttpResponseTest {
     }
 
     @Test void setStatusCode_nonHttpStatusInstance_usesValue() {
-        // 非标准状态码（299）→ HttpStatus.valueOf 抛 IAE（快速失败，防脏状态码写入响应）
+        // 非标准状态码（299）→ 允许按原始码值写入响应（Servlet 规范允许 100-999）
         org.springframework.http.HttpStatusCode custom =
                 org.springframework.http.HttpStatusCode.valueOf(299);
         assertFalse(custom instanceof HttpStatus);
-        assertThrows(IllegalArgumentException.class, () -> response.setStatusCode(custom));
+        response.setStatusCode(custom);
+        assertEquals(299, response.getStatus().value());
+        assertEquals(299, response.getStatus().value());
+    }
+
+    @Test void sendError_nonStandardCode_writesRawValue() {
+        org.springframework.http.HttpStatusCode custom =
+                org.springframework.http.HttpStatusCode.valueOf(599);
+        response.sendError(custom, "upstream boom");
+        assertEquals(599, response.getStatus().value());
+        assertTrue(response.isHandled());
     }
 
     @Test void resetHandled_clearsHandledFlag() {
