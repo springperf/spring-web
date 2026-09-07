@@ -73,7 +73,13 @@ public class VirtualThreadE2ETest {
 
     @Test
     void runInPool_withDefaultPool_shouldUsePlatformThread() throws Exception {
-        // JDK 17 下虚拟线程不可用，且虚拟线程命名前缀为 perf-virtual-：验证 biz pool 使用平台线程
+        // 本用例仅在虚拟线程不可用的 JDK（<21）上有效：类级属性 spring.threads.virtual.enabled=true
+        // 在 JDK 21+ 会令默认业务池使用虚拟线程（perf-virtual-），与"默认池应使用平台线程"矛盾。
+        // JDK 21+ 由 bizPool_shouldUseVirtualThread 覆盖虚拟线程语义，此处跳过。
+        assumeTrue(Runtime.version().feature() < 21,
+                "Default pool is virtual on JDK 21+ when spring.threads.virtual.enabled=true; skipping on JDK "
+                        + Runtime.version().feature());
+
         Request req = new Request.Builder()
                 .url(baseUrl() + "/core/pool/biz-pool")
                 .get()
