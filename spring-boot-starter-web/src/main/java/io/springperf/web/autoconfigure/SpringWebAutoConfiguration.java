@@ -14,7 +14,6 @@ import io.springperf.web.core.DispatcherHandler;
 import io.springperf.web.core.filter.AccessLogWebFilter;
 import io.springperf.web.core.metrics.WebMetrics;
 import io.springperf.web.server.NettyHttpServer;
-import io.springperf.web.server.NettyMetricsHandler;
 import io.springperf.web.server.PipelineCustomizer;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
@@ -92,8 +91,8 @@ public class SpringWebAutoConfiguration {
                                                 NettyHttpServer nettyHttpServer) {
             // Register Netty-level Gauges
             io.micrometer.core.instrument.Gauge.builder("netty.connections.active",
-                            NettyMetricsHandler.INSTANCE, NettyMetricsHandler::getActiveConnectionCount)
-                    .description("Active TCP connections")
+                            nettyHttpServer, NettyHttpServer::getActiveConnectionCount)
+                    .description("Active TCP connections on the main server")
                     .register(meterRegistry);
 
             io.micrometer.core.instrument.Gauge.builder("netty.eventloop.pending.tasks",

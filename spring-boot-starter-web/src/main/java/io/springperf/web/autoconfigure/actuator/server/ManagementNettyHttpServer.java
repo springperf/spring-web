@@ -46,6 +46,8 @@ public class ManagementNettyHttpServer implements SmartLifecycle, LifecycleWebCo
     private EventLoopGroup workerGroup;
     private Channel serverChannel;
     private NettyHttpHandler nettyHttpHandler;
+    /** 管理服务器独立的连接计数（与主服务器各自计数，不共享全局单例）。 */
+    private final NettyMetricsHandler metricsHandler = new NettyMetricsHandler();
 
     public ManagementNettyHttpServer(WebContext webContext, String contextPath, HttpHandler handler,
                                      int port, int maxContentLength) {
@@ -95,7 +97,7 @@ public class ManagementNettyHttpServer implements SmartLifecycle, LifecycleWebCo
                                 webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_HEADER_SIZE),
                                 webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_CHUNK_SIZE)
                         );
-                        ch.pipeline().addLast(NettyMetricsHandler.INSTANCE);
+                        ch.pipeline().addLast(metricsHandler);
                         ch.pipeline().addLast(innerInit);
                     }
                 });

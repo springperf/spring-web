@@ -9,18 +9,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Netty pipeline handler that tracks active TCP connection count.
  * <p>
- * Designed as a {@link ChannelHandler.Sharable} singleton (see {@link #INSTANCE}),
- * following the same pattern as {@link io.springperf.web.http.BackpressureHandler}.
- * When placed at the head of the pipeline, it atomically increments/decrements
- * a counter on {@link #channelActive}/{@link #channelInactive} events.
+ * {@link ChannelHandler.Sharable}：可在同一服务器 pipeline 的多个 channel 间共享。
+ * 每个服务器持有独立实例（主服务器与管理服务器各自计数），避免连接数跨服务器混算。
+ * 当置于 pipeline 头部时，在 {@link #channelActive}/{@link #channelInactive} 上原子增减计数。
  * </p>
  *
  * @since 2.7.0
  */
 @ChannelHandler.Sharable
 public class NettyMetricsHandler extends ChannelInboundHandlerAdapter {
-
-    public static final NettyMetricsHandler INSTANCE = new NettyMetricsHandler();
 
     private final AtomicInteger activeConnections = new AtomicInteger();
 
