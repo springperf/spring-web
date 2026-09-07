@@ -57,10 +57,17 @@ public class SupportServletRegistry extends BaseWebComponent {
     private void registerServlet(Servlet servlet, PerfServletContext servletContext, MappingRegistry mappingRegistry) throws ServletException {
         WebServlet webServlet = AnnotatedElementUtils.findMergedAnnotation(servlet.getClass(), WebServlet.class);
         String servletName = resolveServletName(webServlet, servlet);
+        String[] urlPatterns = resolveUrlPatterns(webServlet);
+        if (urlPatterns == null) {
+            // 无 @WebServlet 且无显式 URL pattern：无法确定路由，跳过注册避免 /** 全路径通配遮蔽控制器
+            log.warn("Servlet {} has no @WebServlet url-pattern, skipping route registration. "
+                    + "Annotate it with @WebServlet(urlPatterns=...) to expose it as a route.",
+                    servlet.getClass().getName());
+            return;
+        }
         servlet.init(new PerfServletConfig(servletName, servletContext, resolveInitParams(webServlet)));
         initializedServlets.add(servlet);
         ServletInvoker invoker = new ServletInvoker(servlet);
-        String[] urlPatterns = resolveUrlPatterns(webServlet);
         for (String pattern : urlPatterns) {
             String pathRule = toPathRule(pattern);
             PathMappingContext mappingContext = new PathMappingContext(invoker, pathRule);
@@ -76,7 +83,10 @@ public class SupportServletRegistry extends BaseWebComponent {
         return servlet.getClass().getName();
     }
 
-    private String[] resolveUrlPatterns(WebServlet webServlet) {
+    /**
+     * 解析 servlet 的 url-pattern。无 {@link WebServlet} 注解时返回 {@code null}（跳过注册）。
+     */
+    static String[] resolveUrlPatterns(WebServlet webServlet) {
         if (webServlet != null) {
             String[] patterns = webServlet.urlPatterns();
             if (patterns.length == 0) {
@@ -86,7 +96,7 @@ public class SupportServletRegistry extends BaseWebComponent {
                 return patterns;
             }
         }
-        return new String[]{"/"};
+        return null;
     }
 
     private Map<String, String> resolveInitParams(WebServlet webServlet) {

@@ -30,6 +30,9 @@ public class AsyncSupportRegistry extends WebComponentContainer {
 
     private AsyncTaskExecutor defaultTaskExecutor;
 
+    /** 无 default 业务线程池且方法未显式指定 executor 时的兜底 executor（懒加载复用，避免每次请求新建）。 */
+    private volatile AsyncTaskExecutor fallbackExecutor;
+
     private long defaultTimeout = 30000L; // 30 seconds, matching Spring MVC default
 
     @Override
@@ -68,6 +71,24 @@ public class AsyncSupportRegistry extends WebComponentContainer {
         this.defaultTaskExecutor = taskExecutor;
     }
 
+    /**
+     * 懒加载单例的兜底 {@link SimpleAsyncTaskExecutor}。
+     * 仅在无 default 业务线程池且方法未显式指定 executor 时使用。
+     */
+    private AsyncTaskExecutor getOrCreateFallbackExecutor() {
+        AsyncTaskExecutor executor = this.fallbackExecutor;
+        if (executor == null) {
+            synchronized (this) {
+                executor = this.fallbackExecutor;
+                if (executor == null) {
+                    executor = new SimpleAsyncTaskExecutor();
+                    this.fallbackExecutor = executor;
+                }
+            }
+        }
+        return executor;
+    }
+
     public void addCallableInterceptors(List<CallableProcessingInterceptor> interceptors) {
         this.callableInterceptors.addAll(interceptors);
     }
@@ -97,7 +118,8 @@ public class AsyncSupportRegistry extends WebComponentContainer {
         if (effectiveExecutor == null) {
             // 无 default 业务线程池（如 pool.core-pool-size<0 禁用了默认池）且方法未显式指定
             // executor 时兜底为 SimpleAsyncTaskExecutor，避免 NPE（对齐 Spring MVC WebAsyncManager）。
-            effectiveExecutor = new SimpleAsyncTaskExecutor();
+            // 懒加载单例复用，避免每次请求创建新 executor。
+            effectiveExecutor = getOrCreateFallbackExecutor();
         }
         final AsyncTaskExecutor executorToUse = effectiveExecutor;
 

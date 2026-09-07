@@ -60,6 +60,22 @@ class SupportServletRegistryTest {
         }
     }
 
+    @WebServlet(urlPatterns = "/track")
+    static class AnnotatedTrackingServlet extends HttpServlet {
+        int initCalls;
+        int destroyCalls;
+
+        @Override
+        public void init(ServletConfig config) {
+            initCalls++;
+        }
+
+        @Override
+        public void destroy() {
+            destroyCalls++;
+        }
+    }
+
     private void mockEnvironment(Map<String, Servlet> beans) {
         doReturn(mappingRegistry).when(webContext).getWebComponent(MappingRegistry.class);
         doReturn(servletContext).when(webContext).getWebComponent(PerfServletContext.class);
@@ -97,7 +113,7 @@ class SupportServletRegistryTest {
 
     @Test
     void initComponentPhase1_invokesServletInit() throws Exception {
-        TrackingServlet servlet = new TrackingServlet();
+        AnnotatedTrackingServlet servlet = new AnnotatedTrackingServlet();
         Map<String, Servlet> beans = new LinkedHashMap<>();
         beans.put("tracking", servlet);
         mockEnvironment(beans);
@@ -121,8 +137,27 @@ class SupportServletRegistryTest {
     }
 
     @Test
+    void initComponentPhase1_unannotatedServlet_skippedWithoutCatchAllMapping() throws Exception {
+        // 无 @WebServlet 注解的 Servlet bean：应跳过注册，避免 /** 全路径通配遮蔽控制器
+        Map<String, Servlet> beans = new LinkedHashMap<>();
+        beans.put("plain", new TrackingServlet());
+        mockEnvironment(beans);
+
+        SupportServletRegistry registry = new SupportServletRegistry();
+        registry.initWithWebContext(webContext);
+        registry.initComponentPhase1();
+
+        verify(mappingRegistry, times(0)).registerMapping(any(PathMappingContext.class));
+    }
+
+    @Test
+    void resolveUrlPatterns_unannotated_returnsNull() {
+        assertThat(SupportServletRegistry.resolveUrlPatterns(null)).isNull();
+    }
+
+    @Test
     void destroyComponent_callsDestroyOnInitializedServlets() throws Exception {
-        TrackingServlet servlet = new TrackingServlet();
+        AnnotatedTrackingServlet servlet = new AnnotatedTrackingServlet();
         Map<String, Servlet> beans = new LinkedHashMap<>();
         beans.put("tracking", servlet);
         mockEnvironment(beans);

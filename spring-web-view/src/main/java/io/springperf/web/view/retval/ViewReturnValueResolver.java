@@ -12,7 +12,9 @@ import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.view.ModelSupport;
 import io.springperf.web.view.RedirectView;
 import io.springperf.web.view.View;
+import io.springperf.web.view.ViewProperties;
 import io.springperf.web.view.ViewResolverRegistry;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.http.HttpHeaders;
@@ -22,6 +24,7 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 public class ViewReturnValueResolver extends BaseWebComponent implements ReturnValueResolver {
 
     private static final MappingCacheKey<Boolean> VIEW_NAME_KEY =
@@ -58,12 +61,36 @@ public class ViewReturnValueResolver extends BaseWebComponent implements ReturnV
             }
         }
         if (!unresolvedViewMethods.isEmpty() && !viewResolverRegistry.hasViewResolvers()) {
-            throw new IllegalStateException(
-                    "View methods detected but no ViewResolver registered. "
-                    + "Add a template engine dependency (thymeleaf/freemarker) to the project, "
-                    + "or set spring.web.view.engine=none if only redirect: is used. "
-                    + "Affected methods: " + unresolvedViewMethods);
+            // 显式 engine=none：仅 redirect: 场景（无需模板引擎），跳过 fail-fast
+            if (isViewEngineDisabled()) {
+                log.warn("spring.web.view.engine=none configured, but {} view-name method(s) "
+                        + "exist and will only support redirect: view names: {}", unresolvedViewMethods.size(),
+                        unresolvedViewMethods);
+            } else {
+                throw new IllegalStateException(
+                        "View methods detected but no ViewResolver registered. "
+                        + "Add a template engine dependency (thymeleaf/freemarker) to the project, "
+                        + "or set spring.web.view.engine=none if only redirect: is used. "
+                        + "Affected methods: " + unresolvedViewMethods);
+            }
         }
+    }
+
+    /**
+     * 是否显式禁用了全部模板引擎（{@code spring.web.view.engine} 配置含 {@code none}）。
+     * <p>此时仅支持 {@code redirect:} 视图名，无模板引擎时不应触发 fail-fast。</p>
+     */
+    private boolean isViewEngineDisabled() {
+        String engine = webContext.getProps().get(ViewProperties.ENGINE, ViewProperties.ENGINE_DEFAULT);
+        if (engine == null || engine.trim().isEmpty()) {
+            return false;
+        }
+        for (String item : engine.split(",")) {
+            if (item.trim().equalsIgnoreCase("none")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

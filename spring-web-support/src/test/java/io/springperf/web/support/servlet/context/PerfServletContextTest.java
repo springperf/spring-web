@@ -1,4 +1,4 @@
-package io.springperf.web.support.servlet.context;
+﻿package io.springperf.web.support.servlet.context;
 
 import io.springperf.web.context.WebContext;
 import org.junit.jupiter.api.BeforeEach;
@@ -116,5 +116,28 @@ class PerfServletContextTest {
     @Test
     void getRealPath_returnsNullForNonFileResource() {
         assertNull(servletContext.getRealPath("/nonexistent"));
+    }
+
+    @Test
+    void tempDir_createdAndAttributeSet() {
+        Object tempDir = servletContext.getAttribute(javax.servlet.ServletContext.TEMPDIR);
+        assertNotNull(tempDir);
+        assertTrue(((java.io.File) tempDir).isDirectory());
+    }
+
+    @Test
+    void destroyComponent_removesCreatedTempDir() {
+        java.io.File tempDir = (java.io.File) servletContext.getAttribute(javax.servlet.ServletContext.TEMPDIR);
+        assertTrue(tempDir.exists());
+
+        servletContext.destroyComponent();
+
+        assertFalse(tempDir.exists(), "鑷缓涓存椂鐩綍搴斿湪閿€姣佹椂琚竻鐞?);
+    }
+
+    @Test
+    void destroyComponent_twice_isIdempotent() {
+        servletContext.destroyComponent();
+        assertDoesNotThrow(servletContext::destroyComponent);
     }
 }
