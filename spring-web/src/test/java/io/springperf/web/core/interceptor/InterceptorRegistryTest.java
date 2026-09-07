@@ -13,6 +13,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.annotation.Order;
+import org.springframework.web.method.ControllerAdviceBean;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -96,6 +97,70 @@ class InterceptorRegistryTest {
         verify(mappingContext).setCachedInterceptors(captor.capture());
         assertTrue(actual.stream().anyMatch(h -> h == i1), "i1 应进入拦截器列表");
         assertTrue(actual.stream().anyMatch(h -> h == i2), "i2 应进入拦截器列表");
+    }
+
+    // ---- 类级匹配（@ControllerAdvice + ControllerAdviceBean）----
+
+    @Test
+    void findControllerAdviceBean_noAnnotatedBean_returnsNull() {
+        HandlerInterceptor interceptor = new HandlerInterceptor() {};
+        assertNull(registry.findControllerAdviceBean(interceptor));
+    }
+
+    @Test
+    void initCachedInterceptors_controllerAdviceScoped_matchesByBeanType() {
+        HandlerInterceptor interceptor = new HandlerInterceptor() {};
+        ControllerAdviceBean adviceBean = mock(ControllerAdviceBean.class);
+        when(adviceBean.isApplicableToBeanType(ControllerA.class)).thenReturn(true);
+
+        registry.registerInterceptor(interceptor).applyTo(adviceBean);
+
+        PathMappingContext mappingContext = mock(PathMappingContext.class);
+        when(mappingContext.getBeanType()).thenReturn((Class) ControllerA.class);
+        when(mappingContext.getPathRule()).thenReturn("/api/**");
+
+        List<HandlerInterceptor> interceptors = registry.initCachedInterceptors(mappingContext);
+        assertTrue(interceptors.contains(interceptor), "匹配 ControllerA 时应包含该拦截器");
+    }
+
+    @Test
+    void initCachedInterceptors_controllerAdviceScoped_nonMatchingType_excluded() {
+        HandlerInterceptor interceptor = new HandlerInterceptor() {};
+        ControllerAdviceBean adviceBean = mock(ControllerAdviceBean.class);
+        when(adviceBean.isApplicableToBeanType(ControllerB.class)).thenReturn(false);
+
+        registry.registerInterceptor(interceptor).applyTo(adviceBean);
+
+        PathMappingContext mappingContext = mock(PathMappingContext.class);
+        when(mappingContext.getBeanType()).thenReturn((Class) ControllerB.class);
+
+        List<HandlerInterceptor> interceptors = registry.initCachedInterceptors(mappingContext);
+        assertFalse(interceptors.contains(interceptor), "不匹配 ControllerB 时不应包含该拦截器");
+    }
+
+    @Test
+    void initCachedInterceptors_controllerAdviceScoped_ignoresPathRule() {
+        // 类级匹配的 registration 不使用 pathPatterns，即使 includePatterns 不匹配该路径也要按 beanType 判定
+        HandlerInterceptor interceptor = new HandlerInterceptor() {};
+        ControllerAdviceBean adviceBean = mock(ControllerAdviceBean.class);
+        when(adviceBean.isApplicableToBeanType(ControllerA.class)).thenReturn(true);
+
+        registry.registerInterceptor(interceptor)
+                .addPathPatterns("/exclude/**")   // path 匹配应被忽略
+                .applyTo(adviceBean);
+
+        PathMappingContext mappingContext = mock(PathMappingContext.class);
+        when(mappingContext.getBeanType()).thenReturn((Class) ControllerA.class);
+        when(mappingContext.getPathRule()).thenReturn("/api/not-matching");
+
+        List<HandlerInterceptor> interceptors = registry.initCachedInterceptors(mappingContext);
+        assertTrue(interceptors.contains(interceptor), "类级匹配忽略 path 规则，应命中");
+    }
+
+    static class ControllerA {
+    }
+
+    static class ControllerB {
     }
 
 
