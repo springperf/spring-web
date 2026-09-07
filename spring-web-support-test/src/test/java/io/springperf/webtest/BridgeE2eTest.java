@@ -9,12 +9,14 @@ public class BridgeE2eTest extends BaseE2ETest {
 
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
     private static final MediaType CUSTOM = MediaType.parse("application/x-custom; charset=utf-8");
-    private final String baseUrl = "http://localhost:9090/api";
+    private String baseUrl() {
+        return url("/api");
+    }
 
     @Test
     void ping_endpointAvailable() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/bridge/ping")
+                .url(baseUrl() + "/bridge/ping")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -27,7 +29,7 @@ public class BridgeE2eTest extends BaseE2ETest {
     @Test
     void customArgumentResolver_resolvesCustomAnnotation() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/bridge/custom-arg")
+                .url(baseUrl() + "/bridge/custom-arg")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -41,7 +43,7 @@ public class BridgeE2eTest extends BaseE2ETest {
     void customValidator_rejectsInvalidInput() throws Exception {
         String json = "{\"name\":\"fail\"}";
         Request req = new Request.Builder()
-                .url(baseUrl + "/bridge/validate")
+                .url(baseUrl() + "/bridge/validate")
                 .post(RequestBody.create(JSON, json))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -53,7 +55,7 @@ public class BridgeE2eTest extends BaseE2ETest {
     void customValidator_acceptsValidInput() throws Exception {
         String json = "{\"name\":\"ok\"}";
         Request req = new Request.Builder()
-                .url(baseUrl + "/bridge/validate")
+                .url(baseUrl() + "/bridge/validate")
                 .post(RequestBody.create(JSON, json))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -66,7 +68,7 @@ public class BridgeE2eTest extends BaseE2ETest {
     @Test
     void customReturnValueHandler_interceptsResponse() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/bridge/custom-retval")
+                .url(baseUrl() + "/bridge/custom-retval")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -80,7 +82,7 @@ public class BridgeE2eTest extends BaseE2ETest {
     @Test
     void customExceptionResolver_handlesException() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/bridge/custom-ex")
+                .url(baseUrl() + "/bridge/custom-ex")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -94,7 +96,7 @@ public class BridgeE2eTest extends BaseE2ETest {
     void customMessageConverter_readsAndWritesCustomMediaType() throws Exception {
         String input = "hello-converter";
         Request req = new Request.Builder()
-                .url(baseUrl + "/bridge/custom-convert")
+                .url(baseUrl() + "/bridge/custom-convert")
                 .post(RequestBody.create(CUSTOM, input))
                 .addHeader("Content-Type", "application/x-custom")
                 .addHeader("Accept", "application/x-custom")
@@ -110,7 +112,7 @@ public class BridgeE2eTest extends BaseE2ETest {
     @Test
     void interceptor_blocksBlockedPath() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/bridge/blocked")
+                .url(baseUrl() + "/bridge/blocked")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -123,7 +125,7 @@ public class BridgeE2eTest extends BaseE2ETest {
     @Test
     void interceptor_allowsUnblockedPath() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/bridge/ping")
+                .url(baseUrl() + "/bridge/ping")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -134,7 +136,7 @@ public class BridgeE2eTest extends BaseE2ETest {
     @Test
     void customFormatter_appliesFormat() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/bridge/format?name=test")
+                .url(baseUrl() + "/bridge/format?name=test")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -149,7 +151,7 @@ public class BridgeE2eTest extends BaseE2ETest {
     @Test
     void staticResource_isServed() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/bridge-static/test.txt")
+                .url(baseUrl() + "/bridge-static/test.txt")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -164,7 +166,7 @@ public class BridgeE2eTest extends BaseE2ETest {
     @Test
     void cors_preflight_allowsConfiguredOrigin() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/bridge/ping")
+                .url(baseUrl() + "/bridge/ping")
                 .method("OPTIONS", null)
                 .addHeader("Origin", "http://trusted-origin.com")
                 .addHeader("Access-Control-Request-Method", "GET")
@@ -182,7 +184,7 @@ public class BridgeE2eTest extends BaseE2ETest {
     @Test
     void cors_actualRequest_allowedOrigin() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/bridge/ping")
+                .url(baseUrl() + "/bridge/ping")
                 .get()
                 .addHeader("Origin", "http://trusted-origin.com")
                 .build();
@@ -196,7 +198,7 @@ public class BridgeE2eTest extends BaseE2ETest {
     @Test
     void cors_actualRequest_rejectedOrigin() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/bridge/ping")
+                .url(baseUrl() + "/bridge/ping")
                 .get()
                 .addHeader("Origin", "http://evil.com")
                 .build();
@@ -210,7 +212,7 @@ public class BridgeE2eTest extends BaseE2ETest {
     @Test
     void async_callable_returnsResult() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/bridge/async/callable")
+                .url(baseUrl() + "/bridge/async/callable")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -223,7 +225,7 @@ public class BridgeE2eTest extends BaseE2ETest {
     @Test
     void async_deferredResult_returnsResult() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/bridge/async/deferred")
+                .url(baseUrl() + "/bridge/async/deferred")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -239,7 +241,7 @@ public class BridgeE2eTest extends BaseE2ETest {
         // 因此无论框架把超时映射为多少状态码，"too-late" 都不应作为完成结果返回；
         // 用可证伪断言（而非恒真的"任意状态码都行"）锁定超时确实生效。
         Request req = new Request.Builder()
-                .url(baseUrl + "/bridge/async/timeout")
+                .url(baseUrl() + "/bridge/async/timeout")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {

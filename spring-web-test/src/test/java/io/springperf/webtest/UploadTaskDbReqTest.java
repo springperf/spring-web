@@ -12,7 +12,9 @@ import static org.junit.jupiter.api.Assertions.*;
 public class UploadTaskDbReqTest extends BaseE2ETest {
 
     private static final MediaType TEXT_PLAIN = MediaType.parse("text/plain");
-    private final String uploadUrl = "http://localhost:9090/api/upload";
+    private String uploadUrl() {
+        return url("/api/upload");
+    }
 
     @Test
     void unannotatedPojo_withAllFields_shouldBindCorrectly() throws Exception {
@@ -26,7 +28,7 @@ public class UploadTaskDbReqTest extends BaseE2ETest {
                 .build();
 
         Request req = new Request.Builder()
-                .url(uploadUrl + "/db-req")
+                .url(uploadUrl() + "/db-req")
                 .post(multipartBody)
                 .build();
 
@@ -55,7 +57,7 @@ public class UploadTaskDbReqTest extends BaseE2ETest {
                 .build();
 
         Request req = new Request.Builder()
-                .url(uploadUrl + "/db-req")
+                .url(uploadUrl() + "/db-req")
                 .post(multipartBody)
                 .build();
 
@@ -84,7 +86,7 @@ public class UploadTaskDbReqTest extends BaseE2ETest {
                 .build();
 
         Request req = new Request.Builder()
-                .url(uploadUrl + "/db-req")
+                .url(uploadUrl() + "/db-req")
                 .post(multipartBody)
                 .build();
 
@@ -106,7 +108,7 @@ public class UploadTaskDbReqTest extends BaseE2ETest {
                 .build();
 
         Request req = new Request.Builder()
-                .url(uploadUrl + "/db-req-validated")
+                .url(uploadUrl() + "/db-req-validated")
                 .post(multipartBody)
                 .build();
 
@@ -126,7 +128,7 @@ public class UploadTaskDbReqTest extends BaseE2ETest {
                 .build();
 
         Request req = new Request.Builder()
-                .url(uploadUrl + "/db-req-validated")
+                .url(uploadUrl() + "/db-req-validated")
                 .post(multipartBody)
                 .build();
 

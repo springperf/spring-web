@@ -1,10 +1,11 @@
-package io.springperf.webtest.proxy;
+﻿package io.springperf.webtest.proxy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.web.server.LocalServerPort;
 
 import java.time.Duration;
 import java.util.Map;
@@ -12,16 +13,15 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * P4 E2E 测试：produces/consumes 正条件、@CrossOrigin、DeferredResult、
- * {@code @ResponseStatus} 异常、@CookieValue、三级类继承、多 Filter 排序。
+ * P4 E2E 娴嬭瘯锛歱roduces/consumes 姝ｆ潯浠躲€丂CrossOrigin銆丏eferredResult銆?
+ * {@code @ResponseStatus} 寮傚父銆丂CookieValue銆佷笁绾х被缁ф壙銆佸 Filter 鎺掑簭銆?
  * <p>
- * 与 ProxyE2eTest 共享 Spring 上下文（端口 9092）。
+ * 涓?ProxyE2eTest 鍏变韩 Spring 涓婁笅鏂囷紙绔彛 9092锛夈€?
  */
 @SpringBootTest(
         classes = ProxyE2eApp.class,
-        webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT,
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
-                "server.port=9092",
                 "server.servlet.context-path=/api",
                 "proxy.placeholder.path=/proxy/placeholder-resolved"
         })
@@ -40,14 +40,23 @@ public class ProxyP4E2eTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final String baseUrl = "http://localhost:9092/api";
 
-    // ==================== 1. produces 正条件 ====================
+    @LocalServerPort
+    private int serverPort;
+
+    private String url(String path) {
+        return "http://localhost:" + serverPort + path;
+    }
+    private String baseUrl() {
+        return url("/api");
+    }
+
+    // ==================== 1. produces 姝ｆ潯浠?====================
 
     @Test
     void producesJson_withAcceptJson_returns200() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p4/json-only")
+                .url(baseUrl() + "/proxy-p4/json-only")
                 .header("Accept", "application/json")
                 .get()
                 .build();
@@ -60,9 +69,9 @@ public class ProxyP4E2eTest {
 
     @Test
     void producesJson_withAcceptXml_returns404() throws Exception {
-        // produces = "application/json" 不匹配 Accept: text/xml
+        // produces = "application/json" 涓嶅尮閰?Accept: text/xml
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p4/json-only")
+                .url(baseUrl() + "/proxy-p4/json-only")
                 .header("Accept", "text/xml")
                 .get()
                 .build();
@@ -71,12 +80,12 @@ public class ProxyP4E2eTest {
         }
     }
 
-    // ==================== 2. consumes 正条件 ====================
+    // ==================== 2. consumes 姝ｆ潯浠?====================
 
     @Test
     void consumesJson_withJsonContentType_returns200() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p4/consume-json")
+                .url(baseUrl() + "/proxy-p4/consume-json")
                 .post(RequestBody.create("{\"key\":\"val\"}", JSON_TYPE))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -89,9 +98,9 @@ public class ProxyP4E2eTest {
 
     @Test
     void consumesJson_withTextContentType_returns404() throws Exception {
-        // consumes = "application/json" 不匹配 Content-Type: text/plain
+        // consumes = "application/json" 涓嶅尮閰?Content-Type: text/plain
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p4/consume-json")
+                .url(baseUrl() + "/proxy-p4/consume-json")
                 .post(RequestBody.create("hello", TEXT_TYPE))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -104,7 +113,7 @@ public class ProxyP4E2eTest {
     @Test
     void cors_withMatchingOrigin_returnsAllowOriginHeader() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p4/cors")
+                .url(baseUrl() + "/proxy-p4/cors")
                 .header("Origin", "https://example.com")
                 .get()
                 .build();
@@ -116,12 +125,12 @@ public class ProxyP4E2eTest {
         }
     }
 
-    // ==================== 4. DeferredResult 异步 ====================
+    // ==================== 4. DeferredResult 寮傛 ====================
 
     @Test
     void asyncDeferredResult_returnsDone() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p4/async")
+                .url(baseUrl() + "/proxy-p4/async")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -132,12 +141,12 @@ public class ProxyP4E2eTest {
         }
     }
 
-    // ==================== 5. @ResponseStatus 异常 ====================
+    // ==================== 5. @ResponseStatus 寮傚父 ====================
 
     @Test
     void blockedResource_returns429() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p4/blocked-resource")
+                .url(baseUrl() + "/proxy-p4/blocked-resource")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -146,15 +155,15 @@ public class ProxyP4E2eTest {
         }
     }
 
-    // ==================== 6. 三级类继承 (GrandchildController) ====================
+    // ==================== 6. 涓夌骇绫荤户鎵?(GrandchildController) ====================
 
     @Test
     void grandchildController_threeLevelInheritance_returnsGrandchildStatus() throws Exception {
         // GrandchildController extends ChildController extends ParentController
-        // 类级 @RequestMapping("/proxy-parent") 通过 AnnotatedElementUtils 三级继承
-        // GrandchildController 的 /grandchild-status 应注册为 /proxy-parent/grandchild-status
+        // 绫荤骇 @RequestMapping("/proxy-parent") 閫氳繃 AnnotatedElementUtils 涓夌骇缁ф壙
+        // GrandchildController 鐨?/grandchild-status 搴旀敞鍐屼负 /proxy-parent/grandchild-status
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-parent/grandchild-status")
+                .url(baseUrl() + "/proxy-parent/grandchild-status")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -163,15 +172,15 @@ public class ProxyP4E2eTest {
         }
     }
 
-    // ==================== 7. 多 Filter 排序 ====================
+    // ==================== 7. 澶?Filter 鎺掑簭 ====================
 
     @Test
     void filters_executedInOrder_returnsBothFilterHeaders() throws Exception {
-        // ProxyTestFilter  @Order(1)  → 添加 X-Test-Filter
-        // ProxyTestFilter2 @Order(2)  → 添加 X-Test-Filter2
-        // BlockingProxyFilter @Order(20) → 仅阻断特定路径
+        // ProxyTestFilter  @Order(1)  鈫?娣诲姞 X-Test-Filter
+        // ProxyTestFilter2 @Order(2)  鈫?娣诲姞 X-Test-Filter2
+        // BlockingProxyFilter @Order(20) 鈫?浠呴樆鏂壒瀹氳矾寰?
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-p4/json-only")
+                .url(baseUrl() + "/proxy-p4/json-only")
                 .header("Accept", "application/json")
                 .get()
                 .build();

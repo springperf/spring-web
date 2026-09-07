@@ -11,7 +11,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class InterceptorAdvancedTest extends BaseE2ETest {
 
-    private final String baseUrl = "http://localhost:9090/api";
+    private String baseUrl() {
+        return url("/api");
+    }
 
     @BeforeEach
     void resetInterceptorCounts() {
@@ -22,7 +24,7 @@ public class InterceptorAdvancedTest extends BaseE2ETest {
     void interceptorLifecycle_postHandleAndAfterCompletion_withException() throws Exception {
         // 请求一个抛异常的端点，验证 afterCompletion 仍被调用
         Request req = new Request.Builder()
-                .url(baseUrl + "/core/exception/illegal-argument")
+                .url(baseUrl() + "/core/exception/illegal-argument")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -41,7 +43,7 @@ public class InterceptorAdvancedTest extends BaseE2ETest {
         // /demo/echo is in the excludePathPatterns of LoginInterceptor
         // So it should return 302 (the echo GET response) instead of 401
         Request req = new Request.Builder()
-                .url(baseUrl + "/demo/echo?received=test")
+                .url(baseUrl() + "/demo/echo?received=test")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -56,7 +58,7 @@ public class InterceptorAdvancedTest extends BaseE2ETest {
     void interceptorNonExcludedPath_shouldBeIntercepted() throws Exception {
         // /core/name is NOT excluded and its method name "name" triggers LoginInterceptor
         Request req = new Request.Builder()
-                .url(baseUrl + "/core/name")
+                .url(baseUrl() + "/core/name")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -71,7 +73,7 @@ public class InterceptorAdvancedTest extends BaseE2ETest {
 
         // Make a request to /core/lifecycle/check which is handled by LifecycleInterceptor
         Request req = new Request.Builder()
-                .url(baseUrl + "/core/lifecycle/check")
+                .url(baseUrl() + "/core/lifecycle/check")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {

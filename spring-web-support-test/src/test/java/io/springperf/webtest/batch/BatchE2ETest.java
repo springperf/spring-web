@@ -20,7 +20,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class BatchE2ETest extends BaseE2ETest {
 
-    private static final String BASE_URL = "http://localhost:9090/api/batch/echo?msg=hello";
+    private String baseUrl() {
+        return url("/api/batch/echo?msg=hello");
+    }
+
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
     @Test
@@ -35,7 +38,7 @@ public class BatchE2ETest extends BaseE2ETest {
             executor.submit(() -> {
                 try {
                     Request req = new Request.Builder()
-                            .url(BASE_URL)
+                            .url(baseUrl())
                             .get()
                             .build();
                     try (Response resp = CLIENT.newCall(req).execute()) {
@@ -66,7 +69,7 @@ public class BatchE2ETest extends BaseE2ETest {
     @Test
     void singleRequest_alsoProcessedByBatchHandler() throws Exception {
         Request req = new Request.Builder()
-                .url(BASE_URL)
+                .url(baseUrl())
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -83,7 +86,7 @@ public class BatchE2ETest extends BaseE2ETest {
     void postWithMultiParams_injectsBodyQueryAndPathVar() throws Exception {
         String json = "{\"name\":\"testUser\",\"age\":25}";
         Request req = new Request.Builder()
-                .url("http://localhost:9090/api/batch/echo/testPath?msg=helloMulti")
+                .url(url("/api/batch/echo/testPath?msg=helloMulti"))
                 .post(RequestBody.create(JSON, json))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -109,7 +112,7 @@ public class BatchE2ETest extends BaseE2ETest {
             executor.submit(() -> {
                 try {
                     Request req = new Request.Builder()
-                            .url("http://localhost:9090/api/batch/echo-batchsize?msg=test")
+                            .url(url("/api/batch/echo-batchsize?msg=test"))
                             .get()
                             .build();
                     try (Response resp = CLIENT.newCall(req).execute()) {
@@ -148,7 +151,7 @@ public class BatchE2ETest extends BaseE2ETest {
             executor.submit(() -> {
                 try {
                     Request req = new Request.Builder()
-                            .url("http://localhost:9090/api/batch/echo-error?msg=test")
+                            .url(url("/api/batch/echo-error?msg=test"))
                             .get()
                             .build();
                     try (Response resp = CLIENT.newCall(req).execute()) {
@@ -192,7 +195,7 @@ public class BatchE2ETest extends BaseE2ETest {
             executor.submit(() -> {
                 try {
                     Request req = new Request.Builder()
-                            .url("http://localhost:9090/api/batch/echo-consumers?msg=test")
+                            .url(url("/api/batch/echo-consumers?msg=test"))
                             .get()
                             .build();
                     try (Response resp = CLIENT.newCall(req).execute()) {

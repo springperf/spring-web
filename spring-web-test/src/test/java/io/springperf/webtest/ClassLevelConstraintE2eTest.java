@@ -13,7 +13,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 public class ClassLevelConstraintE2eTest extends BaseE2ETest {
 
-    private final String baseUrl = "http://localhost:9090/api/class-level-constraint/echo";
+    private String baseUrl() {
+        return url("/api/class-level-constraint/echo");
+    }
 
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
@@ -21,7 +23,7 @@ public class ClassLevelConstraintE2eTest extends BaseE2ETest {
     void postJson_shouldReturn200() throws Exception {
         RequestBody body = RequestBody.create(JSON, "{}");
         Request req = new Request.Builder()
-                .url(baseUrl)
+                .url(baseUrl())
                 .post(body)
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -32,7 +34,7 @@ public class ClassLevelConstraintE2eTest extends BaseE2ETest {
     @Test
     void getMethod_shouldReturn405() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl)
+                .url(baseUrl())
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {

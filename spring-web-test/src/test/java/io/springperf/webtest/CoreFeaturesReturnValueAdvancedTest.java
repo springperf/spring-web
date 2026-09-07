@@ -14,12 +14,14 @@ import static org.junit.jupiter.api.Assertions.*;
 public class CoreFeaturesReturnValueAdvancedTest extends BaseE2ETest {
 
     private static final Logger log = LoggerFactory.getLogger(CoreFeaturesReturnValueAdvancedTest.class);
-    private final String baseUrl = "http://localhost:9090/api/core";
+    private String baseUrl() {
+        return url("/api/core");
+    }
 
     @Test
     void fileDownload_returnsFileContent() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/file-download")
+                .url(baseUrl() + "/file-download")
                 .get()
                 .build();
         // FileReturnValueResolver → NettyServerHttpResponse.writeFile 设置 Content-Length + LastHttpContent，
@@ -35,7 +37,7 @@ public class CoreFeaturesReturnValueAdvancedTest extends BaseE2ETest {
     @Test
     void completionStage_returnsResult() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/completion-stage")
+                .url(baseUrl() + "/completion-stage")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -50,7 +52,7 @@ public class CoreFeaturesReturnValueAdvancedTest extends BaseE2ETest {
     @Test
     void webAsyncTask_returnsResult() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/async-task")
+                .url(baseUrl() + "/async-task")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -64,7 +66,7 @@ public class CoreFeaturesReturnValueAdvancedTest extends BaseE2ETest {
     @Test
     void asyncTimeout_triggersTimeoutHandling() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/async-timeout")
+                .url(baseUrl() + "/async-timeout")
                 .get()
                 .build();
         // WebAsyncTask(timeout=100ms) 的任务 sleep 500ms 必然超时：框架在异步派发异常
@@ -78,7 +80,7 @@ public class CoreFeaturesReturnValueAdvancedTest extends BaseE2ETest {
     @Test
     void dateFormat_serializesCorrectly() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/date-format")
+                .url(baseUrl() + "/date-format")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {

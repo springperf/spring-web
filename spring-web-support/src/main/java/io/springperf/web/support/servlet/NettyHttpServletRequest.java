@@ -49,6 +49,15 @@ public class NettyHttpServletRequest extends PerfHttpServletRequest {
     }
 
     @Override
+    public int getServerPort() {
+        // 返回实际绑定端口而非配置值（server.port）：
+        // RANDOM_PORT/management 隔离等场景下配置端口为 0 或不同于实际绑定端口，
+        // getRequestURL() 依赖此端口拼接出正确的请求 URL
+        InetSocketAddress addr = (InetSocketAddress) getDelegateRequest().getLocalAddress();
+        return addr != null ? addr.getPort() : super.getServerPort();
+    }
+
+    @Override
     public String getScheme() {
         return getDelegateRequest().getURI().getScheme();
     }

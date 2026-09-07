@@ -19,16 +19,22 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     private static final MediaType JSON_MEDIA = MediaType.parse("application/json; charset=utf-8");
 
-    private final String coreUrl = "http://localhost:9090/api/core";
-    private final String p0Url = "http://localhost:9090/api/p0";
-    private final String noRestUrl = "http://localhost:9090/api/p0/no-rest-controller";
+    private String coreUrl() {
+        return url("/api/core");
+    }
+    private String p0Url() {
+        return url("/api/p0");
+    }
+    private String noRestUrl() {
+        return url("/api/p0/no-rest-controller");
+    }
 
     // ==================== 1. @RequestParam MultiValueMap ====================
 
     @Test
     void multiValueMap_withMultipleParams_bindsCorrectly() throws Exception {
         Request req = new Request.Builder()
-                .url(p0Url + "/multi-value-map?a=hello&b=world")
+                .url(p0Url() + "/multi-value-map?a=hello&b=world")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -40,7 +46,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     @Test
     void multiValueMap_withSingleParam_returnsNullForMissing() throws Exception {
         Request req = new Request.Builder()
-                .url(p0Url + "/multi-value-map?a=only")
+                .url(p0Url() + "/multi-value-map?a=only")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -55,7 +61,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     @Test
     void locale_withAcceptLanguage_returnsParsedLocale() throws Exception {
         Request req = new Request.Builder()
-                .url(p0Url + "/locale")
+                .url(p0Url() + "/locale")
                 .header("Accept-Language", "zh-CN")
                 .get()
                 .build();
@@ -70,7 +76,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     @Test
     void locale_withoutAcceptLanguage_returnsDefaultLocale() throws Exception {
         Request req = new Request.Builder()
-                .url(p0Url + "/locale")
+                .url(p0Url() + "/locale")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -86,7 +92,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     @Test
     void multiPath_firstPath_returns200() throws Exception {
         Request req = new Request.Builder()
-                .url(p0Url + "/multi-path-a")
+                .url(p0Url() + "/multi-path-a")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -98,7 +104,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     @Test
     void multiPath_secondPath_returns200() throws Exception {
         Request req = new Request.Builder()
-                .url(p0Url + "/multi-path-b")
+                .url(p0Url() + "/multi-path-b")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -112,7 +118,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     @Test
     void multiMethod_getRequest_returns200() throws Exception {
         Request req = new Request.Builder()
-                .url(p0Url + "/multi-method")
+                .url(p0Url() + "/multi-method")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -124,7 +130,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     @Test
     void multiMethod_postRequest_returns200() throws Exception {
         Request req = new Request.Builder()
-                .url(p0Url + "/multi-method")
+                .url(p0Url() + "/multi-method")
                 .post(RequestBody.create("", JSON_MEDIA))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -138,7 +144,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     @Test
     void multiParamAnd_bothConditionsMatch_returns200() throws Exception {
         Request req = new Request.Builder()
-                .url(p0Url + "/multi-param?a=1&b=2")
+                .url(p0Url() + "/multi-param?a=1&b=2")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -150,7 +156,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     @Test
     void multiParamAnd_firstConditionMissing_returns404() throws Exception {
         Request req = new Request.Builder()
-                .url(p0Url + "/multi-param?a=1")
+                .url(p0Url() + "/multi-param?a=1")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -161,7 +167,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     @Test
     void multiParamAnd_secondConditionMissing_returns404() throws Exception {
         Request req = new Request.Builder()
-                .url(p0Url + "/multi-param?b=2")
+                .url(p0Url() + "/multi-param?b=2")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -172,7 +178,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     @Test
     void multiParamAnd_neitherConditionMatches_returns404() throws Exception {
         Request req = new Request.Builder()
-                .url(p0Url + "/multi-param?a=3&b=3")
+                .url(p0Url() + "/multi-param?a=3&b=3")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -185,7 +191,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     @Test
     void multiHeaderAnd_bothConditionsMatch_returns200() throws Exception {
         Request req = new Request.Builder()
-                .url(p0Url + "/multi-header")
+                .url(p0Url() + "/multi-header")
                 .header("X-A", "1")
                 .header("X-B", "2")
                 .get()
@@ -199,7 +205,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     @Test
     void multiHeaderAnd_firstConditionMissing_returns404() throws Exception {
         Request req = new Request.Builder()
-                .url(p0Url + "/multi-header")
+                .url(p0Url() + "/multi-header")
                 .header("X-A", "1")
                 .get()
                 .build();
@@ -211,7 +217,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     @Test
     void multiHeaderAnd_secondConditionMissing_returns404() throws Exception {
         Request req = new Request.Builder()
-                .url(p0Url + "/multi-header")
+                .url(p0Url() + "/multi-header")
                 .header("X-B", "2")
                 .get()
                 .build();
@@ -223,7 +229,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     @Test
     void multiHeaderAnd_neitherConditionMatches_returns404() throws Exception {
         Request req = new Request.Builder()
-                .url(p0Url + "/multi-header")
+                .url(p0Url() + "/multi-header")
                 .header("X-A", "3")
                 .header("X-B", "3")
                 .get()
@@ -238,7 +244,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     @Test
     void requestEntity_withPost_containsMethodAndBody() throws Exception {
         Request req = new Request.Builder()
-                .url(p0Url + "/request-entity")
+                .url(p0Url() + "/request-entity")
                 .post(RequestBody.create("\"test-body\"", JSON_MEDIA))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -254,7 +260,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     @Test
     void noRestController_getWithParam_returnsValue() throws Exception {
         Request req = new Request.Builder()
-                .url(noRestUrl + "/echo?msg=hello-no-rest")
+                .url(noRestUrl() + "/echo?msg=hello-no-rest")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -266,7 +272,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     @Test
     void noRestController_postWithBody_returns201() throws Exception {
         Request req = new Request.Builder()
-                .url(noRestUrl + "/save")
+                .url(noRestUrl() + "/save")
                 .post(RequestBody.create("\"data\"", JSON_MEDIA))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -281,7 +287,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     @Test
     void interceptorReturnFalse_responseHas200WithEmptyBody() throws Exception {
         Request req = new Request.Builder()
-                .url(p0Url + "/interceptor-return-false")
+                .url(p0Url() + "/interceptor-return-false")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -299,7 +305,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     @Test
     void interceptorReturnTrue_controllerExecutesNormally() throws Exception {
         Request req = new Request.Builder()
-                .url(p0Url + "/interceptor-return-true")
+                .url(p0Url() + "/interceptor-return-true")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -313,7 +319,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     @Test
     void runInEventLoop_usesEventLoopThread() throws Exception {
         Request req = new Request.Builder()
-                .url(coreUrl + "/pool/event-loop")
+                .url(coreUrl() + "/pool/event-loop")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -330,7 +336,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     @Test
     void runInEventloopMetaAnnotation_usesEventLoopThread() throws Exception {
         Request req = new Request.Builder()
-                .url(coreUrl + "/pool/run-in-eventloop")
+                .url(coreUrl() + "/pool/run-in-eventloop")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -346,7 +352,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     @Test
     void runInBizPool_usesBizPoolThread() throws Exception {
         Request req = new Request.Builder()
-                .url(coreUrl + "/pool/biz-pool")
+                .url(coreUrl() + "/pool/biz-pool")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -365,7 +371,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     @Test
     void runInNonExistentPool_returns500() throws Exception {
         Request req = new Request.Builder()
-                .url(coreUrl + "/pool/bad-pool")
+                .url(coreUrl() + "/pool/bad-pool")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {

@@ -9,12 +9,14 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class CoreFeaturesWebFilterTest extends BaseE2ETest {
 
-    private final String baseUrl = "http://localhost:9090/api/core";
+    private String baseUrl() {
+        return url("/api/core");
+    }
 
     @Test
     void webFilter_addsHeaderToResponse() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/bytes")
+                .url(baseUrl() + "/bytes")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -28,7 +30,7 @@ public class CoreFeaturesWebFilterTest extends BaseE2ETest {
     @Test
     void webFilter_headerPresentOnAllEndpoints() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/header")
+                .url(baseUrl() + "/header")
                 .header("X-Custom-Header", "test")
                 .get()
                 .build();

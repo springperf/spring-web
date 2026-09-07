@@ -21,14 +21,16 @@ public class CoreFeaturesP2Test extends BaseE2ETest {
     private static final MediaType JSON_TYPE = MediaType.parse("application/json; charset=utf-8");
     private static final MediaType XML_TYPE = MediaType.parse("application/xml; charset=utf-8");
     private static final MediaType XML = MediaType.parse("application/xml; charset=utf-8");
-    private final String baseUrl = "http://localhost:9090/api";
+    private String baseUrl() {
+        return url("/api");
+    }
 
     // ==================== 1. 占位符路径 ====================
 
     @Test
     void placeholderPath_resolvesFromEnvironment() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/p2/placeholder-test")
+                .url(baseUrl() + "/p2/placeholder-test")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -42,7 +44,7 @@ public class CoreFeaturesP2Test extends BaseE2ETest {
     @Test
     void placeholderSegment_resolvesInPath() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/p2-placeholder-seg/nested")
+                .url(baseUrl() + "/p2-placeholder-seg/nested")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -57,7 +59,7 @@ public class CoreFeaturesP2Test extends BaseE2ETest {
     @Test
     void notXmlConsumes_withJsonBody_returns200() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/p2/not-xml")
+                .url(baseUrl() + "/p2/not-xml")
                 .post(RequestBody.create("{\"key\":\"val\"}", JSON_TYPE))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -68,7 +70,7 @@ public class CoreFeaturesP2Test extends BaseE2ETest {
     @Test
     void notXmlConsumes_withXmlBody_returns404() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/p2/not-xml")
+                .url(baseUrl() + "/p2/not-xml")
                 .post(RequestBody.create("<root/>", XML_TYPE))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -82,7 +84,7 @@ public class CoreFeaturesP2Test extends BaseE2ETest {
     @Test
     void noBlockHeader_withoutHeader_returns200() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/p2/no-block-header")
+                .url(baseUrl() + "/p2/no-block-header")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -93,7 +95,7 @@ public class CoreFeaturesP2Test extends BaseE2ETest {
     @Test
     void noBlockHeader_withBlockHeader_returns404() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/p2/no-block-header")
+                .url(baseUrl() + "/p2/no-block-header")
                 .header("X-Block", "true")
                 .get()
                 .build();
@@ -108,7 +110,7 @@ public class CoreFeaturesP2Test extends BaseE2ETest {
     @Test
     void noSkipParam_withoutSkip_returns200() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/p2/no-skip-param")
+                .url(baseUrl() + "/p2/no-skip-param")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -119,7 +121,7 @@ public class CoreFeaturesP2Test extends BaseE2ETest {
     @Test
     void noSkipParam_withSkip_returns404() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/p2/no-skip-param?skip=true")
+                .url(baseUrl() + "/p2/no-skip-param?skip=true")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -133,7 +135,7 @@ public class CoreFeaturesP2Test extends BaseE2ETest {
     @Test
     void parentException_caughtByParentHandler() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/p2/parent-exception")
+                .url(baseUrl() + "/p2/parent-exception")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -147,7 +149,7 @@ public class CoreFeaturesP2Test extends BaseE2ETest {
     @Test
     void childException_caughtBySpecificHandler() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/p2/child-exception")
+                .url(baseUrl() + "/p2/child-exception")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -163,7 +165,7 @@ public class CoreFeaturesP2Test extends BaseE2ETest {
     @Test
     void blockingFilter_returns403() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/p2/blocked")
+                .url(baseUrl() + "/p2/blocked")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -179,7 +181,7 @@ public class CoreFeaturesP2Test extends BaseE2ETest {
     @Test
     void filterOrder_bothHeadersPresent() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/p2/filter-order")
+                .url(baseUrl() + "/p2/filter-order")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {

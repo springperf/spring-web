@@ -19,6 +19,10 @@ class WebSocketE2eTest extends BaseE2ETest {
     private WebSocket webSocket;
     private OkHttpClient wsClient;
 
+    private String wsUrl(String path) {
+        return "ws://localhost:" + serverPort + path;
+    }
+
     @AfterEach
     void tearDown() {
         if (webSocket != null) {
@@ -39,7 +43,7 @@ class WebSocketE2eTest extends BaseE2ETest {
         wsClient = new OkHttpClient.Builder()
                 .readTimeout(5, TimeUnit.SECONDS)
                 .build();
-        Request request = new Request.Builder().url("ws://localhost:9090/ws/echo").build();
+        Request request = new Request.Builder().url(wsUrl("/ws/echo")).build();
         webSocket = wsClient.newWebSocket(request, new WebSocketListener() {
             @Override
             public void onOpen(@NotNull WebSocket ws, @NotNull Response response) {
@@ -70,7 +74,7 @@ class WebSocketE2eTest extends BaseE2ETest {
         wsClient = new OkHttpClient.Builder()
                 .readTimeout(5, TimeUnit.SECONDS)
                 .build();
-        Request request = new Request.Builder().url("ws://localhost:9090/ws/echo").build();
+        Request request = new Request.Builder().url(wsUrl("/ws/echo")).build();
         webSocket = wsClient.newWebSocket(request, new WebSocketListener() {
             @Override
             public void onOpen(@NotNull WebSocket ws, @NotNull Response response) {
@@ -101,7 +105,7 @@ class WebSocketE2eTest extends BaseE2ETest {
         wsClient = new OkHttpClient.Builder()
                 .readTimeout(5, TimeUnit.SECONDS)
                 .build();
-        Request request = new Request.Builder().url("ws://localhost:9090/ws/echo").build();
+        Request request = new Request.Builder().url(wsUrl("/ws/echo")).build();
         webSocket = wsClient.newWebSocket(request, new WebSocketListener() {
             @Override
             public void onOpen(@NotNull WebSocket ws, @NotNull Response response) {
@@ -145,7 +149,7 @@ class WebSocketE2eTest extends BaseE2ETest {
         wsClient = new OkHttpClient.Builder()
                 .readTimeout(5, TimeUnit.SECONDS)
                 .build();
-        Request request = new Request.Builder().url("ws://localhost:9090/ws/echo").build();
+        Request request = new Request.Builder().url(wsUrl("/ws/echo")).build();
         webSocket = wsClient.newWebSocket(request, new WebSocketListener() {
             @Override
             public void onOpen(@NotNull WebSocket ws, @NotNull Response response) {
@@ -183,7 +187,7 @@ class WebSocketE2eTest extends BaseE2ETest {
         wsClient = new OkHttpClient.Builder()
                 .readTimeout(5, TimeUnit.SECONDS)
                 .build();
-        Request request = new Request.Builder().url("ws://localhost:9090/ws/room/myroom123").build();
+        Request request = new Request.Builder().url(wsUrl("/ws/room/myroom123")).build();
         webSocket = wsClient.newWebSocket(request, new WebSocketListener() {
             @Override
             public void onOpen(@NotNull WebSocket ws, @NotNull Response response) {
@@ -220,7 +224,7 @@ class WebSocketE2eTest extends BaseE2ETest {
         wsClient = new OkHttpClient.Builder()
                 .readTimeout(3, TimeUnit.SECONDS)
                 .build();
-        Request request = new Request.Builder().url("ws://localhost:9090/ws/nonexistent").build();
+        Request request = new Request.Builder().url(wsUrl("/ws/nonexistent")).build();
         webSocket = wsClient.newWebSocket(request, new WebSocketListener() {
             @Override
             public void onFailure(@NotNull WebSocket ws, @NotNull Throwable t, Response response) {
@@ -256,7 +260,7 @@ class WebSocketE2eTest extends BaseE2ETest {
         wsClient = new OkHttpClient.Builder()
                 .readTimeout(10, TimeUnit.SECONDS)
                 .build();
-        Request request = new Request.Builder().url("ws://localhost:9090/ws/echo").build();
+        Request request = new Request.Builder().url(wsUrl("/ws/echo")).build();
         CountDownLatch openLatch = new CountDownLatch(1);
 
         webSocket = wsClient.newWebSocket(request, new WebSocketListener() {
@@ -321,7 +325,7 @@ class WebSocketE2eTest extends BaseE2ETest {
             OkHttpClient client = new OkHttpClient.Builder()
                     .readTimeout(5, TimeUnit.SECONDS)
                     .build();
-            Request request = new Request.Builder().url("ws://localhost:9090/ws/echo").build();
+            Request request = new Request.Builder().url(wsUrl("/ws/echo")).build();
             client.newWebSocket(request, new WebSocketListener() {
                 @Override
                 public void onOpen(@NotNull WebSocket ws, @NotNull Response response) {
@@ -372,7 +376,7 @@ class WebSocketE2eTest extends BaseE2ETest {
         wsClient = new OkHttpClient.Builder()
                 .readTimeout(5, TimeUnit.SECONDS)
                 .build();
-        Request request = new Request.Builder().url("ws://localhost:9090/ws/echo").build();
+        Request request = new Request.Builder().url(wsUrl("/ws/echo")).build();
         byte[] binaryPayload = "bin".getBytes(StandardCharsets.UTF_8);
 
         webSocket = wsClient.newWebSocket(request, new WebSocketListener() {

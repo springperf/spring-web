@@ -12,12 +12,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class CoreFeaturesParamReturnTest extends BaseE2ETest {
 
-    private final String baseUrl = "http://localhost:9090/api/core";
+    private String baseUrl() {
+        return url("/api/core");
+    }
 
     @Test
     void testRequestHeader() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/header")
+                .url(baseUrl() + "/header")
                 .header("X-Custom-Header", "my-value")
                 .get()
                 .build();
@@ -32,7 +34,7 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
     void testHttpEntity() throws Exception {
         RequestBody body = RequestBody.create("hello entity", MediaType.parse("text/plain"));
         Request req = new Request.Builder()
-                .url(baseUrl + "/http-entity")
+                .url(baseUrl() + "/http-entity")
                 .post(body)
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -44,7 +46,7 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
 
     @Test
     void testDeferredResultError() throws Exception {
-        Request req = new Request.Builder().url(baseUrl + "/deferred-result-error").get().build();
+        Request req = new Request.Builder().url(baseUrl() + "/deferred-result-error").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(500, resp.code());
         }
@@ -52,7 +54,7 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
 
     @Test
     void testDeferredResult() throws Exception {
-        Request req = new Request.Builder().url(baseUrl + "/deferred-result").get().build();
+        Request req = new Request.Builder().url(baseUrl() + "/deferred-result").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -63,7 +65,7 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
 
     @Test
     void testCallable() throws Exception {
-        Request req = new Request.Builder().url(baseUrl + "/callable").get().build();
+        Request req = new Request.Builder().url(baseUrl() + "/callable").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -74,7 +76,7 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
 
     @Test
     void testListenableFuture() throws Exception {
-        Request req = new Request.Builder().url(baseUrl + "/listenable-future").get().build();
+        Request req = new Request.Builder().url(baseUrl() + "/listenable-future").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -85,7 +87,7 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
 
     @Test
     void testBytes() throws Exception {
-        Request req = new Request.Builder().url(baseUrl + "/bytes").get().build();
+        Request req = new Request.Builder().url(baseUrl() + "/bytes").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -95,7 +97,7 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
 
     @Test
     void testResource() throws Exception {
-        Request req = new Request.Builder().url(baseUrl + "/resource").get().build();
+        Request req = new Request.Builder().url(baseUrl() + "/resource").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             assertNotNull(resp.header("Content-Type"));
@@ -108,7 +110,7 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
 
     @Test
     void testInputStream() throws Exception {
-        Request req = new Request.Builder().url(baseUrl + "/input-stream").get().build();
+        Request req = new Request.Builder().url(baseUrl() + "/input-stream").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -119,7 +121,7 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
     @Test
     void voidReturn_returns204() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/void")
+                .url(baseUrl() + "/void")
                 .post(RequestBody.create(MediaType.parse("text/plain"), ""))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {

@@ -13,12 +13,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class JspE2eTest extends BaseE2ETest {
 
-    private static final String BASE = "http://localhost:9090/api";
+    private String base() {
+        return url("/api");
+    }
 
     @Test
     void jspRoute_rendersJsp() throws IOException {
         Request request = new Request.Builder()
-                .url(BASE + "/jsp/hello.jsp")
+                .url(base() + "/jsp/hello.jsp")
                 .build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             String body = resp.body().string();
@@ -31,7 +33,7 @@ class JspE2eTest extends BaseE2ETest {
     @Test
     void controllerView_rendersJspWithModel() throws IOException {
         Request request = new Request.Builder()
-                .url(BASE + "/jsp-view")
+                .url(base() + "/jsp-view")
                 .build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             String body = resp.body().string();
@@ -44,7 +46,7 @@ class JspE2eTest extends BaseE2ETest {
     @Test
     void controllerView_suffixForm_rendersJsp() throws IOException {
         Request request = new Request.Builder()
-                .url(BASE + "/jsp-view-suffix")
+                .url(base() + "/jsp-view-suffix")
                 .build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             String body = resp.body().string();
@@ -56,7 +58,7 @@ class JspE2eTest extends BaseE2ETest {
     @Test
     void controllerView_complexModel_rendersViaEl() throws IOException {
         Request request = new Request.Builder()
-                .url(BASE + "/jsp-model")
+                .url(base() + "/jsp-model")
                 .build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             String body = resp.body().string();
@@ -70,7 +72,7 @@ class JspE2eTest extends BaseE2ETest {
     @Test
     void jspInclude_appendsFragment() throws IOException {
         Request request = new Request.Builder()
-                .url(BASE + "/jsp/include.jsp")
+                .url(base() + "/jsp/include.jsp")
                 .build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             String body = resp.body().string();
@@ -84,7 +86,7 @@ class JspE2eTest extends BaseE2ETest {
     @Test
     void jspForward_rendersTarget() throws IOException {
         Request request = new Request.Builder()
-                .url(BASE + "/jsp/forward.jsp")
+                .url(base() + "/jsp/forward.jsp")
                 .build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             String body = resp.body().string();
@@ -96,7 +98,7 @@ class JspE2eTest extends BaseE2ETest {
     @Test
     void jspNotFound_returns404() throws IOException {
         Request request = new Request.Builder()
-                .url(BASE + "/jsp/not-exist.jsp")
+                .url(base() + "/jsp/not-exist.jsp")
                 .build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             assertEquals(404, resp.code(), "body=" + resp.body().string());
@@ -106,7 +108,7 @@ class JspE2eTest extends BaseE2ETest {
     @Test
     void controllerView_jstl_rendersLoopAndCondition() throws IOException {
         Request request = new Request.Builder()
-                .url(BASE + "/jsp-jstl")
+                .url(base() + "/jsp-jstl")
                 .build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             String body = resp.body().string();

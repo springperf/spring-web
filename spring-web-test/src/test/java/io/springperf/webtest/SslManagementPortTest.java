@@ -1,12 +1,19 @@
-package io.springperf.webtest;
+﻿package io.springperf.webtest;
 
 import com.alibaba.fastjson2.JSON;
+import io.springperf.web.autoconfigure.actuator.server.ManagementNettyHttpServer;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.util.TestPropertyValues;
+import org.springframework.boot.web.server.LocalServerPort;
+import org.springframework.context.ApplicationContextInitializer;
+import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.test.context.ContextConfiguration;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
@@ -18,22 +25,45 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * 管理端口 SSL 集成测试。
- * <p>验证 {@code management.server.ssl.*} 配置对管理端口生效，
- * 管理端口通过 HTTPS 提供 Actuator 端点，主端口仍然通过 HTTP 提供业务服务。</p>
+ * 绠＄悊绔彛 SSL 闆嗘垚娴嬭瘯銆?
+ * <p>楠岃瘉 {@code management.server.ssl.*} 閰嶇疆瀵圭鐞嗙鍙ｇ敓鏁堬紝
+ * 绠＄悊绔彛閫氳繃 HTTPS 鎻愪緵 Actuator 绔偣锛屼富绔彛浠嶇劧閫氳繃 HTTP 鎻愪緵涓氬姟鏈嶅姟銆?/p>
  */
-@SpringBootTest(classes = TestApplication.class, properties = {
-        "server.port=9095",
+@SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = {
         "server.servlet.context-path=/api",
-        "management.server.port=9094",
         "management.server.ssl.enabled=true",
         "management.server.ssl.key-store=classpath:test-keystore.p12",
         "management.server.ssl.key-store-password=changeit",
         "management.server.ssl.key-store-type=PKCS12",
         "management.endpoints.web.exposure.include=health"
 })
+@ContextConfiguration(initializers = SslManagementPortTest.ManagementPortInitializer.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class SslManagementPortTest {
+
+    /** 鍚姩鍓嶅垎閰嶄竴涓┖闂茬鍙ｄ綔涓虹鐞嗙鍙ｏ紝閬垮厤鍥哄畾绔彛琚崰鐢?鍐茬獊 */
+    public static class ManagementPortInitializer
+            implements ApplicationContextInitializer<ConfigurableApplicationContext> {
+        @Override
+        public void initialize(ConfigurableApplicationContext ctx) {
+            TestPropertyValues.of("management.server.port=" + freePort()).applyTo(ctx.getEnvironment());
+        }
+    }
+
+    private static int freePort() {
+        try (java.net.ServerSocket socket = new java.net.ServerSocket(0)) {
+            return socket.getLocalPort();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @LocalServerPort
+    private int mainPort;
+
+    @Autowired
+    private ManagementNettyHttpServer managementServer;
 
     private static final OkHttpClient SSL_CLIENT = new OkHttpClient.Builder()
             .connectTimeout(Duration.ofSeconds(3))
@@ -49,10 +79,22 @@ public class SslManagementPortTest {
             .writeTimeout(Duration.ofSeconds(10))
             .build();
 
+    private String mainUrl(String path) {
+        return "http://localhost:" + mainPort + path;
+    }
+
+    private String managementHttpsUrl(String path) {
+        return "https://localhost:" + managementServer.getActualPort() + path;
+    }
+
+    private String managementHttpUrl(String path) {
+        return "http://localhost:" + managementServer.getActualPort() + path;
+    }
+
     @Test
     void managementPortHttps_shouldServeHealth() throws Exception {
         Request req = new Request.Builder()
-                .url("https://localhost:9094/actuator/health")
+                .url(managementHttpsUrl("/actuator/health"))
                 .get()
                 .build();
         try (Response resp = SSL_CLIENT.newCall(req).execute()) {
@@ -64,22 +106,22 @@ public class SslManagementPortTest {
 
     @Test
     void mainPortHttp_shouldStillWork() throws Exception {
-        // 管理端口隔离模式下主端口不提供 Actuator 端点，但业务 HTTP 服务应正常
+        // 绠＄悊绔彛闅旂妯″紡涓嬩富绔彛涓嶆彁渚?Actuator 绔偣锛屼絾涓氬姟 HTTP 鏈嶅姟搴旀甯?
         Request req = new Request.Builder()
-                .url("http://localhost:9095/api/core/bytes")
+                .url(mainUrl("/api/core/bytes"))
                 .get()
                 .build();
         try (Response resp = PLAIN_CLIENT.newCall(req).execute()) {
-            assertEquals(200, resp.code(), "主端口业务端点应通过 HTTP 正常响应");
+            assertEquals(200, resp.code(), "涓荤鍙ｄ笟鍔＄鐐瑰簲閫氳繃 HTTP 姝ｅ父鍝嶅簲");
             assertEquals("Hello, Bytes!", resp.body().string());
         }
     }
 
     @Test
     void managementPortHttp_shouldBeRejected() {
-        // 管理端口仅监听 HTTPS：明文 HTTP 请求应因 TLS 握手失败被拒绝（IO 层异常），而非返回 200
+        // 绠＄悊绔彛浠呯洃鍚?HTTPS锛氭槑鏂?HTTP 璇锋眰搴斿洜 TLS 鎻℃墜澶辫触琚嫆缁濓紙IO 灞傚紓甯革級锛岃€岄潪杩斿洖 200
         Request req = new Request.Builder()
-                .url("http://localhost:9094/actuator/health")
+                .url(managementHttpUrl("/actuator/health"))
                 .get()
                 .build();
         assertThrows(java.io.IOException.class, () -> {

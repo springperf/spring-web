@@ -10,14 +10,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class ErrorScenariosTest extends BaseE2ETest {
 
-    private final String baseUrl = "http://localhost:9090/api/core";
+    private String baseUrl() {
+        return url("/api/core");
+    }
 
     @Test
     void testValidationFailure() throws Exception {
         String json = "{\"name\":\"\"}";
         RequestBody body = RequestBody.create(json, MediaType.parse("application/json"));
         Request req = new Request.Builder()
-                .url(baseUrl + "/validate")
+                .url(baseUrl() + "/validate")
                 .post(body)
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {

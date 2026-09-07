@@ -1,9 +1,10 @@
-package io.springperf.webtest.proxy;
+﻿package io.springperf.webtest.proxy;
 
 import okhttp3.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.web.server.LocalServerPort;
 
 import java.time.Duration;
 
@@ -11,15 +12,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * P2 E2E 测试：接口继承、占位符高级、条件限定。
+ * P2 E2E 娴嬭瘯锛氭帴鍙ｇ户鎵裤€佸崰浣嶇楂樼骇銆佹潯浠堕檺瀹氥€?
  * <p>
- * 与 ProxyE2eTest 共享 Spring 上下文。
+ * 涓?ProxyE2eTest 鍏变韩 Spring 涓婁笅鏂囥€?
  */
 @SpringBootTest(
         classes = ProxyE2eApp.class,
-        webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT,
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
-                "server.port=9092",
                 "server.servlet.context-path=/api",
                 "proxy.placeholder.path=/proxy/placeholder-resolved"
         })
@@ -34,20 +34,29 @@ public class ProxyP2E2eTest {
 
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
-    private final String baseUrl = "http://localhost:9092/api";
 
-    // ==================== 多级接口继承 + CGLIB 代理 ====================
+    @LocalServerPort
+    private int serverPort;
+
+    private String url(String path) {
+        return "http://localhost:" + serverPort + path;
+    }
+    private String baseUrl() {
+        return url("/api");
+    }
+
+    // ==================== 澶氱骇鎺ュ彛缁ф壙 + CGLIB 浠ｇ悊 ====================
 
     @Test
     void postRootSave_withInheritedInterface_resolvesRequestBodyAndParam() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-inherit/root-save?id=abc")
+                .url(baseUrl() + "/proxy-inherit/root-save?id=abc")
                 .post(RequestBody.create(JSON, "\"data\""))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
-            // @RequestBody 接收 JSON 字符串带引号
+            // @RequestBody 鎺ユ敹 JSON 瀛楃涓插甫寮曞彿
             assertTrue(body.contains("data") && body.contains("abc"),
                     "Body should contain both data and abc: " + body);
         }
@@ -56,7 +65,7 @@ public class ProxyP2E2eTest {
     @Test
     void getMiddleQuery_withInheritedInterface_resolvesRequestParam() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-inherit/middle-query?name=inherited")
+                .url(baseUrl() + "/proxy-inherit/middle-query?name=inherited")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -65,12 +74,12 @@ public class ProxyP2E2eTest {
         }
     }
 
-    // ==================== 占位符 + 通配符路径 ====================
+    // ==================== 鍗犱綅绗?+ 閫氶厤绗﹁矾寰?====================
 
     @Test
     void getPlaceholderWithPathVar_resolvesBothPlaceholderAndPathVariable() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy/placeholder-resolved/42")
+                .url(baseUrl() + "/proxy/placeholder-resolved/42")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -79,12 +88,12 @@ public class ProxyP2E2eTest {
         }
     }
 
-    // ==================== 多段占位符 ====================
+    // ==================== 澶氭鍗犱綅绗?====================
 
     @Test
     void getMultiPlaceholder_resolvesAllSegments() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy/placeholder-resolved/multi/detail?q=abc")
+                .url(baseUrl() + "/proxy/placeholder-resolved/multi/detail?q=abc")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -93,12 +102,12 @@ public class ProxyP2E2eTest {
         }
     }
 
-    // ==================== @RequestMapping params 条件限定 ====================
+    // ==================== @RequestMapping params 鏉′欢闄愬畾 ====================
 
     @Test
     void getGreet_withLangParam_routesToCorrectMethod() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-cond/greet?lang=en")
+                .url(baseUrl() + "/proxy-cond/greet?lang=en")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -110,7 +119,7 @@ public class ProxyP2E2eTest {
     @Test
     void getGreet_withoutLangParam_routesToDefaultMethod() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-cond/greet")
+                .url(baseUrl() + "/proxy-cond/greet")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {

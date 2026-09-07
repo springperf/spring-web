@@ -1,31 +1,33 @@
-package io.springperf.webtest.proxy;
+﻿package io.springperf.webtest.proxy;
 
 import okhttp3.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.springframework.boot.web.server.LocalServerPort;
 
 import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * P2 E2E 测试：基础设施边界条件。
+ * P2 E2E 娴嬭瘯锛氬熀纭€璁炬柦杈圭晫鏉′欢銆?
  * <p>
- * 使用独立 Spring 上下文（端口 9093），
- * 测试 max-content-length 超限拒绝等场景。
+ * 浣跨敤鐙珛 Spring 涓婁笅鏂囷紙闅忔満绔彛锛夛紝
+ * 娴嬭瘯 max-content-length 瓒呴檺鎷掔粷绛夊満鏅€?
  */
 @SpringBootTest(
         classes = ProxyE2eApp.class,
-        webEnvironment = WebEnvironment.DEFINED_PORT,
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
-                "server.port=9093",
                 "server.servlet.context-path=",
                 "server.http.max-content-length=100"
         })
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class LimitsE2eTest {
+
+    @LocalServerPort
+    private int serverPort;
 
     private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
             .connectTimeout(Duration.ofSeconds(3))
@@ -35,17 +37,23 @@ public class LimitsE2eTest {
 
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
-    private final String baseUrl = "http://localhost:9093";
+    private String url(String path) {
+        return "http://localhost:" + serverPort + path;
+    }
+
+    private String baseUrl() {
+        return url("");
+    }
 
     @Test
     void postLargeBody_exceedsMaxContentLength_returns413() throws Exception {
-        // 构造超过 max-content-length 的请求体（200 字节 > 100 限制）
+        // 鏋勯€犺秴杩?max-content-length 鐨勮姹備綋锛?00 瀛楄妭 > 100 闄愬埗锛?
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < 200; i++) {
             sb.append('x');
         }
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-api/save?id=test")
+                .url(baseUrl() + "/proxy-api/save?id=test")
                 .post(RequestBody.create(JSON, sb.toString()))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -57,7 +65,7 @@ public class LimitsE2eTest {
     @Test
     void postSmallBody_withinMaxContentLength_returns200() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/proxy-api/save?id=test")
+                .url(baseUrl() + "/proxy-api/save?id=test")
                 .post(RequestBody.create(JSON, "\"small\""))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {

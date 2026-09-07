@@ -12,11 +12,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class CoreFeaturesExceptionTest extends BaseE2ETest {
 
-    private final String baseUrl = "http://localhost:9090/api/core";
+    private String baseUrl() {
+        return url("/api/core");
+    }
 
     @Test
     void testControllerExceptionHandler() throws Exception {
-        Request req = new Request.Builder().url(baseUrl + "/exception/controller-handler").get().build();
+        Request req = new Request.Builder().url(baseUrl() + "/exception/controller-handler").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(500, resp.code());
             Map<String, Object> map = JSON.parseObject(resp.body().string(), Map.class);
@@ -27,7 +29,7 @@ public class CoreFeaturesExceptionTest extends BaseE2ETest {
 
     @Test
     void testGlobalExceptionHandler() throws Exception {
-        Request req = new Request.Builder().url(baseUrl + "/exception/illegal-argument").get().build();
+        Request req = new Request.Builder().url(baseUrl() + "/exception/illegal-argument").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(400, resp.code());
             Map<String, Object> map = JSON.parseObject(resp.body().string(), Map.class);
@@ -38,7 +40,7 @@ public class CoreFeaturesExceptionTest extends BaseE2ETest {
 
     @Test
     void testResponseStatusException() throws Exception {
-        Request req = new Request.Builder().url(baseUrl + "/exception/response-status-exception").get().build();
+        Request req = new Request.Builder().url(baseUrl() + "/exception/response-status-exception").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(509, resp.code());
             String b = resp.body().string();
@@ -48,7 +50,7 @@ public class CoreFeaturesExceptionTest extends BaseE2ETest {
 
     @Test
     void testCustomStatusException() throws Exception {
-        Request req = new Request.Builder().url(baseUrl + "/exception/custom-status-exception").get().build();
+        Request req = new Request.Builder().url(baseUrl() + "/exception/custom-status-exception").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(404, resp.code());
             String b = resp.body().string();
@@ -60,7 +62,7 @@ public class CoreFeaturesExceptionTest extends BaseE2ETest {
     void testFailingExceptionHandler_returns500() throws Exception {
         // @ExceptionHandler 方法自身抛出异常 → invokeAndWriteError catch → 500
         Request req = new Request.Builder()
-                .url(baseUrl + "/exception/failing-handler")
+                .url(baseUrl() + "/exception/failing-handler")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {

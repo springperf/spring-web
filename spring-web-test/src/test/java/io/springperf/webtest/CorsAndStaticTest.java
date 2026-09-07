@@ -10,12 +10,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class CorsAndStaticTest extends BaseE2ETest {
 
-    private final String baseUrl = "http://localhost:9090/api";
+    private String baseUrl() {
+        return url("/api");
+    }
 
     @Test
     void testCorsPreflight() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/core/cors/annotated")
+                .url(baseUrl() + "/core/cors/annotated")
                 .header("Origin", "http://example.com")
                 .header("Access-Control-Request-Method", "GET")
                 .method("OPTIONS", null)
@@ -39,7 +41,7 @@ public class CorsAndStaticTest extends BaseE2ETest {
     @Test
     void testCorsAnnotation() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/core/cors/annotated")
+                .url(baseUrl() + "/core/cors/annotated")
                 .header("Origin", "http://example.com")
                 .get()
                 .build();
@@ -52,7 +54,7 @@ public class CorsAndStaticTest extends BaseE2ETest {
 
     @Test
     void testStaticResource() throws Exception {
-        Request req = new Request.Builder().url(baseUrl + "/static/test.txt").get().build();
+        Request req = new Request.Builder().url(baseUrl() + "/static/test.txt").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -62,7 +64,7 @@ public class CorsAndStaticTest extends BaseE2ETest {
 
     @Test
     void testStaticResourceNotFound() throws Exception {
-        Request req = new Request.Builder().url(baseUrl + "/static/nonexistent.txt").get().build();
+        Request req = new Request.Builder().url(baseUrl() + "/static/nonexistent.txt").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(404, resp.code());
         }

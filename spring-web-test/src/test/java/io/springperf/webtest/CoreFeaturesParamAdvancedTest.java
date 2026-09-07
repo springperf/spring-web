@@ -11,12 +11,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class CoreFeaturesParamAdvancedTest extends BaseE2ETest {
 
-    private final String baseUrl = "http://localhost:9090/api/core";
+    private String baseUrl() {
+        return url("/api/core");
+    }
 
     @Test
     void requestParam_withDefault_usesDefaultWhenMissing() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/param-advanced?req=hello")
+                .url(baseUrl() + "/param-advanced?req=hello")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -31,7 +33,7 @@ public class CoreFeaturesParamAdvancedTest extends BaseE2ETest {
     @Test
     void requestParam_requiredFalse_acceptsMissing() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/param-advanced?req=test&opt=provided")
+                .url(baseUrl() + "/param-advanced?req=test&opt=provided")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -45,7 +47,7 @@ public class CoreFeaturesParamAdvancedTest extends BaseE2ETest {
     @Test
     void requestParam_withExplicitValue_usesProvidedValue() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/param-advanced?req=x&def=customVal")
+                .url(baseUrl() + "/param-advanced?req=x&def=customVal")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -60,7 +62,7 @@ public class CoreFeaturesParamAdvancedTest extends BaseE2ETest {
     @Test
     void requestParam_requiredTrue_missingReturnsError() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/param-advanced")
+                .url(baseUrl() + "/param-advanced")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -72,7 +74,7 @@ public class CoreFeaturesParamAdvancedTest extends BaseE2ETest {
     @Test
     void requestHeader_withDefault_usesDefaultWhenMissing() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/header-advanced")
+                .url(baseUrl() + "/header-advanced")
                 .header("X-Required", "req-value")
                 .get()
                 .build();
@@ -88,7 +90,7 @@ public class CoreFeaturesParamAdvancedTest extends BaseE2ETest {
     @Test
     void requestHeader_requiredFalse_acceptsMissing() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/header-advanced")
+                .url(baseUrl() + "/header-advanced")
                 .header("X-Required", "req")
                 .header("X-Optional", "opt")
                 .header("X-With-Default", "custom")
@@ -105,7 +107,7 @@ public class CoreFeaturesParamAdvancedTest extends BaseE2ETest {
     @Test
     void requestHeader_requiredTrue_missingReturnsError() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/header-advanced")
+                .url(baseUrl() + "/header-advanced")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {

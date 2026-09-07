@@ -18,11 +18,13 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class CoreFeaturesStreamTest extends BaseE2ETest {
 
-    private final String baseUrl = "http://localhost:9090/api/core";
+    private String baseUrl() {
+        return url("/api/core");
+    }
 
     @Test
     void testStreamJson() throws Exception {
-        Request request = new Request.Builder().url(baseUrl + "/stream-json").get().build();
+        Request request = new Request.Builder().url(baseUrl() + "/stream-json").get().build();
         CountDownLatch latch = new CountDownLatch(3);
         AtomicInteger count = new AtomicInteger(0);
         CLIENT.newCall(request).enqueue(new Callback() {
@@ -58,7 +60,7 @@ public class CoreFeaturesStreamTest extends BaseE2ETest {
 
     @Test
     void testTextStream() throws Exception {
-        Request request = new Request.Builder().url(baseUrl + "/text-stream").get().build();
+        Request request = new Request.Builder().url(baseUrl() + "/text-stream").get().build();
         CountDownLatch latch = new CountDownLatch(2);
         StringBuilder sb = new StringBuilder();
         CLIENT.newCall(request).enqueue(new Callback() {

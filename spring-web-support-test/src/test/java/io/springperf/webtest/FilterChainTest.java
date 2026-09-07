@@ -8,12 +8,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class FilterChainTest extends BaseE2ETest {
 
-    private final String baseUrl = "http://localhost:9090/api";
+    private String baseUrl() {
+        return url("/api");
+    }
 
     @Test
     void testHealthFilter() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/health")
+                .url(baseUrl() + "/health")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -25,7 +27,7 @@ public class FilterChainTest extends BaseE2ETest {
     void mixedFilter_servletAndWebFilter_bothExecuted() throws Exception {
         // 验证 Servlet Filter 和 WebFilter 在同一个请求中都被执行
         Request req = new Request.Builder()
-                .url(baseUrl + "/bridge/ping")
+                .url(baseUrl() + "/bridge/ping")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -40,7 +42,7 @@ public class FilterChainTest extends BaseE2ETest {
     @Test
     void testNotFound() throws Exception {
         Request req = new Request.Builder()
-                .url(baseUrl + "/nonexistent")
+                .url(baseUrl() + "/nonexistent")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
