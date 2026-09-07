@@ -291,6 +291,8 @@ spring-web-support
 ├── arg/provider/
 │   ├── HttpServletRequestProvider         解析 HttpServletRequest
 │   ├── HttpServletResponseProvider        解析 HttpServletResponse
+│   ├── ServletRequestProvider             解析 ServletRequest（Servlet.service 参数）
+│   ├── ServletResponseProvider            解析 ServletResponse
 │   └── WebRequestArgumentResolverProvider 解析 WebRequest / NativeWebRequest
 │
 ├── async/stream/
@@ -321,12 +323,20 @@ spring-web-support
 └── servlet/                              Servlet 桥接
     ├── AbstractFastFailHttpServletRequest/ServletResponse  快速失败的 Servlet 包装
     ├── PerfHttpServletRequest/ServletResponse              基于框架请求/响应的 Servlet 包装
+    ├── ServletInvoker                    CustomInvoker：Servlet.service 调用（void 自动 setHandled）
+    ├── SupportServletRegistry            扫描 Servlet Bean + @WebServlet 注册路由
+    ├── PerfServletConfig                 ServletConfig 实现（仿 PerfFilterConfig）
+    ├── JasperJspServlet                  JSP servlet（集成 Apache Jasper，补齐 JspFactory/InstanceManager/TldCache）
     ├── context/ServletAdapterContext                       持有 Servlet 请求/响应/FilterChain
     └── filter/
         ├── FilterWrapper                   包装 javax.servlet.Filter → WebFilter
         ├── SupportWebFilterRegistry        扩展 WebFilterRegistry，自动注册 Filter Bean
         ├── PerfHttpServletFilterChain      适配 FilterChain → javax.servlet.FilterChain
         └── match/                          路径匹配工具 (Exact/Prefix/Suffix/PathMatch)
+
+view/                                   JSP 视图（依赖 spring-web-view + tomcat-embed-jasper）
+    ├── JspViewResolver                  ViewResolver SPI：jsp: 前缀 / .jsp 后缀 → JspView，Phase1 注册 *.jsp 路由
+    └── JspView                          View SPI：model → request attribute → RequestDispatcher.forward
 
 
 org.springframework.web.servlet/         （src/main/java 内重写）
@@ -464,11 +474,16 @@ spring-boot-starter-web
 │   │   ├── HttpServletRequest/Response Provider
 │   │   ├── WebRequestArgumentResolverProvider
 │   │   ├── SupportWebFilterRegistry + FilterWrapper
+│   │   ├── ServletRequest/Response Provider
+│   │   ├── SupportServletRegistry（Servlet Bean + @WebServlet 路由）
 │   │   ├── ResponseBodyEmitterReturnValueResolver
 │   │   ├── WebMvcConfigurerBridge（桥接 WebMvcConfigurer 实现）
 │   │   ├── SpringHandlerMethodArgumentResolverProvider
 │   │   ├── SpringHandlerMethodReturnValueHandlerAdapter
 │   │   └── SpringHandlerExceptionResolverAdapter
+│   │
+│   ├── JspViewAutoConfiguration               JSP 视图自动装配（条件：Jasper + spring-web-view 在 classpath）
+│   │   └── JspViewResolver（注册 *.jsp 路由 + 视图名解析）
 │   │
 │   ├── SpringDataWebCompatibilityAutoConfiguration  Spring Data 兼容（条件：ProjectingArgumentResolverRegistrar 在 classpath）
 │   │   └── 启动时移除 ProjectingArgumentResolverRegistrar 的 BPP

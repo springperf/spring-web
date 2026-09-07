@@ -16,6 +16,7 @@ Spring MVC 的兼容层（如 Servlet 容器 + `spring-webmvc`）依赖的天然
 4. **`FilterWrapper`/`HandlerInterceptorWrapper`** 把 Servlet Filter 和 Spring MVC Interceptor 适配为框架的 `WebFilter`/`HandlerInterceptor`。
 5. **Session 体系** 从零实现 `HttpSession` 接口，通过 `HttpSessionStorage` SPI 可插拔存储。
 6. **Servlet 规范完整桥接** 覆盖 `ServletContext`、`RequestDispatcher`（forward/include）、`AsyncContext`、认证（`Authenticator`）、WebSocket `upgrade` 等，让依赖 Servlet API 的代码无侵入运行。详见第五节 5.6~5.10。
+7. **Servlet 对象路由与 JSP** 支持把 `jakarta.servlet.Servlet` 对象注册为框架路由（`ServletInvoker` / `SupportServletRegistry` / `ServletRequest(Response)Provider`），并集成 Apache Jasper 提供 JSP / JSTL 渲染（`JasperJspServlet` / `JspViewResolver` / `JspView`）。详见第五节 5.11~5.12。
 
 > 完整的支持矩阵、配置项与已知限制，见 `docs/feature/servlet-spec-support.md`（该目录 gitignored，仅本地维护）。
 
@@ -318,6 +319,7 @@ public void afterConcurrentHandlingStarted(WebServerHttpRequest request, ...) th
 | `startAsync()`/`getAsyncContext()` 等 | 见 5.8 AsyncContext |
 | `login()/logout()/authenticate()` | 见 5.9 认证与安全 |
 | `getDispatcherType()` | 可设置字段（`forward` 时 `FORWARD`、`include` 时 `INCLUDE`） |
+| `getServletPath()` / `getPathInfo()` | `getServletPath` 返回应用内路径（`request.getPath()`）；`getPathInfo` 返回空字符串（路由整路径匹配，无剩余路径）。这是 Jasper 解析 `jsp:include` / `jsp:forward` 相对路径的前提 |
 
 **`NettyHttpServletRequest extends PerfHttpServletRequest`**：在 Netty 环境覆盖网络/安全方法——`getRemoteAddr/getRemoteHost/getRemotePort/getLocalAddr/getLocalName/getLocalPort`（真实 `InetSocketAddress`）、`getScheme()/isSecure()`（从 URI 检测 HTTPS）、`getRequestURL()`（完整 URL）。由 `ServletAttribute.createPerfRequest()` 工厂方法根据请求类型选择。
 
@@ -410,6 +412,7 @@ private static final RequestAttribute<ServletAdapterContext> ADAPTER_CTX =
   - `getResource()/getResourceAsStream()` classpath 查找（`META-INF/resources/` → `static/` → `public/` → 根 classpath）。
   - `getInitParameter()` 从 `WebContext` 配置读取；`getSessionCookieConfig()` 返回可配置的 `SessionCookieConfig` 实现。
   - `getRequestDispatcher()/getNamedDispatcher()` 返回 `PerfRequestDispatcher`。
+  - `TEMPDIR` 属性：构造时创建应用级临时目录（`java.io.tmpdir` 下），供 JSP 编译（Jasper scratchdir）等容器能力使用。
 - **限制**：动态注册（`addServlet`/`addFilter`）返回 null、`getContext()` 返回 null（单上下文架构）。
 
 ### 5.7 `RequestDispatcher`：forward / include
@@ -417,7 +420,7 @@ private static final RequestAttribute<ServletAdapterContext> ADAPTER_CTX =
 `PerfRequestDispatcher implements RequestDispatcher`，配合 `SupportDispatcherHandler.forward()/include()`：
 
 - **`forward()`**：检查 `isCommitted`（已提交抛 `IllegalStateException`）→ 设置 `DispatcherType.FORWARD` → 清除 response（headers+status+buffer）→ 通过 `ForwardWebServerHttpRequest` 包装请求（覆盖 `getPath()/getUriStr()/getURI()`，保留/替换 query string）→ `mappingRegistry.mapping()` 重映射 → `handleAfterFilter()` 重新 dispatch（**跳过 filter 链**，与 Tomcat 一致）。
-- **`include()`**：设置并恢复 `DispatcherType.INCLUDE` → `IncludeResponseWrapper` 阻止 flush、隔离 status/header（`setStatusCode`/`sendError` 空操作，`getHeaders()` 返回独立实例）。
+- **`include()`**：设置并恢复 `DispatcherType.INCLUDE` → `IncludeResponseWrapper` 阻止 flush、隔离 status/header（`setStatusCode`/`sendError` 空操作，`getHeaders()` 返回独立实例）。`INCLUDE_SERVLET_PATH` 设置为 include 目标路径（供 Jasper 定位被包含 JSP）；`INCLUDE_PATH_INFO` 为空字符串（底层 `ConcurrentHashMap` 不允许 null value）。
 - **context holders 保护**：forward/include 均在 `try/finally` 中保存恢复 `LocaleContextHolder`/`RequestContextHolder`，避免与原始请求双重初始化冲突。
 - **Filter 包装兼容**：`resolveWebRequest()/resolveWebResponse()` 解开 `HttpServletRequestWrapper`/`HttpServletResponseWrapper` 找到底层请求。
 
@@ -445,6 +448,42 @@ private static final RequestAttribute<ServletAdapterContext> ADAPTER_CTX =
 - **`upgrade(Class<T extends HttpUpgradeHandler>)`**：发送 101 + `Upgrade: websocket` 头 → 创建 handler + `PerfWebConnection`（包装请求输入流/响应输出流）→ 新线程运行 `handler.init()`。
 - **`PerfWebConnection implements WebConnection`**：`getInputStream()/getOutputStream()/close()`。
 - **推荐使用 `spring-web-websocket` 模块**：该项目在 Netty pipeline 层拦截 `Upgrade: websocket`，完整支持 Spring `WebSocketHandler`。`upgrade()` 仅适用于 servlet 层自定义协议升级，不切换 Netty 编解码器。
+
+### 5.11 Servlet 对象路由
+
+支持把 `jakarta.servlet.Servlet` 对象注册为框架路由（第二个消费者是 JSP 的 `JasperJspServlet`）：
+
+| 组件 | 职责 |
+|------|------|
+| `ServletInvoker` | 实现 `CustomInvoker`，`getHandleMethod()` 返回 `Servlet.service`（返回 `void`）——框架的 `ReturnValueResolverRegistry.skipResolve` 对 void 方法自动 `setHandled()`，servlet 直接写入的响应体可正常 flush |
+| `SupportServletRegistry` | 扫描 Spring 中 `Servlet` Bean，读 `@WebServlet` 的 urlPatterns（servlet 语义 → ant 路径，如 `*.jsp` → `/**/*.jsp`），`init()` 后包装为 `PathMappingContext` 注册 |
+| `ServletRequestProvider` / `ServletResponseProvider` | 解析 `Servlet.service(ServletRequest, ServletResponse)` 参数（精确匹配父接口，与 `HttpServletRequest(Response)Provider` 精确匹配子接口互补，无冲突） |
+| `PerfServletConfig` | 提供 `ServletConfig`（仿 `PerfFilterConfig`） |
+
+`ServletInvoker.invoke()` 在 `service()` 返回后调用 `PerfHttpServletResponse.flushBuffer()`——其会先 flush `cachedWriter`（`PrintWriter` 编码缓冲）再 flush 底层 body，模拟容器在 handler 返回时的自动提交。
+
+### 5.12 JSP 视图（Apache Jasper）
+
+非 Tomcat 容器不会自动运行 `JasperInitializer`（ServletContainerInitializer），`JasperJspServlet.init()` 补齐三项容器职责：
+
+| 职责 | 实现 |
+|------|------|
+| `JspFactory` | 显式 `setDefaultFactory(new JspFactoryImpl())` |
+| `InstanceManager` | `ServletContext` 设置 `SimpleInstanceManager` |
+| `TldCache` | `TldScanner` 扫描 classpath `META-INF/*.tld` → 设置到 `ServletContext` attribute（JSTL / taglib 解析，缺失时 `Options.getTldCache()` 为 null 抛 NPE） |
+
+视图接入复用 `spring-web-view` 的 SPI：
+
+```java
+// JspViewResolver（extends BaseWebComponent implements ViewResolver）
+resolveViewName("jsp:hello") → new JspView("/jsp/hello.jsp")   // jsp: 前缀 / .jsp 后缀
+// JspView.render(model, req, resp)
+//   model → request attribute（JSP EL 经 request.getAttribute 访问）
+//   → request.getRequestDispatcher("/jsp/hello.jsp").forward(...)
+//   → PerfRequestDispatcher → 重新 mapping → 命中 /**/*.jsp 路由 → Jasper 渲染
+```
+
+`JspViewAutoConfiguration` 用类级 `@ConditionalOnClass(name = {"org.apache.jasper.servlet.JspServlet", "io.springperf.web.view.View"})` 保证条件不满足时整个配置类跳过、不加载 `JspViewResolver`（其类签名依赖 view 接口，避免无 view 环境 introspect 失败）。
 
 ---
 

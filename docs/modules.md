@@ -198,14 +198,17 @@ destroyComponent()     → 资源释放
 | Servlet Filter 集成 | `FilterWrapper` 将 `javax.servlet.Filter` 包装为 `WebFilter` |
 | Spring MVC 拦截器桥接 | `HandlerInterceptorWrapper` 适配 Spring MVC 的 `HandlerInterceptor` |
 | RequestBodyAdvice / ResponseBodyAdvice | `SupportHttpBodyCodecInterceptorRegistry` 扫描并适配 |
-| Servlet API 参数解析 | `HttpServletRequestProvider` / `HttpServletResponseProvider` |
+| Servlet API 参数解析 | `HttpServletRequestProvider` / `HttpServletResponseProvider` / `ServletRequestProvider` / `ServletResponseProvider` |
 | ResponseBodyEmitter | `ResponseBodyEmitterReturnValueResolver` |
+| Servlet 对象路由 | `ServletInvoker` + `SupportServletRegistry`（`Servlet` Bean + `@WebServlet` 自动注册路由） |
+| JSP 视图 | `JasperJspServlet` + `JspViewResolver` / `JspView`（集成 Apache Jasper，`jsp:` / `.jsp` 视图名，含 JSTL） |
 
 ### 使用场景
 
 - 需要复用已有的 Servlet Filter（如 Spring Security Filter Chain）
 - 需要复用已有的 `RequestBodyAdvice` / `ResponseBodyAdvice`
 - 需要复用已有的 Spring MVC `HandlerInterceptor`
+- 需要把已有 `Servlet` 对象注册为路由，或使用 JSP 视图（集成 Apache Jasper）
 
 添加依赖：
 

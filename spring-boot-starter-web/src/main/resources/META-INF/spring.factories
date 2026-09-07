@@ -8,6 +8,7 @@ io.springperf.web.autoconfigure.SpringBootAdminClientAutoConfiguration,\
 io.springperf.web.autoconfigure.OpenApiAutoConfiguration,\
 io.springperf.web.autoconfigure.SpringWebBatchAutoConfiguration,\
 io.springperf.web.autoconfigure.SpringWebViewAutoConfiguration,\
+io.springperf.web.autoconfigure.JspViewAutoConfiguration,\
 io.springperf.web.autoconfigure.SwaggerUiAutoConfiguration
 org.springframework.boot.ApplicationContextFactory=\
 io.springperf.web.autoconfigure.support.WebServerApplicationContextFactory
