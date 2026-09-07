@@ -57,7 +57,7 @@ All configuration properties are set in `application.properties`.
 | `pool.core-pool-size` | `50` | Core pool size |
 | `pool.max-pool-size` | `200` | Maximum pool size |
 | `pool.keep-alive-time` | `60` | Idle thread keep-alive time (seconds) |
-| `pool.queue-capacity` | Unbounded | Task queue capacity (set to 1 when ≤ 0) |
+| `pool.queue-capacity` | `100` | Task queue capacity. Bounded by default so that `maxPoolSize` takes effect and overload returns 503 instead of queueing unboundedly (set to 1 when ≤ 0) |
 | `pool.default-execute-mode` | `default` | Default execution mode when no `@RunInPool`. `eventloop`=EventLoop, other values = pool name |
 
 ## SSL Configuration
