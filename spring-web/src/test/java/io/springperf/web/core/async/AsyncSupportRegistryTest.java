@@ -16,10 +16,12 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.web.context.request.async.CallableProcessingInterceptor;
 import org.springframework.web.context.request.async.DeferredResult;
 import org.springframework.web.context.request.async.DeferredResultProcessingInterceptor;
+import org.springframework.web.context.request.async.WebAsyncTask;
 
 import java.util.Collections;
 import java.util.concurrent.Executors;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.*;
 
@@ -125,5 +127,34 @@ class AsyncSupportRegistryTest {
         registry.initWithWebContext(webContext);
         registry.initComponentPhase1();
         registry.initComponentPhase2();
+    }
+
+    @Test
+    void startCallableProcessing_withoutDefaultPool_doesNotNpe() throws Exception {
+        // 无 default 业务线程池（BizPoolRegistry.getDefaultPool() 返回 null）→ defaultTaskExecutor = null
+        BizPoolRegistry bizPoolRegistry = mock(BizPoolRegistry.class);
+        when(bizPoolRegistry.getDefaultPool()).thenReturn(null);
+        when(webContext.getWebComponent(BizPoolRegistry.class)).thenReturn(bizPoolRegistry);
+        when(webContext.getCtx()).thenReturn(applicationContext);
+        when(applicationContext.getBeansOfType(CallableProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
+        when(applicationContext.getBeansOfType(DeferredResultProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
+        doReturn(null).when(webContext).getBeanFromCtx(com.fasterxml.jackson.databind.ObjectMapper.class);
+        when(webContext.getWebComponentWithDefault(eq(JsonConverter.class), any(JsonConverter.class)))
+                .thenReturn(mock(JsonConverter.class));
+
+        registry.initWithWebContext(webContext);
+        registry.initComponentPhase1();
+        registry.initComponentPhase2();
+
+        // 捕获 asyncReadyCallback 并执行，验证内部 executor.submit 不会因 null 而 NPE
+        doAnswer(invocation -> {
+            Runnable callback = invocation.getArgument(0);
+            callback.run();
+            return null;
+        }).when(asyncWebRequest).setAsyncReadyCallback(any(Runnable.class));
+
+        WebAsyncTask<String> webAsyncTask = new WebAsyncTask<>(() -> "ok");
+
+        assertDoesNotThrow(() -> registry.startCallableProcessing(asyncWebRequest, webAsyncTask));
     }
 }
