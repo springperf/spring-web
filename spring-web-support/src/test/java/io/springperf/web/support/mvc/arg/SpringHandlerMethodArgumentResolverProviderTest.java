@@ -1,4 +1,4 @@
-package io.springperf.web.support.mvc.arg;
+﻿package io.springperf.web.support.mvc.arg;
 
 import io.springperf.web.core.arg.StaticArgumentResolver;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
@@ -12,6 +12,9 @@ import org.springframework.core.Ordered;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -54,8 +57,29 @@ class SpringHandlerMethodArgumentResolverProviderTest {
 
     @Test
     void getResolver_returnsResolverThatDelegates() throws Exception {
+        // 楠岃瘉杩斿洖鐨?StaticArgumentResolver 鐪熸濮旀墭缁?Spring 鐨?HandlerMethodArgumentResolver
+        io.springperf.web.http.RequestContext requestContext = mock(io.springperf.web.http.RequestContext.class);
+        javax.servlet.http.HttpServletRequest servletRequest = mock(javax.servlet.http.HttpServletRequest.class);
+        javax.servlet.http.HttpServletResponse servletResponse = mock(javax.servlet.http.HttpServletResponse.class);
+        io.springperf.web.support.servlet.context.ServletAdapterContext adapter =
+                new io.springperf.web.support.servlet.context.ServletAdapterContext(
+                        mock(io.springperf.web.support.servlet.PerfHttpServletRequest.class),
+                        mock(io.springperf.web.support.servlet.PerfHttpServletResponse.class), null);
+        adapter.setRequest(servletRequest);
+        adapter.setResponse(servletResponse);
+        when(requestContext.getAttribute(io.springperf.web.support.servlet.ServletAttribute.getAttributeKey()))
+                .thenReturn(adapter);
+
+        io.springperf.web.http.WebServerHttpRequest request = mock(io.springperf.web.http.WebServerHttpRequest.class);
+        io.springperf.web.http.WebServerHttpResponse response = mock(io.springperf.web.http.WebServerHttpResponse.class);
+        when(request.getRequestContext()).thenReturn(requestContext);
+        when(delegate.resolveArgument(eq(methodParameter), any(), any(), any())).thenReturn("resolved-value");
+
         StaticArgumentResolver staticResolver = provider.getResolver(methodParameter, mappingContext, null);
-        assertNotNull(staticResolver);
+        Object result = staticResolver.resolveArgument(request, response);
+
+        assertEquals("resolved-value", result, "搴旀妸鍙傛暟瑙ｆ瀽濮旀墭缁?Spring resolver");
+        verify(delegate).resolveArgument(eq(methodParameter), any(), any(), any());
     }
 
     @Test

@@ -134,7 +134,10 @@ public class ExceptionHandlerExceptionResolver extends WebComponentContainer imp
 
     protected void invokeAndWriteError(MappingHandlerMethod handlerMethod, Throwable ex, WebServerHttpRequest request, WebServerHttpResponse response) {
         try {
-            request.getRequestContext().setAttribute(EXCEPTION_OBJECT_KEY, ex);
+            // ExceptionHandlerMethodResolver 可能沿 cause 链选中 handler（如 @ExceptionHandler(IllegalArgumentException.class)
+            // 命中根异常的 NumberFormatException cause）。此时必须注入与 handler 异常参数类型兼容的那个 cause，
+            // 而非根异常——否则反射强转失败抛 ClassCastException，type mismatch 等场景被误报为 500。
+            request.getRequestContext().setAttribute(EXCEPTION_OBJECT_KEY, resolveInjectedException(handlerMethod, ex));
             Object[] arguments = argumentResolverRegistry.resolveArguments(handlerMethod, request, response);
             Object r = handlerMethod.invoke(arguments, request, response);
             if (response.isHandled()) {
@@ -178,6 +181,36 @@ public class ExceptionHandlerExceptionResolver extends WebComponentContainer imp
             handlerMethod.set(MAPPING_CACHE_KEY, cachedExceptionHandlerAdvices);
         }
         return cachedExceptionHandlerAdvices;
+    }
+
+    /**
+     * 决定注入 {@code @ExceptionHandler} 方法的异常实例。
+     * <p>Spring 的 {@link ExceptionHandlerMethodResolver} 可能沿 cause 链选中 handler（例如
+     * {@link org.springframework.web.method.annotation.MethodArgumentTypeMismatchException} 的
+     * {@code NumberFormatException} cause 命中 {@code @ExceptionHandler(IllegalArgumentException.class)}）。
+     * 此时不能注入根异常（类型不兼容会反射 ClassCastException），应注入 handler 异常参数类型
+     * 兼容的 cause 链上最具体的那个异常。</p>
+     */
+    protected Throwable resolveInjectedException(MappingHandlerMethod handlerMethod, Throwable ex) {
+        Class<?> handlerParamType = null;
+        for (Class<?> paramType : handlerMethod.getMethod().getParameterTypes()) {
+            if (Throwable.class.isAssignableFrom(paramType)) {
+                handlerParamType = paramType;
+                break;
+            }
+        }
+        if (handlerParamType == null) {
+            return ex;
+        }
+        // 从根异常沿 cause 链找第一个能赋给 handler 参数类型的异常（含根本身）
+        Throwable current = ex;
+        while (current != null) {
+            if (handlerParamType.isAssignableFrom(current.getClass())) {
+                return current;
+            }
+            current = current.getCause();
+        }
+        return ex;
     }
 
     protected static class ExceptionArgumentResolverProvider implements StaticArgumentResolverProvider {

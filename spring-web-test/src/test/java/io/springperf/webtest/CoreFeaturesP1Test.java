@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -22,14 +21,6 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
     private static final Logger log = LoggerFactory.getLogger(CoreFeaturesP1Test.class);
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
     private static final MediaType FORM = MediaType.parse("multipart/form-data");
-
-    // Client with short timeout for tests that may hang due to framework behavior (e.g., File/Resource return value)
-    private static final OkHttpClient SHORT_TIMEOUT_CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(3))
-            .writeTimeout(Duration.ofSeconds(3))
-            .retryOnConnectionFailure(true)
-            .build();
 
     private final String coreUrl = "http://localhost:9090/api/core";
     private final String p1Url = "http://localhost:9090/api/p1";
@@ -88,9 +79,9 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            // int 参数收到非数字字符串应触发 TypeMismatchException
-            assertTrue(resp.code() >= 400,
-                    "Type mismatch should return 4xx, got " + resp.code());
+            // int 参数收到非数字字符串应触发 MethodArgumentTypeMismatch → 400
+            assertEquals(400, resp.code(),
+                    "Type mismatch should return 400, got " + resp.code());
         }
     }
 
@@ -208,14 +199,12 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
                 .url(p1Url + "/download-resource")
                 .get()
                 .build();
-        try (Response resp = SHORT_TIMEOUT_CLIENT.newCall(req).execute()) {
+        // Resource/FileReturnValueResolver 均设置 Content-Length + 结束帧，OkHttp 可完整读取，
+        // 超时即视为实现缺陷，不被豁免。
+        try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
             assertTrue(body.contains("Hello"), "Resource should contain file content");
-        } catch (java.net.SocketTimeoutException e) {
-            // ResourceReturnValueResolver may serve content without completing the response,
-            // causing OkHttp to wait for more data. Accept timeout as valid behavior.
-            log.info("Resource download test timed out (expected for some implementations): {}", e.getMessage());
         }
     }
 
@@ -225,15 +214,11 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
                 .url(p1Url + "/download-file")
                 .get()
                 .build();
-        try (Response resp = SHORT_TIMEOUT_CLIENT.newCall(req).execute()) {
+        try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
             assertNotNull(body);
             assertFalse(body.isEmpty(), "File download should return content");
-        } catch (java.net.SocketTimeoutException e) {
-            // FileReturnValueResolver may serve content without completing the response,
-            // causing OkHttp to wait for more data. Accept timeout as valid behavior.
-            log.info("File download test timed out (expected for some implementations): {}", e.getMessage());
         }
     }
 

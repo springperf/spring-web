@@ -3,8 +3,6 @@ package io.springperf.webtest;
 import okhttp3.*;
 import org.junit.jupiter.api.Test;
 
-import java.time.Duration;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 public class BridgeE2eTest extends BaseE2ETest {
@@ -12,13 +10,6 @@ public class BridgeE2eTest extends BaseE2ETest {
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
     private static final MediaType CUSTOM = MediaType.parse("application/x-custom; charset=utf-8");
     private final String baseUrl = "http://localhost:9090/api";
-
-    private static final OkHttpClient SHORT_TIMEOUT_CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(2))
-            .writeTimeout(Duration.ofSeconds(2))
-            .retryOnConnectionFailure(true)
-            .build();
 
     @Test
     void ping_endpointAvailable() throws Exception {
@@ -244,21 +235,17 @@ public class BridgeE2eTest extends BaseE2ETest {
 
     @Test
     void async_timeout_triggersWithBridgeConfiguredTimeout() throws Exception {
-        // Bridge configures 100ms default timeout. This endpoint sleeps 500ms,
-        // so the async timeout should fire before the Callable completes.
-        // The timeout may result in an error response or connection timeout.
+        // Bridge 配置 100ms 默认超时，本端点 Callable 沉睡 500ms——超时应在任务完成前触发并打断。
+        // 因此无论框架把超时映射为多少状态码，"too-late" 都不应作为完成结果返回；
+        // 用可证伪断言（而非恒真的"任意状态码都行"）锁定超时确实生效。
         Request req = new Request.Builder()
                 .url(baseUrl + "/bridge/async/timeout")
                 .get()
                 .build();
-        try (Response resp = SHORT_TIMEOUT_CLIENT.newCall(req).execute()) {
-            // Timeout may return an error status (e.g. 503) or the request
-            // may complete if timeout didn't fire. Either way, just verify
-            // we got some response within the short timeout window.
-            assertTrue(resp.code() >= 400 || resp.code() == 200,
-                    "Timeout should either error out or complete: " + resp.code());
-        } catch (java.net.SocketTimeoutException e) {
-            // Timeout caused the server to hang - this is acceptable behavior
+        try (Response resp = CLIENT.newCall(req).execute()) {
+            String body = resp.body().string();
+            assertTrue(resp.code() >= 400 || !body.contains("too-late"),
+                    "超时打断后不应返回任务完成结果 'too-late'（code=" + resp.code() + ", body=" + body + "）");
         }
     }
 

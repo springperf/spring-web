@@ -31,29 +31,40 @@ class ResponseBodyEmitterTest {
 
     @Test
     void send_withNullMediaType_callsSend() throws Exception {
-        ResponseBodyEmitter emitter = new ResponseBodyEmitter();
+        TestEmitter emitter = new TestEmitter();
         emitter.send("data", null);
-        // send eventual success, no encoding needed in early buffer stage
+        // 未初始化 sender 时数据应进入早发缓冲（原样入队，不包裹 DataWithMediaType）
+        assertEquals(1, emitter.earlySendSize());
+        assertSame("data", emitter.earlySendAt(0));
     }
 
     @Test
     void send_withMediaType_wrapsInDataWithMediaType() throws Exception {
-        ResponseBodyEmitter emitter = new ResponseBodyEmitter();
+        TestEmitter emitter = new TestEmitter();
         emitter.send("data", MediaType.TEXT_PLAIN);
-        // wraps and stores as DataWithMediaType
+        // 带 MediaType 时应包裹为 DataWithMediaType 入早发缓冲
+        assertEquals(1, emitter.earlySendSize());
+        assertTrue(emitter.earlySendAt(0) instanceof ResponseBodyEmitter.DataWithMediaType);
+        ResponseBodyEmitter.DataWithMediaType wrapper =
+                (ResponseBodyEmitter.DataWithMediaType) emitter.earlySendAt(0);
+        assertSame("data", wrapper.getData());
+        assertEquals(MediaType.TEXT_PLAIN, wrapper.getMediaType());
     }
 
     @Test
     void send_withoutMediaType_callsSend() throws Exception {
-        ResponseBodyEmitter emitter = new ResponseBodyEmitter();
+        TestEmitter emitter = new TestEmitter();
         emitter.send("data");
+        assertEquals(1, emitter.earlySendSize());
+        assertSame("data", emitter.earlySendAt(0));
     }
 
     @Test
     void send_multipleTimes_accumulates() throws Exception {
-        ResponseBodyEmitter emitter = new ResponseBodyEmitter();
+        TestEmitter emitter = new TestEmitter();
         emitter.send("first");
         emitter.send("second");
+        assertEquals(2, emitter.earlySendSize());
     }
 
     @Test
@@ -105,15 +116,34 @@ class ResponseBodyEmitterTest {
 
     @Test
     void complete_marksAsDone() {
-        ResponseBodyEmitter emitter = new ResponseBodyEmitter();
+        TestEmitter emitter = new TestEmitter();
+        assertFalse(emitter.isComplete());
         emitter.complete();
-        // mark complete without error
+        assertTrue(emitter.isComplete(), "complete() 后内部完成标志应置位");
     }
 
     @Test
     void completeWithError_marksAsError() {
-        ResponseBodyEmitter emitter = new ResponseBodyEmitter();
+        TestEmitter emitter = new TestEmitter();
+        assertFalse(emitter.isComplete());
         emitter.completeWithError(new RuntimeException("test error"));
-        // mark complete with error
+        assertTrue(emitter.isComplete(), "completeWithError() 后内部完成标志应置位");
+    }
+
+    /**
+     * 测试用子类：暴露 StreamEmitter 内部状态（earlySendDataList / complete）供断言。
+     */
+    private static class TestEmitter extends ResponseBodyEmitter {
+        synchronized boolean isComplete() {
+            return complete.get();
+        }
+
+        synchronized int earlySendSize() {
+            return earlySendDataList.size();
+        }
+
+        synchronized Object earlySendAt(int i) {
+            return earlySendDataList.get(i);
+        }
     }
 }

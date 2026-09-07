@@ -59,11 +59,12 @@ public class SslServerTest {
 
     @Test
     void httpRequest_shouldBeRejected() {
+        // 主端口仅监听 HTTPS：明文 HTTP 请求应因 TLS 握手失败被拒绝（IO 层异常），而非返回 200
         Request req = new Request.Builder()
                 .url("http://localhost:9096/api/actuator/health")
                 .get()
                 .build();
-        assertThrows(Exception.class, () -> {
+        assertThrows(java.io.IOException.class, () -> {
             try (Response resp = new OkHttpClient.Builder()
                     .connectTimeout(Duration.ofSeconds(2))
                     .readTimeout(Duration.ofSeconds(2))

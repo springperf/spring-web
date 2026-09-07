@@ -64,10 +64,8 @@ public class CoreFeaturesParamAdvancedTest extends BaseE2ETest {
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            // Required @RequestParam "req" is missing
-            // Framework may return 200 or 400 depending on configuration
-            assertTrue(resp.code() >= 200 && resp.code() < 500,
-                    "Request without required param should complete, got " + resp.code());
+            // Required @RequestParam "req" 缺失 → 400（与 @RequestHeader 缺失行为一致）
+            assertEquals(400, resp.code(), "缺失必填参数应返回 400，实际 " + resp.code());
         }
     }
 

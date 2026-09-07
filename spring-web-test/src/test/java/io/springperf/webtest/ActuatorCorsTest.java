@@ -71,22 +71,19 @@ public class ActuatorCorsTest {
 
     @Test
     void corsGet_withDisallowedOrigin_shouldBeRejected() throws Exception {
-        okhttp3.OkHttpClient shortTimeoutClient = CLIENT.newBuilder()
-                .readTimeout(java.time.Duration.ofSeconds(2))
-                .build();
         Request req = new Request.Builder()
                 .url(actuatorBase + "/health")
                 .header("Origin", "http://evil.com")
                 .get()
                 .build();
-        try (Response resp = shortTimeoutClient.newCall(req).execute()) {
-            // 不允许的来源：可能返回 403 或 CORS 头中不包含该来源
+        // 配置存在且允许来源仅为 example.com：evil.com 的实际请求应被 CORS 处理器拒绝（403），
+        // 且响应头不得回显被拒来源。不得以"超时豁免"掩盖实现缺陷。
+        try (Response resp = CLIENT.newCall(req).execute()) {
             String allowOrigin = resp.header("Access-Control-Allow-Origin");
             assertFalse("http://evil.com".equals(allowOrigin),
                     "Disallowed origin should not be in CORS header");
-        } catch (java.net.SocketTimeoutException e) {
-            // 框架 CORS 拒绝未返回响应时，超时可接受
-            log.info("CORS rejection caused timeout (expected): " + e.getMessage());
+            assertTrue(resp.code() == 403,
+                    "不被允许的来源应被 403 拒绝，实际 " + resp.code());
         }
     }
 }

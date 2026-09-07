@@ -122,7 +122,7 @@ class PerfAsyncContextTest {
     void start_executesTask() throws Exception {
         Runnable task = mock(Runnable.class);
         asyncContext.start(task);
-        Thread.sleep(100);
+        // timeout verify 已覆盖异步执行轮询，无需额外 Thread.sleep
         verify(task, timeout(1000)).run();
     }
 

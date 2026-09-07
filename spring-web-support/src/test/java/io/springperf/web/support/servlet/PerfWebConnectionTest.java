@@ -11,6 +11,8 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class PerfWebConnectionTest {
@@ -34,7 +36,8 @@ class PerfWebConnectionTest {
     void close_closesStreams() throws Exception {
         PerfWebConnection conn = new PerfWebConnection(inputStream, outputStream);
         conn.close();
-        // 验证流被关闭（Mockito 自动记录 close 调用）
+        verify(inputStream).close();
+        verify(outputStream).close();
     }
 
     @Test

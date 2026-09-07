@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.actuate.endpoint.ApiVersion;
 import org.springframework.boot.actuate.endpoint.web.EndpointMediaTypes;
 import org.springframework.boot.actuate.endpoint.web.WebEndpointHttpMethod;
+import org.springframework.boot.actuate.endpoint.web.WebOperation;
 import org.springframework.boot.actuate.endpoint.web.WebOperationRequestPredicate;
 import org.springframework.boot.actuate.endpoint.web.WebServerNamespace;
 import org.springframework.http.HttpHeaders;
@@ -127,9 +128,20 @@ class ActuatorPathMappingContextTest {
 
     @Test
     void getOperation_returnsOperationWhenSet() {
-        OperationHandlerInvoker invoker = new OperationHandlerInvoker(null, predicate, Collections.emptyList());
+        WebOperation operation = mock(WebOperation.class);
+        OperationHandlerInvoker invoker = new OperationHandlerInvoker(operation, predicate, Collections.emptyList());
         ActuatorPathMappingContext ctx = new ActuatorPathMappingContext(
-                invoker, "/actuator/health", null, predicate,
+                invoker, "/actuator/health", operation, predicate,
+                null, mediaTypes, "/actuator", WebServerNamespace.SERVER);
+
+        assertSame(operation, ctx.getOperation(), "构造传入的 WebOperation 应可由 getOperation 取回");
+    }
+
+    @Test
+    void getOperation_linksEndpoint_returnsNull() {
+        LinksOperationInvoker invoker = new LinksOperationInvoker();
+        ActuatorPathMappingContext ctx = new ActuatorPathMappingContext(
+                invoker, "/actuator", null, null,
                 null, mediaTypes, "/actuator", WebServerNamespace.SERVER);
 
         assertNull(ctx.getOperation());
