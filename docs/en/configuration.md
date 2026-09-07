@@ -43,6 +43,7 @@ All configuration properties are set in `application.properties`.
 | `server.netty.workers` | `0` (auto) | Netty worker EventLoop thread count, 0 = auto (CPU cores × 2) |
 | `server.netty.write-buffer-low-watermark` | `8192` (8KB) | Write buffer low watermark (bytes) |
 | `server.netty.write-buffer-high-watermark` | `32768` (32KB) | Write buffer high watermark (bytes) |
+| `server.netty.transport` | `auto` | Netty transport type: `auto` (use native epoll on Linux, fallback to NIO on other platforms), `nio` (force Java NIO), `epoll` (force native epoll, fail on unsupported platform) |
 
 ## HTTP/2
 

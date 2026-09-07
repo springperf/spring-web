@@ -4,9 +4,7 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.ssl.SslContext;
 import io.springperf.web.context.LifecycleWebComponent;
 import io.springperf.web.context.PropertiesConstant;
@@ -15,6 +13,7 @@ import io.springperf.web.server.Http2ChannelInitializer;
 import io.springperf.web.server.HttpHandler;
 import io.springperf.web.server.NettyHttpHandler;
 import io.springperf.web.server.NettyMetricsHandler;
+import io.springperf.web.server.NettyTransport;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.core.Ordered;
@@ -69,15 +68,17 @@ public class ManagementNettyHttpServer implements SmartLifecycle, LifecycleWebCo
         // 触发 WebContext 生命周期（WebComponent 初始化），AtomicBoolean 保证幂等
         webContext.startLifecycle();
 
-        bossGroup = new NioEventLoopGroup(1);
-        workerGroup = new NioEventLoopGroup();
+        String transportMode = webContext.getProps().get(
+                PropertiesConstant.SERVER_NETTY_TRANSPORT, PropertiesConstant.SERVER_NETTY_TRANSPORT_DEFAULT);
+        bossGroup = NettyTransport.newBossGroup(1, transportMode);
+        workerGroup = NettyTransport.newWorkerGroup(0, transportMode);
 
         NettyHttpHandler nettyHttpHandler = new NettyHttpHandler(webContext, "", handler);
         this.nettyHttpHandler = nettyHttpHandler;
 
         ServerBootstrap bootstrap = new ServerBootstrap();
         bootstrap.group(bossGroup, workerGroup)
-                .channel(NioServerSocketChannel.class)
+                .channel(NettyTransport.serverChannelClass(transportMode))
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel ch) {

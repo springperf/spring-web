@@ -52,6 +52,7 @@ spring-web
 │   ├── NettyHttpServer          implements SmartLifecycle，启动/停止 Netty
 │   │   ├── 管线: HttpServerCodec → ChunkedWriteHandler
 │   │   │     → SupportMultipartAggregator → BackpressureHandler → NettyHttpHandler
+│   │   ├── NettyTransport       transport 工厂：server.netty.transport=auto/nio/epoll，Linux 自动 epoll，其他平台回退 NIO
 │   │   └── 可选 SSL 支持
 │
 ├── http/                        HTTP 请求/响应抽象

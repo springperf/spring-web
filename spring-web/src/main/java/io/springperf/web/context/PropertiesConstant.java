@@ -144,6 +144,14 @@ public final class PropertiesConstant {
     public static final String SERVER_NETTY_ALLOCATOR_TYPE = "server.netty.allocator-type";
     public static final String SERVER_NETTY_ALLOCATOR_TYPE_DEFAULT = "pooled";
 
+    /**
+     * Netty transport type: "auto" / "nio" / "epoll".
+     * auto（默认）：Linux 上 epoll 可用时自动使用 native epoll，否则回退 NIO（Windows/macOS）。
+     * nio：强制 Java NIO。epoll：强制 native epoll，不可用时启动失败。
+     */
+    public static final String SERVER_NETTY_TRANSPORT = "server.netty.transport";
+    public static final String SERVER_NETTY_TRANSPORT_DEFAULT = "auto";
+
     /** Max request body bytes kept in-memory before switching to ByteBuf duplicate (默认值：4KB). */
     public static final String HTTP_MAX_IN_MEMORY_SIZE = "server.http.max-in-memory-size";
     public static final int HTTP_MAX_IN_MEMORY_SIZE_DEFAULT = 4096;

@@ -5,9 +5,7 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.channel.*;
-import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.ssl.NotSslRecordException;
 import io.netty.handler.ssl.SslContext;
 import io.springperf.web.context.LifecycleWebComponent;
@@ -65,9 +63,12 @@ public class NettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
         this.httpHandler = new NettyHttpHandler(webContext, webContext.getContextPath(), dispatcher);
         int port = webContext.getProps().getInt(PropertiesConstant.SERVER_PORT);
         int bossThreads = webContext.getProps().getInt(PropertiesConstant.SERVER_NETTY_BOSS_THREADS);
-        bossGroup = new NioEventLoopGroup(bossThreads);
         int workerThreads = webContext.getProps().getInt(PropertiesConstant.SERVER_NETTY_WORKERS);
-        workerGroup = workerThreads > 0 ? new NioEventLoopGroup(workerThreads) : new NioEventLoopGroup();
+        String transportMode = webContext.getProps().get(
+                PropertiesConstant.SERVER_NETTY_TRANSPORT, PropertiesConstant.SERVER_NETTY_TRANSPORT_DEFAULT);
+        // epoll（Linux auto 生效）或 NIO（Windows/macOS 回退）——native transport 提高高并发 IO 吞吐
+        bossGroup = NettyTransport.newBossGroup(bossThreads, transportMode);
+        workerGroup = NettyTransport.newWorkerGroup(workerThreads, transportMode);
         // 收集模块注入的额外 ChannelHandler（如 WebSocket 握手处理器）
         List<ChannelHandler> beforeAggHandlers = pipelineCustomizer != null
                 ? pipelineCustomizer.getBeforeAggregatorHandlers() : Collections.emptyList();
@@ -75,7 +76,7 @@ public class NettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
                 ? pipelineCustomizer.getAfterAggregatorHandlers() : Collections.emptyList();
         ServerBootstrap bootstrap = new ServerBootstrap();
         bootstrap.group(bossGroup, workerGroup)
-                .channel(NioServerSocketChannel.class)
+                .channel(NettyTransport.serverChannelClass(transportMode))
                 .option(ChannelOption.SO_BACKLOG,
                         webContext.getProps().getInt(PropertiesConstant.SERVER_NETTY_SO_BACKLOG))
                 .childOption(ChannelOption.TCP_NODELAY,
