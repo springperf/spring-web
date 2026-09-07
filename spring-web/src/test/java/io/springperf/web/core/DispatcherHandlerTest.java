@@ -28,6 +28,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
@@ -36,6 +37,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+
+import org.mockito.ArgumentCaptor;
 
 class DispatcherHandlerTest {
 
@@ -159,6 +162,26 @@ class DispatcherHandlerTest {
 
         verify(exceptionRegistry).handle(any(ResponseStatusException.class), eq(req), eq(resp));
         verify(interceptorRegistry).afterCompletion(eq(req), eq(resp), any(ResponseStatusException.class));
+    }
+
+    @Test
+    void handle_two404s_useDistinctExceptionInstances() {
+        ArgumentCaptor<ResponseStatusException> captor = ArgumentCaptor.forClass(ResponseStatusException.class);
+
+        for (int i = 0; i < 2; i++) {
+            WebServerHttpRequest req = createRequest();
+            WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+            MappingResult notFound = MappingResult.notFound();
+            MappingResult.set(req, notFound);
+            when(mappingRegistry.mapping(req)).thenReturn(notFound);
+
+            handler.handle(req, resp);
+        }
+
+        verify(exceptionRegistry, times(2)).handle(captor.capture(), any(), any());
+        List<ResponseStatusException> captured = captor.getAllValues();
+        assertNotSame(captured.get(0), captured.get(1),
+                "404 exceptions must be distinct instances — no shared singleton that risks cross-request state pollution");
     }
 
     @Test
