@@ -38,7 +38,7 @@ spring-web
 │   │   ├── 持有 Spring ApplicationContext
 │   │   ├── 持有 DispatcherHandler
 │   │   ├── 持有 ApplicationProperties
-│   │   └── implements InitializingBean → 驱动整个组件生命周期
+│   │   └── startLifecycle() → 驱动整个组件生命周期（由 NettyHttpServer.start() 触发；失败可清理重试，destroy 后可重新 start）
 │   ├── ApplicationProperties    类型安全的配置属性访问（包装 Environment）
 │   ├── PropertiesConstant       配置键常量
 │   │   ├── SERVER_PORT, CONTEXT_PATH
@@ -519,7 +519,7 @@ spring-boot-starter-web
 
 ## 组件生命周期
 
-所有核心组件继承 `BaseWebComponent`，通过 `WebContext`（implements `InitializingBean`）驱动：
+所有核心组件继承 `BaseWebComponent`，通过 `WebContext.startLifecycle()` 驱动：
 
 ```
 Spring 容器启动

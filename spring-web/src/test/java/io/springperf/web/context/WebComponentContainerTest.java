@@ -209,6 +209,83 @@ class WebComponentContainerTest {
     }
 
     @Test
+    void destroy_fromMidPhase_stillCleansUpComponents() throws Exception {
+        // 生命周期中途失败（只跑到 Phase1）后销毁，应仍能清理已初始化的组件，
+        // 而不是停留在中间态无法回收资源
+        WebComponentContainer container = new WebComponentContainer();
+        WebContext webContext = createWebContext();
+        container.initWithWebContext(webContext);
+
+        LifecycleWebComponent lifecycleComp = mock(LifecycleWebComponent.class);
+        when(lifecycleComp.getComponentName()).thenReturn("lifecycle");
+        container.registerWebComponent(lifecycleComp);
+
+        container.initComponentPhase1();
+
+        container.destroyComponent();
+        verify(lifecycleComp).destroyComponent();
+    }
+
+    @Test
+    void destroy_twice_isIdempotent() throws Exception {
+        WebComponentContainer container = new WebComponentContainer();
+        WebContext webContext = createWebContext();
+        container.initWithWebContext(webContext);
+
+        LifecycleWebComponent lifecycleComp = mock(LifecycleWebComponent.class);
+        when(lifecycleComp.getComponentName()).thenReturn("lifecycle");
+        container.registerWebComponent(lifecycleComp);
+
+        container.initComponentPhase1();
+        container.initComponentPhase2();
+        container.initComponentPhase3();
+        container.destroyComponent();
+        container.destroyComponent();
+        verify(lifecycleComp, times(1)).destroyComponent();
+    }
+
+    @Test
+    void destroy_beforeInit_doesNotDestroyComponents() throws Exception {
+        WebComponentContainer container = new WebComponentContainer();
+        WebContext webContext = createWebContext();
+
+        LifecycleWebComponent lifecycleComp = mock(LifecycleWebComponent.class);
+        when(lifecycleComp.getComponentName()).thenReturn("lifecycle");
+        container.registerWebComponent(lifecycleComp);
+
+        // 从未初始化（State=NEW）时销毁：不应清理组件
+        container.destroyComponent();
+        verify(lifecycleComp, never()).destroyComponent();
+    }
+
+    @Test
+    void resetAfterDestroy_returnsToNew() throws Exception {
+        WebComponentContainer container = new WebComponentContainer();
+        WebContext webContext = createWebContext();
+        container.initWithWebContext(webContext);
+        container.initComponentPhase1();
+        container.destroyComponent();
+
+        assertTrue(container.isDestroyed());
+        assertTrue(container.resetAfterDestroy());
+        // 复位后应能重新执行完整生命周期
+        container.initWithWebContext(webContext);
+        container.initComponentPhase1();
+        container.initComponentPhase2();
+        container.initComponentPhase3();
+    }
+
+    @Test
+    void resetAfterDestroy_whenNotDestroyed_returnsFalse() throws Exception {
+        WebComponentContainer container = new WebComponentContainer();
+        WebContext webContext = createWebContext();
+        container.initWithWebContext(webContext);
+
+        assertFalse(container.isDestroyed());
+        assertFalse(container.resetAfterDestroy());
+    }
+
+    @Test
     void autoRegisterWebComponent_addsRegistration() {
         WebComponentContainer container = new WebComponentContainer();
         container.autoRegisterWebComponent(WebComponent.class);
