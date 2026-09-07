@@ -278,7 +278,7 @@ public String jspView(Model model) {
 | `@PathVariable` 自动入 model | 路径变量在模板中可见 | ✅ 自动合并 | 无迁移成本 |
 | `BindingResult` 自动入 model | 校验错误在模板中可见 | ✅ 自动合并（`BindingResult.getTarget` 入 model） | 无迁移成本 |
 | 局部 `@ModelAttribute` 方法 | 同一 Controller 内预置 model | ✅ 支持（自动排除 handler 方法） | 无迁移成本 |
-| `@SessionAttributes` | 跨请求 session model | ❌ 不支持 | 改用 session 或请求参数 |
+| `@SessionAttributes` | 跨请求 session model | ✅ 支持（需 `spring-web-servlet` 模块） | 引入 `spring-web-servlet` |
 | `redirect:` 路径变量模板 | `redirect:/orders/{id}` | ❌ 不支持（仅支持 query 拼接） | 显式拼接 |
 | `redirect:` flash 属性（PRG） | `RedirectAttributes` + `FlashMap` | ❌ 不支持 | 改用 query 参数 |
 | `forward:` 前缀 | `RequestDispatcher.forward` | ❌ 不支持（Netty 无 forward 语义） | 改用 `redirect:` 或直接返回视图 |

@@ -188,30 +188,67 @@ destroyComponent()     → 资源释放
 
 ---
 
-## spring-web-servlet 与 spring-web-mvc-support（兼容桥接层）
+## spring-web-servlet（Servlet API 桥接层）
 
-当需要与 Servlet API 生态集成时添加此模块。
+**零 SpringMVC 依赖**的纯 Servlet 兼容桥接层。仅引入本模块 + `spring-web` 即可在 Netty 上运行 Servlet 规范生态（Filter、Servlet、HttpSession、JSP），classpath **不会**出现任何重写的 `org.springframework.web.servlet.*` 类。
 
 ### 功能
 
 | 功能 | 实现 |
 |------|------|
-| Servlet Filter 集成 | `FilterWrapper` 将 `javax.servlet.Filter` 包装为 `WebFilter` |
-| Spring MVC 拦截器桥接 | `HandlerInterceptorWrapper` 适配 Spring MVC 的 `HandlerInterceptor` |
-| RequestBodyAdvice / ResponseBodyAdvice | `SupportHttpBodyCodecInterceptorRegistry` 扫描并适配 |
-| Servlet API 参数解析 | `HttpServletRequestProvider` / `HttpServletResponseProvider` / `ServletRequestProvider` / `ServletResponseProvider` |
-| ResponseBodyEmitter | `ResponseBodyEmitterReturnValueResolver` |
-| Servlet 对象路由 | `ServletInvoker` + `SupportServletRegistry`（`Servlet` Bean + `@WebServlet` 自动注册路由） |
-| JSP 视图 | `JasperJspServlet` + `JspViewResolver` / `JspView`（集成 Apache Jasper，`jsp:` / `.jsp` 视图名，含 JSTL） |
+| Servlet Filter 集成 | `FilterWrapper` 将 `jakarta.servlet.Filter` 包装为 `WebFilter`，`SupportWebFilterRegistry` 自动注册 Filter Bean / `FilterRegistrationBean` |
+| Servlet API 参数解析 | `HttpServletRequestProvider` / `HttpServletResponseProvider` / `ServletRequestProvider` / `ServletResponseProvider` / `WebRequestArgumentResolverProvider` |
+| 会话参数 | `SessionAttributeArgumentResolverProvider`（`@SessionAttribute`）/ `SessionStatusArgumentResolverProvider`（`SessionStatus`）、`SessionAttributesInterceptor`（`@SessionAttributes`）、`SessionScopeBeanFactoryPostProcessor`（`session` 作用域 Bean） |
+| HttpSession | `PerfHttpSession` / `PerfHttpSessionManager` / `HttpSessionStorage` / `InMemoryHttpSessionStorage` |
+| Servlet 对象路由 | `SupportServletRegistry` 扫描 Servlet Bean / `@WebServlet` 注册为框架路由；`ServletInvoker`、`PerfServletConfig` |
+| JSP 视图 | `JasperJspServlet` + `JspViewResolver` / `JspView`（Apache Jasper + JSTL，`jsp:` / `.jsp` 视图名） |
+| Servlet 请求/响应包装 | `PerfHttpServletRequest` / `PerfHttpServletResponse`、`ServletAdapterContext`、`PerfRequestDispatcher`（forward/include） |
+| 桥接分发器 | `SupportDispatcherHandler` 初始化 `RequestContextHolder` + 响应完成后 Session flush |
 
 ### 使用场景
 
-- 需要复用已有的 Servlet Filter（如 Spring Security Filter Chain）
-- 需要复用已有的 `RequestBodyAdvice` / `ResponseBodyAdvice`
-- 需要复用已有的 Spring MVC `HandlerInterceptor`
-- 需要把已有 `Servlet` 对象注册为路由，或使用 JSP 视图（集成 Apache Jasper）
+- 需要复用已有的 Servlet Filter（如 Spring Security 的 `FilterChainProxy` 链）
+- 需要 HttpSession / `@SessionAttribute` / `@SessionAttributes` / `session` 作用域 Bean
+- 需要把已有 `Servlet` 对象注册为路由，或使用 JSP 视图
+- 用不到 Spring MVC 生态组件（`WebMvcConfigurer`、`HandlerInterceptor`、`RequestBodyAdvice` 等）
 
-添加依赖：
+### 依赖
+
+```xml
+<dependency>
+    <groupId>io.github.springperf</groupId>
+    <artifactId>spring-web-servlet</artifactId>
+    <version>${spring-web.version}</version>
+</dependency>
+```
+
+---
+
+## spring-web-mvc-support（SpringMVC 兼容桥接层）
+
+桥接 Spring MVC 生态组件（`WebMvcConfigurer`、`HandlerInterceptor`、`RequestBodyAdvice` / `ResponseBodyAdvice`、`ModelAndView` 等）。**依赖 `spring-web-servlet`**——Spring MVC API 构建于 Servlet 之上。
+
+> 注意：本模块会在编译期与框架代码一起打包重写的 `org.springframework.web.servlet.*` 类（同包同名优先于官方 `spring-webmvc`）。仅引入 `spring-web-servlet` 的用户看不到任何这类类。
+
+### 功能
+
+| 功能 | 实现 |
+|------|------|
+| `WebMvcConfigurer` 桥接 | `WebMvcConfigurerBridge` 将 `WebMvcConfigurer` 配置映射到框架各 Registry |
+| Spring MVC 拦截器桥接 | `SupportInterceptorRegistry` 扫描 + `HandlerInterceptorWrapper` 适配 Spring MVC `HandlerInterceptor` |
+| RequestBodyAdvice / ResponseBodyAdvice | `SupportHttpBodyCodecInterceptorRegistry` + `RequestBodyAdviceCodecInterceptor` / `ResponseBodyAdviceCodecInterceptor` |
+| Spring 参数解析器 | `SpringHandlerMethodArgumentResolverProvider` 适配 `HandlerMethodArgumentResolver` |
+| Spring 返回值处理器 | `SpringHandlerMethodReturnValueHandlerAdapter` 适配 `HandlerMethodReturnValueHandler`；`ModelAndViewReturnValueResolver` 桥接 `ModelAndView` |
+| Spring 异常解析器 | `SpringHandlerExceptionResolverAdapter` 适配 `HandlerExceptionResolver` |
+| ResponseBodyEmitter | `ResponseBodyEmitterReturnValueResolver`（含 SseEmitter / StreamingResponseBody） |
+| 重写的 Spring MVC API | `org.springframework.web.servlet.*`：`HandlerInterceptor`、`ModelAndView`、`View`、`MappedInterceptor`、`WebMvcConfigurer`、`InterceptorRegistration`、`RequestBodyAdvice` / `ResponseBodyAdvice` 等 |
+
+### 使用场景
+
+- 需要复用 Spring MVC 生态组件：`WebMvcConfigurer`、`HandlerInterceptor`、`RequestBodyAdvice` / `ResponseBodyAdvice`、`HandlerMethodArgumentResolver`、`ModelAndView`
+- 从 Spring MVC 迁移且依赖上述 API 的业务代码
+
+### 依赖
 
 ```xml
 <dependency>
@@ -221,7 +258,10 @@ destroyComponent()     → 资源释放
 </dependency>
 ```
 
-`spring-web-mvc-support` 依赖 `spring-web-servlet`；纯 Servlet 兼容场景只需引入 `spring-web-servlet`。
+### 选择建议
+
+- **只引入 `spring-web-servlet`**：仅需 Servlet 兼容（Filter/HttpSession/JSP），classpath 干净，不出现任何 Spring MVC 重写类——与官方 `spring-webmvc` 无冲突。
+- **`spring-web-servlet` + `spring-web-mvc-support`**：需要复用 Spring MVC 生态 API 时引入。代价是打包了 `org.springframework.web.servlet.*` 重写类，与官方 spring-webmvc 同包同名、classpath 优先加载，因此**不可与官方 `spring-webmvc` 共存于同一应用**。
 
 ---
 

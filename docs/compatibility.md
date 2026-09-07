@@ -71,9 +71,9 @@
 |------|------|------|
 | SB3（master 默认 3.5.x） | ✅ 可用级 | `SpringWebRuntimeHints` + `ControllerBeanFactoryInitializationAotProcessor`，用户 `@Controller`/DTO 无需手工 hints；示例 `spring-web-example-rest` 已绑定 `process-aot`；**Windows GraalVM 21.0.2 + MSVC 原生构建与请求链路端到端验证通过** |
 | SB4（4.0.x/4.1.x） | ❌ 不支持 | `Boot4WebServerInitializedEventBridge` 需运行时 `defineClass`（封闭世界禁止），显式文档化排除 |
-| epoll transport | ⚠️ 待 Linux 验证 | Netty epoll `.so` 需在 Linux 原生构建环境验证；NIO transport 已在 Windows native 验证通过 |
+| epoll transport | ✅ 已验证 | Netty epoll `.so` 已在 Linux 原生构建环境验证通过（NIO transport 亦已在 Windows native 验证） |
 | WebSocket `@ServerEndpoint` | ⚠️ 需注册为 Bean | native 下 classpath 扫描不可用，`JsrEndpointScanner` 自动降级为 Bean 发现，端点需显式注册为 Spring Bean |
-| 原生构建验证 | ✅ Windows 已验 / 🔧 Linux 待验 | Windows：`mvn -Pnative package`（GraalVM + MSVC，`vcvars64` 环境 + `-H:-CheckToolchain`）；Linux：`scripts/native-smoke-test.sh` |
+| 原生构建验证 | ✅ Windows / Linux 均已验 | Windows：`mvn -Pnative package`（GraalVM + MSVC，`vcvars64` 环境 + `-H:-CheckToolchain`）；Linux：CI `ubuntu-latest` 运行 `scripts/native-smoke-test.sh`（构建 + 启动 + 请求链路断言）通过 |
 
 ---
 

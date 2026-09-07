@@ -27,11 +27,53 @@ This guide is for teams with existing Spring MVC projects, explaining how to rep
 </dependency>
 ```
 
-### 1.2 Exclude Conflicting Dependencies (if any)
+### 1.2 Choose a Compatibility Bridge Module (Two Migration Paths)
+
+After replacing the starter, choose which compatibility module(s) to add based on your business code's dependency on Spring ecosystem APIs. **The two paths can be switched at any time** — start with Path 1, and add Path 2's module only if you hit `org.springframework.web.servlet.*` compile errors.
+
+**Path 1: add only `spring-web-servlet` (pure Servlet compatibility)**
+
+Best for: business code that depends only on **standard annotations + Servlet API** (`HttpServletRequest` / `HttpServletResponse` / `Filter` / `HttpSession` / JSP), and does not use Spring MVC ecosystem APIs (`WebMvcConfigurer`, `org.springframework.web.servlet.HandlerInterceptor`, `RequestBodyAdvice`, etc.).
+
+```xml
+<dependency>
+    <groupId>io.github.springperf</groupId>
+    <artifactId>spring-web-servlet</artifactId>
+    <version>${spring-web.version}</version>
+</dependency>
+```
+
+- ✅ **Pros**: a clean classpath — **no rewritten `org.springframework.web.servlet.*` classes**, no naming conflict with the official Spring MVC ecosystem; minimal dependencies and footprint.
+- ⚠️ **Cons**: Spring MVC high-level APIs (`WebMvcConfigurer`, Spring MVC `HandlerInterceptor`, `RequestBodyAdvice` / `ResponseBodyAdvice`, `ModelAndView`, `HandlerMethodArgumentResolver`) are **unavailable**; business code depending on them must switch to the framework's native SPI (`io.springperf.web.core.interceptor.HandlerInterceptor`, `WebFilter`, `ReturnValueResolver`, `StaticArgumentResolverProvider`).
+
+**Path 2: add `spring-web-servlet` + `spring-web-mvc-support` (Servlet + Spring MVC compatibility)**
+
+Best for: business code that heavily uses Spring MVC ecosystem APIs and wants the **minimum migration effort**.
+
+```xml
+<dependency>
+    <groupId>io.github.springperf</groupId>
+    <artifactId>spring-web-mvc-support</artifactId>
+    <version>${spring-web.version}</version>
+</dependency>
+```
+(`spring-web-mvc-support` transitively depends on `spring-web-servlet`; no explicit addition needed.)
+
+- ✅ **Pros**: `WebMvcConfigurer`, Spring MVC `HandlerInterceptor`, `RequestBodyAdvice` / `ResponseBodyAdvice`, `ModelAndView`, `HandlerMethodArgumentResolver` keep working (via adapters or rewritten classes), so migration changes are minimal.
+- ⚠️ **Cons**: rewritten `org.springframework.web.servlet.*` classes are packaged (same package/name, loaded in preference on the classpath), so it **cannot coexist with the official `spring-webmvc`** — the framework detects the conflict at startup and throws `IllegalStateException` (this is why `spring-boot-starter-web` must be removed); larger dependency and footprint.
+
+**How to decide**
+
+- Most pure-REST projects (annotation controllers + standard argument binding + custom Filters) go with **Path 1**.
+- Only add **Path 2** when business code actually references types under `org.springframework.web.servlet.*` (e.g., `HandlerInterceptor`, `WebMvcConfigurer`, `RequestBodyAdvice`).
+
+---
+
+### 1.3 Exclude Conflicting Dependencies (if any)
 
 If your project explicitly depends on Tomcat (e.g., `spring-boot-starter-tomcat`), remove it as well.
 
-### 1.3 Verify Startup
+### 1.4 Verify Startup
 
 Start the project. The following log confirms successful migration:
 
@@ -117,7 +159,7 @@ public class LogInterceptor implements HandlerInterceptor {
 
 ### Filters (requires support module)
 
-After adding `spring-web-servlet`, `javax.servlet.Filter` is automatically adapted via bridging.
+After adding `spring-web-servlet`, `jakarta.servlet.Filter` is automatically adapted via bridging.
 
 ---
 

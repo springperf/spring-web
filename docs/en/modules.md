@@ -189,27 +189,67 @@ destroyComponent()     → Resource release
 
 ---
 
-## spring-web-servlet and spring-web-mvc-support (Compatibility Bridge Layer)
+## spring-web-servlet (Servlet API Bridge)
 
-Add this module when integration with the Servlet API ecosystem is needed.
+A pure Servlet compatibility bridge with **zero Spring MVC dependency**. Adding only this module + `spring-web` lets Servlet-ecosystem features (Filter, Servlet, HttpSession, JSP) run on Netty, while the classpath stays free of any rewritten `org.springframework.web.servlet.*` classes.
 
 ### Features
 
 | Feature | Implementation |
 |---------|---------------|
-| Servlet Filter integration | `FilterWrapper` wraps `javax.servlet.Filter` as `WebFilter` |
-| Spring MVC interceptor bridge | `HandlerInterceptorWrapper` adapts Spring MVC's `HandlerInterceptor` |
-| RequestBodyAdvice / ResponseBodyAdvice | `SupportHttpBodyCodecInterceptorRegistry` scans and adapts |
-| Servlet API argument resolution | `HttpServletRequestProvider` / `HttpServletResponseProvider` |
-| ResponseBodyEmitter | `ResponseBodyEmitterReturnValueResolver` |
+| Servlet Filter integration | `FilterWrapper` wraps `jakarta.servlet.Filter` as `WebFilter`; `SupportWebFilterRegistry` auto-registers Filter beans / `FilterRegistrationBean` |
+| Servlet API argument resolution | `HttpServletRequestProvider` / `HttpServletResponseProvider` / `ServletRequestProvider` / `ServletResponseProvider` / `WebRequestArgumentResolverProvider` |
+| Session arguments | `SessionAttributeArgumentResolverProvider` (`@SessionAttribute`) / `SessionStatusArgumentResolverProvider` (`SessionStatus`), `SessionAttributesInterceptor` (`@SessionAttributes`), `SessionScopeBeanFactoryPostProcessor` (`session`-scoped beans) |
+| HttpSession | `PerfHttpSession` / `PerfHttpSessionManager` / `HttpSessionStorage` / `InMemoryHttpSessionStorage` |
+| Servlet object routing | `SupportServletRegistry` registers Servlet beans / `@WebServlet` as framework routes; `ServletInvoker`, `PerfServletConfig` |
+| JSP views | `JasperJspServlet` + `JspViewResolver` / `JspView` (Apache Jasper + JSTL, `jsp:` / `.jsp` view names) |
+| Servlet request/response wrappers | `PerfHttpServletRequest` / `PerfHttpServletResponse`, `ServletAdapterContext`, `PerfRequestDispatcher` (forward/include) |
+| Bridge dispatcher | `SupportDispatcherHandler` initializes `RequestContextHolder` + flushes the session after the response completes |
 
 ### Use Cases
 
-- Reusing existing Servlet Filters (e.g., Spring Security Filter Chain)
-- Reusing existing `RequestBodyAdvice` / `ResponseBodyAdvice`
-- Reusing existing Spring MVC `HandlerInterceptor`
+- Reusing existing Servlet Filters (e.g., Spring Security's `FilterChainProxy` chain)
+- Needing `HttpSession` / `@SessionAttribute` / `@SessionAttributes` / `session`-scoped beans
+- Registering existing `Servlet` objects as routes, or using JSP views
+- Not needing Spring MVC ecosystem components (`WebMvcConfigurer`, `HandlerInterceptor`, `RequestBodyAdvice`, etc.)
 
-Add dependency:
+### Dependency
+
+```xml
+<dependency>
+    <groupId>io.github.springperf</groupId>
+    <artifactId>spring-web-servlet</artifactId>
+    <version>${spring-web.version}</version>
+</dependency>
+```
+
+---
+
+## spring-web-mvc-support (Spring MVC Compatibility Bridge)
+
+Bridges Spring MVC ecosystem components (`WebMvcConfigurer`, `HandlerInterceptor`, `RequestBodyAdvice` / `ResponseBodyAdvice`, `ModelAndView`, etc.). **Depends on `spring-web-servlet`** — the Spring MVC API is built on top of Servlet.
+
+> Note: this module compiles rewritten `org.springframework.web.servlet.*` classes into its jar (same package/name, loaded in preference to the official `spring-webmvc`). Users who only add `spring-web-servlet` never see these classes.
+
+### Features
+
+| Feature | Implementation |
+|---------|---------------|
+| `WebMvcConfigurer` bridge | `WebMvcConfigurerBridge` maps `WebMvcConfigurer` configuration to the framework's registries |
+| Spring MVC interceptor bridge | `SupportInterceptorRegistry` scans + `HandlerInterceptorWrapper` adapts Spring MVC `HandlerInterceptor` |
+| RequestBodyAdvice / ResponseBodyAdvice | `SupportHttpBodyCodecInterceptorRegistry` + `RequestBodyAdviceCodecInterceptor` / `ResponseBodyAdviceCodecInterceptor` |
+| Spring argument resolvers | `SpringHandlerMethodArgumentResolverProvider` adapts `HandlerMethodArgumentResolver` |
+| Spring return value handlers | `SpringHandlerMethodReturnValueHandlerAdapter` adapts `HandlerMethodReturnValueHandler`; `ModelAndViewReturnValueResolver` bridges `ModelAndView` |
+| Spring exception resolvers | `SpringHandlerExceptionResolverAdapter` adapts `HandlerExceptionResolver` |
+| ResponseBodyEmitter | `ResponseBodyEmitterReturnValueResolver` (incl. SseEmitter / StreamingResponseBody) |
+| Rewritten Spring MVC API | `org.springframework.web.servlet.*`: `HandlerInterceptor`, `ModelAndView`, `View`, `MappedInterceptor`, `WebMvcConfigurer`, `InterceptorRegistration`, `RequestBodyAdvice` / `ResponseBodyAdvice`, etc. |
+
+### Use Cases
+
+- Reusing Spring MVC ecosystem components: `WebMvcConfigurer`, `HandlerInterceptor`, `RequestBodyAdvice` / `ResponseBodyAdvice`, `HandlerMethodArgumentResolver`, `ModelAndView`
+- Migrating from Spring MVC with business code that depends on these APIs
+
+### Dependency
 
 ```xml
 <dependency>
@@ -219,7 +259,10 @@ Add dependency:
 </dependency>
 ```
 
-`spring-web-mvc-support` depends on `spring-web-servlet`; for pure Servlet compatibility, just add `spring-web-servlet`.
+### Choosing Between the Two
+
+- **Add only `spring-web-servlet`**: when you only need Servlet compatibility (Filter / HttpSession / JSP) — a clean classpath with no Spring MVC rewrite classes and no conflict with the official `spring-webmvc`.
+- **Add `spring-web-servlet` + `spring-web-mvc-support`**: when you need to reuse Spring MVC ecosystem APIs. The trade-off is that rewritten `org.springframework.web.servlet.*` classes are packaged, which load in preference to the official spring-webmvc — therefore **it cannot coexist with the official `spring-webmvc` in the same application**.
 
 ---
 

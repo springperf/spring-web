@@ -183,7 +183,7 @@ This framework chose to **directly reuse Spring's annotation system**: `@Request
 
 ### 4. Bridge, Don't Replace — Respect the Ecosystem
 
-The Servlet API has accumulated two decades of ecosystem: Spring Security Filter Chain, `RequestBodyAdvice`, `ResponseBodyAdvice`, countless middleware based on `javax.servlet.Filter`.
+The Servlet API has accumulated two decades of ecosystem: Spring Security Filter Chain, `RequestBodyAdvice`, `ResponseBodyAdvice`, countless middleware based on `jakarta.servlet.Filter`.
 
 This framework doesn't demand "all or nothing." Through the `spring-web-servlet` bridge module, migration can be gradual: start by running on Netty via the support module reusing existing Filters, then gradually migrate to native `WebFilter`.
 
@@ -245,12 +245,7 @@ This framework doesn't demand "all or nothing." Through the `spring-web-servlet`
 | JSP | Requires `spring-web-servlet` + `tomcat-embed-jasper` (`JasperJspServlet` + `JspViewResolver`) |
 | Servlet WebSocket (JSR-356 `@ServerEndpoint`) | Requires `spring-web-websocket` bridge |
 | Spring MVC `View` / `ViewResolver` | Requires `spring-web-view` (Thymeleaf/FreeMarker) + `ModelAndView` bridge in `spring-web-mvc-support` |
-
-### Not Supported
-
-| Feature | Reason |
-|---------|--------|
-| `@SessionAttributes` / `@SessionScope` | Session-related features; implement via `WebFilter` if needed |
+| `@SessionAttribute` / `@SessionAttributes` / `@SessionScope` | Requires `spring-web-servlet` (`SessionAttributesInterceptor` + `session` scope + `HttpSession`) |
 
 ---
 

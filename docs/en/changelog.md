@@ -22,6 +22,7 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - **`spring-web-support` module split**: split into `spring-web-servlet` (pure Servlet bridge: Filter/Servlet/HttpSession/JSP/`@SessionAttribute` — official spring-web semantics, zero Spring MVC dependency) and `spring-web-mvc-support` (Spring MVC compatibility bridge: `org.springframework.web.servlet.*` shim classes, `WebMvcConfigurer`/`HandlerInterceptor`/`RequestBodyAdvice` adapters). Users needing only Servlet compatibility depend on `spring-web-servlet` alone, keeping `org.springframework.web.servlet.*` classes off the classpath; `spring-web-mvc-support` depends on `spring-web-servlet`. The starter auto-configuration is split into `SpringWebServletAutoConfiguration` + `SpringWebMvcSupportAutoConfiguration` (each conditional on its module's classes). The old coordinate `io.github.springperf:spring-web-support` is removed
+- **Response status API**: `WebServerHttpResponse.getStatus()` return type changed from `HttpStatus` to `HttpStatusCode`, supporting non-standard status codes (e.g. 499/599/507) written as their raw values; `sendError` gains an `HttpStatusCode` overload, and the servlet bridge `setStatus`/`sendError` no longer throw for non-standard codes
 
 ### Security
 
@@ -50,6 +51,13 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **`redirect:` alignment**: only active for view methods — `"redirect:/x"` returned from `@ResponseBody`/`@RestController` methods stays JSON instead of becoming a 302; URLs already containing a query now join with `&`
 - **Component name conflicts**: a losing component is no longer initialized (prevents duplicate routes and resource leaks)
 - **`Optional<Locale>` arg test**: uses a resolvable generic method carrier to verify wrapping semantics
+- **Servlet-bridge sessions never expire → unbounded growth**: `PerfHttpSessionManager.createSession()` never applied the session timeout, so `maxInactiveInterval` stayed 0 and the cleanup thread never reaped sessions; sessions now expire per `server.servlet.session.timeout` (Spring Boot Duration semantics: bare numbers in seconds, `30m/1h/1d` suffixes, default 30 minutes)
+- **`server.http.read-timeout` default ineffective**: `HTTP_READ_TIMEOUT` was missing from the defaults table, so the documented 30s slow-request read timeout was silently disabled when unset; fixed
+- **Non-standard status code crash**: `PerfHttpServletResponse.setStatus/sendError` and core `setStatusCode` threw `IllegalArgumentException` for codes like 499/599; they are now written as their raw values
+- **Async return-value serialization exceptions swallowed**: `asyncDispatch` only logged resolution failures, hanging the response until timeout; exceptions now route to `ExceptionRegistry` and flush, and `afterCompletion` receives the real exception
+- **Path-level interceptors bypassed on 404/405**: include/exclude path filtering now also applies when no handler matched, so path-scoped interceptors no longer fire on arbitrary 404s
+- **Overlapping wildcard routes match by specificity**: `/user/{id}` vs `/user/*` and similar resolve to the most specific pattern (`literal > {var} > * > **`), aligned with Spring MVC
+- **Stream error completion not signaled**: `AbstractNettyStreamSender.complete(.., failure)` now closes the connection on error termination (no normal `LastHttpContent`), letting clients detect abnormal truncation
 
 ### Changed
 

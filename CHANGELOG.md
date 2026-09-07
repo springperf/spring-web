@@ -22,6 +22,7 @@
 ### 变更
 
 - **`spring-web-support` 模块拆分**：拆分为 `spring-web-servlet`（纯 Servlet 桥接：Filter/Servlet/HttpSession/JSP/`@SessionAttribute` 等官方 spring-web 语义，零 SpringMVC 依赖）与 `spring-web-mvc-support`（SpringMVC 兼容桥接：`org.springframework.web.servlet.*` 重写类、`WebMvcConfigurer`/`HandlerInterceptor`/`RequestBodyAdvice` 桥接）。仅需 Servlet 兼容的用户只依赖 `spring-web-servlet`，classpath 不引入任何 `org.springframework.web.servlet.*` 类；`spring-web-mvc-support` 依赖 `spring-web-servlet`。starter 自动配置相应拆为 `SpringWebServletAutoConfiguration` + `SpringWebMvcSupportAutoConfiguration`（分别按模块 class 条件生效）。旧坐标 `io.github.springperf:spring-web-support` 移除
+- **响应状态码 API**：`WebServerHttpResponse.getStatus()` 返回类型由 `HttpStatus` 改为 `HttpStatusCode`，支持非标准状态码（如 499/599/507）按原始码值写入响应；`sendError` 新增 `HttpStatusCode` 重载，servlet 桥接 `setStatus/sendError` 同步支持（不再对非标准码抛异常）
 
 ### 安全
 
@@ -50,6 +51,13 @@
 - **`redirect:` 语义对齐**：仅视图方法生效，不再劫持 `@ResponseBody`/`@RestController` 返回的 `"redirect:/x"` 字符串为 302；目标 URL 已含 query 时用 `&` 续接
 - **`WebComponentContainer` 命名冲突**：落败组件不再被误初始化/重复注册路由，防止副作用与资源泄漏
 - **Locale 参数泛型解析测试修复**：`Optional<Locale>` 用可解析泛型的方法载体验证包装语义
+- **Servlet 桥接 session 永不过期 → 无界内存增长**：`PerfHttpSessionManager.createSession()` 未应用会话超时，`maxInactiveInterval` 恒为 0，清理线程永不回收 session；现按 `server.servlet.session.timeout` 设置过期（Spring Boot Duration 语义：裸数字=秒、支持 `30m/1h/1d` 后缀，默认 30 分钟）
+- **`server.http.read-timeout` 默认值失效**：`HTTP_READ_TIMEOUT` 未加入默认值表，未配置时读超时保护（文档声明的 30s）实际关闭；现已修复
+- **非标准状态码崩溃**：`PerfHttpServletResponse.setStatus/sendError` 与核心 `setStatusCode` 对 499/599 等非标准码抛 `IllegalArgumentException`；现按原始码值写入响应
+- **异步返回值序列化异常被吞**：`asyncDispatch` 中返回值解析异常仅记录日志、响应悬挂至超时；现路由到 `ExceptionRegistry` 并 flush，`afterCompletion` 携带真实异常
+- **404/405 路径级拦截器路径约束失效**：无 handler 时仍按请求路径过滤 include/exclude，路径级拦截器不再对任意 404 触发
+- **重叠通配符路由按特异性匹配**：`/user/{id}` 与 `/user/*` 等重叠通配符最精确者优先（literal > {var} > * > **），对齐 Spring MVC
+- **流式错误结束不标记**：`AbstractNettyStreamSender.complete(.., failure)` 错误终止时关闭连接（不再写正常 `LastHttpContent`），客户端感知异常截断
 
 ### 构建
 

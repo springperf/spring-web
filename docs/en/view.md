@@ -165,7 +165,7 @@ Read this before migrating a page-oriented project. **Aligned** capabilities (vi
 | `@PathVariable` auto-merge into model | Path variables visible in templates | ✅ Auto-merged | No migration cost |
 | `BindingResult` auto-merge into model | Validation errors visible in templates | ✅ Auto-merged (`BindingResult.getTarget` into model) | No migration cost |
 | Local `@ModelAttribute` methods | Pre-populate model within same Controller | ✅ Supported (handler methods auto-excluded) | No migration cost |
-| `@SessionAttributes` | Cross-request session model | ❌ Not supported | Use session or request parameters |
+| `@SessionAttributes` | Cross-request session model | ✅ Supported (requires `spring-web-servlet` module) | Add `spring-web-servlet` |
 | `redirect:` path-variable templates | `redirect:/orders/{id}` | ❌ Not supported (query-only) | Concatenate explicitly |
 | `redirect:` flash attributes (PRG) | `RedirectAttributes` + `FlashMap` | ❌ Not supported | Use query parameters |
 | `forward:` prefix | `RequestDispatcher.forward` | ❌ Not supported (Netty has no forward semantics) | Use `redirect:` or return the view directly |

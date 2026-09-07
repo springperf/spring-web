@@ -183,7 +183,7 @@ WebFlux（Netty 运行时，4,173 样本）与 MVC 问题模式高度相似，�
 
 ### 4. 桥接而非替代——尊重生态
 
-Servlet API 有二十年的生态积累：Spring Security Filter Chain、`RequestBodyAdvice`、`ResponseBodyAdvice`、大量基于 `javax.servlet.Filter` 的中间件。
+Servlet API 有二十年的生态积累：Spring Security Filter Chain、`RequestBodyAdvice`、`ResponseBodyAdvice`、大量基于 `jakarta.servlet.Filter` 的中间件。
 
 本框架不强制"全要或全不要"。通过 `spring-web-servlet` 桥接模块，可以渐进式迁移：项目先用 support 模块运行在 Netty 上复用现有 Filter，再逐步迁移到原生 WebFilter。
 
@@ -245,12 +245,7 @@ Servlet API 有二十年的生态积累：Spring Security Filter Chain、`Reques
 | JSP | 需 `spring-web-servlet` + `tomcat-embed-jasper`（`JasperJspServlet` + `JspViewResolver`） |
 | Servlet WebSocket（JSR-356 `@ServerEndpoint`） | 需 `spring-web-websocket` 模块桥接 |
 | Spring MVC `View` / `ViewResolver` | 需 `spring-web-view`（Thymeleaf/FreeMarker）+ `spring-web-mvc-support` 的 `ModelAndView` 桥接 |
-
-### 不支持
-
-| 功能 | 原因 |
-|------|------|
-| `@SessionAttributes` / `@SessionScope` | 与 Session 相关的功能，如需可基于 `WebFilter` 自行实现 |
+| `@SessionAttribute` / `@SessionAttributes` / `@SessionScope` | 需 `spring-web-servlet` 模块（`SessionAttributesInterceptor` + `session` 作用域 + `HttpSession`） |
 
 ---
 

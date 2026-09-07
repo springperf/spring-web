@@ -44,7 +44,7 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 - Follow Spring Framework naming conventions
 - Public API must have English JavaDoc
 - Chinese comments may be used for complex business logic explanations
-- Package naming: `io.github.spring.web.*`
+- Package naming: `io.springperf.web.*` (Maven groupId: `io.github.springperf`)
 
 ### PR Checklist
 

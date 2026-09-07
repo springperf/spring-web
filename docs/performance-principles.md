@@ -319,7 +319,7 @@ void drain() {
 
 | 维度 | WebPerf | MVC+Tomcat | WebFlux |
 |------|-----------|------------|---------|
-| 过滤器 | **`WebFilter`** SPI → 启动时构建有序链 | `javax.servlet.Filter` → 容器管理的 Filter Chain | `WebFilter` → 响应式链 |
+| 过滤器 | **`WebFilter`** SPI → 启动时构建有序链 | `jakarta.servlet.Filter` → 容器管理的 Filter Chain | `WebFilter` → 响应式链 |
 | 路径映射 | **多级 RouterOptimizer 链** → 精确路径 HashMap O(1)，前缀/后缀索引，兜底遍历 | **`AntPathMatcher`** → 遍历匹配，O(n) | **`PathPatternParser`** → 编译后匹配，近似 O(log n) |
 | 路径匹配机制 | **组合优化器**：FullPathRouterOptimizer → Prefix → Suffix → Loop | `AbstractHandlerMethodMapping.lookupPath()` → 遍历所有注册 | `AbstractHandlerMethodMapping` + `PathPattern` |
 | Controller 调度 | **`DispatcherHandler`** → 直接路由到 `InvokableHandlerMethod` | `DispatcherServlet` → `HandlerExecutionChain` | `DispatcherHandler` → 响应式 HandlerAdapter |

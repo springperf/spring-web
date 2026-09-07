@@ -71,9 +71,9 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 |----------|--------|-------|
 | SB3 (master default 3.5.x) | ✅ Usable | `SpringWebRuntimeHints` + `ControllerBeanFactoryInitializationAotProcessor`; no manual hints needed for user `@Controller`/DTO; example `spring-web-example-rest` binds `process-aot`; **Windows GraalVM 21.0.2 + MSVC native build & request flow verified end-to-end** |
 | SB4 (4.0.x/4.1.x) | ❌ Not supported | `Boot4WebServerInitializedEventBridge` needs runtime `defineClass` (forbidden in closed world), explicitly excluded |
-| epoll transport | ⚠️ Pending Linux verification | Netty epoll `.so` needs verification in Linux native build env; NIO transport verified on Windows native |
+| epoll transport | ✅ Verified | Netty epoll `.so` verified in a Linux native build environment (NIO transport also verified on Windows native) |
 | WebSocket `@ServerEndpoint` | ⚠️ Register as Bean | classpath scanning unavailable under native; `JsrEndpointScanner` auto-degrades to Bean discovery |
-| Native build verification | ✅ Windows verified / 🔧 Linux pending | Windows: `mvn -Pnative package` (GraalVM + MSVC, `vcvars64` env + `-H:-CheckToolchain`); Linux: `scripts/native-smoke-test.sh` |
+| Native build verification | ✅ Windows & Linux verified | Windows: `mvn -Pnative package` (GraalVM + MSVC, `vcvars64` env + `-H:-CheckToolchain`); Linux: CI `ubuntu-latest` runs `scripts/native-smoke-test.sh` (build + launch + request-flow assertions) |
 
 ---
 

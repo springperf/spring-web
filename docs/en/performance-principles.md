@@ -319,7 +319,7 @@ When two descriptions are separated by `→` in the same cell, the left side is 
 
 | Dimension | WebPerf | MVC+Tomcat | WebFlux |
 |-----------|-----------|------------|---------|
-| Filters | **`WebFilter` SPI** → ordered chain built at startup | `javax.servlet.Filter` → container-managed Filter Chain | `WebFilter` → reactive chain |
+| Filters | **`WebFilter` SPI** → ordered chain built at startup | `jakarta.servlet.Filter` → container-managed Filter Chain | `WebFilter` → reactive chain |
 | Path mapping | **Multi-level RouterOptimizer chain** → exact path HashMap O(1), prefix/suffix index, fallback iteration | **`AntPathMatcher`** → iterative matching, O(n) | **`PathPatternParser`** → compiled matching, ~O(log n) |
 | Path matching | **Composite optimizer**: FullPath → Prefix → Suffix → Loop | `AbstractHandlerMethodMapping.lookupPath()` → iterate all registrations | `AbstractHandlerMethodMapping` + `PathPattern` |
 | Controller dispatch | **`DispatcherHandler`** → direct route to `InvokableHandlerMethod` | `DispatcherServlet` → `HandlerExecutionChain` | `DispatcherHandler` → reactive HandlerAdapter |
