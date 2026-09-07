@@ -19,7 +19,7 @@
       "type": "java.lang.Integer",
       "description": "Max content length of an HTTP request in bytes.",
       "sourceType": "io.springperf.web.context.ApplicationProperties",
-      "defaultValue": 1048576
+      "defaultValue": 4194304
     },
     {
       "name": "server.http.timeout",

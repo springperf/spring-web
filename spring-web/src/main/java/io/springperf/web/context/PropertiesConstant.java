@@ -21,9 +21,9 @@ public final class PropertiesConstant {
     /** Context path of the application. */
     public static final String CONTEXT_PATH = "server.servlet.context-path";
 
-    /** Max content length of an HTTP request in bytes (默认值：1MB). */
+    /** Max content length of an HTTP request in bytes (默认值：4MB). */
     public static final String HTTP_MAX_CONTENT_LENGTH = "server.http.max-content-length";
-    public static final int HTTP_MAX_CONTENT_LENGTH_DEFAULT = 1048576;
+    public static final int HTTP_MAX_CONTENT_LENGTH_DEFAULT = 4 * 1024 * 1024;
 
     /** HTTP request timeout in milliseconds (默认值：60s). */
     public static final String HTTP_TIMEOUT = "server.http.timeout";
@@ -124,17 +124,17 @@ public final class PropertiesConstant {
     public static final String SERVER_NETTY_BOSS_THREADS = "server.netty.boss-threads";
     public static final int SERVER_NETTY_BOSS_THREADS_DEFAULT = 1;
 
-    /** TCP listen backlog (默认值：128). */
+    /** TCP listen backlog (默认值：1024，生产 Linux 高并发). */
     public static final String SERVER_NETTY_SO_BACKLOG = "server.netty.so-backlog";
-    public static final int SERVER_NETTY_SO_BACKLOG_DEFAULT = 128;
+    public static final int SERVER_NETTY_SO_BACKLOG_DEFAULT = 1024;
 
     /** TCP_NODELAY, disable Nagle's algorithm (默认值：true). */
     public static final String SERVER_NETTY_TCP_NODELAY = "server.netty.tcp-nodelay";
     public static final boolean SERVER_NETTY_TCP_NODELAY_DEFAULT = true;
 
-    /** SO_KEEPALIVE (默认值：false). */
+    /** SO_KEEPALIVE (默认值：true，生产长连接友好). */
     public static final String SERVER_NETTY_SO_KEEPALIVE = "server.netty.so-keepalive";
-    public static final boolean SERVER_NETTY_SO_KEEPALIVE_DEFAULT = false;
+    public static final boolean SERVER_NETTY_SO_KEEPALIVE_DEFAULT = true;
 
     /** SO_REUSEADDR (默认值：true). */
     public static final String SERVER_NETTY_SO_REUSEADDR = "server.netty.so-reuseaddr";

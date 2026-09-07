@@ -51,9 +51,9 @@ class ApplicationPropertiesTest {
     }
 
     @Test
-    void get_usingHttpMaxContentLengthConstant_default_returns1048576() {
+    void get_usingHttpMaxContentLengthConstant_default_returns4194304() {
         ApplicationProperties props = createProperties("nonexistent", null);
-        assertEquals(1048576, props.getInt(PropertiesConstant.HTTP_MAX_CONTENT_LENGTH));
+        assertEquals(4 * 1024 * 1024, props.getInt(PropertiesConstant.HTTP_MAX_CONTENT_LENGTH));
     }
 
     @Test
