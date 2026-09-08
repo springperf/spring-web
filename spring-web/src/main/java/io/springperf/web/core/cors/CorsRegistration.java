@@ -36,6 +36,11 @@ public class CorsRegistration implements WebComponent {
         this.config = corsConfiguration;
     }
 
+    @Override
+    public String getComponentName() {
+        return "CorsRegistration:" + pathPattern;
+    }
+
     public CorsRegistration order(int order) {
         this.order = order;
         return this;
