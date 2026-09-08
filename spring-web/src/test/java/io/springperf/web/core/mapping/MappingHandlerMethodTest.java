@@ -129,47 +129,4 @@ class MappingHandlerMethodTest {
         assertEquals("second", handlerMethod.get(k2));
         assertEquals("third", handlerMethod.get(k3));
     }
-
-    @Test
-    void clearCache_removesSlotValue_sharedAcrossInstances() throws NoSuchMethodException {
-        MappingCacheKey<String> key = MappingCacheKey.createMethodCacheKey(String.class);
-        handlerMethod.set(key, "testValue");
-        assertEquals("testValue", handlerMethod.get(key));
-
-        // 另一个实例共享同一方法的缓存数组
-        TestController bean = new TestController();
-        Method method = TestController.class.getMethod("hello");
-        MappingHandlerMethod other = new MappingHandlerMethod(bean, method);
-
-        MappingHandlerMethod.clearCache(key);
-
-        assertNull(handlerMethod.get(key));
-        assertNull(other.get(key), "共享数组的槽位应被同时清空");
-    }
-
-    @Test
-    void clearCache_classCache_removesSlotValue() {
-        MappingCacheKey<String> key = MappingCacheKey.createClassCacheKey(String.class);
-        handlerMethod.set(key, "classValue");
-        assertEquals("classValue", handlerMethod.get(key));
-
-        MappingHandlerMethod.clearCache(key);
-
-        assertNull(handlerMethod.get(key));
-    }
-
-    @Test
-    void clearAllCaches_freshInstanceSeesNoCache() throws NoSuchMethodException {
-        MappingCacheKey<String> key = MappingCacheKey.createMethodCacheKey(String.class);
-        handlerMethod.set(key, "m");
-        assertEquals("m", handlerMethod.get(key));
-
-        MappingHandlerMethod.clearAllCaches();
-
-        // 销毁场景：旧实例随上下文废弃，新实例应看不到任何缓存
-        TestController bean = new TestController();
-        Method method = TestController.class.getMethod("hello");
-        MappingHandlerMethod fresh = new MappingHandlerMethod(bean, method);
-        assertNull(fresh.get(key));
-    }
 }

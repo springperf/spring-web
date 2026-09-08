@@ -260,39 +260,4 @@ class PathPatternUtilsTest {
         // 两个非字面量/非正则段组合 → 可能相交
         assertFalse(PathPatternUtils.patternsDisjoint("/a/*", "/a/{id}"));
     }
-
-    @Test
-    void comparePathRuleSpecificity_variableBeatsWildcard() {
-        assertTrue(PathPatternUtils.comparePathRuleSpecificity("/user/{id}", "/user/*") < 0,
-                "路径变量应比单通配符更精确（排前面）");
-    }
-
-    @Test
-    void comparePathRuleSpecificity_literalBeatsVariable() {
-        assertTrue(PathPatternUtils.comparePathRuleSpecificity("/user/me", "/user/{id}") < 0,
-                "字面量段应比路径变量更精确");
-    }
-
-    @Test
-    void comparePathRuleSpecificity_exactBeatsCatchAll() {
-        assertTrue(PathPatternUtils.comparePathRuleSpecificity("/user", "/user/**") < 0,
-                "精确路径应比 catch-all 更精确");
-    }
-
-    @Test
-    void comparePathRuleSpecificity_shorterExactPrefixWins() {
-        // 公共前缀相同：段数更少（精确）优先
-        assertTrue(PathPatternUtils.comparePathRuleSpecificity("/a/b", "/a/b/**") < 0);
-    }
-
-    @Test
-    void comparePathRuleSpecificity_equalPatterns_returnsZero() {
-        assertEquals(0, PathPatternUtils.comparePathRuleSpecificity("/user/{id}", "/user/{id}"));
-    }
-
-    @Test
-    void comparePathRuleSpecificity_sameSpecificity_keepsOrder() {
-        // 同特异性（同段位同为变量/通配符）→ 0，由稳定排序保持注册顺序
-        assertEquals(0, PathPatternUtils.comparePathRuleSpecificity("/user/{a}", "/user/{b}"));
-    }
 }

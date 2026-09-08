@@ -89,9 +89,8 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
     }
 
     private void readConfig() {
-        // Spring Boot Duration 语义：裸数字按秒，支持 30m/1h/1d 后缀；默认 1800s = 30 分钟。
-        // ServletContext.getSessionTimeout() 按规范返回分钟，由秒换算存储。
-        this.sessionTimeout = readSessionTimeoutMinutes();
+        int timeout = webContext.getProps().getInt("server.servlet.session.timeout");
+        this.sessionTimeout = timeout > 0 ? timeout : 1800;
         String reqEnc = webContext.getProps().get("server.servlet.encoding.request", "UTF-8");
         if (reqEnc != null) {
             this.requestCharacterEncoding = reqEnc;
@@ -100,44 +99,6 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
         if (respEnc != null) {
             this.responseCharacterEncoding = respEnc;
         }
-    }
-
-    private int readSessionTimeoutMinutes() {
-        return readSessionTimeoutSeconds() / 60;
-    }
-
-    private int readSessionTimeoutSeconds() {
-        String raw = webContext.getProps().get("server.servlet.session.timeout", null);
-        if (raw == null || raw.trim().isEmpty()) {
-            return 1800;
-        }
-        String value = raw.trim();
-        try {
-            return (int) Math.max(0, Long.parseLong(value));
-        } catch (NumberFormatException e) {
-            try {
-                return (int) Math.max(0, parseDurationToSeconds(value));
-            } catch (Exception ex) {
-                log.warn("Invalid server.servlet.session.timeout '{}', falling back to default 1800s", raw);
-                return 1800;
-            }
-        }
-    }
-
-    private static long parseDurationToSeconds(String value) {
-        char last = value.charAt(value.length() - 1);
-        if (Character.isDigit(last)) {
-            return Long.parseLong(value);
-        }
-        long multiplier;
-        switch (Character.toLowerCase(last)) {
-            case 's': multiplier = 1; break;
-            case 'm': multiplier = 60; break;
-            case 'h': multiplier = 3600; break;
-            case 'd': multiplier = 86400; break;
-            default: throw new IllegalArgumentException("Unknown duration unit: " + last);
-        }
-        return Long.parseLong(value.substring(0, value.length() - 1).trim()) * multiplier;
     }
 
     // ===================== Context Path =====================

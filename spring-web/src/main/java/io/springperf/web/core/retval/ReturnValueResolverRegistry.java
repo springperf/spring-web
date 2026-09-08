@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Manages a chain of ReturnValueResolvers that process handler method return values into HTTP responses.
@@ -29,7 +28,7 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
 
     public static final MappingCacheKey<MethodReturnValueContext> MAPPING_CACHE_KEY = MappingCacheKey.createMethodCacheKey(MethodReturnValueContext.class);
 
-    private final List<ReturnValueResolver> resolvers = new CopyOnWriteArrayList<>();
+    private final List<ReturnValueResolver> resolvers = new ArrayList<>();
     private final ConcurrentMap<Class<?>, Boolean> asyncReturnValueCache = new ConcurrentHashMap<>();
     private volatile List<ReturnValueResolver> asyncResolvers;
 

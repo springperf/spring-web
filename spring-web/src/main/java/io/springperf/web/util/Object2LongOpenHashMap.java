@@ -45,21 +45,6 @@ public class Object2LongOpenHashMap {
         this.value = new long[actualCapacity];
     }
 
-    /**
-     * 拷贝构造：克隆底层数组，与源实例完全独立。
-     * <p>供 copy-on-write 发布模式使用（见 {@code ApplicationProperties}）：源表发布后不再
-     * 改写，写入时拷贝一份并在拷贝上修改，再通过 volatile 引用发布新表。clone 保证新表
-     * 的后续 put（含 rehash）不会影响已发布的源表。</p>
-     */
-    public Object2LongOpenHashMap(Object2LongOpenHashMap other) {
-        this.mask = other.mask;
-        this.maxFill = other.maxFill;
-        this.loadFactor = other.loadFactor;
-        this.size = other.size;
-        this.key = other.key.clone();
-        this.value = other.value.clone();
-    }
-
     // ========== 公共方法 ==========
 
     public long put(String k, long v) {

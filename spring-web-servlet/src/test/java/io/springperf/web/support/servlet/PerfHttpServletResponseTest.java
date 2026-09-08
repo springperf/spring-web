@@ -37,9 +37,6 @@ class PerfHttpServletResponseTest {
     }
 
     @Test void setStatus_delegatesStatusCode() { servletResponse.setStatus(404); verify(response).setStatusCode(HttpStatus.valueOf(404)); }
-    @Test void setStatus_nonStandardCode_writesRawValue() { servletResponse.setStatus(599); verify(response).setStatusCode(argThat((org.springframework.http.HttpStatusCode sc) -> sc != null && sc.value() == 599)); }
-    @Test void sendError_nonStandardCode_delegatesRawValue() { servletResponse.sendError(599, "upstream"); verify(response).sendError(argThat((org.springframework.http.HttpStatusCode sc) -> sc != null && sc.value() == 599), eq("upstream")); }
-    @Test void sendError_nonStandardCode_noMessage_delegatesRawValue() { servletResponse.sendError(599); verify(response).sendError(argThat((org.springframework.http.HttpStatusCode sc) -> sc != null && sc.value() == 599), isNull()); }
     @Test void getStatus_returnsStatusValue() { when(response.getStatus()).thenReturn(HttpStatus.CREATED); assertEquals(201, servletResponse.getStatus()); }
     @Test void setHeader_delegatesToHeadersSet() { servletResponse.setHeader("X-Custom", "value"); verify(headers).set("X-Custom", "value"); }
     @Test void addHeader_delegatesToHeadersAdd() { servletResponse.addHeader("X-Custom", "value"); verify(headers).add("X-Custom", "value"); }

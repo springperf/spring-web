@@ -104,19 +104,13 @@ public class NettyHttpHandler extends ChannelInboundHandlerAdapter {
 
             // 3. 用预解析的 path 创建请求，跳过 BaseWebServerHttpRequest 中的 contextPath 校验
             msg.retain();
-            NettyServerHttpRequest req = null;
+            NettyServerHttpRequest req = new NettyServerHttpRequest(webContext, ctxNetty, msg, resolvedPath);
+            resp.setTimeout();
+            // 4. 委托给实际处理逻辑
             try {
-                req = new NettyServerHttpRequest(webContext, ctxNetty, msg, resolvedPath);
-                resp.setTimeout();
-                // 4. 委托给实际处理逻辑
                 handler.httpHandle(req, resp);
             } finally {
-                if (req != null) {
-                    req.release();
-                } else {
-                    // 构造 req / setTimeout 阶段抛异常：释放 retain 的引用，避免 ByteBuf 泄漏
-                    ReferenceCountUtil.release(msg);
-                }
+                req.release();
             }
         } catch (Throwable e) {
             log.error("NH EXCEPTION", e);

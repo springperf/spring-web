@@ -100,14 +100,6 @@ public class ExceptionHandlerExceptionResolver extends WebComponentContainer imp
     protected static final ExceptionHandlerMethodResolver NO_MATCH = new ExceptionHandlerMethodResolver(Object.class);
     private static final Map<Class<?>, ExceptionHandlerMethodResolver> exceptionHandlerCache = new ConcurrentHashMap<>(64);
 
-    /**
-     * 清空静态异常处理解析器缓存（由 {@code WebContext.destroyComponent()} 在上下文销毁时调用，
-     * 防 devtools 等新 ClassLoader 重启场景下旧 ClassLoader 被钉住）。缓存为纯缓存，清空后自动重建。
-     */
-    public static void clearAllCaches() {
-        exceptionHandlerCache.clear();
-    }
-
     @Override
     public boolean resolveException(WebServerHttpRequest request, WebServerHttpResponse response, @Nullable HandlerMethod handler, Throwable ex) {
         ExceptionHandlerAdvice[] cachedAdvices = getCachedExceptionHandlerAdvices(PathMappingContext.get(request));

@@ -35,9 +35,6 @@ public class ResourceRequestHandler implements CustomInvoker {
     }
 
     private final ConcurrentMap<String, Resource> resourceCache = new ConcurrentHashMap<>();
-    /** gzip 探测结果缓存（path → gzip 资源或 NO_GZIP 哨兵），避免每请求对 {@code .gz} 做存在性探测。 */
-    private final ConcurrentMap<String, Resource> gzipResourceCache = new ConcurrentHashMap<>();
-    private static final Resource NO_GZIP = new ClassPathResource("__no_gzip_marker__");
 
     public ResourceRequestHandler(ResourceHandlerRegistration registration) {
         this.registration = registration;
@@ -68,7 +65,7 @@ public class ResourceRequestHandler implements CustomInvoker {
             resource = getResource(indexPath);
         }
 
-        if (resource == null) {
+        if (resource == null || !resource.exists() || !resource.isReadable()) {
             resp.sendError(HttpStatus.NOT_FOUND);
             return;
         }
@@ -157,13 +154,7 @@ public class ResourceRequestHandler implements CustomInvoker {
         }
         try {
             String uri = resource.getURI().toString();
-            // 缓存 gzip 探测结果（含 NO_GZIP 哨兵），避免每请求对 .gz 做存在性检查
-            Resource cached = gzipResourceCache.get(uri);
-            if (cached != null) {
-                return cached == NO_GZIP ? null : cached;
-            }
             Resource gzipResource = resolveResourceByUri(uri + ".gz");
-            gzipResourceCache.put(uri, gzipResource != null ? gzipResource : NO_GZIP);
             if (gzipResource != null && gzipResource.exists() && gzipResource.isReadable()) {
                 return gzipResource;
             }
@@ -241,10 +232,9 @@ public class ResourceRequestHandler implements CustomInvoker {
 
     @Nullable
     protected Resource getResource(String path) {
-        // 缓存命中直接返回：resolveResource 在入缓存前已校验 exists/isReadable，
-        // 命中后再调 cached.exists() 是每请求的磁盘 stat（FileSystemResource → File.exists syscall）。
+        // check cache first
         Resource cached = resourceCache.get(path);
-        if (cached != null) {
+        if (cached != null && cached.exists()) {
             return cached;
         }
 
@@ -307,11 +297,10 @@ public class ResourceRequestHandler implements CustomInvoker {
     }
 
     /**
-     * Clear the internal resource and gzip-probe caches.
+     * Clear the internal resource cache.
      */
     public void clearCache() {
         resourceCache.clear();
-        gzipResourceCache.clear();
     }
 
     public Method getHandleMethod() {

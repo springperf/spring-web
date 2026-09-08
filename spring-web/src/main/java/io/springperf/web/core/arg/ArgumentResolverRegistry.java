@@ -22,7 +22,6 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Manages a set of argument resolvers, similar to Spring's HandlerMethodArgumentResolver.
@@ -32,7 +31,7 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
 
     public static final MappingCacheKey<MethodArgContext[]> MAPPING_CACHE_KEY = MappingCacheKey.createMethodCacheKey(MethodArgContext[].class);
 
-    protected final List<StaticArgumentResolverProvider> staticArgumentResolverProviders = new CopyOnWriteArrayList<>();
+    protected final List<StaticArgumentResolverProvider> staticArgumentResolverProviders = new ArrayList<>();
 
     protected WebDataBinderRegistry webDataBinderRegistry;
 

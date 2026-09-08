@@ -137,11 +137,10 @@ class CompositeWriteRespEventListenerTest {
     }
 
     @Test
-    void setStatusCode_acceptsHttpStatusCode() {
+    void setStatusCode_acceptsHttpStatus() {
         TestResponse response = new TestResponse(mock(WebContext.class));
         response.setStatusCode(HttpStatus.CREATED);
         assertEquals(HttpStatus.CREATED, response.getStatus());
-        // HttpStatus 本身即 HttpStatusCode；传一个非标准码值验证 valueOf 转换分支
         response.setStatusCode(HttpStatus.ACCEPTED);
         assertEquals(HttpStatus.ACCEPTED, response.getStatus());
         response.setStatusCode(null);

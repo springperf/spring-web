@@ -299,7 +299,7 @@ class ReactiveReturnValueResolverFlowTest {
         resolver.resolveReturnValue(responseEntity,
                 param("handler", ResponseEntity.class), request, response);
 
-        verify(response).setStatusCode(org.springframework.http.HttpStatusCode.valueOf(202));
+        verify(response).setStatusCode(org.springframework.http.HttpStatus.ACCEPTED);
         verify(asyncSupportRegistry).startDeferredResultProcessing(any(), any(), any());
     }
 

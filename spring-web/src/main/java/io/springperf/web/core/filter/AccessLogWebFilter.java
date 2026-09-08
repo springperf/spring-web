@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 /**
  * 访问日志 WebFilter，记录每个请求的方法、URI、状态码、处理耗时和客户端地址。
@@ -157,35 +158,55 @@ public class AccessLogWebFilter implements WebFilter {
 
     private static class TokenSegment implements Segment {
         final Token token;
+        final Function<Context, String> resolver;
 
         TokenSegment(Token token) {
             this.token = token;
+            switch (token) {
+                case REMOTE_ADDR:
+                    this.resolver = ctx -> ctx.remoteAddr;
+                    break;
+                case METHOD:
+                    this.resolver = ctx -> ctx.request.getMethodValue();
+                    break;
+                case URI:
+                    this.resolver = ctx -> ctx.request.getUriStrWithQuery();
+                    break;
+                case ELAPSED_MS:
+                    this.resolver = ctx -> String.valueOf(ctx.elapsedMs);
+                    break;
+                case STATUS:
+                    this.resolver = ctx -> String.valueOf(ctx.status);
+                    break;
+                case USER_AGENT:
+                    this.resolver = ctx -> ctx.userAgent != null ? ctx.userAgent : "-";
+                    break;
+                default:
+                    this.resolver = ctx -> "";
+            }
         }
 
         @Override
         public void append(StringBuilder sb, WebServerHttpRequest request, long elapsedMs,
                            int status, String remoteAddr, String userAgent) {
-            // 直接按 token 追加，避免每段每请求创建 Context 对象 + Function.apply 的分配
-            switch (token) {
-                case REMOTE_ADDR:
-                    sb.append(remoteAddr);
-                    break;
-                case METHOD:
-                    sb.append(request.getMethodValue());
-                    break;
-                case URI:
-                    sb.append(request.getUriStrWithQuery());
-                    break;
-                case ELAPSED_MS:
-                    sb.append(elapsedMs);
-                    break;
-                case STATUS:
-                    sb.append(status);
-                    break;
-                case USER_AGENT:
-                    sb.append(userAgent != null ? userAgent : "-");
-                    break;
-            }
+            sb.append(resolver.apply(new Context(request, elapsedMs, status, remoteAddr, userAgent)));
+        }
+    }
+
+    private static class Context {
+        final WebServerHttpRequest request;
+        final long elapsedMs;
+        final int status;
+        final String remoteAddr;
+        final String userAgent;
+
+        Context(WebServerHttpRequest request, long elapsedMs, int status,
+                String remoteAddr, String userAgent) {
+            this.request = request;
+            this.elapsedMs = elapsedMs;
+            this.status = status;
+            this.remoteAddr = remoteAddr;
+            this.userAgent = userAgent;
         }
     }
 }

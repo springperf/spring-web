@@ -12,7 +12,6 @@ import org.springframework.web.method.HandlerMethod;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 
@@ -23,7 +22,7 @@ import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 @Slf4j
 public class ExceptionRegistry extends WebComponentContainer {
 
-    protected final List<HandlerExceptionResolver> resolvers = new CopyOnWriteArrayList<>();
+    protected final List<HandlerExceptionResolver> resolvers = new ArrayList<>();
     protected WebMetrics metrics;
 
     @Override

@@ -31,14 +31,10 @@
             <groupId>org.springframework</groupId>
             <artifactId>spring-messaging</artifactId>
         </dependency>
-        <!-- JSR-356 Servlet WebSocket 瑙勮寖 API锛氭縺娲?@ServerEndpoint 妗ユ帴 -->
+        <!-- JSR-356 Servlet WebSocket 规范 API：激活 @ServerEndpoint 桥接（1.1 同时含 server/client API） -->
         <dependency>
             <groupId>javax.websocket</groupId>
             <artifactId>javax.websocket-api</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>javax.websocket</groupId>
-            <artifactId>javax.websocket-client-api</artifactId>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>

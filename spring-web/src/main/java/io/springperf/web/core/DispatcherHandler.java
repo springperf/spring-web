@@ -319,13 +319,7 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
                 }
             }
         } catch (Throwable e) {
-            exception = e;
-            log.error("Async dispatch exception: {}", e.getMessage(), e);
-            try {
-                exceptionRegistry.handle(e, req, resp);
-            } catch (Throwable handleEx) {
-                log.error("Async exception handler failed", handleEx);
-            }
+            log.error(e.getMessage(), e);
         } finally {
             invokeWithRealResult(req, resp, result, exception);
             Long start = req.getRequestContext().getAttribute(METRICS_START_ATTR);

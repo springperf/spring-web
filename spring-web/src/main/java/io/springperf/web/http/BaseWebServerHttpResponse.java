@@ -6,7 +6,6 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 
 import java.io.ByteArrayOutputStream;
@@ -27,7 +26,7 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
     protected final boolean keepAlive;
     /** Spring headers 视图，由子类构造方法注入（Netty 子类传可写适配器视图，与 Netty 响应对象共享底层存储） */
     protected final HttpHeaders headers;
-    protected HttpStatusCode status = HttpStatus.OK;
+    protected HttpStatus status = HttpStatus.OK;
     protected ByteArrayOutputStream body;
     protected Charset characterEncoding = StandardCharsets.UTF_8;
     protected AtomicBoolean handled = new AtomicBoolean(false);
@@ -50,13 +49,11 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
     }
 
     @Override
-    public void setStatusCode(HttpStatusCode statusCode) {
-        if (statusCode != null) {
-            this.status = statusCode;
-        }
+    public void setStatusCode(HttpStatus status) {
+        if (status != null) this.status = status;
     }
 
-    public HttpStatusCode getStatus() {
+    public HttpStatus getStatus() {
         return status;
     }
 
@@ -214,11 +211,6 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
 
     @SneakyThrows
     public void sendError(HttpStatus statusCode, String message) {
-        sendError((HttpStatusCode) statusCode, message);
-    }
-
-    @SneakyThrows
-    public void sendError(HttpStatusCode statusCode, String message) {
         String error = "{\"error\":\"" + escapeJson(message) + "\"}";
         writeDataAndFlush(error.getBytes(characterEncoding), MediaType.APPLICATION_JSON, statusCode);
     }
@@ -253,15 +245,12 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
     }
 
     @SneakyThrows
-    protected void writeDataAndFlush(byte[] data, MediaType contentType, HttpStatusCode statusCode) {
+    protected void writeDataAndFlush(byte[] data, MediaType contentType, HttpStatus statusCode) {
         if (!setHandled()) {
             log.warn("response has been handled. status:{}", statusCode);
             return;
         }
         try {
-            // 异常路径：清空已缓冲的部分 body（如 JSON 序列化中途失败写入的字节），
-            // 避免错误响应 JSON 追加在部分内容之后形成畸形响应体（对齐 Spring 语义）。
-            resetBuffer();
             setStatusCode(statusCode);
             headers.setContentType(contentType);
             if (data != null) getBody().write(data);

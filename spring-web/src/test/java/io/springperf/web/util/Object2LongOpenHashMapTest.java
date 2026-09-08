@@ -21,25 +21,6 @@ class Object2LongOpenHashMapTest {
     }
 
     @Test
-    void copyConstructor_copiesEntriesIndependently() {
-        Object2LongOpenHashMap original = new Object2LongOpenHashMap();
-        original.put("a", 1L);
-        original.put("b", 2L);
-
-        Object2LongOpenHashMap copy = new Object2LongOpenHashMap(original);
-        assertEquals(1L, copy.get("a"));
-        assertEquals(2L, copy.get("b"));
-        assertEquals(2, copy.size());
-        assertTrue(copy.containsKey("b"));
-
-        // 独立性：修改拷贝不影响源，修改源不影响拷贝
-        copy.put("c", 3L);
-        assertFalse(original.containsKey("c"));
-        original.put("d", 4L);
-        assertFalse(copy.containsKey("d"));
-    }
-
-    @Test
     void putExisting_returnsOldValue() {
         Object2LongOpenHashMap map = new Object2LongOpenHashMap();
         map.put("a", 1L);
