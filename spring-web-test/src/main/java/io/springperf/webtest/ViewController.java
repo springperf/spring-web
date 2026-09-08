@@ -1,4 +1,4 @@
-﻿package io.springperf.webtest;
+package io.springperf.webtest;
 
 import javax.validation.Valid;
 import org.springframework.stereotype.Controller;

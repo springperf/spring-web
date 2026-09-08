@@ -1,4 +1,4 @@
-﻿package io.springperf.web.autoconfigure;
+package io.springperf.web.autoconfigure;
 
 import io.springperf.web.autoconfigure.openapi.OpenApiDocController;
 import io.springperf.web.core.resource.ResourceHandlerRegistration;

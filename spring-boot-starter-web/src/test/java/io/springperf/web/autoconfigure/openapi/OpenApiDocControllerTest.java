@@ -1,4 +1,4 @@
-﻿package io.springperf.web.autoconfigure.openapi;
+package io.springperf.web.autoconfigure.openapi;
 
 import io.springperf.web.autoconfigure.OpenApiProperties;
 import io.swagger.v3.oas.models.OpenAPI;

@@ -1,4 +1,4 @@
-﻿package io.springperf.web.core.resource;
+package io.springperf.web.core.resource;
 
 import io.springperf.web.core.mapping.match.HttpMethodMatcher;
 import io.springperf.web.http.WebServerHttpRequest;

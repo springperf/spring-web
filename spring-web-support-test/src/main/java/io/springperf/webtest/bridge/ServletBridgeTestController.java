@@ -1,4 +1,4 @@
-﻿package io.springperf.webtest.bridge;
+package io.springperf.webtest.bridge;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;

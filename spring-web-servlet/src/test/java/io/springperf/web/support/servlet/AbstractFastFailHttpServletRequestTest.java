@@ -1,4 +1,4 @@
-﻿package io.springperf.web.support.servlet;
+package io.springperf.web.support.servlet;
 
 import org.junit.jupiter.api.Test;
 

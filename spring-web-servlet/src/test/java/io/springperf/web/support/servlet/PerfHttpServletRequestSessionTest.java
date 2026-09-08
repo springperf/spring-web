@@ -1,4 +1,4 @@
-﻿package io.springperf.web.support.servlet;
+package io.springperf.web.support.servlet;
 
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;

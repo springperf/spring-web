@@ -1,4 +1,4 @@
-﻿package io.springperf.webtest.proxy;
+package io.springperf.webtest.proxy;
 
 import okhttp3.*;
 import org.junit.jupiter.api.Test;

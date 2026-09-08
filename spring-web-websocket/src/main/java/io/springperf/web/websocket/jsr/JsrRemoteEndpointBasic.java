@@ -1,4 +1,4 @@
-﻿package io.springperf.web.websocket.jsr;
+package io.springperf.web.websocket.jsr;
 
 import javax.websocket.EncodeException;
 import javax.websocket.Encoder;

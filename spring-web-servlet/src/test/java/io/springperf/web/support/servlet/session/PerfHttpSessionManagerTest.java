@@ -1,4 +1,4 @@
-﻿package io.springperf.web.support.servlet.session;
+package io.springperf.web.support.servlet.session;
 
 import io.springperf.web.context.WebContext;
 import io.springperf.web.support.servlet.Authenticator;

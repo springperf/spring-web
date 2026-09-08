@@ -1,4 +1,4 @@
-﻿package io.springperf.webtest;
+package io.springperf.webtest;
 
 import io.springperf.web.autoconfigure.actuator.server.ManagementNettyHttpServer;
 import lombok.extern.slf4j.Slf4j;

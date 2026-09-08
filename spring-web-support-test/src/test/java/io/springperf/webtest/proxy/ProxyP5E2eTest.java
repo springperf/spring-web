@@ -1,4 +1,4 @@
-﻿package io.springperf.webtest.proxy;
+package io.springperf.webtest.proxy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.*;

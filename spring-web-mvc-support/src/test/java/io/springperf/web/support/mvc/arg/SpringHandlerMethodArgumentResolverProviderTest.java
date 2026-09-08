@@ -1,4 +1,4 @@
-﻿package io.springperf.web.support.mvc.arg;
+package io.springperf.web.support.mvc.arg;
 
 import io.springperf.web.core.arg.StaticArgumentResolver;
 import io.springperf.web.core.mapping.MappingHandlerMethod;

@@ -1,4 +1,4 @@
-﻿package io.springperf.web.autoconfigure.openapi;
+package io.springperf.web.autoconfigure.openapi;
 
 import io.swagger.v3.oas.models.media.Schema;
 import org.junit.jupiter.api.Test;

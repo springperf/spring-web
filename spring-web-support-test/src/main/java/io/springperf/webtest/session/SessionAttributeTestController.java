@@ -1,4 +1,4 @@
-﻿package io.springperf.webtest.session;
+package io.springperf.webtest.session;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;

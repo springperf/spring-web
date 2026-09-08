@@ -1,4 +1,4 @@
-﻿package io.springperf.web.websocket.config;
+package io.springperf.web.websocket.config;
 
 import io.springperf.web.server.PipelineCustomizer;
 import io.springperf.web.websocket.WebSocketConfigurer;

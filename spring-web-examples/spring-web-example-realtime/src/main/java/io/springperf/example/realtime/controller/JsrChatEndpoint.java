@@ -1,4 +1,4 @@
-﻿package io.springperf.example.realtime.controller;
+package io.springperf.example.realtime.controller;
 
 import javax.websocket.OnClose;
 import javax.websocket.OnError;

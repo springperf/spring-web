@@ -1,4 +1,4 @@
-﻿package io.springperf.webtest;
+package io.springperf.webtest;
 
 import com.alibaba.fastjson2.JSON;
 import okhttp3.MediaType;

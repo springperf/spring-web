@@ -1,4 +1,4 @@
-﻿package io.springperf.web.autoconfigure.openapi;
+package io.springperf.web.autoconfigure.openapi;
 
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.mapping.MappingRegistry;

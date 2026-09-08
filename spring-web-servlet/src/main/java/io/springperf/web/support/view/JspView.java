@@ -1,4 +1,4 @@
-﻿package io.springperf.web.support.view;
+package io.springperf.web.support.view;
 
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;

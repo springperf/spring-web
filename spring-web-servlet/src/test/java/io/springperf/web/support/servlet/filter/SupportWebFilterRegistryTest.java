@@ -1,4 +1,4 @@
-﻿package io.springperf.web.support.servlet.filter;
+package io.springperf.web.support.servlet.filter;
 
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.DispatcherHandler;

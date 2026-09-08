@@ -1,4 +1,4 @@
-﻿package io.springperf.web.core.invoker;
+package io.springperf.web.core.invoker;
 
 import io.springperf.web.annotation.Optimize;
 import org.junit.jupiter.api.Test;

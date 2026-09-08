@@ -1,4 +1,4 @@
-﻿package io.springperf.webtest.common;
+package io.springperf.webtest.common;
 
 import io.springperf.web.support.servlet.Authenticator;
 import io.springperf.web.support.servlet.PerfHttpPrincipal;

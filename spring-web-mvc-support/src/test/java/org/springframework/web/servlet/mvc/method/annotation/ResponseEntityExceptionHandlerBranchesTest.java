@@ -1,4 +1,4 @@
-﻿package org.springframework.web.servlet.mvc.method.annotation;
+package org.springframework.web.servlet.mvc.method.annotation;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.TypeMismatchException;

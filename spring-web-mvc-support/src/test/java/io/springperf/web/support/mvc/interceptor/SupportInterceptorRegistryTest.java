@@ -1,4 +1,4 @@
-﻿package io.springperf.web.support.mvc.interceptor;
+package io.springperf.web.support.mvc.interceptor;
 
 import io.springperf.web.core.interceptor.InterceptorRegistration;
 import org.junit.jupiter.api.Test;

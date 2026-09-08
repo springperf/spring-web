@@ -1,4 +1,4 @@
-﻿package io.springperf.web.websocket.config;
+package io.springperf.web.websocket.config;
 
 import io.springperf.web.websocket.jsr.JsrEndpointWebSocketConfigurer;
 import io.springperf.web.websocket.jsr.JsrEndpointWebSocketConfigurer;

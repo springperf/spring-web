@@ -1,4 +1,4 @@
-﻿package io.springperf.webtest;
+package io.springperf.webtest;
 
 import com.alibaba.fastjson2.JSON;
 import io.springperf.web.autoconfigure.actuator.server.ManagementNettyHttpServer;

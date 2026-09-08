@@ -1,4 +1,4 @@
-﻿package io.springperf.web.websocket;
+package io.springperf.web.websocket;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.web.socket.WebSocketHandler;

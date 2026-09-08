@@ -1,4 +1,4 @@
-﻿package io.springperf.webtest.jsp;
+package io.springperf.webtest.jsp;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;

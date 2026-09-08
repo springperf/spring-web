@@ -1,4 +1,4 @@
-﻿package io.springperf.web.http;
+package io.springperf.web.http;
 
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaders;

@@ -1,4 +1,4 @@
-﻿package io.springperf.webtest;
+package io.springperf.webtest;
 
 import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.TestInstance;

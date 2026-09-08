@@ -1,4 +1,4 @@
-﻿package io.springperf.webtest;
+package io.springperf.webtest;
 
 import io.springperf.web.server.NettyHttpServer;
 import okhttp3.OkHttpClient;

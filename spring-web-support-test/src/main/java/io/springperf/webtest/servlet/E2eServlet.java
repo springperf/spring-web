@@ -1,4 +1,4 @@
-﻿package io.springperf.webtest.servlet;
+package io.springperf.webtest.servlet;
 
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;

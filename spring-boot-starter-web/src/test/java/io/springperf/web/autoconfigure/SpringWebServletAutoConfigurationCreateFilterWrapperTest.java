@@ -1,4 +1,4 @@
-﻿package io.springperf.web.autoconfigure;
+package io.springperf.web.autoconfigure;
 
 import io.springperf.web.core.filter.WebFilter;
 import io.springperf.web.core.filter.WebFilterRegistration;
