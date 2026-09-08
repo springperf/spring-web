@@ -17,7 +17,8 @@ import org.springframework.context.annotation.Configuration;
  * {@code ViewResolverRegistry} 自动吸收，并在 Phase 1 注册 Jasper JSP 路由。</p>
  */
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnClass(name = {"org.apache.jasper.servlet.JspServlet", "io.springperf.web.view.View"})
+@ConditionalOnClass(name = {"org.apache.jasper.servlet.JspServlet", "io.springperf.web.view.View",
+        "io.springperf.web.support.view.JspViewResolver"})
 public class JspViewAutoConfiguration {
 
     @Bean @ConditionalOnMissingBean

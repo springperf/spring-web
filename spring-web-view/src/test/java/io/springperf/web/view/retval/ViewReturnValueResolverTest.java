@@ -93,11 +93,28 @@ class ViewReturnValueResolverTest {
     }
 
     @Test
-    void supportsReturnValue_redirectAlwaysTrue() {
-        // redirect: 前缀判断不依赖容器装配，直接实例化即可
+    void supportsReturnValue_redirectRequiresViewMethod() throws Exception {
+        // redirect: 前缀仅对"视图方法"生效（与 plain view 一致）：@ResponseBody 方法返回
+        // "redirect:/x" 字符串应作为 JSON 输出，不能被劫持成 302
         ViewReturnValueResolver resolver = new ViewReturnValueResolver();
-        assertTrue(resolver.supportsReturnValue("redirect:/home", null, null),
-                "redirect: 前缀视图名无需 MappingContext 即受支持");
+        WebServerHttpRequest req = mock(WebServerHttpRequest.class);
+        RequestContext ctx = mock(RequestContext.class);
+        when(req.getRequestContext()).thenReturn(ctx);
+        Map<RequestAttribute<?>, Object> attrs = new HashMap<>();
+        when(ctx.getAttribute(any(RequestAttribute.class))).thenAnswer(inv -> attrs.get(inv.getArgument(0)));
+        doAnswer(inv -> {
+            attrs.put(inv.getArgument(0), inv.getArgument(1));
+            return null;
+        }).when(ctx).setAttribute(any(RequestAttribute.class), any());
+
+        // 无匹配 MappingContext（非视图方法）→ 不支持
+        assertFalse(resolver.supportsReturnValue("redirect:/home", req, null));
+
+        // 视图方法（VIEW_NAME_KEY=TRUE）→ 支持
+        PathMappingContext mapping = mock(PathMappingContext.class);
+        when(mapping.get(viewNameKey())).thenReturn(Boolean.TRUE);
+        MappingResult.set(req, MappingResult.matched(mapping));
+        assertTrue(resolver.supportsReturnValue("redirect:/home", req, null));
     }
 
     @Test
@@ -183,13 +200,15 @@ class ViewReturnValueResolverTest {
     }
 
     @Test
-    void resolveReturnValue_noView_resolvesNothing() throws Exception {
+    void resolveReturnValue_noView_throwsIllegalArgument() throws Exception {
+        // 视图名无法解析：必须 fail（500），而非静默返回 200 + 空白 body
         ViewReturnValueResolver resolver = buildResolver();
         WebServerHttpRequest req = mock(WebServerHttpRequest.class);
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
         when(viewResolverRegistry.resolve(eq("missing"), eq(req))).thenReturn(null);
 
-        resolver.resolveReturnValue("missing", null, req, resp);
+        assertThrows(IllegalArgumentException.class,
+                () -> resolver.resolveReturnValue("missing", null, req, resp));
 
         verify(resp, org.mockito.Mockito.never()).setHandled();
         verify(resp, org.mockito.Mockito.never()).setStatusCode(any());

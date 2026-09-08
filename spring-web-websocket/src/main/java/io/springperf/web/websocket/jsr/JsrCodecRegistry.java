@@ -19,7 +19,7 @@ import java.util.Map;
  * 姝ゆ敞鍐岃〃鍦ㄨ繛鎺ュ缓绔嬫椂瀹炰緥鍖栥€佸垵濮嬪寲锛屼細璇濆叧闂椂閿€姣併€?/p>
  *
  * @author huangcanda
- * @since 3.2.5
+ * @since 3.5.6
  */
 public class JsrCodecRegistry {
 
@@ -142,9 +142,12 @@ public class JsrCodecRegistry {
         if (found != null) {
             return (Decoder.Text) found;
         }
+        // JSR-356 语义：选中"解码类型 T 可赋值给 @OnMessage 参数类型 P"的 decoder，
+        // 即 targetType.isAssignableFrom(decodedType)（多态场景，如 @OnMessage(IFoo) + Decoder.Text<Foo>）。
+        // 反向判断（decodedType.isAssignableFrom(targetType)）会拒选合法 decoder / 误选泛型超类型。
         for (Object entryObj : map.entrySet()) {
             Map.Entry entry = (Map.Entry) entryObj;
-            if (((Class<?>) entry.getKey()).isAssignableFrom(targetType)) {
+            if (targetType.isAssignableFrom((Class<?>) entry.getKey())) {
                 return (Decoder.Text) entry.getValue();
             }
         }
@@ -159,7 +162,7 @@ public class JsrCodecRegistry {
         }
         for (Object entryObj : map.entrySet()) {
             Map.Entry entry = (Map.Entry) entryObj;
-            if (((Class<?>) entry.getKey()).isAssignableFrom(targetType)) {
+            if (targetType.isAssignableFrom((Class<?>) entry.getKey())) {
                 return (Decoder.Binary) entry.getValue();
             }
         }

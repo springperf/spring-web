@@ -104,11 +104,14 @@ public class ViewReturnValueResolver extends BaseWebComponent implements ReturnV
             return false;
         }
         String viewName = (String) returnValue;
-        if (viewName.startsWith("redirect:")) {
-            return true;
-        }
         PathMappingContext ctx = PathMappingContext.get(req);
-        return ctx != null && Boolean.TRUE.equals(ctx.get(VIEW_NAME_KEY));
+        boolean viewMethod = ctx != null && Boolean.TRUE.equals(ctx.get(VIEW_NAME_KEY));
+        // redirect: 同样要求视图方法标记：@RestController/@ResponseBody 方法返回 "redirect:/x"
+        // 字符串时应作为 JSON 文本输出，而非被劫持成 302（Spring MVC 行为）
+        if (viewName.startsWith("redirect:")) {
+            return viewMethod;
+        }
+        return viewMethod;
     }
 
     @Override
@@ -117,7 +120,11 @@ public class ViewReturnValueResolver extends BaseWebComponent implements ReturnV
         String viewName = (String) returnValue;
         View view = resolveView(viewName, req, resp);
         if (view == null) {
-            return;
+            // 视图名无法解析：抛异常交 ExceptionRegistry → 500（含错误上下文），
+            // 而非静默返回 200 + 空白 body
+            throw new IllegalArgumentException(
+                    "Unable to resolve view name '" + viewName
+                            + "' with any registered ViewResolver (thymeleaf/freemarker/beetl/jsp)");
         }
         String contentType = view.getContentType();
         if (contentType != null) {

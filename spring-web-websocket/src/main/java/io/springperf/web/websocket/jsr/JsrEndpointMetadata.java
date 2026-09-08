@@ -32,7 +32,7 @@ import java.util.List;
  * 璇锋眰璺緞涓婇浂鍙嶅皠銆侀浂娉ㄨВ鏌ユ壘锛堥伒寰鏋舵€ц兘鍘熷垯锛夈€?/p>
  *
  * @author huangcanda
- * @since 3.2.5
+ * @since 3.5.6
  */
 public class JsrEndpointMetadata {
 
@@ -280,7 +280,9 @@ public class JsrEndpointMetadata {
     public Class<? extends Decoder> findDecoder(Class<?> messageType, boolean isText) {
         for (Class<? extends Decoder> decoderClass : decoders) {
             Class<?> decodedType = resolveDecoderType(decoderClass, isText);
-            if (decodedType != null && decodedType.isAssignableFrom(messageType)) {
+            // JSR-356：解码类型 T 必须可赋值给消息参数类型 P（P.isAssignableFrom(T)），
+            // 解码产物才能反射注入 @OnMessage 参数
+            if (decodedType != null && messageType.isAssignableFrom(decodedType)) {
                 return decoderClass;
             }
         }

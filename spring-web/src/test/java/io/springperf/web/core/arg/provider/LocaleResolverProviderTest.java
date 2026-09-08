@@ -102,19 +102,20 @@ class LocaleResolverProviderTest {
     @Test
     void resolveArgument_optionalLocale_wrapsInOptional() throws Exception {
         java.util.Optional<Locale> opt = java.util.Optional.of(Locale.FRENCH);
-        @SuppressWarnings("unused")
-        class Holder {
-            void m(java.util.Optional<Locale> o) {
-            }
-        }
-        java.lang.reflect.Method m = Holder.class.getDeclaredMethods()[0];
-        MethodParameter optionalParam = new MethodParameter(m, 0);
+        // 使用本测试类的 public 方法作为 Optional 参数载体（与 AbstractSupportOptionalResolverTest
+        // 一致的稳定模式：MethodParameter 泛型可完全解析，isOptional 判断可靠）
+        MethodParameter optionalParam =
+                new MethodParameter(getClass().getMethod("optionalLocaleParam", java.util.Optional.class), 0);
         StaticArgumentResolver resolver = provider.getResolver(optionalParam, mappingContext, null);
         when(request.getLocale()).thenReturn(Locale.FRENCH);
 
         Object resolved = resolver.resolveArgument(request, response);
 
         assertEquals(opt, resolved);
+    }
+
+    @SuppressWarnings("unused")
+    public void optionalLocaleParam(java.util.Optional<Locale> locale) {
     }
 
     @Test

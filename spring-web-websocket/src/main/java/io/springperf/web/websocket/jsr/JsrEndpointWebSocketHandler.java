@@ -35,7 +35,7 @@ import java.util.Map;
  * {@link WebSocketSession#getAttributes()} 涓紝閬垮厤璺ㄨ繛鎺ヤ覆鎵般€?/p>
  *
  * @author huangcanda
- * @since 3.2.5
+ * @since 3.5.6
  */
 @Slf4j
 public class JsrEndpointWebSocketHandler implements WebSocketHandler {
@@ -69,7 +69,16 @@ public class JsrEndpointWebSocketHandler implements WebSocketHandler {
         Method onOpen = metadata.getOnOpen();
         if (onOpen != null) {
             Object[] args = resolveArgs(metadata.getOnOpenParams(), jsrSession, config, null, null, null);
-            invoke(endpoint, onOpen, args);
+            try {
+                invoke(endpoint, onOpen, args);
+            } catch (Exception ex) {
+                // @OnOpen 抛异常 → 外层握手处理器会 close(SERVER_ERROR)，而 open=false 后
+                // channelInactive 被跳过，afterConnectionClosed 永不回调 → 必须在此兜底：
+                // 回收会话状态并销毁 Decoder/Encoder（避免连接失败导致 codec/endpoint 实例泄漏）
+                springSession.getAttributes().remove(STATE_KEY);
+                codecRegistry.destroy();
+                throw ex;
+            }
         }
     }
 
@@ -110,14 +119,23 @@ public class JsrEndpointWebSocketHandler implements WebSocketHandler {
         if (state == null) {
             return;
         }
-        Method onClose = metadata.getOnClose();
-        if (onClose != null) {
-            CloseReason reason = new CloseReason(
-                    CloseReason.CloseCodes.getCloseCode(status.getCode()), status.getReason());
-            Object[] args = resolveArgs(metadata.getOnCloseParams(), state.jsrSession, config, null, reason, null);
-            invoke(state.endpoint, onClose, args);
+        try {
+            Method onClose = metadata.getOnClose();
+            if (onClose != null) {
+                // RFC 6455 允许 4000-4999 应用码，CloseCodes 枚举不含时 getCloseCode 返回 null，
+                // 构造 CloseReason 后 @OnClose 调 getCode() 会 NPE——回退到规范通用码
+                CloseReason.CloseCode closeCode = CloseReason.CloseCodes.getCloseCode(status.getCode());
+                if (closeCode == null) {
+                    closeCode = CloseReason.CloseCodes.NO_STATUS_CODE;
+                }
+                CloseReason reason = new CloseReason(closeCode, status.getReason());
+                Object[] args = resolveArgs(metadata.getOnCloseParams(), state.jsrSession, config, null, reason, null);
+                invoke(state.endpoint, onClose, args);
+            }
+        } finally {
+            // @OnClose 自身异常也不能跳过 Decoder/Encoder 销毁（避免 codec 实例泄漏）
+            state.codecRegistry.destroy();
         }
-        state.codecRegistry.destroy();
     }
 
     @Override
