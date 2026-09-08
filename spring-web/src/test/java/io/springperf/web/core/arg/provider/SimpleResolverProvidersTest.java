@@ -129,6 +129,7 @@ class SimpleResolverProvidersTest {
 
     @Test
     void localeResolver_returnsLocale() throws Exception {
+        // 线程已绑定 Locale 时（如拦截器 setLocale），解析应尊重线程值
         LocaleContextHolder.setLocale(Locale.UK);
         try {
             LocaleResolverProvider p = new LocaleResolverProvider();
