@@ -56,10 +56,10 @@ public class BizPoolRegistry extends BaseWebComponent {
 
     @Override
     public void initComponentPhase3() throws Exception {
-        // 自动发现 Spring 容器中 ThreadPoolExecutor Bean，注册到池
+        // 自动发现 Spring 容器中 ExecutorService Bean，注册到池
         ApplicationContext ctx = webContext.getCtx();
-        Map<String, ThreadPoolExecutor> executorBeans = ctx.getBeansOfType(ThreadPoolExecutor.class);
-        for (Map.Entry<String, ThreadPoolExecutor> entry : executorBeans.entrySet()) {
+        Map<String, ExecutorService> executorBeans = ctx.getBeansOfType(ExecutorService.class);
+        for (Map.Entry<String, ExecutorService> entry : executorBeans.entrySet()) {
             String beanName = entry.getKey();
             // 不覆盖已注册的同名池（如配置创建的 "default" 池优先）
             if (!pools.containsKey(beanName)) {
@@ -71,7 +71,7 @@ public class BizPoolRegistry extends BaseWebComponent {
         if (webContext.getProps().getBoolean(PropertiesConstant.CHECK_ON_STARTUP, true)
                 && pools.isEmpty()) {
             log.warn("No thread pools registered — consider configuring pool.* properties "
-                    + "or declaring ThreadPoolExecutor beans");
+                    + "or declaring ExecutorService beans");
         }
     }
 

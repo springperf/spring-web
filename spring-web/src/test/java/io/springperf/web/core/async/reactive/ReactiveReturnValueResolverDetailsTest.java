@@ -35,6 +35,17 @@ import static org.mockito.Mockito.*;
  */
 class ReactiveReturnValueResolverDetailsTest {
 
+    static {
+        // Spring 6（master/SB3.5）的 ReactiveAdapterRegistry 默认注册 org.reactivestreams.Publisher；
+        // Spring 5.3（SB2.7）默认不注册。此处对齐 master 行为，仅对测试的 shared registry 补充注册。
+        org.springframework.core.ReactiveAdapterRegistry.getSharedInstance().registerReactiveType(
+                org.springframework.core.ReactiveTypeDescriptor.multiValue(
+                        org.reactivestreams.Publisher.class,
+                        () -> new io.springperf.web.core.async.reactive.ReactiveReturnValueResolverDetailsTest.NoopPublisher()),
+                source -> (org.reactivestreams.Publisher<?>) source,
+                publisher -> publisher);
+    }
+
     private ReactiveReturnValueResolver resolver;
     private WebServerHttpRequest request;
     private RequestContext requestContext;
@@ -226,5 +237,13 @@ class ReactiveReturnValueResolverDetailsTest {
         when(request.getHeaders()).thenReturn(headers);
         assertEquals(Collections.singletonList(MediaType.APPLICATION_JSON),
                 resolver.getSupportMediaTypeList(request));
+    }
+
+    /** 注册 org.reactivestreams.Publisher adapter 时用的空 Publisher。 */
+    static final class NoopPublisher implements org.reactivestreams.Publisher<Object> {
+        @Override
+        public void subscribe(org.reactivestreams.Subscriber<? super Object> subscriber) {
+            subscriber.onComplete();
+        }
     }
 }
