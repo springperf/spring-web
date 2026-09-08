@@ -60,15 +60,9 @@ public class FilterWrapper implements WebFilter, LifecycleWebComponent {
      * </ol>
      */
     protected Map<String, String> resolveInitParams() {
-<<<<<<< HEAD
         javax.servlet.annotation.WebFilter webFilter =
                 AnnotatedElementUtils.findMergedAnnotation(filter.getClass(),
                         javax.servlet.annotation.WebFilter.class);
-=======
-        jakarta.servlet.annotation.WebFilter webFilter =
-                AnnotatedElementUtils.findMergedAnnotation(filter.getClass(),
-                        jakarta.servlet.annotation.WebFilter.class);
->>>>>>> d6f746e (feat: view rendering module with model injection)
         if (webFilter == null) {
             return Collections.emptyMap();
         }

@@ -110,7 +110,7 @@ public String user(@PathVariable Long id, Model model) {
 
 ### 3. ModelAndView
 
-返回 `org.springframework.web.servlet.ModelAndView`（`spring-web-support` 提供，无 servlet 依赖）：
+返回 `org.springframework.web.servlet.ModelAndView`（`spring-web-mvc-support` 提供，无 servlet 依赖）：
 
 ```java
 @GetMapping("/mav")
@@ -209,7 +209,7 @@ public String save(@ModelAttribute UserForm form) {
 
 ## 六、JSP 视图（可选）
 
-除模板引擎外，`spring-web-support` 还通过集成 **Apache Jasper** 提供 JSP 渲染（依赖 `org.apache.tomcat.embed:tomcat-embed-jasper`，optional）。与模板引擎不同，JSP 是"编译成 servlet"的容器技术，必须走 servlet 桥接层，见 [support 桥接内部文档](internals/12-support-bridge.md#512-jsp-视图apache-jasper)。
+除模板引擎外，`spring-web-servlet` 还通过集成 **Apache Jasper** 提供 JSP 渲染（依赖 `org.apache.tomcat.embed:tomcat-embed-jasper`，optional）。与模板引擎不同，JSP 是"编译成 servlet"的容器技术，必须走 servlet 桥接层，见 [support 桥接内部文档](internals/12-support-bridge.md#512-jsp-视图apache-jasper)。
 
 ### 1. 依赖
 

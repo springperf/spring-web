@@ -11,7 +11,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * <p>
  * 每个容器使用各自的 SseEmitter 实现：
  * - Tomcat / Undertow: Spring MVC 内置的 SseEmitter
- * - perf-support: spring-web-support 提供的 SseEmitter（继承 StreamEmitter）
+ * - perf-support: spring-web-mvc-support 提供的 SseEmitter（继承 StreamEmitter）
  * <p>
  * 数据通过 TaskExecutor 在后台线程生成，由 SseEmitter 异步推送到客户端。
  */

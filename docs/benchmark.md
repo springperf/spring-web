@@ -54,7 +54,7 @@ perf 在 7 个接口 × 3 个并发度（4/8/16 线程）对比中，**全部接
 | Profile | 端口 | 说明 |
 |---------|------|------|
 | perf | 9092 | WebPerf 原生 Netty + 5 WebFilter + 3 Interceptor |
-| perf-support | 9094 | perf + spring-web-support (Servlet 桥接) + 5 Filter + 3 Interceptor |
+| perf-support | 9094 | perf + spring-web-servlet (Servlet 桥接) + 5 Filter + 3 Interceptor |
 | tomcat | 9102 | Spring MVC + Tomcat + 5 Filter + 3 Interceptor |
 | undertow | 9112 | Spring MVC + Undertow + 5 Filter + 3 Interceptor |
 | webflux | 9122 | Spring WebFlux + Reactor Netty + 8 WebFilter |
@@ -346,7 +346,7 @@ JDK 17+、Maven 3.6+，项目已执行 `mvn install -DskipTests` 完成整体构
 | Profile | 端口 | Benchmark 类 | 说明 |
 |---------|------|-------------|------|
 | `perf` | 9092 | PerfBenchmark | WebPerf 原生 Netty + 5 WebFilter + 3 Interceptor |
-| `perf-support` | 9094 | PerfSupportBenchmark | perf + spring-web-support (Servlet 桥接) + 5 Filter + 3 Interceptor |
+| `perf-support` | 9094 | PerfSupportBenchmark | perf + spring-web-servlet (Servlet 桥接) + 5 Filter + 3 Interceptor |
 | `tomcat` | 9102 | TomcatBenchmark | Spring MVC + Tomcat + 5 Filter + 3 Interceptor |
 | `undertow` | 9112 | UndertowBenchmark | Spring MVC + Undertow + 5 Filter + 3 Interceptor |
 | `webflux` | 9122 | WebFluxBenchmark | Spring WebFlux + Reactor Netty + 8 WebFilter |

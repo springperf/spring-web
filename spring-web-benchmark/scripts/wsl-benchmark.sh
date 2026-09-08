@@ -51,7 +51,7 @@ bench_class_of() {
 }
 BENCH_CLASS="$(bench_class_of "$PROFILE")"
 
-# classpath 按 profile 隔离：各 profile 依赖不同（perf 无 spring-web-support、perf-support
+# classpath 按 profile 隔离：各 profile 依赖不同（perf 无 spring-web-servlet/mvc-support、perf-support
 # 引入、tomcat 用官方 starter、undertow 排除 tomcat），共享 cp.txt 会在切换 profile 后
 # 复用首个 profile 的 classpath → 依赖缺失/版本错误。
 # 修复：按规范化 profile 名独立缓存；且 pom.xml 比缓存新时自动重新生成（依赖变更不陈旧）。
@@ -61,7 +61,7 @@ CP_FILE="$BENCH/target/cp-$PROFILE_KEY.txt"
 if [ ! -f "$CP_FILE" ] || [ "$BENCH/pom.xml" -nt "$CP_FILE" ]; then
     # profile 必须用完整名（benchmark-$PROFILE_KEY）：用户传简写 perf 时，mvn -P perf
     # 匹配不到 pom 的 benchmark-perf profile，Maven 会【静默忽略未知 profile】（退出码仍 0）
-    # 并以默认 classpath 生成 cp 文件 → JMH fork 缺 profile 依赖（如 spring-web-support）
+    # 并以默认 classpath 生成 cp 文件 → JMH fork 缺 profile 依赖（如 spring-web-servlet）
     # 报 NoClassDefFoundError。CP_FILE 已按 PROFILE_KEY 命名，此处 mvn 参数统一补全前缀。
     echo "==> 生成 classpath（profile=benchmark-$PROFILE_KEY）"
     (cd "$BENCH" && mvn -q -P"benchmark-$PROFILE_KEY" dependency:build-classpath \

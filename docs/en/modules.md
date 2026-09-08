@@ -6,7 +6,8 @@
 spring-web-parent (aggregate POM)
 ├── spring-web                  Core framework
 ├── spring-web-view             View rendering (Thymeleaf/FreeMarker, optional)
-├── spring-web-support          Optional Servlet bridge layer
+├── spring-web-servlet          Servlet API bridge layer
+├── spring-web-mvc-support     SpringMVC bridge layer
 ├── spring-web-batch            Batch request processing (optional)
 ├── spring-web-websocket        WebSocket support (optional)
 ├── spring-boot-starter-web     Spring Boot auto-configuration
@@ -188,7 +189,7 @@ destroyComponent()     → Resource release
 
 ---
 
-## spring-web-support (Servlet Bridge Layer)
+## spring-web-servlet and spring-web-mvc-support (Compatibility Bridge Layer)
 
 Add this module when integration with the Servlet API ecosystem is needed.
 
@@ -213,10 +214,12 @@ Add dependency:
 ```xml
 <dependency>
     <groupId>io.github.springperf</groupId>
-    <artifactId>spring-web-support</artifactId>
+    <artifactId>spring-web-mvc-support</artifactId>
     <version>${spring-web.version}</version>
 </dependency>
 ```
+
+`spring-web-mvc-support` depends on `spring-web-servlet`; for pure Servlet compatibility, just add `spring-web-servlet`.
 
 ---
 
@@ -281,7 +284,7 @@ Server-side rendering (SSR) module built on Thymeleaf / FreeMarker template engi
 
 ### Support Auto-Configuration
 
-`SpringWebSupportAutoConfiguration` auto-assembles support module components when `spring-web-support` is on the classpath.
+`SpringWebServletAutoConfiguration` and `SpringWebMvcSupportAutoConfiguration` auto-assemble the respective module components when `spring-web-servlet` and `spring-web-mvc-support` are on the classpath.
 
 ### View Auto-Configuration
 

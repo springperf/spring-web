@@ -16,7 +16,7 @@ import org.springframework.context.annotation.Configuration;
  *
  * <p>Spring Data Common 2.7.x auto-detects the presence of {@code WebMvcConfigurer}
  * via {@code @ConditionalOnClass}, which matches the framework's shim interface in
- * spring-web-support. This triggers {@code @EnableSpringDataWebSupport} which imports
+ * spring-web-mvc-support. This triggers {@code @EnableSpringDataWebSupport} which imports
  * {@code ProjectingArgumentResolverRegistrar}, whose inner {@code BeanPostProcessor}
  * references {@code RequestMappingHandlerAdapter.class} in its bytecode.
  *

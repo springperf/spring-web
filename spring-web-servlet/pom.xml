@@ -6,11 +6,11 @@
         <artifactId>spring-web-parent</artifactId>
         <version>2.7.5</version>
     </parent>
-    <artifactId>spring-web-support</artifactId>
+    <artifactId>spring-web-servlet</artifactId>
     <packaging>jar</packaging>
 
-    <name>perf-spring-web-support</name>
-    <description>Spring Perf Web 支持模块，提供 Servlet 兼容层等扩展功能</description>
+    <name>perf-spring-web-servlet</name>
+    <description>Spring Perf Web Servlet 兼容模块，提供 Servlet API 桥接层（Filter/Servlet/HttpSession/JSP），零 SpringMVC 依赖</description>
     <url>https://github.com/springperf/spring-web</url>
 
     <properties>

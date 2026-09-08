@@ -213,7 +213,12 @@
                 </dependency>
                 <dependency>
                     <groupId>io.github.springperf</groupId>
-                    <artifactId>spring-web-support</artifactId>
+                    <artifactId>spring-web-servlet</artifactId>
+                    <scope>compile</scope>
+                </dependency>
+                <dependency>
+                    <groupId>io.github.springperf</groupId>
+                    <artifactId>spring-web-mvc-support</artifactId>
                     <scope>compile</scope>
                 </dependency>
                 <dependency>

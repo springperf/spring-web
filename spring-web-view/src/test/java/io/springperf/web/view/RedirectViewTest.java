@@ -1,4 +1,4 @@
-package io.springperf.web.view;
+﻿package io.springperf.web.view;
 
 import io.springperf.web.context.WebContext;
 import io.springperf.web.http.WebServerHttpRequest;
@@ -57,7 +57,7 @@ class RedirectViewTest {
 
     @Test
     void render_emptyContextPath_noDoubleSlash() throws Exception {
-        // WebContext 默认 contextPath 经 formatPath("/") 归一化为 ""，此处验证空 contextPath 不产生 // 前缀
+        // WebContext 榛樿 contextPath 缁?formatPath("/") 褰掍竴鍖栦负 ""锛屾澶勯獙璇佺┖ contextPath 涓嶄骇鐢?// 鍓嶇紑
         RedirectView view = new RedirectView("/home");
         WebServerHttpResponse resp = mockResp();
         view.render(null, mockReq(""), resp);
@@ -99,7 +99,7 @@ class RedirectViewTest {
         view.render(model, mockReq(""), resp);
         String location = resp.getHeaders().getFirst(HttpHeaders.LOCATION);
         assertTrue(location.startsWith("/search?"));
-        assertTrue(location.contains("q=hello+world"), "q 应 URL 编码，实际: " + location);
+        assertTrue(location.contains("q=hello+world"), "q 搴?URL 缂栫爜锛屽疄闄? " + location);
         assertTrue(location.contains("page=2"));
         assertTrue(location.contains("flag=true"));
     }
@@ -122,7 +122,7 @@ class RedirectViewTest {
         WebServerHttpResponse resp = mockResp();
         Map<String, Object> model = new LinkedHashMap<>();
         model.put("obj", new Object());
-        model.put("list", java.util.List.of(1, 2));
+        model.put("list", Arrays.asList(1, 2));
         view.render(model, mockReq(""), resp);
         assertFalse(resp.getHeaders().getFirst(HttpHeaders.LOCATION).contains("obj="));
         assertFalse(resp.getHeaders().getFirst(HttpHeaders.LOCATION).contains("list="));
@@ -136,8 +136,8 @@ class RedirectViewTest {
         model.put("k e y", "v&a=b/c");
         view.render(model, mockReq(""), resp);
         String location = resp.getHeaders().getFirst(HttpHeaders.LOCATION);
-        assertFalse(location.contains(" "), "空格不应出现在 Location，实际: " + location);
-        assertFalse(location.contains("&a"), "值内 & 应被编码，实际: " + location);
+        assertFalse(location.contains(" "), "绌烘牸涓嶅簲鍑虹幇鍦?Location锛屽疄闄? " + location);
+        assertFalse(location.contains("&a"), "鍊煎唴 & 搴旇缂栫爜锛屽疄闄? " + location);
     }
 
     @Test

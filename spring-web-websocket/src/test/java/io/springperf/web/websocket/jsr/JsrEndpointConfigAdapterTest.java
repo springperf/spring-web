@@ -4,6 +4,7 @@ import javax.websocket.server.ServerEndpoint;
 import javax.websocket.server.ServerEndpointConfig;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -33,7 +34,7 @@ class JsrEndpointConfigAdapterTest {
         JsrEndpointConfigAdapter adapter = new JsrEndpointConfigAdapter(metadata);
         assertEquals(BasicEndpoint.class, adapter.getEndpointClass());
         assertEquals("/ws", adapter.getPath());
-        assertEquals(List.of("chat", "superchat"), adapter.getSubprotocols());
+        assertEquals(Arrays.asList("chat", "superchat"), adapter.getSubprotocols());
         assertTrue(adapter.getExtensions().isEmpty());
     }
 

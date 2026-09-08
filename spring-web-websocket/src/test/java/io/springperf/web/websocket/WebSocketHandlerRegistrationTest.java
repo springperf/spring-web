@@ -1,9 +1,10 @@
-package io.springperf.web.websocket;
+﻿package io.springperf.web.websocket;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -24,7 +25,7 @@ class WebSocketHandlerRegistrationTest {
         WebSocketHandlerRegistration reg = new WebSocketHandlerRegistration(handler, "/ws");
         WebSocketHandlerRegistration result = reg.setAllowedOrigins("http://a.com", "http://b.com");
         assertSame(reg, result);
-        assertEquals(List.of("http://a.com", "http://b.com"), reg.getAllowedOrigins());
+        assertEquals(Arrays.asList("http://a.com", "http://b.com"), reg.getAllowedOrigins());
     }
 
     @Test

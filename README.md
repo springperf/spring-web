@@ -183,17 +183,18 @@ This project manages two branches aligned with Spring Boot major versions. Minim
 |--------|-------------|
 | `spring-web` | Core: Netty server, request dispatch, mapping registration, exception handling |
 | `spring-web-view` | View rendering: Thymeleaf / FreeMarker template engines (optional) ¹ |
-| `spring-web-support` | Spring MVC compatibility: `HandlerInterceptor`, `View` adapters, etc. ² |
+| `spring-web-servlet` | Servlet bridge: `Filter`, `Servlet`, `HttpSession`, JSP — zero Spring MVC dependency |
+| `spring-web-mvc-support` | Spring MVC compatibility: `HandlerInterceptor`, `View` adapters, etc. ² |
 | `spring-web-websocket` | WebSocket support: Spring WebSocket + Netty |
 | `spring-web-batch` | Batch processing: high-performance message aggregation via Disruptor |
 | `spring-boot-starter-web` | Spring Boot Starter: auto-configuration, Actuator support |
 | `spring-web-test` | Integration tests |
-| `spring-web-support-test` | Spring MVC compatibility tests |
+| `spring-web-support-test` | Bridge-layer compatibility tests |
 | `spring-web-examples` | Usage examples for various scenarios |
 
 > ¹ View rendering usage and Spring MVC differences: [View Rendering](docs/view.md).
 >
-> ² Some classes in the support module use `org.springframework.web.servlet` package paths (e.g., `HandlerInterceptor`), intentionally matching Spring WebMVC's official package paths — code written against Spring MVC interfaces can run without import changes. However, this means the support module and `spring-webmvc` **cannot coexist** — having both on the classpath will cause class conflicts at runtime. Under Java 9+ module system this also triggers split package errors. Choose one or the other.
+> ² Some classes in the `spring-web-mvc-support` module use `org.springframework.web.servlet` package paths (e.g., `HandlerInterceptor`), intentionally matching Spring WebMVC's official package paths — code written against Spring MVC interfaces can run without import changes. However, this means the module and `spring-webmvc` **cannot coexist** — having both on the classpath will cause class conflicts at runtime. Under Java 9+ module system this also triggers split package errors. Choose one or the other. Users who only need Servlet compatibility should depend on `spring-web-servlet` only, which keeps `org.springframework.web.servlet.*` classes off the classpath.
 >
 > Further reading: [Modules](docs/en/modules.md) · [Extension Points](docs/en/extensions.md) · [Advanced Topics](docs/en/advanced.md)
 

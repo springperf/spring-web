@@ -43,7 +43,7 @@ The most striking finding: **perf's advantage keeps growing as concurrency incre
 | Profile | Port | Description |
 |---------|------|-------------|
 | perf | 9092 | WebPerf native Netty + 5 WebFilter + 3 Interceptor |
-| perf-support | 9094 | perf + spring-web-support (Servlet bridge) + 5 Filter + 3 Interceptor |
+| perf-support | 9094 | perf + spring-web-servlet (Servlet bridge) + 5 Filter + 3 Interceptor |
 | tomcat | 9102 | Spring MVC + Tomcat + 5 Filter + 3 Interceptor |
 | undertow | 9112 | Spring MVC + Undertow + 5 Filter + 3 Interceptor |
 | webflux | 9122 | Spring WebFlux + Reactor Netty + 8 WebFilter |

@@ -11,13 +11,8 @@ import io.springperf.web.support.arg.provider.ServletResponseProvider;
 import io.springperf.web.support.arg.provider.SessionAttributeArgumentResolverProvider;
 import io.springperf.web.support.arg.provider.SessionStatusArgumentResolverProvider;
 import io.springperf.web.support.arg.provider.WebRequestArgumentResolverProvider;
-import io.springperf.web.support.async.stream.ResponseBodyEmitterReturnValueResolver;
-import io.springperf.web.support.codec.interceptor.SupportHttpBodyCodecInterceptorRegistry;
 import io.springperf.web.support.context.SessionScopeBeanFactoryPostProcessor;
 import io.springperf.web.support.model.SessionAttributesInterceptor;
-import io.springperf.web.support.mvc.config.WebMvcConfigurerBridge;
-import io.springperf.web.support.mvc.interceptor.SupportInterceptorRegistry;
-import io.springperf.web.support.mvc.retval.ModelAndViewReturnValueResolver;
 import io.springperf.web.support.servlet.SupportServletRegistry;
 import io.springperf.web.support.servlet.context.PerfServletContext;
 import io.springperf.web.support.servlet.filter.FilterWrapper;
@@ -40,25 +35,22 @@ import org.springframework.util.StringUtils;
 
 import java.lang.reflect.Method;
 
+/**
+ * Servlet 桥接层自动装配。仅在 classpath 存在 {@code spring-web-servlet} 时激活。
+ *
+ * <p>装配 {@link SupportDispatcherHandler}、Servlet/请求/会话参数 Provider、
+ * Servlet Filter 桥接（{@link SupportWebFilterRegistry} + {@link FilterWrapper}）、
+ * Servlet 注册表、{@code session} 作用域等。不包含任何 SpringMVC（{@code org.springframework.web.servlet}）组件。</p>
+ */
 @Slf4j
 @Configuration
 @ConditionalOnClass(name = "io.springperf.web.support.servlet.context.ServletAdapterContext")
-public class SpringWebSupportAutoConfiguration implements ApplicationContextAware {
+public class SpringWebServletAutoConfiguration implements ApplicationContextAware {
 
     private ApplicationContext applicationContext;
 
     @Bean @ConditionalOnMissingBean
     public SupportDispatcherHandler supportDispatcherHandler() { return new SupportDispatcherHandler(); }
-
-    @Bean @ConditionalOnMissingBean
-    public SupportInterceptorRegistry supportInterceptorRegistry() { return new SupportInterceptorRegistry(); }
-
-    @Bean @ConditionalOnMissingBean
-    public SupportHttpBodyCodecInterceptorRegistry supportHttpBodyCodecInterceptorRegistry() { return new SupportHttpBodyCodecInterceptorRegistry(); }
-
-    @Bean @ConditionalOnMissingBean
-    @ConditionalOnClass(name = "io.springperf.web.view.View")
-    public ModelAndViewReturnValueResolver modelAndViewReturnValueResolver() { return new ModelAndViewReturnValueResolver(); }
 
     @Bean @ConditionalOnMissingBean
     public HttpServletRequestProvider httpServletRequestProvider() { return new HttpServletRequestProvider(); }
@@ -147,19 +139,9 @@ public class SpringWebSupportAutoConfiguration implements ApplicationContextAwar
         return null;
     }
 
-    @Bean @ConditionalOnMissingBean
-    public ResponseBodyEmitterReturnValueResolver responseBodyEmitterReturnValueResolver() { return new ResponseBodyEmitterReturnValueResolver(); }
-
-    @Bean @ConditionalOnMissingBean
-    public WebMvcConfigurerBridge webMvcConfigurerBridge(WebContext webContext) {
-        WebMvcConfigurerBridge bridge = new WebMvcConfigurerBridge();
-        webContext.registerWebComponent(bridge);
-        return bridge;
-    }
-
     /**
      * ServletContext 是 Servlet 桥接层的基础设施，作为独立组件注册（必然存在），
-     * 不依赖 session 管理器创建。JSP/FilterWrapper/SupportServletRegistry 等直接引用。
+     * 不依赖 session 管理器创建。JSP/FilterWrapper/SupportServletRegistry 等直接引用它。
      */
     @Bean @ConditionalOnMissingBean
     public PerfServletContext perfServletContext(WebContext webContext) {

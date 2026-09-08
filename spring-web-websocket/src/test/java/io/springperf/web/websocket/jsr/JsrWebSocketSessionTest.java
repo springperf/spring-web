@@ -155,7 +155,7 @@ class JsrWebSocketSessionTest {
         Map<String, java.util.List<String>> params = session.getRequestParameterMap();
         assertEquals(2, params.size());
         assertEquals(Collections.singletonList("abc"), params.get("token"));
-        assertEquals(java.util.List.of("1", "2"), params.get("x"));
+        assertEquals(Arrays.asList("1", "2"), params.get("x"));
     }
 
     @Test

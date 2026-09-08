@@ -18,21 +18,21 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-class SpringWebSupportAutoConfigurationCreateFilterWrapperTest {
+class SpringWebServletAutoConfigurationCreateFilterWrapperTest {
 
-    private SpringWebSupportAutoConfiguration config;
+    private SpringWebServletAutoConfiguration config;
     private ApplicationContext applicationContext;
 
     @BeforeEach
     void setUp() {
-        config = new SpringWebSupportAutoConfiguration();
+        config = new SpringWebServletAutoConfiguration();
         applicationContext = mock(ApplicationContext.class);
         config.setApplicationContext(applicationContext);
     }
 
     private WebFilterRegistration invokeCreateFilterWrapper(AbstractFilterRegistrationBean<?> reg) {
         try {
-            Method m = SpringWebSupportAutoConfiguration.class
+            Method m = SpringWebServletAutoConfiguration.class
                     .getDeclaredMethod("createFilterWrapper", AbstractFilterRegistrationBean.class);
             m.setAccessible(true);
             return (WebFilterRegistration) m.invoke(config, reg);

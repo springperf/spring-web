@@ -24,7 +24,8 @@
 io.springperf.web.autoconfigure.SpringWebAutoConfiguration
 io.springperf.web.autoconfigure.WebServerInitializedEventAutoConfiguration
 io.springperf.web.autoconfigure.Boot4WebServerInitializedEventAutoConfiguration
-io.springperf.web.autoconfigure.SpringWebSupportAutoConfiguration
+io.springperf.web.autoconfigure.SpringWebServletAutoConfiguration
+io.springperf.web.autoconfigure.SpringWebMvcSupportAutoConfiguration
 io.springperf.web.autoconfigure.ActuatorEndpointAutoConfiguration
 io.springperf.web.autoconfigure.SpringDataWebCompatibilityAutoConfiguration
 io.springperf.web.autoconfigure.SpringBootAdminClientAutoConfiguration
@@ -47,7 +48,7 @@ io.springperf.web.autoconfigure.support.WebServerApplicationContextFactory
 | 1 | `SpringWebAutoConfiguration` | `DispatcherHandler` 在类路径 | 核心装配：WebContext、NettyHttpServer、Validator、AccessLog、Micrometer 指标、Spring MVC 冲突检测 |
 | 2 | `WebServerInitializedEventAutoConfiguration` | SB3 事件类存在 | SB3 专属：Netty 启动后发射 `WebServerInitializedEvent` |
 | 3 | `Boot4WebServerInitializedEventAutoConfiguration` | SB4 事件类存在 | SB4 专属：运行时 ASM 生成事件子类并发射 |
-| 4 | `SpringWebSupportAutoConfiguration` | `ServletAdapterContext` 在类路径 | Support 桥接层：DispatcherHandler、InterceptorRegistry、FilterWrapper、WebMvcConfigurerBridge、Session 管理 |
+| 4 | `SpringWebServletAutoConfiguration` / `SpringWebMvcSupportAutoConfiguration` | Servlet：`ServletAdapterContext` 在类路径；MVC：`org.springframework.web.servlet.HandlerInterceptor` 在类路径 | Support 桥接层：DispatcherHandler、InterceptorRegistry、FilterWrapper、WebMvcConfigurerBridge、Session 管理 |
 | 5 | `ActuatorEndpointAutoConfiguration` | `ExposableWebEndpoint` 在类路径 | Actuator 端点：扫描、注册、管理端口 |
 | 6 | `SpringDataWebCompatibilityAutoConfiguration` | `ProjectingArgumentResolverRegistrar` 存在，`RequestMappingHandlerAdapter` 不存在 | Spring Data 兼容：移除冲突的 BPP |
 | 7 | `SpringBootAdminClientAutoConfiguration` | SBA `ApplicationFactory` 在类路径 | SBA 客户端：框架感知的 `ApplicationFactory` |
@@ -182,11 +183,11 @@ private static void assertNoSpringMvcConflict() {
 
 ---
 
-## 三、Support 桥接自动配置：`SpringWebSupportAutoConfiguration`
+## 三、Support 桥接自动配置：`SpringWebServletAutoConfiguration` / `SpringWebMvcSupportAutoConfiguration`
 
 ### 3.1 条件与入口
 
-`SpringWebSupportAutoConfiguration` 使用 `@ConditionalOnClass(name = "io.springperf.web.support.servlet.context.ServletAdapterContext")`，仅在 `spring-web-support` 在类路径时生效。它实现了 `ApplicationContextAware`，在初始化时持有 Spring `ApplicationContext` 引用，用于 `FilterWrapper` 中的 `DelegatingFilterProxy` 解析。
+`SpringWebServletAutoConfiguration` 使用 `@ConditionalOnClass(name = "io.springperf.web.support.servlet.context.ServletAdapterContext")`，仅在 `spring-web-servlet` 在类路径时生效，实现了 `ApplicationContextAware`；`SpringWebMvcSupportAutoConfiguration` 使用 `@ConditionalOnClass(name = "org.springframework.web.servlet.HandlerInterceptor")`，仅在 `spring-web-mvc-support` 在类路径时生效。`SpringWebServletAutoConfiguration` 在初始化时持有 Spring `ApplicationContext` 引用，用于 `FilterWrapper` 中的 `DelegatingFilterProxy` 解析。
 
 ### 3.2 Bean 定义
 
@@ -210,7 +211,7 @@ private static void assertNoSpringMvcConflict() {
 `supportWebFilterRegistry`创建 `SupportWebFilterRegistry`，并注册 `AbstractFilterRegistrationBean` 的工厂方法 `createFilterWrapper`：
 
 ```java
-// SpringWebSupportAutoConfiguration.java
+// SpringWebServletAutoConfiguration.java
 protected WebFilterRegistration createFilterWrapper(AbstractFilterRegistrationBean<?> filterRegistrationBean) {
     jakarta.servlet.Filter filter;
     try {
@@ -374,7 +375,7 @@ public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
 
 `SpringDataWebCompatibilityAutoConfiguration`解决 Spring Data Common 的 `ProjectingArgumentResolverRegistrar` 与框架的冲突。
 
-问题根因：Spring Data 2.7.x 通过 `@ConditionalOnClass(WebMvcConfigurer.class)` 检测 Web 环境，框架的 `spring-web-support` 提供了 `WebMvcConfigurer` 同名 shim 接口，导致 `@EnableSpringDataWebSupport` 被触发，其内部 `BeanPostProcessor` 引用了 `RequestMappingHandlerAdapter.class`（Spring MVC 类），而框架不包含该类，导致 `NoClassDefFoundError`。
+问题根因：Spring Data 2.7.x 通过 `@ConditionalOnClass(WebMvcConfigurer.class)` 检测 Web 环境，框架的 `spring-web-mvc-support` 提供了 `WebMvcConfigurer` 同名 shim 接口，导致 `@EnableSpringDataWebSupport` 被触发，其内部 `BeanPostProcessor` 引用了 `RequestMappingHandlerAdapter.class`（Spring MVC 类），而框架不包含该类，导致 `NoClassDefFoundError`。
 
 解决方案：`BeanDefinitionRegistryPostProcessor` 在 bean 定义阶段（实例化前）移除冲突的 `BeanPostProcessor`：
 
@@ -449,7 +450,7 @@ public PerfApplicationFactory perfApplicationFactory(
 | GraalVM 支持 | `RuntimeHintsRegistrar` 条件注册 | `RuntimeHintsRegistrar` + AOT 构建期 |
 | 冲突检测 | `BeanFactoryPostProcessor` 早期检测 `DispatcherServlet` | 无（Tomcat 是默认） |
 
-**核心差异**：Spring Boot MVC 的自动配置围绕 `DispatcherServlet` 和 Servlet 容器（Tomcat/Undertow/Jetty）展开，30+ 个配置类覆盖了数据源、事务、安全、验证等企业级功能。本框架的 starter 只有 10 个配置类，聚焦于**让 Netty 框架在 Spring Boot 容器中"开箱即用"**，以及**与 Spring 生态主要组件（Actuator、SBA、OpenAPI、Spring Data）的桥接**。框架的模块化设计（`spring-web` / `spring-web-support` / `spring-web-batch`）通过条件注解自然映射到自动配置的开关——用户只需要引入对应模块的依赖，相关配置自动激活。
+**核心差异**：Spring Boot MVC 的自动配置围绕 `DispatcherServlet` 和 Servlet 容器（Tomcat/Undertow/Jetty）展开，30+ 个配置类覆盖了数据源、事务、安全、验证等企业级功能。本框架的 starter 只有 10 个配置类，聚焦于**让 Netty 框架在 Spring Boot 容器中"开箱即用"**，以及**与 Spring 生态主要组件（Actuator、SBA、OpenAPI、Spring Data）的桥接**。框架的模块化设计（`spring-web` / `spring-web-servlet` / `spring-web-mvc-support` / `spring-web-batch`）通过条件注解自然映射到自动配置的开关——用户只需要引入对应模块的依赖，相关配置自动激活。
 
 ---
 
@@ -457,7 +458,7 @@ public PerfApplicationFactory perfApplicationFactory(
 
 回到引子的问题：40+ 个核心组件如何被 Spring Boot 自动装配？
 
-1. **10 个 `AutoConfiguration` 类分工明确** → 核心（`SpringWebAutoConfiguration`）、桥接（`SpringWebSupportAutoConfiguration`）、Actuator（`ActuatorEndpointAutoConfiguration`）、生态集成（OpenAPI/SBA/Spring Data/Batch），各司其职，条件注解自然隔离。
+1. **10 个 `AutoConfiguration` 类分工明确** → 核心（`SpringWebAutoConfiguration`）、桥接（`SpringWebServletAutoConfiguration` 与 `SpringWebMvcSupportAutoConfiguration`）、Actuator（`ActuatorEndpointAutoConfiguration`）、生态集成（OpenAPI/SBA/Spring Data/Batch），各司其职，条件注解自然隔离。
 2. **`WebContext` 驱动生命周期** → `NettyHttpServer.start()`（`SmartLifecycle` 最后启动）触发 `WebContext.startLifecycle()` 三阶段，`afterPropertiesSet()` 是 no-op。
 3. **`ActuatorEndpointHandlerMapping` 通过 `WebComponent` 生命周期注册路由** → Phase 1 扫描 Actuator 端点，Phase 2 触发路由优化器，与管理端口基础设施无缝集成。
 4. **SB3/SB4 事件适配** → 字符串条件守卫互斥加载，SB3 走 JDK 动态代理包装 `WebServerApplicationContext`，SB4 走 ASM 运行时生成事件子类，`RuntimeHintsRegistrar` 条件注册 GraalVM 提示。

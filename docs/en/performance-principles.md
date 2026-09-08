@@ -368,7 +368,7 @@ When two descriptions are separated by `→` in the same cell, the left side is 
 
 | Dimension | WebPerf | MVC+Tomcat | WebFlux |
 |-----------|-----------|------------|---------|
-| Servlet API | **Bridge compatible** (`spring-web-support` module) | Native | Not supported |
+| Servlet API | **Bridge compatible** (`spring-web-servlet` module) | Native | Not supported |
 | Actuator | **Native support** + standalone management port | Native | Native |
 | `@RequestMapping` | **Fully compatible** | Native | Native |
 | `javax.validation` | Supported | Supported | Supported |

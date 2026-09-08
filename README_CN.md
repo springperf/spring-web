@@ -183,17 +183,18 @@ perf 框架吞吐是 Servlet 容器的 **1.6\~12.6x**，p50 延迟 **0.10\~0.11m
 |------|------|
 | `spring-web` | 核心模块：Netty 服务器、请求分发、映射注册、异常处理等 |
 | `spring-web-view` | 视图渲染模块：Thymeleaf / FreeMarker 模板引擎（可选）¹ |
-| `spring-web-support` | Spring MVC 兼容模块：提供 `HandlerInterceptor`、`View` 等适配类 ² |
+| `spring-web-servlet` | Servlet 桥接模块：`Filter`、`Servlet`、`HttpSession`、JSP，零 SpringMVC 依赖 |
+| `spring-web-mvc-support` | Spring MVC 兼容模块：提供 `HandlerInterceptor`、`View` 等适配类 ² |
 | `spring-web-websocket` | WebSocket 支持模块：基于 Spring WebSocket + Netty |
 | `spring-web-batch` | 批处理模块：基于 Disruptor 的高性能消息聚合与批量处理 |
 | `spring-boot-starter-web` | Spring Boot Starter：自动配置、Actuator 支持 |
 | `spring-web-test` | 集成测试模块 |
-| `spring-web-support-test` | Spring MVC 兼容测试模块 |
+| `spring-web-support-test` | 桥接层兼容测试模块 |
 | `spring-web-examples` | 各场景使用示例 |
 
 > ¹ 视图渲染用法见 [视图渲染文档](docs/view.md)，与 Spring MVC 的差异见该文档第五节。
 >
-> ² support 模块中部分类使用了 `org.springframework.web.servlet` 包路径（如 `HandlerInterceptor`），与 Spring WebMVC 官方包路径相同。这是有意为之——基于 Spring MVC 接口编写的代码可不改 import 直接运行。但这也意味着本模块与 `spring-webmvc` **二者不能同时存在**，否则运行时会产生类冲突。Java 9+ 模块化系统下也会触发 split package 错误，请务必二选一。
+> ² `spring-web-mvc-support` 模块中部分类使用了 `org.springframework.web.servlet` 包路径（如 `HandlerInterceptor`），与 Spring WebMVC 官方包路径相同。这是有意为之——基于 Spring MVC 接口编写的代码可不改 import 直接运行。但这也意味着本模块与 `spring-webmvc` **二者不能同时存在**，否则运行时会产生类冲突。Java 9+ 模块化系统下也会触发 split package 错误，请务必二选一。仅需 Servlet 兼容的用户只依赖 `spring-web-servlet` 即可，classpath 上不会出现任何 `org.springframework.web.servlet.*` 类。
 >
 > 更多说明：[模块详解](docs/modules.md) · [扩展点指南](docs/extensions.md) · [高级主题](docs/advanced.md)
 
