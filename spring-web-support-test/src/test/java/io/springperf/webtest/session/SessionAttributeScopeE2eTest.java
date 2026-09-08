@@ -93,7 +93,7 @@ public class SessionAttributeScopeE2eTest extends BaseE2ETest {
 
         Response respA = counterResponse(clientA);
         Response respB = counterResponse(clientB);
-        try (respA; respB) {
+        try {
             String bodyA = respA.body().string();
             String bodyB = respB.body().string();
             assertEquals(200, respA.code());
@@ -101,6 +101,9 @@ public class SessionAttributeScopeE2eTest extends BaseE2ETest {
             assertEquals(1, parseCount(bodyA));
             assertEquals(1, parseCount(bodyB));
             assertNotEquals(parseSessionId(bodyA), parseSessionId(bodyB));
+        } finally {
+            respA.close();
+            respB.close();
         }
     }
 
