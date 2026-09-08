@@ -20,19 +20,19 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * JSR-356 {@code @ServerEndpoint} 娉ㄨВ绔偣涓庢鏋?{@link WebSocketHandler} 涔嬮棿鐨勯€傞厤鍣ㄣ€?
+ * JSR-356 {@code @ServerEndpoint} 注解端点与框架 {@link WebSocketHandler} 之间的适配器。
  *
- * <p>鐢熷懡鍛ㄦ湡缈昏瘧锛?/p>
+ * <p>生命周期翻译：</p>
  * <ul>
- *   <li>{@link #afterConnectionEstablished} 鈫?瀹炰緥鍖栫鐐?+ 璋冪敤 {@code @OnOpen}</li>
- *   <li>{@link #handleMessage} 鈫?Decoder 瑙ｇ爜 + 鍙傛暟娉ㄥ叆 + 璋冪敤 {@code @OnMessage}</li>
- *   <li>{@link #afterConnectionClosed} 鈫?璋冪敤 {@code @OnClose}</li>
- *   <li>{@link #handleTransportError} 鈫?璋冪敤 {@code @OnError}</li>
+ *   <li>{@link #afterConnectionEstablished} → 实例化端点 + 调用 {@code @OnOpen}</li>
+ *   <li>{@link #handleMessage} → Decoder 解码 + 参数注入 + 调用 {@code @OnMessage}</li>
+ *   <li>{@link #afterConnectionClosed} → 调用 {@code @OnClose}</li>
+ *   <li>{@link #handleTransportError} → 调用 {@code @OnError}</li>
  * </ul>
  *
- * <p>鐢变簬 {@link WebSocketHandler} 琚繛鎺ラ棿鍏变韩锛坽@code @Sharable}锛夛紝
- * 姣忔杩炴帴鐨勭姸鎬侊紙绔偣瀹炰緥銆丣SR Session銆佺紪瑙ｇ爜鍣級瀛樻斁鍦?
- * {@link WebSocketSession#getAttributes()} 涓紝閬垮厤璺ㄨ繛鎺ヤ覆鎵般€?/p>
+ * <p>由于 {@link WebSocketHandler} 被连接间共享（{@code @Sharable}），
+ * 每次连接的状态（端点实例、JSR Session、编解码器）存放在
+ * {@link WebSocketSession#getAttributes()} 中，避免跨连接串扰。</p>
  *
  * @author huangcanda
  * @since 3.5.6
@@ -143,7 +143,7 @@ public class JsrEndpointWebSocketHandler implements WebSocketHandler {
         return false;
     }
 
-    // ===================== 鍐呴儴瀹炵幇 =====================
+    // ===================== 内部实现 =====================
 
     private Object instantiateEndpoint() {
         try {
@@ -152,7 +152,7 @@ public class JsrEndpointWebSocketHandler implements WebSocketHandler {
                 return instance;
             }
         } catch (InstantiationException ex) {
-            // 鍥為€€鍒伴粯璁ゅ疄渚嬪寲
+            // 回退到默认实例化
         }
         try {
             return metadata.getEndpointClass().getDeclaredConstructor().newInstance();
@@ -164,8 +164,8 @@ public class JsrEndpointWebSocketHandler implements WebSocketHandler {
     }
 
     /**
-     * 浠庤姹?URI 涓庣鐐规ā鏉胯矾寰勬彁鍙栬矾寰勫彉閲忥紙{roomId} 鈫?123锛夈€?
-     * <p>涓嶄緷璧?Spring Session attributes锛堝叾涓彲鑳芥贩鍏ュ叾浠栧睘鎬э級锛屼繚璇佽涔夌函鍑€銆?/p>
+     * 从请求 URI 与端点模板路径提取路径变量（{roomId} → 123）。
+     * <p>不依赖 Spring Session attributes（其中可能混入其他属性），保证语义纯净。</p>
      */
     private Map<String, String> resolvePathParameters(WebSocketSession springSession) {
         RouteMatcher routeMatcher = io.springperf.web.util.PathPatternUtils.getPatternRouteMatcher();
@@ -243,8 +243,8 @@ public class JsrEndpointWebSocketHandler implements WebSocketHandler {
     }
 
     /**
-     * 灏?{@code @OnMessage} 杩斿洖鍊煎彂閫佸洖瀹㈡埛绔紙JSR-356 璇箟锛夈€?
-     * <p>String 鈫?鏂囨湰甯э紱byte[]/ByteBuffer 鈫?浜岃繘鍒跺抚锛涘叾浠栫被鍨嬬粡 {@link Encoder} 缂栫爜銆?/p>
+     * 将 {@code @OnMessage} 返回值发送回客户端（JSR-356 语义）。
+     * <p>String → 文本帧；byte[]/ByteBuffer → 二进制帧；其他类型经 {@link Encoder} 编码。</p>
      */
     private void sendReturnValue(WebSocketSession springSession, Object returnValue,
                                  JsrCodecRegistry codecRegistry) throws Exception {
@@ -279,7 +279,7 @@ public class JsrEndpointWebSocketHandler implements WebSocketHandler {
             Object[] args = resolveArgs(metadata.getOnErrorParams(), state.jsrSession, config, null, null, error);
             invoke(state.endpoint, onError, args);
         } catch (Exception ex) {
-            // @OnError 鑷韩寮傚父涓嶅啀涓婃姏锛堥伩鍏嶇粡 handleTransportError 閫掑綊锛夛紝璁板綍鏃ュ織
+            // @OnError 自身异常不再上抛（避免经 handleTransportError 递归），记录日志
             log.error("Error in @OnError handler of {}", metadata.getEndpointClass().getName(), ex);
         }
     }
@@ -289,7 +289,7 @@ public class JsrEndpointWebSocketHandler implements WebSocketHandler {
         return (JsrConnectionState) springSession.getAttributes().get(STATE_KEY);
     }
 
-    /** 鍗曡繛鎺ョ姸鎬併€?*/
+    /** 单连接状态。 */
     private static final class JsrConnectionState {
         final Object endpoint;
         final JsrWebSocketSession jsrSession;

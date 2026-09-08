@@ -13,10 +13,10 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * 楠岃瘉 {@code @RequestMapping} 鐨?headers/params/consumes/produces 鏉′欢涓?
- * 浣跨敤 {@code ${...}} 鍗犱綅绗﹁兘姝ｇ‘瑙ｆ瀽銆?
+ * 验证 {@code @RequestMapping} 的 headers/params/consumes/produces 条件中
+ * 使用 {@code ${...}} 占位符能正确解析。
  * <p>
- * 浣跨敤鐙珛绔彛 9094锛屼笌鍏变韩鐨?proxy 涓婁笅鏂囬殧绂汇€?
+ * 使用独立端口 9094，与共享的 proxy 上下文隔离。
  */
 @SpringBootTest(
         classes = ProxyE2eApp.class,
@@ -53,7 +53,7 @@ public class PlaceholderCondE2eTest {
         return url("/api");
     }
 
-    // ==================== headers 鍗犱綅绗?====================
+    // ==================== headers 占位符 ====================
 
     @Test
     void headerPlaceholder_withMatchingHeader_returns200() throws Exception {
@@ -80,7 +80,7 @@ public class PlaceholderCondE2eTest {
         }
     }
 
-    // ==================== params 鍗犱綅绗?====================
+    // ==================== params 占位符 ====================
 
     @Test
     void paramPlaceholder_withMatchingParam_returns200() throws Exception {
@@ -106,7 +106,7 @@ public class PlaceholderCondE2eTest {
         }
     }
 
-    // ==================== consumes 鍗犱綅绗?====================
+    // ==================== consumes 占位符 ====================
 
     @Test
     void consumesPlaceholder_withJsonContentType_returns200() throws Exception {
@@ -132,7 +132,7 @@ public class PlaceholderCondE2eTest {
         }
     }
 
-    // ==================== produces 鍗犱綅绗?====================
+    // ==================== produces 占位符 ====================
 
     @Test
     void producesPlaceholder_withJsonAccept_returns200() throws Exception {

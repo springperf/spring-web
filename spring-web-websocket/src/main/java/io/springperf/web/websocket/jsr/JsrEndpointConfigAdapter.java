@@ -14,12 +14,12 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 浠?{@link JsrEndpointMetadata} 鏋勯€犵殑 {@link ServerEndpointConfig} 瀹炵幇銆?
+ * 从 {@link JsrEndpointMetadata} 构造的 {@link ServerEndpointConfig} 实现。
  *
- * <p>鍏冩暟鎹湪鍚姩鏃惰В鏋愬畬鎴愶紝姝ら€傞厤鍣ㄤ粎鍋氬€兼嫹璐濓紝璇锋眰璺緞涓婃棤鍙嶅皠銆?/p>
+ * <p>元数据在启动时解析完成，此适配器仅做值拷贝，请求路径上无反射。</p>
  *
  * @author huangcanda
- * @since 3.2.5
+ * @since 3.5.6
  */
 public class JsrEndpointConfigAdapter implements ServerEndpointConfig {
 
@@ -46,8 +46,8 @@ public class JsrEndpointConfigAdapter implements ServerEndpointConfig {
     private static Configurator newConfigurator(JsrEndpointMetadata metadata) {
         Class<? extends Configurator> configuratorClass = metadata.getConfiguratorClass();
         if (configuratorClass == null || configuratorClass == Configurator.class) {
-            // 榛樿 Configurator锛氱洿鎺ユ瀯閫犵鐐瑰疄渚嬶紝閬垮厤渚濊禆瀹瑰櫒骞冲彴 Configurator
-            // 锛坖akarta.websocket 榛樿 getEndpointInstance 濮旀墭 ServerContainer 骞冲彴瀹炵幇锛夈€?
+            // 默认 Configurator：直接构造端点实例，避免依赖容器平台 Configurator
+            // （javax.websocket 默认 getEndpointInstance 委托 ServerContainer 平台实现）。
             return new Configurator() {
                 @Override
                 public <T> T getEndpointInstance(Class<T> endpointClass) throws InstantiationException {

@@ -11,10 +11,10 @@ import java.time.Duration;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * P2 E2E 娴嬭瘯锛氬熀纭€璁炬柦杈圭晫鏉′欢銆?
+ * P2 E2E 测试：基础设施边界条件。
  * <p>
- * 浣跨敤鐙珛 Spring 涓婁笅鏂囷紙闅忔満绔彛锛夛紝
- * 娴嬭瘯 max-content-length 瓒呴檺鎷掔粷绛夊満鏅€?
+ * 使用独立 Spring 上下文（随机端口），
+ * 测试 max-content-length 超限拒绝等场景。
  */
 @SpringBootTest(
         classes = ProxyE2eApp.class,
@@ -47,7 +47,7 @@ public class LimitsE2eTest {
 
     @Test
     void postLargeBody_exceedsMaxContentLength_returns413() throws Exception {
-        // 鏋勯€犺秴杩?max-content-length 鐨勮姹備綋锛?00 瀛楄妭 > 100 闄愬埗锛?
+        // 构造超过 max-content-length 的请求体（200 字节 > 100 限制）
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < 200; i++) {
             sb.append('x');

@@ -1,7 +1,6 @@
 package io.springperf.web.websocket.config;
 
 import io.springperf.web.websocket.jsr.JsrEndpointWebSocketConfigurer;
-import io.springperf.web.websocket.jsr.JsrEndpointWebSocketConfigurer;
 import javax.websocket.ClientEndpointConfig;
 import javax.websocket.server.ServerEndpoint;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -11,14 +10,14 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.WebSocketHandler;
 
 /**
- * JSR-356锛圫ervlet 瑙勮寖 WebSocket锛寋@code @ServerEndpoint} 娉ㄨВ锛夋ˉ鎺ヨ嚜鍔ㄩ厤缃€?
+ * JSR-356（Servlet 规范 WebSocket，{@code @ServerEndpoint} 注解）桥接自动配置。
  *
- * <p>褰?classpath 鍚屾椂瀛樺湪 {@link ServerEndpoint}锛坖akarta.websocket-api锛変笌
- * 妗嗘灦 WebSocket 鏀寔锛坽@link WebSocketHandler}锛夋椂婵€娲伙細</p>
+ * <p>当 classpath 同时存在 {@link ServerEndpoint}（javax.websocket-api）与
+ * 框架 WebSocket 支持（{@link WebSocketHandler}）时激活：</p>
  * <ol>
- *   <li>鍒涘缓 {@link JsrEndpointWebSocketConfigurer}锛堝疄鐜?{@code WebSocketConfigurer} SPI锛?/li>
- *   <li>鐢辩幇鏈?{@link WebSocketAutoConfiguration} 鏀堕泦锛屾壂鎻?{@code @ServerEndpoint} 绔偣</li>
- *   <li>灏嗙鐐圭炕璇戜负 {@code WebSocketHandler} 娉ㄥ唽杩?{@code WebSocketHandlerRegistry}锛屽鐢?Netty 绠＄嚎</li>
+ *   <li>创建 {@link JsrEndpointWebSocketConfigurer}（实现 {@code WebSocketConfigurer} SPI）</li>
+ *   <li>由现有 {@link WebSocketAutoConfiguration} 收集，扫描 {@code @ServerEndpoint} 端点</li>
+ *   <li>将端点翻译为 {@code WebSocketHandler} 注册进 {@code WebSocketHandlerRegistry}，复用 Netty 管线</li>
  * </ol>
  *
  * @author huangcanda

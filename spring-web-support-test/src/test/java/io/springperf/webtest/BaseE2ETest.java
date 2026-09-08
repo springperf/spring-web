@@ -3,20 +3,20 @@ package io.springperf.webtest;
 import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.web.server.LocalServerPort;
+import org.springframework.boot.test.web.server.LocalServerPort;
 
 import java.time.Duration;
 
 /**
- * 鍏变韩 Spring 涓婁笅鏂囷紙RANDOM_PORT锛夌殑 E2E 娴嬭瘯鍩虹被銆?
- * <p>浣跨敤 {@code RANDOM_PORT} + {@link LocalServerPort} 娉ㄥ叆瀹為檯绔彛锛?
- * 閬垮厤鍥哄畾绔彛锛圖EFINED_PORT锛夊湪绔彛琚崰鐢?骞惰鎵ц鏃剁殑鍋囧け璐ャ€?/p>
+ * 共享 Spring 上下文（RANDOM_PORT）的 E2E 测试基类。
+ * <p>使用 {@code RANDOM_PORT} + {@link LocalServerPort} 注入实际端口，
+ * 避免固定端口（DEFINED_PORT）在端口被占用/并行执行时的假失败。</p>
  */
 @SpringBootTest(classes = SupportTestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class BaseE2ETest {
 
-    /** Netty 瀹為檯缁戝畾绔彛锛圧ANDOM_PORT 涓嬬敱瀹瑰櫒娉ㄥ叆锛?*/
+    /** Netty 实际绑定端口（RANDOM_PORT 下由容器注入） */
     @LocalServerPort
     protected int serverPort;
 

@@ -21,8 +21,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * 涓荤鍙?SSL 闆嗘垚娴嬭瘯銆?
- * <p>楠岃瘉 {@code server.ssl.*} 閰嶇疆瀵逛富绔彛鐢熸晥锛孒TTPS 璇锋眰鍙揪銆丠TTP 琚嫆缁濄€?/p>
+ * 主端口 SSL 集成测试。
+ * <p>验证 {@code server.ssl.*} 配置对主端口生效，HTTPS 请求可达、HTTP 被拒绝。</p>
  */
 @SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "server.servlet.context-path=/api",
@@ -70,7 +70,7 @@ public class SslServerTest {
 
     @Test
     void httpRequest_shouldBeRejected() {
-        // 涓荤鍙ｄ粎鐩戝惉 HTTPS锛氭槑鏂?HTTP 璇锋眰搴斿洜 TLS 鎻℃墜澶辫触琚嫆缁濓紙IO 灞傚紓甯革級锛岃€岄潪杩斿洖 200
+        // 主端口仅监听 HTTPS：明文 HTTP 请求应因 TLS 握手失败被拒绝（IO 层异常），而非返回 200
         Request req = new Request.Builder()
                 .url(url("/api/actuator/health"))
                 .get()

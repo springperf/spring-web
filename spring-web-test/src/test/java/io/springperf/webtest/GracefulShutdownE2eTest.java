@@ -19,11 +19,11 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * 浼橀泤鍋滄満 drain E2E 娴嬭瘯銆?
- * <p>楠岃瘉 {@link NettyHttpServer#stop()} 鐨?drain 璇箟锛?
+ * 优雅停机 drain E2E 测试。
+ * <p>验证 {@link NettyHttpServer#stop()} 的 drain 语义：
  * <ul>
- *   <li>宸茶繘鍏ュ鐞嗕腑鐨勮姹傚湪鍋滄満鍚庝粛琚畬鏁村啓鍑猴紙涓嶈鎵撴柇锛?/li>
- *   <li>鍋滄満鍚庢柊璇锋眰琚嫆缁濓紙503 Service Unavailable锛?/li>
+ *   <li>已进入处理中的请求在停机后仍被完整写出（不被打断）</li>
+ *   <li>停机后新请求被拒绝（503 Service Unavailable）</li>
  * </ul>
  */
 @SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
@@ -51,7 +51,7 @@ public class GracefulShutdownE2eTest {
 
     @Test
     void inFlightRequestCompletesAfterStop_andNewRequestsRejected() throws Exception {
-        // 1. 鍙戣捣涓€涓鐞嗕腑浼氭寔缁?~1s 鐨勫紓姝ユ參璇锋眰锛?demo/async 鍐呴儴 sleep 1s锛?
+        // 1. 发起一个处理中会持续 ~1s 的异步慢请求（/demo/async 内部 sleep 1s）
         CountDownLatch asyncDone = new CountDownLatch(1);
         AtomicReference<Response> asyncResp = new AtomicReference<>();
         Request slowReq = new Request.Builder().url(url("/api/demo/async")).get().build();
@@ -68,31 +68,31 @@ public class GracefulShutdownE2eTest {
             }
         });
 
-        // 纭繚鎱㈣姹傚凡杩涘叆澶勭悊绠＄嚎锛坅sync 绾跨▼宸插紑濮嬫墽琛岋級
+        // 确保慢请求已进入处理管线（async 线程已开始执行）
         Thread.sleep(300);
         assertFalse(asyncDone.await(50, TimeUnit.MILLISECONDS),
-                "鎱㈣姹傚湪鍋滄満鍓嶅簲灏氭湭瀹屾垚锛堥獙璇佸畠纭疄澶勪簬澶勭悊涓級");
+                "慢请求在停机前应尚未完成（验证它确实处于处理中）");
 
-        // 2. 瑙﹀彂浼橀泤鍋滄満锛氫粎鍏抽棴 accept + 鎷掔粷鏂拌姹傦紝EventLoop 淇濈暀鐢ㄤ簬鍐欏畬 in-flight 鍝嶅簲
+        // 2. 触发优雅停机：仅关闭 accept + 拒绝新请求，EventLoop 保留用于写完 in-flight 响应
         nettyHttpServer.stop();
-        assertFalse(nettyHttpServer.isRunning(), "stop() 鍚庢湇鍔″櫒涓嶅啀杩愯");
+        assertFalse(nettyHttpServer.isRunning(), "stop() 后服务器不再运行");
 
-        // 3. in-flight 鎱㈣姹傚簲琚畬鏁村啓鍑猴紙drain锛?
-        assertTrue(asyncDone.await(5, TimeUnit.SECONDS), "in-flight 璇锋眰搴斿湪鍋滄満鍚庝粛琚畬鏁村鐞?);
+        // 3. in-flight 慢请求应被完整写出（drain）
+        assertTrue(asyncDone.await(5, TimeUnit.SECONDS), "in-flight 请求应在停机后仍被完整处理");
         Response slow = asyncResp.get();
         assertNotNull(slow);
-        assertEquals(200, slow.code(), "in-flight 璇锋眰搴旇繑鍥?200锛屽疄闄?" + slow.code());
+        assertEquals(200, slow.code(), "in-flight 请求应返回 200，实际 " + slow.code());
         String body = slow.body() != null ? slow.body().string() : "";
-        assertFalse(body.isEmpty(), "in-flight 璇锋眰 body 搴斾负瀹屾暣杈撳嚭");
+        assertFalse(body.isEmpty(), "in-flight 请求 body 应为完整输出");
 
-        // 4. 鍋滄満鍚庢柊璇锋眰琚嫆缁濓紙503 鎴栬繛鎺ヨ鎷掞級
+        // 4. 停机后新请求被拒绝（503 或连接被拒）
         Request newReq = new Request.Builder().url(url("/api/core/bytes")).get().build();
         boolean rejected = false;
         try (Response resp = CLIENT.newCall(newReq).execute()) {
             rejected = resp.code() == 503;
         } catch (java.io.IOException e) {
-            rejected = true; // 鍋滄満鍚庢柊杩炴帴琚嫆
+            rejected = true; // 停机后新连接被拒
         }
-        assertTrue(rejected, "鍋滄満鍚庢柊璇锋眰搴旇繑鍥?503 鎴栬繛鎺ヨ鎷?);
+        assertTrue(rejected, "停机后新请求应返回 503 或连接被拒");
     }
 }

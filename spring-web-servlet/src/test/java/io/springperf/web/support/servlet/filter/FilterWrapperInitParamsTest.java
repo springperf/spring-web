@@ -16,8 +16,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
- * 楠岃瘉 {@link FilterWrapper} 鐨?init-param 瑙ｆ瀽涓庡垵濮嬪寲锛?
- * @WebFilter initParams 瑙ｆ瀽銆佹棤娉ㄨВ鍏滃簳绌?Map銆乫ilter.init 璋冪敤涓?ServletException 鍖呰銆?
+ * 验证 {@link FilterWrapper} 的 init-param 解析与初始化：
+ * @WebFilter initParams 解析、无注解兜底空 Map、filter.init 调用与 ServletException 包装。
  */
 class FilterWrapperInitParamsTest {
 
@@ -100,8 +100,8 @@ class FilterWrapperInitParamsTest {
         RuntimeException ex = assertThrows(RuntimeException.class,
                 () -> wrapper.initWithWebContext(webContext));
         assertTrue(ex.getMessage().contains("Failed to init filter"),
-                "寮傚父搴旀惡甯?filter 鍒濆鍖栧け璐ヤ笂涓嬫枃锛屽疄闄? " + ex.getMessage());
-        assertNotNull(ex.getCause(), "搴斿寘瑁呭師濮?ServletException");
+                "异常应携带 filter 初始化失败上下文，实际: " + ex.getMessage());
+        assertNotNull(ex.getCause(), "应包装原始 ServletException");
         assertInstanceOf(ServletException.class, ex.getCause());
     }
 

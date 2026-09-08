@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class NettyHttpHeadersAdapterDetailsTest {
 
-    // ==================== 鍙妯″紡 ====================
+    // ==================== 只读模式 ====================
 
     @Test
     void readOnly_getFirst_size_isEmpty() {
@@ -79,7 +79,7 @@ class NettyHttpHeadersAdapterDetailsTest {
         assertThrows(UnsupportedOperationException.class, adapter::clear);
     }
 
-    // ==================== 鍙啓妯″紡 ====================
+    // ==================== 可写模式 ====================
 
     @Test
     void writable_add_addAll_set_delegateToNetty() {
@@ -161,7 +161,7 @@ class NettyHttpHeadersAdapterDetailsTest {
         assertSame(view.getContentType(), view.getContentType());
 
         view.setContentType(null);
-        assertNull(view.getContentType(), "setContentType(null) 鍚庣紦瀛樺簲澶辨晥骞惰繑鍥?null");
+        assertNull(view.getContentType(), "setContentType(null) 后缓存应失效并返回 null");
 
         netty.set("Content-Type", "text/plain");
         assertNotNull(view.getContentType());
@@ -210,7 +210,7 @@ class NettyHttpHeadersAdapterDetailsTest {
         view.put("B", Arrays.asList("2", "3"));
         assertEquals(Collections.singletonList("1"), view.get("A"));
         assertEquals(Arrays.asList("2", "3"), view.get("B"));
-        assertFalse(view.containsValue("3"), "澶氬€间綔涓虹嫭绔嬪€煎瓨鍌紝containsValue 涓嶅尮閰嶅崟椤?);
+        assertFalse(view.containsValue("3"), "多值作为独立值存储，containsValue 不匹配单项");
         assertFalse(view.containsValue("nope"));
 
         assertEquals(2, view.entrySet().size());

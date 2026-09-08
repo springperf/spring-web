@@ -35,29 +35,29 @@ class SupportWebFilterRegistryTest {
 
     @Test
     void initWithWebContext_scansServletFilterBeansAndWrapsThem() throws Exception {
-        // 鏍稿績閫昏緫锛歛utoRegisterWebComponent(javax.servlet.Filter.class) 鍦?initWithWebContext 鏃?
-        // 鎵弿 Spring 瀹瑰櫒涓殑 javax.servlet.Filter Bean锛屽苟鍖呰涓?FilterWrapper 鍚庢敞鍐屼负 WebFilterRegistration
+        // 核心逻辑：autoRegisterWebComponent(javax.servlet.Filter.class) 在 initWithWebContext 时
+        // 扫描 Spring 容器中的 javax.servlet.Filter Bean，并包装为 FilterWrapper 后注册为 WebFilterRegistration
         WebContext webContext = mock(WebContext.class);
         ApplicationContext ctx = mock(ApplicationContext.class);
         when(webContext.getCtx()).thenReturn(ctx);
-        // 娉ㄦ剰 stub 椤哄簭锛歛ny(Class) 鍏滃簳鍦ㄥ墠锛岀簿纭被 stub 鍦ㄥ悗锛圡ockito 鍙栨渶鍚庡尮閰嶇殑 stub锛?
+        // 注意 stub 顺序：any(Class) 兜底在前，精确类 stub 在后（Mockito 取最后匹配的 stub）
         when(ctx.getBeansOfType(any(Class.class))).thenReturn(Collections.emptyMap());
         javax.servlet.Filter servletFilter = mock(javax.servlet.Filter.class);
         Map<String, javax.servlet.Filter> filterMap = new HashMap<>();
         filterMap.put("servletFilter", servletFilter);
         when(ctx.getBeansOfType(javax.servlet.Filter.class)).thenReturn(filterMap);
-        // FilterWrapper.initWithWebContext 闇€瑕?PerfServletContext 鏋勫缓 FilterConfig
+        // FilterWrapper.initWithWebContext 需要 PerfServletContext 构建 FilterConfig
         when(webContext.getWebComponent(any(Class.class))).thenReturn(mock(PerfServletContext.class));
 
         SupportWebFilterRegistry registry = new SupportWebFilterRegistry(mock(DispatcherHandler.class));
         registry.initWithWebContext(webContext);
 
-        // 瀹瑰櫒涓簲瀛樺湪鍖呰浜?servlet Filter 鐨?WebFilterRegistration锛屽叾鍐呴儴 filter 涓?FilterWrapper
+        // 容器中应存在包装了 servlet Filter 的 WebFilterRegistration，其内部 filter 为 FilterWrapper
         List<WebFilterRegistration> registrations = registry.getWebComponents(WebFilterRegistration.class);
-        assertTrue(!registrations.isEmpty(), "javax.servlet.Filter Bean 搴旇鎵弿骞舵敞鍐屼负 WebFilterRegistration");
+        assertTrue(!registrations.isEmpty(), "javax.servlet.Filter Bean 应被扫描并注册为 WebFilterRegistration");
         Object wrapped = getFilterField(registrations.get(0));
-        assertInstanceOf(FilterWrapper.class, wrapped, "娉ㄥ唽鐨?filter 搴斾负 FilterWrapper");
-        assertNotNull(wrapped, "鍖呰鍚庣殑 FilterWrapper 涓嶅緱涓?null");
+        assertInstanceOf(FilterWrapper.class, wrapped, "注册的 filter 应为 FilterWrapper");
+        assertNotNull(wrapped, "包装后的 FilterWrapper 不得为 null");
     }
 
     private static Object getFilterField(WebFilterRegistration registration) throws Exception {

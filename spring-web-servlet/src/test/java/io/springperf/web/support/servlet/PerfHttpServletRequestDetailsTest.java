@@ -28,8 +28,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * 楠岃瘉 {@link PerfHttpServletRequest} 鐨?HTTP 缁嗚妭閫昏緫锛?
- * 鏃ユ湡澶磋В鏋愩€丵ueryString銆丠ost 瑙ｆ瀽銆丆ookie 瑙ｆ瀽銆乵ultipart parts銆乺eader/stream 浜掓枼銆?
+ * 验证 {@link PerfHttpServletRequest} 的 HTTP 细节逻辑：
+ * 日期头解析、QueryString、Host 解析、Cookie 解析、multipart parts、reader/stream 互斥。
  */
 class PerfHttpServletRequestDetailsTest {
 
@@ -176,7 +176,7 @@ class PerfHttpServletRequestDetailsTest {
         BufferedReader reader = servletReq.getReader();
         assertEquals("hello", reader.readLine());
         assertThrows(IllegalStateException.class, servletReq::getInputStream,
-                "getReader 鍚庤皟鐢?getInputStream 搴旀姏 IllegalStateException");
+                "getReader 后调用 getInputStream 应抛 IllegalStateException");
     }
 
     @Test

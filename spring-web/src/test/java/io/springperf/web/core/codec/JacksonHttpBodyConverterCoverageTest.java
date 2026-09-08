@@ -156,7 +156,7 @@ class JacksonHttpBodyConverterCoverageTest {
     @Test
     void write_jsonProcessingException_mapsToNotWritable() {
         SimpleModule module = new SimpleModule();
-        module.addSerializer(Boom.class, new StdSerializer<>(Boom.class) {
+        module.addSerializer(Boom.class, new StdSerializer<Boom>(Boom.class) {
             @Override
             public void serialize(Boom value, JsonGenerator gen, SerializerProvider provider) throws IOException {
                 throw new JsonProcessingException("boom") {

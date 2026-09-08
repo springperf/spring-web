@@ -33,8 +33,8 @@ class JsrEndpointScannerTest {
         AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext(TestConfig.class);
         JsrEndpointScanner scanner = new JsrEndpointScanner(ctx);
         List<Class<?>> classes = scanner.scan();
-        assertFalse(classes.isEmpty(), "搴旇嚦灏戞壂鎻忓埌 Spring Bean 娉ㄥ唽鐨勭鐐?);
-        assertTrue(classes.contains(ScannedEndpoint.class), "Bean 绔偣搴旇鎵弿鍒?);
+        assertFalse(classes.isEmpty(), "应至少扫描到 Spring Bean 注册的端点");
+        assertTrue(classes.contains(ScannedEndpoint.class), "Bean 端点应被扫描到");
         ctx.close();
     }
 
@@ -59,7 +59,7 @@ class JsrEndpointScannerTest {
     void scan_beanNamesForAnnotationNull_returnsEmpty() {
         ApplicationContext ctx = mock(ApplicationContext.class);
         when(ctx.getParent()).thenReturn(null);
-        // getBeanNamesForAnnotation 杩斿洖 null锛氭壂鎻忓櫒搴斿畨鍏ㄨ繑鍥炵┖锛屼笉鎶?NPE
+        // getBeanNamesForAnnotation 返回 null：扫描器应安全返回空，不抛 NPE
         when(ctx.getBeanNamesForAnnotation(ServerEndpoint.class)).thenReturn(null);
         JsrEndpointScanner scanner = new JsrEndpointScanner(ctx);
         assertTrue(scanner.scan().isEmpty());
@@ -67,7 +67,7 @@ class JsrEndpointScannerTest {
 
     @Test
     void scan_autoPackagesNotAvailable_returnsEmptyGracefully() {
-        // 闈?Spring Boot 涓荤▼搴忥紙鏃?AutoConfigurationPackages 娉ㄥ唽锛夋椂涓嶅簲鎶涘紓甯?
+        // 非 Spring Boot 主程序（无 AutoConfigurationPackages 注册）时不应抛异常
         ApplicationContext ctx = mock(ApplicationContext.class);
         when(ctx.getParent()).thenReturn(null);
         when(ctx.getBeanNamesForAnnotation(ServerEndpoint.class)).thenReturn(new String[0]);

@@ -14,14 +14,14 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 /**
- * JSR-356 {@link RemoteEndpoint.Async} 瀹炵幇銆?
+ * JSR-356 {@link RemoteEndpoint.Async} 实现。
  *
- * <p>搴曞眰 {@link org.springframework.web.socket.WebSocketSession#sendMessage} 涓哄悓姝ュ啓鍏?
- * 锛圗ventLoop 涓茶鍖栵級锛屽洜姝ゆ澶勪互 CompletableFuture 鍖呰锛氬彂閫佹垚鍔熷嵆杩斿洖宸插畬鎴愮殑 future锛?
- * 鍙戦€佸け璐ュ垯杩斿洖宸插紓甯稿畬鎴愮殑 future銆傛祦寮忓彂閫侀鏈熶笉鏀寔銆?/p>
+ * <p>底层 {@link org.springframework.web.socket.WebSocketSession#sendMessage} 为同步写入
+ * （EventLoop 串行化），因此此处以 CompletableFuture 包装：发送成功即返回已完成的 future，
+ * 发送失败则返回已异常完成的 future。流式发送首期不支持。</p>
  *
  * @author huangcanda
- * @since 3.2.5
+ * @since 3.5.6
  */
 public class JsrRemoteEndpointAsync implements RemoteEndpoint.Async {
 
@@ -122,7 +122,7 @@ public class JsrRemoteEndpointAsync implements RemoteEndpoint.Async {
 
     @Override
     public void setBatchingAllowed(boolean allowed) throws IOException {
-        // 鎵瑰鐞嗛鏈熷拷鐣?
+        // 批处理首期忽略
     }
 
     @Override
@@ -131,7 +131,7 @@ public class JsrRemoteEndpointAsync implements RemoteEndpoint.Async {
     }
 
     public void flushBatch() throws IOException {
-        // 鏃犳壒澶勭悊锛屾棤鎿嶄綔
+        // 无批处理，无操作
     }
 
     public void sendPing(ByteBuffer applicationData) throws IOException, IllegalArgumentException {

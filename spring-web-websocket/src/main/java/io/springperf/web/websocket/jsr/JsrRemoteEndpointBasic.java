@@ -13,14 +13,14 @@ import java.io.Writer;
 import java.nio.ByteBuffer;
 
 /**
- * JSR-356 {@link RemoteEndpoint.Basic} 瀹炵幇锛屽鎵?Spring {@link WebSocketSession} 鍙戦€併€?
+ * JSR-356 {@link RemoteEndpoint.Basic} 实现，委托 Spring {@link WebSocketSession} 发送。
  *
- * <p>娑堟伅浣撲负 {@code String}锛堟枃鏈級銆亄@code ByteBuffer}锛堜簩杩涘埗锛夋垨 POJO锛堢粡
- * {@link Encoder} 缂栫爜锛屾枃鏈?浜岃繘鍒朵换閫夊叾涓€锛夈€傛祦寮忓彂閫侊紙{@link #getSendStream()}
- * / {@link #getSendWriter()}锛変笌鍒嗙墖锛坙ast 鍙傛暟锛夐鏈熶笉鏀寔銆?/p>
+ * <p>消息体为 {@code String}（文本）、{@code ByteBuffer}（二进制）或 POJO（经
+ * {@link Encoder} 编码，文本/二进制任选其一）。流式发送（{@link #getSendStream()}
+ * / {@link #getSendWriter()}）与分片（last 参数）首期不支持。</p>
  *
  * @author huangcanda
- * @since 3.2.5
+ * @since 3.5.6
  */
 public class JsrRemoteEndpointBasic implements RemoteEndpoint.Basic {
 
@@ -74,7 +74,7 @@ public class JsrRemoteEndpointBasic implements RemoteEndpoint.Basic {
 
     @Override
     public void setBatchingAllowed(boolean allowed) throws IOException {
-        // 鎵瑰鐞嗛鏈熷拷鐣?
+        // 批处理首期忽略
     }
 
     @Override
@@ -84,7 +84,7 @@ public class JsrRemoteEndpointBasic implements RemoteEndpoint.Basic {
 
     @Override
     public void flushBatch() throws IOException {
-        // 鏃犳壒澶勭悊锛屾棤鎿嶄綔
+        // 无批处理，无操作
     }
 
     public void sendPing(ByteBuffer applicationData) throws IOException, IllegalArgumentException {

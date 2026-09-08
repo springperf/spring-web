@@ -13,10 +13,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 绔偣绾?{@link Decoder}/{@link Encoder} 瀹炰緥绠＄悊銆?
+ * 端点级 {@link Decoder}/{@link Encoder} 实例管理。
  *
- * <p>JSR-356 瑙勮寖瑕佹眰 Decoder/Encoder 涓庣鐐瑰疄渚嬩竴涓€瀵瑰簲骞跺湪浼氳瘽鐢熷懡鍛ㄦ湡鍐呯鐞嗐€?
- * 姝ゆ敞鍐岃〃鍦ㄨ繛鎺ュ缓绔嬫椂瀹炰緥鍖栥€佸垵濮嬪寲锛屼細璇濆叧闂椂閿€姣併€?/p>
+ * <p>JSR-356 规范要求 Decoder/Encoder 与端点实例一一对应并在会话生命周期内管理。
+ * 此注册表在连接建立时实例化、初始化，会话关闭时销毁。</p>
  *
  * @author huangcanda
  * @since 3.5.6
@@ -26,7 +26,7 @@ public class JsrCodecRegistry {
     private final List<Decoder> decoderInstances = new ArrayList<>();
     private final List<Encoder> encoderInstances = new ArrayList<>();
 
-    /** text/binary 瑙ｇ爜鍣ㄦ寜娉涘瀷绫诲瀷绱㈠紩銆?*/
+    /** text/binary 解码器按泛型类型索引。 */
     private final Map<Class<?>, Decoder.Text<?>> textDecoders = new HashMap<>();
     private final Map<Class<?>, Decoder.Binary<?>> binaryDecoders = new HashMap<>();
     private final Map<Class<?>, Encoder.Text<?>> textEncoders = new HashMap<>();
@@ -72,10 +72,10 @@ public class JsrCodecRegistry {
     }
 
     /**
-     * 瑙ｇ爜鏂囨湰甯с€?
+     * 解码文本帧。
      *
-     * @param text       甯ф枃鏈?
-     * @param targetType @OnMessage 娑堟伅鍙傛暟绫诲瀷锛圫tring 鐩存帴杩斿洖锛屽惁鍒欐煡 Decoder.Text锛?
+     * @param text       帧文本
+     * @param targetType @OnMessage 消息参数类型（String 直接返回，否则查 Decoder.Text）
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
     public Object decodeText(String text, Class<?> targetType) throws javax.websocket.DecodeException {
@@ -90,10 +90,10 @@ public class JsrCodecRegistry {
     }
 
     /**
-     * 瑙ｇ爜浜岃繘鍒跺抚銆?
+     * 解码二进制帧。
      *
-     * @param buf       甯т簩杩涘埗鍐呭
-     * @param targetType @OnMessage 娑堟伅鍙傛暟绫诲瀷锛坆yte[]/ByteBuffer 鐩存帴杩斿洖锛屽惁鍒欐煡 Decoder.Binary锛?
+     * @param buf       帧二进制内容
+     * @param targetType @OnMessage 消息参数类型（byte[]/ByteBuffer 直接返回，否则查 Decoder.Binary）
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
     public Object decodeBinary(ByteBuffer buf, Class<?> targetType) throws javax.websocket.DecodeException {
@@ -113,11 +113,11 @@ public class JsrCodecRegistry {
     }
 
     /**
-     * 灏嗗璞＄紪鐮佸苟鍙戦€併€?
+     * 将对象编码并发送。
      *
-     * @param session 鐩爣浼氳瘽
-     * @param data    瑕佸彂閫佺殑瀵硅薄
-     * @param async   鏄惁寮傛鍙戦€侊紙true 璧?Async remote锛屾澶勪粎缂栫爜锛屽彂閫佺敱璋冪敤鏂瑰鐞嗭級
+     * @param session 目标会话
+     * @param data    要发送的对象
+     * @param async   是否异步发送（true 走 Async remote，此处仅编码，发送由调用方处理）
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
     public EncodedPayload encode(Object data, boolean preferText) throws EncodeException {
@@ -199,25 +199,25 @@ public class JsrCodecRegistry {
         return null;
     }
 
-    /** 閿€姣佹墍鏈?Decoder/Encoder 瀹炰緥銆?*/
+    /** 销毁所有 Decoder/Encoder 实例。 */
     public void destroy() {
         for (Decoder decoder : decoderInstances) {
             try {
                 decoder.destroy();
             } catch (Exception ignored) {
-                // 蹇界暐閿€姣佸紓甯?
+                // 忽略销毁异常
             }
         }
         for (Encoder encoder : encoderInstances) {
             try {
                 encoder.destroy();
             } catch (Exception ignored) {
-                // 蹇界暐閿€姣佸紓甯?
+                // 忽略销毁异常
             }
         }
     }
 
-    /** 缂栫爜缁撴灉銆?*/
+    /** 编码结果。 */
     public static final class EncodedPayload {
         private final String text;
         private final ByteBuffer binary;

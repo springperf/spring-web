@@ -113,8 +113,10 @@ class DefaultNettyStreamSenderTest {
         sender.send("second");
 
         verify(channel, atLeast(2)).writeAndFlush(httpContentCaptor.capture());
-        for (DefaultHttpContent content : httpContentCaptor.getAllValues()) {
-            content.content().release();
+        for (HttpContent content : httpContentCaptor.getAllValues()) {
+            if (content instanceof DefaultHttpContent) {
+                content.content().release();
+            }
         }
     }
 

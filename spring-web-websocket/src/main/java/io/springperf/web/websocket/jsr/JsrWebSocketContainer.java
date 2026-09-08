@@ -13,14 +13,14 @@ import java.util.Collections;
 import java.util.Set;
 
 /**
- * JSR-356 {@link WebSocketContainer} 鐨勬湇鍔＄瀹炵幇銆?
+ * JSR-356 {@link WebSocketContainer} 的服务端实现。
  *
- * <p>鏈鏋朵娇鐢?Netty 鐩存帴澶勭悊 WebSocket锛屾棤闇€鐪熷疄鐨?Servlet 瀹瑰櫒锛屽洜姝わ細
- * 瀹㈡埛绔繛鎺ユ柟娉曪紙{@code connectToServer}锛変笉鍙楁敮鎸侊紱浠呮彁渚涢粯璁や細璇濊秴鏃?缂撳啿鍖洪厤缃紝
- * 渚?{@link JsrWebSocketSession} 鏌ヨ銆?/p>
+ * <p>本框架使用 Netty 直接处理 WebSocket，无需真实的 Servlet 容器，因此：
+ * 客户端连接方法（{@code connectToServer}）不受支持；仅提供默认会话超时/缓冲区配置，
+ * 供 {@link JsrWebSocketSession} 查询。</p>
  *
  * @author huangcanda
- * @since 3.2.5
+ * @since 3.5.6
  */
 public class JsrWebSocketContainer implements WebSocketContainer {
 

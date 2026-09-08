@@ -8,15 +8,15 @@ import javax.servlet.ServletResponse;
 import java.lang.reflect.Method;
 
 /**
- * 灏?{@link Servlet#service(ServletRequest, ServletResponse)} 妗ユ帴涓烘鏋剁殑鍙皟鐢ㄧ洰鏍囥€?
+ * 将 {@link Servlet#service(ServletRequest, ServletResponse)} 桥接为框架的可调用目标。
  *
- * <p>浣滀负 {@link CustomInvoker} 鎺ュ叆鏍稿績鐨勯潪鎺у埗鍣ㄨ矾鐢辨満鍒讹細handleMethod 杩斿洖
- * {@code Servlet.service}锛堣繑鍥?{@code void}锛夛紝鍥犳妗嗘灦鐨?void 杩斿洖鍊煎鐞?
- * 锛坽@code ReturnValueResolverRegistry.skipResolve}锛変細鑷姩 {@code setHandled()}锛?
- * 浣?servlet 鐩存帴鍐欏叆鐨勫搷搴斾綋鑳藉琚?{@code flushResponse} 姝ｅ父鍙戝嚭銆?
+ * <p>作为 {@link CustomInvoker} 接入核心的非控制器路由机制：handleMethod 返回
+ * {@code Servlet.service}（返回 {@code void}），因此框架的 void 返回值处理
+ * （{@code ReturnValueResolverRegistry.skipResolve}）会自动 {@code setHandled()}，
+ * 使 servlet 直接写入的响应体能够被 {@code flushResponse} 正常发出。
  *
- * <p>涓や釜鍙傛暟锛坽@code ServletRequest}/{@code ServletResponse}锛夌敱
- * {@code ServletRequestProvider}/{@code ServletResponseProvider} 瑙ｆ瀽娉ㄥ叆銆?
+ * <p>两个参数（{@code ServletRequest}/{@code ServletResponse}）由
+ * {@code ServletRequestProvider}/{@code ServletResponseProvider} 解析注入。
  */
 public class ServletInvoker implements CustomInvoker {
 

@@ -24,8 +24,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
- * 琛ュ厖 ResourceRequestHandler 瑕嗙洊鐜囷細invoke()/getRegistration銆乬zip 棰勫帇缂┿€?
- * HEAD 璇箟銆丆ache-Control 閰嶇疆銆佹枃浠剁被浣嶇疆瑙ｆ瀽銆侀潪鏍囧噯 path 鍓嶇紑浠ュ強寮傚父鍏滃簳銆?
+ * 补充 ResourceRequestHandler 覆盖率：invoke()/getRegistration、gzip 预压缩、
+ * HEAD 语义、Cache-Control 配置、文件类位置解析、非标准 path 前缀以及异常兜底。
  */
 @ExtendWith(MockitoExtension.class)
 class ResourceRequestHandlerDetailsTest {
@@ -65,7 +65,7 @@ class ResourceRequestHandlerDetailsTest {
         verify(response).setStatusCode(HttpStatus.OK);
     }
 
-    /* ==================== gzip 棰勫帇缂?==================== */
+    /* ==================== gzip 预压缩 ==================== */
 
     @Test
     void handleResourceRequest_acceptsGzip_servesGzipVariant() throws Exception {
@@ -97,7 +97,7 @@ class ResourceRequestHandlerDetailsTest {
         assertFalse(responseHeaders.containsKey(HttpHeaders.CONTENT_ENCODING));
     }
 
-    /* ==================== HEAD 璇箟 ==================== */
+    /* ==================== HEAD 语义 ==================== */
 
     @Test
     void handleResourceRequest_headRequest_skipsBody() {
@@ -108,11 +108,11 @@ class ResourceRequestHandlerDetailsTest {
 
         verify(response, never()).writeStream(any(InputStream.class));
         verify(response).setStatusCode(HttpStatus.OK);
-        // HEAD锛氫粎鍏冩暟鎹紝鏃?body 鍐欏叆
+        // HEAD：仅元数据，无 body 写入
         assertTrue(responseHeaders.getContentLength() > 0);
     }
 
-    /* ==================== Cache-Control 閰嶇疆 ==================== */
+    /* ==================== Cache-Control 配置 ==================== */
 
     @Test
     void handleResourceRequest_cacheControlExplicit_overridesPeriod() {
@@ -124,14 +124,14 @@ class ResourceRequestHandlerDetailsTest {
         assertEquals("max-age=60, public", responseHeaders.getCacheControl());
     }
 
-    /* ==================== file 璧勬簮浣嶇疆瑙ｆ瀽 ==================== */
+    /* ==================== file 资源位置解析 ==================== */
 
     @Test
     void reformatPath_relativePathWithoutLeadingSlash_preservesPath() {
         ResourceHandlerRegistration reg = new ResourceHandlerRegistration("/static/**");
         reg.addResourceLocations("classpath:/static/");
         ResourceRequestHandler h = new ResourceRequestHandler(reg);
-        // prefix 鍖归厤浣嗙浉瀵硅矾寰勬棤鍓嶅鏂滄潬鐨勮竟鐣岋紙path 鎭板ソ绛変簬 prefix锛?
+        // prefix 匹配但相对路径无前导斜杠的边界（path 恰好等于 prefix）
         assertEquals("/", h.reformatPath("/static"));
     }
 
@@ -205,7 +205,7 @@ class ResourceRequestHandlerDetailsTest {
         assertNull(r);
     }
 
-    /* ==================== 杈圭晫涓庡紓甯稿厹搴?==================== */
+    /* ==================== 边界与异常兜底 ==================== */
 
     @Test
     void handleResourceRequest_lastModifiedNegative_servesFullResponse() {

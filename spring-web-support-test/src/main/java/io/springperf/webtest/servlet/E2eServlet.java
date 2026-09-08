@@ -9,8 +9,8 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 
 /**
- * 琚?{@code SupportServletRegistry} 鎵弿娉ㄥ唽涓鸿矾鐢辩殑 Servlet銆?
- * 閫氳繃 {@code @WebServlet} 澹版槑 url-pattern锛屼綔涓?Spring Bean 琚鏋惰嚜鍔ㄨ矾鐢便€?
+ * 被 {@code SupportServletRegistry} 扫描注册为路由的 Servlet。
+ * 通过 {@code @WebServlet} 声明 url-pattern，作为 Spring Bean 被框架自动路由。
  */
 @Component
 @WebServlet(name = "e2eServlet", urlPatterns = {"/e2e-servlet", "/e2e-servlet/*"})

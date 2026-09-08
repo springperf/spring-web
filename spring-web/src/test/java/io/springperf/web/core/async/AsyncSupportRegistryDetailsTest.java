@@ -74,6 +74,10 @@ class AsyncSupportRegistryDetailsTest {
         AsyncTaskExecutor inlineExecutor = new AsyncTaskExecutor() {
             @Override public void execute(Runnable task, long startTimeout) { task.run(); }
             @Override public void execute(Runnable task) { task.run(); }
+            @Override public java.util.concurrent.Future<?> submit(Runnable task) {
+                task.run();
+                return null;
+            }
             @Override public <T> java.util.concurrent.Future<T> submit(java.util.concurrent.Callable<T> task) {
                 try { task.call(); } catch (Exception e) { throw new RuntimeException(e); }
                 return null;
@@ -223,6 +227,9 @@ class AsyncSupportRegistryDetailsTest {
                 throw new RejectedExecutionException("rejected");
             }
             @Override public void execute(Runnable task) { throw new RejectedExecutionException("rejected"); }
+            @Override public java.util.concurrent.Future<?> submit(Runnable task) {
+                throw new RejectedExecutionException("rejected");
+            }
             @Override public <T> java.util.concurrent.Future<T> submit(java.util.concurrent.Callable<T> task) {
                 throw new RejectedExecutionException("rejected");
             }
@@ -332,6 +339,10 @@ class AsyncSupportRegistryDetailsTest {
         return new AsyncTaskExecutor() {
             @Override public void execute(Runnable task, long startTimeout) { task.run(); }
             @Override public void execute(Runnable task) { task.run(); }
+            @Override public java.util.concurrent.Future<?> submit(Runnable task) {
+                task.run();
+                return null;
+            }
             @Override public <T> java.util.concurrent.Future<T> submit(java.util.concurrent.Callable<T> task) {
                 try { task.call(); } catch (Exception e) { throw new RuntimeException(e); }
                 return null;

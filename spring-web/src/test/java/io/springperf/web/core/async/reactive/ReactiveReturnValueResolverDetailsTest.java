@@ -74,9 +74,9 @@ class ReactiveReturnValueResolverDetailsTest {
 
     @SuppressWarnings("unused")
     static class TypeHolder {
-        public void handler(java.util.concurrent.Flow.Publisher<String> p) {}
+        public void handler(org.reactivestreams.Publisher<String> p) {}
         public void handler(String s) {}
-        public void handler(ResponseEntity<java.util.concurrent.Flow.Publisher<String>> p) {}
+        public void handler(ResponseEntity<org.reactivestreams.Publisher<String>> p) {}
     }
 
     static class MonoPublisher {
@@ -165,7 +165,7 @@ class ReactiveReturnValueResolverDetailsTest {
     @Test
     void supportsReturnType_reactive_returnsTrue() throws Exception {
         MethodParameter p = new MethodParameter(TypeHolder.class.getMethod("handler",
-                java.util.concurrent.Flow.Publisher.class), 0);
+                org.reactivestreams.Publisher.class), 0);
         assertTrue(resolver.supportsReturnType(p, null));
     }
 
@@ -201,12 +201,12 @@ class ReactiveReturnValueResolverDetailsTest {
         when(response.getHeaders()).thenReturn(responseHeaders);
         PathMappingContext ctx = mock(PathMappingContext.class);
         when(ctx.getProducibleMediaTypes())
-                .thenReturn(Collections.singletonList(io.springperf.web.util.MediaTypeUtils.APPLICATION_STREAM_JSON));
+                .thenReturn(Collections.singletonList(new MediaType("application", "stream+json")));
         MappingResult.set(request, MappingResult.matched(ctx));
 
         assertTrue(resolver.containMediaType(
-                io.springperf.web.util.MediaTypeUtils.APPLICATION_STREAM_JSON, request, response));
-        assertEquals(io.springperf.web.util.MediaTypeUtils.APPLICATION_STREAM_JSON,
+                new MediaType("application", "stream+json"), request, response));
+        assertEquals(new MediaType("application", "stream+json"),
                 responseHeaders.getContentType());
     }
 

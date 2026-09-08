@@ -33,7 +33,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
- * 鐞涖儱鍘?PerfHttpServletRequest 鐟曞棛娲婇悳鍥风窗requestURL/閺堝秴濮熼崳銊ь伂閸欙絻鈧沟ultipart 缂傚搫銇戦妴? * async start/getAsyncContext/upgrade閵嗕够ession 閸掓稑缂?閸欐ɑ娲?閺嶏繝鐛欓妴浣烘瑜版洘鏁為柨鈧妴浣筋吇鐠囦椒绗?servletContext 鐟欙絾鐎介妴? */
+ * 琛ュ厖 PerfHttpServletRequest 瑕嗙洊鐜囷細requestURL/鏈嶅姟鍣ㄧ鍙ｃ€乵ultipart 缂哄け銆? * async start/getAsyncContext/upgrade銆乻ession 鍒涘缓/鍙樻洿/鏍￠獙銆佺櫥褰曟敞閿€銆佽璇佷笌 servletContext 瑙ｆ瀽銆? */
 class PerfHttpServletRequestSessionTest {
 
     private WebServerHttpRequest request;
@@ -75,7 +75,7 @@ class PerfHttpServletRequestSessionTest {
         return new PerfHttpServletRequest(request);
     }
 
-    /** 鐏?servlet 閸濆秴绨茬紒鎴濈暰閸掓媽顕Ч鍌欑瑐娑撳鏋冮敍鍦玡rvletAttribute.getResponse 缂?ServletAdapterContext 鐠囪褰囬敍?*/
+    /** 灏?servlet 鍝嶅簲缁戝畾鍒拌姹備笂涓嬫枃锛圫ervletAttribute.getResponse 缁?ServletAdapterContext 璇诲彇锛?*/
     private void bindResponse(PerfHttpServletResponse servletResp) {
         ServletAdapterContext adapter = new ServletAdapterContext(newReq(), servletResp, null);
         ServletAttribute.setAdapterContext(requestContext, adapter);
@@ -91,7 +91,7 @@ class PerfHttpServletRequestSessionTest {
         return manager;
     }
 
-    /* ==================== URL / 缁旑垰褰?==================== */
+    /* ==================== URL / 绔彛 ==================== */
 
     @Test
     void getRequestURL_http80_omitsPort() {
@@ -120,7 +120,7 @@ class PerfHttpServletRequestSessionTest {
         assertEquals("/ctx", newReq().getContextPath());
     }
 
-    /* ==================== multipart 缂傚搫銇?==================== */
+    /* ==================== multipart 缂哄け ==================== */
 
     @Test
     void getPart_notMultipart_throws() {
@@ -156,7 +156,7 @@ class PerfHttpServletRequestSessionTest {
     @Test
     void getServletContext_missing_fallsBackToSuper() {
         when(webContext.getWebComponent(PerfServletContext.class)).thenReturn(null);
-        // 鏃?PerfServletContext 娉ㄥ唽鏃跺洖閫€鍒?AbstractFastFailHttpServletRequest 鐨勫揩閫熷け璐?
+        // 无 PerfServletContext 注册时回退到 AbstractFastFailHttpServletRequest 的快速失败
         assertThrows(UnsupportedOperationException.class, () -> newReq().getServletContext());
     }
 
@@ -470,10 +470,10 @@ class PerfHttpServletRequestSessionTest {
 
         newReq().login("bob", "pw");
 
-        // 鐧诲綍鎴愬姛鍚庡繀椤昏疆鎹?session ID锛堜細璇濆浐瀹氶槻鎶わ級
+        // 登录成功后必须轮换 session ID（会话固定防护）
         verify(manager).changeSessionId(oldSession);
         verify(newSession).setAttribute(eq(PerfHttpSessionManager.PRINCIPAL_KEY), any(PerfHttpPrincipal.class));
-        // principal 搴斿啓鍏ヨ疆鎹㈠悗鐨勬柊 session
+        // principal 应写入轮换后的新 session
         PerfHttpSession cached = (PerfHttpSession) fastAttrs.get(PerfHttpSessionManager.SESSION_ATTR_KEY);
         assertEquals("new-id", cached.getId());
     }

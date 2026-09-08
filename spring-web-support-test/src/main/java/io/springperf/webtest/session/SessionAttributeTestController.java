@@ -21,7 +21,7 @@ public class SessionAttributeTestController {
         this.counter = counter;
     }
 
-    /** 璁剧疆 session 灞炴€э紝渚?{@code @SessionAttribute}锛堝崟鏁帮級璇诲彇銆?*/
+    /** 设置 session 属性，供 {@code @SessionAttribute}（单数）读取。 */
     @GetMapping("/put")
     public Map<String, Object> put(@RequestParam String name, @RequestParam String value,
                                    HttpServletRequest request) {
@@ -32,7 +32,7 @@ public class SessionAttributeTestController {
         return result;
     }
 
-    /** 浠?session 璇诲彇鍗曞€煎睘鎬э紙required=true 榛樿锛夈€?*/
+    /** 从 session 读取单值属性（required=true 默认）。 */
     @GetMapping("/get")
     public Map<String, Object> get(@SessionAttribute("greeting") String greeting,
                                    HttpServletRequest request) {
@@ -42,7 +42,7 @@ public class SessionAttributeTestController {
         return result;
     }
 
-    /** required=false锛宻ession 鏃犲睘鎬ф椂杩斿洖 null 鑰岄潪鎶ラ敊銆?*/
+    /** required=false，session 无属性时返回 null 而非报错。 */
     @GetMapping("/get-optional")
     public Map<String, Object> getOptional(
             @SessionAttribute(name = "missing", required = false) String missing) {
@@ -51,7 +51,7 @@ public class SessionAttributeTestController {
         return result;
     }
 
-    /** @SessionScope bean 璺ㄨ姹傚湪 session 鍐呭叡浜鏁般€?*/
+    /** @SessionScope bean 跨请求在 session 内共享计数。 */
     @GetMapping("/counter")
     public Map<String, Object> counter(HttpServletRequest request) {
         int value = counter.increment();

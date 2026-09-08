@@ -13,13 +13,13 @@ import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.SessionAttribute;
 
 /**
- * 瑙ｆ瀽 {@link SessionAttribute}锛堝崟鏁帮級娉ㄨВ鍙傛暟锛氫粠褰撳墠璇锋眰鐨?session 涓寜鍚嶈鍙?
- * 鍗曚釜灞炴€ф敞鍏ユ柟娉曞弬鏁帮紙鍙锛屼笉瑙﹀彂 session 鍒涘缓锛夈€?
- * <p>璇箟瀵归綈 Spring MVC {@code SessionAttributeMethodArgumentResolver}锛?
+ * 解析 {@link SessionAttribute}（单数）注解参数：从当前请求的 session 中按名读取
+ * 单个属性注入方法参数（只读，不触发 session 创建）。
+ * <p>语义对齐 Spring MVC {@code SessionAttributeMethodArgumentResolver}：
  * <ul>
- *   <li>灞炴€у悕鍙栨敞瑙?{@code name}/{@code value}锛屼负绌哄垯鐢ㄥ弬鏁板悕锛?/li>
- *   <li>{@code required=true}锛堥粯璁わ級涓?session 涓笉瀛樺湪鏃舵姏 {@link ServletRequestBindingException}锛?/li>
- *   <li>{@code required=false} 涓斾笉瀛樺湪锛堟垨鏃?session锛夋椂杩斿洖 {@code null}銆?/li>
+ *   <li>属性名取注解 {@code name}/{@code value}，为空则用参数名；</li>
+ *   <li>{@code required=true}（默认）且 session 中不存在时抛 {@link ServletRequestBindingException}；</li>
+ *   <li>{@code required=false} 且不存在（或无 session）时返回 {@code null}。</li>
  * </ul>
  */
 public class SessionAttributeArgumentResolverProvider implements StaticArgumentResolverProvider {

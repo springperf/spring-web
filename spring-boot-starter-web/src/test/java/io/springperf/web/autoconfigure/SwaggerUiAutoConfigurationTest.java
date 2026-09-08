@@ -36,7 +36,7 @@ class SwaggerUiAutoConfigurationTest {
         assertArrayEquals(new String[]{"/swagger-ui/**"}, reg.getPathPatterns());
         assertEquals(1, reg.getLocationValues().size());
         assertEquals("classpath:/META-INF/resources/webjars/swagger-ui/5.4.0",
-                reg.getLocationValues().get(0), "addResourceLocations 浼氬幓鎺夊熬閮ㄦ枩鏉?);
+                reg.getLocationValues().get(0), "addResourceLocations 会去掉尾部斜杠");
     }
 
     @Test

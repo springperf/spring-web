@@ -28,14 +28,14 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * 灏嗘鏋?{@link MappingRegistry} 涓殑璺敱鏆撮湶鍒?SpringDoc OpenAPI 鏂囨。銆?
+ * 将框架 {@link MappingRegistry} 中的路由暴露到 SpringDoc OpenAPI 文档。
  *
- * <p>宸ヤ綔鍘熺悊锛氶亶鍘?{@link PathMappingContext} 鍒楄〃锛屾彁鍙栬矾寰勩€丠TTP 鏂规硶銆?
- * 鍙傛暟鍜岃繑鍥炲€间俊鎭紝鏋勫缓 Swagger {@link PathItem} / {@link Operation} 瀵硅薄锛?
- * 閫氳繃 {@link org.springdoc.core.customizers.OpenApiCustomiser} 娉ㄥ叆 OpenAPI 鏂囨。銆?/p>
+ * <p>工作原理：遍历 {@link PathMappingContext} 列表，提取路径、HTTP 方法、
+ * 参数和返回值信息，构建 Swagger {@link PathItem} / {@link Operation} 对象，
+ * 通过 {@link org.springdoc.core.customizers.OpenApiCustomiser} 注入 OpenAPI 文档。</p>
  *
- * <p>鐢ㄦ埛鍙渶鍦ㄩ」鐩腑娣诲姞 {@code springdoc-openapi-ui} 渚濊禆锛?
- * 鏈鏋剁殑 {@code OpenApiAutoConfiguration} 浼氳嚜鍔ㄦ敞鍐屾閫傞厤鍣ㄣ€?/p>
+ * <p>用户只需在项目中添加 {@code springdoc-openapi-ui} 依赖，
+ * 本框架的 {@code OpenApiAutoConfiguration} 会自动注册此适配器。</p>
  *
  * @author huangcanda
  * @since 1.0.4
@@ -50,7 +50,7 @@ public class OpenApiAdapter {
     }
 
     /**
-     * 浠?MappingRegistry 璇诲彇璺敱骞跺啓鍏?OpenAPI 鏂囨。銆?
+     * 从 MappingRegistry 读取路由并写入 OpenAPI 文档。
      */
     public void customize(OpenAPI openApi) {
         MappingRegistry registry = webContext.getWebComponent(MappingRegistry.class);
@@ -102,18 +102,18 @@ public class OpenApiAdapter {
     }
 
     /**
-     * 娓呯悊璺緞浣垮叾鍏煎 OpenAPI 璇硶锛?
+     * 清理路径使其兼容 OpenAPI 语法：
      * <ul>
-     *   <li>{@code {name:\\d+}} 鈫?{@code {name}}锛堝幓鎺夋鍒欑害鏉燂級</li>
-     *   <li>{@code **} 鈫?{@code {**}}锛堥€氶厤绗︽槧灏勪负 OpenAPI 鐨?any 鍙傛暟锛?/li>
-     *   <li>{@code *} 鈫?绉婚櫎灏鹃儴鏄熷彿</li>
+     *   <li>{@code {name:\\d+}} → {@code {name}}（去掉正则约束）</li>
+     *   <li>{@code **} → {@code {**}}（通配符映射为 OpenAPI 的 any 参数）</li>
+     *   <li>{@code *} → 移除尾部星号</li>
      * </ul>
      */
     static String cleanPathForOpenApi(String rawPath) {
         String path = rawPath;
-        // {name:regex} 鈫?{name}
+        // {name:regex} → {name}
         path = path.replaceAll("\\{(\\w+):[^}]+\\}", "{$1}");
-        // trailing ** 鈫?/{any}
+        // trailing ** → /{any}
         if (path.endsWith("/**")) {
             path = path.substring(0, path.length() - 3) + "/{any}";
         } else if (path.endsWith("/*")) {
@@ -168,7 +168,7 @@ public class OpenApiAdapter {
             if (end < 0) break;
 
             String paramName = path.substring(start + 1, end);
-            // 澶勭悊 {name:\\d+} 鏍煎紡锛氭彁鍙?name锛屽幓鎺夋鍒欓儴鍒?
+            // 处理 {name:\\d+} 格式：提取 name，去掉正则部分
             int colonIdx = paramName.indexOf(':');
             if (colonIdx > 0) {
                 paramName = paramName.substring(0, colonIdx);
@@ -255,7 +255,7 @@ public class OpenApiAdapter {
     }
 
     private void addResponse(Method method, Operation operation) {
-        // 浠?@ResponseStatus 璇诲彇瀹為檯鐘舵€佺爜锛岄粯璁?200
+        // 从 @ResponseStatus 读取实际状态码，默认 200
         int statusCode = resolveResponseStatus(method);
 
         Class<?> returnType = resolveReturnType(method);
@@ -281,7 +281,7 @@ public class OpenApiAdapter {
     }
 
     /**
-     * 浠庢柟娉曟垨鍏剁被涓婅鍙?@ResponseStatus 娉ㄨВ鐨勭姸鎬佺爜锛屼笉瀛樺湪鍒欒繑鍥?200銆?
+     * 从方法或其类上读取 @ResponseStatus 注解的状态码，不存在则返回 200。
      */
     private static int resolveResponseStatus(Method method) {
         if (method == null) return 200;
@@ -292,7 +292,7 @@ public class OpenApiAdapter {
     }
 
     /**
-     * 瑙ｆ瀽鏂规硶鐨勫疄闄呰繑鍥炲€肩被鍨嬶紝瀵?CompletableFuture / Future 瑙ｅ寘娉涘瀷鍙傛暟銆?
+     * 解析方法的实际返回值类型，对 CompletableFuture / Future 解包泛型参数。
      */
     static Class<?> resolveReturnType(Method method) {
         Class<?> returnType = method.getReturnType();
@@ -336,7 +336,8 @@ public class OpenApiAdapter {
     }
 
     static boolean isFrameworkType(Class<?> type) {
-return type.getName().startsWith("javax.servlet")
+        return type.getName().startsWith("javax.servlet")
+                || type.getName().startsWith("javax.servlet")
                 || type == org.springframework.http.HttpEntity.class
                 || type == org.springframework.http.RequestEntity.class
                 || type == org.springframework.validation.BindingResult.class

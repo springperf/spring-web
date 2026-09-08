@@ -28,9 +28,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * 琛ュ厖 {@link JsrEndpointWebSocketHandler} 鍒嗘敮锛氫簩杩涘埗/Pong/POJO 娑堟伅瑙ｇ爜銆?
- * byte[]/ByteBuffer/Encoder 杩斿洖鍊煎彂閫併€丂OnError 缂哄け/寮傚父銆佹棤鍙傛瀯閫犵己澶便€?
- * EndpointConfig/CloseReason 鍙傛暟娉ㄥ叆绛夈€?
+ * 补充 {@link JsrEndpointWebSocketHandler} 分支：二进制/Pong/POJO 消息解码、
+ * byte[]/ByteBuffer/Encoder 返回值发送、@OnError 缺失/异常、无参构造缺失、
+ * EndpointConfig/CloseReason 参数注入等。
  */
 class JsrEndpointWebSocketHandlerBranchesTest {
 
@@ -216,7 +216,7 @@ class JsrEndpointWebSocketHandlerBranchesTest {
         handler.handleMessage(session, new TextMessage("hi"));
 
         assertEquals(1, ThrowingOnErrorEndpoint.ERROR_INVOCATIONS.get(),
-                "@OnMessage 鎶涘紓甯稿簲缈昏瘧涓?@OnError");
+                "@OnMessage 抛异常应翻译为 @OnError");
     }
 
     @Test
@@ -225,7 +225,7 @@ class JsrEndpointWebSocketHandlerBranchesTest {
         JsrEndpointWebSocketHandler handler = handler(ConfigCloseEndpoint.class);
         WebSocketSession session = mockSession();
         handler.afterConnectionEstablished(session);
-        assertNotNull(ConfigCloseEndpoint.OPEN_CONFIG.get(), "EndpointConfig 搴旀敞鍏?@OnOpen 鍙傛暟");
+        assertNotNull(ConfigCloseEndpoint.OPEN_CONFIG.get(), "EndpointConfig 应注入 @OnOpen 参数");
     }
 
     @Test

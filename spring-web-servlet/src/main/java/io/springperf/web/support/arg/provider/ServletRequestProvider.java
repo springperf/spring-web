@@ -9,9 +9,9 @@ import javax.servlet.ServletRequest;
 import org.springframework.core.MethodParameter;
 
 /**
- * 瑙ｆ瀽 {@code Servlet.service(ServletRequest, ServletResponse)} 鐨?{@link ServletRequest}
- * 鍙傛暟銆備笌 {@link HttpServletRequestProvider}锛堢簿纭尮閰?{@code HttpServletRequest}锛変簰琛ワ紝
- * 姝ゅ绮剧‘鍖归厤鐖舵帴鍙?{@code ServletRequest}銆?
+ * 解析 {@code Servlet.service(ServletRequest, ServletResponse)} 的 {@link ServletRequest}
+ * 参数。与 {@link HttpServletRequestProvider}（精确匹配 {@code HttpServletRequest}）互补，
+ * 此处精确匹配父接口 {@code ServletRequest}。
  */
 public class ServletRequestProvider implements StaticArgumentResolverProvider {
 

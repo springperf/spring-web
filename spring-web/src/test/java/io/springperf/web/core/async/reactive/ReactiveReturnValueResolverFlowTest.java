@@ -92,9 +92,9 @@ class ReactiveReturnValueResolverFlowTest {
 
     @SuppressWarnings("unused")
     static class TypeHolder {
-        public void handler(java.util.concurrent.Flow.Publisher<String> p) {}
+        public void handler(org.reactivestreams.Publisher<String> p) {}
         public void handler(String s) {}
-        public void handler(ResponseEntity<java.util.concurrent.Flow.Publisher<String>> p) {}
+        public void handler(ResponseEntity<org.reactivestreams.Publisher<String>> p) {}
         public void handler(CompletableFuture<String> f) {}
     }
 
@@ -134,7 +134,7 @@ class ReactiveReturnValueResolverFlowTest {
     @Test
     void supportsReturnType_adapterRegistryNull_returnsFalse() throws Exception {
         setField("adapterRegistry", null);
-        assertFalse(resolver.supportsReturnType(param("handler", java.util.concurrent.Flow.Publisher.class), null));
+        assertFalse(resolver.supportsReturnType(param("handler", org.reactivestreams.Publisher.class), null));
     }
 
     @Test
@@ -145,7 +145,7 @@ class ReactiveReturnValueResolverFlowTest {
 
     @Test
     void supportsReturnValue_responseEntityBody_reactive() {
-        java.util.concurrent.Flow.Publisher<String> p = simplePublisher();
+        org.reactivestreams.Publisher<String> p = simplePublisher();
         assertTrue(resolver.supportsReturnValue(ResponseEntity.ok(p), request, response));
     }
 
@@ -163,7 +163,7 @@ class ReactiveReturnValueResolverFlowTest {
                 SseEmitter.class.getConstructor(Long.class);
         ReactiveConfig config = new ReactiveConfig(SseEmitter.class, ctor, 150, 50, 5000L);
         ReactiveAdapter adapter = ReactiveAdapterRegistry.getSharedInstance()
-                .getAdapter(java.util.concurrent.Flow.Publisher.class);
+                .getAdapter(org.reactivestreams.Publisher.class);
         StreamEmitter emitter = resolver.createStreamEmitter(config, adapter, String.class, request, response);
         assertNotNull(emitter);
         assertTrue(emitter instanceof SseEmitter);
@@ -173,7 +173,7 @@ class ReactiveReturnValueResolverFlowTest {
     void createStreamEmitter_sseMediaType_returnsSseJsonEmitter() throws Exception {
         responseHeaders.setContentType(MediaType.TEXT_EVENT_STREAM);
         ReactiveAdapter adapter = ReactiveAdapterRegistry.getSharedInstance()
-                .getAdapter(java.util.concurrent.Flow.Publisher.class);
+                .getAdapter(org.reactivestreams.Publisher.class);
         ReactiveConfig config = ReactiveConfig.DEFAULT;
         StreamEmitter emitter = resolver.createStreamEmitter(config, adapter, String.class, request, response);
         assertTrue(emitter instanceof SseJsonEmitter);
@@ -182,7 +182,7 @@ class ReactiveReturnValueResolverFlowTest {
     @Test
     void createStreamEmitter_charSequence_returnsTextStreamEmitter() throws Exception {
         ReactiveAdapter adapter = ReactiveAdapterRegistry.getSharedInstance()
-                .getAdapter(java.util.concurrent.Flow.Publisher.class);
+                .getAdapter(org.reactivestreams.Publisher.class);
         ReactiveConfig config = ReactiveConfig.DEFAULT;
         StreamEmitter emitter = resolver.createStreamEmitter(config, adapter, String.class, request, response);
         assertTrue(emitter instanceof TextStreamEmitter);
@@ -192,7 +192,7 @@ class ReactiveReturnValueResolverFlowTest {
     void createStreamEmitter_streamJsonMediaType_returnsStreamJsonEmitter() throws Exception {
         requestHeaders.setAccept(Collections.singletonList(MediaType.parseMediaType("application/stream+json")));
         ReactiveAdapter adapter = ReactiveAdapterRegistry.getSharedInstance()
-                .getAdapter(java.util.concurrent.Flow.Publisher.class);
+                .getAdapter(org.reactivestreams.Publisher.class);
         ReactiveConfig config = ReactiveConfig.DEFAULT;
         // 元素类型必须非 CharSequence，否则优先命中 TextStreamEmitter 分支
         StreamEmitter emitter = resolver.createStreamEmitter(config, adapter, Datum.class, request, response);
@@ -284,7 +284,7 @@ class ReactiveReturnValueResolverFlowTest {
         SingleValue value = new SingleValue("ok");
 
         resolver.resolveReturnValue(value,
-                param("handler", java.util.concurrent.Flow.Publisher.class), request, response);
+                param("handler", org.reactivestreams.Publisher.class), request, response);
 
         verify(asyncSupportRegistry).startDeferredResultProcessing(any(), any(), any());
     }
@@ -308,16 +308,16 @@ class ReactiveReturnValueResolverFlowTest {
         when(streamSenderFactory.create(any(), any())).thenReturn(mock(StreamSender.class));
         requestHeaders.setAccept(Collections.singletonList(MediaType.TEXT_EVENT_STREAM));
         responseHeaders.setContentType(MediaType.TEXT_EVENT_STREAM);
-        java.util.concurrent.Flow.Publisher<String> p = simplePublisher();
+        org.reactivestreams.Publisher<String> p = simplePublisher();
 
         resolver.resolveReturnValue(p,
-                param("handler", java.util.concurrent.Flow.Publisher.class), request, response);
+                param("handler", org.reactivestreams.Publisher.class), request, response);
 
         verify(streamSenderFactory).create(any(), any());
     }
 
-    private static java.util.concurrent.Flow.Publisher<String> simplePublisher() {
-        return subscriber -> subscriber.onSubscribe(new java.util.concurrent.Flow.Subscription() {
+    private static org.reactivestreams.Publisher<String> simplePublisher() {
+        return subscriber -> subscriber.onSubscribe(new org.reactivestreams.Subscription() {
             private boolean done;
 
             @Override

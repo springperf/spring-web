@@ -57,7 +57,7 @@ class SpringHandlerMethodArgumentResolverProviderTest {
 
     @Test
     void getResolver_returnsResolverThatDelegates() throws Exception {
-        // 楠岃瘉杩斿洖鐨?StaticArgumentResolver 鐪熸濮旀墭缁?Spring 鐨?HandlerMethodArgumentResolver
+        // 验证返回的 StaticArgumentResolver 真正委托给 Spring 的 HandlerMethodArgumentResolver
         io.springperf.web.http.RequestContext requestContext = mock(io.springperf.web.http.RequestContext.class);
         javax.servlet.http.HttpServletRequest servletRequest = mock(javax.servlet.http.HttpServletRequest.class);
         javax.servlet.http.HttpServletResponse servletResponse = mock(javax.servlet.http.HttpServletResponse.class);
@@ -78,7 +78,7 @@ class SpringHandlerMethodArgumentResolverProviderTest {
         StaticArgumentResolver staticResolver = provider.getResolver(methodParameter, mappingContext, null);
         Object result = staticResolver.resolveArgument(request, response);
 
-        assertEquals("resolved-value", result, "搴旀妸鍙傛暟瑙ｆ瀽濮旀墭缁?Spring resolver");
+        assertEquals("resolved-value", result, "应把参数解析委托给 Spring resolver");
         verify(delegate).resolveArgument(eq(methodParameter), any(), any(), any());
     }
 

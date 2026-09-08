@@ -24,13 +24,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * mTLS锛堝弻鍚?TLS锛夌湡瀹炴彙鎵嬮泦鎴愭祴璇曘€?
- * <p>楠岃瘉 {@code client-auth=need} + {@code trust-store} 閰嶇疆鐢熸晥锛?
+ * mTLS（双向 TLS）真实握手集成测试。
+ * <p>验证 {@code client-auth=need} + {@code trust-store} 配置生效：
  * <ul>
- *   <li>鎼哄甫鍙椾俊瀹㈡埛绔瘉涔?鈫?鎻℃墜鎴愬姛锛岃繑鍥?200</li>
- *   <li>涓嶆惡甯﹀鎴风璇佷功 鈫?鏈嶅姟绔姹傚鎴风璁よ瘉锛屾彙鎵嬭鎷掞紙IO 寮傚父锛?/li>
+ *   <li>携带受信客户端证书 → 握手成功，返回 200</li>
+ *   <li>不携带客户端证书 → 服务端要求客户端认证，握手被拒（IO 异常）</li>
  * </ul>
- * 浣跨敤鍚屼竴 {@code test-keystore.p12} 鍚屾椂浣滀负鏈嶅姟绔韩浠戒笌淇′换閿氾紙鑷鍦烘櫙锛夈€?
+ * 使用同一 {@code test-keystore.p12} 同时作为服务端身份与信任锚（自签场景）。
  */
 @SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "server.servlet.context-path=/api",
@@ -54,7 +54,7 @@ public class SslMutualTlsTest {
         return "https://localhost:" + serverPort + path;
     }
 
-    /** 甯﹀鎴风璇佷功鐨?client锛氫俊浠绘墍鏈夋湇鍔＄璇佷功锛屼笖鐢?test-keystore 鎻愪緵瀹㈡埛绔瘉涔?*/
+    /** 带客户端证书的 client：信任所有服务端证书，且用 test-keystore 提供客户端证书 */
     private static OkHttpClient clientWithCert() throws Exception {
         return new OkHttpClient.Builder()
                 .connectTimeout(Duration.ofSeconds(3))
@@ -64,7 +64,7 @@ public class SslMutualTlsTest {
                 .build();
     }
 
-    /** 鏃犲鎴风璇佷功鐨?client锛氫俊浠绘墍鏈夋湇鍔＄璇佷功锛屼絾涓嶆彁渚涘鎴风璇佷功 */
+    /** 无客户端证书的 client：信任所有服务端证书，但不提供客户端证书 */
     private static OkHttpClient clientWithoutCert() throws Exception {
         return new OkHttpClient.Builder()
                 .connectTimeout(Duration.ofSeconds(3))
@@ -74,7 +74,7 @@ public class SslMutualTlsTest {
                 .build();
     }
 
-    /** 鏋勯€?SSLContext锛歱rovideClientCert=true 鏃朵粠 test-keystore 鍔犺浇 KeyManager锛堟惡甯﹀鎴风璇佷功锛?*/
+    /** 构造 SSLContext：provideClientCert=true 时从 test-keystore 加载 KeyManager（携带客户端证书） */
     private static SSLContext sslContext(boolean provideClientCert) throws Exception {
         SSLContext sslContext = SSLContext.getInstance("TLS");
         javax.net.ssl.KeyManager[] kms = null;
@@ -131,10 +131,10 @@ public class SslMutualTlsTest {
                 .url(httpsUrl("/api/core/bytes"))
                 .get()
                 .build();
-        // client-auth=need 涓嬶紝缂哄皯瀹㈡埛绔瘉涔︿細瑙﹀彂 TLS 鎻℃墜澶辫触锛圛O 灞傚紓甯革級
+        // client-auth=need 下，缺少客户端证书会触发 TLS 握手失败（IO 层异常）
         assertThrows(java.io.IOException.class, () -> {
             try (Response resp = clientWithoutCert().newCall(req).execute()) {
-                assertTrue(resp.code() >= 400, "缂鸿瘉涔︿笉搴旇繑鍥?2xx锛屽疄闄?" + resp.code());
+                assertTrue(resp.code() >= 400, "缺证书不应返回 2xx，实际 " + resp.code());
             }
         });
     }

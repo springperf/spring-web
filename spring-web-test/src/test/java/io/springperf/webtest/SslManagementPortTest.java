@@ -25,9 +25,9 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * 绠＄悊绔彛 SSL 闆嗘垚娴嬭瘯銆?
- * <p>楠岃瘉 {@code management.server.ssl.*} 閰嶇疆瀵圭鐞嗙鍙ｇ敓鏁堬紝
- * 绠＄悊绔彛閫氳繃 HTTPS 鎻愪緵 Actuator 绔偣锛屼富绔彛浠嶇劧閫氳繃 HTTP 鎻愪緵涓氬姟鏈嶅姟銆?/p>
+ * 管理端口 SSL 集成测试。
+ * <p>验证 {@code management.server.ssl.*} 配置对管理端口生效，
+ * 管理端口通过 HTTPS 提供 Actuator 端点，主端口仍然通过 HTTP 提供业务服务。</p>
  */
 @SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
@@ -42,7 +42,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class SslManagementPortTest {
 
-    /** 鍚姩鍓嶅垎閰嶄竴涓┖闂茬鍙ｄ綔涓虹鐞嗙鍙ｏ紝閬垮厤鍥哄畾绔彛琚崰鐢?鍐茬獊 */
+    /** 启动前分配一个空闲端口作为管理端口，避免固定端口被占用/冲突 */
     public static class ManagementPortInitializer
             implements ApplicationContextInitializer<ConfigurableApplicationContext> {
         @Override
@@ -106,20 +106,20 @@ public class SslManagementPortTest {
 
     @Test
     void mainPortHttp_shouldStillWork() throws Exception {
-        // 绠＄悊绔彛闅旂妯″紡涓嬩富绔彛涓嶆彁渚?Actuator 绔偣锛屼絾涓氬姟 HTTP 鏈嶅姟搴旀甯?
+        // 管理端口隔离模式下主端口不提供 Actuator 端点，但业务 HTTP 服务应正常
         Request req = new Request.Builder()
                 .url(mainUrl("/api/core/bytes"))
                 .get()
                 .build();
         try (Response resp = PLAIN_CLIENT.newCall(req).execute()) {
-            assertEquals(200, resp.code(), "涓荤鍙ｄ笟鍔＄鐐瑰簲閫氳繃 HTTP 姝ｅ父鍝嶅簲");
+            assertEquals(200, resp.code(), "主端口业务端点应通过 HTTP 正常响应");
             assertEquals("Hello, Bytes!", resp.body().string());
         }
     }
 
     @Test
     void managementPortHttp_shouldBeRejected() {
-        // 绠＄悊绔彛浠呯洃鍚?HTTPS锛氭槑鏂?HTTP 璇锋眰搴斿洜 TLS 鎻℃墜澶辫触琚嫆缁濓紙IO 灞傚紓甯革級锛岃€岄潪杩斿洖 200
+        // 管理端口仅监听 HTTPS：明文 HTTP 请求应因 TLS 握手失败被拒绝（IO 层异常），而非返回 200
         Request req = new Request.Builder()
                 .url(managementHttpUrl("/actuator/health"))
                 .get()

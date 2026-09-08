@@ -11,10 +11,10 @@ import java.time.Duration;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * P1 E2E 娴嬭瘯锛欳GLIB 浠ｇ悊 Controller 鐨勫弬鏁拌竟鐣屽満鏅€?
+ * P1 E2E 测试：CGLIB 代理 Controller 的参数边界场景。
  * <p>
- * 涓?ProxyE2eTest 鍏变韩鍚屼竴涓?Spring 涓婁笅鏂囷紙鐩稿悓閰嶇疆锛夛紝
- * 浣嗗崟鐙粍缁囨祴璇曠被浠ヤ繚鎸佸彲缁存姢鎬с€?
+ * 与 ProxyE2eTest 共享同一个 Spring 上下文（相同配置），
+ * 但单独组织测试类以保持可维护性。
  */
 @SpringBootTest(
         classes = ProxyE2eApp.class,
@@ -45,7 +45,7 @@ public class ProxyP1E2eTest {
         return url("/api");
     }
 
-    // ==================== 澶氬弬鏁扮粍鍚堬細@RequestBody + @PathVariable + @RequestParam + @RequestHeader + optional + defaultValue ====================
+    // ==================== 多参数组合：@RequestBody + @PathVariable + @RequestParam + @RequestHeader + optional + defaultValue ====================
 
     @Test
     void postMixedParams_withProxy_resolvesAllAnnotations() throws Exception {
@@ -69,7 +69,7 @@ public class ProxyP1E2eTest {
 
     @Test
     void postMixedParams_withProxy_usesDefaultValue() throws Exception {
-        // 涓嶄紶 def 鍙傛暟锛岄獙璇?defaultValue="fallback" 鐢熸晥
+        // 不传 def 参数，验证 defaultValue="fallback" 生效
         Request req = new Request.Builder()
                 .url(baseUrl() + "/proxy-p1/mixed/xyz?key=k2")
                 .post(RequestBody.create(JSON, "\"data\""))
@@ -87,7 +87,7 @@ public class ProxyP1E2eTest {
 
     @Test
     void postMixedParams_withoutRequiredParam_returns400() throws Exception {
-        // 缂哄皯 required @RequestParam("key")
+        // 缺少 required @RequestParam("key")
         Request req = new Request.Builder()
                 .url(baseUrl() + "/proxy-p1/mixed/abc")
                 .post(RequestBody.create(JSON, "\"body\""))
@@ -99,13 +99,13 @@ public class ProxyP1E2eTest {
         }
     }
 
-    // ==================== @RequestBody 绌?body ====================
+    // ==================== @RequestBody 空 body ====================
 
     @Test
     void postEmptyBody_withProxy_returns400() throws Exception {
-        // Content-Length 涓?0 鐨?POST + @RequestBody(required=true)锛?
-        // 瀵归綈 Spring 璇箟鎶?400锛圧equestBodyResolver: readBody 绌?body 杩斿洖 null
-        // 鈫?required 缂哄け 鈫?HttpMessageNotReadableException锛夈€傝 RequestBodyResolverTest銆?
+        // Content-Length 为 0 的 POST + @RequestBody(required=true)：
+        // 对齐 Spring 语义抛 400（RequestBodyResolver: readBody 空 body 返回 null
+        // → required 缺失 → HttpMessageNotReadableException）。见 RequestBodyResolverTest。
         Request req = new Request.Builder()
                 .url(baseUrl() + "/proxy-p1/empty-body")
                 .post(RequestBody.create(new byte[0]))
@@ -119,7 +119,7 @@ public class ProxyP1E2eTest {
 
     @Test
     void postEmptyBodyOptional_withProxy_returnsGotNull() throws Exception {
-        // @RequestBody(required=false)锛氱┖ body 涓嶆姏 400锛宐ody 瑙ｆ瀽涓?null 鈫?"got:null"
+        // @RequestBody(required=false)：空 body 不抛 400，body 解析为 null → "got:null"
         Request req = new Request.Builder()
                 .url(baseUrl() + "/proxy-p1/empty-body-optional")
                 .post(RequestBody.create(new byte[0]))
@@ -132,7 +132,7 @@ public class ProxyP1E2eTest {
         }
     }
 
-    // ==================== @RequestHeader 澶氬€笺€佸彲閫夈€佺己澶?====================
+    // ==================== @RequestHeader 多值、可选、缺失 ====================
 
     @Test
     void getMultiHeader_withProxy_resolvesList() throws Exception {
@@ -162,7 +162,7 @@ public class ProxyP1E2eTest {
         }
     }
 
-    // ==================== ResponseEntity 杩斿洖 + proxy ====================
+    // ==================== ResponseEntity 返回 + proxy ====================
 
     @Test
     void getResponseEntity_withProxy_returnsCustomStatusAndHeaders() throws Exception {

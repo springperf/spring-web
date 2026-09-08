@@ -5,7 +5,7 @@ import okhttp3.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.web.server.LocalServerPort;
+import org.springframework.boot.test.web.server.LocalServerPort;
 
 import java.time.Duration;
 import java.util.Map;
@@ -13,8 +13,8 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * P5 E2E 娴嬭瘯锛欻ttpEntity 鍙傛暟銆丆allable 寮傛銆乥yte[]/Resource 杩斿洖鍊笺€?
- * 澶氳矾寰勬槧灏勩€佸鏂规硶鏄犲皠銆丷esponseStatusException銆丷equestEntity 鍙傛暟銆?
+ * P5 E2E 测试：HttpEntity 参数、Callable 异步、byte[]/Resource 返回值、
+ * 多路径映射、多方法映射、ResponseStatusException、RequestEntity 参数。
  */
 @SpringBootTest(
         classes = ProxyE2eApp.class,
@@ -47,7 +47,7 @@ public class ProxyP5E2eTest {
         return url("/api");
     }
 
-    // ==================== 1. HttpEntity 鍙傛暟 ====================
+    // ==================== 1. HttpEntity 参数 ====================
 
     @Test
     void httpEntityParam_receivesRequestBodyAndHeaders() throws Exception {
@@ -64,7 +64,7 @@ public class ProxyP5E2eTest {
         }
     }
 
-    // ==================== 2. Callable 寮傛杩斿洖 ====================
+    // ==================== 2. Callable 异步返回 ====================
 
     @Test
     void callableReturn_asyncExecution_returnsDone() throws Exception {
@@ -78,7 +78,7 @@ public class ProxyP5E2eTest {
         }
     }
 
-    // ==================== 3. byte[] 杩斿洖鍊?====================
+    // ==================== 3. byte[] 返回值 ====================
 
     @Test
     void byteArrayReturn_returnsBytes() throws Exception {
@@ -92,7 +92,7 @@ public class ProxyP5E2eTest {
         }
     }
 
-    // ==================== 4. Resource 杩斿洖鍊?====================
+    // ==================== 4. Resource 返回值 ====================
 
     @Test
     void resourceReturn_returnsContent() throws Exception {
@@ -106,7 +106,7 @@ public class ProxyP5E2eTest {
         }
     }
 
-    // ==================== 5. 澶氳矾寰勬槧灏?====================
+    // ==================== 5. 多路径映射 ====================
 
     @Test
     void multiPath_accessPathA_returnsOk() throws Exception {
@@ -134,7 +134,7 @@ public class ProxyP5E2eTest {
         }
     }
 
-    // ==================== 6. 澶氭柟娉曟槧灏?====================
+    // ==================== 6. 多方法映射 ====================
 
     @Test
     void multiMethod_getRequest_returnsOk() throws Exception {
@@ -176,7 +176,7 @@ public class ProxyP5E2eTest {
         }
     }
 
-    // ==================== 8. RequestEntity 鍙傛暟 ====================
+    // ==================== 8. RequestEntity 参数 ====================
 
     @Test
     void requestEntityParam_receivesMethodAndBody() throws Exception {

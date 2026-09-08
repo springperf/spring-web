@@ -70,10 +70,10 @@ public class Http2ServerTest {
                 .build();
 
         try (Response response = client.newCall(request).execute()) {
-            assertTrue(response.isSuccessful(), "h2c POST 搴旀垚鍔燂紝瀹為檯鐘舵€佺爜: " + response.code());
-            assertEquals(Protocol.H2_PRIOR_KNOWLEDGE, response.protocol(), "璇锋眰搴旈€氳繃 h2c 浼犺緭");
+            assertTrue(response.isSuccessful(), "h2c POST 应成功，实际状态码: " + response.code());
+            assertEquals(Protocol.H2_PRIOR_KNOWLEDGE, response.protocol(), "请求应通过 h2c 传输");
             String body = response.body().string();
-            assertTrue(body.contains("test"), "鍝嶅簲搴斿洖鏄捐姹備綋 name=test锛屽疄闄? " + body);
+            assertTrue(body.contains("test"), "响应应回显请求体 name=test，实际: " + body);
         }
     }
 

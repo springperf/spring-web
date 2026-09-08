@@ -23,8 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 绮剧‘妯℃嫙锛氭棤 context-path锛岀嫭绔嬬鐞嗙鍙ｏ紝SBA v2 Accept 澶淬€?
- * 楠岃瘉鎵€鏈?actuator 绔偣鍙 SBA 2.3.0.1 姝ｅ父璁块棶銆?
+ * 精确模拟：无 context-path，独立管理端口，SBA v2 Accept 头。
+ * 验证所有 actuator 端点可被 SBA 2.3.0.1 正常访问。
  */
 @SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @DirtiesContext
 public class ActuatorSbaExactTest {
 
-    /** 鍚姩鍓嶅垎閰嶄竴涓┖闂茬鍙ｄ綔涓虹鐞嗙鍙ｏ紝閬垮厤鍥哄畾绔彛琚崰鐢?鍐茬獊 */
+    /** 启动前分配一个空闲端口作为管理端口，避免固定端口被占用/冲突 */
     public static class ManagementPortInitializer
             implements ApplicationContextInitializer<ConfigurableApplicationContext> {
         @Override
@@ -85,7 +85,7 @@ public class ActuatorSbaExactTest {
                     endpoint, resp.code(), body.length(), resp.header("Content-Type"));
             assertEquals(200, resp.code(),
                     "SBA v2 GET " + endpoint + " should return 200. Body: " + body);
-            // 楠岃瘉 body 鑳借 SBA 瑙ｆ瀽锛堥潪绌?JSON锛?
+            // 验证 body 能被 SBA 解析（非空 JSON）
             assertTrue(body.startsWith("{") && body.endsWith("}"),
                     "Body should be valid JSON object. Body: " + body);
         }

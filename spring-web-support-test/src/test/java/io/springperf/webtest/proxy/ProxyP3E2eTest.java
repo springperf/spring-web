@@ -5,7 +5,7 @@ import okhttp3.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.web.server.LocalServerPort;
+import org.springframework.boot.test.web.server.LocalServerPort;
 
 import java.time.Duration;
 import java.util.Map;
@@ -14,9 +14,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * P3 E2E 娴嬭瘯锛欳ontroller 绫荤户鎵裤€丂RequestMapping 璐熷悜鏉′欢銆丂ExceptionHandler 鐖跺瓙璺敱銆丗ilter 闃绘柇銆?
+ * P3 E2E 测试：Controller 类继承、@RequestMapping 负向条件、@ExceptionHandler 父子路由、Filter 阻断。
  * <p>
- * 涓?ProxyE2eTest 鍏变韩 Spring 涓婁笅鏂囷紙绔彛 9092锛夈€?
+ * 与 ProxyE2eTest 共享 Spring 上下文（端口 9092）。
  */
 @SpringBootTest(
         classes = ProxyE2eApp.class,
@@ -50,13 +50,13 @@ public class ProxyP3E2eTest {
         return url("/api");
     }
 
-    // ==================== 1. Controller 绫荤户鎵?(Child extends Parent) ====================
+    // ==================== 1. Controller 类继承 (Child extends Parent) ====================
 
     @Test
     void childController_parentGreet_stillWorks() throws Exception {
-        // ChildController 缁ф壙鑷?ParentController锛屼笉瑕嗗啓 greet 鏂规硶
-        // getDeclaredMethods 鍙繑鍥炴湰绫诲０鏄庣殑鏂规硶锛屽洜姝?greet 鐢?ParentController bean 娉ㄥ唽
-        // `/proxy-parent/greet` 璺緞閫氳繃 ParentController 澶勭悊
+        // ChildController 继承自 ParentController，不覆写 greet 方法
+        // getDeclaredMethods 只返回本类声明的方法，因此 greet 由 ParentController bean 注册
+        // `/proxy-parent/greet` 路径通过 ParentController 处理
         Request req = new Request.Builder()
                 .url(baseUrl() + "/proxy-parent/greet?name=test")
                 .get()
@@ -79,7 +79,7 @@ public class ProxyP3E2eTest {
         }
     }
 
-    // ==================== 2. @RequestMapping 璐熷悜鏉′欢 (headers/params/consumes) ====================
+    // ==================== 2. @RequestMapping 负向条件 (headers/params/consumes) ====================
 
     @Test
     void negativeCond_withoutBlockHeader_returns200() throws Exception {
@@ -144,7 +144,7 @@ public class ProxyP3E2eTest {
                 .post(RequestBody.create("<r/>", XML_TYPE))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            // consumes = "!application/xml" rejects XML 鈫?no route matched
+            // consumes = "!application/xml" rejects XML → no route matched
             assertEquals(404, resp.code());
         }
     }
@@ -172,7 +172,7 @@ public class ProxyP3E2eTest {
         }
     }
 
-    // ==================== 3. @ExceptionHandler 鐖跺瓙寮傚父璺敱 (with proxy) ====================
+    // ==================== 3. @ExceptionHandler 父子异常路由 (with proxy) ====================
 
     @Test
     void childController_parentException_caughtByParentHandler() throws Exception {
@@ -204,7 +204,7 @@ public class ProxyP3E2eTest {
         }
     }
 
-    // ==================== 4. WebFilter 闃绘柇璇锋眰 (with proxy) ====================
+    // ==================== 4. WebFilter 阻断请求 (with proxy) ====================
 
     @Test
     void blockingFilter_withProxy_returns403() throws Exception {

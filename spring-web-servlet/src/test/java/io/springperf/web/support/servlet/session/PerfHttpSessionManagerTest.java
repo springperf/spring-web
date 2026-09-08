@@ -32,7 +32,7 @@ class PerfHttpSessionManagerTest {
     void setUp() {
         lenient().when(webContext.getProps()).thenReturn(props);
         lenient().when(webContext.getCtx()).thenReturn(mock(org.springframework.context.ApplicationContext.class));
-        lenient().when(props.get(anyString(), anyString())).thenAnswer(invocation -> invocation.getArgument(1));
+        lenient().when(props.get(any(), any())).thenAnswer(invocation -> invocation.getArgument(1));
         manager = new PerfHttpSessionManager();
         manager.initWithWebContext(webContext);
     }
@@ -45,10 +45,10 @@ class PerfHttpSessionManagerTest {
 
     @Test
     void initWithWebContext_reusesRegisteredServletContext() {
-        // ServletContext 宸蹭綔涓虹嫭绔嬬粍浠舵敞鍐屾椂锛宻ession 绠＄悊鍣ㄥ簲鐩存帴澶嶇敤锛屼笉鍐嶆柊寤?
+        // ServletContext 已作为独立组件注册时，session 管理器应直接复用，不再新建
         PerfServletContext registered = mock(PerfServletContext.class);
         when(webContext.getWebComponent(PerfServletContext.class)).thenReturn(registered);
-        // 娓呴櫎 @BeforeEach 涓?manager.initWithWebContext 浜х敓鐨勫巻鍙茶皟鐢紝鍙粺璁℃湰娴嬭瘯鏂规硶鍐呯殑琛屼负
+        // 清除 @BeforeEach 中 manager.initWithWebContext 产生的历史调用，只统计本测试方法内的行为
         clearInvocations(webContext);
 
         PerfHttpSessionManager newManager = new PerfHttpSessionManager();
@@ -64,6 +64,15 @@ class PerfHttpSessionManagerTest {
         assertNotNull(session);
         assertNotNull(session.getId());
         assertTrue(session.isNew());
+    }
+
+    @Test
+    void createSession_appliesSessionTimeoutToMaxInactiveInterval() {
+        // P0 回归：新 session 必须带上非零 maxInactiveInterval（默认 30 分钟），
+        // 否则 InMemoryHttpSessionStorage.isExpired() 恒为 false，session 永不过期 → 无界内存增长。
+        PerfHttpSession session = manager.createSession();
+        assertTrue(session.getMaxInactiveInterval() > 0);
+        assertEquals(30 * 60, session.getMaxInactiveInterval());
     }
 
     @Test
@@ -135,7 +144,7 @@ class PerfHttpSessionManagerTest {
 
     @Test
     void initWithWebContext_registersPerfServletContextWhenMissing() {
-        // manager 宸茬敱 @BeforeEach 鍒濆鍖栵紝涓?webContext 鏈娉ㄥ唽 PerfServletContext
+        // manager 已由 @BeforeEach 初始化，且 webContext 未预注册 PerfServletContext
         verify(webContext).registerWebComponent(any(PerfServletContext.class));
     }
 

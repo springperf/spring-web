@@ -284,7 +284,11 @@ class SslContextFactoryTest {
         java.io.File f = java.io.File.createTempFile("cert", ".pem");
         try (java.io.InputStream src = SslContextFactoryTest.class.getResourceAsStream("/ssl/cert.pem");
              java.io.OutputStream os = new java.io.FileOutputStream(f)) {
-            src.transferTo(os);
+            byte[] buf = new byte[4096];
+            int len;
+            while ((len = src.read(buf)) != -1) {
+                os.write(buf, 0, len);
+            }
         }
         Method m = SslContextFactory.class.getDeclaredMethod("openInputStream", String.class);
         m.setAccessible(true);
@@ -317,7 +321,8 @@ class SslContextFactoryTest {
     }
 
     private static String readAllOutput(java.io.InputStream in) throws Exception {
-        try (in; java.util.Scanner sc = new java.util.Scanner(in, "UTF-8")) {
+        // JDK8 兼容：try-with-resources 只能在 resource 中声明新变量，不能引用已有变量
+        try (java.util.Scanner sc = new java.util.Scanner(in, "UTF-8")) {
             sc.useDelimiter("\\A");
             return sc.hasNext() ? sc.next() : "";
         }

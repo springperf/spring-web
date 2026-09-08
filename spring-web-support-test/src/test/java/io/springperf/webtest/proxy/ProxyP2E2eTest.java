@@ -4,7 +4,7 @@ import okhttp3.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.web.server.LocalServerPort;
+import org.springframework.boot.test.web.server.LocalServerPort;
 
 import java.time.Duration;
 
@@ -12,9 +12,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * P2 E2E 娴嬭瘯锛氭帴鍙ｇ户鎵裤€佸崰浣嶇楂樼骇銆佹潯浠堕檺瀹氥€?
+ * P2 E2E 测试：接口继承、占位符高级、条件限定。
  * <p>
- * 涓?ProxyE2eTest 鍏变韩 Spring 涓婁笅鏂囥€?
+ * 与 ProxyE2eTest 共享 Spring 上下文。
  */
 @SpringBootTest(
         classes = ProxyE2eApp.class,
@@ -45,7 +45,7 @@ public class ProxyP2E2eTest {
         return url("/api");
     }
 
-    // ==================== 澶氱骇鎺ュ彛缁ф壙 + CGLIB 浠ｇ悊 ====================
+    // ==================== 多级接口继承 + CGLIB 代理 ====================
 
     @Test
     void postRootSave_withInheritedInterface_resolvesRequestBodyAndParam() throws Exception {
@@ -56,7 +56,7 @@ public class ProxyP2E2eTest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
-            // @RequestBody 鎺ユ敹 JSON 瀛楃涓插甫寮曞彿
+            // @RequestBody 接收 JSON 字符串带引号
             assertTrue(body.contains("data") && body.contains("abc"),
                     "Body should contain both data and abc: " + body);
         }
@@ -74,7 +74,7 @@ public class ProxyP2E2eTest {
         }
     }
 
-    // ==================== 鍗犱綅绗?+ 閫氶厤绗﹁矾寰?====================
+    // ==================== 占位符 + 通配符路径 ====================
 
     @Test
     void getPlaceholderWithPathVar_resolvesBothPlaceholderAndPathVariable() throws Exception {
@@ -88,7 +88,7 @@ public class ProxyP2E2eTest {
         }
     }
 
-    // ==================== 澶氭鍗犱綅绗?====================
+    // ==================== 多段占位符 ====================
 
     @Test
     void getMultiPlaceholder_resolvesAllSegments() throws Exception {
@@ -102,7 +102,7 @@ public class ProxyP2E2eTest {
         }
     }
 
-    // ==================== @RequestMapping params 鏉′欢闄愬畾 ====================
+    // ==================== @RequestMapping params 条件限定 ====================
 
     @Test
     void getGreet_withLangParam_routesToCorrectMethod() throws Exception {

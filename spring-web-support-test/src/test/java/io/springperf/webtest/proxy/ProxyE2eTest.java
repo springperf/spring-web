@@ -12,13 +12,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * E2E 娴嬭瘯锛氶獙璇?CGLIB 浠ｇ悊 Controller 鍦烘櫙涓嬫鏋惰兘姝ｇ‘瑙ｆ瀽鍙傛暟娉ㄨВ銆?
+ * E2E 测试：验证 CGLIB 代理 Controller 场景下框架能正确解析参数注解。
  * <p>
- * 娴嬭瘯閾捐矾锛?
- * CGLIB 浠ｇ悊鏂规硶 鈫?targetClass.getDeclaredMethods() (鍙栧疄鐜扮被鏂规硶璺敱)
- * 鈫?createMethodParameters 鈫?findAnnotatedMethod (浠庢帴鍙ｅ彇鍙傛暟娉ㄨВ)
- * 鈫?ArgumentResolverRegistry 鈫?鍙傛暟瑙ｆ瀽鍣?(鍙戠幇 @RequestBody/@RequestParam)
- * 鈫?姝ｅ父璋冪敤 Controller 鏂规硶
+ * 测试链路：
+ * CGLIB 代理方法 → targetClass.getDeclaredMethods() (取实现类方法路由)
+ * → createMethodParameters → findAnnotatedMethod (从接口取参数注解)
+ * → ArgumentResolverRegistry → 参数解析器 (发现 @RequestBody/@RequestParam)
+ * → 正常调用 Controller 方法
  */
 @SpringBootTest(
         classes = ProxyE2eApp.class,
@@ -107,7 +107,7 @@ public class ProxyE2eTest {
         }
     }
 
-    // ==================== 娣峰悎娉ㄨВ ====================
+    // ==================== 混合注解 ====================
 
     @Test
     void postMixed_withAllParams_resolvesCorrectly() throws Exception {
@@ -123,7 +123,7 @@ public class ProxyE2eTest {
         }
     }
 
-    // ==================== 绠€鍗曞弬鏁?====================
+    // ==================== 简单参数 ====================
 
     @Test
     void getEcho_withMsg_returnsSameValue() throws Exception {
@@ -138,7 +138,7 @@ public class ProxyE2eTest {
         }
     }
 
-    // ==================== 鍗犱綅绗﹁矾寰勮В鏋?====================
+    // ==================== 占位符路径解析 ====================
 
     @Test
     void placeholderPath_resolvesFromEnvironment() throws Exception {
@@ -153,7 +153,7 @@ public class ProxyE2eTest {
         }
     }
 
-    // ==================== P0: @ModelAttribute + CGLIB 浠ｇ悊 ====================
+    // ==================== P0: @ModelAttribute + CGLIB 代理 ====================
 
     @Test
     void postModelAttribute_withProxy_bindsFormData() throws Exception {
@@ -173,7 +173,7 @@ public class ProxyE2eTest {
         }
     }
 
-    // ==================== P0: @RequestPart + CGLIB 浠ｇ悊 ====================
+    // ==================== P0: @RequestPart + CGLIB 代理 ====================
 
     @Test
     void postUpload_withProxy_parsesMultipartFile() throws Exception {
@@ -194,7 +194,7 @@ public class ProxyE2eTest {
         }
     }
 
-    // ==================== P0: @ExceptionHandler + CGLIB 浠ｇ悊 ====================
+    // ==================== P0: @ExceptionHandler + CGLIB 代理 ====================
 
     @Test
     void getTriggerError_withProxy_handledByControllerAdvice() throws Exception {
@@ -210,7 +210,7 @@ public class ProxyE2eTest {
         }
     }
 
-    // ==================== P0: Interceptor + CGLIB 浠ｇ悊 ====================
+    // ==================== P0: Interceptor + CGLIB 代理 ====================
 
     @Test
     void interceptor_isInvokedForProxyController() throws Exception {
@@ -226,7 +226,7 @@ public class ProxyE2eTest {
         }
     }
 
-    // ==================== P2: WebFilter + CGLIB 浠ｇ悊 ====================
+    // ==================== P2: WebFilter + CGLIB 代理 ====================
 
     @Test
     void webFilter_executedForProxyController() throws Exception {
@@ -242,7 +242,7 @@ public class ProxyE2eTest {
         }
     }
 
-    // ==================== @InitBinder + CGLIB 浠ｇ悊 ====================
+    // ==================== @InitBinder + CGLIB 代理 ====================
 
     @Test
     void initBinder_withProxy_appliesPropertyEditor() throws Exception {

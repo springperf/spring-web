@@ -60,9 +60,9 @@ class SpringWebServletAutoConfigurationCreateFilterWrapperTest {
         WebFilterRegistration result = invokeCreateFilterWrapper(registration);
 
         assertNotNull(result);
-        assertTrue(wrappedFilter(result) instanceof FilterWrapper, "搴斿寘瑁呬负 FilterWrapper");
-        assertTrue(result.matches("/api/users"), "璺緞妯″紡搴旂敓鏁?);
-        assertFalse(result.matches("/other"), "闈炲尮閰嶈矾寰勫簲 false");
+        assertTrue(wrappedFilter(result) instanceof FilterWrapper, "应包装为 FilterWrapper");
+        assertTrue(result.matches("/api/users"), "路径模式应生效");
+        assertFalse(result.matches("/other"), "非匹配路径应 false");
     }
 
     @Test
@@ -76,7 +76,7 @@ class SpringWebServletAutoConfigurationCreateFilterWrapperTest {
 
     @Test
     void createFilterWrapper_delegatingFilterProxyFallback_resolvesTargetBean() throws Exception {
-        // 鐪熷疄鍖垮悕瀛愮被锛氳鐩?protected getTargetBeanName() 杩斿洖鍥哄畾鍚嶏紱getFilter() 鎶涘紓甯告ā鎷?WebApplicationContext 缂哄け
+        // 真实匿名子类：覆盖 protected getTargetBeanName() 返回固定名；getFilter() 抛异常模拟 WebApplicationContext 缺失
         DelegatingFilterProxyRegistrationBean registration =
                 new DelegatingFilterProxyRegistrationBean("targetBean") {
                     @Override
@@ -95,13 +95,13 @@ class SpringWebServletAutoConfigurationCreateFilterWrapperTest {
 
         WebFilterRegistration result = invokeCreateFilterWrapper(registration);
 
-        assertNotNull(result, "DelegatingFilterProxy 搴旇В鏋愮洰鏍?bean 骞跺寘瑁?);
+        assertNotNull(result, "DelegatingFilterProxy 应解析目标 bean 并包装");
         assertTrue(wrappedFilter(result) instanceof FilterWrapper);
     }
 
     @Test
     void createFilterWrapper_delegatingFilterProxyNoTarget_returnsNull() {
-        // getTargetBeanName() 杩斿洖 null 鈫?鍛婅骞惰烦杩?
+        // getTargetBeanName() 返回 null → 告警并跳过
         DelegatingFilterProxyRegistrationBean registration =
                 new DelegatingFilterProxyRegistrationBean("unused") {
                     @Override
@@ -114,6 +114,6 @@ class SpringWebServletAutoConfigurationCreateFilterWrapperTest {
                         throw new IllegalStateException("no ctx");
                     }
                 };
-        assertNull(invokeCreateFilterWrapper(registration), "鏃?targetBeanName 搴旇繑鍥?null");
+        assertNull(invokeCreateFilterWrapper(registration), "无 targetBeanName 应返回 null");
     }
 }

@@ -18,14 +18,14 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 鎵弿 Spring 瀹瑰櫒涓殑 {@link Servlet} Bean锛屽皢鍏舵敞鍐屼负妗嗘灦璺敱銆?
+ * 扫描 Spring 容器中的 {@link Servlet} Bean，将其注册为框架路由。
  *
- * <p>澶嶇敤鏍稿績鐨勯潪鎺у埗鍣ㄨ矾鐢辨満鍒讹細姣忎釜 servlet 鍖呰涓?{@link ServletInvoker}锛?
- * 浠?{@link PathMappingContext} 褰㈠紡娉ㄥ唽杩?{@link MappingRegistry}銆俿ervlet 鐨?
- * url-pattern锛堟潵鑷?{@link WebServlet} 娉ㄨВ锛夎浆鎹负妗嗘灦鐨?ant 璺緞瑙勫垯銆?
+ * <p>复用核心的非控制器路由机制：每个 servlet 包装为 {@link ServletInvoker}，
+ * 以 {@link PathMappingContext} 形式注册进 {@link MappingRegistry}。servlet 的
+ * url-pattern（来自 {@link WebServlet} 注解）转换为框架的 ant 路径规则。
  *
- * <p>鐢熷懡鍛ㄦ湡锛歅hase 1 娉ㄥ唽璺敱骞惰皟鐢?{@code servlet.init()}锛岄攢姣佹椂璋冪敤
- * {@code servlet.destroy()}銆?
+ * <p>生命周期：Phase 1 注册路由并调用 {@code servlet.init()}，销毁时调用
+ * {@code servlet.destroy()}。
  */
 @Slf4j
 public class SupportServletRegistry extends BaseWebComponent {
@@ -115,12 +115,12 @@ public class SupportServletRegistry extends BaseWebComponent {
     }
 
     /**
-     * 灏?servlet url-pattern 杞崲涓烘鏋剁殑 ant 璺緞瑙勫垯锛?
+     * 将 servlet url-pattern 转换为框架的 ant 路径规则：
      * <ul>
-     *   <li>榛樿鏄犲皠 {@code /} 鈫?鍏ㄨ矾寰勯€氶厤</li>
-     *   <li>璺緞鏄犲皠 {@code /foo/*} 鈫?{@code /foo/**}</li>
-     *   <li>鍚庣紑鏄犲皠锛堝 {@code *.txt}锛夆啋 鍏ㄨ矾寰勫悗缂€鍖归厤</li>
-     *   <li>绮剧‘鍖归厤 {@code /foo} 鈫?{@code /foo}</li>
+     *   <li>默认映射 {@code /} → 全路径通配</li>
+     *   <li>路径映射 {@code /foo/*} → {@code /foo/**}</li>
+     *   <li>后缀映射（如 {@code *.txt}）→ 全路径后缀匹配</li>
+     *   <li>精确匹配 {@code /foo} → {@code /foo}</li>
      * </ul>
      */
     static String toPathRule(String urlPattern) {

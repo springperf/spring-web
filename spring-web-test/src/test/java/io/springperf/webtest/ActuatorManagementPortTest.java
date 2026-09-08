@@ -23,12 +23,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
- * Actuator 绠＄悊绔彛闅旂闆嗘垚娴嬭瘯銆?
- * <p>楠岃瘉绠＄悊绔彛闅旂鏃讹細
+ * Actuator 管理端口隔离集成测试。
+ * <p>验证管理端口隔离时：
  * <ul>
- *   <li>涓荤鍙ｏ紙RANDOM锛変笉鎻愪緵 Actuator 绔偣</li>
- *   <li>绠＄悊绔彛锛堥殢鏈虹┖闂茬鍙ｏ級鎻愪緵 Actuator 绔偣</li>
- *   <li>绠＄悊绔彛鐨勯潪 Actuator 璺緞杩斿洖 404</li>
+ *   <li>主端口（RANDOM）不提供 Actuator 端点</li>
+ *   <li>管理端口（随机空闲端口）提供 Actuator 端点</li>
+ *   <li>管理端口的非 Actuator 路径返回 404</li>
  * </ul>
  * </p>
  */
@@ -41,7 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class ActuatorManagementPortTest {
 
-    /** 鍚姩鍓嶅垎閰嶄竴涓┖闂茬鍙ｄ綔涓虹鐞嗙鍙ｏ紝閬垮厤鍥哄畾绔彛琚崰鐢?鍐茬獊 */
+    /** 启动前分配一个空闲端口作为管理端口，避免固定端口被占用/冲突 */
     public static class ManagementPortInitializer
             implements ApplicationContextInitializer<ConfigurableApplicationContext> {
         @Override

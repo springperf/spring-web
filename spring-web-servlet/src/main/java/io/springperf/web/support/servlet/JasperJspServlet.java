@@ -12,17 +12,17 @@ import org.apache.tomcat.InstanceManager;
 import org.apache.tomcat.SimpleInstanceManager;
 
 /**
- * 鍩轰簬 Apache Jasper 鐨?JSP 澶勭悊 Servlet銆?
+ * 基于 Apache Jasper 的 JSP 处理 Servlet。
  *
- * <p>琛ュ厖鏍囧噯瀹瑰櫒鑱岃矗锛堥潪 Tomcat 瀹瑰櫒涓?Tomcat 涓嶄細鑷姩鎻愪緵锛夛細
+ * <p>补充标准容器职责（非 Tomcat 容器中 Tomcat 不会自动提供）：
  * <ol>
- *   <li>鍒濆鍖?{@link JspFactory}锛圝SP 杩愯鏃跺叆鍙ｏ級锛?/li>
- *   <li>涓?{@link ServletContext} 璁剧疆 {@link InstanceManager}锛圝asper 瀹炰緥鍖?JSP/Tag 绫绘墍闇€锛夛紱</li>
- *   <li>鎵弿 classpath 鐨?TLD 骞惰缃?{@link TldCache}锛圝STL / taglib 鏀寔锛夈€?/li>
+ *   <li>初始化 {@link JspFactory}（JSP 运行时入口）；</li>
+ *   <li>为 {@link ServletContext} 设置 {@link InstanceManager}（Jasper 实例化 JSP/Tag 类所需）；</li>
+ *   <li>扫描 classpath 的 TLD 并设置 {@link TldCache}（JSTL / taglib 支持）。</li>
  * </ol>
  *
- * <p>閫氳繃 {@link ServletInvoker} 娉ㄥ唽涓烘鏋惰矾鐢憋紙*.jsp锛夛紝璇锋眰鍛戒腑鍚庣敱
- * {@code JspServlet.service()} 瀹屾垚 JSP 缂栬瘧涓庢覆鏌撱€?
+ * <p>通过 {@link ServletInvoker} 注册为框架路由（*.jsp），请求命中后由
+ * {@code JspServlet.service()} 完成 JSP 编译与渲染。
  */
 public class JasperJspServlet extends JspServlet {
 

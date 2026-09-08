@@ -10,10 +10,10 @@ import javax.websocket.server.ServerEndpoint;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * JSR-356锛圫ervlet WebSocket 瑙勮寖锛夌鐐圭ず渚嬶細`@ServerEndpoint` 娉ㄨВ鏂瑰紡銆?
+ * JSR-356（Servlet WebSocket 规范）端点示例：`@ServerEndpoint` 注解方式。
  *
- * <p>鐢?{@code spring-web-websocket} 妯″潡鐨?JSR 妗ユ帴鑷姩鎵弿娉ㄥ唽锛?
- * 搴曞眰杩愯鍦ㄦ湰妗嗘灦鐨?Netty WebSocket 绠＄嚎涓娿€?/p>
+ * <p>由 {@code spring-web-websocket} 模块的 JSR 桥接自动扫描注册，
+ * 底层运行在本框架的 Netty WebSocket 管线上。</p>
  */
 @Slf4j
 @ServerEndpoint("/ws/jsr/{roomId}")

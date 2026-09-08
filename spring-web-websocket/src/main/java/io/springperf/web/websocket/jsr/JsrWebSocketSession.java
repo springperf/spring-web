@@ -20,18 +20,18 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * JSR-356 {@link Session} 瀹炵幇锛屽寘瑁呭簳灞?Spring {@link WebSocketSession}锛圢etty 绠￠亾锛夈€?
+ * JSR-356 {@link Session} 实现，包装底层 Spring {@link WebSocketSession}（Netty 管道）。
  *
- * <p>鑱岃矗鏄犲皠锛?/p>
+ * <p>职责映射：</p>
  * <ul>
- *   <li>鍙戦€?鈫?濮旀墭 {@link WebSocketSession#sendMessage}锛堟枃鏈?浜岃繘鍒?Ping/Pong锛?/li>
- *   <li>鍏抽棴 鈫?濮旀墭 {@link WebSocketSession#close(CloseStatus)}</li>
- *   <li>璺緞鍙橀噺 鈫?鎻℃墜闃舵鐢?RouteMatcher 鎻愬彇鍚庢敞鍏?/li>
- *   <li>{@code addMessageHandler} 鈫?棣栨湡涓嶆敮鎸侊紙鐢?{@code @OnMessage} 娉ㄨВ椹卞姩锛?/li>
+ *   <li>发送 → 委托 {@link WebSocketSession#sendMessage}（文本/二进制/Ping/Pong）</li>
+ *   <li>关闭 → 委托 {@link WebSocketSession#close(CloseStatus)}</li>
+ *   <li>路径变量 → 握手阶段由 RouteMatcher 提取后注入</li>
+ *   <li>{@code addMessageHandler} → 首期不支持（由 {@code @OnMessage} 注解驱动）</li>
  * </ul>
  *
  * @author huangcanda
- * @since 3.2.5
+ * @since 3.5.6
  */
 public class JsrWebSocketSession implements Session {
 
@@ -92,7 +92,7 @@ public class JsrWebSocketSession implements Session {
 
     @Override
     public void removeMessageHandler(MessageHandler handler) {
-        // 鏃犲姩鎬佹敞鍐岋紝鏃犳搷浣?
+        // 无动态注册，无操作
     }
 
     @Override

@@ -1,8 +1,8 @@
 package io.springperf.web.support.servlet;
 
+import javax.servlet.DispatcherType;
 import org.junit.jupiter.api.Test;
 
-import javax.servlet.DispatcherType;
 import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -178,7 +178,7 @@ class AbstractFastFailHttpServletRequestTest {
         assertThrows(UnsupportedOperationException.class, () -> request.removeAttribute("k"));
         assertThrows(UnsupportedOperationException.class, () -> request.getRequestDispatcher("/x"));
 
-        // 杩斿洖 null 鐨勮闂櫒涓嶅簲鎶涘紓甯?
+        // 返回 null 的访问器不应抛异常
         assertNull(request.getServerName());
         assertNull(request.getRemoteAddr());
         assertNull(request.getRemoteHost());
@@ -194,26 +194,8 @@ class AbstractFastFailHttpServletRequestTest {
 
     @Test
     void servlet6IdentityMethods_returnRequestId() {
-        String requestId = request.getRequestId();
-        assertNotNull(requestId);
-        assertEquals(requestId, request.getProtocolRequestId());
-        assertFalse(requestId.isEmpty());
-    }
-
-    @Test
-    void servlet6IdentityMethods_haveUniqueIds() {
-        AbstractFastFailHttpServletRequest other = new AbstractFastFailHttpServletRequest() {};
-        assertNotEquals(request.getRequestId(), other.getRequestId());
-    }
-
-    @Test
-    void getServletConnection_reportsConnectionInfo() {
-        javax.servlet.ServletConnection connection = request.getServletConnection();
-        assertNotNull(connection);
-        assertNotNull(connection.getConnectionId());
-        assertEquals("HTTP/1.1", connection.getProtocol());
-        assertNotNull(connection.getProtocolConnectionId());
-        assertFalse(connection.isSecure());
+        // Servlet 6.0（master/SB4）特有的 getRequestId/getProtocolRequestId/getServletConnection 在
+        // javax.servlet 4.0（SB2.7）不存在：2.7.x 实现不提供这些方法，此处不再验证。
     }
 
     @Test

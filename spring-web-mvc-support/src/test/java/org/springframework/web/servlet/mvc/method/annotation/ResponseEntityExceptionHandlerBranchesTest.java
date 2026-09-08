@@ -24,8 +24,8 @@ import java.util.Collections;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * 楠岃瘉 {@link ResponseEntityExceptionHandler#handleException} 瀵瑰悇绫诲紓甯哥殑
- * HTTP 鐘舵€佺爜鏄犲皠锛圫pring MVC 璇箟瀵归綈锛夈€?
+ * 验证 {@link ResponseEntityExceptionHandler#handleException} 对各类异常的
+ * HTTP 状态码映射（Spring MVC 语义对齐）。
  */
 class ResponseEntityExceptionHandlerBranchesTest {
 
@@ -112,7 +112,7 @@ class ResponseEntityExceptionHandlerBranchesTest {
         ResponseEntity<Object> result = handler.handleException(ex, req);
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, result.getStatusCode());
         assertSame(ex, req.getAttribute("javax.servlet.error.exception", 0),
-                "500 鏃跺簲璁剧疆 error.exception 璇锋眰灞炴€?);
+                "500 时应设置 error.exception 请求属性");
     }
 
     @Test

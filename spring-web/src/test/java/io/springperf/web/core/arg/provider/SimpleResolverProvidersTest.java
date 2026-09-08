@@ -293,7 +293,7 @@ class SimpleResolverProvidersTest {
         org.springframework.web.server.ResponseStatusException ex = assertThrows(
                 org.springframework.web.server.ResponseStatusException.class,
                 () -> r.resolveArgument(mockRequest, mockResponse));
-        assertEquals(400, ex.getStatusCode().value(), "缺少必填参数应映射为 400");
+        assertEquals(400, ex.getStatus().value(), "缺少必填参数应映射为 400");
         assertTrue(ex.getMessage().contains("name"), "400 消息应包含缺失的参数名");
     }
 

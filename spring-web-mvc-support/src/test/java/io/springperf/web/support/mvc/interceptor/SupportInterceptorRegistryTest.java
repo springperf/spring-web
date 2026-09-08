@@ -1,6 +1,8 @@
 package io.springperf.web.support.mvc.interceptor;
 
 import io.springperf.web.core.interceptor.InterceptorRegistration;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -10,8 +12,7 @@ import org.springframework.util.PathMatcher;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.handler.MappedInterceptor;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import java.util.Arrays;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -88,7 +89,7 @@ class SupportInterceptorRegistryTest {
         InterceptorRegistration result = registry.convert((HandlerInterceptor) mapped);
 
         assertNotNull(result);
-        // include/exclude 璺緞搴斾粠 MappedInterceptor 澶嶅埗鍒版敞鍐岄」
+        // include/exclude 路径应从 MappedInterceptor 复制到注册项
         assertEquals(Arrays.asList("/api/**"), readList(result, "includePatterns"));
         assertEquals(Arrays.asList("/api/public/**"), readList(result, "excludePatterns"));
     }
@@ -102,8 +103,8 @@ class SupportInterceptorRegistryTest {
         InterceptorRegistration result = registry.convert((HandlerInterceptor) mapped);
 
         assertNotNull(result);
-        assertEquals(Arrays.asList("/secure/*"), readList(result, "includePatterns"));
-        assertTrue(readList(result, "excludePatterns").isEmpty(), "鏃?exclude 鏃朵笉搴斾骇鐢熸帓闄よ矾寰?);
+        assertEquals(java.util.Arrays.asList("/secure/*"), readList(result, "includePatterns"));
+        assertTrue(readList(result, "excludePatterns").isEmpty(), "无 exclude 时不应产生排除路径");
     }
 
     @SuppressWarnings("unchecked")

@@ -8,8 +8,8 @@ import java.util.concurrent.CompletableFuture;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * 楠岃瘉 {@link OpenApiAdapter} 鐨勭函閫昏緫鏂规硶锛?
- * 璺緞娓呮礂銆佽繑鍥炲€艰В鍖呫€丼chema 鏄犲皠銆佹鏋?绠€鍗曠被鍨嬪垽鏂€?
+ * 验证 {@link OpenApiAdapter} 的纯逻辑方法：
+ * 路径清洗、返回值解包、Schema 映射、框架/简单类型判断。
  */
 class OpenApiAdapterDetailsTest {
 

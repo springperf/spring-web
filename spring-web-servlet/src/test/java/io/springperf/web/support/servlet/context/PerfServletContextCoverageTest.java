@@ -11,6 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Collections;
 import java.io.File;
 import java.io.InputStream;
 import java.net.URL;
@@ -185,11 +186,6 @@ class PerfServletContextCoverageTest {
         assertTrue(cfg.isSecure());
         cfg.setMaxAge(100);
         assertEquals(100, cfg.getMaxAge());
-        cfg.setAttribute("a", "1");
-        assertEquals("1", cfg.getAttribute("a"));
-        cfg.setAttribute("a", null);
-        assertNull(cfg.getAttribute("a"));
-        assertNotNull(cfg.getAttributes());
     }
 
     /* ==================== 缂栫爜 ==================== */

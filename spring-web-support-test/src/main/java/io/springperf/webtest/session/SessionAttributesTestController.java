@@ -15,10 +15,10 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * 楠岃瘉 {@code @SessionAttributes}锛堝鏁帮級锛氱被绾у０鏄庡睘鎬у湪璇锋眰闂翠笌 session 鍙屽悜鍚屾銆?
- * <p>鍒嗘琛ㄥ崟璇箟锛歿@code step1} 褰曞叆閮ㄥ垎鏁版嵁 鈫?session 淇濆瓨锛泏@code step2} 浠?session
- * 鎭㈠瀵硅薄锛坽@code @ModelAttribute} 鍙傛暟澶嶇敤鍚屼竴瀹炰緥锛屼笉閲嶅缓锛夛紱{@code complete} 璋?
- * {@link SessionStatus#setComplete()} 娓呯悊 session銆?/p>
+ * 验证 {@code @SessionAttributes}（复数）：类级声明属性在请求间与 session 双向同步。
+ * <p>分步表单语义：{@code step1} 录入部分数据 → session 保存；{@code step2} 从 session
+ * 恢复对象（{@code @ModelAttribute} 参数复用同一实例，不重建）；{@code complete} 调
+ * {@link SessionStatus#setComplete()} 清理 session。</p>
  */
 @RestController
 @RequestMapping("/session-attrs")
@@ -64,7 +64,7 @@ public class SessionAttributesTestController {
         return result;
     }
 
-    /** 鍒嗘琛ㄥ崟鏁版嵁瀵硅薄锛堟棤 ID 璇箟锛屼粎婕旂ず session 鎭㈠锛夈€?*/
+    /** 分步表单数据对象（无 ID 语义，仅演示 session 恢复）。 */
     public static class Wizard {
         private String name;
 

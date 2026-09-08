@@ -11,11 +11,11 @@ import javax.servlet.http.HttpServletResponse;
 import java.util.Map;
 
 /**
- * 鍩轰簬 JSP 鐨?{@link View} 瀹炵幇銆?
+ * 基于 JSP 的 {@link View} 实现。
  *
- * <p>灏?model 鍐欏叆 request attribute锛圝SP EL 缁?{@code request.getAttribute} 璁块棶锛夛紝
- * 鍐嶉€氳繃 {@code RequestDispatcher.forward} 杞彂鍒?JSP 璺緞鈥斺€旂敱 {@code PerfRequestDispatcher}
- * 閲嶆柊鍒嗗彂锛屽懡涓?*.jsp 璺敱鍚庣敱 Jasper 娓叉煋銆?/p>
+ * <p>将 model 写入 request attribute（JSP EL 经 {@code request.getAttribute} 访问），
+ * 再通过 {@code RequestDispatcher.forward} 转发到 JSP 路径——由 {@code PerfRequestDispatcher}
+ * 重新分发，命中 *.jsp 路由后由 Jasper 渲染。</p>
  */
 public class JspView implements View {
 

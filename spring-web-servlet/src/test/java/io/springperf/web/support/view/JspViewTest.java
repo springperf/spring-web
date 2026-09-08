@@ -78,7 +78,7 @@ class JspViewTest {
         new JspView("/jsp/b.jsp").render(model, req, resp);
 
         verify(requestContext, never()).setAttribute(eq("nullKey"), any());
-        verify(requestContext, never()).setAttribute(org.mockito.ArgumentMatchers.isNull(String.class), any());
+        verify(requestContext, never()).setAttribute((String) isNull(), any());
         verify(requestContext).setAttribute("ok", "present");
         verify(resp).setHandled();
     }

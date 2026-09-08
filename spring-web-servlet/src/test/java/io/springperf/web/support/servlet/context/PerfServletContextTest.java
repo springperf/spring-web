@@ -140,7 +140,7 @@ class PerfServletContextTest {
 
         servletContext.destroyComponent();
 
-        assertFalse(tempDir.exists(), "鑷缓涓存椂鐩綍搴斿湪閿€姣佹椂琚竻鐞?);
+        assertFalse(tempDir.exists(), "自建临时目录应在销毁时被清理");
     }
 
     @Test
