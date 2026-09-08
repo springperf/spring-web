@@ -377,4 +377,44 @@ class InterceptorRegistryTest {
 
         registry.afterConcurrentHandlingStarted(request, response);
     }
+
+    // ---- 404/405 无 mappingContext 时的路径级拦截器过滤 ----
+
+    private static WebServerHttpRequest requestWithPath(String path) {
+        WebServerHttpRequest req = mock(WebServerHttpRequest.class);
+        RequestContext rc = mock(RequestContext.class);
+        lenient().when(req.getRequestContext()).thenReturn(rc);
+        lenient().when(req.getPath()).thenReturn(path);
+        lenient().when(rc.getAttribute(any(io.springperf.web.http.RequestAttribute.class))).thenReturn(null);
+        return req;
+    }
+
+    @Test
+    void afterCompletion_noMappingContext_pathScopedInterceptorFilteredByPath() throws Exception {
+        // P1-3 回归：404/405（无 handler）时路径级拦截器（includePatterns=/admin/**）
+        // 必须按请求路径过滤，不得对任意 404 触发 afterCompletion。
+        HandlerInterceptor pathInterceptor = mock(HandlerInterceptor.class);
+        InterceptorRegistration reg = new InterceptorRegistration(pathInterceptor)
+                .addPathPatterns("/admin/**");
+        registry.registerWebComponent(reg);
+        registry.initComponentPhase2();
+
+        registry.afterCompletion(requestWithPath("/public/foo"), response, null);
+        verify(pathInterceptor, never()).afterCompletion(any(), any(), any(), any());
+
+        registry.afterCompletion(requestWithPath("/admin/foo"), response, null);
+        verify(pathInterceptor).afterCompletion(any(), any(), any(), any());
+    }
+
+    @Test
+    void afterCompletion_noMappingContext_globalInterceptorAlwaysRuns() throws Exception {
+        // 全局拦截器（无 include/exclude）在 404 时不受路径过滤影响
+        HandlerInterceptor global = mock(HandlerInterceptor.class);
+        InterceptorRegistration reg = new InterceptorRegistration(global);
+        registry.registerWebComponent(reg);
+        registry.initComponentPhase2();
+
+        registry.afterCompletion(requestWithPath("/public/foo"), response, null);
+        verify(global).afterCompletion(any(), any(), any(), isNull());
+    }
 }

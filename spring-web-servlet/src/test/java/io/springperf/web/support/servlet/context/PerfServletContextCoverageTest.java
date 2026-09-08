@@ -19,6 +19,8 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -165,6 +167,50 @@ class PerfServletContextCoverageTest {
         assertTrue(servletContext.getSessionTimeout() > 0);
         servletContext.setSessionTimeout(120);
         assertEquals(120, servletContext.getSessionTimeout());
+    }
+
+    @Test
+    void sessionTimeout_durationMinutes_parsedToMinutes() {
+        when(props.get(eq("server.servlet.session.timeout"), isNull())).thenReturn("30m");
+        PerfServletContext ctx = new PerfServletContext(webContext);
+        try {
+            assertEquals(30, ctx.getSessionTimeout(), "30m = 1800s → 30 分钟");
+        } finally {
+            ctx.destroyComponent();
+        }
+    }
+
+    @Test
+    void sessionTimeout_hoursSuffix_parsedToMinutes() {
+        when(props.get(eq("server.servlet.session.timeout"), isNull())).thenReturn("1h");
+        PerfServletContext ctx = new PerfServletContext(webContext);
+        try {
+            assertEquals(60, ctx.getSessionTimeout(), "1h = 3600s → 60 分钟");
+        } finally {
+            ctx.destroyComponent();
+        }
+    }
+
+    @Test
+    void sessionTimeout_bareSeconds_parsedToMinutes() {
+        when(props.get(eq("server.servlet.session.timeout"), isNull())).thenReturn("90");
+        PerfServletContext ctx = new PerfServletContext(webContext);
+        try {
+            assertEquals(1, ctx.getSessionTimeout(), "90s → 1 分钟（整数截断）");
+        } finally {
+            ctx.destroyComponent();
+        }
+    }
+
+    @Test
+    void sessionTimeout_invalidValue_fallsBackToDefault() {
+        when(props.get(eq("server.servlet.session.timeout"), isNull())).thenReturn("abc");
+        PerfServletContext ctx = new PerfServletContext(webContext);
+        try {
+            assertEquals(30, ctx.getSessionTimeout(), "非法值兜底 1800s → 30 分钟");
+        } finally {
+            ctx.destroyComponent();
+        }
     }
 
     @Test

@@ -186,7 +186,7 @@ public class InterceptorRegistry extends WebComponentContainer {
     protected List<HandlerInterceptor> realGetInterceptors(WebServerHttpRequest request) {
         PathMappingContext mappingContext = PathMappingContext.get(request);
         if (mappingContext == null) {
-            return runtimeMappingInterceptors;
+            return getRuntimeInterceptors(request, runtimeMappingInterceptors);
         }
         List<HandlerInterceptor> interceptors = mappingContext.getCachedInterceptors();
         if (interceptors == null) {

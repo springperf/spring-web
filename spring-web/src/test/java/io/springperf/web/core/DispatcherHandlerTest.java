@@ -597,7 +597,9 @@ class DispatcherHandlerTest {
 
         // result is set before resolveReturnValue throws, so it's the concurrentResult
         verify(interceptorRegistry).postHandle(req, resp, concurrentResult);
-        verify(interceptorRegistry).afterCompletion(req, resp, null);
+        // 序列化异常不再被吞掉：路由到 ExceptionRegistry，afterCompletion 携带真实异常
+        verify(exceptionRegistry).handle(any(Throwable.class), eq(req), eq(resp));
+        verify(interceptorRegistry).afterCompletion(eq(req), eq(resp), any(Throwable.class));
     }
 
     // ==================== initContextHolders / removeContextHolders ====================

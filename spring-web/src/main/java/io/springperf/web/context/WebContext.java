@@ -1,6 +1,9 @@
 package io.springperf.web.context;
 
 import io.springperf.web.core.DispatcherHandler;
+import io.springperf.web.core.exception.ExceptionHandlerExceptionResolver;
+import io.springperf.web.core.invoker.FastInvokerGenerator;
+import io.springperf.web.core.mapping.MappingHandlerMethod;
 import io.springperf.web.util.WebUtils;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
@@ -87,6 +90,24 @@ public class WebContext extends WebComponentContainer implements DisposableBean,
         this.destroyComponent();
         // 复位生命周期标记，支持 stop/restart 场景下再次 startLifecycle 重新初始化
         this.lifecycleStarted.set(false);
+    }
+
+    /**
+     * 销毁组件并在 finally 中清空进程级静态元数据缓存。
+     * <p>缓存（MappingHandlerMethod / ExceptionHandlerExceptionResolver / FastInvokerGenerator）
+     * 以 Class/Method 为键、进程级共享、永不自然回收。devtools / 新 ClassLoader 重启会关闭上下文
+     * 走到此处，必须显式清空，否则旧 ClassLoader 连同 metaspace 被钉住无法回收。
+     * 均为纯缓存，清空后下次访问自动重建，清空永远安全。</p>
+     */
+    @Override
+    public void destroyComponent() throws Exception {
+        try {
+            super.destroyComponent();
+        } finally {
+            MappingHandlerMethod.clearAllCaches();
+            ExceptionHandlerExceptionResolver.clearAllCaches();
+            FastInvokerGenerator.clearAllCaches();
+        }
     }
 
     /**

@@ -126,4 +126,41 @@ class NettyHttpHandlerErrorPathTest {
         assertNotNull(response);
         assertEquals(500, response.status().code());
     }
+
+    @Test
+    void handlerException_releasesRequestBuffer() throws Exception {
+        NettyHttpHandler nettyHandler = new NettyHttpHandler(webContext, "", handler);
+        EmbeddedChannel channel = new EmbeddedChannel();
+        channel.pipeline().addLast(nettyHandler);
+
+        doThrow(new RuntimeException("handler error")).when(handler)
+                .httpHandle(any(WebServerHttpRequest.class), any(WebServerHttpResponse.class));
+
+        DefaultFullHttpRequest request = new DefaultFullHttpRequest(
+                HttpVersion.HTTP_1_1, HttpMethod.GET, "/test");
+        request.content().writeBytes("hello".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        nettyHandler.channelRead(channel.pipeline().firstContext(), request);
+
+        assertEquals(0, request.refCnt(), "异常路径下请求 ByteBuf 引用应完全释放");
+    }
+
+    @Test
+    void requestConstructionFailure_releasesRetainedBuffer() throws Exception {
+        // 复位静态缓存使构造函数必然读取配置并抛异常（req 创建失败路径）
+        Field limitField = NettyServerHttpRequest.class.getDeclaredField("cachedLargeBodyLimit");
+        limitField.setAccessible(true);
+        limitField.setInt(null, -1);
+        doThrow(new IllegalStateException("props boom")).when(appProperties)
+                .getInt(PropertiesConstant.HTTP_MAX_IN_MEMORY_SIZE);
+
+        NettyHttpHandler nettyHandler = new NettyHttpHandler(webContext, "", handler);
+        EmbeddedChannel channel = new EmbeddedChannel();
+        channel.pipeline().addLast(nettyHandler);
+
+        DefaultFullHttpRequest request = new DefaultFullHttpRequest(
+                HttpVersion.HTTP_1_1, HttpMethod.GET, "/test");
+        nettyHandler.channelRead(channel.pipeline().firstContext(), request);
+
+        assertEquals(0, request.refCnt(), "请求构造失败路径应释放 retain 的引用（无泄漏）");
+    }
 }

@@ -2,12 +2,17 @@ package io.springperf.web.core.mapping.route;
 
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.util.PathPatternUtils;
 
 import java.util.Arrays;
 
 public class PathPatternsRouter implements Router {
 
     private PathPatternRouter[] routers;
+
+    /** 按路径特异性排序（literal > {var} > * > **），重叠通配符时最精确者优先。 */
+    private static final java.util.Comparator<PathPatternRouter> SPECIFICITY_COMPARATOR =
+            (a, b) -> PathPatternUtils.comparePathRuleSpecificity(a.getPathRule(), b.getPathRule());
 
     public PathPatternsRouter() {
         routers = new PathPatternRouter[0];
@@ -59,5 +64,11 @@ public class PathPatternsRouter implements Router {
             }
         }
         addPathPatternRouter(new PathPatternRouter(router));
+        // 启动/修改时（而非请求时）按路径特异性排序：重叠通配符（如 /user/{id} vs /user/*）
+        // 最精确者优先匹配；非重叠路由排序不影响命中；同特异性由稳定排序保持注册顺序。
+        // copy+swap 原子换引用，读者只看到完整数组，无中间态。
+        PathPatternRouter[] sorted = Arrays.copyOf(routers, routers.length);
+        Arrays.sort(sorted, SPECIFICITY_COMPARATOR);
+        routers = sorted;
     }
 }

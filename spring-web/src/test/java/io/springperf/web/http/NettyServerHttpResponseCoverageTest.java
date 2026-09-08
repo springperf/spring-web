@@ -103,6 +103,35 @@ class NettyServerHttpResponseCoverageTest {
     }
 
     @Test
+    void resetBuffer_emptyBuffer_returnsFalse() {
+        NettyServerHttpResponse resp = newResponse(false);
+        assertFalse(resp.resetBuffer(), "无缓冲数据时返回 false");
+    }
+
+    @Test
+    void resetBuffer_withBufferedBody_clearsByteBuf() throws Exception {
+        NettyServerHttpResponse resp = newResponse(false);
+        resp.getBody().write("hello".getBytes(StandardCharsets.UTF_8));
+        assertTrue(resp.resetBuffer(), "有缓冲数据时返回 true");
+        assertEquals(0, resp.getBuf().readableBytes(), "resetBuffer 后底层 ByteBuf 应被清空");
+    }
+
+    @Test
+    void sendError_afterPartialBody_resetsPartialContent() throws Exception {
+        NettyServerHttpResponse resp = newResponse(false);
+        when(ctx.writeAndFlush(any())).thenReturn(mock(ChannelFuture.class));
+        // 模拟序列化中途失败：先写入部分内容再 sendError
+        resp.getBody().write("partial".getBytes(StandardCharsets.UTF_8));
+        resp.sendError(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR);
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(ctx).writeAndFlush(captor.capture());
+        FullHttpResponse nettyResp = (FullHttpResponse) captor.getValue();
+        String body = nettyResp.content().toString(StandardCharsets.UTF_8);
+        assertTrue(body.contains("\"error\""), "错误 JSON 应写入");
+        assertFalse(body.contains("partial"), "已缓冲的部分内容应被清空而非追加");
+    }
+
+    @Test
     void flush_headRequest_convertsWrittenBodyToContentLength() throws Exception {
         NettyServerHttpResponse resp = newResponse(false);
         when(ctx.writeAndFlush(any())).thenReturn(mock(ChannelFuture.class));

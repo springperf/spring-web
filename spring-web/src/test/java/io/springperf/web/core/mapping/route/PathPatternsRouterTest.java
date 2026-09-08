@@ -190,4 +190,59 @@ class PathPatternsRouterTest {
         WebServerHttpRequest req = createMockRequest("/api/123");
         assertNotNull(router.route(req));
     }
+
+    @Test
+    void route_overlappingWildcards_mostSpecificWins() {
+        // 重叠通配符：/api/users/* 与 /api/users/{id} 都命中 /api/users/123
+        // 先注册通配符、后注册变量路由——无论注册顺序，变量路由（更精确）应胜出
+        PathMappingContext wildcardCtx = mock(PathMappingContext.class);
+        when(wildcardCtx.getPathRule()).thenReturn("/api/users/*");
+        when(wildcardCtx.getMatchers()).thenReturn(new Matcher[0]);
+        PathMappingContext varCtx = mock(PathMappingContext.class);
+        when(varCtx.getPathRule()).thenReturn("/api/users/{id}");
+        when(varCtx.getMatchers()).thenReturn(new Matcher[0]);
+
+        PathPatternsRouter router = new PathPatternsRouter();
+        router.add(new SimpleRouter(wildcardCtx));
+        router.add(new SimpleRouter(varCtx));
+
+        WebServerHttpRequest req = createMockRequest("/api/users/123");
+        assertSame(varCtx, router.route(req), "重叠通配符应取最精确的变量路由");
+    }
+
+    @Test
+    void route_overlappingLiteralAndVariable_literalWins() {
+        // 精确段比路径变量更精确：/api/users/me 应优先于 /api/users/{id}
+        PathMappingContext varCtx = mock(PathMappingContext.class);
+        when(varCtx.getPathRule()).thenReturn("/api/users/{id}");
+        when(varCtx.getMatchers()).thenReturn(new Matcher[0]);
+        PathMappingContext literalCtx = mock(PathMappingContext.class);
+        when(literalCtx.getPathRule()).thenReturn("/api/users/me");
+        when(literalCtx.getMatchers()).thenReturn(new Matcher[0]);
+
+        PathPatternsRouter router = new PathPatternsRouter();
+        router.add(new SimpleRouter(varCtx));
+        router.add(new SimpleRouter(literalCtx));
+
+        WebServerHttpRequest req = createMockRequest("/api/users/me");
+        assertSame(literalCtx, router.route(req), "精确字面量路由应优先于变量路由");
+    }
+
+    @Test
+    void route_nonOverlappingPaths_registrationOrderIrrelevant() {
+        // 非重叠路径：排序不改变命中结果
+        PathMappingContext a = mock(PathMappingContext.class);
+        when(a.getPathRule()).thenReturn("/api/users/{id}");
+        when(a.getMatchers()).thenReturn(new Matcher[0]);
+        PathMappingContext b = mock(PathMappingContext.class);
+        when(b.getPathRule()).thenReturn("/api/orders/*");
+        when(b.getMatchers()).thenReturn(new Matcher[0]);
+
+        PathPatternsRouter router = new PathPatternsRouter();
+        router.add(new SimpleRouter(a));
+        router.add(new SimpleRouter(b));
+
+        assertSame(b, router.route(createMockRequest("/api/orders/42")));
+        assertSame(a, router.route(createMockRequest("/api/users/7")));
+    }
 }

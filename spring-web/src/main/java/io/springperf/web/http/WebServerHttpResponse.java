@@ -2,6 +2,7 @@ package io.springperf.web.http;
 
 import io.springperf.web.context.WebContext;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.server.ServerHttpResponse;
 
 import java.io.File;
@@ -38,10 +39,12 @@ public interface WebServerHttpResponse extends ServerHttpResponse {
 
     /**
      * Return the HTTP status set on this response.
+     * <p>支持非标准状态码（如 499/599）：{@link HttpStatusCode} 可以是
+     * {@code DefaultHttpStatusCode}，不再强制收敛到标准 {@link HttpStatus}。</p>
      *
      * @return the status, or {@code null} if not set
      */
-    HttpStatus getStatus();
+    HttpStatusCode getStatus();
 
     /**
      * Return the character encoding of the response body.
@@ -128,6 +131,16 @@ public interface WebServerHttpResponse extends ServerHttpResponse {
      * @param message    the error message
      */
     void sendError(HttpStatus statusCode, String message);
+
+    /**
+     * Send an error response with the given status code and message.
+     * <p>支持非标准状态码（如 499/599）：调用方可传入 {@link HttpStatusCode#valueOf(int)}
+     * 得到的 {@code DefaultHttpStatusCode}，由底层按原始码值写入响应。</p>
+     *
+     * @param statusCode the HTTP status code
+     * @param message    the error message
+     */
+    void sendError(HttpStatusCode statusCode, String message);
 
     /**
      * Write an {@link InputStream} to the response body as a stream.

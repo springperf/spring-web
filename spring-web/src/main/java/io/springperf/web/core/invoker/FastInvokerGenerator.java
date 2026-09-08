@@ -20,6 +20,21 @@ public class FastInvokerGenerator {
 
     private static final Map<Method, Class<?>> invokerClassCache = new ConcurrentHashMap<>();
 
+    /**
+     * 清空已生成的 invoker 类缓存（由 {@code WebContext.destroyComponent()} 在上下文销毁时调用，
+     * 防 devtools 等新 ClassLoader 重启场景下旧 ClassLoader 被钉住——生成的字节码类强引用 controller 类）。
+     * 缓存为纯缓存，清空后下次访问自动重建。
+     */
+    public static void clearAllCaches() {
+        invokerClassCache.clear();
+    }
+
+    /**
+     * GraalVM native-image 运行时会在系统属性中设置此值，用于检测原生镜像环境。
+     */
+    private static final boolean IN_NATIVE_IMAGE =
+            System.getProperty("org.graalvm.nativeimage.imagecode") != null;
+
     public static Invoker createInvoker(Object controller, Class controllerClass, Method method) throws Throwable {
         Class<?> invokerClass = invokerClassCache.computeIfAbsent(method, (m) -> generateClass(controllerClass, m));
         Constructor<?> ctor = invokerClass.getConstructor(controllerClass);
