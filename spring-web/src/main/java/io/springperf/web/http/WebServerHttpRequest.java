@@ -3,6 +3,7 @@ package io.springperf.web.http;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.http.support.BodyHttpInputMessage;
 import io.springperf.web.http.support.HttpInputMessagePart;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.multipart.MultipartFile;
@@ -142,10 +143,13 @@ public interface WebServerHttpRequest extends ServerHttpRequest, BodyHttpInputMe
     /**
      * Return the attributes map for this request.
      *
-     * <p>Spring 6.2+ {@code HttpRequest} declares this method as abstract.
-     * This declaration ensures cross-version compatibility without {@code @Override}.
+     * <p>Spring 5.3 中 {@code HttpRequest#getAttributes()} 已有默认实现
+     * （返回空 map）；此声明仅为 Spring 6.2+（声明为抽象）提供跨版本兼容。
+     * 提供默认实现避免要求所有实现类必须覆盖。</p>
      */
-    Map<String, Object> getAttributes();
+default Map<String, Object> getAttributes() {
+    return new java.util.LinkedHashMap<>();
+}
 
     /**
      * Return the HTTP method value as a String.
