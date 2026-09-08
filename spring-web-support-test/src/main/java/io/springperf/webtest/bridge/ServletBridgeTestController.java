@@ -1,4 +1,4 @@
-package io.springperf.webtest.bridge;
+﻿package io.springperf.webtest.bridge;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -85,6 +85,27 @@ public class ServletBridgeTestController {
         result.put("authType", request.getAuthType());
         result.put("remoteUser", request.getRemoteUser());
         result.put("userPrincipal", String.valueOf(request.getUserPrincipal()));
+        return result;
+    }
+
+    @PostMapping("/login")
+    public Map<String, String> login(@RequestParam String username, @RequestParam String password,
+                                     HttpServletRequest request) throws javax.servlet.ServletException {
+        request.login(username, password);
+        Map<String, String> result = new HashMap<>();
+        javax.servlet.http.HttpSession session = request.getSession(false);
+        result.put("sessionId", session != null ? session.getId() : null);
+        result.put("remoteUser", request.getRemoteUser());
+        return result;
+    }
+
+    @PostMapping("/logout")
+    public Map<String, String> logout(HttpServletRequest request) throws javax.servlet.ServletException {
+        request.logout();
+        Map<String, String> result = new HashMap<>();
+        javax.servlet.http.HttpSession session = request.getSession(false);
+        result.put("sessionId", session != null ? session.getId() : null);
+        result.put("remoteUser", request.getRemoteUser());
         return result;
     }
 

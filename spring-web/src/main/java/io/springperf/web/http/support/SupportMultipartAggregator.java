@@ -1,6 +1,7 @@
 package io.springperf.web.http.support;
 
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.codec.http.*;
 
 import java.util.List;
@@ -11,7 +12,7 @@ public class SupportMultipartAggregator extends HttpObjectAggregator {
     private SupportMultipartResolver multipart;
 
     public SupportMultipartAggregator(int maxContentLength) {
-        this(maxContentLength, new SupportMultipartResolver());
+        this(maxContentLength, new SupportMultipartResolver(maxContentLength));
     }
 
     public SupportMultipartAggregator(int maxContentLength, SupportMultipartResolver multipart) {
@@ -24,7 +25,15 @@ public class SupportMultipartAggregator extends HttpObjectAggregator {
         // 1. 如果 multipart 已经开始，直接 consume
         if (multipart.isMultipartMode()) {
             HttpContent content = (HttpContent) msg;
-            multipart.consume(content);
+            // 提前捕获当前请求引用：consume 超限时 abort() 会清空 resolver 的 request，需用副本构造 413
+            HttpRequest currentReq = multipart.getRequest();
+            try {
+                multipart.consume(content);
+            } catch (TooLongFrameException e) {
+                // 对齐 HttpObjectAggregator 行为：超限返回 413，而非裸异常关闭连接
+                handleOversizedMessage(ctx, currentReq);
+                return;
+            }
             if (content instanceof LastHttpContent) {
                 out.add(multipart.finish());
             }
@@ -34,9 +43,19 @@ public class SupportMultipartAggregator extends HttpObjectAggregator {
         if (msg instanceof HttpRequest) {
             HttpRequest req = (HttpRequest) msg;
             if (multipart.isMultipart(req)) {
-                multipart.start(req);
+                try {
+                    multipart.start(req);
+                } catch (TooLongFrameException e) {
+                    handleOversizedMessage(ctx, req);
+                    return;
+                }
                 if (msg instanceof HttpContent) {
-                    multipart.consume((HttpContent) msg);
+                    try {
+                        multipart.consume((HttpContent) msg);
+                    } catch (TooLongFrameException e) {
+                        handleOversizedMessage(ctx, req);
+                        return;
+                    }
                     if (msg instanceof LastHttpContent) {
                         out.add(multipart.finish());
                     }
