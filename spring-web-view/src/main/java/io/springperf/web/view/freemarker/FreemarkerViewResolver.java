@@ -39,7 +39,7 @@ public class FreemarkerViewResolver extends BaseWebComponent implements ViewReso
     }
 
     private void initEngine(boolean cacheable) {
-        this.configuration = new Configuration(Configuration.VERSION_2_3_33);
+        this.configuration = new Configuration(Configuration.VERSION_2_3_32);
         configuration.setDefaultEncoding(encoding);
         configuration.setClassLoaderForTemplateLoading(getClass().getClassLoader(), prefix);
         if (!cacheable) {
