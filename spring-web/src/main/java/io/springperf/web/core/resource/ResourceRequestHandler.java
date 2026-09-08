@@ -114,7 +114,13 @@ public class ResourceRequestHandler implements CustomInvoker {
 
             // write resource
             resp.setStatusCode(HttpStatus.OK);
-            resp.writeStream(resource.getInputStream());
+            // HEAD：仅返回元数据（Content-Length/ETag/Last-Modified 已在上面设置），
+            // 跳过 body 读取——避免打开文件流，资源探测零 IO
+            if (!req.isHeadRequest()) {
+                resp.writeStream(resource.getInputStream());
+            } else {
+                resp.setHandled();
+            }
         } catch (Exception e) {
             log.error("Failed to serve resource: {}", resourcePath, e);
             resp.sendError(HttpStatus.INTERNAL_SERVER_ERROR);
@@ -302,8 +308,9 @@ public class ResourceRequestHandler implements CustomInvoker {
     }
 
     public List<Matcher> getMatchers() {
-        HttpMethod[] httpMethods = new HttpMethod[]{HttpMethod.GET, HttpMethod.HEAD, HttpMethod.POST};
-        Matcher matcher = new HttpMethodMatcher(httpMethods);
+        // 仅允许 GET 访问静态资源（对齐 Spring MVC ResourceHttpRequestHandler 语义）；
+        // HEAD 无需显式声明——HttpMethodMatcher 在路由时自动将 HEAD 映射到 GET（RFC 7231 §4.3.2）
+        Matcher matcher = new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET});
         return Arrays.asList(matcher);
     }
 

@@ -46,6 +46,9 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
 
     protected volatile ByteBuf buf;
 
+    /** HEAD 请求标志：flush/写 body 时抑制响应体（只写 headers），对齐 RFC 7231 §4.3.2 */
+    private volatile boolean headRequest;
+
     public NettyServerHttpResponse(WebContext webContext, ChannelHandlerContext ctx, boolean keepAlive) {
         this(webContext, ctx, keepAlive, new DefaultHttpHeaders(false));
     }
@@ -55,6 +58,15 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
         super(webContext, keepAlive, new WebHttpHeaders(new NettyHttpHeadersAdapter(nettyHeaders, true)));
         this.ctx = ctx;
         this.nettyHeaders = nettyHeaders;
+    }
+
+    /** 标记本响应对应 HEAD 请求，后续 flush/write* 时抑制响应体。 */
+    public void markAsHeadRequest() {
+        this.headRequest = true;
+    }
+
+    protected boolean isHeadRequest() {
+        return headRequest;
     }
 
     public ByteBuf getBuf() {
@@ -73,6 +85,7 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
     public void flush(boolean chunked) throws IOException {
         ByteBuf buf = this.buf;
         try {
+            // HEAD 抑制逻辑由 writeAndFlush 内部处理（保留 Content-Length，丢弃 body）
             writeAndFlush(buf, null, null, chunked);
         } catch (Exception e) {
             // make sure to release buffer on error
@@ -110,7 +123,11 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
         } else if (chunked) {
             HttpUtil.setTransferEncodingChunked(response, true);
         } else {
-            response.headers().setInt(HttpHeaderNames.CONTENT_LENGTH, 0);
+            // 无 body 分支：已设置 Content-Length（如 HEAD 保留 body 长度、资源 HEAD 元数据）
+            // 则保留；否则置 0。
+            if (!response.headers().contains(HttpHeaderNames.CONTENT_LENGTH)) {
+                response.headers().setInt(HttpHeaderNames.CONTENT_LENGTH, 0);
+            }
         }
         if (keepAlive) {
             response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
@@ -124,6 +141,15 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
     protected void writeAndFlush(ByteBuf buf, String contentType, HttpStatus statusCode, boolean chunked) {
         if (!setCommitted()) {
             return;
+        }
+        // HEAD：抑制响应体——丢弃已写 body，但 Content-Length 保留真实 body 长度（RFC 7231 §4.3.2）
+        if (headRequest && buf != null) {
+            int bodyLength = buf.readableBytes();
+            if (!nettyHeaders.contains(HttpHeaderNames.CONTENT_LENGTH)) {
+                nettyHeaders.setInt(HttpHeaderNames.CONTENT_LENGTH, bodyLength);
+            }
+            buf.release();
+            buf = null;
         }
         HttpResponse response = initHttpResponse(buf, contentType, statusCode, chunked);
         ChannelFuture f = ctx.writeAndFlush(response);
@@ -141,6 +167,16 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
         HttpResponse response = initHttpResponse(null, "application/octet-stream", null, true);
         response.headers().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
         try {
+            if (headRequest) {
+                // HEAD：不发 body——发送 headers 后立即发 LastHttpContent 收尾
+                addRespEventListener(ctx.writeAndFlush(response), false);
+                ChannelFuture lastFuture = ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
+                addRespEventListener(lastFuture, true);
+                if (!keepAlive) {
+                    lastFuture.addListener(ChannelFutureListener.CLOSE);
+                }
+                return;
+            }
             addRespEventListener(ctx.writeAndFlush(response), false);
             // ChunkedStream produces ByteBuf chunks wrapped in HttpContent
             final ChunkedStream cs = new ChunkedStream(input);
@@ -168,9 +204,11 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
         if (!setCommitted()) {
             return;
         }
-        ByteBuf body = Unpooled.wrappedBuffer(data);
+        // HEAD：抑制 body——只发送 headers，Content-Length 保留真实长度
+        ByteBuf body = headRequest ? null : Unpooled.wrappedBuffer(data);
         HttpResponse response = new DefaultFullHttpResponse(
-                HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()), body, nettyHeaders, EmptyHttpHeaders.INSTANCE);
+                HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()),
+                body != null ? body : Unpooled.EMPTY_BUFFER, nettyHeaders, EmptyHttpHeaders.INSTANCE);
         // 零拷贝：nettyHeaders 即框架 headers 视图底层存储，无需逐条拷贝
         response.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/octet-stream");
         response.headers().setInt(HttpHeaderNames.CONTENT_LENGTH, data.length);
@@ -202,6 +240,15 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
             response.headers().set(HttpHeaderNames.CONTENT_LENGTH, fileLen);
             // write headers
             addRespEventListener(ctx.writeAndFlush(response), false);
+            if (headRequest) {
+                // HEAD：不发文件体——补发 LastHttpContent 收尾（headers 已含真实 Content-Length）
+                ChannelFuture lastFuture = ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
+                addRespEventListener(lastFuture, true);
+                if (!keepAlive) {
+                    lastFuture.addListener(ChannelFutureListener.CLOSE);
+                }
+                return;
+            }
             // write file
             fc = new FileInputStream(file).getChannel();
             final FileChannel toClose = fc;

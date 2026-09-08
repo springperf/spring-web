@@ -49,6 +49,7 @@ public class WebServerHttpRequestWrapper implements WebServerHttpRequest {
     @Override public ServerHttpAsyncRequestControl getAsyncRequestControl(ServerHttpResponse response) { return request.getAsyncRequestControl(response); }
     @Override @Nullable public HttpMethod getMethod() { return request.getMethod(); }
     @Override public String getMethodValue() { return request.getMethodValue(); }
+    @Override public boolean isHeadRequest() { return request.isHeadRequest(); }
     @Override public URI getURI() { return request.getURI(); }
     @Override public HttpHeaders getHeaders() { return request.getHeaders(); }
     @Override public InputStream getBody() throws IOException { return request.getBody(); }

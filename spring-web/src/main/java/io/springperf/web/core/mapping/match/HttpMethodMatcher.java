@@ -21,7 +21,18 @@ public class HttpMethodMatcher implements Matcher {
 
     @Override
     public boolean match(WebServerHttpRequest req, PathMappingContext mappingContext) {
-        return httpMethods.contains(req.getMethod());
+        HttpMethod method = req.getMethod();
+        if (HttpMethod.HEAD == method) {
+            // HEAD 语义：无显式 HEAD handler 时映射到 GET（RFC 7231 §4.3.2，
+            // 与 Spring MVC 一致——HEAD 请求返回与 GET 相同的响应头，但无响应体）。
+            // 显式声明了 HEAD 或可映射到 GET 均算匹配成功，并统一在路由层标记请求。
+            if (httpMethods.contains(HttpMethod.HEAD) || httpMethods.contains(HttpMethod.GET)) {
+                req.markAsHeadRequest();
+                return true;
+            }
+            return false;
+        }
+        return httpMethods.contains(method);
     }
 
     @Override
