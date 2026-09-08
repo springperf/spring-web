@@ -1,4 +1,324 @@
-﻿<?xml version="1.0" encoding="UTF-8"?><project xmlns="http://maven.apache.org/POM/4.0.0"         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">    <modelVersion>4.0.0</modelVersion>    <groupId>io.github.springperf</groupId>    <artifactId>spring-web-parent</artifactId>    <version>2.7.5</version>    <packaging>pom</packaging>    <name>Spring WebPerf Parent</name>    <description>鍩轰簬 Netty 鐨勯珮鎬ц兘鑷畾涔?SpringWeb 妗嗘灦锛孲pringMVC 鐨勬浛浠ｆ柟妗?/description>    <url>https://github.com/springperf/spring-web</url>    <licenses>        <license>            <name>Apache License, Version 2.0</name>            <url>https://www.apache.org/licenses/LICENSE-2.0</url>        </license>    </licenses>    <scm>        <connection>scm:git:git://github.com/springperf/spring-web.git</connection>        <developerConnection>scm:git:ssh://github.com/springperf/spring-web.git</developerConnection>        <url>https://github.com/springperf/spring-web</url>        <tag>HEAD</tag>    </scm>    <developers>        <developer>            <name>huangcanda</name>            <email>hcd0614@gmail.com</email>        </developer>    </developers>    <modules>        <module>spring-web</module>        <module>spring-web-websocket</module>        <module>spring-web-servlet</module>        <module>spring-web-mvc-support</module>        <module>spring-boot-starter-web</module>        <module>spring-web-test</module>        <module>spring-web-support-test</module>        <module>spring-web-benchmark</module>        <module>spring-web-view</module>        <module>spring-web-batch</module>        <module>spring-web-examples</module>    </modules>    <properties>        <java.version>8</java.version>        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>        <spring-web.version>2.7.5</spring-web.version>        <spring-boot.version>2.7.18</spring-boot.version>        <gpg.executable>gpg</gpg.executable>        <gpg.keyname>${env.GPG_KEY}</gpg.keyname>        <gpg.passphrase>${env.GPG_PASSPHRASE}</gpg.passphrase>        <!-- 绗笁鏂逛緷璧栫増鏈粺涓€绠＄悊 -->        <netty.version>4.1.115.Final</netty.version>        <jackson.version>2.17.2</jackson.version>        <lombok.version>1.18.24</lombok.version>        <fastjson2.version>2.0.60</fastjson2.version>        <junit-jupiter.version>5.8.2</junit-jupiter.version>        <junit-platform.version>1.8.2</junit-platform.version>        <jmh.version>1.37</jmh.version>        <springdoc.version>1.7.0</springdoc.version>        <hutool.version>5.8.23</hutool.version>        <disruptor.version>3.4.4</disruptor.version>        <!-- 鏋勫缓鎻掍欢鐗堟湰 -->        <maven-compiler-plugin.version>3.8.1</maven-compiler-plugin.version>        <maven-surefire-plugin.version>3.0.0-M5</maven-surefire-plugin.version>        <maven-failsafe-plugin.version>3.0.0-M5</maven-failsafe-plugin.version>        <maven-resources-plugin.version>3.1.0</maven-resources-plugin.version>        <maven-jar-plugin.version>3.1.2</maven-jar-plugin.version>        <maven-source-plugin.version>3.2.0</maven-source-plugin.version>        <maven-javadoc-plugin.version>3.2.0</maven-javadoc-plugin.version>        <build-helper-maven-plugin.version>3.6.0</build-helper-maven-plugin.version>        <!-- 娴嬭瘯瑕嗙洊鐜囷細JaCoCo -->        <jacoco.version>0.8.13</jacoco.version>    </properties>    <build>        <pluginManagement>            <plugins>                <plugin>                    <groupId>org.apache.maven.plugins</groupId>                    <artifactId>maven-compiler-plugin</artifactId>                    <version>${maven-compiler-plugin.version}</version>                    <configuration>                        <source>${java.version}</source>                        <target>${java.version}</target>                        <compilerArgs>                            <arg>-parameters</arg>                        </compilerArgs>                        <annotationProcessorPaths>                            <path>                                <groupId>org.projectlombok</groupId>                                <artifactId>lombok</artifactId>                                <version>${lombok.version}</version>                            </path>                        </annotationProcessorPaths>                    </configuration>                </plugin>                <plugin>                    <groupId>org.apache.maven.plugins</groupId>                    <artifactId>maven-surefire-plugin</artifactId>                    <version>${maven-surefire-plugin.version}</version>                </plugin>                <plugin>                    <groupId>org.apache.maven.plugins</groupId>                    <artifactId>maven-failsafe-plugin</artifactId>                    <version>${maven-failsafe-plugin.version}</version>                </plugin>                <plugin>                    <groupId>org.apache.maven.plugins</groupId>                    <artifactId>maven-resources-plugin</artifactId>                    <version>${maven-resources-plugin.version}</version>                </plugin>                <plugin>                    <groupId>org.apache.maven.plugins</groupId>                    <artifactId>maven-jar-plugin</artifactId>                    <version>${maven-jar-plugin.version}</version>                </plugin>                <plugin>                    <groupId>org.apache.maven.plugins</groupId>                    <artifactId>maven-source-plugin</artifactId>                    <version>${maven-source-plugin.version}</version>                </plugin>                <plugin>                    <groupId>org.apache.maven.plugins</groupId>                    <artifactId>maven-javadoc-plugin</artifactId>                    <version>${maven-javadoc-plugin.version}</version>                </plugin>                <plugin>                    <groupId>org.apache.maven.plugins</groupId>                    <artifactId>maven-gpg-plugin</artifactId>                    <version>1.6</version>                </plugin>                <plugin>                    <groupId>org.codehaus.mojo</groupId>                    <artifactId>build-helper-maven-plugin</artifactId>                    <version>${build-helper-maven-plugin.version}</version>                </plugin>                <plugin>                    <groupId>org.openjdk.jmh</groupId>                    <artifactId>jmh-maven-plugin</artifactId>                    <version>${jmh.version}</version>                </plugin>                <plugin>                    <groupId>org.springframework.boot</groupId>                    <artifactId>spring-boot-maven-plugin</artifactId>                    <version>${spring-boot.version}</version>                </plugin>                <plugin>                    <groupId>org.jacoco</groupId>                    <artifactId>jacoco-maven-plugin</artifactId>                    <version>${jacoco.version}</version>                    <executions>                        <execution>                            <id>prepare-agent</id>                            <goals>                                <goal>prepare-agent</goal>                            </goals>                        </execution>                        <execution>                            <id>report</id>                            <goals>                                <goal>report</goal>                            </goals>                        </execution>                    </executions>                </plugin>            </plugins>        </pluginManagement>    </build>    <profiles>        <profile>            <id>spring-boot-2.7</id>            <activation>                <activeByDefault>true</activeByDefault>            </activation>            <properties>                <spring-boot.version>2.7.18</spring-boot.version>            </properties>        </profile>        <profile>            <id>spring-boot-2.6</id>            <properties>                <spring-boot.version>2.6.15</spring-boot.version>            </properties>        </profile>        <profile>            <id>spring-boot-2.5</id>            <properties>                <spring-boot.version>2.5.15</spring-boot.version>            </properties>        </profile>        <profile>            <id>spring-boot-2.4</id>            <properties>                <spring-boot.version>2.4.13</spring-boot.version>            </properties>        </profile>        <profile>            <id>release</id>            <build>                <plugins>                    <plugin>                        <groupId>org.apache.maven.plugins</groupId>                        <artifactId>maven-source-plugin</artifactId>                        <executions>                            <execution>                                <id>attach-sources</id>                                <goals><goal>jar-no-fork</goal></goals>                            </execution>                        </executions>                    </plugin>                    <plugin>                        <groupId>org.apache.maven.plugins</groupId>                        <artifactId>maven-javadoc-plugin</artifactId>                        <configuration>                            <source>${java.version}</source>                            <failOnError>false</failOnError>                        </configuration>                        <executions>                            <execution>                                <id>attach-javadocs</id>                                <goals><goal>jar</goal></goals>                            </execution>                        </executions>                    </plugin>                    <plugin>                        <groupId>org.apache.maven.plugins</groupId>                        <artifactId>maven-gpg-plugin</artifactId>                        <configuration>                            <executable>${gpg.executable}</executable>                            <keyname>${gpg.keyname}</keyname>                            <passphrase>${gpg.passphrase}</passphrase>                        </configuration>                        <executions>                            <execution>                                <id>sign-artifacts</id>                                <goals><goal>sign</goal></goals>                            </execution>                        </executions>                    </plugin>                    <plugin>                        <groupId>org.sonatype.central</groupId>                        <artifactId>central-publishing-maven-plugin</artifactId>                        <version>0.5.0</version>                        <extensions>true</extensions>                        <configuration>                            <publishingServerId>spring-web</publishingServerId>                            <autoPublish>true</autoPublish>                        </configuration>                    </plugin>                </plugins>            </build>        </profile>    </profiles>    <dependencyManagement>        <dependencies>            <!--                鍏堣澹版槑锛氬湪 BOM 涔嬪墠澹版槑鐨勪緷璧栦紭鍏堜簬 BOM銆?                鐢ㄤ簬鍥哄畾蹇呴』缁熶竴鐗堟湰鐨勪緷璧栵紙濡?junit-jupiter 鍦ㄤ綆鐗堟湰 SB 涓己灏?assertInstanceOf锛夈€?            -->            <dependency>                <groupId>org.junit.jupiter</groupId>                <artifactId>junit-jupiter</artifactId>                <version>${junit-jupiter.version}</version>            </dependency>            <dependency>                <groupId>org.junit.jupiter</groupId>                <artifactId>junit-jupiter-api</artifactId>                <version>${junit-jupiter.version}</version>            </dependency>            <dependency>                <groupId>org.junit.jupiter</groupId>                <artifactId>junit-jupiter-engine</artifactId>                <version>${junit-jupiter.version}</version>            </dependency>            <dependency>                <groupId>org.junit.jupiter</groupId>                <artifactId>junit-jupiter-params</artifactId>                <version>${junit-jupiter.version}</version>            </dependency>            <!-- JUnit Platform锛堜笌 JUnit Jupiter 5.8.2 鍏煎鐨勫钩鍙扮増鏈紝瑕嗙洊 SB 2.5.x-2.3.x BOM 涓殑浣庣増鏈級 -->            <dependency>                <groupId>org.junit.platform</groupId>                <artifactId>junit-platform-commons</artifactId>                <version>${junit-platform.version}</version>            </dependency>            <dependency>                <groupId>org.junit.platform</groupId>                <artifactId>junit-platform-engine</artifactId>                <version>${junit-platform.version}</version>            </dependency>            <dependency>                <groupId>org.junit.platform</groupId>                <artifactId>junit-platform-launcher</artifactId>                <version>${junit-platform.version}</version>            </dependency>            <!-- Spring Boot BOM: 绠＄悊 springframework / spring-boot / 娴嬭瘯妗嗘灦绛夌増鏈?-->            <dependency>                <groupId>org.springframework.boot</groupId>                <artifactId>spring-boot-dependencies</artifactId>                <version>${spring-boot.version}</version>                <type>pom</type>                <scope>import</scope>            </dependency>            <!-- 鍐呴儴妯″潡 -->            <dependency>
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>io.github.springperf</groupId>
+    <artifactId>spring-web-parent</artifactId>
+    <version>2.7.5</version>
+    <packaging>pom</packaging>
+
+    <name>Spring WebPerf Parent</name>
+    <description>基于 Netty 的高性能自定义 SpringWeb 框架，SpringMVC 的替代方案</description>
+    <url>https://github.com/springperf/spring-web</url>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+        </license>
+    </licenses>
+
+    <scm>
+        <connection>scm:git:git://github.com/springperf/spring-web.git</connection>
+        <developerConnection>scm:git:ssh://github.com/springperf/spring-web.git</developerConnection>
+        <url>https://github.com/springperf/spring-web</url>
+        <tag>HEAD</tag>
+    </scm>
+
+    <developers>
+        <developer>
+            <name>huangcanda</name>
+            <email>hcd0614@gmail.com</email>
+        </developer>
+    </developers>
+
+    <modules>
+        <module>spring-web</module>
+        <module>spring-web-websocket</module>
+        <module>spring-web-servlet</module>
+        <module>spring-web-mvc-support</module>
+        <module>spring-boot-starter-web</module>
+        <module>spring-web-test</module>
+        <module>spring-web-support-test</module>
+        <module>spring-web-benchmark</module>
+        <module>spring-web-view</module>
+        <module>spring-web-batch</module>
+        <module>spring-web-examples</module>
+    </modules>
+
+    <properties>
+        <java.version>8</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <spring-web.version>2.7.5</spring-web.version>
+        <spring-boot.version>2.7.18</spring-boot.version>
+        <gpg.executable>gpg</gpg.executable>
+        <gpg.keyname>${env.GPG_KEY}</gpg.keyname>
+        <gpg.passphrase>${env.GPG_PASSPHRASE}</gpg.passphrase>
+
+        <!-- 第三方依赖版本统一管理 -->
+        <netty.version>4.1.115.Final</netty.version>
+        <jackson.version>2.17.2</jackson.version>
+        <lombok.version>1.18.24</lombok.version>
+        <fastjson2.version>2.0.60</fastjson2.version>
+        <junit-jupiter.version>5.8.2</junit-jupiter.version>
+        <junit-platform.version>1.8.2</junit-platform.version>
+        <jmh.version>1.37</jmh.version>
+        <springdoc.version>1.7.0</springdoc.version>
+        <hutool.version>5.8.23</hutool.version>
+        <disruptor.version>3.4.4</disruptor.version>
+
+        <!-- 构建插件版本 -->
+        <maven-compiler-plugin.version>3.8.1</maven-compiler-plugin.version>
+        <maven-surefire-plugin.version>3.0.0-M5</maven-surefire-plugin.version>
+        <maven-failsafe-plugin.version>3.0.0-M5</maven-failsafe-plugin.version>
+        <maven-resources-plugin.version>3.1.0</maven-resources-plugin.version>
+        <maven-jar-plugin.version>3.1.2</maven-jar-plugin.version>
+        <maven-source-plugin.version>3.2.0</maven-source-plugin.version>
+        <maven-javadoc-plugin.version>3.2.0</maven-javadoc-plugin.version>
+        <build-helper-maven-plugin.version>3.6.0</build-helper-maven-plugin.version>
+
+        <!-- 测试覆盖率：JaCoCo -->
+        <jacoco.version>0.8.13</jacoco.version>
+    </properties>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>${maven-compiler-plugin.version}</version>
+                    <configuration>
+                        <source>${java.version}</source>
+                        <target>${java.version}</target>
+                        <compilerArgs>
+                            <arg>-parameters</arg>
+                        </compilerArgs>
+                        <annotationProcessorPaths>
+                            <path>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                                <version>${lombok.version}</version>
+                            </path>
+                        </annotationProcessorPaths>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>${maven-surefire-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-failsafe-plugin</artifactId>
+                    <version>${maven-failsafe-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-resources-plugin</artifactId>
+                    <version>${maven-resources-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <version>${maven-jar-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-source-plugin</artifactId>
+                    <version>${maven-source-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-javadoc-plugin</artifactId>
+                    <version>${maven-javadoc-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-gpg-plugin</artifactId>
+                    <version>1.6</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>build-helper-maven-plugin</artifactId>
+                    <version>${build-helper-maven-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.openjdk.jmh</groupId>
+                    <artifactId>jmh-maven-plugin</artifactId>
+                    <version>${jmh.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.jacoco</groupId>
+                    <artifactId>jacoco-maven-plugin</artifactId>
+                    <version>${jacoco.version}</version>
+                    <executions>
+                        <execution>
+                            <id>prepare-agent</id>
+                            <goals>
+                                <goal>prepare-agent</goal>
+                            </goals>
+                        </execution>
+                        <execution>
+                            <id>report</id>
+                            <goals>
+                                <goal>report</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+    <profiles>
+        <profile>
+            <id>spring-boot-2.7</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <spring-boot.version>2.7.18</spring-boot.version>
+            </properties>
+        </profile>
+        <profile>
+            <id>spring-boot-2.6</id>
+            <properties>
+                <spring-boot.version>2.6.15</spring-boot.version>
+            </properties>
+        </profile>
+        <profile>
+            <id>spring-boot-2.5</id>
+            <properties>
+                <spring-boot.version>2.5.15</spring-boot.version>
+            </properties>
+        </profile>
+        <profile>
+            <id>spring-boot-2.4</id>
+            <properties>
+                <spring-boot.version>2.4.13</spring-boot.version>
+            </properties>
+        </profile>
+
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals><goal>jar-no-fork</goal></goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <configuration>
+                            <source>${java.version}</source>
+                            <failOnError>false</failOnError>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals><goal>jar</goal></goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <configuration>
+                            <executable>${gpg.executable}</executable>
+                            <keyname>${gpg.keyname}</keyname>
+                            <passphrase>${gpg.passphrase}</passphrase>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <goals><goal>sign</goal></goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.5.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>spring-web</publishingServerId>
+                            <autoPublish>true</autoPublish>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
+    <dependencyManagement>
+        <dependencies>
+            <!--
+                先行声明：在 BOM 之前声明的依赖优先于 BOM。
+                用于固定必须统一版本的依赖（如 junit-jupiter 在低版本 SB 中缺少 assertInstanceOf）。
+            -->
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter</artifactId>
+                <version>${junit-jupiter.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter-api</artifactId>
+                <version>${junit-jupiter.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter-engine</artifactId>
+                <version>${junit-jupiter.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter-params</artifactId>
+                <version>${junit-jupiter.version}</version>
+            </dependency>
+            <!-- JUnit Platform（与 JUnit Jupiter 5.8.2 兼容的平台版本，覆盖 SB 2.5.x-2.3.x BOM 中的低版本） -->
+            <dependency>
+                <groupId>org.junit.platform</groupId>
+                <artifactId>junit-platform-commons</artifactId>
+                <version>${junit-platform.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.junit.platform</groupId>
+                <artifactId>junit-platform-engine</artifactId>
+                <version>${junit-platform.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.junit.platform</groupId>
+                <artifactId>junit-platform-launcher</artifactId>
+                <version>${junit-platform.version}</version>
+            </dependency>
+
+            <!-- Spring Boot BOM: 管理 springframework / spring-boot / 测试框架等版本 -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- 内部模块 -->
+            <dependency>
                 <groupId>io.github.springperf</groupId>
                 <artifactId>spring-web</artifactId>
                 <version>${spring-web.version}</version>
@@ -12,4 +332,97 @@
                 <groupId>io.github.springperf</groupId>
                 <artifactId>spring-web-mvc-support</artifactId>
                 <version>${spring-web.version}</version>
-            </dependency>            <dependency>                <groupId>io.github.springperf</groupId>                <artifactId>spring-web-websocket</artifactId>                <version>${spring-web.version}</version>            </dependency>            <dependency>                <groupId>io.github.springperf</groupId>                <artifactId>spring-web-view</artifactId>                <version>${spring-web.version}</version>            </dependency>            <dependency>                <groupId>io.github.springperf</groupId>                <artifactId>spring-web-batch</artifactId>                <version>${spring-web.version}</version>            </dependency>            <dependency>                <groupId>io.github.springperf</groupId>                <artifactId>spring-boot-starter-web</artifactId>                <version>${spring-web.version}</version>            </dependency>            <!-- 绗笁鏂逛緷璧栵紙鏄惧紡瑕嗙洊 BOM 鐗堟湰锛岀‘淇濊法 Spring Boot 鐗堟湰涓€鑷达級 -->            <dependency>                <groupId>io.netty</groupId>                <artifactId>netty-all</artifactId>                <version>${netty.version}</version>            </dependency>            <dependency>                <groupId>com.fasterxml.jackson.core</groupId>                <artifactId>jackson-databind</artifactId>                <version>${jackson.version}</version>            </dependency>            <dependency>                <groupId>com.fasterxml.jackson.core</groupId>                <artifactId>jackson-core</artifactId>                <version>${jackson.version}</version>            </dependency>            <dependency>                <groupId>com.fasterxml.jackson.core</groupId>                <artifactId>jackson-annotations</artifactId>                <version>${jackson.version}</version>            </dependency>            <dependency>                <groupId>org.projectlombok</groupId>                <artifactId>lombok</artifactId>                <version>${lombok.version}</version>            </dependency>            <dependency>                <groupId>com.alibaba.fastjson2</groupId>                <artifactId>fastjson2</artifactId>                <version>${fastjson2.version}</version>            </dependency>            <!-- 绗笁鏂逛緷璧栵紙BOM 鏈鐞嗭紝蹇呴』鏄惧紡澹版槑鐗堟湰锛?-->            <dependency>                <groupId>de.codecentric</groupId>                <artifactId>spring-boot-admin-client</artifactId>                <version>2.7.10</version>            </dependency>            <dependency>                <groupId>cn.hutool</groupId>                <artifactId>hutool-all</artifactId>                <version>${hutool.version}</version>            </dependency>            <!-- JMH -->            <dependency>                <groupId>org.openjdk.jmh</groupId>                <artifactId>jmh-core</artifactId>                <version>${jmh.version}</version>            </dependency>            <dependency>                <groupId>org.openjdk.jmh</groupId>                <artifactId>jmh-generator-annprocess</artifactId>                <version>${jmh.version}</version>            </dependency>            <!-- Disruptor -->            <dependency>                <groupId>com.lmax</groupId>                <artifactId>disruptor</artifactId>                <version>${disruptor.version}</version>            </dependency>            <!-- SpringDoc OpenAPI (optional, for auto-configuration) -->            <dependency>                <groupId>org.springdoc</groupId>                <artifactId>springdoc-openapi-common</artifactId>                <version>${springdoc.version}</version>            </dependency>        </dependencies>    </dependencyManagement></project>
+            </dependency>
+            <dependency>
+                <groupId>io.github.springperf</groupId>
+                <artifactId>spring-web-websocket</artifactId>
+                <version>${spring-web.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.springperf</groupId>
+                <artifactId>spring-web-view</artifactId>
+                <version>${spring-web.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.springperf</groupId>
+                <artifactId>spring-web-batch</artifactId>
+                <version>${spring-web.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.springperf</groupId>
+                <artifactId>spring-boot-starter-web</artifactId>
+                <version>${spring-web.version}</version>
+            </dependency>
+
+            <!-- 第三方依赖（显式覆盖 BOM 版本，确保跨 Spring Boot 版本一致） -->
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-all</artifactId>
+                <version>${netty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-core</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-annotations</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.alibaba.fastjson2</groupId>
+                <artifactId>fastjson2</artifactId>
+                <version>${fastjson2.version}</version>
+            </dependency>
+
+            <!-- 第三方依赖（BOM 未管理，必须显式声明版本） -->
+            <dependency>
+                <groupId>de.codecentric</groupId>
+                <artifactId>spring-boot-admin-client</artifactId>
+                <version>2.7.10</version>
+            </dependency>
+            <dependency>
+                <groupId>cn.hutool</groupId>
+                <artifactId>hutool-all</artifactId>
+                <version>${hutool.version}</version>
+            </dependency>
+
+            <!-- JMH -->
+            <dependency>
+                <groupId>org.openjdk.jmh</groupId>
+                <artifactId>jmh-core</artifactId>
+                <version>${jmh.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.openjdk.jmh</groupId>
+                <artifactId>jmh-generator-annprocess</artifactId>
+                <version>${jmh.version}</version>
+            </dependency>
+
+            <!-- Disruptor -->
+            <dependency>
+                <groupId>com.lmax</groupId>
+                <artifactId>disruptor</artifactId>
+                <version>${disruptor.version}</version>
+            </dependency>
+
+            <!-- SpringDoc OpenAPI (optional, for auto-configuration) -->
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-common</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+</project>
