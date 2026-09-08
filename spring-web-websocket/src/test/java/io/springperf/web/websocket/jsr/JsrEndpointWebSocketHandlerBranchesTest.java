@@ -124,12 +124,28 @@ class JsrEndpointWebSocketHandlerBranchesTest {
         public boolean willDecode(String s) {
             return true;
         }
+
+        @Override
+        public void init(EndpointConfig config) {
+        }
+
+        @Override
+        public void destroy() {
+        }
     }
 
     public static class PojoTextEncoder implements Encoder.Text<PojoMessage> {
         @Override
         public String encode(PojoMessage m) {
             return "encoded:" + m.value;
+        }
+
+        @Override
+        public void init(EndpointConfig config) {
+        }
+
+        @Override
+        public void destroy() {
         }
     }
 

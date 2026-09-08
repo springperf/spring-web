@@ -11,6 +11,7 @@ import org.springframework.web.socket.WebSocketSession;
 import java.io.IOException;
 import java.net.URI;
 import java.security.Principal;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
