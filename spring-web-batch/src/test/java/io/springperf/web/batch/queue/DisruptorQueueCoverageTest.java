@@ -12,7 +12,9 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
 
 /**
  * 真实构造 DisruptorQueue：验证 enqueue（BLOCK/THROW/DROP）、停机后直连处理、
@@ -133,5 +135,47 @@ class DisruptorQueueCoverageTest {
         assertTrue(queue.queueName().startsWith("query-"));
         assertEquals(64, queue.bufferSize());
         assertTrue(queue.remainingCapacity() >= 0);
+    }
+
+    /* ==================== enqueue DROP / THROW ==================== */
+
+    @Test
+    void enqueue_drop_mode_processedWhenCapacityAvailable() throws Exception {
+        FastService.INVOKED.set(0);
+        BatchMetrics metrics = mock(BatchMetrics.class);
+        queue = new DisruptorQueue("drop-" + SEQ.incrementAndGet(),
+                meta(BatchMapping.Backpressure.DROP), new FastService(), metrics);
+
+        BatchRequest<String> r = request();
+        queue.enqueue(r);
+        awaitResult(r);
+
+        assertNotNull(r.getResult(), "DROP 模式容量充足时请求应正常处理");
+        verify(metrics).recordEnqueue(anyString(), eq(true));
+        verify(metrics, never()).recordDrop(anyString());
+    }
+
+    @Test
+    void enqueue_throw_mode_processedWhenCapacityAvailable() throws Exception {
+        FastService.INVOKED.set(0);
+        BatchMetrics metrics = mock(BatchMetrics.class);
+        queue = new DisruptorQueue("throw-" + SEQ.incrementAndGet(),
+                meta(BatchMapping.Backpressure.THROW), new FastService(), metrics);
+
+        BatchRequest<String> r = request();
+        assertDoesNotThrow(() -> queue.enqueue(r));
+        awaitResult(r);
+
+        assertNotNull(r.getResult(), "THROW 模式容量充足时请求应正常处理");
+        verify(metrics).recordEnqueue(anyString(), eq(true));
+    }
+
+    @Test
+    void shutdown_thenShutdown_idempotent() throws Exception {
+        queue = new DisruptorQueue("idem-" + SEQ.incrementAndGet(),
+                meta(BatchMapping.Backpressure.BLOCK), new FastService());
+        queue.shutdown();
+        assertDoesNotThrow(() -> queue.shutdown(), "重复 shutdown 应幂等");
+        queue = null;
     }
 }

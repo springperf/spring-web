@@ -1,6 +1,10 @@
 package io.springperf.web.support.servlet;
 
 import io.springperf.web.http.WebServerHttpResponse;
+import io.springperf.web.support.servlet.context.ServletAdapterContext;
+import javax.servlet.ServletOutputStream;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,10 +17,9 @@ import javax.servlet.ServletOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
-import java.util.Collection;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -168,5 +171,233 @@ class PerfHttpServletResponseTest {
     void flushBuffer_withoutWriter_stillFlushesResponse() throws Exception {
         servletResponse.flushBuffer();
         verify(response).flush();
+    }
+
+    @Test
+    void sendRedirect_nullLocation_throws() {
+        assertThrows(IllegalArgumentException.class, () -> servletResponse.sendRedirect(null));
+    }
+
+    @Test
+    void sendRedirect_absoluteLocation_noContextRewrite() {
+        servletResponse.sendRedirect("https://external.com/page");
+        verify(response).setStatusCode(HttpStatus.valueOf(302));
+        verify(headers).set(io.netty.handler.codec.http.HttpHeaders.Names.LOCATION, "https://external.com/page");
+    }
+
+    @Test
+    void sendRedirect_withAdapterContext_absoluteUrlWithPort() {
+        io.springperf.web.context.WebContext webContext = mock(io.springperf.web.context.WebContext.class);
+        when(response.getWebContext()).thenReturn(webContext);
+        when(webContext.getContextPath()).thenReturn("/app");
+        ServletAdapterContext adapter = mock(ServletAdapterContext.class);
+        HttpServletRequest httpRequest = mock(HttpServletRequest.class);
+        when(adapter.getRequest()).thenReturn(httpRequest);
+        when(httpRequest.getScheme()).thenReturn("http");
+        when(httpRequest.getServerName()).thenReturn("localhost");
+        when(httpRequest.getServerPort()).thenReturn(8080);
+        servletResponse.setAdapterContext(adapter);
+
+        servletResponse.sendRedirect("/target");
+
+        verify(headers).set(io.netty.handler.codec.http.HttpHeaders.Names.LOCATION,
+                "http://localhost:8080/app/target");
+    }
+
+    @Test
+    void sendRedirect_withAdapterContext_defaultHttpPortOmitted() {
+        io.springperf.web.context.WebContext webContext = mock(io.springperf.web.context.WebContext.class);
+        when(response.getWebContext()).thenReturn(webContext);
+        when(webContext.getContextPath()).thenReturn("");
+        ServletAdapterContext adapter = mock(ServletAdapterContext.class);
+        HttpServletRequest httpRequest = mock(HttpServletRequest.class);
+        when(adapter.getRequest()).thenReturn(httpRequest);
+        when(httpRequest.getScheme()).thenReturn("http");
+        when(httpRequest.getServerName()).thenReturn("localhost");
+        when(httpRequest.getServerPort()).thenReturn(80);
+        servletResponse.setAdapterContext(adapter);
+
+        servletResponse.sendRedirect("/ok");
+
+        verify(headers).set(io.netty.handler.codec.http.HttpHeaders.Names.LOCATION, "http://localhost/ok");
+    }
+
+    @Test
+    void sendRedirect_withAdapterContext_httpsDefaultPortOmitted() {
+        io.springperf.web.context.WebContext webContext = mock(io.springperf.web.context.WebContext.class);
+        when(response.getWebContext()).thenReturn(webContext);
+        when(webContext.getContextPath()).thenReturn("/app");
+        ServletAdapterContext adapter = mock(ServletAdapterContext.class);
+        HttpServletRequest httpRequest = mock(HttpServletRequest.class);
+        when(adapter.getRequest()).thenReturn(httpRequest);
+        when(httpRequest.getScheme()).thenReturn("https");
+        when(httpRequest.getServerName()).thenReturn("secure.example");
+        when(httpRequest.getServerPort()).thenReturn(443);
+        servletResponse.setAdapterContext(adapter);
+
+        servletResponse.sendRedirect("/s");
+
+        verify(headers).set(io.netty.handler.codec.http.HttpHeaders.Names.LOCATION,
+                "https://secure.example/app/s");
+    }
+
+    @Test
+    void sendError_withMessage_committed_throws() {
+        when(response.isCommitted()).thenReturn(true);
+        assertThrows(IllegalStateException.class, () -> servletResponse.sendError(500, "oops"));
+    }
+
+    @Test
+    void encodeURL_null_returnsNull() {
+        assertNull(servletResponse.encodeURL(null));
+    }
+
+    @Test
+    void encodeURL_noAdapterContext_unchanged() {
+        assertEquals("/path", servletResponse.encodeURL("/path"));
+    }
+
+    @Test
+    void encodeURL_sessionFromCookie_unchanged() {
+        ServletAdapterContext adapter = mock(ServletAdapterContext.class);
+        HttpServletRequest httpRequest = mock(HttpServletRequest.class);
+        when(adapter.getRequest()).thenReturn(httpRequest);
+        when(httpRequest.isRequestedSessionIdFromCookie()).thenReturn(true);
+        servletResponse.setAdapterContext(adapter);
+
+        assertEquals("/path", servletResponse.encodeURL("/path"));
+    }
+
+    @Test
+    void encodeURL_noRequestedSessionId_unchanged() {
+        ServletAdapterContext adapter = mock(ServletAdapterContext.class);
+        HttpServletRequest httpRequest = mock(HttpServletRequest.class);
+        when(adapter.getRequest()).thenReturn(httpRequest);
+        when(httpRequest.isRequestedSessionIdFromCookie()).thenReturn(false);
+        when(httpRequest.getRequestedSessionId()).thenReturn(null);
+        servletResponse.setAdapterContext(adapter);
+
+        assertEquals("/path", servletResponse.encodeURL("/path"));
+    }
+
+    @Test
+    void encodeURL_alreadyContainsJSessionId_unchanged() {
+        ServletAdapterContext adapter = mock(ServletAdapterContext.class);
+        HttpServletRequest httpRequest = mock(HttpServletRequest.class);
+        when(adapter.getRequest()).thenReturn(httpRequest);
+        when(httpRequest.isRequestedSessionIdFromCookie()).thenReturn(false);
+        when(httpRequest.getRequestedSessionId()).thenReturn("abc");
+        servletResponse.setAdapterContext(adapter);
+
+        assertEquals("/path;jsessionid=abc", servletResponse.encodeURL("/path;jsessionid=abc"));
+    }
+
+    @Test
+    void encodeURL_appendsJSessionId_beforeQueryAndFragment() {
+        ServletAdapterContext adapter = mock(ServletAdapterContext.class);
+        HttpServletRequest httpRequest = mock(HttpServletRequest.class);
+        when(adapter.getRequest()).thenReturn(httpRequest);
+        when(httpRequest.isRequestedSessionIdFromCookie()).thenReturn(false);
+        when(httpRequest.getRequestedSessionId()).thenReturn("sess123");
+        servletResponse.setAdapterContext(adapter);
+
+        assertEquals("/path;jsessionid=sess123?a=1#frag",
+                servletResponse.encodeURL("/path?a=1#frag"));
+    }
+
+    @Test
+    void encodeRedirectURL_appendsJSessionId() {
+        ServletAdapterContext adapter = mock(ServletAdapterContext.class);
+        HttpServletRequest httpRequest = mock(HttpServletRequest.class);
+        when(adapter.getRequest()).thenReturn(httpRequest);
+        when(httpRequest.isRequestedSessionIdFromCookie()).thenReturn(false);
+        when(httpRequest.getRequestedSessionId()).thenReturn("sess456");
+        servletResponse.setAdapterContext(adapter);
+
+        assertEquals("/target;jsessionid=sess456", servletResponse.encodeRedirectURL("/target"));
+    }
+
+    @Test
+    void addCookie_encodesToSetCookieHeader() {
+        Cookie cookie = new Cookie("name", "value");
+        servletResponse.addCookie(cookie);
+
+        verify(headers).add(argThat(name -> "Set-Cookie".equals(name)), argThat(value -> value.contains("name=value")));
+    }
+
+    @Test
+    void addCookie_withAllAttributes() {
+        Cookie cookie = new Cookie("session", "token");
+        cookie.setDomain("example.com");
+        cookie.setPath("/app");
+        cookie.setMaxAge(3600);
+        cookie.setSecure(true);
+        cookie.setHttpOnly(true);
+        servletResponse.addCookie(cookie);
+
+        verify(headers).add(argThat(name -> "Set-Cookie".equals(name)),
+                argThat(value -> value.contains("session=token")
+                        && value.contains("Domain=example.com")
+                        && value.contains("Path=/app")
+                        && value.contains("Max-Age=3600")
+                        && value.contains("Secure")
+                        && value.contains("HTTPOnly")));
+    }
+
+    @Test
+    void addCookie_nullValue_becomesEmpty() {
+        Cookie cookie = new Cookie("name", null);
+        servletResponse.addCookie(cookie);
+        verify(headers).add(argThat(name -> "Set-Cookie".equals(name)), argThat(value -> value.contains("name=")));
+    }
+
+    @Test
+    void addCookie_withSameSite() {
+        servletResponse.setSameSite("Lax");
+        Cookie cookie = new Cookie("name", "value");
+        servletResponse.addCookie(cookie);
+        verify(headers).add(argThat(name -> "Set-Cookie".equals(name)),
+                argThat(value -> value.contains("SameSite=Lax")));
+    }
+
+    @Test
+    void rebind_sameResponse_keepsWriterCache() throws Exception {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        when(response.getBody()).thenReturn(baos);
+        when(response.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
+
+        servletResponse.getWriter().write("x");
+        servletResponse.flushBuffer();
+        assertEquals("x", baos.toString("UTF-8"));
+
+        servletResponse.rebind(response);
+        assertSame(response, servletResponse.getResponse());
+    }
+
+    @Test
+    void rebind_newResponse_resetsWriterCacheAndDelegates() throws Exception {
+        ByteArrayOutputStream baos1 = new ByteArrayOutputStream();
+        when(response.getBody()).thenReturn(baos1);
+        when(response.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
+        servletResponse.getWriter().write("one");
+        servletResponse.flushBuffer();
+        assertEquals("one", baos1.toString("UTF-8"));
+
+        WebServerHttpResponse newResponse = mock(WebServerHttpResponse.class);
+        ByteArrayOutputStream baos2 = new ByteArrayOutputStream();
+        when(newResponse.getBody()).thenReturn(baos2);
+        when(newResponse.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
+        servletResponse.rebind(newResponse);
+
+        servletResponse.getWriter().write("two");
+        servletResponse.flushBuffer();
+        assertEquals("two", baos2.toString("UTF-8"));
+        assertSame(newResponse, servletResponse.getResponse());
+    }
+
+    @Test
+    void getOutputStream_multipleCalls_allowed() throws Exception {
+        assertNotNull(servletResponse.getOutputStream());
+        assertNotNull(servletResponse.getOutputStream());
     }
 }

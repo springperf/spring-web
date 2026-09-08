@@ -125,4 +125,50 @@ class WebFilterRegistrationTest {
                 registration.matchPathRuleToCached("/api/users"));
     }
 
+    // -------- matches 运行时路径匹配 --------
+
+    @Test
+    void matches_noPatterns_returnsTrue() {
+        WebFilterRegistration registration = new WebFilterRegistration(mock(WebFilter.class));
+        assertTrue(registration.matches("/any/path"));
     }
+
+    @Test
+    void matches_includePrefixMatches_returnsTrue() {
+        WebFilterRegistration registration = new WebFilterRegistration(mock(WebFilter.class));
+        registration.addPathPatterns("/api/*");
+        assertTrue(registration.matches("/api/users"));
+        assertTrue(registration.matches("/api"));
+    }
+
+    @Test
+    void matches_includeNotMatched_returnsFalse() {
+        WebFilterRegistration registration = new WebFilterRegistration(mock(WebFilter.class));
+        registration.addPathPatterns("/api/*");
+        assertFalse(registration.matches("/other"));
+    }
+
+    @Test
+    void matches_excludeTakesPrecedence_returnsFalse() {
+        WebFilterRegistration registration = new WebFilterRegistration(mock(WebFilter.class));
+        registration.addPathPatterns("/api/*");
+        registration.excludePathPatterns("/api/secret");
+        assertFalse(registration.matches("/api/secret"), "exclude 命中应优先生效");
+        assertTrue(registration.matches("/api/open"));
+    }
+
+    @Test
+    void matches_excludeSufficientToDisable_returnsFalse() {
+        WebFilterRegistration registration = new WebFilterRegistration(mock(WebFilter.class));
+        registration.excludePathPatterns("/admin/*");
+        assertFalse(registration.matches("/admin/panel"));
+    }
+
+    @Test
+    void matches_suffixPattern() {
+        WebFilterRegistration registration = new WebFilterRegistration(mock(WebFilter.class));
+        registration.addPathPatterns("*.json");
+        assertTrue(registration.matches("/api/data.json"));
+        assertFalse(registration.matches("/api/data.xml"));
+    }
+}

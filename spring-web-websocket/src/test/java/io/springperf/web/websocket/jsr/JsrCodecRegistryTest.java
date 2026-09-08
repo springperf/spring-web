@@ -160,6 +160,39 @@ class JsrCodecRegistryTest {
         assertThrows(IllegalStateException.class, () -> registry(BadEndpoint.class));
     }
 
+    public static class MyPojoSub extends MyPojo {
+        public MyPojoSub(String value) {
+            super(value);
+        }
+    }
+
+    @Test
+    void decodeText_subtypeFallsBackToSupertypeDecoder() throws DecodeException {
+        // targetType 是 MyPojo 子类 → findTextDecoder 的 isAssignableFrom 兜底应命中 MyTextDecoder
+        JsrCodecRegistry registry = registry(Endpoint.class);
+        Object result = registry.decodeText("hello", MyPojoSub.class);
+        assertEquals("HELLO", ((MyPojo) result).getValue());
+    }
+
+    @Test
+    void decodeBinary_subtypeFallsBackToSupertypeDecoder() throws DecodeException {
+        JsrCodecRegistry registry = registry(Endpoint.class);
+        Object result = registry.decodeBinary(
+                ByteBuffer.wrap("data".getBytes(StandardCharsets.UTF_8)), MyPojoSub.class);
+        assertTrue(result instanceof MyPojo);
+    }
+
+    @Test
+    void encode_subtypeFallsBackToSupertypeEncoder() throws EncodeException {
+        // only BinaryEncoder for MyPojo → 子类对象经 isAssignableFrom 兜底命中二进制编码
+        @ServerEndpoint(value = "/sb", encoders = {MyBinaryEncoder.class})
+        class SubFallback {}
+        JsrCodecRegistry registry = registry(SubFallback.class);
+        JsrCodecRegistry.EncodedPayload payload = registry.encode(new MyPojoSub("x"), true);
+        assertFalse(payload.isText());
+        assertNotNull(payload.getBinary());
+    }
+
     public static class NoNoArgDecoder implements Decoder.Text<MyPojo> {
         public NoNoArgDecoder(String arg) {}
         @Override public MyPojo decode(String s) { return null; }

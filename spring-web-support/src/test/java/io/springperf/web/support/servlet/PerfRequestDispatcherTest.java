@@ -1,4 +1,4 @@
-package io.springperf.web.support.servlet;
+﻿package io.springperf.web.support.servlet;
 
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.DispatcherHandler;
@@ -8,13 +8,12 @@ import io.springperf.web.support.SupportDispatcherHandler;
 import io.springperf.web.support.servlet.context.ServletAdapterContext;
 import javax.servlet.DispatcherType;
 import javax.servlet.RequestDispatcher;
+import javax.servlet.ServletException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -94,5 +93,60 @@ class PerfRequestDispatcherTest {
     @Test
     void getRequestDispatcher_null_returnsNull() {
         assertNull(servletRequest.getRequestDispatcher(null));
+    }
+
+    @Test
+    void forward_wrappedRequest_unwrapsPerfRequest() throws Exception {
+        when(webResponse.isCommitted()).thenReturn(false);
+        javax.servlet.http.HttpServletRequestWrapper wrapped =
+                new javax.servlet.http.HttpServletRequestWrapper(servletRequest);
+
+        dispatcher.forward(wrapped, servletResponse);
+
+        verify(dispatcherHandler).forward(eq(webRequest), eq(webResponse), eq("/target"));
+    }
+
+    @Test
+    void forward_wrappedResponse_unwrapsPerfResponse() throws Exception {
+        when(webResponse.isCommitted()).thenReturn(false);
+        javax.servlet.http.HttpServletResponseWrapper wrapped =
+                new javax.servlet.http.HttpServletResponseWrapper(servletResponse);
+
+        dispatcher.forward(servletRequest, wrapped);
+
+        verify(dispatcherHandler).forward(eq(webRequest), eq(webResponse), eq("/target"));
+    }
+
+    @Test
+    void include_wrappedResponse_unwrapsPerfResponse() throws Exception {
+        javax.servlet.http.HttpServletResponseWrapper wrapped =
+                new javax.servlet.http.HttpServletResponseWrapper(servletResponse);
+
+        dispatcher.include(servletRequest, wrapped);
+
+        verify(dispatcherHandler).include(eq(webRequest), any(WebServerHttpResponse.class), eq("/target"));
+    }
+
+    @Test
+    void forward_unresolvableRequest_throwsServletException() {
+        javax.servlet.ServletRequest plainRequest = mock(javax.servlet.ServletRequest.class);
+        assertThrows(javax.servlet.ServletException.class,
+                () -> dispatcher.forward(plainRequest, servletResponse));
+    }
+
+    @Test
+    void include_unresolvableResponse_throwsServletException() {
+        javax.servlet.ServletResponse plainResponse = mock(javax.servlet.ServletResponse.class);
+        assertThrows(javax.servlet.ServletException.class,
+                () -> dispatcher.include(servletRequest, plainResponse));
+    }
+
+    @Test
+    void forward_nonSupportDispatcher_throwsServletException() throws Exception {
+        when(webResponse.isCommitted()).thenReturn(false);
+        when(webContext.getDispatcherHandler()).thenReturn(new io.springperf.web.core.DispatcherHandler());
+
+        assertThrows(javax.servlet.ServletException.class,
+                () -> dispatcher.forward(servletRequest, servletResponse));
     }
 }

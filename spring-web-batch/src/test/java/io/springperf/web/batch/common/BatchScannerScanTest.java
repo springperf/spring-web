@@ -68,6 +68,36 @@ class BatchScannerScanTest {
         }
     }
 
+    @Controller
+    public static class OverloadedSingleController {
+        @BatchMapping(method = "single")
+        public void batch(List<EchoRequest> requests) {
+        }
+
+        public void single(String data) {
+        }
+
+        @SuppressWarnings("unused")
+        public void single(Integer number) {
+        }
+    }
+
+    public static class NoCtorRequest extends BatchRequest<String> {
+        public NoCtorRequest() {
+            super();
+        }
+    }
+
+    @Controller
+    public static class NoMatchingCtorController {
+        @BatchMapping(method = "single")
+        public void batch(List<NoCtorRequest> requests) {
+        }
+
+        public void single(String data) {
+        }
+    }
+
     @Configuration
     static class TestConfig {
         @Bean
@@ -167,6 +197,36 @@ class BatchScannerScanTest {
             List<BatchHandlerRegistration> result = scanner.scan(ctx, Collections.singletonList(singleCtx));
             assertEquals(1, result.size());
             assertEquals(Runtime.getRuntime().availableProcessors(), result.get(0).meta().consumerSize());
+        }
+    }
+
+    @Test
+    void scan_overloadedSingleMethod_throws() throws Exception {
+        try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext()) {
+            ctx.registerBean(OverloadedSingleController.class);
+            ctx.refresh();
+            OverloadedSingleController bean = ctx.getBean(OverloadedSingleController.class);
+            PathMappingContext singleStr = mappingFor(bean, "single", String.class);
+            PathMappingContext singleInt = mappingFor(bean, "single", Integer.class);
+            BatchScanner scanner = new BatchScanner();
+            IllegalStateException ex = assertThrows(IllegalStateException.class,
+                    () -> scanner.scan(ctx, java.util.Arrays.asList(singleStr, singleInt)));
+            assertTrue(ex.getMessage().contains("distinct methods"),
+                    "同名单方法重载应被视为歧义并抛异常: " + ex.getMessage());
+        }
+    }
+
+    @Test
+    void scan_requestTypeWithoutMatchingCtor_throws() throws Exception {
+        try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext()) {
+            ctx.registerBean(NoMatchingCtorController.class);
+            ctx.refresh();
+            NoMatchingCtorController bean = ctx.getBean(NoMatchingCtorController.class);
+            PathMappingContext singleCtx = mappingFor(bean, "single", String.class);
+            BatchScanner scanner = new BatchScanner();
+            assertThrows(IllegalStateException.class,
+                    () -> scanner.scan(ctx, Collections.singletonList(singleCtx)),
+                    "BatchRequest 缺少与 single 方法参数匹配的构造函数应抛异常");
         }
     }
 }

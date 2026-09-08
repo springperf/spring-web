@@ -238,6 +238,91 @@ class SslContextFactoryTest {
                 "ciphers 应成功构建（加密套件配置）");
     }
 
+    /* ==================== 补充：http2 ALPN / key-store 分支 / openInputStream 回退 ==================== */
+
+    @Test
+    void createServerSslContext_http2Enabled_addsAlpn() {
+        stubPemServer();
+
+        SslContext ctx = SslContextFactory.createServerSslContext(env, "server.ssl.", true);
+
+        assertNotNull(ctx, "http2Enabled=true 应配置 ALPN 后构建 SslContext");
+    }
+
+    @Test
+    void createServerSslContext_pkcs12KeyStore_builds() throws Exception {
+        java.io.File keyStore = generatePkcs12KeyStore();
+        try {
+            when(env.getProperty(eq("server.ssl.enabled"), eq(Boolean.class))).thenReturn(null);
+            when(env.containsProperty("server.ssl.key-store")).thenReturn(true);
+            when(env.containsProperty("server.ssl.certificate")).thenReturn(false);
+            when(env.getProperty(eq("server.ssl.key-store"))).thenReturn(keyStore.getAbsolutePath());
+            when(env.getProperty(eq("server.ssl.key-store-password"))).thenReturn("changeit");
+            when(env.getProperty(eq("server.ssl.key-store-type"), eq("PKCS12"))).thenReturn("PKCS12");
+            when(env.getProperty(eq("server.ssl.key-password"), eq("changeit"))).thenReturn("changeit");
+
+            SslContext ctx = SslContextFactory.createServerSslContext(env, "server.ssl.");
+
+            assertNotNull(ctx, "PKCS12 密钥库配置应能构建 SslContext");
+        } finally {
+            keyStore.delete();
+        }
+    }
+
+    @Test
+    void openInputStream_missingResource_throwsIllegalArgument() throws Exception {
+        Method m = SslContextFactory.class.getDeclaredMethod("openInputStream", String.class);
+        m.setAccessible(true);
+        java.lang.reflect.InvocationTargetException ex = assertThrows(
+                java.lang.reflect.InvocationTargetException.class, () -> m.invoke(null, (Object) null));
+        assertInstanceOf(IllegalArgumentException.class, ex.getCause(),
+                "openInputStream(null) 应抛 IllegalArgumentException");
+    }
+
+    @Test
+    void openInputStream_filePath_fallsBackToFileInput() throws Exception {
+        java.io.File f = java.io.File.createTempFile("cert", ".pem");
+        try (java.io.InputStream src = SslContextFactoryTest.class.getResourceAsStream("/ssl/cert.pem");
+             java.io.OutputStream os = new java.io.FileOutputStream(f)) {
+            src.transferTo(os);
+        }
+        Method m = SslContextFactory.class.getDeclaredMethod("openInputStream", String.class);
+        m.setAccessible(true);
+        try (InputStream in = (InputStream) m.invoke(null, f.getAbsolutePath())) {
+            assertNotNull(in);
+            assertTrue(in.available() > 0);
+        } finally {
+            f.delete();
+        }
+    }
+
+    /** 生成含自签密钥对的 PKCS12 密钥库（仅 JDK + keytool，不引入第三方库）。 */
+    private java.io.File generatePkcs12KeyStore() throws Exception {
+        String keytoolPath = System.getProperty("java.home") + java.io.File.separator + "bin" + java.io.File.separator
+                + (System.getProperty("os.name").toLowerCase().contains("win") ? "keytool.exe" : "keytool");
+        java.io.File ksFile = java.io.File.createTempFile("keystore", ".p12");
+        ksFile.delete(); // keytool 拒绝覆盖已存在文件，先删除占位
+        ksFile.deleteOnExit();
+        Process p = new ProcessBuilder(keytoolPath,
+                "-genkeypair", "-alias", "server", "-keyalg", "RSA", "-keysize", "2048",
+                "-storetype", "PKCS12", "-keystore", ksFile.getAbsolutePath(),
+                "-storepass", "changeit", "-keypass", "changeit",
+                "-dname", "CN=localhost").redirectErrorStream(true).start();
+        String output = readAllOutput(p.getInputStream());
+        p.waitFor();
+        if (p.exitValue() != 0) {
+            throw new IllegalStateException("keytool 生成密钥库失败: " + output);
+        }
+        return ksFile;
+    }
+
+    private static String readAllOutput(java.io.InputStream in) throws Exception {
+        try (in; java.util.Scanner sc = new java.util.Scanner(in, "UTF-8")) {
+            sc.useDelimiter("\\A");
+            return sc.hasNext() ? sc.next() : "";
+        }
+    }
+
     private static boolean invokeIsSslEnabled(Environment env, String prefix) throws Exception {
         Method method = SslContextFactory.class.getDeclaredMethod("isSslEnabled", Environment.class, String.class);
         method.setAccessible(true);

@@ -1,4 +1,4 @@
-package io.springperf.web.support.servlet;
+﻿package io.springperf.web.support.servlet;
 
 import io.springperf.web.core.async.PerfAsyncWebRequest;
 import io.springperf.web.http.RequestContext;
@@ -122,7 +122,7 @@ class PerfAsyncContextTest {
     void start_executesTask() throws Exception {
         Runnable task = mock(Runnable.class);
         asyncContext.start(task);
-        // timeout verify 已覆盖异步执行轮询，无需额外 Thread.sleep
+        // timeout verify 宸茶鐩栧紓姝ユ墽琛岃疆璇紝鏃犻渶棰濆 Thread.sleep
         verify(task, timeout(1000)).run();
     }
 
@@ -131,5 +131,82 @@ class PerfAsyncContextTest {
         @Override public void onComplete(AsyncEvent event) { }
         @Override public void onTimeout(AsyncEvent event) { }
         @Override public void onError(AsyncEvent event) { }
+    }
+
+    /* ==================== 琛ュ厖瑕嗙洊 ==================== */
+
+    @Test
+    void dispatch_withPath_supportDispatcher_forwards() {
+        io.springperf.web.support.SupportDispatcherHandler supportHandler =
+                mock(io.springperf.web.support.SupportDispatcherHandler.class);
+        io.springperf.web.context.WebContext webContext = mock(io.springperf.web.context.WebContext.class);
+        when(webRequest.getWebContext()).thenReturn(webContext);
+        when(webContext.getDispatcherHandler()).thenReturn(supportHandler);
+
+        asyncContext.dispatch("/forward-target");
+
+        verify(supportHandler).forward(webRequest, webResponse, "/forward-target");
+    }
+
+    @Test
+    void dispatch_withPath_plainDispatcher_fallsBackToAsyncDispatch() {
+        io.springperf.web.core.DispatcherHandler plain = mock(io.springperf.web.core.DispatcherHandler.class);
+        io.springperf.web.context.WebContext webContext = mock(io.springperf.web.context.WebContext.class);
+        when(webRequest.getWebContext()).thenReturn(webContext);
+        when(webContext.getDispatcherHandler()).thenReturn(plain);
+
+        asyncContext.dispatch("/somewhere");
+
+        verify(asyncWebRequest).dispatch();
+        verify(asyncWebRequest, never()).complete();
+    }
+
+    @Test
+    void dispatch_servletContextPath_delegatesToPathDispatch() {
+        io.springperf.web.context.WebContext webContext = mock(io.springperf.web.context.WebContext.class);
+        when(webRequest.getWebContext()).thenReturn(webContext);
+        when(webContext.getDispatcherHandler()).thenReturn(mock(io.springperf.web.core.DispatcherHandler.class));
+
+        asyncContext.dispatch(mock(javax.servlet.ServletContext.class), "/x");
+
+        verify(asyncWebRequest).dispatch();
+    }
+
+    @Test
+    void addListener_overload_registersHandlers() {
+        AsyncListener listener = mock(AsyncListener.class);
+        asyncContext.addListener(listener, servletRequest, servletResponse);
+        verify(asyncWebRequest).addTimeoutHandler(any(Runnable.class));
+        verify(asyncWebRequest).addErrorHandler(any());
+    }
+
+    static class NoDefaultCtorListener implements AsyncListener {
+        @SuppressWarnings("unused")
+        NoDefaultCtorListener(String required) {
+        }
+
+        @Override public void onStartAsync(AsyncEvent event) { }
+        @Override public void onComplete(AsyncEvent event) { }
+        @Override public void onTimeout(AsyncEvent event) { }
+        @Override public void onError(AsyncEvent event) { }
+    }
+
+    @Test
+    void createListener_noDefaultConstructor_throwsIllegalArgument() {
+        assertThrows(IllegalArgumentException.class,
+                () -> asyncContext.createListener(NoDefaultCtorListener.class));
+    }
+
+    @Test
+    void listener_onCompleteThrows_swallowedAndContinues() throws Exception {
+        AsyncListener throwing = mock(AsyncListener.class);
+        doThrow(new RuntimeException("listener boom")).when(throwing).onComplete(any(AsyncEvent.class));
+        AsyncListener ok = mock(AsyncListener.class);
+        asyncContext.addListener(throwing);
+        asyncContext.addListener(ok);
+
+        assertDoesNotThrow(() -> asyncContext.complete());
+
+        verify(ok).onComplete(any(AsyncEvent.class));
     }
 }

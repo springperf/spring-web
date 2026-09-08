@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
 
 class SpringWebSupportAutoConfigurationTest {
 
@@ -68,5 +69,89 @@ class SpringWebSupportAutoConfigurationTest {
         ResponseBodyEmitterReturnValueResolver bean = config.responseBodyEmitterReturnValueResolver();
         assertNotNull(bean);
         assertInstanceOf(ResponseBodyEmitterReturnValueResolver.class, bean);
+    }
+
+    @Test
+    void modelAndViewReturnValueResolver_createsBean() {
+        assertInstanceOf(io.springperf.web.support.mvc.retval.ModelAndViewReturnValueResolver.class,
+                config.modelAndViewReturnValueResolver());
+    }
+
+    @Test
+    void servletRequestProvider_createsBean() {
+        assertInstanceOf(io.springperf.web.support.arg.provider.ServletRequestProvider.class,
+                config.servletRequestProvider());
+    }
+
+    @Test
+    void servletResponseProvider_createsBean() {
+        assertInstanceOf(io.springperf.web.support.arg.provider.ServletResponseProvider.class,
+                config.servletResponseProvider());
+    }
+
+    @Test
+    void webRequestArgumentResolverProvider_createsBean() {
+        assertInstanceOf(io.springperf.web.support.arg.provider.WebRequestArgumentResolverProvider.class,
+                config.webRequestArgumentResolverProvider());
+    }
+
+    @Test
+    void sessionAttributeArgumentResolverProvider_createsBean() {
+        assertInstanceOf(io.springperf.web.support.arg.provider.SessionAttributeArgumentResolverProvider.class,
+                config.sessionAttributeArgumentResolverProvider());
+    }
+
+    @Test
+    void sessionAttributesInterceptor_createsBean() {
+        assertInstanceOf(io.springperf.web.support.model.SessionAttributesInterceptor.class,
+                config.sessionAttributesInterceptor());
+    }
+
+    @Test
+    void sessionStatusArgumentResolverProvider_createsBean() {
+        assertInstanceOf(io.springperf.web.support.arg.provider.SessionStatusArgumentResolverProvider.class,
+                config.sessionStatusArgumentResolverProvider());
+    }
+
+    @Test
+    void sessionScopeBeanFactoryPostProcessor_createsBean() {
+        assertInstanceOf(io.springperf.web.support.context.SessionScopeBeanFactoryPostProcessor.class,
+                SpringWebSupportAutoConfiguration.sessionScopeBeanFactoryPostProcessor());
+    }
+
+    @Test
+    void webMvcConfigurerBridge_registersComponent() {
+        io.springperf.web.context.WebContext webContext = mock(io.springperf.web.context.WebContext.class);
+        io.springperf.web.support.mvc.config.WebMvcConfigurerBridge bridge = config.webMvcConfigurerBridge(webContext);
+        assertNotNull(bridge);
+        org.mockito.Mockito.verify(webContext).registerWebComponent(bridge);
+    }
+
+    @Test
+    void perfServletContext_createsAndRegisters() {
+        io.springperf.web.context.WebContext webContext = mock(io.springperf.web.context.WebContext.class);
+        io.springperf.web.context.ApplicationProperties props =
+                mock(io.springperf.web.context.ApplicationProperties.class);
+        org.mockito.Mockito.when(webContext.getProps()).thenReturn(props);
+        io.springperf.web.support.servlet.context.PerfServletContext ctx = config.perfServletContext(webContext);
+        assertNotNull(ctx);
+        org.mockito.Mockito.verify(webContext).registerWebComponent(ctx);
+    }
+
+    @Test
+    void perfHttpSessionManager_createsAndRegisters() {
+        io.springperf.web.context.WebContext webContext = mock(io.springperf.web.context.WebContext.class);
+        io.springperf.web.support.servlet.session.PerfHttpSessionManager manager =
+                config.perfHttpSessionManager(webContext);
+        assertNotNull(manager);
+        org.mockito.Mockito.verify(webContext).registerWebComponent(manager);
+    }
+
+    @Test
+    void supportServletRegistry_createsAndRegisters() {
+        io.springperf.web.context.WebContext webContext = mock(io.springperf.web.context.WebContext.class);
+        io.springperf.web.support.servlet.SupportServletRegistry registry = config.supportServletRegistry(webContext);
+        assertNotNull(registry);
+        org.mockito.Mockito.verify(webContext).registerWebComponent(registry);
     }
 }

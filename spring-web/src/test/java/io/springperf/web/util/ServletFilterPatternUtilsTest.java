@@ -493,4 +493,56 @@ class ServletFilterPatternUtilsTest {
                 ServletFilterPatternUtils.matchPathRuleToCached(
                         Arrays.asList("/other/*"), Arrays.asList("*.json"), "/api/users"));
     }
+
+    // ========== validateServletPattern ==========
+
+    @Test
+    void validateServletPattern_validPatterns_returnNull() {
+        assertNull(ServletFilterPatternUtils.validateServletPattern("/*"));
+        assertNull(ServletFilterPatternUtils.validateServletPattern("/"));
+        assertNull(ServletFilterPatternUtils.validateServletPattern("/api/*"));
+        assertNull(ServletFilterPatternUtils.validateServletPattern("*.json"));
+        assertNull(ServletFilterPatternUtils.validateServletPattern("/api/health"));
+    }
+
+    @Test
+    void validateServletPattern_invalidPatterns_returnDescription() {
+        assertNotNull(ServletFilterPatternUtils.validateServletPattern(""));
+        assertNotNull(ServletFilterPatternUtils.validateServletPattern("api/test/*"));
+        assertNotNull(ServletFilterPatternUtils.validateServletPattern("api/health"));
+        assertNotNull(ServletFilterPatternUtils.validateServletPattern("api/{id}"));
+    }
+
+    @Test
+    void validateServletPattern_nullPattern_returnsDescription() {
+        assertNotNull(ServletFilterPatternUtils.validateServletPattern(null));
+    }
+
+    // ========== patternsDisjoint 补充分支 ==========
+
+    @Test
+    void patternsDisjoint_exactWithWildcard_differentFirstSegment_disjoint() {
+        // /api/{x} 与 /other/{y} 首段字面量不同 → 确定不相交
+        assertTrue(ServletFilterPatternUtils.patternsDisjoint("/api/{x}", "/other/{y}"));
+        assertTrue(ServletFilterPatternUtils.patternsDisjoint("/other/{y}", "/api/{x}"));
+    }
+
+    @Test
+    void patternsDisjoint_prefixVsExactWithLeadingWildcardSegment_notDisjoint() {
+        // /api/* vs /{var}/foo — 首段为通配符无法判断 → 不相交为 false
+        assertFalse(ServletFilterPatternUtils.patternsDisjoint("/api/*", "/{var}/foo"));
+    }
+
+    @Test
+    void patternsDisjoint_suffixVsExactWithWildcard_notDisjoint() {
+        // *.json vs /api/{id} — 保守判断
+        assertFalse(ServletFilterPatternUtils.patternsDisjoint("*.json", "/api/{id}"));
+        assertFalse(ServletFilterPatternUtils.patternsDisjoint("/api/{id}", "*.json"));
+    }
+
+    @Test
+    void patternsDisjoint_exactWithWildcard_sameFirstSegment_notDisjoint() {
+        // /api/{x} 与 /api/{y} 首段相同 → 不相交为 false
+        assertFalse(ServletFilterPatternUtils.patternsDisjoint("/api/{x}", "/api/{y}"));
+    }
 }
