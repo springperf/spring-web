@@ -50,7 +50,15 @@ public abstract class BaseWebServerHttpRequest implements WebServerHttpRequest, 
     public String getPath() { return path; }
 
     public MultiValueMap<String, String> getParameterMap() {
-        if (parameterMap == null) parameterMap = parseParameters();
+        if (parameterMap == null) {
+            // 与 getBodyBytes() 相同的双检锁：异步 dispatch（另一线程）可能再次读取参数，
+            // 无锁懒初始化会在并发时重复解析（multipart 场景重复调 decoder、读同一 ByteBuf）。
+            synchronized (this) {
+                if (parameterMap == null) {
+                    parameterMap = parseParameters();
+                }
+            }
+        }
         return parameterMap;
     }
 

@@ -123,6 +123,37 @@ public class PathPatternUtils {
         return segmentsDisjoint(s1, 0, s2, 0);
     }
 
+    public static int comparePathRuleSpecificity(String p1, String p2) {
+        if (p1.equals(p2)) {
+            return 0;
+        }
+        String[] s1 = p1.split("/");
+        String[] s2 = p2.split("/");
+        int min = Math.min(s1.length, s2.length);
+        for (int i = 0; i < min; i++) {
+            int a = segmentSpecificity(s1[i]);
+            int b = segmentSpecificity(s2[i]);
+            if (a != b) {
+                return Integer.compare(b, a);
+            }
+        }
+        // 公共前缀相同：段数更少的（更精确，如 /user 与 /user/**）排前面
+        return Integer.compare(s1.length, s2.length);
+    }
+
+    private static int segmentSpecificity(String segment) {
+        if ("**".equals(segment)) {
+            return 0;
+        }
+        if ("*".equals(segment)) {
+            return 1;
+        }
+        if (segment.startsWith("{") && segment.endsWith("}")) {
+            return 2;
+        }
+        return 3;
+    }
+
     private static boolean segmentsDisjoint(List<Segment> s1, int i, List<Segment> s2, int j) {
         while (i < s1.size() && j < s2.size()) {
             Segment a = s1.get(i);

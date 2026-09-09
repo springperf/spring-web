@@ -22,7 +22,6 @@ public class WebAsyncSupportUtils {
 
     public static DeferredResultInterceptorChainAdapter newDeferredResultInterceptorChain(DeferredResult<?> deferredResult, List<DeferredResultProcessingInterceptor> deferredResultInterceptors) {
         List<DeferredResultProcessingInterceptor> interceptors = new ArrayList<>();
-        interceptors.add(deferredResult.getInterceptor());
         interceptors.addAll(deferredResultInterceptors);
         interceptors.add(timeoutDeferredResultInterceptor);
         return new DeferredResultInterceptorChainAdapter(interceptors);

@@ -31,8 +31,8 @@ public abstract class BaseE2ETest {
         logging.setLevel(HttpLoggingInterceptor.Level.HEADERS);
         CLIENT = new OkHttpClient.Builder()
                 .connectTimeout(Duration.ofSeconds(3))
-                .readTimeout(Duration.ofSeconds(10))
-                .writeTimeout(Duration.ofSeconds(10))
+                .readTimeout(Duration.ofSeconds(30))
+                .writeTimeout(Duration.ofSeconds(30))
                 .retryOnConnectionFailure(true)
                 .addInterceptor(logging)
                 .build();

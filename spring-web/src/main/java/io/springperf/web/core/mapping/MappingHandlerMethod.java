@@ -51,9 +51,13 @@ public class MappingHandlerMethod extends InvokableHandlerMethod {
                     cache = Arrays.copyOf(cache, index + 1);
                     setCache(key, cache);
                 }
+                // 扩容路径：值与数组一起在锁内发布，避免锁外写孤儿数组 / 读者看到
+                // 新数组但 index 槽位尚未写入的中间态。
+                cache[index] = value;
             }
+        } else {
+            cache[index] = value;
         }
-        cache[index] = value;
     }
 
     protected Object[] getCache(MappingCacheKey key) {

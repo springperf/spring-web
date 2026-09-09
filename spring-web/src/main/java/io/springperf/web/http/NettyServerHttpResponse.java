@@ -81,6 +81,22 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
         return new ByteBufOutputStream(getBuf());
     }
 
+    /**
+     * 清空已缓冲的响应体（resetBuffer 的真实实现）。
+     * 基类实现只重置从未被写入过的 {@link ByteArrayOutputStream body}，对 Netty 响应是空操作。
+     * 此处直接清空底层 {@link ByteBuf}，使异常路径能丢弃序列化中途写入的部分内容。
+     */
+    @Override
+    public boolean resetBuffer() {
+        ByteBuf current = this.buf;
+        if (current == null) {
+            return false;
+        }
+        boolean haveData = current.readableBytes() > 0;
+        current.clear();
+        return haveData;
+    }
+
     @Override
     public void flush(boolean chunked) throws IOException {
         ByteBuf buf = this.buf;

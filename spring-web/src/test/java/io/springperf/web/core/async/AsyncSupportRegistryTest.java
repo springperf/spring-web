@@ -149,13 +149,13 @@ class AsyncSupportRegistryTest {
     void startCallableProcessing_withoutDefaultPool_doesNotNpe() throws Exception {
         // 无 default 业务线程池（BizPoolRegistry.getDefaultPool() 返回 null）→ defaultTaskExecutor = null
         BizPoolRegistry bizPoolRegistry = mock(BizPoolRegistry.class);
-        when(bizPoolRegistry.getDefaultPool()).thenReturn(null);
-        when(webContext.getWebComponent(BizPoolRegistry.class)).thenReturn(bizPoolRegistry);
-        when(webContext.getCtx()).thenReturn(applicationContext);
-        when(applicationContext.getBeansOfType(CallableProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
-        when(applicationContext.getBeansOfType(DeferredResultProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
-        doReturn(null).when(webContext).getBeanFromCtx(com.fasterxml.jackson.databind.ObjectMapper.class);
-        when(webContext.getWebComponentWithDefault(eq(JsonConverter.class), any(JsonConverter.class)))
+        lenient().when(bizPoolRegistry.getDefaultPool()).thenReturn(null);
+        lenient().when(webContext.getWebComponent(BizPoolRegistry.class)).thenReturn(bizPoolRegistry);
+        lenient().when(webContext.getCtx()).thenReturn(applicationContext);
+        lenient().when(applicationContext.getBeansOfType(CallableProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
+        lenient().when(applicationContext.getBeansOfType(DeferredResultProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
+        lenient().doReturn(null).when(webContext).getBeanFromCtx(com.fasterxml.jackson.databind.ObjectMapper.class);
+        lenient().when(webContext.getWebComponentWithDefault(eq(JsonConverter.class), any(JsonConverter.class)))
                 .thenReturn(mock(JsonConverter.class));
 
         registry.initWithWebContext(webContext);
@@ -177,13 +177,13 @@ class AsyncSupportRegistryTest {
     @Test
     void startCallableProcessing_withoutDefaultPool_createsReusableFallbackExecutor() throws Exception {
         BizPoolRegistry bizPoolRegistry = mock(BizPoolRegistry.class);
-        when(bizPoolRegistry.getDefaultPool()).thenReturn(null);
-        when(webContext.getWebComponent(BizPoolRegistry.class)).thenReturn(bizPoolRegistry);
-        when(webContext.getCtx()).thenReturn(applicationContext);
-        when(applicationContext.getBeansOfType(CallableProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
-        when(applicationContext.getBeansOfType(DeferredResultProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
-        doReturn(null).when(webContext).getBeanFromCtx(com.fasterxml.jackson.databind.ObjectMapper.class);
-        when(webContext.getWebComponentWithDefault(eq(JsonConverter.class), any(JsonConverter.class)))
+        lenient().when(bizPoolRegistry.getDefaultPool()).thenReturn(null);
+        lenient().when(webContext.getWebComponent(BizPoolRegistry.class)).thenReturn(bizPoolRegistry);
+        lenient().when(webContext.getCtx()).thenReturn(applicationContext);
+        lenient().when(applicationContext.getBeansOfType(CallableProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
+        lenient().when(applicationContext.getBeansOfType(DeferredResultProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
+        lenient().doReturn(null).when(webContext).getBeanFromCtx(com.fasterxml.jackson.databind.ObjectMapper.class);
+        lenient().when(webContext.getWebComponentWithDefault(eq(JsonConverter.class), any(JsonConverter.class)))
                 .thenReturn(mock(JsonConverter.class));
 
         registry.initWithWebContext(webContext);

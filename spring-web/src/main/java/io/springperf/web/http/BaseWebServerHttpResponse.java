@@ -251,6 +251,9 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
             return;
         }
         try {
+            // 异常路径：清空已缓冲的部分 body（如 JSON 序列化中途失败写入的字节），
+            // 避免错误响应 JSON 追加在部分内容之后形成畸形响应体（对齐 Spring 语义）。
+            resetBuffer();
             setStatusCode(statusCode);
             headers.setContentType(contentType);
             if (data != null) getBody().write(data);

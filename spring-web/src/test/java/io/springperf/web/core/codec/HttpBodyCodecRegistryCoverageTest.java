@@ -28,11 +28,14 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -117,9 +120,17 @@ class HttpBodyCodecRegistryCoverageTest {
 
         List<MediaType> sorted = registry.allSupportedMediaTypes;
         assertEquals(3, sorted.size());
-        assertEquals("json", sorted.get(0).getSubtype());
-        assertEquals("xml", sorted.get(1).getSubtype());
-        assertEquals("text", sorted.get(2).getType());
+        // Spring 5.3（SB2.7）的 sortBySpecificity 对等 specificity 的类型保持输入相对顺序
+        // （输入 = ConcurrentHashMap values() 遍历，顺序不保证），因此不断言绝对顺序，
+        // 只断言集合完整 + 已按 specificity 排序（再排一次结果不变）。
+        Set<String> subtypes = new HashSet<>();
+        for (MediaType mt : sorted) {
+            subtypes.add(mt.getSubtype());
+        }
+        assertEquals(new HashSet<>(Arrays.asList("xml", "plain", "json")), subtypes);
+        List<MediaType> reSorted = new ArrayList<>(sorted);
+        MediaType.sortBySpecificity(reSorted);
+        assertEquals(sorted, reSorted);
     }
 
     @Test

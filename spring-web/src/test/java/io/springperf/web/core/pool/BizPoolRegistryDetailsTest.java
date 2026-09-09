@@ -169,7 +169,6 @@ class BizPoolRegistryDetailsTest {
                 mock(io.springperf.web.context.ApplicationProperties.class);
         when(wc.getProps()).thenReturn(props);
         when(wc.getWebComponentWithDefault(eq(WebMetrics.class), any())).thenReturn(NoOpWebMetrics.INSTANCE);
-        when(props.getBoolean(eq("spring.threads.virtual.enabled"), eq(false))).thenReturn(false);
         when(props.getInt(PropertiesConstant.POOL_CORE_POOL_SIZE)).thenReturn(core);
         when(props.getInt(PropertiesConstant.POOL_MAX_POOL_SIZE)).thenReturn(max);
         when(props.getInt(PropertiesConstant.POOL_KEEP_ALIVE_TIME)).thenReturn(60);

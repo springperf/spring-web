@@ -300,7 +300,6 @@ class BizPoolRegistryTest {
         when(props.getInt(PropertiesConstant.POOL_KEEP_ALIVE_TIME)).thenReturn(60);
         when(props.getInt(PropertiesConstant.POOL_QUEUE_CAPACITY))
                 .thenReturn(PropertiesConstant.POOL_QUEUE_CAPACITY_DEFAULT);
-        when(props.getBoolean(eq("spring.threads.virtual.enabled"), eq(false))).thenReturn(false);
         when(props.get(PropertiesConstant.POOL_DEFAULT_EXECUTE_MODE,
                 PropertiesConstant.POOL_DEFAULT_EXECUTE_MODE_DEFAULT)).thenReturn("default");
 

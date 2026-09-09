@@ -31,6 +31,16 @@ class ResponseEntityExceptionHandlerBranchesTest {
 
     private final ResponseEntityExceptionHandler handler = new ResponseEntityExceptionHandler();
 
+    // Spring 5.3 的 MethodParameter 构造会对 parameterIndex 做边界校验，
+    // getMethods()[0] 可能返回无参方法（如 wait/equals）导致越界，这里提供确定的有参方法。
+    @SuppressWarnings("unused")
+    private static void sampleHandler(Object payload) {
+    }
+
+    private static java.lang.reflect.Method sampleHandlerMethod() throws NoSuchMethodException {
+        return ResponseEntityExceptionHandlerBranchesTest.class.getDeclaredMethod("sampleHandler", Object.class);
+    }
+
     private WebRequest webRequest() {
         return new ServletWebRequest(new MockHttpServletRequest(), new MockHttpServletResponse());
     }
@@ -62,7 +72,7 @@ class ResponseEntityExceptionHandlerBranchesTest {
     @Test
     void missingPathVariable_mapsTo500() throws Exception {
         MissingPathVariableException ex =
-                new MissingPathVariableException("varName", new org.springframework.core.MethodParameter(getClass().getMethods()[0], 0));
+                new MissingPathVariableException("varName", new org.springframework.core.MethodParameter(sampleHandlerMethod(), 0));
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR,
                 handler.handleException(ex, webRequest()).getStatusCode());
     }
@@ -71,7 +81,7 @@ class ResponseEntityExceptionHandlerBranchesTest {
     void typeMismatch_mapsTo400() throws Exception {
         TypeMismatchException ex =
                 new MethodArgumentTypeMismatchException("value", Integer.class, "name",
-                        new org.springframework.core.MethodParameter(getClass().getMethods()[0], 0), null);
+                        new org.springframework.core.MethodParameter(sampleHandlerMethod(), 0), null);
         assertEquals(HttpStatus.BAD_REQUEST,
                 handler.handleException(ex, webRequest()).getStatusCode());
     }
@@ -161,7 +171,7 @@ class ResponseEntityExceptionHandlerBranchesTest {
                 new org.springframework.validation.BeanPropertyBindingResult(new Object(), "target");
         org.springframework.web.bind.MethodArgumentNotValidException ex =
                 new org.springframework.web.bind.MethodArgumentNotValidException(
-                        new org.springframework.core.MethodParameter(getClass().getMethods()[0], 0), br);
+                        new org.springframework.core.MethodParameter(sampleHandlerMethod(), 0), br);
         assertEquals(HttpStatus.BAD_REQUEST,
                 handler.handleException(ex, webRequest()).getStatusCode());
     }

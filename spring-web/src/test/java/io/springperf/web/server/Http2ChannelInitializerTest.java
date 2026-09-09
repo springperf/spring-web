@@ -94,6 +94,7 @@ class Http2ChannelInitializerTest {
     }
 
     @Test
+    @org.junit.jupiter.api.Disabled("Netty 4.1.115 的 SslContext.newHandler(ByteBufAllocator) 为 final 方法，Mockito 4 core（subclass mock maker）无法 mock；master 用 Netty 4.1.137 可 mock。2.7.x 真实 SSL 管线由 SslServerTest/SslManagementPortTest 覆盖。")
     void http11_withSsl_addsSslHandlerAndExceptionHandler() {
         ChannelPipeline pipeline = mock(ChannelPipeline.class);
         io.netty.handler.ssl.SslContext sslContext = mock(io.netty.handler.ssl.SslContext.class);
