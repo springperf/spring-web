@@ -5,8 +5,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.asm.MethodVisitor;
 import org.springframework.asm.Type;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
@@ -114,65 +112,12 @@ class FastInvokerGeneratorCoverageTest {
 
     @Test
     void createInvoker_nativeImagePropertyInIsolatedClassLoader_throws() throws Exception {
-        String key = "org.graalvm.nativeimage.imagecode";
-        String previous = System.setProperty(key, "runtime");
-        try {
-            ClassLoader isolated = new IsolatedClassLoader(getClass().getClassLoader());
-            Class<?> clazz = Class.forName("io.springperf.web.core.invoker.FastInvokerGenerator", true, isolated);
-            Method createInvoker = clazz.getDeclaredMethod("createInvoker", Object.class, Class.class, Method.class);
-            Method hello = FullPrimController.class.getMethod("hello", String.class);
-            InvocationTargetException ex = assertThrows(InvocationTargetException.class,
-                    () -> createInvoker.invoke(null, new FullPrimController(), FullPrimController.class, hello));
-            assertInstanceOf(UnsupportedOperationException.class, ex.getCause());
-        } finally {
-            if (previous == null) {
-                System.clearProperty(key);
-            } else {
-                System.setProperty(key, previous);
-            }
-        }
+        // GraalVM native-image（master/SB3）特有的降级测试：2.7.x 无 IN_NATIVE_IMAGE 守卫，
+        // 该行为依赖的字节码守卫不随本分支 backport，此测试不适用。
     }
 
     private static void assertInvoke(Method m, Object target, Object[] args, Object expected) throws Throwable {
         Invoker invoker = FastInvokerGenerator.createInvoker(target, target.getClass(), m);
         assertEquals(expected, invoker.invoke(args));
-    }
-
-    private static class IsolatedClassLoader extends ClassLoader {
-        IsolatedClassLoader(ClassLoader parent) {
-            super(parent);
-        }
-
-        @Override
-        protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-            if ("io.springperf.web.core.invoker.FastInvokerGenerator".equals(name)) {
-                synchronized (getClassLoadingLock(name)) {
-                    Class<?> loaded = findLoadedClass(name);
-                    if (loaded == null) {
-                        try (InputStream in = getResourceAsStream(
-                                "io/springperf/web/core/invoker/FastInvokerGenerator.class")) {
-                            if (in == null) {
-                                throw new ClassNotFoundException(name);
-                            }
-                            java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
-                            byte[] buf = new byte[4096];
-                            int len;
-                            while ((len = in.read(buf)) != -1) {
-                                bos.write(buf, 0, len);
-                            }
-                            byte[] bytes = bos.toByteArray();
-                            loaded = defineClass(name, bytes, 0, bytes.length);
-                        } catch (IOException e) {
-                            throw new ClassNotFoundException(name, e);
-                        }
-                    }
-                    if (resolve) {
-                        resolveClass(loaded);
-                    }
-                    return loaded;
-                }
-            }
-            return super.loadClass(name, resolve);
-        }
     }
 }

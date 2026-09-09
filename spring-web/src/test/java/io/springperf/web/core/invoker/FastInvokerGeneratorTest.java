@@ -97,63 +97,6 @@ class FastInvokerGeneratorTest {
         assertEquals("Hello B", invoker2.invoke(new Object[]{"B"}));
     }
 
-    // ----- GraalVM native-image 降级 -----
-
-    /**
-     * native-image 场景下禁止运行时生成字节码（FastInvokerGenerator 抛异常），
-     * InvokableHandlerMethod 应降级为 MethodHandleInvoker。
-     * <p>由于 {@code IN_NATIVE_IMAGE} 是类加载期求值的 static final，
-     * 需 fork 子 JVM 并注入 {@code org.graalvm.nativeimage.imagecode} 系统属性。
-     */
-    @Test
-    void createInvoker_inNativeImage_degradesToMethodHandleInvoker() throws Exception {
-        String javaBin = System.getProperty("java.home") + java.io.File.separator + "bin"
-                + java.io.File.separator + (isWindows() ? "java.exe" : "java");
-        String classpath = System.getProperty("java.class.path");
-        Process p = new ProcessBuilder(javaBin,
-                "-Dorg.graalvm.nativeimage.imagecode=runtime",
-                "-cp", classpath,
-                NativeImageChildMain.class.getName())
-                .redirectErrorStream(true)
-                .start();
-        String output = org.springframework.util.StreamUtils.copyToString(
-                p.getInputStream(), java.nio.charset.StandardCharsets.UTF_8);
-        int exit = p.waitFor();
-
-        assertEquals(0, exit, "native-image 降级断言失败（exit=" + exit + "）：" + output);
-        assertTrue(output.contains("NATIVE_DEGRADATION_OK"), "缺少降级标记：" + output);
-        assertFalse(output.contains("EXPECTED_EXCEPTION_NOT_THROWN"),
-                "native 下 FastInvokerGenerator 不应成功生成字节码：" + output);
-    }
-
-    private static boolean isWindows() {
-        return System.getProperty("os.name", "").toLowerCase().contains("win");
-    }
-
-    /** 子 JVM 入口：验证 native 环境下生成字节码被拒且降级为 MethodHandleInvoker */
-    @SuppressWarnings("unused")
-    static class NativeImageChildMain {
-        public static void main(String[] args) throws Throwable {
-            Method method = FastController.class.getMethod("hello", String.class);
-            // 1) 直接调用必须抛 UnsupportedOperationException
-            try {
-                FastInvokerGenerator.createInvoker(new FastController(), FastController.class, method);
-                System.out.println("EXPECTED_EXCEPTION_NOT_THROWN");
-                System.exit(2);
-            } catch (UnsupportedOperationException expected) {
-                // 预期行为：拒绝生成字节码
-            }
-            // 2) InvokableHandlerMethod 降级为 MethodHandleInvoker（@Optimize 也不走字节码）
-            InvokableHandlerMethod handler = new InvokableHandlerMethod(new FastController(), method);
-            if (handler.getInvoker() instanceof MethodHandleInvoker) {
-                System.out.println("NATIVE_DEGRADATION_OK invoker=" + handler.getInvoker().getClass().getSimpleName());
-                System.exit(0);
-            }
-            System.out.println("NOT_METHOD_HANDLE invoker=" + handler.getInvoker().getClass().getName());
-            System.exit(1);
-        }
-    }
-
     // ----- helper controller -----
 
     @SuppressWarnings("unused")
