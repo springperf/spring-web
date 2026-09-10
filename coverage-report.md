@@ -1,6 +1,6 @@
 ﻿# 单元测试覆盖率报告 / Unit Test Coverage Report
 
-- **生成时间 / Generated at**：2026-09-09 23:23:56
+- **生成时间 / Generated at**：2026-09-10 08:44:48
 - **环境 / Environment**：Windows_NT / java version "17.0.9" 2023-10-17 LTS
 - **覆盖范围 / Scope**：库模块单元测试（JaCoCo，基于 target/site/jacoco/jacoco.csv）
   Library module unit tests (JaCoCo, based on target/site/jacoco/jacoco.csv)

@@ -35,7 +35,7 @@ import java.util.Map;
  * {@link WebSocketSession#getAttributes()} 中，避免跨连接串扰。</p>
  *
  * @author huangcanda
- * @since 3.5.6
+ * @since 2.7.6
  */
 @Slf4j
 public class JsrEndpointWebSocketHandler implements WebSocketHandler {

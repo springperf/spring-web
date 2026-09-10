@@ -4,6 +4,67 @@
 
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.6] - 20260910
+
+### Added
+
+- **View rendering module `spring-web-view`**: Model/View promoted to first-class citizens in the request pipeline (`ModelContext` request-scoped container + `View`/`ViewResolver` SPI), with `@ControllerAdvice @ModelAttribute` pre-population, local `@ModelAttribute` methods, `@PathVariable`/`BindingResult` merging; multi-engine (Thymeleaf / FreeMarker / Beetl) coexistence, `spring.web.view.engine` selection; `redirect:` prefix views and `ViewReturnValueResolver` (Thymeleaf 3.0 adapted to plain `IContext`, FreeMarker 2.3.32)
+- **JSP rendering**: Apache Jasper + JSTL integration (`JasperJspServlet`), `JspViewResolver` provides `jsp:` prefix / `.jsp` suffix view names and auto-registers `/**/*.jsp` routes; `spring-web-mvc-support` bridges `ModelAndView` / JSP views (javax.servlet + JSTL 1.2 adaptation)
+- **Servlet object routing**: `SupportServletRegistry` scans Servlet beans / `@WebServlet` `url-pattern` annotations and registers them as framework routes; `ServletInvoker`, `PerfServletConfig`
+- **JSR-356 `@ServerEndpoint` bridge** (`spring-web-websocket`): standard WebSocket endpoint annotation support covering `@OnOpen/@OnMessage/@OnClose/@OnError`, `@PathParam`, Decoder/Encoder, custom `Configurator`, `JsrWebSocketContainer` endpoint lifecycle (javax.websocket adaptation)
+- **Method-level interceptors and `@SessionAttributes`**: `@ControllerAdvice` interceptors match by handler controller type; `@SessionAttributes` syncs Model attributes across requests with `SessionStatus` cleanup, `@SessionAttribute`/`SessionStatus` parameter auto-wiring
+- **HEAD semantics (RFC 7231 §4.3.2)**: auto-maps to GET when no explicit HEAD handler, suppresses body but keeps real `Content-Length` (resource/stream/byte paths covered)
+- **Linux native transport**: new `server.netty.transport=auto/nio/epoll` (default auto), auto-enables native epoll on Linux
+- **Production Netty defaults**: `SO_BACKLOG` 1024, `SO_KEEPALIVE` true, `max-content-length` 4MB; business thread pool default bounded queue of 100 so `maxPoolSize` scaling and 503 fast-fail actually take effect
+
+### Changed
+
+- **`spring-web-support` module split**: split into `spring-web-servlet` (pure Servlet bridge: Filter/Servlet/HttpSession/JSP/`@SessionAttribute` etc. with official spring-web semantics, zero SpringMVC dependency) and `spring-web-mvc-support` (SpringMVC compatibility bridge: `org.springframework.web.servlet.*` rewritten classes, `WebMvcConfigurer`/`HandlerInterceptor`/`RequestBodyAdvice` bridging). Users needing only Servlet compatibility depend solely on `spring-web-servlet`; `spring-web-mvc-support` depends on `spring-web-servlet`. Starter auto-config split into `SpringWebServletAutoConfiguration` + `SpringWebMvcSupportAutoConfiguration` (activated per-module by class conditions)
+
+### Security
+
+- **Multipart DoS protection**: `SupportMultipartResolver` fail-fasts on declared `Content-Length` and enforces a streaming byte ceiling (covers chunked), returning 413 on overflow aligned with `HttpObjectAggregator` instead of closing the connection
+- **Fastjson deserialization hardening**: `SupportAutoType` disabled by default with `ErrorOnNotSupportAutoType` enabled, blocking `@type` gadget attacks
+- **Session Fixation protection**: session fixation attack protection and security audit fixes
+
+### Optimized
+
+- **Component registration concurrency**: `WebComponentContainer` now uses `ConcurrentHashMap` + atomic `compute` merge, no read-write races or leftover destroy on runtime registration
+- **Connection metric isolation**: `NettyMetricsHandler` changed from shared singleton to per-server instance; main and management port connection counts tracked separately
+- **Locale argument resolution**: resolves by request `Accept-Language` when no thread-bound Locale, respecting interceptor/ControllerAdvice overrides, without `ThreadLocal` (zero thread-pool residue)
+- **Exception injection fix**: `@ExceptionHandler` injects the most specific cause-chain exception compatible with the parameter type, avoiding spurious `ClassCastException` 500s
+
+### Fixed
+
+- **404/405 shared-state pollution**: per-request `StacklessResponseStatusException` (stack trace disabled, zero overhead) so `@ExceptionHandler` header/body mutations no longer affect subsequent requests
+- **Filter-chain exception path**: initializes request context and runs full exception handling and `afterCompletion`, avoiding null interceptors / leftover ThreadLocal
+- **`WebContext` lifecycle**: cleans up initialized components on startup failure while keeping fail-fast retry; child component state resets after `destroy()`, supporting stop/restart re-init
+- **Async fallback**: lazily creates and reuses a `SimpleAsyncTaskExecutor` when no default business pool is configured and the method specifies no executor, eliminating NPE
+- **Route boundaries**: `PrefixPathRouterOptimizer` explicitly rejects when no prefix index (avoids array OOB); `SuffixPathRouterOptimizer` boundary guards
+- **Async & stream edges**: asynchronous handler exception handling, `AbstractNettyStreamSender` completion boundary hardening
+- **Static resource method tightening**: `ResourceRequestHandler` only allows GET (HEAD auto-mapped by the route layer returning metadata only, skipping file IO)
+- **JSR-356 lifecycle hardening**: fallback cleanup of Decoder/Encoder on `@OnOpen` failure / non-standard close codes; `@OnClose` exceptions no longer skip codec cleanup
+- **View resolution failure no longer silent**: unresolvable view names throw `IllegalArgumentException` (500 + error context) instead of empty 200; `ViewResolver` parse exceptions are logged
+- **`redirect:` semantics alignment**: only honored for view methods, no longer hijacking `@ResponseBody`/`@RestController` `"redirect:/x"` strings into 302; appends `&` when the target URL already contains a query
+- **`WebComponentContainer` name conflicts**: losing components are no longer mis-initialized / duplicate route registration, preventing side effects and resource leaks
+- **Servlet bridge sessions never expire → unbounded memory growth**: `PerfHttpSessionManager.createSession()` did not apply session timeout, so `maxInactiveInterval` stayed 0 and the cleanup thread never reclaimed sessions; now sets expiry from `server.servlet.session.timeout` (Spring Boot Duration semantics: bare digits = seconds, supports `30m/1h/1d` suffixes, default 30 minutes)
+- **`server.http.read-timeout` default lost**: `HTTP_READ_TIMEOUT` was missing from the default table, so read-timeout protection (documented 30s) was effectively disabled; now fixed
+- **Async return-value serialization exception swallowed**: `asyncDispatch` return-value resolution exceptions were only logged with the response hanging until timeout; now routed to `ExceptionRegistry` and flushed, with `afterCompletion` carrying the real exception
+- **404/405 path-level interceptor constraint ineffective**: include/exclude were still evaluated by request path when no handler existed; path-level interceptors no longer fire on arbitrary 404s
+- **Overlapping wildcard routes match by specificity**: most-specific wins for overlapping wildcards like `/user/{id}` vs `/user/*` (literal > {var} > * > **), aligned with Spring MVC; `PathPatternUtils.comparePathRuleSpecificity` provides the comparison
+- **Streaming error termination no longer hangs**: `AbstractNettyStreamSender.complete(.., failure)` closes the connection on error (no longer writes a normal `LastHttpContent`), so clients see the abnormal truncation
+
+### Build
+
+- **JaCoCo coverage gate**: total module coverage 92.1% (spring-web 92.7% / servlet 91.5% / websocket 90.5% / view 95.5%), new `scripts/coverage-report.sh/ps1` report scripts (relocated to `scripts/`)
+- **E2E enhancements**: random ports to avoid conflicts, graceful-shutdown drain, TLS depth / mTLS, native degradation and perf-gate tests, connection reuse and request-thickness tests; `BaseE2ETest` read/write timeouts relaxed to 30s to reduce occasional flakiness
+- **Test hardening**: `lenient()` on isomorphic stubs in `AsyncSupportRegistryTest`; order-independent sort assertions in `HttpBodyCodecRegistryCoverageTest`; explicit parameterized method in `ResponseEntityExceptionHandlerBranchesTest`; restored `placeholder.txt` test resource + `.gitignore` negate rule
+
+### Documentation
+
+- **View rendering docs**: `docs/view.md` (zh/en) synced with 2.7.6
+- **Module docs**: with the `spring-web-support` split, `spring-web-servlet` and `spring-web-mvc-support` each have their own chapter with selection guidance
+
 ## [2.7.5] - 20260824
 
 ### Added

@@ -31,7 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * </ul>
  *
  * @author huangcanda
- * @since 3.5.6
+ * @since 2.7.6
  */
 public class JsrWebSocketSession implements Session {
 

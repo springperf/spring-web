@@ -21,7 +21,7 @@ import org.springframework.web.socket.WebSocketHandler;
  * </ol>
  *
  * @author huangcanda
- * @since 3.5.6
+ * @since 2.7.6
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnClass({ServerEndpoint.class, WebSocketHandler.class, ClientEndpointConfig.class})

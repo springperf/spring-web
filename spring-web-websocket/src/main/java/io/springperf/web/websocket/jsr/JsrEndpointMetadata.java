@@ -32,7 +32,7 @@ import java.util.List;
  * 请求路径上零反射、零注解查找（遵循框架性能原则）。</p>
  *
  * @author huangcanda
- * @since 3.5.6
+ * @since 2.7.6
  */
 public class JsrEndpointMetadata {
 

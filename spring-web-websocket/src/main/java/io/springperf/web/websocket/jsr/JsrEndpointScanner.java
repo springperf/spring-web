@@ -28,7 +28,7 @@ import java.util.Set;
  * 显式注册为 Spring Bean。</p>
  *
  * @author huangcanda
- * @since 3.5.6
+ * @since 2.7.6
  */
 public class JsrEndpointScanner {
 

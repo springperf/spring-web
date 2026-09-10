@@ -19,7 +19,7 @@ import java.util.Map;
  * 此注册表在连接建立时实例化、初始化，会话关闭时销毁。</p>
  *
  * @author huangcanda
- * @since 3.5.6
+ * @since 2.7.6
  */
 public class JsrCodecRegistry {
 

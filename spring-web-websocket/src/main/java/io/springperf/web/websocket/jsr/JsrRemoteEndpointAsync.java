@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit;
  * 发送失败则返回已异常完成的 future。流式发送首期不支持。</p>
  *
  * @author huangcanda
- * @since 3.5.6
+ * @since 2.7.6
  */
 public class JsrRemoteEndpointAsync implements RemoteEndpoint.Async {
 

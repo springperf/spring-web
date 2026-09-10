@@ -27,7 +27,7 @@ if [[ "${1:-}" == "--skip" || "${1:-}" == "-s" ]]; then
   SKIP_MVN=true
 fi
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_FILE="$REPO_ROOT/coverage-report.md"
 GENERATED_AT="$(date '+%Y-%m-%d %H:%M:%S')"
 PLATFORM="$(uname -s 2>/dev/null || echo 'Windows')"
