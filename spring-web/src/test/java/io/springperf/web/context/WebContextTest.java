@@ -1,10 +1,13 @@
 package io.springperf.web.context;
 
 import io.springperf.web.core.DispatcherHandler;
+import io.springperf.web.core.mapping.MappingCacheKey;
+import io.springperf.web.core.mapping.MappingHandlerMethod;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationContext;
 
+import java.lang.reflect.Method;
 import java.util.Collections;
 
 import static io.springperf.web.context.PropertiesConstant.CONTEXT_PATH;
@@ -195,5 +198,23 @@ class WebContextTest {
 
         assertDoesNotThrow(() -> webContext.destroy());
         verify(comp, never()).destroyComponent();
+    }
+
+    @Test
+    void destroyComponent_clearsStaticMetadataCaches() throws Exception {
+        // 2-7 回归：destroy 必须清空进程级静态元数据缓存，防 devtools/新 ClassLoader 重启时
+        // 旧 ClassLoader 被钉住（metaspace 泄漏）。缓存为纯缓存，清空后自动重建。
+        webContext.startLifecycle();
+        Method method = Object.class.getMethod("toString");
+        Object bean = new Object();
+        MappingCacheKey<String> key = MappingCacheKey.createMethodCacheKey(String.class);
+        MappingHandlerMethod mhm = new MappingHandlerMethod(bean, method);
+        mhm.set(key, "v");
+        assertEquals("v", mhm.get(key));
+
+        webContext.destroy();
+
+        MappingHandlerMethod fresh = new MappingHandlerMethod(bean, method);
+        assertNull(fresh.get(key), "destroy 后静态缓存应被清空");
     }
 }

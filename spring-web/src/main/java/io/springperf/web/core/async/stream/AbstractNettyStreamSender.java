@@ -46,6 +46,8 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
 
     protected final AtomicInteger wip = new AtomicInteger(0);
     protected volatile boolean completed;
+    /** 终止原因：非 null 表示流以错误终止（complete(.., failure)），排空末尾走错误分支。 */
+    protected Throwable failure;
 
     protected boolean lastHttpContentWritten;
 
@@ -82,6 +84,7 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
     @Override
     public void complete(boolean closeChannelOnComplete, Throwable failure) {
         this.closeChannelOnComplete = closeChannelOnComplete;
+        this.failure = failure;
         this.completed = true;
         scheduleDrain();
     }
@@ -189,7 +192,12 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
         }
         if (completed && !lastHttpContentWritten) {
             lastHttpContentWritten = true;
-            onAllDataWritten();
+            if (failure != null) {
+                // 错误终止：不写正常 LastHttpContent，关闭连接使客户端感知异常截断
+                onAllDataFailed(failure);
+            } else {
+                onAllDataWritten();
+            }
         }
     }
 
@@ -198,6 +206,17 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
         ChannelFuture f = channel.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
         resp.addRespEventListener(f, true);
         f.addListener(completeListener);
+    }
+
+    /**
+     * 流以错误终止：丢弃剩余写入、取消超时并关闭连接。
+     * 已排空队列的数据照常发送，但终止标志是连接异常关闭而非正常流结束。
+     */
+    protected void onAllDataFailed(Throwable failure) {
+        this.resp.setWritableCallback(null);
+        this.resp.setTimeout(null, -1);
+        log.warn("[SSE] stream terminated with error: {}", failure != null ? failure.getMessage() : "unknown", failure);
+        this.channel.close();
     }
 
     protected void onCompleteSuccess() {

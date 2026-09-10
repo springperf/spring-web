@@ -246,4 +246,62 @@ class ResourceRequestHandlerDetailsTest {
         assertEquals(1, matchers.size());
         assertInstanceOf(HttpMethodMatcher.class, matchers.get(0));
     }
+
+    /* ==================== gzip 探测缓存 ==================== */
+
+    @Test
+    void gzipProbe_cachedAcrossRequests_consistentResult() {
+        requestHeaders.set(HttpHeaders.ACCEPT_ENCODING, "gzip");
+        when(request.getPath()).thenReturn("/static/css/style.css");
+
+        handler.handleResourceRequest(request, response);
+        assertEquals("gzip", responseHeaders.getFirst(HttpHeaders.CONTENT_ENCODING));
+
+        // 第二次请求复用缓存结果（同一 path 的探测结果被缓存）
+        HttpHeaders secondHeaders = new HttpHeaders();
+        WebServerHttpResponse secondResp = mock(WebServerHttpResponse.class);
+        when(secondResp.getHeaders()).thenReturn(secondHeaders);
+        handler.handleResourceRequest(request, secondResp);
+        assertEquals("gzip", secondHeaders.getFirst(HttpHeaders.CONTENT_ENCODING));
+    }
+
+    @Test
+    void clearCache_afterClear_reprobesGzip() {
+        requestHeaders.set(HttpHeaders.ACCEPT_ENCODING, "gzip");
+        when(request.getPath()).thenReturn("/static/css/style.css");
+        handler.handleResourceRequest(request, response);
+
+        assertDoesNotThrow(handler::clearCache);
+
+        // 清缓存后重新探测仍得到一致结果（纯缓存，清空安全）
+        HttpHeaders secondHeaders = new HttpHeaders();
+        WebServerHttpResponse secondResp = mock(WebServerHttpResponse.class);
+        when(secondResp.getHeaders()).thenReturn(secondHeaders);
+        handler.handleResourceRequest(request, secondResp);
+        assertEquals("gzip", secondHeaders.getFirst(HttpHeaders.CONTENT_ENCODING));
+    }
+
+    /* ==================== 304 不写 Content-Length ==================== */
+
+    @Test
+    void handleResourceRequest_notModified_doesNotSetContentLength() {
+        ClassPathResource cp = new ClassPathResource("static/css/style.css");
+        String eTag;
+        try {
+            java.lang.reflect.Method m = ResourceRequestHandler.class.getDeclaredMethod(
+                    "computeEtag", Resource.class);
+            m.setAccessible(true);
+            eTag = (String) m.invoke(null, cp);
+        } catch (Exception e) {
+            throw new AssertionError(e);
+        }
+        requestHeaders.set(HttpHeaders.IF_NONE_MATCH, eTag);
+        when(request.getPath()).thenReturn("/static/css/style.css");
+
+        handler.handleResourceRequest(request, response);
+
+        verify(response).setStatusCode(HttpStatus.NOT_MODIFIED);
+        // 304 不应写入 Content-Length（修复前写 -1）
+        assertNull(responseHeaders.getFirst(HttpHeaders.CONTENT_LENGTH));
+    }
 }

@@ -193,12 +193,6 @@ class AbstractFastFailHttpServletRequestTest {
     }
 
     @Test
-    void servlet6IdentityMethods_returnRequestId() {
-        // Servlet 6.0（master/SB4）特有的 getRequestId/getProtocolRequestId/getServletConnection 在
-        // javax.servlet 4.0（SB2.7）不存在：2.7.x 实现不提供这些方法，此处不再验证。
-    }
-
-    @Test
     void sessionMethods_fastFail() {
         assertThrows(UnsupportedOperationException.class, () -> request.changeSessionId());
         assertThrows(UnsupportedOperationException.class, () -> request.isRequestedSessionIdValid());

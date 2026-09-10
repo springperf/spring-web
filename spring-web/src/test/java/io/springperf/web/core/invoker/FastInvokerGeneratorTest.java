@@ -97,6 +97,19 @@ class FastInvokerGeneratorTest {
         assertEquals("Hello B", invoker2.invoke(new Object[]{"B"}));
     }
 
+    @Test
+    void clearAllCaches_regeneratesInvokerAndStillWorks() throws Throwable {
+        Method method = FastController.class.getMethod("hello", String.class);
+        FastInvokerGenerator.createInvoker(controller, FastController.class, method);
+
+        FastInvokerGenerator.clearAllCaches();
+
+        // 清空后应能正常重建并工作（缓存为纯缓存，清空永远安全）
+        Invoker regenerated = FastInvokerGenerator.createInvoker(controller, FastController.class, method);
+        assertEquals("Hello after clear", regenerated.invoke(new Object[]{"after clear"}));
+    }
+
+
     // ----- helper controller -----
 
     @SuppressWarnings("unused")

@@ -121,4 +121,22 @@ class AbstractNettyStreamSenderDetailsTest {
         assertTrue(sender.queueSize() == 0 || channel.isActive(),
                 "complete 后应安全排空队列并结束流");
     }
+
+    @Test
+    void complete_withFailure_closesChannelInsteadOfWritingLastContent() {
+        DefaultNettyStreamSender sender = newSender();
+
+        sender.complete(false, new IOException("downstream break"));
+        channel.runPendingTasks();
+        channel.runPendingTasks();
+
+        // 错误终止：关闭连接，不写正常 LastHttpContent，客户端感知异常截断
+        assertFalse(channel.isOpen(), "错误终止应关闭连接而非正常结束流");
+        Object out;
+        while ((out = channel.readOutbound()) != null) {
+            io.netty.util.ReferenceCountUtil.release(out);
+            assertFalse(out instanceof io.netty.handler.codec.http.LastHttpContent,
+                    "错误终止不应写出正常 LastHttpContent");
+        }
+    }
 }

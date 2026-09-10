@@ -583,22 +583,41 @@ class DispatcherHandlerTest {
     }
 
     @Test
-    void asyncDispatch_throwableDuringReturnValueResolution_stillInvokesRealResult() throws Exception {
+    void asyncDispatch_throwableDuringReturnValueResolution_routesToExceptionRegistry() throws Exception {
         WebServerHttpRequest req = createRequest();
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
         PathMappingContext mappingContext = mock(PathMappingContext.class);
         MappingResult matched = MappingResult.matched(mappingContext);
         MappingResult.set(req, matched);
-        doThrow(new RuntimeException("resolver error")).when(returnValueResolverRegistry)
+        RuntimeException resolverEx = new RuntimeException("resolver error");
+        doThrow(resolverEx).when(returnValueResolverRegistry)
                 .resolveReturnValue(any(), any(), any(), any());
 
         Object concurrentResult = new Object();
         handler.asyncDispatch(req, resp, concurrentResult);
 
-        // result is set before resolveReturnValue throws, so it's the concurrentResult
+        // 序列化异常不再被吞：必须路由到 ExceptionRegistry 并 flush，afterCompletion 携带真实异常
+        verify(exceptionRegistry).handle(resolverEx, req, resp);
         verify(interceptorRegistry).postHandle(req, resp, concurrentResult);
-        verify(interceptorRegistry).afterCompletion(req, resp, null);
+        verify(interceptorRegistry).afterCompletion(req, resp, resolverEx);
     }
+
+    @Test
+    void asyncDispatch_exceptionHandlerItselfThrows_doesNotPropagate() throws Exception {
+        WebServerHttpRequest req = createRequest();
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        PathMappingContext mappingContext = mock(PathMappingContext.class);
+        MappingResult matched = MappingResult.matched(mappingContext);
+        MappingResult.set(req, matched);
+        RuntimeException resolverEx = new RuntimeException("resolver error");
+        doThrow(resolverEx).when(returnValueResolverRegistry)
+                .resolveReturnValue(any(), any(), any(), any());
+        doThrow(new RuntimeException("handler failed")).when(exceptionRegistry).handle(any(), any(), any());
+
+        assertDoesNotThrow(() -> handler.asyncDispatch(req, resp, new Object()));
+        verify(interceptorRegistry).afterCompletion(eq(req), eq(resp), eq(resolverEx));
+    }
+
 
     // ==================== initContextHolders / removeContextHolders ====================
 

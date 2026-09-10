@@ -110,12 +110,6 @@ class FastInvokerGeneratorCoverageTest {
         assertInstanceOf(MethodHandleInvoker.class, handler.getInvoker());
     }
 
-    @Test
-    void createInvoker_nativeImagePropertyInIsolatedClassLoader_throws() throws Exception {
-        // GraalVM native-image（master/SB3）特有的降级测试：2.7.x 无 IN_NATIVE_IMAGE 守卫，
-        // 该行为依赖的字节码守卫不随本分支 backport，此测试不适用。
-    }
-
     private static void assertInvoke(Method m, Object target, Object[] args, Object expected) throws Throwable {
         Invoker invoker = FastInvokerGenerator.createInvoker(target, target.getClass(), m);
         assertEquals(expected, invoker.invoke(args));
