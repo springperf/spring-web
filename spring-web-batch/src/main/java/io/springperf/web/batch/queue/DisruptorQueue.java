@@ -9,10 +9,12 @@ import io.springperf.web.batch.common.BatchRequest;
 import io.springperf.web.batch.common.BatchRequestMetaData;
 import io.springperf.web.batch.metrics.BatchMetrics;
 import io.springperf.web.batch.metrics.NoOpBatchMetrics;
+import io.springperf.web.core.pool.VirtualThreadSupport;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Collections;
 import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -40,6 +42,21 @@ public class DisruptorQueue {
                           BatchRequestMetaData meta,
                           Object bean,
                           BatchMetrics metrics) {
+        this(queueName, meta, bean, metrics, false);
+    }
+
+    /**
+     * @param virtualThreads 批量方法是否在虚拟线程上执行——由 {@code BatchRegistry} 依据
+     *                       {@code spring.threads.virtual.enabled} + JDK 21+（
+     *                       {@code BizPoolRegistry#usesVirtualThreads()}）判定。为 {@code true} 时
+     *                       只把 bizExecutor 的线程工厂换成虚拟线程（线程名 {@code batch-virtual-*}）；
+     *                       池的并发上限 {@code consumerSize}、无排队策略与 CallerRunsPolicy 背压语义不变。
+     */
+    public DisruptorQueue(String queueName,
+                          BatchRequestMetaData meta,
+                          Object bean,
+                          BatchMetrics metrics,
+                          boolean virtualThreads) {
         this.queueName = queueName;
         this.metrics = metrics != null ? metrics : NoOpBatchMetrics.INSTANCE;
         int size = normalizeRingBufferSize(meta.ringBufferSize());
@@ -61,17 +78,27 @@ public class DisruptorQueue {
                 WaitStrategyFactory.create(meta.waitStrategy())
         );
 
+        boolean useVirtualThreads = virtualThreads && VirtualThreadSupport.isAvailable();
+        if (virtualThreads && !useVirtualThreads) {
+            // 防御：调用方本应只在 JDK 21+ 传 true（BizPoolRegistry#usesVirtualThreads），
+            // 若被误传则回落平台池而不是启动失败。
+            log.warn("Queue [{}] requested virtual threads but JDK 21+ is unavailable — "
+                    + "falling back to platform pool", queueName);
+        }
+
         // Dedicated business thread pool — SynchronousQueue + CallerRunsPolicy
         // Pool full → consumer thread executes the task → consumer blocks → RingBuffer backpressure
+        //
+        // 虚拟线程模式只替换线程工厂（batch-virtual-*）：池大小、排队与背压语义完全不变——
+        // consumerSize 在两种模式下都是最大并发处理线程数，满员时同样由消费者线程自行执行。
+        ThreadFactory bizThreadFactory = useVirtualThreads
+                ? VirtualThreadSupport.newThreadFactory("batch-virtual-" + queueName + "-")
+                : platformThreadFactory(queueName);
         this.bizExecutor = new ThreadPoolExecutor(
                 0, consumerSize,
                 60L, TimeUnit.SECONDS,
                 new SynchronousQueue<>(),
-                r -> {
-                    Thread t = new Thread(r, "batch-worker-" + queueName);
-                    t.setDaemon(false);
-                    return t;
-                },
+                bizThreadFactory,
                 (r, executor) -> {
                     if (!executor.isShutdown()) {
                         r.run(); // CallerRunsPolicy — consumer thread executes directly
@@ -87,8 +114,9 @@ public class DisruptorQueue {
         this.ringBuffer = disruptor.getRingBuffer();
         this.backpressure = meta.backpressure();
 
-        log.info("Batch disruptor [{}] started: ringBufferSize={}, waitStrategy={}, consumerSize={}",
-                queueName, size, meta.waitStrategy(), consumerSize);
+        log.info("Batch disruptor [{}] started: ringBufferSize={}, waitStrategy={}, consumerSize={}, bizExecutor={}",
+                queueName, size, meta.waitStrategy(), consumerSize,
+                useVirtualThreads ? "virtual-threads" : "platform-pool");
     }
 
     public void enqueue(BatchRequest<?> request) {
@@ -136,6 +164,15 @@ public class DisruptorQueue {
 
     public String queueName() {
         return queueName;
+    }
+
+    /** 平台线程工厂（线程名 {@code batch-worker-<queue>-*}）。 */
+    private static ThreadFactory platformThreadFactory(String queueName) {
+        return r -> {
+            Thread t = new Thread(r, "batch-worker-" + queueName);
+            t.setDaemon(false);
+            return t;
+        };
     }
 
     /**

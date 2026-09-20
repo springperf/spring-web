@@ -81,9 +81,13 @@ public class BatchRegistry extends BaseWebComponent {
         // cache meta on the single method for BatchInvoker
         reg.singleCtx().set(BATCH_META_CACHE_KEY, meta);
 
+        // 开启虚拟线程（JDK 21+）时，批量方法本身也改用虚拟线程执行（见 DisruptorQueue 构造说明）
+        BizPoolRegistry poolRegistry = webContext.getWebComponent(BizPoolRegistry.class);
+        boolean virtualThreads = poolRegistry != null && poolRegistry.usesVirtualThreads();
+
         // create a dedicated Disruptor queue per @BatchMapping method
         String queueName = meta.queueName();
-        DisruptorQueue queue = new DisruptorQueue(queueName, meta, reg.bean(), metrics);
+        DisruptorQueue queue = new DisruptorQueue(queueName, meta, reg.bean(), metrics, virtualThreads);
         DisruptorQueue existing = queues.putIfAbsent(queueName, queue);
         if (existing != null) {
             // 同 queueName 重复安装：刚创建的 queue 其 Disruptor 线程与 bizExecutor 已启动，
@@ -104,9 +108,13 @@ public class BatchRegistry extends BaseWebComponent {
         // 矫正返回值类型为 BatchRequest 子类，让 ReturnValueResolverRegistry 能正确解析泛型内联类型
         reg.singleCtx().setEffectiveReturnType(createEffectiveReturnType(meta));
 
-        // 默认在 EventLoop 完成入队列前处理；用户指定 @RunInPool 时尊重其选择
-        BizPoolRegistry poolRegistry = webContext.getWebComponent(BizPoolRegistry.class);
-        if (poolRegistry != null) {
+        // single 路径的默认线程模型：
+        //  - 开启虚拟线程（JDK 21+）：default 池以虚拟线程执行任务，而 single 路径只做入队
+        //    （微秒级、不阻塞），走它反而多一次线程切换 → 保持 EventLoop 零切换；
+        //  - 未开启（含属性开启但 JDK < 21 回落的情形）：不设置，遵循全局默认线程模型
+        //    pool.default-execute-mode（默认 default 业务池）。
+        // 两种情况下用户显式 @RunInPool 都优先（setDefaultPool 仅在无注解时生效）。
+        if (virtualThreads) {
             poolRegistry.setDefaultPool(reg.singleCtx(), null);
         }
     }

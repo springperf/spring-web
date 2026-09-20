@@ -12,7 +12,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 
-import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.*;
@@ -38,12 +37,13 @@ public class BizPoolRegistry extends BaseWebComponent {
             MappingCacheKey.createMethodCacheKey(Object.class);
     private static final Object NO_POOL = new Object();
 
-private static final boolean VIRTUAL_THREADS_AVAILABLE = detectVirtualThreads();
-
     private final Map<String, ExecutorService> pools = new ConcurrentHashMap<>();
 
     /** 预缓存的默认执行策略：null 表示未初始化（降级为 EventLoop），"eventloop" 表示 EventLoop，其他值为池名。 */
     private volatile String defaultExecuteMode;
+
+    /** {@link #defaultExecuteMode} 是否为 EventLoop 的预计算布尔（请求路径只读，避免字符串比较）。 */
+    private volatile boolean defaultEventLoop;
 
     private WebMetrics metrics;
     private boolean virtualThreadEnabled;
@@ -55,43 +55,39 @@ private static final boolean VIRTUAL_THREADS_AVAILABLE = detectVirtualThreads();
         this.virtualThreadEnabled = isVirtualThreadEnabled();
         initDefaultPoolFromConfig();
         // 缓存默认执行策略，避免请求路径上查询配置
-        this.defaultExecuteMode = webContext.getProps().get(
+        String mode = webContext.getProps().get(
                 PropertiesConstant.POOL_DEFAULT_EXECUTE_MODE, PropertiesConstant.POOL_DEFAULT_EXECUTE_MODE_DEFAULT);
+        this.defaultExecuteMode = mode;
+        // 与 determinePool 的判定保持一致：null / "eventloop" 均表示无池（EventLoop 同步执行）
+        this.defaultEventLoop = mode == null || RunInPool.EVENTLOOP.equalsIgnoreCase(mode);
     }
 
-private boolean isVirtualThreadEnabled() {
+    /**
+     * 默认执行策略是否为 EventLoop（{@code pool.default-execute-mode=eventloop} 或未配置）。
+     *
+     * <p>供响应超时装配决策使用：EventLoop 同步执行期间，超时定时器与被执行的处理器同线程
+     * （{@code ctx.executor().schedule(...)}），<b>不可能在处理器执行期间触发</b>——凡是能让它执行的
+     * 时刻，要么响应已提交（被 setCommitted 取消）、要么请求已交棒（由对应位置补装配/异步重装配）。
+     * 故该模式下请求开始无需装配响应超时，纯属每请求的调度开销。</p>
+     */
+    public boolean isDefaultEventLoop() {
+        return defaultEventLoop;
+    }
+
+    /**
+     * 默认业务池是否**真的**使用虚拟线程：{@code spring.threads.virtual.enabled=true} <b>且</b>
+     * 运行在 JDK 21+（{@link VirtualThreadSupport#isAvailable()}）。
+     *
+     * <p>供 batch 等模块判定线程模型：为 {@code true} 时 {@code default} 池以虚拟线程执行任务
+     * （池的上限 / 队列 / 拒绝策略等 {@code pool.*} 语义不变，仅线程类型为虚拟线程）；为
+     * {@code false}（含属性开启但 JDK &lt; 21 的回落情形）时是常规平台线程池。</p>
+     */
+    public boolean usesVirtualThreads() {
+        return virtualThreadEnabled && VirtualThreadSupport.isAvailable();
+    }
+
+    private boolean isVirtualThreadEnabled() {
         return webContext.getProps().getBoolean("spring.threads.virtual.enabled", false);
-    }
-
-    /**
-     * 检测 JDK 21+ 是否可用。
-     */
-    private static boolean detectVirtualThreads() {
-        try {
-            Thread.class.getMethod("ofVirtual");
-            return true;
-        } catch (NoSuchMethodException e) {
-            return false;
-        }
-    }
-
-    /**
-     * 通过反射创建虚拟线程 {@link ThreadFactory}（兼容 JDK 17 编译）。
-     * 在 JDK 21+ 上调用 {@code Thread.ofVirtual().name("perf-virtual-").factory()}。
-     * 通过公开接口 {@code java.lang.Thread.Builder.OfVirtual} 反射，避免模块系统限制。
-     */
-    private static ThreadFactory createVirtualThreadFactory() {
-        try {
-            Object ofVirtual = Thread.class.getMethod("ofVirtual").invoke(null);
-            // Thread.Builder.OfVirtual 是公开接口，方法可访问
-            Class<?> ofVirtualIface = Class.forName("java.lang.Thread$Builder$OfVirtual");
-            Method nameMethod = ofVirtualIface.getMethod("name", String.class);
-            Object named = nameMethod.invoke(ofVirtual, "perf-virtual-");
-            Method factoryMethod = ofVirtualIface.getMethod("factory");
-            return (ThreadFactory) factoryMethod.invoke(named);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to create virtual thread factory (JDK 21+ required)", e);
-        }
     }
 
     @Override
@@ -117,24 +113,27 @@ private boolean isVirtualThreadEnabled() {
 
     /**
      * 从 ApplicationProperties 读取配置，创建 "default" 线程池。
+     *
+     * <p><b>虚拟线程模式（JDK 21+ 且 {@code spring.threads.virtual.enabled=true}）只替换线程工厂</b>：
+     * {@code pool.core-pool-size} / {@code pool.max-pool-size} / {@code pool.queue-capacity} /
+     * {@code pool.keep-alive-time} 的上限与拒绝语义完全不变——用户显式配置的并发旋钮在任何模式下
+     * 都生效，虚拟线程只解决"阻塞占用平台线程"的问题（与 batch 模块 bizExecutor 的处理方式一致）。</p>
      */
     private void initDefaultPoolFromConfig() {
-        if (virtualThreadEnabled) {
-            if (VIRTUAL_THREADS_AVAILABLE) {
-                ThreadFactory factory = createVirtualThreadFactory();
-                ExecutorService executor = new ThreadPoolExecutor(0, Integer.MAX_VALUE, 60L,
-                        TimeUnit.SECONDS, new SynchronousQueue<>(), factory);
-                pools.put("default", executor);
-                log.info("BizPool [default] created with virtual threads");
-                return;
-            } else {
-                log.warn("spring.threads.virtual.enabled=true but JDK 21+ is not available, fallback to platform threads");
-            }
-        }
         int corePoolSize = webContext.getProps().getInt(PropertiesConstant.POOL_CORE_POOL_SIZE);
         int maxPoolSize = webContext.getProps().getInt(PropertiesConstant.POOL_MAX_POOL_SIZE);
         int keepAliveTime = webContext.getProps().getInt(PropertiesConstant.POOL_KEEP_ALIVE_TIME);
         int queueCapacity = webContext.getProps().getInt(PropertiesConstant.POOL_QUEUE_CAPACITY);
+
+        // 虚拟线程模式：只换线程工厂，池结构（上限 / 队列 / 拒绝）与平台模式完全一致
+        ThreadFactory threadFactory = null;
+        if (virtualThreadEnabled) {
+            if (VirtualThreadSupport.isAvailable()) {
+                threadFactory = VirtualThreadSupport.newThreadFactory("perf-virtual-");
+            } else {
+                log.warn("spring.threads.virtual.enabled=true but JDK 21+ is not available, fallback to platform threads");
+            }
+        }
 
         if (corePoolSize < 0 || maxPoolSize < 0) {
             log.warn("pool.core-pool-size or pool.max-pool-size < 0, skip default pool creation");
@@ -146,11 +145,14 @@ private boolean isVirtualThreadEnabled() {
             log.warn("pool.queue-capacity <= 0, adjusted to 1");
         }
 
-        ThreadPoolExecutor executor = new ThreadPoolExecutor(
-                corePoolSize, maxPoolSize, keepAliveTime,
-                TimeUnit.SECONDS, new LinkedBlockingQueue<>(queueCapacity));
+        ThreadPoolExecutor executor = threadFactory == null
+                ? new ThreadPoolExecutor(corePoolSize, maxPoolSize, keepAliveTime,
+                        TimeUnit.SECONDS, new LinkedBlockingQueue<>(queueCapacity))
+                : new ThreadPoolExecutor(corePoolSize, maxPoolSize, keepAliveTime,
+                        TimeUnit.SECONDS, new LinkedBlockingQueue<>(queueCapacity), threadFactory);
         pools.put("default", executor);
-        log.info("BizPool [default] created: core={}, max={}", corePoolSize, maxPoolSize);
+        log.info("BizPool [default] created: core={}, max={}, queue={}, threads={}",
+                corePoolSize, maxPoolSize, queueCapacity, threadFactory == null ? "platform" : "virtual");
     }
 
     /**

@@ -79,4 +79,30 @@ public class BatchEchoController {
             req.setResult("consumed:" + requests.size() + ":msg=" + injectedMsg + ":consumerSize=2");
         }
     }
+
+    /** 报告批量方法实际执行线程（线程名 + 是否虚拟线程），用于验证虚拟线程配置。 */
+    @RequestMapping("/batch/thread")
+    public BatchRequest<String> threadInfo(@RequestParam String msg) {
+        return null;
+    }
+
+    @BatchMapping(method = "threadInfo")
+    public void batchThreadInfo(List<EchoBatchRequest> requests) {
+        Thread current = Thread.currentThread();
+        boolean virtual = isVirtualThread(current);
+        for (EchoBatchRequest req : requests) {
+            req.setResult("thread=" + current.getName() + ":virtual=" + virtual);
+        }
+    }
+
+    /** JDK 17 编译期无 {@code Thread.isVirtual()}，运行时反射判定。 */
+    private static boolean isVirtualThread(Thread t) {
+        try {
+            return (boolean) Thread.class.getMethod("isVirtual").invoke(t);
+        } catch (NoSuchMethodException e) {
+            return false;
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Failed to detect virtual thread", e);
+        }
+    }
 }

@@ -16,7 +16,7 @@
 | Spring MVC (Tomcat) | < 4,000 |
 | Spring WebFlux | < 4,000 |
 
-同样的业务逻辑，只是接入层从消息队列换成了 HTTP 接口，吞吐量就差了 **6-7 倍**。业务逻辑没有变，瓶颈显然不在业务代码里。
+同样的业务逻辑，只是接入层从消息队列换成了 HTTP 接口，吞吐量就差了 **3.75 倍以上**（15,000 / 4,000）。业务逻辑没有变，瓶颈显然不在业务代码里。
 
 ### 热点分析
 
@@ -169,9 +169,11 @@ WebFlux（Netty 运行时，4,173 样本）与 MVC 问题模式高度相似，�
 
 本框架允许请求直接在 Netty EventLoop 上执行，同时提供 `@RunInPool` 注解让业务方按方法粒度决定是否需要切换到业务线程池。三种编程模型自由选择，全局默认行为由 `pool.default-execute-mode` 控制（默认 `default` 线程池，设 `eventloop` 可切回 EventLoop）：
 
-- **同步阻塞（默认）**：无 `@RunInPool` 时方法默认在 `default` 业务线程池执行，和传统 Servlet 模型类似；`@RunInPool("custom")` 可调度到自定义线程池
+- **同步阻塞（默认）**：无 `@RunInPool` 时方法默认在 `default` 业务线程池执行，和传统 Servlet 模型类似
+- **自定义线程池**：`@RunInPool("custom")` 调度到 `pool.*` 配置创建的自定义池，按业务隔离
 - **EventLoop 直处理**：`@RunInPool(RunInPool.EVENTLOOP)` 在 EventLoop 上执行，适合纯 CPU 计算或配合响应式驱动（R2DBC、Reactive Redis）
-- **虚拟线程**：`@RunInPool(RunInPool.EVENTLOOP)` + JDK 21 虚拟线程，EventLoop 上无阻塞切换
+
+> **虚拟线程**：JDK 21+ 下设 `spring.threads.virtual.enabled=true`，`default` 业务池与 batch 的批量方法（`@BatchMapping`）均以虚拟线程执行（只替换线程类型：`pool.*` 上限/队列语义与 batch 的 `consumerSize` 上限、背压语义均保持不变）；JDK < 21 时启动告警并回落平台线程。实现见 [`VirtualThreadSupport`](../spring-web/src/main/java/io/springperf/web/core/pool/VirtualThreadSupport.java)，E2E 覆盖见 [`VirtualThreadE2ETest`](../spring-web-test/src/test/java/io/springperf/webtest/VirtualThreadE2ETest.java) 与 [`BatchVirtualThreadE2ETest`](../spring-web-support-test/src/test/java/io/springperf/webtest/batch/BatchVirtualThreadE2ETest.java)。
 
 框架不替用户做决定，而是提供基础设施让用户自行选择。
 
@@ -185,7 +187,7 @@ WebFlux（Netty 运行时，4,173 样本）与 MVC 问题模式高度相似，�
 
 Servlet API 有二十年的生态积累：Spring Security Filter Chain、`RequestBodyAdvice`、`ResponseBodyAdvice`、大量基于 `jakarta.servlet.Filter` 的中间件。
 
-本框架不强制"全要或全不要"。通过 `spring-web-servlet` 桥接模块，可以渐进式迁移：项目先用 support 模块运行在 Netty 上复用现有 Filter，再逐步迁移到原生 WebFilter。
+本框架不强制"全要或全不要"。通过 `spring-web-servlet` 桥接模块，可以渐进式迁移：项目先用 `spring-web-servlet` 模块运行在 Netty 上复用现有 Filter，再逐步迁移到原生 WebFilter。
 
 ---
 

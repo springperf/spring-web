@@ -18,6 +18,7 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.web.method.HandlerMethod;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -27,6 +28,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -165,11 +167,16 @@ class BizPoolRegistryDetailsTest {
     }
 
     private static ExecutorService initDefaultPoolWith(WebContext wc, int core, int max, int queue) {
+        return initDefaultPoolWith(wc, false, core, max, queue);
+    }
+
+    private static ExecutorService initDefaultPoolWith(WebContext wc, boolean virtualThreadsEnabled,
+                                                       int core, int max, int queue) {
         io.springperf.web.context.ApplicationProperties props =
                 mock(io.springperf.web.context.ApplicationProperties.class);
         when(wc.getProps()).thenReturn(props);
         when(wc.getWebComponentWithDefault(eq(WebMetrics.class), any())).thenReturn(NoOpWebMetrics.INSTANCE);
-        when(props.getBoolean(eq("spring.threads.virtual.enabled"), eq(false))).thenReturn(false);
+        when(props.getBoolean(eq("spring.threads.virtual.enabled"), eq(false))).thenReturn(virtualThreadsEnabled);
         when(props.getInt(PropertiesConstant.POOL_CORE_POOL_SIZE)).thenReturn(core);
         when(props.getInt(PropertiesConstant.POOL_MAX_POOL_SIZE)).thenReturn(max);
         when(props.getInt(PropertiesConstant.POOL_KEEP_ALIVE_TIME)).thenReturn(60);
@@ -183,6 +190,57 @@ class BizPoolRegistryDetailsTest {
         } finally {
             fresh.shutdownPools(1, TimeUnit.SECONDS);
         }
+    }
+
+    /* ==================== 虚拟线程模式仍受 pool.* 约束 ==================== */
+
+    /**
+     * 虚拟线程模式只替换线程类型：{@code pool.*} 的上限与队列语义必须继续生效。
+     * <p>回归护栏：修复前该模式是 {@code 0 / MAX_VALUE + SynchronousQueue} 且提前 return，
+     * 配置被整段忽略（本用例在修复前必然失败）。</p>
+     */
+    @Test
+    void initDefaultPool_virtualThreadsMode_stillHonorsPoolBounds() throws Exception {
+        assumeTrue(Runtime.version().feature() >= 21, "虚拟线程需要 JDK 21+");
+        ExecutorService pool = initDefaultPoolWith(webContext, true, 1, 2, 7);
+        assertTrue(pool instanceof ThreadPoolExecutor);
+        ThreadPoolExecutor tpe = (ThreadPoolExecutor) pool;
+        assertEquals(1, tpe.getCorePoolSize(), "core-pool-size 应生效");
+        assertEquals(2, tpe.getMaximumPoolSize(), "max-pool-size 应生效");
+        assertEquals(7, tpe.getQueue().remainingCapacity(), "queue-capacity 应生效");
+        Thread t = tpe.getThreadFactory().newThread(() -> { });
+        Method isVirtual = Thread.class.getMethod("isVirtual");
+        assertTrue((boolean) isVirtual.invoke(t), "池线程应为虚拟线程");
+    }
+
+    /* ==================== usesVirtualThreads（batch 默认线程模型判定依据） ==================== */
+
+    @Test
+    void usesVirtualThreads_falseWhenPropertyDisabled() {
+        initRegistryWithVirtualThreadProperty(false);
+        assertFalse(registry.usesVirtualThreads(), "属性未开启时不得认为默认池是虚拟线程池");
+    }
+
+    @Test
+    void usesVirtualThreads_requiresPropertyEnabledAndJdk21() {
+        initRegistryWithVirtualThreadProperty(true);
+        // 属性开启后仍取决于 JDK 能力（JDK < 21 会告警并回落平台线程池）
+        assertEquals(Runtime.version().feature() >= 21, registry.usesVirtualThreads());
+    }
+
+    private void initRegistryWithVirtualThreadProperty(boolean enabled) {
+        io.springperf.web.context.ApplicationProperties props =
+                mock(io.springperf.web.context.ApplicationProperties.class);
+        when(webContext.getProps()).thenReturn(props);
+        when(webContext.getWebComponentWithDefault(eq(WebMetrics.class), any())).thenReturn(NoOpWebMetrics.INSTANCE);
+        when(props.getBoolean(eq("spring.threads.virtual.enabled"), eq(false))).thenReturn(enabled);
+        when(props.getInt(PropertiesConstant.POOL_CORE_POOL_SIZE)).thenReturn(1);
+        when(props.getInt(PropertiesConstant.POOL_MAX_POOL_SIZE)).thenReturn(1);
+        when(props.getInt(PropertiesConstant.POOL_KEEP_ALIVE_TIME)).thenReturn(60);
+        when(props.getInt(PropertiesConstant.POOL_QUEUE_CAPACITY)).thenReturn(1);
+        when(props.get(PropertiesConstant.POOL_DEFAULT_EXECUTE_MODE,
+                PropertiesConstant.POOL_DEFAULT_EXECUTE_MODE_DEFAULT)).thenReturn("default");
+        registry.initWithWebContext(webContext);
     }
 
     /* ==================== resolvePool：Spring 容器兜底 ==================== */

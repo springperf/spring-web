@@ -31,7 +31,7 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 | Spring Framework | **5.3.x** | Managed by Spring Boot | |
 | JDK | **8, 11, 17** | 8, 11, 17 verified | Compile target `java.version=8` |
 | Servlet API | **javax.servlet 4.0.1** | 4.0.x | |
-| Netty | **4.1.110.Final** | 4.1.x (manually overridden) | Spring Boot 2.7.x manages a lower version by default |
+| Netty | **4.1.115.Final** | 4.1.x (manually overridden) | Spring Boot 2.7.x manages a lower version by default |
 | Jackson | **2.17.2** | 2.17.x (manually overridden) | Spring Boot 2.7.x manages 2.13.x by default |
 | Lombok | **1.18.24** | 1.18.x | |
 | JMH | **1.37** | 1.37 | Benchmark module only |
@@ -52,7 +52,7 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 |------------|----------------|----------------|-------|
 | Spring Boot | **3.5.16** | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | Switch via Maven profile (`-Pspring-boot-3.0` ~ `-Pspring-boot-4.1`) |
 | Spring Framework | **6.2.x** | 6.0.x ~ 6.2.x / 7.0.x | Managed by Spring Boot |
-| JDK | **17, 21** | 17, 21 verified | Compile target `java.version=17`; JDK 21 provides virtual thread support |
+| JDK | **17** | 17 / 21 / 25 (CI matrix, see [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)) | Compile target `java.version=17`; JDK 21+ supports virtual threads (see below) |
 | Servlet API | **jakarta.servlet 6.0** | 6.0.x | javax.servlet incompatible |
 | Netty | **4.1.137.Final** | 4.1.x | |
 | Jackson | **2.17.2** | 2.17.x | |
@@ -61,7 +61,7 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 
 ### Additional Features
 
-- **Virtual threads**: enable with `spring.threads.virtual.enabled=true` on JDK 21+, business thread pool auto-switches to virtual threads
+- **Virtual threads**: enable with `spring.threads.virtual.enabled=true` on JDK 21+ and both the `default` business pool and batch methods (`@BatchMapping`) switch to virtual threads (only the thread type changes: `pool.*` bounds/queueing and batch's `consumerSize` cap + backpressure semantics are all unchanged) — via reflection on `Thread.ofVirtual`, so it compiles on JDK 17; below JDK 21 it warns and falls back to platform threads. Implemented in [`VirtualThreadSupport`](../../spring-web/src/main/java/io/springperf/web/core/pool/VirtualThreadSupport.java) / [`BizPoolRegistry`](../../spring-web/src/main/java/io/springperf/web/core/pool/BizPoolRegistry.java). E2E coverage: [`VirtualThreadE2ETest`](../../spring-web-test/src/test/java/io/springperf/webtest/VirtualThreadE2ETest.java) and [`BatchVirtualThreadE2ETest`](../../spring-web-support-test/src/test/java/io/springperf/webtest/batch/BatchVirtualThreadE2ETest.java)
 - **GraalVM native-image**: `FastInvokerGenerator` degrades to `MethodHandle` calls under native-image; `SpringWebRuntimeHints` registers event-path/resource/async-callback reachability hints; `ControllerBeanFactoryInitializationAotProcessor` (via `META-INF/spring/aot.factories`) auto-registers reflection/serialization hints for user `@Controller` methods and DTOs at AOT build time
 - **WebSocket**: auto-configuration based on Jakarta WebSocket
 

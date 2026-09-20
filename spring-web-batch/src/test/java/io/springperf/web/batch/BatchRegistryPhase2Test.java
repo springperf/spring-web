@@ -18,6 +18,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
@@ -78,6 +79,66 @@ class BatchRegistryPhase2Test {
             registry.destroyComponent();
             // 幂等：二次 destroy 安全
             assertDoesNotThrow(() -> registry.destroyComponent());
+        }
+    }
+
+    /**
+     * 开启虚拟线程（JDK 21+）时：single 路径 pin 到 EventLoop（其默认池是"每请求一个虚拟线程"的
+     * 不池化模型，而入队只需微秒级，走默认池反而多一次虚拟线程创建 + 切换）。
+     */
+    @Test
+    void install_virtualThreadsEnabled_defaultsToEventLoop() throws Exception {
+        try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext(TestConfig.class)) {
+            BatchController bean = ctx.getBean(BatchController.class);
+            PathMappingContext singleCtx = mappingFor(bean, "single", String.class);
+
+            WebContext webContext = mock(WebContext.class);
+            when(webContext.getCtx()).thenReturn(ctx);
+            MappingRegistry mappingRegistry = mock(MappingRegistry.class);
+            when(mappingRegistry.getMappingContextList()).thenReturn(Collections.singletonList(singleCtx));
+            when(webContext.getWebComponent(MappingRegistry.class)).thenReturn(mappingRegistry);
+            BizPoolRegistry poolRegistry = mock(BizPoolRegistry.class);
+            when(poolRegistry.usesVirtualThreads()).thenReturn(true);
+            when(webContext.getWebComponent(BizPoolRegistry.class)).thenReturn(poolRegistry);
+
+            BatchRegistry registry = new BatchRegistry();
+            registry.initWithWebContext(webContext);
+            try {
+                registry.initComponentPhase2();
+                verify(poolRegistry).setDefaultPool(singleCtx, null);
+            } finally {
+                registry.destroyComponent();
+            }
+        }
+    }
+
+    /**
+     * 未开启虚拟线程（含属性开启但 JDK &lt; 21 回落）：不得覆盖全局默认线程模型，
+     * 让 single 路径遵循 {@code pool.default-execute-mode}（默认 default 业务池）。
+     */
+    @Test
+    void install_virtualThreadsDisabled_doesNotOverrideGlobalDefault() throws Exception {
+        try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext(TestConfig.class)) {
+            BatchController bean = ctx.getBean(BatchController.class);
+            PathMappingContext singleCtx = mappingFor(bean, "single", String.class);
+
+            WebContext webContext = mock(WebContext.class);
+            when(webContext.getCtx()).thenReturn(ctx);
+            MappingRegistry mappingRegistry = mock(MappingRegistry.class);
+            when(mappingRegistry.getMappingContextList()).thenReturn(Collections.singletonList(singleCtx));
+            when(webContext.getWebComponent(MappingRegistry.class)).thenReturn(mappingRegistry);
+            BizPoolRegistry poolRegistry = mock(BizPoolRegistry.class);
+            when(poolRegistry.usesVirtualThreads()).thenReturn(false);
+            when(webContext.getWebComponent(BizPoolRegistry.class)).thenReturn(poolRegistry);
+
+            BatchRegistry registry = new BatchRegistry();
+            registry.initWithWebContext(webContext);
+            try {
+                registry.initComponentPhase2();
+                verify(poolRegistry, never()).setDefaultPool(any(), any());
+            } finally {
+                registry.destroyComponent();
+            }
         }
     }
 
