@@ -61,6 +61,13 @@ public abstract class StreamEmitter<T> {
      * earlyEncode=false：原始数据直接投递，由发送器（EventLoop 线程）延迟编码。
      */
     public void send(T data) throws IOException {
+        // 已完成（正常/异常终止）后不得再发送：对齐 Spring ResponseBodyEmitter 语义（抛
+        // IllegalStateException）。修复前该调用在「sender 未就绪」时会静默进入 earlySendDataList，
+        // 随后 initialize() 批量交付 → 已终止的流仍被写出数据（E2E 实测）。
+        if (complete.get()) {
+            throw new IllegalStateException(
+                    "StreamEmitter has already been completed; send() is not allowed");
+        }
         Object payload = data;
         if (earlyEncode) {
             ByteArrayOutputStream baos = new ByteArrayOutputStream(256);

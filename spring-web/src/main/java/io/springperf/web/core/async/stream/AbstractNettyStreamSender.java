@@ -203,6 +203,32 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
 
     protected void onAllDataWritten() {
         this.resp.setWritableCallback(null);
+        // 终止块单一所有者：抢占写入权。若已被另一方（请求收尾的 endStream()）写出，
+        // 本次不得再写——否则 HTTP 编码器在写完上一条 LastHttpContent 后已复位为 INIT，
+        // 再收 LastHttpContent 会抛 EncoderException(unexpected message type, state: 0)。
+        if (!this.resp.markStreamCompleted()) {
+            return;
+        }
+        if (!channel.isActive()) {
+            // 客户端已断开（常见于 SSE 断连场景）：此时响应头可能尚未写到线上，
+            // HTTP 编码器仍处于 INIT 状态，裸写 LastHttpContent 会抛
+            // EncoderException("unexpected message type: LastHttpContent, state: 0")。
+            // 流已无投递对象，直接收尾并关闭连接（不再写任何帧）。
+            this.resp.setTimeout(null, -1);
+            channel.close();
+            return;
+        }
+        if (this.resp.isCommitted() && !this.resp.isStreaming()) {
+            // 已提交但从未进入渐进式输出：典型为 HEAD 请求——flushChunked 已以「仅响应头」的完整响应
+            // 收尾，编码器随之复位为 INIT，再写 LastHttpContent 会抛
+            // EncoderException("unexpected message type: LastHttpContent, state: 0")
+            // （实测来源：AsyncSseRobustnessE2eTest.headRequest_sse_headersOnly_noBody_lifecycleTerminates）。
+            // 该响应已完整，既不需要也不得再补终止块；连接去留由 onCompleteSuccess 依 keep-alive 决定。
+            // 判据同时要求 isCommitted()：未提交且非流式的场景由上方 channel 不活跃分支兜底，
+            // 而单元测试的替身响应（未打桩 committed）不应因此被误跳过。
+            this.resp.setTimeout(null, -1);
+            return;
+        }
         ChannelFuture f = channel.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
         resp.addRespEventListener(f, true);
         f.addListener(completeListener);
@@ -213,6 +239,7 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
      * 已排空的队列数据照常发送，但终止标志是连接异常关闭而非正常流结束。
      */
     protected void onAllDataFailed(Throwable failure) {
+        this.resp.markStreamCompleted();
         this.resp.setWritableCallback(null);
         this.resp.setTimeout(null, -1);
         log.warn("[SSE] stream terminated with error: {}", failure != null ? failure.getMessage() : "unknown", failure);

@@ -63,6 +63,10 @@ public class PublisherToStreamEmitterAdapter implements Subscriber<Object> {
         // 都在订阅建立后立即注册，写帧必然发生在 onSubscribe 之后，回调始终可用。
         if (asyncWebRequest != null) {
             asyncWebRequest.addWriteCallbackHandler(writeCallback);
+            // 断连即取消上游：写入回调依赖「下一次投递失败」，源若断连后不再投递则永不取消
+            // （每个断连客户端留下一个仍在运行的源）。断连钩子让取消不再依赖后续投递。
+            asyncWebRequest.addConnectionCloseHandler(
+                    () -> tryCancel(new IOException("client disconnected")));
         }
         subscription.request(config.getHighWaterMark());
     }
@@ -80,7 +84,9 @@ public class PublisherToStreamEmitterAdapter implements Subscriber<Object> {
         if (terminated) {
             return;
         }
-        log.error("send data error", e);
+        // 降噪：取消有两个正常来源——客户端断连、发送器不可用（背压/已关闭），
+        // 都属设计内终止而非异常。原先以 ERROR + 完整堆栈打印，污染日志并误导排查。
+        log.warn("cancel upstream subscription: {}", e == null ? "unknown" : e.toString());
         subscription.cancel();
         onError(e);
     }
