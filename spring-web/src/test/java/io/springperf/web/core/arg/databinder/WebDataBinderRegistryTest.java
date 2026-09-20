@@ -165,6 +165,49 @@ class WebDataBinderRegistryTest {
     private static final class FallbackB { @SuppressWarnings("unused") public void handle() {} }
     private static final class FallbackC { @SuppressWarnings("unused") public void handle() {} }
 
+    // ==================== spring.mvc.message-codes-resolver-format ====================
+
+    @Test
+    void createDefaultMessageCodesResolver_default_isPrefixFormat() throws Exception {
+        WebDataBinderRegistry registry = registryWithProps(
+                io.springperf.web.context.PropertiesConstant.MVC_MESSAGE_CODES_RESOLVER_FORMAT_DEFAULT);
+        org.springframework.validation.MessageCodesResolver resolver = registry.createDefaultMessageCodesResolver();
+        assertNotNull(resolver);
+        String[] codes = resolver.resolveMessageCodes("NotBlank", "target", "name", String.class);
+        // prefix 格式：NotBlank.target.name（错误码在前）
+        assertEquals("NotBlank.target.name", codes[0]);
+    }
+
+    @Test
+    void createDefaultMessageCodesResolver_postfixFormat() throws Exception {
+        WebDataBinderRegistry registry = registryWithProps("postfix_error_code");
+        org.springframework.validation.MessageCodesResolver resolver = registry.createDefaultMessageCodesResolver();
+        String[] codes = resolver.resolveMessageCodes("NotBlank", "target", "name", String.class);
+        // postfix 格式：target.name.NotBlank（错误码在后）
+        assertEquals("target.name.NotBlank", codes[0]);
+    }
+
+    @Test
+    void createDefaultMessageCodesResolver_invalidFormat_fallsBackToPrefix() throws Exception {
+        WebDataBinderRegistry registry = registryWithProps("bogus");
+        org.springframework.validation.MessageCodesResolver resolver = registry.createDefaultMessageCodesResolver();
+        String[] codes = resolver.resolveMessageCodes("NotBlank", "target", "name", String.class);
+        assertEquals("NotBlank.target.name", codes[0]);
+    }
+
+    private static WebDataBinderRegistry registryWithProps(String resolverFormat) throws Exception {
+        io.springperf.web.context.ApplicationProperties props =
+                mock(io.springperf.web.context.ApplicationProperties.class);
+        when(props.get(io.springperf.web.context.PropertiesConstant.MVC_MESSAGE_CODES_RESOLVER_FORMAT,
+                        io.springperf.web.context.PropertiesConstant.MVC_MESSAGE_CODES_RESOLVER_FORMAT_DEFAULT))
+                .thenReturn(resolverFormat);
+        io.springperf.web.context.WebContext ctx = mock(io.springperf.web.context.WebContext.class);
+        when(ctx.getProps()).thenReturn(props);
+        WebDataBinderRegistry registry = new WebDataBinderRegistry();
+        registry.initWithWebContext(ctx);
+        return registry;
+    }
+
     // 同样按 userClass 静态共享缓存，getConversionService/getValidators 的用例各自使用独立
     // userClass 槽位，避免测试顺序导致缓存串扰。
     private static final class SlotA { @SuppressWarnings("unused") public void handle() {} }

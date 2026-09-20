@@ -61,6 +61,8 @@ class NettyServerHttpResponseCoverageTest {
         lenient().when(ctx.executor()).thenReturn(eventLoop);
         lenient().when(ctx.alloc()).thenReturn(allocator);
         lenient().when(allocator.buffer(256)).thenAnswer(invocation -> Unpooled.buffer(256));
+        // writeFile 走压缩透传标记（ctx.attr(COMPRESSION_SKIP)），未桩化会 NPE
+        lenient().when(ctx.attr(any())).thenReturn(mock(io.netty.util.Attribute.class));
     }
 
     private NettyServerHttpResponse newResponse(boolean keepAlive) {
@@ -127,7 +129,8 @@ class NettyServerHttpResponseCoverageTest {
         verify(ctx).writeAndFlush(captor.capture());
         FullHttpResponse nettyResp = (FullHttpResponse) captor.getValue();
         String body = nettyResp.content().toString(StandardCharsets.UTF_8);
-        assertTrue(body.contains("\"error\""), "错误 JSON 应写入");
+        // 默认 whitelabel 启用 -> HTML 错误页（500），且不含已缓冲的部分内容
+        assertTrue(body.contains("500"), "错误页应写入");
         assertFalse(body.contains("partial"), "已缓冲的部分内容应被清空而非追加");
     }
 

@@ -29,6 +29,7 @@ public class AccessLogWebFilter implements WebFilter {
     private static final String DEFAULT_FORMAT = "%h %m %U %Tms %s \"%u\"";
 
     private final List<Segment> segments;
+    private final AccessLogWriter accessLogWriter;
 
     /**
      * 使用默认格式创建访问日志过滤器。
@@ -43,7 +44,18 @@ public class AccessLogWebFilter implements WebFilter {
      * @param format 格式字符串，支持 %h、%m、%U、%T、%s、%u 占位符
      */
     public AccessLogWebFilter(String format) {
+        this(format, AccessLogWriter.NOOP);
+    }
+
+    /**
+     * 使用指定格式与落盘写出器创建访问日志过滤器。
+     *
+     * @param format          格式字符串，支持 %h、%m、%U、%T、%s、%u 占位符
+     * @param accessLogWriter 落盘写出器（{@link AccessLogWriter#NOOP} 表示仅走日志框架）
+     */
+    public AccessLogWebFilter(String format, AccessLogWriter accessLogWriter) {
         this.segments = parseFormat(format != null ? format : DEFAULT_FORMAT);
+        this.accessLogWriter = accessLogWriter != null ? accessLogWriter : AccessLogWriter.NOOP;
     }
 
     @Override
@@ -62,7 +74,10 @@ public class AccessLogWebFilter implements WebFilter {
             for (Segment seg : segments) {
                 seg.append(sb, request, elapsedMs, status, remoteAddr, ua);
             }
-            log.info(sb.toString());
+            String line = sb.toString();
+            log.info(line);
+            // 落盘（未配置 directory 时为 NOOP）
+            accessLogWriter.write(line);
         }
     }
 

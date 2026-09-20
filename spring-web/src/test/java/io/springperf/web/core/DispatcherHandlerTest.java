@@ -21,6 +21,7 @@ import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.i18n.LocaleContext;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -30,6 +31,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
@@ -605,14 +607,18 @@ class DispatcherHandlerTest {
     // ==================== initContextHolders / removeContextHolders ====================
 
     @Test
-    void initContextHolders_buildLocaleContextNull_returnsFalse() {
+    void initContextHolders_localeContextNotNull_returnsTrue() {
+        // spring.web.locale/locale-resolver 已实现：默认 accept-header 策略恒返回 LocaleContext，
+        // 故上下文初始化成功（返回 true），并写入 LocaleContextHolder。
         WebServerHttpRequest req = createRequest();
+        when(req.getLocale()).thenReturn(Locale.US);
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
 
         boolean result = handler.initContextHolders(req, resp);
 
-        assertFalse(result);
-        assertNull(LocaleContextHolder.getLocaleContext());
+        assertTrue(result);
+        assertEquals(Locale.US, LocaleContextHolder.getLocale());
+        handler.removeContextHolders(req, resp);
     }
 
     @Test
@@ -626,11 +632,16 @@ class DispatcherHandlerTest {
     }
 
     @Test
-    void buildLocaleContext_returnsNull() {
+    void buildLocaleContext_returnsRequestLocale() {
+        // 默认 accept-header 策略：返回请求 Locale 的 LocaleContext
         WebServerHttpRequest req = createRequest();
+        when(req.getLocale()).thenReturn(Locale.GERMANY);
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
 
-        assertNull(handler.buildLocaleContext(req, resp));
+        LocaleContext ctx = handler.buildLocaleContext(req, resp);
+
+        assertNotNull(ctx);
+        assertEquals(Locale.GERMANY, ctx.getLocale());
     }
 
     // ==================== handleWithFilter 异常路径上下文对称管理 ====================

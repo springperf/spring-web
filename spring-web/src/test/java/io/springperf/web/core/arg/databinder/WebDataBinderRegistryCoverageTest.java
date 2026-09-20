@@ -64,7 +64,8 @@ class WebDataBinderRegistryCoverageTest {
             assertEquals(1, registry.initBinderAdviceCache.size());
             assertNotNull(field(registry, "defaultConversionService"));
             assertNull(field(registry, "defaultValidator"));
-            assertNull(field(registry, "messageCodesResolver"));
+            // bean 未提供 MessageCodesResolver 时，按 spring.mvc.message-codes-resolver-format 创建默认实现
+            assertNotNull(field(registry, "messageCodesResolver"));
             assertNull(registry.webDataBinderFactory);
             assertNull(registry.webBindingInitializer);
         }

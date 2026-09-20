@@ -37,4 +37,5 @@ class WebServerHttpResponseWrapperTest {
     @Test void close_delegates() { wrapper.close(); verify(delegate).close(); }
     @Test void getBody_delegates() throws Exception { java.io.OutputStream s = mock(java.io.OutputStream.class); when(delegate.getBody()).thenReturn(s); assertSame(s, wrapper.getBody()); }
     @Test void getHeaders_delegates() { org.springframework.http.HttpHeaders h = new org.springframework.http.HttpHeaders(); when(delegate.getHeaders()).thenReturn(h); assertSame(h, wrapper.getHeaders()); }
+    @Test void release_delegates() { wrapper.release(); verify(delegate).release(); }
 }
