@@ -44,6 +44,11 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
     private int sessionTimeout;
     private String requestCharacterEncoding = "UTF-8";
     private String responseCharacterEncoding = "UTF-8";
+    /** server.servlet.encoding.force-request：为 true 时忽略业务对请求编码的显式设置。 */
+    private boolean forceRequestEncoding;
+    /** server.servlet.encoding.force-response：为 true 时忽略业务对响应编码的显式设置。 */
+    private boolean forceResponseEncoding;
+    private Set<SessionTrackingMode> sessionTrackingModes = Collections.singleton(SessionTrackingMode.COOKIE);
 
     public PerfServletContext(WebContext webContext) {
         this.webContext = webContext;
@@ -92,13 +97,39 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
         // Spring Boot Duration 语义：裸数字按秒，支持 30m/1h/1d 后缀；默认 1800s = 30 分钟。
         // ServletContext.getSessionTimeout() 按规范返回分钟，由秒换算存储。
         this.sessionTimeout = readSessionTimeoutMinutes();
-        String reqEnc = webContext.getProps().get("server.servlet.encoding.request", "UTF-8");
-        if (reqEnc != null) {
-            this.requestCharacterEncoding = reqEnc;
-        }
-        String respEnc = webContext.getProps().get("server.servlet.encoding.response", "UTF-8");
-        if (respEnc != null) {
-            this.responseCharacterEncoding = respEnc;
+        // server.servlet.context-parameters.*：显式块预解析为 init parameters（去掉前缀）
+        readExplicitContextParameters();
+        // server.servlet.encoding.*：charset + force/force-request/force-response（启动期预解析）
+        EncodingConfig encodingConfig = EncodingConfig.fromProperties(webContext.getProps());
+        this.requestCharacterEncoding = encodingConfig.getCharset();
+        this.responseCharacterEncoding = encodingConfig.getCharset();
+        this.forceRequestEncoding = encodingConfig.isForceRequest();
+        this.forceResponseEncoding = encodingConfig.isForceResponse();
+        // session tracking-modes：COOKIE 与 URL 均真实生效；SSL 因 Netty 无容器 SSL session 概念而 N/A。
+        String modes = webContext.getProps().get(PropertiesConstant.SERVLET_SESSION_TRACKING_MODES, null);
+        if (modes != null && !modes.trim().isEmpty()) {
+            java.util.EnumSet<SessionTrackingMode> parsed = java.util.EnumSet.noneOf(SessionTrackingMode.class);
+            for (String s : modes.split(",")) {
+                String t = s.trim().toUpperCase(java.util.Locale.ROOT);
+                if (t.isEmpty()) {
+                    continue;
+                }
+                try {
+                    SessionTrackingMode m = SessionTrackingMode.valueOf(t);
+                    if (m == SessionTrackingMode.SSL) {
+                        // Netty 无容器 SSL session 概念，SSL 跟踪 N/A
+                        log.warn("Session tracking mode SSL is not supported by this framework, ignored");
+                    } else {
+                        // COOKIE 走 Set-Cookie；URL 走 encodeURL 重写（见 PerfHttpServletResponse.encodeSessionUrl）
+                        parsed.add(m);
+                    }
+                } catch (IllegalArgumentException e) {
+                    log.warn("Unknown session tracking mode: {}", t);
+                }
+            }
+            if (!parsed.isEmpty()) {
+                this.sessionTrackingModes = parsed;
+            }
         }
     }
 
@@ -106,38 +137,39 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
         return readSessionTimeoutSeconds() / 60;
     }
 
-    private int readSessionTimeoutSeconds() {
-        String raw = webContext.getProps().get("server.servlet.session.timeout", null);
-        if (raw == null || raw.trim().isEmpty()) {
-            return 1800;
+    /**
+     * 预解析 {@code server.servlet.context-parameters.*} 显式块：前缀后的键名作为 init parameter 名
+     * （如 {@code server.servlet.context-parameters.foo=bar} → {@code foo=bar}）。
+     * 显式 {@code setInitParameter} 调用优先（同名时不被配置块覆盖）。
+     */
+    private void readExplicitContextParameters() {
+        String prefix = PropertiesConstant.SERVLET_CONTEXT_PARAMETERS_PREFIX;
+        java.util.List<String> keys = webContext.getProps().getPropertyNames(prefix);
+        if (keys == null) {
+            return;
         }
-        String value = raw.trim();
-        try {
-            return (int) Math.max(0, Long.parseLong(value));
-        } catch (NumberFormatException e) {
-            try {
-                return (int) Math.max(0, parseDurationToSeconds(value));
-            } catch (Exception ex) {
-                log.warn("Invalid server.servlet.session.timeout '{}', falling back to default 1800s", raw);
-                return 1800;
+        for (String key : keys) {
+            String name = key.substring(prefix.length());
+            if (name.isEmpty()) {
+                continue;
+            }
+            String value = webContext.getProps().get(key, null);
+            if (value != null) {
+                initParameters.putIfAbsent(name, value);
             }
         }
     }
 
-    private static long parseDurationToSeconds(String value) {
-        char last = value.charAt(value.length() - 1);
-        if (Character.isDigit(last)) {
-            return Long.parseLong(value);
+    private int readSessionTimeoutSeconds() {
+        // 统一走 ApplicationProperties.getDurationSeconds（Boot Duration 语义：裸数字=秒，支持 30s/1m/1h/1d），
+        // 无效值 warn 并回退默认 1800s。
+        try {
+            return (int) Math.max(0, webContext.getProps()
+                    .getDurationSeconds("server.servlet.session.timeout", 1800));
+        } catch (Exception ex) {
+            log.warn("Invalid server.servlet.session.timeout, falling back to default 1800s", ex);
+            return 1800;
         }
-        long multiplier;
-        switch (Character.toLowerCase(last)) {
-            case 's': multiplier = 1; break;
-            case 'm': multiplier = 60; break;
-            case 'h': multiplier = 3600; break;
-            case 'd': multiplier = 86400; break;
-            default: throw new IllegalArgumentException("Unknown duration unit: " + last);
-        }
-        return Long.parseLong(value.substring(0, value.length() - 1).trim()) * multiplier;
     }
 
     // ===================== Context Path =====================
@@ -207,7 +239,8 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
 
     @Override
     public String getVirtualServerName() {
-        return webContext.getProps().get("server.virtual-host", "localhost");
+        return webContext.getProps().get(PropertiesConstant.SERVLET_VIRTUAL_SERVER_NAME,
+                PropertiesConstant.SERVLET_VIRTUAL_SERVER_NAME_DEFAULT);
     }
 
     @Override
@@ -232,7 +265,7 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
 
     @Override
     public String getServletContextName() {
-        return webContext.getProps().get("server.servlet.application-name", "spring-perf-web");
+        return webContext.getProps().get(PropertiesConstant.SERVLET_APPLICATION_DISPLAY_NAME, "spring-perf-web");
     }
 
     // ===================== MIME Types =====================
@@ -465,12 +498,12 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
 
     @Override
     public Set<SessionTrackingMode> getDefaultSessionTrackingModes() {
-        return Collections.singleton(SessionTrackingMode.COOKIE);
+        return sessionTrackingModes;
     }
 
     @Override
     public Set<SessionTrackingMode> getEffectiveSessionTrackingModes() {
-        return Collections.singleton(SessionTrackingMode.COOKIE);
+        return sessionTrackingModes;
     }
 
     @Override
@@ -492,6 +525,10 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
 
     @Override
     public void setRequestCharacterEncoding(String encoding) {
+        // force-request=true：忽略业务显式设置，保持配置 charset
+        if (forceRequestEncoding) {
+            return;
+        }
         this.requestCharacterEncoding = encoding;
     }
 
@@ -502,7 +539,21 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
 
     @Override
     public void setResponseCharacterEncoding(String encoding) {
+        // force-response=true：忽略业务显式设置，保持配置 charset
+        if (forceResponseEncoding) {
+            return;
+        }
         this.responseCharacterEncoding = encoding;
+    }
+
+    /** server.servlet.encoding.force-request：是否强制请求编码。 */
+    public boolean isForceRequestEncoding() {
+        return forceRequestEncoding;
+    }
+
+    /** server.servlet.encoding.force-response：是否强制响应编码。 */
+    public boolean isForceResponseEncoding() {
+        return forceResponseEncoding;
     }
 
     // ===================== Others =====================

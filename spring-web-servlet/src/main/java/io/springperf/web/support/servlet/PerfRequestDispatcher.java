@@ -36,21 +36,26 @@ public class PerfRequestDispatcher implements RequestDispatcher {
             throw new IllegalStateException("Cannot forward: response already committed");
         }
 
-        // Save forward attributes in request context
+        // Save forward attributes in request context（捕获「forward 前」的原始请求路径组件，符合 Servlet 规范）
         requestContext.setAttribute(RequestDispatcher.FORWARD_REQUEST_URI, webRequest.getUriStr());
         requestContext.setAttribute(RequestDispatcher.FORWARD_CONTEXT_PATH, webContext.getContextPath());
-        requestContext.setAttribute(RequestDispatcher.FORWARD_SERVLET_PATH, "");
-        requestContext.setAttribute(RequestDispatcher.FORWARD_PATH_INFO, webRequest.getPath());
-        requestContext.setAttribute(RequestDispatcher.FORWARD_QUERY_STRING, webRequest.getUriStrWithQuery());
+        // 修正 2-20：原 SERVLET_PATH/PATH_INFO 颠倒。forward 属性应记录原始 servletPath/pathInfo；
+        // 本框架 getServletPath()=getPath()，pathInfo 恒为 ""。
+        requestContext.setAttribute(RequestDispatcher.FORWARD_SERVLET_PATH, webRequest.getPath());
+        requestContext.setAttribute(RequestDispatcher.FORWARD_PATH_INFO, "");
+        // 修正 2-20：QUERY_STRING 不应含前导 '?'（规范要求纯查询串）
+        String forwardUriWithQuery = webRequest.getUriStrWithQuery();
+        int forwardQIdx = forwardUriWithQuery.indexOf('?');
+        requestContext.setAttribute(RequestDispatcher.FORWARD_QUERY_STRING,
+                forwardQIdx >= 0 ? forwardUriWithQuery.substring(forwardQIdx + 1) : null);
 
         // Set dispatcher type to FORWARD
         if (request instanceof PerfHttpServletRequest) {
             ((PerfHttpServletRequest) request).setDispatcherType(DispatcherType.FORWARD);
         }
 
-        // Clear response (buffer, headers, status)
-        webResponse.getHeaders().clear();
-        webResponse.setStatusCode(org.springframework.http.HttpStatus.OK);
+        // 修正 2-19：forward 仅应重置 buffer（丢弃未提交 body），【不应】清空已写响应头、【不应】强制状态 200。
+        // 原实现 getHeaders().clear() + setStatusCode(OK) 违反规范：转发链路会丢失已写入的响应头并被强制 200。
         webResponse.resetBuffer();
 
         DispatcherHandler dispatcher = webContext.getDispatcherHandler();

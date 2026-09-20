@@ -2,6 +2,8 @@ package io.springperf.web.autoconfigure;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.springperf.web.context.ApplicationProperties;
+import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.core.filter.AccessLogWebFilter;
 import io.springperf.web.server.NettyHttpServer;
 import org.junit.jupiter.api.Test;
@@ -20,7 +22,9 @@ class SpringWebAutoConfigurationAdditionalTest {
     void accessLogWebFilter_withFormat_fromEnvironment() {
         Environment env = mock(Environment.class);
         when(env.getProperty("server.accesslog.format")).thenReturn("%m %U");
-        AccessLogWebFilter filter = config.accessLogWebFilter(env);
+        ApplicationProperties props = mock(ApplicationProperties.class);
+        when(props.get(PropertiesConstant.ACCESSLOG_DIRECTORY, null)).thenReturn(null);
+        AccessLogWebFilter filter = config.accessLogWebFilter(env, props);
         assertNotNull(filter);
         assertEquals(Integer.MIN_VALUE, filter.getOrder(), "访问日志 Filter 应最早执行");
     }
@@ -29,7 +33,9 @@ class SpringWebAutoConfigurationAdditionalTest {
     void accessLogWebFilter_nullFormat_usesDefault() {
         Environment env = mock(Environment.class);
         when(env.getProperty("server.accesslog.format")).thenReturn(null);
-        AccessLogWebFilter filter = config.accessLogWebFilter(env);
+        ApplicationProperties props = mock(ApplicationProperties.class);
+        when(props.get(PropertiesConstant.ACCESSLOG_DIRECTORY, null)).thenReturn(null);
+        AccessLogWebFilter filter = config.accessLogWebFilter(env, props);
         assertNotNull(filter);
     }
 

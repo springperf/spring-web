@@ -1,10 +1,12 @@
 package io.springperf.web.support.servlet.session;
 
 import io.springperf.web.context.BaseWebComponent;
+import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.http.RequestAttribute;
 import io.springperf.web.support.servlet.Authenticator;
 import io.springperf.web.support.servlet.context.PerfServletContext;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
 
 import jakarta.servlet.ServletContext;
@@ -16,6 +18,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 public class PerfHttpSessionManager extends BaseWebComponent {
 
     public static final RequestAttribute<PerfHttpSession> SESSION_ATTR_KEY =
@@ -25,6 +28,9 @@ public class PerfHttpSessionManager extends BaseWebComponent {
     static final String COOKIE_NAME_KEY = "server.servlet.session.cookie.name";
     static final String COOKIE_SAME_SITE_KEY = "server.servlet.session.cookie.same-site";
     static final String COOKIE_SECURE_KEY = "server.servlet.session.cookie.secure";
+    static final String COOKIE_DOMAIN_KEY = "server.servlet.session.cookie.domain";
+    static final String COOKIE_MAX_AGE_KEY = "server.servlet.session.cookie.max-age";
+    static final String COOKIE_HTTP_ONLY_KEY = "server.servlet.session.cookie.http-only";
 
     public static final String DEFAULT_SESSION_COOKIE_NAME = "JSESSIONID";
     static final String REQUESTED_SESSION_ID_ATTR = PerfHttpSessionManager.class.getName() + ".REQUESTED_SESSION_ID";
@@ -43,6 +49,24 @@ public class PerfHttpSessionManager extends BaseWebComponent {
     private String cookiePath = "/";
     private String sameSite;
     private boolean cookieSecure;
+    private String cookieDomain;
+    private int cookieMaxAge = -1;
+    private boolean cookieHttpOnly = true;
+
+    /**
+     * SameSite 配置值规范化为 Netty {@code CookieHeaderNames.SameSite} 枚举的精确常量名
+     * （Lax/Strict/None——注意非全大写）：配置大小写不敏感，未知值忽略并告警。
+     */
+    static String canonicalSameSite(String raw) {
+        switch (raw.trim().toLowerCase(java.util.Locale.ROOT)) {
+            case "lax": return "Lax";
+            case "strict": return "Strict";
+            case "none": return "None";
+            default:
+                log.warn("Unknown server.servlet.session.cookie.same-site value: {}, ignored", raw);
+                return null;
+        }
+    }
 
     @Override
     public void initWithWebContext(WebContext webContext) {
@@ -56,7 +80,7 @@ public class PerfHttpSessionManager extends BaseWebComponent {
         }
         this.servletContext = servletCtx;
         HttpSessionStorage bean = webContext.getBeanFromCtx(HttpSessionStorage.class);
-        this.storage = bean != null ? bean : new InMemoryHttpSessionStorage();
+        this.storage = bean != null ? bean : createDefaultStorage(webContext);
         // Scan for Authenticator bean
         this.authenticator = webContext.getBeanFromCtx(Authenticator.class);
         // Scan for HttpSessionListener and HttpSessionAttributeListener beans
@@ -69,9 +93,43 @@ public class PerfHttpSessionManager extends BaseWebComponent {
         this.cookieName = webContext.getProps().get(COOKIE_NAME_KEY, DEFAULT_SESSION_COOKIE_NAME);
         this.cookieSecure = webContext.getProps().getBoolean(COOKIE_SECURE_KEY, false);
         String configuredSameSite = webContext.getProps().get(COOKIE_SAME_SITE_KEY, "");
-        this.sameSite = configuredSameSite.isEmpty() ? null : configuredSameSite.toUpperCase();
+        this.sameSite = configuredSameSite.isEmpty() ? null : canonicalSameSite(configuredSameSite);
+        this.cookieDomain = webContext.getProps().get(COOKIE_DOMAIN_KEY, null);
+        String maxAgeRaw = webContext.getProps().get(COOKIE_MAX_AGE_KEY, null);
+        this.cookieMaxAge = -1;
+        if (maxAgeRaw != null && !maxAgeRaw.trim().isEmpty()) {
+            try {
+                this.cookieMaxAge = Integer.parseInt(maxAgeRaw.trim());
+            } catch (NumberFormatException e) {
+                this.cookieMaxAge = -1;
+            }
+        }
+        this.cookieHttpOnly = webContext.getProps().getBoolean(COOKIE_HTTP_ONLY_KEY, true);
         String ctxPath = webContext.getContextPath();
         this.cookiePath = (ctxPath == null || ctxPath.isEmpty() || "/".equals(ctxPath)) ? "/" : ctxPath;
+    }
+
+    /**
+     * 按 {@code server.servlet.session.persistent} 选择默认存储：
+     * {@code true} → {@link FileHttpSessionStorage}（每 session 一文件，重启恢复）；
+     * {@code false}（默认）→ 现有 {@link InMemoryHttpSessionStorage}。
+     * 容器中存在自定义 {@link HttpSessionStorage} bean 时优先使用该 bean（不走此方法）。
+     */
+    private HttpSessionStorage createDefaultStorage(WebContext webContext) {
+        boolean persistent = webContext.getProps().getBoolean(
+                PropertiesConstant.SERVLET_SESSION_PERSISTENT,
+                PropertiesConstant.SERVLET_SESSION_PERSISTENT_DEFAULT);
+        if (!persistent) {
+            return new InMemoryHttpSessionStorage();
+        }
+        String storeDir = webContext.getProps().get(PropertiesConstant.SERVLET_SESSION_STORE_DIR,
+                PropertiesConstant.SERVLET_SESSION_STORE_DIR_DEFAULT);
+        String excludeRaw = webContext.getProps().get(PropertiesConstant.SERVLET_SESSION_PERSISTENT_EXCLUDE, null);
+        java.util.Set<String> exclude = FileHttpSessionStorage.parseExcludeList(excludeRaw);
+        java.nio.file.Path dir = java.nio.file.Paths.get(storeDir);
+        log.info("Session persistence enabled (server.servlet.session.persistent=true), store-dir={}, exclude={}",
+                dir.toAbsolutePath(), exclude);
+        return new FileHttpSessionStorage(dir, exclude);
     }
 
     @Override
@@ -115,6 +173,18 @@ public class PerfHttpSessionManager extends BaseWebComponent {
         return cookieSecure;
     }
 
+    public String getCookieDomain() {
+        return cookieDomain;
+    }
+
+    public int getCookieMaxAge() {
+        return cookieMaxAge;
+    }
+
+    public boolean isCookieHttpOnly() {
+        return cookieHttpOnly;
+    }
+
     public PerfHttpSession getSession(String sessionId) {
         if (sessionId == null) {
             return null;
@@ -155,6 +225,11 @@ public class PerfHttpSessionManager extends BaseWebComponent {
     }
 
     public void saveSession(PerfHttpSession session) {
+        // L8：已失效会话不持久化，避免被并发在途请求复活（invalidate 已从 storage 移除，
+        // 若此处仍保存会把已失效会话重新写入存储）。
+        if (session.isInvalid()) {
+            return;
+        }
         storage.saveSession(session.getData());
     }
 

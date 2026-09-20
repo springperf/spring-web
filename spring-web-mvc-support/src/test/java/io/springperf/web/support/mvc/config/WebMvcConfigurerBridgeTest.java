@@ -14,6 +14,8 @@ import io.springperf.web.core.mapping.MappingRegistry;
 import io.springperf.web.core.resource.ResourceHandlerRegistry;
 import io.springperf.web.core.retval.ReturnValueResolver;
 import io.springperf.web.core.retval.ReturnValueResolverRegistry;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,6 +53,8 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -70,6 +74,13 @@ class WebMvcConfigurerBridgeTest {
     @BeforeEach
     void setUp() {
         when(webContext.getCtx()).thenReturn(applicationContext);
+        // ResourceHandlerRegistry.initComponentPhase2 读取 spring.web.resources.* 与 static-path-pattern，
+        // 统一兜底桩避免 mock 返回 null 触发 NPE。
+        io.springperf.web.context.ApplicationProperties props =
+                mock(io.springperf.web.context.ApplicationProperties.class, RETURNS_DEFAULTS);
+        lenient().when(props.get(anyString(), anyString())).thenAnswer(inv -> inv.getArgument(1));
+        lenient().when(props.getBoolean(anyString(), anyBoolean())).thenAnswer(inv -> inv.getArgument(1));
+        lenient().when(webContext.getProps()).thenReturn(props);
         bridge = new WebMvcConfigurerBridge();
         bridge.initWithWebContext(webContext);
     }
@@ -861,5 +872,196 @@ class WebMvcConfigurerBridgeTest {
         public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
             return true;
         }
+    }
+
+    // ========== 未桥接回调的 WARN 检测 ==========
+
+    @Test
+    void unsupportedCallbacks_constantCoversExpectedMethods() {
+        // 7 个未桥接回调均应被登记（覆写即静默失效，需 WARN）；addViewControllers 已桥接，不再登记
+        assertTrue(WebMvcConfigurerBridge.UNSUPPORTED_CALLBACKS.containsKey("configurePathMatch"));
+        assertTrue(WebMvcConfigurerBridge.UNSUPPORTED_CALLBACKS.containsKey("configureContentNegotiation"));
+        assertTrue(WebMvcConfigurerBridge.UNSUPPORTED_CALLBACKS.containsKey("configureDefaultServletHandling"));
+        assertTrue(WebMvcConfigurerBridge.UNSUPPORTED_CALLBACKS.containsKey("configureHandlerExceptionResolvers"));
+        assertTrue(WebMvcConfigurerBridge.UNSUPPORTED_CALLBACKS.containsKey("configureMessageCodesResolver"));
+        assertTrue(WebMvcConfigurerBridge.UNSUPPORTED_CALLBACKS.containsKey("configureMessageConverters"));
+        assertTrue(WebMvcConfigurerBridge.UNSUPPORTED_CALLBACKS.containsKey("configureViewResolvers"));
+        assertFalse(WebMvcConfigurerBridge.UNSUPPORTED_CALLBACKS.containsKey("addViewControllers"),
+                "addViewControllers 已桥接，不应再出现在未桥接清单");
+        assertEquals(7, WebMvcConfigurerBridge.UNSUPPORTED_CALLBACKS.size());
+    }
+
+    @Test
+    void warnUnsupportedOverrides_overriddenCallback_emitsWarnWithoutError() throws Exception {
+        // 覆写未桥接回调：initComponentPhase1 仍应正常完成（仅 WARN），不得抛异常
+        when(applicationContext.getBeansOfType(WebMvcConfigurer.class))
+                .thenReturn(Collections.singletonMap("viewCfg", new WebMvcConfigurer() {
+                    @Override
+                    public void addViewControllers(
+                            org.springframework.web.servlet.config.annotation.ViewControllerRegistry registry) {
+                        // 用户以为生效，实际框架未桥接 → 应 WARN
+                    }
+                }));
+
+        assertDoesNotThrow(() -> bridge.initComponentPhase1());
+    }
+
+    @Test
+    void warnUnsupportedOverrides_overriddenPathMatch_emitsWarnWithoutError() throws Exception {
+        when(applicationContext.getBeansOfType(WebMvcConfigurer.class))
+                .thenReturn(Collections.singletonMap("pathCfg", new WebMvcConfigurer() {
+                    @Override
+                    public void configurePathMatch(
+                            org.springframework.web.servlet.config.annotation.PathMatchConfigurer configurer) {
+                        // 未桥接
+                    }
+                }));
+
+        assertDoesNotThrow(() -> bridge.initComponentPhase1());
+    }
+
+    @Test
+    void warnUnsupportedOverrides_noOverride_noWarnNoError() throws Exception {
+        // 空实现（未覆写任何未桥接回调）：不应告警，也不应抛异常
+        when(applicationContext.getBeansOfType(WebMvcConfigurer.class))
+                .thenReturn(Collections.singletonMap("empty", new WebMvcConfigurer() {}));
+
+        assertDoesNotThrow(() -> bridge.initComponentPhase1());
+    }
+
+    @Test
+    void warnUnsupportedOverrides_supportedCallback_only_doesNotWarn() throws Exception {
+        // 覆写「已桥接」回调（addInterceptors）：捕获器行为正常，且不应触发未桥接 WARN 路径异常
+        InterceptorRegistry frameworkRegistry = new InterceptorRegistry();
+        doReturn(frameworkRegistry).when(webContext).getWebComponent(InterceptorRegistry.class);
+        when(applicationContext.getBeansOfType(WebMvcConfigurer.class))
+                .thenReturn(Collections.singletonMap("ok", new WebMvcConfigurer() {
+                    @Override
+                    public void addInterceptors(
+                            org.springframework.web.servlet.config.annotation.InterceptorRegistry registry) {
+                        registry.addInterceptor(new TestHandlerInterceptor());
+                    }
+                }));
+
+        assertDoesNotThrow(() -> bridge.initComponentPhase1());
+    }
+
+    // ========== addViewControllers 桥接 ==========
+
+    @Test
+    void viewControllerRegistry_shim_collectsRegistrations() {
+        org.springframework.web.servlet.config.annotation.ViewControllerRegistry registry =
+                new org.springframework.web.servlet.config.annotation.ViewControllerRegistry();
+        registry.addViewController("/home").setViewName("index");
+        registry.addRedirectViewController("/old", "/new");
+        registry.addStatusController("/ping", org.springframework.http.HttpStatus.NO_CONTENT);
+
+        assertEquals(3, registry.getRegistrations().size());
+        org.springframework.web.servlet.config.annotation.ViewControllerRegistration home =
+                registry.getRegistrations().get(0);
+        assertEquals("/home", home.getUrlPath());
+        assertEquals("index", home.getViewName());
+        org.springframework.web.servlet.config.annotation.ViewControllerRegistration redirect =
+                registry.getRegistrations().get(1);
+        assertEquals("redirect:/new", redirect.getViewName(), "redirect 注册应带 redirect: 前缀");
+        org.springframework.web.servlet.config.annotation.ViewControllerRegistration status =
+                registry.getRegistrations().get(2);
+        assertEquals(org.springframework.http.HttpStatus.NO_CONTENT, status.getStatusCode());
+        assertNull(status.getViewName());
+    }
+
+    @Test
+    void bridgeViewControllers_registersFrameworkMappings() throws Exception {
+        MappingRegistry mappingRegistry = new MappingRegistry();
+        doReturn(mappingRegistry).when(webContext)
+                .getWebComponentWithDefault(eq(MappingRegistry.class), any(MappingRegistry.class));
+        when(applicationContext.getBeansOfType(WebMvcConfigurer.class))
+                .thenReturn(Collections.singletonMap("vc", new WebMvcConfigurer() {
+                    @Override
+                    public void addViewControllers(
+                            org.springframework.web.servlet.config.annotation.ViewControllerRegistry registry) {
+                        registry.addViewController("/home").setViewName("index");
+                        registry.addStatusController("/ping", org.springframework.http.HttpStatus.NO_CONTENT);
+                    }
+                }));
+
+        bridge.initComponentPhase1();
+
+        boolean hasHome = mappingRegistry.getMappingContextList().stream()
+                .anyMatch(ctx -> ctx.getPathRule().equals("/home"));
+        boolean hasPing = mappingRegistry.getMappingContextList().stream()
+                .anyMatch(ctx -> ctx.getPathRule().equals("/ping"));
+        assertTrue(hasHome, "view controller /home 应注册为框架路由");
+        assertTrue(hasPing, "status controller /ping 应注册为框架路由");
+    }
+
+    @Test
+    void bridgeViewControllers_noRegistrations_noMappings() throws Exception {
+        MappingRegistry mappingRegistry = new MappingRegistry();
+        doReturn(mappingRegistry).when(webContext)
+                .getWebComponentWithDefault(eq(MappingRegistry.class), any(MappingRegistry.class));
+        when(applicationContext.getBeansOfType(WebMvcConfigurer.class))
+                .thenReturn(Collections.singletonMap("empty", new WebMvcConfigurer() {}));
+
+        bridge.initComponentPhase1();
+
+        assertTrue(mappingRegistry.getMappingContextList().isEmpty());
+    }
+
+    /** 构造带 RequestContext 桩的请求（ModelContext.getOrCreate 需要读写字节属性）；lenient 避免未用桩报错。 */
+    private WebServerHttpRequest requestWithContext() {
+        WebServerHttpRequest req = mock(WebServerHttpRequest.class);
+        io.springperf.web.http.RequestContext reqCtx = mock(io.springperf.web.http.RequestContext.class);
+        java.util.Map<io.springperf.web.http.RequestAttribute<?>, Object> attrs = new java.util.HashMap<>();
+        lenient().doAnswer(inv -> attrs.get(inv.getArgument(0)))
+                .when(reqCtx).getAttribute(any(io.springperf.web.http.RequestAttribute.class));
+        lenient().doAnswer(inv -> { attrs.put(inv.getArgument(0), inv.getArgument(1)); return null; })
+                .when(reqCtx).setAttribute(any(io.springperf.web.http.RequestAttribute.class), any());
+        lenient().doReturn(reqCtx).when(req).getRequestContext();
+        // RedirectView.buildLocation 读取请求所属 WebContext 的 contextPath
+        lenient().doReturn(webContext).when(req).getWebContext();
+        lenient().when(webContext.getContextPath()).thenReturn("");
+        return req;
+    }
+
+    @Test
+    void viewControllerInvoker_statusOnly_setsStatusCodeAndHandled() throws Throwable {
+        ViewControllerInvoker invoker = new ViewControllerInvoker(webContext, null,
+                org.springframework.http.HttpStatus.NO_CONTENT);
+        WebServerHttpRequest req = requestWithContext();
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+
+        invoker.invoke(new Object[]{req, resp});
+
+        verify(resp).setStatusCode(org.springframework.http.HttpStatus.NO_CONTENT);
+        verify(resp).setHandled();
+    }
+
+    @Test
+    void viewControllerInvoker_redirect_setsLocation() throws Throwable {
+        ViewControllerInvoker invoker = new ViewControllerInvoker(webContext, "redirect:/new", null);
+        WebServerHttpRequest req = requestWithContext();
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        when(resp.getHeaders()).thenReturn(new org.springframework.http.HttpHeaders());
+
+        invoker.invoke(new Object[]{req, resp});
+
+        verify(resp).setStatusCode(org.springframework.http.HttpStatus.FOUND);
+        verify(resp).setHandled();
+    }
+
+    @Test
+    void viewControllerInvoker_viewName_unresolvable_throws() throws Throwable {
+        ViewControllerInvoker invoker = new ViewControllerInvoker(webContext, "no-such-view", null);
+        WebServerHttpRequest req = requestWithContext();
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        lenient().when(resp.getHeaders()).thenReturn(new org.springframework.http.HttpHeaders());
+        // 空的 ViewResolverRegistry：解析失败
+        doReturn(new io.springperf.web.view.ViewResolverRegistry()).when(webContext)
+                .getWebComponentWithDefault(eq(io.springperf.web.view.ViewResolverRegistry.class),
+                        any(io.springperf.web.view.ViewResolverRegistry.class));
+
+        // 无 ViewResolver：解析失败应抛异常（交 ExceptionRegistry 转 500），而非静默 200
+        assertThrows(IllegalArgumentException.class, () -> invoker.invoke(new Object[]{req, resp}));
     }
 }

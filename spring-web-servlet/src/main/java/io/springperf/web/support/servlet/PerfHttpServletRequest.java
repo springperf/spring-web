@@ -18,6 +18,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
+import jakarta.servlet.SessionTrackingMode;
 import jakarta.servlet.http.HttpUpgradeHandler;
 import jakarta.servlet.http.WebConnection;
 import jakarta.servlet.http.Cookie;
@@ -46,6 +47,27 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
 
     public PerfHttpServletRequest(WebServerHttpRequest request) {
         this.request = request;
+        applyContainerRequestEncoding();
+    }
+
+    /**
+     * {@code server.servlet.encoding.charset}：容器级请求编码在适配器创建期写入
+     * （早于任何业务代码与参数解析，构成"默认值"；业务后续显式 setCharacterEncoding 仍可覆盖，
+     * force-request=true 时该覆盖被忽略——见 {@link #setCharacterEncoding}）。
+     * <p>rebind（Filter 包装）时对新 delegate 重新应用：Filter 包装发生在参数解析之前，
+     * 否则容器编码丢失、参数退回委托默认 UTF-8 解码。</p>
+     */
+    private void applyContainerRequestEncoding() {
+        try {
+            io.springperf.web.support.servlet.context.PerfServletContext sc =
+                    request.getWebContext().getWebComponent(
+                            io.springperf.web.support.servlet.context.PerfServletContext.class);
+            if (sc != null) {
+                request.setCharacterEncoding(java.nio.charset.Charset.forName(sc.getRequestCharacterEncoding()));
+            }
+        } catch (Exception ignored) {
+            // 无 WebContext/Servlet 组件（如单测桩环境）或非法 charset：保持委托默认 UTF-8
+        }
     }
 
     /**
@@ -75,6 +97,7 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
         if (this.request != request) {
             this.request = request;
             this.cookies = null;
+            applyContainerRequestEncoding();
         }
     }
 
@@ -145,7 +168,21 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
         return new BufferedReader(new InputStreamReader(createInputStream(), encoding != null ? encoding : StandardCharsets.UTF_8.name()));
     }
     @Override public String getCharacterEncoding() { return request.getCharacterEncoding() == null ? null : request.getCharacterEncoding().name(); }
-    @Override public void setCharacterEncoding(String env) { request.setCharacterEncoding(Charset.forName(env)); }
+    @Override public void setCharacterEncoding(String env) {
+        // server.servlet.encoding.force-request=true：忽略业务显式设置，保持 ServletContext 配置 charset。
+        // getServletContext() 在无容器上下文时可能抛 UnsupportedOperationException，此时按未强制处理。
+        try {
+            ServletContext sc = getServletContext();
+            if (sc instanceof io.springperf.web.support.servlet.context.PerfServletContext
+                    && ((io.springperf.web.support.servlet.context.PerfServletContext) sc)
+                    .isForceRequestEncoding()) {
+                return;
+            }
+        } catch (Exception ignored) {
+            // 无 ServletContext：不强制
+        }
+        request.setCharacterEncoding(Charset.forName(env));
+    }
     @Override public Locale getLocale() { return request.getLocales().get(0); }
     @Override public Enumeration<Locale> getLocales() { return Collections.enumeration(request.getLocales()); }
     @Override public String getParameter(String name) { return request.getParameter(name); }
@@ -333,7 +370,12 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
         if (result != null) {
             return result;
         }
-        String cookieHeader = request.getHeaders().getFirst(HttpHeaders.Names.COOKIE);
+        org.springframework.http.HttpHeaders h = request.getHeaders();
+        if (h == null) {
+            cookies = new Cookie[0];
+            return cookies;
+        }
+        String cookieHeader = h.getFirst(HttpHeaders.Names.COOKIE);
         if (cookieHeader == null || cookieHeader.isEmpty()) {
             cookies = new Cookie[0];
             return cookies;
@@ -350,14 +392,17 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
 
     // ===================== Session =====================
 
+    /** 会话 id 是否来自客户端 Cookie（getRequestedSessionId 解析时判定，供 isRequestedSessionIdFromCookie 使用）。 */
+    private volatile boolean requestedSessionIdFromCookie;
+
+    /** 会话 id 是否来自请求 URI 的 {@code ;jsessionid=}（URL 重写回读，供 isRequestedSessionIdFromURL 使用）。 */
+    private volatile boolean requestedSessionIdFromUrl;
+
     @Override
     public String getRequestedSessionId() {
-        // Check if a session was created during this request first
-        PerfHttpSession cached = getCachedSession();
-        if (cached != null) {
-            return cached.getId();
-        }
-        // Fall back to session cookie
+        // 修正 2-21：优先返回客户端提交的 session id（cookie），符合 Servlet 规范。
+        // 此 id 用于会话固定检测、isRequestedSessionIdValid 等语义，必须反映「客户端实际携带」的标识，
+        // 而非本次请求内新建/轮换后的 id（如 changeSessionId 之后）。
         String cookieName = DEFAULT_SESSION_COOKIE_NAME;
         PerfHttpSessionManager manager = getSessionManager();
         if (manager != null) {
@@ -367,11 +412,65 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
         if (allCookies != null) {
             for (Cookie cookie : allCookies) {
                 if (cookieName.equals(cookie.getName())) {
+                    requestedSessionIdFromCookie = true;
+                    requestedSessionIdFromUrl = false;
                     return cookie.getValue();
                 }
             }
         }
+        requestedSessionIdFromCookie = false;
+        // URL 重写回读（Servlet 规范 §7.1）：/path;jsessionid=ID。Cookie 优先于 URL 路径参数
+        // （与 Tomcat 一致）。这是 URL 跟踪模式的读侧——只写不读会让跨请求会话静默丢失。
+        String fromUrl = parseSessionIdFromUri(request.getUriStr());
+        if (fromUrl != null) {
+            requestedSessionIdFromUrl = true;
+            return fromUrl;
+        }
+        requestedSessionIdFromUrl = false;
+        // 请求未携带任何 session 标识、但本次请求已新建会话时，回退到新建 id（供 URL 重写编码 jsessionid）。
+        PerfHttpSession cached = getCachedSession();
+        if (cached != null) {
+            return cached.getId();
+        }
         return null;
+    }
+
+    /**
+     * 从原始请求 URI 中解析 {@code ;jsessionid=<id>}（Servlet 规范 §7.1 URL 重写）。
+     *
+     * <p>参数名固定为小写 {@code jsessionid}（与 {@code encodeURL} 写出侧一致，Tomcat 同样使用固定名），
+     * 大小写不敏感匹配；取值止于 {@code / ? ; #}。未携带时返回 {@code null}。</p>
+     */
+    static String parseSessionIdFromUri(String uri) {
+        if (uri == null) {
+            return null;
+        }
+        final String token = ";jsessionid=";
+        int idx = indexOfIgnoreCase(uri, token);
+        if (idx < 0) {
+            return null;
+        }
+        int valueStart = idx + token.length();
+        int end = valueStart;
+        int len = uri.length();
+        while (end < len) {
+            char c = uri.charAt(end);
+            if (c == '/' || c == '?' || c == ';' || c == '#') {
+                break;
+            }
+            end++;
+        }
+        return end == valueStart ? null : uri.substring(valueStart, end);
+    }
+
+    private static int indexOfIgnoreCase(String s, String token) {
+        int limit = s.length() - token.length();
+        for (int i = 0; i <= limit; i++) {
+            if (s.regionMatches(true, i, token, 0, token.length())) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     @Override
@@ -415,12 +514,18 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
 
     @Override
     public boolean isRequestedSessionIdFromCookie() {
-        return getRequestedSessionId() != null;
+        // 必须反映「id 是否来自客户端 Cookie」：getRequestedSessionId 的「回退新建会话 id」
+        // 不能被当成 Cookie 来源，否则 encodeURL 的 Cookie 分支误判、URL 重写永不在纯 URL
+        // 跟踪模式下生效（tracking-modes=url 会话跨请求丢失）。
+        getRequestedSessionId();
+        return requestedSessionIdFromCookie;
     }
 
     @Override
     public boolean isRequestedSessionIdFromURL() {
-        return false;
+        // 与 isRequestedSessionIdFromCookie 同样的解析时机：先跑一遍 getRequestedSessionId 定源
+        getRequestedSessionId();
+        return requestedSessionIdFromUrl;
     }
 
     @Override
@@ -461,6 +566,18 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
     }
 
     private void setSessionCookie(PerfHttpSession session) {
+        // Servlet 规范 §7.1：effective tracking modes 不含 COOKIE 时不得下发会话 Cookie
+        // （tracking-modes=url 纯 URL 重写），否则 URL 重写与 Cookie 双轨下发。
+        try {
+            jakarta.servlet.ServletContext sc = getServletContext();
+            if (sc instanceof io.springperf.web.support.servlet.context.PerfServletContext
+                    && !((io.springperf.web.support.servlet.context.PerfServletContext) sc)
+                            .getEffectiveSessionTrackingModes().contains(SessionTrackingMode.COOKIE)) {
+                return;
+            }
+        } catch (Exception ignored) {
+            // 无法获取 ServletContext 时回退为下发 Cookie
+        }
         HttpServletResponse resp = ServletAttribute.getResponse(request.getRequestContext());
         if (resp == null) {
             return;
@@ -471,7 +588,11 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
         }
         Cookie sessionCookie = new Cookie(manager.getCookieName(), session.getId());
         sessionCookie.setPath(manager.getCookiePath());
-        sessionCookie.setHttpOnly(true);
+        if (manager.getCookieDomain() != null) {
+            sessionCookie.setDomain(manager.getCookieDomain());
+        }
+        sessionCookie.setMaxAge(manager.getCookieMaxAge());
+        sessionCookie.setHttpOnly(manager.isCookieHttpOnly());
         boolean secure = manager.isCookieSecure();
         if (!secure) {
             String forwardedProto = request.getHeaders().getFirst("X-Forwarded-Proto");
