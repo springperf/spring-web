@@ -2,6 +2,8 @@ package io.springperf.web.support.servlet;
 
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.support.servlet.context.ServletAdapterContext;
+import jakarta.servlet.SessionTrackingMode;
+import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -37,8 +39,8 @@ class PerfHttpServletResponseTest {
 
     @Test void setStatus_delegatesStatusCode() { servletResponse.setStatus(404); verify(response).setStatusCode(HttpStatus.valueOf(404)); }
     @Test void setStatus_nonStandardCode_writesRawValue() { servletResponse.setStatus(599); verify(response).setStatusCode(argThat((org.springframework.http.HttpStatusCode sc) -> sc != null && sc.value() == 599)); }
-    @Test void sendError_nonStandardCode_delegatesRawValue() { servletResponse.sendError(599, "upstream"); verify(response).sendError(argThat((org.springframework.http.HttpStatusCode sc) -> sc != null && sc.value() == 599), eq("upstream")); }
-    @Test void sendError_nonStandardCode_noMessage_delegatesRawValue() { servletResponse.sendError(599); verify(response).sendError(argThat((org.springframework.http.HttpStatusCode sc) -> sc != null && sc.value() == 599), isNull()); }
+    @Test void sendError_nonStandardCode_delegatesRawValue() { servletResponse.sendError(599, "upstream"); verify(response).sendError(argThat((org.springframework.http.HttpStatusCode sc) -> sc != null && sc.value() == 599), eq("upstream"), isNull(), eq(false), eq(false), eq(false)); }
+    @Test void sendError_nonStandardCode_noMessage_delegatesRawValue() { servletResponse.sendError(599); verify(response).sendError(argThat((org.springframework.http.HttpStatusCode sc) -> sc != null && sc.value() == 599), isNull(), isNull(), eq(false), eq(false), eq(false)); }
     @Test void getStatus_returnsStatusValue() { when(response.getStatus()).thenReturn(HttpStatus.CREATED); assertEquals(201, servletResponse.getStatus()); }
     @Test void setHeader_delegatesToHeadersSet() { servletResponse.setHeader("X-Custom", "value"); verify(headers).set("X-Custom", "value"); }
     @Test void addHeader_delegatesToHeadersAdd() { servletResponse.addHeader("X-Custom", "value"); verify(headers).add("X-Custom", "value"); }
@@ -52,18 +54,69 @@ class PerfHttpServletResponseTest {
     @Test void setCharacterEncoding_delegatesToResponse() { servletResponse.setCharacterEncoding("ISO-8859-1"); verify(response).setCharacterEncoding(StandardCharsets.ISO_8859_1); }
     @Test void getOutputStream_writesToResponseBody() throws Exception { ByteArrayOutputStream baos = new ByteArrayOutputStream(); when(response.getBody()).thenReturn(baos); ServletOutputStream out = servletResponse.getOutputStream(); out.write(65); out.write("hello".getBytes()); assertArrayEquals(new byte[]{65, 'h', 'e', 'l', 'l', 'o'}, baos.toByteArray()); }
     @Test void getOutputStream_print_writesEncodedString() throws Exception { ByteArrayOutputStream baos = new ByteArrayOutputStream(); when(response.getBody()).thenReturn(baos); when(response.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8); servletResponse.getOutputStream().print("hello"); assertEquals("hello", baos.toString("UTF-8")); }
-    @Test void getOutputStream_flush_flushesBody() throws Exception { ByteArrayOutputStream baos = new ByteArrayOutputStream(); when(response.getBody()).thenReturn(baos); servletResponse.getOutputStream().flush(); }
+    // Servlet 规范/Tomcat：getOutputStream().flush() 提交响应并写出已缓冲内容（渐进式输出）
+    @Test void getOutputStream_flush_commitsChunked() throws Exception { servletResponse.getOutputStream().flush(); verify(response).flushChunked(); }
     @Test void getOutputStream_setWriteListener_throwsUnsupported() throws Exception { assertThrows(UnsupportedOperationException.class, () -> servletResponse.getOutputStream().setWriteListener(null)); }
     @Test void getOutputStream_isReady_returnsTrue() throws Exception { assertTrue(servletResponse.getOutputStream().isReady()); }
+
+    // ========== 2-32：getOutputStream 应返回同一实例（Servlet 规范） ==========
+    @Test void getOutputStream_returnsSameInstance() throws Exception {
+        jakarta.servlet.ServletOutputStream out1 = servletResponse.getOutputStream();
+        jakarta.servlet.ServletOutputStream out2 = servletResponse.getOutputStream();
+        assertSame(out1, out2, "多次 getOutputStream 必须返回同一实例");
+    }
+
+    @Test void getOutputStream_afterRebind_returnsNewInstance() throws Exception {
+        jakarta.servlet.ServletOutputStream out1 = servletResponse.getOutputStream();
+        WebServerHttpResponse newResponse = mock(WebServerHttpResponse.class);
+        servletResponse.rebind(newResponse);
+        jakarta.servlet.ServletOutputStream out2 = servletResponse.getOutputStream();
+        assertNotSame(out1, out2, "rebind 后底层响应已替换，应返回新的输出流实例");
+    }
     @Test void getWriter_writesToResponseBody() throws Exception { ByteArrayOutputStream baos = new ByteArrayOutputStream(); when(response.getBody()).thenReturn(baos); when(response.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8); PrintWriter writer = servletResponse.getWriter(); writer.print("test content"); writer.flush(); assertEquals("test content", baos.toString("UTF-8")); }
-    @Test void flushBuffer_delegatesToResponseFlush() throws Exception { servletResponse.flushBuffer(); verify(response).flush(); }
+    // Tomcat 语义（autoFlush=false）：println 不提交响应——内容留在 Writer 编码缓冲，
+    // 但必须标记「业务已写响应体」，否则框架收尾不提交，响应永不发出（客户端挂到超时）。
+    @Test void getWriter_println_doesNotCommitButMarksHandled() throws Exception {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        lenient().when(response.getBody()).thenReturn(baos);
+        lenient().when(response.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
+        servletResponse.getWriter().println("autoflush-off");
+        verify(response, never()).flushChunked();
+        verify(response).setHandled();
+        assertEquals("", baos.toString("UTF-8"), "println 不得提交/写出：内容仍在 Writer 编码缓冲中");
+    }
+    // 显式 flush() 才提交：编码缓冲先落响应体，再以 chunked 提交（渐进式输出）
+    @Test void getWriter_explicitFlush_flushesEncoderThenCommitsChunked() throws Exception {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        lenient().when(response.getBody()).thenReturn(baos);
+        lenient().when(response.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
+        PrintWriter writer = servletResponse.getWriter();
+        writer.write("segment");
+        writer.flush();
+        assertEquals("segment", baos.toString("UTF-8"), "显式 flush 应先把编码缓冲写入响应体");
+        verify(response).flushChunked();
+    }
+    @Test void flushBuffer_commitsChunkedStream() throws Exception { servletResponse.flushBuffer(); verify(response).flushChunked(); }
     @Test void getBufferSize_returnsFromResponse() { when(response.getBufferSize()).thenReturn(4096); assertEquals(4096, servletResponse.getBufferSize()); }
     @Test void setBufferSize_doesNothing() { servletResponse.setBufferSize(8192); }
     @Test void isCommitted_returnsFalse() { assertFalse(servletResponse.isCommitted()); }
     @Test void resetBuffer_delegatesToResponse() { servletResponse.resetBuffer(); verify(response).resetBuffer(); }
     @Test void reset_delegatesToResponseResetBuffer() { servletResponse.reset(); verify(response).resetBuffer(); }
-    @Test void sendError_withStatus_delegatesToResponse() { servletResponse.sendError(500); verify(response).sendError(HttpStatus.valueOf(500)); }
-    @Test void sendError_withStatusAndMessage_delegatesToResponse() { servletResponse.sendError(400, "Bad Request"); verify(response).sendError(HttpStatus.valueOf(400), "Bad Request"); }
+    // Servlet 规范 §5.6：响应已提交（内容已在线路上）后 resetBuffer/reset 必须抛 IllegalStateException——
+    // 不得静默清空缓冲，让调用方误以为能收回已发出的内容（forward/sendRedirect 先查 isCommitted，不受影响）。
+    @Test void resetBuffer_afterCommit_throwsIllegalState() {
+        when(response.isCommitted()).thenReturn(true);
+        assertThrows(IllegalStateException.class, () -> servletResponse.resetBuffer());
+        verify(response, never()).resetBuffer();
+    }
+    @Test void reset_afterCommit_throwsIllegalState() {
+        when(response.isCommitted()).thenReturn(true);
+        assertThrows(IllegalStateException.class, () -> servletResponse.reset());
+        verify(response, never()).resetBuffer();
+    }
+    // 无 adapterContext（无请求上下文）时 on-param 三参数均视为未命中 → false,false,false
+    @Test void sendError_withStatus_delegatesToResponse() { servletResponse.sendError(500); verify(response).sendError(HttpStatus.valueOf(500), null, null, false, false, false); }
+    @Test void sendError_withStatusAndMessage_delegatesToResponse() { servletResponse.sendError(400, "Bad Request"); verify(response).sendError(HttpStatus.valueOf(400), "Bad Request", null, false, false, false); }
 
     @Test void isCommitted_delegatesToResponse() { when(response.isCommitted()).thenReturn(true); assertTrue(servletResponse.isCommitted()); }
     @Test void isCommitted_notCommitted() { when(response.isCommitted()).thenReturn(false); assertFalse(servletResponse.isCommitted()); }
@@ -135,8 +188,6 @@ class PerfHttpServletResponseTest {
 
     @Test
     void getWriter_thenGetOutputStream_throws() throws Exception {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        when(response.getBody()).thenReturn(baos);
         when(response.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
         servletResponse.getWriter();
         assertThrows(IllegalStateException.class, () -> servletResponse.getOutputStream());
@@ -159,20 +210,21 @@ class PerfHttpServletResponseTest {
     }
 
     @Test
-    void flushBuffer_flushesWriterContentAndResponse() throws Exception {
+    void flushBuffer_flushesWriterContentAndCommits() throws Exception {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         when(response.getBody()).thenReturn(baos);
         when(response.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
         servletResponse.getWriter().write("servlet content");
         servletResponse.flushBuffer();
-        assertEquals("servlet content", baos.toString("UTF-8"));
-        verify(response).flush();
+        assertEquals("servlet content", baos.toString("UTF-8"),
+                "flushBuffer 应先把 Writer 编码缓冲刷入响应体");
+        verify(response).flushChunked();
     }
 
     @Test
-    void flushBuffer_withoutWriter_stillFlushesResponse() throws Exception {
+    void flushBuffer_withoutWriter_stillCommits() throws Exception {
         servletResponse.flushBuffer();
-        verify(response).flush();
+        verify(response).flushChunked();
     }
 
     @Test
@@ -263,7 +315,11 @@ class PerfHttpServletResponseTest {
     void encodeURL_sessionFromCookie_unchanged() {
         ServletAdapterContext adapter = mock(ServletAdapterContext.class);
         HttpServletRequest httpRequest = mock(HttpServletRequest.class);
+        ServletContext servletContext = mock(ServletContext.class);
         when(adapter.getRequest()).thenReturn(httpRequest);
+        when(httpRequest.getServletContext()).thenReturn(servletContext);
+        when(servletContext.getEffectiveSessionTrackingModes())
+                .thenReturn(java.util.EnumSet.of(SessionTrackingMode.URL));
         when(httpRequest.isRequestedSessionIdFromCookie()).thenReturn(true);
         servletResponse.setAdapterContext(adapter);
 
@@ -274,7 +330,11 @@ class PerfHttpServletResponseTest {
     void encodeURL_noRequestedSessionId_unchanged() {
         ServletAdapterContext adapter = mock(ServletAdapterContext.class);
         HttpServletRequest httpRequest = mock(HttpServletRequest.class);
+        ServletContext servletContext = mock(ServletContext.class);
         when(adapter.getRequest()).thenReturn(httpRequest);
+        when(httpRequest.getServletContext()).thenReturn(servletContext);
+        when(servletContext.getEffectiveSessionTrackingModes())
+                .thenReturn(java.util.EnumSet.of(SessionTrackingMode.URL));
         when(httpRequest.isRequestedSessionIdFromCookie()).thenReturn(false);
         when(httpRequest.getRequestedSessionId()).thenReturn(null);
         servletResponse.setAdapterContext(adapter);
@@ -286,7 +346,11 @@ class PerfHttpServletResponseTest {
     void encodeURL_alreadyContainsJSessionId_unchanged() {
         ServletAdapterContext adapter = mock(ServletAdapterContext.class);
         HttpServletRequest httpRequest = mock(HttpServletRequest.class);
+        ServletContext servletContext = mock(ServletContext.class);
         when(adapter.getRequest()).thenReturn(httpRequest);
+        when(httpRequest.getServletContext()).thenReturn(servletContext);
+        when(servletContext.getEffectiveSessionTrackingModes())
+                .thenReturn(java.util.EnumSet.of(SessionTrackingMode.URL));
         when(httpRequest.isRequestedSessionIdFromCookie()).thenReturn(false);
         when(httpRequest.getRequestedSessionId()).thenReturn("abc");
         servletResponse.setAdapterContext(adapter);
@@ -298,7 +362,11 @@ class PerfHttpServletResponseTest {
     void encodeURL_appendsJSessionId_beforeQueryAndFragment() {
         ServletAdapterContext adapter = mock(ServletAdapterContext.class);
         HttpServletRequest httpRequest = mock(HttpServletRequest.class);
+        ServletContext servletContext = mock(ServletContext.class);
         when(adapter.getRequest()).thenReturn(httpRequest);
+        when(httpRequest.getServletContext()).thenReturn(servletContext);
+        when(servletContext.getEffectiveSessionTrackingModes())
+                .thenReturn(java.util.EnumSet.of(SessionTrackingMode.URL));
         when(httpRequest.isRequestedSessionIdFromCookie()).thenReturn(false);
         when(httpRequest.getRequestedSessionId()).thenReturn("sess123");
         servletResponse.setAdapterContext(adapter);
@@ -311,12 +379,45 @@ class PerfHttpServletResponseTest {
     void encodeRedirectURL_appendsJSessionId() {
         ServletAdapterContext adapter = mock(ServletAdapterContext.class);
         HttpServletRequest httpRequest = mock(HttpServletRequest.class);
+        ServletContext servletContext = mock(ServletContext.class);
         when(adapter.getRequest()).thenReturn(httpRequest);
+        when(httpRequest.getServletContext()).thenReturn(servletContext);
+        when(servletContext.getEffectiveSessionTrackingModes())
+                .thenReturn(java.util.EnumSet.of(SessionTrackingMode.URL));
         when(httpRequest.isRequestedSessionIdFromCookie()).thenReturn(false);
         when(httpRequest.getRequestedSessionId()).thenReturn("sess456");
         servletResponse.setAdapterContext(adapter);
 
         assertEquals("/target;jsessionid=sess456", servletResponse.encodeRedirectURL("/target"));
+    }
+
+    @Test
+    void encodeURL_urlTrackingDisabled_unchanged() {
+        ServletAdapterContext adapter = mock(ServletAdapterContext.class);
+        HttpServletRequest httpRequest = mock(HttpServletRequest.class);
+        ServletContext servletContext = mock(ServletContext.class);
+        when(adapter.getRequest()).thenReturn(httpRequest);
+        when(httpRequest.getServletContext()).thenReturn(servletContext);
+        // 默认仅 COOKIE：即使无 cookie 也不重写 URL（提前返回，不再读 session id）
+        when(servletContext.getEffectiveSessionTrackingModes())
+                .thenReturn(java.util.Collections.singleton(SessionTrackingMode.COOKIE));
+        servletResponse.setAdapterContext(adapter);
+
+        assertEquals("/path", servletResponse.encodeURL("/path"));
+    }
+
+    @Test
+    void encodeRedirectURL_urlTrackingDisabled_unchanged() {
+        ServletAdapterContext adapter = mock(ServletAdapterContext.class);
+        HttpServletRequest httpRequest = mock(HttpServletRequest.class);
+        ServletContext servletContext = mock(ServletContext.class);
+        when(adapter.getRequest()).thenReturn(httpRequest);
+        when(httpRequest.getServletContext()).thenReturn(servletContext);
+        when(servletContext.getEffectiveSessionTrackingModes())
+                .thenReturn(java.util.Collections.singleton(SessionTrackingMode.COOKIE));
+        servletResponse.setAdapterContext(adapter);
+
+        assertEquals("/target", servletResponse.encodeRedirectURL("/target"));
     }
 
     @Test

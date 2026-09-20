@@ -452,6 +452,45 @@ public String page(Model model) {
 
 ---
 
+## 14. WebExchangeProvider — 模板 exchange 提供者（spring-web-view）
+
+核心框架的 `WebServerHttpRequest` 是纯 HTTP 抽象，**没有 session / principal 概念**；模板引擎（Thymeleaf）
+渲染所需的 web 上下文因此由 SPI 按运行环境选择：
+
+```java
+public interface WebExchangeProvider extends WebComponent {
+    boolean supports(WebServerHttpRequest request);              // 快速能力探测，无副作用、不抛异常
+    IWebExchange createExchange(WebServerHttpRequest request, WebServerHttpResponse response);
+    default int getOrder() { return Ordered.LOWEST_PRECEDENCE; } // 兜底默认
+}
+```
+
+- **选择机制**：按 `getOrder()` 升序取**第一个** `supports()` 为 `true` 的实现；内置
+  `DefaultWebExchangeProvider` order 最低且恒返回 `true`，保证总有可用实现。
+- **Servlet 场景**：引入 `spring-web-servlet` 后由 `SpringWebViewExchangeAutoConfiguration` 注册
+  `ServletWebExchangeProvider`（order `HIGHEST_PRECEDENCE`），模板可读真实 `HttpSession` / `Principal` /
+  Cookie；其 `supports()` 在请求上下文不可用时降级，交回默认实现兜底。
+- **装配方式**：经 Spring 组件容器（`WebContext.registerWebComponent`），消费方以
+  `getWebComponentWithDefault(WebExchangeProvider.class, new DefaultWebExchangeProvider())` 获取。
+  刻意**不使用** JDK `ServiceLoader`：native-image/AOT 下 Spring 装配天然可用，ServiceLoader 则不能。
+- **自定义**：实现接口并注册为 Spring Bean，`getOrder()` 小于内置实现即优先：
+
+```java
+@Component
+public class MyExchangeProvider implements WebExchangeProvider {
+    @Override public boolean supports(WebServerHttpRequest req) { return req.getPath().startsWith("/admin"); }
+    @Override public IWebExchange createExchange(WebServerHttpRequest req, WebServerHttpResponse resp) {
+        return new io.springperf.web.view.exchange.PerfWebExchange(req, resp);   // 或自实现 IWebExchange
+    }
+    @Override public int getOrder() { return 0; }
+}
+```
+
+> **Thymeleaf 3.1 提示**：`#session` / `#request` 表达式对象自 3.1 起被官方移除。框架把 session 属性注入
+> **上下文变量**（同名时 **model 优先**，避免覆盖控制器显式设置的值），因此模板直接写 `${user}`。
+
+---
+
 ## 集成案例：SpringDoc OpenAPI
 
 本框架不使用 Spring MVC，因此 SpringDoc 默认无法通过 `RequestMappingHandlerMapping` 发现路由。框架通过实现 `OpenApiCustomizer` SPI，从 `MappingRegistry` 中构建 OpenAPI 文档。
@@ -515,4 +554,5 @@ Swagger 注解（`@Tag`、`@Operation`、`@Schema`）直接可用。
 | `WebCorsProcessor` | Spring Bean | CORS 处理策略 |
 | `ViewResolver` | Spring Bean | 视图名 → `View` 解析（spring-web-view） |
 | `View` | — | 视图渲染 SPI（`render(model, req, resp)`） |
+| `WebExchangeProvider` | Spring Bean | 模板 `IWebExchange` 提供者（按 order 取首个 `supports()` 命中，spring-web-view） |
 | `Model` 参数 | — | 请求级 model 注入（`ModelArgumentResolverProvider`） |
