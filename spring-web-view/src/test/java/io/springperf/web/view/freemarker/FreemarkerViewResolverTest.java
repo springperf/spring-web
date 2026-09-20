@@ -30,7 +30,6 @@ class FreemarkerViewResolverTest {
         when(props.get(ViewProperties.FREEMARKER_PREFIX, ViewProperties.FREEMARKER_PREFIX_DEFAULT)).thenReturn("templates/");
         when(props.get(ViewProperties.FREEMARKER_SUFFIX, ViewProperties.FREEMARKER_SUFFIX_DEFAULT)).thenReturn(".ftl");
         when(props.getBoolean(ViewProperties.FREEMARKER_CACHE, ViewProperties.FREEMARKER_CACHE_DEFAULT)).thenReturn(true);
-        when(props.get(ViewProperties.ENCODING, ViewProperties.ENCODING_DEFAULT)).thenReturn("UTF-8");
         webContext = mock(WebContext.class);
         when(webContext.getProps()).thenReturn(props);
     }
@@ -79,5 +78,55 @@ class FreemarkerViewResolverTest {
         String output = new String(body.toByteArray(), StandardCharsets.UTF_8);
         assertTrue(output.contains("Hello"), "渲染输出应包含模板内容: " + output);
         assertTrue(output.contains("Perf"), "渲染输出应包含 model 值: " + output);
+    }
+
+    @Test
+    void viewRender_concurrentSameView_doesNotMutateSharedTemplate() throws Exception {
+        FreemarkerViewResolver resolver = buildResolver();
+        View view = resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class));
+        assertNotNull(view);
+
+        // 提取底层共享 Template（缓存开启时为同一实例）。修复前 render 会调用
+        // template.setOutputEncoding(...)，在并发渲染同一视图时产生数据竞争并互相覆盖编码。
+        java.lang.reflect.Field templateField = view.getClass().getDeclaredField("template");
+        templateField.setAccessible(true);
+        freemarker.template.Template template =
+                (freemarker.template.Template) templateField.get(view);
+
+        int threads = 32;
+        java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(threads);
+        java.util.List<Throwable> errors =
+                java.util.Collections.synchronizedList(new java.util.ArrayList<Throwable>());
+        for (int i = 0; i < threads; i++) {
+            final int idx = i;
+            Thread t = new Thread(() -> {
+                try {
+                    start.await();
+                    WebServerHttpRequest req = mock(WebServerHttpRequest.class);
+                    WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+                    when(resp.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
+                    ByteArrayOutputStream body = new ByteArrayOutputStream();
+                    when(resp.getBody()).thenReturn(body);
+                    Map<String, Object> model = new HashMap<>();
+                    model.put("name", "Perf" + idx);
+                    view.render(model, req, resp);
+                    String out = new String(body.toByteArray(), StandardCharsets.UTF_8);
+                    if (!out.contains("Perf" + idx)) {
+                        errors.add(new AssertionError("缺少 model 值 (thread " + idx + "): " + out));
+                    }
+                } catch (Throwable e) {
+                    errors.add(e);
+                } finally {
+                    done.countDown();
+                }
+            });
+            t.start();
+        }
+        start.countDown();
+        assertTrue(done.await(10, java.util.concurrent.TimeUnit.SECONDS), "并发渲染应在 10s 内完成");
+        assertTrue(errors.isEmpty(), "并发渲染不应抛异常或输出错乱: " + errors);
+        // 关键回归：共享 Template 实例的 outputEncoding 不应被并发渲染改写（修复前为 "UTF-8"）
+        assertNull(template.getOutputEncoding(), "共享 Template 的 outputEncoding 不应被并发渲染改写");
     }
 }

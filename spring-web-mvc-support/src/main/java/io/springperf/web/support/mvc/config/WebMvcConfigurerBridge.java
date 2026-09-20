@@ -13,6 +13,8 @@ import io.springperf.web.core.codec.WrappedHttpBodyConverter;
 import io.springperf.web.core.cors.CorsRegistry;
 import io.springperf.web.core.exception.ExceptionRegistry;
 import io.springperf.web.core.interceptor.InterceptorRegistry;
+import io.springperf.web.core.mapping.MappingRegistry;
+import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.core.resource.ResourceHandlerRegistry;
 import io.springperf.web.core.retval.ReturnValueResolverRegistry;
 import io.springperf.web.support.mvc.arg.SpringHandlerMethodArgumentResolverProvider;
@@ -72,6 +74,20 @@ public class WebMvcConfigurerBridge extends BaseWebComponent {
      */
     static final int DEFAULT_INTERCEPTOR_ORDER_STEP = 100;
 
+    /**
+     * 框架<b>未桥接</b>的 {@link WebMvcConfigurer} 回调（方法名 → 中文说明）。
+     * 用户若覆写这些回调，配置不会生效——启动期检测到覆写即 WARN，避免「配了却静默无效」。
+     */
+    static final Map<String, String> UNSUPPORTED_CALLBACKS = Map.of(
+            "configurePathMatch", "路径匹配配置（PathMatchConfigurer：尾斜杠匹配、URL 解码等）",
+            "configureContentNegotiation", "内容协商配置（URL 参数/后缀驱动；框架有意不做）",
+            "configureDefaultServletHandling", "默认 Servlet 处理配置",
+            "configureHandlerExceptionResolvers", "替换全部异常解析器（请改用 extendHandlerExceptionResolvers）",
+            "configureMessageCodesResolver", "替换消息码解析器（请改用 spring.mvc.message-codes-resolver-format 配置）",
+            "configureMessageConverters", "替换全部消息转换器（请改用 extendMessageConverters）",
+            "configureViewResolvers", "视图解析器注册（请使用 spring-web-view 的 spring.{engine}.* 配置）"
+    );
+
     @Override
     public int getOrder() {
         return Ordered.LOWEST_PRECEDENCE - 20000;
@@ -84,6 +100,9 @@ public class WebMvcConfigurerBridge extends BaseWebComponent {
             return;
         }
         log.debug("Found {} WebMvcConfigurer bean(s)", configurers.size());
+
+        // 检测用户是否覆写了框架未桥接的回调：覆写即配置静默失效，WARN 提示（避免“配了却无效”）
+        warnUnsupportedOverrides(configurers);
 
         // Create shim collectors
         org.springframework.web.servlet.config.annotation.InterceptorRegistry shimInterceptorRegistry =
@@ -129,6 +148,74 @@ public class WebMvcConfigurerBridge extends BaseWebComponent {
 
         // Bridge validator
         bridgeConfigureValidator(configurers);
+
+        // Bridge view controllers
+        bridgeViewControllers(configurers);
+    }
+
+    /**
+     * 桥接 {@code addViewControllers}：把 shim 注册项转换为框架原生路由。
+     * <ul>
+     *   <li>{@code addViewController(p).setViewName(v)} → 渲染视图 v</li>
+     *   <li>{@code addRedirectViewController(p, url)} → 302 重定向</li>
+     *   <li>{@code addStatusController(p, status)} → 仅状态码</li>
+     * </ul>
+     * 桥接发生在 phase1（先于 MappingRegistry 的 phase3 路由优化），直接注册即可。
+     */
+    protected void bridgeViewControllers(Map<String, WebMvcConfigurer> configurers) {
+        MappingRegistry mappingRegistry = webContext.getWebComponentWithDefault(
+                MappingRegistry.class, new MappingRegistry());
+
+        org.springframework.web.servlet.config.annotation.ViewControllerRegistry shimRegistry =
+                new org.springframework.web.servlet.config.annotation.ViewControllerRegistry();
+        for (WebMvcConfigurer configurer : configurers.values()) {
+            configurer.addViewControllers(shimRegistry);
+        }
+
+        for (org.springframework.web.servlet.config.annotation.ViewControllerRegistration reg
+                : shimRegistry.getRegistrations()) {
+            ViewControllerInvoker invoker = new ViewControllerInvoker(
+                    webContext, reg.getViewName(), reg.getStatusCode());
+            mappingRegistry.registerMapping(new PathMappingContext(invoker, reg.getUrlPath()));
+            log.debug("Bridged view controller: path={}, viewName={}, status={}",
+                    reg.getUrlPath(), reg.getViewName(), reg.getStatusCode());
+        }
+    }
+
+    /**
+     * 启动期检测：用户 {@link WebMvcConfigurer} 是否覆写了框架<b>未桥接</b>的回调。
+     * 覆写即该配置不会生效——逐个 WARN，并给出替代方案，避免「配了却静默无效」。
+     *
+     * <p>判定方式：反射取该方法在用户类上的声明类；若声明类仍是 {@code WebMvcConfigurer}
+     * 接口（即未覆写默认空实现），则视为未使用，不告警。</p>
+     */
+    protected void warnUnsupportedOverrides(Map<String, WebMvcConfigurer> configurers) {
+        for (Map.Entry<String, WebMvcConfigurer> entry : configurers.entrySet()) {
+            WebMvcConfigurer configurer = entry.getValue();
+            Class<?> userClass = org.springframework.aop.support.AopUtils.getTargetClass(configurer);
+            for (Map.Entry<String, String> unsupported : UNSUPPORTED_CALLBACKS.entrySet()) {
+                if (isOverridden(userClass, unsupported.getKey())) {
+                    log.warn("WebMvcConfigurer bean '{}' overrides '{}' ({}), which is NOT bridged by this "
+                                    + "framework — the configuration will have NO effect. See the config-alignment "
+                                    + "doc for alternatives.",
+                            entry.getKey(), unsupported.getKey(), unsupported.getValue());
+                }
+            }
+        }
+    }
+
+    /** 判断 {@code userClass} 是否覆写了 {@link WebMvcConfigurer} 的指定回调。 */
+    private static boolean isOverridden(Class<?> userClass, String methodName) {
+        for (java.lang.reflect.Method method : userClass.getMethods()) {
+            if (!method.getName().equals(methodName)) {
+                continue;
+            }
+            // 声明类非接口本身 → 用户（或其父类）覆写了默认实现
+            if (!method.getDeclaringClass().equals(WebMvcConfigurer.class)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     protected void bridgeInterceptors(

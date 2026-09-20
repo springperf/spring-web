@@ -18,9 +18,8 @@ import java.util.Enumeration;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -42,6 +41,10 @@ class PerfServletContextCoverageTest {
         lenient().when(webContext.getContextPath()).thenReturn("/app");
         props = mock(io.springperf.web.context.ApplicationProperties.class);
         lenient().when(props.get(anyString(), anyString())).thenAnswer(invocation -> invocation.getArgument(1));
+        // 兜底：未显式桩化时 getDurationSeconds 返回传入默认值（模拟“未配置”），
+        // 避免 Mockito 默认 0 导致 session timeout 为 0。
+        lenient().when(props.getDurationSeconds(anyString(), anyLong()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
         lenient().when(webContext.getProps()).thenReturn(props);
         servletContext = new PerfServletContext(webContext);
     }
@@ -82,6 +85,140 @@ class PerfServletContextCoverageTest {
         assertFalse(servletContext.setInitParameter("p1", "v2"), "重复设置应返回 false");
         assertEquals("v1", servletContext.getInitParameter("p1"));
         assertNotNull(servletContext.getInitParameterNames());
+    }
+
+    // ==================== server.servlet.context-parameters.* 显式块 ====================
+
+    @Test
+    void contextParameters_explicitBlock_exposedAsInitParameters() {
+        // 构造新的 mock：显式块键 "server.servlet.context-parameters.foo" → init param "foo"
+        io.springperf.web.context.WebContext wc = mock(io.springperf.web.context.WebContext.class);
+        io.springperf.web.context.ApplicationProperties p =
+                mock(io.springperf.web.context.ApplicationProperties.class);
+        lenient().when(wc.getContextPath()).thenReturn("/app");
+        lenient().when(wc.getProps()).thenReturn(p);
+        lenient().when(p.getDurationSeconds(anyString(), anyLong()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
+        lenient().when(p.getPropertyNames(
+                        io.springperf.web.context.PropertiesConstant.SERVLET_CONTEXT_PARAMETERS_PREFIX))
+                .thenReturn(java.util.List.of(
+                        "server.servlet.context-parameters.foo",
+                        "server.servlet.context-parameters.bar"));
+        lenient().when(p.get("server.servlet.context-parameters.foo", null)).thenReturn("FOO");
+        lenient().when(p.get("server.servlet.context-parameters.bar", null)).thenReturn("BAR");
+
+        PerfServletContext ctx = new PerfServletContext(wc);
+        try {
+            assertEquals("FOO", ctx.getInitParameter("foo"));
+            assertEquals("BAR", ctx.getInitParameter("bar"));
+            // init parameter names 应包含显式块键
+            java.util.Set<String> names = new java.util.HashSet<>();
+            ctx.getInitParameterNames().asIterator().forEachRemaining(names::add);
+            assertTrue(names.contains("foo"));
+            assertTrue(names.contains("bar"));
+        } finally {
+            ctx.destroyComponent();
+        }
+    }
+
+    @Test
+    void contextParameters_noBlock_doesNotThrow() {
+        // setUp 的 props.getPropertyNames 未桩化 → 返回 null，应被防御处理
+        assertNull(servletContext.getInitParameter("absent"));
+    }
+
+    // ==================== server.servlet.virtual-server-name ====================
+
+    @Test
+    void virtualServerName_configured_usesNewKey() {
+        io.springperf.web.context.WebContext wc = mock(io.springperf.web.context.WebContext.class);
+        io.springperf.web.context.ApplicationProperties p =
+                mock(io.springperf.web.context.ApplicationProperties.class);
+        lenient().when(wc.getContextPath()).thenReturn("/app");
+        lenient().when(wc.getProps()).thenReturn(p);
+        lenient().when(p.getDurationSeconds(anyString(), anyLong()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
+        lenient().when(p.get(io.springperf.web.context.PropertiesConstant.SERVLET_VIRTUAL_SERVER_NAME,
+                        io.springperf.web.context.PropertiesConstant.SERVLET_VIRTUAL_SERVER_NAME_DEFAULT))
+                .thenReturn("perf-host");
+
+        PerfServletContext ctx = new PerfServletContext(wc);
+        try {
+            assertEquals("perf-host", ctx.getVirtualServerName());
+        } finally {
+            ctx.destroyComponent();
+        }
+    }
+
+    @Test
+    void virtualServerName_defaultIsLocalhost() {
+        assertEquals("localhost", servletContext.getVirtualServerName());
+    }
+
+    // ==================== server.servlet.encoding.force-request / force-response ====================
+
+    @Test
+    void encoding_forceRequest_ignoresBusinessOverride() {
+        PerfServletContext ctx = newContextWithEncoding(true, false);
+        try {
+            assertEquals("UTF-8", ctx.getRequestCharacterEncoding());
+            ctx.setRequestCharacterEncoding("GBK");
+            assertEquals("UTF-8", ctx.getRequestCharacterEncoding(), "force-request=true 应忽略业务设置");
+            // 响应未强制：可被覆盖
+            ctx.setResponseCharacterEncoding("GBK");
+            assertEquals("GBK", ctx.getResponseCharacterEncoding());
+        } finally {
+            ctx.destroyComponent();
+        }
+    }
+
+    @Test
+    void encoding_forceResponse_ignoresBusinessOverride() {
+        PerfServletContext ctx = newContextWithEncoding(false, true);
+        try {
+            assertEquals("UTF-8", ctx.getResponseCharacterEncoding());
+            ctx.setResponseCharacterEncoding("GBK");
+            assertEquals("UTF-8", ctx.getResponseCharacterEncoding(), "force-response=true 应忽略业务设置");
+            // 请求未强制：可被覆盖
+            ctx.setRequestCharacterEncoding("GBK");
+            assertEquals("GBK", ctx.getRequestCharacterEncoding());
+        } finally {
+            ctx.destroyComponent();
+        }
+    }
+
+    @Test
+    void encoding_noForce_allowsOverride() {
+        PerfServletContext ctx = newContextWithEncoding(false, false);
+        try {
+            ctx.setRequestCharacterEncoding("GBK");
+            ctx.setResponseCharacterEncoding("GBK");
+            assertEquals("GBK", ctx.getRequestCharacterEncoding());
+            assertEquals("GBK", ctx.getResponseCharacterEncoding());
+        } finally {
+            ctx.destroyComponent();
+        }
+    }
+
+    /** 构造一个 force-request/force-response 按参数配置的 ServletContext。 */
+    private PerfServletContext newContextWithEncoding(boolean forceRequest, boolean forceResponse) {
+        io.springperf.web.context.WebContext wc = mock(io.springperf.web.context.WebContext.class);
+        io.springperf.web.context.ApplicationProperties p =
+                mock(io.springperf.web.context.ApplicationProperties.class);
+        lenient().when(wc.getContextPath()).thenReturn("/app");
+        lenient().when(wc.getProps()).thenReturn(p);
+        lenient().when(p.getDurationSeconds(anyString(), anyLong()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
+        lenient().when(p.get(io.springperf.web.context.PropertiesConstant.SERVLET_ENCODING_CHARSET,
+                        io.springperf.web.context.PropertiesConstant.SERVLET_ENCODING_CHARSET_DEFAULT))
+                .thenReturn("UTF-8");
+        lenient().when(p.getBoolean(io.springperf.web.context.PropertiesConstant.SERVLET_ENCODING_FORCE, false))
+                .thenReturn(false);
+        lenient().when(p.getBoolean(io.springperf.web.context.PropertiesConstant.SERVLET_ENCODING_FORCE_REQUEST, false))
+                .thenReturn(forceRequest);
+        lenient().when(p.getBoolean(io.springperf.web.context.PropertiesConstant.SERVLET_ENCODING_FORCE_RESPONSE, false))
+                .thenReturn(forceResponse);
+        return new PerfServletContext(wc);
     }
 
     /* ==================== 上下文信息 ==================== */
@@ -171,7 +308,7 @@ class PerfServletContextCoverageTest {
 
     @Test
     void sessionTimeout_durationMinutes_parsedToMinutes() {
-        when(props.get(eq("server.servlet.session.timeout"), isNull())).thenReturn("30m");
+        when(props.getDurationSeconds("server.servlet.session.timeout", 1800)).thenReturn(1800L);
         PerfServletContext ctx = new PerfServletContext(webContext);
         try {
             assertEquals(30, ctx.getSessionTimeout(), "30m = 1800s → 30 分钟");
@@ -182,7 +319,7 @@ class PerfServletContextCoverageTest {
 
     @Test
     void sessionTimeout_hoursSuffix_parsedToMinutes() {
-        when(props.get(eq("server.servlet.session.timeout"), isNull())).thenReturn("1h");
+        when(props.getDurationSeconds("server.servlet.session.timeout", 1800)).thenReturn(3600L);
         PerfServletContext ctx = new PerfServletContext(webContext);
         try {
             assertEquals(60, ctx.getSessionTimeout(), "1h = 3600s → 60 分钟");
@@ -193,7 +330,7 @@ class PerfServletContextCoverageTest {
 
     @Test
     void sessionTimeout_bareSeconds_parsedToMinutes() {
-        when(props.get(eq("server.servlet.session.timeout"), isNull())).thenReturn("90");
+        when(props.getDurationSeconds("server.servlet.session.timeout", 1800)).thenReturn(90L);
         PerfServletContext ctx = new PerfServletContext(webContext);
         try {
             assertEquals(1, ctx.getSessionTimeout(), "90s → 1 分钟（整数截断）");
@@ -204,7 +341,8 @@ class PerfServletContextCoverageTest {
 
     @Test
     void sessionTimeout_invalidValue_fallsBackToDefault() {
-        when(props.get(eq("server.servlet.session.timeout"), isNull())).thenReturn("abc");
+        when(props.getDurationSeconds("server.servlet.session.timeout", 1800))
+                .thenThrow(new IllegalArgumentException("Unknown duration unit: c"));
         PerfServletContext ctx = new PerfServletContext(webContext);
         try {
             assertEquals(30, ctx.getSessionTimeout(), "非法值兜底 1800s → 30 分钟");

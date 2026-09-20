@@ -27,6 +27,8 @@ class PerfRequestDispatcherTest {
     @Mock SupportDispatcherHandler dispatcherHandler;
     @Mock io.springperf.web.http.RequestContext requestContext;
 
+    private org.springframework.http.HttpHeaders headers;
+
     private PerfHttpServletRequest servletRequest;
     private PerfHttpServletResponse servletResponse;
     private PerfRequestDispatcher dispatcher;
@@ -40,7 +42,7 @@ class PerfRequestDispatcherTest {
         lenient().when(webRequest.getUriStrWithQuery()).thenReturn("/original?page=1");
         lenient().when(webContext.getContextPath()).thenReturn("/api");
         lenient().when(webContext.getDispatcherHandler()).thenReturn(dispatcherHandler);
-        lenient().when(webResponse.getHeaders()).thenReturn(new org.springframework.http.HttpHeaders());
+        lenient().when(webResponse.getHeaders()).thenReturn(headers = mock(org.springframework.http.HttpHeaders.class));
 
         servletRequest = new PerfHttpServletRequest(webRequest);
         servletResponse = new PerfHttpServletResponse(webResponse);
@@ -56,8 +58,14 @@ class PerfRequestDispatcherTest {
         assertEquals(DispatcherType.FORWARD, servletRequest.getDispatcherType());
         verify(requestContext).setAttribute(RequestDispatcher.FORWARD_REQUEST_URI, "/original");
         verify(requestContext).setAttribute(RequestDispatcher.FORWARD_CONTEXT_PATH, "/api");
+        // 2-20：FORWARD 属性应捕获原始 servletPath/pathInfo（不得颠倒），query 不带 '?'
+        verify(requestContext).setAttribute(RequestDispatcher.FORWARD_SERVLET_PATH, "/original");
+        verify(requestContext).setAttribute(RequestDispatcher.FORWARD_PATH_INFO, "");
+        verify(requestContext).setAttribute(RequestDispatcher.FORWARD_QUERY_STRING, "page=1");
+        // 2-19：forward 仅重置 buffer，【不应】清空已写响应头、【不应】强制状态 200
         verify(webResponse).resetBuffer();
-        verify(webResponse).setStatusCode(org.springframework.http.HttpStatus.OK);
+        verify(webResponse, never()).setStatusCode(org.springframework.http.HttpStatus.OK);
+        verify(headers, never()).clear();
         verify(dispatcherHandler).forward(eq(webRequest), eq(webResponse), eq("/target"));
     }
 
