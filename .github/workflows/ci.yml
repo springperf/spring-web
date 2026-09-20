@@ -41,3 +41,14 @@ jobs:
         with:
           name: test-reports-java${{ matrix.java }}
           path: "**/target/surefire-reports/*.txt"
+
+  docs:
+    # Markdown 一致性检查（坏链 / 锚点 / 编码与格式），与 JDK 无关，独立成 job 只跑一次。
+    # 仅对 master 生效：2.7.x 分支的文档基线未做校验，避免误红。
+    if: github.ref == 'refs/heads/master' || github.base_ref == 'master'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check docs (links / anchors / format)
+        run: bash scripts/check-docs.sh

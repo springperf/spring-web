@@ -46,10 +46,21 @@ if (-not $OutFile) {
     $OutFile = Join-Path $repoRoot 'coverage-report.md'
 }
 
+# 刷新范围：库模块 + E2E 模块 + 聚合模块（聚合模块排最后，report-aggregate 合并全部 exec，
+# 这样 E2E 触发的库模块覆盖才会计入报告）。
+# Refresh scope: library modules + E2E modules + the aggregate module (kept last; report-aggregate
+# merges every exec file, which is what brings E2E-driven library coverage into the report).
+$refreshModules = $modules + $e2eModules + @('coverage-aggregate')
+
+# 合并后的 CSV（GROUP 列形如 `coverage-aggregate/spring-web`，取末段即模块名）。
+# The merged CSV produced by report-aggregate; its GROUP column looks like
+# `coverage-aggregate/spring-web`, so the last path segment is the module name.
+$aggregateCsv = Join-Path $repoRoot 'coverage-aggregate/target/site/jacoco-aggregate/jacoco.csv'
+
 # ---------- 1. 刷新覆盖率数据 / refresh coverage data ----------
 if (-not $SkipTests) {
-    Write-Host "[coverage-report] 运行测试并生成 JaCoCo 报告 / running tests & generating JaCoCo report ..." -ForegroundColor Cyan
-    $mvnArgs = @('test', 'jacoco:report', '-pl', ($modules -join ','))
+    Write-Host "[coverage-report] 运行测试并生成聚合覆盖率数据 / running tests & generating aggregate coverage data ..." -ForegroundColor Cyan
+    $mvnArgs = @('test', '-pl', ($refreshModules -join ','))
     Push-Location $repoRoot
     try {
         & mvn @mvnArgs
@@ -64,12 +75,25 @@ if (-not $SkipTests) {
 }
 
 # ---------- 2. 汇总各模块覆盖率 / aggregate per-module coverage ----------
+# 口径：读取 report-aggregate 产出的**合并 CSV**（coverage-aggregate 模块），
+# 因此「E2E 触发的库模块覆盖」也计入——与聚合 HTML 报告同一数据源。
+# Scope: read the merged CSV produced by report-aggregate (coverage-aggregate module), so
+# E2E-driven coverage of library modules is included — same data as the aggregate HTML.
+$aggregateRows = @()
+
+function Load-AggregateRows {
+    if (-not (Test-Path $aggregateCsv)) {
+        throw ("缺少合并 CSV：{0}；请先运行 mvn test -pl {1}（或去掉 -SkipTests）。" -f $aggregateCsv, ($refreshModules -join ','))
+    }
+    return @(Import-Csv $aggregateCsv)
+}
+
 function Get-ModuleCoverage([string]$module) {
-    $csv = Join-Path $repoRoot (Join-Path $module 'target/site/jacoco/jacoco.csv')
-    if (-not (Test-Path $csv)) {
+    # GROUP 形如 `coverage-aggregate/<module>`，取末段比对（E2E 模块自身类被 excludes 排除，不会出现）
+    $rows = @($aggregateRows | Where-Object { ($_.GROUP -split '/')[-1] -eq $module })
+    if ($rows.Count -eq 0) {
         return $null
     }
-    $rows = Import-Csv $csv
     $lineMissed = 0; $lineCovered = 0
     $brMissed = 0; $brCovered = 0
     $instrMissed = 0; $instrCovered = 0
@@ -112,6 +136,7 @@ function Get-ModuleCoverage([string]$module) {
     }
 }
 
+$aggregateRows = Load-AggregateRows
 $results = @()
 $totalLineCovered = 0; $totalLineAll = 0
 $totalBrCovered = 0; $totalBrAll = 0
@@ -121,7 +146,7 @@ $totalMethodCovered = 0; $totalMethodAll = 0
 foreach ($m in $modules) {
     $r = Get-ModuleCoverage $m
     if ($r -eq $null) {
-        Write-Warning "缺少 $m/target/site/jacoco/jacoco.csv（未运行测试？）/ missing $m jacoco.csv"
+        Write-Warning "合并 CSV 中缺少模块 $m（未运行测试？）/ module $m missing in merged CSV"
         continue
     }
     $results += $r
@@ -192,8 +217,8 @@ W "# 单元测试覆盖率报告 / Unit Test Coverage Report"
 W ""
 W "- **生成时间 / Generated at**：$($generatedAt.ToString('yyyy-MM-dd HH:mm:ss'))"
 W "- **环境 / Environment**：$platform / $javaVer"
-W "- **覆盖范围 / Scope**：库模块单元测试（JaCoCo，基于 target/site/jacoco/jacoco.csv）"
-W "  Library module unit tests (JaCoCo, based on target/site/jacoco/jacoco.csv)"
+W "- **覆盖范围 / Scope**：库模块，**单测 + E2E 合并口径**（JaCoCo，coverage-aggregate 模块 report-aggregate 合并后的 jacoco.csv）"
+W "  Library modules, unit tests **plus E2E** (JaCoCo, merged jacoco.csv from the coverage-aggregate module)"
 W "- **覆盖目标 / Targets**：spring-web ≥90%，其余库模块 ≥80%（✅=达标 ✓，❌=未达标 ✗）"
 W "  spring-web ≥90%, other library modules ≥80% (✅=met, ❌=missed)"
 W "- **汇总 / Summary**：行/Line $overallLine% · 分支/Branch $overallBr% · 指令/Instr $overallInstr% · 方法/Method $overallMethod%"
@@ -220,9 +245,8 @@ W "| **库模块合计 / Library total** | **$unitTotal** |"
 foreach ($r in $e2eRows) { W "| E2E $($r.Module) | $($r.Count) |" }
 W "| **E2E 合计 / E2E total** | **$e2eTotal** |"
 W ""
-W "> 说明 / Note：E2E 用例默认不随本脚本执行，上表基于已存在的 surefire 报告；如需刷新请单独运行"
-W "> E2E tests are not run by this script; the table above reflects existing surefire reports."
-W "> 刷新命令 / To refresh: mvn test -pl spring-web-test,spring-web-support-test"
+W "> 说明 / Note：本脚本会运行库模块 + E2E 模块；E2E 触发的库模块覆盖由聚合模块合并后计入第一节。"
+W "> Both library and E2E modules are run; E2E-driven library coverage is merged in by the aggregate module."
 W ""
 
 W "## 三、未覆盖热点（各模块未覆盖行最多的类 Top 5）/ 3. Coverage Hotspots (Top 5 classes by missed lines per module)"
@@ -238,7 +262,13 @@ foreach ($r in $results) {
     W ""
 }
 
-$sb.ToString() | Set-Content -Path $OutFile -Encoding UTF8
+# 以**无 BOM** 的 UTF-8 写出：仓库的 check-docs 规则禁止 BOM，而 PS 5.1 的
+# `Set-Content -Encoding utf8` 总会写入 BOM（并因此让首行 `# ...` 不被识别为 H1，
+# 触发 h1-count 缺陷）。这里用 .NET API 显式指定不带 BOM 的编码。
+# Write UTF-8 **without BOM**: the repo's check-docs rule forbids a BOM, but PS 5.1's
+# `Set-Content -Encoding utf8` always emits one (which also hides the leading `# ...`
+# from H1 detection). Use the .NET API with an explicit no-BOM encoding instead.
+[System.IO.File]::WriteAllText($OutFile, $sb.ToString(), (New-Object System.Text.UTF8Encoding($false)))
 
 Write-Host ''
 Write-Host "[coverage-report] 报告已生成 / report generated: $OutFile" -ForegroundColor Green
