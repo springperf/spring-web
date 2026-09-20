@@ -157,7 +157,7 @@ public class LogInterceptor implements HandlerInterceptor {
 }
 ```
 
-### Filters (requires support module)
+### Filters (requires the `spring-web-servlet` module)
 
 After adding `spring-web-servlet`, `jakarta.servlet.Filter` is automatically adapted via bridging.
 
@@ -169,7 +169,7 @@ After adding `spring-web-servlet`, `jakarta.servlet.Filter` is automatically ada
 
 If your controller methods directly use `HttpServletRequest` / `HttpServletResponse`:
 
-**Option 1: Add the support module (recommended, gradual migration)**
+**Option 1: Add the `spring-web-servlet` module (recommended, gradual migration)**
 
 ```xml
 <dependency>
@@ -247,7 +247,7 @@ Page-oriented (server-side rendered) projects need the `spring-web-view` module:
 
 **Already aligned, no changes needed**: `@ModelAttribute` parameter auto-merged into model, `@ControllerAdvice @ModelAttribute` providers, `@PathVariable` auto-merge, `BindingResult` auto-merge, local `@ModelAttribute` methods, `redirect:` prefix.
 
-> Full difference list: [View Rendering](view.md#5-differences-from-spring-mvc).
+> Full difference list: [View Rendering](view.md#7-differences-from-spring-mvc).
 
 ---
 

@@ -75,7 +75,7 @@ perf 在 7 个接口 × 3 个并发度（4/8/16 线程）对比中，**全部接
 | OkHttp（JMH 客户端） | **4.12.0** |
 | JMH | **1.37** |
 
-> **版本来源：** perf 使用原生 Netty（见 [配置](../README_CN.md)），其余四档容器版本由 Spring Boot 3.2.12 依赖管理决定（Spring Framework 6.1.15 → Spring MVC / WebFlux、Tomcat 10.1.33、Undertow 2.3.17.Final、Reactor Netty 1.1.24）；Netty 4.1.115.Final、Jackson 2.17.2、OkHttp 4.12.0 为项目显式覆盖。如需复现，请锁定 `pom.xml` 中的 `spring-boot.version`。
+> **版本来源：** perf 使用原生 Netty（见 [配置](../README_CN.md)），其余四档容器版本由 Spring Boot 3.2.12 依赖管理决定（Spring Framework 6.1.15 → Spring MVC / WebFlux、Tomcat 10.1.33、Undertow 2.3.17.Final、Reactor Netty 1.1.24）。表中 Netty 4.1.115.Final / Jackson 2.17.2 / OkHttp 4.12.0 是**本次测试实际使用的版本**（基准快照锚点，见测试日期），**不等于当前 `master` 的 pom 取值**（现为 Netty `4.1.137.Final`）。如需复现，请锁定 `pom.xml` 中的 `spring-boot.version` 与 `netty.version`。
 
 ## 测试接口
 
@@ -381,8 +381,48 @@ JDK 17+、Maven 3.6+，项目已执行 `mvn install -DskipTests` 完成整体构
 | `benchmark.jfr` | boolean | 启用 JFR 飞行记录 | `-Dbenchmark.jfr=true` |
 | `benchmark.jfr.duration` | duration | JFR 录音时长 | `-Dbenchmark.jfr.duration=600s` |
 | `benchmark.jfr.settings` | string | JFR 配置（profile/default） | `-Dbenchmark.jfr.settings=profile` |
+| `benchmark.jfr.stackdepth` | int | JFR 记录栈深（默认 `1024`） | `-Dbenchmark.jfr.stackdepth=2048` |
+| `benchmark.jvm.extraArgs` | string | 追加到 forked JVM 的参数（空格分隔），用于开启诊断/泄漏检测 | `-Dbenchmark.jvm.extraArgs="-Dio.netty.leakDetection.level=paranoid"` |
 | `benchmark.stack` | boolean | 启用 StackProfiler（ThreadMXBean CPU 采样） | `-Dbenchmark.stack=true` |
 | `jmh.forks` | int | JMH fork 次数（默认 `0`，脚本覆盖为 `1`） | `-Djmh.forks=3` |
+
+> **JFR 栈深必须显式设置。** JVM 默认 JFR 栈深仅 **64 帧**，深栈样本会被标记 `truncated`，
+> 被砍掉的是**外层帧**（Netty/框架入口 → 调用链根部），火焰图与热点归因会失真。
+> 因此凡是开启 recording 的启动路径都必须配 `-XX:FlightRecorderOptions=stackdepth=1024`
+> （`BenchmarkRunner` / WSL 脚本 / 手工 JMH `-jvmArgsAppend` 均已在脚本内兜底）。
+> 事后校验：`./check-jfr-truncation.sh <jfr 文件或目录>`（有截断则退出码非 0）。
+> 注意 `jfr print --stack-depth N` 只控制**打印**层，不改变录制数据，用它无法补救已有截断。
+
+### Netty ByteBuf 泄漏门禁 / soak
+
+Netty 的 `ResourceLeakDetector` 只在 **paranoid** 级别报告泄漏，且报告走 `java.util.logging`
+（`reportTracedLeak` / `reportUntracedLeak`），行首带平台 locale 的日期前缀——中文 Windows 下是 GBK
+字节，朴素的 UTF-8 grep 会「看不见」这些行（本仓库曾因此把 22 条报告误判成 0 泄漏）。另外默认只保留
+4 条 access records，其余被丢弃（日志里会写 `leak records were discarded`），故门禁必须同时给
+`targetRecords`，否则证据不完整：
+
+```bash
+# 测试级：全量套件 3 轮（每轮新 JVM），跑完自动校验并给出结论
+./scripts/check-netty-leaks.sh --run 3
+
+# 已有日志直接校验（Windows 版为 -Paths，分号分隔）
+./scripts/check-netty-leaks.sh full-paranoid.log
+./scripts/check-netty-leaks.ps1 -Paths "full-paranoid.log;logs\"
+
+# 负载级 soak：真实压测负载下开 paranoid（嵌入式 server 与压测线程同一 JVM，覆盖两端）
+mvn -o -Pbenchmark-perf compile
+mvn -o -Pbenchmark-perf dependency:build-classpath -Dmdep.outputFile=target/cp-perf.txt -q
+java -cp "target/classes;$(cat target/cp-perf.txt)" \
+  -Dbenchmark.profile.name=soak -Dbenchmark.output.dir=benchmark-reports/soak \
+  -Dbenchmark.include='io\.springperf\.benchmark\.servlet\.PerfBenchmark\.get' -Djmh.forks=1 \
+  "-Dbenchmark.jvm.extraArgs=-Dio.netty.leakDetection.level=paranoid -Dio.netty.leakDetection.targetRecords=16" \
+  io.springperf.benchmark.BenchmarkRunner
+./scripts/check-netty-leaks.sh soak.log
+```
+
+退出码：`0` = 无泄漏报告；`1` = 存在泄漏报告（报告中 `Created at:` 即分配点）；`2` = 用法/环境错误。
+判定要求「报告数 = 0」**且**日志中能找到 `io.netty.leakDetection.level = paranoid` 属性转储——否则
+「无报告」可能只是检测级别没生效（`--run` 模式会自动带 `-XshowSettings:properties` 做这项自证）。
 
 ### Maven 方式（单 profile 调试）
 

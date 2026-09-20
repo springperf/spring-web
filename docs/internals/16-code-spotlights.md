@@ -20,7 +20,7 @@
 
 ### 方案
 
-`MappingCacheKey<T>` 是一个启动期分配整型索引的泛型容器（[05 篇](05-request-pipeline.md) 四节）：
+`MappingCacheKey<T>` 是一个启动期分配整型索引的泛型容器（[05 篇](04-request-pipeline.md) 四节）：
 
 ```java
 // MappingCacheKey.java
@@ -172,7 +172,7 @@ protected void drain() {
 
 ### 方案
 
-`BaseWebServerHttpRequest` 用 `Object[]` 数组 + 启动期分配的 `RequestAttribute` 索引（[05 篇](05-request-pipeline.md) 四节）：
+`BaseWebServerHttpRequest` 用 `Object[]` 数组 + 启动期分配的 `RequestAttribute` 索引（[05 篇](04-request-pipeline.md) 四节）：
 
 ```java
 // RequestAttribute.java
@@ -428,7 +428,7 @@ public class SupportDispatcherHandler extends DispatcherHandler {
             if (session == null || session.isInvalid()) return;
             PerfHttpSessionManager manager = request.getWebContext()
                     .getWebComponent(PerfHttpSessionManager.class);
-            if (manager != null) { session.markAccessed(); manager.saveSession(session); }  // 
+            if (manager != null) { session.markAccessed(); manager.saveSession(session); }  //
         }
     }
 }

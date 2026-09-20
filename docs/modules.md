@@ -121,7 +121,13 @@ handleAfterFilter() — 初始化上下文
   - `postHandle` — 处理器执行后、返回值渲染前
   - `afterCompletion` — 请求完成后（无论是否异常）
 - `InterceptorRegistry` 管理拦截器注册，支持路径包含/排除模式
-- 自动注册 Spring 容器中 `HandlerInterceptor` 或 `InterceptorRegistration` 类型的 Bean
+- 自动注册的拦截器来源（与 Spring MVC 语义一致）：`WebMvcConfigurer#addInterceptors` 产生的
+  `InterceptorRegistration`，以及自带路径规则的 `MappedInterceptor`。
+  **普通 `HandlerInterceptor` Bean 不再自动全局生效**（Spring MVC 亦然）——需要全局生效请经
+  `addInterceptors` 注册或声明为 `MappedInterceptor`；这也避免同一实例经 bean 扫描与 `addInterceptors`
+  两路注册造成的重复执行
+- `postHandle` / `afterCompletion` 与 `preHandle` **同向（正向）**遍历：拦截器顺序由显式 `order` 决定，
+  列表已按 order 排好；`preHandle` 提前返回时未通过的拦截器按**逆向**补 `afterCompletion`
 
 #### async — 异步支持
 
@@ -240,7 +246,7 @@ destroyComponent()     → 资源释放
 | Spring 参数解析器 | `SpringHandlerMethodArgumentResolverProvider` 适配 `HandlerMethodArgumentResolver` |
 | Spring 返回值处理器 | `SpringHandlerMethodReturnValueHandlerAdapter` 适配 `HandlerMethodReturnValueHandler`；`ModelAndViewReturnValueResolver` 桥接 `ModelAndView` |
 | Spring 异常解析器 | `SpringHandlerExceptionResolverAdapter` 适配 `HandlerExceptionResolver` |
-| ResponseBodyEmitter | `ResponseBodyEmitterReturnValueResolver`（含 SseEmitter / StreamingResponseBody） |
+| ResponseBodyEmitter | `ResponseBodyEmitterReturnValueResolver`（含 mvc `SseEmitter`；**不含** `StreamingResponseBody`——它是独立 `@FunctionalInterface`，非 `StreamEmitter`，当前无 resolver） |
 | 重写的 Spring MVC API | `org.springframework.web.servlet.*`：`HandlerInterceptor`、`ModelAndView`、`View`、`MappedInterceptor`、`WebMvcConfigurer`、`InterceptorRegistration`、`RequestBodyAdvice` / `ResponseBodyAdvice` 等 |
 
 ### 使用场景

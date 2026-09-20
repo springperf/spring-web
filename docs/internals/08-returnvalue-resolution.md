@@ -371,7 +371,7 @@ if (returnValue instanceof Optional<?> opt) {
 
 ```java
 // ReturnValueResolverRegistry.java
-public void resolveReturnValue(Object returnValue, MappingHandlerMethod mappingContext, 
+public void resolveReturnValue(Object returnValue, MappingHandlerMethod mappingContext,
                                 WebServerHttpRequest req, WebServerHttpResponse resp) throws Exception {
     if (skipResolve(returnValue, mappingContext, req, resp)) {
         return;

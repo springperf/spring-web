@@ -225,21 +225,27 @@ Business uses reactive drivers (R2DBC, WebClient, Reactive Redis) — all IO is 
 
 This approach is particularly effective for high-concurrency, IO-intensive workloads with scattered latency (e.g., gateways, aggregation services) — EventLoop's efficient scheduling + reactive library async drivers, no business thread pool needed.
 
-**Option 3: JDK 21 virtual threads (future)**
+**Option 3: JDK 21 virtual threads (supported)**
+
+With `spring.threads.virtual.enabled=true` the `default` business pool switches to virtual threads — one virtual thread per request (no pooling):
+
+```properties
+# application.properties (JDK 21+)
+spring.threads.virtual.enabled=true
+```
 
 ```java
-@GetMapping("/future-ready")
-@RunInPool(RunInPool.EVENTLOOP) // Virtual threads + EventLoop non-blocking switching
-public Result<Data> query() {
+@GetMapping("/virtual-thread")
+public Result<Data> query() {   // no @RunInPool needed: uses the default business pool
     return Result.ok(repository.findById(1L));
 }
 ```
 
-This framework's synchronous programming model is naturally compatible with virtual threads. When JDK 21+ virtual threads become mainstream, `@RunInPool` + `EventLoop` allows virtual threads to execute blocking operations directly on EventLoop — virtual thread `park`/`unpark` means blocking no longer blocks OS threads, eliminating the need for a separate business thread pool.
+The synchronous programming model is naturally compatible with virtual threads: business code stays blocking-style, but a block only parks a virtual thread instead of an OS thread, so IO-heavy endpoints no longer need a large thread pool. Below JDK 21 the flag logs a warning and falls back to platform threads (see [`BizPoolRegistry`](../../spring-web/src/main/java/io/springperf/web/core/pool/BizPoolRegistry.java)).
 
 ### Current Benefit vs Architectural Significance
 
-Today, direct EventLoop processing saves thread switching (~1-3μs) for pure CPU endpoints — a nice side benefit. **Architecturally more important**: the framework doesn't lock into a single model — the business can choose synchronous blocking, reactive, or future virtual threads without switching web frameworks.
+Today, direct EventLoop processing saves thread switching (~1-3μs) for pure CPU endpoints — a nice side benefit. **Architecturally more important**: the framework doesn't lock into a single model — the business can choose synchronous blocking, reactive, or virtual threads (first-class on JDK 21+) without switching web frameworks.
 
 ---
 

@@ -41,6 +41,8 @@ spring-web
 │   │   ├── 持有 ApplicationProperties
 │   │   └── startLifecycle() → 驱动整个组件生命周期（由 NettyHttpServer.start() 触发；失败可清理重试，destroy 后可重新 start）
 │   ├── ApplicationProperties    类型安全的配置属性访问（包装 Environment）
+│   │   └── clearCache() — 清空两份 copy-on-write 缓存（配置中心动态刷新用）
+│   ├── PropertyRefreshHandler    配置刷新协调器：清空 ApplicationProperties 缓存 + 静态缓存
 │   ├── PropertiesConstant       配置键常量
 │   │   ├── SERVER_PORT, CONTEXT_PATH
 │   │   ├── HTTP_MAX_CONTENT_LENGTH, HTTP_TIMEOUT
@@ -325,12 +327,17 @@ spring-web-servlet
 │   ├── PerfHttpSession / PerfHttpSessionManager
 │   └── HttpSessionStorage / InMemoryHttpSessionStorage
 │
-└── view/                                   JSP 视图（依赖 spring-web-view + tomcat-embed-jasper）
+└── view/                                   JSP 视图 + 模板 exchange 桥接（依赖 spring-web-view + tomcat-embed-jasper）
     ├── JspViewResolver                  ViewResolver SPI：jsp: 前缀 / .jsp 后缀 → JspView，Phase1 注册 *.jsp 路由
-    └── JspView                          View SPI：model → request attribute → RequestDispatcher.forward
+    ├── JspView                          View SPI：model → request attribute → RequestDispatcher.forward
+    ├── ServletWebExchangeProvider       WebExchangeProvider SPI：为模板提供真实 session/principal/cookie
+    │                                    order=HIGHEST_PRECEDENCE，优先于 view 模块的 DefaultWebExchangeProvider
+    ├── ServletWebExchange               IWebExchange 适配：session=getSession(false) 桥接、principal=getUserPrincipal
+    ├── ServletWebRequest                IWebRequest 适配：在 PerfWebRequest 之上补齐 Cookie（惰性缓存）
+    └── ServletWebSession                IWebSession 适配：桥接 HttpSession 属性读写
 ```
 
-依赖：`spring-web`、`spring-web-view`（provided）、`jakarta.servlet-api`（provided）、`tomcat-embed-jasper`（optional）。
+依赖：`spring-web`、`spring-web-view`（provided）、`thymeleaf`（provided + optional）、`jakarta.servlet-api`（provided）、`tomcat-embed-jasper`（optional）。
 
 ---
 
@@ -407,10 +414,19 @@ spring-web-view
 │   └── order=HIGHEST_PRECEDENCE+100，先于 ModelAttributeResolver 兜底
 ├── retval/ViewReturnValueResolver  无 @ResponseBody 的 String → 视图名
 │   └── order=MAX-200，低于 JsonBodyReturnValueResolver（MAX-100），supportsReturnValue 通过 PathMappingContext.get() 判断方法注解
+├── WebExchangeProvider             SPI：按环境提供模板 IWebExchange（extends WebComponent，有序）
+│   ├── supports(request) — 能力探测；createExchange(req, resp) — 构造 exchange
+│   └── DefaultWebExchangeProvider  兜底（order=LOWEST_PRECEDENCE，supports 恒 true，session/principal 为 null）
+├── exchange/                       零 Servlet 依赖的 exchange 组件
+│   ├── PerfWebExchange             IWebExchange 适配（contextPath 来自 getWebContext()，@{...} 经 transformURL）
+│   ├── PerfWebRequest              IWebRequest 适配（header/parameter；cookie 默认空）
+│   └── PerfWebApplication          IWebApplication 适配（classpath 资源）
 └── thymeleaf/                      基于模板引擎核心 API（零 servlet）
     ├── ThymeleafViewResolver       ClassLoaderTemplateResolver + TemplateEngine 单例
-    └── ThymeleafWebContext         自实现 IWebContext/IWebExchange/IWebRequest/IWebApplication
-                                    contextPath 取自 getWebContext().getContextPath()，@{...} URL 方言经 transformURL 适配
+    │                               initWithWebContext 取 WebExchangeProvider 列表（按 order），渲染时选首个 supports
+    └── ThymeleafWebContext         实现 IWebContext；web 能力委托 WebExchangeProvider 产生的 IWebExchange
+                                    session 属性注入上下文变量（Thymeleaf 3.1 已移除 #session 表达式对象，
+                                    model 同名时优先于 session，避免覆盖控制器显式值）
 freemarker/                         FreemarkerViewResolver（备用引擎，engine=freemarker）
 beetl/                              BeetlViewResolver（引擎，engine=beetl，GroupTemplate + ClassLoader 显式绑定）
 
@@ -502,6 +518,15 @@ spring-boot-starter-web
 │   │
 │   ├── JspViewAutoConfiguration               JSP 视图自动装配（条件：Jasper + spring-web-view 在 classpath）
 │   │   └── JspViewResolver（注册 *.jsp 路由 + 视图名解析）
+│   │
+│   ├── SpringWebViewExchangeAutoConfiguration  模板 exchange provider 装配
+│   │   └── 条件：spring-web-view + Thymeleaf + spring-web-servlet 均在 classpath
+│   │       ServletWebExchangeProvider（模板可读真实 session/principal/cookie）
+│   │       独立成类：@Bean 方法签名引用 Thymeleaf 类型，条件需在类加载前生效
+│   │
+│   ├── SpringWebPropertyRefreshAutoConfiguration  配置中心动态刷新
+│   │   └── 监听 Spring Cloud EnvironmentChangeEvent（按类名匹配，零 Cloud 编译期依赖）
+│   │       → WebContext.refreshProperties() 清空框架配置缓存
 │   │
 │   ├── SpringDataWebCompatibilityAutoConfiguration  Spring Data 兼容（条件：ProjectingArgumentResolverRegistrar 在 classpath）
 │   │   └── 启动时移除 ProjectingArgumentResolverRegistrar 的 BPP
@@ -601,6 +626,7 @@ WebComponent (interface)
 | `WebComponent` / `BaseWebComponent` | Spring Bean | 自定义生命周期组件 | `WebComponentContainer` |
 | `ViewResolver` | Spring Bean | 视图名 → `View` 解析 | `ViewResolverRegistry` |
 | `View` | — | 视图渲染（render(model, req, resp)） | `ViewResolverRegistry` |
+| `WebExchangeProvider` | Spring Bean / `registerWebComponent` | 模板 `IWebExchange` 构造（按 order + supports 选择） | `ViewResolverRegistry`（经 `ThymeleafViewResolver`） |
 | `Model` 参数 | — | 请求级 model 注入 | `ArgumentResolverRegistry`（via `ModelArgumentResolverProvider`） |
 
 ---
@@ -611,8 +637,8 @@ WebComponent (interface)
 |----|--------|------|
 | `server.port` | `8080` | Netty 监听端口 |
 | `server.servlet.context-path` | `/` | 上下文路径 |
-| `server.http.max-content-length` | `1048576` | 最大请求体（字节） |
-| `server.http.timeout` | 无 | 请求超时（毫秒） |
+| `server.http.max-content-length` | `4194304`（4MB） | 最大请求体（字节） |
+| `server.http.timeout` | `60000` | 请求超时（毫秒） |
 | `server.check-on-startup` | `true` | 启动时校验 Mapping |
 | `pool.core-pool-size` | `50` | 默认业务线程池核心数 |
 | `pool.max-pool-size` | `200` | 默认业务线程池最大数 |

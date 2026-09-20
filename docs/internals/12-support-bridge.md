@@ -53,7 +53,8 @@ Spring MVC 的兼容层（如 Servlet 容器 + `spring-webmvc`）依赖的天然
 | `ViewResolverRegistry` | `spring-webmvc` | 空实现 |
 | `ValidatorRegistration` | `spring-webmvc` | 完整实现（`getValidator`/`setValidator`） |
 | `RequestBodyAdvice` / `ResponseBodyAdvice` | `spring-webmvc` | 接口 |
-| `ResponseBodyEmitter` / `SseEmitter` / `StreamingResponseBody` | `spring-webmvc` | 完整实现（extends 框架 `StreamEmitter`） |
+| `ResponseBodyEmitter` / mvc `SseEmitter` | `spring-webmvc` | 完整实现（extends 框架 `StreamEmitter`，经 `ResponseBodyEmitterReturnValueResolver` 注入 encodeFunction） |
+| `StreamingResponseBody` | `spring-webmvc` | **未实现**：它只是独立 `@FunctionalInterface`（`void writeTo(OutputStream)`），不是 `StreamEmitter`，没有任何 resolver 认领它 → 返回值会被静默忽略（需实现 resolver 或改用 emitter/`InputStream` 返回值） |
 | `ResponseEntityExceptionHandler` | `spring-webmvc` | `@ControllerAdvice` 15 个标准异常处理 |
 | `AdapterUtil` | `spring-webmvc` | 工具类（`setEncodeFunction`/`getEncodeFunction`） |
 

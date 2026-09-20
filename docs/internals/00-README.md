@@ -14,14 +14,14 @@
 ## 一、写作约定
 
 1. **语言**：正文简体中文；`代码`、`类名`、`API`、`协议字段`、`注解名`保持英文。
-2. **证据粒度**：每个机制至少给出一组 `类名` 锚点，并附"做了什么 / 为什么快 / 对比谁"三元组。以当前 `master` 分支源码为准；写作时必须实际打开对应 `.java` 文件核对，禁止凭记忆引用。
+2. **证据粒度**：每个机制至少给出一组 `类名` 锚点，并附"做了什么 / 为什么快 / 对比谁"三元组。全系列结论均以当前 `master` 分支源码为准。
 3. **不重复既有文档**：性能对比表、用法示例、注解参数表已在 `performance-principles.md` / `advanced.md` / `batch.md` 给全的，本系列只给"机制链路"，数据用 `→ 见 xxx.md` 引用。
 4. **图示**：能用 ASCII 流程图说清的不外链 SVG；需要图时统一放 `docs/images/internals/`。
 5. **篇幅**：每篇以"讲透一个子系统"为限，不贪大；预计单篇 400–800 行。
 
 ---
 
-## 二、系列总览（9 部 20 篇）
+## 二、系列总览（9 部 20 篇：`00` 索引 + `01`–`19` 正文）
 
 | 篇号 | 文件 | 标题 | 所属部 |
 |------|------|------|--------|
@@ -73,7 +73,7 @@
   4. 与 Spring MVC/WebFlux 的哲学差异：Spring 选"运行时灵活"，本框架选"启动时确定"。
 - **源码依据**：`WebContext`、`BaseWebComponent`、`DispatcherHandler`、`AbstractWebServerHttpRequest`（`fastAttributes`）、`MappingCacheKey`。
 - **与既有文档关系**：是 `philosophy.md` 的代码层展开；`performance-principles.md` 的"优先级表"在此给出取舍依据。
-- **写作前提**：核对 `WebContext` 与 `BaseWebComponent` 的生命周期接口签名。
+- **阅读前提**：核对 `WebContext` 与 `BaseWebComponent` 的生命周期接口签名。
 
 #### 02 · 模块拓扑与启动期全景 `02-architecture-overview.md`
 
@@ -87,7 +87,7 @@
   5. 路径匹配归核心 `RuntimeMappingWebFilter`（`core/filter`），非 support 子包。
 - **源码依据**：`module.md`（架构图基线）+ 四模块 `pom.xml` + `spring-web` 根包下的包结构 + `WebContext` / `WebServerApplicationContext` / `NettyHttpServer` 入口类。
 - **与既有文档关系**：是 `overview.md` 的内部结构补充；`module.md` 的代码级校正版。
-- **写作前提**：`module.md` 内容较多，写作时按需 `Read` 对应片段；实际包结构用 `Glob` 列目录核对。
+- **阅读前提**：`module.md` 内容较多，可按需查阅对应片段；包结构以实际目录为准。
 
 ---
 
@@ -106,7 +106,7 @@
   6. fail-fast 设计：Phase3 如何在启动时拦截"无法解析的参数 / 无法匹配的返回值"，避免运行时才暴问题。
 - **源码依据**：`WebContext`、`WebComponent` / `LifecycleWebComponent` / `BaseWebComponent` / `WebComponentContainer`、`MappingRegistry`、`MappingCacheKey`、`ArgumentResolverRegistry`、`ReturnValueResolverRegistry`、`InterceptorRegistry`。
 - **与既有文档关系**：`performance-principles.md` §1 的代码层全展开。
-- **写作前提**：核对 Phase1/2/3 三个方法的确切签名与调用顺序。
+- **阅读前提**：核对 Phase1/2/3 三个方法的确切签名与调用顺序。
 
 #### 04 · 请求处理主链路与线程模型 `04-request-pipeline.md`
 
@@ -121,7 +121,7 @@
   6. `BaseWebServerHttpRequest.fastAttributes[]` 与响应 `setCommitted()` 的 CAS。
 - **源码依据**：`DispatcherHandler`（含 `handleWithMappingResult`、acquire/release 段）、`RuntimeMappingWebFilter`、`BaseWebServerHttpRequest`（`fastAttributes`）、`BaseWebServerHttpResponse`（`setCommitted` CAS）、`RunInPool` 注解与 `BizPoolRegistry`。
 - **与既有文档关系**：`performance-principles.md` §4/§5/§6 的链路化；`advanced.md` 线程模型章节的内部化。
-- **写作前提**：确认 `default-execute-mode` 默认值与 EventLoop 切换的精确判断点。
+- **阅读前提**：确认 `default-execute-mode` 默认值与 EventLoop 切换的精确判断点。
 
 ---
 
@@ -139,7 +139,7 @@
   5. 内存管理：Direct `ByteBuf` 引用计数 vs GC `Cleaner` 延迟回收的取舍。
 - **源码依据**：`NettyHttpServer`、`NettyServerHttpRequest`、`NettyServerHttpResponse`、SSL/HTTP2 相关 handler、`AbstractNettyWebServer`。
 - **与既有文档关系**：`performance-principles.md` §5/§8 的代码层；`advanced.md` SSL/HTTP2 章节的内部化。
-- **写作前提**：核对 `ChannelOption` 实际设置项与 HTTP/2 开关条件。
+- **阅读前提**：核对 `ChannelOption` 实际设置项与 HTTP/2 开关条件。
 
 #### 06 · 路由引擎与多级 RouterOptimizer 链 `06-routing-engine.md`
 
@@ -154,7 +154,7 @@
   6. 与 Spring MVC `AbstractHandlerMethodMapping.lookupPath()` 全量遍历的复杂度对比。
 - **源码依据**：`MappingRegistry`（`optimizeMapping`）、`RouterOptimizer` 接口与四个实现、`PathPatternRouter`、`RuntimeMappingWebFilter`（运行时入口）。
 - **与既有文档关系**：`performance-principles.md` §3 的代码层全展开。
-- **写作前提**：核对四个 Optimizer 的链式短路条件与顺序。
+- **阅读前提**：核对四个 Optimizer 的链式短路条件与顺序。
 
 #### 07 · 参数解析与启动期预缓存 `07-argument-resolution.md`
 
@@ -169,7 +169,7 @@
   6. `StaticArgumentResolverProvider` SPI：允许业务注册自定义解析器，启动期一次性匹配。
 - **源码依据**：`ArgumentResolverRegistry`、`StaticArgumentResolver`、各内建 `*ArgumentResolver`、`StaticArgumentResolverProvider`、`MappingCacheKey`（参数维度）。
 - **与既有文档关系**：`performance-principles.md` §1 参数行的代码层；`extensions.md` `StaticArgumentResolverProvider` 的内部化。
-- **写作前提**：核对 Phase3 决策调用的确切方法名与 `MappingCacheKey` 在参数维度的存储结构。
+- **阅读前提**：核对 Phase3 决策调用的确切方法名与 `MappingCacheKey` 在参数维度的存储结构。
 
 #### 08 · 返回值解析与响应写出 `08-returnvalue-resolution.md`
 
@@ -184,7 +184,7 @@
   6. 大文件 / `Resource` 返回：`DefaultFileRegion` sendfile 路径。
 - **源码依据**：`ReturnValueResolverRegistry`、各 `*ReturnValueResolver`、`HttpBodyConverter` / `HttpBodyCodecRegistry`、`JsonConverter` 体系、`ResponseBodyEmitterReturnValueResolver`（联动 12）。
 - **与既有文档关系**：`performance-principles.md` §1 返回值行的代码层；`extensions.md` `ReturnValueResolver`/`HttpBodyConverter` 的内部化。
-- **写作前提**：核对 `HttpBodyConverter` 启动期收集机制（见 12）。
+- **阅读前提**：核对 `HttpBodyConverter` 启动期收集机制（见 12）。
 
 #### 09 · 方法调用器：ASM 字节码生成与 MethodHandle `09-invoker-bytecode.md`
 
@@ -201,7 +201,7 @@
   8. 何时选 `@Optimize`：高频端点建议标注，低频端点 MethodHandle 足矣。
 - **源码依据**：`Invoker` 接口、`FastInvokerGenerator`、`MethodHandleInvoker`、`@Optimize` 注解、生成的 Invoker 字节码（可手写反编译示意）。
 - **与既有文档关系**：`performance-principles.md` §2 的代码层全展开；本篇是全系列"最硬核"的一篇。
-- **写作前提**：核对 ASM 生成器的 `visitor` 调用序列与 `defineClass` 路径（注意类加载器隔离）。
+- **阅读前提**：核对 ASM 生成器的 `visitor` 调用序列与 `defineClass` 路径（注意类加载器隔离）。
 
 #### 10 · 横切关注点：拦截器 / 异常 / CORS / 数据绑定 / 静态资源 `10-cross-cutting.md`
 
@@ -216,7 +216,7 @@
   6. `ResourceHandlerRegistry`：静态资源映射，`DefaultFileRegion` sendfile；classpath/location 解析（含双斜杠 bug 的防御，见记忆 `resource-handler-double-slash-fix`）。
 - **源码依据**：`InterceptorRegistry`、`ExceptionResolverRegistry`、`CorsRegistry`/`WebCorsProcessor`、`WebDataBinderRegistry`/`PerfDataBinder`、`ResourceHandlerRegistry`。
 - **与既有文档关系**：`performance-principles.md` §1 拦截器/异常行的代码层；`extensions.md` `HandlerExceptionResolver`/`WebCorsProcessor` 的内部化。
-- **写作前提**：核对各 Registry 的 Phase3 预匹配产物结构。
+- **阅读前提**：核对各 Registry 的 Phase3 预匹配产物结构。
 
 ---
 
@@ -236,7 +236,7 @@
   7. 线程模型：SSE 写入统一在 EventLoop，线程数 = CPU 核，不随连接增长；对比 Spring MVC 每连接一线程。
 - **源码依据**：`AsyncSupportRegistry`、`DeferredResultReturnValueResolver`、`NettyStreamSender`（drain loop）、`BackpressureHandler`、`ReactiveReturnValueResolver`、`@ReactiveSupport`。
 - **与既有文档关系**：`performance-principles.md` §7 的代码层；`advanced.md` SSE/响应式章节的内部化。
-- **写作前提**：`NettyStreamSender.drain()` 必须实读，wip 边界描述按记忆谨慎措辞，不臆断"完美无缺"。
+- **阅读前提**：`NettyStreamSender.drain()` 必须实读，wip 边界描述按记忆谨慎措辞，不臆断"完美无缺"。
 
 ---
 
@@ -259,9 +259,9 @@
   10. **`SupportDispatcherHandler`**：`getOrder=LOWEST_PRECEDENCE-30000`；`initContextHolders` override（`RequestContextHolder` set/reset）；`WriteRespEventListener`/`SessionFlushListener` 用 Netty `ChannelFuture` 驱动 session 持久化。
   11. **Session 体系**：`PerfHttpSession`/`PerfHttpSessionManager`/`HttpSessionData`/`HttpSessionStorage`(SPI)/`InMemoryHttpSessionStorage`(默认 + daemon 过期清理)；session cookie 安全（httpOnly、secure via config/X-Forwarded-Proto、SameSite）。
   12. **`ResponseEntityExceptionHandler`**：`@ControllerAdvice` 15 个标准异常处理。
-- **源码依据**：support 模块 47 文件（已有 subagent 报告提供 file:line，**写作时必须用 Read 逐个核对**，因报告生成时安全分类器不可用）。重点核对：`WebMvcConfigurerBridge`（10 bridge 方法行号）、`FilterWrapper`（`IdentityHashMap` 段）、`PerfHttpServletRequest`（session/cookie 段）、`ResponseBodyEmitterReturnValueResolver`（`encodeToStream` 兜底段）、`SupportDispatcherHandler`（`ChannelFuture` session 持久化段）。
+- **源码依据**：`spring-web-servlet` 与 `spring-web-mvc-support` 模块（`spring-web-servlet` 约 47 个源文件）。重点：`WebMvcConfigurerBridge`（10 bridge 方法行号）、`FilterWrapper`（`IdentityHashMap` 段）、`PerfHttpServletRequest`（session/cookie 段）、`ResponseBodyEmitterReturnValueResolver`（`encodeToStream` 兜底段）、`SupportDispatcherHandler`（`ChannelFuture` session 持久化段）。
 - **与既有文档关系**：既有文档无 support 内部专门篇；本篇是 support 的首份内部机制文档。
-- **写作前提**：support 报告的 file:line 不可直接照抄，必须实读核对。
+- **阅读前提**：support 报告中的 file:line 仅供参考，以当前源码为准。
 
 ---
 
@@ -282,7 +282,7 @@
   8. 超时与错误：`DeferredResult` 超时回调（默认 30s）、批量异常遍历 `setError`。
 - **源码依据**：`BatchRegistry`、`BatchInvoker`、`DisruptorQueue`、`BufferingBatchHandler`、`BatchRequest`、`@BatchMapping`、8 个 metrics 埋点类（共 16 文件，需逐个 Read）。
 - **与既有文档关系**：`batch.md` 的内部化；`philosophy.md` 批处理节的代码层。
-- **写作前提**：核对 Disruptor `WaitStrategy` 枚举与 backpressure 实现的确切类名。
+- **阅读前提**：核对 Disruptor `WaitStrategy` 枚举与 backpressure 实现的确切类名。
 
 ---
 
@@ -305,7 +305,7 @@
   10. `PerfWebServer`：`WebServer` 抽象的实现，与 Spring Boot `WebServer` 契约对齐。
 - **源码依据**：`spring.factories`、10 个 `*AutoConfiguration` 类、`PerfWebServer`、`WebServerApplicationContextFactory`、`ManagementNettyHttpServer`/`ManagementDispatcherHandler`。
 - **与既有文档关系**：`advanced.md` Actuator/CORS 章节的内部化；记忆 `sba-web-server-initialized-event` / `wsl-external-migrated-to-master` 的代码层。
-- **写作前提**：核对 `spring.factories` 实际注册项与各 `@ConditionalOn*` 条件。
+- **阅读前提**：核对 `spring.factories` 实际注册项与各 `@ConditionalOn*` 条件。
 
 ---
 
@@ -326,13 +326,13 @@
   8. Netty 传输 opts（`TCP_NODELAY`/`DefaultFileRegion`/`WriteBufferWaterMark`）。
 - **源码依据**：综合引用 03–11 的源码锚点 + Spring 同位实现（引用 Spring Framework 公开源码位置，标注版本）。
 - **与既有文档关系**：`performance-principles.md` 的"同位对比"补完。
-- **写作前提**：03–11 已完成（本篇为汇总对比篇，应最后写）。
+- **阅读前提**：03–11 已完成（本篇为汇总对比篇，应最后写）。
 
 #### 16 · 代码聚光灯：十个值得反复读的实现 `16-code-spotlights.md`
 
 - **定位**：欣赏篇。挑十个"体现工程美感"的具体实现，逐个用 30–80 行讲透设计意图与巧妙处。
 - **核心问题**：哪些实现最能代表"启动时确定性 + 运行时零开销"哲学？它们的巧妙在哪？
-- **覆盖要点**（候选，写作时定稿）：
+- **覆盖要点**（候选）：
   1. `MappingCacheKey` 整型索引数组（预缓存核心）；
   2. `FastInvokerGenerator` ASM 生成（调用零反射）；
   3. 多级 RouterOptimizer 链短路（路由 O(1)）；
@@ -345,11 +345,11 @@
   10. `SupportDispatcherHandler` ChannelFuture 驱动 session 持久化。
 - **源码依据**：各对应类的关键方法。
 - **与既有文档关系**：全系列唯一的"赏析"篇，串联前文。
-- **写作前提**：03–13 已完成。
+- **阅读前提**：03–13 已完成。
 
 #### 17 · Benchmark 数据解读与归因 `17-benchmark-data.md`
 
-- **定位**：数据篇。用最新报告（`benchmark-reports/20260813-232906/report.md`）的数字，归因到前文讲过的机制。
+- **定位**：数据篇。用最新报告（`spring-web-benchmark/benchmark-reports/20260813-232906/report.md`）的数字，归因到前文讲过的机制。
 - **核心问题**：perf 为何在 get/json ~2x tomcat？为何 SSE 7–11x tomcat 且 undertow 4t/64t FAIL？为何每请求分配 perf ~8–11KB vs tomcat ~23–37KB vs webflux ~25–51KB？为何 heap perf ~17MB？
 - **覆盖要点**：
   1. 吞吐表解读：get perf 41466/77418/65624 vs tomcat 19129/44031/44900；json perf 40103/77917/110641 vs tomcat 21196/49911/56824；sse perf 14157/15111/14957 vs tomcat 1286/1989/2344 vs undertow FAIL(4t/64t)。
@@ -358,9 +358,9 @@
   4. 64t 反超：json/valid perf 在 64t 反超 16t（77917→110641），归因基准 eventloop 模式零切换在高并发下的伸缩性。
   5. undertow sse FAIL：归因其 SSE 实现在 4t/64t 的稳定性问题（非本框架优势，客观标注）。
   6. perf vs perf-support：support 桥接的额外开销（get 34504 vs 41466，约 -17%），归因 servlet 适配对象创建。
-- **源码依据**：`benchmark-reports/20260813-232906/report.md` + 前文机制锚点。
+- **源码依据**：`spring-web-benchmark/benchmark-reports/20260813-232906/report.md` + 前文机制锚点。
 - **与既有文档关系**：`benchmark.md`/`benchmark-wsl.md` 的归因版。
-- **写作前提**：数据以报告原文为准，不臆造。
+- **阅读前提**：数据以报告原文为准，不臆造。
 
 ---
 
@@ -373,13 +373,13 @@
 - **覆盖要点**：12 个 SPI 的"发现时机 / 排序键 / 缓存产物 / 运行时调用点"四元组表 + 每个补一个最小扩展示例骨架。
 - **源码依据**：各 Registry 的 `autoRegisterWebComponent`/`getOrder` 段、`WebComponent` 接口/`@Order` 注解、`AnnotationAwareOrderUtils`。
 - **与既有文档关系**：`extensions.md` 的内部发现机制版。
-- **写作前提**：核对各 SPI 的发现注解与排序机制。
+- **阅读前提**：核对各 SPI 的发现注解与排序机制。
 
 #### 19 · 关键设计决策记录（ADR 风格） `19-design-decisions.md`
 
 - **定位**：决策篇。用 ADR（Architecture Decision Record）风格记录关键取舍的"背景 / 决策 / 后果"。
 - **核心问题**：为什么选 ASM 而非全用 MethodHandle？为什么默认业务线程池而非全 EventLoop？为什么 `int index` 而非 `ConcurrentHashMap`？为什么 support 用同包同名覆盖而非新包？为什么 Disruptor 而非自研队列？
-- **覆盖要点**（候选 ADR，写作时定稿 10–15 条）：
+- **覆盖要点**（候选 ADR，10–15 条）：
   1. ASM vs 全 MethodHandle；
   2. 默认业务池 vs 全 EventLoop；
   3. `int index` + `Object[]` vs `ConcurrentHashMap`；
@@ -392,7 +392,7 @@
   10. 显式 SPI vs Spring `@Conditional` 自动发现。
 - **源码依据**：对应类/注释 + 记忆中的既定决策。
 - **与既有文档关系**：全系列收尾，把"为什么这么设计"沉淀为可追溯记录。
-- **写作前提**：07–13 已完成，决策有代码证据。
+- **阅读前提**：07–13 已完成，决策有代码证据。
 
 ---
 

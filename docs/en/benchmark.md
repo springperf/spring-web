@@ -1,3 +1,5 @@
+> English | [中文](../benchmark.md)
+
 # Spring WebPerf Performance Benchmark Report
 
 **Generated:** 2026-08-17
@@ -73,7 +75,7 @@ Versions below are the actual resolved artifacts from the project's `spring-boot
 | OkHttp (JMH client) | **4.12.0** |
 | JMH | **1.37** |
 
-> **Version source:** perf runs on native Netty (see [configuration](../README.md)); the other four container versions are governed by Spring Boot 3.2.12 dependency management (Spring Framework 6.1.15 → Spring MVC / WebFlux, Tomcat 10.1.33, Undertow 2.3.17.Final, Reactor Netty 1.1.24); Netty 4.1.115.Final, Jackson 2.17.2 and OkHttp 4.12.0 are explicit project overrides. To reproduce, pin `spring-boot.version` in `pom.xml`.
+> **Version source:** perf runs on native Netty (see [configuration](../../README.md)); the other four container versions are governed by Spring Boot 3.2.12 dependency management (Spring Framework 6.1.15 → Spring MVC / WebFlux, Tomcat 10.1.33, Undertow 2.3.17.Final, Reactor Netty 1.1.24). Netty 4.1.115.Final / Jackson 2.17.2 / OkHttp 4.12.0 in that table are the versions **actually used for this run** (a benchmark-snapshot anchor, see the test date) and are **not** what today's `master` pom declares (currently Netty `4.1.137.Final`). To reproduce, pin `spring-boot.version` and `netty.version` in `pom.xml`.
 
 ## Benchmarked APIs
 
@@ -428,5 +430,5 @@ spring-web-benchmark/benchmark-reports/
 | Issue | Impact | Status |
 |-------|--------|--------|
 | SSE fails on Undertow | Spring MVC (Undertow) / sse | Undertow SSE implementation limitation (4t/8t all FAIL; 16t thrpt ran but sample latency still FAIL) |
-| bytesLarge throughput dips at high concurrency | perf / bytesLarge | 100KB write-buffer pressure; every container dips 8→16t (perf 19,111→15,603), TBD |
+| bytesLarge throughput dips at high concurrency | perf / bytesLarge | 100KB write-buffer pressure; every container dips 8→16t (perf 19,111→15,603) — left for future optimization |
 | In-process oversubscription at high concurrency | all / high concurrency | When client threads exceed core count (>16t), in-process measurement degrades to "scheduling efficiency of client+server sharing CPU": light-API throughput drops and framework gaps flatten. This is a measurement-model limitation, not a server defect. Verified with JFR: at 64t client threads steal 74% of CPU samples, the server's 4 EventLoops get only 22%. For a fair high-concurrency comparison use [benchmark-wsl.md](../benchmark-wsl.md) (WSL external — client/server CPU separated) |

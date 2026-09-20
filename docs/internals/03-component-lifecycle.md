@@ -131,7 +131,7 @@ public void initWithWebContext(WebContext webContext) {
 
 只有 2 个 Registry override Phase1：
 
-- **`MappingRegistry.initComponentPhase1`**（摘要）：用 `LinkedHashMap` 遍历 `@Controller` bean，`ClassUtils.getUserClass` 去代理类，`ReflectionUtils.getUniqueDeclaredMethods` 扫描方法，构建路由元数据。这里是 [D4 修复](../00-README.md) 落地点——重复映射不再启动期拒绝，先注册者胜，保序用 `LinkedHashMap`。
+- **`MappingRegistry.initComponentPhase1`**（摘要）：用 `LinkedHashMap` 遍历 `@Controller` bean，`ClassUtils.getUserClass` 去代理类，`ReflectionUtils.getUniqueDeclaredMethods` 扫描方法，构建路由元数据。这里是 [D4 修复](00-README.md) 落地点——重复映射不再启动期拒绝，先注册者胜，保序用 `LinkedHashMap`。
 - **`WebDataBinderRegistry.initComponentPhase1`**（摘要）：`ControllerAdviceBean.findAnnotatedBeans` 收集 `@InitBinder` 方法到 `initBinderAdviceCache`（`LinkedHashMap<ControllerAdviceBean, Set<Method>>`），构造 `defaultConversionService`（`DefaultFormattingConversionService`）、`defaultValidator`、`messageCodesResolver`。
 
 ### Phase 2 · 跨组件连接建索引
@@ -619,7 +619,7 @@ if (webComponents.containsKey(webComponent.getComponentName())) {
 
 1. **`getComponentName()` 默认取简单类名**（`WebComponent.java`）——所以"同名"是"同类名"。当新注册组件与已有组件产生同类名冲突时，正是走这条路径。
 2. **`AnnotationAwareOrderComparator.sort`** 按 `@Order`/`Ordered` 排序，`list.get(0)` 取优先级最高（order 值最小）者保留。
-3. **`log.warn` 显式告知"用了谁、废弃了谁"**——业务方能在启动日志看到覆盖关系，而非在某个请求出诡异行为后才发现某组件被悄悄换掉。这是 [01 篇原则 6](01-design-philosophy.md#原则-6--避免魔法行为显式-spifail-fast不靠隐式猜测) "避免魔法行为"的代码落地。
+3. **`log.warn` 显式告知"用了谁、废弃了谁"**——业务方能在启动日志看到覆盖关系，而非在某个请求出诡异行为后才发现某组件被悄悄换掉。这是 [01 篇原则 6](01-design-philosophy.md#原则-6--避免魔法行为显式-spi显式-fail-fast不靠隐式猜测) "避免魔法行为"的代码落地。
 4. **败者被 `destroyComponent`**：新者胜则旧者销毁（释放线程池等资源）；旧者胜则新者直接 return 被丢弃（新者从未初始化，无需 destroy）。资源不泄漏、状态不残留。
 
 > 注意冲突解决发生在重放逻辑**之前**（ 在  前）——即先决定"留谁"，再对留存的组件补跑生命周期。
@@ -647,7 +647,7 @@ public void initComponentPhase3() throws Exception {
 1. **`isParameterResolvable`**：遍历 12 个 `StaticArgumentResolverProvider` 的 `supports`，命中则通过；不命中走 fallback——简单类型 → `requestParamResolverProvider`，否则 → `modelAttributeResolverProvider`。全不匹配则抛异常。
 2. **`validateModelAttributeConstructor`**（D3 fail-fast）：标注 `@ModelAttribute` 且无默认构造器的类，**启动直接失败**——而不是等到运行时第一次绑定才发现 `InstantiationException`。
 
-校验开关 `CHECK_ON_STARTUP` 默认 `true`，可通过配置关闭（用于某些启动速度敏感、愿意接受运行时降级的场景）。这是显式的"校验可配"而非"魔法默认"——又是 [01 篇原则 6](01-design-philosophy.md#原则-6--避免魔法行为显式-spifail-fast不靠隐式猜测) 的体现。
+校验开关 `CHECK_ON_STARTUP` 默认 `true`，可通过配置关闭（用于某些启动速度敏感、愿意接受运行时降级的场景）。这是显式的"校验可配"而非"魔法默认"——又是 [01 篇原则 6](01-design-philosophy.md#原则-6--避免魔法行为显式-spi显式-fail-fast不靠隐式猜测) 的体现。
 
 ### fail-fast 的哲学
 

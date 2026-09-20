@@ -1,3 +1,5 @@
+> English | [中文](../ai-guide.md)
+
 # Spring AI Integration Guide
 
 This guide explains how to migrate a standard Spring AI project to this framework. It only takes two steps: **replace dependencies** + **disable WebFlux**.
@@ -132,6 +134,6 @@ public class Application {
 
 ## References
 
-- [Example project source](../spring-web-examples/spring-web-example-ai)
-- [Module Details](en/modules.md)
-- [Spring MVC Migration Guide](en/quickstart.md)
+- [Example project source](../../spring-web-examples/spring-web-example-ai)
+- [Module Details](modules.md)
+- [Spring MVC Migration Guide](quickstart.md)
