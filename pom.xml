@@ -46,6 +46,8 @@
         <module>spring-web-view</module>
         <module>spring-web-batch</module>
         <module>spring-web-examples</module>
+        <!-- 覆盖率聚合报告：必须排在最后（reactor 末尾），mvn test 收尾时合并全仓库 exec -->
+        <module>coverage-aggregate</module>
     </modules>
 
     <properties>
@@ -414,6 +416,13 @@
                     <groupId>org.jacoco</groupId>
                     <artifactId>jacoco-maven-plugin</artifactId>
                     <version>${jacoco.version}</version>
+                    <configuration>
+                        <!-- 排除测试支撑模块（spring-web-test/support-test 的测试控制器与脚手架）：
+                             它们不是生产代码，计入覆盖率只会稀释统计、且永远 0%（无单测执行） -->
+                        <excludes>
+                            <exclude>io/springperf/webtest/**</exclude>
+                        </excludes>
+                    </configuration>
                     <executions>
                         <execution>
                             <id>prepare-agent</id>
@@ -431,6 +440,16 @@
                 </plugin>
             </plugins>
         </pluginManagement>
+
+        <plugins>
+            <!-- 所有模块统一采集覆盖率（prepare-agent + report）。
+                 此前只有部分模块声明，spring-web-support-test（全部 E2E 所在）从未挂 agent，
+                 E2E 触发的服务端代码覆盖一直缺失，聚合报告严重低估真实覆盖率。 -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
     </build>
 
     <profiles>
