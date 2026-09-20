@@ -31,7 +31,7 @@
 | Spring Framework | **5.3.x** | 随 Spring Boot 管理 |  |
 | JDK | **8、11、17** | 8、11、17 已验证 | 编译目标 `java.version=8` |
 | Servlet API | **javax.servlet 4.0.1** | 4.0.x |  |
-| Netty | **4.1.110.Final** | 4.1.x（当前为手动覆盖版本） | Spring Boot 2.7.x 默认管理更低版本 |
+| Netty | **4.1.115.Final** | 4.1.x（当前为手动覆盖版本） | Spring Boot 2.7.x 默认管理更低版本 |
 | Jackson | **2.17.2** | 2.17.x（当前为手动覆盖版本） | Spring Boot 2.7.x 默认管理 2.13.x |
 | Lombok | **1.18.24** | 1.18.x |  |
 | JMH | **1.37** | 1.37 | 仅 benchmark 模块使用 |
@@ -52,7 +52,7 @@
 |------|---------|---------------|------|
 | Spring Boot | **3.5.16** | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | 通过 Maven Profile 切换（`-Pspring-boot-3.0` ~ `-Pspring-boot-4.1`） |
 | Spring Framework | **6.2.x** | 6.0.x ~ 6.2.x / 7.0.x | 随 Spring Boot 管理 |
-| JDK | **17、21** | 17、21 已验证 | 编译目标 `java.version=17`，21 提供虚拟线程支持 |
+| JDK | **17** | 17 / 21 / 25（CI 矩阵，见 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)） | 编译目标 `java.version=17`；JDK 21 起支持虚拟线程（见下） |
 | Servlet API | **jakarta.servlet 6.0** | 6.0.x | javax.servlet 不兼容 |
 | Netty | **4.1.137.Final** | 4.1.x |  |
 | Jackson | **2.17.2** | 2.17.x |  |
@@ -61,7 +61,7 @@
 
 ### 额外特性
 
-- **虚拟线程**：JDK 21+ 下 `spring.threads.virtual.enabled=true` 启用，业务线程池自动切换为虚拟线程
+- **虚拟线程**：JDK 21+ 下 `spring.threads.virtual.enabled=true` 启用，`default` 业务线程池与 batch 的批量方法（`@BatchMapping`）均改用虚拟线程执行（只替换线程类型：`pool.*` 上限/队列语义与 batch 的 `consumerSize` 上限、背压语义均保持不变）——反射调用 `Thread.ofVirtual`，兼容 JDK 17 编译，JDK < 21 时告警并回落平台线程。实现见 [`VirtualThreadSupport`](../spring-web/src/main/java/io/springperf/web/core/pool/VirtualThreadSupport.java) / [`BizPoolRegistry`](../spring-web/src/main/java/io/springperf/web/core/pool/BizPoolRegistry.java)；E2E 覆盖见 [`VirtualThreadE2ETest`](../spring-web-test/src/test/java/io/springperf/webtest/VirtualThreadE2ETest.java) 与 [`BatchVirtualThreadE2ETest`](../spring-web-support-test/src/test/java/io/springperf/webtest/batch/BatchVirtualThreadE2ETest.java)
 - **GraalVM native-image**：`FastInvokerGenerator` 在 native-image 下自动降级为 `MethodHandle` 调用；`SpringWebRuntimeHints` 注册事件路径/资源/异步回调可达性提示；`ControllerBeanFactoryInitializationAotProcessor`（经 `META-INF/spring/aot.factories`）在 AOT 构建期自动为 `@Controller` 处理方法与 DTO 注册反射/序列化 hints
 - **WebSocket**：基于 Jakarta WebSocket 的自动配置
 
@@ -84,7 +84,7 @@
 | 现有项目基于 Servlet 容器，JDK 8/11 | `2.7.x` |
 | 新项目或已迁移到 JDK 17+ | `master` |
 | 需要使用虚拟线程（JDK 21） | `master` |
-| 需要 GraalVM native-image 编译 | `master` |
+| 需要使用 GraalVM native-image 编译 | `master` |
 
 > **分支选择建议**：JDK 8/11 现有项目选 `2.7.x`，使用 `-Pspring-boot-2.6` / `-Pspring-boot-2.5` / `-Pspring-boot-2.4` 切换目标版本；JDK 17+ 新项目选 `master`（支持虚拟线程、GraalVM native-image）。
 
@@ -99,7 +99,7 @@
 | 虚拟线程 | 不支持 | 支持（JDK 21+） |
 | GraalVM native-image | 不支持 | 支持 |
 | `ModelMap` 与 `Model` 接口 | `ModelMap implements Model` | **`ModelMap` 不实现 `Model`**（需 `ExtendedModelMap`） |
-| `spring-web-view` | 视 Backport 情况 | 新功能基线 |
+| `spring-web-view` | 已包含（`2.7.x` 分支 pom 即有此模块） | 新功能基线 |
 
 ---
 

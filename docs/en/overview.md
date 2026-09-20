@@ -16,7 +16,7 @@ The results were puzzling:
 | Spring MVC (Tomcat) | < 4,000 |
 | Spring WebFlux | < 4,000 |
 
-Same business logic — only the transport layer changed from a message queue to an HTTP endpoint — yet throughput dropped by **6-7x**. The business logic hadn't changed, so the bottleneck clearly wasn't in the business code.
+Same business logic — only the transport layer changed from a message queue to an HTTP endpoint — yet throughput dropped by **more than 3.75x** (15,000 / 4,000). The business logic hadn't changed, so the bottleneck clearly wasn't in the business code.
 
 ### Hotspot Analysis
 
@@ -169,9 +169,11 @@ Traditional Servlet containers force all requests through the container thread p
 
 This framework allows requests to execute directly on the Netty EventLoop, while providing the `@RunInPool` annotation for method-level control over whether to switch to a business thread pool. Three programming models are freely selectable, with global default controlled by `pool.default-execute-mode` (defaults to the `default` thread pool; set to `eventloop` to switch back to EventLoop):
 
-- **Synchronous blocking (default)**: Without `@RunInPool`, methods execute on the `default` business thread pool, similar to traditional Servlet model; `@RunInPool("custom")` schedules to a custom thread pool
+- **Synchronous blocking (default)**: Without `@RunInPool`, methods execute on the `default` business thread pool, similar to traditional Servlet model
+- **Custom thread pool**: `@RunInPool("custom")` schedules to a pool created by the `pool.*` properties, for per-business isolation
 - **EventLoop direct**: `@RunInPool(RunInPool.EVENTLOOP)` executes on EventLoop, suitable for pure CPU-bound work or with reactive drivers (R2DBC, Reactive Redis)
-- **Virtual threads**: `@RunInPool(RunInPool.EVENTLOOP)` + JDK 21 virtual threads — non-blocking switching on EventLoop
+
+> **Virtual threads**: on JDK 21+ set `spring.threads.virtual.enabled=true` and both the `default` business pool and batch methods (`@BatchMapping`) run on virtual threads (only the thread type changes: `pool.*` bounds/queueing and batch's `consumerSize` cap + backpressure semantics are all unchanged); below JDK 21 it warns at startup and falls back to platform threads. Implementation: [`VirtualThreadSupport`](../../spring-web/src/main/java/io/springperf/web/core/pool/VirtualThreadSupport.java); E2E coverage: [`VirtualThreadE2ETest`](../../spring-web-test/src/test/java/io/springperf/webtest/VirtualThreadE2ETest.java) and [`BatchVirtualThreadE2ETest`](../../spring-web-support-test/src/test/java/io/springperf/webtest/batch/BatchVirtualThreadE2ETest.java).
 
 The framework doesn't make decisions for the user — it provides infrastructure for the user to choose.
 
@@ -185,7 +187,7 @@ This framework chose to **directly reuse Spring's annotation system**: `@Request
 
 The Servlet API has accumulated two decades of ecosystem: Spring Security Filter Chain, `RequestBodyAdvice`, `ResponseBodyAdvice`, countless middleware based on `jakarta.servlet.Filter`.
 
-This framework doesn't demand "all or nothing." Through the `spring-web-servlet` bridge module, migration can be gradual: start by running on Netty via the support module reusing existing Filters, then gradually migrate to native `WebFilter`.
+This framework doesn't demand "all or nothing." Through the `spring-web-servlet` bridge module, migration can be gradual: start by running on Netty via the `spring-web-servlet` module reusing existing Filters, then gradually migrate to native `WebFilter`.
 
 ---
 

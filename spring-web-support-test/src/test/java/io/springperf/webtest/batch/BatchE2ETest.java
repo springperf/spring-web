@@ -82,6 +82,23 @@ public class BatchE2ETest extends BaseE2ETest {
         }
     }
 
+    /** 未开启虚拟线程（默认）：批量方法应在平台工作线程上执行。 */
+    @Test
+    void batchHandler_runsOnPlatformWorkerThreadByDefault() throws Exception {
+        Request req = new Request.Builder()
+                .url(url("/api/batch/thread?msg=hello"))
+                .get()
+                .build();
+        try (Response resp = CLIENT.newCall(req).execute()) {
+            assertEquals(200, resp.code());
+            String body = resp.body().string();
+            assertTrue(body.startsWith("thread=batch-worker-"),
+                    "默认应在平台工作线程执行: " + body);
+            assertTrue(body.endsWith(":virtual=false"),
+                    "默认不应是虚拟线程: " + body);
+        }
+    }
+
     @Test
     void postWithMultiParams_injectsBodyQueryAndPathVar() throws Exception {
         String json = "{\"name\":\"testUser\",\"age\":25}";

@@ -8,6 +8,17 @@ Built on **LMAX Disruptor** with lock-free ring buffer, backpressure strategies,
 
 ---
 
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [@BatchMapping Annotation](#batchmapping-annotation)
+- [Architecture](#architecture)
+- [Observability](#observability)
+- [Configuration Guide](#configuration-guide)
+- [Important Notes](#important-notes)
+
+---
+
 ## Quick Start
 
 ### 1. Add Dependency
@@ -118,7 +129,7 @@ public @interface BatchMapping {
 | `backpressure` | BLOCK | Backpressure strategy (see table) |
 | `method` | "" | Single-request method name to intercept; defaults to the batch method name |
 | `maxBatchSize` | 100 | Max requests per batch before flushing |
-| `consumerSize` | -1 | Max concurrent processing threads; defaults to available processors |
+| `consumerSize` | -1 | Max concurrent processing threads; defaults to available processors. Still the concurrency cap with virtual threads enabled (JDK 21+) — only the executing threads become virtual |
 
 ### Backpressure Strategies
 
@@ -142,20 +153,20 @@ public @interface BatchMapping {
 Each `@BatchMapping` method gets its own Disruptor queue:
 
 ```
-EventLoop (producer)
+Dispatch thread (producer: `default` business pool; EventLoop when virtual threads are on)
     ↓ enqueue
 RingBuffer
     ↓
 Disruptor consumer (1 thread)
     ↓ accumulate → submit
-bizExecutor pool (0 ~ consumerSize threads)
+bizExecutor pool (0 ~ consumerSize threads; virtual threads when enabled)
     ↓ execute
 @BatchMapping method
 ```
 
-- **Producer**: EventLoop enqueues directly via `BatchInvoker`
+- **Producer**: the dispatch thread enqueues via `BatchInvoker` — the `default` business pool by default (following `pool.default-execute-mode`), or the EventLoop when virtual threads are enabled on JDK 21+ (zero thread switch). Either way an enqueue is microsecond-scale and non-blocking, so no `@RunInPool` is needed
 - **Consumer**: Single Disruptor consumer thread polls the ring buffer
-- **Business pool**: 0 core threads, `SynchronousQueue`, `CallerRunsPolicy`. Zero threads at idle; consumer self-executes at capacity (built-in backpressure)
+- **Business pool**: 0 core threads, `SynchronousQueue`, `CallerRunsPolicy` — zero threads at idle, consumer self-executes at capacity (built-in backpressure). With `spring.threads.virtual.enabled=true` (JDK 21+) the executing threads become **virtual threads** (cap and backpressure semantics unchanged: `consumerSize` still applies), so blocking parks a virtual thread rather than a platform thread
 
 ---
 
@@ -237,6 +248,8 @@ The pool uses `SynchronousQueue` + `CallerRunsPolicy`:
 - Consumer self-executes at capacity (backpressure)
 - No manual core thread tuning needed
 
+> **Virtual threads**: with `spring.threads.virtual.enabled=true` (JDK 21+) the pool's **threads** become virtual (thread names `batch-virtual-*`) — `consumerSize`, `SynchronousQueue` and `CallerRunsPolicy` all keep their semantics, so a saturated pool still makes the consumer thread execute inline as backpressure; blocking IO inside a batch method no longer occupies a platform thread.
+
 ---
 
 ## Important Notes
@@ -263,7 +276,7 @@ public class GetUserRequest extends BatchRequest<UserResp> {
 
 | Scenario | Handling | Client Response |
 |----------|----------|-----------------|
-| RingBuffer full, backpressure BLOCK | EventLoop blocks | Connection suspended |
+| RingBuffer full, backpressure BLOCK | Producer thread blocks | Connection suspended |
 | RingBuffer full, backpressure DROP | `BatchOverflowException` set on request | 429 |
 | RingBuffer full, backpressure THROW | Synchronous exception thrown | 429 |
 | Batch processing exception | `setError(e)` on all pending requests | 500 |

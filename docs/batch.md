@@ -129,13 +129,13 @@ public @interface BatchMapping {
 | `backpressure` | BLOCK | 背压策略，见下方表格 |
 | `method` | "" | 被关联的单请求方法名，默认与批量处理方法同名 |
 | `maxBatchSize` | 100 | 单次批处理最大请求数，达到该值触发批量处理 |
-| `consumerSize` | -1 | 最大并发处理线程数，默认 CPU 核数 |
+| `consumerSize` | -1 | 最大并发处理线程数，默认 CPU 核数。开启虚拟线程（JDK 21+）后仍是并发上限，只是执行线程变为虚拟线程 |
 
 ### 背压策略
 
 | 策略 | 行为 | 客户端响应 |
 |------|------|-----------|
-| `BLOCK` | 生产者线程（EventLoop）阻塞直到 RingBuffer 有空间 | 连接挂起，等待处理 |
+| `BLOCK` | 生产者线程（业务池或 EventLoop）阻塞直到 RingBuffer 有空间 | 请求挂起，等待处理 |
 | `DROP` | 丢弃请求，`BatchRequest` 收到 `BatchOverflowException` | **429 Too Many Requests** |
 | `THROW` | 同步抛出 `BatchOverflowException` | **429 Too Many Requests** |
 
@@ -153,18 +153,18 @@ public @interface BatchMapping {
 `@BatchMapping` 为每个方法创建独立的 Disruptor 队列，内部线程模型：
 
 ```
-EventLoop 线程（生产者）
+调度线程（生产者：默认业务池；开虚拟线程时为 EventLoop）
     ↓ 入队 RingBuffer
 Disruptor 消费者线程（1 个）
     ↓ 攒批 → 提交
-bizExecutor 线程池（0 ~ consumerSize 个）
+bizExecutor 线程池（0 ~ consumerSize 个；开虚拟线程时为虚拟线程）
     ↓ 执行
 @BatchMapping 方法
 ```
 
-- **生产者**：EventLoop 线程直接调用 `BatchInvoker` 入队，无需 `@RunInPool`
+- **生产者**：由默认线程模型决定——未开启虚拟线程时是 `default` 业务线程池（遵循 `pool.default-execute-mode`），开启虚拟线程（JDK 21+）时是 EventLoop（零切换）。两种情况下都只是调用 `BatchInvoker` 入队（微秒级、不阻塞），无需 `@RunInPool`
 - **消费者**：Disruptor 单消费者线程不断从 RingBuffer 拉取事件
-- **业务线程池**：0 核心线程、`SynchronousQueue`、`CallerRunsPolicy`。空闲时零线程占用；满负荷时消费者线程自行执行形成背压
+- **业务线程池**：0 核心线程、`SynchronousQueue`、`CallerRunsPolicy`——空闲时零线程占用，满负荷时消费者线程自行执行形成背压。开启虚拟线程（`spring.threads.virtual.enabled=true`，JDK 21+）时执行线程改为**虚拟线程**（上限与背压语义不变：仍受 `consumerSize` 限制），阻塞只挂起虚拟线程而不占用平台线程
 
 ---
 
@@ -192,7 +192,7 @@ bizExecutor 线程池（0 ~ consumerSize 个）
 - **无锁并发**：`ProducerType.MULTI` 支持多个 EventLoop 线程同时入队，无锁竞争
 - **预分配事件槽**：`BatchEvent` 在 RingBuffer 中预创建，减少 GC 压力
 - **endOfBatch 信号**：Disruptor 在批量发布结束时通知消费者，减少攒批延迟
-- **背压自然**：生产者写入 RingBuffer 时，RingBuffer 满 → 生产者阻塞 → EventLoop 自然反压到 TCP 层
+- **背压自然**：生产者写入 RingBuffer 时，RingBuffer 满 → 生产者线程阻塞（业务池线程，或开虚拟线程时的 EventLoop）→ 请求等待、连接反压
 
 ---
 
@@ -245,6 +245,8 @@ bizExecutor 线程池（0 ~ consumerSize 个）
 - 达到上限时，消费者线程自行执行，形成背压
 - 无需手动调优核心线程数
 
+> **虚拟线程**：`spring.threads.virtual.enabled=true`（JDK 21+）时，业务池的**线程**改为虚拟线程（线程名 `batch-virtual-*`）——`consumerSize`、`SynchronousQueue`、`CallerRunsPolicy` 语义全部不变，池满时仍由消费者线程自执行形成背压；批量方法内的阻塞 IO 只挂起虚拟线程，不再占用平台线程。
+
 ---
 
 ## 注意事项
@@ -271,7 +273,7 @@ public class GetUserRequest extends BatchRequest<UserResp> {
 
 | 异常场景 | 处理方式 | 客户端响应 |
 |---------|---------|-----------|
-| RingBuffer 满，背压 BLOCK | EventLoop 阻塞等待 | 连接挂起 |
+| RingBuffer 满，背压 BLOCK | 生产者线程阻塞等待 | 请求挂起 |
 | RingBuffer 满，背压 DROP | 请求设置 `BatchOverflowException` | 429 |
 | RingBuffer 满，背压 THROW | 同步抛出异常 | 429 |
 | 批量处理异常 | 遍历所有未完成的 request 调用 `setError(e)` | 500 |
