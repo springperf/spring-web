@@ -219,6 +219,9 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
             }
         }
         // 1. Content-Type 已设置 → 直接找匹配 converter 写
+        // 注：曾试过「先 containsKey 廉价探测、未设置则跳过 getContentType()」，JFR 同口径对比证明
+        // 无收益（DefaultHttpHeaders.get 叶帧 58→0，但 AsciiString 哈希 48→97 + writeBody 43 ——
+        // 缺头时 get 本就不物化 value，探测反而多一次哈希+桶遍历），已回退。
         MediaType contentType = response.getHeaders().getContentType();
         if (contentType != null && contentType.isConcrete()) {
             writeWithConverter(body, targetType, valueType, contentType, returnType, request, response, ctx);
@@ -318,8 +321,15 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
             }
             methodCache.put(acceptKey, new NegotiationCacheEntry(bestConverter, bestMediaType));
         }
-        bestMediaType = resetContentTypeWithCharset(response.getHeaders(), bestMediaType, response.getCharacterEncoding());
-        if (response.getHeaders().getContentType() == null) {
+        MediaType negotiated = resetContentTypeWithCharset(response.getHeaders(), bestMediaType,
+                response.getCharacterEncoding());
+        // 复用第 1 步读到的 contentType，避免每响应第二次 Netty 头查找（JFR: HeadersUtils.getAsString
+        // 52 样本 / 3371）。resetContentTypeWithCharset 仅在需要改写 charset 时**新建 MediaType 并写入响应头**，
+        // 故以「引用不等」判定其是否已写入；等价性：此处再次读取为 null ⟺ ①第 1 步读到的值为 null
+        // （否则那个非 concrete 的旧值仍在头上）且 ②reset 未写入。
+        boolean resetWroteHeader = negotiated != bestMediaType;
+        bestMediaType = negotiated;
+        if (contentType == null && !resetWroteHeader) {
             response.getHeaders().setContentType(bestMediaType);
         }
         body = interceptorRegistry.beforeBodyWrite(body, returnType, bestMediaType, bestConverter, request, response);

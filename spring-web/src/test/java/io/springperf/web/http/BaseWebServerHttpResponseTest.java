@@ -46,7 +46,7 @@ class BaseWebServerHttpResponseTest {
     void setUp() {
         webContext = mock(WebContext.class);
         ApplicationProperties props = mock(ApplicationProperties.class);
-        when(props.getLong(PropertiesConstant.HTTP_TIMEOUT)).thenReturn(60000L);
+        when(props.getHttpTimeoutMillis()).thenReturn(60000L);
         when(webContext.getProps()).thenReturn(props);
         response = new TestResponse(webContext, false);
     }
@@ -88,7 +88,8 @@ class BaseWebServerHttpResponseTest {
         response.sendError(HttpStatus.BAD_REQUEST);
         assertTrue(response.isHandled());
         assertTrue(response.flushed);
-        assertTrue(response.getHeaders().getContentType().includes(MediaType.APPLICATION_JSON));
+        // 默认 whitelabel 启用 -> HTML 错误页；message 默认 never 不暴露
+        assertTrue(response.getHeaders().getContentType().includes(MediaType.TEXT_HTML));
     }
 
     @Test void sendErrorOnce_twice_onlyFirstApplies() {
@@ -106,7 +107,7 @@ class BaseWebServerHttpResponseTest {
 
     @Test void writeDataAndFlush_setsContentType() {
         response.sendError(HttpStatus.BAD_REQUEST, "bad");
-        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
+        assertTrue(response.getHeaders().getContentType().includes(MediaType.TEXT_HTML));
     }
 
     @Test void setTimeout_cancelsPrevious() {
@@ -130,9 +131,12 @@ class BaseWebServerHttpResponseTest {
         assertNotNull(response.writeRespEventListener);
     }
 
-    @Test void sendError_jsonMessage_containsErrorMessage() {
+    @Test void sendError_defaultPolicy_hidesMessage() {
+        // include-message 默认 never：whitelabel 页面不含业务 message
         response.sendError(HttpStatus.BAD_GATEWAY, "bad upstream");
-        assertTrue(new String(response.body.toByteArray()).contains("bad upstream"));
+        String body = new String(response.body.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
+        assertFalse(body.contains("bad upstream"));
+        assertTrue(body.contains("502"));
     }
 
     @Test void sendError_setsStatusCode() {
@@ -140,7 +144,22 @@ class BaseWebServerHttpResponseTest {
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatus());
     }
 
-    @Test void escapeJson_escapesSpecialCharacters() {
+    @Test void sendError_messageHiddenByDefault_evenWithSpecialChars() {
+        response.sendError(HttpStatus.BAD_REQUEST, "quote\" back\\ new\n tab\t control\u0001 end");
+        String body = new String(response.body.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
+        // 默认 never：原文不出现，避免特殊字符破坏输出
+        assertFalse(body.contains("quote"));
+        assertFalse(body.contains("\u0001"));
+    }
+
+    @Test void sendError_jsonMode_escapesSpecialCharacters() {
+        // 关闭 whitelabel + include-message=always -> JSON 且转义正确
+        when(webContext.getWebComponent(io.springperf.web.server.ErrorResponseConfig.class))
+                .thenReturn(new io.springperf.web.server.ErrorResponseConfig(
+                        io.springperf.web.server.ErrorResponseConfig.IncludePolicy.NEVER,
+                        io.springperf.web.server.ErrorResponseConfig.IncludePolicy.ALWAYS,
+                        io.springperf.web.server.ErrorResponseConfig.IncludePolicy.NEVER,
+                        false, "/error"));
         response.sendError(HttpStatus.BAD_REQUEST,
                 "quote\" back\\ new\n tab\t ff\f bs\b cr\r control\u0001 end");
         String json = new String(response.body.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
@@ -152,12 +171,6 @@ class BaseWebServerHttpResponseTest {
         assertTrue(json.contains("\\b"), "退格应转义为 \\b");
         assertTrue(json.contains("\\r"), "回车应转义为 \\r");
         assertTrue(json.contains("\\u0001"), "控制字符应以 \\u 转义");
-    }
-
-    @Test void escapeJson_null_returnsEmpty() {
-        response.sendError(HttpStatus.BAD_REQUEST, null);
-        String json = new String(response.body.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
-        assertTrue(json.contains("\"error\":\"\""));
     }
 
     @Test void setStatusCode_nonHttpStatusInstance_usesValue() {

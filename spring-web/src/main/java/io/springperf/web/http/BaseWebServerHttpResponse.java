@@ -2,6 +2,8 @@ package io.springperf.web.http;
 
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
+import io.springperf.web.server.ErrorPageRenderer;
+import io.springperf.web.server.ErrorResponseConfig;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -24,7 +26,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse {
 
     protected final WebContext webContext;
-    protected final boolean keepAlive;
+    protected boolean keepAlive;
     /** Spring headers 视图，由子类构造方法注入（Netty 子类传可写适配器视图，与 Netty 响应对象共享底层存储） */
     protected final HttpHeaders headers;
     protected HttpStatusCode status = HttpStatus.OK;
@@ -32,8 +34,23 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
     protected Charset characterEncoding = StandardCharsets.UTF_8;
     protected AtomicBoolean handled = new AtomicBoolean(false);
     protected AtomicBoolean committed = new AtomicBoolean(false);
+    /** 是否处于 chunked 渐进式输出状态（flushChunked/首次 flush(true) 进入，endStream 结束）。 */
+    protected final AtomicBoolean streaming = new AtomicBoolean(false);
+    /** 流是否已终止（LastHttpContent 已写出；由 endStream 或外部 StreamSender 标记）。 */
+    protected final AtomicBoolean streamCompleted = new AtomicBoolean(false);
+    /**
+     * 提交前回调，仅执行一次。供 servlet 桥在「响应真正提交前」把其 Writer 的编码缓冲刷入响应体
+     * （否则 {@code getWriter().write("x")} 这类未 flush 的写入会随编码缓冲一起丢失）。
+     */
+    protected volatile Runnable beforeCommit;
     protected WriteRespEventListener writeRespEventListener;
     protected ScheduledFuture<?> timeoutFuture;
+
+    /**
+     * 响应超时任务：预先持有（无状态、幂等），避免每次装配都创建 {@code this::defaultHandleTimeout}
+     * 方法引用对象（热路径每请求一次装配）。
+     */
+    private final Runnable defaultHandleTimeoutTask = this::defaultHandleTimeout;
 
     public BaseWebServerHttpResponse(WebContext webContext, boolean keepAlive, HttpHeaders headers) {
         this.webContext = webContext;
@@ -93,9 +110,37 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
     @Override
     public void close() {
         try {
-            flush();
+            if (streaming.get()) {
+                // 渐进式输出：收尾必须写终止块，否则客户端无法判定响应结束（挂到超时）
+                endStream();
+            } else {
+                flush();
+            }
         } catch (IOException ignore) {
         }
+    }
+
+    @Override
+    public boolean isStreaming() {
+        return streaming.get();
+    }
+
+    @Override
+    public boolean markStreamCompleted() {
+        // 抢占式语义：返回 true 表示本次调用赢得「终止块写入权」。
+        // 一个响应只允许写一个终止块——重复写入会让 HTTP 编码器状态复位后再次收到
+        // LastHttpContent，抛 unexpected message type（state: INIT）。
+        return streamCompleted.compareAndSet(false, true);
+    }
+
+    /** 流是否已终止（供 endStream 幂等判定）。 */
+    protected boolean isStreamCompleted() {
+        return streamCompleted.get();
+    }
+
+    @Override
+    public void setBeforeCommit(Runnable callback) {
+        this.beforeCommit = callback;
     }
 
     public boolean isKeepAlive() {
@@ -112,12 +157,31 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
     }
 
     public ScheduledFuture setTimeout() {
-        return setTimeout(this::defaultHandleTimeout, webContext.getProps().getLong(PropertiesConstant.HTTP_TIMEOUT));
+        // server.http.timeout：热路径字段快照直读（首次访问解析，clearCache 后重新解析）
+        return setTimeout(defaultHandleTimeoutTask, webContext.getProps().getHttpTimeoutMillis());
+    }
+
+    /**
+     * 若尚未装配响应超时则装配（幂等）。用于「按需补装配」：处理器被交棒到业务线程池时、
+     * 或同步段结束仍未提交（异步/流式等待）时的兜底装配。已装配时不触发 cancel/reschedule。
+     */
+    @Override
+    public void armTimeoutIfAbsent() {
+        if (timeoutFuture == null) {
+            setTimeout(defaultHandleTimeoutTask, webContext.getProps().getHttpTimeoutMillis());
+        }
+    }
+
+    @Override
+    public boolean hasTimeoutArmed() {
+        return timeoutFuture != null;
     }
 
     public ScheduledFuture setTimeout(Runnable task, long delay) {
         if (timeoutFuture != null) timeoutFuture.cancel(false);
-        if (delay < 0 || task == null) return null;
+        // delay <= 0：关闭超时（对齐框架「≤0 = 不限制」约定与 Tomcat connectionTimeout=0 的无限语义）。
+        // 若把 0 当作「立即触发」，任何配置 server.http.timeout=0 的部署都会全量 504。
+        if (delay <= 0 || task == null) return null;
         timeoutFuture = scheduleOnEventLoop(task, delay, TimeUnit.MILLISECONDS);
         return timeoutFuture;
     }
@@ -204,8 +268,31 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
     protected boolean setCommitted() {
         setHandled();
         boolean result = committed.compareAndSet(false, true);
-        if (result) setTimeout(null, -1);
+        if (result) {
+            // 提交即取消响应超时
+            setTimeout(null, -1);
+            runBeforeCommitOnce();
+        }
         return result;
+    }
+
+    /**
+     * 执行「提交前回调」（幂等，仅一次）。
+     *
+     * <p>凡是在提交时读取响应体缓冲的路径，都必须在**捕获缓冲引用之前**调用本方法：
+     * 回调（servlet 桥把 Writer 编码缓冲刷入响应体）会把内容写入<b>当前</b>缓冲，
+     * 若调用方已经捕获了旧引用，新内容就会落在被忽略的新缓冲里而丢失。</p>
+     */
+    protected void runBeforeCommitOnce() {
+        Runnable cb = beforeCommit;
+        if (cb != null) {
+            beforeCommit = null;
+            try {
+                cb.run();
+            } catch (Throwable t) {
+                log.warn("beforeCommit callback failed: {}", t.getMessage(), t);
+            }
+        }
     }
 
     public void sendError(HttpStatus statusCode) {
@@ -219,37 +306,47 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
 
     @SneakyThrows
     public void sendError(HttpStatusCode statusCode, String message) {
-        String error = "{\"error\":\"" + escapeJson(message) + "\"}";
-        writeDataAndFlush(error.getBytes(characterEncoding), MediaType.APPLICATION_JSON, statusCode);
+        sendError(statusCode, message, null, false, false);
     }
 
     /**
-     * 对写入 JSON 字符串字面量的 message 做转义，防止 {@code "}、{@code \} 及控制字符破坏响应体 JSON。
+     * 完整错误响应入口：按 {@link ErrorResponseConfig}（从 {@link #webContext} 读取，缺失则用默认）
+     * 渲染 whitelabel HTML 或 JSON，并按 {@code on-param} 模式决定是否暴露异常栈 / message。
      */
-    private static String escapeJson(String s) {
-        if (s == null) {
-            return "";
-        }
-        StringBuilder sb = new StringBuilder(s.length() + 16);
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            switch (c) {
-                case '"': sb.append("\\\""); break;
-                case '\\': sb.append("\\\\"); break;
-                case '\b': sb.append("\\b"); break;
-                case '\f': sb.append("\\f"); break;
-                case '\n': sb.append("\\n"); break;
-                case '\r': sb.append("\\r"); break;
-                case '\t': sb.append("\\t"); break;
-                default:
-                    if (c < 0x20) {
-                        sb.append(String.format("\\u%04x", (int) c));
-                    } else {
-                        sb.append(c);
-                    }
-            }
-        }
-        return sb.toString();
+    @SneakyThrows
+    public void sendError(HttpStatusCode statusCode, String message, Throwable cause,
+                         boolean includeStacktraceOnParam, boolean includeMessageOnParam) {
+        sendError(statusCode, message, cause, includeStacktraceOnParam, includeMessageOnParam, false);
+    }
+
+    @Override
+    @SneakyThrows
+    public void sendError(HttpStatusCode statusCode, String message, Throwable cause,
+                         boolean includeStacktraceOnParam, boolean includeMessageOnParam,
+                         boolean includeErrorsOnParam) {
+        ErrorResponseConfig cfg = resolveErrorConfig();
+        ErrorPageRenderer.ErrorResponseBody body = ErrorPageRenderer.build(
+                statusCode, message, cause, cfg, includeStacktraceOnParam, includeMessageOnParam,
+                includeErrorsOnParam, acceptHeader);
+        writeDataAndFlush(body.getBody().getBytes(characterEncoding),
+                MediaType.parseMediaType(body.getContentType()), statusCode);
+    }
+
+    /** 当前请求的 Accept 头（由管线在构造响应时注入；用于 whitelabel/JSON 错误体内容协商）。 */
+    private String acceptHeader;
+
+    /**
+     * 注入请求 Accept 头：对齐 Boot {@code BasicErrorController} 的 produces 协商——
+     * 浏览器（text/html 或 *&#47;*）得到 whitelabel HTML，显式 JSON 客户端得到 JSON。
+     */
+    public void setRequestAcceptHeader(String acceptHeader) {
+        this.acceptHeader = acceptHeader;
+    }
+
+    /** 读取错误响应配置：未注册（如非 Netty 嵌入场景）时回退默认（whitelabel 开启、三项均 never）。 */
+    private ErrorResponseConfig resolveErrorConfig() {
+        ErrorResponseConfig cfg = webContext.getWebComponent(ErrorResponseConfig.class);
+        return cfg != null ? cfg : ErrorResponseConfig.DEFAULT;
     }
 
     @SneakyThrows
@@ -259,6 +356,9 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
             return;
         }
         try {
+            // 先让 servlet Writer 的编码缓冲落入响应体，随后被 resetBuffer 一并清掉——
+            // 对齐 Tomcat：错误响应不得夹带业务先前写入的内容。
+            runBeforeCommitOnce();
             // 异常路径：清空已缓冲的部分 body（如 JSON 序列化中途失败写入的字节），
             // 避免错误响应 JSON 追加在部分内容之后形成畸形响应体（对齐 Spring 语义）。
             resetBuffer();

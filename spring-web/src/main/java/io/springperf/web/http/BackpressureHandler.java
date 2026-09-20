@@ -4,6 +4,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.springperf.web.server.ChannelAttrs;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -17,7 +18,8 @@ public final class BackpressureHandler extends ChannelInboundHandlerAdapter {
         Channel ch = ctx.channel();
         boolean writable = ch.isWritable();
 
-        ConnectionContext conn = ch.attr(NettyServerHttpResponse.CONN_CTX).get();
+        ChannelAttrs attrs = ChannelAttrs.ofIfPresent(ch);
+        ConnectionContext conn = attrs == null ? null : attrs.connCtx;
         if (conn == null) {
             ctx.fireChannelWritabilityChanged();
             return;

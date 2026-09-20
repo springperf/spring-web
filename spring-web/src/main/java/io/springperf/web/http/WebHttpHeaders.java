@@ -1,5 +1,6 @@
 package io.springperf.web.http;
 
+import io.netty.handler.codec.http.HttpHeaderNames;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.util.MultiValueMap;
@@ -71,11 +72,24 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
     /** 缓存 {@link #getContentType()} 的解析结果，避免重复 {@link MediaType#parseMediaType} */
     private MediaType cachedContentType;
 
+    /**
+     * 底层 Netty headers（当以可写 {@link NettyHttpHeadersAdapter} 为存储时非 null）：
+     * 供 Content-Type 读写走「{@code HttpHeaderNames} 常量名直通」快路径。
+     *
+     * <p>JFR（服务端线程，PerfBenchmark.get）显示每响应的 Content-Type 读写是本框架热点：
+     * 写侧 {@code setContentType} → Spring {@code HttpHeaders.set(String,String)} → Netty 每次
+     * 现造 {@code AsciiString} 名字并重算哈希（{@code hashCodeAscii} 12 样本）+
+     * {@code setObject} 36 样本；读侧 {@code getContentType} 每次按 String 名查（
+     * {@code HeadersUtils.getAsString} 17 样本）。常量名哈希已缓存，直通可免掉这部分。</p>
+     */
+    private final io.netty.handler.codec.http.HttpHeaders rawHeaders;
+
     private static final MediaType NOT_SET = new MediaType("application", "x-not-set");
 
     public WebHttpHeaders() {
         this.delegateMap = resolveDelegateForVersion();
         this.cachedContentType = NOT_SET;
+        this.rawHeaders = null;
     }
 
     /**
@@ -88,6 +102,9 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
         super(headers);
         this.delegateMap = resolveDelegateForVersion();
         this.cachedContentType = NOT_SET;
+        this.rawHeaders = (headers instanceof NettyHttpHeadersAdapter)
+                ? ((NettyHttpHeadersAdapter) headers).rawHeadersIfWritable()
+                : null;
     }
 
     private MultiValueMap<String, String> resolveDelegateForVersion() {
@@ -284,7 +301,9 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
     @Override
     public MediaType getContentType() {
         if (cachedContentType == NOT_SET) {
-            cachedContentType = super.getContentType();
+            cachedContentType = rawHeaders != null
+                    ? parseContentType(rawHeaders)
+                    : super.getContentType();
             if (cachedContentType == null) {
                 cachedContentType = NOT_SET;
             }
@@ -292,9 +311,24 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
         return cachedContentType == NOT_SET ? null : cachedContentType;
     }
 
+    /** 语义对齐 Spring {@code HttpHeaders.getContentType()}：缺值/空串返回 null，否则 {@code parseMediaType}。 */
+    private static MediaType parseContentType(io.netty.handler.codec.http.HttpHeaders raw) {
+        String value = raw.get(HttpHeaderNames.CONTENT_TYPE);
+        return (value != null && !value.isEmpty()) ? MediaType.parseMediaType(value) : null;
+    }
+
     @Override
     public void setContentType(MediaType mediaType) {
-        super.setContentType(mediaType);
+        if (rawHeaders != null) {
+            // 语义对齐 Spring HttpHeaders：null 等价 remove；非 null 写 mediaType.toString()
+            if (mediaType == null) {
+                rawHeaders.remove(HttpHeaderNames.CONTENT_TYPE);
+            } else {
+                rawHeaders.set(HttpHeaderNames.CONTENT_TYPE, mediaType.toString());
+            }
+        } else {
+            super.setContentType(mediaType);
+        }
         // 清空缓存，下次 getContentType() 重新解析
         cachedContentType = NOT_SET;
     }
