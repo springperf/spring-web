@@ -266,11 +266,11 @@ Spring Boot 启动
   │     │     └─ initComponentPhase3()  预缓存/fail-fast          →
   │     │        （MappingRegistry.optimizeMapping() 在此阶段构建 RouterOptimizer 链）
   │     │
-  │     ├─ 取 DispatcherHandler（启动期单线程，运行时纯读）       → 
+  │     ├─ 取 DispatcherHandler（启动期单线程，运行时纯读）       →
   │     ├─ new NettyHttpHandler(webContext, contextPath, dispatcher)  →
-  │     ├─ 配置 boss/worker EventLoopGroup + ServerBootstrap     → 
+  │     ├─ 配置 boss/worker EventLoopGroup + ServerBootstrap     →
   │     └─ bootstrap.bind(port).sync()                           →
-  │        ├─ actualPort 写入 local.server.port 系统属性         → 
+  │        ├─ actualPort 写入 local.server.port 系统属性         →
   │        └─ log.info("Netty Server started on port {}")       →
   │
   └─ 就绪，开始接受请求
@@ -356,7 +356,7 @@ if (shuttingDown) {
   │       └─ BizPoolRegistry.determinePool(req, mappingResult)
   │           ├─ != null → req.acquire() + executor.execute（默认走
   │           │             "default" 业务线程池，发生一次切换）       
-  │           │   └─ RejectedExecutionException → req.release() + 503 
+  │           │   └─ RejectedExecutionException → req.release() + 503
   │           └─ == null → EventLoop 直处理（@RunInPool(EVENTLOOP)
   │                         或 pool.default-execute-mode=eventloop）
   ▼
@@ -371,7 +371,7 @@ if (shuttingDown) {
   │       ├─ initContextHolders（LocaleContextHolder 等）           
   │       └─ mappingResult.isMatched() ?
   │           ├─ YES → doHandle()
-  │           └─ NO  → handleWithNoFullMatch()（CORS 预检 / 404 / 405） 
+  │           └─ NO  → handleWithNoFullMatch()（CORS 预检 / 404 / 405）
   ▼
 [web]    doHandle()                                              
   │       ├─ CorsRegistry.corsHandle()                              
@@ -385,7 +385,7 @@ if (shuttingDown) {
   │       │     ├─ [support] ResponseBodyEmitterReturnValueResolver（若引入 support）
   │       │     ├─ [web]     StreamEmitterReturnValueResolver → NettyStreamSender（SSE/流式）
   │       │     └─ [batch]   BatchReturnValueResolver（若引入 batch，透明聚合）
-  │       └─ finally: invokeWithRealResult() / metrics.recordRequest() 
+  │       └─ finally: invokeWithRealResult() / metrics.recordRequest()
   ▼
 [web]    invokeWithRealResult()                                  
   │       ├─ InterceptorRegistry.postHandle()
@@ -493,7 +493,7 @@ public class RuntimeMappingWebFilter implements WebFilter {
 
 `spring-web` 只引 Spring 五件套（context/core/beans/aop/web）+ Netty + Jackson，**不引 `spring-boot`、不引 `spring-webmvc`、不引 Servlet API**。这意味着核心可以脱离 Spring Boot 独立使用——理论上能嵌入任何 Netty 应用。`reactive-streams`/`jsr305`/`fastjson2` 全 `provided`，是"有则增强、无则不报错"的可选能力。
 
-这一边界对应 [01 篇 原则 6](01-design-philosophy.md#原则-6--避免魔法行为显式-sp显式-fail-fast不靠隐式猜测)：核心不靠"类路径上有 Spring Boot"来决定行为，它只声明自己能用的最小集合。
+这一边界对应 [01 篇 原则 6](01-design-philosophy.md#原则-6--避免魔法行为显式-spi显式-fail-fast不靠隐式猜测)：核心不靠"类路径上有 Spring Boot"来决定行为，它只声明自己能用的最小集合。
 
 ### 6.2 support/batch 的"可选激活"
 
@@ -502,7 +502,7 @@ support 与 batch 是 `provided` 依赖，用户按需引入。这带来两个�
 1. **轻量场景的启动更快**：纯 API 网关不引 support，省掉 Servlet 桥接的初始化开销与依赖体积。
 2. **能力的组合自由**：要 Servlet 兼容引 support，要批量聚合引 batch，两者可独立选择。
 
-这对应 [01 篇 原则 3](01-design-philosophy.md#原则-3--避免线程切换默认-eventloop-直处理显式才切换) 的精神延伸——"框架把选择权交给业务方"：是否需要 Servlet 兼容、是否需要批量聚合，是业务方用 Maven 坐标显式声明的，不是框架替业务方做死。
+这对应 [01 篇 原则 3](01-design-philosophy.md#原则-3--避免线程模型僵化业务方掌控何时切换) 的精神延伸——"框架把选择权交给业务方"：是否需要 Servlet 兼容、是否需要批量聚合，是业务方用 Maven 坐标显式声明的，不是框架替业务方做死。
 
 ### 6.3 starter 的"零配置 + 零冲突"
 
@@ -512,7 +512,7 @@ starter 聚合自动装配（10 个 AutoConfiguration，详见 [14 篇](14-start
 
 support 模块在 `src/main/java/org/springframework/web/servlet/` 等路径下**重写** Spring 的类（如 `PathMatchConfigurer`，见 [§2.2](#22-support-与-batch-的包拓扑简表) 表末）。这是"同包同名覆盖"策略——Java 类加载时，同名同包的类先入 classpath 者胜。support 用此策略让用户的 `import org.springframework.web.servlet.config.annotation.PathMatchConfigurer` 实际拿到的是本框架的覆盖版本，从而在不改业务代码的前提下注入桥接行为。
 
-这是 [01 篇 原则 6](01-design-philosophy.md#原则-6--避免魔法行为显式-sp显式-fail-fast不靠隐式猜测) 的一个**特例与张力点**：同包覆盖本质是一种"隐式"行为，但框架用 `@Order` 优先级 + `log.warn` 显式告警（见 `WebComponentContainer.registerWebComponent` 的冲突处理）把它变得可观测、可排查。机制细节留到 [12 篇](12-support-bridge.md)。
+这是 [01 篇 原则 6](01-design-philosophy.md#原则-6--避免魔法行为显式-spi显式-fail-fast不靠隐式猜测) 的一个**特例与张力点**：同包覆盖本质是一种"隐式"行为，但框架用 `@Order` 优先级 + `log.warn` 显式告警（见 `WebComponentContainer.registerWebComponent` 的冲突处理）把它变得可观测、可排查。机制细节留到 [12 篇](12-support-bridge.md)。
 
 ---
 

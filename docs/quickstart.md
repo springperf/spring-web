@@ -157,7 +157,7 @@ public class LogInterceptor implements HandlerInterceptor {
 }
 ```
 
-### 过滤器（需 support 模块）
+### 过滤器（需 `spring-web-servlet` 模块）
 
 需要引入 `spring-web-servlet` 后，`jakarta.servlet.Filter` 通过桥接自动适配。
 
@@ -169,7 +169,7 @@ public class LogInterceptor implements HandlerInterceptor {
 
 如果控制器方法中直接使用了 `HttpServletRequest` / `HttpServletResponse`，需要：
 
-**方法一：引入 support 模块（推荐，渐进迁移）**
+**方法一：引入 `spring-web-servlet` 模块（推荐，渐进迁移）**
 
 ```xml
 <dependency>
@@ -247,7 +247,7 @@ public ResourceHandlerRegistration resourceHandlerRegistration() {
 
 **以下能力已对齐，无需改动**：`@ModelAttribute` 参数绑定自动入 model、`@ControllerAdvice @ModelAttribute` 提供者、`@PathVariable` 自动入 model、`BindingResult` 自动入 model、局部 `@ModelAttribute` 方法、`redirect:` 前缀。
 
-> 完整差异清单见 [视图渲染文档](view.md#五与-spring-mvc-的差异)。
+> 完整差异清单见 [视图渲染文档](view.md#七与-spring-mvc-的差异)。
 
 ---
 

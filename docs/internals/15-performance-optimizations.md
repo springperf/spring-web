@@ -124,7 +124,7 @@ RouterOptimizer 链:
 
 ### 手段
 
-`BaseWebServerHttpRequest` 用 `fastAttributes[]`（`Object[]` 数组）替代 `ConcurrentHashMap<String, Object>` 存储请求属性（[05 篇](05-request-pipeline.md) 四节）：
+`BaseWebServerHttpRequest` 用 `fastAttributes[]`（`Object[]` 数组）替代 `ConcurrentHashMap<String, Object>` 存储请求属性（[05 篇](04-request-pipeline.md) 四节）：
 
 ```java
 // RequestAttribute.java
@@ -173,7 +173,7 @@ public abstract class BaseWebServerHttpRequest implements ..., RequestContext {
 
 ### 手段
 
-框架的请求/响应对象（`NettyServerHttpRequest`/`NettyServerHttpResponse`）实现引用计数接口，通过 `acquire()`/`release()` 手动管理 Direct Memory 生命周期（[05 篇](05-request-pipeline.md) 三节）：
+框架的请求/响应对象（`NettyServerHttpRequest`/`NettyServerHttpResponse`）实现引用计数接口，通过 `acquire()`/`release()` 手动管理 Direct Memory 生命周期（[05 篇](04-request-pipeline.md) 三节）：
 
 ```java
 // NettyServerHttpRequest.java

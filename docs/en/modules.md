@@ -121,7 +121,14 @@ Supported return value types:
   - `postHandle` — After handler execution, before return value rendering
   - `afterCompletion` — After request completion (whether or not an exception occurred)
 - `InterceptorRegistry` manages interceptor registration with path include/exclude patterns
-- Auto-registers `HandlerInterceptor` or `InterceptorRegistration` beans from the Spring container
+- Auto-registered interceptor sources (matching Spring MVC semantics): `InterceptorRegistration` produced by
+  `WebMvcConfigurer#addInterceptors`, plus `MappedInterceptor` (which carries its own path rules).
+  **Plain `HandlerInterceptor` beans are no longer auto-registered globally** (Spring MVC behaves the same way) —
+  register them via `addInterceptors` or declare a `MappedInterceptor`; this also avoids double registration
+  (bean scan + `addInterceptors`) of the same instance
+- `postHandle` / `afterCompletion` traverse in the **same (forward) direction** as `preHandle`: ordering is
+  driven by explicit `order`, and the list is already sorted by it; when `preHandle` returns early, the
+  interceptors that did not pass get a **reverse-order** `afterCompletion`
 
 #### async — Async Support
 
@@ -241,7 +248,7 @@ Bridges Spring MVC ecosystem components (`WebMvcConfigurer`, `HandlerInterceptor
 | Spring argument resolvers | `SpringHandlerMethodArgumentResolverProvider` adapts `HandlerMethodArgumentResolver` |
 | Spring return value handlers | `SpringHandlerMethodReturnValueHandlerAdapter` adapts `HandlerMethodReturnValueHandler`; `ModelAndViewReturnValueResolver` bridges `ModelAndView` |
 | Spring exception resolvers | `SpringHandlerExceptionResolverAdapter` adapts `HandlerExceptionResolver` |
-| ResponseBodyEmitter | `ResponseBodyEmitterReturnValueResolver` (incl. SseEmitter / StreamingResponseBody) |
+| ResponseBodyEmitter | `ResponseBodyEmitterReturnValueResolver` (incl. mvc `SseEmitter`; **not** `StreamingResponseBody` — a standalone `@FunctionalInterface`, not a `StreamEmitter`, no resolver yet) |
 | Rewritten Spring MVC API | `org.springframework.web.servlet.*`: `HandlerInterceptor`, `ModelAndView`, `View`, `MappedInterceptor`, `WebMvcConfigurer`, `InterceptorRegistration`, `RequestBodyAdvice` / `ResponseBodyAdvice`, etc. |
 
 ### Use Cases

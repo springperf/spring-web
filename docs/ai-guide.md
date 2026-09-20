@@ -1,3 +1,5 @@
+> 中文 | [English](en/ai-guide.md)
+
 # Spring AI 集成指南
 
 本文说明如何将标准 Spring AI 项目迁移到本框架。核心就两步：**替换依赖** + **禁用 WebFlux**。

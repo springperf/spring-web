@@ -27,11 +27,11 @@ NettyHttpHandler.channelRead              NettyHttpHandler.java
   ▼
 NettyHttpHandler.handleRequest           NettyHttpHandler.java
   │  · shuttingDown? → 503 ()
-  │  · 构造 NettyServerHttpResponse(keepAlive) 
+  │  · 构造 NettyServerHttpResponse(keepAlive)
   │  · URI 解析 + contextPath 校验 → 404 ()
-  │  · msg.retain()  ← ByteBuf 生命周期第一站 
-  │  · new NettyServerHttpRequest 
-  │  · resp.setTimeout() 
+  │  · msg.retain()  ← ByteBuf 生命周期第一站
+  │  · new NettyServerHttpRequest
+  │  · resp.setTimeout()
   ▼
 DispatcherHandler.httpHandle              DispatcherHandler.java
   ▼
@@ -42,10 +42,10 @@ DispatcherHandler.handleWithMappingResult DispatcherHandler.java
   │  bizPoolRegistry.determinePool(req, mr)  ← 取 methodCache 槽位的线程池引用
   │
   ├── executor != null（default 池 / 自定义池）:
-  │     │  req.acquire()              ← retain，跨线程前加固引用 
+  │     │  req.acquire()              ← retain，跨线程前加固引用
   │     ▼  executor.execute(() -> { handleWithFilter; finally req.release() })  ()
   │     │  catch RejectedExecutionException:
-  │     │     req.release() 
+  │     │     req.release()
   │     │     !isShutdown() → 503 + RETRY_AFTER ()
   │     │     isShutdown()  → EventLoop 兜底 handleWithFilter ()
   │     ▼  【业务线程池】
@@ -66,27 +66,27 @@ DispatcherHandler.handleWithFilter        DispatcherHandler.java
   │  catch Throwable → handleException + invokeWithRealResult ()
   ▼
 DispatcherHandler.handleAfterFilter       DispatcherHandler.java
-  │  initContextHolders(LocaleContextHolder) 
+  │  initContextHolders(LocaleContextHolder)
   │  mappingResult.isMatched()?
-  │    是 → doHandle(req, resp, matchedContext) 
-  │    否 → handleWithNoFullMatch → CORS 预检 / 404·405 
+  │    是 → doHandle(req, resp, matchedContext)
+  │    否 → handleWithNoFullMatch → CORS 预检 / 404·405
   │  finally removeContextHolders ()
   ▼
 DispatcherHandler.doHandle                DispatcherHandler.java
-  │  corsRegistry.corsHandle(req,resp)         ← 取 corsConfigurationProvider 
-  │  interceptorRegistry.preHandle(req,resp)   ← 取 cachedInterceptors 
-  │  argumentResolverRegistry.resolveArguments ← 取 methodCache 参数解析器槽 
+  │  corsRegistry.corsHandle(req,resp)         ← 取 corsConfigurationProvider
+  │  interceptorRegistry.preHandle(req,resp)   ← 取 cachedInterceptors
+  │  argumentResolverRegistry.resolveArguments ← 取 methodCache 参数解析器槽
   │  mappingContext.invoke(args,req,resp)      ← invoker.invoke（MethodHandle/Fast）
-  │  returnValueResolverRegistry.resolveReturnValue ← 取 methodCache 返回值处理器槽 
+  │  returnValueResolverRegistry.resolveReturnValue ← 取 methodCache 返回值处理器槽
   │  catch → handleException → exceptionRegistry.handle ()
   │  finally:
   │    isAsyncRequest? → afterConcurrentHandlingStarted + 存 METRICS_START_ATTR ()
   │    否 → (preHandlePassed? invokeWithRealResult : skip) + metrics.recordRequest ()
   ▼
 DispatcherHandler.invokeWithRealResult   DispatcherHandler.java
-  │  interceptorRegistry.postHandle 
-  │  interceptorRegistry.afterCompletion 
-  │  finally flushResponse 
+  │  interceptorRegistry.postHandle
+  │  interceptorRegistry.afterCompletion
+  │  finally flushResponse
   ▼
 响应 flush → Netty channel 写出 → 请求结束
 ```

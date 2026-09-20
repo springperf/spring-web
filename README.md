@@ -7,7 +7,7 @@ A high-performance Netty-based web framework, compatible with Spring MVC program
 [![CI](https://github.com/springperf/spring-web/actions/workflows/ci.yml/badge.svg)](https://github.com/springperf/spring-web/actions/workflows/ci.yml)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.springperf/spring-web)](https://central.sonatype.com/artifact/io.github.springperf/spring-web)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE.md)
-[![Throughput](https://img.shields.io/badge/Throughput-1.2~12.6x_vs_Spring_MVC-brightgreen?style=flat-square)](docs/en/benchmark.md)
+[![Throughput](https://img.shields.io/badge/Throughput-1.45~12.6x_vs_Spring_MVC-brightgreen?style=flat-square)](docs/en/benchmark.md)
 [![SSE](https://img.shields.io/badge/SSE-7.7x_under_high_concurrency-blue?style=flat-square)](docs/en/benchmark.md)
 
 ---
@@ -36,7 +36,7 @@ A high-performance Netty-based web framework, compatible with Spring MVC program
 >
 > **Spring WebPerf was born from this question.** Goal: maximize web framework performance while remaining fully compatible with the Spring ecosystem.
 >
-> [View Benchmark Report](docs/en/benchmark.md) · [Performance Principles](docs/en/performance-principles.md) · [Full Origin Story](docs/en/overview.md)
+> [View Benchmark Report](docs/en/benchmark.md) · [Performance Principles](docs/en/performance-principles.md) · [Full Origin Story](docs/en/overview.md) · [Changelog](CHANGELOG.md) · [Breaking Changes](docs/BREAKING-CHANGES.md)
 
 ---
 
@@ -54,7 +54,7 @@ Spring WebPerf is a high-performance web framework built on **Netty 4.1**, desig
 - **Async Native** — Built-in support for DeferredResult, Callable, SseEmitter, StreamEmitter, Reactive Streams; SSE throughput reaches 12.63x of Spring MVC at 4 threads / 7.72x at 16 threads
 - **Batch Processing** — Disruptor-based request aggregation that transparently merges concurrent requests into batch operations, boosting throughput by multiple times; supports backpressure strategies, wait strategies, and thread pool isolation
 - **Extensible** — SPI at every key juncture: argument resolvers, return value handlers, codec interceptors, filters, interceptors
-- **Ecosystem Bridge** — The `support` module bridges Servlet Filters, Spring MVC `HandlerInterceptor`, `RequestBodyAdvice` / `ResponseBodyAdvice`
+- **Ecosystem Bridge** — The `spring-web-servlet` module bridges Servlet Filters, Spring MVC `HandlerInterceptor`, `RequestBodyAdvice` / `ResponseBodyAdvice`
 - **Server-Side Rendering** — Optional `spring-web-view` module adds Thymeleaf / FreeMarker template rendering; `@Controller` + `Model` + view-name programming model matches Spring MVC
 - **Actuator Integration** — Supports Spring Boot Actuator with optional standalone management port
 
@@ -110,7 +110,7 @@ server:
   servlet:
     context-path: /api               # Application context path (optional)
   http:
-    max-content-length: 5242880      # Max request body, default 1MB
+    max-content-length: 5242880      # Max request body, default 4MB
     timeout: 15000                   # Request timeout, default 60s (milliseconds)
 management:
   server:
@@ -142,7 +142,7 @@ JMH benchmark results on JDK 17 + G1GC (1GB heap, 4 threads):
 | bytesLarge | **18,250** ops/s | **1.82x** | **1.45x** | **1.55x** |
 | sse | **13,323** ops/s | **12.63x** | — | **5.08x** |
 
-The perf framework delivers **1.6\~12.6x** throughput over Servlet containers, with **0.10\~0.11ms** p50 latency (lowest among peers). SSE reaches **12.63x** of Spring MVC at 4 threads and **7.72x** at 16 threads. See [full comparison report](docs/en/benchmark.md).
+The perf framework delivers **1.45\~12.6x** throughput over Servlet containers, with **0.10\~0.11ms** p50 latency (lowest among peers). SSE reaches **12.63x** of Spring MVC at 4 threads and **7.72x** at 16 threads. See [full comparison report](docs/en/benchmark.md).
 
 ---
 
@@ -159,7 +159,7 @@ The perf framework delivers **1.6\~12.6x** throughput over Servlet containers, w
 | Method invocation | ASM / MethodHandle (~10-30ns) | `Method.invoke()` reflection (~200ns) |
 | Argument resolution | Pre-cached at startup, direct call at runtime | Per-request iteration + `synchronized` cache |
 | Routing | O(1) HashMap multi-level optimizer | `AntPathMatcher` linear traversal |
-| Servlet API | Bridged via support module | Native |
+| Servlet API | Bridged via `spring-web-servlet` | Native |
 | Actuator | Native | Native |
 
 ---
@@ -171,7 +171,7 @@ This project manages two branches aligned with Spring Boot major versions. Minim
 | Branch | Spring Boot | Spring Framework | JDK | Servlet API | Status |
 |--------|------------|----------------|-----|-------------|--------|
 | `2.7.x` | 2.4.x ~ 2.7.x | 5.3.x | 8 / 11 / 17 | javax.servlet 4.0 | Maintenance branch (features + bugfix) |
-| `master` | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | 6.0.x ~ 6.2.x / 7.0.x | 17 / 21 | jakarta.servlet 6.0 | **Development baseline** (multi-version via profiles) |
+| `master` | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | 6.0.x ~ 6.2.x / 7.0.x | 17 / 21 / 25 | jakarta.servlet 6.0 | **Development baseline** (multi-version via profiles) |
 
 > See [Version Compatibility](docs/en/compatibility.md) for version floor notes, branch recommendations, and detailed compatibility information.
 
@@ -190,6 +190,7 @@ This project manages two branches aligned with Spring Boot major versions. Minim
 | `spring-boot-starter-web` | Spring Boot Starter: auto-configuration, Actuator support |
 | `spring-web-test` | Integration tests |
 | `spring-web-support-test` | Bridge-layer compatibility tests |
+| `spring-web-benchmark` | JMH benchmarks + report generator (5 stacks: perf / perf-support / tomcat / undertow / webflux) |
 | `spring-web-examples` | Usage examples for various scenarios |
 
 > ¹ View rendering usage and Spring MVC differences: [View Rendering](docs/view.md).

@@ -1,6 +1,6 @@
 # 19 · 关键设计决策记录（ADR）
 
-> [← 返回索引](00-README.md) | 上一篇：[18 · 内部 SPI 发现与调用机制](18-spi-extension.md) | 下一篇：[20 · 总结与路线图](20-summary-roadmap.md)
+> [← 返回索引](00-README.md) | 上一篇：[18 · 内部 SPI 发现与调用机制](18-spi-extension.md)
 
 ---
 
@@ -93,7 +93,7 @@ Netty 的 EventLoop 单线程模型天然适合 I/O 密集型场景，但若业�
 - **代价**：`int index` 在编译期分配且不可回收（`MappingCacheKey` 是静态常量，生命周期 = JVM 生命周期）；`methodCache`/`classCache` 数组按 `key.index + 1` 懒分配，越界时 `Arrays.copyOf` 扩容（`MappingHandlerMethod.java`，`synchronized` 双检），无固定上限——槽位随已注册键增长，未用槽位仅浪费单个对象引用。
 - **边界**：仅适用于"已知有限且编译期确定"的属性集。运行时动态增删的属性仍需 Map/List——框架核心属性全走索引，用户扩展走 SPI 的 List/单字段/Map（见 [18 篇](18-spi-extension.md) 四种发现模式）。重新审视条件：若未来出现高频动态属性，该属性不应进 `methodCache`/`classCache`，而应走请求级 Map。
 
-**关联**：[15 篇](15-performance-optimizations.md) 优化 1/4、[16 篇](16-code-spotlights.md) 聚光灯 1/5、[05 篇](05-request-pipeline.md) 四节。
+**关联**：[15 篇](15-performance-optimizations.md) 优化 1/4、[16 篇](16-code-spotlights.md) 聚光灯 1/5、[05 篇](04-request-pipeline.md) 四节。
 
 ---
 
@@ -129,7 +129,7 @@ Bean 层覆盖有两个硬约束：其一，core 的 Registry 是 `WebComponent`
 
 ### 背景
 
-`spring-web-batch` 模块需要高吞吐攒批队列：多生产者（多个 EventLoop 线程）→ 单消费者（Disruptor 消费者线程）→ 攒批 → 提交业务线程池。可选：① 自研 `MpscArrayQueue`（SSE 所用，见 ADR 6）；② LMAX Disruptor（成熟的 RingBuffer + SequenceBarrier + 批量发布机制）。
+`spring-web-batch` 模块需要高吞吐攒批队列：多生产者（多个业务池 / EventLoop 线程）→ 单消费者（Disruptor 消费者线程）→ 攒批 → 提交业务线程池。可选：① 自研 `MpscArrayQueue`（SSE 所用，见 ADR 6）；② LMAX Disruptor（成熟的 RingBuffer + SequenceBarrier + 批量发布机制）。
 
 ### 决策
 
@@ -275,7 +275,41 @@ SSE/流式输出需生产者（EventLoop 或业务线程）→ 消费者（Event
 
 ---
 
-## 小结：十条决策的共同主线
+## ADR 11：Servlet 容器语义下沉管线执行——配置键命名空间与实现模块分离
+
+**状态**：已采纳
+
+### 背景
+
+配置对齐工作（`spring.*`/`server.*` 键全量补齐）新增的功能中，multipart、错误页、参数上限等本质是 **Servlet 容器语义**，但实现均落在 `spring-web`（core）而非 `spring-web-servlet`：`spring.servlet.multipart.*` 的配置类 `MultipartConfig` 在 `io.springperf.web.server`，`server.error.*` 的 `ErrorPageRenderer`/`ErrorResponseConfig` 也在 core。质疑：配置键命名空间与实现模块错位是否合理？是否应把"Servlet 相关"实现迁入 servlet 模块？
+
+### 决策
+
+**保持现状，明确"键命名空间 ≠ 实现模块"的分层原则**。三个硬约束决定了这是必然而非偶然：
+
+1. **core 不依赖 `jakarta.servlet-api`**（见 [02 篇](02-architecture-overview.md) 依赖矩阵）——凡需 Servlet API 类型的实现只能在 servlet 模块；
+2. **依赖方向 `servlet → core` 单向**——若管线级实现（multipart 聚合、参数上限）放 servlet 模块，core 的 `Http2ChannelInitializer` 就要反向依赖 servlet，成环不可行；
+3. **本框架无 Servlet 容器**——容器语义（multipart 聚合与 413/400、whitelabel 错误页、参数上限防护）被翻译为 Netty 管线行为，翻译层必然在 core。"**传输层提前执行 Servlet 语义，servlet 桥只消费结果**"是本框架的一贯模式，不是放错位置。
+
+典型证据（键名 → core 实现 → servlet 桥消费）：
+
+| 键 | core 实现 | servlet 桥消费 |
+|----|----------|---------------|
+| `spring.servlet.multipart.*` | `MultipartConfig`（io.springperf.web.server）+ `SupportMultipartAggregator` 管线聚合、超限即 413/400 | `PerfHttpServletRequest.getParts` 只读聚合结果 |
+| `server.error.*` | `ErrorPageRenderer`/`ErrorResponseConfig` 内联渲染（无 ERROR dispatch 重入） | `ExceptionRegistry`/`NettyServerHttpResponse.sendError` 调用 |
+| `server.http.max-parameter-count` | `NettyServerHttpRequest` + `ParameterLimitExceededException` 管线防护 | `getParameter*` 仅桥接 |
+
+### 后果
+
+- **收益**：依赖矩阵不变（core 零 servlet-api 依赖，core 可独立发布）；管线防护在请求进入 servlet 桥/业务线程之前生效（恶意大文件/超参请求不消耗业务资源）；错误页与防护能力被所有上层（含 management 端口路径）共享，不被 servlet 模块独占。
+- **代价**：按"键命名空间"找实现会定位到 core 而非 servlet 模块——读代码需按**实现层级**（传输层管线 / MVC 分发 / Servlet 桥）而非键前缀定位；multipart 键存在**双家族并存**（`spring.servlet.multipart.max-file-size/max-request-size` 与 `server.http.multipart.max-part-count/max-part-header-size`，语义部分重叠），是已知的键名整理债务——对齐 Boot 优先，暂不改名（破坏性变更）。
+- **边界 / 重新审视条件**：若未来①引入 reactive 栈（`spring.mvc.*` 键将产生语义冲突，Boot 中该命名空间是 servlet 栈专属）；②决定统一 multipart 键家族——两者都需要一次集中键名整理并走 `BREAKING-CHANGES.md` 流程，届时本 ADR 升级为"已部分取代"。
+
+**关联**：[02 篇](02-architecture-overview.md) 依赖矩阵与包拓扑、[12 篇](12-support-bridge.md) Servlet 桥接、`BREAKING-CHANGES.md`、`docs/configuration.md`。
+
+---
+
+## 小结：十一条决策的共同主线
 
 | # | 决策 | 状态 | 代价 | 边界核心 |
 |---|------|------|------|---------|
@@ -289,8 +323,9 @@ SSE/流式输出需生产者（EventLoop 或业务线程）→ 消费者（Event
 | 8 | 静态 Map 唯一性（不 per-instance） | 已采纳 | 扩容并发理论窗口 | 不改 per-instance |
 | 9 | fail-fast 启动校验 | 已采纳 | 启动期遍历成本 | 动态注册时退化为注册时校验 |
 | 10 | 显式 SPI 收口 vs `@Conditional` | 已采纳 | 同名覆盖机制隐式 | `RouterOptimizer` 不走类型发现 |
+| 11 | Servlet 容器语义下沉管线，键名与实现模块分离 | 已采纳 | 键命名空间与模块错位 + multipart 双家族并存 | 引入 reactive 栈或统一键家族时重新审视 |
 
-十条决策背后是三条一以贯之的主线：
+十一条决策背后是三条一以贯之的主线：
 
 1. **启动期确定性 + 运行时零开销**（ADR 1/3/9）：把"确定"从运行时前移到启动期——ASM 字节码生成、`int index` 分配、fail-fast 校验都在启动期完成，运行时只做数组索引与无锁 drain。这与 [16 篇](16-code-spotlights.md) 小结的"启动期做尽计算，运行时只做最必要的事"完全一致。
 2. **显式优于隐式，但不发明轮子**（ADR 4/10）：`@RunInPool` 显式声明执行位置（命名业务池或 EventLoop）、`WebComponent` 显式收口 SPI 发现——框架在关键决策点让用户显式表态（而非靠惯例推断）；但又不发明 `@WebComponent` 注解，复用 Spring `Ordered`/`@Order` 与 `AnnotationAwareOrderComparator`，扩展方零学习成本。
@@ -300,4 +335,4 @@ SSE/流式输出需生产者（EventLoop 或业务线程）→ 消费者（Event
 
 ---
 
-> **下一篇**：[20 · 总结与路线图](20-summary-roadmap.md)——系列总结与未来工作。
+> **系列到此结束**：本系列共 20 篇（`00` 索引 + `01`–`19` 正文），本篇为最后一篇。后续路线图见仓库根目录 [`CHANGELOG.md`](../../CHANGELOG.md) 与 [`docs/modules.md`](../modules.md)。

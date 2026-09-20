@@ -225,21 +225,27 @@ public Publisher<Data> reactiveEndpoint() {
 
 这种方式对高并发、IO 密集且延迟分散的场景（如网关、聚合服务）特别有效——EventLoop 本身的高效调度 + reactive 库的异步驱动，不需要业务线程池介入。
 
-**选择三：JDK 21 虚拟线程（未来）**
+**选择三：JDK 21 虚拟线程（已支持）**
+
+`spring.threads.virtual.enabled=true` 时，`default` 业务线程池切换为虚拟线程——每请求一个虚拟线程（不池化）：
+
+```properties
+# application.properties（JDK 21+）
+spring.threads.virtual.enabled=true
+```
 
 ```java
-@GetMapping("/future-ready")
-@RunInPool(RunInPool.EVENTLOOP) // 虚拟线程 + EventLoop 无阻塞切换
-public Result<Data> query() {
+@GetMapping("/virtual-thread")
+public Result<Data> query() {   // 无需 @RunInPool：默认走 default 业务池
     return Result.ok(repository.findById(1L));
 }
 ```
 
-此框架的同步编程模型与虚拟线程天然兼容。当 JDK 21+ 虚拟线程普及后，`@RunInPool` + `EventLoop` 组合允许虚拟线程直接在 EventLoop 上执行阻塞操作——虚拟线程的 `park`/`unpark` 机制让阻塞不再阻塞操作系统线程，无需额外业务线程池。
+此框架的同步编程模型与虚拟线程天然兼容：业务代码仍是阻塞式写法，但阻塞只挂起虚拟线程而非平台线程，因此 IO 密集端点不必再准备大线程池。JDK < 21 时该配置会告警并回落平台线程池（见 [`BizPoolRegistry`](../spring-web/src/main/java/io/springperf/web/core/pool/BizPoolRegistry.java)）。
 
 ### 当前收益 vs 架构意义
 
-在当下，直接 EventLoop 处理对纯 CPU 端点节省了线程切换（~1-3μs），但这只是附带好处。**架构上更重要的是**：框架没有绑定死一个模型——业务方可以根据自己的场景选择同步阻塞、响应式、或者未来的虚拟线程，而不需要更换 Web 框架。
+在当下，直接 EventLoop 处理对纯 CPU 端点节省了线程切换（~1-3μs），但这只是附带好处。**架构上更重要的是**：框架没有绑定死一个模型——业务方可以根据自己的场景选择同步阻塞、响应式、或者虚拟线程（JDK 21+ 开箱即用），而不需要更换 Web 框架。
 
 ---
 

@@ -14,12 +14,14 @@
 
 ## 项目配置
 
-- Java 8 源码兼容
-- 多版本兼容：Spring Boot 2.7.x / 2.6.x / 2.5.x / 2.4.x（BOM + Profile 切换）
+- Java 17 源码兼容（`pom.xml` 的 `java.version=17`；`2.7.x` 分支才是 Java 8）
+- 多版本兼容：默认 Spring Boot **3.5.16**，Profile 覆盖 **2.4 ~ 2.7 / 3.0 ~ 3.5 / 4.0 ~ 4.1**（`-Pspring-boot-*` 切换）
 - Netty 4.1.137.Final
 - Jackson 2.17.2、Fastjson 2.0.60（provided）
-- Lombok 1.18.24
-- 测试：Spring Boot Test + JUnit 5.8.2 + OkHttp 4.12.0 + AssertJ 3.25.3 + Mockito 4.11.0 + Actuator
+- Lombok 1.18.46
+- 测试：Spring Boot Test + JUnit 5.10.5 + OkHttp 4.12.0 + AssertJ 3.24.2 + Mockito 5.19.0 + Actuator
+
+> 以上为 `master` 分支取值，**以 [`pom.xml`](pom.xml) 为准**（Profile 会覆盖其中多项）；跨分支的版本矩阵与差异见 [`docs/compatibility.md`](docs/compatibility.md)。
 
 # 状态机
 

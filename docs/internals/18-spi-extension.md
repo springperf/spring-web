@@ -224,7 +224,7 @@ phase3 `getBeansOfType(ExecutorService)` 按 beanName 收进 `pools` Map。首�
 ```java
 public class MyMappingRegistry extends MappingRegistry {
     @Override
-    protected List<RouterOptimizer> getOptimizerTemplate() {   // 重写 
+    protected List<RouterOptimizer> getOptimizerTemplate() {   // 重写
         List<RouterOptimizer> t = super.getOptimizerTemplate();
         t.add(0, new RadixTreeRouterOptimizer());  // 在 Prefix 之前插入自定义层
         return t;
