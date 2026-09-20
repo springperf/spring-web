@@ -150,6 +150,20 @@ cp "$JFR_SOURCE_DIR"/jmh-results-*.json "$JFR_TARGET_DIR/" 2>/dev/null
 JFR_COUNT=$(ls "$JFR_TARGET_DIR"/*.jfr 2>/dev/null | wc -l)
 echo "  复制 $JFR_COUNT 个 JFR 文件到: $JFR_TARGET_DIR"
 
+# 栈截断门禁：录制时漏配 -XX:FlightRecorderOptions=stackdepth 会让深栈样本丢掉
+# 【外层】帧（Netty/框架入口），火焰图与热点归因失真。此处只告警不中断
+# （栈顶热点仍可用），但明确提示需用 stackdepth=1024 重新录制。
+CHECK_SCRIPT="$SCRIPT_DIR/check-jfr-truncation.sh"
+if [ -f "$CHECK_SCRIPT" ]; then
+  echo ""
+  echo "[2.5/3] JFR 栈截断检查..."
+  if bash "$CHECK_SCRIPT" "$JFR_TARGET_DIR"; then
+    echo "  -> 无截断"
+  else
+    echo "  -> [WARN] 存在栈截断：深栈样本丢失外层帧，热点归因可能失真（请用 stackdepth=1024 重新录制）"
+  fi
+fi
+
 # ========== Step 3: 运行分析 ==========
 echo ""
 echo "[3/3] CPU 热点分析..."
