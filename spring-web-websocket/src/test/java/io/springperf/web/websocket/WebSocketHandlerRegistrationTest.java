@@ -72,4 +72,18 @@ class WebSocketHandlerRegistrationTest {
         assertNull(reg.getIdleTimeout());
         assertNull(reg.getHeartbeatInterval());
     }
+
+    @Test
+    void setMessageSizeLimit_storesAndReturnsSelf() {
+        WebSocketHandlerRegistration reg = new WebSocketHandlerRegistration(handler, "/ws");
+        WebSocketHandlerRegistration result = reg.setMessageSizeLimit(1024 * 1024);
+        assertSame(reg, result);
+        assertEquals(Long.valueOf(1024 * 1024), reg.getMessageSizeLimit());
+    }
+
+    @Test
+    void messageSizeLimit_defaultNull() {
+        WebSocketHandlerRegistration reg = new WebSocketHandlerRegistration(handler, "/ws");
+        assertNull(reg.getMessageSizeLimit());
+    }
 }

@@ -133,6 +133,21 @@ public class SupportDispatcherHandler extends DispatcherHandler {
         }
 
         @Override
+        public void flushChunked() throws IOException {
+            // include 目标不得提交外层响应（同 flush() 屏蔽）：否则外层尚未写完的内容
+            // 被迫以 chunked 提交，外层后续写入与最终响应都会错乱
+        }
+
+        @Override
+        public void endStream() {
+        }
+
+        @Override
+        public void setBeforeCommit(Runnable callback) {
+            // 不得顶替外层已注册的提交前回调（外层 Writer 编码缓冲依赖它刷入响应体）
+        }
+
+        @Override
         public boolean setHandled() {
             return false;
         }

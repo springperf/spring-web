@@ -189,4 +189,38 @@ class ActuatorEndpointAutoConfigurationTest {
         assertFalse(server.isRunning());
         org.mockito.Mockito.verify(webContext).registerWebComponent(server);
     }
+
+    // ========== M8：管理端口 HTTP/2 与 max-content-length 应取自 management.server.* 前缀 ==========
+
+    @Test
+    void managementNettyHttpServer_readsMaxContentLengthFromManagementPrefix() throws Exception {
+        environment.setProperty("management.server.port", "9092");
+        environment.setProperty("server.http.max-content-length", "9999"); // 主服务器值，应被忽略
+        environment.setProperty("management.server.max-content-length", "2048"); // 管理端口值，应生效
+        WebEndpointProperties props = new WebEndpointProperties();
+        ManagementServerInfrastructure infra = mock(ManagementServerInfrastructure.class);
+        org.mockito.Mockito.when(infra.getDispatcherHandler())
+                .thenReturn(mock(io.springperf.web.autoconfigure.actuator.ManagementDispatcherHandler.class));
+
+        io.springperf.web.autoconfigure.actuator.server.ManagementNettyHttpServer server =
+                config.managementNettyHttpServer(webContext, infra, props, environment);
+
+        assertNotNull(server);
+        java.lang.reflect.Field f = io.springperf.web.autoconfigure.actuator.server.ManagementNettyHttpServer.class
+                .getDeclaredField("maxContentLength");
+        f.setAccessible(true);
+        int maxContentLength = (int) f.get(server);
+        assertEquals(2048, maxContentLength,
+                "管理端口 max-content-length 应取自 management.server.max-content-length，而非主服务器前缀");
+    }
+
+    @Test
+    void managementServerInfrastructure_bothRandomPorts_doesNotThrow() {
+        // L11：management.server.port=0 且 server.port=0（都随机）时不应误报冲突。
+        // 旧逻辑字面比较 0==0 会抛 IllegalStateException 阻断启动。
+        environment.setProperty("management.server.port", "0");
+        environment.setProperty("server.port", "0");
+        WebEndpointProperties props = new WebEndpointProperties();
+        assertDoesNotThrow(() -> config.managementServerInfrastructure(webContext, props, environment));
+    }
 }

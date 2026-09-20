@@ -22,6 +22,7 @@ public class WebSocketHandlerRegistration {
     private Boolean allowExtensions;
     private Long idleTimeout;
     private Long heartbeatInterval;
+    private Long messageSizeLimit;
 
     public WebSocketHandlerRegistration(WebSocketHandler handler, String... paths) {
         this.handler = handler;
@@ -79,5 +80,20 @@ public class WebSocketHandlerRegistration {
 
     public Long getHeartbeatInterval() {
         return heartbeatInterval;
+    }
+
+    /**
+     * 设置该路径 WebSocket 连接允许的最大帧载荷长度（字节），覆盖 {@link io.springperf.web.websocket.server.NettyWebSocketSession}
+     * 默认的 text 8KB / binary 64KB，用于按路径差异化帧上限（如大文件通道 vs 心跳通道）（L14）。
+     *
+     * @param messageSizeLimit 单帧最大字节数，需 &gt; 0
+     */
+    public WebSocketHandlerRegistration setMessageSizeLimit(long messageSizeLimit) {
+        this.messageSizeLimit = messageSizeLimit;
+        return this;
+    }
+
+    public Long getMessageSizeLimit() {
+        return messageSizeLimit;
     }
 }

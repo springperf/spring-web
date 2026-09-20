@@ -42,6 +42,8 @@ public class NettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
     private final PipelineCustomizer pipelineCustomizer;
     /** 本服务器独立的连接计数（与 ManagementNettyHttpServer 各自计数，不共享全局单例）。 */
     private final NettyMetricsHandler metricsHandler = new NettyMetricsHandler();
+    /** 优雅关闭等待时长（毫秒），启动期预解析自 {@code server.shutdown.grace-period}，关闭时传入 EventLoopGroup.shutdownGracefully。 */
+    private long shutdownGraceMillis = PropertiesConstant.SERVER_SHUTDOWN_GRACE_PERIOD_DEFAULT;
 
     public NettyHttpServer(WebContext webContext) {
         this(webContext, null, null);
@@ -61,11 +63,26 @@ public class NettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
     public void start() {
         // 在 Netty 启动前触发 WebContext 生命周期，确保所有 WebComponent 已完成初始化
         webContext.startLifecycle();
+        // 启动期预解析优雅关闭时长，配置错误在此 fail-fast（避免关闭时才暴露）
+        this.shutdownGraceMillis = webContext.getProps().getDurationMillis(
+                PropertiesConstant.SERVER_SHUTDOWN_GRACE_PERIOD,
+                PropertiesConstant.SERVER_SHUTDOWN_GRACE_PERIOD_DEFAULT);
+        // 预解析最大连接数（≤0 不限制），注入连接计数 handler（启动期 fail-fast）
+        metricsHandler.setMaxConnections(webContext.getProps().getInt(PropertiesConstant.SERVER_MAX_CONNECTIONS));
         this.http2Enabled = webContext.getProps().getBoolean(PropertiesConstant.HTTP2_ENABLED, false);
         // 在启动阶段（单线程、Netty 未接受连接前）获取 DispatcherHandler
         // 确保 NettyHttpHandler 运行时只需做纯读操作，线程安全
         DispatcherHandler dispatcher = webContext.getWebComponent(DispatcherHandler.class);
-        this.httpHandler = new NettyHttpHandler(webContext, webContext.getContextPath(), dispatcher);
+        // 启动期预解析压缩配置：供管线注入与 NettyHttpHandler（决定是否每请求写 UA）共用，仅解析一次
+        CompressionConfig compressionConfig = CompressionConfig.fromProperties(webContext.getProps());
+        // 启动期预解析 keep-alive 配置：供管线注入（请求计数 / 空闲超时），仅解析一次
+        KeepAliveConfig keepAliveConfig = KeepAliveConfig.fromProperties(webContext.getProps());
+        // 启动期预解析响应写出层限制（swallow-size / 响应头大小），仅解析一次
+        ResponseLimitConfig responseLimitConfig = ResponseLimitConfig.fromProperties(webContext.getProps());
+        // 启动期预解析 multipart 上传配置（spring.servlet.multipart.*），仅解析一次
+        final MultipartConfig multipartConfig = MultipartConfig.fromProperties(webContext.getProps());
+        this.httpHandler = new NettyHttpHandler(webContext, webContext.getContextPath(), dispatcher,
+                compressionConfig.isEnabled(), responseLimitConfig);
         int port = webContext.getProps().getInt(PropertiesConstant.SERVER_PORT);
         int bossThreads = webContext.getProps().getInt(PropertiesConstant.SERVER_NETTY_BOSS_THREADS);
         int workerThreads = webContext.getProps().getInt(PropertiesConstant.SERVER_NETTY_WORKERS);
@@ -103,22 +120,32 @@ public class NettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
                         Http2ChannelInitializer innerInit = new Http2ChannelInitializer(
                         http2Enabled,
                         sslContext,
-                        webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_CONTENT_LENGTH),
-                        webContext.getProps().getLong(PropertiesConstant.HTTP_READ_TIMEOUT),
-                        true, // supportMultipart = true for main server
+                        (int) Math.min(multipartConfig.getMaxRequestSize(), Integer.MAX_VALUE),
+                        webContext.getProps().getDurationMillis(PropertiesConstant.HTTP_READ_TIMEOUT,
+                                PropertiesConstant.HTTP_READ_TIMEOUT_DEFAULT),
+                        // spring.servlet.multipart.enabled=false 时不装 multipart 聚合器（对齐 Boot：
+                        // 关闭后请求体不解析为 part，getParts 按规范报"非 multipart 请求"）
+                        multipartConfig.isEnabled(),
                         httpHandler,
                         beforeAggHandlers,
                         afterAggHandlers,
                         webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_INITIAL_LINE_LENGTH),
-                        webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_HEADER_SIZE),
-                        webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_CHUNK_SIZE)
-                );
+                        webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_REQUEST_HEADER_SIZE),
+                        webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_CHUNK_SIZE),
+                        webContext.getProps().getInt(PropertiesConstant.HTTP_MULTIPART_MAX_PART_COUNT),
+                        webContext.getProps().getInt(PropertiesConstant.HTTP_MULTIPART_MAX_PART_HEADER_SIZE),
+                        compressionConfig, keepAliveConfig
+                ).multipartConfig(multipartConfig);
                         ch.pipeline().addLast(metricsHandler);
                         innerInit.initChannel(ch);
                     }
                 });
         try {
-            serverChannel = bootstrap.bind(port).sync().channel();
+            String bindAddress = webContext.getProps().get(PropertiesConstant.SERVER_ADDRESS, null);
+            InetSocketAddress bindSocketAddress = (bindAddress != null && !bindAddress.trim().isEmpty())
+                    ? new InetSocketAddress(bindAddress.trim(), port)
+                    : new InetSocketAddress(port);
+            serverChannel = bootstrap.bind(bindSocketAddress).sync().channel();
             this.actualPort = ((InetSocketAddress) serverChannel.localAddress()).getPort();
             running = true;
             publishLocalServerPort();
@@ -246,12 +273,13 @@ public class NettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
 
     @Override
     public void destroyComponent() throws Exception {
+        // 对齐 Spring Boot：quietPeriod=0，最多等待 grace-period 让在途请求排空后强制关闭
         if (bossGroup != null) {
-            bossGroup.shutdownGracefully().sync();
+            bossGroup.shutdownGracefully(0, shutdownGraceMillis, TimeUnit.MILLISECONDS).sync();
         }
         if (workerGroup != null) {
-            workerGroup.shutdownGracefully().sync();
+            workerGroup.shutdownGracefully(0, shutdownGraceMillis, TimeUnit.MILLISECONDS).sync();
         }
-        log.info("Netty Server EventLoop shut down");
+        log.info("Netty Server EventLoop shut down (grace-period={}ms)", shutdownGraceMillis);
     }
 }

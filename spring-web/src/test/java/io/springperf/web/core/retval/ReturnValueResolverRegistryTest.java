@@ -62,13 +62,17 @@ class ReturnValueResolverRegistryTest {
     }
 
     @Test
-    void skipResolve_nullMethodReturnValue_nonVoid_doesNotSetHandled() {
+    void skipResolve_nonVoidMethodReturnsNull_setsHandled() throws Exception {
+        // 修复 H2：非 void 方法返回 null 必须标记 handled，否则响应永不 flush（挂起→504）
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        when(resp.isHandled()).thenReturn(false);
+        Method method = TestController.class.getMethod("handle"); // public String handle()
+        MappingHandlerMethod mapping = new MappingHandlerMethod(new TestController(), method);
 
-        boolean skipped = registry.skipResolve(null, null, null, resp);
+        boolean skipped = registry.skipResolve(null, mapping, null, resp);
 
         assertTrue(skipped);
-        verify(resp, never()).setHandled();
+        verify(resp).setHandled();
     }
 
     @Test
@@ -164,6 +168,21 @@ class ReturnValueResolverRegistryTest {
         WebServerHttpRequest req = mock(WebServerHttpRequest.class);
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
         Method method = TestController.class.getMethod("voidMethod");
+        MappingHandlerMethod mapping = new MappingHandlerMethod(new TestController(), method);
+
+        registry.resolveReturnValue(null, mapping, req, resp);
+
+        verify(resp).setHandled();
+    }
+
+    @Test
+    void resolveReturnValue_nonVoidMethodReturnsNull_setsHandled() throws Exception {
+        // 修复 H2 全链路：非 void 方法返回 null 经 resolveReturnValue 仍须标记 handled（否则响应挂起）
+        registry.initReturnValueResolver();
+        WebServerHttpRequest req = mock(WebServerHttpRequest.class);
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        when(resp.isHandled()).thenReturn(false);
+        Method method = TestController.class.getMethod("handle"); // String handle()
         MappingHandlerMethod mapping = new MappingHandlerMethod(new TestController(), method);
 
         registry.resolveReturnValue(null, mapping, req, resp);

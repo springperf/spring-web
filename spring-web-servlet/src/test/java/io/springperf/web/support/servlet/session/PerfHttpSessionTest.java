@@ -249,6 +249,20 @@ class PerfHttpSessionTest {
         assertTrue(session.isInvalid());
     }
 
+    @Test
+    void invalidate_sharedAcrossConcurrentWrappers_preventsRevival() {
+        // L8：同一底层 data 的多个并发 wrapper，A 失效后 B 也应看到失效状态，
+        // 否则失效会话可被另一在途请求复活/重新持久化。
+        PerfHttpSession a = new PerfHttpSession(data, servletContext);
+        PerfHttpSession b = new PerfHttpSession(data, servletContext);
+        a.invalidate();
+        assertTrue(b.isInvalid(), "B 的 wrapper 应看到共享 data 的失效状态");
+        assertThrows(IllegalStateException.class, () -> b.getAttribute("k"),
+                "失效会话的并发 wrapper 不应再可读属性");
+        assertThrows(IllegalStateException.class, () -> b.setAttribute("k", "v"),
+                "失效会话的并发 wrapper 不应再可写属性");
+    }
+
     // ===================== Test helper =====================
 
     static class TestBindingListener implements HttpSessionBindingListener {

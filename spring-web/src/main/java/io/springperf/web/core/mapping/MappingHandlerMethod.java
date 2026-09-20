@@ -6,14 +6,23 @@ import org.springframework.aop.support.AopUtils;
 import org.springframework.util.ClassUtils;
 import org.springframework.web.method.HandlerMethod;
 
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class MappingHandlerMethod extends InvokableHandlerMethod {
     private static final Map<Class<?>, Object[]> classCacheInstanceMap = new ConcurrentHashMap<>();
     private static final Map<Method, Object[]> methodCacheInstanceMap = new ConcurrentHashMap<>();
+    /**
+     * 存活实例的弱引用集合：使 {@link #clearCache} 能直接把各实例的本地缓存字段置空，
+     * 而非只能清空静态表数组槽位（否则扩容后悬挂在旧数组上的实例无法被失效）。用弱引用避免
+     * 钉住实例导致的内存泄漏；迭代时顺带清理已回收的引用。
+     */
+    private static final Set<WeakReference<MappingHandlerMethod>> INSTANCES =
+            ConcurrentHashMap.newKeySet();
     protected final Method userMethod;
     protected final Class<?> userClass;
     private volatile Object[] methodCache;
@@ -24,6 +33,7 @@ public class MappingHandlerMethod extends InvokableHandlerMethod {
         Class<?> targetClass = AopProxyUtils.ultimateTargetClass(bean);
         userClass = ClassUtils.getUserClass(targetClass);
         userMethod = AopUtils.getMostSpecificMethod(getBridgedMethod(), userClass);
+        INSTANCES.add(new WeakReference<>(this));
     }
 
     public MappingHandlerMethod(HandlerMethod handlerMethod) {
@@ -31,6 +41,7 @@ public class MappingHandlerMethod extends InvokableHandlerMethod {
         Class<?> targetClass = AopProxyUtils.ultimateTargetClass(handlerMethod.getBean());
         userClass = ClassUtils.getUserClass(targetClass);
         userMethod = AopUtils.getMostSpecificMethod(getBridgedMethod(), userClass);
+        INSTANCES.add(new WeakReference<>(this));
     }
 
     public <T> T get(MappingCacheKey<T> key) {
@@ -62,6 +73,10 @@ public class MappingHandlerMethod extends InvokableHandlerMethod {
 
     protected Object[] getCache(MappingCacheKey key) {
         if (key.classCache) {
+            // 实例字段快路径：已填充后不再触碰静态 map，避免每次读 map 的额外开销（缓存才有意义）。
+            // 扩容（set 时 copyOf 生成新数组并写回静态表）后，旧数组引用会"悬"在其它实例上，
+            // 因此 clearCache 会在清除静态表数组槽位的同时，直接把各存活实例的本地字段置空，
+            // 下次访问即重新从静态表拉取已失效的新数组（见 clearCache）。
             if (classCache == null) {
                 classCache = classCacheInstanceMap.computeIfAbsent(userClass, k -> new Object[key.index + 1]);
             }
@@ -95,6 +110,8 @@ public class MappingHandlerMethod extends InvokableHandlerMethod {
      */
     public static <T> void clearCache(MappingCacheKey<T> key) {
         int index = key.index;
+        // 1) 清空静态表数组槽位：覆盖所有 userClass/userMethod；新创建的实例 computeIfAbsent 取到的是
+        //    已失效数组，自然返回 null。
         for (Object[] arr : classCacheInstanceMap.values()) {
             if (index < arr.length) {
                 arr[index] = null;
@@ -103,6 +120,21 @@ public class MappingHandlerMethod extends InvokableHandlerMethod {
         for (Object[] arr : methodCacheInstanceMap.values()) {
             if (index < arr.length) {
                 arr[index] = null;
+            }
+        }
+        // 2) 直接置空所有存活实例的本地缓存字段：扩容后某些实例仍持有已脱离静态表的旧数组引用，
+        //    仅清静态表槽位无法使它们失效；置空本地字段后，下次访问经 getCache 的快路径判断为 null，
+        //    重新从静态表拉取已失效的新数组，确保 Javadoc 声称的"运行期失效"真正生效。
+        for (java.util.Iterator<WeakReference<MappingHandlerMethod>> it = INSTANCES.iterator(); it.hasNext(); ) {
+            MappingHandlerMethod m = it.next().get();
+            if (m == null) {
+                it.remove();
+                continue;
+            }
+            if (key.classCache) {
+                m.classCache = null;
+            } else {
+                m.methodCache = null;
             }
         }
     }

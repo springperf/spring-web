@@ -55,7 +55,7 @@ class ResponseStatusExceptionResolverTest {
         boolean result = resolver.resolveException(request, response, handler, ex);
 
         assertTrue(result);
-        verify(response).sendError(HttpStatus.NOT_FOUND, "not found");
+        verify(response).sendError(HttpStatus.NOT_FOUND, "not found", null, false, false, false);
     }
 
     @Test
@@ -72,7 +72,7 @@ class ResponseStatusExceptionResolverTest {
 
         assertTrue(result);
         assertTrue(respHeaders.isEmpty(), "headers 为空时不得复制任何响应头");
-        verify(response).sendError(HttpStatus.BAD_REQUEST, "bad");
+        verify(response).sendError(HttpStatus.BAD_REQUEST, "bad", null, false, false, false);
     }
 
     @Test
@@ -110,7 +110,7 @@ class ResponseStatusExceptionResolverTest {
         boolean result = resolver.resolveException(request, response, handler, ex);
 
         assertTrue(result);
-        verify(response).sendError(HttpStatus.NOT_FOUND);
+        verify(response).sendError(HttpStatus.NOT_FOUND, null, null, false, false, false);
     }
 
     @ResponseStatus(value = HttpStatus.BAD_REQUEST, reason = "bad.request")
@@ -124,7 +124,7 @@ class ResponseStatusExceptionResolverTest {
         boolean result = resolver.resolveException(request, response, handler, ex);
 
         assertTrue(result);
-        verify(response).sendError(HttpStatus.BAD_REQUEST, "bad.request");
+        verify(response).sendError(HttpStatus.BAD_REQUEST, "bad.request", null, false, false, false);
     }
 
     @Test
@@ -138,7 +138,7 @@ class ResponseStatusExceptionResolverTest {
         boolean result = resolver.resolveException(request, response, handler, ex);
 
         assertTrue(result);
-        verify(response).sendError(HttpStatus.BAD_REQUEST, "自定义错误信息");
+        verify(response).sendError(HttpStatus.BAD_REQUEST, "自定义错误信息", null, false, false, false);
     }
 
     @ResponseStatus(HttpStatus.IM_USED)
@@ -160,7 +160,7 @@ class ResponseStatusExceptionResolverTest {
 
         assertTrue(result);
         // The resolver recurses to ex.getCause() and finds @ResponseStatus on ImUsedException
-        verify(response).sendError(HttpStatus.IM_USED);
+        verify(response).sendError(HttpStatus.IM_USED, null, null, false, false, false);
     }
 
     // ----- C2/C3: 参数绑定/消息体解析错误 → 400（对齐 Spring DefaultHandlerExceptionResolver） -----
@@ -173,7 +173,8 @@ class ResponseStatusExceptionResolverTest {
         boolean result = resolver.resolveException(request, response, handler, ex);
 
         assertTrue(result);
-        verify(response).sendError(HttpStatus.BAD_REQUEST);
+        // 绑定/解析失败：400 且必须携带原始异常（BindingResult 的唯一来源）
+        verify(response).sendError(HttpStatus.BAD_REQUEST, ex.getMessage(), ex, false, false, false);
     }
 
     @Test
@@ -183,7 +184,8 @@ class ResponseStatusExceptionResolverTest {
         boolean result = resolver.resolveException(request, response, handler, ex);
 
         assertTrue(result);
-        verify(response).sendError(HttpStatus.BAD_REQUEST);
+        // 绑定/解析失败：400 且必须携带原始异常（BindingResult 的唯一来源）
+        verify(response).sendError(HttpStatus.BAD_REQUEST, ex.getMessage(), ex, false, false, false);
     }
 
     @Test
@@ -202,7 +204,7 @@ class ResponseStatusExceptionResolverTest {
         boolean result = resolver.applyStatusAndReason(HttpStatus.BAD_REQUEST, "error reason", response);
 
         assertTrue(result);
-        verify(response).sendError(HttpStatus.BAD_REQUEST, "error reason");
+        verify(response).sendError(HttpStatus.BAD_REQUEST, "error reason", null, false, false, false);
     }
 
     @Test
@@ -214,7 +216,7 @@ class ResponseStatusExceptionResolverTest {
         boolean result = resolver.applyStatusAndReason(HttpStatus.BAD_REQUEST, "error.code", response);
 
         assertTrue(result);
-        verify(response).sendError(HttpStatus.BAD_REQUEST, "解析后的错误信息");
+        verify(response).sendError(HttpStatus.BAD_REQUEST, "解析后的错误信息", null, false, false, false);
     }
 
     @Test
@@ -222,6 +224,6 @@ class ResponseStatusExceptionResolverTest {
         boolean result = resolver.applyStatusAndReason(HttpStatus.OK, null, response);
 
         assertTrue(result);
-        verify(response).sendError(HttpStatus.OK);
+        verify(response).sendError(HttpStatus.OK, null, null, false, false, false);
     }
 }

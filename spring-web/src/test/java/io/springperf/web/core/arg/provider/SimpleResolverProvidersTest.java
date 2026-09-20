@@ -160,6 +160,20 @@ class SimpleResolverProvidersTest {
         assertFalse(p.supports(param("stringParam", String.class), null));
     }
 
+    /**
+     * 异常类型虽实现 BindingResult（MethodArgumentNotValidException / BindException 家族），
+     * 但在 @ExceptionHandler 上语义是「被抛出的异常」，必须交给异常参数 provider 注入，
+     * 否则本 provider 抢先命中 → 请求属性无 BindingResult → 500。
+     */
+    @Test
+    void errorsResolver_notSupportsExceptionImplementingBindingResult() throws Exception {
+        ErrorsResolverProvider p = new ErrorsResolverProvider();
+        assertFalse(p.supports(param("methodArgNotValidParam",
+                org.springframework.web.bind.MethodArgumentNotValidException.class), null));
+        assertFalse(p.supports(param("bindExceptionParam",
+                org.springframework.validation.BindException.class), null));
+    }
+
     @Test
     void errorsResolver_existingErrors_returnsErrors() throws Exception {
         ErrorsResolverProvider p = new ErrorsResolverProvider();
@@ -434,6 +448,10 @@ class SimpleResolverProvidersTest {
     public void bindingResultParam(BindingResult b) {}
     @SuppressWarnings("unused")
     public void stringParam(String s) {}
+    @SuppressWarnings("unused")
+    public void methodArgNotValidParam(org.springframework.web.bind.MethodArgumentNotValidException e) {}
+    @SuppressWarnings("unused")
+    public void bindExceptionParam(org.springframework.validation.BindException e) {}
     @SuppressWarnings("unused")
     public void annotatedRequestParam(@RequestParam String s) {}
     @SuppressWarnings("unused")

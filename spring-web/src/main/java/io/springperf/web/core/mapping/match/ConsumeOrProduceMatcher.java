@@ -19,6 +19,7 @@ public class ConsumeOrProduceMatcher implements Matcher {
         this.mediaTypeRuleList = mediaTypeRuleList;
     }
 
+    /** 是否 produces 约束（false = consumes 约束）——供不匹配原因判定（415/406）使用。 */
     public boolean isProduce() {
         return isProduce;
     }

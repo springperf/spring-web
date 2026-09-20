@@ -18,29 +18,43 @@ public class MappingResult {
 
     private final PathMappingContext matchedContext;
     private final PathMappingContext[] pathMatchedContexts;
-    private final boolean methodMismatch;
+    private final MismatchKind mismatchKind;
 
-    private static final MappingResult NOT_FOUND = new MappingResult(null, null, false);
+    private static final MappingResult NOT_FOUND = new MappingResult(null, null, MismatchKind.NONE);
     private static final PathMappingContext[] EMPTY_ARRAY = new PathMappingContext[0];
+
+    /**
+     * 路径匹配但条件不满足的原因（决定错误状态码，对齐 Spring MVC）：
+     * {@code METHOD}→405、{@code CONSUMES}→415、{@code PRODUCES}→406、{@code OTHER}→404。
+     */
+    public enum MismatchKind {
+        NONE, METHOD, CONSUMES, PRODUCES, OTHER
+    }
 
     private MappingResult(PathMappingContext matchedContext,
                           PathMappingContext[] pathMatchedContexts,
-                          boolean methodMismatch) {
+                          MismatchKind mismatchKind) {
         this.matchedContext = matchedContext;
         this.pathMatchedContexts = pathMatchedContexts;
-        this.methodMismatch = methodMismatch;
+        this.mismatchKind = mismatchKind;
     }
 
     // ---- factory methods ----
 
     /** 完全匹配（路径 + 条件均命中） */
     public static MappingResult matched(PathMappingContext ctx) {
-        return new MappingResult(ctx, null, false);
+        return new MappingResult(ctx, null, MismatchKind.NONE);
     }
 
     /** 路径精确匹配但条件不满足 */
     public static MappingResult pathMatched(PathMappingContext[] pathMatchedContexts, boolean methodMismatch) {
-        return new MappingResult(null, pathMatchedContexts, methodMismatch);
+        return new MappingResult(null, pathMatchedContexts,
+                methodMismatch ? MismatchKind.METHOD : MismatchKind.OTHER);
+    }
+
+    /** 路径精确匹配但条件不满足（携带具体原因） */
+    public static MappingResult pathMatched(PathMappingContext[] pathMatchedContexts, MismatchKind kind) {
+        return new MappingResult(null, pathMatchedContexts, kind);
     }
 
     /** 完全未匹配（路径不存在） */
@@ -59,7 +73,12 @@ public class MappingResult {
     }
 
     public boolean isMethodMismatch() {
-        return methodMismatch;
+        return mismatchKind == MismatchKind.METHOD;
+    }
+
+    /** 条件不匹配的具体原因（415/406 判定依据）。 */
+    public MismatchKind getMismatchKind() {
+        return mismatchKind;
     }
 
     public PathMappingContext getMatchedContext() {

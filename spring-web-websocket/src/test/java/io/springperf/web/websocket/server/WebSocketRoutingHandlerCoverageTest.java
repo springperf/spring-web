@@ -29,6 +29,9 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.WebSocketSession;
 
+import io.springperf.web.websocket.server.NettyWebSocketSession;
+import org.mockito.ArgumentCaptor;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -348,5 +351,29 @@ class WebSocketRoutingHandlerCoverageTest {
 
         channel.pipeline().fireChannelWritabilityChanged();
         assertNull(channel.pipeline().get("ws.session"));
+    }
+
+    /* ==================== L14：per-path 帧上限覆盖 ==================== */
+
+    @Test
+    void perPathConfig_messageSizeLimit_overridesSessionDefault() throws Exception {
+        handler = mock(WebSocketHandler.class);
+        io.springperf.web.websocket.WebSocketHandlerRegistry registry =
+                new io.springperf.web.websocket.WebSocketHandlerRegistry();
+        registry.addHandler(handler, "/ws").setMessageSizeLimit(1024 * 1024);
+        channel = newChannel(new WebSocketRoutingHandler(
+                Collections.singletonMap("/ws", handler), null, false, null, -1, -1, registry));
+
+        channel.pipeline().fireChannelRead(upgradeRequest("/ws", null));
+        channel.runPendingTasks();
+
+        ArgumentCaptor<WebSocketSession> captor = ArgumentCaptor.forClass(WebSocketSession.class);
+        verify(handler, timeout(2000)).afterConnectionEstablished(captor.capture());
+        WebSocketSession session = captor.getValue();
+        assertInstanceOf(NettyWebSocketSession.class, session);
+        assertEquals(1024 * 1024, ((NettyWebSocketSession) session).getTextMessageSizeLimit(),
+                "per-path messageSizeLimit 应覆盖 session 默认 8KB text 上限");
+        assertEquals(1024 * 1024, ((NettyWebSocketSession) session).getBinaryMessageSizeLimit(),
+                "per-path messageSizeLimit 应覆盖 session 默认 64KB binary 上限");
     }
 }

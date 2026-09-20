@@ -7,6 +7,7 @@ import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PongWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
+import io.netty.handler.timeout.IdleStateHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.CloseStatus;
@@ -204,6 +205,48 @@ class NettyWebSocketSessionTest {
         EmbeddedChannel channel = new EmbeddedChannel();
         NettyWebSocketSession.drainBackpressureQueue(channel);
         assertNull(channel.readOutbound());
+        channel.finishAndReleaseAll();
+    }
+
+    // ========== M7：setMaxIdleTimeout 应真正传播到 pipeline 的 IdleStateHandler ==========
+
+    @Test
+    void setMaxIdleTimeout_updatesExistingIdleHandler() {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        channel.pipeline().addLast("ws-idle", new IdleStateHandler(0, 0, 0));
+
+        NettyWebSocketSession session = newSession(channel);
+        session.setMaxIdleTimeout(30000);
+        channel.runPendingTasks();
+
+        IdleStateHandler after = channel.pipeline().get(IdleStateHandler.class);
+        assertNotNull(after, "IdleStateHandler 应存在");
+        assertEquals(30000, after.getAllIdleTimeInMillis(), "应更新现有 IdleStateHandler 的空闲超时");
+        channel.finishAndReleaseAll();
+    }
+
+    @Test
+    void setMaxIdleTimeout_addsIdleHandlerWhenAbsent() {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        NettyWebSocketSession session = newSession(channel);
+        session.setMaxIdleTimeout(30000);
+        channel.runPendingTasks();
+
+        IdleStateHandler after = channel.pipeline().get(IdleStateHandler.class);
+        assertNotNull(after, "无 IdleStateHandler 时应新增");
+        assertEquals(30000, after.getAllIdleTimeInMillis());
+        channel.finishAndReleaseAll();
+    }
+
+    @Test
+    void setMaxIdleTimeout_removesIdleHandlerWhenZero() {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        channel.pipeline().addLast("ws-idle", new IdleStateHandler(60000, 60000, 60000));
+        NettyWebSocketSession session = newSession(channel);
+        session.setMaxIdleTimeout(0);
+        channel.runPendingTasks();
+
+        assertNull(channel.pipeline().get(IdleStateHandler.class), "setMaxIdleTimeout(<=0) 应移除空闲检测");
         channel.finishAndReleaseAll();
     }
 }
