@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Session View</title>
+</head>
+<body>
+<p>model-msg= <span th:text="${msg}">none</span></p>
+<p>session-user= <span th:text="${user != null ? user : 'no-session'}">none</span></p>
+<p>session-count= <span th:text="${count != null ? count : 'no-session'}">0</span></p>
+</body>
+</html>

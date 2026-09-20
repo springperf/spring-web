@@ -69,11 +69,15 @@ public class CoreFeaturesReturnValueAdvancedTest extends BaseE2ETest {
                 .url(baseUrl() + "/async-timeout")
                 .get()
                 .build();
-        // WebAsyncTask(timeout=100ms) 的任务 sleep 500ms 必然超时：框架在异步派发异常
-        // 路径捕获 InterruptedException 走异常处理 → 500（实测确认）。不得豁免超时。
+        // WebAsyncTask(timeout=100ms) 的任务 sleep 500ms 必然超时。两种合法收尾（竞态）：
+        //   - 框架超时先到 → 503（AsyncRequestTimeoutException，Spring 语义）；
+        //   - 任务被中断后由应用异常处理兜底 → 500（本示例应用的 advice）。
+        // 原先硬编码 500 属竞态型 flaky（跨模块全量运行时暴露）。此处接受两种结果，
+        // 但超时本身不得被豁免（既不能 200、也不能悬挂）。
         try (Response resp = CLIENT.newCall(req).execute()) {
-            assertEquals(500, resp.code(),
-                    "异步任务超时应触发异常处理返回 500，实际 " + resp.code());
+            int code = resp.code();
+            assertTrue(code == 503 || code == 500,
+                    "异步任务超时应以 503（框架超时）或 500（应用异常兜底）收尾，实际 " + code);
         }
     }
 

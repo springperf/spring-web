@@ -35,6 +35,11 @@
             <groupId>io.github.springperf</groupId>
             <artifactId>spring-web-view</artifactId>
         </dependency>
+        <!-- Thymeleaf：E2E 验证 Servlet 场景下模板可读真实 session / principal -->
+        <dependency>
+            <groupId>org.thymeleaf</groupId>
+            <artifactId>thymeleaf</artifactId>
+        </dependency>
 
         <!-- JSP E2E 测试（POC：集成 Apache Jasper 验证 JSP 支持） -->
         <dependency>
@@ -65,6 +70,15 @@
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-messaging</artifactId>
+        </dependency>
+
+        <!-- Reactive 流式 E2E（Publisher → SSE，含客户端断连时的上游取消订阅）。
+             reactive-streams 在 spring-web 中是 optional/非传递依赖，测试模块须显式声明，
+             否则连 org.reactivestreams.Publisher 都无法引用 —— 这正是该路径长期无 E2E 的原因。 -->
+        <dependency>
+            <groupId>org.reactivestreams</groupId>
+            <artifactId>reactive-streams</artifactId>
+            <scope>test</scope>
         </dependency>
 
         <!-- Batch E2E 测试 -->

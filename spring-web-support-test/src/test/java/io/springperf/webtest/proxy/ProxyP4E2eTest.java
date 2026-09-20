@@ -68,15 +68,15 @@ public class ProxyP4E2eTest {
     }
 
     @Test
-    void producesJson_withAcceptXml_returns404() throws Exception {
-        // produces = "application/json" 不匹配 Accept: text/xml
+    void producesJson_withAcceptXml_returns406() throws Exception {
+        // produces = "application/json" 不匹配 Accept: text/xml → 406（对齐 Spring MVC）
         Request req = new Request.Builder()
                 .url(baseUrl() + "/proxy-p4/json-only")
                 .header("Accept", "text/xml")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            assertEquals(404, resp.code());
+            assertEquals(406, resp.code());
         }
     }
 
@@ -97,14 +97,14 @@ public class ProxyP4E2eTest {
     }
 
     @Test
-    void consumesJson_withTextContentType_returns404() throws Exception {
-        // consumes = "application/json" 不匹配 Content-Type: text/plain
+    void consumesJson_withTextContentType_returns415() throws Exception {
+        // consumes = "application/json" 不匹配 Content-Type: text/plain → 415（对齐 Spring MVC）
         Request req = new Request.Builder()
                 .url(baseUrl() + "/proxy-p4/consume-json")
                 .post(RequestBody.create("hello", TEXT_TYPE))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            assertEquals(404, resp.code());
+            assertEquals(415, resp.code());
         }
     }
 

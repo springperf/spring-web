@@ -33,15 +33,15 @@ public class CoreFeaturesContentNegotiationTest extends BaseE2ETest {
     }
 
     @Test
-    void consumesJson_withXmlContentType_returnsNotMatched() throws Exception {
+    void consumesJson_withXmlContentType_returns415() throws Exception {
         RequestBody body = RequestBody.create(XML, "<root/>");
         Request req = new Request.Builder()
                 .url(baseUrl() + "/consumes-json")
                 .post(body)
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            // Framework returns 404 (no matching route) instead of 415
-            assertEquals(404, resp.code());
+            // 对齐 Spring MVC：路径匹配但 consumes 不满足 → 415 Unsupported Media Type
+            assertEquals(415, resp.code());
         }
     }
 
@@ -58,15 +58,15 @@ public class CoreFeaturesContentNegotiationTest extends BaseE2ETest {
     }
 
     @Test
-    void producesXml_withNonMatchingAccept_returnsNotMatched() throws Exception {
+    void producesXml_withNonMatchingAccept_returns406() throws Exception {
         Request req = new Request.Builder()
                 .url(baseUrl() + "/produces-xml")
                 .header("Accept", "text/plain")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            // Framework returns 404 (no matching route) instead of 406
-            assertEquals(404, resp.code());
+            // 对齐 Spring MVC：路径匹配但 produces 不被 Accept 接受 → 406 Not Acceptable
+            assertEquals(406, resp.code());
         }
     }
 

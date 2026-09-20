@@ -40,7 +40,8 @@ class NettyServerHttpRequestBodyTest {
     @BeforeEach
     void setUp() {
         lenient().when(webContext.getProps()).thenReturn(props);
-        lenient().when(props.getInt(anyString())).thenReturn(4096);
+        // 请求体内联阈值现为 ApplicationProperties 热路径字段（默认 4KB）
+        lenient().when(props.getMaxInMemorySize()).thenReturn(4096);
     }
     private static final int LARGE_SIZE = 100 * 1024;
 
@@ -301,6 +302,43 @@ class NettyServerHttpRequestBodyTest {
         NettyServerHttpRequest req = new NettyServerHttpRequest(webContext, ctx, nativeRequest, "/test");
 
         assertEquals(LARGE_SIZE, req.getContentLength());
+    }
+
+    @Test
+    void getContentLength_afterRelease_usesCachedLength() {
+        // 异步场景：同步收尾已把入站 buf 释放（池化 buf 会被回收复用），
+        // 此时再读 content() 会得到 0/陈旧值或抛 IllegalReferenceCountException；
+        // 长度必须来自构造期缓存，与 buf 生命周期解耦。
+        byte[] bodyBytes = "async-body-content".getBytes(StandardCharsets.UTF_8);
+        ByteBuf pooledContent = io.netty.buffer.PooledByteBufAllocator.DEFAULT.buffer(bodyBytes.length);
+        pooledContent.writeBytes(bodyBytes);
+        FullHttpRequest nativeRequest = new DefaultFullHttpRequest(
+                HttpVersion.HTTP_1_1, HttpMethod.POST, "/test", pooledContent);
+        NettyServerHttpRequest req = new NettyServerHttpRequest(webContext, ctx, nativeRequest, "/test");
+        int expected = req.getContentLength();
+        assertEquals(bodyBytes.length, expected);
+
+        req.release();
+
+        assertEquals(expected, req.getContentLength(),
+                "释放后仍应返回构造期缓存长度（不依赖已归还池的 content()）");
+    }
+
+    @Test
+    void release_cascadesToResponse_onlyOnLastRelease() {
+        FullHttpRequest nativeRequest = newRequest("cascade-body");
+        NettyServerHttpRequest req = new NettyServerHttpRequest(webContext, ctx, nativeRequest, "/test");
+        WebServerHttpResponse boundResp = org.mockito.Mockito.mock(WebServerHttpResponse.class);
+        req.setResponse(boundResp);
+
+        req.acquire();   // refCnt 1 → 2
+
+        assertEquals(false, req.release(), "非最后一次 release 不应归零");
+        // 非最后一次（业务线程可能仍在写响应缓冲）时不得级联释放响应 buf
+        org.mockito.Mockito.verify(boundResp, org.mockito.Mockito.never()).release();
+
+        assertEquals(true, req.release(), "最后一次 release 应归零");
+        org.mockito.Mockito.verify(boundResp).release();
     }
 
     // ==================== 辅助 ====================

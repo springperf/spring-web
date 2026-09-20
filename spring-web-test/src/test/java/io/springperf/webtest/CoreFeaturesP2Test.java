@@ -68,14 +68,14 @@ public class CoreFeaturesP2Test extends BaseE2ETest {
     }
 
     @Test
-    void notXmlConsumes_withXmlBody_returns404() throws Exception {
+    void notXmlConsumes_withXmlBody_returns415() throws Exception {
         Request req = new Request.Builder()
                 .url(baseUrl() + "/p2/not-xml")
                 .post(RequestBody.create("<root/>", XML_TYPE))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            // consumes = "!application/xml" rejects XML content type → no route matched
-            assertEquals(404, resp.code());
+            // 对齐 Spring MVC：consumes = "!application/xml" 拒绝 XML 内容类型 → 415
+            assertEquals(415, resp.code());
         }
     }
 
@@ -172,7 +172,10 @@ public class CoreFeaturesP2Test extends BaseE2ETest {
             assertEquals(403, resp.code());
             assertEquals("blocked", resp.header("X-Blocking-Filter"));
             String body = resp.body().string();
-            assertTrue(body.contains("blocked by filter"));
+            // 错误策略对齐 Boot（4.10）：sendError 的 message 默认不外露
+            // （server.error.include-message=never），body 为 whitelabel 错误页（含状态码），
+            // 不再包含 filter 传入的 message 字面量。
+            assertTrue(body.contains("403"), "实际 body=" + body);
         }
     }
 
