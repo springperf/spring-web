@@ -119,9 +119,20 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
 
     protected boolean skipResolve(Object returnValue, MappingHandlerMethod mappingContext, WebServerHttpRequest req, WebServerHttpResponse resp) {
         if (returnValue == null) {
-            if (mappingContext != null && mappingContext.getMethod().getReturnType() == void.class && !resp.isHandled()) {
-                resp.setHandled();
+            if (mappingContext != null) {
+                Class<?> returnType = mappingContext.getMethod().getReturnType();
+                if (returnType == void.class) {
+                    // void 方法：响应体由方法自身写入，直接标记完成
+                    if (!resp.isHandled()) {
+                        resp.setHandled();
+                    }
+                } else {
+                    // 非 void 方法返回 null：声明了返回类型却返回空值，视为"无响应体的已完成响应"。
+                    // 必须标记 handled，否则响应永不 flush（客户端挂起至超时 504）。
+                    resp.setHandled();
+                }
             }
+            // mappingContext == null 时保持原行为：不主动标记（由其它路径负责 flush）
             return true;
         }
         return resp.isHandled();
@@ -185,8 +196,19 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
                 return true;
             }
         }
+        // 无解析器认领：若是响应式类型，说明缺 ReactiveAdapter（最常见原因：运行时类路径无 reactor）。
+        // 「静默空 200」是最难排查的降级形态，故显式告警。独立 logger 名避免与 lombok @Slf4j 的 log 冲突。
+        if (returnValue instanceof org.reactivestreams.Publisher) {
+            REACTIVE_WARN_LOG.warn("return value looks reactive but no resolver accepted it: {} "
+                            + "— missing ReactiveAdapter? (e.g. reactor absent from classpath, "
+                            + "or register one via a ReactiveAdapterRegistry bean)",
+                    returnValue.getClass().getName());
+        }
         return false;
     }
+
+    private static final org.slf4j.Logger REACTIVE_WARN_LOG =
+            org.slf4j.LoggerFactory.getLogger(ReturnValueResolverRegistry.class);
 
     /**
      * 懒缓存异步类型的泛型内联类型和解析器。

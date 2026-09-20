@@ -56,6 +56,8 @@ class EarlyEncodeNettyStreamSenderTest {
         when(asyncWebRequest.getNativeResponse()).thenReturn(nativeResponse);
         when(nativeResponse.getCtx()).thenReturn(ctx);
         when(nativeResponse.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
+        // 终止块单一所有者契约：声明由发送器赢得写入权（mock 默认 false = 已被他人写出）
+        when(nativeResponse.markStreamCompleted()).thenReturn(true);
         when(ctx.channel()).thenReturn(channel);
         when(ctx.executor()).thenReturn(eventLoop);
         when(ctx.alloc()).thenReturn(ByteBufAllocator.DEFAULT);

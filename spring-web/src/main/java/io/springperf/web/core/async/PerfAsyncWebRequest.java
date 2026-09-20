@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.server.ServerHttpAsyncRequestControl;
 import org.springframework.web.context.request.async.AsyncWebRequest;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -17,6 +18,22 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
     public static final RuntimeException DEFAULT_WRITE_ERROR_EXCEPTION = new DefaultWriteErrorException();
     private static final Object RESULT_NONE = new Object();
     private final AtomicReference<State> state = new AtomicReference<>(State.NEW);
+    /** 异步持有者是否仍持有入站请求引用（startAsync 时 +1，写终结时 -1；见 releaseRequestOnce）。 */
+    private final AtomicBoolean requestRefHeld = new AtomicBoolean(false);
+
+    /**
+     * 测试/压测用计量：当前仍被异步持有者扣留的入站请求引用数（acquire +1 / release -1）。
+     *
+     * <p>只触碰异步路径（同步热路径零开销），用于断言「每个场景结束后归零」——这是 ByteBuf
+     * 不泄漏的前置条件；缓冲本身是否泄漏由 Netty leakDetector 判定，两者互为交叉验证。</p>
+     */
+    private static final java.util.concurrent.atomic.AtomicInteger ACTIVE_REQUEST_REFS =
+            new java.util.concurrent.atomic.AtomicInteger();
+
+    /** 供测试断言：所有异步持有者退场后应回到 0（未归零即说明存在未终结的异步生命周期）。 */
+    public static int activeRequestRefs() {
+        return ACTIVE_REQUEST_REFS.get();
+    }
     protected boolean errorHandlingInProgress;
     private long timeoutMillis = -1;
     private Object concurrentResult = RESULT_NONE;
@@ -62,7 +79,67 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
         if (!state.compareAndSet(State.NEW, State.ASYNC_STARTED)) {
             throw new IllegalStateException("Async already started");
         }
+        // 异步持有者诞生：CAS 成功保证只执行一次。异步阶段若读请求体（大 body 为 content 的
+        // duplicate 共享视图）依赖入站 buf 存活，故在此 acquire，由 releaseRequestOnce() 归还。
+        request.acquire();
+        requestRefHeld.set(true);
+        ACTIVE_REQUEST_REFS.incrementAndGet();
         response.addWriteRespEventListener(this);
+    }
+
+    /**
+     * 异步持有者退场（幂等，仅一次）：入站请求引用 -1。
+     *
+     * <p>只在响应【写终结】回调里调用（{@code completeSuccessCallback}/{@code completeErrorCallback}）：
+     * 写完成时响应已提交，请求释放触发的 {@code resp.release()} 为空操作；写失败时响应永无提交机会，
+     * 恰好兜底释放其未提交 buf。超时/断连无需另设释放点——超时响应是一次写入、断连会让写入 future
+     * 失败，两者都会走到这里。</p>
+     *
+     * <p><b>切勿</b>在 {@code writeStreamSuccessCallback} 等【逐 chunk】回调里调用——那是每帧触发。</p>
+     */
+    private void releaseRequestOnce() {
+        if (requestRefHeld.compareAndSet(true, false)) {
+            request.release();
+            ACTIVE_REQUEST_REFS.decrementAndGet();
+        }
+    }
+
+    /**
+     * 连接在响应写出前关闭（客户端中断）时由 NettyHttpHandler 调用：异步持有者退场。
+     *
+     * <p>覆盖「空闲流 / 未完成异步被直接断连」——此时既不写 {@code LastHttpContent}（无
+     * completeSuccessCallback），也没有 chunk 写失败（无 completeErrorCallback /
+     * writeStreamErrorCallback）；若不在此退场，入站 buf 要等请求对象被 GC 才释放。</p>
+     *
+     * <p>只做生命周期清理，<b>不</b>触发业务 errorHandler（客户端中断不是业务错误，避免日志/指标噪声）。
+     * 释放时其他持有者（业务池任务那一次 acquire）仍持有各自引用，故正在读 body 的线程不受影响。</p>
+     */
+    /** 连接断开（客户端消失）时的取消钩子：供上游订阅（reactive）/长任务在断连时主动退场。 */
+    private Runnable connectionCloseHandler;
+
+    /**
+     * 注册「客户端断连」钩子。
+     *
+     * <p>为什么需要独立钩子：写入回调（{@code addWriteCallbackHandler}）只在【下一次投递失败】时
+     * 触发；若源在断连后不再投递（长轮询挂住、DB 游标等待），就永远不会取消 →
+     * 每个断连客户端都会留下一个仍在运行的源。断连本身必须能作为取消信号。</p>
+     */
+    public void addConnectionCloseHandler(Runnable handler) {
+        this.connectionCloseHandler = handler;
+    }
+
+    public void releaseOnConnectionClose() {
+        state.compareAndSet(State.ASYNC_STARTED, State.COMPLETED);
+        Runnable handler = this.connectionCloseHandler;
+        if (handler != null) {
+            this.connectionCloseHandler = null;   // 幂等：只通知一次
+            try {
+                handler.run();
+            } catch (Throwable ignored) {
+                // 断连清理路径：钩子自身异常不得影响后续引用归零
+            }
+        }
+        releaseRequestOnce();
     }
 
     public void scheduleTimeoutIfNeeded() {
@@ -99,6 +176,7 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
     @Override
     public void completeErrorCallback(Throwable throwable) {
         state.set(State.COMPLETED);
+        releaseRequestOnce();
         if (errorHandler != null) {
             errorHandler.accept(throwable);
         }
@@ -107,6 +185,7 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
     @Override
     public void completeSuccessCallback() {
         state.set(State.COMPLETED);
+        releaseRequestOnce();
         if (completionHandler != null) {
             completionHandler.run();
         }
@@ -121,6 +200,11 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
 
     @Override
     public void writeStreamErrorCallback(Throwable throwable) {
+        // 流式路径的【异常终结点】：AbstractNettyStreamSender.onAllDataFailed() 只关连接、
+        // 不挂 isComplete 监听器（正常结束那条走 onAllDataWritten → addRespEventListener(f,true)，
+        // 已汇入 completeSuccessCallback），故这里必须让异步持有者退场，否则入站 buf 泄漏。
+        // 单次守卫 + 流失败即终止 ⇒ 不会重复释放。
+        releaseRequestOnce();
         if (writeCallbackHandler != null) {
             if (throwable == null) {
                 throwable = DEFAULT_WRITE_ERROR_EXCEPTION;

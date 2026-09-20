@@ -108,11 +108,26 @@ public class BenchmarkRunner {
             }
             String jfrDuration = System.getProperty("benchmark.jfr.duration", "600s");
             String jfrSettings = System.getProperty("benchmark.jfr.settings", "profile");
-            extraJvmArgs.add("-XX:FlightRecorderOptions=stackdepth=1024");
+            // 栈深必须显式设置：JVM 默认仅 64 帧，深栈样本会被 JFR 标记 truncated
+            // （丢失外层 Netty/框架帧，热点归因失真）。可用 check-jfr-truncation.sh 校验产物。
+            String jfrStackDepth = System.getProperty("benchmark.jfr.stackdepth", "1024");
+            extraJvmArgs.add("-XX:FlightRecorderOptions=stackdepth=" + jfrStackDepth);
             extraJvmArgs.add("-XX:StartFlightRecording=duration=" + jfrDuration + ",filename=" + jfrFile
                     + ",settings=" + jfrSettings + ",maxsize=256m");
             System.out.println("[BenchmarkRunner] JFR recording enabled: " + jfrFile
-                    + ", duration=" + jfrDuration + ", settings=" + jfrSettings);
+                    + ", duration=" + jfrDuration + ", settings=" + jfrSettings
+                    + ", stackdepth=" + jfrStackDepth);
+        }
+
+        // 额外 JVM 参数（空格分隔）：benchmark.jvm.extraArgs="-Dio.netty.leakDetection.level=paranoid"
+        // 用途：让 forked JVM（内含嵌入式 server 与压测线程，即真实负载路径）开启 Netty 泄漏检测 /
+        // 内存诊断等，供长时 soak 使用；产物用 scripts/check-netty-leaks.sh 校验。
+        String extraJvmArgsProp = System.getProperty("benchmark.jvm.extraArgs", "");
+        if (!extraJvmArgsProp.trim().isEmpty()) {
+            String[] extraParts = extraJvmArgsProp.trim().split("\\s+");
+            java.util.Collections.addAll(extraJvmArgs, extraParts);
+            System.out.println("[BenchmarkRunner] Extra JVM args: "
+                    + java.util.Arrays.toString(extraParts));
         }
 
         // 传递 benchmark.* 系统属性到 forked JVM（内存快照、端口、profile名、线程数等需要）

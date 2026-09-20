@@ -57,6 +57,9 @@ class DefaultNettyStreamSenderTest {
         when(asyncWebRequest.getNativeResponse()).thenReturn(nativeResponse);
         when(nativeResponse.getCtx()).thenReturn(ctx);
         when(nativeResponse.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
+        // 终止块单一所有者契约：默认 mock 返回 false 会被视为「已被他人抢走写入权」→ 不写终止块。
+        // 本类用例验证正常收尾，故声明由发送器赢得该权利。
+        when(nativeResponse.markStreamCompleted()).thenReturn(true);
         when(ctx.channel()).thenReturn(channel);
         when(ctx.executor()).thenReturn(eventLoop);
         when(ctx.alloc()).thenReturn(ByteBufAllocator.DEFAULT);
