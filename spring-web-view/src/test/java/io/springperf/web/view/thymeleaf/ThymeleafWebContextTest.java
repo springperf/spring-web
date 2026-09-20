@@ -165,6 +165,73 @@ class ThymeleafWebContextTest {
     }
 
     @Test
+    void sessionAttributes_injectedAsVariables() {
+        // Thymeleaf 3.1 移除 #session 表达式对象后，session 属性以上下文变量形式提供
+        io.springperf.web.view.WebExchangeProvider provider = sessionProvider();
+        ThymeleafWebContext ctx = new ThymeleafWebContext(
+                new HashMap<>(), Locale.US, req, resp, provider);
+
+        assertTrue(ctx.containsVariable("user"));
+        assertEquals("alice", ctx.getVariable("user"));
+        assertTrue(ctx.getVariableNames().contains("user"));
+    }
+
+    @Test
+    void modelOverridesSessionAttribute() {
+        io.springperf.web.view.WebExchangeProvider provider = sessionProvider();
+        Map<String, Object> model = new HashMap<>();
+        model.put("user", "fromModel");
+
+        ThymeleafWebContext ctx = new ThymeleafWebContext(model, Locale.US, req, resp, provider);
+
+        assertEquals("fromModel", ctx.getVariable("user"), "model 应优先于 session 同名属性");
+    }
+
+    @Test
+    void noSession_modelOnly() {
+        // 默认 provider 无 session：仅 model 变量
+        Map<String, Object> model = new HashMap<>();
+        model.put("only", "m");
+        ThymeleafWebContext ctx = new ThymeleafWebContext(model, Locale.US, req, resp);
+
+        assertEquals("m", ctx.getVariable("only"));
+        assertFalse(ctx.containsVariable("user"));
+    }
+
+    /** 构造一个提供 user=alice 会话的 provider。 */
+    private io.springperf.web.view.WebExchangeProvider sessionProvider() {
+        return new io.springperf.web.view.WebExchangeProvider() {
+            @Override
+            public boolean supports(WebServerHttpRequest request) { return true; }
+
+            @Override
+            public IWebExchange createExchange(WebServerHttpRequest r, WebServerHttpResponse p) {
+                return new io.springperf.web.view.exchange.PerfWebExchange(r, p) {
+                    @Override
+                    public org.thymeleaf.web.IWebSession getSession() {
+                        return new org.thymeleaf.web.IWebSession() {
+                            @Override public boolean exists() { return true; }
+                            @Override public boolean containsAttribute(String name) { return "user".equals(name); }
+                            @Override public int getAttributeCount() { return 1; }
+                            @Override public java.util.Set<String> getAllAttributeNames() {
+                                return java.util.Collections.singleton("user");
+                            }
+                            @Override public Map<String, Object> getAttributeMap() {
+                                return java.util.Collections.singletonMap("user", "alice");
+                            }
+                            @Override public Object getAttributeValue(String name) {
+                                return "user".equals(name) ? "alice" : null;
+                            }
+                            @Override public void setAttributeValue(String name, Object value) { }
+                            @Override public void removeAttribute(String name) { }
+                        };
+                    }
+                };
+            }
+        };
+    }
+
+    @Test
     void application_attributesAndResources() {
         ThymeleafWebContext ctx = buildContext(new HashMap<>());
         IWebApplication application = ctx.getExchange().getApplication();

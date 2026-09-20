@@ -27,6 +27,14 @@
             <artifactId>spring-web-view</artifactId>
             <scope>provided</scope>
         </dependency>
+        <!-- 视图 exchange 桥接需要 Thymeleaf 的 IWebExchange/IWebSession 类型（provided，
+             仅引入 spring-web-view + thymeleaf 时激活；不引入则相关类不参与编译后的运行时路径） -->
+        <dependency>
+            <groupId>org.thymeleaf</groupId>
+            <artifactId>thymeleaf</artifactId>
+            <scope>provided</scope>
+            <optional>true</optional>
+        </dependency>
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-codec-http</artifactId>
