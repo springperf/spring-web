@@ -5,7 +5,7 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.stream.ChunkedWriteHandler;
-import io.netty.handler.timeout.ReadTimeoutHandler;
+
 import io.springperf.web.http.BackpressureHandler;
 import io.springperf.web.http.support.SupportMultipartAggregator;
 import org.junit.jupiter.api.Test;
@@ -57,17 +57,17 @@ class Http2ChannelInitializerTest {
         verify(pipeline).addLast(any(ChunkedWriteHandler.class));
         verify(pipeline).addLast(same(BackpressureHandler.INSTANCE));
         verify(pipeline).addLast(same(httpHandler));
-        verify(pipeline, never()).addLast(any(ReadTimeoutHandler.class));
+        verify(pipeline, never()).addLast(any(ReadIdleTimeoutHandler.class));
     }
 
     @Test
-    void http11_withReadTimeout_addsReadTimeoutHandler() {
+    void http11_withReadTimeout_addsReadIdleTimeoutHandler() {
         ChannelPipeline pipeline = mock(ChannelPipeline.class);
         TestableInitializer init = new TestableInitializer(false, null, 1024, 5000, false,
                 httpHandler, Collections.emptyList(), Collections.emptyList());
         init.initChannel(channel(pipeline));
 
-        verify(pipeline).addLast(any(ReadTimeoutHandler.class));
+        verify(pipeline).addLast(any(ReadIdleTimeoutHandler.class));
     }
 
     @Test
@@ -122,5 +122,52 @@ class Http2ChannelInitializerTest {
         } catch (Exception e) {
             fail("cleartext h2 init 不应抛异常: " + e.getMessage());
         }
+    }
+
+    // ==================== 管线顺序：keep-alive 必须在 httpHandler 之前 ====================
+
+    /** 暴露带 KeepAliveConfig 的完整构造。 */
+    static class TestableKeepAliveInitializer extends Http2ChannelInitializer {
+        TestableKeepAliveInitializer(boolean http2Enabled, int maxContentLength, long readTimeout,
+                                     boolean supportMultipart, NettyHttpHandler httpHandler,
+                                     KeepAliveConfig keepAliveConfig) {
+            super(http2Enabled, null, maxContentLength, readTimeout, supportMultipart, httpHandler,
+                    Collections.emptyList(), Collections.emptyList(),
+                    4096, 8192, 8192, -1, 8192,
+                    CompressionConfig.DISABLED, keepAliveConfig);
+        }
+
+        @Override
+        public void initChannel(SocketChannel ch) {
+            super.initChannel(ch);
+        }
+    }
+
+    @Test
+    void http11_pipelineOrder_keepAliveHandlerBeforeHttpHandler() {
+        // NettyHttpHandler 是入站终端且用自身 ctx 写响应：KeepAliveHandler 若排在其后
+        // 将收不到任何事件（曾因此回归）。用真实 pipeline 锁死顺序。
+        io.netty.channel.embedded.EmbeddedChannel embedded = new io.netty.channel.embedded.EmbeddedChannel();
+        TestableKeepAliveInitializer init = new TestableKeepAliveInitializer(false, 1024, 0, false,
+                httpHandler, new KeepAliveConfig(1000L, 5));
+        init.initChannel(channel(embedded.pipeline()));
+
+        ChannelPipeline pipeline = embedded.pipeline();
+        int keepAliveIdx = -1;
+        int httpHandlerIdx = -1;
+        for (int i = 0; i < pipeline.names().size(); i++) {
+            String name = pipeline.names().get(i);
+            if (pipeline.get(name) instanceof KeepAliveHandler) {
+                keepAliveIdx = i;
+            }
+            if (pipeline.get(name) == httpHandler) {
+                httpHandlerIdx = i;
+            }
+        }
+        assertTrue(keepAliveIdx >= 0, "keep-alive handler 应注入管线");
+        assertTrue(httpHandlerIdx >= 0);
+        assertTrue(keepAliveIdx < httpHandlerIdx,
+                "KeepAliveHandler 必须位于 NettyHttpHandler 之前，实际 keep-alive=" + keepAliveIdx
+                        + " httpHandler=" + httpHandlerIdx + " names=" + pipeline.names());
     }
 }

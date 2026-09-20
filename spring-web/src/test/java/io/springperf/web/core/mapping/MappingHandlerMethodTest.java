@@ -172,4 +172,34 @@ class MappingHandlerMethodTest {
         MappingHandlerMethod fresh = new MappingHandlerMethod(bean, method);
         assertNull(fresh.get(key));
     }
+
+    // ========== M4：扩容后存活实例数组发散导致 clearCache 失效 ==========
+
+    @Test
+    void clearCache_invalidatesAcrossDivergentInstances() throws NoSuchMethodException {
+        // 复现 M4：扩容后某些存活实例仍引用旧(已脱离静态表)数组，clearCache 仅置空静态表当前数组，
+        // 发散实例的缓存槽未被失效，Javadoc 声称的"运行期失效"为假。
+        MappingCacheKey<String> keyLow = MappingCacheKey.createMethodCacheKey(String.class);
+        MappingCacheKey<String> keyHigh = MappingCacheKey.createMethodCacheKey(String.class);
+
+        TestController bean = new TestController();
+        Method method = TestController.class.getMethod("hello");
+        MappingHandlerMethod m1 = new MappingHandlerMethod(bean, method);
+        MappingHandlerMethod m2 = new MappingHandlerMethod(bean, method); // 同 userMethod，共享静态缓存
+
+        // 1. m2 先访问 -> 静态表创建初始数组(长度=keyLow.index+1)，m2.methodCache 指向它
+        m2.get(keyLow);
+        // 2. m1 在更高 index 写入 -> set 触发扩容，生成新数组并写回静态表；m2.methodCache 仍指向旧数组
+        m1.set(keyHigh, "highValue");
+        // 3. m2 在 keyLow 写入 -> 修复前写入 m2 仍持有的旧(已脱离静态表)数组
+        m2.set(keyLow, "lowValue");
+
+        // 4. clearCache 仅置空静态表当前数组，旧数组槽位应一并失效
+        MappingHandlerMethod.clearCache(keyLow);
+
+        // 修复前：m2 仍引用旧数组，get(keyLow) 返回 "lowValue"（未被失效）；
+        // 修复后：getCache 始终从静态表取最新数组，m2 看到 null。
+        assertNull(m1.get(keyLow), "m1 的槽位应被 clearCache 清空");
+        assertNull(m2.get(keyLow), "m2 不应再引用已脱离静态表的旧数组，槽位应被 clearCache 清空");
+    }
 }

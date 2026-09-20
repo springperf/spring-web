@@ -281,9 +281,40 @@ public class MappingRegistry extends WebComponentContainer {
             }
         }
         if (pathMatchedCtxs != null) {
-            return MappingResult.pathMatched(pathMatchedCtxs, false);
+            return MappingResult.pathMatched(pathMatchedCtxs, resolveConditionMismatch(pathMatchedCtxs, req));
         }
         return MappingResult.notFound();
+    }
+
+    /**
+     * 判定「路径匹配但条件不满足」的具体原因（对齐 Spring MVC 状态码语义）：
+     * consumes 不匹配 → 415、produces 不匹配 → 406，其余按 404 处理。
+     */
+    private static MappingResult.MismatchKind resolveConditionMismatch(
+            PathMappingContext[] contexts, WebServerHttpRequest req) {
+        boolean consumesMismatch = false;
+        boolean producesMismatch = false;
+        for (PathMappingContext ctx : contexts) {
+            for (Matcher matcher : ctx.getMatchers()) {
+                if (matcher instanceof ConsumeOrProduceMatcher) {
+                    ConsumeOrProduceMatcher mediaMatcher = (ConsumeOrProduceMatcher) matcher;
+                    if (!mediaMatcher.match(req, ctx)) {
+                        if (mediaMatcher.isProduce()) {
+                            producesMismatch = true;
+                        } else {
+                            consumesMismatch = true;
+                        }
+                    }
+                }
+            }
+        }
+        if (consumesMismatch) {
+            return MappingResult.MismatchKind.CONSUMES;
+        }
+        if (producesMismatch) {
+            return MappingResult.MismatchKind.PRODUCES;
+        }
+        return MappingResult.MismatchKind.OTHER;
     }
 
     /**

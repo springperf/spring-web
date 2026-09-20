@@ -128,6 +128,8 @@ public class InterceptorRegistry extends WebComponentContainer {
         List<HandlerInterceptor> interceptors = getInterceptors(request);
         PathMappingContext mappingContext = PathMappingContext.get(request);
         try {
+            // 与 preHandle 同向（正向）遍历：本项目拦截器顺序由显式 order 决定（添加顺序已转化为
+            // order 做兼容），列表本身已按 order 排好，postHandle 沿用同一顺序即可，不逆向。
             for (HandlerInterceptor i : interceptors) {
                 i.postHandle(request, response, mappingContext, result);
             }
@@ -144,6 +146,8 @@ public class InterceptorRegistry extends WebComponentContainer {
         List<HandlerInterceptor> interceptors = getInterceptors(request);
         PathMappingContext mappingContext = PathMappingContext.get(request);
         try {
+            // 与 preHandle 同向（正向）遍历：本项目拦截器顺序由显式 order 决定，列表已按 order 排好，
+            // afterCompletion 沿用同一顺序。preHandle 提前返回时的逆向语义由 afterCompletionForPassed 处理。
             for (HandlerInterceptor i : interceptors) {
                 i.afterCompletion(request, response, mappingContext, exception);
             }

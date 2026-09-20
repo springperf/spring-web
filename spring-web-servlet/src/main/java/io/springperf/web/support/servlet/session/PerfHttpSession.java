@@ -13,7 +13,6 @@ public class PerfHttpSession implements HttpSession {
     private final ServletContext servletContext;
     private final List<HttpSessionListener> sessionListeners;
     private final List<HttpSessionAttributeListener> attributeListeners;
-    private volatile boolean invalid;
     private volatile Runnable onInvalidateCallback;
     private volatile boolean newSession = true;
 
@@ -119,7 +118,7 @@ public class PerfHttpSession implements HttpSession {
     @Override
     public void invalidate() {
         checkValid();
-        this.invalid = true;
+        data.setInvalid(true);
         Map<String, Object> attrs = new java.util.HashMap<>(data.getAttributes());
         data.clearAttributes();
         for (Map.Entry<String, Object> entry : attrs.entrySet()) {
@@ -150,7 +149,7 @@ public class PerfHttpSession implements HttpSession {
     }
 
     public boolean isInvalid() {
-        return invalid;
+        return data.isInvalid();
     }
 
     @Override
@@ -176,7 +175,7 @@ public class PerfHttpSession implements HttpSession {
     }
 
     private void checkValid() {
-        if (invalid) {
+        if (data.isInvalid()) {
             throw new IllegalStateException("Session with id [" + data.getId() + "] has been invalidated");
         }
     }

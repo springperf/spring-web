@@ -21,6 +21,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -48,6 +49,89 @@ class ResourceRequestHandlerTest {
 
         lenient().when(request.getHeaders()).thenReturn(requestHeaders);
         lenient().when(response.getHeaders()).thenReturn(responseHeaders);
+    }
+
+    // ----- 多段 Range 段数上限（server.http.max-ranges）-----
+
+    /** 固定内容的资源替身，避免依赖测试资源文件（覆盖 protected getResource 钩子）。 */
+    private ResourceRequestHandler handlerServingFixedContent() {
+        return new ResourceRequestHandler(registration) {
+            @Override
+            protected org.springframework.core.io.Resource getResource(String path) {
+                return new org.springframework.core.io.ByteArrayResource("0123456789".getBytes());
+            }
+        };
+    }
+
+    private void stubMaxRanges(String value) {
+        io.springperf.web.context.ApplicationProperties props =
+                mock(io.springperf.web.context.ApplicationProperties.class);
+        io.springperf.web.context.WebContext webContext = mock(io.springperf.web.context.WebContext.class);
+        lenient().when(webContext.getProps()).thenReturn(props);
+        lenient().when(props.get(io.springperf.web.context.PropertiesConstant.HTTP_MAX_RANGES, null))
+                .thenReturn(value);
+        lenient().when(request.getWebContext()).thenReturn(webContext);
+        lenient().when(request.getPath()).thenReturn("/static/e2e-range.txt");
+    }
+
+    /** 上限=2 时 3 段被忽略 → 整实体 200（不 206、不 multipart）。 */
+    @Test
+    void handleResourceRequest_multiRangeAboveConfiguredLimit_fallsBackToWholeEntity() throws Exception {
+        stubMaxRanges("2");
+        requestHeaders.set(HttpHeaders.RANGE, "bytes=0-0,1-1,2-2");
+
+        handlerServingFixedContent().handleResourceRequest(request, response);
+
+        verify(response).setStatusCode(HttpStatus.OK);
+        verify(response, never()).setStatusCode(HttpStatus.PARTIAL_CONTENT);
+    }
+
+    /** 上限=2 时 2 段仍走 multipart/byteranges 206（边界含等于）。 */
+    @Test
+    void handleResourceRequest_multiRangeAtConfiguredLimit_servedAsMultipart() throws Exception {
+        stubMaxRanges("2");
+        requestHeaders.set(HttpHeaders.RANGE, "bytes=0-0,1-1");
+
+        handlerServingFixedContent().handleResourceRequest(request, response);
+
+        verify(response).setStatusCode(HttpStatus.PARTIAL_CONTENT);
+    }
+
+    /** 未配置时不因上下文缺失而收紧：走默认上限（多段正常 206）。 */
+    @Test
+    void handleResourceRequest_withoutWebContext_usesDefaultLimit() throws Exception {
+        // 不桩 getWebContext（返回 null）→ 应回退默认上限而非抛异常/收紧
+        lenient().when(request.getPath()).thenReturn("/static/e2e-range.txt");
+        requestHeaders.set(HttpHeaders.RANGE, "bytes=0-0,1-1");
+
+        handlerServingFixedContent().handleResourceRequest(request, response);
+
+        verify(response).setStatusCode(HttpStatus.PARTIAL_CONTENT);
+    }
+
+    // ----- 多段 Range 段数上限（server.http.max-ranges 的判定内核）-----
+
+    @Test
+    void exceedsMaxRanges_negativeLimit_neverExceeds() {
+        // 负值 = 本层不额外限制（底层 HttpRange 解析器仍有 100 段固有限制，见 PropertiesConstant）
+        assertFalse(ResourceRequestHandler.exceedsMaxRanges(10_000, -1), "上限为负 = 本层不限");
+    }
+
+    @Test
+    void exceedsMaxRanges_aboveParserCap_isStillAllowedByThisLayer() {
+        // 本键只收紧不收放：设成 >100 时本层放行，实际由解析器的 100 段上限拒绝（忽略 Range）
+        assertFalse(ResourceRequestHandler.exceedsMaxRanges(150, 200), "本层放行，交由解析器上限拒绝");
+    }
+
+    @Test
+    void exceedsMaxRanges_boundaryIsInclusive() {
+        assertFalse(ResourceRequestHandler.exceedsMaxRanges(100, 100), "恰好等于上限应放行");
+        assertTrue(ResourceRequestHandler.exceedsMaxRanges(101, 100), "超一段即超限");
+    }
+
+    @Test
+    void exceedsMaxRanges_zero_disablesMultipart() {
+        assertTrue(ResourceRequestHandler.exceedsMaxRanges(2, 0), "0 = 禁止多段（任何多段请求都回退整实体）");
     }
 
     // ----- reformatPath -----
@@ -127,7 +211,8 @@ class ResourceRequestHandlerTest {
         handler.handleResourceRequest(request, response);
 
         verify(response).setStatusCode(HttpStatus.OK);
-        verify(response).writeStream(any(InputStream.class));
+        // 长度已知 → 走 Content-Length 帧的流式重载（chunked 会丢掉 Content-Length）
+        verify(response).writeStream(any(InputStream.class), anyLong());
     }
 
     @Test

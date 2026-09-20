@@ -38,7 +38,8 @@ public class AsyncSupportRegistry extends WebComponentContainer {
     @Override
     public void initWithWebContext(WebContext webContext) {
         super.initWithWebContext(webContext);
-        this.defaultTimeout = webContext.getProps().getLong(PropertiesConstant.ASYNC_TIMEOUT);
+        this.defaultTimeout = webContext.getProps().getDurationMillis(
+                PropertiesConstant.ASYNC_REQUEST_TIMEOUT, PropertiesConstant.ASYNC_REQUEST_TIMEOUT_DEFAULT);
         WebComponentWrapperUtils.registerComponent(this, CallableProcessingInterceptor.class);
         WebComponentWrapperUtils.registerComponent(this, DeferredResultProcessingInterceptor.class);
         ObjectMapper objectMapper = webContext.getBeanFromCtx(ObjectMapper.class);
@@ -176,6 +177,10 @@ public class AsyncSupportRegistry extends WebComponentContainer {
         Long timeout = WebAsyncSupportUtils.getDeferredResultTimeout(deferredResult);
         if (timeout != null) {
             asyncWebRequest.setTimeout(timeout);
+        } else {
+            // DeferredResult 未显式指定超时：回退 spring.mvc.async.request-timeout
+            // （对齐 Callable 路径与 Spring MVC WebAsyncManager 默认超时语义）
+            asyncWebRequest.setTimeout(defaultTimeout);
         }
         WebAsyncSupportUtils.DeferredResultInterceptorChainAdapter interceptorChain = WebAsyncSupportUtils.newDeferredResultInterceptorChain(deferredResult, deferredResultInterceptors);
 

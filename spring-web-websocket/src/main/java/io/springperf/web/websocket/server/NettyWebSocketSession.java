@@ -4,6 +4,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.handler.codec.http.websocketx.*;
+import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.AttributeKey;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.Nullable;
@@ -16,6 +17,7 @@ import java.nio.ByteBuffer;
 import java.security.Principal;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -30,6 +32,7 @@ public class NettyWebSocketSession implements WebSocketSession {
     private static final AtomicLong sessionIdCounter = new AtomicLong(0);
     private static final AttributeKey<Queue<WebSocketFrame>> BACKPRESSURE_QUEUE_KEY =
             AttributeKey.valueOf("ws.backpressure.queue");
+    private static final String IDLE_HANDLER_NAME = "ws-idle";
 
     private final String id;
     private final Channel channel;
@@ -257,6 +260,37 @@ public class NettyWebSocketSession implements WebSocketSession {
     @Override
     public void setBinaryMessageSizeLimit(int limit) {
         this.binaryMessageSizeLimit = limit;
+    }
+
+    /**
+     * 运行期更新会话级空闲超时（毫秒），传播到 Netty pipeline 中的 {@link IdleStateHandler}：
+     * <ul>
+     *   <li>已存在则直接 {@link IdleStateHandler#setAllIdleTime(long)} 重新调度；</li>
+     *   <li>不存在且 {@code idleTimeoutMs > 0} 则新增（握手时全局/per-path 空闲超时未启用的场景）；</li>
+     *   <li>{@code <= 0} 则移除已有的空闲检测。</li>
+     * </ul>
+     * 操作提交到 channel 的 eventLoop 执行，使 JSR-356 {@code Session.setMaxIdleTimeout} 真正生效
+     * （修复前仅赋值字段、空闲超时空操作）。
+     */
+    public void setMaxIdleTimeout(long idleTimeoutMs) {
+        channel.eventLoop().execute(() -> {
+            IdleStateHandler idle = channel.pipeline().get(IdleStateHandler.class);
+            if (idleTimeoutMs <= 0) {
+                if (idle != null) {
+                    channel.pipeline().remove(idle);
+                }
+                return;
+            }
+            if (idle != null) {
+                // Netty 4.1 的 IdleStateHandler 仅提供 getter、无运行期 set 方法；超时在
+                // handlerAdded 时由 initialize() 固化。故就地 replace 为同位置新实例以重新调度。
+                channel.pipeline().replace(idle, IDLE_HANDLER_NAME,
+                        new IdleStateHandler(idleTimeoutMs, idleTimeoutMs, idleTimeoutMs, TimeUnit.MILLISECONDS));
+            } else {
+                channel.pipeline().addFirst(IDLE_HANDLER_NAME,
+                        new IdleStateHandler(idleTimeoutMs, idleTimeoutMs, idleTimeoutMs, TimeUnit.MILLISECONDS));
+            }
+        });
     }
 
     @Override

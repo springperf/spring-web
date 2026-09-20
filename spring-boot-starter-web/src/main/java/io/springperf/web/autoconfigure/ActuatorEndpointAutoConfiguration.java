@@ -89,7 +89,9 @@ public class ActuatorEndpointAutoConfiguration {
                                                                          Environment environment) {
         int mgmtPort = environment.getProperty("management.server.port", int.class, 0);
         int mainPort = environment.getProperty("server.port", int.class, 8080);
-        if (mgmtPort == mainPort) throw new IllegalStateException(
+        // L11：两端口任一为随机端口(0)时跳过冲突校验——OS 会分配不同端口，不会真实冲突；
+        // 仅当两者都显式配置了相同且非 0 的端口时才真正冲突。修复前字面比较 0==0 误报并阻断启动。
+        if (mgmtPort > 0 && mainPort > 0 && mgmtPort == mainPort) throw new IllegalStateException(
                 "management.server.port (" + mgmtPort + ") must be different from server.port (" + mainPort + ")");
         String basePath = webEndpointProperties.getBasePath();
         return new ManagementServerInfrastructure(webContext, basePath);
@@ -102,11 +104,13 @@ public class ActuatorEndpointAutoConfiguration {
             WebContext webContext, ManagementServerInfrastructure managementServerInfrastructure,
             WebEndpointProperties webEndpointProperties, Environment environment) {
         int mgmtPort = environment.getProperty("management.server.port", int.class, 0);
-        boolean http2Enabled = environment.getProperty("server.http2.enabled", boolean.class, false);
+        // 管理端口独立配置：HTTP/2 与 max-content-length 均取自 management.server.* 前缀，
+        // 不再误用主服务器 server.* 的配置（修复前两者都取主服务器值，无法独立配置管理端口）。
+        boolean http2Enabled = environment.getProperty("management.server.http2.enabled", boolean.class, false);
         SslContext sslContext = SslContextFactory.createServerSslContext(environment, "management.server.ssl.", http2Enabled);
         ManagementNettyHttpServer server = new ManagementNettyHttpServer(webContext, webEndpointProperties.getBasePath(),
                 managementServerInfrastructure.getDispatcherHandler(), mgmtPort,
-                environment.getProperty("server.http.max-content-length", int.class, DEFAULT_MAX_CONTENT_LENGTH), sslContext);
+                environment.getProperty("management.server.max-content-length", int.class, DEFAULT_MAX_CONTENT_LENGTH), sslContext);
         webContext.registerWebComponent(server);
         return server;
     }

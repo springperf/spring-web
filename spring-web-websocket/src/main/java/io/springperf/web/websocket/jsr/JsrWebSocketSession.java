@@ -4,6 +4,7 @@ import jakarta.websocket.CloseReason;
 import jakarta.websocket.Extension;
 import jakarta.websocket.MessageHandler;
 import jakarta.websocket.RemoteEndpoint;
+import io.springperf.web.websocket.server.NettyWebSocketSession;
 import jakarta.websocket.Session;
 import jakarta.websocket.WebSocketContainer;
 import org.springframework.web.socket.CloseStatus;
@@ -128,6 +129,11 @@ public class JsrWebSocketSession implements Session {
     @Override
     public void setMaxIdleTimeout(long milliseconds) {
         this.maxIdleTimeout = milliseconds;
+        // 传播到底层 Netty 会话的 pipeline（IdleStateHandler），使会话级空闲超时真正生效
+        // （修复前仅赋值字段、空闲超时空操作）。非 Netty 实现（如测试桩）忽略委托。
+        if (springSession instanceof NettyWebSocketSession) {
+            ((NettyWebSocketSession) springSession).setMaxIdleTimeout(milliseconds);
+        }
     }
 
     @Override
