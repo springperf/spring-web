@@ -71,7 +71,8 @@ public class ControllerEndpointTest extends BaseE2ETest {
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            assertEquals(200, resp.code());
+            assertEquals(200, resp.code(), "async 端点异常，body=" + resp.body().string()
+                    + " retry-after=" + resp.header("Retry-After"));
         }
     }
 }

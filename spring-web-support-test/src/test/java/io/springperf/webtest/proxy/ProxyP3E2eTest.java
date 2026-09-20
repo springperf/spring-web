@@ -138,14 +138,14 @@ public class ProxyP3E2eTest {
     }
 
     @Test
-    void negativeCond_notXmlConsumes_withXml_returns404() throws Exception {
+    void negativeCond_notXmlConsumes_withXml_returns415() throws Exception {
         Request req = new Request.Builder()
                 .url(baseUrl() + "/proxy-cond-extra/not-xml")
                 .post(RequestBody.create("<r/>", XML_TYPE))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            // consumes = "!application/xml" rejects XML → no route matched
-            assertEquals(404, resp.code());
+            // 对齐 Spring MVC：consumes = "!application/xml" 拒绝 XML → 415
+            assertEquals(415, resp.code());
         }
     }
 
@@ -216,7 +216,10 @@ public class ProxyP3E2eTest {
             assertEquals(403, resp.code());
             assertEquals("blocked", resp.header("X-Blocking-Filter"));
             String body = resp.body().string();
-            assertTrue(body.contains("blocked by proxy filter"));
+            // 错误策略对齐 Boot（4.10）：sendError 的 message 默认不外露
+            // （server.error.include-message=never），body 为 whitelabel 错误页（含状态码），
+            // 不再包含 filter 传入的 message 字面量。
+            assertTrue(body.contains("403"), "实际 body=" + body);
         }
     }
 }

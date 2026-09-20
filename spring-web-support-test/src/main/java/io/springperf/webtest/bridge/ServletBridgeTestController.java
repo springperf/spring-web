@@ -42,10 +42,131 @@ public class ServletBridgeTestController {
         return "redirected";
     }
 
+    /**
+     * 桥接模式 SSE：返回 native {@code SseEmitter}，经 servlet 响应包装写出。
+     * 用于补齐桥接模式流式路径的 E2E（见 {@code ServletBridgeSseE2eTest}）。
+     */
+    @GetMapping(value = "/sse-stream", produces = "text/event-stream;charset=UTF-8")
+    public io.springperf.web.core.async.stream.SseEmitter sseStream() {
+        io.springperf.web.core.async.stream.SseEmitter emitter =
+                new io.springperf.web.core.async.stream.SseEmitter();
+        Thread worker = new Thread(() -> {
+            try {
+                emitter.send("bridge-a");
+                Thread.sleep(30);
+                emitter.send("bridge-b");
+                emitter.complete();
+            } catch (Exception e) {
+                emitter.completeWithError(e);
+            }
+        }, "bridge-sse-worker");
+        worker.setDaemon(true);
+        worker.start();
+        return emitter;
+    }
+
+    /**
+     * Spring 兼容的 mvc {@code SseEmitter}（extends ResponseBodyEmitter extends StreamEmitter）：
+     * 经 {@code ResponseBodyEmitterReturnValueResolver} 注入 encodeFunction 后走同一 native 内核。
+     */
+    @GetMapping(value = "/sse-mvc", produces = "text/event-stream;charset=UTF-8")
+    public org.springframework.web.servlet.mvc.method.annotation.SseEmitter sseMvc() {
+        org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter =
+                new org.springframework.web.servlet.mvc.method.annotation.SseEmitter();
+        Thread worker = new Thread(() -> {
+            try {
+                emitter.send("mvc-a");
+                Thread.sleep(30);
+                emitter.send("mvc-b");
+                emitter.complete();
+            } catch (Exception e) {
+                emitter.completeWithError(e);
+            }
+        }, "bridge-mvc-sse-worker");
+        worker.setDaemon(true);
+        worker.start();
+        return emitter;
+    }
+
+    /** Spring 兼容的 {@code ResponseBodyEmitter}：非 SSE，按 codec 编码后顺序写出。 */
+    @GetMapping(value = "/emitter", produces = "text/plain;charset=UTF-8")
+    public org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter emitter() {
+        org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter emitter =
+                new org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter();
+        Thread worker = new Thread(() -> {
+            try {
+                emitter.send("emitter-1");
+                Thread.sleep(30);
+                emitter.send("emitter-2");
+                emitter.complete();
+            } catch (Exception e) {
+                emitter.completeWithError(e);
+            }
+        }, "bridge-emitter-worker");
+        worker.setDaemon(true);
+        worker.start();
+        return emitter;
+    }
+
+    /**
+     * {@code StreamingResponseBody}：独立 {@code @FunctionalInterface}（不是 StreamEmitter），
+     * 当前无 resolver 认领 → 用于固化「未实现」的实测行为（见 ServletBridgeSseE2eTest）。
+     */
+    @GetMapping(value = "/streaming-response-body", produces = "text/plain;charset=UTF-8")
+    public org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody streamingResponseBody() {
+        return out -> {
+            out.write("srb-1".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            out.write("srb-2".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        };
+    }
+
+    /** 桥接模式 SSE 异常终止：发一段后 completeWithError → 截断收尾（与 native 语义一致）。 */
+    @GetMapping(value = "/sse-error", produces = "text/event-stream;charset=UTF-8")
+    public io.springperf.web.core.async.stream.SseEmitter sseError() {
+        io.springperf.web.core.async.stream.SseEmitter emitter =
+                new io.springperf.web.core.async.stream.SseEmitter();
+        Thread worker = new Thread(() -> {
+            try {
+                emitter.send("bridge-err-1");
+                Thread.sleep(50);
+                emitter.completeWithError(new IllegalStateException("bridge-boom"));
+            } catch (Exception e) {
+                emitter.completeWithError(e);
+            }
+        }, "bridge-sse-error-worker");
+        worker.setDaemon(true);
+        worker.start();
+        return emitter;
+    }
+
     @GetMapping("/mime-type")
     public Map<String, String> getMimeType(@RequestParam String file, HttpServletRequest request) {
         Map<String, String> result = new HashMap<>();
         result.put("mimeType", request.getServletContext().getMimeType(file));
+        return result;
+    }
+
+    /** 处理器抛异常 → 期望 500（用于桥接 vs native 错误码一致性对照）。 */
+    @GetMapping("/error-500")
+    public String error500() {
+        throw new IllegalStateException("bridge-boom");
+    }
+
+    /** 异步超时（150ms）→ 期望与 native 相同的超时状态码对照。 */
+    @GetMapping("/async-timeout")
+    public org.springframework.web.context.request.async.DeferredResult<String> asyncTimeout() {
+        org.springframework.web.context.request.async.DeferredResult<String> result =
+                new org.springframework.web.context.request.async.DeferredResult<>(150L);
+        Thread worker = new Thread(() -> {
+            try {
+                Thread.sleep(800);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            result.setResult("bridge-late");
+        }, "bridge-async-timeout-worker");
+        worker.setDaemon(true);
+        worker.start();
         return result;
     }
 

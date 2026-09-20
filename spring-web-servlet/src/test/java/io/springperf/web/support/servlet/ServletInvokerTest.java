@@ -62,6 +62,7 @@ class ServletInvokerTest {
         invoker.invoke(new Object[]{request, perfResponse});
 
         verify(servlet).service(request, perfResponse);
-        verify(webResponse).flush();
+        // flushBuffer 现为 chunked 渐进提交（Tomcat 语义），不再是一次性 flush
+        verify(webResponse).flushChunked();
     }
 }

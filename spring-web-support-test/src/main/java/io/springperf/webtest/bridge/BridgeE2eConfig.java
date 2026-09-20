@@ -96,8 +96,9 @@ public class BridgeE2eConfig implements WebMvcConfigurer {
 
     @Override
     public void configureAsyncSupport(AsyncSupportConfigurer configurer) {
+        // 桥接回调验证已由 WebMvcConfigurerBridgeTest 覆盖；此处不再设置 100ms 默认超时——
+        // 该值会经桥接进入 AsyncSupportRegistry，作用于共享应用的所有异步请求
+        // （DeferredResult/CompletableFuture 现已正确应用 defaultTimeout，1s 的 /demo/async 会被误杀）
         log.info("BridgeE2eConfig.configureAsyncSupport called");
-        configurer.setDefaultTimeout(100L);
-        log.info("Async default timeout set to 100ms");
     }
 }
