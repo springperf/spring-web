@@ -60,16 +60,16 @@
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
 | `spring.web.view.engine` | 无（全部可用） | 启用的模板引擎列表（逗号分隔）：`thymeleaf` / `freemarker` / `beetl`；**不配置则注册 classpath 上所有可用引擎** |
-| `spring.web.view.thymeleaf.prefix` | `templates/` | Thymeleaf 模板前缀（classpath 相对路径） |
-| `spring.web.view.thymeleaf.suffix` | `.html` | Thymeleaf 模板后缀 |
-| `spring.web.view.thymeleaf.cache` | `true` | 是否开启模板缓存（生产开启，开发可设 `false` 热改） |
-| `spring.web.view.freemarker.prefix` | `templates/` | FreeMarker 模板前缀（classpath 相对路径） |
-| `spring.web.view.freemarker.suffix` | `.ftl` | FreeMarker 模板后缀 |
-| `spring.web.view.freemarker.cache` | `true` | 是否开启模板缓存 |
-| `spring.web.view.beetl.prefix` | `templates/` | Beetl 模板前缀（classpath 相对路径） |
-| `spring.web.view.beetl.suffix` | `.btl` | Beetl 模板后缀 |
-| `spring.web.view.beetl.cache` | `true` | 是否开启模板缓存 |
-| `spring.web.view.encoding` | `UTF-8` | 渲染字符集，同时写入 `Content-Type` |
+| `spring.thymeleaf.prefix` | `templates/` | Thymeleaf 模板前缀（classpath 相对路径） |
+| `spring.thymeleaf.suffix` | `.html` | Thymeleaf 模板后缀 |
+| `spring.thymeleaf.cache` | `true` | 是否开启模板缓存（生产开启，开发可设 `false` 热改） |
+| `spring.freemarker.prefix` | `templates/` | FreeMarker 模板前缀（classpath 相对路径） |
+| `spring.freemarker.suffix` | `.ftl` | FreeMarker 模板后缀 |
+| `spring.freemarker.cache` | `true` | 是否开启模板缓存 |
+| `spring.beetl.prefix` | `templates/` | Beetl 模板前缀（classpath 相对路径） |
+| `spring.beetl.suffix` | `.btl` | Beetl 模板后缀 |
+| `spring.beetl.cache` | `true` | 是否开启模板缓存 |
+| `spring.thymeleaf.encoding` | `UTF-8` | 渲染字符集，同时写入 `Content-Type`；FreeMarker / Beetl 默认 UTF-8（与 Boot 行为一致，无独立编码键） |
 
 模板默认从 classpath 的 `templates/` 目录加载（Spring Boot 惯例）。
 
@@ -282,7 +282,7 @@ public String jspView(Model model) {
 | `redirect:` 路径变量模板 | `redirect:/orders/{id}` | ❌ 不支持（仅支持 query 拼接） | 显式拼接 |
 | `redirect:` flash 属性（PRG） | `RedirectAttributes` + `FlashMap` | ❌ 不支持 | 改用 query 参数 |
 | `forward:` 前缀 | `RequestDispatcher.forward` | ❌ 不支持（Netty 无 forward 语义） | 改用 `redirect:` 或直接返回视图 |
-| Thymeleaf `#request` / `#response` / `#session` | `WebContext` 提供 servlet 对象 | ❌ 不支持（`IWebSession` 返回 null） | 模板避免使用，改用 model 属性 |
+| Thymeleaf `#request` / `#response` / `#session` 表达式对象 | `WebContext` 提供 servlet 对象 | ⚠️ 这些表达式对象自 **Thymeleaf 3.1** 起被官方移除；框架改为把 **session 属性注入上下文变量**（同名时 **model 优先**），Servlet 场景（引入 `spring-web-servlet`）下由 `ServletWebExchangeProvider` 提供**真实** session / principal / cookie | 模板写 `${user}` 而非 `${session.user}`；需要 `IWebExchange` 时见[扩展点 §14](extensions.md) |
 | Content Negotiation（Accept 选视图） | `ContentNegotiationManager` | ❌ 不支持（始终 `text/html`） | — |
 | `WebMvcConfigurer.configureViewResolvers` | 配置视图解析器 | ❌ 不支持 | 通过 `@Bean` 注册自定义 `ViewResolver` 或用配置项 |
 | `Map<String,Object>` 参数 | 视为 Model | ❌ 不支持（避免与 `@ModelAttribute` 兜底冲突） | 改用 `Model` 参数 |

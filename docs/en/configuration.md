@@ -10,25 +10,153 @@ All configuration properties are set in `application.properties`.
 |----------|---------|-------------|
 | `server.port` | `8080` | Netty HTTP listening port |
 | `server.servlet.context-path` | `/` | Application context path |
+| `server.address` | none | Bind to a specific NIC address (e.g. `192.168.1.10`); when unset, binds all interfaces (0.0.0.0). Applies to both the main and management ports |
 
 ## HTTP Configuration
 
 | Property | Default | Description |
 |----------|---------|-------------|
 | `server.http.max-content-length` | `4194304` (4MB) | Maximum request body size (bytes) |
-| `server.http.timeout` | `60000` (60s) | HTTP request timeout (milliseconds) |
+| `server.http.timeout` | `60000` (60s) | Response timeout (milliseconds; `<=0` means unlimited, aligning with Tomcat `connectionTimeout=0`): deadline from entering the pipeline to committing the response. On timeout a **504** is written; committing the response (flush / first streaming frame) cancels the timer. Async request timeouts are governed separately by `spring.mvc.async.request-timeout` and produce **503** |
 
 ## Async Configuration
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `server.async.timeout` | `30000` (30s) | Async request (DeferredResult/Callable) timeout (milliseconds) |
+| `spring.mvc.async.request-timeout` | `30s` | Async request (DeferredResult/Callable) timeout (supports 30s/1m/1h or plain number in ms) |
+
+## File Upload (multipart)
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `spring.servlet.multipart.enabled` | `true` | Whether multipart (file upload) parsing is enabled |
+| `spring.servlet.multipart.max-file-size` | `-1` (unlimited) | Max size of a single uploaded file (DataSize, e.g. `10MB`); exceeding it returns **413** |
+| `spring.servlet.multipart.max-request-size` | `-1` | Max size of the whole multipart request (DataSize); falls back to `server.http.max-content-length` when unset |
+| `spring.servlet.multipart.file-size-threshold` | `-1` (framework default 16KB) | Size threshold above which a multipart part is written to disk (DataSize); parts below it stay in memory. Explicit `0` aligns with Boot's write-everything-to-disk semantics |
+| `spring.servlet.multipart.location` | none (system temp dir) | Directory for multipart temp files. **Recommended for containerized deployments** (size-limited tmpfs fills up quickly and eats memory quota) |
+
+> Related guards: `server.http.multipart.max-part-count` (max part count), `server.http.multipart.max-part-header-size` (max single-part header size, exceeding it returns 400), `server.http.max-ranges` (max byte ranges in a multi-range request; default `100` = no extra tightening, **effective cap = min(value, 100)** because the underlying `HttpRange` parser rejects more than 100 ranges, so this key tightens rather than raises; `0` = disable multi-range, negative = no extra limit; above the cap the `Range` header is ignored per RFC 9110 §14.2 and the full entity is returned), `server.http.max-pipelined-requests` (max same-connection requests queued while a response is in flight, default `16`; `<=0` = unlimited. Reaching the limit **pauses reads** (`autoRead=false`) rather than closing the connection or rejecting requests, because pipelining requires in-order responses; unread bytes stay in the socket buffer so TCP flow control provides backpressure, and reads resume once the queue drains).
+>
+> **Why multipart keys span two namespaces**: `spring.servlet.multipart.*` (Boot-aligned upload config: size limits, spilling) vs `server.http.multipart.*` (framework-native pipeline guards: part count, header size). This framework executes Servlet container semantics early in the Netty pipeline (aggregation/validation happens before the Servlet bridge), hence guard keys belong to the HTTP protocol family. See [Design Decision ADR 11](../internals/19-design-decisions.md) for the layering rationale. (Chinese only.)
+
+## Static Resources
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `spring.mvc.static-path-pattern` | `/**` | Global prefix for all resource handler path patterns |
+| `spring.web.resources.add-mappings` | `false` | Whether to auto-register the default mapping (`/**` → `static-locations`). **Default false** (keeps the historical "registered by user code" behavior); when true it coexists with user-registered handlers (user patterns win by specificity, aligned with Boot) |
+| `spring.web.resources.static-locations` | Boot default (4 locations) | Default static locations (comma-separated), aligned with Boot |
+| `spring.web.resources.cache.period` | none | Default cache period for the auto-registered mapping (e.g. `1h`) |
+| `spring.web.resources.cache.cachecontrol.max-age` | none | Cache-Control max-age (takes precedence over `cache.period`) |
+
+## Encoding (server.servlet.encoding.*)
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `server.servlet.encoding.charset` | `UTF-8` | Unified request/response character set |
+| `server.servlet.encoding.force` | `false` | Force the charset on both request and response (overrides explicit `setCharacterEncoding`) |
+| `server.servlet.encoding.force-request` | inherits `force` | Force the charset on the request only |
+| `server.servlet.encoding.force-response` | inherits `force` | Force the charset on the response only |
+
+## Session (server.servlet.session.*)
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `server.servlet.session.tracking-modes` | `COOKIE` | Tracking modes (`COOKIE` / `URL`; `SSL` is N/A here). In `URL` mode no session cookie is issued; `encodeURL()` writes `;jsessionid=` instead and the server reads it back when the cookie is absent (Servlet spec §7.1) |
+| `server.servlet.session.persistent` | `false` | Persist sessions to disk so they survive a restart (JDK serialization, one file per session) |
+| `server.servlet.session.store-dir` | `.perf-sessions` | Persistence directory (effective when `persistent=true`) |
+| `server.servlet.session.persistent-exclude` | none | Session attribute names excluded from persistence (comma-separated) |
+| `server.servlet.virtual-server-name` | `localhost` | ServletContext virtual server name |
+| `server.servlet.application-display-name` | none | ServletContext application display name (`getServletContextName()`) |
+| `server.servlet.context-parameters.*` | none | Explicit block of ServletContext init parameters: `server.servlet.context-parameters.foo=bar` is exposed as `getInitParameter("foo")` |
+| `server.servlet.session.cookie.name` | `JSESSIONID` | Session cookie name |
+| `server.servlet.session.cookie.http-only` | `true` | Forbid script access (`HttpOnly`) |
+| `server.servlet.session.cookie.secure` | `false` | Send over HTTPS only (`Secure`) |
+| `server.servlet.session.cookie.max-age` | `-1` (session cookie) | Cookie lifetime in seconds (`-1` = end of browser session) |
+| `server.servlet.session.cookie.domain` | none | Cookie scope (`Domain`) |
+| `server.servlet.session.cookie.same-site` | none | `SameSite`: `lax` / `strict` / `none` (case-insensitive; unknown values are logged and ignored). **Historical defect**: earlier versions upper-cased the value before handing it to the Netty enum, so `strict` threw `IllegalArgumentException` (fixed) |
+
+> **URL rewriting & session id**: when `tracking-modes` includes `URL` and the request carries no session cookie, the container passes the session as `;jsessionid=<id>` in the URL (`encodeURL`/`encodeRedirectURL` write it, the server reads it back).
+>
+> **Matrix (path) parameters**: content after the first `;` in each path segment is stripped before routing (aligning with Spring's `UrlPathHelper.removeSemicolonContent=true`), so `/foo;jsessionid=X` matches `/foo`; `getRequestURI()` still returns the raw URI while `getServletPath()` returns the stripped path (same split as Tomcat).
+
+## Response Compression (server.compression.*)
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `server.compression.enabled` | `false` | Enable gzip response compression (when off, no compressor is added to the pipeline — zero runtime overhead) |
+| `server.compression.mime-types` | 8-item whitelist | Comma-separated whitelist of Content-Type **primary types** eligible for compression: `text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json,application/xml` |
+| `server.compression.excluded-user-agents` | none | Comma-separated User-Agent regex list (case-insensitive); a match skips compression |
+| `server.compression.min-response-size` | `2KB` | Responses smaller than this size are not compressed (DataSize syntax supported); applies to both `FullHttpResponse` and the first chunk of a chunked response |
+
+> Handled edge cases: HEAD requests are never compressed; zero-copy file responses (`writeFile`) are passed through uncompressed (so a plaintext file body never gets a bogus `Content-Encoding`); pre-compressed static `.gz` assets (already carrying `Content-Encoding`) are not re-compressed. The gzip level is fixed at 6 (Spring exposes no such switch; this matches the Netty default).
+
+## Error Response (server.error.*)
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `server.error.include-stacktrace` | `never` | Expose stack trace: `never` / `on-param` / `always` |
+| `server.error.include-message` | `never` | Expose exception message: `never` / `on-param` / `always` |
+| `server.error.include-binding-errors` | `never` | Expose binding/validation errors: `never` / `on-param` / `always` |
+| `server.error.whitelabel.enabled` | `true` | Whether to render the built-in whitelabel HTML error page |
+| `server.error.path` | `/error` | Error page path / instance identifier |
+| `spring.mvc.problemdetails.enabled` | `false` | Render error responses as RFC 7807 `application/problem+json` |
+
+## MVC Behavior (spring.mvc.*)
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `spring.mvc.throw-exception-if-no-handler-found` | `true` | Raise an exception for a missing handler (routable to `@ControllerAdvice`) instead of a direct 404/405 |
+| `spring.mvc.dispatch.error` / `.options` / `.trace` | `true` | Whether ERROR / OPTIONS / TRACE requests are dispatched to handlers (CORS preflight is still handled when OPTIONS is disabled) |
+| `spring.mvc.publish-request-handled-events` | `false` | Whether to publish a `ServletRequestHandledEvent` when a request completes (aligned with Boot default; enable explicitly for monitoring/audit) |
+| `spring.mvc.message-codes-resolver-format` | `prefix_error_code` | Validation message-code format: `prefix_error_code` / `postfix_error_code` |
+| `spring.mvc.format.date` / `.time` / `.datetime` | ISO (`yyyy-MM-dd` etc.) | Default date/time formats when no `@DateTimeFormat` is present |
+
+## Internationalization (spring.web.locale.*)
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `spring.web.locale` | none | Default Locale (e.g. `zh_CN`) |
+| `spring.web.locale-resolver` | `accept-header` | Locale resolution strategy: `fixed` / `accept-header` |
+| `spring.web.locale-bind` | `true` | Whether to bind `LocaleContextHolder` per request (aligning with Spring MVC). When `false` the framework never touches the Locale context: no per-request context allocation and no ThreadLocal `set/remove`, so `LocaleContextHolder.getLocaleContext()` returns `null` and `getLocale()` falls back to the JVM default. Useful for locale-agnostic API services (if you set the holder yourself afterwards, you must clear it yourself) |
+
+## Access Log (server.accesslog.*)
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `server.accesslog.enabled` | `false` | Whether the access-log filter is enabled |
+| `server.accesslog.format` | see source | Log format (`%h`/`%m`/`%U`/`%T`/`%s`/`%u`) |
+| `server.accesslog.directory` | none | Directory for log files; unset means SLF4J only |
+| `server.accesslog.prefix` / `.suffix` | `access` / `.log` | File name prefix / suffix |
+| `server.accesslog.rotate` | `true` | Daily rotation |
+| `server.accesslog.max-days` | `7` | Days to retain rotated files (`<=0` unlimited) |
+
+## Connections and Limits (server.* guards)
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `server.max-connections` | see source | Max connections (overload protection) |
+| `server.max-parameter-count` | `10000` | Max total parameter count (hash DoS guard) |
+| `server.max-http-request-header-size` | `8192` | Max combined request header size |
+| `server.max-http-response-header-size` | `8192` | Max response header size (degrades to a minimal 500 when exceeded) |
+| `server.max-swallow-size` | `2MB` | Max request-body bytes swallowed after an error response (negative unlimited) |
+| `server.keep-alive-timeout` / `server.max-keep-alive-requests` | see source | Keep-alive idle timeout / max requests per connection |
+| `server.forward-headers-strategy` | `NONE` | Forwarded-header strategy: `NONE`/`FALSE` (do not trust), `FRAMEWORK`/`NATIVE` (trust) |
+| `server.http.max-in-memory-size` | `4096` | In-memory body aggregation limit (beyond it a ByteBuf duplicate is used) |
+| `server.http.max-chunk-size` | `8192` | Max HTTP chunk size |
+| `server.http.max-initial-line-length` | `4096` | Max request initial line length |
+| `server.http.read-timeout` | `30000` | Read **idle** timeout (supports the `30s` form; `<=0` disables). It only bounds read inactivity: **in-flight requests are never killed** (a slow SQL call / downstream call / suspended async handler may exceed it and still deliver its response); only genuinely idle connections and stalled half-requests are reclaimed. Aligns with Tomcat `connectionTimeout` |
+
+> **Full list**: the entries above are the common ones. Every supported key is maintained and validated by
+> `SupportedPropertiesTest` — adding a key without registering it in
+> `META-INF/additional-spring-configuration-metadata.json` fails the build. Run
+> `mvn -pl spring-web test -Dtest=SupportedPropertiesTest -Dperf.props.dump=dump.txt` to export the full list.
 
 ## Graceful Shutdown
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `server.shutdown.timeout` | `30000` (30s) | Graceful shutdown max wait time (milliseconds) |
+| `server.shutdown.grace-period` | `30s` | Graceful shutdown max wait time (supports 30s/1m/1h or plain number in ms) |
 
 ## Startup Configuration
 
@@ -48,6 +176,8 @@ All configuration properties are set in `application.properties`.
 | `server.netty.so-keepalive` | `true` | Enable TCP keepalive (production long-connection friendly) |
 | `server.netty.tcp-nodelay` | `true` | Disable Nagle's algorithm for lower latency |
 | `server.netty.so-reuseaddr` | `true` | Allow port reuse |
+| `server.netty.boss-threads` | `1` | boss EventLoop thread count (accepts connections) |
+| `server.netty.allocator-type` | `pooled` | ByteBuf allocator type (`pooled` reuses buffers to reduce GC) |
 
 ## HTTP/2
 
@@ -64,6 +194,7 @@ All configuration properties are set in `application.properties`.
 | `pool.keep-alive-time` | `60` | Idle thread keep-alive time (seconds) |
 | `pool.queue-capacity` | `100` | Task queue capacity. Bounded by default so that `maxPoolSize` takes effect and overload returns 503 instead of queueing unboundedly (set to 1 when ≤ 0) |
 | `pool.default-execute-mode` | `default` | Default execution mode when no `@RunInPool`. `eventloop`=EventLoop, other values = pool name |
+| `spring.threads.virtual.enabled` | `false` | JDK 21+: when `true`, the framework's execution hot spots use virtual threads — both the `default` business pool and batch methods (`@BatchMapping`) run on virtual threads (only the thread type changes: `pool.*` bounds/queueing and batch's `consumerSize` cap + backpressure semantics are all unchanged); below JDK 21 it warns at startup and falls back to platform threads |
 
 ## SSL Configuration
 
@@ -87,6 +218,10 @@ management.server.port=9090
 management.endpoints.web.base-path=/actuator
 # Exposed endpoints
 management.endpoints.web.exposure.include=health,info,metrics
+# HTTP/2 and request body limit for the management port (prefix management.server.*; defaults
+# apply when unset — the main server's server.* values are no longer reused)
+management.server.http2.enabled=false
+management.server.max-content-length=4194304
 ```
 
 ## Observability Metrics
@@ -110,16 +245,18 @@ When `spring-boot-starter-actuator` is on the classpath, the framework auto-regi
 | Property | Default | Description |
 |----------|---------|-------------|
 | `spring.web.view.engine` | none (all available) | Enabled template engines (comma-separated): `thymeleaf` / `freemarker` / `beetl`; **if unset, all engines on the classpath are registered** |
-| `spring.web.view.thymeleaf.prefix` | `templates/` | Thymeleaf template prefix (classpath-relative) |
-| `spring.web.view.thymeleaf.suffix` | `.html` | Thymeleaf template suffix |
-| `spring.web.view.thymeleaf.cache` | `true` | Template cache (set `false` in development for hot reload) |
-| `spring.web.view.freemarker.prefix` | `templates/` | FreeMarker template prefix (classpath-relative) |
-| `spring.web.view.freemarker.suffix` | `.ftl` | FreeMarker template suffix |
-| `spring.web.view.freemarker.cache` | `true` | Template cache |
-| `spring.web.view.beetl.prefix` | `templates/` | Beetl template prefix (classpath-relative) |
-| `spring.web.view.beetl.suffix` | `.btl` | Beetl template suffix |
-| `spring.web.view.beetl.cache` | `true` | Template cache |
-| `spring.web.view.encoding` | `UTF-8` | Rendering charset, also written to `Content-Type` |
+| `spring.thymeleaf.prefix` | `templates/` | Thymeleaf template prefix (classpath-relative) |
+| `spring.thymeleaf.suffix` | `.html` | Thymeleaf template suffix |
+| `spring.thymeleaf.cache` | `true` | Template cache (set `false` in development for hot reload) |
+| `spring.freemarker.prefix` | `templates/` | FreeMarker template prefix (classpath-relative) |
+| `spring.freemarker.suffix` | `.ftl` | FreeMarker template suffix |
+| `spring.freemarker.cache` | `true` | Template cache |
+| `spring.beetl.prefix` | `templates/` | Beetl template prefix (classpath-relative) |
+| `spring.beetl.suffix` | `.btl` | Beetl template suffix |
+| `spring.beetl.cache` | `true` | Template cache |
+| `spring.thymeleaf.encoding` | `UTF-8` | Rendering charset, also written to `Content-Type`; FreeMarker/Beetl default UTF-8 (no separate key, aligned with Boot) |
+| `spring.mvc.view.prefix` | `/jsp/` | Prefix for **JSP views only** (aligns with Boot's JSP semantics); template engines use their own `spring.{engine}.prefix` |
+| `spring.mvc.view.suffix` | `.jsp` | Suffix for **JSP views only** |
 
 > Full usage: [View Rendering](view.md).
 
@@ -149,10 +286,10 @@ server.http.max-content-length=5242880
 server.http.timeout=15000
 
 # Async
-server.async.timeout=30000
+spring.mvc.async.request-timeout=30s
 
 # Graceful shutdown
-server.shutdown.timeout=30000
+server.shutdown.grace-period=30s
 
 # SSL
 server.ssl.enabled=false
