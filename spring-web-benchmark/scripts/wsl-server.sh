@@ -64,6 +64,6 @@ echo "    连接目标: http://$WSL_IP:$PORT   (JMH 侧传 -Dbenchmark.target=$W
 echo "    Ctrl+C 停止；JFR 落盘 /tmp/${PROFILE#benchmark-}-server.jfr"
 echo
 wsl -e bash -c "exec java -Xms${HEAP_MB}m -Xmx${HEAP_MB}m -XX:+UseG1GC -XX:+AlwaysPreTouch \
-    -XX:FlightRecorderOptions=stackdepth=512 \
+    -XX:FlightRecorderOptions=stackdepth=1024 \
     -XX:StartFlightRecording=filename=/tmp/${PROFILE#benchmark-}-server.jfr,settings=profile \
     -cp '${CP_WSL}:${BENCH_CLASSES_WSL}' ${APP} --server.port=${PORT}"

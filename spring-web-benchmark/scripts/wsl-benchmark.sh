@@ -24,10 +24,30 @@
 #     JMH fork 的子 JVM 不继承启动 JVM 的系统属性，且命令行 -jvmArgs 覆盖 @Fork 注解
 #     jvmArgs，所以堆参数也一并经 -jvmArgs 传（否则 fork 子 JVM 会误判 in-process
 #     在 9090 自起服务端）
-#   - 客户端 JFR：追加 JMH 参数 -jvmArgsAppend -XX:StartFlightRecording=filename=client.jfr,settings=profile
+#   - 客户端 JFR：追加 JMH 参数
+#       -jvmArgsAppend "-XX:FlightRecorderOptions=stackdepth=1024 -XX:StartFlightRecording=filename=client.jfr,settings=profile"
+#     ⚠ 必须同时给 stackdepth：只给 StartFlightRecording 时 JVM 用默认栈深 64，深栈样本会被
+#       标记 truncated（丢失外层 Netty/框架帧，热点归因失真）。本脚本已自动兜底注入，
+#       见下方 apply_jfr_stackdepth。
 #   - 结果: 控制台（默认）；追加 -rf json -rff <file> 落盘 JSON
 # =============================================================================
 set -euo pipefail
+
+# 兜底：用户自行追加 -XX:StartFlightRecording 却漏配 stackdepth 时自动补上（默认仅 64 帧，
+# 深栈样本在 JFR 中标记 truncated）。仅改写 -jvmArgsAppend 的值，其余参数原样透传。
+JFR_STACKDEPTH="${JFR_STACKDEPTH:-1024}"
+apply_jfr_stackdepth() {
+  local out=() prev="" arg
+  for arg in "$@"; do
+    if [ "$prev" = "-jvmArgsAppend" ] && [[ "$arg" == *StartFlightRecording* ]] && [[ "$arg" != *stackdepth* ]]; then
+      echo "==> 自动补 -XX:FlightRecorderOptions=stackdepth=$JFR_STACKDEPTH（避免 JFR 栈截断）" >&2
+      arg="-XX:FlightRecorderOptions=stackdepth=$JFR_STACKDEPTH $arg"
+    fi
+    out+=("$arg")
+    prev="$arg"
+  done
+  printf '%s\0' "${out[@]}"
+}
 # 脚本位于 <project>/spring-web-benchmark/scripts/
 cd "$(dirname "$0")/.."
 BENCH="$(pwd)"   # <project>/spring-web-benchmark 模块目录
@@ -81,8 +101,9 @@ echo "==> Benchmark: $BENCH_CLASS (args: $*)"
 # classpath 里会让原生 JVM 解析失败（报 Unable to find BenchmarkList）。
 BENCH_CLASSES_WIN="$(cygpath -m "$BENCH/target/classes")"
 CP="$BENCH_CLASSES_WIN;$(cat "$CP_FILE")"
+mapfile -d '' JFR_SAFE_ARGS < <(apply_jfr_stackdepth "$@")
 java -Djmh.ignoreLock=true \
     -cp "$CP" org.openjdk.jmh.Main \
     "io.springperf.benchmark.servlet.${BENCH_CLASS}\\..*" \
     -jvmArgs "-Xms1g -Xmx1g -XX:+UseG1GC -XX:+AlwaysPreTouch -Dbenchmark.target=$IP -Dbenchmark.port=$PORT" \
-    "$@"
+    "${JFR_SAFE_ARGS[@]}"

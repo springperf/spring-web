@@ -286,7 +286,9 @@ for ENTRY in "${PROFILES_TO_RUN[@]}"; do
     JFR_OPTS=""
     if [ "$ENABLE_JFR" = true ]; then
       JFR_WSL="$(wsl -e wslpath -a "$REPORTS_DIR/$RUN_ID/$P-server.jfr")"
-      JFR_OPTS="-XX:FlightRecorderOptions=stackdepth=512 -XX:StartFlightRecording=filename=${JFR_WSL},settings=profile"
+      # stackdepth 必须与 StartFlightRecording 配套：缺省 64 会让深栈样本标记 truncated，
+      # 丢失外层 Netty/框架帧导致热点归因失真（可用 check-jfr-truncation.sh 校验）。
+      JFR_OPTS="-XX:FlightRecorderOptions=stackdepth=1024 -XX:StartFlightRecording=filename=${JFR_WSL},settings=profile"
     fi
     echo "    [server] 启动 $APP_CLASS:$PORT in WSL (attempt $1, JFR=$([ "$ENABLE_JFR" = true ] && echo on || echo off)) ..."
     wsl -e bash -c "nohup java -Xms${HEAP_MB}m -Xmx${HEAP_MB}m -XX:+UseG1GC -XX:+AlwaysPreTouch ${JFR_OPTS} -cp '${CP_WSL}:${CLASSES_WSL}' ${APP_CLASS} --server.port=${PORT} > ${LOG_WSL} 2>&1 & echo \$! > ${PID_WSL}; wait" &
