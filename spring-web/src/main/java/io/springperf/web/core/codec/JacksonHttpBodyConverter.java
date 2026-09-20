@@ -51,6 +51,9 @@ public class JacksonHttpBodyConverter extends BaseWebComponent implements HttpBo
             MappingCacheKey.createMethodCacheKey(JavaType.class);
     private static final MappingCacheKey<Boolean> WRITE_TYPE_SERIALIZABLE_CACHE_KEY =
             MappingCacheKey.createMethodCacheKey(Boolean.class);
+    /** canRead 的 canDeserialize 探测结果缓存（见 canRead 注释）。 */
+    private static final MappingCacheKey<Boolean> CAN_DESERIALIZE_CACHE_KEY =
+            MappingCacheKey.createMethodCacheKey(Boolean.class);
 
     private static final MappingCacheKey<Class<?>> JSON_VIEW_CACHE_KEY =
             MappingCacheKey.createMethodCacheKey((Class) Class.class);
@@ -171,8 +174,24 @@ public class JacksonHttpBodyConverter extends BaseWebComponent implements HttpBo
         if (!isJsonMediaType(mediaType)) return false;
         // String 类型应由 StringHttpMessageConverter 处理，而非 Jackson
         if (type == String.class) return false;
-        return getReadObjectMapper(request, mappingContext)
-                .canDeserialize(resolveReadJavaType(type, mappingContext, request));
+        ObjectMapper readMapper = getReadObjectMapper(request, mappingContext);
+        JavaType javaType = resolveReadJavaType(type, mappingContext, request);
+        // canDeserialize 是反射型能力探测（遍历 DeserializerFactory 查反序列化器），
+        // JFR 显示在 POST JSON 热路径上占 ~2-3% 采样。目标 JavaType 与默认 mapper 都静态不变，
+        // 结果按 mappingContext 缓存一次（自定义 mapper 不缓存，保留请求级切换语义）。
+        // 约束：默认 mapper 的能力集视为静态——与 READ_JAVA_TYPE_CACHE_KEY（JavaType 构造
+        // 依赖 mapper 的 TypeFactory）及写侧 WRITE_TYPE_SERIALIZABLE_CACHE_KEY 共享同一假设；
+        // 若运行期修改默认 mapper 能力集，需同时 clearCache 这三个键。
+        if (mappingContext != null && readMapper == mapper) {
+            Boolean cached = mappingContext.get(CAN_DESERIALIZE_CACHE_KEY);
+            if (cached != null) {
+                return cached;
+            }
+            boolean can = readMapper.canDeserialize(javaType);
+            mappingContext.set(CAN_DESERIALIZE_CACHE_KEY, can);
+            return can;
+        }
+        return readMapper.canDeserialize(javaType);
     }
 
     @Override

@@ -168,6 +168,21 @@ class BaseWebServerHttpRequestTest {
     }
 
     @Test
+    void attributes_setAttributeNull_removesPerServletSpec() {
+        // Servlet 规范：setAttribute(name, null) 等价 removeAttribute(name)。
+        // 回归：attributes 为 ConcurrentHashMap，null 值直接 put 抛 NPE，
+        // 导致 forward（无查询串时设置 FORWARD_QUERY_STRING=null）/JSP 视图渲染整体 500。
+        TestRequest req = new TestRequest(webContext, "/test", "/test", new HttpHeaders(), null);
+        req.setAttribute("k", "v");
+        assertDoesNotThrow(() -> req.setAttribute("k", null));
+        assertNull(req.getAttribute("k"));
+        assertEquals(0, req.getAttributes().size());
+        // 对不存在的属性 set null 同样安全
+        assertDoesNotThrow(() -> req.setAttribute("absent", null));
+        assertNull(req.getAttribute("absent"));
+    }
+
+    @Test
     void attributes_typedKeys() {
         TestRequest req = new TestRequest(webContext, "/test", "/test", new HttpHeaders(), null);
         RequestAttribute<String> key = RequestAttribute.createAttribute(String.class);
@@ -251,5 +266,14 @@ class BaseWebServerHttpRequestTest {
         BaseWebServerHttpRequest.AcceptLanguageLocaleCache.put("cache-test", locales);
         assertSame(locales, BaseWebServerHttpRequest.AcceptLanguageLocaleCache.get("cache-test"));
         assertNull(BaseWebServerHttpRequest.AcceptLanguageLocaleCache.get("not-exists"));
+    }
+
+    @Test
+    void defaultLocaleList_isReusedAcrossCalls() {
+        // 默认 Locale 列表固定复用（原实现每请求 Arrays.asList 新建列表）
+        List<Locale> first = BaseWebServerHttpRequest.defaultLocaleList();
+        List<Locale> second = BaseWebServerHttpRequest.defaultLocaleList();
+        assertSame(first, second, "同一 JVM 默认 Locale 下应复用同一列表实例");
+        assertEquals(Locale.getDefault(), first.get(0));
     }
 }

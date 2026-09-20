@@ -24,11 +24,19 @@ public abstract class AbstractNamedValueResolver extends AbstractSupportOptional
 
     protected final WebDataBinderRegistry webDataBinderRegistry;
 
+    /**
+     * 参数类型能否直接接受 String 且非容器（启动期预判）。
+     * <p>命名参数（{@code @RequestParam}/{@code @RequestHeader}/{@code @PathVariable}）的原始取值恒为
+     * String，故该判定为真时无需任何转换 —— 热路径可跳过每参数的类型判定（见 {@link #convert(Object)}）。</p>
+     */
+    private final boolean stringAssignableWithoutConversion;
+
     public AbstractNamedValueResolver(WebContext webContext, MappingHandlerMethod mappingContext, MethodParameter parameter, Class<? extends Annotation>... supportClass) {
         super(mappingContext, parameter);
         this.webContext = webContext;
         this.name = MetaUtils.getParameterName(parameter, supportClass);
         this.webDataBinderRegistry = webContext.getWebComponent(WebDataBinderRegistry.class);
+        this.stringAssignableWithoutConversion = isStringAssignableWithoutConversion(this.paramType);
     }
 
     public AbstractNamedValueResolver(MappingHandlerMethod mappingContext, MethodParameter parameter, WebContext webContext, String name) {
@@ -36,6 +44,15 @@ public abstract class AbstractNamedValueResolver extends AbstractSupportOptional
         this.webContext = webContext;
         this.name = name;
         this.webDataBinderRegistry = webContext.getWebComponent(WebDataBinderRegistry.class);
+        this.stringAssignableWithoutConversion = isStringAssignableWithoutConversion(this.paramType);
+    }
+
+    private static boolean isStringAssignableWithoutConversion(Class<?> paramType) {
+        return paramType != null
+                && paramType.isAssignableFrom(String.class)
+                && !Collection.class.isAssignableFrom(paramType)
+                && !Map.class.isAssignableFrom(paramType)
+                && !paramType.isArray();
     }
 
     protected abstract Object resolveByName(WebServerHttpRequest request, WebServerHttpResponse response) throws Exception;
@@ -53,6 +70,12 @@ public abstract class AbstractNamedValueResolver extends AbstractSupportOptional
 
     protected Object convert(Object arg) {
         if (arg == null) return null;
+        if (arg instanceof String && stringAssignableWithoutConversion) {
+            // 启动期已判定「参数类型可直接接受 String 且非容器」：命名参数的原始取值恒为 String，
+            // 故直接返回，省掉每参数的 arg.getClass() + isAssignableFrom + isContainer 三处判定
+            // （JFR 叶帧 AbstractNamedValueResolver.convert 81 样本 / 2195 ≈ 3.7%，为项目内首位）。
+            return arg;
+        }
         if (paramType.isAssignableFrom(arg.getClass()) && !isContainer(arg)) {
             return arg;
         }
