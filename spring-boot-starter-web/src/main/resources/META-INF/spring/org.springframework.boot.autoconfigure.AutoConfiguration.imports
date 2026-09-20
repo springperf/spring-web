@@ -11,3 +11,5 @@ io.springperf.web.autoconfigure.SwaggerUiAutoConfiguration
 io.springperf.web.autoconfigure.SpringWebViewAutoConfiguration
 io.springperf.web.autoconfigure.SpringWebBatchAutoConfiguration
 io.springperf.web.autoconfigure.JspViewAutoConfiguration
+io.springperf.web.autoconfigure.SpringWebViewExchangeAutoConfiguration
+io.springperf.web.autoconfigure.SpringWebPropertyRefreshAutoConfiguration

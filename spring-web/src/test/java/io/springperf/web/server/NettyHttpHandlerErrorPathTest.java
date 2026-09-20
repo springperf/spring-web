@@ -39,16 +39,9 @@ class NettyHttpHandlerErrorPathTest {
     void setUp() {
         handler = mock(HttpHandler.class);
         lenient().when(webContext.getProps()).thenReturn(appProperties);
-        // 固定合法的内存上限值：mock 默认返回 0 会永久污染 NettyServerHttpRequest 静态缓存
-        lenient().when(appProperties.getInt(PropertiesConstant.HTTP_MAX_IN_MEMORY_SIZE))
+        // 固定合法的内存上限值（热路径字段直读；不再是静态缓存，无跨用例污染）
+        lenient().when(appProperties.getMaxInMemorySize())
                 .thenReturn(PropertiesConstant.HTTP_MAX_IN_MEMORY_SIZE_DEFAULT);
-    }
-
-    @AfterEach
-    void resetStaticCache() throws Exception {
-        Field field = NettyServerHttpRequest.class.getDeclaredField("cachedLargeBodyLimit");
-        field.setAccessible(true);
-        field.setInt(null, -1);
     }
 
     @Test
@@ -146,12 +139,9 @@ class NettyHttpHandlerErrorPathTest {
 
     @Test
     void requestConstructionFailure_releasesRetainedBuffer() throws Exception {
-        // 复位静态缓存使构造函数必然读取配置并抛异常（req 创建失败路径）
-        Field limitField = NettyServerHttpRequest.class.getDeclaredField("cachedLargeBodyLimit");
-        limitField.setAccessible(true);
-        limitField.setInt(null, -1);
+        // 构造期读取配置抛异常（req 创建失败路径）
         doThrow(new IllegalStateException("props boom")).when(appProperties)
-                .getInt(PropertiesConstant.HTTP_MAX_IN_MEMORY_SIZE);
+                .getMaxInMemorySize();
 
         NettyHttpHandler nettyHandler = new NettyHttpHandler(webContext, "", handler);
         EmbeddedChannel channel = new EmbeddedChannel();
