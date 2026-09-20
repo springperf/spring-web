@@ -9,6 +9,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.lang.reflect.Field;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -30,11 +32,12 @@ class ManagementNettyHttpServerTest {
         lenient().when(props.getBoolean(PropertiesConstant.HTTP2_ENABLED, false)).thenReturn(false);
         lenient().when(props.get(PropertiesConstant.SERVER_NETTY_TRANSPORT,
                 PropertiesConstant.SERVER_NETTY_TRANSPORT_DEFAULT)).thenReturn("nio");
-        lenient().when(props.getLong(PropertiesConstant.HTTP_READ_TIMEOUT)).thenReturn(30000L);
+        lenient().when(props.getDurationMillis(PropertiesConstant.HTTP_READ_TIMEOUT,
+                PropertiesConstant.HTTP_READ_TIMEOUT_DEFAULT)).thenReturn(30000L);
         lenient().when(props.getInt(PropertiesConstant.HTTP_MAX_INITIAL_LINE_LENGTH)).thenReturn(4096);
-        lenient().when(props.getInt(PropertiesConstant.HTTP_MAX_HEADER_SIZE)).thenReturn(8192);
+        lenient().when(props.getInt(PropertiesConstant.HTTP_MAX_REQUEST_HEADER_SIZE)).thenReturn(8192);
         lenient().when(props.getInt(PropertiesConstant.HTTP_MAX_CHUNK_SIZE)).thenReturn(8192);
-        lenient().when(props.getInt(PropertiesConstant.HTTP_MAX_IN_MEMORY_SIZE)).thenReturn(4096);
+        lenient().when(props.getMaxInMemorySize()).thenReturn(4096);
         return webContext;
     }
 
@@ -110,5 +113,41 @@ class ManagementNettyHttpServerTest {
 
         server.destroyComponent();
         assertFalse(server.isRunning());
+    }
+
+    /**
+     * 验证 {@code start()} 将 {@code server.shutdown.grace-period} 解析进 {@code shutdownGraceMillis}
+     * （启动期预解析、fail-fast 点）。
+     */
+    @Test
+    void start_resolvesConfiguredGracePeriod() throws Exception {
+        ApplicationProperties props = mock(ApplicationProperties.class);
+        lenient().when(webContext.getProps()).thenReturn(props);
+        lenient().when(props.getBoolean(PropertiesConstant.HTTP2_ENABLED, false)).thenReturn(false);
+        lenient().when(props.get(PropertiesConstant.SERVER_NETTY_TRANSPORT,
+                PropertiesConstant.SERVER_NETTY_TRANSPORT_DEFAULT)).thenReturn("nio");
+        lenient().when(props.getDurationMillis(PropertiesConstant.HTTP_READ_TIMEOUT,
+                PropertiesConstant.HTTP_READ_TIMEOUT_DEFAULT)).thenReturn(30000L);
+        lenient().when(props.getInt(PropertiesConstant.HTTP_MAX_INITIAL_LINE_LENGTH)).thenReturn(4096);
+        lenient().when(props.getInt(PropertiesConstant.HTTP_MAX_REQUEST_HEADER_SIZE)).thenReturn(8192);
+        lenient().when(props.getInt(PropertiesConstant.HTTP_MAX_CHUNK_SIZE)).thenReturn(8192);
+        lenient().when(props.getMaxInMemorySize()).thenReturn(4096);
+        lenient().when(props.getDurationMillis(PropertiesConstant.SERVER_SHUTDOWN_GRACE_PERIOD,
+                PropertiesConstant.SERVER_SHUTDOWN_GRACE_PERIOD_DEFAULT)).thenReturn(4242L);
+
+        ManagementNettyHttpServer server = createServer(0);
+        server.start();
+        try {
+            long grace = readLongField(server, "shutdownGraceMillis");
+            assertEquals(4242L, grace, "start() 应把配置的 grace-period 解析到 shutdownGraceMillis");
+        } finally {
+            server.destroyComponent();
+        }
+    }
+
+    private static long readLongField(Object target, String name) throws Exception {
+        Field f = target.getClass().getDeclaredField(name);
+        f.setAccessible(true);
+        return f.getLong(target);
     }
 }

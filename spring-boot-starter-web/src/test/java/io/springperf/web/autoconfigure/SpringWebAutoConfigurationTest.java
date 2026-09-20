@@ -38,14 +38,16 @@ class SpringWebAutoConfigurationTest {
 
     @Test
     void applicationProperties_createsNewApplicationProperties() {
-        ApplicationProperties props = config.applicationProperties();
+        ApplicationProperties props = config.applicationProperties(new org.springframework.core.env.StandardEnvironment());
         assertNotNull(props);
         assertInstanceOf(ApplicationProperties.class, props);
     }
 
     @Test
     void applicationProperties_returnsNewInstanceEachCall() {
-        assertNotSame(config.applicationProperties(), config.applicationProperties());
+        assertNotSame(
+                config.applicationProperties(new org.springframework.core.env.StandardEnvironment()),
+                config.applicationProperties(new org.springframework.core.env.StandardEnvironment()));
     }
 
     @Test
