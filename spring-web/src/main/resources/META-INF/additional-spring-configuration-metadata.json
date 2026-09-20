@@ -29,6 +29,20 @@
       "defaultValue": 60000
     },
     {
+      "name": "server.http.max-pipelined-requests",
+      "type": "java.lang.Integer",
+      "description": "Maximum number of same-connection requests queued while a response is in flight (HTTP/1.1 pipelining). 16 by default; 0 or negative means unlimited. Reaching the limit pauses reads (autoRead=false) instead of closing the connection or rejecting requests, because pipelining requires in-order responses; unread bytes stay in the socket buffer, so TCP flow control provides backpressure.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": 16
+    },
+    {
+      "name": "server.http.max-ranges",
+      "type": "java.lang.Integer",
+      "description": "Maximum number of byte ranges served as multipart/byteranges. Effective cap is min(value, 100): the underlying parser (Spring HttpRange) rejects more than 100 ranges, which the framework treats as an unusable Range header. Use it to tighten the limit (e.g. 2); values above 100 do not raise it. 0 disables multi-range; negative applies no extra limit. Above the cap the full entity is returned (Range ignored per RFC 9110 14.2).",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": 100
+    },
+    {
       "name": "server.check-on-startup",
       "type": "java.lang.Boolean",
       "description": "Check handler mappings on startup.",
@@ -36,18 +50,18 @@
       "defaultValue": true
     },
     {
-      "name": "server.async.timeout",
-      "type": "java.lang.Long",
-      "description": "Async request timeout in milliseconds.",
+      "name": "spring.mvc.async.request-timeout",
+      "type": "java.time.Duration",
+      "description": "Async request (DeferredResult/Callable) timeout. Supports 30s/1m/1h or plain number (milliseconds).",
       "sourceType": "io.springperf.web.context.ApplicationProperties",
-      "defaultValue": 30000
+      "defaultValue": "30s"
     },
     {
-      "name": "server.shutdown.timeout",
-      "type": "java.lang.Integer",
-      "description": "Graceful shutdown max wait time in milliseconds.",
+      "name": "server.shutdown.grace-period",
+      "type": "java.time.Duration",
+      "description": "Graceful shutdown max wait time. Supports 30s/1m/1h or plain number (milliseconds).",
       "sourceType": "io.springperf.web.context.ApplicationProperties",
-      "defaultValue": 30000
+      "defaultValue": "30s"
     },
     {
       "name": "server.netty.transport",
@@ -83,6 +97,511 @@
       "description": "Default business thread pool queue capacity. Must be bounded so that maxPoolSize takes effect and overload returns 503 instead of queueing unboundedly.",
       "sourceType": "io.springperf.web.context.ApplicationProperties",
       "defaultValue": 100
+    },
+    {
+      "name": "server.max-connections",
+      "type": "java.lang.Integer",
+      "description": "Maximum number of concurrent TCP connections. 0 (default) means unlimited; aligns with Tomcat accept-queue-full rejection semantics.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": 0
+    },
+    {
+      "name": "server.max-parameter-count",
+      "type": "java.lang.Integer",
+      "description": "Maximum combined query/form/multipart parameter value count (hash DoS guard). 0 means unlimited; default 10000 aligns with Tomcat/Spring Boot.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": 10000
+    },
+    {
+      "name": "server.http.multipart.max-part-count",
+      "type": "java.lang.Integer",
+      "description": "Maximum number of parts in a multipart request (file + attribute). -1 (default) means unlimited; hash DoS guard. Semantics align with Spring Boot server.tomcat.max-part-count.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": -1
+    },
+    {
+      "name": "server.http.multipart.max-part-header-size",
+      "type": "java.lang.Integer",
+      "description": "Maximum size in bytes of a single multipart part's header region (header DoS guard). 8192 (default) means limit; <=0 means unlimited. Semantics align with Spring Boot server.tomcat.max-part-header-size.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": 8192
+    },
+    {
+      "name": "spring.servlet.multipart.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether multipart (file upload) parsing is enabled.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": true
+    },
+    {
+      "name": "spring.servlet.multipart.max-file-size",
+      "type": "java.lang.String",
+      "description": "Maximum size of a single uploaded file (DataSize, e.g. 10MB). -1 (default) means unlimited. Exceeding it returns 413.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "-1"
+    },
+    {
+      "name": "spring.servlet.multipart.max-request-size",
+      "type": "java.lang.String",
+      "description": "Maximum size of the whole multipart request (DataSize, e.g. 10MB). -1 (default) falls back to server.http.max-content-length.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "-1"
+    },
+    {
+      "name": "spring.servlet.multipart.file-size-threshold",
+      "type": "java.lang.String",
+      "description": "Size threshold above which a multipart part is written to disk (DataSize, e.g. 1MB); parts below it stay in memory. -1 (default) keeps the framework default of 16KB; 0 aligns with Boot's write-everything-to-disk semantics.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "-1"
+    },
+    {
+      "name": "spring.servlet.multipart.location",
+      "type": "java.lang.String",
+      "description": "Directory for multipart temp files (used when a part exceeds file-size-threshold). Empty (default) falls back to java.io.tmpdir. Recommended for containers with size-limited tmpfs.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties"
+    },
+    {
+      "name": "spring.web.resources.add-mappings",
+      "type": "java.lang.Boolean",
+      "description": "Whether to auto-register the default static resource mapping (/** -> static-locations) when no user ResourceHandlerRegistration exists. Default false (historical behavior: static resources registered by user code).",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": false
+    },
+    {
+      "name": "spring.web.resources.static-locations",
+      "type": "java.lang.String",
+      "description": "Comma-separated default static resource locations (used by the auto-registered mapping). Default aligns with Spring Boot: classpath:/META-INF/resources/,classpath:/resources/,classpath:/static/,classpath:/public/",
+      "sourceType": "io.springperf.web.context.ApplicationProperties"
+    },
+    {
+      "name": "spring.web.resources.cache.period",
+      "type": "java.time.Duration",
+      "description": "Default cache period for the auto-registered static resource mapping (Duration or seconds). Unset by default."
+    },
+    {
+      "name": "spring.web.resources.cache.cachecontrol.max-age",
+      "type": "java.time.Duration",
+      "description": "Default Cache-Control max-age for the auto-registered static resource mapping (takes precedence over cache.period)."
+    },
+    {
+      "name": "server.compression.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Enable gzip response compression. Off by default; aligns with Spring Boot server.compression.enabled.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": false
+    },
+    {
+      "name": "server.compression.mime-types",
+      "type": "java.lang.String",
+      "description": "Comma-separated Content-Type whitelist that participates in compression. Aligns with Spring Boot server.compression.mime-types.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json,application/xml"
+    },
+    {
+      "name": "server.compression.excluded-user-agents",
+      "type": "java.lang.String",
+      "description": "Comma-separated User-Agent regex list; a matching client is served uncompressed. Aligns with Spring Boot server.compression.excluded-user-agents.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": ""
+    },
+    {
+      "name": "server.compression.min-response-size",
+      "type": "java.lang.String",
+      "description": "Responses smaller than this size (DataSize, default 2KB) are not compressed. Aligns with Spring Boot server.compression.min-response-size.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "2KB"
+    },
+    {
+      "name": "server.address",
+      "type": "java.lang.String",
+      "description": "Network interface / IP to bind. Empty means all interfaces (0.0.0.0). Aligns with Spring Boot server.address."
+    },
+    {
+      "name": "server.max-http-request-header-size",
+      "type": "java.lang.Integer",
+      "description": "Maximum size in bytes of the combined request headers (default 8KB). Aligns with Spring Boot server.max-http-request-header-size.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": 8192
+    },
+    {
+      "name": "server.max-swallow-size",
+      "type": "java.lang.Long",
+      "description": "Maximum number of request-body bytes to swallow after an error response (default 2MB; negative means unlimited). Aligns with Spring Boot server.max-swallow-size.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": 2097152
+    },
+    {
+      "name": "server.max-http-response-header-size",
+      "type": "java.lang.Integer",
+      "description": "Maximum size in bytes of the response headers (default 8KB); exceeding it degrades to a minimal 500. Aligns with Spring Boot server.max-http-response-header-size.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": 8192
+    },
+    {
+      "name": "server.keep-alive-timeout",
+      "type": "java.lang.Long",
+      "description": "Idle timeout (millis; Duration style supported) after which a keep-alive connection is closed.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties"
+    },
+    {
+      "name": "server.max-keep-alive-requests",
+      "type": "java.lang.Integer",
+      "description": "Maximum number of requests served on a single keep-alive connection before it is closed.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties"
+    },
+    {
+      "name": "server.forward-headers-strategy",
+      "type": "java.lang.String",
+      "description": "Whether to honor forwarded headers: NONE/FALSE (do not trust), FRAMEWORK/NATIVE (trust Forwarded / X-Forwarded-*). Aligns with Spring Boot server.forward-headers-strategy.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "NONE"
+    },
+    {
+      "name": "server.http2.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Enable HTTP/2 support (requires TLS/ALPN for browser clients).",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": false
+    },
+    {
+      "name": "server.http.read-timeout",
+      "type": "java.lang.Long",
+      "description": "HTTP read timeout in millis (Duration style such as 30s supported).",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": 30000
+    },
+    {
+      "name": "server.http.max-initial-line-length",
+      "type": "java.lang.Integer",
+      "description": "Maximum length in bytes of the HTTP request initial line (default 4KB).",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": 4096
+    },
+    {
+      "name": "server.http.max-chunk-size",
+      "type": "java.lang.Integer",
+      "description": "Maximum size in bytes of each HTTP chunk (default 8KB).",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": 8192
+    },
+    {
+      "name": "server.http.max-in-memory-size",
+      "type": "java.lang.Integer",
+      "description": "Max request-body bytes kept in memory before switching to a ByteBuf duplicate (default 4KB).",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": 4096
+    },
+    {
+      "name": "server.netty.workers",
+      "type": "java.lang.Integer",
+      "description": "Number of Netty worker event-loop threads (default: 2 x CPU cores)."
+    },
+    {
+      "name": "server.netty.boss-threads",
+      "type": "java.lang.Integer",
+      "description": "Number of Netty boss event-loop threads (default 1).",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": 1
+    },
+    {
+      "name": "server.netty.so-backlog",
+      "type": "java.lang.Integer",
+      "description": "TCP listen backlog (default 1024).",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": 1024
+    },
+    {
+      "name": "server.netty.tcp-nodelay",
+      "type": "java.lang.Boolean",
+      "description": "TCP_NODELAY (disable Nagle's algorithm). Default true.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": true
+    },
+    {
+      "name": "server.netty.so-keepalive",
+      "type": "java.lang.Boolean",
+      "description": "SO_KEEPALIVE for accepted connections. Default true.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": true
+    },
+    {
+      "name": "server.netty.so-reuseaddr",
+      "type": "java.lang.Boolean",
+      "description": "SO_REUSEADDR for the server channel. Default true.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": true
+    },
+    {
+      "name": "server.netty.allocator-type",
+      "type": "java.lang.String",
+      "description": "ByteBuf allocator type: pooled (default) or unpooled.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "pooled"
+    },
+    {
+      "name": "server.netty.write-buffer-low-watermark",
+      "type": "java.lang.Integer",
+      "description": "Channel write-buffer low watermark in bytes (default 32KB)."
+    },
+    {
+      "name": "server.netty.write-buffer-high-watermark",
+      "type": "java.lang.Integer",
+      "description": "Channel write-buffer high watermark in bytes (default 64KB); crossing it marks the channel non-writable for backpressure."
+    },
+    {
+      "name": "server.servlet.application-display-name",
+      "type": "java.lang.String",
+      "description": "ServletContext application display name. Aligns with Spring Boot server.servlet.application-display-name."
+    },
+    {
+      "name": "server.servlet.encoding.charset",
+      "type": "java.lang.String",
+      "description": "Unified request/response character set. Aligns with Spring Boot server.servlet.encoding.charset.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "UTF-8"
+    },
+    {
+      "name": "server.servlet.encoding.force",
+      "type": "java.lang.Boolean",
+      "description": "Force the configured charset on both request and response, overriding any explicit setCharacterEncoding. Aligns with Spring Boot server.servlet.encoding.force.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": false
+    },
+    {
+      "name": "server.servlet.encoding.force-request",
+      "type": "java.lang.Boolean",
+      "description": "Force the configured charset on the request (inherits force when unset). Aligns with Spring Boot server.servlet.encoding.force-request."
+    },
+    {
+      "name": "server.servlet.encoding.force-response",
+      "type": "java.lang.Boolean",
+      "description": "Force the configured charset on the response (inherits force when unset). Aligns with Spring Boot server.servlet.encoding.force-response."
+    },
+    {
+      "name": "server.servlet.session.tracking-modes",
+      "type": "java.lang.String",
+      "description": "Comma-separated session tracking modes: COOKIE (default) / URL (SSL is N/A for this framework). Aligns with Spring Boot server.servlet.session.tracking-modes."
+    },
+    {
+      "name": "server.servlet.session.persistent",
+      "type": "java.lang.Boolean",
+      "description": "Persist sessions to disk so they survive a restart (JDK serialization, one file per session). Default false. Aligns with Spring Boot server.servlet.session.persistent.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": false
+    },
+    {
+      "name": "server.servlet.session.store-dir",
+      "type": "java.lang.String",
+      "description": "Directory for persisted sessions (used when session.persistent=true). Aligns with Spring Boot server.servlet.session.store-dir.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": ".perf-sessions"
+    },
+    {
+      "name": "server.servlet.session.persistent-exclude",
+      "type": "java.lang.String",
+      "description": "Comma-separated session attribute names excluded from disk persistence."
+    },
+    {
+      "name": "server.servlet.virtual-server-name",
+      "type": "java.lang.String",
+      "description": "ServletContext virtual server name. Aligns with Spring Boot server.servlet.virtual-server-name.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "localhost"
+    },
+    {
+      "name": "server.error.include-stacktrace",
+      "type": "java.lang.String",
+      "description": "When to expose a stack trace in error responses: never (default) / on-param / always. Aligns with Spring Boot server.error.include-stacktrace.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "never"
+    },
+    {
+      "name": "server.error.include-message",
+      "type": "java.lang.String",
+      "description": "When to expose the exception message in error responses: never (default) / on-param / always. Aligns with Spring Boot server.error.include-message.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "never"
+    },
+    {
+      "name": "server.error.include-binding-errors",
+      "type": "java.lang.String",
+      "description": "When to expose binding/validation errors: never (default) / always. Aligns with Spring Boot server.error.include-binding-errors.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "never"
+    },
+    {
+      "name": "server.error.whitelabel.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether to render the built-in whitelabel HTML error page. Aligns with Spring Boot server.error.whitelabel.enabled.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": true
+    },
+    {
+      "name": "server.error.path",
+      "type": "java.lang.String",
+      "description": "Error page path / instance identifier. Aligns with Spring Boot server.error.path.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "/error"
+    },
+    {
+      "name": "server.accesslog.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Enable the access-log filter. Aligns with Spring Boot server.tomcat.accesslog.enabled (this framework keeps a container-agnostic server.accesslog.* prefix).",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": false
+    },
+    {
+      "name": "server.accesslog.format",
+      "type": "java.lang.String",
+      "description": "Access-log format supporting %h/%m/%U/%T/%s/%u placeholders. Aligns with Spring Boot server.tomcat.accesslog.pattern."
+    },
+    {
+      "name": "server.accesslog.directory",
+      "type": "java.lang.String",
+      "description": "Directory for access-log files; when unset the filter only logs via SLF4J. Aligns with Spring Boot server.tomcat.accesslog.directory."
+    },
+    {
+      "name": "server.accesslog.prefix",
+      "type": "java.lang.String",
+      "description": "Access-log file name prefix. Aligns with Spring Boot server.tomcat.accesslog.prefix.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "access"
+    },
+    {
+      "name": "server.accesslog.suffix",
+      "type": "java.lang.String",
+      "description": "Access-log file name suffix. Aligns with Spring Boot server.tomcat.accesslog.suffix.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": ".log"
+    },
+    {
+      "name": "server.accesslog.rotate",
+      "type": "java.lang.Boolean",
+      "description": "Rotate access-log files daily (date appended to the file name). Aligns with Spring Boot server.tomcat.accesslog.rotate.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": true
+    },
+    {
+      "name": "server.accesslog.max-days",
+      "type": "java.lang.Integer",
+      "description": "Number of days to retain rotated access-log files (<=0 means unlimited). Aligns with Spring Boot server.tomcat.accesslog.max-days.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": 7
+    },
+    {
+      "name": "pool.default-execute-mode",
+      "type": "java.lang.String",
+      "description": "Default business-pool execute mode for request handling."
+    },
+    {
+      "name": "spring.mvc.throw-exception-if-no-handler-found",
+      "type": "java.lang.Boolean",
+      "description": "Whether a missing handler raises an exception (routable to @ControllerAdvice) instead of a direct 404/405. Aligns with Spring Boot spring.mvc.throw-exception-if-no-handler-found.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": true
+    },
+    {
+      "name": "spring.mvc.dispatch.error",
+      "type": "java.lang.Boolean",
+      "description": "Whether ERROR requests are dispatched to handlers. Aligns with Spring Boot spring.mvc.dispatch.error.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": true
+    },
+    {
+      "name": "spring.mvc.dispatch.options",
+      "type": "java.lang.Boolean",
+      "description": "Whether OPTIONS requests are dispatched to handlers (CORS preflight is still handled when disabled). Aligns with Spring Boot spring.mvc.dispatch.options.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": true
+    },
+    {
+      "name": "spring.mvc.dispatch.trace",
+      "type": "java.lang.Boolean",
+      "description": "Whether TRACE requests are dispatched to handlers. Aligns with Spring Boot spring.mvc.dispatch.trace.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": true
+    },
+    {
+      "name": "spring.mvc.publish-request-handled-events",
+      "type": "java.lang.Boolean",
+      "description": "Whether to publish a ServletRequestHandledEvent when a request completes. Aligns with Spring Boot spring.mvc.publish-request-handled-events.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": false
+    },
+    {
+      "name": "spring.mvc.problemdetails.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Render error responses as RFC 7807 application/problem+json. Aligns with Spring Boot spring.mvc.problemdetails.enabled.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": false
+    },
+    {
+      "name": "spring.mvc.message-codes-resolver-format",
+      "type": "java.lang.String",
+      "description": "Validation message-code format: prefix_error_code (default) or postfix_error_code. Aligns with Spring Boot spring.mvc.message-codes-resolver-format.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "prefix_error_code"
+    },
+    {
+      "name": "spring.mvc.static-path-pattern",
+      "type": "java.lang.String",
+      "description": "Global prefix applied to all resource handler path patterns (default /** means no prefix). Aligns with Spring Boot spring.mvc.static-path-pattern.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "/**"
+    },
+    {
+      "name": "spring.mvc.format.date",
+      "type": "java.lang.String",
+      "description": "Default date format used when no @DateTimeFormat is present. Aligns with Spring Boot spring.mvc.format.date.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "yyyy-MM-dd"
+    },
+    {
+      "name": "spring.mvc.format.time",
+      "type": "java.lang.String",
+      "description": "Default time format used when no @DateTimeFormat is present. Aligns with Spring Boot spring.mvc.format.time.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "HH:mm:ss"
+    },
+    {
+      "name": "spring.mvc.format.datetime",
+      "type": "java.lang.String",
+      "description": "Default date-time format used when no @DateTimeFormat is present. Aligns with Spring Boot spring.mvc.format.datetime.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "yyyy-MM-dd'T'HH:mm:ss"
+    },
+    {
+      "name": "spring.web.locale",
+      "type": "java.lang.String",
+      "description": "Default Locale (e.g. zh_CN). Aligns with Spring Boot spring.web.locale."
+    },
+    {
+      "name": "spring.web.locale-resolver",
+      "type": "java.lang.String",
+      "description": "Locale resolution strategy: fixed or accept-header (default). Aligns with Spring Boot spring.web.locale-resolver.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "accept-header"
+    },
+    {
+      "name": "spring.web.locale-bind",
+      "type": "java.lang.Boolean",
+      "description": "Whether to bind LocaleContextHolder per request (default true, aligned with Spring MVC). Setting false removes the per-request locale context allocation and the ThreadLocal set/remove; LocaleContextHolder.getLocaleContext() then returns null and getLocale() falls back to Locale.getDefault().",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": true
+    },
+    {
+      "name": "spring.mvc.view.prefix",
+      "type": "java.lang.String",
+      "description": "Prefix for JSP views only (aligns with Boot's InternalResourceViewResolver semantics). Template engines use their own spring.{engine}.prefix. Default /jsp/ preserves the framework's historical default.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "/jsp/"
+    },
+    {
+      "name": "spring.mvc.view.suffix",
+      "type": "java.lang.String",
+      "description": "Suffix for JSP views only. Default .jsp preserves the framework's historical default.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": ".jsp"
     }
   ]
 }

@@ -4,6 +4,7 @@ import io.springperf.web.core.DispatcherHandler;
 import io.springperf.web.core.exception.ExceptionHandlerExceptionResolver;
 import io.springperf.web.core.invoker.FastInvokerGenerator;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.server.ErrorResponseConfig;
 import io.springperf.web.util.WebUtils;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +45,22 @@ public class WebContext extends WebComponentContainer implements DisposableBean,
         this.contextPath = WebUtils.formatPath(props.get(PropertiesConstant.CONTEXT_PATH, "/"));
         this.webContext = this;
         registerWebComponent(dispatcherHandler);
+        // 错误响应策略（server.error.*）：启动期预解析并注册，供 sendError / 异常解析链路读取
+        registerWebComponent(ErrorResponseConfig.fromProperties(props));
+    }
+
+    /**
+     * 清空框架级配置缓存，使后续读取回落到 Spring {@code Environment} 最新值。
+     *
+     * <p>供配置中心动态刷新调用（如 Spring Cloud 的 {@code EnvironmentChangeEvent}，
+     * 见 starter 的 {@code SpringWebCloudRefreshAutoConfiguration}），业务代码亦可主动调用。</p>
+     *
+     * <p><b>不影响</b>启动期已固化进 Netty bootstrap / 线程池 / 模板引擎的配置
+     * （{@code server.port}、{@code server.netty.*}、{@code pool.core-pool-size} 等），
+     * 这些需要重建组件才能生效。</p>
+     */
+    public void refreshProperties() {
+        new PropertyRefreshHandler(this).refresh();
     }
 
     /**

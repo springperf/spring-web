@@ -25,7 +25,7 @@ import static org.mockito.Mockito.*;
 /**
  * 验证 {@link NettyServerHttpRequest#resolveScheme} 的 scheme 判定安全逻辑：
  * <ol>
- *   <li>转发头默认不信任（use-forwarded-headers=false 时忽略 Forwarded/X-Forwarded-Proto）</li>
+ *   <li>转发头默认不信任（forward-headers-strategy=NONE/FALSE 或未配置时忽略 Forwarded/X-Forwarded-Proto）</li>
  *   <li>开启转发头后优先 RFC 7239 Forwarded，其次 X-Forwarded-Proto</li>
  *   <li>pipeline 存在 SslHandler 时判定 https</li>
  *   <li>兜底 http</li>
@@ -78,7 +78,7 @@ class NettyServerHttpRequestSchemeTest {
     @Test
     void default_forwardedHeadersIgnored() {
         // 默认不信任转发头：即使客户端伪造 Forwarded/X-Forwarded-Proto 也判定为 http
-        when(props.getBoolean(PropertiesConstant.USE_FORWARDED_HEADERS, false)).thenReturn(false);
+        when(props.get(PropertiesConstant.FORWARD_HEADERS_STRATEGY, null)).thenReturn("NONE");
         FullHttpRequest req = newRequest("example.com",
                 "Forwarded", "proto=https; host=attacker.com",
                 "X-Forwarded-Proto", "https");
@@ -88,7 +88,7 @@ class NettyServerHttpRequestSchemeTest {
 
     @Test
     void useForwarded_true_rfc7239ForwardedProto() {
-        when(props.getBoolean(PropertiesConstant.USE_FORWARDED_HEADERS, false)).thenReturn(true);
+        when(props.get(PropertiesConstant.FORWARD_HEADERS_STRATEGY, null)).thenReturn("FRAMEWORK");
         FullHttpRequest req = newRequest("example.com",
                 "Forwarded", "proto=https; host=proxy.com");
         assertEquals("https", getUri(req).getScheme());
@@ -97,7 +97,7 @@ class NettyServerHttpRequestSchemeTest {
 
     @Test
     void useForwarded_true_forwardedQuotedProto() {
-        when(props.getBoolean(PropertiesConstant.USE_FORWARDED_HEADERS, false)).thenReturn(true);
+        when(props.get(PropertiesConstant.FORWARD_HEADERS_STRATEGY, null)).thenReturn("FRAMEWORK");
         FullHttpRequest req = newRequest("example.com",
                 "Forwarded", "for=192.0.2.60;proto=\"https\";host=example.com");
         assertEquals("https", getUri(req).getScheme());
@@ -106,7 +106,7 @@ class NettyServerHttpRequestSchemeTest {
 
     @Test
     void useForwarded_true_fallsBackToXForwardedProto() {
-        when(props.getBoolean(PropertiesConstant.USE_FORWARDED_HEADERS, false)).thenReturn(true);
+        when(props.get(PropertiesConstant.FORWARD_HEADERS_STRATEGY, null)).thenReturn("FRAMEWORK");
         FullHttpRequest req = newRequest("example.com",
                 "X-Forwarded-Proto", "https");
         assertEquals("https", getUri(req).getScheme());
@@ -115,7 +115,7 @@ class NettyServerHttpRequestSchemeTest {
 
     @Test
     void useForwarded_true_forwardedProtoMissing_returnsHttp() {
-        when(props.getBoolean(PropertiesConstant.USE_FORWARDED_HEADERS, false)).thenReturn(true);
+        when(props.get(PropertiesConstant.FORWARD_HEADERS_STRATEGY, null)).thenReturn("FRAMEWORK");
         // Forwarded 头存在但不含 proto，且无 X-Forwarded-Proto
         FullHttpRequest req = newRequest("example.com",
                 "Forwarded", "for=192.0.2.60");
@@ -125,7 +125,7 @@ class NettyServerHttpRequestSchemeTest {
 
     @Test
     void sslHandlerInPipeline_returnsHttps() {
-        when(props.getBoolean(PropertiesConstant.USE_FORWARDED_HEADERS, false)).thenReturn(false);
+        when(props.get(PropertiesConstant.FORWARD_HEADERS_STRATEGY, null)).thenReturn("NONE");
         when(pipeline.get(SslHandler.class)).thenReturn(mock(SslHandler.class));
         FullHttpRequest req = newRequest("example.com");
         assertEquals("https", getUri(req).getScheme());

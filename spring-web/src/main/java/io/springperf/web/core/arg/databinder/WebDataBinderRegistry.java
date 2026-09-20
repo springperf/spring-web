@@ -1,6 +1,7 @@
 package io.springperf.web.core.arg.databinder;
 
 import io.springperf.web.context.BaseWebComponent;
+import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebComponentWrapperUtils;
 import io.springperf.web.core.mapping.MappingCacheKey;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
@@ -11,6 +12,7 @@ import org.springframework.core.convert.ConversionService;
 import org.springframework.format.support.DefaultFormattingConversionService;
 import org.springframework.lang.Nullable;
 import org.springframework.util.ReflectionUtils;
+import org.springframework.validation.DefaultMessageCodesResolver;
 import org.springframework.validation.MessageCodesResolver;
 import org.springframework.validation.Validator;
 import org.springframework.web.bind.WebDataBinder;
@@ -53,13 +55,43 @@ public class WebDataBinderRegistry extends BaseWebComponent {
                 this.initBinderAdviceCache.put(adviceBean, binderMethods);
             }
         }
-        defaultConversionService = WebComponentWrapperUtils.getComponentWithDefault(webContext, ConversionService.class, new DefaultFormattingConversionService());
+        defaultConversionService = WebComponentWrapperUtils.getComponentWithDefault(webContext, ConversionService.class,
+                createDefaultFormattingConversionService());
         if (defaultValidator == null) {
             defaultValidator = webContext.getBeanFromCtx(Validator.class);
         }
         messageCodesResolver = webContext.getBeanFromCtx(MessageCodesResolver.class);
+        if (messageCodesResolver == null) {
+            messageCodesResolver = createDefaultMessageCodesResolver();
+        }
     }
 
+    /**
+     * 按 {@code spring.mvc.message-codes-resolver-format} 创建默认消息码解析器
+     * （prefix_error_code / postfix_error_code；未配置或非法时回退 prefix，对齐 Boot）。
+     */
+    protected MessageCodesResolver createDefaultMessageCodesResolver() {
+        DefaultMessageCodesResolver resolver = new DefaultMessageCodesResolver();
+        String format = webContext.getProps().get(
+                PropertiesConstant.MVC_MESSAGE_CODES_RESOLVER_FORMAT,
+                PropertiesConstant.MVC_MESSAGE_CODES_RESOLVER_FORMAT_DEFAULT);
+        if (format != null && "postfix_error_code".equalsIgnoreCase(format.trim())) {
+            resolver.setMessageCodeFormatter(DefaultMessageCodesResolver.Format.POSTFIX_ERROR_CODE);
+        }
+        return resolver;
+    }
+
+
+    /**
+     * 创建默认格式化转换服务，并注册 {@code spring.mvc.format.date/time/datetime}
+     * 全局默认格式（对齐 Boot：无 {@code @DateTimeFormat} 的字段使用该默认格式）。
+     */
+    protected DefaultFormattingConversionService createDefaultFormattingConversionService() {
+        DefaultFormattingConversionService service = new DefaultFormattingConversionService();
+        MvcFormatConfig formatConfig = MvcFormatConfig.fromProperties(webContext.getProps());
+        formatConfig.applyTo(service);
+        return service;
+    }
 
     public ConversionService getConversionService(MappingHandlerMethod mappingContext) {
         ConversionService conversionService = mappingContext.get(CONVERSION_SERVICE_KEY);
