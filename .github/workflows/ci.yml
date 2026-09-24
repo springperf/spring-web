@@ -6,25 +6,37 @@ on:
   pull_request:
     branches: [master, 2.7.x]
 
+# 供应链加固（提炼自 mybatis-parent 工程实践清单）：最小权限 + 同分支新推送取消旧 run
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
+      # 一个 JDK 组合失败不影响观察其他组合
+      fail-fast: false
       matrix:
         java: [8, 11, 17, 21, 25]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Set up JDK ${{ matrix.java }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           java-version: ${{ matrix.java }}
           distribution: temurin
           cache: maven
 
       - name: Build and test
-        run: mvn clean test -q
+        # 用仓库自带 Wrapper（与所有人同一 Maven 版本）；setup-java@v4 已弃用，故 pin v5
+        run: ./mvnw clean test --batch-mode --no-transfer-progress -q
         if: |
           (github.event_name == 'pull_request' || github.event_name == 'push')
           && (
@@ -37,18 +49,71 @@ jobs:
 
       - name: Upload test reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: test-reports-java${{ matrix.java }}
           path: "**/target/surefire-reports/*.txt"
 
   docs:
-    # Markdown 一致性检查（坏链 / 锚点 / 编码与格式），与 JDK 无关，独立成 job 只跑一次。
+    # Markdown 一致性检查（坏链 / 锚点 / 编码与格式 / 符号），与 JDK 无关，独立成 job 只跑一次。
     # 仅对 master 生效：2.7.x 分支的文档基线未做校验，避免误红。
     if: github.ref == 'refs/heads/master' || github.base_ref == 'master'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
-      - name: Check docs (links / anchors / format)
+      - name: Check docs (links / anchors / format / symbols)
         run: bash scripts/check-docs.sh
+
+  static-analysis:
+    # SpotBugs + modernizer（提炼自 mybatis-parent）：独立成 job，避免给 8/11 旧 JDK 矩阵添负担
+    # （SpotBugs 自身要求较新的 JDK 运行）。现阶段 report-only，triage 后翻开关成为硬门禁。
+    if: github.ref == 'refs/heads/master' || github.base_ref == 'master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          java-version: 17
+          distribution: temurin
+          cache: maven
+
+      # 走 verify 绑定的门禁：SpotBugs check（Default 档：高+中优先级）+ modernizer（report-only，331 条待 triage）+ JaCoCo 报告，
+      # 与本地 mvn verify 完全一致（此前 CLI 直调 goal 与 pom 绑定各管一半，容易误判门禁状态）
+      - name: SpotBugs gate + modernizer
+        run: ./mvnw verify -DskipTests --batch-mode --no-transfer-progress -q
+
+      # 只校验不重写：格式漂移在此红，修法见 CONTRIBUTING 的 Formatting 一节
+      - name: Check formatting (no rewrite)
+        run: ./mvnw formatter:validate --batch-mode --no-transfer-progress -q
+
+      - name: Upload SpotBugs XML
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: spotbugs-xml
+          path: "**/spotbugsXml.xml"
+          if-no-files-found: ignore
+
+  javadoc:
+    # Javadoc 也是一次“文档正确性编译”：坏链接 / 坏标签在此暴露。
+    # doclint 排除 missing：不强求全量注释，只拦坏链接与坏标签。
+    if: github.ref == 'refs/heads/master' || github.base_ref == 'master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          java-version: 17
+          distribution: temurin
+          cache: maven
+
+      - name: Javadoc (doclint: all except missing)
+        run: ./mvnw javadoc:javadoc -DadditionalJOption=-Xdoclint:all,-missing --batch-mode --no-transfer-progress -q

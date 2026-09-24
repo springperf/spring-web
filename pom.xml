@@ -1,9 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-<groupId>io.github.springperf</groupId>
+    <groupId>io.github.springperf</groupId>
     <artifactId>spring-web-parent</artifactId>
 
     <version>3.5.6</version>
@@ -19,13 +17,6 @@
             <url>https://www.apache.org/licenses/LICENSE-2.0</url>
         </license>
     </licenses>
-
-    <scm>
-        <connection>scm:git:git://github.com/springperf/spring-web.git</connection>
-        <developerConnection>scm:git:ssh://github.com/springperf/spring-web.git</developerConnection>
-        <url>https://github.com/springperf/spring-web</url>
-        <tag>HEAD</tag>
-    </scm>
 
     <developers>
         <developer>
@@ -50,8 +41,15 @@
         <module>coverage-aggregate</module>
     </modules>
 
+    <scm>
+        <connection>scm:git:git://github.com/springperf/spring-web.git</connection>
+        <developerConnection>scm:git:ssh://github.com/springperf/spring-web.git</developerConnection>
+        <tag>HEAD</tag>
+        <url>https://github.com/springperf/spring-web</url>
+    </scm>
+
     <properties>
-<!-- Spring Boot 版本（默认 3.5.x），可通过 profile 切换 -->
+        <!-- Spring Boot 版本（默认 3.5.x），可通过 profile 切换 -->
         <spring-boot.version>3.5.16</spring-boot.version>
 
         <java.version>17</java.version>
@@ -68,7 +66,7 @@
         <!-- Jackson 注解组件可独立于 core/databind 对齐版本（SB4 生态 annotations=2.21、core/databind=2.21.4） -->
         <jackson-annotations.version>2.17.2</jackson-annotations.version>
         <fastjson2.version>2.0.60</fastjson2.version>
-<okhttp.version>4.12.0</okhttp.version>
+        <okhttp.version>4.12.0</okhttp.version>
         <hutool.version>5.8.23</hutool.version>
         <jmh.version>1.37</jmh.version>
         <springdoc.version>2.3.0</springdoc.version>
@@ -85,10 +83,30 @@
 
         <!-- Maven 插件版本 -->
         <maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>
+        <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
+        <extra-enforcer-rules.version>1.9.0</extra-enforcer-rules.version>
         <maven-surefire-plugin.version>3.1.2</maven-surefire-plugin.version>
         <maven-failsafe-plugin.version>3.1.2</maven-failsafe-plugin.version>
         <maven-resources-plugin.version>3.3.1</maven-resources-plugin.version>
         <maven-jar-plugin.version>3.3.0</maven-jar-plugin.version>
+        <maven-clean-plugin.version>3.2.0</maven-clean-plugin.version>
+        <maven-install-plugin.version>3.1.2</maven-install-plugin.version>
+        <maven-deploy-plugin.version>3.1.2</maven-deploy-plugin.version>
+        <maven-site-plugin.version>3.12.1</maven-site-plugin.version>
+        <spotbugs-maven-plugin.version>4.10.4.1</spotbugs-maven-plugin.version>
+        <!-- SpotBugs 报告阈值：默认拦 Default 档（高+中优先级）——全仓中优先级已从 416 清零
+             （能改的真修、设计使然的逐条核对后写进 exclude 并注明依据），故门禁正式覆盖该档；
+             需要临时放宽用 -Dspotbugs.threshold=High。
+             写成属性引用而非字面量，否则 pom 值会压过命令行属性（实测：写死 High 时
+             -Dspotbugs.threshold=Default 无效） -->
+        <spotbugs.threshold>Default</spotbugs.threshold>
+        <modernizer-maven-plugin.version>3.5.0</modernizer-maven-plugin.version>
+        <japicmp-maven-plugin.version>0.26.2</japicmp-maven-plugin.version>
+        <formatter-maven-plugin.version>2.29.0</formatter-maven-plugin.version>
+        <rewrite-maven-plugin.version>6.46.1</rewrite-maven-plugin.version>
+        <sortpom-maven-plugin.version>4.0.0</sortpom-maven-plugin.version>
+        <!-- 可复现构建：同样源码两次打包产出字节相同的 jar（jar 插件按该时间戳写 entry） -->
+        <project.build.outputTimestamp>2026-09-21T00:00:00Z</project.build.outputTimestamp>
         <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
         <maven-javadoc-plugin.version>3.11.2</maven-javadoc-plugin.version>
         <build-helper-maven-plugin.version>3.6.0</build-helper-maven-plugin.version>
@@ -348,8 +366,10 @@
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>${maven-compiler-plugin.version}</version>
                     <configuration>
-                        <source>${java.version}</source>
-                        <target>${java.version}</target>
+                        <!-- release 优于 source/target：按目标 JDK 的 API 签名编译，防“编译过但运行时缺 API” -->
+                        <release>${java.version}</release>
+                        <!-- 关闭增量编译：构建更快，并规避 MCOMPILER-209 的增量编译误判 -->
+                        <useIncrementalCompilation>false</useIncrementalCompilation>
                         <compilerArgs>
                             <arg>-parameters</arg>
                         </compilerArgs>
@@ -371,6 +391,73 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-jar-plugin</artifactId>
                     <version>${maven-jar-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-clean-plugin</artifactId>
+                    <version>${maven-clean-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-install-plugin</artifactId>
+                    <version>${maven-install-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-deploy-plugin</artifactId>
+                    <version>${maven-deploy-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-site-plugin</artifactId>
+                    <version>${maven-site-plugin.version}</version>
+                </plugin>
+                <!-- 静态分析（P1，提炼自 mybatis-parent）：SpotBugs 已是 Default 档硬门禁（全仓 0 告警）；
+                     modernizer 仍为 report-only——实测全仓 331 条违例（此前「0 违例」是 -q 抑制插件输出
+                     导致的误判），待按规则聚类 triage 后再翻 failOnViolations=true -->
+                <!-- 声明在 pluginManagement（而非只放在 format profile 内）：这样无 profile 时也能
+                     按前缀调用（如 mvn formatter:validate 做 CI 校验），profile 只负责绑定执行 -->
+                <plugin>
+                    <groupId>net.revelc.code.formatter</groupId>
+                    <artifactId>formatter-maven-plugin</artifactId>
+                    <version>${formatter-maven-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>com.github.spotbugs</groupId>
+                    <artifactId>spotbugs-maven-plugin</artifactId>
+                    <version>${spotbugs-maven-plugin.version}</version>
+                    <configuration>
+                        <!-- 排除镜像包与 E2E 支撑包，见仓库根 spotbugs-exclude.xml；
+                             用多模块根目录定位，单模块单独构建时也能找到 -->
+                        <excludeFilterFile>${maven.multiModuleProjectDirectory}/spotbugs-exclude.xml</excludeFilterFile>
+                        <!-- 门禁拦 Default 档：全仓高优先级 10 条与中优先级 416 条均已处置——能改的
+                             真修（防御性拷贝、只读包装、真实缺陷），设计使然的逐条核对后写进
+                             exclude 文件并注明依据。临时放宽：mvn verify -Dspotbugs.threshold=High
+                             踩坑记录一：写在 <execution> 的 <configuration> 里【不生效】（实测仍报 180 条），
+                             必须放插件级（此处）。
+                             踩坑记录二：值必须写成属性引用 ${spotbugs.threshold}，写死字面量时
+                             命令行 -Dspotbugs.threshold=... 无法覆盖（pom 值优先） -->
+                        <threshold>${spotbugs.threshold}</threshold>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.gaul</groupId>
+                    <artifactId>modernizer-maven-plugin</artifactId>
+                    <version>${modernizer-maven-plugin.version}</version>
+                    <configuration>
+                        <!-- 配置放插件级：CLI 直调 goal 也能拿到（execution 级配置对 CLI 直调不可见） -->
+                        <javaVersion>17</javaVersion>
+                        <!-- 仍只报告：全仓 331 条违例待按规则聚类 triage（翻 true 前必须先清零或逐条有据豁免） -->
+                        <failOnViolations>false</failOnViolations>
+                    </configuration>
+                </plugin>
+                <!-- 二进制兼容对比：compat profile 由 -Dcompat.oldVersion 显式激活（需仓库/本地
+                     存在该版本的构件），避免无基线时误触发。用法：
+                     mvn -Pcompat -Dcompat.oldVersion=3.5.5 verify -->
+                <plugin>
+                    <groupId>com.github.siom79.japicmp</groupId>
+                    <artifactId>japicmp-maven-plugin</artifactId>
+                    <version>${japicmp-maven-plugin.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -442,6 +529,51 @@
         </pluginManagement>
 
         <plugins>
+            <!-- 环境基线门禁（提炼自 mybatis-parent）：JDK / 依赖字节码 / Maven / 插件版本四类拦截。
+                 2.7.x 分支的 maxJdkVersion 应为 8（其 java.version 不同），见
+                 docs/feature/engineering-practices-checklist.md。requirePluginVersions 先限定
+                 phases=clean,deploy,site，避免对默认生命周期插件误报。 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>${maven-enforcer-plugin.version}</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>extra-enforcer-rules</artifactId>
+                        <version>${extra-enforcer-rules.version}</version>
+                    </dependency>
+                </dependencies>
+                <executions>
+                    <execution>
+                        <id>enforce-baseline</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <phase>validate</phase>
+                        <configuration>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>[17,)</version>
+                                </requireJavaVersion>
+                                <enforceBytecodeVersion>
+                                    <maxJdkVersion>17</maxJdkVersion>
+                                    <ignoredScopes>provided,test</ignoredScopes>
+                                </enforceBytecodeVersion>
+                                <requireMavenVersion>
+                                    <version>[3.6.3,)</version>
+                                </requireMavenVersion>
+                                <requirePluginVersions>
+                                    <message>[ERROR] 插件版本必须显式声明：禁止 LATEST/RELEASE/SNAPSHOT 浮动版本</message>
+                                    <banLatest>true</banLatest>
+                                    <banRelease>true</banRelease>
+                                    <banSnapshots>true</banSnapshots>
+                                </requirePluginVersions>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <!-- 所有模块统一采集覆盖率（prepare-agent + report）。
                  此前只有部分模块声明，spring-web-support-test（全部 E2E 所在）从未挂 agent，
                  E2E 触发的服务端代码覆盖一直缺失，聚合报告严重低估真实覆盖率。 -->
@@ -449,10 +581,220 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
             </plugin>
+            <!-- 静态分析挂在 verify（mybatis 清单的坑：只配 reporting = mvn site 才跑 = 形同虚设）。
+                 现为硬门禁：spotbugs:check 按 Default 档阈值拦截，见 pluginManagement 注释。 -->
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>spotbugs-report</id>
+                        <goals>
+                            <!-- 报告（不失败）+ 供 CI 上传的 XML -->
+                            <goal>spotbugs</goal>
+                        </goals>
+                        <phase>verify</phase>
+                    </execution>
+                    <execution>
+                        <id>spotbugs-check</id>
+                        <goals>
+                            <!-- 硬门禁：发现 Default 档（高+中优先级）缺陷即失败（阈值/排除见 pluginManagement） -->
+                            <goal>check</goal>
+                        </goals>
+                        <phase>verify</phase>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.gaul</groupId>
+                <artifactId>modernizer-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>modernizer-report</id>
+                        <goals>
+                            <goal>modernizer</goal>
+                        </goals>
+                        <phase>verify</phase>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 
     <profiles>
+        <!-- 二进制兼容对比（P1，提炼自 mybatis-parent）：显式给出上一发布版本才激活。
+             用法：mvn -Pcompat -Dcompat.oldVersion=3.5.5 verify
+             （基线构件需存在于本地仓库或远端仓库；pom 打包模块自动跳过） -->
+        <profile>
+            <id>compat</id>
+            <activation>
+                <property>
+                    <name>compat.oldVersion</name>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.github.siom79.japicmp</groupId>
+                        <artifactId>japicmp-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>japicmp</id>
+                                <goals>
+                                    <goal>cmp</goal>
+                                </goals>
+                                <phase>verify</phase>
+                                <configuration>
+                                    <!-- 层级要点（实测踩坑）：oldVersion / newVersion 是 <parameter> 的
+                                         【兄弟节点】，<parameter> 本身对应 ConfigParameters（只放 onlyModified /
+                                         skipPomModules 这类分析参数）。把 oldVersion 放进 <parameter> 里会报
+                                         Cannot find 'oldVersion' in class japicmp.maven.ConfigParameters。 -->
+                                    <oldVersion>
+                                        <dependency>
+                                            <groupId>${project.groupId}</groupId>
+                                            <artifactId>${project.artifactId}</artifactId>
+                                            <version>${compat.oldVersion}</version>
+                                            <type>jar</type>
+                                        </dependency>
+                                    </oldVersion>
+                                    <newVersion>
+                                        <file>
+                                            <path>${project.build.directory}/${project.build.finalName}.jar</path>
+                                        </file>
+                                    </newVersion>
+                                    <parameter>
+                                        <skipPomModules>true</skipPomModules>
+                                        <onlyModified>true</onlyModified>
+                                    </parameter>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- 格式化（P1，提炼自 mybatis-parent）：显式调用，绝不隐式运行。
+             用法：./mvnw -Dformat=true process-sources
+             首跑会重写几乎所有文件 → 必须独立成提交，不与功能提交混合。 -->
+        <profile>
+            <id>format</id>
+            <activation>
+                <property>
+                    <name>format</name>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <!-- 同阶段按声明顺序执行：先删未用 import（rewrite），再统一排版（formatter），
+                         pom 布局单独交给 sortpom。
+                         不用 impsort：其给 JavaParser 配的语言级低于 14，无法解析本仓库的
+                         instanceof 模式匹配等 Java 16+ 语法（探针实测：同一文件 JAVA_17 下
+                         PARSE OK）；待上游修复后再引入。import 顺序目前由代码约定保证。 -->
+                    <plugin>
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>rewrite-maven-plugin</artifactId>
+                        <version>${rewrite-maven-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>remove-unused-imports</id>
+                                <goals>
+                                    <!-- 6.x 已移除专用 goal，统一走 run + activeRecipes -->
+                                    <goal>run</goal>
+                                </goals>
+                                <phase>process-sources</phase>
+                                <configuration>
+                                    <activeRecipes>
+                                        <recipe>org.openrewrite.java.RemoveUnusedImports</recipe>
+                                    </activeRecipes>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>net.revelc.code.formatter</groupId>
+                        <artifactId>formatter-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>format-sources</id>
+                                <goals>
+                                    <goal>format</goal>
+                                </goals>
+                                <phase>process-sources</phase>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>com.github.ekryd.sortpom</groupId>
+                        <artifactId>sortpom-maven-plugin</artifactId>
+                        <version>${sortpom-maven-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>sort-poms</id>
+                                <goals>
+                                    <goal>sort</goal>
+                                </goals>
+                                <phase>process-sources</phase>
+                                <configuration>
+                                    <nrOfIndentSpace>4</nrOfIndentSpace>
+                                    <keepBlankLines>true</keepBlankLines>
+                                    <!-- 不留 .bak：sortpom 默认会为每个 pom 生成备份文件，污染工作区 -->
+                                    <createBackupFile>false</createBackupFile>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- 文件基线（compat 的补充）：当上一版构件无法从仓库解析，或【本地仓库里恰好 install 过
+             同版本号的自构建】时使用——后者会让 dependency 方式静默变成"自比对"，得出
+             No incompatible changes 的假结论（实测踩到：本地 3.5.6 jar 与 Central 已发布 jar
+             的 sha256 不同）。
+             用法：mvn -Pcompat-file -Dcompat.oldJar=/path/to/spring-web-3.5.6.jar verify -->
+        <profile>
+            <id>compat-file</id>
+            <activation>
+                <property>
+                    <name>compat.oldJar</name>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.github.siom79.japicmp</groupId>
+                        <artifactId>japicmp-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>japicmp</id>
+                                <goals>
+                                    <goal>cmp</goal>
+                                </goals>
+                                <phase>verify</phase>
+                                <configuration>
+                                    <oldVersion>
+                                        <file>
+                                            <path>${compat.oldJar}</path>
+                                        </file>
+                                    </oldVersion>
+                                    <newVersion>
+                                        <file>
+                                            <path>${project.build.directory}/${project.build.finalName}.jar</path>
+                                        </file>
+                                    </newVersion>
+                                    <parameter>
+                                        <skipPomModules>true</skipPomModules>
+                                        <onlyModified>true</onlyModified>
+                                    </parameter>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
         <!-- Spring Boot 3.5.x（默认，无需显式激活；版本取顶层 spring-boot.version=3.5.16） -->
         <profile>
             <id>spring-boot-3.5</id>
@@ -581,7 +923,9 @@
                         <executions>
                             <execution>
                                 <id>attach-sources</id>
-                                <goals><goal>jar-no-fork</goal></goals>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                </goals>
                             </execution>
                         </executions>
                     </plugin>
@@ -595,7 +939,9 @@
                         <executions>
                             <execution>
                                 <id>attach-javadocs</id>
-                                <goals><goal>jar</goal></goals>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
                             </execution>
                         </executions>
                     </plugin>
@@ -610,7 +956,9 @@
                         <executions>
                             <execution>
                                 <id>sign-artifacts</id>
-                                <goals><goal>sign</goal></goals>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
                             </execution>
                         </executions>
                     </plugin>
