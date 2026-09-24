@@ -26,12 +26,13 @@ import java.util.List;
 
 /**
  * JSR-356 {@link ServerEndpoint} 注解端点的元数据。
- *
- * <p>启动时一次性解析端点类，将 {@code @ServerEndpoint} 注解属性与
- * {@code @OnOpen/@OnMessage/@OnClose/@OnError} 生命周期方法及参数注入规则缓存，
- * 请求路径上零反射、零注解查找（遵循框架性能原则）。</p>
+ * <p>
+ * 启动时一次性解析端点类，将 {@code @ServerEndpoint} 注解属性与 {@code @OnOpen/@OnMessage/@OnClose/@OnError} 生命周期方法及参数注入规则缓存，
+ * 请求路径上零反射、零注解查找（遵循框架性能原则）。
+ * </p>
  *
  * @author huangcanda
+ *
  * @since 3.5.6
  */
 public class JsrEndpointMetadata {
@@ -48,7 +49,7 @@ public class JsrEndpointMetadata {
         THROWABLE,
         /** 消息体（仅 @OnMessage）：String/ByteBuffer/byte[]/PongMessage/POJO */
         MESSAGE,
-        /** @PathParam */
+        /** {@code @PathParam} */
         PATH_PARAM
     }
 
@@ -84,6 +85,12 @@ public class JsrEndpointMetadata {
     private final List<ParamSpec> onCloseParams;
     private final List<ParamSpec> onErrorParams;
 
+    /** 上面四张参数表的只读视图缓存：getter 在每次 open / message / close / error 派发时被调用，逐次新建包装属白扔；字段是 final，故构造期建好即可。 */
+    private final List<ParamSpec> onOpenParamsView;
+    private final List<ParamSpec> onMessageParamsView;
+    private final List<ParamSpec> onCloseParamsView;
+    private final List<ParamSpec> onErrorParamsView;
+
     /** @OnMessage 消息体参数规格（无消息参数时为 null）。 */
     private final ParamSpec messageParam;
 
@@ -110,6 +117,11 @@ public class JsrEndpointMetadata {
         this.onMessageParams = onMessage != null ? parseParams(onMessage, false) : Collections.emptyList();
         this.onCloseParams = onClose != null ? parseParams(onClose, false) : Collections.emptyList();
         this.onErrorParams = onError != null ? parseParams(onError, false) : Collections.emptyList();
+
+        this.onOpenParamsView = Collections.unmodifiableList(onOpenParams);
+        this.onMessageParamsView = Collections.unmodifiableList(onMessageParams);
+        this.onCloseParamsView = Collections.unmodifiableList(onCloseParams);
+        this.onErrorParamsView = Collections.unmodifiableList(onErrorParams);
 
         this.messageParam = findMessageParam(onMessageParams);
     }
@@ -192,15 +204,16 @@ public class JsrEndpointMetadata {
     }
 
     public String[] getSubprotocols() {
-        return subprotocols;
+        // 返回副本，避免调用方改动内部配置数组
+        return subprotocols.clone();
     }
 
     public List<Class<? extends Decoder>> getDecoders() {
-        return decoders;
+        return new java.util.ArrayList<>(decoders);
     }
 
     public List<Class<? extends Encoder>> getEncoders() {
-        return encoders;
+        return new java.util.ArrayList<>(encoders);
     }
 
     public Class<? extends ServerEndpointConfig.Configurator> getConfiguratorClass() {
@@ -224,19 +237,19 @@ public class JsrEndpointMetadata {
     }
 
     public List<ParamSpec> getOnOpenParams() {
-        return onOpenParams;
+        return onOpenParamsView;
     }
 
     public List<ParamSpec> getOnMessageParams() {
-        return onMessageParams;
+        return onMessageParamsView;
     }
 
     public List<ParamSpec> getOnCloseParams() {
-        return onCloseParams;
+        return onCloseParamsView;
     }
 
     public List<ParamSpec> getOnErrorParams() {
-        return onErrorParams;
+        return onErrorParamsView;
     }
 
     public ParamSpec getMessageParam() {
@@ -245,8 +258,7 @@ public class JsrEndpointMetadata {
 
     /** 端点类是否有可用的无参构造（setAccessible 后可用，包私有类亦支持）。 */
     public boolean isInstantiable() {
-        return !Modifier.isAbstract(endpointClass.getModifiers())
-                && hasNoArgConstructor(endpointClass);
+        return !Modifier.isAbstract(endpointClass.getModifiers()) && hasNoArgConstructor(endpointClass);
     }
 
     private static boolean hasNoArgConstructor(Class<?> clazz) {
@@ -259,24 +271,24 @@ public class JsrEndpointMetadata {
     }
 
     /**
-     * 是否为消息体类型（String/byte[]/ByteBuffer/PongMessage/POJO）。
-     * 非文本/二进制基础类型即视为 POJO，需要 Decoder 支持。
+     * 是否为消息体类型（String/byte[]/ByteBuffer/PongMessage/POJO）。 非文本/二进制基础类型即视为 POJO，需要 Decoder 支持。
      */
     public static boolean isPlainMessageType(Class<?> type) {
-        return String.class == type
-                || byte[].class == type
-                || ByteBuffer.class == type
+        return String.class == type || byte[].class == type || ByteBuffer.class == type
                 || PongMessage.class.isAssignableFrom(type);
     }
 
     /**
      * 查找匹配给定消息体类型的 {@link Decoder} 类。
      *
-     * @param messageType 消息体 POJO 类型
-     * @param isText      是否为文本帧
+     * @param messageType
+     *            消息体 POJO 类型
+     * @param isText
+     *            是否为文本帧
+     *
      * @return 匹配的 Decoder 类；无匹配返回 null
      */
-    @SuppressWarnings({"rawtypes", "unchecked"})
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public Class<? extends Decoder> findDecoder(Class<?> messageType, boolean isText) {
         for (Class<? extends Decoder> decoderClass : decoders) {
             Class<?> decodedType = resolveDecoderType(decoderClass, isText);
@@ -291,9 +303,11 @@ public class JsrEndpointMetadata {
 
     /**
      * 解析 Decoder 泛型参数对应的消息体类型。
-     * <p>只支持 {@link Decoder.Text}/{@link Decoder.Binary}，流式 Decoder 首期不支持。</p>
+     * <p>
+     * 只支持 {@link Decoder.Text}/{@link Decoder.Binary}，流式 Decoder 首期不支持。
+     * </p>
      */
-    @SuppressWarnings({"rawtypes"})
+    @SuppressWarnings({ "rawtypes" })
     private static Class<?> resolveDecoderType(Class<? extends Decoder> decoderClass, boolean isText) {
         Class<?> iface = isText ? Decoder.Text.class : Decoder.Binary.class;
         ResolvableType rt = ResolvableType.forClass(decoderClass).as(iface);
@@ -305,9 +319,11 @@ public class JsrEndpointMetadata {
 
     /**
      * 查找匹配对象类型的 {@link Encoder} 类。
-     * <p>只支持 {@link Encoder.Text}/{@link Encoder.Binary}，流式 Encoder 首期不支持。</p>
+     * <p>
+     * 只支持 {@link Encoder.Text}/{@link Encoder.Binary}，流式 Encoder 首期不支持。
+     * </p>
      */
-    @SuppressWarnings({"rawtypes", "unchecked"})
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public Class<? extends Encoder> findEncoder(Class<?> objectType, boolean isText) {
         for (Class<? extends Encoder> encoderClass : encoders) {
             Class<?> iface = isText ? Encoder.Text.class : Encoder.Binary.class;

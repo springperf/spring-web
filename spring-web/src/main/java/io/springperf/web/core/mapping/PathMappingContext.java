@@ -1,5 +1,12 @@
 package io.springperf.web.core.mapping;
 
+import java.util.Arrays;
+import java.util.List;
+
+import org.springframework.http.MediaType;
+import org.springframework.util.CollectionUtils;
+import org.springframework.web.method.HandlerMethod;
+
 import io.springperf.web.core.cors.provider.CorsConfigurationProvider;
 import io.springperf.web.core.filter.DefaultFilterChain;
 import io.springperf.web.core.interceptor.HandlerInterceptor;
@@ -8,16 +15,11 @@ import io.springperf.web.core.mapping.match.ConsumeOrProduceMatcher;
 import io.springperf.web.core.mapping.match.Matcher;
 import io.springperf.web.http.RequestAttribute;
 import io.springperf.web.http.WebServerHttpRequest;
-import org.springframework.http.MediaType;
-import org.springframework.util.CollectionUtils;
-import org.springframework.web.method.HandlerMethod;
-
-import java.util.Arrays;
-import java.util.List;
 
 public class PathMappingContext extends MappingHandlerMethod {
 
-    private static final RequestAttribute<PathMappingContext[]> REQUEST_ATTRIBUTE_ARRAY = RequestAttribute.createAttribute(PathMappingContext[].class);
+    private static final RequestAttribute<PathMappingContext[]> REQUEST_ATTRIBUTE_ARRAY = RequestAttribute
+            .createAttribute(PathMappingContext[].class);
 
     private static final Matcher[] EMPTY_MATCHERS = new Matcher[0];
 
@@ -26,24 +28,33 @@ public class PathMappingContext extends MappingHandlerMethod {
     private final Matcher[] matchers;
     private final String pathRule;
     private final List<MediaType> producibleMediaTypes;
+    /**
+     * 只读视图缓存。该 getter 落在**每次响应体编码 / 内容协商**的路径上（HttpBodyCodecRegistry、
+     * ReactiveReturnValueResolver），逐次新建包装等于每请求白扔一个对象；字段本身是 final， 故在构造期建好即可，无需任何同步。
+     */
+    private final List<MediaType> producibleMediaTypesView;
     private List<HandlerInterceptor> cachedInterceptors;
     private CorsConfigurationProvider corsConfigurationProvider;
     private DefaultFilterChain cachedFilterChain;
-
 
     public PathMappingContext(HandlerMethod handlerMethod, List<Matcher> matchers, String pathRule) {
         super(handlerMethod);
         this.type = "Controller";
         this.matchers = CollectionUtils.isEmpty(matchers) ? EMPTY_MATCHERS : matchers.toArray(new Matcher[0]);
         this.producibleMediaTypes = initProducibleMediaTypes();
+        this.producibleMediaTypesView = producibleMediaTypes == null ? null
+                : java.util.Collections.unmodifiableList(producibleMediaTypes);
         this.pathRule = pathRule;
     }
 
     public PathMappingContext(CustomInvoker invoker, String pathRule) {
         super(invoker, invoker.getHandleMethod());
         this.type = invoker.getType();
-        this.matchers = CollectionUtils.isEmpty(invoker.getMatchers()) ? EMPTY_MATCHERS : invoker.getMatchers().toArray(new Matcher[0]);
+        this.matchers = CollectionUtils.isEmpty(invoker.getMatchers()) ? EMPTY_MATCHERS
+                : invoker.getMatchers().toArray(new Matcher[0]);
         this.producibleMediaTypes = initProducibleMediaTypes();
+        this.producibleMediaTypesView = producibleMediaTypes == null ? null
+                : java.util.Collections.unmodifiableList(producibleMediaTypes);
         this.pathRule = pathRule;
     }
 
@@ -70,6 +81,8 @@ public class PathMappingContext extends MappingHandlerMethod {
     }
 
     public List<HandlerInterceptor> getCachedInterceptors() {
+        // 回退只读化：PathMappingContextTest#interceptors_getAndSet 以 assertSame 锁定「返回同一实例」
+        // （含 Collections.emptyList() 这一特例），故保留直接引用 + 按字段豁免并写明依据。
         return cachedInterceptors;
     }
 
@@ -86,7 +99,8 @@ public class PathMappingContext extends MappingHandlerMethod {
     }
 
     public List<MediaType> getProducibleMediaTypes() {
-        return producibleMediaTypes;
+        // 只读视图（构造期建好，见 producibleMediaTypesView）；字段为 null 时仍返回 null
+        return producibleMediaTypesView;
     }
 
     @Override
