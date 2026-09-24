@@ -83,6 +83,9 @@ function Get-LeakCounts {
 }
 
 $files = New-Object System.Collections.ArrayList
+# 优先用仓库自带 Wrapper（与 CI 同一 Maven 版本）
+$mvnCmd = Join-Path $PSScriptRoot '..\mvnw.cmd'
+if (-not (Test-Path $mvnCmd)) { $mvnCmd = 'mvn' }
 $mvnFailures = 0
 $leakFailures = 0
 
@@ -100,7 +103,7 @@ if ($Run) {
         if ($ExtraMvnArgs.Trim().Length -gt 0) {
             $mvnArgs += $ExtraMvnArgs.Trim().Split(' ')
         }
-        & mvn @mvnArgs 2>&1 | Tee-Object -FilePath $log | Out-Null
+        & $mvnCmd @mvnArgs 2>&1 | Tee-Object -FilePath $log | Out-Null
         if ($LASTEXITCODE -ne 0) {
             Write-Output ("    [FAIL] maven exit code {0}: build or test failure (NOT necessarily a leak; see {1})" -f $LASTEXITCODE, $log)
             $mvnFailures++

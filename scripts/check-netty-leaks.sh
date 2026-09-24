@@ -20,6 +20,8 @@
 #
 set -uo pipefail
 
+# 优先用仓库自带 Wrapper（与 CI 同一 Maven 版本）；可用 MVN=... 覆盖
+if [ -z "${MVN:-}" ] && [ -x "./mvnw" ]; then MVN="./mvnw"; fi
 MVN="${MVN:-mvn}"
 LEAK_MARKERS='reportTracedLeak|reportUntracedLeak|LEAK: ByteBuf'
 RUN=0

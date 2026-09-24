@@ -46,6 +46,10 @@ if (-not $OutFile) {
     $OutFile = Join-Path $repoRoot 'coverage-report.md'
 }
 
+# 优先用仓库自带 Wrapper（与 CI 同一 Maven 版本）
+$mvnCmd = Join-Path $repoRoot 'mvnw.cmd'
+if (-not (Test-Path $mvnCmd)) { $mvnCmd = 'mvn' }
+
 # 刷新范围：库模块 + E2E 模块 + 聚合模块（聚合模块排最后，report-aggregate 合并全部 exec，
 # 这样 E2E 触发的库模块覆盖才会计入报告）。
 # Refresh scope: library modules + E2E modules + the aggregate module (kept last; report-aggregate
@@ -63,7 +67,7 @@ if (-not $SkipTests) {
     $mvnArgs = @('test', '-pl', ($refreshModules -join ','))
     Push-Location $repoRoot
     try {
-        & mvn @mvnArgs
+        & $mvnCmd @mvnArgs
         if ($LASTEXITCODE -ne 0) {
             throw "mvn test jacoco:report 失败，exit=$LASTEXITCODE"
         }

@@ -56,5 +56,9 @@ __pycache__/
 *.txt
 *.py
 !/spring-web-benchmark/analyze_jfr.py
+# scripts/ 下的工具脚本需入库（check-docs.py 与 check-docs.sh 成对；没有这条会静默漏提交）
+!/scripts/*.py
 !/spring-web-servlet/src/test/resources/perf-web/placeholder.txt
 /promotion/
+/.workbuddy/
+/.codebuddy/

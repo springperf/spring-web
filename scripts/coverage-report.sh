@@ -30,6 +30,8 @@ fi
 # 脚本位于 scripts/，仓库根为其父目录
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_FILE="$REPO_ROOT/coverage-report.md"
+# 优先用仓库自带 Wrapper（与 CI 同一 Maven 版本）
+if [ -x "$REPO_ROOT/mvnw" ]; then MVN="$REPO_ROOT/mvnw"; else MVN="mvn"; fi
 # 刷新范围：库模块 + E2E 模块 + 聚合模块（聚合模块排最后，report-aggregate 合并全部 exec，
 # 这样 E2E 触发的库模块覆盖才会计入报告）
 REFRESH_MODULES=("${MODULES[@]}" "${E2E_MODULES[@]}" coverage-aggregate)
@@ -42,7 +44,7 @@ JAVA_VERSION="$(java -version 2>/dev/null | head -n1 || echo 'java: n/a')"
 # ---------- 1. 刷新覆盖率数据 / refresh coverage data ----------
 if [[ "$SKIP_MVN" == "false" ]]; then
   echo "[coverage-report] 运行测试并生成聚合覆盖率数据 / running tests & generating aggregate coverage data ..."
-  (cd "$REPO_ROOT" && mvn test -pl "$(IFS=,; echo "${REFRESH_MODULES[*]}")")
+  (cd "$REPO_ROOT" && "$MVN" test -pl "$(IFS=,; echo "${REFRESH_MODULES[*]}")")
 else
   echo "[coverage-report] --skip：仅汇总已有 jacoco.csv / aggregating existing jacoco.csv only"
 fi
