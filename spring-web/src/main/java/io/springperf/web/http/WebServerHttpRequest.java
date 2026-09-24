@@ -1,27 +1,65 @@
 package io.springperf.web.http;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.http.support.BodyHttpInputMessage;
-import io.springperf.web.http.support.HttpInputMessagePart;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.server.ServerHttpRequest;
-import org.springframework.util.MultiValueMap;
-import org.springframework.web.multipart.MultipartFile;
-
+import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.springframework.http.HttpMethod;
+import org.springframework.http.server.ServerHttpRequest;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.multipart.MultipartFile;
+
+import io.springperf.web.context.WebContext;
+import io.springperf.web.http.support.BodyHttpInputMessage;
+import io.springperf.web.http.support.HttpInputMessagePart;
+
 /**
  * Server-side HTTP request abstraction for the perf web framework.
  * <p>
- * Extends Spring's {@link ServerHttpRequest} with additional methods for
- * accessing URI parts, parameters, multipart files, locales, and the
- * underlying {@link WebContext}. Also extends {@link BodyHttpInputMessage}
- * for body reading support.
+ * Extends Spring's {@link ServerHttpRequest} with additional methods for accessing URI parts, parameters, multipart
+ * files, locales, and the underlying {@link WebContext}. Also extends {@link BodyHttpInputMessage} for body reading
+ * support.
  */
 public interface WebServerHttpRequest extends ServerHttpRequest, BodyHttpInputMessage {
+
+    /**
+     * Return the request URI. Never {@code null} in this framework: implementations either build it eagerly (Netty) or
+     * hold it from construction (forwarded requests), so callers may dereference the result directly. Redeclared here
+     * (with the annotation) because the inherited declaration comes from the Spring jar, where the contract is not
+     * visible to static analysis.
+     * <p>
+     * Note the boundary: "never {@code null}" is not the same as "never fails" - {@code URI.create} still throws
+     * {@link IllegalArgumentException} for a malformed authority, and callers that need to survive that must catch it.
+     *
+     * @return the request URI, never {@code null}
+     */
+    @Override
+    @NonNull
+    URI getURI();
+
+    /**
+     * Return the remote (client) address. {@code null} when the channel is not connected or already closed; callers are
+     * expected to tolerate that (see {@code NettyHttpServletRequest}, {@code AccessLogWebFilter}).
+     *
+     * @return the remote address, or {@code null} if unavailable
+     */
+    @Override
+    @Nullable
+    InetSocketAddress getRemoteAddress();
+
+    /**
+     * Return the local (server) address. {@code null} when the channel has no bound local address.
+     *
+     * @return the local address, or {@code null} if unavailable
+     */
+    @Override
+    @Nullable
+    InetSocketAddress getLocalAddress();
 
     /**
      * Return the full request URI including the query string.
@@ -61,7 +99,9 @@ public interface WebServerHttpRequest extends ServerHttpRequest, BodyHttpInputMe
     /**
      * Return the first value of the named parameter.
      *
-     * @param name the parameter name
+     * @param name
+     *            the parameter name
+     *
      * @return the first value, or {@code null} if the parameter is absent
      */
     String getParameter(String name);
@@ -69,7 +109,9 @@ public interface WebServerHttpRequest extends ServerHttpRequest, BodyHttpInputMe
     /**
      * Return all values of the named parameter.
      *
-     * @param name the parameter name
+     * @param name
+     *            the parameter name
+     *
      * @return the values array, or {@code null} if the parameter is absent
      */
     String[] getParameterValues(String name);
@@ -98,7 +140,8 @@ public interface WebServerHttpRequest extends ServerHttpRequest, BodyHttpInputMe
     /**
      * Set the character encoding for reading the request body.
      *
-     * @param characterEncoding the encoding to use
+     * @param characterEncoding
+     *            the encoding to use
      */
     void setCharacterEncoding(Charset characterEncoding);
 
@@ -132,9 +175,9 @@ public interface WebServerHttpRequest extends ServerHttpRequest, BodyHttpInputMe
 
     /**
      * Return the {@link RequestContext} for this request.
-     *
-     * <p>The request context holds request-scoped attributes that live for
-     * the duration of the request lifecycle.</p>
+     * <p>
+     * The request context holds request-scoped attributes that live for the duration of the request lifecycle.
+     * </p>
      *
      * @return the request context
      */
@@ -142,15 +185,17 @@ public interface WebServerHttpRequest extends ServerHttpRequest, BodyHttpInputMe
 
     /**
      * Return the attributes map for this request.
-     *
-     * <p>Spring 6.2+ {@code HttpRequest} declares this method as abstract.
-     * This declaration ensures cross-version compatibility without {@code @Override}.
+     * <p>
+     * Spring 6.2+ {@code HttpRequest} declares this method as abstract. This declaration ensures cross-version
+     * compatibility without {@code @Override}.
      */
     Map<String, Object> getAttributes();
 
     /**
      * Return the HTTP method value as a String.
-     * <p>Default implementation derives the value from {@link #getMethod()}.</p>
+     * <p>
+     * Default implementation derives the value from {@link #getMethod()}.
+     * </p>
      *
      * @return the HTTP method value (e.g. "GET", "POST"), or {@code null} if not available
      */
@@ -161,8 +206,10 @@ public interface WebServerHttpRequest extends ServerHttpRequest, BodyHttpInputMe
 
     /**
      * 是否为 HEAD 请求（已按 RFC 7231 §4.3.2 映射到支持 GET 的处理器）。
-     * <p>由 {@link io.springperf.web.core.mapping.match.HttpMethodMatcher} 在路由匹配时统一标记，
-     * 后续处理（资源元数据、响应 body 抑制等）只需读此标志，无需重复判断 HTTP 方法。</p>
+     * <p>
+     * 由 {@link io.springperf.web.core.mapping.match.HttpMethodMatcher} 在路由匹配时统一标记， 后续处理（资源元数据、响应 body 抑制等）只需读此标志，无需重复判断
+     * HTTP 方法。
+     * </p>
      *
      * @return {@code true} 表示当前是 HEAD 请求
      */
@@ -172,7 +219,9 @@ public interface WebServerHttpRequest extends ServerHttpRequest, BodyHttpInputMe
 
     /**
      * 标记当前请求为 HEAD 请求。由路由层在匹配到支持 GET（或显式 HEAD）的处理器时调用。
-     * <p>默认空实现（对未实现字段的请求无害）；{@link BaseWebServerHttpRequest} 覆盖以记录标志。</p>
+     * <p>
+     * 默认空实现（对未实现字段的请求无害）；{@link BaseWebServerHttpRequest} 覆盖以记录标志。
+     * </p>
      */
     default void markAsHeadRequest() {
         // 默认无操作
@@ -180,18 +229,19 @@ public interface WebServerHttpRequest extends ServerHttpRequest, BodyHttpInputMe
 
     /**
      * Retain the underlying Netty ByteBuf reference count.
-     *
-     * <p>Must be called before offloading request processing to a separate
-     * thread (e.g., a business thread pool) to prevent premature release
-     * by the I/O thread.</p>
+     * <p>
+     * Must be called before offloading request processing to a separate thread (e.g., a business thread pool) to
+     * prevent premature release by the I/O thread.
+     * </p>
      */
     void acquire();
 
     /**
      * Release the underlying Netty ByteBuf reference count.
-     *
-     * <p>Each call to {@link #acquire()} must be paired with a corresponding
-     * call to {@code release()} when the offloaded processing completes.</p>
+     * <p>
+     * Each call to {@link #acquire()} must be paired with a corresponding call to {@code release()} when the offloaded
+     * processing completes.
+     * </p>
      *
      * @return {@code true} if the reference count reached zero and the buffer was freed
      */

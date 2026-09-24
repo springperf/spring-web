@@ -13,8 +13,9 @@ import java.util.Set;
 
 /**
  * 基于框架 {@link WebServerHttpRequest} 的 {@link IWebRequest} 适配（零 Servlet 依赖）。
- *
- * <p>Cookie 能力默认空实现；Servlet 场景可覆写 {@link #containsCookie} 等方法补齐。</p>
+ * <p>
+ * Cookie 能力默认空实现；Servlet 场景可覆写 {@link #containsCookie} 等方法补齐。
+ * </p>
  *
  * @since 3.5.7
  */
@@ -29,7 +30,9 @@ public class PerfWebRequest implements IWebRequest {
     }
 
     @Override
-    public String getMethod() { return nativeReq.getMethodValue(); }
+    public String getMethod() {
+        return nativeReq.getMethodValue();
+    }
 
     @Override
     public String getScheme() {
@@ -50,15 +53,19 @@ public class PerfWebRequest implements IWebRequest {
     }
 
     @Override
-    public String getApplicationPath() { return contextPath; }
+    public String getApplicationPath() {
+        return contextPath;
+    }
 
     @Override
-    public String getPathWithinApplication() { return nativeReq.getPath(); }
+    public String getPathWithinApplication() {
+        return nativeReq.getPath();
+    }
 
     @Override
     public String getQueryString() {
-        URI uri = nativeReq.getURI();
-        return uri != null ? uri.getRawQuery() : null;
+        // getURI() 由 WebServerHttpRequest 声明为非空（见其 @NonNull 契约）；getRawQuery() 无查询串时为 null
+        return nativeReq.getURI().getRawQuery();
     }
 
     @Override
@@ -67,10 +74,14 @@ public class PerfWebRequest implements IWebRequest {
     }
 
     @Override
-    public int getHeaderCount() { return nativeReq.getHeaders().size(); }
+    public int getHeaderCount() {
+        return nativeReq.getHeaders().size();
+    }
 
     @Override
-    public Set<String> getAllHeaderNames() { return nativeReq.getHeaders().keySet(); }
+    public Set<String> getAllHeaderNames() {
+        return nativeReq.getHeaders().keySet();
+    }
 
     @Override
     public Map<String, String[]> getHeaderMap() {
@@ -95,10 +106,14 @@ public class PerfWebRequest implements IWebRequest {
     }
 
     @Override
-    public int getParameterCount() { return nativeReq.getParameterMap().size(); }
+    public int getParameterCount() {
+        return nativeReq.getParameterMap().size();
+    }
 
     @Override
-    public Set<String> getAllParameterNames() { return nativeReq.getParameterMap().keySet(); }
+    public Set<String> getAllParameterNames() {
+        return nativeReq.getParameterMap().keySet();
+    }
 
     @Override
     public Map<String, String[]> getParameterMap() {
@@ -117,17 +132,27 @@ public class PerfWebRequest implements IWebRequest {
     }
 
     @Override
-    public boolean containsCookie(String name) { return false; }
+    public boolean containsCookie(String name) {
+        return false;
+    }
 
     @Override
-    public int getCookieCount() { return 0; }
+    public int getCookieCount() {
+        return 0;
+    }
 
     @Override
-    public Set<String> getAllCookieNames() { return Collections.emptySet(); }
+    public Set<String> getAllCookieNames() {
+        return Collections.emptySet();
+    }
 
     @Override
-    public Map<String, String[]> getCookieMap() { return Collections.emptyMap(); }
+    public Map<String, String[]> getCookieMap() {
+        return Collections.emptyMap();
+    }
 
     @Override
-    public String[] getCookieValues(String name) { return new String[0]; }
+    public String[] getCookieValues(String name) {
+        return new String[0];
+    }
 }

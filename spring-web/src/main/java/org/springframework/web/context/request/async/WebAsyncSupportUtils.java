@@ -4,6 +4,8 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.springframework.lang.Nullable;
+
 public class WebAsyncSupportUtils {
 
     private static final CallableProcessingInterceptor timeoutCallableInterceptor = new TimeoutCallableProcessingInterceptor();
@@ -23,7 +25,8 @@ public class WebAsyncSupportUtils {
         SUPPORTS_GET_INTERCEPTOR = m != null;
     }
 
-    public static CallableInterceptorChainAdapter newCallableInterceptorChain(WebAsyncTask<?> webAsyncTask, List<CallableProcessingInterceptor> callableInterceptors) {
+    public static CallableInterceptorChainAdapter newCallableInterceptorChain(WebAsyncTask<?> webAsyncTask,
+            List<CallableProcessingInterceptor> callableInterceptors) {
         List<CallableProcessingInterceptor> interceptors = new ArrayList<>();
         interceptors.add(webAsyncTask.getInterceptor());
         interceptors.addAll(callableInterceptors);
@@ -31,11 +34,14 @@ public class WebAsyncSupportUtils {
         return new CallableInterceptorChainAdapter(interceptors);
     }
 
+    /** 透传 DeferredResult 超时值；未显式设置超时时为 null（对齐 DeferredResult#getTimeoutValue 契约）。 */
+    @Nullable
     public static Long getDeferredResultTimeout(DeferredResult<?> deferredResult) {
         return deferredResult.getTimeoutValue();
     }
 
-    public static DeferredResultInterceptorChainAdapter newDeferredResultInterceptorChain(DeferredResult<?> deferredResult, List<DeferredResultProcessingInterceptor> deferredResultInterceptors) {
+    public static DeferredResultInterceptorChainAdapter newDeferredResultInterceptorChain(
+            DeferredResult<?> deferredResult, List<DeferredResultProcessingInterceptor> deferredResultInterceptors) {
         List<DeferredResultProcessingInterceptor> interceptors = new ArrayList<>();
         if (SUPPORTS_GET_INTERCEPTOR) {
             try {
