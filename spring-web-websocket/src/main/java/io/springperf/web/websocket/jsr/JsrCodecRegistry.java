@@ -14,11 +14,12 @@ import java.util.Map;
 
 /**
  * 端点级 {@link Decoder}/{@link Encoder} 实例管理。
- *
- * <p>JSR-356 规范要求 Decoder/Encoder 与端点实例一一对应并在会话生命周期内管理。
- * 此注册表在连接建立时实例化、初始化，会话关闭时销毁。</p>
+ * <p>
+ * JSR-356 规范要求 Decoder/Encoder 与端点实例一一对应并在会话生命周期内管理。 此注册表在连接建立时实例化、初始化，会话关闭时销毁。
+ * </p>
  *
  * @author huangcanda
+ *
  * @since 3.5.6
  */
 public class JsrCodecRegistry {
@@ -32,7 +33,7 @@ public class JsrCodecRegistry {
     private final Map<Class<?>, Encoder.Text<?>> textEncoders = new HashMap<>();
     private final Map<Class<?>, Encoder.Binary<?>> binaryEncoders = new HashMap<>();
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public JsrCodecRegistry(JsrEndpointConfigAdapter config) {
         EndpointConfig endpointConfig = config;
         for (Class<? extends Decoder> decoderClass : config.getDecoders()) {
@@ -74,10 +75,12 @@ public class JsrCodecRegistry {
     /**
      * 解码文本帧。
      *
-     * @param text       帧文本
-     * @param targetType @OnMessage 消息参数类型（String 直接返回，否则查 Decoder.Text）
+     * @param text
+     *            帧文本
+     * @param targetType
+     *            {@code @OnMessage} 消息参数类型（String 直接返回，否则查 Decoder.Text）
      */
-    @SuppressWarnings({"rawtypes", "unchecked"})
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public Object decodeText(String text, Class<?> targetType) throws jakarta.websocket.DecodeException {
         if (String.class == targetType) {
             return text;
@@ -92,10 +95,12 @@ public class JsrCodecRegistry {
     /**
      * 解码二进制帧。
      *
-     * @param buf       帧二进制内容
-     * @param targetType @OnMessage 消息参数类型（byte[]/ByteBuffer 直接返回，否则查 Decoder.Binary）
+     * @param buf
+     *            帧二进制内容
+     * @param targetType
+     *            {@code @OnMessage} 消息参数类型（byte[]/ByteBuffer 直接返回，否则查 Decoder.Binary）
      */
-    @SuppressWarnings({"rawtypes", "unchecked"})
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public Object decodeBinary(ByteBuffer buf, Class<?> targetType) throws jakarta.websocket.DecodeException {
         if (byte[].class == targetType) {
             byte[] bytes = new byte[buf.remaining()];
@@ -113,13 +118,14 @@ public class JsrCodecRegistry {
     }
 
     /**
-     * 将对象编码并发送。
+     * 将对象编码为 {@link EncodedPayload}（实际发送由调用方处理）。
      *
-     * @param session 目标会话
-     * @param data    要发送的对象
-     * @param async   是否异步发送（true 走 Async remote，此处仅编码，发送由调用方处理）
+     * @param data
+     *            要编码的对象
+     * @param preferText
+     *            文本与二进制编码器都可用时是否优先文本编码
      */
-    @SuppressWarnings({"rawtypes", "unchecked"})
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public EncodedPayload encode(Object data, boolean preferText) throws EncodeException {
         Class<?> type = data.getClass();
         Encoder.Text textEncoder = findTextEncoder(textEncoders, type);
@@ -136,7 +142,7 @@ public class JsrCodecRegistry {
         throw new EncodeException(data, "No matching Encoder for type " + type.getName());
     }
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     private static Decoder.Text findTextDecoder(Map map, Class<?> targetType) {
         Object found = map.get(targetType);
         if (found != null) {
@@ -154,7 +160,7 @@ public class JsrCodecRegistry {
         return null;
     }
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     private static Decoder.Binary findBinaryDecoder(Map map, Class<?> targetType) {
         Object found = map.get(targetType);
         if (found != null) {
@@ -169,7 +175,7 @@ public class JsrCodecRegistry {
         return null;
     }
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     private static Encoder.Text findTextEncoder(Map map, Class<?> targetType) {
         Object found = map.get(targetType);
         if (found != null) {
@@ -184,7 +190,7 @@ public class JsrCodecRegistry {
         return null;
     }
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     private static Encoder.Binary findBinaryEncoder(Map map, Class<?> targetType) {
         Object found = map.get(targetType);
         if (found != null) {

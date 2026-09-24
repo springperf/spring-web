@@ -24,16 +24,17 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Stream;
 
 /**
- * 基于文件的会话存储（对齐 Spring Boot {@code server.servlet.session.persistent} /
- * {@code store-dir}）：每 session 一个文件，JDK 序列化，重启可恢复未过期会话。
- *
- * <p>设计要点：</p>
+ * 基于文件的会话存储（对齐 Spring Boot {@code server.servlet.session.persistent} / {@code store-dir}）：每 session 一个文件，JDK
+ * 序列化，重启可恢复未过期会话。
+ * <p>
+ * 设计要点：
+ * </p>
  * <ul>
- *   <li><b>每 session 一文件</b>：{@code <store-dir>/<sessionId>.session}，便于并发写与局部恢复。</li>
- *   <li><b>原子写</b>：先写 {@code <id>.tmp}，再 {@code ATOMIC_MOVE} 替换目标，避免半写损坏。</li>
- *   <li><b>不可序列化属性跳过</b>：逐属性序列化，失败者跳过并 warn，不影响其余属性与整个会话。</li>
- *   <li><b>坏文件容错</b>：启动加载时反序列化失败（损坏 / 类版本不匹配）跳过并 warn，不影响启动。</li>
- *   <li><b>内存优先</b>：运行时读写走内存 map，落盘仅用于重启恢复。</li>
+ * <li><b>每 session 一文件</b>：{@code <store-dir>/<sessionId>.session}，便于并发写与局部恢复。</li>
+ * <li><b>原子写</b>：先写 {@code <id>.tmp}，再 {@code ATOMIC_MOVE} 替换目标，避免半写损坏。</li>
+ * <li><b>不可序列化属性跳过</b>：逐属性序列化，失败者跳过并 warn，不影响其余属性与整个会话。</li>
+ * <li><b>坏文件容错</b>：启动加载时反序列化失败（损坏 / 类版本不匹配）跳过并 warn，不影响启动。</li>
+ * <li><b>内存优先</b>：运行时读写走内存 map，落盘仅用于重启恢复。</li>
  * </ul>
  */
 public class FileHttpSessionStorage implements HttpSessionStorage {
@@ -48,6 +49,8 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
     private static final char[] HEX = "0123456789abcdef".toCharArray();
 
     private final Path storeDir;
+    /** {@code storeDir} 的规范化绝对路径：仅用于 {@link #fileOf} 的越界判定（保持 {@link #getStoreDir()} 原值不变）。 */
+    private final Path storeDirNormalized;
     private final Set<String> excludeAttributes;
     private final ConcurrentMap<String, HttpSessionData> sessions = new ConcurrentHashMap<>();
     private final Thread cleanupThread;
@@ -58,6 +61,7 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
 
     public FileHttpSessionStorage(Path storeDir, Set<String> excludeAttributes) {
         this.storeDir = storeDir;
+        this.storeDirNormalized = storeDir.toAbsolutePath().normalize();
         this.excludeAttributes = excludeAttributes != null ? excludeAttributes : Collections.emptySet();
         try {
             Files.createDirectories(storeDir);
@@ -74,7 +78,11 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
     private void loadExistingSessions() {
         long now = System.currentTimeMillis();
         try (Stream<Path> files = Files.list(storeDir)) {
-            files.filter(p -> p.getFileName().toString().endsWith(FILE_SUFFIX)).forEach(path -> {
+            // Path.getFileName() 声明为 @Nullable：无文件名的条目直接跳过
+            files.filter(p -> {
+                Path name = p.getFileName();
+                return name != null && name.toString().endsWith(FILE_SUFFIX);
+            }).forEach(path -> {
                 HttpSessionData data = readSessionFile(path);
                 if (data == null) {
                     return;
@@ -106,8 +114,8 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
             }
             log.warn("Unexpected session file content (not HttpSessionData): {}", path);
         } catch (Exception e) {
-            log.warn("Failed to deserialize session file {} (corrupted or incompatible), discarded: {}",
-                    path, e.toString());
+            log.warn("Failed to deserialize session file {} (corrupted or incompatible), discarded: {}", path,
+                    e.toString());
         }
         deleteFileQuietly(path);
         return null;
@@ -134,8 +142,7 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
     }
 
     /**
-     * 落盘会话：过滤排除名单与不可序列化属性后，原子写入 {@code <id>.session}。
-     * 写入失败只 warn，不影响请求处理。
+     * 落盘会话：过滤排除名单与不可序列化属性后，原子写入 {@code <id>.session}。 写入失败只 warn，不影响请求处理。
      */
     @Override
     public void saveSession(HttpSessionData session) {
@@ -159,8 +166,7 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
     }
 
     /**
-     * 序列化会话：排除名单命中或不可序列化的属性被跳过（warn），其余正常写入。
-     * 整体序列化异常时返回 null（放弃本次落盘）。
+     * 序列化会话：排除名单命中或不可序列化的属性被跳过（warn），其余正常写入。 整体序列化异常时返回 null（放弃本次落盘）。
      */
     @Nullable
     private byte[] serialize(HttpSessionData session) {
@@ -170,18 +176,29 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
         copy.setMaxInactiveInterval(session.getMaxInactiveInterval());
         for (Map.Entry<String, Object> entry : session.getAttributes().entrySet()) {
             String name = entry.getKey();
+            // 属性名不可能为 null，但 Map 允许 null 键：跳过而不是把它传给要求非空的 setAttribute
+            if (name == null) {
+                continue;
+            }
             Object value = entry.getValue();
+            // Servlet 语义：null 值等同于「移除该属性」；且 HttpSessionData 内部是 ConcurrentHashMap，
+            // 它不接受 null value（put 会抛 NPE），故在入口显式跳过
+            if (value == null) {
+                continue;
+            }
             if (excludeAttributes.contains(name)) {
                 continue;
             }
-            if (value != null && !(value instanceof Serializable)) {
-                log.warn("Session attribute '{}' is not serializable ({}), skipped from persistence",
-                        name, value.getClass().getName());
+            if (!(value instanceof Serializable)) {
+                log.warn("Session attribute '{}' is not serializable ({}), skipped from persistence", name,
+                        value.getClass().getName());
                 continue;
             }
-            if (value instanceof Serializable && !isActuallySerializable((Serializable) value)) {
-                log.warn("Session attribute '{}' ({}) failed serialization check, skipped from persistence",
-                        name, value.getClass().getName());
+            // 走到这里 value 已被确认可序列化：原先第二处 instanceof 因此恒真
+            // （BC_VACUOUS_INSTANCEOF），改为直接校验
+            if (!isActuallySerializable((Serializable) value)) {
+                log.warn("Session attribute '{}' ({}) failed serialization check, skipped from persistence", name,
+                        value.getClass().getName());
                 continue;
             }
             copy.setAttribute(name, value);
@@ -224,8 +241,30 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
         return storeDir;
     }
 
+    /**
+     * 会话 id → 落盘路径。
+     *
+     * <p>
+     * <b>路径安全收口</b>：id 的来源（{@code JSESSIONID} cookie、{@code ;jsessionid=} URL）是客户端可控的， 因此在这里就地保证「id 绝不参与路径解析」。今天的调用点本来都只会传自己生成的 id
+     * （{@code generateSessionId()} 产出纯 hex）——但那是跨方法的隐式约定，一旦将来引入「按请求懒加载」之类的改动就会变成 任意文件读 / 删除 / 反序列化原语。把校验放在此处后，该性质成为
+     * <b>局部不变量</b>：越界一律失败，且失败发生在任何文件操作之前。
+     * </p>
+     *
+     * @throws IllegalArgumentException
+     *             id 为空、含路径分隔符或上跳片段、或解析后越出 store 目录
+     */
     private Path fileOf(String sessionId) {
-        return storeDir.resolve(sessionId + FILE_SUFFIX);
+        if (sessionId == null || sessionId.isEmpty()) {
+            throw new IllegalArgumentException("Session id must not be empty");
+        }
+        if (sessionId.indexOf('/') >= 0 || sessionId.indexOf('\\') >= 0 || sessionId.contains("..")) {
+            throw new IllegalArgumentException("Unsafe session id: " + sessionId);
+        }
+        Path path = storeDir.resolve(sessionId + FILE_SUFFIX).normalize();
+        if (!path.startsWith(storeDirNormalized)) {
+            throw new IllegalArgumentException("Session id escapes the store dir: " + sessionId);
+        }
+        return path;
     }
 
     private void deleteFileQuietly(Path path) {

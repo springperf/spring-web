@@ -7,7 +7,7 @@ public class MethodReturnValueContext {
     protected MethodParameter returnType;
     protected ReturnValueResolver returnValueResolver;
 
-    /** 异步类型的泛型参数类型，如 DeferredResult<String> 中的 String */
+    /** 异步类型的泛型参数类型，如 {@code DeferredResult<String>} 中的元素类型 */
     protected MethodParameter innerReturnType;
     /** 匹配 innerReturnType 的解析器 */
     protected ReturnValueResolver innerReturnValueResolver;
@@ -16,7 +16,7 @@ public class MethodReturnValueContext {
 
     /** 是否为 Optional 返回类型 */
     protected boolean optionalType;
-    /** Optional 内联类型，如 Optional<User> 中的 User */
+    /** Optional 内联类型，如 {@code Optional<User>} 中的元素类型 */
     protected MethodParameter optionalInnerReturnType;
     /** 匹配 optionalInnerReturnType 的解析器 */
     protected ReturnValueResolver optionalInnerReturnValueResolver;

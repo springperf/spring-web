@@ -13,16 +13,15 @@ import java.util.concurrent.atomic.AtomicLong;
  * <p>
  * Registers the following metrics (all tagged with {@code queue}={@literal <queueName>}):
  * <ul>
- *   <li>{@code batch.enqueue.total} — Counter, total enqueue attempts</li>
- *   <li>{@code batch.enqueue.dropped} — Counter, requests dropped due to backpressure</li>
- *   <li>{@code batch.enqueue.overflow} — Counter, overflow exceptions thrown</li>
- *   <li>{@code batch.process.duration} — Timer, batch processing duration</li>
- *   <li>{@code batch.process.batch.size} — DistributionSummary, batch size distribution</li>
- *   <li>{@code batch.process.requests} — Counter, individual requests completed via batch</li>
- *   <li>{@code batch.queue.remaining} — Gauge, ring buffer remaining capacity</li>
- *   <li>{@code batch.queue.capacity} — Gauge, ring buffer total capacity</li>
+ * <li>{@code batch.enqueue.total} — Counter, total enqueue attempts</li>
+ * <li>{@code batch.enqueue.dropped} — Counter, requests dropped due to backpressure</li>
+ * <li>{@code batch.enqueue.overflow} — Counter, overflow exceptions thrown</li>
+ * <li>{@code batch.process.duration} — Timer, batch processing duration</li>
+ * <li>{@code batch.process.batch.size} — DistributionSummary, batch size distribution</li>
+ * <li>{@code batch.process.requests} — Counter, individual requests completed via batch</li>
+ * <li>{@code batch.queue.remaining} — Gauge, ring buffer remaining capacity</li>
+ * <li>{@code batch.queue.capacity} — Gauge, ring buffer total capacity</li>
  * </ul>
- * </p>
  */
 public class MicrometerBatchMetrics implements BatchMetrics {
 
@@ -65,10 +64,9 @@ public class MicrometerBatchMetrics implements BatchMetrics {
 
     @Override
     public void recordBatchProcessed(String queueName, int batchSize, long durationNanos, boolean success) {
-        timer(durationTimers, "batch.process.duration", queueName)
-                .record(durationNanos, java.util.concurrent.TimeUnit.NANOSECONDS);
-        summary(batchSizeSummaries, "batch.process.batch.size", queueName)
-                .record(batchSize);
+        timer(durationTimers, "batch.process.duration", queueName).record(durationNanos,
+                java.util.concurrent.TimeUnit.NANOSECONDS);
+        summary(batchSizeSummaries, "batch.process.batch.size", queueName).record(batchSize);
     }
 
     @Override
@@ -80,19 +78,15 @@ public class MicrometerBatchMetrics implements BatchMetrics {
     public void reportQueueCapacity(String queueName, int remaining, int total) {
         AtomicInteger cap = remainingCapacities.computeIfAbsent(queueName, k -> {
             AtomicInteger v = new AtomicInteger(remaining);
-            Gauge.builder("batch.queue.remaining", v, AtomicInteger::get)
-                    .tag(TAG_QUEUE, queueName)
-                    .strongReference(true)
-                    .register(meterRegistry);
+            Gauge.builder("batch.queue.remaining", v, AtomicInteger::get).tag(TAG_QUEUE, queueName)
+                    .strongReference(true).register(meterRegistry);
             return v;
         });
         cap.set(remaining);
 
         capacityTotals.computeIfAbsent(queueName, k -> {
             AtomicLong v = new AtomicLong(total);
-            Gauge.builder("batch.queue.capacity", v, AtomicLong::get)
-                    .tag(TAG_QUEUE, queueName)
-                    .strongReference(true)
+            Gauge.builder("batch.queue.capacity", v, AtomicLong::get).tag(TAG_QUEUE, queueName).strongReference(true)
                     .register(meterRegistry);
             return v;
         });

@@ -1,11 +1,11 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>io.github.springperf</groupId>
         <artifactId>spring-web-parent</artifactId>
 
-<version>3.5.6</version>
+        <version>3.5.6</version>
     </parent>
     <artifactId>spring-web-mvc-support</artifactId>
     <packaging>jar</packaging>
@@ -85,6 +85,19 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
+            </plugin>
+            <!-- javadoc doclint 排除 reference：本模块的 org.springframework.web.servlet.* 兼容镜像
+                 携带 Spring 原版 javadoc，其 {@link} 交叉引用指向 Spring 框架内部类（不在本模块
+                 classpath，也不能加入——同包同名会与镜像类冲突），故只保留 HTML/语法检查。
+                 The Spring-API mirror classes carry upstream javadoc whose cross-references point to
+                 Spring internals absent from this module's classpath (they cannot be added: same
+                 package + name would clash with the mirrors), so the reference doclint group is off. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <configuration>
+                    <doclint>all,-missing,-reference</doclint>
+                </configuration>
             </plugin>
         </plugins>
     </build>

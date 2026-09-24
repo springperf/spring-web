@@ -24,14 +24,15 @@ import java.util.concurrent.atomic.AtomicLong;
  * 将 Netty {@link Channel} 包装为 Spring {@link WebSocketSession}。
  *
  * @author huangcanda
+ *
  * @since 1.0.4
  */
 @Slf4j
 public class NettyWebSocketSession implements WebSocketSession {
 
     private static final AtomicLong sessionIdCounter = new AtomicLong(0);
-    private static final AttributeKey<Queue<WebSocketFrame>> BACKPRESSURE_QUEUE_KEY =
-            AttributeKey.valueOf("ws.backpressure.queue");
+    private static final AttributeKey<Queue<WebSocketFrame>> BACKPRESSURE_QUEUE_KEY = AttributeKey
+            .valueOf("ws.backpressure.queue");
     private static final String IDLE_HANDLER_NAME = "ws-idle";
 
     private final String id;
@@ -52,9 +53,8 @@ public class NettyWebSocketSession implements WebSocketSession {
     private volatile boolean open = true;
 
     public NettyWebSocketSession(Channel channel, URI uri, SpringHeadersAdapter handshakeHeaders,
-                                  String acceptedProtocol, InetSocketAddress localAddress,
-                                  InetSocketAddress remoteAddress, Principal principal,
-                                  @Nullable WebSocketHandler handler) {
+            String acceptedProtocol, InetSocketAddress localAddress, InetSocketAddress remoteAddress,
+            Principal principal, @Nullable WebSocketHandler handler) {
         this.id = "ws-" + sessionIdCounter.incrementAndGet();
         this.channel = channel;
         this.uri = uri;
@@ -141,12 +141,11 @@ public class NettyWebSocketSession implements WebSocketSession {
     private void flushMessage(WebSocketMessage<?> message) {
         WebSocketFrame frame = toFrame(message);
         if (frame != null) {
-            channel.writeAndFlush(frame)
-                    .addListener((ChannelFutureListener) future -> {
-                        if (!future.isSuccess() && handler != null) {
-                            notifyTransportError(future.cause());
-                        }
-                    });
+            channel.writeAndFlush(frame).addListener((ChannelFutureListener) future -> {
+                if (!future.isSuccess() && handler != null) {
+                    notifyTransportError(future.cause());
+                }
+            });
         }
     }
 
@@ -202,7 +201,8 @@ public class NettyWebSocketSession implements WebSocketSession {
         if (queue.size() >= 100) {
             log.warn("WebSocket backpressure queue full (100), dropping oldest frame");
             WebSocketFrame dropped = queue.poll();
-            if (dropped != null) dropped.release();
+            if (dropped != null)
+                dropped.release();
         }
     }
 
@@ -211,7 +211,8 @@ public class NettyWebSocketSession implements WebSocketSession {
      */
     static void drainBackpressureQueue(Channel channel) {
         Queue<WebSocketFrame> queue = channel.attr(BACKPRESSURE_QUEUE_KEY).get();
-        if (queue == null || queue.isEmpty()) return;
+        if (queue == null || queue.isEmpty())
+            return;
         WebSocketFrame frame;
         while ((frame = queue.poll()) != null) {
             channel.writeAndFlush(frame);
@@ -265,12 +266,11 @@ public class NettyWebSocketSession implements WebSocketSession {
     /**
      * 运行期更新会话级空闲超时（毫秒），传播到 Netty pipeline 中的 {@link IdleStateHandler}：
      * <ul>
-     *   <li>已存在则直接 {@link IdleStateHandler#setAllIdleTime(long)} 重新调度；</li>
-     *   <li>不存在且 {@code idleTimeoutMs > 0} 则新增（握手时全局/per-path 空闲超时未启用的场景）；</li>
-     *   <li>{@code <= 0} 则移除已有的空闲检测。</li>
+     * <li>已存在则原位置 replace 为新 {@link IdleStateHandler} 实例重新调度（Netty 4.1 的 IdleStateHandler 无运行期 setter）；</li>
+     * <li>不存在且 {@code idleTimeoutMs > 0} 则新增（握手时全局/per-path 空闲超时未启用的场景）；</li>
+     * <li>{@code <= 0} 则移除已有的空闲检测。</li>
      * </ul>
-     * 操作提交到 channel 的 eventLoop 执行，使 JSR-356 {@code Session.setMaxIdleTimeout} 真正生效
-     * （修复前仅赋值字段、空闲超时空操作）。
+     * 操作提交到 channel 的 eventLoop 执行，使 JSR-356 {@code Session.setMaxIdleTimeout} 真正生效 （修复前仅赋值字段、空闲超时空操作）。
      */
     public void setMaxIdleTimeout(long idleTimeoutMs) {
         channel.eventLoop().execute(() -> {
@@ -295,7 +295,8 @@ public class NettyWebSocketSession implements WebSocketSession {
 
     @Override
     public boolean equals(Object obj) {
-        if (this == obj) return true;
+        if (this == obj)
+            return true;
         if (obj instanceof NettyWebSocketSession) {
             return id.equals(((NettyWebSocketSession) obj).id);
         }

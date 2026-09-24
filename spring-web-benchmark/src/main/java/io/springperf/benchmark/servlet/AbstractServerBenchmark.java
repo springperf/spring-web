@@ -23,32 +23,24 @@ import java.util.concurrent.TimeUnit;
 /**
  * 基准测试基类 — 所有 Server Benchmark 共享 setup/teardown/benchmark 方法。
  * <p>
- * 子类只需覆盖 {@link #getApplicationClass()} 返回对应的 Spring Boot 启动类。
- * JMH 注解集中管理，保证 5 个 profile 使用完全一致的 Benchmark 配置。
- * 注意：不能用 abstract 关键字，否则 JMH 注解处理器生成的 _jmhType 子类无法编译。
+ * 子类只需覆盖 {@link #getApplicationClass()} 返回对应的 Spring Boot 启动类。 JMH 注解集中管理，保证 5 个 profile 使用完全一致的 Benchmark 配置。 注意：不能用
+ * abstract 关键字，否则 JMH 注解处理器生成的 _jmhType 子类无法编译。
  * <p>
- * ⚠ JMH Fork 说明：{@link BenchmarkConstants#FORKS}=1 确保每次 benchmark method 运行时
- * 有独立的 JVM 进程，避免 JIT 编译 / GC 行为交叉污染。jvmArgs 统一为 1G G1GC 堆。
+ * ⚠ JMH Fork 说明：{@link BenchmarkConstants#FORKS}=1 确保每次 benchmark method 运行时 有独立的 JVM 进程，避免 JIT 编译 / GC 行为交叉污染。jvmArgs
+ * 统一为 1G G1GC 堆。
  */
-@BenchmarkMode({Mode.Throughput, Mode.SampleTime})
+@BenchmarkMode({ Mode.Throughput, Mode.SampleTime })
 @OutputTimeUnit(TimeUnit.SECONDS)
-@Warmup(iterations = BenchmarkConstants.WARMUP_ITERATIONS,
-        time = BenchmarkConstants.WARMUP_TIME_SECONDS, timeUnit = TimeUnit.SECONDS)
-@Measurement(iterations = BenchmarkConstants.MEASUREMENT_ITERATIONS,
-        time = BenchmarkConstants.MEASUREMENT_TIME_SECONDS, timeUnit = TimeUnit.SECONDS)
-@Fork(value = BenchmarkConstants.FORKS, jvmArgs = {
-        "-Xms1g", "-Xmx1g",
-        "-XX:+UseG1GC",
-        "-XX:+AlwaysPreTouch"
-})
+@Warmup(iterations = BenchmarkConstants.WARMUP_ITERATIONS, time = BenchmarkConstants.WARMUP_TIME_SECONDS, timeUnit = TimeUnit.SECONDS)
+@Measurement(iterations = BenchmarkConstants.MEASUREMENT_ITERATIONS, time = BenchmarkConstants.MEASUREMENT_TIME_SECONDS, timeUnit = TimeUnit.SECONDS)
+@Fork(value = BenchmarkConstants.FORKS, jvmArgs = { "-Xms1g", "-Xmx1g", "-XX:+UseG1GC", "-XX:+AlwaysPreTouch" })
 @Threads(BenchmarkConstants.THREADS)
 @State(Scope.Benchmark)
 public class AbstractServerBenchmark {
 
     /** 由子类覆盖返回启动类。直接使用会抛异常。 */
     protected Class<?> getApplicationClass() {
-        throw new UnsupportedOperationException(
-                "Subclass must override getApplicationClass()");
+        throw new UnsupportedOperationException("Subclass must override getApplicationClass()");
     }
 
     private BenchServerState serverState;
@@ -102,9 +94,11 @@ public class AbstractServerBenchmark {
             for (MemoryPoolMXBean pool : ManagementFactory.getMemoryPoolMXBeans()) {
                 String name = pool.getName();
                 MemoryUsage usage = pool.getUsage();
-                if (usage == null) continue;
+                if (usage == null)
+                    continue;
                 Map<String, Object> target;
-                if (name.contains("Young") || name.contains("Eden") || name.contains("Survivor") || name.contains("S0") || name.contains("S1")) {
+                if (name.contains("Young") || name.contains("Eden") || name.contains("Survivor") || name.contains("S0")
+                        || name.contains("S1")) {
                     target = young;
                 } else if (name.contains("Old") || name.contains("Tenured")) {
                     target = old;
@@ -148,8 +142,7 @@ public class AbstractServerBenchmark {
             Files.createDirectories(Paths.get(outputDir));
             String path = outputDir + "/memory-" + BenchmarkConstants.PROFILE_NAME + ".json";
 
-            new ObjectMapper().writerWithDefaultPrettyPrinter()
-                    .writeValue(Paths.get(path).toFile(), data);
+            new ObjectMapper().writerWithDefaultPrettyPrinter().writeValue(Paths.get(path).toFile(), data);
         } catch (Exception e) {
             System.err.println("[WARN] Failed to collect memory snapshot: " + e.getMessage());
         }
@@ -159,38 +152,38 @@ public class AbstractServerBenchmark {
 
     @Benchmark
     public void json(Blackhole blackhole) throws Exception {
-        blackhole.consume(clientState.executeAndConsume(clientState.jsonRequest));
+        blackhole.consume(clientState.executeAndConsume(clientState.jsonRequest()));
     }
 
     @Benchmark
     public void get(Blackhole blackhole) throws Exception {
-        blackhole.consume(clientState.executeAndConsume(clientState.getRequest));
+        blackhole.consume(clientState.executeAndConsume(clientState.getRequest()));
     }
 
     @Benchmark
     public void async(Blackhole blackhole) throws Exception {
-        blackhole.consume(clientState.executeAndConsume(clientState.asyncRequest));
+        blackhole.consume(clientState.executeAndConsume(clientState.asyncRequest()));
     }
 
     @Benchmark
     public void bytes(Blackhole blackhole) throws Exception {
-        blackhole.consume(clientState.executeAndConsume(clientState.bytesRequest));
+        blackhole.consume(clientState.executeAndConsume(clientState.bytesRequest()));
     }
 
     @Benchmark
     public void valid(Blackhole blackhole) throws Exception {
-        blackhole.consume(clientState.executeAndConsume(clientState.validRequest));
+        blackhole.consume(clientState.executeAndConsume(clientState.validRequest()));
     }
 
     // ==================== SSE Stream ====================
 
     @Benchmark
     public void sse(Blackhole blackhole) throws Exception {
-        blackhole.consume(clientState.executeAndConsumeStream(clientState.sseRequest));
+        blackhole.consume(clientState.executeAndConsumeStream(clientState.sseRequest()));
     }
 
     @Benchmark
     public void bytesLarge(Blackhole blackhole) throws Exception {
-        blackhole.consume(clientState.executeAndConsume(clientState.bytesLargeRequest));
+        blackhole.consume(clientState.executeAndConsume(clientState.bytesLargeRequest()));
     }
 }

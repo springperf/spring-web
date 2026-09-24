@@ -69,8 +69,9 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
 
     /**
      * 销毁时清理应用级临时目录，避免多次启动在系统临时目录中累积泄漏。
-     * <p>仅删除本实例实际创建的目录（{@code tempDir != null}）；创建失败回退到系统
-     * 临时目录时（{@code tempDir == null}）不执行删除，避免误删共享目录。</p>
+     * <p>
+     * 仅删除本实例实际创建的目录（{@code tempDir != null}）；创建失败回退到系统 临时目录时（{@code tempDir == null}）不执行删除，避免误删共享目录。
+     * </p>
      */
     @Override
     public void destroyComponent() {
@@ -87,10 +88,15 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
                 if (child.isDirectory()) {
                     deleteRecursively(child);
                 }
-                child.delete();
+                // 删除失败不静默：登记到 JVM 退出时再试（临时目录清理的兜底）
+                if (!child.delete()) {
+                    child.deleteOnExit();
+                }
             }
         }
-        dir.delete();
+        if (!dir.delete()) {
+            dir.deleteOnExit();
+        }
     }
 
     private void readConfig() {
@@ -138,9 +144,9 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
     }
 
     /**
-     * 预解析 {@code server.servlet.context-parameters.*} 显式块：前缀后的键名作为 init parameter 名
-     * （如 {@code server.servlet.context-parameters.foo=bar} → {@code foo=bar}）。
-     * 显式 {@code setInitParameter} 调用优先（同名时不被配置块覆盖）。
+     * 预解析 {@code server.servlet.context-parameters.*} 显式块：前缀后的键名作为 init parameter 名 （如
+     * {@code server.servlet.context-parameters.foo=bar} → {@code foo=bar}）。 显式 {@code setInitParameter}
+     * 调用优先（同名时不被配置块覆盖）。
      */
     private void readExplicitContextParameters() {
         String prefix = PropertiesConstant.SERVLET_CONTEXT_PARAMETERS_PREFIX;
@@ -164,8 +170,7 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
         // 统一走 ApplicationProperties.getDurationSeconds（Boot Duration 语义：裸数字=秒，支持 30s/1m/1h/1d），
         // 无效值 warn 并回退默认 1800s。
         try {
-            return (int) Math.max(0, webContext.getProps()
-                    .getDurationSeconds("server.servlet.session.timeout", 1800));
+            return (int) Math.max(0, webContext.getProps().getDurationSeconds("server.servlet.session.timeout", 1800));
         } catch (Exception ex) {
             log.warn("Invalid server.servlet.session.timeout, falling back to default 1800s", ex);
             return 1800;
@@ -410,7 +415,8 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
     }
 
     @Override
-    public ServletRegistration.Dynamic addServlet(String servletName, Class<? extends jakarta.servlet.Servlet> servletClass) {
+    public ServletRegistration.Dynamic addServlet(String servletName,
+            Class<? extends jakarta.servlet.Servlet> servletClass) {
         return null;
     }
 
@@ -447,7 +453,8 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
     }
 
     @Override
-    public FilterRegistration.Dynamic addFilter(String filterName, Class<? extends jakarta.servlet.Filter> filterClass) {
+    public FilterRegistration.Dynamic addFilter(String filterName,
+            Class<? extends jakarta.servlet.Filter> filterClass) {
         return null;
     }
 
@@ -637,7 +644,8 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
 
     // ===================== SessionCookieConfig =====================
 
-    private class PerfSessionCookieConfig implements SessionCookieConfig {
+    /** 不引用外部实例，故为 static：避免每个实例持有隐式外部引用（SIC_INNER_SHOULD_BE_STATIC）。 */
+    private static class PerfSessionCookieConfig implements SessionCookieConfig {
 
         private String name;
         private String domain;
