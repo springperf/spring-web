@@ -1,10 +1,11 @@
 package io.springperf.web.core.filter;
 
+import org.springframework.lang.Nullable;
+import org.springframework.util.ObjectUtils;
+
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.util.ServletFilterPatternUtils;
-import org.springframework.lang.Nullable;
-import org.springframework.util.ObjectUtils;
 
 public class RuntimeMappingWebFilter implements WebFilter {
 
@@ -18,11 +19,11 @@ public class RuntimeMappingWebFilter implements WebFilter {
 
     private final int order;
 
-    public RuntimeMappingWebFilter(WebFilter filter, String[] includePatterns, String[] excludePatterns,
-                                    int order) {
+    public RuntimeMappingWebFilter(WebFilter filter, String[] includePatterns, String[] excludePatterns, int order) {
         this.delegate = filter;
-        this.includePatterns = includePatterns;
-        this.excludePatterns = excludePatterns;
+        // 防御性拷贝：配置数组由调用方持有，直接存引用会让外部修改影响运行期路由
+        this.includePatterns = includePatterns != null ? includePatterns.clone() : null;
+        this.excludePatterns = excludePatterns != null ? excludePatterns.clone() : null;
         this.order = order;
     }
 
@@ -37,10 +38,8 @@ public class RuntimeMappingWebFilter implements WebFilter {
      * Convenience constructor from a WebFilterRegistration with RUNTIME result.
      */
     public RuntimeMappingWebFilter(WebFilterRegistration registration) {
-        this(registration.getFilter(),
-                registration.getIncludePatterns().toArray(new String[0]),
-                registration.getExcludePatterns().toArray(new String[0]),
-                registration.getOrder());
+        this(registration.getFilter(), registration.getIncludePatterns().toArray(new String[0]),
+                registration.getExcludePatterns().toArray(new String[0]), registration.getOrder());
     }
 
     public WebFilter getDelegate() {
@@ -55,7 +54,9 @@ public class RuntimeMappingWebFilter implements WebFilter {
     /**
      * Determine a match for the given lookup path using Servlet 规范路径匹配。
      *
-     * @param lookupPath the current request path
+     * @param lookupPath
+     *            the current request path
+     *
      * @return {@code true} if the filter applies to the given request path
      */
     public boolean matches(String lookupPath) {
@@ -78,7 +79,8 @@ public class RuntimeMappingWebFilter implements WebFilter {
     }
 
     @Override
-    public void doFilter(WebServerHttpRequest request, WebServerHttpResponse response, FilterChain chain) throws Exception {
+    public void doFilter(WebServerHttpRequest request, WebServerHttpResponse response, FilterChain chain)
+            throws Exception {
         if (matches(request.getPath())) {
             delegate.doFilter(request, response, chain);
         } else {
