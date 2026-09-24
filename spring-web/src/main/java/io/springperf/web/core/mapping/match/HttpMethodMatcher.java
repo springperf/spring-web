@@ -1,21 +1,21 @@
 package io.springperf.web.core.mapping.match;
 
-import io.springperf.web.core.mapping.PathMappingContext;
-import io.springperf.web.http.WebServerHttpRequest;
-import org.springframework.http.HttpMethod;
-
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+
+import org.springframework.http.HttpMethod;
+
+import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.http.WebServerHttpRequest;
 
 public class HttpMethodMatcher implements Matcher {
 
     private Set<HttpMethod> httpMethods;
 
     public HttpMethodMatcher(HttpMethod[] httpMethods) {
-        this.httpMethods = new HashSet<>(Arrays.asList(httpMethods));
+        this.httpMethods = java.util.Collections.unmodifiableSet(new HashSet<>(Arrays.asList(httpMethods)));
     }
-
 
     @Override
     public boolean match(WebServerHttpRequest req, PathMappingContext mappingContext) {
@@ -42,7 +42,8 @@ public class HttpMethodMatcher implements Matcher {
     public boolean haveAmbiguous(Matcher matcher) {
         if (matcher instanceof HttpMethodMatcher) {
             HttpMethodMatcher httpMethodMatcher = (HttpMethodMatcher) matcher;
-            return httpMethods.containsAll(httpMethodMatcher.httpMethods) || httpMethodMatcher.httpMethods.containsAll(httpMethods);
+            return httpMethods.containsAll(httpMethodMatcher.httpMethods)
+                    || httpMethodMatcher.httpMethods.containsAll(httpMethods);
         }
         return false;
     }
