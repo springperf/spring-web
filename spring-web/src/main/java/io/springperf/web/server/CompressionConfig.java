@@ -1,9 +1,5 @@
 package io.springperf.web.server;
 
-import io.springperf.web.context.ApplicationProperties;
-import io.springperf.web.context.PropertiesConstant;
-import io.springperf.web.util.DataSizeUtils;
-
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -12,16 +8,19 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import io.springperf.web.context.ApplicationProperties;
+import io.springperf.web.context.PropertiesConstant;
+import io.springperf.web.util.DataSizeUtils;
+
 /**
- * 不可变压缩配置，对齐 Spring Boot {@code server.compression.*}。
- * 由 {@link #fromProperties(ApplicationProperties)} 在启动期预解析（配置错误在此 fail-fast）。
+ * 不可变压缩配置，对齐 Spring Boot {@code server.compression.*}。 由 {@link #fromProperties(ApplicationProperties)} 在启动期预解析（配置错误在此
+ * fail-fast）。
  */
 public final class CompressionConfig {
 
     /** 关闭态单例：管线不注入压缩器，零运行时开销。 */
-    public static final CompressionConfig DISABLED = new CompressionConfig(false,
-            Collections.emptySet(), Collections.emptyList(), 0L,
-            PropertiesConstant.SERVER_COMPRESSION_LEVEL_DEFAULT);
+    public static final CompressionConfig DISABLED = new CompressionConfig(false, Collections.emptySet(),
+            Collections.emptyList(), 0L, PropertiesConstant.SERVER_COMPRESSION_LEVEL_DEFAULT);
 
     private final boolean enabled;
     private final Set<String> mimeTypes;
@@ -29,8 +28,8 @@ public final class CompressionConfig {
     private final long minResponseSizeBytes;
     private final int level;
 
-    private CompressionConfig(boolean enabled, Set<String> mimeTypes,
-                              List<Pattern> excludedUserAgents, long minResponseSizeBytes, int level) {
+    private CompressionConfig(boolean enabled, Set<String> mimeTypes, List<Pattern> excludedUserAgents,
+            long minResponseSizeBytes, int level) {
         this.enabled = enabled;
         this.mimeTypes = mimeTypes;
         this.excludedUserAgents = excludedUserAgents;
@@ -44,29 +43,27 @@ public final class CompressionConfig {
         if (!enabled) {
             return DISABLED;
         }
-        Set<String> mimeTypes = Arrays.stream(
+        // props.get 声明为 @Nullable：显式回落到各自的非空默认值（这里默认值非空，兜底仅为契约完整）
+        String mimeTypesRaw = java.util.Objects.requireNonNullElse(
                 props.get(PropertiesConstant.SERVER_COMPRESSION_MIME_TYPES,
-                        PropertiesConstant.SERVER_COMPRESSION_MIME_TYPES_DEFAULT).split(","))
-                .map(s -> s.trim().toLowerCase(Locale.ROOT))
-                .filter(s -> !s.isEmpty())
-                .collect(Collectors.toSet());
-        List<Pattern> excludedUserAgents = Arrays.stream(
-                props.get(PropertiesConstant.SERVER_COMPRESSION_EXCLUDED_USER_AGENTS, "").split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .map(s -> Pattern.compile(s, Pattern.CASE_INSENSITIVE))
+                        PropertiesConstant.SERVER_COMPRESSION_MIME_TYPES_DEFAULT),
+                PropertiesConstant.SERVER_COMPRESSION_MIME_TYPES_DEFAULT);
+        Set<String> mimeTypes = Arrays.stream(mimeTypesRaw.split(",")).map(s -> s.trim().toLowerCase(Locale.ROOT))
+                .filter(s -> !s.isEmpty()).collect(Collectors.toSet());
+        String excludedUserAgentsRaw = java.util.Objects
+                .requireNonNullElse(props.get(PropertiesConstant.SERVER_COMPRESSION_EXCLUDED_USER_AGENTS, ""), "");
+        List<Pattern> excludedUserAgents = Arrays.stream(excludedUserAgentsRaw.split(",")).map(String::trim)
+                .filter(s -> !s.isEmpty()).map(s -> Pattern.compile(s, Pattern.CASE_INSENSITIVE))
                 .collect(Collectors.toList());
-        long minResponseSizeBytes = parseSizeBytes(props.get(
-                PropertiesConstant.SERVER_COMPRESSION_MIN_RESPONSE_SIZE,
+        long minResponseSizeBytes = parseSizeBytes(props.get(PropertiesConstant.SERVER_COMPRESSION_MIN_RESPONSE_SIZE,
                 PropertiesConstant.SERVER_COMPRESSION_MIN_RESPONSE_SIZE_DEFAULT));
         return new CompressionConfig(true, mimeTypes, excludedUserAgents, minResponseSizeBytes,
                 PropertiesConstant.SERVER_COMPRESSION_LEVEL_DEFAULT);
     }
 
     /**
-     * 解析 Spring DataSize 风格的大小（复用 {@link DataSizeUtils}）：纯数字按字节，
-     * 后缀 B/KB/MB/GB（1024 进制，对齐 Spring）。解析失败以 {@link IllegalStateException} 中断
-     * （启动期 fail-fast）。
+     * 解析 Spring DataSize 风格的大小（复用 {@link DataSizeUtils}）：纯数字按字节， 后缀 B/KB/MB/GB（1024 进制，对齐 Spring）。解析失败以
+     * {@link IllegalStateException} 中断 （启动期 fail-fast）。
      */
     private static long parseSizeBytes(String raw) {
         String s = raw == null ? "" : raw.trim();
@@ -85,11 +82,11 @@ public final class CompressionConfig {
     }
 
     public Set<String> getMimeTypes() {
-        return mimeTypes;
+        return java.util.Collections.unmodifiableSet(mimeTypes);
     }
 
     public List<Pattern> getExcludedUserAgents() {
-        return excludedUserAgents;
+        return java.util.Collections.unmodifiableList(excludedUserAgents);
     }
 
     public long getMinResponseSizeBytes() {

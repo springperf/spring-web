@@ -1,11 +1,12 @@
 package io.springperf.web.core.interceptor;
 
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
-import io.springperf.web.util.PathPatternUtils;
 import org.springframework.lang.Nullable;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.PathMatcher;
+
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
+import io.springperf.web.util.PathPatternUtils;
 
 public class RuntimeMappingInterceptor implements HandlerInterceptor {
 
@@ -20,13 +21,16 @@ public class RuntimeMappingInterceptor implements HandlerInterceptor {
     @Nullable
     private PathMatcher pathMatcher;
 
-    public RuntimeMappingInterceptor(@Nullable String[] includePatterns, @Nullable String[] excludePatterns, HandlerInterceptor interceptor) {
+    public RuntimeMappingInterceptor(@Nullable String[] includePatterns, @Nullable String[] excludePatterns,
+            HandlerInterceptor interceptor) {
         this(includePatterns, excludePatterns, interceptor, null);
     }
 
-    public RuntimeMappingInterceptor(@Nullable String[] includePatterns, @Nullable String[] excludePatterns, HandlerInterceptor interceptor, @Nullable PathMatcher pathMatcher) {
-        this.includePatterns = includePatterns;
-        this.excludePatterns = excludePatterns;
+    public RuntimeMappingInterceptor(@Nullable String[] includePatterns, @Nullable String[] excludePatterns,
+            HandlerInterceptor interceptor, @Nullable PathMatcher pathMatcher) {
+        // 防御性拷贝：配置数组由调用方持有，直接存引用会让外部修改影响运行期路由
+        this.includePatterns = includePatterns != null ? includePatterns.clone() : null;
+        this.excludePatterns = excludePatterns != null ? excludePatterns.clone() : null;
         this.interceptor = interceptor;
         this.pathMatcher = pathMatcher;
     }
@@ -44,7 +48,8 @@ public class RuntimeMappingInterceptor implements HandlerInterceptor {
      */
     @Nullable
     public String[] getPathPatterns() {
-        return this.includePatterns;
+        // 返回副本，避免调用方经由返回数组改动内部配置
+        return this.includePatterns != null ? this.includePatterns.clone() : null;
     }
 
     /**
@@ -54,11 +59,12 @@ public class RuntimeMappingInterceptor implements HandlerInterceptor {
         return this.interceptor;
     }
 
-
     /**
      * Determine a match for the given lookup path.
      *
-     * @param lookupPath the current request path
+     * @param lookupPath
+     *            the current request path
+     *
      * @return {@code true} if the interceptor applies to the given request path
      */
     public boolean matches(String lookupPath) {
@@ -82,22 +88,26 @@ public class RuntimeMappingInterceptor implements HandlerInterceptor {
     }
 
     @Override
-    public boolean preHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler) throws Exception {
+    public boolean preHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler)
+            throws Exception {
         return interceptor.preHandle(request, response, handler);
     }
 
     @Override
-    public void postHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler, Object result) throws Exception {
+    public void postHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler, Object result)
+            throws Exception {
         interceptor.postHandle(request, response, handler, result);
     }
 
     @Override
-    public void afterCompletion(WebServerHttpRequest request, WebServerHttpResponse response, Object handler, Throwable ex) throws Exception {
+    public void afterCompletion(WebServerHttpRequest request, WebServerHttpResponse response, Object handler,
+            Throwable ex) throws Exception {
         interceptor.afterCompletion(request, response, handler, ex);
     }
 
     @Override
-    public void afterConcurrentHandlingStarted(WebServerHttpRequest request, WebServerHttpResponse response, Object handler) throws Exception {
+    public void afterConcurrentHandlingStarted(WebServerHttpRequest request, WebServerHttpResponse response,
+            Object handler) throws Exception {
         interceptor.afterConcurrentHandlingStarted(request, response, handler);
     }
 }
