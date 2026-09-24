@@ -26,7 +26,7 @@ class ManagementMappingRegistryTest {
     }
 
     @Test
-    void buildOptimizerPipeline_withEmptyRoutes_logsWarning() {
+    void buildOptimizerPipeline_withEmptyRoutes_doesNotThrow() {
         assertDoesNotThrow(() -> registry.buildOptimizerPipeline());
     }
 
@@ -36,8 +36,8 @@ class ManagementMappingRegistryTest {
         // buildOptimizerPipeline() 应触发 optimizeMapping 构建优化器
         Method method = StubController.class.getMethod("health");
         HandlerMethod handlerMethod = new HandlerMethod(new StubController(), method);
-        io.springperf.web.core.mapping.PathMappingContext ctx =
-                new io.springperf.web.core.mapping.PathMappingContext(handlerMethod, Collections.emptyList(), "/actuator/health");
+        io.springperf.web.core.mapping.PathMappingContext ctx = new io.springperf.web.core.mapping.PathMappingContext(
+                handlerMethod, Collections.emptyList(), "/actuator/health");
 
         registry.registerMapping(ctx);
         assertDoesNotThrow(() -> registry.buildOptimizerPipeline());

@@ -76,8 +76,8 @@ class WebMvcConfigurerBridgeTest {
         when(webContext.getCtx()).thenReturn(applicationContext);
         // ResourceHandlerRegistry.initComponentPhase2 读取 spring.web.resources.* 与 static-path-pattern，
         // 统一兜底桩避免 mock 返回 null 触发 NPE。
-        io.springperf.web.context.ApplicationProperties props =
-                mock(io.springperf.web.context.ApplicationProperties.class, RETURNS_DEFAULTS);
+        io.springperf.web.context.ApplicationProperties props = mock(
+                io.springperf.web.context.ApplicationProperties.class, RETURNS_DEFAULTS);
         lenient().when(props.get(anyString(), anyString())).thenAnswer(inv -> inv.getArgument(1));
         lenient().when(props.getBoolean(anyString(), anyBoolean())).thenAnswer(inv -> inv.getArgument(1));
         lenient().when(webContext.getProps()).thenReturn(props);
@@ -89,8 +89,7 @@ class WebMvcConfigurerBridgeTest {
 
     @Test
     void noConfigurers_doesNothing() throws Exception {
-        when(applicationContext.getBeansOfType(WebMvcConfigurer.class))
-                .thenReturn(Collections.emptyMap());
+        when(applicationContext.getBeansOfType(WebMvcConfigurer.class)).thenReturn(Collections.emptyMap());
 
         bridge.initComponentPhase1();
         // no exception, no interactions with registries
@@ -107,18 +106,15 @@ class WebMvcConfigurerBridgeTest {
                     @Override
                     public void addInterceptors(
                             org.springframework.web.servlet.config.annotation.InterceptorRegistry registry) {
-                        registry.addInterceptor(new TestHandlerInterceptor())
-                                .addPathPatterns("/api/**")
-                                .excludePathPatterns("/api/public/**")
-                                .order(5);
+                        registry.addInterceptor(new TestHandlerInterceptor()).addPathPatterns("/api/**")
+                                .excludePathPatterns("/api/public/**").order(5);
                     }
                 }));
 
         bridge.initComponentPhase1();
 
-        assertFalse(frameworkRegistry.getWebComponents(
-                io.springperf.web.core.interceptor.InterceptorRegistration.class).isEmpty(),
-                "InterceptorRegistration should be registered");
+        assertFalse(frameworkRegistry.getWebComponents(io.springperf.web.core.interceptor.InterceptorRegistration.class)
+                .isEmpty(), "InterceptorRegistration should be registered");
     }
 
     @Test
@@ -136,8 +132,8 @@ class WebMvcConfigurerBridgeTest {
 
         bridge.initComponentPhase1();
 
-        assertFalse(frameworkRegistry.getWebComponents(
-                io.springperf.web.core.interceptor.InterceptorRegistration.class).isEmpty());
+        assertFalse(frameworkRegistry.getWebComponents(io.springperf.web.core.interceptor.InterceptorRegistration.class)
+                .isEmpty());
     }
 
     @Test
@@ -160,13 +156,12 @@ class WebMvcConfigurerBridgeTest {
                 registry.addInterceptor(new TestHandlerInterceptor()).addPathPatterns("/admin/**");
             }
         });
-        when(applicationContext.getBeansOfType(WebMvcConfigurer.class))
-                .thenReturn(configurers);
+        when(applicationContext.getBeansOfType(WebMvcConfigurer.class)).thenReturn(configurers);
 
         bridge.initComponentPhase1();
 
-        assertFalse(frameworkRegistry.getWebComponents(
-                io.springperf.web.core.interceptor.InterceptorRegistration.class).isEmpty());
+        assertFalse(frameworkRegistry.getWebComponents(io.springperf.web.core.interceptor.InterceptorRegistration.class)
+                .isEmpty());
     }
 
     @Test
@@ -189,15 +184,13 @@ class WebMvcConfigurerBridgeTest {
 
         bridge.initComponentPhase1();
 
-        List<io.springperf.web.core.interceptor.InterceptorRegistration> regs =
-                frameworkRegistry.getWebComponents(
-                        io.springperf.web.core.interceptor.InterceptorRegistration.class);
+        List<io.springperf.web.core.interceptor.InterceptorRegistration> regs = frameworkRegistry
+                .getWebComponents(io.springperf.web.core.interceptor.InterceptorRegistration.class);
         assertEquals(3, regs.size());
         int first = regs.get(0).getOrder();
         int second = regs.get(1).getOrder();
         int third = regs.get(2).getOrder();
-        assertTrue(first < second && second < third,
-                "默认 order 拦截器应按添加顺序递增: " + first + ", " + second + ", " + third);
+        assertTrue(first < second && second < third, "默认 order 拦截器应按添加顺序递增: " + first + ", " + second + ", " + third);
         assertEquals(0, first);
         assertEquals(first + WebMvcConfigurerBridge.DEFAULT_INTERCEPTOR_ORDER_STEP, second);
         assertEquals(second + WebMvcConfigurerBridge.DEFAULT_INTERCEPTOR_ORDER_STEP, third);
@@ -222,9 +215,8 @@ class WebMvcConfigurerBridgeTest {
 
         bridge.initComponentPhase1();
 
-        List<io.springperf.web.core.interceptor.InterceptorRegistration> regs =
-                frameworkRegistry.getWebComponents(
-                        io.springperf.web.core.interceptor.InterceptorRegistration.class);
+        List<io.springperf.web.core.interceptor.InterceptorRegistration> regs = frameworkRegistry
+                .getWebComponents(io.springperf.web.core.interceptor.InterceptorRegistration.class);
         assertEquals(2, regs.size());
         assertEquals(-10, regs.get(0).getOrder());
         assertEquals(50, regs.get(1).getOrder());
@@ -241,21 +233,20 @@ class WebMvcConfigurerBridgeTest {
                     @Override
                     public void addInterceptors(
                             org.springframework.web.servlet.config.annotation.InterceptorRegistry registry) {
-                        registry.addInterceptor(new TestHandlerInterceptor());          // default -> 0
+                        registry.addInterceptor(new TestHandlerInterceptor()); // default -> 0
                         registry.addInterceptor(new TestHandlerInterceptor()).order(10); // explicit 10
-                        registry.addInterceptor(new TestHandlerInterceptor());          // default -> 100
+                        registry.addInterceptor(new TestHandlerInterceptor()); // default -> 100
                     }
                 }));
 
         bridge.initComponentPhase1();
 
-        List<io.springperf.web.core.interceptor.InterceptorRegistration> regs =
-                frameworkRegistry.getWebComponents(
-                        io.springperf.web.core.interceptor.InterceptorRegistration.class);
+        List<io.springperf.web.core.interceptor.InterceptorRegistration> regs = frameworkRegistry
+                .getWebComponents(io.springperf.web.core.interceptor.InterceptorRegistration.class);
         assertEquals(3, regs.size());
-        assertEquals(0, regs.get(0).getOrder());   // 第一个默认项
-        assertEquals(10, regs.get(1).getOrder());   // 显式序保留
-        assertEquals(100, regs.get(2).getOrder());   // 第二个默认项 = 0 + 1*STEP
+        assertEquals(0, regs.get(0).getOrder()); // 第一个默认项
+        assertEquals(10, regs.get(1).getOrder()); // 显式序保留
+        assertEquals(100, regs.get(2).getOrder()); // 第二个默认项 = 0 + 1*STEP
     }
 
     // ---- CORS ----
@@ -269,18 +260,14 @@ class WebMvcConfigurerBridgeTest {
                     @Override
                     public void addCorsMappings(
                             org.springframework.web.servlet.config.annotation.CorsRegistry registry) {
-                        registry.addMapping("/api/**")
-                                .allowedOrigins("https://example.com")
-                                .allowedMethods("GET", "POST")
-                                .allowCredentials(true)
-                                .maxAge(3600);
+                        registry.addMapping("/api/**").allowedOrigins("https://example.com")
+                                .allowedMethods("GET", "POST").allowCredentials(true).maxAge(3600);
                     }
                 }));
 
         bridge.initComponentPhase1();
 
-        assertFalse(frameworkRegistry.getWebComponents(
-                io.springperf.web.core.cors.CorsRegistration.class).isEmpty());
+        assertFalse(frameworkRegistry.getWebComponents(io.springperf.web.core.cors.CorsRegistration.class).isEmpty());
     }
 
     @Test
@@ -298,8 +285,7 @@ class WebMvcConfigurerBridgeTest {
 
         bridge.initComponentPhase1();
 
-        assertFalse(frameworkRegistry.getWebComponents(
-                io.springperf.web.core.cors.CorsRegistration.class).isEmpty());
+        assertFalse(frameworkRegistry.getWebComponents(io.springperf.web.core.cors.CorsRegistration.class).isEmpty());
     }
 
     // ---- Resource handlers ----
@@ -319,10 +305,8 @@ class WebMvcConfigurerBridgeTest {
                     @Override
                     public void addResourceHandlers(
                             org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry registry) {
-                        registry.addResourceHandler("/static/**")
-                                .addResourceLocations("classpath:/static/")
-                                .setCachePeriod(3600)
-                                .setCacheControl(CacheControl.maxAge(1, TimeUnit.HOURS));
+                        registry.addResourceHandler("/static/**").addResourceLocations("classpath:/static/")
+                                .setCachePeriod(3600).setCacheControl(CacheControl.maxAge(1, TimeUnit.HOURS));
                     }
                 }));
 
@@ -398,7 +382,8 @@ class WebMvcConfigurerBridgeTest {
     @Test
     void addFormatters_nullConversionService_skipsGracefully() throws Exception {
         when(applicationContext.getBeansOfType(WebMvcConfigurer.class))
-                .thenReturn(Collections.singletonMap("test", new WebMvcConfigurer() {}));
+                .thenReturn(Collections.singletonMap("test", new WebMvcConfigurer() {
+                }));
         doReturn(null).when(webContext).getBeanFromCtx(ConversionService.class);
 
         bridge.initComponentPhase1();
@@ -407,7 +392,8 @@ class WebMvcConfigurerBridgeTest {
     @Test
     void addFormatters_nonFormatterRegistryConversionService_skipsGracefully() throws Exception {
         when(applicationContext.getBeansOfType(WebMvcConfigurer.class))
-                .thenReturn(Collections.singletonMap("test", new WebMvcConfigurer() {}));
+                .thenReturn(Collections.singletonMap("test", new WebMvcConfigurer() {
+                }));
         ConversionService plainCs = mock(ConversionService.class);
         doReturn(plainCs).when(webContext).getBeanFromCtx(ConversionService.class);
 
@@ -526,8 +512,8 @@ class WebMvcConfigurerBridgeTest {
         bridge.initComponentPhase1();
 
         @SuppressWarnings("unchecked")
-        ArgumentCaptor<java.util.List<CallableProcessingInterceptor>> captor =
-                ArgumentCaptor.forClass(java.util.List.class);
+        ArgumentCaptor<java.util.List<CallableProcessingInterceptor>> captor = ArgumentCaptor
+                .forClass(java.util.List.class);
         verify(asyncRegistry).addCallableInterceptors(captor.capture());
         assertTrue(captor.getValue().contains(interceptor));
     }
@@ -548,8 +534,8 @@ class WebMvcConfigurerBridgeTest {
         bridge.initComponentPhase1();
 
         @SuppressWarnings("unchecked")
-        ArgumentCaptor<java.util.List<DeferredResultProcessingInterceptor>> captor =
-                ArgumentCaptor.forClass(java.util.List.class);
+        ArgumentCaptor<java.util.List<DeferredResultProcessingInterceptor>> captor = ArgumentCaptor
+                .forClass(java.util.List.class);
         verify(asyncRegistry).addDeferredResultInterceptors(captor.capture());
         assertTrue(captor.getValue().contains(interceptor));
     }
@@ -571,10 +557,8 @@ class WebMvcConfigurerBridgeTest {
                             }
 
                             @Override
-                            public Object resolveArgument(MethodParameter parameter,
-                                                          ModelAndViewContainer mavContainer,
-                                                          NativeWebRequest webRequest,
-                                                          WebDataBinderFactory binderFactory) {
+                            public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
+                                    NativeWebRequest webRequest, WebDataBinderFactory binderFactory) {
                                 return "resolved";
                             }
                         });
@@ -670,8 +654,7 @@ class WebMvcConfigurerBridgeTest {
                 converters.add(new org.springframework.http.converter.ByteArrayHttpMessageConverter());
             }
         });
-        when(applicationContext.getBeansOfType(WebMvcConfigurer.class))
-                .thenReturn(configurers);
+        when(applicationContext.getBeansOfType(WebMvcConfigurer.class)).thenReturn(configurers);
 
         bridge.initComponentPhase1();
 
@@ -696,8 +679,7 @@ class WebMvcConfigurerBridgeTest {
 
                             @Override
                             public void handleReturnValue(Object returnValue, MethodParameter returnType,
-                                                          ModelAndViewContainer mavContainer,
-                                                          NativeWebRequest webRequest) {
+                                    ModelAndViewContainer mavContainer, NativeWebRequest webRequest) {
                             }
                         });
                     }
@@ -728,7 +710,8 @@ class WebMvcConfigurerBridgeTest {
         ReturnValueResolverRegistry retValRegistry = new ReturnValueResolverRegistry();
         doReturn(retValRegistry).when(webContext).getWebComponent(ReturnValueResolverRegistry.class);
         when(applicationContext.getBeansOfType(WebMvcConfigurer.class))
-                .thenReturn(Collections.singletonMap("test", new WebMvcConfigurer() {}));
+                .thenReturn(Collections.singletonMap("test", new WebMvcConfigurer() {
+                }));
 
         bridge.initComponentPhase1();
 
@@ -751,8 +734,8 @@ class WebMvcConfigurerBridgeTest {
 
         bridge.initComponentPhase1();
 
-        assertFalse(exRegistry.getWebComponents(
-                io.springperf.web.core.exception.HandlerExceptionResolver.class).isEmpty());
+        assertFalse(
+                exRegistry.getWebComponents(io.springperf.web.core.exception.HandlerExceptionResolver.class).isEmpty());
     }
 
     @Test
@@ -775,12 +758,13 @@ class WebMvcConfigurerBridgeTest {
         ExceptionRegistry exRegistry = spy(new ExceptionRegistry());
         doReturn(exRegistry).when(webContext).getWebComponent(ExceptionRegistry.class);
         when(applicationContext.getBeansOfType(WebMvcConfigurer.class))
-                .thenReturn(Collections.singletonMap("test", new WebMvcConfigurer() {}));
+                .thenReturn(Collections.singletonMap("test", new WebMvcConfigurer() {
+                }));
 
         bridge.initComponentPhase1();
 
-        assertTrue(exRegistry.getWebComponents(
-                io.springperf.web.core.exception.HandlerExceptionResolver.class).isEmpty());
+        assertTrue(
+                exRegistry.getWebComponents(io.springperf.web.core.exception.HandlerExceptionResolver.class).isEmpty());
     }
 
     // ========== New bridge method tests: configureValidator ==========
@@ -857,8 +841,7 @@ class WebMvcConfigurerBridgeTest {
                 registration.validator(secondValidator);
             }
         });
-        when(applicationContext.getBeansOfType(WebMvcConfigurer.class))
-                .thenReturn(configurers);
+        when(applicationContext.getBeansOfType(WebMvcConfigurer.class)).thenReturn(configurers);
 
         bridge.initComponentPhase1();
 
@@ -924,13 +907,14 @@ class WebMvcConfigurerBridgeTest {
     void warnUnsupportedOverrides_noOverride_noWarnNoError() throws Exception {
         // 空实现（未覆写任何未桥接回调）：不应告警，也不应抛异常
         when(applicationContext.getBeansOfType(WebMvcConfigurer.class))
-                .thenReturn(Collections.singletonMap("empty", new WebMvcConfigurer() {}));
+                .thenReturn(Collections.singletonMap("empty", new WebMvcConfigurer() {
+                }));
 
         assertDoesNotThrow(() -> bridge.initComponentPhase1());
     }
 
     @Test
-    void warnUnsupportedOverrides_supportedCallback_only_doesNotWarn() throws Exception {
+    void warnUnsupportedOverrides_supportedCallback_doesNotThrow() throws Exception {
         // 覆写「已桥接」回调（addInterceptors）：捕获器行为正常，且不应触发未桥接 WARN 路径异常
         InterceptorRegistry frameworkRegistry = new InterceptorRegistry();
         doReturn(frameworkRegistry).when(webContext).getWebComponent(InterceptorRegistry.class);
@@ -950,22 +934,21 @@ class WebMvcConfigurerBridgeTest {
 
     @Test
     void viewControllerRegistry_shim_collectsRegistrations() {
-        org.springframework.web.servlet.config.annotation.ViewControllerRegistry registry =
-                new org.springframework.web.servlet.config.annotation.ViewControllerRegistry();
+        org.springframework.web.servlet.config.annotation.ViewControllerRegistry registry = new org.springframework.web.servlet.config.annotation.ViewControllerRegistry();
         registry.addViewController("/home").setViewName("index");
         registry.addRedirectViewController("/old", "/new");
         registry.addStatusController("/ping", org.springframework.http.HttpStatus.NO_CONTENT);
 
         assertEquals(3, registry.getRegistrations().size());
-        org.springframework.web.servlet.config.annotation.ViewControllerRegistration home =
-                registry.getRegistrations().get(0);
+        org.springframework.web.servlet.config.annotation.ViewControllerRegistration home = registry.getRegistrations()
+                .get(0);
         assertEquals("/home", home.getUrlPath());
         assertEquals("index", home.getViewName());
-        org.springframework.web.servlet.config.annotation.ViewControllerRegistration redirect =
-                registry.getRegistrations().get(1);
+        org.springframework.web.servlet.config.annotation.ViewControllerRegistration redirect = registry
+                .getRegistrations().get(1);
         assertEquals("redirect:/new", redirect.getViewName(), "redirect 注册应带 redirect: 前缀");
-        org.springframework.web.servlet.config.annotation.ViewControllerRegistration status =
-                registry.getRegistrations().get(2);
+        org.springframework.web.servlet.config.annotation.ViewControllerRegistration status = registry
+                .getRegistrations().get(2);
         assertEquals(org.springframework.http.HttpStatus.NO_CONTENT, status.getStatusCode());
         assertNull(status.getViewName());
     }
@@ -973,8 +956,8 @@ class WebMvcConfigurerBridgeTest {
     @Test
     void bridgeViewControllers_registersFrameworkMappings() throws Exception {
         MappingRegistry mappingRegistry = new MappingRegistry();
-        doReturn(mappingRegistry).when(webContext)
-                .getWebComponentWithDefault(eq(MappingRegistry.class), any(MappingRegistry.class));
+        doReturn(mappingRegistry).when(webContext).getWebComponentWithDefault(eq(MappingRegistry.class),
+                any(MappingRegistry.class));
         when(applicationContext.getBeansOfType(WebMvcConfigurer.class))
                 .thenReturn(Collections.singletonMap("vc", new WebMvcConfigurer() {
                     @Override
@@ -998,10 +981,11 @@ class WebMvcConfigurerBridgeTest {
     @Test
     void bridgeViewControllers_noRegistrations_noMappings() throws Exception {
         MappingRegistry mappingRegistry = new MappingRegistry();
-        doReturn(mappingRegistry).when(webContext)
-                .getWebComponentWithDefault(eq(MappingRegistry.class), any(MappingRegistry.class));
+        doReturn(mappingRegistry).when(webContext).getWebComponentWithDefault(eq(MappingRegistry.class),
+                any(MappingRegistry.class));
         when(applicationContext.getBeansOfType(WebMvcConfigurer.class))
-                .thenReturn(Collections.singletonMap("empty", new WebMvcConfigurer() {}));
+                .thenReturn(Collections.singletonMap("empty", new WebMvcConfigurer() {
+                }));
 
         bridge.initComponentPhase1();
 
@@ -1013,10 +997,12 @@ class WebMvcConfigurerBridgeTest {
         WebServerHttpRequest req = mock(WebServerHttpRequest.class);
         io.springperf.web.http.RequestContext reqCtx = mock(io.springperf.web.http.RequestContext.class);
         java.util.Map<io.springperf.web.http.RequestAttribute<?>, Object> attrs = new java.util.HashMap<>();
-        lenient().doAnswer(inv -> attrs.get(inv.getArgument(0)))
-                .when(reqCtx).getAttribute(any(io.springperf.web.http.RequestAttribute.class));
-        lenient().doAnswer(inv -> { attrs.put(inv.getArgument(0), inv.getArgument(1)); return null; })
-                .when(reqCtx).setAttribute(any(io.springperf.web.http.RequestAttribute.class), any());
+        lenient().doAnswer(inv -> attrs.get(inv.getArgument(0))).when(reqCtx)
+                .getAttribute(any(io.springperf.web.http.RequestAttribute.class));
+        lenient().doAnswer(inv -> {
+            attrs.put(inv.getArgument(0), inv.getArgument(1));
+            return null;
+        }).when(reqCtx).setAttribute(any(io.springperf.web.http.RequestAttribute.class), any());
         lenient().doReturn(reqCtx).when(req).getRequestContext();
         // RedirectView.buildLocation 读取请求所属 WebContext 的 contextPath
         lenient().doReturn(webContext).when(req).getWebContext();
@@ -1031,7 +1017,7 @@ class WebMvcConfigurerBridgeTest {
         WebServerHttpRequest req = requestWithContext();
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
 
-        invoker.invoke(new Object[]{req, resp});
+        invoker.invoke(new Object[] { req, resp });
 
         verify(resp).setStatusCode(org.springframework.http.HttpStatus.NO_CONTENT);
         verify(resp).setHandled();
@@ -1044,7 +1030,7 @@ class WebMvcConfigurerBridgeTest {
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
         when(resp.getHeaders()).thenReturn(new org.springframework.http.HttpHeaders());
 
-        invoker.invoke(new Object[]{req, resp});
+        invoker.invoke(new Object[] { req, resp });
 
         verify(resp).setStatusCode(org.springframework.http.HttpStatus.FOUND);
         verify(resp).setHandled();
@@ -1057,11 +1043,11 @@ class WebMvcConfigurerBridgeTest {
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
         lenient().when(resp.getHeaders()).thenReturn(new org.springframework.http.HttpHeaders());
         // 空的 ViewResolverRegistry：解析失败
-        doReturn(new io.springperf.web.view.ViewResolverRegistry()).when(webContext)
-                .getWebComponentWithDefault(eq(io.springperf.web.view.ViewResolverRegistry.class),
-                        any(io.springperf.web.view.ViewResolverRegistry.class));
+        doReturn(new io.springperf.web.view.ViewResolverRegistry()).when(webContext).getWebComponentWithDefault(
+                eq(io.springperf.web.view.ViewResolverRegistry.class),
+                any(io.springperf.web.view.ViewResolverRegistry.class));
 
         // 无 ViewResolver：解析失败应抛异常（交 ExceptionRegistry 转 500），而非静默 200
-        assertThrows(IllegalArgumentException.class, () -> invoker.invoke(new Object[]{req, resp}));
+        assertThrows(IllegalArgumentException.class, () -> invoker.invoke(new Object[] { req, resp }));
     }
 }

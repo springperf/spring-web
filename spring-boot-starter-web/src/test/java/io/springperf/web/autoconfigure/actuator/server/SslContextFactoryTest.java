@@ -20,7 +20,8 @@ import static org.mockito.Mockito.when;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class SslContextFactoryTest {
 
-    @Mock Environment env;
+    @Mock
+    Environment env;
 
     @Test
     void createServerSslContext_nullEnv_returnsNull() {
@@ -40,8 +41,7 @@ class SslContextFactoryTest {
     void createServerSslContext_enabledExplicitly_throwsNoKeyStore() {
         when(env.getProperty(eq("server.ssl.enabled"), eq(Boolean.class))).thenReturn(true);
 
-        assertThrows(IllegalStateException.class,
-                () -> SslContextFactory.createServerSslContext(env, "server.ssl."));
+        assertThrows(IllegalStateException.class, () -> SslContextFactory.createServerSslContext(env, "server.ssl."));
     }
 
     @Test
@@ -84,25 +84,25 @@ class SslContextFactoryTest {
     @Test
     void splitByComma_singleValue() throws Exception {
         String[] result = invokeSplitByComma("TLSv1.2");
-        assertArrayEquals(new String[]{"TLSv1.2"}, result);
+        assertArrayEquals(new String[] { "TLSv1.2" }, result);
     }
 
     @Test
     void splitByComma_multipleValues() throws Exception {
         String[] result = invokeSplitByComma("TLSv1.2,TLSv1.3");
-        assertArrayEquals(new String[]{"TLSv1.2", "TLSv1.3"}, result);
+        assertArrayEquals(new String[] { "TLSv1.2", "TLSv1.3" }, result);
     }
 
     @Test
     void splitByComma_withSpaces() throws Exception {
         String[] result = invokeSplitByComma(" TLSv1.2 , TLSv1.3 ");
-        assertArrayEquals(new String[]{"TLSv1.2", "TLSv1.3"}, result);
+        assertArrayEquals(new String[] { "TLSv1.2", "TLSv1.3" }, result);
     }
 
     @Test
     void splitByComma_emptyEntriesFiltered() throws Exception {
         String[] result = invokeSplitByComma("TLSv1.2,,TLSv1.3");
-        assertArrayEquals(new String[]{"TLSv1.2", "TLSv1.3"}, result);
+        assertArrayEquals(new String[] { "TLSv1.2", "TLSv1.3" }, result);
     }
 
     @Test
@@ -143,11 +143,14 @@ class SslContextFactoryTest {
     // ==================== TLS 深度：client-auth / protocols / ciphers 分支 ====================
 
     private void stubPemServer() {
-        org.mockito.Mockito.lenient().when(env.getProperty(eq("server.ssl.enabled"), eq(Boolean.class))).thenReturn(null);
+        org.mockito.Mockito.lenient().when(env.getProperty(eq("server.ssl.enabled"), eq(Boolean.class)))
+                .thenReturn(null);
         org.mockito.Mockito.lenient().when(env.containsProperty("server.ssl.key-store")).thenReturn(false);
         org.mockito.Mockito.lenient().when(env.containsProperty("server.ssl.certificate")).thenReturn(true);
-        org.mockito.Mockito.lenient().when(env.getProperty(eq("server.ssl.certificate"))).thenReturn("classpath:ssl/cert.pem");
-        org.mockito.Mockito.lenient().when(env.getProperty(eq("server.ssl.certificate-private-key"))).thenReturn("classpath:ssl/key.pem");
+        org.mockito.Mockito.lenient().when(env.getProperty(eq("server.ssl.certificate")))
+                .thenReturn("classpath:ssl/cert.pem");
+        org.mockito.Mockito.lenient().when(env.getProperty(eq("server.ssl.certificate-private-key")))
+                .thenReturn("classpath:ssl/key.pem");
     }
 
     @Test
@@ -178,12 +181,13 @@ class SslContextFactoryTest {
     }
 
     @Test
-    void createServerSslContext_clientAuthUnknown_buildsAsNone() {
+    void createServerSslContext_clientAuthUnknown_builds() {
         stubPemServer();
         when(env.getProperty(eq("server.ssl.client-auth"))).thenReturn("bogus");
 
-        assertDoesNotThrow(() -> SslContextFactory.createServerSslContext(env, "server.ssl."),
-                "未知 client-auth 值应回退为 NONE 而非抛异常");
+        // 只断言"能构建"：回退 NONE 属实现细节，SslContext 的公共 API 不暴露该模式。
+        assertNotNull(SslContextFactory.createServerSslContext(env, "server.ssl."),
+                "未知 client-auth 值应回退为 NONE 并仍能构建成功");
     }
 
     @Test
@@ -204,8 +208,7 @@ class SslContextFactoryTest {
 
     /** 从 classpath ssl/cert.pem 读取证书并写入临时 PKCS12 信任库，供 mTLS trust-store 配置测试使用 */
     private java.io.File createPkcs12TrustStoreFromCert() throws Exception {
-        java.security.cert.CertificateFactory cf =
-                java.security.cert.CertificateFactory.getInstance("X.509");
+        java.security.cert.CertificateFactory cf = java.security.cert.CertificateFactory.getInstance("X.509");
         try (InputStream in = SslContextFactoryTest.class.getResourceAsStream("/ssl/cert.pem")) {
             java.security.cert.Certificate cert = cf.generateCertificate(in);
             java.security.KeyStore ks = java.security.KeyStore.getInstance("PKCS12");
@@ -225,7 +228,8 @@ class SslContextFactoryTest {
         stubPemServer();
         when(env.getProperty(eq("server.ssl.enabled-protocols"))).thenReturn("TLSv1.2,TLSv1.3");
 
-        assertDoesNotThrow(() -> SslContextFactory.createServerSslContext(env, "server.ssl."),
+        // 与同文件其它 _builds 用例一致：断言真的构建出了对象，而不只是"没抛异常"
+        assertNotNull(SslContextFactory.createServerSslContext(env, "server.ssl."),
                 "enabled-protocols 应成功构建（版本协商配置）");
     }
 
@@ -234,8 +238,7 @@ class SslContextFactoryTest {
         stubPemServer();
         when(env.getProperty(eq("server.ssl.ciphers"))).thenReturn("TLS_AES_128_GCM_SHA256");
 
-        assertDoesNotThrow(() -> SslContextFactory.createServerSslContext(env, "server.ssl."),
-                "ciphers 应成功构建（加密套件配置）");
+        assertNotNull(SslContextFactory.createServerSslContext(env, "server.ssl."), "ciphers 应成功构建（加密套件配置）");
     }
 
     /* ==================== 补充：http2 ALPN / key-store 分支 / openInputStream 回退 ==================== */
@@ -273,8 +276,8 @@ class SslContextFactoryTest {
     void openInputStream_missingResource_throwsIllegalArgument() throws Exception {
         Method m = SslContextFactory.class.getDeclaredMethod("openInputStream", String.class);
         m.setAccessible(true);
-        java.lang.reflect.InvocationTargetException ex = assertThrows(
-                java.lang.reflect.InvocationTargetException.class, () -> m.invoke(null, (Object) null));
+        java.lang.reflect.InvocationTargetException ex = assertThrows(java.lang.reflect.InvocationTargetException.class,
+                () -> m.invoke(null, (Object) null));
         assertInstanceOf(IllegalArgumentException.class, ex.getCause(),
                 "openInputStream(null) 应抛 IllegalArgumentException");
     }
@@ -283,7 +286,7 @@ class SslContextFactoryTest {
     void openInputStream_filePath_fallsBackToFileInput() throws Exception {
         java.io.File f = java.io.File.createTempFile("cert", ".pem");
         try (java.io.InputStream src = SslContextFactoryTest.class.getResourceAsStream("/ssl/cert.pem");
-             java.io.OutputStream os = new java.io.FileOutputStream(f)) {
+                java.io.OutputStream os = new java.io.FileOutputStream(f)) {
             src.transferTo(os);
         }
         Method m = SslContextFactory.class.getDeclaredMethod("openInputStream", String.class);
@@ -303,11 +306,9 @@ class SslContextFactoryTest {
         java.io.File ksFile = java.io.File.createTempFile("keystore", ".p12");
         ksFile.delete(); // keytool 拒绝覆盖已存在文件，先删除占位
         ksFile.deleteOnExit();
-        Process p = new ProcessBuilder(keytoolPath,
-                "-genkeypair", "-alias", "server", "-keyalg", "RSA", "-keysize", "2048",
-                "-storetype", "PKCS12", "-keystore", ksFile.getAbsolutePath(),
-                "-storepass", "changeit", "-keypass", "changeit",
-                "-dname", "CN=localhost").redirectErrorStream(true).start();
+        Process p = new ProcessBuilder(keytoolPath, "-genkeypair", "-alias", "server", "-keyalg", "RSA", "-keysize",
+                "2048", "-storetype", "PKCS12", "-keystore", ksFile.getAbsolutePath(), "-storepass", "changeit",
+                "-keypass", "changeit", "-dname", "CN=localhost").redirectErrorStream(true).start();
         String output = readAllOutput(p.getInputStream());
         p.waitFor();
         if (p.exitValue() != 0) {
@@ -317,7 +318,8 @@ class SslContextFactoryTest {
     }
 
     private static String readAllOutput(java.io.InputStream in) throws Exception {
-        try (in; java.util.Scanner sc = new java.util.Scanner(in, "UTF-8")) {
+        try (in;
+                java.util.Scanner sc = new java.util.Scanner(in, "UTF-8")) {
             sc.useDelimiter("\\A");
             return sc.hasNext() ? sc.next() : "";
         }
