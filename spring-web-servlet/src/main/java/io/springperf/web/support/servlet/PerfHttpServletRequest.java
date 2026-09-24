@@ -51,17 +51,16 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
     }
 
     /**
-     * {@code server.servlet.encoding.charset}：容器级请求编码在适配器创建期写入
-     * （早于任何业务代码与参数解析，构成"默认值"；业务后续显式 setCharacterEncoding 仍可覆盖，
+     * {@code server.servlet.encoding.charset}：容器级请求编码在适配器创建期写入 （早于任何业务代码与参数解析，构成"默认值"；业务后续显式 setCharacterEncoding 仍可覆盖，
      * force-request=true 时该覆盖被忽略——见 {@link #setCharacterEncoding}）。
-     * <p>rebind（Filter 包装）时对新 delegate 重新应用：Filter 包装发生在参数解析之前，
-     * 否则容器编码丢失、参数退回委托默认 UTF-8 解码。</p>
+     * <p>
+     * rebind（Filter 包装）时对新 delegate 重新应用：Filter 包装发生在参数解析之前， 否则容器编码丢失、参数退回委托默认 UTF-8 解码。
+     * </p>
      */
     private void applyContainerRequestEncoding() {
         try {
-            io.springperf.web.support.servlet.context.PerfServletContext sc =
-                    request.getWebContext().getWebComponent(
-                            io.springperf.web.support.servlet.context.PerfServletContext.class);
+            io.springperf.web.support.servlet.context.PerfServletContext sc = request.getWebContext()
+                    .getWebComponent(io.springperf.web.support.servlet.context.PerfServletContext.class);
             if (sc != null) {
                 request.setCharacterEncoding(java.nio.charset.Charset.forName(sc.getRequestCharacterEncoding()));
             }
@@ -71,8 +70,7 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
     }
 
     /**
-     * 重新绑定底层的 {@link WebServerHttpRequest} 委托对象。
-     * 当 WebFilter 包装了请求后调用，使此 {@code PerfHttpServletRequest}
+     * 重新绑定底层的 {@link WebServerHttpRequest} 委托对象。 当 WebFilter 包装了请求后调用，使此 {@code PerfHttpServletRequest}
      * 后续操作指向包装后的请求，而非创建新实例。
      */
     /**
@@ -101,9 +99,20 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
         }
     }
 
-    @Override public String getMethod() { return request.getMethodValue(); }
-      @Override public String getRequestURI() { return request.getUriStr(); }
-      @Override public String getServletPath() { return request.getPath(); }
+    @Override
+    public String getMethod() {
+        return request.getMethodValue();
+    }
+
+    @Override
+    public String getRequestURI() {
+        return request.getUriStr();
+    }
+
+    @Override
+    public String getServletPath() {
+        return request.getPath();
+    }
 
     @Override
     public StringBuffer getRequestURL() {
@@ -126,11 +135,32 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
         return idx >= 0 ? uri.substring(idx + 1) : null;
     }
 
-      @Override public String getPathInfo() { return ""; }
-    @Override public String getContextPath() { return request.getWebContext().getContextPath(); }
-    @Override public String getHeader(String name) { return request.getHeaders().getFirst(name); }
-    @Override public Enumeration<String> getHeaders(String name) { return Collections.enumeration(request.getHeaders().get(name)); }
-    @Override public Enumeration<String> getHeaderNames() { return Collections.enumeration(request.getHeaders().keySet()); }
+    @Override
+    public String getPathInfo() {
+        return "";
+    }
+
+    @Override
+    public String getContextPath() {
+        return request.getWebContext().getContextPath();
+    }
+
+    @Override
+    public String getHeader(String name) {
+        return request.getHeaders().getFirst(name);
+    }
+
+    @Override
+    public Enumeration<String> getHeaders(String name) {
+        // MultiValueMap.get 声明为 @Nullable：Servlet 契约要求无该头时返回空枚举，而非 NPE
+        java.util.List<String> values = request.getHeaders().get(name);
+        return Collections.enumeration(values != null ? values : Collections.emptyList());
+    }
+
+    @Override
+    public Enumeration<String> getHeaderNames() {
+        return Collections.enumeration(request.getHeaders().keySet());
+    }
 
     @Override
     public long getDateHeader(String name) {
@@ -138,10 +168,26 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
         return value != null ? HttpHeaderDateParser.parseDate(value) : -1;
     }
 
-    @Override public int getIntHeader(String name) { String v = getHeader(name); return v != null ? Integer.parseInt(v) : -1; }
-    @Override public String getContentType() { return request.getHeaders().getFirst(HttpHeaders.Names.CONTENT_TYPE); }
-    @Override public int getContentLength() { return request.getContentLength(); }
-    @Override public long getContentLengthLong() { return request.getContentLength(); }
+    @Override
+    public int getIntHeader(String name) {
+        String v = getHeader(name);
+        return v != null ? Integer.parseInt(v) : -1;
+    }
+
+    @Override
+    public String getContentType() {
+        return request.getHeaders().getFirst(HttpHeaders.Names.CONTENT_TYPE);
+    }
+
+    @Override
+    public int getContentLength() {
+        return request.getContentLength();
+    }
+
+    @Override
+    public long getContentLengthLong() {
+        return request.getContentLength();
+    }
 
     @Override
     public ServletInputStream getInputStream() {
@@ -153,7 +199,11 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
     }
 
     private NettyServletInputStream createInputStream() {
-        try { return new NettyServletInputStream(request.getBody()); } catch (IOException e) { throw new RuntimeException(e); }
+        try {
+            return new NettyServletInputStream(request.getBody());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
@@ -165,17 +215,23 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
         // 请求无 charset 时回退框架默认 UTF-8（与 BaseWebServerHttpRequest 一致）。
         // 修复前 getCharacterEncoding() 返回 null → InputStreamReader(stream, null) → IllegalArgumentException。
         String encoding = getCharacterEncoding();
-        return new BufferedReader(new InputStreamReader(createInputStream(), encoding != null ? encoding : StandardCharsets.UTF_8.name()));
+        return new BufferedReader(new InputStreamReader(createInputStream(),
+                encoding != null ? encoding : StandardCharsets.UTF_8.name()));
     }
-    @Override public String getCharacterEncoding() { return request.getCharacterEncoding() == null ? null : request.getCharacterEncoding().name(); }
-    @Override public void setCharacterEncoding(String env) {
+
+    @Override
+    public String getCharacterEncoding() {
+        return request.getCharacterEncoding() == null ? null : request.getCharacterEncoding().name();
+    }
+
+    @Override
+    public void setCharacterEncoding(String env) {
         // server.servlet.encoding.force-request=true：忽略业务显式设置，保持 ServletContext 配置 charset。
         // getServletContext() 在无容器上下文时可能抛 UnsupportedOperationException，此时按未强制处理。
         try {
             ServletContext sc = getServletContext();
             if (sc instanceof io.springperf.web.support.servlet.context.PerfServletContext
-                    && ((io.springperf.web.support.servlet.context.PerfServletContext) sc)
-                    .isForceRequestEncoding()) {
+                    && ((io.springperf.web.support.servlet.context.PerfServletContext) sc).isForceRequestEncoding()) {
                 return;
             }
         } catch (Exception ignored) {
@@ -183,19 +239,69 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
         }
         request.setCharacterEncoding(Charset.forName(env));
     }
-    @Override public Locale getLocale() { return request.getLocales().get(0); }
-    @Override public Enumeration<Locale> getLocales() { return Collections.enumeration(request.getLocales()); }
-    @Override public String getParameter(String name) { return request.getParameter(name); }
-    @Override public Map<String, String[]> getParameterMap() { return request.getParameterMapArray(); }
-    @Override public Enumeration<String> getParameterNames() { return Collections.enumeration(request.getParameterMap().keySet()); }
-    @Override public String[] getParameterValues(String name) { return request.getParameterValues(name); }
-    @Override public Object getAttribute(String name) { return request.getRequestContext().getAttribute(name); }
-    @Override public Enumeration<String> getAttributeNames() { return Collections.enumeration(request.getRequestContext().getAttributes().keySet()); }
-    @Override public void setAttribute(String name, Object o) { request.getRequestContext().setAttribute(name, o); }
-    @Override public void removeAttribute(String name) { request.getRequestContext().removeAttribute(name); }
-    @Override public int getServerPort() { return request.getWebContext().getProps().getInt(io.springperf.web.context.PropertiesConstant.SERVER_PORT); }
-    @Override public String getScheme() { return "http"; }
-    @Override public String getServerName() {
+
+    @Override
+    public Locale getLocale() {
+        return request.getLocales().get(0);
+    }
+
+    @Override
+    public Enumeration<Locale> getLocales() {
+        return Collections.enumeration(request.getLocales());
+    }
+
+    @Override
+    public String getParameter(String name) {
+        return request.getParameter(name);
+    }
+
+    @Override
+    public Map<String, String[]> getParameterMap() {
+        return request.getParameterMapArray();
+    }
+
+    @Override
+    public Enumeration<String> getParameterNames() {
+        return Collections.enumeration(request.getParameterMap().keySet());
+    }
+
+    @Override
+    public String[] getParameterValues(String name) {
+        return request.getParameterValues(name);
+    }
+
+    @Override
+    public Object getAttribute(String name) {
+        return request.getRequestContext().getAttribute(name);
+    }
+
+    @Override
+    public Enumeration<String> getAttributeNames() {
+        return Collections.enumeration(request.getRequestContext().getAttributes().keySet());
+    }
+
+    @Override
+    public void setAttribute(String name, Object o) {
+        request.getRequestContext().setAttribute(name, o);
+    }
+
+    @Override
+    public void removeAttribute(String name) {
+        request.getRequestContext().removeAttribute(name);
+    }
+
+    @Override
+    public int getServerPort() {
+        return request.getWebContext().getProps().getInt(io.springperf.web.context.PropertiesConstant.SERVER_PORT);
+    }
+
+    @Override
+    public String getScheme() {
+        return "http";
+    }
+
+    @Override
+    public String getServerName() {
         String host = getHeader("Host");
         if (host == null) {
             return "localhost";
@@ -207,9 +313,21 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
         }
         return host;
     }
-    @Override public String getLocalAddr() { return "127.0.0.1"; }
-    @Override public String getRemoteAddr() { return "127.0.0.1"; }
-    @Override public String getRemoteHost() { return getRemoteAddr(); }
+
+    @Override
+    public String getLocalAddr() {
+        return "127.0.0.1";
+    }
+
+    @Override
+    public String getRemoteAddr() {
+        return "127.0.0.1";
+    }
+
+    @Override
+    public String getRemoteHost() {
+        return getRemoteAddr();
+    }
 
     @Override
     public DispatcherType getDispatcherType() {
@@ -230,8 +348,8 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
 
     @Override
     public ServletContext getServletContext() {
-        io.springperf.web.support.servlet.context.PerfServletContext ctx =
-                request.getWebContext().getWebComponent(io.springperf.web.support.servlet.context.PerfServletContext.class);
+        io.springperf.web.support.servlet.context.PerfServletContext ctx = request.getWebContext()
+                .getWebComponent(io.springperf.web.support.servlet.context.PerfServletContext.class);
         if (ctx != null) {
             return ctx;
         }
@@ -280,11 +398,11 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
         if (webResponse == null) {
             throw new IllegalStateException("Cannot start async: no WebServerHttpResponse available");
         }
-        PerfAsyncWebRequest asyncWebRequest =
-                (PerfAsyncWebRequest) AsyncSupportUtils.getAsyncWebRequest(request, webResponse);
+        PerfAsyncWebRequest asyncWebRequest = (PerfAsyncWebRequest) AsyncSupportUtils.getAsyncWebRequest(request,
+                webResponse);
         asyncWebRequest.startAsync();
-        PerfAsyncContext asyncContext = new PerfAsyncContext(asyncWebRequest,
-                request, webResponse, this, ServletAttribute.getResponse(request.getRequestContext()));
+        PerfAsyncContext asyncContext = new PerfAsyncContext(asyncWebRequest, request, webResponse, this,
+                ServletAttribute.getResponse(request.getRequestContext()));
         PerfAsyncContext.set(request.getRequestContext(), asyncContext);
         return asyncContext;
     }
@@ -300,11 +418,11 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
         if (webResponse == null) {
             throw new IllegalStateException("Cannot start async: no WebServerHttpResponse available");
         }
-        PerfAsyncWebRequest asyncWebRequest =
-                (PerfAsyncWebRequest) AsyncSupportUtils.getAsyncWebRequest(request, webResponse);
+        PerfAsyncWebRequest asyncWebRequest = (PerfAsyncWebRequest) AsyncSupportUtils.getAsyncWebRequest(request,
+                webResponse);
         asyncWebRequest.startAsync();
-        PerfAsyncContext asyncContext = new PerfAsyncContext(asyncWebRequest,
-                request, webResponse, servletRequest, servletResponse);
+        PerfAsyncContext asyncContext = new PerfAsyncContext(asyncWebRequest, request, webResponse, servletRequest,
+                servletResponse);
         PerfAsyncContext.set(request.getRequestContext(), asyncContext);
         return asyncContext;
     }
@@ -340,12 +458,12 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
                 webResponse.setStatusCode(org.springframework.http.HttpStatus.SWITCHING_PROTOCOLS);
                 webResponse.getHeaders().set(io.netty.handler.codec.http.HttpHeaderNames.CONNECTION.toString(),
                         io.netty.handler.codec.http.HttpHeaderValues.UPGRADE.toString());
-                webResponse.getHeaders().set(io.netty.handler.codec.http.HttpHeaderNames.UPGRADE.toString(), "websocket");
+                webResponse.getHeaders().set(io.netty.handler.codec.http.HttpHeaderNames.UPGRADE.toString(),
+                        "websocket");
                 webResponse.setHandled();
             }
             HttpServletResponse servletResp = ServletAttribute.getResponse(request.getRequestContext());
-            PerfWebConnection connection = new PerfWebConnection(
-                    getInputStream(),
+            PerfWebConnection connection = new PerfWebConnection(getInputStream(),
                     servletResp != null ? servletResp.getOutputStream() : null);
             Thread handlerThread = new Thread(() -> {
                 try {
@@ -371,6 +489,9 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
             return result;
         }
         org.springframework.http.HttpHeaders h = request.getHeaders();
+        // 保留判空：本仓有意容忍协作者（含测试替身）返回 null。静态分析能证明真实实现恒非空，
+        // 但删掉会破坏该容错契约（同类容错在 JsrEndpointScanner 有专门测试），故按 RCN 的
+        // 已知误报处理，不删守卫。
         if (h == null) {
             cookies = new Cookie[0];
             return cookies;
@@ -437,9 +558,10 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
 
     /**
      * 从原始请求 URI 中解析 {@code ;jsessionid=<id>}（Servlet 规范 §7.1 URL 重写）。
-     *
-     * <p>参数名固定为小写 {@code jsessionid}（与 {@code encodeURL} 写出侧一致，Tomcat 同样使用固定名），
-     * 大小写不敏感匹配；取值止于 {@code / ? ; #}。未携带时返回 {@code null}。</p>
+     * <p>
+     * 参数名固定为小写 {@code jsessionid}（与 {@code encodeURL} 写出侧一致，Tomcat 同样使用固定名）， 大小写不敏感匹配；取值止于 {@code / ? ; #}。未携带时返回
+     * {@code null}。
+     * </p>
      */
     static String parseSessionIdFromUri(String uri) {
         if (uri == null) {
@@ -659,8 +781,7 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
         if (principal == null) {
             throw new ServletException("Login failed for user: " + username);
         }
-        PerfHttpPrincipal perfPrincipal = (principal instanceof PerfHttpPrincipal)
-                ? (PerfHttpPrincipal) principal
+        PerfHttpPrincipal perfPrincipal = (principal instanceof PerfHttpPrincipal) ? (PerfHttpPrincipal) principal
                 : new PerfHttpPrincipal(principal.getName());
         // 会话固定防护：登录成功后必须轮换 Session ID，防止攻击者预置的 session 在认证后继续有效
         getSession(true);
@@ -695,23 +816,53 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
 
     static class NettyServletInputStream extends ServletInputStream {
         private final InputStream in;
-        NettyServletInputStream(InputStream in) { this.in = in; }
-        @Override public boolean isFinished() { try { return in.available() <= 0; } catch (IOException e) { return true; } }
-        @Override public boolean isReady() { return true; }
-        @Override public void setReadListener(ReadListener readListener) { throw new UnsupportedOperationException("Non-blocking IO is not supported"); }
-        @Override public int read() throws IOException { return in.read(); }
+
+        NettyServletInputStream(InputStream in) {
+            this.in = in;
+        }
+
+        @Override
+        public boolean isFinished() {
+            try {
+                return in.available() <= 0;
+            } catch (IOException e) {
+                return true;
+            }
+        }
+
+        @Override
+        public boolean isReady() {
+            return true;
+        }
+
+        @Override
+        public void setReadListener(ReadListener readListener) {
+            throw new UnsupportedOperationException("Non-blocking IO is not supported");
+        }
+
+        @Override
+        public int read() throws IOException {
+            return in.read();
+        }
     }
 
     static class HttpHeaderDateParser {
-        private static final DateTimeFormatter RFC_1123_FORMAT = DateTimeFormatter.RFC_1123_DATE_TIME.withLocale(Locale.US).withZone(ZoneId.of("GMT"));
-        private static final DateTimeFormatter RFC_1036_FORMAT = DateTimeFormatter.ofPattern("EEEE, dd-MMM-yy HH:mm:ss zzz", Locale.US).withZone(ZoneId.of("GMT"));
-        private static final DateTimeFormatter ASCTIME_FORMAT = DateTimeFormatter.ofPattern("EEE MMM d HH:mm:ss yyyy", Locale.US).withZone(ZoneId.of("GMT"));
-        private static final DateTimeFormatter[] FORMATS = {RFC_1123_FORMAT, RFC_1036_FORMAT, ASCTIME_FORMAT};
+        private static final DateTimeFormatter RFC_1123_FORMAT = DateTimeFormatter.RFC_1123_DATE_TIME
+                .withLocale(Locale.US).withZone(ZoneId.of("GMT"));
+        private static final DateTimeFormatter RFC_1036_FORMAT = DateTimeFormatter
+                .ofPattern("EEEE, dd-MMM-yy HH:mm:ss zzz", Locale.US).withZone(ZoneId.of("GMT"));
+        private static final DateTimeFormatter ASCTIME_FORMAT = DateTimeFormatter
+                .ofPattern("EEE MMM d HH:mm:ss yyyy", Locale.US).withZone(ZoneId.of("GMT"));
+        private static final DateTimeFormatter[] FORMATS = { RFC_1123_FORMAT, RFC_1036_FORMAT, ASCTIME_FORMAT };
 
         public static long parseDate(String value) {
-            if (value == null) return -1L;
+            if (value == null)
+                return -1L;
             for (DateTimeFormatter formatter : FORMATS) {
-                try { return Instant.from(formatter.parse(value)).toEpochMilli(); } catch (DateTimeParseException ignored) { }
+                try {
+                    return Instant.from(formatter.parse(value)).toEpochMilli();
+                } catch (DateTimeParseException ignored) {
+                }
             }
             return -1L;
         }

@@ -1,5 +1,20 @@
 package io.springperf.web.http;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.lang.Nullable;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.util.MultiValueMapAdapter;
+import org.springframework.web.multipart.MultipartFile;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
@@ -20,19 +35,6 @@ import io.springperf.web.http.support.HttpInputMessagePart;
 import io.springperf.web.http.support.NettyAttributeMessage;
 import io.springperf.web.http.support.NettyMultipartWebRequest;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-import org.springframework.util.MultiValueMapAdapter;
-import org.springframework.web.multipart.MultipartFile;
-
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
-import java.net.InetSocketAddress;
-import java.net.URI;
-import java.util.List;
-import java.util.Map;
 
 @Slf4j
 public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
@@ -55,10 +57,11 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
 
     /**
      * 请求体长度（构造期缓存）。
-     * <p>不在 {@link #getContentLength()} 里现读 {@code request.content().readableBytes()}：入站 buf
-     * 在同步收尾后即被释放（见 {@link #release()} 与 NettyHttpHandler 引用计数说明），异步阶段再触碰
-     * {@code content()} 会读到陈旧长度、或（未被复用时）抛 {@code IllegalReferenceCountException}。
-     * 聚合后的 body 长度在构造时即已确定，缓存无信息损失。</p>
+     * <p>
+     * 不在 {@link #getContentLength()} 里现读 {@code request.content().readableBytes()}：入站 buf 在同步收尾后即被释放（见
+     * {@link #release()} 与 NettyHttpHandler 引用计数说明），异步阶段再触碰 {@code content()} 会读到陈旧长度、或（未被复用时）抛
+     * {@code IllegalReferenceCountException}。 聚合后的 body 长度在构造时即已确定，缓存无信息损失。
+     * </p>
      */
     private final int contentLength;
 
@@ -70,8 +73,9 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
 
     /**
      * 快路径资格<b>懒判定</b>状态：{@code 0}=未判定、{@code 1}=可用、{@code 2}=不可用。
-     * <p>懒判定的两点理由：① 无 {@code @RequestParam} 的请求完全不必扫查询串；
-     * ② 判定需单趟扫描（转义/分隔符 + 段数），把它从构造期移到首次取值，避免构造期白扫。</p>
+     * <p>
+     * 懒判定的两点理由：① 无 {@code @RequestParam} 的请求完全不必扫查询串； ② 判定需单趟扫描（转义/分隔符 + 段数），把它从构造期移到首次取值，避免构造期白扫。
+     * </p>
      */
     private volatile byte fastQueryState = FAST_UNKNOWN;
     private static final byte FAST_UNKNOWN = 0;
@@ -85,8 +89,7 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
     private WebServerHttpResponse response;
 
     /**
-     * 绑定其响应对象。仅在 NettyHttpHandler 构造 request 后调用一次，
-     * 使响应未提交 buf 随请求释放而兜底释放。
+     * 绑定其响应对象。仅在 NettyHttpHandler 构造 request 后调用一次， 使响应未提交 buf 随请求释放而兜底释放。
      */
     public void setResponse(WebServerHttpResponse response) {
         this.response = response;
@@ -94,9 +97,12 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
 
     /**
      * 使用已解析的 path 构造，跳过 context-path 校验。
-     * <p>供管理端口使用——请求 URI 不包含 context-path 前缀时直接使用原始路径。</p>
+     * <p>
+     * 供管理端口使用——请求 URI 不包含 context-path 前缀时直接使用原始路径。
+     * </p>
      */
-    public NettyServerHttpRequest(WebContext webContext, ChannelHandlerContext ctx, FullHttpRequest request, String resolvedPath) {
+    public NettyServerHttpRequest(WebContext webContext, ChannelHandlerContext ctx, FullHttpRequest request,
+            String resolvedPath) {
         super(webContext, request.uri(), resolvedPath);
         this.ctx = ctx;
         this.request = request;
@@ -124,10 +130,10 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
             MultiValueMap<String, NettyAttributeMessage> attributeMessageMap = multipartWebRequest.getParameters();
             if (!attributeMessageMap.isEmpty()) {
                 MultiValueMap<String, String> result = new LinkedMultiValueMap<>();
-                for (String name : attributeMessageMap.keySet()) {
-                    for (NettyAttributeMessage attr : attributeMessageMap.get(name)) {
+                for (Map.Entry<String, List<NettyAttributeMessage>> entry : attributeMessageMap.entrySet()) {
+                    for (NettyAttributeMessage attr : entry.getValue()) {
                         try {
-                            result.add(name, attr.getValue());
+                            result.add(entry.getKey(), attr.getValue());
                         } catch (Exception e) {
                             log.error("Failed to parse form field: {}", attr.getName(), e);
                         }
@@ -170,8 +176,8 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
     }
 
     /**
-     * 校验参数值总数是否超出 {@code server.max-parameter-count}（hash DoS 防护）。
-     * 超限抛出 {@link ParameterLimitExceededException}，由 NettyHttpHandler 捕获转 400。
+     * 校验参数值总数是否超出 {@code server.max-parameter-count}（hash DoS 防护）。 超限抛出 {@link ParameterLimitExceededException}，由
+     * NettyHttpHandler 捕获转 400。
      */
     private void enforceParameterLimit(MultiValueMap<String, String> params) {
         if (maxParameterCount > 0 && params.size() > maxParameterCount) {
@@ -181,24 +187,22 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
 
     /**
      * {@code @RequestParam} 等单值命名的快路径：直接在原始查询串上线性扫描。
-     *
-     * <p>通用路径（{@link #getParameterMap()} → {@code QueryStringDecoder} → {@code LinkedHashMap}
-     * → {@code MultiValueMapAdapter}）每请求都要：为每个参数名解析/建 Map（含 String 哈希）、
-     * 为每次名字查找做一次哈希桶定位。JFR 采样（{@code PerfBenchmark.get}，5 个 {@code @RequestParam}）
-     * 显示这两项合计约占该端点 CPU 的 5%（解码 60 样本 + 名字查找 78/24 样本，总 3205）。
-     * 本方法在「无 body 的纯查询请求 + 查询串无 {@code % + ; #}」（{@link #fastQueryEligible}）时
-     * 直扫查询串：<b>零哈希、零 Map/List 分配</b>，仅命中时创建一个 value 子串。
-     *
-     * <p>语义与通用路径严格一致：
+     * <p>
+     * 通用路径（{@link #getParameterMap()} → {@code QueryStringDecoder} → {@code LinkedHashMap} →
+     * {@code MultiValueMapAdapter}）每请求都要：为每个参数名解析/建 Map（含 String 哈希）、 为每次名字查找做一次哈希桶定位。JFR
+     * 采样（{@code PerfBenchmark.get}，5 个 {@code @RequestParam}） 显示这两项合计约占该端点 CPU 的 5%（解码 60 样本 + 名字查找 78/24 样本，总 3205）。
+     * 本方法在「无 body 的纯查询请求 + 查询串无 {@code % + ; #}」（{@link #fastQueryEligible}）时 直扫查询串：<b>零哈希、零 Map/List 分配</b>，仅命中时创建一个
+     * value 子串。
+     * <p>
+     * 语义与通用路径严格一致：
      * <ul>
-     *   <li>同名多值返回第一个（对齐 {@code MultiValueMap#getFirst}）；</li>
-     *   <li>缺 {@code =} 时值为空串（对齐 Netty 解码）；</li>
-     *   <li>未命中返回 {@code null}：快路径仅在「参数只可能来自查询串」时启用，故不存在遗漏来源；</li>
-     *   <li>段数超过 {@link #FAST_QUERY_MAX_SEGMENTS} 或超过 {@code server.max-parameter-count}
-     *       （hash DoS 防护）时，{@link #fastQueryEligible()} 判定为不可用 → 一律走通用路径，
-     *       由后者抛原有 400，<b>不可被命中早退绕过</b>（资格判定先于任何命中，见回归用例
-     *       {@code parameterLimitExceeded_stillThrows}）；</li>
-     *   <li>含转义 / 分号 / 片段时同样不走快路径。</li>
+     * <li>同名多值返回第一个（对齐 {@code MultiValueMap#getFirst}）；</li>
+     * <li>缺 {@code =} 时值为空串（对齐 Netty 解码）；</li>
+     * <li>未命中返回 {@code null}：快路径仅在「参数只可能来自查询串」时启用，故不存在遗漏来源；</li>
+     * <li>段数超过 {@link #FAST_QUERY_MAX_SEGMENTS} 或超过 {@code server.max-parameter-count} （hash DoS
+     * 防护）时，{@link #fastQueryEligible()} 判定为不可用 → 一律走通用路径， 由后者抛原有 400，<b>不可被命中早退绕过</b>（资格判定先于任何命中，见回归用例
+     * {@code parameterLimitExceeded_stillThrows}）；</li>
+     * <li>含转义 / 分号 / 片段时同样不走快路径。</li>
      * </ul>
      */
     @Override
@@ -221,12 +225,12 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
     }
 
     /**
-     * 快路径资格（懒判定，单趟扫描）：无 body（参数只可能来自查询串）、非 multipart、
-     * 查询串不含 {@code % + ; #}，且段数 ≤ min({@link #FAST_QUERY_MAX_SEGMENTS}, {@code server.max-parameter-count})。
-     *
-     * <p>此前该判定是构造期 4 次 {@code indexOf}（转义/分隔符）+ 1 次段数扫描共 <b>5 趟</b>，
-     * JFR 显示仅段数统计一项就占 73 样本 / 3411（≈2%，叶帧 {@code countQuerySegments}）。
-     * 现合并为 1 趟并懒执行：无参数取值的请求完全不扫。</p>
+     * 快路径资格（懒判定，单趟扫描）：无 body（参数只可能来自查询串）、非 multipart、 查询串不含 {@code % + ; #}，且段数 ≤ min({@link #FAST_QUERY_MAX_SEGMENTS},
+     * {@code server.max-parameter-count})。
+     * <p>
+     * 此前该判定是构造期 4 次 {@code indexOf}（转义/分隔符）+ 1 次段数扫描共 <b>5 趟</b>， JFR 显示仅段数统计一项就占 73 样本 / 3411（≈2%，叶帧
+     * {@code countQuerySegments}）。 现合并为 1 趟并懒执行：无参数取值的请求完全不扫。
+     * </p>
      */
     private boolean fastQueryEligible() {
         byte state = fastQueryState;
@@ -252,8 +256,8 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
                 return false;
             }
         }
-        int cap = (maxParameterCount > 0 && maxParameterCount < FAST_QUERY_MAX_SEGMENTS)
-                ? maxParameterCount : FAST_QUERY_MAX_SEGMENTS;
+        int cap = (maxParameterCount > 0 && maxParameterCount < FAST_QUERY_MAX_SEGMENTS) ? maxParameterCount
+                : FAST_QUERY_MAX_SEGMENTS;
         return segments <= cap;
     }
 
@@ -331,8 +335,11 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
             if (hostHeader != null) {
                 uri = URI.create(scheme + "://" + hostHeader + getUriStrWithQuery());
             } else {
+                // getLocalAddress 声明为 @Nullable（通道未绑定本地地址时为 null）：退化为不带端口的
+                // localhost，避免构造 URI 时 NPE
                 InetSocketAddress addr = getLocalAddress();
-                uri = URI.create(scheme + "://" + addr.getHostString() + ":" + addr.getPort() + getUriStrWithQuery());
+                String authority = addr != null ? addr.getHostString() + ":" + addr.getPort() : "localhost";
+                uri = URI.create(scheme + "://" + authority + getUriStrWithQuery());
             }
         }
         return uri;
@@ -341,14 +348,15 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
     /**
      * 按优先级确定请求 scheme：
      * <ol>
-     *   <li>RFC 7239 {@code Forwarded} 头（当 {@code server.forward-headers-strategy}=FRAMEWORK/NATIVE）</li>
-     *   <li>{@code X-Forwarded-Proto} 头（同上）</li>
-     *   <li>Netty pipeline 中存在 {@link SslHandler}（TLS 在 Java 层终结）</li>
-     *   <li>兜底 {@code http}</li>
+     * <li>RFC 7239 {@code Forwarded} 头（当 {@code server.forward-headers-strategy}=FRAMEWORK/NATIVE）</li>
+     * <li>{@code X-Forwarded-Proto} 头（同上）</li>
+     * <li>Netty pipeline 中存在 {@link SslHandler}（TLS 在 Java 层终结）</li>
+     * <li>兜底 {@code http}</li>
      * </ol>
-     * <p>转发头默认不信任（{@code server.forward-headers-strategy}=NONE），防止客户端伪造 scheme。
-     * 部署在反向代理后方时设为 FRAMEWORK（或 NATIVE），并确保代理已清理上游转发头。
-     * NATIVE 与 FRAMEWORK 在本框架行为一致（无原生容器）。</p>
+     * <p>
+     * 转发头默认不信任（{@code server.forward-headers-strategy}=NONE），防止客户端伪造 scheme。 部署在反向代理后方时设为 FRAMEWORK（或
+     * NATIVE），并确保代理已清理上游转发头。 NATIVE 与 FRAMEWORK 在本框架行为一致（无原生容器）。
+     * </p>
      */
     private String resolveScheme() {
         if (isForwardedHeadersEnabled()) {
@@ -375,8 +383,7 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
     }
 
     /**
-     * 是否信任转发头：读 {@code server.forward-headers-strategy}
-     * （NONE/FALSE 视为不信任；FRAMEWORK/NATIVE/其它非空视为信任）。
+     * 是否信任转发头：读 {@code server.forward-headers-strategy} （NONE/FALSE 视为不信任；FRAMEWORK/NATIVE/其它非空视为信任）。
      */
     private boolean isForwardedHeadersEnabled() {
         String strategy = getWebContext().getProps().get(PropertiesConstant.FORWARD_HEADERS_STRATEGY, null);
@@ -388,8 +395,7 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
     }
 
     /**
-     * 从 RFC 7239 Forwarded 头中提取 proto 指令。
-     * 格式示例: {@code Forwarded: proto=https; host=example.com}
+     * 从 RFC 7239 Forwarded 头中提取 proto 指令。 格式示例: {@code Forwarded: proto=https; host=example.com}
      */
     private static String parseForwardedProto(String forwarded) {
         for (String segment : forwarded.split(";")) {
@@ -444,12 +450,16 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
         return request.content().readableBytes() > 0;
     }
 
+    // Netty 对未绑定/未连接（或已关闭）的通道返回 null：契约即 @Nullable。
+    // 标注必须落在“分析器实际看到的声明”上——即此处覆写处，只标接口不生效。
     @Override
+    @Nullable
     public InetSocketAddress getLocalAddress() {
         return (InetSocketAddress) ctx.channel().localAddress();
     }
 
     @Override
+    @Nullable
     public InetSocketAddress getRemoteAddress() {
         return (InetSocketAddress) ctx.channel().remoteAddress();
     }
@@ -484,4 +494,3 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
     }
 
 }
-

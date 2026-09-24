@@ -1,8 +1,7 @@
 package io.springperf.web.util;
 
-import io.springperf.web.util.support.ContainmentResult;
-import io.springperf.web.util.support.SegKind;
-import io.springperf.web.util.support.Segment;
+import java.util.List;
+
 import org.springframework.util.AntPathMatcher;
 import org.springframework.util.PathMatcher;
 import org.springframework.util.RouteMatcher;
@@ -11,7 +10,9 @@ import org.springframework.web.util.pattern.PathPatternParser;
 import org.springframework.web.util.pattern.PathPatternRouteMatcher;
 import org.springframework.web.util.pattern.PatternParseException;
 
-import java.util.List;
+import io.springperf.web.util.support.ContainmentResult;
+import io.springperf.web.util.support.SegKind;
+import io.springperf.web.util.support.Segment;
 
 public class PathPatternUtils {
 
@@ -41,14 +42,15 @@ public class PathPatternUtils {
 
     public static boolean supportPatternParse(String patternString) {
         try {
-            return PARSER.parse(patternString) != null;
+            // PathPatternParser.parse 要么返回非空 PathPattern，要么抛 PatternParseException（Spring 契约）
+            PARSER.parse(patternString);
+            return true;
         } catch (PatternParseException ex) {
             return false;
         }
     }
 
-    public static ContainmentResult patternListContains(
-            List<String> patternList, String pathRule) {
+    public static ContainmentResult patternListContains(List<String> patternList, String pathRule) {
         boolean sawRuntime = false;
         for (String inc : patternList) {
             ContainmentResult r = patternContains(inc, pathRule);
@@ -77,10 +79,11 @@ public class PathPatternUtils {
     }
 
     /**
-     * 路径模式特异性比较，用于重叠通配符路由（如 {@code /user/{id}} 与 {@code /user/*}）
-     * 在构建期排序，使最精确的模式优先匹配（对齐 Spring AntPathMatcher 的主排序）。
-     * <p>排序规则：{@code literal > {var} > * > **}，逐段比较；公共前缀相同时段数更少
-     * （如 {@code /user} 对 {@code /user/**}）更精确。同特异性返回 0，由稳定排序保持注册顺序。</p>
+     * 路径模式特异性比较，用于重叠通配符路由（如 {@code /user/{id}} 与 {@code /user/*}） 在构建期排序，使最精确的模式优先匹配（对齐 Spring AntPathMatcher 的主排序）。
+     * <p>
+     * 排序规则：{@code literal > {var} > * > **}，逐段比较；公共前缀相同时段数更少 （如 {@code /user} 对 {@code /user/**}）更精确。同特异性返回
+     * 0，由稳定排序保持注册顺序。
+     * </p>
      *
      * @return 负值表示 {@code p1} 更精确（应排前面），0 表示等价，正值表示 {@code p2} 更精确
      */
@@ -117,14 +120,18 @@ public class PathPatternUtils {
 
     /**
      * 判断两个路径模式是否确定不相交（没有请求路径能同时匹配二者）。
-     * <p>仅在可编译期证明不相交时返回 {@code true}，否则保守返回 {@code false}。</p>
+     * <p>
+     * 仅在可编译期证明不相交时返回 {@code true}，否则保守返回 {@code false}。
+     * </p>
      */
     /**
      * 三段式编译期推断：根据 mapping 的 pathRule 判断此 registration 是否适用。
-     * <p>对应 {@link ContainmentResult}：ALWAYS — 确定包含；NEVER — 确定不包含；RUNTIME — 需运行时判断。</p>
+     * <p>
+     * 对应 {@link ContainmentResult}：ALWAYS — 确定包含；NEVER — 确定不包含；RUNTIME — 需运行时判断。
+     * </p>
      */
-    public static ContainmentResult matchPathRuleToCached(
-            List<String> includePatterns, List<String> excludePatterns, String pathRule) {
+    public static ContainmentResult matchPathRuleToCached(List<String> includePatterns, List<String> excludePatterns,
+            String pathRule) {
 
         if (includePatterns.isEmpty() && excludePatterns.isEmpty()) {
             return ContainmentResult.ALWAYS;
@@ -141,13 +148,11 @@ public class PathPatternUtils {
         if (excludeResult == ContainmentResult.ALWAYS) {
             return ContainmentResult.NEVER;
         }
-        if (includeResult == ContainmentResult.ALWAYS
-                && excludeResult == ContainmentResult.NEVER) {
+        if (includeResult == ContainmentResult.ALWAYS && excludeResult == ContainmentResult.NEVER) {
             if (excludePatterns.isEmpty()) {
                 return ContainmentResult.ALWAYS;
             }
-            boolean disjoint = excludePatterns.stream()
-                    .allMatch(e -> patternsDisjoint(e, pathRule));
+            boolean disjoint = excludePatterns.stream().allMatch(e -> patternsDisjoint(e, pathRule));
             if (disjoint) {
                 return ContainmentResult.ALWAYS;
             }
@@ -196,17 +201,17 @@ public class PathPatternUtils {
 
         // 剩余段检查：只有 LITERAL 则不同路径深度必然不相交
         while (i < s1.size()) {
-            if (s1.get(i++).kind != SegKind.LITERAL) return false;
+            if (s1.get(i++).kind != SegKind.LITERAL)
+                return false;
         }
         while (j < s2.size()) {
-            if (s2.get(j++).kind != SegKind.LITERAL) return false;
+            if (s2.get(j++).kind != SegKind.LITERAL)
+                return false;
         }
         return true;
     }
 
-    private static ContainmentResult match(
-            List<Segment> c, int i,
-            List<Segment> e, int j) {
+    private static ContainmentResult match(List<Segment> c, int i, List<Segment> e, int j) {
 
         ContainmentResult acc = ContainmentResult.ALWAYS;
 
@@ -245,9 +250,7 @@ public class PathPatternUtils {
         return acc;
     }
 
-    private static ContainmentResult matchMulti(
-            List<Segment> c, int i,
-            List<Segment> e, int j) {
+    private static ContainmentResult matchMulti(List<Segment> c, int i, List<Segment> e, int j) {
 
         ContainmentResult acc = ContainmentResult.NEVER;
 
@@ -264,14 +267,11 @@ public class PathPatternUtils {
         return acc;
     }
 
-    private static ContainmentResult segmentContains(
-            Segment a, Segment b) {
+    private static ContainmentResult segmentContains(Segment a, Segment b) {
         switch (a.kind) {
             case LITERAL:
                 if (b.kind == SegKind.LITERAL) {
-                    return a.literal.equals(b.literal)
-                            ? ContainmentResult.ALWAYS
-                            : ContainmentResult.NEVER;
+                    return a.literal.equals(b.literal) ? ContainmentResult.ALWAYS : ContainmentResult.NEVER;
                 }
                 return ContainmentResult.NEVER;
 
@@ -283,9 +283,7 @@ public class PathPatternUtils {
 
             case REGEX:
                 if (b.kind == SegKind.LITERAL) {
-                    return a.regex.matcher(b.literal).matches()
-                            ? ContainmentResult.ALWAYS
-                            : ContainmentResult.NEVER;
+                    return a.regex.matcher(b.literal).matches() ? ContainmentResult.ALWAYS : ContainmentResult.NEVER;
                 }
                 return ContainmentResult.RUNTIME;
 
@@ -294,5 +292,4 @@ public class PathPatternUtils {
         }
     }
 
-
-    }
+}
