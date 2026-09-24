@@ -1,5 +1,11 @@
 package io.springperf.web.http.support;
 
+import static io.springperf.web.context.PropertiesConstant.HTTP_MULTIPART_MAX_PART_HEADER_SIZE_DEFAULT;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.List;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.TooLongFrameException;
@@ -11,18 +17,11 @@ import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.springperf.web.server.MultipartConfig;
 import lombok.extern.slf4j.Slf4j;
 
-import static io.springperf.web.context.PropertiesConstant.HTTP_MULTIPART_MAX_PART_HEADER_SIZE_DEFAULT;
-
-import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.List;
-
 @Slf4j
 public class SupportMultipartResolver {
 
     /**
-     * HTTP 数据工厂：决定 part 是否落盘（尺寸阈值）与落盘目录。
-     * 默认对齐框架既有行为（Netty MINSIZE=16KB，系统临时目录）；可由
+     * HTTP 数据工厂：决定 part 是否落盘（尺寸阈值）与落盘目录。 默认对齐框架既有行为（Netty MINSIZE=16KB，系统临时目录）；可由
      * {@code spring.servlet.multipart.file-size-threshold} / {@code .location} 配置。
      */
     protected HttpDataFactory factory;
@@ -31,7 +30,10 @@ public class SupportMultipartResolver {
     private final long maxContentLength;
     /** multipart part 总数上限（≤0 表示不限制，默认 -1）。 */
     private final int maxPartCount;
-    /** 单 part header 区字节上限（≤0 表示不限制，默认 8192 对齐 Tomcat）。 */
+    /**
+     * 单 part header 区字节上限（≤0 表示不限制）。默认 8192 —— **与 Boot/Tomcat 的同名键不同**： {@code server.tomcat.max-part-header-size} 在
+     * Boot 元数据里的默认值是 {@code 512B}，本项目为 8192。
+     */
     private final int maxPartHeaderSize;
     /** 单个上传文件大小上限（字节，≤0 表示不限制）。对齐 spring.servlet.multipart.max-file-size。 */
     private final long maxFileSize;
@@ -73,22 +75,22 @@ public class SupportMultipartResolver {
         this(maxContentLength, maxPartCount, maxPartHeaderSize, -1L);
     }
 
-    public SupportMultipartResolver(long maxContentLength, int maxPartCount, int maxPartHeaderSize,
-                                    long maxFileSize) {
-        this(maxContentLength, maxPartCount, maxPartHeaderSize, maxFileSize,
-                MultipartConfig.FILE_SIZE_THRESHOLD_UNSET, "");
+    public SupportMultipartResolver(long maxContentLength, int maxPartCount, int maxPartHeaderSize, long maxFileSize) {
+        this(maxContentLength, maxPartCount, maxPartHeaderSize, maxFileSize, MultipartConfig.FILE_SIZE_THRESHOLD_UNSET,
+                "");
     }
 
     /**
-     * 完整构造：按 {@code spring.servlet.multipart.file-size-threshold} / {@code .location}
-     * 创建 HTTP 数据工厂。
+     * 完整构造：按 {@code spring.servlet.multipart.file-size-threshold} / {@code .location} 创建 HTTP 数据工厂。
      *
-     * @param fileSizeThreshold part 落盘阈值（字节）；{@code <0}（{@link MultipartConfig#FILE_SIZE_THRESHOLD_UNSET}）
-     *                          表示沿用框架默认（Netty MINSIZE=16KB）
-     * @param location          上传临时目录；空表示沿用 Netty 默认（{@code java.io.tmpdir}）
+     * @param fileSizeThreshold
+     *            part 落盘阈值（字节）；{@code <0}（{@link MultipartConfig#FILE_SIZE_THRESHOLD_UNSET}） 表示沿用框架默认（Netty
+     *            MINSIZE=16KB）
+     * @param location
+     *            上传临时目录；空表示沿用 Netty 默认（{@code java.io.tmpdir}）
      */
-    public SupportMultipartResolver(long maxContentLength, int maxPartCount, int maxPartHeaderSize,
-                                    long maxFileSize, long fileSizeThreshold, String location) {
+    public SupportMultipartResolver(long maxContentLength, int maxPartCount, int maxPartHeaderSize, long maxFileSize,
+            long fileSizeThreshold, String location) {
         this.maxContentLength = maxContentLength;
         this.maxPartCount = maxPartCount;
         this.maxPartHeaderSize = maxPartHeaderSize;
@@ -145,8 +147,7 @@ public class SupportMultipartResolver {
             consumedBytes += content.content().readableBytes();
             if (consumedBytes > maxContentLength) {
                 abort();
-                throw new TooLongFrameException(
-                        "multipart content exceeds limit " + maxContentLength);
+                throw new TooLongFrameException("multipart content exceeds limit " + maxContentLength);
             }
         }
         // B2：增量扫描每个 part 的 header 区字节数，超 server.http.multipart.max-part-header-size 抛
@@ -199,8 +200,7 @@ public class SupportMultipartResolver {
             List<InterfaceHttpData> datas = decoder.getBodyHttpDatas();
             if (datas.size() > maxPartCount) {
                 abort();
-                throw new DecoderException(
-                        "multipart part count " + datas.size() + " exceeds limit " + maxPartCount);
+                throw new DecoderException("multipart part count " + datas.size() + " exceeds limit " + maxPartCount);
             }
         }
         // spring.servlet.multipart.max-file-size：单个上传文件超限 → 413（TooLongFrameException
@@ -211,9 +211,8 @@ public class SupportMultipartResolver {
                     long size = ((io.netty.handler.codec.http.multipart.FileUpload) data).length();
                     if (size > maxFileSize) {
                         abort();
-                        throw new TooLongFrameException(
-                                "multipart file '" + data.getName() + "' size " + size
-                                        + " exceeds limit " + maxFileSize);
+                        throw new TooLongFrameException("multipart file '" + data.getName() + "' size " + size
+                                + " exceeds limit " + maxFileSize);
                     }
                 }
             }
@@ -252,9 +251,8 @@ public class SupportMultipartResolver {
     }
 
     /**
-     * 增量扫描单个 chunk 的 part header 区字节数（B2）。
-     * 跨 chunk 通过 {@link #partHeaderCarry} 保留尾部留样，以正确识别被分片拆断的边界/空行序列。
-     * 任一 part 的 header 区字节数超过 {@link #maxPartHeaderSize} 即抛 {@link DecoderException}。
+     * 增量扫描单个 chunk 的 part header 区字节数（B2）。 跨 chunk 通过 {@link #partHeaderCarry} 保留尾部留样，以正确识别被分片拆断的边界/空行序列。 任一 part 的
+     * header 区字节数超过 {@link #maxPartHeaderSize} 即抛 {@link DecoderException}。
      */
     private void scanPartHeaders(HttpContent content) {
         ByteBuf cb = content.content();
@@ -283,8 +281,7 @@ public class SupportMultipartResolver {
                     }
                     if (match) {
                         // 结束边界 --boundary--：无更多 part，停止扫描
-                        if (i + delim.length + 2 <= n
-                                && combined[i + delim.length] == '-'
+                        if (i + delim.length + 2 <= n && combined[i + delim.length] == '-'
                                 && combined[i + delim.length + 1] == '-') {
                             partHeaderScanDone = true;
                             return;
@@ -309,9 +306,8 @@ public class SupportMultipartResolver {
                 i++;
             } else {
                 // 处于 header 区：统计字节直到遇到终止空行 \r\n\r\n
-                if (i + 4 <= n
-                        && combined[i] == '\r' && combined[i + 1] == '\n'
-                        && combined[i + 2] == '\r' && combined[i + 3] == '\n') {
+                if (i + 4 <= n && combined[i] == '\r' && combined[i + 1] == '\n' && combined[i + 2] == '\r'
+                        && combined[i + 3] == '\n') {
                     inPartHeader = false;
                     partHeaderLen = 0;
                     i += 4;
@@ -319,8 +315,8 @@ public class SupportMultipartResolver {
                 }
                 partHeaderLen++;
                 if (partHeaderLen > maxPartHeaderSize) {
-                    throw new DecoderException("multipart part header size " + partHeaderLen
-                            + " exceeds limit " + maxPartHeaderSize);
+                    throw new DecoderException(
+                            "multipart part header size " + partHeaderLen + " exceeds limit " + maxPartHeaderSize);
                 }
                 i++;
             }

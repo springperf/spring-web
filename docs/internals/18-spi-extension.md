@@ -8,7 +8,7 @@
 
 `extensions.md` 讲了用户视角的 12 个扩展点怎么用。本篇回答内部视角的问题：**这些 SPI 在框架里到底怎么被找到、怎么排顺序、缓存成什么、请求时从哪里调？**
 
-写作前提是"核对各 SPI 的发现注解与排序机制"。核对后有一个必须先纠正的误解：**框架里没有 `@WebComponent` 注解**。`WebComponent` 是一个 `extends Ordered` 的接口（`WebComponent.java`），SPI 的发现全部走 Spring 原生的 Bean 类型扫描（`getBeansOfType` / `autoRegisterWebComponent` / `getWebComponentWithDefault`），排序全部走 `Ordered.getOrder()` / `@Order` 经 `AnnotationAwareOrderComparator.sort` 统一处理。这带来了一个好处：扩展方只要把实现类注册成 Spring Bean，框架自动发现，零额外注解。
+先说一个容易产生的误解：**框架里没有 `@WebComponent` 注解**。`WebComponent` 是一个 `extends Ordered` 的接口（`WebComponent.java`），SPI 的发现全部走 Spring 原生的 Bean 类型扫描（`getBeansOfType` / `autoRegisterWebComponent` / `getWebComponentWithDefault`），排序全部走 `Ordered.getOrder()` / `@Order` 经 `AnnotationAwareOrderComparator.sort` 统一处理。这带来了一个好处：扩展方只要把实现类注册成 Spring Bean，框架自动发现，零额外注解。
 
 更关键的是，发现不止一种模式——经核对共 **四种**，对应四类扩展需求。本篇先讲统一契约与排序基础设施，再讲四种模式，再给 12 SPI 的四元组总表，最后逐个给最小扩展示例骨架。
 
@@ -272,7 +272,7 @@ public class MyMappingRegistry extends MappingRegistry {
 | 命名资源按名取用 | C 命名 Map | BizPoolRegistry | `@Bean("name")`+`@RunInPool` |
 | 内部路由结构策略 | D 硬编码继承 | RouterOptimizer | 继承重写 `protected` |
 
-核对结论三条：① **没有 `@WebComponent` 注解**，SPI 靠 Spring Bean 类型扫描发现，排序靠 `Ordered`/`@Order` 经 `AnnotationAwareOrderComparator.sort` 统一——这是对 Spring 原生发现机制的复用，扩展方零学习成本。② 发现分四种模式，对应四类扩展需求，不是"一种注解打天下"。③ `StaticArgumentResolverProvider` 启动期只校验可达、实例化延迟到首请求，是 fail-fast 与零闲置内存的折中，而非简单的"启动预创建"。
+结论三条：① **没有 `@WebComponent` 注解**，SPI 靠 Spring Bean 类型扫描发现，排序靠 `Ordered`/`@Order` 经 `AnnotationAwareOrderComparator.sort` 统一——这是对 Spring 原生发现机制的复用，扩展方零学习成本。② 发现分四种模式，对应四类扩展需求，不是"一种注解打天下"。③ `StaticArgumentResolverProvider` 启动期只校验可达、实例化延迟到首请求，是 fail-fast 与零闲置内存的折中，而非简单的"启动预创建"。
 
 这一层的克制体现在：**不发明新的发现注解，不发明新的排序注解，直接复用 Spring 的 `Ordered`/`@Order` 与 `AnnotationAwareOrderComparator`**——扩展方写的就是普通 Spring Bean，框架在内部用 `WebComponentContainer` 把"扫描+排序+固化"收口。12 个 SPI 看似各异，发现与排序却收敛到同一套基础设施，每个的"个性"只在缓存形态（List/单字段/Map/链）与运行时调用点上。
 

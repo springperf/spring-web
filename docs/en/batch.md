@@ -129,7 +129,7 @@ public @interface BatchMapping {
 | `backpressure` | BLOCK | Backpressure strategy (see table) |
 | `method` | "" | Single-request method name to intercept; defaults to the batch method name |
 | `maxBatchSize` | 100 | Max requests per batch before flushing |
-| `consumerSize` | -1 | Max concurrent processing threads; defaults to available processors. Still the concurrency cap with virtual threads enabled (JDK 21+) — only the executing threads become virtual |
+| `consumerSize` | -1 | Max concurrent processing threads; defaults to available processors. Still the concurrency cap with virtual threads enabled (JDK 21+) — only the executing threads become virtual. Keep `waitStrategy=BLOCKING` in that mode: `BUSY_SPIN`/`YIELDING` never unmount a virtual thread, so they hold a carrier thread |
 
 ### Backpressure Strategies
 
@@ -234,7 +234,7 @@ All metrics are tagged with `queue=<batch:ClassName.methodName>`.
 | Scenario | Recommended Configuration | Notes |
 |----------|--------------------------|-------|
 | High throughput, latency-tolerant | `ringBufferSize=16384, maxBatchSize=500` | Larger buffer, larger batches |
-| Latency-sensitive | `ringBufferSize=1024, maxBatchSize=50, waitStrategy=BUSY_SPIN` | Small buffer, aggressive wait |
+| Latency-sensitive | `ringBufferSize=1024, maxBatchSize=50, waitStrategy=BUSY_SPIN` | Small buffer, aggressive wait. **With `spring.threads.virtual.enabled` use `BLOCKING` instead**: `BUSY_SPIN`/`YIELDING` never unmount a virtual thread and hold a carrier |
 | Resource-constrained (1c1g) | `ringBufferSize=4096, consumerSize=1` | Single consumer thread |
 | Batch DB queries | `maxBatchSize=200` | Most DB IN queries perform best at ~200 |
 | Batch RPC calls | `maxBatchSize=50, consumerSize=4` | Parallel RPC, smaller batches |

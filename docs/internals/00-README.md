@@ -1,4 +1,4 @@
-# Spring WebPerf 内部机制详解（大纲与索引）
+# Spring WebPerf 内部机制详解（索引）
 
 > 本系列是面向"想了解框架设计优秀与性能优越、但不打算阅读源码"的读者的内部机制文档。
 >
@@ -11,13 +11,13 @@
 
 ---
 
-## 一、写作约定
+## 一、本系列的约定
 
 1. **语言**：正文简体中文；`代码`、`类名`、`API`、`协议字段`、`注解名`保持英文。
 2. **证据粒度**：每个机制至少给出一组 `类名` 锚点，并附"做了什么 / 为什么快 / 对比谁"三元组。全系列结论均以当前 `master` 分支源码为准。
 3. **不重复既有文档**：性能对比表、用法示例、注解参数表已在 `performance-principles.md` / `advanced.md` / `batch.md` 给全的，本系列只给"机制链路"，数据用 `→ 见 xxx.md` 引用。
 4. **图示**：能用 ASCII 流程图说清的不外链 SVG；需要图时统一放 `docs/images/internals/`。
-5. **篇幅**：每篇以"讲透一个子系统"为限，不贪大；预计单篇 400–800 行。
+5. **篇幅**：每篇以"讲透一个子系统"为限，不贪大。
 
 ---
 
@@ -25,7 +25,7 @@
 
 | 篇号 | 文件 | 标题 | 所属部 |
 |------|------|------|--------|
-| 00 | `00-README.md` | 大纲与索引（本文） | 导航 |
+| 00 | `00-README.md` | 索引（本文） | 导航 |
 | 01 | `01-design-philosophy.md` | 设计哲学与六大取舍原则 | 一·哲学与架构 |
 | 02 | `02-architecture-overview.md` | 模块拓扑与启动期全景 | 一·哲学与架构 |
 | 03 | `03-component-lifecycle.md` | 三阶段组件生命周期与 Registry 体系 | 二·核心机制 |
@@ -50,7 +50,7 @@
 
 ## 三、各篇详述
 
-下面为每一篇给出：**定位 / 核心问题 / 覆盖要点 / 源码依据 / 与既有文档关系 / 写作前提**。`源码依据`列出该篇写作时必须实际 Read 的源码文件（行号在写作时核对，大纲阶段只标类名与模块）。
+下面为每一篇给出：**定位 / 核心问题 / 覆盖要点 / 源码依据 / 与既有文档关系 / 阅读前提**。`源码依据`列出该篇涉及的关键源码文件（类名与关键行号，便于对照源码阅读）；行号以当前 `master` 为准，可能随源码演进变化。
 
 ---
 
@@ -261,7 +261,7 @@
   12. **`ResponseEntityExceptionHandler`**：`@ControllerAdvice` 15 个标准异常处理。
 - **源码依据**：`spring-web-servlet` 与 `spring-web-mvc-support` 模块（`spring-web-servlet` 约 47 个源文件）。重点：`WebMvcConfigurerBridge`（10 bridge 方法行号）、`FilterWrapper`（`IdentityHashMap` 段）、`PerfHttpServletRequest`（session/cookie 段）、`ResponseBodyEmitterReturnValueResolver`（`encodeToStream` 兜底段）、`SupportDispatcherHandler`（`ChannelFuture` session 持久化段）。
 - **与既有文档关系**：既有文档无 support 内部专门篇；本篇是 support 的首份内部机制文档。
-- **阅读前提**：support 报告中的 file:line 仅供参考，以当前源码为准。
+- **阅读前提**：文中 `file:line` 用于对照源码阅读；行号随源码演进可能变化，以当前 `master` 为准。
 
 ---
 
@@ -280,7 +280,7 @@
   6. 8 Micrometer 指标的埋点位置与 tag 约定（`batch:<ClassName>.<methodName>`）。
   7. 背压传导：RingBuffer 满 → 生产者阻塞 → EventLoop 反压 → TCP 层。
   8. 超时与错误：`DeferredResult` 超时回调（默认 30s）、批量异常遍历 `setError`。
-- **源码依据**：`BatchRegistry`、`BatchInvoker`、`DisruptorQueue`、`BufferingBatchHandler`、`BatchRequest`、`@BatchMapping`、8 个 metrics 埋点类（共 16 文件，需逐个 Read）。
+- **源码依据**：`BatchRegistry`、`BatchInvoker`、`DisruptorQueue`、`BufferingBatchHandler`、`BatchRequest`、`@BatchMapping`、8 个 metrics 埋点类（共 16 个文件）。
 - **与既有文档关系**：`batch.md` 的内部化；`philosophy.md` 批处理节的代码层。
 - **阅读前提**：核对 Disruptor `WaitStrategy` 枚举与 backpressure 实现的确切类名。
 
@@ -390,7 +390,7 @@
   8. 静态 Map 唯一性是有意设计（记忆同上）；
   9. fail-fast 启动校验 vs 运行时降级；
   10. 显式 SPI vs Spring `@Conditional` 自动发现。
-- **源码依据**：对应类/注释 + 记忆中的既定决策。
+- **源码依据**：对应类与注释 + 既定设计记录。
 - **与既有文档关系**：全系列收尾，把"为什么这么设计"沉淀为可追溯记录。
 - **阅读前提**：07–13 已完成，决策有代码证据。
 

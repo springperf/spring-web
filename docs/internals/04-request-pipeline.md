@@ -99,7 +99,7 @@ DispatcherHandler.invokeWithRealResult   DispatcherHandler.java
 
 ### 2.1 它才是真正的入口，不是 RuntimeMappingWebFilter
 
-00-README 大纲把入口写成"Netty `ChannelInboundHandler` → `RuntimeMappingWebFilter` → `DispatcherHandler`"。核对源码后修正：**`RuntimeMappingWebFilter` 不是入口，它是 Filter 链内的一个运行时包装节点**（见第五节）。真正的 Netty→框架入口是 `NettyHttpHandler`：
+00-README 索引把入口写成"Netty `ChannelInboundHandler` → `RuntimeMappingWebFilter` → `DispatcherHandler`"。核对源码后修正：**`RuntimeMappingWebFilter` 不是入口，它是 Filter 链内的一个运行时包装节点**（见第五节）。真正的 Netty→框架入口是 `NettyHttpHandler`：
 
 ```java
 // NettyHttpHandler.java
@@ -320,7 +320,7 @@ public class RuntimeMappingWebFilter implements WebFilter {
 }
 ```
 
-`RuntimeMappingWebFilter` 是 `WebFilter` 链中的一个节点，用 Servlet 规范路径匹配（`ServletFilterPatternUtils.matches`）决定是否执行被包装的 delegate。它和 `DefaultFilterChain` 的关系是组合：链里每个节点都是 `WebFilter`，`RuntimeMappingWebFilter` 是其中"带路径条件"的那一类。**它不接 Netty、不接 Dispatcher，只是链内一个条件分支**——大纲把它列为入口是误读。
+`RuntimeMappingWebFilter` 是 `WebFilter` 链中的一个节点，用 Servlet 规范路径匹配（`ServletFilterPatternUtils.matches`）决定是否执行被包装的 delegate。它和 `DefaultFilterChain` 的关系是组合：链里每个节点都是 `WebFilter`，`RuntimeMappingWebFilter` 是其中"带路径条件"的那一类。**它不接 Netty、不接 Dispatcher，只是链内一个条件分支**——索引把它列为入口并不准确。
 
 ### 5.3 DefaultFilterChain：游标式链，零对象创建
 

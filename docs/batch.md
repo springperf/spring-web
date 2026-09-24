@@ -129,7 +129,7 @@ public @interface BatchMapping {
 | `backpressure` | BLOCK | 背压策略，见下方表格 |
 | `method` | "" | 被关联的单请求方法名，默认与批量处理方法同名 |
 | `maxBatchSize` | 100 | 单次批处理最大请求数，达到该值触发批量处理 |
-| `consumerSize` | -1 | 最大并发处理线程数，默认 CPU 核数。开启虚拟线程（JDK 21+）后仍是并发上限，只是执行线程变为虚拟线程 |
+| `consumerSize` | -1 | 最大并发处理线程数，默认 CPU 核数。开启虚拟线程（JDK 21+）后仍是并发上限，只是执行线程变为虚拟线程；此时建议保持 `waitStrategy=BLOCKING`——`BUSY_SPIN`/`YIELDING` 不会卸载虚拟线程，会长期占住载体线程 |
 
 ### 背压策略
 
@@ -230,7 +230,7 @@ bizExecutor 线程池（0 ~ consumerSize 个；开虚拟线程时为虚拟线程
 | 场景 | 推荐配置 | 说明 |
 |------|---------|------|
 | 高吞吐、可接受延迟 | `ringBufferSize=16384, maxBatchSize=500` | 大 buffer 降低丢包，大 batch 提升吞吐 |
-| 低延迟敏感 | `ringBufferSize=1024, maxBatchSize=50, waitStrategy=BUSY_SPIN` | 小 buffer 减少排队，BUSY_SPIN 降低延迟 |
+| 低延迟敏感 | `ringBufferSize=1024, maxBatchSize=50, waitStrategy=BUSY_SPIN` | 小 buffer 减少排队，BUSY_SPIN 降低延迟。**开启 `spring.threads.virtual.enabled` 时改用 `BLOCKING`**：`BUSY_SPIN`/`YIELDING` 在虚拟线程上不会卸载，会长期占住载体线程 |
 | 资源受限（1c1g） | `ringBufferSize=4096, consumerSize=1` | 单消费者线程，省资源 |
 | 批量 DB 查询 | `maxBatchSize=200` | 多数数据库 IN 查询 200 条以内性能最佳 |
 | 批量 RPC 调用 | `maxBatchSize=50, consumerSize=4` | 多线程并行 RPC，单批不宜过大 |

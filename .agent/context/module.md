@@ -407,8 +407,8 @@ spring-web-view
 │   ├── hasViewResolvers() — 空则 String 保持 JSON 行为（条件化开关）
 │   └── initComponentPhase3 — 校验并提示视图方法签名
 ├── RedirectView.java               redirect: 前缀 → 302 + query 序列化
-├── ModelSupport.java               请求级 Model 容器（RequestAttribute<ModelMap>）
-│   └── getOrCreate() — 懒创建 ExtendedModelMap，挂 RequestContext，请求结束释放
+├── （Model 容器已移至 spring-web core：io.springperf.web.core.model.ModelContext，
+│     原 ModelSupport 之名已废弃；懒创建 ExtendedModelMap，挂 RequestContext，请求结束释放）
 ├── ViewProperties.java             配置键（spring.web.view.*）
 ├── arg/ModelArgumentResolverProvider  Model 参数注入 + postProcess 5 步 Model 初始化
 │   └── order=HIGHEST_PRECEDENCE+100，先于 ModelAttributeResolver 兜底
@@ -437,7 +437,7 @@ spring-web-mvc-support/mvc/retval/
     └── @ConditionalOnClass(name="io.springperf.web.view.View") 条件注册
 ```
 
-> **ModelAndView 桥接归属**：`ModelAndView` 是 Spring MVC 概念（`org.springframework.web.servlet.ModelAndView`），属 mvc 桥接层。`ModelAndViewReturnValueResolver` 位于 `spring-web-mvc-support`，直接依赖 `org.springframework.web.servlet.ModelAndView`（无反射），依赖 `spring-web-view` 的 `View`/`ModelSupport`/`ViewResolverRegistry`/`RedirectView`。
+> **ModelAndView 桥接归属**：`ModelAndView` 是 Spring MVC 概念（`org.springframework.web.servlet.ModelAndView`），属 mvc 桥接层。`ModelAndViewReturnValueResolver` 位于 `spring-web-mvc-support`，直接依赖 `org.springframework.web.servlet.ModelAndView`（无反射），依赖 `spring-web-view` 的 `View`/`ViewResolverRegistry`/`RedirectView`，以及 `spring-web` core 的 `ModelContext`。
 
 **接入机制**（core SPI，无核心代码改动）：
 
@@ -453,7 +453,7 @@ spring-web-mvc-support/mvc/retval/
 ```
 doHandle()
   ├── ArgumentResolverRegistry.resolveArguments()
-  │   ├── ModelArgumentResolverProvider → ModelSupport.getOrCreate(req)   // 懒创建挂 RequestContext
+  │   ├── ModelArgumentResolverProvider → ModelContext.getOrCreate(req)   // 懒创建挂 RequestContext
   │   └── postProcess: 5 步 Model 初始化（@ControllerAdvice/局部 @ModelAttribute 方法、@ModelAttribute 参数、@PathVariable、BindingResult）
   ├── InvokableHandlerMethod.invoke()
   └── ReturnValueResolverRegistry.resolveReturnValue()

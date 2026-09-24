@@ -68,7 +68,7 @@ All configuration properties are set in `application.properties`.
 | `server.servlet.session.persistent-exclude` | none | Session attribute names excluded from persistence (comma-separated) |
 | `server.servlet.virtual-server-name` | `localhost` | ServletContext virtual server name |
 | `server.servlet.application-display-name` | none | ServletContext application display name (`getServletContextName()`) |
-| `server.servlet.context-parameters.*` | none | Explicit block of ServletContext init parameters: `server.servlet.context-parameters.foo=bar` is exposed as `getInitParameter("foo")` |
+| `server.servlet.context-parameters.*` | none | Explicit block of ServletContext init parameters: `server.servlet.context-parameters.<name>=bar` is exposed as `getInitParameter("foo")` |
 | `server.servlet.session.cookie.name` | `JSESSIONID` | Session cookie name |
 | `server.servlet.session.cookie.http-only` | `true` | Forbid script access (`HttpOnly`) |
 | `server.servlet.session.cookie.secure` | `false` | Send over HTTPS only (`Secure`) |
@@ -108,9 +108,9 @@ All configuration properties are set in `application.properties`.
 |----------|---------|-------------|
 | `spring.mvc.throw-exception-if-no-handler-found` | `true` | Raise an exception for a missing handler (routable to `@ControllerAdvice`) instead of a direct 404/405 |
 | `spring.mvc.dispatch.error` / `.options` / `.trace` | `true` | Whether ERROR / OPTIONS / TRACE requests are dispatched to handlers (CORS preflight is still handled when OPTIONS is disabled) |
-| `spring.mvc.publish-request-handled-events` | `false` | Whether to publish a `ServletRequestHandledEvent` when a request completes (aligned with Boot default; enable explicitly for monitoring/audit) |
+| `spring.mvc.publish-request-handled-events` | `false` | Whether to publish a `ServletRequestHandledEvent` when a request completes. **Deliberately off, unlike Boot whose default is `true`**: the event is of no use to most applications, so publishing it per request is pure overhead when nothing listens; turn it on explicitly for monitoring/audit |
 | `spring.mvc.message-codes-resolver-format` | `prefix_error_code` | Validation message-code format: `prefix_error_code` / `postfix_error_code` |
-| `spring.mvc.format.date` / `.time` / `.datetime` | ISO (`yyyy-MM-dd` etc.) | Default date/time formats when no `@DateTimeFormat` is present |
+| `spring.mvc.format.date` / `.time` / `.datetime` | `yyyy-MM-dd` / `HH:mm:ss` / `yyyy-MM-dd'T'HH:mm:ss` | Default date/time formats when no `@DateTimeFormat` is present (all ISO in shape, but each has its own pattern) |
 
 ## Internationalization (spring.web.locale.*)
 
@@ -118,7 +118,7 @@ All configuration properties are set in `application.properties`.
 |----------|---------|-------------|
 | `spring.web.locale` | none | Default Locale (e.g. `zh_CN`) |
 | `spring.web.locale-resolver` | `accept-header` | Locale resolution strategy: `fixed` / `accept-header` |
-| `spring.web.locale-bind` | `true` | Whether to bind `LocaleContextHolder` per request (aligning with Spring MVC). When `false` the framework never touches the Locale context: no per-request context allocation and no ThreadLocal `set/remove`, so `LocaleContextHolder.getLocaleContext()` returns `null` and `getLocale()` falls back to the JVM default. Useful for locale-agnostic API services (if you set the holder yourself afterwards, you must clear it yourself) |
+| `spring.web.locale-bind` | `true` | Whether to bind `LocaleContextHolder` per request, following Spring MVC's `initContextHolders`/`resetContextHolders` pattern (save the previous context, set, reset, honouring `threadContextInheritable`; implemented in `SupportDispatcherHandler`). When `false` the framework never touches the Locale context: no per-request context allocation and no ThreadLocal `set/remove`, so `LocaleContextHolder.getLocaleContext()` returns `null` and `getLocale()` falls back to the JVM default. Useful for locale-agnostic API services (if you set the holder yourself afterwards, you must clear it yourself) |
 
 ## Access Log (server.accesslog.*)
 
@@ -135,16 +135,20 @@ All configuration properties are set in `application.properties`.
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `server.max-connections` | see source | Max connections (overload protection) |
+| `server.max-connections` | `0` (unlimited) | Max connections (overload protection); beyond it the connection is dropped outright (no `fireChannelActive`, so no 503 can be sent) |
 | `server.max-parameter-count` | `10000` | Max total parameter count (hash DoS guard) |
 | `server.max-http-request-header-size` | `8192` | Max combined request header size |
 | `server.max-http-response-header-size` | `8192` | Max response header size (degrades to a minimal 500 when exceeded) |
 | `server.max-swallow-size` | `2MB` | Max request-body bytes swallowed after an error response (negative unlimited) |
-| `server.keep-alive-timeout` / `server.max-keep-alive-requests` | see source | Keep-alive idle timeout / max requests per connection |
+| `server.keep-alive-timeout` / `server.max-keep-alive-requests` | `0` (unlimited) / `100` | Keep-alive idle timeout / max requests per connection |
 | `server.forward-headers-strategy` | `NONE` | Forwarded-header strategy: `NONE`/`FALSE` (do not trust), `FRAMEWORK`/`NATIVE` (trust) |
 | `server.http.max-in-memory-size` | `4096` | In-memory body aggregation limit (beyond it a ByteBuf duplicate is used) |
 | `server.http.max-chunk-size` | `8192` | Max HTTP chunk size |
 | `server.http.max-initial-line-length` | `4096` | Max request initial line length |
+| `server.http.max-pipelined-requests` | `16` | Cap on queued pipelined requests per connection; reaching it **pauses reads** (`autoRead=false`) instead of closing, leaving unread bytes in the socket buffer so the TCP window applies backpressure |
+| `server.http.max-ranges` | `100` | Max Range segments per request; `0` forbids multi-range (such requests fall back to the full entity), a negative value adds no extra limit |
+| `server.http.multipart.max-part-count` | `-1` | Max multipart part count (`<=0` unlimited). **The default differs from Boot**: Boot's `server.tomcat.max-part-count` is `50`; the key means the same thing (a non-positive value disables the cap) |
+| `server.http.multipart.max-part-header-size` | `8192` | Max header bytes per multipart part (`<=0` unlimited); exceeding it makes the incremental scan throw `DecoderException` and the aggregator answer **400**. **The default differs from Boot**: Boot/Tomcat default this key to `512B`, this framework to `8192` |
 | `server.http.read-timeout` | `30000` | Read **idle** timeout (supports the `30s` form; `<=0` disables). It only bounds read inactivity: **in-flight requests are never killed** (a slow SQL call / downstream call / suspended async handler may exceed it and still deliver its response); only genuinely idle connections and stalled half-requests are reclaimed. Aligns with Tomcat `connectionTimeout` |
 
 > **Full list**: the entries above are the common ones. Every supported key is maintained and validated by

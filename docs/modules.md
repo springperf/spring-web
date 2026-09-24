@@ -303,7 +303,7 @@ destroyComponent()     → 资源释放
 | `ViewResolver` | 解析 SPI：`resolveViewName(name, locale, req)`，按 `getOrder()` 排序 |
 | `ViewResolverRegistry` | `ViewResolver` 注册中心，空则 String 保持 JSON |
 | `RedirectView` | `redirect:` 前缀 → 302 + query 参数序列化 |
-| `ModelSupport` | 请求级 Model 容器（`ExtendedModelMap`）挂 `RequestContext` |
+| `ModelContext`（`spring-web` core 持有） | 请求级 Model 容器（`ExtendedModelMap`），挂 `RequestContext`；视图层经 `getOrCreate(req)` 复用 |
 | `ModelArgumentResolverProvider` | `Model` / `ModelMap` / `ExtendedModelMap` 参数注入 + `postProcess` 5 步 Model 初始化（`@ControllerAdvice`/局部 `@ModelAttribute` 方法、`@ModelAttribute` 参数、`@PathVariable`、`BindingResult`） |
 | `ViewReturnValueResolver` | 无 `@ResponseBody` 的 String → 视图名（order=MAX-200，先于 JsonBody） |
 | `ThymeleafViewResolver` | Thymeleaf 引擎适配（核心 API，零 servlet） |

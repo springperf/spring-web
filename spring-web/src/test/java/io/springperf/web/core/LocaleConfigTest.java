@@ -1,13 +1,5 @@
 package io.springperf.web.core;
 
-import io.springperf.web.context.ApplicationProperties;
-import io.springperf.web.context.PropertiesConstant;
-import io.springperf.web.http.WebServerHttpRequest;
-import org.junit.jupiter.api.Test;
-import org.springframework.context.i18n.LocaleContext;
-
-import java.util.Locale;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -19,6 +11,15 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Locale;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.context.i18n.LocaleContext;
+
+import io.springperf.web.context.ApplicationProperties;
+import io.springperf.web.context.PropertiesConstant;
+import io.springperf.web.http.WebServerHttpRequest;
+
 /**
  * {@link LocaleConfig} 单元测试：{@code spring.web.locale} / {@code spring.web.locale-resolver} 解析与请求 Locale 绑定。
  */
@@ -28,20 +29,49 @@ class LocaleConfigTest {
         ApplicationProperties props = mock(ApplicationProperties.class);
         lenient().when(props.get(PropertiesConstant.WEB_LOCALE, null)).thenReturn(locale);
         // 模拟真实 get(key, default) 语义：未显式给 resolver 时返回默认值 accept-header
-        lenient().when(props.get(PropertiesConstant.WEB_LOCALE_RESOLVER,
-                        PropertiesConstant.WEB_LOCALE_RESOLVER_DEFAULT))
+        lenient()
+                .when(props.get(PropertiesConstant.WEB_LOCALE_RESOLVER, PropertiesConstant.WEB_LOCALE_RESOLVER_DEFAULT))
                 .thenReturn(resolver != null ? resolver : PropertiesConstant.WEB_LOCALE_RESOLVER_DEFAULT);
-        lenient().when(props.getBoolean(PropertiesConstant.WEB_LOCALE_BIND,
-                        PropertiesConstant.WEB_LOCALE_BIND_DEFAULT))
+        lenient().when(props.getBoolean(PropertiesConstant.WEB_LOCALE_BIND, PropertiesConstant.WEB_LOCALE_BIND_DEFAULT))
                 .thenReturn(PropertiesConstant.WEB_LOCALE_BIND_DEFAULT);
         return props;
     }
 
     private static ApplicationProperties propsBindDisabled() {
         ApplicationProperties props = props(null, null);
-        when(props.getBoolean(PropertiesConstant.WEB_LOCALE_BIND,
-                PropertiesConstant.WEB_LOCALE_BIND_DEFAULT)).thenReturn(false);
+        when(props.getBoolean(PropertiesConstant.WEB_LOCALE_BIND, PropertiesConstant.WEB_LOCALE_BIND_DEFAULT))
+                .thenReturn(false);
         return props;
+    }
+
+    /**
+     * JVM 默认 Locale 快照必须整体一致：{@code setDefault()} 之后取到的上下文,其 locale 必须等于当时的默认 Locale。
+     * <p>
+     * 回归用例：早前 locale 与 context 分处两个 {@code volatile}，并发 {@code setDefault()} 下可能读到「新 locale + 旧 context」的自洽组合，从
+     * 而返回上一个默认 Locale 的上下文。现在两者装进同一不可变快照、单引用发布。
+     * </p>
+     */
+    @Test
+    void defaultLocaleContextStaysConsistentWithLocaleSetDefault() {
+        Locale original = Locale.getDefault();
+        try {
+            // fixed 策略 + 未配置 locale → 走 defaultLocaleContext() 快照路径
+            LocaleConfig fixedWithoutLocale = new LocaleConfig(null, "fixed", true);
+
+            Locale first = Locale.forLanguageTag("en-GB");
+            Locale.setDefault(first);
+            assertEquals(first, fixedWithoutLocale.resolveLocaleContext(null).getLocale());
+
+            Locale second = Locale.forLanguageTag("fr-CA");
+            Locale.setDefault(second);
+            assertEquals(second, fixedWithoutLocale.resolveLocaleContext(null).getLocale());
+
+            // 换回第一个：快照必须重新发布，而不是沿用上一次的 context
+            Locale.setDefault(first);
+            assertEquals(first, fixedWithoutLocale.resolveLocaleContext(null).getLocale());
+        } finally {
+            Locale.setDefault(original);
+        }
     }
 
     private static WebServerHttpRequest request(Locale locale) {
@@ -145,7 +175,7 @@ class LocaleConfigTest {
         verify(req, times(1)).getLocale();
 
         assertEquals(Locale.GERMANY, ctx.getLocale());
-        verify(req, times(1)).getLocale();  // 结果缓存，不重复解析
+        verify(req, times(1)).getLocale(); // 结果缓存，不重复解析
     }
 
     @Test

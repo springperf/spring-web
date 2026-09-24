@@ -68,7 +68,7 @@
 | `server.servlet.session.persistent-exclude` | 无 | 不落盘的 session 属性名（逗号分隔） |
 | `server.servlet.virtual-server-name` | `localhost` | ServletContext 虚拟服务器名 |
 | `server.servlet.application-display-name` | 无 | ServletContext 应用显示名（`getServletContextName()`） |
-| `server.servlet.context-parameters.*` | 无 | ServletContext 初始化参数显式块：`server.servlet.context-parameters.foo=bar` 暴露为 `getInitParameter("foo")` |
+| `server.servlet.context-parameters.*` | 无 | ServletContext 初始化参数显式块：`server.servlet.context-parameters.<name>=bar` 暴露为 `getInitParameter("foo")` |
 | `server.servlet.session.cookie.name` | `JSESSIONID` | 会话 Cookie 名 |
 | `server.servlet.session.cookie.http-only` | `true` | 禁止脚本读取（`HttpOnly`） |
 | `server.servlet.session.cookie.secure` | `false` | 仅通过 HTTPS 下发（`Secure`） |
@@ -108,9 +108,9 @@
 |--------|--------|------|
 | `spring.mvc.throw-exception-if-no-handler-found` | `true` | 无匹配处理器时抛异常（可被 `@ControllerAdvice` 拦截）而非直接 404/405 |
 | `spring.mvc.dispatch.error` / `.options` / `.trace` | `true` | 是否将 ERROR / OPTIONS / TRACE 请求分发给处理器（关闭 OPTIONS 时 CORS 预检仍放行） |
-| `spring.mvc.publish-request-handled-events` | `false` | 请求完成时是否发布 `ServletRequestHandledEvent`（对齐 Boot 默认；需监控/审计时显式开启） |
+| `spring.mvc.publish-request-handled-events` | `false` | 请求完成时是否发布 `ServletRequestHandledEvent`。**本项目有意关闭**（Boot 默认相反为 `true`）：该事件对多数应用无实际用途，默认关闭可省掉每请求一次的事件发布；需监控/审计时显式开启 |
 | `spring.mvc.message-codes-resolver-format` | `prefix_error_code` | 校验消息码格式：`prefix_error_code` / `postfix_error_code` |
-| `spring.mvc.format.date` / `.time` / `.datetime` | ISO（`yyyy-MM-dd` 等） | 无 `@DateTimeFormat` 时的默认日期/时间格式 |
+| `spring.mvc.format.date` / `.time` / `.datetime` | `yyyy-MM-dd` / `HH:mm:ss` / `yyyy-MM-dd'T'HH:mm:ss` | 无 `@DateTimeFormat` 时的默认日期/时间格式（均为 ISO 形态，但各自的模式串不同） |
 
 ## 国际化（spring.web.locale.*）
 
@@ -118,7 +118,7 @@
 |--------|--------|------|
 | `spring.web.locale` | 无 | 默认 Locale（如 `zh_CN`） |
 | `spring.web.locale-resolver` | `accept-header` | Locale 解析策略：`fixed`（恒用 `spring.web.locale`）/ `accept-header`（按请求头） |
-| `spring.web.locale-bind` | `true` | 是否每请求绑定 `LocaleContextHolder`（对齐 Spring MVC）。设为 `false` 时框架完全不触碰 Locale 上下文：省掉每请求的上下文对象分配与 ThreadLocal `set/remove`，此时 `LocaleContextHolder.getLocaleContext()` 返回 `null`、`getLocale()` 按 Spring 语义回退 JVM 默认；不关注 Locale 的 API 服务可关闭（关闭后应用若自行设置该 holder，需自行清理） |
+| `spring.web.locale-bind` | `true` | 是否每请求绑定 `LocaleContextHolder`（与 Spring MVC 的 `initContextHolders`/`resetContextHolders` 同范式：保存旧上下文 → 设置 → 复位，含 `threadContextInheritable`；实现见 `SupportDispatcherHandler`）。设为 `false` 时框架完全不触碰 Locale 上下文：省掉每请求的上下文对象分配与 ThreadLocal `set/remove`，此时 `LocaleContextHolder.getLocaleContext()` 返回 `null`、`getLocale()` 按 Spring 语义回退 JVM 默认；不关注 Locale 的 API 服务可关闭（关闭后应用若自行设置该 holder，需自行清理） |
 
 ## 访问日志（server.accesslog.*）
 
@@ -135,16 +135,20 @@
 
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
-| `server.max-connections` | 见源码 | 最大连接数（过载保护） |
+| `server.max-connections` | `0`（不限） | 最大连接数（过载保护）；超限时直接断连（不 `fireChannelActive`，无法返回 503） |
 | `server.max-parameter-count` | `10000` | 参数总数上限（防 hash DoS） |
 | `server.max-http-request-header-size` | `8192` | 合并请求头大小上限 |
 | `server.max-http-response-header-size` | `8192` | 响应头总大小上限（超限降级最小 500） |
 | `server.max-swallow-size` | `2MB` | 错误响应后吞掉请求体上限（负数不限） |
-| `server.keep-alive-timeout` / `server.max-keep-alive-requests` | 见源码 | keep-alive 空闲超时 / 单连接请求数上限 |
+| `server.keep-alive-timeout` / `server.max-keep-alive-requests` | `0`（不限） / `100` | keep-alive 空闲超时 / 单连接请求数上限 |
 | `server.forward-headers-strategy` | `NONE` | 转发头信任策略：`NONE`/`FALSE` 不信任，`FRAMEWORK`/`NATIVE` 信任 |
 | `server.http.max-in-memory-size` | `4096` | 请求体内存聚合上限（超出转 ByteBuf） |
 | `server.http.max-chunk-size` | `8192` | 单 chunk 大小上限 |
 | `server.http.max-initial-line-length` | `4096` | 请求起始行长度上限 |
+| `server.http.max-pipelined-requests` | `16` | 同连接 pipelined 请求的排队上限；达上限**暂停读取**（`autoRead=false`）而非断连，未读字节留在 socket 缓冲，由 TCP 窗口对客户端形成背压 |
+| `server.http.max-ranges` | `100` | 单个请求允许的 Range 段数上限；`0` 表示禁止多段（多段请求回退整实体），负值表示本层不额外限制 |
+| `server.http.multipart.max-part-count` | `-1` | multipart part 总数上限（`<=0` 不限）。**默认值与 Boot 不同**：Boot `server.tomcat.max-part-count` 为 `50`；键语义相同（非正数即关闭该上限） |
+| `server.http.multipart.max-part-header-size` | `8192` | 单个 multipart part 的 header 字节上限（`<=0` 不限），超限由增量扫描抛 `DecoderException` → **400**。**默认值与 Boot 不同**：Boot/Tomcat 的同名键默认 `512B`，本项目为 `8192` |
 | `server.http.read-timeout` | `30000` | 读**空闲**超时（支持 `30s` 写法；`<=0` 关闭）。只约束读空闲：**正在处理的请求不会被掐断**（慢 SQL / 下游调用 / 异步挂起的处理器耗时可超过该值，响应仍会送达）；仅回收真正空闲的连接与半截请求，语义对齐 Tomcat `connectionTimeout` |
 
 > **完整清单**：以上为常用项。全部已支持键由 `SupportedPropertiesTest` 维护并校验——新增配置键若未登记到

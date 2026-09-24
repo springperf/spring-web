@@ -1,28 +1,26 @@
 package io.springperf.web.core;
 
-import io.springperf.web.context.ApplicationProperties;
-import io.springperf.web.context.PropertiesConstant;
-import io.springperf.web.http.WebServerHttpRequest;
+import java.util.Locale;
+
 import org.springframework.context.i18n.LocaleContext;
 import org.springframework.context.i18n.SimpleLocaleContext;
 
-import java.util.Locale;
+import io.springperf.web.context.ApplicationProperties;
+import io.springperf.web.context.PropertiesConstant;
+import io.springperf.web.http.WebServerHttpRequest;
 
 /**
- * Locale 解析配置（对齐 {@code spring.web.locale} / {@code spring.web.locale-resolver}）。
- * 启动期预解析一次。
- *
+ * Locale 解析配置（对齐 {@code spring.web.locale} / {@code spring.web.locale-resolver}）。 启动期预解析一次。
  * <ul>
- *   <li>{@code locale}：默认 Locale（如 {@code zh_CN}），可空。</li>
- *   <li>{@code locale-resolver}：{@code fixed}（恒用配置的 locale）/ {@code accept-header}
- *       （按请求 Accept-Language，默认），对齐 Boot 的固定 / 请求头两种策略。</li>
- *   <li>{@code locale-bind}：是否每请求绑定 {@code LocaleContextHolder}（默认 true）。
- *       关闭时不产生任何每请求 locale 开销。</li>
+ * <li>{@code locale}：默认 Locale（如 {@code zh_CN}），可空。</li>
+ * <li>{@code locale-resolver}：{@code fixed}（恒用配置的 locale）/ {@code accept-header} （按请求 Accept-Language，默认），对齐 Boot 的固定 /
+ * 请求头两种策略。</li>
+ * <li>{@code locale-bind}：是否每请求绑定 {@code LocaleContextHolder}（默认 true）。 关闭时不产生任何每请求 locale 开销。</li>
  * </ul>
- *
- * <p><b>每请求成本</b>：解析结果按策略分层缓存——fixed 命中预建单例（零分配）；
- * accept-header 返回懒上下文（首次 {@code getLocale()} 才解析请求头并缓存结果），
- * 多数请求不读 Locale 即零解析成本。</p>
+ * <p>
+ * <b>每请求成本</b>：解析结果按策略分层缓存——fixed 命中预建单例（零分配）； accept-header 返回懒上下文（首次 {@code getLocale()} 才解析请求头并缓存结果）， 多数请求不读 Locale
+ * 即零解析成本。
+ * </p>
  */
 public class LocaleConfig {
 
@@ -96,13 +94,12 @@ public class LocaleConfig {
     }
 
     /**
-     * 解析当前请求的 {@link LocaleContext}：fixed 策略返回配置的固定 Locale
-     * （未配置则 JVM 默认）；否则返回请求首选 Locale（Accept-Language）。
-     * 供 DispatcherHandler 绑定到 {@code LocaleContextHolder}。
-     *
-     * <p>fixed + 配置了 locale → 预建单例（零分配）；fixed 无配置 → JVM 默认上下文
-     * （随 {@code Locale.setDefault()} 变化重建）；accept-header → 懒上下文
-     * （首次 {@code getLocale()} 才读请求头，结果缓存）。</p>
+     * 解析当前请求的 {@link LocaleContext}：fixed 策略返回配置的固定 Locale （未配置则 JVM 默认）；否则返回请求首选 Locale（Accept-Language）。 供
+     * DispatcherHandler 绑定到 {@code LocaleContextHolder}。
+     * <p>
+     * fixed + 配置了 locale → 预建单例（零分配）；fixed 无配置 → JVM 默认上下文 （随 {@code Locale.setDefault()} 变化重建）；accept-header → 懒上下文
+     * （首次 {@code getLocale()} 才读请求头，结果缓存）。
+     * </p>
      */
     public LocaleContext resolveLocaleContext(WebServerHttpRequest request) {
         if (fixed) {
@@ -119,26 +116,42 @@ public class LocaleConfig {
 
     // ---- JVM 默认 Locale 常量上下文（随 setDefault 变化重建，稳态零分配） ----
 
-    private static volatile Locale cachedDefaultLocale;
-    private static volatile LocaleContext cachedDefaultContext;
+    /**
+     * 「JVM 默认 Locale + 其上下文」的不可变快照。
+     * <p>
+     * 早前实现用两个独立 {@code volatile}（locale 与 context 各一个）， 写入序为 locale 再 context，读取则「取 context + 比 locale」——并发
+     * {@code Locale.setDefault()} 时可能读到 <b>locale=新 + context=旧</b> 这种自洽组合，从而返回上一个默认 Locale 的上下文。 把两者装进同一对象、只用<b>一个</b>
+     * {@code volatile} 引用发布，读写就不再可能撕裂（要么整份旧、要么整份新）。
+     * </p>
+     */
+    private static final class DefaultLocaleSnapshot {
+
+        private final Locale locale;
+        private final LocaleContext context;
+
+        DefaultLocaleSnapshot(Locale locale, LocaleContext context) {
+            this.locale = locale;
+            this.context = context;
+        }
+    }
+
+    private static volatile DefaultLocaleSnapshot cachedDefaultSnapshot;
 
     static LocaleContext defaultLocaleContext() {
         Locale current = Locale.getDefault();
-        LocaleContext ctx = cachedDefaultContext;
-        if (ctx == null || cachedDefaultLocale != current) {
-            ctx = new SimpleLocaleContext(current);
-            cachedDefaultLocale = current;
-            cachedDefaultContext = ctx;
+        DefaultLocaleSnapshot snapshot = cachedDefaultSnapshot;
+        if (snapshot == null || snapshot.locale != current) {
+            snapshot = new DefaultLocaleSnapshot(current, new SimpleLocaleContext(current));
+            cachedDefaultSnapshot = snapshot;
         }
-        return ctx;
+        return snapshot.context;
     }
 
     /**
-     * 懒解析的请求 Locale 上下文：{@link #getLocale()} 首次调用才解析
-     * （读 Accept-Language + 缓存查找），随后缓存结果。
-     *
-     * <p>多数请求（API/静态资源/健康检查）从不读取 Locale——据此把解析从
-     * 「每请求必做」降为「实际读取才做」。</p>
+     * 懒解析的请求 Locale 上下文：{@link #getLocale()} 首次调用才解析 （读 Accept-Language + 缓存查找），随后缓存结果。
+     * <p>
+     * 多数请求（API/静态资源/健康检查）从不读取 Locale——据此把解析从 「每请求必做」降为「实际读取才做」。
+     * </p>
      */
     static final class LazyRequestLocaleContext implements LocaleContext {
 

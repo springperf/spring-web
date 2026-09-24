@@ -8,7 +8,7 @@
 
 前 18 篇讲了框架"是什么"（架构）、"怎么做到的"（代码）、"快多少"（数据）。本篇是"决策篇"——用 ADR（Architecture Decision Record）风格，把 10 条关键取舍的**背景 / 决策 / 后果**沉淀下来。
 
-写作前提有两条：① 07–13 篇已完成，每条决策都有可追溯到 `file:line` 的代码证据；② 决策依据来自对应类的源码与注释，辅以既定设计记录。本篇不重复论证"怎么做"的细节——那是 [15 篇](15-performance-optimizations.md)（性能优化三元组）、[16 篇](16-code-spotlights.md)（代码聚光灯）、[18 篇](18-spi-extension.md)（SPI 机制）的职责。本篇只回答**"面临什么取舍、选了什么、代价是什么、何时该重新审视"**。
+本篇每条决策都可追溯到 `file:line` 的代码证据，依据来自对应类的源码与注释，辅以既定设计记录。本篇不重复论证"怎么做"的细节——那是 [15 篇](15-performance-optimizations.md)（性能优化三元组）、[16 篇](16-code-spotlights.md)（代码聚光灯）、[18 篇](18-spi-extension.md)（SPI 机制）的职责。本篇只回答**"面临什么取舍、选了什么、代价是什么、何时该重新审视"**。
 
 ### 阅读约定
 
@@ -19,7 +19,7 @@
 - **后果**：收益、代价、边界条件三条。边界条件是最重要的部分——它标明"这条决策在什么前提下成立、何时该推翻"。
 - **关联**：指向论证细节的前文章节，避免重复。
 
-ADR 编号 1–10，与 [00-README](00-README.md) 大纲及 [18 篇](18-spi-extension.md) 已引用的 ADR 2 / 9 / 10 一致。
+ADR 编号 1–10，与 [00-README](00-README.md) 及 [18 篇](18-spi-extension.md) 已引用的 ADR 2 / 9 / 10 一致。
 
 ---
 
@@ -155,7 +155,7 @@ SSE 场景则用自研 `MpscArrayQueue`（ADR 6）——两者场景不同：bat
 
 SSE/流式输出需生产者（EventLoop 或业务线程）→ 消费者（EventLoop writer）的通信队列。可选：① 无界队列（`LinkedBlockingQueue`）——永不阻塞生产者，但慢消费者下数据无限堆积导致 OOM；② 有界 `MpscArrayQueue` ——队列满则背压，但生产者需等待。
 
-> **纠偏**：[00-README](00-README.md) 大纲原标题曾写作 `MpscUnboundedArrayQueue`，源码核对后实为**有界** `MpscArrayQueue`（`AbstractNettyStreamSender.java` import、 字段、 构造）。本条以源码为准。
+> **纠偏**：[00-README](00-README.md) 原标题曾写作 `MpscUnboundedArrayQueue`，源码核对后实为**有界** `MpscArrayQueue`（`AbstractNettyStreamSender.java` import、 字段、 构造）。本条以源码为准。
 
 ### 决策
 
