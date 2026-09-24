@@ -1,5 +1,13 @@
 package io.springperf.web.core.interceptor;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.aop.support.AopUtils;
+import org.springframework.core.annotation.AnnotationAwareOrderUtils;
+import org.springframework.util.StringUtils;
+import org.springframework.web.method.ControllerAdviceBean;
+
 import io.springperf.web.context.WebComponentContainer;
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.http.RequestAttribute;
@@ -7,25 +15,18 @@ import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.util.support.ContainmentResult;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.aop.support.AopUtils;
-import org.springframework.core.annotation.AnnotationAwareOrderUtils;
-import org.springframework.util.StringUtils;
-import org.springframework.web.method.ControllerAdviceBean;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
- * Manages the registration and lifecycle of HandlerInterceptors, supporting path-pattern-based
- * matching and runtime resolution. 亦支持"方法级/类级"匹配：实现 {@link HandlerInterceptor} 并标注
- * {@link org.springframework.web.bind.annotation.ControllerAdvice} 的拦截器，会被包装
- * {@link ControllerAdviceBean}，按 handler 的 controller 类型（而非 path）匹配。
+ * Manages the registration and lifecycle of HandlerInterceptors, supporting path-pattern-based matching and runtime
+ * resolution. 亦支持"方法级/类级"匹配：实现 {@link HandlerInterceptor} 并标注
+ * {@link org.springframework.web.bind.annotation.ControllerAdvice} 的拦截器，会被包装 {@link ControllerAdviceBean}，按 handler 的
+ * controller 类型（而非 path）匹配。
  */
 @Slf4j
 public class InterceptorRegistry extends WebComponentContainer {
 
-    public static final RequestAttribute<List<HandlerInterceptor>> INTERCEPTORS_ATTRIBUTE =
-            (RequestAttribute) RequestAttribute.createAttribute(List.class);
+    public static final RequestAttribute<List<HandlerInterceptor>> INTERCEPTORS_ATTRIBUTE = (RequestAttribute) RequestAttribute
+            .createAttribute(List.class);
     private final List<InterceptorRegistration> registrations = new ArrayList<>();
 
     private final List<HandlerInterceptor> runtimeMappingInterceptors = new ArrayList<>();
@@ -42,10 +43,8 @@ public class InterceptorRegistry extends WebComponentContainer {
         runtimeMappingInterceptors.clear();
         // runtimeMappingInterceptors 仅在 mappingContext 为 null（404/405 无 handler）时兜底，
         // 方法级拦截器（@ControllerAdvice 类级匹配）依赖 handler 的 controller 类型，此处一律跳过。
-        registrations.stream()
-                .filter(registration -> !registration.isControllerAdviceScoped())
-                .map(this::getRuntimeMappingInterceptor)
-                .forEach(runtimeMappingInterceptors::add);
+        registrations.stream().filter(registration -> !registration.isControllerAdviceScoped())
+                .map(this::getRuntimeMappingInterceptor).forEach(runtimeMappingInterceptors::add);
     }
 
     protected InterceptorRegistration registerInterceptor(HandlerInterceptor interceptor) {
@@ -72,7 +71,9 @@ public class InterceptorRegistry extends WebComponentContainer {
         }
         Class<?> target = AopUtils.getTargetClass(interceptor);
         for (ControllerAdviceBean adviceBean : ControllerAdviceBean.findAnnotatedBeans(webContext.getCtx())) {
-            if (adviceBean.getBeanType() != null && adviceBean.getBeanType().equals(target)) {
+            // 取一次判一次：避免"判 null 后又调一次 getter"（重复计算，且会被判为可能 NPE）
+            Class<?> beanType = adviceBean.getBeanType();
+            if (beanType != null && beanType.equals(target)) {
                 return adviceBean;
             }
         }
@@ -106,11 +107,10 @@ public class InterceptorRegistry extends WebComponentContainer {
     }
 
     /**
-     * 仅对已通过 preHandle 的拦截器逆序调用 afterCompletion（preHandle 提前返回 false 时用）。
-     * 正常请求完成路径仍走 {@link #afterCompletion} 全量回调。
+     * 仅对已通过 preHandle 的拦截器逆序调用 afterCompletion（preHandle 提前返回 false 时用）。 正常请求完成路径仍走 {@link #afterCompletion} 全量回调。
      */
     private void afterCompletionForPassed(WebServerHttpRequest request, WebServerHttpResponse response,
-                                          Throwable exception, List<HandlerInterceptor> interceptors, int passed) {
+            Throwable exception, List<HandlerInterceptor> interceptors, int passed) {
         PathMappingContext mappingContext = PathMappingContext.get(request);
         try {
             for (int i = passed - 1; i >= 0; i--) {
@@ -171,7 +171,6 @@ public class InterceptorRegistry extends WebComponentContainer {
         }
     }
 
-
     protected List<HandlerInterceptor> getInterceptors(WebServerHttpRequest request) {
         List<HandlerInterceptor> interceptors = request.getRequestContext().getAttribute(INTERCEPTORS_ATTRIBUTE);
         if (interceptors == null) {
@@ -185,6 +184,7 @@ public class InterceptorRegistry extends WebComponentContainer {
      * 获取当前请求对应的拦截器
      *
      * @param request
+     *
      * @return
      */
     protected List<HandlerInterceptor> realGetInterceptors(WebServerHttpRequest request) {
@@ -206,11 +206,11 @@ public class InterceptorRegistry extends WebComponentContainer {
     }
 
     /**
-     * 获取mappingContext对应的拦截器（放入方法级缓存）。
-     * 类级匹配（@ControllerAdvice）的 registration 按 handler 的 controller 类型判定；
-     * 其余按 path 规则判定。
+     * 获取mappingContext对应的拦截器（放入方法级缓存）。 类级匹配（@ControllerAdvice）的 registration 按 handler 的 controller 类型判定； 其余按 path
+     * 规则判定。
      *
      * @param mappingContext
+     *
      * @return
      */
     protected List<HandlerInterceptor> initCachedInterceptors(PathMappingContext mappingContext) {
@@ -242,7 +242,8 @@ public class InterceptorRegistry extends WebComponentContainer {
         if (registration.getPathMatcher() == null) {
             return new RuntimeMappingInterceptor(include, exclude, registration.getInterceptor());
         } else {
-            return new RuntimeMappingInterceptor(include, exclude, registration.getInterceptor(), registration.getPathMatcher());
+            return new RuntimeMappingInterceptor(include, exclude, registration.getInterceptor(),
+                    registration.getPathMatcher());
         }
     }
 
@@ -251,9 +252,11 @@ public class InterceptorRegistry extends WebComponentContainer {
      *
      * @param request
      * @param interceptors
+     *
      * @return
      */
-    protected List<HandlerInterceptor> getRuntimeInterceptors(WebServerHttpRequest request, List<HandlerInterceptor> interceptors) {
+    protected List<HandlerInterceptor> getRuntimeInterceptors(WebServerHttpRequest request,
+            List<HandlerInterceptor> interceptors) {
         if (interceptors.isEmpty()) {
             return interceptors;
         }

@@ -13,13 +13,13 @@ import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.SessionAttribute;
 
 /**
- * 解析 {@link SessionAttribute}（单数）注解参数：从当前请求的 session 中按名读取
- * 单个属性注入方法参数（只读，不触发 session 创建）。
- * <p>语义对齐 Spring MVC {@code SessionAttributeMethodArgumentResolver}：
+ * 解析 {@link SessionAttribute}（单数）注解参数：从当前请求的 session 中按名读取 单个属性注入方法参数（只读，不触发 session 创建）。
+ * <p>
+ * 语义对齐 Spring MVC {@code SessionAttributeMethodArgumentResolver}：
  * <ul>
- *   <li>属性名取注解 {@code name}/{@code value}，为空则用参数名；</li>
- *   <li>{@code required=true}（默认）且 session 中不存在时抛 {@link ServletRequestBindingException}；</li>
- *   <li>{@code required=false} 且不存在（或无 session）时返回 {@code null}。</li>
+ * <li>属性名取注解 {@code name}/{@code value}，为空则用参数名；</li>
+ * <li>{@code required=true}（默认）且 session 中不存在时抛 {@link ServletRequestBindingException}；</li>
+ * <li>{@code required=false} 且不存在（或无 session）时返回 {@code null}。</li>
  * </ul>
  */
 public class SessionAttributeArgumentResolverProvider implements StaticArgumentResolverProvider {
@@ -31,8 +31,12 @@ public class SessionAttributeArgumentResolverProvider implements StaticArgumentR
 
     @Override
     public StaticArgumentResolver getResolver(MethodParameter parameter, MappingHandlerMethod mappingContext,
-                                              WebContext webContext) {
+            WebContext webContext) {
+        // getParameterAnnotation 声明为 @Nullable（supports 已保证存在，这里仍显式兜底）
         SessionAttribute annotation = parameter.getParameterAnnotation(SessionAttribute.class);
+        if (annotation == null) {
+            return null;
+        }
         String name = StringUtils.hasText(annotation.name()) ? annotation.name() : parameter.getParameterName();
         final boolean required = annotation.required();
         final String attributeName = name;

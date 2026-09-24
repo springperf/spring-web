@@ -1,5 +1,13 @@
 package io.springperf.web.core.async.stream;
 
+import java.io.IOException;
+import java.util.Collection;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.LockSupport;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
@@ -12,22 +20,14 @@ import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.internal.shaded.org.jctools.queues.MpscArrayQueue;
 import io.springperf.web.core.async.PerfAsyncWebRequest;
 import io.springperf.web.http.NettyServerHttpResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.util.Collection;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.LockSupport;
 
 /**
  * Netty 流式发送器的抽象基类。
  * <p>
- * 提供公共的构造器、校验、完成、调度、drain 后置处理等逻辑。
- * 子类只需实现 {@link #send(Object)} 和 {@link #drain()} 两个方法。
+ * 提供公共的构造器、校验、完成、调度、drain 后置处理等逻辑。 子类只需实现 {@link #send(Object)} 和 {@link #drain()} 两个方法。
  *
- * @see DefaultNettyStreamSender  EventLoop 延迟编码（默认）
- * @see EarlyEncodeNettyStreamSender  App 线程早编码
+ * @see DefaultNettyStreamSender EventLoop 延迟编码（默认）
+ * @see EarlyEncodeNettyStreamSender App 线程早编码
  */
 public abstract class AbstractNettyStreamSender implements StreamSender {
 
@@ -62,7 +62,11 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
 
     public AbstractNettyStreamSender(StreamEmitter emitter, PerfAsyncWebRequest asyncWebRequest) {
         this.emitter = emitter;
+        // getNativeResponse 声明为 @Nullable：拿不到响应就建不出发送器，明确失败好过 NPE
         this.resp = (NettyServerHttpResponse) asyncWebRequest.getNativeResponse();
+        if (this.resp == null) {
+            throw new IllegalStateException("No native response available for stream sender");
+        }
         ChannelHandlerContext ctx = this.resp.getCtx();
         this.channel = ctx.channel();
         this.eventLoop = ctx.executor();
@@ -104,10 +108,8 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
     /**
      * 批量入队并仅调度一次 drain。
      * <p>
-     * 与逐条 {@link #send(Object)} 的区别：每条 send 的 scheduleDrain 在
-     * EventLoop 线程上会同步 drain 并立即 flush 当前队列（只有刚入队的一条），
-     * 破坏 {@code drain()} 里 batchBuf + maxFlushBytes 的批量编码设计；
-     * 批量入队后 drain 一次即可编码整个批次。
+     * 与逐条 {@link #send(Object)} 的区别：每条 send 的 scheduleDrain 在 EventLoop 线程上会同步 drain 并立即 flush 当前队列（只有刚入队的一条）， 破坏
+     * {@code drain()} 里 batchBuf + maxFlushBytes 的批量编码设计； 批量入队后 drain 一次即可编码整个批次。
      */
     @Override
     public void sendAll(Collection<?> data) throws IOException {
@@ -124,11 +126,10 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
     /**
      * 入队并等待空位（背压自旋）。
      * <p>
-     * 队列满时短暂自旋等待 drain 消费腾出空间；自旋中重复 {@link #preSendCheck()}
-     * 以在 channel 关闭或流完成时立即失败，避免无限自旋。
+     * 队列满时短暂自旋等待 drain 消费腾出空间；自旋中重复 {@link #preSendCheck()} 以在 channel 关闭或流完成时立即失败，避免无限自旋。
      */
     private void enqueueWithBackpressure(Object data) throws IOException {
-        for (int spins = 0; ; spins++) {
+        for (int spins = 0;; spins++) {
             if (queue.offer(data)) {
                 return;
             }
@@ -142,10 +143,9 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
     }
 
     /**
-     * 批量写出一个 HttpContent 帧并挂写完成监听器（isComplete=false）：
-     * 写成功 → writeStreamSuccessCallback → asyncWebRequest 的写回调（背压补充订阅请求）；
-     * 写失败 → writeStreamErrorCallback → 终止流。修复前 drain 直写 channel 不挂监听器，
-     * 遵守背压的冷 Publisher 在 highWaterMark 条后永不再被补充请求，流静默停滞。
+     * 批量写出一个 HttpContent 帧并挂写完成监听器（isComplete=false）： 写成功 → writeStreamSuccessCallback → asyncWebRequest
+     * 的写回调（背压补充订阅请求）； 写失败 → writeStreamErrorCallback → 终止流。修复前 drain 直写 channel 不挂监听器， 遵守背压的冷 Publisher 在 highWaterMark
+     * 条后永不再被补充请求，流静默停滞。
      */
     protected void flushContent(ByteBuf buf) {
         ChannelFuture f = channel.writeAndFlush(new DefaultHttpContent(buf));
@@ -175,8 +175,8 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
     /**
      * drain 末尾的 re-drain 检查。子类 drain 方法末尾调用。
      * <ul>
-     *   <li>队列非空 → 尝试重新调度 drain</li>
-     *   <li>已 completed 且未写 LastHttpContent → 直接写入关闭连接</li>
+     * <li>队列非空 → 尝试重新调度 drain</li>
+     * <li>已 completed 且未写 LastHttpContent → 直接写入关闭连接</li>
      * </ul>
      */
     protected void afterDrain() {
@@ -235,8 +235,7 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
     }
 
     /**
-     * 流以错误终止：丢弃剩余写入、取消超时并关闭连接。
-     * 已排空的队列数据照常发送，但终止标志是连接异常关闭而非正常流结束。
+     * 流以错误终止：丢弃剩余写入、取消超时并关闭连接。 已排空的队列数据照常发送，但终止标志是连接异常关闭而非正常流结束。
      */
     protected void onAllDataFailed(Throwable failure) {
         this.resp.markStreamCompleted();

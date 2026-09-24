@@ -43,50 +43,45 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Scans all {@link WebMvcConfigurer} beans from the Spring context and bridges
- * their configuration to the framework's native registries.
- *
- * <p>Supported methods in Phase 1:
+ * Scans all {@link WebMvcConfigurer} beans from the Spring context and bridges their configuration to the framework's
+ * native registries.
+ * <p>
+ * Supported methods in Phase 1:
  * <ul>
- *   <li>{@link WebMvcConfigurer#addInterceptors(InterceptorRegistry)}</li>
- *   <li>{@link WebMvcConfigurer#addCorsMappings(CorsRegistry)}</li>
- *   <li>{@link WebMvcConfigurer#addResourceHandlers(ResourceHandlerRegistry)}</li>
- *   <li>{@link WebMvcConfigurer#addFormatters(FormatterRegistry)}</li>
- *   <li>{@link WebMvcConfigurer#configureAsyncSupport(AsyncSupportConfigurer)}</li>
- *   <li>{@link WebMvcConfigurer#addArgumentResolvers(List)}</li>
- *   <li>{@link WebMvcConfigurer#extendMessageConverters(List)}</li>
- *   <li>{@link WebMvcConfigurer#addReturnValueHandlers(List)}</li>
- *   <li>{@link WebMvcConfigurer#extendHandlerExceptionResolvers(List)}</li>
- *   <li>{@link WebMvcConfigurer#configureValidator(ValidatorRegistration)}</li>
+ * <li>{@code WebMvcConfigurer#addInterceptors(InterceptorRegistry)}</li>
+ * <li>{@code WebMvcConfigurer#addCorsMappings(CorsRegistry)}</li>
+ * <li>{@code WebMvcConfigurer#addResourceHandlers(ResourceHandlerRegistry)}</li>
+ * <li>{@code WebMvcConfigurer#addFormatters(FormatterRegistry)}</li>
+ * <li>{@code WebMvcConfigurer#configureAsyncSupport(AsyncSupportConfigurer)}</li>
+ * <li>{@code WebMvcConfigurer#addArgumentResolvers(List)}</li>
+ * <li>{@code WebMvcConfigurer#extendMessageConverters(List)}</li>
+ * <li>{@code WebMvcConfigurer#addReturnValueHandlers(List)}</li>
+ * <li>{@code WebMvcConfigurer#extendHandlerExceptionResolvers(List)}</li>
+ * <li>{@code WebMvcConfigurer#configureValidator(ValidatorRegistration)}</li>
  * </ul>
- *
- * <p>This component runs during {@link #initComponentPhase1()} to ensure
- * configuration is applied before the framework's registries complete their
- * own Phase 1 initialization.
+ * <p>
+ * This component runs during {@link #initComponentPhase1()} to ensure configuration is applied before the framework's
+ * registries complete their own Phase 1 initialization.
  */
 @Slf4j
 public class WebMvcConfigurerBridge extends BaseWebComponent {
 
     /**
-     * 未显式设置 order 的桥接拦截器的默认排序步长：按添加顺序分配
-     * {@code 0, STEP, 2*STEP...}，使框架侧基于 order 的稳定排序保持用户定义顺序。
-     * 取较大值以在常见显式 order（小整数）与默认序列之间留出间隔。
+     * 未显式设置 order 的桥接拦截器的默认排序步长：按添加顺序分配 {@code 0, STEP, 2*STEP...}，使框架侧基于 order 的稳定排序保持用户定义顺序。 取较大值以在常见显式
+     * order（小整数）与默认序列之间留出间隔。
      */
     static final int DEFAULT_INTERCEPTOR_ORDER_STEP = 100;
 
     /**
-     * 框架<b>未桥接</b>的 {@link WebMvcConfigurer} 回调（方法名 → 中文说明）。
-     * 用户若覆写这些回调，配置不会生效——启动期检测到覆写即 WARN，避免「配了却静默无效」。
+     * 框架<b>未桥接</b>的 {@link WebMvcConfigurer} 回调（方法名 → 中文说明）。 用户若覆写这些回调，配置不会生效——启动期检测到覆写即 WARN，避免「配了却静默无效」。
      */
-    static final Map<String, String> UNSUPPORTED_CALLBACKS = Map.of(
-            "configurePathMatch", "路径匹配配置（PathMatchConfigurer：尾斜杠匹配、URL 解码等）",
-            "configureContentNegotiation", "内容协商配置（URL 参数/后缀驱动；框架有意不做）",
-            "configureDefaultServletHandling", "默认 Servlet 处理配置",
-            "configureHandlerExceptionResolvers", "替换全部异常解析器（请改用 extendHandlerExceptionResolvers）",
-            "configureMessageCodesResolver", "替换消息码解析器（请改用 spring.mvc.message-codes-resolver-format 配置）",
-            "configureMessageConverters", "替换全部消息转换器（请改用 extendMessageConverters）",
-            "configureViewResolvers", "视图解析器注册（请使用 spring-web-view 的 spring.{engine}.* 配置）"
-    );
+    static final Map<String, String> UNSUPPORTED_CALLBACKS = Map.of("configurePathMatch",
+            "路径匹配配置（PathMatchConfigurer：尾斜杠匹配、URL 解码等）", "configureContentNegotiation", "内容协商配置（URL 参数/后缀驱动；框架有意不做）",
+            "configureDefaultServletHandling", "默认 Servlet 处理配置", "configureHandlerExceptionResolvers",
+            "替换全部异常解析器（请改用 extendHandlerExceptionResolvers）", "configureMessageCodesResolver",
+            "替换消息码解析器（请改用 spring.mvc.message-codes-resolver-format 配置）", "configureMessageConverters",
+            "替换全部消息转换器（请改用 extendMessageConverters）", "configureViewResolvers",
+            "视图解析器注册（请使用 spring-web-view 的 spring.{engine}.* 配置）");
 
     @Override
     public int getOrder() {
@@ -105,12 +100,9 @@ public class WebMvcConfigurerBridge extends BaseWebComponent {
         warnUnsupportedOverrides(configurers);
 
         // Create shim collectors
-        org.springframework.web.servlet.config.annotation.InterceptorRegistry shimInterceptorRegistry =
-                new org.springframework.web.servlet.config.annotation.InterceptorRegistry();
-        org.springframework.web.servlet.config.annotation.CorsRegistry shimCorsRegistry =
-                new org.springframework.web.servlet.config.annotation.CorsRegistry();
-        org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry shimResourceRegistry =
-                new org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry();
+        org.springframework.web.servlet.config.annotation.InterceptorRegistry shimInterceptorRegistry = new org.springframework.web.servlet.config.annotation.InterceptorRegistry();
+        org.springframework.web.servlet.config.annotation.CorsRegistry shimCorsRegistry = new org.springframework.web.servlet.config.annotation.CorsRegistry();
+        org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry shimResourceRegistry = new org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry();
 
         // Collect configuration from all WebMvcConfigurer beans
         for (WebMvcConfigurer configurer : configurers.values()) {
@@ -156,38 +148,36 @@ public class WebMvcConfigurerBridge extends BaseWebComponent {
     /**
      * 桥接 {@code addViewControllers}：把 shim 注册项转换为框架原生路由。
      * <ul>
-     *   <li>{@code addViewController(p).setViewName(v)} → 渲染视图 v</li>
-     *   <li>{@code addRedirectViewController(p, url)} → 302 重定向</li>
-     *   <li>{@code addStatusController(p, status)} → 仅状态码</li>
+     * <li>{@code addViewController(p).setViewName(v)} → 渲染视图 v</li>
+     * <li>{@code addRedirectViewController(p, url)} → 302 重定向</li>
+     * <li>{@code addStatusController(p, status)} → 仅状态码</li>
      * </ul>
      * 桥接发生在 phase1（先于 MappingRegistry 的 phase3 路由优化），直接注册即可。
      */
     protected void bridgeViewControllers(Map<String, WebMvcConfigurer> configurers) {
-        MappingRegistry mappingRegistry = webContext.getWebComponentWithDefault(
-                MappingRegistry.class, new MappingRegistry());
+        MappingRegistry mappingRegistry = webContext.getWebComponentWithDefault(MappingRegistry.class,
+                new MappingRegistry());
 
-        org.springframework.web.servlet.config.annotation.ViewControllerRegistry shimRegistry =
-                new org.springframework.web.servlet.config.annotation.ViewControllerRegistry();
+        org.springframework.web.servlet.config.annotation.ViewControllerRegistry shimRegistry = new org.springframework.web.servlet.config.annotation.ViewControllerRegistry();
         for (WebMvcConfigurer configurer : configurers.values()) {
             configurer.addViewControllers(shimRegistry);
         }
 
-        for (org.springframework.web.servlet.config.annotation.ViewControllerRegistration reg
-                : shimRegistry.getRegistrations()) {
-            ViewControllerInvoker invoker = new ViewControllerInvoker(
-                    webContext, reg.getViewName(), reg.getStatusCode());
+        for (org.springframework.web.servlet.config.annotation.ViewControllerRegistration reg : shimRegistry
+                .getRegistrations()) {
+            ViewControllerInvoker invoker = new ViewControllerInvoker(webContext, reg.getViewName(),
+                    reg.getStatusCode());
             mappingRegistry.registerMapping(new PathMappingContext(invoker, reg.getUrlPath()));
-            log.debug("Bridged view controller: path={}, viewName={}, status={}",
-                    reg.getUrlPath(), reg.getViewName(), reg.getStatusCode());
+            log.debug("Bridged view controller: path={}, viewName={}, status={}", reg.getUrlPath(), reg.getViewName(),
+                    reg.getStatusCode());
         }
     }
 
     /**
-     * 启动期检测：用户 {@link WebMvcConfigurer} 是否覆写了框架<b>未桥接</b>的回调。
-     * 覆写即该配置不会生效——逐个 WARN，并给出替代方案，避免「配了却静默无效」。
-     *
-     * <p>判定方式：反射取该方法在用户类上的声明类；若声明类仍是 {@code WebMvcConfigurer}
-     * 接口（即未覆写默认空实现），则视为未使用，不告警。</p>
+     * 启动期检测：用户 {@link WebMvcConfigurer} 是否覆写了框架<b>未桥接</b>的回调。 覆写即该配置不会生效——逐个 WARN，并给出替代方案，避免「配了却静默无效」。
+     * <p>
+     * 判定方式：反射取该方法在用户类上的声明类；若声明类仍是 {@code WebMvcConfigurer} 接口（即未覆写默认空实现），则视为未使用，不告警。
+     * </p>
      */
     protected void warnUnsupportedOverrides(Map<String, WebMvcConfigurer> configurers) {
         for (Map.Entry<String, WebMvcConfigurer> entry : configurers.entrySet()) {
@@ -195,7 +185,8 @@ public class WebMvcConfigurerBridge extends BaseWebComponent {
             Class<?> userClass = org.springframework.aop.support.AopUtils.getTargetClass(configurer);
             for (Map.Entry<String, String> unsupported : UNSUPPORTED_CALLBACKS.entrySet()) {
                 if (isOverridden(userClass, unsupported.getKey())) {
-                    log.warn("WebMvcConfigurer bean '{}' overrides '{}' ({}), which is NOT bridged by this "
+                    log.warn(
+                            "WebMvcConfigurer bean '{}' overrides '{}' ({}), which is NOT bridged by this "
                                     + "framework — the configuration will have NO effect. See the config-alignment "
                                     + "doc for alternatives.",
                             entry.getKey(), unsupported.getKey(), unsupported.getValue());
@@ -221,8 +212,8 @@ public class WebMvcConfigurerBridge extends BaseWebComponent {
     protected void bridgeInterceptors(
             org.springframework.web.servlet.config.annotation.InterceptorRegistry shimRegistry) {
 
-        List<org.springframework.web.servlet.config.annotation.InterceptorRegistration> shimRegistrations =
-                shimRegistry.getRegistrations();
+        List<org.springframework.web.servlet.config.annotation.InterceptorRegistration> shimRegistrations = shimRegistry
+                .getRegistrations();
         if (shimRegistrations == null || shimRegistrations.isEmpty()) {
             return;
         }
@@ -238,8 +229,8 @@ public class WebMvcConfigurerBridge extends BaseWebComponent {
         int defaultSeq = 0;
         for (org.springframework.web.servlet.config.annotation.InterceptorRegistration shimReg : shimRegistrations) {
             HandlerInterceptorWrapper wrapper = new HandlerInterceptorWrapper(shimReg.getInterceptor());
-            io.springperf.web.core.interceptor.InterceptorRegistration frameworkReg =
-                    new io.springperf.web.core.interceptor.InterceptorRegistration(wrapper);
+            io.springperf.web.core.interceptor.InterceptorRegistration frameworkReg = new io.springperf.web.core.interceptor.InterceptorRegistration(
+                    wrapper);
             for (String includePattern : shimReg.getIncludePatterns()) {
                 frameworkReg.addPathPatterns(includePattern);
             }
@@ -256,16 +247,15 @@ public class WebMvcConfigurerBridge extends BaseWebComponent {
             }
             frameworkRegistry.registerWebComponent(frameworkReg);
             log.debug("Bridged interceptor: {} with patterns={}, exclude={}, order={}",
-                    shimReg.getInterceptor().getClass().getSimpleName(),
-                    shimReg.getIncludePatterns(), shimReg.getExcludePatterns(), frameworkReg.getOrder());
+                    shimReg.getInterceptor().getClass().getSimpleName(), shimReg.getIncludePatterns(),
+                    shimReg.getExcludePatterns(), frameworkReg.getOrder());
         }
     }
 
-    protected void bridgeCorsMappings(
-            org.springframework.web.servlet.config.annotation.CorsRegistry shimRegistry) {
+    protected void bridgeCorsMappings(org.springframework.web.servlet.config.annotation.CorsRegistry shimRegistry) {
 
-        java.util.List<org.springframework.web.servlet.config.annotation.CorsRegistration> shimRegistrations =
-                shimRegistry.getRegistrations();
+        java.util.List<org.springframework.web.servlet.config.annotation.CorsRegistration> shimRegistrations = shimRegistry
+                .getRegistrations();
         if (shimRegistrations.isEmpty()) {
             return;
         }
@@ -277,50 +267,59 @@ public class WebMvcConfigurerBridge extends BaseWebComponent {
         }
 
         for (org.springframework.web.servlet.config.annotation.CorsRegistration shimReg : shimRegistrations) {
-            io.springperf.web.core.cors.CorsRegistration frameworkReg =
-                    frameworkRegistry.addMapping(shimReg.getPathPattern());
+            io.springperf.web.core.cors.CorsRegistration frameworkReg = frameworkRegistry
+                    .addMapping(shimReg.getPathPattern());
             org.springframework.web.cors.CorsConfiguration config = shimReg.getCorsConfiguration();
-            if (config.getAllowedOrigins() != null) {
-                frameworkReg.allowedOrigins(config.getAllowedOrigins().toArray(new String[0]));
+            // 每个 getter 只取一次并判其返回值：原先"判 null 后又调一次"的成对写法既重复计算，
+            // 又让静态分析无法关联两次调用，产生 NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE 误报
+            // （本方法的 6 条即来源于此）。语义不变。
+            java.util.List<String> allowedOrigins = config.getAllowedOrigins();
+            if (allowedOrigins != null) {
+                frameworkReg.allowedOrigins(allowedOrigins.toArray(new String[0]));
             }
-            if (config.getAllowedMethods() != null) {
-                frameworkReg.allowedMethods(config.getAllowedMethods().toArray(new String[0]));
+            java.util.List<String> allowedMethods = config.getAllowedMethods();
+            if (allowedMethods != null) {
+                frameworkReg.allowedMethods(allowedMethods.toArray(new String[0]));
             }
-            if (config.getAllowedHeaders() != null) {
-                frameworkReg.allowedHeaders(config.getAllowedHeaders().toArray(new String[0]));
+            java.util.List<String> allowedHeaders = config.getAllowedHeaders();
+            if (allowedHeaders != null) {
+                frameworkReg.allowedHeaders(allowedHeaders.toArray(new String[0]));
             }
-            if (config.getExposedHeaders() != null) {
-                frameworkReg.exposedHeaders(config.getExposedHeaders().toArray(new String[0]));
+            java.util.List<String> exposedHeaders = config.getExposedHeaders();
+            if (exposedHeaders != null) {
+                frameworkReg.exposedHeaders(exposedHeaders.toArray(new String[0]));
             }
-            if (config.getAllowCredentials() != null) {
-                frameworkReg.allowCredentials(config.getAllowCredentials());
+            Boolean allowCredentials = config.getAllowCredentials();
+            if (allowCredentials != null) {
+                frameworkReg.allowCredentials(allowCredentials);
             }
-            if (config.getMaxAge() != null) {
-                frameworkReg.maxAge(config.getMaxAge());
+            Long maxAge = config.getMaxAge();
+            if (maxAge != null) {
+                frameworkReg.maxAge(maxAge);
             }
-            log.debug("Bridged CORS mapping: {} -> origins={}", shimReg.getPathPattern(), config.getAllowedOrigins());
+            log.debug("Bridged CORS mapping: {} -> origins={}", shimReg.getPathPattern(), allowedOrigins);
         }
     }
 
     protected void bridgeResourceHandlers(
             org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry shimRegistry) {
 
-        List<org.springframework.web.servlet.config.annotation.ResourceHandlerRegistration> shimRegistrations =
-                shimRegistry.getRegistrations();
+        List<org.springframework.web.servlet.config.annotation.ResourceHandlerRegistration> shimRegistrations = shimRegistry
+                .getRegistrations();
         if (shimRegistrations == null || shimRegistrations.isEmpty()) {
             return;
         }
 
-        io.springperf.web.core.resource.ResourceHandlerRegistry resourceHandlerRegistry =
-                webContext.getWebComponent(io.springperf.web.core.resource.ResourceHandlerRegistry.class);
+        io.springperf.web.core.resource.ResourceHandlerRegistry resourceHandlerRegistry = webContext
+                .getWebComponent(io.springperf.web.core.resource.ResourceHandlerRegistry.class);
         if (resourceHandlerRegistry == null) {
             log.warn("ResourceHandlerRegistry not available, skipping resource handler bridging");
             return;
         }
 
         for (org.springframework.web.servlet.config.annotation.ResourceHandlerRegistration shimReg : shimRegistrations) {
-            io.springperf.web.core.resource.ResourceHandlerRegistration frameworkReg =
-                    new io.springperf.web.core.resource.ResourceHandlerRegistration(shimReg.getPathPatterns());
+            io.springperf.web.core.resource.ResourceHandlerRegistration frameworkReg = new io.springperf.web.core.resource.ResourceHandlerRegistration(
+                    shimReg.getPathPatterns());
             for (String location : shimReg.getLocationValues()) {
                 frameworkReg.addResourceLocations(location);
             }
@@ -331,20 +330,22 @@ public class WebMvcConfigurerBridge extends BaseWebComponent {
                 frameworkReg.setCacheControl(shimReg.getCacheControl());
             }
             resourceHandlerRegistry.registerWebComponent(frameworkReg);
-            log.debug("Bridged resource handler: patterns={}, locations={}", shimReg.getPathPatterns(), shimReg.getLocationValues());
+            log.debug("Bridged resource handler: patterns={}, locations={}", shimReg.getPathPatterns(),
+                    shimReg.getLocationValues());
         }
     }
 
     protected void bridgeFormatters(Map<String, WebMvcConfigurer> configurers) {
-        org.springframework.core.convert.ConversionService cs =
-                webContext.getBeanFromCtx(org.springframework.core.convert.ConversionService.class);
+        org.springframework.core.convert.ConversionService cs = webContext
+                .getBeanFromCtx(org.springframework.core.convert.ConversionService.class);
         if (cs instanceof FormatterRegistry) {
             FormatterRegistry formatterRegistry = (FormatterRegistry) cs;
             for (WebMvcConfigurer configurer : configurers.values()) {
                 configurer.addFormatters(formatterRegistry);
             }
             if (log.isDebugEnabled()) {
-                log.debug("Bridged formatters from {} WebMvcConfigurer bean(s) to Spring ConversionService", configurers.size());
+                log.debug("Bridged formatters from {} WebMvcConfigurer bean(s) to Spring ConversionService",
+                        configurers.size());
             }
         }
     }
@@ -379,7 +380,8 @@ public class WebMvcConfigurerBridge extends BaseWebComponent {
             log.debug("Bridged {} CallableProcessingInterceptor(s)", callableInterceptors.size());
         }
 
-        List<DeferredResultProcessingInterceptor> deferredResultInterceptors = shimConfigurer.getDeferredResultInterceptors();
+        List<DeferredResultProcessingInterceptor> deferredResultInterceptors = shimConfigurer
+                .getDeferredResultInterceptors();
         if (!deferredResultInterceptors.isEmpty()) {
             asyncRegistry.addDeferredResultInterceptors(deferredResultInterceptors);
             log.debug("Bridged {} DeferredResultProcessingInterceptor(s)", deferredResultInterceptors.size());
@@ -456,7 +458,8 @@ public class WebMvcConfigurerBridge extends BaseWebComponent {
         }
 
         for (HandlerMethodReturnValueHandler handler : handlers) {
-            SpringHandlerMethodReturnValueHandlerAdapter adapter = new SpringHandlerMethodReturnValueHandlerAdapter(handler);
+            SpringHandlerMethodReturnValueHandlerAdapter adapter = new SpringHandlerMethodReturnValueHandlerAdapter(
+                    handler);
             if (AnnotationAwareOrderUtils.findOrder(handler) == null) {
                 adapter.setOrder(Ordered.LOWEST_PRECEDENCE - 20000);
             }
@@ -486,7 +489,8 @@ public class WebMvcConfigurerBridge extends BaseWebComponent {
                 adapter.setOrder(Ordered.LOWEST_PRECEDENCE - 20000);
             }
             exceptionRegistry.addResolver(adapter);
-            log.debug("Bridged exception resolver: {} with order {}", resolver.getClass().getName(), adapter.getOrder());
+            log.debug("Bridged exception resolver: {} with order {}", resolver.getClass().getName(),
+                    adapter.getOrder());
         }
     }
 

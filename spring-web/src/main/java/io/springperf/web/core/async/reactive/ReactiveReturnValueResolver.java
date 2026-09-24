@@ -1,5 +1,18 @@
 package io.springperf.web.core.async.reactive;
 
+import java.lang.reflect.Constructor;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import org.springframework.core.MethodParameter;
+import org.springframework.core.ReactiveAdapter;
+import org.springframework.core.ReactiveAdapterRegistry;
+import org.springframework.core.ResolvableType;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.web.context.request.async.DeferredResult;
+
 import io.springperf.web.annotation.ReactiveSupport;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.async.AsyncSupportRegistry;
@@ -15,22 +28,11 @@ import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.json.JsonConverter;
 import io.springperf.web.util.MediaTypeUtils;
 import lombok.SneakyThrows;
-import org.springframework.core.MethodParameter;
-import org.springframework.core.ReactiveAdapter;
-import org.springframework.core.ReactiveAdapterRegistry;
-import org.springframework.core.ResolvableType;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.codec.ServerSentEvent;
-import org.springframework.web.context.request.async.DeferredResult;
-
-import java.lang.reflect.Constructor;
-import java.util.*;
-import java.util.stream.Collectors;
 
 public class ReactiveReturnValueResolver extends BaseAsyncReturnValueResolver {
 
-    protected static final MappingCacheKey<ReactiveConfig> MAPPING_CACHE_KEY = MappingCacheKey.createClassCacheKey(ReactiveConfig.class);
+    protected static final MappingCacheKey<ReactiveConfig> MAPPING_CACHE_KEY = MappingCacheKey
+            .createClassCacheKey(ReactiveConfig.class);
     private static final Set<Class<?>> SUPPORTED_TYPES = new HashSet<>(Arrays.asList(Long.class, JsonConverter.class));
     private AsyncSupportRegistry asyncSupportRegistry;
     private StreamSenderFactory streamSenderFactory;
@@ -39,8 +41,10 @@ public class ReactiveReturnValueResolver extends BaseAsyncReturnValueResolver {
     @Override
     public void initWithWebContext(WebContext webContext) {
         super.initWithWebContext(webContext);
-        asyncSupportRegistry = webContext.getWebComponentWithDefault(AsyncSupportRegistry.class, new AsyncSupportRegistry());
-        streamSenderFactory = webContext.getWebComponentWithDefault(StreamSenderFactory.class, new DefaultStreamSenderFactory());
+        asyncSupportRegistry = webContext.getWebComponentWithDefault(AsyncSupportRegistry.class,
+                new AsyncSupportRegistry());
+        streamSenderFactory = webContext.getWebComponentWithDefault(StreamSenderFactory.class,
+                new DefaultStreamSenderFactory());
         adapterRegistry = webContext.getBeanFromCtx(ReactiveAdapterRegistry.class);
         if (adapterRegistry == null) {
             adapterRegistry = ReactiveAdapterRegistry.getSharedInstance();
@@ -52,9 +56,14 @@ public class ReactiveReturnValueResolver extends BaseAsyncReturnValueResolver {
         if (adapterRegistry == null) {
             return false;
         }
-        Class<?> reactiveType = ResponseEntity.class.isAssignableFrom(returnType.getParameterType()) ?
-                ResolvableType.forMethodParameter(returnType).getGeneric().resolve() :
-                returnType.getParameterType();
+        Class<?> reactiveType = ResponseEntity.class.isAssignableFrom(returnType.getParameterType())
+                ? ResolvableType.forMethodParameter(returnType).getGeneric().resolve()
+                : returnType.getParameterType();
+        // ResolvableType.resolve() 声明为 @Nullable（泛型不可解析时）：无法确定类型即视为不支持，
+        // 避免把 null 交给 getAdapter（原实现会在此 NPE）
+        if (reactiveType == null) {
+            return false;
+        }
         return adapterRegistry.getAdapter(reactiveType) != null;
     }
 
@@ -73,7 +82,8 @@ public class ReactiveReturnValueResolver extends BaseAsyncReturnValueResolver {
     }
 
     @Override
-    public void resolveReturnValue(Object returnValue, MethodParameter returnType, WebServerHttpRequest req, WebServerHttpResponse resp) throws Exception {
+    public void resolveReturnValue(Object returnValue, MethodParameter returnType, WebServerHttpRequest req,
+            WebServerHttpResponse resp) throws Exception {
         if (returnValue instanceof ResponseEntity) {
             ResponseEntity<?> responseEntity = (ResponseEntity<?>) returnValue;
             resp.setStatusCode(responseEntity.getStatusCode());
@@ -83,38 +93,54 @@ public class ReactiveReturnValueResolver extends BaseAsyncReturnValueResolver {
             returnValue = responseEntity.getBody();
             returnType = returnType.nested();
         }
+        // ResponseEntity.getBody() 合法可为 null（204 / 无响应体）：无 body 就没有可订阅的发布者，直接返回
+        if (returnValue == null) {
+            return;
+        }
         ReactiveAdapter adapter = this.adapterRegistry.getAdapter(returnValue.getClass());
+        // ReactiveAdapterRegistry.getAdapter() 声明为 @Nullable：无适配器则无法订阅，
+        // 避免把 null 继续传给 createStreamEmitter
+        if (adapter == null) {
+            return;
+        }
         ResolvableType elementType = ResolvableType.forMethodParameter(returnType).getGeneric();
         Class<?> elementClass = elementType.toClass();
         ReactiveConfig reactiveConfig = getReactiveConfig(req);
         StreamEmitter emitter = createStreamEmitter(reactiveConfig, adapter, elementClass, req, resp);
         if (emitter != null) {
             StreamEmitterUtil.extendResponseAndFlush(emitter, resp, true);
-            StreamSender sender = StreamEmitterUtil.initStreamSenderAndStartAsync(emitter, streamSenderFactory, asyncSupportRegistry, req, resp);
+            StreamSender sender = StreamEmitterUtil.initStreamSenderAndStartAsync(emitter, streamSenderFactory,
+                    asyncSupportRegistry, req, resp);
             PerfAsyncWebRequest asyncWebRequest = AsyncSupportUtils.getAsyncWebRequest(req, resp);
-            PublisherToStreamEmitterAdapter streamEmitterAdapter = new PublisherToStreamEmitterAdapter(emitter, sender, reactiveConfig, asyncWebRequest);
+            PublisherToStreamEmitterAdapter streamEmitterAdapter = new PublisherToStreamEmitterAdapter(emitter, sender,
+                    reactiveConfig, asyncWebRequest);
             streamEmitterAdapter.subscribe(adapter, returnValue);
             // 写回调同步已移至 onSubscribe 内（订阅建立后立即注册给 asyncWebRequest），
             // 修复前在 subscribe() 返回后事后读取 emitter.getWriteCallbackHandler()，
             // 对 onSubscribe 异步投递的 Publisher 拿到 null 回调 → 流停滞。
             StreamEmitterUtil.initializeWithStreamSender(emitter, sender);
         } else {
-            DeferredResult deferredResult = reactiveConfig.getTimeout() < 0 ? new DeferredResult() : new DeferredResult(reactiveConfig.getTimeout());
-            PublisherToDeferredResultAdapter deferredResultAdapter = new PublisherToDeferredResultAdapter(deferredResult, adapter);
+            DeferredResult deferredResult = reactiveConfig.getTimeout() < 0 ? new DeferredResult()
+                    : new DeferredResult(reactiveConfig.getTimeout());
+            PublisherToDeferredResultAdapter deferredResultAdapter = new PublisherToDeferredResultAdapter(
+                    deferredResult, adapter);
             deferredResultAdapter.subscribe(adapter, returnValue);
             asyncSupportRegistry.startDeferredResultProcessing(req, resp, deferredResult);
         }
     }
 
     @SneakyThrows
-    protected StreamEmitter createStreamEmitter(ReactiveConfig reactiveConfig, ReactiveAdapter adapter, Class<?> elementClass, WebServerHttpRequest request, WebServerHttpResponse response) {
+    protected StreamEmitter createStreamEmitter(ReactiveConfig reactiveConfig, ReactiveAdapter adapter,
+            Class<?> elementClass, WebServerHttpRequest request, WebServerHttpResponse response) {
         if (adapter.isMultiValue()) {
             if (reactiveConfig.getStreamEmitterType() != null && reactiveConfig.getStreamEmitterConstructor() != null) {
-                Constructor<? extends StreamEmitter> streamEmitterConstructor = reactiveConfig.getStreamEmitterConstructor();
+                Constructor<? extends StreamEmitter> streamEmitterConstructor = reactiveConfig
+                        .getStreamEmitterConstructor();
                 Object[] args = getConstructorArgs(streamEmitterConstructor, reactiveConfig, request);
                 return streamEmitterConstructor.newInstance(args);
             }
-            if (ServerSentEvent.class.isAssignableFrom(elementClass) || containMediaType(MediaType.TEXT_EVENT_STREAM, request, response)) {
+            if (ServerSentEvent.class.isAssignableFrom(elementClass)
+                    || containMediaType(MediaType.TEXT_EVENT_STREAM, request, response)) {
                 return new SseJsonEmitter(reactiveConfig.getTimeout(), asyncSupportRegistry.getJsonConverter());
             }
             if (CharSequence.class.isAssignableFrom(elementClass)) {
@@ -127,7 +153,8 @@ public class ReactiveReturnValueResolver extends BaseAsyncReturnValueResolver {
         return null;
     }
 
-    protected Object[] getConstructorArgs(Constructor streamEmitterConstructor, ReactiveConfig reactiveConfig, WebServerHttpRequest request) {
+    protected Object[] getConstructorArgs(Constructor streamEmitterConstructor, ReactiveConfig reactiveConfig,
+            WebServerHttpRequest request) {
         Object[] args = new Object[streamEmitterConstructor.getParameterCount()];
         for (int index = 0; index < streamEmitterConstructor.getParameterCount(); index++) {
             Class<?> argType = streamEmitterConstructor.getParameterTypes()[index];
@@ -146,7 +173,8 @@ public class ReactiveReturnValueResolver extends BaseAsyncReturnValueResolver {
         }
     }
 
-    protected boolean containMediaType(MediaType mediaType, WebServerHttpRequest request, WebServerHttpResponse response) {
+    protected boolean containMediaType(MediaType mediaType, WebServerHttpRequest request,
+            WebServerHttpResponse response) {
         MediaType contentType = response.getHeaders().getContentType();
         // application/json 不包含在 text/event-stream 中 → 不命中，继续走 produces/accept 判断）。
         if (contentType != null && mediaType.includes(contentType)) {
@@ -190,7 +218,9 @@ public class ReactiveReturnValueResolver extends BaseAsyncReturnValueResolver {
                 ReactiveSupport reactiveSupport = handlerMethod.getMethodAndClassAnnotation(ReactiveSupport.class);
                 if (reactiveSupport != null) {
                     // 修复：此前误用仍为 null 的 reactiveConfig 取 streamEmitterType，首次请求必 NPE
-                    reactiveConfig = new ReactiveConfig(reactiveSupport.streamEmitterType(), selectBestConstructor(reactiveSupport.streamEmitterType()), reactiveSupport.highWaterMark(), reactiveSupport.lowWaterMark(), reactiveSupport.timeout());
+                    reactiveConfig = new ReactiveConfig(reactiveSupport.streamEmitterType(),
+                            selectBestConstructor(reactiveSupport.streamEmitterType()), reactiveSupport.highWaterMark(),
+                            reactiveSupport.lowWaterMark(), reactiveSupport.timeout());
                 } else {
                     reactiveConfig = ReactiveConfig.DEFAULT;
                 }
@@ -213,7 +243,8 @@ public class ReactiveReturnValueResolver extends BaseAsyncReturnValueResolver {
         if (streamEmitterType == null) {
             return null;
         }
-        List<Constructor<?>> supportedConstructor = Arrays.stream(streamEmitterType.getDeclaredConstructors()).filter(this::isConstructorSupported).collect(Collectors.toList());
+        List<Constructor<?>> supportedConstructor = Arrays.stream(streamEmitterType.getDeclaredConstructors())
+                .filter(this::isConstructorSupported).collect(Collectors.toList());
         if (supportedConstructor.isEmpty()) {
             // 自定义 streamEmitterType 无受支持构造器时给出明确错误，避免 IndexOutOfBoundsException
             throw new IllegalStateException("No supported constructor in " + streamEmitterType.getName()
@@ -221,8 +252,10 @@ public class ReactiveReturnValueResolver extends BaseAsyncReturnValueResolver {
         }
         supportedConstructor.sort(Comparator.comparingInt(Constructor::getParameterCount));
         Constructor<?> best = supportedConstructor.get(supportedConstructor.size() - 1);
-        if (supportedConstructor.size() > 1 && supportedConstructor.get(supportedConstructor.size() - 2).getParameterCount() == best.getParameterCount()) {
-            throw new IllegalStateException("Multiple constructors with same max parameter count: " + best.getParameterCount());
+        if (supportedConstructor.size() > 1 && supportedConstructor.get(supportedConstructor.size() - 2)
+                .getParameterCount() == best.getParameterCount()) {
+            throw new IllegalStateException(
+                    "Multiple constructors with same max parameter count: " + best.getParameterCount());
         }
         best.setAccessible(true);
         return best;

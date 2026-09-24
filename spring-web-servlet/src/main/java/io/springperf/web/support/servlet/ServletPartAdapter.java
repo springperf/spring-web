@@ -22,8 +22,9 @@ public class ServletPartAdapter implements Part {
 
     @Override
     public String getContentType() {
-        return part.getHeaders().getContentType() != null
-                ? part.getHeaders().getContentType().toString() : null;
+        // 取一次判一次：原先调用两次 getContentType（重复计算，且静态分析无法关联两次调用）
+        Object contentType = part.getHeaders().getContentType();
+        return contentType != null ? contentType.toString() : null;
     }
 
     @Override

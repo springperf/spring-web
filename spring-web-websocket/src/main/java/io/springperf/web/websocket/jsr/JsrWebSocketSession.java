@@ -22,16 +22,18 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * JSR-356 {@link Session} 实现，包装底层 Spring {@link WebSocketSession}（Netty 管道）。
- *
- * <p>职责映射：</p>
+ * <p>
+ * 职责映射：
+ * </p>
  * <ul>
- *   <li>发送 → 委托 {@link WebSocketSession#sendMessage}（文本/二进制/Ping/Pong）</li>
- *   <li>关闭 → 委托 {@link WebSocketSession#close(CloseStatus)}</li>
- *   <li>路径变量 → 握手阶段由 RouteMatcher 提取后注入</li>
- *   <li>{@code addMessageHandler} → 首期不支持（由 {@code @OnMessage} 注解驱动）</li>
+ * <li>发送 → 委托 {@link WebSocketSession#sendMessage}（文本/二进制/Ping/Pong）</li>
+ * <li>关闭 → 委托 {@link WebSocketSession#close(CloseStatus)}</li>
+ * <li>路径变量 → 握手阶段由 RouteMatcher 提取后注入</li>
+ * <li>{@code addMessageHandler} → 首期不支持（由 {@code @OnMessage} 注解驱动）</li>
  * </ul>
  *
  * @author huangcanda
+ *
  * @since 3.5.6
  */
 public class JsrWebSocketSession implements Session {
@@ -47,10 +49,8 @@ public class JsrWebSocketSession implements Session {
 
     private long maxIdleTimeout = -1;
 
-    public JsrWebSocketSession(WebSocketSession springSession,
-                               JsrWebSocketContainer container,
-                               JsrCodecRegistry codecRegistry,
-                               Map<String, String> pathParameters) {
+    public JsrWebSocketSession(WebSocketSession springSession, JsrWebSocketContainer container,
+            JsrCodecRegistry codecRegistry, Map<String, String> pathParameters) {
         this.springSession = springSession;
         this.container = container;
         this.codecRegistry = codecRegistry;
@@ -113,7 +113,10 @@ public class JsrWebSocketSession implements Session {
 
     @Override
     public boolean isSecure() {
-        return "wss".equalsIgnoreCase(springSession.getUri().getScheme());
+        // getUri()/getScheme() 均可为 null：用常量侧比较，缺失协议视为非安全
+        java.net.URI uri = springSession.getUri();
+        String scheme = uri != null ? uri.getScheme() : null;
+        return scheme != null && "wss".equalsIgnoreCase(scheme);
     }
 
     @Override
@@ -205,7 +208,10 @@ public class JsrWebSocketSession implements Session {
 
     @Override
     public String getQueryString() {
-        return springSession.getUri().getRawQuery();
+        // getRawQuery() 无查询串时即为 null（jakarta.websocket 契约允许）；先取 URI 再取值，
+        // 避免链式调用被判为可能 NPE
+        java.net.URI uri = springSession.getUri();
+        return uri != null ? uri.getRawQuery() : null;
     }
 
     @Override

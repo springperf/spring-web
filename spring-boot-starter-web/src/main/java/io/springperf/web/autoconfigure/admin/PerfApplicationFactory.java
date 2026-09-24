@@ -14,16 +14,20 @@ import java.net.UnknownHostException;
 
 /**
  * 框架感知的 {@link ApplicationFactory} 实现。
- * <p>替代 SBA Client 的 {@code ServletApplicationFactory}，在不依赖 Servlet 容器的情况下
- * 从本框架配置中自动构建正确的 serviceUrl、managementUrl、healthUrl。</p>
- *
- * <p>URL 构造优先级：</p>
+ * <p>
+ * 替代 SBA Client 的 {@code ServletApplicationFactory}，在不依赖 Servlet 容器的情况下 从本框架配置中自动构建正确的
+ * serviceUrl、managementUrl、healthUrl。
+ * </p>
+ * <p>
+ * URL 构造优先级：
+ * </p>
  * <ol>
- *     <li>用户显式配置（spring.boot.admin.client.instance.*）</li>
- *     <li>自动从 ServerProperties / ManagementServerProperties 计算</li>
+ * <li>用户显式配置（spring.boot.admin.client.instance.*）</li>
+ * <li>自动从 ServerProperties / ManagementServerProperties 计算</li>
  * </ol>
  *
  * @author huangcanda
+ *
  * @since 1.0.4
  */
 public class PerfApplicationFactory implements ApplicationFactory {
@@ -35,10 +39,8 @@ public class PerfApplicationFactory implements ApplicationFactory {
     private final Environment environment;
 
     public PerfApplicationFactory(InstanceProperties instanceProperties,
-                                  ManagementServerProperties managementServerProperties,
-                                  ServerProperties serverProperties,
-                                  WebEndpointProperties webEndpointProperties,
-                                  Environment environment) {
+            ManagementServerProperties managementServerProperties, ServerProperties serverProperties,
+            WebEndpointProperties webEndpointProperties, Environment environment) {
         this.instanceProperties = instanceProperties;
         this.managementServerProperties = managementServerProperties;
         this.serverProperties = serverProperties;
@@ -53,15 +55,13 @@ public class PerfApplicationFactory implements ApplicationFactory {
         String managementUrl = resolveManagementUrl();
         String healthUrl = managementUrl + "/health";
 
-        // 优先使用用户显式配置的 health-url
-        if (instanceProperties.getHealthUrl() != null) {
-            healthUrl = instanceProperties.getHealthUrl();
+        // 优先使用用户显式配置的 health-url（取一次判一次，避免重复调用被判为可能 NPE）
+        String configuredHealthUrl = instanceProperties.getHealthUrl();
+        if (configuredHealthUrl != null) {
+            healthUrl = configuredHealthUrl;
         }
 
-        return Application.create(name)
-                .healthUrl(healthUrl)
-                .managementUrl(managementUrl)
-                .serviceUrl(serviceUrl)
+        return Application.create(name).healthUrl(healthUrl).managementUrl(managementUrl).serviceUrl(serviceUrl)
                 .build();
     }
 
@@ -117,8 +117,8 @@ public class PerfApplicationFactory implements ApplicationFactory {
         if (isManagementPortEqual()) {
             return resolveServiceBaseUrl() + resolveServicePath();
         }
-        return resolveScheme(managementServerProperties.getSsl())
-                + "://" + resolveManagementHost() + ":" + resolveManagementPort();
+        return resolveScheme(managementServerProperties.getSsl()) + "://" + resolveManagementHost() + ":"
+                + resolveManagementPort();
     }
 
     private boolean isManagementPortEqual() {
