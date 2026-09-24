@@ -9,14 +9,13 @@ import java.lang.reflect.Method;
 
 /**
  * 将 {@link Servlet#service(ServletRequest, ServletResponse)} 桥接为框架的可调用目标。
- *
- * <p>作为 {@link CustomInvoker} 接入核心的非控制器路由机制：handleMethod 返回
- * {@code Servlet.service}（返回 {@code void}），因此框架的 void 返回值处理
- * （{@code ReturnValueResolverRegistry.skipResolve}）会自动 {@code setHandled()}，
- * 使 servlet 直接写入的响应体能够被 {@code flushResponse} 正常发出。
- *
- * <p>两个参数（{@code ServletRequest}/{@code ServletResponse}）由
- * {@code ServletRequestProvider}/{@code ServletResponseProvider} 解析注入。
+ * <p>
+ * 作为 {@link CustomInvoker} 接入核心的非控制器路由机制：handleMethod 返回 {@code Servlet.service}（返回 {@code void}），因此框架的 void 返回值处理
+ * （{@code ReturnValueResolverRegistry.skipResolve}）会自动 {@code setHandled()}， 使 servlet 直接写入的响应体能够被
+ * {@code flushResponse} 正常发出。
+ * <p>
+ * 两个参数（{@code ServletRequest}/{@code ServletResponse}）由 {@code ServletRequestProvider}/{@code ServletResponseProvider}
+ * 解析注入。
  */
 public class ServletInvoker implements CustomInvoker {
 

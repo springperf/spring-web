@@ -12,7 +12,8 @@ class SpringWebMvcSupportAutoConfigurationTest {
 
     @Test
     void configuration_hasConditionalOnClass() {
-        ConditionalOnClass annotation = SpringWebMvcSupportAutoConfiguration.class.getAnnotation(ConditionalOnClass.class);
+        ConditionalOnClass annotation = SpringWebMvcSupportAutoConfiguration.class
+                .getAnnotation(ConditionalOnClass.class);
         assertNotNull(annotation);
         assertTrue(annotation.name().length > 0);
         assertEquals("org.springframework.web.servlet.HandlerInterceptor", annotation.name()[0]);
@@ -27,16 +28,17 @@ class SpringWebMvcSupportAutoConfigurationTest {
 
     @Test
     void supportHttpBodyCodecInterceptorRegistry_createsBean() {
-        io.springperf.web.support.codec.interceptor.SupportHttpBodyCodecInterceptorRegistry bean =
-                config.supportHttpBodyCodecInterceptorRegistry();
+        io.springperf.web.support.codec.interceptor.SupportHttpBodyCodecInterceptorRegistry bean = config
+                .supportHttpBodyCodecInterceptorRegistry();
         assertNotNull(bean);
-        assertInstanceOf(io.springperf.web.support.codec.interceptor.SupportHttpBodyCodecInterceptorRegistry.class, bean);
+        assertInstanceOf(io.springperf.web.support.codec.interceptor.SupportHttpBodyCodecInterceptorRegistry.class,
+                bean);
     }
 
     @Test
     void responseBodyEmitterReturnValueResolver_createsBean() {
-        io.springperf.web.support.async.stream.ResponseBodyEmitterReturnValueResolver bean =
-                config.responseBodyEmitterReturnValueResolver();
+        io.springperf.web.support.async.stream.ResponseBodyEmitterReturnValueResolver bean = config
+                .responseBodyEmitterReturnValueResolver();
         assertNotNull(bean);
         assertInstanceOf(io.springperf.web.support.async.stream.ResponseBodyEmitterReturnValueResolver.class, bean);
     }

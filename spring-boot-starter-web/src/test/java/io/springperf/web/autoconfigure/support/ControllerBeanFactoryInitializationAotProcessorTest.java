@@ -26,10 +26,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
- * 验证 {@link ControllerBeanFactoryInitializationAotProcessor}：
- * 为 {@code @Controller} 处理方法与 {@code @ControllerAdvice} 反射调用方法注册反射 hint、
- * 为 DTO（含泛型参数）注册绑定/序列化 hint。
- * JVM 模式下处理器由 Spring AOT 构建期调用，本测试直接驱动它验证注册结果。
+ * 验证 {@link ControllerBeanFactoryInitializationAotProcessor}： 为 {@code @Controller} 处理方法与 {@code @ControllerAdvice}
+ * 反射调用方法注册反射 hint、 为 DTO（含泛型参数）注册绑定/序列化 hint。 JVM 模式下处理器由 Spring AOT 构建期调用，本测试直接驱动它验证注册结果。
  */
 class ControllerBeanFactoryInitializationAotProcessorTest {
 
@@ -37,8 +35,8 @@ class ControllerBeanFactoryInitializationAotProcessorTest {
 
     @Test
     void processAheadOfTime_noControllers_returnsNull() {
-        BeanFactoryInitializationAotContribution contribution =
-                new ControllerBeanFactoryInitializationAotProcessor().processAheadOfTime(beanFactory);
+        BeanFactoryInitializationAotContribution contribution = new ControllerBeanFactoryInitializationAotProcessor()
+                .processAheadOfTime(beanFactory);
         assertNull(contribution);
     }
 
@@ -46,8 +44,8 @@ class ControllerBeanFactoryInitializationAotProcessorTest {
     void registersControllerAndDtoHints() {
         beanFactory.registerSingleton("testController", new TestController());
 
-        BeanFactoryInitializationAotContribution contribution =
-                new ControllerBeanFactoryInitializationAotProcessor().processAheadOfTime(beanFactory);
+        BeanFactoryInitializationAotContribution contribution = new ControllerBeanFactoryInitializationAotProcessor()
+                .processAheadOfTime(beanFactory);
         assertNotNull(contribution, "存在 @Controller bean 时应产生 AOT contribution");
 
         RuntimeHints hints = new RuntimeHints();
@@ -58,8 +56,7 @@ class ControllerBeanFactoryInitializationAotProcessorTest {
         // 控制器类注册反射 hint
         TypeHint controllerHint = hints.reflection().getTypeHint(TestController.class);
         assertNotNull(controllerHint, "控制器类应注册反射 hint");
-        assertTrue(controllerHint.getMemberCategories().stream()
-                        .anyMatch(c -> c.name().contains("INVOKE")),
+        assertTrue(controllerHint.getMemberCategories().stream().anyMatch(c -> c.name().contains("INVOKE")),
                 "控制器类应注册 INVOKE 成员类别");
 
         // 处理方法注册 INVOKE hint（hello 方法：@GetMapping，返回 User）
@@ -67,16 +64,12 @@ class ControllerBeanFactoryInitializationAotProcessorTest {
         assertMethodInvokeHint(hints, "create");
 
         // DTO 类型（含 ResponseEntity<Map<String, Order>> 的泛型参数）注册反射 hint
-        assertTrue(hints.reflection().getTypeHint(User.class) != null,
-                "User DTO 应注册反射 hint");
+        assertTrue(hints.reflection().getTypeHint(User.class) != null, "User DTO 应注册反射 hint");
         assertTrue(hints.reflection().getTypeHint(User.class).getMemberCategories()
-                        .contains(MemberCategory.DECLARED_FIELDS),
-                "User DTO 应注册 DECLARED_FIELDS 成员类别");
-        assertTrue(hints.reflection().getTypeHint(Order.class) != null,
-                "泛型参数 Order 应注册反射 hint");
+                .contains(MemberCategory.DECLARED_FIELDS), "User DTO 应注册 DECLARED_FIELDS 成员类别");
+        assertTrue(hints.reflection().getTypeHint(Order.class) != null, "泛型参数 Order 应注册反射 hint");
         assertTrue(hints.reflection().getTypeHint(Order.class).getMemberCategories()
-                        .contains(MemberCategory.DECLARED_FIELDS),
-                "泛型参数 Order 应注册 DECLARED_FIELDS 成员类别");
+                .contains(MemberCategory.DECLARED_FIELDS), "泛型参数 Order 应注册 DECLARED_FIELDS 成员类别");
     }
 
     @Test
@@ -84,8 +77,8 @@ class ControllerBeanFactoryInitializationAotProcessorTest {
         // @RequestMapping 返回 ResponseEntity（框架类型）但泛型 User 应被收集
         beanFactory.registerSingleton("frameworkReturnController", new FrameworkReturnController());
 
-        BeanFactoryInitializationAotContribution contribution =
-                new ControllerBeanFactoryInitializationAotProcessor().processAheadOfTime(beanFactory);
+        BeanFactoryInitializationAotContribution contribution = new ControllerBeanFactoryInitializationAotProcessor()
+                .processAheadOfTime(beanFactory);
         assertNotNull(contribution);
 
         RuntimeHints hints = new RuntimeHints();
@@ -93,16 +86,15 @@ class ControllerBeanFactoryInitializationAotProcessorTest {
         when(generationContext.getRuntimeHints()).thenReturn(hints);
         contribution.applyTo(generationContext, null);
 
-        assertTrue(hints.reflection().getTypeHint(User.class) != null,
-                "ResponseEntity<User> 的泛型参数 User 应被收集");
+        assertTrue(hints.reflection().getTypeHint(User.class) != null, "ResponseEntity<User> 的泛型参数 User 应被收集");
     }
 
     @Test
     void registersControllerAdviceMethodsAndDtos() {
         beanFactory.registerSingleton("testAdvice", new TestAdvice());
 
-        BeanFactoryInitializationAotContribution contribution =
-                new ControllerBeanFactoryInitializationAotProcessor().processAheadOfTime(beanFactory);
+        BeanFactoryInitializationAotContribution contribution = new ControllerBeanFactoryInitializationAotProcessor()
+                .processAheadOfTime(beanFactory);
         assertNotNull(contribution, "存在 @ControllerAdvice bean 时应产生 AOT contribution");
 
         RuntimeHints hints = new RuntimeHints();
@@ -117,17 +109,13 @@ class ControllerBeanFactoryInitializationAotProcessorTest {
         assertMethodInvokeHint(hints, "addGlobalAttribute");
 
         // @ExceptionHandler 返回的 ResponseEntity<ErrorBody> 泛型参数 ErrorBody 注册字段 hint
-        assertTrue(hints.reflection().getTypeHint(ErrorBody.class) != null,
-                "advice DTO ErrorBody 应注册反射 hint");
+        assertTrue(hints.reflection().getTypeHint(ErrorBody.class) != null, "advice DTO ErrorBody 应注册反射 hint");
         assertTrue(hints.reflection().getTypeHint(ErrorBody.class).getMemberCategories()
-                        .contains(MemberCategory.DECLARED_FIELDS),
-                "advice DTO ErrorBody 应注册 DECLARED_FIELDS 成员类别");
+                .contains(MemberCategory.DECLARED_FIELDS), "advice DTO ErrorBody 应注册 DECLARED_FIELDS 成员类别");
     }
 
     private static void assertMethodInvokeHint(RuntimeHints hints, String methodName) {
-        boolean registered = hints.reflection().typeHints()
-                .flatMap(TypeHint::methods)
-                .map(ExecutableHint::getName)
+        boolean registered = hints.reflection().typeHints().flatMap(TypeHint::methods).map(ExecutableHint::getName)
                 .anyMatch(methodName::equals);
         assertTrue(registered, "处理方法 " + methodName + " 应注册反射 hint");
     }
@@ -157,8 +145,8 @@ class ControllerBeanFactoryInitializationAotProcessorTest {
         // 泛型控制器 BaseController<T> 的 @RequestBody T 应解析为 User
         beanFactory.registerSingleton("userController", new GenericUserController());
 
-        BeanFactoryInitializationAotContribution contribution =
-                new ControllerBeanFactoryInitializationAotProcessor().processAheadOfTime(beanFactory);
+        BeanFactoryInitializationAotContribution contribution = new ControllerBeanFactoryInitializationAotProcessor()
+                .processAheadOfTime(beanFactory);
         assertNotNull(contribution);
 
         RuntimeHints hints = new RuntimeHints();

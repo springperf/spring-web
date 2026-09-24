@@ -36,7 +36,7 @@ public class CoreFeaturesController {
 
     @GetMapping("/header")
     public Map<String, Object> testRequestHeader(@RequestHeader("X-Custom-Header") String headerValue,
-                                                  @RequestHeader("User-Agent") String userAgent) {
+            @RequestHeader("User-Agent") String userAgent) {
         Map<String, Object> m = new HashMap<>();
         m.put("xCustomHeader", headerValue);
         m.put("userAgent", userAgent);
@@ -292,8 +292,7 @@ public class CoreFeaturesController {
     // ==================== @RequestParam 高级特性 ====================
 
     @GetMapping("/param-advanced")
-    public Map<String, Object> paramAdvanced(
-            @RequestParam("req") String required,
+    public Map<String, Object> paramAdvanced(@RequestParam("req") String required,
             @RequestParam(value = "opt", required = false) String optional,
             @RequestParam(value = "def", defaultValue = "defaultVal") String withDefault) {
         Map<String, Object> m = new HashMap<>();
@@ -306,8 +305,7 @@ public class CoreFeaturesController {
     // ==================== @RequestHeader 高级特性 ====================
 
     @GetMapping("/header-advanced")
-    public Map<String, Object> headerAdvanced(
-            @RequestHeader("X-Required") String required,
+    public Map<String, Object> headerAdvanced(@RequestHeader("X-Required") String required,
             @RequestHeader(value = "X-Optional", required = false) String optional,
             @RequestHeader(value = "X-With-Default", defaultValue = "defaultHeaderVal") String withDefault) {
         Map<String, Object> m = new HashMap<>();

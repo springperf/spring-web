@@ -19,9 +19,7 @@ class JspE2eTest extends BaseE2ETest {
 
     @Test
     void jspRoute_rendersJsp() throws IOException {
-        Request request = new Request.Builder()
-                .url(base() + "/jsp/hello.jsp")
-                .build();
+        Request request = new Request.Builder().url(base() + "/jsp/hello.jsp").build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             String body = resp.body().string();
             assertTrue(resp.isSuccessful(), "status=" + resp.code() + " body=" + body);
@@ -32,9 +30,7 @@ class JspE2eTest extends BaseE2ETest {
 
     @Test
     void controllerView_rendersJspWithModel() throws IOException {
-        Request request = new Request.Builder()
-                .url(base() + "/jsp-view")
-                .build();
+        Request request = new Request.Builder().url(base() + "/jsp-view").build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             String body = resp.body().string();
             assertTrue(resp.isSuccessful(), "status=" + resp.code() + " body=" + body);
@@ -45,9 +41,7 @@ class JspE2eTest extends BaseE2ETest {
 
     @Test
     void controllerView_suffixForm_rendersJsp() throws IOException {
-        Request request = new Request.Builder()
-                .url(base() + "/jsp-view-suffix")
-                .build();
+        Request request = new Request.Builder().url(base() + "/jsp-view-suffix").build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             String body = resp.body().string();
             assertTrue(resp.isSuccessful(), "status=" + resp.code() + " body=" + body);
@@ -57,9 +51,7 @@ class JspE2eTest extends BaseE2ETest {
 
     @Test
     void controllerView_complexModel_rendersViaEl() throws IOException {
-        Request request = new Request.Builder()
-                .url(base() + "/jsp-model")
-                .build();
+        Request request = new Request.Builder().url(base() + "/jsp-model").build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             String body = resp.body().string();
             assertTrue(resp.isSuccessful(), "status=" + resp.code() + " body=" + body);
@@ -71,9 +63,7 @@ class JspE2eTest extends BaseE2ETest {
 
     @Test
     void jspInclude_appendsFragment() throws IOException {
-        Request request = new Request.Builder()
-                .url(base() + "/jsp/include.jsp")
-                .build();
+        Request request = new Request.Builder().url(base() + "/jsp/include.jsp").build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             String body = resp.body().string();
             assertTrue(resp.isSuccessful(), "status=" + resp.code() + " body=" + body);
@@ -85,9 +75,7 @@ class JspE2eTest extends BaseE2ETest {
 
     @Test
     void jspForward_rendersTarget() throws IOException {
-        Request request = new Request.Builder()
-                .url(base() + "/jsp/forward.jsp")
-                .build();
+        Request request = new Request.Builder().url(base() + "/jsp/forward.jsp").build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             String body = resp.body().string();
             assertTrue(resp.isSuccessful(), "status=" + resp.code() + " body=" + body);
@@ -97,9 +85,7 @@ class JspE2eTest extends BaseE2ETest {
 
     @Test
     void jspNotFound_returns404() throws IOException {
-        Request request = new Request.Builder()
-                .url(base() + "/jsp/not-exist.jsp")
-                .build();
+        Request request = new Request.Builder().url(base() + "/jsp/not-exist.jsp").build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             assertEquals(404, resp.code(), "body=" + resp.body().string());
         }
@@ -107,9 +93,7 @@ class JspE2eTest extends BaseE2ETest {
 
     @Test
     void controllerView_jstl_rendersLoopAndCondition() throws IOException {
-        Request request = new Request.Builder()
-                .url(base() + "/jsp-jstl")
-                .build();
+        Request request = new Request.Builder().url(base() + "/jsp-jstl").build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             String body = resp.body().string();
             assertTrue(resp.isSuccessful(), "status=" + resp.code() + " body=" + body);

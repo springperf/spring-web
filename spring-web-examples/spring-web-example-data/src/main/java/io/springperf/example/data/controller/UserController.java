@@ -27,8 +27,7 @@ public class UserController {
 
     @GetMapping("/{id}")
     public User get(@PathVariable Long id) {
-        return userRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("user not found, id=" + id));
+        return userRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("user not found, id=" + id));
     }
 
     @PostMapping
@@ -40,8 +39,7 @@ public class UserController {
 
     @PutMapping("/{id}")
     public User update(@PathVariable Long id, @Valid @RequestBody User user) {
-        userRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("user not found, id=" + id));
+        userRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("user not found, id=" + id));
         user.setId(id);
         User saved = userRepository.save(user);
         log.info("updated user: {}", saved);

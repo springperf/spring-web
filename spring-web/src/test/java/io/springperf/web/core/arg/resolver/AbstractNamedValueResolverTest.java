@@ -1,10 +1,11 @@
 package io.springperf.web.core.arg.resolver;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.arg.databinder.WebDataBinderRegistry;
-import io.springperf.web.core.mapping.MappingHandlerMethod;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.when;
+
+import java.lang.reflect.Method;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -14,11 +15,11 @@ import org.springframework.core.convert.ConversionService;
 import org.springframework.core.convert.support.DefaultConversionService;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
-import java.lang.reflect.Method;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.when;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.arg.databinder.WebDataBinderRegistry;
+import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 class AbstractNamedValueResolverTest {
@@ -88,8 +89,7 @@ class AbstractNamedValueResolverTest {
         MethodParameter mp = new MethodParameter(method, 0);
 
         AbstractNamedValueResolver resolver = createResolver(mp, null);
-        assertThrows(IllegalStateException.class,
-                () -> resolver.resolveArgument(request, response));
+        assertThrows(IllegalStateException.class, () -> resolver.resolveArgument(request, response));
     }
 
     @Test
@@ -145,8 +145,7 @@ class AbstractNamedValueResolverTest {
         MethodParameter mp = new MethodParameter(method, 0);
 
         AbstractNamedValueResolver resolver = createResolver(mp, "not-a-number");
-        assertThrows(MethodArgumentTypeMismatchException.class,
-                () -> resolver.resolveArgument(request, response));
+        assertThrows(MethodArgumentTypeMismatchException.class, () -> resolver.resolveArgument(request, response));
     }
 
     @Test
@@ -162,8 +161,7 @@ class AbstractNamedValueResolverTest {
         MethodParameter mp = new MethodParameter(method, 0);
 
         AbstractNamedValueResolver resolver = createResolver(mp, "value");
-        assertThrows(MethodArgumentTypeMismatchException.class,
-                () -> resolver.resolveArgument(request, response));
+        assertThrows(MethodArgumentTypeMismatchException.class, () -> resolver.resolveArgument(request, response));
     }
 
     // ----- name field access (same package resolver) -----
@@ -193,16 +191,20 @@ class AbstractNamedValueResolverTest {
     }
 
     @SuppressWarnings("unused")
-    public void stringParam(String name) {}
+    public void stringParam(String name) {
+    }
 
     @SuppressWarnings("unused")
-    public void booleanParam(boolean flag) {}
+    public void booleanParam(boolean flag) {
+    }
 
     @SuppressWarnings("unused")
-    public void intParam(int count) {}
+    public void intParam(int count) {
+    }
 
     @SuppressWarnings("unused")
-    public void noConverterParam(Target target) {}
+    public void noConverterParam(Target target) {
+    }
 
     /** DefaultConversionService 无 String→Target 转换器（无 String 构造器 / valueOf factory）的目标类型。 */
     static class Target {

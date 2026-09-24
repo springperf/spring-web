@@ -25,7 +25,6 @@ public class InterceptorRegistration {
     /** 用户是否显式调用过 {@link #order(int)}（区分默认 order=0 与显式 order(0)）。 */
     private boolean orderSet = false;
 
-
     /**
      * Create an {@link InterceptorRegistration} instance.
      */
@@ -33,7 +32,6 @@ public class InterceptorRegistration {
         Assert.notNull(interceptor, "Interceptor is required");
         this.interceptor = interceptor;
     }
-
 
     /**
      * Add URL patterns to which the registered interceptor should apply to.
@@ -70,10 +68,9 @@ public class InterceptorRegistration {
     }
 
     /**
-     * A PathMatcher implementation to use with this interceptor. This is an optional,
-     * advanced property required only if using custom PathMatcher implementations
-     * that support mapping metadata other than the Ant path patterns supported
-     * by default.
+     * A PathMatcher implementation to use with this interceptor. This is an optional, advanced property required only
+     * if using custom PathMatcher implementations that support mapping metadata other than the Ant path patterns
+     * supported by default.
      */
     public InterceptorRegistration pathMatcher(PathMatcher pathMatcher) {
         this.pathMatcher = pathMatcher;
@@ -99,8 +96,7 @@ public class InterceptorRegistration {
     }
 
     /**
-     * 用户是否显式设置过 order（{@code true} 表示 {@code order()} 被调用过；{@code false}
-     * 表示使用默认 order 0，桥接时应按添加顺序分配递增值以保持稳定序）。
+     * 用户是否显式设置过 order（{@code true} 表示 {@code order()} 被调用过；{@code false} 表示使用默认 order 0，桥接时应按添加顺序分配递增值以保持稳定序）。
      */
     public boolean isOrderSet() {
         return this.orderSet;

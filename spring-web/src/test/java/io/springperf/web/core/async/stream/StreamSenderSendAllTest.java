@@ -1,31 +1,5 @@
 package io.springperf.web.core.async.stream;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.DefaultHttpContent;
-import io.netty.handler.codec.http.LastHttpContent;
-import io.netty.util.concurrent.EventExecutor;
-import io.springperf.web.core.async.PerfAsyncWebRequest;
-import io.springperf.web.http.NettyServerHttpResponse;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
-
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.any;
@@ -36,20 +10,46 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.http.DefaultHttpContent;
+import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.util.concurrent.EventExecutor;
+import io.springperf.web.core.async.PerfAsyncWebRequest;
+import io.springperf.web.http.NettyServerHttpResponse;
+
 /**
  * 回归：{@link StreamSender#sendAll(Collection)} 批量交付语义。
  * <p>
- * 背景（SSE CPU 热点分析）：{@code StreamEmitter.initialize} 在 EventLoop 线程上
- * 逐条 {@code send()} 时，每条 send 的 scheduleDrain 因 {@code inEventLoop()} 直接同步
- * drain 并立即 flush 当前队列（仅刚入队的一条），100 条 SSE 消息产生 100 次小
- * writeAndFlush，破坏 drain() 里 batchBuf + maxFlushBytes 的批量编码设计。
+ * 背景（SSE CPU 热点分析）：{@code StreamEmitter.initialize} 在 EventLoop 线程上 逐条 {@code send()} 时，每条 send 的 scheduleDrain 因
+ * {@code inEventLoop()} 直接同步 drain 并立即 flush 当前队列（仅刚入队的一条），100 条 SSE 消息产生 100 次小 writeAndFlush，破坏 drain() 里 batchBuf +
+ * maxFlushBytes 的批量编码设计。
  * <p>
  * 本测试验证 sendAll 修复后的语义：
  * <ul>
- *   <li>全部元素一次性入队（drain 前 queueSize 反映批量大小）</li>
- *   <li>末尾仅调度一次 drain（对比逐条 send 逐条 drain）</li>
- *   <li>多元素在单次 drain 中合并为一次 writeAndFlush（不超过 maxFlushBytes）</li>
- *   <li>earlyEncode（byte[]）路径同样批量生效</li>
+ * <li>全部元素一次性入队（drain 前 queueSize 反映批量大小）</li>
+ * <li>末尾仅调度一次 drain（对比逐条 send 逐条 drain）</li>
+ * <li>多元素在单次 drain 中合并为一次 writeAndFlush（不超过 maxFlushBytes）</li>
+ * <li>earlyEncode（byte[]）路径同样批量生效</li>
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
@@ -114,8 +114,8 @@ class StreamSenderSendAllTest {
         DefaultHttpContent content = httpContentCaptor.getValue();
         ByteBuf written = content.content();
         assertEquals(50, written.readableBytes(), "5 条小数据必须合并进单次 flush");
-        assertEquals("0123456789" + "0123456789" + "0123456789"
-                + "0123456789" + "0123456789", written.toString(StandardCharsets.UTF_8));
+        assertEquals("0123456789" + "0123456789" + "0123456789" + "0123456789" + "0123456789",
+                written.toString(StandardCharsets.UTF_8));
         written.release();
     }
 

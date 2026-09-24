@@ -10,13 +10,10 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Locale;
 
-public abstract class AbstractFastFailHttpServletResponse
-        implements HttpServletResponse {
+public abstract class AbstractFastFailHttpServletResponse implements HttpServletResponse {
 
     protected static UnsupportedOperationException unsupported(String method) {
-        return new UnsupportedOperationException(
-                method + " is not supported: not running in a Servlet container"
-        );
+        return new UnsupportedOperationException(method + " is not supported: not running in a Servlet container");
     }
 
     // ================= ServletResponse =================

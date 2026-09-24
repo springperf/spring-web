@@ -11,8 +11,7 @@ import java.util.Locale;
  * A custom {@link Formatter} registered via
  * {@link org.springframework.web.servlet.config.annotation.WebMvcConfigurer#addFormatters}.
  * <p>
- * On {@link #print}, returns {@code formatted:<value>} to verify the formatter
- * is applied during response rendering.
+ * On {@link #print}, returns {@code formatted:<value>} to verify the formatter is applied during response rendering.
  */
 public class CustomNameFormatter implements Formatter<CustomName> {
 

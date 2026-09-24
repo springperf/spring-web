@@ -1,10 +1,11 @@
 package io.springperf.web.core.arg.resolver;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.arg.databinder.WebDataBinderRegistry;
-import io.springperf.web.core.mapping.MappingHandlerMethod;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.when;
+
+import java.lang.reflect.Method;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -14,11 +15,11 @@ import org.springframework.core.convert.ConversionService;
 import org.springframework.core.convert.support.DefaultConversionService;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.lang.reflect.Method;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.when;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.arg.databinder.WebDataBinderRegistry;
+import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 class AbstractNamedValueNullableResolverTest {
@@ -73,8 +74,7 @@ class AbstractNamedValueNullableResolverTest {
         MethodParameter mp = new MethodParameter(method, 0);
 
         AbstractNamedValueNullableResolver resolver = createResolver(mp, null, true, null);
-        assertThrows(ResponseStatusException.class,
-                () -> resolver.resolveArgument(request, response));
+        assertThrows(ResponseStatusException.class, () -> resolver.resolveArgument(request, response));
     }
 
     @Test
@@ -90,7 +90,8 @@ class AbstractNamedValueNullableResolverTest {
             fail("Expected ResponseStatusException");
         } catch (ResponseStatusException e) {
             assertEquals(400, e.getStatusCode().value());
-            assertTrue(e.getReason().contains("Missing required argument")); assertTrue(e.getReason().contains("String"));
+            assertTrue(e.getReason().contains("Missing required argument"));
+            assertTrue(e.getReason().contains("String"));
         }
     }
 
@@ -178,9 +179,9 @@ class AbstractNamedValueNullableResolverTest {
     // ----- helper -----
 
     private AbstractNamedValueNullableResolver createResolver(MethodParameter mp, Object resolvedValue,
-                                                               boolean required, String defaultValue) {
-        return new AbstractNamedValueNullableResolver(mappingContext, mp, webContext,
-                "testName", required, defaultValue) {
+            boolean required, String defaultValue) {
+        return new AbstractNamedValueNullableResolver(mappingContext, mp, webContext, "testName", required,
+                defaultValue) {
             @Override
             protected Object resolveByName(WebServerHttpRequest request, WebServerHttpResponse response) {
                 return resolvedValue;
@@ -189,8 +190,10 @@ class AbstractNamedValueNullableResolverTest {
     }
 
     @SuppressWarnings("unused")
-    public void stringParam(String name) {}
+    public void stringParam(String name) {
+    }
 
     @SuppressWarnings("unused")
-    public void booleanParam(boolean flag) {}
+    public void booleanParam(boolean flag) {
+    }
 }

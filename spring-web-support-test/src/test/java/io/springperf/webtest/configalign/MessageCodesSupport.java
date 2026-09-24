@@ -4,9 +4,8 @@ import org.springframework.validation.Errors;
 import org.springframework.validation.Validator;
 
 /**
- * message-codes E2E 的共享装置：
- * 用自定义 {@link Validator} 制造字段错误（无需 jakarta.validation 实现），
- * 断言目标则是 {@code BindingResult} 上被 {@code MessageCodesResolver} 解析出的错误码集合。
+ * message-codes E2E 的共享装置： 用自定义 {@link Validator} 制造字段错误（无需 jakarta.validation 实现）， 断言目标则是 {@code BindingResult} 上被
+ * {@code MessageCodesResolver} 解析出的错误码集合。
  */
 final class MessageCodesSupport {
 

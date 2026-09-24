@@ -12,8 +12,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * P0 E2E 测试：核心框架遗漏的基础能力覆盖。
- * 依赖 CoreFeaturesController、P0TestController、NoRestControllerController。
+ * P0 E2E 测试：核心框架遗漏的基础能力覆盖。 依赖 CoreFeaturesController、P0TestController、NoRestControllerController。
  */
 public class CoreFeaturesP0Test extends BaseE2ETest {
 
@@ -22,9 +21,11 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
     private String coreUrl() {
         return url("/api/core");
     }
+
     private String p0Url() {
         return url("/api/p0");
     }
+
     private String noRestUrl() {
         return url("/api/p0/no-rest-controller");
     }
@@ -33,10 +34,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void multiValueMap_withMultipleParams_bindsCorrectly() throws Exception {
-        Request req = new Request.Builder()
-                .url(p0Url() + "/multi-value-map?a=hello&b=world")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(p0Url() + "/multi-value-map?a=hello&b=world").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             assertEquals("hello-world", resp.body().string());
@@ -45,10 +43,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void multiValueMap_withSingleParam_returnsNullForMissing() throws Exception {
-        Request req = new Request.Builder()
-                .url(p0Url() + "/multi-value-map?a=only")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(p0Url() + "/multi-value-map?a=only").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             // b 不存在时 getFirst 返回 null，字符串拼接为 "only-null"
@@ -60,11 +55,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void locale_withAcceptLanguage_returnsParsedLocale() throws Exception {
-        Request req = new Request.Builder()
-                .url(p0Url() + "/locale")
-                .header("Accept-Language", "zh-CN")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(p0Url() + "/locale").header("Accept-Language", "zh-CN").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             // 框架 LocaleResolver 解析 Accept-Language，控制器返回 toLanguageTag()
@@ -75,10 +66,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void locale_withoutAcceptLanguage_returnsDefaultLocale() throws Exception {
-        Request req = new Request.Builder()
-                .url(p0Url() + "/locale")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(p0Url() + "/locale").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -91,10 +79,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void multiPath_firstPath_returns200() throws Exception {
-        Request req = new Request.Builder()
-                .url(p0Url() + "/multi-path-a")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(p0Url() + "/multi-path-a").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             assertEquals("multi-path-ok", resp.body().string());
@@ -103,10 +88,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void multiPath_secondPath_returns200() throws Exception {
-        Request req = new Request.Builder()
-                .url(p0Url() + "/multi-path-b")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(p0Url() + "/multi-path-b").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             assertEquals("multi-path-ok", resp.body().string());
@@ -117,10 +99,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void multiMethod_getRequest_returns200() throws Exception {
-        Request req = new Request.Builder()
-                .url(p0Url() + "/multi-method")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(p0Url() + "/multi-method").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             assertEquals("multi-method-ok", resp.body().string());
@@ -129,9 +108,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void multiMethod_postRequest_returns200() throws Exception {
-        Request req = new Request.Builder()
-                .url(p0Url() + "/multi-method")
-                .post(RequestBody.create("", JSON_MEDIA))
+        Request req = new Request.Builder().url(p0Url() + "/multi-method").post(RequestBody.create("", JSON_MEDIA))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
@@ -143,10 +120,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void multiParamAnd_bothConditionsMatch_returns200() throws Exception {
-        Request req = new Request.Builder()
-                .url(p0Url() + "/multi-param?a=1&b=2")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(p0Url() + "/multi-param?a=1&b=2").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             assertEquals("multi-param-matched", resp.body().string());
@@ -155,10 +129,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void multiParamAnd_firstConditionMissing_returns404() throws Exception {
-        Request req = new Request.Builder()
-                .url(p0Url() + "/multi-param?a=1")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(p0Url() + "/multi-param?a=1").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(404, resp.code());
         }
@@ -166,10 +137,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void multiParamAnd_secondConditionMissing_returns404() throws Exception {
-        Request req = new Request.Builder()
-                .url(p0Url() + "/multi-param?b=2")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(p0Url() + "/multi-param?b=2").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(404, resp.code());
         }
@@ -177,10 +145,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void multiParamAnd_neitherConditionMatches_returns404() throws Exception {
-        Request req = new Request.Builder()
-                .url(p0Url() + "/multi-param?a=3&b=3")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(p0Url() + "/multi-param?a=3&b=3").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(404, resp.code());
         }
@@ -190,11 +155,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void multiHeaderAnd_bothConditionsMatch_returns200() throws Exception {
-        Request req = new Request.Builder()
-                .url(p0Url() + "/multi-header")
-                .header("X-A", "1")
-                .header("X-B", "2")
-                .get()
+        Request req = new Request.Builder().url(p0Url() + "/multi-header").header("X-A", "1").header("X-B", "2").get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
@@ -204,11 +165,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void multiHeaderAnd_firstConditionMissing_returns404() throws Exception {
-        Request req = new Request.Builder()
-                .url(p0Url() + "/multi-header")
-                .header("X-A", "1")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(p0Url() + "/multi-header").header("X-A", "1").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(404, resp.code());
         }
@@ -216,11 +173,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void multiHeaderAnd_secondConditionMissing_returns404() throws Exception {
-        Request req = new Request.Builder()
-                .url(p0Url() + "/multi-header")
-                .header("X-B", "2")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(p0Url() + "/multi-header").header("X-B", "2").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(404, resp.code());
         }
@@ -228,11 +181,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void multiHeaderAnd_neitherConditionMatches_returns404() throws Exception {
-        Request req = new Request.Builder()
-                .url(p0Url() + "/multi-header")
-                .header("X-A", "3")
-                .header("X-B", "3")
-                .get()
+        Request req = new Request.Builder().url(p0Url() + "/multi-header").header("X-A", "3").header("X-B", "3").get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(404, resp.code());
@@ -243,10 +192,8 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void requestEntity_withPost_containsMethodAndBody() throws Exception {
-        Request req = new Request.Builder()
-                .url(p0Url() + "/request-entity")
-                .post(RequestBody.create("\"test-body\"", JSON_MEDIA))
-                .build();
+        Request req = new Request.Builder().url(p0Url() + "/request-entity")
+                .post(RequestBody.create("\"test-body\"", JSON_MEDIA)).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -259,10 +206,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void noRestController_getWithParam_returnsValue() throws Exception {
-        Request req = new Request.Builder()
-                .url(noRestUrl() + "/echo?msg=hello-no-rest")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(noRestUrl() + "/echo?msg=hello-no-rest").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             assertEquals("hello-no-rest", resp.body().string());
@@ -271,9 +215,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void noRestController_postWithBody_returns201() throws Exception {
-        Request req = new Request.Builder()
-                .url(noRestUrl() + "/save")
-                .post(RequestBody.create("\"data\"", JSON_MEDIA))
+        Request req = new Request.Builder().url(noRestUrl() + "/save").post(RequestBody.create("\"data\"", JSON_MEDIA))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(201, resp.code());
@@ -286,10 +228,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void interceptorReturnFalse_responseHas200WithEmptyBody() throws Exception {
-        Request req = new Request.Builder()
-                .url(p0Url() + "/interceptor-return-false")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(p0Url() + "/interceptor-return-false").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             String body = resp.body().string();
             // 当 preHandle 返回 false 时，DispatcherHandler 直接 resp.flush() 返回，
@@ -304,10 +243,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void interceptorReturnTrue_controllerExecutesNormally() throws Exception {
-        Request req = new Request.Builder()
-                .url(p0Url() + "/interceptor-return-true")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(p0Url() + "/interceptor-return-true").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             assertEquals("interceptor-allowed", resp.body().string());
@@ -318,10 +254,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void runInEventLoop_usesEventLoopThread() throws Exception {
-        Request req = new Request.Builder()
-                .url(coreUrl() + "/pool/event-loop")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(coreUrl() + "/pool/event-loop").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
@@ -335,10 +268,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void runInEventloopMetaAnnotation_usesEventLoopThread() throws Exception {
-        Request req = new Request.Builder()
-                .url(coreUrl() + "/pool/run-in-eventloop")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(coreUrl() + "/pool/run-in-eventloop").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
@@ -351,10 +281,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void runInBizPool_usesBizPoolThread() throws Exception {
-        Request req = new Request.Builder()
-                .url(coreUrl() + "/pool/biz-pool")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(coreUrl() + "/pool/biz-pool").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
@@ -370,18 +297,14 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void runInNonExistentPool_returns500() throws Exception {
-        Request req = new Request.Builder()
-                .url(coreUrl() + "/pool/bad-pool")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(coreUrl() + "/pool/bad-pool").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(500, resp.code());
         }
     }
 
     /**
-     * Event loop 线程名是否包含 EventLoop 标识。
-     * 兼容 NIO（nioEventLoopGroup-*）、epoll（epollEventLoopGroup-*）等不同 transport，
+     * Event loop 线程名是否包含 EventLoop 标识。 兼容 NIO（nioEventLoopGroup-*）、epoll（epollEventLoopGroup-*）等不同 transport，
      * 大小写不敏感匹配（Netty 各实现线程名均含 "EventLoop"）。
      */
     private static boolean isEventLoopThreadName(String threadName) {

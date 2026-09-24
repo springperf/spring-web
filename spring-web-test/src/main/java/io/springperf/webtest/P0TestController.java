@@ -29,28 +29,28 @@ public class P0TestController {
 
     // ============ 3. @RequestMapping 多路径 ============
 
-    @GetMapping({"/multi-path-a", "/multi-path-b"})
+    @GetMapping({ "/multi-path-a", "/multi-path-b" })
     public String multiPath() {
         return "multi-path-ok";
     }
 
     // ============ 4. @RequestMapping method 数组 ============
 
-    @RequestMapping(value = "/multi-method", method = {RequestMethod.GET, RequestMethod.POST})
+    @RequestMapping(value = "/multi-method", method = { RequestMethod.GET, RequestMethod.POST })
     public String multiMethod() {
         return "multi-method-ok";
     }
 
     // ============ 5. @RequestMapping params 多条件（AND 语义） ============
 
-    @GetMapping(value = "/multi-param", params = {"a=1", "b=2"})
+    @GetMapping(value = "/multi-param", params = { "a=1", "b=2" })
     public String multiParam() {
         return "multi-param-matched";
     }
 
     // ============ 6. @RequestMapping headers 多条件（AND 语义） ============
 
-    @GetMapping(value = "/multi-header", headers = {"X-A=1", "X-B=2"})
+    @GetMapping(value = "/multi-header", headers = { "X-A=1", "X-B=2" })
     public String multiHeader() {
         return "multi-header-matched";
     }
@@ -59,8 +59,7 @@ public class P0TestController {
 
     @PostMapping("/request-entity")
     public String requestEntity(RequestEntity<String> reqEntity) {
-        return "method=" + reqEntity.getMethod()
-                + ",body=" + reqEntity.getBody();
+        return "method=" + reqEntity.getMethod() + ",body=" + reqEntity.getBody();
     }
 
     // ============ 8. Interceptor return-false 测试端点 ============

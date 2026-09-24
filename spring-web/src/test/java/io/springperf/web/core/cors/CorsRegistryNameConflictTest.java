@@ -1,26 +1,28 @@
 package io.springperf.web.core.cors;
 
-import io.springperf.web.context.ApplicationProperties;
-import io.springperf.web.context.PropertiesConstant;
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.DispatcherHandler;
-import org.junit.jupiter.api.Test;
-import org.springframework.context.ApplicationContext;
-
-import java.util.Collections;
-import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.util.Collections;
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationContext;
+
+import io.springperf.web.context.ApplicationProperties;
+import io.springperf.web.context.PropertiesConstant;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.DispatcherHandler;
+
 /**
  * 回归：多个 {@link CorsRegistration} 必须全部存活于组件容器。
- * <p>修复前 {@link CorsRegistration} 未覆盖 {@code getComponentName()}，多个注册共享默认
- * 简单类名，在 {@link WebComponentContainer#registerWebComponent} 中按名互斥、相互覆盖，
- * 仅最后一个保留——多路径 CORS 配置会静默丢失。此测试锁定唯一组件名的契约。</p>
+ * <p>
+ * 修复前 {@link CorsRegistration} 未覆盖 {@code getComponentName()}，多个注册共享默认 简单类名，在
+ * {@link WebComponentContainer#registerWebComponent} 中按名互斥、相互覆盖， 仅最后一个保留——多路径 CORS 配置会静默丢失。此测试锁定唯一组件名的契约。
+ * </p>
  */
 class CorsRegistryNameConflictTest {
 

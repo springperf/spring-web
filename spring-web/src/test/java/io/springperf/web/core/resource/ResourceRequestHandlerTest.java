@@ -1,9 +1,15 @@
 package io.springperf.web.core.resource;
 
-import io.springperf.web.core.mapping.match.HttpMethodMatcher;
-import io.springperf.web.core.mapping.match.Matcher;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.*;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Method;
+import java.util.List;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,15 +20,10 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.lang.reflect.Method;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.*;
+import io.springperf.web.core.mapping.match.HttpMethodMatcher;
+import io.springperf.web.core.mapping.match.Matcher;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 class ResourceRequestHandlerTest {
@@ -64,12 +65,11 @@ class ResourceRequestHandlerTest {
     }
 
     private void stubMaxRanges(String value) {
-        io.springperf.web.context.ApplicationProperties props =
-                mock(io.springperf.web.context.ApplicationProperties.class);
+        io.springperf.web.context.ApplicationProperties props = mock(
+                io.springperf.web.context.ApplicationProperties.class);
         io.springperf.web.context.WebContext webContext = mock(io.springperf.web.context.WebContext.class);
         lenient().when(webContext.getProps()).thenReturn(props);
-        lenient().when(props.get(io.springperf.web.context.PropertiesConstant.HTTP_MAX_RANGES, null))
-                .thenReturn(value);
+        lenient().when(props.get(io.springperf.web.context.PropertiesConstant.HTTP_MAX_RANGES, null)).thenReturn(value);
         lenient().when(request.getWebContext()).thenReturn(webContext);
         lenient().when(request.getPath()).thenReturn("/static/e2e-range.txt");
     }
@@ -311,7 +311,8 @@ class ResourceRequestHandlerTest {
     @Test
     void handleResourceRequest_notModified_whenIfNoneMatchMatches() throws IOException {
         ClassPathResource testResource = new ClassPathResource("static/css/style.css");
-        String expectedEtag = "\"0x" + Long.toHexString(testResource.lastModified()) + "-" + testResource.contentLength() + "\"";
+        String expectedEtag = "\"0x" + Long.toHexString(testResource.lastModified()) + "-"
+                + testResource.contentLength() + "\"";
 
         when(request.getPath()).thenReturn("/static/css/style.css");
         requestHeaders.setIfNoneMatch(expectedEtag);

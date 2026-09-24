@@ -20,10 +20,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(
-        classes = BatchApplication.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
-)
+@SpringBootTest(classes = BatchApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class BatchUserE2eTest {
 
     private TestRestTemplate rest;
@@ -34,8 +31,7 @@ class BatchUserE2eTest {
     @BeforeEach
     void setUp() {
         int actualPort = nettyHttpServer.getActualPort();
-        rest = new TestRestTemplate(new RestTemplateBuilder()
-                .rootUri("http://localhost:" + actualPort));
+        rest = new TestRestTemplate(new RestTemplateBuilder().rootUri("http://localhost:" + actualPort));
     }
 
     @Test
@@ -44,8 +40,7 @@ class BatchUserE2eTest {
         body.setName("testUser");
         body.setAge(30);
 
-        ResponseEntity<String> resp = rest.postForEntity(
-                "/batch/users?name=testUser", body, String.class);
+        ResponseEntity<String> resp = rest.postForEntity("/batch/users?name=testUser", body, String.class);
 
         assertThat(resp.getStatusCodeValue()).isEqualTo(200);
         assertThat(resp.getBody()).isNotNull();
@@ -54,8 +49,7 @@ class BatchUserE2eTest {
 
     @Test
     void getUser_singleRequest_withFields() {
-        ResponseEntity<String> resp = rest.getForEntity(
-                "/batch/users/user-001?fields=name,email", String.class);
+        ResponseEntity<String> resp = rest.getForEntity("/batch/users/user-001?fields=name,email", String.class);
 
         assertThat(resp.getStatusCodeValue()).isEqualTo(200);
         assertThat(resp.getBody()).isNotNull();
@@ -66,8 +60,7 @@ class BatchUserE2eTest {
 
     @Test
     void getUser_singleRequest_withoutFields() {
-        ResponseEntity<String> resp = rest.getForEntity(
-                "/batch/users/user-002", String.class);
+        ResponseEntity<String> resp = rest.getForEntity("/batch/users/user-002", String.class);
 
         assertThat(resp.getStatusCodeValue()).isEqualTo(200);
         assertThat(resp.getBody()).isNotNull();
@@ -91,19 +84,17 @@ class BatchUserE2eTest {
                     body.setName("concurrent-" + idx);
                     body.setAge(20 + idx);
 
-                    TestRestTemplate t = new TestRestTemplate(new RestTemplateBuilder()
-                            .rootUri("http://localhost:" + nettyHttpServer.getActualPort()));
+                    TestRestTemplate t = new TestRestTemplate(
+                            new RestTemplateBuilder().rootUri("http://localhost:" + nettyHttpServer.getActualPort()));
 
-                    ResponseEntity<String> resp = t.postForEntity(
-                            "/batch/users?name=concurrent-" + idx, body, String.class);
+                    ResponseEntity<String> resp = t.postForEntity("/batch/users?name=concurrent-" + idx, body,
+                            String.class);
 
-                    if (resp.getStatusCodeValue() == 200
-                            && resp.getBody() != null
+                    if (resp.getStatusCodeValue() == 200 && resp.getBody() != null
                             && resp.getBody().startsWith("created:")) {
                         successCount.incrementAndGet();
                     } else {
-                        failures.add("status=" + resp.getStatusCodeValue()
-                                + ", body=" + resp.getBody());
+                        failures.add("status=" + resp.getStatusCodeValue() + ", body=" + resp.getBody());
                     }
                 } catch (Exception e) {
                     failures.add("EXCEPTION:" + e.getMessage());
@@ -113,13 +104,12 @@ class BatchUserE2eTest {
             });
         }
 
-        assertThat(latch.await(15, TimeUnit.SECONDS))
-                .as("All concurrent requests should complete within timeout")
+        assertThat(latch.await(15, TimeUnit.SECONDS)).as("All concurrent requests should complete within timeout")
                 .isTrue();
         executor.shutdown();
 
-        assertThat(successCount.get())
-                .as("All concurrent create requests should be batched and return created: prefix. Failures: " + failures)
+        assertThat(successCount.get()).as(
+                "All concurrent create requests should be batched and return created: prefix. Failures: " + failures)
                 .isEqualTo(requestCount);
     }
 
@@ -135,20 +125,16 @@ class BatchUserE2eTest {
             String id = "id-" + i;
             executor.submit(() -> {
                 try {
-                    TestRestTemplate t = new TestRestTemplate(new RestTemplateBuilder()
-                            .rootUri("http://localhost:" + nettyHttpServer.getActualPort()));
+                    TestRestTemplate t = new TestRestTemplate(
+                            new RestTemplateBuilder().rootUri("http://localhost:" + nettyHttpServer.getActualPort()));
 
-                    ResponseEntity<String> resp = t.getForEntity(
-                            "/batch/users/" + id + "?fields=name", String.class);
+                    ResponseEntity<String> resp = t.getForEntity("/batch/users/" + id + "?fields=name", String.class);
 
-                    if (resp.getStatusCodeValue() == 200
-                            && resp.getBody() != null
-                            && resp.getBody().startsWith("user:")
+                    if (resp.getStatusCodeValue() == 200 && resp.getBody() != null && resp.getBody().startsWith("user:")
                             && resp.getBody().contains(id)) {
                         successCount.incrementAndGet();
                     } else {
-                        failures.add("id=" + id + ", status=" + resp.getStatusCodeValue()
-                                + ", body=" + resp.getBody());
+                        failures.add("id=" + id + ", status=" + resp.getStatusCodeValue() + ", body=" + resp.getBody());
                     }
                 } catch (Exception e) {
                     failures.add("EXCEPTION:" + e.getMessage());
@@ -158,8 +144,7 @@ class BatchUserE2eTest {
             });
         }
 
-        assertThat(latch.await(15, TimeUnit.SECONDS))
-                .as("All concurrent get requests should complete within timeout")
+        assertThat(latch.await(15, TimeUnit.SECONDS)).as("All concurrent get requests should complete within timeout")
                 .isTrue();
         executor.shutdown();
 

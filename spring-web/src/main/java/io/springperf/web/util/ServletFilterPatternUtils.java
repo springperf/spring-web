@@ -1,53 +1,50 @@
 package io.springperf.web.util;
 
-import io.springperf.web.util.support.ContainmentResult;
+import java.util.List;
+
 import org.springframework.lang.Nullable;
 
-import java.util.List;
+import io.springperf.web.util.support.ContainmentResult;
 
 /**
  * Servlet 规范的 URL 路径模式匹配工具。
- *
- * <p>与 {@link PathPatternUtils}（Ant/Spring 风格）不同，此类实现 Servlet 容器路径匹配语义：
+ * <p>
+ * 与 {@link PathPatternUtils}（Ant/Spring 风格）不同，此类实现 Servlet 容器路径匹配语义：
  * <ul>
- *   <li>{@code /*} — 匹配所有路径（Servlet 中相当于 Ant 的 {@code /**}）</li>
- *   <li>{@code /prefix/*} — 前缀递归匹配（如 {@code /api/*} 匹配 {@code /api/foo}、{@code /api/foo/bar}）</li>
- *   <li>{@code *.suffix} — 后缀匹配（如 {@code *.json} 匹配任意以 {@code .json} 结尾的路径）</li>
- *   <li>精确路径 — 完全匹配</li>
+ * <li>{@code /*} — 匹配所有路径（Servlet 中相当于 Ant 的 {@code /**}）</li>
+ * <li>{@code /prefix/*} — 前缀递归匹配（如 {@code /api/*} 匹配 {@code /api/foo}、{@code /api/foo/bar}）</li>
+ * <li>{@code *.suffix} — 后缀匹配（如 {@code *.json} 匹配任意以 {@code .json} 结尾的路径）</li>
+ * <li>精确路径 — 完全匹配</li>
  * </ul>
- *
- * <p>复用了三段式编译期推断思想（{@link ContainmentResult#ALWAYS}/{@link ContainmentResult#NEVER}/{@link ContainmentResult#RUNTIME}），
+ * <p>
+ * 复用了三段式编译期推断思想（{@link ContainmentResult#ALWAYS}/{@link ContainmentResult#NEVER}/{@link ContainmentResult#RUNTIME}），
  * 但内部使用 Servlet 规则进行判断。
- *
- * <p>注意：{@code matchPathRuleToCached} 接受的 {@code pathRule} 来自 Handler 映射（Ant 风格），
- * 可能包含 {@code {var}}、{@code **} 等 Ant 通配符。此类对 Ant 通配符做保守处理：
- * 能确定包含时返回 ALWAYS、能确定不包含时返回 NEVER、否则返回 RUNTIME。
- *
- * <p>专用于 {@code WebFilter} 路径匹配，不适用于 {@code HandlerInterceptor}（后者应继续使用 {@link PathPatternUtils}）。
+ * <p>
+ * 注意：{@code matchPathRuleToCached} 接受的 {@code pathRule} 来自 Handler 映射（Ant 风格）， 可能包含 {@code {var}}、{@code **} 等 Ant
+ * 通配符。此类对 Ant 通配符做保守处理： 能确定包含时返回 ALWAYS、能确定不包含时返回 NEVER、否则返回 RUNTIME。
+ * <p>
+ * 专用于 {@code WebFilter} 路径匹配，不适用于 {@code HandlerInterceptor}（后者应继续使用 {@link PathPatternUtils}）。
  */
 public class ServletFilterPatternUtils {
 
     // ========== Pattern type detection ==========
 
     /**
-     * 是否为 ALL 模式：{@code /*} 或 {@code /}。
-     * Servlet 中 {@code /*} 匹配所有路径。
+     * 是否为 ALL 模式：{@code /*} 或 {@code /}。 Servlet 中 {@code /*} 匹配所有路径。
      */
     public static boolean isAllPattern(String pattern) {
         return "/*".equals(pattern) || "/".equals(pattern);
     }
 
     /**
-     * 是否为前缀模式：以 {@code /} 开头、以 {@code /*} 结尾、长度 &gt; 2。
-     * 如 {@code /api/*}、{@code /api/users/*}。
+     * 是否为前缀模式：以 {@code /} 开头、以 {@code /*} 结尾、长度 &gt; 2。 如 {@code /api/*}、{@code /api/users/*}。
      */
     public static boolean isPrefixPattern(String pattern) {
         return pattern.startsWith("/") && pattern.endsWith("/*") && pattern.length() > 2;
     }
 
     /**
-     * 是否为后缀模式：以 {@code *.} 开头。
-     * 如 {@code *.json}、{@code *.do}。
+     * 是否为后缀模式：以 {@code *.} 开头。 如 {@code *.json}、{@code *.do}。
      */
     public static boolean isSuffixPattern(String pattern) {
         return pattern.startsWith("*.");
@@ -55,8 +52,9 @@ public class ServletFilterPatternUtils {
 
     /**
      * 校验 Servlet URL 模式的合法性，不合法时返回描述信息，合法返回 {@code null}。
-     * <p>Servlet 规范要求 URL 模式必须以 {@code /} 或 {@code *.} 开头。
-     * 不合规的模式（如 {@code api/test/*}）会被视为精确字面量，实际不会匹配任何请求。</p>
+     * <p>
+     * Servlet 规范要求 URL 模式必须以 {@code /} 或 {@code *.} 开头。 不合规的模式（如 {@code api/test/*}）会被视为精确字面量，实际不会匹配任何请求。
+     * </p>
      */
     @Nullable
     public static String validateServletPattern(String pattern) {
@@ -82,16 +80,14 @@ public class ServletFilterPatternUtils {
     // ========== Pattern extraction ==========
 
     /**
-     * 从前缀模式中提取前缀路径。
-     * 如 {@code /api/*} → {@code /api}。
+     * 从前缀模式中提取前缀路径。 如 {@code /api/*} → {@code /api}。
      */
     public static String extractPrefix(String prefixPattern) {
         return prefixPattern.substring(0, prefixPattern.length() - 2);
     }
 
     /**
-     * 从后缀模式中提取后缀。
-     * 如 {@code *.json} → {@code .json}。
+     * 从后缀模式中提取后缀。 如 {@code *.json} → {@code .json}。
      */
     public static String extractSuffix(String suffixPattern) {
         return suffixPattern.substring(1);
@@ -102,8 +98,11 @@ public class ServletFilterPatternUtils {
     /**
      * Servlet 规范的运行时路径匹配。
      *
-     * @param pattern    Servlet URL 模式（来自 Filter 配置：{@code /*}、{@code /api/*}、{@code *.json} 或精确路径）
-     * @param lookupPath 实际请求路径
+     * @param pattern
+     *            Servlet URL 模式（来自 Filter 配置：{@code /*}、{@code /api/*}、{@code *.json} 或精确路径）
+     * @param lookupPath
+     *            实际请求路径
+     *
      * @return 是否匹配
      */
     public static boolean matches(String pattern, String lookupPath) {
@@ -124,10 +123,12 @@ public class ServletFilterPatternUtils {
 
     /**
      * 三段式编译期推断：根据 mapping 的 pathRule（Ant 风格）判断 filter 是否适用。
-     * <p>逻辑与 {@link PathPatternUtils#matchPathRuleToCached} 一致，但使用 Servlet 模式规则。</p>
+     * <p>
+     * 逻辑与 {@link PathPatternUtils#matchPathRuleToCached} 一致，但使用 Servlet 模式规则。
+     * </p>
      */
-    public static ContainmentResult matchPathRuleToCached(
-            List<String> includePatterns, List<String> excludePatterns, String pathRule) {
+    public static ContainmentResult matchPathRuleToCached(List<String> includePatterns, List<String> excludePatterns,
+            String pathRule) {
 
         if (includePatterns.isEmpty() && excludePatterns.isEmpty()) {
             return ContainmentResult.ALWAYS;
@@ -144,13 +145,11 @@ public class ServletFilterPatternUtils {
         if (excludeResult == ContainmentResult.ALWAYS) {
             return ContainmentResult.NEVER;
         }
-        if (includeResult == ContainmentResult.ALWAYS
-                && excludeResult == ContainmentResult.NEVER) {
+        if (includeResult == ContainmentResult.ALWAYS && excludeResult == ContainmentResult.NEVER) {
             if (excludePatterns.isEmpty()) {
                 return ContainmentResult.ALWAYS;
             }
-            boolean disjoint = excludePatterns.stream()
-                    .allMatch(e -> patternsDisjoint(e, pathRule));
+            boolean disjoint = excludePatterns.stream().allMatch(e -> patternsDisjoint(e, pathRule));
             if (disjoint) {
                 return ContainmentResult.ALWAYS;
             }
@@ -162,8 +161,7 @@ public class ServletFilterPatternUtils {
     /**
      * 判断一个模式列表是否确定包含指定 pathRule。
      */
-    public static ContainmentResult patternListContains(
-            List<String> patternList, String pathRule) {
+    public static ContainmentResult patternListContains(List<String> patternList, String pathRule) {
         boolean sawRuntime = false;
         for (String inc : patternList) {
             ContainmentResult r = patternContains(inc, pathRule);
@@ -213,9 +211,7 @@ public class ServletFilterPatternUtils {
         if (p1Prefix && p2Prefix) {
             String pre1 = extractPrefix(p1) + "/";
             String pre2 = extractPrefix(p2) + "/";
-            return !pre1.equals(pre2)
-                    && !pre2.startsWith(pre1)
-                    && !pre1.startsWith(pre2);
+            return !pre1.equals(pre2) && !pre2.startsWith(pre1) && !pre1.startsWith(pre2);
         }
 
         // PREFIX vs EXACT：检查"EXACT"的首段字面量是否与 prefix 不同
@@ -268,17 +264,15 @@ public class ServletFilterPatternUtils {
     // ========== Internal helpers ==========
 
     /**
-     * 判断模式是否含有 Ant 通配符（{@code {var}}、{@code **}、{@code *}、{@code ?}）。
-     * 编译期推断中，含通配符的 containee 需要保守处理。
+     * 判断模式是否含有 Ant 通配符（{@code {var}}、{@code **}、{@code *}、{@code ?}）。 编译期推断中，含通配符的 containee 需要保守处理。
      */
     private static boolean hasAntWildcard(String s) {
         return s.indexOf('*') >= 0 || s.indexOf('{') >= 0 || s.indexOf('?') >= 0;
     }
 
     /**
-     * 提取路径模式中第一个固定路径段。
-     * 如 {@code /api/{id}} → {@code /api}，{@code /other/**} → {@code /other}，
-     * {@code {var}/foo} → {@code null}（首段非字面量）。
+     * 提取路径模式中第一个固定路径段。 如 {@code /api/{id}} → {@code /api}，{@code /other/**} → {@code /other}， {@code {var}/foo} →
+     * {@code null}（首段非字面量）。
      */
     private static String extractFirstLiteralSegment(String path) {
         if (!path.startsWith("/")) {
@@ -297,8 +291,8 @@ public class ServletFilterPatternUtils {
 
     /**
      * 前缀模式（如 /api/*）是否确定包含 containee（handler pathRule）。
-     *
-     * <p>对于 Ant 通配符 containee：若其首段字面量不同则 NEVER，若字面量能落在前缀下则检查字面前缀关系。
+     * <p>
+     * 对于 Ant 通配符 containee：若其首段字面量不同则 NEVER，若字面量能落在前缀下则检查字面前缀关系。
      */
     private static ContainmentResult prefixContains(String prefix, String containee) {
         // ALL (/*) 作为 containee → 前缀不能确定包含所有路径
@@ -333,8 +327,7 @@ public class ServletFilterPatternUtils {
         // 含 Ant 通配符的 containee：检查首段字面量是否与 prefix 不同
         if (hasAntWildcard(containee)) {
             String firstLit = extractFirstLiteralSegment(containee);
-            if (firstLit != null && !firstLit.equals(prefix)
-                    && !firstLit.startsWith(prefix + "/")) {
+            if (firstLit != null && !firstLit.equals(prefix) && !firstLit.startsWith(prefix + "/")) {
                 // 首段字面量不同且不落在 prefix 下 → NEVER
                 // 如 prefix=/api, containee=/other/** → /other/foo 不在 /api/ 下
                 return ContainmentResult.NEVER;
@@ -355,26 +348,22 @@ public class ServletFilterPatternUtils {
         }
         if (isSuffixPattern(containee)) {
             String cs = extractSuffix(containee);
-            return cs.endsWith(suffix)
-                    ? ContainmentResult.ALWAYS
-                    : ContainmentResult.NEVER;
+            return cs.endsWith(suffix) ? ContainmentResult.ALWAYS : ContainmentResult.NEVER;
         }
         // 含 Ant 通配符 → 保守
         if (hasAntWildcard(containee)) {
             return ContainmentResult.RUNTIME;
         }
         // 精确路径
-        return containee.endsWith(suffix)
-                ? ContainmentResult.ALWAYS
-                : ContainmentResult.NEVER;
+        return containee.endsWith(suffix) ? ContainmentResult.ALWAYS : ContainmentResult.NEVER;
     }
 
     /**
      * 精确路径是否确定包含 containee。
      */
     private static ContainmentResult exactContains(String exact, String containee) {
-        if (hasAntWildcard(containee) || isAllPattern(containee)
-                || isPrefixPattern(containee) || isSuffixPattern(containee)) {
+        if (hasAntWildcard(containee) || isAllPattern(containee) || isPrefixPattern(containee)
+                || isSuffixPattern(containee)) {
             return ContainmentResult.RUNTIME;
         }
         return exact.equals(containee) ? ContainmentResult.ALWAYS : ContainmentResult.NEVER;
@@ -385,8 +374,7 @@ public class ServletFilterPatternUtils {
     }
 
     /**
-     * PREFIX 模式与含 Ant 通配符的 EXACT 模式的不相交判断。
-     * 如果 EXACT 模式的首段是固定字面量且不落在 prefix 下 → 确定不相交。
+     * PREFIX 模式与含 Ant 通配符的 EXACT 模式的不相交判断。 如果 EXACT 模式的首段是固定字面量且不落在 prefix 下 → 确定不相交。
      */
     private static boolean isPrefixDisjointFromExactWithWildcard(String prefix, String exactWithWildcard) {
         String firstLit = extractFirstLiteralSegment(exactWithWildcard);
@@ -398,8 +386,7 @@ public class ServletFilterPatternUtils {
     }
 
     /**
-     * 两个可能含 Ant 通配符的"EXACT"模式的不相交判断。
-     * 如果两者首段都是不同的固定字面量 → 确定不相交。
+     * 两个可能含 Ant 通配符的"EXACT"模式的不相交判断。 如果两者首段都是不同的固定字面量 → 确定不相交。
      */
     private static boolean isExactDisjointWithWildcard(String p1, String p2) {
         String firstLit1 = extractFirstLiteralSegment(p1);

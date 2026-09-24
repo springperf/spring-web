@@ -1,5 +1,23 @@
 package io.springperf.web.core.cors;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.util.Collections;
+import java.util.List;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationContext;
+import org.springframework.http.HttpMethod;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.method.HandlerMethod;
+
 import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
@@ -11,47 +29,38 @@ import io.springperf.web.core.cors.provider.SimpleCorsConfigurationProvider;
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.core.mapping.match.HttpMethodMatcher;
 import io.springperf.web.core.mapping.match.Matcher;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.context.ApplicationContext;
-import org.springframework.http.HttpMethod;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.method.HandlerMethod;
-
-import java.util.Collections;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 class CorsRegistryProviderTest {
 
     @CrossOrigin(origins = "http://a.com")
     static class ClassLevelController {
         @RequestMapping("/c")
-        public String hello() { return "hello"; }
+        public String hello() {
+            return "hello";
+        }
     }
 
     static class MethodLevelController {
-        @CrossOrigin(origins = "http://b.com", methods = {org.springframework.web.bind.annotation.RequestMethod.PUT})
+        @CrossOrigin(origins = "http://b.com", methods = { org.springframework.web.bind.annotation.RequestMethod.PUT })
         @RequestMapping("/m")
-        public String hello() { return "hello"; }
+        public String hello() {
+            return "hello";
+        }
     }
 
     static class NoAnnotationController {
         @RequestMapping("/n")
-        public String hello() { return "hello"; }
+        public String hello() {
+            return "hello";
+        }
     }
 
     static class AllCredentialsController {
         @CrossOrigin(origins = "http://c.com", allowCredentials = "true")
         @RequestMapping("/ac")
-        public String hello() { return "hello"; }
+        public String hello() {
+            return "hello";
+        }
     }
 
     private WebContext webContext;
@@ -98,7 +107,7 @@ class CorsRegistryProviderTest {
     @Test
     void methodLevelCrossOrigin_mergesConfigAndUsesHttpMethodMatcher() throws Exception {
         PathMappingContext ctx = contextFor(new MethodLevelController(), "/m",
-                Collections.singletonList(new HttpMethodMatcher(new HttpMethod[]{HttpMethod.PUT})));
+                Collections.singletonList(new HttpMethodMatcher(new HttpMethod[] { HttpMethod.PUT })));
         CorsConfigurationProvider provider = registry.createCorsConfigurationProvider(ctx);
         CorsConfiguration config = provider.getCorsConfiguration(
                 mock(io.springperf.web.http.WebServerHttpRequest.class),
@@ -124,7 +133,9 @@ class CorsRegistryProviderTest {
         @CrossOrigin(allowCredentials = "maybe")
         class BadController {
             @RequestMapping("/bad")
-            public String hello() { return "x"; }
+            public String hello() {
+                return "x";
+            }
         }
         PathMappingContext ctx = contextFor(new BadController(), "/bad", Collections.emptyList());
         assertThrows(IllegalStateException.class, () -> registry.createCorsConfigurationProvider(ctx));
@@ -190,12 +201,13 @@ class CorsRegistryProviderTest {
 
     @Test
     void embeddedValueResolver_resolvesPlaceholders() throws Exception {
-        registry.setEmbeddedValueResolver(value ->
-                value.equals("${origin}") ? "http://resolved.com" : value);
+        registry.setEmbeddedValueResolver(value -> value.equals("${origin}") ? "http://resolved.com" : value);
         @CrossOrigin(origins = "${origin}")
         class PlaceholderController {
             @RequestMapping("/p")
-            public String hello() { return "x"; }
+            public String hello() {
+                return "x";
+            }
         }
         PathMappingContext ctx = contextFor(new PlaceholderController(), "/p", Collections.emptyList());
         CorsConfigurationProvider provider = registry.createCorsConfigurationProvider(ctx);
@@ -210,10 +222,8 @@ class CorsRegistryProviderTest {
 
     private io.springperf.web.http.WebServerHttpRequest requestWithMapping(
             io.springperf.web.core.mapping.MappingResult result) {
-        io.springperf.web.http.WebServerHttpRequest request =
-                mock(io.springperf.web.http.WebServerHttpRequest.class);
-        io.springperf.web.http.RequestContext requestContext =
-                mock(io.springperf.web.http.RequestContext.class);
+        io.springperf.web.http.WebServerHttpRequest request = mock(io.springperf.web.http.WebServerHttpRequest.class);
+        io.springperf.web.http.RequestContext requestContext = mock(io.springperf.web.http.RequestContext.class);
         java.util.Map<io.springperf.web.http.RequestAttribute<?>, Object> attrs = new java.util.HashMap<>();
         when(requestContext.getAttribute(any(io.springperf.web.http.RequestAttribute.class)))
                 .thenAnswer(inv -> attrs.get(inv.getArgument(0)));
@@ -239,8 +249,8 @@ class CorsRegistryProviderTest {
     @Test
     void getCorsConfiguration_matchedResult_usesMatchedContext() throws Exception {
         PathMappingContext ctx = contextFor(new ClassLevelController(), "/c", Collections.emptyList());
-        io.springperf.web.http.WebServerHttpRequest request =
-                requestWithMapping(io.springperf.web.core.mapping.MappingResult.matched(ctx));
+        io.springperf.web.http.WebServerHttpRequest request = requestWithMapping(
+                io.springperf.web.core.mapping.MappingResult.matched(ctx));
 
         CorsConfiguration config = registry.getCorsConfiguration(request,
                 mock(io.springperf.web.http.WebServerHttpResponse.class));
@@ -252,9 +262,8 @@ class CorsRegistryProviderTest {
     @Test
     void getCorsConfiguration_pathMatchedResult_usesFirstContext() throws Exception {
         PathMappingContext ctx = contextFor(new MethodLevelController(), "/m", Collections.emptyList());
-        io.springperf.web.http.WebServerHttpRequest request =
-                requestWithMapping(io.springperf.web.core.mapping.MappingResult.pathMatched(
-                        new PathMappingContext[]{ctx}, true));
+        io.springperf.web.http.WebServerHttpRequest request = requestWithMapping(
+                io.springperf.web.core.mapping.MappingResult.pathMatched(new PathMappingContext[] { ctx }, true));
 
         CorsConfiguration config = registry.getCorsConfiguration(request,
                 mock(io.springperf.web.http.WebServerHttpResponse.class));
@@ -265,8 +274,8 @@ class CorsRegistryProviderTest {
 
     @Test
     void getCorsConfiguration_notFoundResult_returnsDefaultProvider() throws Exception {
-        io.springperf.web.http.WebServerHttpRequest request =
-                requestWithMapping(io.springperf.web.core.mapping.MappingResult.notFound());
+        io.springperf.web.http.WebServerHttpRequest request = requestWithMapping(
+                io.springperf.web.core.mapping.MappingResult.notFound());
 
         CorsConfiguration config = registry.getCorsConfiguration(request,
                 mock(io.springperf.web.http.WebServerHttpResponse.class));

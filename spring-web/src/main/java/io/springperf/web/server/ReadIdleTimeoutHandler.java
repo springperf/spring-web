@@ -1,5 +1,7 @@
 package io.springperf.web.server;
 
+import java.util.concurrent.TimeUnit;
+
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -7,18 +9,16 @@ import io.netty.util.concurrent.ScheduledFuture;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 
-import java.util.concurrent.TimeUnit;
-
 /**
  * 读空闲超时处理器：{@code server.http.read-timeout} 只约束**读空闲**，不得掐断正在处理的请求。
- *
- * <p>Netty 自带的 {@link io.netty.handler.timeout.ReadTimeoutHandler} 在「无读事件」时即触发并关闭连接。
- * 但业务处理期间（慢 SQL、下游调用、异步挂起）本来就没有读事件——直接用它会把这些请求的响应连同连接
- * 一起丢弃：只要处理器耗时超过 {@code read-timeout}（默认 30s），客户端就收不到响应。</p>
- *
- * <p>因此本处理器在计时到期时先检查该连接是否有请求在途（复用
- * {@link NettyHttpHandler} 已有的 pipelining 在途标记），有则重新计时，无则关闭连接。
- * 语义对齐 Tomcat 的 {@code connectionTimeout}：只回收真正的空闲连接与半截请求。</p>
+ * <p>
+ * Netty 自带的 {@link io.netty.handler.timeout.ReadTimeoutHandler} 在「无读事件」时即触发并关闭连接。 但业务处理期间（慢
+ * SQL、下游调用、异步挂起）本来就没有读事件——直接用它会把这些请求的响应连同连接 一起丢弃：只要处理器耗时超过 {@code read-timeout}（默认 30s），客户端就收不到响应。
+ * </p>
+ * <p>
+ * 因此本处理器在计时到期时先检查该连接是否有请求在途（复用 {@link NettyHttpHandler} 已有的 pipelining 在途标记），有则重新计时，无则关闭连接。 语义对齐 Tomcat 的
+ * {@code connectionTimeout}：只回收真正的空闲连接与半截请求。
+ * </p>
  */
 public class ReadIdleTimeoutHandler extends ChannelInboundHandlerAdapter {
 

@@ -25,17 +25,16 @@ import java.util.List;
  * 视图控制器的 {@link CustomInvoker}：把 {@code addViewController}/
  * {@code addRedirectViewController}/{@code addStatusController} 注册项路由为三种行为——
  * <ul>
- *   <li><b>viewName</b>：经 {@link ViewResolverRegistry} 解析并渲染（缺 resolver 时 500，与
- *       视图方法返回不可解析视图名一致）</li>
- *   <li><b>redirect</b>：{@link RedirectView}（302 + Location，自动拼 context-path 与 model query）</li>
- *   <li><b>status</b>：仅设置状态码</li>
+ * <li><b>viewName</b>：经 {@link ViewResolverRegistry} 解析并渲染（缺 resolver 时 500，与 视图方法返回不可解析视图名一致）</li>
+ * <li><b>redirect</b>：{@link RedirectView}（302 + Location，自动拼 context-path 与 model query）</li>
+ * <li><b>status</b>：仅设置状态码</li>
  * </ul>
  * viewName 与 status 可组合（先设状态再渲染，如 200 + 指定视图）。
  */
 public class ViewControllerInvoker implements CustomInvoker {
 
-    public static final Method HANDLE_METHOD = ReflectionUtils.findMethod(
-            ViewControllerInvoker.class, "handle", WebServerHttpRequest.class, WebServerHttpResponse.class);
+    public static final Method HANDLE_METHOD = ReflectionUtils.findMethod(ViewControllerInvoker.class, "handle",
+            WebServerHttpRequest.class, WebServerHttpResponse.class);
 
     private final String viewName;
     private final HttpStatus statusCode;
@@ -43,8 +42,7 @@ public class ViewControllerInvoker implements CustomInvoker {
     private volatile ViewResolverRegistry viewResolverRegistry;
 
     ViewControllerInvoker(WebContext webContext, String viewName, HttpStatus statusCode) {
-        Assert.isTrue(viewName != null || statusCode != null,
-                "ViewController requires a viewName or a statusCode");
+        Assert.isTrue(viewName != null || statusCode != null, "ViewController requires a viewName or a statusCode");
         this.webContext = webContext;
         this.viewName = viewName;
         this.statusCode = statusCode;
@@ -94,8 +92,7 @@ public class ViewControllerInvoker implements CustomInvoker {
         ViewResolverRegistry registry = this.viewResolverRegistry;
         if (registry == null) {
             // getWebComponentWithDefault 缺失时注册并返回（幂等），与 ThymeleafViewResolver 同模式
-            registry = webContext.getWebComponentWithDefault(ViewResolverRegistry.class,
-                    new ViewResolverRegistry());
+            registry = webContext.getWebComponentWithDefault(ViewResolverRegistry.class, new ViewResolverRegistry());
             this.viewResolverRegistry = registry;
         }
         return registry.resolve(name, req);
@@ -109,7 +106,7 @@ public class ViewControllerInvoker implements CustomInvoker {
     /** 视图控制器仅响应 GET（HEAD 由 HttpMethodMatcher 自动映射，对齐 ResourceRequestHandler）。 */
     @Override
     public List<Matcher> getMatchers() {
-        return Arrays.asList(new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET}));
+        return Arrays.asList(new HttpMethodMatcher(new HttpMethod[] { HttpMethod.GET }));
     }
 
     @Override

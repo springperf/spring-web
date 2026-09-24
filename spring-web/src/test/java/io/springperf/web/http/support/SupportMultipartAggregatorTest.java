@@ -1,32 +1,30 @@
 package io.springperf.web.http.support;
 
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.nio.charset.StandardCharsets;
+
+import org.junit.jupiter.api.Test;
+
 import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.http.*;
-import org.junit.jupiter.api.Test;
-
-import java.nio.charset.StandardCharsets;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * 验证 {@link SupportMultipartAggregator} 对 multipart/form-data 请求的流式聚合。
- * <p>注意：Netty 4.1.137 {@code MessageAggregator.acceptInboundMessage} 会拒绝
- * {@code FullHttpMessage}（已聚合），故测试必须按真实管线（HttpServerCodec 解码产物）
- * 分块喂入 {@code HttpRequest} + {@code HttpContent} + {@code LastHttpContent}。</p>
+ * <p>
+ * 注意：Netty 4.1.137 {@code MessageAggregator.acceptInboundMessage} 会拒绝
+ * {@code FullHttpMessage}（已聚合），故测试必须按真实管线（HttpServerCodec 解码产物） 分块喂入 {@code HttpRequest} + {@code HttpContent} +
+ * {@code LastHttpContent}。
+ * </p>
  */
 class SupportMultipartAggregatorTest {
 
     private static String multipartBody() {
-        return "--boundary\r\n"
-                + "Content-Disposition: form-data; name=\"field1\"\r\n\r\n"
-                + "value1\r\n"
-                + "--boundary\r\n"
-                + "Content-Disposition: form-data; name=\"file1\"; filename=\"test.txt\"\r\n"
-                + "Content-Type: text/plain\r\n\r\n"
-                + "file-content\r\n"
-                + "--boundary--\r\n";
+        return "--boundary\r\n" + "Content-Disposition: form-data; name=\"field1\"\r\n\r\n" + "value1\r\n"
+                + "--boundary\r\n" + "Content-Disposition: form-data; name=\"file1\"; filename=\"test.txt\"\r\n"
+                + "Content-Type: text/plain\r\n\r\n" + "file-content\r\n" + "--boundary--\r\n";
     }
 
     private static DefaultHttpRequest multipartHead() {
@@ -63,8 +61,8 @@ class SupportMultipartAggregatorTest {
         channel.writeInbound(new DefaultLastHttpContent());
 
         Object out = channel.readInbound();
-        assertTrue(out instanceof NettyMultipartWebRequest, "multipart 请求应聚合为 NettyMultipartWebRequest，实际: "
-                + (out == null ? "null" : out.getClass().getName()));
+        assertTrue(out instanceof NettyMultipartWebRequest,
+                "multipart 请求应聚合为 NettyMultipartWebRequest，实际: " + (out == null ? "null" : out.getClass().getName()));
         NettyMultipartWebRequest multipart = (NettyMultipartWebRequest) out;
         assertTrue(multipart.getParameters().containsKey("field1"));
         assertTrue(multipart.getFiles().containsKey("file1"));
@@ -79,8 +77,10 @@ class SupportMultipartAggregatorTest {
 
         String body = multipartBody();
         int mid = body.length() / 2;
-        channel.writeInbound(new DefaultHttpContent(Unpooled.copiedBuffer(body.substring(0, mid), StandardCharsets.UTF_8)));
-        channel.writeInbound(new DefaultHttpContent(Unpooled.copiedBuffer(body.substring(mid), StandardCharsets.UTF_8)));
+        channel.writeInbound(
+                new DefaultHttpContent(Unpooled.copiedBuffer(body.substring(0, mid), StandardCharsets.UTF_8)));
+        channel.writeInbound(
+                new DefaultHttpContent(Unpooled.copiedBuffer(body.substring(mid), StandardCharsets.UTF_8)));
         channel.writeInbound(new DefaultLastHttpContent());
 
         Object out = channel.readInbound();
@@ -100,7 +100,8 @@ class SupportMultipartAggregatorTest {
 
         channel.writeInbound(multipartHead());
         assertTrue(resolver.isMultipartMode(), "multipart 头到达后应进入 multipart 模式");
-        assertTrue(aggregator.acceptInboundMessage(
+        assertTrue(
+                aggregator.acceptInboundMessage(
                         new DefaultHttpContent(Unpooled.copiedBuffer("x", StandardCharsets.UTF_8))),
                 "multipart 模式期间 HttpContent 应被接受");
         channel.finishAndReleaseAll();
@@ -124,13 +125,12 @@ class SupportMultipartAggregatorTest {
         SupportMultipartResolver resolver = new SupportMultipartResolver();
         SupportMultipartAggregator aggregator = new SupportMultipartAggregator(1024 * 1024, resolver);
         // 追加吞异常的 tail handler，避免 EmbeddedChannel 将异常向上重抛
-        EmbeddedChannel channel = new EmbeddedChannel(aggregator,
-                new io.netty.channel.ChannelInboundHandlerAdapter() {
-                    @Override
-                    public void exceptionCaught(io.netty.channel.ChannelHandlerContext ctx, Throwable cause) {
-                        // swallow
-                    }
-                });
+        EmbeddedChannel channel = new EmbeddedChannel(aggregator, new io.netty.channel.ChannelInboundHandlerAdapter() {
+            @Override
+            public void exceptionCaught(io.netty.channel.ChannelHandlerContext ctx, Throwable cause) {
+                // swallow
+            }
+        });
 
         channel.writeInbound(multipartHead());
         assertTrue(resolver.isMultipartMode());
@@ -152,8 +152,8 @@ class SupportMultipartAggregatorTest {
         channel.writeInbound(head);
 
         Object out = channel.readOutbound();
-        assertTrue(out instanceof FullHttpResponse, "超限请求应返回 413，实际: "
-                + (out == null ? "null" : out.getClass().getName()));
+        assertTrue(out instanceof FullHttpResponse,
+                "超限请求应返回 413，实际: " + (out == null ? "null" : out.getClass().getName()));
         assertEquals(HttpResponseStatus.REQUEST_ENTITY_TOO_LARGE, ((FullHttpResponse) out).status());
         ((FullHttpResponse) out).release();
         channel.finishAndReleaseAll();
@@ -168,8 +168,8 @@ class SupportMultipartAggregatorTest {
         channel.writeInbound(new DefaultHttpContent(Unpooled.copiedBuffer(multipartBody(), StandardCharsets.UTF_8)));
 
         Object out = channel.readOutbound();
-        assertTrue(out instanceof FullHttpResponse, "chunked 超限请求应返回 413，实际: "
-                + (out == null ? "null" : out.getClass().getName()));
+        assertTrue(out instanceof FullHttpResponse,
+                "chunked 超限请求应返回 413，实际: " + (out == null ? "null" : out.getClass().getName()));
         assertEquals(HttpResponseStatus.REQUEST_ENTITY_TOO_LARGE, ((FullHttpResponse) out).status());
         ((FullHttpResponse) out).release();
         channel.finishAndReleaseAll();
@@ -208,8 +208,8 @@ class SupportMultipartAggregatorTest {
         channel.writeInbound(new DefaultHttpContent(Unpooled.copiedBuffer("garbage", StandardCharsets.UTF_8)));
 
         Object out = channel.readOutbound();
-        assertTrue(out instanceof FullHttpResponse, "解码失败的 multipart 应回写 400，实际: "
-                + (out == null ? "null" : out.getClass().getName()));
+        assertTrue(out instanceof FullHttpResponse,
+                "解码失败的 multipart 应回写 400，实际: " + (out == null ? "null" : out.getClass().getName()));
         assertEquals(HttpResponseStatus.BAD_REQUEST, ((FullHttpResponse) out).status());
         ((FullHttpResponse) out).release();
         channel.finishAndReleaseAll();

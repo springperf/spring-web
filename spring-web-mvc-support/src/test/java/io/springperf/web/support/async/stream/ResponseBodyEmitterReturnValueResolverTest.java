@@ -44,7 +44,8 @@ class ResponseBodyEmitterReturnValueResolverTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(webContext.getWebComponentWithDefault(eq(HttpBodyCodecRegistry.class), any())).thenReturn(codecRegistry);
+        lenient().when(webContext.getWebComponentWithDefault(eq(HttpBodyCodecRegistry.class), any()))
+                .thenReturn(codecRegistry);
         resolver = new ResponseBodyEmitterReturnValueResolver();
         resolver.initWithWebContext(webContext);
     }
@@ -79,7 +80,8 @@ class ResponseBodyEmitterReturnValueResolverTest {
         HttpBodyConverter converter = mock(HttpBodyConverter.class);
         when(converter.canWrite(null, String.class, null)).thenReturn(true);
         doAnswer(invocation -> {
-            java.io.OutputStream body = invocation.getArgument(3, org.springframework.http.HttpOutputMessage.class).getBody();
+            java.io.OutputStream body = invocation.getArgument(3, org.springframework.http.HttpOutputMessage.class)
+                    .getBody();
             body.write("converted".getBytes(StandardCharsets.UTF_8));
             return null;
         }).when(converter).write(eq("data"), isNull(), isNull(), any());
@@ -96,14 +98,15 @@ class ResponseBodyEmitterReturnValueResolverTest {
         HttpBodyConverter converter = mock(HttpBodyConverter.class);
         when(converter.canWrite(null, String.class, MediaType.TEXT_PLAIN)).thenReturn(true);
         doAnswer(invocation -> {
-            java.io.OutputStream body = invocation.getArgument(3, org.springframework.http.HttpOutputMessage.class).getBody();
+            java.io.OutputStream body = invocation.getArgument(3, org.springframework.http.HttpOutputMessage.class)
+                    .getBody();
             body.write("encoded".getBytes(StandardCharsets.UTF_8));
             return null;
         }).when(converter).write(any(), isNull(), eq(MediaType.TEXT_PLAIN), any());
         when(codecRegistry.getConverters()).thenReturn(Collections.singletonList(converter));
 
-        ResponseBodyEmitter.DataWithMediaType dataWithType =
-                new ResponseBodyEmitter.DataWithMediaType("data", MediaType.TEXT_PLAIN);
+        ResponseBodyEmitter.DataWithMediaType dataWithType = new ResponseBodyEmitter.DataWithMediaType("data",
+                MediaType.TEXT_PLAIN);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         resolver.encodeToStream(new HttpHeaders(), dataWithType, baos);
 

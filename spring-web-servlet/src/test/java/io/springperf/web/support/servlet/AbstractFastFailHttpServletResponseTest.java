@@ -9,7 +9,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class AbstractFastFailHttpServletResponseTest {
 
-    private final AbstractFastFailHttpServletResponse response = new AbstractFastFailHttpServletResponse() {};
+    private final AbstractFastFailHttpServletResponse response = new AbstractFastFailHttpServletResponse() {
+    };
 
     @Test
     void getCharacterEncoding_returnsUtf8() {

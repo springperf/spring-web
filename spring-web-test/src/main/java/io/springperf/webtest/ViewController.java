@@ -30,9 +30,8 @@ public class ViewController {
 
     @GetMapping("/mav")
     public ModelAndView modelAndView(@RequestParam(value = "name", defaultValue = "MAV") String name) {
-        return new ModelAndView("hello")
-                .addObject("name", name)
-                .addObject("message", "Hello from ModelAndView " + name + "!");
+        return new ModelAndView("hello").addObject("name", name).addObject("message",
+                "Hello from ModelAndView " + name + "!");
     }
 
     @GetMapping("/model-attr")
@@ -44,8 +43,8 @@ public class ViewController {
     @GetMapping("/advice")
     public String advice(Model model) {
         model.addAttribute("name", "advice");
-        model.addAttribute("message", "app=" + model.getAttribute("appName")
-                + ", title=" + model.getAttribute("globalTitle"));
+        model.addAttribute("message",
+                "app=" + model.getAttribute("appName") + ", title=" + model.getAttribute("globalTitle"));
         return "hello";
     }
 
@@ -70,8 +69,8 @@ public class ViewController {
     }
 
     @GetMapping("/binding")
-    public String binding(@ModelAttribute("validForm") @Valid ValidatedForm form,
-                          BindingResult bindingResult, Model model) {
+    public String binding(@ModelAttribute("validForm") @Valid ValidatedForm form, BindingResult bindingResult,
+            Model model) {
         model.addAttribute("hasErrors", bindingResult.hasErrors());
         return "binding";
     }

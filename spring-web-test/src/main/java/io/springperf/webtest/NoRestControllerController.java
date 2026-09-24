@@ -6,8 +6,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * 测试不含 @RestController 的控制器。
- * 使用 @Controller + 方法级 @ResponseBody，验证框架仍能正确处理。
+ * 测试不含 @RestController 的控制器。 使用 @Controller + 方法级 @ResponseBody，验证框架仍能正确处理。
  */
 @Controller
 @RequestMapping("/p0/no-rest-controller")

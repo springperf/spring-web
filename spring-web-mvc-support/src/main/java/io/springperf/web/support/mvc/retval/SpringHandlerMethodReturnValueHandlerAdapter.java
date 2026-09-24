@@ -18,23 +18,21 @@ import org.springframework.web.method.support.HandlerMethodReturnValueHandler;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
 /**
- * Adapts a Spring MVC {@link HandlerMethodReturnValueHandler} to the framework's
- * {@link ReturnValueResolver} interface.
- *
- * <p>The adapter creates Servlet API wrappers around the framework's request/response
- * objects so that existing Spring return value handlers can be used without modification.
- *
- * <p>Order is resolved via {@link WebComponentWrapper}:
+ * Adapts a Spring MVC {@link HandlerMethodReturnValueHandler} to the framework's {@link ReturnValueResolver} interface.
+ * <p>
+ * The adapter creates Servlet API wrappers around the framework's request/response objects so that existing Spring
+ * return value handlers can be used without modification.
+ * <p>
+ * Order is resolved via {@link WebComponentWrapper}:
  * <ol>
- *   <li>If the wrapped handler has {@link org.springframework.core.annotation.Order @Order}
- *       or implements {@link org.springframework.core.Ordered Ordered}, that value is used.</li>
- *   <li>Otherwise falls back to {@link #defaultOrderPriority()} = {@code LOWEST_PRECEDENCE - 10000}.</li>
+ * <li>If the wrapped handler has {@link org.springframework.core.annotation.Order @Order} or implements
+ * {@link org.springframework.core.Ordered Ordered}, that value is used.</li>
+ * <li>Otherwise falls back to {@link #defaultOrderPriority()} = {@code LOWEST_PRECEDENCE - 10000}.</li>
  * </ol>
- * The {@link io.springperf.web.support.mvc.config.WebMvcConfigurerBridge} may override
- * the order to a higher priority when no custom order is set.
+ * The {@link io.springperf.web.support.mvc.config.WebMvcConfigurerBridge} may override the order to a higher priority
+ * when no custom order is set.
  */
-public class SpringHandlerMethodReturnValueHandlerAdapter
-        extends WebComponentWrapper<HandlerMethodReturnValueHandler>
+public class SpringHandlerMethodReturnValueHandlerAdapter extends WebComponentWrapper<HandlerMethodReturnValueHandler>
         implements ReturnValueResolver {
 
     public SpringHandlerMethodReturnValueHandlerAdapter(HandlerMethodReturnValueHandler handler) {
@@ -60,8 +58,8 @@ public class SpringHandlerMethodReturnValueHandlerAdapter
     }
 
     @Override
-    public void resolveReturnValue(Object returnValue, MethodParameter returnType,
-                                   WebServerHttpRequest request, WebServerHttpResponse response) throws Exception {
+    public void resolveReturnValue(Object returnValue, MethodParameter returnType, WebServerHttpRequest request,
+            WebServerHttpResponse response) throws Exception {
         // C5：复用请求级已缓存的 Servlet 包装（ServletAttribute），避免每次返回都
         // new PerfHttpServletRequest/Response（P2 正确性组 #12 热路径开销）。
         RequestContext ctx = request.getRequestContext();

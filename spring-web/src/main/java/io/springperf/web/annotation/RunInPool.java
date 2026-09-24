@@ -1,21 +1,20 @@
 package io.springperf.web.annotation;
 
-import io.springperf.web.core.pool.BizPoolRegistry;
-
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import io.springperf.web.core.pool.BizPoolRegistry;
+
 /**
- * 标注在 HandlerMethod 上，指定该方法应运行在哪个业务线程池中。
- * 也可作为元注解，用于自定义组合注解（如 {@code @RunInEventloop}）。
+ * 标注在 HandlerMethod 上，指定该方法应运行在哪个业务线程池中。 也可作为元注解，用于自定义组合注解（如 {@code @RunInEventloop}）。
  * <p>
- * 默认值 "default" 对应全局配置 {@code pool.*} 创建的线程池。
- * 不标注此注解的方法默认在 {@code default} 业务线程池中执行，
- * 可通过 {@code pool.default-execute-mode=eventloop} 配置为 EventLoop。
+ * 默认值 "default" 对应全局配置 {@code pool.*} 创建的线程池。 不标注此注解的方法默认在 {@code default} 业务线程池中执行， 可通过
+ * {@code pool.default-execute-mode=eventloop} 配置为 EventLoop。
  * <p>
  * 使用 {@link #EVENTLOOP} 常量可显式声明在 EventLoop 上执行：
+ *
  * <pre>{@code
  * &#64;GetMapping("/fast")
  * &#64;RunInPool(RunInPool.EVENTLOOP)
@@ -23,6 +22,7 @@ import java.lang.annotation.Target;
  * }</pre>
  * <p>
  * 使用自定义池：
+ *
  * <pre>{@code
  * &#64;GetMapping("/report")
  * &#64;RunInPool("io")
@@ -31,13 +31,12 @@ import java.lang.annotation.Target;
  *
  * @see BizPoolRegistry
  */
-@Target({ElementType.METHOD, ElementType.ANNOTATION_TYPE})
+@Target({ ElementType.METHOD, ElementType.ANNOTATION_TYPE })
 @Retention(RetentionPolicy.RUNTIME)
 public @interface RunInPool {
 
     /**
-     * 保留关键字，标注此值时强制在 Netty EventLoop 上执行。
-     * 对应配置 {@code pool.default-execute-mode=eventloop}。
+     * 保留关键字，标注此值时强制在 Netty EventLoop 上执行。 对应配置 {@code pool.default-execute-mode=eventloop}。
      */
     String EVENTLOOP = "eventloop";
 

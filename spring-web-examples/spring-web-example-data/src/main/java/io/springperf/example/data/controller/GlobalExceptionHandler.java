@@ -20,27 +20,23 @@ public class GlobalExceptionHandler {
         Map<String, Object> body = new HashMap<>();
         body.put("code", 400);
         body.put("message", e.getMessage());
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(body);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleUnknown(Exception e) {
         if (e instanceof MethodArgumentNotValidException) {
             String msg = ((MethodArgumentNotValidException) e).getBindingResult().getFieldErrors().stream()
-                    .map(err -> err.getField() + ": " + err.getDefaultMessage())
-                    .collect(Collectors.joining("; "));
+                    .map(err -> err.getField() + ": " + err.getDefaultMessage()).collect(Collectors.joining("; "));
             Map<String, Object> body = new HashMap<>();
             body.put("code", 400);
             body.put("message", msg);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(body);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
         }
         log.error("unhandled exception", e);
         Map<String, Object> body = new HashMap<>();
         body.put("code", 500);
         body.put("message", "internal server error");
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(body);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
     }
 }

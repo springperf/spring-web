@@ -8,8 +8,10 @@ import java.util.List;
 
 /**
  * Shim of Spring MVC's {@code ViewControllerRegistry}.
- * <p>收集用户 {@code WebMvcConfigurer#addViewControllers} 的注册项，由
- * {@code WebMvcConfigurerBridge} 桥接为框架原生路由（{@code PathMappingContext}）。</p>
+ * <p>
+ * 收集用户 {@code WebMvcConfigurer#addViewControllers} 的注册项，由 {@code WebMvcConfigurerBridge}
+ * 桥接为框架原生路由（{@code PathMappingContext}）。
+ * </p>
  */
 public class ViewControllerRegistry {
 

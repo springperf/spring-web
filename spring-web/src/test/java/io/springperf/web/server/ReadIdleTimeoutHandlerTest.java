@@ -1,19 +1,19 @@
 package io.springperf.web.server;
 
-import io.netty.channel.embedded.EmbeddedChannel;
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.concurrent.TimeUnit;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.Test;
+
+import io.netty.channel.embedded.EmbeddedChannel;
 
 /**
- * 读空闲超时处理器（{@code server.http.read-timeout} 的执行者）：
- * 只回收真正空闲的连接——**有请求在途时必须改期再审，不得关闭连接**，
- * 否则慢处理器（慢 SQL / 下游调用 / 异步挂起）的响应会随连接一起被丢弃。
- *
- * <p>用 {@link EmbeddedChannel} 的虚拟时钟驱动定时器（{@code advanceTimeBy} +
- * {@code runScheduledPendingTasks}），不依赖墙钟等待，因此结果确定。</p>
+ * 读空闲超时处理器（{@code server.http.read-timeout} 的执行者）： 只回收真正空闲的连接——**有请求在途时必须改期再审，不得关闭连接**， 否则慢处理器（慢 SQL / 下游调用 /
+ * 异步挂起）的响应会随连接一起被丢弃。
+ * <p>
+ * 用 {@link EmbeddedChannel} 的虚拟时钟驱动定时器（{@code advanceTimeBy} + {@code runScheduledPendingTasks}），不依赖墙钟等待，因此结果确定。
+ * </p>
  */
 class ReadIdleTimeoutHandlerTest {
 

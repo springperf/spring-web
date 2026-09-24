@@ -21,23 +21,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code server.accesslog.*} E2E：开启访问日志 + directory 落盘后，
- * 请求路径被写入 access*.log（真实 AccessLogWebFilter 链路）。
+ * {@code server.accesslog.*} E2E：开启访问日志 + directory 落盘后， 请求路径被写入 access*.log（真实 AccessLogWebFilter 链路）。
  */
-@SpringBootTest(classes = {io.springperf.webtest.SupportTestApplication.class,
-                AccessLogE2eTest.AccessLogConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.accesslog.enabled=true",
-                "server.accesslog.directory=target/accesslog-e2e",
-                "server.accesslog.rotate=false"
-        })
+@SpringBootTest(classes = { io.springperf.webtest.SupportTestApplication.class,
+        AccessLogE2eTest.AccessLogConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.accesslog.enabled=true", "server.accesslog.directory=target/accesslog-e2e",
+                "server.accesslog.rotate=false" })
 class AccessLogE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     private static final Path LOG_DIR = Path.of("target", "accesslog-e2e");
 
@@ -56,13 +49,12 @@ class AccessLogE2eTest {
         StringBuilder sb = new StringBuilder();
         if (Files.exists(LOG_DIR)) {
             try (Stream<Path> files = Files.list(LOG_DIR)) {
-                files.filter(p -> p.getFileName().toString().endsWith(".log"))
-                        .forEach(p -> {
-                            try {
-                                sb.append(Files.readString(p));
-                            } catch (IOException ignored) {
-                            }
-                        });
+                files.filter(p -> p.getFileName().toString().endsWith(".log")).forEach(p -> {
+                    try {
+                        sb.append(Files.readString(p));
+                    } catch (IOException ignored) {
+                    }
+                });
             }
         }
         return sb.toString();
@@ -75,8 +67,9 @@ class AccessLogE2eTest {
 
     @Test
     void accessLog_fileContainsRequestPathAndStatus() throws Exception {
-        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder()
-                .url("http://localhost:" + port + "/api/e2e-accesslog/first").build()).execute();
+        okhttp3.Response resp = CLIENT.newCall(
+                new okhttp3.Request.Builder().url("http://localhost:" + port + "/api/e2e-accesslog/first").build())
+                .execute();
         try {
             assertEquals(200, resp.code());
         } finally {
@@ -90,8 +83,9 @@ class AccessLogE2eTest {
 
     @Test
     void accessLog_secondRequest_loggedToo() throws Exception {
-        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder()
-                .url("http://localhost:" + port + "/api/e2e-accesslog/second").build()).execute();
+        okhttp3.Response resp = CLIENT.newCall(
+                new okhttp3.Request.Builder().url("http://localhost:" + port + "/api/e2e-accesslog/second").build())
+                .execute();
         try {
             assertEquals(200, resp.code());
         } finally {

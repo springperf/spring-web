@@ -1,14 +1,13 @@
 package io.springperf.web.core.mapping.optimize;
 
+import java.util.*;
+import java.util.stream.Collectors;
+
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.core.mapping.route.Router;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.util.PathPatternUtils;
 import io.springperf.web.util.WebUtils;
-
-import java.util.*;
-import java.util.stream.Collectors;
-
 
 public class SuffixPathRouterOptimizer implements RouterOptimizer {
 
@@ -39,7 +38,8 @@ public class SuffixPathRouterOptimizer implements RouterOptimizer {
                 suffixPathSet = new HashSet<>();
                 suffixPathMap.put(reversedIndex, suffixPathSet);
             }
-            suffixPathSet.add(pathStrList.subList(pathStrList.size() - reversedIndex, pathStrList.size()).stream().collect(Collectors.joining("/")));
+            suffixPathSet.add(pathStrList.subList(pathStrList.size() - reversedIndex, pathStrList.size()).stream()
+                    .collect(Collectors.joining("/")));
         }
         int total = wildcardPathList.size();
         double minScore = (total - 1.5) * total + 2;

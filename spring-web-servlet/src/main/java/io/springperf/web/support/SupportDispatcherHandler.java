@@ -57,8 +57,7 @@ public class SupportDispatcherHandler extends DispatcherHandler {
     }
 
     /**
-     * 将请求转发到指定路径，重新走映射和 dispatch（跳过 filter 链）。
-     * 由 {@link jakarta.servlet.RequestDispatcher#forward} 调用。
+     * 将请求转发到指定路径，重新走映射和 dispatch（跳过 filter 链）。 由 {@link jakarta.servlet.RequestDispatcher#forward} 调用。
      */
     public void forward(WebServerHttpRequest req, WebServerHttpResponse resp, String forwardPath) {
         ForwardWebServerHttpRequest wrappedReq = new ForwardWebServerHttpRequest(req, forwardPath);
@@ -82,8 +81,7 @@ public class SupportDispatcherHandler extends DispatcherHandler {
     }
 
     /**
-     * 将请求包含到指定路径，目标 handler 的输出追加到当前响应 body。
-     * 由 {@link jakarta.servlet.RequestDispatcher#include} 调用。
+     * 将请求包含到指定路径，目标 handler 的输出追加到当前响应 body。 由 {@link jakarta.servlet.RequestDispatcher#include} 调用。
      */
     public void include(WebServerHttpRequest req, WebServerHttpResponse resp, String includePath) {
         ForwardWebServerHttpRequest wrappedReq = new ForwardWebServerHttpRequest(req, includePath);
@@ -176,9 +174,8 @@ public class SupportDispatcherHandler extends DispatcherHandler {
     }
 
     /**
-     * 在响应写入完成/失败时持久化 session。
-     * 通过 {@link WriteRespEventListener} 接入 Netty 的 ChannelFuture 回调，
-     * 确保在 同步/异步/流式 场景下均在正确的生命周期点执行。
+     * 在响应写入完成/失败时持久化 session。 通过 {@link WriteRespEventListener} 接入 Netty 的 ChannelFuture 回调， 确保在 同步/异步/流式
+     * 场景下均在正确的生命周期点执行。
      */
     private static class SessionFlushListener implements WriteRespEventListener {
 
@@ -200,13 +197,11 @@ public class SupportDispatcherHandler extends DispatcherHandler {
         }
 
         private void flushSession() {
-            PerfHttpSession session = request.getRequestContext()
-                    .getAttribute(PerfHttpSessionManager.SESSION_ATTR_KEY);
+            PerfHttpSession session = request.getRequestContext().getAttribute(PerfHttpSessionManager.SESSION_ATTR_KEY);
             if (session == null || session.isInvalid()) {
                 return;
             }
-            PerfHttpSessionManager manager = request.getWebContext()
-                    .getWebComponent(PerfHttpSessionManager.class);
+            PerfHttpSessionManager manager = request.getWebContext().getWebComponent(PerfHttpSessionManager.class);
             if (manager != null) {
                 session.markAccessed();
                 manager.saveSession(session);

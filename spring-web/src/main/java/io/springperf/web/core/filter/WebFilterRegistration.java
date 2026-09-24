@@ -1,15 +1,16 @@
 package io.springperf.web.core.filter;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import org.springframework.util.Assert;
+import org.springframework.util.ObjectUtils;
+
 import io.springperf.web.context.WebComponent;
 import io.springperf.web.util.ServletFilterPatternUtils;
 import io.springperf.web.util.support.ContainmentResult;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.util.Assert;
-import org.springframework.util.ObjectUtils;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 @Slf4j
 public class WebFilterRegistration implements WebComponent {
@@ -21,7 +22,6 @@ public class WebFilterRegistration implements WebComponent {
     private final List<String> excludePatterns = new ArrayList<>();
 
     private int order = 0;
-
 
     /**
      * Create a {@link WebFilterRegistration} instance.
@@ -35,7 +35,6 @@ public class WebFilterRegistration implements WebComponent {
     public String getComponentName() {
         return this.filter.getComponentName();
     }
-
 
     /**
      * Add URL patterns to which the registered filter should apply to.
@@ -110,10 +109,11 @@ public class WebFilterRegistration implements WebComponent {
     }
 
     /**
-     * Runtime path matching: check if this filter should apply to the given request path.
-     * Uses Servlet 规范路径匹配语义。
+     * Runtime path matching: check if this filter should apply to the given request path. Uses Servlet 规范路径匹配语义。
      *
-     * @param lookupPath the actual request path
+     * @param lookupPath
+     *            the actual request path
+     *
      * @return {@code true} if this filter applies
      */
     public boolean matches(String lookupPath) {

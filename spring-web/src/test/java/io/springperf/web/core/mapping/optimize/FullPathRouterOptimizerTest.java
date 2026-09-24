@@ -1,15 +1,16 @@
 package io.springperf.web.core.mapping.optimize;
 
-import io.springperf.web.core.mapping.PathMappingContext;
-import io.springperf.web.core.mapping.route.Router;
-import io.springperf.web.http.WebServerHttpRequest;
-import org.junit.jupiter.api.Test;
-
-import java.util.Collections;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+
+import java.util.Collections;
+
+import org.junit.jupiter.api.Test;
+
+import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.core.mapping.route.Router;
+import io.springperf.web.http.WebServerHttpRequest;
 
 class FullPathRouterOptimizerTest {
 

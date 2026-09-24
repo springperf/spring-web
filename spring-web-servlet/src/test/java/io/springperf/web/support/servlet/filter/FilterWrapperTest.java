@@ -65,7 +65,8 @@ class FilterWrapperTest {
         wrapper.doFilter(request, response, chain);
 
         verify(requestContext).setAttribute(eq(ServletAttribute.getAttributeKey()), any());
-        verify(servletFilter).doFilter(any(jakarta.servlet.ServletRequest.class), any(jakarta.servlet.ServletResponse.class), any(jakarta.servlet.FilterChain.class));
+        verify(servletFilter).doFilter(any(jakarta.servlet.ServletRequest.class),
+                any(jakarta.servlet.ServletResponse.class), any(jakarta.servlet.FilterChain.class));
     }
 
     @Test
@@ -132,7 +133,8 @@ class FilterWrapperTest {
 
     static class TestFilter implements Filter {
         @Override
-        public void doFilter(jakarta.servlet.ServletRequest request, jakarta.servlet.ServletResponse response, jakarta.servlet.FilterChain chain) {
+        public void doFilter(jakarta.servlet.ServletRequest request, jakarta.servlet.ServletResponse response,
+                jakarta.servlet.FilterChain chain) {
         }
 
         @Override

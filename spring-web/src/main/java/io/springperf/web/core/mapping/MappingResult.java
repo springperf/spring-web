@@ -5,16 +5,19 @@ import io.springperf.web.http.WebServerHttpRequest;
 
 /**
  * Mapping 查找结果封装。
- * <p>替代 {@code PathMappingContext} 的 null 返回值，携带三种状态：</p>
+ * <p>
+ * 替代 {@code PathMappingContext} 的 null 返回值，携带三种状态：
+ * </p>
  * <ul>
- *   <li><b>matched</b> — 路径 + 所有条件完全匹配</li>
- *   <li><b>pathMatched</b> — 路径精确匹配但条件不匹配（含 methodMismatch 标记）</li>
- *   <li><b>notFound</b> — 完全未匹配</li>
+ * <li><b>matched</b> — 路径 + 所有条件完全匹配</li>
+ * <li><b>pathMatched</b> — 路径精确匹配但条件不匹配（含 methodMismatch 标记）</li>
+ * <li><b>notFound</b> — 完全未匹配</li>
  * </ul>
  */
 public class MappingResult {
 
-    private static final RequestAttribute<MappingResult> REQUEST_ATTRIBUTE = RequestAttribute.createAttribute(MappingResult.class);
+    private static final RequestAttribute<MappingResult> REQUEST_ATTRIBUTE = RequestAttribute
+            .createAttribute(MappingResult.class);
 
     private final PathMappingContext matchedContext;
     private final PathMappingContext[] pathMatchedContexts;
@@ -31,9 +34,8 @@ public class MappingResult {
         NONE, METHOD, CONSUMES, PRODUCES, OTHER
     }
 
-    private MappingResult(PathMappingContext matchedContext,
-                          PathMappingContext[] pathMatchedContexts,
-                          MismatchKind mismatchKind) {
+    private MappingResult(PathMappingContext matchedContext, PathMappingContext[] pathMatchedContexts,
+            MismatchKind mismatchKind) {
         this.matchedContext = matchedContext;
         this.pathMatchedContexts = pathMatchedContexts;
         this.mismatchKind = mismatchKind;
@@ -48,8 +50,7 @@ public class MappingResult {
 
     /** 路径精确匹配但条件不满足 */
     public static MappingResult pathMatched(PathMappingContext[] pathMatchedContexts, boolean methodMismatch) {
-        return new MappingResult(null, pathMatchedContexts,
-                methodMismatch ? MismatchKind.METHOD : MismatchKind.OTHER);
+        return new MappingResult(null, pathMatchedContexts, methodMismatch ? MismatchKind.METHOD : MismatchKind.OTHER);
     }
 
     /** 路径精确匹配但条件不满足（携带具体原因） */
@@ -86,8 +87,8 @@ public class MappingResult {
     }
 
     /**
-     * 返回路径命中的所有 PathMappingContext（仅当 {@link #isPathMatched()} 为 true 时非空）。
-     * 这些 context 共享相同路径但条件不匹配，可供 CORS 预检等场景读取 {@code @CrossOrigin} 配置。
+     * 返回路径命中的所有 PathMappingContext（仅当 {@link #isPathMatched()} 为 true 时非空）。 这些 context 共享相同路径但条件不匹配，可供 CORS 预检等场景读取
+     * {@code @CrossOrigin} 配置。
      */
     public PathMappingContext[] getPathMatchedContexts() {
         return pathMatchedContexts != null ? pathMatchedContexts : EMPTY_ARRAY;

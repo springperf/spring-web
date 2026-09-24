@@ -11,8 +11,8 @@ public final class Segment {
     public static final Segment MULTI_WILDCARD = new Segment(SegKind.MULTI_WILDCARD, "**", null);
 
     public final SegKind kind;
-    public final String literal;   // LITERAL
-    public final Pattern regex;    // REGEX
+    public final String literal; // LITERAL
+    public final Pattern regex; // REGEX
 
     private Segment(SegKind kind, String literal, Pattern regex) {
         this.kind = kind;
@@ -37,7 +37,8 @@ public final class Segment {
         List<Segment> segments = new ArrayList<>();
 
         for (String p : parts) {
-            if (p.isEmpty()) continue;
+            if (p.isEmpty())
+                continue;
 
             if ("**".equals(p)) {
                 segments.add(MULTI_WILDCARD);
@@ -90,8 +91,6 @@ public final class Segment {
 
     @Override
     public String toString() {
-        return "Segment{" +
-                "literal='" + literal + '\'' +
-                '}';
+        return "Segment{" + "literal='" + literal + '\'' + '}';
     }
 }

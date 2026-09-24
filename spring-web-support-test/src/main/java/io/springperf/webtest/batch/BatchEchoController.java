@@ -23,9 +23,8 @@ public class BatchEchoController {
     }
 
     @RequestMapping("/batch/echo/{pathVal}")
-    public BatchRequest<String> echoMulti(@RequestParam String msg,
-                                           @RequestBody UserBody body,
-                                           @PathVariable String pathVal) {
+    public BatchRequest<String> echoMulti(@RequestParam String msg, @RequestBody UserBody body,
+            @PathVariable String pathVal) {
         return null;
     }
 
@@ -36,11 +35,8 @@ public class BatchEchoController {
             String injectedName = req.body != null ? req.body.name : "null";
             int injectedAge = req.body != null ? req.body.age : -1;
             String injectedPathVal = req.pathVal != null ? req.pathVal : "null";
-            req.setResult("batched:" + requests.size()
-                    + ":msg=" + injectedMsg
-                    + ":name=" + injectedName
-                    + ":age=" + injectedAge
-                    + ":pathVal=" + injectedPathVal);
+            req.setResult("batched:" + requests.size() + ":msg=" + injectedMsg + ":name=" + injectedName + ":age="
+                    + injectedAge + ":pathVal=" + injectedPathVal);
         }
     }
 

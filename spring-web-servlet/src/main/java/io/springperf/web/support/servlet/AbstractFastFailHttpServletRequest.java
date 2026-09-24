@@ -10,16 +10,13 @@ import java.security.Principal;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 
-public abstract class AbstractFastFailHttpServletRequest
-        implements HttpServletRequest {
+public abstract class AbstractFastFailHttpServletRequest implements HttpServletRequest {
 
     private static final AtomicLong REQUEST_ID_COUNTER = new AtomicLong(1);
     private final String requestId = Long.toHexString(REQUEST_ID_COUNTER.getAndIncrement());
 
     protected static UnsupportedOperationException unsupported(String method) {
-        return new UnsupportedOperationException(
-                method + " is not supported: not running in a Servlet container"
-        );
+        return new UnsupportedOperationException(method + " is not supported: not running in a Servlet container");
     }
 
     // ================= ServletRequest =================
@@ -182,9 +179,7 @@ public abstract class AbstractFastFailHttpServletRequest
     }
 
     @Override
-    public AsyncContext startAsync(
-            ServletRequest servletRequest,
-            ServletResponse servletResponse) {
+    public AsyncContext startAsync(ServletRequest servletRequest, ServletResponse servletResponse) {
         throw unsupported("startAsync");
     }
 
@@ -221,10 +216,25 @@ public abstract class AbstractFastFailHttpServletRequest
     @Override
     public ServletConnection getServletConnection() {
         return new ServletConnection() {
-            @Override public String getConnectionId() { return requestId; }
-            @Override public String getProtocol() { return "HTTP/1.1"; }
-            @Override public String getProtocolConnectionId() { return requestId; }
-            @Override public boolean isSecure() { return false; }
+            @Override
+            public String getConnectionId() {
+                return requestId;
+            }
+
+            @Override
+            public String getProtocol() {
+                return "HTTP/1.1";
+            }
+
+            @Override
+            public String getProtocolConnectionId() {
+                return requestId;
+            }
+
+            @Override
+            public boolean isSecure() {
+                return false;
+            }
         };
     }
 
@@ -387,4 +397,3 @@ public abstract class AbstractFastFailHttpServletRequest
         throw unsupported("upgrade");
     }
 }
-

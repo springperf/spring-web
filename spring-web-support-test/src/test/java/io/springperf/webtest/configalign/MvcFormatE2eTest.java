@@ -20,30 +20,23 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * {@code spring.mvc.format.date/time/datetime} 自定义 pattern E2E：
- * 无 {@code @DateTimeFormat} 时使用全局默认格式；注解存在时注解优先（对齐 Boot）。
+ * {@code spring.mvc.format.date/time/datetime} 自定义 pattern E2E： 无 {@code @DateTimeFormat} 时使用全局默认格式；注解存在时注解优先（对齐 Boot）。
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, MvcFormatE2eTest.FormatConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "spring.mvc.format.date=dd/MM/yyyy",
-                "spring.mvc.format.time=HH:mm:ss",
-                "spring.mvc.format.datetime=dd/MM/yyyy HH:mm:ss"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        MvcFormatE2eTest.FormatConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "spring.mvc.format.date=dd/MM/yyyy", "spring.mvc.format.time=HH:mm:ss",
+                "spring.mvc.format.datetime=dd/MM/yyyy HH:mm:ss" })
 class MvcFormatE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
 
     private String get(String path) throws Exception {
-        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder()
-                .url("http://localhost:" + port + path).build()).execute();
+        okhttp3.Response resp = CLIENT
+                .newCall(new okhttp3.Request.Builder().url("http://localhost:" + port + path).build()).execute();
         try {
             String body = resp.body().string();
             assertEquals(200, resp.code(), "请求 " + path + " 失败，body=" + body);
@@ -55,14 +48,12 @@ class MvcFormatE2eTest {
 
     @Test
     void dateParam_usesConfiguredPattern() throws Exception {
-        assertEquals("2024-01-15", get("/e2e-fmt/date?value=15/01/2024"),
-                "spring.mvc.format.date=dd/MM/yyyy 应生效");
+        assertEquals("2024-01-15", get("/e2e-fmt/date?value=15/01/2024"), "spring.mvc.format.date=dd/MM/yyyy 应生效");
     }
 
     @Test
     void timeParam_usesConfiguredPattern() throws Exception {
-        assertEquals("13:45:30", get("/e2e-fmt/time?value=13:45:30"),
-                "spring.mvc.format.time=HH:mm:ss 应生效");
+        assertEquals("13:45:30", get("/e2e-fmt/time?value=13:45:30"), "spring.mvc.format.time=HH:mm:ss 应生效");
     }
 
     @Test
@@ -79,15 +70,13 @@ class MvcFormatE2eTest {
 
     @Test
     void listParam_collectsAllValues() throws Exception {
-        assertEquals("[a, b, c]", get("/e2e-fmt/list?item=a&item=b&item=c"),
-                "重复参数应收集为 List（顺序保留）");
+        assertEquals("[a, b, c]", get("/e2e-fmt/list?item=a&item=b&item=c"), "重复参数应收集为 List（顺序保留）");
     }
 
     @Test
     void chineseParam_decodedCorrectly() throws Exception {
         // UTF-8 百分号编码的 "你好"
-        assertEquals("你好", get("/e2e-fmt/echo?value=%E4%BD%A0%E5%A5%BD"),
-                "UTF-8 参数应正确解码");
+        assertEquals("你好", get("/e2e-fmt/echo?value=%E4%BD%A0%E5%A5%BD"), "UTF-8 参数应正确解码");
     }
 
     @TestConfiguration
@@ -117,8 +106,7 @@ class MvcFormatE2eTest {
         }
 
         @GetMapping("/e2e-fmt/date-annotation")
-        public String dateAnnotation(
-                @RequestParam("value") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate value) {
+        public String dateAnnotation(@RequestParam("value") @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate value) {
             return value.toString();
         }
 

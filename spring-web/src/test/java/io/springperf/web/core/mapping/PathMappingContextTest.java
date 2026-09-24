@@ -1,5 +1,16 @@
 package io.springperf.web.core.mapping;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.lang.reflect.Method;
+import java.util.*;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.method.HandlerMethod;
+
 import io.springperf.web.core.cors.provider.CorsConfigurationProvider;
 import io.springperf.web.core.interceptor.HandlerInterceptor;
 import io.springperf.web.core.invoker.CustomInvoker;
@@ -9,22 +20,14 @@ import io.springperf.web.core.mapping.match.MediaTypeExpressionSupport;
 import io.springperf.web.http.RequestAttribute;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
-import org.junit.jupiter.api.Test;
-import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.method.HandlerMethod;
-
-import java.lang.reflect.Method;
-import java.util.*;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 class PathMappingContextTest {
 
     static class TestController {
         @RequestMapping("/test")
-        public String hello() { return "hello"; }
+        public String hello() {
+            return "hello";
+        }
     }
 
     private HandlerMethod createHandlerMethod() throws NoSuchMethodException {
@@ -74,8 +77,7 @@ class PathMappingContextTest {
         ConsumeOrProduceMatcher consumeMatcher = new ConsumeOrProduceMatcher(false,
                 Collections.singletonList(MediaTypeExpressionSupport.build("application/json")));
 
-        PathMappingContext ctx = new PathMappingContext(hm,
-                Collections.singletonList(consumeMatcher), "/api/test");
+        PathMappingContext ctx = new PathMappingContext(hm, Collections.singletonList(consumeMatcher), "/api/test");
 
         assertNull(ctx.getProducibleMediaTypes());
     }
@@ -86,8 +88,7 @@ class PathMappingContextTest {
         ConsumeOrProduceMatcher produceMatcher = new ConsumeOrProduceMatcher(true,
                 Collections.singletonList(MediaTypeExpressionSupport.build("application/json")));
 
-        PathMappingContext ctx = new PathMappingContext(hm,
-                Collections.singletonList(produceMatcher), "/api/test");
+        PathMappingContext ctx = new PathMappingContext(hm, Collections.singletonList(produceMatcher), "/api/test");
 
         assertNotNull(ctx.getProducibleMediaTypes());
         assertTrue(ctx.getProducibleMediaTypes().contains(MediaType.APPLICATION_JSON));
@@ -100,8 +101,8 @@ class PathMappingContextTest {
         ConsumeOrProduceMatcher produceMatcher = new ConsumeOrProduceMatcher(true,
                 Collections.singletonList(MediaTypeExpressionSupport.build("text/html")));
 
-        PathMappingContext ctx = new PathMappingContext(hm,
-                Arrays.asList(httpMethodMatcher, produceMatcher), "/api/test");
+        PathMappingContext ctx = new PathMappingContext(hm, Arrays.asList(httpMethodMatcher, produceMatcher),
+                "/api/test");
 
         assertNotNull(ctx.getProducibleMediaTypes());
         assertTrue(ctx.getProducibleMediaTypes().contains(MediaType.TEXT_HTML));
@@ -112,8 +113,7 @@ class PathMappingContextTest {
         HandlerMethod hm = createHandlerMethod();
         Matcher matcher = mock(Matcher.class);
 
-        PathMappingContext ctx = new PathMappingContext(hm,
-                Collections.singletonList(matcher), "/api/test");
+        PathMappingContext ctx = new PathMappingContext(hm, Collections.singletonList(matcher), "/api/test");
 
         assertNull(ctx.getProducibleMediaTypes());
     }
@@ -137,8 +137,7 @@ class PathMappingContextTest {
 
         assertNull(ctx.getCorsConfigurationProvider());
 
-        CorsConfigurationProvider provider = mock(
-                CorsConfigurationProvider.class);
+        CorsConfigurationProvider provider = mock(CorsConfigurationProvider.class);
         ctx.setCorsConfigurationProvider(provider);
         assertSame(provider, ctx.getCorsConfigurationProvider());
     }
@@ -157,8 +156,7 @@ class PathMappingContextTest {
         Matcher matcher = mock(Matcher.class);
         when(matcher.toString()).thenReturn("GET");
 
-        PathMappingContext ctx = new PathMappingContext(hm,
-                Collections.singletonList(matcher), "/api/test");
+        PathMappingContext ctx = new PathMappingContext(hm, Collections.singletonList(matcher), "/api/test");
 
         assertTrue(ctx.toString().startsWith("Controller:/api/test "));
     }

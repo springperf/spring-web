@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>io.github.springperf</groupId>
@@ -18,15 +16,51 @@
     <packaging>pom</packaging>
 
     <dependencies>
-        <dependency><groupId>io.github.springperf</groupId><artifactId>spring-web</artifactId><version>3.5.6</version></dependency>
-        <dependency><groupId>io.github.springperf</groupId><artifactId>spring-web-servlet</artifactId><version>3.5.6</version></dependency>
-        <dependency><groupId>io.github.springperf</groupId><artifactId>spring-web-mvc-support</artifactId><version>3.5.6</version></dependency>
-        <dependency><groupId>io.github.springperf</groupId><artifactId>spring-web-websocket</artifactId><version>3.5.6</version></dependency>
-        <dependency><groupId>io.github.springperf</groupId><artifactId>spring-web-view</artifactId><version>3.5.6</version></dependency>
-        <dependency><groupId>io.github.springperf</groupId><artifactId>spring-web-batch</artifactId><version>3.5.6</version></dependency>
-        <dependency><groupId>io.github.springperf</groupId><artifactId>spring-boot-starter-web</artifactId><version>3.5.6</version></dependency>
-        <dependency><groupId>io.github.springperf</groupId><artifactId>spring-web-test</artifactId><version>3.5.6</version></dependency>
-        <dependency><groupId>io.github.springperf</groupId><artifactId>spring-web-support-test</artifactId><version>3.5.6</version></dependency>
+        <dependency>
+            <groupId>io.github.springperf</groupId>
+            <artifactId>spring-web</artifactId>
+            <version>3.5.6</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.springperf</groupId>
+            <artifactId>spring-web-servlet</artifactId>
+            <version>3.5.6</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.springperf</groupId>
+            <artifactId>spring-web-mvc-support</artifactId>
+            <version>3.5.6</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.springperf</groupId>
+            <artifactId>spring-web-websocket</artifactId>
+            <version>3.5.6</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.springperf</groupId>
+            <artifactId>spring-web-view</artifactId>
+            <version>3.5.6</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.springperf</groupId>
+            <artifactId>spring-web-batch</artifactId>
+            <version>3.5.6</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.springperf</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+            <version>3.5.6</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.springperf</groupId>
+            <artifactId>spring-web-test</artifactId>
+            <version>3.5.6</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.springperf</groupId>
+            <artifactId>spring-web-support-test</artifactId>
+            <version>3.5.6</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -37,10 +71,10 @@
                 <executions>
                     <execution>
                         <id>report-aggregate</id>
-                        <phase>test</phase>
                         <goals>
                             <goal>report-aggregate</goal>
                         </goals>
+                        <phase>test</phase>
                         <configuration>
                             <!-- 除 HTML 外再产出 CSV：scripts/coverage-report.{sh,ps1} 以该合并 CSV 为准
                                  （GROUP 列即模块），这样"E2E 触发的库模块覆盖"也计入报告，与聚合口径一致。

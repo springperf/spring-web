@@ -1,17 +1,17 @@
 package io.springperf.web.util;
 
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.lang.reflect.Method;
+import java.util.List;
+import java.util.Map;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ValueConstants;
-
-import java.lang.reflect.Method;
-import java.util.List;
-import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class MetaUtilsTest {
 
@@ -153,16 +153,37 @@ class MetaUtilsTest {
 
     // ----- helper methods for reflection -----
 
-    public void listParam(List<String> list) {}
+    public void listParam(List<String> list) {
+    }
+
     @SuppressWarnings("rawtypes")
-    public void rawListParam(List list) {}
-    public void mapParam(Map<String, Integer> map) {}
-    public void stringParam(String s) {}
-    public void annotatedParam(@RequestParam("userId") String userId, @RequestParam String name) {}
-    public void pathVarParam(@PathVariable("id") String id) {}
-    public void pathVarNameParam(@PathVariable(name = "userId") String id) {}
-    public void headerParam(@RequestHeader("X-Token") String token) {}
-    public void defaultValueParam(@RequestParam(defaultValue = "10") String page) {}
-    public void headerDefaultParam(@RequestHeader(defaultValue = "default-val") String header) {}
-    public void notRequiredParam(@RequestParam(required = false) String optional) {}
+    public void rawListParam(List list) {
+    }
+
+    public void mapParam(Map<String, Integer> map) {
+    }
+
+    public void stringParam(String s) {
+    }
+
+    public void annotatedParam(@RequestParam("userId") String userId, @RequestParam String name) {
+    }
+
+    public void pathVarParam(@PathVariable("id") String id) {
+    }
+
+    public void pathVarNameParam(@PathVariable(name = "userId") String id) {
+    }
+
+    public void headerParam(@RequestHeader("X-Token") String token) {
+    }
+
+    public void defaultValueParam(@RequestParam(defaultValue = "10") String page) {
+    }
+
+    public void headerDefaultParam(@RequestHeader(defaultValue = "default-val") String header) {
+    }
+
+    public void notRequiredParam(@RequestParam(required = false) String optional) {
+    }
 }

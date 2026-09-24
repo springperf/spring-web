@@ -14,17 +14,16 @@ public class WebRequestHandlerInterceptorAdapter implements AsyncHandlerIntercep
 
     private final WebRequestInterceptor requestInterceptor;
 
-
     /**
      * Create a new WebRequestHandlerInterceptorAdapter for the given WebRequestInterceptor.
      *
-     * @param requestInterceptor the WebRequestInterceptor to wrap
+     * @param requestInterceptor
+     *            the WebRequestInterceptor to wrap
      */
     public WebRequestHandlerInterceptorAdapter(WebRequestInterceptor requestInterceptor) {
         Assert.notNull(requestInterceptor, "WebRequestInterceptor must not be null");
         this.requestInterceptor = requestInterceptor;
     }
-
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
@@ -36,7 +35,7 @@ public class WebRequestHandlerInterceptorAdapter implements AsyncHandlerIntercep
 
     @Override
     public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler,
-                           @Nullable ModelAndView modelAndView) throws Exception {
+            @Nullable ModelAndView modelAndView) throws Exception {
 
         this.requestInterceptor.postHandle(new ServletWebRequest(request, response),
                 (modelAndView != null && !modelAndView.wasCleared() ? modelAndView.getModelMap() : null));
@@ -44,13 +43,14 @@ public class WebRequestHandlerInterceptorAdapter implements AsyncHandlerIntercep
 
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler,
-                                @Nullable Exception ex) throws Exception {
+            @Nullable Exception ex) throws Exception {
 
         this.requestInterceptor.afterCompletion(new ServletWebRequest(request, response), ex);
     }
 
     @Override
-    public void afterConcurrentHandlingStarted(HttpServletRequest request, HttpServletResponse response, Object handler) {
+    public void afterConcurrentHandlingStarted(HttpServletRequest request, HttpServletResponse response,
+            Object handler) {
         if (this.requestInterceptor instanceof AsyncWebRequestInterceptor) {
             AsyncWebRequestInterceptor asyncInterceptor = (AsyncWebRequestInterceptor) this.requestInterceptor;
             ServletWebRequest webRequest = new ServletWebRequest(request, response);

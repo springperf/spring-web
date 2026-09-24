@@ -16,21 +16,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code spring.web.locale-resolver=accept-header}（默认）E2E：
- * Locale 跟随请求 Accept-Language 头解析；无头时回退 {@code spring.web.locale}。
+ * {@code spring.web.locale-resolver=accept-header}（默认）E2E： Locale 跟随请求 Accept-Language 头解析；无头时回退
+ * {@code spring.web.locale}。
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, LocaleAcceptHeaderE2eTest.LocaleEchoConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "spring.web.locale=zh_CN"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        LocaleAcceptHeaderE2eTest.LocaleEchoConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "spring.web.locale=zh_CN" })
 class LocaleAcceptHeaderE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
@@ -53,14 +48,12 @@ class LocaleAcceptHeaderE2eTest {
     @Test
     void locale_followsAcceptLanguage() throws Exception {
         String locale = echoLocale("fr-CA,fr;q=0.9");
-        assertTrue(locale.startsWith("fr"),
-                "accept-header 策略应按 Accept-Language 解析 Locale，实际 " + locale);
+        assertTrue(locale.startsWith("fr"), "accept-header 策略应按 Accept-Language 解析 Locale，实际 " + locale);
     }
 
     @Test
     void locale_fallsBackToConfiguredWithoutHeader() throws Exception {
-        assertEquals("zh_CN", echoLocale(null),
-                "无 Accept-Language 时应回退 spring.web.locale");
+        assertEquals("zh_CN", echoLocale(null), "无 Accept-Language 时应回退 spring.web.locale");
     }
 
     @TestConfiguration

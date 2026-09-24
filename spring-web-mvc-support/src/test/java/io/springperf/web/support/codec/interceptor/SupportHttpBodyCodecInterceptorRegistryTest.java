@@ -55,7 +55,7 @@ class SupportHttpBodyCodecInterceptorRegistryTest {
     }
 
     private static boolean hasWrappedInterceptor(io.springperf.web.context.WebComponentContainer container,
-                                                 Class<?> interceptorType) {
+            Class<?> interceptorType) {
         for (WebComponent component : container.getWebComponents(WebComponent.class)) {
             if (component instanceof WebComponentControllerAdviceBean) {
                 Object real = ((WebComponentControllerAdviceBean<?>) component).getComponent();
@@ -72,8 +72,8 @@ class SupportHttpBodyCodecInterceptorRegistryTest {
         TestRequestBodyAdvice advice = new TestRequestBodyAdvice();
         RequestBodyAdviceCodecInterceptor interceptor = new RequestBodyAdviceCodecInterceptor(advice);
 
-        io.springperf.web.core.codec.HttpBodyConverter converter =
-                mock(io.springperf.web.core.codec.HttpBodyConverter.class);
+        io.springperf.web.core.codec.HttpBodyConverter converter = mock(
+                io.springperf.web.core.codec.HttpBodyConverter.class);
         when(converter.getConverterClass()).thenReturn((Class) HttpMessageConverter.class);
         MethodParameter param = mock(MethodParameter.class);
 
@@ -82,10 +82,8 @@ class SupportHttpBodyCodecInterceptorRegistryTest {
         assertEquals(HttpInputMessage.class.getName(),
                 interceptor.beforeBodyRead(in, param, String.class, converter).toString(),
                 "beforeBodyRead 应委托给 advice 实现");
-        assertEquals("after-body",
-                interceptor.afterBodyRead("raw", in, param, String.class, converter));
-        assertEquals("empty-body",
-                interceptor.handleEmptyBodyRead(null, in, param, String.class, converter));
+        assertEquals("after-body", interceptor.afterBodyRead("raw", in, param, String.class, converter));
+        assertEquals("empty-body", interceptor.handleEmptyBodyRead(null, in, param, String.class, converter));
     }
 
     private static void assertDoesNotThrow(Runnable r) {
@@ -100,13 +98,13 @@ class SupportHttpBodyCodecInterceptorRegistryTest {
     static class TestRequestBodyAdvice implements RequestBodyAdvice {
         @Override
         public boolean supports(MethodParameter methodParameter, Type targetType,
-                                Class<? extends HttpMessageConverter<?>> converterType) {
+                Class<? extends HttpMessageConverter<?>> converterType) {
             return true;
         }
 
         @Override
         public HttpInputMessage beforeBodyRead(HttpInputMessage inputMessage, MethodParameter parameter,
-                                               Type targetType, Class<? extends HttpMessageConverter<?>> converterType) {
+                Type targetType, Class<? extends HttpMessageConverter<?>> converterType) {
             return new HttpInputMessage() {
                 @Override
                 public java.io.InputStream getBody() {
@@ -127,13 +125,13 @@ class SupportHttpBodyCodecInterceptorRegistryTest {
 
         @Override
         public Object afterBodyRead(Object body, HttpInputMessage inputMessage, MethodParameter parameter,
-                                    Type targetType, Class<? extends HttpMessageConverter<?>> converterType) {
+                Type targetType, Class<? extends HttpMessageConverter<?>> converterType) {
             return "after-body";
         }
 
         @Override
         public Object handleEmptyBody(Object body, HttpInputMessage inputMessage, MethodParameter parameter,
-                                      Type targetType, Class<? extends HttpMessageConverter<?>> converterType) {
+                Type targetType, Class<? extends HttpMessageConverter<?>> converterType) {
             return "empty-body";
         }
     }
@@ -147,10 +145,10 @@ class SupportHttpBodyCodecInterceptorRegistryTest {
 
         @Override
         public Object beforeBodyWrite(Object body, MethodParameter returnType,
-                                      org.springframework.http.MediaType selectedContentType,
-                                      Class<? extends HttpMessageConverter<?>> selectedConverterType,
-                                      org.springframework.http.server.ServerHttpRequest request,
-                                      org.springframework.http.server.ServerHttpResponse response) {
+                org.springframework.http.MediaType selectedContentType,
+                Class<? extends HttpMessageConverter<?>> selectedConverterType,
+                org.springframework.http.server.ServerHttpRequest request,
+                org.springframework.http.server.ServerHttpResponse response) {
             return body;
         }
     }

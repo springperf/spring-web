@@ -1,14 +1,15 @@
 package io.springperf.web.server;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import org.junit.jupiter.api.Test;
+
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.springperf.web.context.WebContext;
-import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 class NettyHttpHandlerTest {
 
@@ -69,8 +70,7 @@ class NettyHttpHandlerTest {
 
         channel.pipeline().fireChannelRead("not a http request");
 
-        assertEquals(java.util.Collections.singletonList("not a http request"), received,
-                "非 HttpObject 消息应透传到链尾，不被吞掉");
+        assertEquals(java.util.Collections.singletonList("not a http request"), received, "非 HttpObject 消息应透传到链尾，不被吞掉");
         verify(handler, never()).httpHandle(any(), any());
     }
 }

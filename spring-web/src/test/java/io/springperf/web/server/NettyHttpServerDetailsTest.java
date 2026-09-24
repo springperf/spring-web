@@ -1,5 +1,11 @@
 package io.springperf.web.server;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.core.Ordered;
+
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.UnpooledByteBufAllocator;
@@ -7,11 +13,6 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.DecoderException;
 import io.netty.handler.ssl.NotSslRecordException;
 import io.springperf.web.context.WebContext;
-import org.junit.jupiter.api.Test;
-import org.springframework.core.Ordered;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 class NettyHttpServerDetailsTest {
 
@@ -75,7 +76,6 @@ class NettyHttpServerDetailsTest {
     /** SslExceptionHandler 实例单例可复用（@Sharable） */
     @Test
     void sslExceptionHandler_singleton() {
-        assertSame(NettyHttpServer.SslExceptionHandler.INSTANCE,
-                NettyHttpServer.SslExceptionHandler.INSTANCE);
+        assertSame(NettyHttpServer.SslExceptionHandler.INSTANCE, NettyHttpServer.SslExceptionHandler.INSTANCE);
     }
 }

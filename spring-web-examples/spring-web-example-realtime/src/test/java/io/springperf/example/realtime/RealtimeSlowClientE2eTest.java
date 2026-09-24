@@ -29,21 +29,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * 慢客户端（订阅后**不读**响应）下的 SSE 行为 E2E。
- *
- * <p>覆盖三件事：</p>
+ * <p>
+ * 覆盖三件事：
+ * </p>
  * <ol>
- *   <li><b>生产者不被永久阻塞</b>：向停滞客户端推送远超 TCP 窗口的数据，{@code /sse/broadcast}
- *       必须在有界时间内返回（数据进入发送器有界队列/由背压承接，而不是把调用线程拖死）；</li>
- *   <li><b>慢客户端不拖累其他客户端与请求处理</b>：同一时刻另一客户端仍能及时收到事件，
- *       且服务端仍能正常响应其他请求（EventLoop 未被 drain 阻塞）；</li>
- *   <li><b>客户端异常断开后自动清理</b>：emitter 最终被移除，后续推送得到明确拒绝，
- *       不会留下「永远写不出去」的僵尸订阅。</li>
+ * <li><b>生产者不被永久阻塞</b>：向停滞客户端推送远超 TCP 窗口的数据，{@code /sse/broadcast} 必须在有界时间内返回（数据进入发送器有界队列/由背压承接，而不是把调用线程拖死）；</li>
+ * <li><b>慢客户端不拖累其他客户端与请求处理</b>：同一时刻另一客户端仍能及时收到事件， 且服务端仍能正常响应其他请求（EventLoop 未被 drain 阻塞）；</li>
+ * <li><b>客户端异常断开后自动清理</b>：emitter 最终被移除，后续推送得到明确拒绝， 不会留下「永远写不出去」的僵尸订阅。</li>
  * </ol>
  */
-@SpringBootTest(
-        classes = RealtimeApplication.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
-)
+@SpringBootTest(classes = RealtimeApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class RealtimeSlowClientE2eTest {
 
     /** 单个事件负载：2KB（须明显小于 Netty 默认 maxInitialLineLength=4096，避免请求行超限）。 */
@@ -61,13 +56,9 @@ class RealtimeSlowClientE2eTest {
     @BeforeEach
     void setUp() {
         port = nettyHttpServer.getActualPort();
-        rest = new TestRestTemplate(new RestTemplateBuilder()
-                .rootUri("http://localhost:" + port)
-                .setConnectTimeout(Duration.ofSeconds(5))
-                .setReadTimeout(Duration.ofSeconds(10)));
-        httpClient = new OkHttpClient.Builder()
-                .connectTimeout(5, TimeUnit.SECONDS)
-                .readTimeout(20, TimeUnit.SECONDS)
+        rest = new TestRestTemplate(new RestTemplateBuilder().rootUri("http://localhost:" + port)
+                .setConnectTimeout(Duration.ofSeconds(5)).setReadTimeout(Duration.ofSeconds(10)));
+        httpClient = new OkHttpClient.Builder().connectTimeout(5, TimeUnit.SECONDS).readTimeout(20, TimeUnit.SECONDS)
                 .build();
     }
 
@@ -81,8 +72,7 @@ class RealtimeSlowClientE2eTest {
         slowSocket.connect(new InetSocketAddress("localhost", port), 5000);
         slowSocket.setSoTimeout(200);
         OutputStream out = slowSocket.getOutputStream();
-        out.write(("GET /sse/subscribe?clientId=" + slowId + " HTTP/1.1\r\n"
-                + "Host: localhost:" + port + "\r\n"
+        out.write(("GET /sse/subscribe?clientId=" + slowId + " HTTP/1.1\r\n" + "Host: localhost:" + port + "\r\n"
                 + "Connection: keep-alive\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
         out.flush();
 
@@ -93,9 +83,7 @@ class RealtimeSlowClientE2eTest {
         CountDownLatch fastMarker = new CountDownLatch(1);
         AtomicReference<String> fastFailure = new AtomicReference<>();
         EventSource fastSource = EventSources.createFactory(httpClient).newEventSource(
-                new Request.Builder()
-                        .url("http://localhost:" + port + "/sse/subscribe?clientId=" + fastId)
-                        .build(),
+                new Request.Builder().url("http://localhost:" + port + "/sse/subscribe?clientId=" + fastId).build(),
                 new EventSourceListener() {
                     @Override
                     public void onOpen(EventSource eventSource, Response response) {
@@ -103,42 +91,36 @@ class RealtimeSlowClientE2eTest {
                     }
 
                     @Override
-                    public void onEvent(EventSource eventSource, @Nullable String id,
-                                        @Nullable String type, String data) {
+                    public void onEvent(EventSource eventSource, @Nullable String id, @Nullable String type,
+                            String data) {
                         if ("MARKER".equals(data)) {
                             fastMarker.countDown();
                         }
                     }
 
                     @Override
-                    public void onFailure(EventSource eventSource, @Nullable Throwable t,
-                                          @Nullable Response response) {
+                    public void onFailure(EventSource eventSource, @Nullable Throwable t, @Nullable Response response) {
                         fastFailure.set(t != null ? t.getMessage() : "unknown");
                     }
                 });
-        assertThat(fastConnected.await(5, TimeUnit.SECONDS))
-                .as("对照客户端应在 5s 内建立连接").isTrue();
+        assertThat(fastConnected.await(5, TimeUnit.SECONDS)).as("对照客户端应在 5s 内建立连接").isTrue();
 
         try {
             // ---- 3. 灌入远超 TCP 窗口的数据：broadcast 必须在有界时间内返回 ----
             long start = System.nanoTime();
             for (int i = 0; i < BULK_EVENTS; i++) {
                 String body = rest.getForObject("/sse/broadcast?data=" + PAYLOAD, String.class);
-                assertThat(parseSentCount(body))
-                        .as("第 %s 次 broadcast 应至少送达慢客户端与对照客户端（实际=%s）", i, body)
+                assertThat(parseSentCount(body)).as("第 %s 次 broadcast 应至少送达慢客户端与对照客户端（实际=%s）", i, body)
                         .isGreaterThanOrEqualTo(2);
             }
             long elapsedMs = (System.nanoTime() - start) / 1_000_000;
-            assertThat(elapsedMs)
-                    .as("向停滞客户端推送 %s 个事件耗费 %s ms：生产者被阻塞或实现为同步等待", BULK_EVENTS, elapsedMs)
+            assertThat(elapsedMs).as("向停滞客户端推送 %s 个事件耗费 %s ms：生产者被阻塞或实现为同步等待", BULK_EVENTS, elapsedMs)
                     .isLessThan(30_000);
 
             // ---- 4. 慢客户端停滞期间，对照客户端仍须及时收到事件 ----
             assertThat(parseSentCount(rest.getForObject("/sse/broadcast?data=MARKER", String.class)))
-                    .as("MARKER 广播应至少送达两个客户端")
-                    .isGreaterThanOrEqualTo(2);
-            assertThat(fastMarker.await(5, TimeUnit.SECONDS))
-                    .as("慢客户端停滞时，其他客户端仍应按时收到事件").isTrue();
+                    .as("MARKER 广播应至少送达两个客户端").isGreaterThanOrEqualTo(2);
+            assertThat(fastMarker.await(5, TimeUnit.SECONDS)).as("慢客户端停滞时，其他客户端仍应按时收到事件").isTrue();
             assertThat(fastFailure.get()).as("对照客户端不应收到失败").isNull();
 
             // ---- 5. 服务端整体仍可响应（EventLoop 未被阻塞） ----
@@ -168,14 +150,12 @@ class RealtimeSlowClientE2eTest {
                 }
                 Thread.sleep(100);
             }
-            assertThat(finalState)
-                    .as("慢客户端断开后 emitter 必须被自动移除（否则是僵尸订阅泄漏），实际=%s", finalState)
+            assertThat(finalState).as("慢客户端断开后 emitter 必须被自动移除（否则是僵尸订阅泄漏），实际=%s", finalState)
                     .startsWith("client not found");
 
             // ---- 7. 对照客户端不受影响（慢客户端已被移除，不应再计入送达数） ----
             assertThat(parseSentCount(rest.getForObject("/sse/broadcast?data=after-close-2", String.class)))
-                    .as("慢客户端已被移除后，对照客户端仍应收到广播")
-                    .isGreaterThanOrEqualTo(1);
+                    .as("慢客户端已被移除后，对照客户端仍应收到广播").isGreaterThanOrEqualTo(1);
         } finally {
             slowSocket.close();
             fastSource.cancel();
@@ -183,8 +163,7 @@ class RealtimeSlowClientE2eTest {
     }
 
     /**
-     * 解析 {@code /sse/broadcast} 的送达数。用「至少 N」而非「恰好 N」断言：同一模块的其他测试
-     * 类可能复用 Spring 上下文并遗留 emitter（map 是单例），精确计数会造成偶发失败。
+     * 解析 {@code /sse/broadcast} 的送达数。用「至少 N」而非「恰好 N」断言：同一模块的其他测试 类可能复用 Spring 上下文并遗留 emitter（map 是单例），精确计数会造成偶发失败。
      */
     private static int parseSentCount(String body) {
         assertThat(body).as("broadcast 响应格式（实际=%s）", body).startsWith("ok, sent to ");
@@ -197,8 +176,8 @@ class RealtimeSlowClientE2eTest {
         long deadline = System.currentTimeMillis() + 5000;
         while (System.currentTimeMillis() < deadline) {
             try {
-                ResponseEntity<String> resp =
-                        rest.getForEntity("/sse/send?clientId=" + clientId + "&data=probe", String.class);
+                ResponseEntity<String> resp = rest.getForEntity("/sse/send?clientId=" + clientId + "&data=probe",
+                        String.class);
                 if (resp.getBody() != null && resp.getBody().startsWith("ok")) {
                     return;
                 }

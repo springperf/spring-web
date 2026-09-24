@@ -1,12 +1,12 @@
 package io.springperf.web.util;
 
-import org.junit.jupiter.api.Test;
-import org.springframework.http.MediaType;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
 
 class MediaTypeUtilsTest {
 
@@ -20,24 +20,21 @@ class MediaTypeUtilsTest {
     void specificity_concreteBeforeWildcardType() {
         MediaType concrete = MediaType.parseMediaType("text/plain");
         MediaType wildcard = MediaType.parseMediaType("*/*");
-        assertTrue(MediaTypeUtils.compareSpecificity(concrete, wildcard) < 0,
-                "具体类型应排在通配类型之前");
+        assertTrue(MediaTypeUtils.compareSpecificity(concrete, wildcard) < 0, "具体类型应排在通配类型之前");
     }
 
     @Test
     void specificity_concreteSubtypeBeforeWildcardSubtype() {
         MediaType concrete = MediaType.parseMediaType("text/plain");
         MediaType wildcard = MediaType.parseMediaType("text/*");
-        assertTrue(MediaTypeUtils.compareSpecificity(concrete, wildcard) < 0,
-                "具体子类型应排在通配子类型之前");
+        assertTrue(MediaTypeUtils.compareSpecificity(concrete, wildcard) < 0, "具体子类型应排在通配子类型之前");
     }
 
     @Test
     void specificity_moreParametersFirst() {
         MediaType withParam = MediaType.parseMediaType("text/plain;charset=UTF-8");
         MediaType withoutParam = MediaType.parseMediaType("text/plain");
-        assertTrue(MediaTypeUtils.compareSpecificity(withParam, withoutParam) < 0,
-                "带参数的类型应更具体");
+        assertTrue(MediaTypeUtils.compareSpecificity(withParam, withoutParam) < 0, "带参数的类型应更具体");
     }
 
     @Test
@@ -68,16 +65,14 @@ class MediaTypeUtilsTest {
     void qualityComparator_higherQFirst() {
         MediaType q09 = MediaType.parseMediaType("text/plain;q=0.9");
         MediaType q10 = MediaType.parseMediaType("text/html");
-        assertTrue(MediaTypeUtils.QUALITY_AND_SPECIFICITY_COMPARATOR.compare(q10, q09) < 0,
-                "q=1 应排在 q=0.9 之前");
+        assertTrue(MediaTypeUtils.QUALITY_AND_SPECIFICITY_COMPARATOR.compare(q10, q09) < 0, "q=1 应排在 q=0.9 之前");
     }
 
     @Test
     void qualityComparator_equalQ_fallsBackToSpecificity() {
         MediaType q1 = MediaType.parseMediaType("*/*;q=1");
         MediaType q2 = MediaType.parseMediaType("text/plain;q=1");
-        assertTrue(MediaTypeUtils.QUALITY_AND_SPECIFICITY_COMPARATOR.compare(q2, q1) < 0,
-                "q 相同时更具体的类型在前");
+        assertTrue(MediaTypeUtils.QUALITY_AND_SPECIFICITY_COMPARATOR.compare(q2, q1) < 0, "q 相同时更具体的类型在前");
     }
 
     @Test

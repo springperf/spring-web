@@ -20,29 +20,24 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code server.servlet.session.tracking-modes=cookie}（显式声明）E2E：
- * 只走 Cookie，{@code encodeURL} 不得重写——这正是 Servlet 规范的默认语义。
+ * {@code server.servlet.session.tracking-modes=cookie}（显式声明）E2E： 只走 Cookie，{@code encodeURL} 不得重写——这正是 Servlet 规范的默认语义。
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, SessionTrackingCookieOnlyE2eTest.CookieOnlyConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "server.servlet.session.tracking-modes=cookie"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        SessionTrackingCookieOnlyE2eTest.CookieOnlyConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "server.servlet.session.tracking-modes=cookie" })
 class SessionTrackingCookieOnlyE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
 
     @Test
     void cookieOnly_noUrlRewrite() throws Exception {
-        Response resp = CLIENT.newCall(new Request.Builder()
-                .url("http://localhost:" + port + "/e2e-tkc/session").get().build()).execute();
+        Response resp = CLIENT
+                .newCall(new Request.Builder().url("http://localhost:" + port + "/e2e-tkc/session").get().build())
+                .execute();
         try {
             assertEquals(200, resp.code());
             assertNotNull(resp.header("Set-Cookie"), "cookie 模式应下发 Set-Cookie");

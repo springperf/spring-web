@@ -10,7 +10,6 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(new MeasurementInterceptor())
-                .addPathPatterns("/bridge/**");
+        registry.addInterceptor(new MeasurementInterceptor()).addPathPatterns("/bridge/**");
     }
 }

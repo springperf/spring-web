@@ -1,13 +1,7 @@
 package io.springperf.web.http;
 
-import io.netty.handler.codec.http.DefaultHttpHeaders;
-import io.springperf.web.context.ApplicationProperties;
-import io.springperf.web.context.PropertiesConstant;
-import io.springperf.web.context.WebContext;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -15,8 +9,15 @@ import java.io.InputStream;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+
+import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.springperf.web.context.ApplicationProperties;
+import io.springperf.web.context.PropertiesConstant;
+import io.springperf.web.context.WebContext;
 
 class BaseWebServerHttpResponseTest {
 
@@ -28,11 +29,27 @@ class BaseWebServerHttpResponseTest {
                     new WebHttpHeaders(new NettyHttpHeadersAdapter(new DefaultHttpHeaders(false), true)));
         }
 
-        @Override void runOnEventLoop(Runnable task) {}
-        @Override ScheduledFuture scheduleOnEventLoop(Runnable task, long delay, TimeUnit unit) { return null; }
-        @Override public void writeStream(InputStream input) {}
-        @Override public void writeBytes(byte[] data) {}
-        @Override public void writeFile(File file) {}
+        @Override
+        void runOnEventLoop(Runnable task) {
+        }
+
+        @Override
+        ScheduledFuture scheduleOnEventLoop(Runnable task, long delay, TimeUnit unit) {
+            return null;
+        }
+
+        @Override
+        public void writeStream(InputStream input) {
+        }
+
+        @Override
+        public void writeBytes(byte[] data) {
+        }
+
+        @Override
+        public void writeFile(File file) {
+        }
+
         @Override
         public void flush(boolean chunked) throws IOException {
             flushed = true;
@@ -51,40 +68,107 @@ class BaseWebServerHttpResponseTest {
         response = new TestResponse(webContext, false);
     }
 
-    @Test void constructor_initialState() {
+    @Test
+    void constructor_initialState() {
         assertFalse(response.isHandled());
         assertFalse(response.isCommitted());
         assertEquals(HttpStatus.OK, response.getStatus());
         assertFalse(response.flushed);
     }
 
-    @Test void setStatusCode_updatesStatus() {
+    @Test
+    void setStatusCode_updatesStatus() {
         response.setStatusCode(HttpStatus.NOT_FOUND);
         assertEquals(HttpStatus.NOT_FOUND, response.getStatus());
     }
 
-    @Test void setStatusCode_null_ignored() {
+    @Test
+    void setStatusCode_null_ignored() {
         response.setStatusCode(HttpStatus.NOT_FOUND);
         response.setStatusCode(null);
         assertEquals(HttpStatus.NOT_FOUND, response.getStatus());
     }
 
-    @Test void getHeaders_returnsSameInstance() { assertSame(response.getHeaders(), response.getHeaders()); }
-    @Test void getBody_initiallyNull_lazyCreates() { assertNotNull(response.getBody()); }
-    @Test void getBody_returnsSameInstance() throws IOException { assertSame(response.getBody(), response.getBody()); }
-    @Test void getBufferSize_beforeWrite_returnsZero() { assertEquals(0, response.getBufferSize()); }
-    @Test void getBufferSize_afterWrite_returnsSize() throws IOException { response.getBody().write("hello".getBytes()); assertEquals(5, response.getBufferSize()); }
-    @Test void resetBuffer_beforeWrite_returnsFalse() { assertFalse(response.resetBuffer()); }
-    @Test void resetBuffer_afterWrite_returnsTrueAndClears() throws IOException { response.getBody().write("data".getBytes()); assertTrue(response.resetBuffer()); assertEquals(0, response.getBufferSize()); }
-    @Test void setHandled_firstCall_returnsTrue() { assertTrue(response.setHandled()); assertTrue(response.isHandled()); }
-    @Test void setHandled_secondCall_returnsFalse() { assertTrue(response.setHandled()); assertFalse(response.setHandled()); }
-    @Test void close_callsFlush() { response.close(); assertTrue(response.flushed); }
-    @Test void isCommitted_initiallyFalse() { assertFalse(response.isCommitted()); }
-    @Test void setCharacterEncoding_updatesEncoding() { response.setCharacterEncoding(java.nio.charset.StandardCharsets.ISO_8859_1); assertEquals(java.nio.charset.StandardCharsets.ISO_8859_1, response.getCharacterEncoding()); }
-    @Test void setTimeout_negativeDelay_returnsNull() { assertNull(response.setTimeout(() -> {}, -1)); }
-    @Test void setTimeout_nullTask_returnsNull() { assertNull(response.setTimeout(null, 1000)); }
+    @Test
+    void getHeaders_returnsSameInstance() {
+        assertSame(response.getHeaders(), response.getHeaders());
+    }
 
-    @Test void sendError_setsHandledAndFlushes() {
+    @Test
+    void getBody_initiallyNull_lazyCreates() {
+        assertNotNull(response.getBody());
+    }
+
+    @Test
+    void getBody_returnsSameInstance() throws IOException {
+        assertSame(response.getBody(), response.getBody());
+    }
+
+    @Test
+    void getBufferSize_beforeWrite_returnsZero() {
+        assertEquals(0, response.getBufferSize());
+    }
+
+    @Test
+    void getBufferSize_afterWrite_returnsSize() throws IOException {
+        response.getBody().write("hello".getBytes());
+        assertEquals(5, response.getBufferSize());
+    }
+
+    @Test
+    void resetBuffer_beforeWrite_returnsFalse() {
+        assertFalse(response.resetBuffer());
+    }
+
+    @Test
+    void resetBuffer_afterWrite_returnsTrueAndClears() throws IOException {
+        response.getBody().write("data".getBytes());
+        assertTrue(response.resetBuffer());
+        assertEquals(0, response.getBufferSize());
+    }
+
+    @Test
+    void setHandled_firstCall_returnsTrue() {
+        assertTrue(response.setHandled());
+        assertTrue(response.isHandled());
+    }
+
+    @Test
+    void setHandled_secondCall_returnsFalse() {
+        assertTrue(response.setHandled());
+        assertFalse(response.setHandled());
+    }
+
+    @Test
+    void close_callsFlush() {
+        response.close();
+        assertTrue(response.flushed);
+    }
+
+    @Test
+    void isCommitted_initiallyFalse() {
+        assertFalse(response.isCommitted());
+    }
+
+    @Test
+    void setCharacterEncoding_updatesEncoding() {
+        response.setCharacterEncoding(java.nio.charset.StandardCharsets.ISO_8859_1);
+        assertEquals(java.nio.charset.StandardCharsets.ISO_8859_1, response.getCharacterEncoding());
+    }
+
+    @Test
+    void setTimeout_negativeDelay_returnsNull() {
+        assertNull(response.setTimeout(() -> {
+        }, -1));
+    }
+
+    @Test
+    void setTimeout_nullTask_returnsNull() {
+        assertNull(response.setTimeout(null, 1000));
+    }
+
+    @Test
+    void sendError_setsHandledAndFlushes() {
         response.sendError(HttpStatus.BAD_REQUEST);
         assertTrue(response.isHandled());
         assertTrue(response.flushed);
@@ -92,46 +176,69 @@ class BaseWebServerHttpResponseTest {
         assertTrue(response.getHeaders().getContentType().includes(MediaType.TEXT_HTML));
     }
 
-    @Test void sendErrorOnce_twice_onlyFirstApplies() {
+    @Test
+    void sendErrorOnce_twice_onlyFirstApplies() {
         response.sendError(HttpStatus.BAD_REQUEST);
         response.flushed = false;
         response.sendError(HttpStatus.INTERNAL_SERVER_ERROR);
         assertFalse(response.flushed);
     }
 
-    @Test void sendError_withMessage_usesCustomMessage() {
+    @Test
+    void sendError_withMessage_usesCustomMessage() {
         response.sendError(HttpStatus.NOT_FOUND, "Custom error");
         assertEquals(HttpStatus.NOT_FOUND, response.getStatus());
         assertTrue(response.isHandled());
     }
 
-    @Test void writeDataAndFlush_setsContentType() {
+    @Test
+    void writeDataAndFlush_setsContentType() {
         response.sendError(HttpStatus.BAD_REQUEST, "bad");
         assertTrue(response.getHeaders().getContentType().includes(MediaType.TEXT_HTML));
     }
 
-    @Test void setTimeout_cancelsPrevious() {
+    @Test
+    void setTimeout_cancelsPrevious() {
         TestResponse innerResponse = new TestResponse(webContext, false) {
-            @Override ScheduledFuture scheduleOnEventLoop(Runnable task, long delay, TimeUnit unit) { return mock(ScheduledFuture.class); }
+            @Override
+            ScheduledFuture scheduleOnEventLoop(Runnable task, long delay, TimeUnit unit) {
+                return mock(ScheduledFuture.class);
+            }
         };
-        ScheduledFuture first = innerResponse.setTimeout(() -> {}, 1000);
-        innerResponse.setTimeout(() -> {}, 2000);
+        ScheduledFuture first = innerResponse.setTimeout(() -> {
+        }, 1000);
+        innerResponse.setTimeout(() -> {
+        }, 2000);
         verify(first).cancel(false);
     }
 
-    @Test void getWebContext_returnsConstructedContext() { assertSame(webContext, response.getWebContext()); }
-    @Test void writeRespEventListener_defaultNull() { assertNull(response.writeRespEventListener); }
+    @Test
+    void getWebContext_returnsConstructedContext() {
+        assertSame(webContext, response.getWebContext());
+    }
 
-    @Test void setWriteRespEventListener_setsListener() {
+    @Test
+    void writeRespEventListener_defaultNull() {
+        assertNull(response.writeRespEventListener);
+    }
+
+    @Test
+    void setWriteRespEventListener_setsListener() {
         WriteRespEventListener listener = new WriteRespEventListener() {
-            @Override public void completeSuccessCallback() {}
-            @Override public void completeErrorCallback(Throwable throwable) {}
+            @Override
+            public void completeSuccessCallback() {
+            }
+
+            @Override
+            public void completeErrorCallback(Throwable throwable) {
+            }
         };
         response.setWriteRespEventListener(listener);
         assertNotNull(response.writeRespEventListener);
     }
 
-    @Test void sendError_defaultPolicy_hidesMessage() {
+    @Test
+    void sendError_defaultPolicy_hidesMessage() {
         // include-message 默认 never：whitelabel 页面不含业务 message
         response.sendError(HttpStatus.BAD_GATEWAY, "bad upstream");
         String body = new String(response.body.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
@@ -139,12 +246,14 @@ class BaseWebServerHttpResponseTest {
         assertTrue(body.contains("502"));
     }
 
-    @Test void sendError_setsStatusCode() {
+    @Test
+    void sendError_setsStatusCode() {
         response.sendError(HttpStatus.SERVICE_UNAVAILABLE);
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatus());
     }
 
-    @Test void sendError_messageHiddenByDefault_evenWithSpecialChars() {
+    @Test
+    void sendError_messageHiddenByDefault_evenWithSpecialChars() {
         response.sendError(HttpStatus.BAD_REQUEST, "quote\" back\\ new\n tab\t control\u0001 end");
         String body = new String(response.body.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
         // 默认 never：原文不出现，避免特殊字符破坏输出
@@ -152,16 +261,15 @@ class BaseWebServerHttpResponseTest {
         assertFalse(body.contains("\u0001"));
     }
 
-    @Test void sendError_jsonMode_escapesSpecialCharacters() {
+    @Test
+    void sendError_jsonMode_escapesSpecialCharacters() {
         // 关闭 whitelabel + include-message=always -> JSON 且转义正确
         when(webContext.getWebComponent(io.springperf.web.server.ErrorResponseConfig.class))
                 .thenReturn(new io.springperf.web.server.ErrorResponseConfig(
                         io.springperf.web.server.ErrorResponseConfig.IncludePolicy.NEVER,
                         io.springperf.web.server.ErrorResponseConfig.IncludePolicy.ALWAYS,
-                        io.springperf.web.server.ErrorResponseConfig.IncludePolicy.NEVER,
-                        false, "/error"));
-        response.sendError(HttpStatus.BAD_REQUEST,
-                "quote\" back\\ new\n tab\t ff\f bs\b cr\r control\u0001 end");
+                        io.springperf.web.server.ErrorResponseConfig.IncludePolicy.NEVER, false, "/error"));
+        response.sendError(HttpStatus.BAD_REQUEST, "quote\" back\\ new\n tab\t ff\f bs\b cr\r control\u0001 end");
         String json = new String(response.body.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
         assertTrue(json.contains("\\\""), "双引号应转义为 \\\"");
         assertTrue(json.contains("\\\\"), "反斜杠应转义为 \\\\");
@@ -173,43 +281,47 @@ class BaseWebServerHttpResponseTest {
         assertTrue(json.contains("\\u0001"), "控制字符应以 \\u 转义");
     }
 
-    @Test void setStatusCode_nonHttpStatusInstance_usesValue() {
+    @Test
+    void setStatusCode_nonHttpStatusInstance_usesValue() {
         // 非标准状态码（299）→ 允许按原始码值写入响应（Servlet 规范允许 100-999）
-        org.springframework.http.HttpStatusCode custom =
-                org.springframework.http.HttpStatusCode.valueOf(299);
+        org.springframework.http.HttpStatusCode custom = org.springframework.http.HttpStatusCode.valueOf(299);
         assertFalse(custom instanceof HttpStatus);
         response.setStatusCode(custom);
         assertEquals(299, response.getStatus().value());
         assertEquals(299, response.getStatus().value());
     }
 
-    @Test void sendError_nonStandardCode_writesRawValue() {
-        org.springframework.http.HttpStatusCode custom =
-                org.springframework.http.HttpStatusCode.valueOf(599);
+    @Test
+    void sendError_nonStandardCode_writesRawValue() {
+        org.springframework.http.HttpStatusCode custom = org.springframework.http.HttpStatusCode.valueOf(599);
         response.sendError(custom, "upstream boom");
         assertEquals(599, response.getStatus().value());
         assertTrue(response.isHandled());
     }
 
-    @Test void resetHandled_clearsHandledFlag() {
+    @Test
+    void resetHandled_clearsHandledFlag() {
         assertTrue(response.setHandled());
         response.resetHandled();
         assertFalse(response.isHandled());
     }
 
-    @Test void defaultHandleTimeout_sendsGatewayTimeout() {
+    @Test
+    void defaultHandleTimeout_sendsGatewayTimeout() {
         response.defaultHandleTimeout();
         assertEquals(org.springframework.http.HttpStatus.GATEWAY_TIMEOUT, response.getStatus());
         assertTrue(response.isHandled());
     }
 
-    @Test void setTimeout_default_schedulesTimeoutHandler() {
+    @Test
+    void setTimeout_default_schedulesTimeoutHandler() {
         // webContext.getProps().getLong(HTTP_TIMEOUT) 已在 @BeforeEach stub 为 60000
         response.setTimeout();
         assertTrue(response.flushed == false);
     }
 
-    @Test void addWriteRespEventListener_single_thenComposite() {
+    @Test
+    void addWriteRespEventListener_single_thenComposite() {
         WriteRespEventListener first = mock(WriteRespEventListener.class);
         WriteRespEventListener second = mock(WriteRespEventListener.class);
         WriteRespEventListener third = mock(WriteRespEventListener.class);

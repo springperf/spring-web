@@ -12,10 +12,10 @@ import java.util.Map;
 
 /**
  * 基于 JSP 的 {@link View} 实现。
- *
- * <p>将 model 写入 request attribute（JSP EL 经 {@code request.getAttribute} 访问），
- * 再通过 {@code RequestDispatcher.forward} 转发到 JSP 路径——由 {@code PerfRequestDispatcher}
- * 重新分发，命中 *.jsp 路由后由 Jasper 渲染。</p>
+ * <p>
+ * 将 model 写入 request attribute（JSP EL 经 {@code request.getAttribute} 访问）， 再通过 {@code RequestDispatcher.forward} 转发到 JSP
+ * 路径——由 {@code PerfRequestDispatcher} 重新分发，命中 *.jsp 路由后由 Jasper 渲染。
+ * </p>
  */
 public class JspView implements View {
 

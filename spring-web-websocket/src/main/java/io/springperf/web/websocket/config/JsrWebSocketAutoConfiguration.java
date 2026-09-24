@@ -11,20 +11,21 @@ import org.springframework.web.socket.WebSocketHandler;
 
 /**
  * JSR-356（Servlet 规范 WebSocket，{@code @ServerEndpoint} 注解）桥接自动配置。
- *
- * <p>当 classpath 同时存在 {@link ServerEndpoint}（jakarta.websocket-api）与
- * 框架 WebSocket 支持（{@link WebSocketHandler}）时激活：</p>
+ * <p>
+ * 当 classpath 同时存在 {@link ServerEndpoint}（jakarta.websocket-api）与 框架 WebSocket 支持（{@link WebSocketHandler}）时激活：
+ * </p>
  * <ol>
- *   <li>创建 {@link JsrEndpointWebSocketConfigurer}（实现 {@code WebSocketConfigurer} SPI）</li>
- *   <li>由现有 {@link WebSocketAutoConfiguration} 收集，扫描 {@code @ServerEndpoint} 端点</li>
- *   <li>将端点翻译为 {@code WebSocketHandler} 注册进 {@code WebSocketHandlerRegistry}，复用 Netty 管线</li>
+ * <li>创建 {@link JsrEndpointWebSocketConfigurer}（实现 {@code WebSocketConfigurer} SPI）</li>
+ * <li>由现有 {@link WebSocketAutoConfiguration} 收集，扫描 {@code @ServerEndpoint} 端点</li>
+ * <li>将端点翻译为 {@code WebSocketHandler} 注册进 {@code WebSocketHandlerRegistry}，复用 Netty 管线</li>
  * </ol>
  *
  * @author huangcanda
+ *
  * @since 3.5.6
  */
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnClass({ServerEndpoint.class, WebSocketHandler.class, ClientEndpointConfig.class})
+@ConditionalOnClass({ ServerEndpoint.class, WebSocketHandler.class, ClientEndpointConfig.class })
 public class JsrWebSocketAutoConfiguration {
 
     @Bean

@@ -9,7 +9,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class InterceptorRegistrationTest {
 
-    private final HandlerInterceptor interceptor = new HandlerInterceptor() {};
+    private final HandlerInterceptor interceptor = new HandlerInterceptor() {
+    };
 
     @Test
     void constructor_nullInterceptor_throwsException() {
@@ -24,8 +25,7 @@ class InterceptorRegistrationTest {
 
     @Test
     void addPathPatterns_addsPatterns() {
-        InterceptorRegistration reg = new InterceptorRegistration(interceptor)
-                .addPathPatterns("/api/**", "/admin/**");
+        InterceptorRegistration reg = new InterceptorRegistration(interceptor).addPathPatterns("/api/**", "/admin/**");
 
         assertEquals(2, reg.getIncludePatterns().size());
         assertTrue(reg.getIncludePatterns().contains("/api/**"));
@@ -41,8 +41,7 @@ class InterceptorRegistrationTest {
 
     @Test
     void excludePathPatterns_addsExcludes() {
-        InterceptorRegistration reg = new InterceptorRegistration(interceptor)
-                .excludePathPatterns("/api/public/**");
+        InterceptorRegistration reg = new InterceptorRegistration(interceptor).excludePathPatterns("/api/public/**");
 
         assertEquals(1, reg.getExcludePatterns().size());
         assertTrue(reg.getExcludePatterns().contains("/api/public/**"));
@@ -59,16 +58,14 @@ class InterceptorRegistrationTest {
     @Test
     void pathMatcher_setsPathMatcher() {
         PathMatcher matcher = new AntPathMatcher();
-        InterceptorRegistration reg = new InterceptorRegistration(interceptor)
-                .pathMatcher(matcher);
+        InterceptorRegistration reg = new InterceptorRegistration(interceptor).pathMatcher(matcher);
 
         assertSame(matcher, reg.getPathMatcher());
     }
 
     @Test
     void order_setsOrder() {
-        InterceptorRegistration reg = new InterceptorRegistration(interceptor)
-                .order(5);
+        InterceptorRegistration reg = new InterceptorRegistration(interceptor).order(5);
 
         assertEquals(5, reg.getOrder());
     }
@@ -81,10 +78,8 @@ class InterceptorRegistrationTest {
 
     @Test
     void chainedCalls_returnsSelf() {
-        InterceptorRegistration reg = new InterceptorRegistration(interceptor)
-                .addPathPatterns("/api/**")
-                .excludePathPatterns("/api/public/**")
-                .order(1);
+        InterceptorRegistration reg = new InterceptorRegistration(interceptor).addPathPatterns("/api/**")
+                .excludePathPatterns("/api/public/**").order(1);
 
         assertNotNull(reg);
         assertEquals(1, reg.getIncludePatterns().size());

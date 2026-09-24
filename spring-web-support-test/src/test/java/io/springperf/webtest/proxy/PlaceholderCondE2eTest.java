@@ -13,35 +13,23 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * 验证 {@code @RequestMapping} 的 headers/params/consumes/produces 条件中
- * 使用 {@code ${...}} 占位符能正确解析。
+ * 验证 {@code @RequestMapping} 的 headers/params/consumes/produces 条件中 使用 {@code ${...}} 占位符能正确解析。
  * <p>
  * 使用独立端口 9094，与共享的 proxy 上下文隔离。
  */
-@SpringBootTest(
-        classes = ProxyE2eApp.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/api",
-                "test.header.cond=X-Custom=present",
-                "test.param.cond=required-param",
-                "test.consumes.cond=application/json",
-                "test.produces.cond=application/json"
-        })
+@SpringBootTest(classes = ProxyE2eApp.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+        "server.servlet.context-path=/api", "test.header.cond=X-Custom=present", "test.param.cond=required-param",
+        "test.consumes.cond=application/json", "test.produces.cond=application/json" })
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class PlaceholderCondE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .writeTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).writeTimeout(Duration.ofSeconds(10)).build();
 
     private static final MediaType JSON_TYPE = MediaType.parse("application/json; charset=utf-8");
     private static final MediaType XML_TYPE = MediaType.parse("application/xml; charset=utf-8");
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-
 
     @LocalServerPort
     private int serverPort;
@@ -49,6 +37,7 @@ public class PlaceholderCondE2eTest {
     private String url(String path) {
         return "http://localhost:" + serverPort + path;
     }
+
     private String baseUrl() {
         return url("/api");
     }
@@ -57,11 +46,8 @@ public class PlaceholderCondE2eTest {
 
     @Test
     void headerPlaceholder_withMatchingHeader_returns200() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/placeholder-cond/header-check")
-                .header("X-Custom", "present")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/placeholder-cond/header-check")
+                .header("X-Custom", "present").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = MAPPER.readValue(resp.body().string(), Map.class);
@@ -71,10 +57,7 @@ public class PlaceholderCondE2eTest {
 
     @Test
     void headerPlaceholder_withoutMatchingHeader_returns404() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/placeholder-cond/header-check")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/placeholder-cond/header-check").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(404, resp.code());
         }
@@ -84,9 +67,7 @@ public class PlaceholderCondE2eTest {
 
     @Test
     void paramPlaceholder_withMatchingParam_returns200() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/placeholder-cond/param-check?required-param=any")
-                .get()
+        Request req = new Request.Builder().url(baseUrl() + "/placeholder-cond/param-check?required-param=any").get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
@@ -97,10 +78,7 @@ public class PlaceholderCondE2eTest {
 
     @Test
     void paramPlaceholder_withoutMatchingParam_returns404() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/placeholder-cond/param-check")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/placeholder-cond/param-check").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(404, resp.code());
         }
@@ -110,10 +88,8 @@ public class PlaceholderCondE2eTest {
 
     @Test
     void consumesPlaceholder_withJsonContentType_returns200() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/placeholder-cond/consume-check")
-                .post(RequestBody.create("{}", JSON_TYPE))
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/placeholder-cond/consume-check")
+                .post(RequestBody.create("{}", JSON_TYPE)).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = MAPPER.readValue(resp.body().string(), Map.class);
@@ -123,10 +99,8 @@ public class PlaceholderCondE2eTest {
 
     @Test
     void consumesPlaceholder_withXmlContentType_returns415() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/placeholder-cond/consume-check")
-                .post(RequestBody.create("<r/>", XML_TYPE))
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/placeholder-cond/consume-check")
+                .post(RequestBody.create("<r/>", XML_TYPE)).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             // 对齐 Spring MVC：路径匹配但 consumes 不满足 → 415
             assertEquals(415, resp.code());
@@ -137,11 +111,8 @@ public class PlaceholderCondE2eTest {
 
     @Test
     void producesPlaceholder_withJsonAccept_returns200() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/placeholder-cond/produce-check")
-                .header("Accept", "application/json")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/placeholder-cond/produce-check")
+                .header("Accept", "application/json").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = MAPPER.readValue(resp.body().string(), Map.class);
@@ -151,11 +122,8 @@ public class PlaceholderCondE2eTest {
 
     @Test
     void producesPlaceholder_withXmlAccept_returns406() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/placeholder-cond/produce-check")
-                .header("Accept", "text/xml")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/placeholder-cond/produce-check")
+                .header("Accept", "text/xml").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             // 对齐 Spring MVC：路径匹配但 produces 不被 Accept 接受 → 406
             assertEquals(406, resp.code());

@@ -9,22 +9,21 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 /**
- * Extends the framework's {@link ResponseEntityExceptionHandler} shim
- * to verify integration with @ControllerAdvice exception handling.
+ * Extends the framework's {@link ResponseEntityExceptionHandler} shim to verify integration with @ControllerAdvice
+ * exception handling.
  */
 @ControllerAdvice
 public class ShimResponseEntityExceptionHandler extends ResponseEntityExceptionHandler {
 
     @Override
-    protected ResponseEntity<Object> handleMissingServletRequestParameter(
-            MissingServletRequestParameterException ex,
+    protected ResponseEntity<Object> handleMissingServletRequestParameter(MissingServletRequestParameterException ex,
             HttpHeaders headers, HttpStatus status, WebRequest request) {
         return handleExceptionInternal(ex, "custom-missing-param", headers, status, request);
     }
 
     @Override
-    protected ResponseEntity<Object> handleExceptionInternal(
-            Exception ex, Object body, HttpHeaders headers, HttpStatus status, WebRequest request) {
+    protected ResponseEntity<Object> handleExceptionInternal(Exception ex, Object body, HttpHeaders headers,
+            HttpStatus status, WebRequest request) {
         if (body == null) {
             body = "handled-by-shim";
         }

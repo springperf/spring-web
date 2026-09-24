@@ -1,15 +1,16 @@
 package io.springperf.web.core.arg.resolver;
 
+import java.lang.reflect.Type;
+
+import org.springframework.core.MethodParameter;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.arg.StaticArgumentResolver;
 import io.springperf.web.core.codec.HttpBodyCodecRegistry;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
-import org.springframework.core.MethodParameter;
-import org.springframework.http.converter.HttpMessageNotReadableException;
-
-import java.lang.reflect.Type;
 
 public class RequestBodyResolver extends AbstractSupportOptionalResolver implements StaticArgumentResolver {
     private final WebContext webContext;
@@ -17,7 +18,8 @@ public class RequestBodyResolver extends AbstractSupportOptionalResolver impleme
     private final HttpBodyCodecRegistry httpBodyCodecRegistry;
     private final Type targetType;
 
-    public RequestBodyResolver(WebContext webContext, MappingHandlerMethod mappingContext, MethodParameter parameter, boolean required) {
+    public RequestBodyResolver(WebContext webContext, MappingHandlerMethod mappingContext, MethodParameter parameter,
+            boolean required) {
         super(mappingContext, parameter);
         this.webContext = webContext;
         this.required = isOptional ? false : required;

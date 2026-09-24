@@ -37,8 +37,7 @@ public class EdgeCaseE2ETest extends BaseE2ETest {
 
     @Test
     void postMethod_returns200() throws Exception {
-        Request req = new Request.Builder().url(edge() + "/method")
-                .post(RequestBody.create("", JSON_TYPE)).build();
+        Request req = new Request.Builder().url(edge() + "/method").post(RequestBody.create("", JSON_TYPE)).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
@@ -48,8 +47,7 @@ public class EdgeCaseE2ETest extends BaseE2ETest {
 
     @Test
     void putMethod_returns200() throws Exception {
-        Request req = new Request.Builder().url(edge() + "/method")
-                .put(RequestBody.create("", JSON_TYPE)).build();
+        Request req = new Request.Builder().url(edge() + "/method").put(RequestBody.create("", JSON_TYPE)).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
@@ -69,8 +67,7 @@ public class EdgeCaseE2ETest extends BaseE2ETest {
 
     @Test
     void patchMethod_returns200() throws Exception {
-        Request req = new Request.Builder().url(edge() + "/method")
-                .patch(RequestBody.create("", JSON_TYPE)).build();
+        Request req = new Request.Builder().url(edge() + "/method").patch(RequestBody.create("", JSON_TYPE)).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
@@ -96,8 +93,8 @@ public class EdgeCaseE2ETest extends BaseE2ETest {
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
             assertEquals("ALL", body.get("method"));
         }
-        Request post = new Request.Builder().url(edge() + "/method-all")
-                .post(RequestBody.create("", JSON_TYPE)).build();
+        Request post = new Request.Builder().url(edge() + "/method-all").post(RequestBody.create("", JSON_TYPE))
+                .build();
         try (Response resp = CLIENT.newCall(post).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
@@ -109,8 +106,7 @@ public class EdgeCaseE2ETest extends BaseE2ETest {
 
     @Test
     void onlyGet_withPost_returns405() throws Exception {
-        Request req = new Request.Builder().url(edge() + "/only-get")
-                .post(RequestBody.create("", JSON_TYPE)).build();
+        Request req = new Request.Builder().url(edge() + "/only-get").post(RequestBody.create("", JSON_TYPE)).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(405, resp.code(), "仅 GET 的端点收到 POST 应返回 405");
         }
@@ -136,8 +132,7 @@ public class EdgeCaseE2ETest extends BaseE2ETest {
 
     @Test
     void noContent_returns204() throws Exception {
-        Request req = new Request.Builder().url(edge() + "/no-content")
-                .post(RequestBody.create("", JSON_TYPE)).build();
+        Request req = new Request.Builder().url(edge() + "/no-content").post(RequestBody.create("", JSON_TYPE)).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(204, resp.code());
             String body = resp.body() != null ? resp.body().string() : null;
@@ -147,7 +142,7 @@ public class EdgeCaseE2ETest extends BaseE2ETest {
 
     @Test
     void dynamicStatus_returnsConfiguredCode() throws Exception {
-        for (int code : new int[]{201, 202, 400, 404, 500}) {
+        for (int code : new int[] { 201, 202, 400, 404, 500 }) {
             Request req = new Request.Builder().url(edge() + "/status/" + code).get().build();
             try (Response resp = CLIENT.newCall(req).execute()) {
                 assertEquals(code, resp.code(), "状态码 " + code + " 应透传");
@@ -173,8 +168,7 @@ public class EdgeCaseE2ETest extends BaseE2ETest {
     void chineseRequestBody_roundTrips() throws Exception {
         String payload = "{\"message\":\"中文内容测试\"}";
         Request req = new Request.Builder().url(edge() + "/chinese-body")
-                .post(RequestBody.create(payload.getBytes(StandardCharsets.UTF_8), JSON_TYPE))
-                .build();
+                .post(RequestBody.create(payload.getBytes(StandardCharsets.UTF_8), JSON_TYPE)).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
@@ -188,9 +182,7 @@ public class EdgeCaseE2ETest extends BaseE2ETest {
 
     @Test
     void multiParam_arrayAndList() throws Exception {
-        Request req = new Request.Builder()
-                .url(edge() + "/multi-param?ids=1&ids=2&ids=3&tags=a&tags=b")
-                .get().build();
+        Request req = new Request.Builder().url(edge() + "/multi-param?ids=1&ids=2&ids=3&tags=a&tags=b").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
@@ -202,9 +194,7 @@ public class EdgeCaseE2ETest extends BaseE2ETest {
 
     @Test
     void multiParam_singleValue() throws Exception {
-        Request req = new Request.Builder()
-                .url(edge() + "/multi-param?ids=only")
-                .get().build();
+        Request req = new Request.Builder().url(edge() + "/multi-param?ids=only").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);

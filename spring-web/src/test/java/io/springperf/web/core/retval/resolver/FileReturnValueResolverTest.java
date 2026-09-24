@@ -1,20 +1,21 @@
 package io.springperf.web.core.retval.resolver;
 
-import io.springperf.web.http.WebServerHttpResponse;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.core.MethodParameter;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.verify;
 
 import java.io.File;
 import java.lang.reflect.Method;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.verify;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.MethodParameter;
+
+import io.springperf.web.http.WebServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 class FileReturnValueResolverTest {
@@ -75,9 +76,17 @@ class FileReturnValueResolverTest {
     }
 
     @SuppressWarnings("unused")
-    public File fileReturn() { return null; }
+    public File fileReturn() {
+        return null;
+    }
+
     @SuppressWarnings("unused")
-    public Path pathReturn() { return null; }
+    public Path pathReturn() {
+        return null;
+    }
+
     @SuppressWarnings("unused")
-    public String stringReturn() { return null; }
+    public String stringReturn() {
+        return null;
+    }
 }

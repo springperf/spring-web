@@ -1,24 +1,24 @@
 package io.springperf.web.server;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.util.Collections;
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.stream.ChunkedWriteHandler;
-
 import io.springperf.web.http.BackpressureHandler;
 import io.springperf.web.http.support.SupportMultipartAggregator;
-import org.junit.jupiter.api.Test;
-
-import java.util.Collections;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 /**
- * 验证 {@link Http2ChannelInitializer} 的 HTTP/1.1 管线构建：
- * handler 顺序、aggregator 选择（multipart/simple）、before/after 注入、readTimeout 条件。
+ * 验证 {@link Http2ChannelInitializer} 的 HTTP/1.1 管线构建： handler 顺序、aggregator 选择（multipart/simple）、before/after
+ * 注入、readTimeout 条件。
  */
 class Http2ChannelInitializerTest {
 
@@ -26,12 +26,11 @@ class Http2ChannelInitializerTest {
 
     /** 暴露 protected initChannel 的测试子类 */
     static class TestableInitializer extends Http2ChannelInitializer {
-        TestableInitializer(boolean http2Enabled, io.netty.handler.ssl.SslContext sslContext,
-                            int maxContentLength, long readTimeout, boolean supportMultipart,
-                            NettyHttpHandler httpHandler, List<ChannelHandler> before,
-                            List<ChannelHandler> after) {
-            super(http2Enabled, sslContext, maxContentLength, readTimeout, supportMultipart,
-                    httpHandler, before, after);
+        TestableInitializer(boolean http2Enabled, io.netty.handler.ssl.SslContext sslContext, int maxContentLength,
+                long readTimeout, boolean supportMultipart, NettyHttpHandler httpHandler, List<ChannelHandler> before,
+                List<ChannelHandler> after) {
+            super(http2Enabled, sslContext, maxContentLength, readTimeout, supportMultipart, httpHandler, before,
+                    after);
         }
 
         @Override
@@ -49,8 +48,8 @@ class Http2ChannelInitializerTest {
     @Test
     void http11_noSsl_buildsCodecAggregatorHandlers() {
         ChannelPipeline pipeline = mock(ChannelPipeline.class);
-        TestableInitializer init = new TestableInitializer(false, null, 1024, 0, false,
-                httpHandler, Collections.emptyList(), Collections.emptyList());
+        TestableInitializer init = new TestableInitializer(false, null, 1024, 0, false, httpHandler,
+                Collections.emptyList(), Collections.emptyList());
         init.initChannel(channel(pipeline));
 
         verify(pipeline).addLast(any(HttpServerCodec.class));
@@ -63,8 +62,8 @@ class Http2ChannelInitializerTest {
     @Test
     void http11_withReadTimeout_addsReadIdleTimeoutHandler() {
         ChannelPipeline pipeline = mock(ChannelPipeline.class);
-        TestableInitializer init = new TestableInitializer(false, null, 1024, 5000, false,
-                httpHandler, Collections.emptyList(), Collections.emptyList());
+        TestableInitializer init = new TestableInitializer(false, null, 1024, 5000, false, httpHandler,
+                Collections.emptyList(), Collections.emptyList());
         init.initChannel(channel(pipeline));
 
         verify(pipeline).addLast(any(ReadIdleTimeoutHandler.class));
@@ -73,8 +72,8 @@ class Http2ChannelInitializerTest {
     @Test
     void http11_supportMultipart_usesSupportMultipartAggregator() {
         ChannelPipeline pipeline = mock(ChannelPipeline.class);
-        TestableInitializer init = new TestableInitializer(false, null, 1024, 0, true,
-                httpHandler, Collections.emptyList(), Collections.emptyList());
+        TestableInitializer init = new TestableInitializer(false, null, 1024, 0, true, httpHandler,
+                Collections.emptyList(), Collections.emptyList());
         init.initChannel(channel(pipeline));
 
         verify(pipeline).addLast(any(SupportMultipartAggregator.class));
@@ -85,8 +84,8 @@ class Http2ChannelInitializerTest {
         ChannelPipeline pipeline = mock(ChannelPipeline.class);
         ChannelHandler before = mock(ChannelHandler.class);
         ChannelHandler after = mock(ChannelHandler.class);
-        TestableInitializer init = new TestableInitializer(false, null, 1024, 0, false,
-                httpHandler, Collections.singletonList(before), Collections.singletonList(after));
+        TestableInitializer init = new TestableInitializer(false, null, 1024, 0, false, httpHandler,
+                Collections.singletonList(before), Collections.singletonList(after));
         init.initChannel(channel(pipeline));
 
         verify(pipeline).addLast(before);
@@ -99,8 +98,8 @@ class Http2ChannelInitializerTest {
         io.netty.handler.ssl.SslContext sslContext = mock(io.netty.handler.ssl.SslContext.class);
         when(sslContext.newHandler(any(io.netty.buffer.ByteBufAllocator.class)))
                 .thenReturn(mock(io.netty.handler.ssl.SslHandler.class));
-        TestableInitializer init = new TestableInitializer(false, sslContext, 1024, 0, false,
-                httpHandler, Collections.emptyList(), Collections.emptyList());
+        TestableInitializer init = new TestableInitializer(false, sslContext, 1024, 0, false, httpHandler,
+                Collections.emptyList(), Collections.emptyList());
         SocketChannel ch = channel(pipeline);
         when(ch.alloc()).thenReturn(io.netty.buffer.UnpooledByteBufAllocator.DEFAULT);
         init.initChannel(ch);
@@ -113,8 +112,8 @@ class Http2ChannelInitializerTest {
     @Test
     void http2_withoutSsl_addsCleartextHandlers() {
         ChannelPipeline pipeline = mock(ChannelPipeline.class);
-        TestableInitializer init = new TestableInitializer(true, null, 1024, 0, false,
-                httpHandler, Collections.emptyList(), Collections.emptyList());
+        TestableInitializer init = new TestableInitializer(true, null, 1024, 0, false, httpHandler,
+                Collections.emptyList(), Collections.emptyList());
         try {
             init.initChannel(channel(pipeline));
             // cleartext h2：HttpServerCodec source codec 追加
@@ -129,11 +128,9 @@ class Http2ChannelInitializerTest {
     /** 暴露带 KeepAliveConfig 的完整构造。 */
     static class TestableKeepAliveInitializer extends Http2ChannelInitializer {
         TestableKeepAliveInitializer(boolean http2Enabled, int maxContentLength, long readTimeout,
-                                     boolean supportMultipart, NettyHttpHandler httpHandler,
-                                     KeepAliveConfig keepAliveConfig) {
+                boolean supportMultipart, NettyHttpHandler httpHandler, KeepAliveConfig keepAliveConfig) {
             super(http2Enabled, null, maxContentLength, readTimeout, supportMultipart, httpHandler,
-                    Collections.emptyList(), Collections.emptyList(),
-                    4096, 8192, 8192, -1, 8192,
+                    Collections.emptyList(), Collections.emptyList(), 4096, 8192, 8192, -1, 8192,
                     CompressionConfig.DISABLED, keepAliveConfig);
         }
 
@@ -148,8 +145,8 @@ class Http2ChannelInitializerTest {
         // NettyHttpHandler 是入站终端且用自身 ctx 写响应：KeepAliveHandler 若排在其后
         // 将收不到任何事件（曾因此回归）。用真实 pipeline 锁死顺序。
         io.netty.channel.embedded.EmbeddedChannel embedded = new io.netty.channel.embedded.EmbeddedChannel();
-        TestableKeepAliveInitializer init = new TestableKeepAliveInitializer(false, 1024, 0, false,
-                httpHandler, new KeepAliveConfig(1000L, 5));
+        TestableKeepAliveInitializer init = new TestableKeepAliveInitializer(false, 1024, 0, false, httpHandler,
+                new KeepAliveConfig(1000L, 5));
         init.initChannel(channel(embedded.pipeline()));
 
         ChannelPipeline pipeline = embedded.pipeline();
@@ -166,8 +163,7 @@ class Http2ChannelInitializerTest {
         }
         assertTrue(keepAliveIdx >= 0, "keep-alive handler 应注入管线");
         assertTrue(httpHandlerIdx >= 0);
-        assertTrue(keepAliveIdx < httpHandlerIdx,
-                "KeepAliveHandler 必须位于 NettyHttpHandler 之前，实际 keep-alive=" + keepAliveIdx
-                        + " httpHandler=" + httpHandlerIdx + " names=" + pipeline.names());
+        assertTrue(keepAliveIdx < httpHandlerIdx, "KeepAliveHandler 必须位于 NettyHttpHandler 之前，实际 keep-alive="
+                + keepAliveIdx + " httpHandler=" + httpHandlerIdx + " names=" + pipeline.names());
     }
 }

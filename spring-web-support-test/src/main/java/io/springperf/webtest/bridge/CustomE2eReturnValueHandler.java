@@ -10,8 +10,8 @@ import org.springframework.web.method.support.ModelAndViewContainer;
  * A custom {@link HandlerMethodReturnValueHandler} registered via
  * {@link org.springframework.web.servlet.config.annotation.WebMvcConfigurer#addReturnValueHandlers}.
  * <p>
- * For {@link CustomE2eReturnValueDto} return types, it writes a response prefixed with "custom-handled:".
- * For other return types, it passes through the original string value.
+ * For {@link CustomE2eReturnValueDto} return types, it writes a response prefixed with "custom-handled:". For other
+ * return types, it passes through the original string value.
  */
 public class CustomE2eReturnValueHandler implements HandlerMethodReturnValueHandler {
 
@@ -21,8 +21,8 @@ public class CustomE2eReturnValueHandler implements HandlerMethodReturnValueHand
     }
 
     @Override
-    public void handleReturnValue(Object returnValue, MethodParameter returnType,
-                                  ModelAndViewContainer mavContainer, NativeWebRequest webRequest) throws Exception {
+    public void handleReturnValue(Object returnValue, MethodParameter returnType, ModelAndViewContainer mavContainer,
+            NativeWebRequest webRequest) throws Exception {
         HttpServletResponse response = webRequest.getNativeResponse(HttpServletResponse.class);
         if (response == null) {
             return;

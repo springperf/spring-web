@@ -20,26 +20,18 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code server.servlet.*} E2E：session.timeout（Duration 秒口径）、
- * tracking-modes=url（URL 重写生效且不发 Set-Cookie）、virtual-server-name、
- * application-display-name、context-parameters 显式块。
+ * {@code server.servlet.*} E2E：session.timeout（Duration 秒口径）、 tracking-modes=url（URL 重写生效且不发
+ * Set-Cookie）、virtual-server-name、 application-display-name、context-parameters 显式块。
  */
-@SpringBootTest(classes = {io.springperf.webtest.SupportTestApplication.class,
-                ServletConfigE2eTest.ServletKeysConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.session.timeout=1m",
-                "server.servlet.session.tracking-modes=url",
-                "server.servlet.virtual-server-name=e2e-host",
-                "server.servlet.application-display-name=E2eApp",
-                "server.servlet.context-parameters.e2e-param=hello"
-        })
+@SpringBootTest(classes = { io.springperf.webtest.SupportTestApplication.class,
+        ServletConfigE2eTest.ServletKeysConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.session.timeout=1m", "server.servlet.session.tracking-modes=url",
+                "server.servlet.virtual-server-name=e2e-host", "server.servlet.application-display-name=E2eApp",
+                "server.servlet.context-parameters.e2e-param=hello" })
 class ServletConfigE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
@@ -49,8 +41,7 @@ class ServletConfigE2eTest {
     }
 
     private Map<String, String> get(String path) throws Exception {
-        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder()
-                .url(url(path)).build()).execute();
+        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder().url(url(path)).build()).execute();
         try {
             String raw = resp.body().string();
             assertEquals(200, resp.code(), raw);
@@ -71,8 +62,7 @@ class ServletConfigE2eTest {
     @Test
     void sessionTimeout_oneMinute_reflectedAs60s() throws Exception {
         Map<String, String> out = get("/e2e-scfg/session");
-        assertEquals("60", out.get("maxInactive"),
-                "session.timeout=1m 应解析为 60 秒，实际 " + out);
+        assertEquals("60", out.get("maxInactive"), "session.timeout=1m 应解析为 60 秒，实际 " + out);
     }
 
     @Test
@@ -84,12 +74,11 @@ class ServletConfigE2eTest {
 
     @Test
     void trackingModesUrl_noSetCookie() throws Exception {
-        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder()
-                .url(url("/e2e-scfg/session")).build()).execute();
+        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder().url(url("/e2e-scfg/session")).build())
+                .execute();
         try {
             assertEquals(200, resp.code());
-            assertNull(resp.header("Set-Cookie"),
-                    "纯 URL 跟踪模式不应下发 Cookie，实际 " + resp.header("Set-Cookie"));
+            assertNull(resp.header("Set-Cookie"), "纯 URL 跟踪模式不应下发 Cookie，实际 " + resp.header("Set-Cookie"));
         } finally {
             resp.close();
         }

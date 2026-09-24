@@ -12,8 +12,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * 验证 GraalVM native-image 配置文件的正确性。
- * <p>遍历 reflect-config.json / proxy-config.json 中所有类名，
- * 确保编译时能在 classpath 上找到对应类，避免 native-image 构建时因缺失反射配置而静默失败。</p>
+ * <p>
+ * 遍历 reflect-config.json / proxy-config.json 中所有类名， 确保编译时能在 classpath 上找到对应类，避免 native-image 构建时因缺失反射配置而静默失败。
+ * </p>
  */
 class GraalVmNativeImageConfigTest {
 
@@ -33,15 +34,11 @@ class GraalVmNativeImageConfigTest {
     @Test
     void reflectConfig_allClassesExist() throws Exception {
         List<Map<String, Object>> entries = parseReflectConfig();
-        List<String> missing = entries.stream()
-                .map(e -> (String) e.get("name"))
-                .filter(name -> !classExists(name))
-                .sorted()
-                .toList();
+        List<String> missing = entries.stream().map(e -> (String) e.get("name")).filter(name -> !classExists(name))
+                .sorted().toList();
 
         assertTrue(missing.isEmpty(),
-                "Classes not found on classpath (" + missing.size() + "):\n  " +
-                        String.join("\n  ", missing));
+                "Classes not found on classpath (" + missing.size() + "):\n  " + String.join("\n  ", missing));
     }
 
     @Test
@@ -96,9 +93,7 @@ class GraalVmNativeImageConfigTest {
         Map<String, Object> root = parseResourceConfig();
         @SuppressWarnings("unchecked")
         List<Map<String, String>> resources = (List<Map<String, String>>) root.get("resources");
-        List<String> patterns = resources.stream()
-                .map(r -> r.get("pattern"))
-                .toList();
+        List<String> patterns = resources.stream().map(r -> r.get("pattern")).toList();
 
         assertTrue(patterns.stream().anyMatch(p -> p.contains("spring.factories")),
                 "Missing spring.factories resource pattern");
@@ -110,9 +105,8 @@ class GraalVmNativeImageConfigTest {
 
     private List<Map<String, Object>> parseReflectConfig() throws Exception {
         try (InputStream is = loadConfig("reflect-config.json")) {
-            CollectionType type = mapper.getTypeFactory()
-                    .constructCollectionType(List.class,
-                            mapper.getTypeFactory().constructMapType(Map.class, String.class, Object.class));
+            CollectionType type = mapper.getTypeFactory().constructCollectionType(List.class,
+                    mapper.getTypeFactory().constructMapType(Map.class, String.class, Object.class));
             return mapper.readValue(is, type);
         }
     }

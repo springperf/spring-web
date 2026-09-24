@@ -19,12 +19,13 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * E2E：配置中心动态刷新。
- *
- * <p>链路：修改 Spring {@code Environment} → 发布 Spring Cloud {@code EnvironmentChangeEvent}
- * → {@code SpringWebPropertyRefreshAutoConfiguration} 监听并调用 {@code WebContext.refreshProperties()}
- * → 清空框架配置缓存 → 后续请求读到新值。</p>
- *
- * <p>回归保护：若未清缓存，请求仍返回旧值，断言失败。</p>
+ * <p>
+ * 链路：修改 Spring {@code Environment} → 发布 Spring Cloud {@code EnvironmentChangeEvent} →
+ * {@code SpringWebPropertyRefreshAutoConfiguration} 监听并调用 {@code WebContext.refreshProperties()} → 清空框架配置缓存 → 后续请求读到新值。
+ * </p>
+ * <p>
+ * 回归保护：若未清缓存，请求仍返回旧值，断言失败。
+ * </p>
  */
 class PropertyRefreshE2eTest extends BaseE2ETest {
 
@@ -41,10 +42,7 @@ class PropertyRefreshE2eTest extends BaseE2ETest {
     WebContext webContext;
 
     private String observedValue() throws Exception {
-        Request request = new Request.Builder()
-                .url(url("/api/dynamic-prop"))
-                .get()
-                .build();
+        Request request = new Request.Builder().url(url("/api/dynamic-prop")).get().build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             String body = resp.body().string();
             assertTrue(resp.isSuccessful(), "status=" + resp.code() + " body=" + body);

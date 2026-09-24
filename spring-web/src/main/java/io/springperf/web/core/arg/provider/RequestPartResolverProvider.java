@@ -1,11 +1,12 @@
 package io.springperf.web.core.arg.provider;
 
+import org.springframework.core.MethodParameter;
+import org.springframework.web.bind.annotation.RequestPart;
+
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.arg.StaticArgumentResolver;
 import io.springperf.web.core.arg.resolver.RequestPartResolver;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
-import org.springframework.core.MethodParameter;
-import org.springframework.web.bind.annotation.RequestPart;
 
 public class RequestPartResolverProvider implements StaticArgumentResolverProvider {
     @Override
@@ -14,7 +15,8 @@ public class RequestPartResolverProvider implements StaticArgumentResolverProvid
     }
 
     @Override
-    public StaticArgumentResolver getResolver(MethodParameter parameter, MappingHandlerMethod mappingContext, WebContext webContext) {
+    public StaticArgumentResolver getResolver(MethodParameter parameter, MappingHandlerMethod mappingContext,
+            WebContext webContext) {
         return new RequestPartResolver(webContext, mappingContext, parameter);
     }
 }

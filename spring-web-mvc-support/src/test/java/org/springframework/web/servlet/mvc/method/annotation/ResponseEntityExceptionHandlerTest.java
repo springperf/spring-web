@@ -26,7 +26,8 @@ class ResponseEntityExceptionHandlerTest {
         HttpHeaders headers = new HttpHeaders();
         WebRequest request = createWebRequest();
 
-        ResponseEntity<Object> result = handler.handleExceptionInternal(ex, "body", headers, HttpStatus.BAD_REQUEST, request);
+        ResponseEntity<Object> result = handler.handleExceptionInternal(ex, "body", headers, HttpStatus.BAD_REQUEST,
+                request);
 
         assertEquals(HttpStatus.BAD_REQUEST, result.getStatusCode());
         assertEquals("body", result.getBody());
@@ -37,7 +38,8 @@ class ResponseEntityExceptionHandlerTest {
         Exception ex = new RuntimeException("test");
         WebRequest request = createWebRequest();
 
-        ResponseEntity<Object> result = handler.handleExceptionInternal(ex, null, new HttpHeaders(), HttpStatus.OK, request);
+        ResponseEntity<Object> result = handler.handleExceptionInternal(ex, null, new HttpHeaders(), HttpStatus.OK,
+                request);
 
         assertEquals(HttpStatus.OK, result.getStatusCode());
         assertNull(result.getBody());
@@ -55,8 +57,7 @@ class ResponseEntityExceptionHandlerTest {
 
     @Test
     void handleException_dispatchesToCorrectMethod() throws Exception {
-        MissingServletRequestParameterException ex =
-                new MissingServletRequestParameterException("param1", "String");
+        MissingServletRequestParameterException ex = new MissingServletRequestParameterException("param1", "String");
         WebRequest request = createWebRequest();
 
         ResponseEntity<Object> result = handler.handleException(ex, request);
@@ -76,15 +77,14 @@ class ResponseEntityExceptionHandlerTest {
 
     @Test
     void handleException_canOverrideMethod() throws Exception {
-        MissingServletRequestParameterException ex =
-                new MissingServletRequestParameterException("param1", "String");
+        MissingServletRequestParameterException ex = new MissingServletRequestParameterException("param1", "String");
         WebRequest request = createWebRequest();
 
         ResponseEntityExceptionHandler customHandler = new ResponseEntityExceptionHandler() {
             @Override
             protected ResponseEntity<Object> handleMissingServletRequestParameter(
-                    MissingServletRequestParameterException exc,
-                    HttpHeaders headers, HttpStatus status, WebRequest req) {
+                    MissingServletRequestParameterException exc, HttpHeaders headers, HttpStatus status,
+                    WebRequest req) {
                 return new ResponseEntity<>("custom", HttpStatus.BAD_REQUEST);
             }
         };

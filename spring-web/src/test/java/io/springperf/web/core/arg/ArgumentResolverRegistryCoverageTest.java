@@ -1,16 +1,22 @@
 package io.springperf.web.core.arg;
 
-import io.springperf.web.context.ApplicationProperties;
-import io.springperf.web.context.PropertiesConstant;
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.DispatcherHandler;
-import io.springperf.web.core.arg.databinder.WebDataBinderRegistry;
-import io.springperf.web.core.arg.provider.StaticArgumentResolverProvider;
-import io.springperf.web.core.mapping.MappingHandlerMethod;
-import io.springperf.web.core.mapping.MappingRegistry;
-import io.springperf.web.core.mapping.PathMappingContext;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.lang.reflect.Method;
+import java.util.Collections;
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.core.DefaultParameterNameDiscoverer;
@@ -24,22 +30,17 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.method.HandlerMethod;
 
-import java.lang.reflect.Method;
-import java.util.Collections;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import io.springperf.web.context.ApplicationProperties;
+import io.springperf.web.context.PropertiesConstant;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.DispatcherHandler;
+import io.springperf.web.core.arg.databinder.WebDataBinderRegistry;
+import io.springperf.web.core.arg.provider.StaticArgumentResolverProvider;
+import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.core.mapping.MappingRegistry;
+import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 class ArgumentResolverRegistryCoverageTest {
 
@@ -115,7 +116,8 @@ class ArgumentResolverRegistryCoverageTest {
     public void validatedParam(@Validated SmartTarget target) {
     }
 
-    static class Group1 {}
+    static class Group1 {
+    }
 
     @SuppressWarnings("unused")
     public void validatedParamWithHints(@Validated(Group1.class) SmartTarget target) {
@@ -212,11 +214,11 @@ class ArgumentResolverRegistryCoverageTest {
         mp.initParameterNameDiscovery(new DefaultParameterNameDiscoverer());
 
         MappingHandlerMethod mapping = mock(MappingHandlerMethod.class);
-        when(mapping.createMethodParameters()).thenReturn(new MethodParameter[]{mp});
+        when(mapping.createMethodParameters()).thenReturn(new MethodParameter[] { mp });
         when(mapping.get(ArgumentResolverRegistry.MAPPING_CACHE_KEY)).thenReturn(null);
 
-        Object[] args = registry.resolveArguments(mapping,
-                mock(WebServerHttpRequest.class), mock(WebServerHttpResponse.class));
+        Object[] args = registry.resolveArguments(mapping, mock(WebServerHttpRequest.class),
+                mock(WebServerHttpResponse.class));
         assertNull(args[0]);
         verify(nullProvider).supports(any(), any());
     }

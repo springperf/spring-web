@@ -9,7 +9,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class AbstractFastFailHttpServletRequestTest {
 
-    private final AbstractFastFailHttpServletRequest request = new AbstractFastFailHttpServletRequest() {};
+    private final AbstractFastFailHttpServletRequest request = new AbstractFastFailHttpServletRequest() {
+    };
 
     @Test
     void getCharacterEncoding_returnsUtf8() {
@@ -202,7 +203,8 @@ class AbstractFastFailHttpServletRequestTest {
 
     @Test
     void servlet6IdentityMethods_haveUniqueIds() {
-        AbstractFastFailHttpServletRequest other = new AbstractFastFailHttpServletRequest() {};
+        AbstractFastFailHttpServletRequest other = new AbstractFastFailHttpServletRequest() {
+        };
         assertNotEquals(request.getRequestId(), other.getRequestId());
     }
 
@@ -229,6 +231,7 @@ class AbstractFastFailHttpServletRequestTest {
         assertThrows(UnsupportedOperationException.class, () -> request.login("u", "p"));
         assertThrows(UnsupportedOperationException.class, () -> request.logout());
         assertThrows(UnsupportedOperationException.class, () -> request.getPart("p"));
-        assertThrows(UnsupportedOperationException.class, () -> request.upgrade(jakarta.servlet.http.HttpUpgradeHandler.class));
+        assertThrows(UnsupportedOperationException.class,
+                () -> request.upgrade(jakarta.servlet.http.HttpUpgradeHandler.class));
     }
 }

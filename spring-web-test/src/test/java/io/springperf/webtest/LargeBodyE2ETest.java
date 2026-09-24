@@ -33,9 +33,7 @@ public class LargeBodyE2ETest extends BaseE2ETest {
 
     @Test
     void largePost_shouldReturn201() throws Exception {
-        Request req = new Request.Builder()
-                .url(url("/api/demo/echo"))
-                .post(RequestBody.create(JSON_MEDIA, LARGE_BODY))
+        Request req = new Request.Builder().url(url("/api/demo/echo")).post(RequestBody.create(JSON_MEDIA, LARGE_BODY))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             System.out.println("Status: " + resp.code());
@@ -63,10 +61,8 @@ public class LargeBodyE2ETest extends BaseE2ETest {
             threads[t] = new Thread(() -> {
                 for (int i = 0; i < requestsPerThread; i++) {
                     try {
-                        Request req = new Request.Builder()
-                                .url(url("/api/demo/echo"))
-                                .post(RequestBody.create(JSON_MEDIA, LARGE_BODY))
-                                .build();
+                        Request req = new Request.Builder().url(url("/api/demo/echo"))
+                                .post(RequestBody.create(JSON_MEDIA, LARGE_BODY)).build();
                         try (Response resp = CLIENT.newCall(req).execute()) {
                             if (resp.code() != 201) {
                                 System.err.println("FAIL: " + resp.code() + " " + resp.body().string());

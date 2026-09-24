@@ -106,7 +106,8 @@ public class PerfRequestDispatcher implements RequestDispatcher {
         ServletRequest unwrapped = request;
         while (unwrapped instanceof HttpServletRequestWrapper) {
             ServletRequest next = ((HttpServletRequestWrapper) unwrapped).getRequest();
-            if (next == unwrapped) break;
+            if (next == unwrapped)
+                break;
             unwrapped = next;
             if (unwrapped instanceof PerfHttpServletRequest) {
                 return ((PerfHttpServletRequest) unwrapped).getDelegateRequest();

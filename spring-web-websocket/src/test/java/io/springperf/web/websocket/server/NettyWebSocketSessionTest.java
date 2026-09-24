@@ -29,10 +29,9 @@ class NettyWebSocketSessionTest {
     private URI uri = URI.create("ws://localhost:8080/ws");
 
     private NettyWebSocketSession newSession(EmbeddedChannel channel) {
-        return new NettyWebSocketSession(
-                channel, uri, new SpringHeadersAdapter(new io.netty.handler.codec.http.DefaultHttpHeaders(false)),
-                "chat", new InetSocketAddress("127.0.0.1", 8080),
-                new InetSocketAddress("192.168.1.5", 5000), null, null);
+        return new NettyWebSocketSession(channel, uri,
+                new SpringHeadersAdapter(new io.netty.handler.codec.http.DefaultHttpHeaders(false)), "chat",
+                new InetSocketAddress("127.0.0.1", 8080), new InetSocketAddress("192.168.1.5", 5000), null, null);
     }
 
     @Test
@@ -53,13 +52,13 @@ class NettyWebSocketSessionTest {
     void sendBinaryMessage_writesBinaryFrame() throws Exception {
         EmbeddedChannel channel = new EmbeddedChannel();
         NettyWebSocketSession session = newSession(channel);
-        ByteBuffer payload = ByteBuffer.wrap(new byte[]{1, 2, 3});
+        ByteBuffer payload = ByteBuffer.wrap(new byte[] { 1, 2, 3 });
         session.sendMessage(new BinaryMessage(payload));
         channel.runPendingTasks();
 
         WebSocketFrame out = channel.readOutbound();
         assertTrue(out instanceof BinaryWebSocketFrame);
-        assertArrayEquals(new byte[]{1, 2, 3}, io.netty.buffer.ByteBufUtil.getBytes(out.content()));
+        assertArrayEquals(new byte[] { 1, 2, 3 }, io.netty.buffer.ByteBufUtil.getBytes(out.content()));
         out.release();
         channel.finishAndReleaseAll();
     }
@@ -86,8 +85,7 @@ class NettyWebSocketSessionTest {
         EmbeddedChannel channel = new EmbeddedChannel();
         NettyWebSocketSession session = newSession(channel);
         session.setOpen(false);
-        assertThrows(java.io.IOException.class,
-                () -> session.sendMessage(new TextMessage("x")));
+        assertThrows(java.io.IOException.class, () -> session.sendMessage(new TextMessage("x")));
         channel.finishAndReleaseAll();
     }
 
@@ -187,8 +185,10 @@ class NettyWebSocketSessionTest {
         java.util.Queue<io.netty.handler.codec.http.websocketx.WebSocketFrame> queue = new java.util.LinkedList<>();
         queue.add(new TextWebSocketFrame("q1"));
         queue.add(new TextWebSocketFrame("q2"));
-        channel.attr(io.netty.util.AttributeKey.<java.util.Queue<io.netty.handler.codec.http.websocketx.WebSocketFrame>>
-                valueOf("ws.backpressure.queue")).set(queue);
+        channel.attr(
+                io.netty.util.AttributeKey.<java.util.Queue<io.netty.handler.codec.http.websocketx.WebSocketFrame>> valueOf(
+                        "ws.backpressure.queue"))
+                .set(queue);
 
         NettyWebSocketSession.drainBackpressureQueue(channel);
         channel.runPendingTasks();

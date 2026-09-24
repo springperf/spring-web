@@ -1,17 +1,18 @@
 package io.springperf.web.core.mapping.match;
 
-import io.springperf.web.http.WebServerHttpRequest;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.util.Arrays;
+import java.util.Collections;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
-import java.util.Arrays;
-import java.util.Collections;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import io.springperf.web.http.WebServerHttpRequest;
 
 class ParamOrHeaderMatcherTest {
 
@@ -163,11 +164,8 @@ class ParamOrHeaderMatcherTest {
 
     @Test
     void match_multipleExpressions_allMatchReturnsTrue() {
-        ParamOrHeaderMatcher matcher = new ParamOrHeaderMatcher(false,
-                Arrays.asList(
-                        NameValueExpressionSupport.build("foo=value"),
-                        NameValueExpressionSupport.build("bar=value")
-                ));
+        ParamOrHeaderMatcher matcher = new ParamOrHeaderMatcher(false, Arrays
+                .asList(NameValueExpressionSupport.build("foo=value"), NameValueExpressionSupport.build("bar=value")));
 
         WebServerHttpRequest req = mock(WebServerHttpRequest.class);
         when(req.getParameter("foo")).thenReturn("value");
@@ -178,11 +176,8 @@ class ParamOrHeaderMatcherTest {
 
     @Test
     void match_multipleExpressions_anyMismatchReturnsFalse() {
-        ParamOrHeaderMatcher matcher = new ParamOrHeaderMatcher(false,
-                Arrays.asList(
-                        NameValueExpressionSupport.build("foo=nonexistent"),
-                        NameValueExpressionSupport.build("bar=value")
-                ));
+        ParamOrHeaderMatcher matcher = new ParamOrHeaderMatcher(false, Arrays.asList(
+                NameValueExpressionSupport.build("foo=nonexistent"), NameValueExpressionSupport.build("bar=value")));
 
         WebServerHttpRequest req = mock(WebServerHttpRequest.class);
         when(req.getParameter("foo")).thenReturn("other");
@@ -307,10 +302,7 @@ class ParamOrHeaderMatcherTest {
     @Test
     void toString_multipleExpressions() {
         ParamOrHeaderMatcher matcher = new ParamOrHeaderMatcher(false,
-                Arrays.asList(
-                        NameValueExpressionSupport.build("foo=bar"),
-                        NameValueExpressionSupport.build("baz")
-                ));
+                Arrays.asList(NameValueExpressionSupport.build("foo=bar"), NameValueExpressionSupport.build("baz")));
         String str = matcher.toString();
         assertTrue(str.startsWith("params: "));
     }

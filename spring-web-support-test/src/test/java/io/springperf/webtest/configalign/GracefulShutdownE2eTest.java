@@ -27,29 +27,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 优雅关闭 E2E（{@code NettyHttpServer} SmartLifecycle 停止链路）：
- *
  * <ol>
- *   <li>关闭触发后在途**渐进式**请求必须完整送达（首段已发 + 尾段 + 终止块 + 连接关闭），
- *       不得因关闭把流拦腰截断；</li>
- *   <li>已建立的 keep-alive 连接上的新请求被拒绝：503 Service Unavailable；</li>
- *   <li>关闭完成后新连接被拒绝（acceptor 已关，TCP 连接失败）。</li>
+ * <li>关闭触发后在途**渐进式**请求必须完整送达（首段已发 + 尾段 + 终止块 + 连接关闭）， 不得因关闭把流拦腰截断；</li>
+ * <li>已建立的 keep-alive 连接上的新请求被拒绝：503 Service Unavailable；</li>
+ * <li>关闭完成后新连接被拒绝（acceptor 已关，TCP 连接失败）。</li>
  * </ol>
- *
- * <p>时序同步：在途请求睡 2s，业务池排空必须等它结束（&gt;5s 上限内），这给
- * 「关闭已触发但 EventLoop 尚存」的 503 断言提供了一个确定窗口。</p>
+ * <p>
+ * 时序同步：在途请求睡 2s，业务池排空必须等它结束（&gt;5s 上限内），这给 「关闭已触发但 EventLoop 尚存」的 503 断言提供了一个确定窗口。
+ * </p>
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, GracefulShutdownE2eTest.Cfg.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "server.shutdown.grace-period=10s"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        GracefulShutdownE2eTest.Cfg.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "server.shutdown.grace-period=10s" })
 class GracefulShutdownE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(2))
-            .readTimeout(Duration.ofSeconds(5))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(2))
+            .readTimeout(Duration.ofSeconds(5)).build();
 
     @LocalServerPort
     int port;
@@ -187,14 +180,12 @@ class GracefulShutdownE2eTest {
                 break;
             }
         }
-        assertTrue(rejected != null && rejected.contains("503"),
-                "关闭触发后新请求应被 503 拒绝，实际:\n" + rejected);
+        assertTrue(rejected != null && rejected.contains("503"), "关闭触发后新请求应被 503 拒绝，实际:\n" + rejected);
 
         // ---- 在途渐进式请求必须完整送达（关闭不得截断流） ----
         String rest = readAll(a);
         String full = first + rest;
-        assertTrue(full.contains("gs-part-2"),
-                "在途渐进式请求应在优雅关闭期间完整送达，实际:\n" + full);
+        assertTrue(full.contains("gs-part-2"), "在途渐进式请求应在优雅关闭期间完整送达，实际:\n" + full);
         assertTrue(full.contains("connection: close") || full.contains("Connection: close"),
                 "在途请求应以关闭连接收尾，实际:\n" + full);
         a.close();
@@ -202,8 +193,9 @@ class GracefulShutdownE2eTest {
         // ---- 关闭完成后：新连接被拒绝（acceptor 已关） ----
         assertTrue(closed.await(30, TimeUnit.SECONDS), "上下文关闭应在宽限期内完成");
         assertThrows(Exception.class,
-                () -> CLIENT.newCall(new okhttp3.Request.Builder()
-                        .url("http://localhost:" + port + "/e2e-gs/ping").build()).execute(),
+                () -> CLIENT
+                        .newCall(new okhttp3.Request.Builder().url("http://localhost:" + port + "/e2e-gs/ping").build())
+                        .execute(),
                 "关闭完成后新连接应失败（停止接受连接）");
         closer.join(5000);
     }

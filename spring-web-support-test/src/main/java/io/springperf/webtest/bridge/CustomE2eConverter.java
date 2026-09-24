@@ -18,8 +18,8 @@ import java.util.List;
  * A custom {@link HttpMessageConverter} registered via
  * {@link org.springframework.web.servlet.config.annotation.WebMvcConfigurer#extendMessageConverters}.
  * <p>
- * Handles only {@code application/x-custom} media type with String body.
- * On write, prefixes the body with {@code custom-converter:}.
+ * Handles only {@code application/x-custom} media type with String body. On write, prefixes the body with
+ * {@code custom-converter:}.
  */
 public class CustomE2eConverter implements HttpMessageConverter<String> {
 

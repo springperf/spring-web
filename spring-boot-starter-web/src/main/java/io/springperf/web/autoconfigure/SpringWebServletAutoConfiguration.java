@@ -37,10 +37,10 @@ import java.lang.reflect.Method;
 
 /**
  * Servlet 桥接层自动装配。仅在 classpath 存在 {@code spring-web-servlet} 时激活。
- *
- * <p>装配 {@link SupportDispatcherHandler}、Servlet/请求/会话参数 Provider、
- * Servlet Filter 桥接（{@link SupportWebFilterRegistry} + {@link FilterWrapper}）、
- * Servlet 注册表、{@code session} 作用域等。不包含任何 SpringMVC（{@code org.springframework.web.servlet}）组件。</p>
+ * <p>
+ * 装配 {@link SupportDispatcherHandler}、Servlet/请求/会话参数 Provider、 Servlet Filter 桥接（{@link SupportWebFilterRegistry} +
+ * {@link FilterWrapper}）、 Servlet 注册表、{@code session} 作用域等。不包含任何 SpringMVC（{@code org.springframework.web.servlet}）组件。
+ * </p>
  */
 @Slf4j
 @Configuration
@@ -49,49 +49,74 @@ public class SpringWebServletAutoConfiguration implements ApplicationContextAwar
 
     private ApplicationContext applicationContext;
 
-    @Bean @ConditionalOnMissingBean
-    public SupportDispatcherHandler supportDispatcherHandler() { return new SupportDispatcherHandler(); }
+    @Bean
+    @ConditionalOnMissingBean
+    public SupportDispatcherHandler supportDispatcherHandler() {
+        return new SupportDispatcherHandler();
+    }
 
-    @Bean @ConditionalOnMissingBean
-    public HttpServletRequestProvider httpServletRequestProvider() { return new HttpServletRequestProvider(); }
+    @Bean
+    @ConditionalOnMissingBean
+    public HttpServletRequestProvider httpServletRequestProvider() {
+        return new HttpServletRequestProvider();
+    }
 
-    @Bean @ConditionalOnMissingBean
-    public HttpServletResponseProvider httpServletResponseProvider() { return new HttpServletResponseProvider(); }
+    @Bean
+    @ConditionalOnMissingBean
+    public HttpServletResponseProvider httpServletResponseProvider() {
+        return new HttpServletResponseProvider();
+    }
 
-    @Bean @ConditionalOnMissingBean
-    public ServletRequestProvider servletRequestProvider() { return new ServletRequestProvider(); }
+    @Bean
+    @ConditionalOnMissingBean
+    public ServletRequestProvider servletRequestProvider() {
+        return new ServletRequestProvider();
+    }
 
-    @Bean @ConditionalOnMissingBean
-    public ServletResponseProvider servletResponseProvider() { return new ServletResponseProvider(); }
+    @Bean
+    @ConditionalOnMissingBean
+    public ServletResponseProvider servletResponseProvider() {
+        return new ServletResponseProvider();
+    }
 
-    @Bean @ConditionalOnMissingBean
-    public WebRequestArgumentResolverProvider webRequestArgumentResolverProvider() { return new WebRequestArgumentResolverProvider(); }
+    @Bean
+    @ConditionalOnMissingBean
+    public WebRequestArgumentResolverProvider webRequestArgumentResolverProvider() {
+        return new WebRequestArgumentResolverProvider();
+    }
 
-    @Bean @ConditionalOnMissingBean
+    @Bean
+    @ConditionalOnMissingBean
     public SessionAttributeArgumentResolverProvider sessionAttributeArgumentResolverProvider() {
         return new SessionAttributeArgumentResolverProvider();
     }
 
-    @Bean @ConditionalOnMissingBean
+    @Bean
+    @ConditionalOnMissingBean
     public SessionAttributesInterceptor sessionAttributesInterceptor() {
         return new SessionAttributesInterceptor();
     }
 
-    @Bean @ConditionalOnMissingBean
+    @Bean
+    @ConditionalOnMissingBean
     public SessionStatusArgumentResolverProvider sessionStatusArgumentResolverProvider() {
         return new SessionStatusArgumentResolverProvider();
     }
 
     // 返回 BeanFactoryPostProcessor 的 @Bean 方法必须为 static（避免 @Configuration 增强处理失效）
-    @Bean @ConditionalOnMissingBean
+    @Bean
+    @ConditionalOnMissingBean
     public static SessionScopeBeanFactoryPostProcessor sessionScopeBeanFactoryPostProcessor() {
         return new SessionScopeBeanFactoryPostProcessor();
     }
 
-    @Bean @ConditionalOnMissingBean
+    @Bean
+    @ConditionalOnMissingBean
     public SupportWebFilterRegistry supportWebFilterRegistry(WebContext webContext) {
-        SupportWebFilterRegistry supportWebFilterRegistry = new SupportWebFilterRegistry(webContext.getDispatcherHandler());
-        supportWebFilterRegistry.autoRegisterWebComponent(AbstractFilterRegistrationBean.class, this::createFilterWrapper);
+        SupportWebFilterRegistry supportWebFilterRegistry = new SupportWebFilterRegistry(
+                webContext.getDispatcherHandler());
+        supportWebFilterRegistry.autoRegisterWebComponent(AbstractFilterRegistrationBean.class,
+                this::createFilterWrapper);
         return supportWebFilterRegistry;
     }
 
@@ -106,13 +131,15 @@ public class SpringWebServletAutoConfiguration implements ApplicationContextAwar
             // 时两者都需要 fallback 直接从 Spring 容器解析目标 filter bean。
             if (filterRegistrationBean instanceof DelegatingFilterProxyRegistrationBean) {
                 try {
-                    String targetBeanName = resolveTargetBeanName((DelegatingFilterProxyRegistrationBean) filterRegistrationBean);
+                    String targetBeanName = resolveTargetBeanName(
+                            (DelegatingFilterProxyRegistrationBean) filterRegistrationBean);
                     if (targetBeanName == null) {
                         log.warn("DelegatingFilterProxyRegistrationBean has no targetBeanName, skipping");
                         return null;
                     }
                     filter = applicationContext.getBean(targetBeanName, jakarta.servlet.Filter.class);
-                    log.debug("Resolved DelegatingFilterProxy target bean: {} -> {}", targetBeanName, filter.getClass().getName());
+                    log.debug("Resolved DelegatingFilterProxy target bean: {} -> {}", targetBeanName,
+                            filter.getClass().getName());
                 } catch (Exception e2) {
                     log.error("Failed to resolve filter from DelegatingFilterProxyRegistrationBean", e2);
                     return null;
@@ -144,24 +171,27 @@ public class SpringWebServletAutoConfiguration implements ApplicationContextAwar
     }
 
     /**
-     * ServletContext 是 Servlet 桥接层的基础设施，作为独立组件注册（必然存在），
-     * 不依赖 session 管理器创建。JSP/FilterWrapper/SupportServletRegistry 等直接引用它。
+     * ServletContext 是 Servlet 桥接层的基础设施，作为独立组件注册（必然存在）， 不依赖 session 管理器创建。JSP/FilterWrapper/SupportServletRegistry
+     * 等直接引用它。
      */
-    @Bean @ConditionalOnMissingBean
+    @Bean
+    @ConditionalOnMissingBean
     public PerfServletContext perfServletContext(WebContext webContext) {
         PerfServletContext servletContext = new PerfServletContext(webContext);
         webContext.registerWebComponent(servletContext);
         return servletContext;
     }
 
-    @Bean @ConditionalOnMissingBean
+    @Bean
+    @ConditionalOnMissingBean
     public PerfHttpSessionManager perfHttpSessionManager(WebContext webContext) {
         PerfHttpSessionManager manager = new PerfHttpSessionManager();
         webContext.registerWebComponent(manager);
         return manager;
     }
 
-    @Bean @ConditionalOnMissingBean
+    @Bean
+    @ConditionalOnMissingBean
     public SupportServletRegistry supportServletRegistry(WebContext webContext) {
         SupportServletRegistry registry = new SupportServletRegistry();
         webContext.registerWebComponent(registry);

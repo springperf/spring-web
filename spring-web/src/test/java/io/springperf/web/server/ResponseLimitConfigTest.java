@@ -1,20 +1,23 @@
 package io.springperf.web.server;
 
-import io.springperf.web.context.ApplicationProperties;
-import io.springperf.web.context.PropertiesConstant;
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+
+import org.junit.jupiter.api.Test;
+
+import io.springperf.web.context.ApplicationProperties;
+import io.springperf.web.context.PropertiesConstant;
 
 class ResponseLimitConfigTest {
 
     @Test
     void defaults_matchBoot() {
         ApplicationProperties props = mock(ApplicationProperties.class);
-        when(props.getLong(PropertiesConstant.MAX_SWALLOW_SIZE)).thenReturn(PropertiesConstant.MAX_SWALLOW_SIZE_DEFAULT);
-        when(props.getInt(PropertiesConstant.MAX_HTTP_RESPONSE_HEADER_SIZE)).thenReturn(PropertiesConstant.MAX_HTTP_RESPONSE_HEADER_SIZE_DEFAULT);
+        when(props.getLong(PropertiesConstant.MAX_SWALLOW_SIZE))
+                .thenReturn(PropertiesConstant.MAX_SWALLOW_SIZE_DEFAULT);
+        when(props.getInt(PropertiesConstant.MAX_HTTP_RESPONSE_HEADER_SIZE))
+                .thenReturn(PropertiesConstant.MAX_HTTP_RESPONSE_HEADER_SIZE_DEFAULT);
 
         ResponseLimitConfig cfg = ResponseLimitConfig.fromProperties(props);
         assertEquals(PropertiesConstant.MAX_SWALLOW_SIZE_DEFAULT, cfg.getMaxSwallowSize());

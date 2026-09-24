@@ -1,21 +1,22 @@
 package io.springperf.web.core.invoker;
 
-import io.springperf.web.annotation.Optimize;
-import org.junit.jupiter.api.Test;
-import org.springframework.asm.MethodVisitor;
-import org.springframework.asm.Type;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.asm.MethodVisitor;
+import org.springframework.asm.Type;
+
+import io.springperf.web.annotation.Optimize;
 
 class FastInvokerGeneratorCoverageTest {
 
@@ -73,20 +74,20 @@ class FastInvokerGeneratorCoverageTest {
         FullPrimController ctl = new FullPrimController();
         Class<?> cc = FullPrimController.class;
 
-        assertInvoke(cc.getMethod("doubleOp", double.class, double.class), ctl, new Object[]{1.5d, 2.5d}, 4.0d);
-        assertInvoke(cc.getMethod("floatOp", float.class), ctl, new Object[]{3.5f}, 3.5f);
-        assertInvoke(cc.getMethod("shortOp", short.class), ctl, new Object[]{(short) 7}, (short) 7);
-        assertInvoke(cc.getMethod("byteOp", byte.class), ctl, new Object[]{(byte) 5}, (byte) 5);
-        assertInvoke(cc.getMethod("charOp", char.class), ctl, new Object[]{'x'}, 'x');
+        assertInvoke(cc.getMethod("doubleOp", double.class, double.class), ctl, new Object[] { 1.5d, 2.5d }, 4.0d);
+        assertInvoke(cc.getMethod("floatOp", float.class), ctl, new Object[] { 3.5f }, 3.5f);
+        assertInvoke(cc.getMethod("shortOp", short.class), ctl, new Object[] { (short) 7 }, (short) 7);
+        assertInvoke(cc.getMethod("byteOp", byte.class), ctl, new Object[] { (byte) 5 }, (byte) 5);
+        assertInvoke(cc.getMethod("charOp", char.class), ctl, new Object[] { 'x' }, 'x');
     }
 
     @Test
     void createInvoker_seventhParameter_usesBipush() throws Throwable {
         FullPrimController ctl = new FullPrimController();
-        Method m = FullPrimController.class.getMethod("concatSeven",
-                String.class, String.class, String.class, String.class, String.class, String.class, String.class);
+        Method m = FullPrimController.class.getMethod("concatSeven", String.class, String.class, String.class,
+                String.class, String.class, String.class, String.class);
         Invoker invoker = FastInvokerGenerator.createInvoker(ctl, FullPrimController.class, m);
-        assertEquals("abcdefg", invoker.invoke(new Object[]{"a", "b", "c", "d", "e", "f", "g"}));
+        assertEquals("abcdefg", invoker.invoke(new Object[] { "a", "b", "c", "d", "e", "f", "g" }));
     }
 
     @Test
@@ -100,15 +101,15 @@ class FastInvokerGeneratorCoverageTest {
 
     @Test
     void invokableHandlerMethod_optimize_picksGeneratedInvoker() throws Exception {
-        InvokableHandlerMethod handler = new InvokableHandlerMethod(
-                new FastController(), FastController.class.getMethod("hello", String.class));
+        InvokableHandlerMethod handler = new InvokableHandlerMethod(new FastController(),
+                FastController.class.getMethod("hello", String.class));
         assertTrue(handler.getInvoker().getClass().getName().startsWith("io.springperf.web.core.invoker.Invoker$"));
     }
 
     @Test
     void invokableHandlerMethod_withoutOptimize_fallsBackToMethodHandle() throws Exception {
-        InvokableHandlerMethod handler = new InvokableHandlerMethod(
-                new PlainController(), PlainController.class.getMethod("hello", String.class));
+        InvokableHandlerMethod handler = new InvokableHandlerMethod(new PlainController(),
+                PlainController.class.getMethod("hello", String.class));
         assertInstanceOf(MethodHandleInvoker.class, handler.getInvoker());
     }
 

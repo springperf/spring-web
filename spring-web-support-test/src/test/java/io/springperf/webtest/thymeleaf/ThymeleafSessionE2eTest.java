@@ -20,22 +20,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * E2E：Servlet 场景下 Thymeleaf 模板读取真实 session。
- *
- * <p>验证链路：{@code ServletWebExchangeProvider} → {@code ServletWebSession}（桥接 HttpSession）
- * → {@code ThymeleafWebContext} 把 session 属性注入模板上下文变量。</p>
- *
- * <p>回归保护：若 provider 未生效（回退默认实现），session 为 null，
- * 模板将渲染 {@code no-session}，测试失败。</p>
- *
- * <p>注：Thymeleaf 3.1 起 {@code #session} 表达式对象已被官方移除，故通过上下文变量读取。</p>
+ * <p>
+ * 验证链路：{@code ServletWebExchangeProvider} → {@code ServletWebSession}（桥接 HttpSession） → {@code ThymeleafWebContext} 把
+ * session 属性注入模板上下文变量。
+ * </p>
+ * <p>
+ * 回归保护：若 provider 未生效（回退默认实现），session 为 null， 模板将渲染 {@code no-session}，测试失败。
+ * </p>
+ * <p>
+ * 注：Thymeleaf 3.1 起 {@code #session} 表达式对象已被官方移除，故通过上下文变量读取。
+ * </p>
  */
 class ThymeleafSessionE2eTest extends BaseE2ETest {
 
-    private final OkHttpClient sessionClient = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .writeTimeout(Duration.ofSeconds(10))
-            .cookieJar(new InMemoryCookieJar())
+    private final OkHttpClient sessionClient = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).writeTimeout(Duration.ofSeconds(10)).cookieJar(new InMemoryCookieJar())
             .build();
 
     private String base() {
@@ -51,8 +50,7 @@ class ThymeleafSessionE2eTest extends BaseE2ETest {
             assertTrue(body.contains("hello-thymeleaf"), "模型变量应渲染, body=" + flat);
             assertTrue(body.contains("alice"), "session user 应可从模板变量读取, body=" + flat);
             assertTrue(body.contains("session-count= <span>"), "session count 应被注入, body=" + flat);
-            assertTrue(!body.contains("no-session"),
-                    "session 不应为 null（ServletWebExchangeProvider 应已生效）, body=" + flat);
+            assertTrue(!body.contains("no-session"), "session 不应为 null（ServletWebExchangeProvider 应已生效）, body=" + flat);
         }
     }
 
@@ -61,8 +59,7 @@ class ThymeleafSessionE2eTest extends BaseE2ETest {
         // 不依赖固定计数值（其它用例可能已访问过同一会话），改为断言「连续请求间 count 递增」
         int first = fetchSessionCount(sessionClient);
         int second = fetchSessionCount(sessionClient);
-        assertEquals(first + 1, second,
-                "同一会话连续请求应共享 session 并使 count 递增: first=" + first + " second=" + second);
+        assertEquals(first + 1, second, "同一会话连续请求应共享 session 并使 count 递增: first=" + first + " second=" + second);
     }
 
     private int fetchSessionCount(OkHttpClient client) throws Exception {
@@ -70,8 +67,8 @@ class ThymeleafSessionE2eTest extends BaseE2ETest {
             String body = resp.body().string();
             String flat = body.replace("\r", "").replace("\n", "~");
             assertTrue(resp.isSuccessful(), "status=" + resp.code() + " body=" + flat);
-            java.util.regex.Matcher m = java.util.regex.Pattern
-                    .compile("session-count= <span>(\\d+)</span>").matcher(body);
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("session-count= <span>(\\d+)</span>")
+                    .matcher(body);
             assertTrue(m.find(), "未找到 session-count, body=" + flat);
             return Integer.parseInt(m.group(1));
         }
@@ -85,8 +82,7 @@ class ThymeleafSessionE2eTest extends BaseE2ETest {
             String body = resp.body().string();
             String flat = body.replace("\r", "").replace("\n", "~");
             assertTrue(resp.isSuccessful(), "status=" + resp.code() + " body=" + flat);
-            assertTrue(body.contains("session-count= <span>1</span>"),
-                    "独立会话应为全新计数 1, body=" + flat);
+            assertTrue(body.contains("session-count= <span>1</span>"), "独立会话应为全新计数 1, body=" + flat);
         }
     }
 

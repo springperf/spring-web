@@ -19,7 +19,7 @@ public class BlockingWebFilter implements WebFilter {
 
     @Override
     public void doFilter(WebServerHttpRequest request, WebServerHttpResponse response,
-                         io.springperf.web.core.filter.FilterChain chain) throws Exception {
+            io.springperf.web.core.filter.FilterChain chain) throws Exception {
         // Only block requests to the specific path
         String path = request.getPath();
         if (path.contains("/p2/blocked")) {

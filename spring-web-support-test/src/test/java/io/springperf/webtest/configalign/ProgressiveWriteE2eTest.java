@@ -26,25 +26,20 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Servlet 渐进式写出 E2E（对齐 Tomcat 的 {@code flushBuffer()} / {@code Writer.flush()} /
- * {@code OutputStream.flush()} 语义）：
- *
+ * Servlet 渐进式写出 E2E（对齐 Tomcat 的 {@code flushBuffer()} / {@code Writer.flush()} / {@code OutputStream.flush()} 语义）：
  * <ul>
- *   <li>提交后可继续写入（chunked 续帧），不再是「一次成型」；</li>
- *   <li>首段内容必须在处理器结束**之前**到达客户端（渐进性的本质，用到达时序断言）；</li>
- *   <li>框架在请求收尾写终止块，客户端能判定响应结束（否则 OkHttp 会读到超时）；</li>
- *   <li>多段顺序、UTF-8 多字节跨写入边界、提交后异常/ sendError 均不得破坏已提交的流。</li>
+ * <li>提交后可继续写入（chunked 续帧），不再是「一次成型」；</li>
+ * <li>首段内容必须在处理器结束**之前**到达客户端（渐进性的本质，用到达时序断言）；</li>
+ * <li>框架在请求收尾写终止块，客户端能判定响应结束（否则 OkHttp 会读到超时）；</li>
+ * <li>多段顺序、UTF-8 多字节跨写入边界、提交后异常/ sendError 均不得破坏已提交的流。</li>
  * </ul>
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, ProgressiveWriteE2eTest.ProgressiveConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "server.servlet.context-path=/")
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        ProgressiveWriteE2eTest.ProgressiveConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "server.servlet.context-path=/")
 class ProgressiveWriteE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(15))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(15)).build();
 
     @LocalServerPort
     int port;
@@ -85,8 +80,7 @@ class ProgressiveWriteE2eTest {
     }
 
     private Response get(String path) throws Exception {
-        return CLIENT.newCall(new Request.Builder()
-                .url("http://localhost:" + port + path).build()).execute();
+        return CLIENT.newCall(new Request.Builder().url("http://localhost:" + port + path).build()).execute();
     }
 
     // ==================== 渐进性（时序） ====================
@@ -101,13 +95,10 @@ class ProgressiveWriteE2eTest {
             AtomicLong firstByteAt = new AtomicLong();
             String resp = readAllRecordingFirstByte(s, firstByteAt);
             long firstByteDelay = firstByteAt.get() - start;
-            assertTrue(firstByteDelay < 1000,
-                    "首段应在处理器结束前到达（实测首字节 " + firstByteDelay + "ms，睡眠 1500ms）");
-            assertTrue(resp.contains("stage-1") && resp.contains("stage-2"),
-                    "两段都应送达，实际:\n" + resp);
+            assertTrue(firstByteDelay < 1000, "首段应在处理器结束前到达（实测首字节 " + firstByteDelay + "ms，睡眠 1500ms）");
+            assertTrue(resp.contains("stage-1") && resp.contains("stage-2"), "两段都应送达，实际:\n" + resp);
             // 线上 header 名大小写不敏感：Netty 常量以小写写出（transfer-encoding），统一按小写比对
-            assertTrue(resp.toLowerCase().contains("transfer-encoding: chunked"),
-                    "渐进式输出应使用 chunked 帧，实际:\n" + resp);
+            assertTrue(resp.toLowerCase().contains("transfer-encoding: chunked"), "渐进式输出应使用 chunked 帧，实际:\n" + resp);
         }
     }
 
@@ -116,8 +107,7 @@ class ProgressiveWriteE2eTest {
         try (Socket s = open()) {
             write(s, "GET /e2e-prog/staged?sleep=200 HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
             String resp = readAllRecordingFirstByte(s, new AtomicLong());
-            assertTrue(!resp.contains("Content-Length:"),
-                    "已提交为 chunked 后不得再带 Content-Length（两者互斥），实际:\n" + resp);
+            assertTrue(!resp.contains("Content-Length:"), "已提交为 chunked 后不得再带 Content-Length（两者互斥），实际:\n" + resp);
         }
     }
 
@@ -133,8 +123,7 @@ class ProgressiveWriteE2eTest {
             assertEquals(1, countStatusLines(resp), "只应有一个响应，实际:\n" + resp);
             assertTrue(resp.contains("out-1") && resp.contains("out-2"),
                     "getOutputStream().flush() 后仍应能继续写，实际:\n" + resp);
-            assertTrue(firstByteAt.get() - start < 500,
-                    "首段应先于处理器结束到达，实测 " + (firstByteAt.get() - start) + "ms");
+            assertTrue(firstByteAt.get() - start < 500, "首段应先于处理器结束到达，实测 " + (firstByteAt.get() - start) + "ms");
         }
     }
 
@@ -147,8 +136,7 @@ class ProgressiveWriteE2eTest {
             int c2 = resp.indexOf("chunk-2");
             int c3 = resp.indexOf("chunk-3");
             int c4 = resp.indexOf("chunk-4");
-            assertTrue(c1 >= 0 && c2 > c1 && c3 > c2 && c4 > c3,
-                    "分段内容顺序必须保持，实际:\n" + resp);
+            assertTrue(c1 >= 0 && c2 > c1 && c3 > c2 && c4 > c3, "分段内容顺序必须保持，实际:\n" + resp);
         }
     }
 
@@ -173,8 +161,7 @@ class ProgressiveWriteE2eTest {
         Response resp = get("/e2e-prog/flush-then-return");
         try {
             assertEquals(200, resp.code());
-            assertEquals("only-part\n", resp.body().string(),
-                    "未显式收尾时框架应补终止块，客户端读到完整内容");
+            assertEquals("only-part\n", resp.body().string(), "未显式收尾时框架应补终止块，客户端读到完整内容");
         } finally {
             resp.close();
         }
@@ -186,8 +173,7 @@ class ProgressiveWriteE2eTest {
         Response resp = get("/e2e-prog/write-no-flush");
         try {
             assertEquals(200, resp.code());
-            assertEquals("no-flush-body", resp.body().string(),
-                    "未 flush 的 Writer 内容应在提交前刷入响应体");
+            assertEquals("no-flush-body", resp.body().string(), "未 flush 的 Writer 内容应在提交前刷入响应体");
         } finally {
             resp.close();
         }
@@ -213,11 +199,9 @@ class ProgressiveWriteE2eTest {
             write(s, "GET /e2e-prog/flush-then-sendError HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
             String resp = readAllRecordingFirstByte(s, new AtomicLong());
             assertEquals(1, countStatusLines(resp), "只应有一个响应，实际:\n" + resp);
-            assertTrue(resp.contains("200"),
-                    "已提交的状态码不得被改写，实际:\n" + resp);
+            assertTrue(resp.contains("200"), "已提交的状态码不得被改写，实际:\n" + resp);
             assertTrue(resp.contains("streamed-part"), "已提交内容应送达，实际:\n" + resp);
-            assertTrue(!resp.contains("500"),
-                    "不得把错误响应追加进已提交的流，实际:\n" + resp);
+            assertTrue(!resp.contains("500"), "不得把错误响应追加进已提交的流，实际:\n" + resp);
         }
     }
 
@@ -233,9 +217,9 @@ class ProgressiveWriteE2eTest {
 
     @Test
     void headRequest_flushBuffer_noBody() throws Exception {
-        Response resp = CLIENT.newCall(new Request.Builder()
-                .url("http://localhost:" + port + "/e2e-prog/staged?sleep=100")
-                .head().build()).execute();
+        Response resp = CLIENT.newCall(
+                new Request.Builder().url("http://localhost:" + port + "/e2e-prog/staged?sleep=100").head().build())
+                .execute();
         try {
             assertEquals(200, resp.code(), "HEAD 应正常响应，实际 " + resp.code());
             assertEquals("", resp.body().string(), "HEAD 不得返回 body");

@@ -26,17 +26,20 @@ public class RequestBodyAdviceCodecInterceptor implements HttpBodyCodecIntercept
     }
 
     @Override
-    public HttpInputMessage beforeBodyRead(HttpInputMessage inputMessage, MethodParameter parameter, Type targetType, HttpBodyConverter converter) throws IOException {
+    public HttpInputMessage beforeBodyRead(HttpInputMessage inputMessage, MethodParameter parameter, Type targetType,
+            HttpBodyConverter converter) throws IOException {
         return advice.beforeBodyRead(inputMessage, parameter, targetType, converter.getConverterClass());
     }
 
     @Override
-    public Object afterBodyRead(Object body, HttpInputMessage inputMessage, MethodParameter parameter, Type targetType, HttpBodyConverter converter) {
+    public Object afterBodyRead(Object body, HttpInputMessage inputMessage, MethodParameter parameter, Type targetType,
+            HttpBodyConverter converter) {
         return advice.afterBodyRead(body, inputMessage, parameter, targetType, converter.getConverterClass());
     }
 
     @Override
-    public Object handleEmptyBodyRead(Object body, HttpInputMessage inputMessage, MethodParameter parameter, Type targetType, HttpBodyConverter converter) {
+    public Object handleEmptyBodyRead(Object body, HttpInputMessage inputMessage, MethodParameter parameter,
+            Type targetType, HttpBodyConverter converter) {
         return advice.handleEmptyBody(body, inputMessage, parameter, targetType, converter.getConverterClass());
     }
 
@@ -46,7 +49,8 @@ public class RequestBodyAdviceCodecInterceptor implements HttpBodyCodecIntercept
     }
 
     @Override
-    public Object beforeBodyWrite(Object body, MethodParameter returnType, MediaType selectedContentType, HttpBodyConverter converter, ServerHttpRequest request, ServerHttpResponse response) {
+    public Object beforeBodyWrite(Object body, MethodParameter returnType, MediaType selectedContentType,
+            HttpBodyConverter converter, ServerHttpRequest request, ServerHttpResponse response) {
         return null;
     }
 }

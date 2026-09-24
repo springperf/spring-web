@@ -1,21 +1,22 @@
 package io.springperf.web.core.resource;
 
-import io.springperf.web.context.ApplicationProperties;
-import io.springperf.web.context.PropertiesConstant;
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.DispatcherHandler;
-import io.springperf.web.core.mapping.MappingRegistry;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.context.ApplicationContext;
-
-import java.util.Collections;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+
+import java.util.Collections;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationContext;
+
+import io.springperf.web.context.ApplicationProperties;
+import io.springperf.web.context.PropertiesConstant;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.DispatcherHandler;
+import io.springperf.web.core.mapping.MappingRegistry;
 
 class ResourceHandlerRegistryTest {
 
@@ -44,8 +45,8 @@ class ResourceHandlerRegistryTest {
     @Test
     void initComponentPhase2_withRegistrations_registersMappings() throws Exception {
         ResourceHandlerRegistry registry = new ResourceHandlerRegistry();
-        registry.registerWebComponent(new ResourceHandlerRegistration("/static/**")
-                .addResourceLocations("classpath:/static/"));
+        registry.registerWebComponent(
+                new ResourceHandlerRegistration("/static/**").addResourceLocations("classpath:/static/"));
         registry.initWithWebContext(webContext);
         registry.initComponentPhase1();
         registry.initComponentPhase2();
@@ -57,10 +58,10 @@ class ResourceHandlerRegistryTest {
     @Test
     void initComponentPhase2_multipleRegistrations_registersAllMappings() throws Exception {
         ResourceHandlerRegistry registry = new ResourceHandlerRegistry();
-        registry.registerWebComponent(new ResourceHandlerRegistration("/static/**")
-                .addResourceLocations("classpath:/static/"));
-        registry.registerWebComponent(new ResourceHandlerRegistration("/images/**", "/css/**")
-                .addResourceLocations("classpath:/images/"));
+        registry.registerWebComponent(
+                new ResourceHandlerRegistration("/static/**").addResourceLocations("classpath:/static/"));
+        registry.registerWebComponent(
+                new ResourceHandlerRegistration("/images/**", "/css/**").addResourceLocations("classpath:/images/"));
         registry.initWithWebContext(webContext);
         registry.initComponentPhase1();
         registry.initComponentPhase2();
@@ -94,8 +95,8 @@ class ResourceHandlerRegistryTest {
         ctx.registerWebComponent(mapping);
 
         ResourceHandlerRegistry registry = new ResourceHandlerRegistry();
-        registry.registerWebComponent(new ResourceHandlerRegistration("/static/**")
-                .addResourceLocations("classpath:/static/"));
+        registry.registerWebComponent(
+                new ResourceHandlerRegistration("/static/**").addResourceLocations("classpath:/static/"));
         registry.initWithWebContext(ctx);
         registry.initComponentPhase1();
         registry.initComponentPhase2();
@@ -134,7 +135,8 @@ class ResourceHandlerRegistryTest {
 
     private WebContext ctxWithProps(ApplicationProperties props) {
         // 兜底桩：static-locations 与 cache 键未显式配置时走默认值
-        lenient().when(props.get(PropertiesConstant.WEB_RESOURCES_STATIC_LOCATIONS,
+        lenient()
+                .when(props.get(PropertiesConstant.WEB_RESOURCES_STATIC_LOCATIONS,
                         PropertiesConstant.WEB_RESOURCES_STATIC_LOCATIONS_DEFAULT))
                 .thenReturn(PropertiesConstant.WEB_RESOURCES_STATIC_LOCATIONS_DEFAULT);
         lenient().when(props.get(PropertiesConstant.WEB_RESOURCES_CACHE_PERIOD, null)).thenReturn(null);
@@ -175,8 +177,8 @@ class ResourceHandlerRegistryTest {
 
         WebContext ctx = ctxWithProps(props);
         ResourceHandlerRegistry registry = new ResourceHandlerRegistry();
-        registry.registerWebComponent(new ResourceHandlerRegistration("/static/**")
-                .addResourceLocations("classpath:/static/"));
+        registry.registerWebComponent(
+                new ResourceHandlerRegistration("/static/**").addResourceLocations("classpath:/static/"));
         registry.initWithWebContext(ctx);
         registry.initComponentPhase1();
         registry.initComponentPhase2();
@@ -184,10 +186,8 @@ class ResourceHandlerRegistryTest {
         MappingRegistry mapping = ctx.getWebComponent(MappingRegistry.class);
         // 对齐 Boot：默认 /** 映射与用户注册共存（特异性匹配下用户 pattern 优先）
         assertEquals(2, mapping.getMappingContextList().size());
-        assertTrue(mapping.getMappingContextList().stream()
-                .anyMatch(m -> m.getPathRule().equals("/static/**")));
-        assertTrue(mapping.getMappingContextList().stream()
-                .anyMatch(m -> m.getPathRule().equals("/**")));
+        assertTrue(mapping.getMappingContextList().stream().anyMatch(m -> m.getPathRule().equals("/static/**")));
+        assertTrue(mapping.getMappingContextList().stream().anyMatch(m -> m.getPathRule().equals("/**")));
     }
 
     @Test
@@ -223,8 +223,7 @@ class ResourceHandlerRegistryTest {
 
         MappingRegistry mapping = ctx.getWebComponent(MappingRegistry.class);
         assertEquals(1, mapping.getMappingContextList().size());
-        ResourceRequestHandler handler =
-                (ResourceRequestHandler) mapping.getMappingContextList().get(0).getBean();
+        ResourceRequestHandler handler = (ResourceRequestHandler) mapping.getMappingContextList().get(0).getBean();
         assertNotNull(handler);
         assertEquals(3600, handler.getRegistration().getCachePeriod(), "全局 cache.period 应应用到默认注册");
     }

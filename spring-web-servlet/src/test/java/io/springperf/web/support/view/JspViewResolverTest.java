@@ -23,9 +23,12 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class JspViewResolverTest {
 
-    @Mock WebContext webContext;
-    @Mock MappingRegistry mappingRegistry;
-    @Mock WebServerHttpRequest req;
+    @Mock
+    WebContext webContext;
+    @Mock
+    MappingRegistry mappingRegistry;
+    @Mock
+    WebServerHttpRequest req;
 
     private String viewPath(View view) {
         return (String) org.springframework.test.util.ReflectionTestUtils.getField(view, "path");
@@ -67,7 +70,8 @@ class JspViewResolverTest {
     @Test
     void initComponentPhase1_registersJspServletRoute() throws Exception {
         JspFactory.setDefaultFactory(null);
-        io.springperf.web.context.ApplicationProperties props = mock(io.springperf.web.context.ApplicationProperties.class);
+        io.springperf.web.context.ApplicationProperties props = mock(
+                io.springperf.web.context.ApplicationProperties.class);
         lenient().when(props.get(anyString(), anyString())).thenAnswer(inv -> inv.getArgument(1));
         when(webContext.getProps()).thenReturn(props);
         PerfServletContext servletContext = new PerfServletContext(webContext);
@@ -78,8 +82,7 @@ class JspViewResolverTest {
         resolver.initWithWebContext(webContext);
         resolver.initComponentPhase1();
 
-        verify(mappingRegistry).registerMapping(argThat(ctx ->
-                ctx.getPathRule().equals("/**/*.jsp")));
+        verify(mappingRegistry).registerMapping(argThat(ctx -> ctx.getPathRule().equals("/**/*.jsp")));
         assertNotNull(JspFactory.getDefaultFactory(), "初始化后应设置 JspFactory");
         assertInstanceOf(JspFactoryImpl.class, JspFactory.getDefaultFactory());
         assertNotNull(TldCache.getInstance(servletContext), "初始化后应设置 TldCache");

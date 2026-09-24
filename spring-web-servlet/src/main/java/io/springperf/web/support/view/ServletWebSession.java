@@ -12,9 +12,9 @@ import java.util.Enumeration;
 
 /**
  * {@link IWebSession} 的 Servlet 适配：桥接 {@link HttpSession}。
- *
- * <p>仅在 {@code HttpSession} 非 null 时实例化；{@link #exists()} 恒返回 {@code true}
- * （包装实例的存在即表示会话存在）。</p>
+ * <p>
+ * 仅在 {@code HttpSession} 非 null 时实例化；{@link #exists()} 恒返回 {@code true} （包装实例的存在即表示会话存在）。
+ * </p>
  *
  * @since 3.5.7
  */

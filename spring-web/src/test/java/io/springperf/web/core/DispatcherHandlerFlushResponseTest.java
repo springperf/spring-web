@@ -1,21 +1,22 @@
 package io.springperf.web.core;
 
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
-import org.junit.jupiter.api.Test;
-
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import org.junit.jupiter.api.Test;
+
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
+
 /**
  * {@link DispatcherHandler} 收尾 {@code flushResponse} 的语义回归。
- *
- * <p><b>回归点</b>：一次性写出路径（{@code byte[]} → {@code writeBytes}）在解析返回值时已提交响应，
- * 收尾若再调 {@code flush()}，会走进 {@code writeAndFlush} 的「已提交」拒绝分支：
- * 释放缓冲 + 每个请求白打一条 WARN（实测 {@code /core/bytes} 与 {@code /core/large-response}
- * 各 +1 条/请求，而 JSON 端点 +0 条）。已提交即无待刷内容，应直接跳过。</p>
+ * <p>
+ * <b>回归点</b>：一次性写出路径（{@code byte[]} → {@code writeBytes}）在解析返回值时已提交响应， 收尾若再调 {@code flush()}，会走进 {@code writeAndFlush}
+ * 的「已提交」拒绝分支： 释放缓冲 + 每个请求白打一条 WARN（实测 {@code /core/bytes} 与 {@code /core/large-response} 各 +1 条/请求，而 JSON 端点 +0
+ * 条）。已提交即无待刷内容，应直接跳过。
+ * </p>
  */
 class DispatcherHandlerFlushResponseTest {
 

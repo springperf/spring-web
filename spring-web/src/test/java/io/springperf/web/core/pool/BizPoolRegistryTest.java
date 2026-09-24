@@ -1,19 +1,7 @@
 package io.springperf.web.core.pool;
 
-import io.springperf.web.annotation.RunInEventloop;
-import io.springperf.web.annotation.RunInPool;
-import io.springperf.web.context.ApplicationProperties;
-import io.springperf.web.context.BaseWebComponent;
-import io.springperf.web.context.PropertiesConstant;
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.mapping.MappingHandlerMethod;
-import io.springperf.web.core.metrics.NoOpWebMetrics;
-import io.springperf.web.core.metrics.WebMetrics;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.web.method.HandlerMethod;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import java.lang.reflect.Field;
 import java.util.Map;
@@ -23,12 +11,24 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.method.HandlerMethod;
+
+import io.springperf.web.annotation.RunInEventloop;
+import io.springperf.web.annotation.RunInPool;
+import io.springperf.web.context.ApplicationProperties;
+import io.springperf.web.context.BaseWebComponent;
+import io.springperf.web.context.PropertiesConstant;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.core.metrics.NoOpWebMetrics;
+import io.springperf.web.core.metrics.WebMetrics;
 
 /**
- * 注意：各测试用例使用独立的 controller method name，
- * 避免 {@link MappingHandlerMethod} 静态缓存跨测试污染。
+ * 注意：各测试用例使用独立的 controller method name， 避免 {@link MappingHandlerMethod} 静态缓存跨测试污染。
  */
 @ExtendWith(MockitoExtension.class)
 class BizPoolRegistryTest {
@@ -77,16 +77,14 @@ class BizPoolRegistryTest {
 
     @Test
     void determinePool_withDefaultAnnotation_returnsPool() {
-        registry.register("default", new ThreadPoolExecutor(1, 1, 0,
-                TimeUnit.SECONDS, new LinkedBlockingQueue<>()));
+        registry.register("default", new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, new LinkedBlockingQueue<>()));
         MappingHandlerMethod mhm = mappingHandler(DefaultPoolCtrl.class, "withDefaultPool");
         assertNotNull(registry.determinePool(mhm));
     }
 
     @Test
     void determinePool_withDefaultAnnotation_resultIsCached() {
-        registry.register("default", new ThreadPoolExecutor(1, 1, 0,
-                TimeUnit.SECONDS, new LinkedBlockingQueue<>()));
+        registry.register("default", new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, new LinkedBlockingQueue<>()));
         MappingHandlerMethod mhm = mappingHandler(DefaultPoolCtrl.class, "withDefaultPool");
         ExecutorService pool1 = registry.determinePool(mhm);
         ExecutorService pool2 = registry.determinePool(mhm);
@@ -106,8 +104,7 @@ class BizPoolRegistryTest {
     @Test
     void determinePool_withInvalidPoolName_throwsIllegalState() {
         MappingHandlerMethod mhm = mappingHandler(InvalidPoolCtrl.class, "withInvalidPool");
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> registry.determinePool(mhm));
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> registry.determinePool(mhm));
         assertTrue(ex.getMessage().contains("nonexistent"));
     }
 
@@ -123,16 +120,14 @@ class BizPoolRegistryTest {
 
     @Test
     void determinePool_withEventLoopAnnotation_returnsNull() {
-        registry.register("default", new ThreadPoolExecutor(1, 1, 0,
-                TimeUnit.SECONDS, new LinkedBlockingQueue<>()));
+        registry.register("default", new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, new LinkedBlockingQueue<>()));
         MappingHandlerMethod mhm = mappingHandler(EventLoopCtrl.class, "withEventLoopPool");
         assertNull(registry.determinePool(mhm));
     }
 
     @Test
     void determinePool_withEventLoopAnnotation_resultIsCached() {
-        registry.register("default", new ThreadPoolExecutor(1, 1, 0,
-                TimeUnit.SECONDS, new LinkedBlockingQueue<>()));
+        registry.register("default", new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, new LinkedBlockingQueue<>()));
         MappingHandlerMethod mhm = mappingHandler(EventLoopCtrl.class, "withEventLoopPool");
         assertNull(registry.determinePool(mhm));
         assertNull(registry.determinePool(mhm));
@@ -150,16 +145,14 @@ class BizPoolRegistryTest {
 
     @Test
     void determinePool_withRunInEventloopMetaAnnotation_returnsNull() {
-        registry.register("default", new ThreadPoolExecutor(1, 1, 0,
-                TimeUnit.SECONDS, new LinkedBlockingQueue<>()));
+        registry.register("default", new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, new LinkedBlockingQueue<>()));
         MappingHandlerMethod mhm = mappingHandler(RunInEventloopCtrl.class, "withRunInEventloop");
         assertNull(registry.determinePool(mhm));
     }
 
     @Test
     void determinePool_withRunInEventloopMetaAnnotation_resultIsCached() {
-        registry.register("default", new ThreadPoolExecutor(1, 1, 0,
-                TimeUnit.SECONDS, new LinkedBlockingQueue<>()));
+        registry.register("default", new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, new LinkedBlockingQueue<>()));
         MappingHandlerMethod mhm = mappingHandler(RunInEventloopCtrl.class, "withRunInEventloop");
         assertNull(registry.determinePool(mhm));
         assertNull(registry.determinePool(mhm));
@@ -177,19 +170,15 @@ class BizPoolRegistryTest {
 
     @Test
     void register_withEventLoopName_throwsIllegalArgument() {
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> registry.register("eventloop",
-                        new ThreadPoolExecutor(1, 1, 0,
-                                TimeUnit.SECONDS, new LinkedBlockingQueue<>())));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> registry.register("eventloop",
+                new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, new LinkedBlockingQueue<>())));
         assertTrue(ex.getMessage().contains("reserved keyword"));
     }
 
     @Test
     void register_withEventLoopNameCaseInsensitive_throwsIllegalArgument() {
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> registry.register("EventLoop",
-                        new ThreadPoolExecutor(1, 1, 0,
-                                TimeUnit.SECONDS, new LinkedBlockingQueue<>())));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> registry.register("EventLoop",
+                new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, new LinkedBlockingQueue<>())));
         assertTrue(ex.getMessage().contains("reserved keyword"));
     }
 
@@ -201,8 +190,7 @@ class BizPoolRegistryTest {
     @Test
     void determinePool_noAnnotation_withDefaultPoolConfig_returnsPool() {
         setWebContext(registry, "myPool");
-        registry.register("myPool", new ThreadPoolExecutor(1, 1, 0,
-                TimeUnit.SECONDS, new LinkedBlockingQueue<>()));
+        registry.register("myPool", new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, new LinkedBlockingQueue<>()));
         MappingHandlerMethod mhm = mappingHandler(DefaultConfigCtrl.class, "noAnnotationWithDefaultConfig");
         assertNotNull(registry.determinePool(mhm));
     }
@@ -210,8 +198,7 @@ class BizPoolRegistryTest {
     @Test
     void determinePool_noAnnotation_withDefaultPoolConfig_resultIsCached() {
         setWebContext(registry, "myPool");
-        registry.register("myPool", new ThreadPoolExecutor(1, 1, 0,
-                TimeUnit.SECONDS, new LinkedBlockingQueue<>()));
+        registry.register("myPool", new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, new LinkedBlockingQueue<>()));
         MappingHandlerMethod mhm = mappingHandler(DefaultConfigCtrl.class, "noAnnotationWithDefaultConfig");
         ExecutorService p1 = registry.determinePool(mhm);
         ExecutorService p2 = registry.determinePool(mhm);
@@ -231,8 +218,7 @@ class BizPoolRegistryTest {
     void determinePool_noAnnotation_withInvalidDefaultPool_throwsIllegalState() {
         setWebContext(registry, "nonexistent");
         MappingHandlerMethod mhm = mappingHandler(InvalidConfigCtrl.class, "noAnnotationWithInvalidConfig");
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> registry.determinePool(mhm));
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> registry.determinePool(mhm));
         assertTrue(ex.getMessage().contains("nonexistent"));
     }
 
@@ -265,8 +251,7 @@ class BizPoolRegistryTest {
     void register_withThreadPoolExecutor_registersPoolGauges() {
         WebMetrics metrics = mock(WebMetrics.class);
         setMetrics(registry, metrics);
-        ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 0,
-                TimeUnit.SECONDS, new LinkedBlockingQueue<>());
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
 
         registry.register("myPool", executor);
 
@@ -327,8 +312,7 @@ class BizPoolRegistryTest {
     private static MappingHandlerMethod mappingHandler(Class<?> controllerClass, String methodName) {
         try {
             Object bean = controllerClass.getDeclaredConstructor().newInstance();
-            return new MappingHandlerMethod(
-                    new HandlerMethod(bean, controllerClass.getDeclaredMethod(methodName)));
+            return new MappingHandlerMethod(new HandlerMethod(bean, controllerClass.getDeclaredMethod(methodName)));
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

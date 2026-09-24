@@ -13,16 +13,15 @@ import org.apache.tomcat.SimpleInstanceManager;
 
 /**
  * 基于 Apache Jasper 的 JSP 处理 Servlet。
- *
- * <p>补充标准容器职责（非 Tomcat 容器中 Tomcat 不会自动提供）：
+ * <p>
+ * 补充标准容器职责（非 Tomcat 容器中 Tomcat 不会自动提供）：
  * <ol>
- *   <li>初始化 {@link JspFactory}（JSP 运行时入口）；</li>
- *   <li>为 {@link ServletContext} 设置 {@link InstanceManager}（Jasper 实例化 JSP/Tag 类所需）；</li>
- *   <li>扫描 classpath 的 TLD 并设置 {@link TldCache}（JSTL / taglib 支持）。</li>
+ * <li>初始化 {@link JspFactory}（JSP 运行时入口）；</li>
+ * <li>为 {@link ServletContext} 设置 {@link InstanceManager}（Jasper 实例化 JSP/Tag 类所需）；</li>
+ * <li>扫描 classpath 的 TLD 并设置 {@link TldCache}（JSTL / taglib 支持）。</li>
  * </ol>
- *
- * <p>通过 {@link ServletInvoker} 注册为框架路由（*.jsp），请求命中后由
- * {@code JspServlet.service()} 完成 JSP 编译与渲染。
+ * <p>
+ * 通过 {@link ServletInvoker} 注册为框架路由（*.jsp），请求命中后由 {@code JspServlet.service()} 完成 JSP 编译与渲染。
  */
 public class JasperJspServlet extends JspServlet {
 
@@ -44,8 +43,7 @@ public class JasperJspServlet extends JspServlet {
         try {
             TldScanner scanner = new TldScanner(servletContext, true, true, false);
             scanner.scan();
-            TldCache tldCache = new TldCache(servletContext,
-                    scanner.getUriTldResourcePathMap(),
+            TldCache tldCache = new TldCache(servletContext, scanner.getUriTldResourcePathMap(),
                     scanner.getTldResourcePathTaglibXmlMap());
             servletContext.setAttribute(TldCache.SERVLET_CONTEXT_ATTRIBUTE_NAME, tldCache);
         } catch (Exception e) {

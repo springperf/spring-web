@@ -16,7 +16,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class SseEmitterTest {
 
-    @Mock ServerHttpResponse serverHttpResponse;
+    @Mock
+    ServerHttpResponse serverHttpResponse;
 
     @Test
     void defaultConstructor_createsEmitter() {
@@ -55,10 +56,7 @@ class SseEmitterTest {
 
     @Test
     void eventBuilder_build_generatesDataWithMediaType() {
-        SseEmitter.SseEventBuilder builder = SseEmitter.event()
-                .id("1")
-                .name("update")
-                .data("payload");
+        SseEmitter.SseEventBuilder builder = SseEmitter.event().id("1").name("update").data("payload");
 
         Set<SseEmitter.DataWithMediaType> result = builder.build();
         assertFalse(result.isEmpty());
@@ -76,8 +74,7 @@ class SseEmitterTest {
         Set<SseEmitter.DataWithMediaType> result = SseEmitter.event().name("user-update").build();
         assertFalse(result.isEmpty());
         String content = result.iterator().next().getData().toString();
-        assertTrue(content.contains("event:user-update"),
-                "应生成 event: 行，实际: " + content);
+        assertTrue(content.contains("event:user-update"), "应生成 event: 行，实际: " + content);
     }
 
     @Test
@@ -92,8 +89,7 @@ class SseEmitterTest {
         Set<SseEmitter.DataWithMediaType> result = SseEmitter.event().comment("heartbeat").build();
         assertFalse(result.isEmpty());
         String content = result.iterator().next().getData().toString();
-        assertTrue(content.contains(":heartbeat"),
-                "应生成注释行(:heartbeat)，实际: " + content);
+        assertTrue(content.contains(":heartbeat"), "应生成注释行(:heartbeat)，实际: " + content);
     }
 
     @Test
@@ -101,9 +97,7 @@ class SseEmitterTest {
         Set<SseEmitter.DataWithMediaType> result = SseEmitter.event().data("hello").build();
         assertFalse(result.isEmpty());
         // data() 会把 "data:" 前缀与 object 分成多个 DataWithMediaType，需拼接全部内容校验
-        String content = result.stream()
-                .map(d -> d.getData().toString())
-                .reduce("", String::concat);
+        String content = result.stream().map(d -> d.getData().toString()).reduce("", String::concat);
         assertTrue(content.contains("data:"), "应含 data: 前缀，实际: " + content);
         assertTrue(content.contains("hello"), "应含数据内容，实际: " + content);
     }
@@ -116,38 +110,24 @@ class SseEmitterTest {
 
     @Test
     void eventBuilder_chainedBuild_containsAllParts() {
-        Set<SseEmitter.DataWithMediaType> result = SseEmitter.event()
-                .id("1")
-                .name("msg")
-                .reconnectTime(1000L)
-                .comment("test")
-                .data("hello")
-                .build();
+        Set<SseEmitter.DataWithMediaType> result = SseEmitter.event().id("1").name("msg").reconnectTime(1000L)
+                .comment("test").data("hello").build();
 
         assertFalse(result.isEmpty());
     }
 
     @Test
     void eventBuilder_multipleData_accumulates() {
-        Set<SseEmitter.DataWithMediaType> result = SseEmitter.event()
-                .data("first")
-                .data("second")
-                .build();
+        Set<SseEmitter.DataWithMediaType> result = SseEmitter.event().data("first").data("second").build();
 
         assertTrue(result.size() >= 2);
     }
 
     @Test
     void eventBuilder_buildContent_containsSseFormatting() {
-        Set<SseEmitter.DataWithMediaType> result = SseEmitter.event()
-                .id("1")
-                .name("msg")
-                .data("hello")
-                .build();
+        Set<SseEmitter.DataWithMediaType> result = SseEmitter.event().id("1").name("msg").data("hello").build();
 
-        String allContent = result.stream()
-                .map(d -> d.getData().toString())
-                .reduce("", String::concat);
+        String allContent = result.stream().map(d -> d.getData().toString()).reduce("", String::concat);
 
         assertTrue(allContent.contains("id:1"));
         assertTrue(allContent.contains("event:msg"));

@@ -1,17 +1,18 @@
 package io.springperf.web.core.retval.resolver;
 
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.verify;
+
+import java.lang.reflect.Method;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.MethodParameter;
 
-import java.lang.reflect.Method;
-
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.verify;
+import io.springperf.web.http.WebServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 class ByteArrayReturnValueResolverTest {
@@ -54,7 +55,12 @@ class ByteArrayReturnValueResolverTest {
     }
 
     @SuppressWarnings("unused")
-    public byte[] byteArrayReturn() { return null; }
+    public byte[] byteArrayReturn() {
+        return null;
+    }
+
     @SuppressWarnings("unused")
-    public String stringReturn() { return null; }
+    public String stringReturn() {
+        return null;
+    }
 }

@@ -23,10 +23,7 @@ public class InterceptorAdvancedTest extends BaseE2ETest {
     @Test
     void interceptorLifecycle_postHandleAndAfterCompletion_withException() throws Exception {
         // 请求一个抛异常的端点，验证 afterCompletion 仍被调用
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/core/exception/illegal-argument")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/core/exception/illegal-argument").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(400, resp.code());
         }
@@ -42,13 +39,9 @@ public class InterceptorAdvancedTest extends BaseE2ETest {
     void interceptorExcludedPath_shouldPassWithoutInterception() throws Exception {
         // /demo/echo is in the excludePathPatterns of LoginInterceptor
         // So it should return 302 (the echo GET response) instead of 401
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/demo/echo?received=test")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/demo/echo?received=test").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            assertEquals(302, resp.code(),
-                    "Excluded path should be handled normally without interception");
+            assertEquals(302, resp.code(), "Excluded path should be handled normally without interception");
             String body = resp.body().string();
             assertEquals("test", body);
         }
@@ -57,13 +50,9 @@ public class InterceptorAdvancedTest extends BaseE2ETest {
     @Test
     void interceptorNonExcludedPath_shouldBeIntercepted() throws Exception {
         // /core/name is NOT excluded and its method name "name" triggers LoginInterceptor
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/core/name")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/core/name").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            assertEquals(401, resp.code(),
-                    "Non-excluded path matching interceptor condition should be blocked");
+            assertEquals(401, resp.code(), "Non-excluded path matching interceptor condition should be blocked");
         }
     }
 
@@ -72,10 +61,7 @@ public class InterceptorAdvancedTest extends BaseE2ETest {
         LifecycleInterceptor.resetCounts();
 
         // Make a request to /core/lifecycle/check which is handled by LifecycleInterceptor
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/core/lifecycle/check")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/core/lifecycle/check").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
         }

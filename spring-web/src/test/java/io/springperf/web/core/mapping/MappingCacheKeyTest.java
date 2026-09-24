@@ -1,8 +1,8 @@
 package io.springperf.web.core.mapping;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.*;
+
+import org.junit.jupiter.api.Test;
 
 class MappingCacheKeyTest {
 

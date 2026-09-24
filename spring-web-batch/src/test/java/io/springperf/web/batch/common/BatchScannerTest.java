@@ -30,7 +30,8 @@ class BatchScannerTest {
         Method resolveRequestType = ReflectionUtils.findMethod(BatchScanner.class, "resolveRequestType", Method.class);
         assertThat(resolveRequestType).isNotNull();
         resolveRequestType.setAccessible(true);
-        return (Class<? extends BatchRequest<?>>) ReflectionUtils.invokeMethod(resolveRequestType, new BatchScanner(), batchMethod);
+        return (Class<? extends BatchRequest<?>>) ReflectionUtils.invokeMethod(resolveRequestType, new BatchScanner(),
+                batchMethod);
     }
 
     @Test

@@ -1,5 +1,15 @@
 package io.springperf.web.core;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
+
 import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
@@ -18,15 +28,6 @@ import io.springperf.web.http.RequestAttribute;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
-import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpStatus;
-
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
 
 /**
  * 覆盖 {@code spring.mvc.dispatch.error/options/trace} 三开关的分发行为。
@@ -39,8 +40,10 @@ class DispatcherHandlerDispatchTest {
         when(req.getRequestContext()).thenReturn(reqCtx);
         Map<RequestAttribute<?>, Object> fastAttrs = new HashMap<>();
         when(reqCtx.getAttribute(any(RequestAttribute.class))).thenAnswer(inv -> fastAttrs.get(inv.getArgument(0)));
-        doAnswer(inv -> { fastAttrs.put(inv.getArgument(0), inv.getArgument(1)); return null; })
-                .when(reqCtx).setAttribute(any(RequestAttribute.class), any());
+        doAnswer(inv -> {
+            fastAttrs.put(inv.getArgument(0), inv.getArgument(1));
+            return null;
+        }).when(reqCtx).setAttribute(any(RequestAttribute.class), any());
         lenient().when(req.getMethodValue()).thenReturn(method);
         lenient().when(req.getHeaders()).thenReturn(new org.springframework.http.HttpHeaders());
         return req;
@@ -68,10 +71,10 @@ class DispatcherHandlerDispatchTest {
                 .thenReturn(mappingRegistry);
         when(webContext.getWebComponentWithDefault(eq(ExceptionRegistry.class), any(ExceptionRegistry.class)))
                 .thenReturn(exceptionRegistry);
-        when(webContext.getWebComponentWithDefault(eq(ArgumentResolverRegistry.class), any(ArgumentResolverRegistry.class)))
-                .thenReturn(mock(ArgumentResolverRegistry.class));
-        when(webContext.getWebComponentWithDefault(eq(ReturnValueResolverRegistry.class), any(ReturnValueResolverRegistry.class)))
-                .thenReturn(mock(ReturnValueResolverRegistry.class));
+        when(webContext.getWebComponentWithDefault(eq(ArgumentResolverRegistry.class),
+                any(ArgumentResolverRegistry.class))).thenReturn(mock(ArgumentResolverRegistry.class));
+        when(webContext.getWebComponentWithDefault(eq(ReturnValueResolverRegistry.class),
+                any(ReturnValueResolverRegistry.class))).thenReturn(mock(ReturnValueResolverRegistry.class));
         when(webContext.getWebComponentWithDefault(eq(CorsRegistry.class), any(CorsRegistry.class)))
                 .thenReturn(corsRegistry);
         when(webContext.getWebComponentWithDefault(eq(InterceptorRegistry.class), any(InterceptorRegistry.class)))
@@ -82,8 +85,7 @@ class DispatcherHandlerDispatchTest {
                 .thenReturn(mock(AsyncSupportRegistry.class));
         when(webContext.getWebComponentWithDefault(eq(WebFilterRegistry.class), any(WebFilterRegistry.class)))
                 .thenReturn(webFilterRegistry);
-        when(webContext.getWebComponentWithDefault(eq(WebMetrics.class), any()))
-                .thenReturn(mock(WebMetrics.class));
+        when(webContext.getWebComponentWithDefault(eq(WebMetrics.class), any())).thenReturn(mock(WebMetrics.class));
 
         doAnswer(invocation -> {
             WebServerHttpRequest req = invocation.getArgument(0);

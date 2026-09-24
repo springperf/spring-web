@@ -26,25 +26,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 负值 = 不限的 E2E 口径：
- *
  * <ul>
- *   <li>{@code server.max-swallow-size=-1}：错误响应 + 超大 body 也不关闭连接（永不因 swallow 降级）；</li>
- *   <li>{@code server.max-http-response-header-size=-1}：响应头总量不设上限，超大响应头原样写出。</li>
+ * <li>{@code server.max-swallow-size=-1}：错误响应 + 超大 body 也不关闭连接（永不因 swallow 降级）；</li>
+ * <li>{@code server.max-http-response-header-size=-1}：响应头总量不设上限，超大响应头原样写出。</li>
  * </ul>
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, ResponseLimitUnlimitedE2eTest.UnlimitedConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "server.max-swallow-size=-1",
-                "server.max-http-response-header-size=-1"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        ResponseLimitUnlimitedE2eTest.UnlimitedConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "server.max-swallow-size=-1",
+                "server.max-http-response-header-size=-1" })
 class ResponseLimitUnlimitedE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
@@ -60,17 +54,14 @@ class ResponseLimitUnlimitedE2eTest {
             InputStream in = socket.getInputStream();
 
             String body = "y".repeat(65536);
-            out.write(("POST /e2e-unlimited/fail HTTP/1.1\r\n"
-                    + "Host: localhost\r\nContent-Type: text/plain\r\n"
-                    + "Content-Length: " + body.length() + "\r\n\r\n" + body)
-                    .getBytes(StandardCharsets.UTF_8));
+            out.write(("POST /e2e-unlimited/fail HTTP/1.1\r\n" + "Host: localhost\r\nContent-Type: text/plain\r\n"
+                    + "Content-Length: " + body.length() + "\r\n\r\n" + body).getBytes(StandardCharsets.UTF_8));
             out.flush();
 
             StringBuilder sb = new StringBuilder();
             byte[] buf = new byte[8192];
             long deadline = System.currentTimeMillis() + 5000;
-            while (sb.toString().split("HTTP/1\\.1 ", -1).length - 1 < 1
-                    && System.currentTimeMillis() < deadline) {
+            while (sb.toString().split("HTTP/1\\.1 ", -1).length - 1 < 1 && System.currentTimeMillis() < deadline) {
                 int n;
                 try {
                     n = in.read(buf);
@@ -88,13 +79,11 @@ class ResponseLimitUnlimitedE2eTest {
                     "max-swallow-size=-1 时不应因 body 大而关闭连接，实际:\n" + first);
 
             // 连接仍可复用
-            out.write("GET /e2e-unlimited/ok HTTP/1.1\r\nHost: localhost\r\n\r\n"
-                    .getBytes(StandardCharsets.UTF_8));
+            out.write("GET /e2e-unlimited/ok HTTP/1.1\r\nHost: localhost\r\n\r\n".getBytes(StandardCharsets.UTF_8));
             out.flush();
             StringBuilder sb2 = new StringBuilder();
             long deadline2 = System.currentTimeMillis() + 5000;
-            while (sb2.toString().split("HTTP/1\\.1 ", -1).length - 1 < 1
-                    && System.currentTimeMillis() < deadline2) {
+            while (sb2.toString().split("HTTP/1\\.1 ", -1).length - 1 < 1 && System.currentTimeMillis() < deadline2) {
                 int n;
                 try {
                     n = in.read(buf);
@@ -106,19 +95,17 @@ class ResponseLimitUnlimitedE2eTest {
                 }
                 sb2.append(new String(buf, 0, n, StandardCharsets.UTF_8));
             }
-            assertTrue(sb2.toString().contains("ok-body"),
-                    "负值上限下错误响应后连接应仍可复用，实际:\n" + sb2);
+            assertTrue(sb2.toString().contains("ok-body"), "负值上限下错误响应后连接应仍可复用，实际:\n" + sb2);
         }
     }
 
     @Test
     void negativeResponseHeaderSize_hugeHeadersPassedThrough() throws Exception {
-        Response resp = CLIENT.newCall(new Request.Builder()
-                .url("http://localhost:" + port + "/e2e-unlimited/big-header")
-                .get().build()).execute();
+        Response resp = CLIENT.newCall(
+                new Request.Builder().url("http://localhost:" + port + "/e2e-unlimited/big-header").get().build())
+                .execute();
         try {
-            assertEquals(200, resp.code(),
-                    "max-http-response-header-size=-1 时不限制响应头，原响应应保持 200");
+            assertEquals(200, resp.code(), "max-http-response-header-size=-1 时不限制响应头，原响应应保持 200");
             String big = resp.header("X-Big");
             assertTrue(big != null && big.length() == BIG_HEADER_LEN,
                     "超大响应头应原样透出，实际长度=" + (big == null ? "null" : big.length()));
@@ -150,9 +137,7 @@ class ResponseLimitUnlimitedE2eTest {
 
         @GetMapping("/e2e-unlimited/big-header")
         public ResponseEntity<String> bigHeader() {
-            return ResponseEntity.ok()
-                    .header("X-Big", "b".repeat(BIG_HEADER_LEN))
-                    .body("done");
+            return ResponseEntity.ok().header("X-Big", "b".repeat(BIG_HEADER_LEN)).body("done");
         }
     }
 }

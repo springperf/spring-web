@@ -87,7 +87,7 @@ class ResponseBodyAdviceCodecInterceptorTest {
         when(advice.beforeBodyWrite(body, methodParameter, mediaType, converterClass, serverRequest, serverResponse))
                 .thenReturn("modified");
 
-        assertEquals("modified",
-                createInterceptor().beforeBodyWrite(body, methodParameter, mediaType, converter, serverRequest, serverResponse));
+        assertEquals("modified", createInterceptor().beforeBodyWrite(body, methodParameter, mediaType, converter,
+                serverRequest, serverResponse));
     }
 }

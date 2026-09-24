@@ -1,10 +1,10 @@
 package io.springperf.web.context;
 
-import org.springframework.core.annotation.AnnotationAwareOrderComparator;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 
 public class WebComponentWrapperUtils {
 
@@ -36,7 +36,8 @@ public class WebComponentWrapperUtils {
         return list;
     }
 
-    public static <T> T getComponentWithDefault(WebComponentContainer componentContainer, Class<T> clazz, T defaultComponent) {
+    public static <T> T getComponentWithDefault(WebComponentContainer componentContainer, Class<T> clazz,
+            T defaultComponent) {
         T component = getComponent(componentContainer, clazz);
         if (component == null) {
             registerComponent(componentContainer, clazz);
@@ -49,7 +50,8 @@ public class WebComponentWrapperUtils {
         return component;
     }
 
-    public static <T> void initRealComponentList(WebComponentContainer componentContainer, List<T> list, Class<T> clazz) {
+    public static <T> void initRealComponentList(WebComponentContainer componentContainer, List<T> list,
+            Class<T> clazz) {
         list.clear();
         list.addAll(getComponents(componentContainer, clazz));
     }

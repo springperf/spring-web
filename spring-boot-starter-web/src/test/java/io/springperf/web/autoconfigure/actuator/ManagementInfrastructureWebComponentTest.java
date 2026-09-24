@@ -18,8 +18,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * 正向验证 R2-5（P1-18）修复行为：{@link ManagementServerInfrastructure} 自身作为
- * WebComponent 注册（生命周期可驱动），并转发 Phase 2 到内部 dispatcher。
+ * 正向验证 R2-5（P1-18）修复行为：{@link ManagementServerInfrastructure} 自身作为 WebComponent 注册（生命周期可驱动），并转发 Phase 2 到内部 dispatcher。
  */
 class ManagementInfrastructureWebComponentTest {
 

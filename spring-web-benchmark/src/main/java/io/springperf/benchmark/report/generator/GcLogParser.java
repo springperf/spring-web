@@ -3,8 +3,7 @@ package io.springperf.benchmark.report.generator;
 import java.nio.file.Path;
 
 /**
- * GC 日志解析器接口。
- * 实现类通过 {@link #supports(Path)} 检测日志格式，通过 {@link #parse(Path)} 提取指标。
+ * GC 日志解析器接口。 实现类通过 {@link #supports(Path)} 检测日志格式，通过 {@link #parse(Path)} 提取指标。
  */
 public interface GcLogParser {
 

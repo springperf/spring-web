@@ -16,14 +16,13 @@ import java.util.Locale;
 
 /**
  * 基于 JSP 的 {@link ViewResolver}。
- *
- * <p>Phase 1 将 Apache Jasper 的 {@link JasperJspServlet} 注册为框架路由
- * （{@code /**&#47;*.jsp}），JSP 请求命中后由 Jasper 编译渲染。
- *
- * <p>视图名匹配规则（不匹配时返回 null，交其他 resolver 处理）：
+ * <p>
+ * Phase 1 将 Apache Jasper 的 {@link JasperJspServlet} 注册为框架路由 （{@code /**&#47;*.jsp}），JSP 请求命中后由 Jasper 编译渲染。
+ * <p>
+ * 视图名匹配规则（不匹配时返回 null，交其他 resolver 处理）：
  * <ul>
- *   <li>{@code jsp:hello} 前缀形式 → {@code prefix + hello + suffix}</li>
- *   <li>{@code hello.jsp} 后缀形式 → {@code prefix + hello.jsp}</li>
+ * <li>{@code jsp:hello} 前缀形式 → {@code prefix + hello + suffix}</li>
+ * <li>{@code hello.jsp} 后缀形式 → {@code prefix + hello.jsp}</li>
  * </ul>
  */
 @Slf4j

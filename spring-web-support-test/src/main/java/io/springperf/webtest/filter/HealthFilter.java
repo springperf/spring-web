@@ -11,7 +11,8 @@ import java.io.PrintWriter;
 public class HealthFilter implements jakarta.servlet.Filter {
 
     @Override
-    public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, jakarta.servlet.FilterChain filterChain) throws IOException, ServletException {
+    public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse,
+            jakarta.servlet.FilterChain filterChain) throws IOException, ServletException {
         HttpServletResponse httpServletResponse = (HttpServletResponse) servletResponse;
         PrintWriter out = httpServletResponse.getWriter();
         out.println("{\"success\":true,\"message\":\"OK\"}");

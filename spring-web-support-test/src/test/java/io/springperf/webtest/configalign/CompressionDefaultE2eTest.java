@@ -13,33 +13,28 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
- * {@code server.compression.enabled} 默认 false E2E：即使客户端携带
- * Accept-Encoding: gzip，大响应也不压缩（默认零开销）。
+ * {@code server.compression.enabled} 默认 false E2E：即使客户端携带 Accept-Encoding: gzip，大响应也不压缩（默认零开销）。
  */
-@SpringBootTest(classes = {io.springperf.webtest.SupportTestApplication.class,
-                CompressionDefaultE2eTest.LargeJsonConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(classes = { io.springperf.webtest.SupportTestApplication.class,
+        CompressionDefaultE2eTest.LargeJsonConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class CompressionDefaultE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
 
     @Test
     void compressionDisabledByDefault_largeResponseNotCompressed() throws Exception {
-        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder()
-                .url("http://localhost:" + port + "/api/e2e-compression/large")
-                .header("Accept-Encoding", "gzip")
-                .build()).execute();
+        okhttp3.Response resp = CLIENT
+                .newCall(new okhttp3.Request.Builder().url("http://localhost:" + port + "/api/e2e-compression/large")
+                        .header("Accept-Encoding", "gzip").build())
+                .execute();
         try {
             assertEquals(200, resp.code());
             assertNull(resp.header("Content-Encoding"),
-                    "未开启 server.compression.enabled 时大响应也不应压缩，实际 "
-                            + resp.header("Content-Encoding"));
+                    "未开启 server.compression.enabled 时大响应也不应压缩，实际 " + resp.header("Content-Encoding"));
         } finally {
             resp.close();
         }

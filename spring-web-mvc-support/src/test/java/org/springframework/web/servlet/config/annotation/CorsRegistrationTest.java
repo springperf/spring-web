@@ -59,13 +59,8 @@ class CorsRegistrationTest {
 
     @Test
     void chainedCalls_returnsSelf() {
-        CorsRegistration reg = new CorsRegistration("/api/**")
-                .allowedOrigins("*")
-                .allowedMethods("GET")
-                .allowedHeaders("X-Hdr")
-                .exposedHeaders("X-Res")
-                .allowCredentials(false)
-                .maxAge(100);
+        CorsRegistration reg = new CorsRegistration("/api/**").allowedOrigins("*").allowedMethods("GET")
+                .allowedHeaders("X-Hdr").exposedHeaders("X-Res").allowCredentials(false).maxAge(100);
         assertNotNull(reg);
         assertEquals("/api/**", reg.getPathPattern());
     }

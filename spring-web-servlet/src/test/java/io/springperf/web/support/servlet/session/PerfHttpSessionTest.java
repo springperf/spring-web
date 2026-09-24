@@ -21,7 +21,8 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class PerfHttpSessionTest {
 
-    @Mock ServletContext servletContext;
+    @Mock
+    ServletContext servletContext;
 
     private HttpSessionData data;
     private PerfHttpSession session;
@@ -233,8 +234,7 @@ class PerfHttpSessionTest {
         long before = data.getLastAccessedTime();
         session.markAccessed();
         assertTrue(session.getLastAccessedTime() > before,
-                "markAccessed 应把最后访问时间更新为当前时间（" + before + " -> "
-                        + session.getLastAccessedTime() + "）");
+                "markAccessed 应把最后访问时间更新为当前时间（" + before + " -> " + session.getLastAccessedTime() + "）");
     }
 
     @Test
@@ -257,10 +257,8 @@ class PerfHttpSessionTest {
         PerfHttpSession b = new PerfHttpSession(data, servletContext);
         a.invalidate();
         assertTrue(b.isInvalid(), "B 的 wrapper 应看到共享 data 的失效状态");
-        assertThrows(IllegalStateException.class, () -> b.getAttribute("k"),
-                "失效会话的并发 wrapper 不应再可读属性");
-        assertThrows(IllegalStateException.class, () -> b.setAttribute("k", "v"),
-                "失效会话的并发 wrapper 不应再可写属性");
+        assertThrows(IllegalStateException.class, () -> b.getAttribute("k"), "失效会话的并发 wrapper 不应再可读属性");
+        assertThrows(IllegalStateException.class, () -> b.setAttribute("k", "v"), "失效会话的并发 wrapper 不应再可写属性");
     }
 
     // ===================== Test helper =====================

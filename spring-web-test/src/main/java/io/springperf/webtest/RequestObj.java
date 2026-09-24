@@ -8,7 +8,6 @@ import lombok.Data;
 @Data
 public class RequestObj<T> {
 
-
     @Valid
     private T data;
 

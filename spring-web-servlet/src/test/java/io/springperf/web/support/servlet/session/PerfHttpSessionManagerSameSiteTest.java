@@ -5,9 +5,8 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * {@code server.servlet.session.cookie.same-site} 的规范化：
- * 必须产出 Netty {@code CookieHeaderNames.SameSite} 的精确常量名（`Lax`/`Strict`/`None`，非全大写），
- * 否则配置 `strict` 时整体大写会抛 {@code IllegalArgumentException}（历史缺陷）。
+ * {@code server.servlet.session.cookie.same-site} 的规范化： 必须产出 Netty {@code CookieHeaderNames.SameSite}
+ * 的精确常量名（`Lax`/`Strict`/`None`，非全大写）， 否则配置 `strict` 时整体大写会抛 {@code IllegalArgumentException}（历史缺陷）。
  */
 class PerfHttpSessionManagerSameSiteTest {
 

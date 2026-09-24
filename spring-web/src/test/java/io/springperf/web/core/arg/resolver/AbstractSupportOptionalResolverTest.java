@@ -1,18 +1,19 @@
 package io.springperf.web.core.arg.resolver;
 
-import io.springperf.web.core.mapping.MappingHandlerMethod;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.lang.reflect.Method;
+import java.util.Optional;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.MethodParameter;
 
-import java.lang.reflect.Method;
-import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
+import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 class AbstractSupportOptionalResolverTest {
@@ -119,8 +120,10 @@ class AbstractSupportOptionalResolverTest {
     }
 
     @SuppressWarnings("unused")
-    public void stringParam(String s) {}
+    public void stringParam(String s) {
+    }
 
     @SuppressWarnings("unused")
-    public void optionalParam(Optional<String> s) {}
+    public void optionalParam(Optional<String> s) {
+    }
 }

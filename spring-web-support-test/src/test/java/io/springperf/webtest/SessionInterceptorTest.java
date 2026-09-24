@@ -14,10 +14,7 @@ public class SessionInterceptorTest extends BaseE2ETest {
 
     @Test
     void testProtectedEndpoint() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/demo/protected")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/demo/protected").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             assertEquals("authorized", resp.body().string());

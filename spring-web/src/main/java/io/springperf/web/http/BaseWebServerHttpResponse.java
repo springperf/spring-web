@@ -1,16 +1,5 @@
 package io.springperf.web.http;
 
-import io.springperf.web.context.PropertiesConstant;
-import io.springperf.web.context.WebContext;
-import io.springperf.web.server.ErrorPageRenderer;
-import io.springperf.web.server.ErrorResponseConfig;
-import lombok.SneakyThrows;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
-import org.springframework.http.MediaType;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -21,6 +10,18 @@ import java.util.List;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
+
+import io.springperf.web.context.PropertiesConstant;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.server.ErrorPageRenderer;
+import io.springperf.web.server.ErrorResponseConfig;
+import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse {
@@ -39,16 +40,15 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
     /** 流是否已终止（LastHttpContent 已写出；由 endStream 或外部 StreamSender 标记）。 */
     protected final AtomicBoolean streamCompleted = new AtomicBoolean(false);
     /**
-     * 提交前回调，仅执行一次。供 servlet 桥在「响应真正提交前」把其 Writer 的编码缓冲刷入响应体
-     * （否则 {@code getWriter().write("x")} 这类未 flush 的写入会随编码缓冲一起丢失）。
+     * 提交前回调，仅执行一次。供 servlet 桥在「响应真正提交前」把其 Writer 的编码缓冲刷入响应体 （否则 {@code getWriter().write("x")} 这类未 flush
+     * 的写入会随编码缓冲一起丢失）。
      */
     protected volatile Runnable beforeCommit;
     protected WriteRespEventListener writeRespEventListener;
     protected ScheduledFuture<?> timeoutFuture;
 
     /**
-     * 响应超时任务：预先持有（无状态、幂等），避免每次装配都创建 {@code this::defaultHandleTimeout}
-     * 方法引用对象（热路径每请求一次装配）。
+     * 响应超时任务：预先持有（无状态、幂等），避免每次装配都创建 {@code this::defaultHandleTimeout} 方法引用对象（热路径每请求一次装配）。
      */
     private final Runnable defaultHandleTimeoutTask = this::defaultHandleTimeout;
 
@@ -84,7 +84,8 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
 
     @Override
     public OutputStream getBody() {
-        if (body == null) body = new ByteArrayOutputStream();
+        if (body == null)
+            body = new ByteArrayOutputStream();
         return body;
     }
 
@@ -101,7 +102,8 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
     }
 
     public boolean resetBuffer() {
-        if (body == null) return false;
+        if (body == null)
+            return false;
         boolean haveData = body.size() > 0;
         body.reset();
         return haveData;
@@ -162,8 +164,7 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
     }
 
     /**
-     * 若尚未装配响应超时则装配（幂等）。用于「按需补装配」：处理器被交棒到业务线程池时、
-     * 或同步段结束仍未提交（异步/流式等待）时的兜底装配。已装配时不触发 cancel/reschedule。
+     * 若尚未装配响应超时则装配（幂等）。用于「按需补装配」：处理器被交棒到业务线程池时、 或同步段结束仍未提交（异步/流式等待）时的兜底装配。已装配时不触发 cancel/reschedule。
      */
     @Override
     public void armTimeoutIfAbsent() {
@@ -178,10 +179,12 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
     }
 
     public ScheduledFuture setTimeout(Runnable task, long delay) {
-        if (timeoutFuture != null) timeoutFuture.cancel(false);
+        if (timeoutFuture != null)
+            timeoutFuture.cancel(false);
         // delay <= 0：关闭超时（对齐框架「≤0 = 不限制」约定与 Tomcat connectionTimeout=0 的无限语义）。
         // 若把 0 当作「立即触发」，任何配置 server.http.timeout=0 的部署都会全量 504。
-        if (delay <= 0 || task == null) return null;
+        if (delay <= 0 || task == null)
+            return null;
         timeoutFuture = scheduleOnEventLoop(task, delay, TimeUnit.MILLISECONDS);
         return timeoutFuture;
     }
@@ -199,8 +202,7 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
     }
 
     /**
-     * 追加 response 写入事件监听器，与已有监听器共存。
-     * 若已有监听器，自动用 {@link CompositeWriteRespEventListener} 合并。
+     * 追加 response 写入事件监听器，与已有监听器共存。 若已有监听器，自动用 {@link CompositeWriteRespEventListener} 合并。
      */
     public void addWriteRespEventListener(WriteRespEventListener listener) {
         if (this.writeRespEventListener == null) {
@@ -213,8 +215,7 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
     }
 
     /**
-     * 合并多个 {@link WriteRespEventListener} 的复合监听器。
-     * 将回调事件广播到所有子监听器。
+     * 合并多个 {@link WriteRespEventListener} 的复合监听器。 将回调事件广播到所有子监听器。
      */
     private static class CompositeWriteRespEventListener implements WriteRespEventListener {
         private final List<WriteRespEventListener> listeners = new ArrayList<>(2);
@@ -278,10 +279,10 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
 
     /**
      * 执行「提交前回调」（幂等，仅一次）。
-     *
-     * <p>凡是在提交时读取响应体缓冲的路径，都必须在**捕获缓冲引用之前**调用本方法：
-     * 回调（servlet 桥把 Writer 编码缓冲刷入响应体）会把内容写入<b>当前</b>缓冲，
-     * 若调用方已经捕获了旧引用，新内容就会落在被忽略的新缓冲里而丢失。</p>
+     * <p>
+     * 凡是在提交时读取响应体缓冲的路径，都必须在**捕获缓冲引用之前**调用本方法： 回调（servlet 桥把 Writer 编码缓冲刷入响应体）会把内容写入<b>当前</b>缓冲，
+     * 若调用方已经捕获了旧引用，新内容就会落在被忽略的新缓冲里而丢失。
+     * </p>
      */
     protected void runBeforeCommitOnce() {
         Runnable cb = beforeCommit;
@@ -310,34 +311,32 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
     }
 
     /**
-     * 完整错误响应入口：按 {@link ErrorResponseConfig}（从 {@link #webContext} 读取，缺失则用默认）
-     * 渲染 whitelabel HTML 或 JSON，并按 {@code on-param} 模式决定是否暴露异常栈 / message。
+     * 完整错误响应入口：按 {@link ErrorResponseConfig}（从 {@link #webContext} 读取，缺失则用默认） 渲染 whitelabel HTML 或 JSON，并按
+     * {@code on-param} 模式决定是否暴露异常栈 / message。
      */
     @SneakyThrows
-    public void sendError(HttpStatusCode statusCode, String message, Throwable cause,
-                         boolean includeStacktraceOnParam, boolean includeMessageOnParam) {
+    public void sendError(HttpStatusCode statusCode, String message, Throwable cause, boolean includeStacktraceOnParam,
+            boolean includeMessageOnParam) {
         sendError(statusCode, message, cause, includeStacktraceOnParam, includeMessageOnParam, false);
     }
 
     @Override
     @SneakyThrows
-    public void sendError(HttpStatusCode statusCode, String message, Throwable cause,
-                         boolean includeStacktraceOnParam, boolean includeMessageOnParam,
-                         boolean includeErrorsOnParam) {
+    public void sendError(HttpStatusCode statusCode, String message, Throwable cause, boolean includeStacktraceOnParam,
+            boolean includeMessageOnParam, boolean includeErrorsOnParam) {
         ErrorResponseConfig cfg = resolveErrorConfig();
-        ErrorPageRenderer.ErrorResponseBody body = ErrorPageRenderer.build(
-                statusCode, message, cause, cfg, includeStacktraceOnParam, includeMessageOnParam,
-                includeErrorsOnParam, acceptHeader);
-        writeDataAndFlush(body.getBody().getBytes(characterEncoding),
-                MediaType.parseMediaType(body.getContentType()), statusCode);
+        ErrorPageRenderer.ErrorResponseBody body = ErrorPageRenderer.build(statusCode, message, cause, cfg,
+                includeStacktraceOnParam, includeMessageOnParam, includeErrorsOnParam, acceptHeader);
+        writeDataAndFlush(body.getBody().getBytes(characterEncoding), MediaType.parseMediaType(body.getContentType()),
+                statusCode);
     }
 
     /** 当前请求的 Accept 头（由管线在构造响应时注入；用于 whitelabel/JSON 错误体内容协商）。 */
     private String acceptHeader;
 
     /**
-     * 注入请求 Accept 头：对齐 Boot {@code BasicErrorController} 的 produces 协商——
-     * 浏览器（text/html 或 *&#47;*）得到 whitelabel HTML，显式 JSON 客户端得到 JSON。
+     * 注入请求 Accept 头：对齐 Boot {@code BasicErrorController} 的 produces 协商—— 浏览器（text/html 或 *&#47;*）得到 whitelabel HTML，显式
+     * JSON 客户端得到 JSON。
      */
     public void setRequestAcceptHeader(String acceptHeader) {
         this.acceptHeader = acceptHeader;
@@ -364,7 +363,8 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
             resetBuffer();
             setStatusCode(statusCode);
             headers.setContentType(contentType);
-            if (data != null) getBody().write(data);
+            if (data != null)
+                getBody().write(data);
         } finally {
             flush();
         }

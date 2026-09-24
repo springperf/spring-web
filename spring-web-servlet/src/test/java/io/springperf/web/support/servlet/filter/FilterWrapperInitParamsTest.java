@@ -17,34 +17,48 @@ import static org.mockito.Mockito.*;
 
 /**
  * 验证 {@link FilterWrapper} 的 init-param 解析与初始化：
+ *
  * @WebFilter initParams 解析、无注解兜底空 Map、filter.init 调用与 ServletException 包装。
  */
 class FilterWrapperInitParamsTest {
 
-    @WebFilter(urlPatterns = "/api/*", initParams = {
-            @WebInitParam(name = "mode", value = "strict"),
-            @WebInitParam(name = "retry", value = "3")
-    })
+    @WebFilter(urlPatterns = "/api/*", initParams = { @WebInitParam(name = "mode", value = "strict"),
+            @WebInitParam(name = "retry", value = "3") })
     static class AnnotatedFilter implements Filter {
         public void doFilter(jakarta.servlet.ServletRequest req, jakarta.servlet.ServletResponse resp,
-                             jakarta.servlet.FilterChain chain) {}
-        public void init(FilterConfig config) {}
-        public void destroy() {}
+                jakarta.servlet.FilterChain chain) {
+        }
+
+        public void init(FilterConfig config) {
+        }
+
+        public void destroy() {
+        }
     }
 
     @WebFilter
     static class NoParamFilter implements Filter {
         public void doFilter(jakarta.servlet.ServletRequest req, jakarta.servlet.ServletResponse resp,
-                             jakarta.servlet.FilterChain chain) {}
-        public void init(FilterConfig config) {}
-        public void destroy() {}
+                jakarta.servlet.FilterChain chain) {
+        }
+
+        public void init(FilterConfig config) {
+        }
+
+        public void destroy() {
+        }
     }
 
     static class PlainFilter implements Filter {
         public void doFilter(jakarta.servlet.ServletRequest req, jakarta.servlet.ServletResponse resp,
-                             jakarta.servlet.FilterChain chain) {}
-        public void init(FilterConfig config) {}
-        public void destroy() {}
+                jakarta.servlet.FilterChain chain) {
+        }
+
+        public void init(FilterConfig config) {
+        }
+
+        public void destroy() {
+        }
     }
 
     @Test
@@ -87,20 +101,22 @@ class FilterWrapperInitParamsTest {
     void initWithWebContext_filterInitFails_wrapsServletException() throws Exception {
         Filter filter = new Filter() {
             public void doFilter(jakarta.servlet.ServletRequest req, jakarta.servlet.ServletResponse resp,
-                                 jakarta.servlet.FilterChain chain) {}
+                    jakarta.servlet.FilterChain chain) {
+            }
+
             public void init(FilterConfig config) throws ServletException {
                 throw new ServletException("init fail");
             }
-            public void destroy() {}
+
+            public void destroy() {
+            }
         };
         FilterWrapper wrapper = new FilterWrapper(filter);
         WebContext webContext = mock(WebContext.class);
         when(webContext.getWebComponent(PerfServletContext.class)).thenReturn(mock(PerfServletContext.class));
 
-        RuntimeException ex = assertThrows(RuntimeException.class,
-                () -> wrapper.initWithWebContext(webContext));
-        assertTrue(ex.getMessage().contains("Failed to init filter"),
-                "异常应携带 filter 初始化失败上下文，实际: " + ex.getMessage());
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> wrapper.initWithWebContext(webContext));
+        assertTrue(ex.getMessage().contains("Failed to init filter"), "异常应携带 filter 初始化失败上下文，实际: " + ex.getMessage());
         assertNotNull(ex.getCause(), "应包装原始 ServletException");
         assertInstanceOf(ServletException.class, ex.getCause());
     }

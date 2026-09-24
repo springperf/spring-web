@@ -15,7 +15,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @ExtendWith(MockitoExtension.class)
 class PerfFilterConfigTest {
 
-    @Mock ServletContext servletContext;
+    @Mock
+    ServletContext servletContext;
 
     @Test
     void getFilterName() {

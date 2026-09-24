@@ -21,16 +21,20 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class WebRequestHandlerInterceptorAdapterTest {
 
-    @Mock WebRequestInterceptor requestInterceptor;
-    @Mock HttpServletRequest request;
-    @Mock HttpServletResponse response;
-    @Mock ModelAndView modelAndView;
-    @Captor ArgumentCaptor<ServletWebRequest> webRequestCaptor;
+    @Mock
+    WebRequestInterceptor requestInterceptor;
+    @Mock
+    HttpServletRequest request;
+    @Mock
+    HttpServletResponse response;
+    @Mock
+    ModelAndView modelAndView;
+    @Captor
+    ArgumentCaptor<ServletWebRequest> webRequestCaptor;
 
     @Test
     void constructor_nullInterceptor_throwsException() {
-        assertThrows(IllegalArgumentException.class,
-                () -> new WebRequestHandlerInterceptorAdapter(null));
+        assertThrows(IllegalArgumentException.class, () -> new WebRequestHandlerInterceptorAdapter(null));
     }
 
     @Test

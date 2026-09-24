@@ -1,13 +1,14 @@
 package io.springperf.web.core.cors.provider;
 
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
-import io.springperf.web.util.PathPatternUtils;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import org.springframework.util.PathMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
+import io.springperf.web.util.PathPatternUtils;
 
 public class RuntimeMappingCorsConfigurationProvider implements CorsConfigurationProvider {
 

@@ -8,8 +8,8 @@ import java.util.Enumeration;
 import java.util.Map;
 
 /**
- * 基于框架 {@link ServletContext} 的 {@link ServletConfig} 实现，
- * 供 {@code SupportServletRegistry} 在启动时调用 {@code servlet.init(ServletConfig)}。
+ * 基于框架 {@link ServletContext} 的 {@link ServletConfig} 实现， 供 {@code SupportServletRegistry} 在启动时调用
+ * {@code servlet.init(ServletConfig)}。
  */
 public class PerfServletConfig implements ServletConfig {
 

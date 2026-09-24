@@ -8,9 +8,9 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * A data-collecting shim of Spring MVC's {@code ResourceHandlerRegistration}.
- * Collects resource handler configuration so that it can be read and bridged
- * to the framework's native {@link io.springperf.web.core.resource.ResourceHandlerRegistration}.
+ * A data-collecting shim of Spring MVC's {@code ResourceHandlerRegistration}. Collects resource handler configuration
+ * so that it can be read and bridged to the framework's native
+ * {@link io.springperf.web.core.resource.ResourceHandlerRegistration}.
  */
 public class ResourceHandlerRegistration {
 

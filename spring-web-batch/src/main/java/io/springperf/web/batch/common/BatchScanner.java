@@ -19,8 +19,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class BatchScanner {
 
-    public List<BatchHandlerRegistration> scan(ApplicationContext ctx,
-                                                List<PathMappingContext> allMappings) {
+    public List<BatchHandlerRegistration> scan(ApplicationContext ctx, List<PathMappingContext> allMappings) {
         Map<Object, List<PathMappingContext>> byBean = allMappings.stream()
                 .collect(Collectors.groupingBy(PathMappingContext::getBean));
 
@@ -34,31 +33,26 @@ public class BatchScanner {
 
             Class<? extends BatchRequest<?>> requestType = resolveRequestType(c.method);
             if (requestType == null) {
-                throw new IllegalStateException(
-                        "@BatchMapping method " + c.method.toGenericString()
-                                + " must have a List<? extends BatchRequest<?>> as its first parameter");
+                throw new IllegalStateException("@BatchMapping method " + c.method.toGenericString()
+                        + " must have a List<? extends BatchRequest<?>> as its first parameter");
             }
             if (c.method.getParameterCount() != 1) {
-                throw new IllegalStateException(
-                        "@BatchMapping method " + c.method.toGenericString()
-                                + " must have exactly one parameter (List<? extends BatchRequest<?>>), "
-                                + "but found " + c.method.getParameterCount() + " parameters");
+                throw new IllegalStateException("@BatchMapping method " + c.method.toGenericString()
+                        + " must have exactly one parameter (List<? extends BatchRequest<?>>), " + "but found "
+                        + c.method.getParameterCount() + " parameters");
             }
 
             String queueName = resolveQueueName(c.beanType, c.method);
             int consumerSize = resolveConsumerSize(ann, c.method);
             Constructor<?> singleMethodCtor = resolveSingleMethodCtor(requestType, singleCtx);
 
-            BatchRequestMetaData meta = new BatchRequestMetaData(
-                    c.method, c.beanType, requestType, queueName,
-                    ann.ringBufferSize(), ann.waitStrategy(), ann.backpressure(),
-                    singleMethodCtor,
-                    ann.maxBatchSize(), consumerSize
-            );
+            BatchRequestMetaData meta = new BatchRequestMetaData(c.method, c.beanType, requestType, queueName,
+                    ann.ringBufferSize(), ann.waitStrategy(), ann.backpressure(), singleMethodCtor, ann.maxBatchSize(),
+                    consumerSize);
 
             result.add(new BatchHandlerRegistration(c.bean, singleCtx, meta));
-            log.info("Batch queue [{}] registered: batchMethod={}, singleMethod={}, requestType={}",
-                    queueName, c.method.getName(), singleName, requestType.getSimpleName());
+            log.info("Batch queue [{}] registered: batchMethod={}, singleMethod={}, requestType={}", queueName,
+                    c.method.getName(), singleName, requestType.getSimpleName());
         }
 
         log.info("Discovered {} @BatchMapping methods", result.size());
@@ -76,7 +70,8 @@ public class BatchScanner {
         Set<Object> seen = new HashSet<>();
 
         for (Object bean : beans.values()) {
-            if (!seen.add(bean)) continue;
+            if (!seen.add(bean))
+                continue;
             Class<?> targetClass = ClassUtils.getUserClass(bean.getClass());
 
             for (Method method : targetClass.getDeclaredMethods()) {
@@ -98,15 +93,12 @@ public class BatchScanner {
         return ann.method().isEmpty() ? batchMethod.getName() : ann.method();
     }
 
-    private PathMappingContext findSingleMethod(Object bean,
-                                                 Map<Object, List<PathMappingContext>> byBean,
-                                                 String methodName,
-                                                 Method batchMethod) {
+    private PathMappingContext findSingleMethod(Object bean, Map<Object, List<PathMappingContext>> byBean,
+            String methodName, Method batchMethod) {
         List<PathMappingContext> beanMappings = byBean.get(bean);
         if (beanMappings == null) {
-            throw new IllegalStateException(
-                    "Cannot find single-request method '" + methodName
-                            + "': no mappings for this bean. @BatchMapping on " + batchMethod.getName());
+            throw new IllegalStateException("Cannot find single-request method '" + methodName
+                    + "': no mappings for this bean. @BatchMapping on " + batchMethod.getName());
         }
 
         List<PathMappingContext> matched = new ArrayList<>();
@@ -117,18 +109,15 @@ public class BatchScanner {
         }
 
         if (matched.isEmpty()) {
-            throw new IllegalStateException(
-                    "Cannot find single-request method '" + methodName
-                            + "' for @BatchMapping on " + batchMethod.getName());
+            throw new IllegalStateException("Cannot find single-request method '" + methodName
+                    + "' for @BatchMapping on " + batchMethod.getName());
         }
 
         Method first = matched.get(0).getMethod();
         for (int i = 1; i < matched.size(); i++) {
             if (!first.equals(matched.get(i).getMethod())) {
-                throw new IllegalStateException(
-                        "Found " + matched.size() + " distinct methods named '" + methodName
-                                + "' for @BatchMapping on " + batchMethod.getName()
-                                + ". Expected exactly one.");
+                throw new IllegalStateException("Found " + matched.size() + " distinct methods named '" + methodName
+                        + "' for @BatchMapping on " + batchMethod.getName() + ". Expected exactly one.");
             }
         }
         return matched.get(0);
@@ -149,17 +138,21 @@ public class BatchScanner {
     @SuppressWarnings("unchecked")
     private Class<? extends BatchRequest<?>> resolveRequestType(Method batchMethod) {
         Type[] genericTypes = batchMethod.getGenericParameterTypes();
-        if (genericTypes.length == 0) return null;
+        if (genericTypes.length == 0)
+            return null;
 
         Type type = genericTypes[0];
-        if (!(type instanceof ParameterizedType)) return null;
+        if (!(type instanceof ParameterizedType))
+            return null;
 
         ParameterizedType pType = (ParameterizedType) type;
         Type raw = pType.getRawType();
-        if (!(raw instanceof Class) || !List.class.isAssignableFrom((Class<?>) raw)) return null;
+        if (!(raw instanceof Class) || !List.class.isAssignableFrom((Class<?>) raw))
+            return null;
 
         Type[] args = pType.getActualTypeArguments();
-        if (args.length == 0) return null;
+        if (args.length == 0)
+            return null;
         Type arg = args[0];
         if (arg instanceof Class) {
             Class<?> argClass = (Class<?>) arg;
@@ -190,8 +183,7 @@ public class BatchScanner {
 
     private Constructor<?> resolveSingleMethodCtor(Class<?> requestType, PathMappingContext singleCtx) {
         MethodParameter[] params = singleCtx.getMethodParameters();
-        Class<?>[] paramTypes = params == null || params.length == 0
-                ? new Class<?>[0]
+        Class<?>[] paramTypes = params == null || params.length == 0 ? new Class<?>[0]
                 : Arrays.stream(params).map(MethodParameter::getParameterType).toArray(Class<?>[]::new);
 
         try {
@@ -200,10 +192,8 @@ public class BatchScanner {
             return ctor;
         } catch (NoSuchMethodException e) {
             throw new IllegalStateException(
-                    "BatchRequest [" + requestType.getSimpleName()
-                            + "] must have a constructor matching method ["
-                            + singleCtx.getMethod().getName() + "] parameter types: "
-                            + Arrays.toString(paramTypes));
+                    "BatchRequest [" + requestType.getSimpleName() + "] must have a constructor matching method ["
+                            + singleCtx.getMethod().getName() + "] parameter types: " + Arrays.toString(paramTypes));
         }
     }
 

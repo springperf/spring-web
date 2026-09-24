@@ -15,8 +15,8 @@ import static org.mockito.Mockito.when;
 
 class PerfHttpServletRequestSessionIdTest {
 
-    private PerfHttpServletRequest buildRequest(String cookieName, String cookieHeader,
-                                                RequestContext requestContext, WebContext webContext) {
+    private PerfHttpServletRequest buildRequest(String cookieName, String cookieHeader, RequestContext requestContext,
+            WebContext webContext) {
         WebServerHttpRequest webRequest = mock(WebServerHttpRequest.class);
         when(webRequest.getRequestContext()).thenReturn(requestContext);
         when(webRequest.getWebContext()).thenReturn(webContext);
@@ -38,8 +38,8 @@ class PerfHttpServletRequestSessionIdTest {
         when(manager.getCookieName()).thenReturn("SESSIONID");
         when(webContext.getWebComponent(PerfHttpSessionManager.class)).thenReturn(manager);
 
-        PerfHttpServletRequest req = buildRequest("SESSIONID", "SESSIONID=client-id; other=1",
-                requestContext, webContext);
+        PerfHttpServletRequest req = buildRequest("SESSIONID", "SESSIONID=client-id; other=1", requestContext,
+                webContext);
         assertEquals("client-id", req.getRequestedSessionId());
     }
 
@@ -56,8 +56,7 @@ class PerfHttpServletRequestSessionIdTest {
         when(session.getId()).thenReturn("new-id");
         when(requestContext.getAttribute(PerfHttpSessionManager.SESSION_ATTR_KEY)).thenReturn(session);
 
-        PerfHttpServletRequest req = buildRequest("SESSIONID", "SESSIONID=client-id",
-                requestContext, webContext);
+        PerfHttpServletRequest req = buildRequest("SESSIONID", "SESSIONID=client-id", requestContext, webContext);
         // 仍应返回客户端提交的 id，符合 Servlet 规范（用于会话固定检测等语义），而非 new-id
         assertEquals("client-id", req.getRequestedSessionId());
     }

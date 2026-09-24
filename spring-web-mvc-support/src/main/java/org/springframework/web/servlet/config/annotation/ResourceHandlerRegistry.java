@@ -4,9 +4,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A data-collecting shim of Spring MVC's {@code ResourceHandlerRegistry}.
- * Stores resource handler registrations so that they can be read and bridged
- * to the framework's native {@link io.springperf.web.core.resource.ResourceHandlerRegistry}.
+ * A data-collecting shim of Spring MVC's {@code ResourceHandlerRegistry}. Stores resource handler registrations so that
+ * they can be read and bridged to the framework's native
+ * {@link io.springperf.web.core.resource.ResourceHandlerRegistry}.
  */
 public class ResourceHandlerRegistry {
 
@@ -14,7 +14,10 @@ public class ResourceHandlerRegistry {
 
     /**
      * Add a resource handler for the specified path patterns.
-     * @param pathPatterns one or more resource URL path patterns
+     *
+     * @param pathPatterns
+     *            one or more resource URL path patterns
+     *
      * @return a {@link ResourceHandlerRegistration} to customize
      */
     public ResourceHandlerRegistration addResourceHandler(String... pathPatterns) {

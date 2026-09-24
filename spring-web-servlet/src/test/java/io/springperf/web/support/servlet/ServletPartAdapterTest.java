@@ -25,7 +25,7 @@ class ServletPartAdapterTest {
     @Test
     void getInputStream_delegatesToBody() throws Exception {
         HttpInputMessagePart part = mockPart();
-        InputStream body = new ByteArrayInputStream(new byte[]{1, 2, 3});
+        InputStream body = new ByteArrayInputStream(new byte[] { 1, 2, 3 });
         when(part.getBody()).thenReturn(body);
         ServletPartAdapter adapter = new ServletPartAdapter(part);
         assertSame(body, adapter.getInputStream());

@@ -23,16 +23,14 @@ class WebServerInitializedEventAutoConfigurationTest {
         when(server.getActualPort()).thenReturn(8080);
         ApplicationContext ctx = mock(ApplicationContext.class);
 
-        ApplicationListener<ApplicationReadyEvent> listener =
-                config.webServerInitializedEventPublisher(server, ctx);
+        ApplicationListener<ApplicationReadyEvent> listener = config.webServerInitializedEventPublisher(server, ctx);
         listener.onApplicationEvent(mock(ApplicationReadyEvent.class));
 
         verify(server).isRunning();
-        org.mockito.ArgumentCaptor<ApplicationEvent> captor =
-                org.mockito.ArgumentCaptor.forClass(ApplicationEvent.class);
+        org.mockito.ArgumentCaptor<ApplicationEvent> captor = org.mockito.ArgumentCaptor
+                .forClass(ApplicationEvent.class);
         verify(ctx).publishEvent(captor.capture());
-        assertTrue(captor.getValue() instanceof PerfWebServerInitializedEvent,
-                "应发布 PerfWebServerInitializedEvent");
+        assertTrue(captor.getValue() instanceof PerfWebServerInitializedEvent, "应发布 PerfWebServerInitializedEvent");
         PerfWebServerInitializedEvent event = (PerfWebServerInitializedEvent) captor.getValue();
         WebServer webServer = event.getWebServer();
         assertEquals(8080, webServer.getPort(), "事件 WebServer 应携带真实端口");
@@ -45,8 +43,7 @@ class WebServerInitializedEventAutoConfigurationTest {
         when(server.isRunning()).thenReturn(false);
         ApplicationContext ctx = mock(ApplicationContext.class);
 
-        ApplicationListener<ApplicationReadyEvent> listener =
-                config.webServerInitializedEventPublisher(server, ctx);
+        ApplicationListener<ApplicationReadyEvent> listener = config.webServerInitializedEventPublisher(server, ctx);
         listener.onApplicationEvent(mock(ApplicationReadyEvent.class));
 
         verify(ctx, never()).publishEvent(any(ApplicationEvent.class));

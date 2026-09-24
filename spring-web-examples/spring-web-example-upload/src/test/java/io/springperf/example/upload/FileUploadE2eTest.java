@@ -27,10 +27,7 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(
-        classes = UploadApplication.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
-)
+@SpringBootTest(classes = UploadApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class FileUploadE2eTest {
 
     private static Path tempUploadDir;
@@ -45,13 +42,12 @@ class FileUploadE2eTest {
     static void cleanUp() throws IOException {
         if (tempUploadDir != null && Files.exists(tempUploadDir)) {
             try (Stream<Path> paths = Files.walk(tempUploadDir)) {
-                paths.sorted(Comparator.reverseOrder())
-                        .forEach(p -> {
-                            try {
-                                Files.deleteIfExists(p);
-                            } catch (IOException ignored) {
-                            }
-                        });
+                paths.sorted(Comparator.reverseOrder()).forEach(p -> {
+                    try {
+                        Files.deleteIfExists(p);
+                    } catch (IOException ignored) {
+                    }
+                });
             }
         }
     }
@@ -64,8 +60,7 @@ class FileUploadE2eTest {
     @BeforeEach
     void setUp() {
         int actualPort = nettyHttpServer.getActualPort();
-        rest = new TestRestTemplate(new RestTemplateBuilder()
-                .rootUri("http://localhost:" + actualPort));
+        rest = new TestRestTemplate(new RestTemplateBuilder().rootUri("http://localhost:" + actualPort));
     }
 
     @Test
@@ -86,8 +81,8 @@ class FileUploadE2eTest {
         assertThat(uploadResp.getBody()).isNotNull();
         assertThat(uploadResp.getBody().get("filename")).isEqualTo(filename);
 
-        ResponseEntity<byte[]> downloadResp = rest.exchange(
-                "/files/download?filename=" + filename, HttpMethod.GET, null, byte[].class);
+        ResponseEntity<byte[]> downloadResp = rest.exchange("/files/download?filename=" + filename, HttpMethod.GET,
+                null, byte[].class);
         assertThat(downloadResp.getStatusCodeValue()).isEqualTo(200);
 
         String diskContent = new String(Files.readAllBytes(tempUploadDir.resolve(filename)), StandardCharsets.UTF_8);
@@ -127,8 +122,8 @@ class FileUploadE2eTest {
 
     @Test
     void downloadNonExistentFile_returns404() {
-        ResponseEntity<byte[]> resp = rest.exchange(
-                "/files/download?filename=nonexist-file.txt", HttpMethod.GET, null, byte[].class);
+        ResponseEntity<byte[]> resp = rest.exchange("/files/download?filename=nonexist-file.txt", HttpMethod.GET, null,
+                byte[].class);
 
         assertThat(resp.getStatusCodeValue()).isEqualTo(404);
     }
@@ -165,8 +160,8 @@ class FileUploadE2eTest {
         });
         rest.postForEntity("/files/upload", body, Map.class);
 
-        ResponseEntity<Map> deleteResp = rest.exchange(
-                "/files?filename=" + filename, HttpMethod.DELETE, null, Map.class);
+        ResponseEntity<Map> deleteResp = rest.exchange("/files?filename=" + filename, HttpMethod.DELETE, null,
+                Map.class);
         assertThat(deleteResp.getStatusCodeValue()).isEqualTo(200);
         assertThat(deleteResp.getBody()).isNotNull();
         assertThat(deleteResp.getBody().get("filename")).isEqualTo(filename);
@@ -177,8 +172,8 @@ class FileUploadE2eTest {
 
     @Test
     void deleteNonExistentFile_returnsDeletedFalse() {
-        ResponseEntity<Map> resp = rest.exchange(
-                "/files?filename=nonexist-delete.txt", HttpMethod.DELETE, null, Map.class);
+        ResponseEntity<Map> resp = rest.exchange("/files?filename=nonexist-delete.txt", HttpMethod.DELETE, null,
+                Map.class);
 
         assertThat(resp.getStatusCodeValue()).isEqualTo(200);
         assertThat(resp.getBody()).isNotNull();

@@ -6,9 +6,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * @RequestMapping 条件限定场景：测试 params/headers 条件匹配路由。
- * <p>
- * 同一个路径 /greet 根据请求参数是否存在路由到不同方法，
- * 验证 ParamOrHeaderMatcher 在代理 Controller 场景下正常工作。
+ *                 <p>
+ *                 同一个路径 /greet 根据请求参数是否存在路由到不同方法， 验证 ParamOrHeaderMatcher 在代理 Controller 场景下正常工作。
  */
 @RestController
 @RequestMapping("/proxy-cond")

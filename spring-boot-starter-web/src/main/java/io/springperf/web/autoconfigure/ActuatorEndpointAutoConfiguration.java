@@ -33,29 +33,35 @@ import java.util.stream.Collectors;
 
 /**
  * Perf 框架的 Actuator 端点自动配置。
- * <p>当 classpath 中存在 {@link ExposableWebEndpoint}（即引入了 spring-boot-actuator）时自动生效。</p>
+ * <p>
+ * 当 classpath 中存在 {@link ExposableWebEndpoint}（即引入了 spring-boot-actuator）时自动生效。
+ * </p>
  */
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnClass({ExposableWebEndpoint.class, ApiVersion.class})
-@EnableConfigurationProperties({WebEndpointProperties.class, CorsEndpointProperties.class})
+@ConditionalOnClass({ ExposableWebEndpoint.class, ApiVersion.class })
+@EnableConfigurationProperties({ WebEndpointProperties.class, CorsEndpointProperties.class })
 public class ActuatorEndpointAutoConfiguration {
 
     private static final String DEFAULT_EXPOSED_ENDPOINTS = "info";
     private static final int DEFAULT_MAX_CONTENT_LENGTH = 1024 * 1024;
 
-    @Bean @ConditionalOnMissingBean
+    @Bean
+    @ConditionalOnMissingBean
     public ActuatorMappingDescriptionProvider perfMappingDescriptionProvider(WebContext webContext) {
         return new ActuatorMappingDescriptionProvider(webContext);
     }
 
-    @Bean @ConditionalOnMissingBean
-    public EndpointMediaTypes endpointMediaTypes() { return EndpointMediaTypes.DEFAULT; }
+    @Bean
+    @ConditionalOnMissingBean
+    public EndpointMediaTypes endpointMediaTypes() {
+        return EndpointMediaTypes.DEFAULT;
+    }
 
-    @Bean @ConditionalOnMissingBean
-    public WebEndpointDiscoverer webEndpointDiscoverer(
-            ApplicationContext applicationContext, ParameterValueMapper parameterValueMapper,
-            EndpointMediaTypes endpointMediaTypes, ObjectProvider<PathMapper> pathMappers,
-            ObjectProvider<OperationInvokerAdvisor> invokerAdvisors,
+    @Bean
+    @ConditionalOnMissingBean
+    public WebEndpointDiscoverer webEndpointDiscoverer(ApplicationContext applicationContext,
+            ParameterValueMapper parameterValueMapper, EndpointMediaTypes endpointMediaTypes,
+            ObjectProvider<PathMapper> pathMappers, ObjectProvider<OperationInvokerAdvisor> invokerAdvisors,
             ObjectProvider<EndpointFilter<ExposableWebEndpoint>> filters) {
         return new WebEndpointDiscoverer(applicationContext, parameterValueMapper, endpointMediaTypes,
                 pathMappers.orderedStream().collect(Collectors.toList()),
@@ -63,20 +69,24 @@ public class ActuatorEndpointAutoConfiguration {
                 filters.orderedStream().collect(Collectors.toList()));
     }
 
-    @Bean @ConditionalOnMissingBean
-    public IncludeExcludeEndpointFilter<ExposableWebEndpoint> perfExposeExcludePropertyEndpointFilter(Environment environment) {
-        return new IncludeExcludeEndpointFilter<>(ExposableWebEndpoint.class, environment, "management.endpoints.web.exposure", DEFAULT_EXPOSED_ENDPOINTS);
+    @Bean
+    @ConditionalOnMissingBean
+    public IncludeExcludeEndpointFilter<ExposableWebEndpoint> perfExposeExcludePropertyEndpointFilter(
+            Environment environment) {
+        return new IncludeExcludeEndpointFilter<>(ExposableWebEndpoint.class, environment,
+                "management.endpoints.web.exposure", DEFAULT_EXPOSED_ENDPOINTS);
     }
 
-    @Bean @ConditionalOnMissingBean
-    public ActuatorEndpointHandlerMapping perfEndpointHandlerMapping(
-            WebEndpointsSupplier endpointsSupplier, EndpointMediaTypes endpointMediaTypes,
-            WebEndpointProperties webEndpointProperties, CorsEndpointProperties corsEndpointProperties,
-            WebContext webContext, ObjectProvider<ManagementServerInfrastructure> managementServerInfrastructureProvider) {
+    @Bean
+    @ConditionalOnMissingBean
+    public ActuatorEndpointHandlerMapping perfEndpointHandlerMapping(WebEndpointsSupplier endpointsSupplier,
+            EndpointMediaTypes endpointMediaTypes, WebEndpointProperties webEndpointProperties,
+            CorsEndpointProperties corsEndpointProperties, WebContext webContext,
+            ObjectProvider<ManagementServerInfrastructure> managementServerInfrastructureProvider) {
 
         ManagementServerInfrastructure infrastructure = managementServerInfrastructureProvider.getIfAvailable();
-        ActuatorEndpointHandlerMapping mapping = new ActuatorEndpointHandlerMapping(endpointsSupplier, endpointMediaTypes, webEndpointProperties,
-                corsEndpointProperties, infrastructure);
+        ActuatorEndpointHandlerMapping mapping = new ActuatorEndpointHandlerMapping(endpointsSupplier,
+                endpointMediaTypes, webEndpointProperties, corsEndpointProperties, infrastructure);
         webContext.registerWebComponent(mapping);
         return mapping;
     }
@@ -85,14 +95,14 @@ public class ActuatorEndpointAutoConfiguration {
     @ConditionalOnMissingBean
     @ConditionalOnProperty(value = "management.server.port", matchIfMissing = false)
     public ManagementServerInfrastructure managementServerInfrastructure(WebContext webContext,
-                                                                         WebEndpointProperties webEndpointProperties,
-                                                                         Environment environment) {
+            WebEndpointProperties webEndpointProperties, Environment environment) {
         int mgmtPort = environment.getProperty("management.server.port", int.class, 0);
         int mainPort = environment.getProperty("server.port", int.class, 8080);
         // L11：两端口任一为随机端口(0)时跳过冲突校验——OS 会分配不同端口，不会真实冲突；
         // 仅当两者都显式配置了相同且非 0 的端口时才真正冲突。修复前字面比较 0==0 误报并阻断启动。
-        if (mgmtPort > 0 && mainPort > 0 && mgmtPort == mainPort) throw new IllegalStateException(
-                "management.server.port (" + mgmtPort + ") must be different from server.port (" + mainPort + ")");
+        if (mgmtPort > 0 && mainPort > 0 && mgmtPort == mainPort)
+            throw new IllegalStateException(
+                    "management.server.port (" + mgmtPort + ") must be different from server.port (" + mainPort + ")");
         String basePath = webEndpointProperties.getBasePath();
         return new ManagementServerInfrastructure(webContext, basePath);
     }
@@ -100,17 +110,19 @@ public class ActuatorEndpointAutoConfiguration {
     @Bean(destroyMethod = "")
     @ConditionalOnMissingBean
     @ConditionalOnProperty(value = "management.server.port", matchIfMissing = false)
-    public ManagementNettyHttpServer managementNettyHttpServer(
-            WebContext webContext, ManagementServerInfrastructure managementServerInfrastructure,
-            WebEndpointProperties webEndpointProperties, Environment environment) {
+    public ManagementNettyHttpServer managementNettyHttpServer(WebContext webContext,
+            ManagementServerInfrastructure managementServerInfrastructure, WebEndpointProperties webEndpointProperties,
+            Environment environment) {
         int mgmtPort = environment.getProperty("management.server.port", int.class, 0);
         // 管理端口独立配置：HTTP/2 与 max-content-length 均取自 management.server.* 前缀，
         // 不再误用主服务器 server.* 的配置（修复前两者都取主服务器值，无法独立配置管理端口）。
         boolean http2Enabled = environment.getProperty("management.server.http2.enabled", boolean.class, false);
-        SslContext sslContext = SslContextFactory.createServerSslContext(environment, "management.server.ssl.", http2Enabled);
-        ManagementNettyHttpServer server = new ManagementNettyHttpServer(webContext, webEndpointProperties.getBasePath(),
-                managementServerInfrastructure.getDispatcherHandler(), mgmtPort,
-                environment.getProperty("management.server.max-content-length", int.class, DEFAULT_MAX_CONTENT_LENGTH), sslContext);
+        SslContext sslContext = SslContextFactory.createServerSslContext(environment, "management.server.ssl.",
+                http2Enabled);
+        ManagementNettyHttpServer server = new ManagementNettyHttpServer(webContext,
+                webEndpointProperties.getBasePath(), managementServerInfrastructure.getDispatcherHandler(), mgmtPort,
+                environment.getProperty("management.server.max-content-length", int.class, DEFAULT_MAX_CONTENT_LENGTH),
+                sslContext);
         webContext.registerWebComponent(server);
         return server;
     }

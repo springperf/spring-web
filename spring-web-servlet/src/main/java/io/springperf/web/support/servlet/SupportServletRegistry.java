@@ -19,13 +19,11 @@ import java.util.Map;
 
 /**
  * 扫描 Spring 容器中的 {@link Servlet} Bean，将其注册为框架路由。
- *
- * <p>复用核心的非控制器路由机制：每个 servlet 包装为 {@link ServletInvoker}，
- * 以 {@link PathMappingContext} 形式注册进 {@link MappingRegistry}。servlet 的
- * url-pattern（来自 {@link WebServlet} 注解）转换为框架的 ant 路径规则。
- *
- * <p>生命周期：Phase 1 注册路由并调用 {@code servlet.init()}，销毁时调用
- * {@code servlet.destroy()}。
+ * <p>
+ * 复用核心的非控制器路由机制：每个 servlet 包装为 {@link ServletInvoker}， 以 {@link PathMappingContext} 形式注册进
+ * {@link MappingRegistry}。servlet 的 url-pattern（来自 {@link WebServlet} 注解）转换为框架的 ant 路径规则。
+ * <p>
+ * 生命周期：Phase 1 注册路由并调用 {@code servlet.init()}，销毁时调用 {@code servlet.destroy()}。
  */
 @Slf4j
 public class SupportServletRegistry extends BaseWebComponent {
@@ -54,14 +52,16 @@ public class SupportServletRegistry extends BaseWebComponent {
         initializedServlets.clear();
     }
 
-    private void registerServlet(Servlet servlet, PerfServletContext servletContext, MappingRegistry mappingRegistry) throws ServletException {
+    private void registerServlet(Servlet servlet, PerfServletContext servletContext, MappingRegistry mappingRegistry)
+            throws ServletException {
         WebServlet webServlet = AnnotatedElementUtils.findMergedAnnotation(servlet.getClass(), WebServlet.class);
         String servletName = resolveServletName(webServlet, servlet);
         String[] urlPatterns = resolveUrlPatterns(webServlet);
         if (urlPatterns == null) {
             // 无 @WebServlet 且无显式 URL pattern：无法确定路由，跳过注册避免 /** 全路径通配遮蔽控制器
-            log.warn("Servlet {} has no @WebServlet url-pattern, skipping route registration. "
-                    + "Annotate it with @WebServlet(urlPatterns=...) to expose it as a route.",
+            log.warn(
+                    "Servlet {} has no @WebServlet url-pattern, skipping route registration. "
+                            + "Annotate it with @WebServlet(urlPatterns=...) to expose it as a route.",
                     servlet.getClass().getName());
             return;
         }
@@ -117,10 +117,10 @@ public class SupportServletRegistry extends BaseWebComponent {
     /**
      * 将 servlet url-pattern 转换为框架的 ant 路径规则：
      * <ul>
-     *   <li>默认映射 {@code /} → 全路径通配</li>
-     *   <li>路径映射 {@code /foo/*} → {@code /foo/**}</li>
-     *   <li>后缀映射（如 {@code *.txt}）→ 全路径后缀匹配</li>
-     *   <li>精确匹配 {@code /foo} → {@code /foo}</li>
+     * <li>默认映射 {@code /} → 全路径通配</li>
+     * <li>路径映射 {@code /foo/*} → {@code /foo/**}</li>
+     * <li>后缀映射（如 {@code *.txt}）→ 全路径后缀匹配</li>
+     * <li>精确匹配 {@code /foo} → {@code /foo}</li>
      * </ul>
      */
     static String toPathRule(String urlPattern) {

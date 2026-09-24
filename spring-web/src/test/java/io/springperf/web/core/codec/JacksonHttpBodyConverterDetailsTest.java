@@ -1,16 +1,8 @@
 package io.springperf.web.core.codec;
 
-import com.fasterxml.jackson.annotation.JsonView;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.mapping.PathMappingContext;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.http.MediaType;
-import org.springframework.http.converter.HttpMessageNotWritableException;
-import org.springframework.http.converter.json.MappingJacksonValue;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -20,26 +12,46 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
+import org.springframework.http.converter.HttpMessageNotWritableException;
+import org.springframework.http.converter.json.MappingJacksonValue;
+
+import com.fasterxml.jackson.annotation.JsonView;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 class JacksonHttpBodyConverterDetailsTest {
 
     static class Dto {
         public String name;
-        Dto() {}
-        Dto(String name) { this.name = name; }
+
+        Dto() {
+        }
+
+        Dto(String name) {
+            this.name = name;
+        }
     }
 
     static class Payload {
         public String name;
-        Payload() { this.name = "payload"; }
+
+        Payload() {
+            this.name = "payload";
+        }
     }
 
-    static class ViewA {}
+    static class ViewA {
+    }
 
-    static class ViewB {}
+    static class ViewB {
+    }
 
     static class ViewDto {
         @JsonView(ViewA.class)
@@ -47,7 +59,9 @@ class JacksonHttpBodyConverterDetailsTest {
         @JsonView(ViewB.class)
         public String secret;
 
-        ViewDto() {}
+        ViewDto() {
+        }
+
         ViewDto(String name, String secret) {
             this.name = name;
             this.secret = secret;
@@ -103,8 +117,7 @@ class JacksonHttpBodyConverterDetailsTest {
                 java.util.Collections.emptyList(), "/dto") {
         };
         // 用真实 mapping 验证 JavaType 缓存
-        Object result = converter.read((Type) Dto.class, null, input("{\"name\":\"hello\"}"),
-                mockReq(), null);
+        Object result = converter.read((Type) Dto.class, null, input("{\"name\":\"hello\"}"), mockReq(), null);
         assertTrue(result instanceof Dto);
         assertEquals("hello", ((Dto) result).name);
     }
@@ -113,8 +126,7 @@ class JacksonHttpBodyConverterDetailsTest {
     void read_withMappingContext_cachesJavaType() throws Exception {
         PathMappingContext mapping = mock(PathMappingContext.class);
         when(mapping.get(any(io.springperf.web.core.mapping.MappingCacheKey.class))).thenReturn(null);
-        Object result = converter.read((Type) Dto.class, null, input("{\"name\":\"cached\"}"),
-                mockReq(), mapping);
+        Object result = converter.read((Type) Dto.class, null, input("{\"name\":\"cached\"}"), mockReq(), mapping);
         assertEquals("cached", ((Dto) result).name);
         verify(mapping).set(any(), any());
     }
@@ -123,8 +135,7 @@ class JacksonHttpBodyConverterDetailsTest {
     void write_stringUsesFastPathNoSerialization() throws Exception {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         org.springframework.http.HttpOutputMessage output = outputMessage(out);
-        converter.write("hello", (Type) String.class, MediaType.APPLICATION_JSON,
-                output, mockReq(), mockResp(), null);
+        converter.write("hello", (Type) String.class, MediaType.APPLICATION_JSON, output, mockReq(), mockResp(), null);
         assertEquals("hello", new String(out.toByteArray(), StandardCharsets.UTF_8));
     }
 
@@ -133,8 +144,7 @@ class JacksonHttpBodyConverterDetailsTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         org.springframework.http.HttpOutputMessage output = outputMessage(out);
         byte[] data = "bytes".getBytes(StandardCharsets.UTF_8);
-        converter.write(data, (Type) byte[].class, MediaType.APPLICATION_JSON,
-                output, mockReq(), mockResp(), null);
+        converter.write(data, (Type) byte[].class, MediaType.APPLICATION_JSON, output, mockReq(), mockResp(), null);
         assertArrayEquals(data, out.toByteArray());
     }
 
@@ -142,8 +152,8 @@ class JacksonHttpBodyConverterDetailsTest {
     void write_objectSerializesAsJson() throws Exception {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         org.springframework.http.HttpOutputMessage output = outputMessage(out);
-        converter.write(new Dto("perf"), (Type) Dto.class, MediaType.APPLICATION_JSON,
-                output, mockReq(), mockResp(), null);
+        converter.write(new Dto("perf"), (Type) Dto.class, MediaType.APPLICATION_JSON, output, mockReq(), mockResp(),
+                null);
         String json = new String(out.toByteArray(), StandardCharsets.UTF_8);
         assertTrue(json.contains("\"name\":\"perf\""));
     }
@@ -154,8 +164,7 @@ class JacksonHttpBodyConverterDetailsTest {
         org.springframework.http.HttpOutputMessage output = outputMessage(out);
         MappingJacksonValue mjv = new MappingJacksonValue(new ViewDto("visible", "hidden"));
         mjv.setSerializationView(ViewA.class);
-        converter.write(mjv, (Type) Object.class, MediaType.APPLICATION_JSON,
-                output, mockReq(), mockResp(), null);
+        converter.write(mjv, (Type) Object.class, MediaType.APPLICATION_JSON, output, mockReq(), mockResp(), null);
         String json = new String(out.toByteArray(), StandardCharsets.UTF_8);
         assertTrue(json.contains("visible"));
         assertFalse(json.contains("hidden"), "未在 JsonView 中的字段不应序列化");
@@ -166,17 +175,17 @@ class JacksonHttpBodyConverterDetailsTest {
         // InvalidDefinitionException（如自引用）→ HttpMessageConversionException
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         org.springframework.http.HttpOutputMessage output = outputMessage(out);
-        assertThrows(org.springframework.http.converter.HttpMessageConversionException.class, () ->
-                converter.write(new SerializeFail(), (Type) SerializeFail.class,
-                        MediaType.APPLICATION_JSON, output, mockReq(), mockResp(), null));
+        assertThrows(org.springframework.http.converter.HttpMessageConversionException.class,
+                () -> converter.write(new SerializeFail(), (Type) SerializeFail.class, MediaType.APPLICATION_JSON,
+                        output, mockReq(), mockResp(), null));
     }
 
     @Test
     void canWrite_declaredType_cachesSerializable() {
         PathMappingContext mapping = mock(PathMappingContext.class);
         when(mapping.get(any(io.springperf.web.core.mapping.MappingCacheKey.class))).thenReturn(null);
-        assertTrue(converter.canWrite((Type) Dto.class, Dto.class, MediaType.APPLICATION_JSON,
-                mockReq(), mockResp(), mapping));
+        assertTrue(converter.canWrite((Type) Dto.class, Dto.class, MediaType.APPLICATION_JSON, mockReq(), mockResp(),
+                mapping));
         verify(mapping).set(any(), eq(Boolean.TRUE));
     }
 
@@ -211,8 +220,8 @@ class JacksonHttpBodyConverterDetailsTest {
         c.initComponentPhase1();
         // 通过 write 验证使用 spring bean（bean 无特殊配置，仍可序列化普通对象）
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        c.write(new Dto("from-bean"), (Type) Dto.class, MediaType.APPLICATION_JSON,
-                outputMessage(out), mockReq(), mockResp(), null);
+        c.write(new Dto("from-bean"), (Type) Dto.class, MediaType.APPLICATION_JSON, outputMessage(out), mockReq(),
+                mockResp(), null);
         assertTrue(new String(out.toByteArray(), StandardCharsets.UTF_8).contains("from-bean"));
     }
 

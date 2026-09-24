@@ -1,16 +1,16 @@
 package io.springperf.web.server;
 
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.embedded.EmbeddedChannel;
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import org.junit.jupiter.api.Test;
+
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.embedded.EmbeddedChannel;
+
 /**
- * {@link NettyMetricsHandler} 测试：
- * 每个服务器持有独立实例（主/管理服务器计数分离），同一实例可在多 channel 间共享（Sharable）。
+ * {@link NettyMetricsHandler} 测试： 每个服务器持有独立实例（主/管理服务器计数分离），同一实例可在多 channel 间共享（Sharable）。
  */
 class NettyMetricsHandlerTest {
 

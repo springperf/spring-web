@@ -15,31 +15,25 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code spring.mvc.view.prefix/suffix} E2E：控制器返回 {@code jsp:hi}，
- * 由 prefix + name + suffix 拼出 {@code /e2e-jsp/hi.jsp} 并经 Jasper 渲染——
- * 自定义前缀/后缀真实生效（默认值为 /jsp/ 与 .jsp）。
+ * {@code spring.mvc.view.prefix/suffix} E2E：控制器返回 {@code jsp:hi}， 由 prefix + name + suffix 拼出 {@code /e2e-jsp/hi.jsp}
+ * 并经 Jasper 渲染—— 自定义前缀/后缀真实生效（默认值为 /jsp/ 与 .jsp）。
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, ViewPrefixSuffixE2eTest.ViewConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "spring.mvc.view.prefix=/e2e-jsp/",
-                "spring.mvc.view.suffix=.jsp"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        ViewPrefixSuffixE2eTest.ViewConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "spring.mvc.view.prefix=/e2e-jsp/", "spring.mvc.view.suffix=.jsp" })
 class ViewPrefixSuffixE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
 
     @Test
     void customPrefixSuffix_resolvesJspView() throws Exception {
-        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder()
-                .url("http://localhost:" + port + "/e2e-view/hello").build()).execute();
+        okhttp3.Response resp = CLIENT
+                .newCall(new okhttp3.Request.Builder().url("http://localhost:" + port + "/e2e-view/hello").build())
+                .execute();
         try {
             assertEquals(200, resp.code());
             String body = resp.body().string();

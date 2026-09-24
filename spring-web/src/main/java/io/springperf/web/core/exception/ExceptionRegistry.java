@@ -1,5 +1,13 @@
 package io.springperf.web.core.exception;
 
+import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+import org.springframework.web.method.HandlerMethod;
+
 import io.springperf.web.context.WebComponentContainer;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.mapping.PathMappingContext;
@@ -9,13 +17,6 @@ import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.server.ErrorResponseConfig;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.method.HandlerMethod;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
-
-import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 
 /**
  * Scans @ExceptionHandler methods in @ControllerAdvice and resolves exceptions by the most specific matching type.
@@ -43,11 +44,11 @@ public class ExceptionRegistry extends WebComponentContainer {
     }
 
     /**
-     * 500 兜底响应暴露的 message：取**根因**的 message（对齐 Boot
-     * {@code DefaultErrorAttributes#addErrorMessage}）。
-     *
-     * <p>固定文案「Internal Server Error」会让 {@code server.error.include-message=always} 形同虚设
-     * ——用户显式要求暴露 message 时拿到的却是与状态码重复的套话，真实原因只藏在 trace 里。</p>
+     * 500 兜底响应暴露的 message：取**根因**的 message（对齐 Boot {@code DefaultErrorAttributes#addErrorMessage}）。
+     * <p>
+     * 固定文案「Internal Server Error」会让 {@code server.error.include-message=always} 形同虚设 ——用户显式要求暴露 message
+     * 时拿到的却是与状态码重复的套话，真实原因只藏在 trace 里。
+     * </p>
      */
     private static String rootCauseMessage(Throwable ex) {
         Throwable root = ex;
@@ -74,8 +75,8 @@ public class ExceptionRegistry extends WebComponentContainer {
                         ErrorResponseConfig.isParamPresent(req, "errors"));
             }
         } catch (Exception e) {
-            log.error("ExceptionRegistry.doHandle/sendError failed for original [{}] {}",
-                    ex.getClass().getSimpleName(), ex.getMessage(), e);
+            log.error("ExceptionRegistry.doHandle/sendError failed for original [{}] {}", ex.getClass().getSimpleName(),
+                    ex.getMessage(), e);
         }
     }
 

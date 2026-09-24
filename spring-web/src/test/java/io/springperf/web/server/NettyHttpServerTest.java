@@ -1,16 +1,17 @@
 package io.springperf.web.server;
 
-import io.netty.channel.EventLoopGroup;
-import io.netty.util.concurrent.Future;
-import io.springperf.web.context.WebContext;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 import java.lang.reflect.Field;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.Test;
+
+import io.netty.channel.EventLoopGroup;
+import io.netty.util.concurrent.Future;
+import io.springperf.web.context.WebContext;
 
 class NettyHttpServerTest {
 
@@ -41,14 +42,16 @@ class NettyHttpServerTest {
         NettyHttpServer server = new NettyHttpServer(webContext);
         // stop(Runnable) on unstarted server catches NPE from null channel/group,
         // logs it, then runs callback. Should not propagate exception.
-        assertDoesNotThrow(() -> server.stop(() -> {}));
+        assertDoesNotThrow(() -> server.stop(() -> {
+        }));
     }
 
     @Test
     void stop_beforeStart_setsRunningToFalse() {
         WebContext webContext = mock(WebContext.class);
         NettyHttpServer server = new NettyHttpServer(webContext);
-        server.stop(() -> {});
+        server.stop(() -> {
+        });
         assertFalse(server.isRunning());
     }
 
@@ -56,7 +59,7 @@ class NettyHttpServerTest {
     void stop_beforeStart_callsCallback() {
         WebContext webContext = mock(WebContext.class);
         NettyHttpServer server = new NettyHttpServer(webContext);
-        final boolean[] called = {false};
+        final boolean[] called = { false };
         server.stop(() -> called[0] = true);
         assertTrue(called[0]);
     }
@@ -71,9 +74,8 @@ class NettyHttpServerTest {
     }
 
     /**
-     * 验证 {@code destroyComponent()} 真正消费 {@code server.shutdown.grace-period}：
-     * 以 {@code shutdownGracefully(0, graceMillis, MILLISECONDS)} 关闭两个 EventLoopGroup
-     * （quietPeriod=0，最多等待 grace 让在途请求排空）。
+     * 验证 {@code destroyComponent()} 真正消费 {@code server.shutdown.grace-period}： 以
+     * {@code shutdownGracefully(0, graceMillis, MILLISECONDS)} 关闭两个 EventLoopGroup （quietPeriod=0，最多等待 grace 让在途请求排空）。
      */
     @Test
     void destroyComponent_passesGracePeriodToShutdownGracefully() throws Exception {

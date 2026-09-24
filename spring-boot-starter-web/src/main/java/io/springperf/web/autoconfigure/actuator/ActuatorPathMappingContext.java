@@ -33,11 +33,9 @@ public class ActuatorPathMappingContext extends PathMappingContext {
     private final boolean linksEndpoint;
     private final WebServerNamespace serverNamespace;
 
-    public ActuatorPathMappingContext(CustomInvoker invoker, String pathRule,
-                                      WebOperation operation, WebOperationRequestPredicate predicate,
-                                      EndpointLinksResolver linksResolver,
-                                      EndpointMediaTypes endpointMediaTypes, String basePath,
-                                      WebServerNamespace serverNamespace) {
+    public ActuatorPathMappingContext(CustomInvoker invoker, String pathRule, WebOperation operation,
+            WebOperationRequestPredicate predicate, EndpointLinksResolver linksResolver,
+            EndpointMediaTypes endpointMediaTypes, String basePath, WebServerNamespace serverNamespace) {
         super(invoker, pathRule);
         this.operation = operation;
         this.predicate = predicate;
@@ -48,10 +46,8 @@ public class ActuatorPathMappingContext extends PathMappingContext {
         this.serverNamespace = serverNamespace;
     }
 
-    ActuatorPathMappingContext(CustomInvoker invoker, String pathRule,
-                               EndpointLinksResolver linksResolver,
-                               EndpointMediaTypes endpointMediaTypes, String basePath,
-                               WebServerNamespace serverNamespace) {
+    ActuatorPathMappingContext(CustomInvoker invoker, String pathRule, EndpointLinksResolver linksResolver,
+            EndpointMediaTypes endpointMediaTypes, String basePath, WebServerNamespace serverNamespace) {
         super(invoker, pathRule);
         this.operation = null;
         this.predicate = null;
@@ -70,7 +66,8 @@ public class ActuatorPathMappingContext extends PathMappingContext {
             int statusCode = wer.getStatus();
             if (statusCode > 0 && statusCode != WebEndpointResponse.STATUS_OK) {
                 HttpStatus httpStatus = HttpStatus.resolve(statusCode);
-                if (httpStatus != null) response.setStatusCode(httpStatus);
+                if (httpStatus != null)
+                    response.setStatusCode(httpStatus);
             }
             if (wer.getContentType() != null)
                 response.getHeaders().setContentType(MediaType.parseMediaType(wer.getContentType().toString()));
@@ -93,13 +90,14 @@ public class ActuatorPathMappingContext extends PathMappingContext {
     }
 
     private ApiVersion resolveApiVersion(List<MediaType> acceptHeaders) {
-        if (acceptHeaders == null || acceptHeaders.isEmpty()) return ApiVersion.LATEST;
+        if (acceptHeaders == null || acceptHeaders.isEmpty())
+            return ApiVersion.LATEST;
         for (MediaType accepted : acceptHeaders)
             for (String producedStr : endpointMediaTypes.getProduced()) {
                 MediaType produced = MediaType.parseMediaType(producedStr);
                 if (accepted.isCompatibleWith(produced))
-                    return producedStr.contains("v2") ? ApiVersion.V2 :
-                           producedStr.contains("v3") ? ApiVersion.V3 : ApiVersion.LATEST;
+                    return producedStr.contains("v2") ? ApiVersion.V2
+                            : producedStr.contains("v3") ? ApiVersion.V3 : ApiVersion.LATEST;
             }
         return ApiVersion.LATEST;
     }
@@ -107,7 +105,8 @@ public class ActuatorPathMappingContext extends PathMappingContext {
     private Map<String, Object> buildActuatorArguments(WebServerHttpRequest request) {
         Map<String, Object> arguments = new LinkedHashMap<>();
         Map<String, String> uriVariables = PathPatternRouter.getUriVariableMap(request);
-        if (uriVariables != null && !uriVariables.isEmpty()) arguments.putAll(uriVariables);
+        if (uriVariables != null && !uriVariables.isEmpty())
+            arguments.putAll(uriVariables);
         Map<String, String[]> parameterMap = request.getParameterMapArray();
         if (parameterMap != null && !parameterMap.isEmpty())
             for (Map.Entry<String, String[]> entry : parameterMap.entrySet()) {
@@ -119,13 +118,19 @@ public class ActuatorPathMappingContext extends PathMappingContext {
             String matchAllRemaining = predicate.getMatchAllRemainingPathSegmentsVariable();
             if (matchAllRemaining != null && uriVariables != null) {
                 String remaining = uriVariables.get(matchAllRemaining);
-                if (remaining != null) arguments.put(matchAllRemaining, remaining);
+                if (remaining != null)
+                    arguments.put(matchAllRemaining, remaining);
             }
         }
         arguments.put("Accept", request.getHeaders().getAccept());
         return arguments;
     }
 
-    public WebOperation getOperation() { return operation; }
-    public WebOperationRequestPredicate getPredicate() { return predicate; }
+    public WebOperation getOperation() {
+        return operation;
+    }
+
+    public WebOperationRequestPredicate getPredicate() {
+        return predicate;
+    }
 }

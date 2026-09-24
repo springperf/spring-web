@@ -12,22 +12,17 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
- * keep-alive 调优 E2E（真实管线装配验证）：
- * {@code server.max-keep-alive-requests=2} 时，同一连接第 2 个响应应携带
+ * keep-alive 调优 E2E（真实管线装配验证）： {@code server.max-keep-alive-requests=2} 时，同一连接第 2 个响应应携带
  * {@code Connection: close}，之后新连接继续正常服务。
- *
- * <p>此测试可捕获「KeepAliveHandler 装配在 httpHandler 之后收不到任何事件」类的
- * 管线位置回归——该缺陷曾使 keep-alive 计数在真实服务中完全失效而单测全绿。</p>
+ * <p>
+ * 此测试可捕获「KeepAliveHandler 装配在 httpHandler 之后收不到任何事件」类的 管线位置回归——该缺陷曾使 keep-alive 计数在真实服务中完全失效而单测全绿。
+ * </p>
  */
-@SpringBootTest(classes = io.springperf.webtest.SupportTestApplication.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "server.max-keep-alive-requests=2")
+@SpringBootTest(classes = io.springperf.webtest.SupportTestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "server.max-keep-alive-requests=2")
 class KeepAliveE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
@@ -48,8 +43,7 @@ class KeepAliveE2eTest {
         okhttp3.Response r1 = get("/session/get-optional");
         try {
             assertEquals(200, r1.code());
-            assertFalse("close".equalsIgnoreCase(r1.header("Connection", "")),
-                    "第 1 个响应不应携带 Connection: close");
+            assertFalse("close".equalsIgnoreCase(r1.header("Connection", "")), "第 1 个响应不应携带 Connection: close");
         } finally {
             r1.close();
         }
@@ -61,8 +55,7 @@ class KeepAliveE2eTest {
             assertEquals(200, r2.code());
             conn2 = r2.header("Connection");
             assertNotNull(conn2, "第 2 个响应应显式携带 Connection 头");
-            assertEquals("close", conn2.toLowerCase(),
-                    "达到 max-keep-alive-requests 的响应应携带 Connection: close");
+            assertEquals("close", conn2.toLowerCase(), "达到 max-keep-alive-requests 的响应应携带 Connection: close");
         } finally {
             r2.close();
         }

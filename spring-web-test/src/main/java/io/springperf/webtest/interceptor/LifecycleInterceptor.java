@@ -19,19 +19,22 @@ public class LifecycleInterceptor implements HandlerInterceptor {
     }
 
     @Override
-    public boolean preHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler) throws Exception {
+    public boolean preHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler)
+            throws Exception {
         return true;
     }
 
     @Override
-    public void postHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler, Object result) throws Exception {
+    public void postHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler, Object result)
+            throws Exception {
 
         log.info("LifecycleInterceptor.postHandle called");
         postHandleCount++;
     }
 
     @Override
-    public void afterCompletion(WebServerHttpRequest request, WebServerHttpResponse response, Object handler, Throwable ex) throws Exception {
+    public void afterCompletion(WebServerHttpRequest request, WebServerHttpResponse response, Object handler,
+            Throwable ex) throws Exception {
         log.info("LifecycleInterceptor.afterCompletion called");
         afterCompletionCount++;
     }

@@ -21,26 +21,20 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * 反向代理场景 E2E（{@code server.forward-headers-strategy=FRAMEWORK}）：
- * 应用位于 TLS 终结代理之后时，重定向与 {@code getRequestURL()} 必须反映**外部** scheme/host/port，
- * 而不是内部监听地址——否则 Location 会带上内部端口或内网主机名，客户端直接跳错。
- *
- * <p>同时覆盖 {@code Forwarded} / {@code X-Forwarded-Proto}（scheme）与
- * {@code X-Forwarded-Host} / {@code X-Forwarded-Port}（host/port）。</p>
+ * 反向代理场景 E2E（{@code server.forward-headers-strategy=FRAMEWORK}）： 应用位于 TLS 终结代理之后时，重定向与 {@code getRequestURL()}
+ * 必须反映**外部** scheme/host/port， 而不是内部监听地址——否则 Location 会带上内部端口或内网主机名，客户端直接跳错。
+ * <p>
+ * 同时覆盖 {@code Forwarded} / {@code X-Forwarded-Proto}（scheme）与 {@code X-Forwarded-Host} /
+ * {@code X-Forwarded-Port}（host/port）。
+ * </p>
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, ForwardedRedirectE2eTest.ForwardedConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "server.forward-headers-strategy=FRAMEWORK"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        ForwardedRedirectE2eTest.ForwardedConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "server.forward-headers-strategy=FRAMEWORK" })
 class ForwardedRedirectE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .followRedirects(false)
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).followRedirects(false).build();
 
     @LocalServerPort
     int port;
@@ -55,11 +49,8 @@ class ForwardedRedirectE2eTest {
 
     @Test
     void redirect_behindTlsProxy_usesExternalSchemeHostAndPort() throws Exception {
-        Response resp = get("/e2e-fwd/redirect",
-                "Host", "internal-app:8080",
-                "X-Forwarded-Proto", "https",
-                "X-Forwarded-Host", "public.example.com",
-                "X-Forwarded-Port", "443");
+        Response resp = get("/e2e-fwd/redirect", "Host", "internal-app:8080", "X-Forwarded-Proto", "https",
+                "X-Forwarded-Host", "public.example.com", "X-Forwarded-Port", "443");
         try {
             assertEquals(302, resp.code());
             assertEquals("https://public.example.com/cb", resp.header("Location"),
@@ -71,11 +62,8 @@ class ForwardedRedirectE2eTest {
 
     @Test
     void redirect_behindTlsProxy_nonDefaultPortKeptInLocation() throws Exception {
-        Response resp = get("/e2e-fwd/redirect",
-                "Host", "internal-app:8080",
-                "X-Forwarded-Proto", "https",
-                "X-Forwarded-Host", "public.example.com",
-                "X-Forwarded-Port", "8443");
+        Response resp = get("/e2e-fwd/redirect", "Host", "internal-app:8080", "X-Forwarded-Proto", "https",
+                "X-Forwarded-Host", "public.example.com", "X-Forwarded-Port", "8443");
         try {
             assertEquals(302, resp.code());
             assertEquals("https://public.example.com:8443/cb", resp.header("Location"),
@@ -87,9 +75,7 @@ class ForwardedRedirectE2eTest {
 
     @Test
     void serverName_usesForwardedHost() throws Exception {
-        Response resp = get("/e2e-fwd/info",
-                "Host", "internal-app:8080",
-                "X-Forwarded-Proto", "https",
+        Response resp = get("/e2e-fwd/info", "Host", "internal-app:8080", "X-Forwarded-Proto", "https",
                 "X-Forwarded-Host", "public.example.com");
         try {
             assertEquals(200, resp.code());
@@ -102,14 +88,11 @@ class ForwardedRedirectE2eTest {
 
     @Test
     void serverPort_usesForwardedPort() throws Exception {
-        Response resp = get("/e2e-fwd/info",
-                "Host", "internal-app:8080",
-                "X-Forwarded-Proto", "https",
+        Response resp = get("/e2e-fwd/info", "Host", "internal-app:8080", "X-Forwarded-Proto", "https",
                 "X-Forwarded-Port", "443");
         try {
             assertEquals(200, resp.code());
-            assertEquals("443", field(resp.body().string(), "serverPort"),
-                    "getServerPort() 应反映外部端口而非内部监听端口");
+            assertEquals("443", field(resp.body().string(), "serverPort"), "getServerPort() 应反映外部端口而非内部监听端口");
         } finally {
             resp.close();
         }
@@ -117,15 +100,11 @@ class ForwardedRedirectE2eTest {
 
     @Test
     void requestUrl_usesExternalAuthority() throws Exception {
-        Response resp = get("/e2e-fwd/info",
-                "Host", "internal-app:8080",
-                "X-Forwarded-Proto", "https",
-                "X-Forwarded-Host", "public.example.com",
-                "X-Forwarded-Port", "443");
+        Response resp = get("/e2e-fwd/info", "Host", "internal-app:8080", "X-Forwarded-Proto", "https",
+                "X-Forwarded-Host", "public.example.com", "X-Forwarded-Port", "443");
         try {
             assertEquals(200, resp.code());
-            assertEquals("https://public.example.com/e2e-fwd/info",
-                    field(resp.body().string(), "requestUrl"),
+            assertEquals("https://public.example.com/e2e-fwd/info", field(resp.body().string(), "requestUrl"),
                     "getRequestURL() 应反映外部权威（scheme+host+端口省略规则）");
         } finally {
             resp.close();
@@ -135,9 +114,8 @@ class ForwardedRedirectE2eTest {
     @Test
     void rfc7239ForwardedHostAndProto_spelledOut() throws Exception {
         // RFC 7239 同时给出 proto 与 host：两者都应被采用（host 覆盖内网 Host 头）
-        Response resp = get("/e2e-fwd/redirect",
-                "Host", "internal-app:8080",
-                "Forwarded", "for=192.0.2.60;proto=https;host=public.example.com");
+        Response resp = get("/e2e-fwd/redirect", "Host", "internal-app:8080", "Forwarded",
+                "for=192.0.2.60;proto=https;host=public.example.com");
         try {
             assertEquals(302, resp.code());
             assertEquals("https://public.example.com/cb", resp.header("Location"),

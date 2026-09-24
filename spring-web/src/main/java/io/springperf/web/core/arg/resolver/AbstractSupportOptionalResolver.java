@@ -1,12 +1,13 @@
 package io.springperf.web.core.arg.resolver;
 
+import java.util.Optional;
+
+import org.springframework.core.MethodParameter;
+
 import io.springperf.web.core.arg.StaticArgumentResolver;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
-import org.springframework.core.MethodParameter;
-
-import java.util.Optional;
 
 public abstract class AbstractSupportOptionalResolver implements StaticArgumentResolver {
 
@@ -24,7 +25,8 @@ public abstract class AbstractSupportOptionalResolver implements StaticArgumentR
         this.isOptional = nestedParameter.isOptional();
     }
 
-    protected abstract Object doResolveArgument(WebServerHttpRequest request, WebServerHttpResponse response) throws Exception;
+    protected abstract Object doResolveArgument(WebServerHttpRequest request, WebServerHttpResponse response)
+            throws Exception;
 
     @Override
     public Object resolveArgument(WebServerHttpRequest request, WebServerHttpResponse response) throws Exception {

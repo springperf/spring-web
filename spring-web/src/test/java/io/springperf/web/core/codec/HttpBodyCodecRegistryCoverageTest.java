@@ -1,27 +1,8 @@
 package io.springperf.web.core.codec;
 
-import io.springperf.web.annotation.Optimize;
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.codec.interceptor.HttpBodyCodecInterceptorRegistry;
-import io.springperf.web.core.mapping.MappingResult;
-import io.springperf.web.core.mapping.PathMappingContext;
-import io.springperf.web.http.RequestAttribute;
-import io.springperf.web.http.RequestContext;
-import io.springperf.web.http.WebHttpHeaders;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
-import io.springperf.web.http.support.BodyHttpInputMessage;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.context.ApplicationContext;
-import org.springframework.core.MethodParameter;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpInputMessage;
-import org.springframework.http.MediaType;
-import org.springframework.http.converter.GenericHttpMessageConverter;
-import org.springframework.http.converter.HttpMessageConverter;
-import org.springframework.http.converter.HttpMessageNotWritableException;
-import org.springframework.web.method.HandlerMethod;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -35,9 +16,29 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationContext;
+import org.springframework.core.MethodParameter;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpInputMessage;
+import org.springframework.http.MediaType;
+import org.springframework.http.converter.GenericHttpMessageConverter;
+import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.http.converter.HttpMessageNotWritableException;
+import org.springframework.web.method.HandlerMethod;
+
+import io.springperf.web.annotation.Optimize;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.codec.interceptor.HttpBodyCodecInterceptorRegistry;
+import io.springperf.web.core.mapping.MappingResult;
+import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.http.RequestAttribute;
+import io.springperf.web.http.RequestContext;
+import io.springperf.web.http.WebHttpHeaders;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
+import io.springperf.web.http.support.BodyHttpInputMessage;
 
 class HttpBodyCodecRegistryCoverageTest {
 
@@ -142,8 +143,8 @@ class HttpBodyCodecRegistryCoverageTest {
         Object result = registry.readBody((Type) String.class, parameter, msg, request);
 
         assertNull(result);
-        verify(interceptorRegistry).handleEmptyBodyRead(
-                eq(request), isNull(), eq(msg), eq(parameter), eq((Type) String.class), eq(cachedConverter));
+        verify(interceptorRegistry).handleEmptyBodyRead(eq(request), isNull(), eq(msg), eq(parameter),
+                eq((Type) String.class), eq(cachedConverter));
     }
 
     @Test
@@ -198,15 +199,16 @@ class HttpBodyCodecRegistryCoverageTest {
 
         registry.writeBody(Optional.of("hello"), mock(MethodParameter.class), request, response);
 
-        verify(converter).write(eq("hello"), eq((Type) String.class), eq(MediaType.APPLICATION_JSON),
-                eq(response), eq(request), eq(response), isNull());
+        verify(converter).write(eq("hello"), eq((Type) String.class), eq(MediaType.APPLICATION_JSON), eq(response),
+                eq(request), eq(response), isNull());
     }
 
     @Test
     void writeBody_producesWildcardMediaType_mapsToJson() throws Exception {
         WebServerHttpRequest request = requestWithContextStorage();
         PathMappingContext ctx = mock(PathMappingContext.class);
-        when(ctx.getProducibleMediaTypes()).thenReturn(Collections.singletonList(MediaType.parseMediaType("application/*")));
+        when(ctx.getProducibleMediaTypes())
+                .thenReturn(Collections.singletonList(MediaType.parseMediaType("application/*")));
         MappingResult.set(request, MappingResult.matched(ctx));
         WebHttpHeaders requestHeaders = new WebHttpHeaders();
         requestHeaders.set("Accept", "application/*");
@@ -219,16 +221,16 @@ class HttpBodyCodecRegistryCoverageTest {
 
         registry.writeBody("hello", mock(MethodParameter.class), request, response);
 
-        verify(converter).write(eq("hello"), eq((Type) String.class), eq(MediaType.APPLICATION_JSON),
-                eq(response), eq(request), eq(response), eq(ctx));
+        verify(converter).write(eq("hello"), eq((Type) String.class), eq(MediaType.APPLICATION_JSON), eq(response),
+                eq(request), eq(response), eq(ctx));
     }
 
     @Test
     void writeBody_negotiationCacheFull_clearsBeforeWritingNewEntry() throws Exception {
         clearMethodCache();
         Method echo = OptimizeController.class.getMethod("echo");
-        PathMappingContext ctx = new PathMappingContext(
-                new HandlerMethod(new OptimizeController(), echo), Collections.emptyList(), "/optimize-coverage");
+        PathMappingContext ctx = new PathMappingContext(new HandlerMethod(new OptimizeController(), echo),
+                Collections.emptyList(), "/optimize-coverage");
         Map<String, Object> preloaded = new ConcurrentHashMap<>();
         for (int i = 0; i < 64; i++) {
             preloaded.put("pre-" + i, new Object());
@@ -279,8 +281,7 @@ class HttpBodyCodecRegistryCoverageTest {
     private HttpBodyConverter converterCanWrite() {
         HttpBodyConverter converter = mock(HttpBodyConverter.class);
         when(converter.canWrite(any(Type.class), any(), any(), any(), any(), any())).thenReturn(true);
-        when(converter.getSupportedMediaTypes())
-                .thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON));
+        when(converter.getSupportedMediaTypes()).thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON));
         return converter;
     }
 

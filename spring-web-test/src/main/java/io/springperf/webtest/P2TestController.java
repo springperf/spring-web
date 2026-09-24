@@ -72,8 +72,8 @@ public class P2TestController {
     }
 
     /**
-     * Throws IllegalArgumentException (child of RuntimeException). Should be caught by
-     * the more specific child handler, not the parent handler.
+     * Throws IllegalArgumentException (child of RuntimeException). Should be caught by the more specific child handler,
+     * not the parent handler.
      */
     @GetMapping("/p2/child-exception")
     public String childException() {

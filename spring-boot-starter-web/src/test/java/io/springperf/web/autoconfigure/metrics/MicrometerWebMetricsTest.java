@@ -30,8 +30,7 @@ class MicrometerWebMetricsTest {
         metrics.recordRequest("GET", "/api/users/{id}", 200, 1_000_000L);
 
         Timer timer = meterRegistry.find("dispatcher.request.duration")
-                .tags("method", "GET", "path", "/api/users/{id}", "status", "200")
-                .timer();
+                .tags("method", "GET", "path", "/api/users/{id}", "status", "200").timer();
         assertNotNull(timer);
         assertEquals(1, timer.count());
     }
@@ -42,8 +41,7 @@ class MicrometerWebMetricsTest {
         metrics.recordRequest("GET", "/api/users/{id}", 200, 2_000_000L);
 
         Timer timer = meterRegistry.find("dispatcher.request.duration")
-                .tags("method", "GET", "path", "/api/users/{id}", "status", "200")
-                .timer();
+                .tags("method", "GET", "path", "/api/users/{id}", "status", "200").timer();
         assertNotNull(timer);
         assertEquals(2, timer.count());
     }
@@ -53,8 +51,7 @@ class MicrometerWebMetricsTest {
         metrics.recordRequest("POST", null, 404, 500_000L);
 
         Timer timer = meterRegistry.find("dispatcher.request.duration")
-                .tags("method", "POST", "path", "", "status", "404")
-                .timer();
+                .tags("method", "POST", "path", "", "status", "404").timer();
         assertNotNull(timer);
     }
 
@@ -63,8 +60,7 @@ class MicrometerWebMetricsTest {
         metrics.recordException("java.lang.RuntimeException", true);
 
         Counter counter = meterRegistry.find("dispatcher.exception")
-                .tags("type", "java.lang.RuntimeException", "resolved", "true")
-                .counter();
+                .tags("type", "java.lang.RuntimeException", "resolved", "true").counter();
         assertNotNull(counter);
         assertEquals(1.0, counter.count(), 0.0);
     }
@@ -74,8 +70,7 @@ class MicrometerWebMetricsTest {
         metrics.recordException("java.lang.RuntimeException", false);
 
         Counter counter = meterRegistry.find("dispatcher.exception")
-                .tags("type", "java.lang.RuntimeException", "resolved", "false")
-                .counter();
+                .tags("type", "java.lang.RuntimeException", "resolved", "false").counter();
         assertNotNull(counter);
         assertEquals(1.0, counter.count(), 0.0);
     }
@@ -86,8 +81,7 @@ class MicrometerWebMetricsTest {
         metrics.recordException("java.lang.RuntimeException", false);
 
         Counter counter = meterRegistry.find("dispatcher.exception")
-                .tags("type", "java.lang.RuntimeException", "resolved", "false")
-                .counter();
+                .tags("type", "java.lang.RuntimeException", "resolved", "false").counter();
         assertEquals(2.0, counter.count(), 0.0);
     }
 
@@ -122,13 +116,13 @@ class MicrometerWebMetricsTest {
         assertTrue(done.await(10, TimeUnit.SECONDS), "并发 recordRequest 未在超时内完成");
 
         Timer timer = meterRegistry.find("dispatcher.request.duration")
-                .tags("method", "GET", "path", "/api/x", "status", "200")
-                .timer();
+                .tags("method", "GET", "path", "/api/x", "status", "200").timer();
         assertNotNull(timer);
         assertEquals(threads * perThread, timer.count());
-        assertEquals(1, meterRegistry.getMeters().stream()
-                .filter(m -> "dispatcher.request.duration".equals(m.getId().getName()))
-                .count(), "同 key 并发只允许注册一个 Timer");
+        assertEquals(1,
+                meterRegistry.getMeters().stream()
+                        .filter(m -> "dispatcher.request.duration".equals(m.getId().getName())).count(),
+                "同 key 并发只允许注册一个 Timer");
     }
 
     @Test
@@ -160,19 +154,17 @@ class MicrometerWebMetricsTest {
         assertTrue(done.await(10, TimeUnit.SECONDS), "并发 recordException 未在超时内完成");
 
         Counter counter = meterRegistry.find("dispatcher.exception")
-                .tags("type", "java.lang.IllegalStateException", "resolved", "true")
-                .counter();
+                .tags("type", "java.lang.IllegalStateException", "resolved", "true").counter();
         assertNotNull(counter);
         assertEquals(threads * perThread, counter.count(), 0.0);
         assertEquals(1, meterRegistry.getMeters().stream()
-                .filter(m -> "dispatcher.exception".equals(m.getId().getName()))
-                .count(), "同 key 并发只允许注册一个 Counter");
+                .filter(m -> "dispatcher.exception".equals(m.getId().getName())).count(), "同 key 并发只允许注册一个 Counter");
     }
 
     @Test
     void registerPoolGauges_createsGauges() {
-        ThreadPoolExecutor executor = new ThreadPoolExecutor(
-                2, 4, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<>(100));
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(2, 4, 60, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(100));
 
         metrics.registerPoolGauges("myPool", executor);
 
@@ -184,8 +176,7 @@ class MicrometerWebMetricsTest {
     @Test
     void registerPoolGauges_gaugeValuesReflectExecutorState() {
         LinkedBlockingQueue<Runnable> queue = new LinkedBlockingQueue<>(100);
-        ThreadPoolExecutor executor = new ThreadPoolExecutor(
-                2, 4, 60, TimeUnit.SECONDS, queue);
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(2, 4, 60, TimeUnit.SECONDS, queue);
 
         metrics.registerPoolGauges("myPool", executor);
 

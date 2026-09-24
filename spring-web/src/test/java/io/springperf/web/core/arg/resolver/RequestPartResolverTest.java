@@ -1,12 +1,10 @@
 package io.springperf.web.core.arg.resolver;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.arg.databinder.WebDataBinderRegistry;
-import io.springperf.web.core.codec.HttpBodyCodecRegistry;
-import io.springperf.web.core.mapping.MappingHandlerMethod;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
-import io.springperf.web.http.support.HttpInputMessagePart;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.lang.reflect.Method;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,10 +15,13 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.multipart.MultipartException;
 
-import java.lang.reflect.Method;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.arg.databinder.WebDataBinderRegistry;
+import io.springperf.web.core.codec.HttpBodyCodecRegistry;
+import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
+import io.springperf.web.http.support.HttpInputMessagePart;
 
 @ExtendWith(MockitoExtension.class)
 class RequestPartResolverTest {
@@ -77,8 +78,7 @@ class RequestPartResolverTest {
         when(request.getPartMap()).thenReturn(null);
 
         RequestPartResolver resolver = new RequestPartResolver(webContext, mappingContext, mp);
-        assertThrows(MultipartException.class,
-                () -> resolver.resolveArgument(request, response));
+        assertThrows(MultipartException.class, () -> resolver.resolveArgument(request, response));
     }
 
     @Test
@@ -124,15 +124,17 @@ class RequestPartResolverTest {
         when(request.getPartMap()).thenReturn(partMap);
 
         RequestPartResolver resolver = new RequestPartResolver(webContext, mappingContext, mp);
-        org.springframework.web.server.ResponseStatusException ex =
-                assertThrows(org.springframework.web.server.ResponseStatusException.class,
-                        () -> resolver.resolveArgument(request, response));
+        org.springframework.web.server.ResponseStatusException ex = assertThrows(
+                org.springframework.web.server.ResponseStatusException.class,
+                () -> resolver.resolveArgument(request, response));
         assertEquals(org.springframework.http.HttpStatus.BAD_REQUEST, ex.getStatusCode());
     }
 
     @SuppressWarnings("unused")
-    public void requiredParam(@org.springframework.web.bind.annotation.RequestPart(required = true) String part) {}
+    public void requiredParam(@org.springframework.web.bind.annotation.RequestPart(required = true) String part) {
+    }
 
     @SuppressWarnings("unused")
-    public void stringParam(String part) {}
+    public void stringParam(String part) {
+    }
 }

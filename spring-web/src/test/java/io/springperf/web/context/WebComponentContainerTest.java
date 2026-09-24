@@ -1,16 +1,18 @@
 package io.springperf.web.context;
 
-import io.springperf.web.core.DispatcherHandler;
-import org.junit.jupiter.api.Test;
-import org.springframework.context.ApplicationContext;
-import org.springframework.core.Ordered;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import static io.springperf.web.context.PropertiesConstant.CONTEXT_PATH;
 
 import java.util.Collections;
 import java.util.List;
 
-import static io.springperf.web.context.PropertiesConstant.CONTEXT_PATH;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationContext;
+import org.springframework.core.Ordered;
+
+import io.springperf.web.core.DispatcherHandler;
 
 class WebComponentContainerTest {
 
@@ -137,8 +139,7 @@ class WebComponentContainerTest {
         // 注意并发时序下被替换次数不确定，故不断言精确次数
         for (LifecycleWebComponent comp : comps) {
             long destroyCount = mockingDetails(comp).getInvocations().stream()
-                    .filter(inv -> inv.getMethod().getName().equals("destroyComponent"))
-                    .count();
+                    .filter(inv -> inv.getMethod().getName().equals("destroyComponent")).count();
             assertTrue(destroyCount <= 1, comp + " 不应被 destroy 超过一次，实际 " + destroyCount);
         }
     }

@@ -18,20 +18,25 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class PerfAsyncContextTest {
 
-    @Mock PerfAsyncWebRequest asyncWebRequest;
-    @Mock WebServerHttpRequest webRequest;
-    @Mock WebServerHttpResponse webResponse;
-    @Mock jakarta.servlet.ServletRequest servletRequest;
-    @Mock jakarta.servlet.ServletResponse servletResponse;
-    @Mock RequestContext requestContext;
+    @Mock
+    PerfAsyncWebRequest asyncWebRequest;
+    @Mock
+    WebServerHttpRequest webRequest;
+    @Mock
+    WebServerHttpResponse webResponse;
+    @Mock
+    jakarta.servlet.ServletRequest servletRequest;
+    @Mock
+    jakarta.servlet.ServletResponse servletResponse;
+    @Mock
+    RequestContext requestContext;
 
     private PerfAsyncContext asyncContext;
 
     @BeforeEach
     void setUp() {
         lenient().when(webRequest.getRequestContext()).thenReturn(requestContext);
-        asyncContext = new PerfAsyncContext(asyncWebRequest, webRequest, webResponse,
-                servletRequest, servletResponse);
+        asyncContext = new PerfAsyncContext(asyncWebRequest, webRequest, webResponse, servletRequest, servletResponse);
     }
 
     @Test
@@ -104,8 +109,8 @@ class PerfAsyncContextTest {
     void errorHandler_firesOnErrorOnListeners() throws Exception {
         AsyncListener listener = mock(AsyncListener.class);
         asyncContext.addListener(listener);
-        org.mockito.ArgumentCaptor<java.util.function.Consumer> captor =
-                org.mockito.ArgumentCaptor.forClass(java.util.function.Consumer.class);
+        org.mockito.ArgumentCaptor<java.util.function.Consumer> captor = org.mockito.ArgumentCaptor
+                .forClass(java.util.function.Consumer.class);
         verify(asyncWebRequest).addErrorHandler(captor.capture());
         captor.getValue().accept(new RuntimeException("test"));
         verify(listener).onError(any(AsyncEvent.class));
@@ -127,18 +132,29 @@ class PerfAsyncContextTest {
     }
 
     public static class TestAsyncListener implements AsyncListener {
-        @Override public void onStartAsync(AsyncEvent event) { }
-        @Override public void onComplete(AsyncEvent event) { }
-        @Override public void onTimeout(AsyncEvent event) { }
-        @Override public void onError(AsyncEvent event) { }
+        @Override
+        public void onStartAsync(AsyncEvent event) {
+        }
+
+        @Override
+        public void onComplete(AsyncEvent event) {
+        }
+
+        @Override
+        public void onTimeout(AsyncEvent event) {
+        }
+
+        @Override
+        public void onError(AsyncEvent event) {
+        }
     }
 
     /* ==================== 补充覆盖 ==================== */
 
     @Test
     void dispatch_withPath_supportDispatcher_forwards() {
-        io.springperf.web.support.SupportDispatcherHandler supportHandler =
-                mock(io.springperf.web.support.SupportDispatcherHandler.class);
+        io.springperf.web.support.SupportDispatcherHandler supportHandler = mock(
+                io.springperf.web.support.SupportDispatcherHandler.class);
         io.springperf.web.context.WebContext webContext = mock(io.springperf.web.context.WebContext.class);
         when(webRequest.getWebContext()).thenReturn(webContext);
         when(webContext.getDispatcherHandler()).thenReturn(supportHandler);
@@ -185,16 +201,26 @@ class PerfAsyncContextTest {
         NoDefaultCtorListener(String required) {
         }
 
-        @Override public void onStartAsync(AsyncEvent event) { }
-        @Override public void onComplete(AsyncEvent event) { }
-        @Override public void onTimeout(AsyncEvent event) { }
-        @Override public void onError(AsyncEvent event) { }
+        @Override
+        public void onStartAsync(AsyncEvent event) {
+        }
+
+        @Override
+        public void onComplete(AsyncEvent event) {
+        }
+
+        @Override
+        public void onTimeout(AsyncEvent event) {
+        }
+
+        @Override
+        public void onError(AsyncEvent event) {
+        }
     }
 
     @Test
     void createListener_noDefaultConstructor_throwsIllegalArgument() {
-        assertThrows(IllegalArgumentException.class,
-                () -> asyncContext.createListener(NoDefaultCtorListener.class));
+        assertThrows(IllegalArgumentException.class, () -> asyncContext.createListener(NoDefaultCtorListener.class));
     }
 
     @Test

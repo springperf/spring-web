@@ -1,5 +1,18 @@
 package io.springperf.web.core;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+
 import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
@@ -14,26 +27,13 @@ import io.springperf.web.core.metrics.WebMetrics;
 import io.springperf.web.core.pool.BizPoolRegistry;
 import io.springperf.web.core.retval.ReturnValueResolverRegistry;
 import io.springperf.web.http.WebServerHttpRequest;
-import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * {@code spring.mvc.dispatch.error/options/trace} 闸门语义（{@link DispatcherHandler#isMethodDispatchEnabled}）。
- *
- * <p>锁定「方法 token 大小写不敏感」（Netty 对未知方法原样保留原始串，小写 {@code trace} 不得绕过
- * {@code dispatch.trace=false}）与「常见方法零扫描放行」的两条契约 —— 后者是 JFR 驱动的热路径改造
- * （原实现每请求对方法名做 {@code toUpperCase(Locale.ROOT)} 整串扫描 + Set 查表，
- * 叶帧占 59 样本 / 2195 ≈ 2.7%）。</p>
+ * <p>
+ * 锁定「方法 token 大小写不敏感」（Netty 对未知方法原样保留原始串，小写 {@code trace} 不得绕过 {@code dispatch.trace=false}）与「常见方法零扫描放行」的两条契约 —— 后者是
+ * JFR 驱动的热路径改造 （原实现每请求对方法名做 {@code toUpperCase(Locale.ROOT)} 整串扫描 + Set 查表， 叶帧占 59 样本 / 2195 ≈ 2.7%）。
+ * </p>
  */
 class DispatcherHandlerMethodDispatchGateTest {
 
@@ -51,10 +51,10 @@ class DispatcherHandlerMethodDispatchGateTest {
                 .thenReturn(mock(MappingRegistry.class));
         when(webContext.getWebComponentWithDefault(eq(ExceptionRegistry.class), any(ExceptionRegistry.class)))
                 .thenReturn(mock(ExceptionRegistry.class));
-        when(webContext.getWebComponentWithDefault(eq(ArgumentResolverRegistry.class), any(ArgumentResolverRegistry.class)))
-                .thenReturn(mock(ArgumentResolverRegistry.class));
-        when(webContext.getWebComponentWithDefault(eq(ReturnValueResolverRegistry.class), any(ReturnValueResolverRegistry.class)))
-                .thenReturn(mock(ReturnValueResolverRegistry.class));
+        when(webContext.getWebComponentWithDefault(eq(ArgumentResolverRegistry.class),
+                any(ArgumentResolverRegistry.class))).thenReturn(mock(ArgumentResolverRegistry.class));
+        when(webContext.getWebComponentWithDefault(eq(ReturnValueResolverRegistry.class),
+                any(ReturnValueResolverRegistry.class))).thenReturn(mock(ReturnValueResolverRegistry.class));
         when(webContext.getWebComponentWithDefault(eq(CorsRegistry.class), any(CorsRegistry.class)))
                 .thenReturn(mock(CorsRegistry.class));
         when(webContext.getWebComponentWithDefault(eq(InterceptorRegistry.class), any(InterceptorRegistry.class)))
@@ -75,9 +75,8 @@ class DispatcherHandlerMethodDispatchGateTest {
     @Test
     void commonMethodsAlwaysPass() throws Exception {
         DispatcherHandler handler = buildHandler(false, false, false);
-        for (String method : new String[]{"GET", "POST", "PUT", "HEAD", "DELETE", "PATCH", "CONNECT"}) {
-            assertTrue(handler.isMethodDispatchEnabled(request(method, null)),
-                    method + " 非闸门方法，应始终放行");
+        for (String method : new String[] { "GET", "POST", "PUT", "HEAD", "DELETE", "PATCH", "CONNECT" }) {
+            assertTrue(handler.isMethodDispatchEnabled(request(method, null)), method + " 非闸门方法，应始终放行");
         }
     }
 
@@ -85,16 +84,13 @@ class DispatcherHandlerMethodDispatchGateTest {
     @Test
     void gatedMethodsAreCaseInsensitive() throws Exception {
         DispatcherHandler handler = buildHandler(false, false, false);
-        for (String method : new String[]{"TRACE", "trace", "TrAcE"}) {
-            assertFalse(handler.isMethodDispatchEnabled(request(method, null)),
-                    method + " 应被 dispatch.trace=false 拦截");
+        for (String method : new String[] { "TRACE", "trace", "TrAcE" }) {
+            assertFalse(handler.isMethodDispatchEnabled(request(method, null)), method + " 应被 dispatch.trace=false 拦截");
         }
-        for (String method : new String[]{"ERROR", "error", "ErRoR"}) {
-            assertFalse(handler.isMethodDispatchEnabled(request(method, null)),
-                    method + " 应被 dispatch.error=false 拦截");
+        for (String method : new String[] { "ERROR", "error", "ErRoR" }) {
+            assertFalse(handler.isMethodDispatchEnabled(request(method, null)), method + " 应被 dispatch.error=false 拦截");
         }
-        assertFalse(handler.isMethodDispatchEnabled(request("options", null)),
-                "options 应被 dispatch.options=false 拦截");
+        assertFalse(handler.isMethodDispatchEnabled(request("options", null)), "options 应被 dispatch.options=false 拦截");
     }
 
     /** 开关为 true 时闸门方法正常分发。 */

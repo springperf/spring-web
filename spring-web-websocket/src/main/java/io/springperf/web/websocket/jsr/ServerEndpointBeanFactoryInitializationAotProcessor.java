@@ -22,25 +22,20 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * GraalVM native-image AOT 处理器：为 Bean 发现的 {@code @ServerEndpoint} 端点注册
- * 反射可达性提示。
- *
- * <p><b>为什么需要它</b>：native 下 {@link JsrEndpointScanner} 不会做 classpath 扫描
- * （封闭世界不可用），只依赖 {@link JsrEndpointScanner#scanBeans()} 的 Bean 发现。
- * {@link JsrEndpointWebSocketHandler} 对端点做两处反射调用：
+ * GraalVM native-image AOT 处理器：为 Bean 发现的 {@code @ServerEndpoint} 端点注册 反射可达性提示。
+ * <p>
+ * <b>为什么需要它</b>：native 下 {@link JsrEndpointScanner} 不会做 classpath 扫描 （封闭世界不可用），只依赖
+ * {@link JsrEndpointScanner#scanBeans()} 的 Bean 发现。 {@link JsrEndpointWebSocketHandler} 对端点做两处反射调用：
  * <ul>
- *   <li>实例化：{@code endpointClass.getDeclaredConstructor().newInstance()}（无参构造器）；</li>
- *   <li>回调：{@code @OnOpen}/{@code @OnMessage}/{@code @OnClose}/{@code @OnError}
- *       方法的 {@code setAccessible + invoke}。</li>
+ * <li>实例化：{@code endpointClass.getDeclaredConstructor().newInstance()}（无参构造器）；</li>
+ * <li>回调：{@code @OnOpen}/{@code @OnMessage}/{@code @OnClose}/{@code @OnError} 方法的 {@code setAccessible + invoke}。</li>
  * </ul>
  * 这些在 native 下都需要 hint，本处理器在 AOT 构建期补齐。
- *
- * <p>与运行时 {@link JsrEndpointScanner#scanBeans()} 同口径：
- * 扫描 {@code getBeanNamesForAnnotation(ServerEndpoint.class)}——Bean 注册的端点
- * （native 下要求用户把 {@code @ServerEndpoint} 端点显式注册为 Spring Bean）。
- *
- * <p>通过本模块 {@code META-INF/spring/aot.factories} 注册，
- * 由 Spring Boot {@code process-aot} 构建期调用；JVM 运行时完全不触发，零影响。
+ * <p>
+ * 与运行时 {@link JsrEndpointScanner#scanBeans()} 同口径： 扫描 {@code getBeanNamesForAnnotation(ServerEndpoint.class)}——Bean
+ * 注册的端点 （native 下要求用户把 {@code @ServerEndpoint} 端点显式注册为 Spring Bean）。
+ * <p>
+ * 通过本模块 {@code META-INF/spring/aot.factories} 注册， 由 Spring Boot {@code process-aot} 构建期调用；JVM 运行时完全不触发，零影响。
  */
 public class ServerEndpointBeanFactoryInitializationAotProcessor implements BeanFactoryInitializationAotProcessor {
 
@@ -73,12 +68,12 @@ public class ServerEndpointBeanFactoryInitializationAotProcessor implements Bean
         }
 
         @Override
-        public void applyTo(GenerationContext generationContext, BeanFactoryInitializationCode beanFactoryInitializationCode) {
+        public void applyTo(GenerationContext generationContext,
+                BeanFactoryInitializationCode beanFactoryInitializationCode) {
             RuntimeHints hints = generationContext.getRuntimeHints();
             for (Class<?> endpointClass : endpointClasses) {
                 // 无参构造器实例化（getDeclaredConstructor().newInstance()）
-                hints.reflection().registerType(endpointClass,
-                        MemberCategory.INVOKE_DECLARED_CONSTRUCTORS);
+                hints.reflection().registerType(endpointClass, MemberCategory.INVOKE_DECLARED_CONSTRUCTORS);
 
                 // @OnOpen/@OnMessage/@OnClose/@OnError 回调方法（setAccessible + invoke）
                 for (Method method : ReflectionUtils.getUniqueDeclaredMethods(endpointClass)) {

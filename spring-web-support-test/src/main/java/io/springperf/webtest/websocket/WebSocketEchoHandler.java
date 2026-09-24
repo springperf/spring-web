@@ -10,8 +10,7 @@ import org.springframework.web.socket.handler.AbstractWebSocketHandler;
 import java.nio.ByteBuffer;
 
 /**
- * WebSocket E2E 测试用 echo handler。
- * 文本和二进制消息均直接回显。
+ * WebSocket E2E 测试用 echo handler。 文本和二进制消息均直接回显。
  */
 @Slf4j
 public class WebSocketEchoHandler extends AbstractWebSocketHandler {

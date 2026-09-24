@@ -1,8 +1,7 @@
 package io.springperf.web.context;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.InputStream;
 import java.lang.reflect.Field;
@@ -11,18 +10,21 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
+import org.junit.jupiter.api.Test;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * 配置键一致性校验（P4）：确保 {@link PropertiesConstant} / {@link ViewProperties} 中声明的
- * 每一个配置键都在 {@code additional-spring-configuration-metadata.json} 中登记。
- *
- * <p>目的：把「文档/元数据滞后」变成<b>编译期可发现的测试失败</b>——新增配置键却忘记登记元数据时，
- * 本测试立即失败并列出缺失键，避免再次出现「代码已实现、文档仍标未做」的漂移。</p>
- *
- * <p>说明：元数据中允许存在<b>非 PropertiesConstant 来源</b>的键（如视图引擎键由
- * {@code ViewProperties} 声明、或 starter 模块自有键），故此处只做「代码键 ⊆ 元数据键」的单向断言。</p>
+ * 配置键一致性校验（P4）：确保 {@link PropertiesConstant} / {@link ViewProperties} 中声明的 每一个配置键都在
+ * {@code additional-spring-configuration-metadata.json} 中登记。
+ * <p>
+ * 目的：把「文档/元数据滞后」变成<b>编译期可发现的测试失败</b>——新增配置键却忘记登记元数据时， 本测试立即失败并列出缺失键，避免再次出现「代码已实现、文档仍标未做」的漂移。
+ * </p>
+ * <p>
+ * 说明：元数据中允许存在<b>非 PropertiesConstant 来源</b>的键（如视图引擎键由 {@code ViewProperties} 声明、或 starter 模块自有键），故此处只做「代码键 ⊆
+ * 元数据键」的单向断言。
+ * </p>
  */
 class SupportedPropertiesTest {
 
@@ -101,8 +103,7 @@ class SupportedPropertiesTest {
         if (!missing.isEmpty()) {
             fail("以下配置键已在 PropertiesConstant 声明但未登记到 "
                     + "spring-web/src/main/resources/META-INF/additional-spring-configuration-metadata.json：\n  "
-                    + String.join("\n  ", missing)
-                    + "\n（请补充元数据，保持文档与代码一致）");
+                    + String.join("\n  ", missing) + "\n（请补充元数据，保持文档与代码一致）");
         }
     }
 
@@ -127,8 +128,7 @@ class SupportedPropertiesTest {
     }
 
     /**
-     * 输出「已支持配置键」完整清单（按前缀分组），便于人工核对与生成文档。
-     * 不写文件、无副作用；需要落盘时运行 mvn 时加 {@code -Dperf.props.dump=<path>}。
+     * 输出「已支持配置键」完整清单（按前缀分组），便于人工核对与生成文档。 不写文件、无副作用；需要落盘时运行 mvn 时加 {@code -Dperf.props.dump=<path>}。
      */
     @Test
     void dumpSupportedProperties() throws Exception {

@@ -11,13 +11,14 @@ import org.thymeleaf.web.IWebExchange;
 
 /**
  * Servlet 场景的 {@link WebExchangeProvider}：为模板引擎提供真实 session / principal / cookie。
- *
- * <p>仅当引入 {@code spring-web-servlet} 时注册（见 {@code SpringWebServletAutoConfiguration}）。
- * order 为 {@link Ordered#HIGHEST_PRECEDENCE}，优先于 view 模块的
- * {@code DefaultWebExchangeProvider}（{@link Ordered#LOWEST_PRECEDENCE}）。</p>
- *
- * <p>{@link ServletAttribute#getAdapterContext} 为懒建幂等操作：若当前请求尚未建立
- * Servlet 适配上下文则此处创建并缓存，后续 Servlet/Filter/JSP 路径复用同一实例。</p>
+ * <p>
+ * 仅当引入 {@code spring-web-servlet} 时注册（见 {@code SpringWebServletAutoConfiguration}）。 order 为
+ * {@link Ordered#HIGHEST_PRECEDENCE}，优先于 view 模块的
+ * {@code DefaultWebExchangeProvider}（{@link Ordered#LOWEST_PRECEDENCE}）。
+ * </p>
+ * <p>
+ * {@link ServletAttribute#getAdapterContext} 为懒建幂等操作：若当前请求尚未建立 Servlet 适配上下文则此处创建并缓存，后续 Servlet/Filter/JSP 路径复用同一实例。
+ * </p>
  *
  * @since 3.5.7
  */

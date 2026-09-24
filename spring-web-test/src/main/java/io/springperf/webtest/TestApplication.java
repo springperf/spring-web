@@ -3,7 +3,7 @@ package io.springperf.webtest;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-@SpringBootApplication(scanBasePackages = {"io.springperf.webtest"})
+@SpringBootApplication(scanBasePackages = { "io.springperf.webtest" })
 public class TestApplication {
     public static void main(String[] args) {
         SpringApplication.run(TestApplication.class, args);

@@ -17,8 +17,10 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 class PerfWebConnectionTest {
 
-    @Mock ServletInputStream inputStream;
-    @Mock ServletOutputStream outputStream;
+    @Mock
+    ServletInputStream inputStream;
+    @Mock
+    ServletOutputStream outputStream;
 
     @Test
     void getInputStream() throws Exception {

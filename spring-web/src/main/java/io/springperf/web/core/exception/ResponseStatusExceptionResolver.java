@@ -1,8 +1,5 @@
 package io.springperf.web.core.exception;
 
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
-import io.springperf.web.server.ErrorResponseConfig;
 import org.springframework.context.MessageSource;
 import org.springframework.context.MessageSourceAware;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -17,6 +14,10 @@ import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
+import io.springperf.web.server.ErrorResponseConfig;
+
 public class ResponseStatusExceptionResolver implements HandlerExceptionResolver, MessageSourceAware {
 
     private static final int MAX_CAUSE_DEPTH = 10;
@@ -24,14 +25,14 @@ public class ResponseStatusExceptionResolver implements HandlerExceptionResolver
     @Nullable
     private MessageSource messageSource;
 
-
     @Override
     public void setMessageSource(MessageSource messageSource) {
         this.messageSource = messageSource;
     }
 
     @Override
-    public boolean resolveException(WebServerHttpRequest request, WebServerHttpResponse response, HandlerMethod handler, Throwable ex) {
+    public boolean resolveException(WebServerHttpRequest request, WebServerHttpResponse response, HandlerMethod handler,
+            Throwable ex) {
         int depth = 0;
         while (ex != null && depth < MAX_CAUSE_DEPTH) {
             depth++;
@@ -55,8 +56,7 @@ public class ResponseStatusExceptionResolver implements HandlerExceptionResolver
                 return true;
             }
 
-            if (ex instanceof MethodArgumentNotValidException
-                    || ex instanceof MethodArgumentTypeMismatchException
+            if (ex instanceof MethodArgumentNotValidException || ex instanceof MethodArgumentTypeMismatchException
                     || ex instanceof HttpMessageNotReadableException) {
                 // 对齐 Spring DefaultHandlerExceptionResolver：参数绑定/消息体解析错误 → 400。
                 // 必须把原始异常作为 cause 传给错误渲染：MethodArgumentNotValidException 携带
@@ -78,32 +78,38 @@ public class ResponseStatusExceptionResolver implements HandlerExceptionResolver
         return false;
     }
 
-    protected boolean resolveResponseStatusException(ResponseStatusException ex, WebServerHttpRequest request, WebServerHttpResponse response, @Nullable HandlerMethod handler) {
+    protected boolean resolveResponseStatusException(ResponseStatusException ex, WebServerHttpRequest request,
+            WebServerHttpResponse response, @Nullable HandlerMethod handler) {
         // 跨 Spring 版本取 headers：6.1 起 getHeaders()，Spring 7 移除 getResponseHeaders()。
         // 经 ResponseStatusExceptionAdapter 反射桥接（并处理 SB4 HttpHeaders 类型差异）。
         // 注：6.1 中 ResponseStatusException 构造器不接收 headers，getHeaders() 恒返回 EMPTY，
         // 此 forEach 在 6.1 为空操作；Spring 7 若恢复 headers 支持则生效。
-        ResponseStatusExceptionAdapter.getHeaders(ex).forEach((name, values) -> values.forEach(value -> response.getHeaders().add(name, value)));
+        ResponseStatusExceptionAdapter.getHeaders(ex)
+                .forEach((name, values) -> values.forEach(value -> response.getHeaders().add(name, value)));
         HttpStatus statusCode = HttpStatus.resolve(ex.getStatusCode().value());
         return applyStatusAndReason(statusCode, ex.getReason(), response, request);
     }
 
-    protected boolean resolveResponseStatus(ResponseStatus responseStatus, WebServerHttpRequest request, WebServerHttpResponse response, @Nullable HandlerMethod handler, Throwable ex) {
+    protected boolean resolveResponseStatus(ResponseStatus responseStatus, WebServerHttpRequest request,
+            WebServerHttpResponse response, @Nullable HandlerMethod handler, Throwable ex) {
         return applyStatusAndReason(responseStatus.code(), responseStatus.reason(), response, request);
     }
 
     /** 兼容旧签名：无请求上下文时 on-param 三参数均视为未命中。 */
-    protected boolean applyStatusAndReason(HttpStatus statusCode, @Nullable String reason, WebServerHttpResponse response) {
+    protected boolean applyStatusAndReason(HttpStatus statusCode, @Nullable String reason,
+            WebServerHttpResponse response) {
         return applyStatusAndReason(statusCode, reason, response, null);
     }
 
-    protected boolean applyStatusAndReason(HttpStatus statusCode, @Nullable String reason, WebServerHttpResponse response,
-                                          @Nullable WebServerHttpRequest request) {
+    protected boolean applyStatusAndReason(HttpStatus statusCode, @Nullable String reason,
+            WebServerHttpResponse response, @Nullable WebServerHttpRequest request) {
         boolean traceParam = ErrorResponseConfig.isParamPresent(request, "trace");
         boolean messageParam = ErrorResponseConfig.isParamPresent(request, "message");
         boolean errorsParam = ErrorResponseConfig.isParamPresent(request, "errors");
         if (StringUtils.hasLength(reason)) {
-            String resolvedReason = (this.messageSource != null ? this.messageSource.getMessage(reason, null, reason, LocaleContextHolder.getLocale()) : reason);
+            String resolvedReason = (this.messageSource != null
+                    ? this.messageSource.getMessage(reason, null, reason, LocaleContextHolder.getLocale())
+                    : reason);
             response.sendError(statusCode, resolvedReason, null, traceParam, messageParam, errorsParam);
         } else {
             response.sendError(statusCode, null, null, traceParam, messageParam, errorsParam);

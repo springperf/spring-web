@@ -1,5 +1,21 @@
 package io.springperf.web.http;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
+
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
@@ -9,21 +25,6 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpVersion;
 import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.WebContext;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicReference;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class NettyServerHttpRequestBodyTest {
@@ -43,6 +44,7 @@ class NettyServerHttpRequestBodyTest {
         // 请求体内联阈值现为 ApplicationProperties 热路径字段（默认 4KB）
         lenient().when(props.getMaxInMemorySize()).thenReturn(4096);
     }
+
     private static final int LARGE_SIZE = 100 * 1024;
 
     // ==================== 小包路径 (=4KB) ====================
@@ -209,9 +211,8 @@ class NettyServerHttpRequestBodyTest {
     }
 
     /**
-     * 回归 R2-4（并发冒烟）：模拟真实异步流——入池前 acquire、异步线程读 body、
-     * 主线程（模拟 EventLoop）提交后立即 release。修复前 release 并发 null 掉
-     * largeBodyBuf → 大 POST 读到空 body，或对已释放 content 抛 IllegalReferenceCountException。
+     * 回归 R2-4（并发冒烟）：模拟真实异步流——入池前 acquire、异步线程读 body、 主线程（模拟 EventLoop）提交后立即 release。修复前 release 并发 null 掉 largeBodyBuf
+     * → 大 POST 读到空 body，或对已释放 content 抛 IllegalReferenceCountException。
      */
     @Test
     void largeBody_concurrentEventLoopRelease_whileAsyncRead_ok() throws Exception {
@@ -312,16 +313,15 @@ class NettyServerHttpRequestBodyTest {
         byte[] bodyBytes = "async-body-content".getBytes(StandardCharsets.UTF_8);
         ByteBuf pooledContent = io.netty.buffer.PooledByteBufAllocator.DEFAULT.buffer(bodyBytes.length);
         pooledContent.writeBytes(bodyBytes);
-        FullHttpRequest nativeRequest = new DefaultFullHttpRequest(
-                HttpVersion.HTTP_1_1, HttpMethod.POST, "/test", pooledContent);
+        FullHttpRequest nativeRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/test",
+                pooledContent);
         NettyServerHttpRequest req = new NettyServerHttpRequest(webContext, ctx, nativeRequest, "/test");
         int expected = req.getContentLength();
         assertEquals(bodyBytes.length, expected);
 
         req.release();
 
-        assertEquals(expected, req.getContentLength(),
-                "释放后仍应返回构造期缓存长度（不依赖已归还池的 content()）");
+        assertEquals(expected, req.getContentLength(), "释放后仍应返回构造期缓存长度（不依赖已归还池的 content()）");
     }
 
     @Test
@@ -331,7 +331,7 @@ class NettyServerHttpRequestBodyTest {
         WebServerHttpResponse boundResp = org.mockito.Mockito.mock(WebServerHttpResponse.class);
         req.setResponse(boundResp);
 
-        req.acquire();   // refCnt 1 → 2
+        req.acquire(); // refCnt 1 → 2
 
         assertEquals(false, req.release(), "非最后一次 release 不应归零");
         // 非最后一次（业务线程可能仍在写响应缓冲）时不得级联释放响应 buf

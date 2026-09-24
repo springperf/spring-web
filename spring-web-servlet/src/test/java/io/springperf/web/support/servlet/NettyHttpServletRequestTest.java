@@ -26,10 +26,8 @@ class NettyHttpServletRequestTest {
 
     @Test
     void remote_returnsHostAndPort() {
-        WebServerHttpRequest req = mockRequest(
-                URI.create("http://localhost:8080/test"),
-                new InetSocketAddress("192.168.1.10", 5000),
-                new InetSocketAddress("127.0.0.1", 8080));
+        WebServerHttpRequest req = mockRequest(URI.create("http://localhost:8080/test"),
+                new InetSocketAddress("192.168.1.10", 5000), new InetSocketAddress("127.0.0.1", 8080));
         NettyHttpServletRequest servletReq = new NettyHttpServletRequest(req);
 
         assertEquals("192.168.1.10", servletReq.getRemoteAddr());
@@ -39,10 +37,8 @@ class NettyHttpServletRequestTest {
 
     @Test
     void local_returnsHostAndPort() {
-        WebServerHttpRequest req = mockRequest(
-                URI.create("http://localhost:8080/test"),
-                new InetSocketAddress("192.168.1.10", 5000),
-                new InetSocketAddress("127.0.0.1", 9090));
+        WebServerHttpRequest req = mockRequest(URI.create("http://localhost:8080/test"),
+                new InetSocketAddress("192.168.1.10", 5000), new InetSocketAddress("127.0.0.1", 9090));
         NettyHttpServletRequest servletReq = new NettyHttpServletRequest(req);
 
         assertEquals("127.0.0.1", servletReq.getLocalAddr());
@@ -53,8 +49,7 @@ class NettyHttpServletRequestTest {
 
     @Test
     void remoteAddressNull_fallsBackToSuper() {
-        WebServerHttpRequest req = mockRequest(
-                URI.create("http://localhost:8080/test"), null, null);
+        WebServerHttpRequest req = mockRequest(URI.create("http://localhost:8080/test"), null, null);
         NettyHttpServletRequest servletReq = new NettyHttpServletRequest(req);
         // 无 remoteAddress，走父类实现（不抛异常）
         assertNotNull(servletReq.getRemoteAddr());
@@ -63,23 +58,19 @@ class NettyHttpServletRequestTest {
 
     @Test
     void scheme_and_isSecure() {
-        WebServerHttpRequest httpReq = mockRequest(
-                URI.create("http://localhost:8080/test"), null, null);
+        WebServerHttpRequest httpReq = mockRequest(URI.create("http://localhost:8080/test"), null, null);
         assertFalse(new NettyHttpServletRequest(httpReq).isSecure());
         assertEquals("http", new NettyHttpServletRequest(httpReq).getScheme());
 
-        WebServerHttpRequest httpsReq = mockRequest(
-                URI.create("https://localhost:8443/test"), null, null);
+        WebServerHttpRequest httpsReq = mockRequest(URI.create("https://localhost:8443/test"), null, null);
         assertTrue(new NettyHttpServletRequest(httpsReq).isSecure());
         assertEquals("https", new NettyHttpServletRequest(httpsReq).getScheme());
     }
 
     @Test
     void getRequestURL_nonDefaultPort_includesPort() {
-        WebServerHttpRequest req = mockRequest(
-                URI.create("http://localhost:8080/test"),
-                new InetSocketAddress("192.168.1.10", 5000),
-                new InetSocketAddress("127.0.0.1", 8080));
+        WebServerHttpRequest req = mockRequest(URI.create("http://localhost:8080/test"),
+                new InetSocketAddress("192.168.1.10", 5000), new InetSocketAddress("127.0.0.1", 8080));
         NettyHttpServletRequest servletReq = new NettyHttpServletRequest(req);
         // getRequestURI 来自父类（基于 request.getPath 等），此处验证 URL 含端口
         String url = servletReq.getRequestURL().toString();
@@ -89,9 +80,7 @@ class NettyHttpServletRequestTest {
 
     @Test
     void getRequestURL_httpPort80_omitsPort() {
-        WebServerHttpRequest req = mockRequest(
-                URI.create("http://localhost:80/test"),
-                null,
+        WebServerHttpRequest req = mockRequest(URI.create("http://localhost:80/test"), null,
                 new InetSocketAddress("127.0.0.1", 80));
         NettyHttpServletRequest servletReq = new NettyHttpServletRequest(req);
         String url = servletReq.getRequestURL().toString();

@@ -10,9 +10,8 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * E2E: verify HTTP/1.1 keep-alive connection reuse. Using {@code /thickness/conn-id},
- * two sequential requests on the same client should reuse the same TCP connection
- * (same remote port), proving the server keeps connections alive.
+ * E2E: verify HTTP/1.1 keep-alive connection reuse. Using {@code /thickness/conn-id}, two sequential requests on the
+ * same client should reuse the same TCP connection (same remote port), proving the server keeps connections alive.
  */
 public class KeepAliveReuseE2ETest extends BaseE2ETest {
 
@@ -47,8 +46,7 @@ public class KeepAliveReuseE2ETest extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
-            assertEquals(serverPort, body.get("serverPort"),
-                    "conn-id 应暴露实际绑定端口");
+            assertEquals(serverPort, body.get("serverPort"), "conn-id 应暴露实际绑定端口");
         }
     }
 }

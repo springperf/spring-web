@@ -6,8 +6,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * URL 重写回读：从请求 URI 解析 {@code ;jsessionid=<id>}（Servlet 规范 §7.1）。
- *
- * <p>这是 {@code tracking-modes=URL} 的**读侧**——只有写出没有回读，会让跨请求会话静默丢失。</p>
+ * <p>
+ * 这是 {@code tracking-modes=URL} 的**读侧**——只有写出没有回读，会让跨请求会话静默丢失。
+ * </p>
  */
 class PerfHttpServletRequestSessionUrlTest {
 

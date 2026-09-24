@@ -16,7 +16,9 @@ public final class WaitStrategyFactory {
     /**
      * 根据枚举值创建等待策略实例。
      *
-     * @param strategy 等待策略枚举
+     * @param strategy
+     *            等待策略枚举
+     *
      * @return Disruptor {@link WaitStrategy} 实例
      */
     public static WaitStrategy create(BatchMapping.WaitStrategy strategy) {

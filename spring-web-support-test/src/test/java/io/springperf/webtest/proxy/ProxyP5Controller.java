@@ -13,8 +13,7 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 
 /**
- * P5 E2E 控制器：覆盖 HttpEntity 参数、Callable 异步、byte[]/Resource 返回值、
- * 多路径映射、多方法映射、ResponseStatusException 等代理场景。
+ * P5 E2E 控制器：覆盖 HttpEntity 参数、Callable 异步、byte[]/Resource 返回值、 多路径映射、多方法映射、ResponseStatusException 等代理场景。
  */
 @RestController
 @RequestMapping("/proxy-p5")
@@ -26,8 +25,8 @@ public class ProxyP5Controller {
     public Map<String, Object> entityBody(HttpEntity<String> entity) {
         Map<String, Object> m = new HashMap<>();
         m.put("body", entity.getBody());
-        m.put("contentType", entity.getHeaders().getContentType() != null
-                ? entity.getHeaders().getContentType().toString() : null);
+        m.put("contentType",
+                entity.getHeaders().getContentType() != null ? entity.getHeaders().getContentType().toString() : null);
         return m;
     }
 
@@ -54,7 +53,7 @@ public class ProxyP5Controller {
 
     // ============ 多路径映射 @GetMapping({"/a","/b"}) ============
 
-    @GetMapping({"/multi-path-a", "/multi-path-b"})
+    @GetMapping({ "/multi-path-a", "/multi-path-b" })
     public Map<String, Object> multiPath() {
         Map<String, Object> m = new HashMap<>();
         m.put("matched", "multi-path");
@@ -63,7 +62,7 @@ public class ProxyP5Controller {
 
     // ============ 多方法映射 @RequestMapping(method={GET,POST}) ============
 
-    @RequestMapping(value = "/multi-method", method = {RequestMethod.GET, RequestMethod.POST})
+    @RequestMapping(value = "/multi-method", method = { RequestMethod.GET, RequestMethod.POST })
     public Map<String, Object> multiMethod() {
         Map<String, Object> m = new HashMap<>();
         m.put("matched", "multi-method");

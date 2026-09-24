@@ -43,13 +43,11 @@ public class ServletBridgeTestController {
     }
 
     /**
-     * 桥接模式 SSE：返回 native {@code SseEmitter}，经 servlet 响应包装写出。
-     * 用于补齐桥接模式流式路径的 E2E（见 {@code ServletBridgeSseE2eTest}）。
+     * 桥接模式 SSE：返回 native {@code SseEmitter}，经 servlet 响应包装写出。 用于补齐桥接模式流式路径的 E2E（见 {@code ServletBridgeSseE2eTest}）。
      */
     @GetMapping(value = "/sse-stream", produces = "text/event-stream;charset=UTF-8")
     public io.springperf.web.core.async.stream.SseEmitter sseStream() {
-        io.springperf.web.core.async.stream.SseEmitter emitter =
-                new io.springperf.web.core.async.stream.SseEmitter();
+        io.springperf.web.core.async.stream.SseEmitter emitter = new io.springperf.web.core.async.stream.SseEmitter();
         Thread worker = new Thread(() -> {
             try {
                 emitter.send("bridge-a");
@@ -66,13 +64,12 @@ public class ServletBridgeTestController {
     }
 
     /**
-     * Spring 兼容的 mvc {@code SseEmitter}（extends ResponseBodyEmitter extends StreamEmitter）：
-     * 经 {@code ResponseBodyEmitterReturnValueResolver} 注入 encodeFunction 后走同一 native 内核。
+     * Spring 兼容的 mvc {@code SseEmitter}（extends ResponseBodyEmitter extends StreamEmitter）： 经
+     * {@code ResponseBodyEmitterReturnValueResolver} 注入 encodeFunction 后走同一 native 内核。
      */
     @GetMapping(value = "/sse-mvc", produces = "text/event-stream;charset=UTF-8")
     public org.springframework.web.servlet.mvc.method.annotation.SseEmitter sseMvc() {
-        org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter =
-                new org.springframework.web.servlet.mvc.method.annotation.SseEmitter();
+        org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter = new org.springframework.web.servlet.mvc.method.annotation.SseEmitter();
         Thread worker = new Thread(() -> {
             try {
                 emitter.send("mvc-a");
@@ -91,8 +88,7 @@ public class ServletBridgeTestController {
     /** Spring 兼容的 {@code ResponseBodyEmitter}：非 SSE，按 codec 编码后顺序写出。 */
     @GetMapping(value = "/emitter", produces = "text/plain;charset=UTF-8")
     public org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter emitter() {
-        org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter emitter =
-                new org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter();
+        org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter emitter = new org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter();
         Thread worker = new Thread(() -> {
             try {
                 emitter.send("emitter-1");
@@ -109,8 +105,8 @@ public class ServletBridgeTestController {
     }
 
     /**
-     * {@code StreamingResponseBody}：独立 {@code @FunctionalInterface}（不是 StreamEmitter），
-     * 当前无 resolver 认领 → 用于固化「未实现」的实测行为（见 ServletBridgeSseE2eTest）。
+     * {@code StreamingResponseBody}：独立 {@code @FunctionalInterface}（不是 StreamEmitter）， 当前无 resolver 认领 →
+     * 用于固化「未实现」的实测行为（见 ServletBridgeSseE2eTest）。
      */
     @GetMapping(value = "/streaming-response-body", produces = "text/plain;charset=UTF-8")
     public org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody streamingResponseBody() {
@@ -123,8 +119,7 @@ public class ServletBridgeTestController {
     /** 桥接模式 SSE 异常终止：发一段后 completeWithError → 截断收尾（与 native 语义一致）。 */
     @GetMapping(value = "/sse-error", produces = "text/event-stream;charset=UTF-8")
     public io.springperf.web.core.async.stream.SseEmitter sseError() {
-        io.springperf.web.core.async.stream.SseEmitter emitter =
-                new io.springperf.web.core.async.stream.SseEmitter();
+        io.springperf.web.core.async.stream.SseEmitter emitter = new io.springperf.web.core.async.stream.SseEmitter();
         Thread worker = new Thread(() -> {
             try {
                 emitter.send("bridge-err-1");
@@ -155,8 +150,8 @@ public class ServletBridgeTestController {
     /** 异步超时（150ms）→ 期望与 native 相同的超时状态码对照。 */
     @GetMapping("/async-timeout")
     public org.springframework.web.context.request.async.DeferredResult<String> asyncTimeout() {
-        org.springframework.web.context.request.async.DeferredResult<String> result =
-                new org.springframework.web.context.request.async.DeferredResult<>(150L);
+        org.springframework.web.context.request.async.DeferredResult<String> result = new org.springframework.web.context.request.async.DeferredResult<>(
+                150L);
         Thread worker = new Thread(() -> {
             try {
                 Thread.sleep(800);
@@ -191,8 +186,8 @@ public class ServletBridgeTestController {
     }
 
     @PostMapping("/content-type")
-    public Map<String, String> setContentType(@RequestBody Map<String, String> body,
-                                              HttpServletRequest request, HttpServletResponse response) {
+    public Map<String, String> setContentType(@RequestBody Map<String, String> body, HttpServletRequest request,
+            HttpServletResponse response) {
         response.setContentType(body.get("contentType"));
         Map<String, String> result = new HashMap<>();
         result.put("contentType", response.getContentType());
@@ -211,7 +206,7 @@ public class ServletBridgeTestController {
 
     @PostMapping("/login")
     public Map<String, String> login(@RequestParam String username, @RequestParam String password,
-                                     HttpServletRequest request) throws jakarta.servlet.ServletException {
+            HttpServletRequest request) throws jakarta.servlet.ServletException {
         request.login(username, password);
         Map<String, String> result = new HashMap<>();
         jakarta.servlet.http.HttpSession session = request.getSession(false);

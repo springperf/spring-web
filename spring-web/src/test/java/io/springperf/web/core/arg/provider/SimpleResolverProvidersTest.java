@@ -1,13 +1,14 @@
 package io.springperf.web.core.arg.provider;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.arg.StaticArgumentResolver;
-import io.springperf.web.core.arg.databinder.WebDataBinderRegistry;
-import io.springperf.web.core.mapping.MappingHandlerMethod;
-import io.springperf.web.http.RequestAttribute;
-import io.springperf.web.http.RequestContext;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.lang.reflect.Method;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -29,14 +30,14 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 
-import java.lang.reflect.Method;
-import java.util.Collections;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.arg.StaticArgumentResolver;
+import io.springperf.web.core.arg.databinder.WebDataBinderRegistry;
+import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.http.RequestAttribute;
+import io.springperf.web.http.RequestContext;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 class SimpleResolverProvidersTest {
@@ -161,17 +162,16 @@ class SimpleResolverProvidersTest {
     }
 
     /**
-     * 异常类型虽实现 BindingResult（MethodArgumentNotValidException / BindException 家族），
-     * 但在 @ExceptionHandler 上语义是「被抛出的异常」，必须交给异常参数 provider 注入，
-     * 否则本 provider 抢先命中 → 请求属性无 BindingResult → 500。
+     * 异常类型虽实现 BindingResult（MethodArgumentNotValidException / BindException 家族）， 但在 @ExceptionHandler
+     * 上语义是「被抛出的异常」，必须交给异常参数 provider 注入， 否则本 provider 抢先命中 → 请求属性无 BindingResult → 500。
      */
     @Test
     void errorsResolver_notSupportsExceptionImplementingBindingResult() throws Exception {
         ErrorsResolverProvider p = new ErrorsResolverProvider();
-        assertFalse(p.supports(param("methodArgNotValidParam",
-                org.springframework.web.bind.MethodArgumentNotValidException.class), null));
-        assertFalse(p.supports(param("bindExceptionParam",
-                org.springframework.validation.BindException.class), null));
+        assertFalse(p.supports(
+                param("methodArgNotValidParam", org.springframework.web.bind.MethodArgumentNotValidException.class),
+                null));
+        assertFalse(p.supports(param("bindExceptionParam", org.springframework.validation.BindException.class), null));
     }
 
     @Test
@@ -233,17 +233,16 @@ class SimpleResolverProvidersTest {
         mockMap.add("name", "test");
         when(mockRequest.getParameterMap()).thenReturn(mockMap);
 
-        MultiValueMap<String, ?> result = p.getMultiValueMapResolver()
-                .resolveMultiValueMap(null, null, mockRequest, mockResponse);
+        MultiValueMap<String, ?> result = p.getMultiValueMapResolver().resolveMultiValueMap(null, null, mockRequest,
+                mockResponse);
 
         assertSame(mockMap, result);
     }
 
     /**
-     * 回归 R2-3：{@code @RequestParam List<Integer>} 的元素级转换。
-     * 解析结果来自 {@code request.getParameterMap()}（{@code List<String>}），形参为
-     * {@code List<Integer>}。修复前 {@code convert()} 因 {@code List.isAssignableFrom(ArrayList)}
-     * 短路返回原 {@code List<String>}，业务层遍历时抛 ClassCastException。
+     * 回归 R2-3：{@code @RequestParam List<Integer>} 的元素级转换。 解析结果来自
+     * {@code request.getParameterMap()}（{@code List<String>}），形参为 {@code List<Integer>}。修复前 {@code convert()} 因
+     * {@code List.isAssignableFrom(ArrayList)} 短路返回原 {@code List<String>}，业务层遍历时抛 ClassCastException。
      */
     @Test
     void requestParamProvider_collectionResolver_convertsGenericElements() throws Exception {
@@ -257,8 +256,8 @@ class SimpleResolverProvidersTest {
         params.add("ids", "2");
         when(mockRequest.getParameterMap()).thenReturn(params);
 
-        StaticArgumentResolver r = p.getResolver(
-                param("annotatedRequestParamList", List.class, RequestParam.class), mappingContext, webContext);
+        StaticArgumentResolver r = p.getResolver(param("annotatedRequestParamList", List.class, RequestParam.class),
+                mappingContext, webContext);
         Object result = r.resolveArgument(mockRequest, mockResponse);
 
         assertTrue(result instanceof List);
@@ -282,16 +281,15 @@ class SimpleResolverProvidersTest {
         params.add("id", "42");
         when(mockRequest.getParameterMap()).thenReturn(params);
 
-        StaticArgumentResolver r = p.getResolver(
-                param("annotatedRequestParamInt", Integer.class, RequestParam.class), mappingContext, webContext);
+        StaticArgumentResolver r = p.getResolver(param("annotatedRequestParamInt", Integer.class, RequestParam.class),
+                mappingContext, webContext);
         Object result = r.resolveArgument(mockRequest, mockResponse);
 
         assertEquals(Integer.valueOf(42), result);
     }
 
     /**
-     * {@code @RequestParam(required=true)} 参数缺失 → 400 BAD_REQUEST。
-     * 覆盖 MetaUtils.getRequired 的 RequestParam 分支 +
+     * {@code @RequestParam(required=true)} 参数缺失 → 400 BAD_REQUEST。 覆盖 MetaUtils.getRequired 的 RequestParam 分支 +
      * {@code AbstractNamedValueNullableResolver.handleMissingValue}（MissingServletRequestParameter 语义对齐）。
      */
     @Test
@@ -333,8 +331,8 @@ class SimpleResolverProvidersTest {
         mockHeaders.add("Accept", "application/json");
         when(mockRequest.getHeaders()).thenReturn(mockHeaders);
 
-        MultiValueMap<String, ?> result = p.getMultiValueMapResolver()
-                .resolveMultiValueMap(null, null, mockRequest, mockResponse);
+        MultiValueMap<String, ?> result = p.getMultiValueMapResolver().resolveMultiValueMap(null, null, mockRequest,
+                mockResponse);
 
         assertEquals(List.of("application/json"), result.get("Accept"));
     }
@@ -349,7 +347,8 @@ class SimpleResolverProvidersTest {
         when(mockRequestContext.getAttribute(any(RequestAttribute.class))).thenReturn(uriVars);
 
         // simpleMap path uses AbstractSupportOptionalResolver, no WebDataBinderRegistry needed
-        StaticArgumentResolver r = p.getResolver(param("annotatedPathVariableMap", Map.class, PathVariable.class), null, null);
+        StaticArgumentResolver r = p.getResolver(param("annotatedPathVariableMap", Map.class, PathVariable.class), null,
+                null);
         Object result = r.resolveArgument(mockRequest, mockResponse);
 
         assertEquals(uriVars, result);
@@ -364,7 +363,8 @@ class SimpleResolverProvidersTest {
         when(mockRequestContext.getAttribute(any(RequestAttribute.class))).thenReturn(uriVars);
 
         // `name` 通过 @PathVariable("id") 获取
-        StaticArgumentResolver r = p.getResolver(param("annotatedPathVariableWithName", String.class, PathVariable.class), mappingContext, webContext);
+        StaticArgumentResolver r = p.getResolver(
+                param("annotatedPathVariableWithName", String.class, PathVariable.class), mappingContext, webContext);
         Object result = r.resolveArgument(mockRequest, mockResponse);
 
         assertEquals("42", result);
@@ -377,7 +377,8 @@ class SimpleResolverProvidersTest {
         when(mockRequest.getRequestContext()).thenReturn(mockRequestContext);
         when(mockRequestContext.getAttribute(any(RequestAttribute.class))).thenReturn(Collections.emptyMap());
 
-        StaticArgumentResolver r = p.getResolver(param("annotatedPathVariable", String.class, PathVariable.class), mappingContext, webContext);
+        StaticArgumentResolver r = p.getResolver(param("annotatedPathVariable", String.class, PathVariable.class),
+                mappingContext, webContext);
         Object result = r.resolveArgument(mockRequest, mockResponse);
 
         assertNull(result);
@@ -427,47 +428,90 @@ class SimpleResolverProvidersTest {
     // ----- parameter methods for reflection -----
 
     @SuppressWarnings("unused")
-    public void requestRest(WebServerHttpRequest r) {}
+    public void requestRest(WebServerHttpRequest r) {
+    }
+
     @SuppressWarnings("unused")
-    public void requestServer(ServerHttpRequest r) {}
+    public void requestServer(ServerHttpRequest r) {
+    }
+
     @SuppressWarnings("unused")
-    public void requestHttp(HttpRequest r) {}
+    public void requestHttp(HttpRequest r) {
+    }
+
     @SuppressWarnings("unused")
-    public void requestInput(HttpInputMessage r) {}
+    public void requestInput(HttpInputMessage r) {
+    }
+
     @SuppressWarnings("unused")
-    public void responseRest(WebServerHttpResponse r) {}
+    public void responseRest(WebServerHttpResponse r) {
+    }
+
     @SuppressWarnings("unused")
-    public void responseServer(ServerHttpResponse r) {}
+    public void responseServer(ServerHttpResponse r) {
+    }
+
     @SuppressWarnings("unused")
-    public void responseOutput(HttpOutputMessage r) {}
+    public void responseOutput(HttpOutputMessage r) {
+    }
+
     @SuppressWarnings("unused")
-    public void localeParam(Locale l) {}
+    public void localeParam(Locale l) {
+    }
+
     @SuppressWarnings("unused")
-    public void errorsParam(Errors e) {}
+    public void errorsParam(Errors e) {
+    }
+
     @SuppressWarnings("unused")
-    public void bindingResultParam(BindingResult b) {}
+    public void bindingResultParam(BindingResult b) {
+    }
+
     @SuppressWarnings("unused")
-    public void stringParam(String s) {}
+    public void stringParam(String s) {
+    }
+
     @SuppressWarnings("unused")
-    public void methodArgNotValidParam(org.springframework.web.bind.MethodArgumentNotValidException e) {}
+    public void methodArgNotValidParam(org.springframework.web.bind.MethodArgumentNotValidException e) {
+    }
+
     @SuppressWarnings("unused")
-    public void bindExceptionParam(org.springframework.validation.BindException e) {}
+    public void bindExceptionParam(org.springframework.validation.BindException e) {
+    }
+
     @SuppressWarnings("unused")
-    public void annotatedRequestParam(@RequestParam String s) {}
+    public void annotatedRequestParam(@RequestParam String s) {
+    }
+
     @SuppressWarnings("unused")
-    public void annotatedRequestParamRequired(@RequestParam("name") String s) {}
+    public void annotatedRequestParamRequired(@RequestParam("name") String s) {
+    }
+
     @SuppressWarnings("unused")
-    public void annotatedRequestParamOptional(@RequestParam(value = "name", required = false) String s) {}
+    public void annotatedRequestParamOptional(@RequestParam(value = "name", required = false) String s) {
+    }
+
     @SuppressWarnings("unused")
-    public void annotatedRequestParamList(@RequestParam("ids") List<Integer> ids) {}
+    public void annotatedRequestParamList(@RequestParam("ids") List<Integer> ids) {
+    }
+
     @SuppressWarnings("unused")
-    public void annotatedRequestParamInt(@RequestParam("id") Integer id) {}
+    public void annotatedRequestParamInt(@RequestParam("id") Integer id) {
+    }
+
     @SuppressWarnings("unused")
-    public void annotatedRequestHeader(@RequestHeader String s) {}
+    public void annotatedRequestHeader(@RequestHeader String s) {
+    }
+
     @SuppressWarnings("unused")
-    public void annotatedPathVariable(@PathVariable String s) {}
+    public void annotatedPathVariable(@PathVariable String s) {
+    }
+
     @SuppressWarnings("unused")
-    public void annotatedPathVariableWithName(@PathVariable("id") String s) {}
+    public void annotatedPathVariableWithName(@PathVariable("id") String s) {
+    }
+
     @SuppressWarnings("unused")
-    public void annotatedPathVariableMap(@PathVariable Map<String, String> m) {}
+    public void annotatedPathVariableMap(@PathVariable Map<String, String> m) {
+    }
 }

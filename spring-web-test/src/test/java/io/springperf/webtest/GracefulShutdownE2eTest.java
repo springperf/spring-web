@@ -20,15 +20,15 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * 优雅停机 drain E2E 测试。
- * <p>验证 {@link NettyHttpServer#stop()} 的 drain 语义：
+ * <p>
+ * 验证 {@link NettyHttpServer#stop()} 的 drain 语义：
  * <ul>
- *   <li>已进入处理中的请求在停机后仍被完整写出（不被打断）</li>
- *   <li>停机后新请求被拒绝（503 Service Unavailable）</li>
+ * <li>已进入处理中的请求在停机后仍被完整写出（不被打断）</li>
+ * <li>停机后新请求被拒绝（503 Service Unavailable）</li>
  * </ul>
  */
 @SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
-        "spring.web.e2e.graceful-shutdown=true"
-})
+        "spring.web.e2e.graceful-shutdown=true" })
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DirtiesContext
 public class GracefulShutdownE2eTest {
@@ -39,11 +39,8 @@ public class GracefulShutdownE2eTest {
     @Autowired
     private NettyHttpServer nettyHttpServer;
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .writeTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).writeTimeout(Duration.ofSeconds(10)).build();
 
     private String url(String path) {
         return "http://localhost:" + serverPort + path;
@@ -70,8 +67,7 @@ public class GracefulShutdownE2eTest {
 
         // 确保慢请求已进入处理管线（async 线程已开始执行）
         Thread.sleep(300);
-        assertFalse(asyncDone.await(50, TimeUnit.MILLISECONDS),
-                "慢请求在停机前应尚未完成（验证它确实处于处理中）");
+        assertFalse(asyncDone.await(50, TimeUnit.MILLISECONDS), "慢请求在停机前应尚未完成（验证它确实处于处理中）");
 
         // 2. 触发优雅停机：仅关闭 accept + 拒绝新请求，EventLoop 保留用于写完 in-flight 响应
         nettyHttpServer.stop();

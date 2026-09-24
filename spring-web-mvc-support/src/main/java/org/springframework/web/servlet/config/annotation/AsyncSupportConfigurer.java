@@ -10,8 +10,9 @@ import java.util.List;
 
 /**
  * Shim of Spring MVC's {@code AsyncSupportConfigurer}.
- * <p>Collects async configuration from {@link WebMvcConfigurer#configureAsyncSupport(AsyncSupportConfigurer)}
- * and bridges it to the framework's native {@code AsyncSupportRegistry}.
+ * <p>
+ * Collects async configuration from {@link WebMvcConfigurer#configureAsyncSupport(AsyncSupportConfigurer)} and bridges
+ * it to the framework's native {@code AsyncSupportRegistry}.
  */
 public class AsyncSupportConfigurer {
 
@@ -38,7 +39,8 @@ public class AsyncSupportConfigurer {
         return this;
     }
 
-    public AsyncSupportConfigurer registerDeferredResultInterceptors(DeferredResultProcessingInterceptor... interceptors) {
+    public AsyncSupportConfigurer registerDeferredResultInterceptors(
+            DeferredResultProcessingInterceptor... interceptors) {
         this.deferredResultInterceptors.addAll(Arrays.asList(interceptors));
         return this;
     }

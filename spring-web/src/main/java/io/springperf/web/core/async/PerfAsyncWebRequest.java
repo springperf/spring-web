@@ -1,19 +1,21 @@
 package io.springperf.web.core.async;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
+
+import org.springframework.http.server.ServerHttpAsyncRequestControl;
+import org.springframework.web.context.request.async.AsyncWebRequest;
+
 import io.springperf.web.core.DispatcherHandler;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.http.WriteRespEventListener;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.server.ServerHttpAsyncRequestControl;
-import org.springframework.web.context.request.async.AsyncWebRequest;
-
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
 
 @Slf4j
-public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWebRequest, WriteRespEventListener, ServerHttpAsyncRequestControl {
+public class PerfAsyncWebRequest extends PerfNativeWebRequest
+        implements AsyncWebRequest, WriteRespEventListener, ServerHttpAsyncRequestControl {
 
     public static final RuntimeException DEFAULT_WRITE_ERROR_EXCEPTION = new DefaultWriteErrorException();
     private static final Object RESULT_NONE = new Object();
@@ -23,17 +25,17 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
 
     /**
      * 测试/压测用计量：当前仍被异步持有者扣留的入站请求引用数（acquire +1 / release -1）。
-     *
-     * <p>只触碰异步路径（同步热路径零开销），用于断言「每个场景结束后归零」——这是 ByteBuf
-     * 不泄漏的前置条件；缓冲本身是否泄漏由 Netty leakDetector 判定，两者互为交叉验证。</p>
+     * <p>
+     * 只触碰异步路径（同步热路径零开销），用于断言「每个场景结束后归零」——这是 ByteBuf 不泄漏的前置条件；缓冲本身是否泄漏由 Netty leakDetector 判定，两者互为交叉验证。
+     * </p>
      */
-    private static final java.util.concurrent.atomic.AtomicInteger ACTIVE_REQUEST_REFS =
-            new java.util.concurrent.atomic.AtomicInteger();
+    private static final java.util.concurrent.atomic.AtomicInteger ACTIVE_REQUEST_REFS = new java.util.concurrent.atomic.AtomicInteger();
 
     /** 供测试断言：所有异步持有者退场后应回到 0（未归零即说明存在未终结的异步生命周期）。 */
     public static int activeRequestRefs() {
         return ACTIVE_REQUEST_REFS.get();
     }
+
     protected boolean errorHandlingInProgress;
     private long timeoutMillis = -1;
     private Object concurrentResult = RESULT_NONE;
@@ -89,13 +91,13 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
 
     /**
      * 异步持有者退场（幂等，仅一次）：入站请求引用 -1。
-     *
-     * <p>只在响应【写终结】回调里调用（{@code completeSuccessCallback}/{@code completeErrorCallback}）：
-     * 写完成时响应已提交，请求释放触发的 {@code resp.release()} 为空操作；写失败时响应永无提交机会，
-     * 恰好兜底释放其未提交 buf。超时/断连无需另设释放点——超时响应是一次写入、断连会让写入 future
-     * 失败，两者都会走到这里。</p>
-     *
-     * <p><b>切勿</b>在 {@code writeStreamSuccessCallback} 等【逐 chunk】回调里调用——那是每帧触发。</p>
+     * <p>
+     * 只在响应【写终结】回调里调用（{@code completeSuccessCallback}/{@code completeErrorCallback}）： 写完成时响应已提交，请求释放触发的
+     * {@code resp.release()} 为空操作；写失败时响应永无提交机会， 恰好兜底释放其未提交 buf。超时/断连无需另设释放点——超时响应是一次写入、断连会让写入 future 失败，两者都会走到这里。
+     * </p>
+     * <p>
+     * <b>切勿</b>在 {@code writeStreamSuccessCallback} 等【逐 chunk】回调里调用——那是每帧触发。
+     * </p>
      */
     private void releaseRequestOnce() {
         if (requestRefHeld.compareAndSet(true, false)) {
@@ -106,23 +108,23 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
 
     /**
      * 连接在响应写出前关闭（客户端中断）时由 NettyHttpHandler 调用：异步持有者退场。
-     *
-     * <p>覆盖「空闲流 / 未完成异步被直接断连」——此时既不写 {@code LastHttpContent}（无
-     * completeSuccessCallback），也没有 chunk 写失败（无 completeErrorCallback /
-     * writeStreamErrorCallback）；若不在此退场，入站 buf 要等请求对象被 GC 才释放。</p>
-     *
-     * <p>只做生命周期清理，<b>不</b>触发业务 errorHandler（客户端中断不是业务错误，避免日志/指标噪声）。
-     * 释放时其他持有者（业务池任务那一次 acquire）仍持有各自引用，故正在读 body 的线程不受影响。</p>
+     * <p>
+     * 覆盖「空闲流 / 未完成异步被直接断连」——此时既不写 {@code LastHttpContent}（无 completeSuccessCallback），也没有 chunk 写失败（无
+     * completeErrorCallback / writeStreamErrorCallback）；若不在此退场，入站 buf 要等请求对象被 GC 才释放。
+     * </p>
+     * <p>
+     * 只做生命周期清理，<b>不</b>触发业务 errorHandler（客户端中断不是业务错误，避免日志/指标噪声）。 释放时其他持有者（业务池任务那一次 acquire）仍持有各自引用，故正在读 body 的线程不受影响。
+     * </p>
      */
     /** 连接断开（客户端消失）时的取消钩子：供上游订阅（reactive）/长任务在断连时主动退场。 */
     private Runnable connectionCloseHandler;
 
     /**
      * 注册「客户端断连」钩子。
-     *
-     * <p>为什么需要独立钩子：写入回调（{@code addWriteCallbackHandler}）只在【下一次投递失败】时
-     * 触发；若源在断连后不再投递（长轮询挂住、DB 游标等待），就永远不会取消 →
-     * 每个断连客户端都会留下一个仍在运行的源。断连本身必须能作为取消信号。</p>
+     * <p>
+     * 为什么需要独立钩子：写入回调（{@code addWriteCallbackHandler}）只在【下一次投递失败】时 触发；若源在断连后不再投递（长轮询挂住、DB 游标等待），就永远不会取消 →
+     * 每个断连客户端都会留下一个仍在运行的源。断连本身必须能作为取消信号。
+     * </p>
      */
     public void addConnectionCloseHandler(Runnable handler) {
         this.connectionCloseHandler = handler;
@@ -132,7 +134,7 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
         state.compareAndSet(State.ASYNC_STARTED, State.COMPLETED);
         Runnable handler = this.connectionCloseHandler;
         if (handler != null) {
-            this.connectionCloseHandler = null;   // 幂等：只通知一次
+            this.connectionCloseHandler = null; // 幂等：只通知一次
             try {
                 handler.run();
             } catch (Throwable ignored) {
@@ -283,7 +285,9 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
         completeSuccessCallback();
     }
 
-    protected enum State {NEW, ASYNC_STARTED, DISPATCHED, COMPLETED}
+    protected enum State {
+        NEW, ASYNC_STARTED, DISPATCHED, COMPLETED
+    }
 
     public static class DefaultWriteErrorException extends RuntimeException {
         @Override

@@ -22,16 +22,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * 主端口 SSL 集成测试。
- * <p>验证 {@code server.ssl.*} 配置对主端口生效，HTTPS 请求可达、HTTP 被拒绝。</p>
+ * <p>
+ * 验证 {@code server.ssl.*} 配置对主端口生效，HTTPS 请求可达、HTTP 被拒绝。
+ * </p>
  */
 @SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
-        "server.servlet.context-path=/api",
-        "server.ssl.enabled=true",
-        "server.ssl.key-store=classpath:test-keystore.p12",
-        "server.ssl.key-store-password=changeit",
-        "server.ssl.key-store-type=PKCS12",
-        "management.endpoints.web.exposure.include=health"
-})
+        "server.servlet.context-path=/api", "server.ssl.enabled=true",
+        "server.ssl.key-store=classpath:test-keystore.p12", "server.ssl.key-store-password=changeit",
+        "server.ssl.key-store-type=PKCS12", "management.endpoints.web.exposure.include=health" })
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DirtiesContext
 public class SslServerTest {
@@ -39,13 +37,10 @@ public class SslServerTest {
     @LocalServerPort
     private int serverPort;
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .writeTimeout(Duration.ofSeconds(10))
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).writeTimeout(Duration.ofSeconds(10))
             .sslSocketFactory(trustAllSslContext().getSocketFactory(), trustAllCertManager())
-            .hostnameVerifier((hostname, session) -> true)
-            .build();
+            .hostnameVerifier((hostname, session) -> true).build();
 
     private String url(String path) {
         return "http://localhost:" + serverPort + path;
@@ -57,10 +52,7 @@ public class SslServerTest {
 
     @Test
     void httpsHealthEndpoint_shouldReturnUp() throws Exception {
-        Request req = new Request.Builder()
-                .url(httpsUrl("/api/actuator/health"))
-                .get()
-                .build();
+        Request req = new Request.Builder().url(httpsUrl("/api/actuator/health")).get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
@@ -71,16 +63,10 @@ public class SslServerTest {
     @Test
     void httpRequest_shouldBeRejected() {
         // 主端口仅监听 HTTPS：明文 HTTP 请求应因 TLS 握手失败被拒绝（IO 层异常），而非返回 200
-        Request req = new Request.Builder()
-                .url(url("/api/actuator/health"))
-                .get()
-                .build();
+        Request req = new Request.Builder().url(url("/api/actuator/health")).get().build();
         assertThrows(java.io.IOException.class, () -> {
-            try (Response resp = new OkHttpClient.Builder()
-                    .connectTimeout(Duration.ofSeconds(2))
-                    .readTimeout(Duration.ofSeconds(2))
-                    .build()
-                    .newCall(req).execute()) {
+            try (Response resp = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(2))
+                    .readTimeout(Duration.ofSeconds(2)).build().newCall(req).execute()) {
                 // Should not reach here
             }
         });
@@ -89,7 +75,7 @@ public class SslServerTest {
     private static SSLContext trustAllSslContext() {
         try {
             SSLContext sslContext = SSLContext.getInstance("TLS");
-            sslContext.init(null, new TrustManager[]{trustAllCertManager()}, null);
+            sslContext.init(null, new TrustManager[] { trustAllCertManager() }, null);
             return sslContext;
         } catch (Exception e) {
             throw new RuntimeException(e);

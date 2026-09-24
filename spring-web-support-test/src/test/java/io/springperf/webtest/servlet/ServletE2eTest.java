@@ -17,9 +17,7 @@ class ServletE2eTest extends BaseE2ETest {
 
     @Test
     void exactRoute_servesServletContent() throws IOException {
-        Request request = new Request.Builder()
-                .url(base() + "/e2e-servlet")
-                .build();
+        Request request = new Request.Builder().url(base() + "/e2e-servlet").build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             String body = resp.body().string();
             assertTrue(resp.isSuccessful(), "status=" + resp.code() + " body=" + body);
@@ -30,9 +28,7 @@ class ServletE2eTest extends BaseE2ETest {
 
     @Test
     void pathMappingRoute_servesNestedContent() throws IOException {
-        Request request = new Request.Builder()
-                .url(base() + "/e2e-servlet/sub/deep?echo=hi")
-                .build();
+        Request request = new Request.Builder().url(base() + "/e2e-servlet/sub/deep?echo=hi").build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             String body = resp.body().string();
             assertTrue(resp.isSuccessful(), "status=" + resp.code() + " body=" + body);
@@ -44,9 +40,7 @@ class ServletE2eTest extends BaseE2ETest {
 
     @Test
     void unmappedRoute_returns404() throws IOException {
-        Request request = new Request.Builder()
-                .url(base() + "/e2e-servlet-unknown")
-                .build();
+        Request request = new Request.Builder().url(base() + "/e2e-servlet-unknown").build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             assertEquals(404, resp.code());
         }

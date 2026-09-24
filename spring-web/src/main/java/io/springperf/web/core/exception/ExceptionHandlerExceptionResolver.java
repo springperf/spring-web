@@ -1,5 +1,22 @@
 package io.springperf.web.core.exception;
 
+import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
+
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.springframework.core.MethodParameter;
+import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.lang.Nullable;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.method.ControllerAdviceBean;
+import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
+import org.springframework.web.server.ResponseStatusException;
+
 import io.springperf.web.context.WebComponentContainer;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.arg.ArgumentResolverRegistry;
@@ -12,27 +29,12 @@ import io.springperf.web.core.retval.ReturnValueResolverRegistry;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.MethodParameter;
-import org.springframework.core.annotation.AnnotatedElementUtils;
-import org.springframework.lang.Nullable;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.method.ControllerAdviceBean;
-import org.springframework.web.method.HandlerMethod;
-import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
-import org.springframework.web.server.ResponseStatusException;
-
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
-import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 
 @Slf4j
 public class ExceptionHandlerExceptionResolver extends WebComponentContainer implements HandlerExceptionResolver {
 
-    protected static final MappingCacheKey<ExceptionHandlerAdvice[]> MAPPING_CACHE_KEY = MappingCacheKey.createClassCacheKey(ExceptionHandlerAdvice[].class);
+    protected static final MappingCacheKey<ExceptionHandlerAdvice[]> MAPPING_CACHE_KEY = MappingCacheKey
+            .createClassCacheKey(ExceptionHandlerAdvice[].class);
 
     protected final List<ExceptionHandlerAdvice> exceptionHandlerAdvices = new ArrayList<>();
 
@@ -57,9 +59,11 @@ public class ExceptionHandlerExceptionResolver extends WebComponentContainer imp
     @Override
     public void initWithWebContext(WebContext webContext) {
         super.initWithWebContext(webContext);
-        this.argumentResolverRegistry = webContext.getWebComponentWithDefault(ArgumentResolverRegistry.class, new ArgumentResolverRegistry());
+        this.argumentResolverRegistry = webContext.getWebComponentWithDefault(ArgumentResolverRegistry.class,
+                new ArgumentResolverRegistry());
         this.argumentResolverRegistry.addStaticArgumentResolverProvider(new ExceptionArgumentResolverProvider());
-        this.returnValueResolverRegistry = webContext.getWebComponentWithDefault(ReturnValueResolverRegistry.class, new ReturnValueResolverRegistry());
+        this.returnValueResolverRegistry = webContext.getWebComponentWithDefault(ReturnValueResolverRegistry.class,
+                new ReturnValueResolverRegistry());
         initExceptionHandler();
     }
 
@@ -69,18 +73,21 @@ public class ExceptionHandlerExceptionResolver extends WebComponentContainer imp
         initRealComponentList(exceptionHandlerAdvices, ExceptionHandlerAdvice.class);
     }
 
-
     /**
-     * ResponseStatusException 是框架内部信号异常，不应被宽泛的父类匹配意外拦截。
-     * 只有 {@code @ExceptionHandler(ResponseStatusException.class)} 及其子类显式声明时才处理，
-     * {@code @ExceptionHandler(Throwable.class)}、{@code @ExceptionHandler(RuntimeException.class)} 等父类声明跳过。
-     * <p>结果缓存到 MappingHandlerMethod 上，首次反射计算后不再重复读取注解。</p>
+     * ResponseStatusException 是框架内部信号异常，不应被宽泛的父类匹配意外拦截。 只有 {@code @ExceptionHandler(ResponseStatusException.class)}
+     * 及其子类显式声明时才处理， {@code @ExceptionHandler(Throwable.class)}、{@code @ExceptionHandler(RuntimeException.class)}
+     * 等父类声明跳过。
+     * <p>
+     * 结果缓存到 MappingHandlerMethod 上，首次反射计算后不再重复读取注解。
+     * </p>
      */
-    private static final MappingCacheKey<Boolean> RSE_EXPLICIT_CACHE_KEY = MappingCacheKey.createMethodCacheKey(Boolean.class);
+    private static final MappingCacheKey<Boolean> RSE_EXPLICIT_CACHE_KEY = MappingCacheKey
+            .createMethodCacheKey(Boolean.class);
 
     static boolean isExplicitRseHandler(MappingHandlerMethod handlerMethod) {
         Boolean cached = handlerMethod.get(RSE_EXPLICIT_CACHE_KEY);
-        if (cached != null) return cached;
+        if (cached != null)
+            return cached;
 
         Method method = handlerMethod.getMethod();
         ExceptionHandler ann = AnnotatedElementUtils.findMergedAnnotation(method, ExceptionHandler.class);
@@ -98,18 +105,20 @@ public class ExceptionHandlerExceptionResolver extends WebComponentContainer imp
     }
 
     protected static final ExceptionHandlerMethodResolver NO_MATCH = new ExceptionHandlerMethodResolver(Object.class);
-    private static final Map<Class<?>, ExceptionHandlerMethodResolver> exceptionHandlerCache = new ConcurrentHashMap<>(64);
+    private static final Map<Class<?>, ExceptionHandlerMethodResolver> exceptionHandlerCache = new ConcurrentHashMap<>(
+            64);
 
     /**
-     * 清空静态异常处理解析器缓存（由 {@code WebContext.destroyComponent()} 在上下文销毁时调用，
-     * 防 devtools 等新 ClassLoader 重启场景下旧 ClassLoader 被钉住）。缓存为纯缓存，清空后自动重建。
+     * 清空静态异常处理解析器缓存（由 {@code WebContext.destroyComponent()} 在上下文销毁时调用， 防 devtools 等新 ClassLoader 重启场景下旧 ClassLoader
+     * 被钉住）。缓存为纯缓存，清空后自动重建。
      */
     public static void clearAllCaches() {
         exceptionHandlerCache.clear();
     }
 
     @Override
-    public boolean resolveException(WebServerHttpRequest request, WebServerHttpResponse response, @Nullable HandlerMethod handler, Throwable ex) {
+    public boolean resolveException(WebServerHttpRequest request, WebServerHttpResponse response,
+            @Nullable HandlerMethod handler, Throwable ex) {
         ExceptionHandlerAdvice[] cachedAdvices = getCachedExceptionHandlerAdvices(PathMappingContext.get(request));
         if (cachedAdvices != null) {
             for (ExceptionHandlerAdvice exceptionHandlerAdvice : cachedAdvices) {
@@ -140,7 +149,8 @@ public class ExceptionHandlerExceptionResolver extends WebComponentContainer imp
         return false;
     }
 
-    protected void invokeAndWriteError(MappingHandlerMethod handlerMethod, Throwable ex, WebServerHttpRequest request, WebServerHttpResponse response) {
+    protected void invokeAndWriteError(MappingHandlerMethod handlerMethod, Throwable ex, WebServerHttpRequest request,
+            WebServerHttpResponse response) {
         try {
             // ExceptionHandlerMethodResolver 可能沿 cause 链选中 handler（如 @ExceptionHandler(IllegalArgumentException.class)
             // 命中根异常的 NumberFormatException cause）。此时必须注入与 handler 异常参数类型兼容的那个 cause，
@@ -193,11 +203,12 @@ public class ExceptionHandlerExceptionResolver extends WebComponentContainer imp
 
     /**
      * 决定注入 {@code @ExceptionHandler} 方法的异常实例。
-     * <p>Spring 的 {@link ExceptionHandlerMethodResolver} 可能沿 cause 链选中 handler（例如
+     * <p>
+     * Spring 的 {@link ExceptionHandlerMethodResolver} 可能沿 cause 链选中 handler（例如
      * {@link org.springframework.web.method.annotation.MethodArgumentTypeMismatchException} 的
      * {@code NumberFormatException} cause 命中 {@code @ExceptionHandler(IllegalArgumentException.class)}）。
-     * 此时不能注入根异常（类型不兼容会反射 ClassCastException），应注入 handler 异常参数类型
-     * 兼容的 cause 链上最具体的那个异常。</p>
+     * 此时不能注入根异常（类型不兼容会反射 ClassCastException），应注入 handler 异常参数类型 兼容的 cause 链上最具体的那个异常。
+     * </p>
      */
     protected Throwable resolveInjectedException(MappingHandlerMethod handlerMethod, Throwable ex) {
         Class<?> handlerParamType = null;
@@ -223,15 +234,18 @@ public class ExceptionHandlerExceptionResolver extends WebComponentContainer imp
 
     protected static class ExceptionArgumentResolverProvider implements StaticArgumentResolverProvider {
 
-        private static final StaticArgumentResolver resolver = (req, resp) -> req.getRequestContext().getAttribute(EXCEPTION_OBJECT_KEY);
+        private static final StaticArgumentResolver resolver = (req, resp) -> req.getRequestContext()
+                .getAttribute(EXCEPTION_OBJECT_KEY);
 
         @Override
         public boolean supports(MethodParameter parameter, MappingHandlerMethod mappingContext) {
-            return Throwable.class.isAssignableFrom(parameter.getParameterType()) && MappingHandlerMethod.class.equals(mappingContext.getClass());
+            return Throwable.class.isAssignableFrom(parameter.getParameterType())
+                    && MappingHandlerMethod.class.equals(mappingContext.getClass());
         }
 
         @Override
-        public StaticArgumentResolver getResolver(MethodParameter parameter, MappingHandlerMethod mappingContext, WebContext webContext) {
+        public StaticArgumentResolver getResolver(MethodParameter parameter, MappingHandlerMethod mappingContext,
+                WebContext webContext) {
             return resolver;
         }
     }

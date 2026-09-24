@@ -18,10 +18,7 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
 
     @Test
     void testRequestHeader() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/header")
-                .header("X-Custom-Header", "my-value")
-                .get()
+        Request req = new Request.Builder().url(baseUrl() + "/header").header("X-Custom-Header", "my-value").get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
@@ -33,10 +30,7 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
     @Test
     void testHttpEntity() throws Exception {
         RequestBody body = RequestBody.create("hello entity", MediaType.parse("text/plain"));
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/http-entity")
-                .post(body)
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/http-entity").post(body).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String responseBody = resp.body().string();
@@ -80,8 +74,7 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
-            assertTrue(body.contains("listenable-future-result"),
-                    "ListenableFuture 应返回异步结果，实际: " + body);
+            assertTrue(body.contains("listenable-future-result"), "ListenableFuture 应返回异步结果，实际: " + body);
         }
     }
 
@@ -103,8 +96,7 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
             assertNotNull(resp.header("Content-Type"));
             // 读取 body 验证资源内容（static/test.txt）
             String body = resp.body().string();
-            assertTrue(body.contains("Hello, Static Resource!"),
-                    "Resource 应返回文件内容，实际: " + body);
+            assertTrue(body.contains("Hello, Static Resource!"), "Resource 应返回文件内容，实际: " + body);
         }
     }
 
@@ -120,10 +112,8 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
 
     @Test
     void voidReturn_returns204() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/void")
-                .post(RequestBody.create(MediaType.parse("text/plain"), ""))
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/void")
+                .post(RequestBody.create(MediaType.parse("text/plain"), "")).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(204, resp.code());
         }

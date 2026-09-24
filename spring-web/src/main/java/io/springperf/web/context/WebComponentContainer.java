@@ -1,13 +1,14 @@
 package io.springperf.web.context;
 
-import lombok.SneakyThrows;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.annotation.AnnotationAwareOrderComparator;
-
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+
+import org.springframework.core.annotation.AnnotationAwareOrderComparator;
+
+import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class WebComponentContainer extends BaseWebComponent {
@@ -16,8 +17,9 @@ public class WebComponentContainer extends BaseWebComponent {
 
     /**
      * web组件容器
-     * <p>并发安全：启动期单线程注册 + 运行期动态注册（如 Actuator 端点）可能并发，
-     * 使用 ConcurrentHashMap 避免请求路径遍历读与动态注册写的竞争。</p>
+     * <p>
+     * 并发安全：启动期单线程注册 + 运行期动态注册（如 Actuator 端点）可能并发， 使用 ConcurrentHashMap 避免请求路径遍历读与动态注册写的竞争。
+     * </p>
      */
     protected Map<String, WebComponent> webComponents = new ConcurrentHashMap<>();
 
@@ -114,7 +116,8 @@ public class WebComponentContainer extends BaseWebComponent {
             // 命名冲突且本组件落败：未进入容器，不做生命周期初始化，避免副作用（如重复注册路由）
             return;
         }
-        if (state.get() == State.INIT_CONTEXT || state.get() == State.PHASE1 || state.get() == State.PHASE2 || state.get() == State.PHASE3) {
+        if (state.get() == State.INIT_CONTEXT || state.get() == State.PHASE1 || state.get() == State.PHASE2
+                || state.get() == State.PHASE3) {
             webComponent.initWithWebContext(webContext);
         }
         if (state.get() == State.PHASE1 || state.get() == State.PHASE2 || state.get() == State.PHASE3) {
@@ -186,9 +189,10 @@ public class WebComponentContainer extends BaseWebComponent {
 
     /**
      * 销毁所有子组件并置状态为 {@link State#DESTROY}。
-     * <p>允许从任意已初始化状态（INIT_CONTEXT/PHASE1/PHASE2/PHASE3）进入销毁：
-     * 生命周期中途失败（如 startLifecycle 某 phase 抛异常）时也能清理已初始化的组件，
-     * 而不是停留在中间态无法回收资源。</p>
+     * <p>
+     * 允许从任意已初始化状态（INIT_CONTEXT/PHASE1/PHASE2/PHASE3）进入销毁： 生命周期中途失败（如 startLifecycle 某 phase 抛异常）时也能清理已初始化的组件，
+     * 而不是停留在中间态无法回收资源。
+     * </p>
      */
     @Override
     public void destroyComponent() throws Exception {
@@ -210,8 +214,7 @@ public class WebComponentContainer extends BaseWebComponent {
     }
 
     /**
-     * 状态机是否已处于 DESTROY（destroy 或启动失败清理后）。
-     * 用于支持 stop/restart 场景下重新初始化。
+     * 状态机是否已处于 DESTROY（destroy 或启动失败清理后）。 用于支持 stop/restart 场景下重新初始化。
      */
     protected boolean isDestroyed() {
         return state.get() == State.DESTROY;
@@ -219,9 +222,10 @@ public class WebComponentContainer extends BaseWebComponent {
 
     /**
      * 将状态机从 DESTROY 复位回 NEW，使组件可重新执行完整生命周期（stop/restart 支持）。
-     * <p>递归复位所有子容器：destroy 会把子组件一并置为 DESTROY，
-     * 仅复位自身会令子组件后续 {@code init*} 的 CAS 全部失败（静默跳过初始化、路由表为空），
-     * 因此必须同步复位嵌套容器，destroy 后才可真正重新 start。</p>
+     * <p>
+     * 递归复位所有子容器：destroy 会把子组件一并置为 DESTROY， 仅复位自身会令子组件后续 {@code init*} 的 CAS 全部失败（静默跳过初始化、路由表为空）， 因此必须同步复位嵌套容器，destroy
+     * 后才可真正重新 start。
+     * </p>
      *
      * @return 是否成功复位；非 DESTROY 状态返回 false（无需复位）
      */
@@ -268,11 +272,6 @@ public class WebComponentContainer extends BaseWebComponent {
     }
 
     private enum State {
-        NEW,
-        INIT_CONTEXT,
-        PHASE1,
-        PHASE2,
-        PHASE3,
-        DESTROY
+        NEW, INIT_CONTEXT, PHASE1, PHASE2, PHASE3, DESTROY
     }
 }

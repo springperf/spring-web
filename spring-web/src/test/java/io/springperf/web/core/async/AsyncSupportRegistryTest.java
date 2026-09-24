@@ -1,12 +1,15 @@
 package io.springperf.web.core.async;
 
-import io.springperf.web.context.ApplicationProperties;
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.pool.BizPoolRegistry;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
-import io.springperf.web.json.JacksonConverter;
-import io.springperf.web.json.JsonConverter;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.mockito.Mockito.*;
+
+import java.util.Collections;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,15 +21,13 @@ import org.springframework.web.context.request.async.DeferredResult;
 import org.springframework.web.context.request.async.DeferredResultProcessingInterceptor;
 import org.springframework.web.context.request.async.WebAsyncTask;
 
-import java.util.Collections;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.mockito.Mockito.*;
+import io.springperf.web.context.ApplicationProperties;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.pool.BizPoolRegistry;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
+import io.springperf.web.json.JacksonConverter;
+import io.springperf.web.json.JsonConverter;
 
 @ExtendWith(MockitoExtension.class)
 class AsyncSupportRegistryTest {
@@ -59,7 +60,8 @@ class AsyncSupportRegistryTest {
         JacksonConverter jacksonConverter = new JacksonConverter();
         when(webContext.getCtx()).thenReturn(applicationContext);
         when(applicationContext.getBeansOfType(CallableProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
-        when(applicationContext.getBeansOfType(DeferredResultProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
+        when(applicationContext.getBeansOfType(DeferredResultProcessingInterceptor.class))
+                .thenReturn(Collections.emptyMap());
         doReturn(null).when(webContext).getBeanFromCtx(com.fasterxml.jackson.databind.ObjectMapper.class);
         when(webContext.getWebComponentWithDefault(eq(JsonConverter.class), any(JsonConverter.class)))
                 .thenReturn(jacksonConverter);
@@ -126,8 +128,10 @@ class AsyncSupportRegistryTest {
             when(bizPoolRegistry.getDefaultPool()).thenReturn(executor);
             when(webContext.getWebComponent(BizPoolRegistry.class)).thenReturn(bizPoolRegistry);
             when(webContext.getCtx()).thenReturn(applicationContext);
-            when(applicationContext.getBeansOfType(CallableProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
-            when(applicationContext.getBeansOfType(DeferredResultProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
+            when(applicationContext.getBeansOfType(CallableProcessingInterceptor.class))
+                    .thenReturn(Collections.emptyMap());
+            when(applicationContext.getBeansOfType(DeferredResultProcessingInterceptor.class))
+                    .thenReturn(Collections.emptyMap());
             doReturn(null).when(webContext).getBeanFromCtx(com.fasterxml.jackson.databind.ObjectMapper.class);
             when(webContext.getWebComponentWithDefault(eq(JsonConverter.class), any(JsonConverter.class)))
                     .thenReturn(mock(JsonConverter.class));
@@ -153,7 +157,8 @@ class AsyncSupportRegistryTest {
         when(webContext.getWebComponent(BizPoolRegistry.class)).thenReturn(bizPoolRegistry);
         when(webContext.getCtx()).thenReturn(applicationContext);
         when(applicationContext.getBeansOfType(CallableProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
-        when(applicationContext.getBeansOfType(DeferredResultProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
+        when(applicationContext.getBeansOfType(DeferredResultProcessingInterceptor.class))
+                .thenReturn(Collections.emptyMap());
         doReturn(null).when(webContext).getBeanFromCtx(com.fasterxml.jackson.databind.ObjectMapper.class);
         when(webContext.getWebComponentWithDefault(eq(JsonConverter.class), any(JsonConverter.class)))
                 .thenReturn(mock(JsonConverter.class));
@@ -181,7 +186,8 @@ class AsyncSupportRegistryTest {
         when(webContext.getWebComponent(BizPoolRegistry.class)).thenReturn(bizPoolRegistry);
         when(webContext.getCtx()).thenReturn(applicationContext);
         when(applicationContext.getBeansOfType(CallableProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
-        when(applicationContext.getBeansOfType(DeferredResultProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
+        when(applicationContext.getBeansOfType(DeferredResultProcessingInterceptor.class))
+                .thenReturn(Collections.emptyMap());
         doReturn(null).when(webContext).getBeanFromCtx(com.fasterxml.jackson.databind.ObjectMapper.class);
         when(webContext.getWebComponentWithDefault(eq(JsonConverter.class), any(JsonConverter.class)))
                 .thenReturn(mock(JsonConverter.class));

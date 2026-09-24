@@ -1,8 +1,10 @@
 package io.springperf.web.core.invoker;
 
-import io.springperf.web.annotation.Optimize;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.lang.reflect.Method;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -15,10 +17,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
-import java.lang.reflect.Method;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import io.springperf.web.annotation.Optimize;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 class InvokableHandlerMethodTest {
@@ -64,7 +65,8 @@ class InvokableHandlerMethodTest {
     void constructor_withInvokerBean_usesBeanDirectly() throws Exception {
         DirectInvoker bean = new DirectInvoker();
         // Invoker has no business method; HandlerMethod needs a real Method for super()
-        InvokableHandlerMethod hm = new InvokableHandlerMethod(bean, DirectInvoker.class.getMethod("invoke", Object[].class));
+        InvokableHandlerMethod hm = new InvokableHandlerMethod(bean,
+                DirectInvoker.class.getMethod("invoke", Object[].class));
 
         assertFalse(hm.isOptimize());
         assertSame(bean, hm.getInvoker());
@@ -113,7 +115,7 @@ class InvokableHandlerMethodTest {
         Method method = PlainController.class.getMethod("hello", String.class);
         InvokableHandlerMethod hm = new InvokableHandlerMethod(new PlainController(), method);
 
-        Object result = hm.invoke(new Object[]{"test"}, request, response);
+        Object result = hm.invoke(new Object[] { "test" }, request, response);
 
         assertEquals("Hello test", result);
         verify(response, never()).setStatusCode(any(HttpStatus.class));
@@ -216,7 +218,7 @@ class InvokableHandlerMethodTest {
         assertEquals(0, params.length);
     }
 
-    // ==================== isOptimized / getInvoker  ====================
+    // ==================== isOptimized / getInvoker ====================
 
     @Test
     void isOptimized_withoutOptimize_returnsFalse() throws Exception {
@@ -283,7 +285,7 @@ class InvokableHandlerMethodTest {
         Method method = MethodOptimizedController.class.getMethod("fastMethod", String.class);
         InvokableHandlerMethod hm = new InvokableHandlerMethod(new MethodOptimizedController(), method);
 
-        Object result = hm.invoke(new Object[]{"World"}, request, response);
+        Object result = hm.invoke(new Object[] { "World" }, request, response);
 
         assertEquals("Fast World", result);
     }
@@ -391,7 +393,9 @@ class InvokableHandlerMethodTest {
     @SuppressWarnings("unused")
     static class ApiImpl implements AnnotatedApi {
         @Override
-        public String save(String body, String id) { return body + id; }
+        public String save(String body, String id) {
+            return body + id;
+        }
     }
 
     interface PathApi {
@@ -401,7 +405,9 @@ class InvokableHandlerMethodTest {
     @SuppressWarnings("unused")
     static class PathApiImpl implements PathApi {
         @Override
-        public String get(String name) { return name; }
+        public String get(String name) {
+            return name;
+        }
     }
 
     // 三层接口继承：DeepApi → ExtendedApi → AnnotatedApi
@@ -415,52 +421,80 @@ class InvokableHandlerMethodTest {
 
     @SuppressWarnings("unused")
     static class DeepApiImpl implements DeepApi {
-        @Override public String save(String body, String id) { return body + id; }
-        @Override public String find(String name) { return name; }
-        @Override public String query(String key, String value, String q) { return q; }
+        @Override
+        public String save(String body, String id) {
+            return body + id;
+        }
+
+        @Override
+        public String find(String name) {
+            return name;
+        }
+
+        @Override
+        public String query(String key, String value, String q) {
+            return q;
+        }
     }
 
     @SuppressWarnings("unused")
     static class NoOpController {
-        public void noop() {}
+        public void noop() {
+        }
     }
 
     // ==================== helper classes ====================
 
     @SuppressWarnings("unused")
     static class PlainController {
-        public String hello(String name) { return "Hello " + name; }
-        public void noop() {}
+        public String hello(String name) {
+            return "Hello " + name;
+        }
+
+        public void noop() {
+        }
     }
 
     @SuppressWarnings("unused")
     static class MethodOptimizedController {
         @Optimize
-        public String fastMethod(String name) { return "Fast " + name; }
+        public String fastMethod(String name) {
+            return "Fast " + name;
+        }
     }
 
     @SuppressWarnings("unused")
     @Optimize
     static class ClassOptimizedController {
-        public String classOptimized(String name) { return "Class " + name; }
+        public String classOptimized(String name) {
+            return "Class " + name;
+        }
     }
 
     @SuppressWarnings("unused")
     static class StatusController {
         @ResponseStatus(HttpStatus.ACCEPTED)
-        public String accepted() { return "ok"; }
+        public String accepted() {
+            return "ok";
+        }
 
         @ResponseStatus(value = HttpStatus.BAD_REQUEST, reason = "bad")
-        public String badRequest() { return "no"; }
+        public String badRequest() {
+            return "no";
+        }
     }
 
     @SuppressWarnings("unused")
     static class MultiParamController {
-        public String multi(String s, int i, boolean b) { return s + i + b; }
+        public String multi(String s, int i, boolean b) {
+            return s + i + b;
+        }
     }
 
     static class DirectInvoker implements Invoker {
         @Override
-        public Object invoke(Object[] args) { return "direct-result"; }
+        public Object invoke(Object[] args) {
+            return "direct-result";
+        }
     }
 }

@@ -1,8 +1,17 @@
 package io.springperf.web.core.mapping;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.mapping.match.*;
-import io.springperf.web.http.WebServerHttpRequest;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
+
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -15,25 +24,21 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.method.HandlerMethod;
 
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.when;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.mapping.match.*;
+import io.springperf.web.http.WebServerHttpRequest;
 
 @ExtendWith(MockitoExtension.class)
 class MappingRegistryTest {
 
-    @Mock WebServerHttpRequest request;
-    @Mock WebContext webContext;
-    @Mock ApplicationContext applicationContext;
-    @Mock Environment environment;
+    @Mock
+    WebServerHttpRequest request;
+    @Mock
+    WebContext webContext;
+    @Mock
+    ApplicationContext applicationContext;
+    @Mock
+    Environment environment;
 
     /* ==================== registerMapping ==================== */
 
@@ -102,8 +107,8 @@ class MappingRegistryTest {
 
     @Test
     void isMethodMismatch_contextWithoutMethodMatcher_returnsFalse() throws Exception {
-        PathMappingContext ctx = createPathMappingContext("/test", Collections.<Matcher>emptyList());
-        PathMappingContext[] contexts = new PathMappingContext[]{ctx};
+        PathMappingContext ctx = createPathMappingContext("/test", Collections.<Matcher> emptyList());
+        PathMappingContext[] contexts = new PathMappingContext[] { ctx };
 
         boolean result = invokeIsMethodMismatch(contexts, request);
 
@@ -113,9 +118,9 @@ class MappingRegistryTest {
     @Test
     void isMethodMismatch_methodMatches_returnsFalse() throws Exception {
         when(request.getMethod()).thenReturn(HttpMethod.GET);
-        HttpMethodMatcher matcher = new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET});
-        PathMappingContext ctx = createPathMappingContext("/test", Collections.<Matcher>singletonList(matcher));
-        PathMappingContext[] contexts = new PathMappingContext[]{ctx};
+        HttpMethodMatcher matcher = new HttpMethodMatcher(new HttpMethod[] { HttpMethod.GET });
+        PathMappingContext ctx = createPathMappingContext("/test", Collections.<Matcher> singletonList(matcher));
+        PathMappingContext[] contexts = new PathMappingContext[] { ctx };
 
         boolean result = invokeIsMethodMismatch(contexts, request);
 
@@ -125,9 +130,9 @@ class MappingRegistryTest {
     @Test
     void isMethodMismatch_methodDoesNotMatch_returnsTrue() throws Exception {
         when(request.getMethod()).thenReturn(HttpMethod.POST);
-        HttpMethodMatcher matcher = new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET});
-        PathMappingContext ctx = createPathMappingContext("/test", Collections.<Matcher>singletonList(matcher));
-        PathMappingContext[] contexts = new PathMappingContext[]{ctx};
+        HttpMethodMatcher matcher = new HttpMethodMatcher(new HttpMethod[] { HttpMethod.GET });
+        PathMappingContext ctx = createPathMappingContext("/test", Collections.<Matcher> singletonList(matcher));
+        PathMappingContext[] contexts = new PathMappingContext[] { ctx };
 
         boolean result = invokeIsMethodMismatch(contexts, request);
 
@@ -137,11 +142,11 @@ class MappingRegistryTest {
     @Test
     void isMethodMismatch_oneContextMatches_returnsFalse() throws Exception {
         when(request.getMethod()).thenReturn(HttpMethod.GET);
-        HttpMethodMatcher getMatcher = new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET});
-        HttpMethodMatcher postMatcher = new HttpMethodMatcher(new HttpMethod[]{HttpMethod.POST});
-        PathMappingContext ctx1 = createPathMappingContext("/test", Collections.<Matcher>singletonList(getMatcher));
-        PathMappingContext ctx2 = createPathMappingContext("/test", Collections.<Matcher>singletonList(postMatcher));
-        PathMappingContext[] contexts = new PathMappingContext[]{ctx1, ctx2};
+        HttpMethodMatcher getMatcher = new HttpMethodMatcher(new HttpMethod[] { HttpMethod.GET });
+        HttpMethodMatcher postMatcher = new HttpMethodMatcher(new HttpMethod[] { HttpMethod.POST });
+        PathMappingContext ctx1 = createPathMappingContext("/test", Collections.<Matcher> singletonList(getMatcher));
+        PathMappingContext ctx2 = createPathMappingContext("/test", Collections.<Matcher> singletonList(postMatcher));
+        PathMappingContext[] contexts = new PathMappingContext[] { ctx1, ctx2 };
 
         boolean result = invokeIsMethodMismatch(contexts, request);
 
@@ -179,8 +184,8 @@ class MappingRegistryTest {
 
     @Test
     void mergeMatcherPair_httpMethod_mergesBothSets() {
-        HttpMethodMatcher m = new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET});
-        HttpMethodMatcher c = new HttpMethodMatcher(new HttpMethod[]{HttpMethod.POST});
+        HttpMethodMatcher m = new HttpMethodMatcher(new HttpMethod[] { HttpMethod.GET });
+        HttpMethodMatcher c = new HttpMethodMatcher(new HttpMethod[] { HttpMethod.POST });
 
         HttpMethodMatcher result = (HttpMethodMatcher) MappingRegistry.mergeMatcherPair(m, c);
 
@@ -191,8 +196,8 @@ class MappingRegistryTest {
 
     @Test
     void mergeMatcherPair_httpMethod_withOverlap_deduplicates() {
-        HttpMethodMatcher m = new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET, HttpMethod.POST});
-        HttpMethodMatcher c = new HttpMethodMatcher(new HttpMethod[]{HttpMethod.POST, HttpMethod.PUT});
+        HttpMethodMatcher m = new HttpMethodMatcher(new HttpMethod[] { HttpMethod.GET, HttpMethod.POST });
+        HttpMethodMatcher c = new HttpMethodMatcher(new HttpMethod[] { HttpMethod.POST, HttpMethod.PUT });
 
         HttpMethodMatcher result = (HttpMethodMatcher) MappingRegistry.mergeMatcherPair(m, c);
 
@@ -272,7 +277,7 @@ class MappingRegistryTest {
                 return false;
             }
         };
-        HttpMethodMatcher m = new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET});
+        HttpMethodMatcher m = new HttpMethodMatcher(new HttpMethod[] { HttpMethod.GET });
 
         Matcher result = MappingRegistry.mergeMatcherPair(m, unknown);
 
@@ -285,9 +290,9 @@ class MappingRegistryTest {
     void mergeMatchers_emptyClassMatchers_noChange() {
         MappingRegistry registry = new MappingRegistry();
         List<Matcher> methodMatchers = new ArrayList<>();
-        methodMatchers.add(new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET}));
+        methodMatchers.add(new HttpMethodMatcher(new HttpMethod[] { HttpMethod.GET }));
 
-        registry.mergeMatchers(methodMatchers, Collections.<Matcher>emptyList());
+        registry.mergeMatchers(methodMatchers, Collections.<Matcher> emptyList());
 
         assertEquals(1, methodMatchers.size());
     }
@@ -296,9 +301,9 @@ class MappingRegistryTest {
     void mergeMatchers_classHttpMethod_mergesWithExisting() {
         MappingRegistry registry = new MappingRegistry();
         List<Matcher> methodMatchers = new ArrayList<>();
-        methodMatchers.add(new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET}));
-        List<Matcher> classMatchers = Collections.<Matcher>singletonList(
-                new HttpMethodMatcher(new HttpMethod[]{HttpMethod.POST}));
+        methodMatchers.add(new HttpMethodMatcher(new HttpMethod[] { HttpMethod.GET }));
+        List<Matcher> classMatchers = Collections
+                .<Matcher> singletonList(new HttpMethodMatcher(new HttpMethod[] { HttpMethod.POST }));
 
         registry.mergeMatchers(methodMatchers, classMatchers);
 
@@ -312,10 +317,9 @@ class MappingRegistryTest {
     void mergeMatchers_classConsumeMatcher_noMethodConsume_appends() {
         MappingRegistry registry = new MappingRegistry();
         List<Matcher> methodMatchers = new ArrayList<>();
-        methodMatchers.add(new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET}));
-        List<Matcher> classMatchers = Collections.<Matcher>singletonList(
-                new ConsumeOrProduceMatcher(false,
-                        Collections.singletonList(MediaTypeExpressionSupport.build("application/json"))));
+        methodMatchers.add(new HttpMethodMatcher(new HttpMethod[] { HttpMethod.GET }));
+        List<Matcher> classMatchers = Collections.<Matcher> singletonList(new ConsumeOrProduceMatcher(false,
+                Collections.singletonList(MediaTypeExpressionSupport.build("application/json"))));
 
         registry.mergeMatchers(methodMatchers, classMatchers);
 
@@ -327,9 +331,9 @@ class MappingRegistryTest {
     void mergeMatchers_classMultipleMatchers_mergedAndAppended() {
         MappingRegistry registry = new MappingRegistry();
         List<Matcher> methodMatchers = new ArrayList<>();
-        methodMatchers.add(new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET}));
+        methodMatchers.add(new HttpMethodMatcher(new HttpMethod[] { HttpMethod.GET }));
         List<Matcher> classMatchers = new ArrayList<>();
-        classMatchers.add(new HttpMethodMatcher(new HttpMethod[]{HttpMethod.POST}));
+        classMatchers.add(new HttpMethodMatcher(new HttpMethod[] { HttpMethod.POST }));
         classMatchers.add(new ConsumeOrProduceMatcher(false,
                 Collections.singletonList(MediaTypeExpressionSupport.build("application/json"))));
 
@@ -350,16 +354,15 @@ class MappingRegistryTest {
         TestController bean = new TestController();
         Method method = TestController.class.getMethod("getMethod");
         RequestMapping methodMapping = method.getAnnotation(RequestMapping.class);
-        List<Matcher> classMatchers = Collections.singletonList(
-                new HttpMethodMatcher(new HttpMethod[]{HttpMethod.POST}));
+        List<Matcher> classMatchers = Collections
+                .singletonList(new HttpMethodMatcher(new HttpMethod[] { HttpMethod.POST }));
 
-        registry.initMethodMappingContext(bean, method, new String[]{"/api"}, methodMapping, classMatchers);
+        registry.initMethodMappingContext(bean, method, new String[] { "/api" }, methodMapping, classMatchers);
 
         assertEquals(1, registry.getMappingContextList().size());
         PathMappingContext ctx = registry.getMappingContextList().get(0);
 
-        boolean hasMergedMethods = Arrays.stream(ctx.getMatchers())
-                .filter(m -> m instanceof HttpMethodMatcher)
+        boolean hasMergedMethods = Arrays.stream(ctx.getMatchers()).filter(m -> m instanceof HttpMethodMatcher)
                 .anyMatch(m -> {
                     HttpMethodMatcher hm = (HttpMethodMatcher) m;
                     return hm.getHttpMethods().contains(HttpMethod.GET)
@@ -374,17 +377,15 @@ class MappingRegistryTest {
         TestController bean = new TestController();
         Method method = TestController.class.getMethod("noMethod");
         RequestMapping methodMapping = method.getAnnotation(RequestMapping.class);
-        List<Matcher> classMatchers = Collections.singletonList(
-                new ConsumeOrProduceMatcher(false,
-                        Collections.singletonList(MediaTypeExpressionSupport.build("application/json"))));
+        List<Matcher> classMatchers = Collections.singletonList(new ConsumeOrProduceMatcher(false,
+                Collections.singletonList(MediaTypeExpressionSupport.build("application/json"))));
 
-        registry.initMethodMappingContext(bean, method, new String[]{"/api"}, methodMapping, classMatchers);
+        registry.initMethodMappingContext(bean, method, new String[] { "/api" }, methodMapping, classMatchers);
 
         assertEquals(1, registry.getMappingContextList().size());
         PathMappingContext ctx = registry.getMappingContextList().get(0);
 
-        long consumeMatchers = Arrays.stream(ctx.getMatchers())
-                .filter(m -> m instanceof ConsumeOrProduceMatcher)
+        long consumeMatchers = Arrays.stream(ctx.getMatchers()).filter(m -> m instanceof ConsumeOrProduceMatcher)
                 .count();
         assertEquals(1, consumeMatchers, "class-level consume should be present in context");
     }
@@ -443,8 +444,8 @@ class MappingRegistryTest {
     void registerMapping_duplicatePathAllowed_registersBoth() {
         // D4 宽容语义：重复映射不拒绝、不抛异常，两个 context 都注册（运行时先注册者胜出）。
         MappingRegistry registry = new MappingRegistry();
-        registry.registerMapping(createPathMappingContext("/dup", Collections.<Matcher>emptyList()));
-        registry.registerMapping(createPathMappingContext("/dup", Collections.<Matcher>emptyList()));
+        registry.registerMapping(createPathMappingContext("/dup", Collections.<Matcher> emptyList()));
+        registry.registerMapping(createPathMappingContext("/dup", Collections.<Matcher> emptyList()));
 
         assertEquals(2, registry.getMappingContextList().size());
     }
@@ -454,7 +455,7 @@ class MappingRegistryTest {
     private static PathMappingContext createPathMappingContext(String pathRule) {
         try {
             HandlerMethod hm = new HandlerMethod(new Object(), Object.class.getDeclaredMethod("toString"));
-            return new PathMappingContext(hm, Collections.<Matcher>emptyList(), pathRule);
+            return new PathMappingContext(hm, Collections.<Matcher> emptyList(), pathRule);
         } catch (NoSuchMethodException e) {
             throw new RuntimeException(e);
         }
@@ -470,18 +471,22 @@ class MappingRegistryTest {
     }
 
     @SuppressWarnings("unchecked")
-    private static boolean invokeIsMethodMismatch(PathMappingContext[] contexts, WebServerHttpRequest req) throws Exception {
-        Method method = MappingRegistry.class.getDeclaredMethod("isMethodMismatch", PathMappingContext[].class, WebServerHttpRequest.class);
+    private static boolean invokeIsMethodMismatch(PathMappingContext[] contexts, WebServerHttpRequest req)
+            throws Exception {
+        Method method = MappingRegistry.class.getDeclaredMethod("isMethodMismatch", PathMappingContext[].class,
+                WebServerHttpRequest.class);
         method.setAccessible(true);
         return (boolean) method.invoke(null, contexts, req);
     }
 
     private static class TestController {
         @RequestMapping(method = RequestMethod.GET)
-        public void getMethod() {}
+        public void getMethod() {
+        }
 
         @RequestMapping
-        public void noMethod() {}
+        public void noMethod() {
+        }
     }
 
     @Controller
@@ -492,19 +497,22 @@ class MappingRegistryTest {
     static class OrderControllerA {
         @RequestMapping("/order-a")
         @SuppressWarnings("unused")
-        public void orderA() {}
+        public void orderA() {
+        }
     }
 
     @Controller
     static class OrderControllerB {
         @RequestMapping("/order-b")
         @SuppressWarnings("unused")
-        public void orderB() {}
+        public void orderB() {
+        }
     }
 
     static class BaseController {
         @RequestMapping("/base")
         @SuppressWarnings("unused")
-        public void baseMethod() {}
+        public void baseMethod() {
+        }
     }
 }

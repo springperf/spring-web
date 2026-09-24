@@ -1,12 +1,11 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>io.github.springperf</groupId>
         <artifactId>spring-web-parent</artifactId>
 
-<version>3.5.6</version>
+        <version>3.5.6</version>
     </parent>
 
     <artifactId>spring-web-benchmark</artifactId>
@@ -120,7 +119,7 @@
     </build>
 
     <profiles>
-        
+
         <!-- ============================================================ -->
         <!-- Profile: benchmark-perf (Perf + 5Filter + 3Interceptor) -->
         <!-- ============================================================ -->
@@ -151,7 +150,9 @@
                         <executions>
                             <execution>
                                 <id>add-perf-source</id>
-                                <goals><goal>add-source</goal></goals>
+                                <goals>
+                                    <goal>add-source</goal>
+                                </goals>
                                 <configuration>
                                     <sources>
                                         <source>src/benchmark-perf/java</source>
@@ -160,7 +161,9 @@
                             </execution>
                             <execution>
                                 <id>add-perf-resources</id>
-                                <goals><goal>add-resource</goal></goals>
+                                <goals>
+                                    <goal>add-resource</goal>
+                                </goals>
                                 <configuration>
                                     <resources>
                                         <resource>
@@ -193,7 +196,6 @@
             </build>
         </profile>
 
-        
         <!-- ============================================================ -->
         <!-- Profile: benchmark-perf-support (Perf+Support + Servlet Filter/Interceptor) -->
         <!-- ============================================================ -->
@@ -239,16 +241,20 @@
                         <executions>
                             <execution>
                                 <id>add-perf-support-source</id>
-                                <goals><goal>add-source</goal></goals>
+                                <goals>
+                                    <goal>add-source</goal>
+                                </goals>
                                 <configuration>
                                     <sources>
                                         <source>src/benchmark-perf-support/java</source>
-                                        </sources>
+                                    </sources>
                                 </configuration>
                             </execution>
                             <execution>
                                 <id>add-perf-support-config-source</id>
-                                <goals><goal>add-source</goal></goals>
+                                <goals>
+                                    <goal>add-source</goal>
+                                </goals>
                                 <configuration>
                                     <sources>
                                         <source>src/benchmark-tomcat/java</source>
@@ -257,7 +263,9 @@
                             </execution>
                             <execution>
                                 <id>add-perf-support-resources</id>
-                                <goals><goal>add-resource</goal></goals>
+                                <goals>
+                                    <goal>add-resource</goal>
+                                </goals>
                                 <configuration>
                                     <resources>
                                         <resource>
@@ -290,7 +298,6 @@
             </build>
         </profile>
 
-        
         <!-- ============================================================ -->
 
         <!-- Profile: benchmark-perf-support-filter (Perf+Support + Servlet Filter/Interceptor) -->
@@ -337,16 +344,20 @@
                         <executions>
                             <execution>
                                 <id>add-perf-support-filter-source</id>
-                                <goals><goal>add-source</goal></goals>
+                                <goals>
+                                    <goal>add-source</goal>
+                                </goals>
                                 <configuration>
                                     <sources>
                                         <source>src/benchmark-perf-support-filter/java</source>
-                                        </sources>
+                                    </sources>
                                 </configuration>
                             </execution>
                             <execution>
                                 <id>add-perf-support-filter-config-source</id>
-                                <goals><goal>add-source</goal></goals>
+                                <goals>
+                                    <goal>add-source</goal>
+                                </goals>
                                 <configuration>
                                     <sources>
                                         <source>src/benchmark-tomcat-filter/java</source>
@@ -355,7 +366,9 @@
                             </execution>
                             <execution>
                                 <id>add-perf-support-filter-resources</id>
-                                <goals><goal>add-resource</goal></goals>
+                                <goals>
+                                    <goal>add-resource</goal>
+                                </goals>
                                 <configuration>
                                     <resources>
                                         <resource>
@@ -418,16 +431,20 @@
                         <executions>
                             <execution>
                                 <id>add-tomcat-source</id>
-                                <goals><goal>add-source</goal></goals>
+                                <goals>
+                                    <goal>add-source</goal>
+                                </goals>
                                 <configuration>
                                     <sources>
                                         <source>src/benchmark-tomcat/java</source>
-                                        </sources>
+                                    </sources>
                                 </configuration>
                             </execution>
                             <execution>
                                 <id>add-tomcat-resources</id>
-                                <goals><goal>add-resource</goal></goals>
+                                <goals>
+                                    <goal>add-resource</goal>
+                                </goals>
                                 <configuration>
                                     <resources>
                                         <resource>
@@ -460,7 +477,6 @@
             </build>
         </profile>
 
-        
         <!-- ============================================================ -->
         <!-- Profile: benchmark-undertow (Undertow + 5Filter + 3Interceptor) -->
         <!-- ============================================================ -->
@@ -501,25 +517,31 @@
                         <executions>
                             <execution>
                                 <id>add-undertow-source</id>
-                                <goals><goal>add-source</goal></goals>
+                                <goals>
+                                    <goal>add-source</goal>
+                                </goals>
                                 <configuration>
                                     <sources>
                                         <source>src/benchmark-undertow/java</source>
-                                        </sources>
+                                    </sources>
                                 </configuration>
                             </execution>
                             <execution>
                                 <id>add-undertow-config-source</id>
-                                <goals><goal>add-source</goal></goals>
+                                <goals>
+                                    <goal>add-source</goal>
+                                </goals>
                                 <configuration>
                                     <sources>
                                         <source>src/benchmark-tomcat/java</source>
-                                        </sources>
+                                    </sources>
                                 </configuration>
                             </execution>
                             <execution>
                                 <id>add-undertow-resources</id>
-                                <goals><goal>add-resource</goal></goals>
+                                <goals>
+                                    <goal>add-resource</goal>
+                                </goals>
                                 <configuration>
                                     <resources>
                                         <resource>
@@ -552,7 +574,6 @@
             </build>
         </profile>
 
-        
         <!-- ============================================================ -->
         <!-- Profile: benchmark-webflux (WebFlux + 8Filter)          -->
         <!-- ============================================================ -->
@@ -583,7 +604,9 @@
                         <executions>
                             <execution>
                                 <id>add-webflux-source</id>
-                                <goals><goal>add-source</goal></goals>
+                                <goals>
+                                    <goal>add-source</goal>
+                                </goals>
                                 <configuration>
                                     <sources>
                                         <source>src/benchmark-webflux/java</source>
@@ -592,7 +615,9 @@
                             </execution>
                             <execution>
                                 <id>add-webflux-resources</id>
-                                <goals><goal>add-resource</goal></goals>
+                                <goals>
+                                    <goal>add-resource</goal>
+                                </goals>
                                 <configuration>
                                     <resources>
                                         <resource>

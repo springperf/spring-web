@@ -1,12 +1,13 @@
 package io.springperf.web.core.invoker;
 
-import io.springperf.web.core.mapping.match.Matcher;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.lang.reflect.Method;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
+
+import io.springperf.web.core.mapping.match.Matcher;
 
 class CustomInvokerTest {
 

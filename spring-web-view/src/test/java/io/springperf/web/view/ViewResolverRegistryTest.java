@@ -144,29 +144,32 @@ class ViewResolverRegistryTest {
     void hasResponseBody_methodAnnotation_detects() throws Exception {
         class Controller {
             @ResponseBody
-            public String json() { return "x"; }
+            public String json() {
+                return "x";
+            }
         }
-        assertTrue(ViewResolverRegistry.hasResponseBody(
-                Controller.class.getMethod("json"), Controller.class));
+        assertTrue(ViewResolverRegistry.hasResponseBody(Controller.class.getMethod("json"), Controller.class));
     }
 
     @Test
     void hasResponseBody_classAnnotation_detects() throws Exception {
         @ResponseBody
         class Controller {
-            public String json() { return "x"; }
+            public String json() {
+                return "x";
+            }
         }
-        assertTrue(ViewResolverRegistry.hasResponseBody(
-                Controller.class.getMethod("json"), Controller.class));
+        assertTrue(ViewResolverRegistry.hasResponseBody(Controller.class.getMethod("json"), Controller.class));
     }
 
     @Test
     void hasResponseBody_noAnnotation_returnsFalse() throws Exception {
         class Controller {
-            public String view() { return "x"; }
+            public String view() {
+                return "x";
+            }
         }
-        assertFalse(ViewResolverRegistry.hasResponseBody(
-                Controller.class.getMethod("view"), Controller.class));
+        assertFalse(ViewResolverRegistry.hasResponseBody(Controller.class.getMethod("view"), Controller.class));
     }
 
     @Test
@@ -196,9 +199,14 @@ class ViewResolverRegistryTest {
         webContext.registerWebComponent(mappingRegistry);
 
         class Controller {
-            public String home() { return "home"; }
+            public String home() {
+                return "home";
+            }
+
             @ResponseBody
-            public String api() { return "api"; }
+            public String api() {
+                return "api";
+            }
         }
         HandlerMethod hm = new HandlerMethod(new Controller(), Controller.class.getMethod("home"));
         PathMappingContext viewMapping = new PathMappingContext(hm, Collections.emptyList(), "/home");

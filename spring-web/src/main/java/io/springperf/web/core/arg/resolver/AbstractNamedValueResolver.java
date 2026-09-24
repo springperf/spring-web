@@ -1,5 +1,15 @@
 package io.springperf.web.core.arg.resolver;
 
+import java.lang.annotation.Annotation;
+import java.util.Collection;
+import java.util.Map;
+
+import org.springframework.core.MethodParameter;
+import org.springframework.core.convert.ConversionException;
+import org.springframework.core.convert.TypeDescriptor;
+import org.springframework.lang.Nullable;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.arg.StaticArgumentResolver;
 import io.springperf.web.core.arg.databinder.WebDataBinderRegistry;
@@ -7,17 +17,9 @@ import io.springperf.web.core.mapping.MappingHandlerMethod;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.util.MetaUtils;
-import org.springframework.core.MethodParameter;
-import org.springframework.core.convert.ConversionException;
-import org.springframework.core.convert.TypeDescriptor;
-import org.springframework.lang.Nullable;
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
-import java.lang.annotation.Annotation;
-import java.util.Collection;
-import java.util.Map;
-
-public abstract class AbstractNamedValueResolver extends AbstractSupportOptionalResolver implements StaticArgumentResolver {
+public abstract class AbstractNamedValueResolver extends AbstractSupportOptionalResolver
+        implements StaticArgumentResolver {
 
     protected final WebContext webContext;
     protected final String name;
@@ -26,12 +28,15 @@ public abstract class AbstractNamedValueResolver extends AbstractSupportOptional
 
     /**
      * 参数类型能否直接接受 String 且非容器（启动期预判）。
-     * <p>命名参数（{@code @RequestParam}/{@code @RequestHeader}/{@code @PathVariable}）的原始取值恒为
-     * String，故该判定为真时无需任何转换 —— 热路径可跳过每参数的类型判定（见 {@link #convert(Object)}）。</p>
+     * <p>
+     * 命名参数（{@code @RequestParam}/{@code @RequestHeader}/{@code @PathVariable}）的原始取值恒为 String，故该判定为真时无需任何转换 ——
+     * 热路径可跳过每参数的类型判定（见 {@link #convert(Object)}）。
+     * </p>
      */
     private final boolean stringAssignableWithoutConversion;
 
-    public AbstractNamedValueResolver(WebContext webContext, MappingHandlerMethod mappingContext, MethodParameter parameter, Class<? extends Annotation>... supportClass) {
+    public AbstractNamedValueResolver(WebContext webContext, MappingHandlerMethod mappingContext,
+            MethodParameter parameter, Class<? extends Annotation>... supportClass) {
         super(mappingContext, parameter);
         this.webContext = webContext;
         this.name = MetaUtils.getParameterName(parameter, supportClass);
@@ -39,7 +44,8 @@ public abstract class AbstractNamedValueResolver extends AbstractSupportOptional
         this.stringAssignableWithoutConversion = isStringAssignableWithoutConversion(this.paramType);
     }
 
-    public AbstractNamedValueResolver(MappingHandlerMethod mappingContext, MethodParameter parameter, WebContext webContext, String name) {
+    public AbstractNamedValueResolver(MappingHandlerMethod mappingContext, MethodParameter parameter,
+            WebContext webContext, String name) {
         super(mappingContext, parameter);
         this.webContext = webContext;
         this.name = name;
@@ -48,14 +54,13 @@ public abstract class AbstractNamedValueResolver extends AbstractSupportOptional
     }
 
     private static boolean isStringAssignableWithoutConversion(Class<?> paramType) {
-        return paramType != null
-                && paramType.isAssignableFrom(String.class)
-                && !Collection.class.isAssignableFrom(paramType)
-                && !Map.class.isAssignableFrom(paramType)
+        return paramType != null && paramType.isAssignableFrom(String.class)
+                && !Collection.class.isAssignableFrom(paramType) && !Map.class.isAssignableFrom(paramType)
                 && !paramType.isArray();
     }
 
-    protected abstract Object resolveByName(WebServerHttpRequest request, WebServerHttpResponse response) throws Exception;
+    protected abstract Object resolveByName(WebServerHttpRequest request, WebServerHttpResponse response)
+            throws Exception;
 
     @Override
     protected Object doResolveArgument(WebServerHttpRequest request, WebServerHttpResponse response) throws Exception {
@@ -69,7 +74,8 @@ public abstract class AbstractNamedValueResolver extends AbstractSupportOptional
     }
 
     protected Object convert(Object arg) {
-        if (arg == null) return null;
+        if (arg == null)
+            return null;
         if (arg instanceof String && stringAssignableWithoutConversion) {
             // 启动期已判定「参数类型可直接接受 String 且非容器」：命名参数的原始取值恒为 String，
             // 故直接返回，省掉每参数的 arg.getClass() + isAssignableFrom + isContainer 三处判定
@@ -91,11 +97,9 @@ public abstract class AbstractNamedValueResolver extends AbstractSupportOptional
     }
 
     /**
-     * Collection/Map/数组 参数：即使运行时类型与 {@code paramType} 兼容（如 List→List），
-     * 泛型元素类型也可能不匹配（解析结果 {@code List<String>} → 形参 {@code List<Integer>}）。
-     * 必须携带方法参数的完整泛型信息（{@link TypeDescriptor}）做元素级转换，
-     * 由 ConversionService 的 CollectionToCollectionConverter / ArrayToArrayConverter 完成。
-     * 修复前短路返回原集合，业务层遍历时抛 ClassCastException。
+     * Collection/Map/数组 参数：即使运行时类型与 {@code paramType} 兼容（如 List→List）， 泛型元素类型也可能不匹配（解析结果 {@code List<String>} → 形参
+     * {@code List<Integer>}）。 必须携带方法参数的完整泛型信息（{@link TypeDescriptor}）做元素级转换， 由 ConversionService 的
+     * CollectionToCollectionConverter / ArrayToArrayConverter 完成。 修复前短路返回原集合，业务层遍历时抛 ClassCastException。
      */
     protected Object convertWithGenericType(Object arg) {
         TypeDescriptor targetType = new TypeDescriptor(parameter.nestedIfOptional());
@@ -108,10 +112,15 @@ public abstract class AbstractNamedValueResolver extends AbstractSupportOptional
 
     /**
      * Handle a null value for the named parameter.
-     * <p>A {@code null} results in a {@code false} value for {@code boolean}s or an exception for other primitives.</p>
+     * <p>
+     * A {@code null} results in a {@code false} value for {@code boolean}s or an exception for other primitives.
+     * </p>
      *
-     * @param name      the parameter name
-     * @param paramType the parameter type
+     * @param name
+     *            the parameter name
+     * @param paramType
+     *            the parameter type
+     *
      * @return the value to use for null (Boolean.FALSE for booleans, null for others)
      */
     @Nullable
@@ -119,7 +128,9 @@ public abstract class AbstractNamedValueResolver extends AbstractSupportOptional
         if (Boolean.TYPE.equals(paramType)) {
             return Boolean.FALSE;
         } else if (paramType.isPrimitive()) {
-            throw new IllegalStateException("Optional " + paramType.getSimpleName() + " parameter '" + name + "' is present but cannot be translated into a null value due to being declared as a " + "primitive type. Consider declaring it as object wrapper for the corresponding primitive type.");
+            throw new IllegalStateException("Optional " + paramType.getSimpleName() + " parameter '" + name
+                    + "' is present but cannot be translated into a null value due to being declared as a "
+                    + "primitive type. Consider declaring it as object wrapper for the corresponding primitive type.");
         }
         return null;
     }

@@ -1,11 +1,11 @@
 package io.springperf.web.http.support;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class NettyMultipartFileTest {
 
@@ -59,12 +59,7 @@ class NettyMultipartFileTest {
     }
 
     @ParameterizedTest
-    @CsvSource({
-        "normal, test.txt",
-        "'', test.txt",
-        "' ', test.txt",
-        "field1, ''"
-    })
+    @CsvSource({ "normal, test.txt", "'', test.txt", "' ', test.txt", "field1, ''" })
     void buildContentDisposition_variousInputs_noCrLfInOutput(String name, String filename) {
         String result = NettyMultipartFile.buildContentDisposition(name, filename);
         assertFalse(result.contains("\r"), "输出不应含 CR: name=" + name + " filename=" + filename);

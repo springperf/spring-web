@@ -1,29 +1,24 @@
 package io.springperf.web.http;
 
-import io.netty.handler.codec.http.HttpHeaders;
+import java.util.*;
+
 import org.springframework.util.MultiValueMap;
 
-import java.util.*;
+import io.netty.handler.codec.http.HttpHeaders;
 
 /**
  * 基于 Netty {@link HttpHeaders} 的零拷贝 {@link MultiValueMap} 视图，读写按需可选。
- *
- * <p><b>请求侧（可写）：</b>请求头视图直接委托 Netty headers，写操作穿透到
- * Netty 请求对象（对齐 Spring {@code ServerHttpRequest.getHeaders()} 的可写契约，
- * 支持 WebFilter 改写请求头，如 Trace ID 注入、X-Forwarded-* 归一化）。
- * 相比旧实现（每请求首次访问把 Netty headers 全量拷入 LinkedMultiValueMap），
- * 免去 O(n) 拷贝与逐条 add 分配，并保留 Netty 的大小写不敏感解析——旧拷贝为
- * 大小写敏感的 LinkedMultiValueMap，导致小写 key 读取永远 miss，缓存 key 恒为
- * 通配类型（见 HttpBodyCodecRegistry.normalizeAcceptKey）。
- *
- * <p><b>响应侧（可写）：</b>用 {@link #NettyHttpHeadersAdapter(HttpHeaders, boolean)}
- * 传入 writable=true，所有写操作委托 Netty headers。配合
- * {@link NettyServerHttpResponse#nettyHeaders} 共享同一 {@code DefaultHttpHeaders}
- * 实例传给 Netty 响应对象，消除 commit 时框架 map → Netty headers 的拷贝循环，
- * 并把两套 header 存储压成一套。
- *
- * <p>仅依赖 Netty API，与 Spring 版本无关。Spring 自带 {@code Netty4HeadersAdapter}
- * 仅 6.1+ 存在，直接引用会破坏 5.3/SB 2.7 编译，故自研以跨 5.3/6.x/7.x。
+ * <p>
+ * <b>请求侧（可写）：</b>请求头视图直接委托 Netty headers，写操作穿透到 Netty 请求对象（对齐 Spring {@code ServerHttpRequest.getHeaders()} 的可写契约， 支持
+ * WebFilter 改写请求头，如 Trace ID 注入、X-Forwarded-* 归一化）。 相比旧实现（每请求首次访问把 Netty headers 全量拷入 LinkedMultiValueMap）， 免去 O(n)
+ * 拷贝与逐条 add 分配，并保留 Netty 的大小写不敏感解析——旧拷贝为 大小写敏感的 LinkedMultiValueMap，导致小写 key 读取永远 miss，缓存 key 恒为 通配类型（见
+ * HttpBodyCodecRegistry.normalizeAcceptKey）。
+ * <p>
+ * <b>响应侧（可写）：</b>用 {@link #NettyHttpHeadersAdapter(HttpHeaders, boolean)} 传入 writable=true，所有写操作委托 Netty headers。配合
+ * {@link NettyServerHttpResponse#nettyHeaders} 共享同一 {@code DefaultHttpHeaders} 实例传给 Netty 响应对象，消除 commit 时框架 map →
+ * Netty headers 的拷贝循环， 并把两套 header 存储压成一套。
+ * <p>
+ * 仅依赖 Netty API，与 Spring 版本无关。Spring 自带 {@code Netty4HeadersAdapter} 仅 6.1+ 存在，直接引用会破坏 5.3/SB 2.7 编译，故自研以跨 5.3/6.x/7.x。
  */
 public class NettyHttpHeadersAdapter implements MultiValueMap<String, String> {
 
@@ -42,12 +37,11 @@ public class NettyHttpHeadersAdapter implements MultiValueMap<String, String> {
     }
 
     /**
-     * 底层 Netty headers（供热路径用 {@code HttpHeaderNames} 常量名直读/直写——常量名是
-     * {@code AsciiString} 且哈希在类初始化时已缓存，可免掉按 {@code String} 名调用时
-     * 每次现造 {@code AsciiString} 并重算哈希的开销）。
-     *
-     * <p><b>只读视图返回 {@code null}</b>：只读视图上的写操作必须继续抛
-     * {@link UnsupportedOperationException}，不能让调用方绕过该约束。</p>
+     * 底层 Netty headers（供热路径用 {@code HttpHeaderNames} 常量名直读/直写——常量名是 {@code AsciiString} 且哈希在类初始化时已缓存，可免掉按
+     * {@code String} 名调用时 每次现造 {@code AsciiString} 并重算哈希的开销）。
+     * <p>
+     * <b>只读视图返回 {@code null}</b>：只读视图上的写操作必须继续抛 {@link UnsupportedOperationException}，不能让调用方绕过该约束。
+     * </p>
      */
     public HttpHeaders rawHeadersIfWritable() {
         return writable ? headers : null;

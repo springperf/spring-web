@@ -14,7 +14,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ManagementServerInfrastructureTest {
 
-    @Mock WebContext webContext;
+    @Mock
+    WebContext webContext;
 
     @BeforeEach
     void setUp() {

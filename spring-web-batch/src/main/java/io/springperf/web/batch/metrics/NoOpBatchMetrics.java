@@ -3,8 +3,8 @@ package io.springperf.web.batch.metrics;
 /**
  * No-operation {@link BatchMetrics} implementation.
  * <p>
- * Used as the default when no metrics integration is configured.
- * All methods are empty — no overhead when metrics are not needed.
+ * Used as the default when no metrics integration is configured. All methods are empty — no overhead when metrics are
+ * not needed.
  * </p>
  */
 public final class NoOpBatchMetrics implements BatchMetrics {

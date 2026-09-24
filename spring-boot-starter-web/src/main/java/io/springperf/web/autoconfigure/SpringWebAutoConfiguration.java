@@ -30,23 +30,32 @@ import java.util.List;
 @ConditionalOnClass(DispatcherHandler.class)
 public class SpringWebAutoConfiguration {
 
-    @Bean @ConditionalOnMissingBean
-    public DispatcherHandler dispatcherHandler() { return new DispatcherHandler(); }
+    @Bean
+    @ConditionalOnMissingBean
+    public DispatcherHandler dispatcherHandler() {
+        return new DispatcherHandler();
+    }
 
-    @Bean @ConditionalOnMissingBean
-    public ApplicationProperties applicationProperties(Environment environment) { return new ApplicationProperties(environment); }
+    @Bean
+    @ConditionalOnMissingBean
+    public ApplicationProperties applicationProperties(Environment environment) {
+        return new ApplicationProperties(environment);
+    }
 
-    @Bean @ConditionalOnMissingBean
+    @Bean
+    @ConditionalOnMissingBean
     public WebContext webContext(List<DispatcherHandler> dispatcherHandlers, ApplicationProperties props) {
         return new WebContext(dispatcherHandlers.get(0), props);
     }
 
-    @Bean @ConditionalOnMissingBean
+    @Bean
+    @ConditionalOnMissingBean
     public NettyHttpServer nettyHttpServer(WebContext webContext, Environment environment,
-                                           ObjectProvider<PipelineCustomizer> pipelineCustomizerProvider) {
+            ObjectProvider<PipelineCustomizer> pipelineCustomizerProvider) {
         boolean http2Enabled = environment.getProperty("server.http2.enabled", boolean.class, false);
         SslContext sslContext = SslContextFactory.createServerSslContext(environment, "server.ssl.", http2Enabled);
-        NettyHttpServer server = new NettyHttpServer(webContext, sslContext, pipelineCustomizerProvider.getIfAvailable());
+        NettyHttpServer server = new NettyHttpServer(webContext, sslContext,
+                pipelineCustomizerProvider.getIfAvailable());
         webContext.registerWebComponent(server);
         return server;
     }
@@ -58,8 +67,12 @@ public class SpringWebAutoConfiguration {
         return new AccessLogWebFilter(format, AccessLogWriter.fromProperties(props));
     }
 
-    @Bean @ConditionalOnMissingBean @ConditionalOnClass(name = "jakarta.validation.Validator")
-    public Validator validator() { return new OptionalValidatorFactoryBean(); }
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnClass(name = "jakarta.validation.Validator")
+    public Validator validator() {
+        return new OptionalValidatorFactoryBean();
+    }
 
     @Configuration
     @ConditionalOnClass(name = "io.micrometer.core.instrument.MeterRegistry")
@@ -68,35 +81,30 @@ public class SpringWebAutoConfiguration {
         @Bean
         @ConditionalOnMissingBean
         public WebMetrics micrometerWebMetrics(io.micrometer.core.instrument.MeterRegistry meterRegistry,
-                                                NettyHttpServer nettyHttpServer) {
+                NettyHttpServer nettyHttpServer) {
             // Register Netty-level Gauges
-            io.micrometer.core.instrument.Gauge.builder("netty.connections.active",
-                            nettyHttpServer, NettyHttpServer::getActiveConnectionCount)
-                    .description("Active TCP connections on the main server")
-                    .register(meterRegistry);
+            io.micrometer.core.instrument.Gauge
+                    .builder("netty.connections.active", nettyHttpServer, NettyHttpServer::getActiveConnectionCount)
+                    .description("Active TCP connections on the main server").register(meterRegistry);
 
-            io.micrometer.core.instrument.Gauge.builder("netty.eventloop.pending.tasks",
-                            nettyHttpServer, server -> {
-                                EventLoopGroup group = server.getWorkerGroup();
-                                long total = 0;
-                                for (EventExecutor executor : group) {
-                                    if (executor instanceof SingleThreadEventExecutor) {
-                                        total += ((SingleThreadEventExecutor) executor).pendingTasks();
-                                    }
-                                }
-                                return (double) total;
-                            })
-                    .description("Pending tasks across all EventLoops")
-                    .register(meterRegistry);
+            io.micrometer.core.instrument.Gauge.builder("netty.eventloop.pending.tasks", nettyHttpServer, server -> {
+                EventLoopGroup group = server.getWorkerGroup();
+                long total = 0;
+                for (EventExecutor executor : group) {
+                    if (executor instanceof SingleThreadEventExecutor) {
+                        total += ((SingleThreadEventExecutor) executor).pendingTasks();
+                    }
+                }
+                return (double) total;
+            }).description("Pending tasks across all EventLoops").register(meterRegistry);
 
             return new MicrometerWebMetrics(meterRegistry);
         }
     }
 
     /**
-     * D9：冲突检测提前到容器初始化早期。BeanFactoryPostProcessor 在 bean 定义加载后、
-     * 实例化前执行，比原 webContext bean 方法（实例化阶段）更早暴露问题。
-     * 静态 @Bean 确保本类实例化前即可注册该 post-processor。
+     * D9：冲突检测提前到容器初始化早期。BeanFactoryPostProcessor 在 bean 定义加载后、 实例化前执行，比原 webContext bean 方法（实例化阶段）更早暴露问题。 静态 @Bean
+     * 确保本类实例化前即可注册该 post-processor。
      */
     @Bean
     public static BeanFactoryPostProcessor springMvcConflictGuard() {
@@ -104,10 +112,12 @@ public class SpringWebAutoConfiguration {
     }
 
     private static void assertNoSpringMvcConflict() {
-        try { Class.forName("org.springframework.web.servlet.DispatcherServlet"); }
-        catch (ClassNotFoundException e) { return; }
-        throw new IllegalStateException(
-                "Detected spring-boot-starter-web on the classpath. " +
-                        "Perf Actuator integration conflicts with Spring MVC Actuator integration.");
+        try {
+            Class.forName("org.springframework.web.servlet.DispatcherServlet");
+        } catch (ClassNotFoundException e) {
+            return;
+        }
+        throw new IllegalStateException("Detected spring-boot-starter-web on the classpath. "
+                + "Perf Actuator integration conflicts with Spring MVC Actuator integration.");
     }
 }

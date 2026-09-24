@@ -25,10 +25,14 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class ManagementConfigPropertiesTest {
 
-    @Mock private WebEndpointsSupplier endpointsSupplier;
-    @Mock private ExposableWebEndpoint endpoint;
-    @Mock private WebOperation operation;
-    @Mock private WebContext webContext;
+    @Mock
+    private WebEndpointsSupplier endpointsSupplier;
+    @Mock
+    private ExposableWebEndpoint endpoint;
+    @Mock
+    private WebOperation operation;
+    @Mock
+    private WebContext webContext;
 
     private ManagementMappingRegistry registry;
 
@@ -36,7 +40,8 @@ class ManagementConfigPropertiesTest {
     void setUp() {
         MappingRegistry dummy = mock(MappingRegistry.class);
         when(webContext.getWebComponent(MappingRegistry.class)).thenReturn(dummy);
-        lenient().when(webContext.getWebComponentWithDefault(any(Class.class), any())).thenAnswer(inv -> inv.getArgument(1));
+        lenient().when(webContext.getWebComponentWithDefault(any(Class.class), any()))
+                .thenAnswer(inv -> inv.getArgument(1));
     }
 
     @Test
@@ -46,29 +51,27 @@ class ManagementConfigPropertiesTest {
         properties.setBasePath("/management");
 
         // When: 创建 infrastructure 并注册路由
-        ManagementServerInfrastructure infrastructure = new ManagementServerInfrastructure(webContext, properties.getBasePath());
+        ManagementServerInfrastructure infrastructure = new ManagementServerInfrastructure(webContext,
+                properties.getBasePath());
         this.registry = infrastructure.getMappingRegistry();
 
-        WebOperationRequestPredicate predicate = new WebOperationRequestPredicate(
-                "/health", WebEndpointHttpMethod.GET,
+        WebOperationRequestPredicate predicate = new WebOperationRequestPredicate("/health", WebEndpointHttpMethod.GET,
                 Collections.emptyList(), Collections.singletonList("application/json"));
         setupEndpoint("health", predicate);
         when(endpointsSupplier.getEndpoints()).thenReturn(Collections.singletonList(endpoint));
 
-        ActuatorEndpointHandlerMapping mapping = new ActuatorEndpointHandlerMapping(
-                endpointsSupplier, EndpointMediaTypes.DEFAULT, properties, null, infrastructure);
+        ActuatorEndpointHandlerMapping mapping = new ActuatorEndpointHandlerMapping(endpointsSupplier,
+                EndpointMediaTypes.DEFAULT, properties, null, infrastructure);
         mapping.initWithWebContext(webContext);
         mapping.initComponentPhase1();
 
         // Then: 路由应注册在 /management/health 而非 /actuator/health
-        List<String> paths = registry.getMappingContextList().stream()
-                .map(PathMappingContext::getPathRule)
+        List<String> paths = registry.getMappingContextList().stream().map(PathMappingContext::getPathRule)
                 .collect(Collectors.toList());
 
         assertTrue(paths.contains("/management/health"),
                 "Route should use custom base-path '/management'. Actual: " + paths);
-        assertFalse(paths.contains("/actuator/health"),
-                "Route should NOT use default '/actuator'. Actual: " + paths);
+        assertFalse(paths.contains("/actuator/health"), "Route should NOT use default '/actuator'. Actual: " + paths);
     }
 
     @Test
@@ -86,19 +89,17 @@ class ManagementConfigPropertiesTest {
         properties.setBasePath("/actuator");
 
         // Given: 无 managementHttpHandler → 走主端口路径测试 CORS 注册
-        setupEndpoint("health", new WebOperationRequestPredicate(
-                "/health", WebEndpointHttpMethod.GET,
+        setupEndpoint("health", new WebOperationRequestPredicate("/health", WebEndpointHttpMethod.GET,
                 Collections.emptyList(), Collections.singletonList("application/json")));
         when(endpointsSupplier.getEndpoints()).thenReturn(Collections.singletonList(endpoint));
 
-        ActuatorEndpointHandlerMapping mapping = new ActuatorEndpointHandlerMapping(
-                endpointsSupplier, EndpointMediaTypes.DEFAULT, properties, corsProps, null);
+        ActuatorEndpointHandlerMapping mapping = new ActuatorEndpointHandlerMapping(endpointsSupplier,
+                EndpointMediaTypes.DEFAULT, properties, corsProps, null);
         mapping.initWithWebContext(webContext);
         mapping.initComponentPhase1();
 
         // Then: CorsRegistry.addActuatorCorsConfiguration 被调用
-        verify(corsRegistry, times(1))
-                .addActuatorCorsConfiguration(eq("/actuator/**"), any(CorsConfiguration.class));
+        verify(corsRegistry, times(1)).addActuatorCorsConfiguration(eq("/actuator/**"), any(CorsConfiguration.class));
     }
 
     @Test
@@ -106,27 +107,25 @@ class ManagementConfigPropertiesTest {
         // Given: default base-path (not set)
         WebEndpointProperties properties = new WebEndpointProperties();
 
-        ManagementServerInfrastructure infrastructure = new ManagementServerInfrastructure(webContext, properties.getBasePath());
+        ManagementServerInfrastructure infrastructure = new ManagementServerInfrastructure(webContext,
+                properties.getBasePath());
         this.registry = infrastructure.getMappingRegistry();
 
-        WebOperationRequestPredicate predicate = new WebOperationRequestPredicate(
-                "/health", WebEndpointHttpMethod.GET,
+        WebOperationRequestPredicate predicate = new WebOperationRequestPredicate("/health", WebEndpointHttpMethod.GET,
                 Collections.emptyList(), Collections.singletonList("application/json"));
         setupEndpoint("health", predicate);
         when(endpointsSupplier.getEndpoints()).thenReturn(Collections.singletonList(endpoint));
 
-        ActuatorEndpointHandlerMapping mapping = new ActuatorEndpointHandlerMapping(
-                endpointsSupplier, EndpointMediaTypes.DEFAULT, properties, null, infrastructure);
+        ActuatorEndpointHandlerMapping mapping = new ActuatorEndpointHandlerMapping(endpointsSupplier,
+                EndpointMediaTypes.DEFAULT, properties, null, infrastructure);
         mapping.initWithWebContext(webContext);
         mapping.initComponentPhase1();
 
         // Then: 默认路由为 /actuator/health
-        List<String> paths = registry.getMappingContextList().stream()
-                .map(PathMappingContext::getPathRule)
+        List<String> paths = registry.getMappingContextList().stream().map(PathMappingContext::getPathRule)
                 .collect(Collectors.toList());
 
-        assertTrue(paths.contains("/actuator/health"),
-                "Default base-path should be '/actuator'. Actual: " + paths);
+        assertTrue(paths.contains("/actuator/health"), "Default base-path should be '/actuator'. Actual: " + paths);
     }
 
     private void setupEndpoint(String rootPath, WebOperationRequestPredicate predicate) {

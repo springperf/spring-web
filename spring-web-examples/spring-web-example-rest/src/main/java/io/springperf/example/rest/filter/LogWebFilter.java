@@ -12,7 +12,8 @@ import org.springframework.stereotype.Component;
 public class LogWebFilter implements WebFilter {
 
     @Override
-    public void doFilter(WebServerHttpRequest request, WebServerHttpResponse response, FilterChain chain) throws Exception {
+    public void doFilter(WebServerHttpRequest request, WebServerHttpResponse response, FilterChain chain)
+            throws Exception {
         log.info("[WEB-FILTER] {} {}", request.getMethod(), request.getUriStr());
         chain.doFilter(request, response);
     }

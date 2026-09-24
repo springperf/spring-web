@@ -61,13 +61,9 @@ public class CoreFeaturesExceptionTest extends BaseE2ETest {
     @Test
     void testFailingExceptionHandler_returns500() throws Exception {
         // @ExceptionHandler 方法自身抛出异常 → invokeAndWriteError catch → 500
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/exception/failing-handler")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/exception/failing-handler").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            assertEquals(500, resp.code(),
-                    "When @ExceptionHandler itself throws, framework should return 500");
+            assertEquals(500, resp.code(), "When @ExceptionHandler itself throws, framework should return 500");
         }
     }
 }

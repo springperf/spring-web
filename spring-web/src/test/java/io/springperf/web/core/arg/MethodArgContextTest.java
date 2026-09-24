@@ -1,14 +1,14 @@
 package io.springperf.web.core.arg;
 
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.lang.reflect.Method;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.Errors;
 import org.springframework.validation.annotation.Validated;
-
-import java.lang.reflect.Method;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class MethodArgContextTest {
 
@@ -28,7 +28,7 @@ class MethodArgContextTest {
     void constructor_withUnresolvableParameterName_usesFallbackName() throws Exception {
         Method method = getClass().getMethod("namedParam", String.class);
         MethodParameter mp = new MethodParameter(method, 0);
-        mp.initParameterNameDiscovery(null);  // clear default discoverer (Spring 7.x sets one by default)
+        mp.initParameterNameDiscovery(null); // clear default discoverer (Spring 7.x sets one by default)
         MethodArgContext ctx = new MethodArgContext(mp);
         String paramName = ctx.getParamName();
         assertTrue(paramName.startsWith("Arg "));
@@ -47,7 +47,7 @@ class MethodArgContextTest {
     void getDefaultParamName_withoutName_returnsFallback() throws Exception {
         Method method = getClass().getMethod("namedParam", String.class);
         MethodParameter mp = new MethodParameter(method, 0);
-        mp.initParameterNameDiscovery(null);  // clear default discoverer (Spring 7.x sets one by default)
+        mp.initParameterNameDiscovery(null); // clear default discoverer (Spring 7.x sets one by default)
         String fallback = MethodArgContext.getDefaultParamName(mp);
         assertTrue(fallback.startsWith("Arg "));
     }
@@ -160,29 +160,41 @@ class MethodArgContextTest {
     // ----- helper methods for reflection -----
 
     @SuppressWarnings("unused")
-    public void namedParam(String name) {}
+    public void namedParam(String name) {
+    }
 
     @SuppressWarnings("unused")
-    public void validatedParam(@Validated ValidParam param) {}
+    public void validatedParam(@Validated ValidParam param) {
+    }
 
     @SuppressWarnings("unused")
-    public void validatedWithHintsParam(@Validated({Group1.class, Group2.class}) ValidParam param) {}
+    public void validatedWithHintsParam(@Validated({ Group1.class, Group2.class }) ValidParam param) {
+    }
 
     @SuppressWarnings("unused")
-    public void validParam(@ValidScalarHint ValidParam param) {}
+    public void validParam(@ValidScalarHint ValidParam param) {
+    }
 
     @SuppressWarnings("unused")
-    public void customValidParam(@ValidScalarHint ValidParam param) {}
+    public void customValidParam(@ValidScalarHint ValidParam param) {
+    }
 
     @SuppressWarnings("unused")
-    public void paramWithBindingResult(String name, BindingResult bindingResult) {}
+    public void paramWithBindingResult(String name, BindingResult bindingResult) {
+    }
 
     @SuppressWarnings("unused")
-    public void paramWithErrorsSubclass(String name, Errors errors) {}
+    public void paramWithErrorsSubclass(String name, Errors errors) {
+    }
 
-    static class ValidParam {}
-    interface Group1 {}
-    interface Group2 {}
+    static class ValidParam {
+    }
+
+    interface Group1 {
+    }
+
+    interface Group2 {
+    }
 
     /**
      * 自定义注解名以 Valid 开头且携带标量属性，用于覆盖非 Object[] hints 兜底分支。

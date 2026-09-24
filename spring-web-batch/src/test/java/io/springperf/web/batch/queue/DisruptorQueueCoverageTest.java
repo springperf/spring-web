@@ -17,8 +17,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
- * 真实构造 DisruptorQueue：验证 enqueue（BLOCK/THROW/DROP）、停机后直连处理、
- * 剩余容量/缓冲大小与优雅停机，覆盖构造函数与 shutdown 全流程。
+ * 真实构造 DisruptorQueue：验证 enqueue（BLOCK/THROW/DROP）、停机后直连处理、 剩余容量/缓冲大小与优雅停机，覆盖构造函数与 shutdown 全流程。
  */
 class DisruptorQueueCoverageTest {
 
@@ -36,7 +35,7 @@ class DisruptorQueueCoverageTest {
     static class FastService {
         static final AtomicInteger INVOKED = new AtomicInteger();
 
-        @SuppressWarnings({"unchecked", "rawtypes"})
+        @SuppressWarnings({ "unchecked", "rawtypes" })
         public void handle(List<? extends BatchRequest<?>> batch) {
             INVOKED.incrementAndGet();
             for (BatchRequest request : batch) {
@@ -47,10 +46,8 @@ class DisruptorQueueCoverageTest {
 
     private static BatchRequestMetaData meta(BatchMapping.Backpressure backpressure) throws Exception {
         Method m = FastService.class.getDeclaredMethod("handle", List.class);
-        return new BatchRequestMetaData(
-                m, FastService.class, null, "cq-" + SEQ.incrementAndGet(),
-                64, BatchMapping.WaitStrategy.BLOCKING, backpressure, null, 2, 2
-        );
+        return new BatchRequestMetaData(m, FastService.class, null, "cq-" + SEQ.incrementAndGet(), 64,
+                BatchMapping.WaitStrategy.BLOCKING, backpressure, null, 2, 2);
     }
 
     private BatchRequest<String> request() {
@@ -71,7 +68,8 @@ class DisruptorQueueCoverageTest {
 
     @Test
     void constructor_singleArgUsesNoOpMetrics() throws Exception {
-        queue = new DisruptorQueue("single-" + SEQ.incrementAndGet(), meta(BatchMapping.Backpressure.BLOCK), new FastService());
+        queue = new DisruptorQueue("single-" + SEQ.incrementAndGet(), meta(BatchMapping.Backpressure.BLOCK),
+                new FastService());
         assertNotNull(queue.queueName());
         assertEquals(64, queue.bufferSize(), "ring buffer 应归一化到至少 64");
         assertTrue(queue.remainingCapacity() > 0);
@@ -79,8 +77,8 @@ class DisruptorQueueCoverageTest {
 
     @Test
     void constructor_withNullMetrics_usesNoOpMetrics() throws Exception {
-        queue = new DisruptorQueue("null-metrics-" + SEQ.incrementAndGet(),
-                meta(BatchMapping.Backpressure.BLOCK), new FastService(), null);
+        queue = new DisruptorQueue("null-metrics-" + SEQ.incrementAndGet(), meta(BatchMapping.Backpressure.BLOCK),
+                new FastService(), null);
         assertTrue(queue.bufferSize() > 0);
     }
 
@@ -89,8 +87,8 @@ class DisruptorQueueCoverageTest {
     @Test
     void enqueue_block_mode_processedByConsumer() throws Exception {
         FastService.INVOKED.set(0);
-        queue = new DisruptorQueue("block-" + SEQ.incrementAndGet(),
-                meta(BatchMapping.Backpressure.BLOCK), new FastService(), mock(BatchMetrics.class));
+        queue = new DisruptorQueue("block-" + SEQ.incrementAndGet(), meta(BatchMapping.Backpressure.BLOCK),
+                new FastService(), mock(BatchMetrics.class));
 
         BatchRequest<String> r1 = request();
         BatchRequest<String> r2 = request();
@@ -109,8 +107,8 @@ class DisruptorQueueCoverageTest {
     @Test
     void enqueue_afterShutdown_processesDirectly() throws Exception {
         FastService.INVOKED.set(0);
-        queue = new DisruptorQueue("halted-" + SEQ.incrementAndGet(),
-                meta(BatchMapping.Backpressure.BLOCK), new FastService());
+        queue = new DisruptorQueue("halted-" + SEQ.incrementAndGet(), meta(BatchMapping.Backpressure.BLOCK),
+                new FastService());
         queue.shutdown();
         queue = null;
 
@@ -130,8 +128,8 @@ class DisruptorQueueCoverageTest {
 
     @Test
     void queueName_remainingCapacity_bufferSize_reflectState() throws Exception {
-        queue = new DisruptorQueue("query-" + SEQ.incrementAndGet(),
-                meta(BatchMapping.Backpressure.BLOCK), new FastService());
+        queue = new DisruptorQueue("query-" + SEQ.incrementAndGet(), meta(BatchMapping.Backpressure.BLOCK),
+                new FastService());
         assertTrue(queue.queueName().startsWith("query-"));
         assertEquals(64, queue.bufferSize());
         assertTrue(queue.remainingCapacity() >= 0);
@@ -143,8 +141,8 @@ class DisruptorQueueCoverageTest {
     void enqueue_drop_mode_processedWhenCapacityAvailable() throws Exception {
         FastService.INVOKED.set(0);
         BatchMetrics metrics = mock(BatchMetrics.class);
-        queue = new DisruptorQueue("drop-" + SEQ.incrementAndGet(),
-                meta(BatchMapping.Backpressure.DROP), new FastService(), metrics);
+        queue = new DisruptorQueue("drop-" + SEQ.incrementAndGet(), meta(BatchMapping.Backpressure.DROP),
+                new FastService(), metrics);
 
         BatchRequest<String> r = request();
         queue.enqueue(r);
@@ -159,8 +157,8 @@ class DisruptorQueueCoverageTest {
     void enqueue_throw_mode_processedWhenCapacityAvailable() throws Exception {
         FastService.INVOKED.set(0);
         BatchMetrics metrics = mock(BatchMetrics.class);
-        queue = new DisruptorQueue("throw-" + SEQ.incrementAndGet(),
-                meta(BatchMapping.Backpressure.THROW), new FastService(), metrics);
+        queue = new DisruptorQueue("throw-" + SEQ.incrementAndGet(), meta(BatchMapping.Backpressure.THROW),
+                new FastService(), metrics);
 
         BatchRequest<String> r = request();
         assertDoesNotThrow(() -> queue.enqueue(r));
@@ -172,8 +170,8 @@ class DisruptorQueueCoverageTest {
 
     @Test
     void shutdown_thenShutdown_idempotent() throws Exception {
-        queue = new DisruptorQueue("idem-" + SEQ.incrementAndGet(),
-                meta(BatchMapping.Backpressure.BLOCK), new FastService());
+        queue = new DisruptorQueue("idem-" + SEQ.incrementAndGet(), meta(BatchMapping.Backpressure.BLOCK),
+                new FastService());
         queue.shutdown();
         assertDoesNotThrow(() -> queue.shutdown(), "重复 shutdown 应幂等");
         queue = null;

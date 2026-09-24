@@ -28,12 +28,11 @@ import static org.mockito.Mockito.verify;
 
 /**
  * JSR-356 {@code @ServerEndpoint} 桥接全链路测试。
- *
- * <p>握手阶段复用生产 {@link WebSocketRoutingHandler} 走真实 Netty pipeline
- * （HttpServerCodec → HttpObjectAggregator → RoutingHandler），验证
- * {@code @ServerEndpoint} 端点能经现有握手管线完成升级并触发 {@code @OnOpen}；
- * 帧处理阶段通过直接驱动 {@link JsrEndpointWebSocketHandler} 验证
- * {@code @OnMessage} echo 与 {@code @OnClose} 翻译。</p>
+ * <p>
+ * 握手阶段复用生产 {@link WebSocketRoutingHandler} 走真实 Netty pipeline （HttpServerCodec → HttpObjectAggregator →
+ * RoutingHandler），验证 {@code @ServerEndpoint} 端点能经现有握手管线完成升级并触发 {@code @OnOpen}； 帧处理阶段通过直接驱动
+ * {@link JsrEndpointWebSocketHandler} 验证 {@code @OnMessage} echo 与 {@code @OnClose} 翻译。
+ * </p>
  */
 class JsrEndpointWebSocketHandlerIntegrationTest {
 
@@ -52,8 +51,7 @@ class JsrEndpointWebSocketHandlerIntegrationTest {
         channel = new EmbeddedChannel();
         channel.pipeline().addLast(new HttpServerCodec());
         channel.pipeline().addLast(new HttpObjectAggregator(64 * 1024));
-        channel.pipeline().addLast(new WebSocketRoutingHandler(
-                Map.of("/ws/jsr/{roomId}", handler), null, false, null));
+        channel.pipeline().addLast(new WebSocketRoutingHandler(Map.of("/ws/jsr/{roomId}", handler), null, false, null));
     }
 
     @AfterEach

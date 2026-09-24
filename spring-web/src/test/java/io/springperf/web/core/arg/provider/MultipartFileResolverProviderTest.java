@@ -1,5 +1,18 @@
 package io.springperf.web.core.arg.provider;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.lang.reflect.Method;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.core.MethodParameter;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.multipart.MultipartFile;
+
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.arg.StaticArgumentResolver;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
@@ -7,18 +20,6 @@ import io.springperf.web.http.RequestAttribute;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
-import org.junit.jupiter.api.Test;
-import org.springframework.core.MethodParameter;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-import org.springframework.web.multipart.MultipartFile;
-
-import java.lang.reflect.Method;
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 class MultipartFileResolverProviderTest {
 
@@ -67,8 +68,7 @@ class MultipartFileResolverProviderTest {
         MappingHandlerMethod mappingContext = mock(MappingHandlerMethod.class);
         when(request.getRequestContext()).thenReturn(requestContext);
         Map<RequestAttribute<?>, Object> attrs = new HashMap<>();
-        when(requestContext.getAttribute(any(RequestAttribute.class)))
-                .thenAnswer(inv -> attrs.get(inv.getArgument(0)));
+        when(requestContext.getAttribute(any(RequestAttribute.class))).thenAnswer(inv -> attrs.get(inv.getArgument(0)));
         doAnswer(inv -> {
             attrs.put(inv.getArgument(0), inv.getArgument(1));
             return null;
@@ -94,8 +94,7 @@ class MultipartFileResolverProviderTest {
         WebContext webContext = mock(WebContext.class);
         MappingHandlerMethod mappingContext = mock(MappingHandlerMethod.class);
         // 数组转换路径需要 WebDataBinderRegistry 提供 ConversionService
-        io.springperf.web.core.arg.databinder.WebDataBinderRegistry binderRegistry =
-                new io.springperf.web.core.arg.databinder.WebDataBinderRegistry();
+        io.springperf.web.core.arg.databinder.WebDataBinderRegistry binderRegistry = new io.springperf.web.core.arg.databinder.WebDataBinderRegistry();
         try {
             java.lang.reflect.Field field = io.springperf.web.core.arg.databinder.WebDataBinderRegistry.class
                     .getDeclaredField("defaultConversionService");
@@ -131,11 +130,14 @@ class MultipartFileResolverProviderTest {
     }
 
     @SuppressWarnings("unused")
-    public void fileParam(MultipartFile file) {}
+    public void fileParam(MultipartFile file) {
+    }
 
     @SuppressWarnings("unused")
-    public void fileArrayParam(MultipartFile[] files) {}
+    public void fileArrayParam(MultipartFile[] files) {
+    }
 
     @SuppressWarnings("unused")
-    public void stringParam(String s) {}
+    public void stringParam(String s) {
+    }
 }

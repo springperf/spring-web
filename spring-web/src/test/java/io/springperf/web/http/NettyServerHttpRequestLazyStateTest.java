@@ -1,5 +1,22 @@
 package io.springperf.web.http;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
+
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
@@ -8,32 +25,15 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpVersion;
 import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.WebContext;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicReference;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.lenient;
 
 /**
  * 请求对象两处**懒分配**（构造期不再白分配）的语义回归：
- *
  * <ul>
- *   <li>{@code uriStr}（{@code '?'} 之前的部分）——只在 {@code getUriStr()} 首次访问时截取。
- *       默认 {@code spring.mvc.publish-request-handled-events=false}，热路径完全不读它，
- *       原实现在构造期无条件 {@code substring} 属每请求白分配（JFR 分配采样驱动）。</li>
- *   <li>String 键属性表（{@link RequestContext#getAttributes()}）——只在真正读写 String 键属性时创建；
- *       热路径只用类型化属性数组。语义（含 Servlet {@code setAttribute(name, null)} == remove）不变。</li>
+ * <li>{@code uriStr}（{@code '?'} 之前的部分）——只在 {@code getUriStr()} 首次访问时截取。 默认
+ * {@code spring.mvc.publish-request-handled-events=false}，热路径完全不读它， 原实现在构造期无条件 {@code substring} 属每请求白分配（JFR
+ * 分配采样驱动）。</li>
+ * <li>String 键属性表（{@link RequestContext#getAttributes()}）——只在真正读写 String 键属性时创建； 热路径只用类型化属性数组。语义（含 Servlet
+ * {@code setAttribute(name, null)} == remove）不变。</li>
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
@@ -83,19 +83,17 @@ class NettyServerHttpRequestLazyStateTest {
     }
 
     /**
-     * 行为证明缓存**真的**生效（帧级采样对内联敏感，不能作为证据）：首次读取后改动底层请求的方法，
-     * 后续读取必须仍返回首次结果 —— 若未缓存，这里会变成 POST。
+     * 行为证明缓存**真的**生效（帧级采样对内联敏感，不能作为证据）：首次读取后改动底层请求的方法， 后续读取必须仍返回首次结果 —— 若未缓存，这里会变成 POST。
      */
     @Test
     void getMethod_doesNotReReadUnderlyingRequestAfterFirstCall() {
-        io.netty.handler.codec.http.FullHttpRequest raw = new DefaultFullHttpRequest(
-                HttpVersion.HTTP_1_1, HttpMethod.GET, "/test", Unpooled.EMPTY_BUFFER);
+        io.netty.handler.codec.http.FullHttpRequest raw = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1,
+                HttpMethod.GET, "/test", Unpooled.EMPTY_BUFFER);
         NettyServerHttpRequest req = new NettyServerHttpRequest(webContext, ctx, raw, "/test");
 
         assertEquals(org.springframework.http.HttpMethod.GET, req.getMethod());
         raw.setMethod(HttpMethod.POST);
-        assertEquals(org.springframework.http.HttpMethod.GET, req.getMethod(),
-                "首次解析后应命中缓存，不再回读底层请求");
+        assertEquals(org.springframework.http.HttpMethod.GET, req.getMethod(), "首次解析后应命中缓存，不再回读底层请求");
     }
 
     /** 未使用 String 键属性时，属性表不创建：getAttribute/removeAttribute 返回 null 而非抛错。 */

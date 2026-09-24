@@ -104,21 +104,23 @@ class SupportWebFilterRegistryTest {
 
         List<WebFilterRegistration> registrations = registry.getWebComponents(WebFilterRegistration.class);
         assertEquals(1, registrations.size());
-        assertTrue(readPatterns(registrations.get(0)).isEmpty(),
-                "无 urlPatterns 的 Filter 应全局生效（include 路径为空）");
+        assertTrue(readPatterns(registrations.get(0)).isEmpty(), "无 urlPatterns 的 Filter 应全局生效（include 路径为空）");
     }
 
     @jakarta.servlet.annotation.WebFilter(urlPatterns = "/admin/*")
     static class AdminOnlyFilter implements jakarta.servlet.Filter {
         @Override
         public void doFilter(jakarta.servlet.ServletRequest request, jakarta.servlet.ServletResponse response,
-                             jakarta.servlet.FilterChain chain) { }
+                jakarta.servlet.FilterChain chain) {
+        }
 
         @Override
-        public void init(jakarta.servlet.FilterConfig filterConfig) { }
+        public void init(jakarta.servlet.FilterConfig filterConfig) {
+        }
 
         @Override
-        public void destroy() { }
+        public void destroy() {
+        }
     }
 
     private static java.util.List<String> readPatterns(WebFilterRegistration registration) throws Exception {
@@ -136,5 +138,6 @@ class SupportWebFilterRegistryTest {
         assertEquals("/admin/*", patterns[0]);
     }
 
-    static class AdminOnlyFilterSub extends AdminOnlyFilter {}
+    static class AdminOnlyFilterSub extends AdminOnlyFilter {
+    }
 }

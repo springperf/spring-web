@@ -1,5 +1,10 @@
 package io.springperf.web.core.retval.resolver;
 
+import org.springframework.core.MethodParameter;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
+
 import io.springperf.web.context.BaseWebComponent;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.codec.HttpBodyCodecRegistry;
@@ -8,10 +13,6 @@ import io.springperf.web.core.retval.ReturnValueResolver;
 import io.springperf.web.core.retval.ReturnValueResolverRegistry;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
-import org.springframework.core.MethodParameter;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseEntity;
 
 public class HttpEntityReturnValueResolver extends BaseWebComponent implements ReturnValueResolver {
 
@@ -32,14 +33,15 @@ public class HttpEntityReturnValueResolver extends BaseWebComponent implements R
 
     @Override
     public boolean supportsReturnValue(Object returnValue, WebServerHttpRequest req, WebServerHttpResponse resp) {
-        if (!(returnValue instanceof HttpEntity)) return false;
+        if (!(returnValue instanceof HttpEntity))
+            return false;
         Object body = ((HttpEntity<?>) returnValue).getBody();
-        return returnValueResolverRegistry == null
-                || !returnValueResolverRegistry.isAsyncReturnValue(body, req, resp);
+        return returnValueResolverRegistry == null || !returnValueResolverRegistry.isAsyncReturnValue(body, req, resp);
     }
 
     @Override
-    public void resolveReturnValue(Object returnValue, MethodParameter returnType, WebServerHttpRequest req, WebServerHttpResponse resp) throws Exception {
+    public void resolveReturnValue(Object returnValue, MethodParameter returnType, WebServerHttpRequest req,
+            WebServerHttpResponse resp) throws Exception {
         HttpEntity httpEntity = (HttpEntity) returnValue;
         if (httpEntity instanceof ResponseEntity) {
             ResponseEntity<?> responseEntity = (ResponseEntity<?>) httpEntity;

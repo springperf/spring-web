@@ -1,11 +1,10 @@
 package io.springperf.web.core.interceptor;
 
-import io.springperf.web.core.mapping.MappingResult;
-import io.springperf.web.core.mapping.PathMappingContext;
-import io.springperf.web.http.RequestAttribute;
-import io.springperf.web.http.RequestContext;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.util.*;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,10 +14,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.annotation.Order;
 import org.springframework.web.method.ControllerAdviceBean;
 
-import java.util.*;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import io.springperf.web.core.mapping.MappingResult;
+import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.http.RequestAttribute;
+import io.springperf.web.http.RequestContext;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 class InterceptorRegistryTest {
@@ -43,7 +44,8 @@ class InterceptorRegistryTest {
 
     @Test
     void registerInterceptor_createsRegistration() {
-        HandlerInterceptor interceptor = new HandlerInterceptor() {};
+        HandlerInterceptor interceptor = new HandlerInterceptor() {
+        };
 
         InterceptorRegistration registration = registry.registerInterceptor(interceptor);
 
@@ -54,7 +56,8 @@ class InterceptorRegistryTest {
     @Test
     void registerInterceptor_withOrderAnnotation_appliesOrder() {
         @Order(42)
-        class AnnotatedInterceptor implements HandlerInterceptor {}
+        class AnnotatedInterceptor implements HandlerInterceptor {
+        }
         HandlerInterceptor interceptor = new AnnotatedInterceptor();
 
         InterceptorRegistration registration = registry.registerInterceptor(interceptor);
@@ -64,8 +67,10 @@ class InterceptorRegistryTest {
 
     @Test
     void registerInterceptor_multiple_addsAll() throws Exception {
-        HandlerInterceptor i1 = new HandlerInterceptor() {};
-        HandlerInterceptor i2 = new HandlerInterceptor() {};
+        HandlerInterceptor i1 = new HandlerInterceptor() {
+        };
+        HandlerInterceptor i2 = new HandlerInterceptor() {
+        };
 
         registry.registerInterceptor(i1);
         registry.registerInterceptor(i2);
@@ -99,13 +104,15 @@ class InterceptorRegistryTest {
 
     @Test
     void findControllerAdviceBean_noAnnotatedBean_returnsNull() {
-        HandlerInterceptor interceptor = new HandlerInterceptor() {};
+        HandlerInterceptor interceptor = new HandlerInterceptor() {
+        };
         assertNull(registry.findControllerAdviceBean(interceptor));
     }
 
     @Test
     void initCachedInterceptors_controllerAdviceScoped_matchesByBeanType() {
-        HandlerInterceptor interceptor = new HandlerInterceptor() {};
+        HandlerInterceptor interceptor = new HandlerInterceptor() {
+        };
         ControllerAdviceBean adviceBean = mock(ControllerAdviceBean.class);
         when(adviceBean.isApplicableToBeanType(ControllerA.class)).thenReturn(true);
 
@@ -121,7 +128,8 @@ class InterceptorRegistryTest {
 
     @Test
     void initCachedInterceptors_controllerAdviceScoped_nonMatchingType_excluded() {
-        HandlerInterceptor interceptor = new HandlerInterceptor() {};
+        HandlerInterceptor interceptor = new HandlerInterceptor() {
+        };
         ControllerAdviceBean adviceBean = mock(ControllerAdviceBean.class);
         when(adviceBean.isApplicableToBeanType(ControllerB.class)).thenReturn(false);
 
@@ -137,12 +145,12 @@ class InterceptorRegistryTest {
     @Test
     void initCachedInterceptors_controllerAdviceScoped_ignoresPathRule() {
         // 类级匹配的 registration 不使用 pathPatterns，即使 includePatterns 不匹配该路径也要按 beanType 判定
-        HandlerInterceptor interceptor = new HandlerInterceptor() {};
+        HandlerInterceptor interceptor = new HandlerInterceptor() {
+        };
         ControllerAdviceBean adviceBean = mock(ControllerAdviceBean.class);
         when(adviceBean.isApplicableToBeanType(ControllerA.class)).thenReturn(true);
 
-        registry.registerInterceptor(interceptor)
-                .addPathPatterns("/exclude/**")   // path 匹配应被忽略
+        registry.registerInterceptor(interceptor).addPathPatterns("/exclude/**") // path 匹配应被忽略
                 .applyTo(adviceBean);
 
         PathMappingContext mappingContext = mock(PathMappingContext.class);
@@ -158,7 +166,6 @@ class InterceptorRegistryTest {
 
     static class ControllerB {
     }
-
 
     // ---- preHandle ----
 
@@ -245,8 +252,8 @@ class InterceptorRegistryTest {
         when(interceptor.preHandle(any(), any(), any())).thenThrow(new RuntimeException("interceptor error"));
 
         when(request.getRequestContext()).thenReturn(requestContext);
-        when(requestContext.getAttribute(InterceptorRegistry.INTERCEPTORS_ATTRIBUTE)).thenReturn(
-                Collections.singletonList(interceptor));
+        when(requestContext.getAttribute(InterceptorRegistry.INTERCEPTORS_ATTRIBUTE))
+                .thenReturn(Collections.singletonList(interceptor));
 
         assertThrows(RuntimeException.class, () -> registry.preHandle(request, response));
     }
@@ -298,8 +305,8 @@ class InterceptorRegistryTest {
         doThrow(new RuntimeException("post error")).when(interceptor).postHandle(any(), any(), any(), any());
 
         when(request.getRequestContext()).thenReturn(requestContext);
-        when(requestContext.getAttribute(InterceptorRegistry.INTERCEPTORS_ATTRIBUTE)).thenReturn(
-                Collections.singletonList(interceptor));
+        when(requestContext.getAttribute(InterceptorRegistry.INTERCEPTORS_ATTRIBUTE))
+                .thenReturn(Collections.singletonList(interceptor));
 
         registry.postHandle(request, response, "result");
     }
@@ -327,8 +334,8 @@ class InterceptorRegistryTest {
         doThrow(new RuntimeException("after error")).when(interceptor).afterCompletion(any(), any(), any(), any());
 
         when(request.getRequestContext()).thenReturn(requestContext);
-        when(requestContext.getAttribute(InterceptorRegistry.INTERCEPTORS_ATTRIBUTE)).thenReturn(
-                Collections.singletonList(interceptor));
+        when(requestContext.getAttribute(InterceptorRegistry.INTERCEPTORS_ATTRIBUTE))
+                .thenReturn(Collections.singletonList(interceptor));
 
         registry.afterCompletion(request, response, null);
     }
@@ -338,8 +345,8 @@ class InterceptorRegistryTest {
         HandlerInterceptor interceptor = mock(HandlerInterceptor.class);
 
         when(request.getRequestContext()).thenReturn(requestContext);
-        when(requestContext.getAttribute(InterceptorRegistry.INTERCEPTORS_ATTRIBUTE)).thenReturn(
-                Collections.singletonList(interceptor));
+        when(requestContext.getAttribute(InterceptorRegistry.INTERCEPTORS_ATTRIBUTE))
+                .thenReturn(Collections.singletonList(interceptor));
 
         registry.afterCompletion(request, response, null);
 
@@ -365,11 +372,12 @@ class InterceptorRegistryTest {
     @Test
     void afterConcurrentHandlingStarted_interceptorThrows_doesNotPropagate() throws Exception {
         HandlerInterceptor interceptor = mock(HandlerInterceptor.class);
-        doThrow(new RuntimeException("async error")).when(interceptor).afterConcurrentHandlingStarted(any(), any(), any());
+        doThrow(new RuntimeException("async error")).when(interceptor).afterConcurrentHandlingStarted(any(), any(),
+                any());
 
         when(request.getRequestContext()).thenReturn(requestContext);
-        when(requestContext.getAttribute(InterceptorRegistry.INTERCEPTORS_ATTRIBUTE)).thenReturn(
-                Collections.singletonList(interceptor));
+        when(requestContext.getAttribute(InterceptorRegistry.INTERCEPTORS_ATTRIBUTE))
+                .thenReturn(Collections.singletonList(interceptor));
 
         registry.afterConcurrentHandlingStarted(request, response);
     }
@@ -390,8 +398,7 @@ class InterceptorRegistryTest {
         // P1-3 回归：404/405（无 handler）时路径级拦截器（includePatterns=/admin/**）
         // 必须按请求路径过滤，不得对任意 404 触发 afterCompletion。
         HandlerInterceptor pathInterceptor = mock(HandlerInterceptor.class);
-        InterceptorRegistration reg = new InterceptorRegistration(pathInterceptor)
-                .addPathPatterns("/admin/**");
+        InterceptorRegistration reg = new InterceptorRegistration(pathInterceptor).addPathPatterns("/admin/**");
         registry.registerWebComponent(reg);
         registry.initComponentPhase2();
 

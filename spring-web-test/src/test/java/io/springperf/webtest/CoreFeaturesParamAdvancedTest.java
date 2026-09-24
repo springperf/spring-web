@@ -17,10 +17,7 @@ public class CoreFeaturesParamAdvancedTest extends BaseE2ETest {
 
     @Test
     void requestParam_withDefault_usesDefaultWhenMissing() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/param-advanced?req=hello")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/param-advanced?req=hello").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
@@ -32,10 +29,7 @@ public class CoreFeaturesParamAdvancedTest extends BaseE2ETest {
 
     @Test
     void requestParam_requiredFalse_acceptsMissing() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/param-advanced?req=test&opt=provided")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/param-advanced?req=test&opt=provided").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
@@ -46,10 +40,7 @@ public class CoreFeaturesParamAdvancedTest extends BaseE2ETest {
 
     @Test
     void requestParam_withExplicitValue_usesProvidedValue() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/param-advanced?req=x&def=customVal")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/param-advanced?req=x&def=customVal").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
@@ -61,10 +52,7 @@ public class CoreFeaturesParamAdvancedTest extends BaseE2ETest {
 
     @Test
     void requestParam_requiredTrue_missingReturnsError() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/param-advanced")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/param-advanced").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             // Required @RequestParam "req" 缺失 → 400（与 @RequestHeader 缺失行为一致）
             assertEquals(400, resp.code(), "缺失必填参数应返回 400，实际 " + resp.code());
@@ -73,10 +61,7 @@ public class CoreFeaturesParamAdvancedTest extends BaseE2ETest {
 
     @Test
     void requestHeader_withDefault_usesDefaultWhenMissing() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/header-advanced")
-                .header("X-Required", "req-value")
-                .get()
+        Request req = new Request.Builder().url(baseUrl() + "/header-advanced").header("X-Required", "req-value").get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
@@ -89,13 +74,8 @@ public class CoreFeaturesParamAdvancedTest extends BaseE2ETest {
 
     @Test
     void requestHeader_requiredFalse_acceptsMissing() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/header-advanced")
-                .header("X-Required", "req")
-                .header("X-Optional", "opt")
-                .header("X-With-Default", "custom")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/header-advanced").header("X-Required", "req")
+                .header("X-Optional", "opt").header("X-With-Default", "custom").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
@@ -106,10 +86,7 @@ public class CoreFeaturesParamAdvancedTest extends BaseE2ETest {
 
     @Test
     void requestHeader_requiredTrue_missingReturnsError() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/header-advanced")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/header-advanced").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             // Required @RequestHeader "X-Required" is missing
             // Framework may return 200 or 4xx depending on configuration

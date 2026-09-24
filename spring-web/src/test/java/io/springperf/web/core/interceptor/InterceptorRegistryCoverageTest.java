@@ -1,17 +1,7 @@
 package io.springperf.web.core.interceptor;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.mapping.MappingResult;
-import io.springperf.web.core.mapping.PathMappingContext;
-import io.springperf.web.http.RequestAttribute;
-import io.springperf.web.http.RequestContext;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
-import org.junit.jupiter.api.Test;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.util.PathMatcher;
-import org.springframework.web.bind.annotation.ControllerAdvice;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import java.lang.reflect.Field;
 import java.util.Arrays;
@@ -19,8 +9,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.util.PathMatcher;
+import org.springframework.web.bind.annotation.ControllerAdvice;
+
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.mapping.MappingResult;
+import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.http.RequestAttribute;
+import io.springperf.web.http.RequestContext;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 class InterceptorRegistryCoverageTest {
 
@@ -50,8 +51,8 @@ class InterceptorRegistryCoverageTest {
             List<InterceptorRegistration> registrations = registrations(registry);
             assertEquals(2, registrations.size());
             InterceptorRegistration adviceRegistration = registrations.stream()
-                    .filter(InterceptorRegistration::isControllerAdviceScoped)
-                    .findFirst().orElseThrow(AssertionError::new);
+                    .filter(InterceptorRegistration::isControllerAdviceScoped).findFirst()
+                    .orElseThrow(AssertionError::new);
             assertTrue(adviceRegistration.matchesControllerType(AdviceInterceptor.class));
             assertTrue(adviceRegistration.matchesControllerType(PlainInterceptor.class));
 
@@ -88,8 +89,7 @@ class InterceptorRegistryCoverageTest {
         HandlerInterceptor handler = new HandlerInterceptor() {
         };
         PathMatcher pathMatcher = mock(PathMatcher.class);
-        InterceptorRegistration registration = registry.registerInterceptor(handler)
-                .addPathPatterns("/api/*")
+        InterceptorRegistration registration = registry.registerInterceptor(handler).addPathPatterns("/api/*")
                 .pathMatcher(pathMatcher);
 
         HandlerInterceptor result = registry.getRuntimeMappingInterceptor(registration);
@@ -121,9 +121,8 @@ class InterceptorRegistryCoverageTest {
         when(request.getPath()).thenReturn("/api/users");
         HandlerInterceptor inner = mock(HandlerInterceptor.class);
         HandlerInterceptor plain = mock(HandlerInterceptor.class);
-        List<HandlerInterceptor> input = Arrays.asList(
-                new RuntimeMappingInterceptor(new String[]{"/api/*"}, new String[0], inner),
-                plain);
+        List<HandlerInterceptor> input = Arrays
+                .asList(new RuntimeMappingInterceptor(new String[] { "/api/*" }, new String[0], inner), plain);
 
         List<HandlerInterceptor> result = registry.getRuntimeInterceptors(request, input);
 
@@ -181,7 +180,7 @@ class InterceptorRegistryCoverageTest {
     }
 
     private static void requestStoreInvocation(Map<RequestAttribute<?>, Object> store,
-                                               org.mockito.invocation.InvocationOnMock invocation) {
+            org.mockito.invocation.InvocationOnMock invocation) {
         store.put(invocation.getArgument(0), invocation.getArgument(1));
     }
 }

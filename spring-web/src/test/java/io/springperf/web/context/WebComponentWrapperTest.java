@@ -1,10 +1,10 @@
 package io.springperf.web.context;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class WebComponentWrapperTest {
 

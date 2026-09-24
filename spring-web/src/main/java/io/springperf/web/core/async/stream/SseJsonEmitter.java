@@ -1,9 +1,9 @@
 package io.springperf.web.core.async.stream;
 
-import io.springperf.web.json.JsonConverter;
-
 import java.io.IOException;
 import java.io.OutputStream;
+
+import io.springperf.web.json.JsonConverter;
 
 public class SseJsonEmitter extends SseEmitter {
 

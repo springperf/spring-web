@@ -20,8 +20,8 @@ class Boot4WebServerInitializedEventAutoConfigurationTest {
         when(server.getActualPort()).thenReturn(8080);
         ApplicationContext ctx = mock(ApplicationContext.class);
 
-        ApplicationListener<ApplicationReadyEvent> listener =
-                config.boot4WebServerInitializedEventPublisher(server, ctx);
+        ApplicationListener<ApplicationReadyEvent> listener = config.boot4WebServerInitializedEventPublisher(server,
+                ctx);
         listener.onApplicationEvent(mock(ApplicationReadyEvent.class));
 
         // 桥接以 Object 静态类型调用 publishEvent(Object) 重载
@@ -35,8 +35,8 @@ class Boot4WebServerInitializedEventAutoConfigurationTest {
         when(server.isRunning()).thenReturn(false);
         ApplicationContext ctx = mock(ApplicationContext.class);
 
-        ApplicationListener<ApplicationReadyEvent> listener =
-                config.boot4WebServerInitializedEventPublisher(server, ctx);
+        ApplicationListener<ApplicationReadyEvent> listener = config.boot4WebServerInitializedEventPublisher(server,
+                ctx);
         listener.onApplicationEvent(mock(ApplicationReadyEvent.class));
 
         verify(ctx, never()).publishEvent(any(ApplicationEvent.class));
@@ -51,8 +51,8 @@ class Boot4WebServerInitializedEventAutoConfigurationTest {
         ApplicationContext ctx = mock(ApplicationContext.class);
         doThrow(new RuntimeException("bridge fail")).when(ctx).publishEvent(any(Object.class));
 
-        ApplicationListener<ApplicationReadyEvent> listener =
-                config.boot4WebServerInitializedEventPublisher(server, ctx);
+        ApplicationListener<ApplicationReadyEvent> listener = config.boot4WebServerInitializedEventPublisher(server,
+                ctx);
         assertDoesNotThrow(() -> listener.onApplicationEvent(mock(ApplicationReadyEvent.class)));
     }
 }

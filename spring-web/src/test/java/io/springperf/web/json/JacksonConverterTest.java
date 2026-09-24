@@ -1,14 +1,15 @@
 package io.springperf.web.json;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.util.*;
 
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 class JacksonConverterTest {
 
@@ -16,7 +17,8 @@ class JacksonConverterTest {
         public String name;
         public int value;
 
-        public TestBean() {}
+        public TestBean() {
+        }
 
         public TestBean(String name, int value) {
             this.name = name;
@@ -25,8 +27,10 @@ class JacksonConverterTest {
 
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (this == o)
+                return true;
+            if (o == null || getClass() != o.getClass())
+                return false;
             TestBean bean = (TestBean) o;
             return value == bean.value && Objects.equals(name, bean.name);
         }
@@ -116,8 +120,7 @@ class JacksonConverterTest {
     void fromJson_string_map() {
         JacksonConverter converter = new JacksonConverter();
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) converter.fromJson(
-                "{\"a\":1,\"b\":\"two\"}", Map.class);
+        Map<String, Object> result = (Map<String, Object>) converter.fromJson("{\"a\":1,\"b\":\"two\"}", Map.class);
         assertEquals(1, result.get("a"));
         assertEquals("two", result.get("b"));
     }
@@ -155,7 +158,8 @@ class JacksonConverterTest {
         JacksonConverter converter = new JacksonConverter();
         StringBuilder sb = new StringBuilder("[");
         for (int i = 0; i < 100; i++) {
-            if (i > 0) sb.append(",");
+            if (i > 0)
+                sb.append(",");
             sb.append("{\"id\":").append(i).append(",\"val\":\"v").append(i).append("\"}");
         }
         sb.append("]");
@@ -167,8 +171,7 @@ class JacksonConverterTest {
     @Test
     void fromJson_invalidJson_throwsException() {
         JacksonConverter converter = new JacksonConverter();
-        assertThrows(Exception.class, () ->
-                converter.fromJson("{invalid}", Map.class));
+        assertThrows(Exception.class, () -> converter.fromJson("{invalid}", Map.class));
     }
 
     @Test

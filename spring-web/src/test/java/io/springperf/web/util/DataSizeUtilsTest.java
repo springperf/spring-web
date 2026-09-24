@@ -1,9 +1,9 @@
 package io.springperf.web.util;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import org.junit.jupiter.api.Test;
 
 /**
  * {@link DataSizeUtils} 单元测试：Spring DataSize 风格解析。

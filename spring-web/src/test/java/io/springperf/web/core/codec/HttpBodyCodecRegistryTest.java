@@ -1,13 +1,17 @@
 package io.springperf.web.core.codec;
 
-import io.springperf.web.core.codec.interceptor.HttpBodyCodecInterceptorRegistry;
-import io.springperf.web.core.mapping.MappingResult;
-import io.springperf.web.core.mapping.PathMappingContext;
-import io.springperf.web.http.RequestAttribute;
-import io.springperf.web.http.RequestContext;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
-import io.springperf.web.http.support.BodyHttpInputMessage;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Type;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,17 +25,14 @@ import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.converter.HttpMessageNotWritableException;
 
-import java.io.IOException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Type;
-import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import io.springperf.web.core.codec.interceptor.HttpBodyCodecInterceptorRegistry;
+import io.springperf.web.core.mapping.MappingResult;
+import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.http.RequestAttribute;
+import io.springperf.web.http.RequestContext;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
+import io.springperf.web.http.support.BodyHttpInputMessage;
 
 @ExtendWith(MockitoExtension.class)
 class HttpBodyCodecRegistryTest {
@@ -122,7 +123,8 @@ class HttpBodyCodecRegistryTest {
         when(msg.getHeaders()).thenReturn(msgHeaders);
         when(request.getCharacterEncoding()).thenReturn(null);
         when(converter1.canRead(any(Type.class), any(), eq(MediaType.APPLICATION_XML), any(), any())).thenReturn(true);
-        when(converter1.read(any(Type.class), any(), any(BodyHttpInputMessage.class), any(), any())).thenReturn("<xml/>");
+        when(converter1.read(any(Type.class), any(), any(BodyHttpInputMessage.class), any(), any()))
+                .thenReturn("<xml/>");
         when(msg.hasBody()).thenReturn(true);
         registry.converters.add(converter1);
 
@@ -250,14 +252,12 @@ class HttpBodyCodecRegistryTest {
         MappingResult.set(request, mr);
 
         // First call: cache miss
-        when(ctx.get(HttpBodyCodecRegistry.READ_BODY_CONVERTER_CACHE_KEY))
-                .thenReturn(null);
+        when(ctx.get(HttpBodyCodecRegistry.READ_BODY_CONVERTER_CACHE_KEY)).thenReturn(null);
         registry.readBody((Type) String.class, parameter, msg, request);
         verify(ctx).set(HttpBodyCodecRegistry.READ_BODY_CONVERTER_CACHE_KEY, converter1);
 
         // Second call: cache hit — converter1.canRead called again, converter2 never called
-        when(ctx.get(HttpBodyCodecRegistry.READ_BODY_CONVERTER_CACHE_KEY))
-                .thenReturn(converter1);
+        when(ctx.get(HttpBodyCodecRegistry.READ_BODY_CONVERTER_CACHE_KEY)).thenReturn(converter1);
         clearInvocations(converter1, converter2);
         Object result = registry.readBody((Type) String.class, parameter, msg, request);
 
@@ -277,7 +277,8 @@ class HttpBodyCodecRegistryTest {
         // converter1 no longer matches (stale), converter2 is the current match
         when(converter1.canRead(any(Type.class), any(), any(), any(), any())).thenReturn(false);
         when(converter2.canRead(any(Type.class), any(), any(), any(), any())).thenReturn(true);
-        when(converter2.read(any(Type.class), any(), any(BodyHttpInputMessage.class), any(), any())).thenReturn("from converter2");
+        when(converter2.read(any(Type.class), any(), any(BodyHttpInputMessage.class), any(), any()))
+                .thenReturn("from converter2");
 
         PathMappingContext ctx = mock(PathMappingContext.class);
         MappingResult mr = MappingResult.matched(ctx);
@@ -285,8 +286,7 @@ class HttpBodyCodecRegistryTest {
         MappingResult.set(request, mr);
 
         // Cache holds stale converter1
-        when(ctx.get(HttpBodyCodecRegistry.READ_BODY_CONVERTER_CACHE_KEY))
-                .thenReturn(converter1);
+        when(ctx.get(HttpBodyCodecRegistry.READ_BODY_CONVERTER_CACHE_KEY)).thenReturn(converter1);
         Object result = registry.readBody((Type) String.class, parameter, msg, request);
 
         assertEquals("from converter2", result);
@@ -318,8 +318,7 @@ class HttpBodyCodecRegistryTest {
         when(response.getHeaders()).thenReturn(new HttpHeaders());
         when(response.getCharacterEncoding()).thenReturn(null);
         when(converter1.canWrite(any(Type.class), any(), any(), any(), any(), any())).thenReturn(true);
-        when(converter1.getSupportedMediaTypes())
-                .thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON));
+        when(converter1.getSupportedMediaTypes()).thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON));
         registry.converters.add(converter1);
         registry.allSupportedMediaTypes = Collections.singletonList(MediaType.APPLICATION_JSON);
         when(request.getHeaders()).thenReturn(new HttpHeaders());
@@ -337,8 +336,7 @@ class HttpBodyCodecRegistryTest {
         when(parameter.getGenericParameterType()).thenReturn((Type) String.class);
         when(parameter.getParameterType()).thenReturn((Class) Object.class);
         when(converter1.canWrite(any(Type.class), any(), any(), any(), any(), any())).thenReturn(true);
-        when(converter1.getSupportedMediaTypes())
-                .thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON));
+        when(converter1.getSupportedMediaTypes()).thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON));
         registry.converters.add(converter1);
         registry.allSupportedMediaTypes = Collections.singletonList(MediaType.APPLICATION_JSON);
         when(request.getHeaders()).thenReturn(new HttpHeaders());
@@ -355,8 +353,7 @@ class HttpBodyCodecRegistryTest {
         registry.converters.add(converter1);
         registry.allSupportedMediaTypes = Collections.singletonList(MediaType.APPLICATION_JSON);
         when(converter1.canWrite(any(Type.class), any(), isNull(), any(), any(), any())).thenReturn(true);
-        when(converter1.getSupportedMediaTypes())
-                .thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON));
+        when(converter1.getSupportedMediaTypes()).thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON));
         HttpHeaders reqHeaders = new HttpHeaders();
         reqHeaders.setAccept(Collections.singletonList(MediaType.APPLICATION_ATOM_XML));
         when(request.getHeaders()).thenReturn(reqHeaders);
@@ -374,8 +371,7 @@ class HttpBodyCodecRegistryTest {
         when(response.getCharacterEncoding()).thenReturn(null);
         when(converter1.canWrite(any(Type.class), any(), any(), any(), any(), any())).thenReturn(false);
         when(converter2.canWrite(any(Type.class), any(), any(), any(), any(), any())).thenReturn(true);
-        when(converter2.getSupportedMediaTypes())
-                .thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON));
+        when(converter2.getSupportedMediaTypes()).thenReturn(Collections.singletonList(MediaType.APPLICATION_JSON));
         registry.converters.add(converter1);
         registry.converters.add(converter2);
         registry.allSupportedMediaTypes = Collections.singletonList(MediaType.APPLICATION_JSON);
@@ -394,7 +390,8 @@ class HttpBodyCodecRegistryTest {
         HttpHeaders respHeaders = new HttpHeaders();
         respHeaders.setContentType(MediaType.APPLICATION_XML);
         when(response.getHeaders()).thenReturn(respHeaders);
-        when(converter1.canWrite(any(Type.class), any(), eq(MediaType.APPLICATION_XML), any(), any(), any())).thenReturn(true);
+        when(converter1.canWrite(any(Type.class), any(), eq(MediaType.APPLICATION_XML), any(), any(), any()))
+                .thenReturn(true);
         registry.converters.add(converter1);
 
         registry.writeBody("body", parameter, request, response);
@@ -450,8 +447,8 @@ class HttpBodyCodecRegistryTest {
         when(parameter.getParameterType()).thenReturn((Class) Object.class);
         // converter 同时支持 application/json 与 application/*+json（Spring 判为 wildcard subtype、非 concrete）
         when(converter1.canWrite(any(Type.class), any(), isNull(), any(), any(), any())).thenReturn(true);
-        when(converter1.getSupportedMediaTypes()).thenReturn(Arrays.asList(
-                MediaType.APPLICATION_JSON, new MediaType("application", "*+json")));
+        when(converter1.getSupportedMediaTypes())
+                .thenReturn(Arrays.asList(MediaType.APPLICATION_JSON, new MediaType("application", "*+json")));
         registry.converters.add(converter1);
 
         registry.writeBody(new Object(), parameter, request, response);
@@ -538,7 +535,8 @@ class HttpBodyCodecRegistryTest {
         when(request.getHeaders()).thenReturn(reqHeaders);
         when(parameter.getGenericParameterType()).thenReturn((Type) Object.class);
         when(parameter.getParameterType()).thenReturn((Class) Object.class);
-        when(converter1.canWrite(any(Type.class), any(), eq(MediaType.APPLICATION_JSON), any(), any(), any())).thenReturn(true);
+        when(converter1.canWrite(any(Type.class), any(), eq(MediaType.APPLICATION_JSON), any(), any(), any()))
+                .thenReturn(true);
         registry.converters.add(converter1);
         registry.converters.add(converter2);
 
@@ -577,7 +575,8 @@ class HttpBodyCodecRegistryTest {
         HttpHeaders respHeaders = new HttpHeaders();
         respHeaders.setContentType(MediaType.APPLICATION_XML);
         when(response.getHeaders()).thenReturn(respHeaders);
-        when(converter1.canWrite(any(Type.class), any(), eq(MediaType.APPLICATION_XML), any(), any(), any())).thenReturn(false);
+        when(converter1.canWrite(any(Type.class), any(), eq(MediaType.APPLICATION_XML), any(), any(), any()))
+                .thenReturn(false);
         registry.converters.add(converter1);
 
         // 等价旧实现：content-type 已设置但无匹配 converter → 静默不写、不抛异常
@@ -615,8 +614,7 @@ class HttpBodyCodecRegistryTest {
         when(response.getHeaders()).thenReturn(new HttpHeaders());
         when(response.getCharacterEncoding()).thenReturn(null);
         HttpHeaders reqHeaders = new HttpHeaders();
-        reqHeaders.setAccept(Arrays.asList(
-                new MediaType("application", "json", Collections.singletonMap("q", "0.8")),
+        reqHeaders.setAccept(Arrays.asList(new MediaType("application", "json", Collections.singletonMap("q", "0.8")),
                 new MediaType("application", "xml")));
         when(request.getHeaders()).thenReturn(reqHeaders);
         when(parameter.getGenericParameterType()).thenReturn((Type) Object.class);

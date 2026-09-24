@@ -1,11 +1,12 @@
 package io.springperf.web.core.cors;
 
-import io.springperf.web.util.support.ContainmentResult;
+import static org.junit.jupiter.api.Assertions.*;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.core.Ordered;
 import org.springframework.web.cors.CorsConfiguration;
 
-import static org.junit.jupiter.api.Assertions.*;
+import io.springperf.web.util.support.ContainmentResult;
 
 class CorsRegistrationTest {
 
@@ -22,7 +23,7 @@ class CorsRegistrationTest {
 
         assertNotNull(config);
         // applyPermitDefaultValues sets allowed origins to *
-        assertArrayEquals(new String[]{"*"}, config.getAllowedOrigins().toArray());
+        assertArrayEquals(new String[] { "*" }, config.getAllowedOrigins().toArray());
     }
 
     @Test
@@ -31,7 +32,7 @@ class CorsRegistrationTest {
         CorsRegistration result = registration.allowedOrigins("https://domain1.com", "https://domain2.com");
 
         assertSame(registration, result);
-        assertArrayEquals(new String[]{"https://domain1.com", "https://domain2.com"},
+        assertArrayEquals(new String[] { "https://domain1.com", "https://domain2.com" },
                 registration.getCorsConfiguration().getAllowedOrigins().toArray());
     }
 
@@ -41,7 +42,7 @@ class CorsRegistrationTest {
         CorsRegistration result = registration.allowedMethods("GET", "POST");
 
         assertSame(registration, result);
-        assertArrayEquals(new String[]{"GET", "POST"},
+        assertArrayEquals(new String[] { "GET", "POST" },
                 registration.getCorsConfiguration().getAllowedMethods().toArray());
     }
 
@@ -51,7 +52,7 @@ class CorsRegistrationTest {
         CorsRegistration result = registration.allowedHeaders("X-Custom", "Authorization");
 
         assertSame(registration, result);
-        assertArrayEquals(new String[]{"X-Custom", "Authorization"},
+        assertArrayEquals(new String[] { "X-Custom", "Authorization" },
                 registration.getCorsConfiguration().getAllowedHeaders().toArray());
     }
 
@@ -61,7 +62,7 @@ class CorsRegistrationTest {
         CorsRegistration result = registration.exposedHeaders("X-Result", "X-Debug");
 
         assertSame(registration, result);
-        assertArrayEquals(new String[]{"X-Result", "X-Debug"},
+        assertArrayEquals(new String[] { "X-Result", "X-Debug" },
                 registration.getCorsConfiguration().getExposedHeaders().toArray());
     }
 

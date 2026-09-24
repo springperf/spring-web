@@ -1,18 +1,18 @@
 package io.springperf.web.core.mapping.route;
 
+import java.util.Arrays;
+
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.util.PathPatternUtils;
-
-import java.util.Arrays;
 
 public class PathPatternsRouter implements Router {
 
     private PathPatternRouter[] routers;
 
     /** 按路径特异性排序（literal > {var} > * > **），重叠通配符时最精确者优先。 */
-    private static final java.util.Comparator<PathPatternRouter> SPECIFICITY_COMPARATOR =
-            (a, b) -> PathPatternUtils.comparePathRuleSpecificity(a.getPathRule(), b.getPathRule());
+    private static final java.util.Comparator<PathPatternRouter> SPECIFICITY_COMPARATOR = (a, b) -> PathPatternUtils
+            .comparePathRuleSpecificity(a.getPathRule(), b.getPathRule());
 
     public PathPatternsRouter() {
         routers = new PathPatternRouter[0];

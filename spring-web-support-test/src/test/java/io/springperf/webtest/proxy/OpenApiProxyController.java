@@ -9,8 +9,7 @@ import java.util.Map;
 /**
  * OpenAPI 代理测试控制器：覆盖代理场景下的 {@code @ResponseStatus}、路径变量、请求参数、请求体。
  * <p>
- * 在 CGLIB 代理环境下验证 {@link io.springperf.web.autoconfigure.openapi.OpenApiAdapter}
- * 能正确解析方法注解构建 OpenAPI 文档。
+ * 在 CGLIB 代理环境下验证 {@link io.springperf.web.autoconfigure.openapi.OpenApiAdapter} 能正确解析方法注解构建 OpenAPI 文档。
  */
 @RestController
 @RequestMapping("/openapi-proxy")
@@ -41,8 +40,7 @@ public class OpenApiProxyController {
      * 验证普通 GET + @RequestParam（无 @ResponseStatus，默认 200）在代理下的解析。
      */
     @GetMapping("/query")
-    public String query(@RequestParam("q") String query,
-                        @RequestParam(defaultValue = "10") int limit) {
+    public String query(@RequestParam("q") String query, @RequestParam(defaultValue = "10") int limit) {
         return "query: " + query + " limit: " + limit;
     }
 

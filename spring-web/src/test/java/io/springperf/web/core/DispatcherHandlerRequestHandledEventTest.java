@@ -1,5 +1,23 @@
 package io.springperf.web.core;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.context.support.ServletRequestHandledEvent;
+
 import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
@@ -18,27 +36,9 @@ import io.springperf.web.http.RequestAttribute;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
-import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.context.support.ServletRequestHandledEvent;
-
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 /**
- * 覆盖 {@code spring.mvc.publish-request-handled-events}：请求完成后发布
- * {@link ServletRequestHandledEvent}。
+ * 覆盖 {@code spring.mvc.publish-request-handled-events}：请求完成后发布 {@link ServletRequestHandledEvent}。
  */
 class DispatcherHandlerRequestHandledEventTest {
 
@@ -49,8 +49,10 @@ class DispatcherHandlerRequestHandledEventTest {
         Map<RequestAttribute<?>, Object> fastAttrs = new HashMap<>();
         lenient().when(reqCtx.getAttribute(any(RequestAttribute.class)))
                 .thenAnswer(inv -> fastAttrs.get(inv.getArgument(0)));
-        lenient().doAnswer(inv -> { fastAttrs.put(inv.getArgument(0), inv.getArgument(1)); return null; })
-                .when(reqCtx).setAttribute(any(RequestAttribute.class), any());
+        lenient().doAnswer(inv -> {
+            fastAttrs.put(inv.getArgument(0), inv.getArgument(1));
+            return null;
+        }).when(reqCtx).setAttribute(any(RequestAttribute.class), any());
         lenient().when(req.getMethodValue()).thenReturn(method);
         lenient().when(req.getUriStr()).thenReturn(uri);
         lenient().when(req.getHeaders()).thenReturn(new org.springframework.http.HttpHeaders());
@@ -70,10 +72,10 @@ class DispatcherHandlerRequestHandledEventTest {
                 .thenReturn(mock(MappingRegistry.class));
         when(webContext.getWebComponentWithDefault(eq(ExceptionRegistry.class), any(ExceptionRegistry.class)))
                 .thenReturn(mock(ExceptionRegistry.class));
-        when(webContext.getWebComponentWithDefault(eq(ArgumentResolverRegistry.class), any(ArgumentResolverRegistry.class)))
-                .thenReturn(mock(ArgumentResolverRegistry.class));
-        when(webContext.getWebComponentWithDefault(eq(ReturnValueResolverRegistry.class), any(ReturnValueResolverRegistry.class)))
-                .thenReturn(mock(ReturnValueResolverRegistry.class));
+        when(webContext.getWebComponentWithDefault(eq(ArgumentResolverRegistry.class),
+                any(ArgumentResolverRegistry.class))).thenReturn(mock(ArgumentResolverRegistry.class));
+        when(webContext.getWebComponentWithDefault(eq(ReturnValueResolverRegistry.class),
+                any(ReturnValueResolverRegistry.class))).thenReturn(mock(ReturnValueResolverRegistry.class));
         when(webContext.getWebComponentWithDefault(eq(CorsRegistry.class), any(CorsRegistry.class)))
                 .thenReturn(mock(CorsRegistry.class));
         when(webContext.getWebComponentWithDefault(eq(InterceptorRegistry.class), any(InterceptorRegistry.class)))
@@ -84,8 +86,7 @@ class DispatcherHandlerRequestHandledEventTest {
                 .thenReturn(mock(AsyncSupportRegistry.class));
         when(webContext.getWebComponentWithDefault(eq(WebFilterRegistry.class), any(WebFilterRegistry.class)))
                 .thenReturn(mock(WebFilterRegistry.class));
-        when(webContext.getWebComponentWithDefault(eq(WebMetrics.class), any()))
-                .thenReturn(mock(WebMetrics.class));
+        when(webContext.getWebComponentWithDefault(eq(WebMetrics.class), any())).thenReturn(mock(WebMetrics.class));
 
         handler.initWithWebContext(webContext);
         // 直接注入发布器（生产路径由 WebContext.getCtx() 解析，mock 场景显式设置）
@@ -108,8 +109,8 @@ class DispatcherHandlerRequestHandledEventTest {
         MappingResult matched = MappingResult.notFound();
         handler.handleAfterFilter(req, resp, matched);
 
-        ArgumentCaptor<org.springframework.context.ApplicationEvent> captor =
-                ArgumentCaptor.forClass(org.springframework.context.ApplicationEvent.class);
+        ArgumentCaptor<org.springframework.context.ApplicationEvent> captor = ArgumentCaptor
+                .forClass(org.springframework.context.ApplicationEvent.class);
         verify(publisher).publishEvent(captor.capture());
         ServletRequestHandledEvent event = (ServletRequestHandledEvent) captor.getValue();
         assertEquals("GET", event.getMethod());
@@ -138,7 +139,7 @@ class DispatcherHandlerRequestHandledEventTest {
         when(resp.getStatus()).thenReturn(HttpStatus.OK);
 
         // 无发布器时应静默跳过，不抛异常
-        org.junit.jupiter.api.Assertions.assertDoesNotThrow(
-                () -> handler.handleAfterFilter(req, resp, MappingResult.notFound()));
+        org.junit.jupiter.api.Assertions
+                .assertDoesNotThrow(() -> handler.handleAfterFilter(req, resp, MappingResult.notFound()));
     }
 }

@@ -1,8 +1,8 @@
 package io.springperf.web.util.support;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import org.junit.jupiter.api.Test;
 
 class ContainmentResultTest {
 
@@ -14,18 +14,15 @@ class ContainmentResultTest {
 
     @Test
     void and_firstNever_returnsNever() {
-        assertEquals(ContainmentResult.NEVER,
-                ContainmentResult.and(ContainmentResult.NEVER, ContainmentResult.ALWAYS));
+        assertEquals(ContainmentResult.NEVER, ContainmentResult.and(ContainmentResult.NEVER, ContainmentResult.ALWAYS));
         assertEquals(ContainmentResult.NEVER,
                 ContainmentResult.and(ContainmentResult.NEVER, ContainmentResult.RUNTIME));
-        assertEquals(ContainmentResult.NEVER,
-                ContainmentResult.and(ContainmentResult.NEVER, ContainmentResult.NEVER));
+        assertEquals(ContainmentResult.NEVER, ContainmentResult.and(ContainmentResult.NEVER, ContainmentResult.NEVER));
     }
 
     @Test
     void and_secondNever_returnsNever() {
-        assertEquals(ContainmentResult.NEVER,
-                ContainmentResult.and(ContainmentResult.ALWAYS, ContainmentResult.NEVER));
+        assertEquals(ContainmentResult.NEVER, ContainmentResult.and(ContainmentResult.ALWAYS, ContainmentResult.NEVER));
         assertEquals(ContainmentResult.NEVER,
                 ContainmentResult.and(ContainmentResult.RUNTIME, ContainmentResult.NEVER));
     }

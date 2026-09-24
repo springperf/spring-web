@@ -25,13 +25,13 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * 补充 PerfServletContext 覆盖率：属性存取、init 参数、资源解析、上下文信息、
- * session cookie config、编码与时区、注册类方法空实现等。
+ * 补充 PerfServletContext 覆盖率：属性存取、init 参数、资源解析、上下文信息、 session cookie config、编码与时区、注册类方法空实现等。
  */
 @ExtendWith(MockitoExtension.class)
 class PerfServletContextCoverageTest {
 
-    @Mock WebContext webContext;
+    @Mock
+    WebContext webContext;
 
     private PerfServletContext servletContext;
     private io.springperf.web.context.ApplicationProperties props;
@@ -93,16 +93,15 @@ class PerfServletContextCoverageTest {
     void contextParameters_explicitBlock_exposedAsInitParameters() {
         // 构造新的 mock：显式块键 "server.servlet.context-parameters.foo" → init param "foo"
         io.springperf.web.context.WebContext wc = mock(io.springperf.web.context.WebContext.class);
-        io.springperf.web.context.ApplicationProperties p =
-                mock(io.springperf.web.context.ApplicationProperties.class);
+        io.springperf.web.context.ApplicationProperties p = mock(io.springperf.web.context.ApplicationProperties.class);
         lenient().when(wc.getContextPath()).thenReturn("/app");
         lenient().when(wc.getProps()).thenReturn(p);
         lenient().when(p.getDurationSeconds(anyString(), anyLong()))
                 .thenAnswer(invocation -> invocation.getArgument(1));
-        lenient().when(p.getPropertyNames(
+        lenient()
+                .when(p.getPropertyNames(
                         io.springperf.web.context.PropertiesConstant.SERVLET_CONTEXT_PARAMETERS_PREFIX))
-                .thenReturn(java.util.List.of(
-                        "server.servlet.context-parameters.foo",
+                .thenReturn(java.util.List.of("server.servlet.context-parameters.foo",
                         "server.servlet.context-parameters.bar"));
         lenient().when(p.get("server.servlet.context-parameters.foo", null)).thenReturn("FOO");
         lenient().when(p.get("server.servlet.context-parameters.bar", null)).thenReturn("BAR");
@@ -132,13 +131,13 @@ class PerfServletContextCoverageTest {
     @Test
     void virtualServerName_configured_usesNewKey() {
         io.springperf.web.context.WebContext wc = mock(io.springperf.web.context.WebContext.class);
-        io.springperf.web.context.ApplicationProperties p =
-                mock(io.springperf.web.context.ApplicationProperties.class);
+        io.springperf.web.context.ApplicationProperties p = mock(io.springperf.web.context.ApplicationProperties.class);
         lenient().when(wc.getContextPath()).thenReturn("/app");
         lenient().when(wc.getProps()).thenReturn(p);
         lenient().when(p.getDurationSeconds(anyString(), anyLong()))
                 .thenAnswer(invocation -> invocation.getArgument(1));
-        lenient().when(p.get(io.springperf.web.context.PropertiesConstant.SERVLET_VIRTUAL_SERVER_NAME,
+        lenient()
+                .when(p.get(io.springperf.web.context.PropertiesConstant.SERVLET_VIRTUAL_SERVER_NAME,
                         io.springperf.web.context.PropertiesConstant.SERVLET_VIRTUAL_SERVER_NAME_DEFAULT))
                 .thenReturn("perf-host");
 
@@ -203,20 +202,21 @@ class PerfServletContextCoverageTest {
     /** 构造一个 force-request/force-response 按参数配置的 ServletContext。 */
     private PerfServletContext newContextWithEncoding(boolean forceRequest, boolean forceResponse) {
         io.springperf.web.context.WebContext wc = mock(io.springperf.web.context.WebContext.class);
-        io.springperf.web.context.ApplicationProperties p =
-                mock(io.springperf.web.context.ApplicationProperties.class);
+        io.springperf.web.context.ApplicationProperties p = mock(io.springperf.web.context.ApplicationProperties.class);
         lenient().when(wc.getContextPath()).thenReturn("/app");
         lenient().when(wc.getProps()).thenReturn(p);
         lenient().when(p.getDurationSeconds(anyString(), anyLong()))
                 .thenAnswer(invocation -> invocation.getArgument(1));
-        lenient().when(p.get(io.springperf.web.context.PropertiesConstant.SERVLET_ENCODING_CHARSET,
+        lenient()
+                .when(p.get(io.springperf.web.context.PropertiesConstant.SERVLET_ENCODING_CHARSET,
                         io.springperf.web.context.PropertiesConstant.SERVLET_ENCODING_CHARSET_DEFAULT))
                 .thenReturn("UTF-8");
         lenient().when(p.getBoolean(io.springperf.web.context.PropertiesConstant.SERVLET_ENCODING_FORCE, false))
                 .thenReturn(false);
         lenient().when(p.getBoolean(io.springperf.web.context.PropertiesConstant.SERVLET_ENCODING_FORCE_REQUEST, false))
                 .thenReturn(forceRequest);
-        lenient().when(p.getBoolean(io.springperf.web.context.PropertiesConstant.SERVLET_ENCODING_FORCE_RESPONSE, false))
+        lenient()
+                .when(p.getBoolean(io.springperf.web.context.PropertiesConstant.SERVLET_ENCODING_FORCE_RESPONSE, false))
                 .thenReturn(forceResponse);
         return new PerfServletContext(wc);
     }

@@ -10,48 +10,33 @@ public class ViewRenderTest extends BaseE2ETest {
 
     @Test
     void helloView_shouldRenderThymeleafTemplate() throws Exception {
-        Request req = new Request.Builder()
-                .url(url("/api/view/hello?name=TestUser"))
-                .get()
-                .build();
+        Request req = new Request.Builder().url(url("/api/view/hello?name=TestUser")).get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
-            assertTrue(body.contains("Hello TestUser!"),
-                    "Response should contain rendered message, got: " + body);
-            assertTrue(body.contains("<h1>"),
-                    "Response should be HTML, got: " + body);
+            assertTrue(body.contains("Hello TestUser!"), "Response should contain rendered message, got: " + body);
+            assertTrue(body.contains("<h1>"), "Response should be HTML, got: " + body);
             String contentType = resp.header("Content-Type");
             assertNotNull(contentType, "Content-Type header should be present");
-            assertTrue(contentType.contains("text/html"),
-                    "Content-Type should be text/html, got: " + contentType);
+            assertTrue(contentType.contains("text/html"), "Content-Type should be text/html, got: " + contentType);
         }
     }
 
     @Test
     void helloView_defaultName() throws Exception {
-        Request req = new Request.Builder()
-                .url(url("/api/view/hello"))
-                .get()
-                .build();
+        Request req = new Request.Builder().url(url("/api/view/hello")).get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
-            assertTrue(body.contains("Hello World!"),
-                    "Response should contain default name, got: " + body);
+            assertTrue(body.contains("Hello World!"), "Response should contain default name, got: " + body);
         }
     }
 
     @Test
     void redirectView_shouldReturn302() throws Exception {
-        okhttp3.OkHttpClient noRedirectClient = CLIENT.newBuilder()
-                .followRedirects(false)
-                .followSslRedirects(false)
+        okhttp3.OkHttpClient noRedirectClient = CLIENT.newBuilder().followRedirects(false).followSslRedirects(false)
                 .build();
-        Request req = new Request.Builder()
-                .url(url("/api/view/redirect"))
-                .get()
-                .build();
+        Request req = new Request.Builder().url(url("/api/view/redirect")).get().build();
         try (Response resp = noRedirectClient.newCall(req).execute()) {
             assertEquals(302, resp.code());
             String location = resp.header("Location");
@@ -63,10 +48,7 @@ public class ViewRenderTest extends BaseE2ETest {
 
     @Test
     void modelAndView_shouldRenderThymeleafTemplate() throws Exception {
-        Request req = new Request.Builder()
-                .url(url("/api/view/mav?name=MVTest"))
-                .get()
-                .build();
+        Request req = new Request.Builder().url(url("/api/view/mav?name=MVTest")).get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -77,10 +59,7 @@ public class ViewRenderTest extends BaseE2ETest {
 
     @Test
     void modelAttribute_shouldMergeIntoModel() throws Exception {
-        Request req = new Request.Builder()
-                .url(url("/api/view/model-attr?name=Alice&age=30"))
-                .get()
-                .build();
+        Request req = new Request.Builder().url(url("/api/view/model-attr?name=Alice&age=30")).get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -91,10 +70,7 @@ public class ViewRenderTest extends BaseE2ETest {
 
     @Test
     void controllerAdviceModelAttribute_shouldPopulateModel() throws Exception {
-        Request req = new Request.Builder()
-                .url(url("/api/view/advice"))
-                .get()
-                .build();
+        Request req = new Request.Builder().url(url("/api/view/advice")).get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -105,10 +81,7 @@ public class ViewRenderTest extends BaseE2ETest {
 
     @Test
     void beetlView_shouldRenderBeetlTemplate() throws Exception {
-        Request req = new Request.Builder()
-                .url(url("/api/view/hello-beetl?name=BeetlUser"))
-                .get()
-                .build();
+        Request req = new Request.Builder().url(url("/api/view/hello-beetl?name=BeetlUser")).get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -119,10 +92,7 @@ public class ViewRenderTest extends BaseE2ETest {
 
     @Test
     void freemarkerView_shouldRenderFreemarkerTemplate() throws Exception {
-        Request req = new Request.Builder()
-                .url(url("/api/view/hello-ftl?name=FtlUser"))
-                .get()
-                .build();
+        Request req = new Request.Builder().url(url("/api/view/hello-ftl?name=FtlUser")).get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -133,10 +103,7 @@ public class ViewRenderTest extends BaseE2ETest {
 
     @Test
     void pathVariable_shouldInjectIntoModel() throws Exception {
-        Request req = new Request.Builder()
-                .url(url("/api/view/hello-path/PathUser"))
-                .get()
-                .build();
+        Request req = new Request.Builder().url(url("/api/view/hello-path/PathUser")).get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -147,10 +114,7 @@ public class ViewRenderTest extends BaseE2ETest {
 
     @Test
     void bindingResult_shouldInjectIntoModel() throws Exception {
-        Request req = new Request.Builder()
-                .url(url("/api/view/binding"))
-                .get()
-                .build();
+        Request req = new Request.Builder().url(url("/api/view/binding")).get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -161,10 +125,7 @@ public class ViewRenderTest extends BaseE2ETest {
 
     @Test
     void localModelAttribute_shouldPopulateModel() throws Exception {
-        Request req = new Request.Builder()
-                .url(url("/api/view/local"))
-                .get()
-                .build();
+        Request req = new Request.Builder().url(url("/api/view/local")).get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -175,15 +136,11 @@ public class ViewRenderTest extends BaseE2ETest {
 
     @Test
     void exceptionHandler_shouldReturnViewName() throws Exception {
-        Request req = new Request.Builder()
-                .url(url("/api/view/boom"))
-                .get()
-                .build();
+        Request req = new Request.Builder().url(url("/api/view/boom")).get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
-            assertTrue(body.contains("handled: boom"),
-                    "Exception handler should render error view, got: " + body);
+            assertTrue(body.contains("handled: boom"), "Exception handler should render error view, got: " + body);
         }
     }
 }

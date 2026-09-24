@@ -1,13 +1,14 @@
 package io.springperf.web.core.async.stream;
 
-import io.springperf.web.util.IoUtils;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.ServerHttpResponse;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
+import io.springperf.web.util.IoUtils;
 
 public class TextStreamEmitter extends StreamEmitter<CharSequence> {
 

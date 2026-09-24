@@ -12,8 +12,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * E2E: cover real controller endpoints previously not referenced by any E2E test.
- * <p>P0 controller: MultiValueMap param, RequestEntity, multi-method, multi-param/header
- * conditions; interceptor pass; upload ping.</p>
+ * <p>
+ * P0 controller: MultiValueMap param, RequestEntity, multi-method, multi-param/header conditions; interceptor pass;
+ * upload ping.
+ * </p>
  */
 public class UncoveredEndpointsE2ETest extends BaseE2ETest {
 
@@ -25,10 +27,7 @@ public class UncoveredEndpointsE2ETest extends BaseE2ETest {
 
     @Test
     void multiValueMap_getFirstValues() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/p0/multi-value-map?a=1&b=2")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/p0/multi-value-map?a=1&b=2").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             assertEquals("1-2", resp.body().string());
@@ -37,10 +36,7 @@ public class UncoveredEndpointsE2ETest extends BaseE2ETest {
 
     @Test
     void multiValueMap_missingValue_returnsNullSuffix() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/p0/multi-value-map?a=only")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/p0/multi-value-map?a=only").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             // getFirst(missing) returns null, string concat yields "only-null"
@@ -50,10 +46,8 @@ public class UncoveredEndpointsE2ETest extends BaseE2ETest {
 
     @Test
     void requestEntity_receivesMethodAndBody() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/p0/request-entity")
-                .post(RequestBody.create("hello-entity", JSON))
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/p0/request-entity")
+                .post(RequestBody.create("hello-entity", JSON)).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -69,8 +63,8 @@ public class UncoveredEndpointsE2ETest extends BaseE2ETest {
             assertEquals(200, resp.code());
             assertEquals("multi-method-ok", resp.body().string());
         }
-        Request post = new Request.Builder().url(baseUrl() + "/p0/multi-method")
-                .post(RequestBody.create("", JSON)).build();
+        Request post = new Request.Builder().url(baseUrl() + "/p0/multi-method").post(RequestBody.create("", JSON))
+                .build();
         try (Response resp = CLIENT.newCall(post).execute()) {
             assertEquals(200, resp.code());
         }
@@ -78,9 +72,7 @@ public class UncoveredEndpointsE2ETest extends BaseE2ETest {
 
     @Test
     void multiParam_allConditionsMatch() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/p0/multi-param?a=1&b=2")
-                .get().build();
+        Request req = new Request.Builder().url(baseUrl() + "/p0/multi-param?a=1&b=2").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code(), "all params conditions met should match");
             assertEquals("multi-param-matched", resp.body().string());
@@ -89,9 +81,7 @@ public class UncoveredEndpointsE2ETest extends BaseE2ETest {
 
     @Test
     void multiParam_partialConditions_noMatch() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/p0/multi-param?a=1")
-                .get().build();
+        Request req = new Request.Builder().url(baseUrl() + "/p0/multi-param?a=1").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(404, resp.code(), "params conditions are AND; missing one should not match");
         }
@@ -99,10 +89,7 @@ public class UncoveredEndpointsE2ETest extends BaseE2ETest {
 
     @Test
     void multiHeader_allConditionsMatch() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/p0/multi-header")
-                .header("X-A", "1")
-                .header("X-B", "2")
+        Request req = new Request.Builder().url(baseUrl() + "/p0/multi-header").header("X-A", "1").header("X-B", "2")
                 .get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code(), "all header conditions met should match");
@@ -112,10 +99,7 @@ public class UncoveredEndpointsE2ETest extends BaseE2ETest {
 
     @Test
     void multiHeader_missingCondition_noMatch() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/p0/multi-header")
-                .header("X-A", "1")
-                .get().build();
+        Request req = new Request.Builder().url(baseUrl() + "/p0/multi-header").header("X-A", "1").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(404, resp.code(), "headers conditions are AND; missing one should not match");
         }
@@ -123,9 +107,7 @@ public class UncoveredEndpointsE2ETest extends BaseE2ETest {
 
     @Test
     void interceptorPass_returnsInterceptedFalse() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/core/interceptor/pass")
-                .get().build();
+        Request req = new Request.Builder().url(baseUrl() + "/core/interceptor/pass").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = com.alibaba.fastjson2.JSON.parseObject(resp.body().string(), Map.class);
@@ -135,9 +117,7 @@ public class UncoveredEndpointsE2ETest extends BaseE2ETest {
 
     @Test
     void uploadPing_returnsOk() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/upload/ping")
-                .get().build();
+        Request req = new Request.Builder().url(baseUrl() + "/upload/ping").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             assertNotNull(resp.body().string());

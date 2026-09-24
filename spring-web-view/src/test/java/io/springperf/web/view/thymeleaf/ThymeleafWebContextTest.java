@@ -109,7 +109,7 @@ class ThymeleafWebContextTest {
         assertTrue(request.getAllHeaderNames().contains("Accept"));
         assertEquals(1, request.getHeaderValues("Accept").length);
         assertEquals("text/html", request.getHeaderValues("Accept")[0]);
-        assertArrayEquals(new String[]{"v1"}, request.getHeaderMap().get("X-Custom"));
+        assertArrayEquals(new String[] { "v1" }, request.getHeaderMap().get("X-Custom"));
         assertEquals(0, request.getHeaderValues("missing").length);
     }
 
@@ -123,7 +123,7 @@ class ThymeleafWebContextTest {
         assertEquals(2, request.getParameterValues("a").length);
         assertEquals("1", request.getParameterValues("a")[0]);
         assertEquals(0, request.getParameterValues("missing").length);
-        assertArrayEquals(new String[]{"1", "2"}, request.getParameterMap().get("a"));
+        assertArrayEquals(new String[] { "1", "2" }, request.getParameterMap().get("a"));
     }
 
     @Test
@@ -168,8 +168,7 @@ class ThymeleafWebContextTest {
     void sessionAttributes_injectedAsVariables() {
         // Thymeleaf 3.1 移除 #session 表达式对象后，session 属性以上下文变量形式提供
         io.springperf.web.view.WebExchangeProvider provider = sessionProvider();
-        ThymeleafWebContext ctx = new ThymeleafWebContext(
-                new HashMap<>(), Locale.US, req, resp, provider);
+        ThymeleafWebContext ctx = new ThymeleafWebContext(new HashMap<>(), Locale.US, req, resp, provider);
 
         assertTrue(ctx.containsVariable("user"));
         assertEquals("alice", ctx.getVariable("user"));
@@ -202,7 +201,9 @@ class ThymeleafWebContextTest {
     private io.springperf.web.view.WebExchangeProvider sessionProvider() {
         return new io.springperf.web.view.WebExchangeProvider() {
             @Override
-            public boolean supports(WebServerHttpRequest request) { return true; }
+            public boolean supports(WebServerHttpRequest request) {
+                return true;
+            }
 
             @Override
             public IWebExchange createExchange(WebServerHttpRequest r, WebServerHttpResponse p) {
@@ -210,20 +211,43 @@ class ThymeleafWebContextTest {
                     @Override
                     public org.thymeleaf.web.IWebSession getSession() {
                         return new org.thymeleaf.web.IWebSession() {
-                            @Override public boolean exists() { return true; }
-                            @Override public boolean containsAttribute(String name) { return "user".equals(name); }
-                            @Override public int getAttributeCount() { return 1; }
-                            @Override public java.util.Set<String> getAllAttributeNames() {
+                            @Override
+                            public boolean exists() {
+                                return true;
+                            }
+
+                            @Override
+                            public boolean containsAttribute(String name) {
+                                return "user".equals(name);
+                            }
+
+                            @Override
+                            public int getAttributeCount() {
+                                return 1;
+                            }
+
+                            @Override
+                            public java.util.Set<String> getAllAttributeNames() {
                                 return java.util.Collections.singleton("user");
                             }
-                            @Override public Map<String, Object> getAttributeMap() {
+
+                            @Override
+                            public Map<String, Object> getAttributeMap() {
                                 return java.util.Collections.singletonMap("user", "alice");
                             }
-                            @Override public Object getAttributeValue(String name) {
+
+                            @Override
+                            public Object getAttributeValue(String name) {
                                 return "user".equals(name) ? "alice" : null;
                             }
-                            @Override public void setAttributeValue(String name, Object value) { }
-                            @Override public void removeAttribute(String name) { }
+
+                            @Override
+                            public void setAttributeValue(String name, Object value) {
+                            }
+
+                            @Override
+                            public void removeAttribute(String name) {
+                            }
                         };
                     }
                 };

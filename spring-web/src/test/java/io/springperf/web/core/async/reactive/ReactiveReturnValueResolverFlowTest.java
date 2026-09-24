@@ -1,21 +1,15 @@
 package io.springperf.web.core.async.reactive;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.async.AsyncSupportRegistry;
-import io.springperf.web.core.async.stream.SseEmitter;
-import io.springperf.web.core.async.stream.SseJsonEmitter;
-import io.springperf.web.core.async.stream.StreamEmitter;
-import io.springperf.web.core.async.stream.StreamSender;
-import io.springperf.web.core.async.stream.StreamSenderFactory;
-import io.springperf.web.core.async.stream.StreamJsonEmitter;
-import io.springperf.web.core.async.stream.TextStreamEmitter;
-import io.springperf.web.core.mapping.MappingResult;
-import io.springperf.web.core.mapping.PathMappingContext;
-import io.springperf.web.http.RequestAttribute;
-import io.springperf.web.http.RequestContext;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
-import io.springperf.web.json.JsonConverter;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+import java.lang.reflect.Constructor;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
@@ -26,20 +20,26 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.method.HandlerMethod;
 
-import java.lang.reflect.Constructor;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.async.AsyncSupportRegistry;
+import io.springperf.web.core.async.stream.SseEmitter;
+import io.springperf.web.core.async.stream.SseJsonEmitter;
+import io.springperf.web.core.async.stream.StreamEmitter;
+import io.springperf.web.core.async.stream.StreamJsonEmitter;
+import io.springperf.web.core.async.stream.StreamSender;
+import io.springperf.web.core.async.stream.StreamSenderFactory;
+import io.springperf.web.core.async.stream.TextStreamEmitter;
+import io.springperf.web.core.mapping.MappingResult;
+import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.http.RequestAttribute;
+import io.springperf.web.http.RequestContext;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
+import io.springperf.web.json.JsonConverter;
 
 /**
- * 补充 ReactiveReturnValueResolver 覆盖率：init 装配、supports 边界、
- * resolveReturnValue 的流式/DeferredResult 路径、createStreamEmitter 分支选择
- * 与 containMediaType 匹配失败路径。
+ * 补充 ReactiveReturnValueResolver 覆盖率：init 装配、supports 边界、 resolveReturnValue 的流式/DeferredResult 路径、createStreamEmitter
+ * 分支选择 与 containMediaType 匹配失败路径。
  */
 class ReactiveReturnValueResolverFlowTest {
 
@@ -92,10 +92,17 @@ class ReactiveReturnValueResolverFlowTest {
 
     @SuppressWarnings("unused")
     static class TypeHolder {
-        public void handler(java.util.concurrent.Flow.Publisher<String> p) {}
-        public void handler(String s) {}
-        public void handler(ResponseEntity<java.util.concurrent.Flow.Publisher<String>> p) {}
-        public void handler(CompletableFuture<String> f) {}
+        public void handler(java.util.concurrent.Flow.Publisher<String> p) {
+        }
+
+        public void handler(String s) {
+        }
+
+        public void handler(ResponseEntity<java.util.concurrent.Flow.Publisher<String>> p) {
+        }
+
+        public void handler(CompletableFuture<String> f) {
+        }
     }
 
     private PathMappingContext mockMapping() throws Exception {
@@ -139,8 +146,7 @@ class ReactiveReturnValueResolverFlowTest {
 
     @Test
     void supportsReturnType_responseEntityGeneric_resolvesBody() throws Exception {
-        assertTrue(resolver.supportsReturnType(
-                param("handler", ResponseEntity.class), null));
+        assertTrue(resolver.supportsReturnType(param("handler", ResponseEntity.class), null));
     }
 
     @Test
@@ -159,8 +165,8 @@ class ReactiveReturnValueResolverFlowTest {
     @Test
     void createStreamEmitter_customType_usesConstructor() throws Exception {
         @SuppressWarnings("unchecked")
-        Constructor<? extends StreamEmitter> ctor = (Constructor<? extends StreamEmitter>) (Constructor<?>)
-                SseEmitter.class.getConstructor(Long.class);
+        Constructor<? extends StreamEmitter> ctor = (Constructor<? extends StreamEmitter>) (Constructor<?>) SseEmitter.class
+                .getConstructor(Long.class);
         ReactiveConfig config = new ReactiveConfig(SseEmitter.class, ctor, 150, 50, 5000L);
         ReactiveAdapter adapter = ReactiveAdapterRegistry.getSharedInstance()
                 .getAdapter(java.util.concurrent.Flow.Publisher.class);
@@ -197,8 +203,8 @@ class ReactiveReturnValueResolverFlowTest {
         // 元素类型必须非 CharSequence，否则优先命中 TextStreamEmitter 分支
         StreamEmitter emitter = resolver.createStreamEmitter(config, adapter, Datum.class, request, response);
         assertTrue(emitter instanceof StreamJsonEmitter);
-        assertEquals(MediaType.parseMediaType("application/stream+json"),
-                response.getHeaders().getContentType(), "accept 命中时响应应回写具体的 Content-Type");
+        assertEquals(MediaType.parseMediaType("application/stream+json"), response.getHeaders().getContentType(),
+                "accept 命中时响应应回写具体的 Content-Type");
     }
 
     public static final class Datum {
@@ -244,8 +250,7 @@ class ReactiveReturnValueResolverFlowTest {
                         public void cancel() {
                         }
                     });
-                },
-                publisher -> null);
+                }, publisher -> null);
         try {
             setField("adapterRegistry", registry);
         } catch (Exception e) {
@@ -283,8 +288,8 @@ class ReactiveReturnValueResolverFlowTest {
         requestHeaders.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
         SingleValue value = new SingleValue("ok");
 
-        resolver.resolveReturnValue(value,
-                param("handler", java.util.concurrent.Flow.Publisher.class), request, response);
+        resolver.resolveReturnValue(value, param("handler", java.util.concurrent.Flow.Publisher.class), request,
+                response);
 
         verify(asyncSupportRegistry).startDeferredResultProcessing(any(), any(), any());
     }
@@ -293,11 +298,9 @@ class ReactiveReturnValueResolverFlowTest {
     void resolveReturnValue_responseEntityUnwrapsStatusAndHeaders() throws Exception {
         setSingleValueAdapter();
         SingleValue value = new SingleValue("ok");
-        ResponseEntity<SingleValue> responseEntity = ResponseEntity.status(202)
-                .header("X-Custom", "v").body(value);
+        ResponseEntity<SingleValue> responseEntity = ResponseEntity.status(202).header("X-Custom", "v").body(value);
 
-        resolver.resolveReturnValue(responseEntity,
-                param("handler", ResponseEntity.class), request, response);
+        resolver.resolveReturnValue(responseEntity, param("handler", ResponseEntity.class), request, response);
 
         verify(response).setStatusCode(org.springframework.http.HttpStatusCode.valueOf(202));
         verify(asyncSupportRegistry).startDeferredResultProcessing(any(), any(), any());
@@ -310,8 +313,7 @@ class ReactiveReturnValueResolverFlowTest {
         responseHeaders.setContentType(MediaType.TEXT_EVENT_STREAM);
         java.util.concurrent.Flow.Publisher<String> p = simplePublisher();
 
-        resolver.resolveReturnValue(p,
-                param("handler", java.util.concurrent.Flow.Publisher.class), request, response);
+        resolver.resolveReturnValue(p, param("handler", java.util.concurrent.Flow.Publisher.class), request, response);
 
         verify(streamSenderFactory).create(any(), any());
     }
@@ -356,8 +358,8 @@ class ReactiveReturnValueResolverFlowTest {
     @Test
     void getConstructorArgs_buildsArgumentArray() throws Exception {
         @SuppressWarnings("unchecked")
-        Constructor<? extends StreamEmitter> ctor = (Constructor<? extends StreamEmitter>) (Constructor<?>)
-                SseJsonEmitter.class.getConstructor(Long.class, JsonConverter.class);
+        Constructor<? extends StreamEmitter> ctor = (Constructor<? extends StreamEmitter>) (Constructor<?>) SseJsonEmitter.class
+                .getConstructor(Long.class, JsonConverter.class);
         ReactiveConfig config = new ReactiveConfig(SseJsonEmitter.class, ctor, 150, 50, 5000L);
         Object[] args = resolver.getConstructorArgs(ctor, config, request);
         assertEquals(2, args.length);

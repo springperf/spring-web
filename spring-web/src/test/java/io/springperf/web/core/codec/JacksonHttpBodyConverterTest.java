@@ -1,18 +1,19 @@
 package io.springperf.web.core.codec;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.lang.reflect.Type;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
-import java.lang.reflect.Type;
-
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * 验证 {@link JacksonHttpBodyConverter#isJsonMediaType} 的等价行为：
- * 仅接受 JSON 相关 MediaType（application/json、application/*、application/*+json、通配类型、null）。
+ * 验证 {@link JacksonHttpBodyConverter#isJsonMediaType} 的等价行为： 仅接受 JSON 相关
+ * MediaType（application/json、application/*、application/*+json、通配类型、null）。
  */
 class JacksonHttpBodyConverterTest {
 
@@ -61,7 +62,8 @@ class JacksonHttpBodyConverterTest {
     @Test
     void canRead_jsonWithCharset() {
         assertTrue(converter.canRead((Type) Object.class, null,
-                new MediaType("application", "json", java.util.Collections.singletonMap("charset", "utf-8")), null, null));
+                new MediaType("application", "json", java.util.Collections.singletonMap("charset", "utf-8")), null,
+                null));
     }
 
     @Test
@@ -82,7 +84,8 @@ class JacksonHttpBodyConverterTest {
 
     @Test
     void canWrite_applicationJson() {
-        assertTrue(converter.canWrite((Type) Payload.class, Payload.class, MediaType.APPLICATION_JSON, null, null, null));
+        assertTrue(
+                converter.canWrite((Type) Payload.class, Payload.class, MediaType.APPLICATION_JSON, null, null, null));
     }
 
     @Test
@@ -97,12 +100,15 @@ class JacksonHttpBodyConverterTest {
 
     @Test
     void canWrite_applicationSuffixWildcardJson() {
-        assertTrue(converter.canWrite((Type) Payload.class, Payload.class, new MediaType("application", "*+json"), null, null, null));
+        assertTrue(converter.canWrite((Type) Payload.class, Payload.class, new MediaType("application", "*+json"), null,
+                null, null));
     }
 
     @Test
     void canWrite_nonJsonMediaType_rejected() {
-        assertFalse(converter.canWrite((Type) Payload.class, Payload.class, MediaType.APPLICATION_XML, null, null, null));
-        assertFalse(converter.canWrite((Type) Payload.class, Payload.class, MediaType.APPLICATION_OCTET_STREAM, null, null, null));
+        assertFalse(
+                converter.canWrite((Type) Payload.class, Payload.class, MediaType.APPLICATION_XML, null, null, null));
+        assertFalse(converter.canWrite((Type) Payload.class, Payload.class, MediaType.APPLICATION_OCTET_STREAM, null,
+                null, null));
     }
 }

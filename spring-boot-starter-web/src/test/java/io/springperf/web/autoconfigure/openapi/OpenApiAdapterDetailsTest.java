@@ -8,8 +8,7 @@ import java.util.concurrent.CompletableFuture;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * 验证 {@link OpenApiAdapter} 的纯逻辑方法：
- * 路径清洗、返回值解包、Schema 映射、框架/简单类型判断。
+ * 验证 {@link OpenApiAdapter} 的纯逻辑方法： 路径清洗、返回值解包、Schema 映射、框架/简单类型判断。
  */
 class OpenApiAdapterDetailsTest {
 
@@ -48,22 +47,24 @@ class OpenApiAdapterDetailsTest {
 
     static class ReturnTypes {
         @SuppressWarnings("unused")
-        public CompletableFuture<Dto> futureDto() { return null; }
+        public CompletableFuture<Dto> futureDto() {
+            return null;
+        }
 
         @SuppressWarnings("unused")
-        public String plainString() { return ""; }
+        public String plainString() {
+            return "";
+        }
     }
 
     @Test
     void resolveReturnType_completableFuture_unwrapsGeneric() throws Exception {
-        assertEquals(Dto.class, OpenApiAdapter.resolveReturnType(
-                ReturnTypes.class.getMethod("futureDto")));
+        assertEquals(Dto.class, OpenApiAdapter.resolveReturnType(ReturnTypes.class.getMethod("futureDto")));
     }
 
     @Test
     void resolveReturnType_plainString_returnsType() throws Exception {
-        assertEquals(String.class, OpenApiAdapter.resolveReturnType(
-                ReturnTypes.class.getMethod("plainString")));
+        assertEquals(String.class, OpenApiAdapter.resolveReturnType(ReturnTypes.class.getMethod("plainString")));
     }
 
     // ==================== resolveSchema ====================

@@ -1,11 +1,12 @@
 package io.springperf.web.server;
 
-import io.netty.channel.ChannelHandler;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
+
+import io.netty.channel.ChannelHandler;
 
 class PipelineCustomizerTest {
 
@@ -66,8 +67,7 @@ class PipelineCustomizerTest {
     void returnedLists_areUnmodifiable() {
         PipelineCustomizer customizer = new PipelineCustomizer();
         customizer.addBeforeAggregator(mockHandler());
-        assertThrows(UnsupportedOperationException.class,
-                () -> customizer.getBeforeAggregatorHandlers().clear());
+        assertThrows(UnsupportedOperationException.class, () -> customizer.getBeforeAggregatorHandlers().clear());
         assertThrows(UnsupportedOperationException.class,
                 () -> customizer.getAfterAggregatorHandlers().add(mockHandler()));
     }

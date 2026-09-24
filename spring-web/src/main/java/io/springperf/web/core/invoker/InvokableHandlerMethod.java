@@ -1,8 +1,10 @@
 package io.springperf.web.core.invoker;
 
-import io.springperf.web.annotation.Optimize;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import java.lang.annotation.Annotation;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.reflect.Method;
+
 import org.springframework.core.DefaultParameterNameDiscoverer;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.ParameterNameDiscoverer;
@@ -12,19 +14,16 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.util.StringUtils;
 import org.springframework.web.method.HandlerMethod;
 
-import java.lang.annotation.Annotation;
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.reflect.Method;
+import io.springperf.web.annotation.Optimize;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 public class InvokableHandlerMethod extends HandlerMethod {
 
     /**
-     * GraalVM native-image 检测：运行时动态生成字节码在封闭世界中不可用。
-     * 提前检查避免 {@link FastInvokerGenerator} 的异常开销。
+     * GraalVM native-image 检测：运行时动态生成字节码在封闭世界中不可用。 提前检查避免 {@link FastInvokerGenerator} 的异常开销。
      */
-    private static final boolean IN_NATIVE_IMAGE =
-            System.getProperty("org.graalvm.nativeimage.imagecode") != null;
+    private static final boolean IN_NATIVE_IMAGE = System.getProperty("org.graalvm.nativeimage.imagecode") != null;
 
     protected static ParameterNameDiscoverer parameterNameDiscoverer = new DefaultParameterNameDiscoverer();
 

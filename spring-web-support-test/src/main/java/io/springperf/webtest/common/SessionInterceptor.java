@@ -14,9 +14,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * 会话拦截器，Controller 方法调用前处理
  *
  * @author jy
+ *
  * @since 2023-12-04 14:54
  */
-//@Configuration
+// @Configuration
 public class SessionInterceptor implements HandlerInterceptor {
 
     /**
@@ -52,7 +53,7 @@ public class SessionInterceptor implements HandlerInterceptor {
         if (handler instanceof HandlerMethod) {
             HandlerMethod handlerMethod = (HandlerMethod) handler;
             Method method = handlerMethod.getMethod();
-            //注解声明了无需认证
+            // 注解声明了无需认证
             LoginIgnore loginIgnore = method.getAnnotation(LoginIgnore.class);
             if (null != loginIgnore) {
                 return true;

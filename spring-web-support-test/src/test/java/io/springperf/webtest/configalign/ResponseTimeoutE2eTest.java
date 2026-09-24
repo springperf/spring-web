@@ -22,20 +22,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * {@code server.http.timeout=1s} 响应超时 E2E（原始 socket，便于检查「只发出一个响应」）：
- *
  * <ul>
- *   <li>处理超过时限 → 504 Gateway Timeout；</li>
- *   <li>超时后处理器才完成时，**不得再写出第二个响应**（客户端只能收到一个完整响应）；</li>
- *   <li>已提交（flush/流式）的响应不受该计时器影响——提交即取消响应超时；</li>
- *   <li>限额内的请求不受影响，且 504 之后连接可继续复用。</li>
+ * <li>处理超过时限 → 504 Gateway Timeout；</li>
+ * <li>超时后处理器才完成时，**不得再写出第二个响应**（客户端只能收到一个完整响应）；</li>
+ * <li>已提交（flush/流式）的响应不受该计时器影响——提交即取消响应超时；</li>
+ * <li>限额内的请求不受影响，且 504 之后连接可继续复用。</li>
  * </ul>
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, ResponseTimeoutE2eTest.TimeoutConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "server.http.timeout=1s"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        ResponseTimeoutE2eTest.TimeoutConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "server.http.timeout=1s" })
 class ResponseTimeoutE2eTest {
 
     @LocalServerPort
@@ -88,8 +84,7 @@ class ResponseTimeoutE2eTest {
         try (Socket s = open()) {
             write(s, "GET /e2e-timeout/slow?ms=2500 HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
             String resp = readAll(s, 8000);
-            assertTrue(resp.contains("HTTP/1.1 504"),
-                    "处理超过 server.http.timeout 应返回 504，实际:\n" + resp);
+            assertTrue(resp.contains("HTTP/1.1 504"), "处理超过 server.http.timeout 应返回 504，实际:\n" + resp);
             assertEquals(1, countStatusLines(resp), "只应有一个响应，实际:\n" + resp);
         }
     }
@@ -101,10 +96,8 @@ class ResponseTimeoutE2eTest {
             write(s, "GET /e2e-timeout/slow?ms=2500 HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
             String resp = readAll(s, 8000);
             assertTrue(resp.contains("504"), "应先返回 504，实际:\n" + resp);
-            assertEquals(1, countStatusLines(resp),
-                    "迟到的处理器完成不得补写第二个响应，实际:\n" + resp);
-            assertTrue(!resp.contains("slow-done"),
-                    "迟到的响应体不得出现在客户端，实际:\n" + resp);
+            assertEquals(1, countStatusLines(resp), "迟到的处理器完成不得补写第二个响应，实际:\n" + resp);
+            assertTrue(!resp.contains("slow-done"), "迟到的响应体不得出现在客户端，实际:\n" + resp);
         }
     }
 
@@ -125,8 +118,7 @@ class ResponseTimeoutE2eTest {
             write(s, "GET /e2e-timeout/stream HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
             String resp = readAll(s, 8000);
             assertTrue(resp.contains("first-part"), "已提交的第一段应送达，实际:\n" + resp);
-            assertTrue(!resp.contains("504"),
-                    "已提交的响应不得被响应超时改写为 504，实际:\n" + resp);
+            assertTrue(!resp.contains("504"), "已提交的响应不得被响应超时改写为 504，实际:\n" + resp);
             assertEquals(1, countStatusLines(resp), "只应有一个响应，实际:\n" + resp);
         }
     }
@@ -139,10 +131,8 @@ class ResponseTimeoutE2eTest {
             write(s, "GET /e2e-timeout/stream HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
             String resp = readAll(s, 8000);
             assertTrue(resp.contains("first-part"), "实际:\n" + resp);
-            assertTrue(resp.contains("second-part"),
-                    "flushBuffer() 后的写入应以 chunked 续帧送达，实际:\n" + resp);
-            assertTrue(resp.toLowerCase().contains("transfer-encoding: chunked"),
-                    "渐进式输出应使用 chunked 帧，实际:\n" + resp);
+            assertTrue(resp.contains("second-part"), "flushBuffer() 后的写入应以 chunked 续帧送达，实际:\n" + resp);
+            assertTrue(resp.toLowerCase().contains("transfer-encoding: chunked"), "渐进式输出应使用 chunked 帧，实际:\n" + resp);
             assertEquals(1, countStatusLines(resp), "只应有一个响应，实际:\n" + resp);
         }
     }
@@ -165,10 +155,8 @@ class ResponseTimeoutE2eTest {
             // 第二个请求。1s 响应超时在负载高的整包运行中可能仍被触发（100ms 的处理器被调度延迟），
             // 那是 fastHandler_unaffected 用例的职责；此处允许 200 或 504，但必须是该连接上的
             // **完整单一响应**（连接被静默关闭 → 空响应；响应拼接 → 多个状态行，都会失败）。
-            assertTrue(second.contains("HTTP/1.1 "),
-                    "504 之后同连接应仍可服务（200 或超时 504 均证明复用），实际:\n" + second);
-            assertEquals(1, countStatusLines(second),
-                    "第二个响应不得与前一个拼接，实际:\n" + second);
+            assertTrue(second.contains("HTTP/1.1 "), "504 之后同连接应仍可服务（200 或超时 504 均证明复用），实际:\n" + second);
+            assertEquals(1, countStatusLines(second), "第二个响应不得与前一个拼接，实际:\n" + second);
         }
     }
 

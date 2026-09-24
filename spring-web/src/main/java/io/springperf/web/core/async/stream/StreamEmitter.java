@@ -1,8 +1,5 @@
 package io.springperf.web.core.async.stream;
 
-import org.springframework.http.server.ServerHttpResponse;
-import org.springframework.web.context.request.async.DeferredResult;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -11,14 +8,16 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
+import org.springframework.http.server.ServerHttpResponse;
+import org.springframework.web.context.request.async.DeferredResult;
+
 public abstract class StreamEmitter<T> {
 
     protected final DeferredResult<?> deferredResult;
 
     protected AtomicBoolean complete = new AtomicBoolean(false);
     /**
-     * earlyEncode=true 时存储 byte[]（已编码快照）；
-     * earlyEncode=false 时存储原始 T 对象。
+     * earlyEncode=true 时存储 byte[]（已编码快照）； earlyEncode=false 时存储原始 T 对象。
      */
     protected List<Object> earlySendDataList = new ArrayList<>();
     protected volatile StreamSender streamSender;
@@ -55,8 +54,7 @@ public abstract class StreamEmitter<T> {
     /**
      * 发送数据。
      * <p>
-     * earlyEncode=true：在 App 线程调用 {@link #encode(Object, OutputStream)} 编码为 byte[] 快照，
-     * 再投递到发送器。确保发送时数据已冻结，线程安全。
+     * earlyEncode=true：在 App 线程调用 {@link #encode(Object, OutputStream)} 编码为 byte[] 快照， 再投递到发送器。确保发送时数据已冻结，线程安全。
      * <p>
      * earlyEncode=false：原始数据直接投递，由发送器（EventLoop 线程）延迟编码。
      */
@@ -65,8 +63,7 @@ public abstract class StreamEmitter<T> {
         // IllegalStateException）。修复前该调用在「sender 未就绪」时会静默进入 earlySendDataList，
         // 随后 initialize() 批量交付 → 已终止的流仍被写出数据（E2E 实测）。
         if (complete.get()) {
-            throw new IllegalStateException(
-                    "StreamEmitter has already been completed; send() is not allowed");
+            throw new IllegalStateException("StreamEmitter has already been completed; send() is not allowed");
         }
         Object payload = data;
         if (earlyEncode) {
@@ -93,11 +90,12 @@ public abstract class StreamEmitter<T> {
     /**
      * encode 失败回调。子类可覆写此方法决定如何处理编码失败的数据。
      * <p>
-     * 默认实现为空（仅打日志），编码失败的数据被静默丢弃，不会中断流。
-     * 子类可改为发送 SSE 错误帧、标记流为错误状态等。
+     * 默认实现为空（仅打日志），编码失败的数据被静默丢弃，不会中断流。 子类可改为发送 SSE 错误帧、标记流为错误状态等。
      *
-     * @param data 编码失败的数据（原始值，未编码）
-     * @param ex   编码异常
+     * @param data
+     *            编码失败的数据（原始值，未编码）
+     * @param ex
+     *            编码异常
      */
     protected void onEncodeError(Object data, Exception ex) {
     }

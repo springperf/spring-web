@@ -14,9 +14,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
- * 验证 {@link ServerEndpointBeanFactoryInitializationAotProcessor}：
- * 为 Bean 发现的 {@code @ServerEndpoint} 端点注册无参构造器 + {@code @On*} 回调方法 hints。
- * JVM 模式下处理器由 Spring AOT 构建期调用，本测试直接驱动它验证注册结果。
+ * 验证 {@link ServerEndpointBeanFactoryInitializationAotProcessor}： 为 Bean 发现的 {@code @ServerEndpoint} 端点注册无参构造器 +
+ * {@code @On*} 回调方法 hints。 JVM 模式下处理器由 Spring AOT 构建期调用，本测试直接驱动它验证注册结果。
  */
 class ServerEndpointBeanFactoryInitializationAotProcessorTest {
 
@@ -24,8 +23,8 @@ class ServerEndpointBeanFactoryInitializationAotProcessorTest {
 
     @Test
     void processAheadOfTime_noEndpoints_returnsNull() {
-        BeanFactoryInitializationAotContribution contribution =
-                new ServerEndpointBeanFactoryInitializationAotProcessor().processAheadOfTime(beanFactory);
+        BeanFactoryInitializationAotContribution contribution = new ServerEndpointBeanFactoryInitializationAotProcessor()
+                .processAheadOfTime(beanFactory);
         assertNull(contribution);
     }
 
@@ -33,8 +32,8 @@ class ServerEndpointBeanFactoryInitializationAotProcessorTest {
     void registersEndpointConstructorAndCallbackHints() {
         beanFactory.registerSingleton("chatEndpoint", new ChatEndpoint());
 
-        BeanFactoryInitializationAotContribution contribution =
-                new ServerEndpointBeanFactoryInitializationAotProcessor().processAheadOfTime(beanFactory);
+        BeanFactoryInitializationAotContribution contribution = new ServerEndpointBeanFactoryInitializationAotProcessor()
+                .processAheadOfTime(beanFactory);
         assertNotNull(contribution, "存在 @ServerEndpoint bean 时应产生 AOT contribution");
 
         RuntimeHints hints = new RuntimeHints();
@@ -43,9 +42,9 @@ class ServerEndpointBeanFactoryInitializationAotProcessorTest {
         contribution.applyTo(generationContext, null);
 
         // 无参构造器注册（INVOKE_DECLARED_CONSTRUCTORS 含 <init>）
-        assertTrue(hints.reflection().getTypeHint(ChatEndpoint.class) != null,
-                "端点类应注册反射 hint");
-        assertTrue(hints.reflection().getTypeHint(ChatEndpoint.class).getMemberCategories()
+        assertTrue(hints.reflection().getTypeHint(ChatEndpoint.class) != null, "端点类应注册反射 hint");
+        assertTrue(
+                hints.reflection().getTypeHint(ChatEndpoint.class).getMemberCategories()
                         .contains(org.springframework.aot.hint.MemberCategory.INVOKE_DECLARED_CONSTRUCTORS),
                 "端点类应注册 INVOKE_DECLARED_CONSTRUCTORS");
 
@@ -55,10 +54,8 @@ class ServerEndpointBeanFactoryInitializationAotProcessorTest {
     }
 
     private static void assertMethodInvokeHint(RuntimeHints hints, String methodName) {
-        boolean registered = hints.reflection().typeHints()
-                .flatMap(org.springframework.aot.hint.TypeHint::methods)
-                .map(org.springframework.aot.hint.ExecutableHint::getName)
-                .anyMatch(methodName::equals);
+        boolean registered = hints.reflection().typeHints().flatMap(org.springframework.aot.hint.TypeHint::methods)
+                .map(org.springframework.aot.hint.ExecutableHint::getName).anyMatch(methodName::equals);
         assertTrue(registered, "回调方法 " + methodName + " 应注册反射 hint");
     }
 

@@ -119,7 +119,8 @@ public class ShiroConfig {
                 }
 
                 private void setCookieIfNeeded() {
-                    if (cookieSet) return;
+                    if (cookieSet)
+                        return;
                     Session shiroSession = SecurityUtils.getSubject().getSession(false);
                     if (shiroSession != null && requestSessionId == null && !getResponse().isCommitted()) {
                         getResponse().getHeaders().add("Set-Cookie",
@@ -138,7 +139,8 @@ public class ShiroConfig {
 
         private static String extractSessionId(WebServerHttpRequest request) {
             String cookieHeader = request.getHeaders().getFirst("Cookie");
-            if (cookieHeader == null) return null;
+            if (cookieHeader == null)
+                return null;
             for (String part : cookieHeader.split(";")) {
                 part = part.trim();
                 if (part.startsWith("JSESSIONID=")) {

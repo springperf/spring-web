@@ -1,7 +1,8 @@
 package io.springperf.web.core.codec.interceptor;
 
-import io.springperf.web.context.WebComponentWrapper;
 import org.springframework.web.method.ControllerAdviceBean;
+
+import io.springperf.web.context.WebComponentWrapper;
 
 public class WebComponentControllerAdviceBean<T> extends WebComponentWrapper<T> {
 

@@ -1,12 +1,13 @@
 package io.springperf.web.json;
 
-import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.SneakyThrows;
-
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Type;
+
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import lombok.SneakyThrows;
 
 public class JacksonConverter implements JsonConverter {
 

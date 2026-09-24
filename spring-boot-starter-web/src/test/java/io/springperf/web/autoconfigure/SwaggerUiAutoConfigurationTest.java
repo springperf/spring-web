@@ -14,8 +14,8 @@ class SwaggerUiAutoConfigurationTest {
 
     @Test
     void openApiDocController_createsBean() {
-        OpenApiDocController controller = config.openApiDocController(
-                mock(OpenApiCustomizer.class), new OpenApiProperties());
+        OpenApiDocController controller = config.openApiDocController(mock(OpenApiCustomizer.class),
+                new OpenApiProperties());
         assertNotNull(controller);
     }
 
@@ -33,16 +33,15 @@ class SwaggerUiAutoConfigurationTest {
         ResourceHandlerRegistration reg = config.swaggerUiResourceHandler(swaggerProps);
 
         assertNotNull(reg);
-        assertArrayEquals(new String[]{"/swagger-ui/**"}, reg.getPathPatterns());
+        assertArrayEquals(new String[] { "/swagger-ui/**" }, reg.getPathPatterns());
         assertEquals(1, reg.getLocationValues().size());
-        assertEquals("classpath:/META-INF/resources/webjars/swagger-ui/5.4.0",
-                reg.getLocationValues().get(0), "addResourceLocations 会去掉尾部斜杠");
+        assertEquals("classpath:/META-INF/resources/webjars/swagger-ui/5.4.0", reg.getLocationValues().get(0),
+                "addResourceLocations 会去掉尾部斜杠");
     }
 
     @Test
     void swaggerUiResourceHandler_usesDefaultVersion() {
         ResourceHandlerRegistration reg = config.swaggerUiResourceHandler(new SwaggerUiProperties());
-        assertEquals("classpath:/META-INF/resources/webjars/swagger-ui/5.2.0",
-                reg.getLocationValues().get(0));
+        assertEquals("classpath:/META-INF/resources/webjars/swagger-ui/5.2.0", reg.getLocationValues().get(0));
     }
 }

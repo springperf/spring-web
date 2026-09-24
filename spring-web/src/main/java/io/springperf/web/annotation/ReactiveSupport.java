@@ -1,14 +1,14 @@
 package io.springperf.web.annotation;
 
-import io.springperf.web.core.async.stream.StreamEmitter;
+import static java.lang.annotation.ElementType.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
-import static java.lang.annotation.ElementType.*;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import io.springperf.web.core.async.stream.StreamEmitter;
 
-@Target({TYPE, METHOD,ANNOTATION_TYPE})
+@Target({ TYPE, METHOD, ANNOTATION_TYPE })
 @Retention(RUNTIME)
 public @interface ReactiveSupport {
 

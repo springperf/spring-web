@@ -1,8 +1,8 @@
 package io.springperf.web.core.mapping.match;
 
-import org.springframework.lang.Nullable;
-
 import java.util.Objects;
+
+import org.springframework.lang.Nullable;
 
 public class NameValueExpressionSupport {
 
@@ -62,8 +62,10 @@ public class NameValueExpressionSupport {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
         NameValueExpressionSupport that = (NameValueExpressionSupport) o;
         return negated == that.negated && Objects.equals(name, that.name) && Objects.equals(value, that.value);
     }

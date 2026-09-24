@@ -31,12 +31,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * batch 默认线程模型的**最终落点**验证（真实 {@link BizPoolRegistry} + 真实 {@link BatchRegistry}，
- * 不使用 mock 断言调用，而是看 {@code determinePool} 实际解析出哪个执行器）：
- *
+ * batch 默认线程模型的**最终落点**验证（真实 {@link BizPoolRegistry} + 真实 {@link BatchRegistry}， 不使用 mock 断言调用，而是看
+ * {@code determinePool} 实际解析出哪个执行器）：
  * <ul>
- *   <li>未开虚拟线程 → 遵循全局默认 {@code pool.default-execute-mode}（本例为 default 业务池）；</li>
- *   <li>开启虚拟线程（JDK 21+）→ EventLoop（{@code determinePool} 返回 null）。</li>
+ * <li>未开虚拟线程 → 遵循全局默认 {@code pool.default-execute-mode}（本例为 default 业务池）；</li>
+ * <li>开启虚拟线程（JDK 21+）→ EventLoop（{@code determinePool} 返回 null）。</li>
  * </ul>
  */
 class BatchDefaultThreadModelTest {
@@ -48,9 +47,9 @@ class BatchDefaultThreadModelTest {
     }
 
     /**
-     * 未开虚拟线程场景。两个场景各用一个控制器类 + 各自的配置：{@code BatchScanner} 按 bean 扫描，
-     * 且 {@link io.springperf.web.core.mapping.MappingHandlerMethod} 的方法级决策缓存是<b>按方法跨实例共享</b>的，
-     * 同一 JVM 内必须让两个场景的方法互不相遇，否则后跑的用例会读到先跑者写入的决策。
+     * 未开虚拟线程场景。两个场景各用一个控制器类 + 各自的配置：{@code BatchScanner} 按 bean 扫描， 且
+     * {@link io.springperf.web.core.mapping.MappingHandlerMethod} 的方法级决策缓存是<b>按方法跨实例共享</b>的， 同一 JVM
+     * 内必须让两个场景的方法互不相遇，否则后跑的用例会读到先跑者写入的决策。
      */
     @Controller
     public static class PlainController {
@@ -97,14 +96,13 @@ class BatchDefaultThreadModelTest {
 
     @Test
     void singlePath_usesEventLoop_whenVirtualThreadsEnabled() throws Exception {
-        assumeTrue(Runtime.version().feature() >= 21,
-                "虚拟线程需要 JDK 21+，当前 JDK " + Runtime.version().feature());
+        assumeTrue(Runtime.version().feature() >= 21, "虚拟线程需要 JDK 21+，当前 JDK " + Runtime.version().feature());
         assertNull(resolveSingleDispatchExecutor(true), "开启虚拟线程时 single 路径应留在 EventLoop（零切换）");
     }
 
     /**
-     * 装配真实的 BizPoolRegistry + BatchRegistry，返回 {@code @BatchMapping} single 处理器
-     * 最终解析到的执行器（{@code null} = EventLoop），并校验它与虚拟线程开关的预期一致。
+     * 装配真实的 BizPoolRegistry + BatchRegistry，返回 {@code @BatchMapping} single 处理器 最终解析到的执行器（{@code null} =
+     * EventLoop），并校验它与虚拟线程开关的预期一致。
      */
     private ExecutorService resolveSingleDispatchExecutor(boolean virtualThreadsEnabled) throws Exception {
         Class<?> controllerType = virtualThreadsEnabled ? VtController.class : PlainController.class;
@@ -119,7 +117,8 @@ class BatchDefaultThreadModelTest {
             ApplicationProperties props = mock(ApplicationProperties.class);
             when(webContext.getCtx()).thenReturn(ctx);
             when(webContext.getProps()).thenReturn(props);
-            when(webContext.getWebComponentWithDefault(eq(WebMetrics.class), any())).thenReturn(NoOpWebMetrics.INSTANCE);
+            when(webContext.getWebComponentWithDefault(eq(WebMetrics.class), any()))
+                    .thenReturn(NoOpWebMetrics.INSTANCE);
             when(props.getBoolean(eq("spring.threads.virtual.enabled"), eq(false))).thenReturn(virtualThreadsEnabled);
             when(props.getInt(PropertiesConstant.POOL_CORE_POOL_SIZE)).thenReturn(1);
             when(props.getInt(PropertiesConstant.POOL_MAX_POOL_SIZE)).thenReturn(2);

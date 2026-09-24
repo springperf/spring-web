@@ -1,10 +1,11 @@
 package io.springperf.web.core.codec.interceptor;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.codec.HttpBodyConverter;
-import io.springperf.web.http.RequestContext;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.io.IOException;
+import java.lang.reflect.Type;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -13,11 +14,11 @@ import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.MediaType;
 
-import java.io.IOException;
-import java.lang.reflect.Type;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.codec.HttpBodyConverter;
+import io.springperf.web.http.RequestContext;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 class HttpBodyCodecInterceptorRegistryTest {
 
@@ -132,12 +133,11 @@ class HttpBodyCodecInterceptorRegistryTest {
         // 覆盖 MAPPING_CACHE_KEY 缓存分支（HttpBodyCodecInterceptorRegistry.java:60-64）：
         // 首次 realGet 后写入 mappingContext 缓存，第二次直接命中缓存不再重新解析
         stubPathMapping();
-        io.springperf.web.core.mapping.PathMappingContext mappingContext =
-                mock(io.springperf.web.core.mapping.PathMappingContext.class);
+        io.springperf.web.core.mapping.PathMappingContext mappingContext = mock(
+                io.springperf.web.core.mapping.PathMappingContext.class);
         // 模拟真实缓存：set 保存数组，get 返回已缓存值
         final HttpBodyCodecInterceptor[][] cached = new HttpBodyCodecInterceptor[1][];
-        when(mappingContext.get(HttpBodyCodecInterceptorRegistry.MAPPING_CACHE_KEY))
-                .thenAnswer(inv -> cached[0]);
+        when(mappingContext.get(HttpBodyCodecInterceptorRegistry.MAPPING_CACHE_KEY)).thenAnswer(inv -> cached[0]);
         doAnswer(inv -> {
             cached[0] = inv.getArgument(1);
             return null;
@@ -328,17 +328,20 @@ class HttpBodyCodecInterceptorRegistryTest {
         }
 
         @Override
-        public HttpInputMessage beforeBodyRead(HttpInputMessage inputMessage, MethodParameter parameter, Type targetType, HttpBodyConverter converter) {
+        public HttpInputMessage beforeBodyRead(HttpInputMessage inputMessage, MethodParameter parameter,
+                Type targetType, HttpBodyConverter converter) {
             return inputMessage;
         }
 
         @Override
-        public Object afterBodyRead(Object body, HttpInputMessage inputMessage, MethodParameter parameter, Type targetType, HttpBodyConverter converter) {
+        public Object afterBodyRead(Object body, HttpInputMessage inputMessage, MethodParameter parameter,
+                Type targetType, HttpBodyConverter converter) {
             return body;
         }
 
         @Override
-        public Object handleEmptyBodyRead(Object body, HttpInputMessage inputMessage, MethodParameter parameter, Type targetType, HttpBodyConverter converter) {
+        public Object handleEmptyBodyRead(Object body, HttpInputMessage inputMessage, MethodParameter parameter,
+                Type targetType, HttpBodyConverter converter) {
             return body;
         }
 
@@ -348,9 +351,9 @@ class HttpBodyCodecInterceptorRegistryTest {
         }
 
         @Override
-        public Object beforeBodyWrite(Object body, MethodParameter returnType, MediaType selectedContentType, HttpBodyConverter converter,
-                                      org.springframework.http.server.ServerHttpRequest request,
-                                      org.springframework.http.server.ServerHttpResponse response) {
+        public Object beforeBodyWrite(Object body, MethodParameter returnType, MediaType selectedContentType,
+                HttpBodyConverter converter, org.springframework.http.server.ServerHttpRequest request,
+                org.springframework.http.server.ServerHttpResponse response) {
             return body;
         }
     }
@@ -368,8 +371,8 @@ class HttpBodyCodecInterceptorRegistryTest {
 
     @Test
     void initWithWebContext_scansControllerAdviceAndInterceptors() throws Exception {
-        try (org.springframework.context.annotation.AnnotationConfigApplicationContext ctx =
-                     new org.springframework.context.annotation.AnnotationConfigApplicationContext(AnnotatedConfig.class)) {
+        try (org.springframework.context.annotation.AnnotationConfigApplicationContext ctx = new org.springframework.context.annotation.AnnotationConfigApplicationContext(
+                AnnotatedConfig.class)) {
             WebContext webContext = mock(WebContext.class);
             when(webContext.getCtx()).thenReturn(ctx);
             HttpBodyCodecInterceptorRegistry reg = new HttpBodyCodecInterceptorRegistry();
@@ -382,8 +385,7 @@ class HttpBodyCodecInterceptorRegistryTest {
 
     @Test
     void initWithWebContext_emptyContext_initializesWithoutBeans() {
-        try (org.springframework.context.annotation.AnnotationConfigApplicationContext ctx =
-                     new org.springframework.context.annotation.AnnotationConfigApplicationContext()) {
+        try (org.springframework.context.annotation.AnnotationConfigApplicationContext ctx = new org.springframework.context.annotation.AnnotationConfigApplicationContext()) {
             ctx.refresh();
             WebContext webContext = mock(WebContext.class);
             when(webContext.getCtx()).thenReturn(ctx);

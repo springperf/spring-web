@@ -1,27 +1,32 @@
 package io.springperf.web.core.filter;
 
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
-import lombok.extern.slf4j.Slf4j;
-
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
+import lombok.extern.slf4j.Slf4j;
+
 /**
  * 访问日志 WebFilter，记录每个请求的方法、URI、状态码、处理耗时和客户端地址。
- * <p>通过 {@code server.accesslog.enabled=false} 关闭。</p>
- * <p>通过 {@code server.accesslog.format} 配置格式，支持以下占位符：</p>
+ * <p>
+ * 通过 {@code server.accesslog.enabled=false} 关闭。
+ * </p>
+ * <p>
+ * 通过 {@code server.accesslog.format} 配置格式，支持以下占位符：
+ * </p>
  * <ul>
- *   <li>{@code %h} — 远程地址</li>
- *   <li>{@code %m} — HTTP 方法</li>
- *   <li>{@code %U} — URI（含查询参数）</li>
- *   <li>{@code %T} — 处理耗时（毫秒）</li>
- *   <li>{@code %s} — HTTP 状态码</li>
- *   <li>{@code %u} — User-Agent 请求头</li>
+ * <li>{@code %h} — 远程地址</li>
+ * <li>{@code %m} — HTTP 方法</li>
+ * <li>{@code %U} — URI（含查询参数）</li>
+ * <li>{@code %T} — 处理耗时（毫秒）</li>
+ * <li>{@code %s} — HTTP 状态码</li>
+ * <li>{@code %u} — User-Agent 请求头</li>
  * </ul>
- * <p>Order 设为 {@code Integer.MIN_VALUE} 使其在 Filter 链中最早执行（最外层包裹），
- * 从而能统计包括其他 Filter 在内的完整处理耗时。</p>
+ * <p>
+ * Order 设为 {@code Integer.MIN_VALUE} 使其在 Filter 链中最早执行（最外层包裹）， 从而能统计包括其他 Filter 在内的完整处理耗时。
+ * </p>
  */
 @Slf4j
 public class AccessLogWebFilter implements WebFilter {
@@ -41,7 +46,8 @@ public class AccessLogWebFilter implements WebFilter {
     /**
      * 使用指定格式创建访问日志过滤器。
      *
-     * @param format 格式字符串，支持 %h、%m、%U、%T、%s、%u 占位符
+     * @param format
+     *            格式字符串，支持 %h、%m、%U、%T、%s、%u 占位符
      */
     public AccessLogWebFilter(String format) {
         this(format, AccessLogWriter.NOOP);
@@ -50,8 +56,10 @@ public class AccessLogWebFilter implements WebFilter {
     /**
      * 使用指定格式与落盘写出器创建访问日志过滤器。
      *
-     * @param format          格式字符串，支持 %h、%m、%U、%T、%s、%u 占位符
-     * @param accessLogWriter 落盘写出器（{@link AccessLogWriter#NOOP} 表示仅走日志框架）
+     * @param format
+     *            格式字符串，支持 %h、%m、%U、%T、%s、%u 占位符
+     * @param accessLogWriter
+     *            落盘写出器（{@link AccessLogWriter#NOOP} 表示仅走日志框架）
      */
     public AccessLogWebFilter(String format, AccessLogWriter accessLogWriter) {
         this.segments = parseFormat(format != null ? format : DEFAULT_FORMAT);
@@ -59,7 +67,8 @@ public class AccessLogWebFilter implements WebFilter {
     }
 
     @Override
-    public void doFilter(WebServerHttpRequest request, WebServerHttpResponse response, FilterChain chain) throws Exception {
+    public void doFilter(WebServerHttpRequest request, WebServerHttpResponse response, FilterChain chain)
+            throws Exception {
         long startNanos = System.nanoTime();
         try {
             chain.doFilter(request, response);
@@ -128,12 +137,7 @@ public class AccessLogWebFilter implements WebFilter {
     }
 
     private enum Token {
-        REMOTE_ADDR('h'),
-        METHOD('m'),
-        URI('U'),
-        ELAPSED_MS('T'),
-        STATUS('s'),
-        USER_AGENT('u');
+        REMOTE_ADDR('h'), METHOD('m'), URI('U'), ELAPSED_MS('T'), STATUS('s'), USER_AGENT('u');
 
         final char ch;
 
@@ -152,8 +156,8 @@ public class AccessLogWebFilter implements WebFilter {
     }
 
     private interface Segment {
-        void append(StringBuilder sb, WebServerHttpRequest request, long elapsedMs,
-                    int status, String remoteAddr, String userAgent);
+        void append(StringBuilder sb, WebServerHttpRequest request, long elapsedMs, int status, String remoteAddr,
+                String userAgent);
     }
 
     private static class LiteralSegment implements Segment {
@@ -164,8 +168,8 @@ public class AccessLogWebFilter implements WebFilter {
         }
 
         @Override
-        public void append(StringBuilder sb, WebServerHttpRequest request, long elapsedMs,
-                           int status, String remoteAddr, String userAgent) {
+        public void append(StringBuilder sb, WebServerHttpRequest request, long elapsedMs, int status,
+                String remoteAddr, String userAgent) {
             sb.append(text);
         }
     }
@@ -178,8 +182,8 @@ public class AccessLogWebFilter implements WebFilter {
         }
 
         @Override
-        public void append(StringBuilder sb, WebServerHttpRequest request, long elapsedMs,
-                           int status, String remoteAddr, String userAgent) {
+        public void append(StringBuilder sb, WebServerHttpRequest request, long elapsedMs, int status,
+                String remoteAddr, String userAgent) {
             // 直接按 token 追加，避免每段每请求创建 Context 对象 + Function.apply 的分配
             switch (token) {
                 case REMOTE_ADDR:

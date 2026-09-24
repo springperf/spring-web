@@ -27,10 +27,7 @@ public class HelloApiTest extends BaseE2ETest {
 
     @Test
     void hello_should_work() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/hello/123/aaab?v=netty")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/hello/123/aaab?v=netty").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             assertEquals("{\"v\":\"netty\",\"message\":\"hello 123\"}", resp.body().string());
@@ -39,12 +36,9 @@ public class HelloApiTest extends BaseE2ETest {
 
     @Test
     void testPostJson() throws Exception {
-        RequestBody body = RequestBody.create(
-                "{\"tid\": 1243456,\"data\":{\"name\":\"123cd\",\"age\":122}}", JSON_MEDIA);
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/find/hcd?v=111&id=777&age=33")
-                .post(body)
-                .build();
+        RequestBody body = RequestBody.create("{\"tid\": 1243456,\"data\":{\"name\":\"123cd\",\"age\":122}}",
+                JSON_MEDIA);
+        Request req = new Request.Builder().url(baseUrl() + "/find/hcd?v=111&id=777&age=33").post(body).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> result = JSON.parseObject(resp.body().string(), Map.class);
@@ -55,10 +49,7 @@ public class HelloApiTest extends BaseE2ETest {
     @Test
     void echoGet() throws Exception {
         String received = System.currentTimeMillis() + "test";
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/echo?received=" + received)
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/echo?received=" + received).get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(302, resp.code());
             assertEquals(received, resp.body().string());
@@ -84,14 +75,8 @@ public class HelloApiTest extends BaseE2ETest {
 
     @Test
     void testPostForm() throws Exception {
-        RequestBody body = new FormBody.Builder()
-                .add("age", "111")
-                .add("ids", "aaa").add("ids", "bbb")
-                .build();
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/read/hcd?name=111hcd")
-                .post(body)
-                .build();
+        RequestBody body = new FormBody.Builder().add("age", "111").add("ids", "aaa").add("ids", "bbb").build();
+        Request req = new Request.Builder().url(baseUrl() + "/read/hcd?name=111hcd").post(body).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> result = JSON.parseObject(resp.body().string(), Map.class);
@@ -103,9 +88,7 @@ public class HelloApiTest extends BaseE2ETest {
 
     @Test
     void asyncGet() throws Exception {
-        OkHttpClient shortClient = CLIENT.newBuilder()
-                .readTimeout(Duration.ofSeconds(5))
-                .build();
+        OkHttpClient shortClient = CLIENT.newBuilder().readTimeout(Duration.ofSeconds(5)).build();
         Request req = new Request.Builder().url(baseUrl() + "/async").get().build();
         try (Response resp = shortClient.newCall(req).execute()) {
             assertEquals(200, resp.code());
@@ -115,17 +98,11 @@ public class HelloApiTest extends BaseE2ETest {
 
     @Test
     void testPostFormData() throws Exception {
-        RequestBody fileBody = RequestBody.create(
-                "aaaaaaaaaaaaaaaaaaaaaa".getBytes(StandardCharsets.UTF_8));
-        RequestBody body = new MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
+        RequestBody fileBody = RequestBody.create("aaaaaaaaaaaaaaaaaaaaaa".getBytes(StandardCharsets.UTF_8));
+        RequestBody body = new MultipartBody.Builder().setType(MultipartBody.FORM)
                 .addFormDataPart("userPart", "{\"name\":\"123cd\",\"age\":122}")
-                .addFormDataPart("file", "testFile.txt", fileBody)
-                .build();
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/upload")
-                .post(body)
-                .build();
+                .addFormDataPart("file", "testFile.txt", fileBody).build();
+        Request req = new Request.Builder().url(baseUrl() + "/upload").post(body).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> result = JSON.parseObject(resp.body().string(), Map.class);
@@ -152,15 +129,15 @@ public class HelloApiTest extends BaseE2ETest {
                 while (!source.exhausted()) {
                     String line = source.readUtf8Line();
                     System.out.println("line: " + line);
-                    if (line == null) continue;
+                    if (line == null)
+                        continue;
                     if (line.startsWith("data:")) {
                         latch.countDown();
                     }
                 }
             }
         });
-        assertTrue(latch.await(5, TimeUnit.SECONDS),
-                "Should receive at least 8 SSE events within timeout");
+        assertTrue(latch.await(5, TimeUnit.SECONDS), "Should receive at least 8 SSE events within timeout");
     }
 
     @Test
@@ -182,7 +159,8 @@ public class HelloApiTest extends BaseE2ETest {
                 BufferedSource source = response.body().source();
                 while (!source.exhausted()) {
                     String line = source.readUtf8Line();
-                    if (line == null) continue;
+                    if (line == null)
+                        continue;
                     System.out.println(line);
                     if (line.startsWith("data:")) {
                         count.incrementAndGet();

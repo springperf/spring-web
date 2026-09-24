@@ -1,15 +1,14 @@
 package io.springperf.web.core.metrics;
 
-import io.springperf.web.context.BaseWebComponent;
-
 import java.util.concurrent.ThreadPoolExecutor;
+
+import io.springperf.web.context.BaseWebComponent;
 
 /**
  * No-operation {@link WebMetrics} implementation.
  * <p>
- * All methods are empty — no overhead when metrics are not needed.
- * {@link #getNanoTime()} returns {@code 0}, enabling the JIT to eliminate
- * the entire timing path through constant folding and dead-code elimination.
+ * All methods are empty — no overhead when metrics are not needed. {@link #getNanoTime()} returns {@code 0}, enabling
+ * the JIT to eliminate the entire timing path through constant folding and dead-code elimination.
  * </p>
  *
  * @since 2.7.0

@@ -1,12 +1,13 @@
 package io.springperf.web.core.async.stream;
 
-import io.springperf.web.json.JsonConverter;
-import io.springperf.web.util.MediaTypeUtils;
+import java.io.IOException;
+import java.io.OutputStream;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.server.ServerHttpResponse;
 
-import java.io.IOException;
-import java.io.OutputStream;
+import io.springperf.web.json.JsonConverter;
+import io.springperf.web.util.MediaTypeUtils;
 
 public class StreamJsonEmitter extends StreamEmitter<Object> {
 

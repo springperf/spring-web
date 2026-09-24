@@ -1,11 +1,12 @@
 package io.springperf.web.core.async.reactive;
 
-import io.springperf.web.core.async.stream.SseEmitter;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.lang.reflect.Constructor;
 
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
+
+import io.springperf.web.core.async.stream.SseEmitter;
 
 class ReactiveConfigTest {
 

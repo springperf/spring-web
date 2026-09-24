@@ -22,36 +22,28 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code server.http.timeout}（响应超时）与 {@code spring.mvc.async.request-timeout}（异步超时）
- * 的优先级 E2E（同文件两个测试类，分别对应两种属性组合）：
- *
+ * {@code server.http.timeout}（响应超时）与 {@code spring.mvc.async.request-timeout}（异步超时） 的优先级 E2E（同文件两个测试类，分别对应两种属性组合）：
  * <ul>
- *   <li>响应超时更短 → 异步尚未完成即以 504 结束，迟到的异步结果必须被丢弃；</li>
- *   <li>异步超时更短 → 由异步机制结束请求（Spring 语义：{@code AsyncRequestTimeoutException} → 503）。</li>
+ * <li>响应超时更短 → 异步尚未完成即以 504 结束，迟到的异步结果必须被丢弃；</li>
+ * <li>异步超时更短 → 由异步机制结束请求（Spring 语义：{@code AsyncRequestTimeoutException} → 503）。</li>
  * </ul>
- *
- * <p>两个方向都必须保证客户端只收到一个响应。</p>
+ * <p>
+ * 两个方向都必须保证客户端只收到一个响应。
+ * </p>
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, DeferredConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "server.http.timeout=1s",
-                "spring.mvc.async.request-timeout=5s"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        DeferredConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "server.http.timeout=1s", "spring.mvc.async.request-timeout=5s" })
 class HttpTimeoutWinsE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(20))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(20)).build();
 
     @LocalServerPort
     int port;
 
     private Response get(String path) throws Exception {
-        return CLIENT.newCall(new Request.Builder().url("http://localhost:" + port + path).build())
-                .execute();
+        return CLIENT.newCall(new Request.Builder().url("http://localhost:" + port + path).build()).execute();
     }
 
     @Test
@@ -74,12 +66,9 @@ class HttpTimeoutWinsE2eTest {
         Response resp = get("/e2e-at/async?ms=2500");
         long elapsed = System.currentTimeMillis() - start;
         try {
-            assertEquals(503, resp.code(),
-                    "异步请求在响应超时(1s)后应由异步超时语义结束（503），实际 " + resp.code());
-            assertTrue(elapsed < 3000,
-                    "应由更短的响应超时(1s)而非异步超时(5s)结束请求，实际耗时 " + elapsed + "ms");
-            assertTrue(!resp.body().string().contains("async-done"),
-                    "迟到的异步结果不得出现在响应中");
+            assertEquals(503, resp.code(), "异步请求在响应超时(1s)后应由异步超时语义结束（503），实际 " + resp.code());
+            assertTrue(elapsed < 3000, "应由更短的响应超时(1s)而非异步超时(5s)结束请求，实际耗时 " + elapsed + "ms");
+            assertTrue(!resp.body().string().contains("async-done"), "迟到的异步结果不得出现在响应中");
         } finally {
             resp.close();
         }
@@ -89,35 +78,26 @@ class HttpTimeoutWinsE2eTest {
 /**
  * 反向组合：异步超时（1s）短于响应超时（10s）→ 由异步机制结束请求。
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, DeferredConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "server.http.timeout=10s",
-                "spring.mvc.async.request-timeout=1s"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        DeferredConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "server.http.timeout=10s", "spring.mvc.async.request-timeout=1s" })
 class AsyncTimeoutWinsE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(20))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(20)).build();
 
     @LocalServerPort
     int port;
 
     private Response get(String path) throws Exception {
-        return CLIENT.newCall(new Request.Builder().url("http://localhost:" + port + path).build())
-                .execute();
+        return CLIENT.newCall(new Request.Builder().url("http://localhost:" + port + path).build()).execute();
     }
 
     @Test
     void asyncNotCompleted_endedByAsyncTimeout() throws Exception {
         Response resp = get("/e2e-at/async?ms=4000");
         try {
-            assertEquals(503, resp.code(),
-                    "异步超时(1s)短于响应超时(10s)时应由异步机制结束请求（Spring 语义 503），实际 "
-                            + resp.code());
+            assertEquals(503, resp.code(), "异步超时(1s)短于响应超时(10s)时应由异步机制结束请求（Spring 语义 503），实际 " + resp.code());
         } finally {
             resp.close();
         }
@@ -129,8 +109,7 @@ class AsyncTimeoutWinsE2eTest {
         try {
             assertTrue(resp.code() >= 500, "异步超时应以错误状态结束，实际 " + resp.code());
             String body = resp.body().string();
-            assertTrue(!body.contains("async-done"),
-                    "异步超时后到达的结果不得写入响应，实际 " + body);
+            assertTrue(!body.contains("async-done"), "异步超时后到达的结果不得写入响应，实际 " + body);
         } finally {
             resp.close();
         }
@@ -149,12 +128,11 @@ class DeferredConfig {
 @RestController
 class DeferredController {
 
-    private static final ScheduledExecutorService SCHEDULER =
-            Executors.newSingleThreadScheduledExecutor(r -> {
-                Thread t = new Thread(r, "e2e-async-timer");
-                t.setDaemon(true);
-                return t;
-            });
+    private static final ScheduledExecutorService SCHEDULER = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "e2e-async-timer");
+        t.setDaemon(true);
+        return t;
+    });
 
     @GetMapping("/e2e-at/async")
     public DeferredResult<String> async(@RequestParam long ms) {

@@ -9,8 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 在条件表达式中使用占位符 {@code ${...}}，验证 {@code MappingRegistry.initMatcher}
- * 对 headers/params/consumes/produces 的占位符解析能力。
+ * 在条件表达式中使用占位符 {@code ${...}}，验证 {@code MappingRegistry.initMatcher} 对 headers/params/consumes/produces 的占位符解析能力。
  * <p>
  * 占位符值由测试类的 {@code @SpringBootTest(properties=...)} 提供。
  */

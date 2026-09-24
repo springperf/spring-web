@@ -13,7 +13,8 @@ import static org.junit.jupiter.api.Assertions.*;
 class JsrEndpointWebSocketConfigurerTest {
 
     @ServerEndpoint("/ws/echo")
-    public static class EchoEndpoint {}
+    public static class EchoEndpoint {
+    }
 
     @Configuration
     static class TestConfig {

@@ -1,20 +1,8 @@
 package io.springperf.web.core.async.reactive;
 
-import io.springperf.web.core.async.stream.SseEmitter;
-import io.springperf.web.core.async.stream.SseJsonEmitter;
-import io.springperf.web.core.mapping.MappingResult;
-import io.springperf.web.core.mapping.PathMappingContext;
-import io.springperf.web.http.RequestAttribute;
-import io.springperf.web.http.RequestContext;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
-import io.springperf.web.json.JsonConverter;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.core.MethodParameter;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -25,13 +13,25 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.core.MethodParameter;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+
+import io.springperf.web.core.async.stream.SseEmitter;
+import io.springperf.web.core.async.stream.SseJsonEmitter;
+import io.springperf.web.core.mapping.MappingResult;
+import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.http.RequestAttribute;
+import io.springperf.web.http.RequestContext;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
+import io.springperf.web.json.JsonConverter;
 
 /**
- * 验证 {@link ReactiveReturnValueResolver} 的纯逻辑方法：
- * 构造器选择/参数解析、supports 判定、MediaType 包含关系、可生产类型解析。
+ * 验证 {@link ReactiveReturnValueResolver} 的纯逻辑方法： 构造器选择/参数解析、supports 判定、MediaType 包含关系、可生产类型解析。
  */
 class ReactiveReturnValueResolverDetailsTest {
 
@@ -44,8 +44,8 @@ class ReactiveReturnValueResolverDetailsTest {
     void setUp() throws Exception {
         resolver = new ReactiveReturnValueResolver();
         JsonConverter jsonConverter = mock(JsonConverter.class);
-        io.springperf.web.core.async.AsyncSupportRegistry registry =
-                org.mockito.Mockito.spy(new io.springperf.web.core.async.AsyncSupportRegistry());
+        io.springperf.web.core.async.AsyncSupportRegistry registry = org.mockito.Mockito
+                .spy(new io.springperf.web.core.async.AsyncSupportRegistry());
         doReturn(jsonConverter).when(registry).getJsonConverter();
         setField("asyncSupportRegistry", registry);
         setField("adapterRegistry", org.springframework.core.ReactiveAdapterRegistry.getSharedInstance());
@@ -74,13 +74,20 @@ class ReactiveReturnValueResolverDetailsTest {
 
     @SuppressWarnings("unused")
     static class TypeHolder {
-        public void handler(java.util.concurrent.Flow.Publisher<String> p) {}
-        public void handler(String s) {}
-        public void handler(ResponseEntity<java.util.concurrent.Flow.Publisher<String>> p) {}
+        public void handler(java.util.concurrent.Flow.Publisher<String> p) {
+        }
+
+        public void handler(String s) {
+        }
+
+        public void handler(ResponseEntity<java.util.concurrent.Flow.Publisher<String>> p) {
+        }
     }
 
     static class MonoPublisher {
-        public <T> T get() { return null; }
+        public <T> T get() {
+            return null;
+        }
     }
 
     // ==================== selectBestConstructor ====================
@@ -109,8 +116,7 @@ class ReactiveReturnValueResolverDetailsTest {
     void selectBestConstructor_conflictingSameCount_throws() {
         // ConflictEmitter 自身声明 (Long) 与 (JsonConverter) 两个 1 参构造器 →
         // 过滤后同参数量（1=1）冲突应抛异常
-        assertThrows(IllegalStateException.class,
-                () -> resolver.selectBestConstructor(ConflictEmitter.class));
+        assertThrows(IllegalStateException.class, () -> resolver.selectBestConstructor(ConflictEmitter.class));
     }
 
     /** 自身同时声明 (Long) 与 (JsonConverter) 两个 1 参构造器的 StreamEmitter */
@@ -134,8 +140,7 @@ class ReactiveReturnValueResolverDetailsTest {
 
     @Test
     void isConstructorSupported_unsupportedParam_returnsFalse() throws Exception {
-        assertFalse(resolver.isConstructorSupported(
-                SseEmitter.class.getConstructor(boolean.class)));
+        assertFalse(resolver.isConstructorSupported(SseEmitter.class.getConstructor(boolean.class)));
     }
 
     // ==================== getConstructorArg ====================
@@ -156,16 +161,15 @@ class ReactiveReturnValueResolverDetailsTest {
     @Test
     void getConstructorArg_unsupported_throws() {
         ReactiveConfig config = new ReactiveConfig(null, null, 100, 20, 5000L);
-        assertThrows(IllegalStateException.class,
-                () -> resolver.getConstructorArg(String.class, config, request));
+        assertThrows(IllegalStateException.class, () -> resolver.getConstructorArg(String.class, config, request));
     }
 
     // ==================== supports ====================
 
     @Test
     void supportsReturnType_reactive_returnsTrue() throws Exception {
-        MethodParameter p = new MethodParameter(TypeHolder.class.getMethod("handler",
-                java.util.concurrent.Flow.Publisher.class), 0);
+        MethodParameter p = new MethodParameter(
+                TypeHolder.class.getMethod("handler", java.util.concurrent.Flow.Publisher.class), 0);
         assertTrue(resolver.supportsReturnType(p, null));
     }
 
@@ -204,10 +208,9 @@ class ReactiveReturnValueResolverDetailsTest {
                 .thenReturn(Collections.singletonList(io.springperf.web.util.MediaTypeUtils.APPLICATION_STREAM_JSON));
         MappingResult.set(request, MappingResult.matched(ctx));
 
-        assertTrue(resolver.containMediaType(
-                io.springperf.web.util.MediaTypeUtils.APPLICATION_STREAM_JSON, request, response));
-        assertEquals(io.springperf.web.util.MediaTypeUtils.APPLICATION_STREAM_JSON,
-                responseHeaders.getContentType());
+        assertTrue(resolver.containMediaType(io.springperf.web.util.MediaTypeUtils.APPLICATION_STREAM_JSON, request,
+                response));
+        assertEquals(io.springperf.web.util.MediaTypeUtils.APPLICATION_STREAM_JSON, responseHeaders.getContentType());
     }
 
     @Test
@@ -224,7 +227,6 @@ class ReactiveReturnValueResolverDetailsTest {
         HttpHeaders headers = new HttpHeaders();
         headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
         when(request.getHeaders()).thenReturn(headers);
-        assertEquals(Collections.singletonList(MediaType.APPLICATION_JSON),
-                resolver.getSupportMediaTypeList(request));
+        assertEquals(Collections.singletonList(MediaType.APPLICATION_JSON), resolver.getSupportMediaTypeList(request));
     }
 }

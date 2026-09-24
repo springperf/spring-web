@@ -25,28 +25,21 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
- * ETag 生命周期 E2E（文件系统资源）：校验器必须能区分内容、随内容变化失效，
- * 否则客户端会长期使用过期副本（拿到陈旧 304）。
- *
- * <p>ETag 由「最后修改时间 + 内容长度」派生（零 IO，避免每请求读盘算哈希）。
- * 这意味着**长度与 mtime 都不变**的原地改写无法被感知——本类显式锁定该已知取舍，
- * 便于后续若改为内容哈希时有对照。</p>
+ * ETag 生命周期 E2E（文件系统资源）：校验器必须能区分内容、随内容变化失效， 否则客户端会长期使用过期副本（拿到陈旧 304）。
+ * <p>
+ * ETag 由「最后修改时间 + 内容长度」派生（零 IO，避免每请求读盘算哈希）。 这意味着**长度与 mtime 都不变**的原地改写无法被感知——本类显式锁定该已知取舍， 便于后续若改为内容哈希时有对照。
+ * </p>
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, ResourceEtagLifecycleE2eTest.EtagConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "spring.web.resources.cache.period=60"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        ResourceEtagLifecycleE2eTest.EtagConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "spring.web.resources.cache.period=60" })
 class ResourceEtagLifecycleE2eTest {
 
     /** 资源目录（配置类静态块创建，早于 addResourceHandlers 注册）。 */
     static final Path DIR = Path.of("target", "e2e-etag-dir").toAbsolutePath();
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
@@ -92,16 +85,14 @@ class ResourceEtagLifecycleE2eTest {
     @Test
     void sameFile_repeatedRequests_keepSameEtag() throws Exception {
         writeFile("stable.txt", "stable-content");
-        assertEquals(etagOf("stable.txt"), etagOf("stable.txt"),
-                "同一文件多次请求 ETag 必须稳定（否则条件请求永不命中）");
+        assertEquals(etagOf("stable.txt"), etagOf("stable.txt"), "同一文件多次请求 ETag 必须稳定（否则条件请求永不命中）");
     }
 
     @Test
     void differentLengths_produceDifferentEtags() throws Exception {
         writeFile("a.txt", "content-aaa");
         writeFile("b.txt", "content-bbbb");
-        assertNotEquals(etagOf("a.txt"), etagOf("b.txt"),
-                "长度不同 → ETag 必须不同");
+        assertNotEquals(etagOf("a.txt"), etagOf("b.txt"), "长度不同 → ETag 必须不同");
     }
 
     @Test
@@ -114,8 +105,7 @@ class ResourceEtagLifecycleE2eTest {
 
         Response resp = get("/e2e-etag/changed.txt", "If-None-Match", oldEtag);
         try {
-            assertEquals(200, resp.code(),
-                    "内容已变化时旧 ETag 不得再命中 304（否则客户端永远拿到旧副本），实际 " + resp.code());
+            assertEquals(200, resp.code(), "内容已变化时旧 ETag 不得再命中 304（否则客户端永远拿到旧副本），实际 " + resp.code());
             assertNotEquals(oldEtag, resp.header("ETag"), "内容变化后应产生新 ETag");
             assertEquals("version-two-longer", resp.body().string());
         } finally {
@@ -140,11 +130,10 @@ class ResourceEtagLifecycleE2eTest {
 
     /**
      * 已知取舍（非缺陷）：ETag = {@code f(lastModified 毫秒, contentLength)}，以免每请求读盘算内容哈希。
-     *
-     * <p>因此 ETag 的区分力取决于 mtime 的毫秒分辨率：**长度相同且 mtime 落在同一毫秒**才可能碰撞
-     * （正常写入几乎不可能命中，故实际风险可忽略；跨 URL 的 ETag 相同对以 URL 为键的缓存亦无影响）。
-     * 比 HTTP Last-Modified 的秒级粒度更细，属可接受的取舍。若将来改为（带缓存的）内容哈希，
-     * 本用例会失败并提示更新语义。</p>
+     * <p>
+     * 因此 ETag 的区分力取决于 mtime 的毫秒分辨率：**长度相同且 mtime 落在同一毫秒**才可能碰撞 （正常写入几乎不可能命中，故实际风险可忽略；跨 URL 的 ETag 相同对以 URL 为键的缓存亦无影响）。
+     * 比 HTTP Last-Modified 的秒级粒度更细，属可接受的取舍。若将来改为（带缓存的）内容哈希， 本用例会失败并提示更新语义。
+     * </p>
      */
     @Test
     void sameLengthAndSameMillisecond_etagCollides_knownTradeoff() throws Exception {
@@ -160,8 +149,7 @@ class ResourceEtagLifecycleE2eTest {
         String etagBefore = etagOf("collide-a.txt");
         writeFile("collide-a.txt", "CCCCCCCC");
         Files.setLastModifiedTime(DIR.resolve("collide-a.txt"), mtime);
-        assertEquals(etagBefore, etagOf("collide-a.txt"),
-                "长度与 mtime 均未变时 ETag 不变");
+        assertEquals(etagBefore, etagOf("collide-a.txt"), "长度与 mtime 均未变时 ETag 不变");
     }
 
     @TestConfiguration
@@ -177,8 +165,7 @@ class ResourceEtagLifecycleE2eTest {
 
         @Override
         public void addResourceHandlers(ResourceHandlerRegistry registry) {
-            registry.addResourceHandler("/e2e-etag/**")
-                    .addResourceLocations(DIR.toUri().toString());
+            registry.addResourceHandler("/e2e-etag/**").addResourceLocations(DIR.toUri().toString());
         }
 
         @Bean

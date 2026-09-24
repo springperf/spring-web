@@ -32,31 +32,22 @@ public class DisruptorQueue {
     private final BufferingBatchHandler batchHandler;
     private final BatchMetrics metrics;
 
-    public DisruptorQueue(String queueName,
-                          BatchRequestMetaData meta,
-                          Object bean) {
+    public DisruptorQueue(String queueName, BatchRequestMetaData meta, Object bean) {
         this(queueName, meta, bean, NoOpBatchMetrics.INSTANCE);
     }
 
-    public DisruptorQueue(String queueName,
-                          BatchRequestMetaData meta,
-                          Object bean,
-                          BatchMetrics metrics) {
+    public DisruptorQueue(String queueName, BatchRequestMetaData meta, Object bean, BatchMetrics metrics) {
         this(queueName, meta, bean, metrics, false);
     }
 
     /**
-     * @param virtualThreads 批量方法是否在虚拟线程上执行——由 {@code BatchRegistry} 依据
-     *                       {@code spring.threads.virtual.enabled} + JDK 21+（
-     *                       {@code BizPoolRegistry#usesVirtualThreads()}）判定。为 {@code true} 时
-     *                       只把 bizExecutor 的线程工厂换成虚拟线程（线程名 {@code batch-virtual-*}）；
-     *                       池的并发上限 {@code consumerSize}、无排队策略与 CallerRunsPolicy 背压语义不变。
+     * @param virtualThreads
+     *            批量方法是否在虚拟线程上执行——由 {@code BatchRegistry} 依据 {@code spring.threads.virtual.enabled} + JDK 21+（
+     *            {@code BizPoolRegistry#usesVirtualThreads()}）判定。为 {@code true} 时 只把 bizExecutor 的线程工厂换成虚拟线程（线程名
+     *            {@code batch-virtual-*}）； 池的并发上限 {@code consumerSize}、无排队策略与 CallerRunsPolicy 背压语义不变。
      */
-    public DisruptorQueue(String queueName,
-                          BatchRequestMetaData meta,
-                          Object bean,
-                          BatchMetrics metrics,
-                          boolean virtualThreads) {
+    public DisruptorQueue(String queueName, BatchRequestMetaData meta, Object bean, BatchMetrics metrics,
+            boolean virtualThreads) {
         this.queueName = queueName;
         this.metrics = metrics != null ? metrics : NoOpBatchMetrics.INSTANCE;
         int size = normalizeRingBufferSize(meta.ringBufferSize());
@@ -66,17 +57,11 @@ public class DisruptorQueue {
             log.warn("Queue [{}] ringBufferSize={} is unusual; expected range [64, 262144]", queueName, size);
         }
 
-        this.disruptor = new Disruptor<>(
-                BatchEvent::new,
-                size,
-                r -> {
-                    Thread t = new Thread(r, "batch-disruptor-" + queueName);
-                    t.setDaemon(false);
-                    return t;
-                },
-                ProducerType.MULTI,
-                WaitStrategyFactory.create(meta.waitStrategy())
-        );
+        this.disruptor = new Disruptor<>(BatchEvent::new, size, r -> {
+            Thread t = new Thread(r, "batch-disruptor-" + queueName);
+            t.setDaemon(false);
+            return t;
+        }, ProducerType.MULTI, WaitStrategyFactory.create(meta.waitStrategy()));
 
         boolean useVirtualThreads = virtualThreads && VirtualThreadSupport.isAvailable();
         if (virtualThreads && !useVirtualThreads) {
@@ -94,17 +79,12 @@ public class DisruptorQueue {
         ThreadFactory bizThreadFactory = useVirtualThreads
                 ? VirtualThreadSupport.newThreadFactory("batch-virtual-" + queueName + "-")
                 : platformThreadFactory(queueName);
-        this.bizExecutor = new ThreadPoolExecutor(
-                0, consumerSize,
-                60L, TimeUnit.SECONDS,
-                new SynchronousQueue<>(),
-                bizThreadFactory,
-                (r, executor) -> {
+        this.bizExecutor = new ThreadPoolExecutor(0, consumerSize, 60L, TimeUnit.SECONDS, new SynchronousQueue<>(),
+                bizThreadFactory, (r, executor) -> {
                     if (!executor.isShutdown()) {
                         r.run(); // CallerRunsPolicy — consumer thread executes directly
                     }
-                }
-        );
+                });
 
         this.batchHandler = new BufferingBatchHandler(bizExecutor, meta, bean, meta.maxBatchSize(), metrics);
         this.disruptor.handleEventsWith(this.batchHandler);
@@ -138,8 +118,7 @@ public class DisruptorQueue {
                     metrics.recordDrop(queueName);
                     if (request.isCompleted()) {
                         log.warn("Queue [{}] drop failed — request already completed (likely timed out), "
-                                        + "client will not receive overflow signal",
-                                queueName);
+                                + "client will not receive overflow signal", queueName);
                     } else {
                         request.setError(new BatchOverflowException(queueName));
                     }
@@ -190,7 +169,8 @@ public class DisruptorQueue {
     }
 
     public void shutdown() {
-        if (!halted.compareAndSet(false, true)) return;
+        if (!halted.compareAndSet(false, true))
+            return;
 
         // Step 1: Gracefully drain the Disruptor RingBuffer — consume all published events
         try {
@@ -229,10 +209,13 @@ public class DisruptorQueue {
     }
 
     static int normalizeRingBufferSize(int size) {
-        if (size <= 0) return 4096;
-        if (size < 64) return 64;
+        if (size <= 0)
+            return 4096;
+        if (size < 64)
+            return 64;
         int result = Integer.highestOneBit(size);
-        if (result < size) result <<= 1;
+        if (result < size)
+            result <<= 1;
         // 钳制到安全上限 2^18（262144 槽位，预分配约 6MB）。
         // 左移溢出（result < 0）或超过上限时回退到最大合理容量。
         return result > 0 && result <= (1 << 18) ? result : 1 << 18;

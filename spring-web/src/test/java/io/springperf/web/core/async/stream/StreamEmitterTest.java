@@ -1,21 +1,22 @@
 package io.springperf.web.core.async.stream;
 
-import io.springperf.web.core.async.AsyncSupportRegistry;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.server.ServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.server.ServerHttpResponse;
+
+import io.springperf.web.core.async.AsyncSupportRegistry;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 class StreamEmitterTest {
@@ -44,6 +45,7 @@ class StreamEmitterTest {
             public void encode(Object data, java.io.OutputStream out) {
                 throw new UnsupportedOperationException();
             }
+
             @Override
             protected void extendResponse(ServerHttpResponse response) {
             }
@@ -100,8 +102,7 @@ class StreamEmitterTest {
     }
 
     /**
-     * 让 mock 的 sendAll 在调用瞬间把参数内容快照到返回的 List。
-     * 因为 sendAll 接收 earlySendDataList 同一引用，事后读取已被 clear。
+     * 让 mock 的 sendAll 在调用瞬间把参数内容快照到返回的 List。 因为 sendAll 接收 earlySendDataList 同一引用，事后读取已被 clear。
      */
     private List<Object> snapshotSendAll() throws Exception {
         List<Object> captured = new ArrayList<>();
@@ -212,6 +213,7 @@ class StreamEmitterTest {
             public void encode(Object data, java.io.OutputStream out) {
                 throw new UnsupportedOperationException();
             }
+
             @Override
             protected void extendResponse(ServerHttpResponse response) {
             }
@@ -227,6 +229,7 @@ class StreamEmitterTest {
             public void encode(Object data, java.io.OutputStream out) {
                 throw new UnsupportedOperationException();
             }
+
             @Override
             protected void extendResponse(ServerHttpResponse response) {
             }
@@ -242,6 +245,7 @@ class StreamEmitterTest {
             public void encode(Object data, java.io.OutputStream out) {
                 throw new UnsupportedOperationException();
             }
+
             @Override
             protected void extendResponse(ServerHttpResponse response) {
             }
@@ -272,6 +276,7 @@ class StreamEmitterTest {
     void encode_throwsUnsupportedOperation() {
         StreamEmitter emitter = createEmitter();
 
-        assertThrows(UnsupportedOperationException.class, () -> emitter.encode("test", new java.io.ByteArrayOutputStream()));
+        assertThrows(UnsupportedOperationException.class,
+                () -> emitter.encode("test", new java.io.ByteArrayOutputStream()));
     }
 }

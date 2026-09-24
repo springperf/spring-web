@@ -1,17 +1,18 @@
 package io.springperf.web.context;
 
-import io.springperf.web.core.DispatcherHandler;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.core.env.Environment;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.core.env.Environment;
+
+import io.springperf.web.core.DispatcherHandler;
+
 /**
- * {@link PropertyRefreshHandler}：验证刷新会清空 ApplicationProperties 的 map 缓存
- * 并重解析热路径字段快照（timeout / max-parameter-count / max-in-memory-size）。
+ * {@link PropertyRefreshHandler}：验证刷新会清空 ApplicationProperties 的 map 缓存 并重解析热路径字段快照（timeout / max-parameter-count /
+ * max-in-memory-size）。
  */
 class PropertyRefreshHandlerTest {
 
@@ -24,8 +25,7 @@ class PropertyRefreshHandlerTest {
         env = mock(Environment.class);
         // WebContext 构造会读取 context-path：2-arg 未 stub 时返回 null 会导致 NPE
         lenient().when(env.getProperty(anyString())).thenReturn(null);
-        lenient().when(env.getProperty(anyString(), anyString()))
-                .thenAnswer(inv -> inv.getArgument(1, String.class));
+        lenient().when(env.getProperty(anyString(), anyString())).thenAnswer(inv -> inv.getArgument(1, String.class));
         props = new ApplicationProperties();
         props.setEnvironment(env);
         webContext = new WebContext(mock(DispatcherHandler.class), props);
@@ -42,8 +42,7 @@ class PropertyRefreshHandlerTest {
 
         new PropertyRefreshHandler(webContext).refresh();
 
-        assertEquals(8, props.getInt(PropertiesConstant.POOL_CORE_POOL_SIZE),
-                "刷新后应读取 Environment 最新值");
+        assertEquals(8, props.getInt(PropertiesConstant.POOL_CORE_POOL_SIZE), "刷新后应读取 Environment 最新值");
     }
 
     @Test
@@ -58,8 +57,7 @@ class PropertyRefreshHandlerTest {
 
         assertEquals(1024, props.getMaxInMemorySize(),
                 "刷新后 max-in-memory-size 热字段应重解析（原静态缓存 + clearStaticCache 手工接线的替代）");
-        assertEquals(50, props.getMaxParameterCount(),
-                "刷新后 max-parameter-count 热字段应重解析");
+        assertEquals(50, props.getMaxParameterCount(), "刷新后 max-parameter-count 热字段应重解析");
     }
 
     @Test

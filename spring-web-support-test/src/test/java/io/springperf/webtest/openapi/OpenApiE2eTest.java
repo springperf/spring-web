@@ -48,12 +48,9 @@ class OpenApiE2eTest extends BaseE2ETest {
         assertTrue(paths.containsKey("/demo/void-test"), "missing /demo/void-test");
 
         // 路径变量端点（正则被清理：{name:\\d+} → {name}，aaa* → aaa）
-        assertTrue(paths.containsKey("/demo/hello/{name}/aaa"),
-                "missing /demo/hello/{name}/aaa");
-        assertTrue(paths.containsKey("/demo/create/{name}"),
-                "missing /demo/create/{name}");
-        assertTrue(paths.containsKey("/demo/find/{name}"),
-                "missing /demo/find/{name}");
+        assertTrue(paths.containsKey("/demo/hello/{name}/aaa"), "missing /demo/hello/{name}/aaa");
+        assertTrue(paths.containsKey("/demo/create/{name}"), "missing /demo/create/{name}");
+        assertTrue(paths.containsKey("/demo/find/{name}"), "missing /demo/find/{name}");
     }
 
     // ========= HTTP 方法 =========
@@ -157,8 +154,7 @@ class OpenApiE2eTest extends BaseE2ETest {
         Operation getOp = api.getPaths().get("/demo/echo").getGet();
         assertNotNull(getOp);
         assertNotNull(getOp.getResponses().get("302"),
-                "@ResponseStatus(FOUND) should produce 302 response, got: " +
-                        getOp.getResponses().keySet());
+                "@ResponseStatus(FOUND) should produce 302 response, got: " + getOp.getResponses().keySet());
     }
 
     @Test
@@ -167,8 +163,7 @@ class OpenApiE2eTest extends BaseE2ETest {
         Operation getOp = api.getPaths().get("/demo/void-test").getGet();
         assertNotNull(getOp);
         assertNotNull(getOp.getResponses().get("204"),
-                "@ResponseStatus(NO_CONTENT) on void should produce 204, got: " +
-                        getOp.getResponses().keySet());
+                "@ResponseStatus(NO_CONTENT) on void should produce 204, got: " + getOp.getResponses().keySet());
     }
 
     @Test
@@ -177,8 +172,8 @@ class OpenApiE2eTest extends BaseE2ETest {
         Operation postOp = api.getPaths().get("/demo/echo").getPost();
         assertNotNull(postOp);
         assertNotNull(postOp.getResponses().get("200"),
-                "ResponseEntity.status(201) runtime status not available from annotation, got: " +
-                        postOp.getResponses().keySet());
+                "ResponseEntity.status(201) runtime status not available from annotation, got: "
+                        + postOp.getResponses().keySet());
     }
 
     // ========= 异步端点 =========

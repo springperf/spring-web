@@ -23,12 +23,18 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class JspViewTest {
 
-    @Mock WebServerHttpRequest req;
-    @Mock WebServerHttpResponse resp;
-    @Mock RequestContext requestContext;
-    @Mock ServletAdapterContext adapterContext;
-    @Mock HttpServletRequest servletRequest;
-    @Mock HttpServletResponse servletResponse;
+    @Mock
+    WebServerHttpRequest req;
+    @Mock
+    WebServerHttpResponse resp;
+    @Mock
+    RequestContext requestContext;
+    @Mock
+    ServletAdapterContext adapterContext;
+    @Mock
+    HttpServletRequest servletRequest;
+    @Mock
+    HttpServletResponse servletResponse;
 
     private final Map<io.springperf.web.http.RequestAttribute<?>, Object> fastAttrs = new HashMap<>();
 

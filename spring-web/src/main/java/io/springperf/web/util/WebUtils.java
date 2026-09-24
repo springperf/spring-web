@@ -3,12 +3,8 @@ package io.springperf.web.util;
 public class WebUtils {
 
     /**
-     * 拼接两个 URL 路径，确保结果以 / 开头，不以 / 结尾。
-     * 例如：
-     * join("/api/", "/user/") => "/api/user"
-     * join("api", "user") => "/api/user"
-     * join(null, "test/") => "/test"
-     * join("/api", null) => "/api"
+     * 拼接两个 URL 路径，确保结果以 / 开头，不以 / 结尾。 例如： join("/api/", "/user/") => "/api/user" join("api", "user") => "/api/user"
+     * join(null, "test/") => "/test" join("/api", null) => "/api"
      */
     public static String pathJoin(String part1, String part2) {
         // 1. 安全处理 null 或空白
@@ -52,7 +48,9 @@ public class WebUtils {
     /**
      * 返回字符串中所有 '/' 的位置下标。
      *
-     * @param url 输入字符串，可为 null
+     * @param url
+     *            输入字符串，可为 null
+     *
      * @return 所有 '/' 的索引坐标数组，如果没有则返回长度为 0 的数组
      */
     public static int[] findAllSlashIndices(String url) {

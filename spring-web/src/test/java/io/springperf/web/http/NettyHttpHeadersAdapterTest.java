@@ -1,10 +1,11 @@
 package io.springperf.web.http;
 
-import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.*;
-import io.springperf.web.context.ApplicationProperties;
-import io.springperf.web.context.WebContext;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
+
+import java.util.List;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,15 +13,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.lenient;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.http.*;
+import io.springperf.web.context.ApplicationProperties;
+import io.springperf.web.context.WebContext;
 
 /**
- * 验证 {@link NettyHttpHeadersAdapter} 零拷贝只读视图接入
- * {@link NettyServerHttpRequest#getHeaders()} 后的行为。
+ * 验证 {@link NettyHttpHeadersAdapter} 零拷贝只读视图接入 {@link NettyServerHttpRequest#getHeaders()} 后的行为。
  */
 @ExtendWith(MockitoExtension.class)
 class NettyHttpHeadersAdapterTest {

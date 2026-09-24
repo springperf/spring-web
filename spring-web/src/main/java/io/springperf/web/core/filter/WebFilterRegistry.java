@@ -1,5 +1,8 @@
 package io.springperf.web.core.filter;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import io.springperf.web.context.WebComponentContainer;
 import io.springperf.web.core.DispatcherHandler;
 import io.springperf.web.core.mapping.MappingResult;
@@ -8,21 +11,16 @@ import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.util.support.ContainmentResult;
 
-import java.util.ArrayList;
-import java.util.List;
-
 public class WebFilterRegistry extends WebComponentContainer {
 
     protected final List<WebFilterRegistration> registrations = new ArrayList<>();
 
     private final DispatcherHandler dispatcherHandler;
     /**
-     * 预计算的全量 filter 列表（无路由匹配时使用）。
-     * 无 include/exclude 的 filter 直接放入，有路径规则的包装为
-     * {@link RuntimeMappingWebFilter} 由其在 doFilter 中运行时匹配。
+     * 预计算的全量 filter 列表（无路由匹配时使用）。 无 include/exclude 的 filter 直接放入，有路径规则的包装为 {@link RuntimeMappingWebFilter} 由其在
+     * doFilter 中运行时匹配。
      */
     private final List<WebFilter> allFilters = new ArrayList<>();
-
 
     private final DefaultFilterChain unmatchedChain;
 
@@ -45,9 +43,7 @@ public class WebFilterRegistry extends WebComponentContainer {
     }
 
     /**
-     * 预计算全量 filter 列表（无路由匹配时使用）。
-     * 无路径规则的 filter 直接放入（永远匹配），
-     * 有路径规则的包装为 {@link RuntimeMappingWebFilter} 运行时按请求路径匹配。
+     * 预计算全量 filter 列表（无路由匹配时使用）。 无路径规则的 filter 直接放入（永远匹配）， 有路径规则的包装为 {@link RuntimeMappingWebFilter} 运行时按请求路径匹配。
      */
     protected void initAllFilters() {
         allFilters.clear();
@@ -63,8 +59,8 @@ public class WebFilterRegistry extends WebComponentContainer {
     }
 
     /**
-     * 执行 Filter 链。内部从请求中获取 {@link MappingResult} 以决定 filter 列表，
-     * 完成后固定调用 {@link io.springperf.web.core.DispatcherHandler#handleAfterFilter}。
+     * 执行 Filter 链。内部从请求中获取 {@link MappingResult} 以决定 filter 列表， 完成后固定调用
+     * {@link io.springperf.web.core.DispatcherHandler#handleAfterFilter}。
      */
     public void doFilter(WebServerHttpRequest request, WebServerHttpResponse response) throws Exception {
         DefaultFilterChain chain = resolveFilterChain(request);
@@ -98,8 +94,8 @@ public class WebFilterRegistry extends WebComponentContainer {
     }
 
     /**
-     * 编译期三段式推断：逐 registration 判断与 mapping pathRule 的包含关系。
-     * ALWAYS → 直接加入；NEVER → 跳过；RUNTIME → 包装为 RuntimeMappingWebFilter。
+     * 编译期三段式推断：逐 registration 判断与 mapping pathRule 的包含关系。 ALWAYS → 直接加入；NEVER → 跳过；RUNTIME → 包装为
+     * RuntimeMappingWebFilter。
      */
     protected List<WebFilter> initCachedFilters(PathMappingContext mappingContext) {
         String pathRule = mappingContext.getPathRule();

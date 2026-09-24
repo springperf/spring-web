@@ -18,16 +18,10 @@ public class BatchRequestMetaData {
     private final int maxBatchSize;
     private final int consumerSize;
 
-    public BatchRequestMetaData(Method batchMethod,
-                                Class<?> beanType,
-                                Class<? extends BatchRequest<?>> requestType,
-                                String queueName,
-                                int ringBufferSize,
-                                BatchMapping.WaitStrategy waitStrategy,
-                                BatchMapping.Backpressure backpressure,
-                                Constructor<?> singleMethodCtor,
-                                int maxBatchSize,
-                                int consumerSize) {
+    public BatchRequestMetaData(Method batchMethod, Class<?> beanType, Class<? extends BatchRequest<?>> requestType,
+            String queueName, int ringBufferSize, BatchMapping.WaitStrategy waitStrategy,
+            BatchMapping.Backpressure backpressure, Constructor<?> singleMethodCtor, int maxBatchSize,
+            int consumerSize) {
         this.batchMethod = batchMethod;
         this.beanType = beanType;
         this.requestType = requestType;
@@ -40,14 +34,43 @@ public class BatchRequestMetaData {
         this.consumerSize = consumerSize;
     }
 
-    public Method batchMethod() { return batchMethod; }
-    public Class<?> beanType() { return beanType; }
-    public Class<? extends BatchRequest<?>> requestType() { return requestType; }
-    public String queueName() { return queueName; }
-    public int ringBufferSize() { return ringBufferSize; }
-    public BatchMapping.WaitStrategy waitStrategy() { return waitStrategy; }
-    public BatchMapping.Backpressure backpressure() { return backpressure; }
-    public Constructor<?> singleMethodCtor() { return singleMethodCtor; }
-    public int maxBatchSize() { return maxBatchSize; }
-    public int consumerSize() { return consumerSize; }
+    public Method batchMethod() {
+        return batchMethod;
+    }
+
+    public Class<?> beanType() {
+        return beanType;
+    }
+
+    public Class<? extends BatchRequest<?>> requestType() {
+        return requestType;
+    }
+
+    public String queueName() {
+        return queueName;
+    }
+
+    public int ringBufferSize() {
+        return ringBufferSize;
+    }
+
+    public BatchMapping.WaitStrategy waitStrategy() {
+        return waitStrategy;
+    }
+
+    public BatchMapping.Backpressure backpressure() {
+        return backpressure;
+    }
+
+    public Constructor<?> singleMethodCtor() {
+        return singleMethodCtor;
+    }
+
+    public int maxBatchSize() {
+        return maxBatchSize;
+    }
+
+    public int consumerSize() {
+        return consumerSize;
+    }
 }

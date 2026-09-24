@@ -1,5 +1,28 @@
 package io.springperf.web.core;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.context.i18n.LocaleContext;
+import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.arg.ArgumentResolverRegistry;
 import io.springperf.web.core.async.AsyncSupportRegistry;
@@ -19,29 +42,6 @@ import io.springperf.web.http.RequestAttribute;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.context.i18n.LocaleContext;
-import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.RejectedExecutionException;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
-
-import org.mockito.ArgumentCaptor;
 
 class DispatcherHandlerTest {
 
@@ -65,7 +65,10 @@ class DispatcherHandlerTest {
         // 模拟 fastAttributes 以支持 RequestAttribute 存取
         Map<RequestAttribute<?>, Object> fastAttrs = new HashMap<>();
         when(reqCtx.getAttribute(any(RequestAttribute.class))).thenAnswer(inv -> fastAttrs.get(inv.getArgument(0)));
-        doAnswer(inv -> { fastAttrs.put(inv.getArgument(0), inv.getArgument(1)); return null; }).when(reqCtx).setAttribute(any(RequestAttribute.class), any());
+        doAnswer(inv -> {
+            fastAttrs.put(inv.getArgument(0), inv.getArgument(1));
+            return null;
+        }).when(reqCtx).setAttribute(any(RequestAttribute.class), any());
         return req;
     }
 
@@ -89,10 +92,10 @@ class DispatcherHandlerTest {
                 .thenReturn(mappingRegistry);
         when(webContext.getWebComponentWithDefault(eq(ExceptionRegistry.class), any(ExceptionRegistry.class)))
                 .thenReturn(exceptionRegistry);
-        when(webContext.getWebComponentWithDefault(eq(ArgumentResolverRegistry.class), any(ArgumentResolverRegistry.class)))
-                .thenReturn(argumentResolverRegistry);
-        when(webContext.getWebComponentWithDefault(eq(ReturnValueResolverRegistry.class), any(ReturnValueResolverRegistry.class)))
-                .thenReturn(returnValueResolverRegistry);
+        when(webContext.getWebComponentWithDefault(eq(ArgumentResolverRegistry.class),
+                any(ArgumentResolverRegistry.class))).thenReturn(argumentResolverRegistry);
+        when(webContext.getWebComponentWithDefault(eq(ReturnValueResolverRegistry.class),
+                any(ReturnValueResolverRegistry.class))).thenReturn(returnValueResolverRegistry);
         when(webContext.getWebComponentWithDefault(eq(CorsRegistry.class), any(CorsRegistry.class)))
                 .thenReturn(corsRegistry);
         when(webContext.getWebComponentWithDefault(eq(InterceptorRegistry.class), any(InterceptorRegistry.class)))
@@ -103,8 +106,7 @@ class DispatcherHandlerTest {
                 .thenReturn(asyncSupportRegistry);
         when(webContext.getWebComponentWithDefault(eq(WebFilterRegistry.class), any(WebFilterRegistry.class)))
                 .thenReturn(webFilterRegistry);
-        when(webContext.getWebComponentWithDefault(eq(WebMetrics.class), any()))
-                .thenReturn(metrics);
+        when(webContext.getWebComponentWithDefault(eq(WebMetrics.class), any())).thenReturn(metrics);
 
         // doFilter 模拟：新流程中 DefaultFilterChain 调用 handleAfterFilter
         doAnswer(invocation -> {
@@ -335,7 +337,7 @@ class DispatcherHandlerTest {
         when(corsRegistry.corsHandle(req, resp)).thenReturn(false);
         when(interceptorRegistry.preHandle(req, resp)).thenReturn(true);
         when(resp.getStatus()).thenReturn(HttpStatus.OK);
-        Object[] args = new Object[]{};
+        Object[] args = new Object[] {};
         when(argumentResolverRegistry.resolveArguments(mappingContext, req, resp)).thenReturn(args);
         Object result = new Object();
         when(mappingContext.invoke(args, req, resp)).thenReturn(result);
@@ -353,7 +355,8 @@ class DispatcherHandlerTest {
         when(corsRegistry.corsHandle(req, resp)).thenReturn(false);
         when(interceptorRegistry.preHandle(req, resp)).thenReturn(true);
         when(resp.getStatus()).thenReturn(HttpStatus.OK);
-        when(argumentResolverRegistry.resolveArguments(mappingContext, req, resp)).thenThrow(new RuntimeException("test error"));
+        when(argumentResolverRegistry.resolveArguments(mappingContext, req, resp))
+                .thenThrow(new RuntimeException("test error"));
 
         handler.doHandle(req, resp, mappingContext);
 
@@ -372,7 +375,7 @@ class DispatcherHandlerTest {
         when(req.getMethodValue()).thenReturn("GET");
         when(mappingContext.getPathRule()).thenReturn("/api/users/{id}");
         when(resp.getStatus()).thenReturn(HttpStatus.OK);
-        Object[] args = new Object[]{};
+        Object[] args = new Object[] {};
         when(argumentResolverRegistry.resolveArguments(mappingContext, req, resp)).thenReturn(args);
         when(mappingContext.invoke(args, req, resp)).thenReturn(new Object());
 
@@ -407,7 +410,7 @@ class DispatcherHandlerTest {
         when(corsRegistry.corsHandle(req, resp)).thenReturn(false);
         when(interceptorRegistry.preHandle(req, resp)).thenReturn(true);
         when(resp.getStatus()).thenReturn(HttpStatus.OK);
-        Object[] args = new Object[]{};
+        Object[] args = new Object[] {};
         when(argumentResolverRegistry.resolveArguments(mappingContext, req, resp)).thenReturn(args);
         when(mappingContext.invoke(args, req, resp)).thenReturn(new Object());
 
@@ -436,7 +439,7 @@ class DispatcherHandlerTest {
         when(req.getMethodValue()).thenReturn("GET");
         when(mappingContext.getPathRule()).thenReturn("/api/users/{id}");
         when(resp.getStatus()).thenReturn(HttpStatus.OK);
-        Object[] args = new Object[]{};
+        Object[] args = new Object[] {};
         when(argumentResolverRegistry.resolveArguments(mappingContext, req, resp)).thenReturn(args);
         when(mappingContext.invoke(args, req, resp)).thenReturn(new Object());
 
@@ -472,7 +475,7 @@ class DispatcherHandlerTest {
         when(req.getMethodValue()).thenReturn("GET");
         when(mappingContext.getPathRule()).thenReturn("/api/users/{id}");
         when(resp.getStatus()).thenReturn(HttpStatus.INTERNAL_SERVER_ERROR);
-        Object[] args = new Object[]{};
+        Object[] args = new Object[] {};
         when(argumentResolverRegistry.resolveArguments(mappingContext, req, resp)).thenReturn(args);
         when(mappingContext.invoke(args, req, resp)).thenReturn(new Object());
 
@@ -591,8 +594,8 @@ class DispatcherHandlerTest {
         PathMappingContext mappingContext = mock(PathMappingContext.class);
         MappingResult matched = MappingResult.matched(mappingContext);
         MappingResult.set(req, matched);
-        doThrow(new RuntimeException("resolver error")).when(returnValueResolverRegistry)
-                .resolveReturnValue(any(), any(), any(), any());
+        doThrow(new RuntimeException("resolver error")).when(returnValueResolverRegistry).resolveReturnValue(any(),
+                any(), any(), any());
 
         Object concurrentResult = new Object();
         handler.asyncDispatch(req, resp, concurrentResult);

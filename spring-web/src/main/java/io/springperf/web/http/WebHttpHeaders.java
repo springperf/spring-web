@@ -1,10 +1,5 @@
 package io.springperf.web.http;
 
-import io.netty.handler.codec.http.HttpHeaderNames;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.util.MultiValueMap;
-
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.util.Collection;
@@ -12,29 +7,32 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.util.MultiValueMap;
+
+import io.netty.handler.codec.http.HttpHeaderNames;
+
 /**
  * Cross-version compatible {@link HttpHeaders} that implements {@link MultiValueMap}.
- *
- * <p><b>Spring 6.x (SB 3.x):</b> {@code HttpHeaders} already implements
- * {@code MultiValueMap<String, String>}, so this class inherits the interface
- * naturally. All {@code super.*()} calls use the parent's built-in behavior.
- *
- * <p><b>Spring 7.x (SB 4.x):</b> {@code HttpHeaders} no longer implements
- * {@code MultiValueMap}. At class load time we resolve the package-private
- * {@code asMultiValueMap()} method via {@link MethodHandle} and cache the
- * returned delegate reference (which IS the parent's internal
- * {@code MultiValueMap<String, String> headers} field). All {@code MultiValueMap}
- * and {@code Map} methods delegate to this reference.
- *
- * <p>The JIT eliminates the version branch in every method because
- * {@link #HEADERS_IS_MULTI_VALUE_MAP} is {@code static final boolean}.
- *
- * <p><b>Performance:</b> Eliminates O(n) copies at call sites that previously
- * used {@code toSingleValueMap().keySet()} to work around the type mismatch,
- * and removes the reflective compatibility code in {@code RequestHeaderResolverProvider}.
- *
- * <p>Also caches {@link #getContentType()} result to avoid repeated
- * {@code MediaType.parseMediaType()} calls.</p>
+ * <p>
+ * <b>Spring 6.x (SB 3.x):</b> {@code HttpHeaders} already implements {@code MultiValueMap<String, String>}, so this
+ * class inherits the interface naturally. All {@code super.*()} calls use the parent's built-in behavior.
+ * <p>
+ * <b>Spring 7.x (SB 4.x):</b> {@code HttpHeaders} no longer implements {@code MultiValueMap}. At class load time we
+ * resolve the package-private {@code asMultiValueMap()} method via {@link MethodHandle} and cache the returned delegate
+ * reference (which IS the parent's internal {@code MultiValueMap<String, String> headers} field). All
+ * {@code MultiValueMap} and {@code Map} methods delegate to this reference.
+ * <p>
+ * The JIT eliminates the version branch in every method because {@link #HEADERS_IS_MULTI_VALUE_MAP} is
+ * {@code static final boolean}.
+ * <p>
+ * <b>Performance:</b> Eliminates O(n) copies at call sites that previously used {@code toSingleValueMap().keySet()} to
+ * work around the type mismatch, and removes the reflective compatibility code in
+ * {@code RequestHeaderResolverProvider}.
+ * <p>
+ * Also caches {@link #getContentType()} result to avoid repeated {@code MediaType.parseMediaType()} calls.
+ * </p>
  */
 @SuppressWarnings("deprecation")
 public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String, String> {
@@ -53,8 +51,7 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
         HEADERS_IS_MULTI_VALUE_MAP = isMap;
         if (!isMap) {
             try {
-                mh = MethodHandles.lookup().unreflect(
-                        HttpHeaders.class.getDeclaredMethod("asMultiValueMap"));
+                mh = MethodHandles.lookup().unreflect(HttpHeaders.class.getDeclaredMethod("asMultiValueMap"));
             } catch (Exception ignored) {
                 // Should not happen — asMultiValueMap() exists in Spring 7.x
             }
@@ -63,9 +60,9 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
     }
 
     /**
-     * Cached delegate reference (Spring 7.x only).
-     * Points to the parent's internal {@code MultiValueMap<String, String> headers} field.
-     * {@code null} on Spring 6.x where {@code this} IS the delegate.
+     * Cached delegate reference (Spring 7.x only). Points to the parent's internal
+     * {@code MultiValueMap<String, String> headers} field. {@code null} on Spring 6.x where {@code this} IS the
+     * delegate.
      */
     private final MultiValueMap<String, String> delegateMap;
 
@@ -73,14 +70,14 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
     private MediaType cachedContentType;
 
     /**
-     * 底层 Netty headers（当以可写 {@link NettyHttpHeadersAdapter} 为存储时非 null）：
-     * 供 Content-Type 读写走「{@code HttpHeaderNames} 常量名直通」快路径。
-     *
-     * <p>JFR（服务端线程，PerfBenchmark.get）显示每响应的 Content-Type 读写是本框架热点：
-     * 写侧 {@code setContentType} → Spring {@code HttpHeaders.set(String,String)} → Netty 每次
-     * 现造 {@code AsciiString} 名字并重算哈希（{@code hashCodeAscii} 12 样本）+
-     * {@code setObject} 36 样本；读侧 {@code getContentType} 每次按 String 名查（
-     * {@code HeadersUtils.getAsString} 17 样本）。常量名哈希已缓存，直通可免掉这部分。</p>
+     * 底层 Netty headers（当以可写 {@link NettyHttpHeadersAdapter} 为存储时非 null）： 供 Content-Type 读写走「{@code HttpHeaderNames}
+     * 常量名直通」快路径。
+     * <p>
+     * JFR（服务端线程，PerfBenchmark.get）显示每响应的 Content-Type 读写是本框架热点： 写侧 {@code setContentType} → Spring
+     * {@code HttpHeaders.set(String,String)} → Netty 每次 现造 {@code AsciiString} 名字并重算哈希（{@code hashCodeAscii} 12 样本）+
+     * {@code setObject} 36 样本；读侧 {@code getContentType} 每次按 String 名查（ {@code HeadersUtils.getAsString} 17
+     * 样本）。常量名哈希已缓存，直通可免掉这部分。
+     * </p>
      */
     private final io.netty.handler.codec.http.HttpHeaders rawHeaders;
 
@@ -94,9 +91,10 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
 
     /**
      * 用已存在的 {@code MultiValueMap} 视图构造，持有引用而非拷贝（零拷贝）。
-     * <p>5.3/6.x/7.x 的 {@code HttpHeaders(MultiValueMap)} 均为引用持有
-     * （已反编译验证 {@code putfield headers} 无拷贝循环）。传入
-     * {@link NettyHttpHeadersAdapter} 即可获得 Netty headers 的只读零拷贝视图。</p>
+     * <p>
+     * 5.3/6.x/7.x 的 {@code HttpHeaders(MultiValueMap)} 均为引用持有 （已反编译验证 {@code putfield headers} 无拷贝循环）。传入
+     * {@link NettyHttpHeadersAdapter} 即可获得 Netty headers 的只读零拷贝视图。
+     * </p>
      */
     public WebHttpHeaders(MultiValueMap<String, String> headers) {
         super(headers);
@@ -116,8 +114,7 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
 
     private MultiValueMap<String, String> resolveDelegate() {
         if (AS_MULTI_VALUE_MAP == null) {
-            throw new IllegalStateException(
-                    "Cannot resolve HttpHeaders.asMultiValueMap() — this should not happen");
+            throw new IllegalStateException("Cannot resolve HttpHeaders.asMultiValueMap() — this should not happen");
         }
         try {
             return (MultiValueMap<String, String>) AS_MULTI_VALUE_MAP.invoke(this);
@@ -301,9 +298,7 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
     @Override
     public MediaType getContentType() {
         if (cachedContentType == NOT_SET) {
-            cachedContentType = rawHeaders != null
-                    ? parseContentType(rawHeaders)
-                    : super.getContentType();
+            cachedContentType = rawHeaders != null ? parseContentType(rawHeaders) : super.getContentType();
             if (cachedContentType == null) {
                 cachedContentType = NOT_SET;
             }

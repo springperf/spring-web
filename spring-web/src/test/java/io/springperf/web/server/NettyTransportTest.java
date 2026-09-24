@@ -1,18 +1,20 @@
 package io.springperf.web.server;
 
+import static org.junit.jupiter.api.Assertions.*;
+
+import org.junit.jupiter.api.Test;
+
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.ServerChannel;
 import io.netty.channel.epoll.EpollServerSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * {@link NettyTransport} 测试。
- * <p>当前测试环境（Windows）epoll 不可用，auto 与 nio 均回退 NIO；
- * 强制 epoll 时应抛 {@link IllegalStateException}。</p>
+ * <p>
+ * 当前测试环境（Windows）epoll 不可用，auto 与 nio 均回退 NIO； 强制 epoll 时应抛 {@link IllegalStateException}。
+ * </p>
  */
 class NettyTransportTest {
 
@@ -42,8 +44,7 @@ class NettyTransportTest {
         if (NettyTransport.isEpollAvailable()) {
             return;
         }
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> NettyTransport.useEpoll("epoll"));
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> NettyTransport.useEpoll("epoll"));
         assertTrue(ex.getMessage().contains("epoll"));
     }
 

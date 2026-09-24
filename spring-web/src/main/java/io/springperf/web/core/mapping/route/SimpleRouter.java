@@ -1,17 +1,17 @@
 package io.springperf.web.core.mapping.route;
 
+import java.util.Arrays;
+
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.core.mapping.match.Matcher;
 import io.springperf.web.http.WebServerHttpRequest;
-
-import java.util.Arrays;
 
 public class SimpleRouter implements Router {
 
     private PathMappingContext[] methodMappingContexts;
 
     public SimpleRouter(PathMappingContext methodMappingContext) {
-        this.methodMappingContexts = new PathMappingContext[]{methodMappingContext};
+        this.methodMappingContexts = new PathMappingContext[] { methodMappingContext };
     }
 
     @Override

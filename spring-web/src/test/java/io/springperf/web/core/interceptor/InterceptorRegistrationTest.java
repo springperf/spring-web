@@ -1,17 +1,19 @@
 package io.springperf.web.core.interceptor;
 
-import io.springperf.web.util.support.ContainmentResult;
-import org.junit.jupiter.api.Test;
-import org.springframework.util.PathMatcher;
-
-import java.util.Arrays;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 
+import java.util.Arrays;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.util.PathMatcher;
+
+import io.springperf.web.util.support.ContainmentResult;
+
 class InterceptorRegistrationTest {
 
-    private final HandlerInterceptor interceptor = new HandlerInterceptor() {};
+    private final HandlerInterceptor interceptor = new HandlerInterceptor() {
+    };
 
     @Test
     void constructor_storesInterceptor() {

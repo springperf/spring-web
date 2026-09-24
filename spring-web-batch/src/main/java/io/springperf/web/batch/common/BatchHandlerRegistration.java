@@ -14,7 +14,15 @@ public class BatchHandlerRegistration {
         this.meta = meta;
     }
 
-    public Object bean() { return bean; }
-    public PathMappingContext singleCtx() { return singleCtx; }
-    public BatchRequestMetaData meta() { return meta; }
+    public Object bean() {
+        return bean;
+    }
+
+    public PathMappingContext singleCtx() {
+        return singleCtx;
+    }
+
+    public BatchRequestMetaData meta() {
+        return meta;
+    }
 }

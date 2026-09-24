@@ -70,8 +70,7 @@ public class ShiroSessionController {
     // ==================== 新增认证/授权端点 ====================
 
     @GetMapping("/login")
-    public ResponseEntity<Map<String, Object>> login(@RequestParam String username,
-                                                     @RequestParam String password) {
+    public ResponseEntity<Map<String, Object>> login(@RequestParam String username, @RequestParam String password) {
         Subject subject = SecurityUtils.getSubject();
         try {
             subject.login(new UsernamePasswordToken(username, password));

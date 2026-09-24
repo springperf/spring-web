@@ -14,10 +14,7 @@ public class FilterChainTest extends BaseE2ETest {
 
     @Test
     void testHealthFilter() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/health")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/health").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
         }
@@ -26,10 +23,7 @@ public class FilterChainTest extends BaseE2ETest {
     @Test
     void mixedFilter_servletAndWebFilter_bothExecuted() throws Exception {
         // 验证 Servlet Filter 和 WebFilter 在同一个请求中都被执行
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/bridge/ping")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/bridge/ping").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             assertEquals("called", resp.header("X-Web-Filter"),
@@ -41,10 +35,7 @@ public class FilterChainTest extends BaseE2ETest {
 
     @Test
     void testNotFound() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/nonexistent")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/nonexistent").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(404, resp.code());
         }

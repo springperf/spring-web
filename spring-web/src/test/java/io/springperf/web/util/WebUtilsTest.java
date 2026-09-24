@@ -1,9 +1,9 @@
 package io.springperf.web.util;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import org.junit.jupiter.api.Test;
 
 class WebUtilsTest {
 
@@ -139,31 +139,31 @@ class WebUtilsTest {
 
     @Test
     void findAllSlashIndices_singleSlash() {
-        assertArrayEquals(new int[]{0}, WebUtils.findAllSlashIndices("/abc"));
+        assertArrayEquals(new int[] { 0 }, WebUtils.findAllSlashIndices("/abc"));
     }
 
     @Test
     void findAllSlashIndices_multipleSlashes() {
-        assertArrayEquals(new int[]{0, 4, 7}, WebUtils.findAllSlashIndices("/api/v1/user"));
+        assertArrayEquals(new int[] { 0, 4, 7 }, WebUtils.findAllSlashIndices("/api/v1/user"));
     }
 
     @Test
     void findAllSlashIndices_trailingSlash() {
-        assertArrayEquals(new int[]{0, 4}, WebUtils.findAllSlashIndices("/api/"));
+        assertArrayEquals(new int[] { 0, 4 }, WebUtils.findAllSlashIndices("/api/"));
     }
 
     @Test
     void findAllSlashIndices_rootOnly() {
-        assertArrayEquals(new int[]{0}, WebUtils.findAllSlashIndices("/"));
+        assertArrayEquals(new int[] { 0 }, WebUtils.findAllSlashIndices("/"));
     }
 
     @Test
     void findAllSlashIndices_consecutiveSlashes() {
-        assertArrayEquals(new int[]{0, 1, 2}, WebUtils.findAllSlashIndices("///"));
+        assertArrayEquals(new int[] { 0, 1, 2 }, WebUtils.findAllSlashIndices("///"));
     }
 
     @Test
     void findAllSlashIndices_noLeadingSlash() {
-        assertArrayEquals(new int[]{3, 5}, WebUtils.findAllSlashIndices("abc/d/e"));
+        assertArrayEquals(new int[] { 3, 5 }, WebUtils.findAllSlashIndices("abc/d/e"));
     }
 }

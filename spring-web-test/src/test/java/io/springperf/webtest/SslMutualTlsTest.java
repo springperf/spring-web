@@ -25,24 +25,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * mTLS（双向 TLS）真实握手集成测试。
- * <p>验证 {@code client-auth=need} + {@code trust-store} 配置生效：
+ * <p>
+ * 验证 {@code client-auth=need} + {@code trust-store} 配置生效：
  * <ul>
- *   <li>携带受信客户端证书 → 握手成功，返回 200</li>
- *   <li>不携带客户端证书 → 服务端要求客户端认证，握手被拒（IO 异常）</li>
+ * <li>携带受信客户端证书 → 握手成功，返回 200</li>
+ * <li>不携带客户端证书 → 服务端要求客户端认证，握手被拒（IO 异常）</li>
  * </ul>
  * 使用同一 {@code test-keystore.p12} 同时作为服务端身份与信任锚（自签场景）。
  */
 @SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
-        "server.servlet.context-path=/api",
-        "server.ssl.enabled=true",
-        "server.ssl.key-store=classpath:test-keystore.p12",
-        "server.ssl.key-store-password=changeit",
-        "server.ssl.key-store-type=PKCS12",
-        "server.ssl.client-auth=need",
-        "server.ssl.trust-store=classpath:test-keystore.p12",
-        "server.ssl.trust-store-password=changeit",
-        "server.ssl.trust-store-type=PKCS12"
-})
+        "server.servlet.context-path=/api", "server.ssl.enabled=true",
+        "server.ssl.key-store=classpath:test-keystore.p12", "server.ssl.key-store-password=changeit",
+        "server.ssl.key-store-type=PKCS12", "server.ssl.client-auth=need",
+        "server.ssl.trust-store=classpath:test-keystore.p12", "server.ssl.trust-store-password=changeit",
+        "server.ssl.trust-store-type=PKCS12" })
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DirtiesContext
 public class SslMutualTlsTest {
@@ -56,22 +52,16 @@ public class SslMutualTlsTest {
 
     /** 带客户端证书的 client：信任所有服务端证书，且用 test-keystore 提供客户端证书 */
     private static OkHttpClient clientWithCert() throws Exception {
-        return new OkHttpClient.Builder()
-                .connectTimeout(Duration.ofSeconds(3))
-                .readTimeout(Duration.ofSeconds(10))
+        return new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3)).readTimeout(Duration.ofSeconds(10))
                 .sslSocketFactory(sslContext(true).getSocketFactory(), trustAllManager())
-                .hostnameVerifier((hostname, session) -> true)
-                .build();
+                .hostnameVerifier((hostname, session) -> true).build();
     }
 
     /** 无客户端证书的 client：信任所有服务端证书，但不提供客户端证书 */
     private static OkHttpClient clientWithoutCert() throws Exception {
-        return new OkHttpClient.Builder()
-                .connectTimeout(Duration.ofSeconds(3))
-                .readTimeout(Duration.ofSeconds(10))
+        return new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3)).readTimeout(Duration.ofSeconds(10))
                 .sslSocketFactory(sslContext(false).getSocketFactory(), trustAllManager())
-                .hostnameVerifier((hostname, session) -> true)
-                .build();
+                .hostnameVerifier((hostname, session) -> true).build();
     }
 
     /** 构造 SSLContext：provideClientCert=true 时从 test-keystore 加载 KeyManager（携带客户端证书） */
@@ -84,7 +74,7 @@ public class SslMutualTlsTest {
             kmf.init(ks, "changeit".toCharArray());
             kms = kmf.getKeyManagers();
         }
-        sslContext.init(kms, new TrustManager[]{trustAllManager()}, null);
+        sslContext.init(kms, new TrustManager[] { trustAllManager() }, null);
         return sslContext;
     }
 
@@ -115,10 +105,7 @@ public class SslMutualTlsTest {
 
     @Test
     void clientWithCertificate_handshakeSucceeds() throws Exception {
-        Request req = new Request.Builder()
-                .url(httpsUrl("/api/core/bytes"))
-                .get()
-                .build();
+        Request req = new Request.Builder().url(httpsUrl("/api/core/bytes")).get().build();
         try (Response resp = clientWithCert().newCall(req).execute()) {
             assertEquals(200, resp.code());
             assertEquals("Hello, Bytes!", resp.body().string());
@@ -127,10 +114,7 @@ public class SslMutualTlsTest {
 
     @Test
     void clientWithoutCertificate_handshakeRejected() throws Exception {
-        Request req = new Request.Builder()
-                .url(httpsUrl("/api/core/bytes"))
-                .get()
-                .build();
+        Request req = new Request.Builder().url(httpsUrl("/api/core/bytes")).get().build();
         // client-auth=need 下，缺少客户端证书会触发 TLS 握手失败（IO 层异常）
         assertThrows(java.io.IOException.class, () -> {
             try (Response resp = clientWithoutCert().newCall(req).execute()) {

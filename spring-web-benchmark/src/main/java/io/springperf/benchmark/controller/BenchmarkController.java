@@ -33,12 +33,9 @@ public class BenchmarkController {
     // ==================== GET with Path + Query ====================
 
     @GetMapping("/demo/hello/{name}/aaaxxx")
-    public UserResp hello(@PathVariable("name") String name,
-                          @RequestParam("p1") String p1,
-                          @RequestParam("p2") String p2,
-                          @RequestParam("p3") String p3,
-                          @RequestParam("p4") String p4,
-                          @RequestParam("p5") String p5) {
+    public UserResp hello(@PathVariable("name") String name, @RequestParam("p1") String p1,
+            @RequestParam("p2") String p2, @RequestParam("p3") String p3, @RequestParam("p4") String p4,
+            @RequestParam("p5") String p5) {
         UserResp resp = new UserResp();
         resp.setId(1L);
         resp.setName(name);

@@ -25,12 +25,15 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
     private String coreUrl() {
         return url("/api/core");
     }
+
     private String p1Url() {
         return url("/api/p1");
     }
+
     private String demoUrl() {
         return url("/api/demo");
     }
+
     private String baseUrl() {
         return url("/api");
     }
@@ -44,9 +47,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
 
     @Test
     void patchMethod_returns200() throws Exception {
-        Request req = new Request.Builder()
-                .url(p1Url() + "/patch-test")
-                .method("PATCH", RequestBody.create("", JSON))
+        Request req = new Request.Builder().url(p1Url() + "/patch-test").method("PATCH", RequestBody.create("", JSON))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
@@ -58,10 +59,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
 
     @Test
     void responseStatus201_returnsCreated() throws Exception {
-        Request req = new Request.Builder()
-                .url(p1Url() + "/status-201")
-                .post(RequestBody.create("", JSON))
-                .build();
+        Request req = new Request.Builder().url(p1Url() + "/status-201").post(RequestBody.create("", JSON)).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(201, resp.code());
         }
@@ -69,10 +67,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
 
     @Test
     void responseStatus202_returnsAccepted() throws Exception {
-        Request req = new Request.Builder()
-                .url(p1Url() + "/status-202")
-                .put(RequestBody.create("", JSON))
-                .build();
+        Request req = new Request.Builder().url(p1Url() + "/status-202").put(RequestBody.create("", JSON)).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(202, resp.code());
         }
@@ -82,14 +77,10 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
 
     @Test
     void typeMismatch_withNonNumericParam_returns400() throws Exception {
-        Request req = new Request.Builder()
-                .url(p1Url() + "/type-mismatch?id=abc")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(p1Url() + "/type-mismatch?id=abc").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             // int 参数收到非数字字符串应触发 MethodArgumentTypeMismatch → 400
-            assertEquals(400, resp.code(),
-                    "Type mismatch should return 400, got " + resp.code());
+            assertEquals(400, resp.code(), "Type mismatch should return 400, got " + resp.code());
         }
     }
 
@@ -97,17 +88,11 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
 
     @Test
     void multiPart_withTwoFiles_returnsBothFilenames() throws Exception {
-        RequestBody multipartBody = new MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("file1", "f1.txt",
-                        RequestBody.create("content1", MediaType.parse("text/plain")))
-                .addFormDataPart("file2", "f2.txt",
-                        RequestBody.create("content2", MediaType.parse("text/plain")))
+        RequestBody multipartBody = new MultipartBody.Builder().setType(MultipartBody.FORM)
+                .addFormDataPart("file1", "f1.txt", RequestBody.create("content1", MediaType.parse("text/plain")))
+                .addFormDataPart("file2", "f2.txt", RequestBody.create("content2", MediaType.parse("text/plain")))
                 .build();
-        Request req = new Request.Builder()
-                .url(p1Url() + "/multi-part")
-                .post(multipartBody)
-                .build();
+        Request req = new Request.Builder().url(p1Url() + "/multi-part").post(multipartBody).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             assertEquals("f1.txt-f2.txt", resp.body().string());
@@ -118,12 +103,9 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
 
     @Test
     void corsClassLevel_preflight_returnsAllowOrigin() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/p1/cors-class/test")
-                .header("Origin", "http://class-level.example.com")
-                .header("Access-Control-Request-Method", "GET")
-                .method("OPTIONS", null)
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/p1/cors-class/test")
+                .header("Origin", "http://class-level.example.com").header("Access-Control-Request-Method", "GET")
+                .method("OPTIONS", null).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             int code = resp.code();
             assertTrue(code == 200 || code == 204);
@@ -135,11 +117,8 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
 
     @Test
     void corsClassLevel_actualRequest_returnsAllowOrigin() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/p1/cors-class/test")
-                .header("Origin", "http://class-level.example.com")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/p1/cors-class/test")
+                .header("Origin", "http://class-level.example.com").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String allowOrigin = resp.header("Access-Control-Allow-Origin");
@@ -152,10 +131,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
 
     @Test
     void sseJsonEmitter_receivesSseEvents() throws Exception {
-        Request req = new Request.Builder()
-                .url(p1Url() + "/sse-json")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(p1Url() + "/sse-json").get().build();
         CountDownLatch latch = new CountDownLatch(1);
         CLIENT.newCall(req).enqueue(new okhttp3.Callback() {
             @Override
@@ -190,10 +166,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
 
     @Test
     void optimizeEndpoint_returns200() throws Exception {
-        Request req = new Request.Builder()
-                .url(p1Url() + "/optimize-check")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(p1Url() + "/optimize-check").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
         }
@@ -203,10 +176,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
 
     @Test
     void resourceDownload_returnsContent() throws Exception {
-        Request req = new Request.Builder()
-                .url(p1Url() + "/download-resource")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(p1Url() + "/download-resource").get().build();
         // Resource/FileReturnValueResolver 均设置 Content-Length + 结束帧，OkHttp 可完整读取，
         // 超时即视为实现缺陷，不被豁免。
         try (Response resp = CLIENT.newCall(req).execute()) {
@@ -218,10 +188,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
 
     @Test
     void fileDownload_returnsContent() throws Exception {
-        Request req = new Request.Builder()
-                .url(p1Url() + "/download-file")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(p1Url() + "/download-file").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -238,10 +205,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
         assertEquals(0, LifecycleInterceptor.postHandleCount);
         assertEquals(0, LifecycleInterceptor.afterCompletionCount);
 
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/core/lifecycle/check")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/core/lifecycle/check").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
         }
@@ -256,10 +220,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
 
     @Test
     void nonexistentPath_returns404() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/nonexistent-route-xyz")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/nonexistent-route-xyz").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(404, resp.code());
         }
@@ -269,10 +230,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
 
     @Test
     void wrongMethod_returns405() throws Exception {
-        Request req = new Request.Builder()
-                .url(coreUrl() + "/bytes")
-                .post(RequestBody.create("", JSON))
-                .build();
+        Request req = new Request.Builder().url(coreUrl() + "/bytes").post(RequestBody.create("", JSON)).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(405, resp.code());
         }
@@ -283,10 +241,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
     @Test
     void duplicateMapping_shouldNotCrash() throws Exception {
         // 两个 @GetMapping("/duplicate") 方法，框架应正常响应其中一个
-        Request req = new Request.Builder()
-                .url(p1Url() + "/duplicate")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(p1Url() + "/duplicate").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();

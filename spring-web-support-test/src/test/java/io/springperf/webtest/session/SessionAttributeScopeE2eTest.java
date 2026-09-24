@@ -23,8 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * E2E 验证 support 模块新增能力：
  * <ul>
- *   <li>{@code @SessionAttribute}（单数）：从 session 读取单值注入参数</li>
- *   <li>{@code @SessionScope}：session 作用域 bean，跨请求共享、跨 session 隔离</li>
+ * <li>{@code @SessionAttribute}（单数）：从 session 读取单值注入参数</li>
+ * <li>{@code @SessionScope}：session 作用域 bean，跨请求共享、跨 session 隔离</li>
  * </ul>
  * 使用 CookieJar 保持 JSESSIONID 以建立同一 session。
  */
@@ -33,12 +33,9 @@ public class SessionAttributeScopeE2eTest extends BaseE2ETest {
     private final OkHttpClient sessionClient;
 
     public SessionAttributeScopeE2eTest() {
-        this.sessionClient = new OkHttpClient.Builder()
-                .connectTimeout(Duration.ofSeconds(3))
-                .readTimeout(Duration.ofSeconds(10))
-                .writeTimeout(Duration.ofSeconds(10))
-                .cookieJar(new InMemoryCookieJar())
-                .build();
+        this.sessionClient = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+                .readTimeout(Duration.ofSeconds(10)).writeTimeout(Duration.ofSeconds(10))
+                .cookieJar(new InMemoryCookieJar()).build();
     }
 
     private String baseUrl() {
@@ -49,8 +46,8 @@ public class SessionAttributeScopeE2eTest extends BaseE2ETest {
     void sessionAttribute_putThenRead_sameSession() throws Exception {
         putGreeting("hello-perf");
         // 同一 session 内可读取 @SessionAttribute 注入值
-        try (Response resp = sessionClient.newCall(new Request.Builder()
-                .url(baseUrl() + "/get").get().build()).execute()) {
+        try (Response resp = sessionClient.newCall(new Request.Builder().url(baseUrl() + "/get").get().build())
+                .execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
             assertTrue(body.contains("hello-perf"), "body should contain greeting, got: " + body);
@@ -60,8 +57,8 @@ public class SessionAttributeScopeE2eTest extends BaseE2ETest {
     @Test
     void sessionAttribute_optionalMissing_returnsNull() throws Exception {
         // required=false 且 session 无该属性时返回 null（不报错）
-        try (Response resp = sessionClient.newCall(new Request.Builder()
-                .url(baseUrl() + "/get-optional").get().build()).execute()) {
+        try (Response resp = sessionClient.newCall(new Request.Builder().url(baseUrl() + "/get-optional").get().build())
+                .execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
             assertTrue(body.contains("\"missing\":null"), "expected null missing, got: " + body);
@@ -75,8 +72,8 @@ public class SessionAttributeScopeE2eTest extends BaseE2ETest {
         assertEquals("2", counterValue());
         assertEquals("3", counterValue());
         // 新 session（无 Cookie）：独立实例 → 从 1 重新开始
-        try (Response resp = CLIENT.newCall(new Request.Builder()
-                .url(baseUrl() + "/counter").get().build()).execute()) {
+        try (Response resp = CLIENT.newCall(new Request.Builder().url(baseUrl() + "/counter").get().build())
+                .execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
             assertTrue(body.contains("\"count\":1"), "fresh session should start at 1, got: " + body);
@@ -86,14 +83,13 @@ public class SessionAttributeScopeE2eTest extends BaseE2ETest {
     @Test
     void sessionScope_differentSessionId_isolated() throws Exception {
         // 两个独立 CookieJar 会话：各自首次请求都应从 1 开始，且 sessionId 不同
-        OkHttpClient clientA = new OkHttpClient.Builder()
-                .cookieJar(new InMemoryCookieJar()).build();
-        OkHttpClient clientB = new OkHttpClient.Builder()
-                .cookieJar(new InMemoryCookieJar()).build();
+        OkHttpClient clientA = new OkHttpClient.Builder().cookieJar(new InMemoryCookieJar()).build();
+        OkHttpClient clientB = new OkHttpClient.Builder().cookieJar(new InMemoryCookieJar()).build();
 
         Response respA = counterResponse(clientA);
         Response respB = counterResponse(clientB);
-        try (respA; respB) {
+        try (respA;
+                respB) {
             String bodyA = respA.body().string();
             String bodyB = respB.body().string();
             assertEquals(200, respA.code());
@@ -107,8 +103,9 @@ public class SessionAttributeScopeE2eTest extends BaseE2ETest {
     // ---- helpers ----
 
     private void putGreeting(String value) throws Exception {
-        try (Response resp = sessionClient.newCall(new Request.Builder()
-                .url(baseUrl() + "/put?name=greeting&value=" + value).get().build()).execute()) {
+        try (Response resp = sessionClient
+                .newCall(new Request.Builder().url(baseUrl() + "/put?name=greeting&value=" + value).get().build())
+                .execute()) {
             assertEquals(200, resp.code());
         }
     }
@@ -125,8 +122,7 @@ public class SessionAttributeScopeE2eTest extends BaseE2ETest {
     }
 
     private Response counterResponse(OkHttpClient client) throws Exception {
-        return client.newCall(new Request.Builder()
-                .url(baseUrl() + "/counter").get().build()).execute();
+        return client.newCall(new Request.Builder().url(baseUrl() + "/counter").get().build()).execute();
     }
 
     private static int parseCount(String body) {

@@ -1,19 +1,20 @@
 package io.springperf.web.core.retval.resolver;
 
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.verify;
+
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.lang.reflect.Method;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.MethodParameter;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
-import java.lang.reflect.Method;
-
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.verify;
+import io.springperf.web.http.WebServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 class InputStreamReturnValueResolverTest {
@@ -56,7 +57,12 @@ class InputStreamReturnValueResolverTest {
     }
 
     @SuppressWarnings("unused")
-    public InputStream streamReturn() { return null; }
+    public InputStream streamReturn() {
+        return null;
+    }
+
     @SuppressWarnings("unused")
-    public String stringReturn() { return null; }
+    public String stringReturn() {
+        return null;
+    }
 }

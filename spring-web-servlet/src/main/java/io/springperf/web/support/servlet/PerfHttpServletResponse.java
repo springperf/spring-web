@@ -48,8 +48,8 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
     /** 业务是否已写入响应体（首次写入时把响应标记为 handled，确保请求收尾会提交）。 */
     private volatile boolean bodyWritten;
 
-    private static final Pattern CHARSET_PATTERN =
-            Pattern.compile(";\\s*charset\\s*=\\s*([^;\\s]+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern CHARSET_PATTERN = Pattern.compile(";\\s*charset\\s*=\\s*([^;\\s]+)",
+            Pattern.CASE_INSENSITIVE);
 
     public PerfHttpServletResponse(WebServerHttpResponse response) {
         this.response = response;
@@ -59,10 +59,10 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
 
     /**
      * 注册「提交前回调」：把 Writer 的编码缓冲刷入响应体。
-     *
-     * <p>Writer 采用 Tomcat 语义（{@code autoFlush=false}）：{@code write()} 不会立即落到响应体，
-     * 若不在任何提交路径（一次性 flush / flushChunked / sendError）之前把编码缓冲刷出，
-     * 未显式 flush 的写入会静默丢失。</p>
+     * <p>
+     * Writer 采用 Tomcat 语义（{@code autoFlush=false}）：{@code write()} 不会立即落到响应体， 若不在任何提交路径（一次性 flush / flushChunked /
+     * sendError）之前把编码缓冲刷出， 未显式 flush 的写入会静默丢失。
+     * </p>
      */
     private void registerBeforeCommit() {
         response.setBeforeCommit(this::flushEncoderIntoBody);
@@ -70,10 +70,10 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
 
     /**
      * 业务首次写入响应体时标记「响应已由业务接管」。
-     *
-     * <p>Servlet 语义下容器在请求结束时会送出业务写入的内容；若不打这个标记，框架的收尾逻辑
-     * （{@code flushResponse} 仅在 {@code isHandled()} 为真时提交）会认为无人写响应，
-     * 导致「用 Writer/OutputStream 写了但没 flush」的处理器**响应永远不发出**（客户端挂到超时）。</p>
+     * <p>
+     * Servlet 语义下容器在请求结束时会送出业务写入的内容；若不打这个标记，框架的收尾逻辑 （{@code flushResponse} 仅在 {@code isHandled()} 为真时提交）会认为无人写响应， 导致「用
+     * Writer/OutputStream 写了但没 flush」的处理器**响应永远不发出**（客户端挂到超时）。
+     * </p>
      */
     private void markBodyWritten() {
         if (!bodyWritten) {
@@ -94,16 +94,16 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
     }
 
     /**
-     * {@code server.servlet.encoding.charset}：容器级响应编码在适配器创建期写入
-     * （早于业务代码，构成"默认值"；业务后续 setCharacterEncoding 仍可覆盖，
+     * {@code server.servlet.encoding.charset}：容器级响应编码在适配器创建期写入 （早于业务代码，构成"默认值"；业务后续 setCharacterEncoding 仍可覆盖，
      * force-response=true 时该覆盖被忽略——见 {@link #setCharacterEncoding}）。
-     * <p>rebind（Filter 包装）时对新 delegate 重新应用，避免容器编码在包装后丢失。</p>
+     * <p>
+     * rebind（Filter 包装）时对新 delegate 重新应用，避免容器编码在包装后丢失。
+     * </p>
      */
     private void applyContainerResponseEncoding() {
         try {
-            io.springperf.web.support.servlet.context.PerfServletContext sc =
-                    response.getWebContext().getWebComponent(
-                            io.springperf.web.support.servlet.context.PerfServletContext.class);
+            io.springperf.web.support.servlet.context.PerfServletContext sc = response.getWebContext()
+                    .getWebComponent(io.springperf.web.support.servlet.context.PerfServletContext.class);
             if (sc != null) {
                 response.setCharacterEncoding(java.nio.charset.Charset.forName(sc.getResponseCharacterEncoding()));
             }
@@ -117,8 +117,7 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
     }
 
     /**
-     * 重新绑定底层的 {@link WebServerHttpResponse} 委托对象。
-     * 当 WebFilter 包装了响应后调用。
+     * 重新绑定底层的 {@link WebServerHttpResponse} 委托对象。 当 WebFilter 包装了响应后调用。
      */
     public WebServerHttpResponse getResponse() {
         return response;
@@ -139,17 +138,32 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
     }
 
     /**
-     * 设置 SameSite 属性，作用于后续所有通过 {@link #addCookie(Cookie)} 添加的 Cookie。
-     * 值为 {@code "Lax"}、{@code "Strict"} 或 {@code "None"}。
+     * 设置 SameSite 属性，作用于后续所有通过 {@link #addCookie(Cookie)} 添加的 Cookie。 值为 {@code "Lax"}、{@code "Strict"} 或
+     * {@code "None"}。
      */
     public void setSameSite(String sameSite) {
         this.sameSite = sameSite;
     }
 
-    @Override public void setStatus(int sc) { response.setStatusCode(HttpStatusCode.valueOf(sc)); }
-    @Override public int getStatus() { return response.getStatus().value(); }
-    @Override public boolean isCommitted() { return response.isCommitted(); }
-    @Override public boolean containsHeader(String name) { return response.getHeaders().containsKey(name); }
+    @Override
+    public void setStatus(int sc) {
+        response.setStatusCode(HttpStatusCode.valueOf(sc));
+    }
+
+    @Override
+    public int getStatus() {
+        return response.getStatus().value();
+    }
+
+    @Override
+    public boolean isCommitted() {
+        return response.isCommitted();
+    }
+
+    @Override
+    public boolean containsHeader(String name) {
+        return response.getHeaders().containsKey(name);
+    }
 
     @Override
     public void setDateHeader(String name, long date) {
@@ -191,10 +205,10 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
     /**
      * 按 Servlet 规范把重定向 location 归一化为绝对 URL：
      * <ul>
-     *   <li>外部绝对 URL（带 scheme，或以 {@code //} 开头的网络路径引用）原样返回；</li>
-     *   <li>以 {@code /} 开头的站内路径：补 context-path 后拼上当前请求的 scheme://host[:port]；</li>
-     *   <li>相对路径（如 {@code next}）：Servlet 规范要求容器转换为绝对 URL —— 先按当前请求 URI
-     *       所在目录解析（含 {@code .}/{@code ..} 归一化，保留 query/fragment），再拼权威部分。</li>
+     * <li>外部绝对 URL（带 scheme，或以 {@code //} 开头的网络路径引用）原样返回；</li>
+     * <li>以 {@code /} 开头的站内路径：补 context-path 后拼上当前请求的 scheme://host[:port]；</li>
+     * <li>相对路径（如 {@code next}）：Servlet 规范要求容器转换为绝对 URL —— 先按当前请求 URI 所在目录解析（含 {@code .}/{@code ..} 归一化，保留
+     * query/fragment），再拼权威部分。</li>
      * </ul>
      */
     private String toAbsoluteLocation(String location) {
@@ -227,8 +241,7 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
     }
 
     /**
-     * 相对 location 解析为站内绝对路径：以当前请求 URI 的目录为基准，
-     * {@code .} / {@code ..} 归一化，query 与 fragment 原样保留。
+     * 相对 location 解析为站内绝对路径：以当前请求 URI 的目录为基准， {@code .} / {@code ..} 归一化，query 与 fragment 原样保留。
      */
     private String resolveRelative(String location) {
         int cut = indexOfAny(location, '?', '#');
@@ -352,8 +365,8 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
         return path + ";jsessionid=" + sessionId + query + afterFragment;
     }
 
-    private static final DateTimeFormatter DATE_FORMAT =
-            DateTimeFormatter.RFC_1123_DATE_TIME.withLocale(Locale.US).withZone(ZoneId.of("GMT"));
+    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.RFC_1123_DATE_TIME.withLocale(Locale.US)
+            .withZone(ZoneId.of("GMT"));
 
     private static String formatDate(long date) {
         return DATE_FORMAT.format(Instant.ofEpochMilli(date));
@@ -361,7 +374,8 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
 
     @Override
     public void addCookie(Cookie cookie) {
-        DefaultCookie nettyCookie = new DefaultCookie(cookie.getName(), cookie.getValue() != null ? cookie.getValue() : "");
+        DefaultCookie nettyCookie = new DefaultCookie(cookie.getName(),
+                cookie.getValue() != null ? cookie.getValue() : "");
         if (cookie.getDomain() != null) {
             nettyCookie.setDomain(cookie.getDomain());
         }
@@ -376,11 +390,32 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
         }
         response.getHeaders().add(HttpHeaders.Names.SET_COOKIE, ServerCookieEncoder.STRICT.encode(nettyCookie));
     }
-    @Override public void setHeader(String name, String value) { response.getHeaders().set(name, value); }
-    @Override public void addHeader(String name, String value) { response.getHeaders().add(name, value); }
-    @Override public String getHeader(String name) { return response.getHeaders().getFirst(name); }
-    @Override public Collection<String> getHeaders(String name) { return response.getHeaders().get(name); }
-    @Override public Collection<String> getHeaderNames() { return response.getHeaders().keySet(); }
+
+    @Override
+    public void setHeader(String name, String value) {
+        response.getHeaders().set(name, value);
+    }
+
+    @Override
+    public void addHeader(String name, String value) {
+        response.getHeaders().add(name, value);
+    }
+
+    @Override
+    public String getHeader(String name) {
+        return response.getHeaders().getFirst(name);
+    }
+
+    @Override
+    public Collection<String> getHeaders(String name) {
+        return response.getHeaders().get(name);
+    }
+
+    @Override
+    public Collection<String> getHeaderNames() {
+        return response.getHeaders().keySet();
+    }
+
     @Override
     public void setContentType(String type) {
         setHeader(HttpHeaders.Names.CONTENT_TYPE, type);
@@ -395,9 +430,19 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
             }
         }
     }
-    @Override public String getContentType() { return getHeader(HttpHeaders.Names.CONTENT_TYPE); }
-    @Override public String getCharacterEncoding() { return response.getCharacterEncoding() == null ? null : response.getCharacterEncoding().name(); }
-    @Override public void setCharacterEncoding(String charset) {
+
+    @Override
+    public String getContentType() {
+        return getHeader(HttpHeaders.Names.CONTENT_TYPE);
+    }
+
+    @Override
+    public String getCharacterEncoding() {
+        return response.getCharacterEncoding() == null ? null : response.getCharacterEncoding().name();
+    }
+
+    @Override
+    public void setCharacterEncoding(String charset) {
         // server.servlet.encoding.force-response=true：忽略业务显式设置（保持 ServletContext 配置 charset）
         PerfServletContext ctx = resolvePerfServletContext();
         if (ctx != null && ctx.isForceResponseEncoding()) {
@@ -453,19 +498,51 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
         // 2-32：规范同一 ServletResponse 的多次 getOutputStream() 必须返回同一实例
         if (cachedOutputStream == null) {
             cachedOutputStream = new ServletOutputStream() {
-                @Override public boolean isReady() { return true; }
-                @Override public void setWriteListener(WriteListener writeListener) { throw new UnsupportedOperationException("Non-blocking IO is not supported"); }
-                @Override public void write(int b) throws IOException { markBodyWritten(); response.getBody().write(b); }
-                @Override public void print(String s) throws IOException { markBodyWritten(); response.getBody().write(s.getBytes(getCharacterEncoding())); }
-                @Override public void write(byte[] b) throws IOException { markBodyWritten(); response.getBody().write(b); }
-                @Override public void write(byte[] b, int off, int len) throws IOException { markBodyWritten(); response.getBody().write(b, off, len); }
-                @Override public void flush() throws IOException { commitChunked(); }
+                @Override
+                public boolean isReady() {
+                    return true;
+                }
+
+                @Override
+                public void setWriteListener(WriteListener writeListener) {
+                    throw new UnsupportedOperationException("Non-blocking IO is not supported");
+                }
+
+                @Override
+                public void write(int b) throws IOException {
+                    markBodyWritten();
+                    response.getBody().write(b);
+                }
+
+                @Override
+                public void print(String s) throws IOException {
+                    markBodyWritten();
+                    response.getBody().write(s.getBytes(getCharacterEncoding()));
+                }
+
+                @Override
+                public void write(byte[] b) throws IOException {
+                    markBodyWritten();
+                    response.getBody().write(b);
+                }
+
+                @Override
+                public void write(byte[] b, int off, int len) throws IOException {
+                    markBodyWritten();
+                    response.getBody().write(b, off, len);
+                }
+
+                @Override
+                public void flush() throws IOException {
+                    commitChunked();
+                }
             };
         }
         return cachedOutputStream;
     }
 
-    @Override public PrintWriter getWriter() throws IOException {
+    @Override
+    public PrintWriter getWriter() throws IOException {
         if (calledOutputStream) {
             throw new IllegalStateException("getOutputStream() has already been called");
         }
@@ -476,10 +553,28 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
             // 若在 getWriter() 时捕获一次 getBody()，后续写入会落进已转移的旧缓冲 → 静默丢失
             // （渐进式输出的第二次 flush 就丢内容）。
             OutputStream dynamicBody = new OutputStream() {
-                @Override public void write(int b) throws IOException { markBodyWritten(); response.getBody().write(b); }
-                @Override public void write(byte[] b) throws IOException { markBodyWritten(); response.getBody().write(b); }
-                @Override public void write(byte[] b, int off, int len) throws IOException { markBodyWritten(); response.getBody().write(b, off, len); }
-                @Override public void flush() throws IOException { response.getBody().flush(); }
+                @Override
+                public void write(int b) throws IOException {
+                    markBodyWritten();
+                    response.getBody().write(b);
+                }
+
+                @Override
+                public void write(byte[] b) throws IOException {
+                    markBodyWritten();
+                    response.getBody().write(b);
+                }
+
+                @Override
+                public void write(byte[] b, int off, int len) throws IOException {
+                    markBodyWritten();
+                    response.getBody().write(b, off, len);
+                }
+
+                @Override
+                public void flush() throws IOException {
+                    response.getBody().flush();
+                }
             };
             cachedEncoder = new OutputStreamWriter(dynamicBody, getCharacterEncoding());
             // 对齐 Tomcat：autoFlush=false（println 不提交，仅显式 flush()/flushBuffer() 提交），
@@ -488,13 +583,18 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
         }
         return cachedWriter;
     }
-    @Override public void flushBuffer() {
+
+    @Override
+    public void flushBuffer() {
         // Tomcat 语义：flushBuffer() 提交响应并以 chunked 帧写出，之后仍可继续写入（渐进式输出）
         flushEncoderIntoBody();
         commitChunked();
     }
 
-    @Override public int getBufferSize() { return response.getBufferSize(); }
+    @Override
+    public int getBufferSize() {
+        return response.getBufferSize();
+    }
 
     @Override
     public void reset() {
@@ -533,6 +633,7 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
             response.sendError(HttpStatusCode.valueOf(sc), null, null, traceParam(), messageParam(), errorsParam());
         }
     }
+
     @Override
     public void sendError(int sc, String msg) {
         if (response.isCommitted()) {
@@ -548,8 +649,8 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
 
     /*
      * server.error.include-message / include-stacktrace / include-binding-errors 的 on-param 模式依赖
-     * 请求参数（message/trace/errors）是否命中；servlet 的 sendError 由本类发起，只有这里有请求上下文，
-     * 因此在此解析并透传——否则 servlet 路径的 on-param 永远不生效（参数被硬编码为未命中）。
+     * 请求参数（message/trace/errors）是否命中；servlet 的 sendError 由本类发起，只有这里有请求上下文， 因此在此解析并透传——否则 servlet 路径的 on-param
+     * 永远不生效（参数被硬编码为未命中）。
      */
     private boolean messageParam() {
         return paramPresent("message");
@@ -577,8 +678,7 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
     }
 
     /**
-     * 提交响应头并以 chunked 帧写出已缓冲内容（Tomcat：{@code flushBuffer()} 与 {@code flush()}
-     * 都会提交响应且之后仍可继续写入）。首次调用提交、后续调用续帧，具体由底层响应处理。
+     * 提交响应头并以 chunked 帧写出已缓冲内容（Tomcat：{@code flushBuffer()} 与 {@code flush()} 都会提交响应且之后仍可继续写入）。首次调用提交、后续调用续帧，具体由底层响应处理。
      */
     private void commitChunked() {
         try {
@@ -589,9 +689,8 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
     }
 
     /**
-     * Tomcat 对齐的 {@link PrintWriter}：{@code autoFlush=false}（{@code println} 不提交响应），
-     * 显式 {@link #flush()} 则「编码缓冲落响应体 + 提交并写出」，即 Servlet 规范中
-     * {@code ServletResponse#getWriter().flush()} 的「提交响应」语义。
+     * Tomcat 对齐的 {@link PrintWriter}：{@code autoFlush=false}（{@code println} 不提交响应）， 显式 {@link #flush()} 则「编码缓冲落响应体 +
+     * 提交并写出」，即 Servlet 规范中 {@code ServletResponse#getWriter().flush()} 的「提交响应」语义。
      */
     static final class CommitOnFlushPrintWriter extends PrintWriter {
 

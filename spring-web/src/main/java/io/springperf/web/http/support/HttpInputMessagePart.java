@@ -2,12 +2,13 @@ package io.springperf.web.http.support;
 
 /**
  * Representation of a single part in a multipart request.
- *
- * <p>Extends {@link BodyHttpInputMessage} with metadata specific to
- * multipart form data: the part name, content size, and original filename.
- * Each part is an independent HTTP message with its own headers and body.</p>
+ * <p>
+ * Extends {@link BodyHttpInputMessage} with metadata specific to multipart form data: the part name, content size, and
+ * original filename. Each part is an independent HTTP message with its own headers and body.
+ * </p>
  *
  * @since 1.0.0
+ *
  * @see BodyHttpInputMessage
  * @see org.springframework.web.multipart.MultipartFile
  */

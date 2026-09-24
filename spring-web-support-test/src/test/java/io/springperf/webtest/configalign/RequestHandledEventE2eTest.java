@@ -19,30 +19,26 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code spring.mvc.publish-request-handled-events=true} E2E：请求完成后
- * {@link ServletRequestHandledEvent} 真实发布（监听器计数与事件字段可读）。
- * <p>默认关闭（对齐 Boot）由 {@code DispatcherHandlerRequestHandledEventTest} 单元测试覆盖；
- * 本类验证开启后的端到端发布链路。</p>
+ * {@code spring.mvc.publish-request-handled-events=true} E2E：请求完成后 {@link ServletRequestHandledEvent}
+ * 真实发布（监听器计数与事件字段可读）。
+ * <p>
+ * 默认关闭（对齐 Boot）由 {@code DispatcherHandlerRequestHandledEventTest} 单元测试覆盖； 本类验证开启后的端到端发布链路。
+ * </p>
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, RequestHandledEventE2eTest.EventConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "spring.mvc.publish-request-handled-events=true"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        RequestHandledEventE2eTest.EventConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "spring.mvc.publish-request-handled-events=true" })
 class RequestHandledEventE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
 
     private String get(String path) throws Exception {
-        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder()
-                .url("http://localhost:" + port + path).build()).execute();
+        okhttp3.Response resp = CLIENT
+                .newCall(new okhttp3.Request.Builder().url("http://localhost:" + port + path).build()).execute();
         try {
             assertEquals(200, resp.code());
             return resp.body().string().trim();
@@ -58,18 +54,15 @@ class RequestHandledEventE2eTest {
         int after = Integer.parseInt(get("/e2e-event/count"));
         // 两次探测请求自身也会各产生一个事件，故至少 +2
         assertTrue(after >= before + 2,
-                "开启 publish-request-handled-events 后每个请求都应发布事件（before="
-                        + before + ", after=" + after + "）");
+                "开启 publish-request-handled-events 后每个请求都应发布事件（before=" + before + ", after=" + after + "）");
     }
 
     @Test
     void eventCarriesRequestMetadata() throws Exception {
         get("/e2e-event/hit");
         String lastSeen = get("/e2e-event/last");
-        assertTrue(lastSeen.contains("GET"),
-                "事件应记录请求方法，实际 " + lastSeen);
-        assertTrue(lastSeen.contains("/e2e-event/"),
-                "事件应记录请求 URL，实际 " + lastSeen);
+        assertTrue(lastSeen.contains("GET"), "事件应记录请求方法，实际 " + lastSeen);
+        assertTrue(lastSeen.contains("/e2e-event/"), "事件应记录请求 URL，实际 " + lastSeen);
     }
 
     @TestConfiguration

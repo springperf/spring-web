@@ -15,22 +15,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code spring.mvc.problemdetails.enabled=true} E2E：错误响应切换为
- * RFC 7807 application/problem+json（含 type/title/status 字段）。
+ * {@code spring.mvc.problemdetails.enabled=true} E2E：错误响应切换为 RFC 7807 application/problem+json（含 type/title/status 字段）。
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class,
-                ProblemDetailsE2eTest.PdConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "spring.mvc.problemdetails.enabled=true"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        ProblemDetailsE2eTest.PdConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "spring.mvc.problemdetails.enabled=true" })
 class ProblemDetailsE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
@@ -41,16 +34,15 @@ class ProblemDetailsE2eTest {
 
     @Test
     void exception_renderedAsProblemJson() throws Exception {
-        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder()
-                .url(url("/e2e-pd/boom")).build()).execute();
+        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder().url(url("/e2e-pd/boom")).build())
+                .execute();
         try {
             String contentType = resp.header("Content-Type", "");
             String body = resp.body().string();
             assertEquals(500, resp.code(), body);
             assertTrue(contentType.startsWith("application/problem+json"),
                     "problemdetails 开启后错误响应应为 RFC 7807，实际 " + contentType);
-            assertTrue(body.contains("\"status\"") && body.contains("500"),
-                    "problem+json 应含 status 字段，实际 " + body);
+            assertTrue(body.contains("\"status\"") && body.contains("500"), "problem+json 应含 status 字段，实际 " + body);
         } finally {
             resp.close();
         }
@@ -58,8 +50,8 @@ class ProblemDetailsE2eTest {
 
     @Test
     void notFound_renderedAsProblemJson() throws Exception {
-        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder()
-                .url(url("/e2e-pd/missing")).build()).execute();
+        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder().url(url("/e2e-pd/missing")).build())
+                .execute();
         try {
             String contentType = resp.header("Content-Type", "");
             String body = resp.body().string();

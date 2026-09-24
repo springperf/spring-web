@@ -1,6 +1,19 @@
 package io.springperf.web.core.async;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+
+import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
+import org.springframework.scheduling.concurrent.ConcurrentTaskExecutor;
+import org.springframework.web.context.request.async.*;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebComponentContainer;
 import io.springperf.web.context.WebComponentWrapperUtils;
@@ -10,17 +23,6 @@ import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.json.JacksonConverter;
 import io.springperf.web.json.JsonConverter;
-import org.springframework.core.task.AsyncTaskExecutor;
-import org.springframework.core.task.SimpleAsyncTaskExecutor;
-import org.springframework.scheduling.concurrent.ConcurrentTaskExecutor;
-import org.springframework.web.context.request.async.*;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.RejectedExecutionException;
 
 public class AsyncSupportRegistry extends WebComponentContainer {
     private final List<CallableProcessingInterceptor> callableInterceptors = new ArrayList<>();
@@ -38,8 +40,8 @@ public class AsyncSupportRegistry extends WebComponentContainer {
     @Override
     public void initWithWebContext(WebContext webContext) {
         super.initWithWebContext(webContext);
-        this.defaultTimeout = webContext.getProps().getDurationMillis(
-                PropertiesConstant.ASYNC_REQUEST_TIMEOUT, PropertiesConstant.ASYNC_REQUEST_TIMEOUT_DEFAULT);
+        this.defaultTimeout = webContext.getProps().getDurationMillis(PropertiesConstant.ASYNC_REQUEST_TIMEOUT,
+                PropertiesConstant.ASYNC_REQUEST_TIMEOUT_DEFAULT);
         WebComponentWrapperUtils.registerComponent(this, CallableProcessingInterceptor.class);
         WebComponentWrapperUtils.registerComponent(this, DeferredResultProcessingInterceptor.class);
         ObjectMapper objectMapper = webContext.getBeanFromCtx(ObjectMapper.class);
@@ -52,7 +54,8 @@ public class AsyncSupportRegistry extends WebComponentContainer {
     @Override
     public void initComponentPhase2() throws Exception {
         WebComponentWrapperUtils.initRealComponentList(this, callableInterceptors, CallableProcessingInterceptor.class);
-        WebComponentWrapperUtils.initRealComponentList(this, deferredResultInterceptors, DeferredResultProcessingInterceptor.class);
+        WebComponentWrapperUtils.initRealComponentList(this, deferredResultInterceptors,
+                DeferredResultProcessingInterceptor.class);
         BizPoolRegistry bizPoolRegistry = webContext.getWebComponent(BizPoolRegistry.class);
         if (bizPoolRegistry != null) {
             ExecutorService defaultPool = bizPoolRegistry.getDefaultPool();
@@ -73,8 +76,7 @@ public class AsyncSupportRegistry extends WebComponentContainer {
     }
 
     /**
-     * 懒加载单例的兜底 {@link SimpleAsyncTaskExecutor}。
-     * 仅在无 default 业务线程池且方法未显式指定 executor 时使用。
+     * 懒加载单例的兜底 {@link SimpleAsyncTaskExecutor}。 仅在无 default 业务线程池且方法未显式指定 executor 时使用。
      */
     private AsyncTaskExecutor getOrCreateFallbackExecutor() {
         AsyncTaskExecutor executor = this.fallbackExecutor;
@@ -102,12 +104,13 @@ public class AsyncSupportRegistry extends WebComponentContainer {
         return jsonConverter;
     }
 
-
-    public void startCallableProcessing(WebServerHttpRequest req, WebServerHttpResponse resp, WebAsyncTask<?> webAsyncTask) throws Exception {
+    public void startCallableProcessing(WebServerHttpRequest req, WebServerHttpResponse resp,
+            WebAsyncTask<?> webAsyncTask) throws Exception {
         startCallableProcessing(AsyncSupportUtils.getAsyncWebRequest(req, resp), webAsyncTask);
     }
 
-    public void startCallableProcessing(PerfAsyncWebRequest asyncWebRequest, WebAsyncTask<?> webAsyncTask) throws Exception {
+    public void startCallableProcessing(PerfAsyncWebRequest asyncWebRequest, WebAsyncTask<?> webAsyncTask)
+            throws Exception {
         Long timeout = webAsyncTask.getTimeout();
         if (timeout != null) {
             asyncWebRequest.setTimeout(timeout);
@@ -125,7 +128,8 @@ public class AsyncSupportRegistry extends WebComponentContainer {
         final AsyncTaskExecutor executorToUse = effectiveExecutor;
 
         Callable<?> callable = webAsyncTask.getCallable();
-        WebAsyncSupportUtils.CallableInterceptorChainAdapter interceptorChain = WebAsyncSupportUtils.newCallableInterceptorChain(webAsyncTask, callableInterceptors);
+        WebAsyncSupportUtils.CallableInterceptorChainAdapter interceptorChain = WebAsyncSupportUtils
+                .newCallableInterceptorChain(webAsyncTask, callableInterceptors);
 
         asyncWebRequest.addTimeoutHandler(() -> {
             Object result = interceptorChain.triggerAfterTimeout(asyncWebRequest, callable);
@@ -169,11 +173,13 @@ public class AsyncSupportRegistry extends WebComponentContainer {
         });
     }
 
-    public void startDeferredResultProcessing(WebServerHttpRequest req, WebServerHttpResponse resp, DeferredResult<?> deferredResult) throws Exception {
+    public void startDeferredResultProcessing(WebServerHttpRequest req, WebServerHttpResponse resp,
+            DeferredResult<?> deferredResult) throws Exception {
         startDeferredResultProcessing(AsyncSupportUtils.getAsyncWebRequest(req, resp), deferredResult);
     }
 
-    public void startDeferredResultProcessing(PerfAsyncWebRequest asyncWebRequest, DeferredResult<?> deferredResult) throws Exception {
+    public void startDeferredResultProcessing(PerfAsyncWebRequest asyncWebRequest, DeferredResult<?> deferredResult)
+            throws Exception {
         Long timeout = WebAsyncSupportUtils.getDeferredResultTimeout(deferredResult);
         if (timeout != null) {
             asyncWebRequest.setTimeout(timeout);
@@ -182,7 +188,8 @@ public class AsyncSupportRegistry extends WebComponentContainer {
             // （对齐 Callable 路径与 Spring MVC WebAsyncManager 默认超时语义）
             asyncWebRequest.setTimeout(defaultTimeout);
         }
-        WebAsyncSupportUtils.DeferredResultInterceptorChainAdapter interceptorChain = WebAsyncSupportUtils.newDeferredResultInterceptorChain(deferredResult, deferredResultInterceptors);
+        WebAsyncSupportUtils.DeferredResultInterceptorChainAdapter interceptorChain = WebAsyncSupportUtils
+                .newDeferredResultInterceptorChain(deferredResult, deferredResultInterceptors);
 
         asyncWebRequest.addTimeoutHandler(() -> {
             try {
@@ -205,7 +212,8 @@ public class AsyncSupportRegistry extends WebComponentContainer {
             }
         });
 
-        asyncWebRequest.addCompletionHandler(() -> interceptorChain.triggerAfterCompletion(asyncWebRequest, deferredResult));
+        asyncWebRequest
+                .addCompletionHandler(() -> interceptorChain.triggerAfterCompletion(asyncWebRequest, deferredResult));
 
         interceptorChain.applyBeforeConcurrentHandling(asyncWebRequest, deferredResult);
         asyncWebRequest.startAsyncProcessing();

@@ -1,13 +1,14 @@
 package io.springperf.web.core.arg.provider;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.arg.StaticArgumentResolver;
-import io.springperf.web.core.mapping.MappingHandlerMethod;
-import io.springperf.web.http.WebServerHttpRequest;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpRequest;
 import org.springframework.http.server.ServerHttpRequest;
+
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.arg.StaticArgumentResolver;
+import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.http.WebServerHttpRequest;
 
 public class RequestResolverProvider implements StaticArgumentResolverProvider {
 
@@ -24,7 +25,8 @@ public class RequestResolverProvider implements StaticArgumentResolverProvider {
     }
 
     @Override
-    public StaticArgumentResolver getResolver(MethodParameter parameter, MappingHandlerMethod mappingContext, WebContext webContext) {
+    public StaticArgumentResolver getResolver(MethodParameter parameter, MappingHandlerMethod mappingContext,
+            WebContext webContext) {
         return httpRequestResolver;
     }
 }

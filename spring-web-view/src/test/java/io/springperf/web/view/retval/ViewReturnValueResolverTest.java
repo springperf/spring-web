@@ -207,8 +207,7 @@ class ViewReturnValueResolverTest {
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
         when(viewResolverRegistry.resolve(eq("missing"), eq(req))).thenReturn(null);
 
-        assertThrows(IllegalArgumentException.class,
-                () -> resolver.resolveReturnValue("missing", null, req, resp));
+        assertThrows(IllegalArgumentException.class, () -> resolver.resolveReturnValue("missing", null, req, resp));
 
         verify(resp, org.mockito.Mockito.never()).setHandled();
         verify(resp, org.mockito.Mockito.never()).setStatusCode(any());

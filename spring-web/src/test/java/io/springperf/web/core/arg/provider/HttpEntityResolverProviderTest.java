@@ -1,9 +1,10 @@
 package io.springperf.web.core.arg.provider;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.arg.StaticArgumentResolver;
-import io.springperf.web.core.arg.resolver.HttpEntityArgResolver;
-import io.springperf.web.core.codec.HttpBodyCodecRegistry;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.doReturn;
+
+import java.lang.reflect.Method;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -12,10 +13,10 @@ import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.RequestEntity;
 
-import java.lang.reflect.Method;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.doReturn;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.arg.StaticArgumentResolver;
+import io.springperf.web.core.arg.resolver.HttpEntityArgResolver;
+import io.springperf.web.core.codec.HttpBodyCodecRegistry;
 
 @ExtendWith(MockitoExtension.class)
 class HttpEntityResolverProviderTest {
@@ -58,11 +59,14 @@ class HttpEntityResolverProviderTest {
     }
 
     @SuppressWarnings("unused")
-    public void entityParam(HttpEntity<String> entity) {}
+    public void entityParam(HttpEntity<String> entity) {
+    }
 
     @SuppressWarnings("unused")
-    public void requestEntityParam(RequestEntity<String> entity) {}
+    public void requestEntityParam(RequestEntity<String> entity) {
+    }
 
     @SuppressWarnings("unused")
-    public void stringParam(String s) {}
+    public void stringParam(String s) {
+    }
 }

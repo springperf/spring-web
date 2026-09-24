@@ -1,6 +1,6 @@
 package io.springperf.web.json;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -10,7 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class FastjsonConverterTest {
 
@@ -18,7 +18,8 @@ class FastjsonConverterTest {
         public String name;
         public int value;
 
-        public TestBean() {}
+        public TestBean() {
+        }
 
         public TestBean(String name, int value) {
             this.name = name;
@@ -35,8 +36,7 @@ class FastjsonConverterTest {
         // 以 Object/接口等「可多态」目标反序列化时，@type 必须被拒绝而非实例化任意类。
         FastjsonConverter converter = new FastjsonConverter();
         String payload = "{\"@type\":\"java.lang.Runtime\"}";
-        assertThrows(Exception.class,
-                () -> converter.fromJson(payload, Object.class),
+        assertThrows(Exception.class, () -> converter.fromJson(payload, Object.class),
                 "含 @type 的载荷应被拒绝（ErrorOnNotSupportAutoType）");
     }
 
@@ -105,8 +105,7 @@ class FastjsonConverterTest {
     void fromJson_string_map() {
         FastjsonConverter converter = new FastjsonConverter();
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) converter.fromJson(
-                "{\"a\":1,\"b\":\"two\"}", Map.class);
+        Map<String, Object> result = (Map<String, Object>) converter.fromJson("{\"a\":1,\"b\":\"two\"}", Map.class);
         assertEquals(1, result.get("a"));
         assertEquals("two", result.get("b"));
     }
@@ -144,7 +143,8 @@ class FastjsonConverterTest {
         FastjsonConverter converter = new FastjsonConverter();
         StringBuilder sb = new StringBuilder("[");
         for (int i = 0; i < 100; i++) {
-            if (i > 0) sb.append(",");
+            if (i > 0)
+                sb.append(",");
             sb.append("{\"id\":").append(i).append("}");
         }
         sb.append("]");
@@ -158,8 +158,7 @@ class FastjsonConverterTest {
         FastjsonConverter converter = new FastjsonConverter();
 
         assertThrows(Exception.class, () -> converter.fromJson("{invalid}", Map.class));
-        assertThrows(Exception.class, () ->
-                converter.fromJson("{invalid}".getBytes(), Map.class));
+        assertThrows(Exception.class, () -> converter.fromJson("{invalid}".getBytes(), Map.class));
     }
 
     @Test

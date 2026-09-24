@@ -1,12 +1,7 @@
 package io.springperf.web.core.arg.resolver;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.arg.databinder.PerfDataBinder;
-import io.springperf.web.core.async.AsyncSupportUtils;
-import io.springperf.web.core.mapping.MappingHandlerMethod;
-import io.springperf.web.core.model.ModelContext;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import java.lang.reflect.Constructor;
+
 import org.springframework.beans.BeanUtils;
 import org.springframework.core.MethodParameter;
 import org.springframework.ui.ModelMap;
@@ -14,7 +9,13 @@ import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
 
-import java.lang.reflect.Constructor;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.arg.databinder.PerfDataBinder;
+import io.springperf.web.core.async.AsyncSupportUtils;
+import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.core.model.ModelContext;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 public class ModelAttributeResolver extends AbstractSupportOptionalResolver {
 
@@ -25,7 +26,8 @@ public class ModelAttributeResolver extends AbstractSupportOptionalResolver {
     private final String name;
     private final boolean binding;
 
-    public ModelAttributeResolver(WebDataBinderFactory binderFactory, WebContext webContext, MappingHandlerMethod mappingContext, MethodParameter parameter, String name, boolean binding) {
+    public ModelAttributeResolver(WebDataBinderFactory binderFactory, WebContext webContext,
+            MappingHandlerMethod mappingContext, MethodParameter parameter, String name, boolean binding) {
         super(mappingContext, parameter);
         this.binderFactory = binderFactory;
         this.webContext = webContext;

@@ -1,20 +1,20 @@
 package io.springperf.web.core.arg.resolver;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.arg.StaticArgumentResolver;
-import io.springperf.web.core.codec.HttpBodyCodecRegistry;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.RequestEntity;
 import org.springframework.util.Assert;
 
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.arg.StaticArgumentResolver;
+import io.springperf.web.core.codec.HttpBodyCodecRegistry;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 public class HttpEntityArgResolver implements StaticArgumentResolver {
-
 
     private final WebContext webContext;
 
@@ -50,8 +50,8 @@ public class HttpEntityArgResolver implements StaticArgumentResolver {
         if (parameterType instanceof ParameterizedType) {
             ParameterizedType type = (ParameterizedType) parameterType;
             if (type.getActualTypeArguments().length != 1) {
-                throw new IllegalArgumentException("Expected single generic parameter on '" +
-                        parameter.getParameterName() + "' in method " + parameter.getMethod());
+                throw new IllegalArgumentException("Expected single generic parameter on '"
+                        + parameter.getParameterName() + "' in method " + parameter.getMethod());
             }
             return type.getActualTypeArguments()[0];
         } else if (parameterType instanceof Class) {

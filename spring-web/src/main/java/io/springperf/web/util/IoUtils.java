@@ -1,18 +1,19 @@
 package io.springperf.web.util;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufOutputStream;
-import io.netty.buffer.ByteBufUtil;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.*;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufOutputStream;
+import io.netty.buffer.ByteBufUtil;
+
 public class IoUtils {
 
-    public static void writeCharSequence(OutputStream out, CharSequence charSequence, Charset charset) throws IOException {
+    public static void writeCharSequence(OutputStream out, CharSequence charSequence, Charset charset)
+            throws IOException {
         if (out instanceof ByteBufOutputStream) {
             writeCharSequence(((ByteBufOutputStream) out).buffer(), charSequence, charset);
         } else {
@@ -26,14 +27,14 @@ public class IoUtils {
         } else if (StandardCharsets.US_ASCII.equals(charset)) {
             ByteBufUtil.writeAscii(buf, charSequence);
         } else {
-            CharsetEncoder charsetEncoder = charset.newEncoder()
-                    .onMalformedInput(CodingErrorAction.REPLACE)
+            CharsetEncoder charsetEncoder = charset.newEncoder().onMalformedInput(CodingErrorAction.REPLACE)
                     .onUnmappableCharacter(CodingErrorAction.REPLACE);
             CharBuffer inBuffer = CharBuffer.wrap(charSequence);
             int estimatedSize = (int) (inBuffer.remaining() * charsetEncoder.averageBytesPerChar());
             ByteBuffer outBuffer = buf.ensureWritable(estimatedSize).nioBuffer(buf.writerIndex(), buf.writableBytes());
             while (true) {
-                CoderResult cr = (inBuffer.hasRemaining() ? charsetEncoder.encode(inBuffer, outBuffer, true) : CoderResult.UNDERFLOW);
+                CoderResult cr = (inBuffer.hasRemaining() ? charsetEncoder.encode(inBuffer, outBuffer, true)
+                        : CoderResult.UNDERFLOW);
                 if (cr.isUnderflow()) {
                     cr = charsetEncoder.flush(outBuffer);
                 }

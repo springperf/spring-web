@@ -1,18 +1,18 @@
 package io.springperf.web.core.async.stream;
 
-import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.codec.ServerSentEvent;
-import org.springframework.http.server.ServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.http.server.ServerHttpResponse;
 
 class SseEmitterTest {
 
@@ -45,13 +45,8 @@ class SseEmitterTest {
 
     @Test
     void encode_withServerSentEvent_allFields() throws Exception {
-        ServerSentEvent<Object> event = ServerSentEvent.builder()
-                .id("1")
-                .event("message")
-                .retry(Duration.ofMillis(3000))
-                .comment("test comment")
-                .data("hello")
-                .build();
+        ServerSentEvent<Object> event = ServerSentEvent.builder().id("1").event("message")
+                .retry(Duration.ofMillis(3000)).comment("test comment").data("hello").build();
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         emitter.encode(event, baos);
@@ -114,10 +109,7 @@ class SseEmitterTest {
 
     @Test
     void encode_withCommentOnly() throws Exception {
-        ServerSentEvent<Object> event = ServerSentEvent.builder()
-                .comment("keepalive")
-                .data("ping")
-                .build();
+        ServerSentEvent<Object> event = ServerSentEvent.builder().comment("keepalive").data("ping").build();
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         emitter.encode(event, baos);

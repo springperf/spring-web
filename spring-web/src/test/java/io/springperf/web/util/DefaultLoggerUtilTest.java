@@ -1,9 +1,9 @@
 package io.springperf.web.util;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class DefaultLoggerUtilTest {
 

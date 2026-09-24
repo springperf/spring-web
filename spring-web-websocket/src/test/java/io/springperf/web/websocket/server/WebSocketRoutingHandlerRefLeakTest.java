@@ -23,23 +23,23 @@ import static org.mockito.Mockito.mock;
 
 /**
  * 回归 R3-A2：WS 升级被拒路径（Origin 校验失败）泄漏 FullHttpRequest。
- * <p>修复前 {@code sendForbiddenResponse} 只写 403 不释放请求引用，content ByteBuf
- * 直到连接关闭才释放；修复后拒绝路径立即 {@code ReferenceCountUtil.release}。
- * 无匹配路径 / 非升级请求应透传且不得提前释放（所有权仍属下游）。</p>
+ * <p>
+ * 修复前 {@code sendForbiddenResponse} 只写 403 不释放请求引用，content ByteBuf 直到连接关闭才释放；修复后拒绝路径立即
+ * {@code ReferenceCountUtil.release}。 无匹配路径 / 非升级请求应透传且不得提前释放（所有权仍属下游）。
+ * </p>
  */
 class WebSocketRoutingHandlerRefLeakTest {
 
     private static WebSocketRoutingHandler handler() {
-        return new WebSocketRoutingHandler(
-                Map.of("/ws", mock(WebSocketHandler.class)),
-                null, false, Collections.emptyList());
+        return new WebSocketRoutingHandler(Map.of("/ws", mock(WebSocketHandler.class)), null, false,
+                Collections.emptyList());
     }
 
     private static FullHttpRequest wsUpgradeRequest(String path) {
         // content 用非空字节：Unpooled.wrappedBuffer(空数组) 返回 EMPTY_BUFFER，
         // 其 release() 是 no-op、refCnt 恒 1，无法观测引用释放。
         FullHttpRequest req = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, path,
-                Unpooled.wrappedBuffer(new byte[]{'x'}));
+                Unpooled.wrappedBuffer(new byte[] { 'x' }));
         req.headers().set(HttpHeaderNames.HOST, "localhost");
         req.headers().set(HttpHeaderNames.UPGRADE, "websocket");
         req.headers().set(HttpHeaderNames.CONNECTION, "Upgrade");

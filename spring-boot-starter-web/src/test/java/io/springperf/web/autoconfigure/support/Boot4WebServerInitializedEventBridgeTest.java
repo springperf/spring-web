@@ -25,14 +25,14 @@ import static org.mockito.Mockito.when;
 
 /**
  * {@link Boot4WebServerInitializedEventBridge} 正向测试（SB4 桩环境）。
- *
- * <p>桥接设计为"编译期零引用 SB4 类"（SB3 下可加载、发布时门卫降级）。本测试在
- * test classpath 提供 SB4 包名桩（{@code org.springframework.boot.web.server.context.*}，
- * SB3 的 spring-boot jar 无该包），使 {@code Class.forName} 门卫通过，从而真实执行
- * ASM 生成子类 + {@code defineClass} + 反射实例化 + 发布事件的成功路径。</p>
- *
- * <p>桩仅在 test scope，不进入发布 jar，主代码编译期仍零引用 SB4 类；SB3 门卫路径
- * （真实 SB3 classpath 下 publish 抛 ClassNotFoundException）由真实运行时保证。</p>
+ * <p>
+ * 桥接设计为"编译期零引用 SB4 类"（SB3 下可加载、发布时门卫降级）。本测试在 test classpath 提供 SB4
+ * 包名桩（{@code org.springframework.boot.web.server.context.*}， SB3 的 spring-boot jar 无该包），使 {@code Class.forName}
+ * 门卫通过，从而真实执行 ASM 生成子类 + {@code defineClass} + 反射实例化 + 发布事件的成功路径。
+ * </p>
+ * <p>
+ * 桩仅在 test scope，不进入发布 jar，主代码编译期仍零引用 SB4 类；SB3 门卫路径 （真实 SB3 classpath 下 publish 抛 ClassNotFoundException）由真实运行时保证。
+ * </p>
  */
 class Boot4WebServerInitializedEventBridgeTest {
 
@@ -94,8 +94,7 @@ class Boot4WebServerInitializedEventBridgeTest {
         // 有 stubbing 匹配怪癖，故用与单测一致的 verify + ArgumentCaptor
         ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
         verify(ctx, times(16)).publishEvent(captor.capture());
-        assertEquals(16, captor.getAllValues().size(),
-                "16 次并发 publish 应全部发布事件（C6 修复前部分失败/抛 LinkageError）");
+        assertEquals(16, captor.getAllValues().size(), "16 次并发 publish 应全部发布事件（C6 修复前部分失败/抛 LinkageError）");
         for (Object event : captor.getAllValues()) {
             assertInstanceOf(WebServerInitializedEvent.class, event, "每个事件都应是生成的 SB4 事件子类");
         }

@@ -17,15 +17,16 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * P2 perf 回归门禁。
- * <p>与绝对数值基线不同，这里采用<b>相对断言</b>：同一运行目录内 perf（spring-web）
- * 与 tomcat 在相同机器、相同并发/JDK 下对跑，天然抵消硬件漂移，无需提交 JSON 基线文件
+ * <p>
+ * 与绝对数值基线不同，这里采用<b>相对断言</b>：同一运行目录内 perf（spring-web） 与 tomcat 在相同机器、相同并发/JDK 下对跑，天然抵消硬件漂移，无需提交 JSON 基线文件
  * （benchmark-reports 已在 .gitignore 中）。
- * <p>仅分析<b>最新一次完整运行</b>（时间戳目录最大者），保证门禁反映当前代码状态；
- * 历史/旧版本运行的差异不代表回归，不参与判定。
- * <p>门禁规则（每个含 perf+tomcat 数据的 jdk 目录、每个 API）：
+ * <p>
+ * 仅分析<b>最新一次完整运行</b>（时间戳目录最大者），保证门禁反映当前代码状态； 历史/旧版本运行的差异不代表回归，不参与判定。
+ * <p>
+ * 门禁规则（每个含 perf+tomcat 数据的 jdk 目录、每个 API）：
  * <ul>
- *   <li>吞吐：perf ≥ tomcat × 1.05（框架必须至少领先 tomcat 5%，防回归漏过）</li>
- *   <li>分配：perf 每请求分配 ≤ tomcat × 1.05（框架应不劣于 tomcat 的内存效率）</li>
+ * <li>吞吐：perf ≥ tomcat × 1.05（框架必须至少领先 tomcat 5%，防回归漏过）</li>
+ * <li>分配：perf 每请求分配 ≤ tomcat × 1.05（框架应不劣于 tomcat 的内存效率）</li>
  * </ul>
  * 无 perf+tomcat 对比数据的场景（如常规 `mvn test` 未跑 benchmark）自动跳过。
  */
@@ -47,11 +48,13 @@ class PerfRegressionGateTest {
                 String api = e.getKey();
                 ProfileData perf = e.getValue().get("perf");
                 ProfileData tomcat = e.getValue().get("tomcat");
-                if (perf == null || tomcat == null) continue;
+                if (perf == null || tomcat == null)
+                    continue;
 
                 double perfTp = firstThroughput(perf);
                 double tomcatTp = firstThroughput(tomcat);
-                if (perfTp <= 0 || tomcatTp <= 0) continue;
+                if (perfTp <= 0 || tomcatTp <= 0)
+                    continue;
                 checked++;
 
                 if (perfTp < tomcatTp * THROUGHPUT_TOLERANCE) {
@@ -75,29 +78,31 @@ class PerfRegressionGateTest {
     private static List<Path> findJdkDirsWithBothProfiles() throws IOException {
         List<Path> dirs = new ArrayList<>();
         Path root = Paths.get("benchmark-reports").toAbsolutePath();
-        if (!Files.isDirectory(root)) return dirs;
+        if (!Files.isDirectory(root))
+            return dirs;
 
         // 只取最新一次完整运行（时间戳目录名最大者），排除 latest/jfr-cpu-hotspot-* 等非完整运行目录
-        Path latestRun = Files.list(root)
-                .filter(Files::isDirectory)
-                .filter(d -> d.getFileName().toString().matches("\\d{8}-\\d{6}"))
-                .sorted()
-                .reduce((a, b) -> b)
+        Path latestRun = Files.list(root).filter(Files::isDirectory)
+                .filter(d -> d.getFileName().toString().matches("\\d{8}-\\d{6}")).sorted().reduce((a, b) -> b)
                 .orElse(null);
-        if (latestRun == null) return dirs;
+        if (latestRun == null)
+            return dirs;
 
         Files.walk(latestRun).filter(Files::isDirectory).forEach(d -> {
             boolean hasPerf = false, hasTomcat = false;
             try (DirectoryStream<Path> ds = Files.newDirectoryStream(d, "jmh-results-*.json")) {
                 for (Path f : ds) {
                     String n = f.getFileName().toString();
-                    if (n.startsWith("jmh-results-perf")) hasPerf = true;
-                    else if (n.startsWith("jmh-results-tomcat")) hasTomcat = true;
+                    if (n.startsWith("jmh-results-perf"))
+                        hasPerf = true;
+                    else if (n.startsWith("jmh-results-tomcat"))
+                        hasTomcat = true;
                 }
             } catch (IOException ignored) {
                 // 目录不可读则跳过
             }
-            if (hasPerf && hasTomcat) dirs.add(d);
+            if (hasPerf && hasTomcat)
+                dirs.add(d);
         });
         return dirs;
     }

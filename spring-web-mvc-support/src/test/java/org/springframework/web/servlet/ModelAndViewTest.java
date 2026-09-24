@@ -30,7 +30,8 @@ class ModelAndViewTest {
 
     @Test
     void viewConstructor_setsView() {
-        View view = (model, request, response) -> {};
+        View view = (model, request, response) -> {
+        };
         ModelAndView mav = new ModelAndView(view);
         assertSame(view, mav.getView());
         assertTrue(mav.hasView());

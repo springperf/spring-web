@@ -21,22 +21,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 连接层防护 E2E（原始 socket）：
- *
  * <ul>
- *   <li>{@code server.max-connections}：限额内正常服务；超限的 TCP 连接直接关闭（无 HTTP 响应）；
- *       连接释放后新连接可被接受（计数不泄漏）；</li>
- *   <li>{@code server.http.read-timeout}：空闲连接在超时后被关闭；半截请求头也会被回收；</li>
- *   <li>关键语义：**处理中的请求不得被读超时掐断**——读超时应只约束「读空闲」，
- *       长耗时处理器（慢 SQL/远程调用）仍须把响应送达。</li>
+ * <li>{@code server.max-connections}：限额内正常服务；超限的 TCP 连接直接关闭（无 HTTP 响应）； 连接释放后新连接可被接受（计数不泄漏）；</li>
+ * <li>{@code server.http.read-timeout}：空闲连接在超时后被关闭；半截请求头也会被回收；</li>
+ * <li>关键语义：**处理中的请求不得被读超时掐断**——读超时应只约束「读空闲」， 长耗时处理器（慢 SQL/远程调用）仍须把响应送达。</li>
  * </ul>
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, ConnectionProtectionE2eTest.ProtectionConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "server.max-connections=2",
-                "server.http.read-timeout=1s"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        ConnectionProtectionE2eTest.ProtectionConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "server.max-connections=2", "server.http.read-timeout=1s" })
 class ConnectionProtectionE2eTest {
 
     @LocalServerPort
@@ -88,10 +81,10 @@ class ConnectionProtectionE2eTest {
 
     /**
      * 精确读取**一个**完整响应（按 {@code Content-Length} 收尾），不等到 socket 读超时。
-     *
-     * <p>用于限额类断言：若用 {@link #readUntilEof}，两条连接会各等满 {@code SO_TIMEOUT}，
-     * 期间 {@code server.http.read-timeout=1s} 会把它们当空闲连接回收、腾出限额，
-     * 于是"超限连接应被拒"的断言假性失败。</p>
+     * <p>
+     * 用于限额类断言：若用 {@link #readUntilEof}，两条连接会各等满 {@code SO_TIMEOUT}， 期间 {@code server.http.read-timeout=1s}
+     * 会把它们当空闲连接回收、腾出限额， 于是"超限连接应被拒"的断言假性失败。
+     * </p>
      */
     private static String readOneResponse(Socket s) throws IOException {
         InputStream in = s.getInputStream();
@@ -99,10 +92,8 @@ class ConnectionProtectionE2eTest {
         int b;
         while ((b = in.read()) >= 0) {
             head.append((char) b);
-            if (head.length() >= 4 && head.charAt(head.length() - 4) == '\r'
-                    && head.charAt(head.length() - 3) == '\n'
-                    && head.charAt(head.length() - 2) == '\r'
-                    && head.charAt(head.length() - 1) == '\n') {
+            if (head.length() >= 4 && head.charAt(head.length() - 4) == '\r' && head.charAt(head.length() - 3) == '\n'
+                    && head.charAt(head.length() - 2) == '\r' && head.charAt(head.length() - 1) == '\n') {
                 break;
             }
         }
@@ -135,10 +126,10 @@ class ConnectionProtectionE2eTest {
 
     /**
      * 每个用例开始前确认限额已归零。
-     *
-     * <p>{@code server.max-connections=2} 是**类级共享**配置：上一个用例留下的连接（或服务端尚未
-     * 回收的计数）会让"本用例独占 2 个槽位"的前提不成立，表现为与本用例语义无关的假失败。
-     * 此处用一次性裸连接轮询到可服务为止（{@link #awaitServiceable()} 内部已含截止时间）。</p>
+     * <p>
+     * {@code server.max-connections=2} 是**类级共享**配置：上一个用例留下的连接（或服务端尚未 回收的计数）会让"本用例独占 2 个槽位"的前提不成立，表现为与本用例语义无关的假失败。
+     * 此处用一次性裸连接轮询到可服务为止（{@link #awaitServiceable()} 内部已含截止时间）。
+     * </p>
      */
     @BeforeEach
     void waitSlotsFree() throws Exception {
@@ -147,9 +138,9 @@ class ConnectionProtectionE2eTest {
 
     /**
      * 轮询直到新连接可被服务（连接计数释放的最终一致性断言）。
-     *
-     * <p>刻意用**一次性裸连接**而非共享 OkHttp 客户端：OkHttp 会维持空闲连接池，
-     * 池中连接同样占用 {@code server.max-connections}，会让限额断言假性失败。</p>
+     * <p>
+     * 刻意用**一次性裸连接**而非共享 OkHttp 客户端：OkHttp 会维持空闲连接池， 池中连接同样占用 {@code server.max-connections}，会让限额断言假性失败。
+     * </p>
      */
     private boolean awaitServiceable() throws Exception {
         // 8s（原 3s）：整包运行时连接回收 + 业务池排空可能远慢于 3s，曾导致"释放后应能继续服务"假失败
@@ -172,7 +163,8 @@ class ConnectionProtectionE2eTest {
 
     @Test
     void withinLimit_connectionsServed() throws Exception {
-        try (Socket a = open(); Socket b = open()) {
+        try (Socket a = open();
+                Socket b = open()) {
             write(a, okRequest());
             write(b, okRequest());
             assertTrue(readUntilEof(a).contains("200"), "限额内的第 1 个连接应被服务");
@@ -183,7 +175,8 @@ class ConnectionProtectionE2eTest {
 
     @Test
     void overLimit_extraConnectionClosedWithoutHttpResponse() throws Exception {
-        try (Socket a = open(); Socket b = open()) {
+        try (Socket a = open();
+                Socket b = open()) {
             write(a, okRequest());
             write(b, okRequest());
             // 必须「精确读完整响应」，不能等 socket 读超时：readUntilEof 会各等满 5s，
@@ -195,8 +188,7 @@ class ConnectionProtectionE2eTest {
             // 第 3 个连接：超过 server.max-connections=2，应在 TCP 层被直接关闭
             try (Socket c = open()) {
                 c.setSoTimeout(3000);
-                assertTrue(awaitEof(c, 3000),
-                        "超过 server.max-connections 的连接应被服务端直接关闭（无 HTTP 响应）");
+                assertTrue(awaitEof(c, 3000), "超过 server.max-connections 的连接应被服务端直接关闭（无 HTTP 响应）");
             }
         }
         assertTrue(awaitServiceable(), "释放后应能继续服务");
@@ -213,8 +205,7 @@ class ConnectionProtectionE2eTest {
             assertTrue(readUntilEof(b).contains("200"));
 
             // a 已由服务端关闭（Connection: close）→ 计数应随之释放
-            assertTrue(awaitServiceable(),
-                    "客户端声明 Connection: close 后连接应被回收，腾出限额");
+            assertTrue(awaitServiceable(), "客户端声明 Connection: close 后连接应被回收，腾出限额");
         } finally {
             a.close();
             b.close();
@@ -243,8 +234,7 @@ class ConnectionProtectionE2eTest {
     void idleConnection_closedAfterReadTimeout() throws Exception {
         try (Socket s = open()) {
             // 建连后不发任何数据：超过 read-timeout(1s) 应被回收
-            assertTrue(awaitEof(s, 4000),
-                    "空闲连接应在 server.http.read-timeout 后被关闭");
+            assertTrue(awaitEof(s, 4000), "空闲连接应在 server.http.read-timeout 后被关闭");
         }
     }
 
@@ -252,8 +242,7 @@ class ConnectionProtectionE2eTest {
     void partialRequestHeaders_closedAfterReadTimeout() throws Exception {
         try (Socket s = open()) {
             write(s, "GET /e2e-proto/ok HTTP/1.1\r\nHost: localhost\r\n"); // 未以空行结束
-            assertTrue(awaitEof(s, 4000),
-                    "半截请求头（无终止空行）应在 read-timeout 后被回收，避免慢速攻击占满连接");
+            assertTrue(awaitEof(s, 4000), "半截请求头（无终止空行）应在 read-timeout 后被回收，避免慢速攻击占满连接");
         }
     }
 
@@ -263,8 +252,7 @@ class ConnectionProtectionE2eTest {
             write(s, okRequest());
             assertTrue(readUntilEof(s).contains("200"), "首个请求应正常响应");
             // 复用连接但不发新请求：空闲超过 read-timeout 应被回收
-            assertTrue(awaitEof(s, 4000),
-                    "保持连接空闲超过 read-timeout 应被关闭");
+            assertTrue(awaitEof(s, 4000), "保持连接空闲超过 read-timeout 应被关闭");
         }
     }
 
@@ -279,8 +267,7 @@ class ConnectionProtectionE2eTest {
             s.setSoTimeout(15000);
             write(s, "GET /e2e-proto/slow?ms=1500 HTTP/1.1\r\nHost: localhost\r\n\r\n");
             String resp = readUntilEof(s);
-            assertTrue(resp.contains("HTTP/1.1 200"),
-                    "慢处理器（1.5s > read-timeout 1s）应仍能返回响应，实际:\n" + resp);
+            assertTrue(resp.contains("HTTP/1.1 200"), "慢处理器（1.5s > read-timeout 1s）应仍能返回响应，实际:\n" + resp);
             assertTrue(resp.contains("slow-done"), "响应体应完整送达，实际:\n" + resp);
         }
     }
@@ -292,8 +279,7 @@ class ConnectionProtectionE2eTest {
             s.setSoTimeout(8000);
             write(s, "GET /e2e-proto/slow?ms=3000 HTTP/1.1\r\nHost: localhost\r\n\r\n");
             String resp = readUntilEof(s);
-            assertTrue(resp.contains("HTTP/1.1 200"),
-                    "跨多个读超时窗口的慢请求仍应送达响应，实际:\n" + resp);
+            assertTrue(resp.contains("HTTP/1.1 200"), "跨多个读超时窗口的慢请求仍应送达响应，实际:\n" + resp);
         }
     }
 

@@ -42,8 +42,8 @@ public class FilterWrapper implements WebFilter, LifecycleWebComponent {
             initialized = true;
             PerfServletContext servletCtx = webContext.getWebComponent(PerfServletContext.class);
             String filterName = getComponentName();
-            jakarta.servlet.FilterConfig filterConfig = new PerfFilterConfig(
-                    filterName, servletCtx, resolveInitParams());
+            jakarta.servlet.FilterConfig filterConfig = new PerfFilterConfig(filterName, servletCtx,
+                    resolveInitParams());
             try {
                 filter.init(filterConfig);
             } catch (jakarta.servlet.ServletException e) {
@@ -55,14 +55,13 @@ public class FilterWrapper implements WebFilter, LifecycleWebComponent {
     /**
      * 解析 Filter 的 init-param：
      * <ol>
-     *   <li>从 {@link jakarta.servlet.annotation.WebFilter#initParams()} 读取</li>
-     *   <li>兜底空 Map</li>
+     * <li>从 {@link jakarta.servlet.annotation.WebFilter#initParams()} 读取</li>
+     * <li>兜底空 Map</li>
      * </ol>
      */
     protected Map<String, String> resolveInitParams() {
-        jakarta.servlet.annotation.WebFilter webFilter =
-                AnnotatedElementUtils.findMergedAnnotation(filter.getClass(),
-                        jakarta.servlet.annotation.WebFilter.class);
+        jakarta.servlet.annotation.WebFilter webFilter = AnnotatedElementUtils.findMergedAnnotation(filter.getClass(),
+                jakarta.servlet.annotation.WebFilter.class);
         if (webFilter == null) {
             return Collections.emptyMap();
         }
@@ -87,11 +86,13 @@ public class FilterWrapper implements WebFilter, LifecycleWebComponent {
     }
 
     @Override
-    public void doFilter(WebServerHttpRequest request, WebServerHttpResponse response, FilterChain chain) throws Exception {
+    public void doFilter(WebServerHttpRequest request, WebServerHttpResponse response, FilterChain chain)
+            throws Exception {
         doFilterInternal(request, response, chain);
     }
 
-    protected void doFilterInternal(WebServerHttpRequest request, WebServerHttpResponse response, FilterChain chain) throws Exception {
+    protected void doFilterInternal(WebServerHttpRequest request, WebServerHttpResponse response, FilterChain chain)
+            throws Exception {
         ServletAdapterContext adapterContext = ServletAttribute.getAdapterContext(request.getRequestContext());
         if (adapterContext == null) {
             adapterContext = createServletAdapterContext(request, response, chain);
@@ -104,7 +105,8 @@ public class FilterWrapper implements WebFilter, LifecycleWebComponent {
         filter.doFilter(adapterContext.getRequest(), adapterContext.getResponse(), adapterContext.getFilterChain());
     }
 
-    protected ServletAdapterContext createServletAdapterContext(WebServerHttpRequest request, WebServerHttpResponse response, FilterChain chain) {
+    protected ServletAdapterContext createServletAdapterContext(WebServerHttpRequest request,
+            WebServerHttpResponse response, FilterChain chain) {
         PerfHttpServletRequest restRequest = ServletAttribute.createPerfRequest(request);
         PerfHttpServletResponse restResponse = new PerfHttpServletResponse(response);
         PerfHttpServletFilterChain filterChain = new PerfHttpServletFilterChain(request, response, chain);
@@ -120,15 +122,15 @@ public class FilterWrapper implements WebFilter, LifecycleWebComponent {
     // 可能碰撞同一 hash，容器误判为同实例而静默销毁低 order 者（安全过滤器被丢 = 静默
     // 安全回归）。改为 IdentityHashMap 按实例身份分配唯一递增 ID——同实例同一 ID（去重
     // 语义不变），不同实例绝不碰撞。强引用随应用生命周期、filter 数量级极小，可忽略。
-    private static final Map<jakarta.servlet.Filter, String> COMPONENT_NAMES =
-            Collections.synchronizedMap(new IdentityHashMap<>());
+    private static final Map<jakarta.servlet.Filter, String> COMPONENT_NAMES = Collections
+            .synchronizedMap(new IdentityHashMap<>());
 
     private static final AtomicLong NEXT_INSTANCE_ID = new AtomicLong(1);
 
     @Override
     public String getComponentName() {
-        return COMPONENT_NAMES.computeIfAbsent(filter, f ->
-                f.getClass().getName() + "@" + NEXT_INSTANCE_ID.getAndIncrement());
+        return COMPONENT_NAMES.computeIfAbsent(filter,
+                f -> f.getClass().getName() + "@" + NEXT_INSTANCE_ID.getAndIncrement());
     }
 
     @Override

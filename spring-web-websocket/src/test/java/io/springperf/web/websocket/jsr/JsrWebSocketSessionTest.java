@@ -37,7 +37,8 @@ class JsrWebSocketSessionTest {
     }
 
     @jakarta.websocket.server.ServerEndpoint("/ws")
-    static class PlainEndpoint {}
+    static class PlainEndpoint {
+    }
 
     @Test
     void getContainer_returnsContainer() {
@@ -47,8 +48,10 @@ class JsrWebSocketSessionTest {
     @Test
     void addMessageHandler_unsupported() {
         assertThrows(UnsupportedOperationException.class, () -> session.addMessageHandler(mock(MessageHandler.class)));
-        assertThrows(UnsupportedOperationException.class, () -> session.addMessageHandler(String.class, mock(MessageHandler.Whole.class)));
-        assertThrows(UnsupportedOperationException.class, () -> session.addMessageHandler(String.class, mock(MessageHandler.Partial.class)));
+        assertThrows(UnsupportedOperationException.class,
+                () -> session.addMessageHandler(String.class, mock(MessageHandler.Whole.class)));
+        assertThrows(UnsupportedOperationException.class,
+                () -> session.addMessageHandler(String.class, mock(MessageHandler.Partial.class)));
     }
 
     @Test

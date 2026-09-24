@@ -14,12 +14,13 @@ import java.util.Set;
 
 /**
  * JSR-356 {@link WebSocketContainer} 的服务端实现。
- *
- * <p>本框架使用 Netty 直接处理 WebSocket，无需真实的 Servlet 容器，因此：
- * 客户端连接方法（{@code connectToServer}）不受支持；仅提供默认会话超时/缓冲区配置，
- * 供 {@link JsrWebSocketSession} 查询。</p>
+ * <p>
+ * 本框架使用 Netty 直接处理 WebSocket，无需真实的 Servlet 容器，因此： 客户端连接方法（{@code connectToServer}）不受支持；仅提供默认会话超时/缓冲区配置， 供
+ * {@link JsrWebSocketSession} 查询。
+ * </p>
  *
  * @author huangcanda
+ *
  * @since 3.5.6
  */
 public class JsrWebSocketContainer implements WebSocketContainer {
@@ -40,14 +41,12 @@ public class JsrWebSocketContainer implements WebSocketContainer {
     }
 
     @Override
-    public Session connectToServer(Object annotatedEndpointInstance, URI path)
-            throws DeploymentException, IOException {
+    public Session connectToServer(Object annotatedEndpointInstance, URI path) throws DeploymentException, IOException {
         throw new UnsupportedOperationException("connectToServer is not supported (server-side container)");
     }
 
     @Override
-    public Session connectToServer(Class<?> annotatedEndpointClass, URI path)
-            throws DeploymentException, IOException {
+    public Session connectToServer(Class<?> annotatedEndpointClass, URI path) throws DeploymentException, IOException {
         throw new UnsupportedOperationException("connectToServer is not supported (server-side container)");
     }
 

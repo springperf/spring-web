@@ -22,7 +22,6 @@ import java.util.stream.Collectors;
 
 import static io.springperf.webtest.common.ApiErrorCode.*;
 
-
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -30,16 +29,16 @@ public class GlobalExceptionHandler {
 
     protected static List<String> convertFiledErrors(List<FieldError> fieldErrors) {
         return Optional.ofNullable(fieldErrors).map(fieldErrorsInner -> fieldErrorsInner.stream()
-                .map(fieldError -> fieldError.getDefaultMessage())
-                .collect(Collectors.toList())).orElse(null);
+                .map(fieldError -> fieldError.getDefaultMessage()).collect(Collectors.toList())).orElse(null);
     }
 
     /**
      * 业务异常
      *
-     * @param e {@link BusinessException}
+     * @param e
+     *            {@link BusinessException}
      */
-    @ExceptionHandler({BusinessException.class})
+    @ExceptionHandler({ BusinessException.class })
     @ResponseStatus(HttpStatus.OK)
     @ResponseBody
     public ApiResult<?> handleError(BusinessException e) {
@@ -48,38 +47,42 @@ public class GlobalExceptionHandler {
         return ApiResult.failed(Integer.valueOf(e.getCode()), msg);
     }
 
-     @ExceptionHandler(value = NotLoginException.class)
-	@ResponseBody
-	public ApiResult<?> handleError(NotLoginException e) {
-		log.error("请求未授权：{}", e.getMessage(), e);
-		return ApiResult.failed(UNAUTHORIZED);
-	}
+    @ExceptionHandler(value = NotLoginException.class)
+    @ResponseBody
+    public ApiResult<?> handleError(NotLoginException e) {
+        log.error("请求未授权：{}", e.getMessage(), e);
+        return ApiResult.failed(UNAUTHORIZED);
+    }
 
     /**
      * 验证异常处理 - 在 @RequestBody 上添加 @Validated 处触发
      *
-     * @param e {@link MethodArgumentNotValidException}
+     * @param e
+     *            {@link MethodArgumentNotValidException}
      */
-    @ExceptionHandler({MethodArgumentNotValidException.class})
+    @ExceptionHandler({ MethodArgumentNotValidException.class })
     @ResponseStatus(HttpStatus.OK)
     @ResponseBody
     public ApiResult<?> handleError(MethodArgumentNotValidException e) {
         log.error("MethodArgumentNotValidException 参数校验失败:", e);
-        ApiResult<?> apiResult = ApiResult.failed(PARAM_ERROR, this.convertFiledErrors(e.getBindingResult().getFieldErrors()));
+        ApiResult<?> apiResult = ApiResult.failed(PARAM_ERROR,
+                this.convertFiledErrors(e.getBindingResult().getFieldErrors()));
         return apiResult;
     }
 
     /**
      * 验证异常处理 - form参数（对象参数，没有加 @RequestBody）触发
      *
-     * @param e {@link BindException}
+     * @param e
+     *            {@link BindException}
      */
-    @ExceptionHandler({BindException.class})
+    @ExceptionHandler({ BindException.class })
     @ResponseStatus(HttpStatus.OK)
     @ResponseBody
     public ApiResult<?> handleError(BindException e) {
         log.error("BindException 参数校验失败：", e);
-        ApiResult<?> apiResult = ApiResult.failed(PARAM_ERROR, this.convertFiledErrors(e.getBindingResult().getFieldErrors()));
+        ApiResult<?> apiResult = ApiResult.failed(PARAM_ERROR,
+                this.convertFiledErrors(e.getBindingResult().getFieldErrors()));
         return apiResult;
     }
 
@@ -88,7 +91,7 @@ public class GlobalExceptionHandler {
      *
      * @param e
      */
-    @ExceptionHandler({IllegalArgumentException.class})
+    @ExceptionHandler({ IllegalArgumentException.class })
     @ResponseStatus(HttpStatus.OK)
     @ResponseBody
     public ApiResult<?> handleError(IllegalArgumentException e) {
@@ -101,7 +104,7 @@ public class GlobalExceptionHandler {
      *
      * @param ex
      */
-    @ExceptionHandler({HttpMessageNotReadableException.class})
+    @ExceptionHandler({ HttpMessageNotReadableException.class })
     @ResponseStatus(HttpStatus.OK)
     @ResponseBody
     public ApiResult<?> handleError(HttpMessageNotReadableException ex) {
@@ -109,7 +112,7 @@ public class GlobalExceptionHandler {
         return ApiResult.failed(PARAM_ERROR);
     }
 
-    @ExceptionHandler({HttpRequestMethodNotSupportedException.class})
+    @ExceptionHandler({ HttpRequestMethodNotSupportedException.class })
     @ResponseStatus(HttpStatus.OK)
     @ResponseBody
     public ApiResult<?> handleError(HttpRequestMethodNotSupportedException e) {
@@ -117,7 +120,7 @@ public class GlobalExceptionHandler {
         return ApiResult.failed(METHOD_NOT_SUPPORTED);
     }
 
-    @ExceptionHandler({HttpMediaTypeNotSupportedException.class})
+    @ExceptionHandler({ HttpMediaTypeNotSupportedException.class })
     @ResponseStatus(HttpStatus.OK)
     @ResponseBody
     public ApiResult<?> handleError(HttpMediaTypeNotSupportedException e) {
@@ -125,7 +128,7 @@ public class GlobalExceptionHandler {
         return ApiResult.failed(MEDIA_TYPE_NOT_SUPPORTED);
     }
 
-    @ExceptionHandler({MethodArgumentTypeMismatchException.class})
+    @ExceptionHandler({ MethodArgumentTypeMismatchException.class })
     @ResponseStatus(HttpStatus.OK)
     @ResponseBody
     public ApiResult<?> handleError(MethodArgumentTypeMismatchException ex) {
@@ -136,7 +139,8 @@ public class GlobalExceptionHandler {
     /**
      * 自定义 REST 业务异常
      *
-     * @param e 异常类型
+     * @param e
+     *            异常类型
      */
     @ExceptionHandler(value = Throwable.class)
     @ResponseBody

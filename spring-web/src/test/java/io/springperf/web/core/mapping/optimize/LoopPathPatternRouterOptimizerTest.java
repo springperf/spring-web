@@ -1,18 +1,19 @@
 package io.springperf.web.core.mapping.optimize;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import org.junit.jupiter.api.Test;
+
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.core.mapping.route.Router;
 import io.springperf.web.core.mapping.route.SimpleRouter;
 import io.springperf.web.http.RequestAttribute;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
-import org.junit.jupiter.api.Test;
-
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 class LoopPathPatternRouterOptimizerTest {
 
@@ -25,8 +26,8 @@ class LoopPathPatternRouterOptimizerTest {
         when(req.getRequestContext()).thenReturn(reqCtx);
         Map<String, Object> attrs = new HashMap<>();
         when(reqCtx.getAttribute(any(String.class))).thenAnswer(inv -> attrs.get(inv.getArgument(0)));
-        when(reqCtx.getAttribute(any(RequestAttribute.class))).thenAnswer(inv ->
-                attrs.get(ATTR_STORE_KEY + ((RequestAttribute) inv.getArgument(0)).getIndex()));
+        when(reqCtx.getAttribute(any(RequestAttribute.class)))
+                .thenAnswer(inv -> attrs.get(ATTR_STORE_KEY + ((RequestAttribute) inv.getArgument(0)).getIndex()));
         doAnswer(inv -> {
             attrs.put(inv.getArgument(0), inv.getArgument(1));
             return null;

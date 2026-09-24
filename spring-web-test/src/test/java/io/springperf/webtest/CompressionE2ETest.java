@@ -20,26 +20,19 @@ import java.util.zip.GZIPInputStream;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * gzip 响应压缩 E2E：启用 {@code server.compression.*} 后，验证大 JSON 被压缩且内容完整、
- * 小响应/非白名单 MIME 不压缩、零拷贝文件响应（writeFile）不被压缩且字节无损。
+ * gzip 响应压缩 E2E：启用 {@code server.compression.*} 后，验证大 JSON 被压缩且内容完整、 小响应/非白名单 MIME 不压缩、零拷贝文件响应（writeFile）不被压缩且字节无损。
  */
-@SpringBootTest(classes = TestApplication.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.compression.enabled=true",
-                "server.compression.min-response-size=2KB",
-                "server.compression.excluded-user-agents=BadBot"
-        })
+@SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+        "server.compression.enabled=true", "server.compression.min-response-size=2KB",
+        "server.compression.excluded-user-agents=BadBot" })
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class CompressionE2ETest {
 
     @LocalServerPort
     protected int serverPort;
 
-    private final OkHttpClient client = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private final OkHttpClient client = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     private String url(String path) {
         return "http://localhost:" + serverPort + "/api" + path;
@@ -54,8 +47,7 @@ public class CompressionE2ETest {
     }
 
     private Response gzipRequest(String path, String userAgent) throws IOException {
-        Request.Builder b = new Request.Builder().url(url(path))
-                .header("Accept-Encoding", "gzip");
+        Request.Builder b = new Request.Builder().url(url(path)).header("Accept-Encoding", "gzip");
         if (userAgent != null) {
             b.header("User-Agent", userAgent);
         }
@@ -64,7 +56,7 @@ public class CompressionE2ETest {
 
     private static byte[] gunzip(byte[] data) throws IOException {
         try (GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(data));
-             ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+                ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             byte[] buf = new byte[8192];
             int n;
             while ((n = gis.read(buf)) != -1) {

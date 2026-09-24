@@ -12,20 +12,15 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Proxy;
 
 /**
- * Spring Boot 4 专用桥接：反射 + Spring 自带 ASM（{@code org.springframework.asm}）运行时
- * 生成 {@code WebServerInitializedEvent} 的具体子类。
- *
- * <p>SB4 中该事件移到 {@code org.springframework.boot.web.server.context} 包且为抽象类，
- * 仅 {@code ServletWebServerInitializedEvent}/{@code ReactiveWebServerInitializedEvent}
- * 两个具体子类、构造参数绑定 servlet/reactive 上下文，无法直接反射实例化。
- * 本桥接编译期零引用任何 SB4 类（保持"编译一次、发布不变"），运行时按名称反射加载：
- * 用 {@code org.springframework.asm.ClassWriter} 生成覆盖 {@code getApplicationContext()}
- * 的具体子类字节码，经 {@link MethodHandles.Lookup#defineClass} 定义后反射实例化；
- * 上下文用 JDK 动态代理包装真实 {@link ApplicationContext} 为 SB4 的
- * {@code WebServerApplicationContext} 接口。全程零新增依赖（ASM 由 spring-core 提供）。
- *
- * <p>仅在 SB4 环境由 {@link io.springperf.web.autoconfigure.Boot4WebServerInitializedEventAutoConfiguration}
- * 触发，SB3 下类不加载。
+ * Spring Boot 4 专用桥接：反射 + Spring 自带 ASM（{@code org.springframework.asm}）运行时 生成 {@code WebServerInitializedEvent} 的具体子类。
+ * <p>
+ * SB4 中该事件移到 {@code org.springframework.boot.web.server.context} 包且为抽象类， 仅
+ * {@code ServletWebServerInitializedEvent}/{@code ReactiveWebServerInitializedEvent} 两个具体子类、构造参数绑定 servlet/reactive
+ * 上下文，无法直接反射实例化。 本桥接编译期零引用任何 SB4 类（保持"编译一次、发布不变"），运行时按名称反射加载： 用 {@code org.springframework.asm.ClassWriter} 生成覆盖
+ * {@code getApplicationContext()} 的具体子类字节码，经 {@link MethodHandles.Lookup#defineClass} 定义后反射实例化； 上下文用 JDK 动态代理包装真实
+ * {@link ApplicationContext} 为 SB4 的 {@code WebServerApplicationContext} 接口。全程零新增依赖（ASM 由 spring-core 提供）。
+ * <p>
+ * 仅在 SB4 环境由 {@link io.springperf.web.autoconfigure.Boot4WebServerInitializedEventAutoConfiguration} 触发，SB3 下类不加载。
  */
 public final class Boot4WebServerInitializedEventBridge {
 
@@ -55,7 +50,8 @@ public final class Boot4WebServerInitializedEventBridge {
     /**
      * 生成具体事件并发布。调用方（配置类）应捕获 Throwable 降级，不影响应用启动。
      */
-    public static void publish(NettyHttpServer nettyHttpServer, ApplicationContext applicationContext) throws Exception {
+    public static void publish(NettyHttpServer nettyHttpServer, ApplicationContext applicationContext)
+            throws Exception {
         // 门卫：SB4 事件类不存在（如 SB3 误触）时抛出，由调用方捕获降级
         Class.forName(SB4_EVENT_CLASS);
         Class<?> contextInterface = Class.forName(SB4_CONTEXT_IFACE);
@@ -70,10 +66,8 @@ public final class Boot4WebServerInitializedEventBridge {
 
     /** JDK 动态代理：真实 ApplicationContext 包装为 SB4 WebServerApplicationContext 接口 */
     private static Object createContextProxy(Class<?> contextInterface, PerfWebServer webServer,
-                                             ApplicationContext delegate) {
-        return Proxy.newProxyInstance(
-                contextInterface.getClassLoader(),
-                new Class<?>[]{contextInterface},
+            ApplicationContext delegate) {
+        return Proxy.newProxyInstance(contextInterface.getClassLoader(), new Class<?>[] { contextInterface },
                 (proxy, method, args) -> {
                     if ("getWebServer".equals(method.getName()) && method.getParameterCount() == 0) {
                         return webServer;
@@ -86,8 +80,8 @@ public final class Boot4WebServerInitializedEventBridge {
     }
 
     /** 生成子类字节码并定义到桥接所在包/类加载器，再反射实例化 */
-    private static Object createEvent(Class<?> contextInterface, Class<?> webServerInterface,
-                                      PerfWebServer webServer, Object contextProxy) throws Exception {
+    private static Object createEvent(Class<?> contextInterface, Class<?> webServerInterface, PerfWebServer webServer,
+            Object contextProxy) throws Exception {
         // C6：defineClass 幂等瓶颈——同一名称的类只能定义一次，并发二次 define 抛 LinkageError。
         // generatedBytes 的 volatile 双检锁只保证字节码生成一次，无法阻止两个线程同时进入
         // defineClass（第二个线程读到的 generatedEventClass 仍为 null 时也会 define）。
@@ -136,15 +130,17 @@ public final class Boot4WebServerInitializedEventBridge {
                     } while (!c.isAssignableFrom(d));
                     return c.getName().replace('.', '/');
                 } catch (Exception ex) {
-                    throw new IllegalStateException("Failed to resolve ASM common superclass " + type1 + " / " + type2, ex);
+                    throw new IllegalStateException("Failed to resolve ASM common superclass " + type1 + " / " + type2,
+                            ex);
                 }
             }
         };
 
-        cw.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC | Opcodes.ACC_SUPER, GENERATED_INTERNAL_NAME,
-                null, EVENT_INTERNAL_NAME, null);
+        cw.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC | Opcodes.ACC_SUPER, GENERATED_INTERNAL_NAME, null,
+                EVENT_INTERNAL_NAME, null);
 
-        FieldVisitor fv = cw.visitField(Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL, "applicationContext", CONTEXT_DESC, null, null);
+        FieldVisitor fv = cw.visitField(Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL, "applicationContext", CONTEXT_DESC,
+                null, null);
         fv.visitEnd();
 
         MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC, "<init>", CTOR_DESC, null, null);

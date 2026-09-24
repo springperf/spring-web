@@ -16,16 +16,12 @@ public class CorsAndStaticTest extends BaseE2ETest {
 
     @Test
     void testCorsPreflight() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/core/cors/annotated")
-                .header("Origin", "http://example.com")
-                .header("Access-Control-Request-Method", "GET")
-                .method("OPTIONS", null)
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/core/cors/annotated")
+                .header("Origin", "http://example.com").header("Access-Control-Request-Method", "GET")
+                .method("OPTIONS", null).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             int code = resp.code();
-            assertTrue(code == 200 || code == 204,
-                    "Expected 200 or 204 for CORS preflight, got " + code);
+            assertTrue(code == 200 || code == 204, "Expected 200 or 204 for CORS preflight, got " + code);
             // 验证 CORS 响应头
             String allowOrigin = resp.header("Access-Control-Allow-Origin");
             assertNotNull(allowOrigin, "CORS preflight must include Access-Control-Allow-Origin");
@@ -33,18 +29,14 @@ public class CorsAndStaticTest extends BaseE2ETest {
                     "Access-Control-Allow-Origin should contain the allowed origin");
             assertNotNull(resp.header("Access-Control-Allow-Methods"),
                     "CORS preflight must include Access-Control-Allow-Methods");
-            assertNotNull(resp.header("Vary"),
-                    "CORS preflight must include Vary header");
+            assertNotNull(resp.header("Vary"), "CORS preflight must include Vary header");
         }
     }
 
     @Test
     void testCorsAnnotation() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/core/cors/annotated")
-                .header("Origin", "http://example.com")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/core/cors/annotated")
+                .header("Origin", "http://example.com").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = Objects.toString(resp.body().string(), "");

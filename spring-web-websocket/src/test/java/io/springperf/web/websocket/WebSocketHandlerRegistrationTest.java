@@ -10,13 +10,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class WebSocketHandlerRegistrationTest {
 
-    private final WebSocketHandler handler = new TextWebSocketHandler() {};
+    private final WebSocketHandler handler = new TextWebSocketHandler() {
+    };
 
     @Test
     void constructor_storesHandlerAndPaths() {
         WebSocketHandlerRegistration reg = new WebSocketHandlerRegistration(handler, "/ws", "/chat");
         assertSame(handler, reg.getHandler());
-        assertArrayEquals(new String[]{"/ws", "/chat"}, reg.getPaths());
+        assertArrayEquals(new String[] { "/ws", "/chat" }, reg.getPaths());
     }
 
     @Test

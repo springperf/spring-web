@@ -26,27 +26,23 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code spring.mvc.message-codes-resolver-format} 默认值（{@code prefix_error_code}）E2E：
- * 校验错误码形如 {@code NotBlank.<对象>.<字段>}（错误码在前）。
+ * {@code spring.mvc.message-codes-resolver-format} 默认值（{@code prefix_error_code}）E2E： 校验错误码形如
+ * {@code NotBlank.<对象>.<字段>}（错误码在前）。
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, MessageCodesPrefixE2eTest.PrefixConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "server.servlet.context-path=/")
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        MessageCodesPrefixE2eTest.PrefixConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "server.servlet.context-path=/")
 class MessageCodesPrefixE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
 
     private String codes() throws Exception {
-        Response resp = CLIENT.newCall(new Request.Builder()
-                .url("http://localhost:" + port + "/e2e-mc/validate")
-                .post(okhttp3.RequestBody.create("{\"name\":\"\"}", MediaType.parse("application/json")))
-                .build()).execute();
+        Response resp = CLIENT.newCall(new Request.Builder().url("http://localhost:" + port + "/e2e-mc/validate")
+                .post(okhttp3.RequestBody.create("{\"name\":\"\"}", MediaType.parse("application/json"))).build())
+                .execute();
         try {
             assertEquals(400, resp.code(), "校验失败应 400");
             return resp.body().string();
@@ -58,12 +54,9 @@ class MessageCodesPrefixE2eTest {
     @Test
     void defaultFormat_prefixErrorCodeApplied() throws Exception {
         String body = codes();
-        assertTrue(body.contains("NotBlank.form.name"),
-                "默认格式下错误码应为 NotBlank.<对象>.<字段>，实际 " + body);
-        assertTrue(body.contains("NotBlank.name"),
-                "应包含 errorCode.field 形式，实际 " + body);
-        assertTrue(body.contains("|NotBlank\""),
-                "错误码链末位应为裸错误码 NotBlank，实际 " + body);
+        assertTrue(body.contains("NotBlank.form.name"), "默认格式下错误码应为 NotBlank.<对象>.<字段>，实际 " + body);
+        assertTrue(body.contains("NotBlank.name"), "应包含 errorCode.field 形式，实际 " + body);
+        assertTrue(body.contains("|NotBlank\""), "错误码链末位应为裸错误码 NotBlank，实际 " + body);
     }
 
     @TestConfiguration
@@ -98,8 +91,7 @@ class MessageCodesPrefixE2eTest {
         @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.BAD_REQUEST)
         public String handle(MethodArgumentNotValidException ex) {
             List<String> codes = new ArrayList<>();
-            ex.getBindingResult().getFieldErrors()
-                    .forEach(fe -> codes.add(String.join("|", fe.getCodes())));
+            ex.getBindingResult().getFieldErrors().forEach(fe -> codes.add(String.join("|", fe.getCodes())));
             return "{\"codes\":[\"" + String.join("\",\"", codes) + "\"]}";
         }
     }
