@@ -1,14 +1,15 @@
 package io.springperf.web.core.async;
 
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
-import org.springframework.lang.Nullable;
-import org.springframework.web.context.request.NativeWebRequest;
-
 import java.security.Principal;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
+
+import org.springframework.lang.Nullable;
+import org.springframework.web.context.request.NativeWebRequest;
+
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 public class PerfNativeWebRequest implements NativeWebRequest {
 
@@ -32,16 +33,17 @@ public class PerfNativeWebRequest implements NativeWebRequest {
     }
 
     @Override
-    public <T> T getNativeRequest(Class<T> requiredType) {
-        if (requiredType.isAssignableFrom(request.getClass())) {
+    public <T> T getNativeRequest(@Nullable Class<T> requiredType) {
+        // NativeWebRequest 契约允许 requiredType 为 null（上游标注 @Nullable），语义为“不限定类型”
+        if (requiredType == null || requiredType.isAssignableFrom(request.getClass())) {
             return (T) request;
         }
         return null;
     }
 
     @Override
-    public <T> T getNativeResponse(Class<T> requiredType) {
-        if (requiredType.isAssignableFrom(response.getClass())) {
+    public <T> T getNativeResponse(@Nullable Class<T> requiredType) {
+        if (requiredType == null || requiredType.isAssignableFrom(response.getClass())) {
             return (T) response;
         }
         return null;
@@ -74,7 +76,9 @@ public class PerfNativeWebRequest implements NativeWebRequest {
 
     @Override
     public String[] getHeaderValues(String headerName) {
-        return request.getHeaders().get(headerName).toArray(new String[0]);
+        // MultiValueMap.get 声明为 @Nullable：缺失的头应返回空数组，而不是 NPE
+        java.util.List<String> values = request.getHeaders().get(headerName);
+        return values != null ? values.toArray(new String[0]) : new String[0];
     }
 
     @Override

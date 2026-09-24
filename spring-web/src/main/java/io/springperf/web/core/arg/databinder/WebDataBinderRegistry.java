@@ -1,11 +1,8 @@
 package io.springperf.web.core.arg.databinder;
 
-import io.springperf.web.context.BaseWebComponent;
-import io.springperf.web.context.PropertiesConstant;
-import io.springperf.web.context.WebComponentWrapperUtils;
-import io.springperf.web.core.mapping.MappingCacheKey;
-import io.springperf.web.core.mapping.MappingHandlerMethod;
-import lombok.extern.slf4j.Slf4j;
+import java.lang.reflect.Method;
+import java.util.*;
+
 import org.springframework.core.MethodIntrospector;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.core.convert.ConversionService;
@@ -22,17 +19,25 @@ import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.method.ControllerAdviceBean;
 import org.springframework.web.method.support.InvocableHandlerMethod;
 
-import java.lang.reflect.Method;
-import java.util.*;
+import io.springperf.web.context.BaseWebComponent;
+import io.springperf.web.context.PropertiesConstant;
+import io.springperf.web.context.WebComponentWrapperUtils;
+import io.springperf.web.core.mapping.MappingCacheKey;
+import io.springperf.web.core.mapping.MappingHandlerMethod;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class WebDataBinderRegistry extends BaseWebComponent {
 
-    public static final ReflectionUtils.MethodFilter INIT_BINDER_METHODS = method -> AnnotatedElementUtils.hasAnnotation(method, InitBinder.class);
+    public static final ReflectionUtils.MethodFilter INIT_BINDER_METHODS = method -> AnnotatedElementUtils
+            .hasAnnotation(method, InitBinder.class);
 
-    private static final MappingCacheKey<ConversionService> CONVERSION_SERVICE_KEY = MappingCacheKey.createClassCacheKey(ConversionService.class);
-    private static final MappingCacheKey<List<Validator>> VALIDATOR_KEY = (MappingCacheKey) MappingCacheKey.createClassCacheKey(List.class);
-    private static final MappingCacheKey<WebDataBinderFactory> BINDER_FACTORY_KEY = MappingCacheKey.createClassCacheKey(WebDataBinderFactory.class);
+    private static final MappingCacheKey<ConversionService> CONVERSION_SERVICE_KEY = MappingCacheKey
+            .createClassCacheKey(ConversionService.class);
+    private static final MappingCacheKey<List<Validator>> VALIDATOR_KEY = (MappingCacheKey) MappingCacheKey
+            .createClassCacheKey(List.class);
+    private static final MappingCacheKey<WebDataBinderFactory> BINDER_FACTORY_KEY = MappingCacheKey
+            .createClassCacheKey(WebDataBinderFactory.class);
     protected WebDataBinderFactory webDataBinderFactory;
     protected WebBindingInitializer webBindingInitializer;
     protected Map<ControllerAdviceBean, Set<Method>> initBinderAdviceCache = new LinkedHashMap<>();
@@ -50,7 +55,12 @@ public class WebDataBinderRegistry extends BaseWebComponent {
         webBindingInitializer = webContext.getBeanFromCtx(WebBindingInitializer.class);
         List<ControllerAdviceBean> adviceBeans = ControllerAdviceBean.findAnnotatedBeans(webContext.getCtx());
         for (ControllerAdviceBean adviceBean : adviceBeans) {
-            Set<Method> binderMethods = MethodIntrospector.selectMethods(adviceBean.getBeanType(), INIT_BINDER_METHODS);
+            // getBeanType 声明为 @Nullable（类型不可解析时）；无法内省则跳过该 advice
+            Class<?> beanType = adviceBean.getBeanType();
+            if (beanType == null) {
+                continue;
+            }
+            Set<Method> binderMethods = MethodIntrospector.selectMethods(beanType, INIT_BINDER_METHODS);
             if (!binderMethods.isEmpty()) {
                 this.initBinderAdviceCache.put(adviceBean, binderMethods);
             }
@@ -67,13 +77,12 @@ public class WebDataBinderRegistry extends BaseWebComponent {
     }
 
     /**
-     * 按 {@code spring.mvc.message-codes-resolver-format} 创建默认消息码解析器
-     * （prefix_error_code / postfix_error_code；未配置或非法时回退 prefix，对齐 Boot）。
+     * 按 {@code spring.mvc.message-codes-resolver-format} 创建默认消息码解析器 （prefix_error_code / postfix_error_code；未配置或非法时回退
+     * prefix，对齐 Boot）。
      */
     protected MessageCodesResolver createDefaultMessageCodesResolver() {
         DefaultMessageCodesResolver resolver = new DefaultMessageCodesResolver();
-        String format = webContext.getProps().get(
-                PropertiesConstant.MVC_MESSAGE_CODES_RESOLVER_FORMAT,
+        String format = webContext.getProps().get(PropertiesConstant.MVC_MESSAGE_CODES_RESOLVER_FORMAT,
                 PropertiesConstant.MVC_MESSAGE_CODES_RESOLVER_FORMAT_DEFAULT);
         if (format != null && "postfix_error_code".equalsIgnoreCase(format.trim())) {
             resolver.setMessageCodeFormatter(DefaultMessageCodesResolver.Format.POSTFIX_ERROR_CODE);
@@ -81,10 +90,9 @@ public class WebDataBinderRegistry extends BaseWebComponent {
         return resolver;
     }
 
-
     /**
-     * 创建默认格式化转换服务，并注册 {@code spring.mvc.format.date/time/datetime}
-     * 全局默认格式（对齐 Boot：无 {@code @DateTimeFormat} 的字段使用该默认格式）。
+     * 创建默认格式化转换服务，并注册 {@code spring.mvc.format.date/time/datetime} 全局默认格式（对齐 Boot：无 {@code @DateTimeFormat}
+     * 的字段使用该默认格式）。
      */
     protected DefaultFormattingConversionService createDefaultFormattingConversionService() {
         DefaultFormattingConversionService service = new DefaultFormattingConversionService();
@@ -196,9 +204,8 @@ public class WebDataBinderRegistry extends BaseWebComponent {
     }
 
     /**
-     * 工厂级 {@link WebDataBinderFactory#createBinder} 失败时，用全局 {@link WebBindingInitializer}
-     * 构造一个裸 binder 兜底，保留其 conversion service 与 validators。
-     * {@code webBindingInitializer} 为 null 时返回 null（调用方回退到默认值）。
+     * 工厂级 {@link WebDataBinderFactory#createBinder} 失败时，用全局 {@link WebBindingInitializer} 构造一个裸 binder 兜底，保留其
+     * conversion service 与 validators。 {@code webBindingInitializer} 为 null 时返回 null（调用方回退到默认值）。
      */
     @Nullable
     protected WebDataBinder createWebBindingInitializerBinder() {
@@ -211,10 +218,11 @@ public class WebDataBinderRegistry extends BaseWebComponent {
     }
 
     /**
-     * Set a default validator to use for model data validation.
-     * Overrides any validator discovered from the Spring context.
+     * Set a default validator to use for model data validation. Overrides any validator discovered from the Spring
+     * context.
      *
-     * @param validator the validator to set
+     * @param validator
+     *            the validator to set
      */
     public void setDefaultValidator(Validator validator) {
         this.defaultValidator = validator;

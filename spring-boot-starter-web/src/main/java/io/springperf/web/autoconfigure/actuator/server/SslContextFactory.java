@@ -15,22 +15,25 @@ import java.util.stream.Collectors;
 
 /**
  * Netty {@link SslContext} 工厂工具类。
- * <p>从 Spring {@link Environment} 中读取 {@code server.ssl.*} 或 {@code management.server.ssl.*}
- * 配置属性，构建 Netty SslContext。支持 PKCS12/JKS 密钥库和 PEM 证书两种格式。</p>
- *
- * <h3>支持的属性</h3>
+ * <p>
+ * 从 Spring {@link Environment} 中读取 {@code server.ssl.*} 或 {@code management.server.ssl.*} 配置属性，构建 Netty SslContext。支持
+ * PKCS12/JKS 密钥库和 PEM 证书两种格式。
+ * </p>
+ * <p>
+ * <b>支持的属性</b>
+ * </p>
  * <ul>
- *   <li>{@code xxx.enabled} — 是否启用 SSL（配置 key-store 或 certificate 时隐式启用）</li>
- *   <li>{@code xxx.key-store} — 密钥库路径（支持 classpath: 前缀）</li>
- *   <li>{@code xxx.key-store-password} — 密钥库密码</li>
- *   <li>{@code xxx.key-store-type} — 密钥库类型（默认 PKCS12）</li>
- *   <li>{@code xxx.key-password} — 密钥密码（默认与 key-store-password 相同）</li>
- *   <li>{@code xxx.certificate} — PEM 证书文件路径</li>
- *   <li>{@code xxx.certificate-private-key} — PEM 私钥文件路径</li>
- *   <li>{@code xxx.client-auth} — 客户端认证模式：need / want / none</li>
- *   <li>{@code xxx.protocol} — SSL 协议（默认 TLS）</li>
- *   <li>{@code xxx.enabled-protocols} — 启用的协议列表（逗号分隔）</li>
- *   <li>{@code xxx.ciphers} — 启用的加密套件列表（逗号分隔）</li>
+ * <li>{@code xxx.enabled} — 是否启用 SSL（配置 key-store 或 certificate 时隐式启用）</li>
+ * <li>{@code xxx.key-store} — 密钥库路径（支持 classpath: 前缀）</li>
+ * <li>{@code xxx.key-store-password} — 密钥库密码</li>
+ * <li>{@code xxx.key-store-type} — 密钥库类型（默认 PKCS12）</li>
+ * <li>{@code xxx.key-password} — 密钥密码（默认与 key-store-password 相同）</li>
+ * <li>{@code xxx.certificate} — PEM 证书文件路径</li>
+ * <li>{@code xxx.certificate-private-key} — PEM 私钥文件路径</li>
+ * <li>{@code xxx.client-auth} — 客户端认证模式：need / want / none</li>
+ * <li>{@code xxx.protocol} — SSL 协议（默认 TLS）</li>
+ * <li>{@code xxx.enabled-protocols} — 启用的协议列表（逗号分隔）</li>
+ * <li>{@code xxx.ciphers} — 启用的加密套件列表（逗号分隔）</li>
  * </ul>
  */
 public final class SslContextFactory {
@@ -43,8 +46,11 @@ public final class SslContextFactory {
     /**
      * 从 Environment 读取指定前缀的 SSL 配置并创建 {@link SslContext}。
      *
-     * @param env    Spring Environment
-     * @param prefix 属性前缀，如 {@code "server.ssl."} 或 {@code "management.server.ssl."}
+     * @param env
+     *            Spring Environment
+     * @param prefix
+     *            属性前缀，如 {@code "server.ssl."} 或 {@code "management.server.ssl."}
+     *
      * @return SslContext，未配置 SSL 时返回 null
      */
     public static SslContext createServerSslContext(Environment env, String prefix) {
@@ -54,9 +60,13 @@ public final class SslContextFactory {
     /**
      * 创建 SslContext，可选配置 ALPN 用于 HTTP/2 协议协商。
      *
-     * @param env          Spring Environment
-     * @param prefix       SSL 属性前缀
-     * @param http2Enabled 是否启用 HTTP/2（配置 ALPN）
+     * @param env
+     *            Spring Environment
+     * @param prefix
+     *            SSL 属性前缀
+     * @param http2Enabled
+     *            是否启用 HTTP/2（配置 ALPN）
+     *
      * @return SslContext，未配置 SSL 时返回 null
      */
     public static SslContext createServerSslContext(Environment env, String prefix, boolean http2Enabled) {
@@ -75,7 +85,7 @@ public final class SslContextFactory {
                 // C7：stream-based 加载，支持 classpath: 前缀（JAR 内资源的
                 // getFile() 不可用，旧实现退化成把 "classpath:..." 当文件路径而误导报错）。
                 try (InputStream certIn = openInputStream(certificate);
-                     InputStream keyIn = openInputStream(privateKey)) {
+                        InputStream keyIn = openInputStream(privateKey)) {
                     builder = SslContextBuilder.forServer(certIn, keyIn, keyPassword);
                 }
             } else {
@@ -83,7 +93,11 @@ public final class SslContextFactory {
                 String keyStorePath = env.getProperty(prefix + "key-store");
                 String keyStorePassword = env.getProperty(prefix + "key-store-password");
                 String keyStoreType = env.getProperty(prefix + "key-store-type", "PKCS12");
-                String keyPassword = env.getProperty(prefix + "key-password", keyStorePassword);
+                // 不把可能为 null 的 keyStorePassword 当默认值传入（语义不变：库口令缺失时
+                // 单参 getProperty 同样返回 null，但避免把 null 交给非空形参）
+                String keyPassword = keyStorePassword != null
+                        ? env.getProperty(prefix + "key-password", keyStorePassword)
+                        : env.getProperty(prefix + "key-password");
 
                 KeyStore keyStore = KeyStore.getInstance(keyStoreType);
                 try (InputStream in = openInputStream(keyStorePath)) {
@@ -97,13 +111,10 @@ public final class SslContextFactory {
 
             // ALPN 配置（HTTP/2 协议协商）
             if (http2Enabled) {
-                builder.applicationProtocolConfig(new ApplicationProtocolConfig(
-                        ApplicationProtocolConfig.Protocol.ALPN,
+                builder.applicationProtocolConfig(new ApplicationProtocolConfig(ApplicationProtocolConfig.Protocol.ALPN,
                         ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
                         ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
-                        ApplicationProtocolNames.HTTP_2,
-                        ApplicationProtocolNames.HTTP_1_1
-                ));
+                        ApplicationProtocolNames.HTTP_2, ApplicationProtocolNames.HTTP_1_1));
             }
 
             // 可选：启用的协议列表（如 "TLSv1.2,TLSv1.3"），不设置则使用 JDK 默认
@@ -141,7 +152,8 @@ public final class SslContextFactory {
                     try (InputStream in = openInputStream(trustStorePath)) {
                         trustStore.load(in, trustStorePassword != null ? trustStorePassword.toCharArray() : null);
                     }
-                    TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+                    TrustManagerFactory tmf = TrustManagerFactory
+                            .getInstance(TrustManagerFactory.getDefaultAlgorithm());
                     tmf.init(trustStore);
                     builder.trustManager(tmf);
                 }
@@ -154,12 +166,11 @@ public final class SslContextFactory {
     }
 
     /**
-     * 判断 SSL 是否已配置启用。
-     * 满足以下任一条件即视为启用：
+     * 判断 SSL 是否已配置启用。 满足以下任一条件即视为启用：
      * <ol>
-     *   <li>{@code xxx.enabled=true} 显式配置</li>
-     *   <li>{@code xxx.key-store} 已配置</li>
-     *   <li>{@code xxx.certificate} 已配置</li>
+     * <li>{@code xxx.enabled=true} 显式配置</li>
+     * <li>{@code xxx.key-store} 已配置</li>
+     * <li>{@code xxx.certificate} 已配置</li>
      * </ol>
      */
     private static boolean isSslEnabled(Environment env, String prefix) {
@@ -188,10 +199,7 @@ public final class SslContextFactory {
     }
 
     private static String[] splitByComma(String value) {
-        return Arrays.stream(value.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .collect(Collectors.toList())
+        return Arrays.stream(value.split(",")).map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList())
                 .toArray(new String[0]);
     }
 }

@@ -1,5 +1,17 @@
 package io.springperf.web.context;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.DisposableBean;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationContextAware;
+import org.springframework.core.annotation.AnnotationAwareOrderComparator;
+import org.springframework.util.ObjectUtils;
+
 import io.springperf.web.core.DispatcherHandler;
 import io.springperf.web.core.exception.ExceptionHandlerExceptionResolver;
 import io.springperf.web.core.invoker.FastInvokerGenerator;
@@ -8,22 +20,10 @@ import io.springperf.web.server.ErrorResponseConfig;
 import io.springperf.web.util.WebUtils;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.BeansException;
-import org.springframework.beans.factory.DisposableBean;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.ApplicationContextAware;
-import org.springframework.core.annotation.AnnotationAwareOrderComparator;
-import org.springframework.util.ObjectUtils;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Central web application context that holds the Spring {@link ApplicationContext},
- * configuration properties, and manages the lifecycle of all web components
- * (dispatcher handler, interceptors, converters, etc.).
+ * Central web application context that holds the Spring {@link ApplicationContext}, configuration properties, and
+ * manages the lifecycle of all web components (dispatcher handler, interceptors, converters, etc.).
  * <p>
  * Initialization proceeds in three phases to respect component ordering dependencies.
  */
@@ -42,7 +42,9 @@ public class WebContext extends WebComponentContainer implements DisposableBean,
     public WebContext(DispatcherHandler dispatcherHandler, ApplicationProperties props) {
         this.dispatcherHandler = dispatcherHandler;
         this.props = props;
-        this.contextPath = WebUtils.formatPath(props.get(PropertiesConstant.CONTEXT_PATH, "/"));
+        // props.get 声明为 @Nullable：默认值 "/" 非空，兜底分支实际不可达，仅为契约完整
+        String configuredContextPath = props.get(PropertiesConstant.CONTEXT_PATH, "/");
+        this.contextPath = WebUtils.formatPath(configuredContextPath != null ? configuredContextPath : "/");
         this.webContext = this;
         registerWebComponent(dispatcherHandler);
         // 错误响应策略（server.error.*）：启动期预解析并注册，供 sendError / 异常解析链路读取
@@ -51,13 +53,14 @@ public class WebContext extends WebComponentContainer implements DisposableBean,
 
     /**
      * 清空框架级配置缓存，使后续读取回落到 Spring {@code Environment} 最新值。
-     *
-     * <p>供配置中心动态刷新调用（如 Spring Cloud 的 {@code EnvironmentChangeEvent}，
-     * 见 starter 的 {@code SpringWebCloudRefreshAutoConfiguration}），业务代码亦可主动调用。</p>
-     *
-     * <p><b>不影响</b>启动期已固化进 Netty bootstrap / 线程池 / 模板引擎的配置
-     * （{@code server.port}、{@code server.netty.*}、{@code pool.core-pool-size} 等），
-     * 这些需要重建组件才能生效。</p>
+     * <p>
+     * 供配置中心动态刷新调用（如 Spring Cloud 的 {@code EnvironmentChangeEvent}， 见 starter 的
+     * {@code SpringWebCloudRefreshAutoConfiguration}），业务代码亦可主动调用。
+     * </p>
+     * <p>
+     * <b>不影响</b>启动期已固化进 Netty bootstrap / 线程池 / 模板引擎的配置
+     * （{@code server.port}、{@code server.netty.*}、{@code pool.core-pool-size} 等）， 这些需要重建组件才能生效。
+     * </p>
      */
     public void refreshProperties() {
         new PropertyRefreshHandler(this).refresh();
@@ -65,11 +68,13 @@ public class WebContext extends WebComponentContainer implements DisposableBean,
 
     /**
      * Trigger the full WebComponent lifecycle: init contexts, then Phase 1/2/3.
-     * <p>Called from {@link io.springperf.web.server.NettyHttpServer#start()} after
-     * the Spring context is fully loaded and all beans (including the bridge)
-     * have been registered as WebComponents.</p>
-     * <p>失败时清理已初始化的组件并复位 {@link #lifecycleStarted}，使启动失败后可以重试；
-     * 已 {@link #destroy()} 过的实例可通过再次调用本方法重新启动生命周期。</p>
+     * <p>
+     * Called from {@link io.springperf.web.server.NettyHttpServer#start()} after the Spring context is fully loaded and
+     * all beans (including the bridge) have been registered as WebComponents.
+     * </p>
+     * <p>
+     * 失败时清理已初始化的组件并复位 {@link #lifecycleStarted}，使启动失败后可以重试； 已 {@link #destroy()} 过的实例可通过再次调用本方法重新启动生命周期。
+     * </p>
      */
     public void startLifecycle() {
         // 支持 destroy 后重新 start：状态机停留在 DESTROY，需复位到 NEW 才能重新初始化
@@ -111,10 +116,11 @@ public class WebContext extends WebComponentContainer implements DisposableBean,
 
     /**
      * 销毁组件并在 finally 中清空进程级静态元数据缓存。
-     * <p>缓存（MappingHandlerMethod / ExceptionHandlerExceptionResolver / FastInvokerGenerator）
-     * 以 Class/Method 为键、进程级共享、永不自然回收。devtools / 新 ClassLoader 重启会关闭上下文
-     * 走到此处，必须显式清空，否则旧 ClassLoader 连同 metaspace 被钉住无法回收。
-     * 均为纯缓存，清空后下次访问自动重建，清空永远安全。</p>
+     * <p>
+     * 缓存（MappingHandlerMethod / ExceptionHandlerExceptionResolver / FastInvokerGenerator） 以 Class/Method
+     * 为键、进程级共享、永不自然回收。devtools / 新 ClassLoader 重启会关闭上下文 走到此处，必须显式清空，否则旧 ClassLoader 连同 metaspace 被钉住无法回收。
+     * 均为纯缓存，清空后下次访问自动重建，清空永远安全。
+     * </p>
      */
     @Override
     public void destroyComponent() throws Exception {
@@ -130,8 +136,11 @@ public class WebContext extends WebComponentContainer implements DisposableBean,
     /**
      * Retrieves the highest-priority bean of the specified type from the Spring {@link ApplicationContext}.
      *
-     * @param clazz the bean type to look up
-     * @param <T>   the bean type
+     * @param clazz
+     *            the bean type to look up
+     * @param <T>
+     *            the bean type
+     *
      * @return the bean, or {@code null} if no bean of the given type exists
      */
     public <T> T getBeanFromCtx(Class<T> clazz) {

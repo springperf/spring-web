@@ -21,20 +21,22 @@ import java.util.Map;
 
 /**
  * JSR-356 {@code @ServerEndpoint} 注解端点与框架 {@link WebSocketHandler} 之间的适配器。
- *
- * <p>生命周期翻译：</p>
+ * <p>
+ * 生命周期翻译：
+ * </p>
  * <ul>
- *   <li>{@link #afterConnectionEstablished} → 实例化端点 + 调用 {@code @OnOpen}</li>
- *   <li>{@link #handleMessage} → Decoder 解码 + 参数注入 + 调用 {@code @OnMessage}</li>
- *   <li>{@link #afterConnectionClosed} → 调用 {@code @OnClose}</li>
- *   <li>{@link #handleTransportError} → 调用 {@code @OnError}</li>
+ * <li>{@link #afterConnectionEstablished} → 实例化端点 + 调用 {@code @OnOpen}</li>
+ * <li>{@link #handleMessage} → Decoder 解码 + 参数注入 + 调用 {@code @OnMessage}</li>
+ * <li>{@link #afterConnectionClosed} → 调用 {@code @OnClose}</li>
+ * <li>{@link #handleTransportError} → 调用 {@code @OnError}</li>
  * </ul>
- *
- * <p>由于 {@link WebSocketHandler} 被连接间共享（{@code @Sharable}），
- * 每次连接的状态（端点实例、JSR Session、编解码器）存放在
- * {@link WebSocketSession#getAttributes()} 中，避免跨连接串扰。</p>
+ * <p>
+ * 由于 {@link WebSocketHandler} 被连接间共享（{@code @Sharable}）， 每次连接的状态（端点实例、JSR Session、编解码器）存放在
+ * {@link WebSocketSession#getAttributes()} 中，避免跨连接串扰。
+ * </p>
  *
  * @author huangcanda
+ *
  * @since 3.5.6
  */
 @Slf4j
@@ -61,8 +63,7 @@ public class JsrEndpointWebSocketHandler implements WebSocketHandler {
         Object endpoint = instantiateEndpoint();
         JsrCodecRegistry codecRegistry = new JsrCodecRegistry(config);
         Map<String, String> pathParams = resolvePathParameters(springSession);
-        JsrWebSocketSession jsrSession =
-                new JsrWebSocketSession(springSession, container, codecRegistry, pathParams);
+        JsrWebSocketSession jsrSession = new JsrWebSocketSession(springSession, container, codecRegistry, pathParams);
 
         springSession.getAttributes().put(STATE_KEY, new JsrConnectionState(endpoint, jsrSession, codecRegistry));
 
@@ -157,26 +158,35 @@ public class JsrEndpointWebSocketHandler implements WebSocketHandler {
         try {
             return metadata.getEndpointClass().getDeclaredConstructor().newInstance();
         } catch (Exception ex) {
-            throw new IllegalStateException(
-                    "Unable to instantiate endpoint " + metadata.getEndpointClass().getName()
-                            + ". Provide a ServerEndpointConfig.Configurator with getEndpointInstance().", ex);
+            throw new IllegalStateException("Unable to instantiate endpoint " + metadata.getEndpointClass().getName()
+                    + ". Provide a ServerEndpointConfig.Configurator with getEndpointInstance().", ex);
         }
     }
 
     /**
      * 从请求 URI 与端点模板路径提取路径变量（{roomId} → 123）。
-     * <p>不依赖 Spring Session attributes（其中可能混入其他属性），保证语义纯净。</p>
+     * <p>
+     * 不依赖 Spring Session attributes（其中可能混入其他属性），保证语义纯净。
+     * </p>
      */
     private Map<String, String> resolvePathParameters(WebSocketSession springSession) {
         RouteMatcher routeMatcher = io.springperf.web.util.PathPatternUtils.getPatternRouteMatcher();
-        String requestPath = springSession.getUri().getPath();
+        // getUri()/getPath() 均可为 null（opaque URI 等）：无路径则无路径变量
+        java.net.URI uri = springSession.getUri();
+        if (uri == null) {
+            return java.util.Collections.emptyMap();
+        }
+        String requestPath = uri.getPath();
+        if (requestPath == null) {
+            return java.util.Collections.emptyMap();
+        }
         RouteMatcher.Route route = routeMatcher.parseRoute(requestPath);
         Map<String, String> variables = routeMatcher.matchAndExtract(metadata.getPath(), route);
         return variables != null ? variables : java.util.Collections.emptyMap();
     }
 
     private Object decode(WebSocketMessage<?> message, JsrEndpointMetadata.ParamSpec messageParam,
-                          JsrCodecRegistry codecRegistry) throws jakarta.websocket.DecodeException {
+            JsrCodecRegistry codecRegistry) throws jakarta.websocket.DecodeException {
         if (messageParam == null) {
             return null;
         }
@@ -188,21 +198,17 @@ public class JsrEndpointWebSocketHandler implements WebSocketHandler {
             ByteBuffer buf = ((BinaryMessage) message).getPayload();
             return codecRegistry.decodeBinary(buf, targetType);
         }
-        if (message instanceof org.springframework.web.socket.PongMessage && PongMessage.class.isAssignableFrom(targetType)) {
-            org.springframework.web.socket.PongMessage pong =
-                    (org.springframework.web.socket.PongMessage) message;
+        if (message instanceof org.springframework.web.socket.PongMessage
+                && PongMessage.class.isAssignableFrom(targetType)) {
+            org.springframework.web.socket.PongMessage pong = (org.springframework.web.socket.PongMessage) message;
             ByteBuffer data = pong.getPayload();
             return (PongMessage) () -> data;
         }
         return null;
     }
 
-    private Object[] resolveArgs(List<JsrEndpointMetadata.ParamSpec> specs,
-                                 JsrWebSocketSession jsrSession,
-                                 EndpointConfig config,
-                                 Object message,
-                                 CloseReason closeReason,
-                                 Throwable error) {
+    private Object[] resolveArgs(List<JsrEndpointMetadata.ParamSpec> specs, JsrWebSocketSession jsrSession,
+            EndpointConfig config, Object message, CloseReason closeReason, Throwable error) {
         Object[] args = new Object[specs.size()];
         for (int i = 0; i < specs.size(); i++) {
             JsrEndpointMetadata.ParamSpec spec = specs.get(i);
@@ -244,10 +250,12 @@ public class JsrEndpointWebSocketHandler implements WebSocketHandler {
 
     /**
      * 将 {@code @OnMessage} 返回值发送回客户端（JSR-356 语义）。
-     * <p>String → 文本帧；byte[]/ByteBuffer → 二进制帧；其他类型经 {@link Encoder} 编码。</p>
+     * <p>
+     * String → 文本帧；byte[]/ByteBuffer → 二进制帧；其他类型经 {@link Encoder} 编码。
+     * </p>
      */
-    private void sendReturnValue(WebSocketSession springSession, Object returnValue,
-                                 JsrCodecRegistry codecRegistry) throws Exception {
+    private void sendReturnValue(WebSocketSession springSession, Object returnValue, JsrCodecRegistry codecRegistry)
+            throws Exception {
         if (returnValue instanceof String) {
             springSession.sendMessage(new TextMessage((String) returnValue));
             return;

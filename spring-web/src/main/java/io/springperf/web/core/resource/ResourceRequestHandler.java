@@ -1,22 +1,5 @@
 package io.springperf.web.core.resource;
 
-import io.springperf.web.context.PropertiesConstant;
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.invoker.CustomInvoker;
-import io.springperf.web.core.mapping.match.HttpMethodMatcher;
-import io.springperf.web.core.mapping.match.Matcher;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
-import org.springframework.http.*;
-import org.springframework.lang.Nullable;
-import org.springframework.util.ReflectionUtils;
-import org.springframework.util.ResourceUtils;
-import org.springframework.util.StringUtils;
-
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
@@ -31,10 +14,29 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.*;
+import org.springframework.lang.Nullable;
+import org.springframework.util.ReflectionUtils;
+import org.springframework.util.ResourceUtils;
+import org.springframework.util.StringUtils;
+
+import io.springperf.web.context.PropertiesConstant;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.invoker.CustomInvoker;
+import io.springperf.web.core.mapping.match.HttpMethodMatcher;
+import io.springperf.web.core.mapping.match.Matcher;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
+import lombok.extern.slf4j.Slf4j;
+
 @Slf4j
 public class ResourceRequestHandler implements CustomInvoker {
 
-    public static final Method HANDLE_METHOD = ReflectionUtils.findMethod(ResourceRequestHandler.class, "handleResourceRequest", WebServerHttpRequest.class, WebServerHttpResponse.class);
+    public static final Method HANDLE_METHOD = ReflectionUtils.findMethod(ResourceRequestHandler.class,
+            "handleResourceRequest", WebServerHttpRequest.class, WebServerHttpResponse.class);
 
     private final ResourceHandlerRegistration registration;
 
@@ -50,10 +52,8 @@ public class ResourceRequestHandler implements CustomInvoker {
     }
 
     /**
-     * 从请求路径剥离映射 pattern 的静态前缀，得到资源相对路径。
-     * 对齐 Spring {@code ResourceHttpRequestHandler}：pattern {@code /res/**} 下请求
-     * {@code /res/a.txt} 应在资源位置下查找 {@code a.txt}（而非 {@code res/a.txt}）。
-     * 默认 pattern {@code /**} 前缀为空，路径原样使用。
+     * 从请求路径剥离映射 pattern 的静态前缀，得到资源相对路径。 对齐 Spring {@code ResourceHttpRequestHandler}：pattern {@code /res/**} 下请求
+     * {@code /res/a.txt} 应在资源位置下查找 {@code a.txt}（而非 {@code res/a.txt}）。 默认 pattern {@code /**} 前缀为空，路径原样使用。
      */
     private String stripMappedPrefix(String path) {
         String[] patterns = mappedPatterns;
@@ -135,8 +135,7 @@ public class ResourceRequestHandler implements CustomInvoker {
             }
 
             // set Content-Type
-            MediaType mediaType = MediaTypeFactory.getMediaType(resource)
-                    .orElse(MediaType.APPLICATION_OCTET_STREAM);
+            MediaType mediaType = MediaTypeFactory.getMediaType(resource).orElse(MediaType.APPLICATION_OCTET_STREAM);
             resp.getHeaders().setContentType(mediaType);
 
             // set Content-Length
@@ -179,8 +178,7 @@ public class ResourceRequestHandler implements CustomInvoker {
                         resp.setHandled();
                         return;
                     }
-                    resp.writeStream(new RangeInputStream(resource.getInputStream(), start, rangeLength),
-                            rangeLength);
+                    resp.writeStream(new RangeInputStream(resource.getInputStream(), start, rangeLength), rangeLength);
                     return;
                 }
                 if (ranges.size() > 1) {
@@ -192,21 +190,23 @@ public class ResourceRequestHandler implements CustomInvoker {
                     }
                     // 段数超限：按 RFC 9110 §14.2 忽略 Range 返回整实体——不截断段数（截断会让客户端
                     // 拿到与请求不符的表示），也不回 416（请求本身合法）。防「单请求放大成多路区间流」。
-                    log.debug("Range ignored: {} segments exceed {}={}",
-                            ranges.size(), PropertiesConstant.HTTP_MAX_RANGES, maxRanges);
+                    log.debug("Range ignored: {} segments exceed {}={}", ranges.size(),
+                            PropertiesConstant.HTTP_MAX_RANGES, maxRanges);
                 }
                 // ranges 为空（头缺失或语法错误）：回退整实体
             }
-
 
             // set Content-Encoding for gzip
             if (useGzip) {
                 resp.getHeaders().add(HttpHeaders.CONTENT_ENCODING, "gzip");
                 // 预压缩变体是按 Accept-Encoding 协商选出的另一份表示，必须声明 Vary，
                 // 否则共享缓存会把 gzip 表示回给未声明该编码的客户端（经典缓存污染）
-                if (resp.getHeaders().get(HttpHeaders.VARY) == null) {
+                // 取一次判一次：原先"判 null 后又调一次 get"的成对写法会重复计算，
+                // 且静态分析无法关联两次调用（NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE）
+                java.util.List<String> vary = resp.getHeaders().get(HttpHeaders.VARY);
+                if (vary == null) {
                     resp.getHeaders().add(HttpHeaders.VARY, HttpHeaders.ACCEPT_ENCODING);
-                } else if (!resp.getHeaders().get(HttpHeaders.VARY).contains(HttpHeaders.ACCEPT_ENCODING)) {
+                } else if (!vary.contains(HttpHeaders.ACCEPT_ENCODING)) {
                     resp.getHeaders().add(HttpHeaders.VARY, HttpHeaders.ACCEPT_ENCODING);
                 }
             }
@@ -233,11 +233,10 @@ public class ResourceRequestHandler implements CustomInvoker {
     }
 
     /**
-     * 多段 Range 段数上限（{@code server.http.max-ranges}，有效上限 = min(本值, 100)，见
-     * {@link PropertiesConstant#HTTP_MAX_RANGES}）。
-     *
-     * <p>**只在多段请求分支读取**：无 Range / 单段请求（绝大多数）不触碰配置，热路径零成本；
-     * 每次读取可自然跟随配置刷新。无 WebContext（单测替身）或取值非法时回退默认上限（不放大防护）。</p>
+     * 多段 Range 段数上限（{@code server.http.max-ranges}，有效上限 = min(本值, 100)，见 {@link PropertiesConstant#HTTP_MAX_RANGES}）。
+     * <p>
+     * **只在多段请求分支读取**：无 Range / 单段请求（绝大多数）不触碰配置，热路径零成本； 每次读取可自然跟随配置刷新。无 WebContext（单测替身）或取值非法时回退默认上限（不放大防护）。
+     * </p>
      */
     private static int maxRanges(WebServerHttpRequest req) {
         try {
@@ -257,8 +256,7 @@ public class ResourceRequestHandler implements CustomInvoker {
     }
 
     /**
-     * 段数是否超过上限：上限为负表示不限制；{@code 0} 表示禁止多段（任何多段请求都回退整实体）。
-     * 独立成包级方法以便单测直接锁定边界（0 / 恰好等于上限 / 超一）。
+     * 段数是否超过上限：上限为负表示不限制；{@code 0} 表示禁止多段（任何多段请求都回退整实体）。 独立成包级方法以便单测直接锁定边界（0 / 恰好等于上限 / 超一）。
      */
     static boolean exceedsMaxRanges(int segments, int maxRanges) {
         return maxRanges >= 0 && segments > maxRanges;
@@ -266,15 +264,14 @@ public class ResourceRequestHandler implements CustomInvoker {
 
     /**
      * 多段 Range：multipart/byteranges（RFC 9110 §14.4；对齐 Spring ResourceHttpRequestHandler / Tomcat）。
-     *
-     * <p>每段自带 {@code Content-Type} 与 {@code Content-Range}，段间以 CRLF 分隔，末尾
-     * {@code --boundary--} 收尾；总 Content-Length 写出前逐段精确累加（分段头是 ASCII 定长的，
-     * 可安全预先计算）。任一段不可满足（start &gt;= 实体长度）→ 整体 416 +
-     * {@code Content-Range: bytes *&#47;len}（对齐 Spring：任一 region 越界即整体不可满足）。</p>
+     * <p>
+     * 每段自带 {@code Content-Type} 与 {@code Content-Range}，段间以 CRLF 分隔，末尾 {@code --boundary--} 收尾；总 Content-Length
+     * 写出前逐段精确累加（分段头是 ASCII 定长的， 可安全预先计算）。任一段不可满足（start &gt;= 实体长度）→ 整体 416 + {@code Content-Range: bytes *&#47;len}（对齐
+     * Spring：任一 region 越界即整体不可满足）。
+     * </p>
      */
-    private void serveMultipartByteranges(WebServerHttpRequest req, WebServerHttpResponse resp,
-                                          Resource resource, List<HttpRange> ranges,
-                                          long contentLength, MediaType mediaType) throws IOException {
+    private void serveMultipartByteranges(WebServerHttpRequest req, WebServerHttpResponse resp, Resource resource,
+            List<HttpRange> ranges, long contentLength, MediaType mediaType) throws IOException {
         for (HttpRange range : ranges) {
             if (range.getRangeStart(contentLength) >= contentLength) {
                 resp.getHeaders().set(HttpHeaders.CONTENT_RANGE, "bytes */" + contentLength);
@@ -289,20 +286,17 @@ public class ResourceRequestHandler implements CustomInvoker {
         for (HttpRange range : ranges) {
             long start = range.getRangeStart(contentLength);
             long end = range.getRangeEnd(contentLength);
-            byte[] prefix = ("--" + boundary + "\r\n"
-                    + "Content-Type: " + mediaType + "\r\n"
-                    + "Content-Range: bytes " + start + "-" + end + "/" + contentLength + "\r\n\r\n")
-                    .getBytes(StandardCharsets.US_ASCII);
+            byte[] prefix = ("--" + boundary + "\r\n" + "Content-Type: " + mediaType + "\r\n" + "Content-Range: bytes "
+                    + start + "-" + end + "/" + contentLength + "\r\n\r\n").getBytes(StandardCharsets.US_ASCII);
             prefixes.add(prefix);
-            segments.add(new long[]{start, end});
+            segments.add(new long[] { start, end });
             // 段前缀 + 区间字节 + 段后 CRLF
             total += prefix.length + (end - start + 1) + 2;
         }
         byte[] closing = ("--" + boundary + "--\r\n").getBytes(StandardCharsets.US_ASCII);
         total += closing.length;
 
-        resp.getHeaders().setContentType(
-                MediaType.parseMediaType("multipart/byteranges; boundary=" + boundary));
+        resp.getHeaders().setContentType(MediaType.parseMediaType("multipart/byteranges; boundary=" + boundary));
         // 206 的 Content-Length 必须是多段体总长（HEAD 与 GET 同头，故此处显式设置）
         resp.getHeaders().setContentLength(total);
         resp.setStatusCode(HttpStatus.PARTIAL_CONTENT);
@@ -315,22 +309,21 @@ public class ResourceRequestHandler implements CustomInvoker {
     }
 
     /** 顺序拼接：每段「段头 + 区间字节 + CRLF」，最后以 {@code --boundary--} 收尾。 */
-    private static InputStream multipartStream(Resource resource, List<byte[]> prefixes,
-                                               List<long[]> segments, byte[] closing) throws IOException {
+    private static InputStream multipartStream(Resource resource, List<byte[]> prefixes, List<long[]> segments,
+            byte[] closing) throws IOException {
         List<InputStream> parts = new ArrayList<>(segments.size() * 3 + 1);
         for (int i = 0; i < segments.size(); i++) {
             parts.add(new ByteArrayInputStream(prefixes.get(i)));
             long[] seg = segments.get(i);
             parts.add(new RangeInputStream(resource.getInputStream(), seg[0], seg[1] - seg[0] + 1));
-            parts.add(new ByteArrayInputStream(new byte[]{'\r', '\n'}));
+            parts.add(new ByteArrayInputStream(new byte[] { '\r', '\n' }));
         }
         parts.add(new ByteArrayInputStream(closing));
         return new SequenceInputStream(java.util.Collections.enumeration(parts));
     }
 
     /**
-     * {@code If-Range} 判定（RFC 9110 §13.1.5）：未携带该头 → 允许 Range；
-     * 携带实体标签 → 与当前 ETag 精确匹配才允许；携带 HTTP 日期 → 资源未在该时刻后修改才允许。
+     * {@code If-Range} 判定（RFC 9110 §13.1.5）：未携带该头 → 允许 Range； 携带实体标签 → 与当前 ETag 精确匹配才允许；携带 HTTP 日期 → 资源未在该时刻后修改才允许。
      * 不匹配时必须忽略 Range 返回整实体（否则客户端会拿到与新版实体不一致的片段）。
      */
     private static boolean ifRangeAllows(WebServerHttpRequest req, Resource resource) {
@@ -344,8 +337,7 @@ public class ResourceRequestHandler implements CustomInvoker {
                 return value.equals(computeEtag(resource));
             }
             long ifRangeDate = java.time.ZonedDateTime
-                    .parse(value, java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME)
-                    .toInstant().toEpochMilli();
+                    .parse(value, java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().toEpochMilli();
             // 与 If-Modified-Since 同口径：资源时间按秒截断后比较
             return (resource.lastModified() / 1000 * 1000) <= ifRangeDate;
         } catch (Exception e) {
@@ -355,8 +347,7 @@ public class ResourceRequestHandler implements CustomInvoker {
     }
 
     /**
-     * 限定区间的输入流：先跳过 {@code start} 字节，再最多读取 {@code length} 字节。
-     * 用于 206 分片响应（避免把整文件读入内存）。
+     * 限定区间的输入流：先跳过 {@code start} 字节，再最多读取 {@code length} 字节。 用于 206 分片响应（避免把整文件读入内存）。
      */
     static final class RangeInputStream extends java.io.FilterInputStream {
 
@@ -476,21 +467,28 @@ public class ResourceRequestHandler implements CustomInvoker {
 
     /** 写出 Cache-Control（显式 CacheControl 优先于 cache.period 推导）。 */
     private void applyCacheControl(WebServerHttpResponse resp) {
-        if (registration.getCacheControl() != null) {
-            resp.getHeaders().setCacheControl(registration.getCacheControl().getHeaderValue());
-        } else if (registration.getCachePeriod() != null) {
-            long period = registration.getCachePeriod();
-            if (period > 0) {
-                resp.getHeaders().setCacheControl("max-age=" + period + ", must-revalidate");
-            } else if (period == 0) {
-                resp.getHeaders().setCacheControl("no-cache, no-store, must-revalidate");
-            }
+        // 同上：getCacheControl/getCachePeriod 各取一次并判其返回值（避免"判 null 后又取一次"）
+        org.springframework.http.CacheControl cacheControl = registration.getCacheControl();
+        if (cacheControl != null) {
+            resp.getHeaders().setCacheControl(cacheControl.getHeaderValue());
+            return;
+        }
+        Integer cachePeriod = registration.getCachePeriod();
+        if (cachePeriod == null) {
+            return;
+        }
+        long period = cachePeriod;
+        if (period > 0) {
+            resp.getHeaders().setCacheControl("max-age=" + period + ", must-revalidate");
+        } else if (period == 0) {
+            resp.getHeaders().setCacheControl("no-cache, no-store, must-revalidate");
         }
     }
 
     /**
-     * Check if the resource has been modified since the last request.
-     * Handles If-Modified-Since and If-None-Match (ETag).
+     * Check if the resource has been modified since the last request. Handles If-Modified-Since and If-None-Match
+     * (ETag).
+     *
      * @return true if a 304 response has been set, false otherwise
      */
     private boolean checkNotModified(WebServerHttpRequest req, WebServerHttpResponse resp, Resource resource) {
@@ -650,7 +648,7 @@ public class ResourceRequestHandler implements CustomInvoker {
     public List<Matcher> getMatchers() {
         // 仅允许 GET 访问静态资源（对齐 Spring MVC ResourceHttpRequestHandler 语义）；
         // HEAD 无需显式声明——HttpMethodMatcher 在路由时自动将 HEAD 映射到 GET（RFC 7231 §4.3.2）
-        Matcher matcher = new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET});
+        Matcher matcher = new HttpMethodMatcher(new HttpMethod[] { HttpMethod.GET });
         return Arrays.asList(matcher);
     }
 

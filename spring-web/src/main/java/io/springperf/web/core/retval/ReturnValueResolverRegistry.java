@@ -27,7 +27,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 public class ReturnValueResolverRegistry extends WebComponentContainer {
 
-    public static final MappingCacheKey<MethodReturnValueContext> MAPPING_CACHE_KEY = MappingCacheKey.createMethodCacheKey(MethodReturnValueContext.class);
+    public static final MappingCacheKey<MethodReturnValueContext> MAPPING_CACHE_KEY = MappingCacheKey
+            .createMethodCacheKey(MethodReturnValueContext.class);
 
     private final List<ReturnValueResolver> resolvers = new CopyOnWriteArrayList<>();
     private final ConcurrentMap<Class<?>, Boolean> asyncReturnValueCache = new ConcurrentHashMap<>();
@@ -40,7 +41,7 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
     }
 
     public void initReturnValueResolver() {
-        //异步处理
+        // 异步处理
         registerWebComponent(new DeferredResultReturnValueResolver());
         registerWebComponent(new ListenableFutureReturnValueResolver());
         registerWebComponent(new CompletionStageReturnValueResolver());
@@ -48,12 +49,12 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
         registerWebComponent(new CallableReturnValueResolver());
         registerWebComponent(new StreamEmitterReturnValueResolver());
         registerWebComponent(new ReactiveReturnValueResolver());
-        //流式处理相关
+        // 流式处理相关
         registerWebComponent(new ByteArrayReturnValueResolver());
         registerWebComponent(new ResourceReturnValueResolver());
         registerWebComponent(new InputStreamReturnValueResolver());
         registerWebComponent(new FileReturnValueResolver());
-        //通用实体处理
+        // 通用实体处理
         registerWebComponent(new HttpEntityReturnValueResolver());
         registerWebComponent(new JsonBodyReturnValueResolver());
         // 拓展处理
@@ -63,14 +64,15 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
     }
 
     /**
-     * 判断 returnValue 是否被任意 BaseAsyncReturnValueResolver 支持（即属于异步返回值）。
-     * 结果缓存到 asyncReturnValueCache，避免重复遍历。
+     * 判断 returnValue 是否被任意 BaseAsyncReturnValueResolver 支持（即属于异步返回值）。 结果缓存到 asyncReturnValueCache，避免重复遍历。
      */
     public boolean isAsyncReturnValue(Object returnValue, WebServerHttpRequest req, WebServerHttpResponse resp) {
-        if (returnValue == null) return false;
+        if (returnValue == null)
+            return false;
         Class<?> clazz = returnValue.getClass();
         Boolean cached = asyncReturnValueCache.get(clazz);
-        if (cached != null) return cached;
+        if (cached != null)
+            return cached;
         for (ReturnValueResolver resolver : getAsyncResolvers()) {
             if (resolver.supportsReturnValue(returnValue, req, resp)) {
                 asyncReturnValueCache.putIfAbsent(clazz, Boolean.TRUE);
@@ -108,7 +110,8 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
         this.asyncReturnValueCache.clear();
     }
 
-    public void resolveReturnValue(Object returnValue, MappingHandlerMethod mappingContext, WebServerHttpRequest req, WebServerHttpResponse resp) throws Exception {
+    public void resolveReturnValue(Object returnValue, MappingHandlerMethod mappingContext, WebServerHttpRequest req,
+            WebServerHttpResponse resp) throws Exception {
         if (skipResolve(returnValue, mappingContext, req, resp)) {
             return;
         }
@@ -117,7 +120,8 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
         }
     }
 
-    protected boolean skipResolve(Object returnValue, MappingHandlerMethod mappingContext, WebServerHttpRequest req, WebServerHttpResponse resp) {
+    protected boolean skipResolve(Object returnValue, MappingHandlerMethod mappingContext, WebServerHttpRequest req,
+            WebServerHttpResponse resp) {
         if (returnValue == null) {
             if (mappingContext != null) {
                 Class<?> returnType = mappingContext.getMethod().getReturnType();
@@ -138,8 +142,8 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
         return resp.isHandled();
     }
 
-
-    protected boolean doResolveReturnValue(Object returnValue, MappingHandlerMethod mappingContext, WebServerHttpRequest req, WebServerHttpResponse resp) throws Exception {
+    protected boolean doResolveReturnValue(Object returnValue, MappingHandlerMethod mappingContext,
+            WebServerHttpRequest req, WebServerHttpResponse resp) throws Exception {
         MethodReturnValueContext returnValueContext = getMethodReturnValueContext(mappingContext);
         MethodParameter returnType = returnValueContext == null ? null : returnValueContext.getReturnType();
 
@@ -200,22 +204,23 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
         // 「静默空 200」是最难排查的降级形态，故显式告警。独立 logger 名避免与 lombok @Slf4j 的 log 冲突。
         if (returnValue instanceof org.reactivestreams.Publisher) {
             REACTIVE_WARN_LOG.warn("return value looks reactive but no resolver accepted it: {} "
-                            + "— missing ReactiveAdapter? (e.g. reactor absent from classpath, "
-                            + "or register one via a ReactiveAdapterRegistry bean)",
-                    returnValue.getClass().getName());
+                    + "— missing ReactiveAdapter? (e.g. reactor absent from classpath, "
+                    + "or register one via a ReactiveAdapterRegistry bean)", returnValue.getClass().getName());
         }
         return false;
     }
 
-    private static final org.slf4j.Logger REACTIVE_WARN_LOG =
-            org.slf4j.LoggerFactory.getLogger(ReturnValueResolverRegistry.class);
+    private static final org.slf4j.Logger REACTIVE_WARN_LOG = org.slf4j.LoggerFactory
+            .getLogger(ReturnValueResolverRegistry.class);
 
     /**
      * 懒缓存异步类型的泛型内联类型和解析器。
-     * <p>如 {@code DeferredResult<String>} 在第一次请求时，
-     * 解析 {@code String} 的解析器并缓存，异步 dispatch 回来时可直接命中。</p>
+     * <p>
+     * 如 {@code DeferredResult<String>} 在第一次请求时， 解析 {@code String} 的解析器并缓存，异步 dispatch 回来时可直接命中。
+     * </p>
      */
-    protected void resolveInnerReturnValueContext(MethodReturnValueContext context, MappingHandlerMethod mappingContext) {
+    protected void resolveInnerReturnValueContext(MethodReturnValueContext context,
+            MappingHandlerMethod mappingContext) {
         context.setAsyncType(true);
         MethodParameter effectiveReturnType = mappingContext.getEffectiveReturnType();
         ResolvableType rt = effectiveReturnType != null
@@ -229,9 +234,17 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
         MethodParameter innerReturnType = new MethodParameter(mappingContext.getMethod(), -1) {
             private final ResolvableType genericRt = rt.getGeneric(0);
 
+            /** resolve 声明为 @Nullable，但构造前已确认同一泛型可解析；兜底 Object.class 以维持 getParameterType 的非空契约。 */
+            private final Class<?> resolvedType = resolveOnce();
+
+            private Class<?> resolveOnce() {
+                Class<?> resolved = genericRt.resolve();
+                return resolved != null ? resolved : Object.class;
+            }
+
             @Override
             public Class<?> getParameterType() {
-                return genericRt.resolve();
+                return resolvedType;
             }
 
             @Override
