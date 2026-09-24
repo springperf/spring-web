@@ -152,7 +152,7 @@ io.springperf.web
 │   ├── HttpHandler                顶层 HTTP 处理策略接口
 │   ├── NettyHttpHandler           Netty ChannelHandler，适配 Netty → 框架请求/响应（@Sharable）
 │   ├── NettyHttpServer            implements SmartLifecycle, LifecycleWebComponent（启动/停止 Netty）
-│   ├── NettyHttpHandler.SslExceptionHandler   SSL 异常兜底（静态单例）
+│   ├── NettyHttpServer.SslExceptionHandler    SSL 异常兜底
 │   ├── Http2ChannelInitializer    HTTP/2 + HTTP/1 pipeline 装配
 │   ├── PipelineCustomizer         pipeline 扩展点（如 WebSocket 握手 handler）
 │   └── NettyMetricsHandler        连接计数 + 指标（静态单例）
@@ -249,7 +249,8 @@ Spring Boot 启动
   │     │   · 各 Registry Bean（MappingRegistry / ArgumentResolverRegistry / ...）
   │     │   · 若 support 在 classpath：SupportDispatcherHandler / WebMvcConfigurerBridge / ...
   │     │   · 若 batch 在 classpath：Batch 相关组件
-  │     │   （注意：WebContext.afterPropertiesSet() 此刻是 no-op，什么都不做）
+  │     │   （注意：此刻不触发任何生命周期——WebContext 不实现 InitializingBean，
+  │     │     初始化全部推迟到 startLifecycle()）
   │     │     → WebContext.java
   │     │
   │     └─ refresh 末尾，LifecycleProcessor 按 phase 升序调用所有 SmartLifecycle.start()
@@ -276,22 +277,13 @@ Spring Boot 启动
   └─ 就绪，开始接受请求
 ```
 
-### 3.2 为什么生命周期锚定在 `start()` 而非 `afterPropertiesSet()`
+### 3.2 为什么生命周期锚定在 `start()` 而非 Bean 初始化期
 
-`WebContext` 虽实现了 `InitializingBean`，却把 `afterPropertiesSet()` 留空：
-
-```java
-// WebContext.java
-@Override
-public void afterPropertiesSet() {
-    // No-op: lifecycle is now deferred to startLifecycle(),
-    // triggered by NettyHttpServer#start().
-}
-```
+`WebContext` **不实现** `InitializingBean`：框架早期版本确实有一个留空的 `afterPropertiesSet()`，该覆写**已被删除**，初始化**只**经 `startLifecycle()` 一条路径（全仓主代码里 `afterPropertiesSet` 仅剩一条注释）。
 
 真正编排三阶段的是 `startLifecycle()`（[`WebContext.java`](../../spring-web/src/main/java/io/springperf/web/context/WebContext.java)），由 `NettyHttpServer.start()` 显式触发（[`NettyHttpServer.java`](../../spring-web/src/main/java/io/springperf/web/server/NettyHttpServer.java)）。
 
-**推迟的理由**：support 的 `WebMvcConfigurerBridge` 必须在 Spring 容器加载完**所有**用户 `WebMvcConfigurer` Bean 之后，才能收集到完整的 shim 数据（拦截器注册、参数解析器、跨域配置等）。若在 `afterPropertiesSet()`（Bean 初始化期）就跑 Phase1，彼时部分 `WebMvcConfigurer` 可能尚未实例化，收集到的输入不完整——违背 [01 篇总纲](01-design-philosophy.md#一总纲启动时确定性) "确定性首先要求输入完整"。
+**推迟的理由**：support 的 `WebMvcConfigurerBridge` 必须在 Spring 容器加载完**所有**用户 `WebMvcConfigurer` Bean 之后，才能收集到完整的 shim 数据（拦截器注册、参数解析器、跨域配置等）。若在 Bean 初始化期（属性装配完成时）就跑 Phase1，彼时部分 `WebMvcConfigurer` 可能尚未实例化，收集到的输入不完整——违背 [01 篇总纲](01-design-philosophy.md#一总纲启动时确定性) "确定性首先要求输入完整"。
 
 锚定在 `NettyHttpServer.start()` 的精妙之处：`NettyHttpServer` 的 `getPhase() = Integer.MAX_VALUE`（[`NettyHttpServer.java`](../../spring-web/src/main/java/io/springperf/web/server/NettyHttpServer.java)），是 Spring `SmartLifecycle` 中**最后一个启动**的组件。此刻所有 Bean（含 support 桥接、用户 `WebMvcConfigurer`）均已就位——`startLifecycle()` 拿到的输入是完整的。
 
@@ -418,16 +410,9 @@ module.md（[`../../.agent/context/module.md`](../../.agent/context/module.md)�
 > `WebContext implements InitializingBean → 驱动整个组件生命周期`
 > `WebContext.afterPropertiesSet() → initWithWebContext() → initComponentPhase1/2/3`
 
-**源码事实**：
+**源码事实**（`WebContext` 不实现 `InitializingBean`；`afterPropertiesSet` 覆写已被删除）：
 
 ```java
-// WebContext.java
-@Override
-public void afterPropertiesSet() {
-    // No-op: lifecycle is now deferred to startLifecycle(),
-    // triggered by NettyHttpServer#start().
-}
-
 // WebContext.java
 public void startLifecycle() {
     if (!lifecycleStarted.compareAndSet(false, true)) { return; }
@@ -449,7 +434,7 @@ public void start() {
 }
 ```
 
-**校正结论**：`afterPropertiesSet()` 是 no-op；真正触发三阶段的是 `NettyHttpServer.start()`（由 Spring `SmartLifecycle` 机制在 refresh 末尾按 phase 顺序调用）→ `WebContext.startLifecycle()`。理由见 [§3.2](#32-为什么生命周期锚定在-start-而非-afterpropertiesset)。
+**校正结论**：`WebContext` 不实现 `InitializingBean`（`afterPropertiesSet()` 已删除，初始化**只**经 `startLifecycle()`）；真正触发三阶段的是 `NettyHttpServer.start()`（由 Spring `SmartLifecycle` 机制在 refresh 末尾按 phase 顺序调用）→ `WebContext.startLifecycle()`。理由见 [§3.2](#32-为什么生命周期锚定在-start-而非-bean-初始化期)。
 
 > 这与 [01 篇总纲](01-design-philosophy.md#一总纲启动时确定性) 已埋的修正一致，本篇给出完整时序链。后续 [03 篇](03-component-lifecycle.md) 将展开 `startLifecycle` 内部三阶段的具体机制。
 

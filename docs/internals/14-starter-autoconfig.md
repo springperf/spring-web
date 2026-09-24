@@ -73,11 +73,11 @@ io.springperf.web.autoconfigure.support.WebServerApplicationContextFactory
 | Bean | 方法 | 条件 | 说明 |
 |------|------|------|------|
 | `DispatcherHandler` | `dispatcherHandler()` | `@ConditionalOnMissingBean` | 中央分发器，可被用户自定义覆盖 |
-| `ApplicationProperties` | `applicationProperties()` | `@ConditionalOnMissingBean` | 类型安全的配置属性 |
+| `ApplicationProperties` | `applicationProperties(Environment)` | `@ConditionalOnMissingBean` | 类型安全的配置属性 |
 | `WebContext` | `webContext()` | `@ConditionalOnMissingBean` | 顶层组件容器，驱动全部生命周期 |
 | `NettyHttpServer` | `nettyHttpServer()` | `@ConditionalOnMissingBean` | Netty 服务器，`SmartLifecycle` 启停 |
 | `Validator` | `validator()` | `@ConditionalOnMissingBean` + `@ConditionalOnClass(name = "jakarta.validation.Validator")` | 可选 Bean Validation |
-| `AccessLogWebFilter` | `accessLogWebFilter()` | `@ConditionalOnProperty(name = "server.accesslog.enabled", havingValue = "true")` | 可选访问日志 |
+| `AccessLogWebFilter` | `accessLogWebFilter(Environment, ApplicationProperties)` | `@ConditionalOnProperty(name = "server.accesslog.enabled", havingValue = "true")` | 可选访问日志 |
 
 ### 2.3 `WebContext` 的初始化链
 
@@ -137,7 +137,7 @@ public WebMetrics micrometerWebMetrics(io.micrometer.core.instrument.MeterRegist
                                         NettyHttpServer nettyHttpServer) {
     // Netty 层 Gauge
     Gauge.builder("netty.connections.active",
-            NettyMetricsHandler.INSTANCE, NettyMetricsHandler::getActiveConnectionCount)
+            nettyHttpServer, NettyHttpServer::getActiveConnectionCount)
             .description("Active TCP connections")
             .register(meterRegistry);
 
