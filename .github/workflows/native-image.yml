@@ -5,18 +5,28 @@ on:
     branches: [master]
   workflow_dispatch:
 
+# 与 ci.yml 同一套加固口径：最小权限、超时、并发取消、action SHA pin
+permissions:
+  contents: read
+
+concurrency:
+  group: native-image-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   native-smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Set up GraalVM
-        uses: graalvm/setup-graalvm@v1
+        uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
         with:
           java-version: '17'
           distribution: 'graalvm'
           components: 'native-image'
+          # 该 action 用 token 避免下载 GraalVM 时触发匿名限流，刻意保留
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Native smoke test (build + launch + assert)
