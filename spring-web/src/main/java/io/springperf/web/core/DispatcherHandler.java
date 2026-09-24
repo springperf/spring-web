@@ -42,7 +42,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 
 /**
- * Central dispatcher: route lookup, optional offload to business thread pool, argument resolution, handler method invocation, and return value processing.
+ * Central dispatcher: route lookup, optional offload to business thread pool, argument resolution, handler method
+ * invocation, and return value processing.
  */
 @Slf4j
 public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
@@ -59,18 +60,17 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
     protected WebFilterRegistry webFilterRegistry;
     protected WebMetrics metrics;
 
-    private static final RequestAttribute<Long> METRICS_START_ATTR =
-            RequestAttribute.createAttribute(Long.class);
+    private static final RequestAttribute<Long> METRICS_START_ATTR = RequestAttribute.createAttribute(Long.class);
 
     /**
-     * 对齐 {@code spring.mvc.throw-exception-if-no-handler-found}：默认 true（保持框架既有行为——
-     * 404/405 进入异常解析，可被 @ControllerAdvice 拦截）；设为 false 时直接 sendError。
+     * 对齐 {@code spring.mvc.throw-exception-if-no-handler-found}：默认 true（保持框架既有行为—— 404/405 进入异常解析，可被 @ControllerAdvice
+     * 拦截）；设为 false 时直接 sendError。
      */
     private boolean throwExceptionIfNoHandlerFound = true;
 
     /**
-     * 对齐 {@code spring.mvc.dispatch.error/options/trace}：是否为对应 HTTP 方法分发处理器（默认均 true）。
-     * 关闭时该方法的请求不进入 @RequestMapping 匹配（OPTIONS 仍可回退 CORS 预检；ERROR/TRACE 直接 404）。
+     * 对齐 {@code spring.mvc.dispatch.error/options/trace}：是否为对应 HTTP 方法分发处理器（默认均 true）。 关闭时该方法的请求不进入 @RequestMapping
+     * 匹配（OPTIONS 仍可回退 CORS 预检；ERROR/TRACE 直接 404）。
      */
     private boolean dispatchError = true;
     private boolean dispatchOptions = true;
@@ -80,9 +80,8 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
     private LocaleConfig localeConfig = LocaleConfig.DEFAULT;
 
     /**
-     * 对齐 {@code spring.mvc.publish-request-handled-events}：请求处理完成后是否发布
-     * {@code ServletRequestHandledEvent}（默认 false，对齐 Boot；无监听方时每请求发布纯属开销）。
-     * 发布器在启动期从 {@link WebContext} 解析。
+     * {@code spring.mvc.publish-request-handled-events}：请求处理完成后是否发布 {@code ServletRequestHandledEvent}。默认 {@code false}
+     * 是**本项目的有意选择**（Boot 默认值为 {@code true}）：无监听方时每请求发布纯属开销。发布器在启动期从 {@link WebContext} 解析。
      */
     private boolean publishRequestHandledEvents = false;
     private org.springframework.context.ApplicationEventPublisher eventPublisher;
@@ -91,14 +90,20 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
     public void initWithWebContext(WebContext webContext) {
         super.initWithWebContext(webContext);
         this.mappingRegistry = webContext.getWebComponentWithDefault(MappingRegistry.class, new MappingRegistry());
-        this.exceptionRegistry = webContext.getWebComponentWithDefault(ExceptionRegistry.class, new ExceptionRegistry());
-        this.argumentResolverRegistry = webContext.getWebComponentWithDefault(ArgumentResolverRegistry.class, new ArgumentResolverRegistry());
-        this.returnValueResolverRegistry = webContext.getWebComponentWithDefault(ReturnValueResolverRegistry.class, new ReturnValueResolverRegistry());
+        this.exceptionRegistry = webContext.getWebComponentWithDefault(ExceptionRegistry.class,
+                new ExceptionRegistry());
+        this.argumentResolverRegistry = webContext.getWebComponentWithDefault(ArgumentResolverRegistry.class,
+                new ArgumentResolverRegistry());
+        this.returnValueResolverRegistry = webContext.getWebComponentWithDefault(ReturnValueResolverRegistry.class,
+                new ReturnValueResolverRegistry());
         this.corsRegistry = webContext.getWebComponentWithDefault(CorsRegistry.class, new CorsRegistry());
-        this.interceptorRegistry = webContext.getWebComponentWithDefault(InterceptorRegistry.class, new InterceptorRegistry());
-        this.asyncSupportRegistry = webContext.getWebComponentWithDefault(AsyncSupportRegistry.class, new AsyncSupportRegistry());
+        this.interceptorRegistry = webContext.getWebComponentWithDefault(InterceptorRegistry.class,
+                new InterceptorRegistry());
+        this.asyncSupportRegistry = webContext.getWebComponentWithDefault(AsyncSupportRegistry.class,
+                new AsyncSupportRegistry());
         this.bizPoolRegistry = webContext.getWebComponentWithDefault(BizPoolRegistry.class, new BizPoolRegistry());
-        this.webFilterRegistry = webContext.getWebComponentWithDefault(WebFilterRegistry.class, new WebFilterRegistry(this));
+        this.webFilterRegistry = webContext.getWebComponentWithDefault(WebFilterRegistry.class,
+                new WebFilterRegistry(this));
         this.metrics = webContext.getWebComponentWithDefault(WebMetrics.class, NoOpWebMetrics.INSTANCE);
         // 启动期预解析 404/405 行为开关（默认 true，保持既有“进入异常解析”行为）；
         // getProps() 可能为 null（单元测试 mock），此时回退默认值。
@@ -121,8 +126,12 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
             this.publishRequestHandledEvents = props.getBoolean(PropertiesConstant.MVC_PUBLISH_REQUEST_HANDLED_EVENTS,
                     PropertiesConstant.MVC_PUBLISH_REQUEST_HANDLED_EVENTS_DEFAULT);
         }
-        // 请求处理完成事件的发布器：优先取 WebContext 持有的 ApplicationContext
-        if (publishRequestHandledEvents && webContext.getCtx() instanceof org.springframework.context.ApplicationEventPublisher) {
+        // 请求处理完成事件的发布器：优先取 WebContext 持有的 ApplicationContext。
+        // 静态类型上 getCtx() 即 ApplicationEventPublisher（ApplicationContext 的父接口），此处
+        // instanceof 恒真（BC_VACUOUS_INSTANCEOF）；但 webContext 是可被测试替身替换的协作者，
+        // 运行期不保证满足静态类型，故按容错契约保留判断，不做删除（已有实测教训）。
+        if (publishRequestHandledEvents
+                && webContext.getCtx() instanceof org.springframework.context.ApplicationEventPublisher) {
             this.eventPublisher = (org.springframework.context.ApplicationEventPublisher) webContext.getCtx();
         }
     }
@@ -147,8 +156,7 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
     }
 
     /**
-     * 按 {@code spring.mvc.dispatch.*} 判断当前请求方法是否允许分发给处理器。
-     * 未禁用的方法恒返回 true；被禁用的 OPTIONS 在 CORS 预检场景仍放行。
+     * 按 {@code spring.mvc.dispatch.*} 判断当前请求方法是否允许分发给处理器。 未禁用的方法恒返回 true；被禁用的 OPTIONS 在 CORS 预检场景仍放行。
      */
     /** 测试可见：暴露 mappingRegistry。 */
     MappingRegistry mappingRegistryForTest() {
@@ -196,8 +204,10 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
         return true;
     }
 
-    protected void handleWithMappingResult(WebServerHttpRequest req, WebServerHttpResponse resp, MappingResult mappingResult) {
-        // 通过 BizPoolRegistry 用 Phase3 预缓存的线程池：返回 null（无映射 / @RunInPool(EVENTLOOP) / default-execute-mode=eventloop）→ EventLoop 同步；返回非 null（缺省 default 池 / @RunInPool 命名池）→ 切业务线程
+    protected void handleWithMappingResult(WebServerHttpRequest req, WebServerHttpResponse resp,
+            MappingResult mappingResult) {
+        // 通过 BizPoolRegistry 用 Phase3 预缓存的线程池：返回 null（无映射 / @RunInPool(EVENTLOOP) / default-execute-mode=eventloop）→
+        // EventLoop 同步；返回非 null（缺省 default 池 / @RunInPool 命名池）→ 切业务线程
         ExecutorService executor = bizPoolRegistry.determinePool(req, mappingResult);
         if (executor != null) {
             // 交棒到业务线程池：EventLoop 随之空闲，响应超时定时器自此才真正可能触发
@@ -231,9 +241,8 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
     }
 
     /**
-     * Filter 链处理完成后固定调用，根据映射结果决定走 doHandle 或 404/405。
-     * 在此初始化上下文（如 LocaleContextHolder、RequestContextHolder），
-     * 确保 Filter 链中对 request 的包装能被后续处理器正确获取。
+     * Filter 链处理完成后固定调用，根据映射结果决定走 doHandle 或 404/405。 在此初始化上下文（如 LocaleContextHolder、RequestContextHolder）， 确保 Filter
+     * 链中对 request 的包装能被后续处理器正确获取。
      */
     public void handleAfterFilter(WebServerHttpRequest req, WebServerHttpResponse resp, MappingResult mappingResult) {
         boolean initContext = false;
@@ -258,7 +267,7 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
      * 无发布器、开关关闭或非同步请求时静默跳过；发布失败不影响请求处理结果。
      */
     protected void publishRequestHandledEvent(WebServerHttpRequest req, WebServerHttpResponse resp,
-                                            MappingResult mappingResult) {
+            MappingResult mappingResult) {
         if (!publishRequestHandledEvents || eventPublisher == null) {
             return;
         }
@@ -269,9 +278,9 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
                     : requestUrl;
             int status = resp.getStatus() != null ? resp.getStatus().value() : 200;
             // (source, requestUrl, clientAddress, method, servletName, sessionId, userName,
-            //  processingTimeMillis, failureCause, statusCode)
-            eventPublisher.publishEvent(new org.springframework.web.context.support.ServletRequestHandledEvent(
-                    this, requestUrl, null, req.getMethodValue(), shortDesc, null, null, -1L, null, status));
+            // processingTimeMillis, failureCause, statusCode)
+            eventPublisher.publishEvent(new org.springframework.web.context.support.ServletRequestHandledEvent(this,
+                    requestUrl, null, req.getMethodValue(), shortDesc, null, null, -1L, null, status));
         } catch (Throwable ex) {
             log.debug("publish ServletRequestHandledEvent failed", ex);
         }
@@ -291,9 +300,8 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
         }
     }
 
-
-
-    protected void handleOnNoMatchMappingContext(WebServerHttpRequest req, WebServerHttpResponse resp, MappingResult result) {
+    protected void handleOnNoMatchMappingContext(WebServerHttpRequest req, WebServerHttpResponse resp,
+            MappingResult result) {
         // 路径匹配但条件不满足：按原因映射状态码（对齐 Spring MVC）
         // METHOD→405（含 Allow 头）、CONSUMES→415、PRODUCES→406、其余→404
         MappingResult.MismatchKind kind = result.getMismatchKind();
@@ -372,8 +380,7 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
     /**
      * 在目标线程中执行完整的请求处理：Filter 链 → handleAfterFilter（含上下文初始化+清理）。
      */
-    private void handleWithFilter(WebServerHttpRequest req, WebServerHttpResponse resp,
-                                MappingResult mappingResult) {
+    private void handleWithFilter(WebServerHttpRequest req, WebServerHttpResponse resp, MappingResult mappingResult) {
         boolean initContext = false;
         try {
             webFilterRegistry.doFilter(req, resp);
@@ -393,8 +400,7 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
         }
     }
 
-    protected void doHandle(WebServerHttpRequest req, WebServerHttpResponse resp,
-                             PathMappingContext mappingContext) {
+    protected void doHandle(WebServerHttpRequest req, WebServerHttpResponse resp, PathMappingContext mappingContext) {
         Object result = null;
         Throwable exception = null;
         long start = metrics.getNanoTime();
@@ -447,13 +453,14 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
                 } else {
                     flushResponse(req, resp);
                 }
-                metrics.recordRequest(req.getMethodValue(), mappingContext.getPathRule(),
-                        resp.getStatus().value(), metrics.getNanoTime() - start);
+                metrics.recordRequest(req.getMethodValue(), mappingContext.getPathRule(), resp.getStatus().value(),
+                        metrics.getNanoTime() - start);
             }
         }
     }
 
-    protected void invokeWithRealResult(WebServerHttpRequest req, WebServerHttpResponse resp, Object result, Throwable exception) {
+    protected void invokeWithRealResult(WebServerHttpRequest req, WebServerHttpResponse resp, Object result,
+            Throwable exception) {
         try {
             // --- postHandle ---
             interceptorRegistry.postHandle(req, resp, result);
@@ -469,9 +476,12 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
     /**
      * 统一异常处理（catch-safe）。
      *
-     * @param ex   the exception to handle
-     * @param req  the current HTTP request
-     * @param resp the current HTTP response
+     * @param ex
+     *            the exception to handle
+     * @param req
+     *            the current HTTP request
+     * @param resp
+     *            the current HTTP response
      */
     protected void handleException(Throwable ex, WebServerHttpRequest req, WebServerHttpResponse resp) {
         log.error("Unhandled exception from request processing: {}", ex.getMessage(), ex);
@@ -485,7 +495,8 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
     /**
      * 刷新响应（catch-safe）。
      *
-     * @param resp the HTTP response to flush
+     * @param resp
+     *            the HTTP response to flush
      */
     protected void flushResponse(WebServerHttpRequest req, WebServerHttpResponse resp) {
         try {
@@ -560,8 +571,7 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
             Long start = req.getRequestContext().getAttribute(METRICS_START_ATTR);
             if (start != null) {
                 PathMappingContext ctx = PathMappingContext.get(req);
-                metrics.recordRequest(req.getMethodValue(),
-                        ctx != null ? ctx.getPathRule() : null,
+                metrics.recordRequest(req.getMethodValue(), ctx != null ? ctx.getPathRule() : null,
                         resp.getStatus().value(), metrics.getNanoTime() - start);
             }
         }

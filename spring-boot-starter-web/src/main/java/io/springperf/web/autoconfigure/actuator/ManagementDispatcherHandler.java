@@ -12,11 +12,13 @@ import org.springframework.http.HttpStatus;
 
 /**
  * 管理端口的 DispatcherHandler。
- * <p>职责参照 {@link DispatcherHandler}：basePath 校验、路由匹配、CORS 处理、404/405 响应，
- * 匹配成功后委托父类的 {@link #doHandle} 执行调用并刷新响应。
- * 跳过拦截器、参数解析等主端口步骤。</p>
- * <p>路由注册委托给 {@link ManagementMappingRegistry}，由
- * {@link ActuatorEndpointHandlerMapping#afterPropertiesSet()} 在初始化阶段注入。</p>
+ * <p>
+ * 职责参照 {@link DispatcherHandler}：basePath 校验、路由匹配、CORS 处理、404/405 响应， 匹配成功后委托父类的 {@link #doHandle} 执行调用并刷新响应。
+ * 跳过拦截器、参数解析等主端口步骤。
+ * </p>
+ * <p>
+ * 路由注册委托给 {@link ManagementMappingRegistry}，由 {@link ActuatorEndpointHandlerMapping#initComponentPhase1()} 在初始化阶段注入。
+ * </p>
  */
 @Slf4j
 public class ManagementDispatcherHandler extends DispatcherHandler {
@@ -25,7 +27,7 @@ public class ManagementDispatcherHandler extends DispatcherHandler {
     private final String basePath;
 
     public ManagementDispatcherHandler(WebContext webContext, String basePath,
-                                       ManagementMappingRegistry managementMappingRegistry) {
+            ManagementMappingRegistry managementMappingRegistry) {
         initWithWebContext(webContext);
         this.basePath = basePath.endsWith("/") ? basePath.substring(0, basePath.length() - 1) : basePath;
         this.managementMappingRegistry = managementMappingRegistry;
@@ -47,14 +49,17 @@ public class ManagementDispatcherHandler extends DispatcherHandler {
 
     /**
      * 所有路由注册完成后，构建优化器管线。
-     * <p>由 {@link ActuatorEndpointHandlerMapping#afterPropertiesSet()} 在所有路由注册完后调用。</p>
+     * <p>
+     * 由 {@link ActuatorEndpointHandlerMapping#initComponentPhase2()} 在所有路由注册完后调用。
+     * </p>
      */
     public void buildOptimizerPipeline() {
         managementMappingRegistry.buildOptimizerPipeline();
     }
 
     @Override
-    protected void handleWithMappingResult(WebServerHttpRequest req, WebServerHttpResponse resp, MappingResult mappingResult) {
+    protected void handleWithMappingResult(WebServerHttpRequest req, WebServerHttpResponse resp,
+            MappingResult mappingResult) {
         if (!mappingResult.isMatched()) {
             handleWithNoFullMatch(req, resp, mappingResult);
             return;
@@ -73,7 +78,8 @@ public class ManagementDispatcherHandler extends DispatcherHandler {
         }
     }
 
-    protected void handleOnNoMatchMappingContext(WebServerHttpRequest req, WebServerHttpResponse resp, MappingResult result) {
+    protected void handleOnNoMatchMappingContext(WebServerHttpRequest req, WebServerHttpResponse resp,
+            MappingResult result) {
         // 405 / 404
         if (result.isMethodMismatch()) {
             sendError(resp, HttpStatus.METHOD_NOT_ALLOWED, "Method Not Allowed");

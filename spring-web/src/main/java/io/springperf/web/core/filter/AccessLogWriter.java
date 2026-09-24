@@ -1,9 +1,5 @@
 package io.springperf.web.core.filter;
 
-import io.springperf.web.context.ApplicationProperties;
-import io.springperf.web.context.PropertiesConstant;
-import lombok.extern.slf4j.Slf4j;
-
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.Writer;
@@ -19,14 +15,19 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 
+import io.springperf.web.context.ApplicationProperties;
+import io.springperf.web.context.PropertiesConstant;
+import lombok.extern.slf4j.Slf4j;
+
 /**
- * 访问日志落盘写出器（对齐 Tomcat {@code server.accesslog.*} 落盘部分）：
- * 按文件 {@code {directory}/{prefix}{date}{suffix}} 追加写入，支持按天轮转与保留天数清理。
- *
- * <p>落盘为可选能力：未配置 {@code server.accesslog.directory} 时使用
- * {@link AccessLogWriter#NOOP}，仅走日志框架（保持既有行为）。</p>
- *
- * <p>并发：{@link #write(String)} 由多请求线程调用，以 {@code synchronized} 串行化写入与轮转检查。</p>
+ * 访问日志落盘写出器（对齐 Tomcat {@code server.accesslog.*} 落盘部分）： 按文件 {@code {directory}/{prefix}{date}{suffix}}
+ * 追加写入，支持按天轮转与保留天数清理。
+ * <p>
+ * 落盘为可选能力：未配置 {@code server.accesslog.directory} 时使用 {@link AccessLogWriter#NOOP}，仅走日志框架（保持既有行为）。
+ * </p>
+ * <p>
+ * 并发：{@link #write(String)} 由多请求线程调用，以专用锁对象（{@code lock}）串行化写入与轮转检查。
+ * </p>
  */
 @Slf4j
 public class AccessLogWriter {
@@ -40,6 +41,11 @@ public class AccessLogWriter {
     private final String suffix;
     private final boolean rotate;
     private final int maxDays;
+
+    /**
+     * 专用锁对象：不用 {@code this}——本类是 public 且实例可能被外部持有，外部一旦同步本实例就会 与写日志互相阻塞甚至死锁（USO_UNSAFE_METHOD_SYNCHRONIZATION）。
+     */
+    private final Object lock = new Object();
 
     private Writer writer;
     private LocalDate currentDate;
@@ -70,8 +76,7 @@ public class AccessLogWriter {
         if (dir == null || dir.trim().isEmpty()) {
             return NOOP;
         }
-        return new AccessLogWriter(
-                Paths.get(dir.trim()),
+        return new AccessLogWriter(Paths.get(dir.trim()),
                 props.get(PropertiesConstant.ACCESSLOG_PREFIX, PropertiesConstant.ACCESSLOG_PREFIX_DEFAULT),
                 props.get(PropertiesConstant.ACCESSLOG_SUFFIX, PropertiesConstant.ACCESSLOG_SUFFIX_DEFAULT),
                 props.getBoolean(PropertiesConstant.ACCESSLOG_ROTATE, PropertiesConstant.ACCESSLOG_ROTATE_DEFAULT),
@@ -85,45 +90,48 @@ public class AccessLogWriter {
     /**
      * 写入一行访问日志（自动补换行）。落盘失败不应影响请求处理，仅记录告警。
      */
-    public synchronized void write(String line) {
-        if (isNoop()) {
-            return;
-        }
-        try {
-            LocalDate today = LocalDate.now();
-            ensureWriter(today);
-            writer.write(line);
-            writer.write('\n');
-            writer.flush();
-            cleanupIfNeeded(today);
-        } catch (IOException e) {
-            log.warn("access log write failed", e);
+    public void write(String line) {
+        synchronized (lock) {
+            if (isNoop()) {
+                return;
+            }
+            try {
+                LocalDate today = LocalDate.now();
+                ensureWriter(today);
+                writer.write(line);
+                writer.write('\n');
+                writer.flush();
+                cleanupIfNeeded(today);
+            } catch (IOException e) {
+                log.warn("access log write failed", e);
+            }
         }
     }
 
     /** 关闭底层 writer（应用关闭时调用）。 */
-    public synchronized void close() {
-        if (writer != null) {
-            try {
-                writer.close();
-            } catch (IOException e) {
-                log.debug("access log close failed", e);
+    public void close() {
+        synchronized (lock) {
+            if (writer != null) {
+                try {
+                    writer.close();
+                } catch (IOException e) {
+                    log.debug("access log close failed", e);
+                }
+                writer = null;
             }
-            writer = null;
         }
     }
 
     private void ensureWriter(LocalDate today) throws IOException {
-        boolean needOpen = writer == null
-                || (rotate && !today.equals(currentDate));
+        boolean needOpen = writer == null || (rotate && !today.equals(currentDate));
         if (needOpen) {
             if (writer != null) {
                 writer.close();
             }
             Files.createDirectories(directory);
             Path file = directory.resolve(fileName(today));
-            writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8,
-                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8, StandardOpenOption.CREATE,
+                    StandardOpenOption.APPEND);
             currentDate = today;
         }
     }
@@ -149,7 +157,12 @@ public class AccessLogWriter {
         try (Stream<Path> files = Files.list(directory)) {
             List<Path> toDelete = new ArrayList<>();
             files.filter(Files::isRegularFile).forEach(p -> {
-                LocalDate fileDate = parseDate(p.getFileName().toString());
+                // Path.getFileName() 声明为 @Nullable：无文件名的条目跳过
+                Path name = p.getFileName();
+                if (name == null) {
+                    return;
+                }
+                LocalDate fileDate = parseDate(name.toString());
                 if (fileDate != null && fileDate.isBefore(cutoff)) {
                     toDelete.add(p);
                 }

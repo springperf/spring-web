@@ -1,5 +1,18 @@
 package io.springperf.web.http;
 
+import java.io.*;
+import java.nio.channels.ClosedChannelException;
+import java.nio.channels.FileChannel;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaTypeFactory;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufOutputStream;
 import io.netty.buffer.Unpooled;
@@ -11,21 +24,9 @@ import io.netty.handler.codec.http.*;
 import io.netty.util.AttributeKey;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.pool.BizPoolRegistry;
-import io.springperf.web.server.ResponseLimitConfig;
 import io.springperf.web.server.ChannelAttrs;
+import io.springperf.web.server.ResponseLimitConfig;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.http.HttpStatusCode;
-import org.springframework.http.MediaTypeFactory;
-
-import java.io.*;
-import java.nio.channels.ClosedChannelException;
-import java.nio.channels.FileChannel;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 
 /**
  * ServerHttpResponse 实现
@@ -68,13 +69,13 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
     }
 
     public NettyServerHttpResponse(WebContext webContext, ChannelHandlerContext ctx, boolean keepAlive,
-                                   ResponseLimitConfig responseLimitConfig, long requestContentLength) {
+            ResponseLimitConfig responseLimitConfig, long requestContentLength) {
         this(webContext, ctx, keepAlive, responseLimitConfig, requestContentLength, new DefaultHttpHeaders(false));
     }
 
     private NettyServerHttpResponse(WebContext webContext, ChannelHandlerContext ctx, boolean keepAlive,
-                                    ResponseLimitConfig responseLimitConfig, long requestContentLength,
-                                    io.netty.handler.codec.http.HttpHeaders nettyHeaders) {
+            ResponseLimitConfig responseLimitConfig, long requestContentLength,
+            io.netty.handler.codec.http.HttpHeaders nettyHeaders) {
         super(webContext, keepAlive, new WebHttpHeaders(new NettyHttpHeadersAdapter(nettyHeaders, true)));
         this.ctx = ctx;
         this.nettyHeaders = nettyHeaders;
@@ -99,11 +100,9 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
     /**
      * 提交前按 {@link ResponseLimitConfig} 收口（仅在 {@code setCommitted()} 成功、即首次提交时调用）：
      * <ol>
-     *   <li>swallow-size：错误响应（4xx/5xx）且当前保活时，若请求 body 超过上限，降级为关闭连接，
-     *       避免在保活通道上复用仍带超大 body 的连接（聚合模型下 body 已读完，关闭即放弃复用）。</li>
+     * <li>swallow-size：错误响应（4xx/5xx）且当前保活时，若请求 body 超过上限，降级为关闭连接， 避免在保活通道上复用仍带超大 body 的连接（聚合模型下 body 已读完，关闭即放弃复用）。</li>
      * </ol>
-     * 响应头大小限制在 {@link #responseHeadersExceedLimit()} 单独判定，超限时由
-     * {@link #writeHeaderTooLarge()} 写出最小 500。
+     * 响应头大小限制在 {@link #responseHeadersExceedLimit()} 单独判定，超限时由 {@link #writeHeaderTooLarge()} 写出最小 500。
      */
     private void applySwallowLimit() {
         HttpStatusCode current = getStatus();
@@ -138,12 +137,11 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
     }
 
     /**
-     * 响应头超限制：丢弃已缓冲 body，写出最小 500 响应（Content-Length:0），按保活状态决定是否关闭连接。
-     * 用于防止业务误写海量响应头（如超大 Cookie）污染连接。
+     * 响应头超限制：丢弃已缓冲 body，写出最小 500 响应（Content-Length:0），按保活状态决定是否关闭连接。 用于防止业务误写海量响应头（如超大 Cookie）污染连接。
      */
     private void writeHeaderTooLarge() {
-        HttpResponse error = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1,
-                HttpResponseStatus.INTERNAL_SERVER_ERROR, Unpooled.EMPTY_BUFFER);
+        HttpResponse error = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR,
+                Unpooled.EMPTY_BUFFER);
         error.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
         error.headers().set(HttpHeaderNames.CONNECTION,
                 keepAlive ? HttpHeaderValues.KEEP_ALIVE : HttpHeaderValues.CLOSE);
@@ -167,7 +165,8 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
                 // 已提交的 SSE + 迟到业务异常 → sendError → writeDataAndFlush → getBuf）。
                 // 处理：响亮记 ERROR（让调用方问题显形），并返回【非池化】丢弃缓冲 ——
                 // 不泄漏池内存、也不在异常处理路径上二次抛异常。
-                log.error("write-after-exchange-finished ignored: status={}, streaming={}, streamCompleted={}, channelActive={}",
+                log.error(
+                        "write-after-exchange-finished ignored: status={}, streaming={}, streamCompleted={}, channelActive={}",
                         status.value(), streaming.get(), streamCompleted.get(), channelActive());
                 buf = io.netty.buffer.Unpooled.buffer(256);
             } else {
@@ -196,9 +195,8 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
     }
 
     /**
-     * 清空已缓冲的响应体（resetBuffer 的真实实现）。
-     * 基类实现只重置从未被写入的 {@code ByteArrayOutputStream body}，对 Netty 响应是空操作；
-     * 此处直接清空底层 {@link ByteBuf}，使异常路径能丢弃序列化中途写入的部分内容。
+     * 清空已缓冲的响应体（resetBuffer 的真实实现）。 基类实现只重置从未被写入的 {@code ByteArrayOutputStream body}，对 Netty 响应是空操作； 此处直接清空底层
+     * {@link ByteBuf}，使异常路径能丢弃序列化中途写入的部分内容。
      */
     @Override
     public boolean resetBuffer() {
@@ -212,10 +210,8 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
     }
 
     /**
-     * 兜底释放未被 flush/sendError 消费的响应体 ByteBuf（L1）。
-     * 正常路径（已 commit）下 buf 已随 {@code FullHttpResponse} 转移给 Netty 由编码器释放，此处跳过；
-     * 仅当响应未提交（如 handler 直接操作 {@link #getBody()} 写字节后未 flush/setHandled）时，
-     * 池化 ByteBuf 不会被释放，需在此兜底释放，避免内存泄漏。
+     * 兜底释放未被 flush/sendError 消费的响应体 ByteBuf（L1）。 正常路径（已 commit）下 buf 已随 {@code FullHttpResponse} 转移给 Netty 由编码器释放，此处跳过；
+     * 仅当响应未提交（如 handler 直接操作 {@link #getBody()} 写字节后未 flush/setHandled）时， 池化 ByteBuf 不会被释放，需在此兜底释放，避免内存泄漏。
      */
     public void release() {
         ByteBuf b = this.buf;
@@ -262,10 +258,9 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
     /**
      * chunked 渐进式写出（语义对齐 Tomcat 的 {@code flushBuffer()} / {@code Writer.flush()}）：
      * <ul>
-     *   <li>首次调用：提交响应头（{@code Transfer-Encoding: chunked}），并把已缓冲内容作为首个内容帧发出；
-     *       之后仍可继续写入——这是与一次性提交的关键区别；</li>
-     *   <li>后续调用：把新增缓冲作为独立内容帧发出（客户端可即时收到，无需等待整个响应结束）；</li>
-     *   <li>HEAD 请求退化为一次性「仅响应头」提交（HEAD 语义上无 body）。</li>
+     * <li>首次调用：提交响应头（{@code Transfer-Encoding: chunked}），并把已缓冲内容作为首个内容帧发出； 之后仍可继续写入——这是与一次性提交的关键区别；</li>
+     * <li>后续调用：把新增缓冲作为独立内容帧发出（客户端可即时收到，无需等待整个响应结束）；</li>
+     * <li>HEAD 请求退化为一次性「仅响应头」提交（HEAD 语义上无 body）。</li>
      * </ul>
      */
     @Override
@@ -333,8 +328,7 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
     }
 
     /**
-     * 终止 chunked 流（幂等）：写出残留内容帧与 {@code LastHttpContent}。
-     * 非流式响应（一次性提交或从未提交）为空操作——一次性路径自带 Content-Length，无需终止块。
+     * 终止 chunked 流（幂等）：写出残留内容帧与 {@code LastHttpContent}。 非流式响应（一次性提交或从未提交）为空操作——一次性路径自带 Content-Length，无需终止块。
      */
     @Override
     public void endStream() {
@@ -351,7 +345,8 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
     /**
      * 写出待发缓冲内容帧。
      *
-     * @param terminate 是否同时写出终止块 {@code LastHttpContent}
+     * @param terminate
+     *            是否同时写出终止块 {@code LastHttpContent}
      */
     private void writePendingContentFrame(boolean terminate) {
         ByteBuf pending = takePendingBuf();
@@ -384,10 +379,9 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
     }
 
     /**
-     * 长度已知的流式响应首帧：必须是**非 Full** 的 {@link DefaultHttpResponse}——body 由后续
-     * {@code HttpContent} 帧续写。若复用 {@link #initHttpResponse}(chunked=false)，得到的是
-     * {@code DefaultFullHttpResponse}（自带 LastHttpContent，语义上响应已结束），其后继续写 body
-     * 帧属非法，客户端会判为协议错误并等到超时。
+     * 长度已知的流式响应首帧：必须是**非 Full** 的 {@link DefaultHttpResponse}——body 由后续 {@code HttpContent} 帧续写。若复用
+     * {@link #initHttpResponse}(chunked=false)，得到的是 {@code DefaultFullHttpResponse}（自带 LastHttpContent，语义上响应已结束），其后继续写
+     * body 帧属非法，客户端会判为协议错误并等到超时。
      */
     private HttpResponse initContentLengthStreamResponse(String contentType, long contentLength) {
         HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1,
@@ -407,13 +401,17 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
         // 响应头由框架/业务内部构造，非用户输入直达，CRLF 注入面可控。
         HttpResponse response;
         if (buf != null) {
-            response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()), buf, nettyHeaders, EmptyHttpHeaders.INSTANCE);
+            response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1,
+                    HttpResponseStatus.valueOf(this.status.value()), buf, nettyHeaders, EmptyHttpHeaders.INSTANCE);
         } else if (chunked) {
-            response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()), nettyHeaders);
+            response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()),
+                    nettyHeaders);
         } else {
             // 无 body 分支：DefaultFullHttpResponse 无 (version,status,headers,trailingHeaders) 构造器，
             // 用空 content 补位；该分支随后设 Content-Length: 0，语义与原 null content 一致。
-            response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()), Unpooled.EMPTY_BUFFER, nettyHeaders, EmptyHttpHeaders.INSTANCE);
+            response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1,
+                    HttpResponseStatus.valueOf(this.status.value()), Unpooled.EMPTY_BUFFER, nettyHeaders,
+                    EmptyHttpHeaders.INSTANCE);
         }
         // 零拷贝：nettyHeaders 即框架 headers 视图底层存储，commit 前所有框架写入已落到位，无需逐条拷贝。
         // 注意：直接 response.headers().set 写入不走 WebHttpHeaders.setContentType，不会清 Content-Type 缓存；
@@ -439,7 +437,6 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
         }
         return response;
     }
-
 
     protected void writeAndFlush(ByteBuf buf, String contentType, HttpStatusCode statusCode, boolean chunked) {
         if (!setCommitted()) {
@@ -482,11 +479,10 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
 
     /**
      * 流式写出：{@code contentLength < 0} 时用 chunked 帧，否则用 {@code Content-Length} 帧。
-     *
-     * <p>长度已知时必须声明长度：chunked 不携带总长度（客户端无法显示进度/预知大小），
-     * 且 HTTP 消息同时出现 {@code Content-Length} 与 {@code Transfer-Encoding} 违反
-     * RFC 7230 §3.3.1（Netty 的 setTransferEncodingChunked 会移除 Content-Length，
-     * 使调用方预设的长度静默失效）。</p>
+     * <p>
+     * 长度已知时必须声明长度：chunked 不携带总长度（客户端无法显示进度/预知大小）， 且 HTTP 消息同时出现 {@code Content-Length} 与 {@code Transfer-Encoding} 违反
+     * RFC 7230 §3.3.1（Netty 的 setTransferEncodingChunked 会移除 Content-Length， 使调用方预设的长度静默失效）。
+     * </p>
      */
     @Override
     public void writeStream(InputStream input, long contentLength) {
@@ -541,8 +537,7 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
     }
 
     /**
-     * 在业务线程池内执行：读取 InputStream 并分块写入 channel（含背压控制）。
-     * 仅「读取」在 worker 线程，写出仍由 Netty 在 EventLoop 串行执行，故 EventLoop 不再被慢速源阻塞。
+     * 在业务线程池内执行：读取 InputStream 并分块写入 channel（含背压控制）。 仅「读取」在 worker 线程，写出仍由 Netty 在 EventLoop 串行执行，故 EventLoop 不再被慢速源阻塞。
      */
     private void streamCopy(InputStream input) {
         try {
@@ -578,8 +573,7 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
     }
 
     /**
-     * 出站不可写时阻塞当前 worker 线程直至可写，防止慢速源 + 客户端零窗口导致出站缓冲无界增长。
-     * 带 1s 超时重检，避免「设置回调前已可写」的竞态造成永久死锁。
+     * 出站不可写时阻塞当前 worker 线程直至可写，防止慢速源 + 客户端零窗口导致出站缓冲无界增长。 带 1s 超时重检，避免「设置回调前已可写」的竞态造成永久死锁。
      */
     private void waitWritable() throws InterruptedException {
         while (!ctx.channel().isWritable()) {
@@ -588,13 +582,15 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
             if (ctx.channel().isWritable()) {
                 break;
             }
-            latch.await(1, TimeUnit.SECONDS);
+            // 忽略 await 的返回值会掩盖「1s 内没等到可写回调」这一事实：显式记录后由循环重新检查
+            if (!latch.await(1, TimeUnit.SECONDS)) {
+                log.debug("waitWritable: no writable callback within 1s, rechecking channel state");
+            }
         }
     }
 
     /**
-     * 解析流式读取使用的线程池：优先业务默认池；缺失时退化为 ForkJoin 公共池（绝不回退 EventLoop，
-     * 否则卸载读流失去意义）。
+     * 解析流式读取使用的线程池：优先业务默认池；缺失时退化为 ForkJoin 公共池（绝不回退 EventLoop， 否则卸载读流失去意义）。
      */
     private ExecutorService resolveStreamPool() {
         BizPoolRegistry poolRegistry = webContext.getWebComponent(BizPoolRegistry.class);
@@ -615,9 +611,9 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
         }
         // HEAD：抑制 body——只发送 headers，Content-Length 保留真实长度
         ByteBuf body = headRequest ? null : Unpooled.wrappedBuffer(data);
-        HttpResponse response = new DefaultFullHttpResponse(
-                HttpVersion.HTTP_1_1, HttpResponseStatus.valueOf(this.status.value()),
-                body != null ? body : Unpooled.EMPTY_BUFFER, nettyHeaders, EmptyHttpHeaders.INSTANCE);
+        HttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1,
+                HttpResponseStatus.valueOf(this.status.value()), body != null ? body : Unpooled.EMPTY_BUFFER,
+                nettyHeaders, EmptyHttpHeaders.INSTANCE);
         // 零拷贝：nettyHeaders 即框架 headers 视图底层存储，无需逐条拷贝
         response.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/octet-stream");
         response.headers().setInt(HttpHeaderNames.CONTENT_LENGTH, data.length);
@@ -653,8 +649,8 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
             // 则尊重之；均无法定夺时回退 octet-stream。
             String fileContentType = nettyHeaders.get(HttpHeaderNames.CONTENT_TYPE);
             if (fileContentType == null) {
-                org.springframework.http.MediaType mediaType =
-                        MediaTypeFactory.getMediaType(new FileSystemResource(file)).orElse(null);
+                org.springframework.http.MediaType mediaType = MediaTypeFactory
+                        .getMediaType(new FileSystemResource(file)).orElse(null);
                 fileContentType = mediaType != null ? mediaType.toString() : "application/octet-stream";
             }
             HttpResponse response = initHttpResponse(null, fileContentType, null, true);
@@ -680,8 +676,7 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
             // write file
             fc = new FileInputStream(file).getChannel();
             final FileChannel toClose = fc;
-            DefaultFileRegion region =
-                    new DefaultFileRegion(fc, 0, file.length());
+            DefaultFileRegion region = new DefaultFileRegion(fc, 0, file.length());
             ChannelFuture future = ctx.write(region);
             future.addListener(f -> {
                 try {
@@ -773,4 +768,3 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
         });
     }
 }
-

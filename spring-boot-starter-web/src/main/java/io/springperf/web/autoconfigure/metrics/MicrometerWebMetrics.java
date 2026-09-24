@@ -17,13 +17,12 @@ import java.util.concurrent.TimeUnit;
  * <p>
  * Registers the following metrics:
  * <ul>
- *   <li>{@code dispatcher.request.duration} — Timer, tagged with {@code method}, {@code path}, {@code status}</li>
- *   <li>{@code dispatcher.exception} — Counter, tagged with {@code type}, {@code resolved}</li>
- *   <li>{@code pool.{name}.active.threads} — Gauge, active thread count</li>
- *   <li>{@code pool.{name}.queue.size} — Gauge, queue size</li>
- *   <li>{@code pool.{name}.completed.tasks} — Gauge, completed task count</li>
+ * <li>{@code dispatcher.request.duration} — Timer, tagged with {@code method}, {@code path}, {@code status}</li>
+ * <li>{@code dispatcher.exception} — Counter, tagged with {@code type}, {@code resolved}</li>
+ * <li>{@code pool.{name}.active.threads} — Gauge, active thread count</li>
+ * <li>{@code pool.{name}.queue.size} — Gauge, queue size</li>
+ * <li>{@code pool.{name}.completed.tasks} — Gauge, completed task count</li>
  * </ul>
- * </p>
  *
  * @since 2.7.0
  */
@@ -52,11 +51,11 @@ public class MicrometerWebMetrics extends BaseWebComponent implements WebMetrics
         String key = method + "|" + (pathPattern != null ? pathPattern : "") + "|" + statusCode;
         // computeIfAbsent 原子建缓存：修复前 get-then-put 并发下同 key 重复 register，
         // Micrometer 会对同名同 tag 二次注册抛异常。
-        Timer timer = requestTimers.computeIfAbsent(key, k -> Timer.builder("dispatcher.request.duration")
-                .tags(TAG_METHOD, method,
-                      TAG_PATH, pathPattern != null ? pathPattern : "",
-                      TAG_STATUS, String.valueOf(statusCode))
-                .register(meterRegistry));
+        Timer timer = requestTimers.computeIfAbsent(key,
+                k -> Timer
+                        .builder("dispatcher.request.duration").tags(TAG_METHOD, method, TAG_PATH,
+                                pathPattern != null ? pathPattern : "", TAG_STATUS, String.valueOf(statusCode))
+                        .register(meterRegistry));
         timer.record(durationNanos, TimeUnit.NANOSECONDS);
     }
 
@@ -64,24 +63,19 @@ public class MicrometerWebMetrics extends BaseWebComponent implements WebMetrics
     public void recordException(String exceptionType, boolean resolved) {
         String key = exceptionType + "|" + resolved;
         Counter counter = exceptionCounters.computeIfAbsent(key, k -> Counter.builder("dispatcher.exception")
-                .tags(TAG_TYPE, exceptionType,
-                      TAG_RESOLVED, String.valueOf(resolved))
-                .register(meterRegistry));
+                .tags(TAG_TYPE, exceptionType, TAG_RESOLVED, String.valueOf(resolved)).register(meterRegistry));
         counter.increment();
     }
 
     @Override
     public void registerPoolGauges(String poolName, ThreadPoolExecutor executor) {
         Gauge.builder("pool." + poolName + ".active.threads", executor, ThreadPoolExecutor::getActiveCount)
-                .description("Active threads in " + poolName)
-                .register(meterRegistry);
+                .description("Active threads in " + poolName).register(meterRegistry);
 
         Gauge.builder("pool." + poolName + ".queue.size", executor, e -> e.getQueue().size())
-                .description("Queue size of " + poolName)
-                .register(meterRegistry);
+                .description("Queue size of " + poolName).register(meterRegistry);
 
         Gauge.builder("pool." + poolName + ".completed.tasks", executor, ThreadPoolExecutor::getCompletedTaskCount)
-                .description("Completed tasks of " + poolName)
-                .register(meterRegistry);
+                .description("Completed tasks of " + poolName).register(meterRegistry);
     }
 }

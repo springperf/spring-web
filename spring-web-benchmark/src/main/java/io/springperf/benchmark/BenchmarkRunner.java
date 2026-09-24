@@ -16,9 +16,8 @@ import java.util.List;
 /**
  * JMH 程序化运行器（开发调试用）。
  * <p>
- * <b>⚠ 重要：本运行器使用 {@code forks=0}（不 fork JVM），
- * 因此所有 benchmark method 共享 JVM，JIT/GC 存在交叉污染。
- * 仅用于开发调试，正式结果请使用 {@code mvn -P benchmark-xxx jmh:benchmark}。</b>
+ * <b>⚠ 重要：本运行器使用 {@code forks=0}（不 fork JVM）， 因此所有 benchmark method 共享 JVM，JIT/GC 存在交叉污染。 仅用于开发调试，正式结果请使用
+ * {@code mvn -P benchmark-xxx jmh:benchmark}。</b>
  * <p>
  * 配合 {@link BenchmarkConstants} 确保 warmup / measurement / threads 等设置与注解一致。
  */
@@ -27,8 +26,8 @@ public class BenchmarkRunner {
     public static void main(String[] args) throws Exception {
         // 兼容 exec:java（工作目录是父项目）和直接 java -jar 运行
         String baseDir = System.getProperty("benchmark.output.dir",
-                new java.io.File("spring-web-benchmark/target").isDirectory()
-                        ? "spring-web-benchmark/target" : "target");
+                new java.io.File("spring-web-benchmark/target").isDirectory() ? "spring-web-benchmark/target"
+                        : "target");
         // 根据 profile name 构建结果文件名（如 jmh-results-tomcat.json）
         String profileName = System.getProperty("benchmark.profile.name", "unknown");
         String resultFile = baseDir + "/jmh-results-" + profileName + ".json";
@@ -47,8 +46,11 @@ public class BenchmarkRunner {
         String includePattern = System.getProperty("benchmark.include", ".*");
         System.out.println("[BenchmarkRunner] Include pattern: " + includePattern);
 
-        // 确保结果文件目录存在
-        new java.io.File(resultFile).getParentFile().mkdirs();
+        // 确保结果文件目录存在（mkdirs 的返回值不可忽略：失败时不静默，直接告警）
+        java.io.File resultDir = new java.io.File(resultFile).getParentFile();
+        if (resultDir != null && !resultDir.mkdirs() && !resultDir.isDirectory()) {
+            System.out.println("[BenchmarkRunner] WARN: cannot create result directory: " + resultDir);
+        }
 
         // 读取 fork 和 JVM 参数（由脚本传入），默认 fork=0 保持向后兼容
         int forks = Integer.getInteger("jmh.forks", 0);
@@ -63,7 +65,7 @@ public class BenchmarkRunner {
         optBuilder.measurementIterations(BenchmarkConstants.MEASUREMENT_ITERATIONS);
         optBuilder.measurementTime(TimeValue.seconds(BenchmarkConstants.MEASUREMENT_TIME_SECONDS));
         int threads = Integer.getInteger("benchmark.threads", BenchmarkConstants.THREADS);
-	        optBuilder.threads(threads);
+        optBuilder.threads(threads);
         optBuilder.mode(Mode.Throughput);
         if (Boolean.getBoolean("benchmark.sampleTime")) {
             optBuilder.mode(Mode.SampleTime);
@@ -112,11 +114,10 @@ public class BenchmarkRunner {
             // （丢失外层 Netty/框架帧，热点归因失真）。可用 check-jfr-truncation.sh 校验产物。
             String jfrStackDepth = System.getProperty("benchmark.jfr.stackdepth", "1024");
             extraJvmArgs.add("-XX:FlightRecorderOptions=stackdepth=" + jfrStackDepth);
-            extraJvmArgs.add("-XX:StartFlightRecording=duration=" + jfrDuration + ",filename=" + jfrFile
-                    + ",settings=" + jfrSettings + ",maxsize=256m");
-            System.out.println("[BenchmarkRunner] JFR recording enabled: " + jfrFile
-                    + ", duration=" + jfrDuration + ", settings=" + jfrSettings
-                    + ", stackdepth=" + jfrStackDepth);
+            extraJvmArgs.add("-XX:StartFlightRecording=duration=" + jfrDuration + ",filename=" + jfrFile + ",settings="
+                    + jfrSettings + ",maxsize=256m");
+            System.out.println("[BenchmarkRunner] JFR recording enabled: " + jfrFile + ", duration=" + jfrDuration
+                    + ", settings=" + jfrSettings + ", stackdepth=" + jfrStackDepth);
         }
 
         // 额外 JVM 参数（空格分隔）：benchmark.jvm.extraArgs="-Dio.netty.leakDetection.level=paranoid"
@@ -126,12 +127,12 @@ public class BenchmarkRunner {
         if (!extraJvmArgsProp.trim().isEmpty()) {
             String[] extraParts = extraJvmArgsProp.trim().split("\\s+");
             java.util.Collections.addAll(extraJvmArgs, extraParts);
-            System.out.println("[BenchmarkRunner] Extra JVM args: "
-                    + java.util.Arrays.toString(extraParts));
+            System.out.println("[BenchmarkRunner] Extra JVM args: " + java.util.Arrays.toString(extraParts));
         }
 
         // 传递 benchmark.* 系统属性到 forked JVM（内存快照、端口、profile名、线程数等需要）
-        String[] propNames = {"benchmark.port", "benchmark.profile.name", "benchmark.output.dir", "benchmark.threads"};
+        String[] propNames = { "benchmark.port", "benchmark.profile.name", "benchmark.output.dir",
+                "benchmark.threads" };
         for (String propName : propNames) {
             String propValue = System.getProperty(propName);
             if (propValue != null && !propValue.isEmpty()) {

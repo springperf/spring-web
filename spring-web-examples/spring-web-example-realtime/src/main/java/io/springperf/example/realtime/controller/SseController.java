@@ -18,8 +18,7 @@ public class SseController {
     private final Map<String, SseEmitter> emitters = new ConcurrentHashMap<>();
 
     /**
-     * 客户端订阅 SSE 事件流
-     * curl -N http://localhost:8082/sse/subscribe?clientId=foo
+     * 客户端订阅 SSE 事件流 curl -N http://localhost:8082/sse/subscribe?clientId=foo
      */
     @GetMapping("/sse/subscribe")
     public SseEmitter subscribe(@RequestParam String clientId) {
@@ -33,7 +32,8 @@ public class SseController {
 
     /**
      * 向指定客户端推送事件
-     * curl "http://localhost:8082/sse/send?clientId=foo&data=hello"
+     *
+     * <pre>{@code curl "http://localhost:8082/sse/send?clientId=foo&data=hello"}</pre>
      */
     @GetMapping("/sse/send")
     public String send(@RequestParam String clientId, @RequestParam String data) throws IOException {
@@ -47,8 +47,7 @@ public class SseController {
     }
 
     /**
-     * 广播给所有客户端
-     * curl "http://localhost:8082/sse/broadcast?data=hello"
+     * 广播给所有客户端 curl "http://localhost:8082/sse/broadcast?data=hello"
      */
     @GetMapping("/sse/broadcast")
     public String broadcast(@RequestParam String data) throws IOException {

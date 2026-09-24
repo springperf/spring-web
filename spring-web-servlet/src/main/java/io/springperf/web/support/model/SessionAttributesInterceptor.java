@@ -23,33 +23,30 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 基于 {@link HandlerInterceptor} 实现 {@code @SessionAttributes}（复数）：将类级别
- * 声明的 model 属性在请求间与 session 同步。
- * <p>类级匹配通过 {@link ControllerAdvice}（annotations = {@code @SessionAttributes}）
- * 声明，由 {@code InterceptorRegistry} 包装 {@code ControllerAdviceBean} 按 handler 的
- * controller 类型匹配（区别于 path 维度的普通拦截器）。</p>
+ * 基于 {@link HandlerInterceptor} 实现 {@code @SessionAttributes}（复数）：将类级别 声明的 model 属性在请求间与 session 同步。
+ * <p>
+ * 类级匹配通过 {@link ControllerAdvice}（annotations = {@code @SessionAttributes}） 声明，由 {@code InterceptorRegistry} 包装
+ * {@code ControllerAdviceBean} 按 handler 的 controller 类型匹配（区别于 path 维度的普通拦截器）。
+ * </p>
  * <ul>
- *   <li>{@link #preHandle}：handler 前从 session 恢复声明属性到 Model（支持
- *       {@code @ModelAttribute} 参数复用，经由 core 的 "先查 Model" 语义）；</li>
- *   <li>{@link #postHandle}：handler 后把 Model 中匹配属性写回 session；若本次请求的
- *       {@link SessionStatus#setComplete()} 被调用则清理 session 属性（同步与异步完成
- *       均经此回调——异步在 {@code asyncDispatch} 完成后执行）。</li>
+ * <li>{@link #preHandle}：handler 前从 session 恢复声明属性到 Model（支持 {@code @ModelAttribute} 参数复用，经由 core 的 "先查 Model"
+ * 语义）；</li>
+ * <li>{@link #postHandle}：handler 后把 Model 中匹配属性写回 session；若本次请求的 {@link SessionStatus#setComplete()} 被调用则清理 session
+ * 属性（同步与异步完成 均经此回调——异步在 {@code asyncDispatch} 完成后执行）。</li>
  * </ul>
- * 复用 Spring 原生 {@link SessionAttributesHandler} + {@link DefaultSessionAttributeStore}
- * （基于 {@link WebRequest}，不依赖具体容器），仅 session 读写经由本框架的
- * servlet 桥接层（{@link ServletAttribute}）。
+ * 复用 Spring 原生 {@link SessionAttributesHandler} + {@link DefaultSessionAttributeStore} （基于
+ * {@link WebRequest}，不依赖具体容器），仅 session 读写经由本框架的 servlet 桥接层（{@link ServletAttribute}）。
  */
 @ControllerAdvice(annotations = SessionAttributes.class)
 public class SessionAttributesInterceptor implements HandlerInterceptor {
 
-    static final RequestAttribute<SessionStatus> SESSION_STATUS_KEY =
-            RequestAttribute.createAttribute(SessionStatus.class);
+    static final RequestAttribute<SessionStatus> SESSION_STATUS_KEY = RequestAttribute
+            .createAttribute(SessionStatus.class);
 
     private final ConcurrentHashMap<Class<?>, SessionAttributesHandler> handlerCache = new ConcurrentHashMap<>();
 
     @Override
-    public boolean preHandle(WebServerHttpRequest request, WebServerHttpResponse response,
-                             Object handler) {
+    public boolean preHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler) {
         MappingHandlerMethod mapping = asHandlerMethod(handler);
         if (mapping == null) {
             return true;
@@ -70,8 +67,8 @@ public class SessionAttributesInterceptor implements HandlerInterceptor {
     }
 
     @Override
-    public void postHandle(WebServerHttpRequest request, WebServerHttpResponse response,
-                           Object handler, Object result) {
+    public void postHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler,
+            Object result) {
         MappingHandlerMethod mapping = asHandlerMethod(handler);
         if (mapping == null) {
             return;
@@ -80,7 +77,7 @@ public class SessionAttributesInterceptor implements HandlerInterceptor {
     }
 
     private void updateModel(WebServerHttpRequest request, WebServerHttpResponse response,
-                             MappingHandlerMethod handler) {
+            MappingHandlerMethod handler) {
         SessionAttributesHandler attrsHandler = resolveHandler(handler.getBeanType());
         if (attrsHandler == null || !attrsHandler.hasSessionAttributes()) {
             return;
@@ -100,10 +97,9 @@ public class SessionAttributesInterceptor implements HandlerInterceptor {
 
     /**
      * 获取（或创建）本次请求绑定的 {@link SessionStatus}，供
-     * {@link SessionStatusArgumentResolverProvider} 注入 handler 参数。
+     * {@link io.springperf.web.support.arg.provider.SessionStatusArgumentResolverProvider} 注入 handler 参数。
      */
-    public SessionStatus getOrCreateSessionStatus(WebServerHttpRequest request,
-                                                  WebServerHttpResponse response) {
+    public SessionStatus getOrCreateSessionStatus(WebServerHttpRequest request, WebServerHttpResponse response) {
         SessionStatus status = request.getRequestContext().getAttribute(SESSION_STATUS_KEY);
         if (status == null) {
             status = new SimpleSessionStatus();
@@ -117,8 +113,8 @@ public class SessionAttributesInterceptor implements HandlerInterceptor {
     }
 
     private SessionAttributesHandler resolveHandler(Class<?> beanType) {
-        return handlerCache.computeIfAbsent(beanType, type ->
-                AnnotatedElementUtils.hasAnnotation(type, SessionAttributes.class)
+        return handlerCache.computeIfAbsent(beanType,
+                type -> AnnotatedElementUtils.hasAnnotation(type, SessionAttributes.class)
                         ? new SessionAttributesHandler(type, new DefaultSessionAttributeStore())
                         : null);
     }

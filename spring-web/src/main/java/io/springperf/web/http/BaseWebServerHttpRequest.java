@@ -1,17 +1,18 @@
 package io.springperf.web.http;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.async.AsyncSupportUtils;
-import org.springframework.http.server.ServerHttpAsyncRequestControl;
-import org.springframework.http.server.ServerHttpResponse;
-import org.springframework.util.MultiValueMap;
-
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+
+import org.springframework.http.server.ServerHttpAsyncRequestControl;
+import org.springframework.http.server.ServerHttpResponse;
+import org.springframework.util.MultiValueMap;
+
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.async.AsyncSupportUtils;
 
 public abstract class BaseWebServerHttpRequest implements WebServerHttpRequest, RequestContext {
 
@@ -20,21 +21,23 @@ public abstract class BaseWebServerHttpRequest implements WebServerHttpRequest, 
     private final String path;
 
     /**
-     * 查询串之前的部分（{@link #getUriStr()}）。<b>懒计算</b>：仅「发布请求完成事件」
-     * （{@code spring.mvc.publish-request-handled-events}，默认 false）与访问日志等路径会读它，
-     * 默认配置下热路径完全不读 → 免掉每请求一次 {@code substring} 分配与一次 {@code '?'} 扫描。
+     * 查询串之前的部分（{@link #getUriStr()}）。<b>懒计算</b>：仅「发布请求完成事件」 （{@code spring.mvc.publish-request-handled-events}，默认
+     * false）与访问日志等路径会读它， 默认配置下热路径完全不读 → 免掉每请求一次 {@code substring} 分配与一次 {@code '?'} 扫描。
      */
     private volatile String uriStr;
 
     /**
-     * String 键属性（Servlet 语义 / 非类型化属性）。<b>懒分配</b>：热路径只用类型化属性数组
-     * （{@link #fastAttributes}），该 map 仅在真正出现 String 键读写、或类型化属性索引超出
-     * 数组长度（请求创建后又有新 {@code RequestAttribute} 注册）时才创建。
-     * 并发下由 {@link #attributes()} 双检锁保证只建一次（异步 dispatch 可能跨线程访问）。
+     * String 键属性（Servlet 语义 / 非类型化属性）。<b>懒分配</b>：热路径只用类型化属性数组 （{@link #fastAttributes}），该 map 仅在真正出现 String
+     * 键读写、或类型化属性索引超出 数组长度（请求创建后又有新 {@code RequestAttribute} 注册）时才创建。 并发下由 {@link #attributes()} 双检锁保证只建一次（异步 dispatch
+     * 可能跨线程访问）。
      */
     private volatile Map<String, Object> attributes;
 
-    private MultiValueMap<String, String> parameterMap;
+    /**
+     * 参数表。<b>懒初始化 + 双检锁</b>：与 {@link #attributes} 同款发布语义——写发生在 {@code synchronized (this)} 内、读完全无锁，因此字段必须是 volatile 才满足
+     * JMM（否则 异步 dispatch 的另一线程可能看到"非 null 但未完全发布"的引用）。
+     */
+    private volatile MultiValueMap<String, String> parameterMap;
     private Charset characterEncoding = StandardCharsets.UTF_8;
     private List<Locale> locales;
     protected final Object[] fastAttributes = new Object[RequestAttribute.getMaxSize()];
@@ -58,11 +61,12 @@ public abstract class BaseWebServerHttpRequest implements WebServerHttpRequest, 
         return headRequest;
     }
 
-    public String getUriStrWithQuery() { return uriStrWithQuery; }
+    public String getUriStrWithQuery() {
+        return uriStrWithQuery;
+    }
 
     /**
-     * 查询串之前的部分。首次访问才截取（见 {@link #uriStr} 字段说明）；
-     * 派生自不可变字段，故并发下重复计算也无害（幂等，结果恒等）。
+     * 查询串之前的部分。首次访问才截取（见 {@link #uriStr} 字段说明）； 派生自不可变字段，故并发下重复计算也无害（幂等，结果恒等）。
      */
     public String getUriStr() {
         String value = uriStr;
@@ -74,7 +78,9 @@ public abstract class BaseWebServerHttpRequest implements WebServerHttpRequest, 
         return value;
     }
 
-    public String getPath() { return path; }
+    public String getPath() {
+        return path;
+    }
 
     /** 懒创建 String 键属性表（双检锁：异步 dispatch 可能跨线程首次访问）。 */
     private Map<String, Object> attributes() {
@@ -106,11 +112,17 @@ public abstract class BaseWebServerHttpRequest implements WebServerHttpRequest, 
     public Map<String, String[]> getParameterMapArray() {
         MultiValueMap<String, String> pm = getParameterMap();
         Map<String, String[]> arr = new HashMap<>();
-        for (String key : pm.keySet()) arr.put(key, pm.get(key).toArray(new String[0]));
+        // 用 entrySet 而非 keySet + get：后者对每个键多做一次哈希查找（本方法是热路径）
+        for (Map.Entry<String, List<String>> entry : pm.entrySet()) {
+            arr.put(entry.getKey(), entry.getValue().toArray(new String[0]));
+        }
         return arr;
     }
 
-    public String getParameter(String name) { return getParameterMap().getFirst(name); }
+    public String getParameter(String name) {
+        return getParameterMap().getFirst(name);
+    }
+
     public String[] getParameterValues(String name) {
         List<String> values = getParameterMap().get(name);
         return values == null ? null : values.toArray(new String[0]);
@@ -118,19 +130,27 @@ public abstract class BaseWebServerHttpRequest implements WebServerHttpRequest, 
 
     protected abstract MultiValueMap<String, String> parseParameters();
 
-    public Charset getCharacterEncoding() { return characterEncoding; }
-    public void setCharacterEncoding(Charset characterEncoding) { this.characterEncoding = characterEncoding; }
-    public Map<String, Object> getAttributes() { return attributes(); }
+    public Charset getCharacterEncoding() {
+        return characterEncoding;
+    }
+
+    public void setCharacterEncoding(Charset characterEncoding) {
+        this.characterEncoding = characterEncoding;
+    }
+
+    public Map<String, Object> getAttributes() {
+        return attributes();
+    }
 
     public Object getAttribute(String name) {
         Map<String, Object> map = attributes;
         return map == null ? null : map.get(name);
     }
+
     /**
-     * Servlet 规范（Jakarta Servlet §4.3/§3.10）：setAttribute(name, null) 等价于 removeAttribute(name)。
-     * attributes 为 ConcurrentHashMap（拒绝 null 值），null 值直接 put 会抛 NPE——
-     * 典型触发点：PerfRequestDispatcher.forward 在无查询串时设置 FORWARD_QUERY_STRING=null，
-     * 导致所有 forward / JSP 视图渲染请求 500。
+     * Servlet 规范（Jakarta Servlet §4.3/§3.10）：setAttribute(name, null) 等价于 removeAttribute(name)。 attributes 为
+     * ConcurrentHashMap（拒绝 null 值），null 值直接 put 会抛 NPE—— 典型触发点：PerfRequestDispatcher.forward 在无查询串时设置
+     * FORWARD_QUERY_STRING=null， 导致所有 forward / JSP 视图渲染请求 500。
      */
     public void setAttribute(String name, Object o) {
         if (o == null) {
@@ -147,6 +167,7 @@ public abstract class BaseWebServerHttpRequest implements WebServerHttpRequest, 
         Map<String, Object> map = attributes;
         return map == null ? null : map.remove(name);
     }
+
     private static final String FAST_ATTR_PREFIX = BaseWebServerHttpRequest.class.getName() + ".FAST_ATTR.";
 
     public <T> T getAttribute(RequestAttribute<T> key) {
@@ -157,6 +178,7 @@ public abstract class BaseWebServerHttpRequest implements WebServerHttpRequest, 
         Map<String, Object> map = attributes;
         return map == null ? null : (T) map.get(FAST_ATTR_PREFIX + idx);
     }
+
     public <T> void setAttribute(RequestAttribute<T> key, T value) {
         int idx = key.getIndex();
         if (idx < fastAttributes.length) {
@@ -165,11 +187,23 @@ public abstract class BaseWebServerHttpRequest implements WebServerHttpRequest, 
             attributes().put(FAST_ATTR_PREFIX + idx, value);
         }
     }
-    public WebContext getWebContext() { return webContext; }
-    public RequestContext getRequestContext() { return this; }
-    public int getFilterIndexAndIncrement() { return filterIndex++; }
 
-    @Override public Principal getPrincipal() { return null; }
+    public WebContext getWebContext() {
+        return webContext;
+    }
+
+    public RequestContext getRequestContext() {
+        return this;
+    }
+
+    public int getFilterIndexAndIncrement() {
+        return filterIndex++;
+    }
+
+    @Override
+    public Principal getPrincipal() {
+        return null;
+    }
 
     @Override
     public ServerHttpAsyncRequestControl getAsyncRequestControl(ServerHttpResponse response) {
@@ -192,11 +226,13 @@ public abstract class BaseWebServerHttpRequest implements WebServerHttpRequest, 
         return locales;
     }
 
-    public Locale getLocale() { return getLocales().get(0); }
+    public Locale getLocale() {
+        return getLocales().get(0);
+    }
 
     /**
-     * JVM 默认 Locale 的单元素列表。随 {@code Locale.setDefault()} 变化自动重建，稳态零分配
-     * （原实现每次请求都 {@code Arrays.asList(Locale.getDefault())} 新建列表对象）。
+     * JVM 默认 Locale 的单元素列表。随 {@code Locale.setDefault()} 变化自动重建，稳态零分配 （原实现每次请求都
+     * {@code Arrays.asList(Locale.getDefault())} 新建列表对象）。
      */
     static List<Locale> defaultLocaleList() {
         Locale current = Locale.getDefault();
@@ -216,11 +252,14 @@ public abstract class BaseWebServerHttpRequest implements WebServerHttpRequest, 
             List<Locale> locales = new ArrayList<>(ranges.size());
             for (Locale.LanguageRange range : ranges) {
                 String tag = range.getRange();
-                if ("*".equals(tag)) continue;
+                if ("*".equals(tag))
+                    continue;
                 Locale locale = Locale.forLanguageTag(tag);
-                if (!locale.getLanguage().isEmpty()) locales.add(locale);
+                if (!locale.getLanguage().isEmpty())
+                    locales.add(locale);
             }
-            if (locales.isEmpty()) return defaultLocaleList();
+            if (locales.isEmpty())
+                return defaultLocaleList();
             return locales;
         } catch (IllegalArgumentException ex) {
             return defaultLocaleList();
@@ -229,17 +268,18 @@ public abstract class BaseWebServerHttpRequest implements WebServerHttpRequest, 
 
     /**
      * Accept-Language 解析结果缓存（按头字符串）。
-     *
-     * <p>原实现用 {@code Collections.synchronizedMap(LRU)}——每个带该头的请求都要抢**全局锁**，
-     * 高并发下是扩展性瓶颈（CPU 采样看不见，表现为线程阻塞）。解析结果小且幂等，
-     * 改为 {@link ConcurrentHashMap} 无锁读；超过上限整体清空（近似淘汰），
-     * 只影响命中率、不影响正确性。</p>
+     * <p>
+     * 原实现用 {@code Collections.synchronizedMap(LRU)}——每个带该头的请求都要抢**全局锁**， 高并发下是扩展性瓶颈（CPU 采样看不见，表现为线程阻塞）。解析结果小且幂等， 改为
+     * {@link ConcurrentHashMap} 无锁读；超过上限整体清空（近似淘汰）， 只影响命中率、不影响正确性。
+     * </p>
      */
     public static class AcceptLanguageLocaleCache {
         private static final int MAX_SIZE = 256;
         private static final ConcurrentMap<String, List<Locale>> CACHE = new ConcurrentHashMap<>();
 
-        public static List<Locale> get(String header) { return CACHE.get(header); }
+        public static List<Locale> get(String header) {
+            return CACHE.get(header);
+        }
 
         public static void put(String header, List<Locale> locales) {
             if (CACHE.size() >= MAX_SIZE) {

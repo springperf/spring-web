@@ -1,10 +1,6 @@
 package io.springperf.web.core.invoker;
 
-import lombok.SneakyThrows;
-import org.springframework.asm.ClassWriter;
-import org.springframework.asm.MethodVisitor;
-import org.springframework.asm.Type;
-import org.springframework.cglib.core.ReflectUtils;
+import static org.springframework.asm.Opcodes.*;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -12,7 +8,12 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.springframework.asm.Opcodes.*;
+import org.springframework.asm.ClassWriter;
+import org.springframework.asm.MethodVisitor;
+import org.springframework.asm.Type;
+import org.springframework.cglib.core.ReflectUtils;
+
+import lombok.SneakyThrows;
 
 public class FastInvokerGenerator {
 
@@ -21,9 +22,8 @@ public class FastInvokerGenerator {
     private static final Map<Method, Class<?>> invokerClassCache = new ConcurrentHashMap<>();
 
     /**
-     * 清空生成的 invoker 类缓存（由 {@code WebContext.destroyComponent()} 在上下文销毁时调用，
-     * 防 devtools 等新 ClassLoader 重启场景下旧 ClassLoader 被钉住——生成的字节码类强引用 controller 类）。
-     * 缓存为纯缓存，清空后下次访问自动重建。
+     * 清空生成的 invoker 类缓存（由 {@code WebContext.destroyComponent()} 在上下文销毁时调用， 防 devtools 等新 ClassLoader 重启场景下旧 ClassLoader
+     * 被钉住——生成的字节码类强引用 controller 类）。 缓存为纯缓存，清空后下次访问自动重建。
      */
     public static void clearAllCaches() {
         invokerClassCache.clear();
@@ -32,14 +32,12 @@ public class FastInvokerGenerator {
     /**
      * GraalVM native-image 运行时会在系统属性中设置此值，用于检测原生镜像环境。
      */
-    private static final boolean IN_NATIVE_IMAGE =
-            System.getProperty("org.graalvm.nativeimage.imagecode") != null;
+    private static final boolean IN_NATIVE_IMAGE = System.getProperty("org.graalvm.nativeimage.imagecode") != null;
 
     public static Invoker createInvoker(Object controller, Class controllerClass, Method method) throws Throwable {
         if (IN_NATIVE_IMAGE) {
-            throw new UnsupportedOperationException(
-                    "FastInvokerGenerator is not supported in GraalVM native-image, " +
-                            "falling back to MethodHandleInvoker");
+            throw new UnsupportedOperationException("FastInvokerGenerator is not supported in GraalVM native-image, "
+                    + "falling back to MethodHandleInvoker");
         }
         Class<?> invokerClass = invokerClassCache.computeIfAbsent(method, (m) -> generateClass(controllerClass, m));
         Constructor<?> ctor = invokerClass.getConstructor(controllerClass);
@@ -47,8 +45,8 @@ public class FastInvokerGenerator {
     }
 
     private static Class<?> generateClass(Class controllerClass, Method method) {
-        String className = Invoker.class.getName() + "$" + controllerClass.getSimpleName()
-                + "$" + method.getName() + "$" + CLASS_COUNTER.getAndIncrement();
+        String className = Invoker.class.getName() + "$" + controllerClass.getSimpleName() + "$" + method.getName()
+                + "$" + CLASS_COUNTER.getAndIncrement();
         byte[] bytes = generateBytes(controllerClass, method, className);
         Class<?> invokerClass = defineClass(className, bytes, Invoker.class);
         return invokerClass;
@@ -57,7 +55,8 @@ public class FastInvokerGenerator {
     private static byte[] generateBytes(Class<?> controllerClass, Method method, String className) {
         String invokerInternal = className.replace(".", "/");
         ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
-        cw.visit(V1_8, ACC_PUBLIC | ACC_FINAL, invokerInternal, null, "java/lang/Object", new String[]{Type.getInternalName(Invoker.class)});
+        cw.visit(V1_8, ACC_PUBLIC | ACC_FINAL, invokerInternal, null, "java/lang/Object",
+                new String[] { Type.getInternalName(Invoker.class) });
         // ---------- field: private final Controller target ----------
         cw.visitField(ACC_PRIVATE | ACC_FINAL, "target", Type.getDescriptor(controllerClass), null, null).visitEnd();
         // ---------- constructor ----------
@@ -69,7 +68,8 @@ public class FastInvokerGenerator {
     }
 
     private static void generateConstructor(ClassWriter cw, String invokerInternal, Class<?> controllerClass) {
-        MethodVisitor mv = cw.visitMethod(ACC_PUBLIC, "<init>", "(" + Type.getDescriptor(controllerClass) + ")V", null, null);
+        MethodVisitor mv = cw.visitMethod(ACC_PUBLIC, "<init>", "(" + Type.getDescriptor(controllerClass) + ")V", null,
+                null);
         mv.visitCode();
         // super();
         mv.visitVarInsn(ALOAD, 0);
@@ -83,8 +83,10 @@ public class FastInvokerGenerator {
         mv.visitEnd();
     }
 
-    private static void generateInvokeMethod(ClassWriter cw, String invokerInternal, Class<?> controllerClass, Method method) {
-        MethodVisitor mv = cw.visitMethod(ACC_PUBLIC, "invoke", "([Ljava/lang/Object;)Ljava/lang/Object;", null, new String[]{"java/lang/Throwable"});
+    private static void generateInvokeMethod(ClassWriter cw, String invokerInternal, Class<?> controllerClass,
+            Method method) {
+        MethodVisitor mv = cw.visitMethod(ACC_PUBLIC, "invoke", "([Ljava/lang/Object;)Ljava/lang/Object;", null,
+                new String[] { "java/lang/Throwable" });
         mv.visitCode();
         // load this.target
         mv.visitVarInsn(ALOAD, 0);
@@ -105,7 +107,8 @@ public class FastInvokerGenerator {
             }
         }
         // invoke target method
-        mv.visitMethodInsn(INVOKEVIRTUAL, Type.getInternalName(controllerClass), method.getName(), Type.getMethodDescriptor(method), false);
+        mv.visitMethodInsn(INVOKEVIRTUAL, Type.getInternalName(controllerClass), method.getName(),
+                Type.getMethodDescriptor(method), false);
 
         // handle return
         Type rt = Type.getReturnType(method);
@@ -192,6 +195,9 @@ public class FastInvokerGenerator {
             case Type.CHAR:
                 mv.visitMethodInsn(INVOKESTATIC, "java/lang/Character", "valueOf", "(C)Ljava/lang/Character;", false);
                 break;
+            default:
+                // 与 unbox 同样兜底：未知 sort 说明传入的是对象类型，静默跳过会生成无效字节码
+                throw new IllegalStateException("Unsupported primitive: " + type);
         }
     }
 

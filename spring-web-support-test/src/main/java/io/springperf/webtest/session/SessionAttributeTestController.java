@@ -23,8 +23,7 @@ public class SessionAttributeTestController {
 
     /** 设置 session 属性，供 {@code @SessionAttribute}（单数）读取。 */
     @GetMapping("/put")
-    public Map<String, Object> put(@RequestParam String name, @RequestParam String value,
-                                   HttpServletRequest request) {
+    public Map<String, Object> put(@RequestParam String name, @RequestParam String value, HttpServletRequest request) {
         HttpSession session = request.getSession(true);
         session.setAttribute(name, value);
         Map<String, Object> result = new LinkedHashMap<>();
@@ -34,8 +33,7 @@ public class SessionAttributeTestController {
 
     /** 从 session 读取单值属性（required=true 默认）。 */
     @GetMapping("/get")
-    public Map<String, Object> get(@SessionAttribute("greeting") String greeting,
-                                   HttpServletRequest request) {
+    public Map<String, Object> get(@SessionAttribute("greeting") String greeting, HttpServletRequest request) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("greeting", greeting);
         result.put("sessionId", request.getSession(false).getId());
@@ -44,14 +42,13 @@ public class SessionAttributeTestController {
 
     /** required=false，session 无属性时返回 null 而非报错。 */
     @GetMapping("/get-optional")
-    public Map<String, Object> getOptional(
-            @SessionAttribute(name = "missing", required = false) String missing) {
+    public Map<String, Object> getOptional(@SessionAttribute(name = "missing", required = false) String missing) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("missing", missing);
         return result;
     }
 
-    /** @SessionScope bean 跨请求在 session 内共享计数。 */
+    /** {@code @SessionScope} bean 跨请求在 session 内共享计数。 */
     @GetMapping("/counter")
     public Map<String, Object> counter(HttpServletRequest request) {
         int value = counter.increment();
