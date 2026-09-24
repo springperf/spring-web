@@ -35,7 +35,11 @@ public class FileStorageService {
         if (!target.startsWith(root)) {
             throw new SecurityException("invalid path: " + filename);
         }
-        Files.createDirectories(target.getParent());
+        // Path.getParent() 声明为 @Nullable：无父目录（纯文件名）时无需创建
+        Path parent = target.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
         Files.write(target, content);
     }
 
@@ -48,10 +52,14 @@ public class FileStorageService {
     }
 
     public List<String> listFiles() throws IOException {
-        return Files.list(root)
-                .filter(Files::isRegularFile)
-                .map(p -> p.getFileName().toString())
-                .collect(Collectors.toList());
+        // try-with-resources：Files.list 的流持有目录句柄，不关闭会泄漏（原先直接 return 漏掉了）
+        try (java.util.stream.Stream<Path> files = Files.list(root)) {
+            // Path.getFileName() 声明为 @Nullable：无文件名时退化为完整路径
+            return files.filter(Files::isRegularFile).map(p -> {
+                Path name = p.getFileName();
+                return name != null ? name.toString() : p.toString();
+            }).collect(Collectors.toList());
+        }
     }
 
     public boolean delete(String filename) throws IOException {
