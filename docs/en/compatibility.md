@@ -112,7 +112,7 @@ The view rendering module depends on Spring's `org.springframework.ui` types. Be
 | `master` | 6.2.x | ❌ No | `ExtendedModelMap` (subclass of `ModelMap` and implements `Model`) | Always injects `ExtendedModelMap` to support `Model`/`ModelMap`/`ExtendedModelMap` declarations |
 | `2.7.x` | 5.3.x | ✅ Yes | `ExtendedModelMap` (simpler on backport) | `ModelMap` itself is castable to `Model` |
 
-> **Backport note**: `ModelSupport.getOrCreate()` in `spring-web-view` needs no special handling on 2.7.x — Spring 5.3's `ModelMap` already implements `Model`, so the same implementation can be reused.
+> **Backport note**: `ModelContext.getOrCreate()` in `spring-web` core needs no special handling on 2.7.x — Spring 5.3's `ModelMap` already implements `Model`, so the same implementation can be reused.
 
 ### Thymeleaf / FreeMarker Version Matrix
 

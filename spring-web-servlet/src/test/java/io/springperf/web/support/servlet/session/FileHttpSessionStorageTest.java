@@ -16,11 +16,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@link FileHttpSessionStorage} 单元测试：持久化 / 重启恢复 / 过期清理 / 坏文件容错 /
- * 不可序列化与排除名单属性跳过。
+ * {@link FileHttpSessionStorage} 单元测试：持久化 / 重启恢复 / 过期清理 / 坏文件容错 / 不可序列化与排除名单属性跳过。
  */
 class FileHttpSessionStorageTest {
 
@@ -41,10 +41,34 @@ class FileHttpSessionStorageTest {
         }
     }
 
+    /**
+     * 路径安全：id 含分隔符 / 上跳片段时必须在任何文件操作前失败。
+     *
+     * <p>
+     * 起因是一次审查：{@code fileOf} 直接把 id 拼进路径，安全性依赖「调用方只传自己生成的 id」这一跨方法约定。 现在校验落在 {@code fileOf} 内，本用例把它固定下来——若有人为了「按请求懒加载」而放行外来
+     * id，此处会先红。
+     * </p>
+     */
+    @Test
+    void fileOfRejectsSessionIdsThatCouldEscapeStoreDir() {
+        for (String unsafe : new String[] { "../../etc/passwd", "..\\..\\windows\\system32\\x", "a/b", "..", "" }) {
+            assertThrows(IllegalArgumentException.class, () -> storage.removeSession(unsafe),
+                    "应拒绝不安全 id: " + unsafe);
+        }
+        // 正常 id（含连字符等普通字符）不受影响
+        HttpSessionData data = storage.createSession();
+        assertNotNull(storage.getSession(data.getId()));
+        storage.removeSession(data.getId());
+        assertNull(storage.getSession(data.getId()));
+    }
+
     private static final class SerializableValue implements Serializable {
         private static final long serialVersionUID = 1L;
         final String text;
-        SerializableValue(String text) { this.text = text; }
+
+        SerializableValue(String text) {
+            this.text = text;
+        }
     }
 
     /** 不可序列化的属性值（无 Serializable）。 */
@@ -63,14 +87,13 @@ class FileHttpSessionStorageTest {
     }
 
     @Test
-    void saveSession_noTmpFileLeft()throws Exception {
+    void saveSession_noTmpFileLeft() throws Exception {
         HttpSessionData data = storage.createSession();
         data.setAttribute("k", "v");
         storage.saveSession(data);
 
         try (var files = Files.list(tempDir)) {
-            assertFalse(files.anyMatch(p -> p.getFileName().toString().endsWith(".tmp")),
-                    "原子写完成后不应残留 .tmp 文件");
+            assertFalse(files.anyMatch(p -> p.getFileName().toString().endsWith(".tmp")), "原子写完成后不应残留 .tmp 文件");
         }
     }
 
@@ -151,8 +174,7 @@ class FileHttpSessionStorageTest {
     @Test
     void excludedAttribute_notPersisted() throws Exception {
         Path dir = tempDir.resolve("excluded");
-        FileHttpSessionStorage excluded = new FileHttpSessionStorage(
-                dir, Collections.singleton("secret"));
+        FileHttpSessionStorage excluded = new FileHttpSessionStorage(dir, Collections.singleton("secret"));
         try {
             HttpSessionData data = excluded.createSession();
             data.setMaxInactiveInterval(3600);
@@ -162,8 +184,7 @@ class FileHttpSessionStorageTest {
             String id = data.getId();
             excluded.shutdown();
 
-            FileHttpSessionStorage restarted = new FileHttpSessionStorage(
-                    dir, Collections.singleton("secret"));
+            FileHttpSessionStorage restarted = new FileHttpSessionStorage(dir, Collections.singleton("secret"));
             try {
                 HttpSessionData restored = restarted.getSession(id);
                 assertNotNull(restored);
@@ -181,7 +202,7 @@ class FileHttpSessionStorageTest {
     void corruptedFile_skippedWithoutFailingStartup() throws Exception {
         // 写入一个损坏的 .session 文件
         Path bad = tempDir.resolve("deadbeef.session");
-        Files.write(bad, new byte[]{1, 2, 3, 4, 5});
+        Files.write(bad, new byte[] { 1, 2, 3, 4, 5 });
 
         // 启动不应抛异常
         FileHttpSessionStorage restarted = new FileHttpSessionStorage(tempDir);
@@ -210,8 +231,7 @@ class FileHttpSessionStorageTest {
         data.setInvalid(true);
         storage.saveSession(data);
 
-        assertFalse(Files.exists(tempDir.resolve(data.getId() + ".session")),
-                "已失效会话不应写入磁盘");
+        assertFalse(Files.exists(tempDir.resolve(data.getId() + ".session")), "已失效会话不应写入磁盘");
     }
 
     @Test

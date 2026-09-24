@@ -40,6 +40,11 @@
 | `server.tomcat.max-part-count` | `server.http.multipart.max-part-count` | 仅改名，语义不变（默认 -1 不限）。本框架非 Tomcat，键归入 HTTP 协议层家族 |
 | `server.tomcat.max-part-header-size` | `server.http.multipart.max-part-header-size` | 仅改名，语义不变（默认 8192） |
 
+> **同时被移除的 Java 常量**（japicmp 对**已发布 3.5.6** 基线的实测报告里 10 项移除中的 7 项，其余 3 项见下方扩展点条目）：
+> `PropertiesConstant.ASYNC_TIMEOUT` / `ASYNC_TIMEOUT_DEFAULT`、`HTTP_MAX_HEADER_SIZE` / `HTTP_MAX_HEADER_SIZE_DEFAULT`、
+> `SERVER_SHUTDOWN_TIMEOUT` / `SERVER_SHUTDOWN_TIMEOUT_DEFAULT`、`USE_FORWARDED_HEADERS`。
+> 键名层面的迁移见上表；**常量标识符没有兼容别名**——直接引用 `PropertiesConstant.XXX` 的代码需改为新常量或直接写新键名。
+
 ---
 
 ## 三、P1 视图引擎内部键（对齐 Boot 后移除 `spring.web.view.*`）
@@ -162,6 +167,9 @@
 |---|---|---|
 | `protected void DispatcherHandler.flushResponse(WebServerHttpResponse)` | `protected void flushResponse(WebServerHttpRequest, WebServerHttpResponse)` | 流式收尾需判断「异步是否仍挂起」，故增加请求参数；同仓子类 `ManagementDispatcherHandler` 已同步 |
 | `public boolean ErrorResponseConfig.includeBindingErrors()` | `public boolean includeBindingErrors(boolean onParam)` | `on-param` 必须真正受参数门控（旧实现在 `ON_PARAM` 下恒为 true，字段级校验信息被无条件下发） |
+| 三个 `@Bean` 方法：`SpringWebAutoConfiguration.applicationProperties()`、`accessLogWebFilter(Environment)`、`JspViewAutoConfiguration.jspViewResolver()` | 依次变为 `applicationProperties(Environment)`、`accessLogWebFilter(Environment, ApplicationProperties)`、`jspViewResolver(ApplicationProperties)`（`jspViewResolver` 同时从主自动配置移入 `JspViewAutoConfiguration`） | bean 依旧注册、类型不变；只有**覆写或调用这些方法**的代码（如 `@Configuration` 子类里的 `super.xxx()`）需按新形参适配。由 japicmp 对**真发布 3.5.6** 的比对报出 |
+| `public static final AttributeKey<ConnectionContext> NettyServerHttpResponse.CONN_CTX` | 已移除：连接上下文改由「每连接状态持有者」`ChannelAttrs.connCtx` 承载（经 `ChannelAttrs.of(ch)` / `ofIfPresent(ch)` 取） | 整个连接收敛为**单个** channel attr，省掉每请求 8~10 次 `attr(key)` 线性扫描（JFR 实测 `searchAttributeByKey` ≈1.6% 叶帧）。用法见 `docs/internals/05-server-and-http.md` §7 |
+| `Http2ChannelInitializer` 的 11 参构造器 `(boolean, SslContext, int, long, boolean, NettyHttpHandler, List<ChannelHandler>, List<ChannelHandler>, int, int, int)` | 已移除，替换为 15 参形态（在原三个 `int` 之后增加 `maxPartCount`、`maxPartHeaderSize`、`CompressionConfig`、`KeepAliveConfig`）；同时新增 `multipartConfig(MultipartConfig)` | 直接 `new` 该类的代码需按新形参调整。上面两侧签名取自 japicmp **实测输出**（基线 3.2.4）：`mvn -Pcompat -Dcompat.oldVersion=<已发布版本> verify`，报告在 `<module>/target/japicmp/` |
 
 - 注：`WebServerHttpResponse` 新增的方法（`flushChunked`/`endStream`/`isStreaming`/`markStreamCompleted`/`setBeforeCommit`）均为 `default`，**不要求**既有实现类改动。**例外**：`markStreamCompleted` 后来由 `void` 改为 `boolean`（抢占式「终止块写入权」，见 6.10）——覆写过该方法的实现需同步改签名（返回 `true` 表示本次调用赢得写入权）。
 - 迁移：覆写或调用上表方法的代码按新签名调整。
@@ -274,7 +282,7 @@
 | **非法配置值** | 热路径键**懒解析**：首次使用时才失败（或落到默认值），启动不受影响 | `ApplicationProperties` 在 **Environment 就绪时急切解析**（对齐 Boot `@ConfigurationProperties`）：解析失败即 **启动失败**（fail-fast）。运行期配置刷新（Spring Cloud）则逐字段容错：解析失败的字段**保留旧值**并告警，不让脏推送中断刷新 |
 | servlet 桥 `AsyncContext.start` 交棒 | 受 `server.http.timeout` 约束 | 在 `pool.default-execute-mode=eventloop`（**默认即此模式**）下**不再受** `server.http.timeout` 约束，改由 Servlet 自身 async 超时语义负责（代码内标注为已知残留）。其他执行模式不变 |
 | 响应超时装配时机 | 每个请求开始即装配定时器 | **按需装配**（同步段结束仍未提交时兜底，异步/流式等待时装配）：eventloop 同步且已提交的请求不再产生一次 schedule/cancel；**长于 `server.http.timeout` 的流式响应不再出现「已提交拒绝写出」WARN**（纯噪声消除，无内容改写） |
-| `spring.mvc.publish-request-handled-events` 默认值 | `true`（请求完成即发布 `ServletRequestHandledEvent`） | **`false`**（对齐 Boot 默认）。依赖该事件做监控/审计的需**显式开启**（见配置手册） |
+| `spring.mvc.publish-request-handled-events` 默认值 | `true`（请求完成即发布 `ServletRequestHandledEvent`） | **`false`**（**本项目有意关闭**，Boot 默认相反为 `true`：该事件对多数应用无实际用途，每请求发布纯属开销）。依赖该事件做监控/审计的需**显式开启**（见配置手册） |
 
 - 等价性佐证（各提交内附 JFR 数值）：`@RequestParam` 快路径 **CPU 采样/请求 −21%**、GET 分配 **−8.8%**；快路径资格在**构造期**判定（曾用「查找中途超阈再回退」，会被命中早退绕过 hash DoS 防护，回归用例捕获后修正）；`canDeserialize` 探测按 `mappingContext` 缓存（**约束**：默认 `ObjectMapper` 的能力集视为静态，运行期修改需同时 `clearCache` 该键与 `READ_JAVA_TYPE`/`WRITE_TYPE_SERIALIZABLE` 两个键——自定义 mapper 不缓存，保留请求级切换语义）。
 - 相关提交：`f515ae43`、`b6091749`、`bf1b88c8`、`59dc0ecb`、`21c3f8b1`、`2ec4e7c6`、`f3f9fa43`、`1708ed48`、`392747f8`、`d8c382cd`、`26281555`、`580ac83b`、`0254200d`、`5c3a23d2`

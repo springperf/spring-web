@@ -305,7 +305,7 @@ Server-side rendering (SSR) module built on Thymeleaf / FreeMarker template engi
 | `ViewResolver` | Resolution SPI: `resolveViewName(name, locale, req)`, sorted by `getOrder()` |
 | `ViewResolverRegistry` | Registration center; empty → String keeps JSON behavior |
 | `RedirectView` | `redirect:` prefix → 302 + query serialization |
-| `ModelSupport` | Request-scoped model container (`ExtendedModelMap`) bound to `RequestContext` |
+| `ModelContext` (held by `spring-web` core) | Request-scoped model container (`ExtendedModelMap`) bound to `RequestContext`; the view layer reuses it through `getOrCreate(req)` |
 | `ModelArgumentResolverProvider` | `Model` / `ModelMap` / `ExtendedModelMap` parameter injection + `postProcess` 5-step Model initialization (`@ControllerAdvice`/local `@ModelAttribute` methods, `@ModelAttribute` params, `@PathVariable`, `BindingResult`) |
 | `ViewReturnValueResolver` | String without `@ResponseBody` → view name (order=MAX-200, before JsonBody) |
 | `ThymeleafViewResolver` | Thymeleaf engine adapter (core API, zero servlet) |
