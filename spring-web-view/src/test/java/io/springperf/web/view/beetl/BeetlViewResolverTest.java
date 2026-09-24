@@ -33,8 +33,7 @@ class BeetlViewResolverTest {
         // 兜底：resolveBoolean 走 get(key, null)，Mockito 未桩时返回 null（视为“未配置” → 默认 true）。
         // resolveDurationMillis 走 getDurationMillis：未桩时返回默认值。
         lenient().when(props.getDurationMillis(org.mockito.ArgumentMatchers.anyString(),
-                org.mockito.ArgumentMatchers.anyLong()))
-                .thenAnswer(inv -> inv.getArgument(1));
+                org.mockito.ArgumentMatchers.anyLong())).thenAnswer(inv -> inv.getArgument(1));
         webContext = mock(WebContext.class);
         when(webContext.getProps()).thenReturn(props);
     }
@@ -86,8 +85,7 @@ class BeetlViewResolverTest {
         ApplicationProperties disabledProps = mock(ApplicationProperties.class);
         when(disabledProps.get(ViewProperties.BEETL_PREFIX, ViewProperties.BEETL_PREFIX_DEFAULT))
                 .thenReturn("templates/");
-        when(disabledProps.get(ViewProperties.BEETL_SUFFIX, ViewProperties.BEETL_SUFFIX_DEFAULT))
-                .thenReturn(".btl");
+        when(disabledProps.get(ViewProperties.BEETL_SUFFIX, ViewProperties.BEETL_SUFFIX_DEFAULT)).thenReturn(".btl");
         when(disabledProps.get(ViewProperties.BEETL_ENABLED, null)).thenReturn("false");
         WebContext disabledContext = mock(WebContext.class);
         when(disabledContext.getProps()).thenReturn(disabledProps);
@@ -106,12 +104,11 @@ class BeetlViewResolverTest {
     }
 
     @Test
-    void initWithWebContext_cacheDisabled_stillInitializes() {
+    void initWithWebContext_cacheDisabled_doesNotThrow() {
         ApplicationProperties noCacheProps = mock(ApplicationProperties.class);
         when(noCacheProps.get(ViewProperties.BEETL_PREFIX, ViewProperties.BEETL_PREFIX_DEFAULT))
                 .thenReturn("templates/");
-        when(noCacheProps.get(ViewProperties.BEETL_SUFFIX, ViewProperties.BEETL_SUFFIX_DEFAULT))
-                .thenReturn(".btl");
+        when(noCacheProps.get(ViewProperties.BEETL_SUFFIX, ViewProperties.BEETL_SUFFIX_DEFAULT)).thenReturn(".btl");
         when(noCacheProps.get(ViewProperties.BEETL_CACHE, null)).thenReturn("false");
         WebContext noCacheContext = mock(WebContext.class);
         when(noCacheContext.getProps()).thenReturn(noCacheProps);
@@ -123,12 +120,10 @@ class BeetlViewResolverTest {
     }
 
     @Test
-    void initWithWebContext_cacheTtlConfigured_stillInitializes() {
+    void initWithWebContext_cacheTtlConfigured_doesNotThrow() {
         ApplicationProperties ttlProps = mock(ApplicationProperties.class);
-        when(ttlProps.get(ViewProperties.BEETL_PREFIX, ViewProperties.BEETL_PREFIX_DEFAULT))
-                .thenReturn("templates/");
-        when(ttlProps.get(ViewProperties.BEETL_SUFFIX, ViewProperties.BEETL_SUFFIX_DEFAULT))
-                .thenReturn(".btl");
+        when(ttlProps.get(ViewProperties.BEETL_PREFIX, ViewProperties.BEETL_PREFIX_DEFAULT)).thenReturn("templates/");
+        when(ttlProps.get(ViewProperties.BEETL_SUFFIX, ViewProperties.BEETL_SUFFIX_DEFAULT)).thenReturn(".btl");
         when(ttlProps.getDurationMillis(ViewProperties.BEETL_CACHE_TTL, -1L)).thenReturn(60_000L);
         WebContext ttlContext = mock(WebContext.class);
         when(ttlContext.getProps()).thenReturn(ttlProps);
