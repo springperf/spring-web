@@ -1,6 +1,11 @@
 package io.springperf.web.core.retval.resolver;
 
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.*;
+
+import java.lang.reflect.Method;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -8,11 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.converter.HttpMessageConverter;
 
-import java.lang.reflect.Method;
-
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.*;
+import io.springperf.web.http.WebServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 class WrapMessageConverterReturnValueResolverTest {
@@ -72,5 +73,7 @@ class WrapMessageConverterReturnValueResolverTest {
     }
 
     @SuppressWarnings("unused")
-    public String stringReturn() { return null; }
+    public String stringReturn() {
+        return null;
+    }
 }

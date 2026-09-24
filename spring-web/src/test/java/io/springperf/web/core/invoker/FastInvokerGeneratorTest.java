@@ -1,10 +1,10 @@
 package io.springperf.web.core.invoker;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.lang.reflect.Method;
 
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class FastInvokerGeneratorTest {
 
@@ -17,7 +17,7 @@ class FastInvokerGeneratorTest {
         Method method = FastController.class.getMethod("hello", String.class);
         Invoker invoker = FastInvokerGenerator.createInvoker(controller, FastController.class, method);
 
-        Object result = invoker.invoke(new Object[]{"World"});
+        Object result = invoker.invoke(new Object[] { "World" });
 
         assertEquals("Hello World", result);
     }
@@ -42,7 +42,7 @@ class FastInvokerGeneratorTest {
         Method method = FastController.class.getMethod("add", int.class, int.class);
         Invoker invoker = FastInvokerGenerator.createInvoker(controller, FastController.class, method);
 
-        Object result = invoker.invoke(new Object[]{3, 4});
+        Object result = invoker.invoke(new Object[] { 3, 4 });
 
         assertTrue(result instanceof Integer);
         assertEquals(7, result);
@@ -64,7 +64,7 @@ class FastInvokerGeneratorTest {
         Method method = FastController.class.getMethod("multiply", long.class, int.class);
         Invoker invoker = FastInvokerGenerator.createInvoker(controller, FastController.class, method);
 
-        Object result = invoker.invoke(new Object[]{10L, 5});
+        Object result = invoker.invoke(new Object[] { 10L, 5 });
 
         assertTrue(result instanceof Long);
         assertEquals(50L, result);
@@ -77,7 +77,7 @@ class FastInvokerGeneratorTest {
         Method method = FastController.class.getMethod("concat", String.class, int.class, boolean.class);
         Invoker invoker = FastInvokerGenerator.createInvoker(controller, FastController.class, method);
 
-        Object result = invoker.invoke(new Object[]{"test", 42, true});
+        Object result = invoker.invoke(new Object[] { "test", 42, true });
 
         assertEquals("test42true", result);
     }
@@ -93,31 +93,27 @@ class FastInvokerGeneratorTest {
         Invoker invoker2 = FastInvokerGenerator.createInvoker(another, FastController.class, method);
 
         assertNotSame(invoker1, invoker2, "同一方法应复用生成的类，但每次 new 出独立实例");
-        assertEquals("Hello A", invoker1.invoke(new Object[]{"A"}));
-        assertEquals("Hello B", invoker2.invoke(new Object[]{"B"}));
+        assertEquals("Hello A", invoker1.invoke(new Object[] { "A" }));
+        assertEquals("Hello B", invoker2.invoke(new Object[] { "B" }));
     }
 
     // ----- GraalVM native-image 降级 -----
 
     /**
-     * native-image 场景下禁止运行时生成字节码（FastInvokerGenerator 抛异常），
-     * InvokableHandlerMethod 应降级为 MethodHandleInvoker。
-     * <p>由于 {@code IN_NATIVE_IMAGE} 是类加载期求值的 static final，
-     * 需 fork 子 JVM 并注入 {@code org.graalvm.nativeimage.imagecode} 系统属性。
+     * native-image 场景下禁止运行时生成字节码（FastInvokerGenerator 抛异常）， InvokableHandlerMethod 应降级为 MethodHandleInvoker。
+     * <p>
+     * 由于 {@code IN_NATIVE_IMAGE} 是类加载期求值的 static final， 需 fork 子 JVM 并注入 {@code org.graalvm.nativeimage.imagecode}
+     * 系统属性。
      */
     @Test
     void createInvoker_inNativeImage_degradesToMethodHandleInvoker() throws Exception {
-        String javaBin = System.getProperty("java.home") + java.io.File.separator + "bin"
-                + java.io.File.separator + (isWindows() ? "java.exe" : "java");
+        String javaBin = System.getProperty("java.home") + java.io.File.separator + "bin" + java.io.File.separator
+                + (isWindows() ? "java.exe" : "java");
         String classpath = System.getProperty("java.class.path");
-        Process p = new ProcessBuilder(javaBin,
-                "-Dorg.graalvm.nativeimage.imagecode=runtime",
-                "-cp", classpath,
-                NativeImageChildMain.class.getName())
-                .redirectErrorStream(true)
-                .start();
-        String output = org.springframework.util.StreamUtils.copyToString(
-                p.getInputStream(), java.nio.charset.StandardCharsets.UTF_8);
+        Process p = new ProcessBuilder(javaBin, "-Dorg.graalvm.nativeimage.imagecode=runtime", "-cp", classpath,
+                NativeImageChildMain.class.getName()).redirectErrorStream(true).start();
+        String output = org.springframework.util.StreamUtils.copyToString(p.getInputStream(),
+                java.nio.charset.StandardCharsets.UTF_8);
         int exit = p.waitFor();
 
         assertEquals(0, exit, "native-image 降级断言失败（exit=" + exit + "）：" + output);

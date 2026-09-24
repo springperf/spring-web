@@ -19,9 +19,7 @@ public class PerfHttpPrincipal implements Principal {
             throw new IllegalArgumentException("name must not be null");
         }
         this.name = name;
-        this.roles = roles != null
-                ? Collections.unmodifiableSet(new HashSet<>(roles))
-                : Collections.emptySet();
+        this.roles = roles != null ? Collections.unmodifiableSet(new HashSet<>(roles)) : Collections.emptySet();
     }
 
     @Override
@@ -39,8 +37,10 @@ public class PerfHttpPrincipal implements Principal {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof PerfHttpPrincipal)) return false;
+        if (this == o)
+            return true;
+        if (!(o instanceof PerfHttpPrincipal))
+            return false;
         return name.equals(((PerfHttpPrincipal) o).name);
     }
 

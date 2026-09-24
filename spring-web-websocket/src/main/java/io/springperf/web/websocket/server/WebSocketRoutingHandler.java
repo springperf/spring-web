@@ -29,29 +29,29 @@ import java.util.Map;
 
 /**
  * Netty pipeline handler：拦截 HTTP WebSocket 升级请求并委托 Spring。
- *
- * <p>放置在 {@code HttpObjectAggregator} 之前，拦截带 {@code Upgrade: websocket} 头的
- * HTTP 请求。匹配到已注册路径后：</p>
+ * <p>
+ * 放置在 {@code HttpObjectAggregator} 之前，拦截带 {@code Upgrade: websocket} 头的 HTTP 请求。匹配到已注册路径后：
+ * </p>
  * <ol>
- *   <li>使用 {@link WebSocketServerHandshaker} 完成 HTTP 升级握手</li>
- *   <li>将 pipeline 从 HTTP 模式切换为 WebSocket 帧模式</li>
- *   <li>创建 {@link NettyWebSocketSession}，调用 Spring 的 {@link WebSocketHandler}</li>
- *   <li>后续 WebSocket 帧直接委托给 Spring handler</li>
+ * <li>使用 {@link WebSocketServerHandshaker} 完成 HTTP 升级握手</li>
+ * <li>将 pipeline 从 HTTP 模式切换为 WebSocket 帧模式</li>
+ * <li>创建 {@link NettyWebSocketSession}，调用 Spring 的 {@link WebSocketHandler}</li>
+ * <li>后续 WebSocket 帧直接委托给 Spring handler</li>
  * </ol>
- *
- * <p>非 WebSocket 升级请求透传，不影响正常 HTTP 处理。</p>
+ * <p>
+ * 非 WebSocket 升级请求透传，不影响正常 HTTP 处理。
+ * </p>
  *
  * @author huangcanda
+ *
  * @since 1.0.4
  */
 @Slf4j
 @ChannelHandler.Sharable
 public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
 
-    private static final AttributeKey<NettyWebSocketSession> SESSION_KEY =
-            AttributeKey.valueOf("ws.session");
-    private static final AttributeKey<WebSocketHandler> HANDLER_KEY =
-            AttributeKey.valueOf("ws.handler");
+    private static final AttributeKey<NettyWebSocketSession> SESSION_KEY = AttributeKey.valueOf("ws.session");
+    private static final AttributeKey<WebSocketHandler> HANDLER_KEY = AttributeKey.valueOf("ws.handler");
 
     private static final String WS_DECODER = "ws-decoder";
     private static final String WS_ENCODER = "ws-encoder";
@@ -69,35 +69,29 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
         this(handlerMap, null, false, null, -1, -1, null);
     }
 
-    public WebSocketRoutingHandler(Map<String, WebSocketHandler> handlerMap,
-                                    String subProtocols, boolean allowExtensions) {
+    public WebSocketRoutingHandler(Map<String, WebSocketHandler> handlerMap, String subProtocols,
+            boolean allowExtensions) {
         this(handlerMap, subProtocols, allowExtensions, null, -1, -1, null);
     }
 
-    public WebSocketRoutingHandler(Map<String, WebSocketHandler> handlerMap,
-                                    String subProtocols, boolean allowExtensions,
-                                    List<String> allowedOrigins) {
+    public WebSocketRoutingHandler(Map<String, WebSocketHandler> handlerMap, String subProtocols,
+            boolean allowExtensions, List<String> allowedOrigins) {
         this(handlerMap, subProtocols, allowExtensions, allowedOrigins, -1, -1, null);
     }
 
-    public WebSocketRoutingHandler(Map<String, WebSocketHandler> handlerMap,
-                                    String subProtocols, boolean allowExtensions,
-                                    List<String> allowedOrigins, long idleTimeout) {
+    public WebSocketRoutingHandler(Map<String, WebSocketHandler> handlerMap, String subProtocols,
+            boolean allowExtensions, List<String> allowedOrigins, long idleTimeout) {
         this(handlerMap, subProtocols, allowExtensions, allowedOrigins, idleTimeout, -1, null);
     }
 
-    public WebSocketRoutingHandler(Map<String, WebSocketHandler> handlerMap,
-                                    String subProtocols, boolean allowExtensions,
-                                    List<String> allowedOrigins, long idleTimeout,
-                                    long heartbeatInterval) {
+    public WebSocketRoutingHandler(Map<String, WebSocketHandler> handlerMap, String subProtocols,
+            boolean allowExtensions, List<String> allowedOrigins, long idleTimeout, long heartbeatInterval) {
         this(handlerMap, subProtocols, allowExtensions, allowedOrigins, idleTimeout, heartbeatInterval, null);
     }
 
-    public WebSocketRoutingHandler(Map<String, WebSocketHandler> handlerMap,
-                                    String subProtocols, boolean allowExtensions,
-                                    List<String> allowedOrigins, long idleTimeout,
-                                    long heartbeatInterval,
-                                    @Nullable io.springperf.web.websocket.WebSocketHandlerRegistry registry) {
+    public WebSocketRoutingHandler(Map<String, WebSocketHandler> handlerMap, String subProtocols,
+            boolean allowExtensions, List<String> allowedOrigins, long idleTimeout, long heartbeatInterval,
+            @Nullable io.springperf.web.websocket.WebSocketHandlerRegistry registry) {
         this.handlerMap = handlerMap;
         this.subProtocols = subProtocols;
         this.allowExtensions = allowExtensions;
@@ -142,8 +136,8 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
         String wsUrl = buildWebSocketUrl(ctx, req, path);
         String effectiveSubProtocols = resolveSubProtocols(result.registration);
         boolean effectiveExtensions = resolveAllowExtensions(result.registration);
-        WebSocketServerHandshakerFactory factory = new WebSocketServerHandshakerFactory(
-                wsUrl, effectiveSubProtocols, effectiveExtensions);
+        WebSocketServerHandshakerFactory factory = new WebSocketServerHandshakerFactory(wsUrl, effectiveSubProtocols,
+                effectiveExtensions);
         WebSocketServerHandshaker handshaker = factory.newHandshaker(req);
 
         if (handshaker == null) {
@@ -153,24 +147,22 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
             return;
         }
 
-        handshaker.handshake(ctx.channel(), (FullHttpRequest) req)
-                .addListener((ChannelFutureListener) future -> {
-                    if (!future.isSuccess()) {
-                        log.error("WebSocket handshake failed for {}", path, future.cause());
-                        // 握手失败：请求不再被使用，释放调用方持有的原始引用
-                        // （netty handshake 内部 retain 的引用由 WebSocketServerHandshaker$2
-                        // 在 fireChannelRead 时释放，此处释放原始引用）。
-                        ReferenceCountUtil.release(req);
-                        ctx.close();
-                        return;
-                    }
-                    afterHandshakeSuccess(ctx, req, path, handshaker, result);
-                });
+        handshaker.handshake(ctx.channel(), (FullHttpRequest) req).addListener((ChannelFutureListener) future -> {
+            if (!future.isSuccess()) {
+                log.error("WebSocket handshake failed for {}", path, future.cause());
+                // 握手失败：请求不再被使用，释放调用方持有的原始引用
+                // （netty handshake 内部 retain 的引用由 WebSocketServerHandshaker$2
+                // 在 fireChannelRead 时释放，此处释放原始引用）。
+                ReferenceCountUtil.release(req);
+                ctx.close();
+                return;
+            }
+            afterHandshakeSuccess(ctx, req, path, handshaker, result);
+        });
     }
 
-    private void afterHandshakeSuccess(ChannelHandlerContext ctx, HttpRequest req,
-                                        String path, WebSocketServerHandshaker handshaker,
-                                        PathMatchResult result) {
+    private void afterHandshakeSuccess(ChannelHandlerContext ctx, HttpRequest req, String path,
+            WebSocketServerHandshaker handshaker, PathMatchResult result) {
         // 构建 URI 和 Headers
         URI sessionUri = buildSessionUri(req);
         SpringHeadersAdapter springHeaders = new SpringHeadersAdapter(req.headers());
@@ -182,10 +174,8 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
 
         // 从 TLS 提取客户端证书 Principal
         Principal principal = extractTlsPrincipal(ctx);
-        NettyWebSocketSession session = new NettyWebSocketSession(
-                ctx.channel(), sessionUri, springHeaders,
-                handshaker.selectedSubprotocol(), localAddr, remoteAddr, principal,
-                result.handler);
+        NettyWebSocketSession session = new NettyWebSocketSession(ctx.channel(), sessionUri, springHeaders,
+                handshaker.selectedSubprotocol(), localAddr, remoteAddr, principal, result.handler);
 
         // 将路径变量存入 session attributes（如 roomId=123）
         session.getAttributes().putAll(result.uriVariables);
@@ -205,9 +195,8 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
         // 空闲超时检测（支持 per-path 覆盖）
         long effectiveIdleTimeout = resolveIdleTimeout(result.registration);
         if (effectiveIdleTimeout > 0) {
-            pipeline.addBefore(currentName, "ws-idle",
-                    new IdleStateHandler(effectiveIdleTimeout, effectiveIdleTimeout, effectiveIdleTimeout,
-                            java.util.concurrent.TimeUnit.MILLISECONDS));
+            pipeline.addBefore(currentName, "ws-idle", new IdleStateHandler(effectiveIdleTimeout, effectiveIdleTimeout,
+                    effectiveIdleTimeout, java.util.concurrent.TimeUnit.MILLISECONDS));
         }
 
         // 从 session 的 sizeLimit 决定 decoder 的最大帧载荷长度
@@ -235,12 +224,11 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
         // 主动心跳保活（支持 per-path 覆盖）
         long effectiveHeartbeat = resolveHeartbeatInterval(result.registration);
         if (effectiveHeartbeat > 0 && session.isOpen()) {
-            java.util.concurrent.ScheduledFuture<?> hbFuture = ctx.channel().eventLoop()
-                    .scheduleAtFixedRate(() -> {
-                        if (session.isOpen() && ctx.channel().isWritable()) {
-                            ctx.writeAndFlush(new PingWebSocketFrame());
-                        }
-                    }, effectiveHeartbeat, effectiveHeartbeat, java.util.concurrent.TimeUnit.MILLISECONDS);
+            java.util.concurrent.ScheduledFuture<?> hbFuture = ctx.channel().eventLoop().scheduleAtFixedRate(() -> {
+                if (session.isOpen() && ctx.channel().isWritable()) {
+                    ctx.writeAndFlush(new PingWebSocketFrame());
+                }
+            }, effectiveHeartbeat, effectiveHeartbeat, java.util.concurrent.TimeUnit.MILLISECONDS);
             ctx.channel().closeFuture().addListener(f -> hbFuture.cancel(false));
         }
 
@@ -298,8 +286,7 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
                     log.error("afterConnectionClosed failed", e);
                 }
                 // RFC 6455 §7.4.1: 服务端必须回显 Close 帧，再关闭 TCP
-                ctx.writeAndFlush(close.retain())
-                        .addListener(ChannelFutureListener.CLOSE);
+                ctx.writeAndFlush(close.retain()).addListener(ChannelFutureListener.CLOSE);
                 return; // frame released in finally, retained copy lives for write
             }
         } catch (Exception e) {
@@ -344,8 +331,7 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
             if (handler != null && session != null) {
                 log.warn("WebSocket idle timeout, closing session {}", session.getId());
                 try {
-                    handler.handleTransportError(session,
-                            new java.io.IOException("Connection idle timeout"));
+                    handler.handleTransportError(session, new java.io.IOException("Connection idle timeout"));
                 } catch (Exception e) {
                     log.error("Idle timeout handler failed", e);
                 }
@@ -379,39 +365,39 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
     // ---- per-path 配置解析（有 per-path 覆盖则使用，否则回退全局） ----
 
     @Nullable
-    private List<String> resolveOrigins(
-            @Nullable io.springperf.web.websocket.WebSocketHandlerRegistration reg) {
-        if (reg != null && reg.getAllowedOrigins() != null) return reg.getAllowedOrigins();
+    private List<String> resolveOrigins(@Nullable io.springperf.web.websocket.WebSocketHandlerRegistration reg) {
+        if (reg != null && reg.getAllowedOrigins() != null)
+            return reg.getAllowedOrigins();
         return allowedOrigins;
     }
 
-    private String resolveSubProtocols(
-            @Nullable io.springperf.web.websocket.WebSocketHandlerRegistration reg) {
-        if (reg != null && reg.getSubProtocols() != null) return reg.getSubProtocols();
+    private String resolveSubProtocols(@Nullable io.springperf.web.websocket.WebSocketHandlerRegistration reg) {
+        if (reg != null && reg.getSubProtocols() != null)
+            return reg.getSubProtocols();
         return subProtocols;
     }
 
-    private boolean resolveAllowExtensions(
-            @Nullable io.springperf.web.websocket.WebSocketHandlerRegistration reg) {
-        if (reg != null && reg.getAllowExtensions() != null) return reg.getAllowExtensions();
+    private boolean resolveAllowExtensions(@Nullable io.springperf.web.websocket.WebSocketHandlerRegistration reg) {
+        if (reg != null && reg.getAllowExtensions() != null)
+            return reg.getAllowExtensions();
         return allowExtensions;
     }
 
-    private long resolveIdleTimeout(
-            @Nullable io.springperf.web.websocket.WebSocketHandlerRegistration reg) {
-        if (reg != null && reg.getIdleTimeout() != null) return reg.getIdleTimeout();
+    private long resolveIdleTimeout(@Nullable io.springperf.web.websocket.WebSocketHandlerRegistration reg) {
+        if (reg != null && reg.getIdleTimeout() != null)
+            return reg.getIdleTimeout();
         return idleTimeout;
     }
 
-    private long resolveHeartbeatInterval(
-            @Nullable io.springperf.web.websocket.WebSocketHandlerRegistration reg) {
-        if (reg != null && reg.getHeartbeatInterval() != null) return reg.getHeartbeatInterval();
+    private long resolveHeartbeatInterval(@Nullable io.springperf.web.websocket.WebSocketHandlerRegistration reg) {
+        if (reg != null && reg.getHeartbeatInterval() != null)
+            return reg.getHeartbeatInterval();
         return heartbeatInterval;
     }
 
-    private long resolveMessageSizeLimit(
-            @Nullable io.springperf.web.websocket.WebSocketHandlerRegistration reg) {
-        if (reg != null && reg.getMessageSizeLimit() != null) return reg.getMessageSizeLimit();
+    private long resolveMessageSizeLimit(@Nullable io.springperf.web.websocket.WebSocketHandlerRegistration reg) {
+        if (reg != null && reg.getMessageSizeLimit() != null)
+            return reg.getMessageSizeLimit();
         return -1;
     }
 
@@ -421,8 +407,7 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
     }
 
     /**
-     * 从 SslHandler 提取 TLS 客户端证书 Principal。
-     * 无 TLS 或无客户端证书时返回 null。
+     * 从 SslHandler 提取 TLS 客户端证书 Principal。 无 TLS 或无客户端证书时返回 null。
      */
     @Nullable
     private static Principal extractTlsPrincipal(ChannelHandlerContext ctx) {
@@ -440,14 +425,14 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
 
     /**
      * 校验 WebSocket 握手请求的 Origin 头。
-     * <p>未配置 allowedOrigins（null）时跳过校验（兼容非浏览器客户端）。
-     * 显式配置为空列表时拒绝所有带 Origin 头的跨域请求。
-     * 复用 {@link CorsUtils} 的 origin 解析逻辑。</p>
+     * <p>
+     * 未配置 allowedOrigins（null）时跳过校验（兼容非浏览器客户端）。 显式配置为空列表时拒绝所有带 Origin 头的跨域请求。 复用 {@link CorsUtils} 的 origin 解析逻辑。
+     * </p>
      *
-     * @param effectiveOrigins 优先使用 per-path 配置，null 时使用全局默认
+     * @param effectiveOrigins
+     *            优先使用 per-path 配置，null 时使用全局默认
      */
-    private boolean checkOrigin(HttpRequest req, ChannelHandlerContext ctx,
-                                @Nullable List<String> effectiveOrigins) {
+    private boolean checkOrigin(HttpRequest req, ChannelHandlerContext ctx, @Nullable List<String> effectiveOrigins) {
         List<String> origins = effectiveOrigins != null ? effectiveOrigins : allowedOrigins;
         if (origins == null) {
             return true; // 未配置，允许所有来源
@@ -474,9 +459,8 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
     }
 
     private static void sendForbiddenResponse(ChannelHandlerContext ctx, HttpRequest req) {
-        io.netty.handler.codec.http.DefaultHttpResponse resp =
-                new io.netty.handler.codec.http.DefaultHttpResponse(
-                        req.protocolVersion(), HttpResponseStatus.FORBIDDEN);
+        io.netty.handler.codec.http.DefaultHttpResponse resp = new io.netty.handler.codec.http.DefaultHttpResponse(
+                req.protocolVersion(), HttpResponseStatus.FORBIDDEN);
         if (HttpUtil.isKeepAlive(req)) {
             resp.headers().set(io.netty.handler.codec.http.HttpHeaderNames.CONNECTION, "close");
         }
@@ -491,9 +475,8 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
         final io.springperf.web.websocket.WebSocketHandlerRegistration registration;
         final Map<String, String> uriVariables;
 
-        PathMatchResult(WebSocketHandler handler,
-                        io.springperf.web.websocket.WebSocketHandlerRegistration registration,
-                        Map<String, String> uriVariables) {
+        PathMatchResult(WebSocketHandler handler, io.springperf.web.websocket.WebSocketHandlerRegistration registration,
+                Map<String, String> uriVariables) {
             this.handler = handler;
             this.registration = registration;
             this.uriVariables = uriVariables;
@@ -504,8 +487,9 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
         // 1. 精确匹配（快速路径，无路径变量）
         WebSocketHandler handler = handlerMap.get(path);
         if (handler != null) {
-            io.springperf.web.websocket.WebSocketHandlerRegistration reg =
-                    registry != null ? registry.getRegistration(path) : null;
+            io.springperf.web.websocket.WebSocketHandlerRegistration reg = registry != null
+                    ? registry.getRegistration(path)
+                    : null;
             return new PathMatchResult(handler, reg, Collections.emptyMap());
         }
 
@@ -515,8 +499,9 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
         for (Map.Entry<String, WebSocketHandler> entry : handlerMap.entrySet()) {
             Map<String, String> variables = routeMatcher.matchAndExtract(entry.getKey(), route);
             if (variables != null) {
-                io.springperf.web.websocket.WebSocketHandlerRegistration reg =
-                        registry != null ? registry.getRegistration(entry.getKey()) : null;
+                io.springperf.web.websocket.WebSocketHandlerRegistration reg = registry != null
+                        ? registry.getRegistration(entry.getKey())
+                        : null;
                 return new PathMatchResult(entry.getValue(), reg, variables);
             }
         }

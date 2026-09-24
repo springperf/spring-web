@@ -9,15 +9,14 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
- * 验证 {@link SpringDataWebCompatibilityAutoConfiguration.ProjectingArgumentResolverCleanupProcessor}：
- * classpath 无 RequestMappingHandlerAdapter 时移除 Spring Data 的 BPP bean，防止 NoClassDefFoundError。
+ * 验证 {@link SpringDataWebCompatibilityAutoConfiguration.ProjectingArgumentResolverCleanupProcessor}： classpath 无
+ * RequestMappingHandlerAdapter 时移除 Spring Data 的 BPP bean，防止 NoClassDefFoundError。
  */
 class SpringDataWebCompatibilityAutoConfigurationTest {
 
     private static final String BPP_BEAN_NAME = "projectingArgumentResolverBeanPostProcessor";
 
-    private final SpringDataWebCompatibilityAutoConfiguration.ProjectingArgumentResolverCleanupProcessor processor =
-            new SpringDataWebCompatibilityAutoConfiguration.ProjectingArgumentResolverCleanupProcessor();
+    private final SpringDataWebCompatibilityAutoConfiguration.ProjectingArgumentResolverCleanupProcessor processor = new SpringDataWebCompatibilityAutoConfiguration.ProjectingArgumentResolverCleanupProcessor();
 
     @Test
     void postProcessBeanDefinitionRegistry_containsBpp_removes() {
@@ -46,8 +45,8 @@ class SpringDataWebCompatibilityAutoConfigurationTest {
 
     @Test
     void projectingArgumentResolverCleanupProcessor_returnsPostProcessor() {
-        BeanDefinitionRegistryPostProcessor processor =
-                SpringDataWebCompatibilityAutoConfiguration.projectingArgumentResolverCleanupProcessor();
+        BeanDefinitionRegistryPostProcessor processor = SpringDataWebCompatibilityAutoConfiguration
+                .projectingArgumentResolverCleanupProcessor();
         assertNotNull(processor);
     }
 }

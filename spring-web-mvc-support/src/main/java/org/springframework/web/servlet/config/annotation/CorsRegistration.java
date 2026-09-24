@@ -5,9 +5,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import java.util.Arrays;
 
 /**
- * A data-collecting shim of Spring MVC's {@code CorsRegistration}.
- * Collects CORS configuration so that it can be read and bridged
- * to the framework's native {@link io.springperf.web.core.cors.CorsRegistration}.
+ * A data-collecting shim of Spring MVC's {@code CorsRegistration}. Collects CORS configuration so that it can be read
+ * and bridged to the framework's native {@link io.springperf.web.core.cors.CorsRegistration}.
  */
 public class CorsRegistration {
 

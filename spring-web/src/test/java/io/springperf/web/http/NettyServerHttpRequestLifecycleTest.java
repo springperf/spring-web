@@ -1,5 +1,14 @@
 package io.springperf.web.http;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.*;
+
+import java.nio.charset.StandardCharsets;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
@@ -13,19 +22,10 @@ import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.async.AsyncSupportUtils;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
-import java.nio.charset.StandardCharsets;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.Mockito.*;
 
 /**
- * 验证"响应未提交 buf 的生命周期绑定到请求"：{@link NettyServerHttpRequest#release()}
- * 应级联释放其绑定的 {@link NettyServerHttpResponse} 未提交 buf，且对同步/异步路径统一，
- * 不再依赖 {@code isAsyncRequest} 守卫。
+ * 验证"响应未提交 buf 的生命周期绑定到请求"：{@link NettyServerHttpRequest#release()} 应级联释放其绑定的 {@link NettyServerHttpResponse} 未提交
+ * buf，且对同步/异步路径统一， 不再依赖 {@code isAsyncRequest} 守卫。
  */
 class NettyServerHttpRequestLifecycleTest {
 
@@ -53,8 +53,8 @@ class NettyServerHttpRequestLifecycleTest {
     }
 
     private NettyServerHttpRequest newRequest() {
-        FullHttpRequest msg = new DefaultFullHttpRequest(
-                HttpVersion.HTTP_1_1, HttpMethod.GET, "/t", Unpooled.buffer(0));
+        FullHttpRequest msg = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/t",
+                Unpooled.buffer(0));
         return new NettyServerHttpRequest(webContext, ctx, msg, "/t");
     }
 
@@ -74,8 +74,7 @@ class NettyServerHttpRequestLifecycleTest {
 
         req.release();
 
-        assertEquals(0, buf.refCnt(),
-                "req.release() 应级联释放绑定的响应未提交 buf（生命周期绑定）");
+        assertEquals(0, buf.refCnt(), "req.release() 应级联释放绑定的响应未提交 buf（生命周期绑定）");
     }
 
     @Test
@@ -91,8 +90,7 @@ class NettyServerHttpRequestLifecycleTest {
         }
 
         // 异步挂起：startAsync 使异步持有者 acquire 一次（refCnt 1 → 2）
-        io.springperf.web.core.async.PerfAsyncWebRequest async =
-                AsyncSupportUtils.getAsyncWebRequest(req, response);
+        io.springperf.web.core.async.PerfAsyncWebRequest async = AsyncSupportUtils.getAsyncWebRequest(req, response);
         async.startAsyncProcessing();
         assertTrue(AsyncSupportUtils.isAsyncRequest(req), "异步应已启动");
 
@@ -110,7 +108,9 @@ class NettyServerHttpRequestLifecycleTest {
     void release_withoutBoundResponse_isNoop() {
         // 未绑定响应（如仅构造 request 做解析测试）时 release 不应抛异常
         NettyServerHttpRequest req = newRequest();
-        assertDoesNotThrow(() -> { req.release(); });
+        assertDoesNotThrow(() -> {
+            req.release();
+        });
     }
 
     @Test
@@ -127,7 +127,9 @@ class NettyServerHttpRequestLifecycleTest {
         }
         assertDoesNotThrow(() -> response.flush());
 
-        assertDoesNotThrow(() -> { req.release(); });
+        assertDoesNotThrow(() -> {
+            req.release();
+        });
 
         // 提交后再次 getBuf 仍能分配出全新（未被误释放）的缓冲
         ByteBuf afterFlush = response.getBuf();

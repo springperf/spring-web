@@ -1,5 +1,9 @@
 package io.springperf.web.server;
 
+import java.util.ArrayDeque;
+
+import org.springframework.http.HttpStatus;
+
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -20,22 +24,21 @@ import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.http.WriteRespEventListener;
 import io.springperf.web.server.ResponseLimitConfig;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
-
-import java.util.ArrayDeque;
 
 /**
  * Netty 入站处理器。职责仅限于：
  * <ol>
- *   <li>解析 URI、校验 contextPath</li>
- *   <li>创建 request/response 对象（msg.retain() + 构造 req，finally 中 req.release()）</li>
- *   <li>委托 {@link HttpHandler#httpHandle} 执行实际处理</li>
- *   <li>异常兜底（ResponseStatusException → 特定状态码，其余 → 500）</li>
+ * <li>解析 URI、校验 contextPath</li>
+ * <li>创建 request/response 对象（msg.retain() + 构造 req，finally 中 req.release()）</li>
+ * <li>委托 {@link HttpHandler#httpHandle} 执行实际处理</li>
+ * <li>异常兜底（ResponseStatusException → 特定状态码，其余 → 500）</li>
  * </ol>
- * <p>contextPath 为空字符串时不执行前缀校验。</p>
- *
- * <p>继承 {@link ChannelInboundHandlerAdapter} 手动管理消息释放，
- * 配合 {@link ChannelHandler.Sharable} 在多 pipeline 中安全共享。</p>
+ * <p>
+ * contextPath 为空字符串时不执行前缀校验。
+ * </p>
+ * <p>
+ * 继承 {@link ChannelInboundHandlerAdapter} 手动管理消息释放， 配合 {@link ChannelHandler.Sharable} 在多 pipeline 中安全共享。
+ * </p>
  */
 @Slf4j
 @ChannelHandler.Sharable
@@ -57,12 +60,12 @@ public class NettyHttpHandler extends ChannelInboundHandlerAdapter {
     }
 
     public NettyHttpHandler(WebContext webContext, String contextPath, HttpHandler handler,
-                           boolean compressionEnabled) {
+            boolean compressionEnabled) {
         this(webContext, contextPath, handler, compressionEnabled, ResponseLimitConfig.DEFAULT);
     }
 
-    public NettyHttpHandler(WebContext webContext, String contextPath, HttpHandler handler,
-                           boolean compressionEnabled, ResponseLimitConfig responseLimitConfig) {
+    public NettyHttpHandler(WebContext webContext, String contextPath, HttpHandler handler, boolean compressionEnabled,
+            ResponseLimitConfig responseLimitConfig) {
         this.webContext = webContext;
         this.contextPath = contextPath;
         this.handler = handler;
@@ -75,13 +78,13 @@ public class NettyHttpHandler extends ChannelInboundHandlerAdapter {
 
     /**
      * 是否需要在请求开始时装配响应超时（{@code server.http.timeout}）。
-     *
-     * <p>{@code pool.default-execute-mode=eventloop}（或未配置）时为 {@code false}：该模式下处理器在
-     * EventLoop 上同步执行，而响应超时任务也调度在同一个 EventLoop（{@code ctx.executor().schedule}），
-     * <b>处理器执行期间定时器不可能触发</b>；凡是能让它执行的时刻，响应要么已提交（被 {@code setCommitted}
-     * 取消）、要么请求已交棒（由 {@link io.springperf.web.core.DispatcherHandler} 池分支补装配、
-     * 或异步开始时按 {@code spring.mvc.async.request-timeout} 重装配）。故该模式下请求开始的装配
-     * 是纯开销（每请求 1 次 schedule + 1 次 cancel + 1 个 ScheduledFutureTask）。</p>
+     * <p>
+     * {@code pool.default-execute-mode=eventloop}（或未配置）时为 {@code false}：该模式下处理器在 EventLoop 上同步执行，而响应超时任务也调度在同一个
+     * EventLoop（{@code ctx.executor().schedule}）， <b>处理器执行期间定时器不可能触发</b>；凡是能让它执行的时刻，响应要么已提交（被 {@code setCommitted}
+     * 取消）、要么请求已交棒（由 {@link io.springperf.web.core.DispatcherHandler} 池分支补装配、 或异步开始时按
+     * {@code spring.mvc.async.request-timeout} 重装配）。故该模式下请求开始的装配 是纯开销（每请求 1 次 schedule + 1 次 cancel + 1 个
+     * ScheduledFutureTask）。
+     * </p>
      */
     private boolean armTimeoutOnRequestStart() {
         BizPoolRegistry registry = this.bizPoolRegistry;
@@ -107,8 +110,7 @@ public class NettyHttpHandler extends ChannelInboundHandlerAdapter {
     }
 
     /**
-     * 入队后是否应暂停读取：达到上限才暂停；上限 {@code <=0} 表示不限制。
-     * 独立成包级方法便于单测直接锁定边界（0 / 恰好等于 / 超一 / 负值）。
+     * 入队后是否应暂停读取：达到上限才暂停；上限 {@code <=0} 表示不限制。 独立成包级方法便于单测直接锁定边界（0 / 恰好等于 / 超一 / 负值）。
      */
     static boolean shouldPauseReads(int queued, int maxPipelined) {
         return maxPipelined > 0 && queued >= maxPipelined;
@@ -116,9 +118,9 @@ public class NettyHttpHandler extends ChannelInboundHandlerAdapter {
 
     /**
      * 同连接排队上限（{@code server.http.max-pipelined-requests}）。
-     *
-     * <p>只在**真的出现排队**时读取（普通请求零成本）；无 WebContext（单测替身）或取值非法时
-     * 回退默认上限——配置错误不得放大防护。</p>
+     * <p>
+     * 只在**真的出现排队**时读取（普通请求零成本）；无 WebContext（单测替身）或取值非法时 回退默认上限——配置错误不得放大防护。
+     * </p>
      */
     private int maxPipelinedRequests() {
         try {
@@ -188,7 +190,8 @@ public class NettyHttpHandler extends ChannelInboundHandlerAdapter {
     /**
      * 注册「响应写入完成」回调，用于解除连接的处理中标记并按序处理已排队的 pipelined 请求。
      */
-    private void registerPipeliningCompletion(ChannelHandlerContext ctx, WebServerHttpResponse resp, ChannelAttrs attrs) {
+    private void registerPipeliningCompletion(ChannelHandlerContext ctx, WebServerHttpResponse resp,
+            ChannelAttrs attrs) {
         resp.addWriteRespEventListener(new WriteRespEventListener() {
             @Override
             public void completeSuccessCallback() {
@@ -265,8 +268,8 @@ public class NettyHttpHandler extends ChannelInboundHandlerAdapter {
     private void handleRequest(ChannelHandlerContext ctxNetty, FullHttpRequest msg, ChannelAttrs attrs) {
         // 关闭中：拒绝新请求
         if (shuttingDown) {
-            NettyServerHttpResponse resp = new NettyServerHttpResponse(webContext, ctxNetty, false,
-                    responseLimitConfig, 0L);
+            NettyServerHttpResponse resp = new NettyServerHttpResponse(webContext, ctxNetty, false, responseLimitConfig,
+                    0L);
             resp.setRequestAcceptHeader(msg.headers().get(HttpHeaderNames.ACCEPT));
             registerPipeliningCompletion(ctxNetty, resp, attrs);
             try {
@@ -277,8 +280,8 @@ public class NettyHttpHandler extends ChannelInboundHandlerAdapter {
             return;
         }
 
-        NettyServerHttpResponse resp = new NettyServerHttpResponse(webContext, ctxNetty,
-                HttpUtil.isKeepAlive(msg), responseLimitConfig, msg.content().readableBytes());
+        NettyServerHttpResponse resp = new NettyServerHttpResponse(webContext, ctxNetty, HttpUtil.isKeepAlive(msg),
+                responseLimitConfig, msg.content().readableBytes());
         // 错误体内容协商：显式 JSON 客户端应得 JSON 错误体（见 ErrorPageRenderer.build）
         resp.setRequestAcceptHeader(msg.headers().get(HttpHeaderNames.ACCEPT));
         // pipelining 串行化：响应写完后再处理同连接排队请求
@@ -324,63 +327,63 @@ public class NettyHttpHandler extends ChannelInboundHandlerAdapter {
             //
             // == 引用计数与异步生命周期的设计说明（#5，已知取舍，未改动逻辑） ==
             // 入站 FullHttpRequest 的 ByteBuf 引用计数轨迹：
-            //   (a) 进入本 handler 前管线已用 HttpObjectAggregator/SupportMultipartAggregator
-            //       把整个 body 聚合成一个 FullHttpRequest，故 handler 跑起来时完整 body 已在内存；
-            //   (b) 下面 msg.retain() → refCnt 1→2（pipeline 占 1，此处多持 1）；
-            //   (c) 同步末尾 req.release() → refCnt 2→1，并级联 response.release()；
-            //   (d) channelRead.finally 的 ReferenceCountUtil.release(request) → refCnt 1→0，
-            //       这是把入站 buf 真正打 0 的唯一位置（不在 req.release() 内）。
+            // (a) 进入本 handler 前管线已用 HttpObjectAggregator/SupportMultipartAggregator
+            // 把整个 body 聚合成一个 FullHttpRequest，故 handler 跑起来时完整 body 已在内存；
+            // (b) 下面 msg.retain() → refCnt 1→2（pipeline 占 1，此处多持 1）；
+            // (c) 同步末尾 req.release() → refCnt 2→1，并级联 response.release()；
+            // (d) channelRead.finally 的 ReferenceCountUtil.release(request) → refCnt 1→0，
+            // 这是把入站 buf 真正打 0 的唯一位置（不在 req.release() 内）。
             //
             // 【结论已更新】异步路径现由 PerfAsyncWebRequest 在 startAsync() 时 acquire、写终结时
             // release（见 AsyncSupportUtils 设计说明）。以下分析仅保留以说明「已物化 body / ctx 与
             // 入站 buf 解耦」这一层面，其「不必 acquire」的结论已不再适用：
-            //   1) 请求体在 handler 运行前已完整聚合，NettyServerHttpRequest.getBodyBytes() 在同步阶段
-            //      已物化为 byte[]（小 body）或 duplicate() 视图（大 body）；异步业务读的是已物化的
-            //      body/largeBodyBuf，不再触碰原始 channel buf，故 buf 在 (d) 被释放到 0 对异步无影响。
-            //   2) 响应写出全部走 ctx.writeAndFlush(...)，ctx 归 channel 所有，与 FullHttpRequest 的
-            //      refCnt 完全解耦——即使请求已彻底释放，异步阶段照样能把响应写到线上。
-            //   3) 同步末尾那次 response.release() 释放的是"尚未 commit 的临时 buf"，异步后续
-            //      getBody()→getBuf() 会懒重分配新 buf 再 flush 提交，所以无 UAF、无泄漏。
+            // 1) 请求体在 handler 运行前已完整聚合，NettyServerHttpRequest.getBodyBytes() 在同步阶段
+            // 已物化为 byte[]（小 body）或 duplicate() 视图（大 body）；异步业务读的是已物化的
+            // body/largeBodyBuf，不再触碰原始 channel buf，故 buf 在 (d) 被释放到 0 对异步无影响。
+            // 2) 响应写出全部走 ctx.writeAndFlush(...)，ctx 归 channel 所有，与 FullHttpRequest 的
+            // refCnt 完全解耦——即使请求已彻底释放，异步阶段照样能把响应写到线上。
+            // 3) 同步末尾那次 response.release() 释放的是"尚未 commit 的临时 buf"，异步后续
+            // getBody()→getBuf() 会懒重分配新 buf 再 flush 提交，所以无 UAF、无泄漏。
             //
             // 剩余边缘（纯理论，框架常规异步路径已被覆盖，故暂不修）：
-            //   - 若 startAsync 后用 getBody() 缓冲、既未 flush 也未走结果序列化就 complete，
-            //     重分配的 buf 不会被释放（级联已在同步末尾跑过）→ 单个 ByteBuf 泄漏。
-            //     但 DeferredResult/Callable 结果会被 dispatcher 序列化并 flush，StreamEmitter 也显式
-            //     flush，实际不会触发。
-            //   - （已实施）异步开始时 req.acquire()、写终结时 req.release()：即上面那条不变式，
-            //     由 PerfAsyncWebRequest 持有与归还，取代早期「不 acquire」的取舍。
+            // - 若 startAsync 后用 getBody() 缓冲、既未 flush 也未走结果序列化就 complete，
+            // 重分配的 buf 不会被释放（级联已在同步末尾跑过）→ 单个 ByteBuf 泄漏。
+            // 但 DeferredResult/Callable 结果会被 dispatcher 序列化并 flush，StreamEmitter 也显式
+            // flush，实际不会触发。
+            // - （已实施）异步开始时 req.acquire()、写终结时 req.release()：即上面那条不变式，
+            // 由 PerfAsyncWebRequest 持有与归还，取代早期「不 acquire」的取舍。
             msg.retain();
             NettyServerHttpRequest req = null;
             try {
                 req = new NettyServerHttpRequest(webContext, ctxNetty, msg, resolvedPath);
                 // 绑定响应：未提交 buf 的生命周期随请求 release() 级联释放（同步/异步统一，无需异步特例守卫）
-            req.setResponse(resp);
-            attrs.inFlightRequest = req;
-            if (armTimeoutOnRequestStart()) {
-                resp.setTimeout();
-            }
-            // 将请求 User-Agent 带入响应侧：压缩器据此做 excluded-user-agents 排除（响应头不含 UA）。
-            // 仅在启用压缩时写入——关闭时管线无压缩器，写了也永不被读，纯属浪费。
-            if (compressionEnabled) {
-                attrs.compressionReqUa = msg.headers().get(HttpHeaderNames.USER_AGENT);
-            }
+                req.setResponse(resp);
+                attrs.inFlightRequest = req;
+                if (armTimeoutOnRequestStart()) {
+                    resp.setTimeout();
+                }
+                // 将请求 User-Agent 带入响应侧：压缩器据此做 excluded-user-agents 排除（响应头不含 UA）。
+                // 仅在启用压缩时写入——关闭时管线无压缩器，写了也永不被读，纯属浪费。
+                if (compressionEnabled) {
+                    attrs.compressionReqUa = msg.headers().get(HttpHeaderNames.USER_AGENT);
+                }
                 // 4. 委托给实际处理逻辑
                 handler.httpHandle(req, resp);
-            // 兜底装配：同步段结束仍未提交 ⇒ 请求已进入异步/流式等待（此处不枚举具体类型），
-            // 此时才需要响应超时。已在异步开始时装配（PerfAsyncWebRequest.scheduleTimeoutIfNeeded，
-            // 按 spring.mvc.async.request-timeout）或池分支补装配过时为 no-op；已提交的同步请求
-            // 不装配（EventLoop 模式下定时器对它们本就不可能生效，见 armTimeoutOnRequestStart）。
-            if (!resp.isCommitted() && !resp.hasTimeoutArmed()) {
-                resp.setTimeout();
+                // 兜底装配：同步段结束仍未提交 ⇒ 请求已进入异步/流式等待（此处不枚举具体类型），
+                // 此时才需要响应超时。已在异步开始时装配（PerfAsyncWebRequest.scheduleTimeoutIfNeeded，
+                // 按 spring.mvc.async.request-timeout）或池分支补装配过时为 no-op；已提交的同步请求
+                // 不装配（EventLoop 模式下定时器对它们本就不可能生效，见 armTimeoutOnRequestStart）。
+                if (!resp.isCommitted() && !resp.hasTimeoutArmed()) {
+                    resp.setTimeout();
+                }
+            } finally {
+                if (req != null) {
+                    req.release();
+                } else {
+                    // 构造 req / setTimeout 阶段抛异常：释放 retain 的引用，避免 ByteBuf 泄漏
+                    ReferenceCountUtil.release(msg);
+                }
             }
-        } finally {
-            if (req != null) {
-                req.release();
-            } else {
-                // 构造 req / setTimeout 阶段抛异常：释放 retain 的引用，避免 ByteBuf 泄漏
-                ReferenceCountUtil.release(msg);
-            }
-        }
         } catch (Throwable e) {
             // 参数数超限（hash DoS 防护）转 400；其余 Throwable 转 500
             if (e instanceof ParameterLimitExceededException
@@ -402,11 +405,11 @@ public class NettyHttpHandler extends ChannelInboundHandlerAdapter {
     }
 
     /**
-     * 剥离路径中的矩阵参数（path parameter）内容：每个路径段内第一个 {@code ';'} 之后的字符
-     * 不参与路由匹配（{@code /foo;a=b/c;jsessionid=X} → {@code /foo/c}）。
-     *
-     * <p>对齐 Spring {@code UrlPathHelper.removeSemicolonContent=true}。热路径零分配：无 {@code ';'}
-     * 时直接返回原串（绝大多数请求）。</p>
+     * 剥离路径中的矩阵参数（path parameter）内容：每个路径段内第一个 {@code ';'} 之后的字符 不参与路由匹配（{@code /foo;a=b/c;jsessionid=X} →
+     * {@code /foo/c}）。
+     * <p>
+     * 对齐 Spring {@code UrlPathHelper.removeSemicolonContent=true}。热路径零分配：无 {@code ';'} 时直接返回原串（绝大多数请求）。
+     * </p>
      */
     static String stripPathParams(String path) {
         if (path == null || path.indexOf(';') < 0) {

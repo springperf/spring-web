@@ -21,24 +21,32 @@ public class ActuatorMappingDescriptionProvider implements MappingDescriptionPro
     private static final String MAPPING_NAME = "dispatcherServlets";
     private final WebContext webContext;
 
-    public ActuatorMappingDescriptionProvider(WebContext webContext) { this.webContext = webContext; }
+    public ActuatorMappingDescriptionProvider(WebContext webContext) {
+        this.webContext = webContext;
+    }
 
-    @Override public String getMappingName() { return MAPPING_NAME; }
+    @Override
+    public String getMappingName() {
+        return MAPPING_NAME;
+    }
 
     @Override
     public Object describeMappings(ApplicationContext context) {
         MappingRegistry mappingRegistry = webContext.getWebComponent(MappingRegistry.class);
-        if (mappingRegistry == null) return Collections.emptyMap();
+        if (mappingRegistry == null)
+            return Collections.emptyMap();
         List<PathMappingContext> routes = mappingRegistry.getMappingContextList();
         List<Map<String, Object>> result = new ArrayList<>();
-        for (PathMappingContext route : routes) result.add(describeRoute(route));
+        for (PathMappingContext route : routes)
+            result.add(describeRoute(route));
         Map<String, List<Map<String, Object>>> wrapper = new LinkedHashMap<>();
         wrapper.put("dispatcherServlet", result);
         return wrapper;
     }
 
     private Map<String, Object> describeRoute(PathMappingContext route) {
-        if (route.getBean() instanceof ResourceRequestHandler) return describeResourceRoute(route);
+        if (route.getBean() instanceof ResourceRequestHandler)
+            return describeResourceRoute(route);
         Map<String, Object> mapping = new LinkedHashMap<>();
         mapping.put("handler", buildHandlerString(route));
         mapping.put("predicate", buildPredicateString(route));
@@ -52,8 +60,8 @@ public class ActuatorMappingDescriptionProvider implements MappingDescriptionPro
     private Map<String, Object> describeResourceRoute(PathMappingContext route) {
         Map<String, Object> mapping = new LinkedHashMap<>();
         ResourceRequestHandler handler = (ResourceRequestHandler) route.getBean();
-        String locationsStr = handler.getRegistration().getLocationValues().stream()
-                .map(loc -> "\"" + loc + "\"").collect(Collectors.joining(", "));
+        String locationsStr = handler.getRegistration().getLocationValues().stream().map(loc -> "\"" + loc + "\"")
+                .collect(Collectors.joining(", "));
         mapping.put("handler", "ResourceRequestHandler [" + locationsStr + "]");
         mapping.put("predicate", route.getPathRule());
         mapping.put("details", null);
@@ -69,7 +77,8 @@ public class ActuatorMappingDescriptionProvider implements MappingDescriptionPro
     private String buildPredicateString(PathMappingContext route) {
         StringBuilder sb = new StringBuilder("{");
         String methods = extractMethods(route);
-        if (!methods.isEmpty()) sb.append(methods).append(" ");
+        if (!methods.isEmpty())
+            sb.append(methods).append(" ");
         sb.append("[").append(route.getPathRule()).append("]}");
         return sb.toString();
     }
@@ -93,31 +102,39 @@ public class ActuatorMappingDescriptionProvider implements MappingDescriptionPro
             if (matcher instanceof ConsumeOrProduceMatcher) {
                 List<String> mediaTypes = ((ConsumeOrProduceMatcher) matcher).getMediaTypeExpressions().stream()
                         .map(Objects::toString).collect(Collectors.toList());
-                if (((ConsumeOrProduceMatcher) matcher).isProduce()) produces.addAll(mediaTypes);
-                else consumes.addAll(mediaTypes);
+                if (((ConsumeOrProduceMatcher) matcher).isProduce())
+                    produces.addAll(mediaTypes);
+                else
+                    consumes.addAll(mediaTypes);
             } else if (matcher instanceof ParamOrHeaderMatcher) {
                 List<String> exprs = ((ParamOrHeaderMatcher) matcher).getExpressions().stream()
                         .map(NameValueExpressionSupport::toString).collect(Collectors.toList());
-                if (((ParamOrHeaderMatcher) matcher).isHeader()) headers.addAll(exprs);
-                else params.addAll(exprs);
+                if (((ParamOrHeaderMatcher) matcher).isHeader())
+                    headers.addAll(exprs);
+                else
+                    params.addAll(exprs);
             }
         }
-        conditions.put("params", params); conditions.put("headers", headers);
-        conditions.put("consumes", consumes); conditions.put("produces", produces);
+        conditions.put("params", params);
+        conditions.put("headers", headers);
+        conditions.put("consumes", consumes);
+        conditions.put("produces", produces);
         return conditions;
     }
 
     private String extractMethods(PathMappingContext route) {
         for (Matcher matcher : route.getMatchers())
             if (matcher instanceof HttpMethodMatcher)
-                return ((HttpMethodMatcher) matcher).getHttpMethods().stream().map(HttpMethod::name).collect(Collectors.joining(" | "));
+                return ((HttpMethodMatcher) matcher).getHttpMethods().stream().map(HttpMethod::name)
+                        .collect(Collectors.joining(" | "));
         return "";
     }
 
     private List<String> extractMethodList(PathMappingContext route) {
         for (Matcher matcher : route.getMatchers())
             if (matcher instanceof HttpMethodMatcher)
-                return ((HttpMethodMatcher) matcher).getHttpMethods().stream().map(HttpMethod::name).collect(Collectors.toList());
+                return ((HttpMethodMatcher) matcher).getHttpMethods().stream().map(HttpMethod::name)
+                        .collect(Collectors.toList());
         return Collections.emptyList();
     }
 }

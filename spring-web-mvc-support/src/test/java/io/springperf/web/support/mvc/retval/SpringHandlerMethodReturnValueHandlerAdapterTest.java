@@ -74,7 +74,8 @@ class SpringHandlerMethodReturnValueHandlerAdapterTest {
 
         adapter.resolveReturnValue(returnValue, returnType, request, response);
 
-        verify(delegate).handleReturnValue(eq(returnValue), eq(returnType), any(ModelAndViewContainer.class), any(NativeWebRequest.class));
+        verify(delegate).handleReturnValue(eq(returnValue), eq(returnType), any(ModelAndViewContainer.class),
+                any(NativeWebRequest.class));
     }
 
     @Test

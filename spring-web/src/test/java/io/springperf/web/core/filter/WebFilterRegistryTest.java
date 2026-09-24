@@ -1,5 +1,16 @@
 package io.springperf.web.core.filter;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationContext;
+
 import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
@@ -9,22 +20,11 @@ import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.http.BaseWebServerHttpRequest;
 import io.springperf.web.http.RequestAttribute;
 import io.springperf.web.http.WebServerHttpResponse;
-import org.junit.jupiter.api.Test;
-import org.springframework.context.ApplicationContext;
-
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 class WebFilterRegistryTest {
 
     private WebContext createWebContext() {
-        ApplicationProperties props =
-                mock(ApplicationProperties.class);
+        ApplicationProperties props = mock(ApplicationProperties.class);
         when(props.get(PropertiesConstant.CONTEXT_PATH, "/")).thenReturn("/");
         WebContext wc = new WebContext(mock(DispatcherHandler.class), props);
         ApplicationContext ctx = mock(ApplicationContext.class);
@@ -33,16 +33,22 @@ class WebFilterRegistryTest {
         return wc;
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     private BaseWebServerHttpRequest createMockRequest() {
         BaseWebServerHttpRequest request = mock(BaseWebServerHttpRequest.class);
         when(request.getRequestContext()).thenReturn(request);
         Map attrs = new HashMap<>();
         Map<RequestAttribute<?>, Object> fastAttrs = new HashMap<>();
         when(request.getAttribute(anyString())).thenAnswer(inv -> attrs.get(inv.getArgument(0)));
-        doAnswer(inv -> { attrs.put(inv.getArgument(0), inv.getArgument(1)); return null; }).when(request).setAttribute(anyString(), any());
+        doAnswer(inv -> {
+            attrs.put(inv.getArgument(0), inv.getArgument(1));
+            return null;
+        }).when(request).setAttribute(anyString(), any());
         when(request.getAttribute(any(RequestAttribute.class))).thenAnswer(inv -> fastAttrs.get(inv.getArgument(0)));
-        doAnswer(inv -> { fastAttrs.put(inv.getArgument(0), inv.getArgument(1)); return null; }).when(request).setAttribute(any(RequestAttribute.class), any());
+        doAnswer(inv -> {
+            fastAttrs.put(inv.getArgument(0), inv.getArgument(1));
+            return null;
+        }).when(request).setAttribute(any(RequestAttribute.class), any());
         when(request.getFilterIndexAndIncrement()).thenReturn(0);
         return request;
     }
@@ -161,8 +167,10 @@ class WebFilterRegistryTest {
         when(request.getRequestContext()).thenReturn(request);
         Map<RequestAttribute<?>, Object> fastAttrs = new HashMap<>();
         when(request.getAttribute(any(RequestAttribute.class))).thenAnswer(inv -> fastAttrs.get(inv.getArgument(0)));
-        doAnswer(inv -> { fastAttrs.put(inv.getArgument(0), inv.getArgument(1)); return null; })
-                .when(request).setAttribute(any(RequestAttribute.class), any());
+        doAnswer(inv -> {
+            fastAttrs.put(inv.getArgument(0), inv.getArgument(1));
+            return null;
+        }).when(request).setAttribute(any(RequestAttribute.class), any());
         MappingResult.set(request, MappingResult.matched(mappingContext));
 
         DefaultFilterChain resolved = registry.resolveFilterChain(request);
@@ -192,8 +200,10 @@ class WebFilterRegistryTest {
         when(request.getRequestContext()).thenReturn(request);
         Map<RequestAttribute<?>, Object> fastAttrs = new HashMap<>();
         when(request.getAttribute(any(RequestAttribute.class))).thenAnswer(inv -> fastAttrs.get(inv.getArgument(0)));
-        doAnswer(inv -> { fastAttrs.put(inv.getArgument(0), inv.getArgument(1)); return null; })
-                .when(request).setAttribute(any(RequestAttribute.class), any());
+        doAnswer(inv -> {
+            fastAttrs.put(inv.getArgument(0), inv.getArgument(1));
+            return null;
+        }).when(request).setAttribute(any(RequestAttribute.class), any());
         MappingResult.set(request, MappingResult.matched(mappingContext));
 
         DefaultFilterChain resolved = registry.resolveFilterChain(request);

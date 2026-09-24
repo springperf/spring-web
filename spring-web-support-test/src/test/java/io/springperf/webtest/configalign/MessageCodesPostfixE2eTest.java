@@ -26,30 +26,24 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code spring.mvc.message-codes-resolver-format=postfix_error_code} E2E：
- * 校验错误码形如 {@code <对象>.<字段>.NotBlank}（错误码在后），与 Spring Boot 同名配置一致。
+ * {@code spring.mvc.message-codes-resolver-format=postfix_error_code} E2E： 校验错误码形如 {@code <对象>.<字段>.NotBlank}（错误码在后），与
+ * Spring Boot 同名配置一致。
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, MessageCodesPostfixE2eTest.PostfixConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "spring.mvc.message-codes-resolver-format=postfix_error_code"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        MessageCodesPostfixE2eTest.PostfixConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "spring.mvc.message-codes-resolver-format=postfix_error_code" })
 class MessageCodesPostfixE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
 
     private String codes() throws Exception {
-        Response resp = CLIENT.newCall(new Request.Builder()
-                .url("http://localhost:" + port + "/e2e-mc2/validate")
-                .post(okhttp3.RequestBody.create("{\"name\":\"\"}", MediaType.parse("application/json")))
-                .build()).execute();
+        Response resp = CLIENT.newCall(new Request.Builder().url("http://localhost:" + port + "/e2e-mc2/validate")
+                .post(okhttp3.RequestBody.create("{\"name\":\"\"}", MediaType.parse("application/json"))).build())
+                .execute();
         try {
             assertEquals(400, resp.code(), "校验失败应 400");
             return resp.body().string();
@@ -61,19 +55,15 @@ class MessageCodesPostfixE2eTest {
     @Test
     void postfixFormat_errorCodeAppended() throws Exception {
         String body = codes();
-        assertTrue(body.contains("form.name.NotBlank"),
-                "postfix 格式下错误码应为 <对象>.<字段>.NotBlank，实际 " + body);
-        assertTrue(body.contains("name.NotBlank"),
-                "应包含 field.errorCode 形式，实际 " + body);
-        assertTrue(body.contains("|NotBlank\""),
-                "错误码链末位应为裸错误码 NotBlank（两种格式下都存在），实际 " + body);
+        assertTrue(body.contains("form.name.NotBlank"), "postfix 格式下错误码应为 <对象>.<字段>.NotBlank，实际 " + body);
+        assertTrue(body.contains("name.NotBlank"), "应包含 field.errorCode 形式，实际 " + body);
+        assertTrue(body.contains("|NotBlank\""), "错误码链末位应为裸错误码 NotBlank（两种格式下都存在），实际 " + body);
     }
 
     @Test
     void postfixFormat_doesNotUsePrefixOrder() throws Exception {
         String body = codes();
-        assertTrue(!body.contains("NotBlank.form.name"),
-                "postfix 格式不应出现前缀式错误码，实际 " + body);
+        assertTrue(!body.contains("NotBlank.form.name"), "postfix 格式不应出现前缀式错误码，实际 " + body);
     }
 
     @TestConfiguration
@@ -108,8 +98,7 @@ class MessageCodesPostfixE2eTest {
         @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.BAD_REQUEST)
         public String handle(MethodArgumentNotValidException ex) {
             List<String> codes = new ArrayList<>();
-            ex.getBindingResult().getFieldErrors()
-                    .forEach(fe -> codes.add(String.join("|", fe.getCodes())));
+            ex.getBindingResult().getFieldErrors().forEach(fe -> codes.add(String.join("|", fe.getCodes())));
             return "{\"codes\":[\"" + String.join("\",\"", codes) + "\"]}";
         }
     }

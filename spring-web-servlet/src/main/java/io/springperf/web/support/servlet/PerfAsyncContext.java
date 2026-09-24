@@ -22,8 +22,8 @@ import java.util.concurrent.Executors;
 
 public class PerfAsyncContext implements AsyncContext {
 
-    private static final RequestAttribute<PerfAsyncContext> ASYNC_CONTEXT_ATTR =
-            RequestAttribute.createAttribute(PerfAsyncContext.class);
+    private static final RequestAttribute<PerfAsyncContext> ASYNC_CONTEXT_ATTR = RequestAttribute
+            .createAttribute(PerfAsyncContext.class);
 
     private static final ExecutorService TASK_EXECUTOR = Executors.newCachedThreadPool(r -> {
         Thread t = new Thread(r, "async-context-worker");
@@ -40,9 +40,8 @@ public class PerfAsyncContext implements AsyncContext {
     private volatile long timeout = 30000L;
     private volatile boolean handlersRegistered;
 
-    public PerfAsyncContext(PerfAsyncWebRequest asyncWebRequest,
-                            WebServerHttpRequest webRequest, WebServerHttpResponse webResponse,
-                            ServletRequest servletRequest, ServletResponse servletResponse) {
+    public PerfAsyncContext(PerfAsyncWebRequest asyncWebRequest, WebServerHttpRequest webRequest,
+            WebServerHttpResponse webResponse, ServletRequest servletRequest, ServletResponse servletResponse) {
         this.asyncWebRequest = asyncWebRequest;
         this.webRequest = webRequest;
         this.webResponse = webResponse;
@@ -51,8 +50,7 @@ public class PerfAsyncContext implements AsyncContext {
     }
 
     /**
-     * 懒注册底层框架的 timeout/error 回调到 AsyncListener，仅在需要时（添加监听器或设置超时）注册，
-     * 避免无条件覆盖框架（如 Callable/DeferredResult 路径）已有的 handler。
+     * 懒注册底层框架的 timeout/error 回调到 AsyncListener，仅在需要时（添加监听器或设置超时）注册， 避免无条件覆盖框架（如 Callable/DeferredResult 路径）已有的 handler。
      */
     private void ensureHandlersRegistered() {
         if (handlersRegistered) {
@@ -145,8 +143,7 @@ public class PerfAsyncContext implements AsyncContext {
         if (listeners.isEmpty()) {
             return;
         }
-        AsyncEvent event = throwable != null
-                ? new AsyncEvent(this, servletRequest, servletResponse, throwable)
+        AsyncEvent event = throwable != null ? new AsyncEvent(this, servletRequest, servletResponse, throwable)
                 : new AsyncEvent(this, servletRequest, servletResponse);
         for (AsyncListener listener : listeners) {
             try {

@@ -65,11 +65,10 @@ public class SseEmitter extends StreamEmitter<Object> {
     /**
      * 编码 SSE data 字段。
      * <ul>
-     *   <li>{@link CharSequence} 数据：经由 {@code getBytes()} 编码为 byte[] 后扫描
-     *       {@code \n} 并用 {@code \ndata:} 续行，满足 SSE 协议要求。</li>
-     *   <li>非 {@link CharSequence} 数据：直接通过 {@link #encodeEventDataAsBytes(Object, OutputStream)}
-     *       写入，不做 {@code \n} 扫描。非 CharSequence 数据（如 JSON）通常不含裸 {@code \n}，
-     *       若子类数据可能包含 {@code \n}，需自行在 {@code encodeEventDataAsBytes} 中处理续行。</li>
+     * <li>{@link CharSequence} 数据：经由 {@code getBytes()} 编码为 byte[] 后扫描 {@code \n} 并用 {@code \ndata:} 续行，满足 SSE
+     * 协议要求。</li>
+     * <li>非 {@link CharSequence} 数据：直接通过 {@link #encodeEventDataAsBytes(Object, OutputStream)} 写入，不做 {@code \n} 扫描。非
+     * CharSequence 数据（如 JSON）通常不含裸 {@code \n}， 若子类数据可能包含 {@code \n}，需自行在 {@code encodeEventDataAsBytes} 中处理续行。</li>
      * </ul>
      */
     protected void encodeData(Object data, OutputStream out) throws IOException {
@@ -128,12 +127,10 @@ public class SseEmitter extends StreamEmitter<Object> {
         out.write(bytes, start, bytes.length - start);
     }
 
-
     /**
      * 子类可重写此方法来自定义数据序列化（如 {@link SseJsonEmitter}）。
      * <p>
-     * 注意：此方法写入的数据不会经过 {@code \n} 续行处理。
-     * 若子类数据可能包含 {@code \n}，需自行在此方法中处理续行逻辑。
+     * 注意：此方法写入的数据不会经过 {@code \n} 续行处理。 若子类数据可能包含 {@code \n}，需自行在此方法中处理续行逻辑。
      */
     protected void encodeEventDataAsBytes(Object data, OutputStream out) throws IOException {
         throw new UnsupportedOperationException();

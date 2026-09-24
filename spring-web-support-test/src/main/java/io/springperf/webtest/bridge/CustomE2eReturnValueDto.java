@@ -1,8 +1,8 @@
 package io.springperf.webtest.bridge;
 
 /**
- * DTO used by {@link CustomE2eReturnValueHandler} to demonstrate
- * that the bridged return value handler is invoked at runtime.
+ * DTO used by {@link CustomE2eReturnValueHandler} to demonstrate that the bridged return value handler is invoked at
+ * runtime.
  */
 public class CustomE2eReturnValueDto {
 

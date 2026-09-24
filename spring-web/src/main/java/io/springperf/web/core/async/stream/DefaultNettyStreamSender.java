@@ -8,9 +8,7 @@ import io.springperf.web.core.async.PerfAsyncWebRequest;
 /**
  * 延迟编码流式发送器（EventLoop 线程编码，默认实现）。
  * <p>
- * App 线程仅入队原始数据，零 ByteBuf 分配。
- * EventLoop 线程的 {@link #drain()} 分配 batchBuf 批量编码写入 channel，
- * 避免 App 线程多线程竞争 PoolArena 锁。
+ * App 线程仅入队原始数据，零 ByteBuf 分配。 EventLoop 线程的 {@link #drain()} 分配 batchBuf 批量编码写入 channel， 避免 App 线程多线程竞争 PoolArena 锁。
  * <p>
  * 对应 {@link StreamEmitter#isEarlyEncode()} = {@code false} 的路径。
  */
@@ -21,8 +19,7 @@ public class DefaultNettyStreamSender extends AbstractNettyStreamSender {
     }
 
     /**
-     * 只能在 EventLoop 线程执行。
-     * 分配 batchBuf 批量从队列中取出原始数据编码写入，超过 maxFlushBytes 后 flush。
+     * 只能在 EventLoop 线程执行。 分配 batchBuf 批量从队列中取出原始数据编码写入，超过 maxFlushBytes 后 flush。
      */
     @Override
     protected void drain() {
@@ -41,7 +38,7 @@ public class DefaultNettyStreamSender extends AbstractNettyStreamSender {
             return;
         }
         int missed = 1;
-        for (; ; ) {
+        for (;;) {
             ByteBuf batchBuf = null;
             ByteBufOutputStream batchOut = null;
             while (channel.isWritable()) {

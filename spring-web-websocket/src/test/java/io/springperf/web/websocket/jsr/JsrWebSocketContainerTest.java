@@ -57,7 +57,7 @@ class JsrWebSocketContainerTest {
                 () -> container.connectToServer((Class<?>) null, URI.create("ws://x")));
         assertThrows(UnsupportedOperationException.class,
                 () -> container.connectToServer((Endpoint) null, (ClientEndpointConfig) null, URI.create("ws://x")));
-        assertThrows(UnsupportedOperationException.class,
-                () -> container.connectToServer((Class<? extends Endpoint>) null, (ClientEndpointConfig) null, URI.create("ws://x")));
+        assertThrows(UnsupportedOperationException.class, () -> container
+                .connectToServer((Class<? extends Endpoint>) null, (ClientEndpointConfig) null, URI.create("ws://x")));
     }
 }

@@ -26,9 +26,9 @@ public class SpringWebBatchAutoConfiguration {
     static class MicrometerBatchMetricsConfiguration {
 
         @Bean
-        @ConditionalOnBean({WebContext.class, io.micrometer.core.instrument.MeterRegistry.class})
+        @ConditionalOnBean({ WebContext.class, io.micrometer.core.instrument.MeterRegistry.class })
         public BatchMetrics batchMetrics(BatchRegistry batchRegistry,
-                                         io.micrometer.core.instrument.MeterRegistry meterRegistry) {
+                io.micrometer.core.instrument.MeterRegistry meterRegistry) {
             MicrometerBatchMetrics metrics = new MicrometerBatchMetrics(meterRegistry);
             batchRegistry.setMetrics(metrics);
             return metrics;

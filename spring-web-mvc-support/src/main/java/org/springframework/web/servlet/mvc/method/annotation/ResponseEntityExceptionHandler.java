@@ -31,23 +31,21 @@ import org.springframework.web.multipart.support.MissingServletRequestPartExcept
 import org.springframework.web.servlet.NoHandlerFoundException;
 
 /**
- * Convenient base class for {@link ControllerAdvice @ControllerAdvice} classes
- * that wish to provide centralized exception handling across all
- * {@code @RequestMapping} methods through {@code @ExceptionHandler} methods.
+ * Convenient base class for {@link ControllerAdvice @ControllerAdvice} classes that wish to provide centralized
+ * exception handling across all {@code @RequestMapping} methods through {@code @ExceptionHandler} methods.
+ * <p>
+ * This shim replicates the API of Spring MVC's {@code ResponseEntityExceptionHandler} without requiring the full
+ * {@code spring-webmvc} module. All protected methods return {@link ResponseEntity} and can be overridden in
+ * subclasses.
+ * <p>
+ * Usage:
  *
- * <p>This shim replicates the API of Spring MVC's
- * {@code ResponseEntityExceptionHandler} without requiring the full
- * {@code spring-webmvc} module. All protected methods return
- * {@link ResponseEntity} and can be overridden in subclasses.
- *
- * <p>Usage:
  * <pre class="code">
  * &#064;ControllerAdvice
  * public class MyExceptionHandler extends ResponseEntityExceptionHandler {
  *
  *     &#064;Override
- *     protected ResponseEntity&lt;Object&gt; handleHttpRequestMethodNotSupported(
- *             HttpRequestMethodNotSupportedException ex,
+ *     protected ResponseEntity&lt;Object&gt; handleHttpRequestMethodNotSupported(HttpRequestMethodNotSupportedException ex,
  *             HttpHeaders headers, HttpStatus status, WebRequest request) {
  *         return handleExceptionInternal(ex, "custom body", headers, status, request);
  *     }
@@ -55,32 +53,26 @@ import org.springframework.web.servlet.NoHandlerFoundException;
  * </pre>
  *
  * @author Rossen Stoyanchev
+ *
  * @since 3.2
  */
 @ControllerAdvice
 public class ResponseEntityExceptionHandler {
 
     /**
-     * Provides handling for a standard set of exceptions, delegating to
-     * individual handler methods.
+     * Provides handling for a standard set of exceptions, delegating to individual handler methods.
      */
-    @ExceptionHandler({
-            org.springframework.web.HttpRequestMethodNotSupportedException.class,
+    @ExceptionHandler({ org.springframework.web.HttpRequestMethodNotSupportedException.class,
             org.springframework.web.HttpMediaTypeNotSupportedException.class,
-            org.springframework.web.HttpMediaTypeNotAcceptableException.class,
-            MissingPathVariableException.class,
-            MissingServletRequestParameterException.class,
-            ServletRequestBindingException.class,
+            org.springframework.web.HttpMediaTypeNotAcceptableException.class, MissingPathVariableException.class,
+            MissingServletRequestParameterException.class, ServletRequestBindingException.class,
             org.springframework.beans.ConversionNotSupportedException.class,
             org.springframework.beans.TypeMismatchException.class,
             org.springframework.http.converter.HttpMessageNotReadableException.class,
             org.springframework.http.converter.HttpMessageNotWritableException.class,
             org.springframework.web.bind.MethodArgumentNotValidException.class,
-            MissingServletRequestPartException.class,
-            org.springframework.validation.BindException.class,
-            NoHandlerFoundException.class,
-            AsyncRequestTimeoutException.class
-    })
+            MissingServletRequestPartException.class, org.springframework.validation.BindException.class,
+            NoHandlerFoundException.class, AsyncRequestTimeoutException.class })
     @Nullable
     public ResponseEntity<Object> handleException(Exception ex, WebRequest request) throws Exception {
         HttpHeaders headers = new HttpHeaders();
@@ -88,49 +80,49 @@ public class ResponseEntityExceptionHandler {
 
         if (ex instanceof org.springframework.web.HttpRequestMethodNotSupportedException) {
             return handleHttpRequestMethodNotSupported(
-                    (org.springframework.web.HttpRequestMethodNotSupportedException) ex, headers, HttpStatus.METHOD_NOT_ALLOWED, request);
+                    (org.springframework.web.HttpRequestMethodNotSupportedException) ex, headers,
+                    HttpStatus.METHOD_NOT_ALLOWED, request);
         } else if (ex instanceof org.springframework.web.HttpMediaTypeNotSupportedException) {
-            return handleHttpMediaTypeNotSupported(
-                    (org.springframework.web.HttpMediaTypeNotSupportedException) ex, headers, HttpStatus.UNSUPPORTED_MEDIA_TYPE, request);
+            return handleHttpMediaTypeNotSupported((org.springframework.web.HttpMediaTypeNotSupportedException) ex,
+                    headers, HttpStatus.UNSUPPORTED_MEDIA_TYPE, request);
         } else if (ex instanceof org.springframework.web.HttpMediaTypeNotAcceptableException) {
-            return handleHttpMediaTypeNotAcceptable(
-                    (org.springframework.web.HttpMediaTypeNotAcceptableException) ex, headers, HttpStatus.NOT_ACCEPTABLE, request);
+            return handleHttpMediaTypeNotAcceptable((org.springframework.web.HttpMediaTypeNotAcceptableException) ex,
+                    headers, HttpStatus.NOT_ACCEPTABLE, request);
         } else if (ex instanceof MissingPathVariableException) {
-            return handleMissingPathVariable(
-                    (MissingPathVariableException) ex, headers, HttpStatus.INTERNAL_SERVER_ERROR, request);
+            return handleMissingPathVariable((MissingPathVariableException) ex, headers,
+                    HttpStatus.INTERNAL_SERVER_ERROR, request);
         } else if (ex instanceof MissingServletRequestParameterException) {
-            return handleMissingServletRequestParameter(
-                    (MissingServletRequestParameterException) ex, headers, HttpStatus.BAD_REQUEST, request);
+            return handleMissingServletRequestParameter((MissingServletRequestParameterException) ex, headers,
+                    HttpStatus.BAD_REQUEST, request);
         } else if (ex instanceof ServletRequestBindingException) {
-            return handleServletRequestBindingException(
-                    (ServletRequestBindingException) ex, headers, HttpStatus.BAD_REQUEST, request);
+            return handleServletRequestBindingException((ServletRequestBindingException) ex, headers,
+                    HttpStatus.BAD_REQUEST, request);
         } else if (ex instanceof org.springframework.beans.ConversionNotSupportedException) {
-            return handleConversionNotSupported(
-                    (org.springframework.beans.ConversionNotSupportedException) ex, headers, HttpStatus.INTERNAL_SERVER_ERROR, request);
+            return handleConversionNotSupported((org.springframework.beans.ConversionNotSupportedException) ex, headers,
+                    HttpStatus.INTERNAL_SERVER_ERROR, request);
         } else if (ex instanceof org.springframework.beans.TypeMismatchException) {
-            return handleTypeMismatch(
-                    (org.springframework.beans.TypeMismatchException) ex, headers, HttpStatus.BAD_REQUEST, request);
+            return handleTypeMismatch((org.springframework.beans.TypeMismatchException) ex, headers,
+                    HttpStatus.BAD_REQUEST, request);
         } else if (ex instanceof org.springframework.http.converter.HttpMessageNotReadableException) {
-            return handleHttpMessageNotReadable(
-                    (org.springframework.http.converter.HttpMessageNotReadableException) ex, headers, HttpStatus.BAD_REQUEST, request);
+            return handleHttpMessageNotReadable((org.springframework.http.converter.HttpMessageNotReadableException) ex,
+                    headers, HttpStatus.BAD_REQUEST, request);
         } else if (ex instanceof org.springframework.http.converter.HttpMessageNotWritableException) {
-            return handleHttpMessageNotWritable(
-                    (org.springframework.http.converter.HttpMessageNotWritableException) ex, headers, HttpStatus.INTERNAL_SERVER_ERROR, request);
+            return handleHttpMessageNotWritable((org.springframework.http.converter.HttpMessageNotWritableException) ex,
+                    headers, HttpStatus.INTERNAL_SERVER_ERROR, request);
         } else if (ex instanceof org.springframework.web.bind.MethodArgumentNotValidException) {
-            return handleMethodArgumentNotValid(
-                    (org.springframework.web.bind.MethodArgumentNotValidException) ex, headers, HttpStatus.BAD_REQUEST, request);
+            return handleMethodArgumentNotValid((org.springframework.web.bind.MethodArgumentNotValidException) ex,
+                    headers, HttpStatus.BAD_REQUEST, request);
         } else if (ex instanceof MissingServletRequestPartException) {
-            return handleMissingServletRequestPart(
-                    (MissingServletRequestPartException) ex, headers, HttpStatus.BAD_REQUEST, request);
+            return handleMissingServletRequestPart((MissingServletRequestPartException) ex, headers,
+                    HttpStatus.BAD_REQUEST, request);
         } else if (ex instanceof org.springframework.validation.BindException) {
-            return handleBindException(
-                    (org.springframework.validation.BindException) ex, headers, HttpStatus.BAD_REQUEST, request);
+            return handleBindException((org.springframework.validation.BindException) ex, headers,
+                    HttpStatus.BAD_REQUEST, request);
         } else if (ex instanceof NoHandlerFoundException) {
-            return handleNoHandlerFoundException(
-                    (NoHandlerFoundException) ex, headers, HttpStatus.NOT_FOUND, request);
+            return handleNoHandlerFoundException((NoHandlerFoundException) ex, headers, HttpStatus.NOT_FOUND, request);
         } else if (ex instanceof AsyncRequestTimeoutException) {
-            return handleAsyncRequestTimeoutException(
-                    (AsyncRequestTimeoutException) ex, headers, HttpStatus.SERVICE_UNAVAILABLE, request);
+            return handleAsyncRequestTimeoutException((AsyncRequestTimeoutException) ex, headers,
+                    HttpStatus.SERVICE_UNAVAILABLE, request);
         } else {
             return handleExceptionInternal(ex, null, headers, HttpStatus.INTERNAL_SERVER_ERROR, request);
         }
@@ -139,102 +131,93 @@ public class ResponseEntityExceptionHandler {
     // ---- Individual handler methods (all overridable) ----
 
     protected ResponseEntity<Object> handleHttpRequestMethodNotSupported(
-            org.springframework.web.HttpRequestMethodNotSupportedException ex,
-            HttpHeaders headers, HttpStatus status, WebRequest request) {
+            org.springframework.web.HttpRequestMethodNotSupportedException ex, HttpHeaders headers, HttpStatus status,
+            WebRequest request) {
         return handleExceptionInternal(ex, null, headers, status, request);
     }
 
     protected ResponseEntity<Object> handleHttpMediaTypeNotSupported(
-            org.springframework.web.HttpMediaTypeNotSupportedException ex,
-            HttpHeaders headers, HttpStatus status, WebRequest request) {
+            org.springframework.web.HttpMediaTypeNotSupportedException ex, HttpHeaders headers, HttpStatus status,
+            WebRequest request) {
         return handleExceptionInternal(ex, null, headers, status, request);
     }
 
     protected ResponseEntity<Object> handleHttpMediaTypeNotAcceptable(
-            org.springframework.web.HttpMediaTypeNotAcceptableException ex,
+            org.springframework.web.HttpMediaTypeNotAcceptableException ex, HttpHeaders headers, HttpStatus status,
+            WebRequest request) {
+        return handleExceptionInternal(ex, null, headers, status, request);
+    }
+
+    protected ResponseEntity<Object> handleMissingPathVariable(MissingPathVariableException ex, HttpHeaders headers,
+            HttpStatus status, WebRequest request) {
+        return handleExceptionInternal(ex, null, headers, status, request);
+    }
+
+    protected ResponseEntity<Object> handleMissingServletRequestParameter(MissingServletRequestParameterException ex,
             HttpHeaders headers, HttpStatus status, WebRequest request) {
         return handleExceptionInternal(ex, null, headers, status, request);
     }
 
-    protected ResponseEntity<Object> handleMissingPathVariable(
-            MissingPathVariableException ex,
-            HttpHeaders headers, HttpStatus status, WebRequest request) {
-        return handleExceptionInternal(ex, null, headers, status, request);
-    }
-
-    protected ResponseEntity<Object> handleMissingServletRequestParameter(
-            MissingServletRequestParameterException ex,
-            HttpHeaders headers, HttpStatus status, WebRequest request) {
-        return handleExceptionInternal(ex, null, headers, status, request);
-    }
-
-    protected ResponseEntity<Object> handleServletRequestBindingException(
-            ServletRequestBindingException ex,
+    protected ResponseEntity<Object> handleServletRequestBindingException(ServletRequestBindingException ex,
             HttpHeaders headers, HttpStatus status, WebRequest request) {
         return handleExceptionInternal(ex, null, headers, status, request);
     }
 
     protected ResponseEntity<Object> handleConversionNotSupported(
-            org.springframework.beans.ConversionNotSupportedException ex,
-            HttpHeaders headers, HttpStatus status, WebRequest request) {
+            org.springframework.beans.ConversionNotSupportedException ex, HttpHeaders headers, HttpStatus status,
+            WebRequest request) {
         return handleExceptionInternal(ex, null, headers, status, request);
     }
 
-    protected ResponseEntity<Object> handleTypeMismatch(
-            org.springframework.beans.TypeMismatchException ex,
+    protected ResponseEntity<Object> handleTypeMismatch(org.springframework.beans.TypeMismatchException ex,
             HttpHeaders headers, HttpStatus status, WebRequest request) {
         return handleExceptionInternal(ex, null, headers, status, request);
     }
 
     protected ResponseEntity<Object> handleHttpMessageNotReadable(
-            org.springframework.http.converter.HttpMessageNotReadableException ex,
-            HttpHeaders headers, HttpStatus status, WebRequest request) {
+            org.springframework.http.converter.HttpMessageNotReadableException ex, HttpHeaders headers,
+            HttpStatus status, WebRequest request) {
         return handleExceptionInternal(ex, null, headers, status, request);
     }
 
     protected ResponseEntity<Object> handleHttpMessageNotWritable(
-            org.springframework.http.converter.HttpMessageNotWritableException ex,
-            HttpHeaders headers, HttpStatus status, WebRequest request) {
+            org.springframework.http.converter.HttpMessageNotWritableException ex, HttpHeaders headers,
+            HttpStatus status, WebRequest request) {
         return handleExceptionInternal(ex, null, headers, status, request);
     }
 
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
-            org.springframework.web.bind.MethodArgumentNotValidException ex,
+            org.springframework.web.bind.MethodArgumentNotValidException ex, HttpHeaders headers, HttpStatus status,
+            WebRequest request) {
+        return handleExceptionInternal(ex, null, headers, status, request);
+    }
+
+    protected ResponseEntity<Object> handleMissingServletRequestPart(MissingServletRequestPartException ex,
             HttpHeaders headers, HttpStatus status, WebRequest request) {
         return handleExceptionInternal(ex, null, headers, status, request);
     }
 
-    protected ResponseEntity<Object> handleMissingServletRequestPart(
-            MissingServletRequestPartException ex,
+    protected ResponseEntity<Object> handleBindException(org.springframework.validation.BindException ex,
             HttpHeaders headers, HttpStatus status, WebRequest request) {
         return handleExceptionInternal(ex, null, headers, status, request);
     }
 
-    protected ResponseEntity<Object> handleBindException(
-            org.springframework.validation.BindException ex,
-            HttpHeaders headers, HttpStatus status, WebRequest request) {
+    protected ResponseEntity<Object> handleNoHandlerFoundException(NoHandlerFoundException ex, HttpHeaders headers,
+            HttpStatus status, WebRequest request) {
         return handleExceptionInternal(ex, null, headers, status, request);
     }
 
-    protected ResponseEntity<Object> handleNoHandlerFoundException(
-            NoHandlerFoundException ex,
-            HttpHeaders headers, HttpStatus status, WebRequest request) {
-        return handleExceptionInternal(ex, null, headers, status, request);
-    }
-
-    protected ResponseEntity<Object> handleAsyncRequestTimeoutException(
-            AsyncRequestTimeoutException ex,
+    protected ResponseEntity<Object> handleAsyncRequestTimeoutException(AsyncRequestTimeoutException ex,
             HttpHeaders headers, HttpStatus status, WebRequest request) {
         return handleExceptionInternal(ex, null, headers, status, request);
     }
 
     /**
-     * Centralized hook for creating the response entity. Subclasses can
-     * override this to add common headers, modify the body, etc.
+     * Centralized hook for creating the response entity. Subclasses can override this to add common headers, modify the
+     * body, etc.
      */
-    protected ResponseEntity<Object> handleExceptionInternal(
-            Exception ex, @Nullable Object body,
-            HttpHeaders headers, HttpStatus status, WebRequest request) {
+    protected ResponseEntity<Object> handleExceptionInternal(Exception ex, @Nullable Object body, HttpHeaders headers,
+            HttpStatus status, WebRequest request) {
 
         if (HttpStatus.INTERNAL_SERVER_ERROR.equals(status)) {
             request.setAttribute("jakarta.servlet.error.exception", ex, 0 /* SCOPE_REQUEST */);

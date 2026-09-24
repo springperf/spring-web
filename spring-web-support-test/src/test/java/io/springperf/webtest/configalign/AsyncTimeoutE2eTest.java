@@ -16,19 +16,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code spring.mvc.async.request-timeout} E2E：超时未完成的 DeferredResult
- * 由框架定时器回收为 504；及时完成则正常 200。
+ * {@code spring.mvc.async.request-timeout} E2E：超时未完成的 DeferredResult 由框架定时器回收为 504；及时完成则正常 200。
  */
-@SpringBootTest(classes = {io.springperf.webtest.SupportTestApplication.class,
-                AsyncTimeoutE2eTest.AsyncConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "spring.mvc.async.request-timeout=500ms")
+@SpringBootTest(classes = { io.springperf.webtest.SupportTestApplication.class,
+        AsyncTimeoutE2eTest.AsyncConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "spring.mvc.async.request-timeout=500ms")
 class AsyncTimeoutE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
@@ -39,14 +34,13 @@ class AsyncTimeoutE2eTest {
 
     @Test
     void deferredResult_neverCompleted_timesOut() throws Exception {
-        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder()
-                .url(url("/e2e-async/never")).build()).execute();
+        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder().url(url("/e2e-async/never")).build())
+                .execute();
         try {
             int code = resp.code();
             // Spring MVC 语义：异步超时经 AsyncRequestTimeoutException 映射为 503；
             // 框架默认超时兜底为 504。两者均表示「异步请求超时回收」。
-            assertTrue(code == 503 || code == 504,
-                    "500ms 超时未完成的 DeferredResult 应被框架回收（503/504），实际 " + code);
+            assertTrue(code == 503 || code == 504, "500ms 超时未完成的 DeferredResult 应被框架回收（503/504），实际 " + code);
         } finally {
             resp.close();
         }
@@ -54,8 +48,8 @@ class AsyncTimeoutE2eTest {
 
     @Test
     void deferredResult_completedInTime_returns200() throws Exception {
-        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder()
-                .url(url("/e2e-async/now")).build()).execute();
+        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder().url(url("/e2e-async/now")).build())
+                .execute();
         try {
             assertEquals(200, resp.code());
             assertEquals("async-done", resp.body().string().trim());

@@ -21,7 +21,11 @@ public @interface BatchMapping {
     /** 最大并发处理线程数（包括 Disruptor 消费者线程在内）。默认 CPU 核数。 */
     int consumerSize() default -1;
 
-    enum WaitStrategy { YIELDING, BLOCKING, SLEEPING, BUSY_SPIN }
+    enum WaitStrategy {
+        YIELDING, BLOCKING, SLEEPING, BUSY_SPIN
+    }
 
-    enum Backpressure { BLOCK, DROP, THROW }
+    enum Backpressure {
+        BLOCK, DROP, THROW
+    }
 }

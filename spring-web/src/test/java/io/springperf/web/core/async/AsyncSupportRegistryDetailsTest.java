@@ -1,10 +1,16 @@
 package io.springperf.web.core.async;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.http.RequestAttribute;
-import io.springperf.web.http.RequestContext;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.function.Consumer;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,27 +22,22 @@ import org.springframework.web.context.request.async.DeferredResult;
 import org.springframework.web.context.request.async.DeferredResultProcessingInterceptor;
 import org.springframework.web.context.request.async.WebAsyncTask;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.function.Consumer;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.http.RequestAttribute;
+import io.springperf.web.http.RequestContext;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 /**
- * 补充 AsyncSupportRegistry 覆盖率：setters/拦截器注册、req/resp 重载、
- * callable 超时/错误/提交异常分支、deferred 超时/错误异步回调分支。
+ * 补充 AsyncSupportRegistry 覆盖率：setters/拦截器注册、req/resp 重载、 callable 超时/错误/提交异常分支、deferred 超时/错误异步回调分支。
  */
 @ExtendWith(MockitoExtension.class)
 class AsyncSupportRegistryDetailsTest {
 
     AsyncSupportRegistry registry;
 
-    @Mock PerfAsyncWebRequest asyncWebRequest;
+    @Mock
+    PerfAsyncWebRequest asyncWebRequest;
 
     private Runnable timeoutHandler;
     private Consumer<Throwable> errorHandler;
@@ -50,14 +51,22 @@ class AsyncSupportRegistryDetailsTest {
         errorHandler = null;
         completionHandler = null;
         asyncReadyCallback = null;
-        lenient().doAnswer(inv -> { timeoutHandler = inv.getArgument(0); return null; })
-                .when(asyncWebRequest).addTimeoutHandler(any(Runnable.class));
-        lenient().doAnswer(inv -> { errorHandler = inv.getArgument(0); return null; })
-                .when(asyncWebRequest).addErrorHandler(any(Consumer.class));
-        lenient().doAnswer(inv -> { completionHandler = inv.getArgument(0); return null; })
-                .when(asyncWebRequest).addCompletionHandler(any(Runnable.class));
-        lenient().doAnswer(inv -> { asyncReadyCallback = inv.getArgument(0); return null; })
-                .when(asyncWebRequest).setAsyncReadyCallback(any(Runnable.class));
+        lenient().doAnswer(inv -> {
+            timeoutHandler = inv.getArgument(0);
+            return null;
+        }).when(asyncWebRequest).addTimeoutHandler(any(Runnable.class));
+        lenient().doAnswer(inv -> {
+            errorHandler = inv.getArgument(0);
+            return null;
+        }).when(asyncWebRequest).addErrorHandler(any(Consumer.class));
+        lenient().doAnswer(inv -> {
+            completionHandler = inv.getArgument(0);
+            return null;
+        }).when(asyncWebRequest).addCompletionHandler(any(Runnable.class));
+        lenient().doAnswer(inv -> {
+            asyncReadyCallback = inv.getArgument(0);
+            return null;
+        }).when(asyncWebRequest).setAsyncReadyCallback(any(Runnable.class));
         lenient().when(asyncWebRequest.isErrorHandlingInProgress()).thenReturn(false);
     }
 
@@ -72,10 +81,23 @@ class AsyncSupportRegistryDetailsTest {
     @Test
     void setTaskExecutor_usedForCallableWithoutExecutor() throws Exception {
         AsyncTaskExecutor inlineExecutor = new AsyncTaskExecutor() {
-            @Override public void execute(Runnable task, long startTimeout) { task.run(); }
-            @Override public void execute(Runnable task) { task.run(); }
-            @Override public <T> java.util.concurrent.Future<T> submit(java.util.concurrent.Callable<T> task) {
-                try { task.call(); } catch (Exception e) { throw new RuntimeException(e); }
+            @Override
+            public void execute(Runnable task, long startTimeout) {
+                task.run();
+            }
+
+            @Override
+            public void execute(Runnable task) {
+                task.run();
+            }
+
+            @Override
+            public <T> java.util.concurrent.Future<T> submit(java.util.concurrent.Callable<T> task) {
+                try {
+                    task.call();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
                 return null;
             }
         };
@@ -91,7 +113,8 @@ class AsyncSupportRegistryDetailsTest {
 
     @Test
     void addCallableInterceptors_appendsToList() throws Exception {
-        CallableProcessingInterceptor interceptor = new CallableProcessingInterceptor() {};
+        CallableProcessingInterceptor interceptor = new CallableProcessingInterceptor() {
+        };
         registry.addCallableInterceptors(Collections.singletonList(interceptor));
         List<CallableProcessingInterceptor> list = readField("callableInterceptors");
         assertEquals(1, list.size());
@@ -100,7 +123,8 @@ class AsyncSupportRegistryDetailsTest {
 
     @Test
     void addDeferredResultInterceptors_appendsToList() throws Exception {
-        DeferredResultProcessingInterceptor interceptor = new DeferredResultProcessingInterceptor() {};
+        DeferredResultProcessingInterceptor interceptor = new DeferredResultProcessingInterceptor() {
+        };
         registry.addDeferredResultInterceptors(Collections.singletonList(interceptor));
         List<DeferredResultProcessingInterceptor> list = readField("deferredResultInterceptors");
         assertEquals(1, list.size());
@@ -158,7 +182,7 @@ class AsyncSupportRegistryDetailsTest {
         CallableProcessingInterceptor returningInterceptor = new CallableProcessingInterceptor() {
             @Override
             public <T> Object handleTimeout(org.springframework.web.context.request.NativeWebRequest request,
-                                            java.util.concurrent.Callable<T> task) {
+                    java.util.concurrent.Callable<T> task) {
                 return "timeout-result";
             }
         };
@@ -177,8 +201,7 @@ class AsyncSupportRegistryDetailsTest {
         CallableProcessingInterceptor returningInterceptor = new CallableProcessingInterceptor() {
             @Override
             public <T> Object handleError(org.springframework.web.context.request.NativeWebRequest request,
-                                          java.util.concurrent.Callable<T> task,
-                                          Throwable error) {
+                    java.util.concurrent.Callable<T> task, Throwable error) {
                 return "error-result";
             }
         };
@@ -219,11 +242,18 @@ class AsyncSupportRegistryDetailsTest {
     @Test
     void startCallableProcessing_asyncReadySubmitRejected_dispatchesRejectedExecution() throws Exception {
         AsyncTaskExecutor rejecting = new AsyncTaskExecutor() {
-            @Override public void execute(Runnable task, long startTimeout) {
+            @Override
+            public void execute(Runnable task, long startTimeout) {
                 throw new RejectedExecutionException("rejected");
             }
-            @Override public void execute(Runnable task) { throw new RejectedExecutionException("rejected"); }
-            @Override public <T> java.util.concurrent.Future<T> submit(java.util.concurrent.Callable<T> task) {
+
+            @Override
+            public void execute(Runnable task) {
+                throw new RejectedExecutionException("rejected");
+            }
+
+            @Override
+            public <T> java.util.concurrent.Future<T> submit(java.util.concurrent.Callable<T> task) {
                 throw new RejectedExecutionException("rejected");
             }
         };
@@ -244,7 +274,7 @@ class AsyncSupportRegistryDetailsTest {
         DeferredResultProcessingInterceptor throwingInterceptor = new DeferredResultProcessingInterceptor() {
             @Override
             public <T> boolean handleTimeout(org.springframework.web.context.request.NativeWebRequest request,
-                                             org.springframework.web.context.request.async.DeferredResult<T> result) {
+                    org.springframework.web.context.request.async.DeferredResult<T> result) {
                 throw new IllegalStateException("timeout-failed");
             }
         };
@@ -274,8 +304,7 @@ class AsyncSupportRegistryDetailsTest {
         DeferredResultProcessingInterceptor continuingInterceptor = new DeferredResultProcessingInterceptor() {
             @Override
             public <T> boolean handleError(org.springframework.web.context.request.NativeWebRequest request,
-                                           org.springframework.web.context.request.async.DeferredResult<T> result,
-                                           Throwable error) {
+                    org.springframework.web.context.request.async.DeferredResult<T> result, Throwable error) {
                 return true;
             }
         };
@@ -295,8 +324,7 @@ class AsyncSupportRegistryDetailsTest {
         DeferredResultProcessingInterceptor throwingInterceptor = new DeferredResultProcessingInterceptor() {
             @Override
             public <T> boolean handleError(org.springframework.web.context.request.NativeWebRequest request,
-                                           org.springframework.web.context.request.async.DeferredResult<T> result,
-                                           Throwable error) {
+                    org.springframework.web.context.request.async.DeferredResult<T> result, Throwable error) {
                 throw new IllegalStateException("interceptor-error");
             }
         };
@@ -313,7 +341,7 @@ class AsyncSupportRegistryDetailsTest {
         DeferredResultProcessingInterceptor throwingPreProcess = new DeferredResultProcessingInterceptor() {
             @Override
             public <T> void preProcess(org.springframework.web.context.request.NativeWebRequest request,
-                                       org.springframework.web.context.request.async.DeferredResult<T> result) {
+                    org.springframework.web.context.request.async.DeferredResult<T> result) {
                 throw new IllegalStateException("pre-failed");
             }
         };
@@ -330,10 +358,23 @@ class AsyncSupportRegistryDetailsTest {
 
     private static AsyncTaskExecutor inlineExecutor() {
         return new AsyncTaskExecutor() {
-            @Override public void execute(Runnable task, long startTimeout) { task.run(); }
-            @Override public void execute(Runnable task) { task.run(); }
-            @Override public <T> java.util.concurrent.Future<T> submit(java.util.concurrent.Callable<T> task) {
-                try { task.call(); } catch (Exception e) { throw new RuntimeException(e); }
+            @Override
+            public void execute(Runnable task, long startTimeout) {
+                task.run();
+            }
+
+            @Override
+            public void execute(Runnable task) {
+                task.run();
+            }
+
+            @Override
+            public <T> java.util.concurrent.Future<T> submit(java.util.concurrent.Callable<T> task) {
+                try {
+                    task.call();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
                 return null;
             }
         };
@@ -343,11 +384,34 @@ class AsyncSupportRegistryDetailsTest {
         final Map<String, Object> attrs = new HashMap<>();
         final Map<RequestAttribute<?>, Object> typed = new HashMap<>();
 
-        @Override public Map<String, Object> getAttributes() { return attrs; }
-        @Override public Object getAttribute(String name) { return attrs.get(name); }
-        @Override public void setAttribute(String name, Object o) { attrs.put(name, o); }
-        @Override public Object removeAttribute(String name) { return attrs.remove(name); }
-        @Override public <T> T getAttribute(RequestAttribute<T> key) { return (T) typed.get(key); }
-        @Override public <T> void setAttribute(RequestAttribute<T> key, T value) { typed.put(key, value); }
+        @Override
+        public Map<String, Object> getAttributes() {
+            return attrs;
+        }
+
+        @Override
+        public Object getAttribute(String name) {
+            return attrs.get(name);
+        }
+
+        @Override
+        public void setAttribute(String name, Object o) {
+            attrs.put(name, o);
+        }
+
+        @Override
+        public Object removeAttribute(String name) {
+            return attrs.remove(name);
+        }
+
+        @Override
+        public <T> T getAttribute(RequestAttribute<T> key) {
+            return (T) typed.get(key);
+        }
+
+        @Override
+        public <T> void setAttribute(RequestAttribute<T> key, T value) {
+            typed.put(key, value);
+        }
     }
 }

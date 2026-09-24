@@ -76,11 +76,11 @@ public class BridgeTestController {
     public org.springframework.web.context.request.async.WebAsyncTask<String> asyncTimeout() {
         // 显式 100ms 超时 + 500ms 任务：验证异步超时机制真实打断慢任务
         // （原先依赖 BridgeE2eConfig 的 100ms 全局默认超时，该值已移除——
-        //   defaultTimeout 现已正确作用于所有异步请求，全局 100ms 会误杀 1s 的 /demo/async）
+        // defaultTimeout 现已正确作用于所有异步请求，全局 100ms 会误杀 1s 的 /demo/async）
         return new org.springframework.web.context.request.async.WebAsyncTask<>(100L, () -> {
             Thread.sleep(500);
             return "too-late";
         });
     }
 
-    }
+}

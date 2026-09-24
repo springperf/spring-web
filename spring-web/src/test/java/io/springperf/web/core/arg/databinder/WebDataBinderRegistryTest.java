@@ -1,6 +1,11 @@
 package io.springperf.web.core.arg.databinder;
 
-import io.springperf.web.core.mapping.MappingHandlerMethod;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.lang.reflect.Field;
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.format.support.DefaultFormattingConversionService;
@@ -8,11 +13,7 @@ import org.springframework.validation.Validator;
 import org.springframework.web.bind.support.WebBindingInitializer;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 
-import java.lang.reflect.Field;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import io.springperf.web.core.mapping.MappingHandlerMethod;
 
 class WebDataBinderRegistryTest {
 
@@ -161,9 +162,23 @@ class WebDataBinderRegistryTest {
 
     // D6 测试用独立 userClass：MappingCacheKey.createClassCacheKey 的缓存按 userClass 静态共享，
     // 若都用 Object.class 会被其他测试预填的 CONVERSION_SERVICE_KEY 污染。
-    private static final class FallbackA { @SuppressWarnings("unused") public void handle() {} }
-    private static final class FallbackB { @SuppressWarnings("unused") public void handle() {} }
-    private static final class FallbackC { @SuppressWarnings("unused") public void handle() {} }
+    private static final class FallbackA {
+        @SuppressWarnings("unused")
+        public void handle() {
+        }
+    }
+
+    private static final class FallbackB {
+        @SuppressWarnings("unused")
+        public void handle() {
+        }
+    }
+
+    private static final class FallbackC {
+        @SuppressWarnings("unused")
+        public void handle() {
+        }
+    }
 
     // ==================== spring.mvc.message-codes-resolver-format ====================
 
@@ -196,11 +211,11 @@ class WebDataBinderRegistryTest {
     }
 
     private static WebDataBinderRegistry registryWithProps(String resolverFormat) throws Exception {
-        io.springperf.web.context.ApplicationProperties props =
-                mock(io.springperf.web.context.ApplicationProperties.class);
+        io.springperf.web.context.ApplicationProperties props = mock(
+                io.springperf.web.context.ApplicationProperties.class);
         when(props.get(io.springperf.web.context.PropertiesConstant.MVC_MESSAGE_CODES_RESOLVER_FORMAT,
-                        io.springperf.web.context.PropertiesConstant.MVC_MESSAGE_CODES_RESOLVER_FORMAT_DEFAULT))
-                .thenReturn(resolverFormat);
+                io.springperf.web.context.PropertiesConstant.MVC_MESSAGE_CODES_RESOLVER_FORMAT_DEFAULT))
+                        .thenReturn(resolverFormat);
         io.springperf.web.context.WebContext ctx = mock(io.springperf.web.context.WebContext.class);
         when(ctx.getProps()).thenReturn(props);
         WebDataBinderRegistry registry = new WebDataBinderRegistry();
@@ -210,10 +225,29 @@ class WebDataBinderRegistryTest {
 
     // 同样按 userClass 静态共享缓存，getConversionService/getValidators 的用例各自使用独立
     // userClass 槽位，避免测试顺序导致缓存串扰。
-    private static final class SlotA { @SuppressWarnings("unused") public void handle() {} }
-    private static final class SlotB { @SuppressWarnings("unused") public void handle() {} }
-    private static final class SlotC { @SuppressWarnings("unused") public void handle() {} }
-    private static final class SlotD { @SuppressWarnings("unused") public void handle() {} }
+    private static final class SlotA {
+        @SuppressWarnings("unused")
+        public void handle() {
+        }
+    }
+
+    private static final class SlotB {
+        @SuppressWarnings("unused")
+        public void handle() {
+        }
+    }
+
+    private static final class SlotC {
+        @SuppressWarnings("unused")
+        public void handle() {
+        }
+    }
+
+    private static final class SlotD {
+        @SuppressWarnings("unused")
+        public void handle() {
+        }
+    }
 
     private static void setField(Object target, String fieldName, Object value) throws Exception {
         Field field = target.getClass().getDeclaredField(fieldName);

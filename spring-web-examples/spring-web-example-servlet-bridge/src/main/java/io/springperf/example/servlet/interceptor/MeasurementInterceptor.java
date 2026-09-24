@@ -20,7 +20,7 @@ public class MeasurementInterceptor implements HandlerInterceptor {
 
     @Override
     public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler,
-                           ModelAndView modelAndView) {
+            ModelAndView modelAndView) {
         Long start = (Long) request.getAttribute(ATTR_START);
         if (start != null) {
             log.info("[MVC-INTERCEPTOR] {} took {}ms", request.getRequestURI(), System.currentTimeMillis() - start);

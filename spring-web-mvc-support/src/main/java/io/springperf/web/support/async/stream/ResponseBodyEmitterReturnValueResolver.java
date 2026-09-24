@@ -18,7 +18,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
-public class ResponseBodyEmitterReturnValueResolver extends StreamEmitterReturnValueResolver implements LifecycleWebComponent {
+public class ResponseBodyEmitterReturnValueResolver extends StreamEmitterReturnValueResolver
+        implements LifecycleWebComponent {
 
     private HttpBodyCodecRegistry codecRegistry;
 
@@ -29,12 +30,14 @@ public class ResponseBodyEmitterReturnValueResolver extends StreamEmitterReturnV
     }
 
     @Override
-    protected void preInitializeEmitter(StreamEmitter emitter, WebServerHttpRequest req, WebServerHttpResponse resp) throws Exception {
+    protected void preInitializeEmitter(StreamEmitter emitter, WebServerHttpRequest req, WebServerHttpResponse resp)
+            throws Exception {
         super.preInitializeEmitter(emitter, req, resp);
         if (emitter instanceof ResponseBodyEmitter) {
             ResponseBodyEmitter responseBodyEmitter = (ResponseBodyEmitter) emitter;
             HttpHeaders mutableHeaders = new HttpHeaders(resp.getHeaders());
-            AdapterUtil.setEncodeFunction(responseBodyEmitter, (data, out) -> encodeToStream(mutableHeaders, data, out));
+            AdapterUtil.setEncodeFunction(responseBodyEmitter,
+                    (data, out) -> encodeToStream(mutableHeaders, data, out));
         }
     }
 
@@ -60,8 +63,8 @@ public class ResponseBodyEmitterReturnValueResolver extends StreamEmitterReturnV
             out.write((byte[]) data);
             return;
         }
-        throw new IllegalArgumentException("No suitable converter for " + data.getClass()
-                + " and no fallback encoding available");
+        throw new IllegalArgumentException(
+                "No suitable converter for " + data.getClass() + " and no fallback encoding available");
     }
 
     @Override

@@ -1,11 +1,10 @@
 package io.springperf.web.core.arg.provider;
 
-import io.springperf.web.context.BaseWebComponent;
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.arg.StaticArgumentResolver;
-import io.springperf.web.core.arg.databinder.WebDataBinderRegistry;
-import io.springperf.web.core.arg.resolver.ModelAttributeResolver;
-import io.springperf.web.core.mapping.MappingHandlerMethod;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.lang.reflect.Method;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -13,10 +12,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.MethodParameter;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
-import java.lang.reflect.Method;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import io.springperf.web.context.BaseWebComponent;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.arg.StaticArgumentResolver;
+import io.springperf.web.core.arg.databinder.WebDataBinderRegistry;
+import io.springperf.web.core.arg.resolver.ModelAttributeResolver;
+import io.springperf.web.core.mapping.MappingHandlerMethod;
 
 @ExtendWith(MockitoExtension.class)
 class ModelAttributeResolverProviderTest {
@@ -62,8 +63,8 @@ class ModelAttributeResolverProviderTest {
         ModelAttributeResolverProvider provider = new ModelAttributeResolverProvider();
         provider.initWithWebContext(webContext);
 
-        StaticArgumentResolver resolver = provider.getResolver(
-                param("annotatedParam", String.class, ModelAttribute.class), mappingContext, webContext);
+        StaticArgumentResolver resolver = provider
+                .getResolver(param("annotatedParam", String.class, ModelAttribute.class), mappingContext, webContext);
         assertNotNull(resolver);
         assertInstanceOf(ModelAttributeResolver.class, resolver);
     }
@@ -74,10 +75,12 @@ class ModelAttributeResolverProviderTest {
     }
 
     @SuppressWarnings("unused")
-    public void annotatedParam(@ModelAttribute String s) {}
+    public void annotatedParam(@ModelAttribute String s) {
+    }
 
     @SuppressWarnings("unused")
-    public void stringParam(String s) {}
+    public void stringParam(String s) {
+    }
 
     private MethodParameter param(String methodName, Class<?> paramType) throws Exception {
         for (Method m : getClass().getDeclaredMethods()) {

@@ -1,9 +1,12 @@
 package io.springperf.web.core.arg.provider;
 
-import io.springperf.web.core.arg.StaticArgumentResolver;
-import io.springperf.web.core.mapping.MappingHandlerMethod;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.lang.reflect.Method;
+import java.util.Locale;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -11,24 +14,24 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.MethodParameter;
 
-import java.lang.reflect.Method;
-import java.util.Locale;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import io.springperf.web.core.arg.StaticArgumentResolver;
+import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 /**
- * 验证 {@link LocaleResolverProvider}：
- * 优先尊重线程已绑定的 Locale（拦截器 / ControllerAdvice setLocale 覆盖），
- * 未绑定时按请求 Accept-Language 解析，且不写 ThreadLocal（零固定开销）。
+ * 验证 {@link LocaleResolverProvider}： 优先尊重线程已绑定的 Locale（拦截器 / ControllerAdvice setLocale 覆盖）， 未绑定时按请求 Accept-Language
+ * 解析，且不写 ThreadLocal（零固定开销）。
  */
 @ExtendWith(MockitoExtension.class)
 class LocaleResolverProviderTest {
 
-    @Mock WebServerHttpRequest request;
-    @Mock WebServerHttpResponse response;
-    @Mock MappingHandlerMethod mappingContext;
+    @Mock
+    WebServerHttpRequest request;
+    @Mock
+    WebServerHttpResponse response;
+    @Mock
+    MappingHandlerMethod mappingContext;
 
     private final LocaleResolverProvider provider = new LocaleResolverProvider();
 
@@ -80,8 +83,7 @@ class LocaleResolverProviderTest {
         LocaleContextHolder.setLocale(Locale.UK);
         try {
             StaticArgumentResolver resolver = provider.getResolver(param("localeParam", 0), mappingContext, null);
-            assertEquals(Locale.UK, resolver.resolveArgument(request, response),
-                    "线程已绑定 Locale 时解析应尊重覆盖值");
+            assertEquals(Locale.UK, resolver.resolveArgument(request, response), "线程已绑定 Locale 时解析应尊重覆盖值");
         } finally {
             LocaleContextHolder.resetLocaleContext();
         }
@@ -95,8 +97,7 @@ class LocaleResolverProviderTest {
 
         resolver.resolveArgument(request, response);
 
-        assertNull(LocaleContextHolder.getLocaleContext(),
-                "解析不应写入 LocaleContextHolder");
+        assertNull(LocaleContextHolder.getLocaleContext(), "解析不应写入 LocaleContextHolder");
     }
 
     @Test
@@ -104,8 +105,8 @@ class LocaleResolverProviderTest {
         java.util.Optional<Locale> opt = java.util.Optional.of(Locale.FRENCH);
         // 使用本测试类的 public 方法作为 Optional 参数载体（与 AbstractSupportOptionalResolverTest
         // 一致的稳定模式：MethodParameter 泛型可完全解析，isOptional 判断可靠）
-        MethodParameter optionalParam =
-                new MethodParameter(getClass().getMethod("optionalLocaleParam", java.util.Optional.class), 0);
+        MethodParameter optionalParam = new MethodParameter(
+                getClass().getMethod("optionalLocaleParam", java.util.Optional.class), 0);
         StaticArgumentResolver resolver = provider.getResolver(optionalParam, mappingContext, null);
         when(request.getLocale()).thenReturn(Locale.FRENCH);
 

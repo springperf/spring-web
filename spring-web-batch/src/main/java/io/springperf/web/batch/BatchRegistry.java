@@ -26,18 +26,19 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class BatchRegistry extends BaseWebComponent {
 
-    private static final MappingCacheKey<BatchRequestMetaData> BATCH_META_CACHE_KEY =
-            MappingCacheKey.createMethodCacheKey(BatchRequestMetaData.class);
+    private static final MappingCacheKey<BatchRequestMetaData> BATCH_META_CACHE_KEY = MappingCacheKey
+            .createMethodCacheKey(BatchRequestMetaData.class);
 
     private final Map<String, DisruptorQueue> queues = new ConcurrentHashMap<>();
     private final List<BatchHandlerRegistration> registrations = new ArrayList<>();
     private BatchMetrics metrics = NoOpBatchMetrics.INSTANCE;
 
     /**
-     * Set a custom metrics collector for all batch queues.
-     * Must be called before {@link #initComponentPhase2()} takes effect.
+     * Set a custom metrics collector for all batch queues. Must be called before {@link #initComponentPhase2()} takes
+     * effect.
      *
-     * @param metrics metrics collector, or {@code null} to disable
+     * @param metrics
+     *            metrics collector, or {@code null} to disable
      */
     public void setMetrics(BatchMetrics metrics) {
         this.metrics = metrics != null ? metrics : NoOpBatchMetrics.INSTANCE;
@@ -52,8 +53,8 @@ public class BatchRegistry extends BaseWebComponent {
         ApplicationContext ctx = webContext.getCtx();
         MappingRegistry mappingRegistry = webContext.getWebComponent(MappingRegistry.class);
 
-        List<BatchHandlerRegistration> registrations = new BatchScanner()
-                .scan(ctx, mappingRegistry.getMappingContextList());
+        List<BatchHandlerRegistration> registrations = new BatchScanner().scan(ctx,
+                mappingRegistry.getMappingContextList());
 
         for (BatchHandlerRegistration reg : registrations) {
             install(reg);
@@ -109,10 +110,10 @@ public class BatchRegistry extends BaseWebComponent {
         reg.singleCtx().setEffectiveReturnType(createEffectiveReturnType(meta));
 
         // single 路径的默认线程模型：
-        //  - 开启虚拟线程（JDK 21+）：default 池以虚拟线程执行任务，而 single 路径只做入队
-        //    （微秒级、不阻塞），走它反而多一次线程切换 → 保持 EventLoop 零切换；
-        //  - 未开启（含属性开启但 JDK < 21 回落的情形）：不设置，遵循全局默认线程模型
-        //    pool.default-execute-mode（默认 default 业务池）。
+        // - 开启虚拟线程（JDK 21+）：default 池以虚拟线程执行任务，而 single 路径只做入队
+        // （微秒级、不阻塞），走它反而多一次线程切换 → 保持 EventLoop 零切换；
+        // - 未开启（含属性开启但 JDK < 21 回落的情形）：不设置，遵循全局默认线程模型
+        // pool.default-execute-mode（默认 default 业务池）。
         // 两种情况下用户显式 @RunInPool 都优先（setDefaultPool 仅在无注解时生效）。
         if (virtualThreads) {
             poolRegistry.setDefaultPool(reg.singleCtx(), null);
@@ -120,9 +121,8 @@ public class BatchRegistry extends BaseWebComponent {
     }
 
     /**
-     * 创建 BatchRequest 子类的合成返回类型，使 ReturnValueResolverRegistry
-     * 能正确解析泛型内联类型（如 EchoBatchRequest extends BatchRequest<String> 中的 String）。
-     * 通过 ResolvableType 沿继承链向上查找，支持多层继承场景。
+     * 创建 BatchRequest 子类的合成返回类型，使 ReturnValueResolverRegistry 能正确解析泛型内联类型（如 EchoBatchRequest extends
+     * BatchRequest<String> 中的 String）。 通过 ResolvableType 沿继承链向上查找，支持多层继承场景。
      */
     private static MethodParameter createEffectiveReturnType(BatchRequestMetaData meta) {
         Class<? extends BatchRequest<?>> requestType = meta.requestType();
@@ -132,6 +132,7 @@ public class BatchRegistry extends BaseWebComponent {
             public Class<?> getParameterType() {
                 return requestType;
             }
+
             @Override
             public Type getGenericParameterType() {
                 return effectiveGenericType != null ? effectiveGenericType : requestType.getGenericSuperclass();

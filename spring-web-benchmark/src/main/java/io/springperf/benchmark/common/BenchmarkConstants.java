@@ -3,13 +3,11 @@ package io.springperf.benchmark.common;
 import okhttp3.MediaType;
 
 /**
- * JMH 基准测试全局常量。
- * 所有基准测试类共享相同的端口、路径和迭代配置，保证对比公平。
+ * JMH 基准测试全局常量。 所有基准测试类共享相同的端口、路径和迭代配置，保证对比公平。
  */
 public final class BenchmarkConstants {
 
-    public static final int PORT = Integer.parseInt(
-            System.getProperty("benchmark.port", "9090"));
+    public static final int PORT = Integer.parseInt(System.getProperty("benchmark.port", "9090"));
     public static final String CONTEXT_PATH = "/api";
     /** external 模式服务端主机（如 WSL IP 172.x.x.x）；空 = 进程内启动服务端 */
     public static final String TARGET_HOST = System.getProperty("benchmark.target", "");
@@ -26,20 +24,16 @@ public final class BenchmarkConstants {
     public static final String JVM_ARGS = "-Xms1g -Xmx1g -XX:+UseG1GC";
 
     /** 基准报告输出目录 */
-    public static final String OUTPUT_DIR = System.getProperty(
-            "benchmark.output.dir", "target/benchmark-reports");
+    public static final String OUTPUT_DIR = System.getProperty("benchmark.output.dir", "target/benchmark-reports");
 
     /** 基准测试 profile 名称 */
-    public static final String PROFILE_NAME = System.getProperty(
-            "benchmark.profile.name", "unknown");
+    public static final String PROFILE_NAME = System.getProperty("benchmark.profile.name", "unknown");
 
     /** 基准 JSON 请求体（UserReq 格式） */
-    public static final String ECHO_BODY =
-            "{\"name\":\"张三\",\"age\":25,\"email\":\"zhangsan@example.com\"}";
+    public static final String ECHO_BODY = "{\"name\":\"张三\",\"age\":25,\"email\":\"zhangsan@example.com\"}";
 
     /** 基准校验请求体（与 json 相同，但端点启用 @Valid 验证） */
-    public static final String VALIDATE_BODY =
-            "{\"name\":\"test\",\"age\":25,\"email\":\"test@example.com\"}";
+    public static final String VALIDATE_BODY = "{\"name\":\"test\",\"age\":25,\"email\":\"test@example.com\"}";
 
     /** 大响应体路径 */
     public static final String LARGE_RESPONSE_PATH = "/core/large-response";

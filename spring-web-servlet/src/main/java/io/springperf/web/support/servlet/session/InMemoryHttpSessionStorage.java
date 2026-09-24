@@ -46,9 +46,7 @@ public class InMemoryHttpSessionStorage implements HttpSessionStorage {
 
     public int getActiveSessionCount() {
         long now = System.currentTimeMillis();
-        return (int) sessions.values().stream()
-                .filter(s -> !s.isExpired(now))
-                .count();
+        return (int) sessions.values().stream().filter(s -> !s.isExpired(now)).count();
     }
 
     private static final java.security.SecureRandom SESSION_ID_RANDOM = new java.security.SecureRandom();

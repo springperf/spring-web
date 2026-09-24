@@ -8,8 +8,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 /**
  * 全局 @ExceptionHandler，用于捕获 ProxyExceptionController 抛出的异常。
  * <p>
- * 验证 CGLIB 代理 Controller 抛出异常后，框架的异常处理链路能正常工作：
- * 异常从代理方法传播 → ExceptionRegistry → ExceptionHandlerExceptionResolver
+ * 验证 CGLIB 代理 Controller 抛出异常后，框架的异常处理链路能正常工作： 异常从代理方法传播 → ExceptionRegistry → ExceptionHandlerExceptionResolver
  * → @ExceptionHandler 方法。
  */
 @RestControllerAdvice

@@ -16,10 +16,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(
-        classes = SecurityApplication.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
-)
+@SpringBootTest(classes = SecurityApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class SecuritySessionE2eTest {
 
     private TestRestTemplate rest;
@@ -30,16 +27,15 @@ class SecuritySessionE2eTest {
     @BeforeEach
     void setUp() {
         int actualPort = nettyHttpServer.getActualPort();
-        rest = new TestRestTemplate(new RestTemplateBuilder()
-                .rootUri("http://localhost:" + actualPort));
+        rest = new TestRestTemplate(new RestTemplateBuilder().rootUri("http://localhost:" + actualPort));
     }
 
     // ==================== session 测试 ====================
 
     @Test
     void securitySession_createAndReadAttribute() {
-        ResponseEntity<Map> createResp = rest.getForEntity(
-                "/security/session-set?key=mykey&value=hello-security", Map.class);
+        ResponseEntity<Map> createResp = rest.getForEntity("/security/session-set?key=mykey&value=hello-security",
+                Map.class);
         assertThat(createResp.getStatusCodeValue()).isEqualTo(200);
 
         Map<String, Object> createBody = createResp.getBody();
@@ -59,8 +55,8 @@ class SecuritySessionE2eTest {
         headers.add(HttpHeaders.COOKIE, "JSESSIONID=" + jsessionid);
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
-        ResponseEntity<Map> getResp = rest.exchange(
-                "/security/session-get?key=mykey", HttpMethod.GET, entity, Map.class);
+        ResponseEntity<Map> getResp = rest.exchange("/security/session-get?key=mykey", HttpMethod.GET, entity,
+                Map.class);
         assertThat(getResp.getStatusCodeValue()).isEqualTo(200);
 
         Map<String, Object> getBody = getResp.getBody();
@@ -82,8 +78,7 @@ class SecuritySessionE2eTest {
 
     @Test
     void securitySession_crossRequestPersistence() {
-        ResponseEntity<Map> firstResp = rest.getForEntity(
-                "/security/session-set?key=color&value=blue", Map.class);
+        ResponseEntity<Map> firstResp = rest.getForEntity("/security/session-set?key=color&value=blue", Map.class);
         String sessionId = (String) firstResp.getBody().get("sessionId");
         String cookie = extractJSessionId(firstResp.getHeaders().getFirst(HttpHeaders.SET_COOKIE));
 
@@ -91,8 +86,8 @@ class SecuritySessionE2eTest {
         headers.add(HttpHeaders.COOKIE, "JSESSIONID=" + cookie);
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
-        ResponseEntity<Map> secondResp = rest.exchange(
-                "/security/session-get?key=color", HttpMethod.GET, entity, Map.class);
+        ResponseEntity<Map> secondResp = rest.exchange("/security/session-get?key=color", HttpMethod.GET, entity,
+                Map.class);
         assertThat(secondResp.getBody().get("sessionId")).isEqualTo(sessionId);
         assertThat(secondResp.getBody().get("value")).isEqualTo("blue");
     }

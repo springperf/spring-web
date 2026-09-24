@@ -1,31 +1,5 @@
 package io.springperf.web.core.async.stream;
 
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.channel.embedded.EmbeddedChannel;
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.async.AsyncSupportUtils;
-import io.springperf.web.core.async.PerfAsyncWebRequest;
-import io.springperf.web.core.async.reactive.PublisherToStreamEmitterAdapter;
-import io.springperf.web.core.async.reactive.ReactiveConfig;
-import io.springperf.web.http.NettyServerHttpResponse;
-import io.springperf.web.http.RequestAttribute;
-import io.springperf.web.http.RequestContext;
-import io.springperf.web.http.WebServerHttpRequest;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -38,14 +12,40 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
+
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.embedded.EmbeddedChannel;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.async.AsyncSupportUtils;
+import io.springperf.web.core.async.PerfAsyncWebRequest;
+import io.springperf.web.core.async.reactive.PublisherToStreamEmitterAdapter;
+import io.springperf.web.core.async.reactive.ReactiveConfig;
+import io.springperf.web.http.NettyServerHttpResponse;
+import io.springperf.web.http.RequestAttribute;
+import io.springperf.web.http.RequestContext;
+import io.springperf.web.http.WebServerHttpRequest;
+
 /**
  * 回归：{@link PublisherToStreamEmitterAdapter} 背压补充请求链路。
  * <p>
  * 修复前两处缺陷叠加导致遵守背压的 cold Publisher 在 highWaterMark 条后流永久停滞：
  * <ol>
- *   <li>时序错误——写回调在 subscribe 之后才注册，而 asyncWebRequest 在 subscribe 之前就
- *       绑定了 emitter 的（null）写回调；</li>
- *   <li>机制缺陷——sender drain 直写 channel 不挂写监听器，写完成不触发写回调。</li>
+ * <li>时序错误——写回调在 subscribe 之后才注册，而 asyncWebRequest 在 subscribe 之前就 绑定了 emitter 的（null）写回调；</li>
+ * <li>机制缺陷——sender drain 直写 channel 不挂写监听器，写完成不触发写回调。</li>
  * </ol>
  * 修复后：{@code drain 写完成 → writeStreamSuccessCallback → tryRequest → subscription.request(增量)}。
  */
@@ -100,8 +100,8 @@ class StreamBackpressureFlowTest {
     void writeCallbackHandler_registered_afterSubscribe() throws Exception {
         SseEmitter emitter = new SseEmitter();
         DefaultNettyStreamSender sender = new DefaultNettyStreamSender(emitter, asyncWebRequest);
-        PublisherToStreamEmitterAdapter adapter =
-                new PublisherToStreamEmitterAdapter(emitter, sender, new ReactiveConfig(150, 50, -1), asyncWebRequest);
+        PublisherToStreamEmitterAdapter adapter = new PublisherToStreamEmitterAdapter(emitter, sender,
+                new ReactiveConfig(150, 50, -1), asyncWebRequest);
 
         adapter.onSubscribe(mock(Subscription.class));
 
@@ -121,8 +121,8 @@ class StreamBackpressureFlowTest {
             SseEmitter emitter = new SseEmitter();
             DefaultNettyStreamSender sender = new DefaultNettyStreamSender(emitter, asyncWebRequest);
             Subscription subscription = mock(Subscription.class);
-            PublisherToStreamEmitterAdapter adapter =
-                    new PublisherToStreamEmitterAdapter(emitter, sender, new ReactiveConfig(150, 50, -1), asyncWebRequest);
+            PublisherToStreamEmitterAdapter adapter = new PublisherToStreamEmitterAdapter(emitter, sender,
+                    new ReactiveConfig(150, 50, -1), asyncWebRequest);
 
             new AsyncSubscribePublisher(executor, subscription, subscribed).subscribe(adapter);
             // subscribe() 返回时 onSubscribe 尚未投递（异步），模拟真实异步 Publisher
@@ -142,8 +142,8 @@ class StreamBackpressureFlowTest {
     void writeComplete_triggersBackpressureRequest_throughAdapter() throws Exception {
         SseEmitter emitter = new SseEmitter();
         DefaultNettyStreamSender sender = new DefaultNettyStreamSender(emitter, asyncWebRequest);
-        PublisherToStreamEmitterAdapter adapter =
-                new PublisherToStreamEmitterAdapter(emitter, sender, new ReactiveConfig(150, 50, -1), asyncWebRequest);
+        PublisherToStreamEmitterAdapter adapter = new PublisherToStreamEmitterAdapter(emitter, sender,
+                new ReactiveConfig(150, 50, -1), asyncWebRequest);
         Subscription subscription = mock(Subscription.class);
 
         adapter.onSubscribe(subscription); // 初始 request(150) + 注册写回调（onSubscribe 内已同步给 asyncWebRequest）
@@ -164,8 +164,8 @@ class StreamBackpressureFlowTest {
         SseEmitter emitter = new SseEmitter();
         DefaultNettyStreamSender sender = new DefaultNettyStreamSender(emitter, asyncWebRequest);
         ReactiveConfig config = new ReactiveConfig(50_000, 1, -1);
-        PublisherToStreamEmitterAdapter adapter =
-                new PublisherToStreamEmitterAdapter(emitter, sender, config, asyncWebRequest);
+        PublisherToStreamEmitterAdapter adapter = new PublisherToStreamEmitterAdapter(emitter, sender, config,
+                asyncWebRequest);
 
         assertDoesNotThrow(() -> {
             // adapter 本身是 Subscriber，直接订阅同步 Publisher；
@@ -178,8 +178,7 @@ class StreamBackpressureFlowTest {
     }
 
     /**
-     * 异步 Publisher：onSubscribe 在独立线程投递（模拟 publishOn/subscribeOn 边界的异步投递），
-     * subscribe() 返回时 onSubscribe 尚未执行。
+     * 异步 Publisher：onSubscribe 在独立线程投递（模拟 publishOn/subscribeOn 边界的异步投递）， subscribe() 返回时 onSubscribe 尚未执行。
      */
     static class AsyncSubscribePublisher implements Publisher<Object> {
         private final ExecutorService executor;
@@ -202,8 +201,8 @@ class StreamBackpressureFlowTest {
     }
 
     /**
-     * 同步 Publisher：request(n) 在调用线程同步回调 n 个 onNext（模拟 Flux.range 的同步投递），
-     * 元素发完后 onComplete。count 远大于 highWaterMark，使每次写完成补充请求都会重入。
+     * 同步 Publisher：request(n) 在调用线程同步回调 n 个 onNext（模拟 Flux.range 的同步投递）， 元素发完后 onComplete。count 远大于
+     * highWaterMark，使每次写完成补充请求都会重入。
      */
     static class SyncRangePublisher implements org.reactivestreams.Publisher<Object> {
         private final int count;

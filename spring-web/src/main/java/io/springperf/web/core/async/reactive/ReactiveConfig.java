@@ -1,9 +1,9 @@
 package io.springperf.web.core.async.reactive;
 
+import java.lang.reflect.Constructor;
+
 import io.springperf.web.core.async.stream.StreamEmitter;
 import lombok.Getter;
-
-import java.lang.reflect.Constructor;
 
 @Getter
 public class ReactiveConfig {
@@ -28,7 +28,9 @@ public class ReactiveConfig {
         this(null, null, highWaterMark, lowWaterMark, timeout);
     }
 
-    public ReactiveConfig(Class<? extends StreamEmitter> streamEmitterType, Constructor<? extends StreamEmitter> streamEmitterConstructor, int highWaterMark, int lowWaterMark, long timeout) {
+    public ReactiveConfig(Class<? extends StreamEmitter> streamEmitterType,
+            Constructor<? extends StreamEmitter> streamEmitterConstructor, int highWaterMark, int lowWaterMark,
+            long timeout) {
         // C14：背压水位 fail-fast 校验。lowWaterMark≤0 时 tryRequest 的补充请求永远不触发，
         // 遵守背压的 cold Publisher 在 highWaterMark 条后流停滞；highWaterMark≤lowWaterMark
         // 时背压区间为空（queueSize<low 才补充请求，而 high-low 无余量），逻辑自相矛盾。

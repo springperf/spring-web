@@ -32,18 +32,24 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class SessionAttributeArgumentResolverProviderTest {
 
-    @Mock WebServerHttpRequest request;
-    @Mock WebServerHttpResponse response;
-    @Mock RequestContext requestContext;
-    @Mock MappingHandlerMethod mappingContext;
-    @Mock HttpServletRequest servletRequest;
-    @Mock HttpSession session;
+    @Mock
+    WebServerHttpRequest request;
+    @Mock
+    WebServerHttpResponse response;
+    @Mock
+    RequestContext requestContext;
+    @Mock
+    MappingHandlerMethod mappingContext;
+    @Mock
+    HttpServletRequest servletRequest;
+    @Mock
+    HttpSession session;
 
     private final SessionAttributeArgumentResolverProvider provider = new SessionAttributeArgumentResolverProvider();
 
     static class Controller {
         public void handler(@SessionAttribute("user") String user,
-                            @SessionAttribute(name = "nick", required = false) String nick) {
+                @SessionAttribute(name = "nick", required = false) String nick) {
         }
 
         public void named(@SessionAttribute String token) {
@@ -51,7 +57,8 @@ class SessionAttributeArgumentResolverProviderTest {
     }
 
     private static MethodParameter param(int index) throws Exception {
-        MethodParameter p = new MethodParameter(Controller.class.getMethod("handler", String.class, String.class), index);
+        MethodParameter p = new MethodParameter(Controller.class.getMethod("handler", String.class, String.class),
+                index);
         p.initParameterNameDiscovery(new DefaultParameterNameDiscoverer());
         return p;
     }

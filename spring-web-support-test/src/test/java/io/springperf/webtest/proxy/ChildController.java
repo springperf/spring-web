@@ -12,10 +12,8 @@ import java.util.Map;
 /**
  * 继承 ParentController，验证 CGLIB 代理 + 类继承场景下路由注解能正常解析。
  * <p>
- * 类级别的 {@code @RequestMapping("/proxy-parent")} 从 ParentController 继承，
- * 通过 AnnotatedElementUtils.findMergedAnnotation 可遍历到父类。
- * method getDeclaredMethods 只返回本类声明的方法，因此子类新增的路由方法能正确注册，
- * 父类的路由方法通过父类自己的 bean 注册。
+ * 类级别的 {@code @RequestMapping("/proxy-parent")} 从 ParentController 继承， 通过 AnnotatedElementUtils.findMergedAnnotation
+ * 可遍历到父类。 method getDeclaredMethods 只返回本类声明的方法，因此子类新增的路由方法能正确注册， 父类的路由方法通过父类自己的 bean 注册。
  */
 @RestController
 public class ChildController extends ParentController {

@@ -37,15 +37,10 @@ public class BatchE2ETest extends BaseE2ETest {
         for (int i = 0; i < requestCount; i++) {
             executor.submit(() -> {
                 try {
-                    Request req = new Request.Builder()
-                            .url(baseUrl())
-                            .get()
-                            .build();
+                    Request req = new Request.Builder().url(baseUrl()).get().build();
                     try (Response resp = CLIENT.newCall(req).execute()) {
                         String body = resp.body() != null ? resp.body().string() : "";
-                        if (resp.code() == 200
-                                && body.startsWith("batched:")
-                                && body.contains("msg=hello")) {
+                        if (resp.code() == 200 && body.startsWith("batched:") && body.contains("msg=hello")) {
                             successCount.incrementAndGet();
                         } else {
                             failures.add(resp.code() + ":" + body);
@@ -68,44 +63,32 @@ public class BatchE2ETest extends BaseE2ETest {
 
     @Test
     void singleRequest_alsoProcessedByBatchHandler() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl())
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl()).get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
-            assertTrue(body.startsWith("batched:"),
-                    "Response should come from batch handler: " + body);
-            assertTrue(body.contains("msg=hello"),
-                    "Response should contain injected msg=hello: " + body);
+            assertTrue(body.startsWith("batched:"), "Response should come from batch handler: " + body);
+            assertTrue(body.contains("msg=hello"), "Response should contain injected msg=hello: " + body);
         }
     }
 
     /** 未开启虚拟线程（默认）：批量方法应在平台工作线程上执行。 */
     @Test
     void batchHandler_runsOnPlatformWorkerThreadByDefault() throws Exception {
-        Request req = new Request.Builder()
-                .url(url("/api/batch/thread?msg=hello"))
-                .get()
-                .build();
+        Request req = new Request.Builder().url(url("/api/batch/thread?msg=hello")).get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
-            assertTrue(body.startsWith("thread=batch-worker-"),
-                    "默认应在平台工作线程执行: " + body);
-            assertTrue(body.endsWith(":virtual=false"),
-                    "默认不应是虚拟线程: " + body);
+            assertTrue(body.startsWith("thread=batch-worker-"), "默认应在平台工作线程执行: " + body);
+            assertTrue(body.endsWith(":virtual=false"), "默认不应是虚拟线程: " + body);
         }
     }
 
     @Test
     void postWithMultiParams_injectsBodyQueryAndPathVar() throws Exception {
         String json = "{\"name\":\"testUser\",\"age\":25}";
-        Request req = new Request.Builder()
-                .url(url("/api/batch/echo/testPath?msg=helloMulti"))
-                .post(RequestBody.create(JSON, json))
-                .build();
+        Request req = new Request.Builder().url(url("/api/batch/echo/testPath?msg=helloMulti"))
+                .post(RequestBody.create(JSON, json)).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -128,14 +111,10 @@ public class BatchE2ETest extends BaseE2ETest {
         for (int i = 0; i < requestCount; i++) {
             executor.submit(() -> {
                 try {
-                    Request req = new Request.Builder()
-                            .url(url("/api/batch/echo-batchsize?msg=test"))
-                            .get()
-                            .build();
+                    Request req = new Request.Builder().url(url("/api/batch/echo-batchsize?msg=test")).get().build();
                     try (Response resp = CLIENT.newCall(req).execute()) {
                         String body = resp.body() != null ? resp.body().string() : "";
-                        if (resp.code() == 200
-                                && body.contains(":maxBatchSize=2")) {
+                        if (resp.code() == 200 && body.contains(":maxBatchSize=2")) {
                             successCount.incrementAndGet();
                         } else {
                             failures.add(resp.code() + ":" + body);
@@ -167,10 +146,7 @@ public class BatchE2ETest extends BaseE2ETest {
         for (int i = 0; i < requestCount; i++) {
             executor.submit(() -> {
                 try {
-                    Request req = new Request.Builder()
-                            .url(url("/api/batch/echo-error?msg=test"))
-                            .get()
-                            .build();
+                    Request req = new Request.Builder().url(url("/api/batch/echo-error?msg=test")).get().build();
                     try (Response resp = CLIENT.newCall(req).execute()) {
                         String body = resp.body() != null ? resp.body().string() : "";
                         if (resp.isSuccessful()) {
@@ -211,15 +187,10 @@ public class BatchE2ETest extends BaseE2ETest {
         for (int i = 0; i < requestCount; i++) {
             executor.submit(() -> {
                 try {
-                    Request req = new Request.Builder()
-                            .url(url("/api/batch/echo-consumers?msg=test"))
-                            .get()
-                            .build();
+                    Request req = new Request.Builder().url(url("/api/batch/echo-consumers?msg=test")).get().build();
                     try (Response resp = CLIENT.newCall(req).execute()) {
                         String body = resp.body() != null ? resp.body().string() : "";
-                        if (resp.code() == 200
-                                && body.startsWith("consumed:")
-                                && body.contains(":consumerSize=2")) {
+                        if (resp.code() == 200 && body.startsWith("consumed:") && body.contains(":consumerSize=2")) {
                             successCount.incrementAndGet();
                         } else {
                             failures.add(resp.code() + ":" + body);

@@ -16,9 +16,10 @@ import java.util.Map;
 
 /**
  * 验证 {@code @SessionAttributes}（复数）：类级声明属性在请求间与 session 双向同步。
- * <p>分步表单语义：{@code step1} 录入部分数据 → session 保存；{@code step2} 从 session
- * 恢复对象（{@code @ModelAttribute} 参数复用同一实例，不重建）；{@code complete} 调
- * {@link SessionStatus#setComplete()} 清理 session。</p>
+ * <p>
+ * 分步表单语义：{@code step1} 录入部分数据 → session 保存；{@code step2} 从 session 恢复对象（{@code @ModelAttribute}
+ * 参数复用同一实例，不重建）；{@code complete} 调 {@link SessionStatus#setComplete()} 清理 session。
+ * </p>
  */
 @RestController
 @RequestMapping("/session-attrs")
@@ -33,9 +34,8 @@ public class SessionAttributesTestController {
     }
 
     @PostMapping("/step1")
-    public Map<String, Object> step1(@ModelAttribute("wizard") Wizard wizard,
-                                     @RequestParam String name,
-                                     HttpServletRequest request) {
+    public Map<String, Object> step1(@ModelAttribute("wizard") Wizard wizard, @RequestParam String name,
+            HttpServletRequest request) {
         wizard.setName(name);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("name", wizard.getName());
@@ -44,8 +44,7 @@ public class SessionAttributesTestController {
     }
 
     @GetMapping("/step2")
-    public Map<String, Object> step2(@ModelAttribute("wizard") Wizard wizard,
-                                     HttpServletRequest request) {
+    public Map<String, Object> step2(@ModelAttribute("wizard") Wizard wizard, HttpServletRequest request) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("name", wizard.getName());
         jakarta.servlet.http.HttpSession session = request.getSession(false);
@@ -54,8 +53,7 @@ public class SessionAttributesTestController {
     }
 
     @PostMapping("/complete")
-    public Map<String, Object> complete(SessionStatus sessionStatus,
-                                        HttpServletRequest request) {
+    public Map<String, Object> complete(SessionStatus sessionStatus, HttpServletRequest request) {
         sessionStatus.setComplete();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("complete", true);

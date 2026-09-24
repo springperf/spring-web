@@ -36,12 +36,14 @@ public class UserController {
         return Optional.ofNullable(fieldErrors)
                 .map(fieldErrorsInner -> fieldErrorsInner.stream()
                         .map(fieldError -> fieldError.getField() + fieldError.getDefaultMessage())
-                        .collect(Collectors.toList())).orElse(null);
+                        .collect(Collectors.toList()))
+                .orElse(null);
     }
 
     @PostMapping(value = "/find/{name}", params = "v=111")
     @Optimize
-    public ResponseEntity<Map<String, Object>> find(@Valid @RequestBody RequestObj<User> req, BindingResult result, @PathVariable("name") String name, @RequestParam("v") String v, int id, @ModelAttribute User user) {
+    public ResponseEntity<Map<String, Object>> find(@Valid @RequestBody RequestObj<User> req, BindingResult result,
+            @PathVariable("name") String name, @RequestParam("v") String v, int id, @ModelAttribute User user) {
         Map<String, Object> m = new HashMap<>();
         m.put("id", id);
         m.put("tid", req.getTid());
@@ -143,4 +145,3 @@ public class UserController {
         return emitter;
     }
 }
-

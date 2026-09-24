@@ -4,8 +4,10 @@ import org.springframework.http.HttpStatus;
 
 /**
  * Shim of Spring MVC's {@code ViewControllerRegistration}.
- * <p>收集 {@code addViewController}/{@code addRedirectViewController}/{@code addStatusController}
- * 的注册信息，由 {@code WebMvcConfigurerBridge} 桥接为框架原生路由（{@code PathMappingContext}）。</p>
+ * <p>
+ * 收集 {@code addViewController}/{@code addRedirectViewController}/{@code addStatusController} 的注册信息，由
+ * {@code WebMvcConfigurerBridge} 桥接为框架原生路由（{@code PathMappingContext}）。
+ * </p>
  */
 public class ViewControllerRegistration {
 

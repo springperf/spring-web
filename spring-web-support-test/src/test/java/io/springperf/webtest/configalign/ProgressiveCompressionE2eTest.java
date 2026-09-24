@@ -23,33 +23,25 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 渐进式输出 × 响应压缩组合 E2E（{@code server.compression.*}）：
- * 分块流经压缩器后，逐帧 gzip 仍应还原出完整有序内容，且压缩头（Content-Encoding/Vary）
+ * 渐进式输出 × 响应压缩组合 E2E（{@code server.compression.*}）： 分块流经压缩器后，逐帧 gzip 仍应还原出完整有序内容，且压缩头（Content-Encoding/Vary）
  * 语义不因流式提交而丢失。OkHttp 不自动解压非主 body 场景，这里手动用 GzipSource 解压。
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, ProgressiveCompressionE2eTest.Cfg.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "server.compression.enabled=true",
-                "server.compression.min-response-size=1B",
-                "server.compression.mime-types=application/json"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        ProgressiveCompressionE2eTest.Cfg.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "server.compression.enabled=true",
+                "server.compression.min-response-size=1B", "server.compression.mime-types=application/json" })
 class ProgressiveCompressionE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
 
     private Response get(String path) throws IOException {
-        return CLIENT.newCall(new Request.Builder()
-                .url("http://localhost:" + port + path)
-                .header("Accept-Encoding", "gzip")
-                .build()).execute();
+        return CLIENT.newCall(
+                new Request.Builder().url("http://localhost:" + port + path).header("Accept-Encoding", "gzip").build())
+                .execute();
     }
 
     @Test
@@ -57,11 +49,9 @@ class ProgressiveCompressionE2eTest {
         Response resp = get("/e2e-pc/staged");
         try {
             assertEquals(200, resp.code());
-            assertEquals("gzip", resp.header("Content-Encoding"),
-                    "流式提交的响应同样应被压缩，实际 headers=" + resp.headers());
+            assertEquals("gzip", resp.header("Content-Encoding"), "流式提交的响应同样应被压缩，实际 headers=" + resp.headers());
             assertNotNull(resp.header("Vary"), "压缩响应应带 Vary");
-            String body = resp.header("Content-Encoding") != null
-                    ? unGzip(resp) : resp.body().string();
+            String body = resp.header("Content-Encoding") != null ? unGzip(resp) : resp.body().string();
             assertEquals("{\"part\":1}{\"part\":2}", body, "逐帧压缩后内容应完整有序");
         } finally {
             resp.close();
@@ -71,8 +61,7 @@ class ProgressiveCompressionE2eTest {
     @Test
     void progressiveUnsupportedEncoding_passesThrough() throws Exception {
         // Accept-Encoding: br（框架不支持的编码）→ 不压缩直传，内容仍完整
-        Response resp = CLIENT.newCall(new Request.Builder()
-                .url("http://localhost:" + port + "/e2e-pc/staged")
+        Response resp = CLIENT.newCall(new Request.Builder().url("http://localhost:" + port + "/e2e-pc/staged")
                 .header("Accept-Encoding", "br").build()).execute();
         try {
             assertEquals(200, resp.code());

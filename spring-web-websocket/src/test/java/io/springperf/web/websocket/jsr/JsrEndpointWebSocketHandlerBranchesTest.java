@@ -28,8 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * 补充 {@link JsrEndpointWebSocketHandler} 分支：二进制/Pong/POJO 消息解码、
- * byte[]/ByteBuffer/Encoder 返回值发送、@OnError 缺失/异常、无参构造缺失、
+ * 补充 {@link JsrEndpointWebSocketHandler} 分支：二进制/Pong/POJO 消息解码、 byte[]/ByteBuffer/Encoder 返回值发送、@OnError 缺失/异常、无参构造缺失、
  * EndpointConfig/CloseReason 参数注入等。
  */
 class JsrEndpointWebSocketHandlerBranchesTest {
@@ -133,7 +132,7 @@ class JsrEndpointWebSocketHandlerBranchesTest {
         }
     }
 
-    @ServerEndpoint(value = "/pojo", decoders = {PojoTextDecoder.class}, encoders = {PojoTextEncoder.class})
+    @ServerEndpoint(value = "/pojo", decoders = { PojoTextDecoder.class }, encoders = { PojoTextEncoder.class })
     public static class PojoEndpoint {
         @OnMessage
         public PojoMessage echo(PojoMessage m) {
@@ -161,8 +160,7 @@ class JsrEndpointWebSocketHandlerBranchesTest {
     }
 
     private JsrEndpointWebSocketHandler handler(Class<?> endpointClass) {
-        return new JsrEndpointWebSocketHandler(
-                new JsrEndpointMetadata(endpointClass), new JsrWebSocketContainer());
+        return new JsrEndpointWebSocketHandler(new JsrEndpointMetadata(endpointClass), new JsrWebSocketContainer());
     }
 
     @Test
@@ -182,8 +180,8 @@ class JsrEndpointWebSocketHandlerBranchesTest {
     @Test
     void handleTransportError_noState_returnsGracefully() {
         WebSocketSession session = mockSession();
-        assertDoesNotThrow(() -> handler(BinaryReturnEndpoint.class)
-                .handleTransportError(session, new RuntimeException("x")));
+        assertDoesNotThrow(
+                () -> handler(BinaryReturnEndpoint.class).handleTransportError(session, new RuntimeException("x")));
     }
 
     @Test
@@ -215,8 +213,7 @@ class JsrEndpointWebSocketHandlerBranchesTest {
 
         handler.handleMessage(session, new TextMessage("hi"));
 
-        assertEquals(1, ThrowingOnErrorEndpoint.ERROR_INVOCATIONS.get(),
-                "@OnMessage 抛异常应翻译为 @OnError");
+        assertEquals(1, ThrowingOnErrorEndpoint.ERROR_INVOCATIONS.get(), "@OnMessage 抛异常应翻译为 @OnError");
     }
 
     @Test
@@ -238,8 +235,8 @@ class JsrEndpointWebSocketHandlerBranchesTest {
 
     @Test
     void afterConnectionClosed_noState_returnsGracefully() throws Exception {
-        assertDoesNotThrow(() -> handler(BinaryReturnEndpoint.class)
-                .afterConnectionClosed(mockSession(), CloseStatus.NORMAL));
+        assertDoesNotThrow(
+                () -> handler(BinaryReturnEndpoint.class).afterConnectionClosed(mockSession(), CloseStatus.NORMAL));
     }
 
     @Test
@@ -250,7 +247,7 @@ class JsrEndpointWebSocketHandlerBranchesTest {
         handler.afterConnectionEstablished(session);
 
         handler.handleMessage(session,
-                new org.springframework.web.socket.PongMessage(ByteBuffer.wrap(new byte[]{1, 2})));
+                new org.springframework.web.socket.PongMessage(ByteBuffer.wrap(new byte[] { 1, 2 })));
 
         assertEquals(1, PongReturnEndpoint.PONG_HANDLED.get());
     }
@@ -261,10 +258,10 @@ class JsrEndpointWebSocketHandlerBranchesTest {
         WebSocketSession session = mockSession();
         handler.afterConnectionEstablished(session);
 
-        handler.handleMessage(session, new BinaryMessage(ByteBuffer.wrap(new byte[]{5, 6, 7})));
+        handler.handleMessage(session, new BinaryMessage(ByteBuffer.wrap(new byte[] { 5, 6, 7 })));
 
-        verify(session).sendMessage(argThat(msg -> msg instanceof BinaryMessage
-                && ((BinaryMessage) msg).getPayload().remaining() == 3));
+        verify(session).sendMessage(
+                argThat(msg -> msg instanceof BinaryMessage && ((BinaryMessage) msg).getPayload().remaining() == 3));
     }
 
     @Test
@@ -273,7 +270,7 @@ class JsrEndpointWebSocketHandlerBranchesTest {
         WebSocketSession session = mockSession();
         handler.afterConnectionEstablished(session);
 
-        byte[] payload = new byte[]{9, 8};
+        byte[] payload = new byte[] { 9, 8 };
         handler.handleMessage(session, new BinaryMessage(ByteBuffer.wrap(payload)));
 
         verify(session).sendMessage(argThat(msg -> msg instanceof BinaryMessage));
@@ -287,8 +284,8 @@ class JsrEndpointWebSocketHandlerBranchesTest {
 
         handler.handleMessage(session, new TextMessage("hello"));
 
-        verify(session).sendMessage(argThat(msg -> msg instanceof TextMessage
-                && ((TextMessage) msg).getPayload().equals("encoded:hello")));
+        verify(session).sendMessage(
+                argThat(msg -> msg instanceof TextMessage && ((TextMessage) msg).getPayload().equals("encoded:hello")));
     }
 
     @Test

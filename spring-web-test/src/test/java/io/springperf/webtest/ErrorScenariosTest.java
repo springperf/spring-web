@@ -18,10 +18,7 @@ public class ErrorScenariosTest extends BaseE2ETest {
     void testValidationFailure() throws Exception {
         String json = "{\"name\":\"\"}";
         RequestBody body = RequestBody.create(json, MediaType.parse("application/json"));
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/validate")
-                .post(body)
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/validate").post(body).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(400, resp.code());
         }

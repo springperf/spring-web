@@ -20,11 +20,10 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 /**
  * 批量方法的执行线程与池语义：
  * <ul>
- *   <li>默认（平台池）→ {@code batch-worker-*} 平台线程；</li>
- *   <li>{@code virtualThreads=true}（{@code spring.threads.virtual.enabled=true} + JDK 21+）
- *       → {@code batch-virtual-*} 虚拟线程；</li>
- *   <li><b>两种模式下池语义一致</b>：{@code consumerSize} 仍是并发上限，池满时由 Disruptor
- *       消费者线程（{@code batch-disruptor-*}）自执行形成背压。</li>
+ * <li>默认（平台池）→ {@code batch-worker-*} 平台线程；</li>
+ * <li>{@code virtualThreads=true}（{@code spring.threads.virtual.enabled=true} + JDK 21+） → {@code batch-virtual-*}
+ * 虚拟线程；</li>
+ * <li><b>两种模式下池语义一致</b>：{@code consumerSize} 仍是并发上限，池满时由 Disruptor 消费者线程（{@code batch-disruptor-*}）自执行形成背压。</li>
  * </ul>
  */
 class DisruptorQueueVirtualThreadsTest {
@@ -37,7 +36,7 @@ class DisruptorQueueVirtualThreadsTest {
     static class ThreadCapturingService {
         static final AtomicReference<Thread> LAST_THREAD = new AtomicReference<>();
 
-        @SuppressWarnings({"unchecked", "rawtypes"})
+        @SuppressWarnings({ "unchecked", "rawtypes" })
         public void handle(List<? extends BatchRequest<?>> batch) {
             LAST_THREAD.set(Thread.currentThread());
             for (BatchRequest request : batch) {
@@ -51,7 +50,7 @@ class DisruptorQueueVirtualThreadsTest {
         static final long SLEEP_MS = 300L;
         static final Set<String> THREADS = ConcurrentHashMap.newKeySet();
 
-        @SuppressWarnings({"unchecked", "rawtypes"})
+        @SuppressWarnings({ "unchecked", "rawtypes" })
         public void handle(List<? extends BatchRequest<?>> batch) {
             THREADS.add(Thread.currentThread().getName());
             try {
@@ -76,15 +75,15 @@ class DisruptorQueueVirtualThreadsTest {
 
     private static BatchRequestMetaData capturingMeta() throws Exception {
         Method m = ThreadCapturingService.class.getDeclaredMethod("handle", List.class);
-        return new BatchRequestMetaData(m, ThreadCapturingService.class, null, "vtq-" + SEQ.incrementAndGet(),
-                64, BatchMapping.WaitStrategy.BLOCKING, BatchMapping.Backpressure.BLOCK, null, 2, 2);
+        return new BatchRequestMetaData(m, ThreadCapturingService.class, null, "vtq-" + SEQ.incrementAndGet(), 64,
+                BatchMapping.WaitStrategy.BLOCKING, BatchMapping.Backpressure.BLOCK, null, 2, 2);
     }
 
     private static BatchRequestMetaData saturationMeta(String queueName) throws Exception {
         Method m = SaturatedService.class.getDeclaredMethod("handle", List.class);
-        return new BatchRequestMetaData(m, SaturatedService.class, null, queueName,
-                64, BatchMapping.WaitStrategy.BLOCKING, BatchMapping.Backpressure.BLOCK, null,
-                1,  // maxBatchSize = 1：每个请求单独成批
+        return new BatchRequestMetaData(m, SaturatedService.class, null, queueName, 64,
+                BatchMapping.WaitStrategy.BLOCKING, BatchMapping.Backpressure.BLOCK, null, 1, // maxBatchSize =
+                                                                                              // 1：每个请求单独成批
                 1); // consumerSize = 1：池上限 1
     }
 
@@ -95,8 +94,8 @@ class DisruptorQueueVirtualThreadsTest {
     }
 
     private Thread runOneBatch(boolean virtualThreads) throws Exception {
-        queue = new DisruptorQueue("vtq-" + SEQ.incrementAndGet(), capturingMeta(),
-                new ThreadCapturingService(), null, virtualThreads);
+        queue = new DisruptorQueue("vtq-" + SEQ.incrementAndGet(), capturingMeta(), new ThreadCapturingService(), null,
+                virtualThreads);
         queue.enqueue(new BatchRequest<String>() {
         });
         for (int i = 0; i < 200 && ThreadCapturingService.LAST_THREAD.get() == null; i++) {
@@ -110,8 +109,7 @@ class DisruptorQueueVirtualThreadsTest {
     /** 池上限 1 且每请求单独成批：第二个批次无空闲 worker → 由消费者线程自执行（背压语义）。 */
     private void assertSaturatedBatchRunsInlineOnConsumerThread(boolean virtualThreads) throws Exception {
         String queueName = "satq-" + SEQ.incrementAndGet();
-        queue = new DisruptorQueue(queueName, saturationMeta(queueName),
-                new SaturatedService(), null, virtualThreads);
+        queue = new DisruptorQueue(queueName, saturationMeta(queueName), new SaturatedService(), null, virtualThreads);
 
         BatchRequest<String> first = new BatchRequest<String>() {
         };

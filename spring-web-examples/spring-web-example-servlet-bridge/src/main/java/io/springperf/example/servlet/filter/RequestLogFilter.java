@@ -20,8 +20,7 @@ public class RequestLogFilter implements Filter {
             chain.doFilter(servletRequest, servletResponse);
         } finally {
             long elapsed = System.currentTimeMillis() - start;
-            log.info("[SERVLET-FILTER] {} {} -> {}ms",
-                    req.getMethod(), req.getRequestURI(), elapsed);
+            log.info("[SERVLET-FILTER] {} {} -> {}ms", req.getMethod(), req.getRequestURI(), elapsed);
         }
     }
 }

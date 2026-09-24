@@ -1,12 +1,11 @@
 package io.springperf.web.server;
 
-import org.junit.jupiter.api.Test;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.junit.jupiter.api.Test;
+
 /**
- * 矩阵参数（path parameter）剥离：路由匹配用剥离后的路径（对齐 Spring
- * {@code UrlPathHelper.removeSemicolonContent=true}），否则服务端自己写出的
+ * 矩阵参数（path parameter）剥离：路由匹配用剥离后的路径（对齐 Spring {@code UrlPathHelper.removeSemicolonContent=true}），否则服务端自己写出的
  * {@code ;jsessionid=} URL 打不开（404）。
  */
 class NettyHttpHandlerPathParamsTest {
@@ -25,8 +24,7 @@ class NettyHttpHandlerPathParamsTest {
 
     @Test
     void paramInLaterSegment_onlyThatSegmentStripped() {
-        assertThat(NettyHttpHandler.stripPathParams("/a;x=1/b;jsessionid=ABC/c"))
-                .isEqualTo("/a/b/c");
+        assertThat(NettyHttpHandler.stripPathParams("/a;x=1/b;jsessionid=ABC/c")).isEqualTo("/a/b/c");
     }
 
     @Test

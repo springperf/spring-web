@@ -14,7 +14,8 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class ForwardWebServerHttpRequestTest {
 
-    @Mock WebServerHttpRequest originalRequest;
+    @Mock
+    WebServerHttpRequest originalRequest;
 
     @Test
     void getPath_returnsForwardPath() {

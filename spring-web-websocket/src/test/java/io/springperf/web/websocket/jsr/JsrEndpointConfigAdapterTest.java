@@ -11,11 +11,13 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class JsrEndpointConfigAdapterTest {
 
-    @ServerEndpoint(value = "/ws", subprotocols = {"chat", "superchat"})
-    static class BasicEndpoint {}
+    @ServerEndpoint(value = "/ws", subprotocols = { "chat", "superchat" })
+    static class BasicEndpoint {
+    }
 
     @ServerEndpoint(value = "/custom", configurator = CustomConfigurator.class)
-    static class CustomEndpoint {}
+    static class CustomEndpoint {
+    }
 
     public static class CustomConfigurator extends ServerEndpointConfig.Configurator {
         @Override
@@ -69,7 +71,8 @@ class JsrEndpointConfigAdapterTest {
     @Test
     void customConfigurator_instantiationFailure_throwsIllegalState() {
         @ServerEndpoint(value = "/broken", configurator = BrokenConfigurator.class)
-        class BrokenEndpoint {}
+        class BrokenEndpoint {
+        }
         assertThrows(IllegalStateException.class,
                 () -> new JsrEndpointConfigAdapter(new JsrEndpointMetadata(BrokenEndpoint.class)));
     }

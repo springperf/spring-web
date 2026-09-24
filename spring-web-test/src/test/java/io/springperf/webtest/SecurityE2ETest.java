@@ -13,7 +13,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * E2E 网络安全回归：multipart 大小限制、路径遍历拦截、CORS 来源校验、异常信息不泄露。
- * <p>对应安全审计修复：multipart 此前绕过 max-content-length 导致磁盘/内存耗尽 DoS。</p>
+ * <p>
+ * 对应安全审计修复：multipart 此前绕过 max-content-length 导致磁盘/内存耗尽 DoS。
+ * </p>
  */
 public class SecurityE2ETest extends BaseE2ETest {
 
@@ -56,37 +58,24 @@ public class SecurityE2ETest extends BaseE2ETest {
         // 服务端在收到请求头后按 Content-Length 提前 fast-fail 返回 413（REQUEST_ENTITY_TOO_LARGE）。
         // 用原始 Socket 发送"声明超大 Content-Length + 极小 body"，确定性验证拒绝路径，
         // 避免真实上传 4MB+ body 时客户端写超时导致的偶发失败。
-        String requestLine = "POST /api/upload/db-req HTTP/1.1\r\n"
-                + "Host: localhost\r\n"
-                + "Content-Type: multipart/form-data; boundary=boundary\r\n"
-                + "Content-Length: 5242880\r\n"   // 5MB > 默认 4MB 限制
-                + "Connection: close\r\n"
-                + "\r\n"
-                + "--boundary\r\n"
-                + "Content-Disposition: form-data; name=\"x\"\r\n\r\n"
-                + "y\r\n"
-                + "--boundary--\r\n";
+        String requestLine = "POST /api/upload/db-req HTTP/1.1\r\n" + "Host: localhost\r\n"
+                + "Content-Type: multipart/form-data; boundary=boundary\r\n" + "Content-Length: 5242880\r\n" // 5MB > 默认
+                                                                                                             // 4MB 限制
+                + "Connection: close\r\n" + "\r\n" + "--boundary\r\n"
+                + "Content-Disposition: form-data; name=\"x\"\r\n\r\n" + "y\r\n" + "--boundary--\r\n";
 
         int status = rawHttpExchange(requestLine);
-        assertTrue(status >= 400 && status < 500,
-                "超大 Content-Length 的 multipart 请求必须被拒绝（4xx），实际状态码: " + status);
+        assertTrue(status >= 400 && status < 500, "超大 Content-Length 的 multipart 请求必须被拒绝（4xx），实际状态码: " + status);
     }
 
     @Test
     void multipartNormalBody_processed() throws Exception {
         RequestBody part = RequestBody.create("small-content", MediaType.parse("text/plain"));
-        RequestBody multipart = new MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("projectId", "1")
-                .addFormDataPart("seq", "1")
-                .addFormDataPart("dbVersionList", "1.0")
-                .addFormDataPart("file", "small.txt", part)
-                .build();
+        RequestBody multipart = new MultipartBody.Builder().setType(MultipartBody.FORM)
+                .addFormDataPart("projectId", "1").addFormDataPart("seq", "1").addFormDataPart("dbVersionList", "1.0")
+                .addFormDataPart("file", "small.txt", part).build();
 
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/upload/db-req")
-                .post(multipart)
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/upload/db-req").post(multipart).build();
 
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code(), "正常 multipart 请求应正常处理");
@@ -97,17 +86,12 @@ public class SecurityE2ETest extends BaseE2ETest {
 
     @Test
     void staticResource_dotDotTraversal_rejected() throws Exception {
-        for (String path : new String[]{
-                "/static/../../etc/passwd",
-                "/static/..%2f..%2fetc%2fpasswd",
-                "/static/%2e%2e/%2e%2e/etc/passwd",
-                "/static/....//....//etc/passwd",
-                "/static/..\\..\\windows\\win.ini"
-        }) {
+        for (String path : new String[] { "/static/../../etc/passwd", "/static/..%2f..%2fetc%2fpasswd",
+                "/static/%2e%2e/%2e%2e/etc/passwd", "/static/....//....//etc/passwd",
+                "/static/..\\..\\windows\\win.ini" }) {
             Request req = new Request.Builder().url(baseUrl() + path).get().build();
             try (Response resp = CLIENT.newCall(req).execute()) {
-                assertNotEquals(200, resp.code(),
-                        "路径遍历请求应被拒绝: " + path + " (got " + resp.code() + ")");
+                assertNotEquals(200, resp.code(), "路径遍历请求应被拒绝: " + path + " (got " + resp.code() + ")");
             }
         }
     }
@@ -126,16 +110,12 @@ public class SecurityE2ETest extends BaseE2ETest {
     @Test
     void cors_unconfiguredOrigin_notEchoed() throws Exception {
         // 未配置 CORS 的路径：响应不应携带 ACAO，更不应回显任意来源
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/demo/echo?received=x")
-                .header("Origin", "http://evil.example.com")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/demo/echo?received=x")
+                .header("Origin", "http://evil.example.com").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             String acao = resp.header("Access-Control-Allow-Origin");
             // 允许无 ACAO 头；但绝不能回显恶意来源
-            assertTrue(acao == null || !acao.contains("evil.example.com"),
-                    "未配置 CORS 的路径不应回显任意 Origin");
+            assertTrue(acao == null || !acao.contains("evil.example.com"), "未配置 CORS 的路径不应回显任意 Origin");
         }
     }
 
@@ -145,18 +125,12 @@ public class SecurityE2ETest extends BaseE2ETest {
     void unhandledExceptionResponse_doesNotLeakDetails() throws Exception {
         // /core/exception/illegal-argument 无显式 @ExceptionHandler，走应用兜底 handler：
         // 框架契约 = 不泄露异常类名与堆栈帧（异常消息是否回显取决于应用自身 handler）
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/core/exception/illegal-argument")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/core/exception/illegal-argument").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             String body = resp.body().string();
-            assertFalse(body.contains("IllegalArgumentException"),
-                    "500 响应不应泄露异常类名: " + body);
-            assertFalse(body.contains("at io.springperf"),
-                    "500 响应不应泄露堆栈帧: " + body);
-            assertFalse(body.contains("Exception"),
-                    "500 响应不应泄露堆栈帧: " + body);
+            assertFalse(body.contains("IllegalArgumentException"), "500 响应不应泄露异常类名: " + body);
+            assertFalse(body.contains("at io.springperf"), "500 响应不应泄露堆栈帧: " + body);
+            assertFalse(body.contains("Exception"), "500 响应不应泄露堆栈帧: " + body);
         }
     }
 }

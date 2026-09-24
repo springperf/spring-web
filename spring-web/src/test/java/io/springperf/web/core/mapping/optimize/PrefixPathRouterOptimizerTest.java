@@ -1,19 +1,20 @@
 package io.springperf.web.core.mapping.optimize;
 
-import io.springperf.web.core.mapping.PathMappingContext;
-import io.springperf.web.core.mapping.route.Router;
-import io.springperf.web.http.RequestAttribute;
-import io.springperf.web.http.RequestContext;
-import io.springperf.web.http.WebServerHttpRequest;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.Test;
+
+import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.core.mapping.route.Router;
+import io.springperf.web.http.RequestAttribute;
+import io.springperf.web.http.RequestContext;
+import io.springperf.web.http.WebServerHttpRequest;
 
 class PrefixPathRouterOptimizerTest {
 
@@ -37,7 +38,8 @@ class PrefixPathRouterOptimizerTest {
             RequestAttribute<?> ra = inv.getArgument(0);
             return attrs.get(ATTR_STORE_KEY + ra.getIndex());
         });
-        doAnswer(inv -> attrs.put(inv.getArgument(0), inv.getArgument(1))).when(reqCtx).setAttribute(any(String.class), any());
+        doAnswer(inv -> attrs.put(inv.getArgument(0), inv.getArgument(1))).when(reqCtx).setAttribute(any(String.class),
+                any());
         doAnswer(inv -> {
             RequestAttribute<?> ra = inv.getArgument(0);
             attrs.put(ATTR_STORE_KEY + ra.getIndex(), inv.getArgument(1));
@@ -81,14 +83,14 @@ class PrefixPathRouterOptimizerTest {
     void getSlashIndexList_returnsCorrectIndices() {
         WebServerHttpRequest req = createMockRequest("/api/user/list");
         int[] indices = PrefixPathRouterOptimizer.getSlashIndexList(req);
-        assertArrayEquals(new int[]{0, 4, 9}, indices);
+        assertArrayEquals(new int[] { 0, 4, 9 }, indices);
     }
 
     @Test
     void getSlashIndexList_rootPath_returnsSingleZero() {
         WebServerHttpRequest req = createMockRequest("/");
         int[] indices = PrefixPathRouterOptimizer.getSlashIndexList(req);
-        assertArrayEquals(new int[]{0}, indices);
+        assertArrayEquals(new int[] { 0 }, indices);
     }
 
     @Test

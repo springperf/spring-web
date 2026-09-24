@@ -15,7 +15,7 @@ public class TestWebFilter implements WebFilter {
 
     @Override
     public void doFilter(WebServerHttpRequest request, WebServerHttpResponse response,
-                         io.springperf.web.core.filter.FilterChain chain) throws Exception {
+            io.springperf.web.core.filter.FilterChain chain) throws Exception {
         // Set header before chain to ensure it's included in the response
         response.getHeaders().add(HEADER_NAME, HEADER_VALUE);
         chain.doFilter(request, response);

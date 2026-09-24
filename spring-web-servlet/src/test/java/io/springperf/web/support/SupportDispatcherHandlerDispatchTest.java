@@ -33,47 +33,63 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class SupportDispatcherHandlerDispatchTest {
 
-    @Mock WebContext webContext;
-    @Mock MappingRegistry mappingRegistry;
-    @Mock ExceptionRegistry exceptionRegistry;
-    @Mock ArgumentResolverRegistry argumentResolverRegistry;
-    @Mock ReturnValueResolverRegistry returnValueResolverRegistry;
-    @Mock CorsRegistry corsRegistry;
-    @Mock InterceptorRegistry interceptorRegistry;
-    @Mock BizPoolRegistry bizPoolRegistry;
-    @Mock AsyncSupportRegistry asyncSupportRegistry;
-    @Mock WebFilterRegistry webFilterRegistry;
-    @Mock WebMetrics metrics;
-    @Mock WebServerHttpRequest req;
-    @Mock WebServerHttpResponse resp;
-    @Mock RequestContext requestContext;
-    @Mock PathMappingContext pathContext;
+    @Mock
+    WebContext webContext;
+    @Mock
+    MappingRegistry mappingRegistry;
+    @Mock
+    ExceptionRegistry exceptionRegistry;
+    @Mock
+    ArgumentResolverRegistry argumentResolverRegistry;
+    @Mock
+    ReturnValueResolverRegistry returnValueResolverRegistry;
+    @Mock
+    CorsRegistry corsRegistry;
+    @Mock
+    InterceptorRegistry interceptorRegistry;
+    @Mock
+    BizPoolRegistry bizPoolRegistry;
+    @Mock
+    AsyncSupportRegistry asyncSupportRegistry;
+    @Mock
+    WebFilterRegistry webFilterRegistry;
+    @Mock
+    WebMetrics metrics;
+    @Mock
+    WebServerHttpRequest req;
+    @Mock
+    WebServerHttpResponse resp;
+    @Mock
+    RequestContext requestContext;
+    @Mock
+    PathMappingContext pathContext;
 
     private SupportDispatcherHandler handler;
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     @BeforeEach
     void setUp() {
         lenient().when(webContext.getWebComponentWithDefault(eq(MappingRegistry.class), any(MappingRegistry.class)))
                 .thenReturn(mappingRegistry);
         lenient().when(webContext.getWebComponentWithDefault(eq(ExceptionRegistry.class), any(ExceptionRegistry.class)))
                 .thenReturn(exceptionRegistry);
-        lenient().when(webContext.getWebComponentWithDefault(eq(ArgumentResolverRegistry.class), any(ArgumentResolverRegistry.class)))
-                .thenReturn(argumentResolverRegistry);
-        lenient().when(webContext.getWebComponentWithDefault(eq(ReturnValueResolverRegistry.class), any(ReturnValueResolverRegistry.class)))
-                .thenReturn(returnValueResolverRegistry);
+        lenient().when(webContext.getWebComponentWithDefault(eq(ArgumentResolverRegistry.class),
+                any(ArgumentResolverRegistry.class))).thenReturn(argumentResolverRegistry);
+        lenient().when(webContext.getWebComponentWithDefault(eq(ReturnValueResolverRegistry.class),
+                any(ReturnValueResolverRegistry.class))).thenReturn(returnValueResolverRegistry);
         lenient().when(webContext.getWebComponentWithDefault(eq(CorsRegistry.class), any(CorsRegistry.class)))
                 .thenReturn(corsRegistry);
-        lenient().when(webContext.getWebComponentWithDefault(eq(InterceptorRegistry.class), any(InterceptorRegistry.class)))
+        lenient().when(
+                webContext.getWebComponentWithDefault(eq(InterceptorRegistry.class), any(InterceptorRegistry.class)))
                 .thenReturn(interceptorRegistry);
         lenient().when(webContext.getWebComponentWithDefault(eq(BizPoolRegistry.class), any(BizPoolRegistry.class)))
                 .thenReturn(bizPoolRegistry);
-        lenient().when(webContext.getWebComponentWithDefault(eq(AsyncSupportRegistry.class), any(AsyncSupportRegistry.class)))
+        lenient().when(
+                webContext.getWebComponentWithDefault(eq(AsyncSupportRegistry.class), any(AsyncSupportRegistry.class)))
                 .thenReturn(asyncSupportRegistry);
         lenient().when(webContext.getWebComponentWithDefault(eq(WebFilterRegistry.class), any(WebFilterRegistry.class)))
                 .thenReturn(webFilterRegistry);
-        lenient().when(webContext.getWebComponentWithDefault(eq(WebMetrics.class), any()))
-                .thenReturn(metrics);
+        lenient().when(webContext.getWebComponentWithDefault(eq(WebMetrics.class), any())).thenReturn(metrics);
 
         handler = new SupportDispatcherHandler();
         handler.initWithWebContext(webContext);
@@ -131,7 +147,8 @@ class SupportDispatcherHandlerDispatchTest {
                 new io.springperf.web.support.servlet.PerfHttpServletRequest(req),
                 new io.springperf.web.support.servlet.PerfHttpServletResponse(resp));
         RequestContextHolder.setRequestAttributes(savedAttrs);
-        LocaleContextHolder.setLocaleContext(new org.springframework.context.i18n.SimpleLocaleContext(java.util.Locale.US));
+        LocaleContextHolder
+                .setLocaleContext(new org.springframework.context.i18n.SimpleLocaleContext(java.util.Locale.US));
         when(mappingRegistry.mapping(any())).thenReturn(MappingResult.notFound());
 
         handler.forward(req, resp, "/missing");
@@ -199,12 +216,12 @@ class SupportDispatcherHandlerDispatchTest {
 
     @Test
     void buildRequestAttributes_withExistingAdapterContext_reusesWrappers() {
-        io.springperf.web.support.servlet.context.ServletAdapterContext adapterContext =
-                mock(io.springperf.web.support.servlet.context.ServletAdapterContext.class);
-        io.springperf.web.support.servlet.PerfHttpServletRequest pReq =
-                mock(io.springperf.web.support.servlet.PerfHttpServletRequest.class);
-        io.springperf.web.support.servlet.PerfHttpServletResponse pResp =
-                mock(io.springperf.web.support.servlet.PerfHttpServletResponse.class);
+        io.springperf.web.support.servlet.context.ServletAdapterContext adapterContext = mock(
+                io.springperf.web.support.servlet.context.ServletAdapterContext.class);
+        io.springperf.web.support.servlet.PerfHttpServletRequest pReq = mock(
+                io.springperf.web.support.servlet.PerfHttpServletRequest.class);
+        io.springperf.web.support.servlet.PerfHttpServletResponse pResp = mock(
+                io.springperf.web.support.servlet.PerfHttpServletResponse.class);
         when(requestContext.getAttribute(io.springperf.web.support.servlet.ServletAttribute.getAttributeKey()))
                 .thenReturn(adapterContext);
         when(adapterContext.getRequest()).thenReturn(pReq);

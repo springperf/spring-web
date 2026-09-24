@@ -14,8 +14,7 @@ public class BatchExceptionHandler implements ExceptionHandler<BatchEvent> {
 
     @Override
     public void handleEventException(Throwable ex, long sequence, BatchEvent event) {
-        log.error("Disruptor queue [{}] consumer error processing sequence {}",
-                queueName, sequence, ex);
+        log.error("Disruptor queue [{}] consumer error processing sequence {}", queueName, sequence, ex);
         // Fail the request if possible so the client doesn't hang
         if (event != null && event.request() != null && !event.request().isCompleted()) {
             event.request().setError(ex);

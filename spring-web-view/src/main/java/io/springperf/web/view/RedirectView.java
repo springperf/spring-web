@@ -62,10 +62,9 @@ public class RedirectView implements View {
     }
 
     private static boolean isSimpleType(Class<?> type) {
-        return type == String.class || type == Integer.class || type == Long.class
-                || type == Double.class || type == Float.class || type == Boolean.class
-                || type == Short.class || type == Byte.class || type == Character.class
-                || type.isPrimitive();
+        return type == String.class || type == Integer.class || type == Long.class || type == Double.class
+                || type == Float.class || type == Boolean.class || type == Short.class || type == Byte.class
+                || type == Character.class || type.isPrimitive();
     }
 
     private static String encode(String value) {

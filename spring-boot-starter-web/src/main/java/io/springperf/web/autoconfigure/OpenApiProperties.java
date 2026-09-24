@@ -4,8 +4,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * Configuration properties for OpenAPI document metadata.
- *
- * <p>Prefix: {@code springperf.openapi}</p>
+ * <p>
+ * Prefix: {@code springperf.openapi}
+ * </p>
  */
 @ConfigurationProperties(prefix = "springperf.openapi")
 public class OpenApiProperties {

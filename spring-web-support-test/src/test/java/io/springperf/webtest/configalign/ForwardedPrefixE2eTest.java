@@ -21,25 +21,19 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * {@code X-Forwarded-Prefix} 语义 E2E：网关剥离前缀转发时，应用侧
- * {@code getContextPath()} 应反映外部前缀（由 Spring 的 {@code ForwardedHeaderFilter} 提供），
- * 而容器级绝对 URL（如 sendRedirect 的 Location）不携带该前缀——前缀由网关补齐。
- *
- * <p>{@code forward-headers-strategy=NONE} 时该头必须被忽略（见 ForwardHeadersNoneE2eTest 的 scheme 覆盖）。</p>
+ * {@code X-Forwarded-Prefix} 语义 E2E：网关剥离前缀转发时，应用侧 {@code getContextPath()} 应反映外部前缀（由 Spring 的
+ * {@code ForwardedHeaderFilter} 提供）， 而容器级绝对 URL（如 sendRedirect 的 Location）不携带该前缀——前缀由网关补齐。
+ * <p>
+ * {@code forward-headers-strategy=NONE} 时该头必须被忽略（见 ForwardHeadersNoneE2eTest 的 scheme 覆盖）。
+ * </p>
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, ForwardedPrefixE2eTest.PrefixConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "server.forward-headers-strategy=FRAMEWORK"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        ForwardedPrefixE2eTest.PrefixConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "server.forward-headers-strategy=FRAMEWORK" })
 class ForwardedPrefixE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .followRedirects(false)
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).followRedirects(false).build();
 
     @LocalServerPort
     int port;

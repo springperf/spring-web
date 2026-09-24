@@ -1,9 +1,5 @@
 package io.springperf.web.server;
 
-import io.springperf.web.context.ApplicationProperties;
-import io.springperf.web.context.PropertiesConstant;
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -12,22 +8,27 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import org.junit.jupiter.api.Test;
+
+import io.springperf.web.context.ApplicationProperties;
+import io.springperf.web.context.PropertiesConstant;
+
 /**
- * {@link MultipartConfig} 单元测试：{@code spring.servlet.multipart.*} 解析与
- * 与 {@code server.http.max-content-length} 的回退关系。
+ * {@link MultipartConfig} 单元测试：{@code spring.servlet.multipart.*} 解析与 与 {@code server.http.max-content-length} 的回退关系。
  */
 class MultipartConfigTest {
 
     private static ApplicationProperties props(String maxFileSize, String maxRequestSize) {
         ApplicationProperties props = mock(ApplicationProperties.class);
         lenient().when(props.get(PropertiesConstant.SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE,
-                        PropertiesConstant.SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE_DEFAULT))
-                .thenReturn(maxFileSize);
-        lenient().when(props.get(PropertiesConstant.SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE,
+                PropertiesConstant.SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE_DEFAULT)).thenReturn(maxFileSize);
+        lenient()
+                .when(props.get(PropertiesConstant.SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE,
                         PropertiesConstant.SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE_DEFAULT))
                 .thenReturn(maxRequestSize);
         // 兜底：未显式桩化 enabled 时返回默认 true
-        lenient().when(props.getBoolean(PropertiesConstant.SPRING_SERVLET_MULTIPART_ENABLED,
+        lenient()
+                .when(props.getBoolean(PropertiesConstant.SPRING_SERVLET_MULTIPART_ENABLED,
                         PropertiesConstant.SPRING_SERVLET_MULTIPART_ENABLED_DEFAULT))
                 .thenReturn(PropertiesConstant.SPRING_SERVLET_MULTIPART_ENABLED_DEFAULT);
         return props;
@@ -95,27 +96,21 @@ class MultipartConfigTest {
     private static ApplicationProperties propsWithThresholdAndLocation(String threshold, String location) {
         ApplicationProperties props = mock(ApplicationProperties.class);
         lenient().when(props.get(PropertiesConstant.SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE,
-                        PropertiesConstant.SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE_DEFAULT))
-                .thenReturn("-1");
+                PropertiesConstant.SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE_DEFAULT)).thenReturn("-1");
         lenient().when(props.get(PropertiesConstant.SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE,
-                        PropertiesConstant.SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE_DEFAULT))
-                .thenReturn("-1");
+                PropertiesConstant.SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE_DEFAULT)).thenReturn("-1");
         lenient().when(props.getBoolean(PropertiesConstant.SPRING_SERVLET_MULTIPART_ENABLED,
-                        PropertiesConstant.SPRING_SERVLET_MULTIPART_ENABLED_DEFAULT))
-                .thenReturn(true);
+                PropertiesConstant.SPRING_SERVLET_MULTIPART_ENABLED_DEFAULT)).thenReturn(true);
         lenient().when(props.get(PropertiesConstant.SPRING_SERVLET_MULTIPART_FILE_SIZE_THRESHOLD,
-                        PropertiesConstant.SPRING_SERVLET_MULTIPART_FILE_SIZE_THRESHOLD_DEFAULT))
-                .thenReturn(threshold);
+                PropertiesConstant.SPRING_SERVLET_MULTIPART_FILE_SIZE_THRESHOLD_DEFAULT)).thenReturn(threshold);
         lenient().when(props.get(PropertiesConstant.SPRING_SERVLET_MULTIPART_LOCATION,
-                        PropertiesConstant.SPRING_SERVLET_MULTIPART_LOCATION_DEFAULT))
-                .thenReturn(location);
+                PropertiesConstant.SPRING_SERVLET_MULTIPART_LOCATION_DEFAULT)).thenReturn(location);
         return props;
     }
 
     @Test
     void threshold_defaultUnset_keepsFrameworkDefault() {
-        MultipartConfig cfg = MultipartConfig.fromProperties(
-                propsWithThresholdAndLocation("-1", ""));
+        MultipartConfig cfg = MultipartConfig.fromProperties(propsWithThresholdAndLocation("-1", ""));
         assertEquals(MultipartConfig.FILE_SIZE_THRESHOLD_UNSET, cfg.getFileSizeThreshold(),
                 "未配置时应为 UNSET，由 resolver 沿用框架默认（16KB）");
         assertEquals("", cfg.getLocation(), "未配置 location 应为空");
@@ -123,23 +118,20 @@ class MultipartConfigTest {
 
     @Test
     void threshold_dataSize_parsedToBytes() {
-        MultipartConfig cfg = MultipartConfig.fromProperties(
-                propsWithThresholdAndLocation("1MB", ""));
+        MultipartConfig cfg = MultipartConfig.fromProperties(propsWithThresholdAndLocation("1MB", ""));
         assertEquals(1024L * 1024, cfg.getFileSizeThreshold());
     }
 
     @Test
     void threshold_zero_mapsToZero() {
         // 显式 0 对齐 Boot 的“全部落盘”语义
-        MultipartConfig cfg = MultipartConfig.fromProperties(
-                propsWithThresholdAndLocation("0", ""));
+        MultipartConfig cfg = MultipartConfig.fromProperties(propsWithThresholdAndLocation("0", ""));
         assertEquals(0L, cfg.getFileSizeThreshold());
     }
 
     @Test
     void location_parsed() {
-        MultipartConfig cfg = MultipartConfig.fromProperties(
-                propsWithThresholdAndLocation("-1", "/data/upload-tmp"));
+        MultipartConfig cfg = MultipartConfig.fromProperties(propsWithThresholdAndLocation("-1", "/data/upload-tmp"));
         assertEquals("/data/upload-tmp", cfg.getLocation());
     }
 

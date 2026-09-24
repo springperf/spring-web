@@ -21,9 +21,9 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * E2E 厚度测试：真实字节流连接级回归。
  * <ul>
- *   <li>keep-alive：同一连接复用（连续请求共享对端端口）</li>
- *   <li>并发隔离：并行请求互不串扰，各自拿到自己路径的结果</li>
- *   <li>失败请求不污染连接：4xx/5xx 后连接仍可继续复用</li>
+ * <li>keep-alive：同一连接复用（连续请求共享对端端口）</li>
+ * <li>并发隔离：并行请求互不串扰，各自拿到自己路径的结果</li>
+ * <li>失败请求不污染连接：4xx/5xx 后连接仍可继续复用</li>
  * </ul>
  */
 class E2EThicknessTest extends BaseE2ETest {
@@ -50,12 +50,12 @@ class E2EThicknessTest extends BaseE2ETest {
         int port = -1;
         for (int i = 0; i < 5; i++) {
             int current = getIntField("/api/thickness/conn-id", "remotePort").intValue();
-            if (port == -1) port = current;
+            if (port == -1)
+                port = current;
             assertEquals(port, current, "keep-alive 连接应在连续请求间被复用");
         }
         int after = nettyHttpServer.getActiveConnectionCount();
-        assertTrue(after <= before + 1,
-                "复用后连接数不应显著增长: before=" + before + " after=" + after);
+        assertTrue(after <= before + 1, "复用后连接数不应显著增长: before=" + before + " after=" + after);
     }
 
     @Test
@@ -81,7 +81,8 @@ class E2EThicknessTest extends BaseE2ETest {
                 pool.submit(() -> {
                     try {
                         String body = get(url("/api/core/bytes")).body().string();
-                        if (!"Hello, Bytes!".equals(body)) failures.incrementAndGet();
+                        if (!"Hello, Bytes!".equals(body))
+                            failures.incrementAndGet();
                     } catch (Exception e) {
                         failures.incrementAndGet();
                     } finally {
@@ -119,7 +120,8 @@ class E2EThicknessTest extends BaseE2ETest {
                 pool.submit(() -> {
                     try {
                         String body = get(url("/api/core/bytes")).body().string();
-                        if (!"Hello, Bytes!".equals(body)) failures.incrementAndGet();
+                        if (!"Hello, Bytes!".equals(body))
+                            failures.incrementAndGet();
                     } catch (Exception e) {
                         failures.incrementAndGet();
                     } finally {

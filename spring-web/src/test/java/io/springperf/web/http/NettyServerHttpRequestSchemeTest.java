@@ -1,5 +1,16 @@
 package io.springperf.web.http;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.net.URI;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
@@ -11,33 +22,27 @@ import io.netty.handler.ssl.SslHandler;
 import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.net.URI;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 /**
  * 验证 {@link NettyServerHttpRequest#resolveScheme} 的 scheme 判定安全逻辑：
  * <ol>
- *   <li>转发头默认不信任（forward-headers-strategy=NONE/FALSE 或未配置时忽略 Forwarded/X-Forwarded-Proto）</li>
- *   <li>开启转发头后优先 RFC 7239 Forwarded，其次 X-Forwarded-Proto</li>
- *   <li>pipeline 存在 SslHandler 时判定 https</li>
- *   <li>兜底 http</li>
+ * <li>转发头默认不信任（forward-headers-strategy=NONE/FALSE 或未配置时忽略 Forwarded/X-Forwarded-Proto）</li>
+ * <li>开启转发头后优先 RFC 7239 Forwarded，其次 X-Forwarded-Proto</li>
+ * <li>pipeline 存在 SslHandler 时判定 https</li>
+ * <li>兜底 http</li>
  * </ol>
  */
 @ExtendWith(MockitoExtension.class)
 class NettyServerHttpRequestSchemeTest {
 
-    @Mock WebContext webContext;
-    @Mock ChannelHandlerContext ctx;
-    @Mock ChannelPipeline pipeline;
-    @Mock ApplicationProperties props;
+    @Mock
+    WebContext webContext;
+    @Mock
+    ChannelHandlerContext ctx;
+    @Mock
+    ChannelPipeline pipeline;
+    @Mock
+    ApplicationProperties props;
 
     @BeforeEach
     void setUp() {
@@ -48,8 +53,8 @@ class NettyServerHttpRequestSchemeTest {
     }
 
     private FullHttpRequest newRequest(String host, String... headers) {
-        DefaultFullHttpRequest req = new DefaultFullHttpRequest(
-                HttpVersion.HTTP_1_1, HttpMethod.GET, "/test", Unpooled.buffer(0));
+        DefaultFullHttpRequest req = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/test",
+                Unpooled.buffer(0));
         if (host != null) {
             req.headers().set("Host", host);
         }
@@ -79,8 +84,7 @@ class NettyServerHttpRequestSchemeTest {
     void default_forwardedHeadersIgnored() {
         // 默认不信任转发头：即使客户端伪造 Forwarded/X-Forwarded-Proto 也判定为 http
         when(props.get(PropertiesConstant.FORWARD_HEADERS_STRATEGY, null)).thenReturn("NONE");
-        FullHttpRequest req = newRequest("example.com",
-                "Forwarded", "proto=https; host=attacker.com",
+        FullHttpRequest req = newRequest("example.com", "Forwarded", "proto=https; host=attacker.com",
                 "X-Forwarded-Proto", "https");
         assertEquals("http", getUri(req).getScheme());
         req.release();
@@ -89,8 +93,7 @@ class NettyServerHttpRequestSchemeTest {
     @Test
     void useForwarded_true_rfc7239ForwardedProto() {
         when(props.get(PropertiesConstant.FORWARD_HEADERS_STRATEGY, null)).thenReturn("FRAMEWORK");
-        FullHttpRequest req = newRequest("example.com",
-                "Forwarded", "proto=https; host=proxy.com");
+        FullHttpRequest req = newRequest("example.com", "Forwarded", "proto=https; host=proxy.com");
         assertEquals("https", getUri(req).getScheme());
         req.release();
     }
@@ -98,8 +101,7 @@ class NettyServerHttpRequestSchemeTest {
     @Test
     void useForwarded_true_forwardedQuotedProto() {
         when(props.get(PropertiesConstant.FORWARD_HEADERS_STRATEGY, null)).thenReturn("FRAMEWORK");
-        FullHttpRequest req = newRequest("example.com",
-                "Forwarded", "for=192.0.2.60;proto=\"https\";host=example.com");
+        FullHttpRequest req = newRequest("example.com", "Forwarded", "for=192.0.2.60;proto=\"https\";host=example.com");
         assertEquals("https", getUri(req).getScheme());
         req.release();
     }
@@ -107,8 +109,7 @@ class NettyServerHttpRequestSchemeTest {
     @Test
     void useForwarded_true_fallsBackToXForwardedProto() {
         when(props.get(PropertiesConstant.FORWARD_HEADERS_STRATEGY, null)).thenReturn("FRAMEWORK");
-        FullHttpRequest req = newRequest("example.com",
-                "X-Forwarded-Proto", "https");
+        FullHttpRequest req = newRequest("example.com", "X-Forwarded-Proto", "https");
         assertEquals("https", getUri(req).getScheme());
         req.release();
     }
@@ -117,8 +118,7 @@ class NettyServerHttpRequestSchemeTest {
     void useForwarded_true_forwardedProtoMissing_returnsHttp() {
         when(props.get(PropertiesConstant.FORWARD_HEADERS_STRATEGY, null)).thenReturn("FRAMEWORK");
         // Forwarded 头存在但不含 proto，且无 X-Forwarded-Proto
-        FullHttpRequest req = newRequest("example.com",
-                "Forwarded", "for=192.0.2.60");
+        FullHttpRequest req = newRequest("example.com", "Forwarded", "for=192.0.2.60");
         assertEquals("http", getUri(req).getScheme());
         req.release();
     }

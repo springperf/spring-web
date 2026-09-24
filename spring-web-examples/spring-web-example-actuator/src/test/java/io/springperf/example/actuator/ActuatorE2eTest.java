@@ -13,10 +13,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(
-        classes = ActuatorApplication.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
-)
+@SpringBootTest(classes = ActuatorApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class ActuatorE2eTest {
 
     private TestRestTemplate rest;
@@ -27,8 +24,7 @@ class ActuatorE2eTest {
     @BeforeEach
     void setUp() {
         int actualPort = nettyHttpServer.getActualPort();
-        rest = new TestRestTemplate(new RestTemplateBuilder()
-                .rootUri("http://localhost:" + actualPort));
+        rest = new TestRestTemplate(new RestTemplateBuilder().rootUri("http://localhost:" + actualPort));
     }
 
     @Test

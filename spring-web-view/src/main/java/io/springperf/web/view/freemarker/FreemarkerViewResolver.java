@@ -31,12 +31,11 @@ public class FreemarkerViewResolver extends BaseWebComponent implements ViewReso
     public void initWithWebContext(WebContext webContext) {
         super.initWithWebContext(webContext);
         String loaderPath = webContext.getProps().get(ViewProperties.FREEMARKER_TEMPLATE_LOADER_PATH, null);
-        this.prefix = (loaderPath != null)
-                ? loaderPath
-                : ViewProperties.resolve(webContext.getProps(),
-                        ViewProperties.FREEMARKER_PREFIX, ViewProperties.FREEMARKER_PREFIX_DEFAULT);
-        this.suffix = ViewProperties.resolve(webContext.getProps(),
-                ViewProperties.FREEMARKER_SUFFIX, ViewProperties.FREEMARKER_SUFFIX_DEFAULT);
+        this.prefix = (loaderPath != null) ? loaderPath
+                : ViewProperties.resolve(webContext.getProps(), ViewProperties.FREEMARKER_PREFIX,
+                        ViewProperties.FREEMARKER_PREFIX_DEFAULT);
+        this.suffix = ViewProperties.resolve(webContext.getProps(), ViewProperties.FREEMARKER_SUFFIX,
+                ViewProperties.FREEMARKER_SUFFIX_DEFAULT);
         this.encoding = ViewProperties.VIEW_ENCODING_DEFAULT;
         this.contentType = webContext.getProps().get(ViewProperties.FREEMARKER_CONTENT_TYPE,
                 ViewProperties.FREEMARKER_CONTENT_TYPE_DEFAULT);
@@ -44,8 +43,8 @@ public class FreemarkerViewResolver extends BaseWebComponent implements ViewReso
         if (settingsRaw != null && !settingsRaw.trim().isEmpty()) {
             this.settings = parseSettings(settingsRaw);
         }
-        boolean cacheable = ViewProperties.resolveBoolean(webContext.getProps(),
-                ViewProperties.FREEMARKER_CACHE, ViewProperties.FREEMARKER_CACHE_DEFAULT);
+        boolean cacheable = ViewProperties.resolveBoolean(webContext.getProps(), ViewProperties.FREEMARKER_CACHE,
+                ViewProperties.FREEMARKER_CACHE_DEFAULT);
         initEngine(cacheable);
     }
 
@@ -104,11 +103,13 @@ public class FreemarkerViewResolver extends BaseWebComponent implements ViewReso
         }
 
         @Override
-        public void render(Map<String, ?> model, WebServerHttpRequest req, WebServerHttpResponse resp) throws Exception {
+        public void render(Map<String, ?> model, WebServerHttpRequest req, WebServerHttpResponse resp)
+                throws Exception {
             if (contentType != null && !contentType.isEmpty()) {
                 resp.getHeaders().setContentType(MediaType.parseMediaType(contentType));
             }
-            Charset charset = resp.getCharacterEncoding() != null ? resp.getCharacterEncoding() : Charset.forName(encoding);
+            Charset charset = resp.getCharacterEncoding() != null ? resp.getCharacterEncoding()
+                    : Charset.forName(encoding);
             try (Writer writer = new OutputStreamWriter(resp.getBody(), charset)) {
                 template.process(model, writer);
                 writer.flush();

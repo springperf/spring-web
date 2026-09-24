@@ -92,8 +92,8 @@ class SpringWebServletAutoConfigurationTest {
     @Test
     void perfServletContext_createsAndRegisters() {
         io.springperf.web.context.WebContext webContext = mock(io.springperf.web.context.WebContext.class);
-        io.springperf.web.context.ApplicationProperties props =
-                mock(io.springperf.web.context.ApplicationProperties.class);
+        io.springperf.web.context.ApplicationProperties props = mock(
+                io.springperf.web.context.ApplicationProperties.class);
         org.mockito.Mockito.when(webContext.getProps()).thenReturn(props);
         io.springperf.web.support.servlet.context.PerfServletContext ctx = config.perfServletContext(webContext);
         assertNotNull(ctx);
@@ -103,8 +103,8 @@ class SpringWebServletAutoConfigurationTest {
     @Test
     void perfHttpSessionManager_createsAndRegisters() {
         io.springperf.web.context.WebContext webContext = mock(io.springperf.web.context.WebContext.class);
-        io.springperf.web.support.servlet.session.PerfHttpSessionManager manager =
-                config.perfHttpSessionManager(webContext);
+        io.springperf.web.support.servlet.session.PerfHttpSessionManager manager = config
+                .perfHttpSessionManager(webContext);
         assertNotNull(manager);
         org.mockito.Mockito.verify(webContext).registerWebComponent(manager);
     }

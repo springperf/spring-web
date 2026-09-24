@@ -28,31 +28,26 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * GraalVM native-image AOT 处理器：为框架自有 {@link MappingRegistry} 扫描到的
- * {@code @Controller} bean 及其处理方法、以及框架反射调用的 {@code @ControllerAdvice}
- * 方法注册可达性提示。
- *
- * <p><b>为什么需要它</b>：Spring Boot AOT 只为 Spring MVC 的
- * {@code RequestMappingHandlerMapping} 自动生成 controller 方法 hints；
- * 本框架用自有 {@link MappingRegistry}（{@code getBeansWithAnnotation(Controller.class)} +
- * {@link ReflectionUtils#getUniqueDeclaredMethods}）扫描控制器，Spring Boot AOT 无法感知，
- * 因此 {@code MethodHandle.unreflect(处理方法)}（{@code InvokableHandlerMethod}）与
- * Jackson 反序列化 DTO（{@code JacksonHttpBodyConverter}）在 native 下会缺提示。
- * 本处理器在 AOT 构建期补齐：方法反射（{@code INVOKE_*}）、DTO 绑定反射与序列化提示。
- *
- * <p>同时覆盖 {@code @ControllerAdvice}：框架经 {@code ControllerAdviceBean.findAnnotatedBeans}
- * 发现 advice 并反射调用其 {@code @ExceptionHandler} / {@code @InitBinder} /
- * {@code @ModelAttribute} 方法（{@code ExceptionHandlerExceptionResolver} /
- * {@code WebDataBinderRegistry} / {@code ModelArgumentResolverProvider}），
- * 这些方法及方法参数/返回 DTO 同样需要 hints。
- *
- * <p>通过 {@code META-INF/spring/aot.factories} 注册为
- * {@code org.springframework.beans.factory.aot.BeanFactoryInitializationAotProcessor}，
- * 由 Spring Boot {@code process-aot} 构建期调用；JVM 运行时完全不触发，零影响。
- *
- * <p>与 {@link io.springperf.web.autoconfigure.SpringWebRuntimeHints} 的关系：
- * 前者是静态 registrar（事件路径/资源），后者按 BeanFactory 实际内容动态收集用户控制器/advice——
- * 二者互补，职责不重叠。
+ * GraalVM native-image AOT 处理器：为框架自有 {@link MappingRegistry} 扫描到的 {@code @Controller} bean 及其处理方法、以及框架反射调用的
+ * {@code @ControllerAdvice} 方法注册可达性提示。
+ * <p>
+ * <b>为什么需要它</b>：Spring Boot AOT 只为 Spring MVC 的 {@code RequestMappingHandlerMapping} 自动生成 controller 方法 hints； 本框架用自有
+ * {@link MappingRegistry}（{@code getBeansWithAnnotation(Controller.class)} +
+ * {@link ReflectionUtils#getUniqueDeclaredMethods}）扫描控制器，Spring Boot AOT 无法感知， 因此
+ * {@code MethodHandle.unreflect(处理方法)}（{@code InvokableHandlerMethod}）与 Jackson 反序列化
+ * DTO（{@code JacksonHttpBodyConverter}）在 native 下会缺提示。 本处理器在 AOT 构建期补齐：方法反射（{@code INVOKE_*}）、DTO 绑定反射与序列化提示。
+ * <p>
+ * 同时覆盖 {@code @ControllerAdvice}：框架经 {@code ControllerAdviceBean.findAnnotatedBeans} 发现 advice 并反射调用其
+ * {@code @ExceptionHandler} / {@code @InitBinder} / {@code @ModelAttribute}
+ * 方法（{@code ExceptionHandlerExceptionResolver} / {@code WebDataBinderRegistry} /
+ * {@code ModelArgumentResolverProvider}）， 这些方法及方法参数/返回 DTO 同样需要 hints。
+ * <p>
+ * 通过 {@code META-INF/spring/aot.factories} 注册为
+ * {@code org.springframework.beans.factory.aot.BeanFactoryInitializationAotProcessor}， 由 Spring Boot
+ * {@code process-aot} 构建期调用；JVM 运行时完全不触发，零影响。
+ * <p>
+ * 与 {@link io.springperf.web.autoconfigure.SpringWebRuntimeHints} 的关系： 前者是静态 registrar（事件路径/资源），后者按 BeanFactory
+ * 实际内容动态收集用户控制器/advice—— 二者互补，职责不重叠。
  */
 public class ControllerBeanFactoryInitializationAotProcessor implements BeanFactoryInitializationAotProcessor {
 
@@ -93,12 +88,11 @@ public class ControllerBeanFactoryInitializationAotProcessor implements BeanFact
     }
 
     /**
-     * 与 {@link MappingRegistry#initComponentPhase1} 同口径扫描处理方法：
-     * 找 {@code @RequestMapping}（含 {@code @GetMapping} 等组合注解）方法，
-     * 收集方法参数类型与返回类型（含泛型参数）作为 DTO 候选。
+     * 与 {@link MappingRegistry#initComponentPhase1} 同口径扫描处理方法： 找 {@code @RequestMapping}（含 {@code @GetMapping}
+     * 等组合注解）方法， 收集方法参数类型与返回类型（含泛型参数）作为 DTO 候选。
      */
-    private static void collectHandlerMethods(Class<?> controllerClass,
-                                              Set<Method> handlerMethods, Set<Type> dtoTypes) {
+    private static void collectHandlerMethods(Class<?> controllerClass, Set<Method> handlerMethods,
+            Set<Type> dtoTypes) {
         Method[] methods = ReflectionUtils.getUniqueDeclaredMethods(controllerClass);
         for (Method method : methods) {
             if (AnnotatedElementUtils.findMergedAnnotation(method, RequestMapping.class) == null) {
@@ -113,12 +107,10 @@ public class ControllerBeanFactoryInitializationAotProcessor implements BeanFact
     }
 
     /**
-     * 收集 {@code @ControllerAdvice} 上被框架反射调用的方法：
-     * {@code @ExceptionHandler} / {@code @InitBinder} / {@code @ModelAttribute}，
-     * 以及这些方法的参数/返回 DTO。
+     * 收集 {@code @ControllerAdvice} 上被框架反射调用的方法： {@code @ExceptionHandler} / {@code @InitBinder} /
+     * {@code @ModelAttribute}， 以及这些方法的参数/返回 DTO。
      */
-    private static void collectAdviceMethods(Class<?> adviceClass,
-                                             Set<Method> handlerMethods, Set<Type> dtoTypes) {
+    private static void collectAdviceMethods(Class<?> adviceClass, Set<Method> handlerMethods, Set<Type> dtoTypes) {
         Method[] methods = ReflectionUtils.getUniqueDeclaredMethods(adviceClass);
         for (Method method : methods) {
             boolean adviceMethod = AnnotatedElementUtils.findMergedAnnotation(method, ExceptionHandler.class) != null
@@ -136,14 +128,12 @@ public class ControllerBeanFactoryInitializationAotProcessor implements BeanFact
     }
 
     /**
-     * 收集 DTO 候选类型（非 JDK / 非框架基础类型），并展开泛型参数（如
-     * {@code ResponseEntity<Map<String, User>>} → {@code User}）。
-     * 注意：框架包装类型（{@code ResponseEntity}/{@code Map}）本身跳过，
-     * 但其泛型参数仍需递归收集。
-     *
-     * <p>对 {@link java.lang.reflect.TypeVariable}（泛型控制器如
-     * {@code BaseController<T>} 的 {@code @RequestBody T}）用
-     * {@link GenericTypeResolver#resolveType} 结合所属类解析出实际类型。</p>
+     * 收集 DTO 候选类型（非 JDK / 非框架基础类型），并展开泛型参数（如 {@code ResponseEntity<Map<String, User>>} → {@code User}）。
+     * 注意：框架包装类型（{@code ResponseEntity}/{@code Map}）本身跳过， 但其泛型参数仍需递归收集。
+     * <p>
+     * 对 {@link java.lang.reflect.TypeVariable}（泛型控制器如 {@code BaseController<T>} 的 {@code @RequestBody T}）用
+     * {@link GenericTypeResolver#resolveType} 结合所属类解析出实际类型。
+     * </p>
      */
     private static void collectDtoType(Type type, Class<?> contextClass, Set<Type> dtoTypes) {
         if (type == null) {
@@ -187,12 +177,9 @@ public class ControllerBeanFactoryInitializationAotProcessor implements BeanFact
         // 用户 DTO/控制器常位于同前缀包下，会被误判为框架类型）。
         // autoconfigure 包不列入：其下的控制器（如 OpenApiDocController）是真实处理器，
         // 需要注册 hints 而非过滤。
-        return name.startsWith("io.springperf.web.context.")
-                || name.startsWith("io.springperf.web.core.")
-                || name.startsWith("io.springperf.web.server.")
-                || name.startsWith("io.springperf.web.http.")
-                || name.startsWith("io.springperf.web.json.")
-                || name.startsWith("io.springperf.web.util.")
+        return name.startsWith("io.springperf.web.context.") || name.startsWith("io.springperf.web.core.")
+                || name.startsWith("io.springperf.web.server.") || name.startsWith("io.springperf.web.http.")
+                || name.startsWith("io.springperf.web.json.") || name.startsWith("io.springperf.web.util.")
                 || name.startsWith("io.springperf.web.annotation.");
     }
 
@@ -210,12 +197,12 @@ public class ControllerBeanFactoryInitializationAotProcessor implements BeanFact
         }
 
         @Override
-        public void applyTo(GenerationContext generationContext, BeanFactoryInitializationCode beanFactoryInitializationCode) {
+        public void applyTo(GenerationContext generationContext,
+                BeanFactoryInitializationCode beanFactoryInitializationCode) {
             RuntimeHints hints = generationContext.getRuntimeHints();
 
             for (Class<?> controllerClass : controllerClasses) {
-                hints.reflection().registerType(controllerClass,
-                        MemberCategory.INVOKE_PUBLIC_CONSTRUCTORS,
+                hints.reflection().registerType(controllerClass, MemberCategory.INVOKE_PUBLIC_CONSTRUCTORS,
                         MemberCategory.INVOKE_DECLARED_METHODS);
             }
             for (Method method : handlerMethods) {
@@ -223,14 +210,13 @@ public class ControllerBeanFactoryInitializationAotProcessor implements BeanFact
             }
             if (!dtoTypes.isEmpty()) {
                 // 绑定反射（构造器/属性访问）——覆盖 @ModelAttribute/@RequestBody 绑定与 Jackson 读写
-                new BindingReflectionHintsRegistrar()
-                        .registerReflectionHints(hints.reflection(), dtoTypes.toArray(new Type[0]));
+                new BindingReflectionHintsRegistrar().registerReflectionHints(hints.reflection(),
+                        dtoTypes.toArray(new Type[0]));
                 // DTO 字段/方法反射（native 下 Jackson 读写字段需显式注册；
                 // 注意不使用 serialization().registerType——那是 Java 序列化，仅对 Serializable 生效）
                 for (Type dtoType : dtoTypes) {
                     if (dtoType instanceof Class) {
-                        hints.reflection().registerType((Class<?>) dtoType,
-                                MemberCategory.DECLARED_FIELDS,
+                        hints.reflection().registerType((Class<?>) dtoType, MemberCategory.DECLARED_FIELDS,
                                 MemberCategory.INVOKE_DECLARED_METHODS);
                     }
                 }

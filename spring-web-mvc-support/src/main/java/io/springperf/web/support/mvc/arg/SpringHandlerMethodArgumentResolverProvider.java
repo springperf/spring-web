@@ -19,16 +19,15 @@ import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 
 /**
- * Adapts a Spring MVC {@link HandlerMethodArgumentResolver} to the framework's
- * {@link StaticArgumentResolverProvider} SPI.
- *
- * <p>During initialization, the provider calls the Spring resolver's
- * {@link HandlerMethodArgumentResolver#supportsParameter(MethodParameter)}
- * for each handler method parameter. On match, a {@link StaticArgumentResolver}
- * is created that bridges to the Spring resolver at runtime.
- *
- * <p>This replaces the old {@code RuntimeArgumentResolver} approach with
- * init-time resolution, eliminating per-request dispatch overhead.
+ * Adapts a Spring MVC {@link HandlerMethodArgumentResolver} to the framework's {@link StaticArgumentResolverProvider}
+ * SPI.
+ * <p>
+ * During initialization, the provider calls the Spring resolver's
+ * {@link HandlerMethodArgumentResolver#supportsParameter(MethodParameter)} for each handler method parameter. On match,
+ * a {@link StaticArgumentResolver} is created that bridges to the Spring resolver at runtime.
+ * <p>
+ * This replaces the old {@code RuntimeArgumentResolver} approach with init-time resolution, eliminating per-request
+ * dispatch overhead.
  */
 public class SpringHandlerMethodArgumentResolverProvider implements StaticArgumentResolverProvider {
 
@@ -58,13 +57,14 @@ public class SpringHandlerMethodArgumentResolverProvider implements StaticArgume
     }
 
     @Override
-    public StaticArgumentResolver getResolver(MethodParameter parameter, MappingHandlerMethod mappingContext, WebContext webContext) {
+    public StaticArgumentResolver getResolver(MethodParameter parameter, MappingHandlerMethod mappingContext,
+            WebContext webContext) {
         return new SpringHandlerMethodArgumentResolver(parameter);
     }
 
     /**
-     * Runtime resolver that bridges to the Spring {@link HandlerMethodArgumentResolver}.
-     * Captures the {@link MethodParameter} at construction time to avoid re-looking it up.
+     * Runtime resolver that bridges to the Spring {@link HandlerMethodArgumentResolver}. Captures the
+     * {@link MethodParameter} at construction time to avoid re-looking it up.
      */
     private class SpringHandlerMethodArgumentResolver implements StaticArgumentResolver {
 

@@ -9,8 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * gzip 压缩 E2E 测试控制器：提供大/小 JSON、非白名单二进制三类响应，配合
- * {@code server.compression.*} 验证压缩器行为。
+ * gzip 压缩 E2E 测试控制器：提供大/小 JSON、非白名单二进制三类响应，配合 {@code server.compression.*} 验证压缩器行为。
  */
 @RestController
 @RequestMapping("/compression")

@@ -16,6 +16,7 @@ import java.util.Objects;
  * Request 缓存 Wrapper
  *
  * @author jy
+ *
  * @since 2023-12-06 16:32
  */
 public class CacheHttpServletRequestWrapper extends HttpServletRequestWrapper {
@@ -42,7 +43,8 @@ public class CacheHttpServletRequestWrapper extends HttpServletRequestWrapper {
 
     @Override
     public ServletInputStream getInputStream() throws IOException {
-        if (origin.getContentType() == null || !origin.getContentType().toLowerCase().startsWith(MediaType.APPLICATION_JSON_VALUE)) {
+        if (origin.getContentType() == null
+                || !origin.getContentType().toLowerCase().startsWith(MediaType.APPLICATION_JSON_VALUE)) {
             // 非JSON格式的请求，返回默认
             return super.getInputStream();
         }

@@ -27,8 +27,7 @@ public class FileController {
     }
 
     /**
-     * 单文件上传
-     * curl -F "file=@/path/to/file.txt" http://localhost:8083/files/upload
+     * 单文件上传 curl -F "file=@/path/to/file.txt" http://localhost:8083/files/upload
      */
     @PostMapping("/upload")
     public Map<String, String> upload(@RequestParam("file") MultipartFile file) throws IOException {
@@ -41,8 +40,7 @@ public class FileController {
     }
 
     /**
-     * 多文件上传
-     * curl -F "files=@/path/to/a.txt" -F "files=@/path/to/b.txt" http://localhost:8083/files/upload-multi
+     * 多文件上传 curl -F "files=@/path/to/a.txt" -F "files=@/path/to/b.txt" http://localhost:8083/files/upload-multi
      */
     @PostMapping("/upload-multi")
     public List<String> uploadMulti(@RequestParam("files") List<MultipartFile> files) throws IOException {
@@ -54,8 +52,7 @@ public class FileController {
     }
 
     /**
-     * 文件下载
-     * curl -O http://localhost:8083/files/download?filename=test.txt
+     * 文件下载 curl -O http://localhost:8083/files/download?filename=test.txt
      */
     @GetMapping("/download")
     public ResponseEntity<Resource> download(@RequestParam String filename) {
@@ -63,15 +60,12 @@ public class FileController {
         if (!resource.exists()) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-                .body(resource);
+        return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"").body(resource);
     }
 
     /**
-     * 文件列表
-     * curl http://localhost:8083/files
+     * 文件列表 curl http://localhost:8083/files
      */
     @GetMapping
     public List<String> list() throws IOException {
@@ -79,8 +73,7 @@ public class FileController {
     }
 
     /**
-     * 删除文件
-     * curl -X DELETE http://localhost:8083/files?filename=test.txt
+     * 删除文件 curl -X DELETE http://localhost:8083/files?filename=test.txt
      */
     @DeleteMapping
     public Map<String, String> delete(@RequestParam String filename) throws IOException {

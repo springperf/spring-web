@@ -17,12 +17,9 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 /**
  * AiChatController E2E 测试。
  * <p>
- * /ai/chat 和 /ai/chat/stream 需要真实的 API key，默认跳过。
- * 设置环境变量 AI_API_KEY 为非默认值即可启用完整对话测试。
+ * /ai/chat 和 /ai/chat/stream 需要真实的 API key，默认跳过。 设置环境变量 AI_API_KEY 为非默认值即可启用完整对话测试。
  */
-@SpringBootTest(
-        classes = AiApplication.class,
-        webEnvironment = SpringBootTest.WebEnvironment.NONE)
+@SpringBootTest(classes = AiApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class AiChatE2eTest {
 
     private static final String PLACEHOLDER_API_KEY = "sk-your-key-here";
@@ -35,8 +32,7 @@ class AiChatE2eTest {
     @BeforeEach
     void setUp() {
         int actualPort = nettyHttpServer.getActualPort();
-        rest = new TestRestTemplate(new RestTemplateBuilder()
-                .rootUri("http://localhost:" + actualPort));
+        rest = new TestRestTemplate(new RestTemplateBuilder().rootUri("http://localhost:" + actualPort));
     }
 
     static boolean hasRealApiKey() {

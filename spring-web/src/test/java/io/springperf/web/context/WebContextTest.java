@@ -1,15 +1,17 @@
 package io.springperf.web.context;
 
-import io.springperf.web.core.DispatcherHandler;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import static io.springperf.web.context.PropertiesConstant.CONTEXT_PATH;
+
+import java.util.Collections;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationContext;
 
-import java.util.Collections;
-
-import static io.springperf.web.context.PropertiesConstant.CONTEXT_PATH;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import io.springperf.web.core.DispatcherHandler;
 
 class WebContextTest {
 
@@ -100,8 +102,7 @@ class WebContextTest {
         multiMap.put("highBean", high);
         when(ctx.getBeansOfType(OrderedType.class)).thenReturn(multiMap);
         OrderedType result = webContext.getBeanFromCtx(OrderedType.class);
-        assertTrue(result instanceof HighPriorityBean,
-                "AnnotationAwareOrderComparator 应返回 @Order 最小（优先级最高）的 Bean");
+        assertTrue(result instanceof HighPriorityBean, "AnnotationAwareOrderComparator 应返回 @Order 最小（优先级最高）的 Bean");
     }
 
     private interface OrderedType {
@@ -140,8 +141,7 @@ class WebContextTest {
         // 注册一个 Phase1 抛异常的组件：第一次启动失败
         LifecycleWebComponent failing = mock(LifecycleWebComponent.class);
         when(failing.getComponentName()).thenReturn("failing");
-        doThrow(new IllegalStateException("phase1 boom"))
-                .doNothing() // 第二次调用不再抛异常，验证可重试
+        doThrow(new IllegalStateException("phase1 boom")).doNothing() // 第二次调用不再抛异常，验证可重试
                 .when(failing).initComponentPhase1();
         webContext.registerWebComponent(failing);
 
@@ -204,17 +204,17 @@ class WebContextTest {
         webContext.startLifecycle();
         java.lang.reflect.Method method = Object.class.getMethod("toString");
         Object bean = new Object();
-        io.springperf.web.core.mapping.MappingCacheKey<String> key =
-                io.springperf.web.core.mapping.MappingCacheKey.createMethodCacheKey(String.class);
-        io.springperf.web.core.mapping.MappingHandlerMethod mhm =
-                new io.springperf.web.core.mapping.MappingHandlerMethod(bean, method);
+        io.springperf.web.core.mapping.MappingCacheKey<String> key = io.springperf.web.core.mapping.MappingCacheKey
+                .createMethodCacheKey(String.class);
+        io.springperf.web.core.mapping.MappingHandlerMethod mhm = new io.springperf.web.core.mapping.MappingHandlerMethod(
+                bean, method);
         mhm.set(key, "v");
         assertEquals("v", mhm.get(key));
 
         webContext.destroy();
 
-        io.springperf.web.core.mapping.MappingHandlerMethod fresh =
-                new io.springperf.web.core.mapping.MappingHandlerMethod(bean, method);
+        io.springperf.web.core.mapping.MappingHandlerMethod fresh = new io.springperf.web.core.mapping.MappingHandlerMethod(
+                bean, method);
         assertNull(fresh.get(key), "destroy 后静态缓存应被清空");
     }
 }

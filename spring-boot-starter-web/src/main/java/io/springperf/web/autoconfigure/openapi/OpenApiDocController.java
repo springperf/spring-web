@@ -18,8 +18,10 @@ import java.util.Map;
 
 /**
  * Auto-configured OpenAPI / Swagger UI endpoints.
- * <p>Activated when {@link OpenApiCustomizer} (springdoc-openapi-common) is on the classpath.
- * Users can override by defining their own {@code OpenApiDocController} bean.</p>
+ * <p>
+ * Activated when {@link OpenApiCustomizer} (springdoc-openapi-common) is on the classpath. Users can override by
+ * defining their own {@code OpenApiDocController} bean.
+ * </p>
  */
 @RestController
 public class OpenApiDocController {
@@ -36,9 +38,7 @@ public class OpenApiDocController {
     public OpenAPI apiDocs() {
         OpenAPI api = new OpenAPI();
         api.setPaths(new Paths());
-        api.setInfo(new Info()
-                .title(openApiProperties.getTitle())
-                .version(openApiProperties.getVersion())
+        api.setInfo(new Info().title(openApiProperties.getTitle()).version(openApiProperties.getVersion())
                 .description(openApiProperties.getDescription()));
         openApiCustomiser.customise(api);
         return api;
@@ -57,7 +57,7 @@ public class OpenApiDocController {
         Map<String, String> defaultUrl = new HashMap<>();
         defaultUrl.put("url", "/v3/api-docs");
         defaultUrl.put("name", openApiProperties.getTitle());
-        config.put("urls", new Object[]{defaultUrl});
+        config.put("urls", new Object[] { defaultUrl });
         return config;
     }
 

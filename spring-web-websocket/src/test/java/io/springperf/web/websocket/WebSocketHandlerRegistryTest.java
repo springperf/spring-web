@@ -8,7 +8,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class WebSocketHandlerRegistryTest {
 
-    private final WebSocketHandler handler = new TextWebSocketHandler() {};
+    private final WebSocketHandler handler = new TextWebSocketHandler() {
+    };
 
     @Test
     void addHandler_singlePath_registers() {
@@ -32,8 +33,7 @@ class WebSocketHandlerRegistryTest {
     void addHandler_duplicatePath_throws() {
         WebSocketHandlerRegistry registry = new WebSocketHandlerRegistry();
         registry.addHandler(handler, "/ws");
-        assertThrows(IllegalArgumentException.class,
-                () -> registry.addHandler(handler, "/ws"));
+        assertThrows(IllegalArgumentException.class, () -> registry.addHandler(handler, "/ws"));
     }
 
     @Test
@@ -74,10 +74,7 @@ class WebSocketHandlerRegistryTest {
     @Test
     void setIdleTimeout_subProtocols_allowExtensions_heartbeat() {
         WebSocketHandlerRegistry registry = new WebSocketHandlerRegistry();
-        WebSocketHandlerRegistry self = registry
-                .setIdleTimeout(30000)
-                .setSubProtocols("chat")
-                .setAllowExtensions(true)
+        WebSocketHandlerRegistry self = registry.setIdleTimeout(30000).setSubProtocols("chat").setAllowExtensions(true)
                 .setHeartbeatInterval(20000);
         assertSame(registry, self);
         assertEquals(30000L, registry.getIdleTimeout());

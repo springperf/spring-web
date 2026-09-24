@@ -1,30 +1,28 @@
 package io.springperf.web.context;
 
-import org.junit.jupiter.api.Test;
-import org.springframework.core.env.Environment;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.Mockito.*;
 
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.nullable;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.Test;
+import org.springframework.core.env.Environment;
 
 class ApplicationPropertiesTest {
 
     // ==================== clearCache（配置动态刷新） ====================
 
     /**
-     * 创建基于可变 Map 的 Environment mock：测试中途改 Map 即可模拟配置中心推送。
-     * 返回的 props 通过 {@link ApplicationProperties#clearCache()} 重新从 Environment 读取。
+     * 创建基于可变 Map 的 Environment mock：测试中途改 Map 即可模拟配置中心推送。 返回的 props 通过 {@link ApplicationProperties#clearCache()} 重新从
+     * Environment 读取。
      */
     private ApplicationProperties createWithMutableEnv(Map<String, String> values) {
         Environment env = mock(Environment.class);
-        when(env.getProperty(anyString()))
-                .thenAnswer(inv -> values.get(inv.getArgument(0, String.class)));
-        when(env.getProperty(anyString(), anyString()))
-                .thenAnswer(inv -> values.getOrDefault(
-                        inv.getArgument(0, String.class), inv.getArgument(1, String.class)));
+        when(env.getProperty(anyString())).thenAnswer(inv -> values.get(inv.getArgument(0, String.class)));
+        when(env.getProperty(anyString(), anyString())).thenAnswer(
+                inv -> values.getOrDefault(inv.getArgument(0, String.class), inv.getArgument(1, String.class)));
         ApplicationProperties props = new ApplicationProperties();
         props.setEnvironment(env);
         return props;
@@ -65,8 +63,7 @@ class ApplicationPropertiesTest {
         ApplicationProperties props = createWithMutableEnv(new HashMap<>());
         assertEquals(PropertiesConstant.getDefault(PropertiesConstant.SERVER_MAX_PARAMETER_COUNT),
                 props.getMaxParameterCount(), "未配置应回退 PropertiesConstant 默认值");
-        assertEquals(PropertiesConstant.HTTP_TIMEOUT_DEFAULT, props.getHttpTimeoutMillis(),
-                "未配置应回退注册默认值");
+        assertEquals(PropertiesConstant.HTTP_TIMEOUT_DEFAULT, props.getHttpTimeoutMillis(), "未配置应回退注册默认值");
         assertEquals(PropertiesConstant.HTTP_MAX_IN_MEMORY_SIZE_DEFAULT, props.getMaxInMemorySize(),
                 "未配置应回退 PropertiesConstant 默认值");
     }
@@ -95,12 +92,10 @@ class ApplicationPropertiesTest {
 
         values.put(PropertiesConstant.POOL_CORE_POOL_SIZE, "20");
         // 未清缓存：仍返回旧值
-        assertEquals(10, props.getInt(PropertiesConstant.POOL_CORE_POOL_SIZE),
-                "清空前应返回缓存旧值");
+        assertEquals(10, props.getInt(PropertiesConstant.POOL_CORE_POOL_SIZE), "清空前应返回缓存旧值");
 
         props.clearCache();
-        assertEquals(20, props.getInt(PropertiesConstant.POOL_CORE_POOL_SIZE),
-                "清空后应读取 Environment 最新值");
+        assertEquals(20, props.getInt(PropertiesConstant.POOL_CORE_POOL_SIZE), "清空后应读取 Environment 最新值");
     }
 
     @Test
@@ -258,8 +253,7 @@ class ApplicationPropertiesTest {
     @Test
     void getLong_readTimeoutDefault_returns30000() {
         ApplicationProperties props = createProperties("nonexistent", null);
-        assertEquals(30000L, props.getLong(PropertiesConstant.HTTP_READ_TIMEOUT),
-                "read-timeout 默认 30s 应生效");
+        assertEquals(30000L, props.getLong(PropertiesConstant.HTTP_READ_TIMEOUT), "read-timeout 默认 30s 应生效");
     }
 
     // ==================== Duration 统一解析 ====================

@@ -1,19 +1,20 @@
 package io.springperf.web.core.mapping.optimize;
 
-import io.springperf.web.core.mapping.PathMappingContext;
-import io.springperf.web.http.RequestContext;
-import io.springperf.web.http.WebServerHttpRequest;
-import org.junit.jupiter.api.Test;
-
-import java.util.ArrayList;
-import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+
+import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.http.RequestContext;
+import io.springperf.web.http.WebServerHttpRequest;
 
 class SuffixPathRouterOptimizerTest {
 
@@ -68,12 +69,11 @@ class SuffixPathRouterOptimizerTest {
     }
 
     /**
-     * 回归 R2-2：suffixPathIndex 从末尾锚定，initAndRemove / optimizeRoute 的 slash 下标
-     * 必须取「倒数第 suffixPathIndex 个」。修复前：
+     * 回归 R2-2：suffixPathIndex 从末尾锚定，initAndRemove / optimizeRoute 的 slash 下标 必须取「倒数第 suffixPathIndex 个」。修复前：
      * <ul>
-     *   <li>initAndRemove 用 {@code slashIndexList[suffixPathIndex - 1]}（从头数），substring
-     *       必含 {@code {id}} 通配段 → 全部 return false，routeMap 永不填充；</li>
-     *   <li>optimizeRoute 用 {@code slashIndexList[suffixPathIndex]}，查询 key 偏移，永远 miss。</li>
+     * <li>initAndRemove 用 {@code slashIndexList[suffixPathIndex - 1]}（从头数），substring 必含 {@code {id}} 通配段 → 全部 return
+     * false，routeMap 永不填充；</li>
+     * <li>optimizeRoute 用 {@code slashIndexList[suffixPathIndex]}，查询 key 偏移，永远 miss。</li>
      * </ul>
      * 结果后缀路由优化器形同虚设。修复后两条路径均取 {@code slashIndexList[length - suffixPathIndex]}。
      */

@@ -3,9 +3,9 @@ package org.springframework.web.servlet.config.annotation;
 import org.springframework.validation.Validator;
 
 /**
- * Shim of Spring MVC's {@code ValidatorRegistration}.
- * Collects a custom {@link Validator} from {@link WebMvcConfigurer#configureValidator(ValidatorRegistration)}
- * and bridges it to the framework's native {@code WebDataBinderRegistry}.
+ * Shim of Spring MVC's {@code ValidatorRegistration}. Collects a custom {@link Validator} from
+ * {@link WebMvcConfigurer#configureValidator(ValidatorRegistration)} and bridges it to the framework's native
+ * {@code WebDataBinderRegistry}.
  */
 public class ValidatorRegistration {
 

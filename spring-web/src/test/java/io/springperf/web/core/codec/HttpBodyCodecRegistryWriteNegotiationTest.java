@@ -1,13 +1,16 @@
 package io.springperf.web.core.codec;
 
-import io.springperf.web.annotation.Optimize;
-import io.springperf.web.core.codec.interceptor.HttpBodyCodecInterceptorRegistry;
-import io.springperf.web.core.mapping.MappingHandlerMethod;
-import io.springperf.web.core.mapping.MappingResult;
-import io.springperf.web.core.mapping.PathMappingContext;
-import io.springperf.web.core.mapping.match.ConsumeOrProduceMatcher;
-import io.springperf.web.core.mapping.match.MediaTypeExpressionSupport;
-import io.springperf.web.http.*;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -17,37 +20,38 @@ import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.web.method.HandlerMethod;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import io.springperf.web.annotation.Optimize;
+import io.springperf.web.core.codec.interceptor.HttpBodyCodecInterceptorRegistry;
+import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.core.mapping.MappingResult;
+import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.core.mapping.match.ConsumeOrProduceMatcher;
+import io.springperf.web.core.mapping.match.MediaTypeExpressionSupport;
+import io.springperf.web.http.*;
 
 /**
  * 2b 方法级内容协商缓存的行为测试（仅 @Optimize 方法启用）。
  * <p>
- * 通过 canWrite 的 mediaType 参数区分命中/全量两条路径：
- * 全量协商 loop 传 null mediaType，缓存命中后的二次 canWrite 传 concrete mediaType。
+ * 通过 canWrite 的 mediaType 参数区分命中/全量两条路径： 全量协商 loop 传 null mediaType，缓存命中后的二次 canWrite 传 concrete mediaType。
  * <p>
- * ctx 通过真实 PathMappingContext + MappingResult.set 注入，isOptimize() 由
- * 真实 PathMappingContext 内层 InvokableHandlerMethod 依据 @Optimize 解析。
+ * ctx 通过真实 PathMappingContext + MappingResult.set 注入，isOptimize() 由 真实 PathMappingContext 内层 InvokableHandlerMethod
+ * 依据 @Optimize 解析。
  */
 class HttpBodyCodecRegistryWriteNegotiationTest {
 
     @SuppressWarnings("unused")
     @Optimize
     static class OptimizeController {
-        public String echo() { return "echo"; }
+        public String echo() {
+            return "echo";
+        }
     }
 
     @SuppressWarnings("unused")
     static class PlainController {
-        public String echo() { return "echo"; }
+        public String echo() {
+            return "echo";
+        }
     }
 
     private HttpBodyCodecRegistry registry;
@@ -115,8 +119,8 @@ class HttpBodyCodecRegistryWriteNegotiationTest {
     }
 
     private PathMappingContext plainContext() {
-        return new PathMappingContext(new HandlerMethod(new PlainController(), plainEcho),
-                Collections.emptyList(), "/plain");
+        return new PathMappingContext(new HandlerMethod(new PlainController(), plainEcho), Collections.emptyList(),
+                "/plain");
     }
 
     private static ConsumeOrProduceMatcher jsonProduceMatcher() {
@@ -173,7 +177,7 @@ class HttpBodyCodecRegistryWriteNegotiationTest {
         verify(converter, times(2)).canWrite(any(), any(), mediaTypeCaptor.capture(), any(), any(), any());
         List<MediaType> captured = mediaTypeCaptor.getAllValues();
         assertEquals(2, captured.size());
-        assertNull(captured.get(0));            // 第一次：全量协商，mediaType=null
+        assertNull(captured.get(0)); // 第一次：全量协商，mediaType=null
         assertEquals(MediaType.APPLICATION_JSON, captured.get(1)); // 第二次：缓存命中二次 canWrite
         verify(converter, times(2)).write(any(), any(), any(), any(), any(), any(), any());
     }
@@ -182,7 +186,7 @@ class HttpBodyCodecRegistryWriteNegotiationTest {
     void writeBody_optimizeMethod_cacheCanWriteFail_fallsBackAndDoesNotCache() throws Exception {
         HttpBodyConverter converter = mock(HttpBodyConverter.class);
         when(converter.getSupportedMediaTypes()).thenReturn(List.of(MediaType.APPLICATION_JSON));
-        when(converter.canWrite(any(), any(), isNull(), any(), any(), any())).thenReturn(true);   // 全量 loop
+        when(converter.canWrite(any(), any(), isNull(), any(), any(), any())).thenReturn(true); // 全量 loop
         when(converter.canWrite(any(), any(), notNull(), any(), any(), any())).thenReturn(false); // 命中二次校验失败
         registry.converters.add(converter);
         setMatchedContext(optimizedContext());
@@ -210,7 +214,7 @@ class HttpBodyCodecRegistryWriteNegotiationTest {
         registry.converters.add(converter);
         setMatchedContext(optimizedContext());
 
-        write("a", optimizeReturnType);          // Accept 缺失 → "*/*"
+        write("a", optimizeReturnType); // Accept 缺失 → "*/*"
         requestHeaders.set("Accept", "application/json");
         write("b", optimizeReturnType);
 
@@ -262,8 +266,8 @@ class HttpBodyCodecRegistryWriteNegotiationTest {
         registry.converters.add(converter);
         setMatchedContext(optimizedContext());
 
-        write("a", optimizeReturnType);                     // 填充缓存
-        registry.registerConverter(converter);              // converter 集合变更 → 缓存清空
+        write("a", optimizeReturnType); // 填充缓存
+        registry.registerConverter(converter); // converter 集合变更 → 缓存清空
         write("b", optimizeReturnType);
 
         ArgumentCaptor<MediaType> mediaTypeCaptor = ArgumentCaptor.forClass(MediaType.class);

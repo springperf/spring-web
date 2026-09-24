@@ -1,16 +1,17 @@
 package io.springperf.web.core.interceptor;
 
-import io.springperf.web.context.WebComponent;
-import io.springperf.web.util.PathPatternUtils;
-import io.springperf.web.util.support.ContainmentResult;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.PathMatcher;
 import org.springframework.web.method.ControllerAdviceBean;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import io.springperf.web.context.WebComponent;
+import io.springperf.web.util.PathPatternUtils;
+import io.springperf.web.util.support.ContainmentResult;
 
 public class InterceptorRegistration implements WebComponent {
 
@@ -27,14 +28,13 @@ public class InterceptorRegistration implements WebComponent {
     private PathMatcher pathMatcher;
 
     /**
-     * 类级匹配载体（ControllerAdvice 语义）。非空时该拦截器为"方法级/类级"匹配：
-     * 经 {@link #matchesControllerType} 按 handler 的 beanType 判定，而非 path 维度。
+     * 类级匹配载体（ControllerAdvice 语义）。非空时该拦截器为"方法级/类级"匹配： 经 {@link #matchesControllerType} 按 handler 的 beanType 判定，而非 path
+     * 维度。
      */
     @Nullable
     private ControllerAdviceBean controllerAdvice;
 
     private int order = 0;
-
 
     /**
      * Create an {@link InterceptorRegistration} instance.
@@ -44,10 +44,8 @@ public class InterceptorRegistration implements WebComponent {
         this.interceptor = interceptor;
     }
 
-
     /**
-     * 自定义组件名。默认取被包装拦截器的实现类全名 + 实例标记（保证多拦截器注册时不冲突，
-     * 即使多个拦截器被包装为同一适配类（如 {@code HandlerInterceptorWrapper}））。
+     * 自定义组件名。默认取被包装拦截器的实现类全名 + 实例标记（保证多拦截器注册时不冲突， 即使多个拦截器被包装为同一适配类（如 {@code HandlerInterceptorWrapper}））。
      */
     public InterceptorRegistration componentName(String componentName) {
         this.componentName = componentName;
@@ -62,7 +60,6 @@ public class InterceptorRegistration implements WebComponent {
         Class<?> type = this.interceptor.getClass();
         return type.getName() + "@" + Integer.toHexString(System.identityHashCode(this.interceptor));
     }
-
 
     /**
      * Add URL patterns to which the registered interceptor should apply to.
@@ -99,10 +96,11 @@ public class InterceptorRegistration implements WebComponent {
     }
 
     /**
-     * 声明为"方法级/类级"拦截器：按 handler 的 controller 类型（ControllerAdvice 语义）
-     * 匹配，而非 URL path。设置后 {@link #matchPathRuleToCached} 不再参与匹配。
+     * 声明为"方法级/类级"拦截器：按 handler 的 controller 类型（ControllerAdvice 语义） 匹配，而非 URL path。设置后 {@link #matchPathRuleToCached}
+     * 不再参与匹配。
      *
-     * @param controllerAdvice ControllerAdvice 匹配载体（含 assignableTypes/annotations/basePackages 约束）
+     * @param controllerAdvice
+     *            ControllerAdvice 匹配载体（含 assignableTypes/annotations/basePackages 约束）
      */
     public InterceptorRegistration applyTo(ControllerAdviceBean controllerAdvice) {
         Assert.notNull(controllerAdvice, "ControllerAdvice is required");
@@ -111,10 +109,9 @@ public class InterceptorRegistration implements WebComponent {
     }
 
     /**
-     * A PathMatcher implementation to use with this interceptor. This is an optional,
-     * advanced property required only if using custom PathMatcher implementations
-     * that support mapping metadata other than the Ant path patterns supported
-     * by default.
+     * A PathMatcher implementation to use with this interceptor. This is an optional, advanced property required only
+     * if using custom PathMatcher implementations that support mapping metadata other than the Ant path patterns
+     * supported by default.
      */
     public InterceptorRegistration pathMatcher(PathMatcher pathMatcher) {
         this.pathMatcher = pathMatcher;
@@ -161,7 +158,8 @@ public class InterceptorRegistration implements WebComponent {
     /**
      * 类级匹配：给定 handler 的 controller 类型是否命中 ControllerAdvice 约束。
      *
-     * @param beanType handler 的 controller bean 类型
+     * @param beanType
+     *            handler 的 controller bean 类型
      */
     protected boolean matchesControllerType(Class<?> beanType) {
         return this.controllerAdvice != null && beanType != null
@@ -171,6 +169,5 @@ public class InterceptorRegistration implements WebComponent {
     protected ContainmentResult matchPathRuleToCached(String pathRule) {
         return PathPatternUtils.matchPathRuleToCached(this.includePatterns, this.excludePatterns, pathRule);
     }
-
 
 }

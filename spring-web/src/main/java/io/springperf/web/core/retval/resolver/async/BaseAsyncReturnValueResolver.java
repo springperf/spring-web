@@ -10,6 +10,7 @@ public abstract class BaseAsyncReturnValueResolver implements ReturnValueResolve
 
     @Override
     public void initWithWebContext(WebContext webContext) {
-        asyncSupportRegistry = webContext.getWebComponentWithDefault(AsyncSupportRegistry.class, new AsyncSupportRegistry());
+        asyncSupportRegistry = webContext.getWebComponentWithDefault(AsyncSupportRegistry.class,
+                new AsyncSupportRegistry());
     }
 }

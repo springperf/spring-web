@@ -1,5 +1,7 @@
 package io.springperf.web.server;
 
+import java.util.concurrent.TimeUnit;
+
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
@@ -10,24 +12,18 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.concurrent.ScheduledFuture;
 
-import java.util.concurrent.TimeUnit;
-
 /**
  * keep-alive 调优 handler（duplex，<b>必须位于 {@code NettyHttpHandler} 之前</b>）：
- *
- * <p>管线位置是正确性前提——{@code NettyHttpHandler} 是入站终端（不转发 channelRead）且用自身
- * {@code ctx.writeAndFlush} 写响应（出站只流经其之前的 handler）。若置于其后，本 handler
- * 收不到任何事件，计数与空闲超时全部失效（曾因此回归，见管线顺序测试与 keep-alive E2E）。</p>
- *
+ * <p>
+ * 管线位置是正确性前提——{@code NettyHttpHandler} 是入站终端（不转发 channelRead）且用自身 {@code ctx.writeAndFlush} 写响应（出站只流经其之前的
+ * handler）。若置于其后，本 handler 收不到任何事件，计数与空闲超时全部失效（曾因此回归，见管线顺序测试与 keep-alive E2E）。
+ * </p>
  * <ul>
- *   <li>{@code max-keep-alive-requests}：对每个入站 {@link HttpRequest} 计数，达到上限后于当前响应结束关闭连接
- *       （在响应头写入 {@code Connection: close}，flush 完成后关闭）。</li>
- *   <li>{@code keep-alive-timeout}：每次响应发送完毕后，若启用则调度空闲超时；超时且无新请求则关闭连接；
- *       新请求到达会取消该调度。</li>
+ * <li>{@code max-keep-alive-requests}：对每个入站 {@link HttpRequest} 计数，达到上限后于当前响应结束关闭连接 （在响应头写入
+ * {@code Connection: close}，flush 完成后关闭）。</li>
+ * <li>{@code keep-alive-timeout}：每次响应发送完毕后，若启用则调度空闲超时；超时且无新请求则关闭连接； 新请求到达会取消该调度。</li>
  * </ul>
- *
- * 所有状态（requestCount / idleFuture / closeAfterResponse）仅在所属 EventLoop 线程上访问，
- * 事件处理与定时回调均在同一 EventLoop 串行，无并发问题。
+ * 所有状态（requestCount / idleFuture / closeAfterResponse）仅在所属 EventLoop 线程上访问， 事件处理与定时回调均在同一 EventLoop 串行，无并发问题。
  */
 public final class KeepAliveHandler extends ChannelDuplexHandler {
 

@@ -34,12 +34,18 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class ServletWebExchangeProviderTest {
 
-    @Mock WebServerHttpRequest req;
-    @Mock WebServerHttpResponse resp;
-    @Mock WebContext webContext;
-    @Mock RequestContext requestContext;
-    @Mock ServletAdapterContext adapterContext;
-    @Mock HttpServletRequest servletRequest;
+    @Mock
+    WebServerHttpRequest req;
+    @Mock
+    WebServerHttpResponse resp;
+    @Mock
+    WebContext webContext;
+    @Mock
+    RequestContext requestContext;
+    @Mock
+    ServletAdapterContext adapterContext;
+    @Mock
+    HttpServletRequest servletRequest;
 
     private final Map<RequestAttribute<?>, Object> fastAttrs = new HashMap<>();
     private ServletWebExchangeProvider provider;
@@ -119,8 +125,7 @@ class ServletWebExchangeProviderTest {
         when(servletRequest.getSession(false)).thenReturn(session);
         when(session.getAttribute("user")).thenReturn("alice");
         // 每次返回新的 enumeration：HttpSession.getAttributeNames() 语义即每次调用独立遍历
-        when(session.getAttributeNames())
-                .thenAnswer(inv -> Collections.enumeration(Collections.singletonList("user")));
+        when(session.getAttributeNames()).thenAnswer(inv -> Collections.enumeration(Collections.singletonList("user")));
 
         IWebSession webSession = provider.createExchange(req, resp).getSession();
 
@@ -176,17 +181,15 @@ class ServletWebExchangeProviderTest {
     @Test
     void request_cookies_bridged() {
         bindAdapter();
-        when(servletRequest.getCookies()).thenReturn(new Cookie[]{
-                new Cookie("a", "1"), new Cookie("b", "2")
-        });
+        when(servletRequest.getCookies()).thenReturn(new Cookie[] { new Cookie("a", "1"), new Cookie("b", "2") });
 
         org.thymeleaf.web.IWebRequest webRequest = provider.createExchange(req, resp).getRequest();
 
         assertTrue(webRequest.containsCookie("a"));
         assertEquals(2, webRequest.getCookieCount());
         assertTrue(webRequest.getAllCookieNames().contains("b"));
-        assertArrayEquals(new String[]{"1"}, webRequest.getCookieValues("a"));
-        assertArrayEquals(new String[]{"2"}, webRequest.getCookieMap().get("b"));
+        assertArrayEquals(new String[] { "1" }, webRequest.getCookieValues("a"));
+        assertArrayEquals(new String[] { "2" }, webRequest.getCookieMap().get("b"));
     }
 
     @Test
@@ -205,14 +208,12 @@ class ServletWebExchangeProviderTest {
     @Test
     void request_duplicateCookieNames_groupedIntoValues() {
         bindAdapter();
-        when(servletRequest.getCookies()).thenReturn(new Cookie[]{
-                new Cookie("x", "1"), new Cookie("x", "2")
-        });
+        when(servletRequest.getCookies()).thenReturn(new Cookie[] { new Cookie("x", "1"), new Cookie("x", "2") });
 
         org.thymeleaf.web.IWebRequest webRequest = provider.createExchange(req, resp).getRequest();
 
         assertEquals(1, webRequest.getCookieCount(), "同名 cookie 归并为一项");
-        assertArrayEquals(new String[]{"1", "2"}, webRequest.getCookieValues("x"));
+        assertArrayEquals(new String[] { "1", "2" }, webRequest.getCookieValues("x"));
     }
 
     // ==================== server 元信息（servlet 精度） ====================
@@ -224,8 +225,7 @@ class ServletWebExchangeProviderTest {
 
         org.thymeleaf.web.IWebRequest webRequest = provider.createExchange(req, resp).getRequest();
 
-        assertEquals(Integer.valueOf(8443), webRequest.getServerPort(),
-                "servlet 场景应取真实端口而非 URI 推断的 80");
+        assertEquals(Integer.valueOf(8443), webRequest.getServerPort(), "servlet 场景应取真实端口而非 URI 推断的 80");
     }
 
     @Test

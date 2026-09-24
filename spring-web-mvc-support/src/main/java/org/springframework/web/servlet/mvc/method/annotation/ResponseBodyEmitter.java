@@ -27,16 +27,14 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 /**
- * A controller method return value type for asynchronous request processing
- * where one or more objects are written to the response.
- *
- * <p>While {@link org.springframework.web.context.request.async.DeferredResult}
- * is used to produce a single result, a {@code ResponseBodyEmitter} can be used
- * to send multiple objects where each object is written with a compatible
+ * A controller method return value type for asynchronous request processing where one or more objects are written to
+ * the response.
+ * <p>
+ * While {@link org.springframework.web.context.request.async.DeferredResult} is used to produce a single result, a
+ * {@code ResponseBodyEmitter} can be used to send multiple objects where each object is written with a compatible
  * {@link org.springframework.http.converter.HttpMessageConverter}.
- *
- * <p>Supported as a return type on its own as well as within a
- * {@link org.springframework.http.ResponseEntity}.
+ * <p>
+ * Supported as a return type on its own as well as within a {@link org.springframework.http.ResponseEntity}.
  *
  * <pre>
  * &#064;RequestMapping(value="/stream", method=RequestMethod.GET)
@@ -58,6 +56,7 @@ import java.io.OutputStream;
  *
  * @author Rossen Stoyanchev
  * @author Juergen Hoeller
+ *
  * @since 4.2
  */
 public class ResponseBodyEmitter extends StreamEmitter {
@@ -73,16 +72,16 @@ public class ResponseBodyEmitter extends StreamEmitter {
 
     /**
      * Create a ResponseBodyEmitter with a custom timeout value.
-     * <p>By default not set in which case the default configured in the MVC
-     * Java Config or the MVC namespace is used, or if that's not set, then the
-     * timeout depends on the default of the underlying server.
+     * <p>
+     * By default not set in which case the default configured in the MVC Java Config or the MVC namespace is used, or
+     * if that's not set, then the timeout depends on the default of the underlying server.
      *
-     * @param timeout the timeout value in milliseconds
+     * @param timeout
+     *            the timeout value in milliseconds
      */
     public ResponseBodyEmitter(Long timeout) {
         super(timeout);
     }
-
 
     /**
      * Return the configured timeout value, if any.
@@ -109,13 +108,18 @@ public class ResponseBodyEmitter extends StreamEmitter {
     }
 
     /**
-     * Overloaded variant of {@link #send(Object)} that also accepts a MediaType
-     * hint for how to serialize the given Object.
+     * Overloaded variant of {@link #send(Object)} that also accepts a MediaType hint for how to serialize the given
+     * Object.
      *
-     * @param object    the object to write
-     * @param mediaType a MediaType hint for selecting an HttpMessageConverter
-     * @throws IOException                     raised when an I/O error occurs
-     * @throws java.lang.IllegalStateException wraps any other errors
+     * @param object
+     *            the object to write
+     * @param mediaType
+     *            a MediaType hint for selecting an HttpMessageConverter
+     *
+     * @throws IOException
+     *             raised when an I/O error occurs
+     * @throws java.lang.IllegalStateException
+     *             wraps any other errors
      */
     public synchronized void send(Object object, @Nullable MediaType mediaType) throws IOException {
         if (mediaType == null) {
@@ -124,7 +128,6 @@ public class ResponseBodyEmitter extends StreamEmitter {
             super.send(new DataWithMediaType(object, mediaType));
         }
     }
-
 
     @Override
     public String toString() {
@@ -137,8 +140,8 @@ public class ResponseBodyEmitter extends StreamEmitter {
     }
 
     /**
-     * A simple holder of data to be written along with a MediaType hint for
-     * selecting a message converter to write with.
+     * A simple holder of data to be written along with a MediaType hint for selecting a message converter to write
+     * with.
      */
     public static class DataWithMediaType {
 

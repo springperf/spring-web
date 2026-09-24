@@ -20,22 +20,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
- * 请求体/响应语义 E2E：chunked（未知长度）请求体、空 body @RequestBody → 400、
- * 缺 Content-Type → 415、204 No Content（ResponseEntity.noContent 与 void+@ResponseStatus）、
- * HEAD 作用于业务端点时抑制 body 且保留 Content-Length。
+ * 请求体/响应语义 E2E：chunked（未知长度）请求体、空 body @RequestBody → 400、 缺 Content-Type → 415、204 No Content（ResponseEntity.noContent
+ * 与 void+@ResponseStatus）、 HEAD 作用于业务端点时抑制 body 且保留 Content-Length。
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, RequestBodySemanticsE2eTest.BodyConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "server.error.whitelabel.enabled=false"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        RequestBodySemanticsE2eTest.BodyConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "server.error.whitelabel.enabled=false" })
 class RequestBodySemanticsE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     private static final MediaType JSON = MediaType.parse("application/json");
 
@@ -65,8 +59,8 @@ class RequestBodySemanticsE2eTest {
                 sink.writeUtf8("{\"name\":\"chunked-e2e\"}");
             }
         };
-        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder()
-                .url(url("/e2e-body/json")).post(chunked).build()).execute();
+        okhttp3.Response resp = CLIENT
+                .newCall(new okhttp3.Request.Builder().url(url("/e2e-body/json")).post(chunked).build()).execute();
         try {
             String body = resp.body().string();
             assertEquals(200, resp.code(), "chunked 请求体应正常聚合解析，body=" + body);
@@ -78,12 +72,10 @@ class RequestBodySemanticsE2eTest {
 
     @Test
     void emptyBody_requiredRequestBody_returns400() throws Exception {
-        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder()
-                .url(url("/e2e-body/json"))
+        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder().url(url("/e2e-body/json"))
                 .post(RequestBody.create(new byte[0], JSON)).build()).execute();
         try {
-            assertEquals(400, resp.code(),
-                    "必填 @RequestBody 但 body 为空应 400（HttpMessageNotReadable），实际 " + resp.code());
+            assertEquals(400, resp.code(), "必填 @RequestBody 但 body 为空应 400（HttpMessageNotReadable），实际 " + resp.code());
         } finally {
             resp.close();
         }
@@ -91,13 +83,11 @@ class RequestBodySemanticsE2eTest {
 
     @Test
     void missingContentType_returns415() throws Exception {
-        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder()
-                .url(url("/e2e-body/json"))
+        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder().url(url("/e2e-body/json"))
                 .post(RequestBody.create("{\"a\":1}".getBytes(), null)).build()).execute();
         try {
             int code = resp.code();
-            assertEquals(true, code == 415 || code == 400,
-                    "缺 Content-Type 的 @RequestBody 应 415（或 400），实际 " + code);
+            assertEquals(true, code == 415 || code == 400, "缺 Content-Type 的 @RequestBody 应 415（或 400），实际 " + code);
         } finally {
             resp.close();
         }
@@ -105,8 +95,8 @@ class RequestBodySemanticsE2eTest {
 
     @Test
     void responseEntityNoContent_returns204WithEmptyBody() throws Exception {
-        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder()
-                .url(url("/e2e-body/no-content")).get().build()).execute();
+        okhttp3.Response resp = CLIENT
+                .newCall(new okhttp3.Request.Builder().url(url("/e2e-body/no-content")).get().build()).execute();
         try {
             assertEquals(204, resp.code());
             assertEquals(0, resp.body().bytes().length, "204 不应有响应体");
@@ -117,8 +107,8 @@ class RequestBodySemanticsE2eTest {
 
     @Test
     void voidWithResponseStatus_returns204() throws Exception {
-        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder()
-                .url(url("/e2e-body/void-204")).get().build()).execute();
+        okhttp3.Response resp = CLIENT
+                .newCall(new okhttp3.Request.Builder().url(url("/e2e-body/void-204")).get().build()).execute();
         try {
             assertEquals(204, resp.code(), "void + @ResponseStatus(NO_CONTENT) 应 204");
         } finally {
@@ -129,8 +119,8 @@ class RequestBodySemanticsE2eTest {
     @Test
     void headOnControllerEndpoint_suppressesBodyKeepsContentLength() throws Exception {
         long fullLength;
-        okhttp3.Response full = CLIENT.newCall(new okhttp3.Request.Builder()
-                .url(url("/e2e-body/payload")).get().build()).execute();
+        okhttp3.Response full = CLIENT
+                .newCall(new okhttp3.Request.Builder().url(url("/e2e-body/payload")).get().build()).execute();
         try {
             assertEquals(200, full.code());
             fullLength = full.body().bytes().length;
@@ -138,8 +128,8 @@ class RequestBodySemanticsE2eTest {
             full.close();
         }
 
-        okhttp3.Response head = CLIENT.newCall(new okhttp3.Request.Builder()
-                .url(url("/e2e-body/payload")).head().build()).execute();
+        okhttp3.Response head = CLIENT
+                .newCall(new okhttp3.Request.Builder().url(url("/e2e-body/payload")).head().build()).execute();
         try {
             assertEquals(200, head.code());
             assertEquals(0, head.body().bytes().length, "HEAD 不应返回 body");

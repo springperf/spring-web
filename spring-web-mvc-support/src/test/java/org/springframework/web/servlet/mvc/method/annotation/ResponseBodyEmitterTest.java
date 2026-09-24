@@ -45,8 +45,7 @@ class ResponseBodyEmitterTest {
         // 带 MediaType 时应包裹为 DataWithMediaType 入早发缓冲
         assertEquals(1, emitter.earlySendSize());
         assertTrue(emitter.earlySendAt(0) instanceof ResponseBodyEmitter.DataWithMediaType);
-        ResponseBodyEmitter.DataWithMediaType wrapper =
-                (ResponseBodyEmitter.DataWithMediaType) emitter.earlySendAt(0);
+        ResponseBodyEmitter.DataWithMediaType wrapper = (ResponseBodyEmitter.DataWithMediaType) emitter.earlySendAt(0);
         assertSame("data", wrapper.getData());
         assertEquals(MediaType.TEXT_PLAIN, wrapper.getMediaType());
     }

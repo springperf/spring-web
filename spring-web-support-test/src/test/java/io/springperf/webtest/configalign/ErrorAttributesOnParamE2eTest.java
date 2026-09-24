@@ -22,28 +22,21 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code server.error.include-*}=on-param 的**参数门控** E2E（对齐 Boot {@code AbstractErrorController}）：
- * 请求参数 {@code trace} / {@code message} / {@code errors} 分别控制异常栈 / message / 绑定错误的暴露，
- * 且取值 {@code false} 视为未命中（{@code ?trace=false} 不暴露）。
- *
- * <p>重点是绑定错误：若 on-param 被实现成 always，用户以为「按需暴露」实则每次下发字段级校验信息，
- * 属超出配置意图的信息外泄。</p>
+ * {@code server.error.include-*}=on-param 的**参数门控** E2E（对齐 Boot {@code AbstractErrorController}）： 请求参数 {@code trace} /
+ * {@code message} / {@code errors} 分别控制异常栈 / message / 绑定错误的暴露， 且取值 {@code false} 视为未命中（{@code ?trace=false} 不暴露）。
+ * <p>
+ * 重点是绑定错误：若 on-param 被实现成 always，用户以为「按需暴露」实则每次下发字段级校验信息， 属超出配置意图的信息外泄。
+ * </p>
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, ErrorAttributesOnParamE2eTest.OnParamConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "server.error.include-message=on-param",
-                "server.error.include-stacktrace=on-param",
-                "server.error.include-binding-errors=on-param",
-                "server.error.whitelabel.enabled=false"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        ErrorAttributesOnParamE2eTest.OnParamConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "server.error.include-message=on-param",
+                "server.error.include-stacktrace=on-param", "server.error.include-binding-errors=on-param",
+                "server.error.whitelabel.enabled=false" })
 class ErrorAttributesOnParamE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
@@ -80,8 +73,7 @@ class ErrorAttributesOnParamE2eTest {
     void message_paramFalse_countsAsAbsent() throws Exception {
         // Boot 语义：?message=false 视为未命中（显式关闭）
         String body = body("/e2e-ea/send403?message=false");
-        assertFalse(body.contains("secret-msg"),
-                "?message=false 应视为未命中，实际 " + body);
+        assertFalse(body.contains("secret-msg"), "?message=false 应视为未命中，实际 " + body);
     }
 
     @Test
@@ -117,29 +109,26 @@ class ErrorAttributesOnParamE2eTest {
     @Test
     void bindingErrors_hiddenWithoutErrorsParam() throws Exception {
         String body = post("/e2e-ea/validate", "{\"name\":\"\"}");
-        assertFalse(body.contains("must-not-be-blank"),
-                "on-param 且未带 errors 参数时不得暴露绑定错误，实际 " + body);
+        assertFalse(body.contains("must-not-be-blank"), "on-param 且未带 errors 参数时不得暴露绑定错误，实际 " + body);
     }
 
     @Test
     void bindingErrors_exposedWithErrorsParam() throws Exception {
         String body = post("/e2e-ea/validate?errors=true", "{\"name\":\"\"}");
-        assertTrue(body.contains("must-not-be-blank"),
-                "?errors=true 应暴露绑定错误，实际 " + body);
+        assertTrue(body.contains("must-not-be-blank"), "?errors=true 应暴露绑定错误，实际 " + body);
     }
 
     @Test
     void bindingErrors_errorsParamFalse_countsAsAbsent() throws Exception {
         String body = post("/e2e-ea/validate?errors=false", "{\"name\":\"\"}");
-        assertFalse(body.contains("must-not-be-blank"),
-                "?errors=false 应视为未命中，实际 " + body);
+        assertFalse(body.contains("must-not-be-blank"), "?errors=false 应视为未命中，实际 " + body);
     }
 
     private String post(String path, String json) throws Exception {
-        Response resp = CLIENT.newCall(new Request.Builder()
-                .url("http://localhost:" + port + path)
-                .post(okhttp3.RequestBody.create(json, okhttp3.MediaType.parse("application/json")))
-                .build()).execute();
+        Response resp = CLIENT
+                .newCall(new Request.Builder().url("http://localhost:" + port + path)
+                        .post(okhttp3.RequestBody.create(json, okhttp3.MediaType.parse("application/json"))).build())
+                .execute();
         try {
             return resp.code() + "|" + resp.body().string();
         } finally {

@@ -18,8 +18,7 @@ public class WebSocketTestConfig {
     }
 
     @Bean
-    public WebSocketConfigurer webSocketConfigurer(
-            WebSocketEchoHandler echoHandler,
+    public WebSocketConfigurer webSocketConfigurer(WebSocketEchoHandler echoHandler,
             WebSocketPathEchoHandler pathHandler) {
         return registry -> {
             registry.addHandler(echoHandler, "/ws/echo");

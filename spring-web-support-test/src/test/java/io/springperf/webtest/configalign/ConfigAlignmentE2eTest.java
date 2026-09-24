@@ -20,29 +20,21 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 配置对齐 E2E（真实 Netty 管线）：静态资源默认映射 + cache.period、dispatch 开关、
- * whitelabel 404、addViewControllers（redirect/status）、locale fixed。
- *
- * <p>这些能力的风险点在「配置 → 管线/注册表」的装配，单测（mock props）无法覆盖，
- * 必须走真实服务验证（KeepAliveHandler 装配回归即此类缺陷）。</p>
+ * 配置对齐 E2E（真实 Netty 管线）：静态资源默认映射 + cache.period、dispatch 开关、 whitelabel 404、addViewControllers（redirect/status）、locale
+ * fixed。
+ * <p>
+ * 这些能力的风险点在「配置 → 管线/注册表」的装配，单测（mock props）无法覆盖， 必须走真实服务验证（KeepAliveHandler 装配回归即此类缺陷）。
+ * </p>
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, ConfigAlignmentE2eTest.VcAndLocaleConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "spring.web.resources.add-mappings=true",
-                "spring.web.resources.cache.period=1h",
-                "spring.mvc.dispatch.trace=false",
-                "spring.mvc.dispatch.options=false",
-                "spring.web.locale=zh_CN",
-                "spring.web.locale-resolver=fixed"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        ConfigAlignmentE2eTest.VcAndLocaleConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "spring.web.resources.add-mappings=true",
+                "spring.web.resources.cache.period=1h", "spring.mvc.dispatch.trace=false",
+                "spring.mvc.dispatch.options=false", "spring.web.locale=zh_CN", "spring.web.locale-resolver=fixed" })
 class ConfigAlignmentE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
@@ -75,8 +67,7 @@ class ConfigAlignmentE2eTest {
 
     @Test
     void traceDispatch_disabled_returns404() throws Exception {
-        okhttp3.Request req = new okhttp3.Request.Builder()
-                .url(url("/user/1")).method("TRACE", null).build();
+        okhttp3.Request req = new okhttp3.Request.Builder().url(url("/user/1")).method("TRACE", null).build();
         okhttp3.Response resp = CLIENT.newCall(req).execute();
         try {
             assertEquals(404, resp.code(), "dispatch.trace=false 时 TRACE 不应分发到处理器");
@@ -87,8 +78,7 @@ class ConfigAlignmentE2eTest {
 
     @Test
     void optionsDispatch_disabled_nonPreflight_returns404() throws Exception {
-        okhttp3.Request req = new okhttp3.Request.Builder()
-                .url(url("/user/1")).method("OPTIONS", null).build();
+        okhttp3.Request req = new okhttp3.Request.Builder().url(url("/user/1")).method("OPTIONS", null).build();
         okhttp3.Response resp = CLIENT.newCall(req).execute();
         try {
             assertEquals(404, resp.code(), "dispatch.options=false 时非预检 OPTIONS 不应分发");
@@ -106,8 +96,7 @@ class ConfigAlignmentE2eTest {
         try {
             assertEquals(404, resp.code());
             String contentType = resp.header("Content-Type", "");
-            assertTrue(contentType.startsWith("text/html"),
-                    "whitelabel 默认开启应为 HTML 错误页，实际 " + contentType);
+            assertTrue(contentType.startsWith("text/html"), "whitelabel 默认开启应为 HTML 错误页，实际 " + contentType);
             assertTrue(resp.body().string().contains("404"), "错误页应包含状态码");
         } finally {
             resp.close();
@@ -149,8 +138,8 @@ class ConfigAlignmentE2eTest {
 
     @Test
     void localeFixed_returnsConfiguredLocale() throws Exception {
-        okhttp3.Request req = new okhttp3.Request.Builder()
-                .url(url("/e2e-locale")).header("Accept-Language", "fr-FR").build();
+        okhttp3.Request req = new okhttp3.Request.Builder().url(url("/e2e-locale")).header("Accept-Language", "fr-FR")
+                .build();
         okhttp3.Response resp = CLIENT.newCall(req).execute();
         try {
             assertEquals(200, resp.code());
@@ -181,8 +170,7 @@ class ConfigAlignmentE2eTest {
                 @Override
                 public void addViewControllers(ViewControllerRegistry registry) {
                     registry.addRedirectViewController("/e2e-vc-redirect", "/e2e-vc-target");
-                    registry.addStatusController("/e2e-vc-status",
-                            org.springframework.http.HttpStatus.NO_CONTENT);
+                    registry.addStatusController("/e2e-vc-status", org.springframework.http.HttpStatus.NO_CONTENT);
                 }
             };
         }

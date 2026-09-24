@@ -33,7 +33,9 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
- * 琛ュ厖 PerfHttpServletRequest 瑕嗙洊鐜囷細requestURL/鏈嶅姟鍣ㄧ鍙ｃ€乵ultipart 缂哄け銆? * async start/getAsyncContext/upgrade銆乻ession 鍒涘缓/鍙樻洿/鏍￠獙銆佺櫥褰曟敞閿€銆佽璇佷笌 servletContext 瑙ｆ瀽銆? */
+ * 琛ュ厖 PerfHttpServletRequest 瑕嗙洊鐜囷細requestURL/鏈嶅姟鍣ㄧ鍙ｃ€乵ultipart 缂哄け銆? * async start/getAsyncContext/upgrade銆乻ession
+ * 鍒涘缓/鍙樻洿/鏍￠獙銆佺櫥褰曟敞閿€銆佽璇佷笌 servletContext 瑙ｆ瀽銆?
+ */
 class PerfHttpServletRequestSessionTest {
 
     private WebServerHttpRequest request;
@@ -49,7 +51,8 @@ class PerfHttpServletRequestSessionTest {
         webContext = mock(WebContext.class);
         when(request.getRequestContext()).thenReturn(requestContext);
         when(request.getWebContext()).thenReturn(webContext);
-        when(requestContext.getAttribute(any(RequestAttribute.class))).thenAnswer(inv -> fastAttrs.get(inv.getArgument(0)));
+        when(requestContext.getAttribute(any(RequestAttribute.class)))
+                .thenAnswer(inv -> fastAttrs.get(inv.getArgument(0)));
         doAnswer(inv -> {
             fastAttrs.put(inv.getArgument(0), inv.getArgument(1));
             return null;
@@ -75,7 +78,7 @@ class PerfHttpServletRequestSessionTest {
         return new PerfHttpServletRequest(request);
     }
 
-    /** 灏?servlet 鍝嶅簲缁戝畾鍒拌姹備笂涓嬫枃锛圫ervletAttribute.getResponse 缁?ServletAdapterContext 璇诲彇锛?*/
+    /** 灏?servlet 鍝嶅簲缁戝畾鍒拌姹備笂涓嬫枃锛圫ervletAttribute.getResponse 缁?ServletAdapterContext 璇诲彇锛? */
     private void bindResponse(PerfHttpServletResponse servletResp) {
         ServletAdapterContext adapter = new ServletAdapterContext(newReq(), servletResp, null);
         ServletAttribute.setAdapterContext(requestContext, adapter);
@@ -231,8 +234,7 @@ class PerfHttpServletRequestSessionTest {
     @Test
     void upgrade_badHandlerClass_throwsServletException() throws Exception {
         when(request.getBody()).thenReturn(new ByteArrayInputStream(new byte[0]));
-        assertThrows(ServletException.class,
-                () -> newReq().upgrade(NoDefaultCtorUpgradeHandler.class));
+        assertThrows(ServletException.class, () -> newReq().upgrade(NoDefaultCtorUpgradeHandler.class));
     }
 
     static class NoDefaultCtorUpgradeHandler implements jakarta.servlet.http.HttpUpgradeHandler {
@@ -255,9 +257,11 @@ class PerfHttpServletRequestSessionTest {
     void getRequestedSessionId_fromCookie() {
         sessionManager();
         headers("Cookie", "SESSION=abc");
-        when(request.getHeaders()).thenReturn(new HttpHeaders() {{
-            add("Cookie", "SESSION=abc");
-        }});
+        when(request.getHeaders()).thenReturn(new HttpHeaders() {
+            {
+                add("Cookie", "SESSION=abc");
+            }
+        });
         PerfHttpServletRequest req = newReq();
         assertEquals("abc", req.getRequestedSessionId());
     }
@@ -277,9 +281,11 @@ class PerfHttpServletRequestSessionTest {
         PerfHttpSessionManager manager = sessionManager();
         when(manager.getCookieName()).thenReturn("SESSION");
         headers("Cookie", "SESSION=sid");
-        when(request.getHeaders()).thenReturn(new HttpHeaders() {{
-            add("Cookie", "SESSION=sid");
-        }});
+        when(request.getHeaders()).thenReturn(new HttpHeaders() {
+            {
+                add("Cookie", "SESSION=sid");
+            }
+        });
         PerfHttpSession session = mock(PerfHttpSession.class);
         when(manager.getSession("sid")).thenReturn(session);
         when(session.isInvalid()).thenReturn(false);
@@ -395,9 +401,11 @@ class PerfHttpServletRequestSessionTest {
         PerfHttpSessionManager manager = sessionManager();
         when(manager.getCookieName()).thenReturn("SESSION");
         headers("Cookie", "SESSION=sid");
-        when(request.getHeaders()).thenReturn(new HttpHeaders() {{
-            add("Cookie", "SESSION=sid");
-        }});
+        when(request.getHeaders()).thenReturn(new HttpHeaders() {
+            {
+                add("Cookie", "SESSION=sid");
+            }
+        });
         PerfHttpSession session = mock(PerfHttpSession.class);
         when(session.isInvalid()).thenReturn(false);
         when(manager.getSession("sid")).thenReturn(session);
@@ -491,9 +499,11 @@ class PerfHttpServletRequestSessionTest {
         PerfHttpSessionManager manager = sessionManager();
         when(manager.getCookieName()).thenReturn("SESSION");
         headers("Cookie", "SESSION=sid");
-        when(request.getHeaders()).thenReturn(new HttpHeaders() {{
-            add("Cookie", "SESSION=sid");
-        }});
+        when(request.getHeaders()).thenReturn(new HttpHeaders() {
+            {
+                add("Cookie", "SESSION=sid");
+            }
+        });
         PerfHttpSession session = mock(PerfHttpSession.class);
         when(session.isInvalid()).thenReturn(false);
         when(manager.getSession("sid")).thenReturn(session);
@@ -508,14 +518,15 @@ class PerfHttpServletRequestSessionTest {
         PerfHttpSessionManager manager = sessionManager();
         when(manager.getCookieName()).thenReturn("SESSION");
         headers("Cookie", "SESSION=sid");
-        when(request.getHeaders()).thenReturn(new HttpHeaders() {{
-            add("Cookie", "SESSION=sid");
-        }});
+        when(request.getHeaders()).thenReturn(new HttpHeaders() {
+            {
+                add("Cookie", "SESSION=sid");
+            }
+        });
         PerfHttpSession session = mock(PerfHttpSession.class);
         when(session.isInvalid()).thenReturn(false);
         when(manager.getSession("sid")).thenReturn(session);
-        when(session.getAttribute(PerfHttpSessionManager.PRINCIPAL_KEY))
-                .thenReturn(mock(PerfHttpPrincipal.class));
+        when(session.getAttribute(PerfHttpSessionManager.PRINCIPAL_KEY)).thenReturn(mock(PerfHttpPrincipal.class));
 
         HttpServletResponse resp = mock(HttpServletResponse.class);
         assertTrue(newReq().authenticate(resp));
@@ -536,18 +547,22 @@ class PerfHttpServletRequestSessionTest {
 
     @Test
     void rebind_withDifferentRequest_resetsCookies() throws Exception {
-        when(request.getHeaders()).thenReturn(new HttpHeaders() {{
-            add("Cookie", "SESSION=old");
-        }});
+        when(request.getHeaders()).thenReturn(new HttpHeaders() {
+            {
+                add("Cookie", "SESSION=old");
+            }
+        });
         PerfHttpServletRequest req = newReq();
         Cookie[] before = req.getCookies();
 
         WebServerHttpRequest newRequest = mock(WebServerHttpRequest.class);
         when(newRequest.getRequestContext()).thenReturn(requestContext);
         when(newRequest.getWebContext()).thenReturn(webContext);
-        when(newRequest.getHeaders()).thenReturn(new HttpHeaders() {{
-            add("Cookie", "SESSION=new");
-        }});
+        when(newRequest.getHeaders()).thenReturn(new HttpHeaders() {
+            {
+                add("Cookie", "SESSION=new");
+            }
+        });
         req.rebind(newRequest);
         Cookie[] after = req.getCookies();
         assertNotEquals(before[0].getValue(), after[0].getValue());
@@ -574,9 +589,11 @@ class PerfHttpServletRequestSessionTest {
         PerfHttpSessionManager manager = sessionManager();
         when(manager.getCookieName()).thenReturn("SESSION");
         headers("Cookie", "SESSION=sid");
-        when(request.getHeaders()).thenReturn(new HttpHeaders() {{
-            add("Cookie", "SESSION=sid");
-        }});
+        when(request.getHeaders()).thenReturn(new HttpHeaders() {
+            {
+                add("Cookie", "SESSION=sid");
+            }
+        });
         PerfHttpSession session = mock(PerfHttpSession.class);
         when(session.isInvalid()).thenReturn(false);
         when(manager.getSession("sid")).thenReturn(session);
@@ -588,9 +605,11 @@ class PerfHttpServletRequestSessionTest {
     @Test
     void isRequestedSessionIdValid_noManager_false() {
         headers("Cookie", "SESSION=sid");
-        when(request.getHeaders()).thenReturn(new HttpHeaders() {{
-            add("Cookie", "SESSION=sid");
-        }});
+        when(request.getHeaders()).thenReturn(new HttpHeaders() {
+            {
+                add("Cookie", "SESSION=sid");
+            }
+        });
         when(webContext.getWebComponent(PerfHttpSessionManager.class)).thenReturn(null);
         assertFalse(newReq().isRequestedSessionIdValid());
     }
@@ -629,9 +648,11 @@ class PerfHttpServletRequestSessionTest {
         PerfHttpSessionManager manager = sessionManager();
         when(manager.getCookieName()).thenReturn("SESSION");
         headers("Cookie", "SESSION=sid");
-        when(request.getHeaders()).thenReturn(new HttpHeaders() {{
-            add("Cookie", "SESSION=sid");
-        }});
+        when(request.getHeaders()).thenReturn(new HttpHeaders() {
+            {
+                add("Cookie", "SESSION=sid");
+            }
+        });
         PerfHttpSession session = mock(PerfHttpSession.class);
         when(session.isInvalid()).thenReturn(false);
         when(manager.getSession("sid")).thenReturn(session);

@@ -1,7 +1,10 @@
 package io.springperf.web.core.exception;
 
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.*;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,10 +19,8 @@ import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.*;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 class ResponseStatusExceptionResolverTest {
@@ -130,8 +131,7 @@ class ResponseStatusExceptionResolverTest {
     @Test
     void resolveException_responseStatusAnnotation_withReason_withMessageSource() {
         resolver.setMessageSource(messageSource);
-        when(messageSource.getMessage(eq("bad.request"), isNull(), eq("bad.request"), any()))
-                .thenReturn("自定义错误信息");
+        when(messageSource.getMessage(eq("bad.request"), isNull(), eq("bad.request"), any())).thenReturn("自定义错误信息");
 
         BadRequestWithReasonException ex = new BadRequestWithReasonException();
 
@@ -167,8 +167,8 @@ class ResponseStatusExceptionResolverTest {
 
     @Test
     void resolveException_methodArgumentTypeMismatch_resolvesToBadRequest() {
-        MethodArgumentTypeMismatchException ex = new MethodArgumentTypeMismatchException(
-                "abc", Integer.class, "count", null, new RuntimeException("convert"));
+        MethodArgumentTypeMismatchException ex = new MethodArgumentTypeMismatchException("abc", Integer.class, "count",
+                null, new RuntimeException("convert"));
 
         boolean result = resolver.resolveException(request, response, handler, ex);
 
@@ -210,8 +210,7 @@ class ResponseStatusExceptionResolverTest {
     @Test
     void applyStatusAndReason_withReason_withMessageSource() {
         resolver.setMessageSource(messageSource);
-        when(messageSource.getMessage(eq("error.code"), isNull(), eq("error.code"), any()))
-                .thenReturn("解析后的错误信息");
+        when(messageSource.getMessage(eq("error.code"), isNull(), eq("error.code"), any())).thenReturn("解析后的错误信息");
 
         boolean result = resolver.applyStatusAndReason(HttpStatus.BAD_REQUEST, "error.code", response);
 

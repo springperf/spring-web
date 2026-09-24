@@ -1,16 +1,17 @@
 package io.springperf.web.core.mapping.match;
 
-import io.springperf.web.http.WebServerHttpRequest;
-import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
 import java.util.Collections;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+
+import io.springperf.web.http.WebServerHttpRequest;
 
 class ConsumeOrProduceMatcherTest {
 
@@ -242,11 +243,8 @@ class ConsumeOrProduceMatcherTest {
 
     @Test
     void toString_multipleMediaTypes() {
-        ConsumeOrProduceMatcher matcher = new ConsumeOrProduceMatcher(true,
-                Arrays.asList(
-                        MediaTypeExpressionSupport.build("application/json"),
-                        MediaTypeExpressionSupport.build("text/html")
-                ));
+        ConsumeOrProduceMatcher matcher = new ConsumeOrProduceMatcher(true, Arrays.asList(
+                MediaTypeExpressionSupport.build("application/json"), MediaTypeExpressionSupport.build("text/html")));
         String str = matcher.toString();
         assertTrue(str.startsWith("produces: "));
     }

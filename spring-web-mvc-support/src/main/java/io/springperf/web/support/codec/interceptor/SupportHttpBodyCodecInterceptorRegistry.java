@@ -15,11 +15,13 @@ public class SupportHttpBodyCodecInterceptorRegistry extends HttpBodyCodecInterc
         super.initCodecInterceptors();
         List<ControllerAdviceBean> adviceBeans1 = getControllerAdviceBean(RequestBodyAdvice.class);
         for (ControllerAdviceBean adviceBean : adviceBeans1) {
-            registerWebComponent(new WebComponentControllerAdviceBean<>(adviceBean, new RequestBodyAdviceCodecInterceptor((RequestBodyAdvice) adviceBean.resolveBean())));
+            registerWebComponent(new WebComponentControllerAdviceBean<>(adviceBean,
+                    new RequestBodyAdviceCodecInterceptor((RequestBodyAdvice) adviceBean.resolveBean())));
         }
         List<ControllerAdviceBean> adviceBeans2 = getControllerAdviceBean(ResponseBodyAdvice.class);
         for (ControllerAdviceBean adviceBean : adviceBeans2) {
-            registerWebComponent(new WebComponentControllerAdviceBean<>(adviceBean, new ResponseBodyAdviceCodecInterceptor((ResponseBodyAdvice) adviceBean.resolveBean())));
+            registerWebComponent(new WebComponentControllerAdviceBean<>(adviceBean,
+                    new ResponseBodyAdviceCodecInterceptor((ResponseBodyAdvice) adviceBean.resolveBean())));
         }
     }
 }

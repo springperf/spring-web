@@ -14,14 +14,13 @@ public class MethodArgumentNotValidResolver implements HandlerExceptionResolver 
 
     @Override
     public boolean resolveException(WebServerHttpRequest request, WebServerHttpResponse response,
-                                     @Nullable HandlerMethod handler, Throwable ex) {
+            @Nullable HandlerMethod handler, Throwable ex) {
         if (!(ex instanceof MethodArgumentNotValidException)) {
             return false;
         }
         MethodArgumentNotValidException e = (MethodArgumentNotValidException) ex;
         String msg = e.getBindingResult().getFieldErrors().stream()
-                .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
-                .collect(Collectors.joining(", "));
+                .map(fe -> fe.getField() + ": " + fe.getDefaultMessage()).collect(Collectors.joining(", "));
         String body = "{\"error\":\"validation failed\",\"message\":\"" + msg + "\"}";
         response.sendError(HttpStatus.BAD_REQUEST, body);
         return true;

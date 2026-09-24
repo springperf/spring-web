@@ -1,7 +1,13 @@
 package io.springperf.web.core.cors;
 
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.io.ByteArrayOutputStream;
+import java.net.URI;
+import java.util.List;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,22 +18,20 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.cors.CorsConfiguration;
 
-import java.io.ByteArrayOutputStream;
-import java.net.URI;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 class PerfCorsProcessorTest {
 
     PerfCorsProcessor processor;
 
-    @Mock WebServerHttpRequest request;
-    @Mock WebServerHttpResponse response;
-    @Mock HttpHeaders requestHeaders;
+    @Mock
+    WebServerHttpRequest request;
+    @Mock
+    WebServerHttpResponse response;
+    @Mock
+    HttpHeaders requestHeaders;
 
     HttpHeaders responseHeaders;
 
@@ -39,7 +43,8 @@ class PerfCorsProcessorTest {
         when(request.getHeaders()).thenReturn(requestHeaders);
     }
 
-    @Test void process_nonCorsRequest_addsVaryHeadersAndReturnsTrue() throws Exception {
+    @Test
+    void process_nonCorsRequest_addsVaryHeadersAndReturnsTrue() throws Exception {
         when(requestHeaders.getOrigin()).thenReturn(null);
         boolean result = processor.process(null, request, response);
         assertTrue(result);
@@ -50,7 +55,8 @@ class PerfCorsProcessorTest {
         assertTrue(vary.contains(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS));
     }
 
-    @Test void process_nonCorsRequest_varyHeadersAlreadyPresent_appendsMissing() throws Exception {
+    @Test
+    void process_nonCorsRequest_varyHeadersAlreadyPresent_appendsMissing() throws Exception {
         when(requestHeaders.getOrigin()).thenReturn(null);
         responseHeaders.add(HttpHeaders.VARY, "Accept");
         boolean result = processor.process(null, request, response);
@@ -63,7 +69,8 @@ class PerfCorsProcessorTest {
         assertTrue(vary.contains(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS));
     }
 
-    @Test void process_corsRequest_hasAccessControlAllowOrigin_returnsTrue() throws Exception {
+    @Test
+    void process_corsRequest_hasAccessControlAllowOrigin_returnsTrue() throws Exception {
         when(requestHeaders.getOrigin()).thenReturn("http://other-origin.com");
         when(request.getURI()).thenReturn(URI.create("http://localhost/path"));
         responseHeaders.set(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "https://existing-origin.com");
@@ -71,7 +78,8 @@ class PerfCorsProcessorTest {
         assertTrue(result);
     }
 
-    @Test void process_preFlightRequest_nullConfig_rejects() throws Exception {
+    @Test
+    void process_preFlightRequest_nullConfig_rejects() throws Exception {
         when(requestHeaders.getOrigin()).thenReturn("http://other-origin.com");
         when(request.getURI()).thenReturn(URI.create("http://localhost/path"));
         when(request.getMethod()).thenReturn(HttpMethod.OPTIONS);
@@ -83,7 +91,8 @@ class PerfCorsProcessorTest {
         verify(response).setStatusCode(HttpStatus.FORBIDDEN);
     }
 
-    @Test void process_actualCorsRequest_nullConfig_returnsTrue() throws Exception {
+    @Test
+    void process_actualCorsRequest_nullConfig_returnsTrue() throws Exception {
         when(requestHeaders.getOrigin()).thenReturn("http://other-origin.com");
         when(request.getURI()).thenReturn(URI.create("http://localhost/path"));
         when(request.getMethod()).thenReturn(HttpMethod.GET);
@@ -91,7 +100,8 @@ class PerfCorsProcessorTest {
         assertTrue(result);
     }
 
-    @Test void process_withValidConfig_returnsTrueAndSetsHeaders() throws Exception {
+    @Test
+    void process_withValidConfig_returnsTrueAndSetsHeaders() throws Exception {
         when(requestHeaders.getOrigin()).thenReturn("http://other-origin.com");
         when(request.getURI()).thenReturn(URI.create("http://localhost/path"));
         when(request.getMethod()).thenReturn(HttpMethod.GET);

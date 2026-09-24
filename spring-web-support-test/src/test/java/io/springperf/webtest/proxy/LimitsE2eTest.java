@@ -13,27 +13,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * P2 E2E 测试：基础设施边界条件。
  * <p>
- * 使用独立 Spring 上下文（随机端口），
- * 测试 max-content-length 超限拒绝等场景。
+ * 使用独立 Spring 上下文（随机端口）， 测试 max-content-length 超限拒绝等场景。
  */
-@SpringBootTest(
-        classes = ProxyE2eApp.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=",
-                "server.http.max-content-length=100"
-        })
+@SpringBootTest(classes = ProxyE2eApp.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+        "server.servlet.context-path=", "server.http.max-content-length=100" })
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class LimitsE2eTest {
 
     @LocalServerPort
     private int serverPort;
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .writeTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).writeTimeout(Duration.ofSeconds(10)).build();
 
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
@@ -52,25 +43,19 @@ public class LimitsE2eTest {
         for (int i = 0; i < 200; i++) {
             sb.append('x');
         }
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/proxy-api/save?id=test")
-                .post(RequestBody.create(JSON, sb.toString()))
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/proxy-api/save?id=test")
+                .post(RequestBody.create(JSON, sb.toString())).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            assertEquals(413, resp.code(),
-                    "Request exceeding max-content-length should return 413");
+            assertEquals(413, resp.code(), "Request exceeding max-content-length should return 413");
         }
     }
 
     @Test
     void postSmallBody_withinMaxContentLength_returns200() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/proxy-api/save?id=test")
-                .post(RequestBody.create(JSON, "\"small\""))
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/proxy-api/save?id=test")
+                .post(RequestBody.create(JSON, "\"small\"")).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            assertEquals(200, resp.code(),
-                    "Request within max-content-length should succeed");
+            assertEquals(200, resp.code(), "Request within max-content-length should succeed");
         }
     }
 }

@@ -11,30 +11,24 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code spring.web.resources.cache.cachecontrol.max-age} E2E：
- * Duration 风格配置（1h）映射为静态资源 Cache-Control 的 max-age=3600 秒。
+ * {@code spring.web.resources.cache.cachecontrol.max-age} E2E： Duration 风格配置（1h）映射为静态资源 Cache-Control 的 max-age=3600 秒。
  */
-@SpringBootTest(classes = ConfigAlignTestApp.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "spring.web.resources.add-mappings=true",
-                "spring.web.resources.cache.cachecontrol.max-age=1h"
-        })
+@SpringBootTest(classes = ConfigAlignTestApp.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+        "server.servlet.context-path=/", "spring.web.resources.add-mappings=true",
+        "spring.web.resources.cache.cachecontrol.max-age=1h" })
 class WebResourcesCacheControlE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
 
     @Test
     void cacheControlMaxAge_oneHour_reflectedAs3600Seconds() throws Exception {
-        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder()
-                .url("http://localhost:" + port + "/e2e-note.txt").build()).execute();
+        okhttp3.Response resp = CLIENT
+                .newCall(new okhttp3.Request.Builder().url("http://localhost:" + port + "/e2e-note.txt").build())
+                .execute();
         try {
             assertEquals(200, resp.code());
             String cacheControl = resp.header("Cache-Control");

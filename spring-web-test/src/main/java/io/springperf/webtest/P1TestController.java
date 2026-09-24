@@ -76,8 +76,7 @@ public class P1TestController {
     // ============ @RequestPart 多个文件（通过 /p1/multi-part） ============
 
     @PostMapping(value = "/multi-part", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public String multiPart(@RequestPart("file1") MultipartFile f1,
-                            @RequestPart("file2") MultipartFile f2) {
+    public String multiPart(@RequestPart("file1") MultipartFile f1, @RequestPart("file2") MultipartFile f2) {
         return f1.getOriginalFilename() + "-" + f2.getOriginalFilename();
     }
 

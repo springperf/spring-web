@@ -1,9 +1,11 @@
 package io.springperf.web.core.exception;
 
-import io.springperf.web.core.metrics.WebMetrics;
-import io.springperf.web.http.RequestContext;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,11 +13,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import io.springperf.web.core.metrics.WebMetrics;
+import io.springperf.web.http.RequestContext;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 class ExceptionRegistryTest {
@@ -61,8 +62,8 @@ class ExceptionRegistryTest {
 
         // 未匹配 @ExceptionHandler 时回退 500，携带原始异常供 server.error.* 策略使用；
         // message 取根因 message（对齐 Boot DefaultErrorAttributes#addErrorMessage）
-        verify(response).sendError(eq(HttpStatus.INTERNAL_SERVER_ERROR), eq("test error"),
-                eq(ex), anyBoolean(), anyBoolean(), anyBoolean());
+        verify(response).sendError(eq(HttpStatus.INTERNAL_SERVER_ERROR), eq("test error"), eq(ex), anyBoolean(),
+                anyBoolean(), anyBoolean());
     }
 
     @Test
@@ -116,4 +117,4 @@ class ExceptionRegistryTest {
         verify(metrics).recordException(RuntimeException.class.getName(), false);
     }
 
-    }
+}

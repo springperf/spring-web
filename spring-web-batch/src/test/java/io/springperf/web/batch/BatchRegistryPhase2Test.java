@@ -22,9 +22,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * 覆盖 {@link BatchRegistry#initComponentPhase2()} / {@link BatchRegistry#destroyComponent()}
- * / {@link BatchRegistry#setMetrics(BatchMetrics)}：真实 Spring 容器 + 真实 PathMappingContext，
- * 验证扫描 @BatchMapping → 安装队列 → 优雅关闭全流程。
+ * 覆盖 {@link BatchRegistry#initComponentPhase2()} / {@link BatchRegistry#destroyComponent()} /
+ * {@link BatchRegistry#setMetrics(BatchMetrics)}：真实 Spring 容器 + 真实 PathMappingContext， 验证扫描 @BatchMapping → 安装队列 →
+ * 优雅关闭全流程。
  */
 class BatchRegistryPhase2Test {
 
@@ -83,8 +83,7 @@ class BatchRegistryPhase2Test {
     }
 
     /**
-     * 开启虚拟线程（JDK 21+）时：single 路径 pin 到 EventLoop（其默认池是"每请求一个虚拟线程"的
-     * 不池化模型，而入队只需微秒级，走默认池反而多一次虚拟线程创建 + 切换）。
+     * 开启虚拟线程（JDK 21+）时：single 路径 pin 到 EventLoop（其默认池是"每请求一个虚拟线程"的 不池化模型，而入队只需微秒级，走默认池反而多一次虚拟线程创建 + 切换）。
      */
     @Test
     void install_virtualThreadsEnabled_defaultsToEventLoop() throws Exception {
@@ -113,8 +112,7 @@ class BatchRegistryPhase2Test {
     }
 
     /**
-     * 未开启虚拟线程（含属性开启但 JDK &lt; 21 回落）：不得覆盖全局默认线程模型，
-     * 让 single 路径遵循 {@code pool.default-execute-mode}（默认 default 业务池）。
+     * 未开启虚拟线程（含属性开启但 JDK &lt; 21 回落）：不得覆盖全局默认线程模型， 让 single 路径遵循 {@code pool.default-execute-mode}（默认 default 业务池）。
      */
     @Test
     void install_virtualThreadsDisabled_doesNotOverrideGlobalDefault() throws Exception {

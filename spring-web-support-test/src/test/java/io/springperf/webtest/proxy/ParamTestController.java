@@ -10,8 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * 实现 ParamTestApi 接口，方法上有路由注解，参数上无注解。
- * 包含非接口方法 responseEntityTest 用于测试 ResponseEntity 返回值。
+ * 实现 ParamTestApi 接口，方法上有路由注解，参数上无注解。 包含非接口方法 responseEntityTest 用于测试 ResponseEntity 返回值。
  * <p>
  * 配合 @EnableAspectJAutoProxy(proxyTargetClass = true) 验证 CGLIB 代理场景。
  */
@@ -21,10 +20,9 @@ public class ParamTestController implements ParamTestApi {
 
     @PostMapping("/mixed/{id}")
     @Override
-    public String mixedParams(String body, String id, String key, String header,
-                              String optional, String withDefault) {
-        return body + "|" + id + "|" + key + "|" + header + "|"
-                + (optional == null ? "null" : optional) + "|" + withDefault;
+    public String mixedParams(String body, String id, String key, String header, String optional, String withDefault) {
+        return body + "|" + id + "|" + key + "|" + header + "|" + (optional == null ? "null" : optional) + "|"
+                + withDefault;
     }
 
     @PostMapping("/empty-body")
@@ -53,8 +51,6 @@ public class ParamTestController implements ParamTestApi {
 
     @GetMapping("/entity")
     public ResponseEntity<String> responseEntityTest() {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .header("X-Custom-Resp", "header-value")
-                .body("entity-body");
+        return ResponseEntity.status(HttpStatus.CREATED).header("X-Custom-Resp", "header-value").body("entity-body");
     }
 }

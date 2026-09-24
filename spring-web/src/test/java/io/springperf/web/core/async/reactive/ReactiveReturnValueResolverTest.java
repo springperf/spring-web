@@ -1,5 +1,18 @@
 package io.springperf.web.core.async.reactive;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.lang.reflect.Proxy;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
 import io.springperf.web.annotation.ReactiveSupport;
 import io.springperf.web.core.async.stream.SseEmitter;
 import io.springperf.web.core.async.stream.StreamEmitter;
@@ -9,23 +22,10 @@ import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.http.RequestAttribute;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
-import java.lang.reflect.Proxy;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
- * 回归用例：{@code getReactiveConfig} 在 {@code reactiveConfig == null} 时
- * 误用仍为 null 的变量取 {@code streamEmitterType}，导致带 {@link ReactiveSupport}
- * 注解的 handler 首次请求必 NPE。修复后应返回正常 {@link ReactiveConfig}。
+ * 回归用例：{@code getReactiveConfig} 在 {@code reactiveConfig == null} 时 误用仍为 null 的变量取 {@code streamEmitterType}，导致带
+ * {@link ReactiveSupport} 注解的 handler 首次请求必 NPE。修复后应返回正常 {@link ReactiveConfig}。
  */
 class ReactiveReturnValueResolverTest {
 
@@ -52,10 +52,8 @@ class ReactiveReturnValueResolverTest {
     }
 
     private ReactiveSupport reactiveSupportAnnotation() {
-        return (ReactiveSupport) Proxy.newProxyInstance(
-                ReactiveSupport.class.getClassLoader(),
-                new Class<?>[]{ReactiveSupport.class},
-                (proxy, method, args) -> {
+        return (ReactiveSupport) Proxy.newProxyInstance(ReactiveSupport.class.getClassLoader(),
+                new Class<?>[] { ReactiveSupport.class }, (proxy, method, args) -> {
                     switch (method.getName()) {
                         case "streamEmitterType":
                             return SseEmitter.class;
@@ -78,10 +76,8 @@ class ReactiveReturnValueResolverTest {
         // PathMappingContext 继承 MappingHandlerMethod；mock 它返回 @ReactiveSupport 注解
         PathMappingContext ctx = mock(PathMappingContext.class);
         when(ctx.get(ReactiveReturnValueResolver.MAPPING_CACHE_KEY)).thenReturn(null);
-        when(ctx.getMethodAndClassAnnotation(ReactiveSupport.class))
-                .thenReturn(reactiveSupportAnnotation());
-        when(requestContext.getAttribute(any(RequestAttribute.class)))
-                .thenReturn(MappingResult.matched(ctx));
+        when(ctx.getMethodAndClassAnnotation(ReactiveSupport.class)).thenReturn(reactiveSupportAnnotation());
+        when(requestContext.getAttribute(any(RequestAttribute.class))).thenReturn(MappingResult.matched(ctx));
 
         ReactiveConfig config = resolver.getReactiveConfig(request);
         assertNotNull(config, "带 @ReactiveSupport 时不应返回 null");
@@ -102,7 +98,6 @@ class ReactiveReturnValueResolverTest {
     @Test
     void selectBestConstructor_unknownType_throwsInsteadOfIoobe() {
         // 自定义 streamEmitterType 无受支持构造器时，应给出明确错误而非越界
-        assertThrows(IllegalStateException.class,
-                () -> resolver.selectBestConstructor(UnsupportedEmitter.class));
+        assertThrows(IllegalStateException.class, () -> resolver.selectBestConstructor(UnsupportedEmitter.class));
     }
 }

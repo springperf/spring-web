@@ -11,9 +11,9 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * JSR-356（Servlet WebSocket 规范）端点示例：`@ServerEndpoint` 注解方式。
- *
- * <p>由 {@code spring-web-websocket} 模块的 JSR 桥接自动扫描注册，
- * 底层运行在本框架的 Netty WebSocket 管线上。</p>
+ * <p>
+ * 由 {@code spring-web-websocket} 模块的 JSR 桥接自动扫描注册， 底层运行在本框架的 Netty WebSocket 管线上。
+ * </p>
  */
 @Slf4j
 @ServerEndpoint("/ws/jsr/{roomId}")

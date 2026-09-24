@@ -1,26 +1,30 @@
 package io.springperf.web.core.arg.resolver;
 
+import java.lang.annotation.Annotation;
+
+import org.springframework.core.MethodParameter;
+import org.springframework.lang.Nullable;
+
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.arg.StaticArgumentResolver;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
 import io.springperf.web.util.MetaUtils;
-import org.springframework.core.MethodParameter;
-import org.springframework.lang.Nullable;
 
-import java.lang.annotation.Annotation;
-
-public abstract class AbstractNamedValueNullableResolver extends AbstractNamedValueResolver implements StaticArgumentResolver {
+public abstract class AbstractNamedValueNullableResolver extends AbstractNamedValueResolver
+        implements StaticArgumentResolver {
 
     protected final boolean required;
     protected final String defaultValue;
 
-    public AbstractNamedValueNullableResolver(WebContext webContext, MappingHandlerMethod mappingContext, MethodParameter parameter, Class<? extends Annotation>... supportClass) {
+    public AbstractNamedValueNullableResolver(WebContext webContext, MappingHandlerMethod mappingContext,
+            MethodParameter parameter, Class<? extends Annotation>... supportClass) {
         super(webContext, mappingContext, parameter, supportClass);
         this.required = MetaUtils.getRequired(parameter, supportClass);
         this.defaultValue = MetaUtils.getDefaultValue(parameter, supportClass);
     }
 
-    public AbstractNamedValueNullableResolver(MappingHandlerMethod mappingContext, MethodParameter parameter, WebContext webContext, String name, boolean required, String defaultValue) {
+    public AbstractNamedValueNullableResolver(MappingHandlerMethod mappingContext, MethodParameter parameter,
+            WebContext webContext, String name, boolean required, String defaultValue) {
         super(mappingContext, parameter, webContext, name);
         this.required = required;
         this.defaultValue = defaultValue;

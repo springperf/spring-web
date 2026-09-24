@@ -1,12 +1,12 @@
 package io.springperf.web.util;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class Object2LongOpenHashMapTest {
 
@@ -104,7 +104,7 @@ class Object2LongOpenHashMapTest {
     void hashCollision_linearProbing_correct() {
         // 构造大量 key，即便哈希冲突也通过线性探测正确存取
         Object2LongOpenHashMap map = new Object2LongOpenHashMap(8);
-        String[] keys = {"Aa", "BB", "C1", "D2", "E3", "F4", "G5", "H6", "I7", "J8"};
+        String[] keys = { "Aa", "BB", "C1", "D2", "E3", "F4", "G5", "H6", "I7", "J8" };
         for (int i = 0; i < keys.length; i++) {
             map.put(keys[i], i);
         }

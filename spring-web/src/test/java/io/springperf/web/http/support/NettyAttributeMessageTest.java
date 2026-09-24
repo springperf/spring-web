@@ -1,17 +1,18 @@
 package io.springperf.web.http.support;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import io.netty.handler.codec.http.multipart.Attribute;
-import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpHeaders;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
+
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.handler.codec.http.multipart.Attribute;
 
 class NettyAttributeMessageTest {
 
@@ -69,8 +70,7 @@ class NettyAttributeMessageTest {
         NettyAttributeMessage message = new NettyAttributeMessage(attribute);
 
         HttpHeaders headers = message.getHeaders();
-        assertEquals("form-data; name=\"field1\"",
-                headers.getFirst(HttpHeaders.CONTENT_DISPOSITION));
+        assertEquals("form-data; name=\"field1\"", headers.getFirst(HttpHeaders.CONTENT_DISPOSITION));
         assertEquals(3L, headers.getContentLength());
     }
 
@@ -82,8 +82,7 @@ class NettyAttributeMessageTest {
         NettyAttributeMessage message = new NettyAttributeMessage(attribute);
 
         HttpHeaders headers = message.getHeaders();
-        assertEquals("form-data; name=\"field1\"",
-                headers.getFirst(HttpHeaders.CONTENT_DISPOSITION));
+        assertEquals("form-data; name=\"field1\"", headers.getFirst(HttpHeaders.CONTENT_DISPOSITION));
         assertNull(headers.get(HttpHeaders.CONTENT_LENGTH));
     }
 

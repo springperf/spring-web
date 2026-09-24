@@ -8,7 +8,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * E2E 条件请求与 HEAD 语义测试。
- * <p>覆盖静态资源的 ETag / If-None-Match / If-Modified-Since → 304，以及 HEAD 无 body。</p>
+ * <p>
+ * 覆盖静态资源的 ETag / If-None-Match / If-Modified-Since → 304，以及 HEAD 无 body。
+ * </p>
  */
 public class ConditionalRequestE2ETest extends BaseE2ETest {
 
@@ -39,11 +41,7 @@ public class ConditionalRequestE2ETest extends BaseE2ETest {
             assertNotNull(etag);
         }
         // 带 If-None-Match 请求
-        Request req = new Request.Builder()
-                .url(staticUrl() + "/test.txt")
-                .header("If-None-Match", etag)
-                .get()
-                .build();
+        Request req = new Request.Builder().url(staticUrl() + "/test.txt").header("If-None-Match", etag).get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(304, resp.code(), "ETag 匹配应返回 304");
         }
@@ -51,11 +49,7 @@ public class ConditionalRequestE2ETest extends BaseE2ETest {
 
     @Test
     void ifNoneMatch_star_returns304() throws Exception {
-        Request req = new Request.Builder()
-                .url(staticUrl() + "/test.txt")
-                .header("If-None-Match", "*")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(staticUrl() + "/test.txt").header("If-None-Match", "*").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(304, resp.code(), "If-None-Match: * 应返回 304");
         }
@@ -63,11 +57,8 @@ public class ConditionalRequestE2ETest extends BaseE2ETest {
 
     @Test
     void ifNoneMatch_mismatchedEtag_returns200() throws Exception {
-        Request req = new Request.Builder()
-                .url(staticUrl() + "/test.txt")
-                .header("If-None-Match", "\"non-existent-etag\"")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(staticUrl() + "/test.txt")
+                .header("If-None-Match", "\"non-existent-etag\"").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code(), "ETag 不匹配应返回 200");
             assertTrue(resp.body().string().contains("Hello"));
@@ -77,13 +68,9 @@ public class ConditionalRequestE2ETest extends BaseE2ETest {
     @Test
     void ifModifiedSince_futureDate_returns304() throws Exception {
         // 未来时间戳必定 ≥ Last-Modified → 304
-        String future = java.time.ZonedDateTime.now(java.time.ZoneOffset.UTC)
-                .plusDays(1)
+        String future = java.time.ZonedDateTime.now(java.time.ZoneOffset.UTC).plusDays(1)
                 .format(java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME);
-        Request req = new Request.Builder()
-                .url(staticUrl() + "/test.txt")
-                .header("If-Modified-Since", future)
-                .get()
+        Request req = new Request.Builder().url(staticUrl() + "/test.txt").header("If-Modified-Since", future).get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(304, resp.code(), "If-Modified-Since 晚于 Last-Modified 应返回 304");
@@ -93,11 +80,8 @@ public class ConditionalRequestE2ETest extends BaseE2ETest {
     @Test
     void ifModifiedSince_epoch_returns200() throws Exception {
         // 1970 起点必定早于 Last-Modified → 200 + 完整 body
-        Request req = new Request.Builder()
-                .url(staticUrl() + "/test.txt")
-                .header("If-Modified-Since", "Thu, 01 Jan 1970 00:00:00 GMT")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(staticUrl() + "/test.txt")
+                .header("If-Modified-Since", "Thu, 01 Jan 1970 00:00:00 GMT").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code(), "If-Modified-Since 早于 Last-Modified 应返回 200");
             assertTrue(resp.body().string().contains("Hello"));
@@ -145,11 +129,7 @@ public class ConditionalRequestE2ETest extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(get).execute()) {
             etag = resp.header("ETag");
         }
-        Request req = new Request.Builder()
-                .url(staticUrl() + "/test.txt")
-                .header("If-None-Match", etag)
-                .head()
-                .build();
+        Request req = new Request.Builder().url(staticUrl() + "/test.txt").header("If-None-Match", etag).head().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(304, resp.code(), "HEAD + ETag 匹配应返回 304");
         }

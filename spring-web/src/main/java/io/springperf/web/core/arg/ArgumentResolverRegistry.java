@@ -1,5 +1,16 @@
 package io.springperf.web.core.arg;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+import org.springframework.beans.BeanUtils;
+import org.springframework.core.MethodParameter;
+import org.springframework.util.ObjectUtils;
+import org.springframework.validation.*;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebComponentContainer;
 import io.springperf.web.context.WebContext;
@@ -13,16 +24,6 @@ import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.BeanUtils;
-import org.springframework.core.MethodParameter;
-import org.springframework.util.ObjectUtils;
-import org.springframework.validation.*;
-import org.springframework.web.bind.MethodArgumentNotValidException;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Manages a set of argument resolvers, similar to Spring's HandlerMethodArgumentResolver.
@@ -30,7 +31,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @Slf4j
 public class ArgumentResolverRegistry extends WebComponentContainer {
 
-    public static final MappingCacheKey<MethodArgContext[]> MAPPING_CACHE_KEY = MappingCacheKey.createMethodCacheKey(MethodArgContext[].class);
+    public static final MappingCacheKey<MethodArgContext[]> MAPPING_CACHE_KEY = MappingCacheKey
+            .createMethodCacheKey(MethodArgContext[].class);
 
     protected final List<StaticArgumentResolverProvider> staticArgumentResolverProviders = new CopyOnWriteArrayList<>();
 
@@ -76,11 +78,12 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
     }
 
     /**
-     * Phase 3 validation: checks that every controller method parameter can be resolved
-     * by at least one registered provider or the fallback resolver.
-     * <p>This only checks {@link StaticArgumentResolverProvider#supports} — it does NOT
-     * create or cache any resolver, keeping memory footprint zero for endpoints that
-     * are never called.</p>
+     * Phase 3 validation: checks that every controller method parameter can be resolved by at least one registered
+     * provider or the fallback resolver.
+     * <p>
+     * This only checks {@link StaticArgumentResolverProvider#supports} — it does NOT create or cache any resolver,
+     * keeping memory footprint zero for endpoints that are never called.
+     * </p>
      */
     protected void validateAllParametersResolvable() {
         MappingRegistry mappingRegistry = webContext.getWebComponent(MappingRegistry.class);
@@ -96,9 +99,9 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
             MethodParameter[] methodParameters = mapping.createMethodParameters();
             for (MethodParameter parameter : methodParameters) {
                 if (!isParameterResolvable(parameter, mapping)) {
-                    unresolvable.add(parameter.getParameterName()
-                            + " (" + parameter.getNestedParameterType().getName() + ")"
-                            + " in " + mapping.getUserClass().getSimpleName() + "#" + mapping.getMethod().getName());
+                    unresolvable.add(parameter.getParameterName() + " (" + parameter.getNestedParameterType().getName()
+                            + ")" + " in " + mapping.getUserClass().getSimpleName() + "#"
+                            + mapping.getMethod().getName());
                     continue;
                 }
                 validateModelAttributeConstructor(parameter, mapping, unresolvable);
@@ -129,24 +132,24 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
     }
 
     /**
-     * D3 fail-fast：无默认构造器的 @ModelAttribute 在首个请求才 500（resolver lazy 创建）。
-     * 启动校验阶段预创建 resolver，配置错误立即暴露为启动失败。
+     * D3 fail-fast：无默认构造器的 @ModelAttribute 在首个请求才 500（resolver lazy 创建）。 启动校验阶段预创建 resolver，配置错误立即暴露为启动失败。
      */
-    protected void validateModelAttributeConstructor(MethodParameter parameter, MappingHandlerMethod mapping, List<String> unresolvable) {
+    protected void validateModelAttributeConstructor(MethodParameter parameter, MappingHandlerMethod mapping,
+            List<String> unresolvable) {
         if (modelAttributeResolverProvider == null || !modelAttributeResolverProvider.supports(parameter, mapping)) {
             return;
         }
         try {
             modelAttributeResolverProvider.getResolver(parameter, mapping, webContext);
         } catch (IllegalStateException e) {
-            unresolvable.add(parameter.getParameterName()
-                    + " (" + parameter.getNestedParameterType().getName() + ")"
-                    + " in " + mapping.getUserClass().getSimpleName() + "#" + mapping.getMethod().getName()
-                    + ": " + e.getMessage());
+            unresolvable.add(parameter.getParameterName() + " (" + parameter.getNestedParameterType().getName() + ")"
+                    + " in " + mapping.getUserClass().getSimpleName() + "#" + mapping.getMethod().getName() + ": "
+                    + e.getMessage());
         }
     }
 
-    public Object[] resolveArguments(MappingHandlerMethod mappingContext, WebServerHttpRequest request, WebServerHttpResponse response) throws Exception {
+    public Object[] resolveArguments(MappingHandlerMethod mappingContext, WebServerHttpRequest request,
+            WebServerHttpResponse response) throws Exception {
         MethodArgContext[] methodArgContexts = getMethodArgContexts(mappingContext);
         Object[] args = new Object[methodArgContexts.length];
         for (int i = 0; i < methodArgContexts.length; i++) {
@@ -160,8 +163,7 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
         }
         for (int i = 0; i < methodArgContexts.length; i++) {
             if (methodArgContexts[i].defaultArgumentResolver != null) {
-                methodArgContexts[i].defaultArgumentResolver.postProcess(
-                        args, methodArgContexts, i, request, response);
+                methodArgContexts[i].defaultArgumentResolver.postProcess(args, methodArgContexts, i, request, response);
             }
         }
         return args;
@@ -171,7 +173,8 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
         MethodArgContext[] methodArgContexts = mappingContext.get(MAPPING_CACHE_KEY);
         if (methodArgContexts == null) {
             MethodParameter[] methodParameters = mappingContext.createMethodParameters();
-            methodArgContexts = Arrays.stream(methodParameters).map(MethodArgContext::new).toArray(MethodArgContext[]::new);
+            methodArgContexts = Arrays.stream(methodParameters).map(MethodArgContext::new)
+                    .toArray(MethodArgContext[]::new);
             for (MethodArgContext methodArgContext : methodArgContexts) {
                 initStaticArgResolverSupport(mappingContext, methodArgContext);
             }
@@ -180,7 +183,8 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
         return methodArgContexts;
     }
 
-    protected void validateIfApplicable(Object target, MethodArgContext methodArgContext, WebServerHttpRequest request, MappingHandlerMethod mappingContext) throws MethodArgumentNotValidException {
+    protected void validateIfApplicable(Object target, MethodArgContext methodArgContext, WebServerHttpRequest request,
+            MappingHandlerMethod mappingContext) throws MethodArgumentNotValidException {
         BindingResult bindingResult = null;
         if (methodArgContext.isHasBindingResult()) {
             bindingResult = createBindingResult(target, methodArgContext, mappingContext);
@@ -213,8 +217,10 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
         }
     }
 
-    protected BeanPropertyBindingResult createBindingResult(Object target, MethodArgContext methodArgContext, MappingHandlerMethod mappingContext) {
-        BeanPropertyBindingResult bindingResult = new BeanPropertyBindingResult(target, methodArgContext.getParamName());
+    protected BeanPropertyBindingResult createBindingResult(Object target, MethodArgContext methodArgContext,
+            MappingHandlerMethod mappingContext) {
+        BeanPropertyBindingResult bindingResult = new BeanPropertyBindingResult(target,
+                methodArgContext.getParamName());
         bindingResult.initConversion(webDataBinderRegistry.getConversionService(mappingContext));
         MessageCodesResolver messageCodesResolver = webDataBinderRegistry.getMessageCodesResolver();
         if (messageCodesResolver != null) {
@@ -238,14 +244,18 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
     /**
      * 初始化静态参数解析器
      *
-     * @param methodMappingContext the handler method metadata
-     * @param methodArgContext     the method argument context
+     * @param methodMappingContext
+     *            the handler method metadata
+     * @param methodArgContext
+     *            the method argument context
      */
-    protected void initStaticArgResolverSupport(MappingHandlerMethod methodMappingContext, MethodArgContext methodArgContext) {
+    protected void initStaticArgResolverSupport(MappingHandlerMethod methodMappingContext,
+            MethodArgContext methodArgContext) {
         MethodParameter parameter = methodArgContext.getMethodParameter();
         for (StaticArgumentResolverProvider provider : staticArgumentResolverProviders) {
             if (provider.supports(parameter, methodMappingContext)) {
-                methodArgContext.defaultArgumentResolver = provider.getResolver(parameter, methodMappingContext, webContext);
+                methodArgContext.defaultArgumentResolver = provider.getResolver(parameter, methodMappingContext,
+                        webContext);
                 methodArgContext.isStaticArgResolved = true;
                 break;
             }
@@ -254,9 +264,11 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
             return;
         }
         if (BeanUtils.isSimpleProperty(parameter.getNestedParameterType())) {
-            methodArgContext.defaultArgumentResolver = requestParamResolverProvider.getResolver(parameter, methodMappingContext, webContext);
+            methodArgContext.defaultArgumentResolver = requestParamResolverProvider.getResolver(parameter,
+                    methodMappingContext, webContext);
         } else {
-            methodArgContext.defaultArgumentResolver = modelAttributeResolverProvider.getResolver(parameter, methodMappingContext, webContext);
+            methodArgContext.defaultArgumentResolver = modelAttributeResolverProvider.getResolver(parameter,
+                    methodMappingContext, webContext);
         }
         methodArgContext.isStaticArgResolved = false;
     }

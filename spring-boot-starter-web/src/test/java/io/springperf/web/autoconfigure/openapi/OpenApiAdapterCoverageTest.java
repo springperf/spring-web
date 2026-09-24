@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * 补充 OpenApiAdapter 覆盖率：HTTP 方法/标签兜底、@RequestHeader/@ModelAttribute/
+ *
  * @RequestBody/简单类型参数、void 响应与 PUT/DELETE/PATCH/HEAD/OPTIONS 操作映射。
  */
 class OpenApiAdapterCoverageTest {
@@ -36,7 +37,7 @@ class OpenApiAdapterCoverageTest {
     static class ParamController {
         @SuppressWarnings("unused")
         public String headerParam(@RequestHeader(value = "X-Token", required = false) String token,
-                                  @RequestHeader("X-Id") String id) {
+                @RequestHeader("X-Id") String id) {
             return "ok";
         }
 
@@ -69,7 +70,7 @@ class OpenApiAdapterCoverageTest {
         HandlerMethod hm = new HandlerMethod(new ParamController(),
                 ParamController.class.getMethod(methodName, paramTypes));
         List<Matcher> matchers = new ArrayList<>();
-        matchers.add(new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET}));
+        matchers.add(new HttpMethodMatcher(new HttpMethod[] { HttpMethod.GET }));
         return new PathMappingContext(hm, matchers, "/api/{id:\\d+}/x");
     }
 
@@ -85,8 +86,7 @@ class OpenApiAdapterCoverageTest {
 
     @Test
     void extractHttpMethods_withoutMethodMatcher_defaultsToGet() throws Exception {
-        HandlerMethod hm = new HandlerMethod(new ParamController(),
-                ParamController.class.getMethod("noReturn"));
+        HandlerMethod hm = new HandlerMethod(new ParamController(), ParamController.class.getMethod("noReturn"));
         PathMappingContext ctx = new PathMappingContext(hm, Collections.emptyList(), "/x");
         OpenApiAdapter adapter = new OpenApiAdapter(webContext(ctx));
         OpenAPI openApi = new OpenAPI();
@@ -96,33 +96,31 @@ class OpenApiAdapterCoverageTest {
 
     @Test
     void customize_customInvoker_noNpe() throws Exception {
-        PathMappingContext ctx = new PathMappingContext(
-                new io.springperf.web.core.invoker.CustomInvoker() {
-                    @Override
-                    public Object invoke(Object[] args) {
-                        return null;
-                    }
+        PathMappingContext ctx = new PathMappingContext(new io.springperf.web.core.invoker.CustomInvoker() {
+            @Override
+            public Object invoke(Object[] args) {
+                return null;
+            }
 
-                    @Override
-                    public java.lang.reflect.Method getHandleMethod() {
-                        try {
-                            return ParamController.class.getMethod("noReturn");
-                        } catch (NoSuchMethodException e) {
-                            throw new IllegalStateException(e);
-                        }
-                    }
+            @Override
+            public java.lang.reflect.Method getHandleMethod() {
+                try {
+                    return ParamController.class.getMethod("noReturn");
+                } catch (NoSuchMethodException e) {
+                    throw new IllegalStateException(e);
+                }
+            }
 
-                    @Override
-                    public List<Matcher> getMatchers() {
-                        return Collections.singletonList(
-                                new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET}));
-                    }
+            @Override
+            public List<Matcher> getMatchers() {
+                return Collections.singletonList(new HttpMethodMatcher(new HttpMethod[] { HttpMethod.GET }));
+            }
 
-                    @Override
-                    public String getType() {
-                        return "Test";
-                    }
-                }, "/invoker");
+            @Override
+            public String getType() {
+                return "Test";
+            }
+        }, "/invoker");
         OpenApiAdapter adapter = new OpenApiAdapter(webContext(ctx));
         OpenAPI openApi = new OpenAPI();
         assertDoesNotThrow(() -> adapter.customize(openApi));
@@ -139,8 +137,10 @@ class OpenApiAdapterCoverageTest {
         Operation op = openApi.getPaths().get("/api/{id}/x").getGet();
         boolean hasToken = false, hasId = false;
         for (Parameter p : op.getParameters()) {
-            if ("X-Token".equals(p.getName()) && "header".equals(p.getIn())) hasToken = true;
-            if ("X-Id".equals(p.getName()) && "header".equals(p.getIn())) hasId = true;
+            if ("X-Token".equals(p.getName()) && "header".equals(p.getIn()))
+                hasToken = true;
+            if ("X-Id".equals(p.getName()) && "header".equals(p.getIn()))
+                hasId = true;
         }
         assertTrue(hasToken, "@RequestHeader(required=false) 应为 header 参数");
         assertTrue(hasId, "@RequestHeader 无显式 name 时应取参数名");
@@ -154,8 +154,8 @@ class OpenApiAdapterCoverageTest {
         adapter.customize(openApi);
 
         Operation op = openApi.getPaths().get("/api/{id}/x").getGet();
-        assertTrue(op.getParameters().stream()
-                .anyMatch(p -> "filter".equals(p.getName()) && "query".equals(p.getIn())));
+        assertTrue(
+                op.getParameters().stream().anyMatch(p -> "filter".equals(p.getName()) && "query".equals(p.getIn())));
     }
 
     @Test
@@ -167,8 +167,7 @@ class OpenApiAdapterCoverageTest {
 
         Operation op = openApi.getPaths().get("/api/{id}/x").getGet();
         assertNotNull(op.getRequestBody());
-        assertEquals("application/json",
-                op.getRequestBody().getContent().keySet().iterator().next());
+        assertEquals("application/json", op.getRequestBody().getContent().keySet().iterator().next());
     }
 
     @Test
@@ -181,8 +180,10 @@ class OpenApiAdapterCoverageTest {
         Operation op = openApi.getPaths().get("/api/{id}/x").getGet();
         boolean hasName = false, hasAge = false;
         for (Parameter p : op.getParameters()) {
-            if ("name".equals(p.getName())) hasName = true;
-            if ("age".equals(p.getName()) && "integer".equals(p.getSchema().getType())) hasAge = true;
+            if ("name".equals(p.getName()))
+                hasName = true;
+            if ("age".equals(p.getName()) && "integer".equals(p.getSchema().getType()))
+                hasAge = true;
         }
         assertTrue(hasName);
         assertTrue(hasAge);
@@ -202,12 +203,10 @@ class OpenApiAdapterCoverageTest {
 
     @Test
     void customize_otherHttpMethods_mapToPathItem() throws Exception {
-        HandlerMethod hm = new HandlerMethod(new ParamController(),
-                ParamController.class.getMethod("noReturn"));
+        HandlerMethod hm = new HandlerMethod(new ParamController(), ParamController.class.getMethod("noReturn"));
         List<Matcher> matchers = new ArrayList<>();
-        matchers.add(new HttpMethodMatcher(new HttpMethod[]{
-                HttpMethod.PUT, HttpMethod.DELETE, HttpMethod.PATCH,
-                HttpMethod.HEAD, HttpMethod.OPTIONS, HttpMethod.POST}));
+        matchers.add(new HttpMethodMatcher(new HttpMethod[] { HttpMethod.PUT, HttpMethod.DELETE, HttpMethod.PATCH,
+                HttpMethod.HEAD, HttpMethod.OPTIONS, HttpMethod.POST }));
         PathMappingContext ctx = new PathMappingContext(hm, matchers, "/multi");
         OpenApiAdapter adapter = new OpenApiAdapter(webContext(ctx));
         OpenAPI openApi = new OpenAPI();

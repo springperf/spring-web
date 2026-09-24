@@ -1,17 +1,18 @@
 package io.springperf.web.core.async.reactive;
 
-import io.springperf.web.core.async.PerfAsyncWebRequest;
-import io.springperf.web.core.async.stream.StreamEmitter;
-import io.springperf.web.core.async.stream.StreamSender;
-import lombok.extern.slf4j.Slf4j;
+import java.io.IOException;
+import java.util.function.Consumer;
+
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.springframework.core.ReactiveAdapter;
 import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 
-import java.io.IOException;
-import java.util.function.Consumer;
+import io.springperf.web.core.async.PerfAsyncWebRequest;
+import io.springperf.web.core.async.stream.StreamEmitter;
+import io.springperf.web.core.async.stream.StreamSender;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class PublisherToStreamEmitterAdapter implements Subscriber<Object> {
@@ -28,9 +29,8 @@ public class PublisherToStreamEmitterAdapter implements Subscriber<Object> {
 
     private volatile boolean terminated = false;
 
-
     public PublisherToStreamEmitterAdapter(StreamEmitter emitter, StreamSender sender, ReactiveConfig config,
-                                           PerfAsyncWebRequest asyncWebRequest) {
+            PerfAsyncWebRequest asyncWebRequest) {
         this.emitter = emitter;
         this.sender = sender;
         this.config = config;
@@ -65,8 +65,7 @@ public class PublisherToStreamEmitterAdapter implements Subscriber<Object> {
             asyncWebRequest.addWriteCallbackHandler(writeCallback);
             // 断连即取消上游：写入回调依赖「下一次投递失败」，源若断连后不再投递则永不取消
             // （每个断连客户端留下一个仍在运行的源）。断连钩子让取消不再依赖后续投递。
-            asyncWebRequest.addConnectionCloseHandler(
-                    () -> tryCancel(new IOException("client disconnected")));
+            asyncWebRequest.addConnectionCloseHandler(() -> tryCancel(new IOException("client disconnected")));
         }
         subscription.request(config.getHighWaterMark());
     }

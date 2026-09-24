@@ -13,18 +13,9 @@ class BatchRequestMetaDataTest {
     void constructorAndAccessors() throws Exception {
         Constructor<?> ctor = String.class.getDeclaredConstructor(String.class);
 
-        BatchRequestMetaData meta = new BatchRequestMetaData(
-                Object.class.getDeclaredMethod("hashCode"),
-                String.class,
-                null,
-                "test-queue",
-                1024,
-                BatchMapping.WaitStrategy.BLOCKING,
-                BatchMapping.Backpressure.BLOCK,
-                ctor,
-                64,
-                4
-        );
+        BatchRequestMetaData meta = new BatchRequestMetaData(Object.class.getDeclaredMethod("hashCode"), String.class,
+                null, "test-queue", 1024, BatchMapping.WaitStrategy.BLOCKING, BatchMapping.Backpressure.BLOCK, ctor, 64,
+                4);
 
         assertThat(meta.batchMethod()).isEqualTo(Object.class.getDeclaredMethod("hashCode"));
         assertThat(meta.beanType()).isEqualTo(String.class);

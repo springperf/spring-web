@@ -61,17 +61,17 @@ class SpringHandlerMethodArgumentResolverProviderTest {
         io.springperf.web.http.RequestContext requestContext = mock(io.springperf.web.http.RequestContext.class);
         jakarta.servlet.http.HttpServletRequest servletRequest = mock(jakarta.servlet.http.HttpServletRequest.class);
         jakarta.servlet.http.HttpServletResponse servletResponse = mock(jakarta.servlet.http.HttpServletResponse.class);
-        io.springperf.web.support.servlet.context.ServletAdapterContext adapter =
-                new io.springperf.web.support.servlet.context.ServletAdapterContext(
-                        mock(io.springperf.web.support.servlet.PerfHttpServletRequest.class),
-                        mock(io.springperf.web.support.servlet.PerfHttpServletResponse.class), null);
+        io.springperf.web.support.servlet.context.ServletAdapterContext adapter = new io.springperf.web.support.servlet.context.ServletAdapterContext(
+                mock(io.springperf.web.support.servlet.PerfHttpServletRequest.class),
+                mock(io.springperf.web.support.servlet.PerfHttpServletResponse.class), null);
         adapter.setRequest(servletRequest);
         adapter.setResponse(servletResponse);
         when(requestContext.getAttribute(io.springperf.web.support.servlet.ServletAttribute.getAttributeKey()))
                 .thenReturn(adapter);
 
         io.springperf.web.http.WebServerHttpRequest request = mock(io.springperf.web.http.WebServerHttpRequest.class);
-        io.springperf.web.http.WebServerHttpResponse response = mock(io.springperf.web.http.WebServerHttpResponse.class);
+        io.springperf.web.http.WebServerHttpResponse response = mock(
+                io.springperf.web.http.WebServerHttpResponse.class);
         when(request.getRequestContext()).thenReturn(requestContext);
         when(delegate.resolveArgument(eq(methodParameter), any(), any(), any())).thenReturn("resolved-value");
 
@@ -90,8 +90,8 @@ class SpringHandlerMethodArgumentResolverProviderTest {
     @Test
     void getOrder_usesResolverOrder_whenResolverImplementsOrdered() {
         HandlerMethodArgumentResolver orderedResolver = new OrderedHandlerMethodArgumentResolver(50);
-        SpringHandlerMethodArgumentResolverProvider orderedProvider =
-                new SpringHandlerMethodArgumentResolverProvider(orderedResolver);
+        SpringHandlerMethodArgumentResolverProvider orderedProvider = new SpringHandlerMethodArgumentResolverProvider(
+                orderedResolver);
         assertEquals(50, orderedProvider.getOrder());
     }
 
@@ -114,9 +114,9 @@ class SpringHandlerMethodArgumentResolverProviderTest {
 
         @Override
         public Object resolveArgument(MethodParameter parameter,
-                                       org.springframework.web.method.support.ModelAndViewContainer mavContainer,
-                                       org.springframework.web.context.request.NativeWebRequest webRequest,
-                                       org.springframework.web.bind.support.WebDataBinderFactory binderFactory) {
+                org.springframework.web.method.support.ModelAndViewContainer mavContainer,
+                org.springframework.web.context.request.NativeWebRequest webRequest,
+                org.springframework.web.bind.support.WebDataBinderFactory binderFactory) {
             return null;
         }
     }

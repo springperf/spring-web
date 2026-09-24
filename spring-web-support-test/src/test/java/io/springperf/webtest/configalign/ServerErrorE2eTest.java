@@ -17,24 +17,17 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code server.error.*} E2E：include-message=always 暴露 sendError/异常 message、
- * include-stacktrace=on-param 由 ?trace 参数控制栈暴露、whitelabel.enabled=false 关闭 HTML 错误页。
+ * {@code server.error.*} E2E：include-message=always 暴露 sendError/异常 message、 include-stacktrace=on-param 由 ?trace
+ * 参数控制栈暴露、whitelabel.enabled=false 关闭 HTML 错误页。
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class,
-                ServerErrorE2eTest.ErrConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "server.error.include-message=always",
-                "server.error.include-stacktrace=on-param",
-                "server.error.whitelabel.enabled=false"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        ServerErrorE2eTest.ErrConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "server.error.include-message=always",
+                "server.error.include-stacktrace=on-param", "server.error.whitelabel.enabled=false" })
 class ServerErrorE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
@@ -45,8 +38,7 @@ class ServerErrorE2eTest {
     }
 
     private String body(String path) throws Exception {
-        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder()
-                .url(url(path)).build()).execute();
+        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder().url(url(path)).build()).execute();
         try {
             return resp.code() + "|" + resp.body().string();
         } finally {
@@ -58,8 +50,7 @@ class ServerErrorE2eTest {
     void sendMessage_included_whenAlways() throws Exception {
         String body = body("/e2e-err/send403");
         assertTrue(body.startsWith("403|"), "应返回 403，实际 " + body);
-        assertTrue(body.contains("custom-msg-e2e"),
-                "include-message=always 时 sendError 的 message 应外露，实际 " + body);
+        assertTrue(body.contains("custom-msg-e2e"), "include-message=always 时 sendError 的 message 应外露，实际 " + body);
     }
 
     @Test
@@ -67,22 +58,19 @@ class ServerErrorE2eTest {
         String body = body("/e2e-err/boom");
         assertTrue(body.startsWith("500|"), "应返回 500，实际 " + body);
         // 兜底渲染的 message 字段受 include-message 策略控制（always 时暴露，never 时隐藏）
-        assertTrue(body.contains("\"message\""),
-                "include-message=always 时错误体应含 message 字段，实际 " + body);
+        assertTrue(body.contains("\"message\""), "include-message=always 时错误体应含 message 字段，实际 " + body);
     }
 
     @Test
     void stacktrace_onParam_traceTrue_shows() throws Exception {
         String body = body("/e2e-err/boom?trace=true");
-        assertTrue(body.contains("E2eBoomException"),
-                "include-stacktrace=on-param 且 ?trace=true 应暴露异常栈，实际 " + body);
+        assertTrue(body.contains("E2eBoomException"), "include-stacktrace=on-param 且 ?trace=true 应暴露异常栈，实际 " + body);
     }
 
     @Test
     void stacktrace_onParam_absent_hidden() throws Exception {
         String body = body("/e2e-err/boom");
-        assertFalse(body.contains("at io.springperf"),
-                "未带 ?trace=true 时不应暴露栈帧，实际 " + body);
+        assertFalse(body.contains("at io.springperf"), "未带 ?trace=true 时不应暴露栈帧，实际 " + body);
     }
 
     @Test

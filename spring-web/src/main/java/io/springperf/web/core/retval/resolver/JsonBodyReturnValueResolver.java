@@ -1,5 +1,9 @@
 package io.springperf.web.core.retval.resolver;
 
+import org.springframework.core.MethodParameter;
+import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.web.bind.annotation.ResponseBody;
+
 import io.springperf.web.context.BaseWebComponent;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.codec.HttpBodyCodecRegistry;
@@ -8,9 +12,6 @@ import io.springperf.web.core.retval.ReturnValueResolver;
 import io.springperf.web.core.retval.ReturnValueResolverRegistry;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
-import org.springframework.core.MethodParameter;
-import org.springframework.core.annotation.AnnotatedElementUtils;
-import org.springframework.web.bind.annotation.ResponseBody;
 
 public class JsonBodyReturnValueResolver extends BaseWebComponent implements ReturnValueResolver {
 
@@ -26,8 +27,8 @@ public class JsonBodyReturnValueResolver extends BaseWebComponent implements Ret
 
     @Override
     public boolean supportsReturnType(MethodParameter returnType, MappingHandlerMethod mappingContext) {
-        return (AnnotatedElementUtils.hasAnnotation(returnType.getContainingClass(), ResponseBody.class) ||
-                returnType.hasMethodAnnotation(ResponseBody.class));
+        return (AnnotatedElementUtils.hasAnnotation(returnType.getContainingClass(), ResponseBody.class)
+                || returnType.hasMethodAnnotation(ResponseBody.class));
     }
 
     @Override
@@ -37,7 +38,8 @@ public class JsonBodyReturnValueResolver extends BaseWebComponent implements Ret
     }
 
     @Override
-    public void resolveReturnValue(Object returnValue, MethodParameter returnType, WebServerHttpRequest req, WebServerHttpResponse resp) throws Exception {
+    public void resolveReturnValue(Object returnValue, MethodParameter returnType, WebServerHttpRequest req,
+            WebServerHttpResponse resp) throws Exception {
         httpBodyCodecRegistry.writeBody(returnValue, returnType, req, resp);
     }
 

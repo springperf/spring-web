@@ -15,10 +15,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(
-        classes = DataApplication.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
-)
+@SpringBootTest(classes = DataApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class DataE2eTest {
 
     private TestRestTemplate rest;
@@ -29,8 +26,7 @@ class DataE2eTest {
     @BeforeEach
     void setUp() {
         int actualPort = nettyHttpServer.getActualPort();
-        rest = new TestRestTemplate(new RestTemplateBuilder()
-                .rootUri("http://localhost:" + actualPort));
+        rest = new TestRestTemplate(new RestTemplateBuilder().rootUri("http://localhost:" + actualPort));
     }
 
     @Test
@@ -60,9 +56,8 @@ class DataE2eTest {
         assertThat(afterUpdate.getBody().get("name")).isEqualTo("alice-updated");
 
         // Step 4: Delete
-        ResponseEntity<Map> deleteResp = rest.exchange(
-                "/api/users/" + userId.longValue(),
-                HttpMethod.DELETE, null, Map.class);
+        ResponseEntity<Map> deleteResp = rest.exchange("/api/users/" + userId.longValue(), HttpMethod.DELETE, null,
+                Map.class);
         assertThat(deleteResp.getStatusCodeValue()).isEqualTo(200);
 
         // Step 5: Verify deletion
@@ -113,4 +108,4 @@ class DataE2eTest {
         assertThat(((String) resp.getBody().get("message"))).contains("user not found");
     }
 
-    }
+}

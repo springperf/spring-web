@@ -25,8 +25,8 @@ public class ModelAndViewReturnValueResolver extends BaseWebComponent implements
     @Override
     public void initWithWebContext(WebContext webContext) {
         super.initWithWebContext(webContext);
-        viewResolverRegistry = webContext.getWebComponentWithDefault(
-                ViewResolverRegistry.class, new ViewResolverRegistry());
+        viewResolverRegistry = webContext.getWebComponentWithDefault(ViewResolverRegistry.class,
+                new ViewResolverRegistry());
     }
 
     @Override
@@ -44,8 +44,8 @@ public class ModelAndViewReturnValueResolver extends BaseWebComponent implements
     }
 
     @Override
-    public void resolveReturnValue(Object returnValue, MethodParameter returnType,
-                                   WebServerHttpRequest req, WebServerHttpResponse resp) throws Exception {
+    public void resolveReturnValue(Object returnValue, MethodParameter returnType, WebServerHttpRequest req,
+            WebServerHttpResponse resp) throws Exception {
         ModelAndView mav = (ModelAndView) returnValue;
         String viewName = mav.getViewName();
         if (viewName == null) {

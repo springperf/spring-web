@@ -1,7 +1,11 @@
 package io.springperf.web.core.filter;
 
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.*;
+
+import java.net.InetSocketAddress;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -10,18 +14,18 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 
-import java.net.InetSocketAddress;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.*;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 class AccessLogWebFilterTest {
 
-    @Mock WebServerHttpRequest request;
-    @Mock WebServerHttpResponse response;
-    @Mock FilterChain chain;
+    @Mock
+    WebServerHttpRequest request;
+    @Mock
+    WebServerHttpResponse response;
+    @Mock
+    FilterChain chain;
 
     @BeforeEach
     void setUp() {

@@ -11,7 +11,8 @@ class InterceptorRegistryTest {
 
     @Test
     void addInterceptor_createsRegistration() {
-        HandlerInterceptor interceptor = new HandlerInterceptor() {};
+        HandlerInterceptor interceptor = new HandlerInterceptor() {
+        };
         InterceptorRegistration reg = registry.addInterceptor(interceptor);
 
         assertNotNull(reg);
@@ -20,8 +21,10 @@ class InterceptorRegistryTest {
 
     @Test
     void addInterceptor_multipleInterceptors_returnsDifferentRegistrations() {
-        HandlerInterceptor i1 = new HandlerInterceptor() {};
-        HandlerInterceptor i2 = new HandlerInterceptor() {};
+        HandlerInterceptor i1 = new HandlerInterceptor() {
+        };
+        HandlerInterceptor i2 = new HandlerInterceptor() {
+        };
 
         InterceptorRegistration reg1 = registry.addInterceptor(i1);
         InterceptorRegistration reg2 = registry.addInterceptor(i2);
@@ -37,10 +40,9 @@ class InterceptorRegistryTest {
 
     @Test
     void addInterceptor_chainedConfig_persists() {
-        HandlerInterceptor interceptor = new HandlerInterceptor() {};
-        registry.addInterceptor(interceptor)
-                .addPathPatterns("/api/**")
-                .order(2);
+        HandlerInterceptor interceptor = new HandlerInterceptor() {
+        };
+        registry.addInterceptor(interceptor).addPathPatterns("/api/**").order(2);
 
         InterceptorRegistration reg = registry.getRegistrations().get(0);
         assertEquals(1, reg.getIncludePatterns().size());

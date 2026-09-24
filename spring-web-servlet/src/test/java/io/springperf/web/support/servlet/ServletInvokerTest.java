@@ -46,7 +46,7 @@ class ServletInvokerTest {
         ServletResponse response = mock(ServletResponse.class);
         ServletInvoker invoker = new ServletInvoker(servlet);
 
-        Object result = invoker.invoke(new Object[]{request, response});
+        Object result = invoker.invoke(new Object[] { request, response });
 
         assertNull(result);
         verify(servlet).service(request, response);
@@ -59,7 +59,7 @@ class ServletInvokerTest {
         ServletRequest request = mock(ServletRequest.class);
         ServletInvoker invoker = new ServletInvoker(servlet);
 
-        invoker.invoke(new Object[]{request, perfResponse});
+        invoker.invoke(new Object[] { request, perfResponse });
 
         verify(servlet).service(request, perfResponse);
         // flushBuffer 现为 chunked 渐进提交（Tomcat 语义），不再是一次性 flush

@@ -1,19 +1,21 @@
 package io.springperf.web.context;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.context.ApplicationContext;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import java.util.Collections;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationContext;
 
 class WebComponentWrapperUtilsTest {
 
     static class TestService {
-        public String serve() { return "ok"; }
+        public String serve() {
+            return "ok";
+        }
     }
 
     static class AnotherService {
@@ -83,7 +85,8 @@ class WebComponentWrapperUtilsTest {
     @Test
     void getComponentWithDefault_noMatch_returnsDefault() {
         TestService defaultService = new TestService();
-        TestService result = WebComponentWrapperUtils.getComponentWithDefault(container, TestService.class, defaultService);
+        TestService result = WebComponentWrapperUtils.getComponentWithDefault(container, TestService.class,
+                defaultService);
         assertSame(defaultService, result);
     }
 
@@ -94,7 +97,8 @@ class WebComponentWrapperUtilsTest {
         container.registerWebComponent(comp);
 
         WebComponent defaultComp = mock(WebComponent.class);
-        WebComponent result = WebComponentWrapperUtils.getComponentWithDefault(container, WebComponent.class, defaultComp);
+        WebComponent result = WebComponentWrapperUtils.getComponentWithDefault(container, WebComponent.class,
+                defaultComp);
         assertSame(comp, result);
     }
 

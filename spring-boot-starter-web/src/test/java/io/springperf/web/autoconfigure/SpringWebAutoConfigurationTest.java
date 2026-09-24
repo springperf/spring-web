@@ -38,15 +38,15 @@ class SpringWebAutoConfigurationTest {
 
     @Test
     void applicationProperties_createsNewApplicationProperties() {
-        ApplicationProperties props = config.applicationProperties(new org.springframework.core.env.StandardEnvironment());
+        ApplicationProperties props = config
+                .applicationProperties(new org.springframework.core.env.StandardEnvironment());
         assertNotNull(props);
         assertInstanceOf(ApplicationProperties.class, props);
     }
 
     @Test
     void applicationProperties_returnsNewInstanceEachCall() {
-        assertNotSame(
-                config.applicationProperties(new org.springframework.core.env.StandardEnvironment()),
+        assertNotSame(config.applicationProperties(new org.springframework.core.env.StandardEnvironment()),
                 config.applicationProperties(new org.springframework.core.env.StandardEnvironment()));
     }
 
@@ -81,8 +81,8 @@ class SpringWebAutoConfigurationTest {
 
     @Test
     void nettyHttpServer_annotatedWithConditionalOnMissingBean() throws Exception {
-        Method m = SpringWebAutoConfiguration.class.getMethod("nettyHttpServer",
-                WebContext.class, Environment.class, ObjectProvider.class);
+        Method m = SpringWebAutoConfiguration.class.getMethod("nettyHttpServer", WebContext.class, Environment.class,
+                ObjectProvider.class);
         assertNotNull(m.getAnnotation(ConditionalOnMissingBean.class),
                 "nettyHttpServer 必须 @ConditionalOnMissingBean，否则用户无法覆盖");
     }

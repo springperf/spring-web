@@ -32,31 +32,29 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * High-performance Jackson {@link HttpBodyConverter} that caches {@link JavaType} objects
- * via {@link MappingCacheKey} in {@link PathMappingContext}.
+ * High-performance Jackson {@link HttpBodyConverter} that caches {@link JavaType} objects via {@link MappingCacheKey}
+ * in {@link PathMappingContext}.
  * <p>
- * Unlike per-instance caches, {@link MappingCacheKey} uses index-based array access
- * on the per-method cache in {@link PathMappingContext}, providing O(1) lookup
- * with zero hashing overhead.
+ * Unlike per-instance caches, {@link MappingCacheKey} uses index-based array access on the per-method cache in
+ * {@link PathMappingContext}, providing O(1) lookup with zero hashing overhead.
  * <p>
- * Register as a Spring bean to replace Spring's {@code MappingJackson2HttpMessageConverter}
- * with higher priority.
+ * Register as a Spring bean to replace Spring's {@code MappingJackson2HttpMessageConverter} with higher priority.
  */
 public class JacksonHttpBodyConverter extends BaseWebComponent implements HttpBodyConverter {
 
-    private static final List<MediaType> SUPPORTED_MEDIA_TYPES = Collections.unmodifiableList(
-            Arrays.asList(MediaType.APPLICATION_JSON, new MediaType("application", "*+json")));
+    private static final List<MediaType> SUPPORTED_MEDIA_TYPES = Collections
+            .unmodifiableList(Arrays.asList(MediaType.APPLICATION_JSON, new MediaType("application", "*+json")));
 
-    private static final MappingCacheKey<JavaType> READ_JAVA_TYPE_CACHE_KEY =
-            MappingCacheKey.createMethodCacheKey(JavaType.class);
-    private static final MappingCacheKey<Boolean> WRITE_TYPE_SERIALIZABLE_CACHE_KEY =
-            MappingCacheKey.createMethodCacheKey(Boolean.class);
+    private static final MappingCacheKey<JavaType> READ_JAVA_TYPE_CACHE_KEY = MappingCacheKey
+            .createMethodCacheKey(JavaType.class);
+    private static final MappingCacheKey<Boolean> WRITE_TYPE_SERIALIZABLE_CACHE_KEY = MappingCacheKey
+            .createMethodCacheKey(Boolean.class);
     /** canRead 的 canDeserialize 探测结果缓存（见 canRead 注释）。 */
-    private static final MappingCacheKey<Boolean> CAN_DESERIALIZE_CACHE_KEY =
-            MappingCacheKey.createMethodCacheKey(Boolean.class);
+    private static final MappingCacheKey<Boolean> CAN_DESERIALIZE_CACHE_KEY = MappingCacheKey
+            .createMethodCacheKey(Boolean.class);
 
-    private static final MappingCacheKey<Class<?>> JSON_VIEW_CACHE_KEY =
-            MappingCacheKey.createMethodCacheKey((Class) Class.class);
+    private static final MappingCacheKey<Class<?>> JSON_VIEW_CACHE_KEY = MappingCacheKey
+            .createMethodCacheKey((Class) Class.class);
     private static final Class<?> NO_JSON_VIEW = Void.class;
 
     private ObjectMapper mapper;
@@ -170,10 +168,12 @@ public class JacksonHttpBodyConverter extends BaseWebComponent implements HttpBo
 
     @Override
     public boolean canRead(Type type, @Nullable Class<?> contextClass, MediaType mediaType,
-                            WebServerHttpRequest request, PathMappingContext mappingContext) {
-        if (!isJsonMediaType(mediaType)) return false;
+            WebServerHttpRequest request, PathMappingContext mappingContext) {
+        if (!isJsonMediaType(mediaType))
+            return false;
         // String 类型应由 StringHttpMessageConverter 处理，而非 Jackson
-        if (type == String.class) return false;
+        if (type == String.class)
+            return false;
         ObjectMapper readMapper = getReadObjectMapper(request, mappingContext);
         JavaType javaType = resolveReadJavaType(type, mappingContext, request);
         // canDeserialize 是反射型能力探测（遍历 DeserializerFactory 查反序列化器），
@@ -196,14 +196,14 @@ public class JacksonHttpBodyConverter extends BaseWebComponent implements HttpBo
 
     @Override
     public Object read(Type type, @Nullable Class<?> contextClass, HttpInputMessage inputMessage,
-                       WebServerHttpRequest request, PathMappingContext mappingContext)
+            WebServerHttpRequest request, PathMappingContext mappingContext)
             throws IOException, HttpMessageNotReadableException {
-        return getReadObjectMapper(request, mappingContext).readValue(
-                inputMessage.getBody(), resolveReadJavaType(type, mappingContext, request));
+        return getReadObjectMapper(request, mappingContext).readValue(inputMessage.getBody(),
+                resolveReadJavaType(type, mappingContext, request));
     }
 
     private JavaType resolveReadJavaType(Type type, @Nullable PathMappingContext mappingContext,
-                                          WebServerHttpRequest request) {
+            WebServerHttpRequest request) {
         ObjectMapper mapper = getReadObjectMapper(request, mappingContext);
         if (mappingContext != null) {
             JavaType cached = mappingContext.get(READ_JAVA_TYPE_CACHE_KEY);
@@ -219,9 +219,8 @@ public class JacksonHttpBodyConverter extends BaseWebComponent implements HttpBo
     }
 
     @Override
-    public boolean canWrite(Type type, Class<?> valueType, MediaType mediaType,
-                             WebServerHttpRequest request, @Nullable WebServerHttpResponse response,
-                             PathMappingContext mappingContext) {
+    public boolean canWrite(Type type, Class<?> valueType, MediaType mediaType, WebServerHttpRequest request,
+            @Nullable WebServerHttpResponse response, PathMappingContext mappingContext) {
         if (!isJsonMediaType(mediaType)) {
             return false;
         }
@@ -231,14 +230,16 @@ public class JacksonHttpBodyConverter extends BaseWebComponent implements HttpBo
         if (mappingContext != null) {
             Boolean cached = mappingContext.get(WRITE_TYPE_SERIALIZABLE_CACHE_KEY);
             if (cached != null) {
-                if (cached) return true;
+                if (cached)
+                    return true;
                 // false → 声明类型不可序列化，但运行时类型可能不同，继续 valueType 判断
             } else {
                 Class<?> rawClass = writeMapper.getTypeFactory().constructType(type).getRawClass();
                 if (rawClass != Object.class) {
                     boolean serializable = writeMapper.canSerialize(rawClass);
                     mappingContext.set(WRITE_TYPE_SERIALIZABLE_CACHE_KEY, serializable);
-                    if (serializable) return true;
+                    if (serializable)
+                        return true;
                     // false → 缓存结果避免重复 constructType，但继续 valueType 判断
                 }
             }
@@ -248,8 +249,7 @@ public class JacksonHttpBodyConverter extends BaseWebComponent implements HttpBo
 
     @Override
     public void write(Object value, Type type, @Nullable MediaType contentType, HttpOutputMessage outputMessage,
-                       WebServerHttpRequest request, WebServerHttpResponse response,
-                       PathMappingContext mappingContext)
+            WebServerHttpRequest request, WebServerHttpResponse response, PathMappingContext mappingContext)
             throws IOException, HttpMessageNotWritableException {
         // Handle MappingJacksonValue wrapper (from dynamic @JsonView / @JsonFilter)
         Object writeValue = value;
@@ -284,16 +284,15 @@ public class JacksonHttpBodyConverter extends BaseWebComponent implements HttpBo
         try {
             writer.writeValue(outputMessage.getBody(), writeValue);
         } catch (InvalidDefinitionException ex) {
-            throw new HttpMessageConversionException(
-                    "Could not write JSON: " + ex.getType(), ex);
+            throw new HttpMessageConversionException("Could not write JSON: " + ex.getType(), ex);
         } catch (JsonProcessingException ex) {
-            throw new HttpMessageNotWritableException(
-                    "Could not write JSON: " + ex.getOriginalMessage(), ex);
+            throw new HttpMessageNotWritableException("Could not write JSON: " + ex.getOriginalMessage(), ex);
         }
     }
 
     private ObjectWriter resolveWriter(ObjectMapper writeMapper, @Nullable PathMappingContext mappingContext) {
-        if (mappingContext == null) return writeMapper.writer();
+        if (mappingContext == null)
+            return writeMapper.writer();
         Class<?> viewClass = resolveJsonViewClass(mappingContext);
         if (viewClass != null) {
             return writeMapper.writerWithView(viewClass);
@@ -306,10 +305,8 @@ public class JacksonHttpBodyConverter extends BaseWebComponent implements HttpBo
         if (cached != null) {
             return cached != NO_JSON_VIEW ? cached : null;
         }
-        JsonView jsonView = AnnotatedElementUtils.findMergedAnnotation(
-                mappingContext.getMethod(), JsonView.class);
-        Class<?> viewClass = (jsonView != null && jsonView.value().length > 0)
-                ? jsonView.value()[0] : null;
+        JsonView jsonView = AnnotatedElementUtils.findMergedAnnotation(mappingContext.getMethod(), JsonView.class);
+        Class<?> viewClass = (jsonView != null && jsonView.value().length > 0) ? jsonView.value()[0] : null;
         mappingContext.set(JSON_VIEW_CACHE_KEY, viewClass != null ? viewClass : NO_JSON_VIEW);
         return viewClass;
     }

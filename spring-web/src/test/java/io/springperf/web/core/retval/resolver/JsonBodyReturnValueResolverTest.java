@@ -1,8 +1,12 @@
 package io.springperf.web.core.retval.resolver;
 
-import io.springperf.web.core.codec.HttpBodyCodecRegistry;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,12 +15,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.MethodParameter;
 import org.springframework.web.bind.annotation.ResponseBody;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
+import io.springperf.web.core.codec.HttpBodyCodecRegistry;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 class JsonBodyReturnValueResolverTest {
@@ -80,15 +81,21 @@ class JsonBodyReturnValueResolverTest {
 
     @ResponseBody
     static class ResponseBodyOnClassController {
-        public String hello() { return "hello"; }
+        public String hello() {
+            return "hello";
+        }
     }
 
     static class MethodAnnotatedController {
         @ResponseBody
-        public String hello() { return "hello"; }
+        public String hello() {
+            return "hello";
+        }
     }
 
     static class PlainController {
-        public String hello() { return "hello"; }
+        public String hello() {
+            return "hello";
+        }
     }
 }

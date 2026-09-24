@@ -1,13 +1,13 @@
 package io.springperf.web.http.support;
 
+import java.util.List;
+
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.codec.http.*;
-
-import java.util.List;
 
 public class SupportMultipartAggregator extends HttpObjectAggregator {
 
@@ -26,14 +26,13 @@ public class SupportMultipartAggregator extends HttpObjectAggregator {
         this(maxContentLength, new SupportMultipartResolver(maxContentLength, maxPartCount, maxPartHeaderSize));
     }
 
-    public SupportMultipartAggregator(int maxContentLength, int maxPartCount, int maxPartHeaderSize,
-                                      long maxFileSize) {
+    public SupportMultipartAggregator(int maxContentLength, int maxPartCount, int maxPartHeaderSize, long maxFileSize) {
         this(maxContentLength,
                 new SupportMultipartResolver(maxContentLength, maxPartCount, maxPartHeaderSize, maxFileSize));
     }
 
-    public SupportMultipartAggregator(int maxContentLength, int maxPartCount, int maxPartHeaderSize,
-                                      long maxFileSize, long fileSizeThreshold, String location) {
+    public SupportMultipartAggregator(int maxContentLength, int maxPartCount, int maxPartHeaderSize, long maxFileSize,
+            long fileSizeThreshold, String location) {
         this(maxContentLength, new SupportMultipartResolver(maxContentLength, maxPartCount, maxPartHeaderSize,
                 maxFileSize, fileSizeThreshold, location));
     }
@@ -138,13 +137,12 @@ public class SupportMultipartAggregator extends HttpObjectAggregator {
     }
 
     /**
-     * 畸形 multipart 报文：直接回写 HTTP 400 并关闭连接（对齐对端 fail-closed 语义）。
-     * 与父类 {@code handleOversizedMessage}（413）一致，绕开 {@link NettyHttpHandler} 的
-     * 业务处理——此时请求尚未聚合完成，无 FullHttpRequest 交付，只能直写通道。
+     * 畸形 multipart 报文：直接回写 HTTP 400 并关闭连接（对齐对端 fail-closed 语义）。 与父类 {@code handleOversizedMessage}（413）一致，绕开
+     * {@link NettyHttpHandler} 的 业务处理——此时请求尚未聚合完成，无 FullHttpRequest 交付，只能直写通道。
      */
     private void handleBadRequest(ChannelHandlerContext ctx, HttpRequest req) {
-        FullHttpResponse response = new DefaultFullHttpResponse(
-                req.protocolVersion(), HttpResponseStatus.BAD_REQUEST, Unpooled.EMPTY_BUFFER);
+        FullHttpResponse response = new DefaultFullHttpResponse(req.protocolVersion(), HttpResponseStatus.BAD_REQUEST,
+                Unpooled.EMPTY_BUFFER);
         response.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
         response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
         ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);

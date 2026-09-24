@@ -10,8 +10,8 @@ import org.springframework.core.MethodParameter;
 
 public class HttpServletRequestProvider implements StaticArgumentResolverProvider {
 
-    private final StaticArgumentResolver resolver = (request, response) ->
-            ServletAttribute.getAdapterContext(request, response).getRequest();
+    private final StaticArgumentResolver resolver = (request, response) -> ServletAttribute
+            .getAdapterContext(request, response).getRequest();
 
     @Override
     public boolean supports(MethodParameter parameter, MappingHandlerMethod mappingContext) {
@@ -19,7 +19,8 @@ public class HttpServletRequestProvider implements StaticArgumentResolverProvide
     }
 
     @Override
-    public StaticArgumentResolver getResolver(MethodParameter parameter, MappingHandlerMethod mappingContext, WebContext webContext) {
+    public StaticArgumentResolver getResolver(MethodParameter parameter, MappingHandlerMethod mappingContext,
+            WebContext webContext) {
         return resolver;
     }
 }

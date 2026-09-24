@@ -1,13 +1,14 @@
 package io.springperf.web.core.mapping.route;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import org.junit.jupiter.api.Test;
+
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.core.mapping.match.Matcher;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
-import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 class SimpleRouterTest {
 

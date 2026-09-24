@@ -1,13 +1,14 @@
 package io.springperf.web.core.resource;
 
-import io.springperf.web.context.WebComponent;
-import io.springperf.web.core.mapping.PathMappingContext;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.springframework.http.CacheControl;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
-import java.util.ArrayList;
-import java.util.List;
+import io.springperf.web.context.WebComponent;
+import io.springperf.web.core.mapping.PathMappingContext;
 
 public class ResourceHandlerRegistration implements WebComponent {
 
@@ -75,10 +76,10 @@ public class ResourceHandlerRegistration implements WebComponent {
 
     /**
      * 构建路径映射，应用全局前缀（对齐 {@code spring.mvc.static-path-pattern}）。
-     *
-     * <p>前缀为空或 {@code "/**"} 时按原样注册；否则将前缀与注册 pattern 组合为
-     * {@code prefix-without-/** + pattern}，例如前缀 {@code /resources/**} 与
-     * pattern {@code /static/**} 组合为 {@code /resources/static/**}。</p>
+     * <p>
+     * 前缀为空或 {@code "/**"} 时按原样注册；否则将前缀与注册 pattern 组合为 {@code prefix-without-/** + pattern}，例如前缀 {@code /resources/**} 与
+     * pattern {@code /static/**} 组合为 {@code /resources/static/**}。
+     * </p>
      */
     public List<PathMappingContext> buildPathMappingContext(String globalPrefix) {
         List<PathMappingContext> pathMappingContexts = new ArrayList<>();
@@ -97,8 +98,7 @@ public class ResourceHandlerRegistration implements WebComponent {
     }
 
     /**
-     * 归一化全局前缀：空白与默认 {@code "/**"} 均视为无前缀；否则去掉尾部 {@code /**} 与 {@code /}，
-     * 保留以 {@code /} 开头的规范形式。
+     * 归一化全局前缀：空白与默认 {@code "/**"} 均视为无前缀；否则去掉尾部 {@code /**} 与 {@code /}， 保留以 {@code /} 开头的规范形式。
      */
     static String normalizePrefix(String globalPrefix) {
         if (globalPrefix == null) {

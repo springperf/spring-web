@@ -23,13 +23,23 @@ class JsrRemoteEndpointAsyncTest {
             codecRegistry, Collections.emptyMap());
     private JsrRemoteEndpointAsync remote = new JsrRemoteEndpointAsync(session, codecRegistry);
 
-    @jakarta.websocket.server.ServerEndpoint(value = "/e", encoders = {TextEncoder.class})
-    static class CodecEndpoint {}
+    @jakarta.websocket.server.ServerEndpoint(value = "/e", encoders = { TextEncoder.class })
+    static class CodecEndpoint {
+    }
 
     public static class TextEncoder implements jakarta.websocket.Encoder.Text<String> {
-        @Override public String encode(String o) { return "encoded:" + o; }
-        @Override public void init(jakarta.websocket.EndpointConfig config) {}
-        @Override public void destroy() {}
+        @Override
+        public String encode(String o) {
+            return "encoded:" + o;
+        }
+
+        @Override
+        public void init(jakarta.websocket.EndpointConfig config) {
+        }
+
+        @Override
+        public void destroy() {
+        }
     }
 
     @Test
@@ -124,7 +134,7 @@ class JsrRemoteEndpointAsyncTest {
         assertThrows(java.util.concurrent.ExecutionException.class, future::get);
     }
 
-    @jakarta.websocket.server.ServerEndpoint(value = "/bin", encoders = {BinEncoder.class})
+    @jakarta.websocket.server.ServerEndpoint(value = "/bin", encoders = { BinEncoder.class })
     static class BinaryCodecEndpoint {
     }
 
@@ -146,15 +156,15 @@ class JsrRemoteEndpointAsyncTest {
     private JsrRemoteEndpointAsync binaryRemote() {
         JsrCodecRegistry binaryRegistry = new JsrCodecRegistry(
                 new JsrEndpointConfigAdapter(new JsrEndpointMetadata(BinaryCodecEndpoint.class)));
-        JsrWebSocketSession binarySession = new JsrWebSocketSession(springSession,
-                new JsrWebSocketContainer(), binaryRegistry, Collections.emptyMap());
+        JsrWebSocketSession binarySession = new JsrWebSocketSession(springSession, new JsrWebSocketContainer(),
+                binaryRegistry, Collections.emptyMap());
         return new JsrRemoteEndpointAsync(binarySession, binaryRegistry);
     }
 
     @Test
     void sendObject_binaryEncoder_sendsBinaryMessage() throws Exception {
         JsrRemoteEndpointAsync binRemote = binaryRemote();
-        Future<Void> future = binRemote.sendObject(new byte[]{1, 2, 3});
+        Future<Void> future = binRemote.sendObject(new byte[] { 1, 2, 3 });
         future.get();
         verify(springSession).sendMessage(argThat(msg -> msg instanceof BinaryMessage));
     }

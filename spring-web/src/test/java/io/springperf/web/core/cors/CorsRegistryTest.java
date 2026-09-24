@@ -1,11 +1,15 @@
 package io.springperf.web.core.cors;
 
-import io.springperf.web.core.cors.provider.CorsConfigurationProvider;
-import io.springperf.web.core.cors.provider.NoneCorsConfigurationProvider;
-import io.springperf.web.core.cors.provider.SimpleCorsConfigurationProvider;
-import io.springperf.web.http.RequestContext;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+import java.lang.reflect.Field;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,30 +19,32 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.web.cors.CorsConfiguration;
 
-import java.lang.reflect.Field;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.stream.Collectors;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import io.springperf.web.core.cors.provider.CorsConfigurationProvider;
+import io.springperf.web.core.cors.provider.NoneCorsConfigurationProvider;
+import io.springperf.web.core.cors.provider.SimpleCorsConfigurationProvider;
+import io.springperf.web.http.RequestContext;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 class CorsRegistryTest {
 
-    @Mock WebServerHttpRequest request;
-    @Mock WebServerHttpResponse response;
-    @Mock WebCorsProcessor processor;
-    @Mock RequestContext requestContext;
+    @Mock
+    WebServerHttpRequest request;
+    @Mock
+    WebServerHttpResponse response;
+    @Mock
+    WebCorsProcessor processor;
+    @Mock
+    RequestContext requestContext;
 
     private CorsRegistry registry;
 
     @BeforeEach
     void setUp() throws Exception {
         lenient().when(request.getRequestContext()).thenReturn(requestContext);
-        lenient().when(requestContext.getAttribute(any(io.springperf.web.http.RequestAttribute.class))).thenReturn(null);
+        lenient().when(requestContext.getAttribute(any(io.springperf.web.http.RequestAttribute.class)))
+                .thenReturn(null);
 
         registry = new CorsRegistry();
         Field processorField = CorsRegistry.class.getDeclaredField("webCorsProcessor");

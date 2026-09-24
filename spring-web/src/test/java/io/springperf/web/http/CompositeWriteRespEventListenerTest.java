@@ -1,16 +1,17 @@
 package io.springperf.web.http;
 
-import io.springperf.web.context.WebContext;
-import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
 
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+
+import io.springperf.web.context.WebContext;
 
 /**
  * 验证 {@link BaseWebServerHttpResponse#addWriteRespEventListener} 的多监听器复合广播逻辑
@@ -129,7 +130,7 @@ class CompositeWriteRespEventListenerTest {
         TestResponse response = new TestResponse(mock(WebContext.class));
         assertFalse(response.resetBuffer(), "空 buffer reset 应返回 false");
         try {
-            response.getBody().write(new byte[]{1, 2, 3});
+            response.getBody().write(new byte[] { 1, 2, 3 });
         } catch (java.io.IOException ignored) {
         }
         assertTrue(response.resetBuffer(), "有数据 buffer reset 应返回 true");

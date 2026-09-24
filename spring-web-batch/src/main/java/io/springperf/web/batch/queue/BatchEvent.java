@@ -9,5 +9,7 @@ public class BatchEvent {
         this.request = null;
     }
 
-    public BatchRequest<?> request() { return request; }
+    public BatchRequest<?> request() {
+        return request;
+    }
 }

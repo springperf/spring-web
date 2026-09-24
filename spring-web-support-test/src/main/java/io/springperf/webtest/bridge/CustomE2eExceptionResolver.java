@@ -12,8 +12,8 @@ import org.springframework.web.servlet.ModelAndView;
  * A custom {@link HandlerExceptionResolver} registered via
  * {@link org.springframework.web.servlet.config.annotation.WebMvcConfigurer#extendHandlerExceptionResolvers}.
  * <p>
- * Handles {@link CustomE2eBridgeException} by returning a plain-text response
- * with status 400 and body "bridge-exception-handled".
+ * Handles {@link CustomE2eBridgeException} by returning a plain-text response with status 400 and body
+ * "bridge-exception-handled".
  */
 public class CustomE2eExceptionResolver implements HandlerExceptionResolver, Ordered {
 
@@ -25,8 +25,8 @@ public class CustomE2eExceptionResolver implements HandlerExceptionResolver, Ord
     }
 
     @Override
-    public ModelAndView resolveException(HttpServletRequest request, HttpServletResponse response,
-                                         Object handler, Exception ex) {
+    public ModelAndView resolveException(HttpServletRequest request, HttpServletResponse response, Object handler,
+            Exception ex) {
         if (ex instanceof CustomE2eBridgeException) {
             log.info("CustomE2eExceptionResolver handling CustomE2eBridgeException");
             try {

@@ -29,12 +29,18 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class ModelAndViewReturnValueResolverTest {
 
-    @Mock WebContext webContext;
-    @Mock ViewResolverRegistry viewResolverRegistry;
-    @Mock WebServerHttpRequest req;
-    @Mock WebServerHttpResponse resp;
-    @Mock RequestContext requestContext;
-    @Mock MappingHandlerMethod mappingContext;
+    @Mock
+    WebContext webContext;
+    @Mock
+    ViewResolverRegistry viewResolverRegistry;
+    @Mock
+    WebServerHttpRequest req;
+    @Mock
+    WebServerHttpResponse resp;
+    @Mock
+    RequestContext requestContext;
+    @Mock
+    MappingHandlerMethod mappingContext;
 
     private ModelAndViewReturnValueResolver resolver;
 

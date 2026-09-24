@@ -1,14 +1,14 @@
 package io.springperf.web.server;
 
-import io.springperf.web.context.ApplicationProperties;
+import static org.junit.jupiter.api.Assertions.*;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
 
-import static org.junit.jupiter.api.Assertions.*;
+import io.springperf.web.context.ApplicationProperties;
 
 /**
- * {@link CompressionConfig} 解析单元测试：覆盖关闭默认态、启用后 mime/min-size/excluded 解析、
- * 默认阈值回退、非法 min-size fail-fast。
+ * {@link CompressionConfig} 解析单元测试：覆盖关闭默认态、启用后 mime/min-size/excluded 解析、 默认阈值回退、非法 min-size fail-fast。
  */
 public class CompressionConfigTest {
 
@@ -31,10 +31,8 @@ public class CompressionConfigTest {
 
     @Test
     void enabledParsesMimeMinSizeAndExcluded() {
-        CompressionConfig c = CompressionConfig.fromProperties(propsWith(
-                "server.compression.enabled=true",
-                "server.compression.mime-types=application/json, text/html",
-                "server.compression.min-response-size=1MB",
+        CompressionConfig c = CompressionConfig.fromProperties(propsWith("server.compression.enabled=true",
+                "server.compression.mime-types=application/json, text/html", "server.compression.min-response-size=1MB",
                 "server.compression.excluded-user-agents=test-agent, bot"));
         assertTrue(c.isEnabled());
         assertEquals(1024L * 1024, c.getMinResponseSizeBytes());
@@ -45,8 +43,7 @@ public class CompressionConfigTest {
 
     @Test
     void minSizeDefaultsTo2KBWhenEmpty() {
-        CompressionConfig c = CompressionConfig.fromProperties(
-                propsWith("server.compression.enabled=true"));
+        CompressionConfig c = CompressionConfig.fromProperties(propsWith("server.compression.enabled=true"));
         assertTrue(c.isEnabled());
         assertEquals(2048L, c.getMinResponseSizeBytes());
     }

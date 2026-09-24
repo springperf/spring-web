@@ -26,33 +26,24 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 明文 HTTP/2（h2c，prior knowledge）E2E：{@code server.http2.enabled=true} 且无 TLS 时，
- * 管线以前言论（HTTP/2 connection preface）探测协议——命中则走 h2，否则回退 HTTP/1.1。
- *
- * <p>覆盖：h2 上的 GET/POST/HEAD、单连接并发多路复用、大响应体分帧、错误响应、
- * 响应头合法性（HTTP/2 禁止 connection-specific 头）以及同端口 HTTP/1.1 回退。</p>
+ * 明文 HTTP/2（h2c，prior knowledge）E2E：{@code server.http2.enabled=true} 且无 TLS 时， 管线以前言论（HTTP/2 connection
+ * preface）探测协议——命中则走 h2，否则回退 HTTP/1.1。
+ * <p>
+ * 覆盖：h2 上的 GET/POST/HEAD、单连接并发多路复用、大响应体分帧、错误响应、 响应头合法性（HTTP/2 禁止 connection-specific 头）以及同端口 HTTP/1.1 回退。
+ * </p>
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, Http2H2cE2eTest.H2cConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "server.http2.enabled=true"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        Http2H2cE2eTest.H2cConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "server.http2.enabled=true" })
 class Http2H2cE2eTest {
 
     /** 仅 h2c prior knowledge：不协商，直接以 h2 发送前言（与框架的明文探测分支匹配）。 */
-    private static final OkHttpClient H2C = new OkHttpClient.Builder()
-            .protocols(List.of(Protocol.H2_PRIOR_KNOWLEDGE))
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient H2C = new OkHttpClient.Builder().protocols(List.of(Protocol.H2_PRIOR_KNOWLEDGE))
+            .connectTimeout(Duration.ofSeconds(3)).readTimeout(Duration.ofSeconds(10)).build();
 
     /** 普通 HTTP/1.1 客户端：验证同端口回退。 */
-    private static final OkHttpClient H1 = new OkHttpClient.Builder()
-            .protocols(List.of(Protocol.HTTP_1_1))
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient H1 = new OkHttpClient.Builder().protocols(List.of(Protocol.HTTP_1_1))
+            .connectTimeout(Duration.ofSeconds(3)).readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
@@ -66,8 +57,7 @@ class Http2H2cE2eTest {
         Response resp = H2C.newCall(new Request.Builder().url(url("/e2e-h2/plain")).get().build()).execute();
         try {
             assertEquals(200, resp.code());
-            assertEquals(Protocol.H2_PRIOR_KNOWLEDGE, resp.protocol(),
-                    "请求应通过 HTTP/2 完成（前端探测未生效会退化成 HTTP/1.1）");
+            assertEquals(Protocol.H2_PRIOR_KNOWLEDGE, resp.protocol(), "请求应通过 HTTP/2 完成（前端探测未生效会退化成 HTTP/1.1）");
             assertEquals("h2-plain", resp.body().string());
         } finally {
             resp.close();
@@ -76,15 +66,14 @@ class Http2H2cE2eTest {
 
     @Test
     void h2c_post_withBody_echoesLength() throws Exception {
-        Response resp = H2C.newCall(new Request.Builder()
-                .url(url("/e2e-h2/echo"))
-                .post(okhttp3.RequestBody.create("h2-body-12345", MediaType.parse("text/plain")))
-                .build()).execute();
+        Response resp = H2C
+                .newCall(new Request.Builder().url(url("/e2e-h2/echo"))
+                        .post(okhttp3.RequestBody.create("h2-body-12345", MediaType.parse("text/plain"))).build())
+                .execute();
         try {
             assertEquals(200, resp.code());
             assertEquals(Protocol.H2_PRIOR_KNOWLEDGE, resp.protocol());
-            assertEquals("echo:13", resp.body().string(),
-                    "HTTP/2 下请求体长度应被正确解析");
+            assertEquals("echo:13", resp.body().string(), "HTTP/2 下请求体长度应被正确解析");
         } finally {
             resp.close();
         }
@@ -114,10 +103,9 @@ class Http2H2cE2eTest {
             // RFC 9113 §8.2.2：HTTP/2 禁止 Connection / Keep-Alive / Transfer-Encoding /
             // Proxy-Connection / Upgrade；框架在 HTTP/1.1 路径会写 Connection: keep-alive，
             // 该头若泄漏到 h2 会被客户端判为协议错误（OkHttp 会直接抛 ProtocolException）。
-            for (String forbidden : List.of("Connection", "Keep-Alive", "Transfer-Encoding",
-                    "Proxy-Connection", "Upgrade")) {
-                assertTrue(resp.header(forbidden) == null,
-                        "HTTP/2 响应不得含 " + forbidden + " 头，实际 " + resp.headers());
+            for (String forbidden : List.of("Connection", "Keep-Alive", "Transfer-Encoding", "Proxy-Connection",
+                    "Upgrade")) {
+                assertTrue(resp.header(forbidden) == null, "HTTP/2 响应不得含 " + forbidden + " 头，实际 " + resp.headers());
             }
         } finally {
             resp.close();
@@ -130,8 +118,7 @@ class Http2H2cE2eTest {
         try {
             assertEquals(200, resp.code());
             String body = resp.body().string();
-            assertEquals(40000, body.length(),
-                    "跨多帧的大响应体应完整（Content-Length 帧语义）");
+            assertEquals(40000, body.length(), "跨多帧的大响应体应完整（Content-Length 帧语义）");
             assertTrue(body.startsWith("L") && body.endsWith("L"), "首尾字符应保持完整");
         } finally {
             resp.close();
@@ -140,12 +127,11 @@ class Http2H2cE2eTest {
 
     @Test
     void h2c_notFound_returns404() throws Exception {
-        Response resp = H2C.newCall(new Request.Builder()
-                .url(url("/e2e-h2/definitely-missing")).get().build()).execute();
+        Response resp = H2C.newCall(new Request.Builder().url(url("/e2e-h2/definitely-missing")).get().build())
+                .execute();
         try {
             assertEquals(404, resp.code());
-            assertEquals(Protocol.H2_PRIOR_KNOWLEDGE, resp.protocol(),
-                    "错误响应也应经 h2 返回（协议层不得降级或断流）");
+            assertEquals(Protocol.H2_PRIOR_KNOWLEDGE, resp.protocol(), "错误响应也应经 h2 返回（协议层不得降级或断流）");
         } finally {
             resp.close();
         }
@@ -164,8 +150,8 @@ class Http2H2cE2eTest {
             Thread t = new Thread(() -> {
                 try {
                     start.await();
-                    Response resp = H2C.newCall(new Request.Builder()
-                            .url(url("/e2e-h2/slow?i=" + idx)).get().build()).execute();
+                    Response resp = H2C.newCall(new Request.Builder().url(url("/e2e-h2/slow?i=" + idx)).get().build())
+                            .execute();
                     try {
                         if (resp.code() == 200 && ("slow-" + idx).equals(resp.body().string())
                                 && resp.protocol() == Protocol.H2_PRIOR_KNOWLEDGE) {
@@ -187,16 +173,14 @@ class Http2H2cE2eTest {
         }
         start.countDown();
         assertTrue(done.await(20, TimeUnit.SECONDS), "并发 h2 请求应在超时内完成");
-        assertEquals(concurrency, ok.get(),
-                "同一连接上的多路复用流应各自正确响应，失败详情=" + failures);
+        assertEquals(concurrency, ok.get(), "同一连接上的多路复用流应各自正确响应，失败详情=" + failures);
     }
 
     @Test
     void samePort_http11Fallback_stillWorks() throws Exception {
         Response resp = H1.newCall(new Request.Builder().url(url("/e2e-h2/plain")).get().build()).execute();
         try {
-            assertEquals(200, resp.code(),
-                    "启用 h2c 后同端口仍须服务 HTTP/1.1 客户端（前言探测未命中即回退）");
+            assertEquals(200, resp.code(), "启用 h2c 后同端口仍须服务 HTTP/1.1 客户端（前言探测未命中即回退）");
             assertEquals(Protocol.HTTP_1_1, resp.protocol());
             assertEquals("h2-plain", resp.body().string());
         } finally {

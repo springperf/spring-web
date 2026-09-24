@@ -17,30 +17,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 条件请求（RFC 9110 §13）E2E：静态资源的 ETag / Last-Modified 校验语义。
- *
  * <ul>
- *   <li>If-None-Match：精确命中 → 304；`*` → 304；**弱比较**（{@code W/"..."}）→ 304；
- *       多值列表中任一命中即 304；无命中 → 200 + 实体；</li>
- *   <li>If-Modified-Since：等于/晚于最后修改 → 304；早于最后修改 → 200；非法日期忽略；</li>
- *   <li>优先级：两者并存时 If-None-Match 优先（RFC 9110 §13.1.3）——即使日期更晚也不得 304；</li>
- *   <li>304 必须无 body，且携带 ETag/Last-Modified/Cache-Control 等校验与缓存指令。</li>
+ * <li>If-None-Match：精确命中 → 304；`*` → 304；**弱比较**（{@code W/"..."}）→ 304； 多值列表中任一命中即 304；无命中 → 200 + 实体；</li>
+ * <li>If-Modified-Since：等于/晚于最后修改 → 304；早于最后修改 → 200；非法日期忽略；</li>
+ * <li>优先级：两者并存时 If-None-Match 优先（RFC 9110 §13.1.3）——即使日期更晚也不得 304；</li>
+ * <li>304 必须无 body，且携带 ETag/Last-Modified/Cache-Control 等校验与缓存指令。</li>
  * </ul>
  */
-@SpringBootTest(classes = ConfigAlignTestApp.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "spring.web.resources.add-mappings=true",
-                "spring.web.resources.cache.period=3600"
-        })
+@SpringBootTest(classes = ConfigAlignTestApp.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+        "server.servlet.context-path=/", "spring.web.resources.add-mappings=true",
+        "spring.web.resources.cache.period=3600" })
 class ConditionalRequestE2eTest {
 
     private static final String PATH = "/e2e-range.txt";
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
@@ -62,7 +54,7 @@ class ConditionalRequestE2eTest {
             String lastModified = resp.header("Last-Modified");
             assertNotNull(etag, "静态资源应携带 ETag");
             assertNotNull(lastModified, "静态资源应携带 Last-Modified");
-            return new String[]{etag, lastModified};
+            return new String[] { etag, lastModified };
         } finally {
             resp.close();
         }
@@ -107,8 +99,7 @@ class ConditionalRequestE2eTest {
         String etag = validators()[0];
         Response resp = get("If-None-Match", "W/" + etag);
         try {
-            assertEquals(304, resp.code(),
-                    "弱 ETag 应参与弱比较命中 304，实际 " + resp.code());
+            assertEquals(304, resp.code(), "弱 ETag 应参与弱比较命中 304，实际 " + resp.code());
         } finally {
             resp.close();
         }
@@ -143,8 +134,7 @@ class ConditionalRequestE2eTest {
         String[] v = validators();
         Response resp = get("If-None-Match", "\"stale\"", "If-Modified-Since", v[1]);
         try {
-            assertEquals(200, resp.code(),
-                    "If-None-Match 未命中时若按 If-Modified-Since 返回 304 属错误优先级，实际 " + resp.code());
+            assertEquals(200, resp.code(), "If-None-Match 未命中时若按 If-Modified-Since 返回 304 属错误优先级，实际 " + resp.code());
         } finally {
             resp.close();
         }
@@ -215,10 +205,8 @@ class ConditionalRequestE2eTest {
     @Test
     void head_withIfNoneMatchMatch_returns304() throws Exception {
         String etag = validators()[0];
-        Response resp = CLIENT.newCall(new Request.Builder()
-                .url("http://localhost:" + port + PATH)
-                .header("If-None-Match", etag)
-                .head().build()).execute();
+        Response resp = CLIENT.newCall(new Request.Builder().url("http://localhost:" + port + PATH)
+                .header("If-None-Match", etag).head().build()).execute();
         try {
             assertEquals(304, resp.code(), "HEAD 条件请求同样应 304，实际 " + resp.code());
             assertEquals("", resp.body().string());

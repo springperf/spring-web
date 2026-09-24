@@ -10,7 +10,8 @@ import org.springframework.web.server.ResponseStatusException;
 public class LoginInterceptor implements HandlerInterceptor {
 
     @Override
-    public boolean preHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler) throws Exception {
+    public boolean preHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler)
+            throws Exception {
         HandlerMethod handlerMethod = (HandlerMethod) handler;
         if ("name".equals(handlerMethod.getMethod().getName())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "用户未登录");

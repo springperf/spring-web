@@ -10,16 +10,16 @@ import org.springframework.web.servlet.HandlerInterceptor;
  * A custom {@link HandlerInterceptor} registered via
  * {@link org.springframework.web.servlet.config.annotation.WebMvcConfigurer#addInterceptors}.
  * <p>
- * Blocks access to paths ending with {@code /blocked} by returning 400 with
- * body {@code "bridge-interceptor-blocked"}, verifying that the interceptor bridge
- * is operational.
+ * Blocks access to paths ending with {@code /blocked} by returning 400 with body {@code "bridge-interceptor-blocked"},
+ * verifying that the interceptor bridge is operational.
  */
 public class CustomE2eInterceptor implements HandlerInterceptor {
 
     private static final Logger log = LoggerFactory.getLogger(CustomE2eInterceptor.class);
 
     @Override
-    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
+            throws Exception {
         String uri = request.getRequestURI();
         log.info("CustomE2eInterceptor.preHandle called for {}", uri);
         if (uri.endsWith("/blocked")) {

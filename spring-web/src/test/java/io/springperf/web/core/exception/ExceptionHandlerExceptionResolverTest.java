@@ -1,10 +1,10 @@
 package io.springperf.web.core.exception;
 
-import io.springperf.web.core.arg.StaticArgumentResolver;
-import io.springperf.web.core.mapping.MappingHandlerMethod;
-import io.springperf.web.http.RequestContext;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.lang.reflect.Method;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -14,10 +14,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.lang.reflect.Method;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import io.springperf.web.core.arg.StaticArgumentResolver;
+import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.http.RequestContext;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 class ExceptionHandlerExceptionResolverTest {
@@ -35,8 +36,7 @@ class ExceptionHandlerExceptionResolverTest {
 
     @Test
     void exceptionArgumentResolverProvider_supportsThrowable() throws Exception {
-        ExceptionHandlerExceptionResolver.ExceptionArgumentResolverProvider provider =
-                new ExceptionHandlerExceptionResolver.ExceptionArgumentResolverProvider();
+        ExceptionHandlerExceptionResolver.ExceptionArgumentResolverProvider provider = new ExceptionHandlerExceptionResolver.ExceptionArgumentResolverProvider();
 
         Method sampleMethod = DummyHandler.class.getMethod("handleException", Throwable.class);
         MethodParameter throwableParam = new MethodParameter(sampleMethod, 0);
@@ -47,8 +47,7 @@ class ExceptionHandlerExceptionResolverTest {
 
     @Test
     void exceptionArgumentResolverProvider_doesNotSupportNonThrowable() throws Exception {
-        ExceptionHandlerExceptionResolver.ExceptionArgumentResolverProvider provider =
-                new ExceptionHandlerExceptionResolver.ExceptionArgumentResolverProvider();
+        ExceptionHandlerExceptionResolver.ExceptionArgumentResolverProvider provider = new ExceptionHandlerExceptionResolver.ExceptionArgumentResolverProvider();
 
         Method sampleMethod = DummyHandler.class.getMethod("handleString", String.class);
         MethodParameter stringParam = new MethodParameter(sampleMethod, 0);
@@ -59,8 +58,7 @@ class ExceptionHandlerExceptionResolverTest {
 
     @Test
     void exceptionArgumentResolverProvider_getResolver_returnsResolver() throws Exception {
-        ExceptionHandlerExceptionResolver.ExceptionArgumentResolverProvider provider =
-                new ExceptionHandlerExceptionResolver.ExceptionArgumentResolverProvider();
+        ExceptionHandlerExceptionResolver.ExceptionArgumentResolverProvider provider = new ExceptionHandlerExceptionResolver.ExceptionArgumentResolverProvider();
 
         Method sampleMethod = DummyHandler.class.getMethod("handleException", Throwable.class);
         MethodParameter param = new MethodParameter(sampleMethod, 0);
@@ -71,8 +69,7 @@ class ExceptionHandlerExceptionResolverTest {
 
     @Test
     void exceptionArgumentResolverProvider_getResolver_resolvesFromRequestContext() throws Exception {
-        ExceptionHandlerExceptionResolver.ExceptionArgumentResolverProvider provider =
-                new ExceptionHandlerExceptionResolver.ExceptionArgumentResolverProvider();
+        ExceptionHandlerExceptionResolver.ExceptionArgumentResolverProvider provider = new ExceptionHandlerExceptionResolver.ExceptionArgumentResolverProvider();
 
         Method sampleMethod = DummyHandler.class.getMethod("handleException", Throwable.class);
         MethodParameter param = new MethodParameter(sampleMethod, 0);
@@ -236,36 +233,48 @@ class ExceptionHandlerExceptionResolverTest {
     // ---- handler classes for isExplicitRseHandler tests ----
 
     static class DummyHandler {
-        public void handleException(Throwable t) {}
-        public void handleString(String s) {}
+        public void handleException(Throwable t) {
+        }
+
+        public void handleString(String s) {
+        }
     }
 
     @SuppressWarnings("serial")
     static class SubResponseStatusException extends ResponseStatusException {
-        SubResponseStatusException() { super(HttpStatus.NOT_FOUND); }
+        SubResponseStatusException() {
+            super(HttpStatus.NOT_FOUND);
+        }
     }
 
     // 各种 @ExceptionHandler 声明方式
     static class RseExplicitHandler {
         @ExceptionHandler(ResponseStatusException.class)
-        public void handleRse(ResponseStatusException e) {}
+        public void handleRse(ResponseStatusException e) {
+        }
 
         @ExceptionHandler(SubResponseStatusException.class)
-        public void handleSubRse(SubResponseStatusException e) {}
+        public void handleSubRse(SubResponseStatusException e) {
+        }
 
-        @ExceptionHandler({ResponseStatusException.class, IllegalArgumentException.class})
-        public void handleRseAndIae(ResponseStatusException e) {}
+        @ExceptionHandler({ ResponseStatusException.class, IllegalArgumentException.class })
+        public void handleRseAndIae(ResponseStatusException e) {
+        }
 
         @ExceptionHandler(Throwable.class)
-        public void handleThrowable(Throwable e) {}
+        public void handleThrowable(Throwable e) {
+        }
 
         @ExceptionHandler(RuntimeException.class)
-        public void handleRuntimeException(RuntimeException e) {}
+        public void handleRuntimeException(RuntimeException e) {
+        }
 
         @ExceptionHandler(Exception.class)
-        public void handleException(Exception e) {}
+        public void handleException(Exception e) {
+        }
 
         @ExceptionHandler(IllegalArgumentException.class)
-        public void handleIae(IllegalArgumentException e) {}
+        public void handleIae(IllegalArgumentException e) {
+        }
     }
 }

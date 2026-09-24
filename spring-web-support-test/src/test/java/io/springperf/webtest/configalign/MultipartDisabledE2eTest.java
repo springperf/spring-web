@@ -19,20 +19,14 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * {@code spring.servlet.multipart.enabled=false} E2E：multipart 解析关闭后，
- * 管线不做聚合，getParts 返回空集合（请求体不消费为 part）。
+ * {@code spring.servlet.multipart.enabled=false} E2E：multipart 解析关闭后， 管线不做聚合，getParts 返回空集合（请求体不消费为 part）。
  */
-@SpringBootTest(classes = {io.springperf.webtest.SupportTestApplication.class,
-                MultipartDisabledE2eTest.DisabledConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "spring.servlet.multipart.enabled=false")
+@SpringBootTest(classes = { io.springperf.webtest.SupportTestApplication.class,
+        MultipartDisabledE2eTest.DisabledConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "spring.servlet.multipart.enabled=false")
 class MultipartDisabledE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .writeTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).writeTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
@@ -41,11 +35,9 @@ class MultipartDisabledE2eTest {
     void multipartDisabled_partsNotParsed() throws Exception {
         okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder()
                 .url("http://localhost:" + port + "/api/e2e-mp-disabled")
-                .post(new MultipartBody.Builder()
-                        .setType(MultipartBody.FORM)
+                .post(new MultipartBody.Builder().setType(MultipartBody.FORM)
                         .addFormDataPart("file", "f.bin",
-                                RequestBody.create(new byte[100],
-                                        MediaType.parse("application/octet-stream")))
+                                RequestBody.create(new byte[100], MediaType.parse("application/octet-stream")))
                         .build())
                 .build()).execute();
         try {

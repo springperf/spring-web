@@ -1,14 +1,15 @@
 package io.springperf.web.core.codec.interceptor;
 
-import io.springperf.web.context.WebComponent;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.when;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.method.ControllerAdviceBean;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
+import io.springperf.web.context.WebComponent;
 
 @ExtendWith(MockitoExtension.class)
 class WebComponentControllerAdviceBeanTest {
@@ -43,7 +44,8 @@ class WebComponentControllerAdviceBeanTest {
     void constructor_withComponentName() {
         Object realBean = new Object();
 
-        WebComponentControllerAdviceBean<Object> wrapper = new WebComponentControllerAdviceBean<>("myComponent", realBean);
+        WebComponentControllerAdviceBean<Object> wrapper = new WebComponentControllerAdviceBean<>("myComponent",
+                realBean);
 
         assertSame(realBean, wrapper.getComponent());
         assertEquals("myComponent", wrapper.getComponentName());

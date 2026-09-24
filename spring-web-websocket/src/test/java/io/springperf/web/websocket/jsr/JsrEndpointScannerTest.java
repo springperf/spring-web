@@ -18,7 +18,8 @@ import static org.mockito.Mockito.when;
 class JsrEndpointScannerTest {
 
     @ServerEndpoint("/ws/scanned")
-    public static class ScannedEndpoint {}
+    public static class ScannedEndpoint {
+    }
 
     @Configuration
     static class TestConfig {
@@ -80,22 +81,21 @@ class JsrEndpointScannerTest {
     void scan_classpathDiscovery_findsAnnotatedEndpoint() {
         // 注册 AutoConfigurationPackages 基准包 → scanClasspath() 通过 classpath 扫描命中 @ServerEndpoint
         try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext(TestConfig.class)) {
-            org.springframework.boot.autoconfigure.AutoConfigurationPackages.register(
-                    ctx.getDefaultListableBeanFactory(), "io.springperf.web.websocket.jsr");
+            org.springframework.boot.autoconfigure.AutoConfigurationPackages
+                    .register(ctx.getDefaultListableBeanFactory(), "io.springperf.web.websocket.jsr");
 
             JsrEndpointScanner scanner = new JsrEndpointScanner(ctx);
             List<Class<?>> classes = scanner.scan();
 
-            assertTrue(classes.contains(ScannedEndpoint.class),
-                    "classpath 扫描应发现 @ServerEndpoint 类");
+            assertTrue(classes.contains(ScannedEndpoint.class), "classpath 扫描应发现 @ServerEndpoint 类");
         }
     }
 
     @Test
     void scan_dedupsClasspathAndBeanResults() {
         try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext()) {
-            org.springframework.boot.autoconfigure.AutoConfigurationPackages.register(
-                    ctx.getDefaultListableBeanFactory(), "io.springperf.web.websocket.jsr");
+            org.springframework.boot.autoconfigure.AutoConfigurationPackages
+                    .register(ctx.getDefaultListableBeanFactory(), "io.springperf.web.websocket.jsr");
             ctx.register(TestConfig.class);
             ctx.refresh();
 
@@ -112,7 +112,7 @@ class JsrEndpointScannerTest {
         // 容器返回 type=null 的 bean 名应被安全跳过
         ApplicationContext ctx = mock(ApplicationContext.class);
         when(ctx.getParent()).thenReturn(null);
-        when(ctx.getBeanNamesForAnnotation(ServerEndpoint.class)).thenReturn(new String[]{"ghost"});
+        when(ctx.getBeanNamesForAnnotation(ServerEndpoint.class)).thenReturn(new String[] { "ghost" });
         when(ctx.getType("ghost")).thenReturn(null);
         JsrEndpointScanner scanner = new JsrEndpointScanner(ctx);
         assertTrue(scanner.scan().isEmpty());

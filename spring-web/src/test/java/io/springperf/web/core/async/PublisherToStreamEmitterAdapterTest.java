@@ -1,9 +1,10 @@
 package io.springperf.web.core.async;
 
-import io.springperf.web.core.async.reactive.PublisherToStreamEmitterAdapter;
-import io.springperf.web.core.async.reactive.ReactiveConfig;
-import io.springperf.web.core.async.stream.SseEmitter;
-import io.springperf.web.core.async.stream.StreamSender;
+import static org.mockito.Mockito.*;
+
+import java.io.IOException;
+import java.util.function.Consumer;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,10 +14,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.reactivestreams.Subscription;
 import org.springframework.core.ReactiveAdapter;
 
-import java.io.IOException;
-import java.util.function.Consumer;
-
-import static org.mockito.Mockito.*;
+import io.springperf.web.core.async.reactive.PublisherToStreamEmitterAdapter;
+import io.springperf.web.core.async.reactive.ReactiveConfig;
+import io.springperf.web.core.async.stream.SseEmitter;
+import io.springperf.web.core.async.stream.StreamSender;
 
 @ExtendWith(MockitoExtension.class)
 class PublisherToStreamEmitterAdapterTest {

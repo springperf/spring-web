@@ -12,22 +12,15 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 静态资源深度语义 E2E：条件请求（ETag/If-None-Match → 304、Last-Modified/If-Modified-Since → 304）、
- * HEAD 元数据（Content-Length 保留、无 body）、目录 welcome page（index.html）、
- * 路径穿越防护（../ → 404）、gzip 预压缩变体（*.gz + Accept-Encoding → Content-Encoding: gzip）。
+ * 静态资源深度语义 E2E：条件请求（ETag/If-None-Match → 304、Last-Modified/If-Modified-Since → 304）、 HEAD 元数据（Content-Length 保留、无
+ * body）、目录 welcome page（index.html）、 路径穿越防护（../ → 404）、gzip 预压缩变体（*.gz + Accept-Encoding → Content-Encoding: gzip）。
  */
-@SpringBootTest(classes = ConfigAlignTestApp.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "spring.web.resources.add-mappings=true"
-        })
+@SpringBootTest(classes = ConfigAlignTestApp.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+        "server.servlet.context-path=/", "spring.web.resources.add-mappings=true" })
 class StaticResourceDeepE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
@@ -102,10 +95,8 @@ class StaticResourceDeepE2eTest {
             full.close();
         }
 
-        okhttp3.Response head = call(CLIENT, new okhttp3.Request.Builder()
-                .url(url("/e2e-note.txt"))
-                .header("Accept-Encoding", "identity")
-                .head().build());
+        okhttp3.Response head = call(CLIENT, new okhttp3.Request.Builder().url(url("/e2e-note.txt"))
+                .header("Accept-Encoding", "identity").head().build());
         try {
             assertEquals(200, head.code(), "HEAD 应 200");
             assertEquals(0, head.body().bytes().length, "HEAD 不应返回 body");
@@ -123,8 +114,7 @@ class StaticResourceDeepE2eTest {
         okhttp3.Response resp = get("/e2e-welcome/");
         try {
             assertEquals(200, resp.code(), "目录路径应回退 index.html welcome page");
-            assertTrue(resp.body().string().contains("e2e-welcome-index"),
-                    "应返回 index.html 内容");
+            assertTrue(resp.body().string().contains("e2e-welcome-index"), "应返回 index.html 内容");
         } finally {
             resp.close();
         }
@@ -136,8 +126,7 @@ class StaticResourceDeepE2eTest {
     void pathTraversal_rejectedAs404() throws Exception {
         okhttp3.Response resp = get("/e2e-note.txt/../../application.properties");
         try {
-            assertTrue(resp.code() == 404 || resp.code() == 400,
-                    "路径穿越应被拒绝（404/400），实际 " + resp.code());
+            assertTrue(resp.code() == 404 || resp.code() == 400, "路径穿越应被拒绝（404/400），实际 " + resp.code());
         } finally {
             resp.close();
         }
@@ -160,8 +149,7 @@ class StaticResourceDeepE2eTest {
         okhttp3.Response resp = get("/e2e-note.txt", "Accept-Encoding", "gzip");
         try {
             assertEquals(200, resp.code());
-            assertEquals("gzip", resp.header("Content-Encoding"),
-                    "存在 .gz 预压缩变体时应返回 Content-Encoding: gzip");
+            assertEquals("gzip", resp.header("Content-Encoding"), "存在 .gz 预压缩变体时应返回 Content-Encoding: gzip");
         } finally {
             resp.close();
         }
@@ -172,8 +160,7 @@ class StaticResourceDeepE2eTest {
         okhttp3.Response resp = get("/e2e-note.txt");
         try {
             assertEquals(200, resp.code());
-            assertEquals(null, resp.header("Content-Encoding"),
-                    "未声明 Accept-Encoding: gzip 时不应返回压缩变体");
+            assertEquals(null, resp.header("Content-Encoding"), "未声明 Accept-Encoding: gzip 时不应返回压缩变体");
         } finally {
             resp.close();
         }

@@ -6,8 +6,7 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 /**
- * WebSocket E2E 测试用 path variable echo handler。
- * 回显消息时附加路径变量 roomId 的值。
+ * WebSocket E2E 测试用 path variable echo handler。 回显消息时附加路径变量 roomId 的值。
  */
 @Slf4j
 public class WebSocketPathEchoHandler extends TextWebSocketHandler {

@@ -8,9 +8,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 
 /**
  * E2E：Servlet 场景下 Thymeleaf 模板读取真实 session / principal。
- *
- * <p>验证 {@code ServletWebExchangeProvider} 提供的 {@code IWebExchange} 使
- * Thymeleaf 的 {@code #session} 表达式对象可用（原生场景下为 null）。</p>
+ * <p>
+ * 验证 {@code ServletWebExchangeProvider} 提供的 {@code IWebExchange} 使 Thymeleaf 的 {@code #session} 表达式对象可用（原生场景下为 null）。
+ * </p>
  */
 @Controller
 public class ThymeleafSessionViewController {

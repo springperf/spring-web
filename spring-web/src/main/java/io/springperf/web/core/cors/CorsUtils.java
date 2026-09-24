@@ -1,5 +1,7 @@
 package io.springperf.web.core.cors;
 
+import java.net.URI;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.server.ServerHttpRequest;
@@ -8,15 +10,15 @@ import org.springframework.util.Assert;
 import org.springframework.web.util.UriComponents;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.net.URI;
-
 public abstract class CorsUtils {
 
     /**
-     * Returns {@code true} if the request is a valid CORS one by checking
-     * the {@code Origin} header against the request URI.
+     * Returns {@code true} if the request is a valid CORS one by checking the {@code Origin} header against the request
+     * URI.
      *
-     * @param request the HTTP request to check
+     * @param request
+     *            the HTTP request to check
+     *
      * @return {@code true} if the request has a cross-origin {@code Origin} header
      */
     @SuppressWarnings("deprecation")
@@ -35,9 +37,8 @@ public abstract class CorsUtils {
         Assert.isTrue(actualPort != -1, "Actual request port must not be undefined");
 
         UriComponents originUrl = UriComponentsBuilder.fromOriginHeader(origin).build();
-        boolean isSameOrigin = (actualScheme.equals(originUrl.getScheme()) &&
-                actualHost.equals(originUrl.getHost()) &&
-                actualPort == getPort(originUrl.getScheme(), originUrl.getPort()));
+        boolean isSameOrigin = (actualScheme.equals(originUrl.getScheme()) && actualHost.equals(originUrl.getHost())
+                && actualPort == getPort(originUrl.getScheme(), originUrl.getPort()));
         return !isSameOrigin;
     }
 
@@ -45,7 +46,9 @@ public abstract class CorsUtils {
      * Returns {@code true} if the request is a valid CORS pre-flight one by checking {@code OPTIONS} method with
      * {@code Origin} and {@code Access-Control-Request-Method} headers presence.
      *
-     * @param request the HTTP request to check
+     * @param request
+     *            the HTTP request to check
+     *
      * @return {@code true} if the request is a CORS preflight
      */
     public static boolean isPreFlightRequest(ServerHttpRequest request) {

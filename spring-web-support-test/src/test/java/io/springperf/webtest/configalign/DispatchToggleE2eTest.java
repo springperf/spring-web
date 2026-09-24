@@ -17,23 +17,17 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code spring.mvc.dispatch.trace/options=false} E2E（真实管线）：
- * TRACE 请求 404；非预检 OPTIONS 404；CORS 预检仍被框架处理（200 + CORS 头）——
+ * {@code spring.mvc.dispatch.trace/options=false} E2E（真实管线）： TRACE 请求 404；非预检 OPTIONS 404；CORS 预检仍被框架处理（200 + CORS 头）——
  * 预检是框架级能力，不受用户路由分发开关影响。
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, DispatchToggleE2eTest.CorsConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "spring.mvc.dispatch.trace=false",
-                "spring.mvc.dispatch.options=false"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        DispatchToggleE2eTest.CorsConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "spring.mvc.dispatch.trace=false",
+                "spring.mvc.dispatch.options=false" })
 class DispatchToggleE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
@@ -67,8 +61,7 @@ class DispatchToggleE2eTest {
     void traceDisabled_returns404() throws Exception {
         okhttp3.Response resp = send("TRACE");
         try {
-            assertEquals(404, resp.code(),
-                    "dispatch.trace=false 时 TRACE 应 404（端点存在，见 getBaseline），实际 " + resp.code());
+            assertEquals(404, resp.code(), "dispatch.trace=false 时 TRACE 应 404（端点存在，见 getBaseline），实际 " + resp.code());
         } finally {
             resp.close();
         }
@@ -87,12 +80,10 @@ class DispatchToggleE2eTest {
 
     @Test
     void optionsDisabled_preflightStillHandled() throws Exception {
-        okhttp3.Response resp = send("OPTIONS",
-                "Origin", "https://example.com",
-                "Access-Control-Request-Method", "GET");
+        okhttp3.Response resp = send("OPTIONS", "Origin", "https://example.com", "Access-Control-Request-Method",
+                "GET");
         try {
-            assertEquals(200, resp.code(),
-                    "CORS 预检不受 OPTIONS 分发开关影响，实际 " + resp.code());
+            assertEquals(200, resp.code(), "CORS 预检不受 OPTIONS 分发开关影响，实际 " + resp.code());
             assertTrue(resp.header("Access-Control-Allow-Origin") != null,
                     "预检响应应带 CORS 头，实际 headers=" + resp.headers());
         } finally {
@@ -105,8 +96,7 @@ class DispatchToggleE2eTest {
         /** 框架原生 CorsRegistration 组件：自动注册进 CorsRegistry（供预检分支处理）。 */
         @Bean
         io.springperf.web.core.cors.CorsRegistration e2eCorsRegistration() {
-            return new io.springperf.web.core.cors.CorsRegistration("/**")
-                    .allowedOrigins("https://example.com")
+            return new io.springperf.web.core.cors.CorsRegistration("/**").allowedOrigins("https://example.com")
                     .allowedMethods("GET", "POST");
         }
 

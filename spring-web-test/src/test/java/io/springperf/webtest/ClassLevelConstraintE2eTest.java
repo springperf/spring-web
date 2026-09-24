@@ -22,10 +22,7 @@ public class ClassLevelConstraintE2eTest extends BaseE2ETest {
     @Test
     void postJson_shouldReturn200() throws Exception {
         RequestBody body = RequestBody.create(JSON, "{}");
-        Request req = new Request.Builder()
-                .url(baseUrl())
-                .post(body)
-                .build();
+        Request req = new Request.Builder().url(baseUrl()).post(body).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
         }
@@ -33,10 +30,7 @@ public class ClassLevelConstraintE2eTest extends BaseE2ETest {
 
     @Test
     void getMethod_shouldReturn405() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl())
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl()).get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(405, resp.code());
         }

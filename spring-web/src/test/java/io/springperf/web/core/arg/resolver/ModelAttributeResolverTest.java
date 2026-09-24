@@ -1,11 +1,10 @@
 package io.springperf.web.core.arg.resolver;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.mapping.MappingHandlerMethod;
-import io.springperf.web.http.RequestAttribute;
-import io.springperf.web.http.RequestContext;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.lang.reflect.Method;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -15,10 +14,12 @@ import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
 
-import java.lang.reflect.Method;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.http.RequestAttribute;
+import io.springperf.web.http.RequestContext;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 class ModelAttributeResolverTest {
@@ -54,8 +55,8 @@ class ModelAttributeResolverTest {
         Method method = getClass().getMethod("modelParam", ModelAttrBean.class);
         MethodParameter mp = new MethodParameter(method, 0);
 
-        ModelAttributeResolver resolver = new ModelAttributeResolver(
-                binderFactory, webContext, mappingContext, mp, "modelParam", true);
+        ModelAttributeResolver resolver = new ModelAttributeResolver(binderFactory, webContext, mappingContext, mp,
+                "modelParam", true);
 
         Object attr = resolver.constructAttribute();
         assertNotNull(attr);
@@ -67,8 +68,8 @@ class ModelAttributeResolverTest {
         Method method = getClass().getMethod("modelParam", ModelAttrBean.class);
         MethodParameter mp = new MethodParameter(method, 0);
 
-        ModelAttributeResolver resolver = new ModelAttributeResolver(
-                binderFactory, webContext, mappingContext, mp, "modelParam", true);
+        ModelAttributeResolver resolver = new ModelAttributeResolver(binderFactory, webContext, mappingContext, mp,
+                "modelParam", true);
 
         assertNotNull(resolver.constructor);
     }
@@ -78,8 +79,8 @@ class ModelAttributeResolverTest {
         Method method = getClass().getMethod("noDefaultCtorParam", NoDefaultCtorBean.class);
         MethodParameter mp = new MethodParameter(method, 0);
 
-        assertThrows(IllegalStateException.class, () ->
-                new ModelAttributeResolver(binderFactory, webContext, mappingContext, mp, "bean", true));
+        assertThrows(IllegalStateException.class,
+                () -> new ModelAttributeResolver(binderFactory, webContext, mappingContext, mp, "bean", true));
     }
 
     @Test
@@ -88,14 +89,13 @@ class ModelAttributeResolverTest {
         Method method = getClass().getMethod("modelParam", ModelAttrBean.class);
         MethodParameter mp = new MethodParameter(method, 0);
 
-        when(binderFactory.createBinder(any(NativeWebRequest.class), any(), eq("modelParam")))
-                .thenReturn(dataBinder);
+        when(binderFactory.createBinder(any(NativeWebRequest.class), any(), eq("modelParam"))).thenReturn(dataBinder);
         when(dataBinder.getTarget()).thenReturn(new ModelAttrBean());
         // 静态 PerfDataBinder.bind 走非 PerfDataBinder 分支：binder.bind(MutablePropertyValues)
         when(request.getParameterMapArray()).thenReturn(java.util.Collections.emptyMap());
 
-        ModelAttributeResolver resolver = new ModelAttributeResolver(
-                binderFactory, webContext, mappingContext, mp, "modelParam", true);
+        ModelAttributeResolver resolver = new ModelAttributeResolver(binderFactory, webContext, mappingContext, mp,
+                "modelParam", true);
 
         Object result = resolver.resolveArgument(request, response);
         assertInstanceOf(ModelAttrBean.class, result);
@@ -108,12 +108,11 @@ class ModelAttributeResolverTest {
         Method method = getClass().getMethod("modelParam", ModelAttrBean.class);
         MethodParameter mp = new MethodParameter(method, 0);
 
-        when(binderFactory.createBinder(any(NativeWebRequest.class), any(), eq("modelParam")))
-                .thenReturn(dataBinder);
+        when(binderFactory.createBinder(any(NativeWebRequest.class), any(), eq("modelParam"))).thenReturn(dataBinder);
         when(dataBinder.getTarget()).thenReturn(new ModelAttrBean());
 
-        ModelAttributeResolver resolver = new ModelAttributeResolver(
-                binderFactory, webContext, mappingContext, mp, "modelParam", false);
+        ModelAttributeResolver resolver = new ModelAttributeResolver(binderFactory, webContext, mappingContext, mp,
+                "modelParam", false);
 
         Object result = resolver.resolveArgument(request, response);
         assertInstanceOf(ModelAttrBean.class, result);
@@ -121,19 +120,28 @@ class ModelAttributeResolverTest {
     }
 
     @SuppressWarnings("unused")
-    public void modelParam(ModelAttrBean bean) {}
+    public void modelParam(ModelAttrBean bean) {
+    }
 
     @SuppressWarnings("unused")
-    public void noDefaultCtorParam(NoDefaultCtorBean bean) {}
+    public void noDefaultCtorParam(NoDefaultCtorBean bean) {
+    }
 
     public static class ModelAttrBean {
         private String name;
-        public String getName() { return name; }
-        public void setName(String name) { this.name = name; }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
     }
 
     public static class NoDefaultCtorBean {
         @SuppressWarnings("unused")
-        public NoDefaultCtorBean(String name) {}
+        public NoDefaultCtorBean(String name) {
+        }
     }
 }

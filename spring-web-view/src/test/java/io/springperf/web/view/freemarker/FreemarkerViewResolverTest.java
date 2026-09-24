@@ -27,9 +27,11 @@ class FreemarkerViewResolverTest {
     @BeforeEach
     void setUp() {
         props = mock(ApplicationProperties.class);
-        when(props.get(ViewProperties.FREEMARKER_PREFIX, ViewProperties.FREEMARKER_PREFIX_DEFAULT)).thenReturn("templates/");
+        when(props.get(ViewProperties.FREEMARKER_PREFIX, ViewProperties.FREEMARKER_PREFIX_DEFAULT))
+                .thenReturn("templates/");
         when(props.get(ViewProperties.FREEMARKER_SUFFIX, ViewProperties.FREEMARKER_SUFFIX_DEFAULT)).thenReturn(".ftl");
-        when(props.getBoolean(ViewProperties.FREEMARKER_CACHE, ViewProperties.FREEMARKER_CACHE_DEFAULT)).thenReturn(true);
+        when(props.getBoolean(ViewProperties.FREEMARKER_CACHE, ViewProperties.FREEMARKER_CACHE_DEFAULT))
+                .thenReturn(true);
         webContext = mock(WebContext.class);
         when(webContext.getProps()).thenReturn(props);
     }
@@ -90,14 +92,12 @@ class FreemarkerViewResolverTest {
         // template.setOutputEncoding(...)，在并发渲染同一视图时产生数据竞争并互相覆盖编码。
         java.lang.reflect.Field templateField = view.getClass().getDeclaredField("template");
         templateField.setAccessible(true);
-        freemarker.template.Template template =
-                (freemarker.template.Template) templateField.get(view);
+        freemarker.template.Template template = (freemarker.template.Template) templateField.get(view);
 
         int threads = 32;
         java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
         java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(threads);
-        java.util.List<Throwable> errors =
-                java.util.Collections.synchronizedList(new java.util.ArrayList<Throwable>());
+        java.util.List<Throwable> errors = java.util.Collections.synchronizedList(new java.util.ArrayList<Throwable>());
         for (int i = 0; i < threads; i++) {
             final int idx = i;
             Thread t = new Thread(() -> {

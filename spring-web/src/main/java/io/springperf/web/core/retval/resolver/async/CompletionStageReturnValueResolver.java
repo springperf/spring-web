@@ -1,14 +1,15 @@
 package io.springperf.web.core.retval.resolver.async;
 
-import io.springperf.web.core.mapping.MappingHandlerMethod;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
-import org.springframework.core.MethodParameter;
-import org.springframework.web.context.request.async.DeferredResult;
-
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.function.BiFunction;
+
+import org.springframework.core.MethodParameter;
+import org.springframework.web.context.request.async.DeferredResult;
+
+import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 public class CompletionStageReturnValueResolver extends BaseAsyncReturnValueResolver {
     @Override
@@ -22,7 +23,8 @@ public class CompletionStageReturnValueResolver extends BaseAsyncReturnValueReso
     }
 
     @Override
-    public void resolveReturnValue(Object returnValue, MethodParameter returnType, WebServerHttpRequest req, WebServerHttpResponse resp) throws Exception {
+    public void resolveReturnValue(Object returnValue, MethodParameter returnType, WebServerHttpRequest req,
+            WebServerHttpResponse resp) throws Exception {
         CompletionStage future = (CompletionStage) returnValue;
         DeferredResult result = adaptCompletionStage(future);
         asyncSupportRegistry.startDeferredResultProcessing(req, resp, result);

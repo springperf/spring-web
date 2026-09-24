@@ -25,26 +25,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * CORS 深水区 E2E（经 {@code WebMvcConfigurer.addCorsMappings} 桥接到框架 CorsRegistry）：
- *
  * <ul>
- *   <li>预检（OPTIONS + Origin + ACRM）：允许 → 200 且带完整允许头；不允许的来源/方法/请求头 → 403 且无 ACAO；</li>
- *   <li>普通请求：带 Origin → ACAO/Vary/Expose-Headers；不带 Origin → 不写 ACAO（但仍写 Vary，避免缓存串味）；</li>
- *   <li>allowCredentials=true 时 ACAO 回显来源（规范禁止与 {@code *} 并用）；</li>
- *   <li>{@code @CrossOrigin} 方法级配置；</li>
- *   <li>错误响应上的 CORS：500（处理器已解析、CORS 先于调用生效）保留 CORS 头；
- *       405（处理器解析阶段即失败）无 CORS 头——与 Spring MVC 行为一致。</li>
+ * <li>预检（OPTIONS + Origin + ACRM）：允许 → 200 且带完整允许头；不允许的来源/方法/请求头 → 403 且无 ACAO；</li>
+ * <li>普通请求：带 Origin → ACAO/Vary/Expose-Headers；不带 Origin → 不写 ACAO（但仍写 Vary，避免缓存串味）；</li>
+ * <li>allowCredentials=true 时 ACAO 回显来源（规范禁止与 {@code *} 并用）；</li>
+ * <li>{@code @CrossOrigin} 方法级配置；</li>
+ * <li>错误响应上的 CORS：500（处理器已解析、CORS 先于调用生效）保留 CORS 头； 405（处理器解析阶段即失败）无 CORS 头——与 Spring MVC 行为一致。</li>
  * </ul>
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, CorsE2eTest.CorsConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "server.servlet.context-path=/")
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        CorsE2eTest.CorsConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "server.servlet.context-path=/")
 class CorsE2eTest {
 
     private static final String ALLOWED = "https://allowed.example";
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
@@ -54,17 +49,16 @@ class CorsE2eTest {
     }
 
     /**
-     * Vary 是多条独立响应头（Origin / Access-Control-Request-Method / Access-Control-Request-Headers），
-     * OkHttp 的 {@code header()} 只返回最后一条，故此处合并全部同名头再判定。
+     * Vary 是多条独立响应头（Origin / Access-Control-Request-Method / Access-Control-Request-Headers）， OkHttp 的 {@code header()}
+     * 只返回最后一条，故此处合并全部同名头再判定。
      */
     private static String varyJoined(Response resp) {
         return String.join(",", resp.headers("Vary"));
     }
 
     private Response preflight(String path, String origin, String method, String reqHeaders) throws Exception {
-        Request.Builder b = new Request.Builder()
-                .url("http://localhost:" + port + path)
-                .method("OPTIONS", RequestBody.create(new byte[0], null));
+        Request.Builder b = new Request.Builder().url("http://localhost:" + port + path).method("OPTIONS",
+                RequestBody.create(new byte[0], null));
         if (origin != null) {
             b.header("Origin", origin);
         }
@@ -84,18 +78,14 @@ class CorsE2eTest {
         Response resp = preflight("/e2e-cors/plain", ALLOWED, "GET", null);
         try {
             assertEquals(200, resp.code(), "允许的预检应 200，实际 " + resp.code());
-            assertEquals(ALLOWED, resp.header("Access-Control-Allow-Origin"),
-                    "allowCredentials=true 时必须回显来源而非 *");
+            assertEquals(ALLOWED, resp.header("Access-Control-Allow-Origin"), "allowCredentials=true 时必须回显来源而非 *");
             String methods = resp.header("Access-Control-Allow-Methods");
-            assertTrue(methods != null && methods.contains("GET"),
-                    "应声明允许方法，实际 " + methods);
+            assertTrue(methods != null && methods.contains("GET"), "应声明允许方法，实际 " + methods);
             assertEquals("true", resp.header("Access-Control-Allow-Credentials"),
                     "allowCredentials(true) 应下发 ACAC=true");
-            assertEquals("1800", resp.header("Access-Control-Max-Age"),
-                    "maxAge(1800) 应下发 Access-Control-Max-Age");
+            assertEquals("1800", resp.header("Access-Control-Max-Age"), "maxAge(1800) 应下发 Access-Control-Max-Age");
             String vary = varyJoined(resp);
-            assertTrue(vary != null && vary.contains("Origin"),
-                    "预检响应应 Vary: Origin（缓存正确性），实际 " + vary);
+            assertTrue(vary != null && vary.contains("Origin"), "预检响应应 Vary: Origin（缓存正确性），实际 " + vary);
             assertTrue(vary.contains("Access-Control-Request-Method"),
                     "预检响应应 Vary: Access-Control-Request-Method，实际 " + vary);
         } finally {
@@ -108,8 +98,7 @@ class CorsE2eTest {
         Response resp = preflight("/e2e-cors/plain", "https://evil.example", "GET", null);
         try {
             assertEquals(403, resp.code(), "非允许来源的预检应被拒绝，实际 " + resp.code());
-            assertNull(resp.header("Access-Control-Allow-Origin"),
-                    "被拒绝的预检不得下发 ACAO");
+            assertNull(resp.header("Access-Control-Allow-Origin"), "被拒绝的预检不得下发 ACAO");
         } finally {
             resp.close();
         }
@@ -156,10 +145,8 @@ class CorsE2eTest {
 
     @Test
     void simpleRequest_allowedOrigin_setsAcaoAndExposeHeaders() throws Exception {
-        Response resp = send(new Request.Builder()
-                .url("http://localhost:" + port + "/e2e-cors/plain")
-                .header("Origin", ALLOWED)
-                .get().build());
+        Response resp = send(new Request.Builder().url("http://localhost:" + port + "/e2e-cors/plain")
+                .header("Origin", ALLOWED).get().build());
         try {
             assertEquals(200, resp.code());
             assertEquals(ALLOWED, resp.header("Access-Control-Allow-Origin"));
@@ -174,16 +161,12 @@ class CorsE2eTest {
 
     @Test
     void simpleRequest_withoutOrigin_noAcao() throws Exception {
-        Response resp = send(new Request.Builder()
-                .url("http://localhost:" + port + "/e2e-cors/plain")
-                .get().build());
+        Response resp = send(new Request.Builder().url("http://localhost:" + port + "/e2e-cors/plain").get().build());
         try {
             assertEquals(200, resp.code());
-            assertNull(resp.header("Access-Control-Allow-Origin"),
-                    "无 Origin 的请求不应下发 ACAO");
+            assertNull(resp.header("Access-Control-Allow-Origin"), "无 Origin 的请求不应下发 ACAO");
             // Vary 仍应存在：同一 URL 的响应随 Origin 变化，缓存必须按 Origin 区分
-            assertTrue(varyJoined(resp).contains("Origin"),
-                    "无 Origin 时也应保留 Vary: Origin，实际 " + varyJoined(resp));
+            assertTrue(varyJoined(resp).contains("Origin"), "无 Origin 时也应保留 Vary: Origin，实际 " + varyJoined(resp));
         } finally {
             resp.close();
         }
@@ -193,10 +176,8 @@ class CorsE2eTest {
 
     @Test
     void crossOriginAnnotation_ownPolicy_applied() throws Exception {
-        Response resp = send(new Request.Builder()
-                .url("http://localhost:" + port + "/e2e-cors/annotated")
-                .header("Origin", "https://annotation.example")
-                .get().build());
+        Response resp = send(new Request.Builder().url("http://localhost:" + port + "/e2e-cors/annotated")
+                .header("Origin", "https://annotation.example").get().build());
         try {
             assertEquals(200, resp.code());
             assertEquals("https://annotation.example", resp.header("Access-Control-Allow-Origin"),
@@ -210,14 +191,11 @@ class CorsE2eTest {
 
     @Test
     void errorResponse500_keepsCorsHeaders() throws Exception {
-        Response resp = send(new Request.Builder()
-                .url("http://localhost:" + port + "/e2e-cors/boom")
-                .header("Origin", ALLOWED)
-                .get().build());
+        Response resp = send(new Request.Builder().url("http://localhost:" + port + "/e2e-cors/boom")
+                .header("Origin", ALLOWED).get().build());
         try {
             assertEquals(500, resp.code(), "处理器抛异常应 500，实际 " + resp.code());
-            assertEquals(ALLOWED, resp.header("Access-Control-Allow-Origin"),
-                    "处理器已解析后抛异常：CORS 头必须保留，否则浏览器读不到错误详情");
+            assertEquals(ALLOWED, resp.header("Access-Control-Allow-Origin"), "处理器已解析后抛异常：CORS 头必须保留，否则浏览器读不到错误详情");
         } finally {
             resp.close();
         }
@@ -227,16 +205,13 @@ class CorsE2eTest {
     void methodMismatch405_hasNoCorsHeaders_aligningSpring() throws Exception {
         // 与 Spring MVC 一致：处理器解析阶段（CORS 之前）即判定方法不匹配，
         // 故 405 不带 CORS 头——浏览器将把该错误当作 CORS 失败。
-        Response resp = send(new Request.Builder()
-                .url("http://localhost:" + port + "/e2e-cors/plain")
-                .header("Origin", ALLOWED)
-                .delete().build());
+        Response resp = send(new Request.Builder().url("http://localhost:" + port + "/e2e-cors/plain")
+                .header("Origin", ALLOWED).delete().build());
         try {
             assertEquals(405, resp.code(), "GET-only 端点收到 DELETE 应 405，实际 " + resp.code());
             assertTrue(resp.header("Allow") != null && resp.header("Allow").contains("GET"),
                     "405 应带 Allow 头，实际 " + resp.header("Allow"));
-            assertNull(resp.header("Access-Control-Allow-Origin"),
-                    "Spring 语义：405 在 CORS 处理前产生，不带 ACAO");
+            assertNull(resp.header("Access-Control-Allow-Origin"), "Spring 语义：405 在 CORS 处理前产生，不带 ACAO");
         } finally {
             resp.close();
         }
@@ -247,13 +222,8 @@ class CorsE2eTest {
 
         @Override
         public void addCorsMappings(CorsRegistry registry) {
-            registry.addMapping("/e2e-cors/**")
-                    .allowedOrigins(ALLOWED)
-                    .allowedMethods("GET", "POST", "DELETE")
-                    .allowedHeaders("X-Custom")
-                    .exposedHeaders("X-Exposed")
-                    .allowCredentials(true)
-                    .maxAge(1800);
+            registry.addMapping("/e2e-cors/**").allowedOrigins(ALLOWED).allowedMethods("GET", "POST", "DELETE")
+                    .allowedHeaders("X-Custom").exposedHeaders("X-Exposed").allowCredentials(true).maxAge(1800);
         }
 
         @Bean

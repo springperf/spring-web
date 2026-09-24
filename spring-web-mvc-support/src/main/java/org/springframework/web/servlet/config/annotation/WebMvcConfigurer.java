@@ -27,26 +27,26 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
 import java.util.List;
 
 /**
- * Defines callback methods to customize the Java-based configuration for
- * Spring Web MVC via {@code @EnableWebMvc}.
- *
- * <p>{@code @EnableWebMvc}-annotated configuration classes may implement
- * this interface to be called back and given a chance to customize the
- * default configuration with the following options:
- *
- * <p>This interface extends {@link WebMvcConfigurer} with the ability
- * to configure additional features.
+ * Defines callback methods to customize the Java-based configuration for Spring Web MVC via {@code @EnableWebMvc}.
+ * <p>
+ * {@code @EnableWebMvc}-annotated configuration classes may implement this interface to be called back and given a
+ * chance to customize the default configuration with the following options:
+ * <p>
+ * This interface extends {@link WebMvcConfigurer} with the ability to configure additional features.
  *
  * @author Rossen Stoyanchev
+ *
  * @since 3.1
  */
 public interface WebMvcConfigurer {
 
     /**
-     * Helps with configuring HandlerMapping path matching options such as
-     * whether to use parsed {@code PathPatterns} or String pattern matching
-     * with {@code PathMatcher}, whether to match trailing slashes, and more.
-     * @param configurer the {@link PathMatchConfigurer} to customize
+     * Helps with configuring HandlerMapping path matching options such as whether to use parsed {@code PathPatterns} or
+     * String pattern matching with {@code PathMatcher}, whether to match trailing slashes, and more.
+     *
+     * @param configurer
+     *            the {@link PathMatchConfigurer} to customize
+     *
      * @since 4.1
      */
     default void configurePathMatch(PathMatchConfigurer configurer) {
@@ -54,32 +54,42 @@ public interface WebMvcConfigurer {
 
     /**
      * Configures content negotiation options.
-     * @param configurer the {@link ContentNegotiationConfigurer} to customize
+     *
+     * @param configurer
+     *            the {@link ContentNegotiationConfigurer} to customize
      */
     default void configureContentNegotiation(ContentNegotiationConfigurer configurer) {
     }
 
     /**
      * Configure asynchronous request handling options.
-     * @param configurer the {@link AsyncSupportConfigurer} to customize
+     *
+     * @param configurer
+     *            the {@link AsyncSupportConfigurer} to customize
+     *
      * @since 4.2
      */
     default void configureAsyncSupport(AsyncSupportConfigurer configurer) {
     }
 
     /**
-     * Configure a handler to defer to a default Servlet if the Spring
-     * MVC {@code DispatcherServlet} does not find a handler for a request.
-     * @param configurer the {@link DefaultServletHandlerConfigurer} to customize
+     * Configure a handler to defer to a default Servlet if the Spring MVC {@code DispatcherServlet} does not find a
+     * handler for a request.
+     *
+     * @param configurer
+     *            the {@link DefaultServletHandlerConfigurer} to customize
      */
     default void configureDefaultServletHandling(DefaultServletHandlerConfigurer configurer) {
     }
 
     /**
-     * Helps with registering {@code HandlerExceptionResolver} beans to
-     * handle exceptions from handlers.
-     * @param resolvers the list of configured resolvers
+     * Helps with registering {@code HandlerExceptionResolver} beans to handle exceptions from handlers.
+     *
+     * @param resolvers
+     *            the list of configured resolvers
+     *
      * @since 4.2
+     *
      * @deprecated use {@link #extendHandlerExceptionResolvers(List)} instead
      */
     @Deprecated
@@ -88,17 +98,23 @@ public interface WebMvcConfigurer {
 
     /**
      * Extending or modify the list of exception resolvers.
-     * @param resolvers the list of configured resolvers
+     *
+     * @param resolvers
+     *            the list of configured resolvers
+     *
      * @since 4.2
      */
     default void extendHandlerExceptionResolvers(List<HandlerExceptionResolver> resolvers) {
     }
 
     /**
-     * Helps with configuring the {@link org.springframework.validation.Validator}
-     * to use for validating model data.
-     * @param validator the validator registration to customize
+     * Helps with configuring the {@link org.springframework.validation.Validator} to use for validating model data.
+     *
+     * @param validator
+     *            the validator registration to customize
+     *
      * @since 4.3
+     *
      * @deprecated use {@link #configureValidator(ValidatorRegistration)} instead
      */
     @Deprecated
@@ -107,9 +123,11 @@ public interface WebMvcConfigurer {
     }
 
     /**
-     * Helps with configuring the {@link org.springframework.validation.Validator}
-     * to use for validating model data.
-     * @param validator the validator registration to customize
+     * Helps with configuring the {@link org.springframework.validation.Validator} to use for validating model data.
+     *
+     * @param validator
+     *            the validator registration to customize
+     *
      * @since 4.3
      */
     default void configureValidator(ValidatorRegistration validator) {
@@ -117,16 +135,21 @@ public interface WebMvcConfigurer {
 
     /**
      * Helps with configuring the {@link MessageCodesResolver}.
-     * @param messageCodesResolver the message codes resolver registration
+     *
+     * @param messageCodesResolver
+     *            the message codes resolver registration
+     *
      * @since 4.3
      */
     default void configureMessageCodesResolver(MessageCodesResolver messageCodesResolver) {
     }
 
     /**
-     * Add {@link HttpMessageConverter HttpMessageConverters} to use in the
-     * framework.
-     * @param converters a list to add converters to
+     * Add {@link HttpMessageConverter HttpMessageConverters} to use in the framework.
+     *
+     * @param converters
+     *            a list to add converters to
+     *
      * @deprecated use {@link #extendMessageConverters(List)} instead
      */
     @Deprecated
@@ -135,34 +158,43 @@ public interface WebMvcConfigurer {
 
     /**
      * Extend or modify the list of converters after it has been configured.
-     * @param converters a list of converters to modify
+     *
+     * @param converters
+     *            a list of converters to modify
+     *
      * @since 4.2
      */
     default void extendMessageConverters(List<HttpMessageConverter<?>> converters) {
     }
 
     /**
-     * Add custom {@link HandlerMethodReturnValueHandler HandlerMethodReturnValueHandlers}
-     * to use in the framework.
-     * @param handlers the list of return value handlers
+     * Add custom {@link HandlerMethodReturnValueHandler HandlerMethodReturnValueHandlers} to use in the framework.
+     *
+     * @param handlers
+     *            the list of return value handlers
+     *
      * @since 4.2
      */
     default void addReturnValueHandlers(List<HandlerMethodReturnValueHandler> handlers) {
     }
 
     /**
-     * Add custom {@link HandlerMethodArgumentResolver HandlerMethodArgumentResolvers}
-     * to use in the framework.
-     * @param resolvers the list of resolvers
+     * Add custom {@link HandlerMethodArgumentResolver HandlerMethodArgumentResolvers} to use in the framework.
+     *
+     * @param resolvers
+     *            the list of resolvers
+     *
      * @since 4.2
      */
     default void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
     }
 
     /**
-     * Configure view controllers to map requests directly to view names
-     * without the need for a controller.
-     * @param registry the view controller registry
+     * Configure view controllers to map requests directly to view names without the need for a controller.
+     *
+     * @param registry
+     *            the view controller registry
+     *
      * @since 4.3
      */
     default void addViewControllers(ViewControllerRegistry registry) {
@@ -170,16 +202,22 @@ public interface WebMvcConfigurer {
 
     /**
      * Configure view resolvers.
-     * @param registry the view resolver registry
+     *
+     * @param registry
+     *            the view resolver registry
+     *
      * @since 4.2
      */
     default void configureViewResolvers(ViewResolverRegistry registry) {
     }
 
     /**
-     * Add custom {@link org.springframework.web.servlet.HandlerInterceptor HandlerInterceptors}
-     * to use in the framework.
-     * @param registry the interceptor registry
+     * Add custom {@link org.springframework.web.servlet.HandlerInterceptor HandlerInterceptors} to use in the
+     * framework.
+     *
+     * @param registry
+     *            the interceptor registry
+     *
      * @since 4.2
      */
     default void addInterceptors(InterceptorRegistry registry) {
@@ -187,7 +225,10 @@ public interface WebMvcConfigurer {
 
     /**
      * Configure resource handling for serving static resources.
-     * @param registry the resource handler registry
+     *
+     * @param registry
+     *            the resource handler registry
+     *
      * @since 4.2
      */
     default void addResourceHandlers(ResourceHandlerRegistry registry) {
@@ -195,16 +236,22 @@ public interface WebMvcConfigurer {
 
     /**
      * Configure cross origin request processing.
-     * @param registry the CORS registry
+     *
+     * @param registry
+     *            the CORS registry
+     *
      * @since 4.2
      */
     default void addCorsMappings(CorsRegistry registry) {
     }
 
     /**
-     * Helps with configuring the {@link org.springframework.format.FormatterRegistry}
-     * such as adding formatters or converters.
-     * @param registry the formatter registry
+     * Helps with configuring the {@link org.springframework.format.FormatterRegistry} such as adding formatters or
+     * converters.
+     *
+     * @param registry
+     *            the formatter registry
+     *
      * @since 4.2
      */
     default void addFormatters(FormatterRegistry registry) {

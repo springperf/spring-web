@@ -31,9 +31,8 @@ class SupportInterceptorRegistryTest {
 
     @Test
     void convertInterceptorRegistration_copiesOrder() {
-        org.springframework.web.servlet.config.annotation.InterceptorRegistration reg =
-                new org.springframework.web.servlet.config.annotation.InterceptorRegistration(
-                        new TestHandlerInterceptor());
+        org.springframework.web.servlet.config.annotation.InterceptorRegistration reg = new org.springframework.web.servlet.config.annotation.InterceptorRegistration(
+                new TestHandlerInterceptor());
         reg.order(5);
 
         SupportInterceptorRegistry registry = new SupportInterceptorRegistry();
@@ -44,9 +43,8 @@ class SupportInterceptorRegistryTest {
 
     @Test
     void convertInterceptorRegistration_defaultOrderIsZero() {
-        org.springframework.web.servlet.config.annotation.InterceptorRegistration reg =
-                new org.springframework.web.servlet.config.annotation.InterceptorRegistration(
-                        new TestHandlerInterceptor());
+        org.springframework.web.servlet.config.annotation.InterceptorRegistration reg = new org.springframework.web.servlet.config.annotation.InterceptorRegistration(
+                new TestHandlerInterceptor());
 
         SupportInterceptorRegistry registry = new SupportInterceptorRegistry();
         InterceptorRegistration result = registry.convert(reg);
@@ -57,8 +55,8 @@ class SupportInterceptorRegistryTest {
     @Test
     void convertInterceptorRegistration_wrapsInterceptor() {
         TestHandlerInterceptor interceptor = new TestHandlerInterceptor();
-        org.springframework.web.servlet.config.annotation.InterceptorRegistration reg =
-                new org.springframework.web.servlet.config.annotation.InterceptorRegistration(interceptor);
+        org.springframework.web.servlet.config.annotation.InterceptorRegistration reg = new org.springframework.web.servlet.config.annotation.InterceptorRegistration(
+                interceptor);
 
         SupportInterceptorRegistry registry = new SupportInterceptorRegistry();
         InterceptorRegistration result = registry.convert(reg);
@@ -89,8 +87,8 @@ class SupportInterceptorRegistryTest {
     @Test
     void convertMappedInterceptor_createsRegistration() {
         TestHandlerInterceptor inner = new TestHandlerInterceptor();
-        MappedInterceptor mapped = new MappedInterceptor(
-                new String[]{"/api/**"}, new String[]{"/api/public/**"}, inner);
+        MappedInterceptor mapped = new MappedInterceptor(new String[] { "/api/**" }, new String[] { "/api/public/**" },
+                inner);
 
         SupportInterceptorRegistry registry = new SupportInterceptorRegistry();
         InterceptorRegistration result = registry.convert((HandlerInterceptor) mapped);
@@ -104,7 +102,7 @@ class SupportInterceptorRegistryTest {
     @Test
     void convertMappedInterceptor_withoutExcludes() {
         TestHandlerInterceptor inner = new TestHandlerInterceptor();
-        MappedInterceptor mapped = new MappedInterceptor(new String[]{"/secure/*"}, new String[0], inner);
+        MappedInterceptor mapped = new MappedInterceptor(new String[] { "/secure/*" }, new String[0], inner);
 
         SupportInterceptorRegistry registry = new SupportInterceptorRegistry();
         InterceptorRegistration result = registry.convert((HandlerInterceptor) mapped);
@@ -188,8 +186,8 @@ class SupportInterceptorRegistryTest {
         when(ctx.getBeansOfType(io.springperf.web.core.interceptor.InterceptorRegistration.class))
                 .thenReturn(Collections.emptyMap());
         // 使用 3 参构造器（excludes 显式为空数组），与既有测试约定一致，避免 getExcludePatterns() 为 null
-        MappedInterceptor mapped =
-                new MappedInterceptor(new String[]{"/api/**"}, new String[0], new TestHandlerInterceptor());
+        MappedInterceptor mapped = new MappedInterceptor(new String[] { "/api/**" }, new String[0],
+                new TestHandlerInterceptor());
         when(ctx.getBeansOfType(org.springframework.web.servlet.handler.MappedInterceptor.class))
                 .thenReturn(Collections.singletonMap("mapped", mapped));
         when(ctx.getBeansOfType(org.springframework.web.servlet.config.annotation.InterceptorRegistration.class))
@@ -209,14 +207,12 @@ class SupportInterceptorRegistryTest {
         // 修复 H1：标准两参构造器 new MappedInterceptor(includes, interceptor) 的
         // getExcludePatterns() 返回 null，修复前 convert 直接传给 excludePathPatterns(String...)
         // 触发 Arrays.asList(null) NPE，导致该 bean 自动注册时启动崩溃。
-        MappedInterceptor mapped =
-                new MappedInterceptor(new String[]{"/api/**"}, new TestHandlerInterceptor());
+        MappedInterceptor mapped = new MappedInterceptor(new String[] { "/api/**" }, new TestHandlerInterceptor());
         SupportInterceptorRegistry registry = new SupportInterceptorRegistry();
 
         InterceptorRegistration result = registry.convert((HandlerInterceptor) mapped);
 
         assertNotNull(result, "两参 MappedInterceptor 不应因 null excludePatterns 而 NPE");
-        assertEquals(List.of("/api/**"), readList(result, "includePatterns"),
-                "两参 MappedInterceptor 的 include 路径应被保留");
+        assertEquals(List.of("/api/**"), readList(result, "includePatterns"), "两参 MappedInterceptor 的 include 路径应被保留");
     }
 }

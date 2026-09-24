@@ -1,8 +1,9 @@
 package io.springperf.web.core.arg.provider;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.arg.StaticArgumentResolver;
-import io.springperf.web.core.arg.resolver.RequestPartResolver;
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.lang.reflect.Method;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -10,9 +11,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.MethodParameter;
 import org.springframework.web.bind.annotation.RequestPart;
 
-import java.lang.reflect.Method;
-
-import static org.junit.jupiter.api.Assertions.*;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.arg.StaticArgumentResolver;
+import io.springperf.web.core.arg.resolver.RequestPartResolver;
 
 @ExtendWith(MockitoExtension.class)
 class RequestPartResolverProviderTest {
@@ -41,10 +42,12 @@ class RequestPartResolverProviderTest {
     }
 
     @SuppressWarnings("unused")
-    public void annotatedPart(@RequestPart String part) {}
+    public void annotatedPart(@RequestPart String part) {
+    }
 
     @SuppressWarnings("unused")
-    public void stringParam(String s) {}
+    public void stringParam(String s) {
+    }
 
     private MethodParameter param(String methodName, Class<?> paramType) throws Exception {
         for (Method m : getClass().getDeclaredMethods()) {

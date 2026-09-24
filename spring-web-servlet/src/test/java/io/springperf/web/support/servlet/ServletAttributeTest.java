@@ -18,8 +18,10 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class ServletAttributeTest {
 
-    @Mock WebServerHttpRequest request;
-    @Mock WebServerHttpResponse response;
+    @Mock
+    WebServerHttpRequest request;
+    @Mock
+    WebServerHttpResponse response;
 
     @Test
     void getAdapterContext_createsAndStores() {
@@ -74,10 +76,25 @@ class ServletAttributeTest {
         private final Map<String, Object> attrs = new HashMap<>();
         private final Object[] fastAttrs = new Object[64];
 
-        @Override public Map<String, Object> getAttributes() { return attrs; }
-        @Override public Object getAttribute(String name) { return attrs.get(name); }
-        @Override public void setAttribute(String name, Object o) { attrs.put(name, o); }
-        @Override public Object removeAttribute(String name) { return attrs.remove(name); }
+        @Override
+        public Map<String, Object> getAttributes() {
+            return attrs;
+        }
+
+        @Override
+        public Object getAttribute(String name) {
+            return attrs.get(name);
+        }
+
+        @Override
+        public void setAttribute(String name, Object o) {
+            attrs.put(name, o);
+        }
+
+        @Override
+        public Object removeAttribute(String name) {
+            return attrs.remove(name);
+        }
 
         @Override
         @SuppressWarnings("unchecked")

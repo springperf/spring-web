@@ -26,11 +26,15 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * 管理端口 Netty 服务器。
- * <p>当 {@code management.server.port} 配置且与 {@code server.port} 不同时，
- * 启动第二个 Netty 服务器仅用于 Actuator 端点。</p>
- * <p>支持通过 {@code management.server.ssl.*} 配置 SSL/TLS。</p>
- * <p>实现 {@link SmartLifecycle}，{@link #getPhase()} 返回
- * {@link Integer#MAX_VALUE} 与主服务器一致，确保在 Spring 上下文就绪后启动。</p>
+ * <p>
+ * 当 {@code management.server.port} 配置且与 {@code server.port} 不同时， 启动第二个 Netty 服务器仅用于 Actuator 端点。
+ * </p>
+ * <p>
+ * 支持通过 {@code management.server.ssl.*} 配置 SSL/TLS。
+ * </p>
+ * <p>
+ * 实现 {@link SmartLifecycle}，{@link #getPhase()} 返回 {@link Integer#MAX_VALUE} 与主服务器一致，确保在 Spring 上下文就绪后启动。
+ * </p>
  */
 @Slf4j
 public class ManagementNettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
@@ -55,13 +59,13 @@ public class ManagementNettyHttpServer implements SmartLifecycle, LifecycleWebCo
     /** 优雅关闭等待时长（毫秒），启动期预解析自 {@code server.shutdown.grace-period}，关闭时传入 EventLoopGroup.shutdownGracefully。 */
     private long shutdownGraceMillis = PropertiesConstant.SERVER_SHUTDOWN_GRACE_PERIOD_DEFAULT;
 
-    public ManagementNettyHttpServer(WebContext webContext, String contextPath, HttpHandler handler,
-                                     int port, int maxContentLength) {
+    public ManagementNettyHttpServer(WebContext webContext, String contextPath, HttpHandler handler, int port,
+            int maxContentLength) {
         this(webContext, contextPath, handler, port, maxContentLength, null);
     }
 
-    public ManagementNettyHttpServer(WebContext webContext, String contextPath, HttpHandler handler,
-                                     int port, int maxContentLength, SslContext sslContext) {
+    public ManagementNettyHttpServer(WebContext webContext, String contextPath, HttpHandler handler, int port,
+            int maxContentLength, SslContext sslContext) {
         this.webContext = webContext;
         this.contextPath = contextPath;
         this.handler = handler;
@@ -82,8 +86,8 @@ public class ManagementNettyHttpServer implements SmartLifecycle, LifecycleWebCo
         // 预解析最大连接数（≤0 不限制），注入连接计数 handler（启动期 fail-fast）
         metricsHandler.setMaxConnections(webContext.getProps().getInt(PropertiesConstant.SERVER_MAX_CONNECTIONS));
 
-        String transportMode = webContext.getProps().get(
-                PropertiesConstant.SERVER_NETTY_TRANSPORT, PropertiesConstant.SERVER_NETTY_TRANSPORT_DEFAULT);
+        String transportMode = webContext.getProps().get(PropertiesConstant.SERVER_NETTY_TRANSPORT,
+                PropertiesConstant.SERVER_NETTY_TRANSPORT_DEFAULT);
         bossGroup = NettyTransport.newBossGroup(1, transportMode);
         workerGroup = NettyTransport.newWorkerGroup(0, transportMode);
 
@@ -93,33 +97,27 @@ public class ManagementNettyHttpServer implements SmartLifecycle, LifecycleWebCo
         KeepAliveConfig keepAliveConfig = KeepAliveConfig.fromProperties(webContext.getProps());
         // 启动期预解析响应写出层限制（swallow-size / 响应头大小），仅解析一次
         ResponseLimitConfig responseLimitConfig = ResponseLimitConfig.fromProperties(webContext.getProps());
-        NettyHttpHandler nettyHttpHandler = new NettyHttpHandler(webContext, "", handler,
-                compressionConfig.isEnabled(), responseLimitConfig);
+        NettyHttpHandler nettyHttpHandler = new NettyHttpHandler(webContext, "", handler, compressionConfig.isEnabled(),
+                responseLimitConfig);
         this.nettyHttpHandler = nettyHttpHandler;
 
         ServerBootstrap bootstrap = new ServerBootstrap();
-        bootstrap.group(bossGroup, workerGroup)
-                .channel(NettyTransport.serverChannelClass(transportMode))
+        bootstrap.group(bossGroup, workerGroup).channel(NettyTransport.serverChannelClass(transportMode))
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel ch) {
-                        Http2ChannelInitializer innerInit = new Http2ChannelInitializer(
-                                http2Enabled,
-                                sslContext,
+                        Http2ChannelInitializer innerInit = new Http2ChannelInitializer(http2Enabled, sslContext,
                                 maxContentLength,
                                 webContext.getProps().getDurationMillis(PropertiesConstant.HTTP_READ_TIMEOUT,
                                         PropertiesConstant.HTTP_READ_TIMEOUT_DEFAULT),
                                 false, // supportMultipart = false (management port uses HttpObjectAggregator)
-                                nettyHttpHandler,
-                                Collections.emptyList(),
-                                Collections.emptyList(),
+                                nettyHttpHandler, Collections.emptyList(), Collections.emptyList(),
                                 webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_INITIAL_LINE_LENGTH),
                                 webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_REQUEST_HEADER_SIZE),
                                 webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_CHUNK_SIZE),
                                 webContext.getProps().getInt(PropertiesConstant.HTTP_MULTIPART_MAX_PART_COUNT),
                                 webContext.getProps().getInt(PropertiesConstant.HTTP_MULTIPART_MAX_PART_HEADER_SIZE),
-                                compressionConfig, keepAliveConfig
-                        );
+                                compressionConfig, keepAliveConfig);
                         ch.pipeline().addLast(metricsHandler);
                         ch.pipeline().addLast(innerInit);
                     }

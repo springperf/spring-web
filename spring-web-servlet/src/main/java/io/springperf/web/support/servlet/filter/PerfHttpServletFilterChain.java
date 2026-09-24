@@ -11,13 +11,15 @@ import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
+
 public class PerfHttpServletFilterChain implements FilterChain {
 
     private final WebServerHttpRequest request;
     private final WebServerHttpResponse response;
     private final io.springperf.web.core.filter.FilterChain filterChain;
 
-    public PerfHttpServletFilterChain(WebServerHttpRequest request, WebServerHttpResponse response, io.springperf.web.core.filter.FilterChain filterChain) {
+    public PerfHttpServletFilterChain(WebServerHttpRequest request, WebServerHttpResponse response,
+            io.springperf.web.core.filter.FilterChain filterChain) {
         this.request = request;
         this.response = response;
         this.filterChain = filterChain;

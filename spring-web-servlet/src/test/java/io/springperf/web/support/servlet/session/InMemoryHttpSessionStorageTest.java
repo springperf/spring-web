@@ -8,7 +8,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * 回归 P2 性能组 #3：generateSessionId 从每字节 String.format 改为 hex 查找表。
- * <p>行为契约不变：32 字节 SecureRandom → 64 字符小写十六进制，字符集仅 [0-9a-f]。</p>
+ * <p>
+ * 行为契约不变：32 字节 SecureRandom → 64 字符小写十六进制，字符集仅 [0-9a-f]。
+ * </p>
  */
 class InMemoryHttpSessionStorageTest {
 

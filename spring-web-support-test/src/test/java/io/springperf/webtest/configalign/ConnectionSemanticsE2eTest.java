@@ -20,19 +20,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 连接级语义 E2E（原始 socket，绕开 OkHttp 抽象）：
- * Connection: close 请求后服务端关闭连接、HTTP/1.1 pipelining 顺序响应、
- * Expect: 100-continue 两段式响应、HTTP/1.0 无 Host 请求可服务。
+ * 连接级语义 E2E（原始 socket，绕开 OkHttp 抽象）： Connection: close 请求后服务端关闭连接、HTTP/1.1 pipelining 顺序响应、 Expect: 100-continue
+ * 两段式响应、HTTP/1.0 无 Host 请求可服务。
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, ConnectionSemanticsE2eTest.ConnConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "server.servlet.context-path=/")
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        ConnectionSemanticsE2eTest.ConnConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "server.servlet.context-path=/")
 class ConnectionSemanticsE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
@@ -64,9 +60,8 @@ class ConnectionSemanticsE2eTest {
             socket.setSoTimeout(5000);
             OutputStream out = socket.getOutputStream();
             InputStream in = socket.getInputStream();
-            out.write(("GET /e2e-conn/hit HTTP/1.1\r\n"
-                    + "Host: localhost\r\n"
-                    + "Connection: close\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+            out.write(("GET /e2e-conn/hit HTTP/1.1\r\n" + "Host: localhost\r\n" + "Connection: close\r\n\r\n")
+                    .getBytes(StandardCharsets.UTF_8));
             out.flush();
             String response = readAll(in, 1);
             assertTrue(response.contains("HTTP/1.1 200"), "应正常响应，实际:\n" + response);
@@ -87,13 +82,12 @@ class ConnectionSemanticsE2eTest {
             // 一次性写入两个请求（HTTP/1.1 pipelining）
             out.write(("GET /e2e-conn/first HTTP/1.1\r\nHost: localhost\r\n\r\n"
                     + "GET /e2e-conn/second HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
-                    .getBytes(StandardCharsets.UTF_8));
+                            .getBytes(StandardCharsets.UTF_8));
             out.flush();
             String responses = readAll(in, 2);
             int firstIdx = responses.indexOf("first-body");
             int secondIdx = responses.indexOf("second-body");
-            assertTrue(firstIdx >= 0 && secondIdx >= 0,
-                    "两个 pipelined 请求都应被响应，实际:\n" + responses);
+            assertTrue(firstIdx >= 0 && secondIdx >= 0, "两个 pipelined 请求都应被响应，实际:\n" + responses);
             assertTrue(firstIdx < secondIdx, "响应顺序应与请求顺序一致（FIFO），实际:\n" + responses);
         }
     }
@@ -105,27 +99,22 @@ class ConnectionSemanticsE2eTest {
             OutputStream out = socket.getOutputStream();
             InputStream in = socket.getInputStream();
             String json = "{\"a\":1}";
-            out.write(("POST /e2e-conn/echo HTTP/1.1\r\n"
-                    + "Host: localhost\r\n"
-                    + "Content-Type: application/json\r\n"
-                    + "Expect: 100-continue\r\n"
-                    + "Content-Length: " + json.length() + "\r\n"
+            out.write(("POST /e2e-conn/echo HTTP/1.1\r\n" + "Host: localhost\r\n" + "Content-Type: application/json\r\n"
+                    + "Expect: 100-continue\r\n" + "Content-Length: " + json.length() + "\r\n"
                     + "Connection: close\r\n\r\n").getBytes(StandardCharsets.UTF_8));
             out.flush();
             // 等待 100 Continue
             String interim = readAll(in, 1);
             if (!interim.contains("100")) {
                 // 框架可能直接返回最终响应（不中间应答，RFC 允许）——继续校验最终 200
-                assertTrue(interim.contains("HTTP/1.1 200"),
-                        "未返回 100 时应直接给出最终响应，实际:\n" + interim);
+                assertTrue(interim.contains("HTTP/1.1 200"), "未返回 100 时应直接给出最终响应，实际:\n" + interim);
                 return;
             }
             // 收到 100 后发送 body
             out.write(json.getBytes(StandardCharsets.UTF_8));
             out.flush();
             String finalResponse = readAll(in, 1);
-            assertTrue(finalResponse.contains("HTTP/1.1 200"),
-                    "100-continue 后应返回 200，实际:\n" + finalResponse);
+            assertTrue(finalResponse.contains("HTTP/1.1 200"), "100-continue 后应返回 200，实际:\n" + finalResponse);
         }
     }
 
@@ -138,8 +127,7 @@ class ConnectionSemanticsE2eTest {
             out.write(("GET /e2e-conn/hit HTTP/1.0\r\n\r\n").getBytes(StandardCharsets.UTF_8));
             out.flush();
             String response = readAll(in, 1);
-            assertTrue(response.contains("HTTP/1."),
-                    "HTTP/1.0 无 Host 请求仍应被服务，实际:\n" + response);
+            assertTrue(response.contains("HTTP/1."), "HTTP/1.0 无 Host 请求仍应被服务，实际:\n" + response);
         }
     }
 

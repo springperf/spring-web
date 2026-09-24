@@ -26,7 +26,8 @@ public class WebRequestArgumentResolverProvider implements StaticArgumentResolve
     }
 
     @Override
-    public StaticArgumentResolver getResolver(MethodParameter parameter, MappingHandlerMethod mappingContext, WebContext webContext) {
+    public StaticArgumentResolver getResolver(MethodParameter parameter, MappingHandlerMethod mappingContext,
+            WebContext webContext) {
         return resolver;
     }
 }

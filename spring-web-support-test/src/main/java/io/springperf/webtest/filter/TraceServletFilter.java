@@ -13,7 +13,8 @@ import java.io.IOException;
 @Slf4j
 public class TraceServletFilter implements jakarta.servlet.Filter {
     @Override
-    public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
+    public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain)
+            throws IOException, ServletException {
         log.info("body length: {}", servletRequest.getContentLength());
         filterChain.doFilter(servletRequest, servletResponse);
     }

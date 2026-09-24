@@ -9,19 +9,17 @@ import java.util.regex.Pattern;
 /**
  * JDK 11+ 统一日志格式的 GC 日志解析器。
  * <p>
- * 匹配格式示例:
- * {@code [info][gc] GC(0) Pause Young (G1 Evacuation Pause) 50M->10M(200M) 5.123ms}
+ * 匹配格式示例: {@code [info][gc] GC(0) Pause Young (G1 Evacuation Pause) 50M->10M(200M) 5.123ms}
  * {@code [info][gc] GC(1) Pause Full (G1 Compaction) 180M->30M(200M) 120.340ms}
  */
 public class Jdk11GcLogParser implements GcLogParser {
 
-    private static final Pattern YOUNG_PATTERN =
-            Pattern.compile("Pause (Young|Mixed)\\s*\\(.*?\\)\\s+.*?\\s+([\\d.]+)ms");
-    private static final Pattern FULL_PATTERN =
-            Pattern.compile("Pause Full\\s*\\(.*?\\)\\s+.*?\\s+([\\d.]+)ms");
+    private static final Pattern YOUNG_PATTERN = Pattern
+            .compile("Pause (Young|Mixed)\\s*\\(.*?\\)\\s+.*?\\s+([\\d.]+)ms");
+    private static final Pattern FULL_PATTERN = Pattern.compile("Pause Full\\s*\\(.*?\\)\\s+.*?\\s+([\\d.]+)ms");
     /** 提取 Young GC 完成行中的 heap 使用量（before/after），用于计算分配率 */
-    private static final Pattern HEAP_PATTERN =
-            Pattern.compile("Pause Young \\((?:Normal|Concurrent Start)\\).*?(\\d+)M->(\\d+)M\\(\\d+M\\)\\s+[\\d.]+ms");
+    private static final Pattern HEAP_PATTERN = Pattern
+            .compile("Pause Young \\((?:Normal|Concurrent Start)\\).*?(\\d+)M->(\\d+)M\\(\\d+M\\)\\s+[\\d.]+ms");
 
     @Override
     public boolean supports(Path logFile) {
@@ -68,7 +66,8 @@ public class Jdk11GcLogParser implements GcLogParser {
                             totalAllocated += before - prevYoungAfter;
                         }
                         prevYoungAfter = after;
-                        if (firstGcTime == 0) firstGcTime = absTime;
+                        if (firstGcTime == 0)
+                            firstGcTime = absTime;
                         lastGcTime = absTime;
                     }
                     continue;
@@ -79,7 +78,8 @@ public class Jdk11GcLogParser implements GcLogParser {
                     fullTotal += pause;
                     fullMax = Math.max(fullMax, pause);
                     // 跳过 JMH shouldDoGC 触发的 System.gc()，避免 FullGC 计数污染
-                    if (!line.contains("System.gc()")) fullCount++;
+                    if (!line.contains("System.gc()"))
+                        fullCount++;
                 }
             }
 
@@ -87,14 +87,9 @@ public class Jdk11GcLogParser implements GcLogParser {
             double gcDuration = lastGcTime - firstGcTime;
             double allocRate = gcDuration > 0 ? totalAllocated / gcDuration : 0;
 
-            metrics.setYoungGcCount(youngCount)
-                    .setYoungGcTotalMs(youngTotal)
-                    .setYoungGcMaxMs(youngMax)
-                    .setYoungGcAvgMs(youngCount > 0 ? youngTotal / youngCount : 0)
-                    .setFullGcCount(fullCount)
-                    .setFullGcTotalMs(fullTotal)
-                    .setFullGcMaxMs(fullMax)
-                    .setTotalAllocatedMb(totalAllocated)
+            metrics.setYoungGcCount(youngCount).setYoungGcTotalMs(youngTotal).setYoungGcMaxMs(youngMax)
+                    .setYoungGcAvgMs(youngCount > 0 ? youngTotal / youngCount : 0).setFullGcCount(fullCount)
+                    .setFullGcTotalMs(fullTotal).setFullGcMaxMs(fullMax).setTotalAllocatedMb(totalAllocated)
                     .setAllocationRateMbPerSec(allocRate);
         } catch (IOException e) {
             System.err.println("[WARN] Failed to parse GC log: " + logFile + " - " + e.getMessage());
@@ -103,11 +98,10 @@ public class Jdk11GcLogParser implements GcLogParser {
     }
 
     /**
-     * 从 GC 日志行提取绝对时间（秒）。
-     * JDK 11+ unified logging 格式: {@code [2026-07-06T18:59:44.202+0800][2.116s][info][gc...}
+     * 从 GC 日志行提取绝对时间（秒）。 JDK 11+ unified logging 格式: {@code [2026-07-06T18:59:44.202+0800][2.116s][info][gc...}
      * <p>
-     * 注意：wall clock 时间戳 {@code [2026-07-06T18:59:44.202+0800]} 不包含 "s]" 后缀，
-     * 不会被 {@code \d+\.\d+s]} 匹配。唯一匹配的是 JVM uptime {@code [2.116s]}。
+     * 注意：wall clock 时间戳 {@code [2026-07-06T18:59:44.202+0800]} 不包含 "s]" 后缀， 不会被 {@code \d+\.\d+s]} 匹配。唯一匹配的是 JVM uptime
+     * {@code [2.116s]}。
      */
     private static double extractAbsTime(String line) {
         java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\[(\\d+\\.\\d+)s\\]").matcher(line);

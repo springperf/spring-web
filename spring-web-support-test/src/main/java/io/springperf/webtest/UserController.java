@@ -21,7 +21,8 @@ public class UserController {
     }
 
     @PostMapping(value = "/find/{name}", params = "v=111")
-    public ResponseEntity<Map<String, Object>> find(@RequestBody RequestObj<User> req, @PathVariable("name") String name, @RequestParam("v") String v, int id, @ModelAttribute User user) {
+    public ResponseEntity<Map<String, Object>> find(@RequestBody RequestObj<User> req,
+            @PathVariable("name") String name, @RequestParam("v") String v, int id, @ModelAttribute User user) {
         Map<String, Object> m = new HashMap<>();
         m.put("id", id);
         m.put("tid", req.getTid());
@@ -32,7 +33,8 @@ public class UserController {
     }
 
     @PostMapping("/create/{name:\\d+}")
-    public ResponseEntity<Map<String, Object>> find(@RequestBody RequestObj<User> req, @PathVariable("name") String name) {
+    public ResponseEntity<Map<String, Object>> find(@RequestBody RequestObj<User> req,
+            @PathVariable("name") String name) {
         Map<String, Object> m = new HashMap<>();
         m.put("tid", req.getTid());
         m.put("age", req.getData().getAge());
@@ -75,4 +77,3 @@ public class UserController {
     public void voidReturn() {
     }
 }
-

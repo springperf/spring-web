@@ -15,12 +15,15 @@ public class SupportInterceptorRegistry extends InterceptorRegistry {
         // 不再自动注册普通 HandlerInterceptor bean：与 Spring MVC 语义一致
         // （普通 HandlerInterceptor bean 不会全局生效，需经 addInterceptors 或 MappedInterceptor），
         // 同时避免同一实例经 bean 扫描与 addInterceptors 两路注册导致同名碰撞/重复执行。
-        autoRegisterWebComponent(org.springframework.web.servlet.config.annotation.InterceptorRegistration.class, this::convert);
+        autoRegisterWebComponent(org.springframework.web.servlet.config.annotation.InterceptorRegistration.class,
+                this::convert);
         autoRegisterWebComponent(org.springframework.web.servlet.handler.MappedInterceptor.class, this::convert);
     }
 
-    public InterceptorRegistration convert(org.springframework.web.servlet.config.annotation.InterceptorRegistration registration) {
-        HandlerInterceptorWrapper handlerInterceptorWrapper = new HandlerInterceptorWrapper(registration.getInterceptor());
+    public InterceptorRegistration convert(
+            org.springframework.web.servlet.config.annotation.InterceptorRegistration registration) {
+        HandlerInterceptorWrapper handlerInterceptorWrapper = new HandlerInterceptorWrapper(
+                registration.getInterceptor());
         InterceptorRegistration interceptorRegistration = new InterceptorRegistration(handlerInterceptorWrapper);
         for (String includePattern : registration.getIncludePatterns()) {
             interceptorRegistration.addPathPatterns(includePattern);

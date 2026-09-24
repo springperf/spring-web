@@ -48,13 +48,11 @@ class SpringWebAutoConfigurationAdditionalTest {
 
     @Test
     void micrometerWebMetrics_registersGaugesAndReturnsMetrics() throws Exception {
-        SpringWebAutoConfiguration.MicrometerWebMetricsConfiguration micConfig =
-                new SpringWebAutoConfiguration.MicrometerWebMetricsConfiguration();
+        SpringWebAutoConfiguration.MicrometerWebMetricsConfiguration micConfig = new SpringWebAutoConfiguration.MicrometerWebMetricsConfiguration();
         MeterRegistry registry = new SimpleMeterRegistry();
         NettyHttpServer server = mock(NettyHttpServer.class);
 
-        io.springperf.web.core.metrics.WebMetrics metrics =
-                micConfig.micrometerWebMetrics(registry, server);
+        io.springperf.web.core.metrics.WebMetrics metrics = micConfig.micrometerWebMetrics(registry, server);
 
         assertNotNull(metrics);
         assertInstanceOf(io.springperf.web.autoconfigure.metrics.MicrometerWebMetrics.class, metrics);

@@ -37,10 +37,8 @@ public class UserController {
     }
 
     @Operation(summary = "获取单个用户")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "成功"),
-            @ApiResponse(responseCode = "404", description = "用户不存在")
-    })
+    @ApiResponses({ @ApiResponse(responseCode = "200", description = "成功"),
+            @ApiResponse(responseCode = "404", description = "用户不存在") })
     @GetMapping("/{id}")
     public User get(@Parameter(description = "用户ID") @PathVariable Long id) {
         User user = users.get(id);
@@ -60,10 +58,8 @@ public class UserController {
     }
 
     @Operation(summary = "更新用户")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "更新成功"),
-            @ApiResponse(responseCode = "404", description = "用户不存在")
-    })
+    @ApiResponses({ @ApiResponse(responseCode = "200", description = "更新成功"),
+            @ApiResponse(responseCode = "404", description = "用户不存在") })
     @PutMapping("/{id}")
     public User update(@Parameter(description = "用户ID") @PathVariable Long id, @RequestBody User user) {
         if (!users.containsKey(id)) {
@@ -75,10 +71,8 @@ public class UserController {
     }
 
     @Operation(summary = "删除用户")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "删除成功"),
-            @ApiResponse(responseCode = "404", description = "用户不存在")
-    })
+    @ApiResponses({ @ApiResponse(responseCode = "200", description = "删除成功"),
+            @ApiResponse(responseCode = "404", description = "用户不存在") })
     @DeleteMapping("/{id}")
     public void delete(@Parameter(description = "用户ID") @PathVariable Long id) {
         User removed = users.remove(id);

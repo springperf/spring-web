@@ -14,8 +14,7 @@ import java.util.Map;
 public class BridgeController {
 
     /**
-     * 访问 HttpServletRequest API（通过 support 模块桥接）
-     * curl http://localhost:8084/bridge/request-info
+     * 访问 HttpServletRequest API（通过 support 模块桥接） curl http://localhost:8084/bridge/request-info
      */
     @GetMapping("/bridge/request-info")
     public Map<String, Object> requestInfo(HttpServletRequest request) {
@@ -38,8 +37,7 @@ public class BridgeController {
     }
 
     /**
-     * 演示通过 HttpServletRequest 读取请求属性
-     * curl http://localhost:8084/bridge/attr-test
+     * 演示通过 HttpServletRequest 读取请求属性 curl http://localhost:8084/bridge/attr-test
      */
     @GetMapping("/bridge/attr-test")
     public Map<String, Object> attributeTest(HttpServletRequest request) {

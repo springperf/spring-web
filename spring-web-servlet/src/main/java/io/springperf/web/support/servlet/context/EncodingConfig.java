@@ -5,22 +5,21 @@ import io.springperf.web.context.PropertiesConstant;
 
 /**
  * Servlet 编码配置（对齐 Spring Boot {@code server.servlet.encoding.*}），启动期预解析一次。
- *
  * <ul>
- *   <li>{@code charset}：请求/响应统一字符集（默认 UTF-8）</li>
- *   <li>{@code force}：同时强制请求与响应（默认 false）</li>
- *   <li>{@code force-request}：强制请求 charset（默认继承 {@code force}）</li>
- *   <li>{@code force-response}：强制响应 charset（默认继承 {@code force}）</li>
+ * <li>{@code charset}：请求/响应统一字符集（默认 UTF-8）</li>
+ * <li>{@code force}：同时强制请求与响应（默认 false）</li>
+ * <li>{@code force-request}：强制请求 charset（默认继承 {@code force}）</li>
+ * <li>{@code force-response}：强制响应 charset（默认继承 {@code force}）</li>
  * </ul>
- *
- * <p>"强制"含义对齐 Boot：为 true 时，即使业务已显式调用 {@code setCharacterEncoding}，
- * 仍以配置的 charset 覆盖。</p>
+ * <p>
+ * "强制"含义对齐 Boot：为 true 时，即使业务已显式调用 {@code setCharacterEncoding}， 仍以配置的 charset 覆盖。
+ * </p>
  */
 public final class EncodingConfig {
 
     /** 默认：UTF-8，均不强制。 */
-    public static final EncodingConfig DEFAULT =
-            new EncodingConfig(PropertiesConstant.SERVLET_ENCODING_CHARSET_DEFAULT, false, false);
+    public static final EncodingConfig DEFAULT = new EncodingConfig(PropertiesConstant.SERVLET_ENCODING_CHARSET_DEFAULT,
+            false, false);
 
     private final String charset;
     private final boolean forceRequest;

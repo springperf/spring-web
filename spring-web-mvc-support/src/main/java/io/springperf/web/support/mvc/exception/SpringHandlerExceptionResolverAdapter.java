@@ -11,21 +11,20 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.method.HandlerMethod;
 
 /**
- * Adapts a Spring MVC {@link org.springframework.web.servlet.HandlerExceptionResolver}
- * to the framework's {@link io.springperf.web.core.exception.HandlerExceptionResolver} interface.
- *
- * <p>The adapter creates Servlet API wrappers around the framework's request/response
- * objects and invokes the Spring exception resolver. A non-null {@code ModelAndView}
- * return value indicates the exception was handled.
- *
- * <p>Order is resolved via {@link WebComponentWrapper}:
+ * Adapts a Spring MVC {@link org.springframework.web.servlet.HandlerExceptionResolver} to the framework's
+ * {@link io.springperf.web.core.exception.HandlerExceptionResolver} interface.
+ * <p>
+ * The adapter creates Servlet API wrappers around the framework's request/response objects and invokes the Spring
+ * exception resolver. A non-null {@code ModelAndView} return value indicates the exception was handled.
+ * <p>
+ * Order is resolved via {@link WebComponentWrapper}:
  * <ol>
- *   <li>If the wrapped resolver has {@link org.springframework.core.annotation.Order @Order}
- *       or implements {@link org.springframework.core.Ordered Ordered}, that value is used.</li>
- *   <li>Otherwise falls back to {@link #defaultOrderPriority()} = {@code LOWEST_PRECEDENCE - 10000}.</li>
+ * <li>If the wrapped resolver has {@link org.springframework.core.annotation.Order @Order} or implements
+ * {@link org.springframework.core.Ordered Ordered}, that value is used.</li>
+ * <li>Otherwise falls back to {@link #defaultOrderPriority()} = {@code LOWEST_PRECEDENCE - 10000}.</li>
  * </ol>
- * The {@link io.springperf.web.support.mvc.config.WebMvcConfigurerBridge} may override
- * the order to a higher priority when no custom order is set.
+ * The {@link io.springperf.web.support.mvc.config.WebMvcConfigurerBridge} may override the order to a higher priority
+ * when no custom order is set.
  */
 @Slf4j
 public class SpringHandlerExceptionResolverAdapter
@@ -37,8 +36,8 @@ public class SpringHandlerExceptionResolverAdapter
     }
 
     @Override
-    public boolean resolveException(WebServerHttpRequest request, WebServerHttpResponse response,
-                                    HandlerMethod handler, Throwable ex) {
+    public boolean resolveException(WebServerHttpRequest request, WebServerHttpResponse response, HandlerMethod handler,
+            Throwable ex) {
         try {
             HttpServletRequest servletRequest = new PerfHttpServletRequest(request);
             HttpServletResponse servletResponse = new PerfHttpServletResponse(response);

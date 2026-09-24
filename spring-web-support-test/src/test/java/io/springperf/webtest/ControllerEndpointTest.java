@@ -29,10 +29,7 @@ public class ControllerEndpointTest extends BaseE2ETest {
 
     @Test
     void voidReturn_returns204() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/demo/void-test")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/demo/void-test").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(204, resp.code());
         }
@@ -40,10 +37,7 @@ public class ControllerEndpointTest extends BaseE2ETest {
 
     @Test
     void testEchoGet() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/demo/echo?received=hello")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/demo/echo?received=hello").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(302, resp.code());
             String body = Objects.toString(resp.body().string(), "");
@@ -55,10 +49,7 @@ public class ControllerEndpointTest extends BaseE2ETest {
     void testEchoPost() throws Exception {
         String json = "{\"message\":\"test\"}";
         RequestBody body = RequestBody.create(MediaType.parse("application/json"), json);
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/demo/echo")
-                .post(body)
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/demo/echo").post(body).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(201, resp.code());
         }
@@ -66,13 +57,10 @@ public class ControllerEndpointTest extends BaseE2ETest {
 
     @Test
     void testAsyncEndpoint() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/demo/async")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/demo/async").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            assertEquals(200, resp.code(), "async 端点异常，body=" + resp.body().string()
-                    + " retry-after=" + resp.header("Retry-After"));
+            assertEquals(200, resp.code(),
+                    "async 端点异常，body=" + resp.body().string() + " retry-after=" + resp.header("Retry-After"));
         }
     }
 }

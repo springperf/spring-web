@@ -13,13 +13,15 @@ public class PerfInterceptor implements HandlerInterceptor {
     private static final String ATTR_START = "_perf_start";
 
     @Override
-    public boolean preHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler) throws Exception {
+    public boolean preHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler)
+            throws Exception {
         request.getRequestContext().setAttribute(ATTR_START, System.currentTimeMillis());
         return true;
     }
 
     @Override
-    public void postHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler, Object result) throws Exception {
+    public void postHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler, Object result)
+            throws Exception {
         Long start = (Long) request.getRequestContext().getAttribute(ATTR_START);
         if (start != null) {
             long elapsed = System.currentTimeMillis() - start;

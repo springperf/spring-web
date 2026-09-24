@@ -20,7 +20,7 @@ public class SecuritySessionController {
      */
     @GetMapping("/session-set")
     public Map<String, Object> sessionSet(@RequestParam String key, @RequestParam String value,
-                                          HttpServletRequest request) {
+            HttpServletRequest request) {
         HttpSession session = request.getSession(true);
         session.setAttribute(key, value);
 
@@ -35,8 +35,7 @@ public class SecuritySessionController {
      * 读取 HttpSession 中指定属性的值。
      */
     @GetMapping("/session-get")
-    public Map<String, Object> sessionGet(@RequestParam String key,
-                                          HttpServletRequest request) {
+    public Map<String, Object> sessionGet(@RequestParam String key, HttpServletRequest request) {
         HttpSession session = request.getSession(false);
 
         Map<String, Object> result = new LinkedHashMap<>();

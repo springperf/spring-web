@@ -27,16 +27,15 @@ import java.util.List;
 @Slf4j
 public class ViewReturnValueResolver extends BaseWebComponent implements ReturnValueResolver {
 
-    private static final MappingCacheKey<Boolean> VIEW_NAME_KEY =
-            MappingCacheKey.createMethodCacheKey(Boolean.class);
+    private static final MappingCacheKey<Boolean> VIEW_NAME_KEY = MappingCacheKey.createMethodCacheKey(Boolean.class);
 
     private ViewResolverRegistry viewResolverRegistry;
 
     @Override
     public void initWithWebContext(WebContext webContext) {
         super.initWithWebContext(webContext);
-        viewResolverRegistry = webContext.getWebComponentWithDefault(
-                ViewResolverRegistry.class, new ViewResolverRegistry());
+        viewResolverRegistry = webContext.getWebComponentWithDefault(ViewResolverRegistry.class,
+                new ViewResolverRegistry());
     }
 
     @Override
@@ -56,29 +55,30 @@ public class ViewReturnValueResolver extends BaseWebComponent implements ReturnV
             }
             mapping.set(VIEW_NAME_KEY, Boolean.TRUE);
             if (!viewResolverRegistry.hasViewResolvers()) {
-                unresolvedViewMethods.add(mapping.getUserClass().getSimpleName()
-                        + "#" + mapping.getMethod().getName());
+                unresolvedViewMethods.add(mapping.getUserClass().getSimpleName() + "#" + mapping.getMethod().getName());
             }
         }
         if (!unresolvedViewMethods.isEmpty() && !viewResolverRegistry.hasViewResolvers()) {
             // 显式 engine=none：仅 redirect: 场景（无需模板引擎），跳过 fail-fast
             if (isViewEngineDisabled()) {
-                log.warn("spring.web.view.engine=none configured, but {} view-name method(s) "
-                        + "exist and will only support redirect: view names: {}", unresolvedViewMethods.size(),
-                        unresolvedViewMethods);
+                log.warn(
+                        "spring.web.view.engine=none configured, but {} view-name method(s) "
+                                + "exist and will only support redirect: view names: {}",
+                        unresolvedViewMethods.size(), unresolvedViewMethods);
             } else {
-                throw new IllegalStateException(
-                        "View methods detected but no ViewResolver registered. "
+                throw new IllegalStateException("View methods detected but no ViewResolver registered. "
                         + "Add a template engine dependency (thymeleaf/freemarker) to the project, "
-                        + "or set spring.web.view.engine=none if only redirect: is used. "
-                        + "Affected methods: " + unresolvedViewMethods);
+                        + "or set spring.web.view.engine=none if only redirect: is used. " + "Affected methods: "
+                        + unresolvedViewMethods);
             }
         }
     }
 
     /**
      * 是否显式禁用了全部模板引擎（{@code spring.web.view.engine} 配置含 {@code none}）。
-     * <p>此时仅支持 {@code redirect:} 视图名，无模板引擎时不应触发 fail-fast。</p>
+     * <p>
+     * 此时仅支持 {@code redirect:} 视图名，无模板引擎时不应触发 fail-fast。
+     * </p>
      */
     private boolean isViewEngineDisabled() {
         String engine = webContext.getProps().get(ViewProperties.ENGINE, ViewProperties.ENGINE_DEFAULT);
@@ -115,16 +115,15 @@ public class ViewReturnValueResolver extends BaseWebComponent implements ReturnV
     }
 
     @Override
-    public void resolveReturnValue(Object returnValue, MethodParameter returnType,
-                                   WebServerHttpRequest req, WebServerHttpResponse resp) throws Exception {
+    public void resolveReturnValue(Object returnValue, MethodParameter returnType, WebServerHttpRequest req,
+            WebServerHttpResponse resp) throws Exception {
         String viewName = (String) returnValue;
         View view = resolveView(viewName, req, resp);
         if (view == null) {
             // 视图名无法解析：抛异常交 ExceptionRegistry → 500（含错误上下文），
             // 而非静默返回 200 + 空白 body
-            throw new IllegalArgumentException(
-                    "Unable to resolve view name '" + viewName
-                            + "' with any registered ViewResolver (thymeleaf/freemarker/beetl/jsp)");
+            throw new IllegalArgumentException("Unable to resolve view name '" + viewName
+                    + "' with any registered ViewResolver (thymeleaf/freemarker/beetl/jsp)");
         }
         String contentType = view.getContentType();
         if (contentType != null) {

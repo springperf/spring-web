@@ -1,31 +1,5 @@
 package io.springperf.web.http;
 
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.EventLoop;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpResponse;
-import io.netty.handler.codec.http.LastHttpContent;
-import io.netty.util.concurrent.GenericFutureListener;
-import io.springperf.web.context.WebContext;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.channels.ClosedChannelException;
-import java.nio.charset.StandardCharsets;
-
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -43,6 +17,33 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.channels.ClosedChannelException;
+import java.nio.charset.StandardCharsets;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.EventLoop;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.util.concurrent.GenericFutureListener;
+import io.springperf.web.context.WebContext;
 
 @ExtendWith(MockitoExtension.class)
 class NettyServerHttpResponseCoverageTest {
@@ -345,8 +346,7 @@ class NettyServerHttpResponseCoverageTest {
         WriteRespEventListener listener = mock(WriteRespEventListener.class);
         resp.setWriteRespEventListener(listener);
         ChannelFuture future = mock(ChannelFuture.class);
-        java.util.concurrent.atomic.AtomicReference<GenericFutureListener> holder =
-                new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<GenericFutureListener> holder = new java.util.concurrent.atomic.AtomicReference<>();
         doAnswer(inv -> {
             holder.set((GenericFutureListener) inv.getArgument(0));
             return future;
@@ -366,8 +366,7 @@ class NettyServerHttpResponseCoverageTest {
         WriteRespEventListener listener = mock(WriteRespEventListener.class);
         resp.setWriteRespEventListener(listener);
         ChannelFuture future = mock(ChannelFuture.class);
-        java.util.concurrent.atomic.AtomicReference<GenericFutureListener> holder =
-                new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<GenericFutureListener> holder = new java.util.concurrent.atomic.AtomicReference<>();
         doAnswer(inv -> {
             holder.set((GenericFutureListener) inv.getArgument(0));
             return future;

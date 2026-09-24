@@ -12,7 +12,7 @@ class ResourceHandlerRegistryTest {
     void addResourceHandler_createsRegistration() {
         ResourceHandlerRegistration reg = registry.addResourceHandler("/static/**");
         assertNotNull(reg);
-        assertArrayEquals(new String[]{"/static/**"}, reg.getPathPatterns());
+        assertArrayEquals(new String[] { "/static/**" }, reg.getPathPatterns());
     }
 
     @Test
@@ -31,9 +31,7 @@ class ResourceHandlerRegistryTest {
 
     @Test
     void addResourceHandler_chainedConfig_persists() {
-        registry.addResourceHandler("/static/**")
-                .addResourceLocations("classpath:/static/")
-                .setCachePeriod(3600);
+        registry.addResourceHandler("/static/**").addResourceLocations("classpath:/static/").setCachePeriod(3600);
 
         ResourceHandlerRegistration reg = registry.getRegistrations().get(0);
         assertEquals(1, reg.getLocationValues().size());

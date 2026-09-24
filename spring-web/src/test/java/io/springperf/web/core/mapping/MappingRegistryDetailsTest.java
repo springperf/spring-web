@@ -1,14 +1,19 @@
 package io.springperf.web.core.mapping;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.mapping.match.ConsumeOrProduceMatcher;
-import io.springperf.web.core.mapping.match.HttpMethodMatcher;
-import io.springperf.web.core.mapping.match.Matcher;
-import io.springperf.web.core.mapping.match.MediaTypeExpressionSupport;
-import io.springperf.web.core.mapping.match.ParamOrHeaderMatcher;
-import io.springperf.web.http.RequestAttribute;
-import io.springperf.web.http.RequestContext;
-import io.springperf.web.http.WebServerHttpRequest;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.lang.reflect.Method;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -20,30 +25,29 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.method.HandlerMethod;
 
-import java.lang.reflect.Method;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.mapping.match.ConsumeOrProduceMatcher;
+import io.springperf.web.core.mapping.match.HttpMethodMatcher;
+import io.springperf.web.core.mapping.match.Matcher;
+import io.springperf.web.core.mapping.match.MediaTypeExpressionSupport;
+import io.springperf.web.core.mapping.match.ParamOrHeaderMatcher;
+import io.springperf.web.http.RequestAttribute;
+import io.springperf.web.http.RequestContext;
+import io.springperf.web.http.WebServerHttpRequest;
 
 /**
- * 补充 MappingRegistry 覆盖率：类级别 path 属性、params/headers/consumes/produces
- * matcher 构建、Phase3 路由优化分流，以及 mapping()/doMapping() 的匹配/405/未全匹配/404 分支。
+ * 补充 MappingRegistry 覆盖率：类级别 path 属性、params/headers/consumes/produces matcher 构建、Phase3 路由优化分流，以及 mapping()/doMapping()
+ * 的匹配/405/未全匹配/404 分支。
  */
 @ExtendWith(MockitoExtension.class)
 class MappingRegistryDetailsTest {
 
-    @Mock WebContext webContext;
-    @Mock ApplicationContext applicationContext;
-    @Mock Environment environment;
+    @Mock
+    WebContext webContext;
+    @Mock
+    ApplicationContext applicationContext;
+    @Mock
+    Environment environment;
 
     private RequestContext reqCtx;
 
@@ -55,7 +59,8 @@ class MappingRegistryDetailsTest {
         lenient().when(req.getPath()).thenReturn(path);
         lenient().when(req.getMethod()).thenReturn(method);
         lenient().when(req.getHeaders()).thenReturn(new org.springframework.http.HttpHeaders());
-        lenient().when(reqCtx.getAttribute(any(RequestAttribute.class))).thenAnswer(inv -> fastAttrs.get(inv.getArgument(0)));
+        lenient().when(reqCtx.getAttribute(any(RequestAttribute.class)))
+                .thenAnswer(inv -> fastAttrs.get(inv.getArgument(0)));
         lenient().doAnswer(inv -> {
             fastAttrs.put(inv.getArgument(0), inv.getArgument(1));
             return null;
@@ -89,7 +94,8 @@ class MappingRegistryDetailsTest {
     static class PathBasedController {
         @RequestMapping("/m")
         @SuppressWarnings("unused")
-        public void m() {}
+        public void m() {
+        }
     }
 
     /* ==================== initMatcher: params/headers/consumes/produces ==================== */
@@ -103,36 +109,34 @@ class MappingRegistryDetailsTest {
         List<Matcher> matchers = registry.initMatcher(annotation);
 
         assertEquals(4, matchers.size());
-        assertEquals(1, countOf(matchers, ParamOrHeaderMatcher.class, false), "params → ParamOrHeaderMatcher(header=false)");
-        assertEquals(1, countOf(matchers, ParamOrHeaderMatcher.class, true), "headers → ParamOrHeaderMatcher(header=true)");
-        assertEquals(1, countOf(matchers, ConsumeOrProduceMatcher.class, false), "consumes → ConsumeOrProduceMatcher(produce=false)");
-        assertEquals(1, countOf(matchers, ConsumeOrProduceMatcher.class, true), "produces → ConsumeOrProduceMatcher(produce=true)");
+        assertEquals(1, countOf(matchers, ParamOrHeaderMatcher.class, false),
+                "params → ParamOrHeaderMatcher(header=false)");
+        assertEquals(1, countOf(matchers, ParamOrHeaderMatcher.class, true),
+                "headers → ParamOrHeaderMatcher(header=true)");
+        assertEquals(1, countOf(matchers, ConsumeOrProduceMatcher.class, false),
+                "consumes → ConsumeOrProduceMatcher(produce=false)");
+        assertEquals(1, countOf(matchers, ConsumeOrProduceMatcher.class, true),
+                "produces → ConsumeOrProduceMatcher(produce=true)");
     }
 
     @Controller
     static class FullConditionController {
-        @RequestMapping(path = "/full",
-                params = "mode=fast",
-                headers = "X-Trace=1",
-                consumes = "application/json",
-                produces = "application/json")
+        @RequestMapping(path = "/full", params = "mode=fast", headers = "X-Trace=1", consumes = "application/json", produces = "application/json")
         @SuppressWarnings("unused")
-        public void doIt() {}
+        public void doIt() {
+        }
     }
 
     private static long countOf(List<Matcher> matchers, Class<?> type, boolean flag) {
-        return matchers.stream()
-                .filter(m -> m.getClass().equals(type))
-                .filter(m -> {
-                    if (m instanceof ParamOrHeaderMatcher) {
-                        return ((ParamOrHeaderMatcher) m).isHeader() == flag;
-                    }
-                    if (m instanceof ConsumeOrProduceMatcher) {
-                        return ((ConsumeOrProduceMatcher) m).isProduce() == flag;
-                    }
-                    return false;
-                })
-                .count();
+        return matchers.stream().filter(m -> m.getClass().equals(type)).filter(m -> {
+            if (m instanceof ParamOrHeaderMatcher) {
+                return ((ParamOrHeaderMatcher) m).isHeader() == flag;
+            }
+            if (m instanceof ConsumeOrProduceMatcher) {
+                return ((ConsumeOrProduceMatcher) m).isProduce() == flag;
+            }
+            return false;
+        }).count();
     }
 
     /* ==================== initComponentPhase3: optimizeMapping 分流 ==================== */
@@ -176,7 +180,7 @@ class MappingRegistryDetailsTest {
     void mapping_methodMismatch_returnsPathMatchedWith405Flag() {
         MappingRegistry registry = new MappingRegistry();
         registry.registerMapping(createPathMappingContext("/only-get",
-                Collections.singletonList(new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET}))));
+                Collections.singletonList(new HttpMethodMatcher(new HttpMethod[] { HttpMethod.GET }))));
         registry.initComponentPhase3();
 
         WebServerHttpRequest req = mockRequest("/only-get", HttpMethod.POST);
@@ -191,8 +195,8 @@ class MappingRegistryDetailsTest {
     void mapping_nonMethodMismatch_returnsPathMatchedWithout405Flag() {
         MappingRegistry registry = new MappingRegistry();
         // 路径命中但条件不满足（无 HttpMethodMatcher → 非方法失败），继续后续 optimizer 后返回 pathMatched
-        registry.registerMapping(createPathMappingContext("/need-json",
-                Collections.singletonList(new ConsumeOrProduceMatcher(false,
+        registry.registerMapping(
+                createPathMappingContext("/need-json", Collections.singletonList(new ConsumeOrProduceMatcher(false,
                         Collections.singletonList(MediaTypeExpressionSupport.build("application/json"))))));
         registry.initComponentPhase3();
 

@@ -21,34 +21,25 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code server.error.path} 自定义值 + RFC 7807 的组合 E2E：错误页路径会作为 problem+json 的
- * {@code instance} 暴露（这是该配置唯一可观测的落地位置）；同时覆盖 {@code detail}/{@code trace}/
- * {@code errors} 三个受策略控制的扩展字段在 problem+json 中的呈现。
+ * {@code server.error.path} 自定义值 + RFC 7807 的组合 E2E：错误页路径会作为 problem+json 的 {@code instance} 暴露（这是该配置唯一可观测的落地位置）；同时覆盖
+ * {@code detail}/{@code trace}/ {@code errors} 三个受策略控制的扩展字段在 problem+json 中的呈现。
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, ErrorPathProblemDetailsE2eTest.PdPathConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "spring.mvc.problemdetails.enabled=true",
-                "server.error.path=/custom-err",
-                "server.error.include-message=always",
-                "server.error.include-stacktrace=always",
-                "server.error.include-binding-errors=always",
-                "server.error.whitelabel.enabled=false"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        ErrorPathProblemDetailsE2eTest.PdPathConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "spring.mvc.problemdetails.enabled=true",
+                "server.error.path=/custom-err", "server.error.include-message=always",
+                "server.error.include-stacktrace=always", "server.error.include-binding-errors=always",
+                "server.error.whitelabel.enabled=false" })
 class ErrorPathProblemDetailsE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
 
     private Response get(String path) throws Exception {
-        return CLIENT.newCall(new Request.Builder().url("http://localhost:" + port + path).get().build())
-                .execute();
+        return CLIENT.newCall(new Request.Builder().url("http://localhost:" + port + path).get().build()).execute();
     }
 
     @Test
@@ -85,8 +76,7 @@ class ErrorPathProblemDetailsE2eTest {
         try {
             String body = resp.body().string();
             assertTrue(body.contains("\"trace\":"), "include-stacktrace=always 应附 trace，实际 " + body);
-            assertTrue(body.contains("PdpBoomException"),
-                    "trace 内容应含异常类名，实际 " + body);
+            assertTrue(body.contains("PdpBoomException"), "trace 内容应含异常类名，实际 " + body);
         } finally {
             resp.close();
         }
@@ -94,18 +84,15 @@ class ErrorPathProblemDetailsE2eTest {
 
     @Test
     void validationFailure_problemJsonContainsErrorsBlock() throws Exception {
-        Response resp = CLIENT.newCall(new Request.Builder()
-                .url("http://localhost:" + port + "/e2e-pdp/validate")
-                .post(okhttp3.RequestBody.create("{\"name\":\"\"}",
-                        okhttp3.MediaType.parse("application/json")))
+        Response resp = CLIENT.newCall(new Request.Builder().url("http://localhost:" + port + "/e2e-pdp/validate")
+                .post(okhttp3.RequestBody.create("{\"name\":\"\"}", okhttp3.MediaType.parse("application/json")))
                 .build()).execute();
         try {
             assertEquals(400, resp.code(), "校验失败应 400");
             String body = resp.body().string();
             assertTrue(body.contains("\"errors\":{"),
                     "include-binding-errors=always 时 problem+json 应含 errors 扩展块，实际 " + body);
-            assertTrue(body.contains("must-not-be-blank"),
-                    "errors 块应含字段错误消息，实际 " + body);
+            assertTrue(body.contains("must-not-be-blank"), "errors 块应含字段错误消息，实际 " + body);
             assertTrue(body.contains("\"name\""), "errors 块应以字段名为键，实际 " + body);
         } finally {
             resp.close();

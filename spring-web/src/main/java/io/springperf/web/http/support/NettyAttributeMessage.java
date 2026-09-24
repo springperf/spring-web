@@ -1,12 +1,13 @@
 package io.springperf.web.http.support;
 
+import java.io.IOException;
+import java.io.InputStream;
+
+import org.springframework.http.HttpHeaders;
+
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.handler.codec.http.multipart.Attribute;
 import lombok.SneakyThrows;
-import org.springframework.http.HttpHeaders;
-
-import java.io.IOException;
-import java.io.InputStream;
 
 public class NettyAttributeMessage implements HttpInputMessagePart {
 
@@ -46,7 +47,8 @@ public class NettyAttributeMessage implements HttpInputMessagePart {
         if (headers == null) {
             HttpHeaders httpHeaders = new HttpHeaders();
             // Content-Disposition
-            httpHeaders.set(HttpHeaders.CONTENT_DISPOSITION, NettyMultipartFile.buildContentDisposition(attribute.getName(), null));
+            httpHeaders.set(HttpHeaders.CONTENT_DISPOSITION,
+                    NettyMultipartFile.buildContentDisposition(attribute.getName(), null));
 
             long length = attribute.length();
             if (length >= 0) {

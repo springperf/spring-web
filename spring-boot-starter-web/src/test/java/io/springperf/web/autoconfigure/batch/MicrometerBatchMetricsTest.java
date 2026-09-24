@@ -83,8 +83,8 @@ class MicrometerBatchMetricsTest {
         metrics.reportQueueCapacity("q1", 150, 200);
         assertEquals(150.0, registry.get("batch.queue.remaining").tag("queue", "q1").gauge().value(), 0.001);
         // 缓存：已注册的 gauge 不重复
-        assertEquals(1, registry.getMeters().stream()
-                .filter(m -> "batch.queue.remaining".equals(m.getId().getName())
-                        && "q1".equals(m.getId().getTag("queue"))).count());
+        assertEquals(1, registry.getMeters().stream().filter(
+                m -> "batch.queue.remaining".equals(m.getId().getName()) && "q1".equals(m.getId().getTag("queue")))
+                .count());
     }
 }

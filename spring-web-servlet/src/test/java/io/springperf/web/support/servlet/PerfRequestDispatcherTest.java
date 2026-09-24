@@ -21,11 +21,16 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class PerfRequestDispatcherTest {
 
-    @Mock WebServerHttpRequest webRequest;
-    @Mock WebServerHttpResponse webResponse;
-    @Mock WebContext webContext;
-    @Mock SupportDispatcherHandler dispatcherHandler;
-    @Mock io.springperf.web.http.RequestContext requestContext;
+    @Mock
+    WebServerHttpRequest webRequest;
+    @Mock
+    WebServerHttpResponse webResponse;
+    @Mock
+    WebContext webContext;
+    @Mock
+    SupportDispatcherHandler dispatcherHandler;
+    @Mock
+    io.springperf.web.http.RequestContext requestContext;
 
     private org.springframework.http.HttpHeaders headers;
 
@@ -86,8 +91,7 @@ class PerfRequestDispatcherTest {
 
     @Test
     void include_restoresDispatcherTypeOnException() {
-        doThrow(new RuntimeException("include failed"))
-                .when(dispatcherHandler).include(any(), any(), any());
+        doThrow(new RuntimeException("include failed")).when(dispatcherHandler).include(any(), any(), any());
 
         assertThrows(RuntimeException.class, () -> dispatcher.include(servletRequest, servletResponse));
         assertEquals(DispatcherType.REQUEST, servletRequest.getDispatcherType());
@@ -106,8 +110,8 @@ class PerfRequestDispatcherTest {
     @Test
     void forward_wrappedRequest_unwrapsPerfRequest() throws Exception {
         when(webResponse.isCommitted()).thenReturn(false);
-        jakarta.servlet.http.HttpServletRequestWrapper wrapped =
-                new jakarta.servlet.http.HttpServletRequestWrapper(servletRequest);
+        jakarta.servlet.http.HttpServletRequestWrapper wrapped = new jakarta.servlet.http.HttpServletRequestWrapper(
+                servletRequest);
 
         dispatcher.forward(wrapped, servletResponse);
 
@@ -117,8 +121,8 @@ class PerfRequestDispatcherTest {
     @Test
     void forward_wrappedResponse_unwrapsPerfResponse() throws Exception {
         when(webResponse.isCommitted()).thenReturn(false);
-        jakarta.servlet.http.HttpServletResponseWrapper wrapped =
-                new jakarta.servlet.http.HttpServletResponseWrapper(servletResponse);
+        jakarta.servlet.http.HttpServletResponseWrapper wrapped = new jakarta.servlet.http.HttpServletResponseWrapper(
+                servletResponse);
 
         dispatcher.forward(servletRequest, wrapped);
 
@@ -127,8 +131,8 @@ class PerfRequestDispatcherTest {
 
     @Test
     void include_wrappedResponse_unwrapsPerfResponse() throws Exception {
-        jakarta.servlet.http.HttpServletResponseWrapper wrapped =
-                new jakarta.servlet.http.HttpServletResponseWrapper(servletResponse);
+        jakarta.servlet.http.HttpServletResponseWrapper wrapped = new jakarta.servlet.http.HttpServletResponseWrapper(
+                servletResponse);
 
         dispatcher.include(servletRequest, wrapped);
 
@@ -138,15 +142,13 @@ class PerfRequestDispatcherTest {
     @Test
     void forward_unresolvableRequest_throwsServletException() {
         jakarta.servlet.ServletRequest plainRequest = mock(jakarta.servlet.ServletRequest.class);
-        assertThrows(jakarta.servlet.ServletException.class,
-                () -> dispatcher.forward(plainRequest, servletResponse));
+        assertThrows(jakarta.servlet.ServletException.class, () -> dispatcher.forward(plainRequest, servletResponse));
     }
 
     @Test
     void include_unresolvableResponse_throwsServletException() {
         jakarta.servlet.ServletResponse plainResponse = mock(jakarta.servlet.ServletResponse.class);
-        assertThrows(jakarta.servlet.ServletException.class,
-                () -> dispatcher.include(servletRequest, plainResponse));
+        assertThrows(jakarta.servlet.ServletException.class, () -> dispatcher.include(servletRequest, plainResponse));
     }
 
     @Test
@@ -154,7 +156,6 @@ class PerfRequestDispatcherTest {
         when(webResponse.isCommitted()).thenReturn(false);
         when(webContext.getDispatcherHandler()).thenReturn(new io.springperf.web.core.DispatcherHandler());
 
-        assertThrows(jakarta.servlet.ServletException.class,
-                () -> dispatcher.forward(servletRequest, servletResponse));
+        assertThrows(jakarta.servlet.ServletException.class, () -> dispatcher.forward(servletRequest, servletResponse));
     }
 }

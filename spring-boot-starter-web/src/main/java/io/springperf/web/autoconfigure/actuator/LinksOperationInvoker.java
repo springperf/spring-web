@@ -11,7 +11,9 @@ import java.util.List;
 
 /**
  * 用于 Actuator links 端点（{@code GET /actuator}）的 {@link CustomInvoker}。
- * <p>该端点返回所有已发现 Actuator 端点的链接列表。</p>
+ * <p>
+ * 该端点返回所有已发现 Actuator 端点的链接列表。
+ * </p>
  */
 public class LinksOperationInvoker implements CustomInvoker {
 
@@ -25,9 +27,8 @@ public class LinksOperationInvoker implements CustomInvoker {
         }
     }
 
-    private static final List<Matcher> MATCHERS = Collections.singletonList(
-            new HttpMethodMatcher(new HttpMethod[]{HttpMethod.GET})
-    );
+    private static final List<Matcher> MATCHERS = Collections
+            .singletonList(new HttpMethodMatcher(new HttpMethod[] { HttpMethod.GET }));
 
     @SuppressWarnings("unused")
     public Object handleMethod() {

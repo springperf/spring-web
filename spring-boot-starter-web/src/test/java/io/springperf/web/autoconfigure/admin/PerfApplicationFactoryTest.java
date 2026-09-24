@@ -36,13 +36,12 @@ class PerfApplicationFactoryTest {
 
         // InstanceProperties 默认 name="spring-boot-application"，覆盖为 null 以触发 Environment 兜底
         instanceProperties.setName(null);
-        when(environment.getProperty("spring.application.name", "application"))
-                .thenReturn("test-app");
+        when(environment.getProperty("spring.application.name", "application")).thenReturn("test-app");
     }
 
     private PerfApplicationFactory createFactory() {
-        return new PerfApplicationFactory(instanceProperties, managementServerProperties,
-                serverProperties, webEndpointProperties, environment);
+        return new PerfApplicationFactory(instanceProperties, managementServerProperties, serverProperties,
+                webEndpointProperties, environment);
     }
 
     // ---------------------------------------------------------------

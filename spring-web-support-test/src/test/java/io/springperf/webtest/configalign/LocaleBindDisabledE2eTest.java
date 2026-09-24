@@ -16,27 +16,20 @@ import org.springframework.web.bind.annotation.RestController;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * {@code spring.web.locale-bind=false} E2E：框架完全不绑定 {@code LocaleContextHolder}——
- * 省掉每请求的上下文分配与 ThreadLocal set/remove。
- *
- * <p>语义（对齐 Spring：holder 为空时的回退）：{@code getLocaleContext()} 返回 null，
- * {@code getLocale()} 回退 JVM 默认 Locale。配置了 {@code spring.web.locale=zh_CN}
- * 也不再生效（这正是"不关注 Locale"的含义）。</p>
+ * {@code spring.web.locale-bind=false} E2E：框架完全不绑定 {@code LocaleContextHolder}—— 省掉每请求的上下文分配与 ThreadLocal set/remove。
+ * <p>
+ * 语义（对齐 Spring：holder 为空时的回退）：{@code getLocaleContext()} 返回 null， {@code getLocale()} 回退 JVM 默认 Locale。配置了
+ * {@code spring.web.locale=zh_CN} 也不再生效（这正是"不关注 Locale"的含义）。
+ * </p>
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, LocaleBindDisabledE2eTest.BindEchoConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "spring.web.locale=zh_CN",
-                "spring.web.locale-resolver=fixed",
-                "spring.web.locale-bind=false"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        LocaleBindDisabledE2eTest.BindEchoConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "spring.web.locale=zh_CN", "spring.web.locale-resolver=fixed",
+                "spring.web.locale-bind=false" })
 class LocaleBindDisabledE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
@@ -59,8 +52,7 @@ class LocaleBindDisabledE2eTest {
 
     @Test
     void bindDisabled_localeContextNotBound_fallsBackToJvmDefault() throws Exception {
-        assertEquals("true|true", echoBindState(null),
-                "关闭绑定时 getLocaleContext() 应为 null，getLocale() 回退 JVM 默认");
+        assertEquals("true|true", echoBindState(null), "关闭绑定时 getLocaleContext() 应为 null，getLocale() 回退 JVM 默认");
     }
 
     @Test

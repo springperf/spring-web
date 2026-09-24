@@ -16,30 +16,25 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * 3.2.x 虚拟线程集成测试。
- * <p>验证 {@code spring.threads.virtual.enabled=true} 时：
+ * <p>
+ * 验证 {@code spring.threads.virtual.enabled=true} 时：
  * <ul>
- *   <li>业务线程池使用虚拟线程执行请求（JDK 21+ 有效）</li>
- *   <li>{@code @RunInPool} 标注的方法在虚拟线程上执行（JDK 21+ 有效）</li>
- *   <li>{@code @RunInPool(RunInPool.EVENTLOOP)} 仍保持在 EventLoop 上执行</li>
+ * <li>业务线程池使用虚拟线程执行请求（JDK 21+ 有效）</li>
+ * <li>{@code @RunInPool} 标注的方法在虚拟线程上执行（JDK 21+ 有效）</li>
+ * <li>{@code @RunInPool(RunInPool.EVENTLOOP)} 仍保持在 EventLoop 上执行</li>
  * </ul>
  * </p>
  */
 @SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
-        "server.servlet.context-path=/api",
-        "spring.threads.virtual.enabled=true",
-        "pool.core-pool-size=10"
-})
+        "server.servlet.context-path=/api", "spring.threads.virtual.enabled=true", "pool.core-pool-size=10" })
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class VirtualThreadE2ETest {
 
     @org.springframework.boot.test.web.server.LocalServerPort
     private int serverPort;
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .writeTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).writeTimeout(Duration.ofSeconds(10)).build();
 
     private String url(String path) {
         return "http://localhost:" + serverPort + path;
@@ -54,10 +49,7 @@ public class VirtualThreadE2ETest {
         assumeTrue(Runtime.version().feature() >= 21,
                 "Virtual threads require JDK 21+, skipping on JDK " + Runtime.version().feature());
 
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/core/pool/virtual-thread")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/core/pool/virtual-thread").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
@@ -80,28 +72,21 @@ public class VirtualThreadE2ETest {
                 "Default pool is virtual on JDK 21+ when spring.threads.virtual.enabled=true; skipping on JDK "
                         + Runtime.version().feature());
 
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/core/pool/biz-pool")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/core/pool/biz-pool").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
             assertNotNull(body);
             String threadName = (String) body.get("thread");
             assertNotNull(threadName);
-            assertFalse(threadName.startsWith("perf-virtual-"),
-                    "@RunInPool 默认池应使用平台线程，实际线程名: " + threadName);
+            assertFalse(threadName.startsWith("perf-virtual-"), "@RunInPool 默认池应使用平台线程，实际线程名: " + threadName);
         }
     }
 
     @Test
     void eventLoop_shouldNotUseVirtualThread() throws Exception {
         // EventLoop 不应使用虚拟线程（即使虚拟线程全局启用）
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/core/pool/event-loop")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/core/pool/event-loop").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
@@ -115,14 +100,10 @@ public class VirtualThreadE2ETest {
 
     @Test
     void badPool_shouldThrowException() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/core/pool/bad-pool")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/core/pool/bad-pool").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             // 不存在池应返回 500
-            assertTrue(resp.code() >= 500,
-                    "Expected 5xx for non-existent pool, got " + resp.code());
+            assertTrue(resp.code() >= 500, "Expected 5xx for non-existent pool, got " + resp.code());
         }
     }
 }

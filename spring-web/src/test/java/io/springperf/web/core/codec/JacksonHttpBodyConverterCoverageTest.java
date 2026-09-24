@@ -1,37 +1,5 @@
 package io.springperf.web.core.codec;
 
-import com.fasterxml.jackson.annotation.JsonFilter;
-import com.fasterxml.jackson.annotation.JsonView;
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializerProvider;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.fasterxml.jackson.databind.ser.impl.SimpleBeanPropertyFilter;
-import com.fasterxml.jackson.databind.ser.impl.SimpleFilterProvider;
-import com.fasterxml.jackson.databind.ser.std.StdSerializer;
-import io.springperf.web.core.mapping.PathMappingContext;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
-import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpInputMessage;
-import org.springframework.http.HttpOutputMessage;
-import org.springframework.http.MediaType;
-import org.springframework.http.converter.HttpMessageNotWritableException;
-import org.springframework.http.converter.json.MappingJacksonValue;
-import org.springframework.web.method.HandlerMethod;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.lang.reflect.Method;
-import java.lang.reflect.Type;
-import java.nio.charset.StandardCharsets;
-import java.util.Collections;
-
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -43,11 +11,47 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Method;
+import java.lang.reflect.Type;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpInputMessage;
+import org.springframework.http.HttpOutputMessage;
+import org.springframework.http.MediaType;
+import org.springframework.http.converter.HttpMessageNotWritableException;
+import org.springframework.http.converter.json.MappingJacksonValue;
+import org.springframework.web.method.HandlerMethod;
+
+import com.fasterxml.jackson.annotation.JsonFilter;
+import com.fasterxml.jackson.annotation.JsonView;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.databind.ser.impl.SimpleBeanPropertyFilter;
+import com.fasterxml.jackson.databind.ser.impl.SimpleFilterProvider;
+import com.fasterxml.jackson.databind.ser.std.StdSerializer;
+
+import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
+
 class JacksonHttpBodyConverterCoverageTest {
 
-    static class ViewA {}
+    static class ViewA {
+    }
 
-    static class ViewB {}
+    static class ViewB {
+    }
 
     static class ViewDto {
         @JsonView(ViewA.class)
@@ -141,8 +145,8 @@ class JacksonHttpBodyConverterCoverageTest {
     void write_mappingJacksonValueWithFilters_appliesFilter() throws Exception {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         MappingJacksonValue mjv = new MappingJacksonValue(new FilteredDto("show", "hide"));
-        SimpleFilterProvider filters = new SimpleFilterProvider()
-                .addFilter("secretFilter", SimpleBeanPropertyFilter.serializeAllExcept("secret"));
+        SimpleFilterProvider filters = new SimpleFilterProvider().addFilter("secretFilter",
+                SimpleBeanPropertyFilter.serializeAllExcept("secret"));
         mjv.setFilters(filters);
 
         converter.write(mjv, (Type) FilteredDto.class, MediaType.APPLICATION_JSON, outputMessage(out),
@@ -163,12 +167,13 @@ class JacksonHttpBodyConverterCoverageTest {
                 };
             }
         });
-        JacksonHttpBodyConverter failingConverter = new JacksonHttpBodyConverter(new ObjectMapper().registerModule(module));
+        JacksonHttpBodyConverter failingConverter = new JacksonHttpBodyConverter(
+                new ObjectMapper().registerModule(module));
 
-        HttpMessageNotWritableException ex = assertThrows(HttpMessageNotWritableException.class, () ->
-                failingConverter.write(new Boom(), (Type) Boom.class, MediaType.APPLICATION_JSON,
-                        outputMessage(new ByteArrayOutputStream()),
-                        mock(WebServerHttpRequest.class), mock(WebServerHttpResponse.class), null));
+        HttpMessageNotWritableException ex = assertThrows(HttpMessageNotWritableException.class,
+                () -> failingConverter.write(new Boom(), (Type) Boom.class, MediaType.APPLICATION_JSON,
+                        outputMessage(new ByteArrayOutputStream()), mock(WebServerHttpRequest.class),
+                        mock(WebServerHttpResponse.class), null));
         assertTrue(ex.getMessage().contains("boom"));
     }
 
@@ -194,8 +199,8 @@ class JacksonHttpBodyConverterCoverageTest {
         PathMappingContext mapping = realMapping("plain");
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        converter.write(new ViewDto("v", "h"), (Type) ViewDto.class, MediaType.APPLICATION_JSON,
-                outputMessage(out), mock(WebServerHttpRequest.class), mock(WebServerHttpResponse.class), mapping);
+        converter.write(new ViewDto("v", "h"), (Type) ViewDto.class, MediaType.APPLICATION_JSON, outputMessage(out),
+                mock(WebServerHttpRequest.class), mock(WebServerHttpResponse.class), mapping);
 
         String json = new String(out.toByteArray(), StandardCharsets.UTF_8);
         assertTrue(json.contains("\"name\":\"v\""));

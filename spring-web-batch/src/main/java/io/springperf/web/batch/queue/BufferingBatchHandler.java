@@ -28,18 +28,12 @@ public class BufferingBatchHandler implements EventHandler<BatchEvent> {
     // 两者不会并发，因此 ArrayList 无需额外同步。
     private List<BatchRequest<?>> buffer = new ArrayList<>();
 
-    public BufferingBatchHandler(Executor executor,
-                                 BatchRequestMetaData meta,
-                                 Object bean,
-                                 int maxBatchSize) {
+    public BufferingBatchHandler(Executor executor, BatchRequestMetaData meta, Object bean, int maxBatchSize) {
         this(executor, meta, bean, maxBatchSize, NoOpBatchMetrics.INSTANCE);
     }
 
-    public BufferingBatchHandler(Executor executor,
-                                 BatchRequestMetaData meta,
-                                 Object bean,
-                                 int maxBatchSize,
-                                 BatchMetrics metrics) {
+    public BufferingBatchHandler(Executor executor, BatchRequestMetaData meta, Object bean, int maxBatchSize,
+            BatchMetrics metrics) {
         this.executor = executor;
         this.meta = meta;
         this.bean = bean;
@@ -51,17 +45,15 @@ public class BufferingBatchHandler implements EventHandler<BatchEvent> {
     public void onEvent(BatchEvent event, long sequence, boolean endOfBatch) {
         buffer.add(event.request());
 
-        boolean shouldFlush = endOfBatch
-                || (maxBatchSize > 0 && buffer.size() >= maxBatchSize);
+        boolean shouldFlush = endOfBatch || (maxBatchSize > 0 && buffer.size() >= maxBatchSize);
         if (shouldFlush) {
             flush();
         }
     }
 
     /**
-     * Force-flush any remaining buffer. Called during graceful shutdown after
-     * the Disruptor has been drained — at this point the event processor has
-     * stopped, so no onEvent() calls will interleave.
+     * Force-flush any remaining buffer. Called during graceful shutdown after the Disruptor has been drained — at this
+     * point the event processor has stopped, so no onEvent() calls will interleave.
      */
     public void flushRemaining() {
         if (!buffer.isEmpty()) {
@@ -70,7 +62,8 @@ public class BufferingBatchHandler implements EventHandler<BatchEvent> {
     }
 
     private void flush() {
-        if (buffer.isEmpty()) return;
+        if (buffer.isEmpty())
+            return;
         List<BatchRequest<?>> batch = buffer;
         buffer = new ArrayList<>();
         executor.execute(() -> processBatch(batch));
@@ -86,7 +79,7 @@ public class BufferingBatchHandler implements EventHandler<BatchEvent> {
         int batchSize = batch.size();
         boolean success = false;
         try {
-            Object[] args = new Object[]{batch};
+            Object[] args = new Object[] { batch };
             meta.batchMethod().invoke(bean, args);
             success = true;
             metrics.recordRequestCompleted(meta.queueName(), batchSize);
@@ -96,14 +89,12 @@ public class BufferingBatchHandler implements EventHandler<BatchEvent> {
         } catch (Throwable e) {
             handleBatchError(batch, e);
         } finally {
-            metrics.recordBatchProcessed(meta.queueName(), batchSize,
-                    System.nanoTime() - start, success);
+            metrics.recordBatchProcessed(meta.queueName(), batchSize, System.nanoTime() - start, success);
         }
     }
 
     private void handleBatchError(List<BatchRequest<?>> batch, Throwable cause) {
-        log.error("Error processing batch of {} requests from queue [{}]",
-                batch.size(), meta.queueName(), cause);
+        log.error("Error processing batch of {} requests from queue [{}]", batch.size(), meta.queueName(), cause);
         for (BatchRequest<?> req : batch) {
             if (!req.isCompleted()) {
                 req.setError(cause);

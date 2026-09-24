@@ -15,10 +15,7 @@ public class CoreFeaturesWebFilterTest extends BaseE2ETest {
 
     @Test
     void webFilter_addsHeaderToResponse() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/bytes")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/bytes").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String filterHeader = resp.header("X-Test-Filter");
@@ -29,11 +26,7 @@ public class CoreFeaturesWebFilterTest extends BaseE2ETest {
 
     @Test
     void webFilter_headerPresentOnAllEndpoints() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/header")
-                .header("X-Custom-Header", "test")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/header").header("X-Custom-Header", "test").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String filterHeader = resp.header("X-Test-Filter");

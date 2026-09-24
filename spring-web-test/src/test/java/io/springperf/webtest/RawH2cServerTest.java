@@ -29,8 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 public class RawH2cServerTest {
 
-    private static final byte[] H2_PREFACE =
-            "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] H2_PREFACE = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n".getBytes(StandardCharsets.UTF_8);
 
     @Test
     void testRawH2c() throws Exception {
@@ -39,8 +38,7 @@ public class RawH2cServerTest {
 
         try {
             ServerBootstrap bootstrap = new ServerBootstrap();
-            bootstrap.group(bossGroup, workerGroup)
-                    .channel(NioServerSocketChannel.class)
+            bootstrap.group(bossGroup, workerGroup).channel(NioServerSocketChannel.class)
                     .childHandler(new ChannelInitializer<Channel>() {
                         @Override
                         protected void initChannel(Channel ch) {
@@ -50,23 +48,25 @@ public class RawH2cServerTest {
                                     new ChannelInitializer<Channel>() {
                                         @Override
                                         protected void initChannel(Channel ch) {
-                                            ch.pipeline().addLast(
-                                                    new Http2StreamFrameToHttpObjectCodec(true),
-                                                    new ChunkedWriteHandler(),
-                                                    new HttpObjectAggregator(1048576),
+                                            ch.pipeline().addLast(new Http2StreamFrameToHttpObjectCodec(true),
+                                                    new ChunkedWriteHandler(), new HttpObjectAggregator(1048576),
                                                     new SimpleChannelInboundHandler<FullHttpRequest>() {
                                                         @Override
-                                                        protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest req) {
-                                                            System.out.println("H2-ECHO: " + req.method() + " " + req.uri());
+                                                        protected void channelRead0(ChannelHandlerContext ctx,
+                                                                FullHttpRequest req) {
+                                                            System.out.println(
+                                                                    "H2-ECHO: " + req.method() + " " + req.uri());
                                                             FullHttpResponse resp = new DefaultFullHttpResponse(
                                                                     HttpVersion.HTTP_1_1, HttpResponseStatus.OK,
-                                                                    ctx.alloc().buffer().writeBytes("hello".getBytes()));
-                                                            resp.headers().set(HttpHeaderNames.CONTENT_TYPE, "text/plain");
-                                                            resp.headers().set(HttpHeaderNames.CONTENT_LENGTH, resp.content().readableBytes());
+                                                                    ctx.alloc().buffer()
+                                                                            .writeBytes("hello".getBytes()));
+                                                            resp.headers().set(HttpHeaderNames.CONTENT_TYPE,
+                                                                    "text/plain");
+                                                            resp.headers().set(HttpHeaderNames.CONTENT_LENGTH,
+                                                                    resp.content().readableBytes());
                                                             ctx.writeAndFlush(resp);
                                                         }
-                                                    }
-                                            );
+                                                    });
                                         }
                                     });
 
@@ -78,7 +78,10 @@ public class RawH2cServerTest {
                                         if (buf.readableBytes() >= 24) {
                                             boolean match = true;
                                             for (int i = 0; i < 24; i++) {
-                                                if (buf.getByte(i) != H2_PREFACE[i]) { match = false; break; }
+                                                if (buf.getByte(i) != H2_PREFACE[i]) {
+                                                    match = false;
+                                                    break;
+                                                }
                                             }
                                             if (match) {
                                                 ChannelPipeline pipe = ctx.pipeline();
@@ -102,8 +105,8 @@ public class RawH2cServerTest {
                                 @Override
                                 protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest req) {
                                     System.out.println("HTTP/1.1 FALLBACK: " + req.uri());
-                                    FullHttpResponse resp = new DefaultFullHttpResponse(
-                                            HttpVersion.HTTP_1_1, HttpResponseStatus.OK,
+                                    FullHttpResponse resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1,
+                                            HttpResponseStatus.OK,
                                             ctx.alloc().buffer().writeBytes("http11".getBytes()));
                                     resp.headers().set(HttpHeaderNames.CONTENT_TYPE, "text/plain");
                                     resp.headers().set(HttpHeaderNames.CONTENT_LENGTH, resp.content().readableBytes());
@@ -116,16 +119,11 @@ public class RawH2cServerTest {
             Channel serverChannel = bootstrap.bind(0).sync().channel();
             int port = ((java.net.InetSocketAddress) serverChannel.localAddress()).getPort();
 
-            OkHttpClient client = new OkHttpClient.Builder()
-                    .connectTimeout(Duration.ofSeconds(3))
+            OkHttpClient client = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
                     .readTimeout(Duration.ofSeconds(10))
-                    .protocols(Collections.singletonList(Protocol.H2_PRIOR_KNOWLEDGE))
-                    .build();
+                    .protocols(Collections.singletonList(Protocol.H2_PRIOR_KNOWLEDGE)).build();
 
-            Request request = new Request.Builder()
-                    .url("http://localhost:" + port + "/test")
-                    .get()
-                    .build();
+            Request request = new Request.Builder().url("http://localhost:" + port + "/test").get().build();
 
             try (Response response = client.newCall(request).execute()) {
                 System.out.println("Status: " + response.code() + " Body: " + response.body().string());

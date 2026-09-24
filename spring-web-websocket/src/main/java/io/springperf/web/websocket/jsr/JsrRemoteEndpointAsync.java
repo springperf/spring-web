@@ -15,12 +15,13 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * JSR-356 {@link RemoteEndpoint.Async} 实现。
- *
- * <p>底层 {@link org.springframework.web.socket.WebSocketSession#sendMessage} 为同步写入
- * （EventLoop 串行化），因此此处以 CompletableFuture 包装：发送成功即返回已完成的 future，
- * 发送失败则返回已异常完成的 future。流式发送首期不支持。</p>
+ * <p>
+ * 底层 {@link org.springframework.web.socket.WebSocketSession#sendMessage} 为同步写入 （EventLoop 串行化），因此此处以 CompletableFuture
+ * 包装：发送成功即返回已完成的 future， 发送失败则返回已异常完成的 future。流式发送首期不支持。
+ * </p>
  *
  * @author huangcanda
+ *
  * @since 3.5.6
  */
 public class JsrRemoteEndpointAsync implements RemoteEndpoint.Async {

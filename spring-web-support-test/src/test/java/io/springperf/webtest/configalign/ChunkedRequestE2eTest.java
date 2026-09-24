@@ -19,16 +19,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * chunked 请求体与 {@code server.http.max-content-length=8192} 的交互 E2E（原始 socket）：
- * 无 Content-Length 时上限必须按**累计字节**判定；分块编码与 Content-Length 并存、
- * HTTP/1.0 使用 chunked 都必须按 RFC 7230 §3.3.3 拒绝（请求走私防护）。
+ * chunked 请求体与 {@code server.http.max-content-length=8192} 的交互 E2E（原始 socket）： 无 Content-Length 时上限必须按**累计字节**判定；分块编码与
+ * Content-Length 并存、 HTTP/1.0 使用 chunked 都必须按 RFC 7230 §3.3.3 拒绝（请求走私防护）。
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, ChunkedRequestE2eTest.ChunkedConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "server.http.max-content-length=8192"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        ChunkedRequestE2eTest.ChunkedConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "server.http.max-content-length=8192" })
 class ChunkedRequestE2eTest {
 
     @LocalServerPort
@@ -91,15 +87,11 @@ class ChunkedRequestE2eTest {
     @Test
     void chunkedBelowLimit_served() throws Exception {
         int size = 4096;
-        String head = "POST /e2e-chunk/echo HTTP/1.1\r\n"
-                + "Host: localhost\r\n"
-                + "Content-Type: text/plain\r\n"
-                + "Transfer-Encoding: chunked\r\n"
-                + "Connection: close\r\n\r\n";
+        String head = "POST /e2e-chunk/echo HTTP/1.1\r\n" + "Host: localhost\r\n" + "Content-Type: text/plain\r\n"
+                + "Transfer-Encoding: chunked\r\n" + "Connection: close\r\n\r\n";
         String resp = sendRaw(head, chunkedBody(size, false));
         assertTrue(resp.contains("HTTP/1.1 200"), "chunked 请求在限额内应被服务，实际:\n" + resp);
-        assertTrue(resp.contains("len:" + size),
-                "chunked 体应被完整聚合（累计 " + size + " 字节），实际:\n" + resp);
+        assertTrue(resp.contains("len:" + size), "chunked 体应被完整聚合（累计 " + size + " 字节），实际:\n" + resp);
     }
 
     @Test
@@ -119,8 +111,7 @@ class ChunkedRequestE2eTest {
         String head = "POST /e2e-chunk/echo HTTP/1.1\r\nHost: localhost\r\n"
                 + "Content-Type: text/plain\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n";
         String resp = sendRaw(head, chunkedBody(size, false));
-        assertTrue(resp.contains("HTTP/1.1 413"),
-                "chunked 体超过 max-content-length 应 413（累计判定），实际:\n" + resp);
+        assertTrue(resp.contains("HTTP/1.1 413"), "chunked 体超过 max-content-length 应 413（累计判定），实际:\n" + resp);
     }
 
     @Test
@@ -135,28 +126,20 @@ class ChunkedRequestE2eTest {
     @Test
     void chunkedWithContentLength_bothPresent_rejected() throws Exception {
         // RFC 7230 §3.3.3：同时出现 Transfer-Encoding 与 Content-Length 属必须拒绝的走私风险
-        String head = "POST /e2e-chunk/echo HTTP/1.1\r\n"
-                + "Host: localhost\r\n"
-                + "Content-Type: text/plain\r\n"
-                + "Content-Length: 2048\r\n"
-                + "Transfer-Encoding: chunked\r\n"
-                + "Connection: close\r\n\r\n";
+        String head = "POST /e2e-chunk/echo HTTP/1.1\r\n" + "Host: localhost\r\n" + "Content-Type: text/plain\r\n"
+                + "Content-Length: 2048\r\n" + "Transfer-Encoding: chunked\r\n" + "Connection: close\r\n\r\n";
         String resp = sendRaw(head, chunkedBody(2048, false));
-        assertTrue(resp.contains("HTTP/1.1 400"),
-                "Content-Length 与 chunked 并存应 400（防请求走私），实际:\n" + resp);
+        assertTrue(resp.contains("HTTP/1.1 400"), "Content-Length 与 chunked 并存应 400（防请求走私），实际:\n" + resp);
     }
 
     @Test
     void http10WithChunked_rejected() throws Exception {
         // HTTP/1.0 不支持分块传输编码
-        String head = "POST /e2e-chunk/echo HTTP/1.0\r\n"
-                + "Content-Type: text/plain\r\n"
+        String head = "POST /e2e-chunk/echo HTTP/1.0\r\n" + "Content-Type: text/plain\r\n"
                 + "Transfer-Encoding: chunked\r\n\r\n";
         String resp = sendRaw(head, chunkedBody(1024, false));
-        assertTrue(resp.contains("HTTP/1."),
-                "HTTP/1.0 + chunked 不应导致连接挂死，实际:\n" + resp);
-        assertTrue(!resp.contains("HTTP/1.1 200") || resp.contains("400"),
-                "HTTP/1.0 使用 chunked 属非法请求，实际:\n" + resp);
+        assertTrue(resp.contains("HTTP/1."), "HTTP/1.0 + chunked 不应导致连接挂死，实际:\n" + resp);
+        assertTrue(!resp.contains("HTTP/1.1 200") || resp.contains("400"), "HTTP/1.0 使用 chunked 属非法请求，实际:\n" + resp);
     }
 
     @TestConfiguration

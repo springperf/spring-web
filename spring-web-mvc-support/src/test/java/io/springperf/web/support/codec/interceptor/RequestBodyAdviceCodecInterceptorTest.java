@@ -34,7 +34,7 @@ class RequestBodyAdviceCodecInterceptorTest {
     @Mock
     HttpInputMessage inputMessage;
 
-    private final Class converterClass =  HttpMessageConverter.class;
+    private final Class converterClass = HttpMessageConverter.class;
 
     private RequestBodyAdviceCodecInterceptor createInterceptor() {
         return new RequestBodyAdviceCodecInterceptor(advice);
@@ -54,8 +54,7 @@ class RequestBodyAdviceCodecInterceptorTest {
     @Test
     void beforeBodyRead_delegatesToAdvice() throws IOException {
         when(converter.getConverterClass()).thenReturn(converterClass);
-        when(advice.beforeBodyRead(inputMessage, methodParameter, targetType, converterClass))
-                .thenReturn(inputMessage);
+        when(advice.beforeBodyRead(inputMessage, methodParameter, targetType, converterClass)).thenReturn(inputMessage);
 
         assertSame(inputMessage,
                 createInterceptor().beforeBodyRead(inputMessage, methodParameter, targetType, converter));

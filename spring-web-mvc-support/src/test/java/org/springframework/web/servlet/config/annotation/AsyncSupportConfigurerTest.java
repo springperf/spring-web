@@ -83,7 +83,8 @@ class AsyncSupportConfigurerTest {
 
     @Test
     void registerDeferredResultInterceptors_returnsSelf() {
-        assertSame(configurer, configurer.registerDeferredResultInterceptors(mock(DeferredResultProcessingInterceptor.class)));
+        assertSame(configurer,
+                configurer.registerDeferredResultInterceptors(mock(DeferredResultProcessingInterceptor.class)));
     }
 
     @Test

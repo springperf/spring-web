@@ -1,5 +1,21 @@
 package io.springperf.web.core.async.stream;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.embedded.EmbeddedChannel;
@@ -10,25 +26,9 @@ import io.springperf.web.http.NettyServerHttpResponse;
 import io.springperf.web.http.RequestAttribute;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
- * 补充 {@link AbstractNettyStreamSender} 边界：preSendCheck 快速失败、
- * sendAll 批量入队/空集合、complete 关闭通道。
+ * 补充 {@link AbstractNettyStreamSender} 边界：preSendCheck 快速失败、 sendAll 批量入队/空集合、complete 关闭通道。
  */
 class AbstractNettyStreamSenderDetailsTest {
 
@@ -76,8 +76,7 @@ class AbstractNettyStreamSenderDetailsTest {
         DefaultNettyStreamSender sender = newSender();
         channel.close().awaitUninterruptibly();
 
-        assertThrows(IOException.class, () -> sender.send("x"),
-                "通道关闭后发送应快速失败");
+        assertThrows(IOException.class, () -> sender.send("x"), "通道关闭后发送应快速失败");
     }
 
     @Test
@@ -85,8 +84,7 @@ class AbstractNettyStreamSenderDetailsTest {
         DefaultNettyStreamSender sender = newSender();
         sender.complete(false, null);
 
-        assertThrows(IOException.class, () -> sender.send("x"),
-                "流完成后发送应快速失败");
+        assertThrows(IOException.class, () -> sender.send("x"), "流完成后发送应快速失败");
     }
 
     @Test
@@ -118,8 +116,7 @@ class AbstractNettyStreamSenderDetailsTest {
         assertDoesNotThrow(() -> sender.complete(true, null));
         channel.runPendingTasks();
         channel.runPendingTasks();
-        assertTrue(sender.queueSize() == 0 || channel.isActive(),
-                "complete 后应安全排空队列并结束流");
+        assertTrue(sender.queueSize() == 0 || channel.isActive(), "complete 后应安全排空队列并结束流");
     }
 
     @Test

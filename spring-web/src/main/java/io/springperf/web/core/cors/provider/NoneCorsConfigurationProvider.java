@@ -1,8 +1,9 @@
 package io.springperf.web.core.cors.provider;
 
+import org.springframework.web.cors.CorsConfiguration;
+
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
-import org.springframework.web.cors.CorsConfiguration;
 
 public class NoneCorsConfigurationProvider implements CorsConfigurationProvider {
     @Override

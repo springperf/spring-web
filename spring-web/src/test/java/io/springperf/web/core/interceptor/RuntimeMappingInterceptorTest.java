@@ -1,33 +1,36 @@
 package io.springperf.web.core.interceptor;
 
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
-import org.junit.jupiter.api.Test;
-import org.springframework.util.PathMatcher;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import org.junit.jupiter.api.Test;
+import org.springframework.util.PathMatcher;
+
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
+
 class RuntimeMappingInterceptorTest {
 
-    private final HandlerInterceptor delegate = new HandlerInterceptor() {};
-    private final HandlerInterceptor spyDelegate = spy(new HandlerInterceptor() {});
+    private final HandlerInterceptor delegate = new HandlerInterceptor() {
+    };
+    private final HandlerInterceptor spyDelegate = spy(new HandlerInterceptor() {
+    });
 
     @Test
     void constructor_withoutPathMatcher() {
-        RuntimeMappingInterceptor interceptor = new RuntimeMappingInterceptor(
-                new String[]{"/api/**"}, new String[]{"/admin/**"}, delegate);
+        RuntimeMappingInterceptor interceptor = new RuntimeMappingInterceptor(new String[] { "/api/**" },
+                new String[] { "/admin/**" }, delegate);
 
         assertNull(interceptor.getPathMatcher());
-        assertArrayEquals(new String[]{"/api/**"}, interceptor.getPathPatterns());
+        assertArrayEquals(new String[] { "/api/**" }, interceptor.getPathPatterns());
         assertSame(delegate, interceptor.getInterceptor());
     }
 
     @Test
     void constructor_withPathMatcher() {
         PathMatcher pathMatcher = mock(PathMatcher.class);
-        RuntimeMappingInterceptor interceptor = new RuntimeMappingInterceptor(
-                new String[]{"/api/**"}, new String[]{"/admin/**"}, delegate, pathMatcher);
+        RuntimeMappingInterceptor interceptor = new RuntimeMappingInterceptor(new String[] { "/api/**" },
+                new String[] { "/admin/**" }, delegate, pathMatcher);
 
         assertSame(pathMatcher, interceptor.getPathMatcher());
     }
@@ -50,40 +53,40 @@ class RuntimeMappingInterceptorTest {
 
     @Test
     void matches_includeMatches_returnsTrue() {
-        RuntimeMappingInterceptor interceptor = new RuntimeMappingInterceptor(
-                new String[]{"/api/**"}, null, delegate);
+        RuntimeMappingInterceptor interceptor = new RuntimeMappingInterceptor(new String[] { "/api/**" }, null,
+                delegate);
 
         assertTrue(interceptor.matches("/api/users"));
     }
 
     @Test
     void matches_includeDoesNotMatch_returnsFalse() {
-        RuntimeMappingInterceptor interceptor = new RuntimeMappingInterceptor(
-                new String[]{"/api/**"}, null, delegate);
+        RuntimeMappingInterceptor interceptor = new RuntimeMappingInterceptor(new String[] { "/api/**" }, null,
+                delegate);
 
         assertFalse(interceptor.matches("/admin/users"));
     }
 
     @Test
     void matches_excludeMatches_returnsFalse() {
-        RuntimeMappingInterceptor interceptor = new RuntimeMappingInterceptor(
-                new String[]{"/**"}, new String[]{"/api/**"}, delegate);
+        RuntimeMappingInterceptor interceptor = new RuntimeMappingInterceptor(new String[] { "/**" },
+                new String[] { "/api/**" }, delegate);
 
         assertFalse(interceptor.matches("/api/users"));
     }
 
     @Test
     void matches_excludeTakesPriorityOverInclude() {
-        RuntimeMappingInterceptor interceptor = new RuntimeMappingInterceptor(
-                new String[]{"/api/**"}, new String[]{"/api/users"}, delegate);
+        RuntimeMappingInterceptor interceptor = new RuntimeMappingInterceptor(new String[] { "/api/**" },
+                new String[] { "/api/users" }, delegate);
 
         assertFalse(interceptor.matches("/api/users"));
     }
 
     @Test
     void matches_includeMatchesExcludeDoesNot_returnsTrue() {
-        RuntimeMappingInterceptor interceptor = new RuntimeMappingInterceptor(
-                new String[]{"/api/**"}, new String[]{"/admin/**"}, delegate);
+        RuntimeMappingInterceptor interceptor = new RuntimeMappingInterceptor(new String[] { "/api/**" },
+                new String[] { "/admin/**" }, delegate);
 
         assertTrue(interceptor.matches("/api/users"));
     }
@@ -93,8 +96,8 @@ class RuntimeMappingInterceptorTest {
         PathMatcher pathMatcher = mock(PathMatcher.class);
         when(pathMatcher.match("/custom/**", "/my/path")).thenReturn(true);
 
-        RuntimeMappingInterceptor interceptor = new RuntimeMappingInterceptor(
-                new String[]{"/custom/**"}, null, delegate, pathMatcher);
+        RuntimeMappingInterceptor interceptor = new RuntimeMappingInterceptor(new String[] { "/custom/**" }, null,
+                delegate, pathMatcher);
 
         assertTrue(interceptor.matches("/my/path"));
         verify(pathMatcher).match("/custom/**", "/my/path");
@@ -105,16 +108,15 @@ class RuntimeMappingInterceptorTest {
         PathMatcher pathMatcher = mock(PathMatcher.class);
         when(pathMatcher.match("/exclude/**", "/blocked")).thenReturn(true);
 
-        RuntimeMappingInterceptor interceptor = new RuntimeMappingInterceptor(
-                null, new String[]{"/exclude/**"}, delegate, pathMatcher);
+        RuntimeMappingInterceptor interceptor = new RuntimeMappingInterceptor(null, new String[] { "/exclude/**" },
+                delegate, pathMatcher);
 
         assertFalse(interceptor.matches("/blocked"));
     }
 
     @Test
     void matches_emptyIncludeAndExclude_returnsTrue() {
-        RuntimeMappingInterceptor interceptor = new RuntimeMappingInterceptor(
-                new String[0], new String[0], delegate);
+        RuntimeMappingInterceptor interceptor = new RuntimeMappingInterceptor(new String[0], new String[0], delegate);
 
         assertTrue(interceptor.matches("/any/path"));
     }

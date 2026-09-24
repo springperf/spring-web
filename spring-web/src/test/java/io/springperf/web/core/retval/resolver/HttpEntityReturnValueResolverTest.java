@@ -1,10 +1,11 @@
 package io.springperf.web.core.retval.resolver;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.codec.HttpBodyCodecRegistry;
-import io.springperf.web.http.WebHttpHeaders;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.lang.reflect.Method;
+import java.util.Collections;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,11 +17,11 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-import java.lang.reflect.Method;
-import java.util.Collections;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.codec.HttpBodyCodecRegistry;
+import io.springperf.web.http.WebHttpHeaders;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 class HttpEntityReturnValueResolverTest {
@@ -115,9 +116,17 @@ class HttpEntityReturnValueResolverTest {
     }
 
     @SuppressWarnings("unused")
-    public HttpEntity<?> entityReturn() { return null; }
+    public HttpEntity<?> entityReturn() {
+        return null;
+    }
+
     @SuppressWarnings("unused")
-    public ResponseEntity<?> responseEntityReturn() { return null; }
+    public ResponseEntity<?> responseEntityReturn() {
+        return null;
+    }
+
     @SuppressWarnings("unused")
-    public String stringReturn() { return null; }
+    public String stringReturn() {
+        return null;
+    }
 }

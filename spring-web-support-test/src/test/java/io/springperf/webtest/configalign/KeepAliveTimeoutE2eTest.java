@@ -17,13 +17,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code server.keep-alive-timeout} E2E：连接空闲超过超时值后由服务端主动关闭
- * （真实 KeepAliveHandler 空闲检测链路）。
+ * {@code server.keep-alive-timeout} E2E：连接空闲超过超时值后由服务端主动关闭 （真实 KeepAliveHandler 空闲检测链路）。
  */
-@SpringBootTest(classes = {io.springperf.webtest.SupportTestApplication.class,
-                KeepAliveTimeoutE2eTest.KeepAliveConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "server.keep-alive-timeout=500ms")
+@SpringBootTest(classes = { io.springperf.webtest.SupportTestApplication.class,
+        KeepAliveTimeoutE2eTest.KeepAliveConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "server.keep-alive-timeout=500ms")
 class KeepAliveTimeoutE2eTest {
 
     @LocalServerPort
@@ -36,8 +33,7 @@ class KeepAliveTimeoutE2eTest {
             OutputStream out = socket.getOutputStream();
             InputStream in = socket.getInputStream();
 
-            out.write(("GET /api/e2e-keepalive/hit HTTP/1.1\r\n"
-                    + "Host: localhost\r\n"
+            out.write(("GET /api/e2e-keepalive/hit HTTP/1.1\r\n" + "Host: localhost\r\n"
                     + "Connection: keep-alive\r\n\r\n").getBytes(StandardCharsets.UTF_8));
             out.flush();
 
@@ -56,9 +52,7 @@ class KeepAliveTimeoutE2eTest {
             // 空闲 1.2s（> 500ms 超时）后服务端应已关闭连接：read 返回 -1
             Thread.sleep(1200);
             int n = in.read(buf);
-            assertEquals(-1, n,
-                    "空闲超过 keep-alive-timeout 后服务端应关闭连接（read=-1），实际读到 "
-                            + (n < 0 ? "EOF" : n + " 字节"));
+            assertEquals(-1, n, "空闲超过 keep-alive-timeout 后服务端应关闭连接（read=-1），实际读到 " + (n < 0 ? "EOF" : n + " 字节"));
         }
     }
 

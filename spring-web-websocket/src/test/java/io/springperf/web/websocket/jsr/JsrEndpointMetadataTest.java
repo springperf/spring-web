@@ -88,7 +88,7 @@ class JsrEndpointMetadataTest {
         assertEquals(JsrEndpointMetadata.ParamKind.THROWABLE, metadata.getOnErrorParams().get(1).kind);
     }
 
-    @ServerEndpoint(value = "/ws/pojo", decoders = {UpperDecoder.class}, encoders = {UpperEncoder.class})
+    @ServerEndpoint(value = "/ws/pojo", decoders = { UpperDecoder.class }, encoders = { UpperEncoder.class })
     static class PojoEndpoint {
 
         @OnMessage

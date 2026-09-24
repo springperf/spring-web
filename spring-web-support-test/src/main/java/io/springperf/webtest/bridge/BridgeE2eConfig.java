@@ -77,20 +77,15 @@ public class BridgeE2eConfig implements WebMvcConfigurer {
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         log.info("BridgeE2eConfig.addResourceHandlers called");
-        registry.addResourceHandler("/bridge-static/**")
-                .addResourceLocations("classpath:/bridge-static/");
+        registry.addResourceHandler("/bridge-static/**").addResourceLocations("classpath:/bridge-static/");
         log.info("ResourceHandler registered for /bridge-static/** -> classpath:/bridge-static/");
     }
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         log.info("BridgeE2eConfig.addCorsMappings called");
-        registry.addMapping("/bridge/**")
-                .allowedOrigins("http://trusted-origin.com")
-                .allowedMethods("GET", "POST")
-                .allowedHeaders("*")
-                .allowCredentials(true)
-                .maxAge(3600);
+        registry.addMapping("/bridge/**").allowedOrigins("http://trusted-origin.com").allowedMethods("GET", "POST")
+                .allowedHeaders("*").allowCredentials(true).maxAge(3600);
         log.info("CORS mappings registered for /bridge/**");
     }
 

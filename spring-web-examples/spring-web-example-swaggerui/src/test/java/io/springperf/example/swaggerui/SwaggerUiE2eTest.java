@@ -14,10 +14,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(
-        classes = SwaggerUiApplication.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
-)
+@SpringBootTest(classes = SwaggerUiApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class SwaggerUiE2eTest {
 
     private TestRestTemplate rest;
@@ -28,8 +25,7 @@ class SwaggerUiE2eTest {
     @BeforeEach
     void setUp() {
         int actualPort = nettyHttpServer.getActualPort();
-        rest = new TestRestTemplate(new RestTemplateBuilder()
-                .rootUri("http://localhost:" + actualPort));
+        rest = new TestRestTemplate(new RestTemplateBuilder().rootUri("http://localhost:" + actualPort));
     }
 
     @Test
@@ -52,8 +48,7 @@ class SwaggerUiE2eTest {
     @Test
     void swaggerUiStaticResources_classpathFound() {
         ClassPathResource resource = new ClassPathResource("META-INF/resources/webjars/swagger-ui/5.2.0/index.html");
-        assertThat(resource.exists())
-                .as("swagger-ui index.html should exist on classpath").isTrue();
+        assertThat(resource.exists()).as("swagger-ui index.html should exist on classpath").isTrue();
         assertThat(resource.isReadable()).isTrue();
     }
 
@@ -78,8 +73,7 @@ class SwaggerUiE2eTest {
         int status = resp.getStatusCodeValue();
         if (status == 404) {
             ResponseEntity<String> directResp = new TestRestTemplate().getForEntity(
-                    "http://localhost:" + nettyHttpServer.getActualPort() + "/swagger-ui/index.html",
-                    String.class);
+                    "http://localhost:" + nettyHttpServer.getActualPort() + "/swagger-ui/index.html", String.class);
             System.err.println("Direct /swagger-ui/index.html status: " + directResp.getStatusCodeValue());
         }
         assertThat(status).isEqualTo(200);

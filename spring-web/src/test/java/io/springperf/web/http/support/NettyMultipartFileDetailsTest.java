@@ -1,18 +1,19 @@
 package io.springperf.web.http.support;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import io.netty.handler.codec.http.multipart.FileUpload;
-import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpHeaders;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
+
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.handler.codec.http.multipart.FileUpload;
 
 class NettyMultipartFileDetailsTest {
 

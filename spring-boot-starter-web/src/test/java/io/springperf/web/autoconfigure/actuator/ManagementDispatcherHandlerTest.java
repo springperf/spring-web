@@ -26,17 +26,28 @@ import static org.mockito.Mockito.*;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class ManagementDispatcherHandlerTest {
 
-    @Mock WebContext webContext;
-    @Mock ManagementMappingRegistry managementMappingRegistry;
-    @Mock CorsRegistry corsRegistry;
-    @Mock ReturnValueResolverRegistry returnValueResolverRegistry;
-    @Mock ExceptionRegistry exceptionRegistry;
-    @Mock InterceptorRegistry interceptorRegistry;
-    @Mock WebFilterRegistry webFilterRegistry;
-    @Mock WebServerHttpRequest request;
-    @Mock WebServerHttpResponse response;
-    @Mock PathMappingContext mappingContext;
-    @Mock MappingResult mappingResult;
+    @Mock
+    WebContext webContext;
+    @Mock
+    ManagementMappingRegistry managementMappingRegistry;
+    @Mock
+    CorsRegistry corsRegistry;
+    @Mock
+    ReturnValueResolverRegistry returnValueResolverRegistry;
+    @Mock
+    ExceptionRegistry exceptionRegistry;
+    @Mock
+    InterceptorRegistry interceptorRegistry;
+    @Mock
+    WebFilterRegistry webFilterRegistry;
+    @Mock
+    WebServerHttpRequest request;
+    @Mock
+    WebServerHttpResponse response;
+    @Mock
+    PathMappingContext mappingContext;
+    @Mock
+    MappingResult mappingResult;
 
     private ManagementDispatcherHandler handler;
 
@@ -44,8 +55,8 @@ class ManagementDispatcherHandlerTest {
     void setUp() throws Exception {
         when(webContext.getWebComponentWithDefault(eq(CorsRegistry.class), any(CorsRegistry.class)))
                 .thenReturn(corsRegistry);
-        when(webContext.getWebComponentWithDefault(eq(ReturnValueResolverRegistry.class), any(ReturnValueResolverRegistry.class)))
-                .thenReturn(returnValueResolverRegistry);
+        when(webContext.getWebComponentWithDefault(eq(ReturnValueResolverRegistry.class),
+                any(ReturnValueResolverRegistry.class))).thenReturn(returnValueResolverRegistry);
         when(webContext.getWebComponentWithDefault(eq(ExceptionRegistry.class), any(ExceptionRegistry.class)))
                 .thenReturn(exceptionRegistry);
         when(webContext.getWebComponentWithDefault(eq(InterceptorRegistry.class), any(InterceptorRegistry.class)))
@@ -64,8 +75,8 @@ class ManagementDispatcherHandlerTest {
 
     @Test
     void constructor_withTrailingSlash_createsHandler() {
-        ManagementDispatcherHandler h = new ManagementDispatcherHandler(
-                webContext, "/management/", managementMappingRegistry);
+        ManagementDispatcherHandler h = new ManagementDispatcherHandler(webContext, "/management/",
+                managementMappingRegistry);
         assertNotNull(h);
     }
 
@@ -120,7 +131,8 @@ class ManagementDispatcherHandlerTest {
         handler.handle(request, response);
 
         verify(mappingContext).invoke(null, request, response);
-        verify(returnValueResolverRegistry).resolveReturnValue(eq("result"), eq(mappingContext), eq(request), eq(response));
+        verify(returnValueResolverRegistry).resolveReturnValue(eq("result"), eq(mappingContext), eq(request),
+                eq(response));
     }
 
     @Test

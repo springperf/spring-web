@@ -1,6 +1,8 @@
 package io.springperf.web.core.async;
 
-import io.springperf.web.core.async.reactive.PublisherToDeferredResultAdapter;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -9,8 +11,7 @@ import org.reactivestreams.Subscription;
 import org.springframework.core.ReactiveAdapter;
 import org.springframework.web.context.request.async.DeferredResult;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import io.springperf.web.core.async.reactive.PublisherToDeferredResultAdapter;
 
 @ExtendWith(MockitoExtension.class)
 class PublisherToDeferredResultAdapterTest {
@@ -148,7 +149,8 @@ class PublisherToDeferredResultAdapterTest {
         org.reactivestreams.Publisher<Object> publisher = mock(org.reactivestreams.Publisher.class);
         when(adapter.toPublisher(any())).thenReturn(publisher);
 
-        PublisherToDeferredResultAdapter pAdapter = new PublisherToDeferredResultAdapter(new DeferredResult<>(), adapter);
+        PublisherToDeferredResultAdapter pAdapter = new PublisherToDeferredResultAdapter(new DeferredResult<>(),
+                adapter);
         Object returnValue = new Object();
 
         pAdapter.subscribe(adapter, returnValue);

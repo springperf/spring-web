@@ -6,11 +6,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 实现 ProxyApi 接口，方法上有 @GetMapping/@PostMapping 路由注解，
- * 但参数上无 @RequestBody/@RequestParam/@PathVariable —— 这些在接口 ProxyApi 上。
+ * 实现 ProxyApi 接口，方法上有 @GetMapping/@PostMapping 路由注解， 但参数上无 @RequestBody/@RequestParam/@PathVariable —— 这些在接口 ProxyApi
+ * 上。
  * <p>
- * 配合 {@link ProxyE2eApp} 的 {@code @EnableAspectJAutoProxy(proxyTargetClass = true)}，
- * Spring 会为此 Controller 创建 CGLIB 代理，验证框架的代理类注解解析能力。
+ * 配合 {@link ProxyE2eApp} 的 {@code @EnableAspectJAutoProxy(proxyTargetClass = true)}， Spring 会为此 Controller 创建 CGLIB
+ * 代理，验证框架的代理类注解解析能力。
  */
 @RestController
 @RequestMapping("/proxy-api")

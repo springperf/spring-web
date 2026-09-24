@@ -1,20 +1,21 @@
 package io.springperf.web.core.exception;
 
-import io.springperf.web.context.BaseWebComponent;
-import io.springperf.web.core.mapping.MappingHandlerMethod;
-import org.springframework.web.method.ControllerAdviceBean;
-import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
-
 import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.springframework.web.method.ControllerAdviceBean;
+import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
+
+import io.springperf.web.context.BaseWebComponent;
+import io.springperf.web.core.mapping.MappingHandlerMethod;
+
 /**
- * Wraps a {@link org.springframework.web.bind.annotation.ControllerAdvice @ControllerAdvice}
- * bean and its exception handler methods for use within the REST web framework.
+ * Wraps a {@link org.springframework.web.bind.annotation.ControllerAdvice @ControllerAdvice} bean and its exception
+ * handler methods for use within the REST web framework.
  * <p>
- * Resolves the appropriate {@link MappingHandlerMethod} for a given exception type,
- * caching resolved handler methods for efficiency.
+ * Resolves the appropriate {@link MappingHandlerMethod} for a given exception type, caching resolved handler methods
+ * for efficiency.
  */
 public class ExceptionHandlerAdvice extends BaseWebComponent {
 
@@ -54,9 +55,12 @@ public class ExceptionHandlerAdvice extends BaseWebComponent {
 
     /**
      * Resolves and returns the {@link MappingHandlerMethod} for the given exception.
-     * <p>Resolved handler methods are cached for subsequent invocations.
+     * <p>
+     * Resolved handler methods are cached for subsequent invocations.
      *
-     * @param exception the exception to resolve a handler for
+     * @param exception
+     *            the exception to resolve a handler for
+     *
      * @return the resolved handler method, or {@code null} if no suitable handler exists
      */
     public MappingHandlerMethod resolveHandlerMethod(Throwable exception) {

@@ -10,8 +10,9 @@ import java.time.Duration;
 
 /**
  * 共享 Spring 上下文（RANDOM_PORT）的 E2E 测试基类。
- * <p>使用 {@code RANDOM_PORT} + {@link LocalServerPort} 注入实际端口，
- * 避免固定端口（DEFINED_PORT）在端口被占用/并行执行时的假失败。</p>
+ * <p>
+ * 使用 {@code RANDOM_PORT} + {@link LocalServerPort} 注入实际端口， 避免固定端口（DEFINED_PORT）在端口被占用/并行执行时的假失败。
+ * </p>
  */
 @SpringBootTest(classes = TestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -24,18 +25,12 @@ public abstract class BaseE2ETest {
     public static final OkHttpClient CLIENT;
 
     static {
-        HttpLoggingInterceptor logging =
-                new HttpLoggingInterceptor(message -> {
-                    System.out.println("[OKHTTP] " + message);
-                });
+        HttpLoggingInterceptor logging = new HttpLoggingInterceptor(message -> {
+            System.out.println("[OKHTTP] " + message);
+        });
         logging.setLevel(HttpLoggingInterceptor.Level.HEADERS);
-        CLIENT = new OkHttpClient.Builder()
-                .connectTimeout(Duration.ofSeconds(3))
-                .readTimeout(Duration.ofSeconds(10))
-                .writeTimeout(Duration.ofSeconds(10))
-                .retryOnConnectionFailure(true)
-                .addInterceptor(logging)
-                .build();
+        CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3)).readTimeout(Duration.ofSeconds(10))
+                .writeTimeout(Duration.ofSeconds(10)).retryOnConnectionFailure(true).addInterceptor(logging).build();
         // 共享 CLIENT 跨测试类复用，不能在每个类 @AfterAll 关闭（会破坏后续类执行）；
         // 注册 JVM hook 仅在整个进程退出时清理连接池/调度线程，OkHttp 默认 daemon 线程不阻塞退出
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {

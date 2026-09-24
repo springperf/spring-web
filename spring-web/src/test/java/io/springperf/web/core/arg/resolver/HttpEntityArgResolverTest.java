@@ -1,9 +1,12 @@
 package io.springperf.web.core.arg.resolver;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.codec.HttpBodyCodecRegistry;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.mockito.Mockito.*;
+
+import java.lang.reflect.Method;
+import java.net.URI;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -13,12 +16,10 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.RequestEntity;
 
-import java.lang.reflect.Method;
-import java.net.URI;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.mockito.Mockito.*;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.codec.HttpBodyCodecRegistry;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 class HttpEntityArgResolverTest {
@@ -45,8 +46,7 @@ class HttpEntityArgResolverTest {
         Method method = getClass().getMethod("httpEntityParam", HttpEntity.class);
         MethodParameter mp = new MethodParameter(method, 0);
 
-        when(httpBodyCodecRegistry.readBody(any(), eq(mp), eq(request), eq(request)))
-                .thenReturn("body-content");
+        when(httpBodyCodecRegistry.readBody(any(), eq(mp), eq(request), eq(request))).thenReturn("body-content");
         when(request.getHeaders()).thenReturn(new HttpHeaders());
 
         HttpEntityArgResolver resolver = new HttpEntityArgResolver(webContext, mp);
@@ -62,8 +62,7 @@ class HttpEntityArgResolverTest {
         Method method = getClass().getMethod("requestEntityParam", RequestEntity.class);
         MethodParameter mp = new MethodParameter(method, 0);
 
-        when(httpBodyCodecRegistry.readBody(any(), eq(mp), eq(request), eq(request)))
-                .thenReturn("body-content");
+        when(httpBodyCodecRegistry.readBody(any(), eq(mp), eq(request), eq(request))).thenReturn("body-content");
         when(request.getHeaders()).thenReturn(new HttpHeaders());
         when(request.getMethod()).thenReturn(org.springframework.http.HttpMethod.POST);
         when(request.getURI()).thenReturn(URI.create("/test"));
@@ -77,8 +76,10 @@ class HttpEntityArgResolverTest {
     }
 
     @SuppressWarnings("unused")
-    public void httpEntityParam(HttpEntity<String> entity) {}
+    public void httpEntityParam(HttpEntity<String> entity) {
+    }
 
     @SuppressWarnings("unused")
-    public void requestEntityParam(RequestEntity<String> entity) {}
+    public void requestEntityParam(RequestEntity<String> entity) {
+    }
 }

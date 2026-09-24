@@ -1,14 +1,12 @@
 package io.springperf.web.core.arg;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.arg.databinder.WebDataBinderRegistry;
-import io.springperf.web.core.arg.provider.*;
-import io.springperf.web.core.mapping.MappingHandlerMethod;
-import io.springperf.web.core.mapping.MappingRegistry;
-import io.springperf.web.core.mapping.PathMappingContext;
-import io.springperf.web.core.mapping.match.Matcher;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.Collections;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationContext;
@@ -19,17 +17,20 @@ import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.Validator;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.method.HandlerMethod;
-import org.springframework.web.bind.MethodArgumentNotValidException;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.util.Collections;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.arg.databinder.WebDataBinderRegistry;
+import io.springperf.web.core.arg.provider.*;
+import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.core.mapping.MappingRegistry;
+import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.core.mapping.match.Matcher;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 class ArgumentResolverRegistryTest {
 
@@ -45,7 +46,8 @@ class ArgumentResolverRegistryTest {
         ApplicationContext ctx = mock(ApplicationContext.class);
         when(ctx.getBeansOfType(any(Class.class))).thenReturn(Collections.emptyMap());
         when(webContextMock.getWebComponent(any(Class.class))).thenReturn(null);
-        when(webContextMock.getWebComponentWithDefault(any(Class.class), any())).thenReturn(mock(WebDataBinderRegistry.class));
+        when(webContextMock.getWebComponentWithDefault(any(Class.class), any()))
+                .thenReturn(mock(WebDataBinderRegistry.class));
         when(webContextMock.getCtx()).thenReturn(ctx);
 
         Field f = registry.getClass().getSuperclass().getSuperclass().getDeclaredField("webContext");
@@ -105,14 +107,14 @@ class ArgumentResolverRegistryTest {
                 .anyMatch(p -> p instanceof ModelAttributeResolverProvider));
         assertTrue(registry.staticArgumentResolverProviders.stream()
                 .anyMatch(p -> p instanceof HttpEntityResolverProvider));
-        assertTrue(registry.staticArgumentResolverProviders.stream()
-                .anyMatch(p -> p instanceof ErrorsResolverProvider));
-        assertTrue(registry.staticArgumentResolverProviders.stream()
-                .anyMatch(p -> p instanceof RequestResolverProvider));
-        assertTrue(registry.staticArgumentResolverProviders.stream()
-                .anyMatch(p -> p instanceof ResponseResolverProvider));
-        assertTrue(registry.staticArgumentResolverProviders.stream()
-                .anyMatch(p -> p instanceof LocaleResolverProvider));
+        assertTrue(
+                registry.staticArgumentResolverProviders.stream().anyMatch(p -> p instanceof ErrorsResolverProvider));
+        assertTrue(
+                registry.staticArgumentResolverProviders.stream().anyMatch(p -> p instanceof RequestResolverProvider));
+        assertTrue(
+                registry.staticArgumentResolverProviders.stream().anyMatch(p -> p instanceof ResponseResolverProvider));
+        assertTrue(
+                registry.staticArgumentResolverProviders.stream().anyMatch(p -> p instanceof LocaleResolverProvider));
         assertTrue(registry.staticArgumentResolverProviders.stream()
                 .anyMatch(p -> p instanceof MultipartFileResolverProvider));
     }
@@ -179,11 +181,13 @@ class ArgumentResolverRegistryTest {
         WebServerHttpRequest request = mock(WebServerHttpRequest.class);
         WebServerHttpResponse response = mock(WebServerHttpResponse.class);
 
-        when(mappingContext.createMethodParameters()).thenReturn(new MethodParameter[]{mp});
+        when(mappingContext.createMethodParameters()).thenReturn(new MethodParameter[] { mp });
         when(mappingContext.get(ArgumentResolverRegistry.MAPPING_CACHE_KEY)).thenReturn(null);
-        when(request.getParameterMap()).thenReturn(new org.springframework.util.LinkedMultiValueMap<String, String>() {{
-            add("name", "test-value");
-        }});
+        when(request.getParameterMap()).thenReturn(new org.springframework.util.LinkedMultiValueMap<String, String>() {
+            {
+                add("name", "test-value");
+            }
+        });
 
         Object[] args = registry.resolveArguments(mappingContext, request, response);
         assertEquals(1, args.length);
@@ -199,8 +203,8 @@ class ArgumentResolverRegistryTest {
         mp.initParameterNameDiscovery(new org.springframework.core.DefaultParameterNameDiscoverer());
         MethodArgContext argCtx = new MethodArgContext(mp);
 
-        assertDoesNotThrow(() ->
-                registry.validateIfApplicable("test", argCtx, mock(WebServerHttpRequest.class), mock(MappingHandlerMethod.class)));
+        assertDoesNotThrow(() -> registry.validateIfApplicable("test", argCtx, mock(WebServerHttpRequest.class),
+                mock(MappingHandlerMethod.class)));
     }
 
     @Test
@@ -225,8 +229,8 @@ class ArgumentResolverRegistryTest {
         io.springperf.web.http.RequestContext requestContext = mock(io.springperf.web.http.RequestContext.class);
         when(request.getRequestContext()).thenReturn(requestContext);
 
-        assertThrows(MethodArgumentNotValidException.class,
-                () -> registry.validateIfApplicable(new ValidTarget(), argCtx, request, mock(MappingHandlerMethod.class)));
+        assertThrows(MethodArgumentNotValidException.class, () -> registry.validateIfApplicable(new ValidTarget(),
+                argCtx, request, mock(MappingHandlerMethod.class)));
         // 校验失败时不应重复创建 BindingResult 写入请求属性（无相邻 BindingResult 参数，走抛异常）
         verify(requestContext, never()).setAttribute(any(io.springperf.web.http.RequestAttribute.class), any());
         verify(requestContext, never()).setAttribute(any(String.class), any());
@@ -255,8 +259,8 @@ class ArgumentResolverRegistryTest {
         io.springperf.web.http.RequestContext requestContext = mock(io.springperf.web.http.RequestContext.class);
         when(request.getRequestContext()).thenReturn(requestContext);
 
-        assertDoesNotThrow(() ->
-                registry.validateIfApplicable(new ValidTarget(), argCtx, request, mock(MappingHandlerMethod.class)));
+        assertDoesNotThrow(() -> registry.validateIfApplicable(new ValidTarget(), argCtx, request,
+                mock(MappingHandlerMethod.class)));
         verify(requestContext).setAttribute(eq(argCtx.getBindingResultAttrKey()),
                 any(org.springframework.validation.BeanPropertyBindingResult.class));
     }
@@ -271,53 +275,71 @@ class ArgumentResolverRegistryTest {
         NoDefaultCtorController bean = new NoDefaultCtorController();
         Method method = NoDefaultCtorController.class.getMethod("modelAttrMethod", NoDefaultCtor.class);
         HandlerMethod handlerMethod = new HandlerMethod(bean, method);
-        PathMappingContext ctx = new PathMappingContext(handlerMethod, Collections.<Matcher>emptyList(), "/model");
+        PathMappingContext ctx = new PathMappingContext(handlerMethod, Collections.<Matcher> emptyList(), "/model");
         when(mappingRegistry.getMappingContextList()).thenReturn(Collections.singletonList(ctx));
 
         IllegalStateException ex = assertThrows(IllegalStateException.class,
                 () -> registry.validateAllParametersResolvable());
-        assertTrue(ex.getMessage().contains("No primary or default constructor"),
-                "启动校验必须暴露无默认构造器问题，而非等到首个请求 500");
+        assertTrue(ex.getMessage().contains("No primary or default constructor"), "启动校验必须暴露无默认构造器问题，而非等到首个请求 500");
     }
 
     // ----- helper methods -----
 
     @SuppressWarnings("unused")
-    public void requestParamMethod(@RequestParam("name") String name) {}
+    public void requestParamMethod(@RequestParam("name") String name) {
+    }
 
     @SuppressWarnings("unused")
-    public void unannotatedSimpleParam(String name) {}
+    public void unannotatedSimpleParam(String name) {
+    }
 
     @SuppressWarnings("unused")
-    public void unannotatedComplexParam(ComplexObj obj) {}
+    public void unannotatedComplexParam(ComplexObj obj) {
+    }
 
     @SuppressWarnings("unused")
-    public void validatedReqBody(@Validated ValidTarget target) {}
+    public void validatedReqBody(@Validated ValidTarget target) {
+    }
 
     @SuppressWarnings("unused")
-    public void validatedWithBindingResult(@Validated ValidTarget target, BindingResult result) {}
+    public void validatedWithBindingResult(@Validated ValidTarget target, BindingResult result) {
+    }
 
     @SuppressWarnings("unused")
     public static class ValidTarget {
         private String name;
-        public String getName() { return name; }
-        public void setName(String name) { this.name = name; }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
     }
 
     static class ComplexObj {
         private String field;
-        public String getField() { return field; }
-        public void setField(String field) { this.field = field; }
+
+        public String getField() {
+            return field;
+        }
+
+        public void setField(String field) {
+            this.field = field;
+        }
     }
 
     @Controller
     static class NoDefaultCtorController {
         @SuppressWarnings("unused")
-        public void modelAttrMethod(@ModelAttribute("obj") NoDefaultCtor obj) {}
+        public void modelAttrMethod(@ModelAttribute("obj") NoDefaultCtor obj) {
+        }
     }
 
     public static class NoDefaultCtor {
         @SuppressWarnings("unused")
-        public NoDefaultCtor(String required) {}
+        public NoDefaultCtor(String required) {
+        }
     }
 }

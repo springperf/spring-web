@@ -13,8 +13,7 @@ import java.util.List;
 public class BatchUserController {
 
     /**
-     * 单个用户创建入口
-     * 返回 BatchRequest，框架自动聚合请求后调用 @BatchMapping 方法
+     * 单个用户创建入口 返回 BatchRequest，框架自动聚合请求后调用 @BatchMapping 方法
      */
     @PostMapping("/users")
     public CreateUserRequest createUser(@RequestParam String name, @RequestBody UserBody body) {
@@ -22,8 +21,7 @@ public class BatchUserController {
     }
 
     /**
-     * 批量处理用户创建
-     * 多个独立请求被聚合为 List 批量处理
+     * 批量处理用户创建 多个独立请求被聚合为 List 批量处理
      */
     @BatchMapping(method = "createUser")
     public void batchCreateUser(List<CreateUserRequest> requests) {

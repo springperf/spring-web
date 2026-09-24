@@ -9,8 +9,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * P4 E2E 控制器：覆盖 produces/consumes 正条件、@CrossOrigin、DeferredResult、
- * {@code @ResponseStatus} 异常、@CookieValue 等代理场景。
+ * P4 E2E 控制器：覆盖 produces/consumes 正条件、@CrossOrigin、DeferredResult、 {@code @ResponseStatus} 异常、@CookieValue 等代理场景。
  * <p>
  * 此类所有方法都通过 CGLIB 代理调用，验证框架在代理环境下的完整功能。
  */
@@ -83,8 +82,7 @@ public class ProxyP4Controller {
     // ============ @ResponseStatus 异常 ============
 
     /**
-     * 抛出 {@link BlockedResourceException}，其 @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
-     * 应被框架解析为 429 状态码。
+     * 抛出 {@link BlockedResourceException}，其 @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS) 应被框架解析为 429 状态码。
      */
     @GetMapping("/blocked-resource")
     public String blockedResource() {

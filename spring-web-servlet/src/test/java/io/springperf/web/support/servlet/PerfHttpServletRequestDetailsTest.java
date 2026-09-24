@@ -28,8 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * 验证 {@link PerfHttpServletRequest} 的 HTTP 细节逻辑：
- * 日期头解析、QueryString、Host 解析、Cookie 解析、multipart parts、reader/stream 互斥。
+ * 验证 {@link PerfHttpServletRequest} 的 HTTP 细节逻辑： 日期头解析、QueryString、Host 解析、Cookie 解析、multipart parts、reader/stream 互斥。
  */
 class PerfHttpServletRequestDetailsTest {
 
@@ -46,7 +45,8 @@ class PerfHttpServletRequestDetailsTest {
         when(request.getWebContext()).thenReturn(webContext);
         Map<RequestAttribute<?>, Object> fastAttrs = new HashMap<>();
         Map<String, Object> stringAttrs = new HashMap<>();
-        when(requestContext.getAttribute(any(RequestAttribute.class))).thenAnswer(inv -> fastAttrs.get(inv.getArgument(0)));
+        when(requestContext.getAttribute(any(RequestAttribute.class)))
+                .thenAnswer(inv -> fastAttrs.get(inv.getArgument(0)));
         doAnswer(inv -> {
             fastAttrs.put(inv.getArgument(0), inv.getArgument(1));
             return null;

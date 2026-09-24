@@ -1,5 +1,11 @@
 package io.springperf.web.server;
 
+import static io.springperf.web.context.PropertiesConstant.HTTP_MULTIPART_MAX_PART_HEADER_SIZE_DEFAULT;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.List;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
 import io.netty.channel.socket.SocketChannel;
@@ -13,15 +19,8 @@ import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.stream.ChunkedWriteHandler;
-
 import io.springperf.web.http.BackpressureHandler;
 import io.springperf.web.http.support.SupportMultipartAggregator;
-
-import static io.springperf.web.context.PropertiesConstant.HTTP_MULTIPART_MAX_PART_HEADER_SIZE_DEFAULT;
-
-import java.nio.charset.StandardCharsets;
-import java.util.Collections;
-import java.util.List;
 
 public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
 
@@ -38,59 +37,46 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
     private final int maxChunkSize;
     private final int maxPartCount;
     private final int maxPartHeaderSize;
-        private final CompressionConfig compressionConfig;
-        private final KeepAliveConfig keepAliveConfig;
+    private final CompressionConfig compressionConfig;
+    private final KeepAliveConfig keepAliveConfig;
     /** multipart 上传配置（spring.servlet.multipart.*）：默认不限制，由 server 按配置注入。 */
     private MultipartConfig multipartConfig = MultipartConfig.DEFAULT;
 
-    public Http2ChannelInitializer(boolean http2Enabled, SslContext sslContext,
-                                    int maxContentLength, long readTimeout,
-                                    boolean supportMultipart,
-                                    NettyHttpHandler httpHandler) {
+    public Http2ChannelInitializer(boolean http2Enabled, SslContext sslContext, int maxContentLength, long readTimeout,
+            boolean supportMultipart, NettyHttpHandler httpHandler) {
         this(http2Enabled, sslContext, maxContentLength, readTimeout, supportMultipart, httpHandler,
                 Collections.emptyList(), Collections.emptyList());
     }
 
-    public Http2ChannelInitializer(boolean http2Enabled, SslContext sslContext,
-                                    int maxContentLength, long readTimeout,
-                                    boolean supportMultipart,
-                                    NettyHttpHandler httpHandler,
-                                    List<ChannelHandler> beforeAggregatorHandlers) {
+    public Http2ChannelInitializer(boolean http2Enabled, SslContext sslContext, int maxContentLength, long readTimeout,
+            boolean supportMultipart, NettyHttpHandler httpHandler, List<ChannelHandler> beforeAggregatorHandlers) {
         this(http2Enabled, sslContext, maxContentLength, readTimeout, supportMultipart, httpHandler,
                 beforeAggregatorHandlers, Collections.emptyList());
     }
 
-    public Http2ChannelInitializer(boolean http2Enabled, SslContext sslContext,
-                                    int maxContentLength, long readTimeout,
-                                    boolean supportMultipart,
-                                    NettyHttpHandler httpHandler,
-                                    List<ChannelHandler> beforeAggregatorHandlers,
-                                    List<ChannelHandler> afterAggregatorHandlers) {
+    public Http2ChannelInitializer(boolean http2Enabled, SslContext sslContext, int maxContentLength, long readTimeout,
+            boolean supportMultipart, NettyHttpHandler httpHandler, List<ChannelHandler> beforeAggregatorHandlers,
+            List<ChannelHandler> afterAggregatorHandlers) {
         this(http2Enabled, sslContext, maxContentLength, readTimeout, supportMultipart, httpHandler,
-                beforeAggregatorHandlers, afterAggregatorHandlers,
-                4096, 8192, 8192, -1, HTTP_MULTIPART_MAX_PART_HEADER_SIZE_DEFAULT,
-                CompressionConfig.DISABLED, KeepAliveConfig.DISABLED);
+                beforeAggregatorHandlers, afterAggregatorHandlers, 4096, 8192, 8192, -1,
+                HTTP_MULTIPART_MAX_PART_HEADER_SIZE_DEFAULT, CompressionConfig.DISABLED, KeepAliveConfig.DISABLED);
     }
 
-    public Http2ChannelInitializer(boolean http2Enabled, SslContext sslContext,
-                                    int maxContentLength, long readTimeout,
-                                    boolean supportMultipart,
-                                    NettyHttpHandler httpHandler,
-                                    List<ChannelHandler> beforeAggregatorHandlers,
-                                    List<ChannelHandler> afterAggregatorHandlers,
-                                    int maxInitialLineLength, int maxHeaderSize, int maxChunkSize,
-                                    int maxPartCount, int maxPartHeaderSize,
-                                    CompressionConfig compressionConfig, KeepAliveConfig keepAliveConfig) {
+    public Http2ChannelInitializer(boolean http2Enabled, SslContext sslContext, int maxContentLength, long readTimeout,
+            boolean supportMultipart, NettyHttpHandler httpHandler, List<ChannelHandler> beforeAggregatorHandlers,
+            List<ChannelHandler> afterAggregatorHandlers, int maxInitialLineLength, int maxHeaderSize, int maxChunkSize,
+            int maxPartCount, int maxPartHeaderSize, CompressionConfig compressionConfig,
+            KeepAliveConfig keepAliveConfig) {
         this.http2Enabled = http2Enabled;
         this.sslContext = sslContext;
         this.maxContentLength = maxContentLength;
         this.readTimeout = readTimeout;
         this.supportMultipart = supportMultipart;
         this.httpHandler = httpHandler;
-        this.beforeAggregatorHandlers = beforeAggregatorHandlers != null
-                ? beforeAggregatorHandlers : Collections.emptyList();
-        this.afterAggregatorHandlers = afterAggregatorHandlers != null
-                ? afterAggregatorHandlers : Collections.emptyList();
+        this.beforeAggregatorHandlers = beforeAggregatorHandlers != null ? beforeAggregatorHandlers
+                : Collections.emptyList();
+        this.afterAggregatorHandlers = afterAggregatorHandlers != null ? afterAggregatorHandlers
+                : Collections.emptyList();
         this.maxInitialLineLength = maxInitialLineLength;
         this.maxHeaderSize = maxHeaderSize;
         this.maxChunkSize = maxChunkSize;
@@ -108,7 +94,10 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
             p.addLast(sslContext.newHandler(ch.alloc()));
             p.addLast(NettyHttpServer.SslExceptionHandler.INSTANCE);
             if (http2Enabled) {
-                p.addLast(new Http2OrHttp1Handler(maxContentLength, readTimeout, supportMultipart, httpHandler, beforeAggregatorHandlers, afterAggregatorHandlers, maxInitialLineLength, maxHeaderSize, maxChunkSize, maxPartCount, maxPartHeaderSize, multipartConfig, compressionConfig, keepAliveConfig));
+                p.addLast(new Http2OrHttp1Handler(maxContentLength, readTimeout, supportMultipart, httpHandler,
+                        beforeAggregatorHandlers, afterAggregatorHandlers, maxInitialLineLength, maxHeaderSize,
+                        maxChunkSize, maxPartCount, maxPartHeaderSize, multipartConfig, compressionConfig,
+                        keepAliveConfig));
             } else {
                 addHttp11Handlers(p);
             }
@@ -140,8 +129,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
         p.addLast(httpHandler);
     }
 
-    private static final byte[] H2_PREFACE_BYTES =
-            "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] H2_PREFACE_BYTES = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n".getBytes(StandardCharsets.UTF_8);
 
     private void addCleartextHttp2Handlers(ChannelPipeline p) {
         // h2c prior knowledge: use a preface detector that switches to HTTP/2
@@ -149,7 +137,8 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
         HttpServerCodec sourceCodec = new HttpServerCodec(maxInitialLineLength, maxHeaderSize, maxChunkSize);
         Http2FrameCodec frameCodec = Http2FrameCodecBuilder.forServer().build();
         Http2MultiplexHandler multiplexHandler = new Http2MultiplexHandler(
-                new Http2ChildChannelInitializer(maxContentLength, supportMultipart, httpHandler, maxPartCount, maxPartHeaderSize, multipartConfig, compressionConfig, keepAliveConfig));
+                new Http2ChildChannelInitializer(maxContentLength, supportMultipart, httpHandler, maxPartCount,
+                        maxPartHeaderSize, multipartConfig, compressionConfig, keepAliveConfig));
 
         p.addLast(new ChannelInboundHandlerAdapter() {
             private ByteBuf accumulator;
@@ -269,8 +258,8 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
     }
 
     /**
-     * 按配置在 codec 之后注入响应 gzip 压缩器（压缩器同时是入站/出站 handler：入站从请求头取
-     * Accept-Encoding，出站压缩响应体）。关闭时（{@code cfg} 为 {@code DISABLED}）不注入，零开销。
+     * 按配置在 codec 之后注入响应 gzip 压缩器（压缩器同时是入站/出站 handler：入站从请求头取 Accept-Encoding，出站压缩响应体）。关闭时（{@code cfg} 为
+     * {@code DISABLED}）不注入，零开销。
      */
     private static void addCompressor(ChannelPipeline p, CompressionConfig cfg) {
         if (cfg != null && cfg.isEnabled()) {
@@ -279,8 +268,8 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
     }
 
     /**
-     * 按配置在 {@code NettyHttpHandler} 之后注入 keep-alive 调优 handler：
-     * 单连接请求计数达到上限后关闭、连接空闲超时后关闭。关闭时（{@code cfg} 为 {@code DISABLED}）不注入。
+     * 按配置在 {@code NettyHttpHandler} 之后注入 keep-alive 调优 handler： 单连接请求计数达到上限后关闭、连接空闲超时后关闭。关闭时（{@code cfg} 为
+     * {@code DISABLED}）不注入。
      */
     private static void addKeepAlive(ChannelPipeline p, KeepAliveConfig cfg) {
         if (cfg != null && cfg.isEnabled()) {
@@ -289,11 +278,9 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
     }
 
     /**
-     * HTTP/2 child channel initializer.
-     * Each HTTP/2 stream gets its own child channel with pipeline:
-     * Http2StreamFrameToHttpObjectCodec -> ChunkedWriteHandler
-     *   -> SupportMultipartAggregator(or HttpObjectAggregator)
-     *   -> BackpressureHandler -> NettyHttpHandler
+     * HTTP/2 child channel initializer. Each HTTP/2 stream gets its own child channel with pipeline:
+     * Http2StreamFrameToHttpObjectCodec -> ChunkedWriteHandler -> SupportMultipartAggregator(or HttpObjectAggregator)
+     * -> BackpressureHandler -> NettyHttpHandler
      */
     private static class Http2ChildChannelInitializer extends ChannelInitializer<Channel> {
         private final int maxContentLength;
@@ -305,11 +292,9 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
         private final CompressionConfig compressionConfig;
         private final KeepAliveConfig keepAliveConfig;
 
-        Http2ChildChannelInitializer(int maxContentLength, boolean supportMultipart,
-                                      NettyHttpHandler httpHandler, int maxPartCount,
-                                      int maxPartHeaderSize, MultipartConfig multipartConfig,
-                                      CompressionConfig compressionConfig,
-                                      KeepAliveConfig keepAliveConfig) {
+        Http2ChildChannelInitializer(int maxContentLength, boolean supportMultipart, NettyHttpHandler httpHandler,
+                int maxPartCount, int maxPartHeaderSize, MultipartConfig multipartConfig,
+                CompressionConfig compressionConfig, KeepAliveConfig keepAliveConfig) {
             this.maxContentLength = maxContentLength;
             this.supportMultipart = supportMultipart;
             this.httpHandler = httpHandler;
@@ -342,8 +327,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
     }
 
     /**
-     * ALPN protocol negotiation handler.
-     * After TLS handshake, selects h2 or h1.1 pipeline based on ALPN result.
+     * ALPN protocol negotiation handler. After TLS handshake, selects h2 or h1.1 pipeline based on ALPN result.
      */
     private static class Http2OrHttp1Handler extends ApplicationProtocolNegotiationHandler {
 
@@ -363,21 +347,19 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
         private final KeepAliveConfig keepAliveConfig;
 
         Http2OrHttp1Handler(int maxContentLength, long readTimeout, boolean supportMultipart,
-                            NettyHttpHandler httpHandler,
-                            List<ChannelHandler> beforeAggregatorHandlers,
-                            List<ChannelHandler> afterAggregatorHandlers,
-                            int maxInitialLineLength, int maxHeaderSize, int maxChunkSize,
-                            int maxPartCount, int maxPartHeaderSize, MultipartConfig multipartConfig,
-                            CompressionConfig compressionConfig, KeepAliveConfig keepAliveConfig) {
+                NettyHttpHandler httpHandler, List<ChannelHandler> beforeAggregatorHandlers,
+                List<ChannelHandler> afterAggregatorHandlers, int maxInitialLineLength, int maxHeaderSize,
+                int maxChunkSize, int maxPartCount, int maxPartHeaderSize, MultipartConfig multipartConfig,
+                CompressionConfig compressionConfig, KeepAliveConfig keepAliveConfig) {
             super(ApplicationProtocolNames.HTTP_1_1);
             this.maxContentLength = maxContentLength;
             this.readTimeout = readTimeout;
             this.supportMultipart = supportMultipart;
             this.httpHandler = httpHandler;
-            this.beforeAggregatorHandlers = beforeAggregatorHandlers != null
-                    ? beforeAggregatorHandlers : Collections.emptyList();
-            this.afterAggregatorHandlers = afterAggregatorHandlers != null
-                    ? afterAggregatorHandlers : Collections.emptyList();
+            this.beforeAggregatorHandlers = beforeAggregatorHandlers != null ? beforeAggregatorHandlers
+                    : Collections.emptyList();
+            this.afterAggregatorHandlers = afterAggregatorHandlers != null ? afterAggregatorHandlers
+                    : Collections.emptyList();
             this.maxInitialLineLength = maxInitialLineLength;
             this.maxHeaderSize = maxHeaderSize;
             this.maxChunkSize = maxChunkSize;
@@ -396,7 +378,8 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
                 p.remove(NettyHttpServer.SslExceptionHandler.class);
                 p.addLast(Http2FrameCodecBuilder.forServer().build());
                 p.addLast(new Http2MultiplexHandler(
-                        new Http2ChildChannelInitializer(maxContentLength, supportMultipart, httpHandler, maxPartCount, maxPartHeaderSize, multipartConfig, compressionConfig, keepAliveConfig)));
+                        new Http2ChildChannelInitializer(maxContentLength, supportMultipart, httpHandler, maxPartCount,
+                                maxPartHeaderSize, multipartConfig, compressionConfig, keepAliveConfig)));
             } else {
                 // http/1.1: add standard h1.1 pipeline
                 p.addLast(new HttpServerCodec(maxInitialLineLength, maxHeaderSize, maxChunkSize));

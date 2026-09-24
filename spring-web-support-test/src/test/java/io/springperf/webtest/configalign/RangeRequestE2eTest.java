@@ -14,28 +14,21 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 静态资源 byte range E2E（RFC 9110 §14）：
- * 普通请求宣告 {@code Accept-Ranges: bytes} 且带 Content-Length；单段 range → 206 + Content-Range；
- * 开区间/后缀区间；不可满足 → 416 + {@code Content-Range: bytes *&#47;len}；
- * {@code If-Range} 命中才走 206（否则整实体 200）；多段 range → {@code multipart/byteranges}；
- * 语法错误或段数超限（{@code server.http.max-ranges}，默认值与解析器上限 100 相同）回退整实体。
- *
- * <p>长度不硬编码：先取一次完整响应作为基准，再据此推导期望的片段内容。</p>
+ * 静态资源 byte range E2E（RFC 9110 §14）： 普通请求宣告 {@code Accept-Ranges: bytes} 且带 Content-Length；单段 range → 206 +
+ * Content-Range； 开区间/后缀区间；不可满足 → 416 + {@code Content-Range: bytes *&#47;len}； {@code If-Range} 命中才走 206（否则整实体 200）；多段
+ * range → {@code multipart/byteranges}； 语法错误或段数超限（{@code server.http.max-ranges}，默认值与解析器上限 100 相同）回退整实体。
+ * <p>
+ * 长度不硬编码：先取一次完整响应作为基准，再据此推导期望的片段内容。
+ * </p>
  */
-@SpringBootTest(classes = ConfigAlignTestApp.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "spring.web.resources.add-mappings=true"
-        })
+@SpringBootTest(classes = ConfigAlignTestApp.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+        "server.servlet.context-path=/", "spring.web.resources.add-mappings=true" })
 class RangeRequestE2eTest {
 
     private static final String PATH = "/e2e-range.txt";
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
@@ -65,9 +58,8 @@ class RangeRequestE2eTest {
         try {
             String lm = resp.header("Last-Modified");
             assertNotNull(lm, "静态资源应带 Last-Modified");
-            return java.time.ZonedDateTime
-                    .parse(lm, java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME)
-                    .toInstant().toEpochMilli();
+            return java.time.ZonedDateTime.parse(lm, java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME).toInstant()
+                    .toEpochMilli();
         } finally {
             resp.close();
         }
@@ -136,8 +128,7 @@ class RangeRequestE2eTest {
             assertEquals(206, resp.code());
             assertEquals("bytes " + start + "-" + (full.length() - 1) + "/" + full.length(),
                     resp.header("Content-Range"));
-            assertEquals(full.substring(start), resp.body().string(),
-                    "bytes=N- 应返回从 N 到结尾的全部内容");
+            assertEquals(full.substring(start), resp.body().string(), "bytes=N- 应返回从 N 到结尾的全部内容");
         } finally {
             resp.close();
         }
@@ -152,8 +143,7 @@ class RangeRequestE2eTest {
             assertEquals(206, resp.code());
             assertEquals("bytes " + (full.length() - n) + "-" + (full.length() - 1) + "/" + full.length(),
                     resp.header("Content-Range"));
-            assertEquals(full.substring(full.length() - n), resp.body().string(),
-                    "bytes=-N 应返回末尾 N 字节");
+            assertEquals(full.substring(full.length() - n), resp.body().string(), "bytes=-N 应返回末尾 N 字节");
         } finally {
             resp.close();
         }
@@ -180,8 +170,7 @@ class RangeRequestE2eTest {
         String full = fullBody();
         Response resp = get(PATH, "Range", "bytes=" + (full.length() + 100) + "-");
         try {
-            assertEquals(416, resp.code(),
-                    "起点超出实体长度应返回 416，实际 " + resp.code());
+            assertEquals(416, resp.code(), "起点超出实体长度应返回 416，实际 " + resp.code());
             assertEquals("bytes */" + full.length(), resp.header("Content-Range"),
                     "416 应带 Content-Range: bytes */len，实际 " + resp.header("Content-Range"));
         } finally {
@@ -206,15 +195,10 @@ class RangeRequestE2eTest {
             String boundary = contentType.substring(contentType.indexOf('=') + 1);
             String body = resp.body().string();
 
-            String expect = "--" + boundary + "\r\n"
-                    + "Content-Type: text/plain\r\n"
-                    + "Content-Range: bytes 0-1/" + len + "\r\n\r\n"
-                    + full.substring(0, 2) + "\r\n"
-                    + "--" + boundary + "\r\n"
-                    + "Content-Type: text/plain\r\n"
-                    + "Content-Range: bytes 5-6/" + len + "\r\n\r\n"
-                    + full.substring(5, 7) + "\r\n"
-                    + "--" + boundary + "--\r\n";
+            String expect = "--" + boundary + "\r\n" + "Content-Type: text/plain\r\n" + "Content-Range: bytes 0-1/"
+                    + len + "\r\n\r\n" + full.substring(0, 2) + "\r\n" + "--" + boundary + "\r\n"
+                    + "Content-Type: text/plain\r\n" + "Content-Range: bytes 5-6/" + len + "\r\n\r\n"
+                    + full.substring(5, 7) + "\r\n" + "--" + boundary + "--\r\n";
             assertEquals(expect, body, "分段体结构、顺序与内容必须精确匹配");
             assertEquals(String.valueOf(body.length()), resp.header("Content-Length"),
                     "多段体的 Content-Length 应为精确总长，实际 headers=" + resp.headers());
@@ -235,8 +219,8 @@ class RangeRequestE2eTest {
             // 请求序即响应序：0-0、3-4、后缀区间 -2 → 末尾 2 字节
             assertTrue(body.contains("Content-Range: bytes 0-0/" + len + "\r\n\r\n" + full.substring(0, 1) + "\r\n"));
             assertTrue(body.contains("Content-Range: bytes 3-4/" + len + "\r\n\r\n" + full.substring(3, 5) + "\r\n"));
-            assertTrue(body.contains("Content-Range: bytes " + (len - 2) + "-" + (len - 1) + "/" + len
-                    + "\r\n\r\n" + full.substring(len - 2) + "\r\n"));
+            assertTrue(body.contains("Content-Range: bytes " + (len - 2) + "-" + (len - 1) + "/" + len + "\r\n\r\n"
+                    + full.substring(len - 2) + "\r\n"));
             assertTrue(body.endsWith("--" + boundary + "--\r\n"), "应以收尾边界结束，实际 " + body);
         } finally {
             resp.close();
@@ -249,8 +233,7 @@ class RangeRequestE2eTest {
         String full = fullBody();
         Response resp = get(PATH, "Range", "bytes=0-1," + (full.length() + 50) + "-");
         try {
-            assertEquals(416, resp.code(),
-                    "任一段越界应整体 416，实际 " + resp.code());
+            assertEquals(416, resp.code(), "任一段越界应整体 416，实际 " + resp.code());
             assertEquals("bytes */" + full.length(), resp.header("Content-Range"),
                     "416 应带 Content-Range: bytes */len，实际 " + resp.header("Content-Range"));
         } finally {
@@ -276,8 +259,7 @@ class RangeRequestE2eTest {
         Response resp = get(PATH, "Range", repeatedSingleByteRanges(100));
         try {
             assertEquals(206, resp.code(), "恰好等于上限应仍返回 206，实际 " + resp.code());
-            assertTrue(resp.header("Content-Type").replace(" ", "")
-                            .startsWith("multipart/byteranges;boundary="),
+            assertTrue(resp.header("Content-Type").replace(" ", "").startsWith("multipart/byteranges;boundary="),
                     "实际 Content-Type=" + resp.header("Content-Type"));
         } finally {
             resp.close();
@@ -292,13 +274,11 @@ class RangeRequestE2eTest {
         String full = fullBody();
         Response resp = get(PATH, "Range", repeatedSingleByteRanges(101));
         try {
-            assertEquals(200, resp.code(),
-                    "超过 server.http.max-ranges 应忽略 Range 返回整实体，实际 " + resp.code());
+            assertEquals(200, resp.code(), "超过 server.http.max-ranges 应忽略 Range 返回整实体，实际 " + resp.code());
             String contentType = resp.header("Content-Type");
             assertTrue(contentType == null || !contentType.contains("multipart/byteranges"),
                     "不得返回 multipart/byteranges，实际 " + contentType);
-            assertEquals(String.valueOf(full.length()), resp.header("Content-Length"),
-                    "整实体应带完整 Content-Length");
+            assertEquals(String.valueOf(full.length()), resp.header("Content-Length"), "整实体应带完整 Content-Length");
             assertEquals(full, resp.body().string(), "应返回完整实体内容");
         } finally {
             resp.close();
@@ -308,14 +288,11 @@ class RangeRequestE2eTest {
     @Test
     void headMultiRange_returns206MetadataWithoutBody() throws Exception {
         String full = fullBody();
-        Response resp = CLIENT.newCall(new Request.Builder()
-                .url("http://localhost:" + port + PATH)
-                .header("Range", "bytes=0-1,5-6")
-                .head().build()).execute();
+        Response resp = CLIENT.newCall(new Request.Builder().url("http://localhost:" + port + PATH)
+                .header("Range", "bytes=0-1,5-6").head().build()).execute();
         try {
             assertEquals(206, resp.code());
-            assertTrue(resp.header("Content-Type").replace(" ", "")
-                    .startsWith("multipart/byteranges;boundary="));
+            assertTrue(resp.header("Content-Type").replace(" ", "").startsWith("multipart/byteranges;boundary="));
             int declared = Integer.parseInt(resp.header("Content-Length"));
             assertEquals("", resp.body().string(), "HEAD 不应返回 body");
             assertTrue(declared > 0, "HEAD 应保留多段体总长元数据");
@@ -352,8 +329,7 @@ class RangeRequestE2eTest {
 
         Response resp = get(PATH, "Range", "bytes=0-4", "If-Range", etag);
         try {
-            assertEquals(206, resp.code(),
-                    "If-Range 的 ETag 命中时应返回 206，实际 " + resp.code());
+            assertEquals(206, resp.code(), "If-Range 的 ETag 命中时应返回 206，实际 " + resp.code());
             assertTrue(resp.body().string().length() == 5);
         } finally {
             resp.close();
@@ -365,8 +341,7 @@ class RangeRequestE2eTest {
         String full = fullBody();
         Response resp = get(PATH, "Range", "bytes=0-4", "If-Range", "\"stale-etag\"");
         try {
-            assertEquals(200, resp.code(),
-                    "If-Range 未命中时应忽略 Range 返回整实体，实际 " + resp.code());
+            assertEquals(200, resp.code(), "If-Range 未命中时应忽略 Range 返回整实体，实际 " + resp.code());
             assertEquals(full, resp.body().string());
         } finally {
             resp.close();
@@ -380,8 +355,7 @@ class RangeRequestE2eTest {
         String date = rfc1123(lastModified + 60_000);
         Response resp = get(PATH, "Range", "bytes=0-4", "If-Range", date);
         try {
-            assertEquals(206, resp.code(),
-                    "If-Range 日期晚于资源修改时间应允许 Range，实际 " + resp.code());
+            assertEquals(206, resp.code(), "If-Range 日期晚于资源修改时间应允许 Range，实际 " + resp.code());
             assertEquals("bytes 0-4/" + fullBody().length(), resp.header("Content-Range"));
         } finally {
             resp.close();
@@ -397,8 +371,7 @@ class RangeRequestE2eTest {
         String full = fullBody();
         Response resp = get(PATH, "Range", "bytes=0-4", "If-Range", staleDate);
         try {
-            assertEquals(200, resp.code(),
-                    "If-Range 日期早于资源修改时间应忽略 Range，实际 " + resp.code());
+            assertEquals(200, resp.code(), "If-Range 日期早于资源修改时间应忽略 Range，实际 " + resp.code());
             assertEquals(full, resp.body().string());
         } finally {
             resp.close();
@@ -437,10 +410,8 @@ class RangeRequestE2eTest {
     @Test
     void headWithRange_returns206HeadersWithoutBody() throws Exception {
         String full = fullBody();
-        Response resp = CLIENT.newCall(new Request.Builder()
-                .url("http://localhost:" + port + PATH)
-                .header("Range", "bytes=0-9")
-                .head().build()).execute();
+        Response resp = CLIENT.newCall(new Request.Builder().url("http://localhost:" + port + PATH)
+                .header("Range", "bytes=0-9").head().build()).execute();
         try {
             assertEquals(206, resp.code(), "HEAD + Range 应返回 206 头，实际 " + resp.code());
             assertEquals("bytes 0-9/" + full.length(), resp.header("Content-Range"));

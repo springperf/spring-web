@@ -10,14 +10,11 @@ import java.net.Socket;
 import java.util.Properties;
 
 /**
- * 每个 JMH fork 启动一个隔离的 Spring Boot 服务器实例。
- * 由具体 Benchmark 类在 @Setup/@TearDown 中手动调用 start()/stop()。
+ * 每个 JMH fork 启动一个隔离的 Spring Boot 服务器实例。 由具体 Benchmark 类在 @Setup/@TearDown 中手动调用 start()/stop()。
  * <p>
- * 使用 {@link WebServerInitializedEvent} 监听器获取实际绑定端口，不依赖
- * {@code local.server.port} 属性（NettyHttpServer 不设置该属性）。
+ * 使用 {@link WebServerInitializedEvent} 监听器获取实际绑定端口，不依赖 {@code local.server.port} 属性（NettyHttpServer 不设置该属性）。
  * <p>
- * 首次绑定失败时自动重试（最多 3 次，1s 间隔），兼容 TIME_WAIT 场景。
- * 若重试后仍然失败，则使用随机端口 fallback。
+ * 首次绑定失败时自动重试（最多 3 次，1s 间隔），兼容 TIME_WAIT 场景。 若重试后仍然失败，则使用随机端口 fallback。
  * <p>
  * stop() 使用端口可用性轮询而非固定 sleep，确保释放确认后才返回。
  */
@@ -41,8 +38,8 @@ public class BenchServerState {
 
     public void start() {
         int configPort = BenchmarkConstants.PORT;
-        System.out.println("[Benchmark] Starting server: " + applicationClass.getSimpleName()
-                + " on port " + configPort);
+        System.out
+                .println("[Benchmark] Starting server: " + applicationClass.getSimpleName() + " on port " + configPort);
 
         SpringApplication app = new SpringApplication(applicationClass);
         app.setDefaultProperties(defaultProperties);
@@ -51,7 +48,7 @@ public class BenchServerState {
 
         // 通过 WebServerInitializedEvent 捕获实际端口（适用于所有容器，不依赖 local.server.port）
         // NettyHttpServer 不设置 local.server.port，必须通过事件获取
-        final int[] eventPort = {0};
+        final int[] eventPort = { 0 };
         app.addListeners((ApplicationListener<WebServerInitializedEvent>) event -> {
             if (eventPort[0] == 0) {
                 eventPort[0] = event.getWebServer().getPort();
@@ -66,10 +63,9 @@ public class BenchServerState {
                 break; // 成功
             } catch (Exception e) {
                 if (attempt < MAX_BIND_RETRIES && isPortBindFailure(e)) {
-                    System.out.println("[Benchmark] Port " + configPort
-                            + " bind failed (attempt " + attempt + "/" + MAX_BIND_RETRIES
-                            + "): " + e.getMessage() + ", retrying in "
-                            + BIND_RETRY_INTERVAL_MS + "ms");
+                    System.out.println("[Benchmark] Port " + configPort + " bind failed (attempt " + attempt + "/"
+                            + MAX_BIND_RETRIES + "): " + e.getMessage() + ", retrying in " + BIND_RETRY_INTERVAL_MS
+                            + "ms");
                     try {
                         Thread.sleep(BIND_RETRY_INTERVAL_MS);
                     } catch (InterruptedException ie) {
@@ -79,8 +75,8 @@ public class BenchServerState {
                     continue;
                 }
                 // 重试耗尽，使用随机端口 fallback
-                System.out.println("[Benchmark] Port " + configPort + " bind failed: "
-                        + e.getMessage() + ", trying random port");
+                System.out.println(
+                        "[Benchmark] Port " + configPort + " bind failed: " + e.getMessage() + ", trying random port");
                 Properties fallbackProps = new Properties();
                 fallbackProps.putAll(defaultProperties);
                 fallbackProps.setProperty("server.port", "0");
@@ -107,8 +103,8 @@ public class BenchServerState {
                 }
             }
         }
-        System.out.println("[Benchmark] Server started: " + applicationClass.getSimpleName()
-                + " on port " + actualPort);
+        System.out
+                .println("[Benchmark] Server started: " + applicationClass.getSimpleName() + " on port " + actualPort);
     }
 
     public int getActualPort() {
@@ -135,26 +131,24 @@ public class BenchServerState {
             // 检查 cause chain
             Throwable cause = e.getCause();
             while (cause != null) {
-                if (cause.getMessage() != null
-                        && (cause.getMessage().contains("Address already in use")
-                        || cause.getMessage().contains("bind")
-                        || cause.getMessage().contains("EADDRINUSE"))) {
+                if (cause.getMessage() != null && (cause.getMessage().contains("Address already in use")
+                        || cause.getMessage().contains("bind") || cause.getMessage().contains("EADDRINUSE"))) {
                     return true;
                 }
                 cause = cause.getCause();
             }
             return false;
         }
-        return msg.contains("Address already in use")
-                || msg.contains("bind")
-                || msg.contains("EADDRINUSE");
+        return msg.contains("Address already in use") || msg.contains("bind") || msg.contains("EADDRINUSE");
     }
 
     /**
      * 轮询指定端口是否已被释放（不再接受连接），替代固定 sleep。
      *
-     * @param port      目标端口
-     * @param timeoutMs 最大等待毫秒
+     * @param port
+     *            目标端口
+     * @param timeoutMs
+     *            最大等待毫秒
      */
     private static void waitForPortRelease(int port, long timeoutMs) {
         long deadline = System.currentTimeMillis() + timeoutMs;
@@ -170,13 +164,13 @@ public class BenchServerState {
             } catch (Exception e) {
                 // 连接被拒绝 → 端口已释放
                 if (pollCount > 0) {
-                    System.out.println("[Benchmark] Port " + port + " released after "
-                            + (pollCount * 200) + "ms polling");
+                    System.out.println(
+                            "[Benchmark] Port " + port + " released after " + (pollCount * 200) + "ms polling");
                 }
                 return;
             }
         }
-        System.out.println("[Benchmark] WARN: Port " + port + " still in use after "
-                + timeoutMs + "ms, continuing anyway (may cause EADDRINUSE)");
+        System.out.println("[Benchmark] WARN: Port " + port + " still in use after " + timeoutMs
+                + "ms, continuing anyway (may cause EADDRINUSE)");
     }
 }

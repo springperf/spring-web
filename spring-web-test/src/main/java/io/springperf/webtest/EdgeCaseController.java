@@ -88,7 +88,7 @@ public class EdgeCaseController {
 
     @GetMapping("/multi-param")
     public Map<String, Object> multiParam(@RequestParam("ids") String[] ids,
-                                          @RequestParam(value = "tags", required = false) java.util.List<String> tags) {
+            @RequestParam(value = "tags", required = false) java.util.List<String> tags) {
         Map<String, Object> m = new HashMap<>();
         m.put("ids", ids != null ? ids.length : 0);
         m.put("first", ids != null && ids.length > 0 ? ids[0] : null);

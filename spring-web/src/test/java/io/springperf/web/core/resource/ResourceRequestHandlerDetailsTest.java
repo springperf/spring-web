@@ -1,8 +1,14 @@
 package io.springperf.web.core.resource;
 
-import io.springperf.web.core.mapping.match.HttpMethodMatcher;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,18 +20,12 @@ import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import io.springperf.web.core.mapping.match.HttpMethodMatcher;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 /**
- * 补充 ResourceRequestHandler 覆盖率：invoke()/getRegistration、gzip 预压缩、
- * HEAD 语义、Cache-Control 配置、文件类位置解析、非标准 path 前缀以及异常兜底。
+ * 补充 ResourceRequestHandler 覆盖率：invoke()/getRegistration、gzip 预压缩、 HEAD 语义、Cache-Control 配置、文件类位置解析、非标准 path 前缀以及异常兜底。
  */
 @ExtendWith(MockitoExtension.class)
 class ResourceRequestHandlerDetailsTest {
@@ -33,8 +33,10 @@ class ResourceRequestHandlerDetailsTest {
     private ResourceHandlerRegistration registration;
     private ResourceRequestHandler handler;
 
-    @Mock WebServerHttpRequest request;
-    @Mock WebServerHttpResponse response;
+    @Mock
+    WebServerHttpRequest request;
+    @Mock
+    WebServerHttpResponse response;
 
     private HttpHeaders requestHeaders;
     private HttpHeaders responseHeaders;
@@ -60,7 +62,7 @@ class ResourceRequestHandlerDetailsTest {
     @Test
     void invoke_callsHandleAndReturnsNull() throws Throwable {
         when(request.getPath()).thenReturn("/static/css/style.css");
-        Object result = handler.invoke(new Object[]{request, response});
+        Object result = handler.invoke(new Object[] { request, response });
         assertNull(result);
         verify(response).setStatusCode(HttpStatus.OK);
     }
@@ -178,8 +180,8 @@ class ResourceRequestHandlerDetailsTest {
     void resolveResourceByUri_filePrefix_existingFile_returnsResource() throws Exception {
         ClassPathResource cp = new ClassPathResource("static/css/style.css");
         File realFile = cp.getFile();
-        java.lang.reflect.Method m = ResourceRequestHandler.class.getDeclaredMethod(
-                "resolveResourceByUri", String.class);
+        java.lang.reflect.Method m = ResourceRequestHandler.class.getDeclaredMethod("resolveResourceByUri",
+                String.class);
         m.setAccessible(true);
         Resource r = (Resource) m.invoke(handler, realFile.toURI().toString());
         assertNotNull(r);
@@ -188,8 +190,8 @@ class ResourceRequestHandlerDetailsTest {
 
     @Test
     void resolveResourceByUri_filePrefix_missingFile_returnsNull() throws Exception {
-        java.lang.reflect.Method m = ResourceRequestHandler.class.getDeclaredMethod(
-                "resolveResourceByUri", String.class);
+        java.lang.reflect.Method m = ResourceRequestHandler.class.getDeclaredMethod("resolveResourceByUri",
+                String.class);
         m.setAccessible(true);
         Resource r = (Resource) m.invoke(handler, "file:/definitely/not/exists.txt");
         assertNull(r);

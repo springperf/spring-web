@@ -1,14 +1,14 @@
 package io.springperf.web.core.mapping.optimize;
 
+import java.util.*;
+import java.util.stream.Collectors;
+
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.core.mapping.route.Router;
 import io.springperf.web.http.RequestAttribute;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.util.PathPatternUtils;
 import io.springperf.web.util.WebUtils;
-
-import java.util.*;
-import java.util.stream.Collectors;
 
 public class PrefixPathRouterOptimizer implements RouterOptimizer {
 
@@ -87,7 +87,8 @@ public class PrefixPathRouterOptimizer implements RouterOptimizer {
         return router;
     }
 
-    private static final RequestAttribute<int[]> SLASH_INDEX_LIST_ATTRIBUTE = RequestAttribute.createAttribute(int[].class);
+    private static final RequestAttribute<int[]> SLASH_INDEX_LIST_ATTRIBUTE = RequestAttribute
+            .createAttribute(int[].class);
 
     protected static int[] getSlashIndexList(WebServerHttpRequest req) {
         int[] slashIndexList = req.getRequestContext().getAttribute(SLASH_INDEX_LIST_ATTRIBUTE);

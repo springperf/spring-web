@@ -1,5 +1,18 @@
 package io.springperf.web.core.cors;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.context.EmbeddedValueResolverAware;
+import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.http.HttpMethod;
+import org.springframework.lang.Nullable;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringValueResolver;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.cors.CorsConfiguration;
+
 import io.springperf.web.context.WebComponentContainer;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.cors.provider.CorsConfigurationProvider;
@@ -13,24 +26,12 @@ import io.springperf.web.core.mapping.match.Matcher;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.util.support.ContainmentResult;
-import org.springframework.context.EmbeddedValueResolverAware;
-import org.springframework.core.annotation.AnnotatedElementUtils;
-import org.springframework.http.HttpMethod;
-import org.springframework.lang.Nullable;
-import org.springframework.util.CollectionUtils;
-import org.springframework.util.StringValueResolver;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.cors.CorsConfiguration;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
- * Manages CORS configuration by aggregating @CrossOrigin annotations and programmatic registrations, then resolving the effective configuration per request.
+ * Manages CORS configuration by aggregating @CrossOrigin annotations and programmatic registrations, then resolving the
+ * effective configuration per request.
  */
 public class CorsRegistry extends WebComponentContainer implements EmbeddedValueResolverAware {
-
 
     private static final CorsConfigurationProvider DEFAULT_CORS_CONFIGURATION_PROVIDER = new NoneCorsConfigurationProvider();
 
@@ -62,12 +63,15 @@ public class CorsRegistry extends WebComponentContainer implements EmbeddedValue
 
     /**
      * 在初始化完成后注册预构建的 CORS 配置。
-     * <p>适用于框架初始化后动态添加路由 CORS 配置的场景（如 Actuator 端点）。
-     * 与 {@link #addMapping(String)} 不同，该方法会直接写入已构建的 registrations 列表，
-     * 因为 {@link #initComponentPhase1()} 已将列表固化。</p>
+     * <p>
+     * 适用于框架初始化后动态添加路由 CORS 配置的场景（如 Actuator 端点）。 与 {@link #addMapping(String)} 不同，该方法会直接写入已构建的 registrations 列表， 因为
+     * {@link #initComponentPhase1()} 已将列表固化。
+     * </p>
      *
-     * @param pathPattern       the path pattern to match
-     * @param corsConfiguration the CORS configuration
+     * @param pathPattern
+     *            the path pattern to match
+     * @param corsConfiguration
+     *            the CORS configuration
      */
     public synchronized void addActuatorCorsConfiguration(String pathPattern, CorsConfiguration corsConfiguration) {
         CorsRegistration registration = new CorsRegistration(pathPattern, corsConfiguration);
@@ -90,7 +94,6 @@ public class CorsRegistry extends WebComponentContainer implements EmbeddedValue
         }
     }
 
-
     public CorsConfiguration getCorsConfiguration(WebServerHttpRequest request, WebServerHttpResponse response) {
         CorsConfigurationProvider provider = getCorsConfigurationProvider(request);
         return provider.getCorsConfiguration(request, response);
@@ -102,12 +105,12 @@ public class CorsRegistry extends WebComponentContainer implements EmbeddedValue
             return DEFAULT_CORS_CONFIGURATION_PROVIDER;
         }
         PathMappingContext context;
-        if(mr.isMatched()){
+        if (mr.isMatched()) {
             context = mr.getMatchedContext();
-        }else if(mr.isPathMatched()){
+        } else if (mr.isPathMatched()) {
             PathMappingContext[] pathMatchedContexts = mr.getPathMatchedContexts();
             context = (pathMatchedContexts != null && pathMatchedContexts.length > 0) ? pathMatchedContexts[0] : null;
-        }else{
+        } else {
             context = null;
         }
         if (context == null) {
@@ -128,8 +131,10 @@ public class CorsRegistry extends WebComponentContainer implements EmbeddedValue
             return DEFAULT_CORS_CONFIGURATION_PROVIDER;
         }
 
-        CrossOrigin typeAnnotation = AnnotatedElementUtils.findMergedAnnotation(context.getUserClass(), CrossOrigin.class);
-        CrossOrigin methodAnnotation = AnnotatedElementUtils.findMergedAnnotation(context.getMethod(), CrossOrigin.class);
+        CrossOrigin typeAnnotation = AnnotatedElementUtils.findMergedAnnotation(context.getUserClass(),
+                CrossOrigin.class);
+        CrossOrigin methodAnnotation = AnnotatedElementUtils.findMergedAnnotation(context.getMethod(),
+                CrossOrigin.class);
 
         CorsConfiguration config = new CorsConfiguration();
         updateCorsConfig(config, typeAnnotation);
@@ -174,7 +179,8 @@ public class CorsRegistry extends WebComponentContainer implements EmbeddedValue
         }
         RuntimeMappingCorsConfigurationProvider provider = new RuntimeMappingCorsConfigurationProvider();
         for (CorsRegistration registration : runtimeRegistrations) {
-            provider.addCorsConfiguration(registration.getPathPattern(), registration.getCorsConfiguration().combine(config));
+            provider.addCorsConfiguration(registration.getPathPattern(),
+                    registration.getCorsConfiguration().combine(config));
         }
         return provider;
     }
@@ -202,8 +208,8 @@ public class CorsRegistry extends WebComponentContainer implements EmbeddedValue
         } else if ("false".equalsIgnoreCase(allowCredentials)) {
             config.setAllowCredentials(false);
         } else if (!allowCredentials.isEmpty()) {
-            throw new IllegalStateException("@CrossOrigin's allowCredentials value must be \"true\", \"false\", " +
-                    "or an empty string (\"\"): current value is [" + allowCredentials + "]");
+            throw new IllegalStateException("@CrossOrigin's allowCredentials value must be \"true\", \"false\", "
+                    + "or an empty string (\"\"): current value is [" + allowCredentials + "]");
         }
 
         if (annotation.maxAge() >= 0 && config.getMaxAge() == null) {

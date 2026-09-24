@@ -1,26 +1,10 @@
 package io.springperf.web.http;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.Unpooled;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.EventLoop;
-import io.netty.channel.FileRegion;
-import io.netty.util.Attribute;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpResponse;
-import io.netty.handler.codec.http.LastHttpContent;
-import io.springperf.web.context.ApplicationProperties;
-import io.springperf.web.context.PropertiesConstant;
-import io.springperf.web.context.WebContext;
-import io.springperf.web.server.ResponseLimitConfig;
-import org.springframework.http.HttpStatus;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -33,11 +17,28 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.http.HttpStatus;
+
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.EventLoop;
+import io.netty.channel.FileRegion;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpResponse;
+import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.util.Attribute;
+import io.springperf.web.context.ApplicationProperties;
+import io.springperf.web.context.PropertiesConstant;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.server.ResponseLimitConfig;
 
 class NettyServerHttpResponseTest {
 
@@ -89,8 +90,7 @@ class NettyServerHttpResponseTest {
         assertTrue(response.isStreaming(), "flush(true) 应进入 chunked 渐进式模式");
         ArgumentCaptor<HttpResponse> head = ArgumentCaptor.forClass(HttpResponse.class);
         verify(ctx).writeAndFlush(head.capture());
-        assertFalse(head.getValue() instanceof FullHttpResponse,
-                "首帧必须是非 Full（Full 自带 LastHttpContent，会提前结束响应）");
+        assertFalse(head.getValue() instanceof FullHttpResponse, "首帧必须是非 Full（Full 自带 LastHttpContent，会提前结束响应）");
         assertEquals("chunked", head.getValue().headers().get(HttpHeaderNames.TRANSFER_ENCODING),
                 "渐进式首帧必须声明 chunked，实际 headers=" + head.getValue().headers());
         assertNull(head.getValue().headers().get(HttpHeaderNames.CONTENT_LENGTH),
@@ -370,8 +370,7 @@ class NettyServerHttpResponseTest {
         assertEquals(content.length, headers.headers().getInt(HttpHeaderNames.CONTENT_LENGTH),
                 "Content-Length must match file size");
         // 文件体：零拷贝 FileRegion（非 chunk 编码）
-        assertTrue(bodyCaptor.getValue() instanceof FileRegion,
-                "file body should be written as zero-copy FileRegion");
+        assertTrue(bodyCaptor.getValue() instanceof FileRegion, "file body should be written as zero-copy FileRegion");
         // 终结：FileRegion 后必须补 LastHttpContent，让 HttpObjectEncoder 状态从 ST_CONTENT 归位，
         // 否则 keep-alive 连接被污染（下个请求写 DefaultHttpResponse 抛 state:1 异常）。
         assertTrue(headersCaptor.getAllValues().get(1) instanceof LastHttpContent,
@@ -568,8 +567,7 @@ class NettyServerHttpResponseTest {
         HttpResponse headers = (HttpResponse) headersCaptor.getAllValues().get(0);
         String contentType = headers.headers().get(HttpHeaderNames.CONTENT_TYPE);
         assertNotNull(contentType, "writeFile 应推导并写入 Content-Type");
-        assertTrue(contentType.contains("text/html"),
-                "html 文件应推导为 text/html，实际: " + contentType);
+        assertTrue(contentType.contains("text/html"), "html 文件应推导为 text/html，实际: " + contentType);
         htmlFile.delete();
     }
 
@@ -620,11 +618,10 @@ class NettyServerHttpResponseTest {
         when(buf1.readableBytes()).thenReturn(0);
         when(ctx.writeAndFlush(any())).thenReturn(mock(ChannelFuture.class));
 
-        response.getBuf();        // 持有 buf1
-        response.flush();         // 成功写出后 this.buf 应置空
+        response.getBuf(); // 持有 buf1
+        response.flush(); // 成功写出后 this.buf 应置空
         ByteBuf after = response.getBuf(); // 应得到新缓冲区，而非悬空的 buf1
-        assertSame(buf2, after,
-                "flush 后 buf 应置空，后续 getBuf 返回新缓冲区，避免悬空引用已释放的 ByteBuf");
+        assertSame(buf2, after, "flush 后 buf 应置空，后续 getBuf 返回新缓冲区，避免悬空引用已释放的 ByteBuf");
         verify(buf1, never()).release(); // 正常路径由 Netty 释放，框架不应重复 release
     }
 

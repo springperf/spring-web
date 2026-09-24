@@ -1,10 +1,10 @@
 package io.springperf.web.http;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class ConnectionContextTest {
 
@@ -32,7 +32,8 @@ class ConnectionContextTest {
     @Test
     void setOnWritable_setsCallback() {
         ConnectionContext ctx = new ConnectionContext();
-        Runnable cb = () -> {};
+        Runnable cb = () -> {
+        };
         ctx.setOnWritable(cb);
         assertSame(cb, ctx.getOnWritable());
     }
@@ -40,8 +41,10 @@ class ConnectionContextTest {
     @Test
     void setOnWritable_overwritesPrevious() {
         ConnectionContext ctx = new ConnectionContext();
-        ctx.setOnWritable(() -> {});
-        Runnable cb2 = () -> {};
+        ctx.setOnWritable(() -> {
+        });
+        Runnable cb2 = () -> {
+        };
         ctx.setOnWritable(cb2);
         assertSame(cb2, ctx.getOnWritable());
     }

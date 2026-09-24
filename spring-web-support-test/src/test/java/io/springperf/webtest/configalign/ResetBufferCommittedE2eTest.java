@@ -20,26 +20,22 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * resetBuffer/reset 契约 E2E（Servlet 规范 §5.6）：
  * <ul>
- *   <li>未提交：清空已缓冲内容（含 Writer 未 flush 的编码缓冲）；</li>
- *   <li>已提交：抛 IllegalStateException（已发出的内容无法收回）。</li>
+ * <li>未提交：清空已缓冲内容（含 Writer 未 flush 的编码缓冲）；</li>
+ * <li>已提交：抛 IllegalStateException（已发出的内容无法收回）。</li>
  * </ul>
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, ResetBufferCommittedE2eTest.Cfg.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "server.servlet.context-path=/")
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        ResetBufferCommittedE2eTest.Cfg.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "server.servlet.context-path=/")
 class ResetBufferCommittedE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
 
     private String body(String path) throws IOException {
-        Response resp = CLIENT.newCall(new Request.Builder()
-                .url("http://localhost:" + port + path).build()).execute();
+        Response resp = CLIENT.newCall(new Request.Builder().url("http://localhost:" + port + path).build()).execute();
         try {
             return resp.code() + ":" + resp.body().string();
         } finally {
@@ -61,8 +57,7 @@ class ResetBufferCommittedE2eTest {
 
     @Test
     void uncommittedReset_discardsContentAndHeaders() throws Exception {
-        assertEquals("200:after-reset", body("/e2e-rb/reset"),
-                "未提交时 reset 应丢弃内容（并重置状态/头）");
+        assertEquals("200:after-reset", body("/e2e-rb/reset"), "未提交时 reset 应丢弃内容（并重置状态/头）");
     }
 
     @TestConfiguration

@@ -14,18 +14,14 @@ public class WebTestConfig {
 
     @Bean
     public ResourceHandlerRegistration resourceHandlerRegistration() {
-        return new ResourceHandlerRegistration("/static/**")
-                .addResourceLocations("classpath:/static/")
+        return new ResourceHandlerRegistration("/static/**").addResourceLocations("classpath:/static/")
                 .setCachePeriod(3600);
     }
 
     @Bean
     public CorsRegistration corsRegistration() {
-        return new CorsRegistration("/api/**")
-                .allowedOrigins("http://example.com")
-                .allowedMethods("GET", "POST", "PUT", "DELETE")
-                .allowCredentials(true)
-                .maxAge(3600);
+        return new CorsRegistration("/api/**").allowedOrigins("http://example.com")
+                .allowedMethods("GET", "POST", "PUT", "DELETE").allowCredentials(true).maxAge(3600);
     }
 
     @Bean

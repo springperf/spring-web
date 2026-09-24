@@ -9,9 +9,9 @@ import org.springframework.util.StringUtils;
 /**
  * 判断某个视图引擎是否启用。逻辑：
  * <ul>
- *   <li>未配置 {@code spring.web.view.engine} → 放行（由 classpath 探测决定是否可用）</li>
- *   <li>配置为多值列表（逗号分隔）→ 列表包含当前引擎名则放行</li>
- *   <li>否则禁用</li>
+ * <li>未配置 {@code spring.web.view.engine} → 放行（由 classpath 探测决定是否可用）</li>
+ * <li>配置为多值列表（逗号分隔）→ 列表包含当前引擎名则放行</li>
+ * <li>否则禁用</li>
  * </ul>
  */
 public class ViewEngineCondition implements Condition {
@@ -23,15 +23,21 @@ public class ViewEngineCondition implements Condition {
     }
 
     public static class Thymeleaf extends ViewEngineCondition {
-        public Thymeleaf() { super("thymeleaf"); }
+        public Thymeleaf() {
+            super("thymeleaf");
+        }
     }
 
     public static class FreeMarker extends ViewEngineCondition {
-        public FreeMarker() { super("freemarker"); }
+        public FreeMarker() {
+            super("freemarker");
+        }
     }
 
     public static class Beetl extends ViewEngineCondition {
-        public Beetl() { super("beetl"); }
+        public Beetl() {
+            super("beetl");
+        }
     }
 
     @Override

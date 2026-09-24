@@ -24,10 +24,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * 回归 P2 并发组 #7：同 queueName 重复安装时，新建的 DisruptorQueue 必须先 shutdown
- * 再抛异常，否则其 Disruptor 线程（非 daemon）泄漏、挂住测试 JVM。
- * <p>修复前 {@code putIfAbsent} 冲突直接抛 {@code IllegalStateException}，新建队列的
- * 线程无人回收。</p>
+ * 回归 P2 并发组 #7：同 queueName 重复安装时，新建的 DisruptorQueue 必须先 shutdown 再抛异常，否则其 Disruptor 线程（非 daemon）泄漏、挂住测试 JVM。
+ * <p>
+ * 修复前 {@code putIfAbsent} 冲突直接抛 {@code IllegalStateException}，新建队列的 线程无人回收。
+ * </p>
  */
 class BatchRegistryInstallConflictTest {
 
@@ -58,8 +58,8 @@ class BatchRegistryInstallConflictTest {
             awaitDisruptorThreadCount(QUEUE, 1);
 
             // 二次同名安装：抛 IllegalStateException，且新建队列的线程被 shutdown
-            InvocationTargetException ex =
-                    assertThrows(InvocationTargetException.class, () -> install.invoke(registry, newRegistration()));
+            InvocationTargetException ex = assertThrows(InvocationTargetException.class,
+                    () -> install.invoke(registry, newRegistration()));
             assertTrue(ex.getCause() instanceof IllegalStateException, "冲突应抛 IllegalStateException");
 
             // 冲突路径新建的 queue 已被 shutdown，其 Disruptor 线程终止，只剩首次那个
@@ -75,24 +75,21 @@ class BatchRegistryInstallConflictTest {
         HandlerMethod handlerMethod = new HandlerMethod(new DummyBatchBean(), m);
         PathMappingContext singleCtx = new PathMappingContext(handlerMethod, Collections.emptyList(), "/dummy");
         Constructor<?> ctor = String.class.getConstructor();
-        BatchRequestMetaData meta = new BatchRequestMetaData(
-                m, DummyBatchBean.class, DummyBatchRequest.class, QUEUE,
-                64, BatchMapping.WaitStrategy.BLOCKING, BatchMapping.Backpressure.BLOCK,
-                ctor, 16, 1);
+        BatchRequestMetaData meta = new BatchRequestMetaData(m, DummyBatchBean.class, DummyBatchRequest.class, QUEUE,
+                64, BatchMapping.WaitStrategy.BLOCKING, BatchMapping.Backpressure.BLOCK, ctor, 16, 1);
         return new BatchHandlerRegistration(new DummyBatchBean(), singleCtx, meta);
     }
 
     private static void awaitDisruptorThreadCount(String queueName, int expected) throws InterruptedException {
         for (int i = 0; i < 100; i++) {
             long alive = Thread.getAllStackTraces().keySet().stream()
-                    .filter(t -> t.isAlive() && t.getName().startsWith("batch-disruptor-" + queueName))
-                    .count();
-            if (alive == expected) return;
+                    .filter(t -> t.isAlive() && t.getName().startsWith("batch-disruptor-" + queueName)).count();
+            if (alive == expected)
+                return;
             Thread.sleep(50);
         }
         long alive = Thread.getAllStackTraces().keySet().stream()
-                .filter(t -> t.isAlive() && t.getName().startsWith("batch-disruptor-" + queueName))
-                .count();
+                .filter(t -> t.isAlive() && t.getName().startsWith("batch-disruptor-" + queueName)).count();
         throw new AssertionError("期望 batch-disruptor-" + queueName + " 存活线程数 = " + expected + "，实际 = " + alive);
     }
 

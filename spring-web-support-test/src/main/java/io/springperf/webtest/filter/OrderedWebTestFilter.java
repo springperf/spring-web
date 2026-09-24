@@ -12,7 +12,8 @@ import org.springframework.stereotype.Component;
 public class OrderedWebTestFilter implements WebFilter {
 
     @Override
-    public void doFilter(WebServerHttpRequest request, WebServerHttpResponse response, FilterChain chain) throws Exception {
+    public void doFilter(WebServerHttpRequest request, WebServerHttpResponse response, FilterChain chain)
+            throws Exception {
         response.getHeaders().set("X-Web-Filter", "called");
         chain.doFilter(request, response);
     }

@@ -33,13 +33,13 @@ public class BeetlViewResolver extends BaseWebComponent implements ViewResolver 
     @Override
     public void initWithWebContext(WebContext webContext) {
         super.initWithWebContext(webContext);
-        this.prefix = ViewProperties.resolve(webContext.getProps(),
-                ViewProperties.BEETL_PREFIX, ViewProperties.BEETL_PREFIX_DEFAULT);
-        this.suffix = ViewProperties.resolve(webContext.getProps(),
-                ViewProperties.BEETL_SUFFIX, ViewProperties.BEETL_SUFFIX_DEFAULT);
+        this.prefix = ViewProperties.resolve(webContext.getProps(), ViewProperties.BEETL_PREFIX,
+                ViewProperties.BEETL_PREFIX_DEFAULT);
+        this.suffix = ViewProperties.resolve(webContext.getProps(), ViewProperties.BEETL_SUFFIX,
+                ViewProperties.BEETL_SUFFIX_DEFAULT);
         this.encoding = ViewProperties.VIEW_ENCODING_DEFAULT;
-        this.enabled = ViewProperties.resolveBoolean(webContext.getProps(),
-                ViewProperties.BEETL_ENABLED, ViewProperties.BEETL_ENABLED_DEFAULT);
+        this.enabled = ViewProperties.resolveBoolean(webContext.getProps(), ViewProperties.BEETL_ENABLED,
+                ViewProperties.BEETL_ENABLED_DEFAULT);
         initEngine(webContext);
     }
 
@@ -50,8 +50,8 @@ public class BeetlViewResolver extends BaseWebComponent implements ViewResolver 
             conf.setDirectByteOutput(true);
             conf.setHtmlTagSupport(true);
             // spring.beetl.cache=false → 使用 NoCache 禁用模板缓存（默认实现为进程内缓存）
-            boolean cache = ViewProperties.resolveBoolean(webContext.getProps(),
-                    ViewProperties.BEETL_CACHE, ViewProperties.BEETL_CACHE_DEFAULT);
+            boolean cache = ViewProperties.resolveBoolean(webContext.getProps(), ViewProperties.BEETL_CACHE,
+                    ViewProperties.BEETL_CACHE_DEFAULT);
             if (!cache) {
                 conf.setCacheClass(NO_CACHE_CLASS);
             }
@@ -93,10 +93,12 @@ public class BeetlViewResolver extends BaseWebComponent implements ViewResolver 
         }
 
         @Override
-        public void render(Map<String, ?> model, WebServerHttpRequest req, WebServerHttpResponse resp) throws Exception {
+        public void render(Map<String, ?> model, WebServerHttpRequest req, WebServerHttpResponse resp)
+                throws Exception {
             Template template = groupTemplate.getTemplate(templatePath);
             template.binding(model);
-            Charset charset = resp.getCharacterEncoding() != null ? resp.getCharacterEncoding() : Charset.forName(encoding);
+            Charset charset = resp.getCharacterEncoding() != null ? resp.getCharacterEncoding()
+                    : Charset.forName(encoding);
             try (Writer writer = new OutputStreamWriter(resp.getBody(), charset)) {
                 template.renderTo(writer);
                 writer.flush();

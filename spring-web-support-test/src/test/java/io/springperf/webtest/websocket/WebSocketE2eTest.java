@@ -40,9 +40,7 @@ class WebSocketE2eTest extends BaseE2ETest {
         CountDownLatch latch = new CountDownLatch(1);
         AtomicReference<String> received = new AtomicReference<>();
 
-        wsClient = new OkHttpClient.Builder()
-                .readTimeout(5, TimeUnit.SECONDS)
-                .build();
+        wsClient = new OkHttpClient.Builder().readTimeout(5, TimeUnit.SECONDS).build();
         Request request = new Request.Builder().url(wsUrl("/ws/echo")).build();
         webSocket = wsClient.newWebSocket(request, new WebSocketListener() {
             @Override
@@ -71,9 +69,7 @@ class WebSocketE2eTest extends BaseE2ETest {
         CountDownLatch closeLatch = new CountDownLatch(1);
         AtomicReference<Integer> closeCode = new AtomicReference<>();
 
-        wsClient = new OkHttpClient.Builder()
-                .readTimeout(5, TimeUnit.SECONDS)
-                .build();
+        wsClient = new OkHttpClient.Builder().readTimeout(5, TimeUnit.SECONDS).build();
         Request request = new Request.Builder().url(wsUrl("/ws/echo")).build();
         webSocket = wsClient.newWebSocket(request, new WebSocketListener() {
             @Override
@@ -102,9 +98,7 @@ class WebSocketE2eTest extends BaseE2ETest {
         CountDownLatch latch = new CountDownLatch(3);
         java.util.List<String> received = new java.util.concurrent.CopyOnWriteArrayList<>();
 
-        wsClient = new OkHttpClient.Builder()
-                .readTimeout(5, TimeUnit.SECONDS)
-                .build();
+        wsClient = new OkHttpClient.Builder().readTimeout(5, TimeUnit.SECONDS).build();
         Request request = new Request.Builder().url(wsUrl("/ws/echo")).build();
         webSocket = wsClient.newWebSocket(request, new WebSocketListener() {
             @Override
@@ -122,7 +116,8 @@ class WebSocketE2eTest extends BaseE2ETest {
 
             @Override
             public void onFailure(@NotNull WebSocket ws, @NotNull Throwable t, Response response) {
-                while (latch.getCount() > 0) latch.countDown();
+                while (latch.getCount() > 0)
+                    latch.countDown();
             }
         });
 
@@ -134,11 +129,9 @@ class WebSocketE2eTest extends BaseE2ETest {
     // ========= 新增高价值测试用例 =========
 
     /**
-     * 验证二进制消息的编解码和回显。
-     * 覆盖 {@code NettyWebSocketSession.toFrame()} 的 BinaryWebSocketFrame 分支
-     * 和 {@code WebSocketRoutingHandler.handleWebSocketFrame()} 的 BinaryWebSocketFrame 分支。
-     *
-     * 价值：二进制帧处理是完全独立的代码路径，Text/Binary 共享逻辑极少，无覆盖则二进制帧可能完全不可用。
+     * 验证二进制消息的编解码和回显。 覆盖 {@code NettyWebSocketSession.toFrame()} 的 BinaryWebSocketFrame 分支 和
+     * {@code WebSocketRoutingHandler.handleWebSocketFrame()} 的 BinaryWebSocketFrame 分支。 价值：二进制帧处理是完全独立的代码路径，Text/Binary
+     * 共享逻辑极少，无覆盖则二进制帧可能完全不可用。
      */
     @Test
     void sendBinary_receivesBinaryEcho() throws Exception {
@@ -146,9 +139,7 @@ class WebSocketE2eTest extends BaseE2ETest {
         AtomicReference<ByteString> received = new AtomicReference<>();
         byte[] payload = "binary-data-你好".getBytes(StandardCharsets.UTF_8);
 
-        wsClient = new OkHttpClient.Builder()
-                .readTimeout(5, TimeUnit.SECONDS)
-                .build();
+        wsClient = new OkHttpClient.Builder().readTimeout(5, TimeUnit.SECONDS).build();
         Request request = new Request.Builder().url(wsUrl("/ws/echo")).build();
         webSocket = wsClient.newWebSocket(request, new WebSocketListener() {
             @Override
@@ -173,20 +164,15 @@ class WebSocketE2eTest extends BaseE2ETest {
     }
 
     /**
-     * 验证路径变量被正确提取并注入 session attributes。
-     * 覆盖 {@code WebSocketRoutingHandler.resolveHandler()} 的 matchAndExtract 路径
-     * 和 {@code afterHandshakeSuccess()} 的 attributes.putAll 路径。
-     *
-     * 价值：P1.1 新功能，路由层与业务层的数据传递通道，断裂会导致路径变量完全不可用。
+     * 验证路径变量被正确提取并注入 session attributes。 覆盖 {@code WebSocketRoutingHandler.resolveHandler()} 的 matchAndExtract 路径 和
+     * {@code afterHandshakeSuccess()} 的 attributes.putAll 路径。 价值：P1.1 新功能，路由层与业务层的数据传递通道，断裂会导致路径变量完全不可用。
      */
     @Test
     void pathVariable_roomIdInjected() throws Exception {
         CountDownLatch latch = new CountDownLatch(1);
         AtomicReference<String> received = new AtomicReference<>();
 
-        wsClient = new OkHttpClient.Builder()
-                .readTimeout(5, TimeUnit.SECONDS)
-                .build();
+        wsClient = new OkHttpClient.Builder().readTimeout(5, TimeUnit.SECONDS).build();
         Request request = new Request.Builder().url(wsUrl("/ws/room/myroom123")).build();
         webSocket = wsClient.newWebSocket(request, new WebSocketListener() {
             @Override
@@ -211,19 +197,14 @@ class WebSocketE2eTest extends BaseE2ETest {
     }
 
     /**
-     * 验证未注册路径的 WebSocket 升级请求被拒绝（不崩溃、不 hang）。
-     * 覆盖 WebSocket 路由未命中时的行为。
-     *
-     * 价值：路由缺失导致连接 hang（超时 5s 才暴露）比直接拒绝更有害，需确保拒绝路径正常工作。
+     * 验证未注册路径的 WebSocket 升级请求被拒绝（不崩溃、不 hang）。 覆盖 WebSocket 路由未命中时的行为。 价值：路由缺失导致连接 hang（超时 5s 才暴露）比直接拒绝更有害，需确保拒绝路径正常工作。
      */
     @Test
     void connectToInvalidPath_connectionFails() throws Exception {
         CountDownLatch latch = new CountDownLatch(1);
         AtomicReference<Boolean> failed = new AtomicReference<>(false);
 
-        wsClient = new OkHttpClient.Builder()
-                .readTimeout(3, TimeUnit.SECONDS)
-                .build();
+        wsClient = new OkHttpClient.Builder().readTimeout(3, TimeUnit.SECONDS).build();
         Request request = new Request.Builder().url(wsUrl("/ws/nonexistent")).build();
         webSocket = wsClient.newWebSocket(request, new WebSocketListener() {
             @Override
@@ -243,11 +224,8 @@ class WebSocketE2eTest extends BaseE2ETest {
     }
 
     /**
-     * 验证多线程并发发送时帧不交织、不丢失。
-     * 覆盖 {@code NettyWebSocketSession.sendMessage()} 的 EventLoop 串行化路径。
-     *
-     * 价值：并发发送是 P0 级别的修复，在 OkHttp 的 WebSocket 实现中，
-     * send() 可从任意线程调用。无此测试则 EventLoop 串行化退化不可发现。
+     * 验证多线程并发发送时帧不交织、不丢失。 覆盖 {@code NettyWebSocketSession.sendMessage()} 的 EventLoop 串行化路径。 价值：并发发送是 P0 级别的修复，在 OkHttp
+     * 的 WebSocket 实现中， send() 可从任意线程调用。无此测试则 EventLoop 串行化退化不可发现。
      */
     @Test
     void concurrentSends_allMessagesDelivered() throws Exception {
@@ -257,9 +235,7 @@ class WebSocketE2eTest extends BaseE2ETest {
         CountDownLatch latch = new CountDownLatch(totalMessages);
         java.util.List<String> received = new java.util.concurrent.CopyOnWriteArrayList<>();
 
-        wsClient = new OkHttpClient.Builder()
-                .readTimeout(10, TimeUnit.SECONDS)
-                .build();
+        wsClient = new OkHttpClient.Builder().readTimeout(10, TimeUnit.SECONDS).build();
         Request request = new Request.Builder().url(wsUrl("/ws/echo")).build();
         CountDownLatch openLatch = new CountDownLatch(1);
 
@@ -277,7 +253,8 @@ class WebSocketE2eTest extends BaseE2ETest {
 
             @Override
             public void onFailure(@NotNull WebSocket ws, @NotNull Throwable t, Response response) {
-                while (latch.getCount() > 0) latch.countDown();
+                while (latch.getCount() > 0)
+                    latch.countDown();
             }
         });
 
@@ -296,7 +273,8 @@ class WebSocketE2eTest extends BaseE2ETest {
         executor.shutdown();
         executor.awaitTermination(10, TimeUnit.SECONDS);
 
-        assertTrue(latch.await(15, TimeUnit.SECONDS), "timeout waiting for " + totalMessages + " messages, got " + received.size());
+        assertTrue(latch.await(15, TimeUnit.SECONDS),
+                "timeout waiting for " + totalMessages + " messages, got " + received.size());
         assertEquals(totalMessages, received.size(), "all messages should be delivered");
 
         // 验证每个消息都有对应的回显
@@ -309,10 +287,8 @@ class WebSocketE2eTest extends BaseE2ETest {
     }
 
     /**
-     * 验证多个独立连接互不干扰。
-     *
-     * 价值：WebSocketRoutingHandler 是 @ChannelHandler.Sharable，所有连接共享同一个
-     * handler 实例。若 handler 错误地使用了实例状态而非连接状态，多连接会互相污染。
+     * 验证多个独立连接互不干扰。 价值：WebSocketRoutingHandler 是 @ChannelHandler.Sharable，所有连接共享同一个 handler 实例。若 handler
+     * 错误地使用了实例状态而非连接状态，多连接会互相污染。
      */
     @Test
     void concurrentConnections_isolation() throws Exception {
@@ -322,9 +298,7 @@ class WebSocketE2eTest extends BaseE2ETest {
 
         for (int i = 0; i < connectionCount; i++) {
             int connId = i;
-            OkHttpClient client = new OkHttpClient.Builder()
-                    .readTimeout(5, TimeUnit.SECONDS)
-                    .build();
+            OkHttpClient client = new OkHttpClient.Builder().readTimeout(5, TimeUnit.SECONDS).build();
             Request request = new Request.Builder().url(wsUrl("/ws/echo")).build();
             client.newWebSocket(request, new WebSocketListener() {
                 @Override
@@ -335,8 +309,7 @@ class WebSocketE2eTest extends BaseE2ETest {
                 @Override
                 public void onMessage(@NotNull WebSocket ws, @NotNull String text) {
                     try {
-                        assertEquals("conn" + connId, text,
-                                "connection " + connId + " received wrong echo");
+                        assertEquals("conn" + connId, text, "connection " + connId + " received wrong echo");
                     } catch (Throwable t) {
                         errors.add(t);
                     }
@@ -362,10 +335,8 @@ class WebSocketE2eTest extends BaseE2ETest {
     }
 
     /**
-     * 验证同一连接上混合发送文本和二进制消息，两种类型均能正确回显。
-     * 覆盖帧类型分发逻辑确保 Text/Binary 不走错分支。
-     *
-     * 价值：帧类型区分是 WebSocket 协议的基本能力，混合使用场景能暴露 instanceof 分支错误。
+     * 验证同一连接上混合发送文本和二进制消息，两种类型均能正确回显。 覆盖帧类型分发逻辑确保 Text/Binary 不走错分支。 价值：帧类型区分是 WebSocket 协议的基本能力，混合使用场景能暴露 instanceof
+     * 分支错误。
      */
     @Test
     void binaryAndTextMixed_bothReceived() throws Exception {
@@ -373,9 +344,7 @@ class WebSocketE2eTest extends BaseE2ETest {
         AtomicReference<String> textReceived = new AtomicReference<>();
         AtomicReference<ByteString> binaryReceived = new AtomicReference<>();
 
-        wsClient = new OkHttpClient.Builder()
-                .readTimeout(5, TimeUnit.SECONDS)
-                .build();
+        wsClient = new OkHttpClient.Builder().readTimeout(5, TimeUnit.SECONDS).build();
         Request request = new Request.Builder().url(wsUrl("/ws/echo")).build();
         byte[] binaryPayload = "bin".getBytes(StandardCharsets.UTF_8);
 
@@ -400,7 +369,8 @@ class WebSocketE2eTest extends BaseE2ETest {
 
             @Override
             public void onFailure(@NotNull WebSocket ws, @NotNull Throwable t, Response response) {
-                while (latch.getCount() > 0) latch.countDown();
+                while (latch.getCount() > 0)
+                    latch.countDown();
             }
         });
 

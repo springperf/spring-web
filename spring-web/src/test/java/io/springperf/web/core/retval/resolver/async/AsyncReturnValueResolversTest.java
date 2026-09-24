@@ -1,8 +1,14 @@
 package io.springperf.web.core.retval.resolver.async;
 
-import io.springperf.web.core.async.AsyncSupportRegistry;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.mockito.Mockito.*;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -11,14 +17,9 @@ import org.springframework.core.MethodParameter;
 import org.springframework.web.context.request.async.DeferredResult;
 import org.springframework.web.context.request.async.WebAsyncTask;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
-import static org.mockito.Mockito.*;
+import io.springperf.web.core.async.AsyncSupportRegistry;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 class AsyncReturnValueResolversTest {
@@ -157,7 +158,8 @@ class AsyncReturnValueResolversTest {
 
         r.resolveReturnValue(future, null, request, response);
 
-        verify(asyncSupportRegistry).startDeferredResultProcessing(eq(request), eq(response), any(DeferredResult.class));
+        verify(asyncSupportRegistry).startDeferredResultProcessing(eq(request), eq(response),
+                any(DeferredResult.class));
     }
 
     @Test
@@ -221,7 +223,8 @@ class AsyncReturnValueResolversTest {
 
         r.resolveReturnValue(future, null, request, response);
 
-        verify(asyncSupportRegistry).startDeferredResultProcessing(eq(request), eq(response), any(DeferredResult.class));
+        verify(asyncSupportRegistry).startDeferredResultProcessing(eq(request), eq(response),
+                any(DeferredResult.class));
     }
 
     // ==================== parameter helpers ====================
@@ -236,15 +239,26 @@ class AsyncReturnValueResolversTest {
     }
 
     @SuppressWarnings("unused")
-    public void deferredResultParam(DeferredResult<?> d) {}
+    public void deferredResultParam(DeferredResult<?> d) {
+    }
+
     @SuppressWarnings("unused")
-    public void webAsyncTaskParam(WebAsyncTask<?> t) {}
+    public void webAsyncTaskParam(WebAsyncTask<?> t) {
+    }
+
     @SuppressWarnings("unused")
-    public void callableParam(Callable<?> c) {}
+    public void callableParam(Callable<?> c) {
+    }
+
     @SuppressWarnings("unused")
-    public void listenableFutureParam(Object f) {}
+    public void listenableFutureParam(Object f) {
+    }
+
     @SuppressWarnings("unused")
-    public void completionStageParam(CompletableFuture<?> f) {}
+    public void completionStageParam(CompletableFuture<?> f) {
+    }
+
     @SuppressWarnings("unused")
-    public void stringParam(String s) {}
+    public void stringParam(String s) {
+    }
 }

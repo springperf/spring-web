@@ -18,9 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 回归：{@code discoverAllData} 遇到空文件 / 截断 JSON（fork 失败残留）时，
- * 修复前 {@code MAPPER.readTree} 抛 {@code IOException} 一路冒泡到 {@code main}，
- * 导致整个报告生成崩溃；修复后应跳过并告警，正常文件照常解析。
+ * 回归：{@code discoverAllData} 遇到空文件 / 截断 JSON（fork 失败残留）时， 修复前 {@code MAPPER.readTree} 抛 {@code IOException} 一路冒泡到
+ * {@code main}， 导致整个报告生成崩溃；修复后应跳过并告警，正常文件照常解析。
  */
 class ReportGeneratorTest {
 
@@ -50,9 +49,8 @@ class ReportGeneratorTest {
     }
 
     /**
-     * 回归 P2（diff 专项）：期望容器中整容器缺失时，主表格必须渲染该 profile 的 FAIL 列，
-     * 与摘要分母（effectiveProfiles）一致。修复前表格只用实际发现的 profiles 作列，
-     * 缺失 profile 无列 → 表格 FAIL 格数 ≠ 摘要 effectiveFail，两者自相矛盾。
+     * 回归 P2（diff 专项）：期望容器中整容器缺失时，主表格必须渲染该 profile 的 FAIL 列， 与摘要分母（effectiveProfiles）一致。修复前表格只用实际发现的 profiles 作列， 缺失
+     * profile 无列 → 表格 FAIL 格数 ≠ 摘要 effectiveFail，两者自相矛盾。
      */
     @Test
     void generateReport_tableRendersFailRow_forMissingProfile() throws Exception {
@@ -78,10 +76,8 @@ class ReportGeneratorTest {
     }
 
     /**
-     * 回归 P2（diff 专项）：多线程伸缩性报告期望容器整容器缺失时，主表格必须渲染
-     * 该容器的 FAIL 行，与摘要的缺失统计自洽。修复前 generateScalabilityReport 仅遍历
-     * 实际发现的 profiles，缺失容器既无表格行也不标 FAIL，摘要却报缺失 → 自相矛盾
-     * （对齐单线程 generateReport 的 tableProfiles 修法）。
+     * 回归 P2（diff 专项）：多线程伸缩性报告期望容器整容器缺失时，主表格必须渲染 该容器的 FAIL 行，与摘要的缺失统计自洽。修复前 generateScalabilityReport 仅遍历 实际发现的
+     * profiles，缺失容器既无表格行也不标 FAIL，摘要却报缺失 → 自相矛盾 （对齐单线程 generateReport 的 tableProfiles 修法）。
      */
     @Test
     void generateScalabilityReport_tableRendersFailRow_forMissingProfile() throws Exception {
@@ -99,28 +95,28 @@ class ReportGeneratorTest {
         // 期望容器含 undertow（整容器缺失）
         List<String> expectedProfiles = Arrays.asList("perf", "tomcat", "undertow");
 
-        String report = invokeGenerateScalabilityReport(tempDir,
-                Collections.singletonList(threads1), "mode=thrpt", expectedProfiles);
+        String report = invokeGenerateScalabilityReport(tempDir, Collections.singletonList(threads1), "mode=thrpt",
+                expectedProfiles);
 
         // 摘要：报告 3 个容器且缺失 1 个
         assertTrue(report.contains("缺失 1 个"), "摘要应声明缺失容器数");
         assertTrue(report.contains("⚠️ 缺失容器:"), "摘要应列出缺失容器");
         // 表格：缺失容器 undertow 必须渲染 FAIL 行（修复前无 undertow 行）
-        assertTrue(report.contains("| undertow | 17 | FAIL |"),
-                "并发伸缩性表格应渲染缺失容器的 FAIL 行");
+        assertTrue(report.contains("| undertow | 17 | FAIL |"), "并发伸缩性表格应渲染缺失容器的 FAIL 行");
         // 已发现容器仍渲染数值
         assertTrue(report.contains("| perf | 17 | 1234 |"), "已发现容器应正常渲染");
     }
 
     private static String invokeGenerateScalabilityReport(Path runDir, List<Path> threadDirs, String runMeta,
-                                                          List<String> expectedProfiles) throws Exception {
-        Method m = ReportGenerator.class.getDeclaredMethod("generateScalabilityReport",
-                Path.class, List.class, String.class, List.class);
+            List<String> expectedProfiles) throws Exception {
+        Method m = ReportGenerator.class.getDeclaredMethod("generateScalabilityReport", Path.class, List.class,
+                String.class, List.class);
         m.setAccessible(true);
         return (String) m.invoke(null, runDir, threadDirs, runMeta, expectedProfiles);
     }
 
-    private static String invokeGenerateReport(Path jdkDir, String runMeta, List<String> expectedProfiles) throws Exception {
+    private static String invokeGenerateReport(Path jdkDir, String runMeta, List<String> expectedProfiles)
+            throws Exception {
         Method m = ReportGenerator.class.getDeclaredMethod("generateReport", Path.class, String.class, List.class);
         m.setAccessible(true);
         return (String) m.invoke(null, jdkDir, runMeta, expectedProfiles);
@@ -128,7 +124,8 @@ class ReportGeneratorTest {
 
     private static String summaryLine(String report) {
         for (String line : report.split("\n")) {
-            if (line.contains("总计")) return line;
+            if (line.contains("总计"))
+                return line;
         }
         return "(摘要行未找到)";
     }

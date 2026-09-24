@@ -30,11 +30,14 @@ class ThymeleafViewResolverTest {
     @BeforeEach
     void setUp() {
         props = mock(ApplicationProperties.class);
-        when(props.get(ViewProperties.THYMELEAF_PREFIX, ViewProperties.THYMELEAF_PREFIX_DEFAULT)).thenReturn("templates/");
+        when(props.get(ViewProperties.THYMELEAF_PREFIX, ViewProperties.THYMELEAF_PREFIX_DEFAULT))
+                .thenReturn("templates/");
         when(props.get(ViewProperties.THYMELEAF_SUFFIX, ViewProperties.THYMELEAF_SUFFIX_DEFAULT)).thenReturn(".html");
         when(props.getBoolean(ViewProperties.THYMELEAF_CACHE, ViewProperties.THYMELEAF_CACHE_DEFAULT)).thenReturn(true);
-        when(props.getBoolean(ViewProperties.THYMELEAF_ENABLED, ViewProperties.THYMELEAF_ENABLED_DEFAULT)).thenReturn(true);
-        when(props.get(ViewProperties.THYMELEAF_ENCODING, ViewProperties.THYMELEAF_ENCODING_DEFAULT)).thenReturn("UTF-8");
+        when(props.getBoolean(ViewProperties.THYMELEAF_ENABLED, ViewProperties.THYMELEAF_ENABLED_DEFAULT))
+                .thenReturn(true);
+        when(props.get(ViewProperties.THYMELEAF_ENCODING, ViewProperties.THYMELEAF_ENCODING_DEFAULT))
+                .thenReturn("UTF-8");
         webContext = mock(WebContext.class);
         when(webContext.getProps()).thenReturn(props);
     }
@@ -88,8 +91,7 @@ class ThymeleafViewResolverTest {
         resolver.initWithWebContext(webContext);
 
         // getWebComponentWithDefault 被调用于注册默认 provider
-        verify(webContext).getWebComponentWithDefault(
-                eq(io.springperf.web.view.WebExchangeProvider.class),
+        verify(webContext).getWebComponentWithDefault(eq(io.springperf.web.view.WebExchangeProvider.class),
                 any(io.springperf.web.view.DefaultWebExchangeProvider.class));
         // 随后取全量 provider 列表
         verify(webContext).getWebComponents(io.springperf.web.view.WebExchangeProvider.class);

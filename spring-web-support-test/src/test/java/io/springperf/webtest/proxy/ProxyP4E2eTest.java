@@ -13,26 +13,18 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * P4 E2E 测试：produces/consumes 正条件、@CrossOrigin、DeferredResult、
- * {@code @ResponseStatus} 异常、@CookieValue、三级类继承、多 Filter 排序。
+ * P4 E2E 测试：produces/consumes 正条件、@CrossOrigin、DeferredResult、 {@code @ResponseStatus} 异常、@CookieValue、三级类继承、多 Filter
+ * 排序。
  * <p>
  * 与 ProxyE2eTest 共享 Spring 上下文（端口 9092）。
  */
-@SpringBootTest(
-        classes = ProxyE2eApp.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/api",
-                "proxy.placeholder.path=/proxy/placeholder-resolved"
-        })
+@SpringBootTest(classes = ProxyE2eApp.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+        "server.servlet.context-path=/api", "proxy.placeholder.path=/proxy/placeholder-resolved" })
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class ProxyP4E2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .writeTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).writeTimeout(Duration.ofSeconds(10)).build();
 
     private static final MediaType JSON_TYPE = MediaType.parse("application/json; charset=utf-8");
     private static final MediaType XML_TYPE = MediaType.parse("application/xml; charset=utf-8");
@@ -40,13 +32,13 @@ public class ProxyP4E2eTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-
     @LocalServerPort
     private int serverPort;
 
     private String url(String path) {
         return "http://localhost:" + serverPort + path;
     }
+
     private String baseUrl() {
         return url("/api");
     }
@@ -55,11 +47,8 @@ public class ProxyP4E2eTest {
 
     @Test
     void producesJson_withAcceptJson_returns200() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/proxy-p4/json-only")
-                .header("Accept", "application/json")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/proxy-p4/json-only").header("Accept", "application/json")
+                .get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = MAPPER.readValue(resp.body().string(), Map.class);
@@ -70,10 +59,7 @@ public class ProxyP4E2eTest {
     @Test
     void producesJson_withAcceptXml_returns406() throws Exception {
         // produces = "application/json" 不匹配 Accept: text/xml → 406（对齐 Spring MVC）
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/proxy-p4/json-only")
-                .header("Accept", "text/xml")
-                .get()
+        Request req = new Request.Builder().url(baseUrl() + "/proxy-p4/json-only").header("Accept", "text/xml").get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(406, resp.code());
@@ -84,10 +70,8 @@ public class ProxyP4E2eTest {
 
     @Test
     void consumesJson_withJsonContentType_returns200() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/proxy-p4/consume-json")
-                .post(RequestBody.create("{\"key\":\"val\"}", JSON_TYPE))
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/proxy-p4/consume-json")
+                .post(RequestBody.create("{\"key\":\"val\"}", JSON_TYPE)).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String raw = resp.body().string();
@@ -99,10 +83,8 @@ public class ProxyP4E2eTest {
     @Test
     void consumesJson_withTextContentType_returns415() throws Exception {
         // consumes = "application/json" 不匹配 Content-Type: text/plain → 415（对齐 Spring MVC）
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/proxy-p4/consume-json")
-                .post(RequestBody.create("hello", TEXT_TYPE))
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/proxy-p4/consume-json")
+                .post(RequestBody.create("hello", TEXT_TYPE)).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(415, resp.code());
         }
@@ -112,11 +94,8 @@ public class ProxyP4E2eTest {
 
     @Test
     void cors_withMatchingOrigin_returnsAllowOriginHeader() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/proxy-p4/cors")
-                .header("Origin", "https://example.com")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/proxy-p4/cors").header("Origin", "https://example.com")
+                .get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String allowOrigin = resp.header("Access-Control-Allow-Origin");
@@ -129,10 +108,7 @@ public class ProxyP4E2eTest {
 
     @Test
     void asyncDeferredResult_returnsDone() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/proxy-p4/async")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/proxy-p4/async").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String raw = resp.body().string();
@@ -145,13 +121,9 @@ public class ProxyP4E2eTest {
 
     @Test
     void blockedResource_returns429() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/proxy-p4/blocked-resource")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/proxy-p4/blocked-resource").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            assertEquals(429, resp.code(),
-                    "@ResponseStatus(HttpStatus.TOO_MANY_REQUESTS) should map to 429");
+            assertEquals(429, resp.code(), "@ResponseStatus(HttpStatus.TOO_MANY_REQUESTS) should map to 429");
         }
     }
 
@@ -162,10 +134,7 @@ public class ProxyP4E2eTest {
         // GrandchildController extends ChildController extends ParentController
         // 类级 @RequestMapping("/proxy-parent") 通过 AnnotatedElementUtils 三级继承
         // GrandchildController 的 /grandchild-status 应注册为 /proxy-parent/grandchild-status
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/proxy-parent/grandchild-status")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/proxy-parent/grandchild-status").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             assertEquals("grandchild-ok", resp.body().string());
@@ -176,20 +145,15 @@ public class ProxyP4E2eTest {
 
     @Test
     void filters_executedInOrder_returnsBothFilterHeaders() throws Exception {
-        // ProxyTestFilter  @Order(1)  → 添加 X-Test-Filter
-        // ProxyTestFilter2 @Order(2)  → 添加 X-Test-Filter2
+        // ProxyTestFilter @Order(1) → 添加 X-Test-Filter
+        // ProxyTestFilter2 @Order(2) → 添加 X-Test-Filter2
         // BlockingProxyFilter @Order(20) → 仅阻断特定路径
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/proxy-p4/json-only")
-                .header("Accept", "application/json")
-                .get()
-                .build();
+        Request req = new Request.Builder().url(baseUrl() + "/proxy-p4/json-only").header("Accept", "application/json")
+                .get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
-            assertEquals("executed", resp.header("X-Test-Filter"),
-                    "Filter @Order(1) should be executed");
-            assertEquals("executed", resp.header("X-Test-Filter2"),
-                    "Filter @Order(2) should be executed");
+            assertEquals("executed", resp.header("X-Test-Filter"), "Filter @Order(1) should be executed");
+            assertEquals("executed", resp.header("X-Test-Filter2"), "Filter @Order(2) should be executed");
         }
     }
 }

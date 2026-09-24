@@ -19,20 +19,15 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>
  * 测试目标：
  * <ul>
- *   <li>{@code @ResponseStatus} 在代理方法上能被 {@code AnnotatedElementUtils.findMergedAnnotation} 解析</li>
- *   <li>{@code @PathVariable} / {@code @RequestParam} / {@code @RequestBody} 参数注解在代理下正常暴露</li>
+ * <li>{@code @ResponseStatus} 在代理方法上能被 {@code AnnotatedElementUtils.findMergedAnnotation} 解析</li>
+ * <li>{@code @PathVariable} / {@code @RequestParam} / {@code @RequestBody} 参数注解在代理下正常暴露</li>
  * </ul>
  *
  * @see OpenApiAdapter
  * @see OpenApiProxyController
  */
-@SpringBootTest(
-        classes = ProxyE2eApp.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/api",
-                "proxy.placeholder.path=/proxy/placeholder-resolved"
-        })
+@SpringBootTest(classes = ProxyE2eApp.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+        "server.servlet.context-path=/api", "proxy.placeholder.path=/proxy/placeholder-resolved" })
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class OpenApiProxyE2eTest {
 
@@ -52,8 +47,7 @@ public class OpenApiProxyE2eTest {
 
     @Test
     void openApiCustomizerBean_exists() {
-        assertNotNull(openApiCustomizer,
-                "OpenApiCustomizer should be available in proxy test context");
+        assertNotNull(openApiCustomizer, "OpenApiCustomizer should be available in proxy test context");
     }
 
     // ============ 路径覆盖 ============
@@ -66,14 +60,10 @@ public class OpenApiProxyE2eTest {
         assertNotNull(paths);
         assertFalse(paths.isEmpty());
 
-        assertTrue(paths.containsKey("/openapi-proxy/create/{id}"),
-                "missing /openapi-proxy/create/{id}");
-        assertTrue(paths.containsKey("/openapi-proxy/update/{id}"),
-                "missing /openapi-proxy/update/{id}");
-        assertTrue(paths.containsKey("/openapi-proxy/query"),
-                "missing /openapi-proxy/query");
-        assertTrue(paths.containsKey("/openapi-proxy/delete/{id}"),
-                "missing /openapi-proxy/delete/{id}");
+        assertTrue(paths.containsKey("/openapi-proxy/create/{id}"), "missing /openapi-proxy/create/{id}");
+        assertTrue(paths.containsKey("/openapi-proxy/update/{id}"), "missing /openapi-proxy/update/{id}");
+        assertTrue(paths.containsKey("/openapi-proxy/query"), "missing /openapi-proxy/query");
+        assertTrue(paths.containsKey("/openapi-proxy/delete/{id}"), "missing /openapi-proxy/delete/{id}");
     }
 
     // ============ @ResponseStatus 状态码 ============

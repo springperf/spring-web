@@ -44,16 +44,13 @@ public class LogErrorFilter extends OncePerRequestFilter {
                 log.error("Failed to write error response", writeEx);
             }
         } finally {
-            log.info("requestURI:{},  cost:{}ms", requestURI , System.currentTimeMillis() - start);
+            log.info("requestURI:{},  cost:{}ms", requestURI, System.currentTimeMillis() - start);
         }
     }
 
     private String buildErrorBody(HttpServletRequest request, Throwable ex) {
-        return "{"
-                + "\"code\":500,"
-                + "\"message\":\"Internal Server Error\","
-                + "\"path\":\"" + request.getRequestURI() + "\""
-                + "}";
+        return "{" + "\"code\":500," + "\"message\":\"Internal Server Error\"," + "\"path\":\""
+                + request.getRequestURI() + "\"" + "}";
     }
 
     private void safelyReset(HttpServletResponse response) {
@@ -68,8 +65,8 @@ public class LogErrorFilter extends OncePerRequestFilter {
         Throwable t = ex;
         while (t != null) {
             String name = t.getClass().getName();
-            if ("org.apache.catalina.connector.ClientAbortException".equals(name)
-                    || t instanceof java.io.EOFException || t instanceof java.net.SocketException) {
+            if ("org.apache.catalina.connector.ClientAbortException".equals(name) || t instanceof java.io.EOFException
+                    || t instanceof java.net.SocketException) {
                 return true;
             }
             t = t.getCause();

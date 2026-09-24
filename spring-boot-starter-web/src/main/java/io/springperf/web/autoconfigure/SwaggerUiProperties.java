@@ -4,8 +4,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * Configuration properties for Swagger UI auto-configuration.
- *
- * <p>Prefix: {@code springperf.swagger-ui}</p>
+ * <p>
+ * Prefix: {@code springperf.swagger-ui}
+ * </p>
  */
 @ConfigurationProperties(prefix = "springperf.swagger-ui")
 public class SwaggerUiProperties {

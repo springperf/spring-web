@@ -11,7 +11,6 @@ public class P0TestConfig {
     @Bean
     public InterceptorRegistration p0ReturnFalseInterceptorRegistration() {
         return new InterceptorRegistration(new P0ReturnFalseInterceptor())
-                .addPathPatterns("/p0/interceptor-return-false")
-                .order(300);
+                .addPathPatterns("/p0/interceptor-return-false").order(300);
     }
 }

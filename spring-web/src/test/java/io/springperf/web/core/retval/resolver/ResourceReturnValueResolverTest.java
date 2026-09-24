@@ -1,6 +1,13 @@
 package io.springperf.web.core.retval.resolver;
 
-import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.*;
+
+import java.io.File;
+import java.io.InputStream;
+import java.lang.reflect.Method;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -9,13 +16,7 @@ import org.springframework.core.MethodParameter;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 
-import java.io.File;
-import java.io.InputStream;
-import java.lang.reflect.Method;
-
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.*;
+import io.springperf.web.http.WebServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 class ResourceReturnValueResolverTest {
@@ -76,7 +77,12 @@ class ResourceReturnValueResolverTest {
     }
 
     @SuppressWarnings("unused")
-    public Resource resourceReturn() { return null; }
+    public Resource resourceReturn() {
+        return null;
+    }
+
     @SuppressWarnings("unused")
-    public String stringReturn() { return null; }
+    public String stringReturn() {
+        return null;
+    }
 }

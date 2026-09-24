@@ -1,12 +1,13 @@
 package io.springperf.web.util;
 
-import io.springperf.web.util.support.ContainmentResult;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.Arrays;
 import java.util.Collections;
 
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
+
+import io.springperf.web.util.support.ContainmentResult;
 
 class PathPatternUtilsTest {
 
@@ -37,81 +38,68 @@ class PathPatternUtilsTest {
 
     @Test
     void patternContains_literalExactMatch_returnsAlways() {
-        assertEquals(ContainmentResult.ALWAYS,
-                PathPatternUtils.patternContains("/api/users", "/api/users"));
+        assertEquals(ContainmentResult.ALWAYS, PathPatternUtils.patternContains("/api/users", "/api/users"));
     }
 
     @Test
     void patternContains_literalMismatch_returnsNever() {
-        assertEquals(ContainmentResult.NEVER,
-                PathPatternUtils.patternContains("/api/users", "/api/admin"));
+        assertEquals(ContainmentResult.NEVER, PathPatternUtils.patternContains("/api/users", "/api/admin"));
     }
 
     @Test
     void patternContains_literalShorterContainer_returnsNever() {
-        assertEquals(ContainmentResult.NEVER,
-                PathPatternUtils.patternContains("/api", "/api/users"));
+        assertEquals(ContainmentResult.NEVER, PathPatternUtils.patternContains("/api", "/api/users"));
     }
 
     @Test
     void patternContains_singleWildcardMatches_returnsAlways() {
-        assertEquals(ContainmentResult.ALWAYS,
-                PathPatternUtils.patternContains("/*/user", "/any/user"));
+        assertEquals(ContainmentResult.ALWAYS, PathPatternUtils.patternContains("/*/user", "/any/user"));
     }
 
     @Test
     void patternContains_singleWildcardMismatchLength_returnsNever() {
-        assertEquals(ContainmentResult.NEVER,
-                PathPatternUtils.patternContains("/*/user", "/a/b/user"));
+        assertEquals(ContainmentResult.NEVER, PathPatternUtils.patternContains("/*/user", "/a/b/user"));
     }
 
     @Test
     void patternContains_multiWildcardMatchesSuffix_returnsAlways() {
-        assertEquals(ContainmentResult.ALWAYS,
-                PathPatternUtils.patternContains("/test/**", "/test/123/456"));
+        assertEquals(ContainmentResult.ALWAYS, PathPatternUtils.patternContains("/test/**", "/test/123/456"));
     }
 
     @Test
     void patternContains_multiWildcardMatchesEmpty_returnsAlways() {
-        assertEquals(ContainmentResult.ALWAYS,
-                PathPatternUtils.patternContains("/test/**", "/test"));
+        assertEquals(ContainmentResult.ALWAYS, PathPatternUtils.patternContains("/test/**", "/test"));
     }
 
     @Test
     void patternContains_multiWildcardInMiddle_returnsAlways() {
-        assertEquals(ContainmentResult.ALWAYS,
-                PathPatternUtils.patternContains("/a/**/b", "/a/x/y/b"));
+        assertEquals(ContainmentResult.ALWAYS, PathPatternUtils.patternContains("/a/**/b", "/a/x/y/b"));
     }
 
     @Test
     void patternContains_regexMatchesLiteral_returnsAlways() {
-        assertEquals(ContainmentResult.ALWAYS,
-                PathPatternUtils.patternContains("/api/{id:\\d+}", "/api/123"));
+        assertEquals(ContainmentResult.ALWAYS, PathPatternUtils.patternContains("/api/{id:\\d+}", "/api/123"));
     }
 
     @Test
     void patternContains_regexMismatch_returnsNever() {
-        assertEquals(ContainmentResult.NEVER,
-                PathPatternUtils.patternContains("/api/{id:\\d+}", "/api/abc"));
+        assertEquals(ContainmentResult.NEVER, PathPatternUtils.patternContains("/api/{id:\\d+}", "/api/abc"));
     }
 
     @Test
     void patternContains_regexContainerVsWildcard_returnsRuntime() {
-        assertEquals(ContainmentResult.RUNTIME,
-                PathPatternUtils.patternContains("/{id:\\d+}", "/*"));
+        assertEquals(ContainmentResult.RUNTIME, PathPatternUtils.patternContains("/{id:\\d+}", "/*"));
     }
 
     @Test
     void patternListContains_oneAlways_returnsAlways() {
         assertEquals(ContainmentResult.ALWAYS,
-                PathPatternUtils.patternListContains(
-                        Arrays.asList("/api/**", "/other"), "/api/users"));
+                PathPatternUtils.patternListContains(Arrays.asList("/api/**", "/other"), "/api/users"));
     }
 
     @Test
     void patternListContains_allNever_returnsNever() {
-        assertEquals(ContainmentResult.NEVER,
-                PathPatternUtils.patternListContains(Arrays.asList("/a", "/b"), "/c"));
+        assertEquals(ContainmentResult.NEVER, PathPatternUtils.patternListContains(Arrays.asList("/a", "/b"), "/c"));
     }
 
     @Test
@@ -122,14 +110,12 @@ class PathPatternUtilsTest {
 
     @Test
     void patternContains_questionMarkMatches_returnsAlways() {
-        assertEquals(ContainmentResult.ALWAYS,
-                PathPatternUtils.patternContains("/test/???", "/test/abc"));
+        assertEquals(ContainmentResult.ALWAYS, PathPatternUtils.patternContains("/test/???", "/test/abc"));
     }
 
     @Test
     void patternContains_multiWildcardExtraContainerSegments_returnsNever() {
-        assertEquals(ContainmentResult.NEVER,
-                PathPatternUtils.patternContains("/**/extra", "/only"));
+        assertEquals(ContainmentResult.NEVER, PathPatternUtils.patternContains("/**/extra", "/only"));
     }
 
     @Test
@@ -162,8 +148,8 @@ class PathPatternUtilsTest {
 
     @Test
     void matchPathRuleToCached_includeMatches_returnsAlways() {
-        assertEquals(ContainmentResult.ALWAYS,
-                PathPatternUtils.matchPathRuleToCached(Arrays.asList("/api/**"), Collections.emptyList(), "/api/users"));
+        assertEquals(ContainmentResult.ALWAYS, PathPatternUtils.matchPathRuleToCached(Arrays.asList("/api/**"),
+                Collections.emptyList(), "/api/users"));
     }
 
     @Test
@@ -175,43 +161,37 @@ class PathPatternUtilsTest {
     @Test
     void matchPathRuleToCached_excludeAlways_returnsNever() {
         assertEquals(ContainmentResult.NEVER,
-                PathPatternUtils.matchPathRuleToCached(
-                        Arrays.asList("/**"), Arrays.asList("/api/**"), "/api/users"));
+                PathPatternUtils.matchPathRuleToCached(Arrays.asList("/**"), Arrays.asList("/api/**"), "/api/users"));
     }
 
     @Test
     void matchPathRuleToCached_includeAlwaysExcludeDisjoint_returnsAlways() {
-        assertEquals(ContainmentResult.ALWAYS,
-                PathPatternUtils.matchPathRuleToCached(
-                        Arrays.asList("/api/**"), Arrays.asList("/admin/**"), "/api/users"));
+        assertEquals(ContainmentResult.ALWAYS, PathPatternUtils.matchPathRuleToCached(Arrays.asList("/api/**"),
+                Arrays.asList("/admin/**"), "/api/users"));
     }
 
     @Test
     void matchPathRuleToCached_includeAlwaysExcludeIntersect_returnsRuntime() {
-        assertEquals(ContainmentResult.RUNTIME,
-                PathPatternUtils.matchPathRuleToCached(
-                        Arrays.asList("/api/**"), Arrays.asList("/api/secret"), "/api/{id}"));
+        assertEquals(ContainmentResult.RUNTIME, PathPatternUtils.matchPathRuleToCached(Arrays.asList("/api/**"),
+                Arrays.asList("/api/secret"), "/api/{id}"));
     }
 
     @Test
     void matchPathRuleToCached_onlyExcludeDisjoint_returnsAlways() {
-        assertEquals(ContainmentResult.ALWAYS,
-                PathPatternUtils.matchPathRuleToCached(
-                        Collections.emptyList(), Arrays.asList("/admin/**"), "/api/users"));
+        assertEquals(ContainmentResult.ALWAYS, PathPatternUtils.matchPathRuleToCached(Collections.emptyList(),
+                Arrays.asList("/admin/**"), "/api/users"));
     }
 
     @Test
     void matchPathRuleToCached_includeRuntime_returnsRuntime() {
         assertEquals(ContainmentResult.RUNTIME,
-                PathPatternUtils.matchPathRuleToCached(
-                        Arrays.asList("/api/*"), Collections.emptyList(), "/api/**"));
+                PathPatternUtils.matchPathRuleToCached(Arrays.asList("/api/*"), Collections.emptyList(), "/api/**"));
     }
 
     @Test
     void matchPathRuleToCached_onlyExcludeIntersects_returnsRuntime() {
-        assertEquals(ContainmentResult.RUNTIME,
-                PathPatternUtils.matchPathRuleToCached(
-                        Collections.emptyList(), Arrays.asList("/api/secret"), "/api/{id}"));
+        assertEquals(ContainmentResult.RUNTIME, PathPatternUtils.matchPathRuleToCached(Collections.emptyList(),
+                Arrays.asList("/api/secret"), "/api/{id}"));
     }
 
     // ---- patternsDisjoint ----
@@ -263,20 +243,17 @@ class PathPatternUtilsTest {
 
     @Test
     void comparePathRuleSpecificity_variableBeatsWildcard() {
-        assertTrue(PathPatternUtils.comparePathRuleSpecificity("/user/{id}", "/user/*") < 0,
-                "路径变量应比单通配符更精确（排前面）");
+        assertTrue(PathPatternUtils.comparePathRuleSpecificity("/user/{id}", "/user/*") < 0, "路径变量应比单通配符更精确（排前面）");
     }
 
     @Test
     void comparePathRuleSpecificity_literalBeatsVariable() {
-        assertTrue(PathPatternUtils.comparePathRuleSpecificity("/user/me", "/user/{id}") < 0,
-                "字面量段应比路径变量更精确");
+        assertTrue(PathPatternUtils.comparePathRuleSpecificity("/user/me", "/user/{id}") < 0, "字面量段应比路径变量更精确");
     }
 
     @Test
     void comparePathRuleSpecificity_exactBeatsCatchAll() {
-        assertTrue(PathPatternUtils.comparePathRuleSpecificity("/user", "/user/**") < 0,
-                "精确路径应比 catch-all 更精确");
+        assertTrue(PathPatternUtils.comparePathRuleSpecificity("/user", "/user/**") < 0, "精确路径应比 catch-all 更精确");
     }
 
     @Test

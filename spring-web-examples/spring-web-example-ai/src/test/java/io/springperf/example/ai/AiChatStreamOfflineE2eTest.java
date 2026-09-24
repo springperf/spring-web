@@ -22,17 +22,15 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * {@code /ai/chat} 与 {@code /ai/chat/stream} 的**离线**确定性 E2E：用替身 {@link ChatClient}
- * 替换真实模型，使「Spring AI 的 {@code Flux<String>} → 框架响应式路径（{@code TextStreamEmitter}）」
- * 这条最易回归的链路在无网络、无 API key 的情况下也能被回归覆盖。
- *
- * <p>动机：{@link AiChatE2eTest} 的真实对话用例以 {@code assumeTrue(hasRealApiKey())} 门控，
- * 未配置 key 时整条流式路径无人覆盖（默认 CI 即为该情形）。本类与之互补：
- * AiChatE2eTest 负责「真模型可达」，本类负责「框架流式语义正确」。</p>
+ * {@code /ai/chat} 与 {@code /ai/chat/stream} 的**离线**确定性 E2E：用替身 {@link ChatClient} 替换真实模型，使「Spring AI 的
+ * {@code Flux<String>} → 框架响应式路径（{@code TextStreamEmitter}）」 这条最易回归的链路在无网络、无 API key 的情况下也能被回归覆盖。
+ * <p>
+ * 动机：{@link AiChatE2eTest} 的真实对话用例以 {@code assumeTrue(hasRealApiKey())} 门控， 未配置 key 时整条流式路径无人覆盖（默认 CI 即为该情形）。本类与之互补：
+ * AiChatE2eTest 负责「真模型可达」，本类负责「框架流式语义正确」。
+ * </p>
  */
-@SpringBootTest(
-        classes = {AiApplication.class, AiChatStreamOfflineE2eTest.StubChatClientConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.NONE,
+@SpringBootTest(classes = { AiApplication.class,
+        AiChatStreamOfflineE2eTest.StubChatClientConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.NONE,
         // 随机端口：application.yml 固定 server.port=8080，而 Spring TestContext 会缓存并保持
         // 前一个上下文（AiChatE2eTest）存活 → 同 JVM 内两个上下文都绑 8080 时后者必然启动失败
         // （全量运行时实测 "Failed to load ApplicationContext"，单独运行时不暴露）。
@@ -40,7 +38,7 @@ import static org.mockito.Mockito.when;
 class AiChatStreamOfflineE2eTest {
 
     private static final String ANSWER = "STUB-ANSWER";
-    private static final String[] TOKENS = {"token-1", "token-2", "token-3"};
+    private static final String[] TOKENS = { "token-1", "token-2", "token-3" };
 
     private TestRestTemplate rest;
 
@@ -59,8 +57,7 @@ class AiChatStreamOfflineE2eTest {
         ChatClient.Builder stubChatClientBuilder() {
             ChatClient client = mock(ChatClient.class, RETURNS_DEEP_STUBS);
             when(client.prompt().user(anyString()).call().content()).thenReturn(ANSWER);
-            when(client.prompt().user(anyString()).stream().content())
-                    .thenReturn(Flux.just(TOKENS.clone()));
+            when(client.prompt().user(anyString()).stream().content()).thenReturn(Flux.just(TOKENS.clone()));
             ChatClient.Builder builder = mock(ChatClient.Builder.class);
             when(builder.build()).thenReturn(client);
             return builder;
@@ -69,8 +66,8 @@ class AiChatStreamOfflineE2eTest {
 
     @BeforeEach
     void setUp() {
-        rest = new TestRestTemplate(new RestTemplateBuilder()
-                .rootUri("http://localhost:" + nettyHttpServer.getActualPort()));
+        rest = new TestRestTemplate(
+                new RestTemplateBuilder().rootUri("http://localhost:" + nettyHttpServer.getActualPort()));
     }
 
     @Test
@@ -93,16 +90,10 @@ class AiChatStreamOfflineE2eTest {
         for (String token : TOKENS) {
             assertThat(body).as("token 必须到达：%s（实际=%s）", token, body).contains(token);
         }
-        assertThat(body.indexOf(TOKENS[0]))
-                .as("token 顺序必须保持（实际=%s）", body)
-                .isLessThan(body.indexOf(TOKENS[1]));
-        assertThat(body.indexOf(TOKENS[1]))
-                .as("token 顺序必须保持（实际=%s）", body)
-                .isLessThan(body.indexOf(TOKENS[2]));
+        assertThat(body.indexOf(TOKENS[0])).as("token 顺序必须保持（实际=%s）", body).isLessThan(body.indexOf(TOKENS[1]));
+        assertThat(body.indexOf(TOKENS[1])).as("token 顺序必须保持（实际=%s）", body).isLessThan(body.indexOf(TOKENS[2]));
 
-        assertThat(PerfAsyncWebRequest.activeRequestRefs())
-                .as("流式结束后异步持有者引用必须归零（残留即有未终结的异步生命周期）")
-                .isZero();
+        assertThat(PerfAsyncWebRequest.activeRequestRefs()).as("流式结束后异步持有者引用必须归零（残留即有未终结的异步生命周期）").isZero();
     }
 
     /** 同一连接的第二次流式请求：验证终结后可复用（无残留状态）。 */

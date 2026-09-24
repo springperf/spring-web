@@ -1,12 +1,11 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>io.github.springperf</groupId>
         <artifactId>spring-web-parent</artifactId>
 
-<version>3.5.6</version>
+        <version>3.5.6</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -16,11 +15,6 @@
     <name>perf-spring-web-examples</name>
     <description>Spring Perf Web 示例聚合模块，提供各场景的可运行示例应用</description>
     <url>https://github.com/springperf/spring-web</url>
-
-    <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.deploy.skip>true</maven.deploy.skip>
-    </properties>
 
     <modules>
         <module>spring-web-example-rest</module>
@@ -37,6 +31,11 @@
         <module>spring-web-example-swaggerui</module>
         <module>spring-web-example-ai</module>
     </modules>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.deploy.skip>true</maven.deploy.skip>
+    </properties>
 
     <build>
         <plugins>

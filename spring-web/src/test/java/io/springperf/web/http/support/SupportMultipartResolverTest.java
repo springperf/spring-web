@@ -1,5 +1,15 @@
 package io.springperf.web.http.support;
 
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
@@ -9,19 +19,10 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpVersion;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Test;
-
-import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * {@link SupportMultipartResolver#finish()} 的 {@code server.http.multipart.max-part-count} 校验：
- * part 总数（file + attribute）超过阈值抛 {@link DecoderException}，由 SupportMultipartAggregator 转 400。
+ * {@link SupportMultipartResolver#finish()} 的 {@code server.http.multipart.max-part-count} 校验： part 总数（file +
+ * attribute）超过阈值抛 {@link DecoderException}，由 SupportMultipartAggregator 转 400。
  */
 class SupportMultipartResolverTest {
 
@@ -72,8 +73,8 @@ class SupportMultipartResolverTest {
     }
 
     private static HttpRequest newRequest(byte[] body) {
-        DefaultFullHttpRequest req = new DefaultFullHttpRequest(
-                HttpVersion.HTTP_1_1, HttpMethod.POST, "/upload", Unpooled.wrappedBuffer(new byte[0]));
+        DefaultFullHttpRequest req = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/upload",
+                Unpooled.wrappedBuffer(new byte[0]));
         req.headers().set(HttpHeaderNames.CONTENT_TYPE, "multipart/form-data; boundary=" + BOUNDARY);
         req.headers().set(HttpHeaderNames.CONTENT_LENGTH, body.length);
         return req;
@@ -126,8 +127,7 @@ class SupportMultipartResolverTest {
         return sb.toString().getBytes(StandardCharsets.UTF_8);
     }
 
-    private static SupportMultipartResolver startAndConsume(
-            byte[] body, int maxPartCount, int maxPartHeaderSize) {
+    private static SupportMultipartResolver startAndConsume(byte[] body, int maxPartCount, int maxPartHeaderSize) {
         SupportMultipartResolver resolver = new SupportMultipartResolver(-1, maxPartCount, maxPartHeaderSize);
         resolver.start(newRequest(body));
         resolver.consume(new DefaultLastHttpContent(Unpooled.wrappedBuffer(body)));
@@ -135,8 +135,7 @@ class SupportMultipartResolverTest {
     }
 
     /** 分两 chunk 消费：验证被分片拆断的 part header 仍能被跨 chunk 扫描识别。 */
-    private static SupportMultipartResolver startAndConsumeInChunks(
-            byte[] body, int maxPartHeaderSize, int splitAt) {
+    private static SupportMultipartResolver startAndConsumeInChunks(byte[] body, int maxPartHeaderSize, int splitAt) {
         SupportMultipartResolver resolver = track(new SupportMultipartResolver(-1, -1, maxPartHeaderSize));
         resolver.start(newRequest(body));
         byte[] first = Arrays.copyOfRange(body, 0, splitAt);
@@ -167,8 +166,7 @@ class SupportMultipartResolverTest {
         // 在 X-Pad 中间把 body 切成两 chunk，验证跨 chunk 仍能识别超限
         byte[] body = multipartBodyWithLargeHeader(200);
         int splitAt = body.length / 2;
-        DecoderException ex = assertThrows(DecoderException.class,
-                () -> startAndConsumeInChunks(body, 64, splitAt));
+        DecoderException ex = assertThrows(DecoderException.class, () -> startAndConsumeInChunks(body, 64, splitAt));
         assertTrue(ex.getMessage().contains("part header size"), ex.getMessage());
     }
 
@@ -232,10 +230,9 @@ class SupportMultipartResolverTest {
     // ========== spring.servlet.multipart.file-size-threshold / location ==========
 
     /** 用指定阈值/location 构造 resolver 并跑完一个 multipart 请求。 */
-    private static NettyMultipartWebRequest runWithFactoryConfig(
-            byte[] body, long fileSizeThreshold, String location) {
-        SupportMultipartResolver resolver = track(new SupportMultipartResolver(
-                -1, -1, 8192, -1L, fileSizeThreshold, location));
+    private static NettyMultipartWebRequest runWithFactoryConfig(byte[] body, long fileSizeThreshold, String location) {
+        SupportMultipartResolver resolver = track(
+                new SupportMultipartResolver(-1, -1, 8192, -1L, fileSizeThreshold, location));
         resolver.start(newRequest(body));
         resolver.consume(new DefaultLastHttpContent(Unpooled.wrappedBuffer(body)));
         return finish(resolver);
@@ -256,8 +253,8 @@ class SupportMultipartResolverTest {
         // 阈值 1 字节 + 文件 100 字节 → 超阈值，应落盘（getFile() 非 null）
         byte[] body = multipartFileBody(100);
         NettyMultipartWebRequest req = runWithFactoryConfig(body, 1L, "");
-        io.netty.handler.codec.http.multipart.FileUpload upload =
-                (io.netty.handler.codec.http.multipart.FileUpload) req.getInterfaceHttpDataList().get(0);
+        io.netty.handler.codec.http.multipart.FileUpload upload = (io.netty.handler.codec.http.multipart.FileUpload) req
+                .getInterfaceHttpDataList().get(0);
         assertTrue(isOnDisk(upload), "超过阈值应落盘（getFile() 非 null）");
     }
 
@@ -266,8 +263,8 @@ class SupportMultipartResolverTest {
         // 阈值 1MB + 文件 100 字节 → 低于阈值，应留内存（getFile() 为 null）
         byte[] body = multipartFileBody(100);
         NettyMultipartWebRequest req = runWithFactoryConfig(body, 1024L * 1024, "");
-        io.netty.handler.codec.http.multipart.FileUpload upload =
-                (io.netty.handler.codec.http.multipart.FileUpload) req.getInterfaceHttpDataList().get(0);
+        io.netty.handler.codec.http.multipart.FileUpload upload = (io.netty.handler.codec.http.multipart.FileUpload) req
+                .getInterfaceHttpDataList().get(0);
         assertFalse(isOnDisk(upload), "低于阈值应留内存（getFile() 为 null）");
     }
 
@@ -275,10 +272,10 @@ class SupportMultipartResolverTest {
     void fileSizeThreshold_unset_usesFrameworkDefault16KB() {
         // 未配置（UNSET）：沿用 Netty MINSIZE=16KB → 100 字节留内存
         byte[] body = multipartFileBody(100);
-        NettyMultipartWebRequest req = runWithFactoryConfig(
-                body, io.springperf.web.server.MultipartConfig.FILE_SIZE_THRESHOLD_UNSET, "");
-        io.netty.handler.codec.http.multipart.FileUpload upload =
-                (io.netty.handler.codec.http.multipart.FileUpload) req.getInterfaceHttpDataList().get(0);
+        NettyMultipartWebRequest req = runWithFactoryConfig(body,
+                io.springperf.web.server.MultipartConfig.FILE_SIZE_THRESHOLD_UNSET, "");
+        io.netty.handler.codec.http.multipart.FileUpload upload = (io.netty.handler.codec.http.multipart.FileUpload) req
+                .getInterfaceHttpDataList().get(0);
         assertFalse(isOnDisk(upload), "未配置时沿用 16KB 默认，小文件应留内存");
     }
 
@@ -287,12 +284,11 @@ class SupportMultipartResolverTest {
             throws Exception {
         byte[] body = multipartFileBody(100);
         NettyMultipartWebRequest req = runWithFactoryConfig(body, 1L, tempDir.toString());
-        io.netty.handler.codec.http.multipart.FileUpload upload =
-                (io.netty.handler.codec.http.multipart.FileUpload) req.getInterfaceHttpDataList().get(0);
+        io.netty.handler.codec.http.multipart.FileUpload upload = (io.netty.handler.codec.http.multipart.FileUpload) req
+                .getInterfaceHttpDataList().get(0);
         assertTrue(isOnDisk(upload), "应落盘");
         String path = upload.getFile().getAbsolutePath();
-        assertTrue(path.startsWith(tempDir.toString()),
-                "落盘文件应位于配置的 location 下，实际：" + path);
+        assertTrue(path.startsWith(tempDir.toString()), "落盘文件应位于配置的 location 下，实际：" + path);
     }
 
     @Test

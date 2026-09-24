@@ -31,27 +31,35 @@ class MappedInterceptorTest {
 
     @Test
     void constructor_withIncludePatterns_setsPatterns() {
-        MappedInterceptor mi = new MappedInterceptor(new String[]{"/api/**"}, delegate);
-        assertArrayEquals(new String[]{"/api/**"}, mi.getIncludePatterns());
+        MappedInterceptor mi = new MappedInterceptor(new String[] { "/api/**" }, delegate);
+        assertArrayEquals(new String[] { "/api/**" }, mi.getIncludePatterns());
         assertNull(mi.getExcludePatterns());
         assertSame(delegate, mi.getInterceptor());
     }
 
     @Test
     void constructor_withExcludePatterns_setsExcludes() {
-        MappedInterceptor mi = new MappedInterceptor(
-                new String[]{"/api/**"}, new String[]{"/api/public/**"}, delegate);
-        assertArrayEquals(new String[]{"/api/public/**"}, mi.getExcludePatterns());
+        MappedInterceptor mi = new MappedInterceptor(new String[] { "/api/**" }, new String[] { "/api/public/**" },
+                delegate);
+        assertArrayEquals(new String[] { "/api/public/**" }, mi.getExcludePatterns());
     }
 
     @Test
     void constructor_withWebRequestInterceptor_wrapsInAdapter() {
-        MappedInterceptor mi = new MappedInterceptor(
-                new String[]{"/**"}, new WebRequestInterceptor() {
-                    @Override public void preHandle(org.springframework.web.context.request.WebRequest request) {}
-                    @Override public void postHandle(org.springframework.web.context.request.WebRequest request, org.springframework.ui.ModelMap model) {}
-                    @Override public void afterCompletion(org.springframework.web.context.request.WebRequest request, Exception ex) {}
-                });
+        MappedInterceptor mi = new MappedInterceptor(new String[] { "/**" }, new WebRequestInterceptor() {
+            @Override
+            public void preHandle(org.springframework.web.context.request.WebRequest request) {
+            }
+
+            @Override
+            public void postHandle(org.springframework.web.context.request.WebRequest request,
+                    org.springframework.ui.ModelMap model) {
+            }
+
+            @Override
+            public void afterCompletion(org.springframework.web.context.request.WebRequest request, Exception ex) {
+            }
+        });
         assertNotNull(mi.getInterceptor());
     }
 
@@ -69,29 +77,27 @@ class MappedInterceptorTest {
 
     @Test
     void matches_matchingInclude_returnsTrue() {
-        MappedInterceptor mi = new MappedInterceptor(
-                new String[]{"/api/**"}, delegate);
+        MappedInterceptor mi = new MappedInterceptor(new String[] { "/api/**" }, delegate);
         assertTrue(mi.matches("/api/users", pathMatcher));
     }
 
     @Test
     void matches_nonMatchingInclude_returnsFalse() {
-        MappedInterceptor mi = new MappedInterceptor(
-                new String[]{"/api/**"}, delegate);
+        MappedInterceptor mi = new MappedInterceptor(new String[] { "/api/**" }, delegate);
         assertFalse(mi.matches("/admin", pathMatcher));
     }
 
     @Test
     void matches_excludeOverridesInclude_returnsFalse() {
-        MappedInterceptor mi = new MappedInterceptor(
-                new String[]{"/api/**"}, new String[]{"/api/public/**"}, delegate);
+        MappedInterceptor mi = new MappedInterceptor(new String[] { "/api/**" }, new String[] { "/api/public/**" },
+                delegate);
         assertFalse(mi.matches("/api/public/login", pathMatcher));
     }
 
     @Test
     void matches_matchingIncludeWithExclude_returnsTrue() {
-        MappedInterceptor mi = new MappedInterceptor(
-                new String[]{"/api/**"}, new String[]{"/api/public/**"}, delegate);
+        MappedInterceptor mi = new MappedInterceptor(new String[] { "/api/**" }, new String[] { "/api/public/**" },
+                delegate);
         assertTrue(mi.matches("/api/private/data", pathMatcher));
     }
 
@@ -100,8 +106,7 @@ class MappedInterceptorTest {
         PathMatcher customMatcher = mock(PathMatcher.class);
         when(customMatcher.match("/custom/**", "/test")).thenReturn(true);
 
-        MappedInterceptor mi = new MappedInterceptor(
-                new String[]{"/custom/**"}, delegate);
+        MappedInterceptor mi = new MappedInterceptor(new String[] { "/custom/**" }, delegate);
         mi.setPathMatcher(customMatcher);
 
         assertTrue(mi.matches("/test", pathMatcher));
@@ -110,9 +115,8 @@ class MappedInterceptorTest {
 
     @Test
     void getPathPatterns_returnsIncludePatterns() {
-        MappedInterceptor mi = new MappedInterceptor(
-                new String[]{"/api/**"}, delegate);
-        assertArrayEquals(new String[]{"/api/**"}, mi.getPathPatterns());
+        MappedInterceptor mi = new MappedInterceptor(new String[] { "/api/**" }, delegate);
+        assertArrayEquals(new String[] { "/api/**" }, mi.getPathPatterns());
     }
 
     @Test

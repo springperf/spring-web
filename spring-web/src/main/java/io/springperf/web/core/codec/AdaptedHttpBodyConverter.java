@@ -1,6 +1,9 @@
 package io.springperf.web.core.codec;
 
-import io.springperf.web.context.WebComponentWrapper;
+import java.io.IOException;
+import java.lang.reflect.Type;
+import java.util.List;
+
 import org.springframework.core.Ordered;
 import org.springframework.core.ResolvableType;
 import org.springframework.http.HttpInputMessage;
@@ -10,11 +13,10 @@ import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.converter.HttpMessageNotWritableException;
 
-import java.io.IOException;
-import java.lang.reflect.Type;
-import java.util.List;
+import io.springperf.web.context.WebComponentWrapper;
 
-public class AdaptedHttpBodyConverter extends WebComponentWrapper<HttpMessageConverter<Object>> implements HttpBodyConverter {
+public class AdaptedHttpBodyConverter extends WebComponentWrapper<HttpMessageConverter<Object>>
+        implements HttpBodyConverter {
 
     private final HttpMessageConverter<Object> genericConverter;
 
@@ -28,7 +30,7 @@ public class AdaptedHttpBodyConverter extends WebComponentWrapper<HttpMessageCon
     }
 
     /**
-     * GenericHttpMessageConverter  API
+     * GenericHttpMessageConverter API
      */
     @Override
     public boolean canRead(Type type, Class<?> contextClass, MediaType mediaType) {
@@ -41,7 +43,8 @@ public class AdaptedHttpBodyConverter extends WebComponentWrapper<HttpMessageCon
     }
 
     @Override
-    public Object read(Type type, Class<?> contextClass, HttpInputMessage inputMessage) throws IOException, HttpMessageNotReadableException {
+    public Object read(Type type, Class<?> contextClass, HttpInputMessage inputMessage)
+            throws IOException, HttpMessageNotReadableException {
         ResolvableType resolvableType = ResolvableType.forType(type);
         Class<?> resolved = resolvableType.resolve();
         if (resolved == null) {
@@ -56,12 +59,13 @@ public class AdaptedHttpBodyConverter extends WebComponentWrapper<HttpMessageCon
     }
 
     @Override
-    public void write(Object t, Type type, MediaType contentType, HttpOutputMessage outputMessage) throws IOException, HttpMessageNotWritableException {
+    public void write(Object t, Type type, MediaType contentType, HttpOutputMessage outputMessage)
+            throws IOException, HttpMessageNotWritableException {
         genericConverter.write(t, contentType, outputMessage);
     }
 
     /**
-     * HttpMessageConverter  API
+     * HttpMessageConverter API
      */
     @Override
     public boolean canRead(Class<?> clazz, MediaType mediaType) {
@@ -84,12 +88,14 @@ public class AdaptedHttpBodyConverter extends WebComponentWrapper<HttpMessageCon
     }
 
     @Override
-    public Object read(Class<?> clazz, HttpInputMessage inputMessage) throws IOException, HttpMessageNotReadableException {
+    public Object read(Class<?> clazz, HttpInputMessage inputMessage)
+            throws IOException, HttpMessageNotReadableException {
         return genericConverter.read(clazz, inputMessage);
     }
 
     @Override
-    public void write(Object t, MediaType contentType, HttpOutputMessage outputMessage) throws IOException, HttpMessageNotWritableException {
+    public void write(Object t, MediaType contentType, HttpOutputMessage outputMessage)
+            throws IOException, HttpMessageNotWritableException {
         genericConverter.write(t, contentType, outputMessage);
     }
 

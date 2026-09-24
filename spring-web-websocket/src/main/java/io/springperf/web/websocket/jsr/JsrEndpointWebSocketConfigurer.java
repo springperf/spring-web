@@ -9,14 +9,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 将扫描到的 JSR-356 {@code @ServerEndpoint} 端点注册为框架 {@link io.springperf.web.websocket.WebSocketHandlerRegistry}
- * 处理器。
- *
- * <p>实现 {@link WebSocketConfigurer} SPI，由现有
- * {@link io.springperf.web.websocket.config.WebSocketAutoConfiguration} 收集并调用，
- * 从而复用现有 Netty 握手/帧路由管线，无需改动核心框架。</p>
+ * 将扫描到的 JSR-356 {@code @ServerEndpoint} 端点注册为框架 {@link io.springperf.web.websocket.WebSocketHandlerRegistry} 处理器。
+ * <p>
+ * 实现 {@link WebSocketConfigurer} SPI，由现有 {@link io.springperf.web.websocket.config.WebSocketAutoConfiguration} 收集并调用，
+ * 从而复用现有 Netty 握手/帧路由管线，无需改动核心框架。
+ * </p>
  *
  * @author huangcanda
+ *
  * @since 3.5.6
  */
 @Slf4j

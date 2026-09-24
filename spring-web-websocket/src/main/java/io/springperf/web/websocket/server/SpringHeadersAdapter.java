@@ -8,6 +8,7 @@ import java.util.*;
  * 将 Netty {@link io.netty.handler.codec.http.HttpHeaders} 适配为 Spring {@link HttpHeaders}。
  *
  * @author huangcanda
+ *
  * @since 1.0.4
  */
 public class SpringHeadersAdapter extends HttpHeaders {
@@ -17,8 +18,7 @@ public class SpringHeadersAdapter extends HttpHeaders {
     public SpringHeadersAdapter(io.netty.handler.codec.http.HttpHeaders nettyHeaders) {
         this.headers = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : nettyHeaders) {
-            this.headers.computeIfAbsent(entry.getKey(), k -> new ArrayList<>())
-                    .add(entry.getValue());
+            this.headers.computeIfAbsent(entry.getKey(), k -> new ArrayList<>()).add(entry.getValue());
         }
     }
 

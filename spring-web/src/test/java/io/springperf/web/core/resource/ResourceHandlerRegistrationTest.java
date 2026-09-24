@@ -1,11 +1,11 @@
 package io.springperf.web.core.resource;
 
-import org.junit.jupiter.api.Test;
-import org.springframework.http.CacheControl;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.CacheControl;
 
 class ResourceHandlerRegistrationTest {
 
@@ -20,14 +20,14 @@ class ResourceHandlerRegistrationTest {
     void constructor_singlePathPattern() {
         ResourceHandlerRegistration registration = new ResourceHandlerRegistration("/static/**");
 
-        assertArrayEquals(new String[]{"/static/**"}, registration.getPathPatterns());
+        assertArrayEquals(new String[] { "/static/**" }, registration.getPathPatterns());
     }
 
     @Test
     void constructor_multiplePathPatterns() {
         ResourceHandlerRegistration registration = new ResourceHandlerRegistration("/images/**", "/css/**", "/js/**");
 
-        assertArrayEquals(new String[]{"/images/**", "/css/**", "/js/**"}, registration.getPathPatterns());
+        assertArrayEquals(new String[] { "/images/**", "/css/**", "/js/**" }, registration.getPathPatterns());
     }
 
     @Test

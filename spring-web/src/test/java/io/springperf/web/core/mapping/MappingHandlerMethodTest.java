@@ -1,19 +1,21 @@
 package io.springperf.web.core.mapping;
 
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.lang.reflect.Method;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.method.HandlerMethod;
 
-import java.lang.reflect.Method;
-
-import static org.junit.jupiter.api.Assertions.*;
-
 class MappingHandlerMethodTest {
 
     static class TestController {
         @RequestMapping("/test")
-        public String hello() { return "hello"; }
+        public String hello() {
+            return "hello";
+        }
     }
 
     private MappingHandlerMethod handlerMethod;

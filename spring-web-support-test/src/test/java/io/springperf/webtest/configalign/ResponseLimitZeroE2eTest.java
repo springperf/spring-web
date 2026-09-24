@@ -21,15 +21,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code server.max-swallow-size=0} E2E：只要错误响应伴随**非空**请求 body 即关闭连接；
- * 零长度 body 的错误响应仍可保活（{@code 0 > 0} 为假）。
+ * {@code server.max-swallow-size=0} E2E：只要错误响应伴随**非空**请求 body 即关闭连接； 零长度 body 的错误响应仍可保活（{@code 0 > 0} 为假）。
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, ResponseLimitZeroE2eTest.ZeroConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "server.max-swallow-size=0"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        ResponseLimitZeroE2eTest.ZeroConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "server.max-swallow-size=0" })
 class ResponseLimitZeroE2eTest {
 
     @LocalServerPort
@@ -39,8 +35,7 @@ class ResponseLimitZeroE2eTest {
         StringBuilder sb = new StringBuilder();
         byte[] buf = new byte[4096];
         long deadline = System.currentTimeMillis() + 5000;
-        while (sb.toString().split("HTTP/1\\.1 ", -1).length - 1 < expected
-                && System.currentTimeMillis() < deadline) {
+        while (sb.toString().split("HTTP/1\\.1 ", -1).length - 1 < expected && System.currentTimeMillis() < deadline) {
             int n;
             try {
                 n = in.read(buf);
@@ -64,8 +59,7 @@ class ResponseLimitZeroE2eTest {
 
             String body = "z";
             out.write(("POST /e2e-zero/fail HTTP/1.1\r\nHost: localhost\r\n"
-                    + "Content-Type: text/plain\r\nContent-Length: 1\r\n\r\n" + body)
-                    .getBytes(StandardCharsets.UTF_8));
+                    + "Content-Type: text/plain\r\nContent-Length: 1\r\n\r\n" + body).getBytes(StandardCharsets.UTF_8));
             out.flush();
 
             String first = readResponses(in, 1);
@@ -91,20 +85,16 @@ class ResponseLimitZeroE2eTest {
             InputStream in = socket.getInputStream();
 
             // 零长度 body：0 > 0 为假 → 不关闭
-            out.write(("GET /e2e-zero/fail-get HTTP/1.1\r\nHost: localhost\r\n\r\n")
-                    .getBytes(StandardCharsets.UTF_8));
+            out.write(("GET /e2e-zero/fail-get HTTP/1.1\r\nHost: localhost\r\n\r\n").getBytes(StandardCharsets.UTF_8));
             out.flush();
             String first = readResponses(in, 1);
             assertTrue(first.contains("HTTP/1.1 400"), "应返回 400，实际:\n" + first);
-            assertTrue(!first.toLowerCase().contains("connection: close"),
-                    "零长度 body 的错误响应不应关闭连接，实际:\n" + first);
+            assertTrue(!first.toLowerCase().contains("connection: close"), "零长度 body 的错误响应不应关闭连接，实际:\n" + first);
 
-            out.write(("GET /e2e-zero/ok HTTP/1.1\r\nHost: localhost\r\n\r\n")
-                    .getBytes(StandardCharsets.UTF_8));
+            out.write(("GET /e2e-zero/ok HTTP/1.1\r\nHost: localhost\r\n\r\n").getBytes(StandardCharsets.UTF_8));
             out.flush();
             String second = readResponses(in, 1);
-            assertTrue(second.contains("ok-body"),
-                    "零长度 body 的错误响应后连接应可复用，实际:\n" + second);
+            assertTrue(second.contains("ok-body"), "零长度 body 的错误响应后连接应可复用，实际:\n" + second);
         }
     }
 

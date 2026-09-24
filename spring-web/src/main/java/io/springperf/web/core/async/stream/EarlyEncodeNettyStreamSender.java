@@ -8,12 +8,10 @@ import io.springperf.web.core.async.PerfAsyncWebRequest;
 /**
  * 早编码流式发送器（App 线程编码）。
  * <p>
- * 接收已编码的 byte[]，App 线程仅入队 byte[]，零 ByteBuf 分配。
- * EventLoop 线程的 {@link #drain()} 分配 pooled batchBuf 将多个 byte[] 拷贝合并为
- * 单个 {@link DefaultHttpContent} 写入 channel，减少 pipeline 对象数。
+ * 接收已编码的 byte[]，App 线程仅入队 byte[]，零 ByteBuf 分配。 EventLoop 线程的 {@link #drain()} 分配 pooled batchBuf 将多个 byte[] 拷贝合并为 单个
+ * {@link DefaultHttpContent} 写入 channel，减少 pipeline 对象数。
  * <p>
- * 与 {@link DefaultNettyStreamSender} 的区别：后者在 drain 中调用 {@code emitter.encode()}
- * 编码原始数据，而本类接收的已是编码后的 byte[]，直接拷贝。
+ * 与 {@link DefaultNettyStreamSender} 的区别：后者在 drain 中调用 {@code emitter.encode()} 编码原始数据，而本类接收的已是编码后的 byte[]，直接拷贝。
  * <p>
  * 对应 {@link StreamEmitter#isEarlyEncode()} = {@code true} 的路径。
  */
@@ -24,8 +22,7 @@ public class EarlyEncodeNettyStreamSender extends AbstractNettyStreamSender {
     }
 
     /**
-     * 只能在 EventLoop 线程执行。
-     * 分配 batchBuf 批量从队列取出 byte[] 拷贝，超过 maxFlushBytes 后 write + flush。
+     * 只能在 EventLoop 线程执行。 分配 batchBuf 批量从队列取出 byte[] 拷贝，超过 maxFlushBytes 后 write + flush。
      */
     @Override
     protected void drain() {
@@ -44,7 +41,7 @@ public class EarlyEncodeNettyStreamSender extends AbstractNettyStreamSender {
             return;
         }
         int missed = 1;
-        for (; ; ) {
+        for (;;) {
             ByteBuf batchBuf = null;
             while (channel.isWritable()) {
                 Object data = queue.poll();

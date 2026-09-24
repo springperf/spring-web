@@ -12,13 +12,14 @@ import java.security.Principal;
 
 /**
  * {@link org.thymeleaf.web.IWebExchange} 的 Servlet 适配。
- *
- * <p>在 {@link PerfWebExchange} 基础上补齐 session / principal / cookie：</p>
+ * <p>
+ * 在 {@link PerfWebExchange} 基础上补齐 session / principal / cookie：
+ * </p>
  * <ul>
- *   <li>{@code session} — {@code HttpServletRequest.getSession(false)} 的桥接；
- *       请求未携带会话时返回 {@code null}（不主动创建，避免为纯渲染请求产生空会话）；</li>
- *   <li>{@code principal} — {@code HttpServletRequest.getUserPrincipal()}；</li>
- *   <li>{@code cookie} — 见 {@link ServletWebRequest}。</li>
+ * <li>{@code session} — {@code HttpServletRequest.getSession(false)} 的桥接； 请求未携带会话时返回
+ * {@code null}（不主动创建，避免为纯渲染请求产生空会话）；</li>
+ * <li>{@code principal} — {@code HttpServletRequest.getUserPrincipal()}；</li>
+ * <li>{@code cookie} — 见 {@link ServletWebRequest}。</li>
  * </ul>
  *
  * @since 3.5.7
@@ -28,8 +29,7 @@ public class ServletWebExchange extends PerfWebExchange {
     private final HttpServletRequest servletRequest;
     private final IWebRequest servletRequestAdapter;
 
-    public ServletWebExchange(WebServerHttpRequest req, WebServerHttpResponse resp,
-                              HttpServletRequest servletRequest) {
+    public ServletWebExchange(WebServerHttpRequest req, WebServerHttpResponse resp, HttpServletRequest servletRequest) {
         super(req, resp);
         this.servletRequest = servletRequest;
         this.servletRequestAdapter = new ServletWebRequest(req, this.contextPath, servletRequest);

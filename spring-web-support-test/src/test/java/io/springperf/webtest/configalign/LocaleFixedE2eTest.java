@@ -15,22 +15,15 @@ import java.time.Duration;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * {@code spring.web.locale} + {@code spring.web.locale-resolver=fixed} E2E：
- * 固定策略下 Locale 恒为配置值，忽略客户端 Accept-Language 头。
+ * {@code spring.web.locale} + {@code spring.web.locale-resolver=fixed} E2E： 固定策略下 Locale 恒为配置值，忽略客户端 Accept-Language 头。
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, LocaleFixedE2eTest.LocaleEchoConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "spring.web.locale=zh_CN",
-                "spring.web.locale-resolver=fixed"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        LocaleFixedE2eTest.LocaleEchoConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "spring.web.locale=zh_CN", "spring.web.locale-resolver=fixed" })
 class LocaleFixedE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
@@ -57,8 +50,7 @@ class LocaleFixedE2eTest {
 
     @Test
     void fixedLocale_ignoresClientHeader() throws Exception {
-        assertEquals("zh_CN", echoLocale("en-US"),
-                "fixed 策略下 Accept-Language 不应改变 Locale");
+        assertEquals("zh_CN", echoLocale("en-US"), "fixed 策略下 Accept-Language 不应改变 Locale");
     }
 
     @TestConfiguration

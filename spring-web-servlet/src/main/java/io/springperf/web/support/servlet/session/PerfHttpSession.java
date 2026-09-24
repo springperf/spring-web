@@ -21,8 +21,7 @@ public class PerfHttpSession implements HttpSession {
     }
 
     public PerfHttpSession(HttpSessionData data, ServletContext servletContext,
-                           List<HttpSessionListener> sessionListeners,
-                           List<HttpSessionAttributeListener> attributeListeners) {
+            List<HttpSessionListener> sessionListeners, List<HttpSessionAttributeListener> attributeListeners) {
         this.data = data;
         this.servletContext = servletContext;
         this.sessionListeners = sessionListeners;
@@ -180,4 +179,4 @@ public class PerfHttpSession implements HttpSession {
         }
     }
 
-    }
+}

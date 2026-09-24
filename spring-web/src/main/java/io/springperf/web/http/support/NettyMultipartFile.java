@@ -1,13 +1,14 @@
 package io.springperf.web.http.support;
 
-import io.netty.buffer.ByteBufInputStream;
-import io.netty.handler.codec.http.multipart.FileUpload;
-import lombok.SneakyThrows;
+import java.io.IOException;
+import java.io.InputStream;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.io.InputStream;
+import io.netty.buffer.ByteBufInputStream;
+import io.netty.handler.codec.http.multipart.FileUpload;
+import lombok.SneakyThrows;
 
 public class NettyMultipartFile implements MultipartFile, HttpInputMessagePart {
 
@@ -73,7 +74,8 @@ public class NettyMultipartFile implements MultipartFile, HttpInputMessagePart {
     public HttpHeaders getHeaders() {
         if (headers == null) {
             HttpHeaders httpHeaders = new HttpHeaders();
-            httpHeaders.set(HttpHeaders.CONTENT_DISPOSITION, buildContentDisposition(fileUpload.getName(), fileUpload.getFilename()));
+            httpHeaders.set(HttpHeaders.CONTENT_DISPOSITION,
+                    buildContentDisposition(fileUpload.getName(), fileUpload.getFilename()));
             if (fileUpload.getContentType() != null) {
                 httpHeaders.set(HttpHeaders.CONTENT_TYPE, fileUpload.getContentType());
             }

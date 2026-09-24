@@ -32,8 +32,8 @@ class SpringWebServletAutoConfigurationCreateFilterWrapperTest {
 
     private WebFilterRegistration invokeCreateFilterWrapper(AbstractFilterRegistrationBean<?> reg) {
         try {
-            Method m = SpringWebServletAutoConfiguration.class
-                    .getDeclaredMethod("createFilterWrapper", AbstractFilterRegistrationBean.class);
+            Method m = SpringWebServletAutoConfiguration.class.getDeclaredMethod("createFilterWrapper",
+                    AbstractFilterRegistrationBean.class);
             m.setAccessible(true);
             return (WebFilterRegistration) m.invoke(config, reg);
         } catch (Exception e) {
@@ -77,18 +77,17 @@ class SpringWebServletAutoConfigurationCreateFilterWrapperTest {
     @Test
     void createFilterWrapper_delegatingFilterProxyFallback_resolvesTargetBean() throws Exception {
         // 真实匿名子类：覆盖 protected getTargetBeanName() 返回固定名；getFilter() 抛异常模拟 WebApplicationContext 缺失
-        DelegatingFilterProxyRegistrationBean registration =
-                new DelegatingFilterProxyRegistrationBean("targetBean") {
-                    @Override
-                    protected String getTargetBeanName() {
-                        return "targetBean";
-                    }
+        DelegatingFilterProxyRegistrationBean registration = new DelegatingFilterProxyRegistrationBean("targetBean") {
+            @Override
+            protected String getTargetBeanName() {
+                return "targetBean";
+            }
 
-                    @Override
-                    public org.springframework.web.filter.DelegatingFilterProxy getFilter() {
-                        throw new IllegalStateException("no ctx");
-                    }
-                };
+            @Override
+            public org.springframework.web.filter.DelegatingFilterProxy getFilter() {
+                throw new IllegalStateException("no ctx");
+            }
+        };
 
         Filter target = mock(Filter.class);
         when(applicationContext.getBean("targetBean", Filter.class)).thenReturn(target);
@@ -102,18 +101,17 @@ class SpringWebServletAutoConfigurationCreateFilterWrapperTest {
     @Test
     void createFilterWrapper_delegatingFilterProxyNoTarget_returnsNull() {
         // getTargetBeanName() 返回 null → 告警并跳过
-        DelegatingFilterProxyRegistrationBean registration =
-                new DelegatingFilterProxyRegistrationBean("unused") {
-                    @Override
-                    protected String getTargetBeanName() {
-                        return null;
-                    }
+        DelegatingFilterProxyRegistrationBean registration = new DelegatingFilterProxyRegistrationBean("unused") {
+            @Override
+            protected String getTargetBeanName() {
+                return null;
+            }
 
-                    @Override
-                    public org.springframework.web.filter.DelegatingFilterProxy getFilter() {
-                        throw new IllegalStateException("no ctx");
-                    }
-                };
+            @Override
+            public org.springframework.web.filter.DelegatingFilterProxy getFilter() {
+                throw new IllegalStateException("no ctx");
+            }
+        };
         assertNull(invokeCreateFilterWrapper(registration), "无 targetBeanName 应返回 null");
     }
 }

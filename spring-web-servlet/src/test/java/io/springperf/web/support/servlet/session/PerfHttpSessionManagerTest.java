@@ -25,8 +25,10 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class PerfHttpSessionManagerTest {
 
-    @Mock WebContext webContext;
-    @Mock io.springperf.web.context.ApplicationProperties props;
+    @Mock
+    WebContext webContext;
+    @Mock
+    io.springperf.web.context.ApplicationProperties props;
 
     private PerfHttpSessionManager manager;
 
@@ -36,11 +38,9 @@ class PerfHttpSessionManagerTest {
         lenient().when(webContext.getCtx()).thenReturn(mock(org.springframework.context.ApplicationContext.class));
         lenient().when(props.get(any(), any())).thenAnswer(invocation -> invocation.getArgument(1));
         // 兜底：未显式桩化的 getBoolean 返回传入默认值（如 persistent 默认 false、cookie.secure 默认 false）
-        lenient().when(props.getBoolean(any(), anyBoolean()))
-                .thenAnswer(invocation -> invocation.getArgument(1));
+        lenient().when(props.getBoolean(any(), anyBoolean())).thenAnswer(invocation -> invocation.getArgument(1));
         // 兜底：未配置 session.timeout 时 getDurationSeconds 返回默认值 1800s（30 分钟）
-        lenient().when(props.getDurationSeconds(any(), anyLong()))
-                .thenAnswer(invocation -> invocation.getArgument(1));
+        lenient().when(props.getDurationSeconds(any(), anyLong())).thenAnswer(invocation -> invocation.getArgument(1));
         manager = new PerfHttpSessionManager();
         manager.initWithWebContext(webContext);
     }
@@ -279,11 +279,10 @@ class PerfHttpSessionManagerTest {
     void persistent_enabled_usesFileStorage(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir)
             throws Exception {
         when(props.getBoolean(io.springperf.web.context.PropertiesConstant.SERVLET_SESSION_PERSISTENT,
-                io.springperf.web.context.PropertiesConstant.SERVLET_SESSION_PERSISTENT_DEFAULT))
-                .thenReturn(true);
+                io.springperf.web.context.PropertiesConstant.SERVLET_SESSION_PERSISTENT_DEFAULT)).thenReturn(true);
         when(props.get(io.springperf.web.context.PropertiesConstant.SERVLET_SESSION_STORE_DIR,
                 io.springperf.web.context.PropertiesConstant.SERVLET_SESSION_STORE_DIR_DEFAULT))
-                .thenReturn(tempDir.toString());
+                        .thenReturn(tempDir.toString());
 
         PerfHttpSessionManager newManager = new PerfHttpSessionManager();
         newManager.initWithWebContext(webContext);
@@ -298,8 +297,7 @@ class PerfHttpSessionManagerTest {
     @Test
     void persistent_disabled_usesInMemoryStorage() throws Exception {
         when(props.getBoolean(io.springperf.web.context.PropertiesConstant.SERVLET_SESSION_PERSISTENT,
-                io.springperf.web.context.PropertiesConstant.SERVLET_SESSION_PERSISTENT_DEFAULT))
-                .thenReturn(false);
+                io.springperf.web.context.PropertiesConstant.SERVLET_SESSION_PERSISTENT_DEFAULT)).thenReturn(false);
 
         PerfHttpSessionManager newManager = new PerfHttpSessionManager();
         newManager.initWithWebContext(webContext);
@@ -316,8 +314,9 @@ class PerfHttpSessionManagerTest {
         // 容器中存在自定义 HttpSessionStorage bean 时，即使 persistent=true 也优先使用该 bean
         HttpSessionStorage custom = mock(HttpSessionStorage.class);
         when(webContext.getBeanFromCtx(HttpSessionStorage.class)).thenReturn(custom);
-        lenient().when(props.getBoolean(io.springperf.web.context.PropertiesConstant.SERVLET_SESSION_PERSISTENT,
-                io.springperf.web.context.PropertiesConstant.SERVLET_SESSION_PERSISTENT_DEFAULT))
+        lenient()
+                .when(props.getBoolean(io.springperf.web.context.PropertiesConstant.SERVLET_SESSION_PERSISTENT,
+                        io.springperf.web.context.PropertiesConstant.SERVLET_SESSION_PERSISTENT_DEFAULT))
                 .thenReturn(true);
 
         PerfHttpSessionManager newManager = new PerfHttpSessionManager();

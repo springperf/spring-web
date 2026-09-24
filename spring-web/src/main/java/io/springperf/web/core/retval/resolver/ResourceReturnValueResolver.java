@@ -1,11 +1,12 @@
 package io.springperf.web.core.retval.resolver;
 
+import org.springframework.core.MethodParameter;
+import org.springframework.core.io.Resource;
+
 import io.springperf.web.core.mapping.MappingHandlerMethod;
 import io.springperf.web.core.retval.ReturnValueResolver;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
-import org.springframework.core.MethodParameter;
-import org.springframework.core.io.Resource;
 
 public class ResourceReturnValueResolver implements ReturnValueResolver {
     @Override
@@ -19,7 +20,8 @@ public class ResourceReturnValueResolver implements ReturnValueResolver {
     }
 
     @Override
-    public void resolveReturnValue(Object returnValue, MethodParameter returnType, WebServerHttpRequest req, WebServerHttpResponse resp) throws Exception {
+    public void resolveReturnValue(Object returnValue, MethodParameter returnType, WebServerHttpRequest req,
+            WebServerHttpResponse resp) throws Exception {
         Resource resource = (Resource) returnValue;
         if (resource.isFile()) {
             resp.writeFile(resource.getFile());

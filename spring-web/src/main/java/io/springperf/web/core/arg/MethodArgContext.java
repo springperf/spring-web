@@ -1,6 +1,7 @@
 package io.springperf.web.core.arg;
 
-import lombok.Getter;
+import java.lang.annotation.Annotation;
+
 import org.springframework.core.MethodParameter;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.validation.BindingResult;
@@ -8,7 +9,7 @@ import org.springframework.validation.Errors;
 import org.springframework.validation.Validator;
 import org.springframework.validation.annotation.Validated;
 
-import java.lang.annotation.Annotation;
+import lombok.Getter;
 
 @Getter
 public class MethodArgContext {
@@ -39,7 +40,8 @@ public class MethodArgContext {
     }
 
     public static String getDefaultParamName(MethodParameter methodParameter) {
-        return methodParameter.getParameterName() == null ? "Arg " + methodParameter.getParameterIndex() : methodParameter.getParameterName();
+        return methodParameter.getParameterName() == null ? "Arg " + methodParameter.getParameterIndex()
+                : methodParameter.getParameterName();
     }
 
     private void initValidateAnnotationInfo() {
@@ -49,10 +51,10 @@ public class MethodArgContext {
             if (validatedAnn != null || ann.annotationType().getSimpleName().startsWith("Valid")) {
                 haveValidateAnnotation = true;
                 Object hints = (validatedAnn != null ? validatedAnn.value() : AnnotationUtils.getValue(ann));
-                if(hints instanceof Object[]){
+                if (hints instanceof Object[]) {
                     validationHints = (Object[]) hints;
-                }else{
-                    validationHints = new Object[]{hints};
+                } else {
+                    validationHints = new Object[] { hints };
                 }
                 break;
             }

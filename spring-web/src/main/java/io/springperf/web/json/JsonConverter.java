@@ -1,10 +1,10 @@
 package io.springperf.web.json;
 
-import io.springperf.web.context.WebComponent;
-
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Type;
+
+import io.springperf.web.context.WebComponent;
 
 /**
  * Abstraction for JSON serialization and deserialization.

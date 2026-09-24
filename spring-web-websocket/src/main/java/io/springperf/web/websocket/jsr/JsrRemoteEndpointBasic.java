@@ -14,12 +14,13 @@ import java.nio.ByteBuffer;
 
 /**
  * JSR-356 {@link RemoteEndpoint.Basic} 实现，委托 Spring {@link WebSocketSession} 发送。
- *
- * <p>消息体为 {@code String}（文本）、{@code ByteBuffer}（二进制）或 POJO（经
- * {@link Encoder} 编码，文本/二进制任选其一）。流式发送（{@link #getSendStream()}
- * / {@link #getSendWriter()}）与分片（last 参数）首期不支持。</p>
+ * <p>
+ * 消息体为 {@code String}（文本）、{@code ByteBuffer}（二进制）或 POJO（经 {@link Encoder} 编码，文本/二进制任选其一）。流式发送（{@link #getSendStream()}
+ * / {@link #getSendWriter()}）与分片（last 参数）首期不支持。
+ * </p>
  *
  * @author huangcanda
+ *
  * @since 3.5.6
  */
 public class JsrRemoteEndpointBasic implements RemoteEndpoint.Basic {

@@ -1,15 +1,12 @@
 package io.springperf.web.core.async.stream;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.DefaultHttpContent;
-import io.netty.handler.codec.http.LastHttpContent;
-import io.netty.util.concurrent.EventExecutor;
-import io.springperf.web.core.async.PerfAsyncWebRequest;
-import io.springperf.web.http.NettyServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,12 +17,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.http.DefaultHttpContent;
+import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.util.concurrent.EventExecutor;
+import io.springperf.web.core.async.PerfAsyncWebRequest;
+import io.springperf.web.http.NettyServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -98,7 +99,8 @@ class DefaultNettyStreamSenderTest {
     void send_multipleItems_batchWritesAtThreshold() throws Exception {
         int chunkSize = 3000;
         byte[] chunk = new byte[chunkSize];
-        for (int i = 0; i < chunkSize; i++) chunk[i] = (byte) 'a';
+        for (int i = 0; i < chunkSize; i++)
+            chunk[i] = (byte) 'a';
         doAnswer(invocation -> {
             OutputStream out = invocation.getArgument(1);
             out.write(chunk);
@@ -148,8 +150,7 @@ class DefaultNettyStreamSenderTest {
             OutputStream out = invocation.getArgument(1);
             out.write("good".getBytes(StandardCharsets.UTF_8));
             return null;
-        }).doThrow(new RuntimeException("encode failed"))
-        .when(emitter).encode(any(), any());
+        }).doThrow(new RuntimeException("encode failed")).when(emitter).encode(any(), any());
         when(channel.writeAndFlush(any())).thenReturn(channelFuture);
         DefaultNettyStreamSender sender = new DefaultNettyStreamSender(emitter, asyncWebRequest);
 

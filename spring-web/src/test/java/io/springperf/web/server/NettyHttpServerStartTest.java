@@ -1,22 +1,22 @@
 package io.springperf.web.server;
 
-import io.springperf.web.context.ApplicationProperties;
-import io.springperf.web.context.PropertiesConstant;
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.DispatcherHandler;
-import org.junit.jupiter.api.Test;
-import org.springframework.context.ConfigurableApplicationContext;
-import org.springframework.core.env.ConfigurableEnvironment;
-import org.springframework.core.env.MutablePropertySources;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import org.junit.jupiter.api.Test;
+import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.core.env.ConfigurableEnvironment;
+import org.springframework.core.env.MutablePropertySources;
+
+import io.springperf.web.context.ApplicationProperties;
+import io.springperf.web.context.PropertiesConstant;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.DispatcherHandler;
+
 /**
- * 真实启动 NettyHttpServer（随机端口）验证完整 start() 管线：
- * 生命周期触发、NettyHttpHandler 构建、错误处理管线、端口发布与停机关闭。
+ * 真实启动 NettyHttpServer（随机端口）验证完整 start() 管线： 生命周期触发、NettyHttpHandler 构建、错误处理管线、端口发布与停机关闭。
  */
 class NettyHttpServerStartTest {
 
@@ -28,8 +28,8 @@ class NettyHttpServerStartTest {
         when(props.getInt(PropertiesConstant.SERVER_PORT)).thenReturn(0);
         when(props.getInt(PropertiesConstant.SERVER_NETTY_BOSS_THREADS)).thenReturn(1);
         when(props.getInt(PropertiesConstant.SERVER_NETTY_WORKERS)).thenReturn(1);
-        when(props.get(PropertiesConstant.SERVER_NETTY_TRANSPORT,
-                PropertiesConstant.SERVER_NETTY_TRANSPORT_DEFAULT)).thenReturn("nio");
+        when(props.get(PropertiesConstant.SERVER_NETTY_TRANSPORT, PropertiesConstant.SERVER_NETTY_TRANSPORT_DEFAULT))
+                .thenReturn("nio");
         when(props.getInt(PropertiesConstant.SERVER_NETTY_SO_BACKLOG)).thenReturn(128);
         when(props.getBoolean(PropertiesConstant.SERVER_NETTY_TCP_NODELAY,
                 PropertiesConstant.SERVER_NETTY_TCP_NODELAY_DEFAULT)).thenReturn(true);

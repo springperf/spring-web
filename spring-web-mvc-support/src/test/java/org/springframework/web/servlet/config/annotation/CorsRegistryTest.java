@@ -31,8 +31,7 @@ class CorsRegistryTest {
 
     @Test
     void addMapping_configuredRegistration_persistsConfig() {
-        CorsRegistration reg = registry.addMapping("/api/**")
-                .allowedOrigins("https://example.com")
+        CorsRegistration reg = registry.addMapping("/api/**").allowedOrigins("https://example.com")
                 .allowedMethods("GET");
 
         assertEquals(1, registry.getRegistrations().size());

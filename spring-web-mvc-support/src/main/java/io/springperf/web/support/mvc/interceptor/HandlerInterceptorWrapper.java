@@ -25,40 +25,50 @@ public class HandlerInterceptorWrapper implements HandlerInterceptor {
     }
 
     @Override
-    public boolean preHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler) throws Exception {
+    public boolean preHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler)
+            throws Exception {
         HttpServletRequest servletRequest = extractRequest(request);
         HttpServletResponse servletResponse = extractResponse(request);
         if (servletRequest == null || servletResponse == null) {
-            log.warn("HandlerInterceptorWrapper.preHandle: Servlet request/response not available, skipping interceptor {}", interceptor);
+            log.warn(
+                    "HandlerInterceptorWrapper.preHandle: Servlet request/response not available, skipping interceptor {}",
+                    interceptor);
             return true;
         }
         return interceptor.preHandle(servletRequest, servletResponse, handler);
     }
 
     @Override
-    public void postHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler, Object result) throws Exception {
+    public void postHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler, Object result)
+            throws Exception {
         HttpServletRequest servletRequest = extractRequest(request);
         HttpServletResponse servletResponse = extractResponse(request);
-        if (servletRequest == null || servletResponse == null) return;
+        if (servletRequest == null || servletResponse == null)
+            return;
         interceptor.postHandle(servletRequest, servletResponse, handler, null);
     }
 
     @Override
-    public void afterCompletion(WebServerHttpRequest request, WebServerHttpResponse response, Object handler, Throwable ex) throws Exception {
+    public void afterCompletion(WebServerHttpRequest request, WebServerHttpResponse response, Object handler,
+            Throwable ex) throws Exception {
         HttpServletRequest servletRequest = extractRequest(request);
         HttpServletResponse servletResponse = extractResponse(request);
-        if (servletRequest == null || servletResponse == null) return;
+        if (servletRequest == null || servletResponse == null)
+            return;
         interceptor.afterCompletion(servletRequest, servletResponse, handler,
                 ex instanceof Exception ? (Exception) ex : new NestedServletException("Handler dispatch failed", ex));
     }
 
     @Override
-    public void afterConcurrentHandlingStarted(WebServerHttpRequest request, WebServerHttpResponse response, Object handler) throws Exception {
+    public void afterConcurrentHandlingStarted(WebServerHttpRequest request, WebServerHttpResponse response,
+            Object handler) throws Exception {
         if (interceptor instanceof AsyncHandlerInterceptor) {
             HttpServletRequest servletRequest = extractRequest(request);
             HttpServletResponse servletResponse = extractResponse(request);
-            if (servletRequest == null || servletResponse == null) return;
-            ((AsyncHandlerInterceptor) interceptor).afterConcurrentHandlingStarted(servletRequest, servletResponse, handler);
+            if (servletRequest == null || servletResponse == null)
+                return;
+            ((AsyncHandlerInterceptor) interceptor).afterConcurrentHandlingStarted(servletRequest, servletResponse,
+                    handler);
         }
     }
 
@@ -66,10 +76,10 @@ public class HandlerInterceptorWrapper implements HandlerInterceptor {
         RequestContext ctx = request.getRequestContext();
         if (ctx != null) {
             HttpServletRequest sr = ServletAttribute.getRequest(ctx);
-            if (sr != null) return sr;
+            if (sr != null)
+                return sr;
         }
-        ServletRequestAttributes attrs = (ServletRequestAttributes)
-                RequestContextHolder.getRequestAttributes();
+        ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         return attrs != null ? attrs.getRequest() : null;
     }
 
@@ -77,10 +87,10 @@ public class HandlerInterceptorWrapper implements HandlerInterceptor {
         RequestContext ctx = request.getRequestContext();
         if (ctx != null) {
             HttpServletResponse sr = ServletAttribute.getResponse(ctx);
-            if (sr != null) return sr;
+            if (sr != null)
+                return sr;
         }
-        ServletRequestAttributes attrs = (ServletRequestAttributes)
-                RequestContextHolder.getRequestAttributes();
+        ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         return attrs != null ? attrs.getResponse() : null;
     }
 

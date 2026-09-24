@@ -24,20 +24,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code spring.servlet.multipart.*} E2E（真实管线）：
- * max-file-size 超限走管线级 413（SupportMultipartAggregator），未超限正常到达控制器。
+ * {@code spring.servlet.multipart.*} E2E（真实管线）： max-file-size 超限走管线级 413（SupportMultipartAggregator），未超限正常到达控制器。
  */
-@SpringBootTest(classes = {io.springperf.webtest.SupportTestApplication.class,
-                MultipartLimitE2eTest.UploadConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "spring.servlet.multipart.max-file-size=1KB")
+@SpringBootTest(classes = { io.springperf.webtest.SupportTestApplication.class,
+        MultipartLimitE2eTest.UploadConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "spring.servlet.multipart.max-file-size=1KB")
 class MultipartLimitE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .writeTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).writeTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
@@ -51,12 +45,8 @@ class MultipartLimitE2eTest {
         byte[] data = new byte[bytes];
         java.util.Arrays.fill(data, (byte) 'x');
         RequestBody fileBody = RequestBody.create(data, MediaType.parse("application/octet-stream"));
-        okhttp3.Request req = new okhttp3.Request.Builder().url(url("/e2e-upload"))
-                .post(new MultipartBody.Builder()
-                        .setType(MultipartBody.FORM)
-                        .addFormDataPart("file", fileName, fileBody)
-                        .build())
-                .build();
+        okhttp3.Request req = new okhttp3.Request.Builder().url(url("/e2e-upload")).post(new MultipartBody.Builder()
+                .setType(MultipartBody.FORM).addFormDataPart("file", fileName, fileBody).build()).build();
         return CLIENT.newCall(req).execute();
     }
 
@@ -64,8 +54,7 @@ class MultipartLimitE2eTest {
     void withinLimit_uploadSucceeds() throws Exception {
         okhttp3.Response resp = upload("small.bin", 100);
         try {
-            assertEquals(200, resp.code(), "100B < 1KB 阈值应正常上传，实际 "
-                    + resp.code() + " body=" + resp.body().string());
+            assertEquals(200, resp.code(), "100B < 1KB 阈值应正常上传，实际 " + resp.code() + " body=" + resp.body().string());
         } finally {
             resp.close();
         }
@@ -75,8 +64,7 @@ class MultipartLimitE2eTest {
     void exceedingLimit_returns413() throws Exception {
         okhttp3.Response resp = upload("big.bin", 8 * 1024);
         try {
-            assertEquals(413, resp.code(), "8KB 文件超 1KB 上限应返回 413，实际 "
-                    + resp.code() + " body=" + resp.body().string());
+            assertEquals(413, resp.code(), "8KB 文件超 1KB 上限应返回 413，实际 " + resp.code() + " body=" + resp.body().string());
         } finally {
             resp.close();
         }

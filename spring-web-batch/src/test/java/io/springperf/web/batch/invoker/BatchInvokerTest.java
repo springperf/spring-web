@@ -32,15 +32,12 @@ class BatchInvokerTest {
     @Test
     void invoke_createsInstanceAndEnqueues() throws Exception {
         Constructor<?> ctor = TestRequest.class.getDeclaredConstructor(String.class);
-        BatchRequestMetaData meta = new BatchRequestMetaData(
-                Object.class.getDeclaredMethod("hashCode"),
-                TestRequest.class, null, "test-queue",
-                1024, BatchMapping.WaitStrategy.BLOCKING, BatchMapping.Backpressure.BLOCK,
-                ctor, 0, 4
-        );
+        BatchRequestMetaData meta = new BatchRequestMetaData(Object.class.getDeclaredMethod("hashCode"),
+                TestRequest.class, null, "test-queue", 1024, BatchMapping.WaitStrategy.BLOCKING,
+                BatchMapping.Backpressure.BLOCK, ctor, 0, 4);
 
         BatchInvoker invoker = new BatchInvoker(meta, queue);
-        Object result = invoker.invoke(new Object[]{"hello"});
+        Object result = invoker.invoke(new Object[] { "hello" });
 
         assertThat(result).isInstanceOf(TestRequest.class);
         assertThat(((TestRequest) result).msg).isEqualTo("hello");
@@ -50,12 +47,9 @@ class BatchInvokerTest {
     @Test
     void getHandleMethod() throws Exception {
         Constructor<?> ctor = TestRequest.class.getDeclaredConstructor(String.class);
-        BatchRequestMetaData meta = new BatchRequestMetaData(
-                Object.class.getDeclaredMethod("hashCode"),
-                TestRequest.class, null, "test-queue",
-                1024, BatchMapping.WaitStrategy.BLOCKING, BatchMapping.Backpressure.BLOCK,
-                ctor, 0, 4
-        );
+        BatchRequestMetaData meta = new BatchRequestMetaData(Object.class.getDeclaredMethod("hashCode"),
+                TestRequest.class, null, "test-queue", 1024, BatchMapping.WaitStrategy.BLOCKING,
+                BatchMapping.Backpressure.BLOCK, ctor, 0, 4);
 
         BatchInvoker invoker = new BatchInvoker(meta, queue);
         assertThat(invoker.getHandleMethod()).isEqualTo(Object.class.getDeclaredMethod("hashCode"));
@@ -64,12 +58,9 @@ class BatchInvokerTest {
     @Test
     void getType() throws Exception {
         Constructor<?> ctor = TestRequest.class.getDeclaredConstructor(String.class);
-        BatchRequestMetaData meta = new BatchRequestMetaData(
-                Object.class.getDeclaredMethod("hashCode"),
-                TestRequest.class, null, "test-queue",
-                1024, BatchMapping.WaitStrategy.BLOCKING, BatchMapping.Backpressure.BLOCK,
-                ctor, 0, 4
-        );
+        BatchRequestMetaData meta = new BatchRequestMetaData(Object.class.getDeclaredMethod("hashCode"),
+                TestRequest.class, null, "test-queue", 1024, BatchMapping.WaitStrategy.BLOCKING,
+                BatchMapping.Backpressure.BLOCK, ctor, 0, 4);
 
         BatchInvoker invoker = new BatchInvoker(meta, queue);
         assertThat(invoker.getType()).isEqualTo("batch");
@@ -78,12 +69,9 @@ class BatchInvokerTest {
     @Test
     void getMatchers_returnsEmptyList() throws Exception {
         Constructor<?> ctor = TestRequest.class.getDeclaredConstructor(String.class);
-        BatchRequestMetaData meta = new BatchRequestMetaData(
-                Object.class.getDeclaredMethod("hashCode"),
-                TestRequest.class, null, "test-queue",
-                1024, BatchMapping.WaitStrategy.BLOCKING, BatchMapping.Backpressure.BLOCK,
-                ctor, 0, 4
-        );
+        BatchRequestMetaData meta = new BatchRequestMetaData(Object.class.getDeclaredMethod("hashCode"),
+                TestRequest.class, null, "test-queue", 1024, BatchMapping.WaitStrategy.BLOCKING,
+                BatchMapping.Backpressure.BLOCK, ctor, 0, 4);
 
         BatchInvoker invoker = new BatchInvoker(meta, queue);
         assertThat(invoker.getMatchers()).isEmpty();

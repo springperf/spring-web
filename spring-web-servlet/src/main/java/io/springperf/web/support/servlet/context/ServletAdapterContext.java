@@ -26,7 +26,8 @@ public class ServletAdapterContext {
 
     private FilterChain filterChain;
 
-    public ServletAdapterContext(PerfHttpServletRequest perfRequest, PerfHttpServletResponse perfResponse, FilterChain filterChain) {
+    public ServletAdapterContext(PerfHttpServletRequest perfRequest, PerfHttpServletResponse perfResponse,
+            FilterChain filterChain) {
         this.perfRequest = perfRequest;
         this.perfResponse = perfResponse;
         this.request = perfRequest;
@@ -67,10 +68,10 @@ public class ServletAdapterContext {
     }
 
     /**
-     * 更新框架请求委托。当 WebFilter 包装了 {@link WebServerHttpRequest} 后调用，
-     * 使原始的 {@code PerfHttpServletRequest} 指向包装后的请求。
-     * <p>如果当前 request 已被 javax.servlet.Filter 替换，替换后的 servlet 包装器
-     * 内部仍委托到此 {@code PerfHttpServletRequest}，因此 rebind 效果仍能传递。</p>
+     * 更新框架请求委托。当 WebFilter 包装了 {@link WebServerHttpRequest} 后调用， 使原始的 {@code PerfHttpServletRequest} 指向包装后的请求。
+     * <p>
+     * 如果当前 request 已被 javax.servlet.Filter 替换，替换后的 servlet 包装器 内部仍委托到此 {@code PerfHttpServletRequest}，因此 rebind 效果仍能传递。
+     * </p>
      */
     public void rebindFrameworkRequest(WebServerHttpRequest webRequest) {
         perfRequest.rebind(webRequest);

@@ -1,13 +1,7 @@
 package io.springperf.web.http;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.http.support.HttpInputMessagePart;
-import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-import org.springframework.web.multipart.MultipartFile;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -18,8 +12,15 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.multipart.MultipartFile;
+
+import io.springperf.web.context.WebContext;
+import io.springperf.web.http.support.HttpInputMessagePart;
 
 class BaseWebServerHttpRequestTest {
 
@@ -31,7 +32,7 @@ class BaseWebServerHttpRequestTest {
         private final MultiValueMap<String, String> params;
 
         TestRequest(WebContext wc, String uriStrWithQuery, String resolvedPath, HttpHeaders headers,
-                    MultiValueMap<String, String> params) {
+                MultiValueMap<String, String> params) {
             super(wc, uriStrWithQuery, resolvedPath);
             this.headers = headers;
             this.params = params;
@@ -133,7 +134,7 @@ class BaseWebServerHttpRequestTest {
         params.add("a", "2");
         TestRequest req = new TestRequest(webContext, "/test", "/test", new HttpHeaders(), params);
         assertEquals("1", req.getParameter("a"));
-        assertArrayEquals(new String[]{"1", "2"}, req.getParameterValues("a"));
+        assertArrayEquals(new String[] { "1", "2" }, req.getParameterValues("a"));
         assertNull(req.getParameter("missing"));
         assertNull(req.getParameterValues("missing"));
     }
@@ -145,7 +146,7 @@ class BaseWebServerHttpRequestTest {
         params.add("a", "2");
         TestRequest req = new TestRequest(webContext, "/test", "/test", new HttpHeaders(), params);
         assertEquals(1, req.getParameterMapArray().size());
-        assertArrayEquals(new String[]{"1", "2"}, req.getParameterMapArray().get("a"));
+        assertArrayEquals(new String[] { "1", "2" }, req.getParameterMapArray().get("a"));
     }
 
     @Test

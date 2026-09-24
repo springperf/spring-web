@@ -1,11 +1,10 @@
 package io.springperf.web.http;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpHeaders;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -15,11 +14,12 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 
 class WebHttpHeadersCoverageTest {
 
@@ -78,15 +78,13 @@ class WebHttpHeadersCoverageTest {
     }
 
     private static MethodHandle asMvmHandle() throws Exception {
-        return MethodHandles.lookup()
-                .findStatic(WebHttpHeadersCoverageTest.class, "asMvm",
-                        MethodType.methodType(Object.class, Object.class));
+        return MethodHandles.lookup().findStatic(WebHttpHeadersCoverageTest.class, "asMvm",
+                MethodType.methodType(Object.class, Object.class));
     }
 
     private static MethodHandle failingHandle() throws Exception {
-        return MethodHandles.lookup()
-                .findStatic(WebHttpHeadersCoverageTest.class, "fail",
-                        MethodType.methodType(Object.class, Object.class));
+        return MethodHandles.lookup().findStatic(WebHttpHeadersCoverageTest.class, "fail",
+                MethodType.methodType(Object.class, Object.class));
     }
 
     static Object asMvm(Object self) throws Exception {
@@ -171,13 +169,12 @@ class WebHttpHeadersCoverageTest {
     }
 
     /**
-     * Content-Type 快路径（可写 Netty 视图）：读写必须直接落到 Netty headers 且语义与
-     * Spring {@code HttpHeaders.setContentType/getContentType} 一致（含 null 等价 remove 与缓存失效）。
+     * Content-Type 快路径（可写 Netty 视图）：读写必须直接落到 Netty headers 且语义与 Spring
+     * {@code HttpHeaders.setContentType/getContentType} 一致（含 null 等价 remove 与缓存失效）。
      */
     @Test
     void contentTypeFastPath_writableNettyView_writesAndReadsThroughNetty() {
-        io.netty.handler.codec.http.HttpHeaders netty =
-                new io.netty.handler.codec.http.DefaultHttpHeaders(false);
+        io.netty.handler.codec.http.HttpHeaders netty = new io.netty.handler.codec.http.DefaultHttpHeaders(false);
         WebHttpHeaders h = new WebHttpHeaders(new NettyHttpHeadersAdapter(netty, true));
 
         h.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
@@ -185,8 +182,8 @@ class WebHttpHeadersCoverageTest {
         assertEquals(org.springframework.http.MediaType.APPLICATION_JSON, h.getContentType());
         assertSame(h.getContentType(), h.getContentType(), "解析结果应被缓存");
 
-        org.springframework.http.MediaType textual =
-                org.springframework.http.MediaType.parseMediaType("text/plain;charset=UTF-8");
+        org.springframework.http.MediaType textual = org.springframework.http.MediaType
+                .parseMediaType("text/plain;charset=UTF-8");
         h.setContentType(textual);
         assertEquals(textual, h.getContentType(), "set 后缓存必须失效并重新解析");
         assertEquals("text/plain;charset=UTF-8", netty.get("Content-Type"));
@@ -199,8 +196,7 @@ class WebHttpHeadersCoverageTest {
     /** 只读 Netty 视图（请求侧）：写操作仍必须抛 UnsupportedOperationException，不得被快路径绕过。 */
     @Test
     void contentTypeFastPath_readOnlyView_stillRejectsWrite() {
-        io.netty.handler.codec.http.HttpHeaders netty =
-                new io.netty.handler.codec.http.DefaultHttpHeaders(false);
+        io.netty.handler.codec.http.HttpHeaders netty = new io.netty.handler.codec.http.DefaultHttpHeaders(false);
         netty.set("Content-Type", "application/json");
         WebHttpHeaders ro = new WebHttpHeaders(new NettyHttpHeadersAdapter(netty, false));
 

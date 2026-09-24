@@ -47,7 +47,8 @@ class WebSocketAutoConfigurationTest {
         WebSocketConfigurer configurer = mock(WebSocketConfigurer.class);
         doAnswer(inv -> {
             WebSocketHandlerRegistry reg = inv.getArgument(0);
-            reg.addHandler(new TextWebSocketHandler() {}, "/ws");
+            reg.addHandler(new TextWebSocketHandler() {
+            }, "/ws");
             return null;
         }).when(configurer).registerWebSocketHandlers(any(WebSocketHandlerRegistry.class));
 

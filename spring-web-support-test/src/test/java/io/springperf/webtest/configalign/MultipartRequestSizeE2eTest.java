@@ -20,23 +20,15 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * {@code spring.servlet.multipart.max-request-size} E2E：整个 multipart 请求体超限 → 413
- * （与单文件上限 max-file-size 互补），未超限正常到达控制器。
+ * {@code spring.servlet.multipart.max-request-size} E2E：整个 multipart 请求体超限 → 413 （与单文件上限 max-file-size 互补），未超限正常到达控制器。
  */
-@SpringBootTest(classes = {io.springperf.webtest.SupportTestApplication.class,
-                MultipartRequestSizeE2eTest.ReqSizeConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "spring.servlet.multipart.max-file-size=2KB",
-                "spring.servlet.multipart.max-request-size=2KB"
-        })
+@SpringBootTest(classes = { io.springperf.webtest.SupportTestApplication.class,
+        MultipartRequestSizeE2eTest.ReqSizeConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "spring.servlet.multipart.max-file-size=2KB", "spring.servlet.multipart.max-request-size=2KB" })
 class MultipartRequestSizeE2eTest {
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .readTimeout(Duration.ofSeconds(10))
-            .writeTimeout(Duration.ofSeconds(10))
-            .build();
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+            .readTimeout(Duration.ofSeconds(10)).writeTimeout(Duration.ofSeconds(10)).build();
 
     @LocalServerPort
     int port;
@@ -49,21 +41,18 @@ class MultipartRequestSizeE2eTest {
         MultipartBody.Builder builder = new MultipartBody.Builder().setType(MultipartBody.FORM);
         for (int i = 0; i < fileCount; i++) {
             builder.addFormDataPart("file" + i, "f" + i + ".bin",
-                    RequestBody.create(new byte[bytesPerFile],
-                            MediaType.parse("application/octet-stream")));
+                    RequestBody.create(new byte[bytesPerFile], MediaType.parse("application/octet-stream")));
         }
-        return CLIENT.newCall(new okhttp3.Request.Builder()
-                .url(url("/e2e-reqsize/upload"))
-                .post(builder.build())
-                .build()).execute();
+        return CLIENT
+                .newCall(new okhttp3.Request.Builder().url(url("/e2e-reqsize/upload")).post(builder.build()).build())
+                .execute();
     }
 
     @Test
     void totalWithinLimit_ok() throws Exception {
         okhttp3.Response resp = upload(1, 100);
         try {
-            assertEquals(200, resp.code(), "单文件 100B 远小于 2KB 应正常，实际 "
-                    + resp.code() + " body=" + resp.body().string());
+            assertEquals(200, resp.code(), "单文件 100B 远小于 2KB 应正常，实际 " + resp.code() + " body=" + resp.body().string());
         } finally {
             resp.close();
         }

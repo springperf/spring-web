@@ -22,22 +22,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * {@code server.max-swallow-size=1024} E2E（原始 socket，必须观察真实连接复用/关闭）：
- *
  * <ul>
- *   <li>错误响应（4xx）+ 请求 body 未超上限 → 保持 keep-alive，同连接后续请求可被服务；</li>
- *   <li>错误响应 + 请求 body 超上限 → 降级为 {@code Connection: close} 并真实关闭连接；</li>
- *   <li>成功响应（2xx）+ 大 body → 不受 swallow 限制影响，连接照常复用（限制只作用于错误响应）。</li>
+ * <li>错误响应（4xx）+ 请求 body 未超上限 → 保持 keep-alive，同连接后续请求可被服务；</li>
+ * <li>错误响应 + 请求 body 超上限 → 降级为 {@code Connection: close} 并真实关闭连接；</li>
+ * <li>成功响应（2xx）+ 大 body → 不受 swallow 限制影响，连接照常复用（限制只作用于错误响应）。</li>
  * </ul>
- *
- * <p>swallow 的取舍：聚合模型下 body 已被读完，若在错误响应后继续复用仍带超大 body 的连接，
- * 只会让坏连接占用资源——超过上限即放弃复用。</p>
+ * <p>
+ * swallow 的取舍：聚合模型下 body 已被读完，若在错误响应后继续复用仍带超大 body 的连接， 只会让坏连接占用资源——超过上限即放弃复用。
+ * </p>
  */
-@SpringBootTest(classes = {ConfigAlignTestApp.class, ResponseLimitSwallowE2eTest.SwallowConfig.class},
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/",
-                "server.max-swallow-size=1024"
-        })
+@SpringBootTest(classes = { ConfigAlignTestApp.class,
+        ResponseLimitSwallowE2eTest.SwallowConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+                "server.servlet.context-path=/", "server.max-swallow-size=1024" })
 class ResponseLimitSwallowE2eTest {
 
     /** 小于上限（1024）的请求 body。 */
@@ -72,11 +68,8 @@ class ResponseLimitSwallowE2eTest {
 
     private static String post(String path, int bodyBytes) {
         String body = "x".repeat(bodyBytes);
-        return "POST " + path + " HTTP/1.1\r\n"
-                + "Host: localhost\r\n"
-                + "Content-Type: text/plain\r\n"
-                + "Content-Length: " + bodyBytes + "\r\n\r\n"
-                + body;
+        return "POST " + path + " HTTP/1.1\r\n" + "Host: localhost\r\n" + "Content-Type: text/plain\r\n"
+                + "Content-Length: " + bodyBytes + "\r\n\r\n" + body;
     }
 
     private static String get(String path) {
@@ -141,14 +134,12 @@ class ResponseLimitSwallowE2eTest {
             out.flush();
             String first = readResponses(in, 1);
             assertTrue(first.contains("HTTP/1.1 200"), "应返回 200，实际:\n" + first);
-            assertTrue(!first.toLowerCase().contains("connection: close"),
-                    "成功响应不应因大 body 被关闭连接，实际:\n" + first);
+            assertTrue(!first.toLowerCase().contains("connection: close"), "成功响应不应因大 body 被关闭连接，实际:\n" + first);
 
             out.write(get("/e2e-limit/ok").getBytes(StandardCharsets.UTF_8));
             out.flush();
             String second = readResponses(in, 1);
-            assertTrue(second.contains("HTTP/1.1 200") && second.contains("ok-body"),
-                    "成功响应后连接应可复用，实际:\n" + second);
+            assertTrue(second.contains("HTTP/1.1 200") && second.contains("ok-body"), "成功响应后连接应可复用，实际:\n" + second);
         }
     }
 
@@ -164,8 +155,7 @@ class ResponseLimitSwallowE2eTest {
             out.flush();
             String first = readResponses(in, 1);
             assertTrue(first.contains("HTTP/1.1 400"), "应返回 400，实际:\n" + first);
-            assertTrue(!first.toLowerCase().contains("connection: close"),
-                    "body 恰好等于上限时不应关闭连接（> 才关闭），实际:\n" + first);
+            assertTrue(!first.toLowerCase().contains("connection: close"), "body 恰好等于上限时不应关闭连接（> 才关闭），实际:\n" + first);
         }
     }
 

@@ -2,8 +2,9 @@ package io.springperf.web.websocket;
 
 /**
  * 用户通过实现此接口注册 WebSocket 端点。
+ * <p>
+ * 示例：
  *
- * <p>示例：
  * <pre>{@code
  * @Configuration
  * public class MyWebSocketConfig implements WebSocketConfigurer {
@@ -14,6 +15,7 @@ package io.springperf.web.websocket;
  * }</pre>
  *
  * @author huangcanda
+ *
  * @since 1.0.4
  */
 @FunctionalInterface

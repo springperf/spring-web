@@ -20,8 +20,9 @@ import static org.mockito.Mockito.when;
 
 /**
  * 回归 P2 并发组 #4：背压队列在通道关闭时必须释放未写出的帧。
- * <p>修复前 {@code closeFuture} 只 {@code clear()} 不释放引用，Binary/Text 帧持有的
- * ByteBuf 泄漏到连接生命周期之外。</p>
+ * <p>
+ * 修复前 {@code closeFuture} 只 {@code clear()} 不释放引用，Binary/Text 帧持有的 ByteBuf 泄漏到连接生命周期之外。
+ * </p>
  */
 class NettyWebSocketSessionBackpressureTest {
 
@@ -31,10 +32,10 @@ class NettyWebSocketSessionBackpressureTest {
         // 强制通道不可写 → sendMessage 走背压队列而非直接 flush
         when(channel.isWritable()).thenReturn(false);
 
-        NettyWebSocketSession session = new NettyWebSocketSession(
-                channel, URI.create("ws://localhost/ws"), null, null, null, null, null, null);
+        NettyWebSocketSession session = new NettyWebSocketSession(channel, URI.create("ws://localhost/ws"), null, null,
+                null, null, null, null);
 
-        session.sendMessage(new BinaryMessage(ByteBuffer.wrap(new byte[]{1, 2, 3})));
+        session.sendMessage(new BinaryMessage(ByteBuffer.wrap(new byte[] { 1, 2, 3 })));
         channel.runPendingTasks();
 
         Queue<WebSocketFrame> queue = backpressureQueueOf(channel);

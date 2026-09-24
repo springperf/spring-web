@@ -15,10 +15,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(
-        classes = RestApplication.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
-)
+@SpringBootTest(classes = RestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class RestApiE2eTest {
 
     private TestRestTemplate rest;
@@ -29,8 +26,7 @@ class RestApiE2eTest {
     @BeforeEach
     void setUp() {
         int actualPort = nettyHttpServer.getActualPort();
-        rest = new TestRestTemplate(new RestTemplateBuilder()
-                .rootUri("http://localhost:" + actualPort));
+        rest = new TestRestTemplate(new RestTemplateBuilder().rootUri("http://localhost:" + actualPort));
     }
 
     @Test
@@ -99,9 +95,8 @@ class RestApiE2eTest {
 
         // Step 4: Delete the user
         // Need to use exchange for DELETE with response body
-        ResponseEntity<Map> deleteResp = rest.exchange(
-                "/api/users/" + userId.longValue(),
-                HttpMethod.DELETE, null, Map.class);
+        ResponseEntity<Map> deleteResp = rest.exchange("/api/users/" + userId.longValue(), HttpMethod.DELETE, null,
+                Map.class);
         assertThat(deleteResp.getStatusCodeValue()).isEqualTo(200);
         assertThat(deleteResp.getBody()).isNotNull();
         assertThat(deleteResp.getBody().get("code")).isEqualTo(0);
@@ -125,8 +120,7 @@ class RestApiE2eTest {
 
     @Test
     void deleteUser_notFound_returns404() {
-        ResponseEntity<Map> resp = rest.exchange(
-                "/api/users/99999", HttpMethod.DELETE, null, Map.class);
+        ResponseEntity<Map> resp = rest.exchange("/api/users/99999", HttpMethod.DELETE, null, Map.class);
 
         assertThat(resp.getStatusCodeValue()).isEqualTo(200);
         assertThat(resp.getBody()).isNotNull();

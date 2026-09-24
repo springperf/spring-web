@@ -82,7 +82,8 @@ class SpringMvcTypesTest {
 
     @Test
     void modelAndView_withViewObject() {
-        View view = (model, request, response) -> {};
+        View view = (model, request, response) -> {
+        };
         ModelAndView mav = new ModelAndView(view);
 
         assertSame(view, mav.getView());
@@ -110,7 +111,8 @@ class SpringMvcTypesTest {
 
     @Test
     void modelAndView_withViewNameModelAndHttpStatus() {
-        ModelAndView mav = new ModelAndView("error", Collections.singletonMap("err", "msg"), HttpStatus.INTERNAL_SERVER_ERROR);
+        ModelAndView mav = new ModelAndView("error", Collections.singletonMap("err", "msg"),
+                HttpStatus.INTERNAL_SERVER_ERROR);
 
         assertEquals("error", mav.getViewName());
         assertEquals("msg", mav.getModel().get("err"));
@@ -127,7 +129,8 @@ class SpringMvcTypesTest {
 
     @Test
     void modelAndView_withViewObjectAndModelObject() {
-        View view = (model, request, response) -> {};
+        View view = (model, request, response) -> {
+        };
         ModelAndView mav = new ModelAndView(view, "objName", "objValue");
 
         assertSame(view, mav.getView());
@@ -144,7 +147,8 @@ class SpringMvcTypesTest {
 
     @Test
     void modelAndView_setView_overridesViewName() {
-        View view = (model, request, response) -> {};
+        View view = (model, request, response) -> {
+        };
         ModelAndView mav = new ModelAndView("name");
         mav.setView(view);
 

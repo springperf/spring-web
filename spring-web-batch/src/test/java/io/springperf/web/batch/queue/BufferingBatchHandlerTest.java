@@ -38,11 +38,8 @@ class BufferingBatchHandlerTest {
     void setUp() throws Exception {
         bean = new TestService();
         batchMethod = TestService.class.getDeclaredMethod("handle", List.class);
-        meta = new BatchRequestMetaData(
-                batchMethod, TestService.class, null, "test-queue",
-                1024, BatchMapping.WaitStrategy.BLOCKING, BatchMapping.Backpressure.BLOCK,
-                null, 0, 4
-        );
+        meta = new BatchRequestMetaData(batchMethod, TestService.class, null, "test-queue", 1024,
+                BatchMapping.WaitStrategy.BLOCKING, BatchMapping.Backpressure.BLOCK, null, 0, 4);
     }
 
     @Test

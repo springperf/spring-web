@@ -1,14 +1,15 @@
 package io.springperf.web.core.retval;
 
-import io.springperf.web.core.mapping.MappingHandlerMethod;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
-import org.junit.jupiter.api.Test;
-import org.springframework.core.MethodParameter;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.lang.reflect.Method;
 
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
+import org.springframework.core.MethodParameter;
+
+import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 class MethodReturnValueContextTest {
 
@@ -91,14 +92,24 @@ class MethodReturnValueContextTest {
     private ReturnValueResolver mockResolver() {
         return new ReturnValueResolver() {
             @Override
-            public boolean supportsReturnType(MethodParameter returnType, MappingHandlerMethod mappingContext) { return false; }
+            public boolean supportsReturnType(MethodParameter returnType, MappingHandlerMethod mappingContext) {
+                return false;
+            }
+
             @Override
-            public boolean supportsReturnValue(Object returnValue, WebServerHttpRequest req, WebServerHttpResponse resp) { return false; }
+            public boolean supportsReturnValue(Object returnValue, WebServerHttpRequest req,
+                    WebServerHttpResponse resp) {
+                return false;
+            }
+
             @Override
-            public void resolveReturnValue(Object returnValue, MethodParameter returnType, WebServerHttpRequest req, WebServerHttpResponse resp) {}
+            public void resolveReturnValue(Object returnValue, MethodParameter returnType, WebServerHttpRequest req,
+                    WebServerHttpResponse resp) {
+            }
         };
     }
 
     @SuppressWarnings("unused")
-    public void dummy() {}
+    public void dummy() {
+    }
 }

@@ -1,5 +1,19 @@
 package io.springperf.web.http;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
+
+import java.nio.charset.StandardCharsets;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
@@ -11,27 +25,14 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpVersion;
 import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.WebContext;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.nio.charset.StandardCharsets;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.lenient;
 
 /**
  * {@code @RequestParam} 单值解析的「查询串直扫」快路径回归测试。
- *
- * <p>快路径（{@code NettyServerHttpRequest#getParameter}）只在「无 body 的纯查询请求 + 查询串
- * 不含 {@code % + ; #}」时启用，其余情况必须<b>与通用路径语义完全一致</b>。本类逐条锁定：
- * 命中/未命中/空值、同名多值取首个、转义与分号分隔回退、段数超阈回退、参数上限仍抛 400（hash DoS 防护）、
- * 以及 POST 表单体不被快路径绕过。</p>
+ * <p>
+ * 快路径（{@code NettyServerHttpRequest#getParameter}）只在「无 body 的纯查询请求 + 查询串 不含
+ * {@code % + ; #}」时启用，其余情况必须<b>与通用路径语义完全一致</b>。本类逐条锁定： 命中/未命中/空值、同名多值取首个、转义与分号分隔回退、段数超阈回退、参数上限仍抛 400（hash DoS 防护）、 以及
+ * POST 表单体不被快路径绕过。
+ * </p>
  */
 @ExtendWith(MockitoExtension.class)
 class NettyServerHttpRequestFastParameterLookupTest {
@@ -73,9 +74,8 @@ class NettyServerHttpRequestFastParameterLookupTest {
     void fastPath_matchesGenericPath_forSimpleQuery() {
         NettyServerHttpRequest req = get("/test?x=1&y=two&z=", "/test");
 
-        for (String name : new String[]{"x", "y", "z", "absent"}) {
-            assertEquals(req.getParameterMap().getFirst(name), req.getParameter(name),
-                    "参数 " + name + " 的快/慢路径结果必须一致");
+        for (String name : new String[] { "x", "y", "z", "absent" }) {
+            assertEquals(req.getParameterMap().getFirst(name), req.getParameter(name), "参数 " + name + " 的快/慢路径结果必须一致");
         }
     }
 
@@ -115,8 +115,7 @@ class NettyServerHttpRequestFastParameterLookupTest {
         lenient().when(props.getMaxParameterCount()).thenReturn(3);
         NettyServerHttpRequest req = get("/test?a=1&b=2&c=3&d=4", "/test");
 
-        assertThrows(ParameterLimitExceededException.class, () -> req.getParameter("a"),
-                "参数数超限必须抛 400（不允许快路径绕过上限校验）");
+        assertThrows(ParameterLimitExceededException.class, () -> req.getParameter("a"), "参数数超限必须抛 400（不允许快路径绕过上限校验）");
     }
 
     /** 带表单体的 POST：不得走快路径（body 字段优先于 query，与合并语义一致）。 */

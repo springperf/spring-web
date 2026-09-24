@@ -18,14 +18,16 @@ public abstract class BatchRequest<R> extends DeferredResult<R> {
 
     @Override
     public final boolean setResult(R result) {
-        if (completed) return false;
+        if (completed)
+            return false;
         completed = true;
         return super.setResult(result);
     }
 
     @Override
     public boolean setErrorResult(Object result) {
-        if (completed) return false;
+        if (completed)
+            return false;
         completed = true;
         return super.setErrorResult(result);
     }

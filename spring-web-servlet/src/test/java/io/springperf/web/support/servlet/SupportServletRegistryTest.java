@@ -41,7 +41,7 @@ class SupportServletRegistryTest {
     @Mock
     ApplicationContext applicationContext;
 
-    @WebServlet(name = "demo", urlPatterns = {"/demo", "/demo/*", "*.txt"})
+    @WebServlet(name = "demo", urlPatterns = { "/demo", "/demo/*", "*.txt" })
     static class AnnotatedServlet extends HttpServlet {
     }
 
@@ -105,8 +105,7 @@ class SupportServletRegistryTest {
 
         ArgumentCaptor<PathMappingContext> captor = ArgumentCaptor.forClass(PathMappingContext.class);
         verify(mappingRegistry, times(3)).registerMapping(captor.capture());
-        List<String> pathRules = captor.getAllValues().stream()
-                .map(PathMappingContext::getPathRule)
+        List<String> pathRules = captor.getAllValues().stream().map(PathMappingContext::getPathRule)
                 .collect(java.util.stream.Collectors.toList());
         assertThat(pathRules).containsExactlyInAnyOrder("/demo", "/demo/**", "/**/*.txt");
     }

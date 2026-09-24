@@ -1,14 +1,8 @@
 package io.springperf.web.core.retval;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.mapping.MappingHandlerMethod;
-import io.springperf.web.core.retval.resolver.async.BaseAsyncReturnValueResolver;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.context.ApplicationContext;
-import org.springframework.core.MethodParameter;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 import java.lang.reflect.Field;
 import java.util.Collections;
@@ -16,9 +10,16 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationContext;
+import org.springframework.core.MethodParameter;
+
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.core.retval.resolver.async.BaseAsyncReturnValueResolver;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 class ReturnValueResolverRegistryCoverageTest {
 
@@ -207,8 +208,8 @@ class ReturnValueResolverRegistryCoverageTest {
         }
 
         @Override
-        public void resolveReturnValue(Object returnValue, MethodParameter returnType,
-                                       WebServerHttpRequest r, WebServerHttpResponse s) {
+        public void resolveReturnValue(Object returnValue, MethodParameter returnType, WebServerHttpRequest r,
+                WebServerHttpResponse s) {
             lastValue = returnValue;
             lastReturnType = returnType;
         }
@@ -226,8 +227,8 @@ class ReturnValueResolverRegistryCoverageTest {
         }
 
         @Override
-        public void resolveReturnValue(Object returnValue, MethodParameter returnType,
-                                       WebServerHttpRequest r, WebServerHttpResponse s) {
+        public void resolveReturnValue(Object returnValue, MethodParameter returnType, WebServerHttpRequest r,
+                WebServerHttpResponse s) {
         }
     }
 }

@@ -1,21 +1,22 @@
 package io.springperf.web.core.async.stream;
 
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.*;
+
+import java.util.function.Consumer;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
 import io.springperf.web.core.async.AsyncSupportRegistry;
 import io.springperf.web.core.async.AsyncSupportUtils;
 import io.springperf.web.core.async.PerfAsyncWebRequest;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.function.Consumer;
-
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class StreamEmitterUtilTest {
@@ -60,8 +61,8 @@ class StreamEmitterUtilTest {
         when(requestContext.getAttribute(AsyncSupportUtils.WEB_ASYNC_REQUEST_ATTRIBUTE)).thenReturn(asyncWebRequest);
         when(streamSenderFactory.create(emitter, asyncWebRequest)).thenReturn(streamSender);
 
-        StreamSender result = StreamEmitterUtil.initStreamSenderAndStartAsync(
-                emitter, streamSenderFactory, asyncSupportRegistry, request, response);
+        StreamSender result = StreamEmitterUtil.initStreamSenderAndStartAsync(emitter, streamSenderFactory,
+                asyncSupportRegistry, request, response);
 
         assertSame(streamSender, result);
         verify(asyncSupportRegistry).startDeferredResultProcessing(asyncWebRequest, emitter.getDeferredResult());
@@ -92,8 +93,8 @@ class StreamEmitterUtilTest {
         doThrow(ex).when(asyncSupportRegistry).startDeferredResultProcessing(any(), any());
 
         try {
-            StreamEmitterUtil.initStreamSenderAndStartAsync(
-                    emitter, streamSenderFactory, asyncSupportRegistry, request, response);
+            StreamEmitterUtil.initStreamSenderAndStartAsync(emitter, streamSenderFactory, asyncSupportRegistry, request,
+                    response);
             fail("Expected exception");
         } catch (RuntimeException actual) {
             assertSame(ex, actual);

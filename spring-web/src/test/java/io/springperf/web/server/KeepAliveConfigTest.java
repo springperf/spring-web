@@ -1,10 +1,11 @@
 package io.springperf.web.server;
 
-import io.springperf.web.context.ApplicationProperties;
+import static org.assertj.core.api.Assertions.assertThat;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import io.springperf.web.context.ApplicationProperties;
 
 class KeepAliveConfigTest {
 

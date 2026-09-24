@@ -1,21 +1,14 @@
 package io.springperf.web.core.pool;
 
-import io.springperf.web.annotation.RunInPool;
-import io.springperf.web.context.PropertiesConstant;
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.mapping.MappingHandlerMethod;
-import io.springperf.web.core.mapping.MappingResult;
-import io.springperf.web.core.mapping.PathMappingContext;
-import io.springperf.web.core.metrics.NoOpWebMetrics;
-import io.springperf.web.core.metrics.WebMetrics;
-import io.springperf.web.http.WebServerHttpRequest;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationContext;
-import org.springframework.web.method.HandlerMethod;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -27,28 +20,39 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationContext;
+import org.springframework.web.method.HandlerMethod;
+
+import io.springperf.web.annotation.RunInPool;
+import io.springperf.web.context.PropertiesConstant;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.core.mapping.MappingResult;
+import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.core.metrics.NoOpWebMetrics;
+import io.springperf.web.core.metrics.WebMetrics;
+import io.springperf.web.http.WebServerHttpRequest;
 
 /**
- * 补充 BizPoolRegistry 覆盖率：Phase3 bean 发现、register 边界/替换、
- * 默认池异常配置、Spring 容器兜底解析、determinePool(MappingResult)、setDefaultPool、destroyComponent。
+ * 补充 BizPoolRegistry 覆盖率：Phase3 bean 发现、register 边界/替换、 默认池异常配置、Spring
+ * 容器兜底解析、determinePool(MappingResult)、setDefaultPool、destroyComponent。
  */
 @ExtendWith(MockitoExtension.class)
 class BizPoolRegistryDetailsTest {
 
     private final BizPoolRegistry registry = new BizPoolRegistry();
 
-    @Mock WebContext webContext;
-    @Mock ApplicationContext applicationContext;
-    @Mock WebServerHttpRequest request;
+    @Mock
+    WebContext webContext;
+    @Mock
+    ApplicationContext applicationContext;
+    @Mock
+    WebServerHttpRequest request;
 
     @AfterEach
     void cleanup() throws Exception {
@@ -97,16 +101,14 @@ class BizPoolRegistryDetailsTest {
     }
 
     @Test
-    void initComponentPhase3_emptyPoolsWarnsWhenCheckOnStartup()
-            throws Exception {
+    void initComponentPhase3_emptyPoolsWarnsWhenCheckOnStartup() throws Exception {
         setWebContext(registry, webContext, "default");
         when(webContext.getCtx()).thenReturn(applicationContext);
-        io.springperf.web.context.ApplicationProperties props =
-                mock(io.springperf.web.context.ApplicationProperties.class);
+        io.springperf.web.context.ApplicationProperties props = mock(
+                io.springperf.web.context.ApplicationProperties.class);
         when(webContext.getProps()).thenReturn(props);
         when(props.getBoolean(eq(PropertiesConstant.CHECK_ON_STARTUP), eq(true))).thenReturn(true);
-        when(applicationContext.getBeansOfType(ExecutorService.class))
-                .thenReturn(Collections.emptyMap());
+        when(applicationContext.getBeansOfType(ExecutorService.class)).thenReturn(Collections.emptyMap());
 
         registry.initComponentPhase3();
 
@@ -162,18 +164,17 @@ class BizPoolRegistryDetailsTest {
         ExecutorService pool = initDefaultPoolWith(webContext, 1, 1, 0);
         assertNotNull(pool);
         assertTrue(pool instanceof ThreadPoolExecutor);
-        assertEquals(1, ((ThreadPoolExecutor) pool).getQueue().remainingCapacity(),
-                "queueCapacity<=0 时应调整为 1");
+        assertEquals(1, ((ThreadPoolExecutor) pool).getQueue().remainingCapacity(), "queueCapacity<=0 时应调整为 1");
     }
 
     private static ExecutorService initDefaultPoolWith(WebContext wc, int core, int max, int queue) {
         return initDefaultPoolWith(wc, false, core, max, queue);
     }
 
-    private static ExecutorService initDefaultPoolWith(WebContext wc, boolean virtualThreadsEnabled,
-                                                       int core, int max, int queue) {
-        io.springperf.web.context.ApplicationProperties props =
-                mock(io.springperf.web.context.ApplicationProperties.class);
+    private static ExecutorService initDefaultPoolWith(WebContext wc, boolean virtualThreadsEnabled, int core, int max,
+            int queue) {
+        io.springperf.web.context.ApplicationProperties props = mock(
+                io.springperf.web.context.ApplicationProperties.class);
         when(wc.getProps()).thenReturn(props);
         when(wc.getWebComponentWithDefault(eq(WebMetrics.class), any())).thenReturn(NoOpWebMetrics.INSTANCE);
         when(props.getBoolean(eq("spring.threads.virtual.enabled"), eq(false))).thenReturn(virtualThreadsEnabled);
@@ -196,8 +197,9 @@ class BizPoolRegistryDetailsTest {
 
     /**
      * 虚拟线程模式只替换线程类型：{@code pool.*} 的上限与队列语义必须继续生效。
-     * <p>回归护栏：修复前该模式是 {@code 0 / MAX_VALUE + SynchronousQueue} 且提前 return，
-     * 配置被整段忽略（本用例在修复前必然失败）。</p>
+     * <p>
+     * 回归护栏：修复前该模式是 {@code 0 / MAX_VALUE + SynchronousQueue} 且提前 return， 配置被整段忽略（本用例在修复前必然失败）。
+     * </p>
      */
     @Test
     void initDefaultPool_virtualThreadsMode_stillHonorsPoolBounds() throws Exception {
@@ -208,7 +210,8 @@ class BizPoolRegistryDetailsTest {
         assertEquals(1, tpe.getCorePoolSize(), "core-pool-size 应生效");
         assertEquals(2, tpe.getMaximumPoolSize(), "max-pool-size 应生效");
         assertEquals(7, tpe.getQueue().remainingCapacity(), "queue-capacity 应生效");
-        Thread t = tpe.getThreadFactory().newThread(() -> { });
+        Thread t = tpe.getThreadFactory().newThread(() -> {
+        });
         Method isVirtual = Thread.class.getMethod("isVirtual");
         assertTrue((boolean) isVirtual.invoke(t), "池线程应为虚拟线程");
     }
@@ -229,8 +232,8 @@ class BizPoolRegistryDetailsTest {
     }
 
     private void initRegistryWithVirtualThreadProperty(boolean enabled) {
-        io.springperf.web.context.ApplicationProperties props =
-                mock(io.springperf.web.context.ApplicationProperties.class);
+        io.springperf.web.context.ApplicationProperties props = mock(
+                io.springperf.web.context.ApplicationProperties.class);
         when(webContext.getProps()).thenReturn(props);
         when(webContext.getWebComponentWithDefault(eq(WebMetrics.class), any())).thenReturn(NoOpWebMetrics.INSTANCE);
         when(props.getBoolean(eq("spring.threads.virtual.enabled"), eq(false))).thenReturn(enabled);
@@ -272,12 +275,14 @@ class BizPoolRegistryDetailsTest {
 
     static class ServicePoolCtrl {
         @RunInPool("servicePool")
-        public void doIt() {}
+        public void doIt() {
+        }
     }
 
     static class MissingPoolCtrl {
         @RunInPool("missingPool")
-        public void doIt() {}
+        public void doIt() {
+        }
     }
 
     /* ==================== determinePool(MappingResult) ==================== */
@@ -299,7 +304,8 @@ class BizPoolRegistryDetailsTest {
     }
 
     static class NoAnnoCtrl {
-        public void doIt() {}
+        public void doIt() {
+        }
     }
 
     /* ==================== setDefaultPool ==================== */
@@ -342,12 +348,14 @@ class BizPoolRegistryDetailsTest {
 
     static class DefaultPoolCtrl {
         @RunInPool("default")
-        public void doIt() {}
+        public void doIt() {
+        }
     }
 
     static class EventLoopCtrl {
         @RunInPool(RunInPool.EVENTLOOP)
-        public void doIt() {}
+        public void doIt() {
+        }
     }
 
     /* ==================== destroyComponent ==================== */
@@ -369,15 +377,13 @@ class BizPoolRegistryDetailsTest {
     private static MappingHandlerMethod mappingHandler(Class<?> controllerClass, String methodName) {
         try {
             Object bean = controllerClass.getDeclaredConstructor().newInstance();
-            return new MappingHandlerMethod(
-                    new HandlerMethod(bean, controllerClass.getDeclaredMethod(methodName)));
+            return new MappingHandlerMethod(new HandlerMethod(bean, controllerClass.getDeclaredMethod(methodName)));
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
 
-    private static PathMappingContext pathMappingContext(Class<?> controllerClass, String methodName)
-            throws Exception {
+    private static PathMappingContext pathMappingContext(Class<?> controllerClass, String methodName) throws Exception {
         Object bean = controllerClass.getDeclaredConstructor().newInstance();
         HandlerMethod hm = new HandlerMethod(bean, controllerClass.getDeclaredMethod(methodName));
         return new PathMappingContext(hm, java.util.Collections.emptyList(), "/x");

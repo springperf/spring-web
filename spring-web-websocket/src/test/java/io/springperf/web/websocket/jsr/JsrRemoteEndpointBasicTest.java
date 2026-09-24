@@ -22,13 +22,23 @@ class JsrRemoteEndpointBasicTest {
             codecRegistry, java.util.Collections.emptyMap());
     private JsrRemoteEndpointBasic remote = new JsrRemoteEndpointBasic(session, codecRegistry);
 
-    @jakarta.websocket.server.ServerEndpoint(value = "/e", encoders = {TextEncoder.class})
-    static class CodecEndpoint {}
+    @jakarta.websocket.server.ServerEndpoint(value = "/e", encoders = { TextEncoder.class })
+    static class CodecEndpoint {
+    }
 
     public static class TextEncoder implements jakarta.websocket.Encoder.Text<String> {
-        @Override public String encode(String o) { return "encoded:" + o; }
-        @Override public void init(jakarta.websocket.EndpointConfig config) {}
-        @Override public void destroy() {}
+        @Override
+        public String encode(String o) {
+            return "encoded:" + o;
+        }
+
+        @Override
+        public void init(jakarta.websocket.EndpointConfig config) {
+        }
+
+        @Override
+        public void destroy() {
+        }
     }
 
     @Test

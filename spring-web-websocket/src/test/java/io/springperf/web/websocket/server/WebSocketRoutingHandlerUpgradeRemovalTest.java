@@ -22,9 +22,10 @@ import static org.mockito.Mockito.mock;
 
 /**
  * 回归 P2 并发组 #11：WS 升级成功后必须移除 HTTP 层的 ReadTimeoutHandler。
- * <p>Http2ChannelInitializer 在 readTimeout>0 时为每个连接添加 ReadTimeoutHandler；
- * 修复前 {@code removeHttpHandlers} 不处理它，空闲 WebSocket 连接会被
- * {@code ReadTimeoutException} 误杀。</p>
+ * <p>
+ * Http2ChannelInitializer 在 readTimeout>0 时为每个连接添加 ReadTimeoutHandler； 修复前 {@code removeHttpHandlers} 不处理它，空闲 WebSocket
+ * 连接会被 {@code ReadTimeoutException} 误杀。
+ * </p>
  */
 class WebSocketRoutingHandlerUpgradeRemovalTest {
 
@@ -40,8 +41,8 @@ class WebSocketRoutingHandlerUpgradeRemovalTest {
         channel.pipeline().addLast(new HttpServerCodec());
         channel.pipeline().addLast(new HttpObjectAggregator(64 * 1024));
         channel.pipeline().addLast(new ReadTimeoutHandler(1000, TimeUnit.MILLISECONDS));
-        channel.pipeline().addLast(new WebSocketRoutingHandler(
-                Map.of("/ws", mock(WebSocketHandler.class)), null, false, null));
+        channel.pipeline()
+                .addLast(new WebSocketRoutingHandler(Map.of("/ws", mock(WebSocketHandler.class)), null, false, null));
 
         FullHttpRequest req = upgradeRequest("/ws");
         // 直接 fireChannelRead 推入 pipeline：不经过 writeInbound 的 inbound 缓存，
@@ -55,8 +56,7 @@ class WebSocketRoutingHandlerUpgradeRemovalTest {
         // 关键回归断言：握手成功后请求原始引用必须归零。netty handshake 内部 retain 的
         // 引用由 WebSocketServerHandshaker$2 消费，此处验证调用方持有的原始引用已被释放。
         // 修复前不释放，每次 WS 握手泄漏 1 个 FullHttpRequest 引用（refCnt 停留在 1）。
-        assertEquals(0, req.refCnt(),
-                "握手成功后请求必须被释放，否则每次 WS 握手泄漏一个 FullHttpRequest 引用");
+        assertEquals(0, req.refCnt(), "握手成功后请求必须被释放，否则每次 WS 握手泄漏一个 FullHttpRequest 引用");
 
         // finishAndReleaseAll 只清理 outbound（握手响应）与 inbound 缓冲；req 不在其中，
         // 不会双重释放。

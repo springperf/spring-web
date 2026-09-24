@@ -5,9 +5,9 @@ import java.util.concurrent.ThreadFactory;
 
 /**
  * 虚拟线程能力探测与创建（编译目标 JDK 17，运行时通过反射调用 {@code Thread.ofVirtual}）。
- *
- * <p>全框架唯一入口：{@link BizPoolRegistry} 的 default 业务池、batch 模块的批量方法执行池
- * 都经此创建虚拟线程，保证探测口径与线程命名一致。</p>
+ * <p>
+ * 全框架唯一入口：{@link BizPoolRegistry} 的 default 业务池、batch 模块的批量方法执行池 都经此创建虚拟线程，保证探测口径与线程命名一致。
+ * </p>
  */
 public final class VirtualThreadSupport {
 
@@ -32,11 +32,13 @@ public final class VirtualThreadSupport {
 
     /**
      * 创建以虚拟线程实现的 {@link ThreadFactory}（线程名前缀 {@code namePrefix}）。
+     * <p>
+     * 在 JDK 21+ 上调用 {@code Thread.ofVirtual().name(namePrefix).factory()}；通过公开接口
+     * {@code java.lang.Thread$Builder$OfVirtual} 反射，避免模块系统限制。
+     * </p>
      *
-     * <p>在 JDK 21+ 上调用 {@code Thread.ofVirtual().name(namePrefix).factory()}；通过公开接口
-     * {@code java.lang.Thread$Builder$OfVirtual} 反射，避免模块系统限制。</p>
-     *
-     * @throws IllegalStateException 当前 JVM 不支持虚拟线程（调用前应先用 {@link #isAvailable()} 判断）
+     * @throws IllegalStateException
+     *             当前 JVM 不支持虚拟线程（调用前应先用 {@link #isAvailable()} 判断）
      */
     public static ThreadFactory newThreadFactory(String namePrefix) {
         try {
@@ -48,8 +50,8 @@ public final class VirtualThreadSupport {
             Method factoryMethod = ofVirtualIface.getMethod("factory");
             return (ThreadFactory) factoryMethod.invoke(named);
         } catch (Exception e) {
-            throw new IllegalStateException(
-                    "Virtual threads require JDK 21+ (Thread.ofVirtual is unavailable): " + e, e);
+            throw new IllegalStateException("Virtual threads require JDK 21+ (Thread.ofVirtual is unavailable): " + e,
+                    e);
         }
     }
 }

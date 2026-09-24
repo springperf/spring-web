@@ -21,10 +21,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(
-        classes = RealtimeApplication.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
-)
+@SpringBootTest(classes = RealtimeApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class RealtimeSseE2eTest {
 
     private TestRestTemplate rest;
@@ -37,11 +34,8 @@ class RealtimeSseE2eTest {
     @BeforeEach
     void setUp() {
         actualPort = nettyHttpServer.getActualPort();
-        rest = new TestRestTemplate(new RestTemplateBuilder()
-                .rootUri("http://localhost:" + actualPort));
-        httpClient = new OkHttpClient.Builder()
-                .connectTimeout(5, TimeUnit.SECONDS)
-                .readTimeout(15, TimeUnit.SECONDS)
+        rest = new TestRestTemplate(new RestTemplateBuilder().rootUri("http://localhost:" + actualPort));
+        httpClient = new OkHttpClient.Builder().connectTimeout(5, TimeUnit.SECONDS).readTimeout(15, TimeUnit.SECONDS)
                 .build();
     }
 
@@ -55,8 +49,7 @@ class RealtimeSseE2eTest {
         AtomicReference<String> failure = new AtomicReference<>();
 
         Request sseRequest = new Request.Builder()
-                .url("http://localhost:" + actualPort + "/sse/subscribe?clientId=" + clientId)
-                .build();
+                .url("http://localhost:" + actualPort + "/sse/subscribe?clientId=" + clientId).build();
 
         EventSource.Factory factory = EventSources.createFactory(httpClient);
         EventSource eventSource = factory.newEventSource(sseRequest, new EventSourceListener() {
@@ -79,8 +72,7 @@ class RealtimeSseE2eTest {
         });
 
         // Wait for SSE connection to be established (instead of fixed sleep)
-        assertThat(connectedLatch.await(5, TimeUnit.SECONDS))
-                .as("SSE connection should be established within 5s")
+        assertThat(connectedLatch.await(5, TimeUnit.SECONDS)).as("SSE connection should be established within 5s")
                 .isTrue();
 
         // Send event
@@ -116,20 +108,14 @@ class RealtimeSseE2eTest {
         EventSource.Factory factory = EventSources.createFactory(httpClient);
 
         Request req1 = new Request.Builder()
-                .url("http://localhost:" + actualPort + "/sse/subscribe?clientId=" + clientId1)
-                .build();
+                .url("http://localhost:" + actualPort + "/sse/subscribe?clientId=" + clientId1).build();
         EventSource es1 = factory.newEventSource(req1, new BroadcastResultHandler(connected1, event1, data1, failure1));
-        assertThat(connected1.await(5, TimeUnit.SECONDS))
-                .as("Client 1 should connect within 5s")
-                .isTrue();
+        assertThat(connected1.await(5, TimeUnit.SECONDS)).as("Client 1 should connect within 5s").isTrue();
 
         Request req2 = new Request.Builder()
-                .url("http://localhost:" + actualPort + "/sse/subscribe?clientId=" + clientId2)
-                .build();
+                .url("http://localhost:" + actualPort + "/sse/subscribe?clientId=" + clientId2).build();
         EventSource es2 = factory.newEventSource(req2, new BroadcastResultHandler(connected2, event2, data2, failure2));
-        assertThat(connected2.await(5, TimeUnit.SECONDS))
-                .as("Client 2 should connect within 5s")
-                .isTrue();
+        assertThat(connected2.await(5, TimeUnit.SECONDS)).as("Client 2 should connect within 5s").isTrue();
 
         // Broadcast
         rest.getForEntity("/sse/broadcast?data=broadcast-msg", String.class);
@@ -152,8 +138,7 @@ class RealtimeSseE2eTest {
 
     @Test
     void sse_sendToNonexistentClient_returnsClientNotFound() {
-        String resp = rest.getForEntity(
-                "/sse/send?clientId=nonexist-client&data=test", String.class).getBody();
+        String resp = rest.getForEntity("/sse/send?clientId=nonexist-client&data=test", String.class).getBody();
 
         assertThat(resp).isEqualTo("client not found: nonexist-client");
     }
@@ -164,8 +149,8 @@ class RealtimeSseE2eTest {
         final AtomicReference<String> data;
         final AtomicReference<String> failure;
 
-        BroadcastResultHandler(CountDownLatch connected, CountDownLatch eventReceived,
-                               AtomicReference<String> data, AtomicReference<String> failure) {
+        BroadcastResultHandler(CountDownLatch connected, CountDownLatch eventReceived, AtomicReference<String> data,
+                AtomicReference<String> failure) {
             this.connected = connected;
             this.eventReceived = eventReceived;
             this.data = data;

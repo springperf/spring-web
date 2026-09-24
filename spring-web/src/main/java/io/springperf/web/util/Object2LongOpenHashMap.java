@@ -1,11 +1,9 @@
 package io.springperf.web.util;
 
 /**
- * 专用于 String→long 的开放寻址哈希表。
- * 参考 fastutil 6.5.6 Object2LongOpenHashMap 的核心算法裁剪而来。
+ * 专用于 String→long 的开放寻址哈希表。 参考 fastutil 6.5.6 Object2LongOpenHashMap 的核心算法裁剪而来。
  * <p>
- * 仅保留 put / get / containsKey，无迭代器、无序列化。
- * null 键不可用（null 作为空槽标记）。
+ * 仅保留 put / get / containsKey，无迭代器、无序列化。 null 键不可用（null 作为空槽标记）。
  */
 public class Object2LongOpenHashMap {
 
@@ -47,9 +45,10 @@ public class Object2LongOpenHashMap {
 
     /**
      * 拷贝构造：克隆底层数组，与源实例完全独立。
-     * <p>供 copy-on-write 发布模式使用（见 {@code ApplicationProperties}）：源表发布后不再
-     * 改写，写入时拷贝一份并在拷贝上修改，再通过 volatile 引用发布新表。clone 保证新表
-     * 的后续 put（含 rehash）不会影响已发布的源表。</p>
+     * <p>
+     * 供 copy-on-write 发布模式使用（见 {@code ApplicationProperties}）：源表发布后不再 改写，写入时拷贝一份并在拷贝上修改，再通过 volatile 引用发布新表。clone 保证新表
+     * 的后续 put（含 rehash）不会影响已发布的源表。
+     * </p>
      */
     public Object2LongOpenHashMap(Object2LongOpenHashMap other) {
         this.mask = other.mask;
@@ -108,8 +107,7 @@ public class Object2LongOpenHashMap {
     // ========== 内部方法 ==========
 
     /**
-     * 查找 key 的位置。
-     * 返回的槽位要么是 key 已存在的位置，要么是一个 null 空槽（可插入）。
+     * 查找 key 的位置。 返回的槽位要么是 key 已存在的位置，要么是一个 null 空槽（可插入）。
      */
     private int find(String k) {
         int pos = mix(k.hashCode()) & mask;
@@ -141,7 +139,7 @@ public class Object2LongOpenHashMap {
         maxFill = maxFill(newCapacity, loadFactor);
         size = 0;
 
-        for (int i = oldKey.length; i-- > 0; ) {
+        for (int i = oldKey.length; i-- > 0;) {
             String k = oldKey[i];
             if (k != null) {
                 put(k, oldValue[i]);
@@ -153,7 +151,8 @@ public class Object2LongOpenHashMap {
     private static int arraySize(int expected, float f) {
         long s = Math.max(2, nextPowerOfTwo((long) Math.ceil(expected / f)));
         if (s > (1 << 30)) {
-            throw new IllegalStateException("Too large (" + expected + " expected elements with load factor " + f + ")");
+            throw new IllegalStateException(
+                    "Too large (" + expected + " expected elements with load factor " + f + ")");
         }
         return (int) s;
     }
@@ -166,9 +165,11 @@ public class Object2LongOpenHashMap {
     /** 返回 ≥ v 的最小 2^N */
     private static int nextPowerOfTwo(long v) {
         // 对于 ≤ 1 的情况返回 2
-        if (v <= 1) return 2;
+        if (v <= 1)
+            return 2;
         // 已经是 2^N
-        if ((v & (v - 1)) == 0) return (int) v;
+        if ((v & (v - 1)) == 0)
+            return (int) v;
         // 找最高位 1，左移一位
         int n = 64 - Long.numberOfLeadingZeros(v - 1);
         return 1 << n;

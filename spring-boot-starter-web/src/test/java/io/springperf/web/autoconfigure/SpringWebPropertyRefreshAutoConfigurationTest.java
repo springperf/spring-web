@@ -13,10 +13,10 @@ import static org.mockito.Mockito.*;
 
 /**
  * {@link SpringWebPropertyRefreshAutoConfiguration}：按类名匹配配置变更事件。
- *
- * <p>测试 classpath 无 Spring Cloud 依赖（框架不编译期引用 Cloud 类型），
- * 用 {@code org.springframework.cloud.context.environment.EnvironmentChangeEvent} 同名桩类
- * 验证匹配逻辑（精确匹配、父类链匹配、非匹配事件忽略）。</p>
+ * <p>
+ * 测试 classpath 无 Spring Cloud 依赖（框架不编译期引用 Cloud 类型）， 用
+ * {@code org.springframework.cloud.context.environment.EnvironmentChangeEvent} 同名桩类 验证匹配逻辑（精确匹配、父类链匹配、非匹配事件忽略）。
+ * </p>
  */
 class SpringWebPropertyRefreshAutoConfigurationTest {
 
@@ -26,8 +26,7 @@ class SpringWebPropertyRefreshAutoConfigurationTest {
     @BeforeEach
     void setUp() {
         webContext = mock(WebContext.class);
-        listener = new SpringWebPropertyRefreshAutoConfiguration()
-                .perfWebPropertyRefreshListener(webContext);
+        listener = new SpringWebPropertyRefreshAutoConfiguration().perfWebPropertyRefreshListener(webContext);
     }
 
     @Test

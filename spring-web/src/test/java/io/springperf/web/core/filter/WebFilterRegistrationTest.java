@@ -1,11 +1,12 @@
 package io.springperf.web.core.filter;
 
-import io.springperf.web.util.support.ContainmentResult;
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+
+import org.junit.jupiter.api.Test;
+
+import io.springperf.web.util.support.ContainmentResult;
 
 class WebFilterRegistrationTest {
 
@@ -55,8 +56,7 @@ class WebFilterRegistrationTest {
     @Test
     void matchPathRuleToCached_emptyPatterns_returnsAlways() {
         WebFilterRegistration registration = new WebFilterRegistration(mock(WebFilter.class));
-        assertEquals(ContainmentResult.ALWAYS,
-                registration.matchPathRuleToCached("/api/users"));
+        assertEquals(ContainmentResult.ALWAYS, registration.matchPathRuleToCached("/api/users"));
     }
 
     @Test
@@ -64,8 +64,7 @@ class WebFilterRegistrationTest {
         // include=/api/* (servlet prefix) covers exact pathRule=/api/users → ALWAYS
         WebFilterRegistration registration = new WebFilterRegistration(mock(WebFilter.class));
         registration.addPathPatterns("/api/*");
-        assertEquals(ContainmentResult.ALWAYS,
-                registration.matchPathRuleToCached("/api/users"));
+        assertEquals(ContainmentResult.ALWAYS, registration.matchPathRuleToCached("/api/users"));
     }
 
     @Test
@@ -73,8 +72,7 @@ class WebFilterRegistrationTest {
         // include=/api/* does NOT cover pathRule=/other → NEVER
         WebFilterRegistration registration = new WebFilterRegistration(mock(WebFilter.class));
         registration.addPathPatterns("/api/*");
-        assertEquals(ContainmentResult.NEVER,
-                registration.matchPathRuleToCached("/other"));
+        assertEquals(ContainmentResult.NEVER, registration.matchPathRuleToCached("/other"));
     }
 
     @Test
@@ -83,8 +81,7 @@ class WebFilterRegistrationTest {
         WebFilterRegistration registration = new WebFilterRegistration(mock(WebFilter.class));
         registration.addPathPatterns("/api/*");
         registration.excludePathPatterns("/api/secret");
-        assertEquals(ContainmentResult.NEVER,
-                registration.matchPathRuleToCached("/api/secret"));
+        assertEquals(ContainmentResult.NEVER, registration.matchPathRuleToCached("/api/secret"));
     }
 
     @Test
@@ -93,8 +90,7 @@ class WebFilterRegistrationTest {
         WebFilterRegistration registration = new WebFilterRegistration(mock(WebFilter.class));
         registration.addPathPatterns("/api/*");
         registration.excludePathPatterns("/other");
-        assertEquals(ContainmentResult.ALWAYS,
-                registration.matchPathRuleToCached("/api/users"));
+        assertEquals(ContainmentResult.ALWAYS, registration.matchPathRuleToCached("/api/users"));
     }
 
     @Test
@@ -102,8 +98,7 @@ class WebFilterRegistrationTest {
         // include=/api/* (servlet prefix) vs pathRule=/{var} (Ant 变量，首段不固定) → RUNTIME
         WebFilterRegistration registration = new WebFilterRegistration(mock(WebFilter.class));
         registration.addPathPatterns("/api/*");
-        assertEquals(ContainmentResult.RUNTIME,
-                registration.matchPathRuleToCached("/{var}"));
+        assertEquals(ContainmentResult.RUNTIME, registration.matchPathRuleToCached("/{var}"));
     }
 
     @Test
@@ -112,8 +107,7 @@ class WebFilterRegistrationTest {
         WebFilterRegistration registration = new WebFilterRegistration(mock(WebFilter.class));
         registration.addPathPatterns("/api/*");
         registration.excludePathPatterns("/api/secret");
-        assertEquals(ContainmentResult.RUNTIME,
-                registration.matchPathRuleToCached("/api/{id}"));
+        assertEquals(ContainmentResult.RUNTIME, registration.matchPathRuleToCached("/api/{id}"));
     }
 
     @Test
@@ -121,8 +115,7 @@ class WebFilterRegistrationTest {
         // no includePatterns, exclude=/admin/*, pathRule=/api/users 前缀不相交 → ALWAYS
         WebFilterRegistration registration = new WebFilterRegistration(mock(WebFilter.class));
         registration.excludePathPatterns("/admin/*");
-        assertEquals(ContainmentResult.ALWAYS,
-                registration.matchPathRuleToCached("/api/users"));
+        assertEquals(ContainmentResult.ALWAYS, registration.matchPathRuleToCached("/api/users"));
     }
 
     // -------- matches 运行时路径匹配 --------

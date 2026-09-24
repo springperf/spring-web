@@ -32,8 +32,7 @@ class BatchRegistryGenericTypeTest {
     }
 
     private Type invokeResolveGenericType(Class<?> requestType) {
-        Method resolve = ReflectionUtils.findMethod(
-                BatchRegistry.class, "resolveBatchRequestGenericType", Class.class);
+        Method resolve = ReflectionUtils.findMethod(BatchRegistry.class, "resolveBatchRequestGenericType", Class.class);
         assertThat(resolve).isNotNull();
         resolve.setAccessible(true);
         return (Type) ReflectionUtils.invokeMethod(resolve, null, requestType);
@@ -66,20 +65,17 @@ class BatchRegistryGenericTypeTest {
 
     @Test
     void createEffectiveReturnType_genericParameterMatches() throws Exception {
-        Method createMethod = ReflectionUtils.findMethod(
-                BatchRegistry.class, "createEffectiveReturnType",
+        Method createMethod = ReflectionUtils.findMethod(BatchRegistry.class, "createEffectiveReturnType",
                 io.springperf.web.batch.common.BatchRequestMetaData.class);
         assertThat(createMethod).isNotNull();
         createMethod.setAccessible(true);
 
         java.lang.reflect.Constructor<?> ctor = DirectRequest.class.getDeclaredConstructor(String.class);
         Method dummyMethod = Object.class.getDeclaredMethod("toString");
-        io.springperf.web.batch.common.BatchRequestMetaData meta =
-                new io.springperf.web.batch.common.BatchRequestMetaData(
-                        dummyMethod, DirectRequest.class, DirectRequest.class, "test-queue",
-                        1024, io.springperf.web.batch.annotation.BatchMapping.WaitStrategy.BLOCKING,
-                        io.springperf.web.batch.annotation.BatchMapping.Backpressure.BLOCK,
-                        ctor, 100, 4);
+        io.springperf.web.batch.common.BatchRequestMetaData meta = new io.springperf.web.batch.common.BatchRequestMetaData(
+                dummyMethod, DirectRequest.class, DirectRequest.class, "test-queue", 1024,
+                io.springperf.web.batch.annotation.BatchMapping.WaitStrategy.BLOCKING,
+                io.springperf.web.batch.annotation.BatchMapping.Backpressure.BLOCK, ctor, 100, 4);
 
         MethodParameter mp = (MethodParameter) ReflectionUtils.invokeMethod(createMethod, null, meta);
         assertThat(mp).isNotNull();

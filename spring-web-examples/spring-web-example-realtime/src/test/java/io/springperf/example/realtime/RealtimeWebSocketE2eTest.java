@@ -14,10 +14,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(
-        classes = RealtimeApplication.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
-)
+@SpringBootTest(classes = RealtimeApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class RealtimeWebSocketE2eTest {
 
     private OkHttpClient httpClient;
@@ -29,9 +26,7 @@ class RealtimeWebSocketE2eTest {
     @BeforeEach
     void setUp() {
         actualPort = nettyHttpServer.getActualPort();
-        httpClient = new OkHttpClient.Builder()
-                .readTimeout(10, TimeUnit.SECONDS)
-                .build();
+        httpClient = new OkHttpClient.Builder().readTimeout(10, TimeUnit.SECONDS).build();
     }
 
     @Test
@@ -40,9 +35,7 @@ class RealtimeWebSocketE2eTest {
         AtomicReference<String> receivedMessage = new AtomicReference<>();
         AtomicReference<String> failure = new AtomicReference<>();
 
-        Request wsRequest = new Request.Builder()
-                .url("ws://localhost:" + actualPort + "/ws/chat")
-                .build();
+        Request wsRequest = new Request.Builder().url("ws://localhost:" + actualPort + "/ws/chat").build();
 
         httpClient.newWebSocket(wsRequest, new WebSocketListener() {
             @Override

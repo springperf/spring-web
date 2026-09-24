@@ -6,8 +6,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * @RequestMapping 负向条件 + CGLIB 代理测试。
- * 覆盖 headers / params / consumes 的否定式条件（! 前缀）。
+ * @RequestMapping 负向条件 + CGLIB 代理测试。 覆盖 headers / params / consumes 的否定式条件（! 前缀）。
  */
 @RestController
 @RequestMapping("/proxy-cond-extra")

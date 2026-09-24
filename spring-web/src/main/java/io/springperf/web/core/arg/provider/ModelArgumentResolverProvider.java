@@ -1,15 +1,12 @@
 package io.springperf.web.core.arg.provider;
 
-import io.springperf.web.context.BaseWebComponent;
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.arg.MethodArgContext;
-import io.springperf.web.core.arg.StaticArgumentResolver;
-import io.springperf.web.core.mapping.MappingHandlerMethod;
-import io.springperf.web.core.mapping.route.PathPatternRouter;
-import io.springperf.web.core.model.ModelContext;
-import io.springperf.web.http.RequestContext;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 import org.springframework.core.MethodParameter;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.AnnotatedElementUtils;
@@ -22,22 +19,26 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.method.ControllerAdviceBean;
 
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import io.springperf.web.context.BaseWebComponent;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.arg.MethodArgContext;
+import io.springperf.web.core.arg.StaticArgumentResolver;
+import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.core.mapping.route.PathPatternRouter;
+import io.springperf.web.core.model.ModelContext;
+import io.springperf.web.http.RequestContext;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 /**
- * 解析 {@code Model}/{@code ModelMap}/{@code ExtendedModelMap} 参数并完成 Model 初始化
- * （Model 为请求管线一等公民，容器为 {@link ModelContext}）：
+ * 解析 {@code Model}/{@code ModelMap}/{@code ExtendedModelMap} 参数并完成 Model 初始化 （Model 为请求管线一等公民，容器为
+ * {@link ModelContext}）：
  * <ol>
- *   <li>{@code @ControllerAdvice} {@code @ModelAttribute} 方法</li>
- *   <li>局部 {@code @ModelAttribute} 方法</li>
- *   <li>合并 {@code @ModelAttribute} 参数绑定结果</li>
- *   <li>合并 {@code @PathVariable}</li>
- *   <li>合并 {@code BindingResult}</li>
+ * <li>{@code @ControllerAdvice} {@code @ModelAttribute} 方法</li>
+ * <li>局部 {@code @ModelAttribute} 方法</li>
+ * <li>合并 {@code @ModelAttribute} 参数绑定结果</li>
+ * <li>合并 {@code @PathVariable}</li>
+ * <li>合并 {@code BindingResult}</li>
  * </ol>
  */
 public class ModelArgumentResolverProvider extends BaseWebComponent implements StaticArgumentResolverProvider {
@@ -51,10 +52,12 @@ public class ModelArgumentResolverProvider extends BaseWebComponent implements S
         List<ControllerAdviceBean> adviceBeans = ControllerAdviceBean.findAnnotatedBeans(webContext.getCtx());
         for (ControllerAdviceBean adviceBean : adviceBeans) {
             Class<?> beanType = adviceBean.getBeanType();
-            if (beanType == null) continue;
+            if (beanType == null)
+                continue;
             for (Method method : beanType.getMethods()) {
                 ModelAttribute ma = AnnotatedElementUtils.findMergedAnnotation(method, ModelAttribute.class);
-                if (ma == null) continue;
+                if (ma == null)
+                    continue;
                 adviceMethods.add(new ModelAttributeAdviceMethod(adviceBean, method, ma));
             }
         }
@@ -63,14 +66,13 @@ public class ModelArgumentResolverProvider extends BaseWebComponent implements S
     @Override
     public boolean supports(MethodParameter parameter, MappingHandlerMethod mappingContext) {
         Class<?> paramType = parameter.getParameterType();
-        return Model.class.isAssignableFrom(paramType)
-                || ModelMap.class.isAssignableFrom(paramType)
+        return Model.class.isAssignableFrom(paramType) || ModelMap.class.isAssignableFrom(paramType)
                 || ExtendedModelMap.class.isAssignableFrom(paramType);
     }
 
     @Override
     public StaticArgumentResolver getResolver(MethodParameter parameter, MappingHandlerMethod mappingContext,
-                                              WebContext webContext) {
+            WebContext webContext) {
         Class<?> controllerType = mappingContext.getBeanType();
         List<ModelAttributeAdviceMethod> applicable = new ArrayList<>(adviceMethods.size());
         for (ModelAttributeAdviceMethod advice : adviceMethods) {
@@ -87,12 +89,15 @@ public class ModelArgumentResolverProvider extends BaseWebComponent implements S
         return new ModelStaticArgumentResolver(applicable, localMethods);
     }
 
-    private static List<LocalModelAttributeMethod> scanLocalModelAttributes(Class<?> controllerType, Object controllerBean) {
+    private static List<LocalModelAttributeMethod> scanLocalModelAttributes(Class<?> controllerType,
+            Object controllerBean) {
         List<LocalModelAttributeMethod> list = new ArrayList<>();
         for (Method method : controllerType.getMethods()) {
             ModelAttribute ma = AnnotatedElementUtils.findMergedAnnotation(method, ModelAttribute.class);
-            if (ma == null) continue;
-            if (AnnotatedElementUtils.hasAnnotation(method, RequestMapping.class)) continue;
+            if (ma == null)
+                continue;
+            if (AnnotatedElementUtils.hasAnnotation(method, RequestMapping.class))
+                continue;
             list.add(new LocalModelAttributeMethod(controllerBean, method, ma));
         }
         return list.isEmpty() ? null : list;
@@ -110,7 +115,7 @@ public class ModelArgumentResolverProvider extends BaseWebComponent implements S
         private volatile ModelParamMeta[] modelParams;
 
         ModelStaticArgumentResolver(List<ModelAttributeAdviceMethod> adviceMethods,
-                                     List<LocalModelAttributeMethod> localMethods) {
+                List<LocalModelAttributeMethod> localMethods) {
             this.adviceMethods = adviceMethods;
             this.localMethods = localMethods;
         }
@@ -121,21 +126,21 @@ public class ModelArgumentResolverProvider extends BaseWebComponent implements S
         }
 
         @Override
-        public void postProcess(Object[] args, MethodArgContext[] contexts, int index,
-                                WebServerHttpRequest request, WebServerHttpResponse response) {
+        public void postProcess(Object[] args, MethodArgContext[] contexts, int index, WebServerHttpRequest request,
+                WebServerHttpResponse response) {
             ModelMap model = (ModelMap) args[index];
 
             // 1. @ControllerAdvice @ModelAttribute 方法
             for (ModelAttributeAdviceMethod advice : adviceMethods) {
-                invokeModelAttribute(advice.bean, advice.method, advice.name, advice.paramCount,
-                        advice.hasModelParam, advice.isVoid, model);
+                invokeModelAttribute(advice.bean, advice.method, advice.name, advice.paramCount, advice.hasModelParam,
+                        advice.isVoid, model);
             }
 
             // 2. 局部 @ModelAttribute 方法
             if (localMethods != null) {
                 for (LocalModelAttributeMethod local : localMethods) {
-                    invokeModelAttribute(local.bean, local.method, local.name, local.paramCount,
-                            local.hasModelParam, local.isVoid, model);
+                    invokeModelAttribute(local.bean, local.method, local.name, local.paramCount, local.hasModelParam,
+                            local.isVoid, model);
                 }
             }
 
@@ -150,19 +155,22 @@ public class ModelArgumentResolverProvider extends BaseWebComponent implements S
         }
 
         private void invokeModelAttribute(Object bean, Method method, String name, int paramCount,
-                                          boolean hasModelParam, boolean isVoid, ModelMap model) {
+                boolean hasModelParam, boolean isVoid, ModelMap model) {
             try {
                 if (paramCount == 0) {
                     Object value = method.invoke(bean);
-                    if (!isVoid && value != null) model.addAttribute(name, value);
+                    if (!isVoid && value != null)
+                        model.addAttribute(name, value);
                 } else if (hasModelParam) {
                     Object value = method.invoke(bean, model);
-                    if (!isVoid && value != null) model.addAttribute(name, value);
+                    if (!isVoid && value != null)
+                        model.addAttribute(name, value);
                 }
             } catch (InvocationTargetException ex) {
                 ReflectionUtils.rethrowRuntimeException(ex.getCause());
             } catch (IllegalAccessException ex) {
-                throw new IllegalStateException("Unable to access @ModelAttribute method '" + method.getName() + "'", ex);
+                throw new IllegalStateException("Unable to access @ModelAttribute method '" + method.getName() + "'",
+                        ex);
             }
         }
 
@@ -173,10 +181,13 @@ public class ModelArgumentResolverProvider extends BaseWebComponent implements S
                 this.modelParams = metas;
             }
             for (ModelParamMeta meta : metas) {
-                if (meta.index == index) continue;
+                if (meta.index == index)
+                    continue;
                 Object value = args[meta.index];
-                if (value == null) continue;
-                if (meta.name != null) model.addAttribute(meta.name, value);
+                if (value == null)
+                    continue;
+                if (meta.name != null)
+                    model.addAttribute(meta.name, value);
             }
         }
 
@@ -185,10 +196,13 @@ public class ModelArgumentResolverProvider extends BaseWebComponent implements S
             for (int i = 0; i < ctxs.length; i++) {
                 MethodParameter param = ctxs[i].getMethodParameter();
                 ModelAttribute ma = param.getParameterAnnotation(ModelAttribute.class);
-                if (ma == null) continue;
+                if (ma == null)
+                    continue;
                 String name = ma.name();
-                if (name.isEmpty()) name = ma.value();
-                if (name.isEmpty()) name = param.getParameterName();
+                if (name.isEmpty())
+                    name = ma.value();
+                if (name.isEmpty())
+                    name = param.getParameterName();
                 list.add(new ModelParamMeta(i, name));
             }
             return list.toArray(new ModelParamMeta[0]);
@@ -196,7 +210,8 @@ public class ModelArgumentResolverProvider extends BaseWebComponent implements S
 
         private void mergePathVariables(ModelMap model, WebServerHttpRequest request) {
             Map<String, String> vars = PathPatternRouter.getUriVariableMap(request);
-            if (vars == null || vars.isEmpty()) return;
+            if (vars == null || vars.isEmpty())
+                return;
             for (Map.Entry<String, String> entry : vars.entrySet()) {
                 if (!model.containsKey(entry.getKey())) {
                     model.addAttribute(entry.getKey(), entry.getValue());
@@ -232,12 +247,13 @@ public class ModelArgumentResolverProvider extends BaseWebComponent implements S
             this.bean = adviceBean.resolveBean();
             this.method = method;
             String n = ma.name();
-            if (n.isEmpty()) n = ma.value();
-            if (n.isEmpty()) n = method.getName();
+            if (n.isEmpty())
+                n = ma.value();
+            if (n.isEmpty())
+                n = method.getName();
             this.name = n;
             this.paramCount = method.getParameterCount();
-            this.hasModelParam = paramCount == 1
-                    && Model.class.isAssignableFrom(method.getParameterTypes()[0]);
+            this.hasModelParam = paramCount == 1 && Model.class.isAssignableFrom(method.getParameterTypes()[0]);
             this.isVoid = method.getReturnType() == void.class;
         }
     }
@@ -254,12 +270,13 @@ public class ModelArgumentResolverProvider extends BaseWebComponent implements S
             this.bean = bean;
             this.method = method;
             String n = ma.name();
-            if (n.isEmpty()) n = ma.value();
-            if (n.isEmpty()) n = method.getName();
+            if (n.isEmpty())
+                n = ma.value();
+            if (n.isEmpty())
+                n = method.getName();
             this.name = n;
             this.paramCount = method.getParameterCount();
-            this.hasModelParam = paramCount == 1
-                    && Model.class.isAssignableFrom(method.getParameterTypes()[0]);
+            this.hasModelParam = paramCount == 1 && Model.class.isAssignableFrom(method.getParameterTypes()[0]);
             this.isVoid = method.getReturnType() == void.class;
         }
     }

@@ -11,13 +11,15 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class LogRequestWebFilter implements WebFilter {
     @Override
-    public void doFilter(WebServerHttpRequest request, WebServerHttpResponse response, FilterChain chain) throws Exception {
+    public void doFilter(WebServerHttpRequest request, WebServerHttpResponse response, FilterChain chain)
+            throws Exception {
         long startTime = System.currentTimeMillis();
         try {
             chain.doFilter(request, response);
         } finally {
             long costTimes = System.currentTimeMillis() - startTime;
-            log.info("{} [{}] --- response:{}, cost: {}ms", request.getMethod(), request.getUriStr(), response.getStatus(), costTimes);
+            log.info("{} [{}] --- response:{}, cost: {}ms", request.getMethod(), request.getUriStr(),
+                    response.getStatus(), costTimes);
         }
     }
 }

@@ -15,7 +15,8 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class PerfServletContextTest {
 
-    @Mock WebContext webContext;
+    @Mock
+    WebContext webContext;
 
     private PerfServletContext servletContext;
     private io.springperf.web.context.ApplicationProperties props;

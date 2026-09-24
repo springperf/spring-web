@@ -1,13 +1,13 @@
 package io.springperf.web.core.retval.resolver.async;
 
-import org.springframework.web.context.request.async.DeferredResult;
-
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 
+import org.springframework.web.context.request.async.DeferredResult;
+
 /**
- * Adapter for {@code ListenableFuture} which was removed in Spring Framework 7.0+ (SB 4.x).
- * Uses reflection to maintain cross-version compatibility.
+ * Adapter for {@code ListenableFuture} which was removed in Spring Framework 7.0+ (SB 4.x). Uses reflection to maintain
+ * cross-version compatibility.
  */
 public class ListenableFutureAdapter {
 
@@ -52,10 +52,8 @@ public class ListenableFutureAdapter {
     public static DeferredResult<Object> adapt(Object future) {
         DeferredResult<Object> result = new DeferredResult<>();
         try {
-            Object callback = Proxy.newProxyInstance(
-                    ListenableFutureAdapter.class.getClassLoader(),
-                    new Class<?>[]{LISTENABLE_FUTURE_CALLBACK_CLASS},
-                    (proxy, method, args) -> {
+            Object callback = Proxy.newProxyInstance(ListenableFutureAdapter.class.getClassLoader(),
+                    new Class<?>[] { LISTENABLE_FUTURE_CALLBACK_CLASS }, (proxy, method, args) -> {
                         String methodName = method.getName();
                         if ("onSuccess".equals(methodName)) {
                             result.setResult(args.length > 0 ? args[0] : null);
@@ -63,8 +61,7 @@ public class ListenableFutureAdapter {
                             result.setErrorResult(args[0]);
                         }
                         return null;
-                    }
-            );
+                    });
             Method addCallback = future.getClass().getMethod("addCallback", LISTENABLE_FUTURE_CALLBACK_CLASS);
             addCallback.invoke(future, callback);
         } catch (Exception e) {

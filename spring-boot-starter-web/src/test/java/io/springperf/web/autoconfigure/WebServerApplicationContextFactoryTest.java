@@ -66,7 +66,7 @@ class WebServerApplicationContextFactoryTest {
     @Test
     void create_returnsNewInstanceEachCall() {
         try (ConfigurableApplicationContext ctx1 = factory.create(null);
-             ConfigurableApplicationContext ctx2 = factory.create(null)) {
+                ConfigurableApplicationContext ctx2 = factory.create(null)) {
             assertNotSame(ctx1, ctx2);
         }
     }

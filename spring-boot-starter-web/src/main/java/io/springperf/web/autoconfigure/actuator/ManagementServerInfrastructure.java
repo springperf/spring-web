@@ -5,14 +5,16 @@ import io.springperf.web.context.WebContext;
 
 /**
  * 管理端口的服务器基础设施持有者。
- * <p>内部创建 {@link ManagementDispatcherHandler} 和 {@link ManagementMappingRegistry}。
- * 仅将自身（而非 ManagementDispatcherHandler）注册为 WebComponent：ManagementDispatcherHandler
- * 是 {@link io.springperf.web.core.DispatcherHandler} 子类，若注册进共享 WebContext，会被主端口
- * {@code webContext.getWebComponent(DispatcherHandler.class)} 按 assignable 收集，与主 dispatcher
- * 共享查找空间 → order 相同、取值取决于 map 迭代顺序 → 主端口可能拿到管理 dispatcher，
- * 业务路由全部 404/405 静默退化。</p>
- * <p>自身不继承 DispatcherHandler，也不会被 {@code List<DispatcherHandler>} 自动收集，
- * 从而切断循环依赖链，同时经 {@link #initComponentPhase2()} 转发驱动内部 dispatcher 的装配。</p>
+ * <p>
+ * 内部创建 {@link ManagementDispatcherHandler} 和 {@link ManagementMappingRegistry}。 仅将自身（而非 ManagementDispatcherHandler）注册为
+ * WebComponent：ManagementDispatcherHandler 是 {@link io.springperf.web.core.DispatcherHandler} 子类，若注册进共享
+ * WebContext，会被主端口 {@code webContext.getWebComponent(DispatcherHandler.class)} 按 assignable 收集，与主 dispatcher 共享查找空间 →
+ * order 相同、取值取决于 map 迭代顺序 → 主端口可能拿到管理 dispatcher， 业务路由全部 404/405 静默退化。
+ * </p>
+ * <p>
+ * 自身不继承 DispatcherHandler，也不会被 {@code List<DispatcherHandler>} 自动收集， 从而切断循环依赖链，同时经 {@link #initComponentPhase2()}
+ * 转发驱动内部 dispatcher 的装配。
+ * </p>
  */
 public class ManagementServerInfrastructure implements LifecycleWebComponent {
 

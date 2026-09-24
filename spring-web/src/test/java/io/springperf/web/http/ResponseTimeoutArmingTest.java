@@ -1,19 +1,5 @@
 package io.springperf.web.http;
 
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.EventLoop;
-import io.netty.util.concurrent.ScheduledFuture;
-import io.springperf.web.context.ApplicationProperties;
-import io.springperf.web.context.WebContext;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.concurrent.TimeUnit;
-
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -27,14 +13,28 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.concurrent.TimeUnit;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.EventLoop;
+import io.netty.util.concurrent.ScheduledFuture;
+import io.springperf.web.context.ApplicationProperties;
+import io.springperf.web.context.WebContext;
+
 /**
- * 响应超时「按需装配」语义（{@link WebServerHttpResponse#armTimeoutIfAbsent()} /
- * {@link WebServerHttpResponse#hasTimeoutArmed()}）。
- *
- * <p>背景：{@code pool.default-execute-mode=eventloop} 下处理器在 EventLoop 上同步执行，而超时任务
- * 也调度在同一 EventLoop（{@code ctx.executor().schedule}），处理器执行期间不可能触发 ——
- * 该模式下请求开始不再装配（{@code NettyHttpHandler#armTimeoutOnRequestStart}），改由
- * 池分支 / 异步开始 / 同步段结束兜底三处按需装配。本类锁定按需装配本身的幂等性与关闭语义。</p>
+ * 响应超时「按需装配」语义（{@link WebServerHttpResponse#armTimeoutIfAbsent()} / {@link WebServerHttpResponse#hasTimeoutArmed()}）。
+ * <p>
+ * 背景：{@code pool.default-execute-mode=eventloop} 下处理器在 EventLoop 上同步执行，而超时任务 也调度在同一
+ * EventLoop（{@code ctx.executor().schedule}），处理器执行期间不可能触发 ——
+ * 该模式下请求开始不再装配（{@code NettyHttpHandler#armTimeoutOnRequestStart}），改由 池分支 / 异步开始 / 同步段结束兜底三处按需装配。本类锁定按需装配本身的幂等性与关闭语义。
+ * </p>
  */
 @ExtendWith(MockitoExtension.class)
 class ResponseTimeoutArmingTest {
@@ -95,7 +95,7 @@ class ResponseTimeoutArmingTest {
         resp.armTimeoutIfAbsent();
         assertTrue(resp.hasTimeoutArmed());
 
-        resp.writeBytes("x".getBytes());   // 触发 setCommitted()
+        resp.writeBytes("x".getBytes()); // 触发 setCommitted()
 
         verify(future, times(1)).cancel(false);
     }

@@ -11,12 +11,14 @@ import org.springframework.web.context.request.SessionScope;
 
 /**
  * 注册 {@code session} 作用域，使 {@code @SessionScope} bean 可用。
- * <p>实现：{@link SessionScope}（Spring 原生，基于 {@code RequestContextHolder}
- * 的 {@code ServletRequestAttributes}，随 {@code SupportDispatcherHandler} 初始化）。
- * <p>fail-fast：{@code @SessionScope} 默认 {@code proxyMode=TARGET_CLASS} 依赖
- * spring-aop 的 {@code ScopedProxyFactoryBean} 生成 scoped-proxy。若 classpath 缺失
- * spring-aop 且存在 session 作用域 bean，启动即抛异常而非运行期 NoClassDefFoundError。
- * <p>注意：spring-aop 在本模块为 {@code provided} 依赖（小众需求不强制传递）。
+ * <p>
+ * 实现：{@link SessionScope}（Spring 原生，基于 {@code RequestContextHolder} 的 {@code ServletRequestAttributes}，随
+ * {@code SupportDispatcherHandler} 初始化）。
+ * <p>
+ * fail-fast：{@code @SessionScope} 默认 {@code proxyMode=TARGET_CLASS} 依赖 spring-aop 的 {@code ScopedProxyFactoryBean} 生成
+ * scoped-proxy。若 classpath 缺失 spring-aop 且存在 session 作用域 bean，启动即抛异常而非运行期 NoClassDefFoundError。
+ * <p>
+ * 注意：spring-aop 在本模块为 {@code provided} 依赖（小众需求不强制传递）。
  */
 public class SessionScopeBeanFactoryPostProcessor implements BeanFactoryPostProcessor, PriorityOrdered {
 
