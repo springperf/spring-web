@@ -1,5 +1,13 @@
 package io.springperf.web.http.support;
 
+import java.util.List;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.multipart.MultipartFile;
+
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
@@ -9,13 +17,6 @@ import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-import org.springframework.web.multipart.MultipartFile;
-
-import java.util.List;
 
 public class NettyMultipartWebRequest extends DefaultFullHttpRequest {
 
@@ -31,7 +32,8 @@ public class NettyMultipartWebRequest extends DefaultFullHttpRequest {
     private boolean parsed = false;
 
     public NettyMultipartWebRequest(HttpRequest request, HttpPostRequestDecoder decoder, HttpHeaders trailingHeader) {
-        super(request.protocolVersion(), request.method(), request.uri(), Unpooled.buffer(0), request.headers(), trailingHeader);
+        super(request.protocolVersion(), request.method(), request.uri(), Unpooled.buffer(0), request.headers(),
+                trailingHeader);
         this.decoder = decoder;
         this.interfaceHttpDataList = decoder.getBodyHttpDatas();
     }
@@ -79,7 +81,8 @@ public class NettyMultipartWebRequest extends DefaultFullHttpRequest {
     }
 
     public List<InterfaceHttpData> getInterfaceHttpDataList() {
-        return interfaceHttpDataList;
+        // 只读视图；字段为 null 时保持原有返回 null 的行为
+        return interfaceHttpDataList == null ? null : java.util.Collections.unmodifiableList(interfaceHttpDataList);
     }
 
     @Override

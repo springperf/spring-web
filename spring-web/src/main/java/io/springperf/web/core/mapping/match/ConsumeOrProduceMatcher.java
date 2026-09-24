@@ -1,12 +1,13 @@
 package io.springperf.web.core.mapping.match;
 
-import io.springperf.web.core.mapping.PathMappingContext;
-import io.springperf.web.http.WebServerHttpRequest;
+import java.util.*;
+
 import org.springframework.http.MediaType;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
-import java.util.*;
+import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.http.WebServerHttpRequest;
 
 public class ConsumeOrProduceMatcher implements Matcher {
 
@@ -25,7 +26,8 @@ public class ConsumeOrProduceMatcher implements Matcher {
     }
 
     public List<MediaTypeExpressionSupport> getMediaTypeExpressions() {
-        return mediaTypeRuleList;
+        // 只读视图（合并方 MappingRegistry 只做拷贝读取）；字段为 null 时保持原行为
+        return mediaTypeRuleList == null ? null : java.util.Collections.unmodifiableList(mediaTypeRuleList);
     }
 
     public List<MediaType> getProducibleMediaTypes() {
@@ -75,7 +77,8 @@ public class ConsumeOrProduceMatcher implements Matcher {
         MediaType ruleMediaType = expressionSupport.mediaType;
         boolean match = false;
         for (MediaType acceptedMediaType : acceptedMediaTypes) {
-            if (ruleMediaType.isCompatibleWith(acceptedMediaType) && matchParameters(ruleMediaType, acceptedMediaType)) {
+            if (ruleMediaType.isCompatibleWith(acceptedMediaType)
+                    && matchParameters(ruleMediaType, acceptedMediaType)) {
                 match = true;
                 break;
             }
@@ -112,7 +115,8 @@ public class ConsumeOrProduceMatcher implements Matcher {
             }
             for (MediaTypeExpressionSupport expressionSupport1 : mediaTypeRuleList) {
                 for (MediaTypeExpressionSupport expressionSupport2 : consumeOrProduceMatcher.mediaTypeRuleList) {
-                    if (expressionSupport1.mediaType.includes(expressionSupport2.mediaType) || expressionSupport2.mediaType.includes(expressionSupport1.mediaType)) {
+                    if (expressionSupport1.mediaType.includes(expressionSupport2.mediaType)
+                            || expressionSupport2.mediaType.includes(expressionSupport1.mediaType)) {
                         if (expressionSupport1.negated == expressionSupport2.negated) {
                             return true;
                         }
@@ -125,6 +129,7 @@ public class ConsumeOrProduceMatcher implements Matcher {
 
     @Override
     public String toString() {
-        return (isProduce ? "produces: " : "consumes: ") + (mediaTypeRuleList.size() == 1 ? mediaTypeRuleList.get(0) : mediaTypeRuleList);
+        return (isProduce ? "produces: " : "consumes: ")
+                + (mediaTypeRuleList.size() == 1 ? mediaTypeRuleList.get(0) : mediaTypeRuleList);
     }
 }
