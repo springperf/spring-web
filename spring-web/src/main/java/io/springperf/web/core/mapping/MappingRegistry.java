@@ -1,15 +1,11 @@
 package io.springperf.web.core.mapping;
 
-import io.springperf.web.context.WebComponentContainer;
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.mapping.match.*;
-import io.springperf.web.core.mapping.optimize.*;
-import io.springperf.web.core.mapping.route.Router;
-import io.springperf.web.core.resource.ResourceHandlerRegistry;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.util.PathPatternUtils;
-import io.springperf.web.util.WebUtils;
-import lombok.extern.slf4j.Slf4j;
+import static java.util.Collections.emptyList;
+
+import java.lang.reflect.Method;
+import java.util.*;
+import java.util.stream.Collectors;
+
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.core.env.PropertyResolver;
@@ -21,11 +17,16 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.method.HandlerMethod;
 
-import java.lang.reflect.Method;
-import java.util.*;
-import java.util.stream.Collectors;
-
-import static java.util.Collections.emptyList;
+import io.springperf.web.context.WebComponentContainer;
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.mapping.match.*;
+import io.springperf.web.core.mapping.optimize.*;
+import io.springperf.web.core.mapping.route.Router;
+import io.springperf.web.core.resource.ResourceHandlerRegistry;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.util.PathPatternUtils;
+import io.springperf.web.util.WebUtils;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Scans ApplicationContext for @Controller beans and registers their mappings.
@@ -42,7 +43,6 @@ public class MappingRegistry extends WebComponentContainer {
         webContext.getWebComponentWithDefault(ResourceHandlerRegistry.class, new ResourceHandlerRegistry());
     }
 
-
     public void initComponentPhase1() {
         // （重复路径/方法）选择谁取决于 map 迭代顺序 → 不确定。LinkedHashMap 保序
         // + 直接遍历 values 后选择确定（先注册者胜出），重复映射不再被启动期拒绝。
@@ -52,7 +52,7 @@ public class MappingRegistry extends WebComponentContainer {
             Class<?> clazz = bean.getClass();
             // 使用真实类而非代理类的方法，确保 @RequestMapping/@PostMapping 等注解可被正常读取
             Class<?> targetClass = ClassUtils.getUserClass(clazz);
-            String[] prefix = new String[]{""};
+            String[] prefix = new String[] { "" };
             List<Matcher> classMatchers = emptyList();
             RequestMapping crm = AnnotatedElementUtils.findMergedAnnotation(targetClass, RequestMapping.class);
             if (crm != null) {
@@ -86,13 +86,14 @@ public class MappingRegistry extends WebComponentContainer {
         optimizeMapping(mappingContextList);
     }
 
-    protected void initMethodMappingContext(Object bean, Method method, String[] prefixArray, RequestMapping requestMapping, List<Matcher> classMatchers) {
+    protected void initMethodMappingContext(Object bean, Method method, String[] prefixArray,
+            RequestMapping requestMapping, List<Matcher> classMatchers) {
         String[] paths = requestMapping.path();
         if (paths.length == 0) {
             paths = requestMapping.value();
         }
         if (paths.length == 0) {
-            paths = new String[]{""};
+            paths = new String[] { "" };
         }
         paths = resolvePlaceholders(paths);
         HandlerMethod hm = new HandlerMethod(bean, method);
@@ -112,39 +113,43 @@ public class MappingRegistry extends WebComponentContainer {
         List<Matcher> matchers = new ArrayList<>();
         RequestMethod[] methods = requestMapping.method();
         if (methods.length > 0) {
-            HttpMethod[] httpMethods = Arrays.stream(methods).map(x -> HttpMethod.valueOf(x.name())).toArray(HttpMethod[]::new);
+            HttpMethod[] httpMethods = Arrays.stream(methods).map(x -> HttpMethod.valueOf(x.name()))
+                    .toArray(HttpMethod[]::new);
             matchers.add(new HttpMethodMatcher(httpMethods));
         }
         String[] params = requestMapping.params();
         if (params.length > 0) {
             params = resolvePlaceholders(params);
-            List<NameValueExpressionSupport> expressionList = Arrays.stream(params).map(NameValueExpressionSupport::build).collect(Collectors.toList());
+            List<NameValueExpressionSupport> expressionList = Arrays.stream(params)
+                    .map(NameValueExpressionSupport::build).collect(Collectors.toList());
             matchers.add(new ParamOrHeaderMatcher(false, expressionList));
         }
         String[] headers = requestMapping.headers();
         if (headers.length > 0) {
             headers = resolvePlaceholders(headers);
-            List<NameValueExpressionSupport> expressionList = Arrays.stream(headers).map(NameValueExpressionSupport::build).collect(Collectors.toList());
+            List<NameValueExpressionSupport> expressionList = Arrays.stream(headers)
+                    .map(NameValueExpressionSupport::build).collect(Collectors.toList());
             matchers.add(new ParamOrHeaderMatcher(true, expressionList));
         }
         String[] consumes = requestMapping.consumes();
         if (consumes.length > 0) {
             consumes = resolvePlaceholders(consumes);
-            List<MediaTypeExpressionSupport> mediaTypeRuleList = Arrays.stream(consumes).map(MediaTypeExpressionSupport::build).collect(Collectors.toList());
+            List<MediaTypeExpressionSupport> mediaTypeRuleList = Arrays.stream(consumes)
+                    .map(MediaTypeExpressionSupport::build).collect(Collectors.toList());
             matchers.add(new ConsumeOrProduceMatcher(false, mediaTypeRuleList));
         }
         String[] produces = requestMapping.produces();
         if (produces.length > 0) {
             produces = resolvePlaceholders(produces);
-            List<MediaTypeExpressionSupport> mediaTypeRuleList = Arrays.stream(produces).map(MediaTypeExpressionSupport::build).collect(Collectors.toList());
+            List<MediaTypeExpressionSupport> mediaTypeRuleList = Arrays.stream(produces)
+                    .map(MediaTypeExpressionSupport::build).collect(Collectors.toList());
             matchers.add(new ConsumeOrProduceMatcher(true, mediaTypeRuleList));
         }
         return matchers;
     }
 
     /**
-     * 将类级别的 Matcher 约束合并到方法级别的 Matcher 列表中。
-     * 同类型的 Matcher 合并内部约束列表，不同类型则直接追加。
+     * 将类级别的 Matcher 约束合并到方法级别的 Matcher 列表中。 同类型的 Matcher 合并内部约束列表，不同类型则直接追加。
      */
     protected void mergeMatchers(List<Matcher> methodMatchers, List<Matcher> classMatchers) {
         for (Matcher classMatcher : classMatchers) {
@@ -287,11 +292,10 @@ public class MappingRegistry extends WebComponentContainer {
     }
 
     /**
-     * 判定「路径匹配但条件不满足」的具体原因（对齐 Spring MVC 状态码语义）：
-     * consumes 不匹配 → 415、produces 不匹配 → 406，其余按 404 处理。
+     * 判定「路径匹配但条件不满足」的具体原因（对齐 Spring MVC 状态码语义）： consumes 不匹配 → 415、produces 不匹配 → 406，其余按 404 处理。
      */
-    private static MappingResult.MismatchKind resolveConditionMismatch(
-            PathMappingContext[] contexts, WebServerHttpRequest req) {
+    private static MappingResult.MismatchKind resolveConditionMismatch(PathMappingContext[] contexts,
+            WebServerHttpRequest req) {
         boolean consumesMismatch = false;
         boolean producesMismatch = false;
         for (PathMappingContext ctx : contexts) {
@@ -319,8 +323,10 @@ public class MappingRegistry extends WebComponentContainer {
 
     /**
      * 判断路由不匹配是否由于 HTTP method 导致。
-     * <p>遍历 router 中所有 PathMappingContext：若任一 context 的 HttpMethodMatcher
-     * 匹配请求方法（或无 HttpMethodMatcher），说明失败由其他条件引起，不返回 405。</p>
+     * <p>
+     * 遍历 router 中所有 PathMappingContext：若任一 context 的 HttpMethodMatcher 匹配请求方法（或无 HttpMethodMatcher），说明失败由其他条件引起，不返回
+     * 405。
+     * </p>
      */
     private static boolean isMethodMismatch(PathMappingContext[] contexts, WebServerHttpRequest req) {
         if (contexts == null || contexts.length == 0) {
@@ -341,7 +347,8 @@ public class MappingRegistry extends WebComponentContainer {
     }
 
     public List<PathMappingContext> getMappingContextList() {
+        // 回退只读化：MappingRegistryTest#getMappingContextList_returnsDirectReference 锁定了
+        // 「返回同一实例」契约，故保留直接引用 + 在 spotbugs-exclude.xml 中按类豁免（写明依据）。
         return mappingContextList;
     }
 }
-

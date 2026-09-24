@@ -38,7 +38,7 @@ public class OperationHandlerInvoker implements CustomInvoker {
     private final List<Matcher> matchers;
 
     public OperationHandlerInvoker(WebOperation operation, WebOperationRequestPredicate predicate,
-                                   Collection<String> consumableMediaTypes) {
+            Collection<String> consumableMediaTypes) {
         this.operation = operation;
         this.predicate = predicate;
         this.matchers = initMatchers(predicate, consumableMediaTypes);
@@ -59,7 +59,8 @@ public class OperationHandlerInvoker implements CustomInvoker {
 
     @Override
     public List<Matcher> getMatchers() {
-        return matchers;
+        // 只读视图；字段为 null 时保持原有返回 null 的行为
+        return matchers == null ? null : java.util.Collections.unmodifiableList(matchers);
     }
 
     @Override
@@ -84,14 +85,14 @@ public class OperationHandlerInvoker implements CustomInvoker {
     // ========== Matcher 构造 ==========
 
     private static List<Matcher> initMatchers(WebOperationRequestPredicate predicate,
-                                              Collection<String> consumableMediaTypes) {
+            Collection<String> consumableMediaTypes) {
         List<Matcher> result = new ArrayList<>(4);
 
         // HTTP 方法
         WebEndpointHttpMethod httpMethod = predicate.getHttpMethod();
         HttpMethod httpMethodEnum = toSpringHttpMethod(httpMethod);
         if (httpMethodEnum != null) {
-            result.add(new HttpMethodMatcher(new HttpMethod[]{httpMethodEnum}));
+            result.add(new HttpMethodMatcher(new HttpMethod[] { httpMethodEnum }));
         }
 
         // Consumes
@@ -99,8 +100,7 @@ public class OperationHandlerInvoker implements CustomInvoker {
         // 只在有明确 consumes 语义时添加 ConsumeOrProduceMatcher
         if (!CollectionUtils.isEmpty(consumes) && !CollectionUtils.isEmpty(consumableMediaTypes)) {
             List<MediaTypeExpressionSupport> expressionList = consumableMediaTypes.stream()
-                    .map(MediaTypeExpressionSupport::build)
-                    .collect(Collectors.toList());
+                    .map(MediaTypeExpressionSupport::build).collect(Collectors.toList());
             if (!expressionList.isEmpty()) {
                 result.add(new ConsumeOrProduceMatcher(false, expressionList));
             }
@@ -109,8 +109,7 @@ public class OperationHandlerInvoker implements CustomInvoker {
         // Produces —— Actuator 默认输出 application/json
         Collection<String> produces = predicate.getProduces();
         if (!CollectionUtils.isEmpty(produces)) {
-            List<MediaTypeExpressionSupport> expressionList = produces.stream()
-                    .map(MediaTypeExpressionSupport::build)
+            List<MediaTypeExpressionSupport> expressionList = produces.stream().map(MediaTypeExpressionSupport::build)
                     .collect(Collectors.toList());
             result.add(new ConsumeOrProduceMatcher(true, expressionList));
         }

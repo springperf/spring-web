@@ -21,8 +21,8 @@ import java.util.Map;
 @Slf4j
 public class PerfHttpSessionManager extends BaseWebComponent {
 
-    public static final RequestAttribute<PerfHttpSession> SESSION_ATTR_KEY =
-            RequestAttribute.createAttribute(PerfHttpSession.class);
+    public static final RequestAttribute<PerfHttpSession> SESSION_ATTR_KEY = RequestAttribute
+            .createAttribute(PerfHttpSession.class);
 
     // ---- Cookie 配置键 ----
     static final String COOKIE_NAME_KEY = "server.servlet.session.cookie.name";
@@ -54,14 +54,16 @@ public class PerfHttpSessionManager extends BaseWebComponent {
     private boolean cookieHttpOnly = true;
 
     /**
-     * SameSite 配置值规范化为 Netty {@code CookieHeaderNames.SameSite} 枚举的精确常量名
-     * （Lax/Strict/None——注意非全大写）：配置大小写不敏感，未知值忽略并告警。
+     * SameSite 配置值规范化为 Netty {@code CookieHeaderNames.SameSite} 枚举的精确常量名 （Lax/Strict/None——注意非全大写）：配置大小写不敏感，未知值忽略并告警。
      */
     static String canonicalSameSite(String raw) {
         switch (raw.trim().toLowerCase(java.util.Locale.ROOT)) {
-            case "lax": return "Lax";
-            case "strict": return "Strict";
-            case "none": return "None";
+            case "lax":
+                return "Lax";
+            case "strict":
+                return "Strict";
+            case "none":
+                return "None";
             default:
                 log.warn("Unknown server.servlet.session.cookie.same-site value: {}, ignored", raw);
                 return null;
@@ -84,8 +86,7 @@ public class PerfHttpSessionManager extends BaseWebComponent {
         // Scan for Authenticator bean
         this.authenticator = webContext.getBeanFromCtx(Authenticator.class);
         // Scan for HttpSessionListener and HttpSessionAttributeListener beans
-        this.sessionListeners = new ArrayList<>(
-                webContext.getCtx().getBeansOfType(HttpSessionListener.class).values());
+        this.sessionListeners = new ArrayList<>(webContext.getCtx().getBeansOfType(HttpSessionListener.class).values());
         this.attributeListeners = new ArrayList<>(
                 webContext.getCtx().getBeansOfType(HttpSessionAttributeListener.class).values());
 
@@ -93,7 +94,9 @@ public class PerfHttpSessionManager extends BaseWebComponent {
         this.cookieName = webContext.getProps().get(COOKIE_NAME_KEY, DEFAULT_SESSION_COOKIE_NAME);
         this.cookieSecure = webContext.getProps().getBoolean(COOKIE_SECURE_KEY, false);
         String configuredSameSite = webContext.getProps().get(COOKIE_SAME_SITE_KEY, "");
-        this.sameSite = configuredSameSite.isEmpty() ? null : canonicalSameSite(configuredSameSite);
+        // get 声明为 @Nullable（此处默认值非空，兜底仅为契约完整）
+        this.sameSite = (configuredSameSite == null || configuredSameSite.isEmpty()) ? null
+                : canonicalSameSite(configuredSameSite);
         this.cookieDomain = webContext.getProps().get(COOKIE_DOMAIN_KEY, null);
         String maxAgeRaw = webContext.getProps().get(COOKIE_MAX_AGE_KEY, null);
         this.cookieMaxAge = -1;
@@ -110,14 +113,12 @@ public class PerfHttpSessionManager extends BaseWebComponent {
     }
 
     /**
-     * 按 {@code server.servlet.session.persistent} 选择默认存储：
-     * {@code true} → {@link FileHttpSessionStorage}（每 session 一文件，重启恢复）；
-     * {@code false}（默认）→ 现有 {@link InMemoryHttpSessionStorage}。
-     * 容器中存在自定义 {@link HttpSessionStorage} bean 时优先使用该 bean（不走此方法）。
+     * 按 {@code server.servlet.session.persistent} 选择默认存储： {@code true} → {@link FileHttpSessionStorage}（每 session
+     * 一文件，重启恢复）； {@code false}（默认）→ 现有 {@link InMemoryHttpSessionStorage}。 容器中存在自定义 {@link HttpSessionStorage} bean
+     * 时优先使用该 bean（不走此方法）。
      */
     private HttpSessionStorage createDefaultStorage(WebContext webContext) {
-        boolean persistent = webContext.getProps().getBoolean(
-                PropertiesConstant.SERVLET_SESSION_PERSISTENT,
+        boolean persistent = webContext.getProps().getBoolean(PropertiesConstant.SERVLET_SESSION_PERSISTENT,
                 PropertiesConstant.SERVLET_SESSION_PERSISTENT_DEFAULT);
         if (!persistent) {
             return new InMemoryHttpSessionStorage();
@@ -150,11 +151,13 @@ public class PerfHttpSessionManager extends BaseWebComponent {
     }
 
     public List<HttpSessionListener> getSessionListeners() {
-        return sessionListeners;
+        // 只读视图；字段为 null 时保持原有返回 null 的行为
+        return sessionListeners == null ? null : java.util.Collections.unmodifiableList(sessionListeners);
     }
 
     public List<HttpSessionAttributeListener> getAttributeListeners() {
-        return attributeListeners;
+        // 只读视图（与 getSessionListeners 同型）；字段为 null 时保持原有返回 null 的行为
+        return attributeListeners == null ? null : java.util.Collections.unmodifiableList(attributeListeners);
     }
 
     public String getCookieName() {

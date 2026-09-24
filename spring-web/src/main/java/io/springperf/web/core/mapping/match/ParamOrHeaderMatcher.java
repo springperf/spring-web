@@ -1,11 +1,12 @@
 package io.springperf.web.core.mapping.match;
 
-import io.springperf.web.core.mapping.PathMappingContext;
-import io.springperf.web.http.WebServerHttpRequest;
-import org.springframework.util.ObjectUtils;
-
 import java.util.List;
 import java.util.Objects;
+
+import org.springframework.util.ObjectUtils;
+
+import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.http.WebServerHttpRequest;
 
 public class ParamOrHeaderMatcher implements Matcher {
 
@@ -32,13 +33,15 @@ public class ParamOrHeaderMatcher implements Matcher {
         boolean isMatch;
         if (isHeader) {
             if (expressionSupport.getValue() != null) {
-                isMatch = ObjectUtils.nullSafeEquals(expressionSupport.getValue(), req.getHeaders().getFirst(expressionSupport.getName()));
+                isMatch = ObjectUtils.nullSafeEquals(expressionSupport.getValue(),
+                        req.getHeaders().getFirst(expressionSupport.getName()));
             } else {
                 isMatch = req.getHeaders().containsKey(expressionSupport.getName());
             }
         } else {
             if (expressionSupport.getValue() != null) {
-                isMatch = ObjectUtils.nullSafeEquals(expressionSupport.getValue(), req.getParameter(expressionSupport.getName()));
+                isMatch = ObjectUtils.nullSafeEquals(expressionSupport.getValue(),
+                        req.getParameter(expressionSupport.getName()));
             } else {
                 isMatch = req.getParameterMap().containsKey(expressionSupport.getName());
             }
@@ -51,7 +54,8 @@ public class ParamOrHeaderMatcher implements Matcher {
     }
 
     public List<NameValueExpressionSupport> getExpressions() {
-        return expressionList;
+        // 只读视图（合并方 MappingRegistry 只做拷贝读取）；字段为 null 时保持原行为
+        return expressionList == null ? null : java.util.Collections.unmodifiableList(expressionList);
     }
 
     @Override
@@ -96,6 +100,7 @@ public class ParamOrHeaderMatcher implements Matcher {
 
     @Override
     public String toString() {
-        return (isHeader ? "headers: " : "params: ") + (expressionList.size() == 1 ? expressionList.get(0) : expressionList);
+        return (isHeader ? "headers: " : "params: ")
+                + (expressionList.size() == 1 ? expressionList.get(0) : expressionList);
     }
 }

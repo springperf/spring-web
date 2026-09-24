@@ -41,8 +41,8 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
 
     public static final MappingCacheKey<Type> TARGET_TYPE_CACHE_KEY = MappingCacheKey.createMethodCacheKey(Type.class);
 
-    public static final MappingCacheKey<HttpBodyConverter> READ_BODY_CONVERTER_CACHE_KEY =
-            MappingCacheKey.createMethodCacheKey(HttpBodyConverter.class);
+    public static final MappingCacheKey<HttpBodyConverter> READ_BODY_CONVERTER_CACHE_KEY = MappingCacheKey
+            .createMethodCacheKey(HttpBodyConverter.class);
 
     // 方法级内容协商缓存（仅 @Optimize 方法启用，激进优化 opt-in）：
     // 存进 ctx 的 methodCache 数组槽，外层查找是数组索引读（PathMappingContext 按方法共享
@@ -52,9 +52,9 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
     // key 空间 = @Optimize 方法数 × 每方法 Accept 变体数，客户端可控的是后者，故按方法设上限。
     private static final int NEGOTIATION_CACHE_MAX_PER_METHOD = 64;
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
-    public static final MappingCacheKey<Map<String, NegotiationCacheEntry>> WRITE_NEGOTIATION_CACHE_KEY =
-            (MappingCacheKey) MappingCacheKey.createMethodCacheKey(Map.class);
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    public static final MappingCacheKey<Map<String, NegotiationCacheEntry>> WRITE_NEGOTIATION_CACHE_KEY = (MappingCacheKey) MappingCacheKey
+            .createMethodCacheKey(Map.class);
 
     // registerConverter 失效用的活表：静态 methodCacheInstanceMap 私有不可遍历，
     // registry 记录自己创建的 inner map，converter 集合变更时逐个 clear。
@@ -75,7 +75,6 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
         }
     }
 
-
     private static List<MediaType> getAllSupportedMediaTypes(List<HttpBodyConverter> messageConverters) {
         Set<MediaType> allSupportedMediaTypes = new LinkedHashSet<>();
         for (HttpBodyConverter messageConverter : messageConverters) {
@@ -84,9 +83,11 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
         List<MediaType> result = new ArrayList<>(allSupportedMediaTypes);
         result.sort((a, b) -> {
             int paramsComp = Integer.compare(b.getParameters().size(), a.getParameters().size());
-            if (paramsComp != 0) return paramsComp;
+            if (paramsComp != 0)
+                return paramsComp;
             int typeComp = a.getType().compareToIgnoreCase(b.getType());
-            if (typeComp != 0) return typeComp;
+            if (typeComp != 0)
+                return typeComp;
             return a.getSubtype().compareToIgnoreCase(b.getSubtype());
         });
         return Collections.unmodifiableList(result);
@@ -95,7 +96,8 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
     @Override
     public void initWithWebContext(WebContext webContext) {
         super.initWithWebContext(webContext);
-        interceptorRegistry = webContext.getWebComponentWithDefault(HttpBodyCodecInterceptorRegistry.class, new HttpBodyCodecInterceptorRegistry());
+        interceptorRegistry = webContext.getWebComponentWithDefault(HttpBodyCodecInterceptorRegistry.class,
+                new HttpBodyCodecInterceptorRegistry());
         // 注册高性能 Jackson 转换器
         registerWebComponent(new JacksonHttpBodyConverter());
         registerWebComponent(HttpMessageConverter.class, this::toHttpBodyConverter);
@@ -118,7 +120,8 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
         }
     }
 
-    private static MediaType resetContentTypeWithCharset(HttpHeaders headers, MediaType contentType, Charset setCharset) {
+    private static MediaType resetContentTypeWithCharset(HttpHeaders headers, MediaType contentType,
+            Charset setCharset) {
         if (setCharset != null) {
             Charset contentTypeCharset = contentType.getCharset();
             boolean modifyCharset = false;
@@ -137,7 +140,8 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
         return contentType;
     }
 
-    public Object readBody(Type targetType, MethodParameter parameter, BodyHttpInputMessage msg, WebServerHttpRequest request) {
+    public Object readBody(Type targetType, MethodParameter parameter, BodyHttpInputMessage msg,
+            WebServerHttpRequest request) {
         MediaType contentType = msg.getHeaders().getContentType();
         boolean noContentType = false;
         if (contentType == null) {
@@ -149,13 +153,17 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
         try {
             PathMappingContext ctx = PathMappingContext.get(request);
             HttpBodyConverter cachedConverter = ctx != null ? ctx.get(READ_BODY_CONVERTER_CACHE_KEY) : null;
-            if (cachedConverter != null && cachedConverter.canRead(targetType, parameter.getContainingClass(), contentType, request, ctx)) {
+            if (cachedConverter != null
+                    && cachedConverter.canRead(targetType, parameter.getContainingClass(), contentType, request, ctx)) {
                 if (msg.hasBody()) {
-                    HttpInputMessage msgToUse = interceptorRegistry.beforeBodyRead(request, msg, parameter, targetType, cachedConverter);
+                    HttpInputMessage msgToUse = interceptorRegistry.beforeBodyRead(request, msg, parameter, targetType,
+                            cachedConverter);
                     body = cachedConverter.read(targetType, parameter.getContainingClass(), msgToUse, request, ctx);
-                    body = interceptorRegistry.afterBodyRead(request, body, msgToUse, parameter, targetType, cachedConverter);
+                    body = interceptorRegistry.afterBodyRead(request, body, msgToUse, parameter, targetType,
+                            cachedConverter);
                 } else {
-                    body = interceptorRegistry.handleEmptyBodyRead(request, null, msg, parameter, targetType, cachedConverter);
+                    body = interceptorRegistry.handleEmptyBodyRead(request, null, msg, parameter, targetType,
+                            cachedConverter);
                 }
             } else {
                 for (HttpBodyConverter converter : this.converters) {
@@ -164,11 +172,14 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
                             ctx.set(READ_BODY_CONVERTER_CACHE_KEY, converter);
                         }
                         if (msg.hasBody()) {
-                            HttpInputMessage msgToUse = interceptorRegistry.beforeBodyRead(request, msg, parameter, targetType, converter);
+                            HttpInputMessage msgToUse = interceptorRegistry.beforeBodyRead(request, msg, parameter,
+                                    targetType, converter);
                             body = converter.read(targetType, parameter.getContainingClass(), msgToUse, request, ctx);
-                            body = interceptorRegistry.afterBodyRead(request, body, msgToUse, parameter, targetType, converter);
+                            body = interceptorRegistry.afterBodyRead(request, body, msgToUse, parameter, targetType,
+                                    converter);
                         } else {
-                            body = interceptorRegistry.handleEmptyBodyRead(request, null, msg, parameter, targetType, converter);
+                            body = interceptorRegistry.handleEmptyBodyRead(request, null, msg, parameter, targetType,
+                                    converter);
                         }
                         break;
                     }
@@ -179,8 +190,8 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
         }
         HttpMethod httpMethod = request.getMethod();
         if (body == NO_VALUE) {
-            if (httpMethod == null || !SUPPORTED_METHODS.contains(httpMethod) ||
-                    (noContentType && !request.hasBody())) {
+            if (httpMethod == null || !SUPPORTED_METHODS.contains(httpMethod)
+                    || (noContentType && !request.hasBody())) {
                 return null;
             }
             throw new HttpMessageNotReadableException("not support contentType :" + contentType, null, request);
@@ -188,7 +199,8 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
         return body;
     }
 
-    public void writeBody(Object value, MethodParameter returnType, WebServerHttpRequest request, WebServerHttpResponse response) throws IOException {
+    public void writeBody(Object value, MethodParameter returnType, WebServerHttpRequest request,
+            WebServerHttpResponse response) throws IOException {
         if (value == null) {
             return;
         }
@@ -212,7 +224,8 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
             valueType = body.getClass();
             targetType = ctx != null ? ctx.get(TARGET_TYPE_CACHE_KEY) : null;
             if (targetType == null) {
-                targetType = GenericTypeResolver.resolveType(getGenericType(returnType), returnType.getContainingClass());
+                targetType = GenericTypeResolver.resolveType(getGenericType(returnType),
+                        returnType.getContainingClass());
                 if (ctx != null) {
                     ctx.set(TARGET_TYPE_CACHE_KEY, targetType);
                 }
@@ -339,8 +352,8 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
     }
 
     private void writeWithConverter(Object body, Type targetType, Class<?> valueType, MediaType contentType,
-                                     MethodParameter returnType, WebServerHttpRequest request,
-                                     WebServerHttpResponse response, PathMappingContext ctx) throws IOException {
+            MethodParameter returnType, WebServerHttpRequest request, WebServerHttpResponse response,
+            PathMappingContext ctx) throws IOException {
         for (HttpBodyConverter converter : converters) {
             if (converter.canWrite(targetType, valueType, contentType, request, response, ctx)) {
                 body = interceptorRegistry.beforeBodyWrite(body, returnType, contentType, converter, request, response);
@@ -359,11 +372,11 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
     }
 
     /**
-     * Accept 头归一为缓存 key：缺失/空白统一为通配类型，大小写归一。
-     * （MediaType 解析对 type/subtype 不区分大小写，raw 字符串归一后可复用同一条目。）
-     * <p>必须用规范大小写 "Accept" 读取：旧拷贝到大小写敏感的 LinkedMultiValueMap 后，
-     * 小写 key 读取永远 miss（Netty 迭代保留原始大小写），导致缓存 key 恒为通配类型，
-     * 多格式 endpoint 下不同 Accept 会跨条目复用错误 converter。</p>
+     * Accept 头归一为缓存 key：缺失/空白统一为通配类型，大小写归一。 （MediaType 解析对 type/subtype 不区分大小写，raw 字符串归一后可复用同一条目。）
+     * <p>
+     * 必须用规范大小写 "Accept" 读取：旧拷贝到大小写敏感的 LinkedMultiValueMap 后， 小写 key 读取永远 miss（Netty 迭代保留原始大小写），导致缓存 key 恒为通配类型， 多格式
+     * endpoint 下不同 Accept 会跨条目复用错误 converter。
+     * </p>
      */
     private static String normalizeAcceptKey(WebServerHttpRequest request) {
         String accept = request.getHeaders().getFirst("Accept");
@@ -432,8 +445,8 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
     }
 
     /**
-     * 等价于 {@code mediaType.isPresentIn(ALL_APPLICATION_MEDIA_TYPES)}：
-     * 无参数的 *&#47;* 或 application/*。避免 MediaType.equals 的完整参数比较与集合遍历。
+     * 等价于 {@code mediaType.isPresentIn(ALL_APPLICATION_MEDIA_TYPES)}： 无参数的 *&#47;* 或 application/*。避免 MediaType.equals
+     * 的完整参数比较与集合遍历。
      */
     private static boolean isAllApplicationMediaType(MediaType mediaType) {
         if (!mediaType.getParameters().isEmpty()) {
@@ -444,16 +457,18 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
     }
 
     /**
-     * 比较两个 MediaType，用与旧算法 sort 一致的优先级：
-     * quality(高→低) → params(多→少) → type(A→Z) → subtype(A→Z)
+     * 比较两个 MediaType，用与旧算法 sort 一致的优先级： quality(高→低) → params(多→少) → type(A→Z) → subtype(A→Z)
      */
     private static boolean isBetterMatch(MediaType candidate, MediaType current) {
         int cmp = Double.compare(candidate.getQualityValue(), current.getQualityValue());
-        if (cmp != 0) return cmp > 0;
+        if (cmp != 0)
+            return cmp > 0;
         cmp = Integer.compare(candidate.getParameters().size(), current.getParameters().size());
-        if (cmp != 0) return cmp > 0;
+        if (cmp != 0)
+            return cmp > 0;
         cmp = candidate.getType().compareToIgnoreCase(current.getType());
-        if (cmp != 0) return cmp < 0;
+        if (cmp != 0)
+            return cmp < 0;
         cmp = candidate.getSubtype().compareToIgnoreCase(current.getSubtype());
         return cmp < 0;
     }
@@ -476,6 +491,9 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
     }
 
     public List<HttpBodyConverter> getConverters() {
+        // 回退只读化：HttpBodyCodecRegistryCoverageTest#getConverters_returnsLiveList 以
+        // assertSame(registry.converters, registry.getConverters()) 锁定了「返回活列表」契约，
+        // 故保留直接引用 + 在 spotbugs-exclude.xml 中按类豁免（并写明依据）。
         return converters;
     }
 

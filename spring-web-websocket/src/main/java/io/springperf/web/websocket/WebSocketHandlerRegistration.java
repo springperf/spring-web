@@ -6,10 +6,10 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * 单条 WebSocket 处理器注册的配置持有者。
- * 支持 per-handler 覆盖全局配置。
+ * 单条 WebSocket 处理器注册的配置持有者。 支持 per-handler 覆盖全局配置。
  *
  * @author huangcanda
+ *
  * @since 1.0.4
  */
 public class WebSocketHandlerRegistration {
@@ -34,16 +34,18 @@ public class WebSocketHandlerRegistration {
     }
 
     public String[] getPaths() {
-        return paths;
+        // 返回副本；paths 为 null 时保持原有返回 null 的行为
+        return paths == null ? null : paths.clone();
     }
 
     public WebSocketHandlerRegistration setAllowedOrigins(String... origins) {
-        this.allowedOrigins = origins != null ? Arrays.asList(origins) : null;
+        // Arrays.asList 只是包装（不是拷贝）：调用方改数组会改到这里的配置，故先克隆
+        this.allowedOrigins = origins != null ? Arrays.asList(origins.clone()) : null;
         return this;
     }
 
     public List<String> getAllowedOrigins() {
-        return allowedOrigins;
+        return allowedOrigins == null ? null : java.util.Collections.unmodifiableList(allowedOrigins);
     }
 
     public WebSocketHandlerRegistration setSubProtocols(String subProtocols) {
@@ -83,10 +85,11 @@ public class WebSocketHandlerRegistration {
     }
 
     /**
-     * 设置该路径 WebSocket 连接允许的最大帧载荷长度（字节），覆盖 {@link io.springperf.web.websocket.server.NettyWebSocketSession}
-     * 默认的 text 8KB / binary 64KB，用于按路径差异化帧上限（如大文件通道 vs 心跳通道）（L14）。
+     * 设置该路径 WebSocket 连接允许的最大帧载荷长度（字节），覆盖 {@link io.springperf.web.websocket.server.NettyWebSocketSession} 默认的 text 8KB
+     * / binary 64KB，用于按路径差异化帧上限（如大文件通道 vs 心跳通道）（L14）。
      *
-     * @param messageSizeLimit 单帧最大字节数，需 &gt; 0
+     * @param messageSizeLimit
+     *            单帧最大字节数，需 &gt; 0
      */
     public WebSocketHandlerRegistration setMessageSizeLimit(long messageSizeLimit) {
         this.messageSizeLimit = messageSizeLimit;
