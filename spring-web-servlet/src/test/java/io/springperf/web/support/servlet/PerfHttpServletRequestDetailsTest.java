@@ -15,12 +15,9 @@ import org.springframework.util.MultiValueMap;
 
 import java.io.ByteArrayInputStream;
 import java.io.BufferedReader;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;

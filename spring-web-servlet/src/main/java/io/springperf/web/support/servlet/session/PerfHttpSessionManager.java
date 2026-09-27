@@ -13,6 +13,7 @@ import jakarta.servlet.ServletContext;
 import jakarta.servlet.http.HttpSessionAttributeListener;
 import jakarta.servlet.http.HttpSessionEvent;
 import jakarta.servlet.http.HttpSessionListener;
+import java.io.ObjectInputFilter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -127,10 +128,28 @@ public class PerfHttpSessionManager extends BaseWebComponent {
                 PropertiesConstant.SERVLET_SESSION_STORE_DIR_DEFAULT);
         String excludeRaw = webContext.getProps().get(PropertiesConstant.SERVLET_SESSION_PERSISTENT_EXCLUDE, null);
         java.util.Set<String> exclude = FileHttpSessionStorage.parseExcludeList(excludeRaw);
+        String filterSpec = webContext.getProps()
+                .get(PropertiesConstant.SERVLET_SESSION_PERSISTENT_DESERIALIZATION_FILTER, null);
+        // 规格非法时在此抛出（收紧项写错必须显形，不能悄悄退化成「不过滤」）
+        ObjectInputFilter deserializationFilter = FileHttpSessionStorage.parseDeserializationFilter(filterSpec);
         java.nio.file.Path dir = java.nio.file.Paths.get(storeDir);
-        log.info("Session persistence enabled (server.servlet.session.persistent=true), store-dir={}, exclude={}",
-                dir.toAbsolutePath(), exclude);
-        return new FileHttpSessionStorage(dir, exclude);
+        if (deserializationFilter == null) {
+            // 默认保持「不过滤」以免打断现有部署（功能优先），但必须让风险显形：
+            // 能往 store-dir 写文件的人，可在下次启动时让任意 classpath 上的类被反序列化。
+            // 配到 /tmp 之类全局可写目录时，这一点尤其要紧。
+            log.warn("Session persistence is enabled WITHOUT a deserialization filter ({} is unset), store-dir={}, "
+                    + "exclude={}: every class on the classpath may be deserialized from that directory, so anyone "
+                    + "able to write it could execute code on the next restart. To lock it down, allow only what you "
+                    + "actually store, e.g. "
+                    + "'java.lang.*;java.util.*;java.math.*;java.time.*;maxarray=1000;maxdepth=20;maxrefs=10000;!*' "
+                    + "(append your own packages; or '*' to keep allowing everything).",
+                    PropertiesConstant.SERVLET_SESSION_PERSISTENT_DESERIALIZATION_FILTER, dir.toAbsolutePath(),
+                    exclude);
+        } else {
+            log.info("Session persistence enabled, store-dir={}, exclude={}, deserialization-filter={}",
+                    dir.toAbsolutePath(), exclude, filterSpec.trim());
+        }
+        return new FileHttpSessionStorage(dir, exclude, deserializationFilter);
     }
 
     @Override

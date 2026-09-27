@@ -7,7 +7,8 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * 验证 {@link NettyHttpServletRequest} 的网络地址/协议/URL 构造逻辑。

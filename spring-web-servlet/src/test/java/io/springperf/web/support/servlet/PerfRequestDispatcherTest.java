@@ -5,7 +5,6 @@ import io.springperf.web.core.DispatcherHandler;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.support.SupportDispatcherHandler;
-import io.springperf.web.support.servlet.context.ServletAdapterContext;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletException;

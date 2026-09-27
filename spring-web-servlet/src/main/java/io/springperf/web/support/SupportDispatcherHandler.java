@@ -21,7 +21,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 
 import java.io.IOException;
-import java.io.OutputStream;
 
 public class SupportDispatcherHandler extends DispatcherHandler {
 

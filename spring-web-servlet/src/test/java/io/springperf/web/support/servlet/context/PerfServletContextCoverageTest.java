@@ -1,7 +1,6 @@
 package io.springperf.web.support.servlet.context;
 
 import io.springperf.web.context.WebContext;
-import jakarta.servlet.ServletContext;
 import jakarta.servlet.SessionCookieConfig;
 import jakarta.servlet.SessionTrackingMode;
 import org.junit.jupiter.api.AfterEach;
@@ -11,7 +10,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.io.File;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.Enumeration;
