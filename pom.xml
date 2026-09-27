@@ -662,6 +662,9 @@
                                             <path>${project.build.directory}/${project.build.finalName}.jar</path>
                                         </file>
                                     </newVersion>
+                                    <!-- 缺失时 japicmp 默认 false：检出二进制不兼容也照样 BUILD SUCCESS，
+                                         门禁形同虚设——只产出一份没人看的报告。这是它唯一能真正拦截的开关。 -->
+                                    <breakBuildOnBinaryIncompatibleModifications>true</breakBuildOnBinaryIncompatibleModifications>
                                     <parameter>
                                         <skipPomModules>true</skipPomModules>
                                         <onlyModified>true</onlyModified>
@@ -783,6 +786,9 @@
                                             <path>${project.build.directory}/${project.build.finalName}.jar</path>
                                         </file>
                                     </newVersion>
+                                    <!-- 缺失时 japicmp 默认 false：检出二进制不兼容也照样 BUILD SUCCESS，
+                                         门禁形同虚设——只产出一份没人看的报告。这是它唯一能真正拦截的开关。 -->
+                                    <breakBuildOnBinaryIncompatibleModifications>true</breakBuildOnBinaryIncompatibleModifications>
                                     <parameter>
                                         <skipPomModules>true</skipPomModules>
                                         <onlyModified>true</onlyModified>

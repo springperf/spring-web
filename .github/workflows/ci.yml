@@ -87,9 +87,18 @@ jobs:
       - name: SpotBugs gate + modernizer
         run: ./mvnw verify -DskipTests --batch-mode --no-transfer-progress -q
 
-      # 只校验不重写：格式漂移在此红，修法见 CONTRIBUTING 的 Formatting 一节
-      - name: Check formatting (no rewrite)
-        run: ./mvnw formatter:validate --batch-mode --no-transfer-progress -q
+      # 跑真正的 format 目标再断言工作区零改动：formatter:validate 只看格式化，看不见 profile 还会做的
+      # 「删除未用 import」这类改写 —— 实测它报绿而一次模块级 format 改写了 44 个文件。
+      # 修法见 CONTRIBUTING 的 Formatting 一节。
+      - name: Check formatting (format then assert no diff)
+        run: |
+          set -euo pipefail
+          ./mvnw -Dformat=true process-sources --batch-mode --no-transfer-progress -q
+          if ! git diff --exit-code; then
+            echo "::error::Formatting differs from the format profile; run ./mvnw -Dformat=true process-sources and commit the result."
+            git --no-pager diff --stat
+            exit 1
+          fi
 
       - name: Upload SpotBugs XML
         if: always()
@@ -97,6 +106,65 @@ jobs:
         with:
           name: spotbugs-xml
           path: "**/spotbugsXml.xml"
+          if-no-files-found: ignore
+
+  binary-compat:
+    # japicmp 二进制兼容门禁：拿「同一 minor 系列的上一个 release tag」构建的产物当基线，与当前分支对比。
+    # 为什么用 -Pcompat-file（jar 路径）而不是 -Pcompat（按版本号从仓库解析）：后者在本地 install 过
+    # 同版本自构建 jar 时会静默变成「自比对」，得出 No incompatible changes 的假结论（pom 注释已记录该踩坑）。
+    # 为什么限定同一 minor：跨 minor/major 的比较混有大量按语义版本本就允许的破坏，噪声盖过信号。
+    # 该系列还没有 release tag 时跳过（首个 3.5.x tag 之后自动开始生效），避免用一个必然红的基线污染门禁。
+    if: github.ref == 'refs/heads/master' || github.base_ref == 'master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          java-version: 17
+          distribution: temurin
+          cache: maven
+
+      - name: Resolve baseline tag
+        id: baseline
+        run: |
+          set -euo pipefail
+          CURRENT=$(./mvnw -q -DforceStdout help:evaluate -Dexpression=project.version -pl spring-web --batch-mode)
+          MINOR=$(printf '%s' "$CURRENT" | cut -d. -f1,2)
+          TAG=$(git tag --list "v${MINOR}.*" --sort=-v:refname | head -1)
+          echo "current=${CURRENT} minor=${MINOR} baseline_tag=${TAG:-<none>}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Build baseline jar from tag
+        if: steps.baseline.outputs.tag != ''
+        run: |
+          set -euo pipefail
+          git checkout --detach "${{ steps.baseline.outputs.tag }}"
+          ./mvnw -pl spring-web -am package -DskipTests -Dmaven.source.skip=true -Dmaven.javadoc.skip=true --batch-mode --no-transfer-progress -q
+          mkdir -p "$RUNNER_TEMP/baseline"
+          cp "$(ls spring-web/target/spring-web-*.jar | grep -v -e sources -e javadoc -e tests | head -1)" "$RUNNER_TEMP/baseline/spring-web.jar"
+          # 回到触发本次 run 的那个提交。不能写 `git checkout -`：PR 上 checkout 出来的是 detached HEAD，
+          # 该写法会回到「上一个分支」，于是后面比对的不是本 PR 的产物 —— 静默通过，正是本 job 要避免的假结论。
+          git checkout --detach "$GITHUB_SHA"
+
+      - name: Compare against baseline
+        if: steps.baseline.outputs.tag != ''
+        run: ./mvnw -pl spring-web -am -Pcompat-file -Dcompat.oldJar="$RUNNER_TEMP/baseline/spring-web.jar" verify -DskipTests --batch-mode --no-transfer-progress
+
+      - name: Skip notice
+        if: steps.baseline.outputs.tag == ''
+        run: echo "::notice::当前 minor 系列尚无 release tag，跳过二进制兼容对比；打出该系列第一个 tag 后本 job 自动启用。"
+
+      - name: Upload japicmp report
+        if: always() && steps.baseline.outputs.tag != ''
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: japicmp-report
+          path: "**/target/japicmp/*"
           if-no-files-found: ignore
 
   javadoc:
