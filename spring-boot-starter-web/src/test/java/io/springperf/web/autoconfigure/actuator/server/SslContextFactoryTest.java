@@ -229,8 +229,7 @@ class SslContextFactoryTest {
         when(env.getProperty(eq("server.ssl.enabled-protocols"))).thenReturn("TLSv1.2,TLSv1.3");
 
         // 与同文件其它 _builds 用例一致：断言真的构建出了对象，而不只是"没抛异常"
-        assertNotNull(SslContextFactory.createServerSslContext(env, "server.ssl."),
-                "enabled-protocols 应成功构建（版本协商配置）");
+        assertNotNull(SslContextFactory.createServerSslContext(env, "server.ssl."), "enabled-protocols 应成功构建（版本协商配置）");
     }
 
     @Test
