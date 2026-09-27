@@ -61,7 +61,30 @@ public class FileController {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"").body(resource);
+                .header(HttpHeaders.CONTENT_DISPOSITION, attachmentHeader(filename)).body(resource);
+    }
+
+    /**
+     * 组装 {@code Content-Disposition} 头。文件名来自请求参数，**不能**直接拼进响应头：能破坏头结构的 字符（CR/LF/引号/反斜杠）先替换掉，非 ASCII 名再用 RFC 5987 的
+     * {@code filename*} 传递， {@code filename=} 只留 ASCII 回退（老客户端用）。
+     */
+    private static String attachmentHeader(String filename) {
+        if (filename == null || filename.isEmpty()) {
+            return "attachment";
+        }
+        String ascii = filename.replaceAll("[\\r\\n\"\\\\]", "_").replaceAll("[^\\x20-\\x7E]", "_");
+        StringBuilder header = new StringBuilder("attachment; filename=\"").append(ascii)
+                .append("\"; filename*=UTF-8''");
+        for (byte b : filename.getBytes(java.nio.charset.StandardCharsets.UTF_8)) {
+            int c = b & 0xFF;
+            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' || c == '-'
+                    || c == '_' || c == '~') {
+                header.append((char) c);
+            } else {
+                header.append('%').append("0123456789ABCDEF".charAt(c >> 4)).append("0123456789ABCDEF".charAt(c & 0xF));
+            }
+        }
+        return header.toString();
     }
 
     /**
