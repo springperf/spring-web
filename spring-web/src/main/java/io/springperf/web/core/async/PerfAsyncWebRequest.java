@@ -38,13 +38,24 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest
 
     protected boolean errorHandlingInProgress;
     private long timeoutMillis = -1;
+    /**
+     * 结果槽：非 RESULT_NONE 即已被并发 dispatch 抢占写入。
+     * <p>
+     * <b>发布边是 {@code state} 的 CAS，而不是 {@code synchronized(this)}</b>：写入确实在锁内，但读取发生在 {@link #dispatch()} 的
+     * {@code state.compareAndSet(ASYNC_STARTED, DISPATCHED)} 之后（volatile 读 → 写入对读取线程可见）。同一依据也记在
+     * {@code spotbugs-exclude.xml}。 改动此处时不要削弱那次 CAS：它同时承担互斥与可见性。
+     * </p>
+     */
     private Object concurrentResult = RESULT_NONE;
 
-    private Runnable timeoutHandler;
-    private Consumer<Throwable> errorHandler;
-    private Runnable completionHandler;
-    private Consumer<Throwable> writeCallbackHandler;
-    private Runnable asyncReadyCallback;
+    // 以下回调字段统一 volatile：写入方是业务线程（注册钩子 / 启动异步），读取方是 EventLoop
+    // （写回调、超时任务、断连回调）。二者之间没有同步点，普通字段会让 EventLoop 侧读到 null
+    // 而静默跳过回调——表现为超时不生效、错误不被记录、异步完成时到不了 completionHandler。
+    private volatile Runnable timeoutHandler;
+    private volatile Consumer<Throwable> errorHandler;
+    private volatile Runnable completionHandler;
+    private volatile Consumer<Throwable> writeCallbackHandler;
+    private volatile Runnable asyncReadyCallback;
 
     protected PerfAsyncWebRequest(WebServerHttpRequest request, WebServerHttpResponse response) {
         super(request, response);
@@ -116,8 +127,14 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest
      * 只做生命周期清理，<b>不</b>触发业务 errorHandler（客户端中断不是业务错误，避免日志/指标噪声）。 释放时其他持有者（业务池任务那一次 acquire）仍持有各自引用，故正在读 body 的线程不受影响。
      * </p>
      */
-    /** 连接断开（客户端消失）时的取消钩子：供上游订阅（reactive）/长任务在断连时主动退场。 */
-    private Runnable connectionCloseHandler;
+    /**
+     * 连接断开（客户端消失）时的取消钩子：供上游订阅（reactive）/长任务在断连时主动退场。
+     * <p>
+     * 用 {@link AtomicReference} 而非 volatile 字段：注册方是业务线程（reactive 订阅建立时），执行方是 EventLoop（断连回调）。 除了可见性，这里还需要「取出并清空」是原子的 ——
+     * 原先的 {@code 读 → 判非空 → 置 null} 三步在并发断连信号下 会让两个线程同时读到同一个 handler 并各跑一次。
+     * </p>
+     */
+    private final AtomicReference<Runnable> connectionCloseHandler = new AtomicReference<>();
 
     /**
      * 注册「客户端断连」钩子。
@@ -127,14 +144,14 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest
      * </p>
      */
     public void addConnectionCloseHandler(Runnable handler) {
-        this.connectionCloseHandler = handler;
+        this.connectionCloseHandler.set(handler);
     }
 
     public void releaseOnConnectionClose() {
         state.compareAndSet(State.ASYNC_STARTED, State.COMPLETED);
-        Runnable handler = this.connectionCloseHandler;
+        // 原子取出并清空：无论多少个断连信号并发到达，钩子至多执行一次
+        Runnable handler = this.connectionCloseHandler.getAndSet(null);
         if (handler != null) {
-            this.connectionCloseHandler = null; // 幂等：只通知一次
             try {
                 handler.run();
             } catch (Throwable ignored) {

@@ -1,19 +1,26 @@
 package io.springperf.web.http;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -118,6 +125,96 @@ class ResponseTimeoutArmingTest {
         NettyServerHttpResponse resp = newResponse();
 
         assertNotNull(resp.setTimeout());
+    }
+
+    /**
+     * 并发「按需装配」至多产生一个定时任务。
+     * <p>
+     * 装配方是 EventLoop、取消方是业务线程（已提交时）。原先的 check-then-act 无保护且字段非 volatile： 两个线程能各自调度一个定时器，先发布的那个被引用覆盖后永远无法取消 ——
+     * 已提交或在途的响应会被它改写成 504。
+     * </p>
+     */
+    @Test
+    void concurrentArm_schedulesExactlyOnce() throws Exception {
+        when(props.getHttpTimeoutMillis()).thenReturn(60000L);
+        when(eventLoop.schedule(any(Runnable.class), anyLong(), any(TimeUnit.class)))
+                .thenAnswer(inv -> mock(ScheduledFuture.class));
+
+        NettyServerHttpResponse resp = newResponse();
+        runConcurrently(8, 200, resp::armTimeoutIfAbsent);
+
+        verify(eventLoop, times(1)).schedule(any(Runnable.class), eq(60000L), eq(TimeUnit.MILLISECONDS));
+    }
+
+    /**
+     * 并发替换超时任务时，除最后一个之外每个都必须被 cancel —— 不允许存在无法取消的孤儿定时器。
+     * <p>
+     * 每次 {@code setTimeout} 恰好「取消至多一个旧的 + 装配一个新的」是临界区内原子完成的结果， 故 {@code cancel 次数 == 装配数 - 1} 是确定的。
+     * </p>
+     */
+    @Test
+    void concurrentSetTimeout_cancelsEveryReplacedFuture() throws Exception {
+        AtomicInteger cancelCount = new AtomicInteger();
+        List<ScheduledFuture<?>> created = new ArrayList<>();
+        when(eventLoop.schedule(any(Runnable.class), anyLong(), any(TimeUnit.class))).thenAnswer(inv -> {
+            ScheduledFuture<?> future = mock(ScheduledFuture.class);
+            doAnswer(c -> {
+                cancelCount.incrementAndGet();
+                return null;
+            }).when(future).cancel(anyBoolean());
+            synchronized (created) {
+                created.add(future);
+            }
+            return future;
+        });
+
+        NettyServerHttpResponse resp = newResponse();
+        runConcurrently(8, 50, () -> resp.setTimeout(() -> {
+        }, 1000L));
+
+        assertEquals(created.size() - 1, cancelCount.get(), "除末次装配外，每个被替换的超时任务都必须已取消");
+    }
+
+    /** 提交相关的清理之后不应再声称已装配：供「是否需要兜底装配」判定。 */
+    @Test
+    void cancel_disarmsAndAllowsRearming() {
+        when(props.getHttpTimeoutMillis()).thenReturn(60000L);
+        when(eventLoop.schedule(any(Runnable.class), anyLong(), any(TimeUnit.class)))
+                .thenAnswer(inv -> mock(ScheduledFuture.class));
+
+        NettyServerHttpResponse resp = newResponse();
+        resp.armTimeoutIfAbsent();
+        assertTrue(resp.hasTimeoutArmed());
+
+        resp.setTimeout(null, -1);
+        assertFalse(resp.hasTimeoutArmed(), "取消后不应再声称已装配");
+
+        resp.armTimeoutIfAbsent();
+        assertTrue(resp.hasTimeoutArmed(), "取消后应允许重新装配");
+        verify(eventLoop, times(2)).schedule(any(Runnable.class), eq(60000L), eq(TimeUnit.MILLISECONDS));
+    }
+
+    /** 起 n 个线程同时执行 action（各 loop 次），全部结束后才返回。 */
+    private static void runConcurrently(int n, int loop, Runnable action) throws InterruptedException {
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(n);
+        for (int i = 0; i < n; i++) {
+            Thread t = new Thread(() -> {
+                try {
+                    start.await();
+                    for (int j = 0; j < loop; j++) {
+                        action.run();
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    done.countDown();
+                }
+            });
+            t.start();
+        }
+        start.countDown();
+        assertTrue(done.await(30, TimeUnit.SECONDS), "并发任务未在时限内结束");
     }
 
     private NettyServerHttpResponse newResponse() {

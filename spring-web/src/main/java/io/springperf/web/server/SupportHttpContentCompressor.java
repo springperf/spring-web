@@ -6,7 +6,6 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.compression.CompressionOptions;
 import io.netty.handler.codec.compression.StandardCompressionOptions;
 import io.netty.handler.codec.http.HttpContentCompressor;
 import io.netty.handler.codec.http.HttpContentEncoder;

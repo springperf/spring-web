@@ -19,7 +19,6 @@ import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpVersion;
 import io.springperf.web.context.ApplicationProperties;
-import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.async.AsyncSupportUtils;
 

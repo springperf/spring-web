@@ -388,10 +388,6 @@
         <Class name="io.springperf.web.core.pool.BizPoolRegistry"/>
         <Bug pattern="AT_STALE_THREAD_WRITE_OF_PRIMITIVE"/>
     </Match>
-    <Match>
-        <Class name="io.springperf.web.http.BaseWebServerHttpRequest"/>
-        <Bug pattern="AT_STALE_THREAD_WRITE_OF_PRIMITIVE"/>
-    </Match>
 
     <!-- PerfAsyncWebRequest.timeoutMillis：启动期按配置写入，之后只读（同上）。
          PerfAsyncWebRequest.concurrentResult：由工作线程写入，但读取发生在 state 的 CAS 之后

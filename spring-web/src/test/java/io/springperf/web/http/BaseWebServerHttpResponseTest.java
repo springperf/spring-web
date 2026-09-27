@@ -16,7 +16,6 @@ import org.springframework.http.MediaType;
 
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.springperf.web.context.ApplicationProperties;
-import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
 
 class BaseWebServerHttpResponseTest {

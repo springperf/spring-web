@@ -16,7 +16,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 
-import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.server.ErrorPageRenderer;
 import io.springperf.web.server.ErrorResponseConfig;
@@ -45,7 +44,24 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
      */
     protected volatile Runnable beforeCommit;
     protected WriteRespEventListener writeRespEventListener;
-    protected ScheduledFuture<?> timeoutFuture;
+    /**
+     * 已装配的响应超时任务。
+     * <p>
+     * 必须 {@code volatile}：装配方是 EventLoop（{@code setTimeout} / {@code armTimeoutIfAbsent}），取消方是业务线程 （已提交时经
+     * {@code setCommitted} → {@code setTimeout(null, -1)}），二者之间没有别的同步点。普通字段在两线程间缺少 happens-before，取消方可能读到 {@code null}
+     * 而放过旧 future —— 定时器泄漏，随后对已提交/异步进行中的响应触发 504。
+     * </p>
+     */
+    protected volatile ScheduledFuture<?> timeoutFuture;
+    /**
+     * 保护 {@link #timeoutFuture} 的复合操作。
+     * <p>
+     * {@code volatile} 只解决单个读写的可见性，解决不了「读旧 → cancel → 装配新 → 发布」这个 check-then-act
+     * 序列：并发装配会让两个线程各自调度一个定时器，先发布的那个被后发布的引用覆盖，从此无法取消 —— 这是本问题的另一半。 该临界区内只有 {@code cancel} 与
+     * {@code executor().schedule}（非阻塞），无持有锁做 IO 的风险。
+     * </p>
+     */
+    private final Object timeoutLock = new Object();
 
     /**
      * 响应超时任务：预先持有（无状态、幂等），避免每次装配都创建 {@code this::defaultHandleTimeout} 方法引用对象（热路径每请求一次装配）。
@@ -168,25 +184,40 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
      */
     @Override
     public void armTimeoutIfAbsent() {
-        if (timeoutFuture == null) {
+        synchronized (timeoutLock) {
+            if (timeoutFuture != null) {
+                return;
+            }
             setTimeout(defaultHandleTimeoutTask, webContext.getProps().getHttpTimeoutMillis());
         }
     }
 
     @Override
     public boolean hasTimeoutArmed() {
+        // 无锁读：调用方在 EventLoop 判别是否需要兜底装配，不应为此抢装配方的锁
         return timeoutFuture != null;
     }
 
     public ScheduledFuture setTimeout(Runnable task, long delay) {
-        if (timeoutFuture != null)
-            timeoutFuture.cancel(false);
-        // delay <= 0：关闭超时（对齐框架「≤0 = 不限制」约定与 Tomcat connectionTimeout=0 的无限语义）。
-        // 若把 0 当作「立即触发」，任何配置 server.http.timeout=0 的部署都会全量 504。
-        if (delay <= 0 || task == null)
-            return null;
-        timeoutFuture = scheduleOnEventLoop(task, delay, TimeUnit.MILLISECONDS);
-        return timeoutFuture;
+        synchronized (timeoutLock) {
+            cancelArmedTimeout();
+            // delay <= 0：关闭超时（对齐框架「≤0 = 不限制」约定与 Tomcat connectionTimeout=0 的无限语义）。
+            // 若把 0 当作「立即触发」，任何配置 server.http.timeout=0 的部署都会全量 504。
+            if (delay <= 0 || task == null) {
+                return null;
+            }
+            timeoutFuture = scheduleOnEventLoop(task, delay, TimeUnit.MILLISECONDS);
+            return timeoutFuture;
+        }
+    }
+
+    /** 取消并摘除已装配的超时任务：调用方必须持有 {@link #timeoutLock}。 */
+    private void cancelArmedTimeout() {
+        ScheduledFuture<?> current = timeoutFuture;
+        if (current != null) {
+            timeoutFuture = null;
+            current.cancel(false);
+        }
     }
 
     abstract void runOnEventLoop(Runnable task);

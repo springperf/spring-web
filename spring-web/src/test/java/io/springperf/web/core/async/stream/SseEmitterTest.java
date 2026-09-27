@@ -119,6 +119,21 @@ class SseEmitterTest {
         assertTrue(result.contains("data:ping"));
     }
 
+    /**
+     * 边界（记录用）：{@code id} / {@code event} 里的 LF 由 Spring 的 {@code ServerSentEvent} **在构造期就拒绝**
+     * （{@code illegal character '\n' or '\r'}），所以本编码器不为它们做续行处理； 而 {@code data} 是自由文本、builder 不做校验，因此 {@code data} 与
+     * {@code comment} 必须自行按 LF 续行。
+     * <p>
+     * 此用例把这条分工钉住：读代码时"同一方法里 data 续行、id 不续行"看着像漏改，实际是**契约分工**。
+     * </p>
+     */
+    @Test
+    void serverSentEvent_rejectsNewlineInIdOrEvent_atConstruction() {
+        assertThrows(IllegalArgumentException.class, () -> ServerSentEvent.builder().id("a\nb"),
+                "id 里的 LF 由 Spring 在构造期拒绝 —— 这正是编码器可以信任 id/event 的原因");
+        assertThrows(IllegalArgumentException.class, () -> ServerSentEvent.builder().event("x\ny"));
+    }
+
     @Test
     void getMaxFlushBytes_returns4096() {
         assertEquals(4096, emitter.getMaxFlushBytes());

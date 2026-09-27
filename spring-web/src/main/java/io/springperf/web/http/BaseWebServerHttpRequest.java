@@ -42,8 +42,14 @@ public abstract class BaseWebServerHttpRequest implements WebServerHttpRequest, 
     private List<Locale> locales;
     protected final Object[] fastAttributes = new Object[RequestAttribute.getMaxSize()];
     protected int filterIndex = 0;
-    /** HEAD 请求标志：由 HttpMethodMatcher 路由匹配时统一写入（RFC 7231 §4.3.2） */
-    protected boolean headRequest;
+    /**
+     * HEAD 请求标志：由 HttpMethodMatcher 路由匹配时统一写入（RFC 7231 §4.3.2）。
+     * <p>
+     * volatile：写入方是路由匹配所在的线程（EventLoop），读取方是业务线程池中的处理器。二者之间只有 「提交任务到线程池」这一道 happens-before 兜底，一旦将来出现不经线程池交接的读取路径就会被打破；
+     * boolean 的 volatile 读写在 x86 上开销可忽略，这里不做性能取舍。
+     * </p>
+     */
+    protected volatile boolean headRequest;
 
     protected BaseWebServerHttpRequest(WebContext webContext, String uriStrWithQuery, String resolvedPath) {
         this.webContext = webContext;

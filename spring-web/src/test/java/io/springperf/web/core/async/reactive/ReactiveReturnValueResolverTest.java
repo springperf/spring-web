@@ -16,7 +16,6 @@ import org.junit.jupiter.api.Test;
 import io.springperf.web.annotation.ReactiveSupport;
 import io.springperf.web.core.async.stream.SseEmitter;
 import io.springperf.web.core.async.stream.StreamEmitter;
-import io.springperf.web.core.mapping.MappingHandlerMethod;
 import io.springperf.web.core.mapping.MappingResult;
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.http.RequestAttribute;

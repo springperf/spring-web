@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.util.PathMatcher;
 import org.springframework.web.bind.annotation.ControllerAdvice;

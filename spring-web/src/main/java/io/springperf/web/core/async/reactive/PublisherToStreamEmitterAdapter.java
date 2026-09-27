@@ -25,7 +25,12 @@ public class PublisherToStreamEmitterAdapter implements Subscriber<Object> {
 
     private final PerfAsyncWebRequest asyncWebRequest;
 
-    private Subscription subscription;
+    /**
+     * 上游订阅。必须 volatile：写入方是 Publisher 线程（{@code onSubscribe}），读取方是 EventLoop （写回调 → {@code tryRequest}、断连/写失败 →
+     * {@code tryCancel}）。缺少可见性时 EventLoop 侧可能读到 null， {@code cancel()/request()} 抛 NPE
+     * 后被上层清理路径吞掉，结果是<b>断连后上游静默继续生产</b>。
+     */
+    private volatile Subscription subscription;
 
     private volatile boolean terminated = false;
 

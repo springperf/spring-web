@@ -2,7 +2,6 @@ package io.springperf.web.core.exception;
 
 import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 

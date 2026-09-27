@@ -144,12 +144,17 @@ public class ResourceRequestHandler implements CustomInvoker {
                 resp.getHeaders().setContentLength(contentLength);
             }
 
-            // 宣告支持 byte range（RFC 9110 §14.3）：客户端据此可发起断点续传 / 视频拖动
-            resp.getHeaders().add(HttpHeaders.ACCEPT_RANGES, "bytes");
-
             // byte range（RFC 9110 §14.1）：仅对未压缩实体生效。预压缩变体（.gz）是另一份
             // 字节流，对其切片会产生不可解码的 gzip 片段，因此回退整实体。
-            if (!useGzip && contentLength > 0 && ifRangeAllows(req, resource)) {
+            boolean rangeSatisfiable = !useGzip && contentLength > 0;
+            // 宣告支持 byte range（RFC 9110 §14.3）：客户端据此可发起断点续传 / 视频拖动。
+            // 只在实际会处理 Range 时宣告 —— 否则 gzip 变体是对外宣称一种并不提供的能力，
+            // 会让 CDN / 缓存据以发起 Range 请求却拿到整实体。
+            // 注意条件不含 ifRangeAllows：那只是本次请求的 If-Range 判定，不改变资源本身的能力。
+            if (rangeSatisfiable) {
+                resp.getHeaders().add(HttpHeaders.ACCEPT_RANGES, "bytes");
+            }
+            if (rangeSatisfiable && ifRangeAllows(req, resource)) {
                 List<HttpRange> ranges;
                 try {
                     ranges = HttpRange.parseRanges(req.getHeaders().getFirst(HttpHeaders.RANGE));
@@ -377,6 +382,10 @@ public class ResourceRequestHandler implements CustomInvoker {
 
         @Override
         public int read(byte[] b, int off, int len) throws IOException {
+            // 契约明文：len == 0 时不做任何读取并返回 0，与是否已到区间末尾无关（修复前末尾处返回 -1）
+            if (len == 0) {
+                return 0;
+            }
             if (!skipFully()) {
                 return -1;
             }
@@ -393,11 +402,19 @@ public class ResourceRequestHandler implements CustomInvoker {
 
         @Override
         public long skip(long n) throws IOException {
-            if (toSkip > 0) {
-                return super.skip(n);
+            if (n <= 0) {
+                return 0;
+            }
+            // 必须先完成「跳到区间起点」再谈跳过 n 个字节：修复前 toSkip>0 时直接把 n 交给底层，
+            // 既不推进 toSkip 也不扣减 remaining，调用方随后 read() 会再跳一次起点 —— 数据错位，
+            // 且返回值可以超过区间长度，违反 InputStream#skip 的契约。
+            if (!skipFully()) {
+                return 0;
             }
             long skipped = super.skip(Math.min(n, remaining));
-            remaining -= skipped;
+            if (skipped > 0) {
+                remaining -= skipped;
+            }
             return skipped;
         }
 

@@ -86,6 +86,15 @@ public class SseEmitter extends StreamEmitter<Object> {
         out.write(TERMINATOR);
     }
 
+    /**
+     * 编码 {@link ServerSentEvent}。字段值含 LF 时的分工（不要误判为漏改）：
+     * <ul>
+     * <li>{@code id} / {@code event}：{@code ServerSentEvent} 的 builder **在构造期就拒绝**含 LF 的值
+     * （{@code illegal character}），故此处原样写出是安全的；</li>
+     * <li>{@code data}：自由文本，builder 不校验，故经 {@link #writeBytesWithNewline} 按 LF 续行；</li>
+     * <li>{@code comment}：同理自行续行。</li>
+     * </ul>
+     */
     protected void encodeServerSentEvent(ServerSentEvent sse, OutputStream out) throws IOException {
         String id = sse.id();
         if (id != null) {
@@ -113,6 +122,17 @@ public class SseEmitter extends StreamEmitter<Object> {
             out.write(NEWLINE);
         }
         encodeData(sse.data(), out);
+    }
+
+    /**
+     * 以 {@code data:} 续行规则写出一段**已编码**的数据，供 {@link #encodeEventDataAsBytes} 的子类实现使用。
+     * <p>
+     * 存在的理由：SSE 字段值不得含 LF，而子类写出的内容可能带裸 LF（典型：美化输出的 JSON）；基类对非 {@code CharSequence}
+     * 数据不做续行，子类若不处理，客户端按规范会**丢弃整条事件**（静默丢数据）。
+     * </p>
+     */
+    protected static void writeDataBytes(OutputStream out, byte[] bytes) throws IOException {
+        writeBytesWithNewline(out, bytes, NEWLINE_DATA);
     }
 
     private static void writeBytesWithNewline(OutputStream out, byte[] bytes, byte[] continuation) throws IOException {
