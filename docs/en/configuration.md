@@ -66,6 +66,15 @@ All configuration properties are set in `application.properties`.
 | `server.servlet.session.persistent` | `false` | Persist sessions to disk so they survive a restart (JDK serialization, one file per session) |
 | `server.servlet.session.store-dir` | `.perf-sessions` | Persistence directory (effective when `persistent=true`) |
 | `server.servlet.session.persistent-exclude` | none | Session attribute names excluded from persistence (comma-separated) |
+| `server.servlet.session.persistent-deserialization-filter` | none (omitted means no filtering) | Deserialization class filter (`ObjectInputFilter` spec, semicolon-separated, e.g. `java.util.*;io.springperf.web.*;!*`). **Omitted keeps the historical behaviour of no filtering**, and a WARN is logged at startup; when set, only matching classes load, a rejected file is discarded and logged with the **rejected class name** (kept distinct from "corrupted"), and a malformed spec fails at startup instead of quietly degrading to no filtering. **This key has no Boot counterpart**: Boot 3.5.16 has 13 `server.servlet.session.*` keys and none of them is about deserialization filtering |
+
+> **When to tighten `persistent-deserialization-filter`**: session files are read **only at startup**, so the risk path is "someone who can write to `store-dir` gets an arbitrary classpath class deserialized on the next restart". The default `.perf-sessions` lives under the working directory, which limits exposure; if you point it at a world-writable path such as `/tmp`, any local user can write there and tightening is recommended. Suggested starting point (append your own packages):
+>
+> ```properties
+> server.servlet.session.persistent-deserialization-filter=java.lang.*;java.util.*;java.math.*;java.time.*;maxarray=1000;maxdepth=20;maxrefs=10000;!*
+> ```
+>
+> Note that a JEP 290 filter inspects the **whole reference graph recursively**, so the allow-list must cover the attributes and every nested object; a rejection discards the entire session file, not just that attribute. Use `*` to explicitly allow every class (equivalent to no defence).
 | `server.servlet.virtual-server-name` | `localhost` | ServletContext virtual server name |
 | `server.servlet.application-display-name` | none | ServletContext application display name (`getServletContextName()`) |
 | `server.servlet.context-parameters.*` | none | Explicit block of ServletContext init parameters: `server.servlet.context-parameters.<name>=bar` is exposed as `getInitParameter("foo")` |
@@ -118,7 +127,7 @@ All configuration properties are set in `application.properties`.
 |----------|---------|-------------|
 | `spring.web.locale` | none | Default Locale (e.g. `zh_CN`) |
 | `spring.web.locale-resolver` | `accept-header` | Locale resolution strategy: `fixed` / `accept-header` |
-| `spring.web.locale-bind` | `true` | Whether to bind `LocaleContextHolder` per request, following Spring MVC's `initContextHolders`/`resetContextHolders` pattern (save the previous context, set, reset, honouring `threadContextInheritable`; implemented in `SupportDispatcherHandler`). When `false` the framework never touches the Locale context: no per-request context allocation and no ThreadLocal `set/remove`, so `LocaleContextHolder.getLocaleContext()` returns `null` and `getLocale()` falls back to the JVM default. Useful for locale-agnostic API services (if you set the holder yourself afterwards, you must clear it yourself) |
+| `spring.web.locale-bind` | `true` | Whether to bind `LocaleContextHolder` per request, following Spring MVC's `initContextHolders`/`resetContextHolders` pattern (save the previous context, set, reset, honouring `threadContextInheritable`; implemented in `SupportDispatcherHandler`). When `false` the framework never touches the Locale context: no per-request context allocation and no ThreadLocal `set` (a `remove` still runs once on the servlet path), so `LocaleContextHolder.getLocaleContext()` returns `null` and `getLocale()` falls back to the JVM default. Useful for locale-agnostic API services (the framework does not set the holder, and whether it clears it depends on the deployment path: on the native path `initContext` is false and the holder is left alone, so a value you set yourself is yours to clear; on the `spring-web-servlet` path `SupportDispatcherHandler` returns `init || requestAttributes != null`, which is always true there, so `resetLocaleContext()` still runs once per request and a value you set yourself is cleared as well) |
 
 ## Access Log (server.accesslog.*)
 

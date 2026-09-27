@@ -177,6 +177,8 @@ EXTERNAL_TYPES = {
     'SpringValidatorAdapter': 'org.springframework.validation.beanvalidation（JFR 热点帧，非本仓导入）',
     'TooLongFrameException': 'io.netty.handler.codec.http',
     'WebExceptionHandler': 'org.springframework.web.server',
+    # JDK：会话反序列化过滤器的规格类型（手册在 server.servlet.session.persistent-deserialization-filter 行点名它）
+    'ObjectInputFilter': 'java.io',
 }
 
 GATING_RULES = ('R1-config-key', 'R2-unknown-class', 'R3-likely-typo', 'R4-member')
