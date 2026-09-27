@@ -1,6 +1,5 @@
 package io.springperf.webtest.configalign;
 
-import okhttp3.FormBody;
 import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

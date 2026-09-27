@@ -121,6 +121,10 @@ class AsyncSseRobustnessE2eTest {
      * 基线被污染而非真的残留）。
      * </p>
      */
+    // 2026-09-25 实测补记：整仓 `clean test`（CI 同款）在**机器同时跑其它构建**时，本类出现 28 条级联失败、
+    // 总耗时 422.5s（每个用例都把 15s 窗口等满）；同一天隔离复跑（-Dtest=AsyncSseRobustnessE2eTest）为
+    // 32/32 通过、15.15s。即「引用迟迟不归零」是**负载阻滞**而非真泄漏，而「阻滞」与「永久不归零」在固定窗口
+    // 内本就判不出差异：宁可整类红，也不要放宽窗口去掩盖真泄漏；遇到级联先隔离复跑再下结论。
     private void assertRefsBackTo(int baseline) throws Exception {
         // 窗口 15s：用例内任务本身 3s（见 webAsyncTask_explicitTimeout… 的场景注释），整包 + 高负载下
         // 该路径收尾实测会超过 5s（曾造成 27 条级联误报；窗口放大到 30s 后全绿、类总耗时仅 15.24s，
@@ -130,6 +134,7 @@ class AsyncSseRobustnessE2eTest {
         while (PerfAsyncWebRequest.activeRequestRefs() != 0 && System.currentTimeMillis() < deadline) {
             Thread.sleep(20);
         }
+        leakedRefsSeen.set(PerfAsyncWebRequest.activeRequestRefs() != 0);
         assertEquals(0, PerfAsyncWebRequest.activeRequestRefs(),
                 "场景结束后异步持有者引用应归零（用例起点基线 " + baseline + "，残留即未终结的异步生命周期）");
     }
@@ -608,15 +613,22 @@ class AsyncSseRobustnessE2eTest {
     private ch.qos.logback.classic.Logger streamLogLogger;
     private ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> streamLogAppender;
 
+    /**
+     * 本轮是否已观测到「引用未归零」。一旦观测到，引用仍在的后续用例**必然失败**，此时再各等满 15s 只是把级联 拖长（实测 28 条 × 15s = 422.5s）；早失败不改变任何结论，只缩短反馈。
+     */
+    private static final java.util.concurrent.atomic.AtomicBoolean leakedRefsSeen = new java.util.concurrent.atomic.AtomicBoolean();
+
     @org.junit.jupiter.api.BeforeEach
     void waitForNoInFlightAsyncLifecycle() throws Exception {
         // 上一用例的异步终结可能晚于本用例开始（跨用例延迟）→ 先等到引用清零，使基线稳定；
         // 否则基线被上一用例污染（实测：基线=1、结束时=0 → 误报）。
-        // 窗口同上（15s）：上一用例的收尾在整包 + 高负载下可能迟到数秒，基线判定需给同等余量
-        long deadline = System.currentTimeMillis() + 15000;
+        // 窗口 15s：上一用例的收尾在整包 + 高负载下可能迟到数秒，基线判定需给同等余量。
+        // 恢复了就重新武装满窗口（下一个真泄漏照样有完整余量），没恢复则本用例不再重等。
+        long deadline = System.currentTimeMillis() + (leakedRefsSeen.get() ? 0 : 15000);
         while (PerfAsyncWebRequest.activeRequestRefs() != 0 && System.currentTimeMillis() < deadline) {
             Thread.sleep(20);
         }
+        leakedRefsSeen.set(PerfAsyncWebRequest.activeRequestRefs() != 0);
         assertEquals(0, PerfAsyncWebRequest.activeRequestRefs(), "用例开始前不应存在未终结的异步生命周期");
     }
 
@@ -631,6 +643,11 @@ class AsyncSseRobustnessE2eTest {
 
     @org.junit.jupiter.api.AfterEach
     void assertNoServerSideStreamDefects() {
+        // 前置 @BeforeEach 抛错时 attachStreamLogCapture 不会执行，而 @AfterEach 仍会跑：此处原先直接解引用，
+        // 于是抛 NPE 并被 JUnit 记为「Suppressed」，把真正的断言失败信息盖住（实测：级联失败时 28 条都带它）。
+        if (streamLogLogger == null || streamLogAppender == null) {
+            return;
+        }
         streamLogLogger.detachAppender(streamLogAppender);
         streamLogAppender.stop();
         java.util.List<String> problems = streamLogAppender.list.stream()

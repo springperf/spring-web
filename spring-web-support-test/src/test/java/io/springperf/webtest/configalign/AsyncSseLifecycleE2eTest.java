@@ -16,7 +16,6 @@ import org.springframework.web.context.request.async.DeferredResult;
 import java.time.Duration;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Flow;
-import java.util.concurrent.SubmissionPublisher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
