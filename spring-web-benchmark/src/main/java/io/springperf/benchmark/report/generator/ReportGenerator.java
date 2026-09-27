@@ -77,9 +77,8 @@ public class ReportGenerator {
     }
 
     /**
-     * Path.getFileName() 声明为 @Nullable（根路径等无文件名场景）。本类处理的都是目录子项，实际必非 null；
-     * 集中在此兜底，既避免每处写判空，也消除 SpotBugs 的 NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE
-     * （原实现直接 getFileName().toString()，共 9 处）。
+     * Path.getFileName() 声明为 @Nullable（根路径等无文件名场景）。本类处理的都是目录子项，实际必非 null； 集中在此兜底，既避免每处写判空，也消除 SpotBugs 的
+     * NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE （原实现直接 getFileName().toString()，共 9 处）。
      */
     private static String fileNameOf(Path path) {
         Path name = path.getFileName();
