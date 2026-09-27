@@ -72,6 +72,11 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
   upper-case) and logs and ignores unknown values. The `locale-bind` row says that with the key off the framework
   never touches `LocaleContextHolder` and that an application setting it itself must clean up; the code returns
   early from `initContextHolders` and both `removeContextHolders` call sites sit behind `if (initContext)`.
+  That holds on the native path, but `spring-web-servlet` overrides `initContextHolders` and returns
+  `init || requestAttributes != null`, which is always true there because it must also install
+  `RequestContextHolder` - so on a servlet deployment the holder is still reset once per request even with the
+  flag off. An earlier wording of the constant and of both manuals generalised the native behaviour to both
+  paths; they now spell out the two separately.
   Spring's own source (`spring-context-6.2.19-sources.jar`) confirms the last part of that row: `getLocale()`
   falls back to the system default when no context is bound, "a replacement for `Locale.getDefault()`".
 - `scripts/check-docs.sh` also runs `scripts/check-doc-symbols.py`, which checks that the keys, classes and
@@ -79,7 +84,8 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
   (`"server.ssl." + "enabled"`, `"management.endpoints.web.exposure" + ".include"`), which a plain literal scan
   misses: the first run reported 34 such keys, all of them false alarms for exactly that reason.
   One limit is deliberate and written in the file: it does not check whether a sentence is **true**. Its
-  unknown-class rule **is** a gate, carried by an 81-entry allowlist whose every entry names where the symbol
+  unknown-class rule **is** a gate, carried by an explicit allow-list (`EXTERNAL_TYPES`) whose every entry names
+  where the symbol
   comes from - a class defined in a doc snippet, a package this repository imports, or a class found in a local
   jar, with the measured name collisions called out (the `ServiceLoader` hit was surefire, the
   `ExceptionHandler` import was disruptor, and `HandlerExecutionChain` was in no local jar at all because
@@ -100,8 +106,11 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
   import order is kept by convention until that is fixed upstream.
 - Run it in a **standalone commit** — the first run touches nearly every file — and never
   mix formatting changes into feature commits.
-- CI enforces it without rewriting: the `static-analysis` job runs `formatter:validate`, which
-  fails if any file is unformatted (fix by running the profile above and committing the result).
+- CI enforces it by rewriting and asserting: the `static-analysis` job runs the profile above and then
+  `git diff --exit-code`, failing with the resulting diff if anything changed (fix by running the profile
+  locally and committing the result). It used to run `formatter:validate`, which checks formatting only and
+  cannot see the unused-import removals the profile also performs - measured: validate reported clean while a
+  module-scoped format run rewrote 44 files.
   **Run that validate locally before committing Java changes.** Measured: a series of javadoc and
   comment edits went in over five commits on a verification loop of `compile` + `javadoc` + the docs
   checker, which never ran the formatter, so the gate would have failed on `PropertiesConstant.java`
@@ -190,6 +199,45 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 - `.gitattributes` declares `* text=auto` (LF in the index; `*.sh` stays LF,
   `*.bat`/`*.cmd` checkout as CRLF), so a CRLF working tree compares clean against the
   LF-based index and line endings never show up as phantom diffs.
+
+### Verification Discipline
+
+Handbook of habits that were paid for. Each one cost this repository a wrong statement or a wasted run, so each
+one carries the instance that produced it.
+
+- **Trace a claim to the code that decides it, not to where it is cheapest to read.** A statement about
+  behaviour has to be checked at the point that controls it, including its call sites. Reading
+  `removeContextHolders` on its own says the locale holder is reset even with `spring.web.locale-bind` off;
+  its only call site sits behind `if (initContext)`, and `initContextHolders` returns false when the flag is
+  off, so on the native path the holder is untouched and the original wording was right. Reading the method was
+  not enough - the guard lives in `handleAfterFilter`. The servlet path is a genuine exception on top of that,
+  because `SupportDispatcherHandler` returns `init || requestAttributes != null` and therefore always reports
+  true there.
+- **Never edit files and start a build in the same batch.** An edit issued alongside a build can land after
+  the compiler has read the file, and the result describes a state that never existed. This happened twice in
+  one session; both runs had to be thrown away and repeated serially. Land the edit, then build.
+- **Prove a new gate can fail before trusting it.** A check that has never been seen red is a claim, not a
+  check. The format assertion added to `static-analysis` was validated by appending one blank line to
+  `docs/configuration.md` and watching it report failure, then reverting. It then earned its place on the
+  first real run, catching a javadoc rewrap that `formatter:validate` had passed.
+- **A red on this machine is a hypothesis until it is isolated.** Re-run the failing class alone, then the
+  module alone, and read the error text before theorising. Measured: two reactor-only failures, twenty-eight
+  cascading timeouts in `AsyncSseRobustnessE2eTest` and one reset in `ChunkedRequestE2eTest`, were both green
+  in isolation - and the second carried a Windows-only error code, so it is not a Linux CI risk at all.
+- **Re-read the file or the tree; do not work from a summary or from memory.** Three times in one session a
+  remembered "known issue" turned out to be already fixed (`check-doc-symbols.py` reports unknown owners of
+  `Class.member` now, and the `CONTRIBUTING` entry about that rule had already been corrected). Memory of a
+  compacted history is a hypothesis about the tree, and the tree is one command away.
+- **Know which checker covers what.** They are not interchangeable. `formatter:validate` does not see the
+  unused-import removals the format profile performs; doclint rejects a `ul` inside a `p` that both the
+  formatter and the format assertion accept; the markdown checker verifies formatting and links but never
+  whether a sentence is true; and `check-doc-symbols.py` only checks that a named symbol exists.
+- **After a deliberate mutation, revert it in the same breath, and never through a command that can be
+  blocked.** Breaking a guard on purpose is the only way to prove a test is not vacuous, so it is worth
+  doing - but the broken state looks like ordinary code and can outlive the run that created it. That
+  happened here: the revert was chained behind a command whose permission prompt timed out, so a mutated
+  `batchBuf.release()` stayed in the working tree and was caught only by re-reading the file. Revert with the
+  edit tool rather than a git command, and read the reverted lines back afterwards; that check is cheap.
 
 ### Binary Compatibility (japicmp)
 

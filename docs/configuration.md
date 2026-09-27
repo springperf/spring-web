@@ -66,6 +66,15 @@
 | `server.servlet.session.persistent` | `false` | 会话持久化到磁盘（重启不丢；JDK 序列化，每 session 一文件） |
 | `server.servlet.session.store-dir` | `.perf-sessions` | 持久化目录（`persistent=true` 时生效） |
 | `server.servlet.session.persistent-exclude` | 无 | 不落盘的 session 属性名（逗号分隔） |
+| `server.servlet.session.persistent-deserialization-filter` | 无（省略即不过滤） | 反序列化类过滤器（`ObjectInputFilter` 规格，分号分隔，如 `java.util.*;io.springperf.web.*;!*`）。**省略 = 与历史行为一致地不过滤**，此时启动会打印 WARN 提示风险；配置后只放行规格内的类，被拒文件按既有"坏文件容错"丢弃并告警（日志会指明**被拒的类名**与"文件损坏"区分开），规格写错则在启动时抛出（不静默退化）。**本项目自有键，Boot 无对应物**：Boot 3.5.16 的 `server.servlet.session.*` 共 13 个键，无反序列化过滤相关项 |
+
+> **何时需要收紧 `persistent-deserialization-filter`**：会话文件只在**启动时**被读取，因此风险路径是「能往 `store-dir` 写文件的人 → 下次启动时让任意 classpath 上的类被反序列化」。默认目录 `.perf-sessions` 位于工作目录下，风险有限；但若把它配到 `/tmp` 之类的全局可写目录，任何本地用户都可写入，建议按实际存储的类型收紧。推荐起点（按需追加自己的包名）：
+>
+> ```properties
+> server.servlet.session.persistent-deserialization-filter=java.lang.*;java.util.*;java.math.*;java.time.*;maxarray=1000;maxdepth=20;maxrefs=10000;!*
+> ```
+>
+> 注意 JEP 290 的过滤器会**递归检查整个引用图**，白名单需覆盖属性及其嵌套对象的全部类；被拒时整个会话文件会被丢弃（不只是那个属性）。`*` 表示显式放行所有类（等同不设防）。
 | `server.servlet.virtual-server-name` | `localhost` | ServletContext 虚拟服务器名 |
 | `server.servlet.application-display-name` | 无 | ServletContext 应用显示名（`getServletContextName()`） |
 | `server.servlet.context-parameters.*` | 无 | ServletContext 初始化参数显式块：`server.servlet.context-parameters.<name>=bar` 暴露为 `getInitParameter("foo")` |
@@ -118,7 +127,7 @@
 |--------|--------|------|
 | `spring.web.locale` | 无 | 默认 Locale（如 `zh_CN`） |
 | `spring.web.locale-resolver` | `accept-header` | Locale 解析策略：`fixed`（恒用 `spring.web.locale`）/ `accept-header`（按请求头） |
-| `spring.web.locale-bind` | `true` | 是否每请求绑定 `LocaleContextHolder`（与 Spring MVC 的 `initContextHolders`/`resetContextHolders` 同范式：保存旧上下文 → 设置 → 复位，含 `threadContextInheritable`；实现见 `SupportDispatcherHandler`）。设为 `false` 时框架完全不触碰 Locale 上下文：省掉每请求的上下文对象分配与 ThreadLocal `set/remove`，此时 `LocaleContextHolder.getLocaleContext()` 返回 `null`、`getLocale()` 按 Spring 语义回退 JVM 默认；不关注 Locale 的 API 服务可关闭（关闭后应用若自行设置该 holder，需自行清理） |
+| `spring.web.locale-bind` | `true` | 是否每请求绑定 `LocaleContextHolder`（与 Spring MVC 的 `initContextHolders`/`resetContextHolders` 同范式：保存旧上下文 → 设置 → 复位，含 `threadContextInheritable`；实现见 `SupportDispatcherHandler`）。设为 `false` 时框架完全不触碰 Locale 上下文：省掉每请求的上下文对象分配与 ThreadLocal `set`（servlet 路径下 `remove` 仍有一次），此时 `LocaleContextHolder.getLocaleContext()` 返回 `null`、`getLocale()` 按 Spring 语义回退 JVM 默认；不关注 Locale 的 API 服务可关闭（关闭后框架不设置该 holder；**是否清理取决于部署路径**：native 路径下 `initContext=false`，既不设置也不清理，应用自行设置需自行清理；`spring-web-servlet` 路径下 `SupportDispatcherHandler` 覆写后返回值恒为 true，故每请求结束时仍会 `resetLocaleContext()` 一次，应用自行设置的值会被清掉） |
 
 ## 访问日志（server.accesslog.*）
 
