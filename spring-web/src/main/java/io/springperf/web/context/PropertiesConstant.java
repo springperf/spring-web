@@ -356,6 +356,21 @@ public final class PropertiesConstant {
      */
     public static final String SERVLET_SESSION_PERSISTENT_EXCLUDE = "server.servlet.session.persistent-exclude";
 
+    /**
+     * 会话持久化的**反序列化类过滤器**规格（{@link java.io.ObjectInputFilter.Config#createFilter(String)} 语法， 分号分隔，例如
+     * {@code java.util.*;io.springperf.web.*;!*}）。 空/未配置 = **不加过滤器**，与历史行为一致； 配置后只放行规格内的类，其余一律拒绝（拒绝的文件走既有"坏文件容错"路径：warn
+     * + 丢弃）。仅在 {@code server.servlet.session.persistent=true} 时生效。
+     * <p>
+     * <b>本项目自有键，Boot 无对应物</b>（依据：对齐版本 {@code spring-boot-autoconfigure-3.5.16.jar} 的
+     * {@code spring-configuration-metadata.json} 中 {@code server.servlet.session.*} 共 13 个键：
+     * {@code cookie.name/same-site/secure/domain/max-age/http-only/comment/path/partitioned}、{@code persistent}、
+     * {@code store-dir}、{@code timeout}、{@code tracking-modes}；同版本元数据里含 filter/serial 的键均与反序列化无关）。
+     * 另注：{@code server.servlet.session.persistent} 与 {@code store-dir} 是 Boot 的 {@code SessionProperties}
+     * 在**内嵌容器**里的键，本项目在这里沿用同名键表达自己的落盘实现 —— 键名沿用，实现不同。
+     * </p>
+     */
+    public static final String SERVLET_SESSION_PERSISTENT_DESERIALIZATION_FILTER = "server.servlet.session.persistent-deserialization-filter";
+
     /** 对齐 {@code spring.mvc.static-path-pattern}：全局静态资源映射前缀（默认 /**）。 */
     public static final String MVC_STATIC_PATH_PATTERN = "spring.mvc.static-path-pattern";
     public static final String MVC_STATIC_PATH_PATTERN_DEFAULT = "/**";
@@ -413,13 +428,20 @@ public final class PropertiesConstant {
     /**
      * 是否每请求绑定 {@code LocaleContextHolder}（默认 true，对齐 Spring MVC）。
      * <p>
-     * 设为 false 时框架完全不触碰 Locale 上下文：省掉每请求的上下文对象分配与 ThreadLocal set/remove（native 模式下这是唯一的 holder 工作）。此时
-     * {@code LocaleContextHolder.getLocaleContext()} 返回 null， {@code LocaleContextHolder.getLocale()} 按 Spring 语义回退
-     * {@code Locale.getDefault()}。 不关注 Locale 的应用（多数 API 服务）可关闭。
+     * 设为 false 时框架跳过 Locale 上下文的**设置**：省掉每请求的上下文对象分配与 ThreadLocal set（native 模式下这就是唯一的 holder 工作； servlet 路径下请求结束仍有一次
+     * remove 兜底）。此时 {@code LocaleContextHolder.getLocaleContext()} 返回 null， {@code LocaleContextHolder.getLocale()} 按
+     * Spring 语义回退 {@code Locale.getDefault()}。 不关注 Locale 的应用（多数 API 服务）可关闭。
      * </p>
      * <p>
-     * 注意：关闭后框架既不设置也不清理该 holder，应用若自行 {@code LocaleContextHolder.setLocaleContext(...)}，需自行保证清理（线程池复用场景）。
+     * 注意：关闭后框架**不设置**该 holder（{@code DispatcherHandler.initContextHolders} 早退）。是否**清理**则取决于
+     * {@code initContext}（清理调用点受它保护，见 {@code DispatcherHandler.handleAfterFilter}），**两条路径不同**：
      * </p>
+     * <ul>
+     * <li>native 路径：早退使 {@code initContext=false}，框架既不设置也不清理 —— 应用若自行设置，需自行清理（线程池复用场景）；</li>
+     * <li>{@code spring-web-servlet} 路径：{@code SupportDispatcherHandler} 因为还要装 {@code RequestContextHolder}， 覆写后的返回值为
+     * {@code init || requestAttributes != null}（恒 true），于是每请求结束时仍会 {@code LocaleContextHolder.resetLocaleContext()} 一次
+     * —— 此时应用自行设置的值也会被清掉。</li>
+     * </ul>
      */
     public static final String WEB_LOCALE_BIND = "spring.web.locale-bind";
     public static final boolean WEB_LOCALE_BIND_DEFAULT = true;

@@ -402,6 +402,11 @@
       "description": "Comma-separated session attribute names excluded from disk persistence."
     },
     {
+      "name": "server.servlet.session.persistent-deserialization-filter",
+      "type": "java.lang.String",
+      "description": "ObjectInputFilter spec (semicolon-separated, e.g. java.util.*;io.springperf.web.*;!*) applied when reading persisted session files. Omitted means no filtering, which is the historical behaviour; when set, only matching classes load and a rejected file is discarded like any corrupt one. This key has no Spring Boot counterpart: Boot 3.5.16 has 13 server.servlet.session.* keys and none of them is about deserialization filtering."
+    },
+    {
       "name": "server.servlet.virtual-server-name",
       "type": "java.lang.String",
       "description": "ServletContext virtual server name. Aligns with Spring Boot server.servlet.virtual-server-name.",

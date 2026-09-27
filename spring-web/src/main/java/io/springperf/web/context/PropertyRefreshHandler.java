@@ -10,8 +10,21 @@ import lombok.extern.slf4j.Slf4j;
  * </p>
  * <p>
  * <b>职责边界</b>：本类只触发 {@link ApplicationProperties#clearCache()}—— 它同时清空 map 缓存并重解析全部热路径字段（{@code server.http.timeout}、
- * {@code server.max-parameter-count}、{@code server.http.max-in-memory-size} 等）， 失败字段保留旧值。启动期一次性固化进 Netty bootstrap /
- * 线程池 / 模板引擎的配置 （如 {@code server.port}、{@code pool.core-pool-size}）<b>不在刷新范围</b>—— 它们需要重建组件，见各组件文档。
+ * {@code server.max-parameter-count}、{@code server.http.max-in-memory-size} 等）， 失败字段保留旧值。
+ * </p>
+ * <p>
+ * <b>不生效的部分（务必先读）</b>：凡是把配置在<b>启动期解析成对象并持有</b>的组件，都不在本刷新范围内， 它们需要重建组件才能生效。已知清单：
+ * </p>
+ * <ul>
+ * <li>Netty 服务器与管线：{@code server.port}、{@code server.netty.*}、{@code CompressionConfig}、
+ * {@code KeepAliveConfig}、{@code MultipartConfig}、{@code ResponseLimitConfig}（在 {@code NettyHttpServer} 构造时固化）；</li>
+ * <li>业务线程池：{@code pool.*} / {@code spring.threads.virtual.enabled}（池结构建成后不再改变）；</li>
+ * <li>访问日志：{@code server.accesslog.*}（{@code AccessLogWriter.fromProperties} 在 Bean 创建时固化）；</li>
+ * <li>区域设置：{@code spring.web.locale.*}（{@code LocaleConfig.fromProperties} 同样在装配时固化）；</li>
+ * <li>模板引擎：{@code spring.{thymeleaf,freemarker,beetl}.*}（{@code TemplateEngine} 为单例）。</li>
+ * </ul>
+ * <p>
+ * 修改上述配置后请重启进程；不要因为调用过 {@link #refresh()} 就认为它们已生效。
  * </p>
  * <p>
  * <b>触发方式</b>：由 starter 侧的 {@code SpringWebCloudRefreshAutoConfiguration} 监听 Spring Cloud
