@@ -12,7 +12,6 @@ import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
-import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
@@ -22,7 +21,6 @@ import io.springperf.web.http.NettyServerHttpResponse;
 import io.springperf.web.http.ParameterLimitExceededException;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.http.WriteRespEventListener;
-import io.springperf.web.server.ResponseLimitConfig;
 import lombok.extern.slf4j.Slf4j;
 
 /**

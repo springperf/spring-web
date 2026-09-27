@@ -87,6 +87,24 @@ class StreamEmitterTest {
         assertTrue(emitter.earlySendDataList.isEmpty());
     }
 
+    /**
+     * 同步出错的 Publisher 会让 {@code onError → completeWithError} 在 {@code initialize} **之前**到达（订阅发生在 initialize 之前，见
+     * {@code ReactiveReturnValueResolver}）。此时流已按错误终止，{@code initialize} 必须把错误 继续交给发送器，而不是用
+     * {@code complete(false, null)} 把出错流当**正常**收尾 —— 后者会写出正常终止块， 违反本仓"错误终止不写正常 LastHttpContent"的不变式（见
+     * {@code AbstractNettyStreamSender.onAllDataFailed}）。
+     */
+    @Test
+    void completeWithError_beforeInitialize_forwardsErrorToSender() throws Exception {
+        StreamEmitter emitter = createEmitter();
+        IllegalStateException boom = new IllegalStateException("boom");
+
+        emitter.completeWithError(boom);
+        emitter.initialize(streamSender);
+
+        verify(streamSender).complete(false, boom);
+        verify(streamSender, never()).complete(false, null);
+    }
+
     @Test
     void initialize_sendError_clearEarlyData() throws Exception {
         StreamEmitter emitter = createEmitter();

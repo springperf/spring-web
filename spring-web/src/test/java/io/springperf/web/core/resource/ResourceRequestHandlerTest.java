@@ -8,14 +8,19 @@ import static org.mockito.Mockito.*;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -388,5 +393,41 @@ class ResourceRequestHandlerTest {
         Resource r2 = handler.getResource("/css/style.css");
         assertNotNull(r2);
         assertTrue(r2.exists());
+    }
+
+    // ----- Accept-Ranges 宣告（RFC 9110 §14.3）-----
+
+    @Test
+    void handleResourceRequest_advertisesAcceptRanges_whenRangeServable() {
+        when(request.getPath()).thenReturn("/static/e2e-range.txt");
+
+        handlerServingFixedContent().handleResourceRequest(request, response);
+
+        assertEquals("bytes", responseHeaders.getFirst(HttpHeaders.ACCEPT_RANGES));
+    }
+
+    /**
+     * 回归：gzip 预压缩变体回退整实体、根本不处理 Range，却无条件宣告 {@code Accept-Ranges: bytes} —— 等于对外声称一种并不提供的能力，会让 CDN / 缓存据以发起 Range
+     * 请求却拿回整实体。
+     */
+    @Test
+    void handleResourceRequest_doesNotAdvertiseAcceptRanges_forGzipVariant(@TempDir Path dir) throws IOException {
+        Path file = dir.resolve("a.txt");
+        Files.write(file, "0123456789".getBytes(StandardCharsets.UTF_8));
+        // 内容不必是真实 gzip：探测只校验 exists/readable
+        Files.write(dir.resolve("a.txt.gz"), new byte[] { 0x1f, (byte) 0x8b });
+
+        ResourceRequestHandler gzipHandler = new ResourceRequestHandler(registration) {
+            @Override
+            protected Resource getResource(String path) {
+                return new FileSystemResource(file);
+            }
+        };
+        requestHeaders.set(HttpHeaders.ACCEPT_ENCODING, "gzip");
+        when(request.getPath()).thenReturn("/static/a.txt");
+
+        gzipHandler.handleResourceRequest(request, response);
+
+        assertFalse(responseHeaders.containsKey(HttpHeaders.ACCEPT_RANGES), "gzip 变体不处理 Range，不应宣告 Accept-Ranges");
     }
 }

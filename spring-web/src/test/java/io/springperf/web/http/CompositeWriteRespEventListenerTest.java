@@ -5,7 +5,6 @@ import static org.mockito.Mockito.mock;
 
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;

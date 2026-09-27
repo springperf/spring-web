@@ -36,7 +36,6 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.Attribute;
 import io.springperf.web.context.ApplicationProperties;
-import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.server.ResponseLimitConfig;
 

@@ -4,9 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.*;
 
-import java.lang.reflect.Field;
-
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,7 +18,6 @@ import io.netty.handler.codec.http.HttpVersion;
 import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
-import io.springperf.web.http.NettyServerHttpRequest;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 

@@ -1,6 +1,5 @@
 package io.springperf.web.core.filter;
 
-import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;

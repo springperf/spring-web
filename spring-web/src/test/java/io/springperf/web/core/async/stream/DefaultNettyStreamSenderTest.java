@@ -249,4 +249,40 @@ class DefaultNettyStreamSenderTest {
         }
         assertEquals(10, written, "所有已发送数据必须完整写出，不允许截断");
     }
+
+    /**
+     * 不变量：批缓冲**为空时绝不写出** {@code DefaultHttpContent}。空的 content 在 chunked 传输里等价于终止块， 会让响应体**提前结束**，而且不抛任何错 —— 是最难查的一类症状。
+     * 本用例覆盖"所有条目 encode 都抛错 → writerIndex 回滚到 0 → 尾部只剩空 buffer"这条唯一路径。
+     */
+    @Test
+    void drain_allEncodesFail_mustNotWriteEmptyContent() throws Exception {
+        doThrow(new RuntimeException("encode failed")).when(emitter).encode(any(), any());
+        DefaultNettyStreamSender sender = new DefaultNettyStreamSender(emitter, asyncWebRequest);
+
+        sender.send("bad1");
+        sender.send("bad2");
+
+        verify(channel, never()).writeAndFlush(any(DefaultHttpContent.class));
+        assertEquals(0, sender.queueSize(), "队列应已被 drain 消费");
+        verify(emitter, times(2)).onEncodeError(any(), any());
+    }
+
+    /**
+     * 上面那条 {@code never()} 的正对照：同一套装置下正常 encode **必须**写出内容， 否则"没写出空帧"可能只是因为装置根本没跑到 drain。
+     */
+    @Test
+    void drain_nonEmptyBatch_writesContent_positiveControl() throws Exception {
+        doAnswer(invocation -> {
+            OutputStream out = invocation.getArgument(1);
+            out.write("ok".getBytes(StandardCharsets.UTF_8));
+            return null;
+        }).when(emitter).encode(any(), any());
+        DefaultNettyStreamSender sender = new DefaultNettyStreamSender(emitter, asyncWebRequest);
+
+        sender.send("a");
+
+        verify(channel).writeAndFlush(httpContentCaptor.capture());
+        assertEquals("ok", httpContentCaptor.getValue().content().toString(StandardCharsets.UTF_8));
+        httpContentCaptor.getValue().content().release();
+    }
 }

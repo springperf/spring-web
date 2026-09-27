@@ -3,6 +3,8 @@ package io.springperf.web.core.async;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -319,5 +321,51 @@ class PerfAsyncWebRequestTest {
     void defaultWriteErrorException_doesNotFillInStackTrace() {
         PerfAsyncWebRequest.DefaultWriteErrorException ex = new PerfAsyncWebRequest.DefaultWriteErrorException();
         assertSame(ex, ex.fillInStackTrace());
+    }
+
+    /**
+     * 并发断连信号下，取消钩子至多执行一次，入站请求引用也只归还一次。
+     * <p>
+     * 原先 {@code 读 → 判非空 → 置 null} 三步非原子（且字段非 volatile）：EventLoop 上重复到达的断连信号会让两个线程 同时读到同一个 handler 并各跑一次 ——
+     * 上游被重复取消，引用计数则可能重复释放。
+     * </p>
+     */
+    @Test
+    void releaseOnConnectionClose_concurrentSignals_runHandlerAndReleaseOnce() throws Exception {
+        Runnable closeHandler = mock(Runnable.class);
+        asyncWebRequest.addConnectionCloseHandler(closeHandler);
+        asyncWebRequest.startAsync();
+
+        int n = 8;
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(n);
+        for (int i = 0; i < n; i++) {
+            Thread t = new Thread(() -> {
+                try {
+                    start.await();
+                    for (int j = 0; j < 100; j++) {
+                        asyncWebRequest.releaseOnConnectionClose();
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    done.countDown();
+                }
+            });
+            t.start();
+        }
+        start.countDown();
+        assertTrue(done.await(30, TimeUnit.SECONDS), "并发任务未在时限内结束");
+
+        verify(closeHandler, times(1)).run();
+        verify(request, times(1)).release();
+    }
+
+    /** 从未注册过断连钩子时的清理：不得抛异常，引用仍应归还。 */
+    @Test
+    void releaseOnConnectionClose_withoutHandler_stillReleases() {
+        asyncWebRequest.startAsync();
+        asyncWebRequest.releaseOnConnectionClose();
+        verify(request).release();
     }
 }

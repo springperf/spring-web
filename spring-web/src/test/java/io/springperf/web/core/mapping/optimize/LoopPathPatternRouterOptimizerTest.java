@@ -10,7 +10,6 @@ import org.junit.jupiter.api.Test;
 
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.core.mapping.route.Router;
-import io.springperf.web.core.mapping.route.SimpleRouter;
 import io.springperf.web.http.RequestAttribute;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;

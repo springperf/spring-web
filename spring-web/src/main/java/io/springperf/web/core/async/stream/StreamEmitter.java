@@ -17,11 +17,26 @@ public abstract class StreamEmitter<T> {
 
     protected AtomicBoolean complete = new AtomicBoolean(false);
     /**
+     * 终止时携带的错误；{@link #completeWithError} / {@link #initializeWithError} 写入， {@link #initialize} 在「先终止、后
+     * initialize」时取用（同步出错的 Publisher 就是这条时序）。
+     */
+    private Throwable completionError;
+    /**
      * earlyEncode=true 时存储 byte[]（已编码快照）； earlyEncode=false 时存储原始 T 对象。
      */
     protected List<Object> earlySendDataList = new ArrayList<>();
     protected volatile StreamSender streamSender;
-    protected Consumer<Throwable> writeCallbackHandler;
+    /**
+     * 写完成回调（背压补充请求的入口）。
+     * <p>
+     * {@code volatile}：注册方可能是任意业务线程（{@code onSubscribe} 或外部代码），读取方是 EventLoop 上的写回调链。
+     * </p>
+     * <p>
+     * 但可见性只是**必要条件** —— <b>注册时机同样由调用方保证</b>：必须在写回调可能触发之前完成注册。 这正是 {@code PublisherToStreamEmitterAdapter#onSubscribe}
+     * 在订阅建立后**同步注册**、而不是事后读本字段的原因 —— 事后读取对 onSubscribe 异步投递的 Publisher 会拿到 null，写完成永不触发补充请求，流静默停滞。
+     * </p>
+     */
+    protected volatile Consumer<Throwable> writeCallbackHandler;
 
     private final boolean earlyEncode;
 
@@ -120,13 +135,22 @@ public abstract class StreamEmitter<T> {
             earlySendDataList.clear();
         }
         if (complete.get() && this.streamSender != null) {
-            deferredResult.setResult(null);
-            this.streamSender.complete(false, null);
+            Throwable error = this.completionError;
+            if (error == null) {
+                deferredResult.setResult(null);
+                this.streamSender.complete(false, null);
+            } else {
+                // 错误终止：不再 setResult(null)（deferredResult 已被 setErrorResult 设过，第二次设置会被
+                // Spring 记录并忽略），也不按正常收尾 —— 把错误交给发送器走「关闭连接」的错误终止路径。
+                // 修复前这里无条件 complete(false, null)，让同步出错的流写出正常终止块，客户端看到干净的结束。
+                this.streamSender.complete(false, error);
+            }
         }
     }
 
     protected synchronized void initializeWithError(Throwable ex) {
         if (complete.compareAndSet(false, true)) {
+            this.completionError = ex;
             this.earlySendDataList.clear();
             deferredResult.setErrorResult(ex);
         }
@@ -144,6 +168,7 @@ public abstract class StreamEmitter<T> {
 
     public synchronized void completeWithError(Throwable ex) {
         if (complete.compareAndSet(false, true)) {
+            this.completionError = ex;
             deferredResult.setErrorResult(ex);
             StreamSender s = this.streamSender;
             if (s != null) {

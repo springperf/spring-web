@@ -2,7 +2,6 @@ package io.springperf.web.core.async.stream;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufOutputStream;
-import io.netty.handler.codec.http.DefaultHttpContent;
 import io.springperf.web.core.async.PerfAsyncWebRequest;
 
 /**
@@ -68,6 +67,7 @@ public class DefaultNettyStreamSender extends AbstractNettyStreamSender {
                 if (batchBuf.readableBytes() > 0) {
                     flushContent(batchBuf);
                 } else {
+                    // 空批只释放、不写出：空 content 在 chunked 里等价于终止块，会让响应体提前结束且不报错
                     batchBuf.release();
                 }
             }

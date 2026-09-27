@@ -21,7 +21,6 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.DefaultFileRegion;
 import io.netty.handler.codec.http.*;
-import io.netty.util.AttributeKey;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.pool.BizPoolRegistry;
 import io.springperf.web.server.ChannelAttrs;

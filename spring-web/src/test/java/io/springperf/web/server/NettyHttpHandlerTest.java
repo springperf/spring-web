@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.embedded.EmbeddedChannel;
-import io.netty.handler.codec.http.FullHttpRequest;
 import io.springperf.web.context.WebContext;
 
 class NettyHttpHandlerTest {
