@@ -20,10 +20,10 @@ import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 import jakarta.servlet.SessionTrackingMode;
 import jakarta.servlet.http.HttpUpgradeHandler;
-import jakarta.servlet.http.WebConnection;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import org.springframework.lang.Nullable;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -562,27 +562,44 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
      * 参数名固定为小写 {@code jsessionid}（与 {@code encodeURL} 写出侧一致，Tomcat 同样使用固定名）， 大小写不敏感匹配；取值止于 {@code / ? ; #}。未携带时返回
      * {@code null}。
      * </p>
+     * <p>
+     * <b>只在路径段中匹配</b>：先切掉 query 与 fragment，再在剩余的 path 里找 {@code ;jsessionid=}。 路径参数是 Servlet 规范定义在 URI
+     * <i>路径段</i>上的语法（{@code /a/seg;jsessionid=X/b}），query 是普通数据； 若允许从 query 里读会话标识，攻击者可用
+     * {@code /any?u=;jsessionid=<known-id>} 把已知 id 注入受害者的会话解析 —— 标准会话固定向量。
+     * </p>
      */
     static String parseSessionIdFromUri(String uri) {
         if (uri == null) {
             return null;
         }
+        String path = stripQueryAndFragment(uri);
         final String token = ";jsessionid=";
-        int idx = indexOfIgnoreCase(uri, token);
+        int idx = indexOfIgnoreCase(path, token);
         if (idx < 0) {
             return null;
         }
         int valueStart = idx + token.length();
         int end = valueStart;
-        int len = uri.length();
+        int len = path.length();
         while (end < len) {
-            char c = uri.charAt(end);
+            char c = path.charAt(end);
             if (c == '/' || c == '?' || c == ';' || c == '#') {
                 break;
             }
             end++;
         }
-        return end == valueStart ? null : uri.substring(valueStart, end);
+        return end == valueStart ? null : path.substring(valueStart, end);
+    }
+
+    /** 切掉 URI 的 query / fragment 部分，只保留 path（首个 {@code ?} 或 {@code #} 之前的内容）。 */
+    private static String stripQueryAndFragment(String uri) {
+        for (int i = 0; i < uri.length(); i++) {
+            char c = uri.charAt(i);
+            if (c == '?' || c == '#') {
+                return uri.substring(0, i);
+            }
+        }
+        return uri;
     }
 
     private static int indexOfIgnoreCase(String s, String token) {
@@ -716,7 +733,10 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
         sessionCookie.setMaxAge(manager.getCookieMaxAge());
         sessionCookie.setHttpOnly(manager.isCookieHttpOnly());
         boolean secure = manager.isCookieSecure();
-        if (!secure) {
+        if (!secure && isForwardedHeadersTrusted(webContextOf(request))) {
+            // 只有显式信任转发头时才看 X-Forwarded-Proto。默认策略是 NONE（不信任），
+            // 此时必须忽略该头，否则任何客户端都能自行决定会话 Cookie 是否带 Secure
+            // —— 那与 server.forward-headers-strategy 的默认语义（以及 Boot 在 NONE 下的行为）直接矛盾。
             String forwardedProto = request.getHeaders().getFirst("X-Forwarded-Proto");
             secure = "https".equalsIgnoreCase(forwardedProto);
         }
@@ -728,6 +748,37 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
     }
 
     private static final String DEFAULT_SESSION_COOKIE_NAME = PerfHttpSessionManager.DEFAULT_SESSION_COOKIE_NAME;
+
+    /**
+     * 是否信任转发头：读 {@code server.forward-headers-strategy}，规则与 {@code NettyServerHttpRequest} 的判定保持一致（NONE / FALSE /
+     * 空视为不信任，其它非空视为信任）。
+     * <p>
+     * <b>必须先 {@code trim()}</b>：{@code NettyServerHttpRequest#isForwardedHeadersEnabled} 是 trim 后比较的。若这里不 trim，配置写成
+     * {@code " none "} 时两侧结论相反 —— 本类判为信任、Netty 侧判为不信任， 于是「会话 Cookie 是否带 Secure」这个安全判定会随调用点不同而翻转。
+     * </p>
+     */
+    /** 取请求的 WebContext；不可得时返回 null（部分场景与测试桩如此）。 */
+    @Nullable
+    private static io.springperf.web.context.WebContext webContextOf(WebServerHttpRequest request) {
+        return request == null ? null : request.getWebContext();
+    }
+
+    /**
+     * 是否信任转发头（包级可见以便单测：「与 Netty 侧判定一致」这条性质必须能被测试锁定）。
+     *
+     * @param webContext
+     *            可为 null；null 时按「不信任」处理（安全默认值）
+     */
+    static boolean isForwardedHeadersTrusted(io.springperf.web.context.WebContext webContext) {
+        io.springperf.web.context.ApplicationProperties props = webContext == null ? null : webContext.getProps();
+        String strategy = props == null ? null
+                : props.get(io.springperf.web.context.PropertiesConstant.FORWARD_HEADERS_STRATEGY, null);
+        if (strategy == null || strategy.trim().isEmpty()) {
+            return false;
+        }
+        String s = strategy.trim();
+        return !("NONE".equalsIgnoreCase(s) || "FALSE".equalsIgnoreCase(s));
+    }
 
     private PerfHttpSession getCachedSession() {
         return request.getRequestContext().getAttribute(PerfHttpSessionManager.SESSION_ATTR_KEY);
