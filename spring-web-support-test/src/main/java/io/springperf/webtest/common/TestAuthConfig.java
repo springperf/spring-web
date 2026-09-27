@@ -5,8 +5,6 @@ import io.springperf.web.support.servlet.PerfHttpPrincipal;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.security.Principal;
-
 /**
  * 测试专用认证器：接受固定凭据 user/secret，返回带 admin 角色的 Principal。
  * <p>
