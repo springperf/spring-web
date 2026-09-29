@@ -170,7 +170,14 @@ echo "[3/3] CPU 热点分析..."
 echo ""
 
 if [ -f "$ANALYZE_SCRIPT" ]; then
+  # PIPESTATUS[0] 取分析脚本自身的退出码：管道末端 tee 的退出码会覆盖它，
+  # 若直接读 $? 则分析失败也会被当成成功。
   bash "$ANALYZE_SCRIPT" "$JFR_TARGET_DIR" 2>&1 | tee "$JFR_TARGET_DIR/hotspot-report.txt"
+  analyze_status=${PIPESTATUS[0]}
+  if [ "$analyze_status" -ne 0 ]; then
+    echo "错误: 热点分析失败 (exit $analyze_status)" >&2
+    exit "$analyze_status"
+  fi
 else
   echo "  (分析脚本不存在，跳过)"
 fi

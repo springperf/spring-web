@@ -34,8 +34,17 @@ class OpenApiAdapterDetailsTest {
     }
 
     @Test
-    void cleanPath_bareStar_cutAtStar() {
-        assertEquals("/api/prefix", OpenApiAdapter.cleanPathForOpenApi("/api/prefix*foo"));
+    void cleanPath_bareStar_stripsStarButKeepsRemainder() {
+        // 早期实现在首个星号处整段截断，/api/prefix*foo 与 /api/prefix*bar 会合并成同一个 /api/prefix
+        assertEquals("/api/prefixfoo", OpenApiAdapter.cleanPathForOpenApi("/api/prefix*foo"));
+        assertEquals("/api/prefixbar", OpenApiAdapter.cleanPathForOpenApi("/api/prefix*bar"));
+    }
+
+    @Test
+    void cleanPath_starMidPath_keepsRoutesDistinct() {
+        String a = OpenApiAdapter.cleanPathForOpenApi("/x/*/a");
+        String b = OpenApiAdapter.cleanPathForOpenApi("/x/*/b");
+        assertNotEquals(a, b, "中间含星号的不同后缀必须保持为不同路径，否则路由会在文档中合并");
     }
 
     @Test

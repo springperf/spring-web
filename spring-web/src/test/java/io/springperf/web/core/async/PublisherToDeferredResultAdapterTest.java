@@ -20,14 +20,35 @@ class PublisherToDeferredResultAdapterTest {
     ReactiveAdapter adapter;
 
     @Test
-    void onSubscribe_requestsMaxValue() {
+    void onSubscribe_requestsInBatchNotUnbounded() {
         DeferredResult<Object> result = new DeferredResult<>();
         PublisherToDeferredResultAdapter adapter = new PublisherToDeferredResultAdapter(result, this.adapter);
         Subscription subscription = mock(Subscription.class);
 
         adapter.onSubscribe(subscription);
 
-        verify(subscription).request(Long.MAX_VALUE);
+        // 分批请求而非 Long.MAX_VALUE：无界请求会让上游一次性推送全部元素，失去背压控制
+        verify(subscription).request(PublisherToDeferredResultAdapter.REQUEST_BATCH_SIZE);
+        verify(subscription, never()).request(Long.MAX_VALUE);
+    }
+
+    @Test
+    void onNext_requestsMoreAfterBatchConsumed() {
+        DeferredResult<Object> result = new DeferredResult<>();
+        PublisherToDeferredResultAdapter adapter = new PublisherToDeferredResultAdapter(result, this.adapter);
+        Subscription subscription = mock(Subscription.class);
+        adapter.onSubscribe(subscription);
+
+        int batch = PublisherToDeferredResultAdapter.REQUEST_BATCH_SIZE;
+        for (int i = 0; i < batch - 1; i++) {
+            adapter.onNext("v" + i);
+        }
+        // 未满一批：不应补请求
+        verify(subscription, times(1)).request(batch);
+
+        // 满一批：补下一批
+        adapter.onNext("last");
+        verify(subscription, times(2)).request(batch);
     }
 
     @Test

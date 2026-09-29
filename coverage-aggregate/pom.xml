@@ -4,6 +4,8 @@
     <parent>
         <groupId>io.github.springperf</groupId>
         <artifactId>spring-web-parent</artifactId>
+        <!-- 必须是字面量：parent 的 version 在解析父子关系时需要先于属性插值可读，
+             写 ${project.version} 会导致 Non-resolvable parent POM -->
         <version>3.5.6</version>
     </parent>
 
@@ -19,47 +21,47 @@
         <dependency>
             <groupId>io.github.springperf</groupId>
             <artifactId>spring-web</artifactId>
-            <version>3.5.6</version>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>io.github.springperf</groupId>
             <artifactId>spring-web-servlet</artifactId>
-            <version>3.5.6</version>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>io.github.springperf</groupId>
             <artifactId>spring-web-mvc-support</artifactId>
-            <version>3.5.6</version>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>io.github.springperf</groupId>
             <artifactId>spring-web-websocket</artifactId>
-            <version>3.5.6</version>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>io.github.springperf</groupId>
             <artifactId>spring-web-view</artifactId>
-            <version>3.5.6</version>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>io.github.springperf</groupId>
             <artifactId>spring-web-batch</artifactId>
-            <version>3.5.6</version>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>io.github.springperf</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
-            <version>3.5.6</version>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>io.github.springperf</groupId>
             <artifactId>spring-web-test</artifactId>
-            <version>3.5.6</version>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>io.github.springperf</groupId>
             <artifactId>spring-web-support-test</artifactId>
-            <version>3.5.6</version>
+            <version>${project.version}</version>
         </dependency>
     </dependencies>
 

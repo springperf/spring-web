@@ -18,8 +18,15 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * AiChatController E2E 测试。
  * <p>
  * /ai/chat 和 /ai/chat/stream 需要真实的 API key，默认跳过。 设置环境变量 AI_API_KEY 为非默认值即可启用完整对话测试。
+ * <p>
+ * 显式指定 {@code server.port=0}（随机端口）：本测试已通过注入 {@link NettyHttpServer} 读取实际端口再访问，
+ * 不依赖固定端口。而框架的 NettyHttpServer 是自管理的 Lifecycle bean，不受 Spring Boot
+ * {@code web-application-type: none} 约束，仍会真实绑定 application.yml 中的 8080 —— 全仓串行构建时
+ * 有 7 个示例模块同用 8080，相邻模块的上一轮绑定尚未释放即被下一个抢占，导致间歇性
+ * {@code BindException} 使 ApplicationContext 加载失败。随机端口从根上消除该竞争。
  */
-@SpringBootTest(classes = AiApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE)
+@SpringBootTest(classes = AiApplication.class, webEnvironment = SpringBootTest.WebEnvironment.NONE,
+        properties = "server.port=0")
 class AiChatE2eTest {
 
     private static final String PLACEHOLDER_API_KEY = "sk-your-key-here";

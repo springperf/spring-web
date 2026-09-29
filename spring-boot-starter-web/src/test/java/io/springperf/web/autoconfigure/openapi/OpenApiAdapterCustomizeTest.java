@@ -91,8 +91,12 @@ class OpenApiAdapterCustomizeTest {
         assertNotNull(pathItem.getPost(), "POST 操作应生成");
 
         Operation getOp = pathItem.getGet();
-        assertEquals("find", getOp.getOperationId());
         assertNotNull(getOp.getResponses(), "应有响应");
+
+        // 同一方法映射到多个 HTTP 动词时会生成多个 Operation，operationId 必须各不相同
+        Operation postOp = pathItem.getPost();
+        assertNotEquals(getOp.getOperationId(), postOp.getOperationId(),
+                "OpenAPI 要求 operationId 全局唯一，重复会让代码生成器产出互相覆盖的方法");
 
         // 路径参数 id + 查询参数 q/page
         boolean hasPathId = false, hasQueryQ = false;
@@ -120,6 +124,28 @@ class OpenApiAdapterCustomizeTest {
         OpenApiAdapter adapter = new OpenApiAdapter(webContext());
         OpenAPI openApi = new OpenAPI();
         assertDoesNotThrow(() -> adapter.customize(openApi));
+    }
+
+    @Test
+    void customize_whenContextPathConfigured_prependsIt() throws Exception {
+        WebContext wc = webContext(route("find", String.class, String.class, int.class));
+        when(wc.getContextPath()).thenReturn("/app");
+        OpenAPI openApi = new OpenAPI();
+        new OpenApiAdapter(wc).customize(openApi);
+
+        assertNotNull(openApi.getPaths().get("/app/demo/{id}/list"), "路径应带上 context-path 前缀: "
+                + openApi.getPaths().keySet());
+        assertNull(openApi.getPaths().get("/demo/{id}/list"), "不应再暴露不带前缀的路径");
+    }
+
+    @Test
+    void customize_rootContextPath_noPrefix() throws Exception {
+        WebContext wc = webContext(route("find", String.class, String.class, int.class));
+        when(wc.getContextPath()).thenReturn("/");
+        OpenAPI openApi = new OpenAPI();
+        new OpenApiAdapter(wc).customize(openApi);
+
+        assertNotNull(openApi.getPaths().get("/demo/{id}/list"), "根 context-path 不应产生前缀");
     }
 
     @Test

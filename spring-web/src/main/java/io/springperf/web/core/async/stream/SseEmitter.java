@@ -73,7 +73,10 @@ public class SseEmitter extends StreamEmitter<Object> {
      */
     protected void encodeData(Object data, OutputStream out) throws IOException {
         if (data == null) {
-            out.write(NEWLINE);
+            // SSE 规范要求事件以 data: 字段开头、以空行结束。旧实现只写裸 \n，
+            // 客户端既解析不出 data 字段也判定不出事件边界，等同丢事件。
+            out.write(DATA_PREFIX);
+            out.write(TERMINATOR);
             return;
         }
         out.write(DATA_PREFIX);

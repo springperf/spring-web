@@ -78,7 +78,9 @@ class SseEmitterTest {
         emitter.encode((Object) null, baos);
 
         String result = baos.toString(StandardCharsets.UTF_8);
-        assertEquals("\n", result);
+        // SSE 规范要求事件以 data: 字段开头、以空行结束。旧实现只写裸 \n，
+        // 客户端既取不到 data 字段也判定不出事件边界，等同丢事件。
+        assertEquals("data:\n\n", result);
     }
 
     @Test

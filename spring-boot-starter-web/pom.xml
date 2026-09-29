@@ -24,6 +24,14 @@
             <groupId>io.github.springperf</groupId>
             <artifactId>spring-web</artifactId>
         </dependency>
+        <!-- 注解处理器：本模块声明了 OpenApiProperties / SwaggerUiProperties 等 @ConfigurationProperties，
+             缺此依赖则不会生成 spring-configuration-metadata.json，IDE 无法补全也无法校验配置键。
+             optional：仅编译期需要，不应传递给使用方 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
         <dependency>
             <groupId>io.github.springperf</groupId>
             <artifactId>spring-web-servlet</artifactId>

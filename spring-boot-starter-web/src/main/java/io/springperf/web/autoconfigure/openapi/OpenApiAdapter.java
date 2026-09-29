@@ -1,6 +1,7 @@
 package io.springperf.web.autoconfigure.openapi;
 
 import io.springperf.web.context.WebContext;
+import io.springperf.web.util.WebUtils;
 import io.springperf.web.core.mapping.MappingRegistry;
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.core.mapping.match.HttpMethodMatcher;
@@ -18,12 +19,15 @@ import io.swagger.v3.oas.models.tags.Tag;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
@@ -64,6 +68,9 @@ public class OpenApiAdapter {
             return;
 
         Set<String> tagNames = new LinkedHashSet<>();
+        // OpenAPI 要求 operationId 全局唯一；按请求重算而非放进字段，保证多次 customize 结果稳定
+        Set<String> usedOperationIds = new LinkedHashSet<>();
+        String contextPath = resolveContextPath();
 
         for (PathMappingContext ctx : mappings) {
             String rawPath = ctx.getPathRule();
@@ -71,6 +78,9 @@ public class OpenApiAdapter {
                 continue;
 
             String path = cleanPathForOpenApi(rawPath);
+            if (contextPath != null) {
+                path = contextPath + path;
+            }
 
             Set<HttpMethod> httpMethods = extractHttpMethods(ctx);
             if (httpMethods.isEmpty())
@@ -83,7 +93,7 @@ public class OpenApiAdapter {
             method = AopUtils.getMostSpecificMethod(method, ctx.getBeanType());
 
             for (HttpMethod httpMethod : httpMethods) {
-                Operation operation = buildOperation(ctx, method, tagName);
+                Operation operation = buildOperation(ctx, method, tagName, usedOperationIds);
                 addPathParameters(path, operation);
 
                 if (method != null) {
@@ -107,12 +117,29 @@ public class OpenApiAdapter {
     }
 
     /**
+     * 解析 context-path 前缀，用于保证文档中的路径与真实对外 URL 一致（{@code OpenAPI} 的 {@code paths} 必须是完整路径）。
+     *
+     * @return 归一化后的前缀（无尾斜杠），无需前缀时返回 null；同时兼容 contextPath 本身为 "/" 或空串的情形
+     */
+    private String resolveContextPath() {
+        String contextPath = webContext.getContextPath();
+        if (contextPath == null || contextPath.isEmpty()) {
+            return null;
+        }
+        contextPath = WebUtils.formatPath(contextPath);
+        return contextPath.isEmpty() ? null : contextPath;
+    }
+
+    /**
      * 清理路径使其兼容 OpenAPI 语法：
      * <ul>
      * <li>{@code {name:\\d+}} → {@code {name}}（去掉正则约束）</li>
      * <li>{@code **} → {@code {**}}（通配符映射为 OpenAPI 的 any 参数）</li>
-     * <li>{@code *} → 移除尾部星号</li>
+     * <li>{@code *} → 移除星号本身，但保留其后内容；并把连续斜杠合并为一个</li>
      * </ul>
+     * <p>
+     * 星号之后的残余内容必须保留：早期实现在首个星号处整段截断，会把「同一前缀 + 中间含星号 + 不同后缀」的多条路由 清洗成同一个前缀，导致它们在文档中合并成一条。
+     * </p>
      */
     static String cleanPathForOpenApi(String rawPath) {
         String path = rawPath;
@@ -127,7 +154,8 @@ public class OpenApiAdapter {
         // remove bare * (non-wildcard stars)
         int starIdx = path.indexOf('*');
         if (starIdx >= 0) {
-            path = path.substring(0, starIdx);
+            path = path.replace("*", "");
+            path = path.replaceAll("/{2,}", "/");
         }
         return path;
     }
@@ -153,16 +181,32 @@ public class OpenApiAdapter {
         return "Endpoints";
     }
 
-    private Operation buildOperation(PathMappingContext ctx, Method method, String tagName) {
+    private Operation buildOperation(PathMappingContext ctx, Method method, String tagName,
+            Set<String> usedOperationIds) {
         Operation operation = new Operation();
         if (method != null) {
-            operation.setOperationId(method.getName());
+            operation.setOperationId(uniqueOperationId(method.getName(), usedOperationIds));
             operation.setSummary(method.getName());
             operation.setDescription(ctx.getPathRule());
         }
         operation.addTagsItem(tagName);
         operation.setResponses(new ApiResponses());
         return operation;
+    }
+
+    /**
+     * 生成全局唯一的 operationId。裸方法名在不同 Controller 之间会重复（同一接口多个实现、通用 CRUD
+     * Controller 等），而 OpenAPI 规范要求 operationId 唯一，重复会让代码生成器产出互相覆盖的方法。
+     * 首次出现保持原方法名（不无故改变既有文档），重复时追加自增后缀。
+     */
+    private static String uniqueOperationId(String methodName, Set<String> usedOperationIds) {
+        String id = methodName;
+        int suffix = 2;
+        while (!usedOperationIds.add(id)) {
+            id = methodName + "_" + suffix;
+            suffix++;
+        }
+        return id;
     }
 
     private void addPathParameters(String path, Operation operation) {
@@ -216,21 +260,16 @@ public class OpenApiAdapter {
             org.springframework.web.bind.annotation.ModelAttribute modelAttr = param
                     .getAnnotation(org.springframework.web.bind.annotation.ModelAttribute.class);
             if (modelAttr != null) {
-                operation.addParametersItem(
-                        new Parameter().name(param.getName()).in("query").schema(resolveSchema(param.getType())));
+                addModelAttributeParameters(param, operation);
                 continue;
             }
 
             org.springframework.web.bind.annotation.RequestBody reqBody = param
                     .getAnnotation(org.springframework.web.bind.annotation.RequestBody.class);
             if (reqBody != null) {
-                Schema<?> schema = resolveSchema(param.getType());
-                Type genericType = param.getParameterizedType();
-                if (genericType instanceof ParameterizedType) {
-                    schema = new Schema<>().name(param.getName()).type("object");
-                }
                 operation.setRequestBody(new io.swagger.v3.oas.models.parameters.RequestBody()
-                        .content(new Content().addMediaType("application/json", new MediaType().schema(schema)))
+                        .content(new Content().addMediaType("application/json",
+                                new MediaType().schema(resolveRequestSchema(param))))
                         .required(reqBody.required()));
                 continue;
             }
@@ -242,20 +281,67 @@ public class OpenApiAdapter {
         }
     }
 
+    /**
+     * 解析请求体 schema：对 {@code List<Dto>} 之类的泛型取类型实参生成 {@code array} 及其元素结构， 其余按 {@link #resolveSchema} 展开。
+     */
+    private static Schema<?> resolveRequestSchema(java.lang.reflect.Parameter param) {
+        Type genericType = param.getParameterizedType();
+        if (genericType instanceof ParameterizedType) {
+            Type[] args = ((ParameterizedType) genericType).getActualTypeArguments();
+            if (args.length == 1 && args[0] instanceof Class<?> elementType) {
+                return new Schema<>().type("array").items(resolveSchema(elementType, new LinkedHashSet<>()));
+            }
+        }
+        return resolveSchema(param.getType());
+    }
+
+    /**
+     * 展开 {@code @ModelAttribute} 参数：Spring 的数据绑定按属性逐个绑定，文档也应逐属性列出 query 参数， 而不是塞一个 {@code object}
+     * 类型的同名参数（客户端无从得知该传什么）。
+     * <p>
+     * 载体没有任何可绑定属性时退化为单个 object 参数，保持既有输出形态。
+     * </p>
+     */
+    private static void addModelAttributeParameters(java.lang.reflect.Parameter param, Operation operation) {
+        Map<String, Schema> properties = resolveProperties(param.getType(), new LinkedHashSet<>());
+        if (properties == null || properties.isEmpty()) {
+            operation.addParametersItem(
+                    new Parameter().name(param.getName()).in("query").schema(resolveSchema(param.getType())));
+            return;
+        }
+        for (Map.Entry<String, Schema> property : properties.entrySet()) {
+            operation.addParametersItem(
+                    new Parameter().name(property.getKey()).in("query").required(false).schema(property.getValue()));
+        }
+    }
     private void addResponse(Method method, Operation operation) {
-        // 从 @ResponseStatus 读取实际状态码，默认 200
-        int statusCode = resolveResponseStatus(method);
+        // 从 @ResponseStatus 读取实际状态码与其 reason（含 Spring 的默认 reason phrase），默认 200 OK。
+        // 早期实现丢弃 reason 并对所有非 204 状态一律写 "OK"，201/202/204 的文档描述因此与实际不符。
+        HttpStatus status = HttpStatus.OK;
+        String reason = null;
+        if (method != null) {
+            org.springframework.web.bind.annotation.ResponseStatus rs = AnnotatedElementUtils
+                    .findMergedAnnotation(method, org.springframework.web.bind.annotation.ResponseStatus.class);
+            if (rs != null) {
+                status = rs.code();
+                if (!rs.reason().isEmpty()) {
+                    reason = rs.reason();
+                }
+            }
+        }
+        int statusCode = status.value();
+        String description = reason != null ? reason : status.getReasonPhrase();
 
         Class<?> returnType = resolveReturnType(method);
 
         if (returnType == void.class || returnType == Void.class) {
             operation.getResponses().addApiResponse(String.valueOf(statusCode),
-                    new ApiResponse().description(statusCode == 204 ? "No Content" : "OK"));
+                    new ApiResponse().description(description));
             return;
         }
 
         Schema<?> schema = resolveSchema(returnType);
-        ApiResponse response = new ApiResponse().description("OK");
+        ApiResponse response = new ApiResponse().description(description);
 
         if (method.isAnnotationPresent(org.springframework.web.bind.annotation.ResponseBody.class)
                 || method.getDeclaringClass()
@@ -264,17 +350,6 @@ public class OpenApiAdapter {
         }
 
         operation.getResponses().addApiResponse(String.valueOf(statusCode), response);
-    }
-
-    /**
-     * 从方法或其类上读取 @ResponseStatus 注解的状态码，不存在则返回 200。
-     */
-    private static int resolveResponseStatus(Method method) {
-        if (method == null)
-            return 200;
-        org.springframework.web.bind.annotation.ResponseStatus rs = AnnotatedElementUtils.findMergedAnnotation(method,
-                org.springframework.web.bind.annotation.ResponseStatus.class);
-        return rs != null ? rs.code().value() : 200;
     }
 
     /**
@@ -314,6 +389,10 @@ public class OpenApiAdapter {
     }
 
     static Schema<?> resolveSchema(Class<?> type) {
+        return resolveSchema(type, new LinkedHashSet<>());
+    }
+
+    private static Schema<?> resolveSchema(Class<?> type, Set<Class<?>> visiting) {
         if (type == String.class)
             return new Schema<>().type("string");
         if (type == Integer.class || type == int.class)
@@ -326,9 +405,51 @@ public class OpenApiAdapter {
             return new Schema<>().type("number").format("float");
         if (type == Boolean.class || type == boolean.class)
             return new Schema<>().type("boolean");
-        if (type.isArray() || Iterable.class.isAssignableFrom(type))
+        if (type.isArray())
+            return new Schema<>().type("array").items(resolveSchema(type.getComponentType(), visiting));
+        if (Iterable.class.isAssignableFrom(type))
             return new Schema<>().type("array").items(new Schema<>().type("object"));
-        return new Schema<>().type("object");
+        Map<String, Schema> properties = resolveProperties(type, visiting);
+        Schema<?> schema = new Schema<>().type("object");
+        if (properties != null && !properties.isEmpty()) {
+            schema.setProperties(properties);
+        }
+        return schema;
+    }
+
+    /**
+     * 提取 JavaBean 可读属性，供请求/响应 schema 与 {@code @ModelAttribute} 参数展开复用。
+     * <p>
+     * 用 Spring 的 {@link org.springframework.beans.BeanUtils#getPropertyDescriptors} 而非裸反射：
+     * 只有实际可绑定的属性才会进入文档，与实际数据绑定语义一致。
+     * </p>
+     * <p>
+     * {@code visiting} 用于掐断自引用/循环引用（如双向关联的实体）；无法展开的类型返回 null。
+     * </p>
+     */
+    private static Map<String, Schema> resolveProperties(Class<?> type, Set<Class<?>> visiting) {
+        if (type == null || type.isPrimitive() || type.isArray() || type.isEnum() || Iterable.class.isAssignableFrom(type)
+                || Map.class.isAssignableFrom(type) || type.getName().startsWith("java.")
+                || type.getName().startsWith("javax.") || type.getName().startsWith("jakarta.")
+                || visiting.contains(type)) {
+            return null;
+        }
+        Map<String, Schema> properties = new LinkedHashMap<>();
+        visiting.add(type);
+        try {
+            for (java.beans.PropertyDescriptor descriptor : org.springframework.beans.BeanUtils
+                    .getPropertyDescriptors(type)) {
+                Method readMethod = descriptor.getReadMethod();
+                if (readMethod == null || readMethod.getDeclaringClass() == Object.class
+                        || "class".equals(descriptor.getName())) {
+                    continue;
+                }
+                properties.put(descriptor.getName(), resolveSchema(readMethod.getReturnType(), visiting));
+            }
+        } finally {
+            visiting.remove(type);
+        }
+        return properties;
     }
 
     static boolean isFrameworkType(Class<?> type) {

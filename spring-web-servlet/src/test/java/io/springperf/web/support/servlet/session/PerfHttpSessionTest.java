@@ -14,6 +14,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.LockSupport;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -261,7 +268,103 @@ class PerfHttpSessionTest {
         assertThrows(IllegalStateException.class, () -> b.setAttribute("k", "v"), "失效会话的并发 wrapper 不应再可写属性");
     }
 
+    @Test
+    void tryInvalidate_grantsExactlyOnce() {
+        assertTrue(data.tryInvalidate(), "首次抢占应成功");
+        assertFalse(data.tryInvalidate(), "重复抢占必须失败，否则会重复触发销毁侧效应");
+        assertFalse(data.tryInvalidate(), "重复抢占必须持续失败");
+        assertTrue(data.isInvalid());
+    }
+
+    @Test
+    void invalidate_secondCallThrowsAndDoesNotRefireDestroy() {
+        AtomicInteger destroyed = new AtomicInteger();
+        List<HttpSessionListener> listeners = new ArrayList<>();
+        listeners.add(new CountingSessionListener(destroyed));
+        PerfHttpSession s = new PerfHttpSession(data, servletContext, listeners, new ArrayList<>());
+        s.setOnInvalidateCallback(destroyed::incrementAndGet);
+
+        s.invalidate();
+        assertThrows(IllegalStateException.class, s::invalidate, "重复 invalidate 应抛 IllegalStateException");
+
+        assertEquals(2, destroyed.get(), "sessionDestroyed 与 onInvalidateCallback 各应恰好触发一次");
+    }
+
+    @Test
+    void invalidate_concurrent_onlyOneRunsDestruction() throws Exception {
+        // 幂等性回归：并发 invalidate 时销毁侧效应（onInvalidateCallback + sessionDestroyed）必须各只发生一次。
+        // SlowIsInvalidData 在「读取失效状态」这一步引入微小延迟来放大 check-then-act 窗口；
+        // 修复后的实现走 tryInvalidate() 原子占位，根本不调用 isInvalid()，故该钩子对修复后的代码无作用，
+        // 不会把测试变成依赖 sleeps 的脆弱用例。多轮 + 栅栏起跑使漏检概率趋近于 0。
+        int threads = 16;
+        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        try {
+            for (int round = 0; round < 200; round++) {
+                SlowIsInvalidData slowData = new SlowIsInvalidData("session-" + round, 1000L);
+                AtomicInteger destroyed = new AtomicInteger();
+                List<HttpSessionListener> listeners = new ArrayList<>();
+                listeners.add(new CountingSessionListener(destroyed));
+                PerfHttpSession s = new PerfHttpSession(slowData, servletContext, listeners, new ArrayList<>());
+                s.setOnInvalidateCallback(destroyed::incrementAndGet);
+
+                CyclicBarrier start = new CyclicBarrier(threads);
+                CountDownLatch done = new CountDownLatch(threads);
+                for (int i = 0; i < threads; i++) {
+                    pool.submit(() -> {
+                        try {
+                            start.await();
+                            try {
+                                s.invalidate();
+                            } catch (IllegalStateException expected) {
+                                // Servlet 规范语义：已被其它线程失效的会话重复 invalidate 抛异常
+                            }
+                        } catch (Throwable t) {
+                            Thread.currentThread().interrupt();
+                        } finally {
+                            done.countDown();
+                        }
+                    });
+                }
+                assertTrue(done.await(10, TimeUnit.SECONDS), "round " + round + ": 并发 invalidate 未在超时前完成");
+                assertEquals(2, destroyed.get(),
+                        "round " + round + ": 并发 invalidate 下 sessionDestroyed 与 onInvalidateCallback 各应恰好触发一次");
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    static class CountingSessionListener implements HttpSessionListener {
+        private final AtomicInteger destroyed;
+
+        CountingSessionListener(AtomicInteger destroyed) {
+            this.destroyed = destroyed;
+        }
+
+        @Override
+        public void sessionDestroyed(HttpSessionEvent se) {
+            destroyed.incrementAndGet();
+        }
+    }
+
     // ===================== Test helper =====================
+
+    /**
+     * 测试替身：在「读取失效状态」这一步让出一小段时间，以放大 check-then-act 的窗口，使竞态在
+     * 修复前的实现下几乎必然复现。修复后的实现不再读取该状态来判断是否失效，故本替身不参与其路径
+     * （钩子对修复后代码无副作用，不会让本测试退化成依赖 sleep 的脆弱用例）。
+     */
+    static class SlowIsInvalidData extends HttpSessionData {
+        SlowIsInvalidData(String id, long creationTime) {
+            super(id, creationTime);
+        }
+
+        @Override
+        public boolean isInvalid() {
+            LockSupport.parkNanos(50_000L);
+            return super.isInvalid();
+        }
+    }
 
     static class TestBindingListener implements HttpSessionBindingListener {
         boolean bound;

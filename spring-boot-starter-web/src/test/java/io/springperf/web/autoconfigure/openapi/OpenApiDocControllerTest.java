@@ -42,6 +42,51 @@ class OpenApiDocControllerTest {
     }
 
     @Test
+    void apiDocs_isCachedAcrossCalls() {
+        OpenApiCustomizer customizer = mock(OpenApiCustomizer.class);
+        OpenApiDocController controller = new OpenApiDocController(customizer, props());
+
+        OpenAPI first = controller.apiDocs();
+        OpenAPI second = controller.apiDocs();
+
+        // 路由表运行期不变，文档内容恒定；不缓存则每次都要重新反射展开全部 POJO（与路由数成正比）
+        assertSame(first, second, "重复调用应返回同一缓存实例");
+        verify(customizer, times(1)).customise(any(OpenAPI.class));
+    }
+
+    @Test
+    void apiDocs_concurrentFirstCall_buildsOnce() throws Exception {
+        OpenApiCustomizer customizer = mock(OpenApiCustomizer.class);
+        OpenApiDocController controller = new OpenApiDocController(customizer, props());
+
+        int threads = 16;
+        java.util.concurrent.CyclicBarrier start = new java.util.concurrent.CyclicBarrier(threads);
+        java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(threads);
+        java.util.Set<OpenAPI> results = java.util.Collections.synchronizedSet(
+                java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()));
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(threads);
+        try {
+            for (int i = 0; i < threads; i++) {
+                pool.submit(() -> {
+                    try {
+                        start.await();
+                        results.add(controller.apiDocs());
+                    } catch (Exception e) {
+                        Thread.currentThread().interrupt();
+                    } finally {
+                        done.countDown();
+                    }
+                });
+            }
+            assertTrue(done.await(10, java.util.concurrent.TimeUnit.SECONDS));
+        } finally {
+            pool.shutdownNow();
+        }
+        assertEquals(1, results.size(), "并发首次调用只应构建一个实例");
+        verify(customizer, times(1)).customise(any(OpenAPI.class));
+    }
+
+    @Test
     void swaggerConfig_returnsUiConfigMap() {
         OpenApiCustomizer customizer = mock(OpenApiCustomizer.class);
         OpenApiDocController controller = new OpenApiDocController(customizer, props());

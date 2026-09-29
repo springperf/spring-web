@@ -34,6 +34,8 @@ public class NettyWebSocketSession implements WebSocketSession {
     private static final AttributeKey<Queue<WebSocketFrame>> BACKPRESSURE_QUEUE_KEY = AttributeKey
             .valueOf("ws.backpressure.queue");
     private static final String IDLE_HANDLER_NAME = "ws-idle";
+    /** WebSocket 帧的 rsv 位：本项目不使用任何扩展协商，恒为 0。 */
+    private static final int NO_RSV = 0;
 
     private final String id;
     private final Channel channel;
@@ -164,12 +166,14 @@ public class NettyWebSocketSession implements WebSocketSession {
     @Nullable
     private WebSocketFrame toFrame(WebSocketMessage<?> message) {
         if (message instanceof TextMessage) {
-            return new TextWebSocketFrame(((TextMessage) message).getPayload());
+            // 透传 isLast：JSR-356 分片发送会用 last=false 标记非尾片，若一律按 final 帧写出，
+            // 客户端会把每个分片当作独立完整消息，分片消息即被静默拆解破坏。
+            return new TextWebSocketFrame(((TextMessage) message).isLast(), NO_RSV, ((TextMessage) message).getPayload());
         } else if (message instanceof BinaryMessage) {
             ByteBuffer buf = ((BinaryMessage) message).getPayload();
             byte[] bytes = new byte[buf.remaining()];
             buf.get(bytes);
-            return new BinaryWebSocketFrame(Unpooled.wrappedBuffer(bytes));
+            return new BinaryWebSocketFrame(((BinaryMessage) message).isLast(), NO_RSV, Unpooled.wrappedBuffer(bytes));
         } else if (message instanceof PingMessage) {
             return new PingWebSocketFrame();
         } else if (message instanceof PongMessage) {
