@@ -38,10 +38,9 @@ public class MicrometerWebMetrics extends BaseWebComponent implements WebMetrics
     static final String OVERFLOW_PATH = "__overflow__";
 
     /**
-     * 每个 tag 维度组合的上限。{@code path} tag 取自 pathPattern，但运行时解析失败时会回落到实际请求 URI，
-     * 其基数不受控（含路径参数的 URL 每个取值都是一个新组合）。无上限则缓存与 MeterRegistry 中的 meter
-     * 会随流量无限增长（内存泄漏）。达到上限后不再缓存新组合，但**仍然记录**到已被淘汰前的既有 meter 之外——
-     * 见 {@link #recordRequest} 的溢出处理说明。
+     * 每个 tag 维度组合的上限。{@code path} tag 取自 pathPattern，但运行时解析失败时会回落到实际请求 URI， 其基数不受控（含路径参数的 URL 每个取值都是一个新组合）。无上限则缓存与
+     * MeterRegistry 中的 meter 会随流量无限增长（内存泄漏）。达到上限后不再缓存新组合，但**仍然记录**到已被淘汰前的既有 meter 之外—— 见 {@link #recordRequest}
+     * 的溢出处理说明。
      */
     static final int MAX_CACHED_KEYS = 1024;
 
@@ -59,9 +58,8 @@ public class MicrometerWebMetrics extends BaseWebComponent implements WebMetrics
     /**
      * 溢出时统一落到的 timer，按 {@code (method, status)} 分桶，保证超限后 latency 仍有观测（不会被静默丢弃）。
      * <p>
-     * 必须分桶而不能用单个共享 timer：{@code path} 是唯一高基数的 tag，去掉它之后 {@code (method, status)} 的
-     * 基数完全可控（方法数 × 状态码数）。早期实现只注册一个共享 timer 并沿用**首个**溢出请求的 method/status tag，
-     * 导致后续其它 method/status 的请求被计到错误的桶里（例如 GET 的耗时混进 POST 序列）。
+     * 必须分桶而不能用单个共享 timer：{@code path} 是唯一高基数的 tag，去掉它之后 {@code (method, status)} 的 基数完全可控（方法数 × 状态码数）。早期实现只注册一个共享 timer
+     * 并沿用**首个**溢出请求的 method/status tag， 导致后续其它 method/status 的请求被计到错误的桶里（例如 GET 的耗时混进 POST 序列）。
      * </p>
      * <p>
      * 桶数量上界 = {@link #MAX_CACHED_KEYS}，与主缓存同级，仍是有界的。
@@ -96,9 +94,9 @@ public class MicrometerWebMetrics extends BaseWebComponent implements WebMetrics
                             .tags(TAG_METHOD, method, TAG_PATH, OVERFLOW_PATH, TAG_STATUS, String.valueOf(statusCode))
                             .register(meterRegistry));
         }
-        Timer created = Timer.builder("dispatcher.request.duration")
-                .tags(TAG_METHOD, method, TAG_PATH, pathPattern != null ? pathPattern : "", TAG_STATUS,
-                        String.valueOf(statusCode))
+        Timer created = Timer
+                .builder("dispatcher.request.duration").tags(TAG_METHOD, method, TAG_PATH,
+                        pathPattern != null ? pathPattern : "", TAG_STATUS, String.valueOf(statusCode))
                 .register(meterRegistry);
         Timer existing = requestTimers.putIfAbsent(key, created);
         return existing != null ? existing : created;

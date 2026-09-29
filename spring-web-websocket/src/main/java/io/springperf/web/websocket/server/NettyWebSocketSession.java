@@ -168,7 +168,8 @@ public class NettyWebSocketSession implements WebSocketSession {
         if (message instanceof TextMessage) {
             // 透传 isLast：JSR-356 分片发送会用 last=false 标记非尾片，若一律按 final 帧写出，
             // 客户端会把每个分片当作独立完整消息，分片消息即被静默拆解破坏。
-            return new TextWebSocketFrame(((TextMessage) message).isLast(), NO_RSV, ((TextMessage) message).getPayload());
+            return new TextWebSocketFrame(((TextMessage) message).isLast(), NO_RSV,
+                    ((TextMessage) message).getPayload());
         } else if (message instanceof BinaryMessage) {
             ByteBuffer buf = ((BinaryMessage) message).getPayload();
             byte[] bytes = new byte[buf.remaining()];

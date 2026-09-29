@@ -133,8 +133,8 @@ class OpenApiAdapterCustomizeTest {
         OpenAPI openApi = new OpenAPI();
         new OpenApiAdapter(wc).customize(openApi);
 
-        assertNotNull(openApi.getPaths().get("/app/demo/{id}/list"), "路径应带上 context-path 前缀: "
-                + openApi.getPaths().keySet());
+        assertNotNull(openApi.getPaths().get("/app/demo/{id}/list"),
+                "路径应带上 context-path 前缀: " + openApi.getPaths().keySet());
         assertNull(openApi.getPaths().get("/demo/{id}/list"), "不应再暴露不带前缀的路径");
     }
 

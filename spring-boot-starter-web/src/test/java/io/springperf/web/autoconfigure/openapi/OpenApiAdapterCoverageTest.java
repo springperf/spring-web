@@ -68,8 +68,7 @@ class OpenApiAdapterCoverageTest {
         }
 
         @SuppressWarnings("unused")
-        @org.springframework.web.bind.annotation.ResponseStatus(
-                code = org.springframework.http.HttpStatus.NOT_FOUND, reason = "用户不存在")
+        @org.springframework.web.bind.annotation.ResponseStatus(code = org.springframework.http.HttpStatus.NOT_FOUND, reason = "用户不存在")
         public String customReason() {
             return "ok";
         }
@@ -319,11 +318,12 @@ class OpenApiAdapterCoverageTest {
         new OpenApiAdapter(webContext(route("bindableModel", SearchForm.class))).customize(openApi);
 
         Operation op = openApi.getPaths().get("/api/{id}/x").getGet();
-        assertTrue(op.getParameters().stream().anyMatch(p -> "keyword".equals(p.getName()) && "query".equals(p.getIn())),
+        assertTrue(
+                op.getParameters().stream().anyMatch(p -> "keyword".equals(p.getName()) && "query".equals(p.getIn())),
                 "可绑定属性应逐个成为 query 参数: " + op.getParameters());
-        assertTrue(op.getParameters().stream().anyMatch(p -> "pageIndex".equals(p.getName()) && "query".equals(p.getIn())));
-        assertFalse(op.getParameters().stream().anyMatch(p -> "form".equals(p.getName())),
-                "展开后不应再保留 object 类型的同名参数");
+        assertTrue(op.getParameters().stream()
+                .anyMatch(p -> "pageIndex".equals(p.getName()) && "query".equals(p.getIn())));
+        assertFalse(op.getParameters().stream().anyMatch(p -> "form".equals(p.getName())), "展开后不应再保留 object 类型的同名参数");
     }
 
     @Test

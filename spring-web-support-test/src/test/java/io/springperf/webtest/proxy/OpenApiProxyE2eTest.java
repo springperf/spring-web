@@ -32,8 +32,8 @@ import static org.junit.jupiter.api.Assertions.*;
 public class OpenApiProxyE2eTest {
 
     /**
-     * 文档路径必须带 context-path 前缀（本测试应用配置 {@code server.servlet.context-path=/api}），
-     * 与 OpenApiAdapter 生成的完整路径保持一致 —— 见 OpenApiE2eTest#API_PREFIX 的同款说明。
+     * 文档路径必须带 context-path 前缀（本测试应用配置 {@code server.servlet.context-path=/api}）， 与 OpenApiAdapter 生成的完整路径保持一致 —— 见
+     * OpenApiE2eTest#API_PREFIX 的同款说明。
      */
     private static final String API_PREFIX = "/api";
 

@@ -195,9 +195,8 @@ public class OpenApiAdapter {
     }
 
     /**
-     * 生成全局唯一的 operationId。裸方法名在不同 Controller 之间会重复（同一接口多个实现、通用 CRUD
-     * Controller 等），而 OpenAPI 规范要求 operationId 唯一，重复会让代码生成器产出互相覆盖的方法。
-     * 首次出现保持原方法名（不无故改变既有文档），重复时追加自增后缀。
+     * 生成全局唯一的 operationId。裸方法名在不同 Controller 之间会重复（同一接口多个实现、通用 CRUD Controller 等），而 OpenAPI 规范要求 operationId
+     * 唯一，重复会让代码生成器产出互相覆盖的方法。 首次出现保持原方法名（不无故改变既有文档），重复时追加自增后缀。
      */
     private static String uniqueOperationId(String methodName, Set<String> usedOperationIds) {
         String id = methodName;
@@ -267,10 +266,11 @@ public class OpenApiAdapter {
             org.springframework.web.bind.annotation.RequestBody reqBody = param
                     .getAnnotation(org.springframework.web.bind.annotation.RequestBody.class);
             if (reqBody != null) {
-                operation.setRequestBody(new io.swagger.v3.oas.models.parameters.RequestBody()
-                        .content(new Content().addMediaType("application/json",
-                                new MediaType().schema(resolveRequestSchema(param))))
-                        .required(reqBody.required()));
+                operation
+                        .setRequestBody(new io.swagger.v3.oas.models.parameters.RequestBody()
+                                .content(new Content().addMediaType("application/json",
+                                        new MediaType().schema(resolveRequestSchema(param))))
+                                .required(reqBody.required()));
                 continue;
             }
 
@@ -296,8 +296,7 @@ public class OpenApiAdapter {
     }
 
     /**
-     * 展开 {@code @ModelAttribute} 参数：Spring 的数据绑定按属性逐个绑定，文档也应逐属性列出 query 参数， 而不是塞一个 {@code object}
-     * 类型的同名参数（客户端无从得知该传什么）。
+     * 展开 {@code @ModelAttribute} 参数：Spring 的数据绑定按属性逐个绑定，文档也应逐属性列出 query 参数， 而不是塞一个 {@code object} 类型的同名参数（客户端无从得知该传什么）。
      * <p>
      * 载体没有任何可绑定属性时退化为单个 object 参数，保持既有输出形态。
      * </p>
@@ -314,19 +313,22 @@ public class OpenApiAdapter {
                     new Parameter().name(property.getKey()).in("query").required(false).schema(property.getValue()));
         }
     }
+
+    /**
+     * 生成响应的状态码与描述。{@code method} 由调用方保证非空（见 {@link #adapt} 的 {@code if (method != null)} 守卫），与 {@link #buildOperation}
+     * / {@link #addMethodParameters} 同一契约，故此处不再重复判空。
+     */
     private void addResponse(Method method, Operation operation) {
         // 从 @ResponseStatus 读取实际状态码与其 reason（含 Spring 的默认 reason phrase），默认 200 OK。
         // 早期实现丢弃 reason 并对所有非 204 状态一律写 "OK"，201/202/204 的文档描述因此与实际不符。
         HttpStatus status = HttpStatus.OK;
         String reason = null;
-        if (method != null) {
-            org.springframework.web.bind.annotation.ResponseStatus rs = AnnotatedElementUtils
-                    .findMergedAnnotation(method, org.springframework.web.bind.annotation.ResponseStatus.class);
-            if (rs != null) {
-                status = rs.code();
-                if (!rs.reason().isEmpty()) {
-                    reason = rs.reason();
-                }
+        org.springframework.web.bind.annotation.ResponseStatus rs = AnnotatedElementUtils.findMergedAnnotation(method,
+                org.springframework.web.bind.annotation.ResponseStatus.class);
+        if (rs != null) {
+            status = rs.code();
+            if (!rs.reason().isEmpty()) {
+                reason = rs.reason();
             }
         }
         int statusCode = status.value();
@@ -428,10 +430,10 @@ public class OpenApiAdapter {
      * </p>
      */
     private static Map<String, Schema> resolveProperties(Class<?> type, Set<Class<?>> visiting) {
-        if (type == null || type.isPrimitive() || type.isArray() || type.isEnum() || Iterable.class.isAssignableFrom(type)
-                || Map.class.isAssignableFrom(type) || type.getName().startsWith("java.")
-                || type.getName().startsWith("javax.") || type.getName().startsWith("jakarta.")
-                || visiting.contains(type)) {
+        if (type == null || type.isPrimitive() || type.isArray() || type.isEnum()
+                || Iterable.class.isAssignableFrom(type) || Map.class.isAssignableFrom(type)
+                || type.getName().startsWith("java.") || type.getName().startsWith("javax.")
+                || type.getName().startsWith("jakarta.") || visiting.contains(type)) {
             return null;
         }
         Map<String, Schema> properties = new LinkedHashMap<>();

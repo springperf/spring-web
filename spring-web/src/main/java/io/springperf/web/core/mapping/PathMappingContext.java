@@ -34,9 +34,8 @@ public class PathMappingContext extends MappingHandlerMethod {
      */
     private final List<MediaType> producibleMediaTypesView;
     /**
-     * 延迟构建的拦截器/过滤器链缓存，由 InterceptorRegistry、WebFilterRegistry 在首次请求命中该路由时以双重检查锁定写入，
-     * 此后在每个请求的匹配路径上被无锁读取。字段必须 volatile：否则锁外的读者可能观察到非空引用但其内部
-     * elementData/元素尚未完成发布，导致该请求静默少执行若干拦截器或过滤器。
+     * 延迟构建的拦截器/过滤器链缓存，由 InterceptorRegistry、WebFilterRegistry 在首次请求命中该路由时以双重检查锁定写入， 此后在每个请求的匹配路径上被无锁读取。字段必须
+     * volatile：否则锁外的读者可能观察到非空引用但其内部 elementData/元素尚未完成发布，导致该请求静默少执行若干拦截器或过滤器。
      */
     private volatile List<HandlerInterceptor> cachedInterceptors;
     private CorsConfigurationProvider corsConfigurationProvider;

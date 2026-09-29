@@ -15,8 +15,8 @@ import lombok.extern.slf4j.Slf4j;
 public class PublisherToDeferredResultAdapter implements Subscriber<Object> {
 
     /**
-     * 每次向 Publisher 请求的元素的数量。以分批代替 {@code request(Long.MAX_VALUE)}，让上游遵守背压：
-     * 无界请求会让上游一次性把所有元素推入 {@link #valueList}，失去流量控制。
+     * 每次向 Publisher 请求的元素的数量。以分批代替 {@code request(Long.MAX_VALUE)}，让上游遵守背压： 无界请求会让上游一次性把所有元素推入
+     * {@link #valueList}，失去流量控制。
      */
     public static final int REQUEST_BATCH_SIZE = 32;
 

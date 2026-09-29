@@ -24,8 +24,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * <li>{@code batch.queue.capacity} — Gauge, ring buffer total capacity</li>
  * </ul>
  * <p>
- * The per-queue caches use {@code ConcurrentHashMap}, but gauge registration is performed <em>outside</em> any
- * mapping function (see {@link #registerRemainingGauge}): registering while holding a CHM bin lock would call into
+ * The per-queue caches use {@code ConcurrentHashMap}, but gauge registration is performed <em>outside</em> any mapping
+ * function (see {@link #registerRemainingGauge}): registering while holding a CHM bin lock would call into
  * {@code MeterRegistry} under that lock and widen the lock-ordering surface.
  * </p>
  */
@@ -87,9 +87,10 @@ public class MicrometerBatchMetrics implements BatchMetrics {
         // 成败分开打 tag：此前 success 形参被忽略，成功与失败的耗时混在同一条时间序列里，
         // 失败批次的耗时（通常更高）会污染延迟指标的分位数。
         Map<String, Timer> cache = success ? successTimers : failureTimers;
-        Timer timer = cache.computeIfAbsent(queueName, k -> Timer.builder("batch.process.duration")
-                .tags(TAG_QUEUE, queueName, TAG_OUTCOME, success ? OUTCOME_SUCCESS : OUTCOME_FAILURE)
-                .register(meterRegistry));
+        Timer timer = cache.computeIfAbsent(queueName,
+                k -> Timer.builder("batch.process.duration")
+                        .tags(TAG_QUEUE, queueName, TAG_OUTCOME, success ? OUTCOME_SUCCESS : OUTCOME_FAILURE)
+                        .register(meterRegistry));
         timer.record(durationNanos, java.util.concurrent.TimeUnit.NANOSECONDS);
         summary(batchSizeSummaries, "batch.process.batch.size", queueName).record(batchSize);
     }
@@ -116,9 +117,8 @@ public class MicrometerBatchMetrics implements BatchMetrics {
     }
 
     /**
-     * 懒注册 remaining gauge。用"外部 map 先占位、注册动作在 CHM 锁外执行"的写法替代直接
-     * {@code computeIfAbsent}：后者会在持有 CHM bin 锁时调用 {@code MeterRegistry.register}，
-     * 与 MeterRegistry 内部锁形成潜在死锁面。
+     * 懒注册 remaining gauge。用"外部 map 先占位、注册动作在 CHM 锁外执行"的写法替代直接 {@code computeIfAbsent}：后者会在持有 CHM bin 锁时调用
+     * {@code MeterRegistry.register}， 与 MeterRegistry 内部锁形成潜在死锁面。
      */
     private AtomicInteger registerRemainingGauge(String queueName, int remaining) {
         AtomicInteger placeholder = new AtomicInteger(remaining);

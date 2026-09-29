@@ -62,8 +62,8 @@ class OpenApiDocControllerTest {
         int threads = 16;
         java.util.concurrent.CyclicBarrier start = new java.util.concurrent.CyclicBarrier(threads);
         java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(threads);
-        java.util.Set<OpenAPI> results = java.util.Collections.synchronizedSet(
-                java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()));
+        java.util.Set<OpenAPI> results = java.util.Collections
+                .synchronizedSet(java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()));
         java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(threads);
         try {
             for (int i = 0; i < threads; i++) {

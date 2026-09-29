@@ -12,10 +12,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class SwaggerUiProperties {
 
     /**
-     * Swagger UI webjar version. Must match the {@code org.webjars:swagger-ui} dependency version
-     * (root {@code pom.xml} property {@code swagger-ui.version}) — the two are cross-referenced, not
-     * derived, so a version bump has to update both. Kept as a plain default rather than a filtered
-     * resource so the starter jar stays free of build-time templating.
+     * Swagger UI webjar version. Must match the {@code org.webjars:swagger-ui} dependency version (root {@code pom.xml}
+     * property {@code swagger-ui.version}) — the two are cross-referenced, not derived, so a version bump has to update
+     * both. Kept as a plain default rather than a filtered resource so the starter jar stays free of build-time
+     * templating.
      */
     private String webjarVersion = "5.2.0";
 

@@ -15,10 +15,9 @@ import static org.junit.jupiter.api.Assertions.*;
 class OpenApiE2eTest extends BaseE2ETest {
 
     /**
-     * 文档中的路径必须带 context-path 前缀：本测试应用配置了 {@code server.servlet.context-path=/api}
-     * （见 {@code spring-web-support-test/src/main/resources/application.properties}），
-     * 对外真实 URL 是 {@code /api/demo/echo}。OpenApiAdapter 生成的 paths 与之一致，
-     * 故断言也必须带上该前缀 —— 否则断言的是「客户端按文档调用会 404」的错误期望。
+     * 文档中的路径必须带 context-path 前缀：本测试应用配置了 {@code server.servlet.context-path=/api} （见
+     * {@code spring-web-support-test/src/main/resources/application.properties}）， 对外真实 URL 是
+     * {@code /api/demo/echo}。OpenApiAdapter 生成的 paths 与之一致， 故断言也必须带上该前缀 —— 否则断言的是「客户端按文档调用会 404」的错误期望。
      */
     private static final String API_PREFIX = "/api";
 
@@ -154,8 +153,7 @@ class OpenApiE2eTest extends BaseE2ETest {
         boolean hasUserPropertyName = postOp.getParameters().stream()
                 .anyMatch(p -> "name".equals(p.getName()) && "query".equals(p.getIn()));
         assertTrue(hasUserPropertyName, "expected @ModelAttribute property 'name' as query param");
-        boolean noRawUserParam = postOp.getParameters().stream()
-                .noneMatch(p -> "user".equals(p.getName()));
+        boolean noRawUserParam = postOp.getParameters().stream().noneMatch(p -> "user".equals(p.getName()));
         assertTrue(noRawUserParam, "@ModelAttribute 应展开为属性，不应保留同名的 object 参数");
 
         // RequestBody

@@ -131,10 +131,11 @@ class MicrometerBatchMetricsTest {
         } finally {
             pool.shutdownNow();
         }
-        assertEquals(1, registry.getMeters().stream()
-                .filter(m -> "batch.queue.remaining".equals(m.getId().getName())).count(), "并发首次注册不应产生重复 gauge");
-        assertEquals(1, registry.getMeters().stream()
-                .filter(m -> "batch.queue.capacity".equals(m.getId().getName())).count());
+        assertEquals(1,
+                registry.getMeters().stream().filter(m -> "batch.queue.remaining".equals(m.getId().getName())).count(),
+                "并发首次注册不应产生重复 gauge");
+        assertEquals(1,
+                registry.getMeters().stream().filter(m -> "batch.queue.capacity".equals(m.getId().getName())).count());
     }
 
     @Test

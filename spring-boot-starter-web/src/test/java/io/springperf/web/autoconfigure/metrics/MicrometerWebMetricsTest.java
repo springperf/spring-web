@@ -219,8 +219,7 @@ class MicrometerWebMetricsTest {
 
         assertNotNull(post500, "应存在 POST/500 的独立溢出桶");
         assertNotNull(delete404, "应存在 DELETE/404 的独立溢出桶");
-        assertEquals(5_000_000L, post500.totalTime(TimeUnit.NANOSECONDS), 0.001,
-                "POST 的耗时应记在 POST 桶，不得串入其它 method");
+        assertEquals(5_000_000L, post500.totalTime(TimeUnit.NANOSECONDS), 0.001, "POST 的耗时应记在 POST 桶，不得串入其它 method");
         assertEquals(7_000_000L, delete404.totalTime(TimeUnit.NANOSECONDS), 0.001,
                 "DELETE 的耗时应记在 DELETE 桶，不得串入其它 method");
     }

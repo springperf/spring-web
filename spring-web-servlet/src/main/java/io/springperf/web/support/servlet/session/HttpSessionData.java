@@ -93,8 +93,8 @@ public class HttpSessionData implements java.io.Serializable {
      * 原子地抢占"失效"状态：仅当当前仍有效时置为失效并返回 true。
      * <p>
      * 用于替代 {@link PerfHttpSession#invalidate()} 中"先 isInvalid() 判断再 setInvalid(true)"的 check-then-act： 该写法在
-     * 同一底层会话被并发失效时（多个 wrapper 实例共享本对象，或两个请求同时调用 invalidate） 可让两个线程同时通过校验，导致失效回调与
-     * sessionDestroyed 被重复触发。本方法把判断与置位合成一个临界区，保证有且只有一个调用者获得 true。
+     * 同一底层会话被并发失效时（多个 wrapper 实例共享本对象，或两个请求同时调用 invalidate） 可让两个线程同时通过校验，导致失效回调与 sessionDestroyed
+     * 被重复触发。本方法把判断与置位合成一个临界区，保证有且只有一个调用者获得 true。
      * </p>
      * <p>
      * 仅 invalidate 路径使用，非每请求热路径，synchronized 开销可接受；读侧 {@link #isInvalid()} 仍保持无锁。

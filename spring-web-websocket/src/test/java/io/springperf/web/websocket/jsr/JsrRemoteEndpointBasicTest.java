@@ -56,15 +56,15 @@ class JsrRemoteEndpointBasicTest {
     }
 
     /**
-     * {@code AbstractWebSocketMessage.equals} 只比较 payload、忽略 isLast，因此下面必须用 ArgumentCaptor
-     * 显式断言该标志，否则"丢弃 isLast"的实现也能让 verify 通过。
+     * {@code AbstractWebSocketMessage.equals} 只比较 payload、忽略 isLast，因此下面必须用 ArgumentCaptor 显式断言该标志，否则"丢弃 isLast"的实现也能让
+     * verify 通过。
      */
     @Test
     void sendText_nonLastFragment_propagatesIsLastFalse() throws IOException {
         remote.sendText("part", false);
 
-        org.mockito.ArgumentCaptor<WebSocketMessage<?>> captor = org.mockito.ArgumentCaptor.forClass(
-                WebSocketMessage.class);
+        org.mockito.ArgumentCaptor<WebSocketMessage<?>> captor = org.mockito.ArgumentCaptor
+                .forClass(WebSocketMessage.class);
         verify(springSession).sendMessage(captor.capture());
         assertFalse(captor.getValue().isLast(), "last=false 的分片必须透传，否则客户端会把分片当完整消息");
     }
@@ -73,8 +73,8 @@ class JsrRemoteEndpointBasicTest {
     void sendText_lastFragment_propagatesIsLastTrue() throws IOException {
         remote.sendText("part", true);
 
-        org.mockito.ArgumentCaptor<WebSocketMessage<?>> captor = org.mockito.ArgumentCaptor.forClass(
-                WebSocketMessage.class);
+        org.mockito.ArgumentCaptor<WebSocketMessage<?>> captor = org.mockito.ArgumentCaptor
+                .forClass(WebSocketMessage.class);
         verify(springSession).sendMessage(captor.capture());
         assertTrue(captor.getValue().isLast());
     }
@@ -83,8 +83,8 @@ class JsrRemoteEndpointBasicTest {
     void sendBinary_nonLastFragment_propagatesIsLastFalse() throws IOException {
         remote.sendBinary(ByteBuffer.wrap("x".getBytes(StandardCharsets.UTF_8)), false);
 
-        org.mockito.ArgumentCaptor<WebSocketMessage<?>> captor = org.mockito.ArgumentCaptor.forClass(
-                WebSocketMessage.class);
+        org.mockito.ArgumentCaptor<WebSocketMessage<?>> captor = org.mockito.ArgumentCaptor
+                .forClass(WebSocketMessage.class);
         verify(springSession).sendMessage(captor.capture());
         assertFalse(captor.getValue().isLast(), "二进制分片的 last 标志同样必须透传");
     }
