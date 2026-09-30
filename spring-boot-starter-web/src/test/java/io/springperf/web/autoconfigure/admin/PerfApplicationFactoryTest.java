@@ -27,7 +27,7 @@ class PerfApplicationFactoryTest {
     private Environment environment;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         instanceProperties = new InstanceProperties();
         managementServerProperties = new ManagementServerProperties();
         serverProperties = new ServerProperties();
@@ -37,6 +37,33 @@ class PerfApplicationFactoryTest {
         // InstanceProperties 默认 name="spring-boot-application"，覆盖为 null 以触发 Environment 兜底
         instanceProperties.setName(null);
         when(environment.getProperty("spring.application.name", "application")).thenReturn("test-app");
+    }
+
+    /** 设置 server.port。 */
+    private void setPort(int port) {
+        serverProperties.setPort(port);
+    }
+
+    /** 设置 servlet.context-path。 */
+    private void setContextPath(String path) {
+        serverProperties.getServlet().setContextPath(path);
+    }
+
+    /** 构造启用 SSL 的 {@link Ssl}。 */
+    private static Ssl newSslEnabled() {
+        Ssl ssl = new Ssl();
+        ssl.setEnabled(true);
+        return ssl;
+    }
+
+    /** 设置 management server 的 SSL。 */
+    private void setManagementSsl() {
+        managementServerProperties.setSsl(newSslEnabled());
+    }
+
+    /** 设置 server.ssl。 */
+    private void setSslEnabled(boolean enabled) {
+        serverProperties.setSsl(newSslEnabled());
     }
 
     private PerfApplicationFactory createFactory() {
@@ -78,7 +105,7 @@ class PerfApplicationFactoryTest {
     @Test
     @DisplayName("Service URL 应使用配置的 server.port")
     void serviceUrl_withCustomPort() {
-        serverProperties.setPort(9090);
+        setPort(9090);
         Application app = createFactory().createApplication();
         assertThat(app.getServiceUrl()).contains(":9090");
     }
@@ -86,8 +113,8 @@ class PerfApplicationFactoryTest {
     @Test
     @DisplayName("Service URL 应包含 context-path")
     void serviceUrl_withContextPath() {
-        serverProperties.setPort(9090);
-        serverProperties.getServlet().setContextPath("/api");
+        setPort(9090);
+        setContextPath("/api");
         Application app = createFactory().createApplication();
         assertThat(app.getServiceUrl()).endsWith(":9090/api");
     }
@@ -115,8 +142,8 @@ class PerfApplicationFactoryTest {
     @Test
     @DisplayName("Management URL 默认应与 Service URL 同端口，附加 actuator base-path")
     void managementUrl_default() {
-        serverProperties.setPort(9090);
-        serverProperties.getServlet().setContextPath("/api");
+        setPort(9090);
+        setContextPath("/api");
         Application app = createFactory().createApplication();
         assertThat(app.getManagementUrl()).isEqualTo(app.getServiceUrl() + "/actuator");
     }
@@ -124,8 +151,8 @@ class PerfApplicationFactoryTest {
     @Test
     @DisplayName("管理端口隔离时 Management URL 不应包含 context-path")
     void managementUrl_withSeparateManagementPort() {
-        serverProperties.setPort(9090);
-        serverProperties.getServlet().setContextPath("/api");
+        setPort(9090);
+        setContextPath("/api");
         managementServerProperties.setPort(9093);
 
         Application app = createFactory().createApplication();
@@ -137,8 +164,8 @@ class PerfApplicationFactoryTest {
     @DisplayName("Management URL 应使用 management-base-url + base-path")
     void managementUrl_shouldUseManagementBaseUrl() {
         instanceProperties.setManagementBaseUrl("http://custom:9093");
-        serverProperties.setPort(9090);
-        serverProperties.getServlet().setContextPath("/api");
+        setPort(9090);
+        setContextPath("/api");
 
         Application app = createFactory().createApplication();
         assertThat(app.getManagementUrl()).isEqualTo("http://custom:9093/actuator");
@@ -159,8 +186,8 @@ class PerfApplicationFactoryTest {
     @Test
     @DisplayName("Health URL 默认为 Management URL + /health")
     void healthUrl_default() {
-        serverProperties.setPort(9090);
-        serverProperties.getServlet().setContextPath("/api");
+        setPort(9090);
+        setContextPath("/api");
         Application app = createFactory().createApplication();
         assertThat(app.getHealthUrl()).isEqualTo(app.getManagementUrl() + "/health");
     }
@@ -180,9 +207,7 @@ class PerfApplicationFactoryTest {
     @Test
     @DisplayName("SSL 启用时 scheme 应为 https")
     void scheme_shouldBeHttpsWhenSslEnabled() {
-        Ssl ssl = new Ssl();
-        ssl.setEnabled(true);
-        serverProperties.setSsl(ssl);
+        setSslEnabled(true);
 
         Application app = createFactory().createApplication();
         assertThat(app.getServiceUrl()).startsWith("https://");
@@ -195,8 +220,8 @@ class PerfApplicationFactoryTest {
     @Test
     @DisplayName("全配置组合：context-path + 管理端口隔离")
     void fullConfig_withContextPathAndManagementPort() {
-        serverProperties.setPort(9090);
-        serverProperties.getServlet().setContextPath("/api");
+        setPort(9090);
+        setContextPath("/api");
         managementServerProperties.setPort(9093);
 
         Application app = createFactory().createApplication();
@@ -208,7 +233,7 @@ class PerfApplicationFactoryTest {
     @Test
     @DisplayName("全配置组合：自定义 base-path")
     void fullConfig_withCustomBasePath() {
-        serverProperties.setPort(9090);
+        setPort(9090);
         webEndpointProperties.setBasePath("/management");
 
         Application app = createFactory().createApplication();
@@ -232,12 +257,11 @@ class PerfApplicationFactoryTest {
     @Test
     @DisplayName("管理端口隔离时 scheme 应使用管理端口 SSL 配置")
     void managementUrl_withManagementSsl() {
-        serverProperties.setPort(9090);
-        serverProperties.getServlet().setContextPath("/api");
+        setPort(9090);
+        setContextPath("/api");
         managementServerProperties.setPort(9093);
-        Ssl mgmtSsl = new Ssl();
-        mgmtSsl.setEnabled(true);
-        managementServerProperties.setSsl(mgmtSsl);
+        // ManagementServerProperties.setSsl(Ssl) 的参数是版本相关类型，故反射调用避免编译期绑定包名
+        setManagementSsl();
 
         Application app = createFactory().createApplication();
         assertThat(app.getManagementUrl()).startsWith("https://");

@@ -1,7 +1,5 @@
 package io.springperf.web.http;
 
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -14,57 +12,19 @@ import org.springframework.util.MultiValueMap;
 import io.netty.handler.codec.http.HttpHeaderNames;
 
 /**
- * Cross-version compatible {@link HttpHeaders} that implements {@link MultiValueMap}.
+ * {@link HttpHeaders} 子类，在保留 Spring 原生行为的基础上做两处优化：
+ * <ol>
+ * <li>缓存 {@link #getContentType()} 的解析结果，避免重复 {@link MediaType#parseMediaType}；</li>
+ * <li>当底层存储是可写的 {@link NettyHttpHeadersAdapter} 时，Content-Type 的读写走
+ * {@code HttpHeaderNames} 常量名直通 Netty，省掉每次按 String 名查找与 {@code AsciiString} 名字重算哈希。</li>
+ * </ol>
  * <p>
- * <b>Spring 6.x (SB 3.x):</b> {@code HttpHeaders} already implements {@code MultiValueMap<String, String>}, so this
- * class inherits the interface naturally. All {@code super.*()} calls use the parent's built-in behavior.
- * <p>
- * <b>Spring 7.x (SB 4.x):</b> {@code HttpHeaders} no longer implements {@code MultiValueMap}. At class load time we
- * resolve the package-private {@code asMultiValueMap()} method via {@link MethodHandle} and cache the returned delegate
- * reference (which IS the parent's internal {@code MultiValueMap<String, String> headers} field). All
- * {@code MultiValueMap} and {@code Map} methods delegate to this reference.
- * <p>
- * The JIT eliminates the version branch in every method because {@link #HEADERS_IS_MULTI_VALUE_MAP} is
- * {@code static final boolean}.
- * <p>
- * <b>Performance:</b> Eliminates O(n) copies at call sites that previously used {@code toSingleValueMap().keySet()} to
- * work around the type mismatch, and removes the reflective compatibility code in
- * {@code RequestHeaderResolverProvider}.
- * <p>
- * Also caches {@link #getContentType()} result to avoid repeated {@code MediaType.parseMediaType()} calls.
+ * 本类同时实现 {@link MultiValueMap}，与 Spring 6 的 {@code HttpHeaders} 一致：父类已经实现了该接口，
+ * 这里的覆写只是为上面两处优化提供入口，其余一律委派 {@code super}。
  * </p>
  */
 @SuppressWarnings("deprecation")
 public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String, String> {
-
-    private static final boolean HEADERS_IS_MULTI_VALUE_MAP;
-    private static final MethodHandle AS_MULTI_VALUE_MAP;
-
-    static {
-        boolean isMap = false;
-        MethodHandle mh = null;
-        try {
-            isMap = MultiValueMap.class.isAssignableFrom(HttpHeaders.class);
-        } catch (Exception ignored) {
-            // Should not happen — HttpHeaders exists in all supported versions
-        }
-        HEADERS_IS_MULTI_VALUE_MAP = isMap;
-        if (!isMap) {
-            try {
-                mh = MethodHandles.lookup().unreflect(HttpHeaders.class.getDeclaredMethod("asMultiValueMap"));
-            } catch (Exception ignored) {
-                // Should not happen — asMultiValueMap() exists in Spring 7.x
-            }
-        }
-        AS_MULTI_VALUE_MAP = mh;
-    }
-
-    /**
-     * Cached delegate reference (Spring 7.x only). Points to the parent's internal
-     * {@code MultiValueMap<String, String> headers} field. {@code null} on Spring 6.x where {@code this} IS the
-     * delegate.
-     */
-    private final MultiValueMap<String, String> delegateMap;
 
     /** 缓存 {@link #getContentType()} 的解析结果，避免重复 {@link MediaType#parseMediaType} */
     private MediaType cachedContentType;
@@ -84,7 +44,6 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
     private static final MediaType NOT_SET = new MediaType("application", "x-not-set");
 
     public WebHttpHeaders() {
-        this.delegateMap = resolveDelegateForVersion();
         this.cachedContentType = NOT_SET;
         this.rawHeaders = null;
     }
@@ -92,35 +51,16 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
     /**
      * 用已存在的 {@code MultiValueMap} 视图构造，持有引用而非拷贝（零拷贝）。
      * <p>
-     * 5.3/6.x/7.x 的 {@code HttpHeaders(MultiValueMap)} 均为引用持有 （已反编译验证 {@code putfield headers} 无拷贝循环）。传入
-     * {@link NettyHttpHeadersAdapter} 即可获得 Netty headers 的只读零拷贝视图。
+     * Spring 的 {@code HttpHeaders(MultiValueMap)} 为引用持有（已反编译验证 {@code putfield headers} 无拷贝循环）。
+     * 传入 {@link NettyHttpHeadersAdapter} 即可获得 Netty headers 的只读零拷贝视图。
      * </p>
      */
     public WebHttpHeaders(MultiValueMap<String, String> headers) {
         super(headers);
-        this.delegateMap = resolveDelegateForVersion();
         this.cachedContentType = NOT_SET;
         this.rawHeaders = (headers instanceof NettyHttpHeadersAdapter)
                 ? ((NettyHttpHeadersAdapter) headers).rawHeadersIfWritable()
                 : null;
-    }
-
-    private MultiValueMap<String, String> resolveDelegateForVersion() {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return null;
-        }
-        return resolveDelegate();
-    }
-
-    private MultiValueMap<String, String> resolveDelegate() {
-        if (AS_MULTI_VALUE_MAP == null) {
-            throw new IllegalStateException("Cannot resolve HttpHeaders.asMultiValueMap() — this should not happen");
-        }
-        try {
-            return (MultiValueMap<String, String>) AS_MULTI_VALUE_MAP.invoke(this);
-        } catch (Throwable e) {
-            throw new RuntimeException("Failed to invoke asMultiValueMap()", e);
-        }
     }
 
     // ========================================================================
@@ -129,64 +69,37 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
 
     @Override
     public String getFirst(String key) {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return super.getFirst(key);
-        }
-        return delegateMap.getFirst(key);
+        return super.getFirst(key);
     }
 
     @Override
     public void add(String key, String value) {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            super.add(key, value);
-        } else {
-            delegateMap.add(key, value);
-        }
+        super.add(key, value);
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public void addAll(String key, List<? extends String> values) {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            super.addAll(key, values);
-        } else {
-            delegateMap.addAll(key, (List<String>) values);
-        }
+        super.addAll(key, values);
     }
 
     @Override
     public void addAll(MultiValueMap<String, String> other) {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            super.addAll(other);
-        } else {
-            delegateMap.addAll(other);
-        }
+        super.addAll(other);
     }
 
     @Override
     public void set(String key, String value) {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            super.set(key, value);
-        } else {
-            delegateMap.set(key, value);
-        }
+        super.set(key, value);
     }
 
     @Override
     public void setAll(Map<String, String> map) {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            super.setAll(map);
-        } else {
-            delegateMap.setAll(map);
-        }
+        super.setAll(map);
     }
 
     @Override
     public Map<String, String> toSingleValueMap() {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return super.toSingleValueMap();
-        }
-        return delegateMap.toSingleValueMap();
+        return super.toSingleValueMap();
     }
 
     // ========================================================================
@@ -195,100 +108,62 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
 
     @Override
     public int size() {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return super.size();
-        }
-        return delegateMap.size();
+        return super.size();
     }
 
     @Override
     public boolean isEmpty() {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return super.isEmpty();
-        }
-        return delegateMap.isEmpty();
+        return super.isEmpty();
     }
 
     @Override
     public boolean containsKey(Object key) {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return super.containsKey(key);
-        }
-        return delegateMap.containsKey(key);
+        return super.containsKey(key);
     }
 
     @Override
     public boolean containsValue(Object value) {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return super.containsValue(value);
-        }
-        return delegateMap.containsValue(value);
+        return super.containsValue(value);
     }
 
     @Override
     public List<String> get(Object key) {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return super.get(key);
-        }
-        return delegateMap.get(key);
+        return super.get(key);
     }
 
     @Override
     public List<String> put(String key, List<String> value) {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return super.put(key, value);
-        }
-        return delegateMap.put(key, value);
+        return super.put(key, value);
     }
 
     @Override
     public List<String> remove(Object key) {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return super.remove(key);
-        }
-        return delegateMap.remove(key);
+        return super.remove(key);
     }
 
     @Override
     public void putAll(Map<? extends String, ? extends List<String>> map) {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            super.putAll(map);
-        } else {
-            delegateMap.putAll(map);
-        }
+        super.putAll(map);
     }
 
     @Override
     public void clear() {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            super.clear();
-        } else {
-            delegateMap.clear();
-        }
+        super.clear();
     }
 
     @Override
     public Set<String> keySet() {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return super.keySet();
-        }
-        return delegateMap.keySet();
+        return super.keySet();
     }
 
     @Override
     public Collection<List<String>> values() {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return super.values();
-        }
-        return delegateMap.values();
+        return super.values();
     }
 
     @Override
     public Set<Entry<String, List<String>>> entrySet() {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return super.entrySet();
-        }
-        return delegateMap.entrySet();
+        return super.entrySet();
     }
 
     // ========================================================================

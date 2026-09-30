@@ -89,15 +89,24 @@ public class PerfApplicationFactory implements ApplicationFactory {
         if (instanceProperties.getServiceBaseUrl() != null) {
             return instanceProperties.getServiceBaseUrl();
         }
-        return resolveScheme(serverProperties.getSsl()) + "://" + resolveServiceHost() + ":" + resolveServerPort();
+        return resolveScheme(serverSsl()) + "://" + resolveServiceHost() + ":" + resolveServerPort();
     }
 
     private String resolveServicePath() {
         if (instanceProperties.getServicePath() != null) {
             return instanceProperties.getServicePath();
         }
-        String ctxPath = serverProperties.getServlet().getContextPath();
+        String ctxPath = serverContextPath();
         return (ctxPath != null && !ctxPath.isEmpty() && !"/".equals(ctxPath)) ? ctxPath : "";
+    }
+
+    private Ssl serverSsl() {
+        return serverProperties.getSsl();
+    }
+
+    private String serverContextPath() {
+        ServerProperties.Servlet servlet = serverProperties.getServlet();
+        return (servlet != null) ? servlet.getContextPath() : null;
     }
 
     // ---- Management URL ----
@@ -181,9 +190,6 @@ public class PerfApplicationFactory implements ApplicationFactory {
     // ---- Scheme ----
 
     private static String resolveScheme(Ssl ssl) {
-        if (ssl != null && ssl.isEnabled()) {
-            return "https";
-        }
-        return "http";
+        return Ssl.isEnabled(ssl) ? "https" : "http";
     }
 }
