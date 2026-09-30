@@ -166,12 +166,13 @@ perf 框架吞吐是 Servlet 容器的 **1.45\~12.6x**，p50 延迟 **0.10\~0.11
 
 ## 版本选择
 
-本项目按 Spring Boot 大版本管理两个分支。最低支持 **Spring Boot 2.4.x**。
+本项目管理三个分支：一条主线（Spring Boot 3.5.x）与两条下游适配分支。最低支持 **Spring Boot 2.4.x**。
 
 | 分支 | Spring Boot | Spring Framework | JDK | Servlet API | 状态 |
 |------|------------|----------------|-----|-------------|------|
-| `2.7.x` | 2.4.x ~ 2.7.x | 5.3.x | 8 / 11 / 17 | javax.servlet 4.0 | 维护分支（功能迭代 + bugfix） |
-| `master` | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | 6.0.x ~ 6.2.x / 7.0.x | 17 / 21 / 25 | jakarta.servlet 6.0 | **开发基线**（多版本兼容，切换 Profile） |
+| `2.7.x` | 2.4.x ~ 2.7.x | 5.3.x | 8 / 11 / 17 | javax.servlet 4.0 | 下游适配分支（从 master 同步） |
+| `master` | **3.5.x** | 6.2.x | 17 / 21 / 25 | jakarta.servlet 6.0 | **开发基线**（不含 Spring Boot 4 代码） |
+| `4.1.x` | 4.0.x ~ 4.1.x | 7.0.x | 17 / 21 / 25 | jakarta.servlet 6.0 | 下游适配分支（从 master 同步） |
 
 > 版本下限说明、分支选择建议及详细兼容性信息见 [版本兼容性说明](docs/compatibility.md)。
 

@@ -2,7 +2,8 @@
 
 # Version Compatibility
 
-This project maintains two main branches corresponding to Spring Boot 2.x and Spring Boot 3.x.
+This project maintains three branches: one mainline (Spring Boot 3.5.x) and two downstream
+adaptation branches (2.7.x / 4.1.x).
 
 ---
 
@@ -10,8 +11,12 @@ This project maintains two main branches corresponding to Spring Boot 2.x and Sp
 
 | Branch | Spring Boot | Status | Maintenance Strategy |
 |--------|-------------|--------|---------------------|
-| `2.7.x` | 2.4.x ~ 2.7.x | Maintenance branch | Features + bugfixes; based on javax.servlet |
-| `master` | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | **Development baseline** | New features merged here first; multi-version via Maven profiles |
+| `2.7.x` | 2.4.x ~ 2.7.x | Downstream adaptation | Synced from master + downgrade adaptation; based on javax.servlet (see [2.7.x migration checklist](../../.agent/context/2.7.x-migration-checklist.md)) |
+| `master` | **3.5.x** | **Development baseline** | New features merged here first; **contains no Spring Boot 4 / Spring Framework 7 compatibility code** |
+| `4.1.x` | 4.0.x ~ 4.1.x | Downstream adaptation | Synced from master + upgrade adaptation (see [4.1.x adaptation guide](../../.agent/context/4.1.x-adaptation-checklist.md)) |
+
+Sync direction is always `master → 4.1.x` / `master → 2.7.x`; version adaptation code lives only
+in the downstream branches.
 
 ---
 
@@ -50,8 +55,8 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 
 | Dependency | Current Version | Verified Range | Notes |
 |------------|----------------|----------------|-------|
-| Spring Boot | **3.5.16** | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | Switch via Maven profile (`-Pspring-boot-3.0` ~ `-Pspring-boot-4.1`) |
-| Spring Framework | **6.2.x** | 6.0.x ~ 6.2.x / 7.0.x | Managed by Spring Boot |
+| Spring Boot | **3.5.16** | 3.0.x ~ 3.5.x | Switch via Maven profile (`-Pspring-boot-3.0` ~ `-Pspring-boot-3.5`); for 4.x see the `4.1.x` branch |
+| Spring Framework | **6.2.x** | 6.0.x ~ 6.2.x | Managed by Spring Boot |
 | JDK | **17** | 17 / 21 / 25 (CI matrix, see [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)) | Compile target `java.version=17`; JDK 21+ supports virtual threads (see below) |
 | Servlet API | **jakarta.servlet 6.0** | 6.0.x | javax.servlet incompatible |
 | Netty | **4.1.137.Final** | 4.1.x | |
@@ -70,7 +75,7 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 | Scenario | Status | Notes |
 |----------|--------|-------|
 | SB3 (master default 3.5.x) | ✅ Usable | `SpringWebRuntimeHints` + `ControllerBeanFactoryInitializationAotProcessor`; no manual hints needed for user `@Controller`/DTO; example `spring-web-example-rest` binds `process-aot`; **Windows GraalVM 21.0.2 + MSVC native build & request flow verified end-to-end** |
-| SB4 (4.0.x/4.1.x) | ❌ Not supported | `Boot4WebServerInitializedEventBridge` needs runtime `defineClass` (forbidden in closed world), explicitly excluded |
+| SB4 (4.0.x/4.1.x, `4.1.x` branch) | ❌ Not supported | The 4.x event bridge needs runtime `defineClass` (forbidden in closed world); explicitly documented as excluded on the `4.1.x` branch |
 | epoll transport | ✅ Verified | Netty epoll `.so` verified in a Linux native build environment (NIO transport also verified on Windows native) |
 | WebSocket `@ServerEndpoint` | ⚠️ Register as Bean | classpath scanning unavailable under native; `JsrEndpointScanner` auto-degrades to Bean discovery |
 | Native build verification | ✅ Windows & Linux verified | Windows: `mvn -Pnative package` (GraalVM + MSVC, `vcvars64` env + `-H:-CheckToolchain`); Linux: CI `ubuntu-latest` runs `scripts/native-smoke-test.sh` (build + launch + request-flow assertions) |

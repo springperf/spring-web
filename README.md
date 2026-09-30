@@ -166,12 +166,14 @@ The perf framework delivers **1.45\~12.6x** throughput over Servlet containers, 
 
 ## Version Selection
 
-This project manages two branches aligned with Spring Boot major versions. Minimum supported: **Spring Boot 2.4.x**.
+This project manages three branches: one mainline (Spring Boot 3.5.x) and two downstream
+adaptation branches. Minimum supported: **Spring Boot 2.4.x**.
 
 | Branch | Spring Boot | Spring Framework | JDK | Servlet API | Status |
 |--------|------------|----------------|-----|-------------|--------|
-| `2.7.x` | 2.4.x ~ 2.7.x | 5.3.x | 8 / 11 / 17 | javax.servlet 4.0 | Maintenance branch (features + bugfix) |
-| `master` | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | 6.0.x ~ 6.2.x / 7.0.x | 17 / 21 / 25 | jakarta.servlet 6.0 | **Development baseline** (multi-version via profiles) |
+| `2.7.x` | 2.4.x ~ 2.7.x | 5.3.x | 8 / 11 / 17 | javax.servlet 4.0 | Downstream adaptation (synced from master) |
+| `master` | **3.5.x** | 6.2.x | 17 / 21 / 25 | jakarta.servlet 6.0 | **Development baseline** (no Spring Boot 4 code) |
+| `4.1.x` | 4.0.x ~ 4.1.x | 7.0.x | 17 / 21 / 25 | jakarta.servlet 6.0 | Downstream adaptation (synced from master) |
 
 > See [Version Compatibility](docs/en/compatibility.md) for version floor notes, branch recommendations, and detailed compatibility information.
 
