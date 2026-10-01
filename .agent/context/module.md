@@ -244,8 +244,8 @@ spring-web
 │   │   └── stream/               流式输出
 │   │       ├── StreamEmitter / SseEmitter / SseJsonEmitter
 │   │       ├── StreamJsonEmitter / TextStreamEmitter
-│   │       ├── StreamSender / StreamSenderFactory
-│   │       ├── NettyStreamSender
+│   │       ├── StreamSender / StreamSenderFactory / DefaultStreamSenderFactory
+│   │       ├── AbstractNettyStreamSender / DefaultNettyStreamSender / EarlyEncodeNettyStreamSender
 │   │       └── StreamEmitterReturnValueResolver
 │   │
 │   ├── resource/                 静态资源
@@ -282,8 +282,8 @@ spring-web
     └── support/ContainmentResult, SegKind, Segment
 
 
-org.springframework.web.context.request/  （src/main/java 内重写，无 Servlet 依赖）
-    └── WebAsyncManager, WebAsyncTask, DeferredResult, CallableProcessingInterceptor 等
+org.springframework.web.context.request.async/  （src/main/java 内重写，无 Servlet 依赖）
+    └── WebAsyncSupportUtils           异步工具（基于 Spring 原生 DeferredResult/WebAsyncTask 等）
 ```
 
 ---
@@ -320,10 +320,10 @@ spring-web-servlet
 │   ├── JasperJspServlet                  JSP servlet（集成 Apache Jasper，补齐 JspFactory/InstanceManager/TldCache）
 │   ├── context/ServletAdapterContext                       持有 Servlet 请求/响应/FilterChain
 │   └── filter/
-│       ├── FilterWrapper                   包装 jakarta.servlet.Filter → WebFilter
+│       ├── FilterWrapper                   包装 jakarta.servlet.Filter → 框架 WebFilter
 │       ├── SupportWebFilterRegistry        扩展 WebFilterRegistry，自动注册 Filter Bean
-│       ├── PerfHttpServletFilterChain      适配 FilterChain → javax.servlet.FilterChain
-│       └── match/                          路径匹配工具 (Exact/Prefix/Suffix/PathMatch)
+│       ├── PerfFilterConfig                FilterConfig 实现
+│       └── PerfHttpServletFilterChain      适配 FilterChain → jakarta.servlet.FilterChain
 │
 ├── session/                             HttpSession 存储
 │   ├── PerfHttpSession / PerfHttpSessionManager
@@ -576,9 +576,11 @@ spring-boot-starter-web
 所有核心组件继承 `BaseWebComponent`，通过 `WebContext.startLifecycle()` 驱动：
 
 ```
-Spring 容器启动
+Spring 容器启动（refresh 完成）
   ↓
-WebContext.afterPropertiesSet()
+NettyHttpServer.start()      → SmartLifecycle，phase=Integer.MAX_VALUE（最后启动）
+  ↓
+WebContext.startLifecycle()  → CAS 守卫，单次执行
   ↓
 initWithWebContext()         → 依赖装配，容器间引用注入
   ↓
@@ -594,6 +596,10 @@ Spring 容器关闭
   ↓
 destroyComponent()           → 资源释放
 ```
+
+> **注意**：`WebContext` **不实现** `InitializingBean`，**没有** `afterPropertiesSet()`。
+> 生命周期**只**经 `startLifecycle()` 一条路径，由 `NettyHttpServer.start()` 触发
+> （锚定在 context refresh 完成后的 `SmartLifecycle` 链末尾，确保所有 bean 已就绪）。
 
 ### Registry 类体系
 
@@ -695,7 +701,7 @@ DispatcherHandler.handle() (根 HttpHandler)
                       │   │   ├── ReturnValueResolverRegistry.resolve(returnValue)
                       │   │   │   ├── JSON: JsonBodyReturnValueResolver → HttpBodyCodecRegistry.writeBody()
                       │   │   │   ├── 异步: DeferredResult/Callable → AsyncSupportRegistry
-                      │   │   │   └── 流式: StreamEmitter → NettyStreamSender
+                      │   │   │   └── 流式: StreamEmitter → NettyStreamSender（Default/EarlyEncode）
                       │   │   ├── InterceptorRegistry.postHandle()
                       │   │   ├── InterceptorRegistry.afterCompletion()
                       │   │   └── flushResponse()
