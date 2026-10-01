@@ -57,7 +57,7 @@ public Callable<Result<String>> callable() {
 @GetMapping("/async-timeout")
 public DeferredResult<Result<String>> withTimeout() {
     // First priority: constructor parameter 5000ms
-    // Second priority: server.http.timeout configuration
+    // Second priority: spring.mvc.async.request-timeout configuration
     // Third priority: no timeout
     return new DeferredResult<>(5000L);
 }

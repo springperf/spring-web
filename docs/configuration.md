@@ -233,7 +233,7 @@ management.endpoints.web.exposure.include=health,info,metrics
 # 管理端口独立的 HTTP/2 与请求体上限（前缀 management.server.*；未配置时用默认值，
 # 不再沿用主服务器 server.* 的值）
 management.server.http2.enabled=false
-management.server.max-content-length=4194304
+management.server.max-content-length=1048576
 ```
 
 ## 可观测性指标

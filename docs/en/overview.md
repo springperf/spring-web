@@ -267,7 +267,7 @@ This means: AI can optimize your business layer to the extreme, but if the under
 
 The core interaction pattern of LLM applications is **streaming output**: tokens generated one by one, pushed in real-time. Whether it's ChatGPT's word-by-word replies, Agent task status streams, or RAG retrieval progress feedback, they all rely on **SSE (Server-Sent Events)** protocol.
 
-However, SSE performs poorly on traditional Servlet containers — Spring MVC's SSE throughput is only ~**1,055 ops/s** (4 threads), making it a bottleneck in AI application pipelines. This project's SSE throughput reaches **13,323 ops/s**, **12.63x** of Spring MVC, **7.72x** at 16 threads. This is powered by **NettyStreamSender**'s lock-free Drain Loop design: write operations don't depend on thread pool scheduling, completing batch flushes directly on EventLoop, avoiding the problem of SSE connections occupying threads in traditional Servlet containers.
+However, SSE performs poorly on traditional Servlet containers — Spring MVC's SSE throughput is only ~**1,055 ops/s** (4 threads), making it a bottleneck in AI application pipelines. This project's SSE throughput reaches **13,323 ops/s**, **12.63x** of Spring MVC, **7.72x** at 16 threads. This is powered by **`AbstractNettyStreamSender`**'s lock-free Drain Loop design: write operations don't depend on thread pool scheduling, completing batch flushes directly on EventLoop, avoiding the problem of SSE connections occupying threads in traditional Servlet containers.
 
 This means:
 

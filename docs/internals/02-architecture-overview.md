@@ -375,7 +375,7 @@ if (shuttingDown) {
   │       ├─ ReturnValueResolverRegistry.resolveReturnValue()
   │       │     ├─ [web]     JsonBodyReturnValueResolver → HttpBodyCodecRegistry.writeBody()
   │       │     ├─ [support] ResponseBodyEmitterReturnValueResolver（若引入 support）
-  │       │     ├─ [web]     StreamEmitterReturnValueResolver → NettyStreamSender（SSE/流式）
+  │       │     ├─ [web]     StreamEmitterReturnValueResolver → AbstractNettyStreamSender（Default/EarlyEncode 两路实现）
   │       │     └─ [batch]   BatchReturnValueResolver（若引入 batch，透明聚合）
   │       └─ finally: invokeWithRealResult() / metrics.recordRequest()
   ▼
@@ -508,7 +508,7 @@ support 模块在 `src/main/java/org/springframework/web/servlet/` 等路径下*
 - [03 篇](03-component-lifecycle.md) 展开 `startLifecycle` 内部三阶段与 Registry 体系（[§3.1](#31-完整启动链校正版) 的中段）；
 - [04 篇](04-request-pipeline.md) 展开 `handleWithMappingResult` → `doHandle` 的请求管线（[§4](#四一次请求的跨模块调用链) 的 `web` 段）；
 - [05-10 篇](05-server-and-http.md) 逐个深潜 `server`/`http`/`mapping`/`arg`/`retval`/`invoker`/横切包；
-- [11 篇](11-async-streaming.md) 展开 `async/stream` 与 `NettyStreamSender`；
+- [11 篇](11-async-streaming.md) 展开 `async/stream` 与 `AbstractNettyStreamSender`；
 - [12 篇](12-support-bridge.md) 展开 support 的同包覆盖与 `WebMvcConfigurerBridge`；
 - [13 篇](13-batch-module.md) 展开 batch 的 Disruptor 聚合切入点；
 - [14 篇](14-starter-autoconfig.md) 展开 starter 的 10 个 AutoConfiguration 与零冲突防线。

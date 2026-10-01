@@ -373,4 +373,4 @@ static boolean isExplicitRseHandler(MappingHandlerMethod handlerMethod) {
 
 ---
 
-> **下一篇**：[11 · 异步流式支持](11-async-streaming.md)——异步任务、流式输出、SSE：`DeferredResult`、`Callable`、`StreamEmitter`、`NettyStreamSender`。
+> **下一篇**：[11 · 异步流式支持](11-async-streaming.md)——异步任务、流式输出、SSE：`DeferredResult`、`Callable`、`StreamEmitter`、`AbstractNettyStreamSender`。

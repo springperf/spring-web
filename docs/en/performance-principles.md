@@ -253,10 +253,10 @@ Today, direct EventLoop processing saves thread switching (~1-3μs) for pure CPU
 
 ### How
 
-`NettyStreamSender` uses `MpscUnboundedArrayQueue` + `AtomicInteger wip` to form a lock-free Drain Loop:
+`AbstractNettyStreamSender` uses a **bounded** `MpscArrayQueue` (capacity 65536) + `AtomicInteger wip` to form a lock-free Drain Loop:
 
 ```java
-private final MpscUnboundedArrayQueue<ByteBuf> queue;  // Multi-producer single-consumer lock-free queue
+private final MpscArrayQueue<Object> queue;  // Multi-producer single-consumer lock-free queue (bounded)
 
 void drain() {
     int missed = 1;
@@ -356,7 +356,7 @@ When two descriptions are separated by `→` in the same cell, the left side is 
 
 | Dimension | WebPerf | MVC+Tomcat | WebFlux |
 |-----------|-----------|------------|---------|
-| SSE implementation | **`NettyStreamSender`** → `MpscUnboundedArrayQueue` + lock-free Drain Loop | `SseEmitter` → one thread per connection, synchronous blocking write | `Flux<ServerSentEvent>` → Reactor backpressure |
+| SSE implementation | **`AbstractNettyStreamSender`** → bounded `MpscArrayQueue` + lock-free Drain Loop | `SseEmitter` → one thread per connection, synchronous blocking write | `Flux<ServerSentEvent>` → Reactor backpressure |
 | Backpressure mechanism | **`channel.isWritable()` + `BackpressureHandler`** → precise watermarks | **None** → fast producer directly blocks thread | Reactor `request(n)` → operator chain propagation |
 | Thread usage | **EventLoop unified write** → thread count = CPU cores, doesn't grow with connections | **One thread per connection** → thread count = connection count | EventLoop unified write |
 | Streaming throughput | **12.63x(4t) / 7.72x(16t) Spring MVC** | Baseline | Comparable, but lock-free queue advantage more significant for small messages |
