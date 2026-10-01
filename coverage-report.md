@@ -1,7 +1,7 @@
 # 单元测试覆盖率报告 / Unit Test Coverage Report
 
 - **生成时间 / Generated at**：2026-10-01 11:13:43
-- **环境 / Environment**：MINGW64_NT-10.0-19045 / 
+- **环境 / Environment**：MINGW64_NT-10.0-19045 /
 - **覆盖范围 / Scope**：库模块，**单测 + E2E 合并口径**（JaCoCo，coverage-aggregate 模块 report-aggregate 合并后的 jacoco.csv）
   Library modules, unit tests **plus E2E** (JaCoCo, merged jacoco.csv from the coverage-aggregate module)
 - **覆盖目标 / Targets**：spring-web ≥90%，其余库模块 ≥80%（✅=达标 ✓，❌=未达标 ✗）

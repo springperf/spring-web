@@ -39,7 +39,11 @@ REFRESH_MODULES=("${MODULES[@]}" "${E2E_MODULES[@]}" coverage-aggregate)
 AGG_CSV="$REPO_ROOT/coverage-aggregate/target/site/jacoco-aggregate/jacoco.csv"
 GENERATED_AT="$(date '+%Y-%m-%d %H:%M:%S')"
 PLATFORM="$(uname -s 2>/dev/null || echo 'Windows')"
-JAVA_VERSION="$(java -version 2>/dev/null | head -n1 || echo 'java: n/a')"
+# 注意：java 不在 PATH 时 `java -version | head -n1` 得到**空串**，`||` 不会触发（管道末段 head 成功），
+# 会让输出行留下 "… / " 的行尾空格，进而被 check-docs.py 判为缺陷。故显式补默认值并去掉首尾空白。
+# 必须用 2>/dev/null：若用 2>&1，shell 自身的 "java: command not found" 会被捕获成非空值，兜底就失效了。
+JAVA_VERSION="$(java -version 2>/dev/null | head -n1 | tr -d '\r' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+[ -n "$JAVA_VERSION" ] || JAVA_VERSION='java: n/a'
 
 # ---------- 1. 刷新覆盖率数据 / refresh coverage data ----------
 if [[ "$SKIP_MVN" == "false" ]]; then
@@ -130,8 +134,7 @@ done
   echo "# 单元测试覆盖率报告 / Unit Test Coverage Report"
   echo ""
   echo "- **生成时间 / Generated at**：$GENERATED_AT"
-  echo "- **环境 / Environment**：$PLATFORM / $JAVA_VERSION"
-  echo "- **覆盖范围 / Scope**：库模块，**单测 + E2E 合并口径**（JaCoCo，coverage-aggregate 模块 report-aggregate 合并后的 jacoco.csv）"
+  echo "- **环境 / Environment**：$PLATFORM / $JAVA_VERSION"  echo "- **覆盖范围 / Scope**：库模块，**单测 + E2E 合并口径**（JaCoCo，coverage-aggregate 模块 report-aggregate 合并后的 jacoco.csv）"
   echo "  Library modules, unit tests **plus E2E** (JaCoCo, merged jacoco.csv from the coverage-aggregate module)"
   echo "- **覆盖目标 / Targets**：spring-web ≥90%，其余库模块 ≥80%（✅=达标 ✓，❌=未达标 ✗）"
   echo "  spring-web ≥90%, other library modules ≥80% (✅=met, ❌=missed)"
