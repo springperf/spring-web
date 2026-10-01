@@ -1,6 +1,6 @@
 # 模块架构
 
-## 10 个模块
+## 12 个模块
 
 ```
 spring-web-parent (聚合 POM)
@@ -17,7 +17,8 @@ spring-web-parent (聚合 POM)
 ├── spring-web-test                核心框架的示例/E2E测试应用
 ├── spring-web-support-test        桥接层的示例/E2E测试应用
 ├── spring-web-benchmark           JMH 性能基准测试
-└── spring-web-examples            可运行示例应用聚合
+├── spring-web-examples            可运行示例应用聚合（嵌套 13 个子模块）
+└── coverage-aggregate             JaCoCo 覆盖率聚合（report-aggregate，不发布）
 ```
 
 ---
@@ -520,6 +521,8 @@ spring-boot-starter-web
 │   ├── JspViewAutoConfiguration               JSP 视图自动装配（条件：Jasper + spring-web-view 在 classpath）
 │   │   └── JspViewResolver（注册 *.jsp 路由 + 视图名解析）
 │   │
+│   ├── SpringWebViewAutoConfiguration         视图引擎装配（Thymeleaf / FreeMarker / Beetl，条件：ViewEngineCondition）
+│   │
 │   ├── SpringWebViewExchangeAutoConfiguration  模板 exchange provider 装配
 │   │   └── 条件：spring-web-view + Thymeleaf + spring-web-servlet 均在 classpath
 │   │       ServletWebExchangeProvider（模板可读真实 session/principal/cookie）
@@ -528,6 +531,11 @@ spring-boot-starter-web
 │   ├── SpringWebPropertyRefreshAutoConfiguration  配置中心动态刷新
 │   │   └── 监听 Spring Cloud EnvironmentChangeEvent（按类名匹配，零 Cloud 编译期依赖）
 │   │       → WebContext.refreshProperties() 清空框架配置缓存
+│   │
+│   ├── WebServerInitializedEventAutoConfiguration  Netty 启动后发射 WebServerInitializedEvent
+│   │   └── 使 Spring Cloud 服务注册（Nacos/Eureka/Consul）感知服务器就绪
+│   │
+│   ├── SpringWebRuntimeHints                  GraalVM 可达性提示（@ImportRuntimeHints，AOT 构建期采集）
 │   │
 │   ├── SpringDataWebCompatibilityAutoConfiguration  Spring Data 兼容（条件：ProjectingArgumentResolverRegistrar 在 classpath）
 │   │   └── 启动时移除 ProjectingArgumentResolverRegistrar 的 BPP
@@ -545,16 +553,19 @@ spring-boot-starter-web
 │   │
 │   ├── SpringWebBatchAutoConfiguration         Batch 模块自动装配（条件：spring-web-batch 在 classpath）
 │   ├── SpringBootAdminClientAutoConfiguration  SBA 客户端自动装配（条件：spring-boot-admin-starter-client 在 classpath）
-│   │   └── 发射 WebServerInitializedEvent 以支持 SBA 心跳注册
 │   ├── OpenApiAutoConfiguration                OpenAPI 文档自动装配（条件：springdoc-openapi 在 classpath）
 │   ├── SwaggerUiAutoConfiguration              Swagger UI 静态资源自动装配（条件：swagger-ui 在 classpath）
 │   │
 │   └── support/
 │       ├── WebServerApplicationContextFactory  强制 AnnotationConfigApplicationContext
-│       └── PerfWebServer                       WebServer 适配
+│       ├── PerfWebServer                       WebServer 适配
+│       ├── PerfWebServerInitializedEvent       WebServerInitializedEvent 适配（JDK 代理包装 WebServerApplicationContext）
+│       └── ControllerBeanFactoryInitializationAotProcessor  为 @Controller/DTO 注册 AOT 反射 hints
 │
 └── resources/META-INF/
-    ├── spring.factories                  注册 10 个 AutoConfiguration + ApplicationContextFactory
+    ├── spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports  注册 14 个 AutoConfiguration
+    ├── spring/aot.factories              AOT 处理器（BeanFactoryInitializationAotProcessor）
+    ├── spring.factories                  仅注册 ApplicationContextFactory（WebServerApplicationContextFactory）
     └── additional-spring-configuration-metadata.json  配置元数据（IDE 提示）
 ```
 
