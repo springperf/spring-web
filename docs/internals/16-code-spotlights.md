@@ -135,20 +135,20 @@ SSE 和流式输出需要生产者线程（EventLoop/业务线程）和消费者
 // DefaultNettyStreamSender.java（drain loop 核心结构，简化展示；入口在 scheduleDrain）
 @Override
 protected void drain() {
-    if (!channel.isActive()) {                  // :29 失活分支：清队列、复位 wip
+    if (!channel.isActive()) {                  // 失活分支：清队列、复位 wip
         queue.clear();
         wip.set(0);                              // 复位，否则后续 complete() 的 scheduleDrain 被吞
         if (completed && !lastHttpContentWritten) onAllDataWritten();
         return;
     }
     int missed = 1;
-    for (;;) {                                   // :44 missed 重检循环
-        while (channel.isWritable()) {           // :47 背压：不可写则停止消费
+    for (;;) {                                   // missed 重检循环
+        while (channel.isWritable()) {           // 背压：不可写则停止消费
             Object data = queue.poll();
             if (data == null) break;
             // emitter.encode(data, batchOut) 批量编码到 batchBuf；达 maxFlushBytes 调 flushContent(batchBuf)
         }
-        missed = wip.addAndGet(-missed);         // :77 drain 期间又有新入队？
+        missed = wip.addAndGet(-missed);         // drain 期间又有新入队？
         if (missed == 0) break;
     }
     afterDrain();                                 队列残留再调度 / completed 收尾写 LastHttpContent
@@ -264,7 +264,7 @@ Support 模块需要桥接 Spring 的 `WebMvcConfigurer` 接口——该接口�
 public class WebMvcConfigurerBridge extends BaseWebComponent {
 
     @Override
-    public void initComponentPhase1() {                    // :74
+    public void initComponentPhase1() {
         Map<String, WebMvcConfigurer> configurers =
                 webContext.getCtx().getBeansOfType(WebMvcConfigurer.class);
         if (configurers.isEmpty()) return;
@@ -321,14 +321,14 @@ public class FilterWrapper implements WebFilter {
     // C4：实例级唯一标识。同类不同实例（如 Spring Security 同 filter 类多实例）
     // 不得被 WebComponentContainer 按类名去重误杀；同实例重复包装返回同一名字。
     private static final Map<jakarta.servlet.Filter, String> COMPONENT_NAMES =
-            Collections.synchronizedMap(new IdentityHashMap<>());          // :69 线程安全
-    private static final AtomicLong NEXT_INSTANCE_ID = new AtomicLong(1); // :72
+            Collections.synchronizedMap(new IdentityHashMap<>());          // 线程安全
+    private static final AtomicLong NEXT_INSTANCE_ID = new AtomicLong(1);
 
     protected final jakarta.servlet.Filter filter;
     protected int order;
 
     @Override
-    public String getComponentName() {                                     // :75 幂等
+    public String getComponentName() {                                     // 幂等
         return COMPONENT_NAMES.computeIfAbsent(filter, f ->
                 f.getClass().getName() + "@" + NEXT_INSTANCE_ID.getAndIncrement());
     }
@@ -409,26 +409,26 @@ Session 需要在响应写入完成后（`ChannelFuture` 完成时）持久化�
 public class SupportDispatcherHandler extends DispatcherHandler {
 
     @Override
-    protected boolean initContextHolders(WebServerHttpRequest req, WebServerHttpResponse resp) {  // :22
+    protected boolean initContextHolders(WebServerHttpRequest req, WebServerHttpResponse resp) {
         boolean init = super.initContextHolders(req, resp);
         // ...RequestContextHolder 设置...
-        resp.addWriteRespEventListener(new SessionFlushListener(req));   // :28 注册写入完成监听器
+        resp.addWriteRespEventListener(new SessionFlushListener(req));   // 注册写入完成监听器
         return init || requestAttributes != null;
     }
 
     // 接入 Netty ChannelFuture 回调，同步/异步/流式场景均在正确生命周期点执行
-    private static class SessionFlushListener implements WriteRespEventListener {   // :53
+    private static class SessionFlushListener implements WriteRespEventListener {
 
-        @Override public void completeSuccessCallback() { flushSession(); }          // :62
-        @Override public void completeErrorCallback(Throwable t) { flushSession(); } // :67 失败也存
+        @Override public void completeSuccessCallback() { flushSession(); }
+        @Override public void completeErrorCallback(Throwable t) { flushSession(); } // 失败也存
 
-        private void flushSession() {                                                // :72
+        private void flushSession() {
             PerfHttpSession session = request.getRequestContext()
                     .getAttribute(PerfHttpSessionManager.SESSION_ATTR_KEY);
             if (session == null || session.isInvalid()) return;
             PerfHttpSessionManager manager = request.getWebContext()
                     .getWebComponent(PerfHttpSessionManager.class);
-            if (manager != null) { session.markAccessed(); manager.saveSession(session); }  //
+            if (manager != null) { session.markAccessed(); manager.saveSession(session); }
         }
     }
 }

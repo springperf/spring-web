@@ -687,7 +687,7 @@ public void release() {
 }
 ```
 
-`WebServerHttpRequest` 接口契约（[:162-179](../../spring-web/src/main/java/io/springperf/web/http/WebServerHttpRequest.java)）：**跨业务线程前必须 `acquire`，处理完配对 `release`**。这个契约在 [04 篇](04-request-pipeline.md) `DispatcherHandler.handleWithMappingResult` 的 `acquire() → executor.execute → release()` 里被遵守，是 [原则 4](01-design-philosophy.md#原则-4--避免阻塞非阻塞-io--显式引用计数) 的硬约束。
+`WebServerHttpRequest` 接口契约（[`WebServerHttpRequest.java`](../../spring-web/src/main/java/io/springperf/web/http/WebServerHttpRequest.java)）：**跨业务线程前必须 `acquire`，处理完配对 `release`**。这个契约在 [04 篇](04-request-pipeline.md) `DispatcherHandler.handleWithMappingResult` 的 `acquire() → executor.execute → release()` 里被遵守，是 [原则 4](01-design-philosophy.md#原则-4--避免阻塞非阻塞-io--显式引用计数) 的硬约束。
 
 `release` 幂等——`ReferenceCountUtil.release` 内部对 refCnt 归零后的再次调用会抛 `IllegalReferenceCountException`，但框架在 `NettyHttpHandler.handleRequest` 的 `finally` 与业务侧 `finally` 两处配对释放，靠"恰好一次"的对称性保证不重复。`largeBodyBuf` 是 `duplicate` 无独立引用，不需要单独 release——它的存活由 `request` 的引用计数托底。
 
@@ -854,7 +854,7 @@ public void addRespEventListener(WriteRespEventListener listener) {
 
 `WriteRespEventListener`（[](../../spring-web/src/main/java/io/springperf/web/http/WriteRespEventListener.java)）定义四个回调：`completeSuccessCallback`/`completeErrorCallback`/`writeStreamSuccessCallback`/`writeStreamErrorCallback`（后两个有 default 实现）。`CompositeWriteRespEventListener`（[](../../spring-web/src/main/java/io/springperf/web/http/BaseWebServerHttpResponse.java)）合并多监听器广播。
 
-`NettyServerHttpResponse` 还有个静态 `LOG_ERROR_ON_FAILURE`（[:31-40](../../spring-web/src/main/java/io/springperf/web/http/NettyServerHttpResponse.java)）——默认监听器，对 `ClosedChannelException` 静默（连接已关闭时写失败是预期行为，不刷错误日志）。无显式 listener 时用这个默认，避免每连接刷一堆无意义错误日志。
+`NettyServerHttpResponse` 还有个静态 `LOG_ERROR_ON_FAILURE`（见 [`NettyServerHttpResponse.java`](../../spring-web/src/main/java/io/springperf/web/http/NettyServerHttpResponse.java)）——默认监听器，对 `ClosedChannelException` 静默（连接已关闭时写失败是预期行为，不刷错误日志）。无显式 listener 时用这个默认，避免每连接刷一堆无意义错误日志。
 
 ---
 
