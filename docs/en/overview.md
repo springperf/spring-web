@@ -145,7 +145,7 @@ So I launched the **Spring Performance Engineering** project. Core idea: resolve
 In JMH benchmarks on JDK 17 + G1GC (1GB heap), this framework leads across all 7 scenarios:
 
 - Small-payload throughput **36K\~42K** ops/s (4 threads), **1.56x\~2.26x** of Spring MVC
-- P50 latency **0.10~0.11ms**, approximately **45-67%** of Spring MVC
+- P50 latency **0.10~0.11ms** (4 threads, small payload), approximately **45-67%** of Spring MVC
 - Steady-state heap **24MB** (4 threads), approximately **92%** of Spring MVC
 - SSE streaming throughput **13,323** ops/s (4 threads), reaching **12.63x** of Spring MVC, **7.72x** at 16 threads
 
@@ -199,7 +199,7 @@ This framework doesn't demand "all or nothing." Through the `spring-web-servlet`
 |----------|--------|
 | **Resource-constrained environments** (1c1g, 2c2g) | Low framework overhead; 1.6~2.3x throughput of Spring MVC with same resources |
 | **High-throughput API services** | 36K~42K ops/s capacity |
-| **Latency-sensitive workloads** | P50 0.10~0.11ms, 45-67% of Spring MVC |
+| **Latency-sensitive workloads** | P50 0.10~0.11ms (4 threads, small payload), 45-67% of Spring MVC |
 | **SSE / streaming push** | Lock-free Drain Loop design; 12.63x Spring MVC throughput (4 threads) / 7.72x (16 threads) |
 | **Greenfield projects** | Zero migration cost |
 | **IoT / device ingestion** | High volume of small requests, resource-constrained — the original use case |

@@ -380,7 +380,7 @@ When two descriptions are separated by `→` in the same cell, the left side is 
 | `javax.validation` | Supported | Supported | Supported |
 | Spring Data | Bridge compatible | Native | Native |
 | Minimum heap | **~24MB** | ~26MB | ~25MB |
-| P50 latency (small payload) | **0.10-0.11ms** | 0.15-0.22ms | 0.16-0.24ms |
+| P50 latency (small payload, 4 threads) | **0.10-0.11ms** | 0.15-0.22ms | 0.16-0.24ms |
 
 ---
 
