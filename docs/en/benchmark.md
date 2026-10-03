@@ -2,7 +2,7 @@
 
 # Spring WebPerf Performance Benchmark Report
 
-**Generated:** 2026-08-17
+**Generated:** 2026-08-15
 
 **JDK:** jdk-17.0.9
 
