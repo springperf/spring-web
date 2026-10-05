@@ -28,7 +28,7 @@ class SpringHeadersAdapterTest {
         SpringHeadersAdapter adapter = new SpringHeadersAdapter(nettyHeaders());
         assertEquals(2, adapter.size());
         assertEquals("application/json", adapter.getFirst("Content-Type"));
-        assertEquals(Arrays.asList("a", "b"), adapter.get("X-Multi"));
+        assertEquals(Arrays.asList("a", "b"), adapter.get((Object) "X-Multi"));
     }
 
     @Test
@@ -62,11 +62,11 @@ class SpringHeadersAdapterTest {
     void put_remove_clear_areMutable() {
         SpringHeadersAdapter adapter = new SpringHeadersAdapter(nettyHeaders());
         adapter.put("X-New", Arrays.asList("1", "2"));
-        assertEquals(Arrays.asList("1", "2"), adapter.get("X-New"));
+        assertEquals(Arrays.asList("1", "2"), adapter.get((Object) "X-New"));
 
-        List<String> removed = adapter.remove("Content-Type");
+        List<String> removed = adapter.remove((Object) "Content-Type");
         assertEquals(Arrays.asList("application/json"), removed);
-        assertNull(adapter.get("Content-Type"));
+        assertNull(adapter.get((Object) "Content-Type"));
 
         adapter.clear();
         assertTrue(adapter.isEmpty());

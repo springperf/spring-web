@@ -95,10 +95,6 @@
     "allDeclaredConstructors": true
   },
   {
-    "name": "io.springperf.web.core.retval.resolver.async.ListenableFutureReturnValueResolver",
-    "allDeclaredConstructors": true
-  },
-  {
     "name": "io.springperf.web.core.retval.resolver.async.CompletionStageReturnValueResolver",
     "allDeclaredConstructors": true
   },

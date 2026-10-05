@@ -18,10 +18,10 @@ public class RequestHeaderResolverProvider extends AbstractSupportResolverProvid
 
     @Override
     protected MultiValueMapResolver getMultiValueMapResolver() {
-        // 框架的请求头由 WebHttpHeaders 承载，它以自身实现 MultiValueMap（Spring 6 靠继承父类，
-        // Spring 7 靠本类自带实现），故此处显式转型即可跨版本 —— 不能直接返回 HttpHeaders，
-        // 因为 Spring 7 的 HttpHeaders 已不是 MultiValueMap（编译期即报错）。
-        return ((parameter, mappingContext, request, response) -> (MultiValueMap<String, String>) request.getHeaders());
+        // Spring 7 的 HttpHeaders 不再实现 MultiValueMap，故用 asMultiValueMap() 取内部 map 视图
+        // （零拷贝）。不能强转：那只有在本框架自建的 WebHttpHeaders 上成立，一旦请求头是
+        // 别的 HttpHeaders（包装类、测试替身、代理）就会 ClassCastException。
+        return ((parameter, mappingContext, request, response) -> request.getHeaders().asMultiValueMap());
     }
 
     @Override
