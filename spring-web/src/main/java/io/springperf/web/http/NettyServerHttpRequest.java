@@ -327,18 +327,93 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
     public URI getURI() {
         if (uri == null) {
             String scheme = resolveScheme();
-            String hostHeader = request.headers().get(HttpHeaderNames.HOST);
-            if (hostHeader != null) {
-                uri = URI.create(scheme + "://" + hostHeader + getUriStrWithQuery());
-            } else {
-                // getLocalAddress 声明为 @Nullable（通道未绑定本地地址时为 null）：退化为不带端口的
-                // localhost，避免构造 URI 时 NPE
-                InetSocketAddress addr = getLocalAddress();
-                String authority = addr != null ? addr.getHostString() + ":" + addr.getPort() : "localhost";
-                uri = URI.create(scheme + "://" + authority + getUriStrWithQuery());
-            }
+            uri = URI.create(scheme + "://" + resolveAuthority() + getUriStrWithQuery());
         }
         return uri;
+    }
+
+    /**
+     * 构造 request URI 的 authority（host[:port]）。
+     * <p>
+     * 优先级：
+     * <ol>
+     * <li>信任转发头时，取自 {@code X-Forwarded-Host} / RFC 7239 {@code Forwarded} 的 {@code host=}；
+     * 若该值未自带端口，再叠加 {@code X-Forwarded-Port}</li>
+     * <li>{@code Host} 请求头</li>
+     * <li>本地监听地址（通道未绑定或 Host 缺失时的兜底）</li>
+     * </ol>
+     * </p>
+     */
+    private String resolveAuthority() {
+        String scheme = resolveScheme();
+        String forwardedHost = resolveForwardedHost();
+        // host 与 port 独立取值：代理可能只转发其一（例如只给 X-Forwarded-Port），
+        // 此时 host 回退到 Host 头、port 仍应采用转发值。
+        String host = forwardedHost;
+        Integer port = null;
+        if (host == null) {
+            String hostHeader = request.headers().get(HttpHeaderNames.HOST);
+            if (hostHeader != null) {
+                // Host 头自带端口时先剥离：本方法统一在末尾补端口，避免出现 host:port:port。
+                // 注意剥出的端口要保留下来，Host 是权威来源（无转发头时它就是客户端请求的主机:端口）。
+                int colon = hostHeader.lastIndexOf(':');
+                if (colon > hostHeader.lastIndexOf(']')) {
+                    host = hostHeader.substring(0, colon);
+                    try {
+                        port = Integer.parseInt(hostHeader.substring(colon + 1));
+                    } catch (NumberFormatException ignored) {
+                        // Host 头端口非法：视为无端口
+                    }
+                } else {
+                    host = hostHeader;
+                }
+            }
+        }
+        if (forwardedHost != null && hostHasPort(forwardedHost)) {
+            // 转发 host 自带端口（如 public.example.com:8443）最优先
+            int colon = forwardedHost.lastIndexOf(':');
+            try {
+                port = Integer.parseInt(forwardedHost.substring(colon + 1));
+            } catch (NumberFormatException ignored) {
+                // 解析不出则忽略，走下面的 forwarded port
+            }
+            host = forwardedHost.substring(0, colon);
+        }
+        if (forwardedPortIndicated()) {
+            // X-Forwarded-Port 是代理明确给出的外部端口，优先于 Host 头里的内网端口
+            // （Host 可能形如 internal-app:8080，而外部实际是 443）
+            port = resolveForwardedPort();
+        }
+        if (host == null) {
+            // getLocalAddress 声明为 @Nullable（通道未绑定本地地址时为 null）：退化为不带端口的
+            // localhost，避免构造 URI 时 NPE
+            InetSocketAddress addr = getLocalAddress();
+            if (addr == null) {
+                return "localhost";
+            }
+            return addr.getHostString() + ":" + addr.getPort();
+        }
+        if (port == null) {
+            // Host 头没给端口、也无转发端口：默认端口不出现在 authority 里（由 scheme 隐含）
+            return host;
+        }
+        return isDefaultPort(scheme, port) ? host : host + ":" + port;
+    }
+
+    /** authority 中是否已含端口（区分 IPv6 字面量 {@code [::1]} 与 {@code host:port}）。 */
+    private static boolean hostHasPort(String authority) {
+        int colon = authority.lastIndexOf(':');
+        return colon > authority.lastIndexOf(']');
+    }
+
+    /** 请求头中是否给出了转发端口（{@code X-Forwarded-Port} 非空且可解析）。 */
+    private boolean forwardedPortIndicated() {
+        return resolveForwardedPort() != null;
+    }
+
+    /** 是否是 scheme 的默认端口（http=80 / https=443）——默认端口不出现在 authority 里。 */
+    private static boolean isDefaultPort(String scheme, int port) {
+        return ("http".equalsIgnoreCase(scheme) && port == 80) || ("https".equalsIgnoreCase(scheme) && port == 443);
     }
 
     /**
@@ -359,7 +434,7 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
             // 1. RFC 7239 Forwarded
             String forwarded = request.headers().get("Forwarded");
             if (forwarded != null) {
-                String proto = parseForwardedProto(forwarded);
+                String proto = parseForwardedDirective(forwarded, "proto");
                 if (proto != null) {
                     return proto;
                 }
@@ -379,6 +454,93 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
     }
 
     /**
+     * 解析转发的 host（{@code X-Forwarded-Host} / RFC 7239 {@code Forwarded} 的 {@code host=}）。
+     * <p>
+     * 仅在信任转发头（{@code server.forward-headers-strategy} 非 NONE）时生效；否则返回 null，
+     * 由调用方回退到 {@code Host} 头。值可能自带端口（{@code public.example.com:8443}），
+     * 由调用方按需拆分。
+     * </p>
+     */
+    @Nullable
+    public String resolveForwardedHost() {
+        if (!isForwardedHeadersEnabled()) {
+            return null;
+        }
+        String forwarded = request.headers().get("Forwarded");
+        if (forwarded != null) {
+            String host = parseForwardedDirective(forwarded, "host");
+            if (host != null) {
+                return host;
+            }
+        }
+        String xfh = request.headers().get("X-Forwarded-Host");
+        // X-Forwarded-Host 可能是逗号分隔的链（client, proxy1, proxy2）：取第一段为客户端原始主机
+        if (xfh != null && !xfh.isEmpty()) {
+            int comma = xfh.indexOf(',');
+            String first = (comma >= 0 ? xfh.substring(0, comma) : xfh).trim();
+            if (!first.isEmpty()) {
+                return first;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 解析转发的端口（{@code X-Forwarded-Port}）。仅在信任转发头时生效，否则返回 null。
+     *
+     * @return 解析出的端口；头缺失或非数字时返回 null
+     */
+    @Nullable
+    public Integer resolveForwardedPort() {
+        if (!isForwardedHeadersEnabled()) {
+            return null;
+        }
+        String xfp = request.headers().get("X-Forwarded-Port");
+        if (xfp == null || xfp.isEmpty()) {
+            return null;
+        }
+        // 同 X-Forwarded-Host，可能是逗号分隔链：取第一段
+        int comma = xfp.indexOf(',');
+        String first = (comma >= 0 ? xfp.substring(0, comma) : xfp).trim();
+        try {
+            int port = Integer.parseInt(first);
+            return (port > 0 && port <= 65535) ? port : null;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /**
+     * 从 RFC 7239 Forwarded 头中提取指定指令的值（如 {@code proto=https} 的 {@code https}）。 格式示例:
+     * {@code Forwarded: for=192.0.2.60;proto=https;host=example.com}
+     *
+     * @param name
+     *            指令名（{@code proto} / {@code host} 等），比较时忽略大小写
+     */
+    @Nullable
+    private static String parseForwardedDirective(String forwarded, String name) {
+        for (String segment : forwarded.split(";")) {
+            segment = segment.trim();
+            int eq = segment.indexOf('=');
+            if (eq < 0) {
+                continue;
+            }
+            if (!segment.substring(0, eq).trim().equalsIgnoreCase(name)) {
+                continue;
+            }
+            // 值可能带引号: proto="https" 或 proto=https
+            String value = segment.substring(eq + 1).trim();
+            if (value.startsWith("\"") && value.endsWith("\"") && value.length() >= 2) {
+                value = value.substring(1, value.length() - 1);
+            }
+            if (!value.isEmpty()) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    /**
      * 是否信任转发头：读 {@code server.forward-headers-strategy} （NONE/FALSE 视为不信任；FRAMEWORK/NATIVE/其它非空视为信任）。
      */
     private boolean isForwardedHeadersEnabled() {
@@ -388,26 +550,6 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
         }
         String s = strategy.trim();
         return !("NONE".equalsIgnoreCase(s) || "FALSE".equalsIgnoreCase(s));
-    }
-
-    /**
-     * 从 RFC 7239 Forwarded 头中提取 proto 指令。 格式示例: {@code Forwarded: proto=https; host=example.com}
-     */
-    private static String parseForwardedProto(String forwarded) {
-        for (String segment : forwarded.split(";")) {
-            segment = segment.trim();
-            if (segment.startsWith("proto=") || segment.startsWith("proto =")) {
-                // proto 值可能带引号: proto="https" 或 proto=https
-                String value = segment.substring(segment.indexOf('=') + 1).trim();
-                if (value.startsWith("\"") && value.endsWith("\"")) {
-                    value = value.substring(1, value.length() - 1);
-                }
-                if (!value.isEmpty()) {
-                    return value;
-                }
-            }
-        }
-        return null;
     }
 
     @Override

@@ -220,8 +220,9 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(201, resp.code());
             String body = resp.body().string();
-            // JSON 字符串 "data" 由 Jackson 解析为 Java String（不含引号）
-            assertEquals("saved:data", body);
+            // @RequestBody String 由 StringHttpMessageConverter 原样读取（Spring 语义：不做 JSON 解析），
+            // 故请求体里的引号被保留 —— 不是 "data" 解析后的值。
+            assertEquals("saved:\"data\"", body);
         }
     }
 

@@ -12,7 +12,7 @@
 |------|-----------------|------|---------|
 | `2.7.x` | 2.4.x ~ 2.7.x | 下游适配分支 | 从 master 同步 + 降级适配，基于 javax.servlet（见 [2.7.x 迁移清单](../.agent/context/2.7.x-migration-checklist.md)） |
 | `master` | **3.5.x** | **开发基线** | 新功能优先合入此处；**不含任何 Spring Boot 4 / Spring Framework 7 兼容代码** |
-| `4.1.x` | 4.0.x ~ 4.1.x | 下游适配分支 | 从 master 同步 + 升级适配（见 [4.1.x 适配指南](../.agent/context/4.1.x-adaptation-checklist.md)） |
+| `4.1.x` | 4.0.x ~ 4.1.x | 下游适配分支 | 从 master 同步 + 升级适配；**默认即 Spring Boot 4.1，不再保留 3.5.x 兼容路径**（见 [4.1.x 适配指南](../.agent/context/4.1.x-adaptation-checklist.md)） |
 
 同步方向始终是 `master → 4.1.x` / `master → 2.7.x`；版本适配代码只存在于下游分支。
 
@@ -80,6 +80,39 @@
 
 ---
 
+## 4.1.x 分支
+
+### 版本矩阵
+
+| 依赖 | 当前版本 | 已验证兼容范围 | 说明 |
+|------|---------|---------------|------|
+| Spring Boot | **4.1.0** | 4.0.x ~ 4.1.x | **默认即 4.1，无需 `-P` 切换**；`-Pspring-boot-4.0` 可切 4.0 |
+| Spring Framework | **7.0.x** | 7.0.x | 随 Spring Boot 管理 |
+| JDK | **17** | 17 / 21 / 25（CI 矩阵） | 编译目标 `java.version=17` |
+| Servlet API | **jakarta.servlet 6.0** | 6.0.x | 同 master |
+| Netty | **4.1.137.Final** | 4.1.x |  |
+| Jackson | **3.1.4**（`tools.jackson`）+ 注解 2.21 | 由 Boot 4 BOM 管理 | **与 master 的 Jackson 2 不同源**，见下 |
+| Lombok | **1.18.46** | 1.18.30+ |  |
+| JMH | **1.37** | 1.37 | 仅 benchmark 模块使用 |
+
+### 与 master 的关键差异
+
+本分支**专用 Spring Boot 4**，不再追求「一份代码同时兼容 3.5.x 与 4.x」——该目标由 master（纯 3.5.x）与本分支的分工取代。
+
+| 维度 | `master` | `4.1.x` |
+|------|----------|---------|
+| Maven Profile | `spring-boot-3.0` ~ `3.5` | `spring-boot-4.0` / `4.1`（**默认 4.1**） |
+| Jackson | **2.17.2**（`com.fasterxml.jackson.databind`） | **3.1.4**（`tools.jackson.databind`）；注解仍用 `com.fasterxml.jackson.annotation` |
+| `WebHttpHeaders` | 单实现，`super.*` 直调 | 单实现，父类没有的方法委派 `asMultiValueMap()` 视图（不再有 MethodHandle 版本分支） |
+| 容器事件适配 | 直接构造 SB3 事件 | 直接构造 SB4 事件（`boot.web.server.context.*`，不再有 ASM 运行时桥接） |
+| `ResponseStatusException` header | 反射桥接 `getResponseHeaders()` / `getHeaders()` | 直接调 `getHeaders()` |
+| `ListenableFuture` 返回支持 | 支持（Spring 6 有该类型） | **已移除**（Spring 7 已删 `ListenableFuture`，原实现是恒 false 的死代码） |
+| GraalVM native-image | 支持 | ❌ 不支持（见 master 章节的支持矩阵） |
+
+> **Jackson 3 的行为差异**：Jackson 3 把 `FAIL_ON_NULL_FOR_PRIMITIVES` 的默认值由 `false` 改为 `true`（JSON 的 `null` 赋给 `int`/`boolean` 等基本类型字段，以前静默得 `0`/`false`，现在抛异常）。本框架经 `JacksonMappers.defaultMapper()` 显式关闭该 feature，保持与 master 一致的行为。
+
+---
+
 ## 版本选择建议
 
 | 你的场景 | 推荐分支 |
@@ -88,6 +121,7 @@
 | 新项目或已迁移到 JDK 17+ | `master` |
 | 需要使用虚拟线程（JDK 21） | `master` |
 | 需要使用 GraalVM native-image 编译 | `master` |
+| 已使用 Spring Boot 4.0.x / 4.1.x | `4.1.x` |
 
 > **分支选择建议**：JDK 8/11 现有项目选 `2.7.x`，使用 `-Pspring-boot-2.6` / `-Pspring-boot-2.5` / `-Pspring-boot-2.4` 切换目标版本；JDK 17+ 新项目选 `master`（支持虚拟线程、GraalVM native-image）。
 

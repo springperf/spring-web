@@ -183,7 +183,6 @@ spring-web
 │   │       └── async/                               异步解析器
 │   │           ├── DeferredResultReturnValueResolver
 │   │           ├── CallableReturnValueResolver
-│   │           ├── ListenableFutureReturnValueResolver
 │   │           ├── CompletionStageReturnValueResolver
 │   │           └── AsyncTaskReturnValueResolver
 │   │

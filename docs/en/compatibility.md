@@ -13,7 +13,7 @@ adaptation branches (2.7.x / 4.1.x).
 |--------|-------------|--------|---------------------|
 | `2.7.x` | 2.4.x ~ 2.7.x | Downstream adaptation | Synced from master + downgrade adaptation; based on javax.servlet (see [2.7.x migration checklist](../../.agent/context/2.7.x-migration-checklist.md)) |
 | `master` | **3.5.x** | **Development baseline** | New features merged here first; **contains no Spring Boot 4 / Spring Framework 7 compatibility code** |
-| `4.1.x` | 4.0.x ~ 4.1.x | Downstream adaptation | Synced from master + upgrade adaptation (see [4.1.x adaptation guide](../../.agent/context/4.1.x-adaptation-checklist.md)) |
+| `4.1.x` | 4.0.x ~ 4.1.x | Downstream adaptation | Synced from master + upgrade adaptation; **defaults to Spring Boot 4.1, with no 3.5.x compatibility path retained** (see [4.1.x adaptation guide](../../.agent/context/4.1.x-adaptation-checklist.md)) |
 
 Sync direction is always `master → 4.1.x` / `master → 2.7.x`; version adaptation code lives only
 in the downstream branches.
@@ -82,6 +82,43 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 
 ---
 
+## 4.1.x Branch
+
+### Version Matrix
+
+| Dependency | Current | Verified Range | Notes |
+|-----------|---------|----------------|-------|
+| Spring Boot | **4.1.0** | 4.0.x ~ 4.1.x | **4.1 is the default — no `-P` needed**; `-Pspring-boot-4.0` switches to 4.0 |
+| Spring Framework | **7.0.x** | 7.0.x | Managed by Spring Boot |
+| JDK | **17** | 17 / 21 / 25 (CI matrix) | Compile target `java.version=17` |
+| Servlet API | **jakarta.servlet 6.0** | 6.0.x | Same as master |
+| Netty | **4.1.137.Final** | 4.1.x | |
+| Jackson | **3.1.4** (`tools.jackson`) + annotations 2.21 | Managed by the Boot 4 BOM | **Not the same lineage as master's Jackson 2** — see below |
+| Lombok | **1.18.46** | 1.18.30+ | |
+| JMH | **1.37** | 1.37 | Benchmark module only |
+
+### Key Differences from master
+
+This branch is **dedicated to Spring Boot 4** and no longer aims for "one codebase running on both
+3.5.x and 4.x" — that goal is served by the division between master (pure 3.5.x) and this branch.
+
+| Dimension | `master` | `4.1.x` |
+|-----------|----------|---------|
+| Maven profiles | `spring-boot-3.0` ~ `3.5` | `spring-boot-4.0` / `4.1` (**4.1 by default**) |
+| Jackson | **2.17.2** (`com.fasterxml.jackson.databind`) | **3.1.4** (`tools.jackson.databind`); annotations still `com.fasterxml.jackson.annotation` |
+| `WebHttpHeaders` | Single implementation, direct `super.*` calls | Single implementation; methods absent from the superclass delegate to the `asMultiValueMap()` view (no MethodHandle version branch) |
+| Container event adaptation | Constructs the SB3 event directly | Constructs the SB4 event directly (`boot.web.server.context.*`; no ASM runtime bridge) |
+| `ResponseStatusException` headers | Reflective bridge over `getResponseHeaders()` / `getHeaders()` | Calls `getHeaders()` directly |
+| `ListenableFuture` return support | Supported (Spring 6 has the type) | **Removed** (Spring 7 dropped `ListenableFuture`; the old implementation was permanently dead code) |
+| GraalVM native-image | Supported | ❌ Not supported (see the support matrix in the master section) |
+
+> **Jackson 3 behaviour difference**: Jackson 3 flips the default of `FAIL_ON_NULL_FOR_PRIMITIVES`
+> from `false` to `true` (a JSON `null` bound to an `int`/`boolean` field used to silently become
+> `0`/`false`, now it throws). The framework explicitly disables this feature via
+> `JacksonMappers.defaultMapper()` to keep behaviour aligned with master.
+
+---
+
 ## Version Selection Guide
 
 | Your Scenario | Recommended Branch |
@@ -90,6 +127,7 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 | New project or already migrated to JDK 17+ | `master` |
 | Need virtual threads (JDK 21) | `master` |
 | Need GraalVM native-image | `master` |
+| Already on Spring Boot 4.0.x / 4.1.x | `4.1.x` |
 
 > **Branch recommendation**: For JDK 8/11 existing projects, choose `2.7.x` and use `-Pspring-boot-2.6` / `-Pspring-boot-2.5` / `-Pspring-boot-2.4` to switch target versions. For JDK 17+ new projects, choose `master` (supports virtual threads, GraalVM native-image).
 

@@ -21,7 +21,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.Ordered;
+import org.springframework.http.MediaType;
 import org.springframework.http.converter.StringHttpMessageConverter;
+import org.springframework.lang.Nullable;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 import org.springframework.validation.Validator;
@@ -85,6 +87,32 @@ public class SpringWebAutoConfiguration {
         public int getOrder() {
             // JacksonHttpBodyConverter 是 LOWEST_PRECEDENCE - 50000，这里取更小值以优先
             return Ordered.LOWEST_PRECEDENCE - 60000;
+        }
+
+        /**
+         * 只认领 {@code text/plain} 与通配类型，不抢占声明了<b>具体</b>媒体类型的写入。
+         * <p>
+         * 父类声明支持 {@code text/plain} 与通配类型。若按父类语义参与写入，当方法声明
+         * {@code produces="application/x-custom"} 时，本转换器（order 最靠前）会被先行选中，
+         * 抢掉本应由用户为该媒体类型注册的专用 {@code HttpMessageConverter}——
+         * 表现为响应体没经过用户转换器（如缺少其前缀）。
+         * </p>
+         * <p>
+         * 写入方本就有明确的 {@code produces}/Accept 协商结果——具体类型应交给能精确处理它的
+         * 转换器；本转换器只在协商结果是 {@code text/plain} 或通配（没有更具体的候选）时兜底。
+         * 读取侧不受影响（见 {@link #getOrder()}：读路径仍需优先于 Jackson，
+         * 以免 {@code @RequestBody String} 被按 JSON 解析）。
+         * </p>
+         */
+        @Override
+        public boolean canWrite(@Nullable Class<?> clazz, @Nullable MediaType mediaType) {
+            if (!super.canWrite(clazz, mediaType)) {
+                return false;
+            }
+            if (mediaType == null || mediaType.isWildcardType() || mediaType.isWildcardSubtype()) {
+                return true;
+            }
+            return MediaType.TEXT_PLAIN.isCompatibleWith(mediaType);
         }
     }
 

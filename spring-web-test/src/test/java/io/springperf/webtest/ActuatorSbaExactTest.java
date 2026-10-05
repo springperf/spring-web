@@ -64,7 +64,9 @@ public class ActuatorSbaExactTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { "", "/health", "/mappings", "/beans", "/env", "/metrics", "/caches", "/conditions",
+    // 注：不含 /caches —— Boot 4 把 CachesEndpoint 从 spring-boot-actuator 移出（仅在有 cache
+    // 实现时由对应模块提供），本项目未引入任何 cache 依赖，故该端点在 4.x 下本就不存在。
+    @ValueSource(strings = { "", "/health", "/mappings", "/beans", "/env", "/metrics", "/conditions",
             "/configprops", "/loggers", "/threaddump", "/scheduledtasks", "/info" })
     void sbaEndpoint_shouldSucceed(String endpoint) throws Exception {
         Request req = new Request.Builder().url(mgmtBase() + endpoint)

@@ -285,8 +285,7 @@ public class JacksonHttpBodyConverter extends BaseWebComponent implements HttpBo
         if (mediaType == null) {
             return true;
         }
-        // 与遍历 SUPPORTED_MEDIA_TYPES isCompatibleWith 等价：
-        // 通配类型；或 application 的 json / * / *+json 子类型。
+        // 通配类型；或 application 下的 json 及任意 `+json` 后缀子类型。
         if (mediaType.isWildcardType()) {
             return true;
         }
@@ -294,6 +293,10 @@ public class JacksonHttpBodyConverter extends BaseWebComponent implements HttpBo
             return false;
         }
         String subtype = mediaType.getSubtype();
-        return "json".equals(subtype) || "*".equals(subtype) || "*+json".equals(subtype);
+        // `json`、通配 `*`，以及任意 `+json` 后缀的结构化类型
+        // （如 application/vnd.spring-boot.actuator.v2+json、application/problem+json、
+        // application/*+json）。RFC 6839 规定 `+json` 后缀表示该类型是 JSON 编码，
+        // 故按后缀判定而非只匹配字面量 `*+json`。
+        return "json".equals(subtype) || "*".equals(subtype) || subtype.endsWith("+json");
     }
 }
