@@ -7,17 +7,15 @@ import org.springframework.aot.hint.JdkProxyHint;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.TypeHint;
 import org.springframework.aot.hint.TypeReference;
-import org.springframework.boot.web.context.WebServerApplicationContext;
+import org.springframework.boot.web.server.context.WebServerApplicationContext;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 验证 {@link SpringWebRuntimeHints} 的事件路径可达性提示： SB3 事件/上下文类型固定注册，SB4 类型仅在其存在时注册（条件注册语义）。 JVM 模式下本 registrar 不被调用（由
- * Spring AOT 构建期触发），本测试直接驱动它验证注册结果。
+ * 验证 {@link SpringWebRuntimeHints} 的事件路径可达性提示。 JVM 模式下本 registrar 不被调用（由 Spring AOT 构建期触发），本测试直接驱动它验证注册结果。
  * <p>
- * 测试 classpath 提供 SB4 包名桩（{@code org.springframework.boot.web.server.context.*}， 见
- * Boot4WebServerInitializedEventBridgeTest），故 SB4 类型"存在"，验证注册的正面语义； 真实 SB3 运行时 classpath 无 SB4 类时 registerTypeIfPresent
- * 静默跳过，由运行时保证。
+ * 早期版本还要验证「SB4 类型仅在 classpath 存在时注册」的条件语义（当时测试 classpath
+ * 用桩类模拟）。本分支专用 Spring Boot 4，SB4 类型是真实依赖，条件注册已移除，故只测正面注册。
  * </p>
  */
 class SpringWebRuntimeHintsTest {
@@ -25,7 +23,7 @@ class SpringWebRuntimeHintsTest {
     private final SpringWebRuntimeHints registrar = new SpringWebRuntimeHints();
 
     @Test
-    void registersSb3EventPath() {
+    void registersEventPathHints() {
         RuntimeHints hints = register();
 
         assertJdkProxy(hints, WebServerApplicationContext.class);
@@ -34,19 +32,11 @@ class SpringWebRuntimeHintsTest {
     }
 
     @Test
-    void sb4TypesRegisteredWhenPresentInClasspath() {
+    void registersResourceHints() {
         RuntimeHints hints = register();
 
-        // 测试 classpath 有 SB4 包名桩，registerTypeIfPresent 应注册 SB4 事件/上下文类型
-        // 的反射提示与上下文接口的 JDK 代理提示（条件注册的正面语义）。
-        boolean sb4Reflected = hints.reflection().typeHints().map(TypeHint::getType)
-                .anyMatch(t -> t.getName().startsWith("org.springframework.boot.web.server.context."));
-        boolean sb4Proxied = hints.proxies().jdkProxyHints().map(JdkProxyHint::getProxiedInterfaces)
-                .flatMap(java.util.List::stream)
-                .anyMatch(t -> t.getName().startsWith("org.springframework.boot.web.server.context."));
-
-        assertTrue(sb4Reflected, "SB4 桩存在时应注册事件/上下文类型反射提示");
-        assertTrue(sb4Proxied, "SB4 桩存在时应注册上下文 JDK 代理提示");
+        boolean hasResources = hints.resources().resourcePatternHints().findAny().isPresent();
+        assertTrue(hasResources, "应注册 classpath 资源提示（元数据/模板/静态资源）");
     }
 
     private RuntimeHints register() {

@@ -80,10 +80,10 @@ public class ResponseStatusExceptionResolver implements HandlerExceptionResolver
 
     protected boolean resolveResponseStatusException(ResponseStatusException ex, WebServerHttpRequest request,
             WebServerHttpResponse response, @Nullable HandlerMethod handler) {
-        // 跨 Spring 版本取 headers：6.1 起 getHeaders()，Spring 7 移除 getResponseHeaders()。
-        // 经 ResponseStatusExceptionAdapter 反射桥接（并处理 SB4 HttpHeaders 类型差异）。
-        // 注：6.1 中 ResponseStatusException 构造器不接收 headers，getHeaders() 恒返回 EMPTY，
-        // 此 forEach 在 6.1 为空操作；Spring 7 若恢复 headers 支持则生效。
+        // 取 headers：经 ResponseStatusExceptionAdapter 统一为 MultiValueMap 视图
+        // （Spring 7 的 HttpHeaders 不再实现 MultiValueMap，适配器内用 asMultiValueMap() 转换）。
+        // 注：Spring 6.1 起 ResponseStatusException 构造器不接收 headers，getHeaders() 恒返回 EMPTY，
+        // 此 forEach 在此情形下为空操作。
         ResponseStatusExceptionAdapter.getHeaders(ex)
                 .forEach((name, values) -> values.forEach(value -> response.getHeaders().add(name, value)));
         HttpStatus statusCode = HttpStatus.resolve(ex.getStatusCode().value());

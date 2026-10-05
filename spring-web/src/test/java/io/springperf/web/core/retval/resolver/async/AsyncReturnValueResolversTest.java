@@ -121,86 +121,6 @@ class AsyncReturnValueResolversTest {
         verify(asyncSupportRegistry).startCallableProcessing(eq(request), eq(response), any(WebAsyncTask.class));
     }
 
-    // ==================== ListenableFutureReturnValueResolver ====================
-
-    @Test
-    void listenableFuture_supportsReturnType() throws Exception {
-        assumeTrue(ListenableFutureAdapter.isAvailable(), "ListenableFuture not available in this Spring version");
-        ListenableFutureReturnValueResolver r = new ListenableFutureReturnValueResolver();
-        Class<?> listenableFutureClass = Class.forName("org.springframework.util.concurrent.ListenableFuture");
-        Method method = getClass().getDeclaredMethod("listenableFutureParam", Object.class);
-        // Anonymous subclass to return the runtime-resolved ListenableFuture type
-        MethodParameter mp = new MethodParameter(method, 0) {
-            @Override
-            public Class<?> getParameterType() {
-                return listenableFutureClass;
-            }
-        };
-        assertTrue(r.supportsReturnType(mp, null));
-    }
-
-    @Test
-    void listenableFuture_supportsReturnValue() throws Exception {
-        assumeTrue(ListenableFutureAdapter.isAvailable(), "ListenableFuture not available in this Spring version");
-        ListenableFutureReturnValueResolver r = new ListenableFutureReturnValueResolver();
-        Class<?> settableFutureClass = Class.forName("org.springframework.util.concurrent.SettableListenableFuture");
-        Object future = settableFutureClass.getDeclaredConstructor().newInstance();
-        assertTrue(r.supportsReturnValue(future, null, null));
-    }
-
-    @Test
-    void listenableFuture_resolve_delegatesToRegistry() throws Exception {
-        assumeTrue(ListenableFutureAdapter.isAvailable(), "ListenableFuture not available in this Spring version");
-        ListenableFutureReturnValueResolver r = new ListenableFutureReturnValueResolver();
-        initAsyncSupport(r);
-        Class<?> settableFutureClass = Class.forName("org.springframework.util.concurrent.SettableListenableFuture");
-        Object future = settableFutureClass.getDeclaredConstructor().newInstance();
-
-        r.resolveReturnValue(future, null, request, response);
-
-        verify(asyncSupportRegistry).startDeferredResultProcessing(eq(request), eq(response),
-                any(DeferredResult.class));
-    }
-
-    @Test
-    void listenableFuture_adapt_onSuccess_setsResult() throws Exception {
-        assumeTrue(ListenableFutureAdapter.isAvailable(), "ListenableFuture not available in this Spring version");
-        ListenableFutureReturnValueResolver r = new ListenableFutureReturnValueResolver();
-        Class<?> settableFutureClass = Class.forName("org.springframework.util.concurrent.SettableListenableFuture");
-        Object future = settableFutureClass.getDeclaredConstructor().newInstance();
-
-        DeferredResult<Object> result = ListenableFutureAdapter.adapt(future);
-
-        // set result via reflection: SettableListenableFuture.set(value)
-        settableFutureClass.getMethod("set", Object.class).invoke(future, "success");
-
-        assertEquals("success", result.getResult());
-    }
-
-    @Test
-    void listenableFuture_adapt_onFailure_setsErrorResult() throws Exception {
-        assumeTrue(ListenableFutureAdapter.isAvailable(), "ListenableFuture not available in this Spring version");
-        ListenableFutureReturnValueResolver r = new ListenableFutureReturnValueResolver();
-        Class<?> settableFutureClass = Class.forName("org.springframework.util.concurrent.SettableListenableFuture");
-        Object future = settableFutureClass.getDeclaredConstructor().newInstance();
-
-        DeferredResult<Object> result = ListenableFutureAdapter.adapt(future);
-
-        IllegalStateException error = new IllegalStateException("failed");
-        // set exception via reflection: SettableListenableFuture.setException(Throwable)
-        settableFutureClass.getMethod("setException", Throwable.class).invoke(future, error);
-
-        assertSame(error, result.getResult());
-    }
-
-    @Test
-    void listenableFuture_notAvailable_returnsFalse() {
-        // When ListenableFuture is not available (SB 4.x+), verify the resolver correctly rejects types
-        ListenableFutureReturnValueResolver r = new ListenableFutureReturnValueResolver();
-        assertFalse(r.supportsReturnType(null, null));
-        assertFalse(r.supportsReturnValue(new Object(), null, null));
-    }
-
     // ==================== CompletionStageReturnValueResolver ====================
 
     @Test
@@ -248,10 +168,6 @@ class AsyncReturnValueResolversTest {
 
     @SuppressWarnings("unused")
     public void callableParam(Callable<?> c) {
-    }
-
-    @SuppressWarnings("unused")
-    public void listenableFutureParam(Object f) {
     }
 
     @SuppressWarnings("unused")

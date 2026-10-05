@@ -61,9 +61,10 @@ class ResponseStatusExceptionResolverTest {
 
     @Test
     void resolveException_responseStatusException_headersEmpty_noHeaderCopy() {
-        // 回归 R3 P1-13：headers 经 ResponseStatusExceptionAdapter 跨版本桥接。
-        // 6.1 中 ResponseStatusException 构造器不接收 headers，getHeaders() 恒返回 EMPTY，
-        // 复制逻辑必须为空操作——不得因 Adapter 桥接引入 NPE 或误加响应头。
+        // 回归 R3 P1-13：headers 经 ResponseStatusExceptionAdapter 取（Spring 7 的 HttpHeaders
+        // 不再实现 MultiValueMap，适配器用 asMultiValueMap() 转视图）。
+        // ResponseStatusException 构造器不接收 headers，getHeaders() 恒返回 EMPTY，
+        // 复制逻辑必须为空操作——不得因 Adapter 转换引入 NPE 或误加响应头。
         ResponseStatusException ex = new ResponseStatusException(HttpStatus.BAD_REQUEST, "bad");
         HttpHeaders respHeaders = new HttpHeaders();
         // 6.1 下 EMPTY headers 空迭代，getHeaders() 不会真正被访问 → lenient 声明避免 UnnecessaryStubbing

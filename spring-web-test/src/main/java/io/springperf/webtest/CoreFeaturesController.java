@@ -87,34 +87,6 @@ public class CoreFeaturesController {
         };
     }
 
-    /**
-     * 返回 {@code ListenableFuture} 的异步端点。
-     * <p>
-     * Spring 7 移除了 {@code org.springframework.util.concurrent.ListenableFuture}，故本方法<b>不能</b>在
-     * 编译期引用该类型（否则 SB4 下无法编译）。改为反射创建：返回类型声明为 {@link Object}，
-     * 框架按运行时类型走 {@code ListenableFutureReturnValueResolver}。
-     * SB4 下该类型不存在，端点返回 500（对应测试用 {@code assumeTrue} 跳过）。
-     * </p>
-     */
-    @GetMapping("/listenable-future")
-    public Object testListenableFuture() throws ReflectiveOperationException {
-        Class<?> futureType = Class.forName("org.springframework.util.concurrent.SettableListenableFuture");
-        Object future = futureType.getDeclaredConstructor().newInstance();
-        new Thread(() -> {
-            try {
-                Thread.sleep(50);
-            } catch (InterruptedException ignored) {
-                Thread.currentThread().interrupt();
-            }
-            try {
-                futureType.getMethod("set", Object.class).invoke(future, "listenable-future-result");
-            } catch (ReflectiveOperationException e) {
-                throw new IllegalStateException(e);
-            }
-        }).start();
-        return future;
-    }
-
     // ==================== 同步返回值 ====================
 
     @GetMapping("/bytes")

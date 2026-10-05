@@ -134,10 +134,9 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
             </plugin>
-            <!-- 本分支（4.1.x）专用 Spring Boot 4，下列 SB3 专属文件在编译期排除
-                 （它们引用 boot.web.context.*，该包在 Boot 4 已移走且事件改为抽象类，
-                 容器事件改由 support/Boot4WebServerInitializedEventBridge 运行时桥接）：
-                 排除方式：完整重声明 compiler-plugin（profile 只替换而非合并 <configuration>）。 -->
+            <!-- 完整重声明 compiler-plugin：与根 pom 的配置保持一致（本模块此前因 SB4 profile
+                 需要在此叠加 excludes，专用化后 excludes 已移除，但重声明仍保留以固化
+                 useIncrementalCompilation=false 等设置）。 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -159,16 +158,6 @@
                             <version>${spring-boot.version}</version>
                         </path>
                     </annotationProcessorPaths>
-                    <excludes>
-                        <exclude>io/springperf/web/autoconfigure/SpringWebRuntimeHints.java</exclude>
-                        <exclude>io/springperf/web/autoconfigure/WebServerInitializedEventAutoConfiguration.java</exclude>
-                        <exclude>io/springperf/web/autoconfigure/support/PerfWebServerInitializedEvent.java</exclude>
-                    </excludes>
-                    <testExcludes>
-                        <testExclude>io/springperf/web/autoconfigure/SpringWebRuntimeHintsTest.java</testExclude>
-                        <testExclude>io/springperf/web/autoconfigure/WebServerInitializedEventAutoConfigurationTest.java</testExclude>
-                        <testExclude>io/springperf/web/autoconfigure/support/PerfWebServerInitializedEventTest.java</testExclude>
-                    </testExcludes>
                 </configuration>
             </plugin>
         </plugins>

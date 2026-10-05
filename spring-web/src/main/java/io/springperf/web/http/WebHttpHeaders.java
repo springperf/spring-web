@@ -1,7 +1,5 @@
 package io.springperf.web.http;
 
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -14,140 +12,38 @@ import org.springframework.util.MultiValueMap;
 import io.netty.handler.codec.http.HttpHeaderNames;
 
 /**
- * Cross-version compatible {@link HttpHeaders} that implements {@link MultiValueMap}.
+ * {@link HttpHeaders} 子类，在 Spring Framework 7（Spring Boot 4.x）下实现 {@link MultiValueMap}。
  * <p>
- * <b>Spring 6.x (SB 3.x):</b> {@code HttpHeaders} already implements {@code MultiValueMap<String, String>}, so this
- * class inherits the interface naturally. All {@code super.*()} calls use the parent's built-in behavior.
+ * Spring 7 的 {@code HttpHeaders} 不再实现 {@code MultiValueMap}，也不再有 {@code containsKey} /
+ * {@code containsValue} / {@code keySet} / {@code values} / {@code entrySet} —— 这些方法改由
+ * {@link HttpHeaders#asMultiValueMap()} 返回的内部 {@code MultiValueMap} 视图暴露。本类在构造期缓存该视图
+ * （零拷贝，指向父类内部的 headers 字段），把 Spring 7 缺失的那批方法委派过去；父类已有的方法
+ * （{@code size} / {@code isEmpty} / {@code get} / {@code put} / {@code remove} / {@code putAll} /
+ * {@code clear} 等）直接调 {@code super}。
+ * </p>
  * <p>
- * <b>Spring 7.x (SB 4.x):</b> {@code HttpHeaders} no longer implements {@code MultiValueMap}. At class load time we
- * resolve the package-private {@code asMultiValueMap()} method via {@link MethodHandle} and cache the returned delegate
- * reference (which IS the parent's internal {@code MultiValueMap<String, String> headers} field). All
- * {@code MultiValueMap} and {@code Map} methods delegate to this reference.
+ * <b>分支说明</b>：本分支（4.1.x）专用 Spring Boot 4.1，不与 3.5.x 共用代码，因此这里<b>没有</b>
+ * 任何运行时版本探测。早期 master 上的实现为同时兼容 Spring 6/7，用 {@code static final boolean}
+ * + 8 个 {@code MethodHandle}（{@code findSpecial} 调父类默认实现）+ {@code invokeWithArguments}
+ * 在类加载期选分支；随「master 收敛为纯 3.5.x、4.x 适配移入本分支」，那套机制在本分支已无必要
+ * ——直接写 Spring 7 的形态即可。与 {@code 2.7.x} 分支对 Spring 5.3 的处理方式一致。
+ * </p>
  * <p>
- * The JIT eliminates the version branch in every method because {@link #HEADERS_IS_MULTI_VALUE_MAP} is
- * {@code static final boolean}.
+ * <b>性能</b>：调用点此前为绕开类型不匹配而写 {@code toSingleValueMap().keySet()}（O(n) 复制），
+ * 现在可直接用 {@code keySet()}；也去掉了 {@code RequestHeaderResolverProvider} 里的反射兼容代码。
+ * </p>
  * <p>
- * <b>Performance:</b> Eliminates O(n) copies at call sites that previously used {@code toSingleValueMap().keySet()} to
- * work around the type mismatch, and removes the reflective compatibility code in
- * {@code RequestHeaderResolverProvider}.
- * <p>
- * Also caches {@link #getContentType()} result to avoid repeated {@code MediaType.parseMediaType()} calls.
+ * 另缓存 {@link #getContentType()} 结果，避免重复 {@code MediaType.parseMediaType()}。
  * </p>
  */
-@SuppressWarnings("deprecation")
 public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String, String> {
 
-    private static final boolean HEADERS_IS_MULTI_VALUE_MAP;
-    private static final MethodHandle AS_MULTI_VALUE_MAP;
-
     /**
-     * 以下 5 个方法句柄仅在 Spring 6.x 使用：{@code containsKey} / {@code containsValue} / {@code keySet} /
-     * {@code values} / {@code entrySet} 在 Spring 6 的 {@code HttpHeaders} 上是**继承自 {@code MultiValueMap} 的
-     * 默认实现**，在 Spring 7 里被整体移除（改由 {@code asMultiValueMap()} 暴露）。
+     * 父类内部 headers 的 {@code MultiValueMap} 视图（{@link HttpHeaders#asMultiValueMap()} 返回值）。
      * <p>
-     * 编译期无法写 {@code super.containsKey(...)} —— javac 解析 {@code super.} 时不看运行时分支，
-     * Spring 7 下父类没有该方法即报「找不到符号」。故 6.x 分支改走 {@link MethodHandles.Lookup#findSpecial}
-     * 直接调父类实现：语义与原 {@code super.xxx()} 完全一致（同样是父类方法体，不经过本类覆写、不会递归）。
+     * Spring 7 的 {@code HttpHeaders} 把 {@code containsKey} / {@code keySet} / {@code entrySet} 等
+     * 「Map 语义」方法移到了这个视图上，父类自身不再暴露，故本类缓存它并在对应方法里委派。
      * </p>
-     * <p>
-     * Spring 7 下这些句柄保持 {@code null} 且永不被调用（分支由 {@link #HEADERS_IS_MULTI_VALUE_MAP} 静态常量决定，
-     * JIT 会消除死分支）。
-     * </p>
-     */
-    private static final MethodHandle SUPER_CONTAINS_KEY;
-    private static final MethodHandle SUPER_CONTAINS_VALUE;
-    private static final MethodHandle SUPER_KEY_SET;
-    private static final MethodHandle SUPER_VALUES;
-    private static final MethodHandle SUPER_ENTRY_SET;
-    /** Spring 6 的 {@code addAll(MultiValueMap)}；Spring 7 该重载改成了 {@code addAll(HttpHeaders)}。 */
-    private static final MethodHandle SUPER_ADD_ALL_MAP;
-    /**
-     * Spring 6 的 {@code get(Object)} / {@code remove(Object)}：Spring 7 把参数从 {@code Object} **收窄为
-     * {@code String}**，因此 6.x 分支不能再写 {@code super.get(key)}（key 是 Object）。
-     */
-    private static final MethodHandle SUPER_GET_OBJECT;
-    private static final MethodHandle SUPER_REMOVE_OBJECT;
-
-    static {
-        boolean isMap = false;
-        MethodHandle mh = null;
-        try {
-            isMap = MultiValueMap.class.isAssignableFrom(HttpHeaders.class);
-        } catch (Exception ignored) {
-            // Should not happen — HttpHeaders exists in all supported versions
-        }
-        HEADERS_IS_MULTI_VALUE_MAP = isMap;
-        if (!isMap) {
-            try {
-                mh = MethodHandles.lookup().unreflect(HttpHeaders.class.getDeclaredMethod("asMultiValueMap"));
-            } catch (Exception ignored) {
-                // Should not happen — asMultiValueMap() exists in Spring 7.x
-            }
-        }
-        AS_MULTI_VALUE_MAP = mh;
-
-        // Spring 6 专属：为上面 5 个「被 Spring 7 移除」的方法解析父类句柄（findSpecial = super 调用语义）
-        MethodHandle containsKey = null;
-        MethodHandle containsValue = null;
-        MethodHandle keySet = null;
-        MethodHandle values = null;
-        MethodHandle entrySet = null;
-        MethodHandle addAllMap = null;
-        MethodHandle getObject = null;
-        MethodHandle removeObject = null;
-        if (isMap) {
-            MethodHandles.Lookup lookup = MethodHandles.lookup();
-            Class<?> p = HttpHeaders.class;
-            Class<?> self = WebHttpHeaders.class;
-            try {
-                containsKey = lookup.findSpecial(p, "containsKey",
-                        java.lang.invoke.MethodType.methodType(boolean.class, Object.class), self);
-                containsValue = lookup.findSpecial(p, "containsValue",
-                        java.lang.invoke.MethodType.methodType(boolean.class, Object.class), self);
-                keySet = lookup.findSpecial(p, "keySet",
-                        java.lang.invoke.MethodType.methodType(Set.class), self);
-                values = lookup.findSpecial(p, "values",
-                        java.lang.invoke.MethodType.methodType(Collection.class), self);
-                entrySet = lookup.findSpecial(p, "entrySet",
-                        java.lang.invoke.MethodType.methodType(Set.class), self);
-                addAllMap = lookup.findSpecial(p, "addAll",
-                        java.lang.invoke.MethodType.methodType(void.class, MultiValueMap.class), self);
-                getObject = lookup.findSpecial(p, "get",
-                        java.lang.invoke.MethodType.methodType(List.class, Object.class), self);
-                removeObject = lookup.findSpecial(p, "remove",
-                        java.lang.invoke.MethodType.methodType(List.class, Object.class), self);
-            } catch (Exception e) {
-                throw new IllegalStateException(
-                        "Failed to resolve Spring 6 HttpHeaders super-method handles — "
-                                + "the inherited MultiValueMap defaults are missing",
-                        e);
-            }
-        }
-        SUPER_CONTAINS_KEY = containsKey;
-        SUPER_CONTAINS_VALUE = containsValue;
-        SUPER_KEY_SET = keySet;
-        SUPER_VALUES = values;
-        SUPER_ENTRY_SET = entrySet;
-        SUPER_ADD_ALL_MAP = addAllMap;
-        SUPER_GET_OBJECT = getObject;
-        SUPER_REMOVE_OBJECT = removeObject;
-    }
-
-    /** 调用 6.x 的父类实现（语义等同原 {@code super.xxx()}）。 */
-    private static Object invokeSuper(MethodHandle handle, Object... args) {
-        try {
-            return handle.invokeWithArguments(args);
-        } catch (RuntimeException | Error e) {
-            throw e;
-        } catch (Throwable e) {
-            throw new IllegalStateException("Failed to invoke HttpHeaders super-method", e);
-        }
-    }
-
-    /**
-     * Cached delegate reference (Spring 7.x only). Points to the parent's internal
-     * {@code MultiValueMap<String, String> headers} field. {@code null} on Spring 6.x where {@code this} IS the
-     * delegate.
      */
     private final MultiValueMap<String, String> delegateMap;
 
@@ -169,7 +65,7 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
     private static final MediaType NOT_SET = new MediaType("application", "x-not-set");
 
     public WebHttpHeaders() {
-        this.delegateMap = resolveDelegateForVersion();
+        this.delegateMap = asMultiValueMap();
         this.cachedContentType = NOT_SET;
         this.rawHeaders = null;
     }
@@ -177,35 +73,17 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
     /**
      * 用已存在的 {@code MultiValueMap} 视图构造，持有引用而非拷贝（零拷贝）。
      * <p>
-     * 5.3/6.x/7.x 的 {@code HttpHeaders(MultiValueMap)} 均为引用持有 （已反编译验证 {@code putfield headers} 无拷贝循环）。传入
+     * Spring 7 的 {@code HttpHeaders(MultiValueMap)} 为引用持有（已反编译验证 {@code putfield headers} 无拷贝循环）。传入
      * {@link NettyHttpHeadersAdapter} 即可获得 Netty headers 的只读零拷贝视图。
      * </p>
      */
     public WebHttpHeaders(MultiValueMap<String, String> headers) {
         super(headers);
-        this.delegateMap = resolveDelegateForVersion();
+        this.delegateMap = asMultiValueMap();
         this.cachedContentType = NOT_SET;
         this.rawHeaders = (headers instanceof NettyHttpHeadersAdapter)
                 ? ((NettyHttpHeadersAdapter) headers).rawHeadersIfWritable()
                 : null;
-    }
-
-    private MultiValueMap<String, String> resolveDelegateForVersion() {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return null;
-        }
-        return resolveDelegate();
-    }
-
-    private MultiValueMap<String, String> resolveDelegate() {
-        if (AS_MULTI_VALUE_MAP == null) {
-            throw new IllegalStateException("Cannot resolve HttpHeaders.asMultiValueMap() — this should not happen");
-        }
-        try {
-            return (MultiValueMap<String, String>) AS_MULTI_VALUE_MAP.invoke(this);
-        } catch (Throwable e) {
-            throw new RuntimeException("Failed to invoke asMultiValueMap()", e);
-        }
     }
 
     // ========================================================================
@@ -214,64 +92,38 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
 
     @Override
     public String getFirst(String key) {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return super.getFirst(key);
-        }
-        return delegateMap.getFirst(key);
+        return super.getFirst(key);
     }
 
     @Override
     public void add(String key, String value) {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            super.add(key, value);
-        } else {
-            delegateMap.add(key, value);
-        }
+        super.add(key, value);
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public void addAll(String key, List<? extends String> values) {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            super.addAll(key, values);
-        } else {
-            delegateMap.addAll(key, (List<String>) values);
-        }
+        super.addAll(key, values);
     }
 
+    /** Spring 7 的重载是 {@code addAll(HttpHeaders)}；父类没有 {@code addAll(MultiValueMap)}。 */
     @Override
     public void addAll(MultiValueMap<String, String> other) {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            invokeSuper(SUPER_ADD_ALL_MAP, this, other);
-        } else {
-            delegateMap.addAll(other);
-        }
+        delegateMap.addAll(other);
     }
 
     @Override
     public void set(String key, String value) {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            super.set(key, value);
-        } else {
-            delegateMap.set(key, value);
-        }
+        super.set(key, value);
     }
 
     @Override
     public void setAll(Map<String, String> map) {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            super.setAll(map);
-        } else {
-            delegateMap.setAll(map);
-        }
+        super.setAll(map);
     }
 
     @Override
     public Map<String, String> toSingleValueMap() {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return super.toSingleValueMap();
-        }
-        return delegateMap.toSingleValueMap();
+        return super.toSingleValueMap();
     }
 
     // ========================================================================
@@ -280,77 +132,53 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
 
     @Override
     public int size() {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return super.size();
-        }
-        return delegateMap.size();
+        return super.size();
     }
 
     @Override
     public boolean isEmpty() {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return super.isEmpty();
-        }
-        return delegateMap.isEmpty();
+        return super.isEmpty();
     }
 
+    /** 父类无此方法（Spring 7 移到 {@code asMultiValueMap()} 视图上），故委派 {@link #delegateMap}。 */
     @Override
     public boolean containsKey(Object key) {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return (boolean) invokeSuper(SUPER_CONTAINS_KEY, this, key);
-        }
         return delegateMap.containsKey(key);
     }
 
     @Override
     public boolean containsValue(Object value) {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return (boolean) invokeSuper(SUPER_CONTAINS_VALUE, this, value);
-        }
         return delegateMap.containsValue(value);
     }
 
     @Override
     public List<String> get(Object key) {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return (List<String>) invokeSuper(SUPER_GET_OBJECT, this, key);
-        }
-        return delegateMap.get(key);
+        return key instanceof String ? super.get((String) key) : delegateMap.get(key);
     }
 
     @Override
     public List<String> put(String key, List<String> value) {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return super.put(key, value);
-        }
-        return delegateMap.put(key, value);
+        return super.put(key, value);
     }
 
     @Override
     public List<String> remove(Object key) {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return (List<String>) invokeSuper(SUPER_REMOVE_OBJECT, this, key);
-        }
-        return delegateMap.remove(key);
+        return key instanceof String ? super.remove((String) key) : delegateMap.remove(key);
     }
 
     @Override
     public void putAll(Map<? extends String, ? extends List<String>> map) {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            super.putAll(map);
-        } else {
-            delegateMap.putAll(map);
-        }
+        super.putAll(map);
     }
 
     /**
      * 把 {@code source} 的条目<b>追加</b>到 {@code target}（保留同名头已有值）。
      * <p>
-     * <b>为什么需要它</b>：调用方若写 {@code target.putAll(sourceHeaders)}，在 Spring 7 下 javac 会选中
-     * {@code HttpHeaders} 新增的 {@code putAll(HttpHeaders)} 重载（内部是 forEach+put、语义为整体替换），
-     * 与 Spring 6 的 {@code Map.putAll} 语义不同，还可能因 {@code put} 落到只读视图而抛
-     * {@code UnsupportedOperationException}。这里改用 {@link HttpHeaders#headerSet()}（两版本签名一致）
-     * 逐条 {@link HttpHeaders#add} —— 语义明确、跨版本一致，也避开重载解析陷阱。
+     * <b>为什么需要它</b>：调用方若写 {@code target.putAll(sourceHeaders)}，javac 会选中
+     * {@code HttpHeaders} 的 {@code putAll(HttpHeaders)} 重载（内部是 forEach+put、语义为整体替换），
+     * 与 {@code Map.putAll} 语义不同，还可能因 {@code put} 落到只读视图而抛
+     * {@code UnsupportedOperationException}。这里改用 {@link HttpHeaders#headerSet()}（签名稳定）
+     * 逐条 {@link HttpHeaders#add} —— 语义明确，也避开重载解析陷阱。
      * </p>
      * <p>
      * 声明为 static 且形参用 {@code HttpHeaders}：调用方拿到的常是声明类型 {@code HttpHeaders} 的
@@ -373,34 +201,22 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
 
     @Override
     public void clear() {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            super.clear();
-        } else {
-            delegateMap.clear();
-        }
+        super.clear();
     }
 
+    /** 父类无此方法（Spring 7 移到 {@code asMultiValueMap()} 视图上），故委派 {@link #delegateMap}。 */
     @Override
     public Set<String> keySet() {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return (Set<String>) invokeSuper(SUPER_KEY_SET, this);
-        }
         return delegateMap.keySet();
     }
 
     @Override
     public Collection<List<String>> values() {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return (Collection<List<String>>) invokeSuper(SUPER_VALUES, this);
-        }
         return delegateMap.values();
     }
 
     @Override
     public Set<Entry<String, List<String>>> entrySet() {
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return (Set<Entry<String, List<String>>>) invokeSuper(SUPER_ENTRY_SET, this);
-        }
         return delegateMap.entrySet();
     }
 

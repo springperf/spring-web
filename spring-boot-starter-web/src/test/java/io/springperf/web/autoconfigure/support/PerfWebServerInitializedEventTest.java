@@ -2,8 +2,8 @@ package io.springperf.web.autoconfigure.support;
 
 import io.springperf.web.server.NettyHttpServer;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.web.context.WebServerApplicationContext;
-import org.springframework.boot.web.context.WebServerInitializedEvent;
+import org.springframework.boot.web.server.context.WebServerApplicationContext;
+import org.springframework.boot.web.server.context.WebServerInitializedEvent;
 import org.springframework.boot.web.server.WebServer;
 import org.springframework.context.ApplicationContext;
 

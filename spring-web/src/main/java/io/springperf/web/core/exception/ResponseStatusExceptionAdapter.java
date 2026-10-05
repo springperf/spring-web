@@ -1,89 +1,32 @@
 package io.springperf.web.core.exception;
 
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-
 import org.springframework.http.HttpHeaders;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Adapter for {@link ResponseStatusException#getResponseHeaders()} which was renamed to {@code getHeaders()} in Spring
- * Framework 7.0+ (SB 4.x).
+ * 取 {@link ResponseStatusException} 的响应头，并补齐 {@code MultiValueMap} 类型缺口。
  * <p>
- * Also bridges the {@code MultiValueMap} type gap: on SB 4.x, {@code HttpHeaders} no longer implements
- * {@code MultiValueMap}, so we unwrap the internal map via {@code asMultiValueMap()} to avoid O(n) copies at call
- * sites.
- * <p>
- * Uses reflection + {@link MethodHandle} to maintain cross-version compatibility.
+ * 两个 Spring 7（SB 4.x）相关的点：
+ * <ul>
+ * <li>方法名：Spring 6.2 之前是 {@code getResponseHeaders()}，Spring 7 只有 {@code getHeaders()}。
+ * 本分支（4.1.x）专用 Spring 7，故直接调 {@code getHeaders()}，不再做方法名探测。</li>
+ * <li>类型：Spring 7 的 {@code HttpHeaders} 不再实现 {@code MultiValueMap}，故经
+ * {@code asMultiValueMap()} 取内部 map（零拷贝视图），避免调用点做 O(n) 复制。</li>
+ * </ul>
+ * 说明：本类不是跨版本兼容层——早期曾用反射 + {@code MethodHandle} 同时兼容
+ * Spring 6.2 的两种方法名，专用化后那层探测已移除。
  */
-public class ResponseStatusExceptionAdapter {
+public final class ResponseStatusExceptionAdapter {
 
-    private static final Method HEADERS_GETTER;
-
-    private static final boolean HEADERS_IS_MULTI_VALUE_MAP;
-    private static final MethodHandle AS_MULTI_VALUE_MAP;
-
-    static {
-        // Resolve getHeaders() vs getResponseHeaders()
-        Method m = null;
-        try {
-            m = ResponseStatusException.class.getMethod("getHeaders");
-        } catch (NoSuchMethodException e) {
-            try {
-                m = ResponseStatusException.class.getMethod("getResponseHeaders");
-            } catch (NoSuchMethodException ex) {
-                // Should not happen — at least one exists in any supported Spring version
-            }
-        }
-        HEADERS_GETTER = m;
-
-        // Resolve asMultiValueMap() for SB 4.x
-        boolean isMap = false;
-        MethodHandle mh = null;
-        try {
-            isMap = MultiValueMap.class.isAssignableFrom(HttpHeaders.class);
-        } catch (Exception ignored) {
-        }
-        HEADERS_IS_MULTI_VALUE_MAP = isMap;
-        if (!isMap) {
-            try {
-                mh = MethodHandles.lookup().unreflect(HttpHeaders.class.getDeclaredMethod("asMultiValueMap"));
-            } catch (Exception ignored) {
-            }
-        }
-        AS_MULTI_VALUE_MAP = mh;
+    private ResponseStatusExceptionAdapter() {
     }
 
     /**
-     * Return the headers from a {@link ResponseStatusException} as a {@link MultiValueMap}, regardless of Spring
-     * version.
+     * 取 {@code ex} 的响应头，以 {@link MultiValueMap} 视图返回。
      */
-    @SuppressWarnings("unchecked")
     public static MultiValueMap<String, String> getHeaders(ResponseStatusException ex) {
-        if (HEADERS_GETTER == null) {
-            // Spring 7 下 HttpHeaders 不再是 MultiValueMap，不能直接当返回值；用空的 LinkedMultiValueMap
-            // 保持两版本一致的返回类型（调用方只读取，不关心具体实现）。
-            return new org.springframework.util.LinkedMultiValueMap<>();
-        }
-        HttpHeaders headers;
-        try {
-            headers = (HttpHeaders) HEADERS_GETTER.invoke(ex);
-        } catch (InvocationTargetException e) {
-            throw new RuntimeException(e.getCause());
-        } catch (IllegalAccessException e) {
-            throw new RuntimeException(e);
-        }
-        if (HEADERS_IS_MULTI_VALUE_MAP) {
-            return (MultiValueMap<String, String>) headers;
-        }
-        // SB 4.x: unwrap internal MultiValueMap via asMultiValueMap()
-        try {
-            return (MultiValueMap<String, String>) AS_MULTI_VALUE_MAP.invoke(headers);
-        } catch (Throwable e) {
-            throw new RuntimeException(e);
-        }
+        HttpHeaders headers = ex.getHeaders();
+        return headers.asMultiValueMap();
     }
 }

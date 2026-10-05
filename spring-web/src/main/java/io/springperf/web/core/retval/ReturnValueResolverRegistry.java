@@ -43,7 +43,6 @@ public class ReturnValueResolverRegistry extends WebComponentContainer {
     public void initReturnValueResolver() {
         // 异步处理
         registerWebComponent(new DeferredResultReturnValueResolver());
-        registerWebComponent(new ListenableFutureReturnValueResolver());
         registerWebComponent(new CompletionStageReturnValueResolver());
         registerWebComponent(new AsyncTaskReturnValueResolver());
         registerWebComponent(new CallableReturnValueResolver());
