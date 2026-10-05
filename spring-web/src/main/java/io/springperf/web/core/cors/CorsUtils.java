@@ -36,7 +36,9 @@ public abstract class CorsUtils {
         Assert.notNull(actualHost, "Actual request host must not be null");
         Assert.isTrue(actualPort != -1, "Actual request port must not be undefined");
 
-        UriComponents originUrl = UriComponentsBuilder.fromOriginHeader(origin).build();
+        // Spring 6 有 UriComponentsBuilder.fromOriginHeader(origin)，其实现就是 fromUriString(origin)；
+        // Spring 7 移除了前者。直接用后者，两个版本都有，语义完全一致（已核对 6.2.19 源码）。
+        UriComponents originUrl = UriComponentsBuilder.fromUriString(origin).build();
         boolean isSameOrigin = (actualScheme.equals(originUrl.getScheme()) && actualHost.equals(originUrl.getHost())
                 && actualPort == getPort(originUrl.getScheme(), originUrl.getPort()));
         return !isSameOrigin;
@@ -56,8 +58,11 @@ public abstract class CorsUtils {
             return false;
         }
         HttpHeaders headers = request.getHeaders();
-        return headers.containsKey(HttpHeaders.ORIGIN)
-                && headers.containsKey(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD);
+        // Spring 7 移除了 HttpHeaders.containsKey（不再是 MultiValueMap），官方 CorsUtils 改用
+        // getFirst(...) != null 判定头存在。此处对齐官方写法 —— 两版本通用，语义等价
+        // （对 CORS 预检而言，空值头与缺失头同样不构成有效预检）。
+        return headers.getFirst(HttpHeaders.ORIGIN) != null
+                && headers.getFirst(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD) != null;
     }
 
     private static int getPort(@Nullable String scheme, int port) {

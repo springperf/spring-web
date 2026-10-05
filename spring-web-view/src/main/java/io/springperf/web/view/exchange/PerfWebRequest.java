@@ -70,7 +70,8 @@ public class PerfWebRequest implements IWebRequest {
 
     @Override
     public boolean containsHeader(String name) {
-        return nativeReq.getHeaders().containsKey(name);
+        // Spring 7 移除了 HttpHeaders.containsKey，改用 getFirst(...) != null（两版本通用）
+        return nativeReq.getHeaders().getFirst(name) != null;
     }
 
     @Override
@@ -80,16 +81,21 @@ public class PerfWebRequest implements IWebRequest {
 
     @Override
     public Set<String> getAllHeaderNames() {
-        return nativeReq.getHeaders().keySet();
+        // Spring 7 移除了 HttpHeaders.keySet，改用 headerSet()（两版本签名一致）
+        Set<String> names = new java.util.LinkedHashSet<>();
+        for (Map.Entry<String, List<String>> e : nativeReq.getHeaders().headerSet()) {
+            names.add(e.getKey());
+        }
+        return names;
     }
 
     @Override
     public Map<String, String[]> getHeaderMap() {
         HttpHeaders headers = nativeReq.getHeaders();
         Map<String, String[]> result = new HashMap<>(headers.size());
-        for (String key : headers.keySet()) {
-            List<String> values = headers.get(key);
-            result.put(key, values != null ? values.toArray(new String[0]) : new String[0]);
+        for (Map.Entry<String, List<String>> entry : headers.headerSet()) {
+            List<String> values = entry.getValue();
+            result.put(entry.getKey(), values != null ? values.toArray(new String[0]) : new String[0]);
         }
         return result;
     }

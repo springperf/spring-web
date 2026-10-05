@@ -6,6 +6,12 @@ import java.util.*;
 
 /**
  * 将 Netty {@link io.netty.handler.codec.http.HttpHeaders} 适配为 Spring {@link HttpHeaders}。
+ * <p>
+ * <b>跨版本注意</b>：Spring 7 的 {@code HttpHeaders} 不再是 {@code MultiValueMap}，下列 8 个 Map 方法
+ * （{@code get}/{@code keySet}/{@code entrySet}/{@code containsKey}/{@code containsValue}/{@code put}/
+ * {@code remove}/{@code values}）在父类上<b>已不存在</b>，故不能标 {@code @Override}（会报「方法不会覆盖
+ * 或实现超类型的方法」）。它们仍作为本类的自有 API 保留，供调用方按需使用。
+ * </p>
  *
  * @author huangcanda
  *
@@ -22,7 +28,6 @@ public class SpringHeadersAdapter extends HttpHeaders {
         }
     }
 
-    @Override
     public List<String> get(Object key) {
         return headers.get(key);
     }
@@ -33,12 +38,10 @@ public class SpringHeadersAdapter extends HttpHeaders {
         return (values != null && !values.isEmpty()) ? values.get(0) : null;
     }
 
-    @Override
     public Set<String> keySet() {
         return headers.keySet();
     }
 
-    @Override
     public Set<Map.Entry<String, List<String>>> entrySet() {
         return headers.entrySet();
     }
@@ -53,22 +56,18 @@ public class SpringHeadersAdapter extends HttpHeaders {
         return headers.isEmpty();
     }
 
-    @Override
     public boolean containsKey(Object key) {
         return headers.containsKey(key);
     }
 
-    @Override
     public boolean containsValue(Object value) {
         return headers.containsValue(value);
     }
 
-    @Override
     public List<String> put(String key, List<String> value) {
         return headers.put(key, value);
     }
 
-    @Override
     public List<String> remove(Object key) {
         return headers.remove(key);
     }
@@ -78,7 +77,6 @@ public class SpringHeadersAdapter extends HttpHeaders {
         headers.clear();
     }
 
-    @Override
     public Collection<List<String>> values() {
         return headers.values();
     }

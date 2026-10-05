@@ -7,15 +7,14 @@ spring-web-parent (aggregate POM)
 ├── spring-web                  Core framework
 ├── spring-web-view             View rendering (Thymeleaf/FreeMarker, optional)
 ├── spring-web-servlet          Servlet API bridge layer
-├── spring-web-mvc-support      SpringMVC bridge layer
+├── spring-web-mvc-support     SpringMVC bridge layer
 ├── spring-web-batch            Batch request processing (optional)
 ├── spring-web-websocket        WebSocket support (optional)
 ├── spring-boot-starter-web     Spring Boot auto-configuration
 ├── spring-web-test             Test application
 ├── spring-web-support-test     Support module tests
 ├── spring-web-benchmark        JMH performance benchmarks
-├── spring-web-examples         Runnable example applications
-└── coverage-aggregate          JaCoCo coverage aggregation (report-aggregate, not published)
+└── spring-web-examples         Runnable example applications
 ```
 
 ---
@@ -341,7 +340,7 @@ Server-side rendering (SSR) module built on Thymeleaf / FreeMarker template engi
 
 `SpringWebViewAutoConfiguration` auto-assembles when `spring-web-view` is on the classpath:
 - `ViewResolverRegistry`, `ViewReturnValueResolver`, `ModelAndViewReturnValueResolver`, `ModelArgumentResolverProvider`
-- Engine selection: `spring.web.view.engine` (when unset, every available engine on the classpath is registered) + classpath detection of `TemplateEngine` / `freemarker.template.Configuration`
+- Engine selection: `spring.web.view.engine` (default `thymeleaf`) + classpath detection of `TemplateEngine` / `freemarker.template.Configuration`
 
 ### Batch Auto-Configuration
 

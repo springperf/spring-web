@@ -1,5 +1,8 @@
 package io.springperf.example.realtime;
 
+import io.springperf.example.support.TestRestTemplate;
+import io.springperf.example.support.RestTemplateBuilder;
+
 import io.springperf.web.server.NettyHttpServer;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -12,8 +15,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.ResponseEntity;
 
 import java.io.OutputStream;
@@ -57,7 +58,7 @@ class RealtimeSlowClientE2eTest {
     void setUp() {
         port = nettyHttpServer.getActualPort();
         rest = new TestRestTemplate(new RestTemplateBuilder().rootUri("http://localhost:" + port)
-                .setConnectTimeout(Duration.ofSeconds(5)).setReadTimeout(Duration.ofSeconds(10)));
+                .connectTimeout(Duration.ofSeconds(5)).readTimeout(Duration.ofSeconds(10)));
         httpClient = new OkHttpClient.Builder().connectTimeout(5, TimeUnit.SECONDS).readTimeout(20, TimeUnit.SECONDS)
                 .build();
     }

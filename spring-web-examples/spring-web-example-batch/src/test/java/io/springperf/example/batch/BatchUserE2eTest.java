@@ -1,13 +1,14 @@
 package io.springperf.example.batch;
 
+import io.springperf.example.support.TestRestTemplate;
+import io.springperf.example.support.RestTemplateBuilder;
+
 import io.springperf.example.batch.model.UserBody;
 import io.springperf.web.server.NettyHttpServer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.ResponseEntity;
 
 import java.util.ArrayList;
@@ -42,7 +43,7 @@ class BatchUserE2eTest {
 
         ResponseEntity<String> resp = rest.postForEntity("/batch/users?name=testUser", body, String.class);
 
-        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody()).isNotNull();
         assertThat(resp.getBody()).startsWith("created:");
     }
@@ -51,7 +52,7 @@ class BatchUserE2eTest {
     void getUser_singleRequest_withFields() {
         ResponseEntity<String> resp = rest.getForEntity("/batch/users/user-001?fields=name,email", String.class);
 
-        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody()).isNotNull();
         assertThat(resp.getBody()).startsWith("user:");
         assertThat(resp.getBody()).contains("user-001");
@@ -62,7 +63,7 @@ class BatchUserE2eTest {
     void getUser_singleRequest_withoutFields() {
         ResponseEntity<String> resp = rest.getForEntity("/batch/users/user-002", String.class);
 
-        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody()).isNotNull();
         assertThat(resp.getBody()).startsWith("user:");
         assertThat(resp.getBody()).contains("user-002");
@@ -90,11 +91,11 @@ class BatchUserE2eTest {
                     ResponseEntity<String> resp = t.postForEntity("/batch/users?name=concurrent-" + idx, body,
                             String.class);
 
-                    if (resp.getStatusCodeValue() == 200 && resp.getBody() != null
+                    if (resp.getStatusCode().value() == 200 && resp.getBody() != null
                             && resp.getBody().startsWith("created:")) {
                         successCount.incrementAndGet();
                     } else {
-                        failures.add("status=" + resp.getStatusCodeValue() + ", body=" + resp.getBody());
+                        failures.add("status=" + resp.getStatusCode().value() + ", body=" + resp.getBody());
                     }
                 } catch (Exception e) {
                     failures.add("EXCEPTION:" + e.getMessage());
@@ -130,11 +131,11 @@ class BatchUserE2eTest {
 
                     ResponseEntity<String> resp = t.getForEntity("/batch/users/" + id + "?fields=name", String.class);
 
-                    if (resp.getStatusCodeValue() == 200 && resp.getBody() != null && resp.getBody().startsWith("user:")
+                    if (resp.getStatusCode().value() == 200 && resp.getBody() != null && resp.getBody().startsWith("user:")
                             && resp.getBody().contains(id)) {
                         successCount.incrementAndGet();
                     } else {
-                        failures.add("id=" + id + ", status=" + resp.getStatusCodeValue() + ", body=" + resp.getBody());
+                        failures.add("id=" + id + ", status=" + resp.getStatusCode().value() + ", body=" + resp.getBody());
                     }
                 } catch (Exception e) {
                     failures.add("EXCEPTION:" + e.getMessage());

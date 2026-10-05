@@ -8,7 +8,6 @@ import org.springframework.boot.actuate.autoconfigure.web.server.ManagementServe
 import org.springframework.boot.autoconfigure.AutoConfigureBefore;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.web.ServerProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -36,8 +35,12 @@ public class SpringBootAdminClientAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean(ApplicationFactory.class)
     public PerfApplicationFactory perfApplicationFactory(InstanceProperties instanceProperties,
-            ManagementServerProperties managementServerProperties, ServerProperties serverProperties,
+            ManagementServerProperties managementServerProperties, Object serverProperties,
             WebEndpointProperties webEndpointProperties, Environment environment) {
+        // serverProperties 声明为 Object：ServerProperties 在 Boot 3 位于
+        // org.springframework.boot.autoconfigure.web，Boot 4 移到 org.springframework.boot.web.server.autoconfigure，
+        // 编译期无法同时引用两个包名（PerfApplicationFactory 内部以反射取值）。
+        // 该 Bean 方法仅在 SBA Client 在 classpath 时加载，参数按运行时实际类型注入。
         return new PerfApplicationFactory(instanceProperties, managementServerProperties, serverProperties,
                 webEndpointProperties, environment);
     }

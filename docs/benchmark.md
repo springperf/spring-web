@@ -2,7 +2,7 @@
 
 # Spring WebPerf 性能对比报告
 
-**生成时间:** 2026-08-15
+**生成时间:** 2026-08-17
 
 **JDK:** jdk-17.0.9
 
@@ -168,7 +168,7 @@ perf 在 7 个接口 × 3 个并发度（4/8/16 线程）对比中，**全部接
 | bytesLarge | **0.21 / 0.35 / 0.76** | 0.38 / 0.57 / 2.76 | 0.29 / 0.48 / 1.70 | 0.31 / 0.54 / 1.68 |
 | sse | **0.28 / 0.46 / 3.27** | 2.27 / 6.92 / 8.40 | FAIL | 1.26 / 2.81 / 3.43 |
 
-小包接口（json/get/bytes/valid/async）perf p50 为 **0.10~0.11ms**，是 Spring MVC 的 45-67%；`bytesLarge`（大包）为 0.21ms、`sse` 为 0.28ms（SSE 下 Spring MVC 达 2.27ms，差距最大）。p99 最低 **0.14ms**（bytes/async），p99.9 同样全面领先——EventLoop 模型在低并发下尾延迟极稳。
+perf p50 延迟为 **0.10~0.28ms**（小包场景），是 Spring MVC 的 45-67%。p99 最低 **0.14ms**（bytes/async），p99.9 同样全面领先——EventLoop 模型在低并发下尾延迟极稳。
 
 SSE 场景 perf p50 仅 **0.28ms**，是 Spring MVC（2.27ms）的 **12%**，也优于 WebFlux 的 1.26ms。
 

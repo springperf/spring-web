@@ -17,6 +17,11 @@
     <dependencies>
         <dependency>
             <groupId>io.github.springperf</groupId>
+            <artifactId>spring-web-example-support-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.github.springperf</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
         <!-- springdoc-openapi-common: OpenAPI 规范生成 + 触发 SwaggerUiAutoConfiguration -->

@@ -126,8 +126,10 @@ class ResponseEntityExceptionHandlerBranchesTest {
 
     @Test
     void messageNotReadable_mapsTo400() throws Exception {
+        // Spring 7 移除了 HttpMessageNotReadableException(String) 单参构造器；
+        // 改用 (String, HttpInputMessage) —— 两版本都有。
         org.springframework.http.converter.HttpMessageNotReadableException ex = new org.springframework.http.converter.HttpMessageNotReadableException(
-                "cannot read");
+                "cannot read", (org.springframework.http.HttpInputMessage) null);
         assertEquals(HttpStatus.BAD_REQUEST, handler.handleException(ex, webRequest()).getStatusCode());
     }
 

@@ -44,7 +44,8 @@ public class StreamEmitterReturnValueResolver extends BaseAsyncReturnValueResolv
         if (returnValue instanceof ResponseEntity) {
             ResponseEntity<?> responseEntity = (ResponseEntity<?>) returnValue;
             resp.setStatusCode(responseEntity.getStatusCode());
-            resp.getHeaders().putAll(responseEntity.getHeaders());
+            // 不能写 putAll(headers)：Spring 7 的 putAll(HttpHeaders) 重载语义/行为均不同（见 WebHttpHeaders#addAllHeaders）
+            io.springperf.web.http.WebHttpHeaders.addAllHeaders(resp.getHeaders(), responseEntity.getHeaders());
             returnValue = responseEntity.getBody();
         }
         // ResponseEntity.getBody() 合法可为 null：无 body 就没有可发送的流，直接返回

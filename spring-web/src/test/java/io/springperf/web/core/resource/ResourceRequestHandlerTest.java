@@ -428,6 +428,6 @@ class ResourceRequestHandlerTest {
 
         gzipHandler.handleResourceRequest(request, response);
 
-        assertFalse(responseHeaders.containsKey(HttpHeaders.ACCEPT_RANGES), "gzip 变体不处理 Range，不应宣告 Accept-Ranges");
+        assertNull(responseHeaders.getFirst(HttpHeaders.ACCEPT_RANGES), "gzip 变体不处理 Range，不应宣告 Accept-Ranges");
     }
 }

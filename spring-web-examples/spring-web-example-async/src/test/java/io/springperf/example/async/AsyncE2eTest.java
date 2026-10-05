@@ -1,12 +1,13 @@
 package io.springperf.example.async;
 
+import io.springperf.example.support.TestRestTemplate;
+import io.springperf.example.support.RestTemplateBuilder;
+
 import io.springperf.web.server.NettyHttpServer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.ResponseEntity;
 
 import java.util.Map;
@@ -31,7 +32,7 @@ class AsyncE2eTest {
     void deferredResult_returnsAsyncResult() {
         ResponseEntity<Map> resp = rest.getForEntity("/async/deferred-result", Map.class);
 
-        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody()).isNotNull();
         assertThat(resp.getBody().get("status")).isEqualTo("async-ok");
         assertThat(resp.getBody().get("from")).isEqualTo("deferred-result");
@@ -41,7 +42,7 @@ class AsyncE2eTest {
     void deferredResultError_returnsErrorResponse() {
         ResponseEntity<Map> resp = rest.getForEntity("/async/deferred-result-error", Map.class);
 
-        assertThat(resp.getStatusCodeValue()).isEqualTo(500);
+        assertThat(resp.getStatusCode().value()).isEqualTo(500);
         assertThat(resp.getBody()).isNotNull();
         assertThat(((String) resp.getBody().get("message"))).contains("async-error-occurred");
     }
@@ -50,7 +51,7 @@ class AsyncE2eTest {
     void callable_returnsResult() {
         ResponseEntity<Map> resp = rest.getForEntity("/async/callable", Map.class);
 
-        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody()).isNotNull();
         assertThat(resp.getBody().get("from")).isEqualTo("callable");
     }
@@ -59,7 +60,7 @@ class AsyncE2eTest {
     void eventLoopThread() {
         ResponseEntity<Map> eventLoopResp = rest.getForEntity("/thread/event-loop", Map.class);
 
-        assertThat(eventLoopResp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(eventLoopResp.getStatusCode().value()).isEqualTo(200);
         assertThat(eventLoopResp.getBody()).isNotNull();
         String eventLoopThread = (String) eventLoopResp.getBody().get("thread");
         // Thread name is like "nioEventLoopGroup-3-1"
@@ -70,7 +71,7 @@ class AsyncE2eTest {
     void bizPoolThread() {
         ResponseEntity<Map> bizResp = rest.getForEntity("/thread/biz-pool", Map.class);
 
-        assertThat(bizResp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(bizResp.getStatusCode().value()).isEqualTo(200);
         assertThat(bizResp.getBody()).isNotNull();
         String threadName = (String) bizResp.getBody().get("thread");
         assertThat(threadName).doesNotContain("eventLoop");

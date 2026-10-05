@@ -7,12 +7,12 @@ import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.support.servlet.ServletAttribute;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.servlet.AsyncHandlerInterceptor;
-import org.springframework.web.util.NestedServletException;
 
 public class HandlerInterceptorWrapper implements HandlerInterceptor {
 
@@ -56,7 +56,10 @@ public class HandlerInterceptorWrapper implements HandlerInterceptor {
         if (servletRequest == null || servletResponse == null)
             return;
         interceptor.afterCompletion(servletRequest, servletResponse, handler,
-                ex instanceof Exception ? (Exception) ex : new NestedServletException("Handler dispatch failed", ex));
+                // Spring 7 移除了 org.springframework.web.util.NestedServletException；
+                // 改用其父类 jakarta.servlet.ServletException —— 两版本都存在，语义一致
+                // （把非 Exception 的 Throwable（Error）包成异常以满足 afterCompletion 的入参类型）。
+                ex instanceof Exception ? (Exception) ex : new ServletException("Handler dispatch failed", ex));
     }
 
     @Override

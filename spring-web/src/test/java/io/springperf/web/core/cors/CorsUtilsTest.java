@@ -89,8 +89,10 @@ class CorsUtilsTest {
     void isPreFlightRequest_allConditionsMet_returnsTrue() {
         when(request.getHeaders()).thenReturn(headers);
         when(request.getMethod()).thenReturn(HttpMethod.OPTIONS);
-        when(headers.containsKey(HttpHeaders.ORIGIN)).thenReturn(true);
-        when(headers.containsKey(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD)).thenReturn(true);
+        // 生产实现已从 containsKey 改为 getFirst(...) != null（Spring 7 移除了 HttpHeaders.containsKey，
+        // 官方 CorsUtils 亦改用此法），故桩也要打在 getFirst 上。
+        when(headers.getFirst(HttpHeaders.ORIGIN)).thenReturn("https://example.com");
+        when(headers.getFirst(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD)).thenReturn("GET");
 
         assertTrue(CorsUtils.isPreFlightRequest(request));
     }
@@ -106,7 +108,7 @@ class CorsUtilsTest {
     void isPreFlightRequest_missingOrigin_returnsFalse() {
         when(request.getHeaders()).thenReturn(headers);
         when(request.getMethod()).thenReturn(HttpMethod.OPTIONS);
-        when(headers.containsKey(HttpHeaders.ORIGIN)).thenReturn(false);
+        when(headers.getFirst(HttpHeaders.ORIGIN)).thenReturn(null);
 
         assertFalse(CorsUtils.isPreFlightRequest(request));
     }
@@ -115,8 +117,8 @@ class CorsUtilsTest {
     void isPreFlightRequest_missingAccessControlRequestMethod_returnsFalse() {
         when(request.getHeaders()).thenReturn(headers);
         when(request.getMethod()).thenReturn(HttpMethod.OPTIONS);
-        when(headers.containsKey(HttpHeaders.ORIGIN)).thenReturn(true);
-        when(headers.containsKey(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD)).thenReturn(false);
+        when(headers.getFirst(HttpHeaders.ORIGIN)).thenReturn("https://example.com");
+        when(headers.getFirst(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD)).thenReturn(null);
 
         assertFalse(CorsUtils.isPreFlightRequest(request));
     }

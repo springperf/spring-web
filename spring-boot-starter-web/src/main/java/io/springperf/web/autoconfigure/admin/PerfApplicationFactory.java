@@ -5,10 +5,9 @@ import de.codecentric.boot.admin.client.registration.Application;
 import de.codecentric.boot.admin.client.registration.ApplicationFactory;
 import org.springframework.boot.actuate.autoconfigure.endpoint.web.WebEndpointProperties;
 import org.springframework.boot.actuate.autoconfigure.web.server.ManagementServerProperties;
-import org.springframework.boot.autoconfigure.web.ServerProperties;
-import org.springframework.boot.web.server.Ssl;
 import org.springframework.core.env.Environment;
 
+import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
@@ -25,6 +24,11 @@ import java.net.UnknownHostException;
  * <li>用户显式配置（spring.boot.admin.client.instance.*）</li>
  * <li>自动从 ServerProperties / ManagementServerProperties 计算</li>
  * </ol>
+ * <p>
+ * <b>跨版本注意</b>：{@code ServerProperties} 在 Spring Boot 3 位于 {@code org.springframework.boot.autoconfigure.web}，
+ * 在 Boot 4 移到 {@code org.springframework.boot.web.server.autoconfigure}（且随 {@code spring-boot-web-server} artifact 拆分）。
+ * 编译期无法同时引用两个包名，故此处以 {@link Object} 持有并反射调用其两个用到的取值方法 （{@code getSsl()} 与 {@code getServlet()}）。
+ * </p>
  *
  * @author huangcanda
  *
@@ -34,12 +38,13 @@ public class PerfApplicationFactory implements ApplicationFactory {
 
     private final InstanceProperties instanceProperties;
     private final ManagementServerProperties managementServerProperties;
-    private final ServerProperties serverProperties;
+    /** Boot 3/4 包名不同的 {@code ServerProperties}：以 Object 持有，反射取值。 */
+    private final Object serverProperties;
     private final WebEndpointProperties webEndpointProperties;
     private final Environment environment;
 
     public PerfApplicationFactory(InstanceProperties instanceProperties,
-            ManagementServerProperties managementServerProperties, ServerProperties serverProperties,
+            ManagementServerProperties managementServerProperties, Object serverProperties,
             WebEndpointProperties webEndpointProperties, Environment environment) {
         this.instanceProperties = instanceProperties;
         this.managementServerProperties = managementServerProperties;
@@ -100,13 +105,31 @@ public class PerfApplicationFactory implements ApplicationFactory {
         return (ctxPath != null && !ctxPath.isEmpty() && !"/".equals(ctxPath)) ? ctxPath : "";
     }
 
-    private Ssl serverSsl() {
-        return serverProperties.getSsl();
+    /** 反射取 {@code ServerProperties.getSsl()}（Boot 3/4 包名不同，故不编译期引用）。 */
+    private Object serverSsl() {
+        return invoke(serverProperties, "getSsl");
     }
 
+    /** 反射取 {@code ServerProperties.getServlet().getContextPath()}。 */
     private String serverContextPath() {
-        ServerProperties.Servlet servlet = serverProperties.getServlet();
-        return (servlet != null) ? servlet.getContextPath() : null;
+        Object servlet = invoke(serverProperties, "getServlet");
+        if (servlet == null) {
+            return null;
+        }
+        Object ctx = invoke(servlet, "getContextPath");
+        return ctx == null ? null : ctx.toString();
+    }
+
+    private static Object invoke(Object target, String method) {
+        if (target == null) {
+            return null;
+        }
+        try {
+            Method m = target.getClass().getMethod(method);
+            return m.invoke(target);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Failed to call " + target.getClass().getName() + "." + method + "()", e);
+        }
     }
 
     // ---- Management URL ----
@@ -178,8 +201,9 @@ public class PerfApplicationFactory implements ApplicationFactory {
     // ---- Port ----
 
     private int resolveServerPort() {
-        Integer port = serverProperties.getPort();
-        return port != null ? port : 8080;
+        // 反射取 ServerProperties.getPort()：该类在 Boot 3/4 位于不同包（见类 Javadoc）
+        Object port = invoke(serverProperties, "getPort");
+        return port instanceof Integer i ? i : 8080;
     }
 
     private int resolveManagementPort() {
@@ -189,7 +213,12 @@ public class PerfApplicationFactory implements ApplicationFactory {
 
     // ---- Scheme ----
 
-    private static String resolveScheme(Ssl ssl) {
-        return Ssl.isEnabled(ssl) ? "https" : "http";
+    /** 反射判定 SSL 是否启用（{@code Ssl} 类型在 Boot 3/4 位于同一包名，但为避免编译期依赖仍走反射）。 */
+    private static String resolveScheme(Object ssl) {
+        if (ssl == null) {
+            return "http";
+        }
+        Object enabled = invoke(ssl, "isEnabled");
+        return Boolean.TRUE.equals(enabled) ? "https" : "http";
     }
 }

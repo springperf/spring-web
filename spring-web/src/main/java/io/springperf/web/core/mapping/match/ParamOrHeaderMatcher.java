@@ -36,7 +36,9 @@ public class ParamOrHeaderMatcher implements Matcher {
                 isMatch = ObjectUtils.nullSafeEquals(expressionSupport.getValue(),
                         req.getHeaders().getFirst(expressionSupport.getName()));
             } else {
-                isMatch = req.getHeaders().containsKey(expressionSupport.getName());
+                // Spring 7 移除了 HttpHeaders.containsKey（不再是 MultiValueMap）。改用 getFirst != null ——
+                // 两版本通用，且与上面 value 分支的取值方式一致（空值头视为不匹配，符合路由条件语义）。
+                isMatch = req.getHeaders().getFirst(expressionSupport.getName()) != null;
             }
         } else {
             if (expressionSupport.getValue() != null) {

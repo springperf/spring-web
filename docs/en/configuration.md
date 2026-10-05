@@ -234,7 +234,7 @@ management.endpoints.web.exposure.include=health,info,metrics
 # HTTP/2 and request body limit for the management port (prefix management.server.*; defaults
 # apply when unset — the main server's server.* values are no longer reused)
 management.server.http2.enabled=false
-management.server.max-content-length=1048576
+management.server.max-content-length=4194304
 ```
 
 ## Observability Metrics

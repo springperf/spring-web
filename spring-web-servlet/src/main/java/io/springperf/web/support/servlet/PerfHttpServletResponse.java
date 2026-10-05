@@ -161,7 +161,8 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
 
     @Override
     public boolean containsHeader(String name) {
-        return response.getHeaders().containsKey(name);
+        // Spring 7 移除了 HttpHeaders.containsKey，改用 getFirst(...) != null（两版本通用）
+        return response.getHeaders().getFirst(name) != null;
     }
 
     @Override
@@ -186,18 +187,31 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
 
     @Override
     public void sendRedirect(String location) {
+        sendRedirect(location, HttpServletResponse.SC_FOUND, true);
+    }
+
+    /**
+     * Servlet 6.1 新增的抽象方法：3 参重定向（状态码 + 是否清缓冲）。
+     * <p>
+     * 该方法在 Servlet 6.1 里是 {@code abstract}，未实现则无法编译；在更早的 Servlet 版本里它不存在，
+     * 但多一个 <b>{@code public} 方法对旧版本完全无害</b>（不作为 {@code @Override}，故旧版本下也不报错）。
+     * 语义对齐规范：{@code clearBuffer=true} 时丢弃已写内容，{@code false} 时保留。
+     * </p>
+     */
+    public void sendRedirect(String location, int sc, boolean clearBuffer) {
         if (location == null) {
             throw new IllegalArgumentException("Redirect location must not be null");
         }
         if (response.isCommitted()) {
             throw new IllegalStateException("Cannot send redirect: response already committed");
         }
-        // 丢弃已缓冲的内容：重定向响应不得把先前写入的页面内容带给客户端
-        // （对齐 Tomcat sendRedirect 的 clearBuffer=true 语义）。
-        // 注意：此处只把 Writer 编码缓冲刷入响应体，【不】走 writer.flush()——后者按 Tomcat 语义会提交响应。
+        // 丢弃已缓冲内容（对齐 Tomcat 语义）：只把 Writer 编码缓冲刷入响应体，
+        // 【不】走 writer.flush()——后者会提交响应。
         flushEncoderIntoBody();
-        response.resetBuffer();
-        setStatus(HttpServletResponse.SC_FOUND);
+        if (clearBuffer) {
+            response.resetBuffer();
+        }
+        setStatus(sc);
         setHeader(HttpHeaders.Names.LOCATION, toAbsoluteLocation(location));
     }
 
@@ -412,7 +426,12 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
 
     @Override
     public Collection<String> getHeaderNames() {
-        return response.getHeaders().keySet();
+        // Spring 7 移除了 HttpHeaders.keySet，改用 headerSet()（两版本签名一致）
+        java.util.Set<String> names = new java.util.LinkedHashSet<>();
+        for (java.util.Map.Entry<String, java.util.List<String>> e : response.getHeaders().headerSet()) {
+            names.add(e.getKey());
+        }
+        return names;
     }
 
     @Override

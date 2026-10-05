@@ -102,7 +102,11 @@ class PerfHttpServletResponseTest {
     @Test
     void getHeaderNames_returnsSet() {
         java.util.Set<String> names = new java.util.HashSet<>(java.util.Arrays.asList("Content-Type", "X-Custom"));
-        when(headers.keySet()).thenReturn(names);
+        java.util.Set<java.util.Map.Entry<String, java.util.List<String>>> entries = new java.util.LinkedHashSet<>();
+        for (String n : names) {
+            entries.add(java.util.Map.entry(n, java.util.List.<String>of()));
+        }
+        when(headers.headerSet()).thenReturn(entries);
         assertEquals(names, servletResponse.getHeaderNames());
     }
 
@@ -304,13 +308,13 @@ class PerfHttpServletResponseTest {
 
     @Test
     void containsHeader_checksHeaders() {
-        when(headers.containsKey("X-Custom")).thenReturn(true);
+        when(headers.getFirst("X-Custom")).thenReturn("v");
         assertTrue(servletResponse.containsHeader("X-Custom"));
     }
 
     @Test
     void containsHeader_missing() {
-        when(headers.containsKey("X-Missing")).thenReturn(false);
+        when(headers.getFirst("X-Missing")).thenReturn(null);
         assertFalse(servletResponse.containsHeader("X-Missing"));
     }
 

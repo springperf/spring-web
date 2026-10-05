@@ -651,7 +651,7 @@ public void asyncDispatch(WebServerHttpRequest req, WebServerHttpResponse resp, 
 -  补 `postHandle`/`afterCompletion`——异步请求的拦截器后处理推迟到恢复时才做。
 - 取回 `METRICS_START_ATTR`（一次 `fastAttributes` 数组直取），算完整耗时 `recordRequest`。
 
-这条异步路径把 [03 篇](03-component-lifecycle.md) 的 `AsyncSupportRegistry`、`ReturnValueResolverRegistry` 的缓存、`fastAttributes` 数组、`handled` CAS 串在一起：**异步不是新机制，而是主链路在 finally 分流、稍后用同一套缓存恢复**。完整异步流式机制（`AbstractNettyStreamSender` 无锁 drain loop、背压）留给 [11 篇](11-async-streaming.md)。
+这条异步路径把 [03 篇](03-component-lifecycle.md) 的 `AsyncSupportRegistry`、`ReturnValueResolverRegistry` 的缓存、`fastAttributes` 数组、`handled` CAS 串在一起：**异步不是新机制，而是主链路在 finally 分流、稍后用同一套缓存恢复**。完整异步流式机制（`NettyStreamSender` 无锁 drain loop、背压）留给 [11 篇](11-async-streaming.md)。
 
 ---
 

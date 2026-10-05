@@ -1,12 +1,13 @@
 package io.springperf.example.ai;
 
+import io.springperf.example.support.TestRestTemplate;
+import io.springperf.example.support.RestTemplateBuilder;
+
 import io.springperf.web.server.NettyHttpServer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.ResponseEntity;
 
 import java.util.Map;
@@ -47,7 +48,7 @@ class AiChatE2eTest {
     @Test
     void modelEndpointShouldReturnConfigInfo() {
         ResponseEntity<Map> resp = rest.getForEntity("/ai/chat/model", Map.class);
-        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody()).isNotNull();
         assertThat(resp.getBody()).containsKeys("baseUrl", "model");
     }
@@ -55,13 +56,13 @@ class AiChatE2eTest {
     @Test
     void chatEndpointShouldReturnBadRequestWhenMessageMissing() {
         ResponseEntity<String> resp = rest.getForEntity("/ai/chat", String.class);
-        assertThat(resp.getStatusCodeValue()).isEqualTo(400);
+        assertThat(resp.getStatusCode().value()).isEqualTo(400);
     }
 
     @Test
     void streamEndpointShouldReturnBadRequestWhenMessageMissing() {
         ResponseEntity<String> resp = rest.getForEntity("/ai/chat/stream", String.class);
-        assertThat(resp.getStatusCodeValue()).isEqualTo(400);
+        assertThat(resp.getStatusCode().value()).isEqualTo(400);
     }
 
     @Test
@@ -69,7 +70,7 @@ class AiChatE2eTest {
         assumeTrue(hasRealApiKey(), "跳过对话测试：未配置真实 API key");
 
         ResponseEntity<String> resp = rest.getForEntity("/ai/chat?message=你好，请用一句话介绍自己", String.class);
-        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody()).isNotNull().isNotEmpty();
     }
 
@@ -78,7 +79,7 @@ class AiChatE2eTest {
         assumeTrue(hasRealApiKey(), "跳过流式对话测试：未配置真实 API key");
 
         ResponseEntity<String> resp = rest.getForEntity("/ai/chat/stream?message=你好，请用一句话介绍自己", String.class);
-        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody()).isNotNull().isNotEmpty();
     }
 }

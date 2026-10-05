@@ -125,6 +125,7 @@ class AsyncReturnValueResolversTest {
 
     @Test
     void listenableFuture_supportsReturnType() throws Exception {
+        assumeTrue(ListenableFutureAdapter.isAvailable(), "ListenableFuture not available in this Spring version");
         ListenableFutureReturnValueResolver r = new ListenableFutureReturnValueResolver();
         Class<?> listenableFutureClass = Class.forName("org.springframework.util.concurrent.ListenableFuture");
         Method method = getClass().getDeclaredMethod("listenableFutureParam", Object.class);
@@ -140,6 +141,7 @@ class AsyncReturnValueResolversTest {
 
     @Test
     void listenableFuture_supportsReturnValue() throws Exception {
+        assumeTrue(ListenableFutureAdapter.isAvailable(), "ListenableFuture not available in this Spring version");
         ListenableFutureReturnValueResolver r = new ListenableFutureReturnValueResolver();
         Class<?> settableFutureClass = Class.forName("org.springframework.util.concurrent.SettableListenableFuture");
         Object future = settableFutureClass.getDeclaredConstructor().newInstance();
@@ -148,6 +150,7 @@ class AsyncReturnValueResolversTest {
 
     @Test
     void listenableFuture_resolve_delegatesToRegistry() throws Exception {
+        assumeTrue(ListenableFutureAdapter.isAvailable(), "ListenableFuture not available in this Spring version");
         ListenableFutureReturnValueResolver r = new ListenableFutureReturnValueResolver();
         initAsyncSupport(r);
         Class<?> settableFutureClass = Class.forName("org.springframework.util.concurrent.SettableListenableFuture");
@@ -161,6 +164,7 @@ class AsyncReturnValueResolversTest {
 
     @Test
     void listenableFuture_adapt_onSuccess_setsResult() throws Exception {
+        assumeTrue(ListenableFutureAdapter.isAvailable(), "ListenableFuture not available in this Spring version");
         ListenableFutureReturnValueResolver r = new ListenableFutureReturnValueResolver();
         Class<?> settableFutureClass = Class.forName("org.springframework.util.concurrent.SettableListenableFuture");
         Object future = settableFutureClass.getDeclaredConstructor().newInstance();
@@ -175,6 +179,7 @@ class AsyncReturnValueResolversTest {
 
     @Test
     void listenableFuture_adapt_onFailure_setsErrorResult() throws Exception {
+        assumeTrue(ListenableFutureAdapter.isAvailable(), "ListenableFuture not available in this Spring version");
         ListenableFutureReturnValueResolver r = new ListenableFutureReturnValueResolver();
         Class<?> settableFutureClass = Class.forName("org.springframework.util.concurrent.SettableListenableFuture");
         Object future = settableFutureClass.getDeclaredConstructor().newInstance();

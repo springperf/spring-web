@@ -1,13 +1,14 @@
 package io.springperf.example.data;
 
+import io.springperf.example.support.TestRestTemplate;
+import io.springperf.example.support.RestTemplateBuilder;
+
 import io.springperf.example.data.model.User;
 import io.springperf.web.server.NettyHttpServer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 
@@ -35,7 +36,7 @@ class DataE2eTest {
         User newUser = new User(null, "alice", "alice@example.com", 25);
         ResponseEntity<Map> createResp = rest.postForEntity("/api/users", newUser, Map.class);
 
-        assertThat(createResp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(createResp.getStatusCode().value()).isEqualTo(200);
         Map<String, Object> created = createResp.getBody();
         assertThat(created).isNotNull();
         assertThat(created.get("id")).isNotNull();
@@ -44,7 +45,7 @@ class DataE2eTest {
 
         // Step 2: Get by ID
         ResponseEntity<Map> getResp = rest.getForEntity("/api/users/" + userId.longValue(), Map.class);
-        assertThat(getResp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(getResp.getStatusCode().value()).isEqualTo(200);
         assertThat(getResp.getBody().get("name")).isEqualTo("alice");
 
         // Step 3: Update
@@ -52,17 +53,17 @@ class DataE2eTest {
         rest.put("/api/users/" + userId.longValue(), updated);
 
         ResponseEntity<Map> afterUpdate = rest.getForEntity("/api/users/" + userId.longValue(), Map.class);
-        assertThat(afterUpdate.getStatusCodeValue()).isEqualTo(200);
+        assertThat(afterUpdate.getStatusCode().value()).isEqualTo(200);
         assertThat(afterUpdate.getBody().get("name")).isEqualTo("alice-updated");
 
         // Step 4: Delete
         ResponseEntity<Map> deleteResp = rest.exchange("/api/users/" + userId.longValue(), HttpMethod.DELETE, null,
                 Map.class);
-        assertThat(deleteResp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(deleteResp.getStatusCode().value()).isEqualTo(200);
 
         // Step 5: Verify deletion
         ResponseEntity<Map> afterDelete = rest.getForEntity("/api/users/" + userId.longValue(), Map.class);
-        assertThat(afterDelete.getStatusCodeValue()).isEqualTo(400);
+        assertThat(afterDelete.getStatusCode().value()).isEqualTo(400);
         assertThat(((String) afterDelete.getBody().get("message"))).contains("user not found");
     }
 
@@ -74,7 +75,7 @@ class DataE2eTest {
         rest.postForEntity("/api/users", u2, Map.class);
 
         ResponseEntity<Map[]> resp = rest.getForEntity("/api/users", Map[].class);
-        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody()).isNotNull();
         assertThat(resp.getBody().length).isGreaterThanOrEqualTo(2);
     }
@@ -85,7 +86,7 @@ class DataE2eTest {
         rest.postForEntity("/api/users", new User(null, "chaplin", "chap@test.com", 35), Map.class);
 
         ResponseEntity<Map[]> resp = rest.getForEntity("/api/users?name=charlie", Map[].class);
-        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody()).isNotNull();
         assertThat(resp.getBody().length).isEqualTo(1);
     }
@@ -95,7 +96,7 @@ class DataE2eTest {
         User invalid = new User(null, "", "bad-email", -1);
 
         ResponseEntity<Map> resp = rest.postForEntity("/api/users", invalid, Map.class);
-        assertThat(resp.getStatusCodeValue()).isEqualTo(400);
+        assertThat(resp.getStatusCode().value()).isEqualTo(400);
         assertThat(resp.getBody()).isNotNull();
         assertThat(resp.getBody().get("code")).isEqualTo(400);
     }
@@ -104,7 +105,7 @@ class DataE2eTest {
     void getUser_notFound() {
         ResponseEntity<Map> resp = rest.getForEntity("/api/users/99999", Map.class);
 
-        assertThat(resp.getStatusCodeValue()).isEqualTo(400);
+        assertThat(resp.getStatusCode().value()).isEqualTo(400);
         assertThat(((String) resp.getBody().get("message"))).contains("user not found");
     }
 

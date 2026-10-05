@@ -88,7 +88,10 @@ class HttpEntityReturnValueResolverTest {
 
     @Test
     void resolveReturnValue_httpEntity_noStatus_doesNotSetStatusCode() throws Exception {
-        HttpEntity<String> entity = new HttpEntity<>("body", new WebHttpHeaders());
+        // 显式声明为 MultiValueMap：Spring 7 新增了 HttpEntity(T, HttpHeaders) 重载，
+        // 而 WebHttpHeaders 同时是 HttpHeaders 与 MultiValueMap，直接传会让重载解析产生歧义。
+        org.springframework.util.MultiValueMap<String, String> entityHeaders = new WebHttpHeaders();
+        HttpEntity<String> entity = new HttpEntity<>("body", entityHeaders);
 
         resolver.resolveReturnValue(entity, null, request, response);
 

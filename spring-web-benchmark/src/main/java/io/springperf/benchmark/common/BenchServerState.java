@@ -2,10 +2,11 @@ package io.springperf.benchmark.common;
 
 import org.springframework.boot.Banner;
 import org.springframework.boot.SpringApplication;
-import org.springframework.boot.web.context.WebServerInitializedEvent;
+import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.ConfigurableApplicationContext;
 
+import java.lang.reflect.Method;
 import java.net.Socket;
 import java.util.Properties;
 
@@ -47,12 +48,26 @@ public class BenchServerState {
         app.setLogStartupInfo(false);
 
         // 通过 WebServerInitializedEvent 捕获实际端口（适用于所有容器，不依赖 local.server.port）
-        // NettyHttpServer 不设置 local.server.port，必须通过事件获取
+        // NettyHttpServer 不设置 local.server.port，必须通过事件获取。
+        // 注意：该事件在 Spring Boot 3 位于 boot.web.context，Boot 4 移到 boot.web.server.context（且为抽象类，
+        // 由框架的 Boot4WebServerInitializedEventBridge 运行时生成子类发布）。故此处不编译期引用该类，
+        // 用「事件类名判定 + 反射取 getWebServer().getPort()」，两版本通用。
         final int[] eventPort = { 0 };
-        app.addListeners((ApplicationListener<WebServerInitializedEvent>) event -> {
-            if (eventPort[0] == 0) {
-                eventPort[0] = event.getWebServer().getPort();
+        app.addListeners((ApplicationListener<ApplicationEvent>) event -> {
+            if (eventPort[0] != 0) {
+                return;
+            }
+            String cn = event.getClass().getName();
+            if (!cn.contains("WebServerInitializedEvent")) {
+                return;
+            }
+            try {
+                Object webServer = event.getClass().getMethod("getWebServer").invoke(event);
+                Method getPort = webServer.getClass().getMethod("getPort");
+                eventPort[0] = (Integer) getPort.invoke(webServer);
                 System.out.println("[Benchmark] WebServerInitializedEvent port: " + eventPort[0]);
+            } catch (ReflectiveOperationException ignored) {
+                // 取不到端口则保持 0，由后续 context.getWebServer() 兜底
             }
         });
 

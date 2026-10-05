@@ -83,8 +83,9 @@ class PerfCorsProcessorTest {
         when(requestHeaders.getOrigin()).thenReturn("http://other-origin.com");
         when(request.getURI()).thenReturn(URI.create("http://localhost/path"));
         when(request.getMethod()).thenReturn(HttpMethod.OPTIONS);
-        when(requestHeaders.containsKey(HttpHeaders.ORIGIN)).thenReturn(true);
-        when(requestHeaders.containsKey(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD)).thenReturn(true);
+        // 生产实现已改用 getFirst(...) != null（Spring 7 移除了 HttpHeaders.containsKey），桩同步调整
+        when(requestHeaders.getFirst(HttpHeaders.ORIGIN)).thenReturn("https://other-origin.com");
+        when(requestHeaders.getFirst(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD)).thenReturn("GET");
         when(response.getBody()).thenReturn(new ByteArrayOutputStream());
         boolean result = processor.process(null, request, response);
         assertFalse(result);

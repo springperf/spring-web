@@ -104,7 +104,7 @@ class HandlerInterceptorWrapperTest {
         verify(springInterceptor).afterCompletion(eq(servletRequest), eq(servletResponse), eq("handler"),
                 exceptionCaptor.capture());
         Exception captured = exceptionCaptor.getValue();
-        assertInstanceOf(org.springframework.web.util.NestedServletException.class, captured);
+        assertInstanceOf(jakarta.servlet.ServletException.class, captured);
         assertSame(error, captured.getCause());
     }
 
@@ -118,7 +118,7 @@ class HandlerInterceptorWrapperTest {
         verify(springInterceptor).afterCompletion(eq(servletRequest), eq(servletResponse), eq("handler"),
                 exceptionCaptor.capture());
         Exception captured = exceptionCaptor.getValue();
-        assertInstanceOf(org.springframework.web.util.NestedServletException.class, captured);
+        assertInstanceOf(jakarta.servlet.ServletException.class, captured);
         assertNull(captured.getCause());
     }
 

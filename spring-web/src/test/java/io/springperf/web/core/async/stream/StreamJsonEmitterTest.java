@@ -19,7 +19,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.server.ServerHttpResponse;
 
 import io.springperf.web.json.JsonConverter;
-
+import io.springperf.web.util.MediaTypeUtils;
 
 @ExtendWith(MockitoExtension.class)
 class StreamJsonEmitterTest {
@@ -36,7 +36,7 @@ class StreamJsonEmitterTest {
         StreamJsonEmitter emitter = new StreamJsonEmitter(jsonConverter);
         emitter.extendResponse(response);
 
-        assertEquals(org.springframework.http.MediaType.APPLICATION_STREAM_JSON, headers.getContentType());
+        assertEquals(MediaTypeUtils.APPLICATION_STREAM_JSON, headers.getContentType());
     }
 
     @Test

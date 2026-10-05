@@ -7,9 +7,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.actuate.autoconfigure.endpoint.web.WebEndpointProperties;
 import org.springframework.boot.actuate.autoconfigure.web.server.ManagementServerProperties;
-import org.springframework.boot.autoconfigure.web.ServerProperties;
-import org.springframework.boot.web.server.Ssl;
 import org.springframework.core.env.Environment;
+
+import java.lang.reflect.Method;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -17,12 +17,19 @@ import static org.mockito.Mockito.when;
 
 /**
  * {@link PerfApplicationFactory} 的单元测试。
+ * <p>
+ * 跨版本注意：{@code ServerProperties} 在 Boot 3 位于 {@code org.springframework.boot.autoconfigure.web}，
+ * Boot 4 移到 {@code org.springframework.boot.web.server.autoconfigure}（随 {@code spring-boot-web-server} 拆分）。
+ * 被测类本身以 {@code Object} 接收，故本测试改用<b>反射</b>构造并操作它，同一份源码可在两个版本编译运行。
+ * </p>
  */
 class PerfApplicationFactoryTest {
 
     private InstanceProperties instanceProperties;
     private ManagementServerProperties managementServerProperties;
-    private ServerProperties serverProperties;
+    /** Boot 3/4 包名不同的 ServerProperties：反射构造与调用。 */
+    private Object serverProperties;
+    private Class<?> serverPropertiesClass;
     private WebEndpointProperties webEndpointProperties;
     private Environment environment;
 
@@ -30,7 +37,8 @@ class PerfApplicationFactoryTest {
     void setUp() throws Exception {
         instanceProperties = new InstanceProperties();
         managementServerProperties = new ManagementServerProperties();
-        serverProperties = new ServerProperties();
+        serverPropertiesClass = loadServerPropertiesClass();
+        serverProperties = serverPropertiesClass.getDeclaredConstructor().newInstance();
         webEndpointProperties = new WebEndpointProperties();
         environment = mock(Environment.class);
 
@@ -39,31 +47,75 @@ class PerfApplicationFactoryTest {
         when(environment.getProperty("spring.application.name", "application")).thenReturn("test-app");
     }
 
-    /** 设置 server.port。 */
+    /** 按 Boot 3 → Boot 4 顺序探测 ServerProperties 所在包。 */
+    private static Class<?> loadServerPropertiesClass() throws ClassNotFoundException {
+        try {
+            return Class.forName("org.springframework.boot.autoconfigure.web.ServerProperties");
+        } catch (ClassNotFoundException e) {
+            return Class.forName("org.springframework.boot.web.server.autoconfigure.ServerProperties");
+        }
+    }
+
+    /** 反射调用 serverProperties 上的方法（含无参取值与 setter）。 */
+    private Object call(String method, Object... args) {
+        try {
+            for (Method m : serverPropertiesClass.getMethods()) {
+                if (m.getName().equals(method) && m.getParameterCount() == args.length) {
+                    return m.invoke(serverProperties, args);
+                }
+            }
+            throw new NoSuchMethodException(method);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Failed to call ServerProperties." + method, e);
+        }
+    }
+
+    /** 反射设置 server.port。 */
     private void setPort(int port) {
-        serverProperties.setPort(port);
+        call("setPort", port);
     }
 
-    /** 设置 servlet.context-path。 */
+    /** 反射设置 servlet.context-path。 */
     private void setContextPath(String path) {
-        serverProperties.getServlet().setContextPath(path);
+        Object servlet = call("getServlet");
+        try {
+            Method setter = servlet.getClass().getMethod("setContextPath", String.class);
+            setter.invoke(servlet, path);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Failed to set servlet context-path", e);
+        }
     }
 
-    /** 构造启用 SSL 的 {@link Ssl}。 */
-    private static Ssl newSslEnabled() {
-        Ssl ssl = new Ssl();
-        ssl.setEnabled(true);
-        return ssl;
+    /** 反射构造 {@code org.springframework.boot.web.server.Ssl}（该类型在两版本包名一致）。 */
+    private static Object newSslEnabled() {
+        try {
+            Class<?> sslClass = Class.forName("org.springframework.boot.web.server.Ssl");
+            Object ssl = sslClass.getDeclaredConstructor().newInstance();
+            sslClass.getMethod("setEnabled", boolean.class).invoke(ssl, true);
+            return ssl;
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Failed to build Ssl", e);
+        }
     }
 
-    /** 设置 management server 的 SSL。 */
+    /** 反射调用 {@code ManagementServerProperties.setSsl(Ssl)}（Ssl 类型在 Boot 3/4 包名不同）。 */
     private void setManagementSsl() {
-        managementServerProperties.setSsl(newSslEnabled());
+        try {
+            for (Method m : ManagementServerProperties.class.getMethods()) {
+                if (m.getName().equals("setSsl") && m.getParameterCount() == 1) {
+                    m.invoke(managementServerProperties, newSslEnabled());
+                    return;
+                }
+            }
+            throw new NoSuchMethodException("setSsl");
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Failed to set management ssl", e);
+        }
     }
 
-    /** 设置 server.ssl。 */
+    /** 反射设置 server.ssl。 */
     private void setSslEnabled(boolean enabled) {
-        serverProperties.setSsl(newSslEnabled());
+        call("setSsl", newSslEnabled());
     }
 
     private PerfApplicationFactory createFactory() {

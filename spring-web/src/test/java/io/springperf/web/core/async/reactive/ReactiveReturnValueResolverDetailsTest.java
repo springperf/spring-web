@@ -203,12 +203,12 @@ class ReactiveReturnValueResolverDetailsTest {
         when(response.getHeaders()).thenReturn(responseHeaders);
         PathMappingContext ctx = mock(PathMappingContext.class);
         when(ctx.getProducibleMediaTypes())
-                .thenReturn(Collections.singletonList(org.springframework.http.MediaType.APPLICATION_STREAM_JSON));
+                .thenReturn(Collections.singletonList(io.springperf.web.util.MediaTypeUtils.APPLICATION_STREAM_JSON));
         MappingResult.set(request, MappingResult.matched(ctx));
 
-        assertTrue(resolver.containMediaType(org.springframework.http.MediaType.APPLICATION_STREAM_JSON, request,
+        assertTrue(resolver.containMediaType(io.springperf.web.util.MediaTypeUtils.APPLICATION_STREAM_JSON, request,
                 response));
-        assertEquals(org.springframework.http.MediaType.APPLICATION_STREAM_JSON, responseHeaders.getContentType());
+        assertEquals(io.springperf.web.util.MediaTypeUtils.APPLICATION_STREAM_JSON, responseHeaders.getContentType());
     }
 
     @Test

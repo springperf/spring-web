@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 public class CoreFeaturesParamReturnTest extends BaseE2ETest {
 
@@ -70,6 +71,9 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
 
     @Test
     void testListenableFuture() throws Exception {
+        // ListenableFuture 在 Spring 7 已移除：SB4 下该端点无有效实现，跳过（与 AsyncReturnValueResolversTest 同策略）
+        assumeTrue(io.springperf.web.core.retval.resolver.async.ListenableFutureAdapter.isAvailable(),
+                "ListenableFuture not available in this Spring version");
         Request req = new Request.Builder().url(baseUrl() + "/listenable-future").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());

@@ -649,5 +649,49 @@
                 </plugins>
             </build>
         </profile>
+
+        <!--
+          Spring Boot 4 适配：Boot 4 的 spring-boot-starter-json 不再传递 spring-web
+          （Jackson 3 拆分所致），导致 benchmark 的 @RestController 等编译失败。
+          另：WebServerInitializedEvent 移包 + spring-boot-web-server artifact 拆分，
+          此处一并补齐。profile id 与根 pom 同名，-Pspring-boot-4.x 时自动激活。
+          本模块不发布（maven.deploy.skip=true），仅需保证 4.x 下可编译/运行。
+        -->
+        <profile>
+            <id>spring-boot-4.0</id>
+            <dependencies>
+                <dependency>
+                    <groupId>org.springframework</groupId>
+                    <artifactId>spring-web</artifactId>
+                </dependency>
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-web-server</artifactId>
+                </dependency>
+                <!-- Boot 4 的 starter-json 改用 Jackson 3，不再传递 Jackson 2 databind；
+                     ReportGenerator 直接使用 com.fasterxml（Jackson 2）读写 JMH 报告，故显式补。 -->
+                <dependency>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-databind</artifactId>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>spring-boot-4.1</id>
+            <dependencies>
+                <dependency>
+                    <groupId>org.springframework</groupId>
+                    <artifactId>spring-web</artifactId>
+                </dependency>
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-web-server</artifactId>
+                </dependency>
+                <dependency>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-databind</artifactId>
+                </dependency>
+            </dependencies>
+        </profile>
     </profiles>
 </project>

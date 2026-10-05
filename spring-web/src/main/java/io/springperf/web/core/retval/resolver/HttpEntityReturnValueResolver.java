@@ -11,6 +11,7 @@ import io.springperf.web.core.codec.HttpBodyCodecRegistry;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
 import io.springperf.web.core.retval.ReturnValueResolver;
 import io.springperf.web.core.retval.ReturnValueResolverRegistry;
+import io.springperf.web.http.WebHttpHeaders;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 
@@ -49,10 +50,13 @@ public class HttpEntityReturnValueResolver extends BaseWebComponent implements R
                 resp.setStatusCode(responseEntity.getStatusCode());
             }
         }
-        // 空 headers 时跳过 putAll，避免空 map 的无谓遍历
+        // 空 headers 时跳过，避免空遍历。
+        // 注意：不能写 resp.getHeaders().putAll(entityHeaders) —— Spring 7 给 HttpHeaders 新增了
+        // putAll(HttpHeaders) 重载，javac 会优先选中它（语义为整体替换，且 put 可能落到只读视图抛异常）。
+        // 改用跨版本一致的 addAllHeaders（内部走 headerSet() + add）。
         HttpHeaders entityHeaders = httpEntity.getHeaders();
         if (entityHeaders != null && !entityHeaders.isEmpty()) {
-            resp.getHeaders().putAll(entityHeaders);
+            WebHttpHeaders.addAllHeaders(resp.getHeaders(), entityHeaders);
         }
         Object body = httpEntity.getBody();
         if (body != null) {

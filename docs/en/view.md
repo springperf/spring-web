@@ -41,7 +41,7 @@ To use FreeMarker instead, swap `thymeleaf` for:
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `spring.web.view.engine` | none (all available) | Enabled template engines (comma-separated): `thymeleaf` / `freemarker` / `beetl`; **when unset every available engine on the classpath is registered** |
+| `spring.web.view.engine` | `thymeleaf` | Template engine: `thymeleaf` / `freemarker` |
 | `spring.thymeleaf.prefix` | `templates/` | Thymeleaf template prefix (classpath-relative) |
 | `spring.thymeleaf.suffix` | `.html` | Thymeleaf template suffix |
 | `spring.thymeleaf.cache` | `true` | Template cache (set `false` in development for hot reload) |

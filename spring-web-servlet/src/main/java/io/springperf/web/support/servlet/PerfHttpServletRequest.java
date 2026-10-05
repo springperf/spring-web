@@ -159,7 +159,12 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
 
     @Override
     public Enumeration<String> getHeaderNames() {
-        return Collections.enumeration(request.getHeaders().keySet());
+        // Spring 7 移除了 HttpHeaders.keySet，改用 headerSet()（两版本签名一致）
+        Set<String> names = new java.util.LinkedHashSet<>();
+        for (Map.Entry<String, List<String>> e : request.getHeaders().headerSet()) {
+            names.add(e.getKey());
+        }
+        return Collections.enumeration(names);
     }
 
     @Override

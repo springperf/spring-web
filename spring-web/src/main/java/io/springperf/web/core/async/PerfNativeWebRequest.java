@@ -83,7 +83,20 @@ public class PerfNativeWebRequest implements NativeWebRequest {
 
     @Override
     public Iterator<String> getHeaderNames() {
-        return request.getHeaders().keySet().iterator();
+        // Spring 7 移除了 HttpHeaders.keySet()（不再是 MultiValueMap）。改用 headerSet() ——
+        // 该 API 在 Spring 6 / 7 均存在且签名一致，返回头名到多值的条目集合。
+        Iterator<java.util.Map.Entry<String, java.util.List<String>>> it = request.getHeaders().headerSet().iterator();
+        return new Iterator<String>() {
+            @Override
+            public boolean hasNext() {
+                return it.hasNext();
+            }
+
+            @Override
+            public String next() {
+                return it.next().getKey();
+            }
+        };
     }
 
     @Override

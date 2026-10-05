@@ -1,12 +1,13 @@
 package io.springperf.example.security;
 
+import io.springperf.example.support.TestRestTemplate;
+import io.springperf.example.support.RestTemplateBuilder;
+
 import io.springperf.web.server.NettyHttpServer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -36,7 +37,7 @@ class SecuritySessionE2eTest {
     void securitySession_createAndReadAttribute() {
         ResponseEntity<Map> createResp = rest.getForEntity("/security/session-set?key=mykey&value=hello-security",
                 Map.class);
-        assertThat(createResp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(createResp.getStatusCode().value()).isEqualTo(200);
 
         Map<String, Object> createBody = createResp.getBody();
         assertThat(createBody).isNotNull();
@@ -57,7 +58,7 @@ class SecuritySessionE2eTest {
 
         ResponseEntity<Map> getResp = rest.exchange("/security/session-get?key=mykey", HttpMethod.GET, entity,
                 Map.class);
-        assertThat(getResp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(getResp.getStatusCode().value()).isEqualTo(200);
 
         Map<String, Object> getBody = getResp.getBody();
         assertThat(getBody).isNotNull();
@@ -69,7 +70,7 @@ class SecuritySessionE2eTest {
     @Test
     void securitySession_infoWithoutSession() {
         ResponseEntity<Map> resp = rest.getForEntity("/security/session-info", Map.class);
-        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
 
         Map<String, Object> body = resp.getBody();
         assertThat(body).isNotNull();
@@ -97,30 +98,30 @@ class SecuritySessionE2eTest {
     @Test
     void adminEndpoint_withoutAuth_returns401() {
         ResponseEntity<Map> resp = rest.getForEntity("/security/admin", Map.class);
-        assertThat(resp.getStatusCodeValue()).isEqualTo(401);
+        assertThat(resp.getStatusCode().value()).isEqualTo(401);
     }
 
     @Test
     void adminEndpoint_withAdminRole_returns200() {
-        TestRestTemplate adminRest = rest.withBasicAuth("admin", "admin");
+        var adminRest = rest.withBasicAuth("admin", "admin");
         ResponseEntity<Map> resp = adminRest.getForEntity("/security/admin", Map.class);
-        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody().get("username")).isEqualTo("admin");
         assertThat(resp.getBody().get("role")).isEqualTo("ADMIN");
     }
 
     @Test
     void adminEndpoint_withUserRole_returns403() {
-        TestRestTemplate userRest = rest.withBasicAuth("user", "user");
+        var userRest = rest.withBasicAuth("user", "user");
         ResponseEntity<Map> resp = userRest.getForEntity("/security/admin", Map.class);
-        assertThat(resp.getStatusCodeValue()).isEqualTo(403);
+        assertThat(resp.getStatusCode().value()).isEqualTo(403);
     }
 
     @Test
     void userEndpoint_withUserRole_returns200() {
-        TestRestTemplate userRest = rest.withBasicAuth("user", "user");
+        var userRest = rest.withBasicAuth("user", "user");
         ResponseEntity<Map> resp = userRest.getForEntity("/security/user", Map.class);
-        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody().get("username")).isEqualTo("user");
         assertThat(resp.getBody().get("role")).isEqualTo("USER");
     }

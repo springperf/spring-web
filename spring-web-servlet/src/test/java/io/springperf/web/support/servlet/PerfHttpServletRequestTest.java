@@ -112,7 +112,11 @@ class PerfHttpServletRequestTest {
     @Test
     void getHeaderNames_returnsEnumeration() {
         Set<String> names = new HashSet<>(Arrays.asList("Content-Type", "Accept"));
-        when(headers.keySet()).thenReturn(names);
+        java.util.Set<java.util.Map.Entry<String, java.util.List<String>>> entries = new java.util.LinkedHashSet<>();
+        for (String n : names) {
+            entries.add(java.util.Map.entry(n, java.util.List.<String>of()));
+        }
+        when(headers.headerSet()).thenReturn(entries);
         assertEquals(names, new HashSet<>(Collections.list(servletRequest.getHeaderNames())));
     }
 

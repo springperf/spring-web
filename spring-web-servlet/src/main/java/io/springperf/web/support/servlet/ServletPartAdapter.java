@@ -63,6 +63,11 @@ public class ServletPartAdapter implements Part {
 
     @Override
     public Collection<String> getHeaderNames() {
-        return part.getHeaders().keySet();
+        // Spring 7 移除了 HttpHeaders.keySet，改用 headerSet()（两版本签名一致）
+        Collection<String> names = new java.util.LinkedHashSet<>();
+        for (java.util.Map.Entry<String, java.util.List<String>> e : part.getHeaders().headerSet()) {
+            names.add(e.getKey());
+        }
+        return names;
     }
 }

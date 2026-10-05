@@ -7,15 +7,14 @@ spring-web-parent (聚合 POM)
 ├── spring-web                  核心框架
 ├── spring-web-view             视图渲染（Thymeleaf/FreeMarker，可选）
 ├── spring-web-servlet          Servlet API 桥接层
-├── spring-web-mvc-support      SpringMVC 兼容桥接层
+├── spring-web-mvc-support     SpringMVC 兼容桥接层
 ├── spring-web-batch            批量请求处理（可选）
 ├── spring-web-websocket        WebSocket 支持（可选）
 ├── spring-boot-starter-web     Spring Boot 自动配置
 ├── spring-web-test             测试应用
 ├── spring-web-support-test     支持模块测试
 ├── spring-web-benchmark        JMH 性能基准测试
-├── spring-web-examples         可运行示例应用聚合
-└── coverage-aggregate          JaCoCo 覆盖率聚合（report-aggregate，不发布）
+└── spring-web-examples         可运行示例应用聚合
 ```
 
 ---
@@ -339,7 +338,7 @@ destroyComponent()     → 资源释放
 
 `SpringWebViewAutoConfiguration` 在 `spring-web-view` 存在时自动装配：
 - `ViewResolverRegistry`、`ViewReturnValueResolver`、`ModelAndViewReturnValueResolver`、`ModelArgumentResolverProvider`
-- 引擎选择：`spring.web.view.engine`（不配置则注册 classpath 上所有可用引擎）+ classpath 探测 `TemplateEngine` / `freemarker.template.Configuration`
+- 引擎选择：`spring.web.view.engine`（默认 `thymeleaf`）+ classpath 探测 `TemplateEngine` / `freemarker.template.Configuration`
 
 ### Batch 自动配置
 

@@ -137,6 +137,13 @@ public abstract class AbstractFastFailHttpServletResponse implements HttpServlet
         throw unsupported("sendRedirect");
     }
 
+    /**
+     * Servlet 6.1 新增的抽象方法（状态码 + 是否清缓冲）。旧版本无此方法，多一个 public 方法无害。
+     */
+    public void sendRedirect(String location, int sc, boolean clearBuffer) {
+        throw unsupported("sendRedirect");
+    }
+
     @Override
     public void setDateHeader(String name, long date) {
         throw unsupported("setDateHeader");

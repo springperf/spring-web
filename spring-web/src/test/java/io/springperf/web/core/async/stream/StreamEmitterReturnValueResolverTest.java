@@ -139,7 +139,7 @@ class StreamEmitterReturnValueResolverTest {
 
         // 验证 ResponseEntity 的状态码和 headers 已被设置
         verify(response).setStatusCode(HttpStatus.ACCEPTED);
-        assertTrue(respHeaders.containsKey("X-Custom"));
+        assertNotNull(respHeaders.getFirst("X-Custom"));
     }
 
     // ===== helpers =====

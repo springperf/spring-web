@@ -60,6 +60,6 @@ __pycache__/
 !/scripts/*.py
 !/spring-web-servlet/src/test/resources/perf-web/placeholder.txt
 /promotion/
+/.vscode/
 /.workbuddy/
 /.codebuddy/
-/.vscode/

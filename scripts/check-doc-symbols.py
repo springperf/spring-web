@@ -33,14 +33,9 @@
     （server.async.timeout、NettyServerHttpResponse.CONN_CTX…），所以它们不参与 R1/R2/R3/R4；
     CONTRIBUTING.md 的 japicmp 段落同理记录已移除成员，故那里不查 R4。
 
-扫描范围: 契约文档与架构基线——仓库根的 README.md / README_CN.md / CONTRIBUTING.md、docs/*.md 与
-    docs/en/*.md、以及 .agent/context/module.md（AI 规则里的架构基线，最易被误信）。
-    **中英 README 同等对待**（早期版本只列了 README.md，中文版长期漏检）。
-    docs/internals/**、docs/feature/**、docs/memory/** 与 .agent/ 下的其余文件属内部笔记或
-    历史材料，出现旧 API 名、Spring/Netty 类型名是正常的，不纳入（否则门禁会被噪声淹没——
-    实测 docs/internals 20 份合计 566 个非本仓类名）。
-    其中两份 backport 清单**刻意排除**：它们的职责就是列出「别的分支上存在、master 上不存在」
-    的类，纳入后每条都是误报——理由写在 in_scope() 的 docstring 里。
+扫描范围: 契约文档——仓库根的 README.md / CONTRIBUTING.md、docs/*.md 与 docs/en/*.md。
+    docs/internals/**、docs/feature/**、docs/memory/**、.agent/** 属内部笔记或历史材料，
+    出现旧 API 名、Spring/Netty 类型名是正常的，不纳入（否则门禁会被噪声淹没）。
 
 已知局限（写在这里是为了不夸大它的能力）:
     - 只看**存在性**：`getURI() 在畸形 authority 下抛异常` 这类句子它一律看不出对错。
@@ -73,8 +68,6 @@ EXTERNAL_KEYS = {
     # 由 Boot 的 @ConfigurationProperties 类消费（本仓只是注入使用），故本仓源码里没有字面量。
     # 依据：ActuatorEndpointAutoConfiguration 注入 WebEndpointProperties（前缀 management.endpoints.web）。
     'management.endpoints.web.base-path': 'Boot WebEndpointProperties',
-    # 注意：这是**文件名**不是配置键，只是恰好以 spring. 开头。module.md 用它说明注册入口。
-    'spring.factories': 'Boot 的注册文件名（非配置键）',
 }
 
 # 仅作"家族前缀"出现的写法（`server.http.*` 之类），不是具体键。**精确匹配**才跳过，
@@ -129,11 +122,6 @@ EXTERNAL_TYPES = {
     'DecoderException': 'io.netty.handler.codec',
     'DefaultCorsProcessor': 'org.springframework.web.cors',
     'DeferredResultProcessingInterceptor': 'org.springframework.web.context.request.async',
-    'ExtendedModelMap': 'org.springframework.ui',
-    'IWebExchange': 'org.thymeleaf.context（IWebContext 的瘦接口，见 spring-web-view 章节）',
-    'InitializingBean': 'org.springframework.beans.factory',
-    'Model': 'org.springframework.ui',
-    'ModelMap': 'org.springframework.ui',
     'ObjectMapper': 'com.fasterxml.jackson.databind',
     'RequestDispatcher': 'jakarta.servlet',
     'ExceptionHandler': 'org.springframework.web.bind.annotation（注解；本地同名类属 disruptor）',
@@ -160,33 +148,8 @@ EXTERNAL_TYPES = {
     'SecurityFilterChain': 'org.springframework.security.web',
     'ServerHttpRequest': 'org.springframework.http.server',
     'ServerHttpResponse': 'org.springframework.http.server',
-    'Servlet': 'jakarta.servlet',
     'WebSocketHandler': 'org.springframework.web.socket',
     'WebSocketSession': 'org.springframework.web.socket',
-    # (b') .agent/context/module.md 纳入扫描后（2026-10）暴露的外部类型。
-    # 该文件是最易被误信的架构基线，故把它的外部类型一次性收编，标注来源便于核对。
-    'ApplicationContext': 'org.springframework.context',
-    'ApplicationContextFactory': 'org.springframework.boot',
-    'AutoConfiguration': 'org.springframework.boot.autoconfigure（概念名，非具体类）',
-    'BeanFactoryInitializationAotProcessor': 'org.springframework.beans.factory.aot',
-    'ChannelHandler': 'io.netty.channel',
-    'ClassLoader': 'java.lang',
-    'ClassLoaderTemplateResolver': 'org.thymeleaf.templateresolver（thymeleaf jar 已取证）',
-    'DataBinderFactory': 'org.springframework.web.bind.support',
-    'ExceptionHandlerMethodResolver': 'org.springframework.web.method.annotation',
-    'FilterConfig': 'jakarta.servlet',
-    'GroupTemplate': 'org.beetl.core（beetl-core jar 已取证）',
-    'IWebRequest': 'org.thymeleaf.context（Thymeleaf 3.1 的瘦接口）',
-    'IWebSession': 'org.thymeleaf.context（Thymeleaf 3.1 的瘦接口）',
-    'InstanceManager': 'org.apache.jasper.runtime（Jasper）',
-    'JspFactory': 'jakarta.servlet.jsp',
-    'RequestMappingHandlerAdapter': 'org.springframework.web.servlet.mvc.method.annotation',
-    'ServletConfig': 'jakarta.servlet',
-    'ServletRequest': 'jakarta.servlet',
-    'ServletResponse': 'jakarta.servlet',
-    'WebRequest': 'org.springframework.web.context.request',
-    'WebServer': 'org.springframework.boot.web.server',
-    'WebServerApplicationContext': 'org.springframework.boot.web.context',
     # (c) 其余外部类型（jar 取证或按文档语境判定）
     'AnnotationConfigServletWebServerApplicationContext': 'org.springframework.boot.web.servlet.context',
     'AcceptHeaderLocaleResolver': 'org.springframework.web.servlet.i18n',
@@ -207,7 +170,6 @@ EXTERNAL_TYPES = {
     'RoutingContext': 'io.vertx.ext.web（对比表里提到的其他框架）',
     'SerializableTypeWrapper': 'org.springframework.core',
     'ServiceLoader': 'java.util（本地同名类属 surefire）',
-    'SmartLifecycle': 'org.springframework.context（NettyHttpServer 实现它，phase=MAX_VALUE）',
     # 以下三条只出现在 docs/overview.md 的 JFR 热点表里（`Class.method` 形式），本仓并未导入它们；
     # 来源按包名写，读者可在对应依赖里核对。
     'ByteToMessageDecoder': 'io.netty.handler.codec（JFR 热点帧，非本仓导入）',
@@ -292,21 +254,8 @@ class Repo:
 
 
 def in_scope(rel):
-    """契约文档与架构基线：仓库根的两个文件 + docs/*.md + docs/en/*.md + .agent/context/module.md
-    （见文件头"扫描范围"）。
-
-    **刻意不含** `docs/internals/**`：那是源码走读笔记，含大量外部类型（`ByteBuf`、`ChannelFuture`、
-    `CompletableFuture`）与 JVM 指令名（`ARETURN`、`CHECKCAST`）。实测 20 份文献合计 566 个
-    「非本仓类名」，靠白名单收编不可行——纳入只会把门禁淹没。它们靠人工评审保证。
-
-    **同样不含**两份 backport 清单（`.agent/context/2.7.x-migration-checklist.md` /
-    `4.1.x-adaptation-checklist.md`）：它们的职责正是逐条列出「在**别的分支**上存在、
-    master 上不存在」的类（`OpenApiCustomiser`、`ListenableFuture`、Boot4 桥接类…），
-    纳入后每条都是误报。
-    """
-    if rel in ('README.md', 'README_CN.md', 'CONTRIBUTING.md', '.agent/context/module.md'):
-        return True
-    return bool(re.fullmatch(r'docs/(en/)?[^/]+\.md', rel))
+    """契约文档：仓库根的两个文件 + docs/*.md 与 docs/en/*.md（见文件头"扫描范围"）。"""
+    return rel in ('README.md', 'CONTRIBUTING.md') or bool(re.fullmatch(r'docs/(en/)?[^/]+\.md', rel))
 
 
 def collect_repo(files_java):

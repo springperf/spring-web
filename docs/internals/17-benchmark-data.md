@@ -8,7 +8,7 @@
 
 前 16 篇讲了"为什么快"。本篇用最新 benchmark 报告的数字，把每个数据点归因到前文讲过的具体机制——路由缓存、ASM 调用、EventLoop 直处理、无锁 drain loop、零拷贝传输。
 
-**数据来源**：`spring-web-benchmark/benchmark-reports/20260814-221509/report.md`（2026-08-15 11:05:55 生成），5 个容器（perf / perf-support / tomcat / undertow / webflux）× 7 个 API（async / bytes / bytesLarge / get / json / sse / valid）× 3 个并发度（4/8/16 线程）× JDK 17.0.9。
+**数据来源**：`spring-web-benchmark/benchmark-reports/latest/report.md`（2026-08-15 11:05:55 生成），5 个容器（perf / perf-support / tomcat / undertow / webflux）× 7 个 API（async / bytes / bytesLarge / get / json / sse / valid）× 3 个并发度（4/8/16 线程）× JDK 17.0.9。
 
 ---
 
@@ -174,17 +174,17 @@
 
 ## 四、延迟分析归因
 
-### 4.1 p50 延迟（json 场景，16线程）
+### 4.1 p50 延迟（get 场景，16线程）
 
 | 容器 | p50 | p90 | p99 | p99.9 | p99.99 |
 |------|-----|-----|-----|-------|--------|
-| **perf** | 0.22ms | 0.30ms | 0.38ms | 0.47ms | 2.16ms |
-| perf-support | 0.25ms | 0.34ms | 0.42ms | 0.52ms | 2.20ms |
-| tomcat | 0.32ms | 0.45ms | 0.66ms | 1.03ms | 4.20ms |
-| undertow | 0.33ms | 0.45ms | 0.61ms | 1.02ms | 4.15ms |
-| webflux | 0.32ms | 0.41ms | 0.56ms | 2.23ms | 4.07ms |
+| **perf** | 0.25ms | 0.35ms | 0.43ms | 0.52ms | 2.16ms |
+| perf-support | 0.25ms | 0.34ms | 0.42ms | 0.52ms | 2.18ms |
+| tomcat | 0.38ms | 0.49ms | 0.67ms | 2.27ms | 4.27ms |
+| undertow | 0.35ms | 0.49ms | 0.66ms | 2.24ms | 4.14ms |
+| webflux | 0.36ms | 0.45ms | 0.60ms | 2.41ms | 3.97ms |
 
-**归因**：perf 的 p50 0.22ms，是 tomcat 0.32ms 的 0.69 倍。p99 差距更大——perf 0.38ms vs tomcat 0.66ms。p99.9 和 p99.99 的差距最明显：perf p99.99 2.16ms vs tomcat 4.20ms。长尾延迟的差距归因 GC 暂停——tomcat 更高的分配率导致更频繁的 Young GC，GC 暂停累积到长尾。
+**归因**：perf 的 p50 0.25ms，是 tomcat 0.38ms 的 0.66 倍。p99 差距更大——perf 0.43ms vs tomcat 0.67ms。p99.9 和 p99.99 的差距最明显：perf p99.99 2.16ms vs tomcat 4.27ms。长尾延迟的差距归因 GC 暂停——tomcat 更高的分配率导致更频繁的 Young GC，GC 暂停累积到长尾。
 
 ### 4.2 SSE 延迟差距
 

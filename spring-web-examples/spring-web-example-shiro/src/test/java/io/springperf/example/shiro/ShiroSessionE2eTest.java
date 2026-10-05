@@ -1,12 +1,13 @@
 package io.springperf.example.shiro;
 
+import io.springperf.example.support.TestRestTemplate;
+import io.springperf.example.support.RestTemplateBuilder;
+
 import io.springperf.web.server.NettyHttpServer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -35,7 +36,7 @@ class ShiroSessionE2eTest {
     @Test
     void shiroSession_createAndReadAttribute() {
         ResponseEntity<Map> createResp = rest.getForEntity("/shiro/session-set?key=mykey&value=hello-shiro", Map.class);
-        assertThat(createResp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(createResp.getStatusCode().value()).isEqualTo(200);
 
         Map<String, Object> createBody = createResp.getBody();
         assertThat(createBody).isNotNull();
@@ -55,7 +56,7 @@ class ShiroSessionE2eTest {
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
         ResponseEntity<Map> getResp = rest.exchange("/shiro/session-get?key=mykey", HttpMethod.GET, entity, Map.class);
-        assertThat(getResp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(getResp.getStatusCode().value()).isEqualTo(200);
 
         Map<String, Object> getBody = getResp.getBody();
         assertThat(getBody).isNotNull();
@@ -67,7 +68,7 @@ class ShiroSessionE2eTest {
     @Test
     void shiroSession_infoWithoutSession() {
         ResponseEntity<Map> resp = rest.getForEntity("/shiro/session-info", Map.class);
-        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
 
         Map<String, Object> body = resp.getBody();
         assertThat(body).isNotNull();
@@ -96,7 +97,7 @@ class ShiroSessionE2eTest {
     void login_withCorrectCredentials_succeeds() {
         ResponseEntity<Map> resp = rest.exchange("/shiro/login?username=admin&password=admin123", HttpMethod.GET,
                 HttpEntity.EMPTY, Map.class);
-        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody().get("success")).isEqualTo(true);
         assertThat(resp.getBody().get("username")).isEqualTo("admin");
         assertThat((String) resp.getBody().get("sessionId")).isNotBlank();
@@ -105,14 +106,14 @@ class ShiroSessionE2eTest {
     @Test
     void login_withWrongCredentials_returns401() {
         ResponseEntity<Map> resp = rest.getForEntity("/shiro/login?username=admin&password=wrong", Map.class);
-        assertThat(resp.getStatusCodeValue()).isEqualTo(401);
+        assertThat(resp.getStatusCode().value()).isEqualTo(401);
         assertThat(resp.getBody().get("success")).isEqualTo(false);
     }
 
     @Test
     void needAuth_withoutLogin_returns401() {
         ResponseEntity<Map> resp = rest.getForEntity("/shiro/need-auth", Map.class);
-        assertThat(resp.getStatusCodeValue()).isEqualTo(401);
+        assertThat(resp.getStatusCode().value()).isEqualTo(401);
         assertThat(resp.getBody().get("error")).isEqualTo("Authentication required");
     }
 
@@ -128,7 +129,7 @@ class ShiroSessionE2eTest {
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
         ResponseEntity<Map> authResp = rest.exchange("/shiro/need-auth", HttpMethod.GET, entity, Map.class);
-        assertThat(authResp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(authResp.getStatusCode().value()).isEqualTo(200);
         assertThat(authResp.getBody().get("authenticated")).isEqualTo(true);
         assertThat(authResp.getBody().get("username")).isEqualTo("admin");
     }
@@ -146,7 +147,7 @@ class ShiroSessionE2eTest {
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
         ResponseEntity<Map> roleResp = rest.exchange("/shiro/need-role?role=admin", HttpMethod.GET, entity, Map.class);
-        assertThat(roleResp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(roleResp.getStatusCode().value()).isEqualTo(200);
         assertThat(roleResp.getBody().get("granted")).isEqualTo(true);
     }
 
@@ -160,7 +161,7 @@ class ShiroSessionE2eTest {
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
         ResponseEntity<Map> roleResp = rest.exchange("/shiro/need-role?role=admin", HttpMethod.GET, entity, Map.class);
-        assertThat(roleResp.getStatusCodeValue()).isEqualTo(403);
+        assertThat(roleResp.getStatusCode().value()).isEqualTo(403);
         assertThat(roleResp.getBody().get("error")).isEqualTo("Missing role: admin");
     }
 
@@ -177,7 +178,7 @@ class ShiroSessionE2eTest {
 
         ResponseEntity<Map> permResp = rest.exchange("/shiro/need-perm?perm=user:create", HttpMethod.GET, entity,
                 Map.class);
-        assertThat(permResp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(permResp.getStatusCode().value()).isEqualTo(200);
         assertThat(permResp.getBody().get("granted")).isEqualTo(true);
     }
 
@@ -192,7 +193,7 @@ class ShiroSessionE2eTest {
 
         ResponseEntity<Map> permResp = rest.exchange("/shiro/need-perm?perm=user:create", HttpMethod.GET, entity,
                 Map.class);
-        assertThat(permResp.getStatusCodeValue()).isEqualTo(403);
+        assertThat(permResp.getStatusCode().value()).isEqualTo(403);
         assertThat(permResp.getBody().get("error")).isEqualTo("Missing permission: user:create");
     }
 
@@ -210,12 +211,12 @@ class ShiroSessionE2eTest {
 
         // Logout
         ResponseEntity<Map> logoutResp = rest.exchange("/shiro/logout", HttpMethod.GET, entity, Map.class);
-        assertThat(logoutResp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(logoutResp.getStatusCode().value()).isEqualTo(200);
         assertThat(logoutResp.getBody().get("success")).isEqualTo(true);
 
         // Subsequent access with same cookie should be rejected
         ResponseEntity<Map> authResp = rest.exchange("/shiro/need-auth", HttpMethod.GET, entity, Map.class);
-        assertThat(authResp.getStatusCodeValue()).isEqualTo(401);
+        assertThat(authResp.getStatusCode().value()).isEqualTo(401);
     }
 
     // ==================== 辅助方法 ====================

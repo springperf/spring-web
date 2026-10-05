@@ -1,5 +1,8 @@
 package io.springperf.example.ai;
 
+import io.springperf.example.support.TestRestTemplate;
+import io.springperf.example.support.RestTemplateBuilder;
+
 import io.springperf.web.core.async.PerfAsyncWebRequest;
 import io.springperf.web.server.NettyHttpServer;
 import org.junit.jupiter.api.BeforeEach;
@@ -8,8 +11,6 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.ResponseEntity;
@@ -73,7 +74,7 @@ class AiChatStreamOfflineE2eTest {
     @Test
     void chat_returnsStubAnswer() {
         ResponseEntity<String> resp = rest.getForEntity("/ai/chat?message=hi", String.class);
-        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody()).isEqualTo(ANSWER);
     }
 
@@ -83,7 +84,7 @@ class AiChatStreamOfflineE2eTest {
     @Test
     void chatStream_emitsAllTokensInOrder_andLifecycleTerminates() {
         ResponseEntity<String> resp = rest.getForEntity("/ai/chat/stream?message=hi", String.class);
-        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
 
         String body = resp.getBody();
         assertThat(body).as("流式响应体不应为空").isNotNull().isNotEmpty();

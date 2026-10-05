@@ -86,7 +86,7 @@ class ResourceRequestHandlerDetailsTest {
 
         handler.handleResourceRequest(request, response);
 
-        assertFalse(responseHeaders.containsKey(HttpHeaders.CONTENT_ENCODING));
+        assertNull(responseHeaders.getFirst(HttpHeaders.CONTENT_ENCODING));
     }
 
     @Test
@@ -96,7 +96,7 @@ class ResourceRequestHandlerDetailsTest {
 
         handler.handleResourceRequest(request, response);
 
-        assertFalse(responseHeaders.containsKey(HttpHeaders.CONTENT_ENCODING));
+        assertNull(responseHeaders.getFirst(HttpHeaders.CONTENT_ENCODING));
     }
 
     /* ==================== HEAD 语义 ==================== */
@@ -219,7 +219,7 @@ class ResourceRequestHandlerDetailsTest {
         h.handleResourceRequest(request, response);
 
         verify(response).setStatusCode(HttpStatus.OK);
-        assertFalse(responseHeaders.containsKey(HttpHeaders.ETAG));
+        assertNull(responseHeaders.getFirst(HttpHeaders.ETAG));
     }
 
     @Test

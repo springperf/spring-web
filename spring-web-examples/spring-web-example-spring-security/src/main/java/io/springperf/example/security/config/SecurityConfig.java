@@ -2,6 +2,7 @@ package io.springperf.example.security.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.userdetails.User;
@@ -24,7 +25,8 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http.authorizeRequests(auth -> auth
+        // Spring Security 7 移除了 authorizeRequests / and()，改用 authorizeHttpRequests + lambda DSL（两版本均可用）
+        http.authorizeHttpRequests(auth -> auth
                 // session 相关端点放行
                 .requestMatchers("/security/session-set").permitAll().requestMatchers("/security/session-get")
                 .permitAll().requestMatchers("/security/session-info").permitAll()
@@ -35,8 +37,8 @@ public class SecurityConfig {
                 // 其余请求需认证
                 .anyRequest().authenticated())
                 // 启用 HTTP Basic 认证，方便测试
-                .httpBasic().and().csrf().disable();
-
+                .httpBasic(Customizer.withDefaults());
+        http.csrf(csrf -> csrf.disable());
         return http.build();
     }
 }

@@ -1,12 +1,13 @@
 package io.springperf.example.openapi;
 
+import io.springperf.example.support.TestRestTemplate;
+import io.springperf.example.support.RestTemplateBuilder;
+
 import io.springperf.web.server.NettyHttpServer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.ResponseEntity;
 
 import java.util.HashMap;
@@ -31,7 +32,7 @@ class OpenApiE2eTest {
     @Test
     void healthEndpoint() {
         ResponseEntity<Map> resp = rest.getForEntity("/health", Map.class);
-        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody().get("status")).isEqualTo("UP");
     }
 
@@ -39,7 +40,7 @@ class OpenApiE2eTest {
     void openApiJson_containsAllEndpoints() {
         ResponseEntity<Map> resp = rest.getForEntity("/v3/api-docs", Map.class);
 
-        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody()).isNotNull();
 
         // Verify OpenAPI metadata
@@ -62,18 +63,18 @@ class OpenApiE2eTest {
         newUser.put("email", "test@test.com");
         newUser.put("age", 25);
         ResponseEntity<Map> createResp = rest.postForEntity("/api/users", newUser, Map.class);
-        assertThat(createResp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(createResp.getStatusCode().value()).isEqualTo(200);
         assertThat(createResp.getBody().get("id")).isNotNull();
         Number id = (Number) createResp.getBody().get("id");
 
         // Get user
         ResponseEntity<Map> getResp = rest.getForEntity("/api/users/" + id.longValue(), Map.class);
-        assertThat(getResp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(getResp.getStatusCode().value()).isEqualTo(200);
         assertThat(getResp.getBody().get("name")).isEqualTo("test");
 
         // Search by name (returns Map<Long, User>, not an array)
         ResponseEntity<Map> searchResp = rest.getForEntity("/api/users?name=test", Map.class);
-        assertThat(searchResp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(searchResp.getStatusCode().value()).isEqualTo(200);
         assertThat(searchResp.getBody()).isNotNull();
     }
 

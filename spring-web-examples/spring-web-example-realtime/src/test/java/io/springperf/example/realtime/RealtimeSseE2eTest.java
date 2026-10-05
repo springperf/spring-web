@@ -1,5 +1,8 @@
 package io.springperf.example.realtime;
 
+import io.springperf.example.support.TestRestTemplate;
+import io.springperf.example.support.RestTemplateBuilder;
+
 import io.springperf.web.server.NettyHttpServer;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -12,8 +15,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;

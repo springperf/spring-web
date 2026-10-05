@@ -63,10 +63,13 @@ public class ActuatorEndpointAutoConfiguration {
             ParameterValueMapper parameterValueMapper, EndpointMediaTypes endpointMediaTypes,
             ObjectProvider<PathMapper> pathMappers, ObjectProvider<OperationInvokerAdvisor> invokerAdvisors,
             ObjectProvider<EndpointFilter<ExposableWebEndpoint>> filters) {
+        // 用 8 参构造器（含 additionalPathsMappers / operationFilters）：Spring Boot 4 移除了 6 参重载，
+        // 而 8 参在两个版本都存在且签名一致，故取交集即可跨版本编译。
         return new WebEndpointDiscoverer(applicationContext, parameterValueMapper, endpointMediaTypes,
                 pathMappers.orderedStream().collect(Collectors.toList()),
+                java.util.Collections.emptyList(),
                 invokerAdvisors.orderedStream().collect(Collectors.toList()),
-                filters.orderedStream().collect(Collectors.toList()));
+                filters.orderedStream().collect(Collectors.toList()), java.util.Collections.emptyList());
     }
 
     @Bean

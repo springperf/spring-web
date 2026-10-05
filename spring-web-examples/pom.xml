@@ -17,6 +17,8 @@
     <url>https://github.com/springperf/spring-web</url>
 
     <modules>
+        <!-- 测试支撑需先构建（examples 的 E2E 测试依赖它） -->
+        <module>spring-web-example-support-test</module>
         <module>spring-web-example-rest</module>
         <module>spring-web-example-batch</module>
         <module>spring-web-example-realtime</module>
@@ -45,4 +47,46 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!--
+          Spring Boot 4 把 TestRestTemplate / RestTemplateBuilder 从 spring-boot / spring-boot-test
+          拆到独立 artifact 并改了包名（org.springframework.boot.resttestclient / restclient），
+          且 Boot 3.x BOM 里没有这两个 artifact（无法用版本管理），故只能在本 profile 下条件引入。
+          profile id 与根 pom 同名：-Pspring-boot-4.0/4.1 会按 id 激活到所有子模块。
+          源文件里的 import 用跨版本 `fully-qualified` 难以兼容，故 examples 的测试统一在
+          两个版本下只用一种 import —— 见各 example 测试类顶部的说明：
+          Spring 6/7 都能编译的类路径在此处由 profile 提供依赖来兜底。
+        -->
+        <profile>
+            <id>spring-boot-4.0</id>
+            <dependencies>
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-resttestclient</artifactId>
+                    <scope>test</scope>
+                </dependency>
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-restclient</artifactId>
+                    <scope>test</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>spring-boot-4.1</id>
+            <dependencies>
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-resttestclient</artifactId>
+                    <scope>test</scope>
+                </dependency>
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-restclient</artifactId>
+                    <scope>test</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 </project>

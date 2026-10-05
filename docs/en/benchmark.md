@@ -2,7 +2,7 @@
 
 # Spring WebPerf Performance Benchmark Report
 
-**Generated:** 2026-08-15
+**Generated:** 2026-08-17
 
 **JDK:** jdk-17.0.9
 
@@ -168,7 +168,7 @@ Throughput growth from 4 → 16 threads; how well each framework extends under c
 | bytesLarge | **0.21 / 0.35 / 0.76** | 0.38 / 0.57 / 2.76 | 0.29 / 0.48 / 1.70 | 0.31 / 0.54 / 1.68 |
 | sse | **0.28 / 0.46 / 3.27** | 2.27 / 6.92 / 8.40 | FAIL | 1.26 / 2.81 / 3.43 |
 
-For the small-payload APIs (json/get/bytes/valid/async) perf's p50 is **0.10–0.11ms**, 45–67% of Spring MVC; `bytesLarge` (large payload) is 0.21ms and `sse` is 0.28ms (SSE is where Spring MVC trails most, at 2.27ms). Lowest p99 is **0.14ms** (bytes/async), and p99.9 leads across the board — the EventLoop model keeps tail latency extremely stable at low concurrency.
+perf p50 is **0.10–0.28ms** (small payloads), 45–67% of Spring MVC. Lowest p99 is **0.14ms** (bytes/async), and p99.9 leads across the board — the EventLoop model keeps tail latency extremely stable at low concurrency.
 
 For SSE, perf p50 is **0.28ms** — only **12%** of Spring MVC (2.27ms) and better than WebFlux (1.26ms).
 

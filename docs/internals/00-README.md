@@ -225,18 +225,18 @@
 #### 11 · 异步与流式：DeferredResult / SSE / 响应式 / 无锁 Drain Loop `11-async-streaming.md`
 
 - **定位**：异步层。讲清四类异步返回值的处理路径，重点是 SSE 的无锁 Drain Loop。
-- **核心问题**：`DeferredResult`/`Callable` 如何挂起与恢复？SSE 的 `AbstractNettyStreamSender` 如何用有界 `MpscArrayQueue` + `AtomicInteger wip` 实现无锁单消费者排空？`@ReactiveSupport` 背压水位如何控制？响应式 `Publisher` 如何在 EventLoop 上直接驱动？
+- **核心问题**：`DeferredResult`/`Callable` 如何挂起与恢复？SSE 的 `NettyStreamSender` 如何用 `MpscUnboundedArrayQueue` + `AtomicInteger wip` 实现无锁单消费者排空？`@ReactiveSupport` 背压水位如何控制？响应式 `Publisher` 如何在 EventLoop 上直接驱动？
 - **覆盖要点**：
   1. `AsyncSupportRegistry`：`DeferredResult`/`Callable`/`ListenableFuture`/`CompletableFuture` 的统一挂起-恢复模型。
   2. `DeferredResultReturnValueResolver`：挂起请求、`setResult`/`setError`/`onTimeout` 恢复。
-  3. SSE：`SseEmitter` → `AbstractNettyStreamSender`；有界 `MpscArrayQueue` 多生产者单消费者；`AtomicInteger wip` drain loop 伪代码与真代码对照。
+  3. SSE：`SseEmitter` → `NettyStreamSender`；`MpscUnboundedArrayQueue` 多生产者单消费者；`AtomicInteger wip` drain loop 伪代码与真代码对照。
   4. **wip 计数器边界**（记忆 `sse_fix_channel_write`）：生产者快于 drain 时 wip 残留的处理，drain 循环的 missed 重入；complete 边界事件丢失属既定可接受设计（记忆 `defensive-fixes-confirm-call-model`）。
   5. 背压：`channel.isWritable()` + `BackpressureHandler.INSTANCE` 单例；`WriteBufferWaterMark` 联动。
   6. 响应式：`ReactiveReturnValueResolver` 把 `Publisher` 适配为流式或 `DeferredResult`；`@ReactiveSupport(highWaterMark/lowWaterMark)` 水位。
   7. 线程模型：SSE 写入统一在 EventLoop，线程数 = CPU 核，不随连接增长；对比 Spring MVC 每连接一线程。
-- **源码依据**：`AsyncSupportRegistry`、`DeferredResultReturnValueResolver`、`AbstractNettyStreamSender`（drain loop）、`BackpressureHandler`、`ReactiveReturnValueResolver`、`@ReactiveSupport`。
+- **源码依据**：`AsyncSupportRegistry`、`DeferredResultReturnValueResolver`、`NettyStreamSender`（drain loop）、`BackpressureHandler`、`ReactiveReturnValueResolver`、`@ReactiveSupport`。
 - **与既有文档关系**：`performance-principles.md` §7 的代码层；`advanced.md` SSE/响应式章节的内部化。
-- **阅读前提**：`AbstractNettyStreamSender.drain()` 必须实读，wip 边界描述按记忆谨慎措辞，不臆断"完美无缺"。
+- **阅读前提**：`NettyStreamSender.drain()` 必须实读，wip 边界描述按记忆谨慎措辞，不臆断"完美无缺"。
 
 ---
 
@@ -336,7 +336,7 @@
   1. `MappingCacheKey` 整型索引数组（预缓存核心）；
   2. `FastInvokerGenerator` ASM 生成（调用零反射）；
   3. 多级 RouterOptimizer 链短路（路由 O(1)）；
-  4. `AbstractNettyStreamSender` drain loop（SSE 无锁）；
+  4. `NettyStreamSender` drain loop（SSE 无锁）；
   5. `fastAttributes[]` Object[]（属性零哈希）；
   6. `DispatcherHandler` acquire/release（跨线程内存安全）；
   7. `WebMvcConfigurerBridge` 翻译中枢（兼容零侵入）；

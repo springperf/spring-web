@@ -1,12 +1,13 @@
 package io.springperf.example.actuator;
 
+import io.springperf.example.support.TestRestTemplate;
+import io.springperf.example.support.RestTemplateBuilder;
+
 import io.springperf.web.server.NettyHttpServer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.ResponseEntity;
 
 import java.util.Map;
@@ -31,7 +32,7 @@ class ActuatorE2eTest {
     void health_upAndRunning() {
         ResponseEntity<Map> resp = rest.getForEntity("/actuator/health", Map.class);
 
-        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody()).isNotNull();
         assertThat(resp.getBody().get("status")).isEqualTo("UP");
     }
@@ -40,7 +41,7 @@ class ActuatorE2eTest {
     void metrics_containsJvmInfo() {
         ResponseEntity<Map> resp = rest.getForEntity("/actuator/metrics", Map.class);
 
-        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody()).isNotNull();
         assertThat(resp.getBody()).containsKey("names");
     }
@@ -49,7 +50,7 @@ class ActuatorE2eTest {
     void metrics_jvmMemoryAvailable() {
         ResponseEntity<Map> resp = rest.getForEntity("/actuator/metrics/jvm.memory.used", Map.class);
 
-        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody()).isNotNull();
         assertThat(resp.getBody()).containsKey("measurements");
     }
@@ -58,7 +59,7 @@ class ActuatorE2eTest {
     void demoController_works() {
         ResponseEntity<Map> resp = rest.getForEntity("/demo/hello", Map.class);
 
-        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody()).isNotNull();
         assertThat(resp.getBody().get("message")).isEqualTo("Hello Actuator");
         assertThat(resp.getBody()).containsKey("visits");

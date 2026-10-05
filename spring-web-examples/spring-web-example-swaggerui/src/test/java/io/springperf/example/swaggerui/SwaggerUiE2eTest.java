@@ -1,12 +1,13 @@
 package io.springperf.example.swaggerui;
 
+import io.springperf.example.support.TestRestTemplate;
+import io.springperf.example.support.RestTemplateBuilder;
+
 import io.springperf.web.server.NettyHttpServer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.ResponseEntity;
 
@@ -31,7 +32,7 @@ class SwaggerUiE2eTest {
     @Test
     void healthEndpoint() {
         ResponseEntity<Map> resp = rest.getForEntity("/health", Map.class);
-        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody().get("status")).isEqualTo("UP");
     }
 
@@ -39,7 +40,7 @@ class SwaggerUiE2eTest {
     void swaggerConfig_returnsValidConfig() {
         ResponseEntity<Map> resp = rest.getForEntity("/v3/api-docs/swagger-config", Map.class);
 
-        assertThat(resp.getStatusCodeValue()).isEqualTo(200);
+        assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody()).isNotNull();
         assertThat(resp.getBody().get("url")).isEqualTo("/v3/api-docs");
         assertThat(resp.getBody().get("configUrl")).isEqualTo("/v3/api-docs/swagger-config");
@@ -70,11 +71,11 @@ class SwaggerUiE2eTest {
     void swaggerUiStaticResources_served() {
         ResponseEntity<String> resp = rest.getForEntity("/swagger-ui/index.html", String.class);
 
-        int status = resp.getStatusCodeValue();
+        int status = resp.getStatusCode().value();
         if (status == 404) {
             ResponseEntity<String> directResp = new TestRestTemplate().getForEntity(
                     "http://localhost:" + nettyHttpServer.getActualPort() + "/swagger-ui/index.html", String.class);
-            System.err.println("Direct /swagger-ui/index.html status: " + directResp.getStatusCodeValue());
+            System.err.println("Direct /swagger-ui/index.html status: " + directResp.getStatusCode().value());
         }
         assertThat(status).isEqualTo(200);
         assertThat(resp.getBody()).contains("Swagger UI");

@@ -26,7 +26,7 @@ import io.springperf.web.core.retval.resolver.async.BaseAsyncReturnValueResolver
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.json.JsonConverter;
-import org.springframework.http.MediaType;
+import io.springperf.web.util.MediaTypeUtils;
 import lombok.SneakyThrows;
 
 public class ReactiveReturnValueResolver extends BaseAsyncReturnValueResolver {
@@ -88,7 +88,8 @@ public class ReactiveReturnValueResolver extends BaseAsyncReturnValueResolver {
             ResponseEntity<?> responseEntity = (ResponseEntity<?>) returnValue;
             resp.setStatusCode(responseEntity.getStatusCode());
             if (responseEntity.getHeaders() != null) {
-                resp.getHeaders().putAll(responseEntity.getHeaders());
+                // 不能写 putAll(headers)：Spring 7 的 putAll(HttpHeaders) 重载语义/行为均不同（见 WebHttpHeaders#addAllHeaders）
+                io.springperf.web.http.WebHttpHeaders.addAllHeaders(resp.getHeaders(), responseEntity.getHeaders());
             }
             returnValue = responseEntity.getBody();
             returnType = returnType.nested();
@@ -146,7 +147,7 @@ public class ReactiveReturnValueResolver extends BaseAsyncReturnValueResolver {
             if (CharSequence.class.isAssignableFrom(elementClass)) {
                 return new TextStreamEmitter(reactiveConfig.getTimeout());
             }
-            if (containMediaType(MediaType.APPLICATION_STREAM_JSON, request, response)) {
+            if (containMediaType(MediaTypeUtils.APPLICATION_STREAM_JSON, request, response)) {
                 return new StreamJsonEmitter(reactiveConfig.getTimeout(), asyncSupportRegistry.getJsonConverter());
             }
         }

@@ -87,20 +87,6 @@ VERIFY -> COMPLETE
 
 - .agent/context/2.7.x-migration-checklist.md
 
-## 涉及 master → 4.1.x 同步
-
-必须读取：
-
-- .agent/context/4.1.x-adaptation-checklist.md
-
-# 分支策略
-
-- `master` —— 主线，**纯 Spring Boot 3.5.x**，不含任何 Spring Boot 4 / Spring 7 兼容处理
-- `4.1.x` —— 下游适配分支（Spring Boot 4.0/4.1），从 master cherry-pick 后做 4.x 适配
-- `2.7.x` —— 下游适配分支（Spring Boot 2.7，Java 8 / javax）
-
-同步方向始终是 `master → 4.1.x` 与 `master → 2.7.x`；适配代码只存在于下游分支。
-
 # 语言规则
 
 - 默认响应语言：简体中文
