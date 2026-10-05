@@ -4,8 +4,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Type;
 
-import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JavaType;
+import tools.jackson.databind.ObjectMapper;
 
 import lombok.SneakyThrows;
 
@@ -14,7 +14,7 @@ public class JacksonConverter implements JsonConverter {
     private ObjectMapper mapper;
 
     public JacksonConverter() {
-        mapper = new ObjectMapper();
+        mapper = JacksonMappers.defaultMapper();
     }
 
     public JacksonConverter(ObjectMapper mapper) {

@@ -1,7 +1,7 @@
 package io.springperf.webtest;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import okhttp3.FormBody;
 import okhttp3.Request;
 import okhttp3.Response;

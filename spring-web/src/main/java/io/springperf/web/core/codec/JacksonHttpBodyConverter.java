@@ -1,12 +1,11 @@
 package io.springperf.web.core.codec;
 
 import com.fasterxml.jackson.annotation.JsonView;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectWriter;
-import com.fasterxml.jackson.databind.exc.InvalidDefinitionException;
-import com.fasterxml.jackson.databind.ser.FilterProvider;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JavaType;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectWriter;
+import tools.jackson.databind.exc.InvalidDefinitionException;
 import io.springperf.web.context.BaseWebComponent;
 import io.springperf.web.core.mapping.MappingCacheKey;
 import io.springperf.web.core.mapping.PathMappingContext;
@@ -47,11 +46,6 @@ public class JacksonHttpBodyConverter extends BaseWebComponent implements HttpBo
 
     private static final MappingCacheKey<JavaType> READ_JAVA_TYPE_CACHE_KEY = MappingCacheKey
             .createMethodCacheKey(JavaType.class);
-    private static final MappingCacheKey<Boolean> WRITE_TYPE_SERIALIZABLE_CACHE_KEY = MappingCacheKey
-            .createMethodCacheKey(Boolean.class);
-    /** canRead 的 canDeserialize 探测结果缓存（见 canRead 注释）。 */
-    private static final MappingCacheKey<Boolean> CAN_DESERIALIZE_CACHE_KEY = MappingCacheKey
-            .createMethodCacheKey(Boolean.class);
 
     private static final MappingCacheKey<Class<?>> JSON_VIEW_CACHE_KEY = MappingCacheKey
             .createMethodCacheKey((Class) Class.class);
@@ -71,7 +65,7 @@ public class JacksonHttpBodyConverter extends BaseWebComponent implements HttpBo
         if (mapper == null) {
             mapper = webContext.getBeanFromCtx(ObjectMapper.class);
             if (mapper == null) {
-                mapper = new ObjectMapper();
+                mapper = io.springperf.web.json.JacksonMappers.defaultMapper();
             }
         }
     }
@@ -171,27 +165,18 @@ public class JacksonHttpBodyConverter extends BaseWebComponent implements HttpBo
             WebServerHttpRequest request, PathMappingContext mappingContext) {
         if (!isJsonMediaType(mediaType))
             return false;
-        // String 类型应由 StringHttpMessageConverter 处理，而非 Jackson
-        if (type == String.class)
-            return false;
-        ObjectMapper readMapper = getReadObjectMapper(request, mappingContext);
-        JavaType javaType = resolveReadJavaType(type, mappingContext, request);
-        // canDeserialize 是反射型能力探测（遍历 DeserializerFactory 查反序列化器），
-        // JFR 显示在 POST JSON 热路径上占 ~2-3% 采样。目标 JavaType 与默认 mapper 都静态不变，
-        // 结果按 mappingContext 缓存一次（自定义 mapper 不缓存，保留请求级切换语义）。
-        // 约束：默认 mapper 的能力集视为静态——与 READ_JAVA_TYPE_CACHE_KEY（JavaType 构造
-        // 依赖 mapper 的 TypeFactory）及写侧 WRITE_TYPE_SERIALIZABLE_CACHE_KEY 共享同一假设；
-        // 若运行期修改默认 mapper 能力集，需同时 clearCache 这三个键。
-        if (mappingContext != null && readMapper == mapper) {
-            Boolean cached = mappingContext.get(CAN_DESERIALIZE_CACHE_KEY);
-            if (cached != null) {
-                return cached;
-            }
-            boolean can = readMapper.canDeserialize(javaType);
-            mappingContext.set(CAN_DESERIALIZE_CACHE_KEY, can);
-            return can;
-        }
-        return readMapper.canDeserialize(javaType);
+        // 注：此处曾有一条 `if (type == String.class) return false;`，让 String 交给
+        // StringHttpMessageConverter。但当请求声明 application/json 时，Spring 原生的
+        // StringHttpMessageConverter 只支持 text/plain，不会接手，于是所有 converter 都返回
+        // false → 400 "not support contentType"。框架也没有其他能读 JSON 下 String 的转换器。
+        // 故移除该排除：JSON 请求体里的 String 由 Jackson 正常解析（含引号的 JSON 字符串）。
+        // 对照 Spring：MappingJackson2HttpMessageConverter 同样能读 String。
+        //
+        // 另：Jackson 2 时代的 canDeserialize(javaType) 能力探测在 Jackson 3 已移除。
+        // 这里不再做能力预判（与 Spring 7 的 AbstractJacksonHttpMessageConverter 一致——
+        // 它也只判断类型/mediaType 兼容，真正不支持时由 readValue 抛异常）。
+        // 由此 CAN_DESERIALIZE_CACHE_KEY 这个缓存键失去用途。
+        return true;
     }
 
     @Override
@@ -224,27 +209,11 @@ public class JacksonHttpBodyConverter extends BaseWebComponent implements HttpBo
         if (!isJsonMediaType(mediaType)) {
             return false;
         }
-        // 声明返回类型是具体类 → 缓存 canSerialize 结果，后续跳过
-        // 声明返回类型是 Object/接口/泛型变量 → 每次按运行时 valueType 判断
-        ObjectMapper writeMapper = getWriteObjectMapper(request, mappingContext);
-        if (mappingContext != null) {
-            Boolean cached = mappingContext.get(WRITE_TYPE_SERIALIZABLE_CACHE_KEY);
-            if (cached != null) {
-                if (cached)
-                    return true;
-                // false → 声明类型不可序列化，但运行时类型可能不同，继续 valueType 判断
-            } else {
-                Class<?> rawClass = writeMapper.getTypeFactory().constructType(type).getRawClass();
-                if (rawClass != Object.class) {
-                    boolean serializable = writeMapper.canSerialize(rawClass);
-                    mappingContext.set(WRITE_TYPE_SERIALIZABLE_CACHE_KEY, serializable);
-                    if (serializable)
-                        return true;
-                    // false → 缓存结果避免重复 constructType，但继续 valueType 判断
-                }
-            }
-        }
-        return writeMapper.canSerialize(valueType);
+        // Jackson 3 移除了 canSerialize()，故不再做能力预判（与 Spring 7 的
+        // AbstractJacksonHttpMessageConverter 一致：只判断类型/mediaType 兼容，
+        // 真正不可序列化时由 writeValue 抛异常）。
+        // 由此 WRITE_TYPE_SERIALIZABLE_CACHE_KEY 这个缓存键失去用途。
+        return true;
     }
 
     @Override
@@ -254,11 +223,15 @@ public class JacksonHttpBodyConverter extends BaseWebComponent implements HttpBo
         // Handle MappingJacksonValue wrapper (from dynamic @JsonView / @JsonFilter)
         Object writeValue = value;
         Class<?> viewClass = null;
-        FilterProvider filters = null;
         if (value instanceof MappingJacksonValue mjv) {
             writeValue = mjv.getValue();
             viewClass = mjv.getSerializationView();
-            filters = mjv.getFilters();
+            // 注：MappingJacksonValue.getFilters() 的类型是 Jackson 2 的
+            // com.fasterxml.jackson.databind.ser.FilterProvider（Spring 7.0 自身尚未迁到
+            // Jackson 3），而本转换器的 ObjectWriter 是 Jackson 3 的
+            // tools.jackson.databind.ser.FilterProvider —— 二者不兼容，无法直接 with(filters)。
+            // 故此处不支持 @JsonFilter 的动态过滤。若需要，应在 Jackson 3 侧自行构造
+            // SimpleFilterProvider 并在 mapper 上配置。
         }
 
         // String fast path: skip JSON serialization entirely
@@ -277,15 +250,12 @@ public class JacksonHttpBodyConverter extends BaseWebComponent implements HttpBo
         } else {
             writer = resolveWriter(writeMapper, mappingContext);
         }
-        if (filters != null) {
-            writer = writer.with(filters);
-        }
 
         try {
             writer.writeValue(outputMessage.getBody(), writeValue);
         } catch (InvalidDefinitionException ex) {
             throw new HttpMessageConversionException("Could not write JSON: " + ex.getType(), ex);
-        } catch (JsonProcessingException ex) {
+        } catch (JacksonException ex) {
             throw new HttpMessageNotWritableException("Could not write JSON: " + ex.getOriginalMessage(), ex);
         }
     }

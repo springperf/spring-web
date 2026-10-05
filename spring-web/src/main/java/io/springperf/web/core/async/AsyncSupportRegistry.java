@@ -12,7 +12,7 @@ import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.scheduling.concurrent.ConcurrentTaskExecutor;
 import org.springframework.web.context.request.async.*;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebComponentContainer;
@@ -46,7 +46,7 @@ public class AsyncSupportRegistry extends WebComponentContainer {
         WebComponentWrapperUtils.registerComponent(this, DeferredResultProcessingInterceptor.class);
         ObjectMapper objectMapper = webContext.getBeanFromCtx(ObjectMapper.class);
         if (objectMapper == null) {
-            objectMapper = new ObjectMapper();
+            objectMapper = io.springperf.web.json.JacksonMappers.defaultMapper();
         }
         jsonConverter = webContext.getWebComponentWithDefault(JsonConverter.class, new JacksonConverter(objectMapper));
     }

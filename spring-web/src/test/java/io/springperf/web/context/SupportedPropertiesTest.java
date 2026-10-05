@@ -12,8 +12,8 @@ import java.util.TreeSet;
 
 import org.junit.jupiter.api.Test;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * 配置键一致性校验（P4）：确保 {@link PropertiesConstant} / {@link ViewProperties} 中声明的 每一个配置键都在

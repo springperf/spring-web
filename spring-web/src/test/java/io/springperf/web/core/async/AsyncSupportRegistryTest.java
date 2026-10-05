@@ -62,7 +62,7 @@ class AsyncSupportRegistryTest {
         when(applicationContext.getBeansOfType(CallableProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
         when(applicationContext.getBeansOfType(DeferredResultProcessingInterceptor.class))
                 .thenReturn(Collections.emptyMap());
-        doReturn(null).when(webContext).getBeanFromCtx(com.fasterxml.jackson.databind.ObjectMapper.class);
+        doReturn(null).when(webContext).getBeanFromCtx(tools.jackson.databind.ObjectMapper.class);
         when(webContext.getWebComponentWithDefault(eq(JsonConverter.class), any(JsonConverter.class)))
                 .thenReturn(jacksonConverter);
 
@@ -132,7 +132,7 @@ class AsyncSupportRegistryTest {
                     .thenReturn(Collections.emptyMap());
             when(applicationContext.getBeansOfType(DeferredResultProcessingInterceptor.class))
                     .thenReturn(Collections.emptyMap());
-            doReturn(null).when(webContext).getBeanFromCtx(com.fasterxml.jackson.databind.ObjectMapper.class);
+            doReturn(null).when(webContext).getBeanFromCtx(tools.jackson.databind.ObjectMapper.class);
             when(webContext.getWebComponentWithDefault(eq(JsonConverter.class), any(JsonConverter.class)))
                     .thenReturn(mock(JsonConverter.class));
 
@@ -159,7 +159,7 @@ class AsyncSupportRegistryTest {
         when(applicationContext.getBeansOfType(CallableProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
         when(applicationContext.getBeansOfType(DeferredResultProcessingInterceptor.class))
                 .thenReturn(Collections.emptyMap());
-        doReturn(null).when(webContext).getBeanFromCtx(com.fasterxml.jackson.databind.ObjectMapper.class);
+        doReturn(null).when(webContext).getBeanFromCtx(tools.jackson.databind.ObjectMapper.class);
         when(webContext.getWebComponentWithDefault(eq(JsonConverter.class), any(JsonConverter.class)))
                 .thenReturn(mock(JsonConverter.class));
 
@@ -188,7 +188,7 @@ class AsyncSupportRegistryTest {
         when(applicationContext.getBeansOfType(CallableProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
         when(applicationContext.getBeansOfType(DeferredResultProcessingInterceptor.class))
                 .thenReturn(Collections.emptyMap());
-        doReturn(null).when(webContext).getBeanFromCtx(com.fasterxml.jackson.databind.ObjectMapper.class);
+        doReturn(null).when(webContext).getBeanFromCtx(tools.jackson.databind.ObjectMapper.class);
         when(webContext.getWebComponentWithDefault(eq(JsonConverter.class), any(JsonConverter.class)))
                 .thenReturn(mock(JsonConverter.class));
 

@@ -16,7 +16,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.MappingJacksonValue;
 
 import com.fasterxml.jackson.annotation.JsonView;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.mapping.PathMappingContext;
@@ -177,14 +177,6 @@ class JacksonHttpBodyConverterDetailsTest {
                         output, mockReq(), mockResp(), null));
     }
 
-    @Test
-    void canWrite_declaredType_cachesSerializable() {
-        PathMappingContext mapping = mock(PathMappingContext.class);
-        when(mapping.get(any(io.springperf.web.core.mapping.MappingCacheKey.class))).thenReturn(null);
-        assertTrue(converter.canWrite((Type) Dto.class, Dto.class, MediaType.APPLICATION_JSON, mockReq(), mockResp(),
-                mapping));
-        verify(mapping).set(any(), eq(Boolean.TRUE));
-    }
 
     @Test
     void canRead_implementsGenericInterface() {

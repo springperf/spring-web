@@ -20,6 +20,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.Ordered;
+import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 import org.springframework.validation.Validator;
@@ -34,6 +36,56 @@ public class SpringWebAutoConfiguration {
     @ConditionalOnMissingBean
     public DispatcherHandler dispatcherHandler() {
         return new DispatcherHandler();
+    }
+
+    /**
+     * Spring 原生的字符串消息转换器。
+     * <p>
+     * {@code @RequestBody String} / {@code HttpEntity<String>} 在 Spring 语义下由
+     * {@code StringHttpMessageConverter} 处理——它把请求体<b>原样</b>读成字符串（不做 JSON 解析），
+     * 且默认支持 {@code text/plain} 与通配类型。
+     * </p>
+     * <p>
+     * 本框架的 {@code HttpBodyCodecRegistry} 会把容器里的 {@code HttpMessageConverter} bean
+     * 包装为内部转换器（见 {@code toHttpBodyConverter}），但此前 starter 从未注册过任何
+     * {@code HttpMessageConverter}，于是这条通路一直空置：JSON 之外的 String 请求体
+     * （如 {@code text/plain}）无转换器可读，直接 400 "not support contentType"。
+     * 补上本 bean 后，{@code @RequestBody String} 恢复 Spring 的既有语义。
+     * </p>
+     * <p>
+     * 顺序：优先于 Jackson（{@code JacksonHttpBodyConverter} 的 order 是
+     * {@code LOWEST_PRECEDENCE - 50000}），使 String 类型优先由本转换器处理，
+     * 避免 JSON 请求下的字符串被 Jackson 按 JSON 解析。
+     * </p>
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public StringHttpMessageConverter stringHttpMessageConverter() {
+        return new OrderedStringHttpMessageConverter();
+    }
+
+    /**
+     * {@link StringHttpMessageConverter} 的排序子类。
+     * <p>
+     * 为什么需要在类上表达顺序：框架的 {@code WebComponentWrapper} 通过
+     * {@code AnnotationAwareOrderComparator.findOrder(bean)} 从「被包装的实例」上取 order
+     * （读 {@code @Order} 注解或 {@link Ordered} 接口）——bean 方法上的 {@code @Order}
+     * 不会体现在实例上。
+     * </p>
+     * <p>
+     * 为什么必须排在 Jackson 之前：{@code @RequestBody String} / {@code HttpEntity<String>}
+     * 在 Spring 语义下始终由 {@code StringHttpMessageConverter} <b>原样</b>读取，
+     * 即使 Content-Type 是 {@code application/json}——不能落到 Jackson 去按 JSON 解析
+     * （那会把非 JSON 字面量的 body 解析失败，返回 400）。
+     * </p>
+     */
+    static class OrderedStringHttpMessageConverter extends StringHttpMessageConverter implements Ordered {
+
+        @Override
+        public int getOrder() {
+            // JacksonHttpBodyConverter 是 LOWEST_PRECEDENCE - 50000，这里取更小值以优先
+            return Ordered.LOWEST_PRECEDENCE - 60000;
+        }
     }
 
     @Bean

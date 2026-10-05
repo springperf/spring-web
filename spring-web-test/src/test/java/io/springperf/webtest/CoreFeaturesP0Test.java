@@ -220,7 +220,8 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(201, resp.code());
             String body = resp.body().string();
-            assertEquals("saved:\"data\"", body);
+            // JSON 字符串 "data" 由 Jackson 解析为 Java String（不含引号）
+            assertEquals("saved:data", body);
         }
     }
 

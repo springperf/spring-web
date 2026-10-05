@@ -1,7 +1,7 @@
 package io.springperf.benchmark.report.generator;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -194,8 +194,9 @@ public class ReportGenerator {
                 JsonNode root;
                 try {
                     root = MAPPER.readTree(jmhFile.toFile());
-                } catch (IOException e) {
+                } catch (tools.jackson.core.JacksonException e) {
                     // fork 失败/中断可能残留空文件或截断 JSON：跳过并告警，而不是让整个报告生成崩溃
+                    // （Jackson 3 的 readTree 抛 JacksonException 而非 IOException）
                     System.err.println("[WARN] Skipping unreadable benchmark result " + jmhFile.getFileName() + ": "
                             + e.getMessage());
                     continue;
@@ -884,8 +885,8 @@ public class ReportGenerator {
 
         JsonNode secondaryMetrics = bench.get("secondaryMetrics");
         if (secondaryMetrics != null && data.gcProfilerCount < 0) {
-            for (java.util.Iterator<String> it = secondaryMetrics.fieldNames(); it.hasNext();) {
-                String key = it.next();
+            // Jackson 3：JsonNode.fieldNames()（Iterator）已改为 propertyNames()（Collection）
+            for (String key : secondaryMetrics.propertyNames()) {
                 JsonNode sr = secondaryMetrics.get(key);
                 if (sr == null || !sr.has("score"))
                     continue;

@@ -61,12 +61,6 @@
 
         <!-- 第三方依赖版本统一管理 -->
         <netty.version>4.1.137.Final</netty.version>
-        <!-- SB4 生态：Jackson 3（tools.jackson）依赖 Jackson 2 注解兼容层 2.21。
-             本框架的 Jackson 2 组件对齐 SB4 BOM 的 jackson-2-bom 2.21.4
-             （annotations=2.21、core/databind=2.21.4），避免覆盖回旧版导致
-             Jackson 3 databind 初始化失败（缺 JsonSerializeAs）。 -->
-        <jackson.version>2.21.4</jackson.version>
-        <jackson-annotations.version>2.21</jackson-annotations.version>
         <fastjson2.version>2.0.60</fastjson2.version>
         <okhttp.version>4.12.0</okhttp.version>
         <hutool.version>5.8.23</hutool.version>
@@ -259,21 +253,6 @@
                 <artifactId>netty-transport-native-epoll</artifactId>
                 <version>${netty.version}</version>
                 <classifier>linux-riscv64</classifier>
-            </dependency>
-            <dependency>
-                <groupId>com.fasterxml.jackson.core</groupId>
-                <artifactId>jackson-databind</artifactId>
-                <version>${jackson.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.fasterxml.jackson.core</groupId>
-                <artifactId>jackson-core</artifactId>
-                <version>${jackson.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.fasterxml.jackson.core</groupId>
-                <artifactId>jackson-annotations</artifactId>
-                <version>${jackson-annotations.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.projectlombok</groupId>

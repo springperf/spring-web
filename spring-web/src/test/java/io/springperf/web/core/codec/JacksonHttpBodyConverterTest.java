@@ -9,7 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * 验证 {@link JacksonHttpBodyConverter#isJsonMediaType} 的等价行为： 仅接受 JSON 相关
@@ -75,9 +75,11 @@ class JacksonHttpBodyConverterTest {
     }
 
     @Test
-    void canRead_stringType_rejected() {
-        // String 由 StringHttpMessageConverter 处理，而非 Jackson
-        assertFalse(converter.canRead((Type) String.class, null, MediaType.APPLICATION_JSON, null, null));
+    void canRead_stringType_accepted() {
+        // 曾把 String 排除出 Jackson（让 StringHttpMessageConverter 接管），但 JSON 请求下
+        // Spring 原生 StringHttpMessageConverter 只支持 text/plain，不会接手，导致 400。
+        // 故改为由 Jackson 读取（对照 Spring 的 MappingJackson2HttpMessageConverter）。
+        assertTrue(converter.canRead((Type) String.class, null, MediaType.APPLICATION_JSON, null, null));
     }
 
     // ---- canWrite : mediaType 判断 ----

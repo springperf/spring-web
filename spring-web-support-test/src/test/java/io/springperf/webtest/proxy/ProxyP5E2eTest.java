@@ -1,6 +1,6 @@
 package io.springperf.webtest.proxy;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import okhttp3.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;

@@ -1,7 +1,7 @@
 package io.springperf.web.autoconfigure;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.type.CollectionType;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.type.CollectionType;
 import org.junit.jupiter.api.Test;
 
 import java.io.InputStream;

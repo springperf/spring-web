@@ -93,14 +93,16 @@
             <classifier>linux-riscv64</classifier>
             <scope>runtime</scope>
         </dependency>
+        <!-- Jackson 3（tools.jackson）：Boot 4 / Spring 7 生态的版本。
+             本框架的 JSON 转换器与之对齐，避免与 Spring 注入的 ObjectMapper 不是同一套。
+             版本由 spring-boot-dependencies 的 tools.jackson:jackson-bom 管理。 -->
         <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
+            <groupId>tools.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
         </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-core</artifactId>
-        </dependency>
+        <!-- 注解仍是 Jackson 2 的 com.fasterxml.jackson.annotation：
+             tools.jackson 的 BOM 明确说明「annotations 没有 3.x 版本，用最新的 2.x 代替」
+             （jackson.version.annotations=2.21，groupId 保持 com.fasterxml.jackson.core）。 -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-annotations</artifactId>

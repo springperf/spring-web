@@ -9,7 +9,7 @@ import java.util.*;
 
 import org.junit.jupiter.api.Test;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 
 class JacksonConverterTest {
 
