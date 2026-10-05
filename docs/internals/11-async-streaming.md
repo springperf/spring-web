@@ -42,7 +42,7 @@ public class AsyncSupportRegistry extends WebComponentContainer {
 | `CallableReturnValueResolver` | `Callable` | `startCallableProcessing`（包装为 `WebAsyncTask`） |
 | `AsyncTaskReturnValueResolver` | `WebAsyncTask` | `startCallableProcessing` |
 | `CompletionStageReturnValueResolver` | `CompletionStage` | 适配为 `DeferredResult` → `startDeferredResultProcessing` |
-| `ListenableFutureReturnValueResolver` | `ListenableFuture` | 适配为 `DeferredResult` → `startDeferredResultProcessing` |
+| `ListenableFutureReturnValueResolver` ⚠️ | `ListenableFuture` | 适配为 `DeferredResult` → `startDeferredResultProcessing`（**仅 master**；Spring 7 已移除 `ListenableFuture`，4.1.x 上该解析器已删除） |
 | `StreamEmitterReturnValueResolver` | `StreamEmitter` | `startDeferredResultProcessing`（绑定 `DeferredResult` 生命周期） |
 | `ReactiveReturnValueResolver` | `Publisher` | 多值→`StreamEmitter`，单值→`DeferredResult` |
 

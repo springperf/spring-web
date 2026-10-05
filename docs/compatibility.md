@@ -90,7 +90,7 @@
 | Spring Framework | **7.0.x** | 7.0.x | 随 Spring Boot 管理 |
 | JDK | **17** | 17 / 21 / 25（CI 矩阵） | 编译目标 `java.version=17` |
 | Servlet API | **jakarta.servlet 6.0** | 6.0.x | 同 master |
-| Netty | **4.1.137.Final** | 4.1.x |  |
+| Netty | **4.2.15.Final** | 由 Boot 4 BOM 管理 | Boot 4 的基线即 4.2；**不要在本项目钉版**，否则与经 reactor-netty 引入的 4.2 混用 |
 | Jackson | **3.1.4**（`tools.jackson`）+ 注解 2.21 | 由 Boot 4 BOM 管理 | **与 master 的 Jackson 2 不同源**，见下 |
 | Lombok | **1.18.46** | 1.18.30+ |  |
 | JMH | **1.37** | 1.37 | 仅 benchmark 模块使用 |
@@ -103,6 +103,7 @@
 |------|----------|---------|
 | Maven Profile | `spring-boot-3.0` ~ `3.5` | `spring-boot-4.0` / `4.1`（**默认 4.1**） |
 | Jackson | **2.17.2**（`com.fasterxml.jackson.databind`） | **3.1.4**（`tools.jackson.databind`）；注解仍用 `com.fasterxml.jackson.annotation` |
+| Netty | **4.1.137.Final** | **4.2.15.Final**（随 Boot 4 BOM；Boot 3.5 的基线才是 4.1） |
 | `WebHttpHeaders` | 单实现，`super.*` 直调 | 单实现，父类没有的方法委派 `asMultiValueMap()` 视图（不再有 MethodHandle 版本分支） |
 | 容器事件适配 | 直接构造 SB3 事件 | 直接构造 SB4 事件（`boot.web.server.context.*`，不再有 ASM 运行时桥接） |
 | `ResponseStatusException` header | 反射桥接 `getResponseHeaders()` / `getHeaders()` | 直接调 `getHeaders()` |

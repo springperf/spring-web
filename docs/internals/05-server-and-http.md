@@ -579,42 +579,29 @@ public Object put(String key, String value) {
 
 **附带修复一个旧 bug**：旧实现把 header 拷进 `LinkedMultiValueMap`（大小写敏感），导致 Netty 原生的大小写不敏感解析丢失——小写 key 的 `get("content-type")` 拿不到 `Content-Type` 的值。直接委托 Netty headers 保留了原生大小写不敏感，这个问题随之消失。
 
-### 5.2 `WebHttpHeaders`：跨版本 HttpHeaders
+### 5.2 `WebHttpHeaders`：两处优化
 
-`WebHttpHeaders` 同时 `extends HttpHeaders`（Spring）和 `implements MultiValueMap`，靠 `static final` + `MethodHandle` 在类加载期解决版本分支：
-
-```java
-// WebHttpHeaders.java
-private static final boolean HEADERS_IS_MULTI_VALUE_MAP;   // 6.x: true, 7.x: false
-private static final MethodHandle AS_MULTI_VALUE_MAP;     // 7.x 反射拿 asMultiValueMap()
-
-static {
-    boolean isMVM = false;
-    MethodHandle asMVM = null;
-    try {
-        // 探测 HttpHeaders 是否本身就是 MultiValueMap（Spring 6.x 是，7.x 否）
-        isMVM = MultiValueMap.class.isAssignableFrom(HttpHeaders.class);
-        if (!isMVM) {
-            // 7.x 用 asMultiValueMap() 方法转
-            Method m = HttpHeaders.class.getMethod("asMultiValueMap");
-            asMVM = MethodHandles.lookup().unreflect(m);
-        }
-    } catch (...) { }
-    HEADERS_IS_MULTI_VALUE_MAP = isMVM;
-    AS_MULTI_VALUE_MAP = asMVM;
-}
-```
-
-`static final boolean` 让 JIT 能完全消除版本分支——运行时只剩一条路径，无反射开销。
-
-除版本桥接外，本类还有两处优化：
+`WebHttpHeaders` 继承 Spring 的 `HttpHeaders`，**不含任何版本分支**——本类直接面向 Spring 7 写：
 
 | 优化 | 做法 |
 |------|------|
 | Content-Type 解析缓存 | 缓存 `getContentType()` 的 `parseMediaType` 结果（`cachedContentType`），避免重复解析；`setContentType` 时清缓存 |
 | 常量名直通 | 当底层存储是可写的 `NettyHttpHeadersAdapter` 时，Content-Type 的读写走 `HttpHeaderNames` 常量名直通 Netty，省掉按 String 名查找与 `AsciiString` 名字重算哈希 |
 
-> **分支说明**：本分支（`4.1.x`）保留上述跨版本分支——这是「一份代码同时支持 3.5.x 与 4.x」的核心机制。master 已收敛为纯 3.5.x，该类在那里为 `super` 直调（消除了每请求的 varargs 分配与 `invokeWithArguments` 慢路径）。
+Spring 7 的 `HttpHeaders` 不再实现 `MultiValueMap`——`containsKey` / `keySet` / `values` / `entrySet` 这些方法移到了 `asMultiValueMap()` 返回的视图上。本类因此缓存该视图（`delegateMap`），**父类有的方法走 `super.*`，父类没有的委派 `delegateMap`**：
+
+```java
+// WebHttpHeaders.java
+private final MultiValueMap<String, String> delegateMap;
+
+public WebHttpHeaders(MultiValueMap<String, String> headers) {
+    super(headers);                                  // 父类持有同一份存储
+    this.delegateMap = asMultiValueMap();            // 与父类存储是同一个对象
+    ...
+}
+```
+
+> **历史注记**：4.1.x 早期曾用 `static final boolean` + `MethodHandle`（`HEADERS_IS_MULTI_VALUE_MAP`、`AS_MULTI_VALUE_MAP`）在类加载期区分 Spring 6.x / 7.x 的语义。那是「一份代码同时支持 3.5.x 与 4.x」时期的产物；**本分支改为专用写法后已整体移除**（该决策的背景见 [4.1.x 适配指南](../../.agent/context/4.1.x-adaptation-checklist.md) §0.1）。
 
 ### 5.3 body 零拷贝分级：`LARGE_BODY_LIMIT = 4096`
 

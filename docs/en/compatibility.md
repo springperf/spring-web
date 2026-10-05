@@ -92,7 +92,7 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 | Spring Framework | **7.0.x** | 7.0.x | Managed by Spring Boot |
 | JDK | **17** | 17 / 21 / 25 (CI matrix) | Compile target `java.version=17` |
 | Servlet API | **jakarta.servlet 6.0** | 6.0.x | Same as master |
-| Netty | **4.1.137.Final** | 4.1.x | |
+| Netty | **4.2.15.Final** | Managed by the Boot 4 BOM | Boot 4's baseline is 4.2; **do not pin it here**, or it will clash with the 4.2 pulled in via reactor-netty |
 | Jackson | **3.1.4** (`tools.jackson`) + annotations 2.21 | Managed by the Boot 4 BOM | **Not the same lineage as master's Jackson 2** — see below |
 | Lombok | **1.18.46** | 1.18.30+ | |
 | JMH | **1.37** | 1.37 | Benchmark module only |
@@ -106,6 +106,7 @@ This branch is **dedicated to Spring Boot 4** and no longer aims for "one codeba
 |-----------|----------|---------|
 | Maven profiles | `spring-boot-3.0` ~ `3.5` | `spring-boot-4.0` / `4.1` (**4.1 by default**) |
 | Jackson | **2.17.2** (`com.fasterxml.jackson.databind`) | **3.1.4** (`tools.jackson.databind`); annotations still `com.fasterxml.jackson.annotation` |
+| Netty | **4.1.137.Final** | **4.2.15.Final** (follows the Boot 4 BOM; Boot 3.5's baseline is 4.1) |
 | `WebHttpHeaders` | Single implementation, direct `super.*` calls | Single implementation; methods absent from the superclass delegate to the `asMultiValueMap()` view (no MethodHandle version branch) |
 | Container event adaptation | Constructs the SB3 event directly | Constructs the SB4 event directly (`boot.web.server.context.*`; no ASM runtime bridge) |
 | `ResponseStatusException` headers | Reflective bridge over `getResponseHeaders()` / `getHeaders()` | Calls `getHeaders()` directly |

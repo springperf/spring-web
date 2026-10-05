@@ -18,7 +18,13 @@ Spring MVC 的做法是：运行时遍历 `HandlerMethodReturnValueHandlerCompos
 
 ### 1.1 注册顺序
 
-`ReturnValueResolverRegistry.initReturnValueResolver()`按分组注册 14 个内置 Resolver：
+`ReturnValueResolverRegistry.initReturnValueResolver()`按分组注册内置 Resolver：
+
+> **分支差异**：`4.1.x` 分支上**没有** `ListenableFutureReturnValueResolver`。
+> Spring Framework 7 已移除 `org.springframework.util.concurrent.ListenableFuture`，
+> 该解析器是为兼容 Spring 6 而写，在 4.1.x 上是恒不匹配的死代码，**专用化时已整体删除**
+> （连同其适配器、端点与测试）。故本分支注册 **13** 个，master 注册 14 个。
+> 下文的代码块与表格按 **master** 列出。
 
 ```java
 // ReturnValueResolverRegistry.java
@@ -50,7 +56,7 @@ public void initReturnValueResolver() {
 | 分组 | Resolver | 匹配条件 | 写出方式 |
 |------|----------|---------|---------|
 | 异步 | `DeferredResultReturnValueResolver` | `DeferredResult` 类型 | `AsyncSupportRegistry.startDeferredResultProcessing` |
-| 异步 | `ListenableFutureReturnValueResolver` | `ListenableFuture` 类型 | 同上 |
+| 异步 | `ListenableFutureReturnValueResolver` ⚠️ | `ListenableFuture` 类型 | 同上（**仅 master**；4.1.x 已删除，见 §1.1） |
 | 异步 | `CompletionStageReturnValueResolver` | `CompletionStage` 类型 | 同上 |
 | 异步 | `AsyncTaskReturnValueResolver` | `AsyncTask` 类型 | 同上 |
 | 异步 | `CallableReturnValueResolver` | `Callable` 类型 | `AsyncSupportRegistry.startCallableProcessing` |

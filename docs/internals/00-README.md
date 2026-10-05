@@ -227,7 +227,7 @@
 - **定位**：异步层。讲清四类异步返回值的处理路径，重点是 SSE 的无锁 Drain Loop。
 - **核心问题**：`DeferredResult`/`Callable` 如何挂起与恢复？SSE 的 `AbstractNettyStreamSender` 如何用有界 `MpscArrayQueue` + `AtomicInteger wip` 实现无锁单消费者排空？`@ReactiveSupport` 背压水位如何控制？响应式 `Publisher` 如何在 EventLoop 上直接驱动？
 - **覆盖要点**：
-  1. `AsyncSupportRegistry`：`DeferredResult`/`Callable`/`ListenableFuture`/`CompletableFuture` 的统一挂起-恢复模型。
+  1. `AsyncSupportRegistry`：`DeferredResult`/`Callable`/`CompletableFuture` 的统一挂起-恢复模型（master 还含 `ListenableFuture`；Spring 7 已移除该类型，`4.1.x` 上相应支持已删除）。
   2. `DeferredResultReturnValueResolver`：挂起请求、`setResult`/`setError`/`onTimeout` 恢复。
   3. SSE：`SseEmitter` → `AbstractNettyStreamSender`；有界 `MpscArrayQueue` 多生产者单消费者；`AtomicInteger wip` drain loop 伪代码与真代码对照。
   4. **wip 计数器边界**（记忆 `sse_fix_channel_write`）：生产者快于 drain 时 wip 残留的处理，drain 循环的 missed 重入；complete 边界事件丢失属既定可接受设计（记忆 `defensive-fixes-confirm-call-model`）。

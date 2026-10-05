@@ -240,7 +240,7 @@ At 4 threads perf's heap is **24MB** — the lowest of all frameworks. As thread
 
 1. **#1 on every API at every level**: perf wins all 7 APIs × 3 concurrency levels (4/8/16) with no exceptions; at 16t the advantage spans 1.22x–7.72x.
 2. **SSE is dominant**: SSE throughput at 16t is **7.72x** Spring MVC (14,920 vs 1,933); p50 is only **13%** of Tomcat — the EventLoop + lock-free Drain Loop maximizes its edge on long-lived connections.
-3. **Low latency, delivered**: json p50 at 16t is **0.22ms** — 69% of Tomcat (0.32ms); small-payload p50 at 4t is 0.10–0.28ms, the lowest across the board.
+3. **Low latency, delivered**: json p50 at 16t is **0.22ms** — 69% of Tomcat (0.32ms); small-payload endpoints at 4t are at **0.10–0.11ms** (`bytesLarge` 0.21ms, `sse` 0.28ms), the lowest across the board.
 4. **Allocation efficiency**: json/get per-request allocation is 43%/29% of Spring MVC and 31%/21% of WebFlux — fewer allocations mean fewer GC pauses and better cache locality.
 5. **Lowest memory at low concurrency**: perf heap is 24MB at 4t (lowest); frameworks converge at high concurrency.
 6. **The SSE allocation trade-off**: perf allocates 310–314KB/request on SSE (higher than peers), but buys 7.72x throughput and 1.6–2.4ms pauses (Tomcat SSE is 3.0–3.6ms) — a higher total is not worse efficiency.

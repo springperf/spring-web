@@ -274,34 +274,32 @@ protected WebFilterRegistration createFilterWrapper(AbstractFilterRegistrationBe
 
 ---
 
-## 五、多版本兼容性：SB3 / SB4 事件适配
+## 五、容器事件适配与 AOT 提示
 
-> **分支说明**：`4.1.x` 分支承接 4.x 适配，**同时支持 Spring Boot 3.5.x 与 4.0/4.1**——
-> 本节描述的 SB3 / SB4 双路径在本分支**均处于启用状态**。
-> 相比之下 master 已收敛为纯 3.5.x，只保留 SB3 路径；两侧的差异与同步规则见
-> [4.1.x 适配指南](../../.agent/context/4.1.x-adaptation-checklist.md)。
+> **分支说明**：本节描述的是 **master（纯 Spring Boot 3.5.x）** 的实现。
+> `4.1.x` 分支专用 Spring Boot 4，**只有一条 SB4 路径**——它早年曾同时保留 SB3/SB4 双路径
+> （字符串条件守卫 + 运行时 ASM 桥接），专用化后已合二为一。两侧差异见
+> [4.1.x 适配指南](../../.agent/context/4.1.x-adaptation-checklist.md) §0.1。
 
 ### 5.1 为什么需要适配
 
-Spring Boot 3 的事件类在 `org.springframework.boot.web.context` 包，Spring Boot 4 移到了 `org.springframework.boot.web.server.context` 包，且事件从具体类变为抽象类。框架需要在不破坏编译一次（"compile once, run anywhere"）的前提下兼容两个版本。
+Spring Boot 3 的事件类在 `org.springframework.boot.web.context` 包，Spring Boot 4 移到了 `org.springframework.boot.web.server.context` 包，且事件从具体类变为抽象类。框架需要在不破坏编译（"compile once, run anywhere"）的前提下兼容两个版本。
 
-### 5.2 策略：字符串条件守卫
+### 5.2 策略：按版本选择实现形态
 
-两个配置类使用字符串形式的 `@ConditionalOnClass`，不触发类加载，仅按名称探测 classpath：
+两个版本无法共用一份实现，差别在**事件类如何拿到**：
 
-```java
-// SB3 配置
-@ConditionalOnClass(name = "org.springframework.boot.web.context.WebServerInitializedEvent")
-public class WebServerInitializedEventAutoConfiguration { ... }
+| 分支 | 策略 |
+|---|---|
+| master（SB 3.5.x） | 直接 `extends WebServerInitializedEvent`（SB3 的具体类），编译期引用，无运行时技巧 |
+| `4.1.x`（SB 4.x） | SB4 的 `WebServerInitializedEvent` 是**抽象类**，直接写一个子类并实现 `getApplicationContext()` 即可 |
 
-// SB4 配置
-@ConditionalOnClass(name = "org.springframework.boot.web.server.context.WebServerInitializedEvent")
-public class Boot4WebServerInitializedEventAutoConfiguration { ... }
-```
+> **历史注记**：`4.1.x` 早期为在同一份源码里兼顾两版，用过字符串形式的
+> `@ConditionalOnClass` 做互斥守卫，并在 SB4 侧用 Spring 内嵌 ASM 在运行时生成事件子类
+> （`Boot4WebServerInitializedEventBridge`，约 170 行）。**专用化后这两者都已移除**——
+> 该分支只面向 SB4，事件类可编译期直接引用，无需条件守卫与字节码生成。
 
-SB3 下只有第一个配置类加载，SB4 下只有第二个配置类加载，互斥。
-
-### 5.3 SB3 方案：`PerfWebServerInitializedEvent`
+### 5.3 `PerfWebServerInitializedEvent`
 
 `WebServerInitializedEventAutoConfiguration`在 `ApplicationReadyEvent` 事件中发射 `PerfWebServerInitializedEvent`：
 
@@ -318,48 +316,36 @@ public ApplicationListener<ApplicationReadyEvent> webServerInitializedEventPubli
 }
 ```
 
-`PerfWebServerInitializedEvent`继承 SB3 的 `WebServerInitializedEvent`，通过 JDK 动态代理将 `AnnotationConfigApplicationContext`（非 `WebServerApplicationContext`）包装为 `WebServerApplicationContext` 接口——仅覆盖 `getWebServer()` 返回本框架的 `PerfWebServer`，其他方法委托给真实上下文。
+`PerfWebServerInitializedEvent` 通过 JDK 动态代理将 `AnnotationConfigApplicationContext`（非 `WebServerApplicationContext`）包装为 `WebServerApplicationContext` 接口——仅覆盖 `getWebServer()` 返回本框架的 `PerfWebServer`，其他方法委托给真实上下文。
 
 这使 Spring Cloud 服务注册（Nacos/Eureka/Consul）等组件能正确感知服务器就绪。
 
-### 5.4 SB4 方案：`Boot4WebServerInitializedEventBridge`
+> master 上它继承 SB3 的 `WebServerInitializedEvent`（具体类，直接 `extends` 即可）；
+> `4.1.x` 上继承的是 SB4 的同名类——在 SB4 里它是**抽象类**，额外实现
+> `getApplicationContext()`，其余相同。
 
-SB4 的 `WebServerInitializedEvent` 变为抽象类，只有 `ServletWebServerInitializedEvent`/`ReactiveWebServerInitializedEvent` 两个具体子类，构造参数绑定 servlet/reactive 上下文，无法直接实例化。
-
-`Boot4WebServerInitializedEventBridge`使用 Spring 内嵌 ASM 在运行时生成事件的具体子类字节码：
-
-1. **`generateEventSubclass()`**：用 `ClassWriter` 生成一个继承抽象类的子类，包含 `applicationContext` 字段和 `getApplicationContext()` 方法。
-2. **`createContextProxy()`**：JDK 动态代理将真实 `ApplicationContext` 包装为 SB4 的 `WebServerApplicationContext` 接口。
-3. **`createEvent()`**：`MethodHandles.lookup().defineClass(bytes)` 定义生成的子类，反射实例化，双检锁保护 `defineClass` 幂等性。
-
-全程零新增依赖（ASM 由 spring-core 提供），`Boot4WebServerInitializedEventAutoConfiguration` 的 `ApplicationListener` 捕获 `Throwable` 降级，桥接失败仅告警，不影响应用启动。
-
-### 5.5 GraalVM 可达性提示
+### 5.4 GraalVM 可达性提示
 
 `SpringWebRuntimeHints`实现 `RuntimeHintsRegistrar`，为事件路径所需的 JDK 动态代理和反射注册可达性提示：
 
 ```java
 // SpringWebRuntimeHints.java
 public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
-    // SB3 事件路径：JDK 动态代理包装 WebServerApplicationContext
+    // 事件路径：JDK 动态代理包装 WebServerApplicationContext
     hints.proxies().registerJdkProxy(WebServerApplicationContext.class);
     hints.reflection().registerType(PerfWebServer.class, MemberCategory.INVOKE_PUBLIC_CONSTRUCTORS);
-    // SB4 类型按名条件注册（仅 classpath 存在时注册）
-    hints.reflection().registerTypeIfPresent(classLoader, SB4_EVENT_CLASS);
-    // ListenableFuture 异步返回路径：代理 + 回调反射
-    hints.proxies().registerJdkProxy(ListenableFutureCallback.class);
-    hints.reflection().registerType(ListenableFutureCallback.class, MemberCategory.INVOKE_PUBLIC_METHODS);
     // ...
 }
 ```
 
-`@ImportRuntimeHints` 挂在 SB3 专属配置上，SB3 下 AOT 构建期执行，SB4 下配置类不加载、registrar 不执行，避免编译期引用 SB3 类型在 SB4 classpath 缺失时引发类解析失败。
+`@ImportRuntimeHints` 挂在事件自动配置类上，由 Spring AOT 构建期采集（JVM 运行时完全不触发，零影响）。
+
+> **历史注记**：该类曾把 SB4 类型名写成字符串、用 `registerTypeIfPresent(classLoader, ...)` 按名条件注册，以免在 SB3 classpath 上解析缺失的类型。专用化后可直接引用——**该写法已删除**。
 
 `SpringWebRuntimeHints` 还注册：
-- `ListenableFutureCallback` JDK 代理 + `ListenableFuture#addCallback` 反射（异步返回路径，`ListenableFutureAdapter` 需要）；
 - 框架强依赖资源：`additional-spring-configuration-metadata.json`、`templates/`/`static/`/`META-INF/resources/`/`public/`（经 `FilePatternResourceHintsRegistrar` 按实际存在文件注册）。
 
-### 5.6 用户控制器 AOT hints：`ControllerBeanFactoryInitializationAotProcessor`
+### 5.5 用户控制器 AOT hints：`ControllerBeanFactoryInitializationAotProcessor`
 
 框架用自有 `MappingRegistry`（`getBeansWithAnnotation(Controller.class)` + `getUniqueDeclaredMethods`）扫描 `@Controller`，Spring Boot AOT 只为 Spring MVC 的 `RequestMappingHandlerMapping` 自动生成 hints——**感知不到本框架控制器**。因此在 `META-INF/spring/aot.factories` 注册了 `BeanFactoryInitializationAotProcessor`：
 
@@ -376,7 +362,7 @@ public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
 
 `process-aot` 端到端效果（`spring-web-example-rest`）：`HealthController`/`UserController` 全部方法进入 `reflect-config.json` 的 `methods`（INVOKE）段，`User`/`ApiResult` DTO 注册字段/构造器 hints；`GlobalExceptionHandler`（`@RestControllerAdvice`）的 `handleValidation`/`handleIllegalArg`/`handleUnknown` 同样进入 `methods` 段。示例模块默认构建绑定 `process-aot`，原生编译用 `-Pnative`（`scripts/native-smoke-test.sh`，Linux + GraalVM）。
 
-### 5.7 WebSocket 端点 AOT hints：`ServerEndpointBeanFactoryInitializationAotProcessor`
+### 5.6 WebSocket 端点 AOT hints：`ServerEndpointBeanFactoryInitializationAotProcessor`
 
 `spring-web-websocket` 模块经自身的 `aot.factories` 注册 `BeanFactoryInitializationAotProcessor`，为 Bean 发现的 `@ServerEndpoint` 端点注册反射 hints：
 

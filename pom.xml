@@ -60,7 +60,6 @@
         <gpg.passphrase>${env.GPG_PASSPHRASE}</gpg.passphrase>
 
         <!-- 第三方依赖版本统一管理 -->
-        <netty.version>4.1.137.Final</netty.version>
         <fastjson2.version>2.0.60</fastjson2.version>
         <okhttp.version>4.12.0</okhttp.version>
         <hutool.version>5.8.23</hutool.version>
@@ -70,7 +69,9 @@
              前者决定实际打包进示例的 webjar，后者决定自动装配时拼出的资源路径。 -->
         <swagger-ui.version>5.2.0</swagger-ui.version>
         <disruptor.version>3.4.4</disruptor.version>
-        <spring-ai.version>1.1.8</spring-ai.version>
+        <!-- Spring AI：2.x 起与 Spring Boot 4 / Spring Framework 7 对齐（1.x 针对 Boot 3，
+             其 OpenAiApi 调用已被 Spring 7 移除的 HttpHeaders.addAll(MultiValueMap)）。 -->
+        <spring-ai.version>2.0.1</spring-ai.version>
 
         <!-- 以下属性从 spring-boot-starter-parent 继承，因移除 parent 改为显式定义 -->
         <lombok.version>1.18.46</lombok.version>
@@ -178,82 +179,6 @@
             </dependency>
 
             <!-- 第三方依赖（覆盖 BOM 版本） -->
-            <!-- Netty 具体模块（替代 netty-all：最小依赖集 + Linux epoll native 等价能力）。
-                 netty-transport-classes-epoll 为编译期 epoll 类；netty-transport-native-epoll
-                 + linux classifier 为运行期 native 库，运行时仅加载匹配平台，与 netty-all 行为一致。 -->
-            <dependency>
-                <groupId>io.netty</groupId>
-                <artifactId>netty-common</artifactId>
-                <version>${netty.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.netty</groupId>
-                <artifactId>netty-buffer</artifactId>
-                <version>${netty.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.netty</groupId>
-                <artifactId>netty-codec</artifactId>
-                <version>${netty.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.netty</groupId>
-                <artifactId>netty-transport</artifactId>
-                <version>${netty.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.netty</groupId>
-                <artifactId>netty-resolver</artifactId>
-                <version>${netty.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.netty</groupId>
-                <artifactId>netty-handler</artifactId>
-                <version>${netty.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.netty</groupId>
-                <artifactId>netty-codec-http</artifactId>
-                <version>${netty.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.netty</groupId>
-                <artifactId>netty-codec-http2</artifactId>
-                <version>${netty.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.netty</groupId>
-                <artifactId>netty-transport-classes-epoll</artifactId>
-                <version>${netty.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.netty</groupId>
-                <artifactId>netty-transport-native-unix-common</artifactId>
-                <version>${netty.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.netty</groupId>
-                <artifactId>netty-transport-native-epoll</artifactId>
-                <version>${netty.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>io.netty</groupId>
-                <artifactId>netty-transport-native-epoll</artifactId>
-                <version>${netty.version}</version>
-                <classifier>linux-x86_64</classifier>
-            </dependency>
-            <dependency>
-                <groupId>io.netty</groupId>
-                <artifactId>netty-transport-native-epoll</artifactId>
-                <version>${netty.version}</version>
-                <classifier>linux-aarch_64</classifier>
-            </dependency>
-            <dependency>
-                <groupId>io.netty</groupId>
-                <artifactId>netty-transport-native-epoll</artifactId>
-                <version>${netty.version}</version>
-                <classifier>linux-riscv64</classifier>
-            </dependency>
             <dependency>
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok</artifactId>

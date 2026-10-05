@@ -93,7 +93,7 @@ Netty 的 EventLoop 单线程模型天然适合 I/O 密集型场景，但若业�
 - **代价**：`int index` 在编译期分配且不可回收（`MappingCacheKey` 是静态常量，生命周期 = JVM 生命周期）；`methodCache`/`classCache` 数组按 `key.index + 1` 懒分配，越界时 `Arrays.copyOf` 扩容（`MappingHandlerMethod.java`，`synchronized` 双检），无固定上限——槽位随已注册键增长，未用槽位仅浪费单个对象引用。
 - **边界**：仅适用于"已知有限且编译期确定"的属性集。运行时动态增删的属性仍需 Map/List——框架核心属性全走索引，用户扩展走 SPI 的 List/单字段/Map（见 [18 篇](18-spi-extension.md) 四种发现模式）。重新审视条件：若未来出现高频动态属性，该属性不应进 `methodCache`/`classCache`，而应走请求级 Map。
 
-**关联**：[15 篇](15-performance-optimizations.md) 优化 1/4、[16 篇](16-code-spotlights.md) 聚光灯 1/5、[05 篇](04-request-pipeline.md) 四节。
+**关联**：[15 篇](15-performance-optimizations.md) 优化 1/4、[16 篇](16-code-spotlights.md) 聚光灯 1/5、[04 篇](04-request-pipeline.md) 四节。
 
 ---
 
