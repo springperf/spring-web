@@ -253,10 +253,10 @@ public Result<Data> query() {   // 无需 @RunInPool：默认走 default 业务�
 
 ### 手段
 
-`NettyStreamSender` 使用 `MpscUnboundedArrayQueue` + `AtomicInteger wip` 构成无锁 Drain Loop：
+`AbstractNettyStreamSender` 使用**有界** `MpscArrayQueue`（容量 65536）+ `AtomicInteger wip` 构成无锁 Drain Loop：
 
 ```java
-private final MpscUnboundedArrayQueue<ByteBuf> queue;  // 多生产者单消费者无锁队列
+private final MpscArrayQueue<Object> queue;  // 多生产者单消费者无锁队列（有界）
 
 void drain() {
     int missed = 1;
@@ -356,7 +356,7 @@ void drain() {
 
 | 维度 | WebPerf | MVC+Tomcat | WebFlux |
 |------|-----------|------------|---------|
-| SSE 实现 | **`NettyStreamSender`** → `MpscUnboundedArrayQueue` + 无锁 Drain Loop | `SseEmitter` → 每个连接一个线程，同步阻塞写 | `Flux<ServerSentEvent>` → Reactor 背压 |
+| SSE 实现 | **`AbstractNettyStreamSender`** → 有界 `MpscArrayQueue` + 无锁 Drain Loop | `SseEmitter` → 每个连接一个线程，同步阻塞写 | `Flux<ServerSentEvent>` → Reactor 背压 |
 | 背压机制 | **`channel.isWritable()` + `BackpressureHandler`** → 水位线精确控制 | **无** → 生产者过快直接阻塞线程 | Reactor `request(n)` → operator 链传播 |
 | 线程占用 | **EventLoop 统一写入** → 线程数 = CPU 核，不随连接增长 | **每连接一线程** → 线程数 = 连接数 | EventLoop 统一写入 |
 | 流式吞吐 | **Spring MVC 的 12.63x(4t) / 7.72x(16t)** | 基准 | 接近，但无锁队列优势在小消息场景更显著 |
@@ -380,7 +380,7 @@ void drain() {
 | `javax.validation` | 支持 | 支持 | 支持 |
 | Spring Data | 桥接兼容 | 原生 | 原生 |
 | 最小堆占用 | **~24MB** | ~26MB | ~25MB |
-| P50 延迟 (小包) | **0.10-0.11ms** | 0.15-0.22ms | 0.16-0.24ms |
+| P50 延迟 (小包, 4 线程) | **0.10-0.11ms** | 0.15-0.22ms | 0.16-0.24ms |
 
 ---
 

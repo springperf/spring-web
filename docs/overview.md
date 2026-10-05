@@ -145,7 +145,7 @@ WebFlux（Netty 运行时，4,173 样本）与 MVC 问题模式高度相似，�
 在 JDK 17 + G1GC (1GB heap) 的基准测试中，本框架在 7 个场景下全面领先：
 
 - 小包场景吞吐 **36K\~42K** ops/s（4 线程），是 Spring MVC 的 **1.56x\~2.26x**
-- P50 延迟 **0.10~0.11ms**，约为 Spring MVC 的 **45-67%**
+- P50 延迟 **0.10~0.11ms**（4 线程，小包场景），约为 Spring MVC 的 **45-67%**
 - 稳态堆占用 **24MB**（4 线程），约为 Spring MVC 的 **92%**
 - SSE 流式场景吞吐 **13,323** ops/s（4 线程），达到 Spring MVC 的 **12.63x**，16 线程下 **7.72x**
 
@@ -199,7 +199,7 @@ Servlet API 有二十年的生态积累：Spring Security Filter Chain、`Reques
 |------|------|
 | **资源受限环境**（1c1g、2c2g） | 框架开销低，同等资源下吞吐是 Spring MVC 的 1.6~2.3x |
 | **高吞吐 API 服务** | 36K~42K ops/s 的吞吐能力，适合接口层卸载 |
-| **延迟敏感业务** | P50 0.10~0.11ms，是 Spring MVC 的 45-67% |
+| **延迟敏感业务** | P50 0.10~0.11ms（4 线程，小包场景），是 Spring MVC 的 45-67% |
 | **SSE / 流式推送** | 无锁 Drain Loop 设计，吞吐达 Spring MVC 的 12.63x（4 线程）/ 7.72x（16 线程） |
 | **新启动的项目** | 从零开始的项目可以直接选用，无需迁移成本 |
 | **IoT / 设备接入** | 大量小请求、资源受限的典型场景（也是本项目缘起的场景） |
@@ -267,7 +267,7 @@ AI 编程（Copilot、Cursor、Claude Code 等）已深度融入日常开发。�
 
 大模型应用的核心交互模式是**流式输出**：Token 逐个生成、实时推送。无论是 ChatGPT 的逐字回复、Agent 的任务状态流，还是 RAG 的检索进度反馈，底层都依赖 **SSE (Server-Sent Events)** 协议。
 
-然而 SSE 在传统 Servlet 容器上性能表现不佳——Spring MVC 的 SSE 吞吐仅约 **1,055 ops/s**（4 线程），成为 AI 应用链路的瓶颈。本项目的 SSE 吞吐达到 **13,323 ops/s**，是 Spring MVC 的 **12.63x**，16 线程下 **7.72x**。支撑这一性能的是 **NettyStreamSender** 的无锁 Drain Loop 设计：写入操作不依赖线程池调度，直接在 EventLoop 上完成批量刷新，避免传统 Servlet 容器中 SSE 连接独占线程的问题。
+然而 SSE 在传统 Servlet 容器上性能表现不佳——Spring MVC 的 SSE 吞吐仅约 **1,055 ops/s**（4 线程），成为 AI 应用链路的瓶颈。本项目的 SSE 吞吐达到 **13,323 ops/s**，是 Spring MVC 的 **12.63x**，16 线程下 **7.72x**。支撑这一性能的是 **`AbstractNettyStreamSender`** 的无锁 Drain Loop 设计：写入操作不依赖线程池调度，直接在 EventLoop 上完成批量刷新，避免传统 Servlet 容器中 SSE 连接独占线程的问题。
 
 这意味着：
 

@@ -8,12 +8,11 @@
 
 ### 变更
 
-- **分支策略调整：master 收敛为纯 Spring Boot 3.5.x**。此前 master 上叠加了 Spring Boot 4 / Spring Framework 7 兼容层（`WebHttpHeaders` 的版本分支与 MethodHandle、`MediaTypeUtils`、`ResponseStatusExceptionAdapter`、`Boot4WebServerInitializedEventBridge`、SB4 Maven Profile 等），现全部移除。4.x 适配改由 `4.1.x` 分支承接，同步规则见 [4.1.x 适配指南](.agent/context/4.1.x-adaptation-checklist.md)
+- **分支定位**：本分支（`4.1.x`）承接 Spring Boot 4.0 / 4.1 适配，**同时支持 3.5.x 与 4.x**——`WebHttpHeaders` 的版本分支、`MediaTypeUtils`、`ResponseStatusExceptionAdapter`、`Boot4WebServerInitializedEventBridge`、SB4 Maven Profile 等兼容层**均在本分支保留**。master 已收敛为纯 3.5.x，两侧的差异与同步规则见 [4.1.x 适配指南](.agent/context/4.1.x-adaptation-checklist.md)
 
 ### 修复
 
-- **移除的兼容层带来的性能收益**：`WebHttpHeaders` 的 8 个 `MultiValueMap` 方法此前经 `MethodHandle` + varargs `invokeWithArguments` 调用（每次分配 `Object[]`），而 `get()`/`entrySet()`/`keySet()` 均在每请求热路径上；现改为 `super.*()` 直调
-- **自动配置注册表残留**：`AutoConfiguration.imports` 中仍注册着已删除的 `Boot4WebServerInitializedEventAutoConfiguration`，会导致 Spring 上下文启动失败
+- **自动配置注册表残留（已在 master 修复，本分支已同步）**：`AutoConfiguration.imports` 中曾注册着 `Boot4WebServerInitializedEventAutoConfiguration`，在 master 上会因该类被删而启动失败；本分支该类仍在，注册项有效
 
 ## [3.5.6] - 20260906
 

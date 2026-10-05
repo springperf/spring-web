@@ -574,7 +574,7 @@ public Object put(String key, String value) {
 
 **为什么自研而不用 Spring 的 `Netty4HeadersAdapter`？** 两个原因：
 
-1. **版本兼容**：`Netty4HeadersAdapter` 仅 Spring 6.1+，本框架要兼容 Spring Boot 2.4.x~4.1.x（[SB 3.x 多版本兼容性验证](../../) 记忆有记录 POM parent→BOM+profiles 改造）。
+1. **版本兼容**：`Netty4HeadersAdapter` 仅 Spring 6.1+，而本框架要兼容 Spring Boot 2.4.x 起的多个版本（2.7.x 分支基于 Spring 5.3）。
 2. **语义**：`writable` 标志支持"只读视图"模式——某些场景只需读 header 不应被改，`checkWritable()` 抛异常而非静默写入，符合[原则 6](01-design-philosophy.md#原则-6--避免魔法行为显式-spi显式-fail-fast不靠隐式猜测)。
 
 **附带修复一个旧 bug**：旧实现把 header 拷进 `LinkedMultiValueMap`（大小写敏感），导致 Netty 原生的大小写不敏感解析丢失——小写 key 的 `get("content-type")` 拿不到 `Content-Type` 的值。直接委托 Netty headers 保留了原生大小写不敏感，这个问题随之消失。
@@ -605,7 +605,16 @@ static {
 }
 ```
 
-`static final boolean` 让 JIT 能完全消除版本分支——运行时只剩一条路径，无反射开销。`getContentType` 还缓存了 `parseMediaType` 结果，避免重复解析；`setContentType` 清缓存。
+`static final boolean` 让 JIT 能完全消除版本分支——运行时只剩一条路径，无反射开销。
+
+除版本桥接外，本类还有两处优化：
+
+| 优化 | 做法 |
+|------|------|
+| Content-Type 解析缓存 | 缓存 `getContentType()` 的 `parseMediaType` 结果（`cachedContentType`），避免重复解析；`setContentType` 时清缓存 |
+| 常量名直通 | 当底层存储是可写的 `NettyHttpHeadersAdapter` 时，Content-Type 的读写走 `HttpHeaderNames` 常量名直通 Netty，省掉按 String 名查找与 `AsciiString` 名字重算哈希 |
+
+> **分支说明**：本分支（`4.1.x`）保留上述跨版本分支——这是「一份代码同时支持 3.5.x 与 4.x」的核心机制。master 已收敛为纯 3.5.x，该类在那里为 `super` 直调（消除了每请求的 varargs 分配与 `invokeWithArguments` 慢路径）。
 
 ### 5.3 body 零拷贝分级：`LARGE_BODY_LIMIT = 4096`
 
@@ -694,7 +703,7 @@ public void release() {
 }
 ```
 
-`WebServerHttpRequest` 接口契约（[:162-179](../../spring-web/src/main/java/io/springperf/web/http/WebServerHttpRequest.java)）：**跨业务线程前必须 `acquire`，处理完配对 `release`**。这个契约在 [04 篇](04-request-pipeline.md) `DispatcherHandler.handleWithMappingResult` 的 `acquire() → executor.execute → release()` 里被遵守，是 [原则 4](01-design-philosophy.md#原则-4--避免阻塞非阻塞-io--显式引用计数) 的硬约束。
+`WebServerHttpRequest` 接口契约（[`WebServerHttpRequest.java`](../../spring-web/src/main/java/io/springperf/web/http/WebServerHttpRequest.java)）：**跨业务线程前必须 `acquire`，处理完配对 `release`**。这个契约在 [04 篇](04-request-pipeline.md) `DispatcherHandler.handleWithMappingResult` 的 `acquire() → executor.execute → release()` 里被遵守，是 [原则 4](01-design-philosophy.md#原则-4--避免阻塞非阻塞-io--显式引用计数) 的硬约束。
 
 `release` 幂等——`ReferenceCountUtil.release` 内部对 refCnt 归零后的再次调用会抛 `IllegalReferenceCountException`，但框架在 `NettyHttpHandler.handleRequest` 的 `finally` 与业务侧 `finally` 两处配对释放，靠"恰好一次"的对称性保证不重复。`largeBodyBuf` 是 `duplicate` 无独立引用，不需要单独 release——它的存活由 `request` 的引用计数托底。
 
@@ -861,7 +870,7 @@ public void addRespEventListener(WriteRespEventListener listener) {
 
 `WriteRespEventListener`（[](../../spring-web/src/main/java/io/springperf/web/http/WriteRespEventListener.java)）定义四个回调：`completeSuccessCallback`/`completeErrorCallback`/`writeStreamSuccessCallback`/`writeStreamErrorCallback`（后两个有 default 实现）。`CompositeWriteRespEventListener`（[](../../spring-web/src/main/java/io/springperf/web/http/BaseWebServerHttpResponse.java)）合并多监听器广播。
 
-`NettyServerHttpResponse` 还有个静态 `LOG_ERROR_ON_FAILURE`（[:31-40](../../spring-web/src/main/java/io/springperf/web/http/NettyServerHttpResponse.java)）——默认监听器，对 `ClosedChannelException` 静默（连接已关闭时写失败是预期行为，不刷错误日志）。无显式 listener 时用这个默认，避免每连接刷一堆无意义错误日志。
+`NettyServerHttpResponse` 还有个静态 `LOG_ERROR_ON_FAILURE`（见 [`NettyServerHttpResponse.java`](../../spring-web/src/main/java/io/springperf/web/http/NettyServerHttpResponse.java)）——默认监听器，对 `ClosedChannelException` 静默（连接已关闭时写失败是预期行为，不刷错误日志）。无显式 listener 时用这个默认，避免每连接刷一堆无意义错误日志。
 
 ---
 

@@ -8,12 +8,11 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- **Branch strategy: `master` is now pure Spring Boot 3.5.x**. The Spring Boot 4 / Spring Framework 7 compatibility layer that had accumulated on `master` (the version branches and MethodHandles in `WebHttpHeaders`, `MediaTypeUtils`, `ResponseStatusExceptionAdapter`, `Boot4WebServerInitializedEventBridge`, SB4 Maven profiles, etc.) has been removed entirely. 4.x adaptation now lives on the `4.1.x` branch; see the [4.1.x adaptation guide](../../.agent/context/4.1.x-adaptation-checklist.md)
+- **Branch positioning**: this branch (`4.1.x`) carries the Spring Boot 4.0 / 4.1 adaptation and **supports both 3.5.x and 4.x** — the compatibility layer (the version branches in `WebHttpHeaders`, `MediaTypeUtils`, `ResponseStatusExceptionAdapter`, `Boot4WebServerInitializedEventBridge`, SB4 Maven profiles, etc.) is **retained here**. `master` has converged to pure 3.5.x; the differences and sync rules are in the [4.1.x adaptation guide](../../.agent/context/4.1.x-adaptation-checklist.md)
 
 ### Fixed
 
-- **Performance gain from removing the compat layer**: the eight `MultiValueMap` methods on `WebHttpHeaders` were invoked through `MethodHandle` + varargs `invokeWithArguments` (allocating an `Object[]` per call), and `get()` / `entrySet()` / `keySet()` all sit on the per-request hot path. They now call `super.*()` directly
-- **Stale auto-configuration registration**: `AutoConfiguration.imports` still registered the removed `Boot4WebServerInitializedEventAutoConfiguration`, which caused Spring context startup failures
+- **Stale auto-configuration registration (fixed on master, synced here)**: `AutoConfiguration.imports` used to register `Boot4WebServerInitializedEventAutoConfiguration`. On master that broke startup once the class was deleted; on this branch the class still exists, so the registration is valid
 
 ## [3.5.6] - 20260906
 

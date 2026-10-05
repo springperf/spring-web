@@ -54,7 +54,7 @@ public void initReturnValueResolver() {
 | 异步 | `CompletionStageReturnValueResolver` | `CompletionStage` 类型 | 同上 |
 | 异步 | `AsyncTaskReturnValueResolver` | `AsyncTask` 类型 | 同上 |
 | 异步 | `CallableReturnValueResolver` | `Callable` 类型 | `AsyncSupportRegistry.startCallableProcessing` |
-| 流式 | `StreamEmitterReturnValueResolver` | `StreamEmitter` 类型 | `NettyStreamSender` 流式输出 |
+| 流式 | `StreamEmitterReturnValueResolver` | `StreamEmitter` 类型 | `AbstractNettyStreamSender` 流式输出 |
 | 响应式 | `ReactiveReturnValueResolver` | `Publisher` 类型 | `PublisherToStreamEmitterAdapter` |
 | 字节流 | `ByteArrayReturnValueResolver` | `byte[]` 类型 | `resp.writeBytes` |
 | 资源 | `ResourceReturnValueResolver` | `Resource` 类型 | `resp.writeFile`（文件）或 `resp.writeStream`（流） |

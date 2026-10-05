@@ -121,14 +121,14 @@ Tomcat 的 `spring-boot-starter-web` 一旦混入，会和本框架在自动装�
 
 | 组件 | 版本 | 来源 |
 |------|------|------|
-| Spring Boot | 3.5.16（默认，Profile 可切 2.4.x~4.1.x） | `pom.xml` + profiles `` |
+| Spring Boot | 3.5.16（默认，Profile 可切 2.4.x~2.7.x / 3.0.x~3.5.x） | `pom.xml` + profiles |
 | Netty | 4.1.137.Final | `pom.xml` |
-| Jackson | 2.17.2（SB4 时对齐 2.21.4） | `pom.xml`  |
+| Jackson | 2.17.2 | `pom.xml` |
 | Fastjson2 | 2.0.60（provided） | `pom.xml` |
 | Disruptor | 3.4.4 | `pom.xml` |
 | Java | 17 | `pom.xml` |
 
-> 多版本兼容（parent→BOM+profiles 改造）的来龙去脉见 memory `sb-3x-compatibility-verification`，本篇不展开。
+> **分支定位**：master 只维护 Spring Boot 3.5.x，**不含 4.x 适配**；4.0/4.1 的适配代码在 `4.1.x` 分支，2.4~2.7（Java 8 / javax）在 `2.7.x` 分支。同步规则见 [`.agent/context/4.1.x-adaptation-checklist.md`](../../.agent/context/4.1.x-adaptation-checklist.md)。
 
 ---
 
@@ -375,7 +375,7 @@ if (shuttingDown) {
   │       ├─ ReturnValueResolverRegistry.resolveReturnValue()
   │       │     ├─ [web]     JsonBodyReturnValueResolver → HttpBodyCodecRegistry.writeBody()
   │       │     ├─ [support] ResponseBodyEmitterReturnValueResolver（若引入 support）
-  │       │     ├─ [web]     StreamEmitterReturnValueResolver → NettyStreamSender（SSE/流式）
+  │       │     ├─ [web]     StreamEmitterReturnValueResolver → AbstractNettyStreamSender（Default/EarlyEncode 两路实现）
   │       │     └─ [batch]   BatchReturnValueResolver（若引入 batch，透明聚合）
   │       └─ finally: invokeWithRealResult() / metrics.recordRequest()
   ▼
@@ -508,7 +508,7 @@ support 模块在 `src/main/java/org/springframework/web/servlet/` 等路径下*
 - [03 篇](03-component-lifecycle.md) 展开 `startLifecycle` 内部三阶段与 Registry 体系（[§3.1](#31-完整启动链校正版) 的中段）；
 - [04 篇](04-request-pipeline.md) 展开 `handleWithMappingResult` → `doHandle` 的请求管线（[§4](#四一次请求的跨模块调用链) 的 `web` 段）；
 - [05-10 篇](05-server-and-http.md) 逐个深潜 `server`/`http`/`mapping`/`arg`/`retval`/`invoker`/横切包；
-- [11 篇](11-async-streaming.md) 展开 `async/stream` 与 `NettyStreamSender`；
+- [11 篇](11-async-streaming.md) 展开 `async/stream` 与 `AbstractNettyStreamSender`；
 - [12 篇](12-support-bridge.md) 展开 support 的同包覆盖与 `WebMvcConfigurerBridge`；
 - [13 篇](13-batch-module.md) 展开 batch 的 Disruptor 聚合切入点；
 - [14 篇](14-starter-autoconfig.md) 展开 starter 的 10 个 AutoConfiguration 与零冲突防线。
