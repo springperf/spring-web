@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [master, 2.7.x]
+    branches: [master, 2.7.x, 4.1.x]
   pull_request:
-    branches: [master, 2.7.x]
+    branches: [master, 2.7.x, 4.1.x]
 
 # 供应链加固（提炼自 mybatis-parent 工程实践清单）：最小权限 + 同分支新推送取消旧 run
 permissions:
@@ -16,6 +16,8 @@ concurrency:
 
 jobs:
   build:
+    # 各分支的 JDK 组合：2.7.x=8/11/17，master=17/21/25，4.1.x=17/21/25
+    # （4.1.x 在此只跑默认 profile；4.x 路径由 boot4-compat job 单独覆盖）
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -45,6 +47,9 @@ jobs:
             ||
             contains(fromJSON('["17", "21", "25"]'), matrix.java)
             && (github.ref == 'refs/heads/master' || github.base_ref == 'master')
+            ||
+            contains(fromJSON('["17", "21", "25"]'), matrix.java)
+            && (github.ref == 'refs/heads/4.1.x' || github.base_ref == '4.1.x')
           )
 
       - name: Upload test reports
@@ -56,8 +61,9 @@ jobs:
 
   docs:
     # Markdown 一致性检查（坏链 / 锚点 / 编码与格式 / 符号），与 JDK 无关，独立成 job 只跑一次。
-    # 仅对 master 生效：2.7.x 分支的文档基线未做校验，避免误红。
-    if: github.ref == 'refs/heads/master' || github.base_ref == 'master'
+    # 覆盖 master 与 4.1.x：两者的文档基线都已校验为 0 defect，纳入门禁不会误红。
+    # 仍不含 2.7.x —— 该分支文档基线未做校验，贸然纳入会红。
+    if: github.ref == 'refs/heads/master' || github.base_ref == 'master' || github.ref == 'refs/heads/4.1.x' || github.base_ref == '4.1.x'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -65,6 +71,31 @@ jobs:
 
       - name: Check docs (links / anchors / format / symbols)
         run: bash scripts/check-docs.sh
+
+  boot4-compat:
+    # 4.1.x 专属门禁：用 -Pspring-boot-4.1 跑全 reactor 的 test-compile，
+    # 覆盖「一份代码同时支持 3.5.x 与 4.x」中的 4.x 那半条路径。
+    # 背景：该分支长期只被当成本地工作分支，CI 从未在其上跑过任何 profile，
+    # 于是 4.x 适配的编译问题只能靠人工发现。本 job 补上这个缺口。
+    # 只做 test-compile：4.x 下的部分 E2E 依赖 Boot 4 的模块拆分（starter-json 不再
+    # 传递 spring-web 等），跑全量测试需要额外适配，当前以「能编译」为门禁下限。
+    if: github.ref == 'refs/heads/4.1.x' || github.base_ref == '4.1.x'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          java-version: 17
+          distribution: temurin
+          cache: maven
+
+      - name: Compile against Spring Boot 4.1
+        # 先 clean：跨 profile 切换必须清 target，否则残留的 3.5 字节码会让编译
+        # 假绿/假红（4.1.x 适配期实测踩过 NoSuchMethodError 的坑）。
+        run: ./mvnw clean test-compile -Pspring-boot-4.1 --batch-mode --no-transfer-progress -q
 
   static-analysis:
     # SpotBugs + modernizer（提炼自 mybatis-parent）：独立成 job，避免给 8/11 旧 JDK 矩阵添负担
