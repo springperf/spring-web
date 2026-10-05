@@ -49,8 +49,8 @@
     </scm>
 
     <properties>
-        <!-- Spring Boot 版本（默认 3.5.x），可通过 profile 切换 -->
-        <spring-boot.version>3.5.16</spring-boot.version>
+        <!-- Spring Boot 版本：本分支（4.1.x）专用 4.1.x，不再兼容 3.5.x -->
+        <spring-boot.version>4.1.0</spring-boot.version>
 
         <java.version>17</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -61,9 +61,12 @@
 
         <!-- 第三方依赖版本统一管理 -->
         <netty.version>4.1.137.Final</netty.version>
-        <jackson.version>2.17.2</jackson.version>
-        <!-- Jackson 注解组件可独立于 core/databind 对齐版本（SB4 生态 annotations=2.21、core/databind=2.21.4） -->
-        <jackson-annotations.version>2.17.2</jackson-annotations.version>
+        <!-- SB4 生态：Jackson 3（tools.jackson）依赖 Jackson 2 注解兼容层 2.21。
+             本框架的 Jackson 2 组件对齐 SB4 BOM 的 jackson-2-bom 2.21.4
+             （annotations=2.21、core/databind=2.21.4），避免覆盖回旧版导致
+             Jackson 3 databind 初始化失败（缺 JsonSerializeAs）。 -->
+        <jackson.version>2.21.4</jackson.version>
+        <jackson-annotations.version>2.21</jackson-annotations.version>
         <fastjson2.version>2.0.60</fastjson2.version>
         <okhttp.version>4.12.0</okhttp.version>
         <hutool.version>5.8.23</hutool.version>
@@ -816,74 +819,11 @@
             </build>
         </profile>
 
-        <!-- Spring Boot 3.5.x（默认，无需显式激活；版本取顶层 spring-boot.version=3.5.16） -->
-        <profile>
-            <id>spring-boot-3.5</id>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-            <properties>
-                <!-- 使用默认值即可 -->
-            </properties>
-        </profile>
 
-        <!-- Spring Boot 3.1.x -->
-        <profile>
-            <id>spring-boot-3.1</id>
-            <properties>
-                <spring-boot.version>3.1.12</spring-boot.version>
-                <lombok.version>1.18.46</lombok.version>
-                <junit-jupiter.version>5.9.3</junit-jupiter.version>
-                <mockito.version>5.3.1</mockito.version>
-                <byte-buddy.version>1.14.16</byte-buddy.version>
-                <assertj.version>3.24.2</assertj.version>
-                <snakeyaml.version>1.33</snakeyaml.version>
-                <okhttp.version>4.10.0</okhttp.version>
-                <maven-surefire-plugin.version>3.1.2</maven-surefire-plugin.version>
-            </properties>
-        </profile>
 
-        <!-- Spring Boot 3.0.x -->
-        <profile>
-            <id>spring-boot-3.0</id>
-            <properties>
-                <spring-boot.version>3.0.13</spring-boot.version>
-                <lombok.version>1.18.46</lombok.version>
-                <junit-jupiter.version>5.9.3</junit-jupiter.version>
-                <mockito.version>4.8.1</mockito.version>
-                <byte-buddy.version>1.12.23</byte-buddy.version>
-                <assertj.version>3.23.1</assertj.version>
-                <netty.version>4.1.101.Final</netty.version>
-                <snakeyaml.version>1.33</snakeyaml.version>
-                <okhttp.version>4.10.0</okhttp.version>
-                <jackson.version>2.15.4</jackson.version>
-                <maven-surefire-plugin.version>3.1.2</maven-surefire-plugin.version>
-            </properties>
-        </profile>
 
-        <!-- Spring Boot 3.3.x -->
-        <profile>
-            <id>spring-boot-3.3</id>
-            <properties>
-                <spring-boot.version>3.3.3</spring-boot.version>
-            </properties>
-        </profile>
 
-        <!-- Spring Boot 3.4.x -->
-        <profile>
-            <id>spring-boot-3.4</id>
-            <properties>
-                <spring-boot.version>3.4.1</spring-boot.version>
-            </properties>
-        </profile>
 
-        <!-- Spring Boot 3.2.x -->
-        <profile>
-            <id>spring-boot-3.2</id>
-            <properties>
-                <spring-boot.version>3.2.12</spring-boot.version>
-            </properties>
-        </profile>
 
         <!-- Spring Boot 4.0.x -->
         <profile>
@@ -909,30 +849,6 @@
             </properties>
         </profile>
 
-        <profile>
-            <id>spring-boot-2.7</id>
-            <properties>
-                <spring-boot.version>2.7.18</spring-boot.version>
-            </properties>
-        </profile>
-        <profile>
-            <id>spring-boot-2.6</id>
-            <properties>
-                <spring-boot.version>2.6.15</spring-boot.version>
-            </properties>
-        </profile>
-        <profile>
-            <id>spring-boot-2.5</id>
-            <properties>
-                <spring-boot.version>2.5.15</spring-boot.version>
-            </properties>
-        </profile>
-        <profile>
-            <id>spring-boot-2.4</id>
-            <properties>
-                <spring-boot.version>2.4.13</spring-boot.version>
-            </properties>
-        </profile>
 
         <profile>
             <id>release</id>

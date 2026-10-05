@@ -7,6 +7,7 @@
         <artifactId>spring-web-parent</artifactId>
 
         <version>3.5.6</version>
+        <relativePath>../../pom.xml</relativePath>
     </parent>
 
     <artifactId>spring-web-example-support-test</artifactId>
@@ -26,7 +27,10 @@
 
     <dependencies>
         <!--
-          编译期需要 TestRestTemplate / RestTemplateBuilder 的真实类；版本由 profile 提供。
+          编译期需要 TestRestTemplate / RestTemplateBuilder 的真实类。
+          本分支（4.1.x）专用 Boot 4：这两个类在 Boot 4 移到了
+          spring-boot-resttestclient / spring-boot-restclient
+          （Boot 3 时代在 spring-boot-test 的 org.springframework.boot.test.web.client 下）。
           必须 optional：否则其传递依赖（含 spring-boot-test 自带的 junit/assertj 版本）会经
           test-scope 传递到下游 example，与下游自身的 starter-test 版本冲突，
           导致 surefire 报 "TestEngine with ID 'junit-jupiter' failed to discover tests"。
@@ -34,6 +38,18 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-test</artifactId>
+            <scope>provided</scope>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-resttestclient</artifactId>
+            <scope>provided</scope>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-restclient</artifactId>
             <scope>provided</scope>
             <optional>true</optional>
         </dependency>
@@ -48,123 +64,26 @@
 
     <build>
         <plugins>
-            <!-- 按 profile 各追加一个 source root（两者同名同包，只能二选一，故不设默认）。 -->
+            <!-- 挂载 sb4 源码根。早期兼容写法按 profile 在 sb3/sb4 间二选一，
+                 专用化后只剩 sb4 一套实现，改为直接在主 build 声明。 -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>build-helper-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>add-sb4-source</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>src/main/sb4/java</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
-
-    <profiles>
-        <!-- SB3（默认）：用 org.springframework.boot.test.web.client.TestRestTemplate -->
-        <profile>
-            <id>spring-boot-3.x-default</id>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>build-helper-maven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>add-sb3-source</id>
-                                <phase>generate-sources</phase>
-                                <goals>
-                                    <goal>add-source</goal>
-                                </goals>
-                                <configuration>
-                                    <sources>
-                                        <source>src/main/sb3/java</source>
-                                    </sources>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-
-        <!-- SB4：改用 org.springframework.boot.resttestclient.TestRestTemplate + spring-boot-restclient -->
-        <profile>
-            <id>spring-boot-4.0</id>
-            <dependencies>
-                <dependency>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-resttestclient</artifactId>
-                    <scope>provided</scope>
-                    <optional>true</optional>
-                </dependency>
-                <dependency>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-restclient</artifactId>
-                    <scope>provided</scope>
-                    <optional>true</optional>
-                </dependency>
-            </dependencies>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>build-helper-maven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>add-sb4-source</id>
-                                <phase>generate-sources</phase>
-                                <goals>
-                                    <goal>add-source</goal>
-                                </goals>
-                                <configuration>
-                                    <sources>
-                                        <source>src/main/sb4/java</source>
-                                    </sources>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-        <profile>
-            <id>spring-boot-4.1</id>
-            <dependencies>
-                <dependency>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-resttestclient</artifactId>
-                    <scope>provided</scope>
-                    <optional>true</optional>
-                </dependency>
-                <dependency>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-restclient</artifactId>
-                    <scope>provided</scope>
-                    <optional>true</optional>
-                </dependency>
-            </dependencies>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>build-helper-maven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>add-sb4-source</id>
-                                <phase>generate-sources</phase>
-                                <goals>
-                                    <goal>add-source</goal>
-                                </goals>
-                                <configuration>
-                                    <sources>
-                                        <source>src/main/sb4/java</source>
-                                    </sources>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
 </project>

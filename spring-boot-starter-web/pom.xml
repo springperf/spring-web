@@ -24,6 +24,13 @@
             <groupId>io.github.springperf</groupId>
             <artifactId>spring-web</artifactId>
         </dependency>
+        <!-- Boot 4 把 org.springframework.boot.web.server / web.context 从 spring-boot 主 jar
+             拆到独立 artifact。本分支（4.1.x）专用 Boot 4，故直接在主依赖声明
+             （早期兼容写法是用 SB4 profile 条件引入，以便同一份 pom 也能在 3.5 下编译）。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-web-server</artifactId>
+        </dependency>
         <!-- 注解处理器：本模块声明了 OpenApiProperties / SwaggerUiProperties 等 @ConfigurationProperties，
              缺此依赖则不会生成 spring-configuration-metadata.json，IDE 无法补全也无法校验配置键。
              optional：仅编译期需要，不应传递给使用方 -->
@@ -127,115 +134,44 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
             </plugin>
+            <!-- 本分支（4.1.x）专用 Spring Boot 4，下列 SB3 专属文件在编译期排除
+                 （它们引用 boot.web.context.*，该包在 Boot 4 已移走且事件改为抽象类，
+                 容器事件改由 support/Boot4WebServerInitializedEventBridge 运行时桥接）：
+                 排除方式：完整重声明 compiler-plugin（profile 只替换而非合并 <configuration>）。 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <release>${java.version}</release>
+                    <useIncrementalCompilation>false</useIncrementalCompilation>
+                    <compilerArgs>
+                        <arg>-parameters</arg>
+                    </compilerArgs>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                        <path>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-configuration-processor</artifactId>
+                            <version>${spring-boot.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                    <excludes>
+                        <exclude>io/springperf/web/autoconfigure/SpringWebRuntimeHints.java</exclude>
+                        <exclude>io/springperf/web/autoconfigure/WebServerInitializedEventAutoConfiguration.java</exclude>
+                        <exclude>io/springperf/web/autoconfigure/support/PerfWebServerInitializedEvent.java</exclude>
+                    </excludes>
+                    <testExcludes>
+                        <testExclude>io/springperf/web/autoconfigure/SpringWebRuntimeHintsTest.java</testExclude>
+                        <testExclude>io/springperf/web/autoconfigure/WebServerInitializedEventAutoConfigurationTest.java</testExclude>
+                        <testExclude>io/springperf/web/autoconfigure/support/PerfWebServerInitializedEventTest.java</testExclude>
+                    </testExcludes>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 
-    <profiles>
-        <!--
-          Spring Boot 4 适配（两个 profile 内容相同，因 Maven 无法按键名前缀匹配 profile）。
-          profile id 与根 pom 的同名 profile 一致：-Pspring-boot-4.0/4.1 会按 id 在本模块同样激活。
-
-          1) 依赖：Boot 4 把 org.springframework.boot.web.server / web.context 从 spring-boot 主 jar
-             拆到独立 artifact spring-boot-web-server，且 Boot 3.x 的 BOM 里没有该 artifact
-             （无法用版本管理），故只能在 SB4 profile 下条件引入。
-          2) 编译排除：下列两个文件是 SB3 专属，引用 boot.web.context.{WebServerInitializedEvent,
-             WebServerApplicationContext}（SB4 已移走且事件改为抽象类，改由 Boot4WebServerInitializedEventBridge
-             运行时桥接），只被同为 SB3 专属的 WebServerInitializedEventAutoConfiguration 使用。
-             排除方式：profile 内**完整重声明** maven-compiler-plugin（含根 pom 的全部配置），
-             因为 profile 只会**替换**而非合并 plugin 的 <configuration>（实测：只写 <excludes>
-             会丢掉 release/annotationProcessorPaths，且 excludes 亦不生效）。
-        -->
-        <profile>
-            <id>spring-boot-4.0</id>
-            <dependencies>
-                <dependency>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-web-server</artifactId>
-                </dependency>
-            </dependencies>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-compiler-plugin</artifactId>
-                        <configuration>
-                            <release>${java.version}</release>
-                            <useIncrementalCompilation>false</useIncrementalCompilation>
-                            <compilerArgs>
-                                <arg>-parameters</arg>
-                            </compilerArgs>
-                            <annotationProcessorPaths>
-                                <path>
-                                    <groupId>org.projectlombok</groupId>
-                                    <artifactId>lombok</artifactId>
-                                    <version>${lombok.version}</version>
-                                </path>
-                                <path>
-                                    <groupId>org.springframework.boot</groupId>
-                                    <artifactId>spring-boot-configuration-processor</artifactId>
-                                    <version>${spring-boot.version}</version>
-                                </path>
-                            </annotationProcessorPaths>
-                            <excludes>
-                                <exclude>io/springperf/web/autoconfigure/SpringWebRuntimeHints.java</exclude>
-                                <exclude>io/springperf/web/autoconfigure/WebServerInitializedEventAutoConfiguration.java</exclude>
-                                <exclude>io/springperf/web/autoconfigure/support/PerfWebServerInitializedEvent.java</exclude>
-                            </excludes>
-                            <testExcludes>
-                                <testExclude>io/springperf/web/autoconfigure/SpringWebRuntimeHintsTest.java</testExclude>
-                                <testExclude>io/springperf/web/autoconfigure/WebServerInitializedEventAutoConfigurationTest.java</testExclude>
-                                <testExclude>io/springperf/web/autoconfigure/support/PerfWebServerInitializedEventTest.java</testExclude>
-                            </testExcludes>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-        <profile>
-            <id>spring-boot-4.1</id>
-            <dependencies>
-                <dependency>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-web-server</artifactId>
-                </dependency>
-            </dependencies>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-compiler-plugin</artifactId>
-                        <configuration>
-                            <release>${java.version}</release>
-                            <useIncrementalCompilation>false</useIncrementalCompilation>
-                            <compilerArgs>
-                                <arg>-parameters</arg>
-                            </compilerArgs>
-                            <annotationProcessorPaths>
-                                <path>
-                                    <groupId>org.projectlombok</groupId>
-                                    <artifactId>lombok</artifactId>
-                                    <version>${lombok.version}</version>
-                                </path>
-                                <path>
-                                    <groupId>org.springframework.boot</groupId>
-                                    <artifactId>spring-boot-configuration-processor</artifactId>
-                                    <version>${spring-boot.version}</version>
-                                </path>
-                            </annotationProcessorPaths>
-                            <excludes>
-                                <exclude>io/springperf/web/autoconfigure/SpringWebRuntimeHints.java</exclude>
-                                <exclude>io/springperf/web/autoconfigure/WebServerInitializedEventAutoConfiguration.java</exclude>
-                                <exclude>io/springperf/web/autoconfigure/support/PerfWebServerInitializedEvent.java</exclude>
-                            </excludes>
-                            <testExcludes>
-                                <testExclude>io/springperf/web/autoconfigure/SpringWebRuntimeHintsTest.java</testExclude>
-                                <testExclude>io/springperf/web/autoconfigure/WebServerInitializedEventAutoConfigurationTest.java</testExclude>
-                                <testExclude>io/springperf/web/autoconfigure/support/PerfWebServerInitializedEventTest.java</testExclude>
-                            </testExcludes>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
 </project>
