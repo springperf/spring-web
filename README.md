@@ -178,6 +178,8 @@ adaptation branches. Minimum supported: **Spring Boot 2.4.x**.
 | `master` | **3.5.x** | 6.2.x | 17 / 21 / 25 | jakarta.servlet 6.0 | **Development baseline** (no Spring Boot 4 code) |
 | `4.1.x` | 4.0.x ~ 4.1.x | 7.0.x | 17 / 21 / 25 | jakarta.servlet 6.0 | Downstream adaptation (synced from master) |
 
+> The `4.1.x` branch keeps the mainline project version while it is developed; the version is bumped to **4.1.7** when that branch is first released (it has no release yet). Its `spring-boot.version` (Boot 4.1.0) is unrelated to the project version.
+>
 > See [Version Compatibility](docs/en/compatibility.md) for version floor notes, branch recommendations, and detailed compatibility information.
 
 ---

@@ -124,7 +124,7 @@ I/O 层配置默认值集中如下（均来自 [`PropertiesConstant.java`](../..
 | `server.netty.workers` | `0`（自动=CPU×2） | worker 线程数 | |
 | `server.netty.write-buffer-low-watermark` | `8192`（8KB） | 背压低水位 | |
 | `server.netty.write-buffer-high-watermark` | `32768`（32KB） | 背压高水位 | |
-| `server.http.read-timeout` | `0`（关闭） | 聚合前**读空闲**超时（防慢客户端占用连接）；默认关闭，生产建议显式设置（Tomcat `connectionTimeout` 默认 20s） | |
+| `server.http.read-timeout` | `0`（关闭） | 聚合前**读空闲**超时（防慢客户端占用连接）；默认关闭（性能优先）；生产环境通常由代理 / 网关回收空闲连接，网关覆盖不到的边界请显式设置（Tomcat `connectionTimeout` 默认 20s） | |
 | `server.http.max-content-length` | `4194304`（4MB） | 聚合上限 | |
 | `server.http.max-initial-line-length` | `4096`（4KB） | 请求行长度上限 | |
 | `server.max-http-request-header-size` | `8192`（8KB） | 合并请求头总大小上限 | |

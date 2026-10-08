@@ -18,6 +18,10 @@ adaptation branches (2.7.x / 4.1.x).
 Sync direction is always `master → 4.1.x` / `master → 2.7.x`; version adaptation code lives only
 in the downstream branches.
 
+The `4.1.x` branch keeps the mainline project version while it is developed and is bumped to `4.1.7`
+when that branch is released (its first release; no release exists yet). Its `spring-boot.version`
+(Boot 4.1.0) is unrelated to the project version.
+
 ---
 
 ## Version Floor Note

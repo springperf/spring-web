@@ -144,12 +144,12 @@
 
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
-| `server.max-connections` | `0`（不限） | 最大连接数（过载保护）；超限时直接断连（不 `fireChannelActive`，无法返回 503） |
+| `server.max-connections` | `0`（不限） | 最大连接数（过载保护）；超限时直接断连（不 `fireChannelActive`，无法返回 503）；生产环境通常由代理 / 网关的并发与连接上限承担（如 Nginx `limit_conn`），网关覆盖不到的边界见本表后说明 |
 | `server.max-parameter-count` | `10000` | 参数总数上限（防 hash DoS） |
 | `server.max-http-request-header-size` | `8192` | 合并请求头大小上限 |
 | `server.max-http-response-header-size` | `8192` | 响应头总大小上限（超限降级最小 500） |
 | `server.max-swallow-size` | `2MB` | 错误响应后吞掉请求体上限（负数不限） |
-| `server.keep-alive-timeout` / `server.max-keep-alive-requests` | `0`（不限） / `0`（不限） | keep-alive 空闲超时 / 单连接请求数上限。**两者默认都为 0 ⇒ `KeepAliveHandler` 不注入管线**；键名对齐 Boot，**默认值不同**（Boot/Tomcat 为 0 / 100）—— 本项目默认不施加连接级隐式限制，需要上限请显式设置 |
+| `server.keep-alive-timeout` / `server.max-keep-alive-requests` | `0`（不限） / `0`（不限） | keep-alive 空闲超时 / 单连接请求数上限。**两者默认都为 0 ⇒ `KeepAliveHandler` 不注入管线**；键名对齐 Boot，**默认值不同**（Boot/Tomcat 为 0 / 100）—— 本项目默认不施加连接级隐式限制，需要上限请显式设置；生产环境**通常由代理 / 网关承担**（连接数上限、keep-alive 请求数、空闲断连），网关覆盖不到的边界见本表后说明 |
 | `server.forward-headers-strategy` | `NONE` | 转发头信任策略：`NONE`/`FALSE` 不信任，`FRAMEWORK`/`NATIVE` 信任 |
 | `server.http.max-in-memory-size` | `4096` | 请求体内存聚合上限（超出转 ByteBuf） |
 | `server.http.max-chunk-size` | `8192` | 单 chunk 大小上限 |
@@ -158,7 +158,7 @@
 | `server.http.max-ranges` | `100` | 单个请求允许的 Range 段数上限；`0` 表示禁止多段（多段请求回退整实体），负值表示本层不额外限制 |
 | `server.http.multipart.max-part-count` | `-1` | multipart part 总数上限（`<=0` 不限）。**默认值与 Boot 不同**：Boot `server.tomcat.max-part-count` 为 `50`；键语义相同（非正数即关闭该上限） |
 | `server.http.multipart.max-part-header-size` | `8192` | 单个 multipart part 的 header 字节上限（`<=0` 不限），超限由增量扫描抛 `DecoderException` → **400**。**默认值与 Boot 不同**：Boot/Tomcat 的同名键默认 `512B`，本项目为 `8192` |
-| `server.http.read-timeout` | `0`（关闭） | 读**空闲**超时（支持 `30s` 写法；`<=0` 关闭）。只约束读空闲：**正在处理的请求不会被掐断**（慢 SQL / 下游调用 / 异步挂起的处理器耗时可超过该值，响应仍会送达）；仅回收真正空闲的连接与半截请求，语义对齐 Tomcat `connectionTimeout`。**默认关闭**（Tomcat 默认 20s）：本项目默认不施加连接级隐式限制，**生产环境建议显式设置** |
+| `server.http.read-timeout` | `0`（关闭） | 读**空闲**超时（支持 `30s` 写法；`<=0` 关闭）。只约束读空闲：**正在处理的请求不会被掐断**（慢 SQL / 下游调用 / 异步挂起的处理器耗时可超过该值，响应仍会送达）；仅回收真正空闲的连接与半截请求，语义对齐 Tomcat `connectionTimeout`。**默认关闭**（Tomcat 默认 20s）：本项目默认不施加连接级隐式限制，生产环境**通常由代理 / 网关回收空闲连接**；网关覆盖不到的边界（直连 / 东西向、应用↔网关这一跳的对端猝死）见本表后说明，无法保证时请显式设置 |
 
 > **完整清单**：以上为常用项。全部已支持键由 `SupportedPropertiesTest` 维护并校验——新增配置键若未登记到
 > `META-INF/additional-spring-configuration-metadata.json`，构建会失败。运行

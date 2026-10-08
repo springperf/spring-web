@@ -116,12 +116,12 @@
 | 配置键 | 默认值 | 超限行为（升级风险） |
 |---|---|---|
 | `server.max-parameter-count` | `10000` | 参数值总数超限抛 `ParameterLimitExceededException` → **400**（防 hash 碰撞 DoS）。原为不限，含超多参数的请求（如大批量表单）会开始 400 |
-| `server.max-connections` | `0`（不限） | 连接数超限时直接断连（不 `fireChannelActive`，无法返回 503）。默认不限 → 默认无行为变化 |
+| `server.max-connections` | `0`（不限） | 连接数超限时直接断连（不 `fireChannelActive`，无法返回 503）。默认不限 → 默认无行为变化；生产环境通常由代理 / 网关的并发与连接上限承担 |
 | `server.http.multipart.max-part-header-size` | `8192` | **单 part header 区**超限 → **400**。原为不限：文件名/自定义头较长的上传会开始失败，需调大 |
 | `server.http.multipart.max-part-count` | `-1`（不限） | part 总数超限 → **400**。默认不限 → 默认无行为变化 |
 | `server.max-http-response-header-size` | `8192` | 响应头总字节超限时**丢弃 body 并降级最小 500**。原为不限：响应头很大（大量 `Set-Cookie` / 自定义头）的接口会开始 500 |
 | `server.max-swallow-size` | `2MB` | 错误响应（4xx/5xx）后请求体超此值**不再吞完**，改为关闭连接（负面影响仅限 keep-alive 复用） |
-| `server.keep-alive-timeout` / `server.max-keep-alive-requests` | 均为 `0`（都不限制） | 两者**都为 0 ⇒ `KeepAliveHandler` 不注入管线**：默认不再有连接级隐式限制；需要空闲回收 / 请求数上限请显式设置 |
+| `server.keep-alive-timeout` / `server.max-keep-alive-requests` | 均为 `0`（都不限制） | 两者**都为 0 ⇒ `KeepAliveHandler` 不注入管线**：默认不再有连接级隐式限制；需要空闲回收 / 请求数上限请显式设置（生产环境通常由代理 / 网关承担，网关覆盖不到的边界见 `docs/configuration.md` 表后说明） |
 | `server.compression.*` | `false`（总开关） | 默认**不压缩**（保持既有行为）；开启后 gzip 仅作用于白名单 Content-Type、大于 `min-response-size` 且非零拷贝文件响应 |
 
 **与 Spring Boot 默认值不同（从 Boot 迁移时需显式配置）**：
@@ -132,7 +132,7 @@
 | `spring.mvc.throw-exception-if-no-handler-found` | `true` | `false` | 本框架默认抛异常（可被 `@ControllerAdvice` 拦截）而非直接 404/405；需要 Boot 行为时设为 `false` |
 | `spring.mvc.publish-request-handled-events` | `false` | `true` | 需要 `ServletRequestHandledEvent`（监控/审计）时显式开启 |
 | `server.max-keep-alive-requests` | `0`（不限） | `100` | 默认不再限制单连接请求数；要 Tomcat 行为请显式设为 `100` |
-| `server.http.read-timeout` | `0`（关闭） | Tomcat `connectionTimeout` = `20s` | 默认**不施加**读空闲防护：不设则慢速客户端可长期占用连接，**生产建议显式设置**（如 `30s`）。语义见手册：只回收真正空闲的连接与半截请求，在途请求不会被掐断 |
+| `server.http.read-timeout` | `0`（关闭） | Tomcat `connectionTimeout` = `20s` | 默认**不施加**读空闲防护：不设则慢速客户端可长期占用连接，生产环境**通常由代理 / 网关回收空闲连接**；网关覆盖不到的边界（直连 / 东西向、应用↔网关这一跳的对端猝死）请显式设置（如 `30s`）。语义见手册：只回收真正空闲的连接与半截请求，在途请求不会被掐断 |
 | `server.error.include-message` / `.include-binding-errors` | `never` | `never` | 一致 |
 - **第六节是行为与 API 变更**（响应分帧、Servlet flush 语义、条件请求/Range、扩展点签名），
   与配置迁移同属一次主版本升级，需一并评估。
