@@ -158,6 +158,7 @@ public WebMetrics micrometerWebMetrics(io.micrometer.core.instrument.MeterRegist
 | `netty.eventloop.pending.tasks` | Gauge | 所有 EventLoop 的待处理任务总数 |
 | `dispatcher.request.duration` | Timer | 请求处理耗时，tag: `method`, `path`, `status` |
 | `dispatcher.exception` | Counter | 异常计数，tag: `type`, `resolved` |
+| `dispatcher.async.active.lifecycles` | Gauge | 在飞异步生命周期数（未归零 = 有异步分发未终结） |
 | `pool.{name}.active.threads` | Gauge | 业务线程池活跃线程数 |
 | `pool.{name}.queue.size` | Gauge | 业务线程池队列大小 |
 | `pool.{name}.completed.tasks` | Gauge | 业务线程池已完成任务数 |

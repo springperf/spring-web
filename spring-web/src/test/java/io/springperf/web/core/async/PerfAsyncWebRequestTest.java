@@ -51,6 +51,28 @@ class PerfAsyncWebRequestTest {
         assertThrows(IllegalStateException.class, () -> asyncWebRequest.startAsync());
     }
 
+    /**
+     * 计量配对：每个异步生命周期恰好 +1 / -1。第二半（重复终结不得二次递减）才是要点——递减没有幂等守卫的话 计数会变成负值，而负值与残留叠加仍可能读成 0，把真泄漏掩盖掉。
+     */
+    @Test
+    void asyncLifecycle_isCountedOncePerLifecycle_andReleasedOnce() {
+        io.springperf.web.core.metrics.CountingWebMetrics metrics = new io.springperf.web.core.metrics.CountingWebMetrics();
+        when(request.getWebContext()).thenReturn(webContext);
+        when(webContext.getWebComponent(io.springperf.web.core.metrics.WebMetrics.class)).thenReturn(metrics);
+
+        PerfAsyncWebRequest asyncRequest = new PerfAsyncWebRequest(request, response);
+        assertEquals(0, metrics.activeAsyncLifecycles(), "未启动异步时不应计入");
+
+        asyncRequest.startAsync();
+        assertEquals(1, metrics.activeAsyncLifecycles(), "startAsync 应 +1");
+
+        asyncRequest.completeSuccessCallback();
+        assertEquals(0, metrics.activeAsyncLifecycles(), "写终结应 -1");
+
+        asyncRequest.completeSuccessCallback();
+        assertEquals(0, metrics.activeAsyncLifecycles(), "重复终结不得二次递减");
+    }
+
     @Test
     void startAsync_withTimeoutAndHandler_schedulesTimeout() {
         asyncWebRequest.setTimeout(1000L);
@@ -99,6 +121,9 @@ class PerfAsyncWebRequestTest {
     void dispatch_whenAlreadyCompleted_isNoOp() {
         asyncWebRequest.startAsync();
         asyncWebRequest.completeSuccessCallback();
+        // 生命周期开关（startAsync / 写终结）本来就会解析计量组件 → 也就会查一次 context；那不是本用例要断言的
+        // 东西（用例名说的是 dispatch 是 no-op）。故把验证范围收到 dispatch() 这一次调用上。
+        clearInvocations(request);
         asyncWebRequest.dispatch();
         verify(request, never()).getWebContext();
     }
@@ -169,6 +194,8 @@ class PerfAsyncWebRequestTest {
     void setConcurrentResultAndDispatch_whenAsyncComplete_doesNotDispatch() {
         asyncWebRequest.startAsync();
         asyncWebRequest.completeSuccessCallback();
+        // 同上：计量解析发生在生命周期开关上，本用例断言的是「已完成时不再分发」，故只验证这一句调用。
+        clearInvocations(request);
         asyncWebRequest.setConcurrentResultAndDispatch("result");
         verify(request, never()).getWebContext();
     }

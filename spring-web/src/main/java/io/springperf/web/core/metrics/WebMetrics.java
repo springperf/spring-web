@@ -70,4 +70,22 @@ public interface WebMetrics extends WebComponent {
      *            the thread pool executor to monitor
      */
     void registerPoolGauges(String poolName, ThreadPoolExecutor executor);
+
+    /**
+     * An asynchronous lifecycle was born: called once, after an async dispatch has successfully started.
+     * <p>
+     * Empty by default, so an implementation that does not need it pays nothing — {@link NoOpWebMetrics} is the default
+     * wiring and stays a no-op here. It is a {@code default} method rather than an abstract one so that adding it does
+     * not break implementations outside this repository.
+     * </p>
+     */
+    default void asyncLifecycleStarted() {
+    }
+
+    /**
+     * An asynchronous lifecycle ended: called once when the inbound request reference is given back, strictly paired
+     * with {@link #asyncLifecycleStarted()}.
+     */
+    default void asyncLifecycleCompleted() {
+    }
 }

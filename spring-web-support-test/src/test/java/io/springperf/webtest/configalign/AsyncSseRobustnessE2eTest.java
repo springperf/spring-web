@@ -1,11 +1,13 @@
 package io.springperf.webtest.configalign;
 
-import io.springperf.web.core.async.PerfAsyncWebRequest;
 import io.springperf.web.core.async.stream.SseEmitter;
+import io.springperf.web.core.metrics.CountingWebMetrics;
+import io.springperf.web.core.metrics.WebMetrics;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -42,7 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * </p>
  * <ol>
  * <li>客户端语义正确（内容完整/保序/不悬挂）；</li>
- * <li>{@link PerfAsyncWebRequest#activeRequestRefs()} 回到基线 + 服务端发送器无缺陷信号日志 （后者由 {@code @AfterEach} 把关：SSE
+ * <li>{@link CountingWebMetrics#activeAsyncLifecycles()} 回到基线 + 服务端发送器无缺陷信号日志 （后者由 {@code @AfterEach} 把关：SSE
  * 双终止块等缺陷往往「客户端全绿、服务端日志报错」）。</li>
  * </ol>
  */
@@ -58,6 +60,24 @@ class AsyncSseRobustnessE2eTest {
 
     @LocalServerPort
     int port;
+
+    /**
+     * 本 context 的计量组件：在飞异步生命周期计数取自它（{@link CountingWebMetrics#activeAsyncLifecycles()}）。
+     * <p>
+     * 这里**不再**读那个全局静态计数：全局计数把「归零」变成整个 JVM 的不变量，别的 context 有残留就污染本类 （实测：整仓 {@code clean test} 下 28 条级联误报 / 422.5s）。计数改由
+     * {@link RobustnessConfig} 注册为容器 bean，框架优先取容器内 bean，故作用域 = 本 context。
+     * </p>
+     */
+    @Autowired
+    WebMetrics webMetrics;
+
+    /** 在飞的异步生命周期数（语义同原先的全局读数，作用域改为本 context）。 */
+    private int activeRequestRefs() {
+        if (!(webMetrics instanceof CountingWebMetrics counting)) {
+            throw new IllegalStateException("本类需要可读计量实现（CountingWebMetrics），实际装配为 " + webMetrics.getClass().getName());
+        }
+        return counting.activeAsyncLifecycles();
+    }
 
     private String base() {
         return "http://localhost:" + port;
@@ -131,19 +151,18 @@ class AsyncSseRobustnessE2eTest {
         // 说明平时根本不等待）。取任务时长 3s 的 5 倍留余量，同时保证「永久不归零」仍然失败——
         // 不掩盖真泄漏。
         long deadline = System.currentTimeMillis() + 15000;
-        while (PerfAsyncWebRequest.activeRequestRefs() != 0 && System.currentTimeMillis() < deadline) {
+        while (activeRequestRefs() != 0 && System.currentTimeMillis() < deadline) {
             Thread.sleep(20);
         }
-        leakedRefsSeen.set(PerfAsyncWebRequest.activeRequestRefs() != 0);
-        assertEquals(0, PerfAsyncWebRequest.activeRequestRefs(),
-                "场景结束后异步持有者引用应归零（用例起点基线 " + baseline + "，残留即未终结的异步生命周期）");
+        leakedRefsSeen.set(activeRequestRefs() != 0);
+        assertEquals(0, activeRequestRefs(), "场景结束后异步持有者引用应归零（用例起点基线 " + baseline + "，残留即未终结的异步生命周期）");
     }
 
     // ==================== 1. pipelining × 流式 ====================
 
     @Test
     void pipelining_sseThenDeferred_responsesInOrder_noHang() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Socket s = openSocket(10000)) {
             // 同连接连续两个请求：SSE 流 + DeferredResult（不等第一个响应）
             send(s, "GET /e2e-rob/sse HTTP/1.1\r\nHost: localhost\r\n\r\n"
@@ -158,7 +177,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void pipelining_twoSseStreams_bothCompleteInOrder() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Socket s = openSocket(10000)) {
             send(s, "GET /e2e-rob/sse HTTP/1.1\r\nHost: localhost\r\n\r\n"
                     + "GET /e2e-rob/sse-b HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
@@ -174,7 +193,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void sse_lateSendErrorAfterCommit_streamNotCorrupted_noHang() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-rob/sse-late-error")) {
             // 首块已提交（响应头 + 第一段 SSE 帧已发出）
             String first = resp.body().source().readUtf8Line();
@@ -194,7 +213,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void backpressure_slowConsumer_thenRecover_allChunksInOrder() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         // 总量约 120KB（> 写缓冲 high watermark 32KB），足以触发应用层背压；
         // 用小块数 + 小接收窗口是为了让「客户端暂停读取 → 服务端暂停写出」尽快成立，
         // 同时保证用例在合理时间内收尾（块数过大会让恢复过程被 TCP 窗口限速拖长）。
@@ -220,7 +239,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void headRequest_sse_headersOnly_noBody_lifecycleTerminates() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Socket s = openSocket(6000)) {
             send(s, "HEAD /e2e-rob/sse HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
             String resp = readAll(s, 6000);
@@ -234,7 +253,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void headRequest_deferredResult_noBody_lifecycleTerminates() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Socket s = openSocket(6000)) {
             send(s, "HEAD /e2e-rob/dr HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
             String resp = readAll(s, 6000);
@@ -248,7 +267,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void http10_sse_closeDelimited_noChunkFraming_eventsDelivered() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Socket s = openSocket(8000)) {
             send(s, "GET /e2e-rob/sse HTTP/1.0\r\nHost: localhost\r\n\r\n");
             String resp = readAll(s, 8000);
@@ -267,7 +286,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void sse_fields_idEventRetryComment_exactWireFormat() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-rob/sse-fields")) {
             assertEquals(200, resp.code());
             assertEquals("text/event-stream", resp.header("Content-Type"));
@@ -291,7 +310,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void asyncTimeout_statusContract_locked_lateResultDropped() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-rob/dr-timeout")) {
             int code = resp.code();
             String body = resp.body().string();
@@ -306,7 +325,7 @@ class AsyncSseRobustnessE2eTest {
     @Test
     void reactive_clientAbort_cancelsUpstreamSubscription() throws Exception {
         ReactiveUpstream.reset();
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-rob/reactive")) {
             assertEquals(200, resp.code(), "reactive 返回值应被识别为流式（需 ReactiveAdapter 支持）");
             String first = resp.body().source().readUtf8Line();
@@ -326,7 +345,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void callable_throwsException_500AndRefsBack() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-rob/callable-fail")) {
             assertEquals(500, resp.code(), "Callable 抛异常应映射为 500");
             resp.body().string();
@@ -336,7 +355,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void deferredResult_setErrorResult_500AndRefsBack() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-rob/dr-error")) {
             assertEquals(500, resp.code(), "setErrorResult 应映射为 500");
             resp.body().string();
@@ -346,7 +365,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void completionStage_failedFuture_500AndRefsBack() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-rob/cs-fail")) {
             assertEquals(500, resp.code(), "CompletionStage 异常完成应映射为 500");
             resp.body().string();
@@ -356,7 +375,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void webAsyncTask_explicitTimeout_statusCodeLocked() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-rob/web-async-task")) {
             int code = resp.code();
             String body = resp.body().string();
@@ -372,7 +391,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void asyncTimeout_clientAlreadyGone_refsBack_noHang() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         Socket s = openSocket(3000);
         send(s, "GET /e2e-rob/dr-slow HTTP/1.1\r\nHost: localhost\r\n\r\n");
         // 超时（150ms）尚未触发时就断开：超时回调随后在已断开的连接上收尾
@@ -384,7 +403,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void sse_plainData_omitsIdEventRetryFields() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-rob/sse")) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -398,7 +417,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void sse_multilineData_continuationUsesDataPrefix() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-rob/sse-multiline")) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -409,7 +428,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void sse_earlyEncode_allChunksDelivered() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-rob/sse-early")) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -422,7 +441,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void sse_fastSendThenComplete_noDataLoss() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-rob/sse-fast")) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -433,7 +452,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void sse_duplicateComplete_and_sendAfterComplete_areIgnored() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-rob/sse-idempotent")) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -445,7 +464,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void sse_headers_contentTypeAndCacheControlExact() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-rob/sse")) {
             assertEquals(200, resp.code());
             assertEquals("text/event-stream", resp.header("Content-Type"));
@@ -457,7 +476,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void sse_utf8Multibyte_acrossChunks_intact() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-rob/sse-utf8")) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -469,7 +488,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void textStreamEmitter_rawTextWithoutSsePrefix() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-rob/text-stream")) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
@@ -483,7 +502,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void keepAlive_sseThenNormalRequest_connectionReusable() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Socket s = openSocket(10000)) {
             send(s, "GET /e2e-rob/sse HTTP/1.1\r\nHost: localhost\r\n\r\n");
             String first = readUntil(s, text -> text.contains("0\r\n\r\n"), 10000);
@@ -499,7 +518,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void backpressure_slowConsumer_thenAbort_refsBack_noDefect() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Socket s = openSocket(8000)) {
             s.setReceiveBufferSize(4096);
             send(s, "GET /e2e-rob/sse-big?n=200 HTTP/1.1\r\nHost: localhost\r\n\r\n");
@@ -510,7 +529,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void clientAbort_beforeFirstChunk_refsBack_noHang() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         Socket s = openSocket(3000);
         send(s, "GET /e2e-rob/sse-slow-start HTTP/1.1\r\nHost: localhost\r\n\r\n");
         s.close(); // 首块送出之前就断开
@@ -519,7 +538,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void http11_chunkedFraming_terminatorPresent() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Socket s = openSocket(8000)) {
             send(s, "GET /e2e-rob/sse HTTP/1.1\r\nHost: localhost\r\n\r\n");
             String resp = readUntil(s, text -> text.contains("0\r\n\r\n"), 8000);
@@ -534,7 +553,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void reactive_sourceCompletes_streamTerminatesNormally_refsBack() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-rob/reactive-complete")) {
             assertEquals(200, resp.code());
             String body = resp.body().string(); // 读到 EOF：onComplete → 正常收尾
@@ -545,7 +564,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void reactive_sourceErrors_streamTruncated_refsBack() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-rob/reactive-error")) {
             assertEquals(200, resp.code());
             try {
@@ -560,7 +579,7 @@ class AsyncSseRobustnessE2eTest {
     @Test
     void reactive_idleSource_clientAbort_cancelsUpstreamSubscription() throws Exception {
         ReactiveUpstream.reset();
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-rob/reactive-idle")) {
             assertEquals(200, resp.code());
             String first = resp.body().source().readUtf8Line();
@@ -578,7 +597,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void reactive_defaultSse_isJsonEncoding_objectPayloadSerialized() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-rob/sse-json")) {
             assertEquals(200, resp.code());
             assertEquals("text/event-stream", resp.header("Content-Type"));
@@ -594,7 +613,7 @@ class AsyncSseRobustnessE2eTest {
 
     @Test
     void reactive_streamEmitterTypeAnnotation_selectsGivenEmitter() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-rob/sse-annotated")) {
             assertEquals(200, resp.code());
             String first = resp.body().source().readUtf8Line();
@@ -625,11 +644,11 @@ class AsyncSseRobustnessE2eTest {
         // 窗口 15s：上一用例的收尾在整包 + 高负载下可能迟到数秒，基线判定需给同等余量。
         // 恢复了就重新武装满窗口（下一个真泄漏照样有完整余量），没恢复则本用例不再重等。
         long deadline = System.currentTimeMillis() + (leakedRefsSeen.get() ? 0 : 15000);
-        while (PerfAsyncWebRequest.activeRequestRefs() != 0 && System.currentTimeMillis() < deadline) {
+        while (activeRequestRefs() != 0 && System.currentTimeMillis() < deadline) {
             Thread.sleep(20);
         }
-        leakedRefsSeen.set(PerfAsyncWebRequest.activeRequestRefs() != 0);
-        assertEquals(0, PerfAsyncWebRequest.activeRequestRefs(), "用例开始前不应存在未终结的异步生命周期");
+        leakedRefsSeen.set(activeRequestRefs() != 0);
+        assertEquals(0, activeRequestRefs(), "用例开始前不应存在未终结的异步生命周期");
     }
 
     @org.junit.jupiter.api.BeforeEach
@@ -667,6 +686,15 @@ class AsyncSseRobustnessE2eTest {
 
     @TestConfiguration
     static class RobustnessConfig {
+
+        /**
+         * 可读计量实现：本类要断言「异步生命周期归零」，而默认装配是 {@code NoOpWebMetrics} —— 它读不出计数 （这正是默认装配零开销的原因）。注册成容器 bean 后框架优先取它。
+         */
+        @Bean
+        WebMetrics countingWebMetrics() {
+            return new CountingWebMetrics();
+        }
+
         @Bean
         RobustnessController robustnessController() {
             return new RobustnessController();
