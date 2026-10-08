@@ -224,13 +224,18 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
             ReentrantLock lock = writeLockFor(sessionId);
             lock.lock();
             try {
-                if (sessions.remove(sessionId, session)) {
+                // 锁内重查：等锁期间该会话可能已被并发请求 touch 复活（同 sweepExpired 的理由）
+                if (session.isExpired(System.currentTimeMillis()) && sessions.remove(sessionId, session)) {
                     deleteFileQuietly(fileOf(sessionId));
+                    return null;
                 }
             } finally {
                 lock.unlock();
             }
-            return null;
+            // 重查发现已复活：当作有效会话返回，不要把它从内存里摘掉。
+            // 注：这里返回的可能是被并发 invalidate 的会话，但 invalidate 会让 isInvalid() 为真，
+            // 由调用方现有的失效检查处理。
+            return session;
         }
         return session;
     }
@@ -241,6 +246,45 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
         HttpSessionData session = new HttpSessionData(id, System.currentTimeMillis());
         sessions.put(id, session);
         return session;
+    }
+
+    /**
+     * 会话 ID 轮换（{@code changeSessionId}）的存储侧实现：在旧 id 的条带锁内，**先摘除旧会话、再复制属性**到新会话。
+     * <p>
+     * 为什么必须先摘除：{@code attributes} 是 {@code ConcurrentHashMap}，迭代器弱一致——边遍历边有并发写会漏掉
+     * 部分属性（登录态/token 静默丢失）。而 {@link #saveSession} 只对「在册」会话生效
+     * （守卫 {@code !sessions.containsKey(id)}），所以一旦在锁内摘除，后续并发写就不会再落到旧会话上，
+     * 复制期间的数据是稳定的。
+     * </p>
+     * <p>
+     * 之所以不用 {@link #createSession()} + 两次独立调用：那两处用的是**新/旧两个不同 id 的锁**，中间窗口里
+     * 并发 {@code saveSession} 仍能写旧会话，属性复制会漏。
+     * </p>
+     *
+     * @param oldId
+     *            旧会话 id
+     * @param oldData
+     *            旧会话数据
+     * @return 已完成属性复制的新会话数据（已登记在册）
+     */
+    @Override
+    public HttpSessionData replaceSessionCopyingAttributes(String oldId, HttpSessionData oldData) {
+        ReentrantLock lock = writeLockFor(oldId);
+        lock.lock();
+        try {
+            // 先在锁内摘除：此后 saveSession 的 containsKey 守卫会拒掉对旧会话的写入
+            sessions.remove(oldId);
+            deleteFileQuietly(fileOf(oldId));
+            HttpSessionData newData = new HttpSessionData(generateSessionId(), System.currentTimeMillis());
+            for (Map.Entry<String, Object> entry : oldData.getAttributes().entrySet()) {
+                newData.setAttribute(entry.getKey(), entry.getValue());
+            }
+            newData.setMaxInactiveInterval(oldData.getMaxInactiveInterval());
+            sessions.put(newData.getId(), newData);
+            return newData;
+        } finally {
+            lock.unlock();
+        }
     }
 
     /** 会话 id 恒定映射到同一把条带锁，保证「同一会话」的磁盘写严格串行。 */
@@ -453,7 +497,11 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
             ReentrantLock lock = writeLockFor(id);
             lock.lock();
             try {
-                if (sessions.remove(id, session)) {
+                // 锁内重查：上面的 isExpired 是拿锁前读的，等锁期间该会话可能已被正常请求
+                // touch（PerfHttpSession 会就地刷新 lastAccessedTime）而复活。不重查就会把
+                // 活跃会话连同文件一起删掉——remove(id, session) 只比对对象引用，touch 改的是
+                // 同一对象的字段，条件式移除挡不住这种情况。
+                if (session.isExpired(System.currentTimeMillis()) && sessions.remove(id, session)) {
                     deleteFileQuietly(fileOf(id));
                 }
             } finally {
