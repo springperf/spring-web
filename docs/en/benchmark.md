@@ -22,6 +22,8 @@
 | Allocation / request (json 4t) | **10.1KB** | 23.4KB (**43%**) | 32.6KB (**31%**) |
 | Heap at 4 threads | **24MB** | 26MB | 25MB |
 
+> Heap figures come from the same benchmark run (`json` scenario, 4 threads); see [version source](#framework-versions) below for the container version matrix.
+
 Across **7 APIs × 3 concurrency levels (4/8/16 threads)**, perf is **#1 on every API at every level** (no exceptions). The most dramatic advantage is SSE: at 16t throughput reaches **7.72x** Spring MVC and p50 latency is only **13%** of Tomcat's.
 
 > **On scaling ratios:** perf's json 4→16 thread scaling is +95%, lower than Spring MVC (+129%) and WebFlux (+161%) — but that is because perf at 4t already runs near saturation (37,508 vs Spring MVC's 19,900): a high base, hence a small marginal gain. In absolute 16t throughput perf still leads 73,286 vs 45,481 (**1.61x**). A lower scaling ratio ≠ weaker scaling; absolute throughput is #1 throughout.

@@ -162,7 +162,9 @@ Specific implementations:
 
 ### Why It's Faster
 
-GC pressure directly translates to STW pauses. Reducing 1-2 short-lived object allocations per request translates to 1.7 million fewer allocations per minute at 28K ops/s.
+GC pressure directly translates to STW pauses. Reducing 1-2 short-lived object allocations per request translates to roughly 1.7 million fewer allocations per minute at the 28K ops/s scale.
+
+> The 28K figure is a **round number chosen for mental arithmetic** (perf measures 13.3K-42.0K ops/s at 4 threads — see the [benchmark report](benchmark.md)); 1.7M = 28,000 × 60 × 1 object. The point (allocation volume drives GC pressure) holds regardless of the exact value.
 
 ---
 
