@@ -5,7 +5,7 @@ import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.springframework.web.context.request.NativeWebRequest;
 
 import io.springperf.web.http.WebServerHttpRequest;

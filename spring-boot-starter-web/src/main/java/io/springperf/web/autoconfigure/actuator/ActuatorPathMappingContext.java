@@ -69,8 +69,9 @@ public class ActuatorPathMappingContext extends PathMappingContext {
                 if (httpStatus != null)
                     response.setStatusCode(httpStatus);
             }
-            if (wer.getContentType() != null)
-                response.getHeaders().setContentType(MediaType.parseMediaType(wer.getContentType().toString()));
+            org.springframework.util.MimeType contentType = wer.getContentType();
+            if (contentType != null)
+                response.getHeaders().setContentType(MediaType.parseMediaType(contentType.toString()));
             result = wer.getBody();
         }
         return result;

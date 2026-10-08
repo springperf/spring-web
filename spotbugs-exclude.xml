@@ -1022,4 +1022,30 @@
         <Bug pattern="CT_CONSTRUCTOR_THROW"/>
     </Match>
 
+    <!-- SupportMultipartResolver：每连接复用的 multipart 解析器，start() 记下当前 HttpRequest、
+         getRequest() 把同一个活引用交回（供超限时构造 413）。请求对象无法做防御性拷贝，且这两个
+         方向都是设计契约，故排除。
+         SupportMultipartResolver is a per-connection resolver: start() keeps the current
+         HttpRequest and getRequest() hands the same live reference back (the 413 path needs
+         it). An HttpRequest cannot be defensively copied, and both directions are the
+         intended contract. -->
+    <Match>
+        <Class name="io.springperf.web.http.support.SupportMultipartResolver"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
+    <Match>
+        <Class name="io.springperf.web.http.support.SupportMultipartResolver"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- TestRestTemplate：4.1.x 的跨版本测试用 shim，故意与被包装的 Boot 4 类同名（见
+         .agent/context/4.1.x-adaptation-checklist.md §5.1），靠 profile 选择 source root。
+         TestRestTemplate is the branch's cross-version test shim; shadowing the wrapped
+         Boot 4 class name is the point. -->
+    <Match>
+        <Class name="io.springperf.example.support.TestRestTemplate"/>
+        <Bug pattern="NM_SAME_SIMPLE_NAME_AS_SUPERCLASS"/>
+    </Match>
+
 </FindBugsFilter>

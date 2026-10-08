@@ -75,7 +75,9 @@ public class SecuritySessionController {
      */
     @GetMapping("/admin")
     public Map<String, Object> adminEndpoint() {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        String username = java.util.Objects
+                .requireNonNull(SecurityContextHolder.getContext().getAuthentication(), "authenticated principal")
+                .getName();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("username", username);
         result.put("role", "ADMIN");
@@ -88,7 +90,9 @@ public class SecuritySessionController {
      */
     @GetMapping("/user")
     public Map<String, Object> userEndpoint() {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        String username = java.util.Objects
+                .requireNonNull(SecurityContextHolder.getContext().getAuthentication(), "authenticated principal")
+                .getName();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("username", username);
         result.put("role", "USER");
