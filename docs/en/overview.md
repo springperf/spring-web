@@ -145,7 +145,7 @@ So I launched the **Spring Performance Engineering** project. Core idea: resolve
 In JMH benchmarks on JDK 17 + G1GC (1GB heap), this framework leads across all 7 scenarios:
 
 - Small-payload throughput **36K\~42K** ops/s (4 threads), **1.56x\~2.26x** of Spring MVC
-- P50 latency **0.10~0.11ms**, approximately **45-67%** of Spring MVC
+- P50 latency **0.10~0.11ms** (4 threads, small payload), approximately **45-67%** of Spring MVC
 - Steady-state heap **24MB** (4 threads), approximately **92%** of Spring MVC
 - SSE streaming throughput **13,323** ops/s (4 threads), reaching **12.63x** of Spring MVC, **7.72x** at 16 threads
 
@@ -199,7 +199,7 @@ This framework doesn't demand "all or nothing." Through the `spring-web-servlet`
 |----------|--------|
 | **Resource-constrained environments** (1c1g, 2c2g) | Low framework overhead; 1.6~2.3x throughput of Spring MVC with same resources |
 | **High-throughput API services** | 36K~42K ops/s capacity |
-| **Latency-sensitive workloads** | P50 0.10~0.11ms, 45-67% of Spring MVC |
+| **Latency-sensitive workloads** | P50 0.10~0.11ms (4 threads, small payload), 45-67% of Spring MVC |
 | **SSE / streaming push** | Lock-free Drain Loop design; 12.63x Spring MVC throughput (4 threads) / 7.72x (16 threads) |
 | **Greenfield projects** | Zero migration cost |
 | **IoT / device ingestion** | High volume of small requests, resource-constrained — the original use case |
@@ -267,7 +267,7 @@ This means: AI can optimize your business layer to the extreme, but if the under
 
 The core interaction pattern of LLM applications is **streaming output**: tokens generated one by one, pushed in real-time. Whether it's ChatGPT's word-by-word replies, Agent task status streams, or RAG retrieval progress feedback, they all rely on **SSE (Server-Sent Events)** protocol.
 
-However, SSE performs poorly on traditional Servlet containers — Spring MVC's SSE throughput is only ~**1,055 ops/s** (4 threads), making it a bottleneck in AI application pipelines. This project's SSE throughput reaches **13,323 ops/s**, **12.63x** of Spring MVC, **7.72x** at 16 threads. This is powered by **NettyStreamSender**'s lock-free Drain Loop design: write operations don't depend on thread pool scheduling, completing batch flushes directly on EventLoop, avoiding the problem of SSE connections occupying threads in traditional Servlet containers.
+However, SSE performs poorly on traditional Servlet containers — Spring MVC's SSE throughput is only ~**1,055 ops/s** (4 threads), making it a bottleneck in AI application pipelines. This project's SSE throughput reaches **13,323 ops/s**, **12.63x** of Spring MVC, **7.72x** at 16 threads. This is powered by **`AbstractNettyStreamSender`**'s lock-free Drain Loop design: write operations don't depend on thread pool scheduling, completing batch flushes directly on EventLoop, avoiding the problem of SSE connections occupying threads in traditional Servlet containers.
 
 This means:
 

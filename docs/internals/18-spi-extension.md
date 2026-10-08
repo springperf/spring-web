@@ -19,11 +19,11 @@
 所有可插拔组件的根接口（`WebComponent.java`）：
 
 ```java
-public interface WebComponent extends Ordered {              
-    default String getComponentName() { return getClass().getSimpleName(); }   // :26
-    default void initWithWebContext(WebContext webContext) { }                 // :39
+public interface WebComponent extends Ordered {
+    default String getComponentName() { return getClass().getSimpleName(); }
+    default void initWithWebContext(WebContext webContext) { }
     @Override
-    default int getOrder() { return Ordered.LOWEST_PRECEDENCE - 10000; }      // :53
+    default int getOrder() { return Ordered.LOWEST_PRECEDENCE - 10000; }
 }
 ```
 
