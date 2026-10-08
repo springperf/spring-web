@@ -6,7 +6,7 @@
         <artifactId>spring-web-parent</artifactId>
         <!-- 必须是字面量：parent 的 version 在解析父子关系时需要先于属性插值可读，
              写 ${project.version} 会导致 Non-resolvable parent POM -->
-        <version>3.5.6</version>
+        <version>4.1.7</version>
     </parent>
 
     <!--

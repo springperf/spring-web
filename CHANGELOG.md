@@ -4,7 +4,11 @@
 
 本项目遵循 [语义化版本控制](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased]
+## [4.1.7] - 20261008
+
+> **关于本版本**：`4.1.x` 是从 `master`（纯 Spring Boot 3.5.x）**拆分出来独立发布**的下游分支，
+> 首个发布版本号为 **`4.1.7`**：Spring Boot 4.0 / 4.1 + Spring Framework 7 + Jackson 3，不再兼顾 3.5.x。
+> 因此首个版本的变更包含「分支拆分与适配」本身，其余条目与 master 的 `3.5.7` 基本一致（后者原文附于本节之后）。
 
 ### 变更
 
@@ -477,3 +481,45 @@
 - 管理端点独立分发器（ManagementDispatcherHandler）
 - 映射注册表优化（单遍遍历替代三次流遍历）
 - 异常解析器递归深度限制（最大 10 层）
+
+---
+
+## [3.5.7] - 20261005
+
+> ⚠️ **本版含破坏性变更**：配置键、响应分帧、Servlet `flush` 语义、条件请求/Range、
+> 扩展点签名均有调整，**升级前请先读 [破坏性变更说明](docs/BREAKING-CHANGES.md)**。
+
+### 新增
+
+- **静态资源与视图**：`WebExchangeProvider` 可插拔 SPI，模板中可直接拿到真实 session 与 principal；视图/编码相关配置键统一
+- **HTTP 协议语义对齐**：条件请求（`If-None-Match` / `If-Modified-Since`）、字节范围（含多段 `multipart/byteranges` 与 `Accept-Ranges`）、响应分帧按 RFC 7231/7232/7233 收紧
+- **服务端配置对齐 Spring Boot**：连接与请求上限、keep-alive 超时/请求数、multipart 上限、错误响应策略、国际化绑定等一组配置键（见配置手册与 [破坏性变更说明](docs/BREAKING-CHANGES.md) 第六节）
+- **批量处理**：`@BatchMapping` 支持在虚拟线程上执行（JDK 21+），保留 `consumerSize` 上限与背压语义
+- **配置刷新**：属性快照与基于 Spring Cloud 环境变更的刷新
+
+### 变更
+
+- **分支策略**：`master` 收敛为**纯 Spring Boot 3.5.x**——此前叠加的 Spring Boot 4 / Spring Framework 7 兼容层（`WebHttpHeaders` 的版本分支与 MethodHandle、`MediaTypeUtils`、`ResponseStatusExceptionAdapter`、`Boot4WebServerInitializedEventBridge`、SB4 Maven Profile 等）已全部移除；4.x 适配改由 `4.1.x` 分支承接（同步规则见 [4.1.x 适配指南](.agent/context/4.1.x-adaptation-checklist.md)）
+- **响应分帧**：`flush(true)` 由「一次性」改为 chunked 渐进式输出
+- **Servlet `PrintWriter`**：`print`/`println` 不再自动提交（对齐 Tomcat `autoFlush=false`）
+- **扩展点签名变更**（源码级不兼容，详见 [破坏性变更说明](docs/BREAKING-CHANGES.md) 6.3）
+- **会话、重定向与条件请求的错误映射**调整（6.7）；管理端口与转发语义调整（6.8）
+
+### 安全
+
+- **会话固定（Session Fixation）防护**：会话 ID 在登录前后轮换，杜绝固定攻击
+- **Multipart DoS 防护**：按声明 `Content-Length` 提前 fail-fast + 流式累计字节上限（覆盖 chunked），超限返回 413 而非断连
+- **Fastjson 反序列化硬化**：默认关闭 `SupportAutoType` 并开启 `ErrorOnNotSupportAutoType`，阻断 `@type` gadget 链
+- **请求参数数量上限**：`server.max-parameter-count` 默认 10000，防 hash 碰撞 DoS
+
+### 优化
+
+- **热路径分配**：JFR 驱动的若干优化（请求分发、属性查找、`WebHttpHeaders` 的只读视图缓存等），降低每请求分配与 CPU
+- **兼容层移除带来的性能收益**：`WebHttpHeaders` 的 8 个 `MultiValueMap` 方法此前经 `MethodHandle` + varargs `invokeWithArguments` 调用（每次分配 `Object[]`），而 `get()`/`entrySet()`/`keySet()` 均在每请求热路径上；现改为 `super.*()` 直调
+
+### 修复
+
+- **会话并发**：过期会话清理改为在写锁内条件摘除，修复「刚清理的过期会话被并发落盘写回、重启后复活」；会话写入串行化
+- **异步 / SSE 生命周期**：`DeferredResult` 终态只触发一次、超时任务及时清理、`ByteBuf` 引用计数配对，避免长连接下的泄漏与提前释放
+- **自动配置注册表残留**：`AutoConfiguration.imports` 中仍注册着已删除的 `Boot4WebServerInitializedEventAutoConfiguration`，会导致 Spring 上下文启动失败
+- **404/405 状态共享污染**、**Filter 链异常路径**、**`WebContext` 生命周期**、**路由边界**等一批既有缺陷
