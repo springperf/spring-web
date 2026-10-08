@@ -14,8 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * 验证 {@link SpringWebRuntimeHints} 的事件路径可达性提示。 JVM 模式下本 registrar 不被调用（由 Spring AOT 构建期触发），本测试直接驱动它验证注册结果。
  * <p>
- * 早期版本还要验证「SB4 类型仅在 classpath 存在时注册」的条件语义（当时测试 classpath
- * 用桩类模拟）。本分支专用 Spring Boot 4，SB4 类型是真实依赖，条件注册已移除，故只测正面注册。
+ * 早期版本还要验证「SB4 类型仅在 classpath 存在时注册」的条件语义（当时测试 classpath 用桩类模拟）。本分支专用 Spring Boot 4，SB4 类型是真实依赖，条件注册已移除，故只测正面注册。
  * </p>
  */
 class SpringWebRuntimeHintsTest {

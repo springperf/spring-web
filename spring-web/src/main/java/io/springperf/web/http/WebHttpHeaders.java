@@ -14,30 +14,25 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 /**
  * {@link HttpHeaders} 子类，在 Spring Framework 7（Spring Boot 4.x）下实现 {@link MultiValueMap}。
  * <p>
- * Spring 7 的 {@code HttpHeaders} 不再实现 {@code MultiValueMap}，也不再有 {@code containsKey} /
- * {@code containsValue} / {@code keySet} / {@code values} / {@code entrySet} —— 这些方法改由
- * {@link HttpHeaders#asMultiValueMap()} 返回的内部 {@code MultiValueMap} 视图暴露。本类在构造期缓存该视图
- * （零拷贝，指向父类内部的 headers 字段），把 Spring 7 缺失的那批方法委派过去；父类已有的方法
- * （{@code size} / {@code isEmpty} / {@code get} / {@code put} / {@code remove} / {@code putAll} /
- * {@code clear} 等）直接调 {@code super}。
+ * Spring 7 的 {@code HttpHeaders} 不再实现 {@code MultiValueMap}，也不再有 {@code containsKey} / {@code containsValue} /
+ * {@code keySet} / {@code values} / {@code entrySet} —— 这些方法改由 {@link HttpHeaders#asMultiValueMap()} 返回的内部
+ * {@code MultiValueMap} 视图暴露。本类在构造期缓存该视图 （零拷贝，指向父类内部的 headers 字段），把 Spring 7 缺失的那批方法委派过去；父类已有的方法 （{@code size} /
+ * {@code isEmpty} / {@code get} / {@code put} / {@code remove} / {@code putAll} / {@code clear} 等）直接调 {@code super}。
  * </p>
  * <p>
- * <b>分支说明</b>：本分支（4.1.x）专用 Spring Boot 4.1，不与 3.5.x 共用代码，因此这里<b>没有</b>
- * 任何运行时版本探测。早期 master 上的实现为同时兼容 Spring 6/7，用 {@code static final boolean}
- * + 8 个 {@code MethodHandle}（{@code findSpecial} 调父类默认实现）+ {@code invokeWithArguments}
- * 在类加载期选分支；随「master 收敛为纯 3.5.x、4.x 适配移入本分支」，那套机制在本分支已无必要
- * ——直接写 Spring 7 的形态即可。与 {@code 2.7.x} 分支对 Spring 5.3 的处理方式一致。
+ * <b>分支说明</b>：本分支（4.1.x）专用 Spring Boot 4.1，不与 3.5.x 共用代码，因此这里<b>没有</b> 任何运行时版本探测。早期 master 上的实现为同时兼容 Spring 6/7，用
+ * {@code static final boolean} + 8 个 {@code MethodHandle}（{@code findSpecial} 调父类默认实现）+ {@code invokeWithArguments}
+ * 在类加载期选分支；随「master 收敛为纯 3.5.x、4.x 适配移入本分支」，那套机制在本分支已无必要 ——直接写 Spring 7 的形态即可。与 {@code 2.7.x} 分支对 Spring 5.3 的处理方式一致。
  * </p>
  * <p>
- * <b>性能</b>：调用点此前为绕开类型不匹配而写 {@code toSingleValueMap().keySet()}（O(n) 复制），
- * 现在可直接用 {@code keySet()}；也去掉了 {@code RequestHeaderResolverProvider} 里的反射兼容代码。
+ * <b>性能</b>：调用点此前为绕开类型不匹配而写 {@code toSingleValueMap().keySet()}（O(n) 复制）， 现在可直接用 {@code keySet()}；也去掉了
+ * {@code RequestHeaderResolverProvider} 里的反射兼容代码。
  * </p>
  * <p>
- * <b>不缓存 {@link #getContentType()} 的解析结果</b>（曾用 {@code cachedContentType} 字段）：该缓存只能由
- * {@link #setContentType(MediaType)} 重置，而本类另有多个覆写方法（{@code set} / {@code add} / {@code remove} /
- * {@code put} / {@code putAll} / {@code clear} …）会改动 header 却<b>不</b>重置它 —— 业务经
- * {@code getHeaders().set("Content-Type", v)} 写入后会读到过期值，且该失效无任何报错，属静默错误。
- * 去掉后的代价实测为服务端分配 +27 B/op（json 场景，+0.5%），相对吞吐测量噪声可忽略。
+ * <b>不缓存 {@link #getContentType()} 的解析结果</b>（曾用 {@code cachedContentType} 字段）：该缓存只能由 {@link #setContentType(MediaType)}
+ * 重置，而本类另有多个覆写方法（{@code set} / {@code add} / {@code remove} / {@code put} / {@code putAll} / {@code clear} …）会改动 header
+ * 却<b>不</b>重置它 —— 业务经 {@code getHeaders().set("Content-Type", v)} 写入后会读到过期值，且该失效无任何报错，属静默错误。 去掉后的代价实测为服务端分配 +27
+ * B/op（json 场景，+0.5%），相对吞吐测量噪声可忽略。
  * </p>
  */
 public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String, String> {
@@ -45,12 +40,11 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
     /**
      * 父类内部 headers 的 {@code MultiValueMap} 视图（{@link HttpHeaders#asMultiValueMap()} 返回值）。
      * <p>
-     * Spring 7 的 {@code HttpHeaders} 把 {@code containsKey} / {@code keySet} / {@code entrySet} 等
-     * 「Map 语义」方法移到了这个视图上，父类自身不再暴露，故本类缓存它并在对应方法里委派。
+     * Spring 7 的 {@code HttpHeaders} 把 {@code containsKey} / {@code keySet} / {@code entrySet} 等 「Map
+     * 语义」方法移到了这个视图上，父类自身不再暴露，故本类缓存它并在对应方法里委派。
      * </p>
      */
     private final MultiValueMap<String, String> delegateMap;
-
 
     /**
      * 底层 Netty headers（当以可写 {@link NettyHttpHeadersAdapter} 为存储时非 null）： 供 Content-Type 读写走「{@code HttpHeaderNames}
@@ -172,15 +166,14 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
     /**
      * 把 {@code source} 的条目<b>追加</b>到 {@code target}（保留同名头已有值）。
      * <p>
-     * <b>为什么需要它</b>：调用方若写 {@code target.putAll(sourceHeaders)}，javac 会选中
-     * {@code HttpHeaders} 的 {@code putAll(HttpHeaders)} 重载（内部是 forEach+put、语义为整体替换），
-     * 与 {@code Map.putAll} 语义不同，还可能因 {@code put} 落到只读视图而抛
-     * {@code UnsupportedOperationException}。这里改用 {@link HttpHeaders#headerSet()}（签名稳定）
-     * 逐条 {@link HttpHeaders#add} —— 语义明确，也避开重载解析陷阱。
+     * <b>为什么需要它</b>：调用方若写 {@code target.putAll(sourceHeaders)}，javac 会选中 {@code HttpHeaders} 的
+     * {@code putAll(HttpHeaders)} 重载（内部是 forEach+put、语义为整体替换）， 与 {@code Map.putAll} 语义不同，还可能因 {@code put} 落到只读视图而抛
+     * {@code UnsupportedOperationException}。这里改用 {@link HttpHeaders#headerSet()}（签名稳定） 逐条 {@link HttpHeaders#add} ——
+     * 语义明确，也避开重载解析陷阱。
      * </p>
      * <p>
-     * 声明为 static 且形参用 {@code HttpHeaders}：调用方拿到的常是声明类型 {@code HttpHeaders} 的
-     * 引用（如 {@code WebServerHttpResponse.getHeaders()}），静态方法无需强转即可复用。
+     * 声明为 static 且形参用 {@code HttpHeaders}：调用方拿到的常是声明类型 {@code HttpHeaders} 的 引用（如
+     * {@code WebServerHttpResponse.getHeaders()}），静态方法无需强转即可复用。
      * </p>
      */
     public static void addAllHeaders(HttpHeaders target, HttpHeaders source) {

@@ -104,7 +104,7 @@ class PerfHttpServletResponseTest {
         java.util.Set<String> names = new java.util.HashSet<>(java.util.Arrays.asList("Content-Type", "X-Custom"));
         java.util.Set<java.util.Map.Entry<String, java.util.List<String>>> entries = new java.util.LinkedHashSet<>();
         for (String n : names) {
-            entries.add(java.util.Map.entry(n, java.util.List.<String>of()));
+            entries.add(java.util.Map.entry(n, java.util.List.<String> of()));
         }
         when(headers.headerSet()).thenReturn(entries);
         assertEquals(names, servletResponse.getHeaderNames());

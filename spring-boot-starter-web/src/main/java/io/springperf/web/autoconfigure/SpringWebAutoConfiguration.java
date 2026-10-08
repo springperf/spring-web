@@ -43,21 +43,18 @@ public class SpringWebAutoConfiguration {
     /**
      * Spring 原生的字符串消息转换器。
      * <p>
-     * {@code @RequestBody String} / {@code HttpEntity<String>} 在 Spring 语义下由
-     * {@code StringHttpMessageConverter} 处理——它把请求体<b>原样</b>读成字符串（不做 JSON 解析），
-     * 且默认支持 {@code text/plain} 与通配类型。
+     * {@code @RequestBody String} / {@code HttpEntity<String>} 在 Spring 语义下由 {@code StringHttpMessageConverter}
+     * 处理——它把请求体<b>原样</b>读成字符串（不做 JSON 解析）， 且默认支持 {@code text/plain} 与通配类型。
      * </p>
      * <p>
-     * 本框架的 {@code HttpBodyCodecRegistry} 会把容器里的 {@code HttpMessageConverter} bean
-     * 包装为内部转换器（见 {@code toHttpBodyConverter}），但此前 starter 从未注册过任何
-     * {@code HttpMessageConverter}，于是这条通路一直空置：JSON 之外的 String 请求体
-     * （如 {@code text/plain}）无转换器可读，直接 400 "not support contentType"。
-     * 补上本 bean 后，{@code @RequestBody String} 恢复 Spring 的既有语义。
+     * 本框架的 {@code HttpBodyCodecRegistry} 会把容器里的 {@code HttpMessageConverter} bean 包装为内部转换器（见
+     * {@code toHttpBodyConverter}），但此前 starter 从未注册过任何 {@code HttpMessageConverter}，于是这条通路一直空置：JSON 之外的 String 请求体 （如
+     * {@code text/plain}）无转换器可读，直接 400 "not support contentType"。 补上本 bean 后，{@code @RequestBody String} 恢复 Spring
+     * 的既有语义。
      * </p>
      * <p>
-     * 顺序：优先于 Jackson（{@code JacksonHttpBodyConverter} 的 order 是
-     * {@code LOWEST_PRECEDENCE - 50000}），使 String 类型优先由本转换器处理，
-     * 避免 JSON 请求下的字符串被 Jackson 按 JSON 解析。
+     * 顺序：优先于 Jackson（{@code JacksonHttpBodyConverter} 的 order 是 {@code LOWEST_PRECEDENCE - 50000}），使 String
+     * 类型优先由本转换器处理， 避免 JSON 请求下的字符串被 Jackson 按 JSON 解析。
      * </p>
      */
     @Bean
@@ -69,16 +66,13 @@ public class SpringWebAutoConfiguration {
     /**
      * {@link StringHttpMessageConverter} 的排序子类。
      * <p>
-     * 为什么需要在类上表达顺序：框架的 {@code WebComponentWrapper} 通过
-     * {@code AnnotationAwareOrderComparator.findOrder(bean)} 从「被包装的实例」上取 order
-     * （读 {@code @Order} 注解或 {@link Ordered} 接口）——bean 方法上的 {@code @Order}
-     * 不会体现在实例上。
+     * 为什么需要在类上表达顺序：框架的 {@code WebComponentWrapper} 通过 {@code AnnotationAwareOrderComparator.findOrder(bean)}
+     * 从「被包装的实例」上取 order （读 {@code @Order} 注解或 {@link Ordered} 接口）——bean 方法上的 {@code @Order} 不会体现在实例上。
      * </p>
      * <p>
-     * 为什么必须排在 Jackson 之前：{@code @RequestBody String} / {@code HttpEntity<String>}
-     * 在 Spring 语义下始终由 {@code StringHttpMessageConverter} <b>原样</b>读取，
-     * 即使 Content-Type 是 {@code application/json}——不能落到 Jackson 去按 JSON 解析
-     * （那会把非 JSON 字面量的 body 解析失败，返回 400）。
+     * 为什么必须排在 Jackson 之前：{@code @RequestBody String} / {@code HttpEntity<String>} 在 Spring 语义下始终由
+     * {@code StringHttpMessageConverter} <b>原样</b>读取， 即使 Content-Type 是 {@code application/json}——不能落到 Jackson 去按 JSON
+     * 解析 （那会把非 JSON 字面量的 body 解析失败，返回 400）。
      * </p>
      */
     static class OrderedStringHttpMessageConverter extends StringHttpMessageConverter implements Ordered {
@@ -92,16 +86,12 @@ public class SpringWebAutoConfiguration {
         /**
          * 只认领 {@code text/plain} 与通配类型，不抢占声明了<b>具体</b>媒体类型的写入。
          * <p>
-         * 父类声明支持 {@code text/plain} 与通配类型。若按父类语义参与写入，当方法声明
-         * {@code produces="application/x-custom"} 时，本转换器（order 最靠前）会被先行选中，
-         * 抢掉本应由用户为该媒体类型注册的专用 {@code HttpMessageConverter}——
-         * 表现为响应体没经过用户转换器（如缺少其前缀）。
+         * 父类声明支持 {@code text/plain} 与通配类型。若按父类语义参与写入，当方法声明 {@code produces="application/x-custom"} 时，本转换器（order
+         * 最靠前）会被先行选中， 抢掉本应由用户为该媒体类型注册的专用 {@code HttpMessageConverter}—— 表现为响应体没经过用户转换器（如缺少其前缀）。
          * </p>
          * <p>
-         * 写入方本就有明确的 {@code produces}/Accept 协商结果——具体类型应交给能精确处理它的
-         * 转换器；本转换器只在协商结果是 {@code text/plain} 或通配（没有更具体的候选）时兜底。
-         * 读取侧不受影响（见 {@link #getOrder()}：读路径仍需优先于 Jackson，
-         * 以免 {@code @RequestBody String} 被按 JSON 解析）。
+         * 写入方本就有明确的 {@code produces}/Accept 协商结果——具体类型应交给能精确处理它的 转换器；本转换器只在协商结果是 {@code text/plain} 或通配（没有更具体的候选）时兜底。
+         * 读取侧不受影响（见 {@link #getOrder()}：读路径仍需优先于 Jackson， 以免 {@code @RequestBody String} 被按 JSON 解析）。
          * </p>
          */
         @Override

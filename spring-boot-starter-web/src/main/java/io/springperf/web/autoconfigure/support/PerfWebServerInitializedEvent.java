@@ -20,8 +20,8 @@ import java.lang.reflect.Proxy;
  * </p>
  * <p>
  * <b>分支说明</b>：本分支（4.1.x）专用 Spring Boot 4，故直接继承 SB4 的事件类（
- * {@code org.springframework.boot.web.server.context.WebServerInitializedEvent}，抽象类）。
- * SB3 的同名类在 {@code org.springframework.boot.web.context} 包下。
+ * {@code org.springframework.boot.web.server.context.WebServerInitializedEvent}，抽象类）。 SB3 的同名类在
+ * {@code org.springframework.boot.web.context} 包下。
  * </p>
  *
  * @author huangcanda

@@ -765,12 +765,6 @@
             </build>
         </profile>
 
-
-
-
-
-
-
         <!-- Spring Boot 4.0.x -->
         <profile>
             <id>spring-boot-4.0</id>
@@ -794,7 +788,6 @@
                 <jackson-annotations.version>2.21</jackson-annotations.version>
             </properties>
         </profile>
-
 
         <profile>
             <id>release</id>

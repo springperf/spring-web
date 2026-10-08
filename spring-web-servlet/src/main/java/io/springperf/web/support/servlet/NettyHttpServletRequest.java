@@ -97,8 +97,7 @@ public class NettyHttpServletRequest extends PerfHttpServletRequest {
     }
 
     /**
-     * 取 {@code X-Forwarded-Prefix}（信任转发头时）。返回规范化后的前缀：去掉尾部 {@code /}，保证以 {@code /} 开头；
-     * 空值或仅 {@code /} 视为无前缀（返回 null）。
+     * 取 {@code X-Forwarded-Prefix}（信任转发头时）。返回规范化后的前缀：去掉尾部 {@code /}，保证以 {@code /} 开头； 空值或仅 {@code /} 视为无前缀（返回 null）。
      */
     private String forwardedPrefix() {
         if (!isForwardedHeadersTrusted()) {

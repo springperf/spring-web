@@ -177,7 +177,6 @@ class JacksonHttpBodyConverterDetailsTest {
                         output, mockReq(), mockResp(), null));
     }
 
-
     @Test
     void canRead_implementsGenericInterface() {
         assertTrue(converter.canRead((Type) Payload.class, null, MediaType.APPLICATION_JSON, null, null));

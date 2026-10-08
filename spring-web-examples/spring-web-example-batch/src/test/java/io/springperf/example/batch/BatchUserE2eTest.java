@@ -131,11 +131,12 @@ class BatchUserE2eTest {
 
                     ResponseEntity<String> resp = t.getForEntity("/batch/users/" + id + "?fields=name", String.class);
 
-                    if (resp.getStatusCode().value() == 200 && resp.getBody() != null && resp.getBody().startsWith("user:")
-                            && resp.getBody().contains(id)) {
+                    if (resp.getStatusCode().value() == 200 && resp.getBody() != null
+                            && resp.getBody().startsWith("user:") && resp.getBody().contains(id)) {
                         successCount.incrementAndGet();
                     } else {
-                        failures.add("id=" + id + ", status=" + resp.getStatusCode().value() + ", body=" + resp.getBody());
+                        failures.add(
+                                "id=" + id + ", status=" + resp.getStatusCode().value() + ", body=" + resp.getBody());
                     }
                 } catch (Exception e) {
                     failures.add("EXCEPTION:" + e.getMessage());

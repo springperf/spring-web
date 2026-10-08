@@ -9,8 +9,8 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * 验证 {@link ResponseStatusExceptionAdapter}：从 {@link ResponseStatusException} 取请求头，
- * 并以 {@link MultiValueMap} 视图返回（Spring 7 的 {@code HttpHeaders} 不再实现该接口）。
+ * 验证 {@link ResponseStatusExceptionAdapter}：从 {@link ResponseStatusException} 取请求头， 并以 {@link MultiValueMap}
+ * 视图返回（Spring 7 的 {@code HttpHeaders} 不再实现该接口）。
  */
 class ResponseStatusExceptionAdapterTest {
 

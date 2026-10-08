@@ -193,9 +193,8 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
     /**
      * Servlet 6.1 新增的抽象方法：3 参重定向（状态码 + 是否清缓冲）。
      * <p>
-     * 该方法在 Servlet 6.1 里是 {@code abstract}，未实现则无法编译；在更早的 Servlet 版本里它不存在，
-     * 但多一个 <b>{@code public} 方法对旧版本完全无害</b>（不作为 {@code @Override}，故旧版本下也不报错）。
-     * 语义对齐规范：{@code clearBuffer=true} 时丢弃已写内容，{@code false} 时保留。
+     * 该方法在 Servlet 6.1 里是 {@code abstract}，未实现则无法编译；在更早的 Servlet 版本里它不存在， 但多一个 <b>{@code public} 方法对旧版本完全无害</b>（不作为
+     * {@code @Override}，故旧版本下也不报错）。 语义对齐规范：{@code clearBuffer=true} 时丢弃已写内容，{@code false} 时保留。
      * </p>
      */
     public void sendRedirect(String location, int sc, boolean clearBuffer) {

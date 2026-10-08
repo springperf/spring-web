@@ -25,8 +25,8 @@ import java.net.UnknownHostException;
  * <li>自动从 ServerProperties / ManagementServerProperties 计算</li>
  * </ol>
  * <p>
- * <b>跨版本注意</b>：{@code ServerProperties} 在 Spring Boot 3 位于 {@code org.springframework.boot.autoconfigure.web}，
- * 在 Boot 4 移到 {@code org.springframework.boot.web.server.autoconfigure}（且随 {@code spring-boot-web-server} artifact 拆分）。
+ * <b>跨版本注意</b>：{@code ServerProperties} 在 Spring Boot 3 位于 {@code org.springframework.boot.autoconfigure.web}， 在 Boot 4
+ * 移到 {@code org.springframework.boot.web.server.autoconfigure}（且随 {@code spring-boot-web-server} artifact 拆分）。
  * 编译期无法同时引用两个包名，故此处以 {@link Object} 持有并反射调用其两个用到的取值方法 （{@code getSsl()} 与 {@code getServlet()}）。
  * </p>
  *

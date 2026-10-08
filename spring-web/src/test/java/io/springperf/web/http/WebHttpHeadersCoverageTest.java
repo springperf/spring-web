@@ -17,9 +17,8 @@ import org.springframework.util.MultiValueMap;
 /**
  * {@link WebHttpHeaders} 的 MultiValueMap 表面与 Content-Type 快路径。
  * <p>
- * 早期版本还有若干用 {@code Unsafe} 改写静态字段、在 Spring 6/7 两种模式间切换的用例
- * （{@code HEADERS_IS_MULTI_VALUE_MAP} / {@code AS_MULTI_VALUE_MAP}）——随本分支专用
- * Spring 7、那套运行时分支被移除，这些机制性用例一并删除。
+ * 早期版本还有若干用 {@code Unsafe} 改写静态字段、在 Spring 6/7 两种模式间切换的用例 （{@code HEADERS_IS_MULTI_VALUE_MAP} /
+ * {@code AS_MULTI_VALUE_MAP}）——随本分支专用 Spring 7、那套运行时分支被移除，这些机制性用例一并删除。
  */
 class WebHttpHeadersCoverageTest {
 

@@ -14,10 +14,9 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * 由此也可知：框架侧对非法 token 的「逐个跳过」容错解析在 Boot 应用下不可达 （属于非 Boot 裸用法的防御，另有单测覆盖）；E2E 层锁定的行为是 fail-fast。
  * </p>
  * <p>
- * <b>前置条件</b>：本用例验证的是 <b>Spring Boot 自身 servlet 栈</b>的属性绑定行为，只有在 Servlet
- * 容器存在（{@code ServletWebServerConfiguration} 启用、{@code ServerProperties} 参与绑定）时才成立。
- * Boot 4 起 {@code spring-boot-starter-web} 不再传递 servlet 容器（如 {@code tomcat-embed-core}），
- * 本仓库测试模块未引入容器，故此处按条件跳过——否则断言会因为「绑压根没发生」而误报为框架缺陷。
+ * <b>前置条件</b>：本用例验证的是 <b>Spring Boot 自身 servlet 栈</b>的属性绑定行为，只有在 Servlet 容器存在（{@code ServletWebServerConfiguration}
+ * 启用、{@code ServerProperties} 参与绑定）时才成立。 Boot 4 起 {@code spring-boot-starter-web} 不再传递 servlet 容器（如
+ * {@code tomcat-embed-core}）， 本仓库测试模块未引入容器，故此处按条件跳过——否则断言会因为「绑压根没发生」而误报为框架缺陷。
  * </p>
  */
 class SessionTrackingInvalidE2eTest {

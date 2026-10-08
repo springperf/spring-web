@@ -140,8 +140,6 @@ class JacksonHttpBodyConverterCoverageTest {
         verify(mapping, atLeastOnce()).get(any(io.springperf.web.core.mapping.MappingCacheKey.class));
     }
 
-
-
     @Test
     void write_unserializableValue_mapsToNotWritable() {
         // Jackson 3 里 JacksonException 的构造器是 protected、且需要 JsonParser/JsonGenerator，

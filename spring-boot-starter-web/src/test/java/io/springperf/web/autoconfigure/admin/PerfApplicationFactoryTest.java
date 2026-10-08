@@ -18,9 +18,9 @@ import static org.mockito.Mockito.when;
 /**
  * {@link PerfApplicationFactory} 的单元测试。
  * <p>
- * 跨版本注意：{@code ServerProperties} 在 Boot 3 位于 {@code org.springframework.boot.autoconfigure.web}，
- * Boot 4 移到 {@code org.springframework.boot.web.server.autoconfigure}（随 {@code spring-boot-web-server} 拆分）。
- * 被测类本身以 {@code Object} 接收，故本测试改用<b>反射</b>构造并操作它，同一份源码可在两个版本编译运行。
+ * 跨版本注意：{@code ServerProperties} 在 Boot 3 位于 {@code org.springframework.boot.autoconfigure.web}， Boot 4 移到
+ * {@code org.springframework.boot.web.server.autoconfigure}（随 {@code spring-boot-web-server} 拆分）。 被测类本身以 {@code Object}
+ * 接收，故本测试改用<b>反射</b>构造并操作它，同一份源码可在两个版本编译运行。
  * </p>
  */
 class PerfApplicationFactoryTest {

@@ -337,8 +337,8 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
      * <p>
      * 优先级：
      * <ol>
-     * <li>信任转发头时，取自 {@code X-Forwarded-Host} / RFC 7239 {@code Forwarded} 的 {@code host=}；
-     * 若该值未自带端口，再叠加 {@code X-Forwarded-Port}</li>
+     * <li>信任转发头时，取自 {@code X-Forwarded-Host} / RFC 7239 {@code Forwarded} 的 {@code host=}； 若该值未自带端口，再叠加
+     * {@code X-Forwarded-Port}</li>
      * <li>{@code Host} 请求头</li>
      * <li>本地监听地址（通道未绑定或 Host 缺失时的兜底）</li>
      * </ol>
@@ -456,9 +456,8 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
     /**
      * 解析转发的 host（{@code X-Forwarded-Host} / RFC 7239 {@code Forwarded} 的 {@code host=}）。
      * <p>
-     * 仅在信任转发头（{@code server.forward-headers-strategy} 非 NONE）时生效；否则返回 null，
-     * 由调用方回退到 {@code Host} 头。值可能自带端口（{@code public.example.com:8443}），
-     * 由调用方按需拆分。
+     * 仅在信任转发头（{@code server.forward-headers-strategy} 非 NONE）时生效；否则返回 null， 由调用方回退到 {@code Host}
+     * 头。值可能自带端口（{@code public.example.com:8443}）， 由调用方按需拆分。
      * </p>
      */
     @Nullable

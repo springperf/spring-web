@@ -9,8 +9,8 @@ import java.util.*;
  * <p>
  * <b>跨版本注意</b>：Spring 7 的 {@code HttpHeaders} 不再是 {@code MultiValueMap}，下列 8 个 Map 方法
  * （{@code get}/{@code keySet}/{@code entrySet}/{@code containsKey}/{@code containsValue}/{@code put}/
- * {@code remove}/{@code values}）在父类上<b>已不存在</b>，故不能标 {@code @Override}（会报「方法不会覆盖
- * 或实现超类型的方法」）。它们仍作为本类的自有 API 保留，供调用方按需使用。
+ * {@code remove}/{@code values}）在父类上<b>已不存在</b>，故不能标 {@code @Override}（会报「方法不会覆盖 或实现超类型的方法」）。它们仍作为本类的自有 API
+ * 保留，供调用方按需使用。
  * </p>
  *
  * @author huangcanda
