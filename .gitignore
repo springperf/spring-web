@@ -58,6 +58,8 @@ __pycache__/
 !/spring-web-benchmark/analyze_jfr.py
 # scripts/ 下的工具脚本需入库（check-docs.py 与 check-docs.sh 成对；没有这条会静默漏提交）
 !/scripts/*.py
+# perf/ 下的 JFR 解析工具同理：方法论文档直接引用它们，缺了就跑不起来
+!/spring-web-benchmark/perf/*.py
 !/spring-web-servlet/src/test/resources/perf-web/placeholder.txt
 /promotion/
 /.vscode/

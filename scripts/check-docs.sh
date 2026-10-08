@@ -24,8 +24,13 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 PY="${PYTHON:-}"
 if [ -z "$PY" ]; then
-  for candidate in python3 python; do
-    if command -v "$candidate" >/dev/null 2>&1; then
+  # 必须实际执行一次来判定：`command -v` 会命中 Windows Store 的
+  # `python`/`python3` 占位stub —— 它存在但执行时打印
+  # "Python was not found but can be installed from the Microsoft Store" 并返回非 0，
+  # 于是探测通过、真正干活时才失败。
+  for candidate in python3 python py; do
+    if command -v "$candidate" >/dev/null 2>&1 \
+       && "$candidate" -c 'import sys' >/dev/null 2>&1; then
       PY="$candidate"
       break
     fi
