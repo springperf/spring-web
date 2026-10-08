@@ -9,14 +9,18 @@ import io.springperf.web.context.ApplicationProperties;
 
 class KeepAliveConfigTest {
 
+    /**
+     * 默认**两个维度都关闭** ⇒ handler 不注入管线（{@code Http2ChannelInitializer.addKeepAlive} 由 {@code isEnabled()} 守卫）。
+     * 这是本项目的策略选择：默认不施加连接级隐式限制；键名与 Boot 相同，默认值不同（Boot/Tomcat 为 100）。
+     */
     @Test
-    void defaults_maxRequests100_timeoutDisabled() {
+    void defaults_bothDisabled_handlerNotInstalled() {
         ApplicationProperties props = new ApplicationProperties();
         props.setEnvironment(new MockEnvironment());
         KeepAliveConfig cfg = KeepAliveConfig.fromProperties(props);
-        assertThat(cfg.getMaxRequests()).isEqualTo(100);
+        assertThat(cfg.getMaxRequests()).isEqualTo(0);
         assertThat(cfg.getTimeoutMillis()).isEqualTo(0L);
-        assertThat(cfg.isEnabled()).isTrue();
+        assertThat(cfg.isEnabled()).isFalse();
     }
 
     @Test

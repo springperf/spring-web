@@ -121,7 +121,7 @@
 | `server.http.multipart.max-part-count` | `-1`（不限） | part 总数超限 → **400**。默认不限 → 默认无行为变化 |
 | `server.max-http-response-header-size` | `8192` | 响应头总字节超限时**丢弃 body 并降级最小 500**。原为不限：响应头很大（大量 `Set-Cookie` / 自定义头）的接口会开始 500 |
 | `server.max-swallow-size` | `2MB` | 错误响应（4xx/5xx）后请求体超此值**不再吞完**，改为关闭连接（负面影响仅限 keep-alive 复用） |
-| `server.keep-alive-timeout` / `server.max-keep-alive-requests` | 见手册 | 空闲连接超时回收 / 单连接请求数达上限后在响应结束时关闭 |
+| `server.keep-alive-timeout` / `server.max-keep-alive-requests` | 均为 `0`（都不限制） | 两者**都为 0 ⇒ `KeepAliveHandler` 不注入管线**：默认不再有连接级隐式限制；需要空闲回收 / 请求数上限请显式设置 |
 | `server.compression.*` | `false`（总开关） | 默认**不压缩**（保持既有行为）；开启后 gzip 仅作用于白名单 Content-Type、大于 `min-response-size` 且非零拷贝文件响应 |
 
 **与 Spring Boot 默认值不同（从 Boot 迁移时需显式配置）**：
@@ -131,6 +131,8 @@
 | `spring.web.resources.add-mappings` | `false` | `true` | Boot 项目默认自动映射静态资源；本框架需显式设为 `true` 才会注册默认静态资源映射 |
 | `spring.mvc.throw-exception-if-no-handler-found` | `true` | `false` | 本框架默认抛异常（可被 `@ControllerAdvice` 拦截）而非直接 404/405；需要 Boot 行为时设为 `false` |
 | `spring.mvc.publish-request-handled-events` | `false` | `true` | 需要 `ServletRequestHandledEvent`（监控/审计）时显式开启 |
+| `server.max-keep-alive-requests` | `0`（不限） | `100` | 默认不再限制单连接请求数；要 Tomcat 行为请显式设为 `100` |
+| `server.http.read-timeout` | `0`（关闭） | Tomcat `connectionTimeout` = `20s` | 默认**不施加**读空闲防护：不设则慢速客户端可长期占用连接，**生产建议显式设置**（如 `30s`）。语义见手册：只回收真正空闲的连接与半截请求，在途请求不会被掐断 |
 | `server.error.include-message` / `.include-binding-errors` | `never` | `never` | 一致 |
 - **第六节是行为与 API 变更**（响应分帧、Servlet flush 语义、条件请求/Range、扩展点签名），
   与配置迁移同属一次主版本升级，需一并评估。

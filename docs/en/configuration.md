@@ -149,7 +149,7 @@ All configuration properties are set in `application.properties`.
 | `server.max-http-request-header-size` | `8192` | Max combined request header size |
 | `server.max-http-response-header-size` | `8192` | Max response header size (degrades to a minimal 500 when exceeded) |
 | `server.max-swallow-size` | `2MB` | Max request-body bytes swallowed after an error response (negative unlimited) |
-| `server.keep-alive-timeout` / `server.max-keep-alive-requests` | `0` (unlimited) / `100` | Keep-alive idle timeout / max requests per connection |
+| `server.keep-alive-timeout` / `server.max-keep-alive-requests` | `0` (unlimited) / `0` (unlimited) | Keep-alive idle timeout / max requests per connection. **Both default to 0, so `KeepAliveHandler` is not installed at all**; the key names match Boot but **the defaults differ** (Boot/Tomcat: 0 / 100) - this framework applies no implicit connection-level limit by default, set one explicitly if you want it |
 | `server.forward-headers-strategy` | `NONE` | Forwarded-header strategy: `NONE`/`FALSE` (do not trust), `FRAMEWORK`/`NATIVE` (trust) |
 | `server.http.max-in-memory-size` | `4096` | In-memory body aggregation limit (beyond it a ByteBuf duplicate is used) |
 | `server.http.max-chunk-size` | `8192` | Max HTTP chunk size |
@@ -158,7 +158,7 @@ All configuration properties are set in `application.properties`.
 | `server.http.max-ranges` | `100` | Max Range segments per request; `0` forbids multi-range (such requests fall back to the full entity), a negative value adds no extra limit |
 | `server.http.multipart.max-part-count` | `-1` | Max multipart part count (`<=0` unlimited). **The default differs from Boot**: Boot's `server.tomcat.max-part-count` is `50`; the key means the same thing (a non-positive value disables the cap) |
 | `server.http.multipart.max-part-header-size` | `8192` | Max header bytes per multipart part (`<=0` unlimited); exceeding it makes the incremental scan throw `DecoderException` and the aggregator answer **400**. **The default differs from Boot**: Boot/Tomcat default this key to `512B`, this framework to `8192` |
-| `server.http.read-timeout` | `30000` | Read **idle** timeout (supports the `30s` form; `<=0` disables). It only bounds read inactivity: **in-flight requests are never killed** (a slow SQL call / downstream call / suspended async handler may exceed it and still deliver its response); only genuinely idle connections and stalled half-requests are reclaimed. Aligns with Tomcat `connectionTimeout` |
+| `server.http.read-timeout` | `0` (disabled) | Read **idle** timeout (supports the `30s` form; `<=0` disables). It only bounds read inactivity: **in-flight requests are never killed** (a slow SQL call / downstream call / suspended async handler may exceed it and still deliver its response); only genuinely idle connections and stalled half-requests are reclaimed. Aligns with Tomcat `connectionTimeout` semantics. **Disabled by default** (Tomcat defaults to 20s): this framework applies no implicit connection-level limit by default, **production deployments should set it explicitly** |
 
 > **Full list**: the entries above are the common ones. Every supported key is maintained and validated by
 > `SupportedPropertiesTest` — adding a key without registering it in
