@@ -4,6 +4,17 @@
 
 本项目遵循 [语义化版本控制](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### 变更
+
+- **分支策略调整：master 收敛为纯 Spring Boot 3.5.x**。此前 master 上叠加了 Spring Boot 4 / Spring Framework 7 兼容层（`WebHttpHeaders` 的版本分支与 MethodHandle、`MediaTypeUtils`、`ResponseStatusExceptionAdapter`、`Boot4WebServerInitializedEventBridge`、SB4 Maven Profile 等），现全部移除。4.x 适配改由 `4.1.x` 分支承接，同步规则见 [4.1.x 适配指南](.agent/context/4.1.x-adaptation-checklist.md)
+
+### 修复
+
+- **移除的兼容层带来的性能收益**：`WebHttpHeaders` 的 8 个 `MultiValueMap` 方法此前经 `MethodHandle` + varargs `invokeWithArguments` 调用（每次分配 `Object[]`），而 `get()`/`entrySet()`/`keySet()` 均在每请求热路径上；现改为 `super.*()` 直调
+- **自动配置注册表残留**：`AutoConfiguration.imports` 中仍注册着已删除的 `Boot4WebServerInitializedEventAutoConfiguration`，会导致 Spring 上下文启动失败
+
 ## [3.5.6] - 20260906
 
 ### 新增
