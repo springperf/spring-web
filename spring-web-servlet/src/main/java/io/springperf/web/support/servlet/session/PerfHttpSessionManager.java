@@ -262,15 +262,13 @@ public class PerfHttpSessionManager extends BaseWebComponent {
     }
 
     public PerfHttpSession changeSessionId(PerfHttpSession oldSession) {
-        String oldId = oldSession.getData().getId();
-        // Create new session data with new ID but same attributes
-        HttpSessionData newData = storage.createSession();
         HttpSessionData oldData = oldSession.getData();
-        for (Map.Entry<String, Object> entry : oldData.getAttributes().entrySet()) {
-            newData.setAttribute(entry.getKey(), entry.getValue());
-        }
-        newData.setMaxInactiveInterval(oldData.getMaxInactiveInterval());
-        storage.removeSession(oldId);
+        String oldId = oldData.getId();
+        // 属性复制必须与「旧会话摘除」在同一个临界区内：attributes 是 ConcurrentHashMap，
+        // 其迭代器弱一致——若边复制边有并发写，会漏掉部分属性（登录态/token 静默丢失）。
+        // 先在旧 id 的条带锁内摘除旧会话，此后并发 saveSession 会因 !containsKey(oldId)
+        // 而被拒（见 FileHttpSessionStorage.saveSession 的守卫），复制期间不再有新写入。
+        HttpSessionData newData = storage.replaceSessionCopyingAttributes(oldId, oldData);
         PerfHttpSession newSession = new PerfHttpSession(newData, servletContext, sessionListeners, attributeListeners);
         newSession.setNotNew();
         newSession.setOnInvalidateCallback(() -> storage.removeSession(newData.getId()));
