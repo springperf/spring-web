@@ -12,6 +12,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.http.MediaType;
 
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
@@ -70,9 +71,17 @@ class NettyHttpHeadersAdapterTest {
     }
 
     @Test
-    void getContentType_cachedWithinSameInstance() {
+    void getContentType_reflectsLatestHeaderValue() {
+        // 不缓存：重复调用返回值相等（equals）但不必是同一实例。
+        // 真正要保护的是「读到的是当前值」而非「缓存是否复用实例」。
         WebHttpHeaders headers = (WebHttpHeaders) req.getHeaders();
-        assertSame(headers.getContentType(), headers.getContentType());
+        MediaType first = headers.getContentType();
+        assertEquals(MediaType.APPLICATION_JSON, first);
+        assertEquals(first, headers.getContentType());
+
+        // 直接改底层 Netty headers（绕过 setContentType）后应立即可见
+        nativeRequest.headers().set("Content-Type", "text/plain");
+        assertEquals(MediaType.TEXT_PLAIN, headers.getContentType());
     }
 
     @Test

@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.util.*;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
@@ -155,17 +156,22 @@ class NettyHttpHeadersAdapterDetailsTest {
     // ==================== WebHttpHeaders ====================
 
     @Test
-    void webHttpHeaders_getContentType_cachedAndResetOnSet() {
+    void webHttpHeaders_getContentType_alwaysReadsCurrentValue() {
         HttpHeaders netty = new DefaultHttpHeaders(false);
         netty.set("Content-Type", "application/json");
         WebHttpHeaders view = new WebHttpHeaders(new NettyHttpHeadersAdapter(netty, true));
-        assertSame(view.getContentType(), view.getContentType());
+        // 不缓存：等值即可，不要求同一实例
+        assertEquals(view.getContentType(), view.getContentType());
 
         view.setContentType(null);
-        assertNull(view.getContentType(), "setContentType(null) 后缓存应失效并返回 null");
+        assertNull(view.getContentType(), "setContentType(null) 后应返回 null");
 
+        // 关键回归：直接改底层 Netty headers（绕过 setContentType）后必须立即可见。
+        // 曾因 cachedContentType 只在 setContentType 重置而导致此场景读到过期值 ——
+        // 业务经 getHeaders().set("Content-Type", v) 写入即命中该 bug。
         netty.set("Content-Type", "text/plain");
-        assertNotNull(view.getContentType());
+        assertEquals(MediaType.TEXT_PLAIN, view.getContentType(),
+                "底层 headers 变更后 getContentType 必须反映新值（原缓存实现会返回 application/json）");
     }
 
     @Test
