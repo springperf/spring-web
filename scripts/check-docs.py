@@ -164,6 +164,27 @@ def check_links(root, files, checks, verbose):
             print('  checked: %s' % rel)
 
 
+# 面向用户的四篇文档必须中英成对（规则见 CONTRIBUTING.md 的 Documentation 一节）
+DOC_PAIRS = (
+    ('CHANGELOG.md', 'docs/en/changelog.md'),
+    ('docs/configuration.md', 'docs/en/configuration.md'),
+    ('docs/compatibility.md', 'docs/en/compatibility.md'),
+    ('docs/breaking-changes.md', 'docs/en/breaking-changes.md'),
+)
+
+
+def check_language_pairs(root, files, checks, verbose):
+    """中英配对：四篇面向用户的文档必须两侧同时存在，缺一侧即缺陷。"""
+    tracked = set(files)
+    for zh, en in DOC_PAIRS:
+        if (zh in tracked) != (en in tracked):
+            present = zh if zh in tracked else en
+            missing = en if zh in tracked else zh
+            checks.append(('lang-pair', present, 0, 'missing counterpart %s' % missing))
+        elif verbose:
+            print('  checked pair: %s <-> %s' % (zh, en))
+
+
 def check_encoding_and_format(root, files, checks, verbose):
     """BOM / 非 UTF-8 / 缺尾换行 / H1 数量 / 行尾单空格（2+ 空格是硬换行语义，仅统计）。"""
     hard_breaks = 0
@@ -282,6 +303,7 @@ def main():
 
     checks = []
     check_links(root, files, checks, args.verbose)
+    check_language_pairs(root, files, checks, args.verbose)
     hard_breaks = check_encoding_and_format(root, files, checks, args.verbose)
 
     if not args.quiet:

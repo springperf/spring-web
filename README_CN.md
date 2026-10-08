@@ -36,7 +36,7 @@
 >
 > **Spring WebPerf 由此而生。** 目标：在兼容 Spring 生态的前提下，最大程度释放 Web 框架的性能。
 >
-> [查看 Benchmark 报告](docs/benchmark.md) · [性能原理详解](docs/performance-principles.md) · [项目缘起全文](docs/overview.md) · [更新日志](CHANGELOG.md) · [破坏性变更](docs/BREAKING-CHANGES.md)
+> [查看 Benchmark 报告](docs/benchmark.md) · [性能原理详解](docs/performance-principles.md) · [项目缘起全文](docs/overview.md) · [更新日志](CHANGELOG.md) · [破坏性变更](docs/breaking-changes.md)
 
 ---
 

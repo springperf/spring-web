@@ -164,7 +164,7 @@ bizExecutor pool (0 ~ consumerSize threads; virtual threads when enabled)
 @BatchMapping method
 ```
 
-- **Producer**: the dispatch thread enqueues via `BatchInvoker` — the `default` business pool by default (following `pool.default-execute-mode`), or the EventLoop when virtual threads are enabled on JDK 21+ (zero thread switch). Either way an enqueue is microsecond-scale and non-blocking, so no `@RunInPool` is needed
+- **Producer**: the dispatch thread enqueues via `BatchInvoker` — the `default` business pool by default (following `pool.default-execute-mode`); with virtual threads enabled (JDK 21+) it **stays on the `default` pool** - only that pool's thread type becomes virtual, the execution location does not change (zero thread switch). Either way an enqueue is microsecond-scale and non-blocking, so no `@RunInPool` is needed
 - **Consumer**: Single Disruptor consumer thread polls the ring buffer
 - **Business pool**: 0 core threads, `SynchronousQueue`, `CallerRunsPolicy` — zero threads at idle, consumer self-executes at capacity (built-in backpressure). With `spring.threads.virtual.enabled=true` (JDK 21+) the executing threads become **virtual threads** (cap and backpressure semantics unchanged: `consumerSize` still applies), so blocking parks a virtual thread rather than a platform thread
 

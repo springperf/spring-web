@@ -303,9 +303,9 @@ SSE/流式输出需生产者（EventLoop 或业务线程）→ 消费者（Event
 
 - **收益**：依赖矩阵不变（core 零 servlet-api 依赖，core 可独立发布）；管线防护在请求进入 servlet 桥/业务线程之前生效（恶意大文件/超参请求不消耗业务资源）；错误页与防护能力被所有上层（含 management 端口路径）共享，不被 servlet 模块独占。
 - **代价**：按"键命名空间"找实现会定位到 core 而非 servlet 模块——读代码需按**实现层级**（传输层管线 / MVC 分发 / Servlet 桥）而非键前缀定位；multipart 键存在**双家族并存**（`spring.servlet.multipart.max-file-size/max-request-size` 与 `server.http.multipart.max-part-count/max-part-header-size`，语义部分重叠），是已知的键名整理债务——对齐 Boot 优先，暂不改名（破坏性变更）。
-- **边界 / 重新审视条件**：若未来①引入 reactive 栈（`spring.mvc.*` 键将产生语义冲突，Boot 中该命名空间是 servlet 栈专属）；②决定统一 multipart 键家族——两者都需要一次集中键名整理并走 `BREAKING-CHANGES.md` 流程，届时本 ADR 升级为"已部分取代"。
+- **边界 / 重新审视条件**：若未来①引入 reactive 栈（`spring.mvc.*` 键将产生语义冲突，Boot 中该命名空间是 servlet 栈专属）；②决定统一 multipart 键家族——两者都需要一次集中键名整理并走 `breaking-changes.md` 流程，届时本 ADR 升级为"已部分取代"。
 
-**关联**：[02 篇](02-architecture-overview.md) 依赖矩阵与包拓扑、[12 篇](12-support-bridge.md) Servlet 桥接、`BREAKING-CHANGES.md`、`docs/configuration.md`。
+**关联**：[02 篇](02-architecture-overview.md) 依赖矩阵与包拓扑、[12 篇](12-support-bridge.md) Servlet 桥接、`breaking-changes.md`、`docs/configuration.md`。
 
 ---
 

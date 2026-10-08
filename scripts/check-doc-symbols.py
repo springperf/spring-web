@@ -29,7 +29,7 @@
        （它写成 `ModelSupport.getOrCreate()`，只报告未知类名的版本看不见它）。
 
 按文件的规则豁免（写在代码里，而不是靠白名单堆）:
-    docs/BREAKING-CHANGES.md 与 docs/(en/)changelog.md 的职责就是列出**已移除/已改名**的键与成员
+    docs/(en/)breaking-changes.md 与 docs/(en/)changelog.md 的职责就是列出**已移除/已改名**的键与成员
     （server.async.timeout、NettyServerHttpResponse.CONN_CTX…），所以它们不参与 R1/R2/R3/R4；
     CONTRIBUTING.md 的 japicmp 段落同理记录已移除成员，故那里不查 R4。
 
@@ -223,7 +223,8 @@ GATING_RULES = ('R1-config-key', 'R2-unknown-class', 'R3-likely-typo', 'R4-membe
 
 # 按文件的规则豁免（见文件头"按文件的规则豁免"）
 FILE_RULE_SKIPS = {
-    'docs/BREAKING-CHANGES.md': ('R1-config-key', 'R2-unknown-class', 'R3-likely-typo', 'R4-member'),
+    'docs/breaking-changes.md': ('R1-config-key', 'R2-unknown-class', 'R3-likely-typo', 'R4-member'),
+    'docs/en/breaking-changes.md': ('R1-config-key', 'R2-unknown-class', 'R3-likely-typo', 'R4-member'),
     'docs/changelog.md': ('R1-config-key', 'R2-unknown-class', 'R3-likely-typo', 'R4-member'),
     'docs/en/changelog.md': ('R1-config-key', 'R2-unknown-class', 'R3-likely-typo', 'R4-member'),
     'CONTRIBUTING.md': ('R4-member',),
@@ -420,7 +421,7 @@ def self_test():
         o = [r for r, _, _ in got if r not in GATING_RULES]
         if g != want_gate or o != want_other:
             bad.append('%s: want %s/%s got %s/%s' % (name, want_gate, want_other, g, o))
-    if check_text('docs/BREAKING-CHANGES.md', 'removed `spring.nope.key` and `GhostHandler`', repo):
+    if check_text('docs/breaking-changes.md', 'removed `spring.nope.key` and `GhostHandler`', repo):
         bad.append('per-file skip not applied')
     assert edit_distance_one('RealHandlers', 'RealHandler')
     assert not edit_distance_one('RealHandler', 'RealConfig')

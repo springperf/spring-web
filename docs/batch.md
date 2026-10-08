@@ -162,7 +162,7 @@ bizExecutor 线程池（0 ~ consumerSize 个；开虚拟线程时为虚拟线程
 @BatchMapping 方法
 ```
 
-- **生产者**：由默认线程模型决定——未开启虚拟线程时是 `default` 业务线程池（遵循 `pool.default-execute-mode`），开启虚拟线程（JDK 21+）时是 EventLoop（零切换）。两种情况下都只是调用 `BatchInvoker` 入队（微秒级、不阻塞），无需 `@RunInPool`
+- **生产者**：由默认线程模型决定——不开启虚拟线程时是 `default` 业务线程池（遵循 `pool.default-execute-mode`）；**开启虚拟线程（JDK 21+）时仍在 `default` 池**，只是该池的执行线程改为虚拟线程（执行位置不变，零切换与此无关）。两种情况下都只是调用 `BatchInvoker` 入队（微秒级、不阻塞），无需 `@RunInPool`
 - **消费者**：Disruptor 单消费者线程不断从 RingBuffer 拉取事件
 - **业务线程池**：0 核心线程、`SynchronousQueue`、`CallerRunsPolicy`——空闲时零线程占用，满负荷时消费者线程自行执行形成背压。开启虚拟线程（`spring.threads.virtual.enabled=true`，JDK 21+）时执行线程改为**虚拟线程**（上限与背压语义不变：仍受 `consumerSize` 限制），阻塞只挂起虚拟线程而不占用平台线程
 
