@@ -38,11 +38,18 @@ public final class PropertiesConstant {
     public static final long HTTP_TIMEOUT_DEFAULT = 60000L;
 
     /**
-     * HTTP socket read timeout in milliseconds, before request aggregation (默认值：30s). 用于防止慢速客户端在聚合请求体前无限期占用连接。0
-     * 或负数表示关闭读取超时。
+     * HTTP socket read **idle** timeout in milliseconds, before request aggregation（**默认 0 = 关闭**）。
+     * 启用后用于防止慢速客户端在聚合请求体前无限期占用连接； 只回收**真正空闲**的连接与半截请求，在途请求不会被掐断（见 {@code ReadIdleTimeoutHandler}）。0 或负数表示关闭。
+     * <p>
+     * <b>默认值与 Boot/Tomcat 不同</b>（Tomcat {@code connectionTimeout} 默认 20s）：本项目默认**不施加连接级隐式限制**，需要读空闲防护的部署请显式设置
+     * <b>（建议生产环境设置：不设则慢速客户端可长期占用连接）</b>。
+     * </p>
+     * <p>
+     * 与历史的一次修复不要混淆：本键曾因漏进 {@code DEFAULTS} 而"文档写 30s、实际关闭"，当时按**缺陷**修复；现在的默认关闭是**有意为之的策略选择**。
+     * </p>
      */
     public static final String HTTP_READ_TIMEOUT = "server.http.read-timeout";
-    public static final long HTTP_READ_TIMEOUT_DEFAULT = 30000L;
+    public static final long HTTP_READ_TIMEOUT_DEFAULT = 0L;
 
     /**
      * 多段 Range（{@code multipart/byteranges}）允许的最大段数，默认 {@value #HTTP_MAX_RANGES_DEFAULT} （与底层解析器上限一致，即默认不额外收紧）。
@@ -531,11 +538,18 @@ public final class PropertiesConstant {
     public static final long KEEP_ALIVE_TIMEOUT_DEFAULT = 0L;
 
     /**
-     * 对齐 Spring Boot {@code server.max-keep-alive-requests}：单 keep-alive 连接最大请求数（默认 100；小于等于 0 表示不限）。 实现见
+     * 键名对齐 Spring Boot {@code server.max-keep-alive-requests}：单 keep-alive 连接最大请求数（**默认 0 = 不限制**；小于等于 0 表示不限）。 实现见
      * {@code KeepAliveConfig} / {@code KeepAliveHandler}。
+     * <p>
+     * <b>默认值与 Boot/Tomcat 不同</b>（两者默认 100）：本项目默认**不施加连接级隐式限制**，需要上限的部署请显式设置。
+     * </p>
+     * <p>
+     * <b>注意"默认关闭"不带来性能收益</b>：该 handler 的 self time 实测为 0（只做 {@code instanceof} + null 检查 + 自增 + 比较），故这里的理由是"不做隐式限制"，
+     * 不是"更快"。本键与 {@link #KEEP_ALIVE_TIMEOUT} 都为 0 时，{@code KeepAliveHandler} **不注入管线**。
+     * </p>
      */
     public static final String MAX_KEEP_ALIVE_REQUESTS = "server.max-keep-alive-requests";
-    public static final int MAX_KEEP_ALIVE_REQUESTS_DEFAULT = 100;
+    public static final int MAX_KEEP_ALIVE_REQUESTS_DEFAULT = 0;
 
     /**
      * 对齐 Spring Boot {@code server.max-swallow-size}：错误响应后吞掉请求 body 的上限（字节，默认 2MB；负数不限）。 实现见

@@ -70,6 +70,21 @@ class Http2ChannelInitializerTest {
         verify(pipeline).addLast(any(ReadIdleTimeoutHandler.class));
     }
 
+    /**
+     * 默认值（{@code server.http.read-timeout} 未配置 ⇒ {@code HTTP_READ_TIMEOUT_DEFAULT}）下**不装**读空闲 handler：默认不施加连接级隐式限制。
+     * 若哪天默认值被改回正数，本用例会红——这正是它存在的意义。
+     */
+    @Test
+    void http11_defaultReadTimeout_addsNoReadIdleTimeoutHandler() {
+        ChannelPipeline pipeline = mock(ChannelPipeline.class);
+        TestableInitializer init = new TestableInitializer(false, null, 1024,
+                io.springperf.web.context.PropertiesConstant.HTTP_READ_TIMEOUT_DEFAULT, false, httpHandler,
+                Collections.emptyList(), Collections.emptyList());
+        init.initChannel(channel(pipeline));
+
+        verify(pipeline, never()).addLast(any(ReadIdleTimeoutHandler.class));
+    }
+
     @Test
     void http11_supportMultipart_usesSupportMultipartAggregator() {
         ChannelPipeline pipeline = mock(ChannelPipeline.class);
