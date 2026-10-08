@@ -93,8 +93,11 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
   the docs calling `ModelContext` by the name `ModelSupport` was found. When the rule fires on something
   legitimate, add an entry with its origin - do not widen the rule. `member` references whose owner is unknown
   go through the same rule, which closes the gap that let `ModelSupport.getOrCreate()` pass.
-  Files whose job is to list **removed** keys and members (`docs/BREAKING-CHANGES.md`, `docs/(en/)changelog.md`)
+  Files whose job is to list **removed** keys and members (`docs/breaking-changes.md`, `docs/(en/)changelog.md`)
   are exempt from those rules in code, and `CONTRIBUTING.md`'s japicmp section from the member rule.
+  Four documents are user-facing and must stay **paired**: `CHANGELOG.md`, `docs/configuration.md`,
+  `docs/compatibility.md` and `docs/breaking-changes.md` each have a mirror under `docs/en/`, and
+  `check-docs.py` enforces it (a missing side is a defect) - change one side and you change the other.
 
 ### Formatting
 
@@ -253,7 +256,7 @@ one carries the instance that produced it.
   published one is 419 KB (different sha256), and repository resolution picks the local copy, silently
   comparing the current build with itself. On such a machine use `compat-file` with a jar fetched into an
   isolated repository (the recipe below). Ran that way against the published 3.5.6, the report says
-  `semver MAJOR` and every item it flags is accounted for in BREAKING-CHANGES.md (the six renamed config
+  `semver MAJOR` and every item it flags is accounted for in breaking-changes.md (the six renamed config
   constants, `DispatcherHandler.flushResponse(WebServerHttpResponse)`, `NettyServerHttpResponse.CONN_CTX`,
   and the 11-argument `Http2ChannelInitializer` constructor). **It reports; it does not fail.** Measured with 0.26.2: the report's
   `Treat changes as errors` block reads `No` for every category (any / binary / source / semantic), so a
@@ -278,11 +281,11 @@ one carries the instance that produced it.
   breaks: removed constants `ASYNC_TIMEOUT*`, `HTTP_MAX_HEADER_SIZE*`, `SERVER_SHUTDOWN_TIMEOUT*`,
   `USE_FORWARDED_HEADERS`, a removed `DispatcherHandler` method, a removed `NettyServerHttpResponse`
   field and an `Http2ChannelInitializer` constructor. The constants line up with the config-key renames
-  recorded below; the last two are now named in BREAKING-CHANGES.md, with the signatures taken from the
+  recorded below; the last two are now named in breaking-changes.md, with the signatures taken from the
   report itself (a later run against the 3.2.4 baseline printed the removed 11-argument
   `Http2ChannelInitializer` constructor next to its 15-argument replacement, and the removed
   `NettyServerHttpResponse.CONN_CTX` field).
-- BREAKING-CHANGES.md records the intentional breaks; the japicmp report is its machine-checkable
+- breaking-changes.md records the intentional breaks; the japicmp report is its machine-checkable
   counterpart — every reported failure must be reviewed (fix it, or record it there), never silenced.
 
 ### Workflow Actions

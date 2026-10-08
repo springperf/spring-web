@@ -487,13 +487,13 @@
 ## [3.5.7] - 20261008
 
 > ⚠️ **本版含破坏性变更**：配置键、响应分帧、Servlet `flush` 语义、条件请求/Range、
-> 扩展点签名均有调整，**升级前请先读 [破坏性变更说明](docs/BREAKING-CHANGES.md)**。
+> 扩展点签名均有调整，**升级前请先读 [破坏性变更说明](docs/breaking-changes.md)**。
 
 ### 新增
 
 - **静态资源与视图**：`WebExchangeProvider` 可插拔 SPI，模板中可直接拿到真实 session 与 principal；视图/编码相关配置键统一
 - **HTTP 协议语义对齐**：条件请求（`If-None-Match` / `If-Modified-Since`）、字节范围（含多段 `multipart/byteranges` 与 `Accept-Ranges`）、响应分帧按 RFC 7231/7232/7233 收紧
-- **服务端配置对齐 Spring Boot**：连接与请求上限、keep-alive 超时/请求数、multipart 上限、错误响应策略、国际化绑定等一组配置键（见配置手册与 [破坏性变更说明](docs/BREAKING-CHANGES.md) 第六节）
+- **服务端配置对齐 Spring Boot**：连接与请求上限、keep-alive 超时/请求数、multipart 上限、错误响应策略、国际化绑定等一组配置键（见配置手册与 [破坏性变更说明](docs/breaking-changes.md) 的 3.5.7 节）
 - **批量处理**：`@BatchMapping` 支持在虚拟线程上执行（JDK 21+），保留 `consumerSize` 上限与背压语义
 - **配置刷新**：属性快照与基于 Spring Cloud 环境变更的刷新
 
@@ -502,8 +502,8 @@
 - **分支策略**：`master` 收敛为**纯 Spring Boot 3.5.x**——此前叠加的 Spring Boot 4 / Spring Framework 7 兼容层（`WebHttpHeaders` 的版本分支与 MethodHandle、`MediaTypeUtils`、`ResponseStatusExceptionAdapter`、`Boot4WebServerInitializedEventBridge`、SB4 Maven Profile 等）已全部移除；4.x 适配改由 `4.1.x` 分支承接（同步规则见 [4.1.x 适配指南](.agent/context/4.1.x-adaptation-checklist.md)）
 - **响应分帧**：`flush(true)` 由「一次性」改为 chunked 渐进式输出
 - **Servlet `PrintWriter`**：`print`/`println` 不再自动提交（对齐 Tomcat `autoFlush=false`）
-- **扩展点签名变更**（源码级不兼容，详见 [破坏性变更说明](docs/BREAKING-CHANGES.md) 6.3）
-- **会话、重定向与条件请求的错误映射**调整（6.7）；管理端口与转发语义调整（6.8）
+- **扩展点签名变更**（源码级不兼容，详见 [破坏性变更说明](docs/breaking-changes.md) 的 3.5.7 节「扩展点签名变更」）
+- **会话、重定向与条件请求的错误映射**调整；管理端口与转发语义调整（均见 [破坏性变更说明](docs/breaking-changes.md) 的 3.5.7 节）
 
 ### 安全
 

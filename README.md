@@ -36,7 +36,7 @@ A high-performance Netty-based web framework, compatible with Spring MVC program
 >
 > **Spring WebPerf was born from this question.** Goal: maximize web framework performance while remaining fully compatible with the Spring ecosystem.
 >
-> [View Benchmark Report](docs/en/benchmark.md) · [Performance Principles](docs/en/performance-principles.md) · [Full Origin Story](docs/en/overview.md) · [Changelog](CHANGELOG.md) · [Breaking Changes](docs/BREAKING-CHANGES.md)
+> [View Benchmark Report](docs/en/benchmark.md) · [Performance Principles](docs/en/performance-principles.md) · [Full Origin Story](docs/en/overview.md) · [Changelog](CHANGELOG.md) · [Breaking Changes](docs/breaking-changes.md)
 
 ---
 

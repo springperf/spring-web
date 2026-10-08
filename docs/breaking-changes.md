@@ -1,16 +1,33 @@
 # 不兼容变更（Breaking Changes）
 
-> 适用版本：**3.5.7（2026-10-08）**。本版为对齐 Spring Boot / Tomcat 配置命名，
-> **移除全部旧配置键的向后兼容别名**，并调整部分扩展点签名与兼容层类（§六）。升级到此版本必须按下方映射迁移配置，旧键不再被读取。
+> [English Version](en/breaking-changes.md)
+
+> 本文件是**跨版本的累积台账**，不属于某一个版本：任何版本引入不兼容变更，都在文末**新增一节**，
+> 并在上面的版本索引里登记一行。每个版本的**全量**条目（含新特性与修复）见 `CHANGELOG.md`。
 >
-> **关于版本号**：本清单原按「下一个主版本（major）」起草，实际随 **3.5.7**（minor）发布 —— 即在 minor 版本内容纳不兼容变更，属**一次性的有意例外**（3.5.6→3.5.7 期间的对齐工作）。该例外已逐条登记为二进制兼容门禁（japicmp）的豁免项，依据见根 `pom.xml` 中 japicmp 配置的注释；**此后任何新增不兼容都会让门禁失败**。
->
-> 配套专项：`docs/feature/config-alignment-springmvc-tomcat.md`（该目录 gitignored，仅本地维护；写法同 `docs/internals/12-support-bridge.md`）
-> 发布说明：版本号与日期见 `CHANGELOG.md`
+> - **收录范围**：升级会让使用者**必须动手**的条目 —— 移除、改名、签名或可见性变更、语义收紧；新特性与常规修复不收。
+> - **登记要求**：每条要么给出**迁移动作**，要么说明**为何无需迁移**。被二进制兼容门禁（japicmp，配置见根 `pom.xml`）
+>   判为破坏的有意变更，必须在本文件里逐条对应 —— japicmp 产出的报告是本台账的机器可核对对照物（见 `CONTRIBUTING.md`）。
+> - **版本号与日期**以 `CHANGELOG.md` 为准；节标题带版本号，引用请用版本号描述，不要依赖中文序号（序号会随版本重排）。
+
+## 版本索引
+
+| 版本 | 日期 | 主题 |
+|------|------|------|
+| **3.5.7** | 2026-10-08 | 配置键对齐 Spring Boot / Tomcat：移除旧配置键别名，扩展点签名与兼容层类调整 |
 
 ---
 
-## 背景
+## [3.5.7] - 2026-10-08
+
+> **这一版为何在 minor 里包含不兼容变更**：本清单原按「下一个主版本（major）」起草，实际随 **3.5.7**（minor）
+> 发布 —— 即在 minor 版本内容纳不兼容变更，属**一次性的有意例外**（3.5.6→3.5.7 期间的对齐工作）。
+> 该例外已逐条登记为二进制兼容门禁（japicmp）的豁免项，依据见根 `pom.xml` 中 japicmp 配置的注释；
+> **此后任何新增不兼容都会让门禁失败**。
+>
+> 配套专项：`docs/feature/config-alignment-springmvc-tomcat.md`（该目录 gitignored，仅本地维护）。
+
+### 背景
 
 在 `config-alignment` 专项（P0/P1）中，框架新增了一批对齐 Spring Boot / Tomcat 的标准配置键，
 并一度保留了旧键作为别名（双读：新键优先、旧键回退）。
@@ -20,7 +37,7 @@
 
 ---
 
-## 一、P0 移除项
+### 一、P0 移除项
 
 | 移除的旧键 | 替代键 | 旧语义 | 新语义 / 迁移说明 |
 |---|---|---|---|
@@ -28,7 +45,7 @@
 
 ---
 
-## 二、P1 改名项（旧键移除）
+### 二、P1 改名项（旧键移除）
 
 | 移除的旧键 | 替代键 | 迁移说明 |
 |---|---|---|
@@ -49,7 +66,7 @@
 
 ---
 
-## 三、P1 视图引擎内部键（对齐 Boot 后移除 `spring.web.view.*`）
+### 三、P1 视图引擎内部键（对齐 Boot 后移除 `spring.web.view.*`）
 
 视图解析器原本使用框架内部键 `spring.web.view.{engine}.*`，现已统一为 Spring Boot 风格
 的 `spring.{engine}.*`。**所有 `spring.web.view.*` 键移除**，仅保留 `spring.*` 命名。
@@ -73,7 +90,7 @@
 | `spring.web.view.beetl.suffix` | `spring.beetl.suffix` |
 | `spring.web.view.beetl.cache` | `spring.beetl.cache` |
 
-### 全局视图编码键移除
+#### 全局视图编码键移除
 
 | 移除的旧键 | 处理 |
 |---|---|
@@ -83,7 +100,7 @@
 
 ---
 
-## 四、迁移检查清单
+### 四、迁移检查清单
 
 - [ ] `server.use-forwarded-headers` → `server.forward-headers-strategy`
 - [ ] `server.http.max-header-size` → `server.max-http-request-header-size`
@@ -102,7 +119,7 @@
 
 ---
 
-## 五、影响范围
+### 五、影响范围
 
 - 第一至四节的改名项**默认值与主要行为语义不变**，两处例外：
   1. `server.servlet.encoding.request` / `.response` 合并为单一 `server.servlet.encoding.charset`（同时作用于请求与响应）——若原配置对请求/响应使用了不同 charset，合并后无法保持差异；
@@ -111,7 +128,7 @@
 
 ---
 
-## 六、配置对齐带来的新增限制与默认值（升级前必读）
+### 六、配置对齐带来的新增限制与默认值（升级前必读）
 
 本批次（`config-alignment` 专项）新增的防护项**多数默认开启**——它们不改变已通过请求的语义，但会**拒绝此前能通过的请求/响应**，属可观察行为变化：
 
@@ -144,11 +161,11 @@
 
 ---
 
-## 六、行为与 API 变更（非配置键，同一次主版本发布）
+### 七、行为与 API 变更（非配置键，同一次发布）
 
 > 与配置键迁移无直接关系，但需一并评估。条目均落地于「E2E 驱动协议对齐」批次（括号内为提交号）。
 
-### 6.1 响应分帧：`flush(true)` 由「一次性」改为 chunked 渐进式
+#### 7.1 响应分帧：`flush(true)` 由「一次性」改为 chunked 渐进式
 
 | 项 | 旧行为 | 新行为 |
 |---|---|---|
@@ -158,14 +175,14 @@
 - 迁移：要一次性提交改用 `flush(false)`；要渐进式且长度未知用 `flushChunked()`，收尾由框架 `endStream()` 处理。
 - 相关提交：`41f4e785`
 
-### 6.2 Servlet `PrintWriter`：`print/println` 不再自动提交（对齐 Tomcat `autoFlush=false`）
+#### 7.2 Servlet `PrintWriter`：`print/println` 不再自动提交（对齐 Tomcat `autoFlush=false`）
 
 - 旧行为：`getWriter().println(...)` 立即提交响应（`autoFlush=true`）。
 - 新行为：`println` **不提交**，仅显式 `flush()` / `flushBuffer()` / `getOutputStream().flush()` 提交；首次写入即标记「业务已接管响应」，框架收尾仍会提交，内容不会丢。
 - 迁移：依赖 `println` 推动提交的代码（自建流式循环等）改为显式 `flush()`。
 - 相关提交：`10a0f9d0`
 
-### 6.3 扩展点签名变更（源码级不兼容）
+#### 7.3 扩展点签名变更（源码级不兼容）
 
 | 旧签名 | 新签名 | 说明 |
 |---|---|---|
@@ -175,14 +192,16 @@
 | `public static final AttributeKey<ConnectionContext> NettyServerHttpResponse.CONN_CTX` | 已移除：连接上下文改由「每连接状态持有者」`ChannelAttrs.connCtx` 承载（经 `ChannelAttrs.of(ch)` / `ofIfPresent(ch)` 取） | 整个连接收敛为**单个** channel attr，省掉每请求 8~10 次 `attr(key)` 线性扫描（JFR 实测 `searchAttributeByKey` ≈1.6% 叶帧）。用法见 `docs/internals/05-server-and-http.md` §7 |
 | `Http2ChannelInitializer` 的 11 参构造器 `(boolean, SslContext, int, long, boolean, NettyHttpHandler, List<ChannelHandler>, List<ChannelHandler>, int, int, int)` | 已移除，替换为 15 参形态（在原三个 `int` 之后增加 `maxPartCount`、`maxPartHeaderSize`、`CompressionConfig`、`KeepAliveConfig`）；同时新增 `multipartConfig(MultipartConfig)` | 直接 `new` 该类的代码需按新形参调整。上面两侧签名取自 japicmp **实测输出**（基线 3.2.4）：`mvn -Pcompat -Dcompat.oldVersion=<已发布版本> verify`，报告在 `<module>/target/japicmp/` |
 
+| 项 | 旧行为 | 新行为 |
+|---|---|---|
 | `WebServerHttpRequest` 新增 `getURI()` / `getRemoteAddress()` / `getLocalAddress()` | **新增（抽象方法，非 `default`）** | ⚠️ 自行实现该接口的代码（框架外实现类）**必须补实现**这三个方法，否则编译不过（源码级不兼容）；`BaseWebServerHttpRequest` 同时把 `attributes` 字段可见性收窄。由 japicmp 对真发布 3.5.6 的比对报出。相关提交：`553bd0ee` |
 | `ListenableFutureAdapter`：`public` 无参构造器、`isAvailable()`、可继承性 | 构造器收为 `private`、`isAvailable()` 删除、类标记 `final` | 该类由「公开扩展点」降级为**框架内部助手**：继承或直接 `new` 它的代码不可用。**`ListenableFuture` 返回值支持本身仍在**（经 `ListenableFutureReturnValueResolver` + `isAssignableFrom`/`isInstance`）。属 Spring Boot 4 兼容层清理。相关提交：`8f51de19` |
 | 兼容层类 `ResponseStatusExceptionAdapter`（含 `getHeaders(ResponseStatusException)`、构造器、父类）、`MediaTypeUtils`（含 `compareSpecificity` / `sortBySpecificity` / 构造器 / `APPLICATION_STREAM_JSON` 与两个 `COMPARATOR` 常量） | **已整体移除** | master 收敛为纯 Spring Boot 3.5.x，Spring Boot 4 / Spring Framework 7 兼容层不再保留（`WebHttpHeaders` 版本分支、MethodHandle 调用等一并移除）。需要 MediaType 排序的代码改用 `org.springframework.http.MediaType` 自带比较器。相关提交：`8f51de19` |
-- 注：`WebServerHttpResponse` 新增的方法（`flushChunked`/`endStream`/`isStreaming`/`markStreamCompleted`/`setBeforeCommit`）均为 `default`，**不要求**既有实现类改动。**例外**：`markStreamCompleted` 后来由 `void` 改为 `boolean`（抢占式「终止块写入权」，见 6.10）——覆写过该方法的实现需同步改签名（返回 `true` 表示本次调用赢得写入权）。
+- 注：`WebServerHttpResponse` 新增的方法（`flushChunked`/`endStream`/`isStreaming`/`markStreamCompleted`/`setBeforeCommit`）均为 `default`，**不要求**既有实现类改动。**例外**：`markStreamCompleted` 后来由 `void` 改为 `boolean`（抢占式「终止块写入权」，见 7.10）——覆写过该方法的实现需同步改签名（返回 `true` 表示本次调用赢得写入权）。
 - 迁移：覆写或调用上表方法的代码按新签名调整。
 - 相关提交：`41f4e785`、`e6cdab8d`
 
-### 6.4 条件请求与错误体暴露语义收紧
+#### 7.4 条件请求与错误体暴露语义收紧
 
 | 项 | 旧行为 | 新行为 |
 |---|---|---|
@@ -196,14 +215,14 @@
 - 影响：客户端 / CDN 的缓存命中行为与错误体内容会变化（更规范）。
 - 相关提交：`f1bba5f9`、`e6cdab8d`
 
-### 6.5 新增：`Accept-Ranges` 与多段 Range（`multipart/byteranges`）
+#### 7.5 新增：`Accept-Ranges` 与多段 Range（`multipart/byteranges`）
 
 - 静态资源开始宣告 `Accept-Ranges: bytes`；单段 → `206` + `Content-Range`（不可满足 → `416` + `Content-Range: bytes */len`）；多段 → `206` + `Content-Type: multipart/byteranges; boundary=...`（此前多段回退整实体）；`If-Range` 门控（实体标签强比较 / HTTP 日期）。
 - 长度已知的流式响应改用 `Content-Length` 帧（此前一律 chunked，导致预设 `Content-Length` 被 Netty 静默移除）。
 - 新增防护键 `server.http.max-ranges`：**有效上限 = min(该值, 100)** —— `Range` 头由 Spring `HttpRange` 解析，超过 100 段会抛 `Too many ranges`（框架按「Range 不可用」忽略该头），故本键用于把上限**收紧到小于 100**（例如只允许 `2` 段），设成大于 100 不会放宽；`0`=禁止多段，负值=本层不额外限制。超限按 RFC 9110 §14.2 忽略 `Range` 返回整实体，**不截断段数**（截断会让客户端拿到与请求不符的表示）、也不回 `416`（请求本身合法）。
 - 相关提交：`e6cdab8d`、`f1bba5f9`、`ead49073`（上限为本次补充）
 
-### 6.6 超时、错误体协商与同连接串行化
+#### 7.6 超时、错误体协商与同连接串行化
 
 | 项 | 旧行为 | 新行为 |
 |---|---|---|
@@ -221,7 +240,7 @@
 
 - 相关提交：`efba12d7`、`b246675f`、`d1c30851`、`267359b7`、`2f505e2f`
 
-### 6.7 会话、重定向与条件请求错误映射
+#### 7.7 会话、重定向与条件请求错误映射
 
 | 项 | 旧行为 | 新行为 |
 |---|---|---|
@@ -235,7 +254,7 @@
 
 - 相关提交：`56b16d40`、`85b98205`、`64de3eef`、`ff33fe73`（`9b1d361a` 为其 E2E 锁定，47 例）
 
-### 6.8 管理端口、转发语义与其它行为调整
+#### 7.8 管理端口、转发语义与其它行为调整
 
 | 项 | 旧行为 | 新行为 |
 |---|---|---|
@@ -255,7 +274,7 @@
 
 - 相关提交：`df3c238f`、`89385c3d`、`a1b0a509`、`756f31f8`、`1b1f33b3`（`54069908`、`e33d4a9b` 为其 E2E 锁定）
 
-### 6.9 分帧与 Servlet 重置语义
+#### 7.9 分帧与 Servlet 重置语义
 
 | 项 | 旧行为 | 新行为 |
 |---|---|---|
@@ -265,7 +284,7 @@
 
 - 相关提交：`e8e16f87`、`890f4345`（`09ddf4bc`、`335c8a17`、`a567726c`、`f68dd351` 为其 E2E 锁定）
 
-### 6.10 异步 / SSE 生命周期与引用计数
+#### 7.10 异步 / SSE 生命周期与引用计数
 
 | 项 | 旧行为 | 新行为 |
 |---|---|---|
@@ -280,21 +299,21 @@
 
 - 相关提交：`fe722450`、`685eaa0c`、`61003c38`、`66204e80`、`11c3ae53`（`219f28a0`、`ebba0f80`、`03f820aa`、`4d838675`、`91d495ad`、`dad4294c`、`249efc50`、`0a346fa2` 为其 E2E / 契约锁定）
 
-### 6.11 性能优化带来的可观测变化（JFR 驱动，等价性为主）
+#### 7.11 性能优化带来的可观测变化（JFR 驱动，等价性为主）
 
 > 本批以「等价变换 + JFR 采样佐证」为主，绝大多数改动对使用方不可见；下面 4 条是其中**可观测**的部分。
 
 | 项 | 旧行为 | 新行为 |
 |---|---|---|
 | **非法配置值** | 热路径键**懒解析**：首次使用时才失败（或落到默认值），启动不受影响 | `ApplicationProperties` 在 **Environment 就绪时急切解析**（对齐 Boot `@ConfigurationProperties`）：解析失败即 **启动失败**（fail-fast）。运行期配置刷新（Spring Cloud）则逐字段容错：解析失败的字段**保留旧值**并告警，不让脏推送中断刷新 |
-| servlet 桥 `AsyncContext.start` 交棒 | 受 `server.http.timeout` 约束 | 在 `pool.default-execute-mode=eventloop`（**默认即此模式**）下**不再受** `server.http.timeout` 约束，改由 Servlet 自身 async 超时语义负责（代码内标注为已知残留）。其他执行模式不变 |
+| servlet 桥 `AsyncContext.start` 交棒 | 受 `server.http.timeout` 约束 | **显式**配置 `pool.default-execute-mode=eventloop` 时**不再受** `server.http.timeout` 约束，改由 Servlet 自身 async 超时语义负责（代码内标注为已知残留）。其他执行模式不变。<br>注：该键**默认是 `default`（业务池）**，不是 `eventloop`；开启虚拟线程（`spring.threads.virtual.enabled=true`）也不改变执行位置，只把 `default` 池的线程类型换成虚拟线程（池上限 / 队列 / 拒绝策略语义不变） |
 | 响应超时装配时机 | 每个请求开始即装配定时器 | **按需装配**（同步段结束仍未提交时兜底，异步/流式等待时装配）：eventloop 同步且已提交的请求不再产生一次 schedule/cancel；**长于 `server.http.timeout` 的流式响应不再出现「已提交拒绝写出」WARN**（纯噪声消除，无内容改写） |
 | `spring.mvc.publish-request-handled-events` 默认值 | `true`（请求完成即发布 `ServletRequestHandledEvent`） | **`false`**（**本项目有意关闭**，Boot 默认相反为 `true`：该事件对多数应用无实际用途，每请求发布纯属开销）。依赖该事件做监控/审计的需**显式开启**（见配置手册） |
 
 - 等价性佐证（各提交内附 JFR 数值）：`@RequestParam` 快路径 **CPU 采样/请求 −21%**、GET 分配 **−8.8%**；快路径资格在**构造期**判定（曾用「查找中途超阈再回退」，会被命中早退绕过 hash DoS 防护，回归用例捕获后修正）；`canDeserialize` 探测按 `mappingContext` 缓存（**约束**：默认 `ObjectMapper` 的能力集视为静态，运行期修改需同时 `clearCache` 该键与 `READ_JAVA_TYPE`/`WRITE_TYPE_SERIALIZABLE` 两个键——自定义 mapper 不缓存，保留请求级切换语义）。
 - 相关提交：`f515ae43`、`b6091749`、`bf1b88c8`、`59dc0ecb`、`21c3f8b1`、`2ec4e7c6`、`f3f9fa43`、`1708ed48`、`392747f8`、`d8c382cd`、`26281555`、`580ac83b`、`0254200d`、`5c3a23d2`
 
-### 6.12 视图层：模板可见变化与新增扩展点
+#### 7.12 视图层：模板可见变化与新增扩展点
 
 | 项 | 旧行为 | 新行为 |
 |---|---|---|
@@ -303,6 +322,6 @@
 | `WebMvcConfigurer#addViewControllers` | **静默忽略**（无告警） | 由 `WebMvcConfigurerBridge` 桥接（`ViewControllerRegistry` / `ViewControllerRegistration` + `ViewControllerInvoker`）；未能桥接的回调打 **WARN**，不再静默 |
 | `spring.mvc.view.prefix` / `.suffix` | — | **新增**，语义对齐 Boot：**仅 JSP 视图**的前后缀；模板引擎仍用各自的 `spring.{engine}.prefix/suffix` |
 | 会话持久化与编码强制 | — | `server.servlet.session.persistent` / `.store-dir` / `.persistent-exclude`（JDK 序列化，每 session 一文件，不落盘 `transient` 属性）；`server.servlet.encoding.force` / `.force-request` / `.force-response` |
-| 配置中心动态刷新 | 改了配置需重启才生效 | 监听 `EnvironmentChangeEvent`（**按类名监听**，不引入 Spring Cloud 编译期依赖 ✓）→ 清空框架属性缓存；亦可调用 `WebContext.refreshProperties()` 手动触发。刷新失败逐字段保留旧值（见 6.11） |
+| 配置中心动态刷新 | 改了配置需重启才生效 | 监听 `EnvironmentChangeEvent`（**按类名监听**，不引入 Spring Cloud 编译期依赖 ✓）→ 清空框架属性缓存；亦可调用 `WebContext.refreshProperties()` 手动触发。刷新失败逐字段保留旧值（见 7.11） |
 
 - 相关提交：`e6088584`、`30d1bf12`、`6aa5bd5f`、`9b6779ac`、`4f7ebbbf`、`24d4f768`

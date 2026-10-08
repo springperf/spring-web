@@ -253,7 +253,7 @@ class ApplicationPropertiesTest {
     @Test
     void getLong_readTimeoutDefault_isDisabled() {
         ApplicationProperties props = createProperties("nonexistent", null);
-        // 默认 0 = 关闭：本项目默认不施加连接级隐式限制（见 BREAKING-CHANGES.md 与属性 javadoc）。
+        // 默认 0 = 关闭：本项目默认不施加连接级隐式限制（见 breaking-changes.md 与属性 javadoc）。
         // 这个默认值有守卫是好事——把它改回正数会立刻红。
         assertEquals(0L, props.getLong(PropertiesConstant.HTTP_READ_TIMEOUT), "read-timeout 默认应为 0（关闭）");
     }
