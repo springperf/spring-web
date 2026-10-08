@@ -1,7 +1,9 @@
 # 不兼容变更（Breaking Changes）
 
-> 目标版本：下一个主版本（major）。本版本为对齐 Spring Boot / Tomcat 配置命名，
-> **移除全部旧配置键的向后兼容别名**。升级到此版本必须按下方映射迁移配置，旧键不再被读取。
+> 适用版本：**3.5.7（2026-10-08）**。本版为对齐 Spring Boot / Tomcat 配置命名，
+> **移除全部旧配置键的向后兼容别名**，并调整部分扩展点签名与兼容层类（§六）。升级到此版本必须按下方映射迁移配置，旧键不再被读取。
+>
+> **关于版本号**：本清单原按「下一个主版本（major）」起草，实际随 **3.5.7**（minor）发布 —— 即在 minor 版本内容纳不兼容变更，属**一次性的有意例外**（3.5.6→3.5.7 期间的对齐工作）。该例外已逐条登记为二进制兼容门禁（japicmp）的豁免项，依据见根 `pom.xml` 中 japicmp 配置的注释；**此后任何新增不兼容都会让门禁失败**。
 >
 > 配套专项：`docs/feature/config-alignment-springmvc-tomcat.md`（该目录 gitignored，仅本地维护；写法同 `docs/internals/12-support-bridge.md`）
 > 发布说明：版本号与日期见 `CHANGELOG.md`
@@ -173,6 +175,9 @@
 | `public static final AttributeKey<ConnectionContext> NettyServerHttpResponse.CONN_CTX` | 已移除：连接上下文改由「每连接状态持有者」`ChannelAttrs.connCtx` 承载（经 `ChannelAttrs.of(ch)` / `ofIfPresent(ch)` 取） | 整个连接收敛为**单个** channel attr，省掉每请求 8~10 次 `attr(key)` 线性扫描（JFR 实测 `searchAttributeByKey` ≈1.6% 叶帧）。用法见 `docs/internals/05-server-and-http.md` §7 |
 | `Http2ChannelInitializer` 的 11 参构造器 `(boolean, SslContext, int, long, boolean, NettyHttpHandler, List<ChannelHandler>, List<ChannelHandler>, int, int, int)` | 已移除，替换为 15 参形态（在原三个 `int` 之后增加 `maxPartCount`、`maxPartHeaderSize`、`CompressionConfig`、`KeepAliveConfig`）；同时新增 `multipartConfig(MultipartConfig)` | 直接 `new` 该类的代码需按新形参调整。上面两侧签名取自 japicmp **实测输出**（基线 3.2.4）：`mvn -Pcompat -Dcompat.oldVersion=<已发布版本> verify`，报告在 `<module>/target/japicmp/` |
 
+| `WebServerHttpRequest` 新增 `getURI()` / `getRemoteAddress()` / `getLocalAddress()` | **新增（抽象方法，非 `default`）** | ⚠️ 自行实现该接口的代码（框架外实现类）**必须补实现**这三个方法，否则编译不过（源码级不兼容）；`BaseWebServerHttpRequest` 同时把 `attributes` 字段可见性收窄。由 japicmp 对真发布 3.5.6 的比对报出。相关提交：`553bd0ee` |
+| `ListenableFutureAdapter`：`public` 无参构造器、`isAvailable()`、可继承性 | 构造器收为 `private`、`isAvailable()` 删除、类标记 `final` | 该类由「公开扩展点」降级为**框架内部助手**：继承或直接 `new` 它的代码不可用。**`ListenableFuture` 返回值支持本身仍在**（经 `ListenableFutureReturnValueResolver` + `isAssignableFrom`/`isInstance`）。属 Spring Boot 4 兼容层清理。相关提交：`8f51de19` |
+| 兼容层类 `ResponseStatusExceptionAdapter`（含 `getHeaders(ResponseStatusException)`、构造器、父类）、`MediaTypeUtils`（含 `compareSpecificity` / `sortBySpecificity` / 构造器 / `APPLICATION_STREAM_JSON` 与两个 `COMPARATOR` 常量） | **已整体移除** | master 收敛为纯 Spring Boot 3.5.x，Spring Boot 4 / Spring Framework 7 兼容层不再保留（`WebHttpHeaders` 版本分支、MethodHandle 调用等一并移除）。需要 MediaType 排序的代码改用 `org.springframework.http.MediaType` 自带比较器。相关提交：`8f51de19` |
 - 注：`WebServerHttpResponse` 新增的方法（`flushChunked`/`endStream`/`isStreaming`/`markStreamCompleted`/`setBeforeCommit`）均为 `default`，**不要求**既有实现类改动。**例外**：`markStreamCompleted` 后来由 `void` 改为 `boolean`（抢占式「终止块写入权」，见 6.10）——覆写过该方法的实现需同步改签名（返回 `true` 表示本次调用赢得写入权）。
 - 迁移：覆写或调用上表方法的代码按新签名调整。
 - 相关提交：`41f4e785`、`e6cdab8d`

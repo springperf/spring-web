@@ -4,7 +4,7 @@
 
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.5.7] - 20261005
+## [3.5.7] - 20261008
 
 > ⚠️ **This release contains breaking changes**: configuration keys, response framing,
 > Servlet `flush` semantics, conditional requests / ranges and extension-point signatures
