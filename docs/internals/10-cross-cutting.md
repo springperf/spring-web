@@ -251,7 +251,13 @@ public void handle(Throwable ex, WebServerHttpRequest req, WebServerHttpResponse
         if (handled) {
             resp.setHandled();
         } else {
-            resp.sendError(INTERNAL_SERVER_ERROR, "Internal Server Error");  // 兜底 500
+            // 兜底 500：消息取**最深层根因**的 message（沿 getCause() 链下潜，
+            // 自引用则停在原异常），为空才回落 "Internal Server Error"。
+            // 这样用户看到的是真实出错原因（如 "Connection refused"）而非笼统文案。
+            resp.sendError(INTERNAL_SERVER_ERROR, rootCauseMessage(ex), ex,
+                    ErrorResponseConfig.isParamPresent(req, "trace"),
+                    ErrorResponseConfig.isParamPresent(req, "message"),
+                    ErrorResponseConfig.isParamPresent(req, "errors"));
         }
     } catch (Exception e) {
         log.error("ExceptionRegistry.doHandle/sendError failed for original [{}] {}",
@@ -259,6 +265,9 @@ public void handle(Throwable ex, WebServerHttpRequest req, WebServerHttpResponse
     }
 }
 ```
+
+`rootCauseMessage(Throwable)` 的实现：沿 `getCause()` 链下潜（防自引用导致死循环），
+取最后一个有非空 `message` 的异常；全链都无消息时回落 `"Internal Server Error"`。
 
 ### 4.2 `ExceptionHandlerExceptionResolver`：`@ExceptionHandler` 扫描
 

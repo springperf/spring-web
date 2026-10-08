@@ -143,7 +143,7 @@ This branch is **dedicated to Spring Boot 4** and no longer aims for "one codeba
 | Virtual threads | Not supported | Supported (JDK 21+) |
 | GraalVM native-image | Not supported | Supported |
 | `ModelMap` vs `Model` | `ModelMap implements Model` | **`ModelMap` does NOT implement `Model`** (requires `ExtendedModelMap`) |
-| `spring-web-view` | Per backport status | New feature baseline |
+| `spring-web-view` | Already present (the `2.7.x` branch pom includes this module) | New feature baseline |
 
 ---
 

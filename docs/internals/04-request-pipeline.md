@@ -404,7 +404,7 @@ public void handleAfterFilter(WebServerHttpRequest req, WebServerHttpResponse re
 
 分流两路：
 - **命中** → `doHandle`（第七节，主处理）。
-- **未命中** → `handleWithNoFullMatch`：CORS 预检（`CorsUtils.isPreFlightRequest`）走 `handleCorsPreflight`，否则 `handleOnNoMatchMappingContext` 抛 404/405 走 `exceptionRegistry.handle` + `afterCompletion`。404/405 用预构的 `static final` 异常单例，不 `fillInStackTrace`——[01 篇](01-design-philosophy.md) 原则 2 在高频错误路径上的兑现。
+- **未命中** → `handleWithNoFullMatch`：CORS 预检（`CorsUtils.isPreFlightRequest`）走 `handleCorsPreflight`，否则 `handleOnNoMatchMappingContext` 抛 404/405 走 `exceptionRegistry.handle` + `afterCompletion`。异常是**每请求新建**的 `StacklessResponseStatusException`（`fillInStackTrace` 已禁用、零栈轨迹开销）——**刻意不用 static final 单例**，避免 `@ExceptionHandler` 修改 headers/body 时污染后续请求。
 
 `finally` 的 `removeContextHolders` 重置 `ThreadLocal`，防止线程复用导致 locale 串味。`initContext` 标志位避免无谓的 reset（`buildLocaleContext` 返回 null 时不初始化也不 reset）。
 
@@ -604,7 +604,9 @@ protected void handleException(Throwable ex, WebServerHttpRequest req, WebServer
 
 ### 9.3 404/405 与未匹配
 
-`handleOnNoMatchMappingContext`：`result.isMethodMismatch()` ? 405 : 404，用 `static final` 异常单例，不 `fillInStackTrace`，走 `exceptionRegistry.handle` + `afterCompletion`——与 `doHandle` 中异常路径行为一致，404/405 不走特殊通道，复用异常处理链。
+`handleOnNoMatchMappingContext`：按 `result.getMismatchKind()` 四分支映射（对齐 Spring MVC）——`METHOD`→**405**（并带 `Allow` 头）、`CONSUMES`→**415**、`PRODUCES`→**406**、其余→**404**。
+
+异常同样是每请求新建的 `StacklessResponseStatusException`（非单例——刻意避免 `@ExceptionHandler` 修改 headers/body 时污染后续请求）；`throwExceptionIfNoHandlerFound=false` 时直接 `sendError` 不进 `ExceptionRegistry`，对齐 Spring Boot 默认行为。
 
 ---
 
@@ -697,7 +699,7 @@ protected boolean setCommitted() {
 }
 ```
 
-`handled` 标记"响应已被某段代码接管"（写 body、sendError 等），CAS 保证全请求只成功一次——重复写（如 `doHandle` 正常返回后又 `handleException`）会被  的 `setHandled()` 返回 false 拦住，只 `log.warn` 不重复写。`committed` 标记"响应已刷到底层 channel"，提交即 `setTimeout(null,-1)` 取消超时——避免已完成的请求还触发超时 503。两个 CAS 把"响应状态机"做到无锁、单次、确定。
+`handled` 标记"响应已被某段代码接管"（写 body、sendError 等），CAS 保证全请求只成功一次——重复写（如 `doHandle` 正常返回后又 `handleException`）会被  的 `setHandled()` 返回 false 拦住，只 `log.warn` 不重复写。`committed` 标记"响应已刷到底层 channel"，提交即 `setTimeout(null,-1)` 取消超时——避免已完成的请求还触发超时 **504**（`BaseWebServerHttpResponse.defaultHandleTimeout` 发的是 `GATEWAY_TIMEOUT`；503 是异步请求超时那条路径，两者不可混谈）。两个 CAS 把"响应状态机"做到无锁、单次、确定。
 
 ### 11.3 getBody 延迟分配与 filterIndex 游标
 

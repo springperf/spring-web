@@ -105,9 +105,9 @@ public void start() {
 
 | ChannelOption | 级别 | 默认值 | 作用 | 性能含义 |
 |---------------|------|--------|------|----------|
-| `SO_BACKLOG` | `option` | `128`（`server.netty.so-backlog`） | 监听 socket 的连接队列长度 | 突发连接多时需调大，默认 128 适合多数场景 |
+| `SO_BACKLOG` | `option` | `1024`（`server.netty.so-backlog`） | 监听 socket 的连接队列长度 | 突发连接多时需调大，默认 1024 适合多数场景 |
 | `TCP_NODELAY` | `childOption` | `true`（`server.netty.tcp-nodelay`） | 禁用 Nagle 算法 | 小包立即发送，降低响应延迟 |
-| `SO_KEEPALIVE` | `childOption` | `false`（`server.netty.so-keepalive`） | TCP keepalive 探测 | 默认关闭，需要时开启 |
+| `SO_KEEPALIVE` | `childOption` | `true`（`server.netty.so-keepalive`） | TCP keepalive 探测 | **默认开启**（长连接友好），需要关闭时设为 `false` |
 | `SO_REUSEADDR` | `childOption` | `true`（`server.netty.so-reuseaddr`） | 允许重用本地地址 | 快速重启时避免 `Address already in use` |
 | `ALLOCATOR` | `childOption` | `"pooled"`（`server.netty.allocator-type`） | ByteBuf 分配器类型 | pooled 复用 ByteBuf 减少 GC |
 | `WRITE_BUFFER_WATER_MARK` | `childOption` | low 8KB / high 32KB（`server.netty.write-buffer-*`） | 触发 `channelWritabilityChanged` | 背压机制的水位线，见 [§7](#七背压机制writewatermark--backpressurehandler) |
@@ -132,9 +132,9 @@ I/O 层配置默认值集中如下（均来自 [`PropertiesConstant.java`](../..
 | `server.http2.enabled` | `false` | HTTP/2 开关 | |
 | `server.forward-headers-strategy` | `NONE` | 转发头策略：`NONE`/`FALSE` 不信任；`FRAMEWORK`/`NATIVE` 信任解析 `Forwarded` / `X-Forwarded-*` | |
 | `server.shutdown.grace-period` | `30s` | 优雅关闭等待 | |
-| `server.netty.so-backlog` | `128` | TCP 连接队列长度 | |
+| `server.netty.so-backlog` | `1024` | TCP 连接队列长度 | |
 | `server.netty.tcp-nodelay` | `true` | 禁用 Nagle 算法 | |
-| `server.netty.so-keepalive` | `false` | TCP keepalive 探测 | |
+| `server.netty.so-keepalive` | `true` | TCP keepalive 探测 | |
 | `server.netty.so-reuseaddr` | `true` | 重用本地地址 | |
 | `server.netty.allocator-type` | `pooled` | ByteBuf 分配器类型 | | |
 
@@ -294,16 +294,18 @@ ASCII 决策树：
 ```java
 // Http2ChannelInitializer.java
 private void addHttp11Handlers(ChannelPipeline p) {
-    p.addLast(new HttpServerCodec(maxInitialLine, maxHeader, maxChunk));   //
+    p.addLast(new HttpServerCodec(maxInitialLine, maxHeader, maxChunk));   // ① 字节流 ↔ Http*Object
+    addCompressor(p, compressionConfig);                                  // ② 响应压缩（总开关默认关）
     if (readTimeout > 0) {
-        p.addLast(new ReadTimeoutHandler(readTimeout, TimeUnit.MILLISECONDS));  //
+        p.addLast(new ReadIdleTimeoutHandler(readTimeout));                // ③ 空闲读取超时
     }
-    p.addLast(new ChunkedWriteHandler());                                  //
-    p.addLast(beforeAggregatorHandlers);                                   // → SPI 插入点
-    addAggregator(p);                                                      //
-    p.addLast(afterAggregatorHandlers);                                    // → SPI 插入点
-    p.addLast(BackpressureHandler.INSTANCE);                               //
-    p.addLast(httpHandler);                                                //
+    p.addLast(new ChunkedWriteHandler());                                  // ④ 支持 ChunkedInput 流式写出
+    p.addLast(beforeAggregatorHandlers);                                   // ⑤ → SPI 插入点
+    addAggregator(p);                                                      // ⑥ 聚合成 FullHttpRequest
+    p.addLast(afterAggregatorHandlers);                                    // ⑦ → SPI 插入点
+    p.addLast(BackpressureHandler.INSTANCE);                               // ⑧ 背压回调
+    addKeepAlive(p, keepAliveConfig);                                      // ⑨ keep-alive 策略
+    p.addLast(httpHandler);                                                // ⑩ NettyHttpHandler 入口
 }
 ```
 
@@ -312,13 +314,15 @@ private void addHttp11Handlers(ChannelPipeline p) {
 | 位置 | Handler | 职责 | 性能/正确性含义 |
 |------|---------|------|----------------|
 | 1 | `HttpServerCodec` | 字节流 ↔ `HttpRequest`/`HttpContent` | Netty 原生，maxInitialLine/maxHeader/maxChunk 限制见配置表 |
-| 2 | `ReadTimeoutHandler`（可选） | 聚合前读取超时 | `readTimeout>0` 才装；防慢客户端在聚合 body 前无限期占用连接（默认 30s） |
-| 3 | `ChunkedWriteHandler` | 支持 `ChunkedInput` 流式写出 | 响应 `writeStream` 必需 |
-| 4 | beforeAggregator handlers | SPI 插入点 | WebSocket 等模块在聚合前插自定义 handler |
-| 5 | `addAggregator` | 聚合成 `FullHttpRequest` | 分流见 [§3.3](#33-addaggregatormultipart-分流) |
-| 6 | afterAggregator handlers | SPI 插入点 | WebSocket 握手 handler 插这里，拿聚合后的 FullHttpRequest |
-| 7 | `BackpressureHandler.INSTANCE` | 背压回调 | 见 [§7](#七背压机制writewatermark--backpressurehandler) |
-| 8 | `httpHandler` | `NettyHttpHandler` 入口 | 见 [§4](#四nettyhttphandler入口适配层) |
+| 2 | `addCompressor` | 响应压缩 | 总开关 `server.compression.enabled` 默认关；开启后仅对白名单 Content-Type 且大于 `min-response-size` 的响应压缩 |
+| 3 | `ReadIdleTimeoutHandler`（可选） | 空闲读取超时 | `readTimeout>0` 才装；防慢客户端在聚合 body 前无限期占用连接（默认 30s）。注意是**空闲**超时（无字节流入即触发），不是「单次 read 耗时上限」 |
+| 4 | `ChunkedWriteHandler` | 支持 `ChunkedInput` 流式写出 | 响应 `writeStream` 必需 |
+| 5 | beforeAggregator handlers | SPI 插入点 | WebSocket 等模块在聚合前插自定义 handler |
+| 6 | `addAggregator` | 聚合成 `FullHttpRequest` | 分流见 [§3.3](#33-addaggregatormultipart-分流) |
+| 7 | afterAggregator handlers | SPI 插入点 | WebSocket 握手 handler 插这里，拿聚合后的 FullHttpRequest |
+| 8 | `BackpressureHandler.INSTANCE` | 背压回调 | 见 [§7](#七背压机制writewatermark--backpressurehandler) |
+| 9 | `addKeepAlive` | keep-alive 策略 | 按 `server.keep-alive-time` / `max-keep-alive-requests` 决定是否复用连接 |
+| 10 | `httpHandler` | `NettyHttpHandler` 入口 | 见 [§4](#四nettyhttphandler入口适配层) |
 
 **索引中写的 `SslHandler` → `HttpTrafficHandler` 是早期规划命名**，实际 HTTP/1.1 管线里没有叫 `HttpTrafficHandler` 的类——业务 handler 就是 `NettyHttpHandler`，背压由独立的 `BackpressureHandler` 担当。`SslHandler` 只在分支 A/B（TLS）出现，分支 D（明文默认）没有。
 
@@ -603,13 +607,13 @@ public WebHttpHeaders(MultiValueMap<String, String> headers) {
 
 > **历史注记**：4.1.x 早期曾用 `static final boolean` + `MethodHandle`（`HEADERS_IS_MULTI_VALUE_MAP`、`AS_MULTI_VALUE_MAP`）在类加载期区分 Spring 6.x / 7.x 的语义。那是「一份代码同时支持 3.5.x 与 4.x」时期的产物；**本分支改为专用写法后已整体移除**（该决策的背景见 [4.1.x 适配指南](../../.agent/context/4.1.x-adaptation-checklist.md) §0.1）。
 
-### 5.3 body 零拷贝分级：`LARGE_BODY_LIMIT = 4096`
+### 5.3 body 零拷贝分级：阈值 `server.http.max-in-memory-size`（默认 4096）
 
 请求体读取是零拷贝分级的关键——小 body 复制到堆 `byte[]`，大 body 共享 ByteBuf 视图：
 
 ```java
 // NettyServerHttpRequest.java  字段
-private static final int LARGE_BODY_LIMIT = 4096;
+private final int largeBodyLimit;                  // 取自 server.http.max-in-memory-size
 private static final byte[] EMPTY_BODY = new byte[0];
 private volatile byte[] body;              // 无初始化，getBodyBytes 首次填充
 private ByteBuf largeBodyBuf;              // 非 volatile：仅由持有 request 的线程读写
@@ -630,7 +634,7 @@ protected byte[] getBodyBytes() {           // protected，非 private
             if (body == null) {
                 ByteBuf content = request.content();
                 int size = content.readableBytes();
-                if (size <= LARGE_BODY_LIMIT) {
+                if (size <= largeBodyLimit) {   // 来自 server.http.max-in-memory-size
                     body = ByteBufUtil.getBytes(content);  // 复制到堆 byte[]（含 size==0 返空数组）
                 } else {
                     largeBodyBuf = content.duplicate();    // 共享视图，不 +refCnt
@@ -652,7 +656,9 @@ protected byte[] getBodyBytes() {           // protected，非 private
 
 **索引中写的 `retainedDuplicate` 实际是 `duplicate`**——这是早期规划措辞与实现的关键差异。`retainedDuplicate` 会 `+refCnt`，`duplicate` 不递增。本框架用 `duplicate`（不 +refCnt），因为大 body 的存活由**请求对象自身的 retain/release 链**保证（见 [§5.5](#55-acquirerelease引用计数契约)），duplicate 出来的视图不独立持有引用。`ByteBufInputStream` 构造传 `false`（不 release）也对应这点——流关闭时不 release，避免重复释放。
 
-**为什么阈值是 4096？** 这是经验值：4KB 以下的 body（绝大多数 JSON API 请求）复制到堆更划算——堆 `byte[]` 无堆外内存管理开销，GC 友好；超过 4KB 后复制代价上升，且堆外 ByteBuf 的零拷贝优势（省 heap→direct 拷贝）显现。这个阈值在 [`NettyServerHttpRequest.java`](../../spring-web/src/main/java/io/springperf/web/http/NettyServerHttpRequest.java) 硬编码，未配置化。
+**为什么默认阈值是 4096？** 这是经验值：4KB 以下的 body（绝大多数 JSON API 请求）复制到堆更划算——堆 `byte[]` 无堆外内存管理开销，GC 友好；超过 4KB 后复制代价上升，且堆外 ByteBuf 的零拷贝优势（省 heap→direct 拷贝）显现。
+
+该阈值**已配置化**：字段 `largeBodyLimit` 在构造期从 `server.http.max-in-memory-size` 读取（默认 4096，见 `PropertiesConstant.HTTP_MAX_IN_MEMORY_SIZE_DEFAULT`），调整该键即可改变分级点，无需改代码。
 
 ### 5.4 `resolveScheme`：scheme 解析四优先级
 
