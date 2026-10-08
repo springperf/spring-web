@@ -185,8 +185,7 @@ class WebComponentContainerTest {
     }
 
     /**
-     * 多命中必须仍然返回「按 @Order 排序后的第一个」—— 快路径只在单命中时生效，
-     * 多命中若跳过排序会静默改变行为（返回容器遍历顺序的首个，而非最高优先级者）。
+     * 多命中必须仍然返回「按 @Order 排序后的第一个」—— 快路径只在单命中时生效， 多命中若跳过排序会静默改变行为（返回容器遍历顺序的首个，而非最高优先级者）。
      */
     @Test
     void getWebComponent_multipleMatches_returnsHighestPriorityNotFirstRegistered() {
@@ -214,8 +213,7 @@ class WebComponentContainerTest {
     }
 
     /**
-     * 快路径与慢路径必须给出一致结果：对同一容器，getWebComponent(X) 恒等于
-     * getWebComponents(X) 的首元素（若非空）。这是本次优化的核心不变量。
+     * 快路径与慢路径必须给出一致结果：对同一容器，getWebComponent(X) 恒等于 getWebComponents(X) 的首元素（若非空）。这是本次优化的核心不变量。
      */
     @Test
     void getWebComponent_matchesGetWebComponentsFirstElement() {
@@ -247,8 +245,7 @@ class WebComponentContainerTest {
     }
 
     /**
-     * 运行期动态注册后查找必须能看到新组件（Actuator 端点场景）——
-     * 快路径不得缓存结果、从而返回过期的 null。
+     * 运行期动态注册后查找必须能看到新组件（Actuator 端点场景）—— 快路径不得缓存结果、从而返回过期的 null。
      */
     @Test
     void getWebComponent_seesLateRegisteredComponent() {
@@ -263,8 +260,7 @@ class WebComponentContainerTest {
         when(late.getComponentName()).thenReturn("late");
         container.registerWebComponent(late);
 
-        assertSame(late, container.getWebComponent(LifecycleWebComponent.class),
-                "运行期注册的组件必须立即可见");
+        assertSame(late, container.getWebComponent(LifecycleWebComponent.class), "运行期注册的组件必须立即可见");
     }
 
     @Test
