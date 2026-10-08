@@ -15,12 +15,11 @@ import io.netty.handler.codec.http.HttpHeaderNames;
  * {@link HttpHeaders} 子类，在保留 Spring 原生行为的基础上做两处优化：
  * <ol>
  * <li>缓存 {@link #getContentType()} 的解析结果，避免重复 {@link MediaType#parseMediaType}；</li>
- * <li>当底层存储是可写的 {@link NettyHttpHeadersAdapter} 时，Content-Type 的读写走
- * {@code HttpHeaderNames} 常量名直通 Netty，省掉每次按 String 名查找与 {@code AsciiString} 名字重算哈希。</li>
+ * <li>当底层存储是可写的 {@link NettyHttpHeadersAdapter} 时，Content-Type 的读写走 {@code HttpHeaderNames} 常量名直通 Netty，省掉每次按 String
+ * 名查找与 {@code AsciiString} 名字重算哈希。</li>
  * </ol>
  * <p>
- * 本类同时实现 {@link MultiValueMap}，与 Spring 6 的 {@code HttpHeaders} 一致：父类已经实现了该接口，
- * 这里的覆写只是为上面两处优化提供入口，其余一律委派 {@code super}。
+ * 本类同时实现 {@link MultiValueMap}，与 Spring 6 的 {@code HttpHeaders} 一致：父类已经实现了该接口， 这里的覆写只是为上面两处优化提供入口，其余一律委派 {@code super}。
  * </p>
  */
 @SuppressWarnings("deprecation")
@@ -51,8 +50,8 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
     /**
      * 用已存在的 {@code MultiValueMap} 视图构造，持有引用而非拷贝（零拷贝）。
      * <p>
-     * Spring 的 {@code HttpHeaders(MultiValueMap)} 为引用持有（已反编译验证 {@code putfield headers} 无拷贝循环）。
-     * 传入 {@link NettyHttpHeadersAdapter} 即可获得 Netty headers 的只读零拷贝视图。
+     * Spring 的 {@code HttpHeaders(MultiValueMap)} 为引用持有（已反编译验证 {@code putfield headers} 无拷贝循环）。 传入
+     * {@link NettyHttpHeadersAdapter} 即可获得 Netty headers 的只读零拷贝视图。
      * </p>
      */
     public WebHttpHeaders(MultiValueMap<String, String> headers) {

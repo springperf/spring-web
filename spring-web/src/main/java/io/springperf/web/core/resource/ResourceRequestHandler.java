@@ -475,8 +475,7 @@ public class ResourceRequestHandler implements CustomInvoker {
             // exists()+isFile()，不判可读性。若把不可读的 .gz 缓存下来，后续请求会走上面的
             // 命中分支直接返回它、跳过这里的 isReadable() 校验，把不可读文件当可压缩资源用。
             Resource candidate = resolveResourceByUri(uri + ".gz");
-            Resource gzipResource = (candidate != null && candidate.exists() && candidate.isReadable())
-                    ? candidate
+            Resource gzipResource = (candidate != null && candidate.exists() && candidate.isReadable()) ? candidate
                     : null;
             gzipResourceCache.put(uri, gzipResource != null ? gzipResource : NO_GZIP);
             if (gzipResource != null) {

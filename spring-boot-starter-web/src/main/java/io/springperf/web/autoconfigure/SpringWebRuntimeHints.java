@@ -15,9 +15,9 @@ import org.springframework.util.concurrent.ListenableFutureCallback;
  * <p>
  * 注册四类元数据：
  * <ul>
- * <li>JDK 动态代理：事件用代理把真实上下文包装为 {@link WebServerApplicationContext}， native 下代理接口必须显式注册；异步返回
- * {@code ListenableFuture} 时 {@link io.springperf.web.core.retval.resolver.async.ListenableFutureAdapter} 注册
- * {@link ListenableFutureCallback} 的回调实现；</li>
+ * <li>JDK 动态代理：事件用代理把真实上下文包装为 {@link WebServerApplicationContext}， native 下代理接口必须显式注册；异步返回 {@code ListenableFuture} 时
+ * {@link io.springperf.web.core.retval.resolver.async.ListenableFutureAdapter} 注册 {@link ListenableFutureCallback}
+ * 的回调实现；</li>
  * <li>反射：{@code ListenableFuture#addCallback} 回调路径；</li>
  * <li>资源：框架强依赖的 classpath 资源（配置元数据、视图模板、静态资源目录）；</li>
  * <li>用户 {@code @Controller} 方法与 DTO 的反射/序列化提示由

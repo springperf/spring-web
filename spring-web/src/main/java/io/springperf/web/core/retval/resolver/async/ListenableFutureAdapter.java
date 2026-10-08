@@ -5,11 +5,10 @@ import org.springframework.util.concurrent.ListenableFutureCallback;
 import org.springframework.web.context.request.async.DeferredResult;
 
 /**
- * {@code ListenableFuture} 到 {@link DeferredResult} 的适配器：注册回调，成功即 {@code setResult}，失败即
- * {@code setErrorResult}。
+ * {@code ListenableFuture} 到 {@link DeferredResult} 的适配器：注册回调，成功即 {@code setResult}，失败即 {@code setErrorResult}。
  * <p>
- * Spring 6 起 {@code ListenableFuture} 已标记弃用（推荐 {@link java.util.concurrent.CompletableFuture}），
- * 但本框架仍需支持以 {@code ListenableFuture} 为返回值的控制器方法。相关类型在本项目支持的 Spring 版本中均存在。
+ * Spring 6 起 {@code ListenableFuture} 已标记弃用（推荐 {@link java.util.concurrent.CompletableFuture}）， 但本框架仍需支持以
+ * {@code ListenableFuture} 为返回值的控制器方法。相关类型在本项目支持的 Spring 版本中均存在。
  * </p>
  */
 @SuppressWarnings("deprecation")

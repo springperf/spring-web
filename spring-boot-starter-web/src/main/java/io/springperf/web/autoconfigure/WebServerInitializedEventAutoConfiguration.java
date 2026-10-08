@@ -12,11 +12,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.ImportRuntimeHints;
 
 /**
- * Netty 服务器启动完成后发射 {@code WebServerInitializedEvent}， 使 Spring Cloud
- * 服务注册（Nacos/Eureka/Consul）等组件正确感知服务器就绪。
+ * Netty 服务器启动完成后发射 {@code WebServerInitializedEvent}， 使 Spring Cloud 服务注册（Nacos/Eureka/Consul）等组件正确感知服务器就绪。
  * <p>
- * 同时承载 GraalVM native-image 可达性提示 {@link SpringWebRuntimeHints}：事件路径的 JDK 代理 + 反射由 Spring AOT
- * 构建期采集。
+ * 同时承载 GraalVM native-image 可达性提示 {@link SpringWebRuntimeHints}：事件路径的 JDK 代理 + 反射由 Spring AOT 构建期采集。
  */
 @Configuration(proxyBeanMethods = false)
 @ImportRuntimeHints(SpringWebRuntimeHints.class)

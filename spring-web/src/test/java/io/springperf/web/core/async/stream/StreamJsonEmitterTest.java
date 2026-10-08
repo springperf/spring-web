@@ -20,7 +20,6 @@ import org.springframework.http.server.ServerHttpResponse;
 
 import io.springperf.web.json.JsonConverter;
 
-
 @ExtendWith(MockitoExtension.class)
 class StreamJsonEmitterTest {
 

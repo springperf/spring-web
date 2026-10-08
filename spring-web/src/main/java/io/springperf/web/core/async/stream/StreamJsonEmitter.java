@@ -9,7 +9,6 @@ import org.springframework.http.server.ServerHttpResponse;
 
 import io.springperf.web.json.JsonConverter;
 
-
 public class StreamJsonEmitter extends StreamEmitter<Object> {
 
     private final JsonConverter jsonConverter;
