@@ -48,7 +48,7 @@ public class JsrEndpointWebSocketConfigurer implements WebSocketConfigurer {
         this.registeredPaths = paths;
     }
 
-    /** 本次扫描注册的端点路径（供测试与诊断）。 */
+    /** 仅供测试与诊断：本次扫描注册的端点路径（公开 API 自 v3.5.6 起，收窄需走主版本决策）。 */
     public List<String> getRegisteredPaths() {
         List<String> paths = registeredPaths;
         return paths != null ? paths : java.util.Collections.emptyList();

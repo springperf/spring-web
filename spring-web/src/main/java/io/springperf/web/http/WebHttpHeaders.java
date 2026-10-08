@@ -12,20 +12,17 @@ import org.springframework.util.MultiValueMap;
 import io.netty.handler.codec.http.HttpHeaderNames;
 
 /**
- * {@link HttpHeaders} 子类：当底层存储是可写的 {@link NettyHttpHeadersAdapter} 时，Content-Type 的读写走
- * {@code HttpHeaderNames} 常量名直通Netty，省掉每次按 String 名查找与 {@code AsciiString} 名字重算哈希。
+ * {@link HttpHeaders} 子类：当底层存储是可写的 {@link NettyHttpHeadersAdapter} 时，Content-Type 的读写走 {@code HttpHeaderNames}
+ * 常量名直通Netty，省掉每次按 String 名查找与 {@code AsciiString} 名字重算哈希。
  * <p>
- * <b>不再缓存 {@link #getContentType()} 的解析结果</b>（曾用 {@code cachedContentType} 字段）：
- * 该缓存只能由 {@link #setContentType(MediaType)} 重置，而本类另有 20 个覆写方法
- * （{@code set}/{@code add}/{@code remove}/{@code put}/{@code putAll}/{@code clear} …）
- * 会改动 header 却<b>不</b>重置缓存 —— 业务经 {@code getHeaders().set("Content-Type", v)}
- * 写入后会读到过期值，且该失效缺陷无任何报错，属静默错误。
+ * <b>不再缓存 {@link #getContentType()} 的解析结果</b>（曾用 {@code cachedContentType} 字段）： 该缓存只能由
+ * {@link #setContentType(MediaType)} 重置，而本类另有 20 个覆写方法
+ * （{@code set}/{@code add}/{@code remove}/{@code put}/{@code putAll}/{@code clear} …） 会改动 header 却<b>不</b>重置缓存 —— 业务经
+ * {@code getHeaders().set("Content-Type", v)} 写入后会读到过期值，且该失效缺陷无任何报错，属静默错误。
  * <p>
- * 实测去掉缓存的代价（{@code ServerAllocBenchmark}，json 场景服务端分配）：
- * 5,446 → 5,473 B/op（<b>+27 B/op，+0.5%</b>）。CPU 侧更可忽略：
- * {@code MediaType.parseMediaType("application/json; charset=utf-8")} 单次 50.9 ns，
- * 每请求1~2 次即 51~102 ns，占单请求耗时（6,700 ops/s 下149μs）的<b>0.03%~0.07%</b> ——
- * 比本机吞吐测量噪声（±15%）小两个数量级，不存在可观测损失。
+ * 实测去掉缓存的代价（{@code ServerAllocBenchmark}，json 场景服务端分配）： 5,446 → 5,473 B/op（<b>+27 B/op，+0.5%</b>）。CPU 侧更可忽略：
+ * {@code MediaType.parseMediaType("application/json; charset=utf-8")} 单次 50.9 ns， 每请求1~2 次即 51~102 ns，占单请求耗时（6,700
+ * ops/s 下149μs）的<b>0.03%~0.07%</b> —— 比本机吞吐测量噪声（±15%）小两个数量级，不存在可观测损失。
  * <p>
  * 用「确定的正确行为」换「测不出来的微小开销」是划算的权衡。
  * </p>

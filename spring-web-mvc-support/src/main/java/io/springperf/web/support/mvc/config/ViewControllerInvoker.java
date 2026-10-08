@@ -114,7 +114,7 @@ public class ViewControllerInvoker implements CustomInvoker {
         return "ViewController";
     }
 
-    /** 供测试：当前关联的 ViewResolverRegistry。 */
+    /** 仅供测试：当前关联的 ViewResolverRegistry（包可见，不进公开 API）。 */
     ViewResolverRegistry getViewResolverRegistryForTest() {
         return viewResolverRegistry;
     }

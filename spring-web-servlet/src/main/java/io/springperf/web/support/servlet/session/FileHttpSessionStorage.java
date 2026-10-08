@@ -16,7 +16,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.SecureRandom;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -404,8 +403,10 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
         }
     }
 
-    /** 当前内存中未过期的会话数。 */
-    public int getActiveSessionCount() {
+    /**
+     * 仅供测试：当前内存中未过期的会话数（O(n) 遍历，生产路径不读它）。 收成包可见，避免它被误当成公开 API 用于运行期统计。
+     */
+    int getActiveSessionCount() {
         long now = System.currentTimeMillis();
         return (int) sessions.values().stream().filter(s -> !s.isExpired(now)).count();
     }
@@ -544,10 +545,5 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
         } catch (IllegalArgumentException e) {
             throw new IllegalStateException("Invalid session deserialization filter spec: " + spec, e);
         }
-    }
-
-    /** 供测试：当前内存中的会话快照（id -> data）。 */
-    Map<String, HttpSessionData> snapshot() {
-        return new HashMap<>(sessions);
     }
 }

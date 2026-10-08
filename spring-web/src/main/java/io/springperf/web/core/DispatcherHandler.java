@@ -157,12 +157,12 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
     /**
      * 按 {@code spring.mvc.dispatch.*} 判断当前请求方法是否允许分发给处理器。 未禁用的方法恒返回 true；被禁用的 OPTIONS 在 CORS 预检场景仍放行。
      */
-    /** 测试可见：暴露 mappingRegistry。 */
+    /** 仅供测试：暴露 mappingRegistry（包可见，不进公开 API）。 */
     MappingRegistry mappingRegistryForTest() {
         return mappingRegistry;
     }
 
-    /** 测试可见：暴露 corsRegistry。 */
+    /** 仅供测试：暴露 corsRegistry（包可见，不进公开 API）。 */
     CorsRegistry corsRegistryForTest() {
         return corsRegistry;
     }
