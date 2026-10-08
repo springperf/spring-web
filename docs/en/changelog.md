@@ -4,16 +4,46 @@
 
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.5.7] - 20261005
+
+> ⚠️ **This release contains breaking changes**: configuration keys, response framing,
+> Servlet `flush` semantics, conditional requests / ranges and extension-point signatures
+> have all changed. **Read the [breaking changes guide](../BREAKING-CHANGES.md) before upgrading.**
+
+### Added
+
+- **Static resources & views**: pluggable `WebExchangeProvider` SPI so templates can access the real session and principal; view/encoding configuration keys unified
+- **HTTP protocol semantics**: conditional requests (`If-None-Match` / `If-Modified-Since`), byte ranges (including multi-range `multipart/byteranges` and `Accept-Ranges`), and response framing now follow RFC 7231/7232/7233
+- **Server configuration aligned with Spring Boot**: a set of keys covering connection and request limits, keep-alive timeout/request count, multipart limits, error-response policy and i18n binding (see the configuration reference and section 6 of the [breaking changes guide](../BREAKING-CHANGES.md))
+- **Batch processing**: `@BatchMapping` can run on virtual threads (JDK 21+), preserving the `consumerSize` bound and backpressure semantics
+- **Configuration refresh**: property snapshots and refresh driven by Spring Cloud environment changes
 
 ### Changed
 
-- **Branch strategy: `master` is now pure Spring Boot 3.5.x**. The Spring Boot 4 / Spring Framework 7 compatibility layer that had accumulated on `master` (the version branches and MethodHandles in `WebHttpHeaders`, `MediaTypeUtils`, `ResponseStatusExceptionAdapter`, `Boot4WebServerInitializedEventBridge`, SB4 Maven profiles, etc.) has been removed entirely. 4.x adaptation now lives on the `4.1.x` branch; see the [4.1.x adaptation guide](../../.agent/context/4.1.x-adaptation-checklist.md)
+- **Branch strategy**: `master` is now **pure Spring Boot 3.5.x** — the Spring Boot 4 / Spring Framework 7 compatibility layer that had accumulated on it (the version branches and MethodHandles in `WebHttpHeaders`, `MediaTypeUtils`, `ResponseStatusExceptionAdapter`, `Boot4WebServerInitializedEventBridge`, SB4 Maven profiles, etc.) has been removed entirely. 4.x adaptation now lives on the `4.1.x` branch; see the [4.1.x adaptation guide](../../.agent/context/4.1.x-adaptation-checklist.md)
+- **Response framing**: `flush(true)` changed from one-shot to progressive (chunked) output
+- **Servlet `PrintWriter`**: `print` / `println` no longer auto-commit (matching Tomcat's `autoFlush=false`)
+- **Extension-point signature changes** (source-level incompatible; see section 6.3 of the [breaking changes guide](../BREAKING-CHANGES.md))
+- **Error mapping** for sessions, redirects and conditional requests adjusted (6.7); management-port and forwarding semantics adjusted (6.8)
+
+### Security
+
+- **Session fixation protection**: the session ID is rotated around login, defeating fixation attacks
+- **Multipart DoS protection**: fail-fast on the declared `Content-Length` plus a streaming byte cap (covering chunked), returning 413 instead of dropping the connection
+- **Fastjson deserialization hardening**: `SupportAutoType` is off by default and `ErrorOnNotSupportAutoType` on, blocking `@type` gadget chains
+- **Request parameter cap**: `server.max-parameter-count` defaults to 10000, guarding against hash-collision DoS
+
+### Performance
+
+- **Hot-path allocations**: a set of JFR-driven optimizations (request dispatch, attribute lookup, cached read-only views in `WebHttpHeaders`, …) reducing per-request allocation and CPU
+- **Gains from removing the compat layer**: the eight `MultiValueMap` methods on `WebHttpHeaders` were invoked through `MethodHandle` + varargs `invokeWithArguments` (allocating an `Object[]` per call), and `get()` / `entrySet()` / `keySet()` all sit on the per-request hot path. They now call `super.*()` directly
 
 ### Fixed
 
-- **Performance gain from removing the compat layer**: the eight `MultiValueMap` methods on `WebHttpHeaders` were invoked through `MethodHandle` + varargs `invokeWithArguments` (allocating an `Object[]` per call), and `get()` / `entrySet()` / `keySet()` all sit on the per-request hot path. They now call `super.*()` directly
+- **Session concurrency**: expired-session sweeps now remove the entry conditionally under the write lock, fixing the case where a just-swept session was written back by a concurrent save and resurrected on restart; session writes are serialised
+- **Async / SSE lifecycle**: `DeferredResult` reaches its terminal state exactly once, timeout tasks are cleaned up promptly, and `ByteBuf` reference counts are paired — avoiding leaks and premature release on long-lived connections
 - **Stale auto-configuration registration**: `AutoConfiguration.imports` still registered the removed `Boot4WebServerInitializedEventAutoConfiguration`, which caused Spring context startup failures
+- A batch of long-standing defects around **404/405 shared-state pollution**, the **filter-chain exception path**, **`WebContext` lifecycle** and **routing boundaries**
 
 ## [3.5.6] - 20260906
 
