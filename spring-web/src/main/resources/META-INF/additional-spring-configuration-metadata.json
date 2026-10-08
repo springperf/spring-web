@@ -241,13 +241,15 @@
       "name": "server.keep-alive-timeout",
       "type": "java.lang.Long",
       "description": "Idle timeout (millis; Duration style supported) after which a keep-alive connection is closed.",
-      "sourceType": "io.springperf.web.context.ApplicationProperties"
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "0"
     },
     {
       "name": "server.max-keep-alive-requests",
       "type": "java.lang.Integer",
       "description": "Maximum number of requests served on a single keep-alive connection before it is closed.",
-      "sourceType": "io.springperf.web.context.ApplicationProperties"
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": "100"
     },
     {
       "name": "server.forward-headers-strategy",
@@ -294,7 +296,8 @@
     {
       "name": "server.netty.workers",
       "type": "java.lang.Integer",
-      "description": "Number of Netty worker event-loop threads (default: 2 x CPU cores)."
+      "description": "Number of Netty worker event-loop threads (default: 2 x CPU cores).",
+      "defaultValue": "0"
     },
     {
       "name": "server.netty.boss-threads",
@@ -341,12 +344,14 @@
     {
       "name": "server.netty.write-buffer-low-watermark",
       "type": "java.lang.Integer",
-      "description": "Channel write-buffer low watermark in bytes (default 32KB)."
+      "description": "Channel write-buffer low watermark in bytes (default 8KB).",
+      "defaultValue": "8192"
     },
     {
       "name": "server.netty.write-buffer-high-watermark",
       "type": "java.lang.Integer",
-      "description": "Channel write-buffer high watermark in bytes (default 64KB); crossing it marks the channel non-writable for backpressure."
+      "description": "Channel write-buffer high watermark in bytes (default 32KB); crossing it marks the channel non-writable for backpressure.",
+      "defaultValue": "32768"
     },
     {
       "name": "server.servlet.application-display-name",

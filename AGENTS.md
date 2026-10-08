@@ -15,7 +15,8 @@
 ## 项目配置
 
 - Java 17 源码兼容（`pom.xml` 的 `java.version=17`；`2.7.x` 分支才是 Java 8）
-- 多版本兼容：默认 Spring Boot **3.5.16**，Profile 覆盖 **2.4 ~ 2.7 / 3.0 ~ 3.5 / 4.0 ~ 4.1**（`-Pspring-boot-*` 切换）
+- 多版本兼容：默认 Spring Boot **3.5.16**，Profile 覆盖 **2.4 ~ 2.7 / 3.0 ~ 3.5**（`-Pspring-boot-*` 切换）。
+  **Spring Boot 4.0/4.1 由 `4.1.x` 分支适配**，master 不含 4.x profile 与任何 SB4 兼容代码
 - Netty 4.1.137.Final
 - Jackson 2.17.2、Fastjson 2.0.60（provided）
 - Lombok 1.18.46

@@ -104,7 +104,7 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 | Virtual threads | Not supported | Supported (JDK 21+) |
 | GraalVM native-image | Not supported | Supported |
 | `ModelMap` vs `Model` | `ModelMap implements Model` | **`ModelMap` does NOT implement `Model`** (requires `ExtendedModelMap`) |
-| `spring-web-view` | Per backport status | New feature baseline |
+| `spring-web-view` | Already present (the `2.7.x` branch pom includes this module) | New feature baseline |
 
 ---
 
