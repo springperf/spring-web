@@ -4,6 +4,27 @@
 
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.7] - 20261008
+
+> **About this version**: `4.1.x` is a downstream branch **split out of `master`** (pure Spring Boot 3.5.x)
+> to release independently; its first release is **`4.1.7`** - Spring Boot 4.0 / 4.1 + Spring Framework 7 +
+> Jackson 3, with no 3.5.x support. Its notes therefore cover the split and adaptation itself; the rest
+> matches master's `3.5.7`, reproduced in full right after this section.
+
+### Changed
+
+- **Branch positioning**: this branch (`4.1.x`) is **dedicated to Spring Boot 4.1** (`-Pspring-boot-4.0` switches to 4.0) and **no longer supports 3.5.x** — the "one codebase for both" goal is served by the division between master (pure 3.5.x) and this branch. 4.1 is the default build; no `-P` needed. The differences and sync rules are in the [4.1.x adaptation guide](../../.agent/context/4.1.x-adaptation-checklist.md)
+- **Compatibility layer removed wholesale**: the eight MethodHandle version branches in `WebHttpHeaders`, the ASM runtime bytecode generation in `Boot4WebServerInitializedEventBridge`, the reflective method-name probing in `ResponseStatusExceptionAdapter`, and `ListenableFutureAdapter` (Spring 7 no longer has the type; the old implementation was dead code) are all gone — the code now targets the Spring 7 / Jackson 3 APIs directly
+- **JSON stack migrated to Jackson 3**: `com.fasterxml.jackson.databind` → `tools.jackson.databind` (annotations still `com.fasterxml.jackson.annotation`). Jackson 3 flips the default of `FAIL_ON_NULL_FOR_PRIMITIVES` from `false` to `true`; the framework disables it explicitly via `JacksonMappers.defaultMapper()` to keep behaviour aligned with master
+- **Netty now follows the Boot 4 BOM**: `4.1.137.Final` → `4.2.15.Final` (Boot 4's baseline). The project's own pins on 14 Netty artifacts were removed
+- **Spring AI upgraded to 2.x**: 1.x targets Boot 3, and its `OpenAiApi` called `HttpHeaders.addAll(MultiValueMap)`, whose signature changed in Spring 7
+
+### Fixed
+
+- **Forwarded-header parsing**: added support for `X-Forwarded-Host` / `X-Forwarded-Port` / `X-Forwarded-Prefix`. Previously only the scheme (proto) was parsed, with host/port relying on Boot's `ForwardedHeaderFilter` — which has nowhere to attach, since Boot 4's `spring-boot-starter-web` no longer pulls in a servlet container
+- **`+json` suffix media types**: prefixed `+json` types such as `application/vnd.spring-boot.actuator.v2+json` did not match the JSON converter, so Actuator endpoints returned 200 with an empty body
+- **String request bodies**: `@RequestBody String` always failed with 400 under `application/json` (the framework never registered a `StringHttpMessageConverter`); it is now registered and ordered ahead of Jackson (Spring semantics: Strings are read as-is, not parsed as JSON)
+
 ## [3.5.7] - 20261008
 
 > ⚠️ **This release contains breaking changes**: configuration keys, response framing,
