@@ -244,6 +244,7 @@ management.server.max-content-length=1048576
 |--------|------|------|------|
 | `dispatcher.request.duration` | Timer | `method`, `path`, `status` | 请求处理耗时分布 |
 | `dispatcher.exception` | Counter | `type`, `resolved` | 异常计数，按异常类型和是否被 `@ExceptionHandler` 处理分类 |
+| `dispatcher.async.active.lifecycles` | Gauge | — | 在飞异步生命周期数；未归零即存在未终结的异步分发（入站 buf 引用未归还，是 ByteBuf 泄漏的前置条件） |
 | `pool.{name}.active.threads` | Gauge | — | 指定线程池的活跃线程数 |
 | `pool.{name}.queue.size` | Gauge | — | 指定线程池的排队任务数 |
 | `pool.{name}.completed.tasks` | Gauge | — | 指定线程池的已完成任务数 |

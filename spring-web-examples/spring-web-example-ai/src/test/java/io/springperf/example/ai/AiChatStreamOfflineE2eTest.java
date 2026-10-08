@@ -1,6 +1,7 @@
 package io.springperf.example.ai;
 
-import io.springperf.web.core.async.PerfAsyncWebRequest;
+import io.springperf.web.core.metrics.CountingWebMetrics;
+import io.springperf.web.core.metrics.WebMetrics;
 import io.springperf.web.server.NettyHttpServer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,11 +47,32 @@ class AiChatStreamOfflineE2eTest {
     private NettyHttpServer nettyHttpServer;
 
     /**
+     * 本 context 的计量组件（由 {@link StubChatClientConfig} 注册 {@link CountingWebMetrics}）：在飞异步生命周期 计数取自它，而不再是全局静态字段——全局读数会被别的
+     * context 的残留污染。
+     */
+    @Autowired
+    private WebMetrics webMetrics;
+
+    /** 在飞的异步生命周期数（语义同原先的全局读数，作用域为本 context）。 */
+    private int activeRequestRefs() {
+        if (!(webMetrics instanceof CountingWebMetrics counting)) {
+            throw new IllegalStateException("本类需要可读计量实现（CountingWebMetrics），实际装配为 " + webMetrics.getClass().getName());
+        }
+        return counting.activeAsyncLifecycles();
+    }
+
+    /**
      * 覆盖自动配置的 {@code ChatClient.Builder}（{@code @Primary}）：控制器本就只依赖这一层间接
      * （{@code chatClientBuilder.build()}），因此**无需改动生产代码**即可注入替身客户端。
      */
     @TestConfiguration
     static class StubChatClientConfig {
+
+        /** 可读计量实现（默认装配 {@code NoOpWebMetrics} 读不出计数，而本类要断言它归零）。 */
+        @Bean
+        WebMetrics countingWebMetrics() {
+            return new CountingWebMetrics();
+        }
 
         @Bean
         @Primary
@@ -93,7 +115,7 @@ class AiChatStreamOfflineE2eTest {
         assertThat(body.indexOf(TOKENS[0])).as("token 顺序必须保持（实际=%s）", body).isLessThan(body.indexOf(TOKENS[1]));
         assertThat(body.indexOf(TOKENS[1])).as("token 顺序必须保持（实际=%s）", body).isLessThan(body.indexOf(TOKENS[2]));
 
-        assertThat(PerfAsyncWebRequest.activeRequestRefs()).as("流式结束后异步持有者引用必须归零（残留即有未终结的异步生命周期）").isZero();
+        assertThat(activeRequestRefs()).as("流式结束后异步持有者引用必须归零（残留即有未终结的异步生命周期）").isZero();
     }
 
     /** 同一连接的第二次流式请求：验证终结后可复用（无残留状态）。 */
@@ -102,6 +124,6 @@ class AiChatStreamOfflineE2eTest {
         String first = rest.getForEntity("/ai/chat/stream?message=a", String.class).getBody();
         String second = rest.getForEntity("/ai/chat/stream?message=b", String.class).getBody();
         assertThat(first).isEqualTo(second);
-        assertThat(PerfAsyncWebRequest.activeRequestRefs()).isZero();
+        assertThat(activeRequestRefs()).isZero();
     }
 }

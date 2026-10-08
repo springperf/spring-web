@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Micrometer-based {@link WebMetrics} implementation.
@@ -19,6 +20,7 @@ import java.util.concurrent.TimeUnit;
  * <ul>
  * <li>{@code dispatcher.request.duration} — Timer, tagged with {@code method}, {@code path}, {@code status}</li>
  * <li>{@code dispatcher.exception} — Counter, tagged with {@code type}, {@code resolved}</li>
+ * <li>{@code dispatcher.async.active.lifecycles} — Gauge, asynchronous dispatches still in flight</li>
  * <li>{@code pool.{name}.active.threads} — Gauge, active thread count</li>
  * <li>{@code pool.{name}.queue.size} — Gauge, queue size</li>
  * <li>{@code pool.{name}.completed.tasks} — Gauge, completed task count</li>
@@ -55,6 +57,9 @@ public class MicrometerWebMetrics extends BaseWebComponent implements WebMetrics
     /** 已注册 gauge 标记，避免重复注册的幂等守卫。 */
     private final java.util.Set<String> registeredPoolGauges = ConcurrentHashMap.newKeySet();
 
+    /** 在飞的异步生命周期数：{@code dispatcher.async.active.lifecycles} gauge 直接读它。 */
+    private final AtomicInteger activeAsyncLifecycles = new AtomicInteger();
+
     /**
      * 溢出时统一落到的 timer，按 {@code (method, status)} 分桶，保证超限后 latency 仍有观测（不会被静默丢弃）。
      * <p>
@@ -69,6 +74,21 @@ public class MicrometerWebMetrics extends BaseWebComponent implements WebMetrics
 
     public MicrometerWebMetrics(MeterRegistry meterRegistry) {
         this.meterRegistry = meterRegistry;
+        // 在飞的异步生命周期数：由 PerfAsyncWebRequest 的 startAsync / releaseRequestOnce 加减，gauge 直接读它。
+        // 这条指标回答的是「还有多少异步分发没终结」——未归零是入站 buf 泄漏的前置条件，而它无法从 per-request
+        // 状态事后推得（泄漏的持有者已不可达），故需要这样一个计数器。
+        Gauge.builder("dispatcher.async.active.lifecycles", activeAsyncLifecycles, counter -> (double) counter.get())
+                .description("Asynchronous dispatches still in flight on this context").register(meterRegistry);
+    }
+
+    @Override
+    public void asyncLifecycleStarted() {
+        activeAsyncLifecycles.incrementAndGet();
+    }
+
+    @Override
+    public void asyncLifecycleCompleted() {
+        activeAsyncLifecycles.decrementAndGet();
     }
 
     @Override

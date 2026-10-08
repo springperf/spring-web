@@ -1,10 +1,12 @@
 package io.springperf.webtest.bridge;
 
-import io.springperf.web.core.async.PerfAsyncWebRequest;
+import io.springperf.web.core.metrics.CountingWebMetrics;
+import io.springperf.web.core.metrics.WebMetrics;
 import io.springperf.webtest.BaseE2ETest;
 import okhttp3.Request;
 import okhttp3.Response;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -26,9 +28,24 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ServletBridgeSseE2eTest extends BaseE2ETest {
 
+    /**
+     * 本 context 的计量组件（由 {@code SupportTestApplication} 注册 {@link CountingWebMetrics}）：在飞异步生命周期
+     * 计数取自它，而不再是全局静态字段——全局读数会被别的 context 的残留污染。
+     */
+    @Autowired
+    WebMetrics webMetrics;
+
+    /** 在飞的异步生命周期数（语义同原先的全局读数，作用域为本 context）。 */
+    private int activeRequestRefs() {
+        if (!(webMetrics instanceof CountingWebMetrics counting)) {
+            throw new IllegalStateException("本类需要可读计量实现（CountingWebMetrics），实际装配为 " + webMetrics.getClass().getName());
+        }
+        return counting.activeAsyncLifecycles();
+    }
+
     @Test
     void sse_servletBridge_deliversEventsAndTerminates_refsReturnToBaseline() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         Request request = new Request.Builder().url(url("/api/servlet-bridge/sse-stream")).build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             assertEquals(200, resp.code());
@@ -44,16 +61,15 @@ class ServletBridgeSseE2eTest extends BaseE2ETest {
         }
         // 桥接模式同样受异步引用计数不变式约束（endStream/complete 后必须归零）
         long deadline = System.currentTimeMillis() + 5000;
-        while (PerfAsyncWebRequest.activeRequestRefs() != baseline && System.currentTimeMillis() < deadline) {
+        while (activeRequestRefs() != baseline && System.currentTimeMillis() < deadline) {
             Thread.sleep(20);
         }
-        assertEquals(baseline, PerfAsyncWebRequest.activeRequestRefs(),
-                "桥接模式 SSE 结束后异步持有者引用应归零（偏离 " + baseline + " 说明有未终结的异步生命周期）");
+        assertEquals(baseline, activeRequestRefs(), "桥接模式 SSE 结束后异步持有者引用应归零（偏离 " + baseline + " 说明有未终结的异步生命周期）");
     }
 
     @Test
     void sse_servletBridgeBusinessError_truncated_refsReturnToBaseline() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = CLIENT.newCall(new Request.Builder().url(url("/api/servlet-bridge/sse-error")).build())
                 .execute()) {
             assertEquals(200, resp.code());
@@ -65,11 +81,10 @@ class ServletBridgeSseE2eTest extends BaseE2ETest {
             }
         }
         long deadline = System.currentTimeMillis() + 5000;
-        while (PerfAsyncWebRequest.activeRequestRefs() != baseline && System.currentTimeMillis() < deadline) {
+        while (activeRequestRefs() != baseline && System.currentTimeMillis() < deadline) {
             Thread.sleep(20);
         }
-        assertEquals(baseline, PerfAsyncWebRequest.activeRequestRefs(),
-                "桥接模式 SSE 异常终止后异步持有者引用应归零（偏离 " + baseline + "）");
+        assertEquals(baseline, activeRequestRefs(), "桥接模式 SSE 异常终止后异步持有者引用应归零（偏离 " + baseline + "）");
     }
 
     /**
@@ -78,7 +93,7 @@ class ServletBridgeSseE2eTest extends BaseE2ETest {
      */
     @Test
     void mvcSseEmitter_framesDeliveredAndTerminated_refsToZero() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = CLIENT.newCall(new Request.Builder().url(url("/api/servlet-bridge/sse-mvc")).build())
                 .execute()) {
             assertEquals(200, resp.code());
@@ -99,7 +114,7 @@ class ServletBridgeSseE2eTest extends BaseE2ETest {
      */
     @Test
     void responseBodyEmitter_encodesInOrderAndTerminates_refsToZero() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = CLIENT.newCall(new Request.Builder().url(url("/api/servlet-bridge/emitter")).build())
                 .execute()) {
             assertEquals(200, resp.code());
@@ -132,9 +147,9 @@ class ServletBridgeSseE2eTest extends BaseE2ETest {
     /** 异步持有者引用归零（桥接模式的异步生命周期同样受此不变式约束）。 */
     private void assertRefsZeroed() throws Exception {
         long deadline = System.currentTimeMillis() + 5000;
-        while (PerfAsyncWebRequest.activeRequestRefs() != 0 && System.currentTimeMillis() < deadline) {
+        while (activeRequestRefs() != 0 && System.currentTimeMillis() < deadline) {
             Thread.sleep(20);
         }
-        assertEquals(0, PerfAsyncWebRequest.activeRequestRefs(), "场景结束后异步持有者引用应归零（残留即有未终结的异步生命周期）");
+        assertEquals(0, activeRequestRefs(), "场景结束后异步持有者引用应归零（残留即有未终结的异步生命周期）");
     }
 }

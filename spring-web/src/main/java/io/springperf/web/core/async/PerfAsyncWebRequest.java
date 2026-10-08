@@ -7,7 +7,10 @@ import java.util.function.Consumer;
 import org.springframework.http.server.ServerHttpAsyncRequestControl;
 import org.springframework.web.context.request.async.AsyncWebRequest;
 
+import io.springperf.web.context.WebContext;
 import io.springperf.web.core.DispatcherHandler;
+import io.springperf.web.core.metrics.NoOpWebMetrics;
+import io.springperf.web.core.metrics.WebMetrics;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.http.WriteRespEventListener;
@@ -24,16 +27,27 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest
     private final AtomicBoolean requestRefHeld = new AtomicBoolean(false);
 
     /**
-     * 测试/压测用计量：当前仍被异步持有者扣留的入站请求引用数（acquire +1 / release -1）。
+     * 本请求所属 context 的计量组件，**懒解析**（首次用到时才查容器，解析结果缓存在此）。
      * <p>
-     * 只触碰异步路径（同步热路径零开销），用于断言「每个场景结束后归零」——这是 ByteBuf 不泄漏的前置条件；缓冲本身是否泄漏由 Netty leakDetector 判定，两者互为交叉验证。
+     * 懒解析不是可选项：既有单测锁定了「无操作路径不触碰 {@link WebContext}」这一契约 —— {@code dispatch()} 在未启动 / 已完成时直接返回， 连 dispatcher handler
+     * 都不查。构造期解析会破坏它（实测 3 个用例 {@code NeverWantedButInvoked}）。异步生命周期的两个端点（{@code startAsync} /
+     * {@code releaseRequestOnce}）都只在异步路径上，故解析也只发生在那条路径上 —— 同步热路径依旧零触碰。
+     * </p>
+     * <p>
+     * 在飞计数落在这里，而不再是全局静态字段：全局字段把「归零」变成整个 JVM 的不变量，任何别的 context 的残留都会污染断言（实测：整仓 {@code clean test} 下 28 条级联误报 /
+     * 422.5s）。默认装配是 {@link NoOpWebMetrics}，两个钩子都是空实现 → 不装计量时零开销。volatile：写入方可能是业务线程 （startAsync），读取方可能是 EventLoop（写回调里的
+     * releaseRequestOnce）。
      * </p>
      */
-    private static final java.util.concurrent.atomic.AtomicInteger ACTIVE_REQUEST_REFS = new java.util.concurrent.atomic.AtomicInteger();
+    private volatile WebMetrics metrics;
 
-    /** 供测试断言：所有异步持有者退场后应回到 0（未归零即说明存在未终结的异步生命周期）。 */
-    public static int activeRequestRefs() {
-        return ACTIVE_REQUEST_REFS.get();
+    private WebMetrics metrics() {
+        WebMetrics resolved = this.metrics;
+        if (resolved == null) {
+            resolved = resolveMetrics(request);
+            this.metrics = resolved;
+        }
+        return resolved;
     }
 
     protected boolean errorHandlingInProgress;
@@ -59,6 +73,20 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest
 
     protected PerfAsyncWebRequest(WebServerHttpRequest request, WebServerHttpResponse response) {
         super(request, response);
+    }
+
+    /**
+     * 取本 context 的计量组件；取不到就退化为 {@link NoOpWebMetrics#INSTANCE}（而不是 null）——单元测试的请求替身 没有
+     * WebContext，而「计量缺失」不该让异步路径出异常。用只读的 {@code getWebComponent} 而非
+     * {@code getWebComponentWithDefault}：后者会**注册**默认实现，那是启动期该做的事，不是每请求该做的。
+     */
+    private static WebMetrics resolveMetrics(WebServerHttpRequest request) {
+        WebContext webContext = request.getWebContext();
+        if (webContext == null) {
+            return NoOpWebMetrics.INSTANCE;
+        }
+        WebMetrics component = webContext.getWebComponent(WebMetrics.class);
+        return component != null ? component : NoOpWebMetrics.INSTANCE;
     }
 
     public boolean isErrorHandlingInProgress() {
@@ -96,7 +124,7 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest
         // duplicate 共享视图）依赖入站 buf 存活，故在此 acquire，由 releaseRequestOnce() 归还。
         request.acquire();
         requestRefHeld.set(true);
-        ACTIVE_REQUEST_REFS.incrementAndGet();
+        metrics().asyncLifecycleStarted();
         response.addWriteRespEventListener(this);
     }
 
@@ -113,7 +141,7 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest
     private void releaseRequestOnce() {
         if (requestRefHeld.compareAndSet(true, false)) {
             request.release();
-            ACTIVE_REQUEST_REFS.decrementAndGet();
+            metrics().asyncLifecycleCompleted();
         }
     }
 

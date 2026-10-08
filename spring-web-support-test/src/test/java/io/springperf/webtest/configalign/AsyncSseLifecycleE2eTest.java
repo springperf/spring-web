@@ -1,9 +1,11 @@
 package io.springperf.webtest.configalign;
 
-import io.springperf.web.core.async.PerfAsyncWebRequest;
+import io.springperf.web.core.metrics.CountingWebMetrics;
+import io.springperf.web.core.metrics.WebMetrics;
 import okhttp3.OkHttpClient;
 import okhttp3.Response;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -28,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * </p>
  * <ol>
  * <li><b>响应语义正确</b>：客户端拿到预期内容；</li>
- * <li><b>异步持有者引用归零</b>：{@link PerfAsyncWebRequest#activeRequestRefs()} 回到场景开始前的基线 —— 这是「入站 buf 引用被归还」的直接证据，不依赖 GC
+ * <li><b>异步持有者引用归零</b>：{@link CountingWebMetrics#activeAsyncLifecycles()} 回到场景开始前的基线 —— 这是「入站 buf 引用被归还」的直接证据，不依赖 GC
  * 时机。</li>
  * </ol>
  * <p>
@@ -47,6 +49,21 @@ class AsyncSseLifecycleE2eTest {
     @LocalServerPort
     int port;
 
+    /**
+     * 本 context 的计量组件：在飞异步生命周期计数取自它（原先读的是全局静态字段，会让别的 context 的残留污染本类 断言）。由 {@link AsyncLifecycleConfig} 注册为容器
+     * bean，框架优先取容器内 bean。
+     */
+    @Autowired
+    WebMetrics webMetrics;
+
+    /** 在飞的异步生命周期数（语义同原先的全局读数，作用域改为本 context）。 */
+    private int activeRequestRefs() {
+        if (!(webMetrics instanceof CountingWebMetrics counting)) {
+            throw new IllegalStateException("本类需要可读计量实现（CountingWebMetrics），实际装配为 " + webMetrics.getClass().getName());
+        }
+        return counting.activeAsyncLifecycles();
+    }
+
     private String base() {
         return "http://localhost:" + port;
     }
@@ -58,18 +75,17 @@ class AsyncSseLifecycleE2eTest {
     /** 异步持有者引用必须回到基线（轮询，容忍写终结回调的异步投递延迟）。 */
     private void assertRefsBackTo(int baseline) throws Exception {
         long deadline = System.currentTimeMillis() + 5000;
-        while (PerfAsyncWebRequest.activeRequestRefs() != baseline && System.currentTimeMillis() < deadline) {
+        while (activeRequestRefs() != baseline && System.currentTimeMillis() < deadline) {
             Thread.sleep(20);
         }
-        assertEquals(baseline, PerfAsyncWebRequest.activeRequestRefs(),
-                "场景结束后异步持有者引用应归零（当前值偏离基线 " + baseline + " 说明有未终结的异步生命周期）");
+        assertEquals(baseline, activeRequestRefs(), "场景结束后异步持有者引用应归零（当前值偏离基线 " + baseline + " 说明有未终结的异步生命周期）");
     }
 
     // ==================== 场景 ====================
 
     @Test
     void deferredResult_completes_refsReturnToBaseline() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-async/dr")) {
             assertEquals(200, resp.code());
             assertEquals("dr-ok", resp.body().string());
@@ -79,7 +95,7 @@ class AsyncSseLifecycleE2eTest {
 
     @Test
     void callable_completes_refsReturnToBaseline() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-async/callable")) {
             assertEquals(200, resp.code());
             assertEquals("callable-ok", resp.body().string());
@@ -89,7 +105,7 @@ class AsyncSseLifecycleE2eTest {
 
     @Test
     void sse_normalClose_deliversAllChunks_refsReturnToBaseline() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-async/sse")) {
             assertEquals(200, resp.code());
             // 读到 EOF（服务端写完 LastHttpContent 后关闭）—— 证明终止块存在、流正常收尾
@@ -102,7 +118,7 @@ class AsyncSseLifecycleE2eTest {
 
     @Test
     void sse_idleClientAbort_refsReturnToBaseline() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         Response resp = get("/e2e-async/sse-idle");
         try {
             // 读到首块后立刻断开：此时服务端既不写 LastHttpContent，也没有 chunk 写失败，
@@ -117,7 +133,7 @@ class AsyncSseLifecycleE2eTest {
 
     @Test
     void sse_halfWrittenClientAbort_refsReturnToBaseline() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         Response resp = get("/e2e-async/sse-slow");
         try {
             String first = resp.body().source().readUtf8Line();
@@ -130,7 +146,7 @@ class AsyncSseLifecycleE2eTest {
 
     @Test
     void sse_businessErrorTermination_refsReturnToBaseline() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-async/sse-error")) {
             assertEquals(200, resp.code());
             try {
@@ -146,7 +162,7 @@ class AsyncSseLifecycleE2eTest {
 
     @Test
     void deferredResult_timeoutThenLateResult_refsReturnToBaseline() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-async/dr-late")) {
             int code = resp.code();
             resp.body().string();
@@ -158,7 +174,7 @@ class AsyncSseLifecycleE2eTest {
 
     @Test
     void bigBody_asyncReadAfterDispatch_isSafe_refsReturnToBaseline() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         int size = 200_000; // 远超内存阈值 → 走 duplicate 共享视图路径（改造前的风险点）
         byte[] payload = new byte[size];
         for (int i = 0; i < size; i++) {
@@ -181,7 +197,7 @@ class AsyncSseLifecycleE2eTest {
 
     @Test
     void pipelining_asyncRequestsServedSerially_refsReturnToBaseline() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         try (java.net.Socket socket = new java.net.Socket("localhost", port)) {
             socket.setSoTimeout(10000);
             String one = "GET /e2e-async/dr HTTP/1.1\r\nHost: localhost\r\n\r\n";
@@ -218,7 +234,7 @@ class AsyncSseLifecycleE2eTest {
 
     @Test
     void stress_mixedAsyncSseScenarios_noRefLeftover_noDefectSignals() throws Exception {
-        int baseline = PerfAsyncWebRequest.activeRequestRefs();
+        int baseline = activeRequestRefs();
         int threads = 6;
         int iterationsPerThread = 8;
         java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(threads);
@@ -353,6 +369,13 @@ class AsyncSseLifecycleE2eTest {
 
     @TestConfiguration
     static class AsyncLifecycleConfig {
+
+        /** 可读计量实现（默认装配 {@code NoOpWebMetrics} 读不出计数，而本类要断言它归零）。 */
+        @Bean
+        WebMetrics countingWebMetrics() {
+            return new CountingWebMetrics();
+        }
+
         @Bean
         AsyncLifecycleController asyncLifecycleController() {
             return new AsyncLifecycleController();

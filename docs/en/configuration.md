@@ -245,6 +245,7 @@ When `spring-boot-starter-actuator` is on the classpath, the framework auto-regi
 |--------|------|------|-------------|
 | `dispatcher.request.duration` | Timer | `method`, `path`, `status` | Request processing duration distribution |
 | `dispatcher.exception` | Counter | `type`, `resolved` | Exception count, categorized by exception type and whether handled by `@ExceptionHandler` |
+| `dispatcher.async.active.lifecycles` | Gauge | — | Asynchronous dispatches still in flight; a non-zero value means an async lifecycle never terminated (the inbound buf reference was not returned, which is the precondition for a ByteBuf leak) |
 | `pool.{name}.active.threads` | Gauge | — | Active thread count for the named pool |
 | `pool.{name}.queue.size` | Gauge | — | Queue size for the named pool |
 | `pool.{name}.completed.tasks` | Gauge | — | Completed task count for the named pool |
