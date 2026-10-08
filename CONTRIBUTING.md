@@ -317,8 +317,10 @@ one carries the instance that produced it.
   implementation-side; the bridged-callback case has no registry getter). The swallow-size
   E2E drives a raw socket and asserts the connection is really gone - a read that times out becomes an explicit
   `AssertionError` rather than a pass - and covers the boundary where the body equals the limit, so `>` versus
-  `>=` cannot pass by accident. The async/SSE lifecycle E2E compares `PerfAsyncWebRequest#activeRequestRefs()`
-  against a per-scenario baseline with a bounded poll, so a leaked holder fails instead of being collected
+  `>=` cannot pass by accident. The async/SSE lifecycle E2E reads a per-context counter
+  (`CountingWebMetrics#activeAsyncLifecycles()`, resolved through the `WebMetrics` component the test registers;
+  the counter used to be a JVM-wide static, which coupled unrelated suites) and requires it to fall back to zero
+  inside a bounded poll, so a leaked holder fails instead of being collected
   later, and one case aborts an idle stream where only `channelInactive` can release. The fast-path parameter
   lookup test asserts the limit cannot be bypassed, and the `maxInactiveInterval` regression is pinned by name.
   The usual false-assurance smells are absent: no `@Disabled`/`@Ignore` in any of the 559 test files, no empty

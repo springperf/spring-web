@@ -375,11 +375,53 @@
                 </plugin>
                 <!-- 二进制兼容对比：compat profile 由 -Dcompat.oldVersion 显式激活（需仓库/本地
                      存在该版本的构件），避免无基线时误触发。用法：
-                     mvn -Pcompat -Dcompat.oldVersion=3.5.5 verify -->
+                     mvn -Pcompat -Dcompat.oldVersion=3.5.6 verify -->
                 <plugin>
                     <groupId>com.github.siom79.japicmp</groupId>
                     <artifactId>japicmp-maven-plugin</artifactId>
                     <version>${japicmp-maven-plugin.version}</version>
+                    <configuration>
+                        <!-- 3.5.7 首次启用本门禁的一次性豁免（登记日期 2026-10-08）。
+                             本门禁拿「同一 minor 系列的上一个 release tag」（此刻 = 3.5.6）当基线，而 3.5.6
+                             发布时这些门禁并不存在（其 ci.yml 只有 build 一个 job，根 pom 无 japicmp/spotbugs/
+                             formatter，scripts/ 亦无 check-docs.sh），故 3.5.6→3.5.7 期间**有意**累积的变更
+                             全部落在「首次比对」里。下面逐条列出已核对为有意的项并注明依据（写法同 SpotBugs 的
+                             exclude 惯例：能改的真修、设计使然的逐条写依据），使门禁自本次起重新生效 ——
+                             本清单之外的**任何**新增不兼容都会让构建失败。
+                             迁移说明见 docs/BREAKING-CHANGES.md（§二 配置键、§6.3 扩展点签名）。
+                             japicmp 的 exclude 语法为 package.Class / package.Class#member；方法可附带
+                             参数类型表（用于区分重载）。 -->
+                        <parameter>
+                            <excludes>
+                                <!-- 配置键对齐：旧常量移除（键名迁移见 BREAKING-CHANGES §二） -->
+                                <exclude>io.springperf.web.context.PropertiesConstant#ASYNC_TIMEOUT</exclude>
+                                <exclude>io.springperf.web.context.PropertiesConstant#ASYNC_TIMEOUT_DEFAULT</exclude>
+                                <exclude>io.springperf.web.context.PropertiesConstant#HTTP_MAX_HEADER_SIZE</exclude>
+                                <exclude>io.springperf.web.context.PropertiesConstant#HTTP_MAX_HEADER_SIZE_DEFAULT</exclude>
+                                <exclude>io.springperf.web.context.PropertiesConstant#SERVER_SHUTDOWN_TIMEOUT</exclude>
+                                <exclude>io.springperf.web.context.PropertiesConstant#SERVER_SHUTDOWN_TIMEOUT_DEFAULT</exclude>
+                                <exclude>io.springperf.web.context.PropertiesConstant#USE_FORWARDED_HEADERS</exclude>
+                                <!-- 响应收尾与连接状态：签名变更 / 字段移除（BREAKING-CHANGES §6.3） -->
+                                <exclude>io.springperf.web.core.DispatcherHandler#flushResponse(io.springperf.web.http.WebServerHttpResponse)</exclude>
+                                <exclude>io.springperf.web.http.NettyServerHttpResponse#CONN_CTX</exclude>
+                                <exclude>io.springperf.web.server.Http2ChannelInitializer#Http2ChannelInitializer(boolean, io.netty.handler.ssl.SslContext, int, long, boolean, io.springperf.web.server.NettyHttpHandler, java.util.List, java.util.List, int, int, int)</exclude>
+                                <!-- 扩展点：接口新增方法（源码级不兼容，外部实现类需补实现；§6.3） -->
+                                <exclude>io.springperf.web.http.WebServerHttpRequest#getURI()</exclude>
+                                <exclude>io.springperf.web.http.WebServerHttpRequest#getRemoteAddress()</exclude>
+                                <exclude>io.springperf.web.http.WebServerHttpRequest#getLocalAddress()</exclude>
+                                <exclude>io.springperf.web.http.BaseWebServerHttpRequest#attributes</exclude>
+                                <!-- Spring Boot 4 兼容层移除：master 收敛为纯 3.5.x（CHANGELOG 3.5.7「变更」） -->
+                                <exclude>io.springperf.web.core.exception.ResponseStatusExceptionAdapter</exclude>
+                                <exclude>io.springperf.web.util.MediaTypeUtils</exclude>
+                                <exclude>io.springperf.web.core.retval.resolver.async.ListenableFutureAdapter</exclude>
+                                <!-- 以下两条是 japicmp 在「新增类 × 被改动的接口」上的噪声：两者都是本轮新增的
+                                     类（新增类不可能破坏既有用户），且它们实现的 WebMetrics 新增方法均带
+                                     default（报告自身亦记作 Method new default）。 -->
+                                <exclude>io.springperf.web.core.metrics.CountingWebMetrics</exclude>
+                                <exclude>io.springperf.web.server.ErrorResponseConfig</exclude>
+                            </excludes>
+                        </parameter>
+                    </configuration>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
