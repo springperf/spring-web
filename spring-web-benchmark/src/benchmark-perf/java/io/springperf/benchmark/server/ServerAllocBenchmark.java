@@ -1,6 +1,6 @@
 package io.springperf.benchmark.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import io.springperf.benchmark.app.PerfApplication;
 import io.springperf.benchmark.common.BenchClientState;
 import io.springperf.benchmark.common.BenchServerState;
