@@ -4,10 +4,11 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.server.ServerHttpResponse;
 
 import io.springperf.web.json.JsonConverter;
-import io.springperf.web.util.MediaTypeUtils;
+
 
 public class StreamJsonEmitter extends StreamEmitter<Object> {
 
@@ -27,7 +28,7 @@ public class StreamJsonEmitter extends StreamEmitter<Object> {
     protected void extendResponse(ServerHttpResponse response) {
         HttpHeaders headers = response.getHeaders();
         if (headers.getContentType() == null) {
-            headers.setContentType(MediaTypeUtils.APPLICATION_STREAM_JSON);
+            headers.setContentType(MediaType.APPLICATION_STREAM_JSON);
         }
     }
 

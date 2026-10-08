@@ -8,7 +8,7 @@ import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.http.support.BodyHttpInputMessage;
-import io.springperf.web.util.MediaTypeUtils;
+
 import org.springframework.core.GenericTypeResolver;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.ResolvableType;
@@ -479,7 +479,7 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
     }
 
     private static int compareSpecificity(MediaType a, MediaType b) {
-        return MediaTypeUtils.compareSpecificity(a, b);
+        return MediaType.SPECIFICITY_COMPARATOR.compare(a, b);
     }
 
     protected Type getGenericType(MethodParameter returnType) {
