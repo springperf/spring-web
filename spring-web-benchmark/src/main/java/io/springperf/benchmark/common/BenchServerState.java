@@ -59,7 +59,11 @@ public class BenchServerState {
         // 首次启动尝试 + 重试（处理 TIME_WAIT 等短暂端口不可用场景）
         for (int attempt = 1; attempt <= MAX_BIND_RETRIES; attempt++) {
             try {
-                context = app.run();
+                // 用「命令行参数」而非 setDefaultProperties 传端口：
+                // defaultProperties 是最低优先级，实测被名为 configurationProperties 的属性源压过
+                // （Spring Boot 内部适配器，会返回上一次解析遗留的随机端口，导致绑到错误端口而
+                // BindException）。命令行参数优先级最高，能确保 server.port 就是本次指定的值。
+                context = app.run("--server.port=" + configPort);
                 break; // 成功
             } catch (Exception e) {
                 if (attempt < MAX_BIND_RETRIES && isPortBindFailure(e)) {
@@ -74,14 +78,10 @@ public class BenchServerState {
                     }
                     continue;
                 }
-                // 重试耗尽，使用随机端口 fallback
+                // 重试耗尽：同样用命令行参数退到随机端口（server.port=0）
                 System.out.println(
                         "[Benchmark] Port " + configPort + " bind failed: " + e.getMessage() + ", trying random port");
-                Properties fallbackProps = new Properties();
-                fallbackProps.putAll(defaultProperties);
-                fallbackProps.setProperty("server.port", "0");
-                app.setDefaultProperties(fallbackProps);
-                context = app.run();
+                context = app.run("--server.port=0");
                 break;
             }
         }

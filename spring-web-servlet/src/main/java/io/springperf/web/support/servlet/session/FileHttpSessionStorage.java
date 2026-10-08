@@ -421,25 +421,43 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
         while (!Thread.currentThread().isInterrupted()) {
             try {
                 Thread.sleep(CLEANUP_INTERVAL_MS);
-                long now = System.currentTimeMillis();
-                sessions.values().removeIf(s -> {
-                    if (s.isExpired(now)) {
-                        // 与 saveSession 同锁：否则刚删掉的过期文件会被并发的落盘写回，
-                        // 复活到下一轮清理（最多存活一个清理周期）。
-                        ReentrantLock lock = writeLockFor(s.getId());
-                        lock.lock();
-                        try {
-                            deleteFileQuietly(fileOf(s.getId()));
-                        } finally {
-                            lock.unlock();
-                        }
-                        return true;
-                    }
-                    return false;
-                });
+                sweepExpired(System.currentTimeMillis());
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
+            }
+        }
+    }
+
+    /**
+     * 清理一轮过期会话：逐条「条件摘除内存条目 + 删文件」，两步必须在同一把写锁内完成。
+     * <p>
+     * <b>为什么不能用 {@code sessions.values().removeIf(...)}</b>：{@code removeIf} 的谓词返回 true 后由 CHM
+     * 自己摘除条目，即「删文件」与「摘除内存」被拆到了两个时刻。删完文件、条目尚未摘除的窗口里， 并发 {@link #saveSession} 能通过 {@code !sessions.containsKey(id)}
+     * 守卫（过期会话不属于 {@code isInvalid()}），把刚删掉的文件连同已刷新的 {@code lastAccessedTime} 一起写回； 重启时 {@code loadExistingSessions}
+     * 便把它当未过期会话加载 —— <b>过期会话复活</b>。 改为锁内条件移除（与 {@link #getSession} 的过期清理同构）后，摘除成功才删文件，窗口消失。
+     * </p>
+     * <p>
+     * 包级可见：便于单测直接驱动（清理线程的间隔是常量，隔着一层无法确定性测试）。
+     * </p>
+     */
+    void sweepExpired(long now) {
+        // 用 entrySet 遍历：直接拿到 value，避免 keySet + get 的双重查找（SpotBugs WMI_WRONG_MAP_ITERATOR）。
+        // 移除仍走 sessions.remove(key, value) 的条件式 API（不在迭代器上 remove），CHM 的弱一致迭代器允许这样用。
+        for (Map.Entry<String, HttpSessionData> entry : sessions.entrySet()) {
+            String id = entry.getKey();
+            HttpSessionData session = entry.getValue();
+            if (session == null || !session.isExpired(now)) {
+                continue;
+            }
+            ReentrantLock lock = writeLockFor(id);
+            lock.lock();
+            try {
+                if (sessions.remove(id, session)) {
+                    deleteFileQuietly(fileOf(id));
+                }
+            } finally {
+                lock.unlock();
             }
         }
     }

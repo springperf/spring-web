@@ -29,6 +29,18 @@ public class OpenApiDocController {
     private final OpenApiCustomizer openApiCustomiser;
     private final OpenApiProperties openApiProperties;
 
+    /**
+     * 文档缓存。路由表在启动期构建后运行期不变，故文档内容恒定，可安全缓存。
+     * <p>
+     * 缓存的意义不只是省掉重复构建：{@code OpenApiAdapter} 会为每个路由反射展开请求/响应 POJO 的属性， 单次生成与路由数成正比（实测 500 路由约 74 µs 且分配数千个 Schema
+     * 对象）。而本端点是无鉴权的静态 资源式接口，若不缓存，被轮询或误暴露到生产时会持续消耗 CPU 与 GC。
+     * </p>
+     * <p>
+     * 用 volatile + 双重检查：{@code apiDocs()} 会被并发调用，避免重复构建。持有类实例不持有可变状态。
+     * </p>
+     */
+    private volatile OpenAPI cachedApiDocs;
+
     public OpenApiDocController(OpenApiCustomizer openApiCustomiser, OpenApiProperties openApiProperties) {
         this.openApiCustomiser = openApiCustomiser;
         this.openApiProperties = openApiProperties;
@@ -36,6 +48,20 @@ public class OpenApiDocController {
 
     @GetMapping("/v3/api-docs")
     public OpenAPI apiDocs() {
+        OpenAPI cached = cachedApiDocs;
+        if (cached == null) {
+            synchronized (this) {
+                cached = cachedApiDocs;
+                if (cached == null) {
+                    cached = buildApiDocs();
+                    cachedApiDocs = cached;
+                }
+            }
+        }
+        return cached;
+    }
+
+    private OpenAPI buildApiDocs() {
         OpenAPI api = new OpenAPI();
         api.setPaths(new Paths());
         api.setInfo(new Info().title(openApiProperties.getTitle()).version(openApiProperties.getVersion())

@@ -19,6 +19,18 @@ HEALTH_PATH="${2:-/health}"
 ARTIFACT_ID="spring-web-example-rest"
 PORT="18080"
 
+# 临时文件放在脚本私有的 mktemp -d 目录，而不是固定的 /tmp/spring-web-native.log。
+# 固定路径在多用户机器上可被预先创建为符号链接（符号链接攻击），并发执行同一脚本的两轮
+# 也会互相覆盖日志导致排障困难。目录由 EXIT trap 一并清理。
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/spring-web-native.XXXXXX")"
+LOG_FILE="${WORK_DIR}/app.log"
+BODY_FILE="${WORK_DIR}/body"
+cleanup() {
+    kill "${APP_PID:-}" 2>/dev/null || true
+    rm -rf "${WORK_DIR}"
+}
+trap cleanup EXIT
+
 command -v native-image >/dev/null 2>&1 || {
     echo "ERROR: native-image 不在 PATH，请安装 GraalVM 并启用 native-image" >&2
     exit 1
@@ -34,9 +46,8 @@ if [ ! -x "${BIN}" ]; then
 fi
 
 echo "==> 2/4 启动原生镜像（端口 ${PORT}）"
-"${BIN}" --server.port="${PORT}" >/tmp/spring-web-native.log 2>&1 &
+"${BIN}" --server.port="${PORT}" >"${LOG_FILE}" 2>&1 &
 APP_PID=$!
-trap 'kill "${APP_PID}" 2>/dev/null || true' EXIT
 
 echo "==> 3/4 等待就绪"
 for i in $(seq 1 60); do
@@ -45,15 +56,15 @@ for i in $(seq 1 60); do
     fi
     if ! kill -0 "${APP_PID}" 2>/dev/null; then
         echo "ERROR: 原生进程提前退出，日志如下：" >&2
-        cat /tmp/spring-web-native.log >&2
+        cat "${LOG_FILE}" >&2
         exit 1
     fi
     sleep 1
 done
 
 echo "==> 4/4 断言 ${HEALTH_PATH} 返回 200"
-CODE=$(curl -s -o /tmp/spring-web-native-body -w '%{http_code}' "http://127.0.0.1:${PORT}${HEALTH_PATH}")
-echo "HTTP ${CODE}: $(cat /tmp/spring-web-native-body)"
+CODE=$(curl -s -o "${BODY_FILE}" -w '%{http_code}' "http://127.0.0.1:${PORT}${HEALTH_PATH}")
+echo "HTTP ${CODE}: $(cat "${BODY_FILE}")"
 [ "${CODE}" = "200" ] || {
     echo "ERROR: 期望 200，实际 ${CODE}" >&2
     exit 1

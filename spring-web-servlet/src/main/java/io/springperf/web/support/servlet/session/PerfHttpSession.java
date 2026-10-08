@@ -116,8 +116,12 @@ public class PerfHttpSession implements HttpSession {
 
     @Override
     public void invalidate() {
-        checkValid();
-        data.setInvalid(true);
+        // 原子抢占失效状态后再执行销毁侧效应。若沿用「先 checkValid() 再 setInvalid(true)」，
+        // 并发 invalidate 可同时通过校验，导致 onInvalidateCallback 与 sessionDestroyed 各触发两次。
+        // 抢占失败即会话已失效，按 Servlet 规范语义抛 IllegalStateException（与 checkValid() 行为一致）。
+        if (!data.tryInvalidate()) {
+            throw new IllegalStateException("Session with id [" + data.getId() + "] has been invalidated");
+        }
         Map<String, Object> attrs = new java.util.HashMap<>(data.getAttributes());
         data.clearAttributes();
         for (Map.Entry<String, Object> entry : attrs.entrySet()) {

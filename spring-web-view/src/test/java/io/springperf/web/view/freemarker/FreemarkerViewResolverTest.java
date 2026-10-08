@@ -83,6 +83,28 @@ class FreemarkerViewResolverTest {
     }
 
     @Test
+    void viewRender_htmlEscapesModelValues() throws Exception {
+        // 回归：模板以 <#ftl output_format="HTML"> 声明输出格式，model 中的 HTML 元字符必须被转义，
+        // 否则本可执行 ?name=<script>alert(1)</script> 之类输入造成 XSS。
+        FreemarkerViewResolver resolver = buildResolver();
+        View view = resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class));
+
+        WebServerHttpRequest req = mock(WebServerHttpRequest.class);
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        when(resp.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
+        ByteArrayOutputStream body = new ByteArrayOutputStream();
+        when(resp.getBody()).thenReturn(body);
+
+        Map<String, Object> model = new HashMap<>();
+        model.put("name", "<script>alert(1)</script>");
+        view.render(model, req, resp);
+
+        String output = new String(body.toByteArray(), StandardCharsets.UTF_8);
+        assertFalse(output.contains("<script>"), "model 中的 HTML 不应原样输出: " + output);
+        assertTrue(output.contains("&lt;script&gt;"), "HTML 元字符应被转义: " + output);
+    }
+
+    @Test
     void viewRender_concurrentSameView_doesNotMutateSharedTemplate() throws Exception {
         FreemarkerViewResolver resolver = buildResolver();
         View view = resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class));

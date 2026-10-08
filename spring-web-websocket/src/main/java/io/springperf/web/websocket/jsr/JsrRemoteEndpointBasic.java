@@ -1,5 +1,6 @@
 package io.springperf.web.websocket.jsr;
 
+import io.springperf.web.websocket.server.NettyWebSocketSession;
 import jakarta.websocket.EncodeException;
 import jakarta.websocket.Encoder;
 import jakarta.websocket.RemoteEndpoint;
@@ -15,8 +16,12 @@ import java.nio.ByteBuffer;
 /**
  * JSR-356 {@link RemoteEndpoint.Basic} 实现，委托 Spring {@link WebSocketSession} 发送。
  * <p>
- * 消息体为 {@code String}（文本）、{@code ByteBuffer}（二进制）或 POJO（经 {@link Encoder} 编码，文本/二进制任选其一）。流式发送（{@link #getSendStream()}
- * / {@link #getSendWriter()}）与分片（last 参数）首期不支持。
+ * 消息体为 {@code String}（文本）、{@code ByteBuffer}（二进制）或 POJO（经 {@link Encoder} 编码，文本/二进制任选其一）。 分片发送通过
+ * {@code sendText}/{@code sendBinary} 的 {@code last} 参数透传：{@code false} 表示该分片不是消息的最后一段， 由 {@link NettyWebSocketSession}
+ * 落成非 final 的 WebSocket 帧。流式发送（{@link #getSendStream()} / {@link #getSendWriter()}）首期不支持。
+ * </p>
+ * <p>
+ * 注意：{@code last=false} 的分片必须以 {@code last=true} 收尾，否则客户端会一直等待后续帧（WebSocket 语义如此）。
  * </p>
  *
  * @author huangcanda
@@ -45,12 +50,12 @@ public class JsrRemoteEndpointBasic implements RemoteEndpoint.Basic {
 
     @Override
     public void sendText(String partialMessage, boolean isLast) throws IOException {
-        sendText(partialMessage);
+        session.getSpringSession().sendMessage(new TextMessage(partialMessage, isLast));
     }
 
     @Override
     public void sendBinary(ByteBuffer partialByte, boolean isLast) throws IOException {
-        sendBinary(partialByte);
+        session.getSpringSession().sendMessage(new BinaryMessage(partialByte, isLast));
     }
 
     @Override

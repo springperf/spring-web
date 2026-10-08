@@ -55,7 +55,6 @@
         <java.version>17</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-        <spring-web.version>3.5.6</spring-web.version>
         <gpg.executable>gpg</gpg.executable>
         <gpg.keyname>${env.GPG_KEY}</gpg.keyname>
         <gpg.passphrase>${env.GPG_PASSPHRASE}</gpg.passphrase>
@@ -70,6 +69,9 @@
         <hutool.version>5.8.23</hutool.version>
         <jmh.version>1.37</jmh.version>
         <springdoc.version>2.3.0</springdoc.version>
+        <!-- Swagger UI 静态资源版本。必须与 SwaggerUiProperties.webjarVersion 一致：
+             前者决定实际打包进示例的 webjar，后者决定自动装配时拼出的资源路径。 -->
+        <swagger-ui.version>5.2.0</swagger-ui.version>
         <disruptor.version>3.4.4</disruptor.version>
         <spring-ai.version>1.1.8</spring-ai.version>
 
@@ -140,37 +142,37 @@
             <dependency>
                 <groupId>io.github.springperf</groupId>
                 <artifactId>spring-web</artifactId>
-                <version>${spring-web.version}</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.github.springperf</groupId>
                 <artifactId>spring-web-servlet</artifactId>
-                <version>${spring-web.version}</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.github.springperf</groupId>
                 <artifactId>spring-web-mvc-support</artifactId>
-                <version>${spring-web.version}</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.github.springperf</groupId>
                 <artifactId>spring-web-websocket</artifactId>
-                <version>${spring-web.version}</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.github.springperf</groupId>
                 <artifactId>spring-web-view</artifactId>
-                <version>${spring-web.version}</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.github.springperf</groupId>
                 <artifactId>spring-web-batch</artifactId>
-                <version>${spring-web.version}</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.github.springperf</groupId>
                 <artifactId>spring-boot-starter-web</artifactId>
-                <version>${spring-web.version}</version>
+                <version>${project.version}</version>
             </dependency>
 
             <!-- 第三方依赖（覆盖 BOM 版本） -->
@@ -378,6 +380,14 @@
                                 <groupId>org.projectlombok</groupId>
                                 <artifactId>lombok</artifactId>
                                 <version>${lombok.version}</version>
+                            </path>
+                            <!-- 一旦显式声明 annotationProcessorPaths，classpath 上的处理器就不再被自动发现。
+                                 本框架在 starter 中声明了 @ConfigurationProperties，缺此条则不会生成
+                                 spring-configuration-metadata.json（IDE 无法补全/校验配置键）。 -->
+                            <path>
+                                <groupId>org.springframework.boot</groupId>
+                                <artifactId>spring-boot-configuration-processor</artifactId>
+                                <version>${spring-boot.version}</version>
                             </path>
                         </annotationProcessorPaths>
                     </configuration>

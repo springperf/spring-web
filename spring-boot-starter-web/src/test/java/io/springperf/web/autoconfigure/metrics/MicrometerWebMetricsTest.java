@@ -162,6 +162,69 @@ class MicrometerWebMetricsTest {
     }
 
     @Test
+    void registerPoolGauges_isIdempotent() {
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>());
+        try {
+            metrics.registerPoolGauges("myPool", executor);
+            int afterFirst = meterRegistry.getMeters().size();
+
+            // 重复调用此前会为同一池重复注册 gauge（读数叠加），也白白增加注册开销
+            metrics.registerPoolGauges("myPool", executor);
+            metrics.registerPoolGauges("myPool", executor);
+
+            assertEquals(afterFirst, meterRegistry.getMeters().size(), "重复注册同一池不应新增 meter");
+            assertEquals(1, meterRegistry.getMeters().stream()
+                    .filter(m -> "pool.myPool.active.threads".equals(m.getId().getName())).count());
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void recordRequest_whenCacheOverflows_stillRecordsIntoFallbackTimer() {
+        // 灌入超过上限的不同 path，模拟 pathPattern 解析失败后回落到实际 URI 导致的高基数场景
+        for (int i = 0; i < MicrometerWebMetrics.MAX_CACHED_KEYS + 50; i++) {
+            metrics.recordRequest("GET", "/dynamic/" + i, 200, 1_000_000L);
+        }
+
+        // 超限后新组合不再注册独立 meter（缓存有界）
+        long distinctPathMeters = meterRegistry.getMeters().stream()
+                .filter(m -> "dispatcher.request.duration".equals(m.getId().getName()))
+                .filter(m -> !MicrometerWebMetrics.OVERFLOW_PATH.equals(m.getId().getTag("path"))).count();
+        assertTrue(distinctPathMeters <= MicrometerWebMetrics.MAX_CACHED_KEYS,
+                "独立 meter 数量应有上界，实际 " + distinctPathMeters);
+
+        // 但请求不能被静默丢弃：仍可通过 overflow 桶观测到
+        Timer overflow = meterRegistry.find("dispatcher.request.duration")
+                .tag("path", MicrometerWebMetrics.OVERFLOW_PATH).timer();
+        assertTrue(overflow.count() > 0, "超限后的请求仍应被记录，否则完全不可观测");
+    }
+
+    @Test
+    void recordRequest_overflowBucketsAreKeyedByMethodAndStatus() {
+        // 先灌满缓存
+        for (int i = 0; i < MicrometerWebMetrics.MAX_CACHED_KEYS + 10; i++) {
+            metrics.recordRequest("GET", "/fill/" + i, 200, 1_000_000L);
+        }
+
+        // 溢出阶段：不同 method/status 的请求必须落到各自的桶，而不是共享一个"首个请求"的 tag 组合
+        metrics.recordRequest("POST", "/overflow/a", 500, 5_000_000L);
+        metrics.recordRequest("DELETE", "/overflow/b", 404, 7_000_000L);
+
+        Timer post500 = meterRegistry.find("dispatcher.request.duration")
+                .tag("path", MicrometerWebMetrics.OVERFLOW_PATH).tag("method", "POST").tag("status", "500").timer();
+        Timer delete404 = meterRegistry.find("dispatcher.request.duration")
+                .tag("path", MicrometerWebMetrics.OVERFLOW_PATH).tag("method", "DELETE").tag("status", "404").timer();
+
+        assertNotNull(post500, "应存在 POST/500 的独立溢出桶");
+        assertNotNull(delete404, "应存在 DELETE/404 的独立溢出桶");
+        assertEquals(5_000_000L, post500.totalTime(TimeUnit.NANOSECONDS), 0.001, "POST 的耗时应记在 POST 桶，不得串入其它 method");
+        assertEquals(7_000_000L, delete404.totalTime(TimeUnit.NANOSECONDS), 0.001,
+                "DELETE 的耗时应记在 DELETE 桶，不得串入其它 method");
+    }
+
+    @Test
     void registerPoolGauges_createsGauges() {
         ThreadPoolExecutor executor = new ThreadPoolExecutor(2, 4, 60, TimeUnit.SECONDS,
                 new LinkedBlockingQueue<>(100));

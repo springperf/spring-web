@@ -37,7 +37,12 @@ if [ -z "$PY" ]; then
   exit 2
 fi
 
+# 保留最高严重度的退出码：check-docs.py 用 2 表示用法/环境错误、1 表示检查未通过。
+# 原先第二次赋值会覆盖第一次，两个检查器都失败时只剩后者的码，调用方无法区分用法错误与检查失败。
 status=0
 "$PY" "$DIR/check-docs.py" "$@" || status=$?
-"$PY" "$DIR/check-doc-symbols.py" "$@" || status=$?
+"$PY" "$DIR/check-doc-symbols.py" "$@" || second=$?
+if [ "${second:-0}" -gt "$status" ]; then
+  status=$second
+fi
 exit "$status"

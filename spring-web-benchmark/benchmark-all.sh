@@ -18,6 +18,11 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# 失败计数：原先 classpath/编译/基准/报告各环节失败都只打印一行提示就继续，
+# 脚本最终仍以 0 退出，CI 无法察觉"跑了一整轮但全部失败"。这里累计失败数，末尾据此决定退出码。
+FAIL_COUNT=0
+FAILED_STEPS=()
+
 RUN_ID=$(date +"%Y%m%d-%H%M%S")
 REPORTS_DIR="benchmark-reports"
 EXTRA_JVM_ARGS=""
@@ -164,7 +169,15 @@ port_warn() {
 echo ""
 echo "[1/4] 全量编译所有模块..."
 cd "$SCRIPT_DIR/.."
-mvn clean install -DskipTests -q
+# 用项目自带的 mvnw（wrapper 声明 Maven 3.9.9），而非 PATH 上的 mvn：
+# spotbugs-maven-plugin 4.10.4.1 要求 Maven ≥ 3.8.9，插件在**加载阶段**即校验版本，
+# 低于该版本会直接 PluginIncompatibleException 中断构建 —— 此时 -Dspotbugs.skip=true 尚未生效，
+# 无法靠跳过参数绕过。mvnw 保证与 CI 使用同一 Maven 版本。
+# 静态分析与覆盖率对基准无意义（基准只需要编译产物与 classpath），一并跳过以节省数分钟。
+# 用绝对路径：后续 Step 会 cd 到不同目录，相对路径 ./mvnw 会失效。
+MVN_CMD="$SCRIPT_DIR/../mvnw"
+[ -x "$MVN_CMD" ] || MVN_CMD="mvn"
+"$MVN_CMD" clean install -DskipTests -q -Dspotbugs.skip=true -Dmodernizer.skip=true -Djacoco.skip=true
 if [ $? -ne 0 ]; then
   echo "[ERROR] 编译失败"
   exit 1
@@ -180,10 +193,12 @@ mkdir -p "$CP_DIR"
 for ENTRY in "${PROFILES_TO_RUN[@]}"; do
   IFS=':' read -r PROFILE PORT BENCH_CLASS <<< "$ENTRY"
   echo "  [$PROFILE] classpath..."
-  mvn -P"benchmark-$PROFILE" dependency:build-classpath \
+  "$MVN_CMD" -P"benchmark-$PROFILE" dependency:build-classpath \
     -Dmdep.outputFile="$CP_DIR/cp-$PROFILE.txt" -q
   if [ $? -ne 0 ]; then
     echo "    -> CLASSPATH FAIL for $PROFILE"
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+    FAILED_STEPS+=("classpath:$PROFILE")
   fi
 done
 
@@ -198,9 +213,11 @@ for ENTRY in "${PROFILES_TO_RUN[@]}"; do
   # 编译当前 profile（clean 防污染，确保 target/classes 只有当前 profile 的类）
   echo ""
   echo "  === Profile: $PROFILE (port $PORT) ==="
-  mvn -P"benchmark-$PROFILE" clean compile -q
+  "$MVN_CMD" -P"benchmark-$PROFILE" clean compile -q -Dspotbugs.skip=true
   if [ $? -ne 0 ]; then
     echo "    -> COMPILE FAIL for $PROFILE, skipping"
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+    FAILED_STEPS+=("compile:$PROFILE")
     continue
   fi
 
@@ -321,6 +338,8 @@ for ENTRY in "${PROFILES_TO_RUN[@]}"; do
           echo "    -> SUCCESS"
         else
           echo "    -> FAIL"
+          FAIL_COUNT=$((FAIL_COUNT + 1))
+          FAILED_STEPS+=("run:$PROFILE_NAME")
         fi
 done
     done
@@ -331,7 +350,7 @@ done
 echo ""
 echo "[4/4] 生成报告..."
 rm -f target/cp-report.txt
-mvn dependency:build-classpath -Dmdep.outputFile="target/cp-report.txt" -q 2>/dev/null
+"$MVN_CMD" dependency:build-classpath -Dmdep.outputFile="target/cp-report.txt" -q 2>/dev/null
 if [ -f "target/cp-report.txt" ]; then
   CP_REPORT=$(head -1 "target/cp-report.txt")
   java -cp "target/classes${CP_SEP}${CP_REPORT}" \
@@ -347,3 +366,9 @@ echo "=========================================="
 echo " 完成!"
 echo " 报告: $(pwd)/$REPORTS_DIR/$RUN_ID/report.md"
 echo "=========================================="
+
+if [ "$FAIL_COUNT" -gt 0 ]; then
+  echo ""
+  echo "错误: 有 $FAIL_COUNT 个环节失败：${FAILED_STEPS[*]}" >&2
+  exit 1
+fi

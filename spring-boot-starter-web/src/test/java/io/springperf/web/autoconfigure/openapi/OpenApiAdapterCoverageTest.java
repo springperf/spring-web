@@ -8,6 +8,7 @@ import io.springperf.web.core.mapping.match.Matcher;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
+import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import org.junit.jupiter.api.Test;
@@ -58,6 +59,76 @@ class OpenApiAdapterCoverageTest {
 
         @SuppressWarnings("unused")
         public void noReturn() {
+        }
+
+        @SuppressWarnings("unused")
+        @org.springframework.web.bind.annotation.ResponseStatus(code = org.springframework.http.HttpStatus.CREATED)
+        public String created() {
+            return "ok";
+        }
+
+        @SuppressWarnings("unused")
+        @org.springframework.web.bind.annotation.ResponseStatus(code = org.springframework.http.HttpStatus.NOT_FOUND, reason = "用户不存在")
+        public String customReason() {
+            return "ok";
+        }
+
+        @SuppressWarnings("unused")
+        public String beanBody(@RequestBody Payload payload) {
+            return "ok";
+        }
+
+        @SuppressWarnings("unused")
+        public String beanListBody(@RequestBody java.util.List<Payload> payloads) {
+            return "ok";
+        }
+
+        @SuppressWarnings("unused")
+        public String bindableModel(@ModelAttribute SearchForm form) {
+            return "ok";
+        }
+    }
+
+    /** 具备可读属性的载体：应被逐属性展开为 query 参数。 */
+    public static class SearchForm {
+        private String keyword;
+        private int pageIndex;
+
+        public String getKeyword() {
+            return keyword;
+        }
+
+        public void setKeyword(String keyword) {
+            this.keyword = keyword;
+        }
+
+        public int getPageIndex() {
+            return pageIndex;
+        }
+
+        public void setPageIndex(int pageIndex) {
+            this.pageIndex = pageIndex;
+        }
+    }
+
+    public static class Payload {
+        private String title;
+        private Integer count;
+
+        public String getTitle() {
+            return title;
+        }
+
+        public void setTitle(String title) {
+            this.title = title;
+        }
+
+        public Integer getCount() {
+            return count;
+        }
+
+        public void setCount(Integer count) {
+            this.count = count;
         }
     }
 
@@ -199,6 +270,60 @@ class OpenApiAdapterCoverageTest {
         Operation op = openApi.getPaths().get("/api/{id}/x").getGet();
         ApiResponse response = op.getResponses().get("200");
         assertNotNull(response);
+    }
+
+    @Test
+    void customize_responseStatusReason_usedAsDescription() throws Exception {
+        OpenAPI openApi = new OpenAPI();
+        new OpenApiAdapter(webContext(route("created"))).customize(openApi);
+        ApiResponse response = openApi.getPaths().get("/api/{id}/x").getGet().getResponses().get("201");
+        assertNotNull(response, "应落到 @ResponseStatus 声明的 201");
+        assertEquals("Created", response.getDescription(), "不得把所有状态码的描述都写成 OK");
+
+        OpenAPI custom = new OpenAPI();
+        new OpenApiAdapter(webContext(route("customReason"))).customize(custom);
+        ApiResponse notFound = custom.getPaths().get("/api/{id}/x").getGet().getResponses().get("404");
+        assertNotNull(notFound);
+        assertEquals("用户不存在", notFound.getDescription(), "@ResponseStatus 的 reason 必须被保留");
+    }
+
+    @Test
+    void customize_requestBodyBean_exposesProperties() throws Exception {
+        OpenAPI openApi = new OpenAPI();
+        new OpenApiAdapter(webContext(route("beanBody", Payload.class))).customize(openApi);
+
+        Schema<?> schema = openApi.getPaths().get("/api/{id}/x").getGet().getRequestBody().getContent()
+                .get("application/json").getSchema();
+        assertNotNull(schema.getProperties(), "POJO 请求体必须展开出属性，而不是塌缩成裸 object");
+        assertTrue(schema.getProperties().containsKey("title"), "属性列表: " + schema.getProperties().keySet());
+        assertEquals("integer", ((Schema<?>) schema.getProperties().get("count")).getType());
+    }
+
+    @Test
+    void customize_requestBodyBeanList_exposesElementSchema() throws Exception {
+        OpenAPI openApi = new OpenAPI();
+        new OpenApiAdapter(webContext(route("beanListBody", java.util.List.class))).customize(openApi);
+
+        Schema<?> schema = openApi.getPaths().get("/api/{id}/x").getGet().getRequestBody().getContent()
+                .get("application/json").getSchema();
+        assertEquals("array", schema.getType(), "List<Payload> 应描述为 array: " + schema.getType());
+        Schema<?> items = (Schema<?>) schema.getItems();
+        assertNotNull(items.getProperties(), "元素类型必须展开出属性，而不是裸 object");
+        assertTrue(items.getProperties().containsKey("title"), "元素属性: " + items.getProperties().keySet());
+    }
+
+    @Test
+    void customize_modelAttributeWithBindableProperties_expandsToEachProperty() throws Exception {
+        OpenAPI openApi = new OpenAPI();
+        new OpenApiAdapter(webContext(route("bindableModel", SearchForm.class))).customize(openApi);
+
+        Operation op = openApi.getPaths().get("/api/{id}/x").getGet();
+        assertTrue(
+                op.getParameters().stream().anyMatch(p -> "keyword".equals(p.getName()) && "query".equals(p.getIn())),
+                "可绑定属性应逐个成为 query 参数: " + op.getParameters());
+        assertTrue(op.getParameters().stream()
+                .anyMatch(p -> "pageIndex".equals(p.getName()) && "query".equals(p.getIn())));
+        assertFalse(op.getParameters().stream().anyMatch(p -> "form".equals(p.getName())), "展开后不应再保留 object 类型的同名参数");
     }
 
     @Test

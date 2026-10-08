@@ -429,6 +429,45 @@ class FileHttpSessionStorageTest {
         assertNull(storage.getSession(data.getId()), "会话不应在内存中复活");
     }
 
+    /**
+     * 过期扫除的原子性契约：{@code sweepExpired} 摘除一个过期会话时，**必须同时删掉它的文件**； 未过期的会话则两者都不动。
+     * <p>
+     * 起因是一次审查：旧实现用 {@code sessions.values().removeIf(...)}，把「删文件」放在写锁内、 「摘除内存条目」交给 CHM 在谓词返回后才做。两步分离产生的窗口里，并发
+     * {@code saveSession} 能通过 {@code !sessions.containsKey(id)} 守卫（过期会话不属于 {@code isInvalid()}）把刚删掉的 文件写回，重启时被
+     * {@code loadExistingSessions} 当未过期会话加载 —— <b>过期会话复活</b>。 修复把「条件移除 + 删文件」收进同一把写锁。
+     * </p>
+     * <p>
+     * 此处断言的是修复所保证的<b>确定性契约</b>（摘除 ⇒ 文件已删），而非去搏那个极窄的并发窗口 —— 后者需要精确的调度控制，写成随机并发只会得到 flaky 的测试。
+     * </p>
+     */
+    @Test
+    void sweepExpired_removesEntryAndFile_together() throws Exception {
+        HttpSessionData expired = storage.createSession();
+        expired.setMaxInactiveInterval(1);
+        expired.setLastAccessedTime(System.currentTimeMillis() - 10_000L);
+        expired.setAttribute("v", new SerializableValue("dead"));
+        storage.saveSession(expired);
+
+        HttpSessionData alive = storage.createSession();
+        alive.setMaxInactiveInterval(3600);
+        alive.setAttribute("v", new SerializableValue("live"));
+        storage.saveSession(alive);
+
+        Path expiredFile = tempDir.resolve(expired.getId() + ".session");
+        Path aliveFile = tempDir.resolve(alive.getId() + ".session");
+        assertTrue(Files.exists(expiredFile));
+        assertTrue(Files.exists(aliveFile));
+
+        storage.sweepExpired(System.currentTimeMillis());
+
+        // 过期：内存与磁盘一起消失
+        assertNull(storage.getSession(expired.getId()), "过期会话应从内存摘除");
+        assertFalse(Files.exists(expiredFile), "过期会话的文件应同时删除（否则重启复活）");
+        // 未过期：两者都保留
+        assertNotNull(storage.getSession(alive.getId()), "未过期会话不应被摘除");
+        assertTrue(Files.exists(aliveFile), "未过期会话的文件不应被删");
+    }
+
     /** 起 n 个线程同时执行 action，全部结束后才返回。 */
     private static void runConcurrently(int n, Runnable action) throws InterruptedException {
         CountDownLatch start = new CountDownLatch(1);

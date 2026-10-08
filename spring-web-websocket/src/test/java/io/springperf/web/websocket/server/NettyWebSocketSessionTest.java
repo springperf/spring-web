@@ -35,6 +35,34 @@ class NettyWebSocketSessionTest {
     }
 
     @Test
+    void sendNonLastFragment_writesNonFinalFrame() throws Exception {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        NettyWebSocketSession session = newSession(channel);
+        session.sendMessage(new TextMessage("part", false));
+        channel.runPendingTasks();
+
+        WebSocketFrame out = channel.readOutbound();
+        assertTrue(out instanceof TextWebSocketFrame);
+        assertFalse(out.isFinalFragment(), "未结尾的分片必须落成非 final 帧，否则客户端会当作完整消息");
+        out.release();
+        channel.finishAndReleaseAll();
+    }
+
+    @Test
+    void sendBinaryNonLastFragment_writesNonFinalFrame() throws Exception {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        NettyWebSocketSession session = newSession(channel);
+        session.sendMessage(new BinaryMessage(ByteBuffer.wrap(new byte[] { 1, 2 }), false));
+        channel.runPendingTasks();
+
+        WebSocketFrame out = channel.readOutbound();
+        assertTrue(out instanceof BinaryWebSocketFrame);
+        assertFalse(out.isFinalFragment(), "二进制分片的 final 位同样必须透传");
+        out.release();
+        channel.finishAndReleaseAll();
+    }
+
+    @Test
     void sendTextMessage_writesTextFrame() throws Exception {
         EmbeddedChannel channel = new EmbeddedChannel();
         NettyWebSocketSession session = newSession(channel);

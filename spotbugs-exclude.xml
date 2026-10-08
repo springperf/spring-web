@@ -704,6 +704,15 @@
         <Class name="io.springperf.web.core.async.stream.AbstractNettyStreamSender"/>
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
+    <!-- completionError 保存的是调用方 completeWithError(ex) 传入的异常对象，必须原样向后传递
+         （deferredResult.setErrorResult / streamSender.complete 都按同一实例向上抛），
+         Throwable 没有可用的防御性拷贝：{@code new XxxException(ex)} 会换掉类型，
+         而异常的 cause/suppressed/stack trace 本就由抛出方持有，框架不应也无权改写。
+         与同包 PublisherToStreamEmitterAdapter / PublisherToDeferredResultAdapter 的豁免同理。 -->
+    <Match>
+        <Class name="io.springperf.web.core.async.stream.StreamEmitter"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
     <Match>
         <Class name="io.springperf.web.core.codec.AdaptedHttpBodyConverter"/>
         <Bug pattern="EI_EXPOSE_REP2"/>

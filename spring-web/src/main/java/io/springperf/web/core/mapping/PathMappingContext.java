@@ -33,9 +33,13 @@ public class PathMappingContext extends MappingHandlerMethod {
      * ReactiveReturnValueResolver），逐次新建包装等于每请求白扔一个对象；字段本身是 final， 故在构造期建好即可，无需任何同步。
      */
     private final List<MediaType> producibleMediaTypesView;
-    private List<HandlerInterceptor> cachedInterceptors;
+    /**
+     * 延迟构建的拦截器/过滤器链缓存，由 InterceptorRegistry、WebFilterRegistry 在首次请求命中该路由时以双重检查锁定写入， 此后在每个请求的匹配路径上被无锁读取。字段必须
+     * volatile：否则锁外的读者可能观察到非空引用但其内部 elementData/元素尚未完成发布，导致该请求静默少执行若干拦截器或过滤器。
+     */
+    private volatile List<HandlerInterceptor> cachedInterceptors;
     private CorsConfigurationProvider corsConfigurationProvider;
-    private DefaultFilterChain cachedFilterChain;
+    private volatile DefaultFilterChain cachedFilterChain;
 
     public PathMappingContext(HandlerMethod handlerMethod, List<Matcher> matchers, String pathRule) {
         super(handlerMethod);
