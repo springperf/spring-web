@@ -154,6 +154,9 @@ perf 框架吞吐是 Servlet 容器的 **1.45\~12.6x**，p50 延迟 **0.10\~0.11
 | 吞吐量 (json 4t) | **37,508** ops/s | 19,900 ops/s (1.88x) |
 | P50 延迟 (bytes 4t) | **0.10ms** | 0.15ms |
 | 稳态堆占用 (4t) | **24MB** | 26MB |
+
+> **基准快照。** 上表数字来自一次 JMH 运行（JDK 17 + G1GC、1GB 堆）；对比容器的版本由 **Spring Boot 3.2.12** 依赖管理决定（Spring Framework 6.1.15、Tomcat 10.1.33、Undertow 2.3.17.Final）。WebPerf 一列的 Netty 版本是框架**当前**取值（4.1.137.Final），而四个对比容器在测试时点被锁定——完整矩阵与复现方式见[基准报告](docs/benchmark.md#对比框架版本)。
+
 | I/O 模型 | Netty 非阻塞传输 + EventLoop 处理 | Servlet 阻塞 I/O + 容器线程 |
 | 线程模型 | EventLoop 直接处理或 `@RunInPool` 按需切换 | 固定容器线程池 |
 | 方法调用 | ASM / MethodHandle（~10-30ns） | `Method.invoke()` 反射（~200ns） |

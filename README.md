@@ -154,6 +154,9 @@ The perf framework delivers **1.45\~12.6x** throughput over Servlet containers, 
 | Throughput (json 4t) | **37,508** ops/s | 19,900 ops/s (1.88x) |
 | P50 Latency (bytes 4t) | **0.10ms** | 0.15ms |
 | Steady-state heap (4t) | **24MB** | 26MB |
+
+> **Benchmark snapshot.** The figures above come from a single JMH run (JDK 17 + G1GC, 1GB heap); the comparison containers are version-managed by Spring Boot 3.2.12 (Spring Framework 6.1.15, Tomcat 10.1.33, Undertow 2.3.17.Final). The Netty version listed for WebPerf is the framework's current one (4.1.137.Final), while the four comparison containers were pinned at the time of that run — see the [full benchmark report](docs/en/benchmark.md#framework-versions) for the exact matrix and how to reproduce it.
+
 | I/O model | Netty non-blocking transport + EventLoop | Servlet blocking I/O + container threads |
 | Thread model | EventLoop direct or `@RunInPool` on-demand | Fixed container thread pool |
 | Method invocation | ASM / MethodHandle (~10-30ns) | `Method.invoke()` reflection (~200ns) |
