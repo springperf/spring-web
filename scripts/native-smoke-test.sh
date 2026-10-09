@@ -5,7 +5,7 @@
 # 前置要求：
 #   - Linux 环境（epoll native transport 在 Windows 上受限）
 #   - GraalVM JDK 17+（native-image 在 PATH）或 `gu install native-image`
-#   - Maven 3.8+
+#   - Maven 3.8.9+（推荐直接用仓库自带 ./mvnw，脚本已优先使用它）
 #
 # 用法：
 #   ./scripts/native-smoke-test.sh [<module>] [<health-path>]
@@ -13,6 +13,13 @@
 # 默认：spring-web-examples/spring-web-example-rest 的 /health
 #
 set -euo pipefail
+
+# 脚本位于 scripts/，仓库根为其父目录（MODULE 是相对仓库根的路径，故须在根目录执行）
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# 优先用仓库自带 Wrapper（与 CI 同一 Maven 版本），而不是 PATH 上的 mvn：
+# spotbugs-maven-plugin 4.10.4.1 要求 Maven ≥ 3.8.9，系统 Maven 过低会在父 POM 处直接失败，
+# 整个 Reactor 其余模块全 SKIPPED（同因见 docs/feature/jfr-cpu-hotspot-analysis.md）。
+if [ -x "$REPO_ROOT/mvnw" ]; then MVN="$REPO_ROOT/mvnw"; else MVN="mvn"; fi
 
 MODULE="${1:-spring-web-examples/spring-web-example-rest}"
 HEALTH_PATH="${2:-/health}"
@@ -36,8 +43,8 @@ command -v native-image >/dev/null 2>&1 || {
     exit 1
 }
 
-echo "==> 1/4 构建原生镜像（mvn -Pnative install：依赖模块 JVM 构建，目标模块原生编译）"
-mvn -q -Pnative -pl "${MODULE}" -am install -DskipTests
+echo "==> 1/4 构建原生镜像（${MVN} -Pnative install：依赖模块 JVM 构建，目标模块原生编译）"
+"${MVN}" -q -Pnative -pl "${MODULE}" -am install -DskipTests
 
 BIN="${MODULE}/target/${ARTIFACT_ID}"
 if [ ! -x "${BIN}" ]; then
