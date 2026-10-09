@@ -62,6 +62,32 @@ class AiChatStreamOfflineE2eTest {
         return counting.activeAsyncLifecycles();
     }
 
+    /** 异步收尾等待窗口：与 {@code AsyncSseRobustnessE2eTest#assertRefsBackTo} 同量级——容忍负载阻滞，但不掩盖真泄漏。 */
+    private static final long LIFECYCLE_SETTLE_TIMEOUT_MILLIS = 15000;
+
+    /**
+     * 轮询等待在飞异步生命周期**归零**后再断言。
+     * <p>
+     * 为什么不能「读到响应就立刻断言」：计数 -1 发生在**终止写入的 {@code channelFuture} 监听回调**里 （{@code NettyServerHttpResponse} 写终结 →
+     * {@code PerfAsyncWebRequest.completeSuccessCallback()} → {@code releaseRequestOnce()} →
+     * {@code WebMetrics#asyncLifecycleCompleted()}），而该回调在 EventLoop 上异步执行， 客户端完全可能先读完 body 返回。直接断言即变成竞态：本地快机 20/20
+     * 通过，CI 慢机偶发 {@code expected: 0 but was: 1}。
+     * </p>
+     */
+    private void assertRefsSettleToZero(String description) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + LIFECYCLE_SETTLE_TIMEOUT_MILLIS;
+        while (activeRequestRefs() != 0 && System.currentTimeMillis() < deadline) {
+            Thread.sleep(20);
+        }
+        assertThat(activeRequestRefs()).as(description).isZero();
+    }
+
+    /** 上一用例的异步收尾可能晚于本用例开始（跨用例延迟）→ 先等到清零，使基线稳定。 */
+    @BeforeEach
+    void waitForSettledBaseline() throws InterruptedException {
+        assertRefsSettleToZero("用例开始前不应存在未终结的异步生命周期");
+    }
+
     /**
      * 覆盖自动配置的 {@code ChatClient.Builder}（{@code @Primary}）：控制器本就只依赖这一层间接
      * （{@code chatClientBuilder.build()}），因此**无需改动生产代码**即可注入替身客户端。
@@ -104,7 +130,7 @@ class AiChatStreamOfflineE2eTest {
      * 流式：3 个 token 必须全部到达、顺序保持、读到 EOF（生命周期正常终结），且异步持有者引用归零。
      */
     @Test
-    void chatStream_emitsAllTokensInOrder_andLifecycleTerminates() {
+    void chatStream_emitsAllTokensInOrder_andLifecycleTerminates() throws InterruptedException {
         ResponseEntity<String> resp = rest.getForEntity("/ai/chat/stream?message=hi", String.class);
         assertThat(resp.getStatusCode().value()).isEqualTo(200);
 
@@ -116,15 +142,15 @@ class AiChatStreamOfflineE2eTest {
         assertThat(body.indexOf(TOKENS[0])).as("token 顺序必须保持（实际=%s）", body).isLessThan(body.indexOf(TOKENS[1]));
         assertThat(body.indexOf(TOKENS[1])).as("token 顺序必须保持（实际=%s）", body).isLessThan(body.indexOf(TOKENS[2]));
 
-        assertThat(activeRequestRefs()).as("流式结束后异步持有者引用必须归零（残留即有未终结的异步生命周期）").isZero();
+        assertRefsSettleToZero("流式结束后异步持有者引用必须归零（残留即有未终结的异步生命周期）");
     }
 
     /** 同一连接的第二次流式请求：验证终结后可复用（无残留状态）。 */
     @Test
-    void chatStream_isRepeatableOnSameServer() {
+    void chatStream_isRepeatableOnSameServer() throws InterruptedException {
         String first = rest.getForEntity("/ai/chat/stream?message=a", String.class).getBody();
         String second = rest.getForEntity("/ai/chat/stream?message=b", String.class).getBody();
         assertThat(first).isEqualTo(second);
-        assertThat(activeRequestRefs()).isZero();
+        assertRefsSettleToZero("连续两次流式后异步持有者引用必须归零（第二次仍归零即证明无残留状态）");
     }
 }

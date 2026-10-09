@@ -189,6 +189,26 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest
         releaseRequestOnce();
     }
 
+    /**
+     * 「更短时限生效」：异步超时（{@code spring.mvc.async.request-timeout}）与响应超时（{@code server.http.timeout}）取更短者。
+     * <p>
+     * 到点时仍执行<b>异步</b>超时处理器（{@link #timeoutHandler}）——异步请求以 503 收尾（Spring 语义），而不是响应超时的 504（异步挂起时响应已标记 handled，504
+     * 的写出会被拒绝）。若只装配异步超时，较短的 {@code server.http.timeout} 会被它顶掉 （{@code BaseWebServerHttpResponse#setTimeout}
+     * 会先取消旧定时器再装新的）， 「更短时限生效」这条契约就破了：CI 上表现为 1s 的响应超时没生效、2.5s 的迟到结果拿走了 200。
+     * </p>
+     * <p>
+     * {@code server.http.timeout <= 0} 表示不限制，不参与比较。
+     * </p>
+     */
+    private long effectiveAsyncTimeoutMillis() {
+        WebContext webContext = request != null ? request.getWebContext() : null;
+        if (webContext == null || webContext.getProps() == null) {
+            return timeoutMillis;
+        }
+        long httpMillis = webContext.getProps().getHttpTimeoutMillis();
+        return httpMillis > 0 && httpMillis < timeoutMillis ? httpMillis : timeoutMillis;
+    }
+
     public void scheduleTimeoutIfNeeded() {
         if (timeoutMillis <= 0 || timeoutHandler == null) {
             return;
@@ -203,7 +223,7 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest
             if (timeoutHandler != null) {
                 timeoutHandler.run();
             }
-        }, timeoutMillis);
+        }, effectiveAsyncTimeoutMillis());
     }
 
     @Override
