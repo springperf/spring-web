@@ -25,7 +25,8 @@ jobs:
         with:
           java-version: '17'
           distribution: 'graalvm'
-          components: 'native-image'
+          # native-image 随发行版提供，不设 components 就不会调用 gu；JDK 17 那份 GraalVM
+          # 的 gu 已无法解析 Oracle 目录里的新版本号格式（2026-10 起必失败，见 setup-graalvm 告警）
           # 该 action 用 token 避免下载 GraalVM 时触发匿名限流，刻意保留
           github-token: ${{ secrets.GITHUB_TOKEN }}
 

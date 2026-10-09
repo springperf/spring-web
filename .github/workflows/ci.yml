@@ -144,6 +144,9 @@ jobs:
         run: |
           set -euo pipefail
           git checkout --detach "${{ steps.baseline.outputs.tag }}"
+          # 该基线 tag 早于 wrapper 引入（3.5.6 发布时仓库还没有 mvnw），直接 ./mvnw 会 127。
+          # 从触发本次 run 的提交取回 wrapper：不动 tag 内容，只让它可用，并带上修正后的校验和。
+          git checkout "$GITHUB_SHA" -- mvnw mvnw.cmd .mvn
           ./mvnw -pl spring-web -am package -DskipTests -Dmaven.source.skip=true -Dmaven.javadoc.skip=true --batch-mode --no-transfer-progress -q
           mkdir -p "$RUNNER_TEMP/baseline"
           cp "$(ls spring-web/target/spring-web-*.jar | grep -v -e sources -e javadoc -e tests | head -1)" "$RUNNER_TEMP/baseline/spring-web.jar"
@@ -183,5 +186,11 @@ jobs:
           distribution: temurin
           cache: maven
 
-      - name: Javadoc (doclint: all except missing)
+      - name: Install the reactor for the javadoc run
+        # javadoc:javadoc 是“直接调 goal”：它只能从本地仓库解析各模块产物，而独立 runner
+        # 上什么都没构建过，于是 spring-web:jar 找不到（CI 实测：spring-web-websocket 解析失败）。
+        # 先 install 一次（跳过 spotbugs/modernizer/javadoc 这些重活），下面那条命令才有东西可用。
+        run: ./mvnw install -DskipTests -Dspotbugs.skip=true -Dmodernizer.skip=true -Dmaven.javadoc.skip=true -Dmaven.source.skip=true --batch-mode --no-transfer-progress -q
+
+      - name: "Javadoc (doclint: all except missing)"
         run: ./mvnw javadoc:javadoc -DadditionalJOption=-Xdoclint:all,-missing --batch-mode --no-transfer-progress -q

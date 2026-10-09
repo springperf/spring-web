@@ -63,7 +63,8 @@ public class BizPoolRegistry extends BaseWebComponent {
     }
 
     /**
-     * 默认执行策略是否为 EventLoop（**仅**当 {@code pool.default-execute-mode=eventloop}；未配置时为 {@code "default"}，即业务池——开启虚拟线程也不改变执行位置，只换该池的线程类型）。
+     * 默认执行策略是否为 EventLoop（**仅**当 {@code pool.default-execute-mode=eventloop}；未配置时为
+     * {@code "default"}，即业务池——开启虚拟线程也不改变执行位置，只换该池的线程类型）。
      * <p>
      * 供响应超时装配决策使用：EventLoop 同步执行期间，超时定时器与被执行的处理器同线程
      * （{@code ctx.executor().schedule(...)}），<b>不可能在处理器执行期间触发</b>——凡是能让它执行的 时刻，要么响应已提交（被 setCommitted
