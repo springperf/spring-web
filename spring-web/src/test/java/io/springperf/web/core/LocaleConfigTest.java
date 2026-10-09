@@ -15,6 +15,7 @@ import java.util.Locale;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.context.i18n.LocaleContext;
+import org.springframework.http.HttpHeaders;
 
 import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.PropertiesConstant;
@@ -74,8 +75,14 @@ class LocaleConfigTest {
         }
     }
 
-    private static WebServerHttpRequest request(Locale locale) {
+    private WebServerHttpRequest request(Locale locale) {
         WebServerHttpRequest req = mock(WebServerHttpRequest.class);
+        HttpHeaders headers = new HttpHeaders();
+        if (locale != null) {
+            // 真实客户端带 Accept-Language 时才会有首选 Locale
+            headers.set("Accept-Language", locale.toLanguageTag());
+        }
+        lenient().when(req.getHeaders()).thenReturn(headers);
         lenient().when(req.getLocale()).thenReturn(locale);
         return req;
     }
@@ -152,6 +159,18 @@ class LocaleConfigTest {
         LocaleConfig cfg = LocaleConfig.fromProperties(props("en", "accept-header"));
         LocaleContext ctx = cfg.resolveLocaleContext(null);
         assertEquals(new Locale("en"), ctx.getLocale());
+    }
+
+    @Test
+    void resolveLocaleContext_acceptHeader_noHeader_fallsBackToConfigured_evenWhenRequestLocaleIsJvmDefault() {
+        // 真实请求在无 Accept-Language 时会回退到 JVM 默认（BaseWebServerHttpRequest#defaultLocaleList）；
+        // 这里用 en_US 模拟 CI runner 的默认语言：配置的 zh_CN 必须胜过它（回归用例，对应 CI 的
+        // LocaleAcceptHeaderE2eTest 失败）。
+        LocaleConfig cfg = LocaleConfig.fromProperties(props("zh_CN", "accept-header"));
+        WebServerHttpRequest req = mock(WebServerHttpRequest.class);
+        lenient().when(req.getHeaders()).thenReturn(new HttpHeaders());
+        lenient().when(req.getLocale()).thenReturn(Locale.US);
+        assertEquals(new Locale("zh", "CN"), cfg.resolveLocaleContext(req).getLocale());
     }
 
     // ==================== 优化项：绑定开关 / 懒解析 / 单例复用 ====================
