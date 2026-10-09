@@ -4,6 +4,7 @@ import java.util.Locale;
 
 import org.springframework.context.i18n.LocaleContext;
 import org.springframework.context.i18n.SimpleLocaleContext;
+import org.springframework.http.HttpHeaders;
 
 import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.PropertiesConstant;
@@ -109,8 +110,18 @@ public class LocaleConfig {
     }
 
     /** accept-header 策略的解析：请求首选 Locale，缺失则回退配置 locale，再回退 JVM 默认。 */
+    /**
+     * accept-header 策略的解析：请求首选 Locale，缺失则回退配置 locale，再回退 JVM 默认。
+     * <p>
+     * 只有请求真的带了 {@code Accept-Language} 才采信请求首选 Locale：{@code request.getLocale()} 在无头时也会回退到 JVM 默认（见
+     * {@code BaseWebServerHttpRequest#defaultLocaleList}），直接采信会让配置回退永不生效—— 在默认语言不等于部署语言的机器上 （例如 CI 的 {@code en}）就会解析出错误
+     * Locale。Spring 的 {@code AcceptHeaderLocaleResolver} 同为「无头/不匹配 → 构造时的 defaultLocale」。
+     * </p>
+     */
     Locale resolveRequestLocale(WebServerHttpRequest request) {
-        Locale requestLocale = request != null ? request.getLocale() : null;
+        HttpHeaders headers = request != null ? request.getHeaders() : null;
+        String acceptLanguage = headers != null ? headers.getFirst("Accept-Language") : null;
+        Locale requestLocale = acceptLanguage != null && !acceptLanguage.trim().isEmpty() ? request.getLocale() : null;
         return requestLocale != null ? requestLocale : (locale != null ? locale : Locale.getDefault());
     }
 
