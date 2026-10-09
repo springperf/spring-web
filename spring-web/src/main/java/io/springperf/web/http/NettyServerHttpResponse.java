@@ -5,6 +5,7 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -589,12 +590,28 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
     }
 
     /**
-     * 解析流式读取使用的线程池：优先业务默认池；缺失时退化为 ForkJoin 公共池（绝不回退 EventLoop， 否则卸载读流失去意义）。
+     * 兜底流式拷贝线程池：<b>不能</b>用 {@link ForkJoinPool#commonPool()}。公共池与应用里的 parallel stream 共用，并行度只有 {@code CPU-1}（2 核 CI 上等于
+     * 1），而 {@link #streamCopy} 会阻塞（{@code waitWritable} 与慢速 {@code read()}）， 排在公共池其它任务之后会让收尾块迟迟写不出 —— 实测 2 核下
+     * {@code writeStream} 的 {@code LastHttpContent} 迟到超过 3s。 这里给流式拷贝一个专用守护线程池：按需创建线程，不占用、也不阻塞公共池。
+     */
+    private static final ExecutorService FALLBACK_STREAM_POOL = Executors.newCachedThreadPool(r -> {
+        Thread thread = new Thread(r, "perf-stream-copy");
+        thread.setDaemon(true);
+        return thread;
+    });
+
+    /** 兜底流式拷贝线程池（见 {@link #FALLBACK_STREAM_POOL}）。 */
+    private static ExecutorService fallbackStreamPool() {
+        return FALLBACK_STREAM_POOL;
+    }
+
+    /**
+     * 解析流式读取使用的线程池：优先业务默认池；缺失时退化为专用兜底池（绝不回退 EventLoop，否则卸载读流失去意义； 也绝不回退 ForkJoin 公共池，见 {@link #FALLBACK_STREAM_POOL}）。
      */
     private ExecutorService resolveStreamPool() {
         BizPoolRegistry poolRegistry = webContext.getWebComponent(BizPoolRegistry.class);
         ExecutorService pool = poolRegistry != null ? poolRegistry.getDefaultPool() : null;
-        return pool != null ? pool : ForkJoinPool.commonPool();
+        return pool != null ? pool : fallbackStreamPool();
     }
 
     // ---------- byte array: Content-Length + single flush ----------

@@ -229,8 +229,12 @@ class AsyncSseRobustnessE2eTest {
                         "慢消费者恢复后第 " + i + " 块缺失（背压期间不得丢数据/截断），实际收到 " + occurrences(all, "bp[") + " 块");
             }
             assertTrue(all.indexOf("bp[1]") < all.indexOf("bp[" + chunks + "]"), "顺序必须保持");
-            assertTrue(all.contains("0\r\n\r\n"),
-                    "背压恢复后流必须正常收尾（chunked 终止块存在），实际尾部:\n" + all.substring(Math.max(0, all.length() - 200)));
+            // 终止块可能比最后一个数据块晚到几十毫秒：与同类用例一致，读到它为止（有界 5s）。
+            // 真没发出终止块时这里仍会失败——只是不再把「读到尾巴就立刻断言」的竞态当成缺陷。
+            String tail = readUntil(s, text -> text.contains("0\r\n\r\n"), 5000);
+            String seen = all + tail;
+            assertTrue(seen.contains("0\r\n\r\n"),
+                    "背压恢复后流必须正常收尾（chunked 终止块存在），实际尾部:\n" + seen.substring(Math.max(0, seen.length() - 200)));
         }
         assertRefsBackTo(baseline);
     }
