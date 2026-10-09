@@ -1,6 +1,6 @@
 # perf/ —— 性能分析脚本
 
-配套文档：[`docs/feature/performance-analysis-methodology.md`](../../docs/feature/performance-analysis-methodology.md)
+配套文档：`docs/feature/performance-analysis-methodology.md`
 （方法论；该目录未纳入 git 跟踪）
 
 ## 前置
