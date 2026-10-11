@@ -237,20 +237,21 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
             flushChunked();
             return;
         }
-        ByteBuf buf = this.buf;
+        // 先摘空字段再交出 buf：「字段不再持有」与「所有权已转移给 writeAndFlush/出站消息」必须同时成立。
+        // 若在写出**之后**才置空，则写出完成回调（addRespEventListener → release()）可能在
+        // writeAndFlush 返回前就被同步触发（EmbeddedChannel / 立即完成的 promise），此时字段仍指向
+        // 已转交给出站消息的同一块 buf → release() 造成双重释放，出站消息带着 refCnt=0 的 body
+        // （实测：NettyHttpHandlerErrorPathTest#requestConstructionFailure_releasesRetainedBuffer 抛
+        // IllegalReferenceCountException，且 404/500 响应体在出站队列中已被释放）。
+        ByteBuf buf = takePendingBuf();
         try {
             // HEAD 抑制逻辑由 writeAndFlush 内部处理（保留 Content-Length，丢弃 body）
             writeAndFlush(buf, null, null, chunked);
-            // 成功写出后 buf 已随 DefaultFullHttpResponse 转移给 Netty，写入完成后由编码器
-            // release。置空字段，避免后续 getBuf()/getBody() 复用已释放的悬空 ByteBuf（UAF 风险）。
-            this.buf = null;
         } catch (Exception e) {
             // make sure to release buffer on error
             if (buf != null && buf.refCnt() > 0) {
                 buf.release();
             }
-            // 置空已释放的 buffer，防止后续 getBuf()/getBody() 返回已释放的 ByteBuf
-            this.buf = null;
             throw new RuntimeException(e);
         }
     }
@@ -452,6 +453,15 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
         }
         applySwallowLimit();
         if (responseHeadersExceedLimit()) {
+            // 本 buf 的所有权已由调用方（flush(boolean)）takePendingBuf() 摘出来交给本方法，
+            // 而 writeHeaderTooLarge() 只释放 this.buf（此处字段已被摘空 → 为 null），
+            // 故必须在此就地释放：不释放则这块池化 buf 从此不可达
+            // （paranoid 实测：ResponseHeaderLimitE2eTest#oversizedResponseHeaders_degradeToMinimal500
+            // 的 /e2e-hdr/big 响应体「should-not-be-written」稳定泄漏）。
+            // 与上方「已提交拒写」分支、以及 HEAD 抑制分支保持一致的「消费即拥有、拒绝即释放」。
+            if (buf != null && buf.refCnt() > 0) {
+                buf.release();
+            }
             writeHeaderTooLarge();
             return;
         }
