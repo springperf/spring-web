@@ -250,7 +250,7 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
         // writeAndFlush 返回前就被同步触发（EmbeddedChannel / 立即完成的 promise），此时字段仍指向
         // 已转交给出站消息的同一块 buf → release() 会造成双重释放（实测：
         // NettyHttpHandlerErrorPathTest#requestConstructionFailure_releasesRetainedBuffer 抛
-        // IllegalReferenceCountException）。
+        // IllegalReferenceCountException，且 404/500 响应体在出站队列中已被释放）。
         ByteBuf buf = takePendingBuf();
         try {
             // HEAD 抑制逻辑由 writeAndFlush 内部处理（保留 Content-Length，丢弃 body）

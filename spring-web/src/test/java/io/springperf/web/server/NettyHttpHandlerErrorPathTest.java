@@ -155,7 +155,7 @@ class NettyHttpHandlerErrorPathTest {
         verify(handler, never()).httpHandle(any(), any());
         // retain 的引用已被释放，无泄漏
         assertEquals(0, request.refCnt(), "构造失败路径必须释放 retain 的 ByteBuf");
-
+        // 该路径同样会写出 500 错误响应，出站队列中的 body buf 已在 finishAndReleaseAll 中释放
         channel.finishAndReleaseAll();
     }
 }
