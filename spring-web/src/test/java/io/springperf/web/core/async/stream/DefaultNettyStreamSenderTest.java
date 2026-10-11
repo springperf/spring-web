@@ -142,6 +142,14 @@ class DefaultNettyStreamSenderTest {
         verify(channel, atLeastOnce()).writeAndFlush(lastHttpContentCaptor.capture());
         assertTrue(lastHttpContentCaptor.getValue() instanceof LastHttpContent);
         lastHttpContentCaptor.getValue().release();
+        // 数据帧的所有权在 mock channel 上无人接管（生产环境由 Netty 写出后释放），
+        // 测试侧不释放则这块池化 ByteBuf 在 GC 时被 paranoid 泄漏检测报为 LEAK。
+        verify(channel, atLeastOnce()).writeAndFlush(httpContentCaptor.capture());
+        for (DefaultHttpContent content : httpContentCaptor.getAllValues()) {
+            if (content.content().refCnt() > 0) {
+                content.content().release();
+            }
+        }
     }
 
     @Test

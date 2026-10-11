@@ -18,6 +18,7 @@ import io.netty.handler.codec.http.HttpVersion;
 import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
+import io.netty.util.ReferenceCountUtil;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 
@@ -55,6 +56,9 @@ class NettyHttpHandlerErrorPathTest {
         HttpResponse response = channel.readOutbound();
         assertNotNull(response);
         assertEquals(404, response.status().code());
+        // readOutbound 取出的消息已脱离出站队列，必须显式释放其 body buf（生产环境由 Netty 写出后释放，
+        // EmbeddedChannel 不会代劳）；否则 paranoid 泄漏检测报 LEAK。
+        ReferenceCountUtil.release(response);
     }
 
     @Test
@@ -110,6 +114,7 @@ class NettyHttpHandlerErrorPathTest {
         HttpResponse response = channel.readOutbound();
         assertNotNull(response);
         assertEquals(500, response.status().code());
+        ReferenceCountUtil.release(response);
     }
 
     @Test
@@ -126,6 +131,8 @@ class NettyHttpHandlerErrorPathTest {
         nettyHandler.channelRead(channel.pipeline().firstContext(), request);
 
         assertEquals(0, request.refCnt(), "异常路径下请求 ByteBuf 引用应完全释放");
+        // 500 错误响应仍在出站队列中（本用例未 readOutbound），必须释放其 body buf
+        channel.finishAndReleaseAll();
     }
 
     @Test
@@ -141,5 +148,7 @@ class NettyHttpHandlerErrorPathTest {
         nettyHandler.channelRead(channel.pipeline().firstContext(), request);
 
         assertEquals(0, request.refCnt(), "请求构造失败路径应释放 retain 的引用（无泄漏）");
+        // 该路径同样会写出 500 错误响应，出站队列中的 body buf 必须在测试侧释放
+        channel.finishAndReleaseAll();
     }
 }
