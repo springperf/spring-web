@@ -83,7 +83,19 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
             allSupportedMediaTypes.addAll(messageConverter.getSupportedMediaTypes());
         }
         List<MediaType> result = new ArrayList<>(allSupportedMediaTypes);
-        MediaType.sortBySpecificity(result);
+        // 参数个数优先的确定性排序：Spring 的 SPECIFICITY_COMPARATOR 只处理「通配符 + qualityValue」，
+        // 非通配且同 quality 时比较结果为 0（退化为注册顺序），不含参数维度 —— 会让
+        // `application/json;charset=utf-8` 与 `application/json` 的前后关系随注册顺序漂移，
+        // 进而影响内容协商的候选序列与同等命中时的取择。此处按 master 口径显式排序（降序偏好带参数的）。
+        result.sort((a, b) -> {
+            int paramsComp = Integer.compare(b.getParameters().size(), a.getParameters().size());
+            if (paramsComp != 0)
+                return paramsComp;
+            int typeComp = a.getType().compareToIgnoreCase(b.getType());
+            if (typeComp != 0)
+                return typeComp;
+            return a.getSubtype().compareToIgnoreCase(b.getSubtype());
+        });
         return Collections.unmodifiableList(result);
     }
 
@@ -178,7 +190,7 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
                     (noContentType && !request.hasBody())) {
                 return null;
             }
-            throw new HttpMessageNotReadableException("not support contentType :" + contentType);
+            throw new HttpMessageNotReadableException("not support contentType :" + contentType, null, request);
         }
         return body;
     }

@@ -584,6 +584,28 @@ class DispatcherHandlerTest {
         verify(interceptorRegistry).afterCompletion(req, resp, null);
     }
 
+    /**
+     * 返回值解析抛异常时：postHandle 仍应拿到**真实并发结果**（结果在解析前已写入 MappingResult），
+     * 且异常不得被吞掉 —— 须交给 ExceptionRegistry，并以真实异常走 afterCompletion。
+     */
+    @Test
+    void asyncDispatch_throwableDuringReturnValueResolution_stillInvokesRealResult() throws Exception {
+        WebServerHttpRequest req = createRequest();
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        PathMappingContext mappingContext = mock(PathMappingContext.class);
+        MappingResult matched = MappingResult.matched(mappingContext);
+        MappingResult.set(req, matched);
+        doThrow(new RuntimeException("resolver error")).when(returnValueResolverRegistry).resolveReturnValue(any(),
+                any(), any(), any());
+
+        Object concurrentResult = new Object();
+        handler.asyncDispatch(req, resp, concurrentResult);
+
+        verify(interceptorRegistry).postHandle(req, resp, concurrentResult);
+        verify(exceptionRegistry).handle(any(Throwable.class), eq(req), eq(resp));
+        verify(interceptorRegistry).afterCompletion(eq(req), eq(resp), any(Throwable.class));
+    }
+
     @Test
     void asyncDispatch_throwableDuringReturnValueResolution_routesToExceptionRegistry() throws Exception {
         WebServerHttpRequest req = createRequest();

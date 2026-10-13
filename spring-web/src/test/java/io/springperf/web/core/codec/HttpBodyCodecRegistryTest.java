@@ -145,8 +145,11 @@ class HttpBodyCodecRegistryTest {
         registry.converters.add(converter1);
         registry.converters.add(converter2);
 
-        assertThrows(HttpMessageNotReadableException.class,
+        HttpMessageNotReadableException ex = assertThrows(HttpMessageNotReadableException.class,
                 () -> registry.readBody((Type) String.class, parameter, msg, request));
+        // 「not support contentType」也必须携带请求输入：错误处理要靠 getHttpInputMessage() 拿原始输入。
+        assertSame(request, ex.getHttpInputMessage(),
+                "HttpMessageNotReadableException 必须携带请求输入（HttpInputMessage）");
     }
 
     @Test

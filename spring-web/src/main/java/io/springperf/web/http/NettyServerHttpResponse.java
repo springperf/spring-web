@@ -245,20 +245,21 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
             flushChunked();
             return;
         }
-        ByteBuf buf = this.buf;
+        // 先摘空字段再交出 buf：「字段不再持有」与「所有权已转移给 writeAndFlush/出站消息」必须同时成立。
+        // 若在写出**之后**才置空，则写出完成回调（addRespEventListener → release()）可能在
+        // writeAndFlush 返回前就被同步触发（EmbeddedChannel / 立即完成的 promise），此时字段仍指向
+        // 已转交给出站消息的同一块 buf → release() 会造成双重释放（实测：
+        // NettyHttpHandlerErrorPathTest#requestConstructionFailure_releasesRetainedBuffer 抛
+        // IllegalReferenceCountException）。
+        ByteBuf buf = takePendingBuf();
         try {
             // HEAD 抑制逻辑由 writeAndFlush 内部处理（保留 Content-Length，丢弃 body）
             writeAndFlush(buf, null, null, chunked);
-            // 成功写出后 buf 已随 DefaultFullHttpResponse 转移给 Netty，写入完成后由编码器 release。
-            // 置空字段，避免 release()/getBuf() 再次触碰已转移（可能已被释放）的悬空 ByteBuf。
-            this.buf = null;
         } catch (Exception e) {
             // make sure to release buffer on error
             if (buf != null && buf.refCnt() > 0) {
                 buf.release();
             }
-            // 置空已释放的 buffer，防止后续 getBuf()/getBody() 返回已释放的 ByteBuf
-            this.buf = null;
             throw new RuntimeException(e);
         }
     }
@@ -422,6 +423,15 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
 
     protected void writeAndFlush(ByteBuf buf, String contentType, HttpStatus statusCode, boolean chunked) {
         if (!setCommitted()) {
+            // 已一次性提交或流已终止：本次 buf 永远不会写出，本方法对其「消费即拥有」，因此拒绝时必须就地释放。
+            // 调用方（flush(boolean)）已用 takePendingBuf() 摘空字段把所有权交出来 —— 不释放则无人在持有，
+            // 该池化 buf 从此不可达（paranoid 实测路径：已提交的 SSE 上 sendError → writeDataAndFlush
+            // → getBody() 新分配 buf → 本分支拒写）。
+            // 与 flushChunked() 的同名分支保持一致的「释放 + 告警」处理。
+            if (buf != null && buf.refCnt() > 0) {
+                buf.release();
+            }
+            log.warn("writeAndFlush ignored: response already committed (status={})", status.value());
             return;
         }
         applySwallowLimit();
@@ -746,6 +756,10 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
                     } else {
                         writeRespEventListener.completeErrorCallback(future.cause());
                     }
+                    // 写终结（成功/失败）后兜底释放未提交 buf：
+                    // 成功路径 buf 已随 FullHttpResponse 转移给 Netty → release() 为空操作；
+                    // 写失败路径响应不会再有提交机会 → 必须在此释放，否则池化 buf 泄漏。
+                    release();
                 });
             } else {
                 channelFuture.addListener(future -> {

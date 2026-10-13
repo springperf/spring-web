@@ -13,6 +13,10 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
@@ -39,6 +43,42 @@ class AccessLogWriterTest {
         ApplicationProperties props = mock(ApplicationProperties.class);
         when(props.get(PropertiesConstant.ACCESSLOG_DIRECTORY, null)).thenReturn("   ");
         assertTrue(AccessLogWriter.fromProperties(props).isNoop());
+    }
+
+    @Test
+    void write_notBlockedByExternalSynchronizationOnInstance() throws Exception {
+        // 写日志用专用锁对象（非 this）：外部代码同步本实例时不应阻塞写入，
+        // 否则第三方持有实例锁就会与写日志互相阻塞甚至死锁（USO_UNSAFE_METHOD_SYNCHRONIZATION）。
+        AccessLogWriter writer = new AccessLogWriter(tempDir, "access", ".log", false, 0);
+
+        CountDownLatch held = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        Thread holder = new Thread(() -> {
+            synchronized (writer) {
+                held.countDown();
+                try {
+                    release.await(10, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }, "external-instance-lock-holder");
+        holder.start();
+        assertTrue(held.await(5, TimeUnit.SECONDS), "外部线程应已持有实例锁");
+
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        try {
+            // 若 write 仍以 this 为锁，这里会因外部持锁而超时失败
+            pool.submit(() -> writer.write("line")).get(2, TimeUnit.SECONDS);
+        } finally {
+            release.countDown();
+            holder.join(5000);
+            pool.shutdownNow();
+        }
+
+        writer.close();
+        assertEquals(Arrays.asList("line"),
+                Files.readAllLines(tempDir.resolve("access.log"), StandardCharsets.UTF_8));
     }
 
     @Test

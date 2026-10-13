@@ -159,6 +159,23 @@ class SseEmitterTest {
         return new String(baos.toByteArray(), StandardCharsets.UTF_8);
     }
 
+    /**
+     * 边界（记录用）：{@code id} / {@code event} 字段值含 LF/CR 必须被拒绝 —— 裸 LF 会破坏 SSE 字段边界
+     * （协议违规 + 换行注入）。{@code data} / {@code comment} 是自由文本，则须按 LF 续行。
+     * <p>
+     * <b>与 master 的机制差异（不是漏改）</b>：master（Spring 6）由 {@code ServerSentEvent} builder 在**构造期**
+     * 拒绝；本分支是 Spring 5.3，builder 实测**不做**该校验，因此校验下沉到**编码期**
+     * （见 {@code SseEmitter#assertNoNewline}）。用例锁定的契约相同，只是拦截点不同。
+     * </p>
+     */
+    @Test
+    void encodeEvent_idOrEventWithNewline_rejected() throws Exception {
+        assertThrows(IllegalArgumentException.class, () -> emit(ServerSentEvent.builder().id("a\nb").build()),
+                "id 含 LF 应在编码期被拒绝（Spring 5.3 的 builder 不校验）");
+        assertThrows(IllegalArgumentException.class, () -> emit(ServerSentEvent.builder().event("x\ry").build()),
+                "event 含 CR 同样拒绝");
+    }
+
     @Test
     void getMaxFlushBytes_returns4096() {
         assertEquals(4096, emitter.getMaxFlushBytes());

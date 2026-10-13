@@ -26,7 +26,7 @@ import java.util.stream.Stream;
  * <p>落盘为可选能力：未配置 {@code server.accesslog.directory} 时使用
  * {@link AccessLogWriter#NOOP}，仅走日志框架（保持既有行为）。</p>
  *
- * <p>并发：{@link #write(String)} 由多请求线程调用，以 {@code synchronized} 串行化写入与轮转检查。</p>
+ * <p>并发：{@link #write(String)} 由多请求线程调用，以专用锁对象（{@code lock}，非 {@code this}）串行化写入与轮转检查。</p>
  */
 @Slf4j
 public class AccessLogWriter {
@@ -40,6 +40,13 @@ public class AccessLogWriter {
     private final String suffix;
     private final boolean rotate;
     private final int maxDays;
+
+    /**
+     * 专用锁对象：不用 {@code this}——本类是 public 且实例可能被外部持有，外部一旦同步本实例就会
+     * 与写日志互相阻塞甚至死锁（USO_UNSAFE_METHOD_SYNCHRONIZATION）。{@link #write(String)} 与
+     * {@link #close()} 必须共用同一把锁，改锁时须两个方法一起改，否则互斥关系被破坏。
+     */
+    private final Object lock = new Object();
 
     private Writer writer;
     private LocalDate currentDate;
@@ -85,31 +92,35 @@ public class AccessLogWriter {
     /**
      * 写入一行访问日志（自动补换行）。落盘失败不应影响请求处理，仅记录告警。
      */
-    public synchronized void write(String line) {
-        if (isNoop()) {
-            return;
-        }
-        try {
-            LocalDate today = LocalDate.now();
-            ensureWriter(today);
-            writer.write(line);
-            writer.write('\n');
-            writer.flush();
-            cleanupIfNeeded(today);
-        } catch (IOException e) {
-            log.warn("access log write failed", e);
+    public void write(String line) {
+        synchronized (lock) {
+            if (isNoop()) {
+                return;
+            }
+            try {
+                LocalDate today = LocalDate.now();
+                ensureWriter(today);
+                writer.write(line);
+                writer.write('\n');
+                writer.flush();
+                cleanupIfNeeded(today);
+            } catch (IOException e) {
+                log.warn("access log write failed", e);
+            }
         }
     }
 
     /** 关闭底层 writer（应用关闭时调用）。 */
-    public synchronized void close() {
-        if (writer != null) {
-            try {
-                writer.close();
-            } catch (IOException e) {
-                log.debug("access log close failed", e);
+    public void close() {
+        synchronized (lock) {
+            if (writer != null) {
+                try {
+                    writer.close();
+                } catch (IOException e) {
+                    log.debug("access log close failed", e);
+                }
+                writer = null;
             }
-            writer = null;
         }
     }
 
@@ -149,7 +160,12 @@ public class AccessLogWriter {
         try (Stream<Path> files = Files.list(directory)) {
             List<Path> toDelete = new ArrayList<>();
             files.filter(Files::isRegularFile).forEach(p -> {
-                LocalDate fileDate = parseDate(p.getFileName().toString());
+                // Path.getFileName() 声明为 @Nullable：无文件名的条目跳过
+                Path name = p.getFileName();
+                if (name == null) {
+                    return;
+                }
+                LocalDate fileDate = parseDate(name.toString());
                 if (fileDate != null && fileDate.isBefore(cutoff)) {
                     toDelete.add(p);
                 }

@@ -67,8 +67,12 @@ class RequestBodyResolverTest {
                 .thenThrow(new RuntimeException("parse error"));
 
         RequestBodyResolver resolver = new RequestBodyResolver(webContext, mappingContext, mp, true);
-        assertThrows(HttpMessageNotReadableException.class,
+        HttpMessageNotReadableException ex = assertThrows(HttpMessageNotReadableException.class,
                 () -> resolver.resolveArgument(request, response));
+        // 解析失败必须把请求体输入一并带进异常：Spring 的错误处理依赖 getHttpInputMessage() 读原始输入，
+        // 只在消息里拼接文本会丢掉输入上下文（原实现漏传第三个实参）。
+        assertSame(request, ex.getHttpInputMessage(),
+                "HttpMessageNotReadableException 必须携带请求输入（HttpInputMessage）");
     }
 
     @Test

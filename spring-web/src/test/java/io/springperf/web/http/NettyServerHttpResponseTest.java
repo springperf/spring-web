@@ -35,6 +35,7 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.Attribute;
+import io.netty.util.concurrent.GenericFutureListener;
 import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.server.ResponseLimitConfig;
@@ -654,5 +655,51 @@ class NettyServerHttpResponseTest {
         response.getBody().write("x".getBytes(StandardCharsets.UTF_8));
         response.flush();
         response.release(); // 应无异常、无 double-release
+    }
+
+    // ========== L2：已提交响应上被拒的 buf 必须就地释放（writeAndFlush 拒绝路径） ==========
+
+    @Test
+    void flush_afterAlreadyCommitted_releasesRejectedBuf() throws IOException {
+        // 已一次性提交后再次 flush：本次 buf 永远不会写出，必须由 writeAndFlush 就地释放，
+        // 否则 flush() 随后把 this.buf 置空 → 该池化 buf 从此不可达（泄漏）。
+        when(allocator.buffer(256)).thenReturn(Unpooled.buffer(256), Unpooled.buffer(256));
+        when(ctx.writeAndFlush(any())).thenReturn(mock(ChannelFuture.class));
+
+        response.getBody().write("first".getBytes(StandardCharsets.UTF_8));
+        response.flush();
+        assertTrue(response.isCommitted(), "首次 flush 应提交响应");
+
+        ByteBuf rejected = response.getBuf();
+        assertEquals(1, rejected.refCnt(), "第二次取缓冲应拿到新分配的池化 buf");
+
+        response.flush(); // 已提交 → writeAndFlush 走拒绝路径
+
+        assertEquals(0, rejected.refCnt(), "被拒绝写出的 buf 必须就地释放，否则池化 ByteBuf 泄漏");
+    }
+
+    // ========== L3：写出终结后的兜底释放（addRespEventListener 的 complete 回调） ==========
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void addRespEventListener_complete_releasesUnflushedBuf() throws Exception {
+        when(allocator.buffer(256)).thenReturn(Unpooled.buffer(256));
+        response.setWriteRespEventListener(mock(WriteRespEventListener.class));
+
+        ByteBuf pending = response.getBuf();
+        assertEquals(1, pending.refCnt());
+        assertFalse(response.isCommitted(), "仅取缓冲写内容、未提交");
+
+        ChannelFuture future = mock(ChannelFuture.class);
+        when(future.isSuccess()).thenReturn(true);
+        ArgumentCaptor<GenericFutureListener> listenerCaptor = ArgumentCaptor.forClass(GenericFutureListener.class);
+        when(future.addListener(listenerCaptor.capture())).thenReturn(future);
+
+        response.addRespEventListener(future, true);
+        assertNotNull(listenerCaptor.getValue(), "complete 语义应注册写出终结监听器");
+
+        listenerCaptor.getValue().operationComplete(future);
+
+        assertEquals(0, pending.refCnt(), "写出终结后必须兜底释放未提交 buf，否则池化 ByteBuf 泄漏");
     }
 }
