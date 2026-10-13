@@ -97,7 +97,7 @@ class JsrEndpointMetadataTest {
         }
     }
 
-    /** Decoder.Text 涓?Encoder.Text 瀹炵幇銆?*/
+    /** Decoder.Text 与 Encoder.Text 实现。*/
     public static class UpperDecoder implements javax.websocket.Decoder.Text<MyPojo> {
         @Override
         public MyPojo decode(String s) {
@@ -153,7 +153,7 @@ class JsrEndpointMetadataTest {
 
         Class<? extends javax.websocket.Decoder> decoder = metadata.findDecoder(MyPojo.class, true);
         assertEquals(UpperDecoder.class, decoder);
-        // 浜岃繘鍒舵棤鍖归厤
+        // 二进制无匹配
         assertNull(metadata.findDecoder(MyPojo.class, false));
 
         Class<? extends javax.websocket.Encoder> encoder = metadata.findEncoder(MyPojo.class, true);

@@ -80,9 +80,9 @@ class JspViewResolverTest {
 
         verify(mappingRegistry).registerMapping(argThat(ctx ->
                 ctx.getPathRule().equals("/**/*.jsp")));
-        assertNotNull(JspFactory.getDefaultFactory(), "鍒濆鍖栧悗搴旇缃?JspFactory");
+        assertNotNull(JspFactory.getDefaultFactory(), "初始化后应设置 JspFactory");
         assertInstanceOf(JspFactoryImpl.class, JspFactory.getDefaultFactory());
-        assertNotNull(TldCache.getInstance(servletContext), "鍒濆鍖栧悗搴旇缃?TldCache");
+        assertNotNull(TldCache.getInstance(servletContext), "初始化后应设置 TldCache");
     }
 
     @Test

@@ -18,7 +18,7 @@ import java.util.concurrent.atomic.AtomicReference;
 @ServerEndpoint("/ws/jsr/{roomId}")
 public class TestEchoEndpoint {
 
-    /** 璁板綍姣忎釜杩炴帴瀹炰緥鏀跺埌鐨勬秷鎭笌璺緞鍙橀噺銆?*/
+    /** 记录每个连接实例收到的消息与路径变量。*/
     public static final CopyOnWriteArrayList<String> MESSAGES = new CopyOnWriteArrayList<>();
     public static final CopyOnWriteArrayList<String> OPEN_ROOM_IDS = new CopyOnWriteArrayList<>();
     public static final AtomicReference<String> CLOSE_ROOM_ID = new AtomicReference<>();

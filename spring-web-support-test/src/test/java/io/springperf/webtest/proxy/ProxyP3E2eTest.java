@@ -138,14 +138,14 @@ public class ProxyP3E2eTest {
     }
 
     @Test
-    void negativeCond_notXmlConsumes_withXml_returns404() throws Exception {
+    void negativeCond_notXmlConsumes_withXml_returns415() throws Exception {
         Request req = new Request.Builder()
                 .url(baseUrl() + "/proxy-cond-extra/not-xml")
                 .post(RequestBody.create("<r/>", XML_TYPE))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            // consumes = "!application/xml" rejects XML → no route matched
-            assertEquals(404, resp.code());
+            // 对齐 Spring MVC：consumes = "!application/xml" 拒绝 XML → 415
+            assertEquals(415, resp.code());
         }
     }
 

@@ -122,7 +122,7 @@ class PerfAsyncContextTest {
     void start_executesTask() throws Exception {
         Runnable task = mock(Runnable.class);
         asyncContext.start(task);
-        // timeout verify 宸茶鐩栧紓姝ユ墽琛岃疆璇紝鏃犻渶棰濆 Thread.sleep
+        // timeout verify 已覆盖异步执行轮询，无需额外 Thread.sleep
         verify(task, timeout(1000)).run();
     }
 
@@ -133,7 +133,7 @@ class PerfAsyncContextTest {
         @Override public void onError(AsyncEvent event) { }
     }
 
-    /* ==================== 琛ュ厖瑕嗙洊 ==================== */
+    /* ==================== 补充覆盖 ==================== */
 
     @Test
     void dispatch_withPath_supportDispatcher_forwards() {

@@ -122,13 +122,14 @@ public class PlaceholderCondE2eTest {
     }
 
     @Test
-    void consumesPlaceholder_withXmlContentType_returns404() throws Exception {
+    void consumesPlaceholder_withXmlContentType_returns415() throws Exception {
         Request req = new Request.Builder()
                 .url(baseUrl() + "/placeholder-cond/consume-check")
                 .post(RequestBody.create("<r/>", XML_TYPE))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            assertEquals(404, resp.code());
+            // 对齐 Spring MVC：路径匹配但 consumes 不满足 → 415
+            assertEquals(415, resp.code());
         }
     }
 
@@ -149,14 +150,15 @@ public class PlaceholderCondE2eTest {
     }
 
     @Test
-    void producesPlaceholder_withXmlAccept_returns404() throws Exception {
+    void producesPlaceholder_withXmlAccept_returns406() throws Exception {
         Request req = new Request.Builder()
                 .url(baseUrl() + "/placeholder-cond/produce-check")
                 .header("Accept", "text/xml")
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            assertEquals(404, resp.code());
+            // 对齐 Spring MVC：路径匹配但 produces 不被 Accept 接受 → 406
+            assertEquals(406, resp.code());
         }
     }
 }

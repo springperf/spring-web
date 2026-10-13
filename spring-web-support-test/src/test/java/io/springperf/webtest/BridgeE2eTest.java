@@ -236,8 +236,8 @@ public class BridgeE2eTest extends BaseE2ETest {
     }
 
     @Test
-    void async_timeout_triggersWithBridgeConfiguredTimeout() throws Exception {
-        // Bridge 配置 100ms 默认超时，本端点 Callable 沉睡 500ms——超时应在任务完成前触发并打断。
+    void async_timeout_triggersWithExplicitWebAsyncTaskTimeout() throws Exception {
+        // 端点以 WebAsyncTask 显式配置 100ms 超时，任务沉睡 500ms——超时应在任务完成前触发并打断。
         // 因此无论框架把超时映射为多少状态码，"too-late" 都不应作为完成结果返回；
         // 用可证伪断言（而非恒真的"任意状态码都行"）锁定超时确实生效。
         Request req = new Request.Builder()

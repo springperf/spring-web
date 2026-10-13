@@ -33,7 +33,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
- * 琛ュ厖 PerfHttpServletRequest 瑕嗙洊鐜囷細requestURL/鏈嶅姟鍣ㄧ鍙ｃ€乵ultipart 缂哄け銆? * async start/getAsyncContext/upgrade銆乻ession 鍒涘缓/鍙樻洿/鏍￠獙銆佺櫥褰曟敞閿€銆佽璇佷笌 servletContext 瑙ｆ瀽銆? */
+ * 补充 PerfHttpServletRequest 覆盖率：requestURL/服务端口、multipart 缺失。 * async start/getAsyncContext/upgrade、session 创建/变更/校验、登录注销、认证与 servletContext 解析。 */
 class PerfHttpServletRequestSessionTest {
 
     private WebServerHttpRequest request;
@@ -75,7 +75,7 @@ class PerfHttpServletRequestSessionTest {
         return new PerfHttpServletRequest(request);
     }
 
-    /** 灏?servlet 鍝嶅簲缁戝畾鍒拌姹備笂涓嬫枃锛圫ervletAttribute.getResponse 缁?ServletAdapterContext 璇诲彇锛?*/
+    /** 将 servlet 响应绑定到请求上下文（ServletAttribute.getResponse 的 ServletAdapterContext 读取）*/
     private void bindResponse(PerfHttpServletResponse servletResp) {
         ServletAdapterContext adapter = new ServletAdapterContext(newReq(), servletResp, null);
         ServletAttribute.setAdapterContext(requestContext, adapter);
@@ -91,7 +91,7 @@ class PerfHttpServletRequestSessionTest {
         return manager;
     }
 
-    /* ==================== URL / 绔彛 ==================== */
+    /* ==================== URL / 端口 ==================== */
 
     @Test
     void getRequestURL_http80_omitsPort() {
@@ -120,7 +120,7 @@ class PerfHttpServletRequestSessionTest {
         assertEquals("/ctx", newReq().getContextPath());
     }
 
-    /* ==================== multipart 缂哄け ==================== */
+    /* ==================== multipart 缺失 ==================== */
 
     @Test
     void getPart_notMultipart_throws() {

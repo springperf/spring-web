@@ -47,7 +47,7 @@ class JsrEndpointWebSocketConfigurerTest {
 
     @Test
     void register_noEndpoints_keepsRegistryEmpty() {
-        // 鏃?@ServerEndpoint Bean 鐨勪笂涓嬫枃
+        // 无 @ServerEndpoint Bean 的上下文
         AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext();
         ctx.refresh();
         JsrEndpointWebSocketConfigurer configurer = new JsrEndpointWebSocketConfigurer(ctx);

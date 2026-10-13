@@ -26,15 +26,18 @@ import static org.junit.jupiter.api.Assertions.*;
  * @see OpenApiAdapter
  * @see OpenApiProxyController
  */
-@SpringBootTest(
-        classes = ProxyE2eApp.class,
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "server.servlet.context-path=/api",
-                "proxy.placeholder.path=/proxy/placeholder-resolved"
-        })
+@SpringBootTest(classes = ProxyE2eApp.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+        "server.servlet.context-path=/api",
+        "proxy.placeholder.path=/proxy/placeholder-resolved"
+})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class OpenApiProxyE2eTest {
+
+    /**
+     * 文档路径必须带 context-path 前缀（本测试应用配置 {@code server.servlet.context-path=/api}），
+     * 与 OpenApiAdapter 生成的完整路径保持一致 —— 见 OpenApiE2eTest#API_PREFIX 的同款说明。
+     */
+    private static final String API_PREFIX = "/api";
 
     @Autowired(required = false)
     private OpenApiCustomiser openApiCustomiser;
@@ -51,9 +54,8 @@ public class OpenApiProxyE2eTest {
     // ============ OpenApiCustomiser Bean ============
 
     @Test
-    void openApiCustomiserBean_exists() {
-        assertNotNull(openApiCustomiser,
-                "OpenApiCustomiser should be available in proxy test context");
+    void openApiCustomizerBean_exists() {
+        assertNotNull(openApiCustomiser, "OpenApiCustomiser should be available in proxy test context");
     }
 
     // ============ 路径覆盖 ============
@@ -66,14 +68,10 @@ public class OpenApiProxyE2eTest {
         assertNotNull(paths);
         assertFalse(paths.isEmpty());
 
-        assertTrue(paths.containsKey("/openapi-proxy/create/{id}"),
-                "missing /openapi-proxy/create/{id}");
-        assertTrue(paths.containsKey("/openapi-proxy/update/{id}"),
-                "missing /openapi-proxy/update/{id}");
-        assertTrue(paths.containsKey("/openapi-proxy/query"),
-                "missing /openapi-proxy/query");
-        assertTrue(paths.containsKey("/openapi-proxy/delete/{id}"),
-                "missing /openapi-proxy/delete/{id}");
+        assertTrue(paths.containsKey(API_PREFIX + "/openapi-proxy/create/{id}"), "missing /openapi-proxy/create/{id}");
+        assertTrue(paths.containsKey(API_PREFIX + "/openapi-proxy/update/{id}"), "missing /openapi-proxy/update/{id}");
+        assertTrue(paths.containsKey(API_PREFIX + "/openapi-proxy/query"), "missing /openapi-proxy/query");
+        assertTrue(paths.containsKey(API_PREFIX + "/openapi-proxy/delete/{id}"), "missing /openapi-proxy/delete/{id}");
     }
 
     // ============ @ResponseStatus 状态码 ============
@@ -81,7 +79,7 @@ public class OpenApiProxyE2eTest {
     @Test
     void createEndpoint_responseStatus_201() {
         OpenAPI api = buildApi();
-        Operation postOp = api.getPaths().get("/openapi-proxy/create/{id}").getPost();
+        Operation postOp = api.getPaths().get(API_PREFIX + "/openapi-proxy/create/{id}").getPost();
         assertNotNull(postOp);
         assertNotNull(postOp.getResponses().get("201"),
                 "@ResponseStatus(CREATED) should produce 201, got: " + postOp.getResponses().keySet());
@@ -90,7 +88,7 @@ public class OpenApiProxyE2eTest {
     @Test
     void updateEndpoint_responseStatus_202() {
         OpenAPI api = buildApi();
-        Operation postOp = api.getPaths().get("/openapi-proxy/update/{id}").getPost();
+        Operation postOp = api.getPaths().get(API_PREFIX + "/openapi-proxy/update/{id}").getPost();
         assertNotNull(postOp);
         assertNotNull(postOp.getResponses().get("202"),
                 "@ResponseStatus(ACCEPTED) should produce 202, got: " + postOp.getResponses().keySet());
@@ -99,7 +97,7 @@ public class OpenApiProxyE2eTest {
     @Test
     void deleteEndpoint_responseStatus_204() {
         OpenAPI api = buildApi();
-        Operation postOp = api.getPaths().get("/openapi-proxy/delete/{id}").getPost();
+        Operation postOp = api.getPaths().get(API_PREFIX + "/openapi-proxy/delete/{id}").getPost();
         assertNotNull(postOp);
         assertNotNull(postOp.getResponses().get("204"),
                 "@ResponseStatus(NO_CONTENT) on void should produce 204, got: " + postOp.getResponses().keySet());
@@ -108,7 +106,7 @@ public class OpenApiProxyE2eTest {
     @Test
     void queryEndpoint_defaultResponseStatus_200() {
         OpenAPI api = buildApi();
-        Operation getOp = api.getPaths().get("/openapi-proxy/query").getGet();
+        Operation getOp = api.getPaths().get(API_PREFIX + "/openapi-proxy/query").getGet();
         assertNotNull(getOp);
         assertNotNull(getOp.getResponses().get("200"),
                 "default (no @ResponseStatus) should produce 200, got: " + getOp.getResponses().keySet());
@@ -119,7 +117,7 @@ public class OpenApiProxyE2eTest {
     @Test
     void createEndpoint_hasPathAndQueryParam() {
         OpenAPI api = buildApi();
-        Operation postOp = api.getPaths().get("/openapi-proxy/create/{id}").getPost();
+        Operation postOp = api.getPaths().get(API_PREFIX + "/openapi-proxy/create/{id}").getPost();
         assertNotNull(postOp);
 
         boolean hasId = postOp.getParameters().stream()
@@ -133,7 +131,7 @@ public class OpenApiProxyE2eTest {
     @Test
     void updateEndpoint_hasPathParamAndRequestBody() {
         OpenAPI api = buildApi();
-        Operation postOp = api.getPaths().get("/openapi-proxy/update/{id}").getPost();
+        Operation postOp = api.getPaths().get(API_PREFIX + "/openapi-proxy/update/{id}").getPost();
         assertNotNull(postOp);
 
         boolean hasId = postOp.getParameters().stream()
@@ -146,7 +144,7 @@ public class OpenApiProxyE2eTest {
     @Test
     void queryEndpoint_hasQueryParams() {
         OpenAPI api = buildApi();
-        Operation getOp = api.getPaths().get("/openapi-proxy/query").getGet();
+        Operation getOp = api.getPaths().get(API_PREFIX + "/openapi-proxy/query").getGet();
         assertNotNull(getOp);
 
         boolean hasQ = getOp.getParameters().stream()
@@ -160,7 +158,7 @@ public class OpenApiProxyE2eTest {
     @Test
     void deleteEndpoint_hasPathParam() {
         OpenAPI api = buildApi();
-        Operation postOp = api.getPaths().get("/openapi-proxy/delete/{id}").getPost();
+        Operation postOp = api.getPaths().get(API_PREFIX + "/openapi-proxy/delete/{id}").getPost();
         assertNotNull(postOp);
 
         boolean hasId = postOp.getParameters().stream()

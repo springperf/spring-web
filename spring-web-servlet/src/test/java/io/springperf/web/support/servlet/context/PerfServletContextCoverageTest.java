@@ -26,8 +26,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * 琛ュ厖 PerfServletContext 瑕嗙洊鐜囷細灞炴€у瓨鍙栥€乮nit 鍙傛暟銆佽祫婧愯В鏋愩€佷笂涓嬫枃淇℃伅銆?
- * session cookie config銆佺紪鐮佷笌鏃跺尯銆佹敞鍐岀被鏂规硶绌哄疄鐜扮瓑銆?
+ * 补充 PerfServletContext 覆盖率：属性存取、init 参数、资源解析、上下文信息。
+ * session cookie config、编码与时区、注册类方法空实现等。
  */
 @ExtendWith(MockitoExtension.class)
 class PerfServletContextCoverageTest {
@@ -83,7 +83,7 @@ class PerfServletContextCoverageTest {
     @Test
     void initParameter_setGetNames() {
         assertTrue(servletContext.setInitParameter("p1", "v1"));
-        assertFalse(servletContext.setInitParameter("p1", "v2"), "閲嶅璁剧疆搴旇繑鍥?false");
+        assertFalse(servletContext.setInitParameter("p1", "v2"), "重复设置应返回 false");
         assertEquals("v1", servletContext.getInitParameter("p1"));
         assertNotNull(servletContext.getInitParameterNames());
     }
@@ -240,7 +240,7 @@ class PerfServletContextCoverageTest {
         assertNull(servletContext.getContext("/other"));
     }
 
-    /* ==================== 璧勬簮瑙ｆ瀽 ==================== */
+    /* ==================== 资源解析 ==================== */
 
     @Test
     void getResource_nullOrEmpty_returnsNull() {
@@ -251,7 +251,7 @@ class PerfServletContextCoverageTest {
     @Test
     void getResource_knownClasspathResource_returnsUrl() {
         URL url = servletContext.getResource("/perf-web/placeholder.txt");
-        assertNotNull(url, "妗嗘灦绫昏矾寰勪笅搴旇兘鎵惧埌璧勬簮");
+        assertNotNull(url, "框架类路径下应能找到资源");
     }
 
     @Test
@@ -376,7 +376,7 @@ class PerfServletContextCoverageTest {
         assertEquals(100, cfg.getMaxAge());
     }
 
-    /* ==================== 缂栫爜 ==================== */
+    /* ==================== 编码 ==================== */
 
     @Test
     void characterEncodings_defaultAndSettable() {
@@ -388,7 +388,7 @@ class PerfServletContextCoverageTest {
         assertEquals("GBK", servletContext.getResponseCharacterEncoding());
     }
 
-    /* ==================== 娉ㄥ唽绫荤┖瀹炵幇 ==================== */
+    /* ==================== 注册类空实现 ==================== */
 
     @Test
     void registrationMethods_noopOrNull() {

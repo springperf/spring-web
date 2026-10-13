@@ -12,7 +12,7 @@
     <artifactId>spring-web-example-realtime</artifactId>
 
     <name>perf-spring-web-example-realtime</name>
-    <description>Spring Perf Web 瀹炴椂鎺ㄩ€佺ず渚?- 婕旂ず SSE (SseEmitter) + WebSocket 瀹炴椂閫氫俊</description>
+    <description>Spring Perf Web 实时推送示例 - 演示 SSE (SseEmitter) + WebSocket 实时通信</description>
 
     <dependencies>
         <dependency>

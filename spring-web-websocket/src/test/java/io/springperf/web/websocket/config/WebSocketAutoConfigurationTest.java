@@ -36,7 +36,7 @@ class WebSocketAutoConfigurationTest {
         PipelineCustomizer customizer = new PipelineCustomizer();
         WebSocketRoutingHandler handler = config.webSocketRoutingHandler(registry, customizer, Arrays.asList());
         assertNotNull(handler);
-        // 鏃犵鐐规椂涓嶆敞鍏?customizer
+        // 无端点时不注入 customizer
     }
 
     @Test
@@ -57,6 +57,6 @@ class WebSocketAutoConfigurationTest {
         assertFalse(registry.isEmpty());
         verify(configurer).registerWebSocketHandlers(registry);
         assertFalse(customizer.getAfterAggregatorHandlers().isEmpty(),
-                "鏈夌鐐规椂搴旀敞鍏?WebSocketRoutingHandler 鍒?afterAggregator");
+                "有端点时应注入 WebSocketRoutingHandler 到 afterAggregator");
     }
 }
