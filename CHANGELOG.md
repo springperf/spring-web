@@ -4,6 +4,54 @@
 
 本项目遵循 [语义化版本控制](https://semver.org/lang/zh-CN/)。
 
+## [2.7.7] - 20261013
+
+> ⚠️ **本版含破坏性变更**：配置键、响应分帧、Servlet `flush` 语义、条件请求/Range、
+> 扩展点签名均有调整，**升级前请先读 [破坏性变更说明](docs/breaking-changes.md)**。
+
+### 新增
+
+- **静态资源与视图**：新增可插拔 SPI `WebExchangeProvider`（`supports()` 能力探测 + `createExchange()` + `getOrder()`），模板中可直接拿到**真实** session 与 principal；视图/编码相关配置键统一
+- **HTTP 协议语义对齐**：条件请求（`If-None-Match` / `If-Modified-Since`）、字节范围（`Accept-Ranges`、单段 `206`、多段 `multipart/byteranges`）、响应分帧按 RFC 7231/7232/7233 收紧
+- **服务端配置对齐 Spring Boot**：连接与请求上限、keep-alive 超时/请求数、multipart 上限、错误响应策略、转发头策略等一组配置键（见配置手册与破坏性变更说明的 2.7.7 节）
+- **会话持久化**：`server.servlet.session.persistent` / `.store-dir` / `.persistent-exclude`（JDK 序列化，每 session 一文件，不落盘 `transient` 属性），并新增反序列化白名单键 `server.servlet.session.persistent-deserialization-filter`
+- **配置刷新**：监听 `EnvironmentChangeEvent` 清空框架属性缓存，配置中心改动无需重启
+
+### 变更
+
+- **响应分帧**：`flush(true)` 由「一次性」改为 chunked 渐进式输出，提交后仍可继续写入，由 `endStream()` 写终止块
+- **Servlet `PrintWriter`**：`print` / `println` 不再自动提交（对齐 Tomcat `autoFlush=false`），需显式 `flush()` / `flushBuffer()`
+- **扩展点签名变更**（源码级不兼容，详见破坏性变更说明的 2.7.7 节「扩展点签名变更」）
+- **会话、重定向与条件请求的错误映射**调整；管理端口与转发语义调整（均见破坏性变更说明的 2.7.7 节）
+
+### 安全
+
+- **请求参数数量上限**：新增 `server.max-parameter-count`（默认 10000），防 hash 碰撞 DoS
+
+### 优化
+
+- **热路径分配**：JFR 驱动的若干优化（请求分发、属性查找、只读响应头视图缓存等），降低每请求分配与 CPU
+- **流式拷贝线程池**：兜底流拷贝改用专用守护线程池，不再退化为并行度受限的公共池
+
+### 修复
+
+- **会话并发**：过期会话清理改为在写锁内条件摘除，修复「刚清理的过期会话被并发落盘写回、重启后复活」；会话写入串行化，`tryInvalidate` 原子失效
+- **异步 / SSE 生命周期**：`DeferredResult` 终态只触发一次、超时任务及时清理、`ByteBuf` 引用计数配对；`markStreamCompleted` 改为抢占式，杜绝双终止块
+- **Servlet / websocket**：`;jsessionid=` 从 URI 回读（Cookie 优先）、same-site 值规范化、JSR-356 端点生命周期与会话收尾
+- **视图与桥接**：Thymeleaf 会话变量注入、FreeMarker 适配、`WebMvcConfigurer#addViewControllers` 桥接（未能桥接的回调打 WARN，不再静默）
+- **core / http**：错误输入处理、日志锁、文件名守卫、media type 顺序、惰性请求状态与 head 标志可见性
+
+### 构建
+
+- **门禁与 master 对齐**：接入 `mvnw`、enforcer `requirePluginVersions`、javadoc doclint（JDK 8 口径）、`check-docs` / 符号校验，并清理 doclint 报错
+- **CI**：采用 master 的 workflow 集（CI / CodeQL / dependabot / coverage-aggregate）
+- **覆盖率**：按「单测 + E2E 合并」口径重生成 `coverage-report.md`
+
+### 文档
+
+- **同步台账**：2.7.x 同步缺口与迁移清单逐文件定性
+- **事实修正**：清除漏入本分支的 jakarta / Spring Boot 3 措辞与失效符号引用
+
 ## [2.7.6] - 20260910
 
 ### 新增

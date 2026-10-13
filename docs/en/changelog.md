@@ -4,6 +4,55 @@
 
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.7] - 20261013
+
+> ⚠️ **This release contains breaking changes**: configuration keys, response framing, Servlet
+> `flush` semantics, conditional requests / Range, and extension-point signatures all changed —
+> read the [breaking changes](breaking-changes.md) before upgrading.
+
+### Added
+
+- **Static resources and views**: new pluggable SPI `WebExchangeProvider` (`supports()` capability probe + `createExchange()` + `getOrder()`), so templates can reach the **real** session and principal; view/encoding keys unified
+- **HTTP protocol semantics**: conditional requests (`If-None-Match` / `If-Modified-Since`), byte ranges (`Accept-Ranges`, single `206`, multi-part `multipart/byteranges`) and response framing tightened per RFC 7231/7232/7233
+- **Server configuration aligned with Spring Boot**: connection and request limits, keep-alive timeout / request count, multipart limits, error-response policy, forwarded-header strategy and more (see the configuration manual and the 2.7.7 section of the breaking changes)
+- **Session persistence**: `server.servlet.session.persistent` / `.store-dir` / `.persistent-exclude` (JDK serialization, one file per session, `transient` attributes not persisted) plus the deserialization allow-list key `server.servlet.session.persistent-deserialization-filter`
+- **Configuration refresh**: listens for `EnvironmentChangeEvent` to drop the framework property caches, so config-centre changes need no restart
+
+### Changed
+
+- **Response framing**: `flush(true)` changed from one-shot to progressive chunked output; writing may continue after commit, with `endStream()` emitting the terminating chunk
+- **Servlet `PrintWriter`**: `print` / `println` no longer auto-commit (aligned with Tomcat `autoFlush=false`); call `flush()` / `flushBuffer()` explicitly
+- **Extension-point signatures changed** (source-incompatible; see "Extension-point signature changes" in the 2.7.7 section of the breaking changes)
+- **Session, redirect and conditional-request error mappings** adjusted; management port and forwarding semantics adjusted (both in the 2.7.7 section of the breaking changes)
+
+### Security
+
+- **Request parameter cap**: new `server.max-parameter-count` (default 10000) guarding against hash-collision DoS
+
+### Optimized
+
+- **Hot-path allocation**: a set of JFR-driven optimizations (request dispatch, attribute lookup, read-only response-header view caching), lowering per-request allocation and CPU
+- **Stream copy pool**: the fallback stream copy uses a dedicated daemon pool instead of degrading to a parallelism-limited shared pool
+
+### Fixed
+
+- **Session concurrency**: stale session sweeping now removes entries conditionally under the write lock, fixing "a just-swept stale session is written back concurrently and resurrects after restart"; session writes serialized, atomic invalidation via `tryInvalidate`
+- **Async / SSE lifecycle**: `DeferredResult` terminal state fires exactly once, timeout tasks cleaned up promptly, `ByteBuf` reference counts paired; `markStreamCompleted` is now preemptive, ruling out double terminating chunks
+- **Servlet / websocket**: `;jsessionid=` read back from the URI (cookie first), SameSite values normalised, JSR-356 endpoint lifecycle and session teardown
+- **Views and bridging**: Thymeleaf session variables injected, FreeMarker adaptation, `WebMvcConfigurer#addViewControllers` bridged (unbridgeable callbacks warn instead of staying silent)
+- **core / http**: error input handling, log lock, file name guard, media type order, lazy request state and head flag visibility
+
+### Build
+
+- **Gates aligned with master**: adopted `mvnw`, enforcer `requirePluginVersions`, javadoc doclint (JDK 8 semantics) and the `check-docs` / symbol checks, clearing the doclint findings
+- **CI**: adopted master's workflow set (CI / CodeQL / dependabot / coverage-aggregate)
+- **Coverage**: regenerated `coverage-report.md` with the merged unit + E2E scope
+
+### Docs
+
+- **Sync ledger**: the 2.7.x sync-gap and migration checklists with per-file verdicts
+- **Fact fixes**: removed jakarta / Spring Boot 3 wording that leaked into this branch, plus dangling symbol references
+
 ## [2.7.6] - 20260910
 
 ### Added
