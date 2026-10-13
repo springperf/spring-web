@@ -79,7 +79,8 @@ public class NettyMultipartWebRequest extends DefaultFullHttpRequest {
     }
 
     public List<InterfaceHttpData> getInterfaceHttpDataList() {
-        return interfaceHttpDataList;
+        // 只读视图；字段为 null 时保持原有返回 null 的行为
+        return interfaceHttpDataList == null ? null : java.util.Collections.unmodifiableList(interfaceHttpDataList);
     }
 
     @Override

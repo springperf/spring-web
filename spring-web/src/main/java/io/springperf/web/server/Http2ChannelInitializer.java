@@ -13,7 +13,6 @@ import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.stream.ChunkedWriteHandler;
-import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.http.BackpressureHandler;
 import io.springperf.web.http.support.SupportMultipartAggregator;
@@ -41,6 +40,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
     private final int maxPartHeaderSize;
     private final CompressionConfig compressionConfig;
     private final KeepAliveConfig keepAliveConfig;
+    private MultipartConfig multipartConfig = MultipartConfig.DEFAULT;
 
     public Http2ChannelInitializer(boolean http2Enabled, SslContext sslContext,
                                     int maxContentLength, long readTimeout,
@@ -123,7 +123,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
             p.addLast(NettyHttpServer.SslExceptionHandler.INSTANCE);
             if (http2Enabled) {
                 p.addLast(new Http2OrHttp1Handler(maxContentLength, readTimeout, supportMultipart, httpHandler, beforeAggregatorHandlers, afterAggregatorHandlers, maxInitialLineLength, maxHeaderSize, maxChunkSize,
-                        maxPartCount, maxPartHeaderSize, compressionConfig, keepAliveConfig));
+                        maxPartCount, maxPartHeaderSize, multipartConfig, compressionConfig, keepAliveConfig));
             } else {
                 addHttp11Handlers(p);
             }
@@ -138,7 +138,8 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
         p.addLast(new HttpServerCodec(maxInitialLineLength, maxHeaderSize, maxChunkSize));
         addCompressor(p, compressionConfig);
         if (readTimeout > 0) {
-            p.addLast(new ReadTimeoutHandler(readTimeout, TimeUnit.MILLISECONDS));
+            // 只约束「读空闲」：不得掐断正在处理的长耗时请求（stock ReadTimeoutHandler 会把响应连同连接一起丢弃）
+            p.addLast(new ReadIdleTimeoutHandler(readTimeout));
         }
         p.addLast(new ChunkedWriteHandler());
         for (ChannelHandler h : beforeAggregatorHandlers) {
@@ -163,7 +164,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
         Http2FrameCodec frameCodec = Http2FrameCodecBuilder.forServer().build();
         Http2MultiplexHandler multiplexHandler = new Http2MultiplexHandler(
                 new Http2ChildChannelInitializer(maxContentLength, supportMultipart, httpHandler,
-                        maxPartCount, maxPartHeaderSize, compressionConfig, keepAliveConfig));
+                        maxPartCount, maxPartHeaderSize, multipartConfig, compressionConfig, keepAliveConfig));
 
         p.addLast(new ChannelInboundHandlerAdapter() {
             private ByteBuf accumulator;
@@ -247,7 +248,8 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
         p.addLast(sourceCodec);
         addCompressor(p, compressionConfig);
         if (readTimeout > 0) {
-            p.addLast(new ReadTimeoutHandler(readTimeout, TimeUnit.MILLISECONDS));
+            // 只约束「读空闲」：不得掐断正在处理的长耗时请求（stock ReadTimeoutHandler 会把响应连同连接一起丢弃）
+            p.addLast(new ReadIdleTimeoutHandler(readTimeout));
         }
         p.addLast(new ChunkedWriteHandler());
         for (ChannelHandler h : beforeAggregatorHandlers) {
@@ -264,11 +266,25 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
 
     private void addAggregator(ChannelPipeline p) {
         if (supportMultipart) {
-            p.addLast(new SupportMultipartAggregator(maxContentLength,
-                    new SupportMultipartResolver(maxContentLength, maxPartCount, maxPartHeaderSize)));
+            p.addLast(new SupportMultipartAggregator(maxContentLength, maxPartCount, maxPartHeaderSize,
+                    multipartConfig.getMaxFileSize(), multipartConfig.getFileSizeThreshold(),
+                    multipartConfig.getLocation()));
         } else {
             p.addLast(new HttpObjectAggregator(maxContentLength));
         }
+    }
+
+    /**
+     * 注入 multipart 上传配置（{@code max-file-size} / {@code file-size-threshold} / {@code location}）。
+     * <p>
+     * 传 {@code null} 时保持默认（{@link MultipartConfig#DEFAULT}）；返回自身以便链式调用。
+     * </p>
+     */
+    public Http2ChannelInitializer multipartConfig(MultipartConfig multipartConfig) {
+        if (multipartConfig != null) {
+            this.multipartConfig = multipartConfig;
+        }
+        return this;
     }
 
     /** 按配置在 codec 之后注入响应 gzip 压缩器；关闭时（{@code DISABLED}）不注入，零开销。 */
@@ -301,17 +317,20 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
         private final NettyHttpHandler httpHandler;
         private final int maxPartCount;
         private final int maxPartHeaderSize;
+        private final MultipartConfig multipartConfig;
         private final CompressionConfig compressionConfig;
         private final KeepAliveConfig keepAliveConfig;
 
         Http2ChildChannelInitializer(int maxContentLength, boolean supportMultipart,
                                       NettyHttpHandler httpHandler, int maxPartCount, int maxPartHeaderSize,
+                                      MultipartConfig multipartConfig,
                                       CompressionConfig compressionConfig, KeepAliveConfig keepAliveConfig) {
             this.maxContentLength = maxContentLength;
             this.supportMultipart = supportMultipart;
             this.httpHandler = httpHandler;
             this.maxPartCount = maxPartCount;
             this.maxPartHeaderSize = maxPartHeaderSize;
+            this.multipartConfig = multipartConfig;
             this.compressionConfig = compressionConfig;
             this.keepAliveConfig = keepAliveConfig;
         }
@@ -324,8 +343,9 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
             addCompressor(p, compressionConfig);
             p.addLast(new ChunkedWriteHandler());
             if (supportMultipart) {
-                p.addLast(new SupportMultipartAggregator(maxContentLength,
-                        new SupportMultipartResolver(maxContentLength, maxPartCount, maxPartHeaderSize)));
+                p.addLast(new SupportMultipartAggregator(maxContentLength, maxPartCount, maxPartHeaderSize,
+                        multipartConfig.getMaxFileSize(), multipartConfig.getFileSizeThreshold(),
+                        multipartConfig.getLocation()));
             } else {
                 p.addLast(new HttpObjectAggregator(maxContentLength));
             }
@@ -353,6 +373,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
         private final int maxChunkSize;
         private final int maxPartCount;
         private final int maxPartHeaderSize;
+        private final MultipartConfig multipartConfig;
         private final CompressionConfig compressionConfig;
         private final KeepAliveConfig keepAliveConfig;
 
@@ -362,6 +383,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
                             List<ChannelHandler> afterAggregatorHandlers,
                             int maxInitialLineLength, int maxHeaderSize, int maxChunkSize,
                             int maxPartCount, int maxPartHeaderSize,
+                            MultipartConfig multipartConfig,
                             CompressionConfig compressionConfig, KeepAliveConfig keepAliveConfig) {
             super(ApplicationProtocolNames.HTTP_1_1);
             this.maxContentLength = maxContentLength;
@@ -377,6 +399,7 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
             this.maxChunkSize = maxChunkSize;
             this.maxPartCount = maxPartCount;
             this.maxPartHeaderSize = maxPartHeaderSize;
+            this.multipartConfig = multipartConfig;
             this.compressionConfig = compressionConfig;
             this.keepAliveConfig = keepAliveConfig;
         }
@@ -390,21 +413,23 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
                 p.addLast(Http2FrameCodecBuilder.forServer().build());
                 p.addLast(new Http2MultiplexHandler(
                         new Http2ChildChannelInitializer(maxContentLength, supportMultipart, httpHandler,
-                                maxPartCount, maxPartHeaderSize, compressionConfig, keepAliveConfig)));
+                                maxPartCount, maxPartHeaderSize, multipartConfig, compressionConfig, keepAliveConfig)));
             } else {
                 // http/1.1: add standard h1.1 pipeline
                 p.addLast(new HttpServerCodec(maxInitialLineLength, maxHeaderSize, maxChunkSize));
                 addCompressor(p, compressionConfig);
                 if (readTimeout > 0) {
-                    p.addLast(new ReadTimeoutHandler(readTimeout, TimeUnit.MILLISECONDS));
+                    // 只约束「读空闲」：不得掐断正在处理的长耗时请求（stock ReadTimeoutHandler 会把响应连同连接一起丢弃）
+                    p.addLast(new ReadIdleTimeoutHandler(readTimeout));
                 }
                 p.addLast(new ChunkedWriteHandler());
                 for (ChannelHandler h : beforeAggregatorHandlers) {
                     p.addLast(h);
                 }
                 if (supportMultipart) {
-                    p.addLast(new SupportMultipartAggregator(maxContentLength,
-                            new SupportMultipartResolver(maxContentLength, maxPartCount, maxPartHeaderSize)));
+                    p.addLast(new SupportMultipartAggregator(maxContentLength, maxPartCount, maxPartHeaderSize,
+                            multipartConfig.getMaxFileSize(), multipartConfig.getFileSizeThreshold(),
+                            multipartConfig.getLocation()));
                 } else {
                     p.addLast(new HttpObjectAggregator(maxContentLength));
                 }

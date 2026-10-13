@@ -34,10 +34,20 @@ public class WebServerHttpResponseWrapper implements WebServerHttpResponse {
     @Override public boolean setHandled() { return response.setHandled(); }
     @Override public void sendError(HttpStatus statusCode) { response.sendError(statusCode); }
     @Override public void sendError(HttpStatus statusCode, String message) { response.sendError(statusCode, message); }
+    @Override public void sendError(HttpStatus statusCode, String message, Throwable cause, boolean includeStacktraceOnParam,
+            boolean includeMessageOnParam, boolean includeErrorsOnParam) {
+        response.sendError(statusCode, message, cause, includeStacktraceOnParam, includeMessageOnParam, includeErrorsOnParam);
+    }
     @Override public void writeStream(InputStream input) { response.writeStream(input); }
+    @Override public void writeStream(InputStream input, long contentLength) { response.writeStream(input, contentLength); }
     @Override public void writeBytes(byte[] data) { response.writeBytes(data); }
     @Override public void writeFile(File file) { response.writeFile(file); }
     @Override public void flush(boolean chunked) throws IOException {response.flush(chunked);}
+    @Override public void flushChunked() throws IOException { response.flushChunked(); }
+    @Override public void endStream() { response.endStream(); }
+    @Override public boolean isStreaming() { return response.isStreaming(); }
+    @Override public boolean markStreamCompleted() { return response.markStreamCompleted(); }
+    @Override public void setBeforeCommit(Runnable callback) { response.setBeforeCommit(callback); }
     @Override public void setStatusCode(HttpStatus status) { response.setStatusCode(status); }
     @Override public void flush() throws IOException { response.flush(); }
     @Override public void close() { response.close(); }

@@ -69,4 +69,18 @@ class WebServerHttpRequestWrapperTest {
     @Test void hasBody_delegates() { when(delegate.hasBody()).thenReturn(true); assertTrue(wrapper.hasBody()); }
     @Test void acquire_delegates() { wrapper.acquire(); verify(delegate).acquire(); }
     @Test void release_delegates() { when(delegate.release()).thenReturn(true); assertTrue(wrapper.release()); }
+
+    /**
+     * attributes 必须委托给被包装的请求。
+     * <p>
+     * {@code WebServerHttpRequest#getAttributes()} 带默认实现（返回空 map，用于 Spring 5.3/6.2 跨版本兼容）；
+     * 包装器若沿用默认实现，Filter 包装后真实 attributes 会静默全部丢失。
+     * </p>
+     */
+    @Test void getAttributes_delegates() {
+        Map<String, Object> attrs = new java.util.HashMap<>();
+        attrs.put("k", "v");
+        when(delegate.getAttributes()).thenReturn(attrs);
+        assertSame(attrs, wrapper.getAttributes());
+    }
 }

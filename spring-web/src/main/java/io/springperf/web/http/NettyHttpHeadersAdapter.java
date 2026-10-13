@@ -41,6 +41,18 @@ public class NettyHttpHeadersAdapter implements MultiValueMap<String, String> {
         this.writable = writable;
     }
 
+    /**
+     * 底层 Netty headers（供热路径用 {@code HttpHeaderNames} 常量名直读/直写——常量名是
+     * {@code AsciiString} 且哈希在类初始化时已缓存，可免掉按 {@code String} 名调用时
+     * 每次现造 {@code AsciiString} 并重算哈希的开销）。
+     *
+     * <p><b>只读视图返回 {@code null}</b>：只读视图上的写操作必须继续抛
+     * {@link UnsupportedOperationException}，不能让调用方绕过该约束。</p>
+     */
+    public HttpHeaders rawHeadersIfWritable() {
+        return writable ? headers : null;
+    }
+
     // ==================== 读 ====================
 
     @Override

@@ -44,14 +44,22 @@ public final class CompressionConfig {
         if (!enabled) {
             return DISABLED;
         }
-        Set<String> mimeTypes = Arrays.stream(
-                props.get(PropertiesConstant.SERVER_COMPRESSION_MIME_TYPES,
-                        PropertiesConstant.SERVER_COMPRESSION_MIME_TYPES_DEFAULT).split(","))
+        // props.get 声明为 @Nullable：显式回落到各自的非空默认值（这里默认值非空，兜底仅为契约完整）
+        // 注：master 用 JDK9+ 的 Objects.requireNonNullElse，本分支（JDK8）以等价的显式判空实现
+        String mimeTypesRaw = props.get(PropertiesConstant.SERVER_COMPRESSION_MIME_TYPES,
+                PropertiesConstant.SERVER_COMPRESSION_MIME_TYPES_DEFAULT);
+        if (mimeTypesRaw == null) {
+            mimeTypesRaw = PropertiesConstant.SERVER_COMPRESSION_MIME_TYPES_DEFAULT;
+        }
+        Set<String> mimeTypes = Arrays.stream(mimeTypesRaw.split(","))
                 .map(s -> s.trim().toLowerCase(Locale.ROOT))
                 .filter(s -> !s.isEmpty())
                 .collect(Collectors.toSet());
-        List<Pattern> excludedUserAgents = Arrays.stream(
-                props.get(PropertiesConstant.SERVER_COMPRESSION_EXCLUDED_USER_AGENTS, "").split(","))
+        String excludedUserAgentsRaw = props.get(PropertiesConstant.SERVER_COMPRESSION_EXCLUDED_USER_AGENTS, "");
+        if (excludedUserAgentsRaw == null) {
+            excludedUserAgentsRaw = "";
+        }
+        List<Pattern> excludedUserAgents = Arrays.stream(excludedUserAgentsRaw.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .map(s -> Pattern.compile(s, Pattern.CASE_INSENSITIVE))
@@ -85,11 +93,11 @@ public final class CompressionConfig {
     }
 
     public Set<String> getMimeTypes() {
-        return mimeTypes;
+        return java.util.Collections.unmodifiableSet(mimeTypes);
     }
 
     public List<Pattern> getExcludedUserAgents() {
-        return excludedUserAgents;
+        return java.util.Collections.unmodifiableList(excludedUserAgents);
     }
 
     public long getMinResponseSizeBytes() {

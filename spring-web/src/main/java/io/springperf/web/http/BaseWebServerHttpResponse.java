@@ -1,6 +1,5 @@
 package io.springperf.web.http;
 
-import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.server.ErrorPageRenderer;
 import io.springperf.web.server.ErrorResponseConfig;
@@ -25,7 +24,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse {
 
     protected final WebContext webContext;
-    protected final boolean keepAlive;
+    /** 是否保持连接。非 final：HTTP/1.0 的 close-delimited 渐进式输出需强制改为 close。 */
+    protected boolean keepAlive;
     /** Spring headers 视图，由子类构造方法注入（Netty 子类传可写适配器视图，与 Netty 响应对象共享底层存储） */
     protected final HttpHeaders headers;
     protected HttpStatus status = HttpStatus.OK;
@@ -33,8 +33,38 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
     protected Charset characterEncoding = StandardCharsets.UTF_8;
     protected AtomicBoolean handled = new AtomicBoolean(false);
     protected AtomicBoolean committed = new AtomicBoolean(false);
+    /** 是否处于 chunked 渐进式输出状态（flushChunked/首次 flush(true) 进入，endStream 结束）。 */
+    protected final AtomicBoolean streaming = new AtomicBoolean(false);
+    /** 流是否已终止（LastHttpContent 已写出；由 endStream 或外部 StreamSender 标记）。 */
+    protected final AtomicBoolean streamCompleted = new AtomicBoolean(false);
+    /**
+     * 提交前回调，仅执行一次。供 servlet 桥在「响应真正提交前」把其 Writer 的编码缓冲刷入响应体
+     * （否则 {@code getWriter().write("x")} 这类未 flush 的写入会随编码缓冲一起丢失）。
+     */
+    protected volatile Runnable beforeCommit;
     protected WriteRespEventListener writeRespEventListener;
-    protected ScheduledFuture<?> timeoutFuture;
+    /**
+     * 已装配的响应超时任务。
+     * <p>
+     * 必须 {@code volatile}：装配方是 EventLoop（{@code setTimeout} / {@code armTimeoutIfAbsent}），取消方是业务线程 （已提交时经
+     * {@code setCommitted} → {@code setTimeout(null, -1)}），二者之间没有别的同步点。普通字段在两线程间缺少 happens-before，取消方可能读到 {@code null}
+     * 而放过旧 future —— 定时器泄漏，随后对已提交/异步进行中的响应触发 504。
+     * </p>
+     */
+    protected volatile ScheduledFuture<?> timeoutFuture;
+    /**
+     * 超时装配的临界区锁。
+     * <p>
+     * {@code volatile} 只解决单个读写的可见性，解决不了「读旧 → cancel → 装配新 → 发布」这个 check-then-act
+     * 序列：并发装配会让两个线程各自调度一个定时器，先发布的那个被后发布的引用覆盖，从此无法取消 —— 这是本问题的另一半。 该临界区内只有 {@code cancel} 与
+     * {@code executor().schedule}（非阻塞），无持有锁做 IO 的风险。
+     * </p>
+     */
+    private final Object timeoutLock = new Object();
+    /**
+     * 响应超时任务：预先持有（无状态、幂等），避免每次装配都创建 {@code this::defaultHandleTimeout} 方法引用对象（热路径每请求一次装配）。
+     */
+    private final Runnable defaultHandleTimeoutTask = this::defaultHandleTimeout;
     /** 请求的 Accept 头：用于错误响应体的内容协商（whitelabel HTML vs JSON）。 */
     private String acceptHeader;
 
@@ -59,6 +89,19 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
 
     public HttpStatus getStatus() {
         return status;
+    }
+
+    /**
+     * 若尚未装配响应超时则装配（幂等）。用于「按需补装配」：处理器被交棒到业务线程池时、 或同步段结束仍未提交（异步/流式等待）时的兜底装配。已装配时不触发 cancel/reschedule。
+     */
+    @Override
+    public void armTimeoutIfAbsent() {
+        synchronized (timeoutLock) {
+            if (timeoutFuture != null) {
+                return;
+            }
+            setTimeout(defaultHandleTimeoutTask, webContext.getProps().getHttpTimeoutMillis());
+        }
     }
 
     @Override
@@ -107,9 +150,37 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
     @Override
     public void close() {
         try {
-            flush();
+            if (streaming.get()) {
+                // 渐进式输出：收尾必须写终止块，否则客户端无法判定响应结束（挂到超时）
+                endStream();
+            } else {
+                flush();
+            }
         } catch (IOException ignore) {
         }
+    }
+
+    @Override
+    public boolean isStreaming() {
+        return streaming.get();
+    }
+
+    @Override
+    public boolean markStreamCompleted() {
+        // 抢占式语义：返回 true 表示本次调用赢得「终止块写入权」。
+        // 一个响应只允许写一个终止块——重复写入会让 HTTP 编码器状态复位后再次收到
+        // LastHttpContent，抛 unexpected message type（state: INIT）。
+        return streamCompleted.compareAndSet(false, true);
+    }
+
+    /** 流是否已终止（供 endStream 幂等判定）。 */
+    protected boolean isStreamCompleted() {
+        return streamCompleted.get();
+    }
+
+    @Override
+    public void setBeforeCommit(Runnable callback) {
+        this.beforeCommit = callback;
     }
 
     public boolean isKeepAlive() {
@@ -126,14 +197,30 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
     }
 
     public ScheduledFuture setTimeout() {
-        return setTimeout(this::defaultHandleTimeout, webContext.getProps().getLong(PropertiesConstant.HTTP_TIMEOUT));
+        // server.http.timeout：热路径字段快照直读（首次访问解析，clearCache 后重新解析）
+        return setTimeout(defaultHandleTimeoutTask, webContext.getProps().getHttpTimeoutMillis());
     }
 
     public ScheduledFuture setTimeout(Runnable task, long delay) {
-        if (timeoutFuture != null) timeoutFuture.cancel(false);
-        if (delay < 0 || task == null) return null;
-        timeoutFuture = scheduleOnEventLoop(task, delay, TimeUnit.MILLISECONDS);
-        return timeoutFuture;
+        synchronized (timeoutLock) {
+            cancelArmedTimeout();
+            // delay <= 0：关闭超时（对齐框架「≤0 = 不限制」约定与 Tomcat connectionTimeout=0 的无限语义）。
+            // 若把 0 当作「立即触发」，任何配置 server.http.timeout=0 的部署都会全量 504。
+            if (delay <= 0 || task == null) {
+                return null;
+            }
+            timeoutFuture = scheduleOnEventLoop(task, delay, TimeUnit.MILLISECONDS);
+            return timeoutFuture;
+        }
+    }
+
+    /** 取消并摘除已装配的超时任务：调用方必须持有 {@link #timeoutLock}。 */
+    private void cancelArmedTimeout() {
+        ScheduledFuture<?> current = timeoutFuture;
+        if (current != null) {
+            timeoutFuture = null;
+            current.cancel(false);
+        }
     }
 
     abstract void runOnEventLoop(Runnable task);
@@ -218,8 +305,31 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
     protected boolean setCommitted() {
         setHandled();
         boolean result = committed.compareAndSet(false, true);
-        if (result) setTimeout(null, -1);
+        if (result) {
+            // 提交即取消响应超时
+            setTimeout(null, -1);
+            runBeforeCommitOnce();
+        }
         return result;
+    }
+
+    /**
+     * 执行「提交前回调」（幂等，仅一次）。
+     * <p>
+     * 凡是在提交时读取响应体缓冲的路径，都必须在 <b>捕获缓冲引用之前</b> 调用本方法：回调（servlet 桥把 Writer
+     * 编码缓冲刷入响应体）会把内容写入<b>当前</b>缓冲，若调用方已经捕获了旧引用，新内容就会落在被忽略的新缓冲里而丢失。
+     * </p>
+     */
+    protected void runBeforeCommitOnce() {
+        Runnable cb = beforeCommit;
+        if (cb != null) {
+            beforeCommit = null;
+            try {
+                cb.run();
+            } catch (Throwable t) {
+                log.warn("beforeCommit callback failed: {}", t.getMessage(), t);
+            }
+        }
     }
 
     public void sendError(HttpStatus statusCode) {
@@ -228,9 +338,16 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
 
     @SneakyThrows
     public void sendError(HttpStatus statusCode, String message) {
+        sendError(statusCode, message, null, false, false, false);
+    }
+
+    @Override
+    @SneakyThrows
+    public void sendError(HttpStatus statusCode, String message, Throwable cause, boolean includeStacktraceOnParam,
+            boolean includeMessageOnParam, boolean includeErrorsOnParam) {
         ErrorResponseConfig cfg = resolveErrorConfig();
-        ErrorPageRenderer.ErrorResponseBody body = ErrorPageRenderer.build(
-                statusCode, message, null, cfg, false, false, false, acceptHeader);
+        ErrorPageRenderer.ErrorResponseBody body = ErrorPageRenderer.build(statusCode, message, cause, cfg,
+                includeStacktraceOnParam, includeMessageOnParam, includeErrorsOnParam, acceptHeader);
         writeDataAndFlush(body.getBody().getBytes(characterEncoding),
                 MediaType.parseMediaType(body.getContentType()), statusCode);
     }
@@ -241,35 +358,6 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
         return cfg != null ? cfg : ErrorResponseConfig.DEFAULT;
     }
 
-    /**
-     * 对写入 JSON 字符串字面量的 message 做转义，防止 {@code "}、{@code \} 及控制字符破坏响应体 JSON。
-     */
-    private static String escapeJson(String s) {
-        if (s == null) {
-            return "";
-        }
-        StringBuilder sb = new StringBuilder(s.length() + 16);
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            switch (c) {
-                case '"': sb.append("\\\""); break;
-                case '\\': sb.append("\\\\"); break;
-                case '\b': sb.append("\\b"); break;
-                case '\f': sb.append("\\f"); break;
-                case '\n': sb.append("\\n"); break;
-                case '\r': sb.append("\\r"); break;
-                case '\t': sb.append("\\t"); break;
-                default:
-                    if (c < 0x20) {
-                        sb.append(String.format("\\u%04x", (int) c));
-                    } else {
-                        sb.append(c);
-                    }
-            }
-        }
-        return sb.toString();
-    }
-
     @SneakyThrows
     protected void writeDataAndFlush(byte[] data, MediaType contentType, HttpStatus statusCode) {
         if (!setHandled()) {
@@ -277,7 +365,10 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
             return;
         }
         try {
-            // 异常路径：清空已缓冲的部分 body（如 JSON 序列化中途失败写入的字节），
+            // 先让 servlet Writer 的编码缓冲落入响应体，随后被 resetBuffer 一并清掉——
+            // 对齐 Tomcat：错误响应不得夹带业务先前写入的内容。
+            runBeforeCommitOnce();
+            // 异常路径：清空已缓冲的部分 body（如 JSON 序列化中途写入的字节），
             // 避免错误响应 JSON 追加在部分内容之后形成畸形响应体（对齐 Spring 语义）。
             resetBuffer();
             setStatusCode(statusCode);

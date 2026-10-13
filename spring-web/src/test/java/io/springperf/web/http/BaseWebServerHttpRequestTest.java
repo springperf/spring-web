@@ -1,13 +1,7 @@
 package io.springperf.web.http;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.http.support.HttpInputMessagePart;
-import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-import org.springframework.web.multipart.MultipartFile;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -18,8 +12,15 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.multipart.MultipartFile;
+
+import io.springperf.web.context.WebContext;
+import io.springperf.web.http.support.HttpInputMessagePart;
 
 class BaseWebServerHttpRequestTest {
 
@@ -31,7 +32,7 @@ class BaseWebServerHttpRequestTest {
         private final MultiValueMap<String, String> params;
 
         TestRequest(WebContext wc, String uriStrWithQuery, String resolvedPath, HttpHeaders headers,
-                    MultiValueMap<String, String> params) {
+                MultiValueMap<String, String> params) {
             super(wc, uriStrWithQuery, resolvedPath);
             this.headers = headers;
             this.params = params;
@@ -133,7 +134,7 @@ class BaseWebServerHttpRequestTest {
         params.add("a", "2");
         TestRequest req = new TestRequest(webContext, "/test", "/test", new HttpHeaders(), params);
         assertEquals("1", req.getParameter("a"));
-        assertArrayEquals(new String[]{"1", "2"}, req.getParameterValues("a"));
+        assertArrayEquals(new String[] { "1", "2" }, req.getParameterValues("a"));
         assertNull(req.getParameter("missing"));
         assertNull(req.getParameterValues("missing"));
     }
@@ -145,7 +146,7 @@ class BaseWebServerHttpRequestTest {
         params.add("a", "2");
         TestRequest req = new TestRequest(webContext, "/test", "/test", new HttpHeaders(), params);
         assertEquals(1, req.getParameterMapArray().size());
-        assertArrayEquals(new String[]{"1", "2"}, req.getParameterMapArray().get("a"));
+        assertArrayEquals(new String[] { "1", "2" }, req.getParameterMapArray().get("a"));
     }
 
     @Test
@@ -168,6 +169,21 @@ class BaseWebServerHttpRequestTest {
     }
 
     @Test
+    void attributes_setAttributeNull_removesPerServletSpec() {
+        // Servlet 规范：setAttribute(name, null) 等价 removeAttribute(name)。
+        // 回归：attributes 为 ConcurrentHashMap，null 值直接 put 抛 NPE，
+        // 导致 forward（无查询串时设置 FORWARD_QUERY_STRING=null）/JSP 视图渲染整体 500。
+        TestRequest req = new TestRequest(webContext, "/test", "/test", new HttpHeaders(), null);
+        req.setAttribute("k", "v");
+        assertDoesNotThrow(() -> req.setAttribute("k", null));
+        assertNull(req.getAttribute("k"));
+        assertEquals(0, req.getAttributes().size());
+        // 对不存在的属性 set null 同样安全
+        assertDoesNotThrow(() -> req.setAttribute("absent", null));
+        assertNull(req.getAttribute("absent"));
+    }
+
+    @Test
     void attributes_typedKeys() {
         TestRequest req = new TestRequest(webContext, "/test", "/test", new HttpHeaders(), null);
         RequestAttribute<String> key = RequestAttribute.createAttribute(String.class);
@@ -183,6 +199,34 @@ class BaseWebServerHttpRequestTest {
         RequestAttribute<String> key = new RequestAttribute<>(RequestAttribute.getMaxSize() + 100, String.class);
         req.setAttribute(key, "beyond");
         assertEquals("beyond", req.getAttribute(key));
+    }
+
+    @Test
+    void attributes_mapIsLazilyAllocated() throws Exception {
+        // 热路径只用类型化属性数组（fastAttributes）；String 键属性表必须惰性分配，
+        // 原实现每请求 eager new ConcurrentHashMap（热路径一次无谓分配）。
+        java.lang.reflect.Field field = BaseWebServerHttpRequest.class.getDeclaredField("attributes");
+        field.setAccessible(true);
+        TestRequest req = new TestRequest(webContext, "/test", "/test", new HttpHeaders(), null);
+
+        // 只读 / 删不存在的键 / set null 都不应创建属性表
+        assertNull(req.getAttribute("k"));
+        assertNull(req.removeAttribute("k"));
+        assertDoesNotThrow(() -> req.setAttribute("k", null));
+        assertNull(field.get(req), "只读或删不存在的键不应分配 String 键属性表");
+
+        // 类型化属性在数组容量内 → 同样不创建
+        RequestAttribute<String> key = RequestAttribute.createAttribute(String.class);
+        req.setAttribute(key, "typed");
+        assertEquals("typed", req.getAttribute(key));
+        assertNull(field.get(req), "类型化属性不应分配 String 键属性表");
+
+        // 真正写 String 键时才创建，且此前的读路径语义不变
+        req.setAttribute("k", "v");
+        assertNotNull(field.get(req), "写入 String 键时才分配属性表");
+        assertEquals("v", req.getAttribute("k"));
+        assertEquals(1, req.getAttributes().size());
+        assertEquals("v", req.removeAttribute("k"));
     }
 
     @Test
@@ -251,5 +295,14 @@ class BaseWebServerHttpRequestTest {
         BaseWebServerHttpRequest.AcceptLanguageLocaleCache.put("cache-test", locales);
         assertSame(locales, BaseWebServerHttpRequest.AcceptLanguageLocaleCache.get("cache-test"));
         assertNull(BaseWebServerHttpRequest.AcceptLanguageLocaleCache.get("not-exists"));
+    }
+
+    @Test
+    void defaultLocaleList_isReusedAcrossCalls() {
+        // 默认 Locale 列表固定复用（原实现每请求 Arrays.asList 新建列表）
+        List<Locale> first = BaseWebServerHttpRequest.defaultLocaleList();
+        List<Locale> second = BaseWebServerHttpRequest.defaultLocaleList();
+        assertSame(first, second, "同一 JVM 默认 Locale 下应复用同一列表实例");
+        assertEquals(Locale.getDefault(), first.get(0));
     }
 }

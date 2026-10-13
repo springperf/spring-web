@@ -44,8 +44,8 @@ public class WebServerHttpRequestWrapper implements WebServerHttpRequest {
     @Override public WebContext getWebContext() { return request.getWebContext(); }
     @Override public RequestContext getRequestContext() { return request.getRequestContext(); }
     @Override @Nullable public Principal getPrincipal() { return request.getPrincipal(); }
-    @Override public InetSocketAddress getLocalAddress() { return request.getLocalAddress(); }
-    @Override public InetSocketAddress getRemoteAddress() { return request.getRemoteAddress(); }
+    @Override @Nullable public InetSocketAddress getLocalAddress() { return request.getLocalAddress(); }
+    @Override @Nullable public InetSocketAddress getRemoteAddress() { return request.getRemoteAddress(); }
     @Override public ServerHttpAsyncRequestControl getAsyncRequestControl(ServerHttpResponse response) { return request.getAsyncRequestControl(response); }
     @Override @Nullable public HttpMethod getMethod() { return request.getMethod(); }
     @Override public String getMethodValue() { return request.getMethodValue(); }
@@ -56,4 +56,17 @@ public class WebServerHttpRequestWrapper implements WebServerHttpRequest {
     @Override public boolean hasBody() { return request.hasBody(); }
     @Override public void acquire() { request.acquire(); }
     @Override public boolean release() { return request.release(); }
+
+    /**
+     * 委托给被包装的请求。
+     * <p>
+     * {@code WebServerHttpRequest#getAttributes()} 是跨版本兼容声明（Spring 5.3 无此方法、6.2+ 为抽象），
+     * 带默认实现（返回空 map）。包装器若沿用该默认实现，被包装请求的真实 attributes 会在 Filter 包装后**全部丢失**，
+     * 故必须显式委托（对齐 master 的 {@code WebServerHttpRequestWrapper}）。
+     * </p>
+     */
+    @Override
+    public Map<String, Object> getAttributes() {
+        return request.getAttributes();
+    }
 }

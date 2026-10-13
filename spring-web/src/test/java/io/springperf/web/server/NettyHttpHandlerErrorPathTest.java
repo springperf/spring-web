@@ -8,7 +8,6 @@ import io.netty.handler.codec.http.HttpVersion;
 import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
-import io.springperf.web.http.NettyServerHttpRequest;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,8 +15,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.lang.reflect.Field;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -35,20 +32,12 @@ class NettyHttpHandlerErrorPathTest {
     HttpHandler handler;
 
     @BeforeEach
-    void setUp() throws Exception {
+    void setUp() {
         handler = mock(HttpHandler.class);
         lenient().when(webContext.getProps()).thenReturn(appProperties);
-        // 固定合法的内存上限值：mock 默认返回 0 会永久污染 NettyServerHttpRequest 静态缓存
-        lenient().when(appProperties.getInt(PropertiesConstant.HTTP_MAX_IN_MEMORY_SIZE))
+        // 固定合法的内存上限值（热路径字段直读；不再是静态缓存，无跨用例污染）
+        lenient().when(appProperties.getMaxInMemorySize())
                 .thenReturn(PropertiesConstant.HTTP_MAX_IN_MEMORY_SIZE_DEFAULT);
-        // 每个用例前复位静态缓存，避免用例间互相污染（如构造失败用例的 stub）
-        resetLargeBodyLimitCache();
-    }
-
-    private void resetLargeBodyLimitCache() throws Exception {
-        Field field = NettyServerHttpRequest.class.getDeclaredField("cachedLargeBodyLimit");
-        field.setAccessible(true);
-        field.setInt(null, -1);
     }
 
     @Test
@@ -128,12 +117,24 @@ class NettyHttpHandlerErrorPathTest {
     }
 
     @Test
-    void requestConstructionFailure_releasesRetainedBuf() throws Exception {
-        // 构造 NettyServerHttpRequest 阶段抛异常：msg.retain() 的引用必须被释放（refCnt 归零），
-        // 否则 ByteBuf 泄漏。先复位静态缓存，使 getProps().getInt() 真正被调用并抛异常。
-        resetLargeBodyLimitCache();
-        when(appProperties.getInt(PropertiesConstant.HTTP_MAX_IN_MEMORY_SIZE))
-                .thenThrow(new RuntimeException("boom during request construction"));
+    void handlerException_releasesRequestBuffer() throws Exception {
+        NettyHttpHandler nettyHandler = new NettyHttpHandler(webContext, "", handler);
+        EmbeddedChannel channel = new EmbeddedChannel();
+        channel.pipeline().addLast(nettyHandler);
+        doThrow(new RuntimeException("handler error")).when(handler)
+                .httpHandle(any(WebServerHttpRequest.class), any(WebServerHttpResponse.class));
+
+        DefaultFullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/test");
+        request.content().writeBytes("hello".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        nettyHandler.channelRead(channel.pipeline().firstContext(), request);
+
+        assertEquals(0, request.refCnt(), "异常路径下请求 ByteBuf 引用应完全释放");
+    }
+
+    @Test
+    void requestConstructionFailure_releasesRetainedBuffer() throws Exception {
+        // 构造期读取配置抛异常（req 创建失败路径）
+        doThrow(new IllegalStateException("props boom")).when(appProperties).getMaxInMemorySize();
 
         NettyHttpHandler nettyHandler = new NettyHttpHandler(webContext, "", handler);
         EmbeddedChannel channel = new EmbeddedChannel();

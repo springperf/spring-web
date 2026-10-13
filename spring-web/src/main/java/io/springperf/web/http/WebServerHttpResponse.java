@@ -84,6 +84,20 @@ public interface WebServerHttpResponse extends ServerHttpResponse {
     ScheduledFuture setTimeout(Runnable task, long delay);
 
     /**
+     * 若尚未装配响应超时则装配（幂等）；已装配时为 no-op。
+     * <p>
+     * 与 {@link #setTimeout(Runnable, long)} 的区别：后者会「取消旧任务 + 重新调度」，用于 重置计时（如异步开始时按
+     * {@code spring.mvc.async.request-timeout} 重装）；本方法用于 <b>按需补装配</b>——例如处理器被交棒到业务线程池时补装配，或同步段结束仍未提交时兜底， 避免重复装配造成
+     * cancel/reschedule 抖动。
+     * </p>
+     * <p>
+     * 默认实现为空操作：未覆写的实现类保持各自既有装配行为。
+     * </p>
+     */
+    default void armTimeoutIfAbsent() {
+    }
+
+    /**
      * 是否已装配响应超时。
      *
      * <p>用于判断「是否需要补装配」：{@code false} 表示当前没有任何定时任务在跑。
@@ -151,11 +165,41 @@ public interface WebServerHttpResponse extends ServerHttpResponse {
     void sendError(HttpStatus statusCode, String message);
 
     /**
+     * 完整错误响应入口：按 {@code server.error.*}（{@link io.springperf.web.server.ErrorResponseConfig}）渲染 whitelabel HTML 或 JSON，
+     * 并由调用方告知 {@code on-param} 模式下 trace / message / errors 参数是否命中。
+     *
+     * @param statusCode       HTTP 状态码
+     * @param message          错误消息
+     * @param cause            原始异常（用于栈与绑定错误提取，可空）
+     * @param includeStacktraceOnParam on-param 模式下是否命中 trace 参数
+     * @param includeMessageOnParam    on-param 模式下是否命中 message 参数
+     * @param includeErrorsOnParam     on-param 模式下是否命中 errors 参数
+     */
+    void sendError(HttpStatus statusCode, String message, Throwable cause, boolean includeStacktraceOnParam,
+            boolean includeMessageOnParam, boolean includeErrorsOnParam);
+
+    /**
      * Write an {@link InputStream} to the response body as a stream.
      *
      * @param input the input stream to write
      */
     void writeStream(InputStream input);
+
+    /**
+     * Write an {@link InputStream} of known length to the response body using
+     * {@code Content-Length} framing instead of chunked transfer encoding.
+     * <p>长度已知时必须声明长度：chunked 不携带总长度（客户端无法显示进度、也无法预知大小），
+     * 且 HTTP 消息同时带 {@code Content-Length} 与 {@code Transfer-Encoding} 违反
+     * RFC 7230 §3.3.1（Netty 的 setTransferEncodingChunked 会移除 Content-Length，
+     * 使调用方预设的长度静默失效）。</p>
+     * <p>默认实现退回 {@link #writeStream(InputStream)}（忽略长度），实现类应覆盖。</p>
+     *
+     * @param input the input stream to write
+     * @param contentLength number of bytes to send (must be non-negative)
+     */
+    default void writeStream(InputStream input, long contentLength) {
+        writeStream(input);
+    }
 
     /**
      * Write a byte array to the response body with {@code Content-Length} header
@@ -181,4 +225,44 @@ public interface WebServerHttpResponse extends ServerHttpResponse {
      * @param chunked whether the response is chunked
      */
     void flush(boolean chunked) throws IOException;
+
+    /**
+     * 以 chunked 帧提交 / 续写响应体（渐进式输出）。语义对齐 Tomcat 的
+     * {@code ServletResponse.flushBuffer()} 与 {@code getWriter().flush()}：首次调用提交响应头
+     * （{@code Transfer-Encoding: chunked}）并发送已缓冲内容，之后每次调用把新增内容作为独立内容帧发出。
+     * <p>调用方必须在请求收尾时调用 {@link #endStream()} 写终止块，否则客户端无法判定响应结束。
+     * 默认实现退回一次性 {@link #flush(boolean)}。</p>
+     */
+    default void flushChunked() throws IOException {
+        flush(true);
+    }
+
+    /**
+     * 终止 chunked 流（幂等）：写出残留内容帧与 {@code LastHttpContent}。
+     * 非流式响应（一次性 Content-Length 或从未提交）为空操作。
+     */
+    default void endStream() {
+    }
+
+    /** 是否处于 chunked 渐进式输出状态（{@link #flushChunked()} 进入，{@link #endStream()} 结束）。 */
+    default boolean isStreaming() {
+        return false;
+    }
+
+    /**
+     * 由外部流写入方（{@code StreamSender} 直写 channel 的场景）标记流已终止，
+     * 使请求收尾的 {@link #endStream()} 成为空操作（避免写出第二个终止块）。
+     *
+     * @return {@code true} 表示本次调用赢得「终止块写入权」
+     */
+    default boolean markStreamCompleted() {
+        return false;
+    }
+
+    /**
+     * 注册「响应提交前」回调（仅执行一次）。servlet 桥用它把 Writer 的编码缓冲刷入响应体——
+     * 否则 {@code getWriter().write("x")} 这类未 flush 的写入会随编码缓冲一起丢失。
+     */
+    default void setBeforeCommit(Runnable callback) {
+    }
 }

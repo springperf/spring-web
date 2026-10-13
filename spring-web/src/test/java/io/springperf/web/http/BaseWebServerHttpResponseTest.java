@@ -2,7 +2,6 @@ package io.springperf.web.http;
 
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.springperf.web.context.ApplicationProperties;
-import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.server.ErrorResponseConfig;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +35,9 @@ class BaseWebServerHttpResponseTest {
         @Override public void writeFile(File file) {}
         @Override
         public void flush(boolean chunked) throws IOException {
+            // 与 NettyServerHttpResponse#flush 一致：先执行提交前回调（把 Writer 编码缓冲刷入响应体）再提交，
+            // 否则「错误响应不得夹带业务内容」这类顺序断言在测试替身上失焦。
+            runBeforeCommitOnce();
             flushed = true;
         }
     }
@@ -47,7 +49,7 @@ class BaseWebServerHttpResponseTest {
     void setUp() {
         webContext = mock(WebContext.class);
         ApplicationProperties props = mock(ApplicationProperties.class);
-        when(props.getLong(PropertiesConstant.HTTP_TIMEOUT)).thenReturn(60000L);
+        when(props.getHttpTimeoutMillis()).thenReturn(60000L);
         when(webContext.getProps()).thenReturn(props);
         response = new TestResponse(webContext, false);
     }
@@ -153,7 +155,60 @@ class BaseWebServerHttpResponseTest {
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatus());
     }
 
-    @Test void escapeJson_escapesSpecialCharacters() {
+    /**
+     * include-message 默认 never：whitelabel 页面不含业务 message。
+     *
+     * <p>未注册 {@code ErrorResponseConfig} 时按默认（whitelabel 开启、三项 never）渲染——即错误响应默认不泄漏业务文案。</p>
+     */
+    @Test void sendError_defaultPolicy_hidesMessage() {
+        response.sendError(HttpStatus.BAD_GATEWAY, "bad upstream");
+        String body = new String(response.body.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
+        assertFalse(body.contains("bad upstream"));
+        assertTrue(body.contains("502"));
+    }
+
+    /** 默认 never 策略下，即便 message 含引号/反斜杠/控制字符，原文与特殊字符都不得出现在响应体中。 */
+    @Test void sendError_messageHiddenByDefault_evenWithSpecialChars() {
+        response.sendError(HttpStatus.BAD_REQUEST, "quote\" back\\ new\n tab\t control\u0001 end");
+        String body = new String(response.body.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
+        // 默认 never：原文不出现，避免特殊字符破坏输出
+        assertFalse(body.contains("quote"));
+        assertFalse(body.contains("\u0001"));
+    }
+
+    /*
+     * 版本层差异（对应 master 的 setStatusCode_nonHttpStatusInstance_usesValue /
+     * sendError_nonStandardCode_writesRawValue）：Boot 2.7 / Spring 5.3 无 {@code HttpStatusCode} 接口，
+     * {@code BaseWebServerHttpResponse.setStatusCode} 只接受 {@link HttpStatus} 枚举，非标准码（299/599）
+     * 无法表达（{@code HttpStatus.valueOf} 抛 IllegalArgumentException）→ 无可适配点，不移植。
+     * 同类裁定见 {@code PerfHttpServletResponseTest}（该处以其分支实际边界 assertThrows 固化）。
+     */
+
+    /**
+     * 错误响应不得夹带业务先前经 servlet Writer 写入的内容：{@code beforeCommit}（把 Writer 编码缓冲刷入响应体）
+     * 必须先于 {@code resetBuffer()} 执行，否则「写入后未 flush 就出错」的内容会被追加到错误体之后，形成畸形响应体。
+     * <p>
+     * 对齐 Tomcat / master：{@code writeDataAndFlush} 首行即 {@code runBeforeCommitOnce()}。
+     * </p>
+     */
+    @Test void sendError_discardsPendingBeforeCommitContent() {
+        when(webContext.getWebComponent(ErrorResponseConfig.class)).thenReturn(jsonConfig());
+        response.setBeforeCommit(() -> {
+            try {
+                response.getBody().write("stray-business-content".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            } catch (IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+        });
+
+        response.sendError(HttpStatus.BAD_REQUEST, "bad");
+
+        String body = new String(response.body.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
+        assertFalse(body.contains("stray-business-content"),
+                "错误响应不得夹带 beforeCommit 刷出的业务内容，实际 body=" + body);
+    }
+
+    @Test void sendError_jsonMessage_escapesSpecialCharacters() {
         when(webContext.getWebComponent(ErrorResponseConfig.class)).thenReturn(jsonConfig());
         response.sendError(HttpStatus.BAD_REQUEST,
                 "quote\" back\\ new\n tab\t ff\f bs\b cr\r control\u0001 end");
@@ -168,7 +223,7 @@ class BaseWebServerHttpResponseTest {
         assertTrue(json.contains("\\u0001"), "控制字符应以 \\u 转义");
     }
 
-    @Test void escapeJson_null_writesNullField() {
+    @Test void sendError_nullMessage_omitsMessageField() {
         when(webContext.getWebComponent(ErrorResponseConfig.class)).thenReturn(jsonConfig());
         response.sendError(HttpStatus.BAD_REQUEST, null);
         String json = new String(response.body.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
@@ -177,7 +232,7 @@ class BaseWebServerHttpResponseTest {
         assertFalse(json.contains("\"message\""));
     }
 
-@Test void resetHandled_clearsHandledFlag() {
+    @Test void resetHandled_clearsHandledFlag() {
         assertTrue(response.setHandled());
         response.resetHandled();
         assertFalse(response.isHandled());
@@ -190,7 +245,7 @@ class BaseWebServerHttpResponseTest {
     }
 
     @Test void setTimeout_default_schedulesTimeoutHandler() {
-        // webContext.getProps().getLong(HTTP_TIMEOUT) 已在 @BeforeEach stub 为 60000
+        // webContext.getProps().getHttpTimeoutMillis() 已在 @BeforeEach stub 为 60000
         response.setTimeout();
         assertTrue(response.flushed == false);
     }

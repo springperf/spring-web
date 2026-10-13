@@ -88,7 +88,12 @@ public final class ErrorPageRenderer {
         int code = status != null ? status.value() : 500;
         String reason = status != null ? status.toString() : "Internal Server Error";
         String error = status != null ? status.value() + " " + status : "500 Internal Server Error";
+        return build(code, reason, error, message, cause, cfg, traceParam, messageParam, errorsParam, acceptHeader);
+    }
 
+    private static ErrorResponseBody build(int code, String reason, String error, String message, Throwable cause,
+            ErrorResponseConfig cfg, boolean traceParam, boolean messageParam, boolean errorsParam,
+            @Nullable String acceptHeader) {
         boolean showMessage = cfg.includeMessage(messageParam);
         boolean showTrace = cfg.includeStacktrace(traceParam);
         Map<String, String> bindingErrors = cfg.includeBindingErrors(errorsParam) ? extractBindingErrors(cause) : null;

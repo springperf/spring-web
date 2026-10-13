@@ -22,7 +22,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
@@ -40,7 +39,7 @@ class NettyServerHttpRequestBodyTest {
     @BeforeEach
     void setUp() {
         lenient().when(webContext.getProps()).thenReturn(props);
-        lenient().when(props.getInt(anyString())).thenReturn(4096);
+        lenient().when(props.getMaxInMemorySize()).thenReturn(4096);
     }
     private static final int LARGE_SIZE = 100 * 1024;
 
@@ -301,6 +300,37 @@ class NettyServerHttpRequestBodyTest {
         NettyServerHttpRequest req = new NettyServerHttpRequest(webContext, ctx, nativeRequest, "/test");
 
         assertEquals(LARGE_SIZE, req.getContentLength());
+    }
+
+    @Test
+    void getContentLength_afterRelease_usesCachedLength() {
+        byte[] bodyBytes = "async-body-content".getBytes(StandardCharsets.UTF_8);
+        ByteBuf pooledContent = io.netty.buffer.PooledByteBufAllocator.DEFAULT.buffer(bodyBytes.length);
+        pooledContent.writeBytes(bodyBytes);
+        FullHttpRequest nativeRequest = new DefaultFullHttpRequest(
+                HttpVersion.HTTP_1_1, HttpMethod.POST, "/test", pooledContent);
+        NettyServerHttpRequest req = new NettyServerHttpRequest(webContext, ctx, nativeRequest, "/test");
+
+        int expected = req.getContentLength();
+        assertEquals(bodyBytes.length, expected);
+        req.release();
+        // 释放后仍应读得到构造期缓存长度，而不是再去触碰已归还池的 content()
+        assertEquals(expected, req.getContentLength(),
+                "释放后应回落到缓存长度（否则会触碰已归还池的 content()）");
+    }
+
+    @Test
+    void release_cascadesToResponse_onlyOnLastRelease() {
+        FullHttpRequest nativeRequest = newRequest("cascade-body");
+        NettyServerHttpRequest req = new NettyServerHttpRequest(webContext, ctx, nativeRequest, "/test");
+        WebServerHttpResponse boundResp = org.mockito.Mockito.mock(WebServerHttpResponse.class);
+        req.setResponse(boundResp);
+
+        req.acquire();
+        assertEquals(false, req.release(), "非最后一次 release 应返回 false");
+        org.mockito.Mockito.verify(boundResp, org.mockito.Mockito.never()).release();
+        assertEquals(true, req.release(), "最后一次 release 应返回 true");
+        org.mockito.Mockito.verify(boundResp).release();
     }
 
     // ==================== 辅助 ====================
