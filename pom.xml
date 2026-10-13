@@ -58,7 +58,10 @@
         <gpg.passphrase>${env.GPG_PASSPHRASE}</gpg.passphrase>
 
         <!-- 第三方依赖版本统一管理 -->
-        <netty.version>4.1.115.Final</netty.version>
+        <!-- 与 master(4.1.137.Final) 对齐：4.1.115 的解码器对 TE+CL 并存 / HTTP/1.0+chunked
+             属宽松处理（分别按「移除 Content-Length」「当作合法 chunked」继续服务），
+             4.1.13x 起按 RFC 7230 §3.3.3 直接拒绝 → 请求走私防护由解码器提供，框架侧无需特判。 -->
+        <netty.version>4.1.137.Final</netty.version>
         <jackson.version>2.17.2</jackson.version>
         <lombok.version>1.18.24</lombok.version>
         <fastjson2.version>2.0.60</fastjson2.version>
