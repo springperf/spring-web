@@ -41,14 +41,14 @@ To use FreeMarker instead, swap `thymeleaf` for:
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `spring.web.view.engine` | `thymeleaf` | Template engine: `thymeleaf` / `freemarker` |
-| `spring.web.view.thymeleaf.prefix` | `templates/` | Thymeleaf template prefix (classpath-relative) |
-| `spring.web.view.thymeleaf.suffix` | `.html` | Thymeleaf template suffix |
-| `spring.web.view.thymeleaf.cache` | `true` | Template cache (set `false` in development for hot reload) |
-| `spring.web.view.freemarker.prefix` | `templates/` | FreeMarker template prefix (classpath-relative) |
-| `spring.web.view.freemarker.suffix` | `.ftl` | FreeMarker template suffix |
-| `spring.web.view.freemarker.cache` | `true` | Template cache |
-| `spring.web.view.encoding` | `UTF-8` | Rendering charset, also written to `Content-Type` |
+| `spring.web.view.engine` | none (all available) | Enabled template engines (comma-separated): `thymeleaf` / `freemarker` / `beetl`; **when unset every available engine on the classpath is registered** |
+| `spring.thymeleaf.prefix` | `templates/` | Thymeleaf template prefix (classpath-relative) |
+| `spring.thymeleaf.suffix` | `.html` | Thymeleaf template suffix |
+| `spring.thymeleaf.cache` | `true` | Template cache (set `false` in development for hot reload) |
+| `spring.freemarker.prefix` | `templates/` | FreeMarker template prefix (classpath-relative) |
+| `spring.freemarker.suffix` | `.ftl` | FreeMarker template suffix |
+| `spring.freemarker.cache` | `true` | Template cache |
+| `spring.thymeleaf.encoding` | `UTF-8` | Rendering charset, also written to `Content-Type`; FreeMarker/Beetl default UTF-8 (no separate key, aligned with Boot) |
 
 Templates are loaded from the classpath `templates/` directory by default (Spring Boot convention).
 
@@ -152,9 +152,96 @@ Standard Thymeleaf expressions are supported: `${...}`, `#{...}`, `@{...}` (URL 
 </html>
 ```
 
+### Beetl (`templates/hello.btl`)
+
+```btl
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>${message}</title>
+</head>
+<body>
+<h1>${message}</h1>
+<p>Name: ${name}</p>
+</body>
+</html>
+```
+
 ---
 
-## 5. Differences from Spring MVC
+## 5. Multiple Engines Coexisting
+
+Multiple `ViewResolver`s can be registered at once; within the **same request pipeline** they are tried in `getOrder()` order. Each resolver decides whether it owns a view name by "template existence probing" — if its own `prefix + viewName + suffix` template exists it returns a `View`, otherwise `null` so the next resolver gets a chance.
+
+```
+/view/hello     → thymeleaf checks templates/hello.html  → exists → hit
+                 → freemarker checks templates/hello.ftl
+                 → beetl checks templates/hello.btl
+```
+
+- Templates with the same name but different suffixes (`hello.html` / `hello.ftl` / `hello.btl`) can coexist — whichever exists wins, with `order` deciding priority
+- Different view names may use different engines: `hello` → thymeleaf, `report` → freemarker, `page-btl` → beetl — as long as each template file exists
+- `spring.web.view.engine` registers every available engine when unset; a comma-separated subset (e.g. `thymeleaf,beetl`) narrows it
+
+---
+
+## 6. JSP Views (Optional)
+
+Beyond template engines, `spring-web-servlet` renders JSP through **Apache Jasper** (dependency `org.apache.tomcat.embed:tomcat-embed-jasper`, optional). Unlike template engines, JSP is a "compile-to-servlet" container technology and must go through the servlet bridge — see the [support-bridge internals (Chinese)](../internals/12-support-bridge.md#512-jsp-视图apache-jasper).
+
+### 1. Dependencies
+
+```xml
+<!-- JSP engine (Jasper) -->
+<dependency>
+    <groupId>org.apache.tomcat.embed</groupId>
+    <artifactId>tomcat-embed-jasper</artifactId>
+</dependency>
+<!-- Add these only when using JSTL: -->
+<dependency>
+    <groupId>javax.servlet</groupId>
+    <artifactId>jstl</artifactId>
+    <!-- version managed by the Spring Boot 2.7 BOM (1.2.x); packages are javax.servlet.jsp.jstl -->
+</dependency>
+```
+
+When both `tomcat-embed-jasper` and `spring-web-view` are present, `JspViewAutoConfiguration` activates `JspViewResolver` and registers the `*.jsp` route.
+
+### 2. View-name rules
+
+| Form | Resolved path |
+|------|---------------|
+| `jsp:hello` (prefix form) | `/jsp/hello.jsp` |
+| `hello.jsp` (suffix form) | `/jsp/hello.jsp` |
+
+Unmatched view names return `null` and are handed to other `ViewResolver`s (Thymeleaf and friends).
+
+### 3. Model passing differs from template engines
+
+Template engines hand the model straight to the rendering API; **JSP has no model concept — `JspView.render()` writes the model into request attributes**, and the page reads them with EL (`${...}`) or via `request.getAttribute` in a scriptlet:
+
+```java
+@GetMapping("/jsp-view")
+public String jspView(Model model) {
+    model.addAttribute("name", "spring-perf");
+    return "jsp:hello";   // → /jsp/hello.jsp
+}
+```
+
+```jsp
+<%-- src/main/resources/jsp/hello.jsp --%>
+<p>name= ${name}</p>
+```
+
+### 4. Capabilities and limits
+
+- **Verified**: scriptlets, EL, `jsp:include` / `jsp:forward`, static `<%@ include %>`, JSTL (`c:forEach` / `c:if`), complex models (Map/List/Bean)
+- **Limits**: JSTL/custom tags need dependencies (custom tag libraries under `/WEB-INF/tld` are not scanned; put them in classpath `META-INF/`); no `web.xml` (`jsp-config` / `error-page` unsupported); no precompilation in the default development mode; javax.servlet + JSTL 1.2 only (Boot 2.7)
+
+---
+
+## 7. Differences from Spring MVC
 
 Read this before migrating a page-oriented project. **Aligned** capabilities (view-name resolution, Model injection, ModelAndView, redirect, `@ResponseBody` isolation, exception-to-view) migrate without changes; adapt the following:
 
@@ -165,11 +252,11 @@ Read this before migrating a page-oriented project. **Aligned** capabilities (vi
 | `@PathVariable` auto-merge into model | Path variables visible in templates | ✅ Auto-merged | No migration cost |
 | `BindingResult` auto-merge into model | Validation errors visible in templates | ✅ Auto-merged (`BindingResult.getTarget` into model) | No migration cost |
 | Local `@ModelAttribute` methods | Pre-populate model within same Controller | ✅ Supported (handler methods auto-excluded) | No migration cost |
-| `@SessionAttributes` | Cross-request session model | ❌ Not supported | Use session or request parameters |
+| `@SessionAttributes` | Cross-request session model | ✅ Supported (requires `spring-web-servlet` module) | Add `spring-web-servlet` |
 | `redirect:` path-variable templates | `redirect:/orders/{id}` | ❌ Not supported (query-only) | Concatenate explicitly |
 | `redirect:` flash attributes (PRG) | `RedirectAttributes` + `FlashMap` | ❌ Not supported | Use query parameters |
 | `forward:` prefix | `RequestDispatcher.forward` | ❌ Not supported (Netty has no forward semantics) | Use `redirect:` or return the view directly |
-| Thymeleaf `#request` / `#response` / `#session` | Servlet objects via `WebContext` | ❌ Not supported (`IWebSession` returns null) | Avoid in templates; use model attributes |
+| Thymeleaf `#request` / `#response` / `#session` expression objects | Servlet objects via `WebContext` | ⚠️ These expression objects were removed in Thymeleaf 3.1; the framework injects **session attributes as context variables** (model wins on name clash), and in the Servlet case (with `spring-web-servlet`) `ServletWebExchangeProvider` supplies the **real** session / principal / cookies, so templates read the same on 3.0 / 3.1 | Write `${user}` instead of `${session.user}`; for the template web context see [Extension Points §14](extensions.md) |
 | Content Negotiation (Accept-based view) | `ContentNegotiationManager` | ❌ Not supported (always `text/html`) | — |
 | `WebMvcConfigurer.configureViewResolvers` | Configure view resolvers | ❌ Not supported | Register `ViewResolver` via `@Bean` or properties |
 | `Map<String,Object>` parameter | Treated as Model | ❌ Not supported (avoids conflict with `@ModelAttribute` fallback) | Use `Model` parameter |
@@ -183,7 +270,7 @@ Read this before migrating a page-oriented project. **Aligned** capabilities (vi
 
 ---
 
-## 6. Custom ViewResolver
+## 8. Custom ViewResolver
 
 Implement `io.springperf.web.view.ViewResolver` and register it as a Spring Bean; it is automatically absorbed by `ViewResolverRegistry` (sorted by `getOrder()`):
 
@@ -205,7 +292,7 @@ Return `null` to defer to the next `ViewResolver` in the chain.
 
 ---
 
-## 7. Related Documents
+## 9. Related Documents
 
 - [Modules](modules.md) — `spring-web-view` module architecture
 - [Configuration](configuration.md) — all properties

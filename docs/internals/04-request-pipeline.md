@@ -27,11 +27,11 @@ NettyHttpHandler.channelRead              NettyHttpHandler.java
   ▼
 NettyHttpHandler.handleRequest           NettyHttpHandler.java
   │  · shuttingDown? → 503 ()
-  │  · 构造 NettyServerHttpResponse(keepAlive) 
+  │  · 构造 NettyServerHttpResponse(keepAlive)
   │  · URI 解析 + contextPath 校验 → 404 ()
-  │  · msg.retain()  ← ByteBuf 生命周期第一站 
-  │  · new NettyServerHttpRequest 
-  │  · resp.setTimeout() 
+  │  · msg.retain()  ← ByteBuf 生命周期第一站
+  │  · new NettyServerHttpRequest
+  │  · resp.setTimeout()
   ▼
 DispatcherHandler.httpHandle              DispatcherHandler.java
   ▼
@@ -42,10 +42,10 @@ DispatcherHandler.handleWithMappingResult DispatcherHandler.java
   │  bizPoolRegistry.determinePool(req, mr)  ← 取 methodCache 槽位的线程池引用
   │
   ├── executor != null（default 池 / 自定义池）:
-  │     │  req.acquire()              ← retain，跨线程前加固引用 
+  │     │  req.acquire()              ← retain，跨线程前加固引用
   │     ▼  executor.execute(() -> { handleWithFilter; finally req.release() })  ()
   │     │  catch RejectedExecutionException:
-  │     │     req.release() 
+  │     │     req.release()
   │     │     !isShutdown() → 503 + RETRY_AFTER ()
   │     │     isShutdown()  → EventLoop 兜底 handleWithFilter ()
   │     ▼  【业务线程池】
@@ -66,27 +66,27 @@ DispatcherHandler.handleWithFilter        DispatcherHandler.java
   │  catch Throwable → handleException + invokeWithRealResult ()
   ▼
 DispatcherHandler.handleAfterFilter       DispatcherHandler.java
-  │  initContextHolders(LocaleContextHolder) 
+  │  initContextHolders(LocaleContextHolder)
   │  mappingResult.isMatched()?
-  │    是 → doHandle(req, resp, matchedContext) 
-  │    否 → handleWithNoFullMatch → CORS 预检 / 404·405 
+  │    是 → doHandle(req, resp, matchedContext)
+  │    否 → handleWithNoFullMatch → CORS 预检 / 404·405
   │  finally removeContextHolders ()
   ▼
 DispatcherHandler.doHandle                DispatcherHandler.java
-  │  corsRegistry.corsHandle(req,resp)         ← 取 corsConfigurationProvider 
-  │  interceptorRegistry.preHandle(req,resp)   ← 取 cachedInterceptors 
-  │  argumentResolverRegistry.resolveArguments ← 取 methodCache 参数解析器槽 
+  │  corsRegistry.corsHandle(req,resp)         ← 取 corsConfigurationProvider
+  │  interceptorRegistry.preHandle(req,resp)   ← 取 cachedInterceptors
+  │  argumentResolverRegistry.resolveArguments ← 取 methodCache 参数解析器槽
   │  mappingContext.invoke(args,req,resp)      ← invoker.invoke（MethodHandle/Fast）
-  │  returnValueResolverRegistry.resolveReturnValue ← 取 methodCache 返回值处理器槽 
+  │  returnValueResolverRegistry.resolveReturnValue ← 取 methodCache 返回值处理器槽
   │  catch → handleException → exceptionRegistry.handle ()
   │  finally:
   │    isAsyncRequest? → afterConcurrentHandlingStarted + 存 METRICS_START_ATTR ()
   │    否 → (preHandlePassed? invokeWithRealResult : skip) + metrics.recordRequest ()
   ▼
 DispatcherHandler.invokeWithRealResult   DispatcherHandler.java
-  │  interceptorRegistry.postHandle 
-  │  interceptorRegistry.afterCompletion 
-  │  finally flushResponse 
+  │  interceptorRegistry.postHandle
+  │  interceptorRegistry.afterCompletion
+  │  finally flushResponse
   ▼
 响应 flush → Netty channel 写出 → 请求结束
 ```
@@ -99,7 +99,7 @@ DispatcherHandler.invokeWithRealResult   DispatcherHandler.java
 
 ### 2.1 它才是真正的入口，不是 RuntimeMappingWebFilter
 
-00-README 大纲把入口写成"Netty `ChannelInboundHandler` → `RuntimeMappingWebFilter` → `DispatcherHandler`"。核对源码后修正：**`RuntimeMappingWebFilter` 不是入口，它是 Filter 链内的一个运行时包装节点**（见第五节）。真正的 Netty→框架入口是 `NettyHttpHandler`：
+00-README 索引把入口写成"Netty `ChannelInboundHandler` → `RuntimeMappingWebFilter` → `DispatcherHandler`"。核对源码后修正：**`RuntimeMappingWebFilter` 不是入口，它是 Filter 链内的一个运行时包装节点**（见第五节）。真正的 Netty→框架入口是 `NettyHttpHandler`：
 
 ```java
 // NettyHttpHandler.java
@@ -320,7 +320,7 @@ public class RuntimeMappingWebFilter implements WebFilter {
 }
 ```
 
-`RuntimeMappingWebFilter` 是 `WebFilter` 链中的一个节点，用 Servlet 规范路径匹配（`ServletFilterPatternUtils.matches`）决定是否执行被包装的 delegate。它和 `DefaultFilterChain` 的关系是组合：链里每个节点都是 `WebFilter`，`RuntimeMappingWebFilter` 是其中"带路径条件"的那一类。**它不接 Netty、不接 Dispatcher，只是链内一个条件分支**——大纲把它列为入口是误读。
+`RuntimeMappingWebFilter` 是 `WebFilter` 链中的一个节点，用 Servlet 规范路径匹配（`ServletFilterPatternUtils.matches`）决定是否执行被包装的 delegate。它和 `DefaultFilterChain` 的关系是组合：链里每个节点都是 `WebFilter`，`RuntimeMappingWebFilter` 是其中"带路径条件"的那一类。**它不接 Netty、不接 Dispatcher，只是链内一个条件分支**——索引把它列为入口并不准确。
 
 ### 5.3 DefaultFilterChain：游标式链，零对象创建
 
@@ -404,7 +404,7 @@ public void handleAfterFilter(WebServerHttpRequest req, WebServerHttpResponse re
 
 分流两路：
 - **命中** → `doHandle`（第七节，主处理）。
-- **未命中** → `handleWithNoFullMatch`：CORS 预检（`CorsUtils.isPreFlightRequest`）走 `handleCorsPreflight`，否则 `handleOnNoMatchMappingContext` 抛 404/405 走 `exceptionRegistry.handle` + `afterCompletion`。404/405 用预构的 `static final` 异常单例，不 `fillInStackTrace`——[01 篇](01-design-philosophy.md) 原则 2 在高频错误路径上的兑现。
+- **未命中** → `handleWithNoFullMatch`：CORS 预检（`CorsUtils.isPreFlightRequest`）走 `handleCorsPreflight`，否则 `handleOnNoMatchMappingContext` 抛 404/405 走 `exceptionRegistry.handle` + `afterCompletion`。异常是**每请求新建**的 `StacklessResponseStatusException`（`fillInStackTrace` 已禁用、零栈轨迹开销）——**刻意不用 static final 单例**，避免 `@ExceptionHandler` 修改 headers/body 时污染后续请求。
 
 `finally` 的 `removeContextHolders` 重置 `ThreadLocal`，防止线程复用导致 locale 串味。`initContext` 标志位避免无谓的 reset（`buildLocaleContext` 返回 null 时不初始化也不 reset）。
 
@@ -604,7 +604,9 @@ protected void handleException(Throwable ex, WebServerHttpRequest req, WebServer
 
 ### 9.3 404/405 与未匹配
 
-`handleOnNoMatchMappingContext`：`result.isMethodMismatch()` ? 405 : 404，用 `static final` 异常单例，不 `fillInStackTrace`，走 `exceptionRegistry.handle` + `afterCompletion`——与 `doHandle` 中异常路径行为一致，404/405 不走特殊通道，复用异常处理链。
+`handleOnNoMatchMappingContext`：按 `result.getMismatchKind()` 四分支映射（对齐 Spring MVC）——`METHOD`→**405**（并带 `Allow` 头）、`CONSUMES`→**415**、`PRODUCES`→**406**、其余→**404**。
+
+异常同样是每请求新建的 `StacklessResponseStatusException`（非单例——刻意避免 `@ExceptionHandler` 修改 headers/body 时污染后续请求）；`throwExceptionIfNoHandlerFound=false` 时直接 `sendError` 不进 `ExceptionRegistry`，对齐 Spring Boot 默认行为。
 
 ---
 
@@ -651,7 +653,7 @@ public void asyncDispatch(WebServerHttpRequest req, WebServerHttpResponse resp, 
 -  补 `postHandle`/`afterCompletion`——异步请求的拦截器后处理推迟到恢复时才做。
 - 取回 `METRICS_START_ATTR`（一次 `fastAttributes` 数组直取），算完整耗时 `recordRequest`。
 
-这条异步路径把 [03 篇](03-component-lifecycle.md) 的 `AsyncSupportRegistry`、`ReturnValueResolverRegistry` 的缓存、`fastAttributes` 数组、`handled` CAS 串在一起：**异步不是新机制，而是主链路在 finally 分流、稍后用同一套缓存恢复**。完整异步流式机制（`NettyStreamSender` 无锁 drain loop、背压）留给 [11 篇](11-async-streaming.md)。
+这条异步路径把 [03 篇](03-component-lifecycle.md) 的 `AsyncSupportRegistry`、`ReturnValueResolverRegistry` 的缓存、`fastAttributes` 数组、`handled` CAS 串在一起：**异步不是新机制，而是主链路在 finally 分流、稍后用同一套缓存恢复**。完整异步流式机制（`AbstractNettyStreamSender` 无锁 drain loop、背压）留给 [11 篇](11-async-streaming.md)。
 
 ---
 
@@ -697,7 +699,7 @@ protected boolean setCommitted() {
 }
 ```
 
-`handled` 标记"响应已被某段代码接管"（写 body、sendError 等），CAS 保证全请求只成功一次——重复写（如 `doHandle` 正常返回后又 `handleException`）会被  的 `setHandled()` 返回 false 拦住，只 `log.warn` 不重复写。`committed` 标记"响应已刷到底层 channel"，提交即 `setTimeout(null,-1)` 取消超时——避免已完成的请求还触发超时 503。两个 CAS 把"响应状态机"做到无锁、单次、确定。
+`handled` 标记"响应已被某段代码接管"（写 body、sendError 等），CAS 保证全请求只成功一次——重复写（如 `doHandle` 正常返回后又 `handleException`）会被  的 `setHandled()` 返回 false 拦住，只 `log.warn` 不重复写。`committed` 标记"响应已刷到底层 channel"，提交即 `setTimeout(null,-1)` 取消超时——避免已完成的请求还触发超时 **504**（`BaseWebServerHttpResponse.defaultHandleTimeout` 发的是 `GATEWAY_TIMEOUT`；503 是异步请求超时那条路径，两者不可混谈）。两个 CAS 把"响应状态机"做到无锁、单次、确定。
 
 ### 11.3 getBody 延迟分配与 filterIndex 游标
 

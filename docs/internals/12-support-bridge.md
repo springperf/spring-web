@@ -6,7 +6,7 @@
 
 ## 引子：兼容层不牺牲性能
 
-`spring-web-servlet` 与 `spring-web-mvc-support` 是框架的兼容层。它的目标是：**让 Spring MVC 生态的组件（`WebMvcConfigurer`、`HandlerInterceptor`、`jakarta.servlet.Filter`、`@ControllerAdvice`、`HttpMessageConverter`、Session 等）不修改一行代码就能无缝工作在 Netty 容器上，同时不引入每请求的反射或类型推断。**
+`spring-web-servlet` 与 `spring-web-mvc-support` 是框架的兼容层。它的目标是：**让 Spring MVC 生态的组件（`WebMvcConfigurer`、`HandlerInterceptor`、`javax.servlet.Filter`、`@ControllerAdvice`、`HttpMessageConverter`、Session 等）不修改一行代码就能无缝工作在 Netty 容器上，同时不引入每请求的反射或类型推断。**
 
 Spring MVC 的兼容层（如 Servlet 容器 + `spring-webmvc`）依赖的天然假设是"运行在 Servlet 容器中"——`HttpServletRequest`/`HttpServletResponse`、`FilterChain`、`Session` 都是容器提供的。本框架用 Netty 替代了 Tomcat/Jetty，所以 support 的职责是：
 
@@ -16,7 +16,7 @@ Spring MVC 的兼容层（如 Servlet 容器 + `spring-webmvc`）依赖的天然
 4. **`FilterWrapper`/`HandlerInterceptorWrapper`** 把 Servlet Filter 和 Spring MVC Interceptor 适配为框架的 `WebFilter`/`HandlerInterceptor`。
 5. **Session 体系** 从零实现 `HttpSession` 接口，通过 `HttpSessionStorage` SPI 可插拔存储。
 6. **Servlet 规范完整桥接** 覆盖 `ServletContext`、`RequestDispatcher`（forward/include）、`AsyncContext`、认证（`Authenticator`）、WebSocket `upgrade` 等，让依赖 Servlet API 的代码无侵入运行。详见第五节 5.6~5.10。
-7. **Servlet 对象路由与 JSP** 支持把 `jakarta.servlet.Servlet` 对象注册为框架路由（`ServletInvoker` / `SupportServletRegistry` / `ServletRequest(Response)Provider`），并集成 Apache Jasper 提供 JSP / JSTL 渲染（`JasperJspServlet` / `JspViewResolver` / `JspView`）。详见第五节 5.11~5.12。
+7. **Servlet 对象路由与 JSP** 支持把 `javax.servlet.Servlet` 对象注册为框架路由（`ServletInvoker` / `SupportServletRegistry` / `ServletRequest(Response)Provider`），并集成 Apache Jasper 提供 JSP / JSTL 渲染（`JasperJspServlet` / `JspViewResolver` / `JspView`）。详见第五节 5.11~5.12。
 
 > 完整的支持矩阵、配置项与已知限制，见 `docs/feature/servlet-spec-support.md`（该目录 gitignored，仅本地维护）。
 
@@ -53,7 +53,8 @@ Spring MVC 的兼容层（如 Servlet 容器 + `spring-webmvc`）依赖的天然
 | `ViewResolverRegistry` | `spring-webmvc` | 空实现 |
 | `ValidatorRegistration` | `spring-webmvc` | 完整实现（`getValidator`/`setValidator`） |
 | `RequestBodyAdvice` / `ResponseBodyAdvice` | `spring-webmvc` | 接口 |
-| `ResponseBodyEmitter` / `SseEmitter` / `StreamingResponseBody` | `spring-webmvc` | 完整实现（extends 框架 `StreamEmitter`） |
+| `ResponseBodyEmitter` / mvc `SseEmitter` | `spring-webmvc` | 完整实现（extends 框架 `StreamEmitter`，经 `ResponseBodyEmitterReturnValueResolver` 注入 encodeFunction） |
+| `StreamingResponseBody` | `spring-webmvc` | **未实现**：它只是独立 `@FunctionalInterface`（`void writeTo(OutputStream)`），不是 `StreamEmitter`，没有任何 resolver 认领它 → 返回值会被静默忽略（需实现 resolver 或改用 emitter/`InputStream` 返回值） |
 | `ResponseEntityExceptionHandler` | `spring-webmvc` | `@ControllerAdvice` 15 个标准异常处理 |
 | `AdapterUtil` | `spring-webmvc` | 工具类（`setEncodeFunction`/`getEncodeFunction`） |
 
@@ -150,23 +151,23 @@ protected void bridgeInterceptors(InterceptorRegistry shimRegistry) {
 
 ### 3.1 `SupportWebFilterRegistry`：自动注册 Filter Bean
 
-`SupportWebFilterRegistry`继承 `WebFilterRegistry`，在构造器中注册 `jakarta.servlet.Filter` 类型的自动发现：
+`SupportWebFilterRegistry`继承 `WebFilterRegistry`，在构造器中注册 `javax.servlet.Filter` 类型的自动发现：
 
 ```java
 // SupportWebFilterRegistry.java
 public class SupportWebFilterRegistry extends WebFilterRegistry {
     public SupportWebFilterRegistry(DispatcherHandler dispatcherHandler) {
         super(dispatcherHandler);
-        autoRegisterWebComponent(jakarta.servlet.Filter.class, filter -> wrapFilterToRegistration(new FilterWrapper(filter)));
+        autoRegisterWebComponent(javax.servlet.Filter.class, filter -> wrapFilterToRegistration(new FilterWrapper(filter)));
     }
 }
 ```
 
-`autoRegisterWebComponent` 扫描 Spring 容器中所有 `jakarta.servlet.Filter` 类型的 Bean，对每个 Filter 创建 `FilterWrapper` → 包装为 `WebFilterRegistration` → 注册到 `WebFilterRegistry`。
+`autoRegisterWebComponent` 扫描 Spring 容器中所有 `javax.servlet.Filter` 类型的 Bean，对每个 Filter 创建 `FilterWrapper` → 包装为 `WebFilterRegistration` → 注册到 `WebFilterRegistry`。
 
 ### 3.2 `FilterWrapper`：实例级唯一标识
 
-`FilterWrapper`实现 `WebFilter`，将 `jakarta.servlet.Filter` 适配为框架的 Filter 接口：
+`FilterWrapper`实现 `WebFilter`，将 `javax.servlet.Filter` 适配为框架的 Filter 接口：
 
 ```java
 // FilterWrapper.java
@@ -192,7 +193,7 @@ protected void doFilterInternal(WebServerHttpRequest request, WebServerHttpRespo
 
 ```java
 // FilterWrapper.java
-private static final Map<jakarta.servlet.Filter, String> COMPONENT_NAMES =
+private static final Map<javax.servlet.Filter, String> COMPONENT_NAMES =
         Collections.synchronizedMap(new IdentityHashMap<>());
 private static final AtomicLong NEXT_INSTANCE_ID = new AtomicLong(1);
 
@@ -206,7 +207,7 @@ public String getComponentName() {
 
 ### 3.3 Filter 生命周期与 `FilterConfig`
 
-`FilterWrapper` 实现 `LifecycleWebComponent`，补齐 `jakarta.servlet.Filter` 的完整生命周期：
+`FilterWrapper` 实现 `LifecycleWebComponent`，补齐 `javax.servlet.Filter` 的完整生命周期：
 
 - **`init(FilterConfig)`**：`initWithWebContext()` 中调用，`FilterConfig` 由 `PerfFilterConfig` 提供，init-param 从 `@WebFilter(initParams=@WebInitParam(...))` 注解读取（`resolveInitParams()`）。
 - **`destroy()`**：`destroyComponent()` 中调用。
@@ -214,7 +215,7 @@ public String getComponentName() {
 
 ### 3.4 `PerfHttpServletFilterChain`：FilterChain 桥接
 
-`PerfHttpServletFilterChain`实现 `jakarta.servlet.FilterChain`，在 `doFilter` 尾端回调框架的 `FilterChain`：
+`PerfHttpServletFilterChain`实现 `javax.servlet.FilterChain`，在 `doFilter` 尾端回调框架的 `FilterChain`：
 
 ```java
 // PerfHttpServletFilterChain.java
@@ -451,7 +452,7 @@ private static final RequestAttribute<ServletAdapterContext> ADAPTER_CTX =
 
 ### 5.11 Servlet 对象路由
 
-支持把 `jakarta.servlet.Servlet` 对象注册为框架路由（第二个消费者是 JSP 的 `JasperJspServlet`）：
+支持把 `javax.servlet.Servlet` 对象注册为框架路由（第二个消费者是 JSP 的 `JasperJspServlet`）：
 
 | 组件 | 职责 |
 |------|------|

@@ -8,6 +8,17 @@ Built on **LMAX Disruptor** with lock-free ring buffer, backpressure strategies,
 
 ---
 
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [@BatchMapping Annotation](#batchmapping-annotation)
+- [Architecture](#architecture)
+- [Observability](#observability)
+- [Configuration Guide](#configuration-guide)
+- [Important Notes](#important-notes)
+
+---
+
 ## Quick Start
 
 ### 1. Add Dependency
@@ -118,7 +129,7 @@ public @interface BatchMapping {
 | `backpressure` | BLOCK | Backpressure strategy (see table) |
 | `method` | "" | Single-request method name to intercept; defaults to the batch method name |
 | `maxBatchSize` | 100 | Max requests per batch before flushing |
-| `consumerSize` | -1 | Max concurrent processing threads; defaults to available processors |
+| `consumerSize` | -1 | Max concurrent processing threads; defaults to available processors. |
 
 ### Backpressure Strategies
 
@@ -142,7 +153,7 @@ public @interface BatchMapping {
 Each `@BatchMapping` method gets its own Disruptor queue:
 
 ```
-EventLoop (producer)
+Dispatch thread (producer: `default` business pool)
     ↓ enqueue
 RingBuffer
     ↓
@@ -153,9 +164,9 @@ bizExecutor pool (0 ~ consumerSize threads)
 @BatchMapping method
 ```
 
-- **Producer**: EventLoop enqueues directly via `BatchInvoker`
+- **Producer**: the dispatch thread enqueues via `BatchInvoker` — the `default` business pool (following `pool.default-execute-mode`); an enqueue is microsecond-scale and non-blocking, so no `@RunInPool` is needed
 - **Consumer**: Single Disruptor consumer thread polls the ring buffer
-- **Business pool**: 0 core threads, `SynchronousQueue`, `CallerRunsPolicy`. Zero threads at idle; consumer self-executes at capacity (built-in backpressure)
+- **Business pool**: 0 core threads, `SynchronousQueue`, `CallerRunsPolicy` — zero threads at idle, consumer self-executes at capacity (built-in backpressure).
 
 ---
 
@@ -263,7 +274,7 @@ public class GetUserRequest extends BatchRequest<UserResp> {
 
 | Scenario | Handling | Client Response |
 |----------|----------|-----------------|
-| RingBuffer full, backpressure BLOCK | EventLoop blocks | Connection suspended |
+| RingBuffer full, backpressure BLOCK | Producer thread blocks | Connection suspended |
 | RingBuffer full, backpressure DROP | `BatchOverflowException` set on request | 429 |
 | RingBuffer full, backpressure THROW | Synchronous exception thrown | 429 |
 | Batch processing exception | `setError(e)` on all pending requests | 500 |

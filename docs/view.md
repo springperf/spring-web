@@ -60,16 +60,16 @@
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
 | `spring.web.view.engine` | 无（全部可用） | 启用的模板引擎列表（逗号分隔）：`thymeleaf` / `freemarker` / `beetl`；**不配置则注册 classpath 上所有可用引擎** |
-| `spring.web.view.thymeleaf.prefix` | `templates/` | Thymeleaf 模板前缀（classpath 相对路径） |
-| `spring.web.view.thymeleaf.suffix` | `.html` | Thymeleaf 模板后缀 |
-| `spring.web.view.thymeleaf.cache` | `true` | 是否开启模板缓存（生产开启，开发可设 `false` 热改） |
-| `spring.web.view.freemarker.prefix` | `templates/` | FreeMarker 模板前缀（classpath 相对路径） |
-| `spring.web.view.freemarker.suffix` | `.ftl` | FreeMarker 模板后缀 |
-| `spring.web.view.freemarker.cache` | `true` | 是否开启模板缓存 |
-| `spring.web.view.beetl.prefix` | `templates/` | Beetl 模板前缀（classpath 相对路径） |
-| `spring.web.view.beetl.suffix` | `.btl` | Beetl 模板后缀 |
-| `spring.web.view.beetl.cache` | `true` | 是否开启模板缓存 |
-| `spring.web.view.encoding` | `UTF-8` | 渲染字符集，同时写入 `Content-Type` |
+| `spring.thymeleaf.prefix` | `templates/` | Thymeleaf 模板前缀（classpath 相对路径） |
+| `spring.thymeleaf.suffix` | `.html` | Thymeleaf 模板后缀 |
+| `spring.thymeleaf.cache` | `true` | 是否开启模板缓存（生产开启，开发可设 `false` 热改） |
+| `spring.freemarker.prefix` | `templates/` | FreeMarker 模板前缀（classpath 相对路径） |
+| `spring.freemarker.suffix` | `.ftl` | FreeMarker 模板后缀 |
+| `spring.freemarker.cache` | `true` | 是否开启模板缓存 |
+| `spring.beetl.prefix` | `templates/` | Beetl 模板前缀（classpath 相对路径） |
+| `spring.beetl.suffix` | `.btl` | Beetl 模板后缀 |
+| `spring.beetl.cache` | `true` | 是否开启模板缓存 |
+| `spring.thymeleaf.encoding` | `UTF-8` | 渲染字符集，同时写入 `Content-Type`；FreeMarker / Beetl 默认 UTF-8（与 Boot 行为一致，无独立编码键） |
 
 模板默认从 classpath 的 `templates/` 目录加载（Spring Boot 惯例）。
 
@@ -221,14 +221,9 @@ public String save(@ModelAttribute UserForm form) {
 </dependency>
 <!-- 使用 JSTL 时再加： -->
 <dependency>
-    <groupId>jakarta.servlet.jsp.jstl</groupId>
-    <artifactId>jakarta.servlet.jsp.jstl-api</artifactId>
-    <version>3.0.0</version>
-</dependency>
-<dependency>
-    <groupId>org.glassfish.web</groupId>
-    <artifactId>jakarta.servlet.jsp.jstl</artifactId>
-    <version>3.0.1</version>
+    <groupId>javax.servlet</groupId>
+    <artifactId>jstl</artifactId>
+    <!-- 版本由 Spring Boot 2.7 BOM 管理（1.2.x）；包名 javax.servlet.jsp.jstl -->
 </dependency>
 ```
 
@@ -263,7 +258,7 @@ public String jspView(Model model) {
 ### 4. 支持能力与局限
 
 - **已验证**：scriptlet、EL、`jsp:include` / `jsp:forward`、静态 `<%@ include %>`、JSTL（`c:forEach` / `c:if`）、复杂 model（Map/List/Bean）
-- **局限**：JSTL/自定义标签需依赖（`/WEB-INF/tld` 自定义标签扫不到，放 classpath `META-INF/`）；无 web.xml（`jsp-config`/`error-page` 不支持）；默认开发模式无预编译；仅 jakarta（Boot 3.x）
+- **局限**：JSTL/自定义标签需依赖（`/WEB-INF/tld` 自定义标签扫不到，放 classpath `META-INF/`）；无 web.xml（`jsp-config`/`error-page` 不支持）；默认开发模式无预编译；仅 javax.servlet + JSTL 1.2（Boot 2.7）
 
 ---
 
@@ -278,11 +273,11 @@ public String jspView(Model model) {
 | `@PathVariable` 自动入 model | 路径变量在模板中可见 | ✅ 自动合并 | 无迁移成本 |
 | `BindingResult` 自动入 model | 校验错误在模板中可见 | ✅ 自动合并（`BindingResult.getTarget` 入 model） | 无迁移成本 |
 | 局部 `@ModelAttribute` 方法 | 同一 Controller 内预置 model | ✅ 支持（自动排除 handler 方法） | 无迁移成本 |
-| `@SessionAttributes` | 跨请求 session model | ❌ 不支持 | 改用 session 或请求参数 |
+| `@SessionAttributes` | 跨请求 session model | ✅ 支持（需 `spring-web-servlet` 模块） | 引入 `spring-web-servlet` |
 | `redirect:` 路径变量模板 | `redirect:/orders/{id}` | ❌ 不支持（仅支持 query 拼接） | 显式拼接 |
 | `redirect:` flash 属性（PRG） | `RedirectAttributes` + `FlashMap` | ❌ 不支持 | 改用 query 参数 |
 | `forward:` 前缀 | `RequestDispatcher.forward` | ❌ 不支持（Netty 无 forward 语义） | 改用 `redirect:` 或直接返回视图 |
-| Thymeleaf `#request` / `#response` / `#session` | `WebContext` 提供 servlet 对象 | ❌ 不支持（`IWebSession` 返回 null） | 模板避免使用，改用 model 属性 |
+| Thymeleaf `#request` / `#response` / `#session` 表达式对象 | `WebContext` 提供 servlet 对象 | ⚠️ 这些表达式对象已被 Thymeleaf 3.1 移除；框架统一把 **session 属性注入上下文变量**（同名时 **model 优先**），Servlet 场景（引入 `spring-web-servlet`）下由 `ServletWebExchangeProvider` 提供**真实** session / principal / cookie，模板在 3.0 / 3.1 上写法一致 | 模板写 `${user}` 而非 `${session.user}`；需要模板 web 上下文时见[扩展点 §14](extensions.md) |
 | Content Negotiation（Accept 选视图） | `ContentNegotiationManager` | ❌ 不支持（始终 `text/html`） | — |
 | `WebMvcConfigurer.configureViewResolvers` | 配置视图解析器 | ❌ 不支持 | 通过 `@Bean` 注册自定义 `ViewResolver` 或用配置项 |
 | `Map<String,Object>` 参数 | 视为 Model | ❌ 不支持（避免与 `@ModelAttribute` 兜底冲突） | 改用 `Model` 参数 |

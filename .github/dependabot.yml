@@ -1,0 +1,29 @@
+version: 2
+updates:
+  # 只维护 GitHub Actions：workflow 里的 action 全部按 commit SHA pin（配版本注释），
+  # 人工跟进升级容易漏；Dependabot 认得 `uses: owner/repo@<sha> # v5` 这种写法，
+  # 会同时更新 SHA 与注释。
+  #
+  # 刻意【不】开启 maven 生态：本仓库有意维护 Spring Boot 版本矩阵（2.7 / 3.0 / 3.1 / 3.3 /
+  # 3.4 / 3.5 多个 profile），自动 bump spring-boot.version 会与兼容性测试矩阵冲突。
+  # 依赖升级走人工 + versions-maven-plugin 报告，见 docs/feature/engineering-practices-checklist.md。
+  #
+  # Actions only: every workflow pins actions by commit SHA (with a version comment), which is easy to
+  # forget. The maven ecosystem is deliberately not enabled - this repository maintains a Spring Boot
+  # version matrix on purpose, and automated version bumps would fight that.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "03:00"
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+    labels:
+      - dependencies
+    groups:
+      github-actions:
+        patterns:
+          - "*"

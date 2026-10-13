@@ -25,7 +25,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   <li>{@code pool.{name}.queue.size} — Gauge, queue size</li>
  *   <li>{@code pool.{name}.completed.tasks} — Gauge, completed task count</li>
  * </ul>
- * </p>
  *
  * @since 2.7.0
  */

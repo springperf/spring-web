@@ -32,7 +32,9 @@ This Code of Conduct applies within all community spaces, and also applies when 
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the project team. All complaints will be reviewed and investigated promptly and fairly.
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the project team at [hcd0614@gmail.com](mailto:hcd0614@gmail.com). All complaints will be reviewed and investigated promptly and fairly, and the identity of the reporter will be kept confidential to the extent permitted by law.
+
+Community leaders are obligated to respect the privacy and security of the reporter of any incident.
 
 ## Attribution
 

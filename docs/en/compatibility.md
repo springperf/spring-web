@@ -2,7 +2,8 @@
 
 # Version Compatibility
 
-This project maintains two main branches corresponding to Spring Boot 2.x and Spring Boot 3.x.
+This project maintains three branches: one mainline (Spring Boot 3.5.x) and two downstream
+adaptation branches (2.7.x / 4.1.x).
 
 ---
 
@@ -10,8 +11,16 @@ This project maintains two main branches corresponding to Spring Boot 2.x and Sp
 
 | Branch | Spring Boot | Status | Maintenance Strategy |
 |--------|-------------|--------|---------------------|
-| `2.7.x` | 2.4.x ~ 2.7.x | Maintenance branch | Features + bugfixes; based on javax.servlet |
-| `master` | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | **Development baseline** | New features merged here first; multi-version via Maven profiles |
+| `2.7.x` | 2.4.x ~ 2.7.x | Downstream adaptation | Synced from master + downgrade adaptation; based on javax.servlet (see [2.7.x migration checklist](../../.agent/context/2.7.x-migration-checklist.md)) |
+| `master` | **3.5.x** | **Development baseline** | New features merged here first; **contains no Spring Boot 4 / Spring Framework 7 compatibility code** |
+| `4.1.x` | 4.0.x ~ 4.1.x | Downstream adaptation | Synced from master + upgrade adaptation (see [4.1.x adaptation guide](../../.agent/context/4.1.x-adaptation-checklist.md)) |
+
+Sync direction is always `master → 4.1.x` / `master → 2.7.x`; version adaptation code lives only
+in the downstream branches.
+
+The `4.1.x` branch keeps the mainline project version while it is developed and is bumped to `4.1.7`
+when that branch is released (its first release; no release exists yet). Its `spring-boot.version`
+(Boot 4.1.0) is unrelated to the project version.
 
 ---
 
@@ -31,7 +40,7 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 | Spring Framework | **5.3.x** | Managed by Spring Boot | |
 | JDK | **8, 11, 17** | 8, 11, 17 verified | Compile target `java.version=8` |
 | Servlet API | **javax.servlet 4.0.1** | 4.0.x | |
-| Netty | **4.1.110.Final** | 4.1.x (manually overridden) | Spring Boot 2.7.x manages a lower version by default |
+| Netty | **4.1.137.Final** | 4.1.x (manually overridden) | Spring Boot 2.7.x manages a lower version by default |
 | Jackson | **2.17.2** | 2.17.x (manually overridden) | Spring Boot 2.7.x manages 2.13.x by default |
 | Lombok | **1.18.24** | 1.18.x | |
 | JMH | **1.37** | 1.37 | Benchmark module only |
@@ -50,20 +59,30 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 
 | Dependency | Current Version | Verified Range | Notes |
 |------------|----------------|----------------|-------|
-| Spring Boot | **3.2.12** | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | Switch via Maven profile (`-Pspring-boot-3.0` ~ `-Pspring-boot-4.1`) |
-| Spring Framework | **6.1.x** | 6.0.x ~ 6.2.x / 7.0.x | Managed by Spring Boot |
-| JDK | **17, 21** | 17, 21 verified | Compile target `java.version=17`; JDK 21 provides virtual thread support |
+| Spring Boot | **3.5.16** | 3.0.x ~ 3.5.x | Switch via Maven profile (`-Pspring-boot-3.0` ~ `-Pspring-boot-3.5`); for 4.x see the `4.1.x` branch |
+| Spring Framework | **6.2.x** | 6.0.x ~ 6.2.x | Managed by Spring Boot |
+| JDK | **17** | 17 / 21 / 25 (CI matrix, see [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)) | Compile target `java.version=17`; JDK 21+ supports virtual threads (see below) |
 | Servlet API | **jakarta.servlet 6.0** | 6.0.x | javax.servlet incompatible |
-| Netty | **4.1.110.Final** | 4.1.x | |
+| Netty | **4.1.137.Final** | 4.1.x | |
 | Jackson | **2.17.2** | 2.17.x | |
-| Lombok | **1.18.36** | 1.18.30+ | Higher version needed for JDK 17+ compatibility |
+| Lombok | **1.18.46** | 1.18.30+ | Higher version needed for JDK 17+ compatibility |
 | JMH | **1.37** | 1.37 | Benchmark module only |
 
 ### Additional Features
 
-- **Virtual threads**: enable with `spring.threads.virtual.enabled=true` on JDK 21+, business thread pool auto-switches to virtual threads
-- **GraalVM native-image**: `FastInvokerGenerator` degrades to `MethodHandle` calls under native-image; `reflect-config.json` is pre-configured
+- **Virtual threads**: enable with `spring.threads.virtual.enabled=true` on JDK 21+ and both the `default` business pool and batch methods (`@BatchMapping`) switch to virtual threads (only the thread type changes: `pool.*` bounds/queueing and batch's `consumerSize` cap + backpressure semantics are all unchanged) — via reflection on `Thread.ofVirtual`, so it compiles on JDK 17; below JDK 21 it warns and falls back to platform threads. Implemented in `VirtualThreadSupport` / `BizPoolRegistry`. E2E coverage: `VirtualThreadE2ETest` and `BatchVirtualThreadE2ETest` (all master-branch sources, not present on this branch)
+- **GraalVM native-image**: `FastInvokerGenerator` degrades to `MethodHandle` calls under native-image; `SpringWebRuntimeHints` registers event-path/resource/async-callback reachability hints; `ControllerBeanFactoryInitializationAotProcessor` (via `META-INF/spring/aot.factories`) auto-registers reflection/serialization hints for user `@Controller` methods and DTOs at AOT build time
 - **WebSocket**: auto-configuration based on Jakarta WebSocket
+
+### GraalVM native-image Support Matrix
+
+| Scenario | Status | Notes |
+|----------|--------|-------|
+| SB3 (master default 3.5.x) | ✅ Usable | `SpringWebRuntimeHints` + `ControllerBeanFactoryInitializationAotProcessor`; no manual hints needed for user `@Controller`/DTO; example `spring-web-example-rest` binds `process-aot`; **Windows GraalVM 21.0.2 + MSVC native build & request flow verified end-to-end** |
+| SB4 (4.0.x/4.1.x, `4.1.x` branch) | ❌ Not supported | The 4.x event bridge needs runtime `defineClass` (forbidden in closed world); explicitly documented as excluded on the `4.1.x` branch |
+| epoll transport | ✅ Verified | Netty epoll `.so` verified in a Linux native build environment (NIO transport also verified on Windows native) |
+| WebSocket `@ServerEndpoint` | ⚠️ Register as Bean | classpath scanning unavailable under native; `JsrEndpointScanner` auto-degrades to Bean discovery |
+| Native build verification | ✅ Windows & Linux verified | Windows: `mvn -Pnative package` (GraalVM + MSVC, `vcvars64` env + `-H:-CheckToolchain`); Linux: CI `ubuntu-latest` runs `scripts/native-smoke-test.sh` (build + launch + request-flow assertions) |
 
 ---
 
@@ -76,7 +95,7 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 | Need virtual threads (JDK 21) | `master` |
 | Need GraalVM native-image | `master` |
 
-> **Branch recommendation**: For JDK 8/11 existing projects, choose `master`/`2.7.x` and use `-Pspring-boot-2.6` / `-Pspring-boot-2.5` / `-Pspring-boot-2.4` to switch target versions. For JDK 17+ new projects, choose `master` (supports virtual threads, GraalVM native-image).
+> **Branch recommendation**: For JDK 8/11 existing projects, choose `2.7.x` and use `-Pspring-boot-2.6` / `-Pspring-boot-2.5` / `-Pspring-boot-2.4` to switch target versions. For JDK 17+ new projects, choose `master` (supports virtual threads, GraalVM native-image).
 
 ---
 
@@ -89,26 +108,26 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 | Virtual threads | Not supported | Supported (JDK 21+) |
 | GraalVM native-image | Not supported | Supported |
 | `ModelMap` vs `Model` | `ModelMap implements Model` | **`ModelMap` does NOT implement `Model`** (requires `ExtendedModelMap`) |
-| `spring-web-view` | Per backport status | New feature baseline |
+| `spring-web-view` | Already present (the `2.7.x` branch pom includes this module) | New feature baseline |
 
 ---
 
 ## spring-web-view and Model Type Differences
 
-The view rendering module depends on Spring's `org.springframework.ui` types. Because the class designs differ between Spring Framework 6.1 (master) and 5.3 (2.7.x), the **Model parameter injection implementation differs**:
+The view rendering module depends on Spring's `org.springframework.ui` types. Because the class designs differ between Spring Framework 6.2 (master) and 5.3 (2.7.x), the **Model parameter injection implementation differs**:
 
 | Branch | Spring Framework | `ModelMap` implements `Model`? | Framework injection type | Notes |
 |--------|-----------------|-------------------------------|--------------------------|-------|
-| `master` | 6.1.x | ❌ No | `ExtendedModelMap` (subclass of `ModelMap` and implements `Model`) | Always injects `ExtendedModelMap` to support `Model`/`ModelMap`/`ExtendedModelMap` declarations |
+| `master` | 6.2.x | ❌ No | `ExtendedModelMap` (subclass of `ModelMap` and implements `Model`) | Always injects `ExtendedModelMap` to support `Model`/`ModelMap`/`ExtendedModelMap` declarations |
 | `2.7.x` | 5.3.x | ✅ Yes | `ExtendedModelMap` (simpler on backport) | `ModelMap` itself is castable to `Model` |
 
-> **Backport note**: `ModelSupport.getOrCreate()` in `spring-web-view` needs no special handling on 2.7.x — Spring 5.3's `ModelMap` already implements `Model`, so the same implementation can be reused.
+> **Backport note**: `ModelContext.getOrCreate()` in `spring-web` core needs no special handling on 2.7.x — Spring 5.3's `ModelMap` already implements `Model`, so the same implementation can be reused.
 
 ### Thymeleaf / FreeMarker Version Matrix
 
 | Branch | Thymeleaf (BOM-managed) | FreeMarker (BOM-managed) |
 |--------|-------------------------|--------------------------|
-| `3.2.12` (master) | 3.1.2.RELEASE | 2.3.33 |
+| `3.5.16` (master) | 3.1.5.RELEASE | 2.3.34 |
 | `2.7.18` (2.7.x) | 3.0.15.RELEASE | 2.3.32 |
 
 `spring-web-view` declares engines as `provided`; exact versions are managed by the user's Spring Boot BOM.

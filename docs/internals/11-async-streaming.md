@@ -901,7 +901,8 @@ public final class BackpressureHandler extends ChannelInboundHandlerAdapter {
     public void channelWritabilityChanged(ChannelHandlerContext ctx) {
         Channel ch = ctx.channel();
         boolean writable = ch.isWritable();
-        ConnectionContext conn = ch.attr(NettyServerHttpResponse.CONN_CTX).get();
+        ChannelAttrs attrs = ChannelAttrs.ofIfPresent(ch);
+        ConnectionContext conn = attrs == null ? null : attrs.connCtx;
         if (conn == null) { ctx.fireChannelWritabilityChanged(); return; }
 
         boolean last = conn.lastWritable();
@@ -949,10 +950,11 @@ drain() 恢复：wip 从 0 递增，继续排空
 // NettyServerHttpResponse.java
 public void setWritableCallback(Runnable callback) {
     runOnEventLoop(() -> {
-        ConnectionContext conn = ctx.attr(NettyServerHttpResponse.CONN_CTX).get();
+        ChannelAttrs attrs = ChannelAttrs.of(ctx.channel());
+        ConnectionContext conn = attrs.connCtx;
         if (conn == null) {
             conn = new ConnectionContext();
-            ctx.attr(NettyServerHttpResponse.CONN_CTX).set(conn);
+            attrs.connCtx = conn;
         }
         conn.setOnWritable(callback);
     });

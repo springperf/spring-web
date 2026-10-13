@@ -20,7 +20,7 @@ import java.util.concurrent.*;
  * 业务线程池注册表，自身作为 {@link LifecycleWebComponent} 初始化。
  * <p>
  * Phase1 从 {@link ApplicationProperties} 读取配置并创建线程池，
- * 开发人员也可在 Phase1 后通过 {@link #register(String, ThreadPoolExecutor)} 添加自定义池。
+ * 开发人员也可在 Phase1 后通过 {@link #register(String, ExecutorService)} 添加自定义池。
  * 池映射通过 {@link MappingCacheKey} 延迟解析：首次调用时才扫描 {@link RunInPool} 并缓存，后续零反射。
  * <p>
  * 配置方式（application.properties）：

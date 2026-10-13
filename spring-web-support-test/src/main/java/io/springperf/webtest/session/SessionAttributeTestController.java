@@ -51,7 +51,7 @@ public class SessionAttributeTestController {
         return result;
     }
 
-    /** @SessionScope bean 跨请求在 session 内共享计数。 */
+    /** {@code @SessionScope} bean 跨请求在 session 内共享计数。 */
     @GetMapping("/counter")
     public Map<String, Object> counter(HttpServletRequest request) {
         int value = counter.increment();

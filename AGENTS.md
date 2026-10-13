@@ -14,12 +14,14 @@
 
 ## 项目配置
 
-- Java 8 源码兼容
-- 多版本兼容：Spring Boot 2.7.x / 2.6.x / 2.5.x / 2.4.x（BOM + Profile 切换）
-- Netty 4.1.110.Final
+- Java 8 源码兼容（`pom.xml` 的 `java.version=8`）
+- 多版本兼容：默认 Spring Boot **2.7.18**，Profile 覆盖 **2.4 / 2.5 / 2.6 / 2.7**（`-Pspring-boot-*` 切换）
+- Netty 4.1.137.Final
 - Jackson 2.17.2、Fastjson 2.0.60（provided）
 - Lombok 1.18.24
-- 测试：Spring Boot Test + JUnit 5.8.2 + OkHttp 4.12.0 + AssertJ 3.25.3 + Mockito 4.11.0 + Actuator
+- 测试：Spring Boot Test + JUnit 5.8.2 + OkHttp 4.12.0 + AssertJ 3.22.0 + Mockito 4.5.1 + Actuator
+
+> 以上取值**以 [`pom.xml`](pom.xml) 为准**（Profile 会覆盖其中多项）；跨分支的版本矩阵与差异见 [`docs/compatibility.md`](docs/compatibility.md)。
 
 # 状态机
 
@@ -84,6 +86,15 @@ VERIFY -> COMPLETE
 必须读取：
 
 - .agent/context/2.7.x-migration-checklist.md
+
+# 分支策略
+
+- `master` —— 主线，**纯 Spring Boot 3.5.x**，不含任何 Spring Boot 4 / Spring 7 兼容处理
+- `2.7.x` —— 下游适配分支（Spring Boot 2.4 ~ 2.7，Java 8 / javax），从 master cherry-pick 后做降级适配
+- `4.1.x` —— 下游适配分支（Spring Boot 4.0/4.1）
+
+同步方向始终是 `master → 2.7.x` 与 `master → 4.1.x`；适配代码只存在于下游分支。
+
 # 语言规则
 
 - 默认响应语言：简体中文
@@ -99,4 +110,4 @@ VERIFY -> COMPLETE
 - 偏好简洁但有技术深度的解释
 - 性能优先
 - 必须真实执行命令并分析输出
-- Git 提交注释 50 个字符以内
+- Git 提交注释限制在 1000 个字符以内，首行在 80 个字符内

@@ -1,6 +1,8 @@
+> English | [中文](../benchmark.md)
+
 # Spring WebPerf Performance Benchmark Report
 
-**Generated:** 2026-08-17
+**Generated:** 2026-08-15
 
 **JDK:** jdk-17.0.9
 
@@ -19,6 +21,8 @@
 | p50 latency (json 16t) | **0.22ms** | 0.32ms (**69%**) | 0.32ms (**69%**) |
 | Allocation / request (json 4t) | **10.1KB** | 23.4KB (**43%**) | 32.6KB (**31%**) |
 | Heap at 4 threads | **24MB** | 26MB | 25MB |
+
+> Heap figures come from the same benchmark run (`json` scenario, 4 threads); see [version source](#framework-versions) below for the container version matrix.
 
 Across **7 APIs × 3 concurrency levels (4/8/16 threads)**, perf is **#1 on every API at every level** (no exceptions). The most dramatic advantage is SSE: at 16t throughput reaches **7.72x** Spring MVC and p50 latency is only **13%** of Tomcat's.
 
@@ -73,7 +77,7 @@ Versions below are the actual resolved artifacts from the project's `spring-boot
 | OkHttp (JMH client) | **4.12.0** |
 | JMH | **1.37** |
 
-> **Version source:** perf runs on native Netty (see [configuration](../README.md)); the other four container versions are governed by Spring Boot 3.2.12 dependency management (Spring Framework 6.1.15 → Spring MVC / WebFlux, Tomcat 10.1.33, Undertow 2.3.17.Final, Reactor Netty 1.1.24); Netty 4.1.115.Final, Jackson 2.17.2 and OkHttp 4.12.0 are explicit project overrides. To reproduce, pin `spring-boot.version` in `pom.xml`.
+> **Version source:** perf runs on native Netty (see [configuration](../../README.md)); the other four container versions are governed by Spring Boot 3.2.12 dependency management (Spring Framework 6.1.15 → Spring MVC / WebFlux, Tomcat 10.1.33, Undertow 2.3.17.Final, Reactor Netty 1.1.24). Netty 4.1.115.Final / Jackson 2.17.2 / OkHttp 4.12.0 in that table are the versions **actually used for this run** (a benchmark-snapshot anchor, see the test date) and are **not** what today's `master` pom declares (currently Netty `4.1.137.Final`). To reproduce, pin `spring-boot.version` and `netty.version` in `pom.xml`.
 
 ## Benchmarked APIs
 
@@ -166,7 +170,7 @@ Throughput growth from 4 → 16 threads; how well each framework extends under c
 | bytesLarge | **0.21 / 0.35 / 0.76** | 0.38 / 0.57 / 2.76 | 0.29 / 0.48 / 1.70 | 0.31 / 0.54 / 1.68 |
 | sse | **0.28 / 0.46 / 3.27** | 2.27 / 6.92 / 8.40 | FAIL | 1.26 / 2.81 / 3.43 |
 
-perf p50 is **0.10–0.28ms** (small payloads), 45–67% of Spring MVC. Lowest p99 is **0.14ms** (bytes/async), and p99.9 leads across the board — the EventLoop model keeps tail latency extremely stable at low concurrency.
+For the small-payload APIs (json/get/bytes/valid/async) perf's p50 is **0.10–0.11ms**, 45–67% of Spring MVC; `bytesLarge` (large payload) is 0.21ms and `sse` is 0.28ms (SSE is where Spring MVC trails most, at 2.27ms). Lowest p99 is **0.14ms** (bytes/async), and p99.9 leads across the board — the EventLoop model keeps tail latency extremely stable at low concurrency.
 
 For SSE, perf p50 is **0.28ms** — only **12%** of Spring MVC (2.27ms) and better than WebFlux (1.26ms).
 
@@ -428,5 +432,5 @@ spring-web-benchmark/benchmark-reports/
 | Issue | Impact | Status |
 |-------|--------|--------|
 | SSE fails on Undertow | Spring MVC (Undertow) / sse | Undertow SSE implementation limitation (4t/8t all FAIL; 16t thrpt ran but sample latency still FAIL) |
-| bytesLarge throughput dips at high concurrency | perf / bytesLarge | 100KB write-buffer pressure; every container dips 8→16t (perf 19,111→15,603), TBD |
+| bytesLarge throughput dips at high concurrency | perf / bytesLarge | 100KB write-buffer pressure; every container dips 8→16t (perf 19,111→15,603) — left for future optimization |
 | In-process oversubscription at high concurrency | all / high concurrency | When client threads exceed core count (>16t), in-process measurement degrades to "scheduling efficiency of client+server sharing CPU": light-API throughput drops and framework gaps flatten. This is a measurement-model limitation, not a server defect. Verified with JFR: at 64t client threads steal 74% of CPU samples, the server's 4 EventLoops get only 22%. For a fair high-concurrency comparison use [benchmark-wsl.md](../benchmark-wsl.md) (WSL external — client/server CPU separated) |

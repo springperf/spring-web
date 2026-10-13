@@ -7,7 +7,7 @@
 [![CI](https://github.com/springperf/spring-web/actions/workflows/ci.yml/badge.svg)](https://github.com/springperf/spring-web/actions/workflows/ci.yml)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.springperf/spring-web)](https://central.sonatype.com/artifact/io.github.springperf/spring-web)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE.md)
-[![Throughput](https://img.shields.io/badge/Throughput-1.2~12.6x_vs_Spring_MVC-brightgreen?style=flat-square)](docs/benchmark.md)
+[![Throughput](https://img.shields.io/badge/Throughput-1.45~12.6x_vs_Spring_MVC-brightgreen?style=flat-square)](docs/benchmark.md)
 [![SSE](https://img.shields.io/badge/SSE-7.7x_under_high_concurrency-blue?style=flat-square)](docs/benchmark.md)
 
 ---
@@ -23,7 +23,7 @@
 > [完整 Benchmark 报告](docs/benchmark.md) · [性能原理详解](docs/performance-principles.md)
 
 > **为什么是这个方案？** —— 三层论证：批处理为何优于非阻塞、CPU 优化为何是下一关、两者叠加为何才是完整方案。
-> 
+>
 > [高性能 Java Web 的完整路径 →](docs/philosophy.md)
 
 ---
@@ -36,7 +36,7 @@
 >
 > **Spring WebPerf 由此而生。** 目标：在兼容 Spring 生态的前提下，最大程度释放 Web 框架的性能。
 >
-> [查看 Benchmark 报告](docs/benchmark.md) · [性能原理详解](docs/performance-principles.md) · [项目缘起全文](docs/overview.md)
+> [查看 Benchmark 报告](docs/benchmark.md) · [性能原理详解](docs/performance-principles.md) · [项目缘起全文](docs/overview.md) · [更新日志](CHANGELOG.md) · [破坏性变更](docs/breaking-changes.md)
 
 ---
 
@@ -49,12 +49,12 @@ Spring WebPerf 是一个基于 **Netty** 构建的高性能 Web 框架，定位�
 ## 核心特性
 
 - **高性能** — 启动时预缓存全部元数据，运行时零反射零匹配；ASM 字节码生成替代反射调用；O(1) HashMap 路由；GC 友好设计
-- **Netty 驱动** — 基于 Netty 4.1 事件驱动 I/O，请求默认在 EventLoop 处理，可按方法粒度通过 `@RunInPool` 调度到业务线程池
+- **Netty 驱动** — 基于 Netty 4.1 事件驱动 I/O，请求默认在 `default` 业务线程池执行以保护 EventLoop，可按方法粒度通过 `@RunInPool` 调度到自定义线程池或直接到 EventLoop
 - **Spring 生态兼容** — 支持 `@RestController`、`@RequestMapping`、`@Validated`、`@ExceptionHandler`、`HandlerInterceptor` 等 Spring 注解与抽象，零侵入迁移
 - **异步原生** — 内置 DeferredResult、Callable、SseEmitter、StreamEmitter、Reactive Streams 支持，SSE 吞吐达 Spring MVC 的 12.63x（4 线程）/ 7.72x（16 线程）
 - **批量处理** — 基于 Disruptor 的请求聚合批处理，透明地将并发请求合并为批量操作，吞吐量可提升数倍；支持背压策略、等待策略、线程池隔离
 - **灵活扩展** — 参数解析器、返回值处理器、编解码 Advice、拦截器、过滤器等关键节点均提供 SPI
-- **生态桥接** — 可通过 support 模块桥接 Servlet Filter、Spring MVC `HandlerInterceptor`、`RequestBodyAdvice` / `ResponseBodyAdvice`
+- **生态桥接** — 可通过 `spring-web-servlet` 模块桥接 Servlet Filter、Spring MVC `HandlerInterceptor`、`RequestBodyAdvice` / `ResponseBodyAdvice`
 - **服务端渲染** — 可选 `spring-web-view` 模块支持 Thymeleaf / FreeMarker 模板引擎，`@Controller` + `Model` + 视图名编程模型与 Spring MVC 一致
 - **Actuator 集成** — 支持 Spring Boot Actuator，可配置独立管理端口
 
@@ -110,7 +110,7 @@ server:
   servlet:
     context-path: /api               # 应用上下文路径（可选）
   http:
-    max-content-length: 5242880      # 最大请求体，默认 1MB
+    max-content-length: 5242880      # 最大请求体，默认 4MB
     timeout: 15000                   # 请求超时，默认 60s（毫秒）
 management:
   server:
@@ -120,8 +120,6 @@ management:
 > 完整配置参考见 [配置文档](docs/configuration.md)。
 >
 > 从 Spring Boot（Spring MVC）项目迁移？查看[迁移指南](docs/quickstart.md)。
->
-> 从 Spring AI 项目迁移？查看[AI 集成指南](docs/ai-guide.md)。
 
 ---
 
@@ -142,7 +140,7 @@ management:
 | bytesLarge | **18,250** ops/s | **1.82x** | **1.45x** | **1.55x** |
 | sse | **13,323** ops/s | **12.63x** | — | **5.08x** |
 
-perf 框架吞吐是 Servlet 容器的 **1.6\~12.6x**，p50 延迟 **0.10\~0.11ms**（同类框架最低）。SSE 4 线程达 Spring MVC 的 **12.63x**、16 线程 **7.72x**。详情见 [完整对比报告](docs/benchmark.md)。
+perf 框架吞吐是 Servlet 容器的 **1.45\~12.6x**，p50 延迟 **0.10\~0.11ms**（同类框架最低）。SSE 4 线程达 Spring MVC 的 **12.63x**、16 线程 **7.72x**。详情见 [完整对比报告](docs/benchmark.md)。
 
 ---
 
@@ -150,29 +148,35 @@ perf 框架吞吐是 Servlet 容器的 **1.6\~12.6x**，p50 延迟 **0.10\~0.11m
 
 | 维度 | WebPerf | Spring MVC (Tomcat) |
 |------|-----------|---------------------|
-| 底层引擎 | Netty 4.1.115.Final | Spring MVC 6.1.15 + Tomcat 10.1.33（Undertow 2.3.17.Final） |
+| 底层引擎 | Netty 4.1.137.Final | Spring MVC 6.1.15 + Tomcat 10.1.33（Undertow 2.3.17.Final） |
 | 吞吐量 (json 4t) | **37,508** ops/s | 19,900 ops/s (1.88x) |
 | P50 延迟 (bytes 4t) | **0.10ms** | 0.15ms |
 | 稳态堆占用 (4t) | **24MB** | 26MB |
+
+> **基准快照。** 上表数字来自一次 JMH 运行（JDK 17 + G1GC、1GB 堆）；对比容器的版本由 **Spring Boot 3.2.12** 依赖管理决定（Spring Framework 6.1.15、Tomcat 10.1.33、Undertow 2.3.17.Final）。WebPerf 一列的 Netty 版本是框架**当前**取值（4.1.137.Final），而四个对比容器在测试时点被锁定——完整矩阵与复现方式见[基准报告](docs/benchmark.md#对比框架版本)。
+
 | I/O 模型 | Netty 非阻塞传输 + EventLoop 处理 | Servlet 阻塞 I/O + 容器线程 |
 | 线程模型 | EventLoop 直接处理或 `@RunInPool` 按需切换 | 固定容器线程池 |
 | 方法调用 | ASM / MethodHandle（~10-30ns） | `Method.invoke()` 反射（~200ns） |
 | 参数解析 | 启动时预缓存，运行时直接调用 | 每次请求遍历 + `synchronized` 缓存 |
 | 路由 | O(1) HashMap 多级优化器 | `AntPathMatcher` 线性遍历 |
-| Servlet API | 通过 support 模块桥接 | 原生支持 |
+| Servlet API | 通过 `spring-web-servlet` 桥接 | 原生支持 |
 | Actuator | 原生支持 | 原生支持 |
 
 ---
 
 ## 版本选择
 
-本项目按 Spring Boot 大版本管理两个分支。最低支持 **Spring Boot 2.4.x**。
+本项目管理三个分支：一条主线（Spring Boot 3.5.x）与两条下游适配分支。最低支持 **Spring Boot 2.4.x**。
 
 | 分支 | Spring Boot | Spring Framework | JDK | Servlet API | 状态 |
 |------|------------|----------------|-----|-------------|------|
-| `2.7.x` | 2.4.x ~ 2.7.x | 5.3.x | 8 / 11 / 17 | javax.servlet 4.0 | 维护分支（功能迭代 + bugfix） |
-| `master` | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | 6.0.x ~ 6.2.x / 7.0.x | 17 / 21 | jakarta.servlet 6.0 | **开发基线**（多版本兼容，切换 Profile） |
+| `2.7.x` | 2.4.x ~ 2.7.x | 5.3.x | 8 / 11 / 17 | javax.servlet 4.0 | 下游适配分支（从 master 同步） |
+| `master` | **3.5.x** | 6.2.x | 17 / 21 / 25 | jakarta.servlet 6.0 | **开发基线**（不含 Spring Boot 4 代码） |
+| `4.1.x` | 4.0.x ~ 4.1.x | 7.0.x | 17 / 21 / 25 | jakarta.servlet 6.0 | 下游适配分支（从 master 同步） |
 
+> `4.1.x` 在**开发期沿用主线的项目版本号**；**发布该分支时**再统一提升为 **`4.1.7`**（首个 4.1.x 版本，当前尚无发布版本）。分支内的 `spring-boot.version`（Boot 4.1.0）与项目版本号无关。
+>
 > 版本下限说明、分支选择建议及详细兼容性信息见 [版本兼容性说明](docs/compatibility.md)。
 
 ---
@@ -190,9 +194,10 @@ perf 框架吞吐是 Servlet 容器的 **1.6\~12.6x**，p50 延迟 **0.10\~0.11m
 | `spring-boot-starter-web` | Spring Boot Starter：自动配置、Actuator 支持 |
 | `spring-web-test` | 集成测试模块 |
 | `spring-web-support-test` | 桥接层兼容测试模块 |
+| `spring-web-benchmark` | JMH 基准与报告生成器（5 个栈：perf / perf-support / tomcat / undertow / webflux） |
 | `spring-web-examples` | 各场景使用示例 |
 
-> ¹ 视图渲染用法见 [视图渲染文档](docs/view.md)，与 Spring MVC 的差异见该文档第五节。
+> ¹ 视图渲染用法见 [视图渲染文档](docs/view.md)，与 Spring MVC 的差异见该文档[第七节](docs/view.md#七与-spring-mvc-的差异)。
 >
 > ² `spring-web-mvc-support` 模块中部分类使用了 `org.springframework.web.servlet` 包路径（如 `HandlerInterceptor`），与 Spring WebMVC 官方包路径相同。这是有意为之——基于 Spring MVC 接口编写的代码可不改 import 直接运行。但这也意味着本模块与 `spring-webmvc` **二者不能同时存在**，否则运行时会产生类冲突。Java 9+ 模块化系统下也会触发 split package 错误，请务必二选一。仅需 Servlet 兼容的用户只依赖 `spring-web-servlet` 即可，classpath 上不会出现任何 `org.springframework.web.servlet.*` 类。
 >

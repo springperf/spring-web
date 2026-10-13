@@ -46,6 +46,7 @@
         <module>spring-web-view</module>
         <module>spring-web-batch</module>
         <module>spring-web-examples</module>
+        <module>coverage-aggregate</module>
     </modules>
 
     <properties>
@@ -82,12 +83,22 @@
         <maven-failsafe-plugin.version>3.0.0-M5</maven-failsafe-plugin.version>
         <maven-resources-plugin.version>3.1.0</maven-resources-plugin.version>
         <maven-jar-plugin.version>3.1.2</maven-jar-plugin.version>
+        <!-- 生命周期默认绑定插件：必须显式声明版本，否则被 enforcer 的 requirePluginVersions 拦截
+             （取值与 master 一致：clean 3.2.0 / install 3.1.2 / deploy 3.1.2 / site 3.12.1，
+             均兼容 Maven 3.6.3+ 与 JDK 8） -->
+        <maven-clean-plugin.version>3.2.0</maven-clean-plugin.version>
+        <maven-install-plugin.version>3.1.2</maven-install-plugin.version>
+        <maven-deploy-plugin.version>3.1.2</maven-deploy-plugin.version>
+        <maven-site-plugin.version>3.12.1</maven-site-plugin.version>
         <maven-source-plugin.version>3.2.0</maven-source-plugin.version>
         <maven-javadoc-plugin.version>3.2.0</maven-javadoc-plugin.version>
         <build-helper-maven-plugin.version>3.6.0</build-helper-maven-plugin.version>
 
         <!-- 测试覆盖率：JaCoCo -->
         <jacoco.version>0.8.13</jacoco.version>
+
+        <!-- 门禁：插件版本必须显式声明（maven-enforcer-plugin，见下方 build/plugins） -->
+        <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
     </properties>
 
     <build>
@@ -131,6 +142,28 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-jar-plugin</artifactId>
                     <version>${maven-jar-plugin.version}</version>
+                </plugin>
+                <!-- 以下 4 个是生命周期默认绑定插件（clean/install/deploy/site），
+                     显式声明版本以通过 enforcer 的 requirePluginVersions 门禁 -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-clean-plugin</artifactId>
+                    <version>${maven-clean-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-install-plugin</artifactId>
+                    <version>${maven-install-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-deploy-plugin</artifactId>
+                    <version>${maven-deploy-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-site-plugin</artifactId>
+                    <version>${maven-site-plugin.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -183,6 +216,40 @@
                 </plugin>
             </plugins>
         </pluginManagement>
+
+        <!--
+            门禁：插件版本必须显式声明（禁止 LATEST/RELEASE/SNAPSHOT 浮动版本）。
+            与 master 的差异：master 的 enforce-baseline 还含 requireJavaVersion [17,)
+            与 enforceBytecodeVersion maxJdkVersion 17 两条规则，与本分支的 JDK 8 目标冲突，
+            故只移植 requirePluginVersions 一条（决策见 .agent/context/2.7.x-sync-gap-checklist.md §31.9）。
+            执行 id 也由 enforce-baseline 改名，避免与 master 的规则集产生同名不同义的混淆。
+        -->
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>${maven-enforcer-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>enforce-plugin-versions</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <phase>validate</phase>
+                        <configuration>
+                            <rules>
+                                <requirePluginVersions>
+                                    <message>[ERROR] 插件版本必须显式声明：禁止 LATEST/RELEASE/SNAPSHOT 浮动版本</message>
+                                    <banLatest>true</banLatest>
+                                    <banRelease>true</banRelease>
+                                    <banSnapshots>true</banSnapshots>
+                                </requirePluginVersions>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
     </build>
 
     <profiles>

@@ -47,7 +47,7 @@ public final class ViewProperties {
     /** Beetl 模板模式（对齐 spring.beetl.mode，如 HTML）；Beetl 无原生 mode 概念，保留配置以对称 thymeleaf/freemarker。 */
     public static final String BEETL_MODE = "spring.beetl.mode";
     public static final String BEETL_MODE_DEFAULT = "HTML";
-    /** Beetl 模板缓存 TTL（对齐 spring.beetl.cache-ttl，Duration 风格；<=0 表示不过期）。 */
+    /** Beetl 模板缓存 TTL（对齐 spring.beetl.cache-ttl，Duration 风格；小于等于 0 表示不过期）。 */
     public static final String BEETL_CACHE_TTL = "spring.beetl.cache-ttl";
     /** Beetl 是否启用（对齐 spring.beetl.enabled）：false 时 resolveViewName 直接返回 null。 */
     public static final String BEETL_ENABLED = "spring.beetl.enabled";

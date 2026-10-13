@@ -23,7 +23,6 @@ import java.util.concurrent.atomic.AtomicLong;
  *   <li>{@code batch.queue.remaining} — Gauge, ring buffer remaining capacity</li>
  *   <li>{@code batch.queue.capacity} — Gauge, ring buffer total capacity</li>
  * </ul>
- * </p>
  * <p>
  * The per-queue caches use {@code ConcurrentHashMap}, but gauge registration is performed <em>outside</em> any mapping
  * function (see {@link #registerRemainingGauge}): registering while holding a CHM bin lock would call into

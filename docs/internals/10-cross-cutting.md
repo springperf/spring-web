@@ -30,7 +30,7 @@ Spring MVC 的做法是：每类横切逻辑各有一个独立的遍历链，运
 
 `InterceptorRegistry.realGetInterceptors`是拦截器匹配的入口。它使用三层缓存策略：
 
-1. **请求属性缓存**（`getInterceptors` :140-147）：单次请求多次调用 `preHandle`/`postHandle`/`afterCompletion` 时，拦截器列表缓存在 `RequestContext` 的 `INTERCEPTORS_ATTRIBUTE` 中，避免重复计算。
+1. **请求属性缓存**（`InterceptorRegistry.getInterceptors`）：单次请求多次调用 `preHandle`/`postHandle`/`afterCompletion` 时，拦截器列表缓存在 `RequestContext` 的 `INTERCEPTORS_ATTRIBUTE` 中，避免重复计算。
 2. **`PathMappingContext.cachedInterceptors`**：按方法缓存预计算的结果。`initCachedInterceptors`在首次请求时计算，DCL 保护并发。
 3. **`RuntimeMappingInterceptor` 运行时路径匹配**：对包含 `includePatterns`/`excludePatterns` 的拦截器，运行时按请求路径检查 `matches`。
 
@@ -251,7 +251,13 @@ public void handle(Throwable ex, WebServerHttpRequest req, WebServerHttpResponse
         if (handled) {
             resp.setHandled();
         } else {
-            resp.sendError(INTERNAL_SERVER_ERROR, "Internal Server Error");  // 兜底 500
+            // 兜底 500：消息取**最深层根因**的 message（沿 getCause() 链下潜，
+            // 自引用则停在原异常），为空才回落 "Internal Server Error"。
+            // 这样用户看到的是真实出错原因（如 "Connection refused"）而非笼统文案。
+            resp.sendError(INTERNAL_SERVER_ERROR, rootCauseMessage(ex), ex,
+                    ErrorResponseConfig.isParamPresent(req, "trace"),
+                    ErrorResponseConfig.isParamPresent(req, "message"),
+                    ErrorResponseConfig.isParamPresent(req, "errors"));
         }
     } catch (Exception e) {
         log.error("ExceptionRegistry.doHandle/sendError failed for original [{}] {}",
@@ -259,6 +265,9 @@ public void handle(Throwable ex, WebServerHttpRequest req, WebServerHttpResponse
     }
 }
 ```
+
+`rootCauseMessage(Throwable)` 的实现：沿 `getCause()` 链下潜（防自引用导致死循环），
+取最后一个有非空 `message` 的异常；全链都无消息时回落 `"Internal Server Error"`。
 
 ### 4.2 `ExceptionHandlerExceptionResolver`：`@ExceptionHandler` 扫描
 
@@ -286,7 +295,7 @@ protected void initExceptionHandler() {
 
 `resolveException`是运行时异常匹配入口：
 
-1. 从 `PathMappingContext` 获取缓存的 `ExceptionHandlerAdvice[]`（`getCachedExceptionHandlerAdvices` :156-180）。
+1. `ExceptionHandlerExceptionResolver` 从 `PathMappingContext` 取请求，再用 `getCachedExceptionHandlerAdvices` 取缓存的 `ExceptionHandlerAdvice[]`。
 2. 遍历 `advices`，对每个 `advice` 调用 `resolveHandlerMethod(ex)` → 找到最匹配的 `@ExceptionHandler` 方法。
 3. 如果匹配且异常类型是 `ResponseStatusException`，检查 `isExplicitRseHandler`——只有显式声明 `@ExceptionHandler(ResponseStatusException.class)` 的处理器才处理，避免被 `@ExceptionHandler(Throwable.class)` 等宽泛声明意外拦截。
 
@@ -373,4 +382,4 @@ static boolean isExplicitRseHandler(MappingHandlerMethod handlerMethod) {
 
 ---
 
-> **下一篇**：[11 · 异步流式支持](11-async-streaming.md)——异步任务、流式输出、SSE：`DeferredResult`、`Callable`、`StreamEmitter`、`NettyStreamSender`。
+> **下一篇**：[11 · 异步流式支持](11-async-streaming.md)——异步任务、流式输出、SSE：`DeferredResult`、`Callable`、`StreamEmitter`、`AbstractNettyStreamSender`。

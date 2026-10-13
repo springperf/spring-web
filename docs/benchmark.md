@@ -2,7 +2,7 @@
 
 # Spring WebPerf 性能对比报告
 
-**生成时间:** 2026-08-17
+**生成时间:** 2026-08-15
 
 **JDK:** jdk-17.0.9
 
@@ -21,6 +21,8 @@
 | p50 延迟 (json 16t) | **0.22ms** | 0.32ms (**69%**) | 0.32ms (**69%**) |
 | 每请求内存分配 (json 4t) | **10.1KB** | 23.4KB (**43%**) | 32.6KB (**31%**) |
 | 4 线程堆内存 | **24MB** | 26MB | 25MB |
+
+> 堆内存数据取自同一次基准运行的 `json` 场景稳态堆（4 线程）；容器的版本口径见下文[版本来源](#对比框架版本)。
 
 perf 在 7 个接口 × 3 个并发度（4/8/16 线程）对比中，**全部接口、全部并发度第一**（无一例外）。SSE 场景优势最显著（16 线程吞吐达 Spring MVC 的 **7.72 倍**、p50 延迟仅其 **13%**）。
 
@@ -75,7 +77,7 @@ perf 在 7 个接口 × 3 个并发度（4/8/16 线程）对比中，**全部接
 | OkHttp（JMH 客户端） | **4.12.0** |
 | JMH | **1.37** |
 
-> **版本来源：** perf 使用原生 Netty（见 [配置](../README_CN.md)），其余四档容器版本由 Spring Boot 3.2.12 依赖管理决定（Spring Framework 6.1.15 → Spring MVC / WebFlux、Tomcat 10.1.33、Undertow 2.3.17.Final、Reactor Netty 1.1.24）；Netty 4.1.115.Final、Jackson 2.17.2、OkHttp 4.12.0 为项目显式覆盖。如需复现，请锁定 `pom.xml` 中的 `spring-boot.version`。
+> **版本来源：** perf 使用原生 Netty（见 [配置](../README_CN.md)），其余四档容器版本由 Spring Boot 3.2.12 依赖管理决定（Spring Framework 6.1.15 → Spring MVC / WebFlux、Tomcat 10.1.33、Undertow 2.3.17.Final、Reactor Netty 1.1.24）。表中 Netty 4.1.115.Final / Jackson 2.17.2 / OkHttp 4.12.0 是**本次测试实际使用的版本**（基准快照锚点，见测试日期），**不等于当前 `master` 的 pom 取值**（现为 Netty `4.1.137.Final`）。如需复现，请锁定 `pom.xml` 中的 `spring-boot.version` 与 `netty.version`。
 
 ## 测试接口
 
@@ -168,7 +170,7 @@ perf 在 7 个接口 × 3 个并发度（4/8/16 线程）对比中，**全部接
 | bytesLarge | **0.21 / 0.35 / 0.76** | 0.38 / 0.57 / 2.76 | 0.29 / 0.48 / 1.70 | 0.31 / 0.54 / 1.68 |
 | sse | **0.28 / 0.46 / 3.27** | 2.27 / 6.92 / 8.40 | FAIL | 1.26 / 2.81 / 3.43 |
 
-perf p50 延迟为 **0.10~0.28ms**（小包场景），是 Spring MVC 的 45-67%。p99 最低 **0.14ms**（bytes/async），p99.9 同样全面领先——EventLoop 模型在低并发下尾延迟极稳。
+小包接口（json/get/bytes/valid/async）perf p50 为 **0.10~0.11ms**，是 Spring MVC 的 45-67%；`bytesLarge`（大包）为 0.21ms、`sse` 为 0.28ms（SSE 下 Spring MVC 达 2.27ms，差距最大）。p99 最低 **0.14ms**（bytes/async），p99.9 同样全面领先——EventLoop 模型在低并发下尾延迟极稳。
 
 SSE 场景 perf p50 仅 **0.28ms**，是 Spring MVC（2.27ms）的 **12%**，也优于 WebFlux 的 1.26ms。
 
@@ -381,8 +383,44 @@ JDK 17+、Maven 3.6+，项目已执行 `mvn install -DskipTests` 完成整体构
 | `benchmark.jfr` | boolean | 启用 JFR 飞行记录 | `-Dbenchmark.jfr=true` |
 | `benchmark.jfr.duration` | duration | JFR 录音时长 | `-Dbenchmark.jfr.duration=600s` |
 | `benchmark.jfr.settings` | string | JFR 配置（profile/default） | `-Dbenchmark.jfr.settings=profile` |
+| `benchmark.jfr.stackdepth` | int | JFR 记录栈深（默认 `1024`） | `-Dbenchmark.jfr.stackdepth=2048` |
+| `benchmark.jvm.extraArgs` | string | 追加到 forked JVM 的参数（空格分隔），用于开启诊断/泄漏检测 | `-Dbenchmark.jvm.extraArgs="-Dio.netty.leakDetection.level=paranoid"` |
 | `benchmark.stack` | boolean | 启用 StackProfiler（ThreadMXBean CPU 采样） | `-Dbenchmark.stack=true` |
 | `jmh.forks` | int | JMH fork 次数（默认 `0`，脚本覆盖为 `1`） | `-Djmh.forks=3` |
+
+> **JFR 栈深必须显式设置。** JVM 默认 JFR 栈深仅 **64 帧**，深栈样本会被标记 `truncated`，
+> 被砍掉的是**外层帧**（Netty/框架入口 → 调用链根部），火焰图与热点归因会失真。
+> 因此凡是开启 recording 的启动路径都必须配 `-XX:FlightRecorderOptions=stackdepth=1024`
+> （`BenchmarkRunner` / WSL 脚本 / 手工 JMH `-jvmArgsAppend` 均已在脚本内兜底）。
+> 事后校验：`./check-jfr-truncation.sh <jfr 文件或目录>`（有截断则退出码非 0）。
+> 注意 `jfr print --stack-depth N` 只控制**打印**层，不改变录制数据，用它无法补救已有截断。
+
+### Netty ByteBuf 泄漏门禁 / soak
+
+Netty 的 `ResourceLeakDetector` 只在 **paranoid** 级别报告泄漏，且报告走 `java.util.logging`
+（`reportTracedLeak` / `reportUntracedLeak`），行首带平台 locale 的日期前缀——中文 Windows 下是 GBK
+字节，朴素的 UTF-8 grep 会「看不见」这些行（本仓库曾因此把 22 条报告误判成 0 泄漏）。另外默认只保留
+4 条 access records，其余被丢弃（日志里会写 `leak records were discarded`），故门禁必须同时给
+`targetRecords`，否则证据不完整：
+
+```bash
+# 测试级：全量套件 3 轮（每轮新 JVM）；-XshowSettings:properties 把生效属性打进日志以便自证级别
+mvn -o test -DargLine="-Dio.netty.leakDetection.level=paranoid -Dio.netty.leakDetection.targetRecords=32 -XshowSettings:properties"
+
+# 负载级 soak：真实压测负载下开 paranoid（嵌入式 server 与压测线程同一 JVM，覆盖两端）
+mvn -o -Pbenchmark-perf compile
+mvn -o -Pbenchmark-perf dependency:build-classpath -Dmdep.outputFile=target/cp-perf.txt -q
+java -cp "target/classes;$(cat target/cp-perf.txt)" \
+  -Dbenchmark.profile.name=soak -Dbenchmark.output.dir=benchmark-reports/soak \
+  -Dbenchmark.include='io\.springperf\.benchmark\.servlet\.PerfBenchmark\.get' -Djmh.forks=1 \
+  "-Dbenchmark.jvm.extraArgs=-Dio.netty.leakDetection.level=paranoid -Dio.netty.leakDetection.targetRecords=16" \
+  io.springperf.benchmark.BenchmarkRunner
+```
+
+判定要求两条同时成立：**日志中检索不到泄漏报告**，**且**日志里能看到 `io.netty.leakDetection.level = paranoid`
+属性转储——否则「无报告」可能只是检测级别没生效。检索时必须用能识别 GBK 的方式：Windows 用
+`Select-String -Encoding Default` 或 `findstr`，Linux/WSL 先 `iconv -f GBK -t UTF-8` 再 grep，
+朴素的 UTF-8 grep 会把 GBK 字节的报告行整行「看不见」。
 
 ### Maven 方式（单 profile 调试）
 

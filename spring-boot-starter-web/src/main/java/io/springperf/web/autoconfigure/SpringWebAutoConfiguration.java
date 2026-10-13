@@ -65,7 +65,7 @@ public class SpringWebAutoConfiguration {
     }
 
     /**
-     * 在 Netty 服务器启动完成后发射 {@link WebServerInitializedEvent}，
+     * 在 Netty 服务器启动完成后发射 {@code WebServerInitializedEvent}，
      * 使 Spring Cloud 服务注册（Nacos/Eureka/Consul）等组件正确感知服务器就绪。
      */
     @Bean

@@ -9,7 +9,7 @@ import java.util.regex.Pattern;
 /**
  * JDK 8 PrintGCDetails 格式的 GC 日志解析器。
  * <p>
- * 支持分配率计算：从 Young GC 的 Heap: before->after 行提取相邻 GC 间的分配量。
+ * 支持分配率计算：从 Young GC 的 Heap: before-&gt;after 行提取相邻 GC 间的分配量。
  * <p>
  * 匹配格式示例:
  * {@code 2026-07-07T07:52:28.601+0800: 2.224: [GC pause (G1 Evacuation Pause) (young), 0.0068104 secs]}

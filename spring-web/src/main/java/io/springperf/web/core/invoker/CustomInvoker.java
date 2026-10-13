@@ -18,7 +18,6 @@ import java.util.List;
  *
  * @since 1.0.0
  * @see Invoker
- * @see io.springperf.web.core.invoker.InvokerRegistry
  */
 public interface CustomInvoker extends Invoker {
 

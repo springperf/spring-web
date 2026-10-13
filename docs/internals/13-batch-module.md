@@ -101,7 +101,7 @@ public void initComponentPhase2() throws Exception {
 public Method batchMethod()      { return batchMethod; }      // @BatchMapping 方法
 public Class<?> beanType()       { return beanType; }         // Controller 类
 public Class<? extends BatchRequest<?>> requestType()         // BatchRequest 子类
-public String queueName()        { return queueName; }        // "batch:UserController.batchGetUser"
+public String queueName()        { return queueName; }        // "batch:BatchUserController.batchGetUser"
 public int ringBufferSize()      { return ringBufferSize; }   // 归一化后的容量
 public BatchMapping.WaitStrategy waitStrategy()               // 等待策略
 public BatchMapping.Backpressure backpressure()               // 背压策略
@@ -416,7 +416,7 @@ private void processBatch(List<BatchRequest<?>> batch) {
 | `batch.queue.remaining` | `reportQueueCapacity` | `DisruptorQueue.remainingCapacity()` | Gauge | `queue` |
 | `batch.queue.capacity` | `reportQueueCapacity` | `DisruptorQueue.bufferSize()` | Gauge | `queue` |
 
-所有指标的 `queue` Tag 值为 `batch:<ClassName>.<methodName>`（如 `batch:UserController.batchGetUser`）。
+所有指标的 `queue` Tag 值为 `batch:<ClassName>.<methodName>`（如 `batch:BatchUserController.batchGetUser`）。
 
 `reportQueueCapacity` 在 `BatchRegistry` 中通过调度定期上报——`DisruptorQueue` 暴露出 `remainingCapacity()` 和 `bufferSize()` 方法，供外部采集器轮询。
 
@@ -506,7 +506,7 @@ public class BatchOverflowException extends ResponseStatusException {
 回到引子的问题：`BatchInvoker` 如何在启动期替换原方法调用？Disruptor 如何无锁入队？三线程如何协作与背压？
 
 1. **`BatchRegistry` + `BatchScanner` 启动期扫描** → 扫描 `@BatchMapping`，关联单请求方法，解析 `BatchRequest` 泛型类型，缓存 `BatchRequestMetaData` 到 `PathMappingContext`。
-2. **`BatchInvoker` 方法体替换** → `PathMappingContext.setInvoker(batchInvoker)`，运行时反射创建 `BatchRequest` 实例并入队，原方法体完全不执行。
+2. **`BatchInvoker` 方法体替换** → `InvokableHandlerMethod.setInvoker(batchInvoker)`（签名 `public void setInvoker(Invoker invoker)`），运行时反射创建 `BatchRequest` 实例并入队，原方法体完全不执行。
 3. **`DisruptorQueue` 无锁入队** → `ProducerType.MULTI` CAS claim，`BatchEvent` 预分配零 GC，`normalizeRingBufferSize` C8/C12 保护，三种背压策略（BLOCK/DROP/THROW）。
 4. **`BufferingBatchHandler` 攒批消费** → `endOfBatch` + `maxBatchSize` 双触发，`bizExecutor` 零核心线程 + `SynchronousQueue` + `CallerRunsPolicy` 自然背压，`handleBatchError` 逐个 `setError` 防挂起。
 5. **三级背压链** → RingBuffer 满 → EventLoop 阻塞 → TCP 反压（BLOCK 模式）；或 `tryPublishEvent` 失败 + `BatchOverflowException` 429（DROP/THROW 模式）。

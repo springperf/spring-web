@@ -1,45 +1,44 @@
-﻿# 单元测试覆盖率报告 / Unit Test Coverage Report
+# 单元测试覆盖率报告 / Unit Test Coverage Report
 
-- **生成时间 / Generated at**：2026-09-10 08:44:48
-- **环境 / Environment**：Windows_NT / java version "17.0.9" 2023-10-17 LTS
-- **覆盖范围 / Scope**：库模块单元测试（JaCoCo，基于 target/site/jacoco/jacoco.csv）
-  Library module unit tests (JaCoCo, based on target/site/jacoco/jacoco.csv)
+- **生成时间 / Generated at**：2026-10-12 16:02:18
+- **环境 / Environment**：Windows_NT / openjdk version "1.8.0_502"
+- **覆盖范围 / Scope**：库模块，**单测 + E2E 合并口径**（JaCoCo，coverage-aggregate 模块 report-aggregate 合并后的 jacoco.csv）
+  Library modules, unit tests **plus E2E** (JaCoCo, merged jacoco.csv from the coverage-aggregate module)
 - **覆盖目标 / Targets**：spring-web ≥90%，其余库模块 ≥80%（✅=达标 ✓，❌=未达标 ✗）
   spring-web ≥90%, other library modules ≥80% (✅=met, ❌=missed)
-- **汇总 / Summary**：行/Line 92.1% · 分支/Branch 81.5% · 指令/Instr 91.5% · 方法/Method 92.5%
+- **汇总 / Summary**：行/Line 90% · 分支/Branch 78.4% · 指令/Instr 89.3% · 方法/Method 92.1%
 
 ## 一、覆盖率总览 / 1. Coverage Overview
 
 | 模块 / Module | 行 / Line | 行覆盖 / Lines | 分支 / Branch | 分支覆盖 / Branches | 指令 / Instr | 方法 / Method | 类数 / Classes | 目标 / Target | 状态 / Status |
 |---|---|---|---|---|---|---|---|---|---|
-| spring-web | 92.7% | 6164/6647 | 82.6% | 2769/3354 | 91.2% | 93.4% | 203 | ≥90% | ✅ |
-| spring-web-view | 95.5% | 236/247 | 81.3% | 109/134 | 96.9% | 98% | 11 | ≥80% | ✅ |
-| spring-web-servlet | 91.5% | 1633/1784 | 79.5% | 505/635 | 91.8% | 92.6% | 45 | ≥80% | ✅ |
-| spring-web-mvc-support | 92.4% | 769/832 | 84.2% | 256/304 | 93.3% | 88.2% | 40 | ≥80% | ✅ |
+| spring-web | 90.2% | 7844/8695 | 79.2% | 3628/4581 | 88.7% | 92.6% | 228 | ≥90% | ✅ |
+| spring-web-view | 91.1% | 308/338 | 73.4% | 141/192 | 89.9% | 97.2% | 15 | ≥80% | ✅ |
+| spring-web-servlet | 87% | 2097/2409 | 72.9% | 701/962 | 87% | 91.5% | 51 | ≥80% | ✅ |
+| spring-web-mvc-support | 93.3% | 877/940 | 84.5% | 289/342 | 94% | 89.5% | 42 | ≥80% | ✅ |
 | spring-web-batch | 91.3% | 345/378 | 79.6% | 109/137 | 92.1% | 94.6% | 18 | ≥80% | ✅ |
-| spring-web-websocket | 90.5% | 1004/1109 | 80.7% | 335/415 | 90.9% | 95.4% | 24 | ≥80% | ✅ |
-| spring-boot-starter-web | 89.4% | 897/1003 | 75.5% | 326/432 | 90.5% | 85.5% | 43 | ≥80% | ✅ |
-| **汇总 / Total** | **92.1%** | **11048/12000** | **81.5%** | **4409/5411** | **91.5%** | **92.5%** | | | |
+| spring-web-websocket | 90.5% | 1041/1150 | 81.3% | 365/449 | 91.1% | 95.5% | 24 | ≥80% | ✅ |
+| spring-boot-starter-web | 90.5% | 1033/1142 | 77.3% | 419/542 | 91.6% | 86.8% | 45 | ≥80% | ✅ |
+| **汇总 / Total** | **90%** | **13545/15052** | **78.4%** | **5652/7205** | **89.3%** | **92.1%** | | | |
 
 ## 二、测试规模 / 2. Test Count
 
 | 模块 / Module | 用例数 / Tests |
 |---|---|
-| spring-web | 2050 |
-| spring-web-view | 52 |
-| spring-web-servlet | 543 |
-| spring-web-mvc-support | 281 |
+| spring-web | 2375 |
+| spring-web-view | 74 |
+| spring-web-servlet | 633 |
+| spring-web-mvc-support | 295 |
 | spring-web-batch | 83 |
-| spring-web-websocket | 170 |
-| spring-boot-starter-web | 241 |
-| **库模块合计 / Library total** | **3420** |
-| E2E spring-web-test | 255 |
-| E2E spring-web-support-test | 168 |
-| **E2E 合计 / E2E total** | **423** |
+| spring-web-websocket | 181 |
+| spring-boot-starter-web | 271 |
+| **库模块合计 / Library total** | **3912** |
+| E2E spring-web-test | 263 |
+| E2E spring-web-support-test | 526 |
+| **E2E 合计 / E2E total** | **789** |
 
-> 说明 / Note：E2E 用例默认不随本脚本执行，上表基于已存在的 surefire 报告；如需刷新请单独运行
-> E2E tests are not run by this script; the table above reflects existing surefire reports.
-> 刷新命令 / To refresh: mvn test -pl spring-web-test,spring-web-support-test
+> 说明 / Note：本脚本会运行库模块 + E2E 模块；E2E 触发的库模块覆盖由聚合模块合并后计入第一节。
+> Both library and E2E modules are run; E2E-driven library coverage is merged in by the aggregate module.
 
 ## 三、未覆盖热点（各模块未覆盖行最多的类 Top 5）/ 3. Coverage Hotspots (Top 5 classes by missed lines per module)
 
@@ -47,39 +46,39 @@
 
 | 类 / Class | 未覆盖行 / Missed | 总行 / Total | 覆盖率 / Coverage |
 |---|---|---|---|
+| ResourceRequestHandler | 61 | 291 | 79% |
+| NettyServerHttpResponse | 58 | 374 | 84.5% |
+| NettyHttpHandler | 47 | 162 | 71% |
+| Http2ChannelInitializer.Http2OrHttp1Handler | 43 | 43 | 0% |
 | Http2ChannelInitializer.new ChannelInboundHandlerAdapter() {...} | 41 | 42 | 2.4% |
-| Http2ChannelInitializer.Http2OrHttp1Handler | 34 | 34 | 0% |
-| Http2ChannelInitializer | 16 | 72 | 77.8% |
-| DispatcherHandler | 16 | 157 | 89.8% |
-| ModelArgumentResolverProvider.ModelStaticArgumentResolver | 15 | 65 | 76.9% |
 
 ### spring-web-view
 
 | 类 / Class | 未覆盖行 / Missed | 总行 / Total | 覆盖率 / Coverage |
 |---|---|---|---|
+| FreemarkerViewResolver | 16 | 41 | 61% |
 | ViewReturnValueResolver | 5 | 64 | 92.2% |
+| ThymeleafViewResolver | 3 | 40 | 92.5% |
 | RedirectView | 2 | 35 | 94.3% |
-| BeetlViewResolver | 2 | 21 | 90.5% |
-| ViewResolverRegistry | 1 | 42 | 97.6% |
-| FreemarkerViewResolver | 1 | 20 | 95% |
+| BeetlViewResolver | 2 | 31 | 93.5% |
 
 ### spring-web-servlet
 
 | 类 / Class | 未覆盖行 / Missed | 总行 / Total | 覆盖率 / Coverage |
 |---|---|---|---|
-| PerfServletContext | 35 | 244 | 85.7% |
-| PerfHttpServletRequest | 19 | 287 | 93.4% |
+| PerfHttpServletResponse | 62 | 262 | 76.3% |
+| FileHttpSessionStorage | 55 | 266 | 79.3% |
+| PerfServletContext | 38 | 267 | 85.8% |
+| PerfHttpServletRequest | 36 | 362 | 90.1% |
 | SupportDispatcherHandler.SessionFlushListener | 14 | 17 | 17.6% |
-| PerfHttpSession | 8 | 96 | 91.7% |
-| SupportServletRegistry | 8 | 63 | 87.3% |
 
 ### spring-web-mvc-support
 
 | 类 / Class | 未覆盖行 / Missed | 总行 / Total | 覆盖率 / Coverage |
 |---|---|---|---|
 | SseEmitter | 11 | 23 | 52.2% |
-| WebMvcConfigurer | 11 | 19 | 42.1% |
-| WebMvcConfigurerBridge | 6 | 230 | 97.4% |
+| WebMvcConfigurer | 10 | 19 | 47.4% |
+| WebMvcConfigurerBridge | 6 | 271 | 97.8% |
 | ModelAndView | 6 | 67 | 91% |
 | ResponseBodyEmitterReturnValueResolver | 5 | 29 | 82.8% |
 
@@ -97,20 +96,19 @@
 
 | 类 / Class | 未覆盖行 / Missed | 总行 / Total | 覆盖率 / Coverage |
 |---|---|---|---|
-| WebSocketRoutingHandler | 46 | 252 | 81.7% |
-| NettyWebSocketSession | 19 | 116 | 83.6% |
-| JsrEndpointWebSocketHandler | 11 | 133 | 91.7% |
+| WebSocketRoutingHandler | 46 | 258 | 82.2% |
+| NettyWebSocketSession | 19 | 128 | 85.2% |
+| JsrEndpointWebSocketHandler | 13 | 138 | 90.6% |
 | JsrCodecRegistry | 7 | 110 | 93.6% |
-| JsrEndpointMetadata | 6 | 103 | 94.2% |
+| JsrEndpointMetadata | 6 | 107 | 94.4% |
 
 ### spring-boot-starter-web
 
 | 类 / Class | 未覆盖行 / Missed | 总行 / Total | 覆盖率 / Coverage |
 |---|---|---|---|
-| ManagementNettyHttpServer.new ChannelInitializer() {...} | 13 | 14 | 7.1% |
-| ManagementNettyHttpServer | 10 | 58 | 82.8% |
+| ManagementNettyHttpServer.new ChannelInitializer() {...} | 15 | 16 | 6.2% |
+| ManagementNettyHttpServer | 10 | 68 | 85.3% |
 | PerfApplicationFactory | 9 | 64 | 85.9% |
-| SpringWebAutoConfiguration | 7 | 21 | 66.7% |
-| SpringWebAutoConfiguration.MicrometerWebMetricsConfiguration | 7 | 15 | 53.3% |
-
+| ActuatorEndpointHandlerMapping | 7 | 55 | 87.3% |
+| SpringWebServletAutoConfiguration | 7 | 54 | 87% |
 

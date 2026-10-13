@@ -7,7 +7,7 @@ import org.springframework.boot.web.server.WebServerException;
 
 /**
  * 包装 {@link NettyHttpServer} 适配 Spring Boot 的 {@link WebServer} 接口。
- * <p>使 Spring Cloud 服务注册（Nacos/Eureka/Consul）等依赖 {@link WebServerInitializedEvent}
+ * <p>使 Spring Cloud 服务注册（Nacos/Eureka/Consul）等依赖 {@code WebServerInitializedEvent}
  * 的组件能够正确获取本框架的服务器信息和端口。</p>
  *
  * @author huangcanda

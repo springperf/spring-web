@@ -10,7 +10,7 @@
 
 读完本篇，你应能回答：**为什么这套框架要拆成四个 jar，而不是塞进一个？support 和 batch 为什么是 `provided` 依赖？一个请求从 Netty 字节到业务方法，到底经过了哪些模块的哪些类？**
 
-本篇另有一项隐性职责：**校正 `../../.agent/context/module.md` 中两处与当前源码不符的描述**。module.md 是架构概览基线，仍有效，但其中"生命周期由 `afterPropertiesSet()` 触发"和"support 的 `servlet/filter/match/` 子包"两点与 `master` 当前源码矛盾——本篇以源码行号为准，给出校正。
+本篇另有一项隐性职责：**校正 `../../.agent/context/module.md` 中两处与当前源码不符的描述**。module.md 是架构概览基线，仍有效，但其中"生命周期由 `afterPropertiesSet()` 触发"和"support 的 `servlet/filter/match/` 子包"两点与当前分支源码矛盾——本篇以源码行号为准，给出校正。
 
 ---
 
@@ -21,7 +21,7 @@
 | 模块 | 职责 | 依赖谁 | 被谁依赖 | 关键包 | 可选性 |
 |------|------|--------|----------|--------|--------|
 | **spring-web** | 核心框架：Netty 服务器 + 路由 + 参数/返回值解析 + 调用器 + 横切 | Spring（context/core/beans/aop/web）+ Netty + Jackson；fastjson2/reactive-streams 为 `provided` | 其余三者 | `context` `core` `http` `server` `json` `annotation` `util` | **基石**，不可选 |
-| **spring-web-servlet** + **spring-web-mvc-support** | Servlet API 与 SpringMVC 桥接层 | spring-web + `spring-web-servlet` + `jakarta.servlet-api`(provided) | starter（provided） | `support.*` + 重写的 `org.springframework.web.servlet.*` | 可选 |
+| **spring-web-servlet** + **spring-web-mvc-support** | Servlet API 与 SpringMVC 桥接层 | spring-web + `spring-web-servlet` + `javax.servlet-api`(provided) | starter（provided） | `support.*` + 重写的 `org.springframework.web.servlet.*` | 可选 |
 | **spring-web-batch** | LMAX Disruptor 透明请求聚合 | spring-web + `disruptor` | starter（provided） | `batch.*` | 可选 |
 | **spring-boot-starter-web** | Spring Boot 自动装配 + 零冲突启动 | spring-web + support(provided) + batch(provided) + spring-boot-starter + starter-json + actuator(provided) | 用户业务应用 | `autoconfigure.*` | 入口，必选 |
 
@@ -48,7 +48,7 @@
 
 `reactive-streams` 是 `provided`——意味着核心的响应式支持（`ReactiveReturnValueResolver` 等）在 classpath 有 reactive 库时才真正生效，没有也不报错。这是"可选能力"的依赖表达。
 
-**spring-web-servlet**（[`spring-web-servlet/pom.xml`](../../spring-web-servlet/pom.xml)）只依赖 spring-web + `jakarta.servlet-api(provided)`：
+**spring-web-servlet**（[`spring-web-servlet/pom.xml`](../../spring-web-servlet/pom.xml)）只依赖 spring-web + `javax.servlet-api(provided)`：
 
 ```xml
 <!-- spring-web-servlet/pom.xml -->
@@ -57,8 +57,8 @@
     <artifactId>spring-web</artifactId>
 </dependency>
 <dependency>
-    <groupId>jakarta.servlet</groupId>
-    <artifactId>jakarta.servlet-api</artifactId>
+    <groupId>javax.servlet</groupId>
+    <artifactId>javax.servlet-api</artifactId>
     <scope>provided</scope>
 </dependency>
 ```
@@ -121,14 +121,14 @@ Tomcat 的 `spring-boot-starter-web` 一旦混入，会和本框架在自动装�
 
 | 组件 | 版本 | 来源 |
 |------|------|------|
-| Spring Boot | 3.2.12（默认，Profile 可切 2.4.x~4.1.x） | `pom.xml` + profiles `` |
-| Netty | 4.1.115.Final | `pom.xml` |
-| Jackson | 2.17.2（SB4 时对齐 2.21.4） | `pom.xml`  |
+| Spring Boot | 3.5.16（默认，Profile 可切 2.4.x~2.7.x / 3.0.x~3.5.x） | `pom.xml` + profiles |
+| Netty | 4.1.137.Final | `pom.xml` |
+| Jackson | 2.17.2 | `pom.xml` |
 | Fastjson2 | 2.0.60（provided） | `pom.xml` |
 | Disruptor | 3.4.4 | `pom.xml` |
 | Java | 17 | `pom.xml` |
 
-> 多版本兼容（parent→BOM+profiles 改造）的来龙去脉见 memory `sb-3x-compatibility-verification`，本篇不展开。
+> **分支定位**：master 只维护 Spring Boot 3.5.x，**不含 4.x 适配**；4.0/4.1 的适配代码在 `4.1.x` 分支，2.4~2.7（Java 8 / javax）在 `2.7.x` 分支。同步规则见 [`.agent/context/4.1.x-adaptation-checklist.md`](../../.agent/context/4.1.x-adaptation-checklist.md)。
 
 ---
 
@@ -152,7 +152,7 @@ io.springperf.web
 │   ├── HttpHandler                顶层 HTTP 处理策略接口
 │   ├── NettyHttpHandler           Netty ChannelHandler，适配 Netty → 框架请求/响应（@Sharable）
 │   ├── NettyHttpServer            implements SmartLifecycle, LifecycleWebComponent（启动/停止 Netty）
-│   ├── NettyHttpHandler.SslExceptionHandler   SSL 异常兜底（静态单例）
+│   ├── NettyHttpServer.SslExceptionHandler    SSL 异常兜底
 │   ├── Http2ChannelInitializer    HTTP/2 + HTTP/1 pipeline 装配
 │   ├── PipelineCustomizer         pipeline 扩展点（如 WebSocket 握手 handler）
 │   └── NettyMetricsHandler        连接计数 + 指标（静态单例）
@@ -225,7 +225,7 @@ support 的源码在 `io.springperf.web.support.*`（[`Glob` 结果](../../sprin
 
 batch 的源码在 `io.springperf.web.batch.*`，核心是 Disruptor 透明聚合——具体类留到 [13 篇](13-batch-module.md) 展开，本篇只点明它的**切入点**：它在请求链路上"拦截"了返回值写出阶段，把多个并发请求的结果聚合后批量返回。
 
-> **一个必须澄清的命名陷阱**：support 的 `support.servlet.filter` 包里也有 "Filter"，但它桥接的是 `jakarta.servlet.Filter`（Servlet API 的 Filter），通过 `FilterWrapper` 适配进核心 `WebFilter` SPI。这与核心 `core/filter.RuntimeMappingWebFilter`（框架自有路径匹配 Filter）是**两个不同概念**，不要混淆。
+> **一个必须澄清的命名陷阱**：support 的 `support.servlet.filter` 包里也有 "Filter"，但它桥接的是 `javax.servlet.Filter`（Servlet API 的 Filter），通过 `FilterWrapper` 适配进核心 `WebFilter` SPI。这与核心 `core/filter.RuntimeMappingWebFilter`（框架自有路径匹配 Filter）是**两个不同概念**，不要混淆。
 
 ---
 
@@ -249,7 +249,8 @@ Spring Boot 启动
   │     │   · 各 Registry Bean（MappingRegistry / ArgumentResolverRegistry / ...）
   │     │   · 若 support 在 classpath：SupportDispatcherHandler / WebMvcConfigurerBridge / ...
   │     │   · 若 batch 在 classpath：Batch 相关组件
-  │     │   （注意：WebContext.afterPropertiesSet() 此刻是 no-op，什么都不做）
+  │     │   （注意：此刻不触发任何生命周期——WebContext 不实现 InitializingBean，
+  │     │     初始化全部推迟到 startLifecycle()）
   │     │     → WebContext.java
   │     │
   │     └─ refresh 末尾，LifecycleProcessor 按 phase 升序调用所有 SmartLifecycle.start()
@@ -266,32 +267,23 @@ Spring Boot 启动
   │     │     └─ initComponentPhase3()  预缓存/fail-fast          →
   │     │        （MappingRegistry.optimizeMapping() 在此阶段构建 RouterOptimizer 链）
   │     │
-  │     ├─ 取 DispatcherHandler（启动期单线程，运行时纯读）       → 
+  │     ├─ 取 DispatcherHandler（启动期单线程，运行时纯读）       →
   │     ├─ new NettyHttpHandler(webContext, contextPath, dispatcher)  →
-  │     ├─ 配置 boss/worker EventLoopGroup + ServerBootstrap     → 
+  │     ├─ 配置 boss/worker EventLoopGroup + ServerBootstrap     →
   │     └─ bootstrap.bind(port).sync()                           →
-  │        ├─ actualPort 写入 local.server.port 系统属性         → 
+  │        ├─ actualPort 写入 local.server.port 系统属性         →
   │        └─ log.info("Netty Server started on port {}")       →
   │
   └─ 就绪，开始接受请求
 ```
 
-### 3.2 为什么生命周期锚定在 `start()` 而非 `afterPropertiesSet()`
+### 3.2 为什么生命周期锚定在 `start()` 而非 Bean 初始化期
 
-`WebContext` 虽实现了 `InitializingBean`，却把 `afterPropertiesSet()` 留空：
-
-```java
-// WebContext.java
-@Override
-public void afterPropertiesSet() {
-    // No-op: lifecycle is now deferred to startLifecycle(),
-    // triggered by NettyHttpServer#start().
-}
-```
+`WebContext` **不实现** `InitializingBean`：框架早期版本确实有一个留空的 `afterPropertiesSet()`，该覆写**已被删除**，初始化**只**经 `startLifecycle()` 一条路径（全仓主代码里 `afterPropertiesSet` 仅剩一条注释）。
 
 真正编排三阶段的是 `startLifecycle()`（[`WebContext.java`](../../spring-web/src/main/java/io/springperf/web/context/WebContext.java)），由 `NettyHttpServer.start()` 显式触发（[`NettyHttpServer.java`](../../spring-web/src/main/java/io/springperf/web/server/NettyHttpServer.java)）。
 
-**推迟的理由**：support 的 `WebMvcConfigurerBridge` 必须在 Spring 容器加载完**所有**用户 `WebMvcConfigurer` Bean 之后，才能收集到完整的 shim 数据（拦截器注册、参数解析器、跨域配置等）。若在 `afterPropertiesSet()`（Bean 初始化期）就跑 Phase1，彼时部分 `WebMvcConfigurer` 可能尚未实例化，收集到的输入不完整——违背 [01 篇总纲](01-design-philosophy.md#一总纲启动时确定性) "确定性首先要求输入完整"。
+**推迟的理由**：support 的 `WebMvcConfigurerBridge` 必须在 Spring 容器加载完**所有**用户 `WebMvcConfigurer` Bean 之后，才能收集到完整的 shim 数据（拦截器注册、参数解析器、跨域配置等）。若在 Bean 初始化期（属性装配完成时）就跑 Phase1，彼时部分 `WebMvcConfigurer` 可能尚未实例化，收集到的输入不完整——违背 [01 篇总纲](01-design-philosophy.md#一总纲启动时确定性) "确定性首先要求输入完整"。
 
 锚定在 `NettyHttpServer.start()` 的精妙之处：`NettyHttpServer` 的 `getPhase() = Integer.MAX_VALUE`（[`NettyHttpServer.java`](../../spring-web/src/main/java/io/springperf/web/server/NettyHttpServer.java)），是 Spring `SmartLifecycle` 中**最后一个启动**的组件。此刻所有 Bean（含 support 桥接、用户 `WebMvcConfigurer`）均已就位——`startLifecycle()` 拿到的输入是完整的。
 
@@ -356,7 +348,7 @@ if (shuttingDown) {
   │       └─ BizPoolRegistry.determinePool(req, mappingResult)
   │           ├─ != null → req.acquire() + executor.execute（默认走
   │           │             "default" 业务线程池，发生一次切换）       
-  │           │   └─ RejectedExecutionException → req.release() + 503 
+  │           │   └─ RejectedExecutionException → req.release() + 503
   │           └─ == null → EventLoop 直处理（@RunInPool(EVENTLOOP)
   │                         或 pool.default-execute-mode=eventloop）
   ▼
@@ -371,7 +363,7 @@ if (shuttingDown) {
   │       ├─ initContextHolders（LocaleContextHolder 等）           
   │       └─ mappingResult.isMatched() ?
   │           ├─ YES → doHandle()
-  │           └─ NO  → handleWithNoFullMatch()（CORS 预检 / 404 / 405） 
+  │           └─ NO  → handleWithNoFullMatch()（CORS 预检 / 404 / 405）
   ▼
 [web]    doHandle()                                              
   │       ├─ CorsRegistry.corsHandle()                              
@@ -383,9 +375,9 @@ if (shuttingDown) {
   │       ├─ ReturnValueResolverRegistry.resolveReturnValue()
   │       │     ├─ [web]     JsonBodyReturnValueResolver → HttpBodyCodecRegistry.writeBody()
   │       │     ├─ [support] ResponseBodyEmitterReturnValueResolver（若引入 support）
-  │       │     ├─ [web]     StreamEmitterReturnValueResolver → NettyStreamSender（SSE/流式）
+  │       │     ├─ [web]     StreamEmitterReturnValueResolver → AbstractNettyStreamSender（Default/EarlyEncode 两路实现）
   │       │     └─ [batch]   BatchReturnValueResolver（若引入 batch，透明聚合）
-  │       └─ finally: invokeWithRealResult() / metrics.recordRequest() 
+  │       └─ finally: invokeWithRealResult() / metrics.recordRequest()
   ▼
 [web]    invokeWithRealResult()                                  
   │       ├─ InterceptorRegistry.postHandle()
@@ -409,7 +401,7 @@ if (shuttingDown) {
 
 ## 五、与 module.md 的差异校正
 
-module.md（[`../../.agent/context/module.md`](../../.agent/context/module.md)）是架构概览基线，整体仍有效。但写作本篇时核对源码发现两处与 `master` 当前源码不符，逐一校正如下。
+module.md（[`../../.agent/context/module.md`](../../.agent/context/module.md)）是架构概览基线，整体仍有效。但写作本篇时核对源码发现两处与当前分支源码不符，逐一校正如下。
 
 ### 校正一：生命周期触发点
 
@@ -418,16 +410,9 @@ module.md（[`../../.agent/context/module.md`](../../.agent/context/module.md)�
 > `WebContext implements InitializingBean → 驱动整个组件生命周期`
 > `WebContext.afterPropertiesSet() → initWithWebContext() → initComponentPhase1/2/3`
 
-**源码事实**：
+**源码事实**（`WebContext` 不实现 `InitializingBean`；`afterPropertiesSet` 覆写已被删除）：
 
 ```java
-// WebContext.java
-@Override
-public void afterPropertiesSet() {
-    // No-op: lifecycle is now deferred to startLifecycle(),
-    // triggered by NettyHttpServer#start().
-}
-
 // WebContext.java
 public void startLifecycle() {
     if (!lifecycleStarted.compareAndSet(false, true)) { return; }
@@ -449,7 +434,7 @@ public void start() {
 }
 ```
 
-**校正结论**：`afterPropertiesSet()` 是 no-op；真正触发三阶段的是 `NettyHttpServer.start()`（由 Spring `SmartLifecycle` 机制在 refresh 末尾按 phase 顺序调用）→ `WebContext.startLifecycle()`。理由见 [§3.2](#32-为什么生命周期锚定在-start-而非-afterpropertiesset)。
+**校正结论**：`WebContext` 不实现 `InitializingBean`（`afterPropertiesSet()` 已删除，初始化**只**经 `startLifecycle()`）；真正触发三阶段的是 `NettyHttpServer.start()`（由 Spring `SmartLifecycle` 机制在 refresh 末尾按 phase 顺序调用）→ `WebContext.startLifecycle()`。理由见 [§3.2](#32-为什么生命周期锚定在-start-而非-bean-初始化期)。
 
 > 这与 [01 篇总纲](01-design-philosophy.md#一总纲启动时确定性) 已埋的修正一致，本篇给出完整时序链。后续 [03 篇](03-component-lifecycle.md) 将展开 `startLifecycle` 内部三阶段的具体机制。
 
@@ -465,7 +450,7 @@ support 的 `support.servlet.filter` 包下实际只有三个类，**无 `match/
 
 | 实际存在的类 | 职责 |
 |--------------|------|
-| `FilterWrapper` | 包装 `jakarta.servlet.Filter` → 框架 `WebFilter` |
+| `FilterWrapper` | 包装 `javax.servlet.Filter` → 框架 `WebFilter` |
 | `SupportWebFilterRegistry` | 扩展 `WebFilterRegistry`，自动注册 Servlet `Filter` Bean |
 | `PerfHttpServletFilterChain` | 适配框架 `FilterChain` → `javax.servlet.FilterChain` |
 
@@ -479,7 +464,7 @@ public class RuntimeMappingWebFilter implements WebFilter {
 }
 ```
 
-**校正结论**：路径匹配的核心 Filter 包装是 `spring-web` 的 `core/filter/RuntimeMappingWebFilter`，不在 support。support 的 `support.servlet.filter` 是 Servlet `jakarta.servlet.Filter` 的桥接层，与核心路径匹配无关。module.md 描述的 support `match/` 子包在当前源码中不存在（疑为历史重构后未同步的过时描述）。
+**校正结论**：路径匹配的核心 Filter 包装是 `spring-web` 的 `core/filter/RuntimeMappingWebFilter`，不在 support。support 的 `support.servlet.filter` 是 Servlet `javax.servlet.Filter` 的桥接层，与核心路径匹配无关。module.md 描述的 support `match/` 子包在当前源码中不存在（疑为历史重构后未同步的过时描述）。
 
 > 这一校正对阅读源码很重要：若按 module.md 旧述去 support 找路径匹配，会扑空。本系列后续涉及 Filter/路径匹配时，一律以 `core/filter` 为准；support 的 Servlet Filter 桥接留到 [12 篇](12-support-bridge.md) 详述。
 
@@ -493,7 +478,7 @@ public class RuntimeMappingWebFilter implements WebFilter {
 
 `spring-web` 只引 Spring 五件套（context/core/beans/aop/web）+ Netty + Jackson，**不引 `spring-boot`、不引 `spring-webmvc`、不引 Servlet API**。这意味着核心可以脱离 Spring Boot 独立使用——理论上能嵌入任何 Netty 应用。`reactive-streams`/`jsr305`/`fastjson2` 全 `provided`，是"有则增强、无则不报错"的可选能力。
 
-这一边界对应 [01 篇 原则 6](01-design-philosophy.md#原则-6--避免魔法行为显式-sp显式-fail-fast不靠隐式猜测)：核心不靠"类路径上有 Spring Boot"来决定行为，它只声明自己能用的最小集合。
+这一边界对应 [01 篇 原则 6](01-design-philosophy.md#原则-6--避免魔法行为显式-spi显式-fail-fast不靠隐式猜测)：核心不靠"类路径上有 Spring Boot"来决定行为，它只声明自己能用的最小集合。
 
 ### 6.2 support/batch 的"可选激活"
 
@@ -502,7 +487,7 @@ support 与 batch 是 `provided` 依赖，用户按需引入。这带来两个�
 1. **轻量场景的启动更快**：纯 API 网关不引 support，省掉 Servlet 桥接的初始化开销与依赖体积。
 2. **能力的组合自由**：要 Servlet 兼容引 support，要批量聚合引 batch，两者可独立选择。
 
-这对应 [01 篇 原则 3](01-design-philosophy.md#原则-3--避免线程切换默认-eventloop-直处理显式才切换) 的精神延伸——"框架把选择权交给业务方"：是否需要 Servlet 兼容、是否需要批量聚合，是业务方用 Maven 坐标显式声明的，不是框架替业务方做死。
+这对应 [01 篇 原则 3](01-design-philosophy.md#原则-3--避免线程模型僵化业务方掌控何时切换) 的精神延伸——"框架把选择权交给业务方"：是否需要 Servlet 兼容、是否需要批量聚合，是业务方用 Maven 坐标显式声明的，不是框架替业务方做死。
 
 ### 6.3 starter 的"零配置 + 零冲突"
 
@@ -512,7 +497,7 @@ starter 聚合自动装配（10 个 AutoConfiguration，详见 [14 篇](14-start
 
 support 模块在 `src/main/java/org/springframework/web/servlet/` 等路径下**重写** Spring 的类（如 `PathMatchConfigurer`，见 [§2.2](#22-support-与-batch-的包拓扑简表) 表末）。这是"同包同名覆盖"策略——Java 类加载时，同名同包的类先入 classpath 者胜。support 用此策略让用户的 `import org.springframework.web.servlet.config.annotation.PathMatchConfigurer` 实际拿到的是本框架的覆盖版本，从而在不改业务代码的前提下注入桥接行为。
 
-这是 [01 篇 原则 6](01-design-philosophy.md#原则-6--避免魔法行为显式-sp显式-fail-fast不靠隐式猜测) 的一个**特例与张力点**：同包覆盖本质是一种"隐式"行为，但框架用 `@Order` 优先级 + `log.warn` 显式告警（见 `WebComponentContainer.registerWebComponent` 的冲突处理）把它变得可观测、可排查。机制细节留到 [12 篇](12-support-bridge.md)。
+这是 [01 篇 原则 6](01-design-philosophy.md#原则-6--避免魔法行为显式-spi显式-fail-fast不靠隐式猜测) 的一个**特例与张力点**：同包覆盖本质是一种"隐式"行为，但框架用 `@Order` 优先级 + `log.warn` 显式告警（见 `WebComponentContainer.registerWebComponent` 的冲突处理）把它变得可观测、可排查。机制细节留到 [12 篇](12-support-bridge.md)。
 
 ---
 
@@ -523,7 +508,7 @@ support 模块在 `src/main/java/org/springframework/web/servlet/` 等路径下*
 - [03 篇](03-component-lifecycle.md) 展开 `startLifecycle` 内部三阶段与 Registry 体系（[§3.1](#31-完整启动链校正版) 的中段）；
 - [04 篇](04-request-pipeline.md) 展开 `handleWithMappingResult` → `doHandle` 的请求管线（[§4](#四一次请求的跨模块调用链) 的 `web` 段）；
 - [05-10 篇](05-server-and-http.md) 逐个深潜 `server`/`http`/`mapping`/`arg`/`retval`/`invoker`/横切包；
-- [11 篇](11-async-streaming.md) 展开 `async/stream` 与 `NettyStreamSender`；
+- [11 篇](11-async-streaming.md) 展开 `async/stream` 与 `AbstractNettyStreamSender`；
 - [12 篇](12-support-bridge.md) 展开 support 的同包覆盖与 `WebMvcConfigurerBridge`；
 - [13 篇](13-batch-module.md) 展开 batch 的 Disruptor 聚合切入点；
 - [14 篇](14-starter-autoconfig.md) 展开 starter 的 10 个 AutoConfiguration 与零冲突防线。

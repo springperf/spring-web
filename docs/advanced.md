@@ -57,7 +57,7 @@ public Callable<Result<String>> callable() {
 @GetMapping("/async-timeout")
 public DeferredResult<Result<String>> withTimeout() {
     // 第一优先级：构造参数 5000ms
-    // 第二优先级：server.http.timeout 配置
+    // 第二优先级：spring.mvc.async.request-timeout 配置
     // 第三优先级：无超时
     return new DeferredResult<>(5000L);
 }

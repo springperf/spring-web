@@ -536,7 +536,7 @@ public final class PropertiesConstant {
     public static final long KEEP_ALIVE_TIMEOUT_DEFAULT = 0L;
 
     /**
-     * 对齐 Spring Boot {@code server.max-keep-alive-requests}：单 keep-alive 连接最大请求数（默认 0；<=0 表示不限）。
+     * 对齐 Spring Boot {@code server.max-keep-alive-requests}：单 keep-alive 连接最大请求数（默认 0；小于等于 0 表示不限）。
      * 实现见 {@code KeepAliveConfig} / {@code KeepAliveHandler}。
      *
      * <p>默认 0 = 不限制（与 Tomcat 默认的 100 不同）：同样是「不施加连接级隐式限制」这一策略。</p>
@@ -624,7 +624,7 @@ public final class PropertiesConstant {
     /** 是否按天轮转（默认 true）。 */
     public static final String ACCESSLOG_ROTATE = "server.accesslog.rotate";
     public static final boolean ACCESSLOG_ROTATE_DEFAULT = true;
-    /** 日志保留天数（默认 7，<=0 表示不限制）。 */
+    /** 日志保留天数（默认 7，小于等于 0 表示不限制）。 */
     public static final String ACCESSLOG_MAX_DAYS = "server.accesslog.max-days";
     public static final int ACCESSLOG_MAX_DAYS_DEFAULT = 7;
 

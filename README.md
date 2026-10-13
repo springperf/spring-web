@@ -7,7 +7,7 @@ A high-performance Netty-based web framework, compatible with Spring MVC program
 [![CI](https://github.com/springperf/spring-web/actions/workflows/ci.yml/badge.svg)](https://github.com/springperf/spring-web/actions/workflows/ci.yml)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.springperf/spring-web)](https://central.sonatype.com/artifact/io.github.springperf/spring-web)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE.md)
-[![Throughput](https://img.shields.io/badge/Throughput-1.2~12.6x_vs_Spring_MVC-brightgreen?style=flat-square)](docs/en/benchmark.md)
+[![Throughput](https://img.shields.io/badge/Throughput-1.45~12.6x_vs_Spring_MVC-brightgreen?style=flat-square)](docs/en/benchmark.md)
 [![SSE](https://img.shields.io/badge/SSE-7.7x_under_high_concurrency-blue?style=flat-square)](docs/en/benchmark.md)
 
 ---
@@ -36,7 +36,7 @@ A high-performance Netty-based web framework, compatible with Spring MVC program
 >
 > **Spring WebPerf was born from this question.** Goal: maximize web framework performance while remaining fully compatible with the Spring ecosystem.
 >
-> [View Benchmark Report](docs/en/benchmark.md) · [Performance Principles](docs/en/performance-principles.md) · [Full Origin Story](docs/en/overview.md)
+> [View Benchmark Report](docs/en/benchmark.md) · [Performance Principles](docs/en/performance-principles.md) · [Full Origin Story](docs/en/overview.md) · [Changelog](CHANGELOG.md) · [Breaking Changes](docs/breaking-changes.md)
 
 ---
 
@@ -49,12 +49,12 @@ Spring WebPerf is a high-performance web framework built on **Netty 4.1**, desig
 ## Key Features
 
 - **High Performance** — Pre-caches all metadata at startup, zero reflection and zero matching at runtime; ASM bytecode generation replaces reflective invocation; O(1) HashMap routing; GC-friendly design
-- **Netty-Driven** — Built on Netty 4.1 event-driven I/O; requests execute on EventLoop by default, with method-level `@RunInPool` scheduling to business thread pools as needed
+- **Netty-Driven** — Built on Netty 4.1 event-driven I/O; requests execute on the `default` business thread pool by default to protect the EventLoop, with method-level `@RunInPool` to schedule to a custom pool or directly to the EventLoop as needed
 - **Spring Ecosystem Compatible** — Supports `@RestController`, `@RequestMapping`, `@Validated`, `@ExceptionHandler`, `HandlerInterceptor`, and other Spring annotations and abstractions — zero-code migration
 - **Async Native** — Built-in support for DeferredResult, Callable, SseEmitter, StreamEmitter, Reactive Streams; SSE throughput reaches 12.63x of Spring MVC at 4 threads / 7.72x at 16 threads
 - **Batch Processing** — Disruptor-based request aggregation that transparently merges concurrent requests into batch operations, boosting throughput by multiple times; supports backpressure strategies, wait strategies, and thread pool isolation
 - **Extensible** — SPI at every key juncture: argument resolvers, return value handlers, codec interceptors, filters, interceptors
-- **Ecosystem Bridge** — The `support` module bridges Servlet Filters, Spring MVC `HandlerInterceptor`, `RequestBodyAdvice` / `ResponseBodyAdvice`
+- **Ecosystem Bridge** — The `spring-web-servlet` module bridges Servlet Filters, Spring MVC `HandlerInterceptor`, `RequestBodyAdvice` / `ResponseBodyAdvice`
 - **Server-Side Rendering** — Optional `spring-web-view` module adds Thymeleaf / FreeMarker template rendering; `@Controller` + `Model` + view-name programming model matches Spring MVC
 - **Actuator Integration** — Supports Spring Boot Actuator with optional standalone management port
 
@@ -110,7 +110,7 @@ server:
   servlet:
     context-path: /api               # Application context path (optional)
   http:
-    max-content-length: 5242880      # Max request body, default 1MB
+    max-content-length: 5242880      # Max request body, default 4MB
     timeout: 15000                   # Request timeout, default 60s (milliseconds)
 management:
   server:
@@ -120,8 +120,6 @@ management:
 > See [Configuration Reference](docs/en/configuration.md) for the full list.
 >
 > Migrating from Spring Boot (Spring MVC)? See the [Migration Guide](docs/en/quickstart.md).
->
-> Migrating from Spring AI? See the [AI Integration Guide](docs/en/ai-guide.md).
 
 ---
 
@@ -142,7 +140,7 @@ JMH benchmark results on JDK 17 + G1GC (1GB heap, 4 threads):
 | bytesLarge | **18,250** ops/s | **1.82x** | **1.45x** | **1.55x** |
 | sse | **13,323** ops/s | **12.63x** | — | **5.08x** |
 
-The perf framework delivers **1.6\~12.6x** throughput over Servlet containers, with **0.10\~0.11ms** p50 latency (lowest among peers). SSE reaches **12.63x** of Spring MVC at 4 threads and **7.72x** at 16 threads. See [full comparison report](docs/en/benchmark.md).
+The perf framework delivers **1.45\~12.6x** throughput over Servlet containers, with **0.10\~0.11ms** p50 latency (lowest among peers). SSE reaches **12.63x** of Spring MVC at 4 threads and **7.72x** at 16 threads. See [full comparison report](docs/en/benchmark.md).
 
 ---
 
@@ -150,29 +148,36 @@ The perf framework delivers **1.6\~12.6x** throughput over Servlet containers, w
 
 | Dimension | WebPerf | Spring MVC (Tomcat) |
 |-----------|-----------|---------------------|
-| Engine | Netty 4.1.115.Final | Spring MVC 6.1.15 + Tomcat 10.1.33 (Undertow 2.3.17.Final) |
+| Engine | Netty 4.1.137.Final | Spring MVC 6.1.15 + Tomcat 10.1.33 (Undertow 2.3.17.Final) |
 | Throughput (json 4t) | **37,508** ops/s | 19,900 ops/s (1.88x) |
 | P50 Latency (bytes 4t) | **0.10ms** | 0.15ms |
 | Steady-state heap (4t) | **24MB** | 26MB |
+
+> **Benchmark snapshot.** The figures above come from a single JMH run (JDK 17 + G1GC, 1GB heap); the comparison containers are version-managed by Spring Boot 3.2.12 (Spring Framework 6.1.15, Tomcat 10.1.33, Undertow 2.3.17.Final). The Netty version listed for WebPerf is the framework's current one (4.1.137.Final), while the four comparison containers were pinned at the time of that run — see the [full benchmark report](docs/en/benchmark.md#framework-versions) for the exact matrix and how to reproduce it.
+
 | I/O model | Netty non-blocking transport + EventLoop | Servlet blocking I/O + container threads |
 | Thread model | EventLoop direct or `@RunInPool` on-demand | Fixed container thread pool |
 | Method invocation | ASM / MethodHandle (~10-30ns) | `Method.invoke()` reflection (~200ns) |
 | Argument resolution | Pre-cached at startup, direct call at runtime | Per-request iteration + `synchronized` cache |
 | Routing | O(1) HashMap multi-level optimizer | `AntPathMatcher` linear traversal |
-| Servlet API | Bridged via support module | Native |
+| Servlet API | Bridged via `spring-web-servlet` | Native |
 | Actuator | Native | Native |
 
 ---
 
 ## Version Selection
 
-This project manages two branches aligned with Spring Boot major versions. Minimum supported: **Spring Boot 2.4.x**.
+This project manages three branches: one mainline (Spring Boot 3.5.x) and two downstream
+adaptation branches. Minimum supported: **Spring Boot 2.4.x**.
 
 | Branch | Spring Boot | Spring Framework | JDK | Servlet API | Status |
 |--------|------------|----------------|-----|-------------|--------|
-| `2.7.x` | 2.4.x ~ 2.7.x | 5.3.x | 8 / 11 / 17 | javax.servlet 4.0 | Maintenance branch (features + bugfix) |
-| `master` | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | 6.0.x ~ 6.2.x / 7.0.x | 17 / 21 | jakarta.servlet 6.0 | **Development baseline** (multi-version via profiles) |
+| `2.7.x` | 2.4.x ~ 2.7.x | 5.3.x | 8 / 11 / 17 | javax.servlet 4.0 | Downstream adaptation (synced from master) |
+| `master` | **3.5.x** | 6.2.x | 17 / 21 / 25 | jakarta.servlet 6.0 | **Development baseline** (no Spring Boot 4 code) |
+| `4.1.x` | 4.0.x ~ 4.1.x | 7.0.x | 17 / 21 / 25 | jakarta.servlet 6.0 | Downstream adaptation (synced from master) |
 
+> The `4.1.x` branch keeps the mainline project version while it is developed; the version is bumped to **4.1.7** when that branch is first released (it has no release yet). Its `spring-boot.version` (Boot 4.1.0) is unrelated to the project version.
+>
 > See [Version Compatibility](docs/en/compatibility.md) for version floor notes, branch recommendations, and detailed compatibility information.
 
 ---
@@ -190,6 +195,7 @@ This project manages two branches aligned with Spring Boot major versions. Minim
 | `spring-boot-starter-web` | Spring Boot Starter: auto-configuration, Actuator support |
 | `spring-web-test` | Integration tests |
 | `spring-web-support-test` | Bridge-layer compatibility tests |
+| `spring-web-benchmark` | JMH benchmarks + report generator (5 stacks: perf / perf-support / tomcat / undertow / webflux) |
 | `spring-web-examples` | Usage examples for various scenarios |
 
 > ¹ View rendering usage and Spring MVC differences: [View Rendering](docs/view.md).

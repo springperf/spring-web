@@ -16,7 +16,7 @@
 | Spring MVC (Tomcat) | < 4,000 |
 | Spring WebFlux | < 4,000 |
 
-同样的业务逻辑，只是接入层从消息队列换成了 HTTP 接口，吞吐量就差了 **6-7 倍**。业务逻辑没有变，瓶颈显然不在业务代码里。
+同样的业务逻辑，只是接入层从消息队列换成了 HTTP 接口，吞吐量就差了 **3.75 倍以上**（15,000 / 4,000）。业务逻辑没有变，瓶颈显然不在业务代码里。
 
 ### 热点分析
 
@@ -145,7 +145,7 @@ WebFlux（Netty 运行时，4,173 样本）与 MVC 问题模式高度相似，�
 在 JDK 17 + G1GC (1GB heap) 的基准测试中，本框架在 7 个场景下全面领先：
 
 - 小包场景吞吐 **36K\~42K** ops/s（4 线程），是 Spring MVC 的 **1.56x\~2.26x**
-- P50 延迟 **0.10~0.11ms**，约为 Spring MVC 的 **45-67%**
+- P50 延迟 **0.10~0.11ms**（4 线程，小包场景），约为 Spring MVC 的 **45-67%**
 - 稳态堆占用 **24MB**（4 线程），约为 Spring MVC 的 **92%**
 - SSE 流式场景吞吐 **13,323** ops/s（4 线程），达到 Spring MVC 的 **12.63x**，16 线程下 **7.72x**
 
@@ -169,9 +169,9 @@ WebFlux（Netty 运行时，4,173 样本）与 MVC 问题模式高度相似，�
 
 本框架允许请求直接在 Netty EventLoop 上执行，同时提供 `@RunInPool` 注解让业务方按方法粒度决定是否需要切换到业务线程池。三种编程模型自由选择，全局默认行为由 `pool.default-execute-mode` 控制（默认 `default` 线程池，设 `eventloop` 可切回 EventLoop）：
 
-- **同步阻塞（默认）**：无 `@RunInPool` 时方法默认在 `default` 业务线程池执行，和传统 Servlet 模型类似；`@RunInPool("custom")` 可调度到自定义线程池
+- **同步阻塞（默认）**：无 `@RunInPool` 时方法默认在 `default` 业务线程池执行，和传统 Servlet 模型类似
+- **自定义线程池**：`@RunInPool("custom")` 调度到 `pool.*` 配置创建的自定义池，按业务隔离
 - **EventLoop 直处理**：`@RunInPool(RunInPool.EVENTLOOP)` 在 EventLoop 上执行，适合纯 CPU 计算或配合响应式驱动（R2DBC、Reactive Redis）
-- **虚拟线程**：`@RunInPool(RunInPool.EVENTLOOP)` + JDK 21 虚拟线程，EventLoop 上无阻塞切换
 
 框架不替用户做决定，而是提供基础设施让用户自行选择。
 
@@ -185,7 +185,7 @@ WebFlux（Netty 运行时，4,173 样本）与 MVC 问题模式高度相似，�
 
 Servlet API 有二十年的生态积累：Spring Security Filter Chain、`RequestBodyAdvice`、`ResponseBodyAdvice`、大量基于 `javax.servlet.Filter` 的中间件。
 
-本框架不强制"全要或全不要"。通过 `spring-web-servlet` 桥接模块，可以渐进式迁移：项目先用 support 模块运行在 Netty 上复用现有 Filter，再逐步迁移到原生 WebFilter。
+本框架不强制"全要或全不要"。通过 `spring-web-servlet` 桥接模块，可以渐进式迁移：项目先用 `spring-web-servlet` 模块运行在 Netty 上复用现有 Filter，再逐步迁移到原生 WebFilter。
 
 ---
 
@@ -197,7 +197,7 @@ Servlet API 有二十年的生态积累：Spring Security Filter Chain、`Reques
 |------|------|
 | **资源受限环境**（1c1g、2c2g） | 框架开销低，同等资源下吞吐是 Spring MVC 的 1.6~2.3x |
 | **高吞吐 API 服务** | 36K~42K ops/s 的吞吐能力，适合接口层卸载 |
-| **延迟敏感业务** | P50 0.10~0.11ms，是 Spring MVC 的 45-67% |
+| **延迟敏感业务** | P50 0.10~0.11ms（4 线程，小包场景），是 Spring MVC 的 45-67% |
 | **SSE / 流式推送** | 无锁 Drain Loop 设计，吞吐达 Spring MVC 的 12.63x（4 线程）/ 7.72x（16 线程） |
 | **新启动的项目** | 从零开始的项目可以直接选用，无需迁移成本 |
 | **IoT / 设备接入** | 大量小请求、资源受限的典型场景（也是本项目缘起的场景） |
@@ -245,12 +245,7 @@ Servlet API 有二十年的生态积累：Spring Security Filter Chain、`Reques
 | JSP | 需 `spring-web-servlet` + `tomcat-embed-jasper`（`JasperJspServlet` + `JspViewResolver`） |
 | Servlet WebSocket（JSR-356 `@ServerEndpoint`） | 需 `spring-web-websocket` 模块桥接 |
 | Spring MVC `View` / `ViewResolver` | 需 `spring-web-view`（Thymeleaf/FreeMarker）+ `spring-web-mvc-support` 的 `ModelAndView` 桥接 |
-
-### 不支持
-
-| 功能 | 原因 |
-|------|------|
-| `@SessionAttributes` / `@SessionScope` | 与 Session 相关的功能，如需可基于 `WebFilter` 自行实现 |
+| `@SessionAttribute` / `@SessionAttributes` / `@SessionScope` | 需 `spring-web-servlet` 模块（`SessionAttributesInterceptor` + `session` 作用域 + `HttpSession`） |
 
 ---
 
@@ -270,7 +265,7 @@ AI 编程（Copilot、Cursor、Claude Code 等）已深度融入日常开发。�
 
 大模型应用的核心交互模式是**流式输出**：Token 逐个生成、实时推送。无论是 ChatGPT 的逐字回复、Agent 的任务状态流，还是 RAG 的检索进度反馈，底层都依赖 **SSE (Server-Sent Events)** 协议。
 
-然而 SSE 在传统 Servlet 容器上性能表现不佳——Spring MVC 的 SSE 吞吐仅约 **1,055 ops/s**（4 线程），成为 AI 应用链路的瓶颈。本项目的 SSE 吞吐达到 **13,323 ops/s**，是 Spring MVC 的 **12.63x**，16 线程下 **7.72x**。支撑这一性能的是 **NettyStreamSender** 的无锁 Drain Loop 设计：写入操作不依赖线程池调度，直接在 EventLoop 上完成批量刷新，避免传统 Servlet 容器中 SSE 连接独占线程的问题。
+然而 SSE 在传统 Servlet 容器上性能表现不佳——Spring MVC 的 SSE 吞吐仅约 **1,055 ops/s**（4 线程），成为 AI 应用链路的瓶颈。本项目的 SSE 吞吐达到 **13,323 ops/s**，是 Spring MVC 的 **12.63x**，16 线程下 **7.72x**。支撑这一性能的是 **`AbstractNettyStreamSender`** 的无锁 Drain Loop 设计：写入操作不依赖线程池调度，直接在 EventLoop 上完成批量刷新，避免传统 Servlet 容器中 SSE 连接独占线程的问题。
 
 这意味着：
 

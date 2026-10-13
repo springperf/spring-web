@@ -5,10 +5,10 @@ public class WebUtils {
     /**
      * 拼接两个 URL 路径，确保结果以 / 开头，不以 / 结尾。
      * 例如：
-     * join("/api/", "/user/") => "/api/user"
-     * join("api", "user") => "/api/user"
-     * join(null, "test/") => "/test"
-     * join("/api", null) => "/api"
+     * join("/api/", "/user/") =&gt; "/api/user"
+     * join("api", "user") =&gt; "/api/user"
+     * join(null, "test/") =&gt; "/test"
+     * join("/api", null) =&gt; "/api"
      */
     public static String pathJoin(String part1, String part2) {
         // 1. 安全处理 null 或空白

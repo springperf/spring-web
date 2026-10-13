@@ -14,13 +14,13 @@ I/O 层的设计哲学是"适配而非重造"：
 - **框架语义的零拷贝包装自研**。`NettyServerHttpRequest`/`NettyServerHttpResponse` 不照搬 Spring 的 `Netty4HeadersAdapter`（仅 Spring 6.1+ 且语义不契合），而是用 `NettyHttpHeadersAdapter` 直接委托 Netty `HttpHeaders`，免去 O(n) 拷入 `LinkedMultiValueMap` 的开销，并保留 Netty 大小写不敏感解析。
 - **引用计数显式化**。不依赖 GC `Cleaner` 延迟回收堆外内存，用 `acquire/release` 对称把 ByteBuf 生命周期交给业务方掌控——这是[原则 4](01-design-philosophy.md#原则-4--避免阻塞非阻塞-io--显式引用计数) 换来零拷贝透传能力的代价。
 
-读完本篇，你应能回答大纲提出的三个核心问题：服务器如何启动与配置？HTTP 请求对象如何零拷贝包装 Netty 对象？响应如何把 `ByteBuf`/`DefaultFileRegion` 写回 Channel？
+读完本篇，你应能回答本系列列出的三个核心问题：服务器如何启动与配置？HTTP 请求对象如何零拷贝包装 Netty 对象？响应如何把 `ByteBuf`/`DefaultFileRegion` 写回 Channel？
 
 ---
 
 ## 一、NettyHttpServer：启动序列与生命周期
 
-`NettyHttpServer` 是整个 I/O 层的入口，单类承担"启动 + 配置 + 优雅关闭 + 指标暴露"四职责。大纲提及的 `AbstractNettyWebServer` 在源码中不存在——这是规划阶段的命名，实际只有一个具体类：
+`NettyHttpServer` 是整个 I/O 层的入口，单类承担"启动 + 配置 + 优雅关闭 + 指标暴露"四职责。索引中提及的 `AbstractNettyWebServer` 在源码中不存在——这是早期规划阶段的命名，实际只有一个具体类：
 
 ```java
 // NettyHttpServer.java
@@ -101,13 +101,13 @@ public void start() {
         ))
 ```
 
-这是[大纲](00-README.md) 写作前提明确要求核对的点。**核对结论**：实际设置了六项，分为 `option`（监听 socket）和 `childOption`（已接受的连接）两类：
+**结论**：实际设置了六项，分为 `option`（监听 socket）和 `childOption`（已接受的连接）两类：
 
 | ChannelOption | 级别 | 默认值 | 作用 | 性能含义 |
 |---------------|------|--------|------|----------|
-| `SO_BACKLOG` | `option` | `128`（`server.netty.so-backlog`） | 监听 socket 的连接队列长度 | 突发连接多时需调大，默认 128 适合多数场景 |
+| `SO_BACKLOG` | `option` | `1024`（`server.netty.so-backlog`） | 监听 socket 的连接队列长度 | 突发连接多时需调大，默认 1024 适合多数场景 |
 | `TCP_NODELAY` | `childOption` | `true`（`server.netty.tcp-nodelay`） | 禁用 Nagle 算法 | 小包立即发送，降低响应延迟 |
-| `SO_KEEPALIVE` | `childOption` | `false`（`server.netty.so-keepalive`） | TCP keepalive 探测 | 默认关闭，需要时开启 |
+| `SO_KEEPALIVE` | `childOption` | `true`（`server.netty.so-keepalive`） | TCP keepalive 探测 | **默认开启**（长连接友好），需要关闭时设为 `false` |
 | `SO_REUSEADDR` | `childOption` | `true`（`server.netty.so-reuseaddr`） | 允许重用本地地址 | 快速重启时避免 `Address already in use` |
 | `ALLOCATOR` | `childOption` | `"pooled"`（`server.netty.allocator-type`） | ByteBuf 分配器类型 | pooled 复用 ByteBuf 减少 GC |
 | `WRITE_BUFFER_WATER_MARK` | `childOption` | low 8KB / high 32KB（`server.netty.write-buffer-*`） | 触发 `channelWritabilityChanged` | 背压机制的水位线，见 [§7](#七背压机制writewatermark--backpressurehandler) |
@@ -116,7 +116,7 @@ public void start() {
 
 ### 1.3 配置默认值速查表
 
-写作前提要求核对的所有 I/O 层配置默认值，集中如下（均来自 [`PropertiesConstant.java`](../../spring-web/src/main/java/io/springperf/web/context/PropertiesConstant.java)）：
+I/O 层配置默认值集中如下（均来自 [`PropertiesConstant.java`](../../spring-web/src/main/java/io/springperf/web/context/PropertiesConstant.java)）：
 
 | 属性键 | 默认值 | 含义 | 源码行 |
 |--------|--------|------|--------|
@@ -124,17 +124,17 @@ public void start() {
 | `server.netty.workers` | `0`（自动=CPU×2） | worker 线程数 | |
 | `server.netty.write-buffer-low-watermark` | `8192`（8KB） | 背压低水位 | |
 | `server.netty.write-buffer-high-watermark` | `32768`（32KB） | 背压高水位 | |
-| `server.http.read-timeout` | `30000`（30s） | 聚合前读取超时（防慢客户端） | |
-| `server.http.max-content-length` | `1048576`（1MB） | 聚合上限 | |
+| `server.http.read-timeout` | `0`（关闭） | 聚合前**读空闲**超时（防慢客户端占用连接）；默认关闭（性能优先）；生产环境通常由代理 / 网关回收空闲连接，网关覆盖不到的边界请显式设置（Tomcat `connectionTimeout` 默认 20s） | |
+| `server.http.max-content-length` | `4194304`（4MB） | 聚合上限 | |
 | `server.http.max-initial-line-length` | `4096`（4KB） | 请求行长度上限 | |
-| `server.http.max-header-size` | `8192`（8KB） | headers 总大小上限 | |
+| `server.max-http-request-header-size` | `8192`（8KB） | 合并请求头总大小上限 | |
 | `server.http.max-chunk-size` | `8192`（8KB） | 单 chunk 上限 | |
 | `server.http2.enabled` | `false` | HTTP/2 开关 | |
-| `server.use-forwarded-headers` | `false` | 信任转发头 | |
-| `server.shutdown.timeout` | `30000`（30s） | 优雅关闭等待 | |
-| `server.netty.so-backlog` | `128` | TCP 连接队列长度 | |
+| `server.forward-headers-strategy` | `NONE` | 转发头策略：`NONE`/`FALSE` 不信任；`FRAMEWORK`/`NATIVE` 信任解析 `Forwarded` / `X-Forwarded-*` | |
+| `server.shutdown.grace-period` | `30s` | 优雅关闭等待 | |
+| `server.netty.so-backlog` | `1024` | TCP 连接队列长度 | |
 | `server.netty.tcp-nodelay` | `true` | 禁用 Nagle 算法 | |
-| `server.netty.so-keepalive` | `false` | TCP keepalive 探测 | |
+| `server.netty.so-keepalive` | `true` | TCP keepalive 探测 | |
 | `server.netty.so-reuseaddr` | `true` | 重用本地地址 | |
 | `server.netty.allocator-type` | `pooled` | ByteBuf 分配器类型 | | |
 
@@ -193,7 +193,7 @@ public int getOrder() {
 
 ## 二、优雅关闭两阶段：`stop` 与 `destroyComponent`
 
-大纲没有单列"优雅关闭"要点，但它是 I/O 层正确性的关键，且体现了[原则 4](01-design-philosophy.md#原则-4--避免阻塞非阻塞-io--显式引用计数) 对"在途请求"的尊重。关闭分两阶段，刻意把 EventLoop 关闭推迟：
+索引中没有单列"优雅关闭"要点，但它是 I/O 层正确性的关键，且体现了[原则 4](01-design-philosophy.md#原则-4--避免阻塞非阻塞-io--显式引用计数) 对"在途请求"的尊重。关闭分两阶段，刻意把 EventLoop 关闭推迟：
 
 ```java
 // NettyHttpServer.java  —— 第一阶段：stop
@@ -235,7 +235,7 @@ public void destroyComponent() throws Exception {
 | `stop(Runnable)` | `httpHandler.setShuttingDown()` + `serverChannel.close()` | Spring 优雅关闭信号到达时 | 拒新连接（新请求 503），但**不关 EventLoop**，让在途请求继续处理 |
 | `destroyComponent()` | `boss/worker.shutdownGracefully().sync()` | `WebContext` 三阶段销毁，`BizPoolRegistry` 等业务组件排空后 | 真正停 I/O 线程 |
 
-**为什么不一次性关？** 如果 `stop` 里直接 `workerGroup.shutdownGracefully()`，在途请求（尤其 SSE 长连接）会被粗暴切断——业务线程池里还有任务没跑完，业务组件里还有未完成的工作。把 EventLoop 关闭推迟到 `destroyComponent`，让"业务组件排空"先于"I/O 线程停止"，是在途请求完整处理的保障。`setShuttingDown()` 让新请求立即拿 503（见 [§4.1](#41-channelread-与-handlerequest-入口适配)），避免关闭期间继续积累新工作。
+**为什么不一次性关？** 如果 `stop` 里直接 `workerGroup.shutdownGracefully()`，在途请求（尤其 SSE 长连接）会被粗暴切断——业务线程池里还有任务没跑完，业务组件里还有未完成的工作。把 EventLoop 关闭推迟到 `destroyComponent`，让"业务组件排空"先于"I/O 线程停止"，是在途请求完整处理的保障。`setShuttingDown()` 让新请求立即拿 503（见 [§4.1](#41-channelread-与-handlerequest入口适配)），避免关闭期间继续积累新工作。
 
 ---
 
@@ -294,16 +294,18 @@ ASCII 决策树：
 ```java
 // Http2ChannelInitializer.java
 private void addHttp11Handlers(ChannelPipeline p) {
-    p.addLast(new HttpServerCodec(maxInitialLine, maxHeader, maxChunk));   //
+    p.addLast(new HttpServerCodec(maxInitialLine, maxHeader, maxChunk));   // ① 字节流 ↔ Http*Object
+    addCompressor(p, compressionConfig);                                  // ② 响应压缩（总开关默认关）
     if (readTimeout > 0) {
-        p.addLast(new ReadTimeoutHandler(readTimeout, TimeUnit.MILLISECONDS));  //
+        p.addLast(new ReadIdleTimeoutHandler(readTimeout));                // ③ 空闲读取超时
     }
-    p.addLast(new ChunkedWriteHandler());                                  //
-    p.addLast(beforeAggregatorHandlers);                                   // → SPI 插入点
-    addAggregator(p);                                                      //
-    p.addLast(afterAggregatorHandlers);                                    // → SPI 插入点
-    p.addLast(BackpressureHandler.INSTANCE);                               //
-    p.addLast(httpHandler);                                                //
+    p.addLast(new ChunkedWriteHandler());                                  // ④ 支持 ChunkedInput 流式写出
+    p.addLast(beforeAggregatorHandlers);                                   // ⑤ → SPI 插入点
+    addAggregator(p);                                                      // ⑥ 聚合成 FullHttpRequest
+    p.addLast(afterAggregatorHandlers);                                    // ⑦ → SPI 插入点
+    p.addLast(BackpressureHandler.INSTANCE);                               // ⑧ 背压回调
+    addKeepAlive(p, keepAliveConfig);                                      // ⑨ keep-alive 策略
+    p.addLast(httpHandler);                                                // ⑩ NettyHttpHandler 入口
 }
 ```
 
@@ -312,15 +314,17 @@ private void addHttp11Handlers(ChannelPipeline p) {
 | 位置 | Handler | 职责 | 性能/正确性含义 |
 |------|---------|------|----------------|
 | 1 | `HttpServerCodec` | 字节流 ↔ `HttpRequest`/`HttpContent` | Netty 原生，maxInitialLine/maxHeader/maxChunk 限制见配置表 |
-| 2 | `ReadTimeoutHandler`（可选） | 聚合前读取超时 | `readTimeout>0` 才装；防慢客户端在聚合 body 前无限期占用连接（默认 30s） |
-| 3 | `ChunkedWriteHandler` | 支持 `ChunkedInput` 流式写出 | 响应 `writeStream` 必需 |
-| 4 | beforeAggregator handlers | SPI 插入点 | WebSocket 等模块在聚合前插自定义 handler |
-| 5 | `addAggregator` | 聚合成 `FullHttpRequest` | 分流见 [§3.3](#33-addaggregatormultipart-分流) |
-| 6 | afterAggregator handlers | SPI 插入点 | WebSocket 握手 handler 插这里，拿聚合后的 FullHttpRequest |
-| 7 | `BackpressureHandler.INSTANCE` | 背压回调 | 见 [§7](#七背压机制writewatermark--backpressurehandler) |
-| 8 | `httpHandler` | `NettyHttpHandler` 入口 | 见 [§4](#四nettyhttphandler入口适配层) |
+| 2 | `addCompressor` | 响应压缩 | 总开关 `server.compression.enabled` 默认关；开启后仅对白名单 Content-Type 且大于 `min-response-size` 的响应压缩 |
+| 3 | `ReadIdleTimeoutHandler`（可选） | 空闲读取超时 | `readTimeout>0` 才装；防慢客户端在聚合 body 前无限期占用连接（默认 30s）。注意是**空闲**超时（无字节流入即触发），不是「单次 read 耗时上限」 |
+| 4 | `ChunkedWriteHandler` | 支持 `ChunkedInput` 流式写出 | 响应 `writeStream` 必需 |
+| 5 | beforeAggregator handlers | SPI 插入点 | WebSocket 等模块在聚合前插自定义 handler |
+| 6 | `addAggregator` | 聚合成 `FullHttpRequest` | 分流见 [§3.3](#33-addaggregatormultipart-分流) |
+| 7 | afterAggregator handlers | SPI 插入点 | WebSocket 握手 handler 插这里，拿聚合后的 FullHttpRequest |
+| 8 | `BackpressureHandler.INSTANCE` | 背压回调 | 见 [§7](#七背压机制writewatermark--backpressurehandler) |
+| 9 | `addKeepAlive` | keep-alive 策略 | 按 `server.keep-alive-time` / `max-keep-alive-requests` 决定是否复用连接 |
+| 10 | `httpHandler` | `NettyHttpHandler` 入口 | 见 [§4](#四nettyhttphandler入口适配层) |
 
-**大纲 写的 `SslHandler` → `HttpTrafficHandler` 是规划命名**，实际 HTTP/1.1 管线里没有叫 `HttpTrafficHandler` 的类——业务 handler 就是 `NettyHttpHandler`，背压由独立的 `BackpressureHandler` 担当。`SslHandler` 只在分支 A/B（TLS）出现，分支 D（明文默认）没有。
+**索引中写的 `SslHandler` → `HttpTrafficHandler` 是早期规划命名**，实际 HTTP/1.1 管线里没有叫 `HttpTrafficHandler` 的类——业务 handler 就是 `NettyHttpHandler`，背压由独立的 `BackpressureHandler` 担当。`SslHandler` 只在分支 A/B（TLS）出现，分支 D（明文默认）没有。
 
 ### 3.3 `addAggregator`：multipart 分流
 
@@ -337,7 +341,7 @@ private void addAggregator(ChannelPipeline p) {
 
 `supportMultipart` 在主服务器构造时固定为 `true`（[`NettyHttpServer.java`](../../spring-web/src/main/java/io/springperf/web/server/NettyHttpServer.java)）。框架自研的 `SupportMultipartAggregator` 在 Netty `HttpObjectAggregator` 基础上扩展了 multipart 解析能力（含文件上传的零拷贝处理，联动 [§5](#五nettyserverhttprequest零拷贝包装) 的 `parseParameters`）。管理端口可设 `supportMultipart=false` 走原生聚合器，省一点开销。
 
-`maxContentLength` 默认 1MB（`HTTP_MAX_CONTENT_LENGTH`）。超过 1MB 的请求体聚合会抛 `413 Request Entity Too Large`——这是 fail-fast 在 I/O 层的体现，避免单请求 OOM。
+`maxContentLength` 默认 4MB（`HTTP_MAX_CONTENT_LENGTH`，值见 [`PropertiesConstant.java`](../../spring-web/src/main/java/io/springperf/web/context/PropertiesConstant.java) 的 `HTTP_MAX_CONTENT_LENGTH_DEFAULT`；3.5.6 起由 1MB 调整为 4MB，见 [`CHANGELOG.md`](../../CHANGELOG.md)）。超过该上限的请求体聚合会抛 `413 Request Entity Too Large`——这是 fail-fast 在 I/O 层的体现，避免单请求 OOM。
 
 ### 3.4 分支 C：h2c prior knowledge 前缀检测
 
@@ -386,7 +390,7 @@ public List<ChannelHandler> getAfterAggregatorHandlers()  { return Collections.u
 - **beforeAggregator**：handler 收到的是未聚合的 `HttpContent` 片段——适合需要流式处理 body、不想等全部到达的场景。
 - **afterAggregator**：handler 收到的是聚合后的 `FullHttpRequest`——适合需要完整请求再决策的场景。**WebSocket 模块用这个**：握手需要读 `Sec-WebSocket-Key` 等 header，必须等聚合完。
 
-返回 `unmodifiableList` 防止外部误改，是[原则 6](01-design-philosophy.md#原则-6--避免魔法行为显式-sp显式-fail-fast不靠隐式猜测) "显式、可预测"的体现。
+返回 `unmodifiableList` 防止外部误改，是[原则 6](01-design-philosophy.md#原则-6--避免魔法行为显式-spi显式-fail-fast不靠隐式猜测) "显式、可预测"的体现。
 
 ### 3.6 HTTP/2 子流 pipeline：`Http2ChildChannelInitializer`
 
@@ -424,7 +428,6 @@ ALPN 协商在 TLS 握手阶段完成，**握手后就知道走 h2 还是 h1.1**
 // NettyMetricsHandler.java
 @ChannelHandler.Sharable
 public class NettyMetricsHandler extends ChannelInboundHandlerAdapter {
-    public static final NettyMetricsHandler INSTANCE = new NettyMetricsHandler();
     private final AtomicInteger activeConnections = new AtomicInteger();
 
     @Override public void channelActive(ChannelHandlerContext ctx) { activeConnections.incrementAndGet(); ... }
@@ -433,7 +436,7 @@ public class NettyMetricsHandler extends ChannelInboundHandlerAdapter {
 }
 ```
 
-`@Sharable` 单例，装在 pipeline 头部（[`NettyHttpServer.java`](../../spring-web/src/main/java/io/springperf/web/server/NettyHttpServer.java) `addLast(NettyMetricsHandler.INSTANCE)`）。`AtomicInteger` 计活跃连接数，`channelActive`/`channelInactive` 增减，供 `NettyHttpServer.getActiveConnectionCount()`暴露给 actuator/metrics。单例 + `@Sharable` 是因为所有连接共享一个计数器——若每连接一个实例就失去聚合计数意义。
+`@Sharable`，但**不是静态单例**：`NettyHttpServer` 与 `ManagementNettyHttpServer` 各持**一个自己的实例字段**（`private final NettyMetricsHandler metricsHandler = new NettyMetricsHandler();`），装在 pipeline 头部（[`NettyHttpServer.java`](../../spring-web/src/main/java/io/springperf/web/server/NettyHttpServer.java) `addLast(metricsHandler)`）。`AtomicInteger` 计活跃连接数，`channelActive`/`channelInactive` 增减，供 `NettyHttpServer.getActiveConnectionCount()` 暴露给 actuator/metrics（该 gauge 直接绑定 **server bean**，见 [14 篇](14-starter-autoconfig.md)）。`@Sharable` 是必需的——同一个实例要装进**该服务器**每条连接的 pipeline，使这些连接共享一个计数器；主服务器与管理服务器各有**各自的**计数器，因此不复用全局单例。
 
 ---
 
@@ -468,7 +471,7 @@ public void channelRead(ChannelHandlerContext ctx, Object msg) {
 
 `@Sharable`（[`NettyHttpHandler.java`](../../spring-web/src/main/java/io/springperf/web/server/NettyHttpHandler.java) 类注解）——所有连接共享一个实例（`NettyHttpServer` 启动期 `new` 一次，:62）。`channelRead` 的 `try/finally release(msg)` 是入口的引用计数对称：Netty 的 `FullHttpRequest` 是堆外 ByteBuf 持有的引用计数对象，进来一次引用，处理完必须在入口释放——否则每请求泄漏一个 ByteBuf。
 
-但"处理完"的语义在这里很微妙：`handleRequest` 内部会 `msg.retain()`（见下文），因为请求对象要传给 `DispatcherHandler`，可能跨线程到业务池，生命周期超出 `channelRead` 的栈。**入口 `release` 的是自己那次引用，`handleRequest` 的 `retain` 给业务侧新加一次引用**——两者配对，引用计数最终归零由业务侧 `release` 负责（见 [§5.5](#55-acquirerelease-引用计数契约)）。
+但"处理完"的语义在这里很微妙：`handleRequest` 内部会 `msg.retain()`（见下文），因为请求对象要传给 `DispatcherHandler`，可能跨线程到业务池，生命周期超出 `channelRead` 的栈。**入口 `release` 的是自己那次引用，`handleRequest` 的 `retain` 给业务侧新加一次引用**——两者配对，引用计数最终归零由业务侧 `release` 负责（见 [§5.5](#55-acquirerelease引用计数契约)）。
 
 ### 4.2 `handleRequest`：校验、包装、委托
 
@@ -511,7 +514,7 @@ private void handleRequest(ChannelHandlerContext ctx, FullHttpRequest msg) {
 
 **④ contextPath 三态校验。** `contextPath` 为空 / 等于请求 path / 是请求 path 前缀且后跟 `/`——三态匹配，不匹配直接 404。这避免把不属于本 context 的请求误送进路由引擎。
 
-**⑤ `msg.retain()` 在构造 `req` 前。** 这是 [原则 4](01-design-philosophy.md#原则-4--避免阻塞非-blocking-io--显式引用计数) 的精确落地：请求对象即将跨线程（EventLoop → 业务池，见 [04 篇](04-request-pipeline.md) `handleWithMappingResult` 的 `acquire`），必须先 `retain` 给业务侧加一次引用，否则入口 `finally release` 后业务侧拿到的 ByteBuf 已释放。
+**⑤ `msg.retain()` 在构造 `req` 前。** 这是 [原则 4](01-design-philosophy.md#原则-4--避免阻塞非阻塞-io--显式引用计数) 的精确落地：请求对象即将跨线程（EventLoop → 业务池，见 [04 篇](04-request-pipeline.md) `handleWithMappingResult` 的 `acquire`），必须先 `retain` 给业务侧加一次引用，否则入口 `finally release` 后业务侧拿到的 ByteBuf 已释放。
 
 **⑥ `catch Throwable` 500 兜底。** 任何异常不抛给 Netty（Netty 的 `ExceptionCaught` 会关闭连接），而是收敛成 500 响应写回——这是 [`development.md`](../../.agent/rule/development.md) "异常统一收敛到 ExceptionRegistry 不抛给 Netty" 在 I/O 层的兜底。
 
@@ -575,46 +578,39 @@ public Object put(String key, String value) {
 
 **为什么自研而不用 Spring 的 `Netty4HeadersAdapter`？** 两个原因：
 
-1. **版本兼容**：`Netty4HeadersAdapter` 仅 Spring 6.1+，本框架要兼容 Spring Boot 2.4.x~4.1.x（[SB 3.x 多版本兼容性验证](../../) 记忆有记录 POM parent→BOM+profiles 改造）。
-2. **语义**：`writable` 标志支持"只读视图"模式——某些场景只需读 header 不应被改，`checkWritable()` 抛异常而非静默写入，符合[原则 6](01-design-philosophy.md#原则-6--避免魔法行为显式-sp显式-fail-fast不靠隐式猜测)。
+1. **版本兼容**：`Netty4HeadersAdapter` 仅 Spring 6.1+，而本框架要兼容 Spring Boot 2.4.x 起的多个版本（2.7.x 分支基于 Spring 5.3）。
+2. **语义**：`writable` 标志支持"只读视图"模式——某些场景只需读 header 不应被改，`checkWritable()` 抛异常而非静默写入，符合[原则 6](01-design-philosophy.md#原则-6--避免魔法行为显式-spi显式-fail-fast不靠隐式猜测)。
 
 **附带修复一个旧 bug**：旧实现把 header 拷进 `LinkedMultiValueMap`（大小写敏感），导致 Netty 原生的大小写不敏感解析丢失——小写 key 的 `get("content-type")` 拿不到 `Content-Type` 的值。直接委托 Netty headers 保留了原生大小写不敏感，这个问题随之消失。
 
-### 5.2 `WebHttpHeaders`：跨版本 HttpHeaders
+### 5.2 `WebHttpHeaders`：两处优化
 
-`WebHttpHeaders` 同时 `extends HttpHeaders`（Spring）和 `implements MultiValueMap`，靠 `static final` + `MethodHandle` 在类加载期解决版本分支：
+`WebHttpHeaders` 继承 Spring 的 `HttpHeaders` 并实现 `MultiValueMap`，**不含任何跨版本分支**——父类在 Spring 6 下本就实现了 `MultiValueMap`，本类的覆写只是为下面两处优化提供入口，其余一律委派 `super`：
+
+| 优化 | 做法 |
+|------|------|
+| Content-Type 解析缓存 | 缓存 `getContentType()` 的 `parseMediaType` 结果（`cachedContentType`），避免重复解析；`setContentType` 时清缓存 |
+| 常量名直通 | 当底层存储是可写的 `NettyHttpHeadersAdapter` 时，Content-Type 的读写走 `HttpHeaderNames` 常量名直通 Netty，省掉按 String 名查找与 `AsciiString` 名字重算哈希 |
 
 ```java
 // WebHttpHeaders.java
-private static final boolean HEADERS_IS_MULTI_VALUE_MAP;   // 6.x: true, 7.x: false
-private static final MethodHandle AS_MULTI_VALUE_MAP;     // 7.x 反射拿 asMultiValueMap()
+public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String, String> {
 
-static {
-    boolean isMVM = false;
-    MethodHandle asMVM = null;
-    try {
-        // 探测 HttpHeaders 是否本身就是 MultiValueMap（Spring 6.x 是，7.x 否）
-        isMVM = MultiValueMap.class.isAssignableFrom(HttpHeaders.class);
-        if (!isMVM) {
-            // 7.x 用 asMultiValueMap() 方法转
-            Method m = HttpHeaders.class.getMethod("asMultiValueMap");
-            asMVM = MethodHandles.lookup().unreflect(m);
-        }
-    } catch (...) { }
-    HEADERS_IS_MULTI_VALUE_MAP = isMVM;
-    AS_MULTI_VALUE_MAP = asMVM;
+    /** 缓存 getContentType() 的解析结果 */
+    private MediaType cachedContentType;
+    ...
 }
 ```
 
-`static final boolean` 让 JIT 能完全消除版本分支——运行时只剩一条路径，无反射开销。`getContentType` 还缓存了 `parseMediaType` 结果，避免重复解析；`setContentType` 清缓存。
+> **历史注记**：master 早期曾在此类用 `static final boolean` + `MethodHandle`（`HEADERS_IS_MULTI_VALUE_MAP`、`AS_MULTI_VALUE_MAP`）在类加载期区分 Spring 6.x / 7.x 的 `HttpHeaders` 语义。该兼容层已随 4.x 适配整体移出 master（改由 `4.1.x` 分支承接），现为 `super` 直调，消除了每请求的 varargs 分配与 `invokeWithArguments` 慢路径。
 
-### 5.3 body 零拷贝分级：`LARGE_BODY_LIMIT = 4096`
+### 5.3 body 零拷贝分级：阈值 `server.http.max-in-memory-size`（默认 4096）
 
 请求体读取是零拷贝分级的关键——小 body 复制到堆 `byte[]`，大 body 共享 ByteBuf 视图：
 
 ```java
 // NettyServerHttpRequest.java  字段
-private static final int LARGE_BODY_LIMIT = 4096;
+private final int largeBodyLimit;                  // 取自 server.http.max-in-memory-size
 private static final byte[] EMPTY_BODY = new byte[0];
 private volatile byte[] body;              // 无初始化，getBodyBytes 首次填充
 private ByteBuf largeBodyBuf;              // 非 volatile：仅由持有 request 的线程读写
@@ -635,7 +631,7 @@ protected byte[] getBodyBytes() {           // protected，非 private
             if (body == null) {
                 ByteBuf content = request.content();
                 int size = content.readableBytes();
-                if (size <= LARGE_BODY_LIMIT) {
+                if (size <= largeBodyLimit) {   // 来自 server.http.max-in-memory-size
                     body = ByteBufUtil.getBytes(content);  // 复制到堆 byte[]（含 size==0 返空数组）
                 } else {
                     largeBodyBuf = content.duplicate();    // 共享视图，不 +refCnt
@@ -655,9 +651,11 @@ protected byte[] getBodyBytes() {           // protected，非 private
 | `size <= 4096`（含 `size == 0`） | `ByteBufUtil.getBytes` 复制到堆 `byte[]`（`size==0` 返回空数组，非 `EMPTY_BODY` 单例） | 小 body 复制代价低，堆 `byte[]` 无引用计数管理负担，业务侧用完即 GC |
 | `size > 4096` | `content.duplicate()` 共享视图，`body` 置 `EMPTY_BODY` 单例占位 | 大 body 复制代价高，duplicate 不拷贝字节、不 +refCnt，直接共享 ByteBuf 的可读区域 |
 
-**大纲 写的 `retainedDuplicate` 实际是 `duplicate`**——这是规划措辞与实现的关键差异。`retainedDuplicate` 会 `+refCnt`，`duplicate` 不递增。本框架用 `duplicate`（不 +refCnt），因为大 body 的存活由**请求对象自身的 retain/release 链**保证（见 [§5.5](#55-acquirerelease-引用计数契约)），duplicate 出来的视图不独立持有引用。`ByteBufInputStream` 构造传 `false`（不 release）也对应这点——流关闭时不 release，避免重复释放。
+**索引中写的 `retainedDuplicate` 实际是 `duplicate`**——这是早期规划措辞与实现的关键差异。`retainedDuplicate` 会 `+refCnt`，`duplicate` 不递增。本框架用 `duplicate`（不 +refCnt），因为大 body 的存活由**请求对象自身的 retain/release 链**保证（见 [§5.5](#55-acquirerelease引用计数契约)），duplicate 出来的视图不独立持有引用。`ByteBufInputStream` 构造传 `false`（不 release）也对应这点——流关闭时不 release，避免重复释放。
 
-**为什么阈值是 4096？** 这是经验值：4KB 以下的 body（绝大多数 JSON API 请求）复制到堆更划算——堆 `byte[]` 无堆外内存管理开销，GC 友好；超过 4KB 后复制代价上升，且堆外 ByteBuf 的零拷贝优势（省 heap→direct 拷贝）显现。这个阈值在 [`NettyServerHttpRequest.java`](../../spring-web/src/main/java/io/springperf/web/http/NettyServerHttpRequest.java) 硬编码，未配置化。
+**为什么默认阈值是 4096？** 这是经验值：4KB 以下的 body（绝大多数 JSON API 请求）复制到堆更划算——堆 `byte[]` 无堆外内存管理开销，GC 友好；超过 4KB 后复制代价上升，且堆外 ByteBuf 的零拷贝优势（省 heap→direct 拷贝）显现。
+
+该阈值**已配置化**：字段 `largeBodyLimit` 在构造期从 `server.http.max-in-memory-size` 读取（默认 4096，见 `PropertiesConstant.HTTP_MAX_IN_MEMORY_SIZE_DEFAULT`），调整该键即可改变分级点，无需改代码。
 
 ### 5.4 `resolveScheme`：scheme 解析四优先级
 
@@ -673,12 +671,12 @@ private String resolveScheme() {
 
 四优先级的逻辑：
 
-1. **`Forwarded` proto**：仅当 `server.use-forwarded-headers=true`（默认 false）。RFC7239 标准转发头。
+1. **`Forwarded` proto**：仅当 `server.forward-headers-strategy=FRAMEWORK`（默认 `NONE`）。RFC7239 标准转发头。
 2. **`X-Forwarded-Proto`**：同条件。常见反向代理（Nginx/ALB）用的非标准头。
 3. **`SslHandler` 存在**：`ctx.pipeline().get(SslHandler.class) != null` → `https`。TLS 在 Netty Java 层终结，pipeline 里有 `SslHandler` 即证明是 TLS 连接。
 4. **兜底 `http`**。
 
-**转发头默认不信任**（`USE_FORWARDED_HEADERS` 默认 false）是安全考量——转发头可被客户端伪造，仅在部署于受信反代后方时才开启。这是[原则 6](01-design-philosophy.md#原则-6--避免魔法行为显式-sp显式-fail-fast不靠隐式猜测) "不靠隐式猜测"在安全维度的延伸。
+**转发头默认不信任**（`server.forward-headers-strategy` 默认 `NONE`）是安全考量——转发头可被客户端伪造，仅在部署于受信反代后方时才开启。这是[原则 6](01-design-philosophy.md#原则-6--避免魔法行为显式-spi显式-fail-fast不靠隐式猜测) "不靠隐式猜测"在安全维度的延伸。
 
 ### 5.5 `acquire`/`release`：引用计数契约
 
@@ -695,7 +693,7 @@ public void release() {
 }
 ```
 
-`WebServerHttpRequest` 接口契约（[:162-179](../../spring-web/src/main/java/io/springperf/web/http/WebServerHttpRequest.java)）：**跨业务线程前必须 `acquire`，处理完配对 `release`**。这个契约在 [04 篇](04-request-pipeline.md) `DispatcherHandler.handleWithMappingResult` 的 `acquire() → executor.execute → release()` 里被遵守，是 [原则 4](01-design-philosophy.md#原则-4--避免阻塞非-blocking-io--显式引用计数) 的硬约束。
+`WebServerHttpRequest` 接口契约（[`WebServerHttpRequest.java`](../../spring-web/src/main/java/io/springperf/web/http/WebServerHttpRequest.java)）：**跨业务线程前必须 `acquire`，处理完配对 `release`**。这个契约在 [04 篇](04-request-pipeline.md) `DispatcherHandler.handleWithMappingResult` 的 `acquire() → executor.execute → release()` 里被遵守，是 [原则 4](01-design-philosophy.md#原则-4--避免阻塞非阻塞-io--显式引用计数) 的硬约束。
 
 `release` 幂等——`ReferenceCountUtil.release` 内部对 refCnt 归零后的再次调用会抛 `IllegalReferenceCountException`，但框架在 `NettyHttpHandler.handleRequest` 的 `finally` 与业务侧 `finally` 两处配对释放，靠"恰好一次"的对称性保证不重复。`largeBodyBuf` 是 `duplicate` 无独立引用，不需要单独 release——它的存活由 `request` 的引用计数托底。
 
@@ -770,7 +768,7 @@ protected void flush(boolean chunked) {
 }
 ```
 
-三分支：有 body → `DefaultFullHttpResponse(body)`；chunked 流式 → `DefaultHttpResponse`（无 body，后续分块写）；无 body → `DefaultFullHttpResponse(EMPTY_BUFFER)`。`flush` 错误时 `buf.release()` + 置空——置空是防 `getBuf()` 返回已释放的 ByteBuf 导致 use-after-release，又是 [原则 4](01-design-philosophy.md#原则-4--避免阻塞非-blocking-io--显式引用计数) 的纪律。
+三分支：有 body → `DefaultFullHttpResponse(body)`；chunked 流式 → `DefaultHttpResponse`（无 body，后续分块写）；无 body → `DefaultFullHttpResponse(EMPTY_BUFFER)`。`flush` 错误时 `buf.release()` + 置空——置空是防 `getBuf()` 返回已释放的 ByteBuf 导致 use-after-release，又是 [原则 4](01-design-philosophy.md#原则-4--避免阻塞非阻塞-io--显式引用计数) 的纪律。
 
 ### 6.3 路径二：`writeStream(InputStream)` — chunked 流式
 
@@ -862,13 +860,13 @@ public void addRespEventListener(WriteRespEventListener listener) {
 
 `WriteRespEventListener`（[](../../spring-web/src/main/java/io/springperf/web/http/WriteRespEventListener.java)）定义四个回调：`completeSuccessCallback`/`completeErrorCallback`/`writeStreamSuccessCallback`/`writeStreamErrorCallback`（后两个有 default 实现）。`CompositeWriteRespEventListener`（[](../../spring-web/src/main/java/io/springperf/web/http/BaseWebServerHttpResponse.java)）合并多监听器广播。
 
-`NettyServerHttpResponse` 还有个静态 `LOG_ERROR_ON_FAILURE`（[:31-40](../../spring-web/src/main/java/io/springperf/web/http/NettyServerHttpResponse.java)）——默认监听器，对 `ClosedChannelException` 静默（连接已关闭时写失败是预期行为，不刷错误日志）。无显式 listener 时用这个默认，避免每连接刷一堆无意义错误日志。
+`NettyServerHttpResponse` 还有个静态 `LOG_ERROR_ON_FAILURE`（见 [`NettyServerHttpResponse.java`](../../spring-web/src/main/java/io/springperf/web/http/NettyServerHttpResponse.java)）——默认监听器，对 `ClosedChannelException` 静默（连接已关闭时写失败是预期行为，不刷错误日志）。无显式 listener 时用这个默认，避免每连接刷一堆无意义错误日志。
 
 ---
 
 ## 七、背压机制：`WriteWaterMark` + `BackpressureHandler`
 
-背压是 [原则 4](01-design-philosophy.md#原则-4--避免阻塞非-blocking-io--显式引用计数) "非阻塞"的关键支撑——当下游消费慢于上游生产时，必须能把压力传回上游，否则 OOM。
+背压是 [原则 4](01-design-philosophy.md#原则-4--避免阻塞非阻塞-io--显式引用计数) "非阻塞"的关键支撑——当下游消费慢于上游生产时，必须能把压力传回上游，否则 OOM。
 
 ### 7.1 水位线触发 `channelWritabilityChanged`
 
@@ -888,20 +886,30 @@ public final class BackpressureHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelWritabilityChanged(ChannelHandlerContext ctx) {
-        if (ctx.channel().isWritable()) {
-            ConnectionContext conn = ctx.channel().attr(CONN_CTX).get();
-            if (conn != null && !conn.isLastWritable()) {
-                // 只处理 false → true 转换
-                conn.updateWritable(true);
-                conn.getOnWritable().run();                // 触发回调
+        Channel ch = ctx.channel();
+        boolean writable = ch.isWritable();
+
+        ChannelAttrs attrs = ChannelAttrs.ofIfPresent(ch);
+        ConnectionContext conn = attrs == null ? null : attrs.connCtx;
+        if (conn == null) {
+            // 从未走过请求路径：无背压状态可谈
+            ctx.fireChannelWritabilityChanged();
+            return;
+        }
+
+        if (!conn.lastWritable() && writable) {   // 只处理 false → true 转换
+            Runnable cb = conn.getOnWritable();
+            if (cb != null) {
+                cb.run();                         // 触发续写回调
             }
         }
+        conn.updateWritable(writable);
         ctx.fireChannelWritabilityChanged();
     }
 }
 ```
 
-**只处理 `false → true` 转换**（`!conn.isLastWritable() && writable`）。为什么？`true → false`（变为不可写）时，Netty 的 `Channel.isWritable()` 已经是 `false`，直接调 `ctx.write()` 会被 Netty 自动缓冲（不抛、不丢，只是堆在 outbound buffer）——框架无需干预。只有恢复可写（`false → true`）时，才需要通知上游"可以继续写了"，触发 `onWritable.run()` 回调让业务侧续写。
+**只处理 `false → true` 转换**（`!conn.lastWritable() && writable`）。为什么？`true → false`（变为不可写）时，Netty 的 `Channel.isWritable()` 已经是 `false`，直接调 `ctx.write()` 会被 Netty 自动缓冲（不抛、不丢，只是堆在 outbound buffer）——框架无需干预。只有恢复可写（`false → true`）时，才需要通知上游"可以继续写了"，触发 `onWritable.run()` 回调让业务侧续写。
 
 ### 7.2 `ConnectionContext`：背压回调载体
 
@@ -911,14 +919,14 @@ public class ConnectionContext {
     private volatile boolean lastWritable = true;   // 上次状态，初始 true
     private volatile Runnable onWritable;           // 可写回调
 
-    public boolean isLastWritable() { return lastWritable; }
+    public boolean lastWritable() { return lastWritable; }
     public void updateWritable(boolean w) { this.lastWritable = w; }
     public Runnable getOnWritable() { return onWritable; }
     // setter ...
 }
 ```
 
-`lastWritable` 记上次状态，用于检测转换边沿（`!lastWritable && writable` 就是 `false→true`）。`onWritable` 是业务侧注册的续写回调。`ConnectionContext` 通过 `CONN_CTX` AttributeKey 绑定到 Channel（[`NettyServerHttpResponse.java`](../../spring-web/src/main/java/io/springperf/web/http/NettyServerHttpResponse.java)），每个连接独立一份。
+`lastWritable` 记上次状态，用于检测转换边沿（`!lastWritable && writable` 就是 `false→true`）。`onWritable` 是业务侧注册的续写回调。`ConnectionContext` 现在挂在**每连接状态持有者** `ChannelAttrs.connCtx` 上（整个连接只占一个 channel attr，见 [`ChannelAttrs.java`](../../spring-web/src/main/java/io/springperf/web/server/ChannelAttrs.java) 的「为什么需要它」），每个连接独立一份；早前独立的 `CONN_CTX` AttributeKey 已合并进该持有者（合并动机与实测见类注释）。
 
 ### 7.3 `setWritableCallback`：注册续写回调
 
@@ -927,10 +935,11 @@ public class ConnectionContext {
 @Override
 public void setWritableCallback(Runnable callback) {
     runOnEventLoop(() -> {
-        ConnectionContext conn = ctx.channel().attr(CONN_CTX).get();
+        ChannelAttrs attrs = ChannelAttrs.of(ctx.channel());
+        ConnectionContext conn = attrs.connCtx;
         if (conn == null) {
             conn = new ConnectionContext();
-            ctx.channel().attr(CONN_CTX).set(conn);
+            attrs.connCtx = conn;
         }
         conn.setOnWritable(callback);
     });
@@ -943,7 +952,7 @@ public void setWritableCallback(Runnable callback) {
 
 ## 八、内存管理：引用计数 vs GC `Cleaner`
 
-[原则 4](01-design-philosophy.md#原则-4--避免阻塞非-blocking-io--显式引用计数) 在 I/O 层的核心是**显式引用计数管理堆外 ByteBuf**。这一节把散落各处的引用计数纪律收拢成一张生命周期图。
+[原则 4](01-design-philosophy.md#原则-4--避免阻塞非阻塞-io--显式引用计数) 在 I/O 层的核心是**显式引用计数管理堆外 ByteBuf**。这一节把散落各处的引用计数纪律收拢成一张生命周期图。
 
 ### 8.1 一个请求的 ByteBuf 引用计数全程
 
@@ -989,7 +998,7 @@ Java 13+ 的 `Cleaner`（替代 `finalize`）能在 ByteBuf 被 GC 时回收堆�
 | 跨线程持有 | 显式 retain，安全 | 无法表达"业务线程还要用" |
 | 零拷贝透传 | `duplicate` 共享视图，靠引用计数托底 | 无对应机制 |
 
-高吞吐下 `Cleaner` 的延迟回收是致命的——每秒数万请求，每个泄漏一点堆外，几秒就撞 `-XX:MaxDirectMemorySize` 上限。显式引用计数换来的即时回收，是 [原则 4](01-design-philosophy.md#原则-4--避免-stackoverflow) 拒绝"便利的容器托管内存"的根本理由。
+高吞吐下 `Cleaner` 的延迟回收是致命的——每秒数万请求，每个泄漏一点堆外，几秒就撞 `-XX:MaxDirectMemorySize` 上限。显式引用计数换来的即时回收，是 [原则 4](01-design-philosophy.md#原则-4--避免阻塞非阻塞-io--显式引用计数) 拒绝"便利的容器托管内存"的根本理由。
 
 ### 8.3 响应 buf 的延迟分配 + 错误释放
 

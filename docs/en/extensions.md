@@ -452,9 +452,53 @@ public String page(Model model) {
 
 ---
 
+## 14. WebExchangeProvider — Template Exchange Provider (spring-web-view)
+
+`WebServerHttpRequest` in the core framework is a plain HTTP abstraction with **no notion of session or
+principal**; the web context a template engine (Thymeleaf) needs is therefore selected per environment via SPI:
+
+```java
+public interface WebExchangeProvider extends WebComponent {
+    boolean supports(WebServerHttpRequest request);              // fast capability probe: no side effects, no throwing
+    WebExchange createExchange(WebServerHttpRequest request, WebServerHttpResponse response);
+    default int getOrder() { return Ordered.LOWEST_PRECEDENCE; } // fallback default
+}
+```
+
+- **Selection**: providers are visited in ascending `getOrder()`, and the **first** one whose `supports()` returns
+  `true` is used; the built-in `DefaultWebExchangeProvider` has the lowest order and always returns `true`, so an
+  implementation is always available.
+- **Servlet case**: with `spring-web-servlet` on the classpath, `SpringWebViewExchangeAutoConfiguration` registers
+  `ServletWebExchangeProvider` (order `HIGHEST_PRECEDENCE`), giving templates the **real** `HttpSession` /
+  `Principal` / cookies; its `supports()` degrades gracefully (falls back to the default provider) when the
+  request context is unavailable.
+- **Wiring**: through the Spring component container (`WebContext.registerWebComponent`); consumers obtain it via
+  `getWebComponentWithDefault(WebExchangeProvider.class, new DefaultWebExchangeProvider())`. JDK `ServiceLoader`
+  is deliberately **not** used: Spring wiring works under native-image/AOT, ServiceLoader does not.
+- **Customizing**: implement the interface and register it as a Spring Bean; a lower `getOrder()` than the built-in
+  providers wins:
+
+```java
+@Component
+public class MyExchangeProvider implements WebExchangeProvider {
+    @Override public boolean supports(WebServerHttpRequest req) { return req.getPath().startsWith("/admin"); }
+    @Override public WebExchange createExchange(WebServerHttpRequest req, WebServerHttpResponse resp) {
+        return new MyWebExchange(req, resp);   // your own WebExchange (Thymeleaf 3.0 shape)
+    }
+    @Override public int getOrder() { return 0; }
+}
+```
+
+> **Thymeleaf note**: templates should not rely on the container-specific `#session` / `#request` expression
+> objects (removed in Thymeleaf 3.1). The framework injects session attributes as **context variables**
+> (**model wins** on name clash, so controller-set values are not overwritten), keeping templates identical
+> on Thymeleaf 3.0 (this branch baseline) / 3.1 — write `${user}` in templates.
+
+---
+
 ## Integration Example: SpringDoc OpenAPI
 
-This framework does not use Spring MVC, so SpringDoc cannot discover routes through `RequestMappingHandlerMapping` by default. The framework implements the `OpenApiCustomizer` SPI to build OpenAPI documentation from `MappingRegistry`.
+This framework does not use Spring MVC, so SpringDoc cannot discover routes through `RequestMappingHandlerMapping` by default. The framework implements the `OpenApiCustomiser` SPI to build OpenAPI documentation from `MappingRegistry`.
 
 ### Usage
 
@@ -515,4 +559,5 @@ Swagger annotations (`@Tag`, `@Operation`, `@Schema`) work directly.
 | `WebCorsProcessor` | Spring Bean | CORS processing strategy |
 | `ViewResolver` | Spring Bean | View-name → `View` resolution (spring-web-view) |
 | `View` | — | View rendering SPI (`render(model, req, resp)`) |
+| `WebExchangeProvider` | Spring Bean | Template `WebExchange` provider (first `supports()` hit by order, spring-web-view) |
 | `Model` parameter | — | Request-scoped model injection (`ModelArgumentResolverProvider`) |

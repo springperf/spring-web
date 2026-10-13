@@ -48,7 +48,7 @@ public class JsrEndpointMetadata {
         THROWABLE,
         /** 消息体（仅 @OnMessage）：String/ByteBuffer/byte[]/PongMessage/POJO */
         MESSAGE,
-        /** @PathParam */
+        /** {@code @PathParam} */
         PATH_PARAM
     }
 

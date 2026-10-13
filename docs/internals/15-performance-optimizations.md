@@ -96,7 +96,7 @@ RouterOptimizer 链:
   FullPathRouterOptimizer  → 全路径精确匹配（O(1) HashMap）
   PrefixRouterOptimizer    → 前缀匹配（HashMap）
   SuffixRouterOptimizer    → 后缀匹配（HashMap）
-  LoopRouterOptimizer      → 遍历兜底（O(n)）
+  LoopPathPatternRouterOptimizer → 遍历兜底（O(n)）
 ```
 
 每个 `PathMappingContext` 启动期存 `pathRule` 字符串，优化器在 `support()` 中分段并分派到对应的路由层级。
@@ -114,7 +114,7 @@ RouterOptimizer 链:
 |------|--------|-----------|
 | 精确路径 | `HashMap.get()`，O(1) | `AntPathMatcher.match`，O(n) 或 `PathPattern.matches`，O(n) |
 | 前缀路径 | 前缀 HashMap 命中 | `AntPathMatcher.match` 逐段匹配 |
-| 通配符路径 | `LoopRouterOptimizer` 遍历 | `AntPathMatcher.match` 或 `PathPattern.matches` |
+| 通配符路径 | `LoopPathPatternRouterOptimizer` 遍历 | `AntPathMatcher.match` 或 `PathPattern.matches` |
 | 路由缓存 | 启动期构建优化器链 | 无路由缓存，每次请求重新匹配 |
 | `PathPattern` 兼容 | 支持 `PathPatternRouteMatcher` 和 `AntPathMatcher` | 支持 `PathPattern`（Spring 5.3+）和 `AntPathMatcher` |
 
@@ -124,7 +124,7 @@ RouterOptimizer 链:
 
 ### 手段
 
-`BaseWebServerHttpRequest` 用 `fastAttributes[]`（`Object[]` 数组）替代 `ConcurrentHashMap<String, Object>` 存储请求属性（[05 篇](05-request-pipeline.md) 四节）：
+`BaseWebServerHttpRequest` 用 `fastAttributes[]`（`Object[]` 数组）替代 `ConcurrentHashMap<String, Object>` 存储请求属性（[04 篇](04-request-pipeline.md) 四节）：
 
 ```java
 // RequestAttribute.java
@@ -173,7 +173,7 @@ public abstract class BaseWebServerHttpRequest implements ..., RequestContext {
 
 ### 手段
 
-框架的请求/响应对象（`NettyServerHttpRequest`/`NettyServerHttpResponse`）实现引用计数接口，通过 `acquire()`/`release()` 手动管理 Direct Memory 生命周期（[05 篇](05-request-pipeline.md) 三节）：
+框架的请求/响应对象（`NettyServerHttpRequest`/`NettyServerHttpResponse`）实现引用计数接口，通过 `acquire()`/`release()` 手动管理 Direct Memory 生命周期（[04 篇](04-request-pipeline.md) 三节）：
 
 ```java
 // NettyServerHttpRequest.java
@@ -296,9 +296,9 @@ protected void drain() {
 ```java
 // NettyHttpServer.java
 .option(ChannelOption.SO_BACKLOG,
-        webContext.getProps().getInt(PropertiesConstant.SERVER_NETTY_SO_BACKLOG))  // 默认 128
+        webContext.getProps().getInt(PropertiesConstant.SERVER_NETTY_SO_BACKLOG))  // 默认 1024
 .childOption(ChannelOption.TCP_NODELAY, true)              // 禁用 Nagle 算法
-.childOption(ChannelOption.SO_KEEPALIVE, false)            // TCP keepalive（默认关闭）
+.childOption(ChannelOption.SO_KEEPALIVE, true)             // TCP keepalive（默认开启）
 .childOption(ChannelOption.SO_REUSEADDR, true)             // 地址重用
 .childOption(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)  // pooled 分配器
 .childOption(ChannelOption.WRITE_BUFFER_WATER_MARK,
@@ -313,7 +313,7 @@ pipeline.addLast(new ChunkedWriteHandler());              // 支持 FileRegion
 - **`TCP_NODELAY`**：禁用 Nagle 算法，小数据包（如 SSE 的 `data:...\n\n`）立即发送，不等待 ACK 累积。
 - **`WriteBufferWaterMark`**：低水位 8KB、高水位 32KB（可配置）。Netty 的 `Channel.isWritable()` 在写缓冲超过高水位时返回 `false`，低于低水位时返回 `true`。与 `BackpressureHandler` 配合，实现 TCP 层的背压控制。
 - **`ChunkedWriteHandler`**：支持 `FileRegion` 零拷贝文件传输，数据从磁盘到网卡绕过 JVM 堆。
-- **`SO_BACKLOG`**：连接队列长度（默认 128，可配置），高并发下可调大以减少连接拒绝。
+- **`SO_BACKLOG`**：连接队列长度（默认 1024，可配置），高并发下可调大以减少连接拒绝。
 - **`PooledByteBufAllocator`**：复用 ByteBuf 实例，减少 GC 压力。
 
 ### 对比 Spring MVC
@@ -323,7 +323,7 @@ pipeline.addLast(new ChunkedWriteHandler());              // 支持 FileRegion
 | Nagle 算法 | `TCP_NODELAY=true`（可配置，默认 true） | `socket.tcpNoDelay=true`（Spring Boot 默认） |
 | 写缓冲 | `WriteBufferWaterMark(8KB, 32KB)`（可配置） | Tomcat 内部缓冲（`max-connections=8192`） |
 | 零拷贝文件 | `FileRegion` + `ChunkedWriteHandler` | `sendfile`（NIO connector） |
-| 连接队列 | `SO_BACKLOG=128`（可配置） | `accept-count=100`（Spring Boot 默认） |
+| 连接队列 | `SO_BACKLOG=1024`（可配置） | `accept-count=100`（Spring Boot 默认） |
 | ByteBuf 分配器 | `PooledByteBufAllocator`（可配置） | Tomcat 内部缓冲池 |
 | 连接数 | 无上限（受 Netty 配置和系统限制） | `max-connections=8192`（Spring Boot 默认） |
 | 背压控制 | `BackpressureHandler` + `WriteBufferWaterMark` | Tomcat 连接器内部抛异常 |

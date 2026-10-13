@@ -135,7 +135,7 @@ public @interface BatchMapping {
 
 | 策略 | 行为 | 客户端响应 |
 |------|------|-----------|
-| `BLOCK` | 生产者线程（EventLoop）阻塞直到 RingBuffer 有空间 | 连接挂起，等待处理 |
+| `BLOCK` | 生产者线程（业务池或 EventLoop）阻塞直到 RingBuffer 有空间 | 请求挂起，等待处理 |
 | `DROP` | 丢弃请求，`BatchRequest` 收到 `BatchOverflowException` | **429 Too Many Requests** |
 | `THROW` | 同步抛出 `BatchOverflowException` | **429 Too Many Requests** |
 
@@ -153,7 +153,7 @@ public @interface BatchMapping {
 `@BatchMapping` 为每个方法创建独立的 Disruptor 队列，内部线程模型：
 
 ```
-EventLoop 线程（生产者）
+调度线程（生产者：默认业务池）
     ↓ 入队 RingBuffer
 Disruptor 消费者线程（1 个）
     ↓ 攒批 → 提交
@@ -162,9 +162,9 @@ bizExecutor 线程池（0 ~ consumerSize 个）
 @BatchMapping 方法
 ```
 
-- **生产者**：EventLoop 线程直接调用 `BatchInvoker` 入队，无需 `@RunInPool`
+- **生产者**：由默认线程模型决定——是 `default` 业务线程池（遵循 `pool.default-execute-mode`），只是调用 `BatchInvoker` 入队（微秒级、不阻塞），无需 `@RunInPool`
 - **消费者**：Disruptor 单消费者线程不断从 RingBuffer 拉取事件
-- **业务线程池**：0 核心线程、`SynchronousQueue`、`CallerRunsPolicy`。空闲时零线程占用；满负荷时消费者线程自行执行形成背压
+- **业务线程池**：0 核心线程、`SynchronousQueue`、`CallerRunsPolicy`——空闲时零线程占用，满负荷时消费者线程自行执行形成背压
 
 ---
 
@@ -192,7 +192,7 @@ bizExecutor 线程池（0 ~ consumerSize 个）
 - **无锁并发**：`ProducerType.MULTI` 支持多个 EventLoop 线程同时入队，无锁竞争
 - **预分配事件槽**：`BatchEvent` 在 RingBuffer 中预创建，减少 GC 压力
 - **endOfBatch 信号**：Disruptor 在批量发布结束时通知消费者，减少攒批延迟
-- **背压自然**：生产者写入 RingBuffer 时，RingBuffer 满 → 生产者阻塞 → EventLoop 自然反压到 TCP 层
+- **背压自然**：生产者写入 RingBuffer 时，RingBuffer 满 → 生产者线程阻塞（业务池线程）→ 请求等待、连接反压
 
 ---
 
@@ -271,7 +271,7 @@ public class GetUserRequest extends BatchRequest<UserResp> {
 
 | 异常场景 | 处理方式 | 客户端响应 |
 |---------|---------|-----------|
-| RingBuffer 满，背压 BLOCK | EventLoop 阻塞等待 | 连接挂起 |
+| RingBuffer 满，背压 BLOCK | 生产者线程阻塞等待 | 请求挂起 |
 | RingBuffer 满，背压 DROP | 请求设置 `BatchOverflowException` | 429 |
 | RingBuffer 满，背压 THROW | 同步抛出异常 | 429 |
 | 批量处理异常 | 遍历所有未完成的 request 调用 `setError(e)` | 500 |

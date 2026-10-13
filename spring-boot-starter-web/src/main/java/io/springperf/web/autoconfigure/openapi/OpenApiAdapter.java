@@ -43,7 +43,7 @@ import java.util.concurrent.CompletableFuture;
  *
  * @author huangcanda
  * @since 1.0.4
- * @see OpenApiAutoConfiguration
+ * @see io.springperf.web.autoconfigure.OpenApiAutoConfiguration
  */
 public class OpenApiAdapter {
 

@@ -33,7 +33,7 @@ public class SseController {
 
     /**
      * 向指定客户端推送事件
-     * curl "http://localhost:8082/sse/send?clientId=foo&data=hello"
+     * curl "http://localhost:8082/sse/send?clientId=foo&amp;data=hello"
      */
     @GetMapping("/sse/send")
     public String send(@RequestParam String clientId, @RequestParam String data) throws IOException {

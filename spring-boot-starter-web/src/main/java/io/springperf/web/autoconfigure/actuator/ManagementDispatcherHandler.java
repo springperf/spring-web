@@ -16,7 +16,7 @@ import org.springframework.http.HttpStatus;
  * 匹配成功后委托父类的 {@link #doHandle} 执行调用并刷新响应。
  * 跳过拦截器、参数解析等主端口步骤。</p>
  * <p>路由注册委托给 {@link ManagementMappingRegistry}，由
- * {@link ActuatorEndpointHandlerMapping#afterPropertiesSet()} 在初始化阶段注入。</p>
+ * {@link ActuatorEndpointHandlerMapping#initComponentPhase1()} 在初始化阶段注入。</p>
  */
 @Slf4j
 public class ManagementDispatcherHandler extends DispatcherHandler {
@@ -47,7 +47,7 @@ public class ManagementDispatcherHandler extends DispatcherHandler {
 
     /**
      * 所有路由注册完成后，构建优化器管线。
-     * <p>由 {@link ActuatorEndpointHandlerMapping#afterPropertiesSet()} 在所有路由注册完后调用。</p>
+     * <p>由 {@link ActuatorEndpointHandlerMapping#initComponentPhase2()} 在所有路由注册完后调用。</p>
      */
     public void buildOptimizerPipeline() {
         managementMappingRegistry.buildOptimizerPipeline();

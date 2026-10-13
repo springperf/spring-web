@@ -1,10 +1,10 @@
 # 模块架构
 
-## 10 个模块
+## 12 个模块
 
 ```
 spring-web-parent (聚合 POM)
-│  Spring Boot 3.5.16 (默认)，多版本兼容 2.4.x~4.1.x（Profile 切换），Java 17
+│  Spring Boot 2.7.18（本分支基线），Profile 可切 2.4.x~2.7.x，Java 8（javax.servlet 4.0）
 │
 ├── spring-web                     核心框架
 ├── spring-web-view                视图渲染（Thymeleaf/FreeMarker，可选）
@@ -16,7 +16,8 @@ spring-web-parent (聚合 POM)
 ├── spring-web-test                核心框架的示例/E2E测试应用
 ├── spring-web-support-test        桥接层的示例/E2E测试应用
 ├── spring-web-benchmark           JMH 性能基准测试
-└── spring-web-examples            可运行示例应用聚合
+├── spring-web-examples            可运行示例应用聚合（嵌套 12 个子模块）
+└── coverage-aggregate             JaCoCo 覆盖率聚合（report-aggregate，不发布）
 ```
 
 ---
@@ -41,6 +42,8 @@ spring-web
 │   │   ├── 持有 ApplicationProperties
 │   │   └── startLifecycle() → 驱动整个组件生命周期（由 NettyHttpServer.start() 触发；失败可清理重试，destroy 后可重新 start）
 │   ├── ApplicationProperties    类型安全的配置属性访问（包装 Environment）
+│   │   └── clearCache() — 清空两份 copy-on-write 缓存（配置中心动态刷新用）
+│   ├── PropertyRefreshHandler    配置刷新协调器：清空 ApplicationProperties 缓存 + 静态缓存
 │   ├── PropertiesConstant       配置键常量
 │   │   ├── SERVER_PORT, CONTEXT_PATH
 │   │   ├── HTTP_MAX_CONTENT_LENGTH, HTTP_TIMEOUT
@@ -240,8 +243,8 @@ spring-web
 │   │   └── stream/               流式输出
 │   │       ├── StreamEmitter / SseEmitter / SseJsonEmitter
 │   │       ├── StreamJsonEmitter / TextStreamEmitter
-│   │       ├── StreamSender / StreamSenderFactory
-│   │       ├── NettyStreamSender
+│   │       ├── StreamSender / StreamSenderFactory / DefaultStreamSenderFactory
+│   │       ├── AbstractNettyStreamSender / DefaultNettyStreamSender / EarlyEncodeNettyStreamSender
 │   │       └── StreamEmitterReturnValueResolver
 │   │
 │   ├── resource/                 静态资源
@@ -278,8 +281,8 @@ spring-web
     └── support/ContainmentResult, SegKind, Segment
 
 
-org.springframework.web.context.request/  （src/main/java 内重写，无 Servlet 依赖）
-    └── WebAsyncManager, WebAsyncTask, DeferredResult, CallableProcessingInterceptor 等
+org.springframework.web.context.request.async/  （src/main/java 内重写，无 Servlet 依赖）
+    └── WebAsyncSupportUtils           异步工具（基于 Spring 原生 DeferredResult/WebAsyncTask 等）
 ```
 
 ---
@@ -316,21 +319,24 @@ spring-web-servlet
 │   ├── JasperJspServlet                  JSP servlet（集成 Apache Jasper，补齐 JspFactory/InstanceManager/TldCache）
 │   ├── context/ServletAdapterContext                       持有 Servlet 请求/响应/FilterChain
 │   └── filter/
-│       ├── FilterWrapper                   包装 jakarta.servlet.Filter → WebFilter
+│       ├── FilterWrapper                   包装 javax.servlet.Filter → 框架 WebFilter
 │       ├── SupportWebFilterRegistry        扩展 WebFilterRegistry，自动注册 Filter Bean
-│       ├── PerfHttpServletFilterChain      适配 FilterChain → javax.servlet.FilterChain
-│       └── match/                          路径匹配工具 (Exact/Prefix/Suffix/PathMatch)
+│       ├── PerfFilterConfig                FilterConfig 实现
+│       └── PerfHttpServletFilterChain      适配 FilterChain → javax.servlet.FilterChain
 │
 ├── session/                             HttpSession 存储
 │   ├── PerfHttpSession / PerfHttpSessionManager
 │   └── HttpSessionStorage / InMemoryHttpSessionStorage
 │
-└── view/                                   JSP 视图（依赖 spring-web-view + tomcat-embed-jasper）
+└── view/                                   JSP 视图 + 模板 exchange 桥接（依赖 spring-web-view + tomcat-embed-jasper）
     ├── JspViewResolver                  ViewResolver SPI：jsp: 前缀 / .jsp 后缀 → JspView，Phase1 注册 *.jsp 路由
-    └── JspView                          View SPI：model → request attribute → RequestDispatcher.forward
+    ├── JspView                          View SPI：model → request attribute → RequestDispatcher.forward
+    ├── ServletWebExchangeProvider       WebExchangeProvider SPI：为模板提供真实 session/principal/cookie
+    │                                    order=HIGHEST_PRECEDENCE，优先于 view 模块的 DefaultWebExchangeProvider
+    └── ServletWebExchange               WebExchange 实现：session=getSession(false) 桥接、principal=getUserPrincipal
 ```
 
-依赖：`spring-web`、`spring-web-view`（provided）、`jakarta.servlet-api`（provided）、`tomcat-embed-jasper`（optional）。
+依赖：`spring-web`、`spring-web-view`（provided）、`javax.servlet-api`（provided）、`tomcat-embed-jasper`（optional）。
 
 ---
 
@@ -381,7 +387,7 @@ spring-web-mvc-support
         StreamingResponseBody, ResponseEntityExceptionHandler, AdapterUtil
 ```
 
-依赖：`spring-web`、`spring-web-servlet`、`spring-web-view`（provided）、`jakarta.servlet-api`（provided）。
+依赖：`spring-web`、`spring-web-servlet`、`spring-web-view`（provided）、`javax.servlet-api`（provided）。
 
 > **重写类与官方 spring-webmvc 的关系**：这些类在编译期与框架代码一起打包，classpath 上同包同名类优先于官方 `spring-webmvc`。仅引入 `spring-web-servlet` 的用户不会看到任何 `org.springframework.web.servlet.*` 类。
 
@@ -400,17 +406,23 @@ spring-web-view
 │   ├── hasViewResolvers() — 空则 String 保持 JSON 行为（条件化开关）
 │   └── initComponentPhase3 — 校验并提示视图方法签名
 ├── RedirectView.java               redirect: 前缀 → 302 + query 序列化
-├── ModelSupport.java               请求级 Model 容器（RequestAttribute<ModelMap>）
-│   └── getOrCreate() — 懒创建 ExtendedModelMap，挂 RequestContext，请求结束释放
+├── （Model 容器已移至 spring-web core：io.springperf.web.core.model.ModelContext，
+│     原 ModelSupport 之名已废弃；懒创建 ExtendedModelMap，挂 RequestContext，请求结束释放）
 ├── ViewProperties.java             配置键（spring.web.view.*）
 ├── arg/ModelArgumentResolverProvider  Model 参数注入 + postProcess 5 步 Model 初始化
 │   └── order=HIGHEST_PRECEDENCE+100，先于 ModelAttributeResolver 兜底
 ├── retval/ViewReturnValueResolver  无 @ResponseBody 的 String → 视图名
 │   └── order=MAX-200，低于 JsonBodyReturnValueResolver（MAX-100），supportsReturnValue 通过 PathMappingContext.get() 判断方法注解
+├── WebExchangeProvider             SPI：按环境提供模板 WebExchange（extends WebComponent，有序）
+│   ├── supports(request) — 能力探测；createExchange(req, resp) — 构造 exchange
+│   └── DefaultWebExchangeProvider  兜底（order=LOWEST_PRECEDENCE，supports 恒 true，session/principal 为 null）
 └── thymeleaf/                      基于模板引擎核心 API（零 servlet）
     ├── ThymeleafViewResolver       ClassLoaderTemplateResolver + TemplateEngine 单例
-    └── ThymeleafWebContext         自实现 IWebContext/IWebExchange/IWebRequest/IWebApplication
-                                    contextPath 取自 getWebContext().getContextPath()，@{...} URL 方言经 transformURL 适配
+    │                               initWithWebContext 取 WebExchangeProvider 列表（按 order），渲染时选首个 supports
+    └── ThymeleafWebContext         实现 Thymeleaf 3.0 的 IWebContext；web 能力（session / contextPath）
+                                    委托 WebExchangeProvider 产生的 WebExchange
+                                    （3.0 的 IWebContext 直接暴露 web 对象；3.1 的 IWebExchange 包在 3.0 不存在）
+                                    会话属性注入上下文变量（model 同名时优先于 session，避免覆盖控制器显式值）
 freemarker/                         FreemarkerViewResolver（备用引擎，engine=freemarker）
 beetl/                              BeetlViewResolver（引擎，engine=beetl，GroupTemplate + ClassLoader 显式绑定）
 
@@ -421,7 +433,7 @@ spring-web-mvc-support/mvc/retval/
     └── @ConditionalOnClass(name="io.springperf.web.view.View") 条件注册
 ```
 
-> **ModelAndView 桥接归属**：`ModelAndView` 是 Spring MVC 概念（`org.springframework.web.servlet.ModelAndView`），属 mvc 桥接层。`ModelAndViewReturnValueResolver` 位于 `spring-web-mvc-support`，直接依赖 `org.springframework.web.servlet.ModelAndView`（无反射），依赖 `spring-web-view` 的 `View`/`ModelSupport`/`ViewResolverRegistry`/`RedirectView`。
+> **ModelAndView 桥接归属**：`ModelAndView` 是 Spring MVC 概念（`org.springframework.web.servlet.ModelAndView`），属 mvc 桥接层。`ModelAndViewReturnValueResolver` 位于 `spring-web-mvc-support`，直接依赖 `org.springframework.web.servlet.ModelAndView`（无反射），依赖 `spring-web-view` 的 `View`/`ViewResolverRegistry`/`RedirectView`，以及 `spring-web` core 的 `ModelContext`。
 
 **接入机制**（core SPI，无核心代码改动）：
 
@@ -437,7 +449,7 @@ spring-web-mvc-support/mvc/retval/
 ```
 doHandle()
   ├── ArgumentResolverRegistry.resolveArguments()
-  │   ├── ModelArgumentResolverProvider → ModelSupport.getOrCreate(req)   // 懒创建挂 RequestContext
+  │   ├── ModelArgumentResolverProvider → ModelContext.getOrCreate(req)   // 懒创建挂 RequestContext
   │   └── postProcess: 5 步 Model 初始化（@ControllerAdvice/局部 @ModelAttribute 方法、@ModelAttribute 参数、@PathVariable、BindingResult）
   ├── InvokableHandlerMethod.invoke()
   └── ReturnValueResolverRegistry.resolveReturnValue()
@@ -453,7 +465,7 @@ doHandle()
 **设计要点**：
 - Spring 6.x 中 `ModelMap` 不再实现 `Model`，统一注入 `ExtendedModelMap`（二者兼取）——2.7.x backport 时 Spring 5.3 的 `ModelMap implements Model`，此点可简化
 - 异常路径天然支持：`ExceptionHandlerExceptionResolver` 已走 `resolveReturnValue`，`@ExceptionHandler` 返回视图名可渲染错误页
-- Spring Boot 3.x auto-config `SpringWebViewAutoConfiguration` 注册于 `AutoConfiguration.imports`
+- `SpringWebViewAutoConfiguration` 注册于 `spring.factories` 的 `EnableAutoConfiguration`
 
 ---
 
@@ -479,7 +491,7 @@ spring-boot-starter-web
 │   │   ├── WebContext → 驱动整个组件生命周期
 │   │   ├── 所有 Registry 组件
 │   │   ├── NettyHttpServer + 可选 SSL
-│   │   ├── Validator（条件：jakarta.validation.Validator 在 classpath）
+│   │   ├── Validator（条件：javax.validation.Validator 在 classpath）
 │   │   └── 启动时检测 SpringMVC 冲突并抛出 IllegalStateException
 │   │
 │   ├── SpringWebServletAutoConfiguration       Servlet 桥接自动装配（条件：spring-web-servlet 在 classpath）
@@ -503,6 +515,17 @@ spring-boot-starter-web
 │   ├── JspViewAutoConfiguration               JSP 视图自动装配（条件：Jasper + spring-web-view 在 classpath）
 │   │   └── JspViewResolver（注册 *.jsp 路由 + 视图名解析）
 │   │
+│   ├── SpringWebViewAutoConfiguration         视图引擎装配（Thymeleaf / FreeMarker / Beetl，条件：ViewEngineCondition）
+│   │
+│   ├── SpringWebViewExchangeAutoConfiguration  模板 exchange provider 装配
+│   │   └── 条件：spring-web-view + Thymeleaf + spring-web-servlet 均在 classpath
+│   │       ServletWebExchangeProvider（模板可读真实 session/principal/cookie）
+│   │       独立成类：@Bean 方法签名引用 Thymeleaf 类型，条件需在类加载前生效
+│   │
+│   ├── SpringWebPropertyRefreshAutoConfiguration  配置中心动态刷新
+│   │   └── 监听 Spring Cloud EnvironmentChangeEvent（按类名匹配，零 Cloud 编译期依赖）
+│   │       → WebContext.refreshProperties() 清空框架配置缓存
+│   │
 │   ├── SpringDataWebCompatibilityAutoConfiguration  Spring Data 兼容（条件：ProjectingArgumentResolverRegistrar 在 classpath）
 │   │   └── 启动时移除 ProjectingArgumentResolverRegistrar 的 BPP
 │   │      防止因缺少 RequestMappingHandlerAdapter 引发 NoClassDefFoundError
@@ -519,16 +542,16 @@ spring-boot-starter-web
 │   │
 │   ├── SpringWebBatchAutoConfiguration         Batch 模块自动装配（条件：spring-web-batch 在 classpath）
 │   ├── SpringBootAdminClientAutoConfiguration  SBA 客户端自动装配（条件：spring-boot-admin-starter-client 在 classpath）
-│   │   └── 发射 WebServerInitializedEvent 以支持 SBA 心跳注册
 │   ├── OpenApiAutoConfiguration                OpenAPI 文档自动装配（条件：springdoc-openapi 在 classpath）
 │   ├── SwaggerUiAutoConfiguration              Swagger UI 静态资源自动装配（条件：swagger-ui 在 classpath）
 │   │
 │   └── support/
 │       ├── WebServerApplicationContextFactory  强制 AnnotationConfigApplicationContext
-│       └── PerfWebServer                       WebServer 适配
+│       ├── PerfWebServer                       WebServer 适配
+│       └── PerfWebServerInitializedEvent       WebServerInitializedEvent 适配（JDK 代理包装 WebServerApplicationContext）
 │
 └── resources/META-INF/
-    ├── spring.factories                  注册 10 个 AutoConfiguration + ApplicationContextFactory
+    └── spring.factories                  注册 13 个 AutoConfiguration + ApplicationContextFactory
     └── additional-spring-configuration-metadata.json  配置元数据（IDE 提示）
 ```
 
@@ -539,9 +562,11 @@ spring-boot-starter-web
 所有核心组件继承 `BaseWebComponent`，通过 `WebContext.startLifecycle()` 驱动：
 
 ```
-Spring 容器启动
+Spring 容器启动（refresh 完成）
   ↓
-WebContext.afterPropertiesSet()
+NettyHttpServer.start()      → SmartLifecycle，phase=Integer.MAX_VALUE（最后启动）
+  ↓
+WebContext.startLifecycle()  → CAS 守卫，单次执行
   ↓
 initWithWebContext()         → 依赖装配，容器间引用注入
   ↓
@@ -557,6 +582,10 @@ Spring 容器关闭
   ↓
 destroyComponent()           → 资源释放
 ```
+
+> **注意**：`WebContext` **不实现** `InitializingBean`，**没有** `afterPropertiesSet()`。
+> 生命周期**只**经 `startLifecycle()` 一条路径，由 `NettyHttpServer.start()` 触发
+> （锚定在 context refresh 完成后的 `SmartLifecycle` 链末尾，确保所有 bean 已就绪）。
 
 ### Registry 类体系
 
@@ -601,6 +630,7 @@ WebComponent (interface)
 | `WebComponent` / `BaseWebComponent` | Spring Bean | 自定义生命周期组件 | `WebComponentContainer` |
 | `ViewResolver` | Spring Bean | 视图名 → `View` 解析 | `ViewResolverRegistry` |
 | `View` | — | 视图渲染（render(model, req, resp)） | `ViewResolverRegistry` |
+| `WebExchangeProvider` | Spring Bean / `registerWebComponent` | 模板 `WebExchange` 构造（按 order + supports 选择） | `ViewResolverRegistry`（经 `ThymeleafViewResolver`） |
 | `Model` 参数 | — | 请求级 model 注入 | `ArgumentResolverRegistry`（via `ModelArgumentResolverProvider`） |
 
 ---
@@ -611,8 +641,8 @@ WebComponent (interface)
 |----|--------|------|
 | `server.port` | `8080` | Netty 监听端口 |
 | `server.servlet.context-path` | `/` | 上下文路径 |
-| `server.http.max-content-length` | `1048576` | 最大请求体（字节） |
-| `server.http.timeout` | 无 | 请求超时（毫秒） |
+| `server.http.max-content-length` | `4194304`（4MB） | 最大请求体（字节） |
+| `server.http.timeout` | `60000` | 请求超时（毫秒） |
 | `server.check-on-startup` | `true` | 启动时校验 Mapping |
 | `pool.core-pool-size` | `50` | 默认业务线程池核心数 |
 | `pool.max-pool-size` | `200` | 默认业务线程池最大数 |
@@ -657,7 +687,7 @@ DispatcherHandler.handle() (根 HttpHandler)
                       │   │   ├── ReturnValueResolverRegistry.resolve(returnValue)
                       │   │   │   ├── JSON: JsonBodyReturnValueResolver → HttpBodyCodecRegistry.writeBody()
                       │   │   │   ├── 异步: DeferredResult/Callable → AsyncSupportRegistry
-                      │   │   │   └── 流式: StreamEmitter → NettyStreamSender
+                      │   │   │   └── 流式: StreamEmitter → NettyStreamSender（Default/EarlyEncode）
                       │   │   ├── InterceptorRegistry.postHandle()
                       │   │   ├── InterceptorRegistry.afterCompletion()
                       │   │   └── flushResponse()

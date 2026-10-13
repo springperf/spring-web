@@ -7,14 +7,15 @@ spring-web-parent (聚合 POM)
 ├── spring-web                  核心框架
 ├── spring-web-view             视图渲染（Thymeleaf/FreeMarker，可选）
 ├── spring-web-servlet          Servlet API 桥接层
-├── spring-web-mvc-support     SpringMVC 兼容桥接层
+├── spring-web-mvc-support      SpringMVC 兼容桥接层
 ├── spring-web-batch            批量请求处理（可选）
 ├── spring-web-websocket        WebSocket 支持（可选）
 ├── spring-boot-starter-web     Spring Boot 自动配置
 ├── spring-web-test             测试应用
 ├── spring-web-support-test     支持模块测试
 ├── spring-web-benchmark        JMH 性能基准测试
-└── spring-web-examples         可运行示例应用聚合
+├── spring-web-examples         可运行示例应用聚合
+└── coverage-aggregate          JaCoCo 覆盖率聚合（report-aggregate，不发布）
 ```
 
 ---
@@ -121,7 +122,13 @@ handleAfterFilter() — 初始化上下文
   - `postHandle` — 处理器执行后、返回值渲染前
   - `afterCompletion` — 请求完成后（无论是否异常）
 - `InterceptorRegistry` 管理拦截器注册，支持路径包含/排除模式
-- 自动注册 Spring 容器中 `HandlerInterceptor` 或 `InterceptorRegistration` 类型的 Bean
+- 自动注册的拦截器来源（与 Spring MVC 语义一致）：`WebMvcConfigurer#addInterceptors` 产生的
+  `InterceptorRegistration`，以及自带路径规则的 `MappedInterceptor`。
+  **普通 `HandlerInterceptor` Bean 不再自动全局生效**（Spring MVC 亦然）——需要全局生效请经
+  `addInterceptors` 注册或声明为 `MappedInterceptor`；这也避免同一实例经 bean 扫描与 `addInterceptors`
+  两路注册造成的重复执行
+- `postHandle` / `afterCompletion` 与 `preHandle` **同向（正向）**遍历：拦截器顺序由显式 `order` 决定，
+  列表已按 order 排好；`preHandle` 提前返回时未通过的拦截器按**逆向**补 `afterCompletion`
 
 #### async — 异步支持
 
@@ -188,30 +195,67 @@ destroyComponent()     → 资源释放
 
 ---
 
-## spring-web-servlet 与 spring-web-mvc-support（兼容桥接层）
+## spring-web-servlet（Servlet API 桥接层）
 
-当需要与 Servlet API 生态集成时添加此模块。
+**零 SpringMVC 依赖**的纯 Servlet 兼容桥接层。仅引入本模块 + `spring-web` 即可在 Netty 上运行 Servlet 规范生态（Filter、Servlet、HttpSession、JSP），classpath **不会**出现任何重写的 `org.springframework.web.servlet.*` 类。
 
 ### 功能
 
 | 功能 | 实现 |
 |------|------|
-| Servlet Filter 集成 | `FilterWrapper` 将 `javax.servlet.Filter` 包装为 `WebFilter` |
-| Spring MVC 拦截器桥接 | `HandlerInterceptorWrapper` 适配 Spring MVC 的 `HandlerInterceptor` |
-| RequestBodyAdvice / ResponseBodyAdvice | `SupportHttpBodyCodecInterceptorRegistry` 扫描并适配 |
-| Servlet API 参数解析 | `HttpServletRequestProvider` / `HttpServletResponseProvider` / `ServletRequestProvider` / `ServletResponseProvider` |
-| ResponseBodyEmitter | `ResponseBodyEmitterReturnValueResolver` |
-| Servlet 对象路由 | `ServletInvoker` + `SupportServletRegistry`（`Servlet` Bean + `@WebServlet` 自动注册路由） |
-| JSP 视图 | `JasperJspServlet` + `JspViewResolver` / `JspView`（集成 Apache Jasper，`jsp:` / `.jsp` 视图名，含 JSTL） |
+| Servlet Filter 集成 | `FilterWrapper` 将 `javax.servlet.Filter` 包装为 `WebFilter`，`SupportWebFilterRegistry` 自动注册 Filter Bean / `FilterRegistrationBean` |
+| Servlet API 参数解析 | `HttpServletRequestProvider` / `HttpServletResponseProvider` / `ServletRequestProvider` / `ServletResponseProvider` / `WebRequestArgumentResolverProvider` |
+| 会话参数 | `SessionAttributeArgumentResolverProvider`（`@SessionAttribute`）/ `SessionStatusArgumentResolverProvider`（`SessionStatus`）、`SessionAttributesInterceptor`（`@SessionAttributes`）、`SessionScopeBeanFactoryPostProcessor`（`session` 作用域 Bean） |
+| HttpSession | `PerfHttpSession` / `PerfHttpSessionManager` / `HttpSessionStorage` / `InMemoryHttpSessionStorage` |
+| Servlet 对象路由 | `SupportServletRegistry` 扫描 Servlet Bean / `@WebServlet` 注册为框架路由；`ServletInvoker`、`PerfServletConfig` |
+| JSP 视图 | `JasperJspServlet` + `JspViewResolver` / `JspView`（Apache Jasper + JSTL，`jsp:` / `.jsp` 视图名） |
+| Servlet 请求/响应包装 | `PerfHttpServletRequest` / `PerfHttpServletResponse`、`ServletAdapterContext`、`PerfRequestDispatcher`（forward/include） |
+| 桥接分发器 | `SupportDispatcherHandler` 初始化 `RequestContextHolder` + 响应完成后 Session flush |
 
 ### 使用场景
 
-- 需要复用已有的 Servlet Filter（如 Spring Security Filter Chain）
-- 需要复用已有的 `RequestBodyAdvice` / `ResponseBodyAdvice`
-- 需要复用已有的 Spring MVC `HandlerInterceptor`
-- 需要把已有 `Servlet` 对象注册为路由，或使用 JSP 视图（集成 Apache Jasper）
+- 需要复用已有的 Servlet Filter（如 Spring Security 的 `FilterChainProxy` 链）
+- 需要 HttpSession / `@SessionAttribute` / `@SessionAttributes` / `session` 作用域 Bean
+- 需要把已有 `Servlet` 对象注册为路由，或使用 JSP 视图
+- 用不到 Spring MVC 生态组件（`WebMvcConfigurer`、`HandlerInterceptor`、`RequestBodyAdvice` 等）
 
-添加依赖：
+### 依赖
+
+```xml
+<dependency>
+    <groupId>io.github.springperf</groupId>
+    <artifactId>spring-web-servlet</artifactId>
+    <version>${spring-web.version}</version>
+</dependency>
+```
+
+---
+
+## spring-web-mvc-support（SpringMVC 兼容桥接层）
+
+桥接 Spring MVC 生态组件（`WebMvcConfigurer`、`HandlerInterceptor`、`RequestBodyAdvice` / `ResponseBodyAdvice`、`ModelAndView` 等）。**依赖 `spring-web-servlet`**——Spring MVC API 构建于 Servlet 之上。
+
+> 注意：本模块会在编译期与框架代码一起打包重写的 `org.springframework.web.servlet.*` 类（同包同名优先于官方 `spring-webmvc`）。仅引入 `spring-web-servlet` 的用户看不到任何这类类。
+
+### 功能
+
+| 功能 | 实现 |
+|------|------|
+| `WebMvcConfigurer` 桥接 | `WebMvcConfigurerBridge` 将 `WebMvcConfigurer` 配置映射到框架各 Registry |
+| Spring MVC 拦截器桥接 | `SupportInterceptorRegistry` 扫描 + `HandlerInterceptorWrapper` 适配 Spring MVC `HandlerInterceptor` |
+| RequestBodyAdvice / ResponseBodyAdvice | `SupportHttpBodyCodecInterceptorRegistry` + `RequestBodyAdviceCodecInterceptor` / `ResponseBodyAdviceCodecInterceptor` |
+| Spring 参数解析器 | `SpringHandlerMethodArgumentResolverProvider` 适配 `HandlerMethodArgumentResolver` |
+| Spring 返回值处理器 | `SpringHandlerMethodReturnValueHandlerAdapter` 适配 `HandlerMethodReturnValueHandler`；`ModelAndViewReturnValueResolver` 桥接 `ModelAndView` |
+| Spring 异常解析器 | `SpringHandlerExceptionResolverAdapter` 适配 `HandlerExceptionResolver` |
+| ResponseBodyEmitter | `ResponseBodyEmitterReturnValueResolver`（含 mvc `SseEmitter`；**不含** `StreamingResponseBody`——它是独立 `@FunctionalInterface`，非 `StreamEmitter`，当前无 resolver） |
+| 重写的 Spring MVC API | `org.springframework.web.servlet.*`：`HandlerInterceptor`、`ModelAndView`、`View`、`MappedInterceptor`、`WebMvcConfigurer`、`InterceptorRegistration`、`RequestBodyAdvice` / `ResponseBodyAdvice` 等 |
+
+### 使用场景
+
+- 需要复用 Spring MVC 生态组件：`WebMvcConfigurer`、`HandlerInterceptor`、`RequestBodyAdvice` / `ResponseBodyAdvice`、`HandlerMethodArgumentResolver`、`ModelAndView`
+- 从 Spring MVC 迁移且依赖上述 API 的业务代码
+
+### 依赖
 
 ```xml
 <dependency>
@@ -221,7 +265,10 @@ destroyComponent()     → 资源释放
 </dependency>
 ```
 
-`spring-web-mvc-support` 依赖 `spring-web-servlet`；纯 Servlet 兼容场景只需引入 `spring-web-servlet`。
+### 选择建议
+
+- **只引入 `spring-web-servlet`**：仅需 Servlet 兼容（Filter/HttpSession/JSP），classpath 干净，不出现任何 Spring MVC 重写类——与官方 `spring-webmvc` 无冲突。
+- **`spring-web-servlet` + `spring-web-mvc-support`**：需要复用 Spring MVC 生态 API 时引入。代价是打包了 `org.springframework.web.servlet.*` 重写类，与官方 spring-webmvc 同包同名、classpath 优先加载，因此**不可与官方 `spring-webmvc` 共存于同一应用**。
 
 ---
 
@@ -257,12 +304,12 @@ destroyComponent()     → 资源释放
 | `ViewResolver` | 解析 SPI：`resolveViewName(name, locale, req)`，按 `getOrder()` 排序 |
 | `ViewResolverRegistry` | `ViewResolver` 注册中心，空则 String 保持 JSON |
 | `RedirectView` | `redirect:` 前缀 → 302 + query 参数序列化 |
-| `ModelSupport` | 请求级 Model 容器（`ExtendedModelMap`）挂 `RequestContext` |
+| `ModelContext`（`spring-web` core 持有） | 请求级 Model 容器（`ExtendedModelMap`），挂 `RequestContext`；视图层经 `getOrCreate(req)` 复用 |
 | `ModelArgumentResolverProvider` | `Model` / `ModelMap` / `ExtendedModelMap` 参数注入 + `postProcess` 5 步 Model 初始化（`@ControllerAdvice`/局部 `@ModelAttribute` 方法、`@ModelAttribute` 参数、`@PathVariable`、`BindingResult`） |
 | `ViewReturnValueResolver` | 无 `@ResponseBody` 的 String → 视图名（order=MAX-200，先于 JsonBody） |
 | `ThymeleafViewResolver` | Thymeleaf 引擎适配（核心 API，零 servlet） |
 | `FreemarkerViewResolver` | FreeMarker 引擎适配 |
-| `ThymeleafWebContext` | 自实现 `IWebContext` / `IWebExchange`，`@{...}` URL 方言经 `transformURL` 适配 `context-path` |
+| `ThymeleafWebContext` | 实现 Thymeleaf 3.0 的 `IWebContext`；web 对象经框架自有 `WebExchange` 抽象获取，`@{...}` URL 方言经 `transformURL` 适配 `context-path` |
 
 ### 接入机制
 
@@ -292,7 +339,7 @@ destroyComponent()     → 资源释放
 
 `SpringWebViewAutoConfiguration` 在 `spring-web-view` 存在时自动装配：
 - `ViewResolverRegistry`、`ViewReturnValueResolver`、`ModelAndViewReturnValueResolver`、`ModelArgumentResolverProvider`
-- 引擎选择：`spring.web.view.engine`（默认 `thymeleaf`）+ classpath 探测 `TemplateEngine` / `freemarker.template.Configuration`
+- 引擎选择：`spring.web.view.engine`（不配置则注册 classpath 上所有可用引擎）+ classpath 探测 `TemplateEngine` / `freemarker.template.Configuration`
 
 ### Batch 自动配置
 

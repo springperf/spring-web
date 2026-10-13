@@ -16,7 +16,7 @@ The results were puzzling:
 | Spring MVC (Tomcat) | < 4,000 |
 | Spring WebFlux | < 4,000 |
 
-Same business logic — only the transport layer changed from a message queue to an HTTP endpoint — yet throughput dropped by **6-7x**. The business logic hadn't changed, so the bottleneck clearly wasn't in the business code.
+Same business logic — only the transport layer changed from a message queue to an HTTP endpoint — yet throughput dropped by **more than 3.75x** (15,000 / 4,000). The business logic hadn't changed, so the bottleneck clearly wasn't in the business code.
 
 ### Hotspot Analysis
 
@@ -145,7 +145,7 @@ So I launched the **Spring Performance Engineering** project. Core idea: resolve
 In JMH benchmarks on JDK 17 + G1GC (1GB heap), this framework leads across all 7 scenarios:
 
 - Small-payload throughput **36K\~42K** ops/s (4 threads), **1.56x\~2.26x** of Spring MVC
-- P50 latency **0.10~0.11ms**, approximately **45-67%** of Spring MVC
+- P50 latency **0.10~0.11ms** (4 threads, small payload), approximately **45-67%** of Spring MVC
 - Steady-state heap **24MB** (4 threads), approximately **92%** of Spring MVC
 - SSE streaming throughput **13,323** ops/s (4 threads), reaching **12.63x** of Spring MVC, **7.72x** at 16 threads
 
@@ -169,9 +169,9 @@ Traditional Servlet containers force all requests through the container thread p
 
 This framework allows requests to execute directly on the Netty EventLoop, while providing the `@RunInPool` annotation for method-level control over whether to switch to a business thread pool. Three programming models are freely selectable, with global default controlled by `pool.default-execute-mode` (defaults to the `default` thread pool; set to `eventloop` to switch back to EventLoop):
 
-- **Synchronous blocking (default)**: Without `@RunInPool`, methods execute on the `default` business thread pool, similar to traditional Servlet model; `@RunInPool("custom")` schedules to a custom thread pool
+- **Synchronous blocking (default)**: Without `@RunInPool`, methods execute on the `default` business thread pool, similar to traditional Servlet model
+- **Custom thread pool**: `@RunInPool("custom")` schedules to a pool created by the `pool.*` properties, for per-business isolation
 - **EventLoop direct**: `@RunInPool(RunInPool.EVENTLOOP)` executes on EventLoop, suitable for pure CPU-bound work or with reactive drivers (R2DBC, Reactive Redis)
-- **Virtual threads**: `@RunInPool(RunInPool.EVENTLOOP)` + JDK 21 virtual threads — non-blocking switching on EventLoop
 
 The framework doesn't make decisions for the user — it provides infrastructure for the user to choose.
 
@@ -185,7 +185,7 @@ This framework chose to **directly reuse Spring's annotation system**: `@Request
 
 The Servlet API has accumulated two decades of ecosystem: Spring Security Filter Chain, `RequestBodyAdvice`, `ResponseBodyAdvice`, countless middleware based on `javax.servlet.Filter`.
 
-This framework doesn't demand "all or nothing." Through the `spring-web-servlet` bridge module, migration can be gradual: start by running on Netty via the support module reusing existing Filters, then gradually migrate to native `WebFilter`.
+This framework doesn't demand "all or nothing." Through the `spring-web-servlet` bridge module, migration can be gradual: start by running on Netty via the `spring-web-servlet` module reusing existing Filters, then gradually migrate to native `WebFilter`.
 
 ---
 
@@ -197,7 +197,7 @@ This framework doesn't demand "all or nothing." Through the `spring-web-servlet`
 |----------|--------|
 | **Resource-constrained environments** (1c1g, 2c2g) | Low framework overhead; 1.6~2.3x throughput of Spring MVC with same resources |
 | **High-throughput API services** | 36K~42K ops/s capacity |
-| **Latency-sensitive workloads** | P50 0.10~0.11ms, 45-67% of Spring MVC |
+| **Latency-sensitive workloads** | P50 0.10~0.11ms (4 threads, small payload), 45-67% of Spring MVC |
 | **SSE / streaming push** | Lock-free Drain Loop design; 12.63x Spring MVC throughput (4 threads) / 7.72x (16 threads) |
 | **Greenfield projects** | Zero migration cost |
 | **IoT / device ingestion** | High volume of small requests, resource-constrained — the original use case |
@@ -245,12 +245,7 @@ This framework doesn't demand "all or nothing." Through the `spring-web-servlet`
 | JSP | Requires `spring-web-servlet` + `tomcat-embed-jasper` (`JasperJspServlet` + `JspViewResolver`) |
 | Servlet WebSocket (JSR-356 `@ServerEndpoint`) | Requires `spring-web-websocket` bridge |
 | Spring MVC `View` / `ViewResolver` | Requires `spring-web-view` (Thymeleaf/FreeMarker) + `ModelAndView` bridge in `spring-web-mvc-support` |
-
-### Not Supported
-
-| Feature | Reason |
-|---------|--------|
-| `@SessionAttributes` / `@SessionScope` | Session-related features; implement via `WebFilter` if needed |
+| `@SessionAttribute` / `@SessionAttributes` / `@SessionScope` | Requires `spring-web-servlet` (`SessionAttributesInterceptor` + `session` scope + `HttpSession`) |
 
 ---
 
@@ -270,7 +265,7 @@ This means: AI can optimize your business layer to the extreme, but if the under
 
 The core interaction pattern of LLM applications is **streaming output**: tokens generated one by one, pushed in real-time. Whether it's ChatGPT's word-by-word replies, Agent task status streams, or RAG retrieval progress feedback, they all rely on **SSE (Server-Sent Events)** protocol.
 
-However, SSE performs poorly on traditional Servlet containers — Spring MVC's SSE throughput is only ~**1,055 ops/s** (4 threads), making it a bottleneck in AI application pipelines. This project's SSE throughput reaches **13,323 ops/s**, **12.63x** of Spring MVC, **7.72x** at 16 threads. This is powered by **NettyStreamSender**'s lock-free Drain Loop design: write operations don't depend on thread pool scheduling, completing batch flushes directly on EventLoop, avoiding the problem of SSE connections occupying threads in traditional Servlet containers.
+However, SSE performs poorly on traditional Servlet containers — Spring MVC's SSE throughput is only ~**1,055 ops/s** (4 threads), making it a bottleneck in AI application pipelines. This project's SSE throughput reaches **13,323 ops/s**, **12.63x** of Spring MVC, **7.72x** at 16 threads. This is powered by **`AbstractNettyStreamSender`**'s lock-free Drain Loop design: write operations don't depend on thread pool scheduling, completing batch flushes directly on EventLoop, avoiding the problem of SSE connections occupying threads in traditional Servlet containers.
 
 This means:
 

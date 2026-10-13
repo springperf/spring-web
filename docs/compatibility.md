@@ -2,7 +2,7 @@
 
 # 版本兼容性说明
 
-本项目维护两个主线分支，分别对应 Spring Boot 2.x 和 Spring Boot 3.x。
+本项目维护三个分支：一条主线（Spring Boot 3.5.x）与两条下游适配分支（2.7.x / 4.1.x）。
 
 ---
 
@@ -10,8 +10,13 @@
 
 | 分支 | 对应 Spring Boot | 状态 | 维护策略 |
 |------|-----------------|------|---------|
-| `2.7.x` | 2.4.x ~ 2.7.x | 维护分支 | 功能迭代 + bugfix，基于 javax.servlet |
-| `master` | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | **开发基线** | 新功能优先合入此处，通过 Maven Profile 多版本兼容 |
+| `2.7.x` | 2.4.x ~ 2.7.x | 下游适配分支 | 从 master 同步 + 降级适配，基于 javax.servlet（见 [2.7.x 迁移清单](../.agent/context/2.7.x-migration-checklist.md)） |
+| `master` | **3.5.x** | **开发基线** | 新功能优先合入此处；**不含任何 Spring Boot 4 / Spring Framework 7 兼容代码** |
+| `4.1.x` | 4.0.x ~ 4.1.x | 下游适配分支 | 从 master 同步 + 升级适配（见 [4.1.x 适配指南](../.agent/context/4.1.x-adaptation-checklist.md)） |
+
+同步方向始终是 `master → 4.1.x` / `master → 2.7.x`；版本适配代码只存在于下游分支。
+
+`4.1.x` 在开发期**沿用主线的项目版本号**，**发布该分支时统一提升为 `4.1.7`**（首个 4.1.x 版本，当前尚无发布版本；分支内 `spring-boot.version` = Boot 4.1.0，与项目版本号无关）。
 
 ---
 
@@ -31,7 +36,7 @@
 | Spring Framework | **5.3.x** | 随 Spring Boot 管理 |  |
 | JDK | **8、11、17** | 8、11、17 已验证 | 编译目标 `java.version=8` |
 | Servlet API | **javax.servlet 4.0.1** | 4.0.x |  |
-| Netty | **4.1.110.Final** | 4.1.x（当前为手动覆盖版本） | Spring Boot 2.7.x 默认管理更低版本 |
+| Netty | **4.1.137.Final** | 4.1.x（当前为手动覆盖版本） | Spring Boot 2.7.x 默认管理更低版本 |
 | Jackson | **2.17.2** | 2.17.x（当前为手动覆盖版本） | Spring Boot 2.7.x 默认管理 2.13.x |
 | Lombok | **1.18.24** | 1.18.x |  |
 | JMH | **1.37** | 1.37 | 仅 benchmark 模块使用 |
@@ -50,20 +55,30 @@
 
 | 依赖 | 当前版本 | 已验证兼容范围 | 说明 |
 |------|---------|---------------|------|
-| Spring Boot | **3.2.12** | 3.0.x ~ 3.5.x / 4.0.x ~ 4.1.x | 通过 Maven Profile 切换（`-Pspring-boot-3.0` ~ `-Pspring-boot-4.1`） |
-| Spring Framework | **6.1.x** | 6.0.x ~ 6.2.x / 7.0.x | 随 Spring Boot 管理 |
-| JDK | **17、21** | 17、21 已验证 | 编译目标 `java.version=17`，21 提供虚拟线程支持 |
+| Spring Boot | **3.5.16** | 3.0.x ~ 3.5.x | 通过 Maven Profile 切换（`-Pspring-boot-3.0` ~ `-Pspring-boot-3.5`）；4.x 见 `4.1.x` 分支 |
+| Spring Framework | **6.2.x** | 6.0.x ~ 6.2.x | 随 Spring Boot 管理 |
+| JDK | **17** | 17 / 21 / 25（CI 矩阵，见 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)） | 编译目标 `java.version=17`；JDK 21 起支持虚拟线程（见下） |
 | Servlet API | **jakarta.servlet 6.0** | 6.0.x | javax.servlet 不兼容 |
-| Netty | **4.1.110.Final** | 4.1.x |  |
+| Netty | **4.1.137.Final** | 4.1.x |  |
 | Jackson | **2.17.2** | 2.17.x |  |
-| Lombok | **1.18.36** | 1.18.30+ | JDK 17+ 兼容性要求高版本 |
+| Lombok | **1.18.46** | 1.18.30+ | JDK 17+ 兼容性要求高版本 |
 | JMH | **1.37** | 1.37 | 仅 benchmark 模块使用 |
 
 ### 额外特性
 
-- **虚拟线程**：JDK 21+ 下 `spring.threads.virtual.enabled=true` 启用，业务线程池自动切换为虚拟线程
-- **GraalVM native-image**：`FastInvokerGenerator` 在 native-image 下自动降级为 `MethodHandle` 调用，`reflect-config.json` 已配置
+- **虚拟线程**：JDK 21+ 下 `spring.threads.virtual.enabled=true` 启用，`default` 业务线程池与 batch 的批量方法（`@BatchMapping`）均改用虚拟线程执行（只替换线程类型：`pool.*` 上限/队列语义与 batch 的 `consumerSize` 上限、背压语义均保持不变）——反射调用 `Thread.ofVirtual`，兼容 JDK 17 编译，JDK < 21 时告警并回落平台线程。实现见 `VirtualThreadSupport` / `BizPoolRegistry`；E2E 覆盖见 `VirtualThreadE2ETest` 与 `BatchVirtualThreadE2ETest`（均为 master 分支源码，本分支不包含）
+- **GraalVM native-image**：`FastInvokerGenerator` 在 native-image 下自动降级为 `MethodHandle` 调用；`SpringWebRuntimeHints` 注册事件路径/资源/异步回调可达性提示；`ControllerBeanFactoryInitializationAotProcessor`（经 `META-INF/spring/aot.factories`）在 AOT 构建期自动为 `@Controller` 处理方法与 DTO 注册反射/序列化 hints
 - **WebSocket**：基于 Jakarta WebSocket 的自动配置
+
+### GraalVM native-image 支持矩阵
+
+| 场景 | 状态 | 说明 |
+|------|------|------|
+| SB3（master 默认 3.5.x） | ✅ 可用级 | `SpringWebRuntimeHints` + `ControllerBeanFactoryInitializationAotProcessor`，用户 `@Controller`/DTO 无需手工 hints；示例 `spring-web-example-rest` 已绑定 `process-aot`；**Windows GraalVM 21.0.2 + MSVC 原生构建与请求链路端到端验证通过** |
+| SB4（4.0.x/4.1.x，`4.1.x` 分支） | ❌ 不支持 | 4.x 的事件桥接需运行时 `defineClass`（native 封闭世界禁止）；`4.1.x` 分支上显式文档化排除 |
+| epoll transport | ✅ 已验证 | Netty epoll `.so` 已在 Linux 原生构建环境验证通过（NIO transport 亦已在 Windows native 验证） |
+| WebSocket `@ServerEndpoint` | ⚠️ 需注册为 Bean | native 下 classpath 扫描不可用，`JsrEndpointScanner` 自动降级为 Bean 发现，端点需显式注册为 Spring Bean |
+| 原生构建验证 | ✅ Windows / Linux 均已验 | Windows：`mvn -Pnative package`（GraalVM + MSVC，`vcvars64` 环境 + `-H:-CheckToolchain`）；Linux：CI `ubuntu-latest` 运行 `scripts/native-smoke-test.sh`（构建 + 启动 + 请求链路断言）通过 |
 
 ---
 
@@ -74,9 +89,9 @@
 | 现有项目基于 Servlet 容器，JDK 8/11 | `2.7.x` |
 | 新项目或已迁移到 JDK 17+ | `master` |
 | 需要使用虚拟线程（JDK 21） | `master` |
-| 需要 GraalVM native-image 编译 | `master` |
+| 需要使用 GraalVM native-image 编译 | `master` |
 
-> **分支选择建议**：JDK 8/11 现有项目选 `master`/`2.7.x`，使用 `-Pspring-boot-2.6` / `-Pspring-boot-2.5` / `-Pspring-boot-2.4` 切换目标版本；JDK 17+ 新项目选 `master`（支持虚拟线程、GraalVM native-image）。
+> **分支选择建议**：JDK 8/11 现有项目选 `2.7.x`，使用 `-Pspring-boot-2.6` / `-Pspring-boot-2.5` / `-Pspring-boot-2.4` 切换目标版本；JDK 17+ 新项目选 `master`（支持虚拟线程、GraalVM native-image）。
 
 ---
 
@@ -89,26 +104,26 @@
 | 虚拟线程 | 不支持 | 支持（JDK 21+） |
 | GraalVM native-image | 不支持 | 支持 |
 | `ModelMap` 与 `Model` 接口 | `ModelMap implements Model` | **`ModelMap` 不实现 `Model`**（需 `ExtendedModelMap`） |
-| `spring-web-view` | 视 Backport 情况 | 新功能基线 |
+| `spring-web-view` | 已包含（`2.7.x` 分支 pom 即有此模块） | 新功能基线 |
 
 ---
 
 ## spring-web-view 与 Model 类型差异
 
-视图渲染模块依赖 Spring 的 `org.springframework.ui` 类型。由于 Spring Framework 6.1（master 分支）与 5.3（2.7.x 分支）的类设计不同，**Model 参数注入的实现存在差异**：
+视图渲染模块依赖 Spring 的 `org.springframework.ui` 类型。由于 Spring Framework 6.2（master 分支）与 5.3（2.7.x 分支）的类设计不同，**Model 参数注入的实现存在差异**：
 
 | 分支 | Spring Framework | `ModelMap` 是否实现 `Model` | 框架注入实现 | 备注 |
 |------|----------------|---------------------------|--------------|------|
-| `master` | 6.1.x | ❌ 否 | `ExtendedModelMap`（`ModelMap` 子类且实现 `Model`） | 统一注入 `ExtendedModelMap` 以兼容 `Model`/`ModelMap`/`ExtendedModelMap` 三种参数声明 |
+| `master` | 6.2.x | ❌ 否 | `ExtendedModelMap`（`ModelMap` 子类且实现 `Model`） | 统一注入 `ExtendedModelMap` 以兼容 `Model`/`ModelMap`/`ExtendedModelMap` 三种参数声明 |
 | `2.7.x` | 5.3.x | ✅ 是 | `ExtendedModelMap`（backport 时可简化） | `ModelMap` 本身即可 cast 到 `Model` |
 
-> **Backport 提示**：`spring-web-view` 的 `ModelSupport.getOrCreate()` 在 2.7.x 分支无需特别处理——Spring 5.3 的 `ModelMap` 已实现 `Model`，可复用同一实现。
+> **Backport 提示**：`spring-web` core 的 `ModelContext.getOrCreate()` 在 2.7.x 分支无需特别处理——Spring 5.3 的 `ModelMap` 已实现 `Model`，可复用同一实现。
 
 ### Thymeleaf / FreeMarker 版本矩阵
 
 | 分支 | Thymeleaf（BOM 管理） | FreeMarker（BOM 管理） |
 |------|----------------------|------------------------|
-| `3.2.12`（master） | 3.1.2.RELEASE | 2.3.33 |
+| `3.5.16`（master） | 3.1.5.RELEASE | 2.3.34 |
 | `2.7.18`（2.7.x） | 3.0.15.RELEASE | 2.3.32 |
 
 `spring-web-view` 对引擎为 `provided` 依赖，具体版本由用户侧 Spring Boot BOM 管理，无需模块内指定。

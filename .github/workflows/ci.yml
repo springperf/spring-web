@@ -9,22 +9,26 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
+      # 一个 JDK 组合失败不影响观察其他组合
+      fail-fast: false
       matrix:
         java: [8, 11, 17, 21, 25]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Set up JDK ${{ matrix.java }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           java-version: ${{ matrix.java }}
           distribution: temurin
           cache: maven
 
       - name: Build and test (push to any branch, or any PR)
-        run: mvn clean test -q
+        # 用仓库自带 Wrapper（与所有人同一 Maven 版本）
+        run: ./mvnw clean test --batch-mode --no-transfer-progress -q
         if: |
           (github.event_name == 'pull_request' || github.event_name == 'push')
           && (
@@ -37,7 +41,54 @@ jobs:
 
       - name: Upload test reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: test-reports-java${{ matrix.java }}
           path: "**/target/surefire-reports/*.txt"
+
+  docs:
+    # 与 master 的差异：master 把该 job 限定在 master 分支（job 级 if），
+    # 2.7.x 分支需要它自己生效，故 if 同时放行 master 与 2.7.x 两种 ref。
+    if: github.ref == 'refs/heads/master' || github.base_ref == 'master' || github.ref == 'refs/heads/2.7.x' || github.base_ref == '2.7.x'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Check docs (links / anchors / format / symbols)
+        run: bash scripts/check-docs.sh
+
+  javadoc:
+    # Javadoc 也是一次"文档正确性编译"：坏链接 / 坏标签在此暴露。
+    # 与 master 的差异：① if 同样放行 2.7.x；② 用 JDK 8（与本分支编译目标一致，
+    # master 用 17）；③ 插件版本沿用本分支的 3.2.0，不做工具版本升级。
+    # ④ doclint 采用 master 同款口径 all,-missing。`-Ddoclint=all,-missing` 与 master 的
+    #    `-DadditionalJOption=-Xdoclint:all,-missing` 等价：插件把 additionalJOption 的值
+    #    原样追加到 javadoc 命令行（实测 `javadoc.exe -Xdoclint:all,-missing @options @argfile`），
+    #    而 `doclint`（user property）的值写进 target/site/apidocs/options，同一句。
+    #    注意 JDK 8 与 JDK 17 的分组语义不同：`@param/@return 没有说明` 在 JDK 8 属 syntax 组、
+    #    `-missing` 排除不掉（JDK 17 才归入 missing），故 JDK 8 下本门禁比 master 严；
+    #    还有 `{@code}` 块内「行首 @」会被当块标签（<pre>{@code @Configuration 即为此调整）。
+    #    存量缺陷已按 master 逐条适配清理，当前 0 error（warning 不判红）——清单、口径与
+    #    适配说明见 .agent/context/2.7.x-sync-gap-checklist.md §31.9.5/§31.9.6。
+    #    另：模块级 <doclint>（spring-web-mvc-support/pom.xml，已同步 master）优先于 -Ddoclint。
+    if: github.ref == 'refs/heads/master' || github.base_ref == 'master' || github.ref == 'refs/heads/2.7.x' || github.base_ref == '2.7.x'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          java-version: 8
+          distribution: temurin
+          cache: maven
+
+      - name: Install the reactor for the javadoc run
+        # javadoc:javadoc 是"直接调 goal"：它只能从本地仓库解析各模块产物，而独立 runner
+        # 上什么都没构建过，于是 spring-web:jar 找不到。先 install 一次，下面那条命令才有东西可用。
+        run: ./mvnw install -DskipTests -Dspotbugs.skip=true -Dmodernizer.skip=true -Dmaven.javadoc.skip=true -Dmaven.source.skip=true --batch-mode --no-transfer-progress -q
+
+      - name: "Javadoc (doclint: all except missing; JDK 8 适配见 checklist §31.9.6)"
+        run: ./mvnw javadoc:javadoc -Ddoclint=all,-missing --batch-mode --no-transfer-progress -q

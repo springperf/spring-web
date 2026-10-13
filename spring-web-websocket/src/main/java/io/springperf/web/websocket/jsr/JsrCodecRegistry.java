@@ -74,8 +74,10 @@ public class JsrCodecRegistry {
     /**
      * 解码文本帧。
      *
-     * @param text       帧文本
-     * @param targetType @OnMessage 消息参数类型（String 直接返回，否则查 Decoder.Text）
+     * @param text
+     *            帧文本
+     * @param targetType
+     *            {@code @OnMessage} 消息参数类型（String 直接返回，否则查 Decoder.Text）
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
     public Object decodeText(String text, Class<?> targetType) throws javax.websocket.DecodeException {
@@ -92,8 +94,10 @@ public class JsrCodecRegistry {
     /**
      * 解码二进制帧。
      *
-     * @param buf       帧二进制内容
-     * @param targetType @OnMessage 消息参数类型（byte[]/ByteBuffer 直接返回，否则查 Decoder.Binary）
+     * @param buf
+     *            帧二进制内容
+     * @param targetType
+     *            {@code @OnMessage} 消息参数类型（byte[]/ByteBuffer 直接返回，否则查 Decoder.Binary）
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
     public Object decodeBinary(ByteBuffer buf, Class<?> targetType) throws javax.websocket.DecodeException {
@@ -113,11 +117,12 @@ public class JsrCodecRegistry {
     }
 
     /**
-     * 将对象编码并发送。
+     * 将对象编码为 {@link EncodedPayload}（实际发送由调用方处理）。
      *
-     * @param session 目标会话
-     * @param data    要发送的对象
-     * @param async   是否异步发送（true 走 Async remote，此处仅编码，发送由调用方处理）
+     * @param data
+     *            要编码的对象
+     * @param preferText
+     *            文本与二进制编码器都可用时是否优先文本编码
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
     public EncodedPayload encode(Object data, boolean preferText) throws EncodeException {

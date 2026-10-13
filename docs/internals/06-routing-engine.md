@@ -57,7 +57,7 @@ public void initComponentPhase1() {
 
 关键设计：
 
-- **`LinkedHashMap` 保序**。`ctx.getBeansWithAnnotation(Controller.class)` 返回的 Map 在有重复路径/方法时，迭代顺序决定选择结果。`LinkedHashMap` 保证先注册的 Bean 胜出。这是此前 [D4 映射顺序修复教训](../memory/d4-mapping-order-fix.md) 的代码体现——试点 `HashMap` 的迭代顺序不确定，导致重复映射在不同启动中表现不一致。
+- **`LinkedHashMap` 保序**。`ctx.getBeansWithAnnotation(Controller.class)` 返回的 Map 在有重复路径/方法时，迭代顺序决定选择结果。`LinkedHashMap` 保证先注册的 Bean 胜出。这是历史上「映射顺序不确定」问题的代码体现——早期用 `HashMap` 时迭代顺序不确定，导致重复映射在不同启动中表现不一致。
 - **`getUniqueDeclaredMethods`**。`ReflectionUtils.getUniqueDeclaredMethods` 收集继承/接口方法并按 override 去重，确保父类声明的 `@RequestMapping` 方法也能被扫描到。
 - **`resolvePlaceholders`**。路径中的 `${...}` 占位符在启动期由 `Environment.resolvePlaceholders` 解析，运行时不再碰配置。
 

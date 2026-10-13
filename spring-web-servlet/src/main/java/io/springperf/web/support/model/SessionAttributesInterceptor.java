@@ -100,7 +100,7 @@ public class SessionAttributesInterceptor implements HandlerInterceptor {
 
     /**
      * 获取（或创建）本次请求绑定的 {@link SessionStatus}，供
-     * {@link SessionStatusArgumentResolverProvider} 注入 handler 参数。
+     * {@link io.springperf.web.support.arg.provider.SessionStatusArgumentResolverProvider} 注入 handler 参数。
      */
     public SessionStatus getOrCreateSessionStatus(WebServerHttpRequest request,
                                                   WebServerHttpResponse response) {
