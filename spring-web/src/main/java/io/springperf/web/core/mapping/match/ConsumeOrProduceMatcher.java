@@ -19,12 +19,14 @@ public class ConsumeOrProduceMatcher implements Matcher {
         this.mediaTypeRuleList = mediaTypeRuleList;
     }
 
+    /** 是否 produces 约束（{@code false} = consumes 约束）——供不匹配原因判定（415/406）使用。 */
     public boolean isProduce() {
         return isProduce;
     }
 
     public List<MediaTypeExpressionSupport> getMediaTypeExpressions() {
-        return mediaTypeRuleList;
+        // 只读视图（合并方 MappingRegistry 只做拷贝读取）；字段为 null 时保持原行为
+        return mediaTypeRuleList == null ? null : java.util.Collections.unmodifiableList(mediaTypeRuleList);
     }
 
     public List<MediaType> getProducibleMediaTypes() {

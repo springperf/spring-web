@@ -17,7 +17,8 @@ public class FullPathRouterOptimizer implements RouterOptimizer {
      * 供 MappingRegistry 在初始化后注册新路由时获取 routeMap。
      */
     public Map<String, Router> getRouteMap() {
-        return routeMap;
+        // 只读视图；字段为 null 时保持原有返回 null 的行为
+        return routeMap == null ? null : java.util.Collections.unmodifiableMap(routeMap);
     }
 
     @Override

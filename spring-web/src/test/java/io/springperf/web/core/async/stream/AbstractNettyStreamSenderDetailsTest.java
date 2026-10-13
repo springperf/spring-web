@@ -123,20 +123,24 @@ class AbstractNettyStreamSenderDetailsTest {
     }
 
     @Test
-    void complete_withFailure_closesChannelInsteadOfWritingLastContent() {
+    void completeWithError_closesChannelWithoutLastHttpContent() throws Exception {
         DefaultNettyStreamSender sender = newSender();
-
-        sender.complete(false, new IOException("downstream break"));
+        // 先入队一段数据：错误终止必须在「已有待写内容」的前提下仍不写正常 LastHttpContent
+        sender.send("data");
+        sender.complete(false, new IllegalStateException("boom"));
         channel.runPendingTasks();
         channel.runPendingTasks();
 
         // 错误终止：关闭连接，不写正常 LastHttpContent，客户端感知异常截断
-        assertFalse(channel.isOpen(), "错误终止应关闭连接而非正常结束流");
+        assertFalse(channel.isActive(), "错误终止应关闭通道而非正常结束流");
         Object out;
+        boolean lastContentSeen = false;
         while ((out = channel.readOutbound()) != null) {
+            if (out instanceof io.netty.handler.codec.http.LastHttpContent) {
+                lastContentSeen = true;
+            }
             io.netty.util.ReferenceCountUtil.release(out);
-            assertFalse(out instanceof io.netty.handler.codec.http.LastHttpContent,
-                    "错误终止不应写出正常 LastHttpContent");
         }
+        assertFalse(lastContentSeen, "错误终止不应发送正常 LastHttpContent");
     }
 }

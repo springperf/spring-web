@@ -10,6 +10,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -39,6 +40,28 @@ class SseJsonEmitterTest {
         String output = new String(baos.toByteArray(), StandardCharsets.UTF_8);
         assertTrue(output.contains("data:{\"key\":\"value\"}"));
         verify(jsonConverter).toJson(any(OutputStream.class), eq(data));
+    }
+
+    /**
+     * 转换器是否**美化输出**决定 JSON 里有没有裸 LF，而 SSE 字段值不得含 LF —— 客户端按规范会**丢弃整条事件**
+     * （静默丢数据）。基类对非 {@code CharSequence} 数据不做续行，所以这一条必须由本子类自己保证。
+     */
+    @Test
+    void encode_jsonContainingNewline_usesDataContinuation() throws Exception {
+        Object data = new Object();
+        byte[] prettyJson = "{\n  \"key\":\"value\"\n}".getBytes(StandardCharsets.UTF_8);
+        doAnswer(invocation -> {
+            ((OutputStream) invocation.getArgument(0)).write(prettyJson);
+            return null;
+        }).when(jsonConverter).toJson(any(OutputStream.class), eq(data));
+
+        SseJsonEmitter emitter = new SseJsonEmitter(jsonConverter);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        emitter.encode(data, baos);
+
+        assertEquals("data:{\ndata:  \"key\":\"value\"\ndata:}\n\n",
+                new String(baos.toByteArray(), StandardCharsets.UTF_8),
+                "JSON 内的裸 LF 必须转成 data: 续行，否则客户端会丢弃整条事件");
     }
 
     @Test

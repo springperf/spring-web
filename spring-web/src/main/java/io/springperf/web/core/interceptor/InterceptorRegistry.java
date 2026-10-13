@@ -72,7 +72,9 @@ public class InterceptorRegistry extends WebComponentContainer {
         }
         Class<?> target = AopUtils.getTargetClass(interceptor);
         for (ControllerAdviceBean adviceBean : ControllerAdviceBean.findAnnotatedBeans(webContext.getCtx())) {
-            if (adviceBean.getBeanType() != null && adviceBean.getBeanType().equals(target)) {
+            // 取一次判一次：避免"判 null 后又调一次 getter"（重复计算，且会被判为可能 NPE）
+            Class<?> beanType = adviceBean.getBeanType();
+            if (beanType != null && beanType.equals(target)) {
                 return adviceBean;
             }
         }
@@ -186,7 +188,9 @@ public class InterceptorRegistry extends WebComponentContainer {
     protected List<HandlerInterceptor> realGetInterceptors(WebServerHttpRequest request) {
         PathMappingContext mappingContext = PathMappingContext.get(request);
         if (mappingContext == null) {
-            return runtimeMappingInterceptors;
+            // 404/405 无 handler：仍须按 path 过滤，否则带 include/exclude pattern 的拦截器
+            // 会误作用于未匹配该 pattern 的请求（例如只拦 /api/** 的鉴权拦截器拦到 404 静态资源）。
+            return getRuntimeInterceptors(request, runtimeMappingInterceptors);
         }
         List<HandlerInterceptor> interceptors = mappingContext.getCachedInterceptors();
         if (interceptors == null) {

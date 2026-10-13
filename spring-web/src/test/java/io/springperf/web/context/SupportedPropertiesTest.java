@@ -122,7 +122,7 @@ class SupportedPropertiesTest {
     void metadataJson_isLoadableAndNonEmpty() throws Exception {
         Set<String> metadataKeys = readMetadataKeys(PropertiesConstant.class);
         assertTrue(metadataKeys.contains("server.port"), "元数据应至少包含 server.port");
-        List<String> sample = List.copyOf(metadataKeys).subList(0, Math.min(3, metadataKeys.size()));
+        List<String> sample = new java.util.ArrayList<>(metadataKeys).subList(0, Math.min(3, metadataKeys.size()));
         assertTrue(!sample.isEmpty());
     }
 
@@ -150,7 +150,9 @@ class SupportedPropertiesTest {
 
         String dumpPath = System.getProperty("perf.props.dump");
         if (dumpPath != null && !dumpPath.isEmpty()) {
-            java.nio.file.Files.writeString(java.nio.file.Path.of(dumpPath), sb.toString());
+            // JDK 8 无 Files.writeString / Path.of（JDK 11+）：等价写法
+            java.nio.file.Files.write(java.nio.file.Paths.get(dumpPath),
+                    sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
         }
     }
 }

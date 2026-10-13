@@ -1,12 +1,12 @@
 package io.springperf.web.util;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 class Object2LongOpenHashMapTest {
 
@@ -18,6 +18,25 @@ class Object2LongOpenHashMapTest {
         assertTrue(map.containsKey("a"));
         assertEquals(1, map.size());
         assertFalse(map.isEmpty());
+    }
+
+    @Test
+    void copyConstructor_copiesEntriesIndependently() {
+        Object2LongOpenHashMap original = new Object2LongOpenHashMap();
+        original.put("a", 1L);
+        original.put("b", 2L);
+
+        Object2LongOpenHashMap copy = new Object2LongOpenHashMap(original);
+        assertEquals(1L, copy.get("a"));
+        assertEquals(2L, copy.get("b"));
+        assertEquals(2, copy.size());
+        assertTrue(copy.containsKey("b"));
+
+        // 独立性：修改拷贝不影响源，修改源不影响拷贝
+        copy.put("c", 3L);
+        assertFalse(original.containsKey("c"));
+        original.put("d", 4L);
+        assertFalse(copy.containsKey("d"));
     }
 
     @Test
@@ -85,7 +104,7 @@ class Object2LongOpenHashMapTest {
     void hashCollision_linearProbing_correct() {
         // 构造大量 key，即便哈希冲突也通过线性探测正确存取
         Object2LongOpenHashMap map = new Object2LongOpenHashMap(8);
-        String[] keys = {"Aa", "BB", "C1", "D2", "E3", "F4", "G5", "H6", "I7", "J8"};
+        String[] keys = { "Aa", "BB", "C1", "D2", "E3", "F4", "G5", "H6", "I7", "J8" };
         for (int i = 0; i < keys.length; i++) {
             map.put(keys[i], i);
         }

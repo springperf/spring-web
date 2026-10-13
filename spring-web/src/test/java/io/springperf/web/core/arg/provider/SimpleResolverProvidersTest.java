@@ -23,8 +23,10 @@ import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.validation.BindException;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.Errors;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -158,6 +160,28 @@ class SimpleResolverProvidersTest {
     void errorsResolver_notSupportsOtherType() throws Exception {
         ErrorsResolverProvider p = new ErrorsResolverProvider();
         assertFalse(p.supports(param("stringParam", String.class), null));
+    }
+
+    /**
+     * 回归：{@code MethodArgumentNotValidException} / {@code BindException} 都 implements
+     * {@code BindingResult}（进而 extends/implements {@code Errors}），会被
+     * {@code Errors.class.isAssignableFrom(type)} 命中。
+     * <p>
+     * 但 {@code @ExceptionHandler} 上这类形参的语义是「被抛出的异常本身」（由异常形参 provider 注入）。
+     * 修复前本 provider 会抢先命中，随后在请求属性里查不到 {@code BindingResult} 而抛
+     * {@code IllegalStateException} —— 最常见的 {@code @ExceptionHandler(MethodArgumentNotValidException ex)}
+     * 写法直接变成 500。本用例把「异常类型一律不归本 provider 管」钉住。
+     * </p>
+     */
+    @Test
+    void errorsResolver_notSupportsTypesThatAreBothErrorsAndThrowable() throws Exception {
+        ErrorsResolverProvider p = new ErrorsResolverProvider();
+        assertFalse(p.supports(param("methodArgumentNotValidExceptionParam", MethodArgumentNotValidException.class), null),
+                "MethodArgumentNotValidException 既是 BindingResult 又是 Throwable，应归异常形参 provider");
+        assertFalse(p.supports(param("bindExceptionParam", BindException.class), null),
+                "BindException 同理");
+        assertFalse(p.supports(param("throwableParam", Throwable.class), null),
+                "Throwable 及其子类一律不归本 provider");
     }
 
     @Test
@@ -432,6 +456,12 @@ class SimpleResolverProvidersTest {
     public void errorsParam(Errors e) {}
     @SuppressWarnings("unused")
     public void bindingResultParam(BindingResult b) {}
+    @SuppressWarnings("unused")
+    public void methodArgumentNotValidExceptionParam(MethodArgumentNotValidException e) {}
+    @SuppressWarnings("unused")
+    public void bindExceptionParam(BindException e) {}
+    @SuppressWarnings("unused")
+    public void throwableParam(Throwable t) {}
     @SuppressWarnings("unused")
     public void stringParam(String s) {}
     @SuppressWarnings("unused")

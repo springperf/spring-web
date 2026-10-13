@@ -25,8 +25,9 @@ public class RuntimeMappingInterceptor implements HandlerInterceptor {
     }
 
     public RuntimeMappingInterceptor(@Nullable String[] includePatterns, @Nullable String[] excludePatterns, HandlerInterceptor interceptor, @Nullable PathMatcher pathMatcher) {
-        this.includePatterns = includePatterns;
-        this.excludePatterns = excludePatterns;
+        // 防御性拷贝：配置数组由调用方持有，直接存引用会让外部修改影响运行期路由
+        this.includePatterns = includePatterns != null ? includePatterns.clone() : null;
+        this.excludePatterns = excludePatterns != null ? excludePatterns.clone() : null;
         this.interceptor = interceptor;
         this.pathMatcher = pathMatcher;
     }
@@ -44,7 +45,8 @@ public class RuntimeMappingInterceptor implements HandlerInterceptor {
      */
     @Nullable
     public String[] getPathPatterns() {
-        return this.includePatterns;
+        // 返回副本，避免调用方经由返回数组改动内部配置
+        return this.includePatterns != null ? this.includePatterns.clone() : null;
     }
 
     /**

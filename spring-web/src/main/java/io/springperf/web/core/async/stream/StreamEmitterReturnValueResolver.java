@@ -44,6 +44,10 @@ public class StreamEmitterReturnValueResolver extends BaseAsyncReturnValueResolv
             resp.getHeaders().putAll(responseEntity.getHeaders());
             returnValue = responseEntity.getBody();
         }
+        // ResponseEntity.getBody() 合法可为 null：无 body 就没有可发送的流，直接返回
+        if (returnValue == null) {
+            return;
+        }
         StreamEmitter emitter = (StreamEmitter) returnValue;
         preInitializeEmitter(emitter, req, resp);
         StreamSender sender = StreamEmitterUtil.initStreamSenderAndStartAsync(emitter, streamSenderFactory, asyncSupportRegistry, req, resp);

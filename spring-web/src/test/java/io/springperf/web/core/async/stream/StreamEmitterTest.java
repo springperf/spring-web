@@ -1,21 +1,22 @@
 package io.springperf.web.core.async.stream;
 
-import io.springperf.web.core.async.AsyncSupportRegistry;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.server.ServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.server.ServerHttpResponse;
+
+import io.springperf.web.core.async.AsyncSupportRegistry;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 @ExtendWith(MockitoExtension.class)
 class StreamEmitterTest {
@@ -44,6 +45,7 @@ class StreamEmitterTest {
             public void encode(Object data, java.io.OutputStream out) {
                 throw new UnsupportedOperationException();
             }
+
             @Override
             protected void extendResponse(ServerHttpResponse response) {
             }
@@ -85,6 +87,24 @@ class StreamEmitterTest {
         assertTrue(emitter.earlySendDataList.isEmpty());
     }
 
+    /**
+     * 同步出错的 Publisher 会让 {@code onError → completeWithError} 在 {@code initialize} **之前**到达（订阅发生在 initialize 之前，见
+     * {@code ReactiveReturnValueResolver}）。此时流已按错误终止，{@code initialize} 必须把错误 继续交给发送器，而不是用
+     * {@code complete(false, null)} 把出错流当**正常**收尾 —— 后者会写出正常终止块， 违反本仓"错误终止不写正常 LastHttpContent"的不变式（见
+     * {@code AbstractNettyStreamSender.onAllDataFailed}）。
+     */
+    @Test
+    void completeWithError_beforeInitialize_forwardsErrorToSender() throws Exception {
+        StreamEmitter emitter = createEmitter();
+        IllegalStateException boom = new IllegalStateException("boom");
+
+        emitter.completeWithError(boom);
+        emitter.initialize(streamSender);
+
+        verify(streamSender).complete(false, boom);
+        verify(streamSender, never()).complete(false, null);
+    }
+
     @Test
     void initialize_sendError_clearEarlyData() throws Exception {
         StreamEmitter emitter = createEmitter();
@@ -100,8 +120,7 @@ class StreamEmitterTest {
     }
 
     /**
-     * 让 mock 的 sendAll 在调用瞬间把参数内容快照到返回的 List。
-     * 因为 sendAll 接收 earlySendDataList 同一引用，事后读取已被 clear。
+     * 让 mock 的 sendAll 在调用瞬间把参数内容快照到返回的 List。 因为 sendAll 接收 earlySendDataList 同一引用，事后读取已被 clear。
      */
     private List<Object> snapshotSendAll() throws Exception {
         List<Object> captured = new ArrayList<>();
@@ -212,6 +231,7 @@ class StreamEmitterTest {
             public void encode(Object data, java.io.OutputStream out) {
                 throw new UnsupportedOperationException();
             }
+
             @Override
             protected void extendResponse(ServerHttpResponse response) {
             }
@@ -227,6 +247,7 @@ class StreamEmitterTest {
             public void encode(Object data, java.io.OutputStream out) {
                 throw new UnsupportedOperationException();
             }
+
             @Override
             protected void extendResponse(ServerHttpResponse response) {
             }
@@ -242,6 +263,7 @@ class StreamEmitterTest {
             public void encode(Object data, java.io.OutputStream out) {
                 throw new UnsupportedOperationException();
             }
+
             @Override
             protected void extendResponse(ServerHttpResponse response) {
             }
@@ -272,6 +294,7 @@ class StreamEmitterTest {
     void encode_throwsUnsupportedOperation() {
         StreamEmitter emitter = createEmitter();
 
-        assertThrows(UnsupportedOperationException.class, () -> emitter.encode("test", new java.io.ByteArrayOutputStream()));
+        assertThrows(UnsupportedOperationException.class,
+                () -> emitter.encode("test", new java.io.ByteArrayOutputStream()));
     }
 }

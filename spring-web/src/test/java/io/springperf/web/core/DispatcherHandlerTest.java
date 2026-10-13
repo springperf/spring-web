@@ -629,6 +629,7 @@ class DispatcherHandlerTest {
         // 故上下文初始化成功（返回 true），并写入 LocaleContextHolder。
         WebServerHttpRequest req = createRequest();
         when(req.getLocale()).thenReturn(Locale.US);
+        withAcceptLanguage(req, Locale.US);
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
 
         boolean result = handler.initContextHolders(req, resp);
@@ -653,12 +654,23 @@ class DispatcherHandlerTest {
         // 默认 accept-header 策略：返回请求 Locale 的 LocaleContext
         WebServerHttpRequest req = createRequest();
         when(req.getLocale()).thenReturn(Locale.GERMANY);
+        withAcceptLanguage(req, Locale.GERMANY);
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
 
         LocaleContext ctx = handler.buildLocaleContext(req, resp);
 
         assertNotNull(ctx);
         assertEquals(Locale.GERMANY, ctx.getLocale());
+    }
+
+    /**
+     * 让 mock 请求真的带上 {@code Accept-Language}：accept-header 策略只在带该头时才采信请求首选 Locale，
+     * 无头时会回退配置 locale / JVM 默认（见 {@link LocaleConfig#resolveRequestLocale}）。
+     */
+    private static void withAcceptLanguage(WebServerHttpRequest req, Locale locale) {
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.set(org.springframework.http.HttpHeaders.ACCEPT_LANGUAGE, locale.toLanguageTag());
+        when(req.getHeaders()).thenReturn(headers);
     }
 
     // ==================== handleWithFilter 异常路径上下文对称管理 ====================

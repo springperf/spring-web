@@ -63,7 +63,7 @@ class AccessLogWriterTest {
 
         Path file = tempDir.resolve("access.log");
         assertTrue(Files.exists(file));
-        assertEquals("hello", Files.readString(file, StandardCharsets.UTF_8).trim());
+        assertEquals("hello", new String(Files.readAllBytes(file), StandardCharsets.UTF_8).trim());
     }
 
     @Test
@@ -79,9 +79,9 @@ class AccessLogWriterTest {
         // 预置一个 30 天前的轮转文件 + 一个非本 writer 命名文件
         String old = LocalDate.now().minusDays(30).format(DateTimeFormatter.BASIC_ISO_DATE);
         Path oldFile = tempDir.resolve("access" + old + ".log");
-        Files.writeString(oldFile, "old\n");
+        Files.write(oldFile, "old\n".getBytes(StandardCharsets.UTF_8));
         Path foreign = tempDir.resolve("other20200101.log");
-        Files.writeString(foreign, "keep\n");
+        Files.write(foreign, "keep\n".getBytes(StandardCharsets.UTF_8));
 
         AccessLogWriter writer = new AccessLogWriter(tempDir, "access", ".log", true, 7);
         writer.write("today");
@@ -95,7 +95,7 @@ class AccessLogWriterTest {
     void cleanup_maxDaysZero_keepsAll() throws IOException {
         String old = LocalDate.now().minusDays(30).format(DateTimeFormatter.BASIC_ISO_DATE);
         Path oldFile = tempDir.resolve("access" + old + ".log");
-        Files.writeString(oldFile, "old\n");
+        Files.write(oldFile, "old\n".getBytes(StandardCharsets.UTF_8));
 
         AccessLogWriter writer = new AccessLogWriter(tempDir, "access", ".log", true, 0);
         writer.write("today");

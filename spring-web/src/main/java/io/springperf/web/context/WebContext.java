@@ -42,7 +42,9 @@ public class WebContext extends WebComponentContainer implements DisposableBean,
     public WebContext(DispatcherHandler dispatcherHandler, ApplicationProperties props) {
         this.dispatcherHandler = dispatcherHandler;
         this.props = props;
-        this.contextPath = WebUtils.formatPath(props.get(PropertiesConstant.CONTEXT_PATH, "/"));
+        // props.get 声明为 @Nullable：默认值 "/" 非空，兜底分支实际不可达，仅为契约完整
+        String configuredContextPath = props.get(PropertiesConstant.CONTEXT_PATH, "/");
+        this.contextPath = WebUtils.formatPath(configuredContextPath != null ? configuredContextPath : "/");
         this.webContext = this;
         registerWebComponent(dispatcherHandler);
         // 错误响应策略（server.error.*）：启动期预解析并注册，供 sendError / 异常解析链路读取

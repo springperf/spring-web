@@ -74,7 +74,10 @@ public class SseEmitter extends StreamEmitter<Object> {
      */
     protected void encodeData(Object data, OutputStream out) throws IOException {
         if (data == null) {
-            out.write(NEWLINE);
+            // SSE 规范要求事件以 data: 字段开头、以空行结束。旧实现只写裸 \n，
+            // 客户端既解析不出 data 字段也判定不出事件边界，等同丢事件。
+            out.write(DATA_PREFIX);
+            out.write(TERMINATOR);
             return;
         }
         out.write(DATA_PREFIX);
@@ -87,15 +90,25 @@ public class SseEmitter extends StreamEmitter<Object> {
         out.write(TERMINATOR);
     }
 
+    /**
+     * 编码 {@link ServerSentEvent}。字段值含 LF 时的分工（不要误判为漏改）：
+     * <ul>
+     *   <li>{@code id} / {@code event}：字段值原样写出（不做续行）—— 由 {@link #assertNoNewline} 拒绝含 LF 的值；</li>
+     *   <li>{@code data}：自由文本，经 {@link #writeBytesWithNewline} 按 LF 续行；</li>
+     *   <li>{@code comment}：同理自行续行。</li>
+     * </ul>
+     */
     protected void encodeServerSentEvent(ServerSentEvent sse, OutputStream out) throws IOException {
         String id = sse.id();
         if (id != null) {
+            assertNoNewline(id, "id");
             out.write(FIELD_ID);
             writeCharSequence(out, id, StandardCharsets.UTF_8);
             out.write(NEWLINE);
         }
         String event = sse.event();
         if (event != null) {
+            assertNoNewline(event, "event");
             out.write(FIELD_EVENT);
             writeCharSequence(out, event, StandardCharsets.UTF_8);
             out.write(NEWLINE);
@@ -114,6 +127,36 @@ public class SseEmitter extends StreamEmitter<Object> {
             out.write(NEWLINE);
         }
         encodeData(sse.data(), out);
+    }
+
+    /**
+     * 拒绝 {@code id} / {@code event} 字段里的 LF/CR（本分支的等价守卫）。
+     * <p>
+     * <b>为什么这里要自己校验（版本适配，不是冗余）：</b>master 依赖 Spring 6 的
+     * {@code ServerSentEvent} builder「构造期即拒绝含 LF 的 id/event」来保证字段值不可换行；
+     * 而本分支是 Spring 5.3，实测 builder <b>不做</b>该校验（同一 {@code ServerSentEvent} API 的不同版本行为）。
+     * 字段值里的裸 LF 会破坏 SSE 字段边界（协议违规，且构成换行注入），因此把等价校验下沉到编码器。
+     * </p>
+     */
+    private static void assertNoNewline(String value, String field) {
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '\n' || c == '\r') {
+                throw new IllegalArgumentException("illegal character '"
+                        + (c == '\n' ? "\\n" : "\\r") + "' in SSE " + field + " field");
+            }
+        }
+    }
+
+    /**
+     * 以 {@code data:} 续行规则写出一段**已编码**的数据，供 {@link #encodeEventDataAsBytes} 的子类实现使用。
+     * <p>
+     * 存在的理由：SSE 字段值不得含 LF，而子类写出的内容可能带裸 LF（典型：美化输出的 JSON）；基类对非
+     * {@code CharSequence} 数据不做续行，子类若不处理，客户端按规范会**丢弃整条事件**（静默丢数据）。
+     * </p>
+     */
+    protected static void writeDataBytes(OutputStream out, byte[] bytes) throws IOException {
+        writeBytesWithNewline(out, bytes, NEWLINE_DATA);
     }
 
     private static void writeBytesWithNewline(OutputStream out, byte[] bytes, byte[] continuation) throws IOException {

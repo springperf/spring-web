@@ -54,6 +54,8 @@ class EarlyEncodeNettyStreamSenderTest {
     void setUp() throws Exception {
         when(emitter.getMaxFlushBytes()).thenReturn(4096);
         when(asyncWebRequest.getNativeResponse()).thenReturn(nativeResponse);
+        // onAllDataWritten 先抢占终止块写入权；替身响应需显式放行，否则不写 LastHttpContent
+        when(nativeResponse.markStreamCompleted()).thenReturn(true);
         when(nativeResponse.getCtx()).thenReturn(ctx);
         when(nativeResponse.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
         when(ctx.channel()).thenReturn(channel);

@@ -16,6 +16,8 @@ import io.springperf.web.core.interceptor.InterceptorRegistry;
 import io.springperf.web.core.mapping.MappingRegistry;
 import io.springperf.web.core.mapping.MappingResult;
 import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.core.mapping.match.HttpMethodMatcher;
+import io.springperf.web.core.mapping.match.Matcher;
 import io.springperf.web.core.metrics.NoOpWebMetrics;
 import io.springperf.web.core.metrics.WebMetrics;
 import io.springperf.web.core.pool.BizPoolRegistry;
@@ -29,10 +31,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.i18n.LocaleContext;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 
@@ -65,6 +70,20 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
     private boolean publishRequestHandledEvents = false;
     private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
+    /**
+     * 对齐 {@code spring.mvc.throw-exception-if-no-handler-found}：默认 {@code true}（保持框架既有行为——404/405 进入异常解析，
+     * 可被 {@code @ControllerAdvice} 拦截）；设为 {@code false} 时直接 {@code sendError}，不进入 {@link ExceptionRegistry}。
+     */
+    private boolean throwExceptionIfNoHandlerFound = true;
+
+    /**
+     * 对齐 {@code spring.mvc.dispatch.error/options/trace}：是否为对应 HTTP 方法分发处理器（默认均 true）。
+     * 关闭时该方法的请求不进入 {@code @RequestMapping} 匹配（OPTIONS 仍可回退 CORS 预检；ERROR/TRACE 直接 404）。
+     */
+    private boolean dispatchError = true;
+    private boolean dispatchOptions = true;
+    private boolean dispatchTrace = true;
+
     private static final RequestAttribute<Long> METRICS_START_ATTR =
             RequestAttribute.createAttribute(Long.class);
 
@@ -90,6 +109,17 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
             this.publishRequestHandledEvents = props.getBoolean(
                     PropertiesConstant.MVC_PUBLISH_REQUEST_HANDLED_EVENTS,
                     PropertiesConstant.MVC_PUBLISH_REQUEST_HANDLED_EVENTS_DEFAULT);
+            // 启动期预解析 404/405 行为开关（默认 true，保持既有「进入异常解析」行为）
+            this.throwExceptionIfNoHandlerFound = props.getBoolean(
+                    PropertiesConstant.THROW_EXCEPTION_IF_NO_HANDLER_FOUND,
+                    PropertiesConstant.THROW_EXCEPTION_IF_NO_HANDLER_FOUND_DEFAULT);
+            // 启动期预解析 ERROR/OPTIONS/TRACE 分发开关（默认均 true，保持既有「全方法分发」行为）
+            this.dispatchError = props.getBoolean(PropertiesConstant.MVC_DISPATCH_ERROR,
+                    PropertiesConstant.MVC_DISPATCH_ERROR_DEFAULT);
+            this.dispatchOptions = props.getBoolean(PropertiesConstant.MVC_DISPATCH_OPTIONS,
+                    PropertiesConstant.MVC_DISPATCH_OPTIONS_DEFAULT);
+            this.dispatchTrace = props.getBoolean(PropertiesConstant.MVC_DISPATCH_TRACE,
+                    PropertiesConstant.MVC_DISPATCH_TRACE_DEFAULT);
         }
         // 请求处理完成事件的发布器：优先取 WebContext 持有的 ApplicationContext。
         // webContext 是可被测试替身替换的协作者，运行期不保证满足静态类型，故按容错契约保留判断。
@@ -105,15 +135,69 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
     }
 
     public void handle(WebServerHttpRequest req, WebServerHttpResponse resp) {
+        // spring.mvc.dispatch.error/options/trace：关闭时为对应方法短路，不进入路由匹配。
+        // OPTIONS 关闭时仍放行 CORS 预检（交由 handleWithNoFullMatch 的预检分支处理）。
+        if (!isMethodDispatchEnabled(req)) {
+            MappingResult unmatched = MappingResult.notFound();
+            MappingResult.set(req, unmatched);
+            handleWithMappingResult(req, resp, unmatched);
+            return;
+        }
         // 路由匹配（EventLoop 中执行，路径查找 O(1)~O(n) 足够快）
         MappingResult result = mappingRegistry.mapping(req);
         handleWithMappingResult(req, resp, result);
+    }
+
+    /** dispatch 开关闸门方法名（5 字符：ERROR / TRACE）。 */
+    private static final String GATED_ERROR = "ERROR";
+    private static final String GATED_TRACE = "TRACE";
+    /** dispatch 开关闸门方法名（7 字符：OPTIONS）。 */
+    private static final String GATED_OPTIONS = "OPTIONS";
+
+    /**
+     * 按 {@code spring.mvc.dispatch.*} 判断当前请求方法是否允许分发给处理器。
+     * 未禁用的方法恒返回 true；被禁用的 OPTIONS 在 CORS 预检场景仍放行。
+     */
+    protected boolean isMethodDispatchEnabled(WebServerHttpRequest req) {
+        // 用方法名字符串比较：ERROR 非标准 HTTP 方法，HttpMethod 枚举无法表示。
+        String methodValue = req.getMethodValue();
+        if (methodValue == null) {
+            return true;
+        }
+        // 热路径（GET/POST/PUT/PATCH...）零扫描放行：equalsIgnoreCase 先比长度，长度不符立即返回，
+        // 不产生任何逐字符工作与分配（原实现先 toUpperCase(Locale.ROOT) 整串扫描再查表）。
+        // 方法 token 不保证大写（Netty 对未知方法原样保留），故必须大小写不敏感，
+        // 否则小写 "trace" 会绕过 dispatch.trace=false 的拦截。
+        int len = methodValue.length();
+        if (len == 5) {
+            if (methodValue.equalsIgnoreCase(GATED_ERROR)) {
+                return dispatchError;
+            }
+            if (methodValue.equalsIgnoreCase(GATED_TRACE)) {
+                return dispatchTrace;
+            }
+            return true;
+        }
+        if (len == 7 && methodValue.equalsIgnoreCase(GATED_OPTIONS)) {
+            // 关闭 OPTIONS 分发，但 CORS 预检仍需处理（框架级能力，非 @RequestMapping）
+            return dispatchOptions || CorsUtils.isPreFlightRequest(req);
+        }
+        return true;
+    }
+
+    /** 仅供测试：暴露 mappingRegistry（包可见，不进公开 API）。 */
+    MappingRegistry mappingRegistryForTest() {
+        return mappingRegistry;
     }
 
     protected void handleWithMappingResult(WebServerHttpRequest req, WebServerHttpResponse resp, MappingResult mappingResult) {
         // 通过 BizPoolRegistry 用 Phase3 预缓存的线程池：返回 null（无映射 / @RunInPool(EVENTLOOP) / default-execute-mode=eventloop）→ EventLoop 同步；返回非 null（缺省 default 池 / @RunInPool 命名池）→ 切业务线程
         ExecutorService executor = bizPoolRegistry.determinePool(req, mappingResult);
         if (executor != null) {
+            // 交棒到业务线程池：EventLoop 随之空闲，响应超时定时器自此才真正可能触发
+            // （EventLoop 默认模式下请求开始未装配，见 NettyHttpHandler#armTimeoutOnRequestStart）。
+            // 幂等：非 EventLoop 默认模式已在请求开始装配，此处为 no-op（不触发 cancel/reschedule）。
+            resp.armTimeoutIfAbsent();
             req.acquire();
             try {
                 executor.execute(() -> {
@@ -180,16 +264,73 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
 
 
     protected void handleOnNoMatchMappingContext(WebServerHttpRequest req, WebServerHttpResponse resp, MappingResult result) {
-        // 404/405：每请求新建异常（fillInStackTrace 已禁用，零栈轨迹开销），
-        // 避免复用单例导致 @ExceptionHandler 修改 headers/body 污染后续请求。
-        ResponseStatusException ex = result.isMethodMismatch()
-                ? new StacklessResponseStatusException(HttpStatus.METHOD_NOT_ALLOWED)
-                : new StacklessResponseStatusException(HttpStatus.NOT_FOUND);
+        // 路径匹配但条件不满足：按原因映射状态码（对齐 Spring MVC）
+        // METHOD→405（含 Allow 头）、CONSUMES→415、PRODUCES→406、其余→404
+        MappingResult.MismatchKind kind = result.getMismatchKind();
+        HttpStatus status;
+        if (kind == MappingResult.MismatchKind.METHOD) {
+            status = HttpStatus.METHOD_NOT_ALLOWED;
+        } else if (kind == MappingResult.MismatchKind.CONSUMES) {
+            status = HttpStatus.UNSUPPORTED_MEDIA_TYPE;
+        } else if (kind == MappingResult.MismatchKind.PRODUCES) {
+            status = HttpStatus.NOT_ACCEPTABLE;
+        } else {
+            status = HttpStatus.NOT_FOUND;
+        }
+        boolean methodNotAllowed = status == HttpStatus.METHOD_NOT_ALLOWED;
+        if (!throwExceptionIfNoHandlerFound) {
+            // 对齐 Spring Boot 默认行为：直接 sendError，不进入 ExceptionRegistry / @ControllerAdvice
+            // （避免用户未显式开启时意外拦截 404）。
+            if (methodNotAllowed) {
+                setAllowHeader(resp, result);
+            }
+            sendError(resp, status, status.getReasonPhrase());
+            interceptorRegistry.afterCompletion(req, resp, null);
+            return;
+        }
+        // 每请求新建异常（fillInStackTrace 已禁用，零栈轨迹开销），避免复用单例导致
+        // @ExceptionHandler 修改 headers/body 污染后续请求。
+        // 注：core 不依赖 jakarta.servlet-api，无法构造 Spring 的
+        // HttpRequestMethodNotSupportedException / HttpMediaTypeNotSupportedException，
+        // 统一以 ResponseStatusException 承载状态码，Allow 等语义头在此直接写入
+        // （@ControllerAdvice 仍可按 ResponseStatusException 拦截）。
+        if (methodNotAllowed) {
+            setAllowHeader(resp, result);
+        }
+        ResponseStatusException ex = new StacklessResponseStatusException(status);
         try {
             exceptionRegistry.handle(ex, req, resp);
+            // advice/异常解析器可能只写 body 不 commit（sendError 才内置 flush）——此处兜底提交，
+            // 否则 @ControllerAdvice 定制的 404/405 响应永不发出（客户端挂死）
+            flushResponse(req, resp);
         } finally {
             interceptorRegistry.afterCompletion(req, resp, ex);
+            flushResponse(req, resp);
         }
+    }
+
+    /** 405 语义：写出 Allow 头，列出该路径已注册的全部方法（对齐 Spring HttpRequestMethodNotSupportedException）。 */
+    private static void setAllowHeader(WebServerHttpResponse resp, MappingResult result) {
+        Set<HttpMethod> methods = supportedMethods(result);
+        if (!methods.isEmpty()) {
+            resp.getHeaders().setAllow(methods);
+        }
+    }
+
+    /** 收集路径命中的所有映射上下文支持的方法（用于 405 的 Allow 头）。 */
+    private static Set<HttpMethod> supportedMethods(MappingResult result) {
+        Set<HttpMethod> methods = new LinkedHashSet<>();
+        PathMappingContext[] contexts = result.getPathMatchedContexts();
+        if (contexts != null) {
+            for (PathMappingContext ctx : contexts) {
+                for (Matcher matcher : ctx.getMatchers()) {
+                    if (matcher instanceof HttpMethodMatcher) {
+                        methods.addAll(((HttpMethodMatcher) matcher).getHttpMethods());
+                    }
+                }
+            }
+        }
+        return methods;
     }
 
     protected void handleCorsPreflight(WebServerHttpRequest req, WebServerHttpResponse resp) {
@@ -236,7 +377,7 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
         try {
             // cors
             if (corsRegistry.corsHandle(req, resp)) {
-                resp.flush();
+                finalizeEarlyReturn(req, resp);
                 return;
             }
 
@@ -247,7 +388,7 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
                 // afterCompletion 仅对已通过的拦截器执行（已在 InterceptorRegistry.preHandle 内
                 // 完成），不执行 postHandle，也不再次全量调用 afterCompletion。修复前 finally 里的
                 // invokeWithRealResult 无条件再回调一次 → 已通过者双调、未进入者误收回调。
-                resp.flush();
+                finalizeEarlyReturn(req, resp);
                 return;
             }
 
@@ -292,7 +433,7 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
         } catch (Exception e) {
             log.error(e.getMessage(), e);
         } finally {
-            flushResponse(resp);
+            flushResponse(req, resp);
         }
     }
 
@@ -315,16 +456,59 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
     /**
      * 刷新响应（catch-safe）。
      *
+     * @param req  the current HTTP request
      * @param resp the HTTP response to flush
      */
-    protected void flushResponse(WebServerHttpResponse resp) {
+    protected void flushResponse(WebServerHttpRequest req, WebServerHttpResponse resp) {
         try {
-            if (resp.isHandled()) {
+            if (resp.isStreaming()) {
+                // 渐进式输出（servlet flushBuffer/writer.flush 或 flush(true) 进入）：
+                // 收尾必须写终止块，否则客户端无法判定响应结束（挂到读超时）。
+                // 异步请求仍在挂起时不得终止（SSE/流式 emitter 还在持续写事件），
+                // 待其完成时的本轮收尾再终止；外部 sender 已收尾的由 markStreamCompleted 兜底为空操作。
+                if (isAsyncStillPending(req)) {
+                    return;
+                }
+                resp.endStream();
+                return;
+            }
+            // 已提交（一次性写出路径已落盘，如 byte[] → writeBytes）则无需再刷：
+            // 再调 flush 会走到 writeAndFlush 的「已提交」拒绝分支，释放缓冲并打 WARN——
+            // 每个 byte[] 响应都白刷一次 + 白打一条 WARN。此处直接跳过。
+            if (resp.isHandled() && !resp.isCommitted()) {
                 resp.flush();
             }
         } catch (IOException e) {
             log.error("flushResponse failed: {}", e.getMessage(), e);
         }
+    }
+
+    /** 异步请求是否仍处于挂起状态（已启动但尚未完成/派发结果）。 */
+    private static boolean isAsyncStillPending(WebServerHttpRequest req) {
+        try {
+            io.springperf.web.core.async.PerfAsyncWebRequest async = req.getRequestContext()
+                    .getAttribute(AsyncSupportUtils.WEB_ASYNC_REQUEST_ATTRIBUTE);
+            // DISPATCHED（结果已派发、响应仍在写出/流式发送中）同样属「尚未结束」：
+            // 此时收尾若调用 endStream() 会与 StreamSender 争写终止块（双写 → 编码器 state: 0）
+            return async != null && (async.isAsyncStarted() || async.isAsyncDispatched());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * 提前返回（CORS 预检 / preHandle 拦截）时的响应收尾。
+     *
+     * <p>拦截器可通过 servlet 的 {@code getWriter().flush()} 提交响应而进入 chunked 渐进式输出
+     * （Servlet 规范：flush 即提交）；此时必须写终止块，否则客户端无法判定响应结束（挂到读超时）。
+     * 非流式路径保持原 {@code resp.flush()} 语义（未提交则一次性提交，已提交则空操作）。</p>
+     */
+    private void finalizeEarlyReturn(WebServerHttpRequest req, WebServerHttpResponse resp) throws IOException {
+        if (resp.isStreaming()) {
+            flushResponse(req, resp);
+            return;
+        }
+        resp.flush();
     }
 
     public void asyncDispatch(WebServerHttpRequest req, WebServerHttpResponse resp, Object concurrentResult) {

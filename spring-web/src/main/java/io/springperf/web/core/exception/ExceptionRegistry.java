@@ -7,6 +7,7 @@ import io.springperf.web.core.metrics.NoOpWebMetrics;
 import io.springperf.web.core.metrics.WebMetrics;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
+import io.springperf.web.server.ErrorResponseConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.method.HandlerMethod;
 
@@ -47,12 +48,33 @@ public class ExceptionRegistry extends WebComponentContainer {
             if (handled) {
                 resp.setHandled();
             } else {
-                resp.sendError(INTERNAL_SERVER_ERROR, "Internal Server Error");
+                // 未匹配任何 @ExceptionHandler：回退 500 错误页，携带原始异常供 server.error.* 策略
+                // 决定是否暴露栈/message/绑定错误（on-param 由请求参数 trace/message/errors 命中决定，
+                // 参数名对齐 Boot AbstractErrorController）。
+                resp.sendError(INTERNAL_SERVER_ERROR, rootCauseMessage(ex), ex,
+                        ErrorResponseConfig.isParamPresent(req, "trace"),
+                        ErrorResponseConfig.isParamPresent(req, "message"),
+                        ErrorResponseConfig.isParamPresent(req, "errors"));
             }
         } catch (Exception e) {
             log.error("ExceptionRegistry.doHandle/sendError failed for original [{}] {}",
                     ex.getClass().getSimpleName(), ex.getMessage(), e);
         }
+    }
+
+    /**
+     * 取最内层 cause 的 message 作为 500 错误页的 message。
+     *
+     * <p>直接使用外层异常的 message 时，业务方看到的往往是包装层（如 {@code ServletException}）的套话，
+     * 真实原因只藏在 trace 里。</p>
+     */
+    private static String rootCauseMessage(Throwable ex) {
+        Throwable root = ex;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        String message = root.getMessage();
+        return message != null && !message.isEmpty() ? message : "Internal Server Error";
     }
 
     public boolean doHandle(Throwable ex, WebServerHttpRequest req, WebServerHttpResponse resp) {

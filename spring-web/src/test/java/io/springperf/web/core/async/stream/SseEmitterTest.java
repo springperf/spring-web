@@ -83,7 +83,9 @@ class SseEmitterTest {
         emitter.encode((Object) null, baos);
 
         String result = new String(baos.toByteArray(), StandardCharsets.UTF_8);
-        assertEquals("\n", result);
+        // SSE 规范要求事件以 data: 字段开头、以空行结束。旧实现只写裸 \n，
+        // 客户端既取不到 data 字段也判定不出事件边界，等同丢事件。
+        assertEquals("data:\n\n", result);
     }
 
     @Test
@@ -125,6 +127,36 @@ class SseEmitterTest {
 
         assertTrue(result.contains(":keepalive"));
         assertTrue(result.contains("data:ping"));
+    }
+
+    /**
+     * 版本适配（与 master 的差异，勿当漏改）：master 依赖 Spring 6 的 {@code ServerSentEvent} builder
+     * **在构造期即拒绝** id/event 里的 LF；本分支是 Spring 5.3，实测 builder 不校验，故把等价校验下沉到编码器。
+     * <p>
+     * 同时钉住「data 与 comment 自行按 LF 续行、id/event 不续行」这条分工 —— 读代码时看着像漏改，实际是契约分工。
+     * </p>
+     */
+    @Test
+    void encode_serverSentEventWithNewlineInIdOrEvent_throws() throws Exception {
+        ServerSentEvent<Object> newlineInId = ServerSentEvent.builder().id("a\nb").data("x").build();
+        assertThrows(IllegalArgumentException.class,
+                () -> emitter.encode(newlineInId, new ByteArrayOutputStream()),
+                "id 里的 LF 必须被编码器拒绝，否则裸 LF 会破坏 SSE 字段边界（Spring 5.3 的 builder 不校验）");
+
+        ServerSentEvent<Object> newlineInEvent = ServerSentEvent.builder().event("x\ny").data("x").build();
+        assertThrows(IllegalArgumentException.class,
+                () -> emitter.encode(newlineInEvent, new ByteArrayOutputStream()));
+
+        ServerSentEvent<Object> newlineInData = ServerSentEvent.builder().id("ok").data("a\nb").build();
+        assertEquals("id:ok\ndata:a\ndata:b\n\n",
+                emit(newlineInData),
+                "data 里的 LF 仍按 data: 续行处理，不受 id/event 守卫影响");
+    }
+
+    private String emit(ServerSentEvent<Object> event) throws Exception {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        emitter.encode(event, baos);
+        return new String(baos.toByteArray(), StandardCharsets.UTF_8);
     }
 
     @Test

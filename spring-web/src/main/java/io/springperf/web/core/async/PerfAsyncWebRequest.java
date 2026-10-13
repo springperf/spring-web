@@ -1,6 +1,9 @@
 package io.springperf.web.core.async;
 
+import io.springperf.web.context.WebContext;
 import io.springperf.web.core.DispatcherHandler;
+import io.springperf.web.core.metrics.NoOpWebMetrics;
+import io.springperf.web.core.metrics.WebMetrics;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.http.WriteRespEventListener;
@@ -8,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.server.ServerHttpAsyncRequestControl;
 import org.springframework.web.context.request.async.AsyncWebRequest;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -17,18 +21,71 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
     public static final RuntimeException DEFAULT_WRITE_ERROR_EXCEPTION = new DefaultWriteErrorException();
     private static final Object RESULT_NONE = new Object();
     private final AtomicReference<State> state = new AtomicReference<>(State.NEW);
+    /** 异步持有者是否仍持有入站请求引用（startAsync 时 +1，写终结时 -1；见 releaseRequestOnce）。 */
+    private final AtomicBoolean requestRefHeld = new AtomicBoolean(false);
+
+    /**
+     * 本请求所属 context 的计量组件，**懒解析**（首次用到时才查容器，解析结果缓存在此）。
+     *
+     * <p>懒解析不是可选项：既有单测锁定了「无操作路径不触碰 {@link WebContext}」这一契约 ——
+     * {@code dispatch()} 在未启动 / 已完成时直接返回，连 dispatcher handler 都不查。构造期解析会破坏它
+     * （实测 3 个用例 {@code NeverWantedButInvoked}）。异步生命周期的两个端点（{@code startAsync} /
+     * {@code releaseRequestOnce}）都只在异步路径上，故解析也只发生在那条路径上 —— 同步热路径依旧零触碰。</p>
+     *
+     * <p>在飞计数落在这里，而不再是全局静态字段：全局字段把「归零」变成整个 JVM 的不变量，
+     * 任何别的 context 的残留都会污染断言（实测：整仓 {@code clean test} 下 28 条级联误报 /
+     * 422.5s）。默认装配是 {@link NoOpWebMetrics}，两个钩子都是空实现 → 不装计量时零开销。
+     * volatile：写入方可能是业务线程（startAsync），读取方可能是 EventLoop（写回调里的 releaseRequestOnce）。</p>
+     */
+    private volatile WebMetrics metrics;
+
+    private WebMetrics metrics() {
+        WebMetrics resolved = this.metrics;
+        if (resolved == null) {
+            resolved = resolveMetrics(request);
+            this.metrics = resolved;
+        }
+        return resolved;
+    }
+
     protected boolean errorHandlingInProgress;
     private long timeoutMillis = -1;
+    /**
+     * 结果槽：非 RESULT_NONE 即已被并发 dispatch 抢占写入。
+     *
+     * <p><b>发布边是 {@code state} 的 CAS，而不是 {@code synchronized(this)}</b>：写入确实在锁内，
+     * 但读取发生在 {@link #dispatch()} 的 {@code state.compareAndSet(ASYNC_STARTED, DISPATCHED)}
+     * 之后（volatile 读 → 写入对读取线程可见）。同一依据也记在 {@code spotbugs-exclude.xml}。
+     * 改动此处时不要削弱那次 CAS：它同时承担互斥与可见性。</p>
+     */
     private Object concurrentResult = RESULT_NONE;
 
-    private Runnable timeoutHandler;
-    private Consumer<Throwable> errorHandler;
-    private Runnable completionHandler;
-    private Consumer<Throwable> writeCallbackHandler;
-    private Runnable asyncReadyCallback;
+    // 以下回调字段统一 volatile：写入方是业务线程（注册钩子 / 启动异步），读取方是 EventLoop
+    // （写回调、超时任务、断连回调）。二者之间没有同步点，普通字段会让 EventLoop 侧读到 null
+    // 而静默跳过回调——表现为超时不生效、错误不被记录、异步完成时到不了 completionHandler。
+    private volatile Runnable timeoutHandler;
+    private volatile Consumer<Throwable> errorHandler;
+    private volatile Runnable completionHandler;
+    private volatile Consumer<Throwable> writeCallbackHandler;
+    private volatile Runnable asyncReadyCallback;
 
     protected PerfAsyncWebRequest(WebServerHttpRequest request, WebServerHttpResponse response) {
         super(request, response);
+    }
+
+    /**
+     * 取本 context 的计量组件；取不到就退化为 {@link NoOpWebMetrics#INSTANCE}（而不是 null）——
+     * 单元测试的请求替身没有 WebContext，而「计量缺失」不该让异步路径出异常。用只读的
+     * {@code getWebComponent} 而非 {@code getWebComponentWithDefault}：后者会**注册**默认实现，
+     * 那是启动期该做的事，不是每请求该做的。
+     */
+    private static WebMetrics resolveMetrics(WebServerHttpRequest request) {
+        WebContext webContext = request.getWebContext();
+        if (webContext == null) {
+            return NoOpWebMetrics.INSTANCE;
+        }
+        WebMetrics component = webContext.getWebComponent(WebMetrics.class);
+        return component != null ? component : NoOpWebMetrics.INSTANCE;
     }
 
     /**
@@ -57,14 +114,16 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
      */
     public void releaseOnConnectionClose() {
         state.compareAndSet(State.ASYNC_STARTED, State.COMPLETED);
+        // 原子取出并清空：无论多少个断连信号并发到达，钩子至多执行一次
         Runnable handler = this.connectionCloseHandler.getAndSet(null);
         if (handler != null) {
             try {
                 handler.run();
             } catch (Throwable ignored) {
-                // 断连清理路径：钩子自身异常不得影响后续流程
+                // 断连清理路径：钩子自身异常不得影响后续引用归零
             }
         }
+        releaseRequestOnce();
     }
 
     public boolean isErrorHandlingInProgress() {
@@ -98,7 +157,50 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
         if (!state.compareAndSet(State.NEW, State.ASYNC_STARTED)) {
             throw new IllegalStateException("Async already started");
         }
+        // 异步持有者诞生：CAS 成功保证只执行一次。异步阶段若读请求体（大 body 为 content 的
+        // duplicate 共享视图）依赖入站 buf 存活，故在此 acquire，由 releaseRequestOnce() 归还。
+        request.acquire();
+        requestRefHeld.set(true);
+        metrics().asyncLifecycleStarted();
         response.addWriteRespEventListener(this);
+    }
+
+    /**
+     * 异步持有者退场（幂等，仅一次）：入站请求引用 -1。
+     *
+     * <p>只在响应【写终结】回调里调用（{@code completeSuccessCallback}/{@code completeErrorCallback}）：
+     * 写完成时响应已提交，请求释放触发的 {@code resp.release()} 为空操作；写失败时响应永无提交机会，
+     * 恰好兜底释放其未提交 buf。超时/断连无需另设释放点——超时响应是一次写入、断连会让写入 future
+     * 失败，两者都会走到这里。</p>
+     *
+     * <p><b>切勿</b>在 {@code writeStreamSuccessCallback} 等【逐 chunk】回调里调用——那是每帧触发。</p>
+     */
+    private void releaseRequestOnce() {
+        if (requestRefHeld.compareAndSet(true, false)) {
+            request.release();
+            metrics().asyncLifecycleCompleted();
+        }
+    }
+
+    /**
+     * 「更短时限生效」：异步超时（{@code spring.mvc.async.request-timeout}）与响应超时
+     * （{@code server.http.timeout}）取更短者。
+     *
+     * <p>到点时仍执行<b>异步</b>超时处理器（{@link #timeoutHandler}）——异步请求以 503 收尾
+     * （Spring 语义），而不是响应超时的 504（异步挂起时响应已标记 handled，504 的写出会被拒绝）。
+     * 若只装配异步超时，较短的 {@code server.http.timeout} 会被它顶掉
+     * （{@code BaseWebServerHttpResponse#setTimeout} 会先取消旧定时器再装新的），
+     * 「更短时限生效」这条契约就破了：CI 上表现为 1s 的响应超时没生效、2.5s 的迟到结果拿走了 200。</p>
+     *
+     * <p>{@code server.http.timeout <= 0} 表示不限制，不参与比较。</p>
+     */
+    private long effectiveAsyncTimeoutMillis() {
+        WebContext webContext = request != null ? request.getWebContext() : null;
+        if (webContext == null || webContext.getProps() == null) {
+            return timeoutMillis;
+        }
+        long httpMillis = webContext.getProps().getHttpTimeoutMillis();
+        return httpMillis > 0 && httpMillis < timeoutMillis ? httpMillis : timeoutMillis;
     }
 
     public void scheduleTimeoutIfNeeded() {
@@ -115,7 +217,7 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
             if (timeoutHandler != null) {
                 timeoutHandler.run();
             }
-        }, timeoutMillis);
+        }, effectiveAsyncTimeoutMillis());
     }
 
     @Override
@@ -135,6 +237,7 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
     @Override
     public void completeErrorCallback(Throwable throwable) {
         state.set(State.COMPLETED);
+        releaseRequestOnce();
         if (errorHandler != null) {
             errorHandler.accept(throwable);
         }
@@ -143,6 +246,7 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
     @Override
     public void completeSuccessCallback() {
         state.set(State.COMPLETED);
+        releaseRequestOnce();
         if (completionHandler != null) {
             completionHandler.run();
         }
@@ -157,6 +261,11 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
 
     @Override
     public void writeStreamErrorCallback(Throwable throwable) {
+        // 流式路径的【异常终结点】：AbstractNettyStreamSender.onAllDataFailed() 只关连接、
+        // 不挂 isComplete 监听器（正常结束那条走 onAllDataWritten → addRespEventListener(f,true)，
+        // 已汇入 completeSuccessCallback），故这里必须让异步持有者退场，否则入站 buf 泄漏。
+        // 单次守卫 + 流失败即终止 ⇒ 不会重复释放。
+        releaseRequestOnce();
         if (writeCallbackHandler != null) {
             if (throwable == null) {
                 throwable = DEFAULT_WRITE_ERROR_EXCEPTION;

@@ -11,6 +11,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -40,6 +42,27 @@ class PerfAsyncWebRequestTest {
     @Test void startAsync_whenAlreadyStarted_throwsISE() {
         asyncWebRequest.startAsync();
         assertThrows(IllegalStateException.class, () -> asyncWebRequest.startAsync());
+    }
+
+    /**
+     * 计量配对：每个异步生命周期恰好 +1 / -1。第二半（重复终结不得二次递减）才是要点——递减没有
+     * 幂等守卫的话计数会变成负值，而负值与残留叠加仍可能读成 0，把真泄漏掩盖掉。
+     */
+    @Test void asyncLifecycle_isCountedOncePerLifecycle_andReleasedOnce() {
+        io.springperf.web.core.metrics.CountingWebMetrics metrics = new io.springperf.web.core.metrics.CountingWebMetrics();
+        when(request.getWebContext()).thenReturn(webContext);
+        when(webContext.getWebComponent(io.springperf.web.core.metrics.WebMetrics.class)).thenReturn(metrics);
+
+        assertEquals(0, metrics.activeAsyncLifecycles(), "未启动异步时不应计入");
+
+        asyncWebRequest.startAsync();
+        assertEquals(1, metrics.activeAsyncLifecycles(), "startAsync 应 +1");
+
+        asyncWebRequest.completeSuccessCallback();
+        assertEquals(0, metrics.activeAsyncLifecycles(), "写终结应 -1");
+
+        asyncWebRequest.completeSuccessCallback();
+        assertEquals(0, metrics.activeAsyncLifecycles(), "重复终结不得二次递减");
     }
 
     @Test void startAsync_withTimeoutAndHandler_schedulesTimeout() {
@@ -82,6 +105,9 @@ class PerfAsyncWebRequestTest {
     @Test void dispatch_whenAlreadyCompleted_isNoOp() {
         asyncWebRequest.startAsync();
         asyncWebRequest.completeSuccessCallback();
+        // 生命周期开关（startAsync / 写终结）本来就会解析计量组件 → 也就会查一次 context；那不是本用例要断言的
+        // 东西（用例名说的是 dispatch 是 no-op）。故把验证范围收到 dispatch() 这一次调用上。
+        clearInvocations(request);
         asyncWebRequest.dispatch();
         verify(request, never()).getWebContext();
     }
@@ -144,6 +170,8 @@ class PerfAsyncWebRequestTest {
     @Test void setConcurrentResultAndDispatch_whenAsyncComplete_doesNotDispatch() {
         asyncWebRequest.startAsync();
         asyncWebRequest.completeSuccessCallback();
+        // 同上：计量解析发生在生命周期开关上，本用例断言的是「已完成时不再分发」，故只验证这一句调用。
+        clearInvocations(request);
         asyncWebRequest.setConcurrentResultAndDispatch("result");
         verify(request, never()).getWebContext();
     }
@@ -253,5 +281,48 @@ class PerfAsyncWebRequestTest {
     @Test void defaultWriteErrorException_doesNotFillInStackTrace() {
         PerfAsyncWebRequest.DefaultWriteErrorException ex = new PerfAsyncWebRequest.DefaultWriteErrorException();
         assertSame(ex, ex.fillInStackTrace());
+    }
+
+    /**
+     * 并发断连信号下，取消钩子至多执行一次，入站请求引用也只归还一次。
+     *
+     * <p>原先 {@code 读 → 判非空 → 置 null} 三步非原子（且字段非 volatile）：EventLoop 上重复到达的断连
+     * 信号会让两个线程同时读到同一个 handler 并各跑一次 —— 上游被重复取消，引用计数则可能重复释放。</p>
+     */
+    @Test void releaseOnConnectionClose_concurrentSignals_runHandlerAndReleaseOnce() throws Exception {
+        Runnable closeHandler = mock(Runnable.class);
+        asyncWebRequest.addConnectionCloseHandler(closeHandler);
+        asyncWebRequest.startAsync();
+
+        int n = 8;
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(n);
+        for (int i = 0; i < n; i++) {
+            Thread t = new Thread(() -> {
+                try {
+                    start.await();
+                    for (int j = 0; j < 100; j++) {
+                        asyncWebRequest.releaseOnConnectionClose();
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    done.countDown();
+                }
+            });
+            t.start();
+        }
+        start.countDown();
+        assertTrue(done.await(30, TimeUnit.SECONDS), "并发任务未在时限内结束");
+
+        verify(closeHandler, times(1)).run();
+        verify(request, times(1)).release();
+    }
+
+    /** 从未注册过断连钩子时的清理：不得抛异常，引用仍应归还。 */
+    @Test void releaseOnConnectionClose_withoutHandler_stillReleases() {
+        asyncWebRequest.startAsync();
+        asyncWebRequest.releaseOnConnectionClose();
+        verify(request).release();
     }
 }

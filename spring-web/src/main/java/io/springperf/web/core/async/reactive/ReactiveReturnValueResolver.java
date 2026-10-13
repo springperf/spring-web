@@ -54,6 +54,11 @@ public class ReactiveReturnValueResolver extends BaseAsyncReturnValueResolver {
         Class<?> reactiveType = ResponseEntity.class.isAssignableFrom(returnType.getParameterType()) ?
                 ResolvableType.forMethodParameter(returnType).getGeneric().resolve() :
                 returnType.getParameterType();
+        // ResolvableType.resolve() 声明为 @Nullable（泛型不可解析时）：无法确定类型即视为不支持，
+        // 避免把 null 交给 getAdapter（原实现会在此 NPE）
+        if (reactiveType == null) {
+            return false;
+        }
         return adapterRegistry.getAdapter(reactiveType) != null;
     }
 
@@ -82,7 +87,16 @@ public class ReactiveReturnValueResolver extends BaseAsyncReturnValueResolver {
             returnValue = responseEntity.getBody();
             returnType = returnType.nested();
         }
+        // ResponseEntity.getBody() 合法可为 null（204 / 无响应体）：无 body 就没有可订阅的发布者，直接返回
+        if (returnValue == null) {
+            return;
+        }
         ReactiveAdapter adapter = this.adapterRegistry.getAdapter(returnValue.getClass());
+        // ReactiveAdapterRegistry.getAdapter() 声明为 @Nullable：无适配器则无法订阅，
+        // 避免把 null 继续传给 createStreamEmitter
+        if (adapter == null) {
+            return;
+        }
         ResolvableType elementType = ResolvableType.forMethodParameter(returnType).getGeneric();
         Class<?> elementClass = elementType.toClass();
         ReactiveConfig reactiveConfig = getReactiveConfig(req);

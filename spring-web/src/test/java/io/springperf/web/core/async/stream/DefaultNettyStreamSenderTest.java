@@ -62,6 +62,8 @@ class DefaultNettyStreamSenderTest {
         when(asyncWebRequest.getNativeResponse()).thenReturn(nativeResponse);
         when(nativeResponse.getCtx()).thenReturn(ctx);
         when(nativeResponse.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
+        // onAllDataWritten 的终止块单一所有者守卫：mock 默认返回 false 会直接 return（不写 LastHttpContent）
+        when(nativeResponse.markStreamCompleted()).thenReturn(true);
         when(ctx.channel()).thenReturn(channel);
         when(ctx.executor()).thenReturn(eventLoop);
         when(ctx.alloc()).thenReturn(ByteBufAllocator.DEFAULT);
@@ -139,11 +141,20 @@ class DefaultNettyStreamSenderTest {
         DefaultNettyStreamSender sender = new DefaultNettyStreamSender(emitter, asyncWebRequest);
 
         sender.send("data");
-        sender.complete(true, null);
+        // 首参 closeChannelOnComplete=false：正常结束 → 写 LastHttpContent（true 走的是「关闭通道」分支，见 complete_withCloseChannelOnComplete_terminates）
+        sender.complete(false, null);
 
-        verify(channel, atLeastOnce()).writeAndFlush(lastHttpContentCaptor.capture());
-        assertTrue(lastHttpContentCaptor.getValue() instanceof LastHttpContent);
-        lastHttpContentCaptor.getValue().release();
+        // 2.7.x 适配：Mockito 4 的 ArgumentCaptor 会捕获所有入参（含 DefaultHttpContent），
+        // 故不能用 ArgumentCaptor<LastHttpContent> 直接取值，改用父接口捕获 + instanceof 过滤。
+        verify(channel, atLeastOnce()).writeAndFlush(httpContentCaptor.capture());
+        LastHttpContent last = null;
+        for (HttpContent c : httpContentCaptor.getAllValues()) {
+            if (c instanceof LastHttpContent) {
+                last = (LastHttpContent) c;
+            }
+        }
+        assertNotNull(last, "complete 必须写出 LastHttpContent");
+        last.release();
     }
 
     @Test
@@ -250,5 +261,37 @@ class DefaultNettyStreamSenderTest {
             }
         }
         assertEquals(10, written, "所有已发送数据必须完整写出，不允许截断");
+    }
+
+    @Test
+    void drain_allEncodesFail_mustNotWriteEmptyContent() throws Exception {
+        doThrow(new RuntimeException("encode failed")).when(emitter).encode(any(), any());
+        DefaultNettyStreamSender sender = new DefaultNettyStreamSender(emitter, asyncWebRequest);
+
+        sender.send("bad1");
+        sender.send("bad2");
+
+        verify(channel, never()).writeAndFlush(any(DefaultHttpContent.class));
+        assertEquals(0, sender.queueSize(), "队列应已被 drain 消费");
+        verify(emitter, times(2)).onEncodeError(any(), any());
+    }
+
+    /*
+     * 上面那条 {@code never()} 的正对照：同一套装置下正常 encode **必须**写出内容， 否则"没写出空帧"可能只是因为装置根本没跑到 drain。
+     */
+    @Test
+    void drain_nonEmptyBatch_writesContent_positiveControl() throws Exception {
+        doAnswer(invocation -> {
+            OutputStream out = invocation.getArgument(1);
+            out.write("ok".getBytes(StandardCharsets.UTF_8));
+            return null;
+        }).when(emitter).encode(any(), any());
+        DefaultNettyStreamSender sender = new DefaultNettyStreamSender(emitter, asyncWebRequest);
+
+        sender.send("a");
+
+        verify(channel).writeAndFlush(httpContentCaptor.capture());
+        assertEquals("ok", httpContentCaptor.getValue().content().toString(StandardCharsets.UTF_8));
+        httpContentCaptor.getValue().content().release();
     }
 }

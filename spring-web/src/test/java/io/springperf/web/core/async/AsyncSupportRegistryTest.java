@@ -1,6 +1,7 @@
 package io.springperf.web.core.async;
 
 import io.springperf.web.context.ApplicationProperties;
+import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.pool.BizPoolRegistry;
 import io.springperf.web.http.WebServerHttpRequest;
@@ -23,6 +24,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -52,6 +54,32 @@ class AsyncSupportRegistryTest {
     void setUp() {
         registry = new AsyncSupportRegistry();
         lenient().when(webContext.getProps()).thenReturn(mock(ApplicationProperties.class));
+    }
+
+    /**
+     * 异步超时键对齐 Spring Boot：读 {@code spring.mvc.async.request-timeout}（Duration 语义：{@code 30s}/{@code 1m}，
+     * 裸数字按毫秒）。
+     * <p>
+     * 2.7.x 原先读自造的 {@code server.async.timeout}，该键在 master 上已不存在；不切键则
+     * {@code spring.mvc.async.request-timeout} 是死键（配置了也不生效）。
+     * </p>
+     */
+    @Test
+    void initWithWebContext_readsSpringMvcAsyncRequestTimeout() {
+        ApplicationProperties props = mock(ApplicationProperties.class);
+        when(webContext.getProps()).thenReturn(props);
+        when(props.getDurationMillis(PropertiesConstant.ASYNC_REQUEST_TIMEOUT,
+                PropertiesConstant.ASYNC_REQUEST_TIMEOUT_DEFAULT)).thenReturn(5000L);
+        when(webContext.getCtx()).thenReturn(applicationContext);
+        when(applicationContext.getBeansOfType(CallableProcessingInterceptor.class)).thenReturn(Collections.emptyMap());
+        when(applicationContext.getBeansOfType(DeferredResultProcessingInterceptor.class))
+                .thenReturn(Collections.emptyMap());
+
+        registry.initWithWebContext(webContext);
+
+        assertEquals(5000L, registry.getDefaultTimeout());
+        verify(props).getDurationMillis(PropertiesConstant.ASYNC_REQUEST_TIMEOUT,
+                PropertiesConstant.ASYNC_REQUEST_TIMEOUT_DEFAULT);
     }
 
     @Test
@@ -190,13 +218,19 @@ class AsyncSupportRegistryTest {
         registry.initComponentPhase1();
         registry.initComponentPhase2();
 
+        // 打桩必须放在循环外：兜底 SimpleAsyncTaskExecutor.execute() 会立刻起工作线程跑 Callable，
+        // 而该线程会回调同一个 mock（setConcurrentResultAndDispatch 等）。若在循环内、且上一轮
+        // 工作线程仍在活动时再次对 mock 打桩（doAnswer(...).when(...)），Mockito 的 stubbing 状态与
+        // 并发调用相撞，会抛出 UnfinishedStubbingException（实测：本方法单跑 3 次中 2 次复现；
+        // master 侧同一写法同样存在，属既有测试竞态）。提到循环外后，循环期间不再有 stubbing 建立。
+        doAnswer(invocation -> {
+            Runnable callback = invocation.getArgument(0);
+            callback.run();
+            return null;
+        }).when(asyncWebRequest).setAsyncReadyCallback(any(Runnable.class));
+
         // 连续两次异步任务（均无显式 executor），兜底 executor 应懒加载且复用同一实例
         for (int i = 0; i < 2; i++) {
-            doAnswer(invocation -> {
-                Runnable callback = invocation.getArgument(0);
-                callback.run();
-                return null;
-            }).when(asyncWebRequest).setAsyncReadyCallback(any(Runnable.class));
             WebAsyncTask<String> task = new WebAsyncTask<>(() -> "ok");
             assertDoesNotThrow(() -> registry.startCallableProcessing(asyncWebRequest, task));
         }

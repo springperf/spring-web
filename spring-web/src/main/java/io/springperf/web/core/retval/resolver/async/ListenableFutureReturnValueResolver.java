@@ -12,6 +12,9 @@ import org.springframework.web.context.request.async.DeferredResult;
 public class ListenableFutureReturnValueResolver extends BaseAsyncReturnValueResolver {
     @Override
     public boolean supportsReturnType(MethodParameter returnType, MappingHandlerMethod mappingContext) {
+        if (returnType == null) {
+            return false;
+        }
         return ListenableFuture.class.isAssignableFrom(returnType.getParameterType());
     }
 

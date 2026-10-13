@@ -44,28 +44,30 @@ public class MetaUtils {
         String name = null;
         for (Class<? extends Annotation> annotation : supportClass) {
             if (RequestParam.class == annotation) {
-                if (parameter.hasParameterAnnotation(RequestParam.class)) {
-                    RequestParam requestParam = parameter.getParameterAnnotation(RequestParam.class);
+                // 一次查找即可：hasParameterAnnotation(x) 等价于 getParameterAnnotation(x) != null，
+                // 少一次参数注解查找（热路径）。
+                RequestParam requestParam = parameter.getParameterAnnotation(RequestParam.class);
+                if (requestParam != null) {
                     name = ObjectUtils.isEmpty(requestParam.value()) ? requestParam.name() : requestParam.value();
                 }
             } else if (RequestHeader.class == annotation) {
-                if (parameter.hasParameterAnnotation(RequestHeader.class)) {
-                    RequestHeader requestHeader = parameter.getParameterAnnotation(RequestHeader.class);
+                RequestHeader requestHeader = parameter.getParameterAnnotation(RequestHeader.class);
+                if (requestHeader != null) {
                     name = ObjectUtils.isEmpty(requestHeader.value()) ? requestHeader.name() : requestHeader.value();
                 }
             } else if (PathVariable.class == annotation) {
-                if (parameter.hasParameterAnnotation(PathVariable.class)) {
-                    PathVariable pathVariable = parameter.getParameterAnnotation(PathVariable.class);
+                PathVariable pathVariable = parameter.getParameterAnnotation(PathVariable.class);
+                if (pathVariable != null) {
                     name = ObjectUtils.isEmpty(pathVariable.value()) ? pathVariable.name() : pathVariable.value();
                 }
             } else if (ModelAttribute.class == annotation) {
-                if (parameter.hasParameterAnnotation(ModelAttribute.class)) {
-                    ModelAttribute modelAttribute = parameter.getParameterAnnotation(ModelAttribute.class);
+                ModelAttribute modelAttribute = parameter.getParameterAnnotation(ModelAttribute.class);
+                if (modelAttribute != null) {
                     name = ObjectUtils.isEmpty(modelAttribute.value()) ? modelAttribute.name() : modelAttribute.value();
                 }
             } else if (RequestPart.class == annotation) {
-                if (parameter.hasParameterAnnotation(RequestPart.class)) {
-                    RequestPart requestPart = parameter.getParameterAnnotation(RequestPart.class);
+                RequestPart requestPart = parameter.getParameterAnnotation(RequestPart.class);
+                if (requestPart != null) {
                     name = ObjectUtils.isEmpty(requestPart.value()) ? requestPart.name() : requestPart.value();
                 }
             }
@@ -80,18 +82,18 @@ public class MetaUtils {
         boolean required = false;
         for (Class<? extends Annotation> annotation : supportClass) {
             if (RequestParam.class == annotation) {
-                if (parameter.hasParameterAnnotation(RequestParam.class)) {
-                    RequestParam requestParam = parameter.getParameterAnnotation(RequestParam.class);
+                RequestParam requestParam = parameter.getParameterAnnotation(RequestParam.class);
+                if (requestParam != null) {
                     required = requestParam.required();
                 }
             } else if (RequestHeader.class == annotation) {
-                if (parameter.hasParameterAnnotation(RequestHeader.class)) {
-                    RequestHeader requestHeader = parameter.getParameterAnnotation(RequestHeader.class);
+                RequestHeader requestHeader = parameter.getParameterAnnotation(RequestHeader.class);
+                if (requestHeader != null) {
                     required = requestHeader.required();
                 }
             } else if (RequestPart.class == annotation) {
-                if (parameter.hasParameterAnnotation(RequestPart.class)) {
-                    RequestPart requestPart = parameter.getParameterAnnotation(RequestPart.class);
+                RequestPart requestPart = parameter.getParameterAnnotation(RequestPart.class);
+                if (requestPart != null) {
                     required = requestPart.required();
                 }
             }
@@ -103,13 +105,13 @@ public class MetaUtils {
         String defaultValue = null;
         for (Class<? extends Annotation> annotation : supportClass) {
             if (RequestParam.class == annotation) {
-                if (parameter.hasParameterAnnotation(RequestParam.class)) {
-                    RequestParam requestParam = parameter.getParameterAnnotation(RequestParam.class);
+                RequestParam requestParam = parameter.getParameterAnnotation(RequestParam.class);
+                if (requestParam != null) {
                     defaultValue = requestParam.defaultValue();
                 }
             } else if (RequestHeader.class == annotation) {
-                if (parameter.hasParameterAnnotation(RequestHeader.class)) {
-                    RequestHeader requestHeader = parameter.getParameterAnnotation(RequestHeader.class);
+                RequestHeader requestHeader = parameter.getParameterAnnotation(RequestHeader.class);
+                if (requestHeader != null) {
                     defaultValue = requestHeader.defaultValue();
                 }
             }

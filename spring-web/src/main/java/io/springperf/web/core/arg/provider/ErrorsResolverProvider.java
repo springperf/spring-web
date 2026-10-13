@@ -13,7 +13,15 @@ public class ErrorsResolverProvider implements StaticArgumentResolverProvider {
 
     @Override
     public boolean supports(MethodParameter parameter, MappingHandlerMethod mappingContext) {
-        return Errors.class.isAssignableFrom(parameter.getParameterType());
+        // 仅支持纯 Errors/BindingResult 形参（须紧跟模型属性 / @RequestBody / @RequestPart 之后）。
+        //
+        // 必须排除异常类型：MethodArgumentNotValidException 与 BindException 家族都 implements
+        // BindingResult，会被 isAssignableFrom(Errors) 命中，但 @ExceptionHandler 上的这类形参语义是
+        // 「被抛出的异常本身」（由 ExceptionArgumentResolverProvider 注入）。若不排除，本 provider 会
+        // 抢先命中并在请求属性里查不到 BindingResult 而抛 IllegalStateException →
+        // 最常见的 @ExceptionHandler(MethodArgumentNotValidException ex) 写法变成 500。
+        Class<?> type = parameter.getParameterType();
+        return Errors.class.isAssignableFrom(type) && !Throwable.class.isAssignableFrom(type);
     }
 
     @Override

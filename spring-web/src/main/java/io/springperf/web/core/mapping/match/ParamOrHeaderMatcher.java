@@ -51,7 +51,8 @@ public class ParamOrHeaderMatcher implements Matcher {
     }
 
     public List<NameValueExpressionSupport> getExpressions() {
-        return expressionList;
+        // 只读视图（合并方 MappingRegistry 只做拷贝读取）；字段为 null 时保持原行为
+        return expressionList == null ? null : java.util.Collections.unmodifiableList(expressionList);
     }
 
     @Override

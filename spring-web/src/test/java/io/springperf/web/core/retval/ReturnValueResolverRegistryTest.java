@@ -1,14 +1,7 @@
 package io.springperf.web.core.retval;
 
-import io.springperf.web.context.WebContext;
-import io.springperf.web.core.codec.HttpBodyCodecRegistry;
-import io.springperf.web.core.mapping.MappingHandlerMethod;
-import io.springperf.web.http.WebServerHttpRequest;
-import io.springperf.web.http.WebServerHttpResponse;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.context.ApplicationContext;
-import org.springframework.core.MethodParameter;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -16,8 +9,16 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Callable;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationContext;
+import org.springframework.core.MethodParameter;
+
+import io.springperf.web.context.WebContext;
+import io.springperf.web.core.codec.HttpBodyCodecRegistry;
+import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.http.WebServerHttpRequest;
+import io.springperf.web.http.WebServerHttpResponse;
 
 class ReturnValueResolverRegistryTest {
 
@@ -33,7 +34,8 @@ class ReturnValueResolverRegistryTest {
         when(ctx.getBeansOfType(any(Class.class))).thenReturn(Collections.emptyMap());
         when(webContextMock.getCtx()).thenReturn(ctx);
         when(webContextMock.getWebComponent(any(Class.class))).thenReturn(null);
-        when(webContextMock.getWebComponentWithDefault(any(Class.class), any())).thenReturn(mock(HttpBodyCodecRegistry.class));
+        when(webContextMock.getWebComponentWithDefault(any(Class.class), any()))
+                .thenReturn(mock(HttpBodyCodecRegistry.class));
 
         // Set protected webContext field via reflection
         Field f = registry.getClass().getSuperclass().getSuperclass().getDeclaredField("webContext");
@@ -62,13 +64,17 @@ class ReturnValueResolverRegistryTest {
     }
 
     @Test
-    void skipResolve_nullMethodReturnValue_nonVoid_doesNotSetHandled() {
+    void skipResolve_nonVoidMethodReturnsNull_setsHandled() throws Exception {
+        // 修复 H2：非 void 方法返回 null 必须标记 handled，否则响应永不 flush（挂起→504）
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        when(resp.isHandled()).thenReturn(false);
+        Method method = TestController.class.getMethod("handle"); // public String handle()
+        MappingHandlerMethod mapping = new MappingHandlerMethod(new TestController(), method);
 
-        boolean skipped = registry.skipResolve(null, null, null, resp);
+        boolean skipped = registry.skipResolve(null, mapping, null, resp);
 
         assertTrue(skipped);
-        verify(resp, never()).setHandled();
+        verify(resp).setHandled();
     }
 
     @Test
@@ -164,6 +170,21 @@ class ReturnValueResolverRegistryTest {
         WebServerHttpRequest req = mock(WebServerHttpRequest.class);
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
         Method method = TestController.class.getMethod("voidMethod");
+        MappingHandlerMethod mapping = new MappingHandlerMethod(new TestController(), method);
+
+        registry.resolveReturnValue(null, mapping, req, resp);
+
+        verify(resp).setHandled();
+    }
+
+    @Test
+    void resolveReturnValue_nonVoidMethodReturnsNull_setsHandled() throws Exception {
+        // 修复 H2 全链路：非 void 方法返回 null 经 resolveReturnValue 仍须标记 handled（否则响应挂起）
+        registry.initReturnValueResolver();
+        WebServerHttpRequest req = mock(WebServerHttpRequest.class);
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        when(resp.isHandled()).thenReturn(false);
+        Method method = TestController.class.getMethod("handle"); // String handle()
         MappingHandlerMethod mapping = new MappingHandlerMethod(new TestController(), method);
 
         registry.resolveReturnValue(null, mapping, req, resp);
@@ -274,8 +295,8 @@ class ReturnValueResolverRegistryTest {
         MethodReturnValueContext ctx = registry.getMethodReturnValueContext(mapping);
 
         // 通过反射调用 resolveInnerReturnValueContext
-        Method resolveInner = ReturnValueResolverRegistry.class.getDeclaredMethod(
-                "resolveInnerReturnValueContext", MethodReturnValueContext.class, MappingHandlerMethod.class);
+        Method resolveInner = ReturnValueResolverRegistry.class.getDeclaredMethod("resolveInnerReturnValueContext",
+                MethodReturnValueContext.class, MappingHandlerMethod.class);
         resolveInner.setAccessible(true);
         resolveInner.invoke(registry, ctx, mapping);
 
@@ -307,8 +328,8 @@ class ReturnValueResolverRegistryTest {
             }
 
             @Override
-            public void resolveReturnValue(Object returnValue, MethodParameter returnType,
-                                           WebServerHttpRequest r, WebServerHttpResponse s) {
+            public void resolveReturnValue(Object returnValue, MethodParameter returnType, WebServerHttpRequest r,
+                    WebServerHttpResponse s) {
             }
         };
         registry.addResolver(newAsync);
@@ -344,8 +365,7 @@ class ReturnValueResolverRegistryTest {
         MappingHandlerMethod mapping = new MappingHandlerMethod(new TestController(), method);
 
         // 设置有效返回类型为 Callable<String>
-        MethodParameter effectiveType = new MethodParameter(
-                TestController.class.getMethod("callableMethod"), -1);
+        MethodParameter effectiveType = new MethodParameter(TestController.class.getMethod("callableMethod"), -1);
         mapping.setEffectiveReturnType(effectiveType);
 
         MethodReturnValueContext ctx = registry.getMethodReturnValueContext(mapping);
@@ -369,14 +389,13 @@ class ReturnValueResolverRegistryTest {
         Method method = TestController.class.getMethod("effTypeMethod3");
         MappingHandlerMethod mapping = new MappingHandlerMethod(new TestController(), method);
 
-        MethodParameter effectiveType = new MethodParameter(
-                TestController.class.getMethod("callableMethod"), -1);
+        MethodParameter effectiveType = new MethodParameter(TestController.class.getMethod("callableMethod"), -1);
         mapping.setEffectiveReturnType(effectiveType);
 
         MethodReturnValueContext ctx = registry.getMethodReturnValueContext(mapping);
 
-        Method resolveInner = ReturnValueResolverRegistry.class.getDeclaredMethod(
-                "resolveInnerReturnValueContext", MethodReturnValueContext.class, MappingHandlerMethod.class);
+        Method resolveInner = ReturnValueResolverRegistry.class.getDeclaredMethod("resolveInnerReturnValueContext",
+                MethodReturnValueContext.class, MappingHandlerMethod.class);
         resolveInner.setAccessible(true);
         resolveInner.invoke(registry, ctx, mapping);
 
@@ -418,13 +437,35 @@ class ReturnValueResolverRegistryTest {
 
     @SuppressWarnings("unused")
     static class TestController {
-        public String handle() { return "ok"; }
-        public String other() { return "other"; }
-        public void voidMethod() {}
-        public Callable<String> callableMethod() { return () -> "ok"; }
-        public String lazyMethod() { return "lazy"; }
-        public String effTypeMethod1() { return "e1"; }
-        public String effTypeMethod2() { return "e2"; }
-        public String effTypeMethod3() { return "e3"; }
+        public String handle() {
+            return "ok";
+        }
+
+        public String other() {
+            return "other";
+        }
+
+        public void voidMethod() {
+        }
+
+        public Callable<String> callableMethod() {
+            return () -> "ok";
+        }
+
+        public String lazyMethod() {
+            return "lazy";
+        }
+
+        public String effTypeMethod1() {
+            return "e1";
+        }
+
+        public String effTypeMethod2() {
+            return "e2";
+        }
+
+        public String effTypeMethod3() {
+            return "e3";
+        }
     }
 }

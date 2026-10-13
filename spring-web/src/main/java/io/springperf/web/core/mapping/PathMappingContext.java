@@ -26,9 +26,10 @@ public class PathMappingContext extends MappingHandlerMethod {
     private final Matcher[] matchers;
     private final String pathRule;
     private final List<MediaType> producibleMediaTypes;
-    private List<HandlerInterceptor> cachedInterceptors;
+    private final List<MediaType> producibleMediaTypesView;
+    private volatile List<HandlerInterceptor> cachedInterceptors;
     private CorsConfigurationProvider corsConfigurationProvider;
-    private DefaultFilterChain cachedFilterChain;
+    private volatile DefaultFilterChain cachedFilterChain;
 
 
     public PathMappingContext(HandlerMethod handlerMethod, List<Matcher> matchers, String pathRule) {
@@ -36,6 +37,7 @@ public class PathMappingContext extends MappingHandlerMethod {
         this.type = "Controller";
         this.matchers = CollectionUtils.isEmpty(matchers) ? EMPTY_MATCHERS : matchers.toArray(new Matcher[0]);
         this.producibleMediaTypes = initProducibleMediaTypes();
+        this.producibleMediaTypesView = producibleMediaTypes == null ? null : java.util.Collections.unmodifiableList(producibleMediaTypes);
         this.pathRule = pathRule;
     }
 
@@ -44,6 +46,7 @@ public class PathMappingContext extends MappingHandlerMethod {
         this.type = invoker.getType();
         this.matchers = CollectionUtils.isEmpty(invoker.getMatchers()) ? EMPTY_MATCHERS : invoker.getMatchers().toArray(new Matcher[0]);
         this.producibleMediaTypes = initProducibleMediaTypes();
+        this.producibleMediaTypesView = producibleMediaTypes == null ? null : java.util.Collections.unmodifiableList(producibleMediaTypes);
         this.pathRule = pathRule;
     }
 
@@ -86,7 +89,7 @@ public class PathMappingContext extends MappingHandlerMethod {
     }
 
     public List<MediaType> getProducibleMediaTypes() {
-        return producibleMediaTypes;
+        return producibleMediaTypesView;
     }
 
     @Override

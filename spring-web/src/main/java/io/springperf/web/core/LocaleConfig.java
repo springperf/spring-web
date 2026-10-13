@@ -109,7 +109,6 @@ public class LocaleConfig {
         return new LazyRequestLocaleContext(this, request);
     }
 
-    /** accept-header 策略的解析：请求首选 Locale，缺失则回退配置 locale，再回退 JVM 默认。 */
     /**
      * accept-header 策略的解析：请求首选 Locale，缺失则回退配置 locale，再回退 JVM 默认。
      * <p>
@@ -119,9 +118,11 @@ public class LocaleConfig {
      * </p>
      */
     Locale resolveRequestLocale(WebServerHttpRequest request) {
-        // 请求侧 Locale 由 WebServerHttpRequest#getLocale 提供（其内部已处理 Accept-Language 解析与
-        // 无头回退）；取不到时才回退配置 locale，最后回退 JVM 默认。
-        Locale requestLocale = request != null ? request.getLocale() : null;
+        // 必须自己判「是否真带 Accept-Language」：WebServerHttpRequest#getLocale 内部已做无头 → JVM 默认的回退，
+        // 无条件采信会让 spring.web.locale 的回退永不生效（CI 等默认语言 ≠ 部署语言的机器上解析出错误 Locale）。
+        HttpHeaders headers = request != null ? request.getHeaders() : null;
+        String acceptLanguage = headers != null ? headers.getFirst("Accept-Language") : null;
+        Locale requestLocale = acceptLanguage != null && !acceptLanguage.trim().isEmpty() ? request.getLocale() : null;
         return requestLocale != null ? requestLocale : (locale != null ? locale : Locale.getDefault());
     }
 

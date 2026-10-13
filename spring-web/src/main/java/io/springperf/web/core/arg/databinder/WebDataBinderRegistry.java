@@ -50,7 +50,12 @@ public class WebDataBinderRegistry extends BaseWebComponent {
         webBindingInitializer = webContext.getBeanFromCtx(WebBindingInitializer.class);
         List<ControllerAdviceBean> adviceBeans = ControllerAdviceBean.findAnnotatedBeans(webContext.getCtx());
         for (ControllerAdviceBean adviceBean : adviceBeans) {
-            Set<Method> binderMethods = MethodIntrospector.selectMethods(adviceBean.getBeanType(), INIT_BINDER_METHODS);
+            // getBeanType 声明为 @Nullable（类型不可解析时）；无法内省则跳过该 advice
+            Class<?> beanType = adviceBean.getBeanType();
+            if (beanType == null) {
+                continue;
+            }
+            Set<Method> binderMethods = MethodIntrospector.selectMethods(beanType, INIT_BINDER_METHODS);
             if (!binderMethods.isEmpty()) {
                 this.initBinderAdviceCache.put(adviceBean, binderMethods);
             }

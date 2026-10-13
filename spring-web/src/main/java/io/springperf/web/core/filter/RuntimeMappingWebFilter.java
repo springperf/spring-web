@@ -21,8 +21,9 @@ public class RuntimeMappingWebFilter implements WebFilter {
     public RuntimeMappingWebFilter(WebFilter filter, String[] includePatterns, String[] excludePatterns,
                                     int order) {
         this.delegate = filter;
-        this.includePatterns = includePatterns;
-        this.excludePatterns = excludePatterns;
+        // 防御性拷贝：配置数组由调用方持有，直接存引用会让外部修改影响运行期路由
+        this.includePatterns = includePatterns != null ? includePatterns.clone() : null;
+        this.excludePatterns = excludePatterns != null ? excludePatterns.clone() : null;
         this.order = order;
     }
 

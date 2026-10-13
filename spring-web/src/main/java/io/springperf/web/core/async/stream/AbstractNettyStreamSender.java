@@ -62,7 +62,11 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
 
     public AbstractNettyStreamSender(StreamEmitter emitter, PerfAsyncWebRequest asyncWebRequest) {
         this.emitter = emitter;
+        // getNativeResponse 声明为 @Nullable：拿不到响应就建不出发送器，明确失败好过 NPE
         this.resp = (NettyServerHttpResponse) asyncWebRequest.getNativeResponse();
+        if (this.resp == null) {
+            throw new IllegalStateException("No native response available for stream sender");
+        }
         ChannelHandlerContext ctx = this.resp.getCtx();
         this.channel = ctx.channel();
         this.eventLoop = ctx.executor();
@@ -203,6 +207,43 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
 
     protected void onAllDataWritten() {
         this.resp.setWritableCallback(null);
+        // HEAD：响应体被抑制，且 `flushChunked()` 的 HEAD 分支已把「仅响应头」的**完整响应**
+        // （initHttpResponse(null,null,null,false) → FullHttpResponse，自带终止语义）写出，HTTP 编码器
+        // 随之复位为 INIT。此时再补写 LastHttpContent 会抛
+        // EncoderException("unexpected message type: LastHttpContent$1, state: 0")，被记成
+        // [SSE] write ERROR 的服务端缺陷信号（E2E: AsyncSseRobustnessE2eTest#headRequest_sse_*）。
+        // 故这里抢占终止块写入权（防其他收尾方再写）后直接完成生命周期，不再写任何帧。
+        if (this.resp.isHeadRequest()) {
+            this.resp.markStreamCompleted();
+            onCompleteSuccess();
+            return;
+        }
+        // 终止块单一所有者：抢占写入权。若已被另一方（请求收尾的 endStream()）写出，
+        // 本次不得再写——否则 HTTP 编码器在写完上一条 LastHttpContent 后已复位为 INIT，
+        // 再收 LastHttpContent 会抛 EncoderException(unexpected message type, state: 0)。
+        if (!this.resp.markStreamCompleted()) {
+            return;
+        }
+        if (!channel.isActive()) {
+            // 客户端已断开（常见于 SSE 断连场景）：此时响应头可能尚未写到线上，
+            // HTTP 编码器仍处于 INIT 状态，裸写 LastHttpContent 会抛
+            // EncoderException("unexpected message type: LastHttpContent, state: 0")。
+            // 流已无投递对象，直接收尾并关闭连接（不再写任何帧）。
+            this.resp.setTimeout(null, -1);
+            channel.close();
+            return;
+        }
+        // 【本分支的适配，与 master 的差异，勿当漏改】master 此处还有第三道守卫：
+        //   if (resp.isCommitted() && !resp.isStreaming()) { resp.setTimeout(null, -1); return; }
+        // 其判据是「已提交但从未进入渐进式输出 ⇒ 响应已以「仅响应头」形态收尾（典型 HEAD）」，
+        // 前提是「渐进式输出一定会把 streaming 置真」。本分支的流式直写路径
+        // （StreamSender 经 flushContent 直接 channel.writeAndFlush）走直写而非 flushChunked，
+        // SSE 完成时 committed=true / streaming=false —— 判据为真但结论错误，会直接返回而不写终止块，
+        // 客户端挂到读超时（实测：E2E HelloApiTest#testSseFast「SSE fast should complete within timeout」
+        // 稳定失败；临时禁用该守卫即恢复）。
+        // 故本分支不移植该守卫：防「双终止块」由上方 markStreamCompleted 抢占负责
+        // （本分支 endStream() 亦以同一 streamCompleted 做 CAS，二者互斥），
+        // 防「对已失活连接写终止块」由上方 channel.isActive() 分支负责。
         ChannelFuture f = channel.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
         resp.addRespEventListener(f, true);
         f.addListener(completeListener);
@@ -213,6 +254,7 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
      * 已排空队列的数据照常发送，但终止标志是连接异常关闭而非正常流结束。
      */
     protected void onAllDataFailed(Throwable failure) {
+        this.resp.markStreamCompleted();
         this.resp.setWritableCallback(null);
         this.resp.setTimeout(null, -1);
         log.warn("[SSE] stream terminated with error: {}", failure != null ? failure.getMessage() : "unknown", failure);

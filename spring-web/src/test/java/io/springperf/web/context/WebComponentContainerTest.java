@@ -1,16 +1,18 @@
 package io.springperf.web.context;
 
-import io.springperf.web.core.DispatcherHandler;
-import org.junit.jupiter.api.Test;
-import org.springframework.context.ApplicationContext;
-import org.springframework.core.Ordered;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import static io.springperf.web.context.PropertiesConstant.CONTEXT_PATH;
 
 import java.util.Collections;
 import java.util.List;
 
-import static io.springperf.web.context.PropertiesConstant.CONTEXT_PATH;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationContext;
+import org.springframework.core.Ordered;
+
+import io.springperf.web.core.DispatcherHandler;
 
 class WebComponentContainerTest {
 
@@ -137,8 +139,7 @@ class WebComponentContainerTest {
         // 注意并发时序下被替换次数不确定，故不断言精确次数
         for (LifecycleWebComponent comp : comps) {
             long destroyCount = mockingDetails(comp).getInvocations().stream()
-                    .filter(inv -> inv.getMethod().getName().equals("destroyComponent"))
-                    .count();
+                    .filter(inv -> inv.getMethod().getName().equals("destroyComponent")).count();
             assertTrue(destroyCount <= 1, comp + " 不应被 destroy 超过一次，实际 " + destroyCount);
         }
     }
@@ -158,6 +159,108 @@ class WebComponentContainerTest {
     void getWebComponent_noMatch_returnsNull() {
         WebComponentContainer container = new WebComponentContainer();
         assertNull(container.getWebComponent(WebComponent.class));
+    }
+
+    // ===== getWebComponent 快路径（单命中免 List 分配）的语义等价性 =====
+
+    /**
+     * 单命中：直接返回该组件，不应受其他不匹配组件干扰。
+     */
+    @Test
+    void getWebComponent_singleMatch_returnsItself_regardlessOfOthers() {
+        WebComponentContainer container = new WebComponentContainer();
+        LifecycleWebComponent target = mock(LifecycleWebComponent.class);
+        when(target.getComponentName()).thenReturn("target");
+        // 另两个不同类型的组件不应被计入
+        WebComponent other1 = mock(WebComponent.class);
+        when(other1.getComponentName()).thenReturn("other1");
+        WebComponent other2 = mock(WebComponent.class);
+        when(other2.getComponentName()).thenReturn("other2");
+
+        container.registerWebComponent(other1);
+        container.registerWebComponent(target);
+        container.registerWebComponent(other2);
+
+        assertSame(target, container.getWebComponent(LifecycleWebComponent.class));
+    }
+
+    /**
+     * 多命中必须仍然返回「按 @Order 排序后的第一个」—— 快路径只在单命中时生效， 多命中若跳过排序会静默改变行为（返回容器遍历顺序的首个，而非最高优先级者）。
+     */
+    @Test
+    void getWebComponent_multipleMatches_returnsHighestPriorityNotFirstRegistered() {
+        WebComponentContainer container = new WebComponentContainer();
+
+        // 先注册低优先级，确保「遍历顺序首个」与「order 最高」不是同一个
+        WebComponent low = mock(WebComponent.class);
+        when(low.getComponentName()).thenReturn("low");
+        when(low.getOrder()).thenReturn(100);
+
+        WebComponent high = mock(WebComponent.class);
+        when(high.getComponentName()).thenReturn("high");
+        when(high.getOrder()).thenReturn(10);
+
+        WebComponent mid = mock(WebComponent.class);
+        when(mid.getComponentName()).thenReturn("mid");
+        when(mid.getOrder()).thenReturn(50);
+
+        container.registerWebComponent(low);
+        container.registerWebComponent(high);
+        container.registerWebComponent(mid);
+
+        assertSame(high, container.getWebComponent(WebComponent.class),
+                "多命中时应按 @Order 返回最高优先级者，与 getWebComponents().get(0) 一致");
+    }
+
+    /**
+     * 快路径与慢路径必须给出一致结果：对同一容器，getWebComponent(X) 恒等于 getWebComponents(X) 的首元素（若非空）。这是本次优化的核心不变量。
+     */
+    @Test
+    void getWebComponent_matchesGetWebComponentsFirstElement() {
+        WebComponentContainer container = new WebComponentContainer();
+        for (int i = 0; i < 5; i++) {
+            WebComponent c = mock(WebComponent.class);
+            when(c.getComponentName()).thenReturn("c" + i);
+            when(c.getOrder()).thenReturn(50 - i * 10);
+            container.registerWebComponent(c);
+        }
+
+        List<WebComponent> all = container.getWebComponents(WebComponent.class);
+        assertEquals(5, all.size());
+        assertSame(all.get(0), container.getWebComponent(WebComponent.class),
+                "getWebComponent 必须与 getWebComponents 的首元素一致");
+    }
+
+    /**
+     * 零命中：即使容器内已有其他组件，按不匹配的类型查找仍返回 null。
+     */
+    @Test
+    void getWebComponent_zeroMatchAmongOthers_returnsNull() {
+        WebComponentContainer container = new WebComponentContainer();
+        WebComponent existing = mock(WebComponent.class);
+        when(existing.getComponentName()).thenReturn("existing");
+        container.registerWebComponent(existing);
+
+        assertNull(container.getWebComponent(LifecycleWebComponent.class));
+    }
+
+    /**
+     * 运行期动态注册后查找必须能看到新组件（Actuator 端点场景）—— 快路径不得缓存结果、从而返回过期的 null。
+     */
+    @Test
+    void getWebComponent_seesLateRegisteredComponent() {
+        WebComponentContainer container = new WebComponentContainer();
+        WebContext webContext = createWebContext();
+        container.initWithWebContext(webContext);
+
+        // 先查一次（无命中）
+        assertNull(container.getWebComponent(LifecycleWebComponent.class));
+
+        LifecycleWebComponent late = mock(LifecycleWebComponent.class);
+        when(late.getComponentName()).thenReturn("late");
+        container.registerWebComponent(late);
+
+        assertSame(late, container.getWebComponent(LifecycleWebComponent.class), "运行期注册的组件必须立即可见");
     }
 
     @Test

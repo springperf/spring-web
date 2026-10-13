@@ -36,10 +36,20 @@ public final class PropertiesConstant {
     public static final String HTTP_TIMEOUT = "server.http.timeout";
     public static final long HTTP_TIMEOUT_DEFAULT = 60000L;
 
-    /** HTTP socket read timeout in milliseconds, before request aggregation (默认值：30s).
-     * 用于防止慢速客户端在聚合请求体前无限期占用连接。0 或负数表示关闭读取超时。 */
+    /**
+     * HTTP socket read **idle** timeout in milliseconds, before request aggregation（**默认 0 = 关闭**）。
+     * 启用后用于防止慢速客户端在聚合请求体前无限期占用连接；只回收**真正空闲**的连接与半截请求，
+     * 在途请求不会被掐断（见 {@code ReadIdleTimeoutHandler}）。0 或负数表示关闭。
+     *
+     * <p><b>默认值与 Boot/Tomcat 不同</b>（Tomcat {@code connectionTimeout} 默认 20s）：本项目默认
+     * **不施加连接级隐式限制**，需要读空闲防护的部署请显式设置
+     * <b>（建议生产环境设置：不设则慢速客户端可长期占用连接）</b>。</p>
+     *
+     * <p>与历史的一次修复不要混淆：本键曾因漏进 {@code DEFAULTS} 而「文档写 30s、实际关闭」，
+     * 当时按**缺陷**修复；现在的默认关闭是**有意为之的策略选择**。</p>
+     */
     public static final String HTTP_READ_TIMEOUT = "server.http.read-timeout";
-    public static final long HTTP_READ_TIMEOUT_DEFAULT = 30000L;
+    public static final long HTTP_READ_TIMEOUT_DEFAULT = 0L;
 
     /**
      * 多段 Range（{@code multipart/byteranges}）允许的最大段数，默认 {@value #HTTP_MAX_RANGES_DEFAULT}
@@ -116,10 +126,6 @@ public final class PropertiesConstant {
      */
     public static final String ASYNC_REQUEST_TIMEOUT = "spring.mvc.async.request-timeout";
     public static final long ASYNC_REQUEST_TIMEOUT_DEFAULT = 30000L;
-
-    /** Async request timeout in milliseconds (默认值：30s). */
-    public static final String ASYNC_TIMEOUT = "server.async.timeout";
-    public static final long ASYNC_TIMEOUT_DEFAULT = 30000L;
 
     // ---- 优雅关闭 ----
 
@@ -353,6 +359,28 @@ public final class PropertiesConstant {
      */
     public static final String SERVLET_SESSION_PERSISTENT_EXCLUDE = "server.servlet.session.persistent-exclude";
 
+    /**
+     * 会话持久化的**反序列化类过滤器**规格（{@code java.io.ObjectInputFilter.Config#createFilter(String)} 语法，
+     * 分号分隔，例如 {@code java.util.*;io.springperf.web.*;!*}）。
+     * 空/未配置 = **不加过滤器**，与历史行为一致；配置后只放行规格内的类，其余一律拒绝
+     * （拒绝的文件走既有"坏文件容错"路径：warn + 丢弃）。仅在 {@code server.servlet.session.persistent=true} 时生效。
+     * <p>
+     * 该过滤器由 JDK 9+ 的 {@code java.io.ObjectInputFilter} 实现；本分支运行时含 JDK 8，故经反射调用
+     * （见 {@code FileHttpSessionStorage#parseDeserializationFilter}）。在 JDK 8 上配置本键会**启动失败**，
+     * 而不是静默不过滤。
+     * </p>
+     * <p>
+     * <b>本项目自有键，Boot 无对应物</b>（依据：对齐版本 {@code spring-boot-autoconfigure-3.5.16.jar} 的
+     * {@code spring-configuration-metadata.json} 中 {@code server.servlet.session.*} 共 13 个键：
+     * {@code cookie.name/same-site/secure/domain/max-age/http-only/comment/path/partitioned}、{@code persistent}、
+     * {@code store-dir}、{@code timeout}、{@code tracking-modes}；同版本元数据里含 filter/serial 的键均与反序列化无关）。
+     * 另注：{@code server.servlet.session.persistent} 与 {@code store-dir} 是 Boot 的 {@code SessionProperties}
+     * 在**内嵌容器**里的键，本项目在这里沿用同名键表达自己的落盘实现 —— 键名沿用，实现不同。
+     * </p>
+     */
+    public static final String SERVLET_SESSION_PERSISTENT_DESERIALIZATION_FILTER =
+            "server.servlet.session.persistent-deserialization-filter";
+
     /** 对齐 {@code spring.mvc.static-path-pattern}：全局静态资源映射前缀（默认 /**）。 */
     public static final String MVC_STATIC_PATH_PATTERN = "spring.mvc.static-path-pattern";
     public static final String MVC_STATIC_PATH_PATTERN_DEFAULT = "/**";
@@ -508,11 +536,17 @@ public final class PropertiesConstant {
     public static final long KEEP_ALIVE_TIMEOUT_DEFAULT = 0L;
 
     /**
-     * 对齐 Spring Boot {@code server.max-keep-alive-requests}：单 keep-alive 连接最大请求数（默认 100；<=0 表示不限）。
-     * 待专项实现（见路线图 P1 专项计划）。
+     * 对齐 Spring Boot {@code server.max-keep-alive-requests}：单 keep-alive 连接最大请求数（默认 0；<=0 表示不限）。
+     * 实现见 {@code KeepAliveConfig} / {@code KeepAliveHandler}。
+     *
+     * <p>默认 0 = 不限制（与 Tomcat 默认的 100 不同）：同样是「不施加连接级隐式限制」这一策略。</p>
+     *
+     * <p><b>注意「默认关闭」不带来性能收益</b>：该 handler 的 self time 实测为 0（只做
+     * {@code instanceof} + null 检查 + 自增 + 比较），故这里的理由是「不做隐式限制」，
+     * 不是「更快」。本键与 {@link #KEEP_ALIVE_TIMEOUT} 都为 0 时，{@code KeepAliveHandler} **不注入管线**。</p>
      */
     public static final String MAX_KEEP_ALIVE_REQUESTS = "server.max-keep-alive-requests";
-    public static final int MAX_KEEP_ALIVE_REQUESTS_DEFAULT = 100;
+    public static final int MAX_KEEP_ALIVE_REQUESTS_DEFAULT = 0;
 
     /**
      * 对齐 Spring Boot {@code server.max-swallow-size}：错误响应后吞掉请求 body 的上限（字节，默认 2MB；负数不限）。
@@ -617,9 +651,9 @@ public final class PropertiesConstant {
         DEFAULTS.put(HTTP_MAX_REQUEST_HEADER_SIZE, (long) HTTP_MAX_REQUEST_HEADER_SIZE_DEFAULT);
         DEFAULTS.put(SERVER_SHUTDOWN_GRACE_PERIOD, SERVER_SHUTDOWN_GRACE_PERIOD_DEFAULT);
         DEFAULTS.put(ASYNC_REQUEST_TIMEOUT, ASYNC_REQUEST_TIMEOUT_DEFAULT);
-        DEFAULTS.put(ASYNC_TIMEOUT, ASYNC_TIMEOUT_DEFAULT);
         DEFAULTS.put(HTTP_MAX_HEADER_SIZE, (long) HTTP_MAX_HEADER_SIZE_DEFAULT);
         DEFAULTS.put(KEEP_ALIVE_TIMEOUT, KEEP_ALIVE_TIMEOUT_DEFAULT);
+        DEFAULTS.put(HTTP_READ_TIMEOUT, HTTP_READ_TIMEOUT_DEFAULT);
         DEFAULTS.put(MAX_KEEP_ALIVE_REQUESTS, (long) MAX_KEEP_ALIVE_REQUESTS_DEFAULT);
         DEFAULTS.put(MAX_SWALLOW_SIZE, MAX_SWALLOW_SIZE_DEFAULT);
         DEFAULTS.put(MAX_HTTP_RESPONSE_HEADER_SIZE, (long) MAX_HTTP_RESPONSE_HEADER_SIZE_DEFAULT);
