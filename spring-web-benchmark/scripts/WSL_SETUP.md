@@ -167,7 +167,8 @@ spring-web-benchmark/benchmark-reports/
 
 结果与 JFR：
 - 服务端 JFR：WSL 内 `/tmp/perf-server.jfr`（启动命令自带 `-XX:StartFlightRecording`）
-- 客户端 JFR：`./scripts/wsl-benchmark.sh benchmark-perf 9092 -jvmArgsAppend "-XX:StartFlightRecording=filename=client.jfr,settings=profile"`
+- 客户端 JFR：`./scripts/wsl-benchmark.sh benchmark-perf 9092 -jvmArgsAppend "-XX:FlightRecorderOptions=stackdepth=1024 -XX:StartFlightRecording=filename=client.jfr,settings=profile"`
+  （`stackdepth` 不可省：JVM 默认 64 帧会让深栈样本 `truncated`、热点归因失真；脚本已自动兜底注入）
 - JMH 结果：控制台（或追加 `-rf json -rff target/jmh-results-external.json` 落盘）
 
 ## 5. 抢占验证清单（跑压测时同时观测）

@@ -30,16 +30,47 @@ import java.util.concurrent.TimeUnit;
 @State(Scope.Thread)
 public class BenchClientState {
 
-    public OkHttpClient client;
+    // 改为 private + 访问器：public 可变字段（PA_PUBLIC_PRIMITIVE_ATTRIBUTE）允许任意代码在
+    // 基准运行期替换请求对象，使测量结果失去意义。JMH 只要求状态对象本身可访问，字段封装不影响
+    // 基准生成代码（生成代码只负责把 state 传给基准方法）。
+    private OkHttpClient client;
 
-    public Request jsonRequest;
-    public Request getRequest;
-    public Request asyncRequest;
-    public Request bytesRequest;
-    public Request validRequest;
+    private Request jsonRequest;
+    private Request getRequest;
+    private Request asyncRequest;
+    private Request bytesRequest;
+    private Request validRequest;
 
-    public Request bytesLargeRequest;
-    public Request sseRequest;
+    private Request bytesLargeRequest;
+    private Request sseRequest;
+
+    public Request jsonRequest() {
+        return jsonRequest;
+    }
+
+    public Request getRequest() {
+        return getRequest;
+    }
+
+    public Request asyncRequest() {
+        return asyncRequest;
+    }
+
+    public Request bytesRequest() {
+        return bytesRequest;
+    }
+
+    public Request validRequest() {
+        return validRequest;
+    }
+
+    public Request bytesLargeRequest() {
+        return bytesLargeRequest;
+    }
+
+    public Request sseRequest() {
+        return sseRequest;
+    }
 
     // 预编码请求体，避免每次请求 OkHttp 的 writeUtf8 开销
     private static final byte[] ECHO_BODY_BYTES =
@@ -48,9 +79,11 @@ public class BenchClientState {
             BenchmarkConstants.VALIDATE_BODY.getBytes(StandardCharsets.UTF_8);
 
     /**
-     * @param actualPort 服务器实际绑定的端口（可能因 fallback 不同于配置端口）
+     * @param base
+     *            目标服务端 base URL，如 {@code http://localhost:9092/api}。 由调用方构造：in-process 模式传 localhost，external 模式传远端
+     *            host（如 WSL IP）。
      */
-    public void setup(int actualPort) {
+    public void setup(String base) {
         client = new OkHttpClient.Builder()
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
@@ -60,8 +93,6 @@ public class BenchClientState {
                 .protocols(Collections.singletonList(Protocol.HTTP_1_1))
                 .connectionPool(new ConnectionPool(128, 30, TimeUnit.SECONDS))
                 .build();
-
-        String base = "http://localhost:" + actualPort + BenchmarkConstants.CONTEXT_PATH;
 
         // byte[] 请求体避免 writeUtf8 开销
         jsonRequest = new Request.Builder()
@@ -100,7 +131,7 @@ public class BenchClientState {
                 .get()
                 .build();
 
-        }
+    }
 
     @TearDown(Level.Trial)
     public void cleanup() {
@@ -115,7 +146,12 @@ public class BenchClientState {
      */
     public byte[] executeAndConsume(Request request) throws Exception {
         try (Response response = client.newCall(request).execute()) {
-            byte[] body = response.body().bytes();
+            // Response.body() 声明为 @Nullable（空响应体时为 null）
+            okhttp3.ResponseBody responseBody = response.body();
+            if (responseBody == null) {
+                throw new RuntimeException("Empty response body for " + request.url());
+            }
+            byte[] body = responseBody.bytes();
             if (!response.isSuccessful()) {
                 throw new RuntimeException("Unexpected response: "
                         + response.code() + " " + body.length + "bytes");

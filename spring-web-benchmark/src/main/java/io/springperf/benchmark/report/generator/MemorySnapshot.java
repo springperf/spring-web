@@ -20,8 +20,8 @@ public class MemorySnapshot {
 
     public String getProfile() { return profile; }
     public String getJdkVersion() { return jdkVersion; }
-    public Map<String, Object> getHeap() { return heap; }
-    public Map<String, Object> getNonHeap() { return nonHeap; }
+    public Map<String, Object> getHeap() { return heap == null ? null : java.util.Collections.unmodifiableMap(heap); }
+    public Map<String, Object> getNonHeap() { return nonHeap == null ? null : java.util.Collections.unmodifiableMap(nonHeap); }
 
     public void setProfile(String v) { this.profile = v; }
     public void setJdkVersion(String v) { this.jdkVersion = v; }
