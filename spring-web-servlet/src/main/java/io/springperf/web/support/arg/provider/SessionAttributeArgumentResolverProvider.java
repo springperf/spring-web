@@ -32,7 +32,11 @@ public class SessionAttributeArgumentResolverProvider implements StaticArgumentR
     @Override
     public StaticArgumentResolver getResolver(MethodParameter parameter, MappingHandlerMethod mappingContext,
                                               WebContext webContext) {
+        // getParameterAnnotation 声明为 @Nullable（supports 已保证存在，这里仍显式兜底）
         SessionAttribute annotation = parameter.getParameterAnnotation(SessionAttribute.class);
+        if (annotation == null) {
+            return null;
+        }
         String name = StringUtils.hasText(annotation.name()) ? annotation.name() : parameter.getParameterName();
         final boolean required = annotation.required();
         final String attributeName = name;

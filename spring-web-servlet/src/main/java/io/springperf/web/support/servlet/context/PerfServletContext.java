@@ -87,10 +87,15 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
                 if (child.isDirectory()) {
                     deleteRecursively(child);
                 }
-                child.delete();
+                // 删除失败不静默：登记到 JVM 退出时再试（临时目录清理的兜底）
+                if (!child.delete()) {
+                    child.deleteOnExit();
+                }
             }
         }
-        dir.delete();
+        if (!dir.delete()) {
+            dir.deleteOnExit();
+        }
     }
 
     private void readConfig() {
@@ -657,7 +662,7 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
 
     // ===================== SessionCookieConfig =====================
 
-    private class PerfSessionCookieConfig implements SessionCookieConfig {
+    private static class PerfSessionCookieConfig implements SessionCookieConfig {
 
         private String name;
         private String domain;

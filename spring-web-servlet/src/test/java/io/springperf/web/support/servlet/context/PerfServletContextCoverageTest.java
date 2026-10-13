@@ -114,7 +114,11 @@ class PerfServletContextCoverageTest {
             assertEquals("BAR", ctx.getInitParameter("bar"));
             // init parameter names 应包含显式块键
             java.util.Set<String> names = new java.util.HashSet<>();
-            ctx.getInitParameterNames().asIterator().forEachRemaining(names::add);
+            // JDK 8 无 Enumeration.asIterator()（JDK 9+）：改用 hasMoreElements 循环
+            java.util.Enumeration<String> initNames = ctx.getInitParameterNames();
+            while (initNames.hasMoreElements()) {
+                names.add(initNames.nextElement());
+            }
             assertTrue(names.contains("foo"));
             assertTrue(names.contains("bar"));
         } finally {

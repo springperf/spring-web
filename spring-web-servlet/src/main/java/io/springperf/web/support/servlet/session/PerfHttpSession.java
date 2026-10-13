@@ -13,7 +13,6 @@ public class PerfHttpSession implements HttpSession {
     private final ServletContext servletContext;
     private final List<HttpSessionListener> sessionListeners;
     private final List<HttpSessionAttributeListener> attributeListeners;
-    private volatile boolean invalid;
     private volatile Runnable onInvalidateCallback;
     private volatile boolean newSession = true;
 
@@ -63,6 +62,10 @@ public class PerfHttpSession implements HttpSession {
         return data.getMaxInactiveInterval();
     }
 
+    // ---- 以下 5 个方法是 javax.servlet.http.HttpSession 的 @Deprecated 成员 ----
+    // 本分支（Servlet 4.0 / javax）的接口仍声明它们，故必须实现；master（jakarta Servlet 6.0）
+    // 已从接口移除，故那边没有这些方法。这不是「本分支漏删」，而是接口版本差异——
+    // 归一化比对时它们恒为残差，勿按漏改处理。
     @Override
     public javax.servlet.http.HttpSessionContext getSessionContext() {
         throw new UnsupportedOperationException("getSessionContext is deprecated and not supported");
@@ -144,8 +147,12 @@ public class PerfHttpSession implements HttpSession {
 
     @Override
     public void invalidate() {
-        checkValid();
-        this.invalid = true;
+        // 原子抢占失效状态后再执行销毁侧效应。若沿用「先 checkValid() 再 setInvalid(true)」，
+        // 并发 invalidate 可同时通过校验，导致 onInvalidateCallback 与 sessionDestroyed 各触发两次。
+        // 抢占失败即会话已失效，按 Servlet 规范语义抛 IllegalStateException（与 checkValid() 行为一致）。
+        if (!data.tryInvalidate()) {
+            throw new IllegalStateException("Session with id [" + data.getId() + "] has been invalidated");
+        }
         Map<String, Object> attrs = new java.util.HashMap<>(data.getAttributes());
         data.clearAttributes();
         for (Map.Entry<String, Object> entry : attrs.entrySet()) {
@@ -176,7 +183,7 @@ public class PerfHttpSession implements HttpSession {
     }
 
     public boolean isInvalid() {
-        return invalid;
+        return data.isInvalid();
     }
 
     @Override
@@ -202,7 +209,7 @@ public class PerfHttpSession implements HttpSession {
     }
 
     private void checkValid() {
-        if (invalid) {
+        if (data.isInvalid()) {
             throw new IllegalStateException("Session with id [" + data.getId() + "] has been invalidated");
         }
     }

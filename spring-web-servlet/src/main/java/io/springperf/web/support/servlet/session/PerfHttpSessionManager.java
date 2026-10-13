@@ -16,7 +16,6 @@ import javax.servlet.http.HttpSessionListener;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 
 @Slf4j
 public class PerfHttpSessionManager extends BaseWebComponent {
@@ -93,7 +92,9 @@ public class PerfHttpSessionManager extends BaseWebComponent {
         this.cookieName = webContext.getProps().get(COOKIE_NAME_KEY, DEFAULT_SESSION_COOKIE_NAME);
         this.cookieSecure = webContext.getProps().getBoolean(COOKIE_SECURE_KEY, false);
         String configuredSameSite = webContext.getProps().get(COOKIE_SAME_SITE_KEY, "");
-        this.sameSite = configuredSameSite.isEmpty() ? null : canonicalSameSite(configuredSameSite);
+        // get 声明为 @Nullable（此处默认值非空，兜底仅为契约完整）
+        this.sameSite = (configuredSameSite == null || configuredSameSite.isEmpty()) ? null
+                : canonicalSameSite(configuredSameSite);
         this.cookieDomain = webContext.getProps().get(COOKIE_DOMAIN_KEY, null);
         String maxAgeRaw = webContext.getProps().get(COOKIE_MAX_AGE_KEY, null);
         this.cookieMaxAge = -1;
@@ -126,10 +127,31 @@ public class PerfHttpSessionManager extends BaseWebComponent {
                 PropertiesConstant.SERVLET_SESSION_STORE_DIR_DEFAULT);
         String excludeRaw = webContext.getProps().get(PropertiesConstant.SERVLET_SESSION_PERSISTENT_EXCLUDE, null);
         java.util.Set<String> exclude = FileHttpSessionStorage.parseExcludeList(excludeRaw);
+        String filterSpec = webContext.getProps()
+                .get(PropertiesConstant.SERVLET_SESSION_PERSISTENT_DESERIALIZATION_FILTER, null);
+        // 规格非法（或 JDK 8 上配置了过滤器）时在此抛出：收紧项写错必须显形，不能悄悄退化成「不过滤」。
+        // 先校验再打日志——否则会先报「持久化已启用（含过滤器）」再抛异常，误导排障。
+        // 本分支的存储以**规格字符串**构造并在内部解析（JDK 8 无法持有 ObjectInputFilter 类型，
+        // 见 FileHttpSessionStorage.SET_OBJECT_INPUT_FILTER），故此处校验一次、构造时再解析一次；
+        // 二者都在启动期，代价可忽略。master 则持有实例并把实例传给存储构造函数。
+        Object deserializationFilter = FileHttpSessionStorage.parseDeserializationFilter(filterSpec);
         java.nio.file.Path dir = java.nio.file.Paths.get(storeDir);
-        log.info("Session persistence enabled (server.servlet.session.persistent=true), store-dir={}, exclude={}",
-                dir.toAbsolutePath(), exclude);
-        return new FileHttpSessionStorage(dir, exclude);
+        if (deserializationFilter == null) {
+            // 默认保持「不过滤」以免打断现有部署（功能优先），但必须让风险显形：
+            // 能往 store-dir 写文件的人，可在下次启动时让任意 classpath 上的类被反序列化。
+            // 配到 /tmp 之类全局可写目录时，这一点尤其要紧。
+            log.warn("Session persistence is enabled WITHOUT a deserialization filter ({} is unset), store-dir={}, "
+                    + "exclude={}: every class on the classpath may be deserialized from that directory, so anyone "
+                    + "able to write it could execute code on the next restart. To lock it down, allow only what you "
+                    + "actually store, e.g. "
+                    + "'java.lang.*;java.util.*;java.math.*;java.time.*;maxarray=1000;maxdepth=20;maxrefs=10000;!*' "
+                    + "(append your own packages; or '*' to keep allowing everything).",
+                    PropertiesConstant.SERVLET_SESSION_PERSISTENT_DESERIALIZATION_FILTER, dir.toAbsolutePath(), exclude);
+        } else {
+            log.info("Session persistence enabled, store-dir={}, exclude={}, deserialization-filter={}",
+                    dir.toAbsolutePath(), exclude, filterSpec.trim());
+        }
+        return new FileHttpSessionStorage(dir, exclude, filterSpec);
     }
 
     @Override
@@ -150,11 +172,13 @@ public class PerfHttpSessionManager extends BaseWebComponent {
     }
 
     public List<HttpSessionListener> getSessionListeners() {
-        return sessionListeners;
+        // 只读视图；字段为 null 时保持原有返回 null 的行为
+        return sessionListeners == null ? null : Collections.unmodifiableList(sessionListeners);
     }
 
     public List<HttpSessionAttributeListener> getAttributeListeners() {
-        return attributeListeners;
+        // 只读视图（与 getSessionListeners 同型）；字段为 null 时保持原有返回 null 的行为
+        return attributeListeners == null ? null : Collections.unmodifiableList(attributeListeners);
     }
 
     public String getCookieName() {
@@ -240,15 +264,13 @@ public class PerfHttpSessionManager extends BaseWebComponent {
     }
 
     public PerfHttpSession changeSessionId(PerfHttpSession oldSession) {
-        String oldId = oldSession.getData().getId();
-        // Create new session data with new ID but same attributes
-        HttpSessionData newData = storage.createSession();
         HttpSessionData oldData = oldSession.getData();
-        for (Map.Entry<String, Object> entry : oldData.getAttributes().entrySet()) {
-            newData.setAttribute(entry.getKey(), entry.getValue());
-        }
-        newData.setMaxInactiveInterval(oldData.getMaxInactiveInterval());
-        storage.removeSession(oldId);
+        String oldId = oldData.getId();
+        // 属性复制必须与「旧会话摘除」在同一个临界区内：attributes 是 ConcurrentHashMap，
+        // 其迭代器弱一致——若边复制边有并发写，会漏掉部分属性（登录态/token 静默丢失）。
+        // 先在旧 id 的条带锁内摘除旧会话，此后并发 saveSession 会因 !containsKey(oldId)
+        // 而被拒（见 FileHttpSessionStorage.saveSession 的守卫），复制期间不再有新写入。
+        HttpSessionData newData = storage.replaceSessionCopyingAttributes(oldId, oldData);
         PerfHttpSession newSession = new PerfHttpSession(newData, servletContext, sessionListeners, attributeListeners);
         newSession.setNotNew();
         newSession.setOnInvalidateCallback(() -> storage.removeSession(newData.getId()));

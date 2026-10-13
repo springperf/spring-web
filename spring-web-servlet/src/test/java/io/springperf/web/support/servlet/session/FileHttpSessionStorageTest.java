@@ -6,21 +6,30 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.Serializable;
+import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * {@link FileHttpSessionStorage} 单元测试：持久化 / 重启恢复 / 过期清理 / 坏文件容错 /
@@ -53,6 +62,26 @@ class FileHttpSessionStorageTest {
 
     /** 不可序列化的属性值（无 Serializable）。 */
     private static final class NotSerializable {
+    }
+
+    /**
+     * 路径安全：id 含分隔符 / 上跳片段时必须在任何文件操作前失败。
+     * <p>
+     * 起因是一次审查：{@code fileOf} 直接把 id 拼进路径，安全性依赖「调用方只传自己生成的 id」这一跨方法约定。
+     * 现在校验落在 {@code fileOf} 内，本用例把它固定下来——若有人为了「按请求懒加载」而放行外来 id，此处会先红。
+     * </p>
+     */
+    @Test
+    void fileOfRejectsSessionIdsThatCouldEscapeStoreDir() {
+        for (String unsafe : new String[] {"../../etc/passwd", "..\\..\\windows\\system32\\x", "a/b", "..", ""}) {
+            assertThrows(IllegalArgumentException.class, () -> storage.removeSession(unsafe),
+                    "应拒绝不安全 id: " + unsafe);
+        }
+        // 正常 id（含连字符等普通字符）不受影响
+        HttpSessionData data = storage.createSession();
+        assertNotNull(storage.getSession(data.getId()));
+        storage.removeSession(data.getId());
+        assertNull(storage.getSession(data.getId()));
     }
 
     @Test
@@ -235,5 +264,317 @@ class FileHttpSessionStorageTest {
         assertEquals(64, a.getId().length(), "32 字节 → 64 位十六进制");
         assertTrue(a.getId().matches("[0-9a-f]{64}"));
         assertFalse(a.getId().equals(b.getId()));
+    }
+
+    /**
+     * 反序列化过滤：同一份**格式正确**的文件，不加过滤器会载入（见 {@link #restart_restoresNonExpiredSession()}），
+     * 加了拒绝一切的过滤器则走既有坏文件容错路径（丢弃 + 删除）。两半合起来才说明「默认不变、收紧有效」。
+     * <p>
+     * 注意：本分支的存储按 JDK 8 API 约束实现，过滤器规格以**字符串**传入（master 传的是
+     * {@code ObjectInputFilter} 实例），语义相同。
+     * </p>
+     */
+    @Test
+    void deserializationFilter_discardsWellFormedFileThatWouldOtherwiseLoad() throws Exception {
+        // 非空规格要求 JDK 9+ 的 java.io.ObjectInputFilter；JDK 8 上构造会 fail fast（见 failFastOnJdk8 用例），故跳过
+        objectInputFilterTypeOrSkip();
+        HttpSessionData data = storage.createSession();
+        data.setAttribute("k", "v");
+        storage.saveSession(data);
+        Path file = tempDir.resolve(data.getId() + ".session");
+        assertTrue(Files.exists(file), "落盘应成功");
+
+        FileHttpSessionStorage filtered = new FileHttpSessionStorage(tempDir, Collections.emptySet(), "!*");
+        try {
+            assertEquals(0, filtered.getActiveSessionCount(), "被过滤器拒绝的文件不应载入");
+            assertFalse(Files.exists(file), "被过滤器拒绝的文件应被删除");
+        } finally {
+            filtered.shutdown();
+        }
+    }
+
+    /**
+     * 启动清扫只删「足够旧」的 {@code *.tmp}：崩溃遗留的 tmp 不再永久累积，而**另一实例**正在写的 tmp
+     * （刚创建、mtime 很新）必须留下 —— 否则共享 store-dir 的两个实例会互相破坏落盘。
+     */
+    @Test
+    void startup_sweepsStaleTmpButKeepsFreshTmp() throws Exception {
+        Path stale = tempDir.resolve("deadbeef.tmp");
+        Files.write(stale, new byte[] {1, 2, 3});
+        Files.setLastModifiedTime(stale, FileTime.fromMillis(System.currentTimeMillis() - 2 * 3_600_000L));
+        Path fresh = tempDir.resolve("cafebabe.tmp");
+        Files.write(fresh, new byte[] {4, 5, 6});
+
+        FileHttpSessionStorage restarted = new FileHttpSessionStorage(tempDir);
+        try {
+            assertFalse(Files.exists(stale), "超过年龄阈值的遗留 tmp 应被清扫");
+            assertTrue(Files.exists(fresh), "刚创建的 tmp 可能属于另一个实例，不能被删");
+        } finally {
+            restarted.shutdown();
+        }
+    }
+
+    @Test
+    void deserializationFilter_blankMeansNoFiltering() {
+        assertNull(FileHttpSessionStorage.parseDeserializationFilter(null), "未配置 = 不过滤（默认不变）");
+        assertNull(FileHttpSessionStorage.parseDeserializationFilter("   "), "全空白 = 不过滤");
+    }
+
+    /**
+     * 非空规格才需要 JDK 9+ 的 {@code java.io.ObjectInputFilter}：JDK 9+ 上应解析为过滤器实例。
+     */
+    @Test
+    void deserializationFilter_nonBlankSpec_parsedOnJdk9OrLater() throws Exception {
+        objectInputFilterTypeOrSkip();
+        assertNotNull(FileHttpSessionStorage.parseDeserializationFilter("java.util.*;!*"));
+    }
+
+    /**
+     * JDK 8 上显式配置反序列化过滤规格必须 fail fast，而不是静默放过（安全配置写错必须显形）；
+     * 这与「默认不过滤」的既定取舍不冲突 —— 只有显式配置非空规格才会走到这里。
+     */
+    @Test
+    void deserializationFilter_nonBlankSpec_failsFastOnJdk8() {
+        assumeTrue(!objectInputFilterAvailable(), "仅在 JDK 8（无 java.io.ObjectInputFilter）上验证 fail-fast");
+        assertThrows(IllegalStateException.class,
+                () -> FileHttpSessionStorage.parseDeserializationFilter("java.util.*;!*"));
+    }
+
+    /** 当前 JVM 是否存在 {@code java.io.ObjectInputFilter}（JDK 9+）。 */
+    private static boolean objectInputFilterAvailable() {
+        try {
+            Class.forName("java.io.ObjectInputFilter");
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
+    }
+
+    /**
+     * 过滤器拒绝与「文件损坏」抛出的是同一种异常（{@code InvalidClassException}），只有消息文本不同。
+     * 本类不依赖消息文本，而是自行记下被拒的类名 —— 这里锁定该记录逻辑。
+     *
+     * <p><b>与 master 的差异</b>：master 直接写 {@code ObjectInputFilter} 类型；2.7.x 主代码禁引 JDK 9+ API
+     * （见 {@code FileHttpSessionStorage.SET_OBJECT_INPUT_FILTER}），故这里用 {@code Proxy} + 反射构造同样的输入，
+     * 断言的契约完全相同。JDK 8 上该类型不存在，用 {@code assumeTrue} 跳过。</p>
+     */
+    @Test
+    void recordingRejections_capturesFirstRejectedClass() throws Exception {
+        Class<?> filterType = objectInputFilterTypeOrSkip();
+        AtomicReference<String> rejected = new AtomicReference<>();
+
+        Object wrapper = FileHttpSessionStorage.recordingRejections(fakeFilter(filterType, "REJECTED"), rejected);
+        Object status = checkInput(wrapper, filterType, HashMap.class);
+
+        assertEquals("REJECTED", String.valueOf(status));
+        assertEquals("java.util.HashMap", rejected.get(), "被拒的类名应被记下（用户据此知道要放行什么）");
+    }
+
+    @Test
+    void recordingRejections_ignoresAllowedClasses() throws Exception {
+        Class<?> filterType = objectInputFilterTypeOrSkip();
+        AtomicReference<String> rejected = new AtomicReference<>();
+
+        Object wrapper = FileHttpSessionStorage.recordingRejections(fakeFilter(filterType, "ALLOWED"), rejected);
+        Object status = checkInput(wrapper, filterType, String.class);
+
+        assertEquals("ALLOWED", String.valueOf(status));
+        assertNull(rejected.get(), "放行时不该留下被拒记录");
+    }
+
+    @Test
+    void recordingRejections_unspecifiedStatus_leavesRecordUntouched() throws Exception {
+        Class<?> filterType = objectInputFilterTypeOrSkip();
+        AtomicReference<String> rejected = new AtomicReference<>();
+
+        Object wrapper = FileHttpSessionStorage.recordingRejections(fakeFilter(filterType, "UNDECIDED"), rejected);
+        Object status = checkInput(wrapper, filterType, String.class);
+
+        assertEquals("UNDECIDED", String.valueOf(status));
+        assertNull(rejected.get(), "只有 REJECTED 才算被拒");
+    }
+
+    /** {@code java.io.ObjectInputFilter} 类型；JDK 8 上不存在该类型 → 跳过用例。 */
+    private static Class<?> objectInputFilterTypeOrSkip() throws ClassNotFoundException {
+        Class<?> filterType;
+        try {
+            filterType = Class.forName("java.io.ObjectInputFilter");
+        } catch (ClassNotFoundException e) {
+            assumeTrue(false, "JDK 9+ 才有 java.io.ObjectInputFilter");
+            throw e;
+        }
+        return filterType;
+    }
+
+    /** 假的过滤器：{@code checkInput} 恒返回给定的 Status 名。 */
+    private static Object fakeFilter(Class<?> filterType, String statusName) throws Exception {
+        Object status = Class.forName("java.io.ObjectInputFilter$Status").getField(statusName).get(null);
+        return Proxy.newProxyInstance(FileHttpSessionStorageTest.class.getClassLoader(),
+                new Class<?>[]{filterType}, (proxy, method, args) -> {
+                    if ("checkInput".equals(method.getName())) {
+                        return status;
+                    }
+                    if ("toString".equals(method.getName())) {
+                        return "fake-filter:" + statusName;
+                    }
+                    if ("hashCode".equals(method.getName())) {
+                        return System.identityHashCode(proxy);
+                    }
+                    return args != null && args.length == 1 && proxy == args[0];
+                });
+    }
+
+    /** 以假的 {@code FilterInfo}（{@code serialClass()} 返回给定类）驱动包装器的 {@code checkInput}。 */
+    private static Object checkInput(Object wrapper, Class<?> filterType, Class<?> serialClass) throws Exception {
+        Class<?> infoType = Class.forName("java.io.ObjectInputFilter$FilterInfo");
+        Object info = Proxy.newProxyInstance(FileHttpSessionStorageTest.class.getClassLoader(),
+                new Class<?>[]{infoType}, (proxy, method, args) ->
+                        "serialClass".equals(method.getName()) ? serialClass : null);
+        return filterType.getMethod("checkInput", infoType).invoke(wrapper, info);
+    }
+
+    /**
+     * 同一会话并发落盘：文件内容必须是某一次<b>完整</b>写入的结果，不得出现半写/相互截断。
+     * <p>
+     * 修复前「写 tmp → ATOMIC_MOVE」两步无互斥，且 tmp 名固定为 {@code <id>.tmp}：并发 save 会交错覆盖同一个临时文件。
+     * </p>
+     */
+    @Test
+    void saveSession_concurrentWrites_keepsFileConsistent() throws Exception {
+        HttpSessionData data = storage.createSession();
+        Set<String> written = ConcurrentHashMap.newKeySet();
+        int n = 8;
+        runConcurrently(n, () -> {
+            String value = Thread.currentThread().getName();
+            written.add(value);
+            data.setAttribute("k", value);
+            storage.saveSession(data);
+        });
+
+        Path file = tempDir.resolve(data.getId() + ".session");
+        assertTrue(Files.exists(file), "落盘应成功");
+
+        // 另开一个实例读盘：文件必须能被完整反序列化，且内容恰好是某个写线程的那一次完整写入
+        FileHttpSessionStorage reloaded = new FileHttpSessionStorage(tempDir);
+        try {
+            HttpSessionData restored = reloaded.getSession(data.getId());
+            assertNotNull(restored, "磁盘上的会话应可被完整反序列化");
+            assertTrue(written.contains(String.valueOf(restored.getAttribute("k"))),
+                    "落盘内容应是某次完整写入，而非半写或交错结果");
+        } finally {
+            reloaded.shutdown();
+        }
+        try (Stream<Path> files = Files.list(tempDir)) {
+            assertTrue(files.noneMatch(p -> p.toString().endsWith(".tmp")), "并发写不应残留 tmp 文件");
+        }
+    }
+
+    /**
+     * invalidate 的落点 {@code removeSession} 与并发 save 竞态：文件不得被写回 —— 否则失效会话在重启后被恢复（会话复活）。
+     * <p>
+     * 两种交错都以「文件不存在」收束：remove 先持锁时 save 取锁后重查内存发现会话已摘除而放弃；
+     * save 先持锁时写完后被紧随的 remove 删掉。
+     * </p>
+     */
+    @Test
+    void removeSession_racingWithSave_doesNotResurrectSession() throws Exception {
+        HttpSessionData data = storage.createSession();
+        data.setAttribute("k", "v");
+        storage.saveSession(data);
+        Path file = tempDir.resolve(data.getId() + ".session");
+        assertTrue(Files.exists(file), "前置：落盘应成功");
+
+        CountDownLatch start = new CountDownLatch(1);
+        int rounds = 200;
+        CountDownLatch done = new CountDownLatch(2);
+        Thread saver = new Thread(() -> {
+            try {
+                start.await();
+                for (int i = 0; i < rounds; i++) {
+                    storage.saveSession(data);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } finally {
+                done.countDown();
+            }
+        });
+        Thread remover = new Thread(() -> {
+            try {
+                start.await();
+                storage.removeSession(data.getId());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } finally {
+                done.countDown();
+            }
+        });
+        saver.start();
+        remover.start();
+        start.countDown();
+        assertTrue(done.await(30, TimeUnit.SECONDS), "竞态任务未在时限内结束");
+
+        assertFalse(Files.exists(file), "已失效的会话不得被并发落盘写回");
+        assertNull(storage.getSession(data.getId()), "会话不应在内存中复活");
+    }
+
+    /**
+     * 过期扫除的原子性契约：{@code sweepExpired} 摘除一个过期会话时，**必须同时删掉它的文件**；
+     * 未过期的会话则两者都不动。
+     * <p>
+     * 起因是一次审查：旧实现用 {@code sessions.values().removeIf(...)}，把「删文件」放在写锁内、
+     * 「摘除内存条目」交给 CHM 在谓词返回后才做。两步分离产生的窗口里，并发 {@code saveSession}
+     * 能通过 {@code !sessions.containsKey(id)} 守卫（过期会话不属于 {@code isInvalid()}）把刚删掉的
+     * 文件写回，重启时被 {@code loadExistingSessions} 当未过期会话加载 —— <b>过期会话复活</b>。
+     * 修复把「条件移除 + 删文件」收进同一把写锁。
+     * </p>
+     */
+    @Test
+    void sweepExpired_removesEntryAndFile_together() throws Exception {
+        HttpSessionData expired = storage.createSession();
+        expired.setMaxInactiveInterval(1);
+        expired.setLastAccessedTime(System.currentTimeMillis() - 10_000L);
+        expired.setAttribute("v", new SerializableValue("dead"));
+        storage.saveSession(expired);
+
+        HttpSessionData alive = storage.createSession();
+        alive.setMaxInactiveInterval(3600);
+        alive.setAttribute("v", new SerializableValue("live"));
+        storage.saveSession(alive);
+
+        Path expiredFile = tempDir.resolve(expired.getId() + ".session");
+        Path aliveFile = tempDir.resolve(alive.getId() + ".session");
+        assertTrue(Files.exists(expiredFile));
+        assertTrue(Files.exists(aliveFile));
+
+        storage.sweepExpired(System.currentTimeMillis());
+
+        // 过期：内存与磁盘一起消失
+        assertNull(storage.getSession(expired.getId()), "过期会话应从内存摘除");
+        assertFalse(Files.exists(expiredFile), "过期会话的文件应同时删除（否则重启复活）");
+        // 未过期：两者都保留
+        assertNotNull(storage.getSession(alive.getId()), "未过期会话不应被摘除");
+        assertTrue(Files.exists(aliveFile), "未过期会话的文件不应被删");
+    }
+
+    /** 起 n 个线程同时执行 action，全部结束后才返回。 */
+    private static void runConcurrently(int n, Runnable action) throws InterruptedException {
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(n);
+        for (int i = 0; i < n; i++) {
+            Thread t = new Thread(() -> {
+                try {
+                    start.await();
+                    action.run();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    done.countDown();
+                }
+            });
+            t.start();
+        }
+        start.countDown();
+        assertTrue(done.await(30, TimeUnit.SECONDS), "并发任务未在时限内结束");
     }
 }

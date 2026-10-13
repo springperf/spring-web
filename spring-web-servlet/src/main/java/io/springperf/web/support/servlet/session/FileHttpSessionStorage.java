@@ -1,8 +1,9 @@
 package io.springperf.web.support.servlet.session;
 
-import org.springframework.lang.Nullable;
+import io.springperf.web.context.PropertiesConstant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.lang.Nullable;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -10,17 +11,21 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.SecureRandom;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
 
 /**
@@ -33,6 +38,10 @@ import java.util.stream.Stream;
  *   <li><b>原子写</b>：先写 {@code <id>.tmp}，再 {@code ATOMIC_MOVE} 替换目标，避免半写损坏。</li>
  *   <li><b>不可序列化属性跳过</b>：逐属性序列化，失败者跳过并 warn，不影响其余属性与整个会话。</li>
  *   <li><b>坏文件容错</b>：启动加载时反序列化失败（损坏 / 类版本不匹配）跳过并 warn，不影响启动。</li>
+ *   <li><b>可选反序列化过滤</b>：构造时可传入来自 {@code
+ *       server.servlet.session.persistent-deserialization-filter} 的规格，只放行规格内的类；不传 = 不过滤。
+ *       本分支按 JDK 8 API 约束实现（见 {@link #parseDeserializationFilter}），故经反射调用 JDK 9+ 的
+ *       {@code java.io.ObjectInputFilter}。</li>
  *   <li><b>内存优先</b>：运行时读写走内存 map，落盘仅用于重启恢复。</li>
  * </ul>
  */
@@ -43,13 +52,65 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
     private static final long CLEANUP_INTERVAL_MS = 60_000L;
     private static final String FILE_SUFFIX = ".session";
     private static final String TMP_SUFFIX = ".tmp";
+    /** 启动清扫 {@code *.tmp} 的年龄阈值：避免误删**另一个实例**正在写的 tmp。 */
+    private static final long STALE_TMP_AGE_MS = 3_600_000L;
 
     private static final SecureRandom SESSION_ID_RANDOM = new SecureRandom();
     private static final char[] HEX = "0123456789abcdef".toCharArray();
 
+    /**
+     * {@code ObjectInputStream#setObjectInputFilter(java.io.ObjectInputFilter)} 的反射句柄。
+     * <p>
+     * <b>为什么用反射（与 master 的差异，勿当漏改）</b>：master（Spring Boot 3.5 / JDK 17+）直接依赖
+     * {@code java.io.ObjectInputFilter}；本分支文档化的运行时是 <b>JDK 8 / 11 / 17</b>，且全仓主代码零 JDK 9+ API。
+     * 若在此直接引用该类型，JDK 8 上加载本类即 {@code NoClassDefFoundError}（把「可选加固」变成「整个持久化不可用」）。
+     * 反射句柄在 JDK 8 上解析失败即为 {@code null}，本类仍可正常加载；配置了过滤规格时由
+     * {@link #parseDeserializationFilter} 显式 fail fast，不做静默降级。
+     * </p>
+     */
+    @Nullable
+    private static final Method SET_OBJECT_INPUT_FILTER = resolveSetObjectInputFilter();
+
+    private static final String FILTER_TYPE_NAME = "java.io.ObjectInputFilter";
+    private static final String FILTER_CONFIG_TYPE_NAME = "java.io.ObjectInputFilter$Config";
+    private static final String FILTER_INFO_TYPE_NAME = "java.io.ObjectInputFilter$FilterInfo";
+    /** {@code ObjectInputFilter.Status.REJECTED} 的名字；按名字比对，避免引用 JDK 9+ 的嵌套枚举类型。 */
+    private static final String REJECTED_STATUS_NAME = "REJECTED";
+
+    /**
+     * {@code FilterInfo#serialClass()} 的反射句柄。必须从**公开接口** {@code ObjectInputFilter$FilterInfo}
+     * 上取：JDK 传入的实参是实现该接口的包私有类，从其实例类取方法再 invoke 会因类不可访问而失败。
+     */
+    @Nullable
+    private static final Method FILTER_INFO_SERIAL_CLASS = resolveFilterInfoSerialClass();
+
     private final Path storeDir;
+    /** {@code storeDir} 的规范化绝对路径：仅用于 {@link #fileOf} 的越界判定（保持 {@link #getStoreDir()} 原值不变）。 */
+    private final Path storeDirNormalized;
     private final Set<String> excludeAttributes;
+    /**
+     * 可选的类过滤器实例（{@code java.io.ObjectInputFilter}）；null = 不过滤（默认，与历史行为一致）。
+     * 声明为 {@code Object} 以避免在 JDK 8 上解析该类型。
+     */
+    @Nullable
+    private final Object deserializationFilter;
     private final ConcurrentMap<String, HttpSessionData> sessions = new ConcurrentHashMap<>();
+    /**
+     * 会话写锁（分条带）。
+     * <p>
+     * 落盘是「先写 {@code <id>.tmp} 再 ATOMIC_MOVE」两步，同一会话并发 save 会交错写同一个 tmp 名，
+     * 出现相互截断/半写；{@code saveSession} 与 {@code removeSession}（{@code invalidate} 的落点）并发时，
+     * 删除之后的那次 move 还会把已失效会话写回磁盘 —— 重启后被恢复，即「会话复活」。二者都要靠互斥消除。
+     * </p>
+     * <p>
+     * 用<b>固定条带</b>而非「每会话一把锁的 map」：后者必须在写完后移除条目以免随会话数无界增长，
+     * 而移除与 {@code computeIfAbsent} 之间存在窗口（持有旧锁的等待者拿到的锁已不在表里，新来者另建一把）
+     * ——互斥就此失效。条带数量恒定（与本类生命周期一致），没有移除，也没有这个窗口；
+     * 代价只是哈希冲突的不同会话偶尔串行一次磁盘写。
+     * </p>
+     */
+    private static final int WRITE_LOCK_STRIPES = 64;
+    private final ReentrantLock[] writeLocks = new ReentrantLock[WRITE_LOCK_STRIPES];
     private final Thread cleanupThread;
 
     public FileHttpSessionStorage(Path storeDir) {
@@ -57,8 +118,23 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
     }
 
     public FileHttpSessionStorage(Path storeDir, Set<String> excludeAttributes) {
+        this(storeDir, excludeAttributes, null);
+    }
+
+    /**
+     * @param deserializationFilterSpec 反序列化过滤规格（JEP 290 语法）；空白/null = 不过滤。
+     *            非空白时要求 JDK 9+（{@code java.io.ObjectInputFilter}），JDK 8 上抛
+     *            {@link IllegalStateException} 而非静默放过。
+     */
+    public FileHttpSessionStorage(Path storeDir, Set<String> excludeAttributes,
+                                  @Nullable String deserializationFilterSpec) {
         this.storeDir = storeDir;
+        this.storeDirNormalized = storeDir.toAbsolutePath().normalize();
         this.excludeAttributes = excludeAttributes != null ? excludeAttributes : Collections.emptySet();
+        this.deserializationFilter = parseDeserializationFilter(deserializationFilterSpec);
+        for (int i = 0; i < WRITE_LOCK_STRIPES; i++) {
+            writeLocks[i] = new ReentrantLock();
+        }
         try {
             Files.createDirectories(storeDir);
         } catch (IOException e) {
@@ -70,11 +146,144 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
         this.cleanupThread.start();
     }
 
-    /** 启动加载：扫描目录中所有 {@code *.session} 文件，反序列化未过期会话到内存。 */
+    /**
+     * 把 {@code ObjectInputFilter.Config#createFilter(String)} 规格解析为过滤器实例：空 / 全空白 → {@code null}
+     * （不过滤，与历史行为一致）。规格非法时**抛异常**而不是静默放过：这是收紧项，写错必须显形，
+     * 否则会以为已加固而其实没有。
+     * <p>
+     * 经反射调用 JDK 9+ 的 {@code java.io.ObjectInputFilter}：本分支需在 JDK 8 上加载本类，
+     * 直接引用该类型会导致类加载失败。JDK 8 上配置了规格时显式失败（不静默忽略安全配置）。
+     * </p>
+     *
+     * @return 过滤器实例（{@code java.io.ObjectInputFilter}）或 null
+     */
+    @Nullable
+    static Object parseDeserializationFilter(@Nullable String spec) {
+        if (spec == null || spec.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            Class<?> configType = Class.forName(FILTER_CONFIG_TYPE_NAME);
+            Method createFilter = configType.getMethod("createFilter", String.class);
+            return createFilter.invoke(null, spec.trim());
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException(
+                    PropertiesConstant.SERVLET_SESSION_PERSISTENT_DESERIALIZATION_FILTER
+                            + " requires JDK 9+ (java.io.ObjectInputFilter is unavailable on this JVM): " + spec,
+                    e);
+        } catch (InvocationTargetException e) {
+            throw new IllegalStateException("Invalid session deserialization filter spec: " + spec, e.getCause());
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Failed to build session deserialization filter: " + spec, e);
+        }
+    }
+
+    @Nullable
+    private static Method resolveSetObjectInputFilter() {
+        try {
+            return ObjectInputStream.class.getMethod("setObjectInputFilter", Class.forName(FILTER_TYPE_NAME));
+        } catch (ReflectiveOperationException e) {
+            // JDK 8：无该 API。不是错误，仅表示无法启用可选的反序列化过滤。
+            return null;
+        }
+    }
+
+    @Nullable
+    private static Method resolveFilterInfoSerialClass() {
+        try {
+            return Class.forName(FILTER_INFO_TYPE_NAME).getMethod("serialClass");
+        } catch (ReflectiveOperationException e) {
+            // JDK 8：无该类型。见 resolveSetObjectInputFilter。
+            return null;
+        }
+    }
+
+    /**
+     * 包一层过滤器，记下本次读取中第一个被拒绝的类名。
+     *
+     * <p><b>必要性</b>：JEP 290 拒绝时抛的是普通 {@code InvalidClassException}（消息含
+     * {@code filter status: REJECTED}），与「文件损坏 / serialVersionUID 不匹配」抛的异常类型<b>完全相同</b>。
+     * 靠 JDK 消息文本区分太脆弱，故自行记录类名 —— 用户在收紧白名单时能看到该放行哪个类，
+     * 而不是只看到一行「文件损坏」。</p>
+     *
+     * <p><b>2.7.x 的等价写法（与 master 的差异，勿当漏改）</b>：master 直接写
+     * {@code info -> { ... delegate.checkInput(info) ... }} 的 lambda；本分支主代码禁引 JDK 9+ API
+     * （见 {@link #SET_OBJECT_INPUT_FILTER}），故用 {@link Proxy} 动态实现同一接口：判定逻辑与方法体
+     * 一一对应，只是把「编译期实现的接口」换成「运行期代理」。代理仅在 JDK 9+ 且配置了过滤规格时创建
+     * （{@link #parseDeserializationFilter} 在 JDK 8 上遇到非空规格会显式失败），且只用于**启动期**读盘，
+     * 不在请求路径上。</p>
+     *
+     * <p>JDK 8（拿不到接口类型）时原样返回 delegate —— 该路径实际不可达（无过滤器实例），仅为防御。</p>
+     */
+    static Object recordingRejections(Object delegate, AtomicReference<String> rejectedClass) {
+        Class<?> filterType;
+        try {
+            filterType = Class.forName(FILTER_TYPE_NAME);
+        } catch (ClassNotFoundException e) {
+            return delegate;
+        }
+        return Proxy.newProxyInstance(FileHttpSessionStorage.class.getClassLoader(), new Class<?>[]{filterType},
+                (proxy, method, args) -> {
+                    Object status = method.invoke(delegate, args);
+                    if ("checkInput".equals(method.getName()) && REJECTED_STATUS_NAME.equals(String.valueOf(status))) {
+                        rejectedClass.compareAndSet(null, serialClassNameOf(args));
+                    }
+                    return status;
+                });
+    }
+
+    /** 取 {@code FilterInfo.serialClass()} 的类名；取不到时返回 {@code "unknown"}（不阻断读取）。 */
+    private static String serialClassNameOf(@Nullable Object[] args) {
+        Method serialClass = FILTER_INFO_SERIAL_CLASS;
+        if (args == null || args.length == 0 || args[0] == null || serialClass == null) {
+            return "unknown";
+        }
+        try {
+            Object type = serialClass.invoke(args[0]);
+            return type instanceof Class ? ((Class<?>) type).getName() : "unknown";
+        } catch (ReflectiveOperationException e) {
+            return "unknown";
+        }
+    }
+
+    /**
+     * 启动清扫遗留的 {@code *.tmp}，只删「足够旧」的（见 {@link #STALE_TMP_AGE_MS}）。
+     * <p>
+     * {@code <id>.tmp → <id>.session} 的 ATOMIC_MOVE 是两步的，进程在两步之间被杀就会留下 tmp；
+     * 而启动扫描只认 {@code *.session}，这些文件原先会永久累积。年龄阈值是为了不误删另一个实例正在写的 tmp。
+     * </p>
+     */
+    private void sweepStaleTmpFiles() {
+        long cutoff = System.currentTimeMillis() - STALE_TMP_AGE_MS;
+        try (Stream<Path> files = Files.list(storeDir)) {
+            files.filter(p -> {
+                Path name = p.getFileName();
+                return name != null && name.toString().endsWith(TMP_SUFFIX);
+            }).forEach(path -> {
+                try {
+                    if (Files.getLastModifiedTime(path).toMillis() < cutoff) {
+                        log.info("Removing stale session temp file {}", path);
+                        deleteFileQuietly(path);
+                    }
+                } catch (IOException e) {
+                    log.debug("Failed to inspect session temp file {}", path, e);
+                }
+            });
+        } catch (IOException e) {
+            log.warn("Failed to sweep session temp files in {}", storeDir, e);
+        }
+    }
+
+    /** 启动加载：清扫遗留 tmp，再扫描目录中所有 {@code *.session} 文件，反序列化未过期会话到内存。 */
     private void loadExistingSessions() {
+        sweepStaleTmpFiles();
         long now = System.currentTimeMillis();
         try (Stream<Path> files = Files.list(storeDir)) {
-            files.filter(p -> p.getFileName().toString().endsWith(FILE_SUFFIX)).forEach(path -> {
+            // Path.getFileName() 声明为 @Nullable：无文件名的条目直接跳过
+            files.filter(p -> {
+                Path name = p.getFileName();
+                return name != null && name.toString().endsWith(FILE_SUFFIX);
+            }).forEach(path -> {
                 HttpSessionData data = readSessionFile(path);
                 if (data == null) {
                     return;
@@ -94,23 +303,52 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
         }
     }
 
-    /** 读取单个会话文件；损坏或不可反序列化时返回 null 并删除坏文件（容错）。 */
+    /** 读取单个会话文件；损坏、被过滤器拒绝或不可反序列化时返回 null 并删除坏文件（容错）。 */
     @Nullable
     private HttpSessionData readSessionFile(Path path) {
+        AtomicReference<String> rejectedClass = new AtomicReference<>();
         try {
             byte[] bytes = Files.readAllBytes(path);
-            ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(bytes));
-            Object obj = ois.readObject();
-            if (obj instanceof HttpSessionData) {
-                return (HttpSessionData) obj;
+            try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(bytes))) {
+                applyDeserializationFilter(ois, rejectedClass);
+                Object obj = ois.readObject();
+                if (obj instanceof HttpSessionData) {
+                    return (HttpSessionData) obj;
+                }
             }
             log.warn("Unexpected session file content (not HttpSessionData): {}", path);
         } catch (Exception e) {
-            log.warn("Failed to deserialize session file {} (corrupted or incompatible), discarded: {}",
-                    path, e.toString());
+            String rejected = rejectedClass.get();
+            if (rejected != null) {
+                // 与「文件损坏」分开上报：前者要改配置、后者是磁盘或类版本问题，运维动作完全不同。
+                // 混成一行「corrupted or incompatible」时，用户调白名单只会看到文件莫名消失。
+                log.warn("Session file {} discarded: the deserialization filter rejected class '{}'. "
+                                + "If you store that type, add it (or its package) to {}.",
+                        path, rejected, PropertiesConstant.SERVLET_SESSION_PERSISTENT_DESERIALIZATION_FILTER);
+            } else {
+                log.warn("Session file {} discarded (corrupted or class-version incompatible): {}", path, e.toString());
+            }
         }
         deleteFileQuietly(path);
         return null;
+    }
+
+    /**
+     * 把配置的反序列化过滤器装到输入流上（JDK 9+ 才有该 API，见 {@link #SET_OBJECT_INPUT_FILTER}），
+     * 并包一层记录被拒类名（见 {@link #recordingRejections}）。
+     */
+    private void applyDeserializationFilter(ObjectInputStream ois, AtomicReference<String> rejectedClass)
+            throws IOException {
+        Object filter = this.deserializationFilter;
+        Method setter = SET_OBJECT_INPUT_FILTER;
+        if (filter == null || setter == null) {
+            return;
+        }
+        try {
+            setter.invoke(ois, recordingRejections(filter, rejectedClass));
+        } catch (ReflectiveOperationException e) {
+            throw new IOException("Failed to apply session deserialization filter", e);
+        }
     }
 
     @Override
@@ -118,9 +356,22 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
     public HttpSessionData getSession(String sessionId) {
         HttpSessionData session = sessions.get(sessionId);
         if (session != null && session.isExpired(System.currentTimeMillis())) {
-            sessions.remove(sessionId, session);
-            deleteFileQuietly(fileOf(sessionId));
-            return null;
+            // 过期清理同样要在写锁下进行：否则清掉文件后会被并发的 saveSession 写回。
+            ReentrantLock lock = writeLockFor(sessionId);
+            lock.lock();
+            try {
+                // 锁内重查：等锁期间该会话可能已被并发请求 touch 复活（同 sweepExpired 的理由）
+                if (session.isExpired(System.currentTimeMillis()) && sessions.remove(sessionId, session)) {
+                    deleteFileQuietly(fileOf(sessionId));
+                    return null;
+                }
+            } finally {
+                lock.unlock();
+            }
+            // 重查发现已复活：当作有效会话返回，不要把它从内存里摘掉。
+            // 注：这里返回的可能是被并发 invalidate 的会话，但 invalidate 会让 isInvalid() 为真，
+            // 由调用方现有的失效检查处理。
+            return session;
         }
         return session;
     }
@@ -134,27 +385,83 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
     }
 
     /**
-     * 落盘会话：过滤排除名单与不可序列化属性后，原子写入 {@code <id>.session}。
-     * 写入失败只 warn，不影响请求处理。
+     * 会话 ID 轮换（{@code changeSessionId}）的存储侧实现：在旧 id 的条带锁内，**先摘除旧会话、再复制属性**到新会话。
+     * <p>
+     * 为什么必须先摘除：{@code attributes} 是 {@code ConcurrentHashMap}，迭代器弱一致——边遍历边有并发写会漏掉
+     * 部分属性（登录态/token 静默丢失）。而 {@link #saveSession} 只对「在册」会话生效
+     * （守卫 {@code !sessions.containsKey(id)}），所以一旦在锁内摘除，后续并发写就不会再落到旧会话上，
+     * 复制期间的数据是稳定的。
+     * </p>
+     * <p>
+     * 之所以不用 {@link #createSession()} + 两次独立调用：那两处用的是**新/旧两个不同 id 的锁**，
+     * 中间窗口里并发 {@code saveSession} 仍能写旧会话，属性复制会漏。
+     * </p>
+     *
+     * @param oldId 旧会话 id
+     * @param oldData 旧会话数据
+     * @return 已完成属性复制的新会话数据（已登记在册）
+     */
+    @Override
+    public HttpSessionData replaceSessionCopyingAttributes(String oldId, HttpSessionData oldData) {
+        ReentrantLock lock = writeLockFor(oldId);
+        lock.lock();
+        try {
+            // 先在锁内摘除：此后 saveSession 的 containsKey 守卫会拒掉对旧会话的写入
+            sessions.remove(oldId);
+            deleteFileQuietly(fileOf(oldId));
+            HttpSessionData newData = new HttpSessionData(generateSessionId(), System.currentTimeMillis());
+            for (Map.Entry<String, Object> entry : oldData.getAttributes().entrySet()) {
+                newData.setAttribute(entry.getKey(), entry.getValue());
+            }
+            newData.setMaxInactiveInterval(oldData.getMaxInactiveInterval());
+            sessions.put(newData.getId(), newData);
+            return newData;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /** 会话 id 恒定映射到同一把条带锁，保证「同一会话」的磁盘写严格串行。 */
+    private ReentrantLock writeLockFor(String sessionId) {
+        return writeLocks[Math.floorMod(sessionId.hashCode(), WRITE_LOCK_STRIPES)];
+    }
+
+    /**
+     * 落盘会话：过滤排除名单与不可序列化属性后，原子写入 {@code <id>.session}。写入失败只 warn，不影响请求处理。
+     * <p>同一会话的写串行化（见 {@link #writeLockFor}）。</p>
      */
     @Override
     public void saveSession(HttpSessionData session) {
         if (session == null || session.isInvalid()) {
             return;
         }
-        sessions.put(session.getId(), session);
-        byte[] payload = serialize(session);
-        if (payload == null) {
-            return;
-        }
-        Path target = fileOf(session.getId());
-        Path tmp = storeDir.resolve(session.getId() + TMP_SUFFIX);
+        String id = session.getId();
+        ReentrantLock lock = writeLockFor(id);
+        lock.lock();
         try {
-            Files.write(tmp, payload);
-            Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        } catch (IOException e) {
-            log.warn("Failed to persist session {} to {}: {}", session.getId(), target, e.toString());
-            deleteFileQuietly(tmp);
+            // 内存更新与写盘必须在同一临界区，且只对**在册**会话生效。put 原先在锁外，会把
+            // removeSession（invalidate 的落点）刚摘除的条目重新放回内存，紧随的这次写盘就把它复活了；
+            // 不在册（已被摘除或已被过期清理）的会话一律不再接纳。
+            if (session.isInvalid() || !sessions.containsKey(id)) {
+                return;
+            }
+            sessions.put(id, session);
+            byte[] payload = serialize(session);
+            if (payload == null) {
+                return;
+            }
+            Path target = fileOf(id);
+            // 同一会话的落盘已由条带锁互斥，tmp 名无需再带线程 id（否则遗留 tmp 数量会随线程数放大）
+            Path tmp = storeDir.resolve(id + TMP_SUFFIX);
+            try {
+                Files.write(tmp, payload);
+                Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (IOException e) {
+                log.warn("Failed to persist session {} to {}: {}", id, target, e.toString());
+                deleteFileQuietly(tmp);
+            }
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -170,16 +477,27 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
         copy.setMaxInactiveInterval(session.getMaxInactiveInterval());
         for (Map.Entry<String, Object> entry : session.getAttributes().entrySet()) {
             String name = entry.getKey();
+            // 属性名不可能为 null，但 Map 允许 null 键：跳过而不是把它传给要求非空的 setAttribute
+            if (name == null) {
+                continue;
+            }
             Object value = entry.getValue();
+            // Servlet 语义：null 值等同于「移除该属性」；且 HttpSessionData 内部是 ConcurrentHashMap，
+            // 它不接受 null value（put 会抛 NPE），故在入口显式跳过
+            if (value == null) {
+                continue;
+            }
             if (excludeAttributes.contains(name)) {
                 continue;
             }
-            if (value != null && !(value instanceof Serializable)) {
+            if (!(value instanceof Serializable)) {
                 log.warn("Session attribute '{}' is not serializable ({}), skipped from persistence",
                         name, value.getClass().getName());
                 continue;
             }
-            if (value instanceof Serializable && !isActuallySerializable((Serializable) value)) {
+            // 走到这里 value 已被确认可序列化：原先第二处 instanceof 因此恒真
+            // （BC_VACUOUS_INSTANCEOF），改为直接校验
+            if (!isActuallySerializable((Serializable) value)) {
                 log.warn("Session attribute '{}' ({}) failed serialization check, skipped from persistence",
                         name, value.getClass().getName());
                 continue;
@@ -210,12 +528,22 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
 
     @Override
     public void removeSession(String sessionId) {
-        sessions.remove(sessionId);
-        deleteFileQuietly(fileOf(sessionId));
+        // 与 saveSession 同一把锁：摘除内存 + 删文件必须一起挡住并发的落盘，否则删除会被紧随的 move 抵消。
+        ReentrantLock lock = writeLockFor(sessionId);
+        lock.lock();
+        try {
+            sessions.remove(sessionId);
+            deleteFileQuietly(fileOf(sessionId));
+        } finally {
+            lock.unlock();
+        }
     }
 
-    /** 当前内存中未过期的会话数。 */
-    public int getActiveSessionCount() {
+    /**
+     * 仅供测试：当前内存中未过期的会话数（O(n) 遍历，生产路径不读它）。
+     * 收成包可见，避免它被误当成公开 API 用于运行期统计。
+     */
+    int getActiveSessionCount() {
         long now = System.currentTimeMillis();
         return (int) sessions.values().stream().filter(s -> !s.isExpired(now)).count();
     }
@@ -224,8 +552,30 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
         return storeDir;
     }
 
+    /**
+     * 会话 id → 落盘路径。
+     * <p>
+     * <b>路径安全收口</b>：id 的来源（{@code JSESSIONID} cookie、{@code ;jsessionid=} URL）是客户端可控的，
+     * 因此在这里就地保证「id 绝不参与路径解析」。今天的调用点本来都只会传自己生成的 id
+     * （{@code generateSessionId()} 产出纯 hex）——但那是跨方法的隐式约定，一旦将来引入「按请求懒加载」
+     * 之类的改动就会变成任意文件读 / 删除 / 反序列化原语。把校验放在此处后，该性质成为
+     * <b>局部不变量</b>：越界一律失败，且失败发生在任何文件操作之前。
+     * </p>
+     *
+     * @throws IllegalArgumentException id 为空、含路径分隔符或上跳片段、或解析后越出 store 目录
+     */
     private Path fileOf(String sessionId) {
-        return storeDir.resolve(sessionId + FILE_SUFFIX);
+        if (sessionId == null || sessionId.isEmpty()) {
+            throw new IllegalArgumentException("Session id must not be empty");
+        }
+        if (sessionId.indexOf('/') >= 0 || sessionId.indexOf('\\') >= 0 || sessionId.contains("..")) {
+            throw new IllegalArgumentException("Unsafe session id: " + sessionId);
+        }
+        Path path = storeDir.resolve(sessionId + FILE_SUFFIX).normalize();
+        if (!path.startsWith(storeDirNormalized)) {
+            throw new IllegalArgumentException("Session id escapes the store dir: " + sessionId);
+        }
+        return path;
     }
 
     private void deleteFileQuietly(Path path) {
@@ -252,17 +602,47 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
         while (!Thread.currentThread().isInterrupted()) {
             try {
                 Thread.sleep(CLEANUP_INTERVAL_MS);
-                long now = System.currentTimeMillis();
-                sessions.values().removeIf(s -> {
-                    if (s.isExpired(now)) {
-                        deleteFileQuietly(fileOf(s.getId()));
-                        return true;
-                    }
-                    return false;
-                });
+                sweepExpired(System.currentTimeMillis());
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
+            }
+        }
+    }
+
+    /**
+     * 清理一轮过期会话：逐条「条件摘除内存条目 + 删文件」，两步必须在同一把写锁内完成。
+     * <p>
+     * <b>为什么不能用 {@code sessions.values().removeIf(...)}</b>：{@code removeIf} 的谓词返回 true 后
+     * 由 CHM 自己摘除条目，即「删文件」与「摘除内存」被拆到了两个时刻。删完文件、条目尚未摘除的窗口里，
+     * 并发 {@link #saveSession} 能通过 {@code !sessions.containsKey(id)} 守卫（过期会话不属于
+     * {@code isInvalid()}），把刚删掉的文件连同已刷新的 {@code lastAccessedTime} 一起写回；
+     * 重启时 {@code loadExistingSessions} 便把它当未过期会话加载 —— <b>过期会话复活</b>。
+     * 改为锁内条件移除（与 {@link #getSession} 的过期清理同构）后，摘除成功才删文件，窗口消失。
+     * </p>
+     * <p>包级可见：便于单测直接驱动（清理线程的间隔是常量，隔着一层无法确定性测试）。</p>
+     */
+    void sweepExpired(long now) {
+        // 用 entrySet 遍历：直接拿到 value，避免 keySet + get 的双重查找（SpotBugs WMI_WRONG_MAP_ITERATOR）。
+        // 移除仍走 sessions.remove(key, value) 的条件式 API（不在迭代器上 remove），CHM 的弱一致迭代器允许这样用。
+        for (Map.Entry<String, HttpSessionData> entry : sessions.entrySet()) {
+            String id = entry.getKey();
+            HttpSessionData session = entry.getValue();
+            if (session == null || !session.isExpired(now)) {
+                continue;
+            }
+            ReentrantLock lock = writeLockFor(id);
+            lock.lock();
+            try {
+                // 锁内重查：上面的 isExpired 是拿锁前读的，等锁期间该会话可能已被正常请求
+                // touch（PerfHttpSession 会就地刷新 lastAccessedTime）而复活。不重查就会把
+                // 活跃会话连同文件一起删掉——remove(id, session) 只比对对象引用，touch 改的是
+                // 同一对象的字段，条件式移除挡不住这种情况。
+                if (session.isExpired(System.currentTimeMillis()) && sessions.remove(id, session)) {
+                    deleteFileQuietly(fileOf(id));
+                }
+            } finally {
+                lock.unlock();
             }
         }
     }
@@ -287,10 +667,5 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
             }
         }
         return result;
-    }
-
-    /** 供测试：当前内存中的会话快照（id -> data）。 */
-    Map<String, HttpSessionData> snapshot() {
-        return new HashMap<>(sessions);
     }
 }
