@@ -83,7 +83,11 @@ public final class SslContextFactory {
                 String keyStorePath = env.getProperty(prefix + "key-store");
                 String keyStorePassword = env.getProperty(prefix + "key-store-password");
                 String keyStoreType = env.getProperty(prefix + "key-store-type", "PKCS12");
-                String keyPassword = env.getProperty(prefix + "key-password", keyStorePassword);
+                // 不把可能为 null 的 keyStorePassword 当默认值传入（语义不变：库口令缺失时
+                // 单参 getProperty 同样返回 null，但避免把 null 交给非空形参）
+                String keyPassword = keyStorePassword != null
+                        ? env.getProperty(prefix + "key-password", keyStorePassword)
+                        : env.getProperty(prefix + "key-password");
 
                 KeyStore keyStore = KeyStore.getInstance(keyStoreType);
                 try (InputStream in = openInputStream(keyStorePath)) {

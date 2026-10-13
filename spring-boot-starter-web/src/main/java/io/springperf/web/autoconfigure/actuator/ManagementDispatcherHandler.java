@@ -69,7 +69,7 @@ public class ManagementDispatcherHandler extends DispatcherHandler {
         } catch (Throwable ex) {
             handleException(ex, req, resp);
         } finally {
-            flushResponse(resp);
+            flushResponse(req, resp);
         }
     }
 

@@ -89,7 +89,7 @@ public class ActuatorEndpointAutoConfiguration {
                                                                          Environment environment) {
         int mgmtPort = environment.getProperty("management.server.port", int.class, 0);
         int mainPort = environment.getProperty("server.port", int.class, 8080);
-        if (mgmtPort == mainPort) throw new IllegalStateException(
+        if (mgmtPort > 0 && mainPort > 0 && mgmtPort == mainPort) throw new IllegalStateException(
                 "management.server.port (" + mgmtPort + ") must be different from server.port (" + mainPort + ")");
         String basePath = webEndpointProperties.getBasePath();
         return new ManagementServerInfrastructure(webContext, basePath);
@@ -102,11 +102,11 @@ public class ActuatorEndpointAutoConfiguration {
             WebContext webContext, ManagementServerInfrastructure managementServerInfrastructure,
             WebEndpointProperties webEndpointProperties, Environment environment) {
         int mgmtPort = environment.getProperty("management.server.port", int.class, 0);
-        boolean http2Enabled = environment.getProperty("server.http2.enabled", boolean.class, false);
+        boolean http2Enabled = environment.getProperty("management.server.http2.enabled", boolean.class, false);
         SslContext sslContext = SslContextFactory.createServerSslContext(environment, "management.server.ssl.", http2Enabled);
         ManagementNettyHttpServer server = new ManagementNettyHttpServer(webContext, webEndpointProperties.getBasePath(),
                 managementServerInfrastructure.getDispatcherHandler(), mgmtPort,
-                environment.getProperty("server.http.max-content-length", int.class, DEFAULT_MAX_CONTENT_LENGTH), sslContext);
+                environment.getProperty("management.server.max-content-length", int.class, DEFAULT_MAX_CONTENT_LENGTH), sslContext);
         webContext.registerWebComponent(server);
         return server;
     }
