@@ -42,9 +42,10 @@ class NettyHttpServerStartTest {
         when(props.getInt(PropertiesConstant.WRITE_BUFFER_LOW_WATERMARK)).thenReturn(8192);
         when(props.getInt(PropertiesConstant.WRITE_BUFFER_HIGH_WATERMARK)).thenReturn(32768);
         when(props.getInt(PropertiesConstant.HTTP_MAX_CONTENT_LENGTH)).thenReturn(1048576);
-        when(props.getLong(PropertiesConstant.HTTP_READ_TIMEOUT)).thenReturn(30000L);
+        when(props.getDurationMillis(PropertiesConstant.HTTP_READ_TIMEOUT,
+                PropertiesConstant.HTTP_READ_TIMEOUT_DEFAULT)).thenReturn(30000L);
         when(props.getInt(PropertiesConstant.HTTP_MAX_INITIAL_LINE_LENGTH)).thenReturn(4096);
-        when(props.getInt(PropertiesConstant.HTTP_MAX_HEADER_SIZE)).thenReturn(8192);
+        when(props.getInt(PropertiesConstant.HTTP_MAX_REQUEST_HEADER_SIZE)).thenReturn(8192);
         when(props.getInt(PropertiesConstant.HTTP_MAX_CHUNK_SIZE)).thenReturn(8192);
         when(wc.getContextPath()).thenReturn("/");
         when(wc.getWebComponent(DispatcherHandler.class)).thenReturn(mock(DispatcherHandler.class));

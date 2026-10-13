@@ -172,7 +172,9 @@ public class CoreFeaturesP2Test extends BaseE2ETest {
             assertEquals(403, resp.code());
             assertEquals("blocked", resp.header("X-Blocking-Filter"));
             String body = resp.body().string();
-            assertTrue(body.contains("blocked by filter"));
+            // 错误策略对齐 Boot：sendError 的 message 默认不外露（server.error.include-message=never），
+            // body 为 whitelabel 错误页（含状态码），不再包含 filter 传入的 message 字面量。
+            assertTrue(body.contains("403"), "实际 body=" + body);
         }
     }
 

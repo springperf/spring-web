@@ -63,8 +63,26 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
         this.largeBodyLimit = cachedLargeBodyLimit;
     }
 
+    /** 绑定的响应对象：请求释放时级联兜底释放其未提交 buf（生命周期绑定）。 */
+    private WebServerHttpResponse response;
+
     public FullHttpRequest getNativeRequest() {
         return request;
+    }
+
+    /**
+     * 绑定其响应对象。仅在 {@code NettyHttpHandler} 构造 request 后调用一次，使响应未提交 buf
+     * 随请求释放而兜底释放。
+     *
+     * @param response 当前请求对应的响应
+     */
+    public void setResponse(WebServerHttpResponse response) {
+        this.response = response;
+    }
+
+    /** 绑定的响应对象（未绑定时为 {@code null}）。 */
+    protected WebServerHttpResponse getBoundResponse() {
+        return response;
     }
 
     protected MultiValueMap<String, String> parseParameters() {
@@ -171,18 +189,16 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
     /**
      * 按优先级确定请求 scheme：
      * <ol>
-     *   <li>RFC 7239 {@code Forwarded} 头（仅当 {@code server.use-forwarded-headers=true}）</li>
-     *   <li>{@code X-Forwarded-Proto} 头（仅当 {@code server.use-forwarded-headers=true}）</li>
+     *   <li>RFC 7239 {@code Forwarded} 头（仅当 {@code server.forward-headers-strategy} 信任转发头）</li>
+     *   <li>{@code X-Forwarded-Proto} 头（仅当策略信任转发头）</li>
      *   <li>Netty pipeline 中存在 {@link SslHandler}（TLS 在 Java 层终结）</li>
      *   <li>兜底 {@code http}</li>
      * </ol>
-     * <p>转发头默认不信任，防止客户端伪造 scheme。部署在反向代理后方时
-     * 需设置 {@code server.use-forwarded-headers=true} 并确保代理已清理上游转发头。</p>
+     * <p>转发头默认不信任（策略 {@code NONE}），防止客户端伪造 scheme。部署在反向代理后方时
+     * 需设置 {@code server.forward-headers-strategy=NATIVE} 并确保代理已清理上游转发头。</p>
      */
     private String resolveScheme() {
-        boolean useForwarded = getWebContext().getProps()
-                .getBoolean(PropertiesConstant.USE_FORWARDED_HEADERS, false);
-        if (useForwarded) {
+        if (isForwardedHeadersEnabled()) {
             // 1. RFC 7239 Forwarded
             String forwarded = request.headers().get("Forwarded");
             if (forwarded != null) {
@@ -203,6 +219,20 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
         }
         // 4. 兜底
         return "http";
+    }
+
+    /**
+     * 是否信任转发头：读 {@code server.forward-headers-strategy}
+     * （{@code NONE}/{@code FALSE} 视为不信任；{@code FRAMEWORK}/{@code NATIVE}/其它非空视为信任）。
+     */
+    private boolean isForwardedHeadersEnabled() {
+        String strategy = getWebContext().getProps()
+                .get(PropertiesConstant.FORWARD_HEADERS_STRATEGY, null);
+        if (strategy == null || strategy.trim().isEmpty()) {
+            return false;
+        }
+        String s = strategy.trim();
+        return !("NONE".equalsIgnoreCase(s) || "FALSE".equalsIgnoreCase(s));
     }
 
     /**

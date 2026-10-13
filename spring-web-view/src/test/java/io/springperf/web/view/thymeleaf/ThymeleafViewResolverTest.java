@@ -16,7 +16,10 @@ import java.util.Locale;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ThymeleafViewResolverTest {
@@ -30,7 +33,8 @@ class ThymeleafViewResolverTest {
         when(props.get(ViewProperties.THYMELEAF_PREFIX, ViewProperties.THYMELEAF_PREFIX_DEFAULT)).thenReturn("templates/");
         when(props.get(ViewProperties.THYMELEAF_SUFFIX, ViewProperties.THYMELEAF_SUFFIX_DEFAULT)).thenReturn(".html");
         when(props.getBoolean(ViewProperties.THYMELEAF_CACHE, ViewProperties.THYMELEAF_CACHE_DEFAULT)).thenReturn(true);
-        when(props.get(ViewProperties.ENCODING, ViewProperties.ENCODING_DEFAULT)).thenReturn("UTF-8");
+        when(props.getBoolean(ViewProperties.THYMELEAF_ENABLED, ViewProperties.THYMELEAF_ENABLED_DEFAULT)).thenReturn(true);
+        when(props.get(ViewProperties.THYMELEAF_ENCODING, ViewProperties.THYMELEAF_ENCODING_DEFAULT)).thenReturn("UTF-8");
         webContext = mock(WebContext.class);
         when(webContext.getProps()).thenReturn(props);
     }
@@ -76,5 +80,46 @@ class ThymeleafViewResolverTest {
         String output = new String(body.toByteArray(), StandardCharsets.UTF_8);
         assertTrue(output.contains("Hello"), "渲染输出应包含模板内容: " + output);
         assertTrue(output.contains("Perf"), "渲染输出应包含 model 值: " + output);
+    }
+
+    @Test
+    void initWithWebContext_registersDefaultProviderWhenAbsent() {
+        ThymeleafViewResolver resolver = new ThymeleafViewResolver();
+        resolver.initWithWebContext(webContext);
+
+        // getWebComponentWithDefault 被调用于注册默认 provider
+        verify(webContext).getWebComponentWithDefault(
+                eq(io.springperf.web.view.WebExchangeProvider.class),
+                any(io.springperf.web.view.DefaultWebExchangeProvider.class));
+        // 随后取全量 provider 列表
+        verify(webContext).getWebComponents(io.springperf.web.view.WebExchangeProvider.class);
+    }
+
+    @Test
+    void viewRender_usesCustomProviderFromContainer() throws Exception {
+        // 容器中存在自定义 provider（如 Servlet 场景）时应被选中
+        io.springperf.web.view.WebExchangeProvider custom = mock(io.springperf.web.view.WebExchangeProvider.class);
+        when(custom.supports(any(WebServerHttpRequest.class))).thenReturn(true);
+        when(custom.createExchange(any(WebServerHttpRequest.class), any(WebServerHttpResponse.class)))
+                .thenAnswer(inv -> new io.springperf.web.view.DefaultWebExchangeProvider()
+                        .createExchange(inv.getArgument(0), inv.getArgument(1)));
+        when(webContext.getWebComponents(io.springperf.web.view.WebExchangeProvider.class))
+                .thenReturn(java.util.Collections.singletonList(custom));
+
+        ThymeleafViewResolver resolver = buildResolver();
+        View view = resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class));
+
+        WebServerHttpRequest req = mock(WebServerHttpRequest.class);
+        when(req.getLocale()).thenReturn(Locale.US);
+        WebContext wc = mock(WebContext.class);
+        when(wc.getContextPath()).thenReturn("");
+        when(req.getWebContext()).thenReturn(wc);
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        when(resp.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
+        when(resp.getBody()).thenReturn(new ByteArrayOutputStream());
+
+        view.render(new HashMap<>(), req, resp);
+
+        verify(custom).createExchange(req, resp);
     }
 }

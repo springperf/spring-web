@@ -1,6 +1,8 @@
 package io.springperf.web.core;
 
+import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.BaseWebComponent;
+import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.arg.ArgumentResolverRegistry;
 import io.springperf.web.core.async.AsyncSupportRegistry;
@@ -52,6 +54,17 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
     protected WebFilterRegistry webFilterRegistry;
     protected WebMetrics metrics;
 
+    /** Locale 解析配置（{@code spring.web.locale} / {@code locale-resolver} / {@code locale-bind}），启动期预解析。 */
+    private LocaleConfig localeConfig = LocaleConfig.DEFAULT;
+
+    /**
+     * {@code spring.mvc.publish-request-handled-events}：请求处理完成后是否发布
+     * {@code ServletRequestHandledEvent}。默认 {@code false}（无监听方时每请求发布纯属开销）。
+     * 发布器在启动期从 {@link WebContext} 解析。
+     */
+    private boolean publishRequestHandledEvents = false;
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
     private static final RequestAttribute<Long> METRICS_START_ATTR =
             RequestAttribute.createAttribute(Long.class);
 
@@ -68,6 +81,22 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
         this.bizPoolRegistry = webContext.getWebComponentWithDefault(BizPoolRegistry.class, new BizPoolRegistry());
         this.webFilterRegistry = webContext.getWebComponentWithDefault(WebFilterRegistry.class, new WebFilterRegistry(this));
         this.metrics = webContext.getWebComponentWithDefault(WebMetrics.class, NoOpWebMetrics.INSTANCE);
+        // 启动期预解析 Locale 与事件发布开关；getProps() 可能为 null（单元测试 mock），此时回退默认值
+        ApplicationProperties props = webContext.getProps();
+        if (props != null) {
+            // 启动期预解析 Locale 配置（spring.web.locale / locale-resolver / locale-bind）
+            this.localeConfig = LocaleConfig.fromProperties(props);
+            // 启动期预解析「发布请求处理完成事件」开关
+            this.publishRequestHandledEvents = props.getBoolean(
+                    PropertiesConstant.MVC_PUBLISH_REQUEST_HANDLED_EVENTS,
+                    PropertiesConstant.MVC_PUBLISH_REQUEST_HANDLED_EVENTS_DEFAULT);
+        }
+        // 请求处理完成事件的发布器：优先取 WebContext 持有的 ApplicationContext。
+        // webContext 是可被测试替身替换的协作者，运行期不保证满足静态类型，故按容错契约保留判断。
+        if (publishRequestHandledEvents
+                && webContext.getCtx() instanceof org.springframework.context.ApplicationEventPublisher) {
+            this.eventPublisher = (org.springframework.context.ApplicationEventPublisher) webContext.getCtx();
+        }
     }
 
     @Override
@@ -129,6 +158,8 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
             if (initContext) {
                 removeContextHolders(req, resp);
             }
+            // 请求处理完成，按 spring.mvc.publish-request-handled-events 发布事件
+            publishRequestHandledEvent(req, resp, mappingResult);
         }
     }
 
@@ -339,6 +370,11 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
     }
 
     protected boolean initContextHolders(WebServerHttpRequest req, WebServerHttpResponse resp) {
+        // spring.web.locale-bind=false：完全不触碰 LocaleContextHolder
+        // （省掉每请求的上下文分配与 ThreadLocal set/remove；读取时 Spring 回退 JVM 默认 Locale）
+        if (!localeConfig.isBindEnabled()) {
+            return false;
+        }
         LocaleContext localeContext = buildLocaleContext(req, resp);
         if (localeContext != null) {
             LocaleContextHolder.setLocaleContext(localeContext, this.threadContextInheritable);
@@ -352,7 +388,32 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
     }
 
     protected LocaleContext buildLocaleContext(WebServerHttpRequest req, WebServerHttpResponse resp) {
-        return null;
+        // 按 spring.web.locale / locale-resolver 解析（fixed 固定 Locale；accept-header 按请求头）
+        return localeConfig.resolveLocaleContext(req);
+    }
+
+    /**
+     * 发布 {@code ServletRequestHandledEvent}（对齐 Boot {@code spring.mvc.publish-request-handled-events}）。
+     * 无发布器、开关关闭时静默跳过；发布失败不影响请求处理结果。
+     */
+    protected void publishRequestHandledEvent(WebServerHttpRequest req, WebServerHttpResponse resp,
+                                             MappingResult mappingResult) {
+        if (!publishRequestHandledEvents || eventPublisher == null) {
+            return;
+        }
+        try {
+            String requestUrl = req.getUriStr();
+            String shortDesc = mappingResult != null && mappingResult.getMatchedContext() != null
+                    ? mappingResult.getMatchedContext().getPathRule()
+                    : requestUrl;
+            int status = resp.getStatus() != null ? resp.getStatus().value() : 200;
+            // (source, requestUrl, clientAddress, method, servletName, sessionId, userName,
+            // processingTimeMillis, failureCause, statusCode)
+            eventPublisher.publishEvent(new org.springframework.web.context.support.ServletRequestHandledEvent(this,
+                    requestUrl, null, req.getMethodValue(), shortDesc, null, null, -1L, null, status));
+        } catch (Throwable ex) {
+            log.debug("publish ServletRequestHandledEvent failed", ex);
+        }
     }
 
     protected static void sendError(WebServerHttpResponse resp, HttpStatus status, String reason) {

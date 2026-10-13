@@ -31,6 +31,42 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
         super(request, response);
     }
 
+    /**
+     * 连接断开（客户端消失）时的取消钩子：供上游订阅（reactive）/ 长任务在断连时主动退场。
+     *
+     * <p>原子取出并清空，保证并发断连信号下钩子至多执行一次。</p>
+     */
+    private final AtomicReference<Runnable> connectionCloseHandler = new AtomicReference<>();
+
+    /**
+     * 注册「客户端断连」钩子。
+     *
+     * <p>写入回调只在【下一次投递失败】时触发；若源在断连后不再投递（长轮询挂住、DB 游标等待），
+     * 就永远不会取消。断连本身必须能作为取消信号。</p>
+     */
+    public void addConnectionCloseHandler(Runnable handler) {
+        this.connectionCloseHandler.set(handler);
+    }
+
+    /**
+     * 连接在响应写出前关闭（客户端中断）时由 {@code NettyHttpHandler} 调用：让异步持有者退场。
+     *
+     * <p>覆盖「空闲流 / 未完成异步被直接断连」——此时既不写 {@code LastHttpContent}，也没有 chunk
+     * 写失败，若不在此退场，入站 buf 要等请求对象被 GC 才释放。只做生命周期清理，不触发业务
+     * errorHandler（客户端中断不是业务错误，避免日志/指标噪声）。</p>
+     */
+    public void releaseOnConnectionClose() {
+        state.compareAndSet(State.ASYNC_STARTED, State.COMPLETED);
+        Runnable handler = this.connectionCloseHandler.getAndSet(null);
+        if (handler != null) {
+            try {
+                handler.run();
+            } catch (Throwable ignored) {
+                // 断连清理路径：钩子自身异常不得影响后续流程
+            }
+        }
+    }
+
     public boolean isErrorHandlingInProgress() {
         return errorHandlingInProgress;
     }

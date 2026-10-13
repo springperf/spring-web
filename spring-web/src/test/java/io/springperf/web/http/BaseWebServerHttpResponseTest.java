@@ -4,6 +4,7 @@ import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
+import io.springperf.web.server.ErrorResponseConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -51,6 +52,13 @@ class BaseWebServerHttpResponseTest {
         response = new TestResponse(webContext, false);
     }
 
+    /** 关闭 whitelabel + include-message=always 的错误响应配置（JSON 错误体）。 */
+    private static ErrorResponseConfig jsonConfig() {
+        return new ErrorResponseConfig(ErrorResponseConfig.IncludePolicy.NEVER,
+                ErrorResponseConfig.IncludePolicy.ALWAYS,
+                ErrorResponseConfig.IncludePolicy.NEVER, false, "/error");
+    }
+
     @Test void constructor_initialState() {
         assertFalse(response.isHandled());
         assertFalse(response.isCommitted());
@@ -88,7 +96,8 @@ class BaseWebServerHttpResponseTest {
         response.sendError(HttpStatus.BAD_REQUEST);
         assertTrue(response.isHandled());
         assertTrue(response.flushed);
-        assertTrue(response.getHeaders().getContentType().includes(MediaType.APPLICATION_JSON));
+        // 默认 whitelabel 启用 → HTML 错误页（Accept 未限制时）
+        assertTrue(response.getHeaders().getContentType().includes(MediaType.TEXT_HTML));
     }
 
     @Test void sendErrorOnce_twice_onlyFirstApplies() {
@@ -105,8 +114,10 @@ class BaseWebServerHttpResponseTest {
     }
 
     @Test void writeDataAndFlush_setsContentType() {
+        // 关闭 whitelabel → JSON 错误体（application/json;charset=UTF-8）
+        when(webContext.getWebComponent(ErrorResponseConfig.class)).thenReturn(jsonConfig());
         response.sendError(HttpStatus.BAD_REQUEST, "bad");
-        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
+        assertTrue(response.getHeaders().getContentType().includes(MediaType.APPLICATION_JSON));
     }
 
     @Test void setTimeout_cancelsPrevious() {
@@ -131,6 +142,8 @@ class BaseWebServerHttpResponseTest {
     }
 
     @Test void sendError_jsonMessage_containsErrorMessage() {
+        // include-message=always 才暴露 message；默认 never 下 HTML 页面不含业务文案
+        when(webContext.getWebComponent(ErrorResponseConfig.class)).thenReturn(jsonConfig());
         response.sendError(HttpStatus.BAD_GATEWAY, "bad upstream");
         assertTrue(new String(response.body.toByteArray()).contains("bad upstream"));
     }
@@ -141,6 +154,7 @@ class BaseWebServerHttpResponseTest {
     }
 
     @Test void escapeJson_escapesSpecialCharacters() {
+        when(webContext.getWebComponent(ErrorResponseConfig.class)).thenReturn(jsonConfig());
         response.sendError(HttpStatus.BAD_REQUEST,
                 "quote\" back\\ new\n tab\t ff\f bs\b cr\r control\u0001 end");
         String json = new String(response.body.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
@@ -154,10 +168,13 @@ class BaseWebServerHttpResponseTest {
         assertTrue(json.contains("\\u0001"), "控制字符应以 \\u 转义");
     }
 
-    @Test void escapeJson_null_returnsEmpty() {
+    @Test void escapeJson_null_writesNullField() {
+        when(webContext.getWebComponent(ErrorResponseConfig.class)).thenReturn(jsonConfig());
         response.sendError(HttpStatus.BAD_REQUEST, null);
         String json = new String(response.body.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
-        assertTrue(json.contains("\"error\":\"\""));
+        assertTrue(json.contains("\"status\":400"));
+        // message 为 null 时不输出该字段（而非输出 null 字面量）
+        assertFalse(json.contains("\"message\""));
     }
 
 @Test void resetHandled_clearsHandledFlag() {

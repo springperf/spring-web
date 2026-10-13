@@ -11,6 +11,7 @@ import io.netty.handler.codec.http.*;
 import io.netty.handler.stream.ChunkedStream;
 import io.netty.util.AttributeKey;
 import io.springperf.web.context.WebContext;
+import io.springperf.web.server.ResponseLimitConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 
@@ -49,15 +50,32 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
     /** HEAD 请求标志：flush/写 body 时抑制响应体（只写 headers），对齐 RFC 7231 §4.3.2 */
     private volatile boolean headRequest;
 
+    /** 响应写出层限制配置（swallow-size / 响应头大小），启动期预解析。 */
+    private final ResponseLimitConfig responseLimitConfig;
+
+    /** 当前请求 body 字节数：用于错误响应后按 swallow-size 决定保活 / 关闭连接。 */
+    private final long requestContentLength;
+
+    /** HTTP/1.0 请求标志：渐进式输出不能用 chunked（1.0 无此分帧），退化为 close-delimited。 */
+    private volatile boolean http10;
+
     public NettyServerHttpResponse(WebContext webContext, ChannelHandlerContext ctx, boolean keepAlive) {
-        this(webContext, ctx, keepAlive, new DefaultHttpHeaders(false));
+        this(webContext, ctx, keepAlive, ResponseLimitConfig.DEFAULT, 0L);
+    }
+
+    public NettyServerHttpResponse(WebContext webContext, ChannelHandlerContext ctx, boolean keepAlive,
+                                   ResponseLimitConfig responseLimitConfig, long requestContentLength) {
+        this(webContext, ctx, keepAlive, responseLimitConfig, requestContentLength, new DefaultHttpHeaders(false));
     }
 
     private NettyServerHttpResponse(WebContext webContext, ChannelHandlerContext ctx, boolean keepAlive,
+                                    ResponseLimitConfig responseLimitConfig, long requestContentLength,
                                     io.netty.handler.codec.http.HttpHeaders nettyHeaders) {
         super(webContext, keepAlive, new WebHttpHeaders(new NettyHttpHeadersAdapter(nettyHeaders, true)));
         this.ctx = ctx;
         this.nettyHeaders = nettyHeaders;
+        this.responseLimitConfig = responseLimitConfig;
+        this.requestContentLength = requestContentLength;
     }
 
     /** 标记本响应对应 HEAD 请求，后续 flush/write* 时抑制响应体。 */
@@ -67,6 +85,31 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
 
     protected boolean isHeadRequest() {
         return headRequest;
+    }
+
+    /** 标记本响应对应 HTTP/1.0 请求（渐进式输出退化为 close-delimited，禁用 chunked）。 */
+    public void markHttp10() {
+        this.http10 = true;
+    }
+
+    protected boolean isHttp10() {
+        return http10;
+    }
+
+    /**
+     * 兜底释放未被 flush / sendError 消费的响应体 ByteBuf。
+     *
+     * <p>正常路径下 buf 已随出站消息转移给 Netty（flush 成功即 {@code this.buf = null}），字段仍持有
+     * 就说明这块缓冲从未转为出站消息，必须在此释放，否则池化 buf 泄漏。</p>
+     */
+    public void release() {
+        ByteBuf b = this.buf;
+        if (b != null) {
+            this.buf = null;
+            if (b.refCnt() > 0) {
+                b.release();
+            }
+        }
     }
 
     public ByteBuf getBuf() {
@@ -103,6 +146,9 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
         try {
             // HEAD 抑制逻辑由 writeAndFlush 内部处理（保留 Content-Length，丢弃 body）
             writeAndFlush(buf, null, null, chunked);
+            // 成功写出后 buf 已随 DefaultFullHttpResponse 转移给 Netty，写入完成后由编码器 release。
+            // 置空字段，避免 release()/getBuf() 再次触碰已转移（可能已被释放）的悬空 ByteBuf。
+            this.buf = null;
         } catch (Exception e) {
             // make sure to release buffer on error
             if (buf != null && buf.refCnt() > 0) {

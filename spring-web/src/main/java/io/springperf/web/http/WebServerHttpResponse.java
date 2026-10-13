@@ -84,6 +84,27 @@ public interface WebServerHttpResponse extends ServerHttpResponse {
     ScheduledFuture setTimeout(Runnable task, long delay);
 
     /**
+     * 是否已装配响应超时。
+     *
+     * <p>用于判断「是否需要补装配」：{@code false} 表示当前没有任何定时任务在跑。
+     * 默认实现返回 {@code false}（未覆写的实现类视为未装配）。</p>
+     *
+     * @return {@code true} 表示已有超时定时任务
+     */
+    default boolean hasTimeoutArmed() {
+        return false;
+    }
+
+    /**
+     * 兜底释放未被提交（未被 flush / sendError 消费）的响应体缓冲，避免池化 ByteBuf 泄漏。
+     *
+     * <p>默认实现为空操作；{@code NettyServerHttpResponse} 在请求 {@code release()} 时级联调用，
+     * 使响应未提交 buf 的生命周期绑定到请求生命周期（同步与异步路径统一）。</p>
+     */
+    default void release() {
+    }
+
+    /**
      * Return the {@link WebContext} associated with this response.
      *
      * @return the web context

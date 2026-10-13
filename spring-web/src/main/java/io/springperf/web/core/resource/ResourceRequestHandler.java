@@ -53,7 +53,7 @@ public class ResourceRequestHandler implements CustomInvoker {
 
     public void handleResourceRequest(WebServerHttpRequest req, WebServerHttpResponse resp) {
         String path = req.getPath();
-        String resourcePath = reformatPath(path);
+        String resourcePath = reformatPath(stripMappedPrefix(path));
 
         if (resourcePath == null || resourcePath.contains("..")) {
             resp.sendError(HttpStatus.NOT_FOUND);
@@ -217,6 +217,50 @@ public class ResourceRequestHandler implements CustomInvoker {
         long lastModified = resource.lastModified();
         long contentLength = resource.contentLength();
         return "\"0x" + Long.toHexString(lastModified) + "-" + contentLength + "\"";
+    }
+
+    /** 实际注册的 path pattern（含 {@code spring.mvc.static-path-pattern} 全局前缀），由注册期回写。 */
+    private volatile String[] mappedPatterns;
+
+    /**
+     * 回写实际注册的 path pattern（含全局前缀），供 {@link #stripMappedPrefix(String)} 从请求路径
+     * 剥离前缀解析资源相对路径。注册期调用一次。
+     *
+     * @param effectivePatterns 实际注册的 pattern 列表
+     */
+    void updateMappedPatterns(List<String> effectivePatterns) {
+        this.mappedPatterns = effectivePatterns.toArray(new String[0]);
+    }
+
+    /**
+     * 从请求路径剥离映射 pattern 的静态前缀，得到资源相对路径。对齐 Spring
+     * {@code ResourceHttpRequestHandler}：pattern {@code /res/**} 下请求 {@code /res/a.txt}
+     * 应在资源位置下查找 {@code a.txt}（而非 {@code res/a.txt}）。默认 pattern {@code /**}
+     * 前缀为空，路径原样使用。
+     *
+     * @param path 请求路径
+     * @return 剥离前缀后的相对路径
+     */
+    private String stripMappedPrefix(String path) {
+        String[] patterns = mappedPatterns;
+        if (patterns == null) {
+            return path;
+        }
+        for (String pattern : patterns) {
+            if (pattern.endsWith("/**")) {
+                String prefix = pattern.substring(0, pattern.length() - 3);
+                if (prefix.isEmpty() || "/".equals(prefix)) {
+                    return path;
+                }
+                if (path.equals(prefix)) {
+                    return "/";
+                }
+                if (path.startsWith(prefix + "/")) {
+                    return path.substring(prefix.length());
+                }
+            }
+        }
+        return path;
     }
 
     protected String reformatPath(String path) {

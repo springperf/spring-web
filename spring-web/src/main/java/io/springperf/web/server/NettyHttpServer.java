@@ -42,6 +42,8 @@ public class NettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
     private final PipelineCustomizer pipelineCustomizer;
     /** 本服务器独立的连接计数（与 ManagementNettyHttpServer 各自计数，不共享全局单例）。 */
     private final NettyMetricsHandler metricsHandler = new NettyMetricsHandler();
+    /** 优雅关闭等待时长（毫秒），启动期预解析自 {@code server.shutdown.grace-period}，关闭时传入 EventLoopGroup.shutdownGracefully。 */
+    private long shutdownGraceMillis = PropertiesConstant.SERVER_SHUTDOWN_GRACE_PERIOD_DEFAULT;
 
     public NettyHttpServer(WebContext webContext) {
         this(webContext, null, null);
@@ -55,6 +57,13 @@ public class NettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
         this.webContext = webContext;
         this.sslContext = sslContext;
         this.pipelineCustomizer = pipelineCustomizer;
+        // 启动期预解析优雅关闭时长，配置错误在此 fail-fast（避免关闭时才暴露）；
+        // getProps() 可能为 null（单元测试 mock），此时回退默认值
+        if (webContext.getProps() != null) {
+            this.shutdownGraceMillis = webContext.getProps().getDurationMillis(
+                    PropertiesConstant.SERVER_SHUTDOWN_GRACE_PERIOD,
+                    PropertiesConstant.SERVER_SHUTDOWN_GRACE_PERIOD_DEFAULT);
+        }
     }
 
     @Override
@@ -111,7 +120,11 @@ public class NettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
                         afterAggHandlers,
                         webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_INITIAL_LINE_LENGTH),
                         webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_HEADER_SIZE),
-                        webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_CHUNK_SIZE)
+                        webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_CHUNK_SIZE),
+                        webContext.getProps().getInt(PropertiesConstant.HTTP_MULTIPART_MAX_PART_COUNT),
+                        webContext.getProps().getInt(PropertiesConstant.HTTP_MULTIPART_MAX_PART_HEADER_SIZE),
+                        CompressionConfig.fromProperties(webContext.getProps()),
+                        KeepAliveConfig.fromProperties(webContext.getProps())
                 );
                         ch.pipeline().addLast(metricsHandler);
                         innerInit.initChannel(ch);
@@ -246,12 +259,13 @@ public class NettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
 
     @Override
     public void destroyComponent() throws Exception {
+        // 对齐 Spring Boot：quietPeriod=0，最多等待 grace-period 让在途请求排空后强制关闭
         if (bossGroup != null) {
-            bossGroup.shutdownGracefully().sync();
+            bossGroup.shutdownGracefully(0, shutdownGraceMillis, TimeUnit.MILLISECONDS).sync();
         }
         if (workerGroup != null) {
-            workerGroup.shutdownGracefully().sync();
+            workerGroup.shutdownGracefully(0, shutdownGraceMillis, TimeUnit.MILLISECONDS).sync();
         }
-        log.info("Netty Server EventLoop shut down");
+        log.info("Netty Server EventLoop shut down (grace-period={}ms)", shutdownGraceMillis);
     }
 }

@@ -2,6 +2,7 @@ package io.springperf.web.http.support;
 
 import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.http.*;
 import org.junit.jupiter.api.Test;
 
@@ -185,6 +186,32 @@ class SupportMultipartAggregatorTest {
         Object out = channel.readInbound();
         assertTrue(out instanceof NettyMultipartWebRequest, "未超限请求应正常聚合");
         ((NettyMultipartWebRequest) out).release();
+        channel.finishAndReleaseAll();
+    }
+
+    /* ==================== 安全回归：multipart 解码失败转 400（2 号修复） ==================== */
+
+    @Test
+    void multipartRequest_decodeFailure_returns400() {
+        // consume 解码失败抛出 DecoderException：应被聚合层捕获并转换为 HTTP 400 优雅关闭，
+        // 而非裸异常经 exceptionCaught 直接关闭连接（fail-closed 但语义明确）。
+        SupportMultipartResolver resolver = new SupportMultipartResolver() {
+            @Override
+            public void consume(HttpContent content) {
+                throw new DecoderException("simulated decode failure");
+            }
+        };
+        SupportMultipartAggregator aggregator = new SupportMultipartAggregator(1024 * 1024, resolver);
+        EmbeddedChannel channel = new EmbeddedChannel(aggregator);
+
+        channel.writeInbound(multipartHead());
+        channel.writeInbound(new DefaultHttpContent(Unpooled.copiedBuffer("garbage", StandardCharsets.UTF_8)));
+
+        Object out = channel.readOutbound();
+        assertTrue(out instanceof FullHttpResponse, "解码失败的 multipart 应回写 400，实际: "
+                + (out == null ? "null" : out.getClass().getName()));
+        assertEquals(HttpResponseStatus.BAD_REQUEST, ((FullHttpResponse) out).status());
+        ((FullHttpResponse) out).release();
         channel.finishAndReleaseAll();
     }
 }

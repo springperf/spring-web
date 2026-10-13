@@ -1,9 +1,12 @@
 package io.springperf.web.server;
 
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.embedded.EmbeddedChannel;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 /**
  * {@link NettyMetricsHandler} 测试：
@@ -36,5 +39,42 @@ class NettyMetricsHandlerTest {
         mainChannel.close();
         mgmtChannel.close();
         mgmtChannel2.close();
+    }
+
+    @Test
+    void channelActive_rejectsWhenOverMaxConnections() {
+        NettyMetricsHandler handler = new NettyMetricsHandler(2);
+        ChannelHandlerContext c1 = mockCtx();
+        handler.channelActive(c1);
+        verify(c1).fireChannelActive();
+        verify(c1, never()).close();
+
+        ChannelHandlerContext c2 = mockCtx();
+        handler.channelActive(c2);
+        verify(c2).fireChannelActive();
+        verify(c2, never()).close();
+
+        // 第 3 个连接超阈值：直接关闭且不向下游 fireChannelActive
+        ChannelHandlerContext c3 = mockCtx();
+        handler.channelActive(c3);
+        verify(c3).close();
+        verify(c3, never()).fireChannelActive();
+    }
+
+    @Test
+    void channelActive_zeroMaxMeansUnlimited() {
+        NettyMetricsHandler handler = new NettyMetricsHandler(0);
+        for (int i = 0; i < 5; i++) {
+            ChannelHandlerContext c = mockCtx();
+            handler.channelActive(c);
+            verify(c).fireChannelActive();
+            verify(c, never()).close();
+        }
+    }
+
+    private static ChannelHandlerContext mockCtx() {
+        ChannelHandlerContext ctx = mock(ChannelHandlerContext.class);
+        when(ctx.channel()).thenReturn(mock(Channel.class));
+        return ctx;
     }
 }

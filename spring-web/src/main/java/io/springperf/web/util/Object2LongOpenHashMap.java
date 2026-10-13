@@ -45,6 +45,20 @@ public class Object2LongOpenHashMap {
         this.value = new long[actualCapacity];
     }
 
+    /**
+     * 拷贝构造：用于 copy-on-write 发布（读线程持有旧快照，写线程基于旧表复制新表）。
+     *
+     * @param other 源表
+     */
+    public Object2LongOpenHashMap(Object2LongOpenHashMap other) {
+        this.mask = other.mask;
+        this.maxFill = other.maxFill;
+        this.loadFactor = other.loadFactor;
+        this.size = other.size;
+        this.key = other.key.clone();
+        this.value = other.value.clone();
+    }
+
     // ========== 公共方法 ==========
 
     public long put(String k, long v) {

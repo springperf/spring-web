@@ -2,6 +2,8 @@ package io.springperf.web.http;
 
 import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.WebContext;
+import io.springperf.web.server.ErrorPageRenderer;
+import io.springperf.web.server.ErrorResponseConfig;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -33,6 +35,8 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
     protected AtomicBoolean committed = new AtomicBoolean(false);
     protected WriteRespEventListener writeRespEventListener;
     protected ScheduledFuture<?> timeoutFuture;
+    /** 请求的 Accept 头：用于错误响应体的内容协商（whitelabel HTML vs JSON）。 */
+    private String acceptHeader;
 
     public BaseWebServerHttpResponse(WebContext webContext, boolean keepAlive, HttpHeaders headers) {
         this.webContext = webContext;
@@ -55,6 +59,19 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
 
     public HttpStatus getStatus() {
         return status;
+    }
+
+    @Override
+    public boolean hasTimeoutArmed() {
+        // 无锁读：调用方在 EventLoop 判别是否需要兜底装配，不应为此抢装配方的锁
+        return timeoutFuture != null;
+    }
+
+    /**
+     * 记录请求的 {@code Accept} 头，供错误响应体做内容协商（显式 JSON 客户端得到 JSON）。
+     */
+    public void setRequestAcceptHeader(String acceptHeader) {
+        this.acceptHeader = acceptHeader;
     }
 
     @Override
@@ -211,8 +228,17 @@ public abstract class BaseWebServerHttpResponse implements WebServerHttpResponse
 
     @SneakyThrows
     public void sendError(HttpStatus statusCode, String message) {
-        String error = "{\"error\":\"" + escapeJson(message) + "\"}";
-        writeDataAndFlush(error.getBytes(characterEncoding), MediaType.APPLICATION_JSON, statusCode);
+        ErrorResponseConfig cfg = resolveErrorConfig();
+        ErrorPageRenderer.ErrorResponseBody body = ErrorPageRenderer.build(
+                statusCode, message, null, cfg, false, false, false, acceptHeader);
+        writeDataAndFlush(body.getBody().getBytes(characterEncoding),
+                MediaType.parseMediaType(body.getContentType()), statusCode);
+    }
+
+    /** 读取错误响应配置：未注册（如非 Netty 嵌入场景）时回退默认（whitelabel 开启、三项均 never）。 */
+    private ErrorResponseConfig resolveErrorConfig() {
+        ErrorResponseConfig cfg = webContext.getWebComponent(ErrorResponseConfig.class);
+        return cfg != null ? cfg : ErrorResponseConfig.DEFAULT;
     }
 
     /**

@@ -12,6 +12,7 @@ import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.DispatcherHandler;
 import io.springperf.web.core.filter.AccessLogWebFilter;
+import io.springperf.web.core.filter.AccessLogWriter;
 import io.springperf.web.core.metrics.WebMetrics;
 import io.springperf.web.server.NettyHttpServer;
 import io.springperf.web.server.PipelineCustomizer;
@@ -58,9 +59,9 @@ public class SpringWebAutoConfiguration {
 
     @Bean
     @ConditionalOnProperty(name = "server.accesslog.enabled", havingValue = "true")
-    public AccessLogWebFilter accessLogWebFilter(Environment environment) {
+    public AccessLogWebFilter accessLogWebFilter(Environment environment, ApplicationProperties props) {
         String format = environment.getProperty("server.accesslog.format");
-        return new AccessLogWebFilter(format);
+        return new AccessLogWebFilter(format, AccessLogWriter.fromProperties(props));
     }
 
     /**

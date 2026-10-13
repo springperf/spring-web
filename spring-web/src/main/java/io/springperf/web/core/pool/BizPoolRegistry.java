@@ -42,6 +42,9 @@ public class BizPoolRegistry extends BaseWebComponent {
     /** 预缓存的默认执行策略：null 表示未初始化（降级为 EventLoop），"eventloop" 表示 EventLoop，其他值为池名。 */
     private volatile String defaultExecuteMode;
 
+    /** {@link #defaultExecuteMode} 是否为 EventLoop 的预计算布尔（请求路径只读，避免字符串比较）。 */
+    private volatile boolean defaultEventLoop;
+
     private WebMetrics metrics;
 
     @Override
@@ -50,8 +53,24 @@ public class BizPoolRegistry extends BaseWebComponent {
         this.metrics = webContext.getWebComponentWithDefault(WebMetrics.class, NoOpWebMetrics.INSTANCE);
         initDefaultPoolFromConfig();
         // 缓存默认执行策略，避免请求路径上查询配置
-        this.defaultExecuteMode = webContext.getProps().get(
+        String mode = webContext.getProps().get(
                 PropertiesConstant.POOL_DEFAULT_EXECUTE_MODE, PropertiesConstant.POOL_DEFAULT_EXECUTE_MODE_DEFAULT);
+        this.defaultExecuteMode = mode;
+        // 与 determinePool 的判定保持一致：null / "eventloop" 均表示无池（EventLoop 同步执行）
+        this.defaultEventLoop = mode == null || RunInPool.EVENTLOOP.equalsIgnoreCase(mode);
+    }
+
+    /**
+     * 默认执行策略是否为 EventLoop（仅当 {@code pool.default-execute-mode=eventloop}；未配置时为
+     * {@code "default"}，即业务池）。
+     *
+     * <p>供响应超时装配决策使用：EventLoop 同步执行期间，超时定时器与被执行的处理器同线程，不可能在
+     * 处理器执行期间触发，故该模式下请求开始无需装配响应超时。</p>
+     *
+     * @return {@code true} 表示默认策略为 EventLoop
+     */
+    public boolean isDefaultEventLoop() {
+        return defaultEventLoop;
     }
 
     @Override

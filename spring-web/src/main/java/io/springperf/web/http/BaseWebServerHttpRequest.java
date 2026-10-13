@@ -81,7 +81,19 @@ public abstract class BaseWebServerHttpRequest implements WebServerHttpRequest, 
     public void setCharacterEncoding(Charset characterEncoding) { this.characterEncoding = characterEncoding; }
     public Map<String, Object> getAttributes() { return attributes; }
     public Object getAttribute(String name) { return attributes.get(name); }
-    public void setAttribute(String name, Object o) { attributes.put(name, o); }
+    /**
+     * Servlet 规范（javax.servlet §4.3/§3.10）：{@code setAttribute(name, null)} 等价于
+     * {@code removeAttribute(name)}。attributes 为 ConcurrentHashMap（拒绝 null 值），
+     * null 值直接 put 会抛 NPE——典型触发点：{@code PerfRequestDispatcher.forward} 在无查询串时
+     * 设置 {@code FORWARD_QUERY_STRING=null}，导致所有 forward / JSP 视图渲染请求 500。
+     */
+    public void setAttribute(String name, Object o) {
+        if (o == null) {
+            attributes.remove(name);
+        } else {
+            attributes.put(name, o);
+        }
+    }
     public Object removeAttribute(String name) { return attributes.remove(name); }
     private static final String FAST_ATTR_PREFIX = BaseWebServerHttpRequest.class.getName() + ".FAST_ATTR.";
 

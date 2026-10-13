@@ -18,6 +18,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,6 +35,12 @@ class PerfHttpSessionManagerTest {
         lenient().when(webContext.getProps()).thenReturn(props);
         lenient().when(webContext.getCtx()).thenReturn(mock(org.springframework.context.ApplicationContext.class));
         lenient().when(props.get(any(), any())).thenAnswer(invocation -> invocation.getArgument(1));
+        // 兜底：未显式桩化的 getBoolean 返回传入默认值（如 persistent 默认 false、cookie.secure 默认 false）
+        lenient().when(props.getBoolean(any(), anyBoolean()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
+        // 兜底：未配置 session.timeout 时 getDurationSeconds 返回默认值 1800s（30 分钟）
+        lenient().when(props.getDurationSeconds(any(), anyLong()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
         manager = new PerfHttpSessionManager();
         manager.initWithWebContext(webContext);
     }
@@ -120,6 +128,8 @@ class PerfHttpSessionManagerTest {
     void getStorage_returnsInMemoryStorage() {
         assertNotNull(manager.getStorage());
         assertInstanceOf(HttpSessionStorage.class, manager.getStorage());
+        // 默认 persistent=false → InMemory 实现
+        assertInstanceOf(InMemoryHttpSessionStorage.class, manager.getStorage());
     }
 
     @Test
@@ -220,11 +230,13 @@ class PerfHttpSessionManagerTest {
     }
 
     @Test
-    void cookieConfig_sameSite_uppercased() {
+    void cookieConfig_sameSite_canonicalizedToNettyEnumName() {
         when(props.get(eq(PerfHttpSessionManager.COOKIE_SAME_SITE_KEY), anyString())).thenReturn("lax");
         PerfHttpSessionManager newManager = new PerfHttpSessionManager();
         newManager.initWithWebContext(webContext);
-        assertEquals("LAX", newManager.getSameSite());
+        // Netty CookieHeaderNames.SameSite 枚举常量为 Lax/Strict/None（非全大写），
+        // valueOf 必须使用精确常量名，否则 SameSite 配置触发 IllegalArgumentException
+        assertEquals("Lax", newManager.getSameSite());
     }
 
     @Test
@@ -246,5 +258,70 @@ class PerfHttpSessionManagerTest {
         assertNotNull(fresh);
         assertNull(manager.getSession(old.getId()));
         assertEquals("v", fresh.getAttribute("k"));
+    }
+
+    @Test
+    void saveSession_invalidSession_doesNotRevive() {
+        // L8：已失效会话（invalidate 已从 storage 移除并设置 data.invalid）被另一在途 wrapper
+        // 调 saveSession 时，不应重新持久化复活。
+        PerfHttpSession a = manager.createSession();
+        String id = a.getId();
+        a.invalidate();
+        // 模拟同一底层 data 的另一并发 wrapper（servletContext 无关紧要，复用 manager 已持有的即可）
+        PerfHttpSession b = new PerfHttpSession(a.getData(), manager.getServletContext());
+        manager.saveSession(b);
+        assertNull(manager.getSession(id), "已失效会话不应被 saveSession 重新持久化");
+    }
+
+    // ==================== server.servlet.session.persistent ====================
+
+    @Test
+    void persistent_enabled_usesFileStorage(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir)
+            throws Exception {
+        when(props.getBoolean(io.springperf.web.context.PropertiesConstant.SERVLET_SESSION_PERSISTENT,
+                io.springperf.web.context.PropertiesConstant.SERVLET_SESSION_PERSISTENT_DEFAULT))
+                .thenReturn(true);
+        when(props.get(io.springperf.web.context.PropertiesConstant.SERVLET_SESSION_STORE_DIR,
+                io.springperf.web.context.PropertiesConstant.SERVLET_SESSION_STORE_DIR_DEFAULT))
+                .thenReturn(tempDir.toString());
+
+        PerfHttpSessionManager newManager = new PerfHttpSessionManager();
+        newManager.initWithWebContext(webContext);
+        try {
+            assertInstanceOf(FileHttpSessionStorage.class, newManager.getStorage(),
+                    "persistent=true 应使用 FileHttpSessionStorage");
+        } finally {
+            newManager.destroyComponent();
+        }
+    }
+
+    @Test
+    void persistent_disabled_usesInMemoryStorage() throws Exception {
+        when(props.getBoolean(io.springperf.web.context.PropertiesConstant.SERVLET_SESSION_PERSISTENT,
+                io.springperf.web.context.PropertiesConstant.SERVLET_SESSION_PERSISTENT_DEFAULT))
+                .thenReturn(false);
+
+        PerfHttpSessionManager newManager = new PerfHttpSessionManager();
+        newManager.initWithWebContext(webContext);
+        try {
+            assertInstanceOf(InMemoryHttpSessionStorage.class, newManager.getStorage(),
+                    "persistent=false 应使用 InMemoryHttpSessionStorage");
+        } finally {
+            newManager.destroyComponent();
+        }
+    }
+
+    @Test
+    void customStorageBean_takesPrecedenceOverPersistent() {
+        // 容器中存在自定义 HttpSessionStorage bean 时，即使 persistent=true 也优先使用该 bean
+        HttpSessionStorage custom = mock(HttpSessionStorage.class);
+        when(webContext.getBeanFromCtx(HttpSessionStorage.class)).thenReturn(custom);
+        lenient().when(props.getBoolean(io.springperf.web.context.PropertiesConstant.SERVLET_SESSION_PERSISTENT,
+                io.springperf.web.context.PropertiesConstant.SERVLET_SESSION_PERSISTENT_DEFAULT))
+                .thenReturn(true);
+
+        PerfHttpSessionManager newManager = new PerfHttpSessionManager();
+        newManager.initWithWebContext(webContext);
+        assertSame(custom, newManager.getStorage());
     }
 }

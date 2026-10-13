@@ -22,7 +22,19 @@ import org.springframework.context.annotation.Configuration;
 public class JspViewAutoConfiguration {
 
     @Bean @ConditionalOnMissingBean
-    public JspViewResolver jspViewResolver() {
-        return new JspViewResolver();
+    public JspViewResolver jspViewResolver(io.springperf.web.context.ApplicationProperties props) {
+        // spring.mvc.view.prefix/suffix：仅作用于 JSP 视图（对齐 Boot 的 InternalResourceViewResolver 语义）；
+        // 未配置或空串时回退框架默认（/jsp/ 与 .jsp），保持既有行为。
+        String prefix = props.get(io.springperf.web.context.PropertiesConstant.MVC_VIEW_PREFIX,
+                io.springperf.web.context.PropertiesConstant.MVC_VIEW_PREFIX_DEFAULT);
+        String suffix = props.get(io.springperf.web.context.PropertiesConstant.MVC_VIEW_SUFFIX,
+                io.springperf.web.context.PropertiesConstant.MVC_VIEW_SUFFIX_DEFAULT);
+        if (prefix == null || prefix.isEmpty()) {
+            prefix = io.springperf.web.context.PropertiesConstant.MVC_VIEW_PREFIX_DEFAULT;
+        }
+        if (suffix == null || suffix.isEmpty()) {
+            suffix = io.springperf.web.context.PropertiesConstant.MVC_VIEW_SUFFIX_DEFAULT;
+        }
+        return new JspViewResolver(prefix, suffix);
     }
 }
