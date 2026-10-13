@@ -2,3 +2,17 @@
 # 会报 invalid option name（Git Bash 的 bash 容忍 CRLF，WSL 内严格报错）。
 # autocrlf=true 会把 git 存储的 LF 检出为 CRLF，这里用 eol=lf 覆盖。
 *.sh text eol=lf
+
+# 仓库统一（P1）：文本文件入库一律 LF（索引 blobs 本就是 LF），工作区行尾交给各端配置；
+# text=auto 让 clean 过滤器在比较时把 CRLF 归一为 LF —— 消除"索引 LF / 工作区 CRLF"造成的
+# 千余个假性修改，且不产生任何 blob 变更。
+* text=auto
+# Windows 批处理检出保持 CRLF（cmd 对 LF 宽容，仅是惯例）
+*.bat text eol=crlf
+*.cmd text eol=crlf
+# 常见二进制显式标记（其余二进制由 text=auto 自动识别）
+*.jar binary
+*.png binary
+*.gif binary
+*.ico binary
+*.jks binary

@@ -58,3 +58,10 @@ __pycache__/
 !/spring-web-benchmark/analyze_jfr.py
 !/spring-web-servlet/src/test/resources/perf-web/placeholder.txt
 /promotion/
+
+# 本地参考工作树 / 同步备份 / 工具目录（不入库）
+/.master-ref/
+/.sync-backup/
+/.workbuddy/
+/.codebuddy/
+/.vscode/
