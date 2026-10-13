@@ -151,6 +151,10 @@ class DefaultNettyStreamSenderTest {
         for (HttpContent c : httpContentCaptor.getAllValues()) {
             if (c instanceof LastHttpContent) {
                 last = (LastHttpContent) c;
+            } else if (c.content().refCnt() > 0) {
+                // 数据帧：mock channel 不接管释放（生产环境由 Netty 写出后释放），
+                // 测试侧必须自行释放，否则 paranoid 泄漏检测报 LEAK。
+                c.content().release();
             }
         }
         assertNotNull(last, "complete 必须写出 LastHttpContent");
@@ -258,6 +262,10 @@ class DefaultNettyStreamSenderTest {
             // 只统计数据帧，排除 LastHttpContent（Mockito 4 下 captor 会捕获到它）
             if (c instanceof DefaultHttpContent) {
                 written += c.content().readableBytes();
+            }
+            // mock channel 不接管释放：不自行释放则池化 buf 在 GC 时被报为 LEAK
+            if (c.content().refCnt() > 0) {
+                c.content().release();
             }
         }
         assertEquals(10, written, "所有已发送数据必须完整写出，不允许截断");

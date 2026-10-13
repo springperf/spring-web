@@ -436,6 +436,13 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
         }
         applySwallowLimit();
         if (responseHeadersExceedLimit()) {
+            // 本 buf 的所有权已由调用方（flush(boolean)）takePendingBuf() 摘出来交给本方法，
+            // 而 writeHeaderTooLarge() 只释放 this.buf（此处字段已被摘空 → 为 null），
+            // 故必须在此就地释放：不释放则这块池化 buf 从此不可达
+            // （paranoid 实测：ResponseHeaderLimitE2eTest#oversizedResponseHeaders_degradeToMinimal500
+            // 的 /e2e-hdr/big 响应体「should-not-be-written」稳定泄漏）。
+            // 与上方「已提交拒写」分支、以及 HEAD 抑制分支保持一致的「消费即拥有、拒绝即释放」。
+            releasePendingBuf(buf);
             writeHeaderTooLarge();
             return;
         }

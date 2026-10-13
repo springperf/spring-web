@@ -165,8 +165,42 @@ public interface WebServerHttpResponse extends ServerHttpResponse {
     void sendError(HttpStatus statusCode, String message);
 
     /**
+     * 携带原始异常发送错误响应，使底层可按 {@code server.error.include-stacktrace}/{@code include-binding-errors}
+     * 暴露栈与校验错误。
+     * <p>默认退化为 {@link #sendError(HttpStatus, String)}（不透出异常信息），实现类可覆写完整入口。</p>
+     *
+     * @param statusCode HTTP 状态码
+     * @param message    错误消息
+     * @param cause      原始异常（可空）
+     */
+    default void sendError(HttpStatus statusCode, String message, Throwable cause) {
+        sendError(statusCode, message);
+    }
+
+    /**
+     * 携带异常并按 {@code on-param} 模式（请求参数 {@code trace}/{@code message} 命中时）决定是否暴露栈/消息。
+     * <p>默认退化为 {@link #sendError(HttpStatus, String, Throwable)}（errors 参数不命中）。</p>
+     *
+     * @param statusCode               HTTP 状态码
+     * @param message                  错误消息
+     * @param cause                    原始异常（可空）
+     * @param includeStacktraceOnParam on-param 模式下是否命中 trace 参数
+     * @param includeMessageOnParam    on-param 模式下是否命中 message 参数
+     */
+    default void sendError(HttpStatus statusCode, String message, Throwable cause, boolean includeStacktraceOnParam,
+            boolean includeMessageOnParam) {
+        sendError(statusCode, message, cause, includeStacktraceOnParam, includeMessageOnParam, false);
+    }
+
+    /**
      * 完整错误响应入口：按 {@code server.error.*}（{@link io.springperf.web.server.ErrorResponseConfig}）渲染 whitelabel HTML 或 JSON，
      * 并由调用方告知 {@code on-param} 模式下 trace / message / errors 参数是否命中。
+     * <p>默认退化为 {@link #sendError(HttpStatus, String, Throwable)} 的等价链路（透出 message 但不透出栈/绑定错误）；
+     * {@code BaseWebServerHttpResponse} 覆写本方法承载真正的渲染逻辑。</p>
+     * <p>
+     * 与 master 的差异（版本层）：master 以 {@code HttpStatusCode} 承载非标准状态码（如 499/599）；
+     * Spring 5.3 无该类型，本分支只能用 {@link HttpStatus} 枚举。
+     * </p>
      *
      * @param statusCode       HTTP 状态码
      * @param message          错误消息
@@ -175,8 +209,10 @@ public interface WebServerHttpResponse extends ServerHttpResponse {
      * @param includeMessageOnParam    on-param 模式下是否命中 message 参数
      * @param includeErrorsOnParam     on-param 模式下是否命中 errors 参数
      */
-    void sendError(HttpStatus statusCode, String message, Throwable cause, boolean includeStacktraceOnParam,
-            boolean includeMessageOnParam, boolean includeErrorsOnParam);
+    default void sendError(HttpStatus statusCode, String message, Throwable cause, boolean includeStacktraceOnParam,
+            boolean includeMessageOnParam, boolean includeErrorsOnParam) {
+        sendError(statusCode, message, cause);
+    }
 
     /**
      * Write an {@link InputStream} to the response body as a stream.

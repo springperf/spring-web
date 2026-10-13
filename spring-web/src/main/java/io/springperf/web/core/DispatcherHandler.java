@@ -290,7 +290,7 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
         }
         // 每请求新建异常（fillInStackTrace 已禁用，零栈轨迹开销），避免复用单例导致
         // @ExceptionHandler 修改 headers/body 污染后续请求。
-        // 注：core 不依赖 jakarta.servlet-api，无法构造 Spring 的
+        // 注：core 不依赖 javax.servlet-api，无法构造 Spring 的
         // HttpRequestMethodNotSupportedException / HttpMediaTypeNotSupportedException，
         // 统一以 ResponseStatusException 承载状态码，Allow 等语义头在此直接写入
         // （@ControllerAdvice 仍可按 ResponseStatusException 拦截）。

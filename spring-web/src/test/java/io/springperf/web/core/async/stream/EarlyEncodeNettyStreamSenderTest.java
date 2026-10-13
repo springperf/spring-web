@@ -6,6 +6,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultHttpContent;
+import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.concurrent.EventExecutor;
 import io.springperf.web.core.async.PerfAsyncWebRequest;
@@ -47,8 +48,6 @@ class EarlyEncodeNettyStreamSenderTest {
 
     @Captor
     ArgumentCaptor<DefaultHttpContent> httpContentCaptor;
-    @Captor
-    ArgumentCaptor<LastHttpContent> lastHttpContentCaptor;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -126,9 +125,20 @@ class EarlyEncodeNettyStreamSenderTest {
         sender.send("data".getBytes(StandardCharsets.UTF_8));
         sender.complete(true, null);
 
-        verify(channel, atLeastOnce()).writeAndFlush(lastHttpContentCaptor.capture());
-        assertTrue(lastHttpContentCaptor.getValue() instanceof LastHttpContent);
-        lastHttpContentCaptor.getValue().release();
+        // 2.7.x 适配：Mockito 4 的 ArgumentCaptor 会捕获所有入参（含 DefaultHttpContent 数据帧），
+        // 故用父接口捕获 + instanceof 过滤，不能直接按 LastHttpContent 取值。
+        ArgumentCaptor<HttpContent> captor = ArgumentCaptor.forClass(HttpContent.class);
+        verify(channel, atLeastOnce()).writeAndFlush(captor.capture());
+        LastHttpContent last = null;
+        for (HttpContent c : captor.getAllValues()) {
+            if (c instanceof LastHttpContent) {
+                last = (LastHttpContent) c;
+            }
+        }
+        assertNotNull(last, "complete 必须写出 LastHttpContent");
+        // 数据帧 + 终止块的所有权在 mock channel 上无人接管（生产环境由 Netty 写出后释放），
+        // 必须由测试自行释放，否则 paranoid 泄漏检测报 LEAK。
+        releaseWrittenContents(captor);
     }
 
     @Test
@@ -141,5 +151,24 @@ class EarlyEncodeNettyStreamSenderTest {
         sender.complete(true, null);
 
         assertThrows(IOException.class, () -> sender.send("more".getBytes(StandardCharsets.UTF_8)));
+
+        ArgumentCaptor<HttpContent> captor = ArgumentCaptor.forClass(HttpContent.class);
+        verify(channel, atLeastOnce()).writeAndFlush(captor.capture());
+        releaseWrittenContents(captor);
+    }
+
+    /**
+     * 释放 mock channel 收到的全部内容帧缓冲。
+     * <p>生产环境中帧写出后由 Netty 接管并释放；mock channel 不会接管，
+     * 测试侧不释放则这块池化 ByteBuf 在 GC 时被 paranoid 泄漏检测报为 LEAK
+     * （{@code ByteBuf.release() was not called before it's garbage-collected}）。</p>
+     */
+    private static void releaseWrittenContents(ArgumentCaptor<HttpContent> captor) {
+        for (HttpContent content : captor.getAllValues()) {
+            // LastHttpContent.EMPTY_LAST_CONTENT 基于 Unpooled.EMPTY_BUFFER，release 为无副作用空操作
+            if (content.content().refCnt() > 0) {
+                content.content().release();
+            }
+        }
     }
 }

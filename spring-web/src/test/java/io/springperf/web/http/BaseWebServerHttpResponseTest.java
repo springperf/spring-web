@@ -115,6 +115,54 @@ class BaseWebServerHttpResponseTest {
         assertTrue(response.isHandled());
     }
 
+    /**
+     * 3 参 default 重载（{@code sendError(status, message, cause)}）：与 master 同款——退化为 2 参重载后
+     * 仍走「完整入口」渲染（message 按 include-message 策略暴露，cause 仅作为渲染上下文传入）。
+     */
+    @Test void sendError_withCause_delegatesToMessageOverload() {
+        when(webContext.getWebComponent(ErrorResponseConfig.class)).thenReturn(jsonConfig());
+        response.sendError(HttpStatus.BAD_GATEWAY, "bad upstream", new IllegalStateException("root"));
+        assertTrue(response.isHandled());
+        assertTrue(response.flushed);
+        assertEquals(HttpStatus.BAD_GATEWAY, response.getStatus());
+        assertTrue(new String(response.body.toByteArray(), java.nio.charset.StandardCharsets.UTF_8).contains("bad upstream"));
+    }
+
+    /**
+     * 5 参 default 重载：{@code on-param} 模式下 trace 命中标志必须透传到完整入口，
+     * 否则 {@code server.error.include-stacktrace=on-param} 形同虚设。
+     */
+    @Test void sendError_fiveArg_forwardsOnParamFlags() {
+        when(webContext.getWebComponent(ErrorResponseConfig.class)).thenReturn(new ErrorResponseConfig(
+                ErrorResponseConfig.IncludePolicy.ON_PARAM, ErrorResponseConfig.IncludePolicy.NEVER,
+                ErrorResponseConfig.IncludePolicy.NEVER, false, "/error"));
+
+        response.sendError(HttpStatus.BAD_GATEWAY, "bad upstream", new IllegalStateException("root"), true, false);
+        String traceHit = new String(response.body.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
+        assertTrue(traceHit.contains("IllegalStateException"), "trace 命中时异常栈应暴露，实际 body=" + traceHit);
+
+        TestResponse miss = new TestResponse(webContext, false);
+        miss.sendError(HttpStatus.BAD_GATEWAY, "bad upstream", new IllegalStateException("root"), false, false);
+        String traceMiss = new String(miss.body.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
+        assertFalse(traceMiss.contains("IllegalStateException"), "trace 未命中时不得暴露异常栈，实际 body=" + traceMiss);
+    }
+
+    /**
+     * 6 参 default 重载（接口层，master 同款）：未覆写完整入口的实现类只需实现 2 参重载即可编译运行——
+     * 6 参默认实现按 6 参 → 3 参 → 2 参链路退化（fail-closed：不透出栈/绑定错误）。
+     */
+    @Test void sendError_defaultOverloadChain_degradesToMinimalContract() {
+        WebServerHttpResponse minimal = mock(WebServerHttpResponse.class, CALLS_REAL_METHODS);
+        minimal.sendError(HttpStatus.BAD_REQUEST, "m", null, true, true, true);
+        verify(minimal).sendError(HttpStatus.BAD_REQUEST, "m", null);
+        verify(minimal).sendError(HttpStatus.BAD_REQUEST, "m");
+
+        WebServerHttpResponse fiveArg = mock(WebServerHttpResponse.class, CALLS_REAL_METHODS);
+        fiveArg.sendError(HttpStatus.BAD_REQUEST, "m", null, true, true);
+        verify(fiveArg).sendError(HttpStatus.BAD_REQUEST, "m", null, true, true, false);
+        verify(fiveArg).sendError(HttpStatus.BAD_REQUEST, "m");
+    }
+
     @Test void writeDataAndFlush_setsContentType() {
         // 关闭 whitelabel → JSON 错误体（application/json;charset=UTF-8）
         when(webContext.getWebComponent(ErrorResponseConfig.class)).thenReturn(jsonConfig());

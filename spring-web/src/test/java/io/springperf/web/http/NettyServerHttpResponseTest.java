@@ -152,6 +152,36 @@ class NettyServerHttpResponseTest {
         assertTrue(captor.getValue() instanceof io.netty.handler.codec.http.FullHttpResponse);
     }
 
+    /**
+     * 响应头总量超限 → 降级为最小 500 时，本次 flush 已经 takePendingBuf() 摘出来的业务 body
+     * 必须被就地释放：writeHeaderTooLarge 只释放 this.buf（字段已摘空 → null），
+     * 若本分支不释放，这块池化 buf 从此不可达（paranoid 实测泄漏路径，见
+     * ResponseHeaderLimitE2eTest#oversizedResponseHeaders_degradeToMinimal500）。
+     */
+    @Test
+    void flush_responseHeadersExceedLimit_releasesPendingBuf_andWritesMinimal500() {
+        when(ctx.writeAndFlush(any())).thenReturn(mock(ChannelFuture.class));
+        ByteBuf body = Unpooled.buffer(64);
+        when(allocator.buffer(256)).thenReturn(body);
+
+        NettyServerHttpResponse limited =
+                new NettyServerHttpResponse(webContext, ctx, true, new ResponseLimitConfig(-1, 512), 0L);
+        char[] bigHeader = new char[2000];
+        java.util.Arrays.fill(bigHeader, 'b');
+        limited.getHeaders().set("X-Big", new String(bigHeader));
+
+        assertDoesNotThrow(() -> limited.getBody().write("should-not-be-written".getBytes(StandardCharsets.UTF_8)));
+        assertDoesNotThrow(() -> limited.flush());
+
+        assertEquals(0, body.refCnt(), "响应头超限降级为最小 500 时，已缓冲的 body ByteBuf 必须被释放，否则池化泄漏");
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(ctx).writeAndFlush(captor.capture());
+        FullHttpResponse written = (FullHttpResponse) captor.getValue();
+        assertEquals(500, written.status().code(), "超限响应应降级为最小 500");
+        assertEquals(0, written.content().readableBytes(), "降级响应体必须为空（业务内容已丢弃）");
+    }
+
     @Test
     void writeStream_writesChunkedStream() {
         ChannelFuture future = mock(ChannelFuture.class);

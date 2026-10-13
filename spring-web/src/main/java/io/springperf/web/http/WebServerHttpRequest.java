@@ -5,9 +5,13 @@ import io.springperf.web.http.support.BodyHttpInputMessage;
 import io.springperf.web.http.support.HttpInputMessagePart;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.server.ServerHttpRequest;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Locale;
@@ -22,6 +26,40 @@ import java.util.Map;
  * for body reading support.
  */
 public interface WebServerHttpRequest extends ServerHttpRequest, BodyHttpInputMessage {
+
+    /**
+     * Return the request URI. Never {@code null} in this framework: implementations either build it eagerly (Netty) or
+     * hold it from construction (forwarded requests), so callers may dereference the result directly. Redeclared here
+     * (with the annotation) because the inherited declaration comes from the Spring jar, where the contract is not
+     * visible to static analysis.
+     * <p>
+     * Note the boundary: "never {@code null}" is not the same as "never fails" - {@code URI.create} still throws
+     * {@link IllegalArgumentException} for a malformed authority, and callers that need to survive that must catch it.
+     *
+     * @return the request URI, never {@code null}
+     */
+    @Override
+    @NonNull
+    URI getURI();
+
+    /**
+     * Return the remote (client) address. {@code null} when the channel is not connected or already closed; callers are
+     * expected to tolerate that (see {@code NettyHttpServletRequest}, {@code AccessLogWebFilter}).
+     *
+     * @return the remote address, or {@code null} if unavailable
+     */
+    @Override
+    @Nullable
+    InetSocketAddress getRemoteAddress();
+
+    /**
+     * Return the local (server) address. {@code null} when the channel has no bound local address.
+     *
+     * @return the local address, or {@code null} if unavailable
+     */
+    @Override
+    @Nullable
+    InetSocketAddress getLocalAddress();
 
     /**
      * Return the full request URI including the query string.
