@@ -1,7 +1,6 @@
 package io.springperf.web.websocket.jsr;
 
 import javax.websocket.server.ServerEndpoint;
-import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.boot.autoconfigure.AutoConfigurationPackages;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
@@ -61,7 +60,12 @@ public class JsrEndpointScanner {
         scanner.addIncludeFilter(new AnnotationTypeFilter(ServerEndpoint.class));
         for (String basePackage : resolveBasePackages()) {
             scanner.findCandidateComponents(basePackage).forEach(bd -> {
-                Class<?> type = resolveClassName(bd.getBeanClassName());
+                // getBeanClassName 声明为 @Nullable：解析不出类名就跳过该候选组件
+                String beanClassName = bd.getBeanClassName();
+                if (beanClassName == null) {
+                    return;
+                }
+                Class<?> type = resolveClassName(beanClassName);
                 if (type != null) {
                     classes.add(type);
                 }
@@ -72,17 +76,21 @@ public class JsrEndpointScanner {
 
     private List<Class<?>> scanBeans() {
         List<Class<?>> classes = new ArrayList<>();
-        if (applicationContext instanceof ListableBeanFactory) {
-            String[] names = ((ListableBeanFactory) applicationContext)
-                    .getBeanNamesForAnnotation(ServerEndpoint.class);
-            if (names == null) {
-                return classes;
-            }
-            for (String name : names) {
-                Class<?> type = applicationContext.getType(name);
-                if (type != null) {
-                    classes.add(type);
-                }
+        // ApplicationContext 本身即 ListableBeanFactory（父接口），instanceof + 强转恒真，属冗余判断；
+        // 对 null 的容忍保留（旧代码里 null instanceof 为 false，语义等价）
+        if (applicationContext == null) {
+            return classes;
+        }
+        String[] names = applicationContext.getBeanNamesForAnnotation(ServerEndpoint.class);
+        // 保留判空：JsrEndpointScannerTest#scan_beanNamesForAnnotationNull_returnsEmpty 明确要求
+        // 容忍返回 null（Spring 文档虽称恒非空，本仓按容错契约处理）→ RCN 的已知误报，不删守卫。
+        if (names == null) {
+            return classes;
+        }
+        for (String name : names) {
+            Class<?> type = applicationContext.getType(name);
+            if (type != null) {
+                classes.add(type);
             }
         }
         return classes;

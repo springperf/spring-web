@@ -84,6 +84,12 @@ public class JsrEndpointMetadata {
     private final List<ParamSpec> onCloseParams;
     private final List<ParamSpec> onErrorParams;
 
+    /** 上面四张参数表的只读视图缓存：getter 在每次 open / message / close / error 派发时被调用，逐次新建包装属白扔；字段是 final，故构造期建好即可。 */
+    private final List<ParamSpec> onOpenParamsView;
+    private final List<ParamSpec> onMessageParamsView;
+    private final List<ParamSpec> onCloseParamsView;
+    private final List<ParamSpec> onErrorParamsView;
+
     /** @OnMessage 消息体参数规格（无消息参数时为 null）。 */
     private final ParamSpec messageParam;
 
@@ -110,6 +116,11 @@ public class JsrEndpointMetadata {
         this.onMessageParams = onMessage != null ? parseParams(onMessage, false) : Collections.emptyList();
         this.onCloseParams = onClose != null ? parseParams(onClose, false) : Collections.emptyList();
         this.onErrorParams = onError != null ? parseParams(onError, false) : Collections.emptyList();
+
+        this.onOpenParamsView = Collections.unmodifiableList(onOpenParams);
+        this.onMessageParamsView = Collections.unmodifiableList(onMessageParams);
+        this.onCloseParamsView = Collections.unmodifiableList(onCloseParams);
+        this.onErrorParamsView = Collections.unmodifiableList(onErrorParams);
 
         this.messageParam = findMessageParam(onMessageParams);
     }
@@ -192,15 +203,16 @@ public class JsrEndpointMetadata {
     }
 
     public String[] getSubprotocols() {
-        return subprotocols;
+        // 返回副本，避免调用方改动内部配置数组
+        return subprotocols.clone();
     }
 
     public List<Class<? extends Decoder>> getDecoders() {
-        return decoders;
+        return new java.util.ArrayList<>(decoders);
     }
 
     public List<Class<? extends Encoder>> getEncoders() {
-        return encoders;
+        return new java.util.ArrayList<>(encoders);
     }
 
     public Class<? extends ServerEndpointConfig.Configurator> getConfiguratorClass() {
@@ -224,19 +236,19 @@ public class JsrEndpointMetadata {
     }
 
     public List<ParamSpec> getOnOpenParams() {
-        return onOpenParams;
+        return onOpenParamsView;
     }
 
     public List<ParamSpec> getOnMessageParams() {
-        return onMessageParams;
+        return onMessageParamsView;
     }
 
     public List<ParamSpec> getOnCloseParams() {
-        return onCloseParams;
+        return onCloseParamsView;
     }
 
     public List<ParamSpec> getOnErrorParams() {
-        return onErrorParams;
+        return onErrorParamsView;
     }
 
     public ParamSpec getMessageParam() {

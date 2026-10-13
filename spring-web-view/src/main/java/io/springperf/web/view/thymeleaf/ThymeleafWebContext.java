@@ -12,6 +12,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -25,7 +26,8 @@ import java.util.Set;
  * {@code IWebExchange}），该包在 3.0 中不存在；3.0 的 {@code IWebContext} 直接暴露
  * {@code javax.servlet.*}。因此这里改为：变量/区域沿用 {@link org.thymeleaf.context.IContext}
  * 的本地实现，web 能力（request / response / session / ServletContext）委托给
- * {@link WebExchangeProvider} 提供的 {@link WebExchange}。</p>
+ * {@link WebExchangeProvider} 提供的 {@link WebExchange}；会话属性另行注入模板变量
+ * （见 {@code buildVariables}），使模板无需依赖 {@code #session} 表达式对象。</p>
  *
  * <ul>
  *   <li>原生场景（仅 {@code spring-web}）：{@link DefaultWebExchangeProvider} 提供空实现，
@@ -59,9 +61,34 @@ public class ThymeleafWebContext implements IWebContext {
         WebExchangeProvider p = provider != null ? provider : new DefaultWebExchangeProvider();
         this.exchange = p.createExchange(req, resp);
         this.locale = locale != null ? locale : Locale.getDefault();
-        this.variables = model != null
-                ? new LinkedHashMap<>(model)
-                : Collections.emptyMap();
+        this.variables = buildVariables(model, this.exchange);
+    }
+
+    /**
+     * 合并 session 属性与 model 变量。
+     *
+     * <p>模板不应依赖容器专有的 {@code #session} 表达式对象（master 基线 Thymeleaf 3.1 已
+     * 将其移除），统一把会话数据注入上下文变量，使模板在 3.0 / 3.1 上行为一致；
+     * <b>model 优先</b>（同名时以 model 为准），避免覆盖控制器显式设置的值。</p>
+     *
+     * <p>无会话时零拷贝：{@link WebExchange#getSession()} 为 {@code getSession(false)} 语义
+     * （服务端不隐式创建会话），原生场景与匿名访问均返回 {@code null}，此时直接使用 model 副本。</p>
+     */
+    private static Map<String, Object> buildVariables(Map<String, ?> model, WebExchange exchange) {
+        HttpSession session = exchange != null ? exchange.getSession() : null;
+        Enumeration<String> names = session != null ? session.getAttributeNames() : null;
+        if (names == null || !names.hasMoreElements()) {
+            return model != null ? new LinkedHashMap<>(model) : Collections.emptyMap();
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        do {
+            String name = names.nextElement();
+            result.put(name, session.getAttribute(name));
+        } while (names.hasMoreElements());
+        if (model != null) {
+            result.putAll(model);
+        }
+        return result;
     }
 
     @Override

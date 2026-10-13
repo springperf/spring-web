@@ -169,7 +169,15 @@ public class JsrEndpointWebSocketHandler implements WebSocketHandler {
      */
     private Map<String, String> resolvePathParameters(WebSocketSession springSession) {
         RouteMatcher routeMatcher = io.springperf.web.util.PathPatternUtils.getPatternRouteMatcher();
-        String requestPath = springSession.getUri().getPath();
+        // getUri()/getPath() 均可为 null（opaque URI 等）：无路径则无路径变量
+        java.net.URI uri = springSession.getUri();
+        if (uri == null) {
+            return java.util.Collections.emptyMap();
+        }
+        String requestPath = uri.getPath();
+        if (requestPath == null) {
+            return java.util.Collections.emptyMap();
+        }
         RouteMatcher.Route route = routeMatcher.parseRoute(requestPath);
         Map<String, String> variables = routeMatcher.matchAndExtract(metadata.getPath(), route);
         return variables != null ? variables : java.util.Collections.emptyMap();

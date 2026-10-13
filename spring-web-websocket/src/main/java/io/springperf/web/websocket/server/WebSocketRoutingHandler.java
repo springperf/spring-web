@@ -190,6 +190,13 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
         // 将路径变量存入 session attributes（如 roomId=123）
         session.getAttributes().putAll(result.uriVariables);
 
+        // 帧大小上限（支持 per-path 覆盖）：仅在有有效配置时应用，避免覆盖 session 默认值
+        long effectiveMessageSizeLimit = resolveMessageSizeLimit(result.registration);
+        if (effectiveMessageSizeLimit > 0) {
+            session.setTextMessageSizeLimit((int) effectiveMessageSizeLimit);
+            session.setBinaryMessageSizeLimit((int) effectiveMessageSizeLimit);
+        }
+
         // 切换 pipeline：移除 HTTP handler，添加 WebSocket 帧编解码器
         ChannelPipeline pipeline = ctx.pipeline();
         String currentName = ctx.name();
@@ -399,6 +406,12 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
             @Nullable io.springperf.web.websocket.WebSocketHandlerRegistration reg) {
         if (reg != null && reg.getHeartbeatInterval() != null) return reg.getHeartbeatInterval();
         return heartbeatInterval;
+    }
+
+    private long resolveMessageSizeLimit(
+            @Nullable io.springperf.web.websocket.WebSocketHandlerRegistration reg) {
+        if (reg != null && reg.getMessageSizeLimit() != null) return reg.getMessageSizeLimit();
+        return -1;
     }
 
     @Nullable

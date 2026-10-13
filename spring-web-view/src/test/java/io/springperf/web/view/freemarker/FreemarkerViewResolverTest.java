@@ -27,9 +27,11 @@ class FreemarkerViewResolverTest {
     @BeforeEach
     void setUp() {
         props = mock(ApplicationProperties.class);
-        when(props.get(ViewProperties.FREEMARKER_PREFIX, ViewProperties.FREEMARKER_PREFIX_DEFAULT)).thenReturn("templates/");
+        when(props.get(ViewProperties.FREEMARKER_PREFIX, ViewProperties.FREEMARKER_PREFIX_DEFAULT))
+                .thenReturn("templates/");
         when(props.get(ViewProperties.FREEMARKER_SUFFIX, ViewProperties.FREEMARKER_SUFFIX_DEFAULT)).thenReturn(".ftl");
-        when(props.getBoolean(ViewProperties.FREEMARKER_CACHE, ViewProperties.FREEMARKER_CACHE_DEFAULT)).thenReturn(true);
+        when(props.getBoolean(ViewProperties.FREEMARKER_CACHE, ViewProperties.FREEMARKER_CACHE_DEFAULT))
+                .thenReturn(true);
         webContext = mock(WebContext.class);
         when(webContext.getProps()).thenReturn(props);
     }
@@ -81,6 +83,28 @@ class FreemarkerViewResolverTest {
     }
 
     @Test
+    void viewRender_htmlEscapesModelValues() throws Exception {
+        // 回归：模板以 <#ftl output_format="HTML"> 声明输出格式，model 中的 HTML 元字符必须被转义，
+        // 否则本可执行 ?name=<script>alert(1)</script> 之类输入造成 XSS。
+        FreemarkerViewResolver resolver = buildResolver();
+        View view = resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class));
+
+        WebServerHttpRequest req = mock(WebServerHttpRequest.class);
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        when(resp.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
+        ByteArrayOutputStream body = new ByteArrayOutputStream();
+        when(resp.getBody()).thenReturn(body);
+
+        Map<String, Object> model = new HashMap<>();
+        model.put("name", "<script>alert(1)</script>");
+        view.render(model, req, resp);
+
+        String output = new String(body.toByteArray(), StandardCharsets.UTF_8);
+        assertFalse(output.contains("<script>"), "model 中的 HTML 不应原样输出: " + output);
+        assertTrue(output.contains("&lt;script&gt;"), "HTML 元字符应被转义: " + output);
+    }
+
+    @Test
     void viewRender_concurrentSameView_doesNotMutateSharedTemplate() throws Exception {
         FreemarkerViewResolver resolver = buildResolver();
         View view = resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class));
@@ -90,14 +114,12 @@ class FreemarkerViewResolverTest {
         // template.setOutputEncoding(...)，在并发渲染同一视图时产生数据竞争并互相覆盖编码。
         java.lang.reflect.Field templateField = view.getClass().getDeclaredField("template");
         templateField.setAccessible(true);
-        freemarker.template.Template template =
-                (freemarker.template.Template) templateField.get(view);
+        freemarker.template.Template template = (freemarker.template.Template) templateField.get(view);
 
         int threads = 32;
         java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
         java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(threads);
-        java.util.List<Throwable> errors =
-                java.util.Collections.synchronizedList(new java.util.ArrayList<Throwable>());
+        java.util.List<Throwable> errors = java.util.Collections.synchronizedList(new java.util.ArrayList<Throwable>());
         for (int i = 0; i < threads; i++) {
             final int idx = i;
             Thread t = new Thread(() -> {

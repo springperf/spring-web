@@ -12,6 +12,7 @@ import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -22,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class ThymeleafWebContextTest {
 
@@ -97,6 +99,62 @@ class ThymeleafWebContextTest {
         ThymeleafWebContext ctx = new ThymeleafWebContext(new HashMap<>(), Locale.US, req, resp, null);
 
         assertNull(ctx.getRequest(), "provider 为 null 时应退回默认实现而非 NPE");
+    }
+
+    @Test
+    void sessionAttributes_injectedAsVariables() {
+        // 模板不应依赖 #session 表达式对象（master 基线 Thymeleaf 3.1 已移除），会话属性统一以上下文变量提供
+        HttpSession session = mock(HttpSession.class);
+        when(session.getAttributeNames()).thenReturn(Collections.enumeration(Collections.singleton("user")));
+        when(session.getAttribute("user")).thenReturn("alice");
+
+        ThymeleafWebContext ctx = new ThymeleafWebContext(new HashMap<>(), Locale.US, req, resp,
+                fixedProvider(null, null, session, null));
+
+        assertTrue(ctx.containsVariable("user"));
+        assertEquals("alice", ctx.getVariable("user"));
+        assertTrue(ctx.getVariableNames().contains("user"));
+    }
+
+    @Test
+    void modelOverridesSessionAttribute() {
+        HttpSession session = mock(HttpSession.class);
+        when(session.getAttributeNames()).thenReturn(Collections.enumeration(Collections.singleton("user")));
+        when(session.getAttribute("user")).thenReturn("alice");
+        Map<String, Object> model = new HashMap<>();
+        model.put("user", "fromModel");
+
+        ThymeleafWebContext ctx = new ThymeleafWebContext(model, Locale.US, req, resp,
+                fixedProvider(null, null, session, null));
+
+        assertEquals("fromModel", ctx.getVariable("user"), "model 应优先于 session 同名属性");
+    }
+
+    @Test
+    void noSession_modelOnly() {
+        // 默认 provider / 匿名访问：getSession(false) 为 null，仅暴露 model 变量
+        Map<String, Object> model = new HashMap<>();
+        model.put("only", "m");
+
+        ThymeleafWebContext ctx = new ThymeleafWebContext(model, Locale.US, req, resp,
+                fixedProvider(null, null, null, null));
+
+        assertEquals("m", ctx.getVariable("only"));
+        assertFalse(ctx.containsVariable("user"));
+    }
+
+    @Test
+    void emptySession_keepsModelVariables() {
+        HttpSession session = mock(HttpSession.class);
+        when(session.getAttributeNames()).thenReturn(Collections.enumeration(Collections.<String>emptyList()));
+        Map<String, Object> model = new HashMap<>();
+        model.put("only", "m");
+
+        ThymeleafWebContext ctx = new ThymeleafWebContext(model, Locale.US, req, resp,
+                fixedProvider(null, null, session, null));
+
+        assertEquals("m", ctx.getVariable("only"));
+        assertEquals(1, ctx.getVariableNames().size());
     }
 
     /** 固定返回给定 servlet 对象的 provider，用于断言上下文确实走 SPI 取值。 */

@@ -66,12 +66,13 @@ public class WebSocketHandlerRegistry {
      * 设置具体来源后浏览器发起跨域连接时将被校验。</p>
      */
     public WebSocketHandlerRegistry setAllowedOrigins(String... origins) {
-        this.allowedOrigins = origins != null ? Arrays.asList(origins) : null;
+        // Arrays.asList 只是包装（不是拷贝）：调用方改数组会改到这里的配置，故先克隆
+        this.allowedOrigins = origins != null ? Arrays.asList(origins.clone()) : null;
         return this;
     }
 
     public List<String> getAllowedOrigins() {
-        return allowedOrigins;
+        return allowedOrigins == null ? null : java.util.Collections.unmodifiableList(allowedOrigins);
     }
 
     /**

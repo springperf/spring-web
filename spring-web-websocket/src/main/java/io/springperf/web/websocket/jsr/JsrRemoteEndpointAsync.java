@@ -130,14 +130,17 @@ public class JsrRemoteEndpointAsync implements RemoteEndpoint.Async {
         return false;
     }
 
+    @Override
     public void flushBatch() throws IOException {
         // 无批处理，无操作
     }
 
+    @Override
     public void sendPing(ByteBuffer applicationData) throws IOException, IllegalArgumentException {
         session.getSpringSession().sendMessage(new org.springframework.web.socket.PingMessage(applicationData));
     }
 
+    @Override
     public void sendPong(ByteBuffer applicationData) throws IOException, IllegalArgumentException {
         session.getSpringSession().sendMessage(new org.springframework.web.socket.PongMessage(applicationData));
     }

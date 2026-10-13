@@ -29,6 +29,9 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.WebSocketSession;
 
+import io.springperf.web.websocket.server.NettyWebSocketSession;
+import org.mockito.ArgumentCaptor;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -39,8 +42,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * 真实握手驱动 WebSocketRoutingHandler：构造器变体、握手成功/失败、帧转发、
- * 空闲超时、异常兜底、连接关闭与 Origin 校验分支。
+ * 真实握手驱动 WebSocketRoutingHandler：构造器变体、握手成功/失败、帧转发、 空闲超时、异常兜底、连接关闭与 Origin 校验分支。
  */
 class WebSocketRoutingHandlerCoverageTest {
 
@@ -71,10 +73,9 @@ class WebSocketRoutingHandlerCoverageTest {
     }
 
     private WebSocketRoutingHandler newRouting(WebSocketHandler h, String subProtocols, boolean allowExtensions,
-                                               List<String> allowedOrigins, long idleTimeout, long heartbeat) {
-        return new WebSocketRoutingHandler(
-                Collections.singletonMap("/ws", h), subProtocols, allowExtensions, allowedOrigins,
-                idleTimeout, heartbeat);
+            List<String> allowedOrigins, long idleTimeout, long heartbeat) {
+        return new WebSocketRoutingHandler(Collections.singletonMap("/ws", h), subProtocols, allowExtensions,
+                allowedOrigins, idleTimeout, heartbeat);
     }
 
     /** 排空握手成功后写入的 outbound 响应（避免与后续帧断言混淆） */
@@ -120,8 +121,8 @@ class WebSocketRoutingHandlerCoverageTest {
         handler = mock(WebSocketHandler.class);
         // 仅 routing handler + 透传尾部：避免 codec/aggregator 缓存 HttpRequest
         channel = new EmbeddedChannel();
-        channel.pipeline().addLast(new WebSocketRoutingHandler(
-                Collections.singletonMap("/ws", handler), null, false, null));
+        channel.pipeline()
+                .addLast(new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), null, false, null));
         channel.pipeline().addLast(new ChannelInboundHandlerAdapter() {
             @Override
             public void channelRead(io.netty.channel.ChannelHandlerContext ctx, Object msg) {
@@ -143,8 +144,7 @@ class WebSocketRoutingHandlerCoverageTest {
     @Test
     void handshake_success_establishesSession() throws Exception {
         handler = mock(WebSocketHandler.class);
-        channel = newChannel(new WebSocketRoutingHandler(
-                Collections.singletonMap("/ws", handler), null, false, null));
+        channel = newChannel(new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), null, false, null));
 
         channel.pipeline().fireChannelRead(upgradeRequest("/ws", null));
         channel.runPendingTasks();
@@ -157,8 +157,7 @@ class WebSocketRoutingHandlerCoverageTest {
     @Test
     void webSocketFrame_text_binary_pingPong_dispatched() throws Exception {
         handler = mock(WebSocketHandler.class);
-        channel = newChannel(new WebSocketRoutingHandler(
-                Collections.singletonMap("/ws", handler), null, false, null));
+        channel = newChannel(new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), null, false, null));
         channel.pipeline().fireChannelRead(upgradeRequest("/ws", null));
         channel.runPendingTasks();
         verify(handler, timeout(2000)).afterConnectionEstablished(any(WebSocketSession.class));
@@ -170,7 +169,7 @@ class WebSocketRoutingHandlerCoverageTest {
         verify(handler, timeout(2000)).handleMessage(any(WebSocketSession.class), any(TextMessage.class));
 
         // Binary 帧
-        BinaryWebSocketFrame binary = new BinaryWebSocketFrame(Unpooled.wrappedBuffer(new byte[]{1, 2, 3}));
+        BinaryWebSocketFrame binary = new BinaryWebSocketFrame(Unpooled.wrappedBuffer(new byte[] { 1, 2, 3 }));
         channel.pipeline().fireChannelRead(binary);
         verify(handler, timeout(2000)).handleMessage(any(WebSocketSession.class), any(BinaryMessage.class));
 
@@ -187,8 +186,7 @@ class WebSocketRoutingHandlerCoverageTest {
     @Test
     void webSocketFrame_close_invokesAfterClosed_andEchoes() throws Exception {
         handler = mock(WebSocketHandler.class);
-        channel = newChannel(new WebSocketRoutingHandler(
-                Collections.singletonMap("/ws", handler), null, false, null));
+        channel = newChannel(new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), null, false, null));
         channel.pipeline().fireChannelRead(upgradeRequest("/ws", null));
         channel.runPendingTasks();
         verify(handler, timeout(2000)).afterConnectionEstablished(any(WebSocketSession.class));
@@ -208,8 +206,7 @@ class WebSocketRoutingHandlerCoverageTest {
     @Test
     void exceptionCaught_afterHandshake_forwardsTransportError() throws Exception {
         handler = mock(WebSocketHandler.class);
-        channel = newChannel(new WebSocketRoutingHandler(
-                Collections.singletonMap("/ws", handler), null, false, null));
+        channel = newChannel(new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), null, false, null));
         channel.pipeline().fireChannelRead(upgradeRequest("/ws", null));
         channel.runPendingTasks();
         verify(handler, timeout(2000)).afterConnectionEstablished(any(WebSocketSession.class));
@@ -225,8 +222,8 @@ class WebSocketRoutingHandlerCoverageTest {
     @Test
     void userEventTriggered_idleEvent_closesSession() throws Exception {
         handler = mock(WebSocketHandler.class);
-        channel = newChannel(new WebSocketRoutingHandler(
-                Collections.singletonMap("/ws", handler), null, false, null, 1000, -1));
+        channel = newChannel(
+                new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), null, false, null, 1000, -1));
         channel.pipeline().fireChannelRead(upgradeRequest("/ws", null));
         channel.runPendingTasks();
         verify(handler, timeout(2000)).afterConnectionEstablished(any(WebSocketSession.class));
@@ -241,16 +238,14 @@ class WebSocketRoutingHandlerCoverageTest {
     @Test
     void channelInactive_invokesAfterClosed() throws Exception {
         handler = mock(WebSocketHandler.class);
-        channel = newChannel(new WebSocketRoutingHandler(
-                Collections.singletonMap("/ws", handler), null, false, null));
+        channel = newChannel(new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), null, false, null));
         channel.pipeline().fireChannelRead(upgradeRequest("/ws", null));
         channel.runPendingTasks();
         verify(handler, timeout(2000)).afterConnectionEstablished(any(WebSocketSession.class));
 
         channel.pipeline().fireChannelInactive();
 
-        verify(handler, timeout(2000)).afterConnectionClosed(any(WebSocketSession.class),
-                eq(CloseStatus.GOING_AWAY));
+        verify(handler, timeout(2000)).afterConnectionClosed(any(WebSocketSession.class), eq(CloseStatus.GOING_AWAY));
     }
 
     /* ==================== Origin 校验 ==================== */
@@ -258,8 +253,8 @@ class WebSocketRoutingHandlerCoverageTest {
     @Test
     void checkOrigin_disallowedOrigin_forbidden() throws Exception {
         handler = mock(WebSocketHandler.class);
-        channel = newChannel(new WebSocketRoutingHandler(
-                Collections.singletonMap("/ws", handler), null, false, Collections.singletonList("http://allowed.com")));
+        channel = newChannel(new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), null, false,
+                Collections.singletonList("http://allowed.com")));
 
         channel.pipeline().fireChannelRead(upgradeRequest("/ws", "http://evil.com"));
         channel.runPendingTasks();
@@ -277,8 +272,8 @@ class WebSocketRoutingHandlerCoverageTest {
     @Test
     void checkOrigin_matchingOrigin_allowed() throws Exception {
         handler = mock(WebSocketHandler.class);
-        channel = newChannel(new WebSocketRoutingHandler(
-                Collections.singletonMap("/ws", handler), null, false, Collections.singletonList("http://allowed.com")));
+        channel = newChannel(new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), null, false,
+                Collections.singletonList("http://allowed.com")));
 
         channel.pipeline().fireChannelRead(upgradeRequest("/ws", "http://allowed.com"));
         channel.runPendingTasks();
@@ -289,8 +284,8 @@ class WebSocketRoutingHandlerCoverageTest {
     @Test
     void checkOrigin_wildcard_allowed() throws Exception {
         handler = mock(WebSocketHandler.class);
-        channel = newChannel(new WebSocketRoutingHandler(
-                Collections.singletonMap("/ws", handler), null, false, Collections.singletonList("*")));
+        channel = newChannel(new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), null, false,
+                Collections.singletonList("*")));
 
         channel.pipeline().fireChannelRead(upgradeRequest("/ws", "http://anything.com"));
         channel.runPendingTasks();
@@ -303,18 +298,12 @@ class WebSocketRoutingHandlerCoverageTest {
     @Test
     void perPathConfig_registryOverridesGlobalSettings() throws Exception {
         handler = mock(WebSocketHandler.class);
-        io.springperf.web.websocket.WebSocketHandlerRegistry registry =
-                new io.springperf.web.websocket.WebSocketHandlerRegistry();
-        registry.addHandler(handler, "/ws")
-                .setAllowedOrigins("http://perpath.com")
-                .setSubProtocols("chat")
-                .setAllowExtensions(true)
-                .setIdleTimeout(2000)
-                .setHeartbeatInterval(1000);
+        io.springperf.web.websocket.WebSocketHandlerRegistry registry = new io.springperf.web.websocket.WebSocketHandlerRegistry();
+        registry.addHandler(handler, "/ws").setAllowedOrigins("http://perpath.com").setSubProtocols("chat")
+                .setAllowExtensions(true).setIdleTimeout(2000).setHeartbeatInterval(1000);
         // 全局配置与 per-path 相悖，期望 per-path 覆盖生效
-        channel = newChannel(new WebSocketRoutingHandler(
-                Collections.singletonMap("/ws", handler), "global-proto", false,
-                Collections.singletonList("http://global.com"), 5000, 5000, registry));
+        channel = newChannel(new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), "global-proto",
+                false, Collections.singletonList("http://global.com"), 5000, 5000, registry));
 
         channel.pipeline().fireChannelRead(upgradeRequest("/ws", "http://perpath.com"));
         channel.runPendingTasks();
@@ -327,11 +316,9 @@ class WebSocketRoutingHandlerCoverageTest {
     @Test
     void perPathConfig_disallowedOrigin_forbiddenEvenWhenGlobalAllows() throws Exception {
         handler = mock(WebSocketHandler.class);
-        io.springperf.web.websocket.WebSocketHandlerRegistry registry =
-                new io.springperf.web.websocket.WebSocketHandlerRegistry();
+        io.springperf.web.websocket.WebSocketHandlerRegistry registry = new io.springperf.web.websocket.WebSocketHandlerRegistry();
         registry.addHandler(handler, "/ws").setAllowedOrigins("http://perpath.com");
-        channel = newChannel(new WebSocketRoutingHandler(
-                Collections.singletonMap("/ws", handler), null, false,
+        channel = newChannel(new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), null, false,
                 Collections.singletonList("http://global.com"), -1, -1, registry));
 
         channel.pipeline().fireChannelRead(upgradeRequest("/ws", "http://evil.com"));
@@ -343,10 +330,32 @@ class WebSocketRoutingHandlerCoverageTest {
     @Test
     void channelWritabilityChanged_writable_drainsQueue() throws Exception {
         handler = mock(WebSocketHandler.class);
-        channel = newChannel(new WebSocketRoutingHandler(
-                Collections.singletonMap("/ws", handler), null, false, null));
+        channel = newChannel(new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), null, false, null));
 
         channel.pipeline().fireChannelWritabilityChanged();
         assertNull(channel.pipeline().get("ws.session"));
+    }
+
+    /* ==================== L14：per-path 帧上限覆盖 ==================== */
+
+    @Test
+    void perPathConfig_messageSizeLimit_overridesSessionDefault() throws Exception {
+        handler = mock(WebSocketHandler.class);
+        io.springperf.web.websocket.WebSocketHandlerRegistry registry = new io.springperf.web.websocket.WebSocketHandlerRegistry();
+        registry.addHandler(handler, "/ws").setMessageSizeLimit(1024 * 1024);
+        channel = newChannel(new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), null, false, null,
+                -1, -1, registry));
+
+        channel.pipeline().fireChannelRead(upgradeRequest("/ws", null));
+        channel.runPendingTasks();
+
+        ArgumentCaptor<WebSocketSession> captor = ArgumentCaptor.forClass(WebSocketSession.class);
+        verify(handler, timeout(2000)).afterConnectionEstablished(captor.capture());
+        WebSocketSession session = captor.getValue();
+        assertInstanceOf(NettyWebSocketSession.class, session);
+        assertEquals(1024 * 1024, ((NettyWebSocketSession) session).getTextMessageSizeLimit(),
+                "per-path messageSizeLimit 应覆盖 session 默认 8KB text 上限");
+        assertEquals(1024 * 1024, ((NettyWebSocketSession) session).getBinaryMessageSizeLimit(),
+                "per-path messageSizeLimit 应覆盖 session 默认 64KB binary 上限");
     }
 }

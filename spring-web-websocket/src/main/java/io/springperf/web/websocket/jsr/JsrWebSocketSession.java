@@ -1,5 +1,7 @@
 package io.springperf.web.websocket.jsr;
 
+import io.springperf.web.websocket.server.NettyWebSocketSession;
+
 import javax.websocket.CloseReason;
 import javax.websocket.Extension;
 import javax.websocket.MessageHandler;
@@ -112,7 +114,9 @@ public class JsrWebSocketSession implements Session {
 
     @Override
     public boolean isSecure() {
-        return "wss".equalsIgnoreCase(springSession.getUri().getScheme());
+        java.net.URI uri = springSession.getUri();
+        String scheme = uri != null ? uri.getScheme() : null;
+        return scheme != null && "wss".equalsIgnoreCase(scheme);
     }
 
     @Override
@@ -128,6 +132,10 @@ public class JsrWebSocketSession implements Session {
     @Override
     public void setMaxIdleTimeout(long milliseconds) {
         this.maxIdleTimeout = milliseconds;
+        // 传播到底层 Netty 会话：否则仅改包装层的值，实际空闲检测不变
+        if (springSession instanceof NettyWebSocketSession) {
+            ((NettyWebSocketSession) springSession).setMaxIdleTimeout(milliseconds);
+        }
     }
 
     @Override
@@ -199,7 +207,8 @@ public class JsrWebSocketSession implements Session {
 
     @Override
     public String getQueryString() {
-        return springSession.getUri().getRawQuery();
+        java.net.URI uri = springSession.getUri();
+        return uri != null ? uri.getRawQuery() : null;
     }
 
     @Override

@@ -4,20 +4,20 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
-import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class WebSocketHandlerRegistrationTest {
 
-    private final WebSocketHandler handler = new TextWebSocketHandler() {};
+    private final WebSocketHandler handler = new TextWebSocketHandler() {
+    };
 
     @Test
     void constructor_storesHandlerAndPaths() {
         WebSocketHandlerRegistration reg = new WebSocketHandlerRegistration(handler, "/ws", "/chat");
         assertSame(handler, reg.getHandler());
-        assertArrayEquals(new String[]{"/ws", "/chat"}, reg.getPaths());
+        assertArrayEquals(new String[] { "/ws", "/chat" }, reg.getPaths());
     }
 
     @Test
@@ -25,7 +25,7 @@ class WebSocketHandlerRegistrationTest {
         WebSocketHandlerRegistration reg = new WebSocketHandlerRegistration(handler, "/ws");
         WebSocketHandlerRegistration result = reg.setAllowedOrigins("http://a.com", "http://b.com");
         assertSame(reg, result);
-        assertEquals(Arrays.asList("http://a.com", "http://b.com"), reg.getAllowedOrigins());
+        assertEquals(java.util.Arrays.asList("http://a.com", "http://b.com"), reg.getAllowedOrigins());
     }
 
     @Test
@@ -72,5 +72,19 @@ class WebSocketHandlerRegistrationTest {
         assertNull(reg.getAllowExtensions());
         assertNull(reg.getIdleTimeout());
         assertNull(reg.getHeartbeatInterval());
+    }
+
+    @Test
+    void setMessageSizeLimit_storesAndReturnsSelf() {
+        WebSocketHandlerRegistration reg = new WebSocketHandlerRegistration(handler, "/ws");
+        WebSocketHandlerRegistration result = reg.setMessageSizeLimit(1024 * 1024);
+        assertSame(reg, result);
+        assertEquals(Long.valueOf(1024 * 1024), reg.getMessageSizeLimit());
+    }
+
+    @Test
+    void messageSizeLimit_defaultNull() {
+        WebSocketHandlerRegistration reg = new WebSocketHandlerRegistration(handler, "/ws");
+        assertNull(reg.getMessageSizeLimit());
     }
 }

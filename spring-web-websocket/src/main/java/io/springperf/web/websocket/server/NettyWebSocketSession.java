@@ -4,6 +4,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.handler.codec.http.websocketx.*;
+import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.AttributeKey;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.Nullable;
@@ -16,6 +17,7 @@ import java.nio.ByteBuffer;
 import java.security.Principal;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -30,6 +32,9 @@ public class NettyWebSocketSession implements WebSocketSession {
     private static final AtomicLong sessionIdCounter = new AtomicLong(0);
     private static final AttributeKey<Queue<WebSocketFrame>> BACKPRESSURE_QUEUE_KEY =
             AttributeKey.valueOf("ws.backpressure.queue");
+    private static final String IDLE_HANDLER_NAME = "ws-idle";
+    /** WebSocket 帧的 rsv 位：本项目不使用任何扩展协商，恒为 0。 */
+    private static final int NO_RSV = 0;
 
     private final String id;
     private final Channel channel;
@@ -162,12 +167,15 @@ public class NettyWebSocketSession implements WebSocketSession {
     @Nullable
     private WebSocketFrame toFrame(WebSocketMessage<?> message) {
         if (message instanceof TextMessage) {
-            return new TextWebSocketFrame(((TextMessage) message).getPayload());
+            // 透传 isLast：JSR-356 分片发送会用 last=false 标记非尾片，若一律按 final 帧写出，
+            // 客户端会把每个分片当作独立完整消息，分片消息即被静默拆解破坏。
+            return new TextWebSocketFrame(((TextMessage) message).isLast(), NO_RSV,
+                    ((TextMessage) message).getPayload());
         } else if (message instanceof BinaryMessage) {
             ByteBuffer buf = ((BinaryMessage) message).getPayload();
             byte[] bytes = new byte[buf.remaining()];
             buf.get(bytes);
-            return new BinaryWebSocketFrame(Unpooled.wrappedBuffer(bytes));
+            return new BinaryWebSocketFrame(((BinaryMessage) message).isLast(), NO_RSV, Unpooled.wrappedBuffer(bytes));
         } else if (message instanceof PingMessage) {
             return new PingWebSocketFrame();
         } else if (message instanceof PongMessage) {
@@ -257,6 +265,32 @@ public class NettyWebSocketSession implements WebSocketSession {
     @Override
     public void setBinaryMessageSizeLimit(int limit) {
         this.binaryMessageSizeLimit = limit;
+    }
+
+    /**
+     * 运行时调整空闲超时：在 eventLoop 上替换/新增 {@link IdleStateHandler}。
+     * <p>
+     * {@code idleTimeoutMs <= 0} 表示关闭空闲检测（移除 handler）；已存在时用 {@code replace} 保持管线位置不变，
+     * 不存在时 {@code addFirst}。必须在 eventLoop 内改管线，避免与 IO 线程竞争。
+     * </p>
+     */
+    public void setMaxIdleTimeout(long idleTimeoutMs) {
+        channel.eventLoop().execute(() -> {
+            IdleStateHandler idle = channel.pipeline().get(IdleStateHandler.class);
+            if (idleTimeoutMs <= 0) {
+                if (idle != null) {
+                    channel.pipeline().remove(idle);
+                }
+                return;
+            }
+            if (idle != null) {
+                channel.pipeline().replace(idle, IDLE_HANDLER_NAME,
+                        new IdleStateHandler(idleTimeoutMs, idleTimeoutMs, idleTimeoutMs, TimeUnit.MILLISECONDS));
+            } else {
+                channel.pipeline().addFirst(IDLE_HANDLER_NAME,
+                        new IdleStateHandler(idleTimeoutMs, idleTimeoutMs, idleTimeoutMs, TimeUnit.MILLISECONDS));
+            }
+        });
     }
 
     @Override

@@ -28,6 +28,11 @@ public class JsrEndpointConfigAdapter implements ServerEndpointConfig {
     private final List<String> subprotocols;
     private final List<Class<? extends Decoder>> decoders;
     private final List<Class<? extends Encoder>> encoders;
+
+    /** 上面三项的只读视图缓存：JsrCodecRegistry 在**每个连接**的构造器里遍历 decoders/encoders，逐次新建包装属白扔；字段是 final，故构造期建好即可。 */
+    private final List<String> subprotocolsView;
+    private final List<Class<? extends Decoder>> decodersView;
+    private final List<Class<? extends Encoder>> encodersView;
     private final List<Extension> extensions = Collections.emptyList();
     private final Configurator configurator;
     private final Map<String, Object> userProperties = new ConcurrentHashMap<>();
@@ -40,6 +45,10 @@ public class JsrEndpointConfigAdapter implements ServerEndpointConfig {
         Collections.addAll(this.subprotocols, subs);
         this.decoders = metadata.getDecoders();
         this.encoders = metadata.getEncoders();
+
+        this.subprotocolsView = Collections.unmodifiableList(subprotocols);
+        this.decodersView = Collections.unmodifiableList(decoders);
+        this.encodersView = Collections.unmodifiableList(encoders);
         this.configurator = newConfigurator(metadata);
     }
 
@@ -114,7 +123,7 @@ public class JsrEndpointConfigAdapter implements ServerEndpointConfig {
 
     @Override
     public List<String> getSubprotocols() {
-        return subprotocols;
+        return subprotocolsView;
     }
 
     @Override
@@ -129,16 +138,18 @@ public class JsrEndpointConfigAdapter implements ServerEndpointConfig {
 
     @Override
     public List<Class<? extends Decoder>> getDecoders() {
-        return decoders;
+        return decodersView;
     }
 
     @Override
     public List<Class<? extends Encoder>> getEncoders() {
-        return encoders;
+        return encodersView;
     }
 
     @Override
     public Map<String, Object> getUserProperties() {
+        // JSR-356 契约：getUserProperties 返回的必须是可写映射（端点/容器借此共享状态），
+        // 故此处刻意直接暴露；JsrEndpointConfigAdapterTest#userProperties_mutable 即为此约束。
         return userProperties;
     }
 }
