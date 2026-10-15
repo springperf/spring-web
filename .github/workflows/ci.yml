@@ -69,8 +69,6 @@ jobs:
     #    注意 JDK 8 与 JDK 17 的分组语义不同：`@param/@return 没有说明` 在 JDK 8 属 syntax 组、
     #    `-missing` 排除不掉（JDK 17 才归入 missing），故 JDK 8 下本门禁比 master 严；
     #    还有 `{@code}` 块内「行首 @」会被当块标签（<pre>{@code @Configuration 即为此调整）。
-    #    存量缺陷已按 master 逐条适配清理，当前 0 error（warning 不判红）——清单、口径与
-    #    适配说明见 .agent/context/2.7.x-sync-gap-checklist.md §31.9.5/§31.9.6。
     #    另：模块级 <doclint>（spring-web-mvc-support/pom.xml，已同步 master）优先于 -Ddoclint。
     if: github.ref == 'refs/heads/master' || github.base_ref == 'master' || github.ref == 'refs/heads/2.7.x' || github.base_ref == '2.7.x'
     runs-on: ubuntu-latest
