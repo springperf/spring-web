@@ -305,4 +305,19 @@ jobs:
         run: ./mvnw install -DskipTests -Dspotbugs.skip=true -Dmodernizer.skip=true -Dmaven.javadoc.skip=true -Dmaven.source.skip=true --batch-mode --no-transfer-progress -q
 
       - name: "Javadoc (doclint: all except missing)"
+        # 全仓排除 missing：不强制全量注释，只拦坏链接与坏标签。
         run: ./mvnw javadoc:javadoc -DadditionalJOption=-Xdoclint:all,-missing --batch-mode --no-transfer-progress -q
+
+      - name: "Javadoc (annotation package: missing tags are errors)"
+        # 注解包是用户直接写在业务代码里的入口，缺 @param/@return 会直接影响使用者，
+        # 因此单独对 io.springperf.web.annotation 打开 missing 并升级为错误。
+        # 用原生命令而不是 javadoc:javadoc：插件没有「只检查某个子包」的参数，
+        # 而全模块开 missing 会产生上百条内部类的告警（与既定取舍冲突）。
+        run: |
+          set -euo pipefail
+          # 不用 -o：dependency 插件在冷启动的 runner 上可能尚未落到本地仓库
+          ./mvnw -q -pl spring-web dependency:build-classpath -Dmdep.outputFile=target/cp.txt
+          javadoc -Xdoclint:all -Werror -encoding UTF-8 -docencoding UTF-8 -charset UTF-8 \
+            -d target/jd-annotation \
+            -classpath "$(cat spring-web/target/cp.txt):spring-web/target/classes" \
+            -sourcepath spring-web/src/main/java io.springperf.web.annotation
