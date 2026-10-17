@@ -73,7 +73,7 @@ io.springperf.web.autoconfigure.support.WebServerApplicationContextFactory
 
 ### 2.2 Bean 定义
 
-配置类定义了 5 个核心 Bean：
+配置类定义了 8 个 Bean（含 1 个内嵌配置类的 Bean 与 1 个 BFPP）：
 
 | Bean | 方法 | 条件 | 说明 |
 |------|------|------|------|
@@ -83,6 +83,8 @@ io.springperf.web.autoconfigure.support.WebServerApplicationContextFactory
 | `NettyHttpServer` | `nettyHttpServer()` | `@ConditionalOnMissingBean` | Netty 服务器，`SmartLifecycle` 启停 |
 | `Validator` | `validator()` | `@ConditionalOnMissingBean` + `@ConditionalOnClass(name = "javax.validation.Validator")` | 可选 Bean Validation |
 | `AccessLogWebFilter` | `accessLogWebFilter(Environment, ApplicationProperties)` | `@ConditionalOnProperty(name = "server.accesslog.enabled", havingValue = "true")` | 可选访问日志 |
+| `WebMetrics` | `micrometerWebMetrics()`（内嵌 `MicrometerWebMetricsConfiguration`） | `@ConditionalOnClass(name = "io.micrometer.core.instrument.MeterRegistry")` + `@ConditionalOnBean(MeterRegistry.class)` | 请求耗时/异常/线程池指标 |
+| `springMvcConflictGuard` | `springMvcConflictGuard()`（`static` `BeanFactoryPostProcessor`） | 无条件 | 在 bean 定义加载后、实例化前检测 `spring-boot-starter-web`(MVC) 冲突并抛 `IllegalStateException`——比在 `webContext()` 里检测更早暴露问题 |
 
 ### 2.3 `WebContext` 的初始化链
 
@@ -199,7 +201,7 @@ private static void assertNoSpringMvcConflict() {
 
 ### 3.2 Bean 定义
 
-配置类定义了 10 个 Bean：
+两个配置类分别定义 Bean：`SpringWebServletAutoConfiguration` **14 个**，`SpringWebMvcSupportAutoConfiguration` **5 个**（注意归属——拦截器/Advice/emitter/bridge 四项在 MVC 配置类，不在 Servlet 配置类）：
 
 | Bean | 说明 |
 |------|------|
@@ -224,7 +226,7 @@ protected WebFilterRegistration createFilterWrapper(AbstractFilterRegistrationBe
     javax.servlet.Filter filter;
     try {
         filter = filterRegistrationBean.getFilter();
-    } catch (IllegalArgumentException e) {
+    } catch (IllegalArgumentException | IllegalStateException e) {
         if (filterRegistrationBean instanceof DelegatingFilterProxyRegistrationBean) {
             // 通过反射调用 getTargetBeanName() 获取代理目标 Bean 名
             String targetBeanName = resolveTargetBeanName(...);
@@ -248,7 +250,7 @@ protected WebFilterRegistration createFilterWrapper(AbstractFilterRegistrationBe
 
 ### 4.2 组件定义
 
-配置类定义了 6 个 Bean：
+配置类定义了 7 个 Bean（后两个仅在配置了 `management.server.port` 时装配）：
 
 | Bean | 说明 |
 |------|------|
@@ -257,6 +259,8 @@ protected WebFilterRegistration createFilterWrapper(AbstractFilterRegistrationBe
 | `webEndpointDiscoverer` | Spring Boot 标准的端点发现器，扫描 `@Endpoint`/`@WebEndpoint` |
 | `perfExposeExcludePropertyEndpointFilter` | 读取 `management.endpoints.web.exposure` 配置 |
 | `perfEndpointHandlerMapping` | 核心：将 Actuator 端点注册为框架路由 |
+| `managementServerInfrastructure` | 管理端口基础设施；`@ConditionalOnProperty(value = "management.server.port", matchIfMissing = false)` |
+| `managementNettyHttpServer` | 独立管理端口服务器；同上条件（`matchIfMissing = false`） |
 | `managementServerInfrastructure` | 管理端口基础设施（`management.server.port` 配置时创建） |
 | `managementNettyHttpServer` | 独立管理端口的 Netty 服务器 |
 
@@ -359,7 +363,7 @@ public PerfApplicationFactory perfApplicationFactory(
 
 `SpringWebBatchAutoConfiguration`在 `@BatchMapping` 在类路径时创建 `BatchRegistry` 并注册到 `WebContext`。内嵌 `MicrometerBatchMetricsConfiguration` 在 `MeterRegistry` 存在时提供 Micrometer 指标实现。
 
-`MicrometerBatchMetrics`缓存 8 个指标（Couter/Timer/DistributionSummary/Gauge），每个指标按 `queue` Tag 区分。`ConcurrentHashMap.computeIfAbsent` 原子性保证每个队列的指标只注册一次，避免 Micrometer 对同名同 tag 二次注册抛异常。
+`MicrometerBatchMetrics`注册 9 个指标（Counter/Timer/DistributionSummary/Gauge），均按 `queue` Tag 区分（`batch.process.duration` 另带 `outcome=success/failure`）。每个队列的 Counter/Timer/Summary 用 `ConcurrentHashMap.computeIfAbsent` 缓存；**两个 Gauge 刻意不用 `computeIfAbsent`**——那会在持有 CHM bin 锁时调用 `MeterRegistry.register`，与 MeterRegistry 内部锁形成潜在死锁面，故改为「外部 map 先占位、注册动作在锁外执行」。详见 [13 篇](13-batch-module.md#六可观测性9-个-micrometer-指标)。
 
 ---
 

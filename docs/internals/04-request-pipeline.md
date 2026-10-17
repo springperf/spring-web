@@ -177,7 +177,7 @@ public void handle(WebServerHttpRequest req, WebServerHttpResponse resp) {
 }
 ```
 
-路由匹配发生在 `handle`，**仍在 EventLoop 线程**（注释  明示）。`mappingRegistry.mapping(req)` 返回 `MappingResult`，内部走的是 [03 篇](03-component-lifecycle.md) Phase2 由 `MappingRegistry.optimizeMapping()` 构建的多级优化器链（精确路径 `HashMap.get` O(1) → 前缀 → 后缀 → 兜底遍历，详见 [06 篇](06-routing-engine.md)）。
+路由匹配发生在 `handle`，**仍在 EventLoop 线程**（注释  明示）。`mappingRegistry.mapping(req)` 返回 `MappingResult`，内部走的是 [03 篇](03-component-lifecycle.md) **Phase3** 由 `MappingRegistry.initComponentPhase3()` → `optimizeMapping()` 构建的多级优化器链（精确路径 `HashMap.get` O(1) → 前缀 → 后缀 → 兜底遍历，详见 [06 篇](06-routing-engine.md)）。
 
 本篇不展开优化器链的内部（那是 06 篇的范畴），只标注一件事：**路由匹配这一步产出的 `MappingResult` 被写回 request，成为后续所有环节取用缓存的"钥匙"**。`DefaultFilterChain` 链尾取 `MappingResult.get(request)`（`DefaultFilterChain.java`）、`PathMappingContext.get(request)` 也是从 `MappingResult` 反查（`PathMappingContext.java`）。一次匹配的结果在整条链路上被反复复用，**绝不重复匹配**——这又是"运行时只做查表"的兑现。
 
@@ -196,6 +196,7 @@ protected void handleWithMappingResult(WebServerHttpRequest req, WebServerHttpRe
     // 通过 BizPoolRegistry 使用 Phase3 预缓存的线程池，无映射或未标注 @RunInPool 时为 null → EventLoop 同步处理
     ExecutorService executor = bizPoolRegistry.determinePool(req, mappingResult);
     if (executor != null) {
+        resp.armTimeoutIfAbsent();             // 移交前武装异步超时（缺失才装，不覆盖 @ReactiveSupport 配置）
         req.acquire();
         try {
             executor.execute(() -> {
@@ -297,7 +298,7 @@ protected DefaultFilterChain resolveFilterChain(WebServerHttpRequest request) {
 
 这里取用的正是 [03 篇](03-component-lifecycle.md) 点名的 `PathMappingContext.cachedFilterChain` 实例字段（`PathMappingContext.java`、``）。三类不走 `MappingCacheKey` 整型索引的 Registry 之一（另两类是 `InterceptorRegistry.cachedInterceptors`、`CorsRegistry.corsConfigurationProvider`），因为存的是 `DefaultFilterChain` 这个有类型的领域对象，不需要整型寻址。get-null-check + DCL 模式与 `MappingCacheKey` 消费者完全一致，只是存储位置在实例字段而非 `Object[]` 槽位。
 
-`initCachedFilters`（`WebFilterRegistry.java`）的三态编译期推断是 Phase3 预匹配的延伸：`matchPathRuleToCached` 返回 `ALWAYS`（直接加入）/ `RUNTIME`（包 `RuntimeMappingWebFilter`）/ `NEVER`（跳过）。无路径规则的 filter 永远匹配，有路径规则的交给 `RuntimeMappingWebFilter` 在运行时按请求路径匹配——**编译期能确定的绝不留到运行时，必须运行时匹配的才包装**。
+`initCachedFilters`（`WebFilterRegistry.java`）的三态启动期推断是 Phase3 预匹配的延伸：`matchPathRuleToCached` 返回 `ALWAYS`（直接加入）/ `RUNTIME`（包 `RuntimeMappingWebFilter`）/ `NEVER`（跳过）。无路径规则的 filter 永远匹配，有路径规则的交给 `RuntimeMappingWebFilter` 在运行时按请求路径匹配——**启动期能确定的绝不留到运行时，必须运行时匹配的才包装**。
 
 ### 5.2 RuntimeMappingWebFilter：链内节点，不是入口
 
@@ -665,7 +666,7 @@ public void asyncDispatch(WebServerHttpRequest req, WebServerHttpResponse resp, 
 
 ```java
 // BaseWebServerHttpRequest.java
-protected final Map<String, Object> attributes = new ConcurrentHashMap<>();
+private volatile Map<String, Object> attributes;   // 懒分配：首次写才 new（attributes() 双检锁）
 protected final Object[] fastAttributes = new Object[RequestAttribute.getMaxSize()];
 
 // BaseWebServerHttpRequest.java
@@ -678,7 +679,7 @@ public <T> T getAttribute(RequestAttribute<T> key) {
 }
 ```
 
-`RequestAttribute.getMaxSize()` 在启动期确定（`RequestAttribute` 用 `AtomicInteger` 分配索引， FAST_ATTR_PREFIX 是回退 Map 的 key 前缀）。热点属性（`METRICS_START_ATTR`、`REQUEST_ATTRIBUTE_ARRAY`、`PathMappingContext` 数组）走 `fastAttributes[idx]`——**整条 get/set 路径不创建任何对象**：不分配 `Entry`、不计算 hashCode、不装箱。只有属性数超过预分配上限才回退 `ConcurrentHashMap`，这是有界可观测的降级而非静默分配（[01 篇](01-design-philosophy.md) 原则 2）。
+`RequestAttribute.getMaxSize()` 取的是**请求构造时刻**的动态快照（`SEQ.get() + 1`；`RequestAttribute` 用 `AtomicInteger` 分配索引， FAST_ATTR_PREFIX 是回退 Map 的 key 前缀）。热点属性（`METRICS_START_ATTR`、`REQUEST_ATTRIBUTE_ARRAY`、`PathMappingContext` 数组）走 `fastAttributes[idx]`——**整条 get/set 路径不创建任何对象**：不分配 `Entry`、不计算 hashCode、不装箱。只有属性数超过该次请求构造时的上限才回退 `ConcurrentHashMap`，这是有界可观测的降级而非静默分配（[01 篇](01-design-philosophy.md) 原则 2）。
 
 ### 11.2 handled/committed 双 CAS
 
@@ -712,7 +713,7 @@ public OutputStream getBody() {
 }
 ```
 
-响应 body 缓冲延迟到首次 `getBody()` 才分配——无 body 的请求（204、304、CORS 预检）零分配。Netty 子类 `NettyServerHttpResponse` 进一步用 `ByteBuf` 替代 `ByteArrayOutputStream`，大 body（>4KB）走 `retainedDuplicate()` 零拷贝（[05 篇](05-server-and-http.md) 展开）。
+响应 body 缓冲延迟到首次 `getBody()` 才分配——无 body 的请求（204、304、CORS 预检）零分配。Netty 子类 `NettyServerHttpResponse` 进一步用 `ByteBuf` 替代 `ByteArrayOutputStream`，大 body（>4KB）走 `duplicate()` 零拷贝视图（[05 篇](05-server-and-http.md) 展开）。
 
 ```java
 // BaseWebServerHttpRequest.java, 85
@@ -730,7 +731,7 @@ public int getFilterIndexAndIncrement() { return filterIndex++; }
 
 | 请求环节 | 代码位置 | 取用的缓存 | 缓存类型 | 写入者（03 篇） | 写入时机 |
 |---------|---------|-----------|---------|----------------|---------|
-| 路由匹配 | `DispatcherHandler` | 优化器链（simpleUrlList 等） | `MappingRegistry` 内部结构 | `MappingRegistry.optimizeMapping` | Phase2 |
+| 路由匹配 | `DispatcherHandler` | 优化器链（simpleUrlList 等） | `MappingRegistry` 内部结构 | `MappingRegistry.optimizeMapping` | **Phase3** |
 | 线程调度 | `DispatcherHandler` | `BizPoolRegistry.BIZ_POOL_KEY` 槽 | `methodCache[index]` | `BizPoolRegistry.determinePool` 首次懒缓存 | 首请求 |
 | Filter 链 | `WebFilterRegistry` | `PathMappingContext.cachedFilterChain` | 实例字段（DCL） | `WebFilterRegistry.initCachedFilters` | 首请求 |
 | Filter 节点匹配 | `RuntimeMappingWebFilter` | include/exclude patterns | 构造期固定 | `WebFilterRegistry.initAllFilters` | Phase3 |
@@ -740,9 +741,9 @@ public int getFilterIndexAndIncrement() { return filterIndex++; }
 | 方法调用 | `DispatcherHandler` | `InvokableHandlerMethod.invoker` | 实例字段 | `InvokableHandlerMethod.initInvoker` | 构造期 |
 | 返回值处理 | `DispatcherHandler` | `MappingHandlerMethod.methodCache[index]` | `Object[]` 槽 | `ReturnValueResolverRegistry` 首次懒缓存 | 首请求 |
 | 异常处理 | `DispatcherHandler` | 异常处理器映射 | `ExceptionRegistry` 内部 | `ExceptionRegistry` | Phase2 |
-| 拦截器 postHandle/afterCompletion | `DispatcherHandler/244` | `cachedInterceptors` | 同 preHandle | 同上 | 同上 |
+| 拦截器 postHandle/afterCompletion | `DispatcherHandler`（`invokeWithRealResult`，:461） | `cachedInterceptors` | 同 preHandle | 同上 | 同上 |
 | 异步恢复 | `DispatcherHandler` | `methodCache` 返回值槽 | 同返回值处理 | 同上 | 同上 |
-| 计时戳传递 | `DispatcherHandler/309` | `fastAttributes[METRICS_START_ATTR.idx]` | `Object[]` 数组 | `RequestAttribute` 启动期分配索引 | 启动期 |
+| 计时戳传递 | `DispatcherHandler`（:439 写入 / :570 取回） | `fastAttributes[METRICS_START_ATTR.idx]` | `Object[]` 数组 | `RequestAttribute` 类加载期分配索引 | 类加载期 |
 
 这张表回答了本篇引子的问题：**03 篇产出的每一份缓存，都能在这张表里找到它在请求路径上的取用点；而请求路径上的每一段业务逻辑，背后都挂着一份启动期算好的缓存。** 这就是"启动时确定性 → 运行时只做查表"在请求管线全链路上的完整兑现。
 
@@ -758,4 +759,4 @@ public int getFilterIndexAndIncrement() { return filterIndex++; }
 
 3. **线程与内存是显式契约，不是隐式托管**：`acquire/release` 对称跨线程管理 `ByteBuf`（原则 4），`RejectedExecutionException` 分满载与关闭两路（原则 3），`handled`/`committed` CAS 保证响应状态机无锁单次（原则 2），`fastAttributes` 数组替代 Map（原则 2）。这些显式契约是性能的来源，也是框架"克制的源码"在请求路径上的集中体现。
 
-下一篇转入 I/O 层：[05 · Netty 服务器与 HTTP 请求/响应适配](05-server-and-http.md)——把本篇里反复出现的 `NettyHttpHandler`、`NettyServerHttpRequest`、`NettyServerHttpResponse`、`msg.retain()`、`retainedDuplicate()` 放回 Netty 的真实环境，讲清服务器如何启动、Channel pipeline 如何装配、`ByteBuf` 如何零拷贝包装与写回。
+下一篇转入 I/O 层：[05 · Netty 服务器与 HTTP 请求/响应适配](05-server-and-http.md)——把本篇里反复出现的 `NettyHttpHandler`、`NettyServerHttpRequest`、`NettyServerHttpResponse`、`ReferenceCountUtil.retain(request)`、`duplicate()` 放回 Netty 的真实环境，讲清服务器如何启动、Channel pipeline 如何装配、`ByteBuf` 如何零拷贝包装与写回。

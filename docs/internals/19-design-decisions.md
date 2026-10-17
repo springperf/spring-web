@@ -85,13 +85,13 @@ Netty 的 EventLoop 单线程模型天然适合 I/O 密集型场景，但若业�
 
 ### 决策
 
-`MappingCacheKey<T>` 在编译期通过 `AtomicInteger` 全局计数器分配唯一 `int index`（`MappingCacheKey.java` `createMethodCacheKey`），作为静态常量持有。运行时 `handlerMethod.get(cacheKey)` 等价于 `cache[key.index]`——`aload` + `iaload` 两条字节码指令，约 2–3ns。`MappingHandlerMethod` 的 `methodCache`/`classCache` 实例字段指向 static map 里的 `Object[]`（`MappingHandlerMethod.java` static `Map<Method, Object[]>` / `Map<Class<?>, Object[]>`； `getCache` 按 Method/Class 维度 `computeIfAbsent` 取数组，`get`/`set` 走 `cache[key.index]`）。
+`MappingCacheKey<T>` 在**类加载期**通过 `AtomicInteger` 全局计数器分配唯一 `int index`（`MappingCacheKey.java` 的静态常量初始化里 `getAndIncrement()`，`createMethodCacheKey`/`createClassCacheKey`），作为静态常量持有。运行时 `handlerMethod.get(cacheKey)` 等价于 `cache[key.index]`——`aload` + `iaload` 两条字节码指令，约 2–3ns。`MappingHandlerMethod` 的 `methodCache`/`classCache` 实例字段指向 static map 里的 `Object[]`（`MappingHandlerMethod.java` static `Map<Method, Object[]>` / `Map<Class<?>, Object[]>`； `getCache` 按 Method/Class 维度 `computeIfAbsent` 取数组，`get`/`set` 走 `cache[key.index]`）。
 
 ### 后果
 
 - **收益**：约 10 倍于 `ConcurrentHashMap`；零哈希冲突、零桶遍历（`int` 索引直取 `cache[key.index]`）；泛型 `MappingCacheKey<T>` 保证类型安全免 `cast`。
-- **代价**：`int index` 在编译期分配且不可回收（`MappingCacheKey` 是静态常量，生命周期 = JVM 生命周期）；`methodCache`/`classCache` 数组按 `key.index + 1` 懒分配，越界时 `Arrays.copyOf` 扩容（`MappingHandlerMethod.java`，`synchronized` 双检），无固定上限——槽位随已注册键增长，未用槽位仅浪费单个对象引用。
-- **边界**：仅适用于"已知有限且编译期确定"的属性集。运行时动态增删的属性仍需 Map/List——框架核心属性全走索引，用户扩展走 SPI 的 List/单字段/Map（见 [18 篇](18-spi-extension.md) 四种发现模式）。重新审视条件：若未来出现高频动态属性，该属性不应进 `methodCache`/`classCache`，而应走请求级 Map。
+- **代价**：`int index` 在类加载期分配且不可回收（`MappingCacheKey` 是静态常量，生命周期 = JVM 生命周期）；`methodCache`/`classCache` 数组按 `key.index + 1` 懒分配，越界时 `Arrays.copyOf` 扩容（`MappingHandlerMethod.java`，`synchronized` 双检；扩容路径的写入在锁内完成，正常路径无锁），无固定上限——槽位随已注册键增长，未用槽位仅浪费单个对象引用。
+- **边界**：仅适用于"已知有限且启动期可确定"的属性集。运行时动态增删的属性仍需 Map/List——框架核心属性全走索引，用户扩展走 SPI 的 List/单字段/Map（见 [18 篇](18-spi-extension.md) 四种发现模式）。重新审视条件：若未来出现高频动态属性，该属性不应进 `methodCache`/`classCache`，而应走请求级 Map。
 
 **关联**：[15 篇](15-performance-optimizations.md) 优化 1/4、[16 篇](16-code-spotlights.md) 聚光灯 1/5、[04 篇](04-request-pipeline.md) 四节。
 
@@ -239,12 +239,12 @@ SSE/流式输出需生产者（EventLoop 或业务线程）→ 消费者（Event
 - `ArgumentResolverRegistry.validateAllParametersResolvable` phase3 遍历所有 `@RequestMapping` 方法的参数，对每个参数调 provider 的 `supports()`，无 provider 可解析则抛 `IllegalStateException`；
 - `@RunInPool` 缺池名、缺 arg resolver when `check-on-startup=true` 等均启动期校验（见 `development.md` fail-fast 条目）。
 
-关键细节：`validateAllParametersResolvable` **只查 `supports()` 不创建实例**—— 注释明言 "does NOT create or cache any resolver, keeping memory footprint zero for endpoints that are never called"。真正的 `resolveArgument` 延迟到首请求 DCL `getMethodArgContexts` → `initStaticArgResolverSupport` 才创建并缓存。这是 fail-fast 与零闲置内存的折中。
+关键细节：`validateAllParametersResolvable` 对**普通参数**只查 `supports()` 不创建实例—— 注释明言 "does NOT create or cache any resolver, keeping memory footprint zero for endpoints that are never called"。**例外**：`@ModelAttribute` 无默认构造器的参数由 `validateModelAttributeConstructor` 调 `getResolver()` 预创建，为的是启动期就暴露 `InstantiationException`。普通参数的真正 `resolveArgument` 延迟到首请求 DCL `getMethodArgContexts` → `initStaticArgResolverSupport` 才创建并缓存。这是 fail-fast 与零闲置内存的折中。
 
 ### 后果
 
 - **收益**：配置错误在部署期暴露，不会到生产运行时才崩（`@RunInPool` 写错池名、参数漏 resolver 都在启动失败）；启动确定性高，运行时无"配置性异常"。
-- **代价**：校验有启动期成本（遍历所有 mapping 方法的参数），但一次性且只查 `supports()` 不创建实例，零闲置内存；启动时间略增（可接受）。
+- **代价**：校验有启动期成本（遍历所有 mapping 方法的参数），但一次性且普通参数只查 `supports()` 不创建实例，零闲置内存；启动时间略增（可接受）。
 - **边界**：运行时仍有兜底 fail——`resolvePool` 在首请求懒解析 `@RunInPool` 注解时才触发（注解值理论上运行时可变，但池名校验逻辑复用 ，保证启动期与运行时一致）。重新审视条件：若某些扩展点无法在启动期确定（如动态注册的 mapping），fail-fast 退化为"动态注册时校验"（`WebComponentContainer.registerWebComponent` 按 state 追 phase，[18 篇](18-spi-extension.md) 七节），但不放弃校验本身。
 
 **关联**：[18 篇](18-spi-extension.md) 六节（已引用为 ADR 9，含"校验可达≠预创建实例"纠偏）、`development.md`。
@@ -315,7 +315,7 @@ SSE/流式输出需生产者（EventLoop 或业务线程）→ 消费者（Event
 |---|------|------|------|---------|
 | 1 | ASM + MethodHandle + native-image 降级 | 已采纳 | Metaspace + `@Optimize` 显式标注 | native-image 退回 MethodHandle |
 | 2 | 默认 default 池 + `@RunInPool`/eventloop 可选 | 已采纳 | 默认一次线程切换 | 流式发送方不适用 `@RunInPool` |
-| 3 | `int index` + `Object[]` vs Map | 已采纳 | 索引不可回收 + 预分配槽位 | 仅编译期确定属性 |
+| 3 | `int index` + `Object[]` vs Map | 已采纳 | 索引不可回收 + 预分配槽位 | 仅启动期可确定属性 |
 | 4 | 同包同名覆盖 vs Bean 层 `@Primary` | 已采纳 | 机制隐式 | 仅 `WebComponent` 适用 |
 | 5 | Disruptor vs 自研队列 | 已采纳 | 依赖 + 按方法独占 | 按方法粒度非全局 |
 | 6 | 有界 `MpscArrayQueue` + 背压 | 已采纳 | 极端高频触发自旋 | 背压是"宁可慢不可崩" |
