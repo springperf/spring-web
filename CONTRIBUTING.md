@@ -146,6 +146,24 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 - The `build` job also emits an aggregate SBOM (`target/bom.json`) as an artifact. It is for delivery
   traceability only - this project does not publish to Maven Central.
 
+### Metric and Sync Contracts
+
+- `MetricContractTest` freezes the metric **names and tag keys** of `MicrometerWebMetrics` and
+  `MicrometerBatchMetrics` as two whitelists (web: 6 meters, batch: 9). The per-metric tests stay - they
+  assert values; this one asserts the set, so *adding* a metric without a test is now a failure too.
+  Changing a name or tag key means editing the whitelist on purpose.
+- The javadoc job also compiles `io.springperf.web.annotation` with `-Xdoclint:all -Werror`. Excluding
+  `missing` for the whole reactor is deliberate (100+ warnings live in internal classes), but the
+  annotation package is what users type in their own code, so missing `@param`/`@return` there is an
+  error. The single-package check is a plain `javadoc` invocation because the Maven plugin has no
+  "one subpackage" switch.
+- `scripts/sync-audit.py --target 2.7.x --whitelist <local list>` produces a branch-sync report with
+  three sections: files only on the base branch, files only on the target branch, and same-name files
+  with line deltas. It never decides "must sync" - 505 same-name files differ between `master` and
+  `2.7.x` simply because adaptation rewrites are normal. The whitelist holds version-boundary paths
+  only (native-image, Spring AI, virtual threads, Thymeleaf WebExchange); feature gaps must not be
+  whitelisted. Reports and whitelists live under `docs/feature/` (git-ignored, local ledger).
+
 ### Formatting
 
 - Source formatting is **explicitly invoked**, never run implicitly:
