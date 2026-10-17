@@ -54,8 +54,72 @@ jobs:
           name: test-reports-java${{ matrix.java }}
           path: "**/target/surefire-reports/*.txt"
 
+      - name: Coverage gate
+        # 聚合 CSV 由 coverage-aggregate 模块在 test 阶段产出（report-aggregate，含 E2E 触发的覆盖）。
+        # 只在一个 JDK 组合上判定，避免同一份数据重复失败、也避免给 8/11 旧 JDK 矩阵添负担。
+        if: matrix.java == 17
+        run: python3 scripts/check-coverage.py
+
+      - name: Upload coverage CSV
+        if: always() && matrix.java == 17
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: coverage-csv-java${{ matrix.java }}
+          path: coverage-aggregate/target/site/jacoco-aggregate/jacoco.csv
+          if-no-files-found: ignore
+
+      - name: Report flaky tests
+        # 重跑后通过的用例不算失败（E2E 模块配了 rerunFailingTestsCount=1），但必须显式可见，
+        # 否则「重试掩盖真 bug」会变成静默行为。
+        if: always()
+        run: |
+          set -euo pipefail
+          files=$(grep -rl 'Flaky: [1-9]' --include='*.txt' . || true)
+          if [ -n "$files" ]; then
+            count=$(printf '%s\n' "$files" | wc -l)
+            echo "::warning::${count} 个测试报告含重跑后才通过的 flaky 用例"
+            while IFS= read -r f; do grep -h 'Flaky: [1-9]' "$f" || true; done <<< "$files"
+          else
+            echo "no flaky tests detected"
+          fi
+
+  netty-leaks:
+    # ByteBuf 引用计数只在 paranoid 级别报告泄漏；默认 simple 采样会漏掉低频路径。
+    # 独立 job：paranoid 有明显开销，不塞进 5 个 JDK 的 build 矩阵。
+    if: github.ref == 'refs/heads/master' || github.base_ref == 'master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          java-version: 17
+          distribution: temurin
+          cache: maven
+
+      - name: ByteBuf leak check (paranoid)
+        run: |
+          set -euo pipefail
+          # --online：CI 首次运行时本地仓库不完整，脚本默认的离线 -o 会失败（不能用它冒充泄漏结论）。
+          # 只跑核心 + 两个 E2E 模块（-am 带上被依赖的库模块），避免全 reactor 的 paranoid 开销。
+          bash scripts/check-netty-leaks.sh --run --online --clean 1 \
+            -pl spring-web,spring-web-test,spring-web-support-test -am
+          # 脚本对“属性没生效”只告警（为了本地离线可用），CI 把它升级为硬断言：
+          # 否则“零泄漏”可能只是没开 paranoid 的假结论。
+          grep -q 'io.netty.leakDetection.level = paranoid' netty-leak-check-round1.log
+
+      - name: Upload leak-check log
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: netty-leak-log
+          path: netty-leak-check-round*.log
+          if-no-files-found: ignore
+
   docs:
-    # Markdown 一致性检查（坏链 / 锚点 / 编码与格式 / 符号），与 JDK 无关，独立成 job 只跑一次。
+    # Markdown 一致性检查（坏链 / 锚点 / 编码与格式 / 符号 / 结构），与 JDK 无关，独立成 job 只跑一次。
     # 仅对 master 生效：2.7.x 分支的文档基线未做校验，避免误红。
     if: github.ref == 'refs/heads/master' || github.base_ref == 'master'
     runs-on: ubuntu-latest

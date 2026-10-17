@@ -4,10 +4,13 @@
 #
 # 用法:
 #   ./check-netty-leaks.sh <日志文件或目录> [...]           # 只校验既有日志
-#   ./check-netty-leaks.sh --run [--clean] [轮数] [额外 mvn 参数...]  # 自行跑 paranoid 全量并校验（默认 1 轮）
+#   ./check-netty-leaks.sh --run [--clean] [--online] [轮数] [额外 mvn 参数...]
+#                                                          # 自行跑 paranoid 并校验（默认 1 轮）
 #
-# --clean: 以 `mvn -o clean test ...` 运行，与 CI（`mvn clean test`）口径一致。不加则复用 target/ 里
+# --clean:  以 `mvn clean test ...` 运行，与 CI（`mvn clean test`）口径一致。不加则复用 target/ 里
 #   上一次编译的 class —— 若那批 class 是别的 JDK 构建的，会出现与当前源码无关的失败甚至假泄漏。
+# --online: 不加 `-o`（联网解析依赖）。本地仓库已有全部依赖时默认离线更快；CI 首次运行必须在线，
+#   否则 `-o` 会因为缺依赖直接失败（与"有泄漏"是两件事，脚本已分开计数，但没必要制造噪声）。
 #
 # 背景:
 #   Netty 的 ResourceLeakDetector 仅在 paranoid 级别报告泄漏，且报告走 **java.util.logging**
@@ -26,6 +29,7 @@ MVN="${MVN:-mvn}"
 LEAK_MARKERS='reportTracedLeak|reportUntracedLeak|LEAK: ByteBuf'
 RUN=0
 CLEAN=0
+ONLINE=0
 ROUNDS=1
 TARGETS=()
 EXTRA_MVN_ARGS=()
@@ -38,14 +42,14 @@ fi
 if [ "$1" = "--run" ]; then
   RUN=1
   shift
-  if [ $# -gt 0 ] && [ "$1" = "--clean" ]; then
-    CLEAN=1
-    shift
-  fi
-  if [ $# -gt 0 ] && [[ "$1" =~ ^[0-9]+$ ]]; then
-    ROUNDS="$1"
-    shift
-  fi
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --clean) CLEAN=1; shift ;;
+      --online) ONLINE=1; shift ;;
+      ''|*[!0-9]*) break ;;
+      *) ROUNDS="$1"; shift ;;
+    esac
+  done
   EXTRA_MVN_ARGS=("$@")
 else
   TARGETS=("$@")
@@ -85,9 +89,12 @@ if [ "$RUN" -eq 1 ]; then
     log="netty-leak-check-round${r}.log"
     echo "==> [第 ${r}/${ROUNDS} 轮] paranoid 全量测试 -> ${log}"
     # -XshowSettings:properties 用于正面证明 paranoid 确实传入了测试 JVM（否则“无报告”也可能是没生效）
-    MVN_GOALS=(-o test)
+    MVN_GOALS=(test)
+    if [ "$ONLINE" -eq 0 ]; then
+      MVN_GOALS=(-o "${MVN_GOALS[@]}")
+    fi
     if [ "$CLEAN" -eq 1 ]; then
-      MVN_GOALS=(-o clean test)
+      MVN_GOALS=(clean "${MVN_GOALS[@]}")
     fi
     "$MVN" "${MVN_GOALS[@]}" -Djacoco.skip=true \
       -DargLine="-Dio.netty.leakDetection.level=paranoid -Dio.netty.leakDetection.targetRecords=16 -XshowSettings:properties" \

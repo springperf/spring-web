@@ -922,32 +922,10 @@
             </properties>
         </profile>
 
-        <!-- Spring Boot 4.x 的适配见 4.1.x 分支（master 仅维护 3.5.x） -->
-
-        <profile>
-            <id>spring-boot-2.7</id>
-            <properties>
-                <spring-boot.version>2.7.18</spring-boot.version>
-            </properties>
-        </profile>
-        <profile>
-            <id>spring-boot-2.6</id>
-            <properties>
-                <spring-boot.version>2.6.15</spring-boot.version>
-            </properties>
-        </profile>
-        <profile>
-            <id>spring-boot-2.5</id>
-            <properties>
-                <spring-boot.version>2.5.15</spring-boot.version>
-            </properties>
-        </profile>
-        <profile>
-            <id>spring-boot-2.4</id>
-            <properties>
-                <spring-boot.version>2.4.13</spring-boot.version>
-            </properties>
-        </profile>
+        <!-- Spring Boot 4.x 的适配见 4.1.x 分支（master 仅维护 3.5.x）。
+             Spring Boot 2.4~2.7 的 profile 只在 2.7.x 分支存在：master 已全面 jakarta
+             （spring-web-servlet 无任何 javax.servlet 引用），激活 Boot 2.x 只会得到
+             无法编译的依赖组合，故此处不再声明，避免误用。 -->
 
         <profile>
             <id>release</id>

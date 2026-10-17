@@ -135,4 +135,20 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!-- E2E 依赖真实端口与网络时序，偶发 flake 不应把 PR 判红：失败用例重跑 1 次，
+                         仍失败才算失败。surefire 会在报告里记 Flaky，CI 汇总打印（见 ci.yml 的
+                         “Report flaky tests”），避免“重试掩盖真 bug”变成静默行为。
+                         只加在 E2E 模块：单测不配重试，避免掩盖真实的时序缺陷。 -->
+                    <rerunFailingTestsCount>1</rerunFailingTestsCount>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>
