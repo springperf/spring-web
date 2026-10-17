@@ -537,7 +537,6 @@ Swagger annotations (`@Tag`, `@Operation`, `@Schema`) work directly.
 | `HttpBodyCodecInterceptor` | Spring Bean | Request/response body read/write interception |
 | `HandlerExceptionResolver` | Spring Bean | Exception resolver |
 | `ReturnValueResolver` | Spring Bean | Return value resolver |
-| `StaticArgumentResolverProvider` | Spring Bean | Argument resolver provider | `ArgumentResolverRegistry` |
 | `StaticArgumentResolverProvider` | Spring Bean | Static argument resolver provider |
 | `HttpBodyConverter` | Spring Bean | HTTP message format conversion |
 | `JsonConverter` | No auto-registration (default `JacksonConverter`) | JSON serialization implementation |

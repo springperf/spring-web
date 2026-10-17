@@ -8,13 +8,15 @@
 #   ./check-docs.sh -v                  # 列出每个被检查的文件
 #
 # 说明:
-#   两个检查器都在 scripts/ 下（Python 3，无第三方依赖），本脚本只做解释器发现，
+#   三个检查器都在 scripts/ 下（Python 3，无第三方依赖），本脚本只做解释器发现，
 #   便于 CI（ubuntu-latest 自带 python3）与本地（WSL / Git Bash）用同一条命令调用：
-#     - check-docs.py         链接 / 锚点 / 编码与基础格式（锚点规则必须与 GitHub 一致：
-#                             删除标点（含 `·` `、` `：`）后**不补 `-`**——详见其文件头）；
-#     - check-doc-symbols.py  契约文档点名的**符号是否存在**（配置键、类名、成员）。
-#                             它**不检查句子真假**，且其"未知类名"规则只报告不拦截——详见其文件头。
-#   两者共用同一套参数（--self-test / --quiet / -v），任一失败即失败。
+#     - check-docs.py           链接 / 锚点 / 编码与基础格式（锚点规则必须与 GitHub 一致：
+#                               删除标点（含 `·` `、` `：`）后**不补 `-`**——详见其文件头）；
+#     - check-doc-symbols.py    契约文档点名的**符号是否存在**（配置键、类名、成员）。
+#                               它**不检查句子真假**，且其"未知类名"规则只报告不拦截——详见其文件头；
+#     - check-doc-structure.py  Markdown **结构完整性**（中文括号残留 / 空行内代码 /
+#                               表格列数与空列 / 代码围栏配对 / `Xxx.java` 引用存在性）——详见其文件头。
+#   三者共用同一套参数（--self-test / --quiet / -v），任一失败即失败。
 #
 # 退出码: 0 = 通过；1 = 存在缺陷；2 = 用法/环境错误
 #
@@ -49,5 +51,9 @@ status=0
 "$PY" "$DIR/check-doc-symbols.py" "$@" || second=$?
 if [ "${second:-0}" -gt "$status" ]; then
   status=$second
+fi
+"$PY" "$DIR/check-doc-structure.py" "$@" || third=$?
+if [ "${third:-0}" -gt "$status" ]; then
+  status=$third
 fi
 exit "$status"
