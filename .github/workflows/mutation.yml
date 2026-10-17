@@ -1,0 +1,50 @@
+name: Mutation
+
+# 变异测试只为「发现断言薄弱处」，不参与 PR 门禁：
+# PIT 对每请求热点包（mapping / arg.resolver / retval）跑一轮约 3~5 分钟，
+# 且 survived 的 mutant 需要人工判断是否等价变异，不适合卡 PR。
+# 结果存档 + 人工 review，稳定后再考虑设阈值。
+
+on:
+  schedule:
+    # 每周五 18:00 UTC（北京时间周六 02:00），与日常 CI 错峰
+    - cron: '0 18 * * 5'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pitest:
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          java-version: 17
+          distribution: temurin
+          cache: maven
+
+      - name: Run PIT on hot paths
+        # targetClasses / targetTests 已在 spring-web/pom.xml 的 mutation profile 中限定，
+        # 这里只负责触发，避免 CI 与本地口径不一致。
+        run: >
+          ./mvnw -Pmutation -pl spring-web pitest:mutationCoverage
+          -Djacoco.skip=true -Dspotbugs.skip=true -Dmodernizer.skip=true
+          --batch-mode --no-transfer-progress
+
+      - name: Upload PIT report
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: pitest-report
+          path: spring-web/target/pit-reports/
+          if-no-files-found: ignore

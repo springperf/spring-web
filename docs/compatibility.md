@@ -55,14 +55,21 @@
 
 | 依赖 | 当前版本 | 已验证兼容范围 | 说明 |
 |------|---------|---------------|------|
-| Spring Boot | **3.5.16** | 3.0.x ~ 3.5.x | 通过 Maven Profile 切换（`-Pspring-boot-3.0` ~ `-Pspring-boot-3.5`）；4.x 见 `4.1.x` 分支 |
-| Spring Framework | **6.2.x** | 6.0.x ~ 6.2.x | 随 Spring Boot 管理 |
+| Spring Boot | **3.5.16** | 3.2.x ~ 3.5.x | 通过 Maven Profile 切换（`-Pspring-boot-3.2` ~ `-Pspring-boot-3.5`）；4.x 见 `4.1.x` 分支 |
+| Spring Framework | **6.2.x** | 6.1.x ~ 6.2.x | 随 Spring Boot 管理 |
 | JDK | **17** | 17 / 21 / 25（CI 矩阵，见 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)） | 编译目标 `java.version=17`；JDK 21 起支持虚拟线程（见下） |
 | Servlet API | **jakarta.servlet 6.0** | 6.0.x | javax.servlet 不兼容 |
 | Netty | **4.1.137.Final** | 4.1.x |  |
 | Jackson | **2.17.2** | 2.17.x |  |
 | Lombok | **1.18.46** | 1.18.30+ | JDK 17+ 兼容性要求高版本 |
 | JMH | **1.37** | 1.37 | 仅 benchmark 模块使用 |
+
+> **3.0 / 3.1 为什么不在范围内**：两者对应 Spring Framework 6.0，缺少本项目已使用的
+> `ConversionService.convert(Object, TypeDescriptor)`（6.1 才新增）。用 3.0/3.1 的依赖构建会直接编译失败；
+> 若改用 3.5 构建、把产物拿到 6.0 运行时执行，则会在 `@RequestParam` / `@PathVariable` 等命名值参数的转换
+> 路径上抛 `NoSuchMethodError`（`Error`，`@ExceptionHandler` 接不住）。两个方向都不可用，故从 3.2 起算。
+> 兼容性由 `ci.yml` 的 `spring-boot-versions` 矩阵（3.2 / 3.3 / 3.4）跑核心模块**单测**验证——只验证
+> `compile` 证明不了运行期符号存在。
 
 ### 额外特性
 

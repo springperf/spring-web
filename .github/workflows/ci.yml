@@ -60,6 +60,19 @@ jobs:
         if: matrix.java == 17
         run: python3 scripts/check-coverage.py
 
+      - name: Generate SBOM
+        # 只做交付物追溯（不发 Central，因此不涉及合规硬要求）；放 JDK 17 上只跑一次。
+        if: matrix.java == 17
+        run: ./mvnw cyclonedx:makeAggregateBom --batch-mode --no-transfer-progress
+
+      - name: Upload SBOM
+        if: always() && matrix.java == 17
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: sbom-json
+          path: target/bom.json
+          if-no-files-found: ignore
+
       - name: Upload coverage CSV
         if: always() && matrix.java == 17
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
@@ -82,6 +95,41 @@ jobs:
           else
             echo "no flaky tests detected"
           fi
+
+  spring-boot-versions:
+    # 「支持 3.2~3.4」必须由单测证明，不能只 compile：换 Spring 版本会改变行为
+    # （例：ServerSentEvent 拒绝换行的校验是 6.2 某个补丁才加的），运行期还会暴露缺失符号。
+    if: github.ref == 'refs/heads/master' || github.base_ref == 'master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        boot: ['3.2', '3.3', '3.4']
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          java-version: 17
+          distribution: temurin
+          cache: maven
+
+      - name: Test spring-web on Spring Boot ${{ matrix.boot }}
+        # 只跑核心模块：全 reactor × 3 个版本会拖长 PR 反馈；nightly 若需要可扩到 -am 全量。
+        run: >
+          ./mvnw -Pspring-boot-${{ matrix.boot }} -pl spring-web -am test
+          -Djacoco.skip=true -Dspotbugs.skip=true -Dmodernizer.skip=true
+          --batch-mode --no-transfer-progress
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: test-reports-boot${{ matrix.boot }}
+          path: "**/target/surefire-reports/*.txt"
+          if-no-files-found: ignore
 
   netty-leaks:
     # ByteBuf 引用计数只在 paranoid 级别报告泄漏；默认 simple 采样会漏掉低频路径。

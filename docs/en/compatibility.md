@@ -58,14 +58,22 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 
 | Dependency | Current Version | Verified Range | Notes |
 |------------|----------------|----------------|-------|
-| Spring Boot | **3.5.16** | 3.0.x ~ 3.5.x | Switch via Maven profile (`-Pspring-boot-3.0` ~ `-Pspring-boot-3.5`); for 4.x see the `4.1.x` branch |
-| Spring Framework | **6.2.x** | 6.0.x ~ 6.2.x | Managed by Spring Boot |
+| Spring Boot | **3.5.16** | 3.2.x ~ 3.5.x | Switch via Maven profile (`-Pspring-boot-3.2` ~ `-Pspring-boot-3.5`); for 4.x see the `4.1.x` branch |
+| Spring Framework | **6.2.x** | 6.1.x ~ 6.2.x | Managed by Spring Boot |
 | JDK | **17** | 17 / 21 / 25 (CI matrix, see [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)) | Compile target `java.version=17`; JDK 21+ supports virtual threads (see below) |
 | Servlet API | **jakarta.servlet 6.0** | 6.0.x | javax.servlet incompatible |
 | Netty | **4.1.137.Final** | 4.1.x | |
 | Jackson | **2.17.2** | 2.17.x | |
 | Lombok | **1.18.46** | 1.18.30+ | Higher version needed for JDK 17+ compatibility |
 | JMH | **1.37** | 1.37 | Benchmark module only |
+
+> **Why 3.0 / 3.1 are out of scope**: both map to Spring Framework 6.0, which lacks the
+> `ConversionService.convert(Object, TypeDescriptor)` overload this project uses (added in 6.1). Building
+> against 3.0/3.1 fails at compile time; building against 3.5 and executing on a 6.0 runtime fails at
+> `@RequestParam` / `@PathVariable` conversion with `NoSuchMethodError` (an `Error`, which
+> `@ExceptionHandler` cannot catch). Neither direction works, so the range starts at 3.2. Coverage is
+> verified by the `spring-boot-versions` matrix in `ci.yml` (3.2 / 3.3 / 3.4) running core-module
+> **tests** - a green `compile` says nothing about runtime symbol resolution.
 
 ### Additional Features
 
