@@ -34,7 +34,7 @@ spring-web
 │   ├── BaseWebComponent         持有 WebContext 的抽象基类，建议自定义组件继承
 │   ├── WebComponentContainer    组件注册表基类（Map<String,WebComponent>）
 │   │   ├── registerWebComponent()
-│   │   ├── getWebComponent(Class)
+│   │   ├── getWebComponent(Class) / getWebComponents(Class)
 │   │   ├── getWebComponentWithDefault(Class, default)
 │   │   └── autoRegisterWebComponent(Class, FactoryFunction)
 │   ├── WebContext               应用上下文（extends WebComponentContainer）
@@ -43,7 +43,7 @@ spring-web
 │   │   ├── 持有 ApplicationProperties
 │   │   └── startLifecycle() → 驱动整个组件生命周期（由 NettyHttpServer.start() 触发；失败可清理重试，destroy 后可重新 start）
 │   ├── ApplicationProperties    类型安全的配置属性访问（包装 Environment）
-│   │   └── clearCache() — 清空两份 copy-on-write 缓存（配置中心动态刷新用）
+│   │   └── clearCache() — 清空四类 volatile copy-on-write 缓存（数值 / 字符串布尔 / Duration 毫秒 / Duration 秒，配置中心动态刷新用）
 │   ├── PropertyRefreshHandler    配置刷新协调器：清空 ApplicationProperties 缓存 + 静态缓存
 │   ├── PropertiesConstant       配置键常量
 │   │   ├── SERVER_PORT, CONTEXT_PATH
@@ -55,8 +55,12 @@ spring-web
 │   ├── HttpHandler              @FunctionalInterface，顶层 HTTP 处理策略
 │   ├── NettyHttpHandler         Netty ChannelHandler，适配 Netty → 框架请求/响应
 │   ├── NettyHttpServer          implements SmartLifecycle，启动/停止 Netty
-│   │   ├── 管线: HttpServerCodec → ChunkedWriteHandler
-│   │   │     → SupportMultipartAggregator → BackpressureHandler → NettyHttpHandler
+│   │   ├── 管线由 Http2ChannelInitializer 组装（HTTP/1.1 与 HTTP/2 两条）:
+│   │   │     HttpServerCodec → [ReadIdleTimeoutHandler] → ChunkedWriteHandler
+│   │   │     → [PipelineCustomizer beforeAgg] → SupportMultipartAggregator|HttpObjectAggregator
+│   │   │     → [PipelineCustomizer afterAgg] → BackpressureHandler → NettyHttpHandler
+│   │   │     （按配置还可注入 SupportHttpContentCompressor / KeepAliveHandler；HTTP/2 子管线为
+│   │   │      Http2StreamFrameToHttpObjectCodec → … → BackpressureHandler → NettyHttpHandler）
 │   │   ├── NettyTransport       transport 工厂：server.netty.transport=auto/nio/epoll，Linux 自动 epoll，其他平台回退 NIO
 │   │   └── 可选 SSL 支持
 │
@@ -86,7 +90,7 @@ spring-web
 │   ├── filter/                  WebFilter 过滤器链
 │   │   ├── WebFilter                SPI 接口（extends WebComponent），doFilter(request, response, chain)
 │   │   ├── FilterChain              过滤器链接口
-│   │   ├── DefaultFilterChain       默认实现，终端通过 FilterChainTerminal 回调
+│   │   ├── DefaultFilterChain       默认实现，filter 耗尽后直接回调 DispatcherHandler.handleAfterFilter()
 │   │   ├── WebFilterRegistry        管理 WebFilter 列表（extends WebComponentContainer）
 │   │   │   ├── 支持 Ordered 排序
 │   │   │   ├── 自动注册 Spring 中 WebFilter 类型的 Bean
@@ -116,8 +120,9 @@ spring-web
 │   │   ├── MappingRegistry      扫描 @Controller/@RestController，构建路径映射
 │   │   │   ├── 解析 @RequestMapping 全部属性
 │   │   │   ├── RouterOptimizer 链（前缀/后缀/全路径/循环优化器）
-│   │   │   ├── registerMappingAfterInit() 支持动态注册（如 Actuator）
-│   │   │   └── supportsPathPattern（AntPathMatcher / PathPattern 兼容）
+│   │   │   ├── registerMapping(PathMappingContext) 支持动态注册（如 Actuator 端点）
+│   │   │   └── 路径匹配由 PathPatternUtils 提供（同时持 PathPatternParser 与 AntPathMatcher，
+│   │   │       getParser()/getMatcher() 按 Router 类型取用；无 matching-strategy 开关）
 │   │   ├── PathMappingContext   映射上下文（extends MappingHandlerMethod）
 │   │   ├── MappingHandlerMethod 可调用的处理器方法（extends InvokableHandlerMethod）
 │   │   │   └── MappingCacheKey  泛型缓存键，用于缓存每方法/每类元数据
@@ -129,9 +134,10 @@ spring-web
 │   │   │   ├── ConsumeOrProduceMatcher
 │   │   │   ├── MediaTypeExpressionSupport
 │   │   │   └── NameValueExpressionSupport
-│   │   └── route/               路由引擎
-│   │       ├── Router           接口: route(request), getPathRule(), add()
-│   │       ├── PathPatternRouter, PathPatternsRouter, SimpleRouter
+│   │   ├── route/               路由引擎
+│   │   │   ├── Router           接口: route(request), getPathRule(), add()
+│   │   │   └── PathPatternRouter, PathPatternsRouter, SimpleRouter
+│   │   └── optimize/            路由优化器（启动期构建）
 │   │       └── RouterOptimizer  接口 + FullPath/Suffix/Prefix/Loop 优化器
 │   │
 │   ├── arg/                     参数解析
@@ -169,7 +175,7 @@ spring-web
 │   │
 │   ├── retval/                   返回值解析
 │   │   ├── ReturnValueResolverRegistry  管理 ReturnValueResolver 链
-│   │   │   └── 预装 15+ 内置解析器
+│   │   │   └── 预装 13 个内置解析器（7 异步/流式 + 6 内容型），并自动吸入 Spring Bean 的 ReturnValueResolver
 │   │   ├── ReturnValueResolver          SPI: supportsReturnType() / supportsReturnValue() / resolveReturnValue()
 │   │   ├── MethodReturnValueContext     每方法返回值上下文缓存
 │   │   └── resolver/                   内置解析器
@@ -273,8 +279,9 @@ spring-web
 │
 ├── annotation/                   自定义注解
 │   ├── @Optimize                 标记开启调用优化
-│   ├── @ReactiveSupport          配置背压参数（highWaterMark/lowWaterMark/streamEmitterType/timeout）
-│   └── @RunInPool                指定业务线程池名称
+│   ├── @ReactiveSupport          配置背压参数（highWaterMark=150/lowWaterMark=50/streamEmitterType/timeout=-1）
+│   ├── @RunInPool                指定业务线程池名称（默认 default，保留值 eventloop）
+│   └── @RunInEventloop           @RunInPool(EVENTLOOP) 的元注解别名
 │
 └── util/                         工具类
     ├── PathPatternUtils, WebUtils, MetaUtils
@@ -566,7 +573,9 @@ spring-boot-starter-web
     ├── spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports  注册 14 个 AutoConfiguration
     ├── spring/aot.factories              AOT 处理器（BeanFactoryInitializationAotProcessor）
     ├── spring.factories                  仅注册 ApplicationContextFactory（WebServerApplicationContextFactory）
-    └── additional-spring-configuration-metadata.json  配置元数据（IDE 提示）
+    ├── additional-spring-configuration-metadata.json  配置元数据（IDE 提示）
+    └── native-image/io.github.springperf/spring-boot-starter-web/  GraalVM 可达性配置
+        （reflect-config.json / proxy-config.json / resource-config.json）
 ```
 
 ---
