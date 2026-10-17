@@ -10,7 +10,7 @@
 
 `spring-boot-starter-web` 模块的职责是**把框架的 40+ 个核心组件通过 Spring Boot 的自动配置机制（条件注解 + `AutoConfiguration.imports`）组装成一个开箱即用的 Web 服务器**。用户只需引入一个 starter 依赖，所有组件自动就位，配置通过 `application.properties` 覆盖。
 
-**核心问题**：10 个 `AutoConfiguration` 类如何分工？条件装配链如何编排？Actuator、OpenAPI、SBA、Spring Data 等生态组件如何桥接？
+**核心问题**：14 个 `AutoConfiguration` 类如何分工？条件装配链如何编排？Actuator、OpenAPI、SBA、Spring Data 等生态组件如何桥接？
 
 ---
 
@@ -18,7 +18,7 @@
 
 ### 1.1 注册入口
 
-`spring-boot-starter-web` 在 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports` 中注册了 10 个自动配置类（Spring Boot 3.x 标准格式，取代了旧版 `spring.factories`）：
+`spring-boot-starter-web` 在 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports` 中注册了 14 个自动配置类（Spring Boot 3.x 标准格式，取代了旧版 `spring.factories`）：
 
 ```properties
 io.springperf.web.autoconfigure.SpringWebAutoConfiguration
@@ -30,7 +30,11 @@ io.springperf.web.autoconfigure.SpringDataWebCompatibilityAutoConfiguration
 io.springperf.web.autoconfigure.SpringBootAdminClientAutoConfiguration
 io.springperf.web.autoconfigure.OpenApiAutoConfiguration
 io.springperf.web.autoconfigure.SwaggerUiAutoConfiguration
+io.springperf.web.autoconfigure.SpringWebViewAutoConfiguration
 io.springperf.web.autoconfigure.SpringWebBatchAutoConfiguration
+io.springperf.web.autoconfigure.JspViewAutoConfiguration
+io.springperf.web.autoconfigure.SpringWebViewExchangeAutoConfiguration
+io.springperf.web.autoconfigure.SpringWebPropertyRefreshAutoConfiguration
 ```
 
 额外在 `spring.factories` 中注册了一个 `ApplicationContextFactory`：
@@ -56,7 +60,7 @@ io.springperf.web.autoconfigure.support.WebServerApplicationContextFactory
 | 8 | `SwaggerUiAutoConfiguration` | `OpenApiCustomizer` 在类路径 | Swagger UI：端点 + 静态资源 |
 | 9 | `SpringWebViewAutoConfiguration` / `JspViewAutoConfiguration` / `SpringWebViewExchangeAutoConfiguration` | 相应视图引擎在类路径 | 视图渲染：Thymeleaf / FreeMarker / Beetl、JSP、ViewExchange |
 | 10 | `SpringWebBatchAutoConfiguration` | `BatchMapping` 在类路径 | Batch 模块：`BatchRegistry` + Micrometer 指标 |
-| 11 | `SpringWebPropertyRefreshAutoConfiguration` | — | 属性热刷新 |
+| 11 | `SpringWebPropertyRefreshAutoConfiguration` | `@ConditionalOnBean(WebContext.class)` + `@AutoConfigureAfter(SpringWebAutoConfiguration.class)` | 属性热刷新 |
 
 ---
 
@@ -68,7 +72,7 @@ io.springperf.web.autoconfigure.support.WebServerApplicationContextFactory
 
 ### 2.2 Bean 定义
 
-配置类定义了 5 个核心 Bean：
+配置类定义了 8 个 Bean（含 1 个内嵌配置类的 Bean 与 1 个 BFPP）：
 
 | Bean | 方法 | 条件 | 说明 |
 |------|------|------|------|
@@ -78,6 +82,8 @@ io.springperf.web.autoconfigure.support.WebServerApplicationContextFactory
 | `NettyHttpServer` | `nettyHttpServer()` | `@ConditionalOnMissingBean` | Netty 服务器，`SmartLifecycle` 启停 |
 | `Validator` | `validator()` | `@ConditionalOnMissingBean` + `@ConditionalOnClass(name = "jakarta.validation.Validator")` | 可选 Bean Validation |
 | `AccessLogWebFilter` | `accessLogWebFilter(Environment, ApplicationProperties)` | `@ConditionalOnProperty(name = "server.accesslog.enabled", havingValue = "true")` | 可选访问日志 |
+| `WebMetrics` | `micrometerWebMetrics()`（内嵌 `MicrometerWebMetricsConfiguration`） | `@ConditionalOnClass(name = "io.micrometer.core.instrument.MeterRegistry")` + `@ConditionalOnBean(MeterRegistry.class)` | 请求耗时/异常/线程池指标 |
+| `springMvcConflictGuard` | `springMvcConflictGuard()`（`static` `BeanFactoryPostProcessor`） | 无条件 | 在 bean 定义加载后、实例化前检测 `spring-boot-starter-web`(MVC) 冲突并抛 `IllegalStateException`——比在 `webContext()` 里检测更早暴露问题 |
 
 ### 2.3 `WebContext` 的初始化链
 
@@ -194,20 +200,27 @@ private static void assertNoSpringMvcConflict() {
 
 ### 3.2 Bean 定义
 
-配置类定义了 10 个 Bean：
+两个配置类分别定义 Bean：`SpringWebServletAutoConfiguration` **14 个**，`SpringWebMvcSupportAutoConfiguration` **5 个**（注意归属——拦截器/Advice/emitter/bridge 四项在 MVC 配置类，不在 Servlet 配置类）：
 
-| Bean | 说明 |
-|------|------|
-| `supportDispatcherHandler` | 扩展 `DispatcherHandler`，增加 `RequestContextHolder` 初始化 |
-| `supportInterceptorRegistry` | 自动扫描 Spring MVC `HandlerInterceptor` Bean |
-| `supportHttpBodyCodecInterceptorRegistry` | 自动扫描 `@ControllerAdvice` 中的 `RequestBodyAdvice`/`ResponseBodyAdvice` |
-| `httpServletRequestProvider` | 解析 `HttpServletRequest` 参数 |
-| `httpServletResponseProvider` | 解析 `HttpServletResponse` 参数 |
-| `webRequestArgumentResolverProvider` | 解析 `WebRequest`/`NativeWebRequest` 参数 |
-| `supportWebFilterRegistry` | 自动注册 `jakarta.servlet.Filter` Bean 为 `WebFilter` |
-| `responseBodyEmitterReturnValueResolver` | 支持 `ResponseBodyEmitter`/`SseEmitter` |
-| `webMvcConfigurerBridge` | 桥接 `WebMvcConfigurer` 实现 |
-| `perfHttpSessionManager` | 会话管理 |
+| Bean | 所属配置类 | 说明 |
+|------|-----------|------|
+| `supportDispatcherHandler` | Servlet | 扩展 `DispatcherHandler`，增加 `RequestContextHolder` 初始化 |
+| `httpServletRequestProvider` / `httpServletResponseProvider` | Servlet | 解析 `HttpServletRequest` / `HttpServletResponse` 参数 |
+| `servletRequestProvider` / `servletResponseProvider` | Servlet | 解析 `ServletRequest` / `ServletResponse` 参数 |
+| `webRequestArgumentResolverProvider` | Servlet | 解析 `WebRequest`/`NativeWebRequest` 参数 |
+| `sessionAttributeArgumentResolverProvider` | Servlet | 解析 `@SessionAttribute` 参数 |
+| `sessionAttributesInterceptor` | Servlet | `@SessionAttributes` 模型同步 |
+| `sessionStatusArgumentResolverProvider` | Servlet | 解析 `SessionStatus` 参数 |
+| `sessionScopeBeanFactoryPostProcessor` | Servlet（static BFPP） | session scope 支持 |
+| `supportWebFilterRegistry` | Servlet | 自动注册 `jakarta.servlet.Filter` Bean 为 `WebFilter` |
+| `perfServletContext` | Servlet | `ServletContext` 实现 |
+| `supportServletRegistry` | Servlet | 自动注册 `Servlet` Bean |
+| `perfHttpSessionManager` | Servlet | 会话管理 |
+| `supportInterceptorRegistry` | **MVC** | 自动扫描 `MappedInterceptor` Bean（见 [12 篇](12-support-bridge.md#41-supportinterceptorregistry双类型扫描)——普通 `HandlerInterceptor` 不自动注册） |
+| `supportHttpBodyCodecInterceptorRegistry` | **MVC** | 自动扫描 `@ControllerAdvice` 中的 `RequestBodyAdvice`/`ResponseBodyAdvice` |
+| `modelAndViewReturnValueResolver` | **MVC**（`@ConditionalOnClass(name = "io.springperf.web.view.View")`） | `ModelAndView` 返回值处理 |
+| `responseBodyEmitterReturnValueResolver` | **MVC** | 支持 `ResponseBodyEmitter`/`SseEmitter` |
+| `webMvcConfigurerBridge` | **MVC** | 桥接 `WebMvcConfigurer` 实现 |
 
 ### 3.3 `FilterWrapper` 转换
 
@@ -219,7 +232,7 @@ protected WebFilterRegistration createFilterWrapper(AbstractFilterRegistrationBe
     jakarta.servlet.Filter filter;
     try {
         filter = filterRegistrationBean.getFilter();
-    } catch (IllegalArgumentException e) {
+    } catch (IllegalArgumentException | IllegalStateException e) {
         if (filterRegistrationBean instanceof DelegatingFilterProxyRegistrationBean) {
             // 通过反射调用 getTargetBeanName() 获取代理目标 Bean 名
             String targetBeanName = resolveTargetBeanName(...);
@@ -243,7 +256,7 @@ protected WebFilterRegistration createFilterWrapper(AbstractFilterRegistrationBe
 
 ### 4.2 组件定义
 
-配置类定义了 6 个 Bean：
+配置类定义了 7 个 Bean（后两个仅在配置了 `management.server.port` 时装配）：
 
 | Bean | 说明 |
 |------|------|
@@ -252,6 +265,8 @@ protected WebFilterRegistration createFilterWrapper(AbstractFilterRegistrationBe
 | `webEndpointDiscoverer` | Spring Boot 标准的端点发现器，扫描 `@Endpoint`/`@WebEndpoint` |
 | `perfExposeExcludePropertyEndpointFilter` | 读取 `management.endpoints.web.exposure` 配置 |
 | `perfEndpointHandlerMapping` | 核心：将 Actuator 端点注册为框架路由 |
+| `managementServerInfrastructure` | 管理端口基础设施；`@ConditionalOnProperty(value = "management.server.port", matchIfMissing = false)` |
+| `managementNettyHttpServer` | 独立管理端口服务器；同上条件（`matchIfMissing = false`） |
 | `managementServerInfrastructure` | 管理端口基础设施（`management.server.port` 配置时创建） |
 | `managementNettyHttpServer` | 独立管理端口的 Netty 服务器 |
 
@@ -411,7 +426,7 @@ public PerfApplicationFactory perfApplicationFactory(
 
 `SpringWebBatchAutoConfiguration`在 `@BatchMapping` 在类路径时创建 `BatchRegistry` 并注册到 `WebContext`。内嵌 `MicrometerBatchMetricsConfiguration` 在 `MeterRegistry` 存在时提供 Micrometer 指标实现。
 
-`MicrometerBatchMetrics`缓存 8 个指标（Couter/Timer/DistributionSummary/Gauge），每个指标按 `queue` Tag 区分。`ConcurrentHashMap.computeIfAbsent` 原子性保证每个队列的指标只注册一次，避免 Micrometer 对同名同 tag 二次注册抛异常。
+`MicrometerBatchMetrics`注册 9 个指标（Counter/Timer/DistributionSummary/Gauge），均按 `queue` Tag 区分（`batch.process.duration` 另带 `outcome=success/failure`）。每个队列的 Counter/Timer/Summary 用 `ConcurrentHashMap.computeIfAbsent` 缓存；**两个 Gauge 刻意不用 `computeIfAbsent`**——那会在持有 CHM bin 锁时调用 `MeterRegistry.register`，与 MeterRegistry 内部锁形成潜在死锁面，故改为「外部 map 先占位、注册动作在锁外执行」。详见 [13 篇](13-batch-module.md#六可观测性9-个-micrometer-指标)。
 
 ---
 
@@ -419,14 +434,14 @@ public PerfApplicationFactory perfApplicationFactory(
 
 | 维度 | 本框架 starter | Spring Boot MVC starter |
 |------|---------------|------------------------|
-| 自动配置类数量 | 10 个 | 30+ 个（`spring-boot-autoconfigure`） |
+| 自动配置类数量 | 14 个 | 30+ 个（`spring-boot-autoconfigure`） |
 | 核心 Server | `NettyHttpServer`（`SmartLifecycle`） | `TomcatServletWebServerFactory`（`WebServerFactory`） |
 | 条件装配 | 全部 `@ConditionalOnClass` 字符串形式 | 同 Spring Boot 标准 |
-| 应用上下文 | `AnnotationConfigApplicationContext`（强制） | `AnnotationConfigServletWebServerApplicationContext` |
-| 生命周期驱动 | `NettyHttpServer.start()` → `WebContext.startLifecycle()` 三阶段（`afterPropertiesSet` 是 no-op） | `DispatcherServlet.onRefresh()` → `initStrategies()` |
-| Filter 发现 | `SupportWebFilterRegistry` 自动注册 `jakarta.servlet.Filter` Bean | `FilterRegistrationBean` + `@Component`/`@WebFilter` |
-| 拦截器发现 | `SupportInterceptorRegistry` 自动注册 `HandlerInterceptor` Bean | `WebMvcConfigurer.addInterceptors()` |
-| 线程池 | 默认 EventLoop 执行，`@RunInPool` 切换 | 默认 `Tomcat` 线程池 |
+| 应用上下文 | 非 Servlet 的 `AnnotationConfigApplicationContext`（AOT/native 下为 `GenericApplicationContext`） | `AnnotationConfigServletWebServerApplicationContext` |
+| 生命周期驱动 | `NettyHttpServer.start()` → `WebContext.startLifecycle()` 三阶段（`WebContext` 不实现 `InitializingBean`，无 `afterPropertiesSet`） | `DispatcherServlet.onRefresh()` → `initStrategies()` |
+| Filter 发现 | `SupportWebFilterRegistry` 自动注册 `jakarta.servlet.Filter` Bean（含 `@WebFilter` urlPatterns） | `FilterRegistrationBean` + `@Component`/`@WebFilter` |
+| 拦截器发现 | `SupportInterceptorRegistry` 自动注册 `MappedInterceptor` Bean（普通 `HandlerInterceptor` 不自动注册，需经 `addInterceptors`） | `WebMvcConfigurer.addInterceptors()` |
+| 线程池 | 默认 `default` 业务池；`@RunInPool(EVENTLOOP)` 或 `pool.default-execute-mode=eventloop` 切 EventLoop | 默认 `Tomcat` 线程池 |
 | Actuator 集成 | 自定义 `ActuatorEndpointHandlerMapping`（WebComponent 生命周期） | `WebMvcEndpointHandlerMapping`（Spring MVC） |
 | 管理端口 | 独立 `NettyHttpServer` + 独立 `WebContext` | 独立 `Tomcat` + `WebMvcEndpointHandlerMapping` |
 | OpenAPI 集成 | 自定义 `OpenApiAdapter` 遍历 `MappingRegistry` | SpringDoc 自动扫描 `RequestMappingHandlerMapping` |
@@ -436,7 +451,7 @@ public PerfApplicationFactory perfApplicationFactory(
 | GraalVM 支持 | `RuntimeHintsRegistrar` 条件注册 | `RuntimeHintsRegistrar` + AOT 构建期 |
 | 冲突检测 | `BeanFactoryPostProcessor` 早期检测 `DispatcherServlet` | 无（Tomcat 是默认） |
 
-**核心差异**：Spring Boot MVC 的自动配置围绕 `DispatcherServlet` 和 Servlet 容器（Tomcat/Undertow/Jetty）展开，30+ 个配置类覆盖了数据源、事务、安全、验证等企业级功能。本框架的 starter 只有 10 个配置类，聚焦于**让 Netty 框架在 Spring Boot 容器中"开箱即用"**，以及**与 Spring 生态主要组件（Actuator、SBA、OpenAPI、Spring Data）的桥接**。框架的模块化设计（`spring-web` / `spring-web-servlet` / `spring-web-mvc-support` / `spring-web-batch`）通过条件注解自然映射到自动配置的开关——用户只需要引入对应模块的依赖，相关配置自动激活。
+**核心差异**：Spring Boot MVC 的自动配置围绕 `DispatcherServlet` 和 Servlet 容器（Tomcat/Undertow/Jetty）展开，30+ 个配置类覆盖了数据源、事务、安全、验证等企业级功能。本框架的 starter 只有 14 个配置类，聚焦于**让 Netty 框架在 Spring Boot 容器中"开箱即用"**，以及**与 Spring 生态主要组件（Actuator、SBA、OpenAPI、Spring Data）的桥接**。框架的模块化设计（`spring-web` / `spring-web-view` / `spring-web-servlet` / `spring-web-mvc-support` / `spring-web-batch`）通过条件注解自然映射到自动配置的开关——用户只需要引入对应模块的依赖，相关配置自动激活。
 
 ---
 
@@ -444,14 +459,14 @@ public PerfApplicationFactory perfApplicationFactory(
 
 回到引子的问题：40+ 个核心组件如何被 Spring Boot 自动装配？
 
-1. **10 个 `AutoConfiguration` 类分工明确** → 核心（`SpringWebAutoConfiguration`）、桥接（`SpringWebServletAutoConfiguration` 与 `SpringWebMvcSupportAutoConfiguration`）、Actuator（`ActuatorEndpointAutoConfiguration`）、生态集成（OpenAPI/SBA/Spring Data/Batch），各司其职，条件注解自然隔离。
-2. **`WebContext` 驱动生命周期** → `NettyHttpServer.start()`（`SmartLifecycle` 最后启动）触发 `WebContext.startLifecycle()` 三阶段，`afterPropertiesSet()` 是 no-op。
+1. **14 个 `AutoConfiguration` 类分工明确** → 核心（`SpringWebAutoConfiguration`）、桥接（`SpringWebServletAutoConfiguration` 与 `SpringWebMvcSupportAutoConfiguration`）、Actuator（`ActuatorEndpointAutoConfiguration`）、视图（`SpringWebViewAutoConfiguration` / `JspViewAutoConfiguration` / `SpringWebViewExchangeAutoConfiguration`）、生态集成（OpenAPI/SBA/Spring Data/Batch/属性刷新），各司其职，条件注解自然隔离。
+2. **`WebContext` 驱动生命周期** → `NettyHttpServer.start()`（`SmartLifecycle` 最后启动）触发 `WebContext.startLifecycle()` 三阶段；`WebContext` 不实现 `InitializingBean`，没有 `afterPropertiesSet`（早期版本的留空覆写已删除）。
 3. **`ActuatorEndpointHandlerMapping` 通过 `WebComponent` 生命周期注册路由** → Phase 1 扫描 Actuator 端点，Phase 2 触发路由优化器，与管理端口基础设施无缝集成。
 4. **事件适配** → JDK 动态代理包装 `WebServerApplicationContext` 后发射 `PerfWebServerInitializedEvent`，`RuntimeHintsRegistrar` 注册 GraalVM 可达性提示。
 5. **生态桥接** → `FilterWrapper` 转换 `jakarta.servlet.Filter`，`WebMvcConfigurerBridge` 桥接 `WebMvcConfigurer`，`OpenApiAdapter` 遍历 `MappingRegistry`，`PerfApplicationFactory` 替换 SBA 默认工厂。
 6. **冲突检测** → `BeanFactoryPostProcessor` 在容器初始化早期检测 `spring-boot-starter-web` 冲突，`BeanDefinitionRegistryPostProcessor` 移除 Spring Data 的冲突 BPP。
 
-这一层的克制体现在：**不重复造 Spring Boot 的轮子，也不为了"自动配置"引入复杂的条件逻辑。** 10 个配置类每个都只做一件事——创建核心 Bean、桥接 Support 模块、集成 Actuator、适配生态组件。条件注解用的都是 `@ConditionalOnClass` 字符串形式（不触发类加载），`@ConditionalOnMissingBean` 允许用户覆盖。`PerfWebServer` 只有 3 个方法（`start`/`stop`/`getPort`），`WebServerApplicationContextFactory` 只有 4 行——"足够简单到不需要文档"的接口，是本框架的设计哲学在自动配置层的体现。
+这一层的克制体现在：**不重复造 Spring Boot 的轮子，也不为了"自动配置"引入复杂的条件逻辑。** 14 个配置类每个都只做一件事——创建核心 Bean、桥接 Support 模块、集成 Actuator、适配生态组件。条件注解用的都是 `@ConditionalOnClass` 字符串形式（不触发类加载），`@ConditionalOnMissingBean` 允许用户覆盖。`PerfWebServer` 只有 3 个方法（`start`/`stop`/`getPort`），`WebServerApplicationContextFactory` 只有 4 行——"足够简单到不需要文档"的接口，是本框架的设计哲学在自动配置层的体现。
 
 ---
 

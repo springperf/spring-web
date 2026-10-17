@@ -299,7 +299,7 @@ public class WebMvcConfigurerBridge extends BaseWebComponent {
 
 - **Spring 原生 Registry 作 Shim**：`shimInterceptorRegistry`/`shimCorsRegistry`/`shimResourceRegistry` 直接 `new` Spring MVC 的原生 Registry，`WebMvcConfigurer` 写入时不知道自己在被"收集"——它们就是 Spring 标准 API。收集后由 `bridgeInterceptors`/`bridgeCorsMappings`/`bridgeResourceHandlers` 读取 shim 的注册列表翻译到框架 Registry。
 - **单阶段收集+翻译**：收集与翻译都在 `initComponentPhase1` 内完成，循环写完 shim 立即 bridge，无跨阶段时序依赖。跑在 Phase 1 是为确保框架 Registry 自身初始化前注入用户配置。
-- **全量兼容**：10 个桥接方法覆盖 `addInterceptors`/`addCorsMappings`/`addResourceHandlers`/`addFormatters`/`configureAsyncSupport`/`addArgumentResolvers`/`extendMessageConverters`/`addReturnValueHandlers`/`extendHandlerExceptionResolvers`/`configureValidator`。
+- **全量兼容**：11 个桥接方法覆盖 `addViewControllers`/`addInterceptors`/`addCorsMappings`/`addResourceHandlers`/`addFormatters`/`configureAsyncSupport`/`addArgumentResolvers`/`extendMessageConverters`/`addReturnValueHandlers`/`extendHandlerExceptionResolvers`/`configureValidator`。
 - **零侵入**：用户代码只操作 Spring 标准接口，框架通过 Shim 收集器透明拦截。
 
 ---
@@ -389,7 +389,7 @@ this.bizExecutor = new ThreadPoolExecutor(
 
 - **`endOfBatch` + `maxBatchSize` 双触发**：Disruptor 在批量发布结束时提供 `endOfBatch` 信号，减少攒批延迟。`maxBatchSize > 0` 时作为兜底防止单批过大；`maxBatchSize <= 0` 时仅靠 `endOfBatch`，纯延迟触发。
 - **原子 buffer 替换**：`flush()` 先 `if (buffer.isEmpty()) return` 跳过空批，再将当前 buffer 整体替换为新 ArrayList 后提交线程池。提交后新事件进入新 buffer，与处理中的 batch 互不干扰。
-- **`SynchronousQueue` + `CallerRunsPolicy`**：零核心线程池空闲时零占用，满负荷时消费者线程自行执行 → 消费者不再从 RingBuffer 拉取 → RingBuffer 填满 → EventLoop 生产者阻塞 → TCP 反压。一条完整的"自然背压链"。`bizExecutor` 在 `DisruptorQueue` 构造期创建并注入 `BufferingBatchHandler`。
+- **`SynchronousQueue` + `CallerRunsPolicy`**：零核心线程池空闲时零占用，满负荷时消费者线程自行执行 → 消费者不再从 RingBuffer 拉取 → RingBuffer 填满 → 生产者线程（默认 `default` 业务池 worker；`eventloop` 模式下才是 EventLoop）阻塞 → TCP 反压。一条完整的"自然背压链"。`bizExecutor` 在 `DisruptorQueue` 构造期创建并注入 `BufferingBatchHandler`。
 - **`handleBatchError` 逐请求 `setError`**：`@BatchMapping` 方法执行失败时，遍历所有未完成的 request 调用 `setError(cause)`，不会出现"一个请求失败，整批请求无响应挂起"。
 
 ---

@@ -42,9 +42,9 @@ public interface StaticArgumentResolver {
 
 **为什么分离？** 因为"判断"和"执行"是两件不同的事。`supports` 需要方法参数元数据（注解、类型、泛型），运行时可复用这个判断结果——把判断前移到启动期，运行时只执行。分离后，`Provider` 只在启动期被调用，`Resolver` 实例被缓存到 `MappingCacheKey` 中，运行时零额外开销。
 
-### 1.2 12 个内置 Provider
+### 1.2 13 个内置 Provider
 
-`ArgumentResolverRegistry.initStaticArgumentResolverProviders()`按固定顺序注册 12 个内置 Provider：
+`ArgumentResolverRegistry.initStaticArgumentResolverProviders()`按固定顺序注册 13 个内置 Provider：
 
 ```java
 // ArgumentResolverRegistry.java
@@ -56,6 +56,7 @@ protected void initStaticArgumentResolverProviders() {
     registerWebComponent(new RequestPartResolverProvider());
     registerWebComponent(new PathVariableResolverProvider());
     registerWebComponent(new ModelAttributeResolverProvider());
+    registerWebComponent(new ModelArgumentResolverProvider());
     registerWebComponent(new HttpEntityResolverProvider());
     registerWebComponent(new ErrorsResolverProvider());
     registerWebComponent(new RequestResolverProvider());

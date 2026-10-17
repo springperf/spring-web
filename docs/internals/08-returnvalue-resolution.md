@@ -14,11 +14,11 @@ Spring MVC 的做法是：运行时遍历 `HandlerMethodReturnValueHandlerCompos
 
 ---
 
-## 一、整体架构：14 个内置 Resolver
+## 一、整体架构：13 个内置 Resolver
 
 ### 1.1 注册顺序
 
-`ReturnValueResolverRegistry.initReturnValueResolver()`按分组注册 14 个内置 Resolver：
+`ReturnValueResolverRegistry.initReturnValueResolver()`按分组注册 13 个内置 Resolver（另有一个 `registerWebComponent(ReturnValueResolver.class)` 是 SPI 扩展点，不计入内置）：
 
 ```java
 // ReturnValueResolverRegistry.java
@@ -406,7 +406,7 @@ public void resolveReturnValue(Object returnValue, MappingHandlerMethod mappingC
 
 回到引子的问题：业务方法的返回值怎么变成 HTTP 响应？
 
-1. **14 个内置 Resolver 按优先级注册** → 异步 > 流式 > 字节流 > 资源 > 实体 > JSON > 兜底。
+1. **13 个内置 Resolver 按优先级注册** → 异步 > 流式 > 字节流 > 资源 > 实体 > JSON > 兜底。
 2. **`MethodReturnValueContext` 按方法缓存** → 首次请求线性扫描命中后，主解析器或异步内联解析器被缓存。
 3. **三级缓存策略** → Fast path 1（主解析器，>95% 请求）、Fast path 2（异步内联，<5% 请求）、线性扫描（首次请求或缓存不匹配）。
 4. **`Optional` 解包** → 声明式 `Optional<T>` 优先缓存内联解析器，运行时 `Optional` 走正常流程。

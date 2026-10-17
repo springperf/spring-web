@@ -64,13 +64,13 @@ public void start() {
     // ⑦ bind + actualPort
     serverChannel = bootstrap.bind(port).sync().channel();
     this.actualPort = ((InetSocketAddress) serverChannel.localAddress()).getPort();
-    // ⑧ 写 local.server.port 系统属性
+    // ⑧ 以 context 级 MapPropertySource 暴露 local.server.port
 }
 ```
 
 每一步都不是随手写的，背后都有性能或正确性考量：
 
-**① `webContext.startLifecycle()` 必须在 Netty bind 前。** 这是 [01 篇](01-design-philosophy.md#一总纲启动时确定性) 强调过的"确定性要求输入完整"——三阶段（Phase1 元数据收集 / Phase2 跨组件连接 / Phase3 优化缓存）跑完之前，`DispatcherHandler` 还没装配好路由表和参数索引，此时若 Netty 已开始接连接，第一个请求就会拿到半成品。把生命周期锚定在 `start()` 第一行而非 `afterPropertiesSet()`，是因为 Web 组件初始化应在基础容器初始化完成之后——`afterPropertiesSet()` 触发时点取决于 bean 依赖图位置、无法保证容器就绪，而 `SmartLifecycle.start()` 在 context refresh 完全结束后才调用。
+**① `webContext.startLifecycle()` 必须在 Netty bind 前。** 这是 [01 篇](01-design-philosophy.md#一总纲启动时确定性) 强调过的"确定性要求输入完整"——三阶段（Phase1 元数据收集 / Phase2 跨组件连接 / Phase3 优化缓存）跑完之前，`DispatcherHandler` 还没装配好路由表和参数索引，此时若 Netty 已开始接连接，第一个请求就会拿到半成品。把生命周期锚定在 `start()` 第一行而非 `InitializingBean.afterPropertiesSet()`，是因为 Web 组件初始化应在基础容器初始化完成之后——`WebContext` 并不实现 `InitializingBean`（早期版本的留空覆写已删除），而 `SmartLifecycle.start()` 在 context refresh 完全结束后才调用。
 
 **② HTTP/2 开关一次性读取。** `HTTP2_ENABLED` 默认 `false`（[`PropertiesConstant.java`](../../spring-web/src/main/java/io/springperf/web/context/PropertiesConstant.java) 无 DEFAULT 常量，`getBoolean` 第二参 `false`）。读到 `this.http2Enabled` 后，运行时只读这个字段，纯读线程安全——这是注释里写的"运行时只需做纯读操作"的来源。
 
@@ -141,18 +141,14 @@ I/O 层配置默认值集中如下（均来自 [`PropertiesConstant.java`](../..
 ### 1.4 `actualPort` 写入 `local.server.port`
 
 ```java
-// NettyHttpServer.java
-serverChannel = bootstrap.bind(port).sync().channel();
-this.actualPort = ((InetSocketAddress) serverChannel.localAddress()).getPort();
-running = true;
-if (webContext.getCtx() instanceof ConfigurableApplicationContext) {
-    ((ConfigurableApplicationContext) webContext.getCtx())
-            .getEnvironment().getSystemProperties()
-            .put("local.server.port", String.valueOf(this.actualPort));
-}
+// NettyHttpServer.java  publishLocalServerPort()
+ConfigurableApplicationContext ctx = (ConfigurableApplicationContext) webContext.getCtx();
+Map<String, Object> props = new HashMap<>();
+props.put("local.server.port", String.valueOf(this.actualPort));
+ctx.getEnvironment().getPropertySources().addFirst(new MapPropertySource("netty-local-server-port", props));
 ```
 
-当配置 `server.port=0`（随机端口）时，实际端口要在 `bind` 后才知道。写进 `local.server.port` 系统属性，让 `@LocalServerPort` 注入、actuator、集成测试都能拿到真实端口——对齐 Spring Boot 的 `WebServerInitializedEvent` 语义（[SBA + WebServerInitializedEvent](../../) 兼容性记忆有记录）。
+当配置 `server.port=0`（随机端口）时，实际端口要在 `bind` 后才知道。框架以 **context 级 `MapPropertySource`（`addFirst`）** 暴露 `local.server.port`，让 `@LocalServerPort` 注入、actuator、集成测试都能拿到真实端口——对齐 Spring Boot 的 `WebServerInitializedEvent` 语义（[SBA + WebServerInitializedEvent](../../) 兼容性记忆有记录）。**刻意不写 JVM 全局系统属性**：主端口与管理端口是两个 context，全局属性会互相覆盖（源码注释即此论证）。
 
 ### 1.5 启动失败：`shutdownGracefully(0,0,SECONDS)` 防线程残留
 
@@ -219,12 +215,12 @@ public void stop(Runnable callback) {
 @Override
 public void destroyComponent() throws Exception {
     if (bossGroup != null) {
-        bossGroup.shutdownGracefully().sync();
+        bossGroup.shutdownGracefully(0, shutdownGraceMillis, TimeUnit.MILLISECONDS).sync();
     }
     if (workerGroup != null) {
-        workerGroup.shutdownGracefully().sync();
+        workerGroup.shutdownGracefully(0, shutdownGraceMillis, TimeUnit.MILLISECONDS).sync();
     }
-    log.info("Netty Server EventLoop shut down");
+    log.info("Netty Server EventLoop shut down (grace-period={}ms)", shutdownGraceMillis);
 }
 ```
 
@@ -233,7 +229,7 @@ public void destroyComponent() throws Exception {
 | 阶段 | 动作 | 时机 | 目的 |
 |------|------|------|------|
 | `stop(Runnable)` | `httpHandler.setShuttingDown()` + `serverChannel.close()` | Spring 优雅关闭信号到达时 | 拒新连接（新请求 503），但**不关 EventLoop**，让在途请求继续处理 |
-| `destroyComponent()` | `boss/worker.shutdownGracefully().sync()` | `WebContext` 三阶段销毁，`BizPoolRegistry` 等业务组件排空后 | 真正停 I/O 线程 |
+| `destroyComponent()` | `boss/worker.shutdownGracefully(0, grace-period, MILLISECONDS).sync()` | `WebContext` 三阶段销毁，`BizPoolRegistry` 等业务组件排空后 | 真正停 I/O 线程（quietPeriod=0，最多等 grace-period 后排空） |
 
 **为什么不一次性关？** 如果 `stop` 里直接 `workerGroup.shutdownGracefully()`，在途请求（尤其 SSE 长连接）会被粗暴切断——业务线程池里还有任务没跑完，业务组件里还有未完成的工作。把 EventLoop 关闭推迟到 `destroyComponent`，让"业务组件排空"先于"I/O 线程停止"，是在途请求完整处理的保障。`setShuttingDown()` 让新请求立即拿 503（见 [§4.1](#41-channelread-与-handlerequest入口适配)），避免关闭期间继续积累新工作。
 
@@ -241,7 +237,7 @@ public void destroyComponent() throws Exception {
 
 ## 三、Channel pipeline 装配：四协议分支
 
-`Http2ChannelInitializer` 是 pipeline 装配的核心。它不继承任何类，是一个普通类，通过 `initChannel(ch)` 把一串 handler 装进 `ChannelPipeline`。装配逻辑按"是否 TLS × 是否 HTTP/2"分成四个分支：
+`Http2ChannelInitializer` 是 pipeline 装配的核心，它继承 Netty 的 `ChannelInitializer<SocketChannel>`（[`Http2ChannelInitializer.java`](../../spring-web/src/main/java/io/springperf/web/server/Http2ChannelInitializer.java)），通过 `initChannel(ch)` 把一串 handler 装进 `ChannelPipeline`。装配逻辑按"是否 TLS × 是否 HTTP/2"分成四个分支：
 
 ### 3.1 四分支决策树
 
@@ -315,7 +311,7 @@ private void addHttp11Handlers(ChannelPipeline p) {
 |------|---------|------|----------------|
 | 1 | `HttpServerCodec` | 字节流 ↔ `HttpRequest`/`HttpContent` | Netty 原生，maxInitialLine/maxHeader/maxChunk 限制见配置表 |
 | 2 | `addCompressor` | 响应压缩 | 总开关 `server.compression.enabled` 默认关；开启后仅对白名单 Content-Type 且大于 `min-response-size` 的响应压缩 |
-| 3 | `ReadIdleTimeoutHandler`（可选） | 空闲读取超时 | `readTimeout>0` 才装；防慢客户端在聚合 body 前无限期占用连接（默认 30s）。注意是**空闲**超时（无字节流入即触发），不是「单次 read 耗时上限」 |
+| 3 | `ReadIdleTimeoutHandler`（可选） | 空闲读取超时 | `server.http.read-timeout>0` 才装（**默认 0 = 关闭**，见配置表）；防慢客户端在聚合 body 前无限期占用连接。注意是**空闲**超时（无字节流入即触发），不是「单次 read 耗时上限」 |
 | 4 | `ChunkedWriteHandler` | 支持 `ChunkedInput` 流式写出 | 响应 `writeStream` 必需 |
 | 5 | beforeAggregator handlers | SPI 插入点 | WebSocket 等模块在聚合前插自定义 handler |
 | 6 | `addAggregator` | 聚合成 `FullHttpRequest` | 分流见 [§3.3](#33-addaggregatormultipart-分流) |
@@ -332,14 +328,16 @@ private void addHttp11Handlers(ChannelPipeline p) {
 // Http2ChannelInitializer.java
 private void addAggregator(ChannelPipeline p) {
     if (supportMultipart) {
-        p.addLast(new SupportMultipartAggregator(maxContentLength));   // 框架自研聚合器
+        p.addLast(new SupportMultipartAggregator(maxContentLength, maxPartCount, maxPartHeaderSize,
+                multipartConfig.getMaxFileSize(), multipartConfig.getFileSizeThreshold(),
+                multipartConfig.getLocation()));   // 框架自研聚合器（6 参）
     } else {
         p.addLast(new HttpObjectAggregator(maxContentLength));          // Netty 原生
     }
 }
 ```
 
-`supportMultipart` 在主服务器构造时固定为 `true`（[`NettyHttpServer.java`](../../spring-web/src/main/java/io/springperf/web/server/NettyHttpServer.java)）。框架自研的 `SupportMultipartAggregator` 在 Netty `HttpObjectAggregator` 基础上扩展了 multipart 解析能力（含文件上传的零拷贝处理，联动 [§5](#五nettyserverhttprequest零拷贝包装) 的 `parseParameters`）。管理端口可设 `supportMultipart=false` 走原生聚合器，省一点开销。
+`supportMultipart` 来自构造参数（[`NettyHttpServer.java`](../../spring-web/src/main/java/io/springperf/web/server/NettyHttpServer.java) 传入 `multipartConfig.isEnabled()`）——`spring.servlet.multipart.enabled=false` 时不装自研聚合器。框架自研的 `SupportMultipartAggregator` 在 Netty `HttpObjectAggregator` 基础上扩展了 multipart 解析能力（含文件上传的零拷贝处理，联动 [§5](#五nettyserverhttprequest零拷贝包装) 的 `parseParameters`）。管理端口可关掉 multipart 走原生聚合器，省一点开销。
 
 `maxContentLength` 默认 4MB（`HTTP_MAX_CONTENT_LENGTH`，值见 [`PropertiesConstant.java`](../../spring-web/src/main/java/io/springperf/web/context/PropertiesConstant.java) 的 `HTTP_MAX_CONTENT_LENGTH_DEFAULT`；3.5.6 起由 1MB 调整为 4MB，见 [`CHANGELOG.md`](../../CHANGELOG.md)）。超过该上限的请求体聚合会抛 `413 Request Entity Too Large`——这是 fail-fast 在 I/O 层的体现，避免单请求 OOM。
 
@@ -400,9 +398,11 @@ HTTP/2 是多路复用——一条 TCP 连接上跑多个 stream，每个 stream
 // Http2ChannelInitializer.java
 // 每个 HTTP/2 stream 的 child channel pipeline：
 Http2StreamFrameToHttpObjectCodec(true)   // true=服务端，把 h2 frame 转 HttpObject
+  → addCompressor（按 compressionConfig，关闭时不注入）
   → ChunkedWriteHandler
   → SupportMultipartAggregator / HttpObjectAggregator
   → BackpressureHandler.INSTANCE
+  → addKeepAlive（按 keepAliveConfig）
   → httpHandler
 ```
 
@@ -447,12 +447,16 @@ public class NettyMetricsHandler extends ChannelInboundHandlerAdapter {
 ### 4.1 `channelRead` 与 `handleRequest`：入口适配
 
 ```java
-// NettyHttpHandler.java  构造
-public NettyHttpHandler(WebContext webContext, String contextPath, HttpHandler handler) {
+// NettyHttpHandler.java  构造（服务器实际使用 5 参重载，见 NettyHttpServer.java:85）
+public NettyHttpHandler(WebContext webContext, String contextPath, HttpHandler handler,
+        boolean compressionEnabled, ResponseLimitConfig responseLimitConfig) {
     this.webContext = webContext;
     this.contextPath = contextPath;
     this.handler = handler;          // DispatcherHandler 或 ManagementDispatcherHandler
+    this.compressionEnabled = compressionEnabled;
+    this.responseLimitConfig = responseLimitConfig;
 }
+// 另有 3 参 / 4 参便利重载，均转调至本构造（3 参 = 不压缩 + ResponseLimitConfig.DEFAULT）
 
 // NettyHttpHandler.java  channelRead
 @Override

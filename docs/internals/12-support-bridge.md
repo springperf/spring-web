@@ -35,7 +35,7 @@ Spring MVC 的兼容层（如 Servlet 容器 + `spring-webmvc`）依赖的天然
 | `HandlerExceptionResolver` | `spring-webmvc` | 接口（`resolveException`） |
 | `ModelAndView` | `spring-webmvc` | 简单 POJO |
 | `View` | `spring-webmvc` | 接口 |
-| `MappedInterceptor` | `spring-webmvc` | 接口（`matches`/`getInterceptor`/`getPathPatterns`） |
+| `MappedInterceptor` | `spring-webmvc` | **final class**（implements `HandlerInterceptor`；`matches`/`getInterceptor`/`getPathPatterns`） |
 | `WebRequestHandlerInterceptorAdapter` | `spring-webmvc` | 适配器（将 `WebRequestInterceptor` 包装为 `HandlerInterceptor`） |
 | `LocaleResolver` / `LocaleContextResolver` | `spring-webmvc` | 接口 |
 | `NoHandlerFoundException` | `spring-webmvc` | `@ResponseStatus` 注解 |
@@ -64,9 +64,9 @@ Spring MVC 的兼容层（如 Servlet 容器 + `spring-webmvc`）依赖的天然
 
 ## 二、`WebMvcConfigurerBridge`：翻译中枢
 
-### 2.1 10 类回调翻译
+### 2.1 11 类回调翻译
 
-`WebMvcConfigurerBridge`在 `initComponentPhase1`中扫描所有 `WebMvcConfigurer` Bean，依次调用 10 个 bridge 方法：
+`WebMvcConfigurerBridge`在 `initComponentPhase1`中扫描所有 `WebMvcConfigurer` Bean，依次调用 11 个 `bridge*` 方法：
 
 ```java
 // WebMvcConfigurerBridge.java
@@ -135,6 +135,7 @@ protected void bridgeInterceptors(InterceptorRegistry shimRegistry) {
 
 | Bridge 方法 | 目标 Registry | 翻译方式 |
 |------------|-------------|---------|
+| `bridgeViewControllers` | `ViewControllerRegistry` | 转发/重定向视图控制器（本框架注册为静态路由） |
 | `bridgeCorsMappings` | `CorsRegistry` | 逐字段拷贝（`allowedOrigins`/`allowedMethods`/`allowedHeaders`/`exposedHeaders`/`allowCredentials`/`maxAge`） |
 | `bridgeResourceHandlers` | `ResourceHandlerRegistry` | 路径模式 + 资源位置 + `cachePeriod`/`cacheControl` |
 | `bridgeFormatters` | `FormatterRegistry`（即 `ConversionService`） | 直接调用 `configurer.addFormatters(formatterRegistry)` |
@@ -158,7 +159,8 @@ protected void bridgeInterceptors(InterceptorRegistry shimRegistry) {
 public class SupportWebFilterRegistry extends WebFilterRegistry {
     public SupportWebFilterRegistry(DispatcherHandler dispatcherHandler) {
         super(dispatcherHandler);
-        autoRegisterWebComponent(jakarta.servlet.Filter.class, filter -> wrapFilterToRegistration(new FilterWrapper(filter)));
+        autoRegisterWebComponent(jakarta.servlet.Filter.class,
+                filter -> wrapFilterToRegistration(new FilterWrapper(filter), resolveUrlPatterns(filter)));
     }
 }
 ```
@@ -251,16 +253,17 @@ public void doFilter(ServletRequest servletRequest, ServletResponse servletRespo
 public SupportInterceptorRegistry() {
     super();
     autoRegisterWebComponent(InterceptorRegistration.class, this::convert);
-    autoRegisterWebComponent(HandlerInterceptor.class, this::convert);
+    // 只自动注册 MappedInterceptor（自带路径规则）；普通 HandlerInterceptor Bean 不在此列
+    autoRegisterWebComponent(org.springframework.web.servlet.handler.MappedInterceptor.class, this::convert);
 }
 ```
 
-`convert(HandlerInterceptor)`处理两种子类型：
+`convert(...)`处理的子类型：
 
 | 子类型 | 处理方式 |
 |--------|---------|
 | `MappedInterceptor` | 提取路径模式（`includePatterns`/`excludePatterns`）+ `pathMatcher` |
-| 普通 `HandlerInterceptor` | 无路径限制 |
+| 普通 `HandlerInterceptor` | **不会**被自动注册——与 Spring MVC 的 `WebMvcConfigurer` 语义一致（避免同一实例经 bean 扫描与 `addInterceptors` 两路注册造成同名碰撞/重复执行）；需要全局生效请经 `addInterceptors` 注册或声明为 `MappedInterceptor` |
 
 ### 4.2 `HandlerInterceptorWrapper`：四阶段适配
 
@@ -420,7 +423,7 @@ private static final RequestAttribute<ServletAdapterContext> ADAPTER_CTX =
 
 `PerfRequestDispatcher implements RequestDispatcher`，配合 `SupportDispatcherHandler.forward()/include()`：
 
-- **`forward()`**：检查 `isCommitted`（已提交抛 `IllegalStateException`）→ 设置 `DispatcherType.FORWARD` → 清除 response（headers+status+buffer）→ 通过 `ForwardWebServerHttpRequest` 包装请求（覆盖 `getPath()/getUriStr()/getURI()`，保留/替换 query string）→ `mappingRegistry.mapping()` 重映射 → `handleAfterFilter()` 重新 dispatch（**跳过 filter 链**，与 Tomcat 一致）。
+- **`forward()`**：检查 `isCommitted`（已提交抛 `IllegalStateException`）→ 设置 `DispatcherType.FORWARD` → **只重置 body buffer**（`webResponse.resetBuffer()`；Servlet 规范只要求丢弃未提交 body，**不清空已写响应头、不强制状态 200`）→ 通过 `ForwardWebServerHttpRequest` 包装请求（覆盖 `getPath()/getUriStr()/getURI()`，保留/替换 query string）→ `mappingRegistry.mapping()` 重映射 → `handleAfterFilter()` 重新 dispatch（**跳过 filter 链**，与 Tomcat 一致）。
 - **`include()`**：设置并恢复 `DispatcherType.INCLUDE` → `IncludeResponseWrapper` 阻止 flush、隔离 status/header（`setStatusCode`/`sendError` 空操作，`getHeaders()` 返回独立实例）。`INCLUDE_SERVLET_PATH` 设置为 include 目标路径（供 Jasper 定位被包含 JSP）；`INCLUDE_PATH_INFO` 为空字符串（底层 `ConcurrentHashMap` 不允许 null value）。
 - **context holders 保护**：forward/include 均在 `try/finally` 中保存恢复 `LocaleContextHolder`/`RequestContextHolder`，避免与原始请求双重初始化冲突。
 - **Filter 包装兼容**：`resolveWebRequest()/resolveWebResponse()` 解开 `HttpServletRequestWrapper`/`HttpServletResponseWrapper` 找到底层请求。
@@ -484,7 +487,7 @@ resolveViewName("jsp:hello") → new JspView("/jsp/hello.jsp")   // jsp: 前缀 
 //   → PerfRequestDispatcher → 重新 mapping → 命中 /**/*.jsp 路由 → Jasper 渲染
 ```
 
-`JspViewAutoConfiguration` 用类级 `@ConditionalOnClass(name = {"org.apache.jasper.servlet.JspServlet", "io.springperf.web.view.View"})` 保证条件不满足时整个配置类跳过、不加载 `JspViewResolver`（其类签名依赖 view 接口，避免无 view 环境 introspect 失败）。
+`JspViewAutoConfiguration` 用类级 `@ConditionalOnClass(name = {"org.apache.jasper.servlet.JspServlet", "io.springperf.web.view.View", "io.springperf.web.support.view.JspViewResolver"})` 保证条件不满足时整个配置类跳过、不加载 `JspViewResolver`（其类签名依赖 view 接口，避免无 view 环境 introspect 失败）。
 
 ---
 
@@ -740,7 +743,7 @@ private void flushSession() {
 | 请求/响应适配 | `PerfHttpServletRequest`/`Response` 包装 `WebServerHttpRequest`/`Response` | Servlet 容器原生提供 |
 | Filter 桥接 | `FilterWrapper` → `WebFilter` 适配 | Servlet 原生 `FilterChain` |
 | 拦截器桥接 | `HandlerInterceptorWrapper` → `HandlerInterceptor` 适配 | 原生 `HandlerInterceptor` |
-| WebMvcConfigurer | `WebMvcConfigurerBridge` 10 类回调翻译 | 原生注册 |
+| WebMvcConfigurer | `WebMvcConfigurerBridge` 11 类回调翻译 | 原生注册 |
 | Session | 从零实现 `HttpSession` + `HttpSessionStorage` SPI | Servlet 容器提供 |
 | Session 持久化 | `SessionFlushListener` 通过 `ChannelFuture` 回调 | `HttpSessionListener` 容器触发 |
 | 参数解析器桥接 | `SpringHandlerMethodArgumentResolverProvider` 启动期 `supports` 决策 | 原生 `HandlerMethodArgumentResolver` |
@@ -750,7 +753,7 @@ private void flushSession() {
 | SSE 桥接 | `ResponseBodyEmitterReturnValueResolver`（`HttpMessageConverter` 兜底） | 原生 `ResponseBodyEmitter`/`SseEmitter` |
 | 标准异常处理 | `ResponseEntityExceptionHandler` 15 个标准异常处理 | 原生 `ResponseEntityExceptionHandler` |
 | Servlet 规范桥接 | `PerfServletContext`/`PerfRequestDispatcher`/`PerfAsyncContext`/`Authenticator`/`upgrade()` 等 | Servlet 容器原生提供 |
-| 同包同名覆盖 | 重写 `org.springframework.web.servlet.*` 40+ 类 | 不适用 |
+| 同包同名覆盖 | 重写 `org.springframework.web.servlet.*` 32 个类 | 不适用 |
 
 **核心差异**：Spring MVC 的兼容层依赖 Servlet 容器，所有组件（Session、Filter、`HttpServletRequest`）都是容器提供的。本框架的 support 模块在"没有 Servlet 容器"的前提下，从零实现 `HttpServletRequest`/`HttpServletResponse`/`HttpSession`/`FilterChain` 接口，通过 `WebMvcConfigurerBridge` 把 Spring MVC 的配置回调翻译为框架内部的 Registry 操作，通过 `FilterWrapper`/`HandlerInterceptorWrapper`/`SpringHandlerMethodArgumentResolverProvider` 等适配器把 Spring 生态的组件桥接到框架的 SPI 体系。
 
@@ -760,8 +763,8 @@ private void flushSession() {
 
 回到引子的问题：support 如何让 Spring MVC 生态组件无缝工作在 Netty 上？
 
-1. **"同包同名覆盖"消除编译期依赖** → 重写 `org.springframework.web.servlet.*` 的 40+ 个类（纯接口/default 方法），不依赖 `spring-webmvc` 即可编译。
-2. **`WebMvcConfigurerBridge` 10 类回调翻译** → 两步策略（Shim 收集 → 翻译，均在 `initComponentPhase1` 内），把 `WebMvcConfigurer` 的配置写入框架的 Registry。
+1. **"同包同名覆盖"消除编译期依赖** → 重写 `org.springframework.web.servlet.*` 的 32 个类（纯接口/default 方法），不依赖 `spring-webmvc` 即可编译。
+2. **`WebMvcConfigurerBridge` 11 类回调翻译** → 两步策略（Shim 收集 → 翻译，均在 `initComponentPhase1` 内），把 `WebMvcConfigurer` 的配置写入框架的 Registry。
 3. **`FilterWrapper` 实例级唯一标识** → `IdentityHashMap` + `AtomicLong` 确保同类不同实例不被去重误杀（修复 `System.identityHashCode` 碰撞）。
 4. **`HandlerInterceptorWrapper` 四阶段适配** → `preHandle`/`postHandle`(null modelAndView)/`afterCompletion`(NestedServletException)/(`AsyncHandlerInterceptor` 可选)。
 5. **`PerfHttpServletRequest`/`Response` 委托 + `rebind`** → 包装框架请求/响应为 `HttpServletRequest`/`HttpServletResponse`，`rebind` 支持 Filter 包装链。

@@ -22,16 +22,16 @@
 |----------|---------|-----------|-----------|
 | `RequestAttribute` | `fastAttributes[]` 索引槽 | `PathMappingContext` 启动期声明属性键分配 index | `requestContext.getAttribute(key)` → `fastAttributes[idx]` |
 | `cachedInterceptors` | `List<HandlerInterceptor>` | 首次请求 DCL 缓存 | 遍历列表，零匹配 |
-| `cachedFilterChain` | `DefaultFilterChain` | 首次请求 DCL 缓存 | `filterIndex.getAndIncrement()` 直取 |
-| `StaticArgumentResolver` | `StaticArgumentResolver[]` | 启动期预创建 | 按参数位置索引直取 |
-| `MethodArgContext` | `MethodArgContext` | 启动期预计算 | 参数解析器读取缓存上下文 |
+| `cachedFilterChain` | `DefaultFilterChain` | 首次请求 DCL 缓存 | `getFilterIndexAndIncrement()` 直取 |
+| `StaticArgumentResolver` | `StaticArgumentResolver[]` | **首请求懒创建**（DCL，`getMethodArgContexts`） | 按参数位置索引直取 |
+| `MethodArgContext` | `MethodArgContext` | **首请求懒创建**（`initStaticArgResolverSupport`） | 参数解析器读取缓存上下文 |
 
 详见 [07 篇](07-argument-resolution.md) 的 `StaticArgumentResolverProvider` 机制、[10 篇](10-cross-cutting.md) 的 `cachedInterceptors`/`cachedFilterChain` 三段式缓存。
 
 ### 为什么快
 
 - **零运行时匹配**：Spring MVC 的 `HandlerMethodArgumentResolverComposite` 在每次请求的 `resolveArgument` 中遍历所有解析器，调用 `supportsParameter` 逐一匹配，`synchronized` 保护内部缓存。框架的 `StaticArgumentResolver[]` 按参数位置索引，O(1) 直接命中。
-- **零注解查找**：Spring MVC 在运行时通过 `getParameterAnnotation` 查找注解（`AnnotatedElementUtils` 的缓存虽有效，但仍有方法调用链开销）。框架在启动期一次性解析并缓存为 `StaticArgumentResolver`，运行时零注解查找。
+- **零注解查找**：Spring MVC 在运行时通过 `getParameterAnnotation` 查找注解（`AnnotatedElementUtils` 的缓存虽有效，但仍有方法调用链开销）。框架在**首次请求**解析并缓存为 `StaticArgumentResolver`，后续请求零注解查找（Phase3 只做 `supports()` 校验，不创建实例）。
 - **零排序开销**：`@Order` 排序在启动期完成，运行时直接遍历有序列表。
 
 ### 对比 Spring MVC
@@ -93,10 +93,10 @@ private Invoker initInvoker() {
 
 ```
 RouterOptimizer 链:
-  FullPathRouterOptimizer  → 全路径精确匹配（O(1) HashMap）
-  PrefixRouterOptimizer    → 前缀匹配（HashMap）
-  SuffixRouterOptimizer    → 后缀匹配（HashMap）
-  LoopRouterOptimizer      → 遍历兜底（O(n)）
+  FullPathRouterOptimizer        → 全路径精确匹配（O(1) HashMap）
+  PrefixPathRouterOptimizer      → 前缀匹配（HashMap）
+  SuffixPathRouterOptimizer      → 后缀匹配（HashMap）
+  LoopPathPatternRouterOptimizer → 遍历兜底（O(n)）
 ```
 
 每个 `PathMappingContext` 启动期存 `pathRule` 字符串，优化器在 `support()` 中分段并分派到对应的路由层级。
@@ -114,7 +114,7 @@ RouterOptimizer 链:
 |------|--------|-----------|
 | 精确路径 | `HashMap.get()`，O(1) | `AntPathMatcher.match`，O(n) 或 `PathPattern.matches`，O(n) |
 | 前缀路径 | 前缀 HashMap 命中 | `AntPathMatcher.match` 逐段匹配 |
-| 通配符路径 | `LoopRouterOptimizer` 遍历 | `AntPathMatcher.match` 或 `PathPattern.matches` |
+| 通配符路径 | `LoopPathPatternRouterOptimizer` 遍历 | `AntPathMatcher.match` 或 `PathPattern.matches` |
 | 路由缓存 | 启动期构建优化器链 | 无路由缓存，每次请求重新匹配 |
 | `PathPattern` 兼容 | 支持 `PathPatternRouteMatcher` 和 `AntPathMatcher` | 支持 `PathPattern`（Spring 5.3+）和 `AntPathMatcher` |
 
@@ -177,11 +177,11 @@ public abstract class BaseWebServerHttpRequest implements ..., RequestContext {
 
 ```java
 // NettyServerHttpRequest.java
-public void acquire() { content.retain(); }
-public void release() { content.release(); }
+public void acquire() { ReferenceCountUtil.retain(request); }   // retain 的是请求对象本身
+public boolean release() { return ReferenceCountUtil.release(request); }
 ```
 
-`DispatcherHandler.handle()` 入口处 `acquire()`，`DispatcherHandler.handleAfterFilter()` 的 finally 中 `release()`。跨线程传递时（`@RunInPool`），EventLoop 线程 `acquire()`，业务线程 `release()`。
+`acquire()`/`release()` 的判据是「**字段是否仍持有**该请求」（`release()` 读 `this.buf`/请求引用判断），因此所有权移交与字段置空必须同时发生——`flush(boolean)` 用 `takePendingBuf()` 先摘后写正是为此（见 [16 篇](16-code-spotlights.md) 聚光灯 6）。移交点在 `DispatcherHandler.handleWithMappingResult` 的 `executor != null` 分支：业务线程 `acquire()` 后 `executor.execute(...)`，任务 `finally` 中 `release()`；入站缓冲的最终释放在 `NettyHttpHandler.channelRead` 的 finally。
 
 ### 为什么快
 
@@ -196,7 +196,7 @@ public void release() { content.release(); }
 | 内存管理 | 手动 `acquire()`/`release()` 引用计数 | 容器自动回收 |
 | 堆外内存 | 直接使用 `ByteBuf`（Direct/Heap 混合） | `NIO Buffer` + `ServletInputStream` 包装 |
 | 零拷贝 | `FileRegion` + `DefaultFileRegion` | `sendfile`（Tomcat NIO） |
-| 每请求分配 | ~8–11KB（预缓存 + 零临时对象） | ~23–37KB（运行时匹配 + Facade 包装） |
+| 每请求分配 | 10.1–10.7KB（预缓存 + 零临时对象） | 23.2–38.6KB（运行时匹配 + Facade 包装） |
 | 对象池 | `BatchEvent` 预分配（Disruptor RingBuffer） | 无（每次请求创建新对象） |
 
 ---
@@ -304,15 +304,15 @@ protected void drain() {
 .childOption(ChannelOption.WRITE_BUFFER_WATER_MARK,
         new WriteBufferWaterMark(8192, 32768))             // low=8KB, high=32KB
 
-// 零拷贝文件传输
-pipeline.addLast(new ChunkedWriteHandler());              // 支持 FileRegion
+// 零拷贝文件传输（Http2ChannelInitializer.addHttp11Handlers / HTTP/2 子管线）
+pipeline.addLast(new ChunkedWriteHandler());              // 支持 ChunkedInput 流式写出
 ```
 
 ### 为什么快
 
 - **`TCP_NODELAY`**：禁用 Nagle 算法，小数据包（如 SSE 的 `data:...\n\n`）立即发送，不等待 ACK 累积。
 - **`WriteBufferWaterMark`**：低水位 8KB、高水位 32KB（可配置）。Netty 的 `Channel.isWritable()` 在写缓冲超过高水位时返回 `false`，低于低水位时返回 `true`。与 `BackpressureHandler` 配合，实现 TCP 层的背压控制。
-- **`ChunkedWriteHandler`**：支持 `FileRegion` 零拷贝文件传输，数据从磁盘到网卡绕过 JVM 堆。
+- **`ChunkedWriteHandler`**：服务 `ChunkedInput` 流式写出（`writeStream` 必需）；`FileRegion` 零拷贝走的是 `NettyServerHttpResponse` 的 `new DefaultFileRegion(...)`（文件直接经 socket 发送，绕过 JVM 堆），二者是不同机制，别混为一谈。
 - **`SO_BACKLOG`**：连接队列长度（默认 1024，可配置），高并发下可调大以减少连接拒绝。
 - **`PooledByteBufAllocator`**：复用 ByteBuf 实例，减少 GC 压力。
 

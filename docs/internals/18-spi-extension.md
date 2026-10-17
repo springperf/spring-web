@@ -31,7 +31,7 @@ public interface WebComponent extends Ordered {
 - **`getComponentName()`** 默认返回类简单名，用于冲突解析与日志（见聚光灯 8 的 `FilterWrapper` 唯一命名）。
 - **`initWithWebContext`** 是构造后、分阶段初始化前的依赖注入钩子，各 Registry 在此扫描 Spring 容器。
 
-纠正点：不存在 `@WebComponent` 注解，`annotation/` 包下只有 `@RunInPool`、`@ReactiveSupport`、`@Optimize` 三个运行时注解。SPI 的"发现注解"实际是 Spring 的 `@Component`/`@Configuration`+`@Bean`（让实现成为 Bean），框架按类型取 Bean。
+纠正点：不存在 `@WebComponent` 注解，`annotation/` 包下有 `@RunInPool`、`@RunInEventloop`、`@ReactiveSupport`、`@Optimize` 四个运行时注解（`@RunInEventloop` 是 `@RunInPool(EVENTLOOP)` 的元注解别名）。SPI 的"发现注解"实际是 Spring 的 `@Component`/`@Configuration`+`@Bean`（让实现成为 Bean），框架按类型取 Bean。
 
 ---
 
@@ -79,12 +79,12 @@ public interface WebComponent extends Ordered {
 | 2 | `HandlerInterceptor` | 构造 `autoRegister`(Interceptor + Registration→wrap) `InterceptorRegistry.java` | `AnnotationAwareOrderUtils.findOrder` 提取  → `registration.order` | `runtimeMappingInterceptors` List phase2；DCL `getCachedInterceptors`；请求级 `INTERCEPTORS_ATTRIBUTE` | preHandle  / postHandle  / afterCompletion  / afterConcurrent  |
 | 3 | `HandlerExceptionResolver` | `initWithWebContext` 注册 2 内置 + `registerWebComponent(scan)` `ExceptionRegistry.java` | `AnnotationAwareOrderComparator.sort` | `resolvers` List phase2 `initRealComponentList` | `doHandle`；`handle`  → `DispatcherHandler.handleException` |
 | 4 | `ReturnValueResolver` | `initReturnValueResolver` 13 内置 + scan + `initRealComponentList` `ReturnValueResolverRegistry.java` | `AnnotationAwareOrderComparator.sort` | `resolvers` List；per-method `MethodReturnValueContext` `MAPPING_CACHE_KEY`（lazy `getReturnValueResolver`  + Optional 内层 + async 内层 + 兜底线性） | `resolveReturnValue`→`doResolveReturnValue` → `DispatcherHandler.doHandle` |
-| 5 | `StaticArgumentResolverProvider` | `initStaticArgumentResolverProviders` 12 内置 + scan `ArgumentResolverRegistry.java` | `AnnotationAwareOrderComparator.sort` | `staticArgumentResolverProviders` List；per-method `MethodArgContext[]` `MAPPING_CACHE_KEY`。**phase3 `validateAllParametersResolvable` 只查 `supports()` 不创建**；真解析器懒创建于首请求 DCL `getMethodArgContexts`→`initStaticArgResolverSupport` | `resolveArguments` → `DispatcherHandler.doHandle` |
+| 5 | `StaticArgumentResolverProvider` | `initStaticArgumentResolverProviders` 13 内置 + scan `ArgumentResolverRegistry.java` | `AnnotationAwareOrderComparator.sort` | `staticArgumentResolverProviders` List；per-method `MethodArgContext[]` `MAPPING_CACHE_KEY`。**phase3 `validateAllParametersResolvable` 对普通参数只查 `supports()` 不创建**（例外：`@ModelAttribute` 无默认构造器的路径会 `getResolver()` 预创建以 fail-fast 校验）；真解析器懒创建于首请求 DCL `getMethodArgContexts`→`initStaticArgResolverSupport` | `resolveArguments` → `DispatcherHandler.doHandle` |
 | 6 | `HttpBodyCodecInterceptor` | `initCodecInterceptors` `HttpBodyCodecInterceptorRegistry.java`：`ControllerAdviceBean.findAnnotatedBeans`  + `getBeansOfType`  | `AnnotationAwareOrderComparator.sort`（包 `WebComponentControllerAdviceBean`） | `codecInterceptors` List；per-method `HttpBodyCodecInterceptor[]` `MAPPING_CACHE_KEY`，`isApplicableToBeanType` 过滤  | beforeBodyRead  / afterBodyRead  / handleEmptyBodyRead  / beforeBodyWrite  |
 | 7 | `HttpBodyConverter` | `initWithWebContext` 注册 Jackson + `registerWebComponent(HttpMessageConverter→wrap)` + `registerWebComponent(HttpBodyConverter, identity)` scan `HttpBodyCodecRegistry.java` | `AnnotationAwareOrderComparator.sort` | `converters` List；`allSupportedMediaTypes` phase2；`READ_BODY_CONVERTER_CACHE_KEY`；`WRITE_NEGOTIATION_CACHE_KEY`（仅 `@Optimize` 方法，每方法上限 64） | `readBody` （cached / fallback）；`writeBody` （协商 / scan） |
 | 8 | `JsonConverter` | `getWebComponentWithDefault(JsonConverter, new JacksonConverter)` `AsyncSupportRegistry.java` | N/A 单实例 | `AsyncSupportRegistry.jsonConverter` 字段 ；`getJsonConverter`  | `SseJsonEmitter` / `StreamJsonEmitter` / `ReactiveReturnValueResolver` |
 | 9 | `WebCorsProcessor` | `getWebComponentWithDefault(WebCorsProcessor, new PerfCorsProcessor)` `CorsRegistry.java` | N/A 单实例 | `CorsRegistry.webCorsProcessor` 字段  | `corsHandle`→`webCorsProcessor.process` `CorsRegistry.java` → `DispatcherHandler.doHandle` |
-| 10 | `BizPoolRegistry`（线程池） | phase3 `getBeansOfType(ExecutorService)` 收 Map `BizPoolRegistry.java`；phase1 配置建 default 池 | N/A 命名 Map | `pools` Map ；`BIZ_POOL_KEY` per-method 懒解析；`defaultExecuteMode` 缓存 | `determinePool` → `DispatcherHandler.handleWithMappingResult` |
+| 10 | `BizPoolRegistry`（线程池） | `initWithWebContext` 读配置建 default 池（`initDefaultPoolFromConfig`）；phase3 `getBeansOfType(ExecutorService)` 收 Map `BizPoolRegistry.java` | N/A 命名 Map | `pools` Map ；`BIZ_POOL_KEY` per-method 懒解析；`defaultExecuteMode` 缓存 | `determinePool` → `DispatcherHandler.handleWithMappingResult` |
 | 11 | `RouterOptimizer` | `getOptimizerTemplate` 硬编码 [Prefix, Suffix, Loop] `MappingRegistry.java` + FullPath 条件加入；**无 Bean 扫描，扩展靠继承重写** | N/A 固定链序 | `optimizers` List ；每优化器 `init` 后 claim 的 mappings 移出 general pool（`RouterOptimizer.init`） | `doMapping` for(optimizer) `optimizeRoute` → `DispatcherHandler.handle` |
 | 12 | `WebComponent`（契约） | 非 SPI，基接口；`extends Ordered` `WebComponent.java`；`getOrder` 默认 `LOWEST_PRECEDENCE-10000`  | `AnnotationAwareOrderComparator.sort`（Container ；`initRealComponentList`；`getSortedWebComponents`） | `getWebComponents`；动态注册按 state 追 phase | 各 Registry 通用 |
 
@@ -158,7 +158,7 @@ public class CurrentUserArgProvider implements StaticArgumentResolverProvider {
     }
 }
 ```
-**注意纠偏**：phase3 `validateAllParametersResolvable` 只调 `supports()` 校验"可达"，注释明言"does NOT create or cache any resolver, keeping memory footprint zero for endpoints that are never called"。真正的 `resolveArgument` 在首请求 DCL `getMethodArgContexts`→`initStaticArgResolverSupport` 才创建并缓存。这与 [15 篇](15-performance-optimizations.md) 优化 1"启动预缓存"的差异见第六节。
+**注意纠偏**：phase3 `validateAllParametersResolvable` 对普通参数只调 `supports()` 校验"可达"——注释明言"does NOT create or cache any resolver, keeping memory footprint zero for endpoints that are never called"。**例外**：`@ModelAttribute` 且无默认构造器的参数，`validateModelAttributeConstructor` 会调 `getResolver()` **预创建** resolver 以在启动期 fail-fast（否则要等运行时第一次绑定才暴露 `InstantiationException`）。普通参数的真正 `resolveArgument` 在首请求 DCL `getMethodArgContexts`→`initStaticArgResolverSupport` 才创建并缓存。这与 [15 篇](15-performance-optimizations.md) 优化 1"启动预缓存"的差异见第六节。
 
 ### 5.6 HttpBodyCodecInterceptor（模式 A，@ControllerAdvice 扫描）
 
@@ -246,10 +246,10 @@ public class MyMappingRegistry extends MappingRegistry {
 
 | 阶段 | `ArgumentResolverRegistry` 实际做的事 | 行号 |
 |------|-------------------------------------|------|
-| phase3 `validateAllParametersResolvable` | 遍历 provider 调 `supports()`，仅校验"有 provider 可解析该参数"，不创建 resolver |  |
+| phase3 `validateAllParametersResolvable` | 遍历 provider 调 `supports()`，仅校验"有 provider 可解析该参数"，**普通参数不创建 resolver**；例外是 `validateModelAttributeConstructor`——`@ModelAttribute` 无默认构造器时调 `getResolver()` 预创建，为的是启动期就能暴露 `InstantiationException` |  |
 | 首请求 DCL `getMethodArgContexts` | 命中 provider 才 `resolveArgument` 创建 `StaticArgumentResolver`，存入 `methodArgContext.defaultArgumentResolver` |  |
 
-注释原话："does NOT create or cache any resolver, keeping memory footprint zero for endpoints that are never called"——对从未被调用的端点保持零内存。这是"启动期确定性"与"零无用内存"的折中：排序/校验在启动期确定（满足 fail-fast），实例化延迟到首请求（满足零闲置内存）。
+注释原话："does NOT create or cache any resolver, keeping memory footprint zero for endpoints that are never called"——对从未被调用的端点保持零内存（就普通参数而言）。这是"启动期确定性"与"零无用内存"的折中：排序/校验在启动期确定（满足 fail-fast），实例化延迟到首请求（满足零闲置内存）。
 
 对比之下，`ReturnValueResolver` 与 `HttpBodyCodecInterceptor` 的 per-method 缓存（`MethodReturnValueContext` / `HttpBodyCodecInterceptor[]`）才是真正的"首请求预缓存命中项"——它们缓存的是"匹配结果"而非"实例本身"。三者语义不同，文档 19 ADR 2"默认业务池 vs 全 EventLoop"与 ADR 9"fail-fast vs 运行时降级"共同解释了这条折中。
 

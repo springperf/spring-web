@@ -732,8 +732,10 @@ public void resolveReturnValue(Object returnValue, ...) throws Exception {
         streamEmitterAdapter.subscribe(adapter, returnValue);
         StreamEmitterUtil.initializeWithStreamSender(emitter, sender);
     } else {
-        // 单值 Publisher → DeferredResult
-        DeferredResult deferredResult = new DeferredResult(reactiveConfig.getTimeout());
+        // 单值 Publisher → DeferredResult（timeout<0 表示不设超时，用无参构造）
+        DeferredResult deferredResult = reactiveConfig.getTimeout() < 0
+                ? new DeferredResult()
+                : new DeferredResult(reactiveConfig.getTimeout());
         PublisherToDeferredResultAdapter deferredResultAdapter =
             new PublisherToDeferredResultAdapter(deferredResult, adapter);
         deferredResultAdapter.subscribe(adapter, returnValue);
@@ -778,7 +780,7 @@ public ReactiveConfig(Class<? extends StreamEmitter> streamEmitterType, ..., int
 
 ```java
 // ReactiveSupport.java
-@Target({TYPE, METHOD})
+@Target({TYPE, METHOD, ANNOTATION_TYPE})
 @Retention(RUNTIME)
 public @interface ReactiveSupport {
     int highWaterMark() default 150;

@@ -27,20 +27,22 @@
 | 返回值 → 哪个处理器 + MediaType | 运行时遍历 `canWrite` | 启动期预匹配，运行时直调 |
 | 方法调用 | 运行时 `Method.invoke` 反射 | 启动期 ASM 生成 `INVOKEVIRTUAL` 或 `MethodHandle` 固化 |
 
-这套"启动时确定"的落地载体，是三阶段组件生命周期。它的入口不在 `InitializingBean` 的常规位置——值得专门指出一个容易误读的细节：
+这套"启动时确定"的落地载体，是三阶段组件生命周期。它的入口不在 `InitializingBean` 的常规位置——值得专门指出一个容易误读的细节：`WebContext` **并不实现** `InitializingBean`，也没有 `afterPropertiesSet()`（历史版本曾实现并留空，该覆写已被删除，见 [02 篇](02-architecture-overview.md) 的校正）。当前类声明只有 `DisposableBean` 与 `ApplicationContextAware`：
 
 ```java
 // WebContext.java
-@Override
-public void afterPropertiesSet() {
-}
+public class WebContext extends WebComponentContainer implements DisposableBean, ApplicationContextAware {
 ```
 
-`WebContext` 虽实现了 `InitializingBean`，却把 `afterPropertiesSet()` 留空。真正的三阶段编排推迟到 `startLifecycle()`，由 `NettyHttpServer.start()` 在 Spring 容器完全就绪、所有 Bean 注册完毕后才触发：
+三阶段编排由 `startLifecycle()` 承担，由 `NettyHttpServer.start()` 在 Spring 容器完全就绪、所有 Bean 注册完毕后才触发：
 
 ```java
 // WebContext.java
 public void startLifecycle() {
+    // 支持 destroy 后重新 start：状态机停留在 DESTROY，需复位到 NEW 才能重新初始化
+    if (isDestroyed()) {
+        resetAfterDestroy();
+    }
     if (!lifecycleStarted.compareAndSet(false, true)) {
         return;
     }
@@ -50,12 +52,19 @@ public void startLifecycle() {
         this.initComponentPhase2();      // Phase2：跨组件连接
         this.initComponentPhase3();      // Phase3：优化与缓存
     } catch (Exception e) {
+        // 启动失败：清理已初始化的组件，并复位 lifecycleStarted，保证同一实例可重试启动
+        try {
+            this.destroyComponent();
+        } catch (Exception cleanupEx) {
+            log.warn("WebContext cleanup after failed lifecycle start also failed", cleanupEx);
+        }
+        lifecycleStarted.set(false);
         throw new RuntimeException("Failed to start WebContext lifecycle", e);
     }
 }
 ```
 
-**为什么推迟？** Web 组件初始化应在 Spring 基础容器初始化完成之后。`afterPropertiesSet()` 的触发时点取决于 bean 在依赖图中的位置，无法保证此时容器已就绪；而 `SmartLifecycle.start()` 在 context refresh 完全结束后由 `LifecycleProcessor` 调用，此时所有 bean 必然就绪。把生命周期锚定在此，是为了让"启动时确定"拿到的输入是完整的——确定性首先要求输入完整。
+**为什么推迟？** Web 组件初始化应在 Spring 基础容器初始化完成之后。若改挂 `InitializingBean.afterPropertiesSet()`，其时点取决于 bean 在依赖图中的位置，无法保证此时容器已就绪；而 `SmartLifecycle.start()` 在 context refresh 完全结束后由 `LifecycleProcessor` 调用，此时所有 bean 必然就绪。把生命周期锚定在此，是为了让"启动时确定"拿到的输入是完整的——确定性首先要求输入完整。
 
 三阶段的精确语义在 [`LifecycleWebComponent`](../../spring-web/src/main/java/io/springperf/web/context/LifecycleWebComponent.java) 的接口注释里写得很清楚（Phase1 扫描收集 / Phase2 跨组件连接建索引 / Phase3 优化缓存预计算），机制细节留给 [03 篇](03-component-lifecycle.md)，本篇只取其哲学含义：**每一阶段都在把"运行时要算的事"前移为"启动时算一次的事"。**
 
@@ -108,7 +117,7 @@ public final class MappingCacheKey<T> {
 
 ```java
 // BaseWebServerHttpRequest.java
-protected final Map<String, Object> attributes = new ConcurrentHashMap<>();
+private volatile Map<String, Object> attributes;   // 懒分配：首次写才 new（attributes() 双检锁）
 protected final Object[] fastAttributes = new Object[RequestAttribute.getMaxSize()];
 
 // BaseWebServerHttpRequest.java
@@ -121,21 +130,19 @@ public <T> T getAttribute(RequestAttribute<T> key) {
 }
 ```
 
-`RequestAttribute.getMaxSize()` 在启动期确定——又是"启动时确定"的体现。热点请求属性（如 DispatcherHandler 的 `METRICS_START_ATTR` 计时戳）走 `fastAttributes[idx]`，**整条 get/set 路径不创建任何对象**：不分配 `Entry`、不计算 hashCode、不装箱。只有当 `RequestAttribute` 数量超过启动期预分配上限时才回退到 `ConcurrentHashMap`——这是一个有界的、可观测的降级，而非静默的隐式分配。
+`RequestAttribute.getMaxSize()` 取的是**请求构造时刻**的动态快照（`SEQ.get() + 1`，即当时已注册的 `RequestAttribute` 数量）——`fastAttributes` 因此按需增长、天然有界。热点请求属性（如 DispatcherHandler 的 `METRICS_START_ATTR` 计时戳）走 `fastAttributes[idx]`，**整条 get/set 路径不创建任何对象**：不分配 `Entry`、不计算 hashCode、不装箱。只有当 `RequestAttribute` 数量超过该次请求构造时的上限才回退到 `ConcurrentHashMap`——这是一个有界的、可观测的降级，而非静默的隐式分配。
 
-**代码证据二：异常对象复用为静态单例**
+**代码证据二：异常对象零堆栈、每请求新建**
 
 ```java
 // DispatcherHandler.java
-private static final StacklessResponseStatusException NOT_FOUND_EXCEPTION =
-        new StacklessResponseStatusException(HttpStatus.NOT_FOUND);
-private static final StacklessResponseStatusException METHOD_NOT_ALLOWED_EXCEPTION =
-        new StacklessResponseStatusException(HttpStatus.METHOD_NOT_ALLOWED);
+// 404/405：每请求新建，刻意不复用单例
+ResponseStatusException ex = new StacklessResponseStatusException(status);
 ```
 
-404/405 是高频路径。Spring MVC 每次 `sendError` 都 `new` 一个异常对象（带堆栈填充）；本框架把这两个异常预构为 `static final` 单例，且 `StacklessResponseStatusException` 顾名思义**不填充堆栈**——省掉 `Throwable.fillInStackTrace()` 这一每次约几微秒、且本身分配栈帧数组的开销。
+404/405 是高频路径。Spring MVC 每次 `sendError` 都 `new` 一个异常对象（带堆栈填充）；本框架同样每请求新建，但 `StacklessResponseStatusException` 顾名思义**不填充堆栈**——省掉 `Throwable.fillInStackTrace()` 这一每次约几微秒、且本身分配栈帧数组的开销。**刻意不预构 `static final` 单例**：异常会被交给 `@ExceptionHandler` 业务代码，可能被修改 headers/body，复用单例会把这处修改污染到后续请求（源码注释即此论证，与早期版本的决定相反）。
 
-**对比对象**：Spring MVC 每请求创建 `EmptyBodyCheckingHttpInputMessage` 包装器（检查 body 是否为空用）、参数绑定用的临时 Map、`ModelAndView` 容器等。Benchmark 实测每请求堆分配本框架 ~8–11KB vs Tomcat ~23–37KB vs WebFlux ~25–51KB（[见 17 篇](17-benchmark-data.md)）——这个 2–5 倍差距的根因之一就是这条原则。
+**对比对象**：Spring MVC 每请求创建 `EmptyBodyCheckingHttpInputMessage` 包装器（检查 body 是否为空用）、参数绑定用的临时 Map、`ModelAndView` 容器等。Benchmark 实测每请求堆分配本框架 10.1–10.7KB vs Tomcat 23.2–38.6KB vs WebFlux 32.6–51.8KB（[见 17 篇](17-benchmark-data.md)）——这个 2–5 倍差距的根因之一就是这条原则。
 
 > 完整对象分配归因见 [15 篇](15-performance-optimizations.md) §4。
 
@@ -204,7 +211,7 @@ protected void handleWithMappingResult(WebServerHttpRequest req, WebServerHttpRe
 
 这个 `acquire/release` 的对称性是"避免阻塞/避免泄漏"原则的代码硬要求——它不是便利 API，是内存安全的契约。
 
-**对比对象**：Servlet 容器由容器统一管理请求体生命周期，请求结束自动回收。便利的代价是：业务代码无法跨线程持有请求体（一持有就泄漏或被回收），也无法做零拷贝透传。本框架用显式引用计数换来了 `retainedDuplicate()` 零拷贝、跨线程传递 `ByteBuf`、直接操作 `DirectByteBuf` 省掉 heap→direct 拷贝等能力。
+**对比对象**：Servlet 容器由容器统一管理请求体生命周期，请求结束自动回收。便利的代价是：业务代码无法跨线程持有请求体（一持有就泄漏或被回收），也无法做零拷贝透传。本框架用显式引用计数换来了 `duplicate()` 零拷贝视图、跨线程传递 `ByteBuf`、直接操作 `DirectByteBuf` 省掉 heap→direct 拷贝等能力。
 
 > 完整内存管理机制见 [05 篇](05-server-and-http.md)。
 
@@ -265,7 +272,7 @@ public void registerWebComponent(WebComponent webComponent) {
 
 ```java
 // WebComponentContainer.java
-protected Map<Class, Function<?, ? extends WebComponent>> autoRegisterComponentMap = new HashMap<>();
+protected Map<Class, Function<?, ? extends WebComponent>> autoRegisterComponentMap = new ConcurrentHashMap<>();
 
 public <B> void autoRegisterWebComponent(Class<B> clazz, Function<B, ? extends WebComponent> getComponentFunc) {
     autoRegisterComponentMap.put(clazz, getComponentFunc);

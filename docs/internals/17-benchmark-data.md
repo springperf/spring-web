@@ -8,7 +8,7 @@
 
 前 16 篇讲了"为什么快"。本篇用最新 benchmark 报告的数字，把每个数据点归因到前文讲过的具体机制——路由缓存、ASM 调用、EventLoop 直处理、无锁 drain loop、零拷贝传输。
 
-**数据来源**：`spring-web-benchmark/benchmark-reports/20260814-221509/report.md`（2026-08-15 11:05:55 生成），5 个容器（perf / perf-support / tomcat / undertow / webflux）× 7 个 API（async / bytes / bytesLarge / get / json / sse / valid）× 3 个并发度（4/8/16 线程）× JDK 17.0.9。
+**数据来源**：同一次基准运行（5 个容器 perf / perf-support / tomcat / undertow / webflux × 7 个 API × 3 个并发度 4/8/16 线程 × JDK 17.0.9）。**仓库内可核对的数字以 [`docs/benchmark.md`](../benchmark.md) 为准**（吞吐、p50/p99/p99.9、每请求分配、分配率、Heap Used）；本篇中更细的列（**p99.99、Metaspace、Code Cache、perf-support 明细**）取自该次运行的原始报告，报告文件未随仓库发布，**无法在仓库内复验**，引用时请注意这一区别。
 
 ---
 
@@ -124,11 +124,12 @@
 
 | 场景 | perf (16t) | tomcat (16t) | 倍数 |
 |------|-----------|-------------|------|
-| get | 741MB/s | 1419MB/s | 0.52x |
-| json | 707MB/s | 1054MB/s | 0.67x |
-| sse | 4489MB/s | 440MB/s | 10.2x |
+| 分配率（容器级，见 `benchmark.md`） | 707MB/s | 1054MB/s | 0.67x |
+| 每请求分配（json） | 10.1KB | 23.8KB | 0.42x |
+| 每请求分配（get） | 10.7KB | 37.0KB | 0.29x |
+| 每请求分配（sse） | 310.4KB | 233.9KB | 1.33x |
 
-**归因**：`get`/`json` 场景 perf 分配率约为 tomcat 的一半，归因更低的每请求分配量。`sse` 场景 perf 分配率 10 倍于 tomcat（4489MB/s vs 440MB/s），但这是"高吞吐的代价"——以 16 线程档位交叉验证（吞吐 × 每请求分配 ≈ 实测分配率）：perf 14920 ops/s × 310.4KB/请求 ≈ 4631MB/s，与实测 4489MB/s 吻合（误差 ~3%）；tomcat 1933 ops/s × 233.9KB/请求 ≈ 452MB/s，与实测 440MB/s 吻合（误差 ~3%）。**perf 的分配率高是因为吞吐高，不是因为单次请求分配多。**
+**归因**：容器级分配率 perf 约为 tomcat 的 2/3（707 vs 1054MB/s），而**每请求分配**差距更大——json 10.1KB vs 23.8KB（43%）、get 10.7KB vs 37.0KB（29%），归因预缓存 + 零临时对象。`sse` 场景 perf 每请求分配高于 tomcat（310.4KB vs 233.9KB），但这是"高吞吐的代价"——按 16 线程档位交叉验证（吞吐 × 每请求分配）：perf 14920 ops/s × 310.4KB ≈ 4631MB/s，tomcat 1933 ops/s × 233.9KB ≈ 452MB/s，与各自量级吻合。**perf 的 SSE 分配总量高是因为吞吐高，不是因为单次请求分配多。**
 
 ---
 
@@ -254,14 +255,14 @@
 | GC 暂停 0.44x | 1.6ms vs 3.6ms (sse) | 低分配率 → 低 GC 频率 | [15](15-performance-optimizations.md) 优化 5 |
 | Metaspace 最低 | 39MB vs 42–47MB | 精简类结构 + JIT 内联 | [15](15-performance-optimizations.md) 优化 2 |
 | Code Cache 最低 | 6MB vs 8–10MB | `invokeExact` 内联 | [15](15-performance-optimizations.md) 优化 2 |
-| p99.99 延迟 0.5x | 2.16ms vs 4.27ms (get) | 低 GC 暂停 → 低长尾 | [15](15-performance-optimizations.md) 优化 5 |
+| p99.99 延迟 0.5x | 2.16ms vs 4.20ms（json 16t，见 §4.1；该分位数未列入 `benchmark.md`） | 低 GC 暂停 → 低长尾 | [15](15-performance-optimizations.md) 优化 5 |
 | perf-support -15% | 桥接层开销 | Servlet 适配 + Session flush | [12](12-support-bridge.md) |
 
 ---
 
 ## 八、小结：数字背后的"启动期确定性"
 
-回到引子的问题：perf 为何在 get/json ~2x tomcat？为何 SSE 7.72x tomcat？为何每请求分配 perf ~8–11KB vs tomcat ~23–37KB？
+回到引子的问题：perf 为何在 get/json ~2x tomcat？为何 SSE 7.72x tomcat？为何每请求分配 perf 10.1–10.7KB vs tomcat 23.2–38.6KB？
 
 1. **吞吐优势归因"启动期确定性"**：路由匹配 O(1)、方法调用零反射、属性访问零哈希——这些在启动期完成的预计算，使运行时每请求节省 ~500ns–1μs 的匹配开销，累积到吞吐差距。
 2. **SSE 7.72x 归因"无锁 drain loop + EventLoop 串行化"**：`MpscArrayQueue` 的无锁 drain loop 消除了 Tomcat SSE 的每连接一线程模型开销，EventLoop 串行化写入避免锁竞争；perf 与 tomcat 均默认禁用 Nagle，非差异来源。
