@@ -98,6 +98,35 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
   Four documents are user-facing and must stay **paired**: `CHANGELOG.md`, `docs/configuration.md`,
   `docs/compatibility.md` and `docs/breaking-changes.md` each have a mirror under `docs/en/`, and
   `check-docs.py` enforces it (a missing side is a defect) - change one side and you change the other.
+- The same entry point runs `scripts/check-doc-structure.py`, which checks markdown **structure** rather
+  than content: leftover CJK-parenthesis debris (`（ ）`, `（，`), empty inline code spans, table row/column
+  mismatches and fully empty columns, unbalanced code fences, and `.java` file references that name no
+  tracked file. Its first full run over 73 files found four real defects - a duplicated table row in both
+  `docs/extensions.md` and its English mirror, an unescaped `||` that split a table cell in
+  `docs/en/configuration.md`, and a stale source-file name left over from a rename. `.agent/` files other than
+  `module.md` are out of scope for the file-existence rule, matching `check-doc-symbols.py`: backport
+  checklists exist to name files that only the other branch has.
+
+### Coverage and Leak Gates
+
+- `scripts/check-coverage.py` is a gate, not a report. It reads the merged CSV that `coverage-aggregate`
+  produces in the `test` phase (`report-aggregate`, so E2E-driven coverage is included) and fails when
+  the totals fall below **92% line / 83% branch**, or when any library module drops below its floor
+  (`spring-web` 90%, the rest 80%). The floors sit 1.6-1.9 points under the measured 93.6% / 84.9%, so
+  ordinary noise does not redden a PR while a real regression does. A module **missing** from the CSV is
+  a defect too - an empty or partial aggregation must not pass silently. CI runs it in the `build` job
+  on JDK 17 only (one judgement over one dataset; the other matrix legs are for compatibility) and
+  uploads the CSV as an artifact.
+- E2E modules (`spring-web-test`, `spring-web-support-test`) set `rerunFailingTestsCount=1`: they bind
+  real ports and depend on network timing, so a single flake should not fail a PR. Retries stay visible
+  rather than silent - surefire records `Flaky:` in the report and the `build` job prints every such
+  report as a warning. Unit-test modules deliberately do **not** retry.
+- The `netty-leaks` job runs `scripts/check-netty-leaks.sh --run --online --clean 1` with
+  `-Dio.netty.leakDetection.level=paranoid` (plus `targetRecords=16`) and fails on any `LEAK: ByteBuf`
+  report. The script treats a missing paranoid property as a warning so it stays usable offline; the job
+  re-checks it with `grep -q`, because "zero leaks" must not come from a detector that never ran. Use
+  `--online` in CI: the default `-o` fails on a cold local repository, and that failure is not a leak
+  verdict.
 
 ### Formatting
 

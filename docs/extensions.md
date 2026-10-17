@@ -532,7 +532,6 @@ Swagger 注解（`@Tag`、`@Operation`、`@Schema`）直接可用。
 | `HttpBodyCodecInterceptor` | Spring Bean | 请求/响应体读写拦截 |
 | `HandlerExceptionResolver` | Spring Bean | 异常解析器 |
 | `ReturnValueResolver` | Spring Bean | 返回值解析器 |
-| `StaticArgumentResolverProvider` | Spring Bean | 参数解析器提供者 | `ArgumentResolverRegistry` |
 | `StaticArgumentResolverProvider` | Spring Bean | 静态参数解析器提供者 |
 | `HttpBodyConverter` | Spring Bean | HTTP 消息格式转换 |
 | `JsonConverter` | 无自动注册（默认 `JacksonConverter`） | JSON 序列化实现 |
