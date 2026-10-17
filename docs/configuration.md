@@ -63,6 +63,7 @@
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
 | `server.servlet.session.tracking-modes` | `COOKIE` | 跟踪模式（`COOKIE` / `URL`；`SSL` 本框架 N/A）。`URL` 模式下**不下发**会话 Cookie，改由 `encodeURL()` 写出 `;jsessionid=`，服务端在 Cookie 缺失时回读该值（Servlet 规范 §7.1） |
+| `server.servlet.session.timeout` | `1800`（30 分钟） | 会话空闲超时（Duration 风格，纯数字按秒）；超时未访问即失效 |
 | `server.servlet.session.persistent` | `false` | 会话持久化到磁盘（重启不丢；JDK 序列化，每 session 一文件） |
 | `server.servlet.session.store-dir` | `.perf-sessions` | 持久化目录（`persistent=true` 时生效） |
 | `server.servlet.session.persistent-exclude` | 无 | 不落盘的 session 属性名（逗号分隔） |
@@ -261,12 +262,21 @@ management.server.max-content-length=1048576
 | `spring.thymeleaf.prefix` | `templates/` | Thymeleaf 模板前缀（classpath 相对路径） |
 | `spring.thymeleaf.suffix` | `.html` | Thymeleaf 模板后缀 |
 | `spring.thymeleaf.cache` | `true` | 是否开启模板缓存（开发可设 `false` 热改） |
+| `spring.thymeleaf.mode` | `HTML` | 模板模式（Thymeleaf `TemplateMode`，如 `HTML` / `HTML5` / `TEXT`） |
+| `spring.thymeleaf.cache-ttl` | 无（`-1`，不过期） | 模板缓存 TTL（Duration 风格，如 `10m`）；`<=0` 表示不过期 |
+| `spring.thymeleaf.enabled` | `true` | 是否启用 Thymeleaf；`false` 时该引擎不参与视图解析 |
 | `spring.freemarker.prefix` | `templates/` | FreeMarker 模板前缀（classpath 相对路径） |
 | `spring.freemarker.suffix` | `.ftl` | FreeMarker 模板后缀 |
 | `spring.freemarker.cache` | `true` | 是否开启模板缓存 |
+| `spring.freemarker.template-loader-path` | 无（回退 `prefix`） | FreeMarker 模板加载路径；**配置后覆盖 `prefix`** |
+| `spring.freemarker.settings` | 无 | FreeMarker 原生 settings（键值对，如 `datetime_format=yyyy-MM-dd`） |
+| `spring.freemarker.content-type` | `text/html;charset=UTF-8` | FreeMarker 输出的 Content-Type |
 | `spring.beetl.prefix` | `templates/` | Beetl 模板前缀（classpath 相对路径） |
 | `spring.beetl.suffix` | `.btl` | Beetl 模板后缀 |
 | `spring.beetl.cache` | `true` | 是否开启模板缓存 |
+| `spring.beetl.mode` | `HTML` | Beetl 模板模式（Beetl 无原生 mode 概念，为与另两个引擎对称而保留） |
+| `spring.beetl.cache-ttl` | 无（`-1`，不过期） | Beetl 模板缓存 TTL（Duration 风格）；仅当所选缓存实现支持 TTL（如 CaffeineCache）时生效 |
+| `spring.beetl.enabled` | `true` | 是否启用 Beetl；`false` 时 `resolveViewName` 直接返回 null |
 | `spring.thymeleaf.encoding` | `UTF-8` | 渲染字符集，同时写入 `Content-Type`；FreeMarker / Beetl 默认 UTF-8（与 Boot 行为一致，无独立编码键） |
 | `spring.mvc.view.prefix` | `/jsp/` | **仅 JSP 视图**的前缀（对齐 Boot 的 JSP 语义）；模板引擎用各自的 `spring.{engine}.prefix` |
 | `spring.mvc.view.suffix` | `.jsp` | **仅 JSP 视图**的后缀 |
