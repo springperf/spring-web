@@ -90,10 +90,11 @@ public class SseEmitter extends StreamEmitter<Object> {
     }
 
     /**
-     * 编码 {@link ServerSentEvent}。字段值含 LF 时的分工（不要误判为漏改）：
+     * 编码 {@link ServerSentEvent}。字段值含换行时的分工：
      * <ul>
-     * <li>{@code id} / {@code event}：{@code ServerSentEvent} 的 builder **在构造期就拒绝**含 LF 的值
-     * （{@code illegal character}），故此处原样写出是安全的；</li>
+     * <li>{@code id} / {@code event}：SSE 规范要求单行，且一个裸 LF 就能让客户端把后续内容解析成新字段 （协议注入）。Spring 6.2 的**某个补丁版本**起
+     * {@code ServerSentEvent} builder 才在构造期拒绝， Boot 3.2~3.4 对应的 Spring 6.1 / 6.2 早期并不拒绝——差异在 patch 级，不可依赖，故此处写出前自行校验
+     * （{@link #requireNoLineBreak}）；</li>
      * <li>{@code data}：自由文本，builder 不校验，故经 {@link #writeBytesWithNewline} 按 LF 续行；</li>
      * <li>{@code comment}：同理自行续行。</li>
      * </ul>
@@ -101,12 +102,14 @@ public class SseEmitter extends StreamEmitter<Object> {
     protected void encodeServerSentEvent(ServerSentEvent sse, OutputStream out) throws IOException {
         String id = sse.id();
         if (id != null) {
+            requireNoLineBreak(id, "id");
             out.write(FIELD_ID);
             writeCharSequence(out, id, StandardCharsets.UTF_8);
             out.write(NEWLINE);
         }
         String event = sse.event();
         if (event != null) {
+            requireNoLineBreak(event, "event");
             out.write(FIELD_EVENT);
             writeCharSequence(out, event, StandardCharsets.UTF_8);
             out.write(NEWLINE);
@@ -136,6 +139,19 @@ public class SseEmitter extends StreamEmitter<Object> {
      */
     protected static void writeDataBytes(OutputStream out, byte[] bytes) throws IOException {
         writeBytesWithNewline(out, bytes, NEWLINE_DATA);
+    }
+
+    /**
+     * SSE 的 {@code id} / {@code event} 是单行字段：写入裸 {@code \n} 或 {@code \r} 会让客户端把后续内容解析成 新的字段，等于允许上游数据伪造事件边界（协议注入）。Spring
+     * 对这两个字段的校验随版本变化（见 {@link #encodeServerSentEvent} 的说明），因此不依赖它，在这里兜住——任何 Boot 3.2+ 上行为一致。
+     */
+    private static void requireNoLineBreak(String value, String field) {
+        int lf = value.indexOf('\n');
+        int cr = value.indexOf('\r');
+        if (lf >= 0 || cr >= 0) {
+            throw new IllegalArgumentException(
+                    "illegal character in SSE " + field + ": newline at index " + (lf >= 0 ? lf : cr));
+        }
     }
 
     private static void writeBytesWithNewline(OutputStream out, byte[] bytes, byte[] continuation) throws IOException {

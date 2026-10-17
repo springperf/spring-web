@@ -5,8 +5,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.function.Supplier;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -122,18 +124,28 @@ class SseEmitterTest {
     }
 
     /**
-     * 边界（记录用）：{@code id} / {@code event} 里的 LF 由 Spring 的 {@code ServerSentEvent} **在构造期就拒绝**
-     * （{@code illegal character '\n' or '\r'}），所以本编码器不为它们做续行处理； 而 {@code data} 是自由文本、builder 不做校验，因此 {@code data} 与
-     * {@code comment} 必须自行按 LF 续行。
+     * 边界：{@code id} / {@code event} 里的换行**绝不能被写进帧**——一个裸 LF 会伪造出后续 SSE 字段（协议注入）； 而 {@code data} 是自由文本，按 LF 续行即可。
      * <p>
-     * 此用例把这条分工钉住：读代码时"同一方法里 data 续行、id 不续行"看着像漏改，实际是**契约分工**。
+     * 拦截位置随 Spring 版本变化：6.2 的某个补丁版本起，{@code ServerSentEvent} builder 在构造期就抛 {@code illegal character}；Boot 3.2~3.4 对应的
+     * Spring 6.1 / 6.2 早期不抛。因此本用例只钉住"必须被拒绝" 这个契约，不钉住"在哪一层拒绝"——编码器自己兜底是硬要求，见 {@code SseEmitter#requireNoLineBreak}。
      * </p>
      */
     @Test
-    void serverSentEvent_rejectsNewlineInIdOrEvent_atConstruction() {
-        assertThrows(IllegalArgumentException.class, () -> ServerSentEvent.builder().id("a\nb"),
-                "id 里的 LF 由 Spring 在构造期拒绝 —— 这正是编码器可以信任 id/event 的原因");
-        assertThrows(IllegalArgumentException.class, () -> ServerSentEvent.builder().event("x\ny"));
+    void serverSentEvent_rejectsNewlineInIdOrEvent() throws IOException {
+        assertRejectedBeforeWriting(() -> ServerSentEvent.builder().id("a\nb"));
+        assertRejectedBeforeWriting(() -> ServerSentEvent.builder().event("x\ny"));
+    }
+
+    private void assertRejectedBeforeWriting(Supplier<ServerSentEvent.Builder<Object>> builder) throws IOException {
+        ServerSentEvent<Object> sse;
+        try {
+            sse = builder.get().build();
+        } catch (IllegalArgumentException rejectedAtConstruction) {
+            return; // 较新的 Spring 在构造期就拦下，编码器无需再拒
+        }
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        assertThrows(IllegalArgumentException.class, () -> emitter.encode(sse, out), "编码器必须在写出前拒绝含换行的 id/event");
+        assertEquals(0, out.size(), "拒绝必须发生在写出任何字节之前");
     }
 
     @Test
