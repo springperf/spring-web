@@ -5,7 +5,7 @@
 ```
 spring-web-parent (aggregate POM)
 ├── spring-web                  Core framework
-├── spring-web-view             View rendering (Thymeleaf/FreeMarker, optional)
+├── spring-web-view             View rendering (Thymeleaf/FreeMarker/Beetl, optional)
 ├── spring-web-servlet          Servlet API bridge layer
 ├── spring-web-mvc-support      SpringMVC bridge layer
 ├── spring-web-batch            Batch request processing (optional)
@@ -73,7 +73,7 @@ handleAfterFilter() — Initialize context
 - `MappingRegistry` — Scans all `@RequestMapping` methods in `@Controller`/`@RestController`
 - Supports all `@RequestMapping` attributes: `value`/`path`, `method`, `params`, `headers`, `consumes`, `produces`
 - Router optimizer chain (`RouterOptimizer`): prefix/suffix/full-path/loop optimization for efficient routing
-- Supports dynamic route registration (`registerMappingAfterInit`) for Actuator endpoints
+- Supports dynamic route registration (`registerMapping(PathMappingContext)`) for Actuator endpoints (driven by the starter's `ManagementMappingRegistry`)
 - `Matcher` system: `HttpMethodMatcher`, `ParamOrHeaderMatcher`, `ConsumeOrProduceMatcher`, etc.
 
 #### arg — Argument Resolvers
@@ -122,11 +122,13 @@ Supported return value types:
   - `postHandle` — After handler execution, before return value rendering
   - `afterCompletion` — After request completion (whether or not an exception occurred)
 - `InterceptorRegistry` manages interceptor registration with path include/exclude patterns
-- Auto-registered interceptor sources (matching Spring MVC semantics): `InterceptorRegistration` produced by
-  `WebMvcConfigurer#addInterceptors`, plus `MappedInterceptor` (which carries its own path rules).
-  **Plain `HandlerInterceptor` beans are no longer auto-registered globally** (Spring MVC behaves the same way) —
-  register them via `addInterceptors` or declare a `MappedInterceptor`; this also avoids double registration
-  (bean scan + `addInterceptors`) of the same instance
+- Auto-registered interceptor sources: the core framework registers plain `HandlerInterceptor` beans from the
+  Spring container **as global interceptors** (`InterceptorRegistry` runs `autoRegisterWebComponent` for
+  `HandlerInterceptor.class`); `InterceptorRegistration` produced by `WebMvcConfigurer#addInterceptors` and
+  `MappedInterceptor` (which carries its own path rules) are absorbed as well
+- Note the distinction: `SupportInterceptorRegistry` in `spring-web-mvc-support` does **not** auto-register plain
+  `HandlerInterceptor` beans (aligned with Spring MVC's `WebMvcConfigurer` semantics) — under the bridge layer
+  they must be registered via `addInterceptors` or declared as `MappedInterceptor` to take effect globally
 - `postHandle` / `afterCompletion` traverse in the **same (forward) direction** as `preHandle`: ordering is
   driven by explicit `order`, and the list is already sorted by it; when `preHandle` returns early, the
   interceptors that did not pass get a **reverse-order** `afterCompletion`
@@ -276,7 +278,7 @@ Bridges Spring MVC ecosystem components (`WebMvcConfigurer`, `HandlerInterceptor
 
 ## spring-web-view (View Rendering)
 
-Server-side rendering (SSR) module built on Thymeleaf / FreeMarker template engines. **Zero changes to the core module** — wired purely through core SPIs (`ReturnValueResolver` / `StaticArgumentResolverProvider` / `ViewResolver`) so that without any registered view resolver, String return values keep their JSON behavior. Pure API projects are unaffected.
+Server-side rendering (SSR) module built on the Thymeleaf / FreeMarker / Beetl template engines. **Zero changes to the core module** — wired purely through core SPIs (`ReturnValueResolver` / `StaticArgumentResolverProvider` / `ViewResolver`) so that without any registered view resolver, String return values keep their JSON behavior. Pure API projects are unaffected.
 
 > Full usage guide: [View Rendering](view.md)
 
@@ -315,10 +317,10 @@ Server-side rendering (SSR) module built on Thymeleaf / FreeMarker template engi
 
 ### Wiring
 
-- `ViewReturnValueResolver` / `ModelAndViewReturnValueResolver` are Spring Beans absorbed by `ReturnValueResolverRegistry`
-- `ModelArgumentResolverProvider` is a Spring Bean absorbed by `ArgumentResolverRegistry`
-- `ThymeleafViewResolver` / `FreemarkerViewResolver` are Spring Beans absorbed by `ViewResolverRegistry`
-- Engine selection is decided by the `spring.web.view.engine` property + classpath detection
+- `ViewReturnValueResolver` is a Spring Bean absorbed by `ReturnValueResolverRegistry`; `ModelAndViewReturnValueResolver` belongs to `spring-web-mvc-support` and is assembled by `SpringWebMvcSupportAutoConfiguration`
+- `ModelArgumentResolverProvider` is registered by the core `ArgumentResolverRegistry` itself (hard-coded), not absorbed as a Spring Bean
+- `ThymeleafViewResolver` / `FreemarkerViewResolver` / `BeetlViewResolver` are Spring Beans absorbed by `ViewResolverRegistry`
+- Engine selection is decided by the `spring.web.view.engine` property + classpath detection (`org.thymeleaf.TemplateEngine` / `freemarker.template.Configuration` / `org.beetl.core.GroupTemplate`)
 
 ---
 
@@ -340,8 +342,9 @@ Server-side rendering (SSR) module built on Thymeleaf / FreeMarker template engi
 ### View Auto-Configuration
 
 `SpringWebViewAutoConfiguration` auto-assembles when `spring-web-view` is on the classpath:
-- `ViewResolverRegistry`, `ViewReturnValueResolver`, `ModelAndViewReturnValueResolver`, `ModelArgumentResolverProvider`
-- Engine selection: `spring.web.view.engine` (when unset, every available engine on the classpath is registered) + classpath detection of `TemplateEngine` / `freemarker.template.Configuration`
+- `ViewReturnValueResolver` + `ThymeleafViewResolver` / `FreemarkerViewResolver` / `BeetlViewResolver` (4 `@Bean` methods in total)
+- Engine selection: `spring.web.view.engine` (when unset, every available engine on the classpath is registered) + classpath detection of `org.thymeleaf.TemplateEngine` / `freemarker.template.Configuration` / `org.beetl.core.GroupTemplate`
+- `ViewResolverRegistry` itself is **not** a bean of this configuration class: `ViewReturnValueResolver` creates it on demand via `getWebComponentWithDefault(..., new ViewResolverRegistry())` when the container has none
 
 ### Batch Auto-Configuration
 
@@ -356,11 +359,11 @@ Server-side rendering (SSR) module built on Thymeleaf / FreeMarker template engi
 
 ### SBA Client Auto-Configuration
 
-`SpringBootAdminClientAutoConfiguration` emits `WebServerInitializedEvent` when SBA client is present, enabling Spring Boot Admin heartbeat registration.
+`SpringBootAdminClientAutoConfiguration` registers `PerfApplicationFactory` (replacing SBA's default `WebServerApplicationContext`) when the SBA client is present. `WebServerInitializedEvent` is emitted by the separate `WebServerInitializedEventAutoConfiguration` (unconditional), so Spring Cloud service registration (Nacos/Eureka/Consul) and SBA can detect server readiness.
 
 ### Metrics Auto-Configuration
 
-`MicrometerWebMetrics` is automatically registered as the `WebMetrics` implementation when `spring-boot-starter-actuator` is on the classpath. It collects request duration, exception counts, and thread pool metrics. See [Configuration Reference](configuration.md#observability-metrics) for details.
+The default `WebMetrics` implementation is `NoOpWebMetrics` (zero overhead); when `io.micrometer.core.instrument.MeterRegistry` is on the classpath the starter registers `MicrometerWebMetrics`, collecting request duration, exception counts and thread pool metrics. See [Configuration Reference](configuration.md#observability-metrics) for details.
 
 ### OpenAPI Auto-Configuration
 
@@ -368,11 +371,11 @@ Server-side rendering (SSR) module built on Thymeleaf / FreeMarker template engi
 
 ### Swagger UI Auto-Configuration
 
-`SwaggerUiAutoConfiguration` registers Swagger UI static resource routes when Swagger UI is on the classpath.
+`SwaggerUiAutoConfiguration` registers Swagger UI static resource routes when springdoc's `OpenApiCustomizer` is on the classpath (webjar version controlled by `springperf.swagger-ui.webjar-version`).
 
 ### Application Context
 
-`WebServerApplicationContextFactory` forces the use of `AnnotationConfigApplicationContext`, replacing Spring Boot's default `AnnotationConfigServletWebServerApplicationContext`.
+`WebServerApplicationContextFactory` uses the non-Servlet `AnnotationConfigApplicationContext` instead of Spring Boot's default `AnnotationConfigServletWebServerApplicationContext`; under AOT / native-image builds (`AotDetector.useGeneratedArtifacts()`) it returns `GenericApplicationContext`.
 
 ---
 
@@ -398,7 +401,7 @@ Request → EventLoop → BatchInvoker creates instance enqueued → RingBuffer
                                                                   │
                                                             Submitted to business thread pool
                                                                   │
-                                                            BatchHandler batch processing
+                                                            BufferingBatchHandler batch processing
                                                                   │
                                        Per req.setResult() → asyncDispatch → write response
 ```

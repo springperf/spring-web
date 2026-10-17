@@ -78,7 +78,7 @@
 启动项目，看到以下日志说明迁移成功：
 
 ```
-NettyHttpServer  - Netty started on port(s): 8080
+NettyHttpServer  - Netty Server started on port 8080
 ```
 
 框架自动使用 `AnnotationConfigApplicationContext`，无需手动配置。
@@ -114,6 +114,10 @@ public class UserController {
 }
 ```
 
+> **关于 `Result`**：它是**业务自定义的返回包装类**，不是框架提供的类型——框架只要求返回值可被
+> `ReturnValueResolver` 处理（任意 POJO 默认按 JSON 写出）。可参考 `spring-web-example-rest`
+> 中的 `ApiResult`。
+
 ### 异常处理
 
 ```java
@@ -142,15 +146,14 @@ public class LogInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(WebServerHttpRequest request, WebServerHttpResponse response,
                              Object handler) {
-        long start = System.currentTimeMillis();
-        request.getRequestContext().setStartTime(start);
+        request.getRequestContext().setAttribute("startTime", System.currentTimeMillis());
         return true;
     }
 
     @Override
     public void afterCompletion(WebServerHttpRequest request, WebServerHttpResponse response,
-                                Object handler, Exception ex) {
-        long start = request.getRequestContext().getStartTime();
+                                Object handler, Throwable ex) {
+        long start = (Long) request.getRequestContext().getAttribute("startTime");
         long cost = System.currentTimeMillis() - start;
         log.info("[{}] {} cost={}ms", request.getMethod(), request.getURI(), cost);
     }

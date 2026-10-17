@@ -24,7 +24,7 @@ The framework supports Spring MVC-style server-side rendering (SSR) with built-i
 </dependency>
 ```
 
-To use FreeMarker instead, swap `thymeleaf` for:
+To use FreeMarker or Beetl instead, swap `thymeleaf` for:
 
 ```xml
 <dependency>
@@ -41,7 +41,7 @@ To use FreeMarker instead, swap `thymeleaf` for:
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `spring.web.view.engine` | none (all available) | Enabled template engines (comma-separated): `thymeleaf` / `freemarker` / `beetl`; **when unset every available engine on the classpath is registered** |
+| `spring.web.view.engine` | none (all available) | Enabled template engines (comma-separated): `thymeleaf` / `freemarker` / `beetl`; the special value `none` registers no engine (only `redirect:` works, and the "no ViewResolver" startup check is skipped); **when unset every available engine on the classpath is registered** |
 | `spring.thymeleaf.prefix` | `templates/` | Thymeleaf template prefix (classpath-relative) |
 | `spring.thymeleaf.suffix` | `.html` | Thymeleaf template suffix |
 | `spring.thymeleaf.cache` | `true` | Template cache (set `false` in development for hot reload) |

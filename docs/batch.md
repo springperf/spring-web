@@ -106,6 +106,7 @@ public class UserController {
 ```java
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
+@Documented
 public @interface BatchMapping {
 
     int ringBufferSize() default 4096;
@@ -129,7 +130,7 @@ public @interface BatchMapping {
 | `backpressure` | BLOCK | 背压策略，见下方表格 |
 | `method` | "" | 被关联的单请求方法名，默认与批量处理方法同名 |
 | `maxBatchSize` | 100 | 单次批处理最大请求数，达到该值触发批量处理 |
-| `consumerSize` | -1 | 最大并发处理线程数，默认 CPU 核数。开启虚拟线程（JDK 21+）后仍是并发上限，只是执行线程变为虚拟线程；此时建议保持 `waitStrategy=BLOCKING`——`BUSY_SPIN`/`YIELDING` 不会卸载虚拟线程，会长期占住载体线程 |
+| `consumerSize` | -1 | 业务线程池（bizExecutor）最大并发处理线程数，默认 CPU 核数；Disruptor 消费者线程独立，**不占该配额**。开启虚拟线程（JDK 21+）后执行线程改为虚拟线程，配额语义不变；此时建议保持 `waitStrategy=BLOCKING`——`BUSY_SPIN`/`YIELDING` 不会卸载虚拟线程，会长期占住载体线程 |
 
 ### 背压策略
 
@@ -162,7 +163,7 @@ bizExecutor 线程池（0 ~ consumerSize 个；开虚拟线程时为虚拟线程
 @BatchMapping 方法
 ```
 
-- **生产者**：由默认线程模型决定——不开启虚拟线程时是 `default` 业务线程池（遵循 `pool.default-execute-mode`）；**开启虚拟线程（JDK 21+）时仍在 `default` 池**，只是该池的执行线程改为虚拟线程（执行位置不变，零切换与此无关）。两种情况下都只是调用 `BatchInvoker` 入队（微秒级、不阻塞），无需 `@RunInPool`
+- **生产者**：由默认线程模型决定——不开启虚拟线程时是 `default` 业务线程池（遵循 `pool.default-execute-mode`）；**开启虚拟线程（JDK 21+）时改为 EventLoop 直投**（`BatchRegistry` 会把 default 池置空，避免多一次线程切换）。两种情况下都只是调用 `BatchInvoker` 入队（微秒级、不阻塞），无需 `@RunInPool`
 - **消费者**：Disruptor 单消费者线程不断从 RingBuffer 拉取事件
 - **业务线程池**：0 核心线程、`SynchronousQueue`、`CallerRunsPolicy`——空闲时零线程占用，满负荷时消费者线程自行执行形成背压。开启虚拟线程（`spring.threads.virtual.enabled=true`，JDK 21+）时执行线程改为**虚拟线程**（上限与背压语义不变：仍受 `consumerSize` 限制），阻塞只挂起虚拟线程而不占用平台线程
 
@@ -200,26 +201,30 @@ bizExecutor 线程池（0 ~ consumerSize 个；开虚拟线程时为虚拟线程
 
 ### Metrics 指标
 
-当 Micrometer 在类路径上时（通过 `spring-boot-starter-actuator` 引入），`spring-web-batch` 自动注册以下指标：
+`BatchMetrics` 是指标 SPI，框架默认实现为 `NoOpBatchMetrics`（全 no-op）。当
+`io.micrometer.core.instrument.MeterRegistry` 在类路径上时（如通过 `spring-boot-starter-actuator` 引入），
+**starter**（`SpringWebBatchAutoConfiguration` 内嵌的 `MicrometerBatchMetricsConfiguration`）会注册
+`MicrometerBatchMetrics` 并经 `BatchRegistry#setMetrics(...)` 注入，产出以下指标：
 
 | 指标名 | 类型 | Tag | 说明 |
 |--------|------|-----|------|
-| `batch.enqueue.total` | Counter | `queue` | 总入队请求数 |
+| `batch.enqueue.total` | Counter | `queue` | 总入队尝试数 |
+| `batch.enqueue.rejected` | Counter | `queue` | 入队失败数（`total` 中未成功的部分） |
 | `batch.enqueue.dropped` | Counter | `queue` | 背压丢弃数 |
 | `batch.enqueue.overflow` | Counter | `queue` | 溢出异常数 |
-| `batch.process.duration` | Timer | `queue` | 批处理耗时 |
+| `batch.process.duration` | Timer | `queue` + `outcome=success/failure` | 批处理耗时（成败分序列，避免失败批次污染分位数） |
 | `batch.process.batch.size` | DistributionSummary | `queue` | 批大小分布 |
 | `batch.process.requests` | Counter | `queue` | 请求完成数 |
 | `batch.queue.remaining` | Gauge | `queue` | RingBuffer 剩余容量 |
 | `batch.queue.capacity` | Gauge | `queue` | RingBuffer 总容量 |
 
-所有指标均带有 `queue` Tag，值为 `batch:<ClassName>.<methodName>`。
+所有指标均带有 `queue` Tag，值为 `batch:<ClassName>.<methodName>`（由 `BatchScanner` 生成）。
 
 ### 监控建议
 
 - **`batch.queue.remaining`**：配置告警，低于 bufferSize 的 10% 时通知，表示背压接近极限
-- **`batch.process.duration`**：关注 p99 延迟，持续升高说明业务线程池饱和
-- **`batch.enqueue.dropped`**：出现丢弃说明 RingBuffer 容量或消费者速度不足，需调整 `ringBufferSize` 或 `consumerSize`
+- **`batch.process.duration`**：关注 p99 延迟（按 `outcome` 分开看），持续升高说明业务线程池饱和
+- **`batch.enqueue.dropped`** / **`batch.enqueue.overflow`**：出现丢弃说明 RingBuffer 容量或消费者速度不足，需调整 `ringBufferSize` 或 `consumerSize`
 
 ---
 
