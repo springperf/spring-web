@@ -106,6 +106,7 @@ public class UserController {
 ```java
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
+@Documented
 public @interface BatchMapping {
 
     int ringBufferSize() default 4096;
@@ -200,26 +201,30 @@ bizExecutor 线程池（0 ~ consumerSize 个）
 
 ### Metrics 指标
 
-当 Micrometer 在类路径上时（通过 `spring-boot-starter-actuator` 引入），`spring-web-batch` 自动注册以下指标：
+`BatchMetrics` 是指标 SPI，框架默认实现为 `NoOpBatchMetrics`（全 no-op）。当
+`io.micrometer.core.instrument.MeterRegistry` 在类路径上时（如通过 `spring-boot-starter-actuator` 引入），
+**starter**（`SpringWebBatchAutoConfiguration` 内嵌的 `MicrometerBatchMetricsConfiguration`）会注册
+`MicrometerBatchMetrics` 并经 `BatchRegistry#setMetrics(...)` 注入，产出以下指标：
 
 | 指标名 | 类型 | Tag | 说明 |
 |--------|------|-----|------|
-| `batch.enqueue.total` | Counter | `queue` | 总入队请求数 |
+| `batch.enqueue.total` | Counter | `queue` | 总入队尝试数 |
+| `batch.enqueue.rejected` | Counter | `queue` | 入队失败数（`total` 中未成功的部分） |
 | `batch.enqueue.dropped` | Counter | `queue` | 背压丢弃数 |
 | `batch.enqueue.overflow` | Counter | `queue` | 溢出异常数 |
-| `batch.process.duration` | Timer | `queue` | 批处理耗时 |
+| `batch.process.duration` | Timer | `queue` + `outcome=success/failure` | 批处理耗时（成败分序列，避免失败批次污染分位数） |
 | `batch.process.batch.size` | DistributionSummary | `queue` | 批大小分布 |
 | `batch.process.requests` | Counter | `queue` | 请求完成数 |
 | `batch.queue.remaining` | Gauge | `queue` | RingBuffer 剩余容量 |
 | `batch.queue.capacity` | Gauge | `queue` | RingBuffer 总容量 |
 
-所有指标均带有 `queue` Tag，值为 `batch:<ClassName>.<methodName>`。
+所有指标均带有 `queue` Tag，值为 `batch:<ClassName>.<methodName>`（由 `BatchScanner` 生成）。
 
 ### 监控建议
 
 - **`batch.queue.remaining`**：配置告警，低于 bufferSize 的 10% 时通知，表示背压接近极限
-- **`batch.process.duration`**：关注 p99 延迟，持续升高说明业务线程池饱和
-- **`batch.enqueue.dropped`**：出现丢弃说明 RingBuffer 容量或消费者速度不足，需调整 `ringBufferSize` 或 `consumerSize`
+- **`batch.process.duration`**：关注 p99 延迟（按 `outcome` 分开看），持续升高说明业务线程池饱和
+- **`batch.enqueue.dropped`** / **`batch.enqueue.overflow`**：出现丢弃说明 RingBuffer 容量或消费者速度不足，需调整 `ringBufferSize` 或 `consumerSize`
 
 ---
 

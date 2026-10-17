@@ -204,7 +204,7 @@ public @interface BatchMapping {
     /** 单次批处理最大请求数。达到该值时触发批量处理。Disruptor endOfBatch 信号也会触发。默认 100。 */
     int maxBatchSize() default 100;
 
-    /** 最大并发处理线程数，包括 Disruptor 消费者线程在内。默认 CPU 核数。 */
+    /** 最大并发处理线程数（bizExecutor 上限；Disruptor 消费者线程独立，不占该配额）。默认 CPU 核数。 */
     int consumerSize() default -1;
 }
 ```
@@ -214,7 +214,7 @@ public @interface BatchMapping {
 | 策略 | 行为 |
 |------|------|
 | `BLOCK` | EventLoop 阻塞等待 RingBuffer 槽位 |
-| `DROP` | 直接丢弃请求（无响应） |
+| `DROP` | 丢弃请求，`BatchRequest` 收到 `BatchOverflowException` → **429** |
 | `THROW` | 抛出 `BatchOverflowException` → ExceptionRegistry → **429** |
 
 #### 等待策略

@@ -78,7 +78,7 @@ If your project explicitly depends on Tomcat (e.g., `spring-boot-starter-tomcat`
 Start the project. The following log confirms successful migration:
 
 ```
-NettyHttpServer  - Netty started on port(s): 8080
+NettyHttpServer  - Netty Server started on port 8080
 ```
 
 The framework automatically uses `AnnotationConfigApplicationContext` — no manual configuration required.
@@ -114,6 +114,10 @@ public class UserController {
 }
 ```
 
+> **About `Result`**: it is a **business-defined return wrapper**, not a framework type — the framework only
+> requires that the return value be handled by a `ReturnValueResolver` (any POJO is written as JSON by
+> default). See `ApiResult` in `spring-web-example-rest` for a reference implementation.
+
 ### Exception Handling
 
 ```java
@@ -142,15 +146,14 @@ public class LogInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(WebServerHttpRequest request, WebServerHttpResponse response,
                              Object handler) {
-        long start = System.currentTimeMillis();
-        request.getRequestContext().setStartTime(start);
+        request.getRequestContext().setAttribute("startTime", System.currentTimeMillis());
         return true;
     }
 
     @Override
     public void afterCompletion(WebServerHttpRequest request, WebServerHttpResponse response,
-                                Object handler, Exception ex) {
-        long start = request.getRequestContext().getStartTime();
+                                Object handler, Throwable ex) {
+        long start = (Long) request.getRequestContext().getAttribute("startTime");
         long cost = System.currentTimeMillis() - start;
         log.info("[{}] {} cost={}ms", request.getMethod(), request.getURI(), cost);
     }
