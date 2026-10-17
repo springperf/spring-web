@@ -18,7 +18,7 @@
 <img src="docs/images/perf-benchmark.svg" alt="Performance Benchmark Chart"/>
 </p>
 
-> 全部 7 个接口 × 3 个并发度，对比 Spring MVC（Tomcat/Undertow）与 WebFlux **100% 领先，无一例外**。json 16t p50 延迟仅 Spring MVC 的 **69%**、每请求内存分配仅其 **43%**、4 线程堆占用 **24MB**（全场最低）。
+> 全部 7 个接口 × 3 个并发度，对比 Spring MVC（Tomcat/Undertow）与 WebFlux **100% 领先，无一例外**。json 16t p50 延迟仅 Tomcat 的 **69%**、每请求内存分配仅其 **43%**、4 线程堆占用 **24MB**（全场最低）。
 >
 > [完整 Benchmark 报告](docs/benchmark.md) · [性能原理详解](docs/performance-principles.md)
 
@@ -54,8 +54,8 @@ Spring WebPerf 是一个基于 **Netty** 构建的高性能 Web 框架，定位�
 - **异步原生** — 内置 DeferredResult、Callable、SseEmitter、StreamEmitter、Reactive Streams 支持，SSE 吞吐达 Spring MVC 的 12.63x（4 线程）/ 7.72x（16 线程）
 - **批量处理** — 基于 Disruptor 的请求聚合批处理，透明地将并发请求合并为批量操作，吞吐量可提升数倍；支持背压策略、等待策略、线程池隔离
 - **灵活扩展** — 参数解析器、返回值处理器、编解码 Advice、拦截器、过滤器等关键节点均提供 SPI
-- **生态桥接** — 可通过 `spring-web-servlet` 模块桥接 Servlet Filter、Spring MVC `HandlerInterceptor`、`RequestBodyAdvice` / `ResponseBodyAdvice`
-- **服务端渲染** — 可选 `spring-web-view` 模块支持 Thymeleaf / FreeMarker 模板引擎，`@Controller` + `Model` + 视图名编程模型与 Spring MVC 一致
+- **生态桥接** — `spring-web-servlet` 桥接 Servlet `Filter` / `Servlet` / `HttpSession` / JSP；`spring-web-mvc-support` 桥接 Spring MVC `HandlerInterceptor`、`RequestBodyAdvice` / `ResponseBodyAdvice`
+- **服务端渲染** — 可选 `spring-web-view` 模块支持 Thymeleaf / FreeMarker / Beetl 模板引擎，`@Controller` + `Model` + 视图名编程模型与 Spring MVC 一致
 - **Actuator 集成** — 支持 Spring Boot Actuator，可配置独立管理端口
 
 ---
@@ -177,7 +177,7 @@ perf 框架吞吐是 Servlet 容器的 **1.45\~12.6x**，p50 延迟 **0.10\~0.11
 | `master` | **3.5.x** | 6.2.x | 17 / 21 / 25 | jakarta.servlet 6.0 | **开发基线**（不含 Spring Boot 4 代码） |
 | `4.1.x` | 4.0.x ~ 4.1.x | 7.0.x | 17 / 21 / 25 | jakarta.servlet 6.0 | 下游适配分支（从 master 同步） |
 
-> `4.1.x` 在**开发期沿用主线的项目版本号**；**发布该分支时**再统一提升为 **`4.1.7`**（首个 4.1.x 版本，当前尚无发布版本）。分支内的 `spring-boot.version`（Boot 4.1.0）与项目版本号无关。
+> `4.1.x` 的**项目版本号与主线独立**，已发布首个版本 **`4.1.7`**（版本号与 `spring-boot.version` 无关：分支内 `spring-boot.version` 为 **Boot 4.1.0**）。
 >
 > 版本下限说明、分支选择建议及详细兼容性信息见 [版本兼容性说明](docs/compatibility.md)。
 
@@ -188,7 +188,7 @@ perf 框架吞吐是 Servlet 容器的 **1.45\~12.6x**，p50 延迟 **0.10\~0.11
 | 模块 | 说明 |
 |------|------|
 | `spring-web` | 核心模块：Netty 服务器、请求分发、映射注册、异常处理等 |
-| `spring-web-view` | 视图渲染模块：Thymeleaf / FreeMarker 模板引擎（可选）¹ |
+| `spring-web-view` | 视图渲染模块：Thymeleaf / FreeMarker / Beetl 模板引擎（可选）¹ |
 | `spring-web-servlet` | Servlet 桥接模块：`Filter`、`Servlet`、`HttpSession`、JSP，零 SpringMVC 依赖 |
 | `spring-web-mvc-support` | Spring MVC 兼容模块：提供 `HandlerInterceptor`、`View` 等适配类 ² |
 | `spring-web-websocket` | WebSocket 支持模块：基于 Spring WebSocket + Netty |
@@ -198,6 +198,7 @@ perf 框架吞吐是 Servlet 容器的 **1.45\~12.6x**，p50 延迟 **0.10\~0.11
 | `spring-web-support-test` | 桥接层兼容测试模块 |
 | `spring-web-benchmark` | JMH 基准与报告生成器（5 个栈：perf / perf-support / tomcat / undertow / webflux） |
 | `spring-web-examples` | 各场景使用示例 |
+| `coverage-aggregate` | 测试覆盖率聚合（不面向使用者） |
 
 > ¹ 视图渲染用法见 [视图渲染文档](docs/view.md)，与 Spring MVC 的差异见该文档[第七节](docs/view.md#七与-spring-mvc-的差异)。
 >
