@@ -45,7 +45,7 @@ public interface WebComponent extends Ordered {
 | 触发扫描 | `initWithWebContext` 遍历 map |  | 对每项调 `registerWebComponent(Class, Function)` → `getBeansOfType(clazz)` 取 Bean 并用 Function 转换 |
 | 统一排序 | `getWebComponents` |  | `AnnotationAwareOrderComparator.sort(list)`——Spring 的比较器，识别 `@Order`/`Ordered`/`@Priority` |
 | 固化 List | `initRealComponentList` |  | 清空后从 `getWebComponents()` 重填，phase2 调用一次 |
-| 冲突解析 | `registerWebComponent(WebComponent)` |  | 同名冲突时 `AnnotationAwareOrderComparator.sort` 选 order 更小者为胜，败者 `destroy` |
+| 冲突解析 | `registerWebComponent(WebComponent)` |  | 同名冲突时 `AnnotationAwareOrderComparator.sort` 选 order 更小者为胜：**新者胜 → `destroyOldComponentSneaky(旧者)`；旧者胜 → 新组件干脆不进容器、不跑任何生命周期**（不 destroy，避免副作用） |
 | 动态注册 | 同上，按 state 追阶段 |  | 后置注册的组件从当前 state 起补跑未完成的 phase |
 | 单实例兜底 | `getWebComponentWithDefault` |  | 先查已注册→无则扫描 Bean→仍无则用 default |
 | 状态枚举 | `State` |  | `NEW/INIT_CONTEXT/PHASE1/PHASE2/PHASE3/DESTROY` |
@@ -79,7 +79,7 @@ public interface WebComponent extends Ordered {
 | 2 | `HandlerInterceptor` | 构造 `autoRegister`(Interceptor + Registration→wrap) `InterceptorRegistry.java` | `AnnotationAwareOrderUtils.findOrder` 提取  → `registration.order` | `runtimeMappingInterceptors` List phase2；DCL `getCachedInterceptors`；请求级 `INTERCEPTORS_ATTRIBUTE` | preHandle  / postHandle  / afterCompletion  / afterConcurrent  |
 | 3 | `HandlerExceptionResolver` | `initWithWebContext` 注册 2 内置 + `registerWebComponent(scan)` `ExceptionRegistry.java` | `AnnotationAwareOrderComparator.sort` | `resolvers` List phase2 `initRealComponentList` | `doHandle`；`handle`  → `DispatcherHandler.handleException` |
 | 4 | `ReturnValueResolver` | `initReturnValueResolver` 13 内置 + scan + `initRealComponentList` `ReturnValueResolverRegistry.java` | `AnnotationAwareOrderComparator.sort` | `resolvers` List；per-method `MethodReturnValueContext` `MAPPING_CACHE_KEY`（lazy `getReturnValueResolver`  + Optional 内层 + async 内层 + 兜底线性） | `resolveReturnValue`→`doResolveReturnValue` → `DispatcherHandler.doHandle` |
-| 5 | `StaticArgumentResolverProvider` | `initStaticArgumentResolverProviders` 13 内置 + scan `ArgumentResolverRegistry.java` | `AnnotationAwareOrderComparator.sort` | `staticArgumentResolverProviders` List；per-method `MethodArgContext[]` `MAPPING_CACHE_KEY`。**phase3 `validateAllParametersResolvable` 对普通参数只查 `supports()` 不创建**（例外：`@ModelAttribute` 无默认构造器的路径会 `getResolver()` 预创建以 fail-fast 校验）；真解析器懒创建于首请求 DCL `getMethodArgContexts`→`initStaticArgResolverSupport` | `resolveArguments` → `DispatcherHandler.doHandle` |
+| 5 | `StaticArgumentResolverProvider` | `initStaticArgumentResolverProviders()`：13 内置 + scan `ArgumentResolverRegistry.java`（注意是全称方法名，勿与 `initStaticArgResolverSupport` 混记） | `AnnotationAwareOrderComparator.sort` | `staticArgumentResolverProviders` List；per-method `MethodArgContext[]` `MAPPING_CACHE_KEY`。**phase3 `validateAllParametersResolvable` 对普通参数只查 `supports()` 不创建**（例外：`@ModelAttribute` 无默认构造器的路径会 `getResolver()` 预创建以 fail-fast 校验）；真解析器懒创建于首请求 DCL `getMethodArgContexts`→`initStaticArgResolverSupport` | `resolveArguments` → `DispatcherHandler.doHandle` |
 | 6 | `HttpBodyCodecInterceptor` | `initCodecInterceptors` `HttpBodyCodecInterceptorRegistry.java`：`ControllerAdviceBean.findAnnotatedBeans`  + `getBeansOfType`  | `AnnotationAwareOrderComparator.sort`（包 `WebComponentControllerAdviceBean`） | `codecInterceptors` List；per-method `HttpBodyCodecInterceptor[]` `MAPPING_CACHE_KEY`，`isApplicableToBeanType` 过滤  | beforeBodyRead  / afterBodyRead  / handleEmptyBodyRead  / beforeBodyWrite  |
 | 7 | `HttpBodyConverter` | `initWithWebContext` 注册 Jackson + `registerWebComponent(HttpMessageConverter→wrap)` + `registerWebComponent(HttpBodyConverter, identity)` scan `HttpBodyCodecRegistry.java` | `AnnotationAwareOrderComparator.sort` | `converters` List；`allSupportedMediaTypes` phase2；`READ_BODY_CONVERTER_CACHE_KEY`；`WRITE_NEGOTIATION_CACHE_KEY`（仅 `@Optimize` 方法，每方法上限 64） | `readBody` （cached / fallback）；`writeBody` （协商 / scan） |
 | 8 | `JsonConverter` | `getWebComponentWithDefault(JsonConverter, new JacksonConverter)` `AsyncSupportRegistry.java` | N/A 单实例 | `AsyncSupportRegistry.jsonConverter` 字段 ；`getJsonConverter`  | `SseJsonEmitter` / `StreamJsonEmitter` / `ReactiveReturnValueResolver` |
@@ -259,7 +259,7 @@ public class MyMappingRegistry extends MappingRegistry {
 
 `WebComponentContainer.registerWebComponent(WebComponent)` 不仅处理启动期冲突，还支持初始化完成后的动态注册（如 Actuator 端点后置注册 mapping/filter/cors）。其生命周期追跑逻辑：新组件注册时，从当前容器的 state 起补跑所有未完成的 phase，确保动态组件与启动期组件经历相同的初始化路径。这是 [16 篇](16-code-spotlights.md) 聚光灯 7 `WebMvcConfigurerBridge` 在 `initComponentPhase1` 内完成收集与翻译、能安全后置执行的基础。
 
-同名冲突时 `AnnotationAwareOrderComparator.sort` 选 order 更小者为胜、败者 `destroy`——动态注册高优先级组件会顶替低优先级旧组件并触发其销毁，避免双实例。
+同名冲突时 `AnnotationAwareOrderComparator.sort` 选 order 更小者为胜：**新者胜 → 旧组件被 `destroyOldComponentSneaky` 销毁；旧者胜 → 新组件不入容器、不跑生命周期**（不会出现双实例，也不会误 destroy 一个从未初始化过的组件）。
 
 ---
 

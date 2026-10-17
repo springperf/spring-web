@@ -265,14 +265,10 @@ protected WebFilterRegistration createFilterWrapper(AbstractFilterRegistrationBe
 | `webEndpointDiscoverer` | Spring Boot 标准的端点发现器，扫描 `@Endpoint`/`@WebEndpoint` |
 | `perfExposeExcludePropertyEndpointFilter` | 读取 `management.endpoints.web.exposure` 配置 |
 | `perfEndpointHandlerMapping` | 核心：将 Actuator 端点注册为框架路由 |
-| `managementServerInfrastructure` | 管理端口基础设施；`@ConditionalOnProperty(value = "management.server.port", matchIfMissing = false)` |
-| `managementNettyHttpServer` | 独立管理端口服务器；同上条件（`matchIfMissing = false`） |
-| `managementServerInfrastructure` | 管理端口基础设施（`management.server.port` 配置时创建） |
-| `managementNettyHttpServer` | 独立管理端口的 Netty 服务器 |
 
 ### 4.3 端点注册流程
 
-`ActuatorEndpointHandlerMapping.initComponentPhase1()`是 Actuator 端点的注册入口：
+`ActuatorEndpointHandlerMapping.initComponentPhase1()`是 Actuator 端点的注册入口（它自身是 `BaseWebComponent`，路由经 `ManagementMappingRegistry.registerMapping(...)` 注入，注册完成后显式触发 `buildOptimizerPipeline()` 构建优化器）：
 
 1. 获取 `MappingRegistry`，读取 `WebEndpointProperties.getBasePath()`（默认 `/actuator`）。
 2. 注册 CORS 配置（从 `CorsEndpointProperties` 读取）。

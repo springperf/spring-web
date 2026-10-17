@@ -69,7 +69,7 @@ protected void initStaticArgumentResolverProviders() {
 
 **注册顺序 = 匹配优先级**。`initStaticArgResolverSupport`遍历 `staticArgumentResolverProviders` 列表，第一个 `supports` 返回 true 的 Provider 胜出。因此 `RequestBodyResolverProvider` 排在 `RequestParamResolverProvider` 之前——如果参数同时标注了 `@RequestBody` 和 `@RequestParam`（合理场景），`@RequestBody` 优先。
 
-`AbstractSupportTypeResolverProvider`（`getOrder() = -10000`，:30-32）通过设置 **`@Order(-10000)`** 确保自己在 `initRealComponentList` 排序时排在前面，承担兜底类型匹配（如 `ModelAttribute` 无注解时的默认行为）。
+`AbstractSupportTypeResolverProvider`（`getOrder() = -10000`，:30-32）通过**覆写 `getOrder()` 返回 -10000**（类上并没有 `@Order` 注解）确保自己在 `initRealComponentList` 排序时排在前面，承担兜底类型匹配（如 `ModelAttribute` 无注解时的默认行为）。
 
 ---
 
@@ -130,7 +130,7 @@ protected MethodArgContext[] getMethodArgContexts(MappingHandlerMethod mappingCo
 
 `MAPPING_CACHE_KEY` 是 `MappingCacheKey.createMethodCacheKey(MethodArgContext[].class)`——方法级缓存，每个业务方法一个 `MethodArgContext[]` 数组。数组长度 = 方法参数个数，每个元素预存了该参数的 Resolver 实例。**运行时是 `array[i].defaultArgumentResolver.resolveArgument()`——零查找、零匹配、零类型推断。**
 
-注意：缓存填充发生在**首次请求**的 `getMethodArgContexts` 调用中，而非 Phase3。Phase3 的 `validateAllParametersResolvable` 只验证"每个参数都有 Provider 可匹配"（调用 `supports`），不创建 Resolver 实例。这样做的收益是——永远不会被调用的端点不分配任何 Resolver 内存。验证与缓存分离，兼顾 fail-fast 与内存效率。
+注意：缓存填充发生在**首次请求**的 `getMethodArgContexts` 调用中，而非 Phase3。Phase3 的 `validateAllParametersResolvable` 对**普通参数**只验证"有 Provider 可匹配"（调用 `supports`），不创建 Resolver 实例。这样做的收益是——永远不会被调用的端点不分配任何 Resolver 内存。**例外**：`@ModelAttribute` 且无默认构造器的参数会走 `validateModelAttributeConstructor` → `getResolver()` **预创建**，为的是启动期就暴露 `InstantiationException`（见 §九）。验证与缓存分离，兼顾 fail-fast 与内存效率。
 
 ---
 
@@ -187,7 +187,7 @@ protected MultiValueMapResolver getMultiValueMapResolver() {
 protected Object doResolveArgument(WebServerHttpRequest request, WebServerHttpResponse response) throws Exception {
     Object arg = resolveByName(request, response);  // ① 从数据源取值
     if (arg == null) {
-        arg = handleNullValue(name, paramType);      // ② null 处理（基本类型抛异常，包装类返 null）
+        arg = handleNullValue(name, paramType);      // ② null 处理（包装类型返 null；boolean 基本类型返 Boolean.FALSE，其余基本类型抛异常）
     } else if (isEmpty(arg)) {
         arg = handleEmptyValue(arg, name, paramType);// ③ 空字符串处理
     }
@@ -415,6 +415,12 @@ public Object[] resolveArguments(MappingHandlerMethod mappingContext, WebServerH
             validateIfApplicable(args[i], methodArgContext, request, mappingContext);  // ③ 校验
         } else {
             args[i] = null;
+        }
+    }
+    for (int i = 0; i < methodArgContexts.length; i++) {          // ④ 后处理第二循环
+        MethodArgContext methodArgContext = methodArgContexts[i];
+        if (methodArgContext.defaultArgumentResolver != null) {
+            methodArgContext.defaultArgumentResolver.postProcess(args[i], methodArgContext, request, response);
         }
     }
     return args;

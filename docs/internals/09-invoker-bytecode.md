@@ -10,7 +10,7 @@
 
 Spring MVC 的回答是 `Method.invoke`——Java 反射的标准做法，每次调用付 access check + 可变参数装箱 + 类型校验的开销，约 200ns。
 
-本框架的回答是三条路：**`@Optimize` 标注的方法走 ASM 生成的 `INVOKEVIRTUAL` 字节码（~10ns），默认走 `MethodHandle.invokeExact`（~30ns），都不走的 Spring 原生 `HandlerMethod` 兜底（极少发生）。** 反射只在启动期出现，运行时从调用路径上彻底消除。
+本框架的回答是三条路：**`@Optimize` 标注且非 native-image 的方法走 ASM 生成的 `INVOKEVIRTUAL` 字节码（~10ns），默认走 `MethodHandle.invokeExact`（~30ns），`CustomInvoker` SPI 让非控制器处理器（batch/Servlet/资源/Actuator 等）自带调用逻辑。** 三者都在启动期定型为 `Invoker` 实例，运行时只有 `invoker.invoke(args)` 一次调用——反射不在请求路径上。
 
 ---
 
@@ -317,7 +317,7 @@ public interface CustomInvoker extends Invoker {
 4. **`invoke` 后 `setResponseStatus`** → `@ResponseStatus` 注解处理，内联在调用链中。
 5. **`CustomInvoker` SPI 扩展** → 非控制器处理器通过自定义 `Invoker` 加入路由。
 
-这一层的克制体现在：**不把反射调用当作"不可避免的代价"。** 框架提供了三条路径（ASM / MethodHandle / 反射），每条路径的启动期决策成本和运行时性能都是显式的。`@Optimize` 标注让用户为关键路径选择最优路径，`MethodHandle` 默认提供无配置的性能提升，`Method.invoke` 只在极少数边界场景被触发。这种"不给全部用户强加同一代价"的设计，是 [01 篇](01-design-philosophy.md) 原则 5（零反射）最直接的代码证据。
+这一层的克制体现在：**不把反射调用当作"不可避免的代价"。** 框架提供了三条路径（ASM / MethodHandle / `CustomInvoker`），每条路径的启动期决策成本和运行时性能都是显式的。`@Optimize` 标注让用户为关键路径选择最优路径，`MethodHandle` 默认提供无配置的性能提升，`CustomInvoker` 则把 batch/资源/Actuator 等非控制器处理器的调用逻辑收进同一契约。**没有第四条"反射兜底"路径**——`InvokableHandlerMethod` 的 `invoker` 字段只可能是上述三种之一，`Method.invoke` 不出现在调用链上。这种"不给全部用户强加同一代价"的设计，是 [01 篇](01-design-philosophy.md) 原则 5（零反射）最直接的代码证据。
 
 ---
 

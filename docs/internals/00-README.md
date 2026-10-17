@@ -81,8 +81,8 @@
 - **核心问题**：`spring-web` / `spring-web-servlet` / `spring-web-mvc-support` / `spring-web-batch` / `spring-boot-starter-web` 各自边界在哪？一个 HTTP 请求从 Netty `Channel` 到业务方法再到响应字节，跨了哪些模块的哪些类？
 - **覆盖要点**：
   1. 四模块职责矩阵（模块 / 依赖谁 / 被谁依赖 / 关键包 / 是否可选）。
-  2. `spring-web` 核心包拓扑：`context`（`WebContext`）、`handler`（`DispatcherHandler`）、`registry`（十大 Registry）、`server`（Netty 服务器）、`http`（请求/响应适配）、`route`（路由优化器）、`argument`/`returnvalue`/`invoker`（解析与调用）、`filter`（`WebFilter` SPI）、`async`/`stream`（异步流式）、`cors`/`exception`/`binder`/`resource`（横切）。
-  3. 启动期协作时序：`WebServerApplicationContextFactory` → refresh → `SmartLifecycle.start()`（`NettyHttpServer` phase=MAX 最后）→ `WebContext.startLifecycle()` → Phase1/2/3 → `MappingRegistry.optimizeMapping()` → `bind` → 就绪。（校正：`afterPropertiesSet()` 实为 no-op，真正触发者是 `NettyHttpServer.start()` → `startLifecycle()`，见 01/02 篇校正）
+  2. `spring-web` 核心包拓扑：`context`（`WebContext`）、`handler`（`DispatcherHandler`）、`registry`（13 个 Registry）、`server`（Netty 服务器）、`http`（请求/响应适配）、`route`（路由优化器）、`argument`/`returnvalue`/`invoker`（解析与调用）、`filter`（`WebFilter` SPI）、`async`/`stream`（异步流式）、`cors`/`exception`/`binder`/`resource`（横切）。
+  3. 启动期协作时序：`WebServerApplicationContextFactory` → refresh → `SmartLifecycle.start()`（`NettyHttpServer` phase=MAX 最后）→ `WebContext.startLifecycle()` → Phase1/2/3 → `MappingRegistry.optimizeMapping()` → `bind` → 就绪。（校正：`WebContext` 不实现 `InitializingBean`、没有 `afterPropertiesSet()`——早期版本那个留空的覆写已被删除；触发者只有 `NettyHttpServer.start()` → `startLifecycle()` 一条路径，见 01/02 篇校正）
   4. 一次请求的调用链（ASCII），标注每一步所属层次（`[web]`/`[netty]`）。
   5. 路径匹配归核心 `RuntimeMappingWebFilter`（`core/filter`），非 support 子包。
 - **源码依据**：`module.md`（架构图基线）+ 四模块 `pom.xml` + `spring-web` 根包下的包结构 + `WebContext` / `WebServerApplicationContext` / `NettyHttpServer` 入口类。
@@ -245,9 +245,9 @@
 #### 12 · spring-web-servlet 与 spring-web-mvc-support：Servlet API 桥接与 WebMvcConfigurer 翻译中枢 `12-support-bridge.md`
 
 - **定位**：兼容层。讲清 support 如何用"同包同名覆盖 + Adapter/Wrapper/Provider"消除 `spring-webmvc` 依赖，同时让 `@ControllerAdvice`/`WebMvcConfigurer`/`Filter`/`HandlerInterceptor`/Session 等 Spring 生态件无缝接入。
-- **核心问题**：support 重写了哪些 `org.springframework.web.servlet.*` 类（纯接口/default 方法）？`WebMvcConfigurerBridge` 如何把 21 个 `WebMvcConfigurer` 回调翻译为框架内部 Registry 的注册动作？Servlet 请求/响应如何被 `PerfHttpServletRequest/Response` 适配？Filter 与拦截器如何被 Wrapper 桥接？
+- **核心问题**：support 重写了哪些 `org.springframework.web.servlet.*` 类（纯接口/default 方法）？`WebMvcConfigurerBridge` 如何把 `WebMvcConfigurer` 的 19 个 default 回调翻译为框架内部 Registry 的注册动作？Servlet 请求/响应如何被 `PerfHttpServletRequest/Response` 适配？Filter 与拦截器如何被 Wrapper 桥接？
 - **覆盖要点**：
-  1. **同包同名覆盖策略**：19 个 `org.springframework.web.servlet.*` 类的重写分类——纯接口（`HandlerInterceptor`/`AsyncHandlerInterceptor`/`HandlerExceptionResolver`/`LocaleResolver`，default 方法）、`@Deprecated` 存根（`ModelAndView`/`View`）、21 回调空实现（`WebMvcConfigurer`）+ 5 个 shim 收集器（`InterceptorRegistry`/`CorsRegistry`/`ResourceHandlerRegistry`/`AsyncSupportConfigurer`/`ValidatorRegistration`）、no-op stub（`PathMatch`/`ContentNegotiation`/`DefaultServletHandler`/`ViewController`/`ViewResolver`）、`mvc.method.annotation` Advice/Emitter 家族。
+  1. **同包同名覆盖策略**：32 个 `org.springframework.web.servlet.*` 类的重写分类——纯接口（`HandlerInterceptor`/`AsyncHandlerInterceptor`/`HandlerExceptionResolver`/`LocaleResolver`，default 方法）、`@Deprecated` 存根（`ModelAndView`/`View`）、19 回调空实现（`WebMvcConfigurer`）+ 5 个 shim 收集器（`InterceptorRegistry`/`CorsRegistry`/`ResourceHandlerRegistry`/`AsyncSupportConfigurer`/`ValidatorRegistration`）、no-op stub（`PathMatch`/`ContentNegotiation`/`DefaultServletHandler`/`ViewController`/`ViewResolver`）、`mvc.method.annotation` Advice/Emitter 家族。
   2. **`WebMvcConfigurerBridge` 翻译中枢**：`getOrder=LOWEST_PRECEDENCE-20000`（最后执行收集所有Configurer）；`initComponentPhase1` 收集 `WebMvcConfigurer` Bean；11 个 bridge 方法——`bridgeViewControllers`/`bridgeInterceptors`/`bridgeCorsMappings`/`bridgeResourceHandlers`/`bridgeFormatters`/`bridgeAsyncSupport`/`bridgeArgumentResolvers`/`bridgeMessageConverters`/`bridgeReturnValueHandlers`/`bridgeHandlerExceptionResolvers`/`bridgeConfigureValidator`，每个讲清 shim 数据流向哪个内部 Registry。
   3. **`HandlerInterceptorWrapper`**：`preHandle`/`postHandle`(传 null modelAndView)/`afterCompletion`(Throwable→Exception `NestedServletException` 包裹)/`afterConcurrentHandlingStarted`；双路径 servlet 视图提取（`ServletAttribute` 缓存优先，`RequestContextHolder` fallback）。
   4. **`SupportInterceptorRegistry`**：双类型扫描（`InterceptorRegistration` vs `HandlerInterceptor`）；`MappedInterceptor` vs plain；`AnnotationAwareOrderUtils.findOrder` 排序。
@@ -259,7 +259,7 @@
   10. **`SupportDispatcherHandler`**：`getOrder=LOWEST_PRECEDENCE-30000`；`initContextHolders` override（`RequestContextHolder` set/reset）；`WriteRespEventListener`/`SessionFlushListener` 用 Netty `ChannelFuture` 驱动 session 持久化。
   11. **Session 体系**：`PerfHttpSession`/`PerfHttpSessionManager`/`HttpSessionData`/`HttpSessionStorage`(SPI)/`InMemoryHttpSessionStorage`(默认 + daemon 过期清理)；session cookie 安全（httpOnly、secure via config/X-Forwarded-Proto、SameSite）。
   12. **`ResponseEntityExceptionHandler`**：`@ControllerAdvice` 15 个标准异常处理。
-- **源码依据**：`spring-web-servlet` 与 `spring-web-mvc-support` 模块（`spring-web-servlet` 约 47 个源文件）。重点：`WebMvcConfigurerBridge`（10 bridge 方法行号）、`FilterWrapper`（`IdentityHashMap` 段）、`PerfHttpServletRequest`（session/cookie 段）、`ResponseBodyEmitterReturnValueResolver`（`encodeToStream` 兜底段）、`SupportDispatcherHandler`（`ChannelFuture` session 持久化段）。
+- **源码依据**：`spring-web-servlet` 与 `spring-web-mvc-support` 模块（`spring-web-servlet` 约 46 个源文件）。重点：`WebMvcConfigurerBridge`（11 个 `bridge*` 方法）、`FilterWrapper`（`IdentityHashMap` 段）、`PerfHttpServletRequest`（session/cookie 段）、`ResponseBodyEmitterReturnValueResolver`（`encodeToStream` 兜底段）、`SupportDispatcherHandler`（`ChannelFuture` session 持久化段）。
 - **与既有文档关系**：既有文档无 support 内部专门篇；本篇是 support 的首份内部机制文档。
 - **阅读前提**：文中 `file:line` 用于对照源码阅读；行号随源码演进可能变化，以当前 `master` 为准。
 
@@ -277,10 +277,10 @@
   3. `DisruptorQueue`：封装 LMAX Disruptor，`ProducerType.MULTI` 多生产者无锁入队，`WaitStrategy`（BLOCKING/YIELDING/SLEEPING/BUSY_SPIN），backpressure（BLOCK/DROP/THROW）。
   4. `BufferingBatchHandler`：Disruptor 消费者，攒批达 `maxBatchSize` 或 `endOfBatch` 提交到 bizExecutor。
   5. bizExecutor 线程池：0 核心 + `SynchronousQueue` + `CallerRunsPolicy`，空闲零线程，满负荷消费者自执行成背压。
-  6. 8 Micrometer 指标的埋点位置与 tag 约定（`batch:<ClassName>.<methodName>`）。
-  7. 背压传导：RingBuffer 满 → 生产者阻塞 → EventLoop 反压 → TCP 层。
+  6. 9 个 Micrometer 指标的埋点位置与 Tag 约定（Tag 名 `queue`，取值 `batch:<ClassName>.<methodName>`）。
+  7. 背压传导：RingBuffer 满 → 生产者线程（默认 `default` 业务池 worker）阻塞 → TCP 反压。
   8. 超时与错误：`DeferredResult` 超时回调（默认 30s）、批量异常遍历 `setError`。
-- **源码依据**：`BatchRegistry`、`BatchInvoker`、`DisruptorQueue`、`BufferingBatchHandler`、`BatchRequest`、`@BatchMapping`、8 个 metrics 埋点类（共 16 个文件）。
+- **源码依据**：`BatchRegistry`、`BatchInvoker`、`DisruptorQueue`、`BufferingBatchHandler`、`BatchRequest`、`@BatchMapping`、3 个 metrics 类（`BatchMetrics` SPI + `NoOpBatchMetrics` + starter 的 `MicrometerBatchMetrics`，共 16 个文件）。
 - **与既有文档关系**：`batch.md` 的内部化；`philosophy.md` 批处理节的代码层。
 - **阅读前提**：核对 Disruptor `WaitStrategy` 枚举与 backpressure 实现的确切类名。
 
@@ -350,17 +350,17 @@
 #### 17 · Benchmark 数据解读与归因 `17-benchmark-data.md`
 
 - **定位**：数据篇。用 `docs/benchmark.md` 的数字，归因到前文讲过的机制。
-- **核心问题**：perf 为何在 get/json ~2x tomcat？为何 SSE 7–11x tomcat 且 undertow 4t/64t FAIL？为何每请求分配 perf ~8–11KB vs tomcat ~23–37KB vs webflux ~25–51KB？为何 heap perf ~17MB？
+- **核心问题**：perf 为何在 get/json ~2x tomcat？为何 SSE 7.72x tomcat 且 undertow sse FAIL？为何每请求分配 perf 10.1–10.7KB vs tomcat 23.2–38.6KB vs webflux 32.6–51.8KB？为何 4 线程堆 perf 24MB（全场最低）？
 - **覆盖要点**：
-  1. 吞吐表解读：get perf 41466/77418/65624 vs tomcat 19129/44031/44900；json perf 40103/77917/110641 vs tomcat 21196/49911/56824；sse perf 14157/15111/14957 vs tomcat 1286/1989/2344 vs undertow FAIL(4t/64t)。
-  2. GC/分配归因：perf 每请求 ~8–11KB（预缓存+零临时对象）vs tomcat ~23–37KB（运行时匹配+包装器）vs webflux ~25–51KB（响应式链对象）；sse perf 315KB/请求（无锁队列高频分配）vs tomcat 233KB（低吞吐下的分配）。
-  3. 内存归因：perf heap ~17MB（最小化内部结构）vs tomcat 19–33MB（容器内部缓冲）。
-  4. 64t 反超：json/valid perf 在 64t 反超 16t（77917→110641），归因基准 eventloop 模式零切换在高并发下的伸缩性。
-  5. undertow sse FAIL：归因其 SSE 实现在 4t/64t 的稳定性问题（非本框架优势，客观标注）。
-  6. perf vs perf-support：support 桥接的额外开销（get 34504 vs 41466，约 -17%），归因 servlet 适配对象创建。
+  1. 吞吐表解读（数字以 `docs/benchmark.md` 为准）：get perf 38538/54982/72636 vs tomcat 17051/44031/39398；json perf 37508/54678/73286 vs tomcat 19900/49911/45481；sse perf 13323/15384/14920 vs tomcat 1055/1989/1933、undertow FAIL。
+  2. GC/分配归因：perf 每请求 10.1–10.7KB（预缓存+零临时对象）vs tomcat 23.2–38.6KB（运行时匹配+包装器）vs webflux 32.6–51.8KB（响应式链对象）；sse perf 310.4–313.9KB/请求（高吞吐下的分配）vs tomcat 219.5–233.9KB。
+  3. 内存归因：perf 4 线程堆 24MB（全场最低，json 场景稳态）→ 16 线程 55MB；tomcat 26MB → 58MB（容器内部缓冲）。
+  4. 伸缩比：perf json 4→16t +95%，低于 Tomcat +129% 与 WebFlux +161%——但 16t 绝对吞吐仍为 Tomcat 的 1.61x，「低伸缩比 ≠ 扩展能力差」。
+  5. undertow sse FAIL：归因其 SSE 实现的稳定性问题（非本框架优势，客观标注）。
+  6. perf vs perf-support：support 桥接的额外开销（heap 基本持平、吞吐有损耗），归因 servlet 适配对象创建；该列未列入 `benchmark.md`，不可复验。
 - **源码依据**：`docs/benchmark.md` + 前文机制锚点。
 - **与既有文档关系**：`benchmark.md`/`benchmark-wsl.md` 的归因版。
-- **阅读前提**：数据以报告原文为准，不臆造。
+- **阅读前提**：数据以 `docs/benchmark.md` 原文为准，不臆造。
 
 ---
 

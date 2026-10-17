@@ -159,12 +159,13 @@ public void setConcurrentResultAndDispatch(Object result) {
 ```java
 // PerfAsyncWebRequest.java
 public void scheduleTimeoutIfNeeded() {
-    if (timeoutMillis <= 0 || timeoutHandler == null) return;
+    if (timeoutHandler == null) return;
     if (state.get() != State.ASYNC_STARTED) return;
+    long effective = effectiveAsyncTimeoutMillis();   // 与 server.http.timeout 取更短者
     response.setTimeout(() -> {
         if (state.get() != State.ASYNC_STARTED) return;
         if (timeoutHandler != null) timeoutHandler.run();
-    }, timeoutMillis);
+    }, effective);
 }
 ```
 
@@ -218,6 +219,9 @@ public void asyncDispatch(WebServerHttpRequest req, WebServerHttpResponse resp, 
 ```java
 // StreamEmitter.java
 public void send(T data) throws IOException {
+    if (complete.get()) {
+        throw new IllegalStateException("...");   // send-after-complete 直接拒绝（E2E 实测修复）
+    }
     Object payload = data;
     if (earlyEncode) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream(256);
@@ -249,6 +253,10 @@ protected synchronized void initialize(StreamSender streamSender) throws IOExcep
         streamSender.sendAll(earlySendDataList);  // 批量入队，仅调度一次 drain
     } finally {
         earlySendDataList.clear();
+    }
+    if (completionError != null) {
+        this.streamSender.complete(false, completionError);   // 初始化前已出错 → 走错误终止
+        return;
     }
     if (complete.get() && this.streamSender != null) {
         deferredResult.setResult(null);
@@ -360,7 +368,7 @@ public AbstractNettyStreamSender(StreamEmitter emitter, PerfAsyncWebRequest asyn
 | `MpscArrayQueue<Object>` | 数据缓冲区 | 固定容量 65536，多生产者（业务线程）单消费者（EventLoop） |
 | `AtomicInteger wip` | 排空计数器 | 跟踪"有多少线程需要 drain 执行" |
 | `volatile boolean completed` | 完成标记 | `complete()` 设置，`afterDrain()` 检查 |
-| `maxFlushBytes` | 批大小 | 默认 4KB（SSE）~ 32KB（TextStream），`emitter.getMaxFlushBytes()` |
+| `maxFlushBytes` | 批大小 | 基类 `StreamEmitter` 默认 16KB；`SseEmitter` 4KB、`TextStreamEmitter` 32KB，`emitter.getMaxFlushBytes()` |
 
 ### 4.2 `scheduleDrain()`：无锁调度
 
@@ -427,7 +435,9 @@ protected void afterDrain() {
         }
         return;
     }
-    if (completed && !lastHttpContentWritten) {
+    if (failure != null) {
+        onAllDataFailed(failure);               // 错误终止：不发 LastHttpContent，直接失败收尾
+    } else if (completed && !lastHttpContentWritten) {
         lastHttpContentWritten = true;
         onAllDataWritten();                     // 写入 LastHttpContent.EMPTY_LAST_CONTENT
     }
@@ -443,10 +453,19 @@ protected void afterDrain() {
 ```java
 // AbstractNettyStreamSender.java
 protected void onAllDataWritten() {
-    this.resp.setWritableCallback(null);                    // 清除背压回调
+    if (!resp.markStreamCompleted()) {           // 抢占「终止块写入权」，失败者直接返回
+        return;
+    }
+    if (!channel.isActive()) {                   // 连接已断开：无需写终止帧
+        return;
+    }
+    if (resp.isCommitted() && !resp.isStreaming()) {
+        return;                                  // HEAD 请求 / 已非流式提交：不写
+    }
+    this.resp.setWritableCallback(null);         // 清除背压回调
     ChannelFuture f = channel.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
-    resp.addRespEventListener(f, true);                     // 触发 complete 回调
-    f.addListener(completeListener);                        // 成功/失败生命周期
+    resp.addRespEventListener(f, true);          // 触发 complete 回调
+    f.addListener(completeListener);             // 成功/失败生命周期
 }
 ```
 
@@ -671,11 +690,14 @@ protected void extendResponse(ServerHttpResponse response) {
 ```java
 // SseJsonEmitter.java
 protected void encodeEventDataAsBytes(Object data, OutputStream out) throws IOException {
-    jsonConverter.toJson(out, data);
+    // 先写进私有缓冲，再交给 writeDataBytes —— 由基类补上前导 "\ndata:"，完成 SSE 续行
+    ByteArrayOutputStream buffer = new ByteArrayOutputStream(256);
+    jsonConverter.toJson(buffer, data);
+    writeDataBytes(out, buffer.toByteArray());
 }
 ```
 
-这样 SSE 的 `data:` 字段包含 JSON 字符串，同时保留 SSE 协议的其他字段（`id`、`event`、`retry`）。
+这样 SSE 的 `data:` 字段包含 JSON 字符串，同时保留 SSE 协议的其他字段（`id`、`event`、`retry`）。**为什么要绕一道缓冲**：若把 JSON 直接写给 `out`，含裸 LF 的 JSON 会被 SSE 客户端当成多条事件而整条丢弃——经 `writeDataBytes` 才能补上 `\ndata:` 续行前缀。
 
 ---
 

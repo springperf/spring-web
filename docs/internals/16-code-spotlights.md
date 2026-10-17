@@ -114,7 +114,7 @@ protected void doMapping(WebServerHttpRequest req) {
 
 ### 巧妙之处
 
-- **`PathPattern` 启动期分段**：`PathMappingContext` 构造时只存储 `pathRule` 字符串，真正的分段（`split("/")`）在优化器的 `support()` 方法中完成（`PrefixPathRouterOptimizer.support`），启动期据此为每条路径选定最优优化器。`/api/users/{id}` 进入全路径优化器，`/api/**` 进入前缀优化器，`*.json` 进入后缀优化器。
+- **`PathPattern` 启动期分段**：`PathMappingContext` 构造时只存储 `pathRule` 字符串，真正的分段（`split("/")`）在优化器的 `support()` 方法中完成（`PrefixPathRouterOptimizer.support`），启动期据此为每条路径选定最优优化器。`/api/users/list`（无通配符）进入全路径优化器，`/api/users/{id}`（含 `{}`）进入前缀优化器，`/api/**` 进入前缀优化器，`*.json` 进入后缀优化器。
 - **精确路径 O(1)**：`FullPathRouterOptimizer` 用 `HashMap<String, Router>`，全路径匹配直接命中，零额外计算。
 - **前缀 HashMap**：`PrefixPathRouterOptimizer` 按选定前缀段拼接的字符串作 `HashMap` key，`/api/users/{id}` 与 `/api/orders/{id}` 共享 `/api` 前缀命中同一 `Router`，O(1) 查找。
 - **短路收益**：benchmark 中绝大多数请求在第一层（全路径精确匹配）命中，剩余在前缀/后缀层命中，遍历兜底极少触发。
@@ -316,7 +316,7 @@ public class WebMvcConfigurerBridge extends BaseWebComponent {
 
 ```java
 // FilterWrapper.java
-public class FilterWrapper implements WebFilter {
+public class FilterWrapper implements WebFilter, LifecycleWebComponent {
 
     // C4：实例级唯一标识。同类不同实例（如 Spring Security 同 filter 类多实例）
     // 不得被 WebComponentContainer 按类名去重误杀；同实例重复包装返回同一名字。
@@ -324,7 +324,8 @@ public class FilterWrapper implements WebFilter {
             Collections.synchronizedMap(new IdentityHashMap<>());          // 线程安全
     private static final AtomicLong NEXT_INSTANCE_ID = new AtomicLong(1);
 
-    protected final jakarta.servlet.Filter filter;
+    private volatile boolean initialized;      // init() 幂等守卫
+    protected jakarta.servlet.Filter filter;   // 非 final：rebind 时替换底层 filter
     protected int order;
 
     @Override
@@ -376,11 +377,14 @@ private void flush() {
 
 ```java
 // DisruptorQueue.java —— bizExecutor 构造（0 core + SynchronousQueue + CallerRunsPolicy）
+ThreadFactory bizThreadFactory = useVirtualThreads
+        ? VirtualThreadSupport.newThreadFactory("batch-virtual-" + queueName + "-")
+        : platformThreadFactory(queueName);          // 平台线程，非 daemon
 this.bizExecutor = new ThreadPoolExecutor(
         0, consumerSize,
         60L, TimeUnit.SECONDS,
         new SynchronousQueue<>(),
-        r -> { Thread t = new Thread(r, "batch-worker-" + queueName); t.setDaemon(false); return t; },
+        bizThreadFactory,
         (r, executor) -> { if (!executor.isShutdown()) r.run(); }   // CallerRunsPolicy
 );
 ```

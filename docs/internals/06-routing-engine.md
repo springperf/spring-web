@@ -107,11 +107,16 @@ protected void mergeMatchers(List<Matcher> methodMatchers, List<Matcher> classMa
 ```java
 // HttpMethodMatcher.java
 public boolean match(WebServerHttpRequest req, PathMappingContext mappingContext) {
+    if (!httpMethods.contains(req.getMethod()) && req.getMethod() == HttpMethod.HEAD) {
+        // HEAD 无显式 handler 时映射到 GET，并标记本次为 HEAD 请求（响应只发头）
+        req.markAsHeadRequest();
+        return httpMethods.contains(HttpMethod.GET);
+    }
     return httpMethods.contains(req.getMethod());
 }
 ```
 
-最简匹配器。`httpMethods` 是 `HashSet<HttpMethod>`，`contains` 是 O(1)。`haveAmbiguous` 检查两个 `HttpMethodMatcher` 的集合是否存在包含关系——如果 `A.methods` 包含 `B.methods` 或反之，则歧义。
+最简匹配器。`httpMethods` 是 `Collections.unmodifiableSet(new HashSet<>(...))`（构造时定型，运行时不可变），`contains` 是 O(1)。`haveAmbiguous` 检查两个 `HttpMethodMatcher` 的集合是否存在包含关系——如果 `A.methods` 包含 `B.methods` 或反之，则歧义。
 
 ### 2.2 `ParamOrHeaderMatcher`：逐条 NameValue 检查
 
@@ -140,7 +145,7 @@ private boolean checkExpression(NameValueExpressionSupport expressionSupport, We
 
 分两路：`consumes` 匹配 `Content-Type` 头，`produces` 匹配 `Accept` 头。`match` 方法遍历 `mediaTypeRuleList`，调用 `MediaType.includes` / `isCompatibleWith` 判断兼容性。
 
-`produces` 分支的 `getProducibleMediaTypes`提取非否定表达式中的 MediaType 列表，供 `PathMappingContext` 缓存的 `producibleMediaTypes` 字段使用——这个列表在 [08 篇](08-returnvalue-resolution.md) 的内容协商中被 `ReturnValueResolverRegistry` 查阅。
+`produces` 分支的 `getProducibleMediaTypes`提取非否定表达式中的 MediaType 列表，供 `PathMappingContext` 缓存的 `producibleMediaTypes` 字段使用——这个列表的查阅方是 `HttpBodyCodecRegistry`（写协商）与 `ReactiveReturnValueResolver`（响应式写协商），**不是** `ReturnValueResolverRegistry`。
 
 ### 2.4 `haveAmbiguous`：歧义检测
 
@@ -443,11 +448,11 @@ public void add(Router router) {
             return;
         }
     }
-    addPathPatternRouter(new PathPatternRouter(router));  // 新路径 → 新建
+    addPathPatternRouter(new PathPatternRouter(router));  // 新路径 → 新建（插入后按特异性重排）
 }
 ```
 
-同一路径的多个映射（如 `GET /api/{id}` 和 `POST /api/{id}`）合并到同一个 `PathPatternRouter` 中，避免重复路径变量提取。`PathPatternRouter[]` 按路径字符串去重，不同路径各自独立匹配。
+同一路径的多个映射（如 `GET /api/{id}` 和 `POST /api/{id}`）合并到同一个 `PathPatternRouter` 中，避免重复路径变量提取。**重叠通配符之间还有第二道排序**：`addPathPatternRouter` 后按 `SPECIFICITY_COMPARATOR` 重排数组——literal 段 > `{var}` > `*` > `**`，确保更具体的模式先被尝试（否则 `/api/*` 可能抢先于 `/api/users/{id}` 命中）。
 
 ---
 
@@ -464,8 +469,9 @@ public class MappingResult {
     private final PathMappingContext[] pathMatchedContexts;  // 仅路径匹配
     private final MismatchKind mismatchKind;            // NONE / METHOD / CONSUMES / PRODUCES / OTHER
 
-    // 三个工厂方法：
+    // 四个工厂方法：
     public static MappingResult matched(PathMappingContext ctx) { ... }
+    public static MappingResult pathMatched(PathMappingContext[] contexts, boolean methodMismatch) { ... }  // 旧重载
     public static MappingResult pathMatched(PathMappingContext[] contexts, MismatchKind kind) { ... }
     public static MappingResult notFound() { ... }
 }
@@ -573,13 +579,13 @@ protected Object[] getCache(MappingCacheKey key) {
 - **`classCacheInstanceMap`**（`ConcurrentHashMap<Class<?>, Object[]>`）：按类缓存，适用于所有方法共享的数据（如 `@ControllerAdvice` 拦截器匹配结果）。
 - **`methodCacheInstanceMap`**（`ConcurrentHashMap<Method, Object[]>`）：按方法缓存，适用于方法私有的数据（如参数解析器索引、返回值解析器索引）。
 
-两个 Map 都是 `static final`，所有 `MappingHandlerMethod` 实例共享。`MappingCacheKey` 的 `index` 是 `AtomicInteger.getAndIncrement()` 分配的全局唯一整型，跨实例不冲突。
+两个 Map 都是 `static final`，所有 `MappingHandlerMethod` 实例共享。`MappingCacheKey` 的 `index` 由 `AtomicInteger.getAndIncrement()` 分配，**method 与 class 各用一个独立序列**（`METHOD_CACHE_SEQ` / `CLASS_CACHE_SEQ`）——两类索引会重号，但分属不同数组，互不干扰。
 
 ---
 
 ## 十一、动态注册：Actuator 端点如何加入路由
 
-标准的 `@Controller` 扫描在 Phase1 完成，但 Actuator 端点等动态注册的处理器在 Phase3 之后才出现。框架通过 `MappingRegistry.registerMapping(PathMappingContext)` 支持动态注册：
+标准的 `@Controller` 扫描在 Phase1 完成；Actuator 端点则由 starter 的 `ActuatorEndpointHandlerMapping`（`extends BaseWebComponent`）在自己的 `initComponentPhase1()` 里通过 `MappingRegistry.registerMapping(PathMappingContext)` 注册：
 
 ```java
 // MappingRegistry.java
@@ -588,11 +594,19 @@ public void registerMapping(PathMappingContext context) {
 }
 ```
 
-`ActuatorEndpointHandlerMapping` 在初始化完成后调用 `registerMapping(ctx)` 把端点追加进 `mappingContextList`。这个操作**不经过** Phase3 的 `optimizeMapping` 流程，因此新注册的路径**只能被 `FullPathRouterOptimizer` 覆盖**（即纯路径，无通配符）。如果 Actuator 端点路径包含通配符，需要手动创建 `Router` 并加入优化器链。
+关键点：**管理端口有自己独立的 `ManagementMappingRegistry`**（`extends MappingRegistry`，但不从 `ApplicationContext` 扫 `@Controller`、不参与主 `WebContext` 生命周期）。它的 Phase2 是 no-op——优化由注册完成后的一次**显式调用**触发：
 
-> **注意**：`FullPathRouterOptimizer.getRouteMap()` 现返回 `Collections.unmodifiableMap(routeMap)` **只读视图**（`FullPathRouterOptimizer.java:19-22`），不能再向其中 `put`——那是早期实现，直接调用会抛 `UnsupportedOperationException`。动态注册的唯一入口是上面的 `registerMapping(ctx)`。
+```java
+// ManagementMappingRegistry.java
+public void buildOptimizerPipeline() {
+    // ...收集 contexts
+    optimizeMapping(contexts);   // 复用主注册表的优化器管线
+}
+```
 
-**为什么动态注册不重新跑优化器链？** 因为 `optimizeMapping` 是 Phase3 的一次性流程，每次 `initOptimizersFor` 都会 `new` 优化器实例。重新跑需要暂停服务、重建所有优化器、替换 `optimizers` 列表——复杂度高且收益低（Actuator 端点极少，一次 `HashMap.get` 足够）。这个设计是"95% 场景优化 + 5% 场景可接受"的务实取舍。
+也就是说，**动态注册的路径同样经过 `optimizeMapping`**（`ActuatorEndpointHandlerMapping` 注册完即触发 `buildOptimizerPipeline()`），并非「只能被 `FullPathRouterOptimizer` 覆盖」。这也是「Phase3 之后才出现的映射不在任何优化器里」这一旧说法的修正——主服务器的 `optimizeMapping` 确实是 Phase3 一次性流程，但管理端点的路由不依赖它。
+
+> **注意**：`FullPathRouterOptimizer.getRouteMap()` 现返回 `Collections.unmodifiableMap(routeMap)` **只读视图**（`FullPathRouterOptimizer.java:19-22`），不能再向其中 `put`——那是早期实现，直接调用会抛 `UnsupportedOperationException`。动态注册的唯一入口是 `registerMapping(ctx)`。
 
 ---
 

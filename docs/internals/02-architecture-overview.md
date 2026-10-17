@@ -30,7 +30,7 @@
 
 四份 `pom.xml` 印证了上表（以下只列 compile 范围的"对外"依赖，test 依赖略）：
 
-**spring-web**（[`spring-web/pom.xml`](../../spring-web/pom.xml)）只引 Spring 五件套 + Netty + Jackson，外加五个 `provided`（lombok / fastjson2 / spring-boot-configuration-processor / reactive-streams / jsr305）：
+**spring-web**（[`spring-web/pom.xml`](../../spring-web/pom.xml)）只引 Spring 五件套 + Netty + Jackson，外加四个 `provided`（lombok / fastjson2 / reactive-streams / jsr305）与一个 `optional`（spring-boot-configuration-processor）：
 
 ```xml
 <!-- spring-web/pom.xml -->
@@ -150,7 +150,7 @@ io.springperf.web
 │   ├── LifecycleWebComponent      三阶段生命周期接口（Phase1/2/3 + destroyComponent，全 default）
 │   ├── BaseWebComponent           抽象基类，持有 WebContext
 │   ├── WebComponentContainer      组件注册表基类（State 状态机 + 冲突解析 + 生命周期重放）
-│   ├── WebContext                 应用上下文（extends WebComponentContainer, implements InitializingBean）
+│   ├── WebContext                 应用上下文（extends WebComponentContainer；实现 DisposableBean + ApplicationContextAware，不实现 InitializingBean）
 │   ├── ApplicationProperties      类型安全配置访问
 │   └── PropertiesConstant         配置键常量
 │
@@ -228,7 +228,7 @@ support 的源码在 `io.springperf.web.support.*`（[`Glob` 结果](../../sprin
 | `support.codec.interceptor` | RequestBodyAdvice/ResponseBodyAdvice 适配 | `SupportHttpBodyCodecInterceptorRegistry` |
 | `support.async.stream` | `ResponseBodyEmitter` 适配 | `ResponseBodyEmitterReturnValueResolver` |
 | `support.servlet` / `support.servlet.session` / `support.servlet.context` | Servlet API 桥接（HttpServletRequest 等） | `PerfHttpServletRequest` / `PerfHttpSession` |
-| `support.servlet.filter` | **Servlet Filter 桥接**（注意：与核心 `core/filter` 是两回事） | `FilterWrapper` / `SupportWebFilterRegistry` / `PerfHttpServletFilterChain` |
+| `support.servlet.filter` | **Servlet Filter 桥接**（注意：与核心 `core/filter` 是两回事） | `FilterWrapper` / `SupportWebFilterRegistry` / `PerfHttpServletFilterChain` / `PerfFilterConfig` |
 | `org.springframework.web.servlet.*`（重写） | 同包同名覆盖 Spring 类 | `PathMatchConfigurer` 等 |
 
 batch 的源码在 `io.springperf.web.batch.*`，核心是 Disruptor 透明聚合——具体类留到 [13 篇](13-batch-module.md) 展开，本篇只点明它的**切入点**：它在请求链路上"拦截"了返回值写出阶段，把多个并发请求的结果聚合后批量返回。
@@ -402,7 +402,7 @@ if (shuttingDown) {
 
 **读法一：模块切入点在哪。** support 在链路上有四个切入点——参数解析（`SpringHandlerMethodArgumentResolverProvider`）、返回值（`ResponseBodyEmitterReturnValueResolver`）、编解码拦截器（`RequestBodyAdvice`/`ResponseBodyAdvice` 适配）、Filter（`FilterWrapper` 包装 Servlet Filter）。batch 只有一个切入点——返回值写出阶段（透明聚合）。它们都通过"同包同名覆盖 + @Order 优先"接入，不修改核心代码。
 
-**读法二：默认线程模型。** 默认（无 `@RunInPool`）时 `determinePool` 返回 `default` 业务线程池（非 `null`）——`BizPoolRegistry` 把全局策略 `defaultExecuteMode` 读为 `pool.default-execute-mode` 的值，缺省 `"default"`，于是 `resolvePool("default")` 返回启动期创建的 `ThreadPoolExecutor`。请求在  `acquire` 后 `executor.execute` 切到 `default` 池跑完整链路（Filter → 参数解析 → 调用 → 返回值），`finally release`。要零切换须显式 `@RunInPool(EVENTLOOP)` 或 `pool.default-execute-mode=eventloop`，此时 `determinePool` 写 `NO_POOL` 哨兵并返回 `null`， 直接在 EventLoop 内 `handleWithFilter`。这与 [01 篇 原则 3](01-design-philosophy.md#原则-3--避免线程模型僵化业务方掌控何时切换) 一致，以 `BizPoolRegistry` 实现 + `PropertiesConstant` 默认值 + `performance-principles.md` §6 为准（`DispatcherHandler.java` 注释系早期残留，与实现矛盾，见 01 篇原则 3 说明）。
+**读法二：默认线程模型。** 默认（无 `@RunInPool`）时 `determinePool` 返回 `default` 业务线程池（非 `null`）——`BizPoolRegistry` 把全局策略 `defaultExecuteMode` 读为 `pool.default-execute-mode` 的值，缺省 `"default"`，于是 `resolvePool("default")` 返回启动期创建的 `ThreadPoolExecutor`。请求在 `armTimeoutIfAbsent()` + `acquire` 后 `executor.execute` 切到 `default` 池跑完整链路（Filter → 参数解析 → 调用 → 返回值），`finally release`。要零切换须显式 `@RunInPool(EVENTLOOP)` 或 `pool.default-execute-mode=eventloop`，此时 `determinePool` 写 `NO_POOL` 哨兵并返回 `null`，直接在 EventLoop 内 `handleWithFilter`。这与 [01 篇 原则 3](01-design-philosophy.md#原则-3--避免线程模型僵化业务方掌控何时切换) 一致，以 `BizPoolRegistry` 实现 + `PropertiesConstant` 默认值 + `performance-principles.md` §6 为准（`DispatcherHandler.java:208-209` 的注释与实现一致，可直接引用）。
 
 **读法三：`acquire/release` 的对称性。** 默认 `default` 池路径触发 `acquire` → 业务线程 `finally release` → 拒绝时也 `release`；只有 EventLoop 直处理路径（`determinePool` 返回 `null`）不触发 `acquire`，因为整条链路同线程，ByteBuf 引用无需跨线程转移。这是 [01 篇 原则 4](01-design-philosophy.md#原则-4--避免阻塞非阻塞-io--显式引用计数) 的代码落地。
 
@@ -460,13 +460,14 @@ public void start() {
 
 **源码事实**（`Glob spring-web-servlet/src/main/java/io/springperf/web/**/*.java` 与 `spring-web-mvc-support/src/main/java/io/springperf/web/**/*.java` 全量结果）：
 
-support 的 `support.servlet.filter` 包下实际只有三个类，**无 `match/` 子包**：
+support 的 `support.servlet.filter` 包下实际只有四个类，**无 `match/` 子包**：
 
 | 实际存在的类 | 职责 |
 |--------------|------|
 | `FilterWrapper` | 包装 `jakarta.servlet.Filter` → 框架 `WebFilter` |
 | `SupportWebFilterRegistry` | 扩展 `WebFilterRegistry`，自动注册 Servlet `Filter` Bean |
-| `PerfHttpServletFilterChain` | 适配框架 `FilterChain` → `javax.servlet.FilterChain` |
+| `PerfHttpServletFilterChain` | 适配框架 `FilterChain` → `jakarta.servlet.FilterChain` |
+| `PerfFilterConfig` | `FilterConfig` 适配（init 参数 / servlet context 访问） |
 
 而真正承担"运行时路径匹配的 Filter 包装"职责的类，在**核心**而非 support：
 
@@ -531,4 +532,4 @@ support 模块在 `src/main/java/org/springframework/web/servlet/` 等路径下*
 
 ---
 
-> **下一篇**：[03 · 三阶段组件生命周期与 Registry 体系](03-component-lifecycle.md)——钻进 `startLifecycle()` 内部，看 Phase1/2/3 各做什么、十大 Registry 如何预匹配、`MappingCacheKey` 的整型索引如何写入。
+> **下一篇**：[03 · 三阶段组件生命周期与 Registry 体系](03-component-lifecycle.md)——钻进 `startLifecycle()` 内部，看 Phase1/2/3 各做什么、13 个 Registry 如何预匹配、`MappingCacheKey` 的整型索引如何写入。

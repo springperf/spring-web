@@ -272,8 +272,7 @@ public void handle(Throwable ex, WebServerHttpRequest req, WebServerHttpResponse
 }
 ```
 
-`rootCauseMessage(Throwable)` 的实现：沿 `getCause()` 链下潜（防自引用导致死循环），
-取最后一个有非空 `message` 的异常；全链都无消息时回落 `"Internal Server Error"`。
+`rootCauseMessage(Throwable)` 的实现：沿 `getCause()` 链下潜到**最深层根因**（防自引用导致死循环），取该根因的 `message`；**若根因的 message 为空，不向上回找**，直接回落 `"Internal Server Error"`。
 
 ### 4.2 `ExceptionHandlerExceptionResolver`：`@ExceptionHandler` 扫描
 
