@@ -462,17 +462,17 @@ public void add(Router router) {
 public class MappingResult {
     private final PathMappingContext matchedContext;    // 完全匹配（路径+条件）
     private final PathMappingContext[] pathMatchedContexts;  // 仅路径匹配
-    private final boolean methodMismatch;               // 是否因 HTTP method 不匹配
+    private final MismatchKind mismatchKind;            // NONE / METHOD / CONSUMES / PRODUCES / OTHER
 
     // 三个工厂方法：
     public static MappingResult matched(PathMappingContext ctx) { ... }
-    public static MappingResult pathMatched(PathMappingContext[] contexts, boolean methodMismatch) { ... }
+    public static MappingResult pathMatched(PathMappingContext[] contexts, MismatchKind kind) { ... }
     public static MappingResult notFound() { ... }
 }
 ```
 
 - **`matched`**：路径 + 所有条件全命中。`DispatcherHandler` 走 `doHandle()` 完整管线。
-- **`pathMatched`**：路径精确匹配但条件不满足。携带 `methodMismatch` 标记，供 `DispatcherHandler` 返回 405 或继续检查后续优化器。
+- **`pathMatched`**：路径精确匹配但条件不满足。携带 `MismatchKind`（而非单一 boolean），`MappingRegistry` 据此区分 **405**（METHOD）/ **415**（CONSUMES）/ **406**（PRODUCES）/ 404（OTHER），供 `DispatcherHandler` 返回对应状态码或继续检查后续优化器。
 - **`notFound`**：路径完全未匹配。走 404 流程。
 
 `NOT_FOUND` 是 `static final` 单例，复用无堆分配——复用 [01 篇](01-design-philosophy.md) 原则 2 的异常单例模式。
@@ -579,16 +579,18 @@ protected Object[] getCache(MappingCacheKey key) {
 
 ## 十一、动态注册：Actuator 端点如何加入路由
 
-标准的 `@Controller` 扫描在 Phase1 完成，但 Actuator 端点等动态注册的处理器在 Phase3 之后才出现。框架通过 `FullPathRouterOptimizer.getRouteMap()` 支持动态注册：
+标准的 `@Controller` 扫描在 Phase1 完成，但 Actuator 端点等动态注册的处理器在 Phase3 之后才出现。框架通过 `MappingRegistry.registerMapping(PathMappingContext)` 支持动态注册：
 
 ```java
-// FullPathRouterOptimizer.java
-public Map<String, Router> getRouteMap() {
-    return routeMap;
+// MappingRegistry.java
+public void registerMapping(PathMappingContext context) {
+    mappingContextList.add(context);
 }
 ```
 
-`ActuatorEndpointHandlerMapping` 在初始化完成后，获取 `FullPathRouterOptimizer` 的 `routeMap`，直接向其中 `put` 新的路径映射。这个操作不经过 Phase3 的 `optimizeMapping` 流程，因此新注册的路径**只能被 `FullPathRouterOptimizer` 覆盖**（即纯路径，无通配符）。如果 Actuator 端点路径包含通配符，需要手动创建 `Router` 并加入优化器链。
+`ActuatorEndpointHandlerMapping` 在初始化完成后调用 `registerMapping(ctx)` 把端点追加进 `mappingContextList`。这个操作**不经过** Phase3 的 `optimizeMapping` 流程，因此新注册的路径**只能被 `FullPathRouterOptimizer` 覆盖**（即纯路径，无通配符）。如果 Actuator 端点路径包含通配符，需要手动创建 `Router` 并加入优化器链。
+
+> **注意**：`FullPathRouterOptimizer.getRouteMap()` 现返回 `Collections.unmodifiableMap(routeMap)` **只读视图**（`FullPathRouterOptimizer.java:19-22`），不能再向其中 `put`——那是早期实现，直接调用会抛 `UnsupportedOperationException`。动态注册的唯一入口是上面的 `registerMapping(ctx)`。
 
 **为什么动态注册不重新跑优化器链？** 因为 `optimizeMapping` 是 Phase3 的一次性流程，每次 `initOptimizersFor` 都会 `new` 优化器实例。重新跑需要暂停服务、重建所有优化器、替换 `optimizers` 列表——复杂度高且收益低（Actuator 端点极少，一次 `HashMap.get` 足够）。这个设计是"95% 场景优化 + 5% 场景可接受"的务实取舍。
 
@@ -604,7 +606,7 @@ public Map<String, Router> getRouteMap() {
 | 匹配条件检查 | 路径命中后 Matcher 逐条 AND | 路径命中后 `RequestMappingInfo` 条件逐一检查 |
 | 路径变量提取 | 启动期 `RouteMatcher` 适配，运行时 `matchAndExtract` 一次 | 运行时 `PathMatcher.extractUriTemplateVariables` |
 | 405 短路 | 优化器链中方法不匹配立即返回，防止 catch-all 覆盖 | 逐条匹配直到找到路径命中者，再检查 method |
-| 动态注册 | `FullPathRouterOptimizer.getRouteMap().put()` | `AbstractHandlerMethodMapping.registerMapping()` |
+| 动态注册 | `MappingRegistry.registerMapping(PathMappingContext)`（Actuator 端点走此路径；`FullPathRouterOptimizer.getRouteMap()` 已改为只读视图） | `AbstractHandlerMethodMapping.registerMapping()` |
 | 缓存 | `MappingCacheKey` 整型索引数组直取 | 无路由级缓存，每次请求重查 `MappingRegistry` |
 | 歧义检测 | `Matcher.haveAmbiguous` 扩展点 | 启动期 `AmbiguousHandlerMappingException` 检测 |
 

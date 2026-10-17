@@ -14,7 +14,7 @@
 ## 一、本系列的约定
 
 1. **语言**：正文简体中文；`代码`、`类名`、`API`、`协议字段`、`注解名`保持英文。
-2. **证据粒度**：每个机制至少给出一组 `类名` 锚点，并附"做了什么 / 为什么快 / 对比谁"三元组。全系列结论均以当前 `master` 分支源码为准。
+2. **证据粒度**：每个机制至少给出一组 `类名` 锚点，并附"做了什么 / 为什么快 / 对比谁"三元组。全系列结论均以本仓库当前源码（主线 `dev`/`master`）为准。
 3. **不重复既有文档**：性能对比表、用法示例、注解参数表已在 `performance-principles.md` / `advanced.md` / `batch.md` 给全的，本系列只给"机制链路"，数据用 `→ 见 xxx.md` 引用。
 4. **图示**：能用 ASCII 流程图说清的不外链 SVG；需要图时统一放 `docs/images/internals/`。
 5. **篇幅**：每篇以"讲透一个子系统"为限，不贪大。
@@ -117,7 +117,7 @@
   2. `DispatcherHandler.handleWithMappingResult()` 主链路（`handleWithFullMatch` 为旧名）：拦截器 `preHandle` → 参数解析 → `Invoker.invoke` → 返回值解析 → 拦截器 `postHandle`/`afterCompletion`。
   3. 线程模型三分支：默认 `default` 业务线程池 / `@RunInPool` 自定义池 / `@RunInPool(EVENTLOOP)` 直处理；`pool.default-execute-mode` 全局开关。
   4. `acquire()/release()` 引用计数链：`DispatcherHandler` 的 retain→execute→release 模式，`RejectedExecutionException` 分支也要释放。
-  5. 大 body 零拷贝：`>4KB` 走 `retainedDuplicate()`。
+  5. 大 body 零拷贝：`>4KB` 走 `duplicate()`（零拷贝视图，不递增引用计数）。
   6. `BaseWebServerHttpRequest.fastAttributes[]` 与响应 `setCommitted()` 的 CAS。
 - **源码依据**：`DispatcherHandler`（含 `handleWithMappingResult`、acquire/release 段）、`RuntimeMappingWebFilter`、`BaseWebServerHttpRequest`（`fastAttributes`）、`BaseWebServerHttpResponse`（`setCommitted` CAS）、`RunInPool` 注解与 `BizPoolRegistry`。
 - **与既有文档关系**：`performance-principles.md` §4/§5/§6 的链路化；`advanced.md` 线程模型章节的内部化。
@@ -133,8 +133,8 @@
 - **核心问题**：服务器如何启动与配置？HTTP 请求对象如何零拷贝包装 Netty 对象？响应如何把 `ByteBuf`/`DefaultFileRegion` 写回 Channel？
 - **覆盖要点**：
   1. `NettyHttpServer` 启动：boss/worker `EventLoopGroup`、`ServerBootstrap`、`ChannelOption`（`TCP_NODELAY`、`WriteBufferWaterMark`、`SO_BACKLOG`）、HTTP/2 ALPN / h2c prior knowledge。
-  2. Channel pipeline 装配：`HttpServerCodec` → `HttpObjectAggregator`（或流式不聚合）→ `SslHandler`（可选）→ `HttpTrafficHandler`/业务 handler。
-  3. `NettyServerHttpRequest`：包装 `FullHttpRequest`，`acquire/release`，`getInputStream`/`getReader`，大 body `retainedDuplicate`。
+  2. Channel pipeline 装配（由 `Http2ChannelInitializer` 组装，`SslHandler` 在最前）：`SslHandler`（可选）→ `HttpServerCodec` → `HttpObjectAggregator`（或流式不聚合）→ `BackpressureHandler` → `NettyHttpHandler`。
+  3. `NettyServerHttpRequest`：包装 `FullHttpRequest`，`acquire/release`，`getInputStream`/`getReader`，大 body `duplicate()`。
   4. `NettyServerHttpResponse`：`getBuf()` 延迟分配，`DefaultHttpContent` 写出，`DefaultFileRegion` sendfile，`setSameSite`/cookie 编码。
   5. 内存管理：Direct `ByteBuf` 引用计数 vs GC `Cleaner` 延迟回收的取舍。
 - **源码依据**：`NettyHttpServer`、`NettyServerHttpRequest`、`NettyServerHttpResponse`、SSL/HTTP2 相关 handler、`AbstractNettyWebServer`。
@@ -248,7 +248,7 @@
 - **核心问题**：support 重写了哪些 `org.springframework.web.servlet.*` 类（纯接口/default 方法）？`WebMvcConfigurerBridge` 如何把 21 个 `WebMvcConfigurer` 回调翻译为框架内部 Registry 的注册动作？Servlet 请求/响应如何被 `PerfHttpServletRequest/Response` 适配？Filter 与拦截器如何被 Wrapper 桥接？
 - **覆盖要点**：
   1. **同包同名覆盖策略**：19 个 `org.springframework.web.servlet.*` 类的重写分类——纯接口（`HandlerInterceptor`/`AsyncHandlerInterceptor`/`HandlerExceptionResolver`/`LocaleResolver`，default 方法）、`@Deprecated` 存根（`ModelAndView`/`View`）、21 回调空实现（`WebMvcConfigurer`）+ 5 个 shim 收集器（`InterceptorRegistry`/`CorsRegistry`/`ResourceHandlerRegistry`/`AsyncSupportConfigurer`/`ValidatorRegistration`）、no-op stub（`PathMatch`/`ContentNegotiation`/`DefaultServletHandler`/`ViewController`/`ViewResolver`）、`mvc.method.annotation` Advice/Emitter 家族。
-  2. **`WebMvcConfigurerBridge` 翻译中枢**：`getOrder=LOWEST_PRECEDENCE-20000`（最后执行收集所有Configurer）；`initComponentPhase1` 收集 `WebMvcConfigurer` Bean；10 个 bridge 方法——`bridgeInterceptors`/`bridgeCorsMappings`/`bridgeResourceHandlers`/`bridgeFormatters`/`bridgeAsyncSupport`/`bridgeArgumentResolvers`/`bridgeMessageConverters`/`bridgeReturnValueHandlers`/`bridgeHandlerExceptionResolvers`/`bridgeConfigureValidator`，每个讲清 shim 数据流向哪个内部 Registry。
+  2. **`WebMvcConfigurerBridge` 翻译中枢**：`getOrder=LOWEST_PRECEDENCE-20000`（最后执行收集所有Configurer）；`initComponentPhase1` 收集 `WebMvcConfigurer` Bean；11 个 bridge 方法——`bridgeViewControllers`/`bridgeInterceptors`/`bridgeCorsMappings`/`bridgeResourceHandlers`/`bridgeFormatters`/`bridgeAsyncSupport`/`bridgeArgumentResolvers`/`bridgeMessageConverters`/`bridgeReturnValueHandlers`/`bridgeHandlerExceptionResolvers`/`bridgeConfigureValidator`，每个讲清 shim 数据流向哪个内部 Registry。
   3. **`HandlerInterceptorWrapper`**：`preHandle`/`postHandle`(传 null modelAndView)/`afterCompletion`(Throwable→Exception `NestedServletException` 包裹)/`afterConcurrentHandlingStarted`；双路径 servlet 视图提取（`ServletAttribute` 缓存优先，`RequestContextHolder` fallback）。
   4. **`SupportInterceptorRegistry`**：双类型扫描（`InterceptorRegistration` vs `HandlerInterceptor`）；`MappedInterceptor` vs plain；`AnnotationAwareOrderUtils.findOrder` 排序。
   5. **`SpringHandlerMethodArgumentResolverProvider` / `SpringHandlerMethodReturnValueHandlerAdapter` / `SpringHandlerExceptionResolverAdapter`**：把 Spring 生态的 `HandlerMethodArgumentResolver`/`HandlerMethodReturnValueHandler`/`HandlerExceptionResolver` 适配为本框架 `StaticArgumentResolver`/`ReturnValueResolver`/`HandlerExceptionResolver`；启动期 `supports` 决策消除每请求 dispatch（替代旧 `RuntimeArgumentResolver`）。
@@ -270,7 +270,7 @@
 #### 13 · spring-web-batch：Disruptor 透明请求聚合内幕 `13-batch-module.md`
 
 - **定位**：批处理层。把 `batch.md` 的用法下沉到 Disruptor 环形缓冲区、三线程模型、`BatchInvoker` 方法体替换的内幕。
-- **核心问题**：`BatchInvoker` 如何在启动期替换原 Controller 方法调用？Disruptor RingBuffer 如何无锁入队？三线程（EventLoop 生产者 / Disruptor 消费者 / bizExecutor 业务池）如何协作与背压？8 个 Micrometer 指标各自埋点在哪？
+- **核心问题**：`BatchInvoker` 如何在启动期替换原 Controller 方法调用？Disruptor RingBuffer 如何无锁入队？三个线程层级（**handler 执行线程（生产者）/ Disruptor 消费者 / bizExecutor 业务池**）如何协作与背压？9 个 Micrometer 指标各自埋点在哪？
 - **覆盖要点**：
   1. `BatchRegistry`：管理所有 RingBuffer 生命周期，启动期安装 `BatchInvoker`（方法体替换语义——原方法体不执行）。
   2. `BatchInvoker`：根据构造参数位置创建 `BatchRequest` 实例并入队；`BatchRequest<R> extends DeferredResult<R>`。
@@ -290,22 +290,22 @@
 
 #### 14 · spring-boot-starter-web：自动装配与零冲突启动 `14-starter-autoconfig.md`
 
-- **定位**：装配层。讲清 starter 如何用 `spring.factories` 注册 10 个 `AutoConfiguration`，如何检测冲突并 fail-fast，如何独立部署 Actuator 管理端口。
-- **核心问题**：`SpringWebAutoConfiguration` 如何检测并拒绝 `spring-boot-starter-web`(MVC) 同存？`ActuatorEndpointAutoConfiguration` 如何用独立 `ManagementNettyHttpServer` 隔离管理端口？`SpringBootAdminClientAutoConfiguration` 如何发射 `WebServerInitializedEvent` 兼容 SBA/Spring Cloud？`WebServerApplicationContextFactory` 为何强制 `AnnotationConfigApplicationContext`？
+- **定位**：装配层。讲清 starter 如何经 `META-INF/spring/...AutoConfiguration.imports` 注册 14 个 `AutoConfiguration`（`spring.factories` 只注册 `ApplicationContextFactory`），如何检测冲突并 fail-fast，如何独立部署 Actuator 管理端口。
+- **核心问题**：`SpringWebAutoConfiguration` 如何检测并拒绝 `spring-boot-starter-web`(MVC) 同存？`ActuatorEndpointAutoConfiguration` 如何用独立 `ManagementNettyHttpServer` 隔离管理端口？`SpringBootAdminClientAutoConfiguration` 如何注册 `PerfApplicationFactory` 兼容 SBA？`WebServerApplicationContextFactory` 为何改用非 Servlet 的 `AnnotationConfigApplicationContext`？
 - **覆盖要点**：
-  1. `spring.factories` 注册的 10 个 `AutoConfiguration` 一览与各自条件。
+  1. `.imports` 注册的 14 个 `AutoConfiguration` 一览与各自条件。
   2. `SpringWebAutoConfiguration`：核心装配；冲突检测抛 `IllegalStateException`（记忆 `sba-web-server-initialized-event` 兼容背景）。
   3. `SpringWebServletAutoConfiguration` 与 `SpringWebMvcSupportAutoConfiguration`：装配 support 桥接。
   4. `SpringDataWebCompatibilityAutoConfiguration`：Spring Data 兼容（分页/排序）。
   5. `ActuatorEndpointAutoConfiguration`：独立 `ManagementNettyHttpServer` + `ManagementDispatcherHandler`，与主端口隔离。
   6. `SpringWebBatchAutoConfiguration`：条件装配 batch（`spring-web-batch` 在类路径）。
-  7. `SpringBootAdminClientAutoConfiguration`：发射 `WebServerInitializedEvent`（兼容 SBA + Spring Cloud 服务注册）。
+  7. `SpringBootAdminClientAutoConfiguration`：注册 `PerfApplicationFactory`（替换 SBA 默认上下文）以兼容 SBA；`WebServerInitializedEvent` 由独立的 `WebServerInitializedEventAutoConfiguration` **无条件**发射，供 Spring Cloud 服务注册感知就绪。
   8. OpenAPI/SwaggerUi 自动装配。
-  9. `WebServerApplicationContextFactory`：强制 `AnnotationConfigApplicationContext` 的原因。
+  9. `WebServerApplicationContextFactory`：为何用非 Servlet 的 `AnnotationConfigApplicationContext`（AOT / native-image 下返回 `GenericApplicationContext`）。
   10. `PerfWebServer`：`WebServer` 抽象的实现，与 Spring Boot `WebServer` 契约对齐。
-- **源码依据**：`spring.factories`、10 个 `*AutoConfiguration` 类、`PerfWebServer`、`WebServerApplicationContextFactory`、`ManagementNettyHttpServer`/`ManagementDispatcherHandler`。
+- **源码依据**：`META-INF/spring/...AutoConfiguration.imports`、14 个 `*AutoConfiguration` 类、`PerfWebServer`、`WebServerApplicationContextFactory`、`ManagementNettyHttpServer`/`ManagementDispatcherHandler`。
 - **与既有文档关系**：`advanced.md` Actuator/CORS 章节的内部化；记忆 `sba-web-server-initialized-event` / `wsl-external-migrated-to-master` 的代码层。
-- **阅读前提**：核对 `spring.factories` 实际注册项与各 `@ConditionalOn*` 条件。
+- **阅读前提**：核对 `.imports` 实际注册项与各 `@ConditionalOn*` 条件。
 
 ---
 
@@ -349,7 +349,7 @@
 
 #### 17 · Benchmark 数据解读与归因 `17-benchmark-data.md`
 
-- **定位**：数据篇。用最新报告（`spring-web-benchmark/benchmark-reports/20260813-232906/report.md`）的数字，归因到前文讲过的机制。
+- **定位**：数据篇。用 `docs/benchmark.md` 的数字，归因到前文讲过的机制。
 - **核心问题**：perf 为何在 get/json ~2x tomcat？为何 SSE 7–11x tomcat 且 undertow 4t/64t FAIL？为何每请求分配 perf ~8–11KB vs tomcat ~23–37KB vs webflux ~25–51KB？为何 heap perf ~17MB？
 - **覆盖要点**：
   1. 吞吐表解读：get perf 41466/77418/65624 vs tomcat 19129/44031/44900；json perf 40103/77917/110641 vs tomcat 21196/49911/56824；sse perf 14157/15111/14957 vs tomcat 1286/1989/2344 vs undertow FAIL(4t/64t)。
@@ -358,7 +358,7 @@
   4. 64t 反超：json/valid perf 在 64t 反超 16t（77917→110641），归因基准 eventloop 模式零切换在高并发下的伸缩性。
   5. undertow sse FAIL：归因其 SSE 实现在 4t/64t 的稳定性问题（非本框架优势，客观标注）。
   6. perf vs perf-support：support 桥接的额外开销（get 34504 vs 41466，约 -17%），归因 servlet 适配对象创建。
-- **源码依据**：`spring-web-benchmark/benchmark-reports/20260813-232906/report.md` + 前文机制锚点。
+- **源码依据**：`docs/benchmark.md` + 前文机制锚点。
 - **与既有文档关系**：`benchmark.md`/`benchmark-wsl.md` 的归因版。
 - **阅读前提**：数据以报告原文为准，不臆造。
 

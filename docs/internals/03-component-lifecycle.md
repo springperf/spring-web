@@ -44,8 +44,8 @@ WebComponentContainer extends BaseWebComponent                ← 容器基类
     │  initWithWebContext/Phase1/2/3: CAS 守卫 + 递归子组件
     ▼
 WebContext extends WebComponentContainer                      ← 唯一根容器
-       implements InitializingBean, DisposableBean, ApplicationContextAware
-       getOrder() = Integer.MAX_VALUE                        （最后启动）
+       implements DisposableBean, ApplicationContextAware      （不实现 InitializingBean）
+       getOrder() = Integer.MAX_VALUE                        （Ordered 组件排序用，非 SmartLifecycle）
 ```
 
 **根接口 `WebComponent`**（[`WebComponent.java`](../../spring-web/src/main/java/io/springperf/web/context/WebComponent.java)）只定义三样东西：`getComponentName()`（默认取简单类名，作为冲突解决的身份标识 ）、`initWithWebContext()`（注入上下文钩子，默认空 ）、`getOrder()`（默认 `LOWEST_PRECEDENCE - 10000`，让组件排在多数 Spring bean 之前但晚于框架内部 ）。它继承 `Ordered`——**排序是组件体系的一等公民**，后文的冲突解决、递归顺序都依赖它。
@@ -60,7 +60,7 @@ WebContext extends WebComponentContainer                      ← 唯一根容�
 
 **容器基类 `WebComponentContainer`**（[`WebComponentContainer.java`](../../spring-web/src/main/java/io/springperf/web/context/WebComponentContainer.java)）是体系的核心：它叠加状态机、子组件表、自动注册声明表、冲突解决 + 生命周期重放、CAS 守卫的递归初始化。11 个容器型 Registry 继承它。它的全部机制后面分节展开。
 
-**根容器 `WebContext`**（[`WebContext.java`](../../spring-web/src/main/java/io/springperf/web/context/WebContext.java)）是整个框架唯一的顶层容器，`getOrder() = Integer.MAX_VALUE`——作为 `SmartLifecycle` 链上优先级最低者最后启动。它在构造器里就把自己注册为 `webContext` 字段（`this.webContext = this`），并把 `dispatcherHandler` 注册为第一个子组件。
+**根容器 `WebContext`**（[`WebContext.java`](../../spring-web/src/main/java/io/springperf/web/context/WebContext.java)）是整个框架唯一的顶层容器，`getOrder() = Integer.MAX_VALUE`——这是 `Ordered` 组件排序值（排在所有 WebComponent 之后）。它在构造器里就把自己注册为 `webContext` 字段（`this.webContext = this`），并把 `dispatcherHandler` 注册为第一个子组件。**注意**：`WebContext` 本身不是 `SmartLifecycle`，「最后启动」是 `NettyHttpServer` 的 `getPhase() = Integer.MAX_VALUE` 所致，二者机制不同（见 [02 篇](02-architecture-overview.md#33-smartlifecycle-与端口绑定在生命周期之后)）。
 
 ### 11 容器型 vs 2 叶子型
 
@@ -182,11 +182,12 @@ public void afterPropertiesSet() {
 }
 ```
 
-这是容易误读的点：很多人会以为 `InitializingBean` 的 `afterPropertiesSet()` 是 Spring bean 初始化的"标准入口"，这里却主动放弃。真正触发三阶段的是 `startLifecycle()`：
+这是容易误读的点：很多人会以为 `InitializingBean` 的 `afterPropertiesSet()` 是 Spring bean 初始化的"标准入口"，但 `WebContext` **根本不实现** `InitializingBean`（早期版本曾留空实现，已删除）——框架主动不走这条路。真正触发三阶段的是 `startLifecycle()`：
 
 ```java
 // WebContext.java
 public void startLifecycle() {
+    if (isDestroyed()) { resetAfterDestroy(); }              // 支持 destroy 后重新 start
     if (!lifecycleStarted.compareAndSet(false, true)) {   // 顶层幂等
         return;
     }
@@ -196,6 +197,10 @@ public void startLifecycle() {
         this.initComponentPhase2();      // Phase2
         this.initComponentPhase3();      // Phase3
     } catch (Exception e) {
+        // 失败清理已初始化组件 + 复位 lifecycleStarted，保证同一实例可重试启动
+        try { this.destroyComponent(); }
+        catch (Exception cleanupEx) { log.warn("WebContext cleanup after failed lifecycle start also failed", cleanupEx); }
+        lifecycleStarted.set(false);
         throw new RuntimeException("Failed to start WebContext lifecycle", e);
     }
 }
@@ -345,7 +350,7 @@ WebContext（根容器，getOrder=MAX_VALUE 最后启动）
 |---|----------|------|---------------|-------------------|-------------------|----------------------|-----------|
 | 1 | MappingRegistry | 容器 | P1+P3 | — | 路由元数据 + 分桶 + 优化器链 | — | `mapping(req)` |
 | 2 | InterceptorRegistry | 容器 | P2 | — | `runtimeMappingInterceptors` 列表 | per-ctx 拦截器数组（DCL ，PathMappingContext 实例字段 `cachedInterceptors`） | `preHandle`/`postHandle`/`afterCompletion` |
-| 3 | ArgumentResolverRegistry | 容器 | P3 | method（`MethodArgContext[]` ） | 12 个 StaticArgumentResolverProvider + Phase3 **只校验** | per-method `MethodArgContext[]`（get-null-check ） | `resolveArguments` |
+| 3 | ArgumentResolverRegistry | 容器 | P3 | method（`MethodArgContext[]` ） | 13 个 StaticArgumentResolverProvider + Phase3 **只校验** | per-method `MethodArgContext[]`（get-null-check ） | `resolveArguments` |
 | 4 | ReturnValueResolverRegistry | 容器 | 无 | method（`MethodReturnValueContext` ） | 13 个内置 ReturnValueResolver + SPI 扩展 | per-method 主 resolver + async/Optional 内联 resolver（两层懒缓存 ） | `resolveReturnValue` |
 | 5 | HttpBodyCodecRegistry | 容器 | P2 | — | `allSupportedMediaTypes` 不可变 list + 1 个内置 converter + SPI 扩展 | per-ctx READ/WRITE converter + write 协商表（cap 64/method） | `readBody`/`writeBody` |
 | 6 | HttpBodyCodecInterceptorRegistry | 容器 | P2 | **class**（`HttpBodyCodecInterceptor[]` ） | ControllerAdvice 收集 | per-ctx `HttpBodyCodecInterceptor[]`（get-null-check ） | `beforeBodyRead`/`afterBodyRead`/`beforeBodyWrite` |
@@ -361,7 +366,7 @@ WebContext（根容器，getOrder=MAX_VALUE 最后启动）
 
 1. **MAPPING_CACHE_KEY 的两种类型**：`method`（每方法共享数组）用于 ArgumentResolverRegistry/ReturnValueResolverRegistry/BizPoolRegistry；`class`（每控制器类共享数组）用于 HttpBodyCodecInterceptorRegistry/WebDataBinderRegistry。两池索引独立、绝不碰撞——机制见第八节。**例外**：InterceptorRegistry/CorsRegistry/WebFilterRegistry 不走 MappingCacheKey，而是直接操作 PathMappingContext 的实例字段（`cachedInterceptors`/`corsConfigurationProvider`/`cachedFilterChain`，见 `PathMappingContext.java`/ 等），三者存的是 `List`/`Provider`/`FilterChain` 等有类型的领域对象，不需要整型索引寻址——get-null-check 或 DCL 模式与 MappingCacheKey 消费者相同，只是存储位置在实例字段而非 `Object[]` 槽位。
 2. **3 个 Registry 无懒缓存**：`ExceptionRegistry`、`AsyncSupportRegistry`、`ResourceHandlerRegistry`。前两者每请求线性扫描 resolver/构建 interceptor chain，后者仅启动期工作。它们的选择各有理由：异常处理低频、异步 interceptor chain 因异步语义难预缓存、资源处理器纯启动期。
-3. **`WebFilterRegistry` 是唯一 override Phase3 的容器型**（`BizPoolRegistry` 是叶子型，也 override Phase3）；它也是唯一有显式 ctor 的 Registry（auto-register `WebFilterRegistration` + `WebFilter` + pre-build `unmatchedChain`）。
+3. **override Phase3 的 Registry 有两个**：容器型 `WebFilterRegistry`（pre-build `unmatchedChain`）与叶子型 `BizPoolRegistry`（自动发现业务线程池 Bean）；另外容器型 `MappingRegistry` 也在 Phase3 构建路由优化器链。显式 ctor 亦非 `WebFilterRegistry` 独有——`InterceptorRegistry` 同样有（auto-register `InterceptorRegistration` + `HandlerInterceptor`）。
 
 ---
 
@@ -509,9 +514,13 @@ public <T> void set(MappingCacheKey<T> key, T value) {
                 cache = Arrays.copyOf(cache, index + 1);  // 扩容 + 复制
                 setCache(key, cache);                     // 回填 map + 实例字段
             }
+            // 扩容路径：值与数组一起在锁内发布，避免锁外写孤儿数组 /
+            // 读者看到新数组但 index 槽位尚未写入的中间态
+            cache[index] = value;
         }
+    } else {
+        cache[index] = value;                             // 正常路径：写入，无锁
     }
-    cache[index] = value;                                 // 写入，无锁
 }
 ```
 
@@ -644,7 +653,7 @@ public void initComponentPhase3() throws Exception {
 
 `validateAllParametersResolvable`（摘要）遍历 `mappingRegistry.getMappingContextList()` 的每一个 `PathMappingContext`，对每个参数：
 
-1. **`isParameterResolvable`**：遍历 12 个 `StaticArgumentResolverProvider` 的 `supports`，命中则通过；不命中走 fallback——简单类型 → `requestParamResolverProvider`，否则 → `modelAttributeResolverProvider`。全不匹配则抛异常。
+1. **`isParameterResolvable`**：遍历 13 个 `StaticArgumentResolverProvider` 的 `supports`，命中则通过；不命中走 fallback——简单类型 → `requestParamResolverProvider`，否则 → `modelAttributeResolverProvider`。全不匹配则抛异常。
 2. **`validateModelAttributeConstructor`**（D3 fail-fast）：标注 `@ModelAttribute` 且无默认构造器的类，**启动直接失败**——而不是等到运行时第一次绑定才发现 `InstantiationException`。
 
 校验开关 `CHECK_ON_STARTUP` 默认 `true`，可通过配置关闭（用于某些启动速度敏感、愿意接受运行时降级的场景）。这是显式的"校验可配"而非"魔法默认"——又是 [01 篇原则 6](01-design-philosophy.md#原则-6--避免魔法行为显式-spi显式-fail-fast不靠隐式猜测) 的体现。
