@@ -63,6 +63,7 @@ All configuration properties are set in `application.properties`.
 | Property | Default | Description |
 |----------|---------|-------------|
 | `server.servlet.session.tracking-modes` | `COOKIE` | Tracking modes (`COOKIE` / `URL`; `SSL` is N/A here). In `URL` mode no session cookie is issued; `encodeURL()` writes `;jsessionid=` instead and the server reads it back when the cookie is absent (Servlet spec §7.1) |
+| `server.servlet.session.timeout` | `1800` (30 minutes) | Session idle timeout (Duration style; a bare number means seconds); the session expires after that long without access |
 | `server.servlet.session.persistent` | `false` | Persist sessions to disk so they survive a restart (JDK serialization, one file per session) |
 | `server.servlet.session.store-dir` | `.perf-sessions` | Persistence directory (effective when `persistent=true`) |
 | `server.servlet.session.persistent-exclude` | none | Session attribute names excluded from persistence (comma-separated) |
@@ -262,12 +263,21 @@ When `spring-boot-starter-actuator` is on the classpath, the framework auto-regi
 | `spring.thymeleaf.prefix` | `templates/` | Thymeleaf template prefix (classpath-relative) |
 | `spring.thymeleaf.suffix` | `.html` | Thymeleaf template suffix |
 | `spring.thymeleaf.cache` | `true` | Template cache (set `false` in development for hot reload) |
+| `spring.thymeleaf.mode` | `HTML` | Template mode (Thymeleaf `TemplateMode`, e.g. `HTML` / `HTML5` / `TEXT`) |
+| `spring.thymeleaf.cache-ttl` | none (`-1`, never expires) | Template cache TTL (Duration style, e.g. `10m`); `<=0` means never expires |
+| `spring.thymeleaf.enabled` | `true` | Whether Thymeleaf is enabled; when `false` the engine takes no part in view resolution |
 | `spring.freemarker.prefix` | `templates/` | FreeMarker template prefix (classpath-relative) |
 | `spring.freemarker.suffix` | `.ftl` | FreeMarker template suffix |
 | `spring.freemarker.cache` | `true` | Template cache |
+| `spring.freemarker.template-loader-path` | none (falls back to `prefix`) | FreeMarker template loader path; **overrides `prefix` when set** |
+| `spring.freemarker.settings` | none | FreeMarker native settings (key=value pairs, e.g. `datetime_format=yyyy-MM-dd`) |
+| `spring.freemarker.content-type` | `text/html;charset=UTF-8` | Content-Type written by FreeMarker |
 | `spring.beetl.prefix` | `templates/` | Beetl template prefix (classpath-relative) |
 | `spring.beetl.suffix` | `.btl` | Beetl template suffix |
 | `spring.beetl.cache` | `true` | Template cache |
+| `spring.beetl.mode` | `HTML` | Beetl template mode (Beetl has no native mode concept; kept for symmetry with the other two engines) |
+| `spring.beetl.cache-ttl` | none (`-1`, never expires) | Beetl template cache TTL (Duration style); only takes effect when the chosen cache implementation supports TTL (e.g. CaffeineCache) |
+| `spring.beetl.enabled` | `true` | Whether Beetl is enabled; when `false` `resolveViewName` returns null directly |
 | `spring.thymeleaf.encoding` | `UTF-8` | Rendering charset, also written to `Content-Type`; FreeMarker/Beetl default UTF-8 (no separate key, aligned with Boot) |
 | `spring.mvc.view.prefix` | `/jsp/` | Prefix for **JSP views only** (aligns with Boot's JSP semantics); template engines use their own `spring.{engine}.prefix` |
 | `spring.mvc.view.suffix` | `.jsp` | Suffix for **JSP views only** |
