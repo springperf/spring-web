@@ -59,7 +59,7 @@
 
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
-| `spring.web.view.engine` | 无（全部可用） | 启用的模板引擎列表（逗号分隔）：`thymeleaf` / `freemarker` / `beetl`；**不配置则注册 classpath 上所有可用引擎** |
+| `spring.web.view.engine` | 无（全部可用） | 启用的模板引擎列表（逗号分隔）：`thymeleaf` / `freemarker` / `beetl`；特殊值 `none` = 不注册任何引擎（仅支持 `redirect:`，并跳过「无 ViewResolver」的启动校验）；**不配置则注册 classpath 上所有可用引擎** |
 | `spring.thymeleaf.prefix` | `templates/` | Thymeleaf 模板前缀（classpath 相对路径） |
 | `spring.thymeleaf.suffix` | `.html` | Thymeleaf 模板后缀 |
 | `spring.thymeleaf.cache` | `true` | 是否开启模板缓存（生产开启，开发可设 `false` 热改） |

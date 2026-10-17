@@ -313,7 +313,7 @@ public class CustomJsonConverter implements JsonConverter {
 }
 ```
 
-**Note**: when replacing the default JSON implementation, ensure your custom `JsonConverter` bean has higher priority than the default `JacksonConverter` (use `@Primary` or `@Order`).
+**Note**: the framework uses `JacksonConverter` by default — `AsyncSupportRegistry` obtains it via `getWebComponentWithDefault(JsonConverter.class, ...)`. `JsonConverter` has **no** Spring Bean auto-registration: a `JsonConverter` bean is never absorbed by the framework, so `@Primary` / `@Order` have no effect. To replace it you must register the component with `WebContext` yourself (not a public SPI today).
 
 ---
 
@@ -351,7 +351,7 @@ public class CustomComponent extends BaseWebComponent {
 
 ## 11. BizPoolRegistry — Custom Business Thread Pool
 
-Schedule handler methods to specific thread pools via `@RunInPool`. The framework auto-discovers `ThreadPoolExecutor` beans from the Spring container — the bean name is used as the pool name.
+Schedule handler methods to specific thread pools via `@RunInPool`. During `initComponentPhase3` the framework auto-discovers `ExecutorService` beans from the Spring container (`ThreadPoolExecutor` included) — the bean name is used as the pool name.
 
 ```java
 @Configuration
@@ -395,24 +395,12 @@ public class HeavyController {
 
 ## 12. RouterOptimizer — Route Optimizer
 
-Implement custom route optimization strategies (advanced).
+Route optimizers are **wired in by the framework** and are not a Spring Bean extension point:
+`MappingRegistry.getOptimizerTemplate()` tries `PrefixPathRouterOptimizer` / `SuffixPathRouterOptimizer` /
+`LoopPathPatternRouterOptimizer` / `FullPathRouterOptimizer` in turn based on the path shape, and the selected
+optimizer pre-builds the mapping list into an efficient route structure at startup.
 
-```java
-@Component
-public class CustomRouterOptimizer implements RouterOptimizer {
-
-    @Override
-    public boolean support(List<PathMappingContext> list) {
-        return true;
-    }
-
-    @Override
-    public Router optimizeRoute(WebServerHttpRequest req) {
-        // Select the best route for the request
-        return null;
-    }
-}
-```
+For a custom strategy you must subclass `MappingRegistry` and override the optimizer wiring (not a public SPI today).
 
 ---
 
@@ -552,10 +540,10 @@ Swagger annotations (`@Tag`, `@Operation`, `@Schema`) work directly.
 | `StaticArgumentResolverProvider` | Spring Bean | Argument resolver provider | `ArgumentResolverRegistry` |
 | `StaticArgumentResolverProvider` | Spring Bean | Static argument resolver provider |
 | `HttpBodyConverter` | Spring Bean | HTTP message format conversion |
-| `JsonConverter` | Spring Bean | JSON serialization implementation |
+| `JsonConverter` | No auto-registration (default `JacksonConverter`) | JSON serialization implementation |
 | `WebComponent` / `BaseWebComponent` | Spring Bean | Framework-level component (participates in lifecycle) |
-| `RouterOptimizer` | Spring Bean | Route optimization strategy |
-| `WebCorsProcessor` | Spring Bean | CORS processing strategy |
+| `RouterOptimizer` | Built in (not a Bean extension point) | Route optimization strategy |
+| `WebCorsProcessor` | No auto-registration (default `PerfCorsProcessor`) | CORS processing strategy |
 | `ViewResolver` | Spring Bean | View-name → `View` resolution (spring-web-view) |
 | `View` | — | View rendering SPI (`render(model, req, resp)`) |
 | `WebExchangeProvider` | Spring Bean | Template `IWebExchange` provider (first `supports()` hit by order, spring-web-view) |

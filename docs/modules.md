@@ -5,7 +5,7 @@
 ```
 spring-web-parent (聚合 POM)
 ├── spring-web                  核心框架
-├── spring-web-view             视图渲染（Thymeleaf/FreeMarker，可选）
+├── spring-web-view             视图渲染（Thymeleaf/FreeMarker/Beetl，可选）
 ├── spring-web-servlet          Servlet API 桥接层
 ├── spring-web-mvc-support      SpringMVC 兼容桥接层
 ├── spring-web-batch            批量请求处理（可选）
@@ -73,7 +73,7 @@ handleAfterFilter() — 初始化上下文
 - `MappingRegistry` — 扫描 `@Controller`/`@RestController` 的所有 `@RequestMapping` 方法
 - 支持 `@RequestMapping` 的全部属性：`value`/`path`、`method`、`params`、`headers`、`consumes`、`produces`
 - 路由优化器链（`RouterOptimizer`）：通过前缀/后缀/全路径/循环优化，实现高效路由匹配
-- 支持动态注册路由（`registerMappingAfterInit`），用于 Actuator 端点注册
+- 支持动态注册路由（`registerMapping(PathMappingContext)`），用于 Actuator 端点注册（由 starter 的 `ManagementMappingRegistry` 调用）
 - `Matcher` 体系：`HttpMethodMatcher`、`ParamOrHeaderMatcher`、`ConsumeOrProduceMatcher` 等
 
 #### arg — 参数解析器
@@ -122,11 +122,11 @@ handleAfterFilter() — 初始化上下文
   - `postHandle` — 处理器执行后、返回值渲染前
   - `afterCompletion` — 请求完成后（无论是否异常）
 - `InterceptorRegistry` 管理拦截器注册，支持路径包含/排除模式
-- 自动注册的拦截器来源（与 Spring MVC 语义一致）：`WebMvcConfigurer#addInterceptors` 产生的
-  `InterceptorRegistration`，以及自带路径规则的 `MappedInterceptor`。
-  **普通 `HandlerInterceptor` Bean 不再自动全局生效**（Spring MVC 亦然）——需要全局生效请经
-  `addInterceptors` 注册或声明为 `MappedInterceptor`；这也避免同一实例经 bean 扫描与 `addInterceptors`
-  两路注册造成的重复执行
+- 自动注册的拦截器来源：核心框架会把 Spring 容器中的 `HandlerInterceptor` Bean **自动注册为全局拦截器**
+  （`InterceptorRegistry` 对 `HandlerInterceptor.class` 执行 `autoRegisterWebComponent`），
+  `WebMvcConfigurer#addInterceptors` 产生的 `InterceptorRegistration` 与自带路径规则的 `MappedInterceptor` 同样会被吸收
+- 注意区分：`spring-web-mvc-support` 的 `SupportInterceptorRegistry` **不**自动注册普通 `HandlerInterceptor` Bean
+  （对齐 Spring MVC 的 `WebMvcConfigurer` 语义）——桥接层下需经 `addInterceptors` 或 `MappedInterceptor` 才能全局生效
 - `postHandle` / `afterCompletion` 与 `preHandle` **同向（正向）**遍历：拦截器顺序由显式 `order` 决定，
   列表已按 order 排好；`preHandle` 提前返回时未通过的拦截器按**逆向**补 `afterCompletion`
 
@@ -274,7 +274,7 @@ destroyComponent()     → 资源释放
 
 ## spring-web-view（视图渲染）
 
-基于 Thymeleaf / FreeMarker 模板引擎的服务器端渲染（SSR）模块。**核心模块零改动**——完全通过核心 SPI（`ReturnValueResolver` / `StaticArgumentResolverProvider` / `ViewResolver`）接入，不注册任何视图解析器时 String 返回值保持 JSON 行为，纯 API 项目零惊扰。
+基于 Thymeleaf / FreeMarker / Beetl 模板引擎的服务器端渲染（SSR）模块。**核心模块零改动**——完全通过核心 SPI（`ReturnValueResolver` / `StaticArgumentResolverProvider` / `ViewResolver`）接入，不注册任何视图解析器时 String 返回值保持 JSON 行为，纯 API 项目零惊扰。
 
 > 详细使用文档：[视图渲染](view.md)
 
@@ -313,10 +313,10 @@ destroyComponent()     → 资源释放
 
 ### 接入机制
 
-- `ViewReturnValueResolver` / `ModelAndViewReturnValueResolver` 为 Spring Bean，被 `ReturnValueResolverRegistry` 自动吸收
-- `ModelArgumentResolverProvider` 为 Spring Bean，被 `ArgumentResolverRegistry` 自动吸收
-- `ThymeleafViewResolver` / `FreemarkerViewResolver` 为 Spring Bean，被 `ViewResolverRegistry` 自动吸收
-- 引擎选择由 `spring.web.view.engine` 配置项 + classpath 探测联合决定
+- `ViewReturnValueResolver` 为 Spring Bean，被 `ReturnValueResolverRegistry` 自动吸收；`ModelAndViewReturnValueResolver` 属 `spring-web-mvc-support`，由 `SpringWebMvcSupportAutoConfiguration` 装配
+- `ModelArgumentResolverProvider` 由核心 `ArgumentResolverRegistry` **内置硬编码注册**（非 Spring Bean 自动吸收）
+- `ThymeleafViewResolver` / `FreemarkerViewResolver` / `BeetlViewResolver` 为 Spring Bean，被 `ViewResolverRegistry` 自动吸收
+- 引擎选择由 `spring.web.view.engine` 配置项 + classpath 探测联合决定（探测 `org.thymeleaf.TemplateEngine` / `freemarker.template.Configuration` / `org.beetl.core.GroupTemplate`）
 
 ---
 
@@ -338,8 +338,9 @@ destroyComponent()     → 资源释放
 ### View 自动配置
 
 `SpringWebViewAutoConfiguration` 在 `spring-web-view` 存在时自动装配：
-- `ViewResolverRegistry`、`ViewReturnValueResolver`、`ModelAndViewReturnValueResolver`、`ModelArgumentResolverProvider`
-- 引擎选择：`spring.web.view.engine`（不配置则注册 classpath 上所有可用引擎）+ classpath 探测 `TemplateEngine` / `freemarker.template.Configuration`
+- `ViewReturnValueResolver` + `ThymeleafViewResolver` / `FreemarkerViewResolver` / `BeetlViewResolver`（共 4 个 `@Bean`）
+- 引擎选择：`spring.web.view.engine`（不配置则注册 classpath 上所有可用引擎）+ classpath 探测 `org.thymeleaf.TemplateEngine` / `freemarker.template.Configuration` / `org.beetl.core.GroupTemplate`
+- `ViewResolverRegistry` 本体**不是**该配置类的 Bean：由 `ViewReturnValueResolver` 在组件容器中缺失时以 `getWebComponentWithDefault(..., new ViewResolverRegistry())` 兜底创建
 
 ### Batch 自动配置
 
@@ -354,11 +355,11 @@ destroyComponent()     → 资源释放
 
 ### SBA 客户端自动配置
 
-`SpringBootAdminClientAutoConfiguration` 在 SBA 客户端存在时自动发射 `WebServerInitializedEvent`，以支持 Spring Boot Admin 心跳注册。
+`SpringBootAdminClientAutoConfiguration` 在 SBA 客户端存在时注册 `PerfApplicationFactory`（替换 SBA 默认的 `WebServerApplicationContext`）。`WebServerInitializedEvent` 的发射由独立的 `WebServerInitializedEventAutoConfiguration` 负责（无条件生效），供 Spring Cloud 服务注册（Nacos/Eureka/Consul）与 SBA 感知服务器就绪。
 
 ### Metrics 自动配置
 
-`MicrometerWebMetrics` 在 `spring-boot-starter-actuator` 存在时自动注册为 `WebMetrics` 实现，收集请求耗时、异常计数和线程池指标。详见[配置参考](configuration.md#可观测性指标)。
+`WebMetrics` 的默认实现为 `NoOpWebMetrics`（零开销）；当 `io.micrometer.core.instrument.MeterRegistry` 在 classpath 上时，starter 会注册 `MicrometerWebMetrics` 收集请求耗时、异常计数和线程池指标。详见[配置参考](configuration.md#可观测性指标)。
 
 ### OpenAPI 自动配置
 
@@ -366,11 +367,11 @@ destroyComponent()     → 资源释放
 
 ### Swagger UI 自动配置
 
-`SwaggerUiAutoConfiguration` 在 Swagger UI 存在时自动注册 Swagger UI 静态资源路由。
+`SwaggerUiAutoConfiguration` 在 springdoc 的 `OpenApiCustomizer` 于 classpath 上时注册 Swagger UI 静态资源路由（webjar 版本由 `springperf.swagger-ui.webjar-version` 控制）。
 
 ### 应用上下文
 
-`WebServerApplicationContextFactory` 强制使用 `AnnotationConfigApplicationContext`，替代 Spring Boot 默认的 `AnnotationConfigServletWebServerApplicationContext`。
+`WebServerApplicationContextFactory` 使用非 Servlet 的 `AnnotationConfigApplicationContext` 替代 Spring Boot 默认的 `AnnotationConfigServletWebServerApplicationContext`；AOT / native-image 构建（`AotDetector.useGeneratedArtifacts()`）时返回 `GenericApplicationContext`。
 
 ---
 
@@ -396,7 +397,7 @@ destroyComponent()     → 资源释放
                                                 │
                                           提交到业务线程池
                                                 │
-                                       BatchHandler 批量处理
+                                      BufferingBatchHandler 批量处理
                                                 │
                      逐个 req.setResult() → asyncDispatch → 写响应
 ```

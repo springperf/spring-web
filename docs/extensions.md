@@ -313,7 +313,7 @@ public class CustomJsonConverter implements JsonConverter {
 }
 ```
 
-**注意**：替换默认 JSON 实现时，确保自定义 `JsonConverter` 的 Bean 优先级高于框架默认的 `JacksonConverter`（可通过 `@Primary` 或 `@Order` 控制）。
+**注意**：框架默认使用 `JacksonConverter`——`AsyncSupportRegistry` 通过 `getWebComponentWithDefault(JsonConverter.class, ...)` 获取。`JsonConverter` **没有** Spring Bean 自动注册机制：声明一个 `JsonConverter` Bean 不会被框架吸收，`@Primary` / `@Order` 也无从生效。如需替换，需自行向 `WebContext` 注册该组件（当前非公开 SPI）。
 
 ---
 
@@ -351,7 +351,7 @@ public class CustomComponent extends BaseWebComponent {
 
 ## 11. BizPoolRegistry — 自定义业务线程池
 
-通过 `@RunInPool` 将处理器方法调度到指定线程池。框架自动发现 Spring 容器中的 `ThreadPoolExecutor` Bean，Bean 名称即池名称。
+通过 `@RunInPool` 将处理器方法调度到指定线程池。框架在 `initComponentPhase3` 自动发现 Spring 容器中的 `ExecutorService` Bean（`ThreadPoolExecutor` 亦在此列），Bean 名称即池名称。
 
 ```java
 @Configuration
@@ -395,24 +395,11 @@ public class HeavyController {
 
 ## 12. RouterOptimizer — 路由优化器
 
-实现自定义路由优化策略（高级）。
+路由优化器由框架**内置装配**，不是 Spring Bean 扩展点：`MappingRegistry.getOptimizerTemplate()` 按路径特征
+依次尝试 `PrefixPathRouterOptimizer` / `SuffixPathRouterOptimizer` / `LoopPathPatternRouterOptimizer` /
+`FullPathRouterOptimizer`，选中的优化器在启动期把映射列表预构建为高效路由结构。
 
-```java
-@Component
-public class CustomRouterOptimizer implements RouterOptimizer {
-
-    @Override
-    public boolean support(List<PathMappingContext> list) {
-        return true;
-    }
-
-    @Override
-    public Router optimizeRoute(WebServerHttpRequest req) {
-        // 为请求选择最佳路由
-        return null;
-    }
-}
-```
+如需自定义策略，需继承 `MappingRegistry` 并覆写优化器装配逻辑（当前非公开 SPI）。
 
 ---
 
@@ -548,10 +535,10 @@ Swagger 注解（`@Tag`、`@Operation`、`@Schema`）直接可用。
 | `StaticArgumentResolverProvider` | Spring Bean | 参数解析器提供者 | `ArgumentResolverRegistry` |
 | `StaticArgumentResolverProvider` | Spring Bean | 静态参数解析器提供者 |
 | `HttpBodyConverter` | Spring Bean | HTTP 消息格式转换 |
-| `JsonConverter` | Spring Bean | JSON 序列化实现 |
+| `JsonConverter` | 无自动注册（默认 `JacksonConverter`） | JSON 序列化实现 |
 | `WebComponent` / `BaseWebComponent` | Spring Bean | 框架级组件（参与生命周期） |
-| `RouterOptimizer` | Spring Bean | 路由优化策略 |
-| `WebCorsProcessor` | Spring Bean | CORS 处理策略 |
+| `RouterOptimizer` | 内置硬编码（非 Bean 扩展点） | 路由优化策略 |
+| `WebCorsProcessor` | 无自动注册（默认 `PerfCorsProcessor`） | CORS 处理策略 |
 | `ViewResolver` | Spring Bean | 视图名 → `View` 解析（spring-web-view） |
 | `View` | — | 视图渲染 SPI（`render(model, req, resp)`） |
 | `WebExchangeProvider` | Spring Bean | 模板 `IWebExchange` 提供者（按 order 取首个 `supports()` 命中，spring-web-view） |

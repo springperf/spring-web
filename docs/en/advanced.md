@@ -204,7 +204,7 @@ public @interface BatchMapping {
     /** Max batch size. When reached, triggers batch processing. Also triggered by Disruptor endOfBatch signal. Default 100. */
     int maxBatchSize() default 100;
 
-    /** Max concurrent processing threads, including the Disruptor consumer thread. Default: CPU cores. */
+    /** Max concurrent processing threads (bizExecutor cap; the Disruptor consumer thread is separate and does not count). Default: CPU cores. */
     int consumerSize() default -1;
 }
 ```
@@ -214,7 +214,7 @@ public @interface BatchMapping {
 | Strategy | Behavior |
 |----------|----------|
 | `BLOCK` | EventLoop blocks waiting for RingBuffer slot |
-| `DROP` | Drops the request (no response) |
+| `DROP` | Drops the request; `BatchOverflowException` is set on it → **429** |
 | `THROW` | Throws `BatchOverflowException` → ExceptionRegistry → **429** |
 
 #### Wait Strategies
