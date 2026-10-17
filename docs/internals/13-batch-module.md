@@ -10,7 +10,7 @@
 
 Spring 生态中，批处理是业务代码的责任：你需要自己收集请求、设计批处理队列、管理线程和超时。`spring-web-batch` 做的事情是**把"批量"变成框架的透明能力**——Controller 方法照常写，框架在启动期替换方法体，把每次调用重定向到 Disruptor 环形缓冲区，由批量处理方法一次消费。
 
-**核心问题**：`BatchInvoker` 如何在启动期替换原 Controller 方法调用？Disruptor RingBuffer 如何无锁入队？三线程（EventLoop 生产者 / Disruptor 消费者 / bizExecutor 业务池）如何协作与背压？8 个 Micrometer 指标各自埋点在哪？
+**核心问题**：`BatchInvoker` 如何在启动期替换原 Controller 方法调用？Disruptor RingBuffer 如何无锁入队？三个线程层级（**生产者 = handler 执行线程** / Disruptor 消费者 / bizExecutor 业务池）如何协作与背压？9 个 Micrometer 指标各自埋点在哪？
 
 ---
 
@@ -19,7 +19,10 @@ Spring 生态中，批处理是业务代码的责任：你需要自己收集请�
 `@BatchMapping` 为每个方法创建独立的 Disruptor 队列，请求流转经过三个线程层级：
 
 ```
-EventLoop 线程（生产者）
+调用线程（生产者）——即该 @RequestMapping handler 的执行线程：
+    默认 `default` 业务池（pool.default-execute-mode 默认值）；
+    虚拟线程模式（spring.threads.virtual.enabled + JDK 21+）或显式
+    pool.default-execute-mode=eventloop 时为 EventLoop（零切换）
     │  BatchInvoker.invoke(args) → 反射创建 BatchRequest 实例
     │  queue.enqueue(batchReq)   → RingBuffer.tryPublishEvent / publishEvent
     ▼
@@ -48,7 +51,7 @@ HTTP 响应
 
 | 层 | 线程 | 职责 | 背压路径 |
 |----|------|------|---------|
-| **生产者** | EventLoop | `BatchInvoker` 创建 `BatchRequest` 入队 | RingBuffer 满 → EventLoop 阻塞 → TCP 反压 |
+| **生产者** | 调用线程（默认 `default` 业务池；虚拟线程 / `eventloop` 模式为 EventLoop） | `BatchInvoker` 创建 `BatchRequest` 入队 | RingBuffer 满 → 生产者线程阻塞 → TCP 反压 |
 | **消费者** | Disruptor 单线程 | 从 RingBuffer 拉取，攒批，提交到业务池 | `CallerRunsPolicy` → 消费者线程执行业务 → 消费阻塞 → RingBuffer 满 |
 | **业务执行** | bizExecutor 池 | 调用 `@BatchMapping` 方法处理整批请求 | `SynchronousQueue` 满 → `CallerRunsPolicy` 触发 |
 
@@ -82,7 +85,7 @@ public void initComponentPhase2() throws Exception {
 2. **创建 `DisruptorQueue`**：按 `queueName`（`batch:<ClassName>.<methodName>`）创建队列，`putIfAbsent` 防重复安装，冲突时 `shutdown` 新队列再抛异常（，修复前直接抛导致线程泄漏）。
 3. **替换 Invoker**：`singleCtx.setInvoker(new BatchInvoker(meta, queue))`——这是"方法体替换"语义的实现点。
 4. **矫正返回值类型**：`setEffectiveReturnType`让 `ReturnValueResolverRegistry` 能正确解析 `BatchRequest<X>` 中的泛型内联类型 `X`。
-5. **取消 `@RunInPool`**：`setDefaultPool(ctx, null)`确保入队操作在 EventLoop 上完成，不额外线程切换。
+5. **虚拟线程模式下取消 `@RunInPool`**：`if (virtualThreads) poolRegistry.setDefaultPool(reg.singleCtx(), null)`——虚拟线程的 `default` 池以虚拟线程执行任务，而 single 路径只做入队（微秒级、不阻塞），走它反而多一次线程切换，故置空默认池让入队留在 EventLoop。**未开虚拟线程时不设置**，遵循全局 `pool.default-execute-mode`（默认 `default` 业务池）。两种情况下用户显式 `@RunInPool` 都优先（`setDefaultPool` 仅在无注解时生效）。
 
 ### 2.2 扫描过程
 
@@ -102,7 +105,7 @@ public Method batchMethod()      { return batchMethod; }      // @BatchMapping �
 public Class<?> beanType()       { return beanType; }         // Controller 类
 public Class<? extends BatchRequest<?>> requestType()         // BatchRequest 子类
 public String queueName()        { return queueName; }        // "batch:BatchUserController.batchGetUser"
-public int ringBufferSize()      { return ringBufferSize; }   // 归一化后的容量
+public int ringBufferSize()      { return ringBufferSize; }   // 注解配置的原始值（归一化发生在 DisruptorQueue 构造时）
 public BatchMapping.WaitStrategy waitStrategy()               // 等待策略
 public BatchMapping.Backpressure backpressure()               // 背压策略
 public Constructor<?> singleMethodCtor()                      // 单方法参数匹配的构造函数
@@ -131,7 +134,7 @@ public Object invoke(Object[] args) throws Exception {
 }
 ```
 
-两步：**反射创建 `BatchRequest` 实例** → **入队**。这个过程在 EventLoop 线程上执行，不涉及 `@RunInPool` 的线程切换。
+两步：**反射创建 `BatchRequest` 实例** → **入队**。这个过程运行在调用方线程（即该 handler 的执行线程：默认 `default` 业务池；虚拟线程 / `eventloop` 模式为 EventLoop）上，不涉及 `@RunInPool` 的额外线程切换。
 
 关键语义：**原 Controller 方法体完全不执行。** `args` 是参数解析器产出的 `Object[]` 数组（与单请求方法参数类型按序一致），`singleMethodCtor` 在 `BatchScanner.resolveSingleMethodCtor` 中通过 `PathMappingContext` 的 `MethodParameter[]` 匹配构造函数参数类型。
 
@@ -198,14 +201,14 @@ this.disruptor = new Disruptor<>(
         BatchEvent::new,                          // EventFactory
         size,                                     // RingBuffer 容量（2^N）
         r -> new Thread(r, "batch-disruptor-" + queueName),
-        ProducerType.MULTI,                        // 多生产者（多个 EventLoop 并发入队）
+        ProducerType.MULTI,                        // 多生产者（多个业务线程并发入队）
         WaitStrategyFactory.create(meta.waitStrategy())
 );
 ```
 
 | 组件 | 选择 | 理由 |
 |------|------|------|
-| `ProducerType.MULTI` | 多生产者模式 | 多个 EventLoop 线程可能同时入队，`MULTI` 使用 CAS 而非 `next()` 单线程 claim |
+| `ProducerType.MULTI` | 多生产者模式 | 多个业务线程（默认 `default` 池的 worker；`eventloop` 模式下为多个 EventLoop）可能同时入队，`MULTI` 使用 CAS 而非 `next()` 单线程 claim |
 | `EventFactory` | `BatchEvent::new` | RingBuffer 预分配所有 `BatchEvent` 槽位，运行时复用，零分配 |
 | 线程工厂 | 命名线程（非 daemon） | 确保 shutdown 前线程不会因 JVM 退出而中断 |
 
@@ -215,23 +218,21 @@ this.disruptor = new Disruptor<>(
 
 ```java
 // DisruptorQueue.java
-this.bizExecutor = new ThreadPoolExecutor(
-        0, consumerSize,
-        60L, TimeUnit.SECONDS,
-        new SynchronousQueue<>(),
-        r -> new Thread(r, "batch-worker-" + queueName),
-        (r, executor) -> {
+ThreadFactory bizThreadFactory = useVirtualThreads
+        ? VirtualThreadSupport.newThreadFactory("batch-virtual-" + queueName + "-")
+        : platformThreadFactory(queueName);          // 非 daemon 平台线程
+this.bizExecutor = new ThreadPoolExecutor(0, consumerSize, 60L, TimeUnit.SECONDS, new SynchronousQueue<>(),
+        bizThreadFactory, (r, executor) -> {
             if (!executor.isShutdown()) {
-                r.run();  // CallerRunsPolicy — 消费者线程直接执行
+                r.run(); // CallerRunsPolicy — 消费者线程直接执行
             }
-        }
-);
+        });
 ```
 
 这个组合的设计意图：
 
 - **空闲零线程**：`corePoolSize=0` + `SynchronousQueue`，无请求时线程池零占用。
-- **自然背压**：`SynchronousQueue` 没有缓冲容量，提交任务时必须有一个工作线程在 `take()`。如果没有空闲线程，新建线程直到 `maximumPoolSize`。达到上限后触发 `CallerRunsPolicy`——Disruptor 消费者线程自行执行 `processBatch`，此时消费者不再从 RingBuffer 拉取新事件，RingBuffer 逐渐填满，EventLoop 生产者因 RingBuffer 满而阻塞，最终反压到 TCP 层。
+- **自然背压**：`SynchronousQueue` 没有缓冲容量，提交任务时必须有一个工作线程在 `take()`。如果没有空闲线程，新建线程直到 `maximumPoolSize`。达到上限后触发 `CallerRunsPolicy`——Disruptor 消费者线程自行执行 `processBatch`，此时消费者不再从 RingBuffer 拉取新事件，RingBuffer 逐渐填满，生产者线程（默认 `default` 业务池 worker）因 RingBuffer 满而阻塞，最终反压到 TCP 层。
 - **无需预热**：无核心线程，无需手动调优。
 
 ### 4.3 `normalizeRingBufferSize`：C8/C12 保护
@@ -247,18 +248,17 @@ static int normalizeRingBufferSize(int size) {
     if (size < 64) return 64;
     int result = Integer.highestOneBit(size);
     if (result < size) result <<= 1;
-    // C12: result 溢出为负（size > 2^30）或恰好等于 2^30 时都不能用——Disruptor
-    // RingBuffer 构造时按 capacity 预分配全部 BatchEvent 槽位，2^30 槽位 × ~24B
-    // ≈ 25GB+ 堆，任何 -Xmx 都必然 OOM（2^30 只是 int 里最大 2 的幂，不是内存安全
-    // 容量）。回退到构造器 warn 声明的最大合理容量 2^18（262144，预分配 ~6MB）。
-    return result > 0 && result < (1 << 30) ? result : 1 << 18;
+    // C12: 上限即 2^18=262144。Disruptor RingBuffer 按 capacity 预分配全部 BatchEvent
+    // 槽位，2^18 × ~24B ≈ 6MB 堆；任何大于 262144 的请求都回退到该上限（而非可用到
+    // 2^30——那需要 25GB+ 堆，必然 OOM）。
+    return result > 0 && result <= (1 << 18) ? result : 1 << 18;
 }
 ```
 
 | 保护 | 条件 | 行为 |
 |------|------|------|
 | **C8** | `size < 64` | 回退到 64，防止退化尺寸（如 `ringBufferSize=1` 导致灾难性背压） |
-| **C12** | `result >= 1<<30` | 回退到 262144（~6MB），防止 `2^30` 预分配 25GB+ 堆导致 OOM |
+| **C12** | `result > 1<<18`（含 `<=0` 的溢出为负） | 回退到 262144（~6MB）；**任何大于 262144 的配置都被压到该上限** |
 
 ### 4.4 `enqueue`：三种背压策略
 
@@ -281,10 +281,13 @@ public void enqueue(BatchRequest<?> request) {
             if (!ringBuffer.tryPublishEvent(translator, request)) {
                 metrics.recordDrop(queueName);
                 if (request.isCompleted()) {
-                    log.warn("Queue [{}] drop failed — request already completed", queueName);
+                    log.warn("Queue [{}] drop failed — request already completed (likely timed out), "
+                            + "client will not receive overflow signal", queueName);
                 } else {
                     request.setError(new BatchOverflowException(queueName));
                 }
+            } else {
+                metrics.recordEnqueue(queueName, true);   // 仅成功路径记录
             }
             break;
         case THROW:
@@ -292,21 +295,22 @@ public void enqueue(BatchRequest<?> request) {
                 metrics.recordOverflow(queueName);
                 throw new BatchOverflowException(queueName);
             }
+            metrics.recordEnqueue(queueName, true);
             break;
         case BLOCK:
         default:
             ringBuffer.publishEvent(translator, request);  // 阻塞等待
+            metrics.recordEnqueue(queueName, true);
             break;
     }
-    metrics.recordEnqueue(queueName, true);
 }
 ```
 
-| 策略 | Disruptor 方法 | EventLoop 行为 | 客户端响应 |
-|------|---------------|---------------|-----------|
+| 策略 | Disruptor 方法 | 生产者行为 | 客户端响应 |
+|------|---------------|-----------|-----------|
 | **BLOCK**（默认） | `publishEvent` | 阻塞等待 RingBuffer 有空间 → TCP 反压 | 连接挂起 |
-| **DROP** | `tryPublishEvent` | 失败时 `BatchRequest.setError(BatchOverflowException)` | 429 Too Many Requests |
-| **THROW** | `tryPublishEvent` | 失败时同步抛异常 → 404/500 处理路径 | 429 Too Many Requests |
+| **DROP** | `tryPublishEvent` | 失败时 `BatchRequest.setError(BatchOverflowException)`，异步完成 | 429 Too Many Requests |
+| **THROW** | `tryPublishEvent` | 失败时同步抛 `BatchOverflowException` → 框架异常处理路径 | **429** Too Many Requests（`BatchOverflowException` 即 `@ResponseStatus(429)`，非 404/500） |
 
 `DROP` 与 `THROW` 的区别：`DROP` 不阻塞 EventLoop，请求通过 `BatchRequest.setError` 异步完成（走 `DeferredResult` 处理路径）；`THROW` 同步抛出，由框架的异常处理路径响应。
 
@@ -401,26 +405,27 @@ private void processBatch(List<BatchRequest<?>> batch) {
 
 ---
 
-## 六、可观测性：8 个 Micrometer 指标
+## 六、可观测性：9 个 Micrometer 指标
 
-`BatchMetrics` SPI定义了 6 个记录方法，对应 8 个 Micrometer 指标：
+`BatchMetrics` SPI定义了 6 个记录方法，由 starter 的 `MicrometerBatchMetrics` 实现为 9 个 Micrometer 指标：
 
 | 指标名 | 记录方法 | 埋点位置 | 类型 | Tag |
 |--------|---------|---------|------|-----|
-| `batch.enqueue.total` | `recordEnqueue` | `DisruptorQueue.enqueue` 成功/失败时 | Counter | `queue` |
-| `batch.enqueue.dropped` | `recordDrop` | `DisruptorQueue.enqueue` DROP 分支 | Counter | `queue` |
-| `batch.enqueue.overflow` | `recordOverflow` | `DisruptorQueue.enqueue` THROW 分支 | Counter | `queue` |
-| `batch.process.duration` | `recordBatchProcessed` | `BufferingBatchHandler.processBatch` finally | Timer | `queue` |
+| `batch.enqueue.total` | `recordEnqueue` | `DisruptorQueue.enqueue` 每次尝试（含停机直处理分支） | Counter | `queue` |
+| `batch.enqueue.rejected` | `recordEnqueue(success=false)` | 入队失败（`total` 中未成功的部分） | Counter | `queue` |
+| `batch.enqueue.dropped` | `recordDrop` | `DisruptorQueue.enqueue` DROP 失败分支 | Counter | `queue` |
+| `batch.enqueue.overflow` | `recordOverflow` | `DisruptorQueue.enqueue` THROW 失败分支 | Counter | `queue` |
+| `batch.process.duration` | `recordBatchProcessed` | `BufferingBatchHandler.processBatch` finally | Timer | `queue` + `outcome=success/failure`（成败分序列，避免失败批次污染分位数） |
 | `batch.process.batch.size` | `recordBatchProcessed` | 同上（DistributionSummary 维度） | DistributionSummary | `queue` |
 | `batch.process.requests` | `recordRequestCompleted` | `BufferingBatchHandler.processBatch` 成功时 | Counter | `queue` |
-| `batch.queue.remaining` | `reportQueueCapacity` | `DisruptorQueue.remainingCapacity()` | Gauge | `queue` |
-| `batch.queue.capacity` | `reportQueueCapacity` | `DisruptorQueue.bufferSize()` | Gauge | `queue` |
+| `batch.queue.remaining` | `reportQueueCapacity` | Gauge，按队列懒注册 | Gauge | `queue` |
+| `batch.queue.capacity` | `reportQueueCapacity` | Gauge，按队列懒注册 | Gauge | `queue` |
 
-所有指标的 `queue` Tag 值为 `batch:<ClassName>.<methodName>`（如 `batch:BatchUserController.batchGetUser`）。
+所有指标的 `queue` Tag 值为 `batch:<ClassName>.<methodName>`（如 `batch:BatchUserController.batchGetUser`，由 `BatchScanner.resolveQueueName` 生成）。
 
-`reportQueueCapacity` 在 `BatchRegistry` 中通过调度定期上报——`DisruptorQueue` 暴露出 `remainingCapacity()` 和 `bufferSize()` 方法，供外部采集器轮询。
+两个 Gauge 采用「外部 map 占位 + 锁外注册」的写法（刻意不用 `ConcurrentHashMap.computeIfAbsent`——那会在持有 CHM bin 锁时调用 `MeterRegistry.register`，与 MeterRegistry 内部锁形成潜在死锁面）。**注意**：当前代码中 `reportQueueCapacity` 没有任何调度调用方，因此这两个 Gauge 实际不会注册——需要容量监控时应在自己的采集侧调用该 SPI 方法。
 
-`NoOpBatchMetrics`是默认实现，所有方法空操作——当 Micrometer 不在类路径时，零开销。
+`NoOpBatchMetrics`是默认实现，所有方法空操作——当 Micrometer 不在类路径时，零开销（实现类 `MicrometerBatchMetrics` 位于 `spring-boot-starter-web`，由 `SpringWebBatchAutoConfiguration` 在 `MeterRegistry` 存在时注入）。
 
 ---
 
@@ -510,10 +515,10 @@ public class BatchOverflowException extends ResponseStatusException {
 3. **`DisruptorQueue` 无锁入队** → `ProducerType.MULTI` CAS claim，`BatchEvent` 预分配零 GC，`normalizeRingBufferSize` C8/C12 保护，三种背压策略（BLOCK/DROP/THROW）。
 4. **`BufferingBatchHandler` 攒批消费** → `endOfBatch` + `maxBatchSize` 双触发，`bizExecutor` 零核心线程 + `SynchronousQueue` + `CallerRunsPolicy` 自然背压，`handleBatchError` 逐个 `setError` 防挂起。
 5. **三级背压链** → RingBuffer 满 → EventLoop 阻塞 → TCP 反压（BLOCK 模式）；或 `tryPublishEvent` 失败 + `BatchOverflowException` 429（DROP/THROW 模式）。
-6. **8 个指标埋点** → `BatchMetrics` SPI 定义 6 个记录方法，`queue` Tag 值 `batch:<ClassName>.<methodName>`，`NoOpBatchMetrics` 默认零开销。
+6. **9 个指标埋点** → `BatchMetrics` SPI 定义 6 个记录方法（由 starter 的 `MicrometerBatchMetrics` 实现为 9 个指标），`queue` Tag 值 `batch:<ClassName>.<methodName>`，`NoOpBatchMetrics` 默认零开销。
 7. **安全网** → 停机竞态窗口由 `DeferredResult` 30s 超时兜底；`BatchRequest.completed` 守卫防止重复回调；`BatchExceptionHandler` 捕获消费者异常；`BatchOverflowException` 映射 429。
 
-这一层的克制体现在：**不把批处理留给业务代码，也不为批处理引入复杂的消息中间件。** LMAX Disruptor 提供无锁的环形缓冲区，`ProducerType.MULTI` 支持多 EventLoop 并发入队，`SynchronousQueue` + `CallerRunsPolicy` 在零额外线程的基础上实现了自然背压——**没有调度线程、没有定时器、没有额外的队列线程**，三个线程层次（EventLoop / Disruptor 消费者 / bizExecutor 工作者）形成了一条干净的反压链。`@BatchMapping` 方法体替换语义让用户无需修改单请求方法——框架层面透明的"请求聚合"，是 [01 篇](01-design-philosophy.md) 原则 2（零侵入）在批处理场景的落地。
+这一层的克制体现在：**不把批处理留给业务代码，也不为批处理引入复杂的消息中间件。** LMAX Disruptor 提供无锁的环形缓冲区，`ProducerType.MULTI` 支持多生产者并发入队，`SynchronousQueue` + `CallerRunsPolicy` 在零额外线程的基础上实现了自然背压——**没有调度线程、没有定时器、没有额外的队列线程**，三个线程层次（handler 执行线程 / Disruptor 消费者 / bizExecutor 工作者）形成了一条干净的反压链。`@BatchMapping` 方法体替换语义让用户无需修改单请求方法——框架层面透明的"请求聚合"，是 [01 篇](01-design-philosophy.md) 原则 2（零侵入）在批处理场景的落地。
 
 ---
 

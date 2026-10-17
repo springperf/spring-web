@@ -24,7 +24,7 @@ Spring MVC 的做法是：每类横切逻辑各有一个独立的遍历链，运
 |------|------|---------|---------|
 | before | `preHandle` | 参数解析前、方法调用前 | 返回 `false` 终止后续拦截器 + 方法调用 |
 | after | `postHandle` | 方法调用后、返回值解析前 | 不短路，异常时跳过 |
-| finally | `afterCompletion` | 请求完成后（含异常/异步） | 逆序调用，不短路 |
+| finally | `afterCompletion` | 请求完成后（含异常/异步） | **正向**遍历（与 preHandle 同序）调用，不短路；仅 `preHandle` 短路路径 `afterCompletionForPassed` 才逆序 |
 
 ### 1.2 匹配缓存：`PathMappingContext.cachedInterceptors`
 
@@ -42,6 +42,13 @@ protected List<HandlerInterceptor> initCachedInterceptors(PathMappingContext map
     String pathRule = mappingContext.getPathRule();
     List<HandlerInterceptor> interceptors = new ArrayList<>();
     for (InterceptorRegistration registration : registrations) {
+        // 类级分支：拦截器标注 @ControllerAdvice 时按 controller 类型匹配（与路径规则无关）
+        if (registration.isControllerAdviceScoped()) {
+            if (registration.matchesControllerType(mappingContext.getBeanType())) {
+                interceptors.add(registration.getInterceptor());
+            }
+            continue;
+        }
         ContainmentResult result = registration.matchPathRuleToCached(pathRule);
         if (result == ContainmentResult.ALWAYS) {
             interceptors.add(registration.getInterceptor());          // 直接加入
@@ -54,7 +61,7 @@ protected List<HandlerInterceptor> initCachedInterceptors(PathMappingContext map
 }
 ```
 
-`ContainmentResult` 三段式（`ALWAYS`/`NEVER`/`RUNTIME`）与 [03 篇](03-component-lifecycle.md) 的 `ContainmentResult` 是同一套机制——通过路径模式匹配在编译期推断包含关系，避免运行时逐条字符串匹配。
+`ContainmentResult` 三段式（`ALWAYS`/`NEVER`/`RUNTIME`）与 [03 篇](03-component-lifecycle.md) 的 `ContainmentResult` 是同一套机制——通过路径模式匹配在启动期推断包含关系，避免运行时逐条字符串匹配。
 
 ### 1.3 `preHandle` 短路：`afterCompletionForPassed`
 
@@ -193,14 +200,13 @@ return new SimpleCorsConfigurationProvider(alwaysRegistration.getCorsConfigurati
 2. 检查 `context.getCorsConfigurationProvider()` 缓存。
 3. 未缓存时调用 `createCorsConfigurationProvider` 创建，并缓存到 `context`。
 
-`CorsConfigurationProvider` 有四种实现：
+`CorsConfigurationProvider` 有三种实现（加上「已缓存到 `PathMappingContext`」这一取用状态，常被误记为第四种）：
 
 | 实现 | 条件 |
 |------|------|
 | `NoneCorsConfigurationProvider` | 无 `@CrossOrigin` 且无注册 |
 | `SimpleCorsConfigurationProvider` | 单一配置（注解或单个 ALWAYS 注册） |
 | `RuntimeMappingCorsConfigurationProvider` | 多个 `RUNTIME` 注册，运行时按路径匹配 |
-| （直接存储在 `PathMappingContext` 上的引用） | 已缓存 |
 
 ### 3.4 预检请求
 
@@ -348,7 +354,7 @@ static boolean isExplicitRseHandler(MappingHandlerMethod handlerMethod) {
 
 ### 4.4 `ResponseStatusExceptionResolver`
 
-`ResponseStatusExceptionResolver` 处理三类异常：`@ResponseStatus` 注解标记的异常、`ResponseStatusException`，以及参数绑定/消息体解析错误（`MethodArgumentNotValidException`、`MethodArgumentTypeMismatchException`、`HttpMessageNotReadableException`，统一返回 400）。它在 `ExceptionRegistry.initWithWebContext`中注册，晚于 `ExceptionHandlerExceptionResolver`；两者默认 `order` 相同，运行时按 `resolvers` 列表顺序遍历，首个匹配的解析器处理。对 `ResponseStatusException`，`ExceptionHandlerExceptionResolver` 通过 `isExplicitRseHandler` 保护——未显式声明 `@ExceptionHandler(ResponseStatusException.class)` 时跳过，交由 `ResponseStatusExceptionResolver` 兜底处理。
+`ResponseStatusExceptionResolver` 处理四类异常：`@ResponseStatus` 注解标记的异常、`ResponseStatusException`、参数绑定/消息体解析错误（`MethodArgumentNotValidException`、`MethodArgumentTypeMismatchException`、`HttpMessageNotReadableException`，统一返回 400），以及 `AsyncRequestTimeoutException` → **503**（对齐 Spring `DefaultHandlerExceptionResolver` 的异步超时语义）。它在 `ExceptionRegistry.initWithWebContext`中注册，晚于 `ExceptionHandlerExceptionResolver`；两者默认 `order` 相同，运行时按 `resolvers` 列表顺序遍历，首个匹配的解析器处理。对 `ResponseStatusException`，`ExceptionHandlerExceptionResolver` 通过 `isExplicitRseHandler` 保护——未显式声明 `@ExceptionHandler(ResponseStatusException.class)` 时跳过，交由 `ResponseStatusExceptionResolver` 兜底处理。
 
 ---
 
@@ -378,7 +384,7 @@ static boolean isExplicitRseHandler(MappingHandlerMethod handlerMethod) {
 4. **异常处理 `@ExceptionHandler` 缓存** → `ExceptionHandlerAdvice[]` 按方法缓存，`MappingCacheKey` 整型索引数组直取，`isExplicitRseHandler` 防止 `ResponseStatusException` 被宽泛匹配意外拦截。
 5. **`ResponseStatusException` 显式保护** → `RSE_EXPLICIT_CACHE_KEY` 方法级缓存，只有显式声明的处理器才处理框架内部信号异常。
 
-这一层的克制体现在：**不把"匹配查找"留给运行时，也不为"缓存"提前做复杂计算。** 三段式推断（`ALWAYS`/`NEVER`/`RUNTIME`）在启动期用路径模式匹配做一次编译期推断，运行时只遍历已经确定"该执行"的列表。`RUNTIME` 的组件被包装为 `RuntimeMapping*`，只在需要时才做运行时路径匹配——大多数横切组件（全局拦截器、无路径规则的 Filter）在启动期就能确定 `ALWAYS`，运行时零额外匹配开销。
+这一层的克制体现在：**不把"匹配查找"留给运行时，也不为"缓存"提前做复杂计算。** 三段式推断（`ALWAYS`/`NEVER`/`RUNTIME`）在启动期用路径模式匹配做一次，运行时只遍历已经确定"该执行"的列表。`RUNTIME` 的组件被包装为 `RuntimeMapping*`，只在需要时才做运行时路径匹配——大多数横切组件（全局拦截器、无路径规则的 Filter）在启动期就能确定 `ALWAYS`，运行时零额外匹配开销。
 
 ---
 

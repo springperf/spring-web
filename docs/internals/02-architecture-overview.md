@@ -16,20 +16,21 @@
 
 ## 一、四模块职责矩阵
 
-顶层 `pom.xml` 聚合了 9 个模块（[`pom.xml`](../../pom.xml)），本系列聚焦其中与 Web 框架直接相关的四个：
+顶层 `pom.xml` 聚合了 12 个模块（[`pom.xml`](../../pom.xml)），本系列聚焦其中与 Web 框架直接相关的几个：
 
 | 模块 | 职责 | 依赖谁 | 被谁依赖 | 关键包 | 可选性 |
 |------|------|--------|----------|--------|--------|
 | **spring-web** | 核心框架：Netty 服务器 + 路由 + 参数/返回值解析 + 调用器 + 横切 | Spring（context/core/beans/aop/web）+ Netty + Jackson；fastjson2/reactive-streams 为 `provided` | 其余三者 | `context` `core` `http` `server` `json` `annotation` `util` | **基石**，不可选 |
 | **spring-web-servlet** + **spring-web-mvc-support** | Servlet API 与 SpringMVC 桥接层 | spring-web + `spring-web-servlet` + `jakarta.servlet-api`(provided) | starter（provided） | `support.*` + 重写的 `org.springframework.web.servlet.*` | 可选 |
 | **spring-web-batch** | LMAX Disruptor 透明请求聚合 | spring-web + `disruptor` | starter（provided） | `batch.*` | 可选 |
+| **spring-web-view** | 服务端渲染：Thymeleaf / FreeMarker / Beetl 视图引擎 | spring-web | starter（provided）、mvc-support（provided） | `view.*` | 可选 |
 | **spring-boot-starter-web** | Spring Boot 自动装配 + 零冲突启动 | spring-web + support(provided) + batch(provided) + spring-boot-starter + starter-json + actuator(provided) | 用户业务应用 | `autoconfigure.*` | 入口，必选 |
 
 ### 1.1 依赖矩阵的代码事实
 
 四份 `pom.xml` 印证了上表（以下只列 compile 范围的"对外"依赖，test 依赖略）：
 
-**spring-web**（[`spring-web/pom.xml`](../../spring-web/pom.xml)）只引 Spring 五件套 + Netty + Jackson，外加三个 `provided`：
+**spring-web**（[`spring-web/pom.xml`](../../spring-web/pom.xml)）只引 Spring 五件套 + Netty + Jackson，外加五个 `provided`（lombok / fastjson2 / spring-boot-configuration-processor / reactive-streams / jsr305）：
 
 ```xml
 <!-- spring-web/pom.xml -->
@@ -82,6 +83,11 @@
 <dependency>
     <groupId>io.github.springperf</groupId>
     <artifactId>spring-web-batch</artifactId>
+    <scope>provided</scope>
+</dependency>
+<dependency>
+    <groupId>io.github.springperf</groupId>
+    <artifactId>spring-web-view</artifactId>
     <scope>provided</scope>
 </dependency>
 ```
@@ -155,7 +161,7 @@ io.springperf.web
 │   ├── NettyHttpServer.SslExceptionHandler    SSL 异常兜底
 │   ├── Http2ChannelInitializer    HTTP/2 + HTTP/1 pipeline 装配
 │   ├── PipelineCustomizer         pipeline 扩展点（如 WebSocket 握手 handler）
-│   └── NettyMetricsHandler        连接计数 + 指标（静态单例）
+│   └── NettyMetricsHandler        连接计数 + 指标（@Sharable，每服务器一个实例，非全局单例）
 │
 ├── http/                         HTTP 请求/响应抽象
 │   ├── WebServerHttpRequest / WebServerHttpResponse   统一接口
@@ -165,7 +171,7 @@ io.springperf.web
 │   ├── BackpressureHandler        背压处理器
 │   └── support/                   HTTP 支持类（multipart、BodyHttpInputMessage 等）
 │
-├── core/                         核心请求处理（11 个子包）
+├── core/                         核心请求处理（14 个子包）
 │   ├── DispatcherHandler          中央分发器（extends BaseWebComponent, implements HttpHandler）
 │   ├── filter/                    WebFilter 过滤器链
 │   │   ├── WebFilter                SPI 接口（extends WebComponent）
@@ -186,6 +192,7 @@ io.springperf.web
 │   ├── resource/                 静态资源
 │   ├── pool/                     业务线程池（BizPoolRegistry）
 │   └── metrics/                  指标（WebMetrics / NoOpWebMetrics）
+│   └── model/                    模型上下文（ModelContext）
 │
 ├── json/                         JSON 抽象层
 │   ├── JsonConverter               SPI（toJson/fromJson 三重重载）
@@ -194,8 +201,9 @@ io.springperf.web
 │
 ├── annotation/                   自定义注解
 │   ├── @Optimize                   标记 ASM 调用优化
-│   ├── @ReactiveSupport            背压参数
-│   └── @RunInPool                  业务线程池指定
+│   ├── @ReactiveSupport            背压参数（highWaterMark=150/lowWaterMark=50/streamEmitterType/timeout=-1）
+│   ├── @RunInPool                  业务线程池指定（保留值 eventloop）
+│   └── @RunInEventloop             @RunInPool(EVENTLOOP) 的元注解别名
 │
 └── util/                         工具类（含 support/ 子包）
     └── PathPatternUtils / WebUtils / MetaUtils / DefaultLoggerUtil / Pair
@@ -203,7 +211,7 @@ io.springperf.web
 
 ### 2.1 拓扑的两个观察点
 
-**观察一：`core` 是"请求处理主链路"的集中地。** 11 个子包对应请求处理的 11 个横切关注点——从 `filter`（前置过滤）到 `mapping`（路由）到 `arg`/`retval`/`invoker`（参数/返回值/调用）到 `interceptor`/`cors`/`exception`（横切）到 `async`/`resource`/`pool`/`metrics`。`DispatcherHandler` 持有其中九个 Registry 的引用（[`DispatcherHandler.java`](../../spring-web/src/main/java/io/springperf/web/core/DispatcherHandler.java)），是这条链的编排者。
+**观察一：`core` 是"请求处理主链路"的集中地。** 14 个子包对应请求处理的各个关注点——从 `filter`（前置过滤）到 `mapping`（路由）到 `arg`/`retval`/`invoker`（参数/返回值/调用）到 `interceptor`/`cors`/`exception`（横切）到 `async`/`resource`/`pool`/`metrics`/`model`。`DispatcherHandler` 持有其中九个 Registry 的引用（[`DispatcherHandler.java`](../../spring-web/src/main/java/io/springperf/web/core/DispatcherHandler.java)），是这条链的编排者。
 
 **观察二：核心 `filter` 包内含 `RuntimeMappingWebFilter`，这是"路径匹配的 Filter 包装"的真正落点。** 这一事实将在 [§五 校正二](#五与-modulemd-的差异校正) 展开——它纠正了 module.md 把路径匹配工具归到 support 的描述。
 
@@ -239,7 +247,8 @@ module.md 的启动时序图（`module.md`）把生命周期触发点写成 `Web
 Spring Boot 启动
   │
   ├─ ApplicationContextFactory = WebServerApplicationContextFactory
-  │     （@Order(-10000)，强制返回 AnnotationConfigApplicationContext）
+  │     （@Order(-10000)，常规返回非 Servlet 的 AnnotationConfigApplicationContext；
+  │      AOT / native-image 下返回 GenericApplicationContext）
   │     → WebServerApplicationContextFactory.java
   │
   ├─ ApplicationContext.refresh()
@@ -271,7 +280,7 @@ Spring Boot 启动
   │     ├─ new NettyHttpHandler(webContext, contextPath, dispatcher)  →
   │     ├─ 配置 boss/worker EventLoopGroup + ServerBootstrap     →
   │     └─ bootstrap.bind(port).sync()                           →
-  │        ├─ actualPort 写入 local.server.port 系统属性         →
+  │        ├─ actualPort 经 context 级 MapPropertySource 暴露为 local.server.port →
   │        └─ log.info("Netty Server started on port {}")       →
   │
   └─ 就绪，开始接受请求
@@ -294,11 +303,11 @@ Spring Boot 启动
 - **`SmartLifecycle.start()`** 负责"触发 WebContext 生命周期 + 绑定端口"——对 Spring 容器的契约。
 - **`LifecycleWebComponent.destroyComponent()`** 负责"关闭 EventLoopGroup"——对框架组件体系的契约。
 
-注意一个细节：`stop()` 里**不**关闭 EventLoopGroup，只 `setShuttingDown()` 拒绝新请求 + 关 `serverChannel`（[`NettyHttpServer.java`](../../spring-web/src/main/java/io/springperf/web/server/NettyHttpServer.java)）。EventLoop 的真正关闭推迟到 `destroyComponent()`，**在 BatchRegistry / BizPoolRegistry 等组件排空之后**——这保证优雅关闭期间，在途请求还能用 EventLoop 完成。`stop()` 注释写得很直白：
+注意一个细节：`stop()` 里**不**关闭 EventLoopGroup，只 `setShuttingDown()` 拒绝新请求 + 关 `serverChannel`（[`NettyHttpServer.java`](../../spring-web/src/main/java/io/springperf/web/server/NettyHttpServer.java)）。EventLoop 的真正关闭推迟到 `destroyComponent()`，**在 BizPoolRegistry 等业务组件排空之后**——这保证优雅关闭期间，在途请求还能用 EventLoop 完成。`stop()` 注释写得很直白：
 
 ```java
 // NettyHttpServer.java
-// EventLoop 关闭已移至 destroyComponent()，在 BatchRegistry / BizPoolRegistry 等组件排空后执行
+// EventLoop 关闭已移至 destroyComponent()，在 BizPoolRegistry 等业务组件排空后执行
 ```
 
 ### 3.4 优雅关闭的 503 兜底
@@ -415,6 +424,7 @@ module.md（[`../../.agent/context/module.md`](../../.agent/context/module.md)�
 ```java
 // WebContext.java
 public void startLifecycle() {
+    if (isDestroyed()) { resetAfterDestroy(); }   // 支持 destroy 后重新 start
     if (!lifecycleStarted.compareAndSet(false, true)) { return; }
     try {
         this.initWithWebContext(this);
@@ -422,6 +432,10 @@ public void startLifecycle() {
         this.initComponentPhase2();
         this.initComponentPhase3();
     } catch (Exception e) {
+        // 失败清理 + 复位，保证同一实例可重试启动（fail-fast 语义保留）
+        try { this.destroyComponent(); }
+        catch (Exception cleanupEx) { log.warn("WebContext cleanup after failed lifecycle start also failed", cleanupEx); }
+        lifecycleStarted.set(false);
         throw new RuntimeException("Failed to start WebContext lifecycle", e);
     }
 }
@@ -491,7 +505,7 @@ support 与 batch 是 `provided` 依赖，用户按需引入。这带来两个�
 
 ### 6.3 starter 的"零配置 + 零冲突"
 
-starter 聚合自动装配（10 个 AutoConfiguration，详见 [14 篇](14-starter-autoconfig.md)），用户只需 `spring-boot-starter-web` 一行依赖即可启动。同时它在依赖源头排除 Tomcat 的 `spring-boot-starter-web`（[§1.3](#13-starter-排除-tomcat-的反向防线)），并在 `SpringWebAutoConfiguration` 启动期检测 SpringMVC 冲突抛 `IllegalStateException`——"零冲突"是显式防线，不是运气。
+starter 聚合自动装配（14 个 AutoConfiguration，详见 [14 篇](14-starter-autoconfig.md)），用户只需 `spring-boot-starter-web` 一行依赖即可启动。同时它在依赖源头排除 Tomcat 的 `spring-boot-starter-web`（[§1.3](#13-starter-排除-tomcat-的反向防线)），并在 `SpringWebAutoConfiguration` 启动期检测 SpringMVC 冲突抛 `IllegalStateException`——"零冲突"是显式防线，不是运气。
 
 ### 6.4 同包覆盖：support 桥接的根基
 
@@ -511,7 +525,7 @@ support 模块在 `src/main/java/org/springframework/web/servlet/` 等路径下*
 - [11 篇](11-async-streaming.md) 展开 `async/stream` 与 `AbstractNettyStreamSender`；
 - [12 篇](12-support-bridge.md) 展开 support 的同包覆盖与 `WebMvcConfigurerBridge`；
 - [13 篇](13-batch-module.md) 展开 batch 的 Disruptor 聚合切入点；
-- [14 篇](14-starter-autoconfig.md) 展开 starter 的 10 个 AutoConfiguration 与零冲突防线。
+- [14 篇](14-starter-autoconfig.md) 展开 starter 的 14 个 AutoConfiguration 与零冲突防线。
 
 记住两个校正（生命周期由 `start()` 触发、路径匹配 Filter 在 `core/filter`），后续阅读源码就不会在错误的位置扑空。
 
