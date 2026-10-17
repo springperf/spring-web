@@ -18,7 +18,7 @@ A high-performance Netty-based web framework, compatible with Spring MVC program
 <img src="docs/images/perf-benchmark-en.svg" alt="Performance Benchmark Chart"/>
 </p>
 
-> **100% win rate** — perf is **#1 on all 7 APIs × 3 concurrency levels** vs Spring MVC (Tomcat/Undertow) and WebFlux, no exceptions. json p50 at 16 threads is just **69%** of Spring MVC, allocation per request **43%** of it, and heap at 4 threads is **24MB** (the lowest).
+> **100% win rate** — perf is **#1 on all 7 APIs × 3 concurrency levels** vs Spring MVC (Tomcat/Undertow) and WebFlux, no exceptions. json p50 at 16 threads is just **69%** of Tomcat, allocation per request **43%** of it, and heap at 4 threads is **24MB** (the lowest).
 >
 > [Full Benchmark Report](docs/en/benchmark.md) · [Performance Principles](docs/en/performance-principles.md)
 
@@ -36,7 +36,7 @@ A high-performance Netty-based web framework, compatible with Spring MVC program
 >
 > **Spring WebPerf was born from this question.** Goal: maximize web framework performance while remaining fully compatible with the Spring ecosystem.
 >
-> [View Benchmark Report](docs/en/benchmark.md) · [Performance Principles](docs/en/performance-principles.md) · [Full Origin Story](docs/en/overview.md) · [Changelog](CHANGELOG.md) · [Breaking Changes](docs/breaking-changes.md)
+> [View Benchmark Report](docs/en/benchmark.md) · [Performance Principles](docs/en/performance-principles.md) · [Full Origin Story](docs/en/overview.md) · [Changelog](CHANGELOG.md) · [Breaking Changes](docs/en/breaking-changes.md)
 
 ---
 
@@ -54,8 +54,8 @@ Spring WebPerf is a high-performance web framework built on **Netty 4.1**, desig
 - **Async Native** — Built-in support for DeferredResult, Callable, SseEmitter, StreamEmitter, Reactive Streams; SSE throughput reaches 12.63x of Spring MVC at 4 threads / 7.72x at 16 threads
 - **Batch Processing** — Disruptor-based request aggregation that transparently merges concurrent requests into batch operations, boosting throughput by multiple times; supports backpressure strategies, wait strategies, and thread pool isolation
 - **Extensible** — SPI at every key juncture: argument resolvers, return value handlers, codec interceptors, filters, interceptors
-- **Ecosystem Bridge** — The `spring-web-servlet` module bridges Servlet Filters, Spring MVC `HandlerInterceptor`, `RequestBodyAdvice` / `ResponseBodyAdvice`
-- **Server-Side Rendering** — Optional `spring-web-view` module adds Thymeleaf / FreeMarker template rendering; `@Controller` + `Model` + view-name programming model matches Spring MVC
+- **Ecosystem Bridge** — `spring-web-servlet` bridges Servlet `Filter` / `Servlet` / `HttpSession` / JSP; `spring-web-mvc-support` bridges Spring MVC `HandlerInterceptor`, `RequestBodyAdvice` / `ResponseBodyAdvice`
+- **Server-Side Rendering** — Optional `spring-web-view` module adds Thymeleaf / FreeMarker / Beetl template rendering; `@Controller` + `Model` + view-name programming model matches Spring MVC
 - **Actuator Integration** — Supports Spring Boot Actuator with optional standalone management port
 
 ---
@@ -192,7 +192,7 @@ adaptation branches. Minimum supported: **Spring Boot 2.7.x**.
 | Module | Description |
 |--------|-------------|
 | `spring-web` | Core: Netty server, request dispatch, mapping registration, exception handling |
-| `spring-web-view` | View rendering: Thymeleaf / FreeMarker template engines (optional) ¹ |
+| `spring-web-view` | View rendering: Thymeleaf / FreeMarker / Beetl template engines (optional) ¹ |
 | `spring-web-servlet` | Servlet bridge: `Filter`, `Servlet`, `HttpSession`, JSP — zero Spring MVC dependency |
 | `spring-web-mvc-support` | Spring MVC compatibility: `HandlerInterceptor`, `View` adapters, etc. ² |
 | `spring-web-websocket` | WebSocket support: Spring WebSocket + Netty |
@@ -202,8 +202,9 @@ adaptation branches. Minimum supported: **Spring Boot 2.7.x**.
 | `spring-web-support-test` | Bridge-layer compatibility tests |
 | `spring-web-benchmark` | JMH benchmarks + report generator (5 stacks: perf / perf-support / tomcat / undertow / webflux) |
 | `spring-web-examples` | Usage examples for various scenarios |
+| `coverage-aggregate` | Test coverage aggregation (not for consumers) |
 
-> ¹ View rendering usage and Spring MVC differences: [View Rendering](docs/view.md).
+> ¹ View rendering usage and Spring MVC differences: [View Rendering](docs/en/view.md).
 >
 > ² Some classes in the `spring-web-mvc-support` module use `org.springframework.web.servlet` package paths (e.g., `HandlerInterceptor`), intentionally matching Spring WebMVC's official package paths — code written against Spring MVC interfaces can run without import changes. However, this means the module and `spring-webmvc` **cannot coexist** — having both on the classpath will cause class conflicts at runtime. Under Java 9+ module system this also triggers split package errors. Choose one or the other. Users who only need Servlet compatibility should depend on `spring-web-servlet` only, which keeps `org.springframework.web.servlet.*` classes off the classpath.
 >
