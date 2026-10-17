@@ -91,11 +91,13 @@ public class SseEmitter extends StreamEmitter<Object> {
     }
 
     /**
-     * 编码 {@link ServerSentEvent}。字段值含 LF 时的分工（不要误判为漏改）：
+     * 编码 {@link ServerSentEvent}。字段值含换行时的分工：
      * <ul>
-     *   <li>{@code id} / {@code event}：字段值原样写出（不做续行）—— 由 {@link #assertNoNewline} 拒绝含 LF 的值；</li>
-     *   <li>{@code data}：自由文本，经 {@link #writeBytesWithNewline} 按 LF 续行；</li>
-     *   <li>{@code comment}：同理自行续行。</li>
+     * <li>{@code id} / {@code event}：SSE 规范要求单行，且一个裸 LF 就能让客户端把后续内容解析成新字段 （协议注入）。Spring 6.2 的**某个补丁版本**起
+     * {@code ServerSentEvent} builder 才在构造期拒绝， Boot 3.2~3.4 对应的 Spring 6.1 / 6.2 早期并不拒绝——差异在 patch 级，不可依赖，故此处写出前自行校验
+     * （{@link #assertNoNewline}）；</li>
+     * <li>{@code data}：自由文本，builder 不校验，故经 {@link #writeBytesWithNewline} 按 LF 续行；</li>
+     * <li>{@code comment}：同理自行续行。</li>
      * </ul>
      */
     protected void encodeServerSentEvent(ServerSentEvent sse, OutputStream out) throws IOException {
@@ -158,6 +160,7 @@ public class SseEmitter extends StreamEmitter<Object> {
     protected static void writeDataBytes(OutputStream out, byte[] bytes) throws IOException {
         writeBytesWithNewline(out, bytes, NEWLINE_DATA);
     }
+
 
     private static void writeBytesWithNewline(OutputStream out, byte[] bytes, byte[] continuation) throws IOException {
         int start = 0;
