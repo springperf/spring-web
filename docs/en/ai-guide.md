@@ -39,7 +39,7 @@ This guide explains how to migrate a standard Spring AI project to this framewor
 </dependency>
 ```
 
-> Spring AI version is managed via BOM. See the example project's `pom.xml` for details.
+> The Spring AI version is managed by the **root pom's `spring-ai-bom`** (`spring-ai.version`); the example project inherits it through the parent, so no declaration is needed in the example pom.
 
 ---
 
@@ -119,7 +119,7 @@ If `/chat/stream` returns `{"scanAvailable":true,"prefetch":-1}` instead of stre
 
 ### Application Class
 
-No special configuration needed — a standard `@SpringBootApplication` works:
+The application class needs `@ConfigurationPropertiesScan` (as `AiApplication` in the example does) — binding of `spring.ai.openai.*` depends on it, and without it the model endpoint is unavailable:
 
 ```java
 @SpringBootApplication

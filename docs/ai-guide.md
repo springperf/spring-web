@@ -39,7 +39,7 @@
 </dependency>
 ```
 
-> Spring AI 版本通过 BOM 统一管理，参见示例项目的 `pom.xml`。
+> Spring AI 版本通过**根 pom 的 `spring-ai-bom`** 统一管理（`spring-ai.version`），示例项目经 parent 继承，无需在示例 pom 中重复声明。
 
 ---
 
@@ -119,10 +119,11 @@ export AI_API_KEY=sk-your-real-key
 
 ### 启动类
 
-启动类无需特殊配置，标准的 `@SpringBootApplication` 即可：
+启动类需要 `@ConfigurationPropertiesScan`（示例 `AiApplication` 即如此）——`spring.ai.openai.*` 的属性绑定依赖它，缺失会导致 model 端点不可用：
 
 ```java
 @SpringBootApplication
+@ConfigurationPropertiesScan
 public class Application {
     public static void main(String[] args) {
         SpringApplication.run(Application.class, args);
