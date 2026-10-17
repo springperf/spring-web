@@ -182,4 +182,55 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>mutation</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.pitest</groupId>
+                        <artifactId>pitest-maven</artifactId>
+                        <version>1.16.1</version>
+                        <configuration>
+                            <!-- 只对每请求热点包做变异：全模块是小时级，且大部分代码已有 E2E 覆盖。
+                                 暂不设 mutationThreshold —— 先积累 baseline，避免第一天就因为一个
+                                 「等价变异」把周跑判红。 -->
+                            <targetClasses>
+                                <param>io.springperf.web.core.mapping.*</param>
+                                <param>io.springperf.web.core.arg.resolver.*</param>
+                                <param>io.springperf.web.core.retval.*</param>
+                            </targetClasses>
+                            <targetTests>
+                                <param>io.springperf.web.core.*Test</param>
+                            </targetTests>
+                            <outputFormats>
+                                <param>HTML</param>
+                                <param>XML</param>
+                            </outputFormats>
+                            <timestampedReports>false</timestampedReports>
+                            <failWhenNoMutations>false</failWhenNoMutations>
+                        </configuration>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.pitest</groupId>
+                                <artifactId>pitest-junit5-plugin</artifactId>
+                                <version>1.2.2</version>
+                            </dependency>
+                            <dependency>
+                                <!-- pitest-junit5-plugin 自带的 launcher 版本低于本项目实际使用的 platform
+                                     （jupiter 5.12.2 → platform 1.12.2），两者不齐会在 minion 里报
+                                     "OutputDirectoryProvider not available" 并直接失败。
+                                     注意：pom 的 junit-jupiter.version=5.10.5 只指向聚合 POM，api/engine 仍由
+                                     Boot BOM 决定为 5.12.2，因此这里必须对齐 1.12.2 而不是 5.10.5。 -->
+                                <groupId>org.junit.platform</groupId>
+                                <artifactId>junit-platform-launcher</artifactId>
+                                <version>1.12.2</version>
+                            </dependency>
+                        </dependencies>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

@@ -128,6 +128,24 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
   `--online` in CI: the default `-o` fails on a cold local repository, and that failure is not a leak
   verdict.
 
+### Version Matrix, Architecture and Mutation
+
+- The `spring-boot-versions` job runs the core module's **tests** on Spring Boot 3.2 / 3.3 / 3.4.
+  Tests rather than `compile` is deliberate: a version switch changes behaviour (the
+  `ServerSentEvent` newline check only appeared in a 6.2 patch, and `SseEmitter` now guards it itself)
+  and surfaces missing runtime symbols that `javac` cannot see. 3.0 / 3.1 are out of scope - see
+  `docs/compatibility.md` for the measured reason.
+- `ArchitectureRulesTest` (`spring-web-test`, ArchUnit) turns four documented promises into assertions:
+  core does not depend on `jakarta.servlet` or `org.springframework.web.servlet`; the request hot path
+  (`core.mapping`, `core.arg.resolver`, `core.retval`) contains no `Method.invoke`; and `util` does not
+  depend on `core`/`server`/`context`. These are exactly the constraints Maven's dependency graph
+  cannot express.
+- `.github/workflows/mutation.yml` runs PIT weekly over the same three hot packages (`-Pmutation`),
+  report-only. The mapping package alone produces ~435 mutants in about a minute; survived mutants need
+  human triage before a threshold means anything.
+- The `build` job also emits an aggregate SBOM (`target/bom.json`) as an artifact. It is for delivery
+  traceability only - this project does not publish to Maven Central.
+
 ### Formatting
 
 - Source formatting is **explicitly invoked**, never run implicitly:

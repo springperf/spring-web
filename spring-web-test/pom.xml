@@ -26,6 +26,14 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
         <dependency>
+            <!-- 架构约束：把「core 不依赖 Servlet/SpringMVC」「热点路径零反射」写成可执行规则。
+                 版本独立于 Spring Boot BOM，故此处显式声明。 -->
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>1.3.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>io.github.springperf</groupId>
             <artifactId>spring-web-mvc-support</artifactId>
         </dependency>
