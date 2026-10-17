@@ -65,14 +65,17 @@
 
 | 依赖 | 当前版本 | 已验证兼容范围 | 说明 |
 |------|---------|---------------|------|
-| Spring Boot | **3.5.16** | 3.0.x ~ 3.5.x | 通过 Maven Profile 切换（`-Pspring-boot-3.0` ~ `-Pspring-boot-3.5`）；4.x 见 `4.1.x` 分支 |
-| Spring Framework | **6.2.x** | 6.0.x ~ 6.2.x | 随 Spring Boot 管理 |
+| Spring Boot | **4.1.0** | 4.0.x ~ 4.1.x | 通过 Maven Profile 切换（`-Pspring-boot-4.0` / `-Pspring-boot-4.1`，默认 4.1）；3.5.x 见 `master` 分支 |
+| Spring Framework | **6.2.x** | 6.1.x ~ 6.2.x | 随 Spring Boot 管理 |
 | JDK | **17** | 17 / 21 / 25（CI 矩阵，见 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)） | 编译目标 `java.version=17`；JDK 21 起支持虚拟线程（见下） |
 | Servlet API | **jakarta.servlet 6.0** | 6.0.x | javax.servlet 不兼容 |
 | Netty | **4.1.137.Final** | 4.1.x |  |
 | Jackson | **2.17.2** | 2.17.x |  |
 | Lombok | **1.18.46** | 1.18.30+ | JDK 17+ 兼容性要求高版本 |
 | JMH | **1.37** | 1.37 | 仅 benchmark 模块使用 |
+
+> 兼容性由 `ci.yml` 的 `spring-boot-versions` 矩阵（4.0 / 4.1）跑核心模块**单测**验证——只验证
+> `compile` 证明不了运行期符号存在。将来支持 4.2 时会在矩阵中追加 4.2 并保留 4.1。
 
 ### 额外特性
 

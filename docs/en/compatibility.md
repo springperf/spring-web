@@ -68,14 +68,18 @@ The lowest supported line across the three branches is **Spring Boot 2.7.x** (va
 
 | Dependency | Current Version | Verified Range | Notes |
 |------------|----------------|----------------|-------|
-| Spring Boot | **3.5.16** | 3.0.x ~ 3.5.x | Switch via Maven profile (`-Pspring-boot-3.0` ~ `-Pspring-boot-3.5`); for 4.x see the `4.1.x` branch |
-| Spring Framework | **6.2.x** | 6.0.x ~ 6.2.x | Managed by Spring Boot |
+| Spring Boot | **4.1.0** | 4.0.x ~ 4.1.x | Switch via Maven profile (`-Pspring-boot-4.0` / `-Pspring-boot-4.1`, 4.1 by default); for 3.5.x see the `master` branch |
+| Spring Framework | **6.2.x** | 6.1.x ~ 6.2.x | Managed by Spring Boot |
 | JDK | **17** | 17 / 21 / 25 (CI matrix, see [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)) | Compile target `java.version=17`; JDK 21+ supports virtual threads (see below) |
 | Servlet API | **jakarta.servlet 6.0** | 6.0.x | javax.servlet incompatible |
 | Netty | **4.1.137.Final** | 4.1.x | |
 | Jackson | **2.17.2** | 2.17.x | |
 | Lombok | **1.18.46** | 1.18.30+ | Higher version needed for JDK 17+ compatibility |
 | JMH | **1.37** | 1.37 | Benchmark module only |
+
+> Compatibility is verified by the `spring-boot-versions` matrix in `ci.yml` (4.0 / 4.1) running
+> core-module **tests** - a green `compile` says nothing about runtime symbol resolution. A future 4.2
+> release will be appended to the matrix while keeping 4.1.
 
 ### Additional Features
 
