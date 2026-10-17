@@ -157,7 +157,7 @@ public StaticArgumentResolver getResolver(MethodParameter parameter, MappingHand
 |------|---------|---------|-----------|
 | MultiValueMap | `MultiValueMap.isAssignableFrom(paramType)` | `MultiValueMap<String, T>` | 整体返回 `MultiValueMap`（如 `@RequestParam MultiValueMap<String, String>`） |
 | SimpleMap | `Map.isAssignableFrom(paramType)` | `Map<String, T>` | `multiValueMap.toSingleValueMap()` |
-| Collection | `Collection || paramType.isArray()` | `List<T>` | `multiValueMap.get(name)` |
+| Collection | `Collection \|\| paramType.isArray()` | `List<T>` | `multiValueMap.get(name)` |
 | SingleValue | 兜底 | `T`（单个值） | `multiValueMap.getFirst(name)` |
 
 每个子类只需实现 `getMultiValueMapResolver()` 返回一个 `MultiValueMapResolver` lambda，声明数据源。例如：
