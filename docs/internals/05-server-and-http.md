@@ -42,7 +42,8 @@ public void start() {
     this.http2Enabled = webContext.getProps().getBoolean(PropertiesConstant.HTTP2_ENABLED, false);
     // ③ 启动期（单线程、Netty 未接受连接前）获取 DispatcherHandler
     DispatcherHandler dispatcher = webContext.getWebComponent(DispatcherHandler.class);
-    this.httpHandler = new NettyHttpHandler(webContext, webContext.getContextPath(), dispatcher);
+    this.httpHandler = new NettyHttpHandler(webContext, webContext.getContextPath(), dispatcher,
+            compressionEnabled, ResponseLimitConfig.DEFAULT);   // 服务器实际使用 5 参重载
     // ④ boss/worker EventLoopGroup（transport 由 server.netty.transport 决定）
     int port = webContext.getProps().getInt(PropertiesConstant.SERVER_PORT);
     int workerThreads = webContext.getProps().getInt(PropertiesConstant.SERVER_NETTY_WORKERS);
@@ -317,7 +318,7 @@ private void addHttp11Handlers(ChannelPipeline p) {
 | 6 | `addAggregator` | 聚合成 `FullHttpRequest` | 分流见 [§3.3](#33-addaggregatormultipart-分流) |
 | 7 | afterAggregator handlers | SPI 插入点 | WebSocket 握手 handler 插这里，拿聚合后的 FullHttpRequest |
 | 8 | `BackpressureHandler.INSTANCE` | 背压回调 | 见 [§7](#七背压机制writewatermark--backpressurehandler) |
-| 9 | `addKeepAlive` | keep-alive 策略 | 按 `server.keep-alive-time` / `max-keep-alive-requests` 决定是否复用连接 |
+| 9 | `addKeepAlive` | keep-alive 策略 | 按 `server.keep-alive-timeout` / `server.max-keep-alive-requests` 决定是否复用连接 |
 | 10 | `httpHandler` | `NettyHttpHandler` 入口 | 见 [§4](#四nettyhttphandler入口适配层) |
 
 **索引中写的 `SslHandler` → `HttpTrafficHandler` 是早期规划命名**，实际 HTTP/1.1 管线里没有叫 `HttpTrafficHandler` 的类——业务 handler 就是 `NettyHttpHandler`，背压由独立的 `BackpressureHandler` 担当。`SslHandler` 只在分支 A/B（TLS）出现，分支 D（明文默认）没有。
@@ -377,10 +378,11 @@ buf.startsWithPreface(H2_PREFACE_BYTES)?
 private final List<ChannelHandler> beforeAggregatorHandlers = new ArrayList<>();
 private final List<ChannelHandler> afterAggregatorHandlers = new ArrayList<>();
 
-public void addBeforeAggregator(ChannelHandler handler) { beforeAggregatorHandlers.add(handler); }
-public void addAfterAggregator(ChannelHandler handler)  { afterAggregatorHandlers.add(handler); }
+public PipelineCustomizer addBeforeAggregator(ChannelHandler handler) { beforeAggregatorHandlers.add(handler); return this; }
+public PipelineCustomizer addAfterAggregator(ChannelHandler handler)  { afterAggregatorHandlers.add(handler); return this; }
 public List<ChannelHandler> getBeforeAggregatorHandlers() { return Collections.unmodifiableList(beforeAggregatorHandlers); }
 public List<ChannelHandler> getAfterAggregatorHandlers()  { return Collections.unmodifiableList(afterAggregatorHandlers); }
+public boolean hasHandlers() { return !beforeAggregatorHandlers.isEmpty() || !afterAggregatorHandlers.isEmpty(); }
 ```
 
 两个插入点（aggregator 前 / 后）的区分有意义：
@@ -429,9 +431,17 @@ ALPN 协商在 TLS 握手阶段完成，**握手后就知道走 h2 还是 h1.1**
 @ChannelHandler.Sharable
 public class NettyMetricsHandler extends ChannelInboundHandlerAdapter {
     private final AtomicInteger activeConnections = new AtomicInteger();
+    private final int maxConnections;   // server.max-connections，<=0 表示不限制
 
-    @Override public void channelActive(ChannelHandlerContext ctx) { activeConnections.incrementAndGet(); ... }
-    @Override public void channelInactive(ChannelHandlerContext ctx) { activeConnections.decrementAndGet(); ... }
+    @Override public void channelActive(ChannelHandlerContext ctx) {
+        if (maxConnections > 0 && activeConnections.incrementAndGet() > maxConnections) {
+            activeConnections.decrementAndGet();
+            ctx.close();                 // 超限：拒绝新连接
+            return;
+        }
+        ctx.fireChannelActive();
+    }
+    @Override public void channelInactive(ChannelHandlerContext ctx) { activeConnections.decrementAndGet(); ctx.fireChannelInactive(); }
     public int getActiveConnectionCount() { return activeConnections.get(); }
 }
 ```
@@ -473,7 +483,7 @@ public void channelRead(ChannelHandlerContext ctx, Object msg) {
 }
 ```
 
-`@Sharable`（[`NettyHttpHandler.java`](../../spring-web/src/main/java/io/springperf/web/server/NettyHttpHandler.java) 类注解）——所有连接共享一个实例（`NettyHttpServer` 启动期 `new` 一次，:62）。`channelRead` 的 `try/finally release(msg)` 是入口的引用计数对称：Netty 的 `FullHttpRequest` 是堆外 ByteBuf 持有的引用计数对象，进来一次引用，处理完必须在入口释放——否则每请求泄漏一个 ByteBuf。
+`@Sharable`（[`NettyHttpHandler.java`](../../spring-web/src/main/java/io/springperf/web/server/NettyHttpHandler.java) 类注解）——所有连接共享一个实例（`NettyHttpServer` 启动期 `new` 一次，见 `NettyHttpServer.java:85-86`）。`channelRead` 的 `try/finally release(msg)` 是入口的引用计数对称：Netty 的 `FullHttpRequest` 是堆外 ByteBuf 持有的引用计数对象，进来一次引用，处理完必须在入口释放——否则每请求泄漏一个 ByteBuf。
 
 但"处理完"的语义在这里很微妙：`handleRequest` 内部会 `msg.retain()`（见下文），因为请求对象要传给 `DispatcherHandler`，可能跨线程到业务池，生命周期超出 `channelRead` 的栈。**入口 `release` 的是自己那次引用，`handleRequest` 的 `retain` 给业务侧新加一次引用**——两者配对，引用计数最终归零由业务侧 `release` 负责（见 [§5.5](#55-acquirerelease引用计数契约)）。
 
@@ -573,10 +583,11 @@ public boolean containsKey(Object key) { return headers.contains(key); }
 // ...
 
 // 写 API 受 writable 控制
-public Object put(String key, String value) {
+public List<String> put(String key, List<String> value) {
     checkWritable();                 // 只读时抛 UnsupportedOperationException
-    headers.add(key, value);         // 否则直接写穿 Netty headers
-    return null;
+    List<String> previous = headers.getAll(key);   // 记住旧值
+    headers.set(key, value);         // 否则直接写穿 Netty headers（set 语义：整体替换）
+    return previous;
 }
 ```
 
@@ -587,21 +598,21 @@ public Object put(String key, String value) {
 
 **附带修复一个旧 bug**：旧实现把 header 拷进 `LinkedMultiValueMap`（大小写敏感），导致 Netty 原生的大小写不敏感解析丢失——小写 key 的 `get("content-type")` 拿不到 `Content-Type` 的值。直接委托 Netty headers 保留了原生大小写不敏感，这个问题随之消失。
 
-### 5.2 `WebHttpHeaders`：两处优化
+### 5.2 `WebHttpHeaders`：常量名直通（解析缓存已被移除）
 
-`WebHttpHeaders` 继承 Spring 的 `HttpHeaders` 并实现 `MultiValueMap`，**不含任何跨版本分支**——父类在 Spring 6 下本就实现了 `MultiValueMap`，本类的覆写只是为下面两处优化提供入口，其余一律委派 `super`：
+`WebHttpHeaders` 继承 Spring 的 `HttpHeaders` 并实现 `MultiValueMap`，**不含任何跨版本分支**——父类在 Spring 6 下本就实现了 `MultiValueMap`，本类的覆写只是为下面这处优化提供入口，其余一律委派 `super`：
 
 | 优化 | 做法 |
 |------|------|
-| Content-Type 解析缓存 | 缓存 `getContentType()` 的 `parseMediaType` 结果（`cachedContentType`），避免重复解析；`setContentType` 时清缓存 |
 | 常量名直通 | 当底层存储是可写的 `NettyHttpHeadersAdapter` 时，Content-Type 的读写走 `HttpHeaderNames` 常量名直通 Netty，省掉按 String 名查找与 `AsciiString` 名字重算哈希 |
+
+> **一处被移除的优化（勿再当作现存机制）**：早期版本曾用 `cachedContentType` 字段缓存 `getContentType()` 的 `parseMediaType` 结果，**该缓存已被移除**——类注释说明它只能由 `setContentType(MediaType)` 失效，而 `set(HttpHeaders.CONTENT_TYPE, ...)` / `put(...)` 改的是同一个底层 header 却不会清缓存，实测命中 `NoSuchMethodException`（`MediaType.valueOf`）。当前类只保留 `private final HttpHeaders rawHeaders` 一个字段。
 
 ```java
 // WebHttpHeaders.java
 public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String, String> {
 
-    /** 缓存 getContentType() 的解析结果 */
-    private MediaType cachedContentType;
+    private final io.netty.handler.codec.http.HttpHeaders rawHeaders;
     ...
 }
 ```
@@ -692,8 +703,8 @@ public void acquire() {
 }
 
 @Override
-public void release() {
-    ReferenceCountUtil.release(request);  // -1，幂等
+public boolean release() {
+    return ReferenceCountUtil.release(request);  // -1，返回是否真正释放
 }
 ```
 
@@ -748,7 +759,7 @@ public OutputStream getBody() {
 
 ```java
 // NettyServerHttpResponse.java  initHttpResponse（三 DefaultHttpResponse 分支）
-private HttpResponse initHttpResponse(ByteBuf body, String contentType, HttpHeaders headers, boolean chunked) {
+private HttpResponse initHttpResponse(ByteBuf buf, String contentType, HttpStatusCode statusCode, boolean chunked) {
     HttpResponse response;
     if (body != null) {
         response = new DefaultFullHttpResponse(HTTP_1_1, status, body, nettyHeaders, EmptyHttpHeaders.INSTANCE);
@@ -829,35 +840,39 @@ public void writeFile(File file) throws IOException {
 
 ```java
 // BaseWebServerHttpResponse.java
-private final AtomicBoolean handled = new AtomicBoolean(false);
-private final AtomicBoolean committed = new AtomicBoolean(false);
+protected AtomicBoolean handled = new AtomicBoolean(false);
+protected AtomicBoolean committed = new AtomicBoolean(false);
 
 // BaseWebServerHttpResponse.java  setHandled
-public void setHandled() { handled.compareAndSet(false, true); }
+public boolean setHandled() { return handled.compareAndSet(false, true); }
 
 // BaseWebServerHttpResponse.java  setCommitted
-public void setCommitted() {
+protected boolean setCommitted() {
     setHandled();                              // committed 隐含 handled
-    if (committed.compareAndSet(false, true)) {
+    boolean result = committed.compareAndSet(false, true);
+    if (result) {
         setTimeout(null, -1);                  // 取消超时
     }
+    return result;
 }
 ```
 
-`handled`（业务侧已处理）和 `committed`（响应已写回 Channel）是两个独立 CAS 状态。`setCommitted` 隐含 `setHandled`（已写回当然算已处理），并取消超时——响应一旦 commit，超时定时器就没意义了，取消避免定时器误触发。
+`handled`（业务侧已处理）和 `committed`（响应已写回 Channel）是两个独立 CAS 状态，字段为 `protected`（子类可直接访问）。`setHandled()` 返回 CAS 结果——重复写（如 `doHandle` 正常返回后又 `handleException`）会由返回 false 的那方只 `log.warn` 不重复写。`setCommitted` 隐含 `setHandled`（已写回当然算已处理），并取消超时——响应一旦 commit，超时定时器就没意义了，取消避免定时器误触发。
 
-`setTimeout`用 `scheduleOnEventLoop(task, delay, MS)` 在 EventLoop 上调度超时任务——必须在 EventLoop 线程调度，避免跨线程定时器的锁开销。`sendError`用 `escapeJson`转义错误消息，防 XSS。
+`setTimeout`用 `scheduleOnEventLoop(task, delay, MS)` 在 EventLoop 上调度超时任务——必须在 EventLoop 线程调度，避免跨线程定时器的锁开销。错误页渲染由 `ErrorPageRenderer` 负责，其中的 `escapeHtml(...)` 对 reason/message/path 做 HTML 转义防 XSS（注意：不是 `sendError` 里的 JSON 转义，也没有 `escapeJson` 这个方法）。
 
 ### 6.7 `WriteRespEventListener`：写出回调
 
 ```java
 // NettyServerHttpResponse.java  addRespEventListener
 @Override
-public void addRespEventListener(WriteRespEventListener listener) {
-    if (isComplete()) {
-        // 已完成 → 触发 complete 回调
-    } else {
-        // 未完成 → 注册 writeStream 回调
+public void addRespEventListener(ChannelFuture channelFuture, boolean isComplete) {
+    if (writeRespEventListener != null) {
+        if (isComplete) {
+            channelFuture.addListener(future -> { /* 成功/失败 → completeSuccess/ErrorCallback */ });
+        } else {
+            channelFuture.addListener(future -> { /* 成功/失败 → writeStreamSuccess/ErrorCallback */ });
+        }
     }
 }
 ```
@@ -920,8 +935,8 @@ public final class BackpressureHandler extends ChannelInboundHandlerAdapter {
 ```java
 // ConnectionContext.java
 public class ConnectionContext {
-    private volatile boolean lastWritable = true;   // 上次状态，初始 true
-    private volatile Runnable onWritable;           // 可写回调
+    private boolean lastWritable = true;   // 上次状态，初始 true（非 volatile：只在 EventLoop 线程读写）
+    private Runnable onWritable;           // 可写回调
 
     public boolean lastWritable() { return lastWritable; }
     public void updateWritable(boolean w) { this.lastWritable = w; }
