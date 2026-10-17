@@ -82,13 +82,55 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 - The contract-doc checker (`python scripts/check-docs.py` + `python scripts/check-doc-symbols.py`) is
   ported to this branch and is run against this tree (72 markdown files, 0 defects; the symbol checker
   carries a small branch-specific allow-list for the `master` section of `docs/(en/)compatibility.md`).
-  It is how the docs that called `ModelContext` by the name `ModelSupport` were found.
-  Its rules are worth remembering: it checks that the keys, classes and members the **contract docs** name
-  actually exist (including keys the code builds by concatenation), and that paired documents stay paired.
-  It never checks whether a sentence is *true* — only the code does that.
-- Four documents are user-facing and must stay **paired**: `CHANGELOG.md`, `docs/configuration.md`,
-  `docs/compatibility.md` and `docs/breaking-changes.md` each have a mirror under `docs/en/` —
-  change one side and you change the other.
+- `scripts/check-docs.sh` also runs `scripts/check-doc-symbols.py`, which checks that the keys, classes and
+  members the **contract docs** name actually exist - including keys the code builds by concatenation
+  (`"server.ssl." + "enabled"`, `"management.endpoints.web.exposure" + ".include"`), which a plain literal scan
+  misses: the first run reported 34 such keys, all of them false alarms for exactly that reason.
+  One limit is deliberate and written in the file: it does not check whether a sentence is **true**. Its
+  unknown-class rule **is** a gate, carried by an explicit allow-list (`EXTERNAL_TYPES`) whose every entry names
+  where the symbol
+  comes from - a class defined in a doc snippet, a package this repository imports, or a class found in a local
+  jar, with the measured name collisions called out (the `ServiceLoader` hit was surefire, the
+  `ExceptionHandler` import was disruptor, and `HandlerExecutionChain` was in no local jar at all because
+  `spring-webmvc` is not on this machine). The triage that built the list is what justified the gate: it is how
+  the docs calling `ModelContext` by the name `ModelSupport` was found. When the rule fires on something
+  legitimate, add an entry with its origin - do not widen the rule. `member` references whose owner is unknown
+  go through the same rule, which closes the gap that let `ModelSupport.getOrCreate()` pass.
+  Files whose job is to list **removed** keys and members (`docs/breaking-changes.md`, `docs/(en/)changelog.md`)
+  are exempt from those rules in code, and `CONTRIBUTING.md`'s japicmp section from the member rule.
+  Four documents are user-facing and must stay **paired**: `CHANGELOG.md`, `docs/configuration.md`,
+  `docs/compatibility.md` and `docs/breaking-changes.md` each have a mirror under `docs/en/`, and
+  `check-docs.py` enforces it (a missing side is a defect) - change one side and you change the other.
+- The same entry point runs `scripts/check-doc-structure.py`, which checks markdown **structure** rather
+  than content: leftover CJK-parenthesis debris (`（ ）`, `（，`), empty inline code spans, table row/column
+  mismatches and fully empty columns, unbalanced code fences, and `.java` file references that name no
+  tracked file. Its first full run over 73 files found four real defects - a duplicated table row in both
+  `docs/extensions.md` and its English mirror, an unescaped `||` that split a table cell in
+  `docs/en/configuration.md`, and a stale source-file name left over from a rename. `.agent/` files other than
+  `module.md` are out of scope for the file-existence rule, matching `check-doc-symbols.py`: backport
+  checklists exist to name files that only the other branch has.
+
+### Coverage and Leak Gates
+
+- `scripts/check-coverage.py` is a gate, not a report. It reads the merged CSV that `coverage-aggregate`
+  produces in the `test` phase (`report-aggregate`, so E2E-driven coverage is included) and fails when
+  the totals fall below **92% line / 83% branch**, or when any library module drops below its floor
+  (`spring-web` 90%, the rest 80%). The floors sit 1.6-1.9 points under the measured 93.6% / 84.9%, so
+  ordinary noise does not redden a PR while a real regression does. A module **missing** from the CSV is
+  a defect too - an empty or partial aggregation must not pass silently. CI runs it in the `build` job
+  on JDK 17 only (one judgement over one dataset; the other matrix legs are for compatibility) and
+  uploads the CSV as an artifact.
+- E2E modules (`spring-web-test`, `spring-web-support-test`) set `rerunFailingTestsCount=1`: they bind
+  real ports and depend on network timing, so a single flake should not fail a PR. Retries stay visible
+  rather than silent - surefire records `Flaky:` in the report and the `build` job prints every such
+  report as a warning. Unit-test modules deliberately do **not** retry.
+- The `netty-leaks` job runs `scripts/check-netty-leaks.sh --run --online --clean 1` with
+  `-Dio.netty.leakDetection.level=paranoid` (plus `targetRecords=16`) and fails on any `LEAK: ByteBuf`
+  report. The script treats a missing paranoid property as a warning so it stays usable offline; the job
+  re-checks it with `grep -q`, because "zero leaks" must not come from a detector that never ran. Use
+  `--online` in CI: the default `-o` fails on a cold local repository, and that failure is not a leak
+  verdict.
+
 ### Formatting
 
 - This branch does **not** carry master's `format` profile (rewrite `RemoveUnusedImports`, Eclipse-style
