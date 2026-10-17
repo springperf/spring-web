@@ -103,8 +103,8 @@ RouterOptimizer 链:
 
 ### 为什么快
 
-- **全路径精确匹配 O(1)**：`@GetMapping("/api/users/{id}")` 编译为全路径模式，`FullPathRouterOptimizer` 使用 `HashMap` 直接命中。
-- **前缀匹配 HashMap**：`/api/**` 等前缀模式按选定前缀段拼接的字符串作 `HashMap` key（`PrefixPathRouterOptimizer`），`/api/users/{id}` 与 `/api/orders/{id}` 共享 `/api` 前缀命中同一 `Router`，O(1) 查找。
+- **全路径精确匹配 O(1)**：**无通配符**的路径（如 `/api/users/list`）进 `simpleUrlList`，由 `FullPathRouterOptimizer` 用 `HashMap` 直接命中（判据是 `PathPatternUtils.pathHaveWildcard`，含 `{`/`}` 即算通配）。
+- **前缀匹配 HashMap**：含 `{var}` 等通配符的路径走这一层——按最长无通配前缀段拼接的字符串作 `HashMap` key（`PrefixPathRouterOptimizer`），`/api/users/{id}` 与 `/api/orders/{id}` 共享 `/api` 前缀命中同一 `Router`，O(1) 查找。**注意 `/api/users/{id}` 属于前缀层而非全路径层**。
 - **Spring MVC 的 `AntPathMatcher.match`** 每次请求逐段字符串匹配，包含通配符展开、正则匹配，时间复杂度 O(path segments × pattern length)。
 - **`PathPattern`（Spring 5.3+）** 虽比 `AntPathMatcher` 快，但仍然是每次请求的匹配，无多级路由缓存。
 
@@ -181,7 +181,7 @@ public void acquire() { ReferenceCountUtil.retain(request); }   // retain 的是
 public boolean release() { return ReferenceCountUtil.release(request); }
 ```
 
-`acquire()`/`release()` 的判据是「**字段是否仍持有**该请求」（`release()` 读 `this.buf`/请求引用判断），因此所有权移交与字段置空必须同时发生——`flush(boolean)` 用 `takePendingBuf()` 先摘后写正是为此（见 [16 篇](16-code-spotlights.md) 聚光灯 6）。移交点在 `DispatcherHandler.handleWithMappingResult` 的 `executor != null` 分支：业务线程 `acquire()` 后 `executor.execute(...)`，任务 `finally` 中 `release()`；入站缓冲的最终释放在 `NettyHttpHandler.channelRead` 的 finally。
+`acquire()`/`release()` 的判据是「**字段是否仍持有**该请求」：`NettyServerHttpRequest.release()` 把请求本身交还引用计数，而**响应侧**的 `flush(boolean)` 用 `takePendingBuf()` 先摘空 `this.buf` 再写——两者共同保证「所有权已移交」与「字段不再持有」在同一时刻成立，写出完成回调里的兜底 `release()` 因此退化为 no-op（见 [16 篇](16-code-spotlights.md) 聚光灯 6）。移交点在 `DispatcherHandler.handleWithMappingResult` 的 `executor != null` 分支：业务线程 `acquire()` 后 `executor.execute(...)`，任务 `finally` 中 `release()`；入站缓冲的最终释放在 `NettyHttpHandler.channelRead` 的 finally。
 
 ### 为什么快
 
@@ -283,7 +283,7 @@ protected void drain() {
 | 消费模式 | 主动 drain 循环 | `SseEmitter.send()` 阻塞调用 |
 | 每连接线程 | 零（EventLoop 处理） | 一个容器线程 |
 | 背压 | `channel.isWritable()` + `channelWritabilityChanged` | `SseEmitter` 超时/异常 |
-| 高吞吐 | 7–11x Tomcat SSE（benchmark 数据） | 低吞吐（连接数增加时线性下降） |
+| 高吞吐 | SSE 7.72x Tomcat（16t；4t 12.63x、8t 11.90x，见 `docs/benchmark.md`） | 低吞吐（连接数增加时线性下降） |
 
 ---
 

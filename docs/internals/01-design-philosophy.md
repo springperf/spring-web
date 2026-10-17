@@ -126,7 +126,8 @@ public <T> T getAttribute(RequestAttribute<T> key) {
     if (idx < fastAttributes.length) {
         return (T) fastAttributes[idx];        // 数组直取，零对象创建
     }
-    return (T) attributes.get(FAST_ATTR_PREFIX + idx);  // 超界才回退 Map
+    Map<String, Object> map = attributes;      // 超界才回退 Map（可能尚未分配）
+    return map == null ? null : (T) map.get(FAST_ATTR_PREFIX + idx);
 }
 ```
 
@@ -159,10 +160,14 @@ ResponseStatusException ex = new StacklessResponseStatusException(status);
 // DispatcherHandler.java
 protected void handleWithMappingResult(WebServerHttpRequest req, WebServerHttpResponse resp,
                                         MappingResult mappingResult) {
-    // 通过 BizPoolRegistry 使用 Phase3 预缓存的线程池，
-    // 无映射或未标注 @RunInPool 时为 null → EventLoop 同步处理
+    // 通过 BizPoolRegistry 用 Phase3 预缓存的线程池：返回 null（无映射 / @RunInPool(EVENTLOOP) /
+    // default-execute-mode=eventloop）→ EventLoop 同步；返回非 null（缺省 default 池 /
+    // @RunInPool 命名池）→ 切业务线程
     ExecutorService executor = bizPoolRegistry.determinePool(req, mappingResult);
     if (executor != null) {
+        // 交棒到业务线程池：EventLoop 随之空闲，响应超时定时器自此才真正可能触发。
+        // 幂等：非 EventLoop 默认模式已在请求开始装配，此处为 no-op。
+        resp.armTimeoutIfAbsent();
         req.acquire();                       // 跨线程前 retain
         try {
             executor.execute(() -> {

@@ -10,7 +10,7 @@
 
 [02 篇](02-architecture-overview.md) 给了启动时序的宏观图，本篇把它拆到 `file:line` 粒度。读完本篇你应能回答：
 
-1. 为什么 `WebContext` 实现了 `InitializingBean` 却把 `afterPropertiesSet()` 留空？真正的三阶段编排由谁触发？
+1. 为什么 `WebContext` **不**实现 `InitializingBean`（早期版本那个留空的 `afterPropertiesSet()` 已被删除）？真正的三阶段编排由谁触发？
 2. 三阶段（Phase1/2/3）各自的职责边界在哪？为什么是这个顺序？
 3. 13 个 Registry 怎么进入容器树？哪些共享、哪些私有？
 4. "启动时确定"为什么不会让启动变慢、内存变大？——急切 vs 懒缓存的混合模式是什么？
@@ -131,7 +131,7 @@ public void initWithWebContext(WebContext webContext) {
 
 只有 2 个 Registry override Phase1：
 
-- **`MappingRegistry.initComponentPhase1`**（摘要）：用 `LinkedHashMap` 遍历 `@Controller` bean，`ClassUtils.getUserClass` 去代理类，`ReflectionUtils.getUniqueDeclaredMethods` 扫描方法，构建路由元数据。这里是 [D4 修复](00-README.md) 落地点——重复映射不再启动期拒绝，先注册者胜，保序用 `LinkedHashMap`。
+- **`MappingRegistry.initComponentPhase1`**（摘要）：用 `LinkedHashMap` 遍历 `@Controller` bean，`ClassUtils.getUserClass` 去代理类，`ReflectionUtils.getUniqueDeclaredMethods` 扫描方法，构建路由元数据。重复映射不再启动期拒绝，先注册者胜，保序用 `LinkedHashMap`。
 - **`WebDataBinderRegistry.initComponentPhase1`**（摘要）：`ControllerAdviceBean.findAnnotatedBeans` 收集 `@InitBinder` 方法到 `initBinderAdviceCache`（`LinkedHashMap<ControllerAdviceBean, Set<Method>>`），构造 `defaultConversionService`（`DefaultFormattingConversionService`）、`defaultValidator`、`messageCodesResolver`。
 
 ### Phase 2 · 跨组件连接建索引
@@ -167,19 +167,13 @@ Phase1（自建）→ Phase2（互连）→ Phase3（优化+校验）
 
 ## 四、生命周期触发链
 
-### afterPropertiesSet 是 no-op
+### 不走 InitializingBean：afterPropertiesSet 已被删除
 
-`WebContext` 实现了 `InitializingBean`，却把 `afterPropertiesSet()` 留空：
+`WebContext` **不实现** `InitializingBean`，也没有 `afterPropertiesSet()`——早期版本曾留空实现，该覆写**已被删除**（全仓主代码 grep `afterPropertiesSet`/`InitializingBean` 于 `WebContext` 零命中）：
 
 ```java
 // WebContext.java
-/**
- * No-op: lifecycle is now deferred to startLifecycle(),
- * triggered by NettyHttpServer#start().
- */
-@Override
-public void afterPropertiesSet() {
-}
+public class WebContext extends WebComponentContainer implements DisposableBean, ApplicationContextAware {
 ```
 
 这是容易误读的点：很多人会以为 `InitializingBean` 的 `afterPropertiesSet()` 是 Spring bean 初始化的"标准入口"，但 `WebContext` **根本不实现** `InitializingBean`（早期版本曾留空实现，已删除）——框架主动不走这条路。真正触发三阶段的是 `startLifecycle()`：
@@ -217,7 +211,7 @@ Spring Boot 启动
 注册所有 bean（含 WebContext、dispatcherHandler）
     │
     ▼ refresh 结束
-Spring LifecycleProcessor 调 SmartLifecycle.start()（按 phase 升序，WebContext phase=MAX 最后）
+Spring LifecycleProcessor 调 SmartLifecycle.start()（按 phase 升序，NettyHttpServer phase=MAX 最后启动）
     │
     ▼ NettyHttpServer.start()
 WebContext.startLifecycle()                                    [WebContext.java]
@@ -366,7 +360,7 @@ WebContext（根容器，getOrder=MAX_VALUE 最后启动）
 
 1. **MAPPING_CACHE_KEY 的两种类型**：`method`（每方法共享数组）用于 ArgumentResolverRegistry/ReturnValueResolverRegistry/BizPoolRegistry；`class`（每控制器类共享数组）用于 HttpBodyCodecInterceptorRegistry/WebDataBinderRegistry。两池索引独立、绝不碰撞——机制见第八节。**例外**：InterceptorRegistry/CorsRegistry/WebFilterRegistry 不走 MappingCacheKey，而是直接操作 PathMappingContext 的实例字段（`cachedInterceptors`/`corsConfigurationProvider`/`cachedFilterChain`，见 `PathMappingContext.java`/ 等），三者存的是 `List`/`Provider`/`FilterChain` 等有类型的领域对象，不需要整型索引寻址——get-null-check 或 DCL 模式与 MappingCacheKey 消费者相同，只是存储位置在实例字段而非 `Object[]` 槽位。
 2. **3 个 Registry 无懒缓存**：`ExceptionRegistry`、`AsyncSupportRegistry`、`ResourceHandlerRegistry`。前两者每请求线性扫描 resolver/构建 interceptor chain，后者仅启动期工作。它们的选择各有理由：异常处理低频、异步 interceptor chain 因异步语义难预缓存、资源处理器纯启动期。
-3. **override Phase3 的 Registry 有两个**：容器型 `WebFilterRegistry`（pre-build `unmatchedChain`）与叶子型 `BizPoolRegistry`（自动发现业务线程池 Bean）；另外容器型 `MappingRegistry` 也在 Phase3 构建路由优化器链。显式 ctor 亦非 `WebFilterRegistry` 独有——`InterceptorRegistry` 同样有（auto-register `InterceptorRegistration` + `HandlerInterceptor`）。
+3. **override Phase3 的 Registry 有四个**：`MappingRegistry`（构建路由优化器链）、`ArgumentResolverRegistry`（参数可解析性校验）、`WebFilterRegistry`（pre-build `unmatchedChain`）与叶子型 `BizPoolRegistry`（自动发现业务线程池 Bean）。显式 ctor 亦非 `WebFilterRegistry` 独有——`InterceptorRegistry` 同样有（auto-register `InterceptorRegistration` + `HandlerInterceptor`）。
 
 ---
 
@@ -606,21 +600,23 @@ if (state.get() == State.DESTROY) {
 
 ```java
 // WebComponentContainer.java
-if (webComponents.containsKey(webComponent.getComponentName())) {
-    WebComponent oldComponent = webComponents.get(webComponent.getComponentName());
-    List<WebComponent> list = Arrays.asList(webComponent, oldComponent);
-    AnnotationAwareOrderComparator.sort(list);               // 按 @Order 排序
-    WebComponent newComponent = list.get(0);                  // 取优先级最高（order 值最小）
-    webComponents.put(webComponent.getComponentName(), newComponent);
-    log.warn("{} components have conflicts. Use {} and deprecate {}",
-            webComponent.getComponentName(), newComponent, list.get(1));  // 显式告警
-    if (newComponent == webComponent) {
-        destroyComponent(oldComponent);                      // 新者胜 → destroy 旧者
-    } else {
-        return;                                              // 旧者胜 → 不动，新者被丢弃
+// compute 原子合并：containsKey/get/put 合一，避免并发注册同名组件时的竞态
+WebComponent kept = webComponents.compute(name, (key, oldComponent) -> {
+    if (oldComponent != null) {
+        List<WebComponent> list = Arrays.asList(webComponent, oldComponent);
+        AnnotationAwareOrderComparator.sort(list);           // 按 @Order 排序
+        WebComponent newComponent = list.get(0);              // 取优先级最高（order 值最小）
+        log.warn("{} components have conflicts. Use {} and deprecate {}", name, newComponent, list.get(1));
+        if (newComponent == webComponent) {
+            destroyOldComponentSneaky(oldComponent);         // 新者胜 → destroy 旧者
+            return webComponent;
+        }
+        return oldComponent;                                 // 旧者胜 → 保留旧者
     }
-} else {
-    webComponents.put(webComponent.getComponentName(), webComponent);
+    return webComponent;
+});
+if (kept != webComponent) {
+    return;   // 本组件落败：未进入容器、不跑生命周期，避免副作用（如重复注册路由）
 }
 ```
 
@@ -672,10 +668,10 @@ public void initComponentPhase3() throws Exception {
 
 回到引子的五个问题：
 
-1. **`afterPropertiesSet()` 留空**——因为 Spring bean 初始化时点无法保证基础容器已就绪；真正触发三阶段的是 `NettyHttpServer.start()` → `WebContext.startLifecycle()`，锚定在 context refresh 完毕后的 `SmartLifecycle` 链最末尾。
+1. **不走 `InitializingBean`**——`WebContext` 没有 `afterPropertiesSet()`（早期留空覆写已删除）；若改挂 `InitializingBean`，其时点取决于 bean 依赖图位置、无法保证基础容器已就绪。真正触发三阶段的是 `NettyHttpServer.start()` → `WebContext.startLifecycle()`，锚定在 context refresh 完毕后的 `SmartLifecycle` 链最末尾。
 2. **三阶段顺序**——Phase1 自建元数据（不跨引用）→ Phase2 跨组件连接建索引（引用已就绪）→ Phase3 优化 + fail-fast（全局结构就绪可做压缩/校验）。顺序由"数据依赖链"决定，CAS 守卫保证全局同步推进。
 3. **13 个 Registry 的容器树**——`dispatcherHandler` 是叶子协调者，9 个 Registry 平铺注册到 `WebContext` 根容器；共享型依赖落根容器，私有型依赖（`WebDataBinderRegistry` 等）落拥有者 `ArgumentResolverRegistry` 子树。共享边界决定注册落点。
-4. **混合模式不让启动变慢/内存变大**——急切层只分配 index 槽位 + 做校验/路由优化；懒层把解析器/处理器匹配推迟到首次请求，零调用端点保持零内存。`ArgumentResolverRegistry` Phase3 只校验不创建是典型。
+4. **混合模式不让启动变慢/内存变大**——急切层只分配 index 槽位 + 做校验/路由优化；懒层把解析器/处理器匹配推迟到首次请求，零调用端点保持零内存。`ArgumentResolverRegistry` Phase3 对普通参数只校验不创建是典型（例外：`@ModelAttribute` 无默认构造器路径会预创建以 fail-fast，见 [18 篇](18-spi-extension.md) 第六节）。
 5. **`MappingCacheKey` 的无锁根**——生产侧两个独立 `AtomicInteger` 池（method/class 索引空间隔离）；消费侧 `MappingHandlerMethod` 两个 `static ConcurrentHashMap`（per-Class/per-Method 共享数组）+ 两个 `volatile` 实例字段读缓存（免 map 查找）+ `boolean classCache` 选数组；`get` 全程无锁 `aaload`，`set` 仅 DCL 扩容上锁、正常写入无锁。
 
 这套生命周期体系是 [01 篇](01-design-philosophy.md) 六大原则的**执行契约**：原则 1（零匹配）靠 MappingCacheKey 的整型索引 + 无锁数组落地；原则 2（零分配）靠混合缓存模式让零调用端点零内存；原则 5（零反射）靠 Phase1 一次性解析注解/泛型固化；原则 6（显式 SPI + fail-fast）靠 `registerWebComponent` 的冲突告警 + Phase3 `validateAllParametersResolvable` 落地。生命周期不是"初始化框架"，而是"把运行时该做的事前移到启动时"的机械装置——后续各篇会在这套骨架上展开每个 Registry 的内部机制。

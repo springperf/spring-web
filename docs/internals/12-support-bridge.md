@@ -50,6 +50,7 @@ Spring MVC 的兼容层（如 Servlet 容器 + `spring-webmvc`）依赖的天然
 | `ContentNegotiationConfigurer` | `spring-webmvc` | 完整实现 |
 | `DefaultServletHandlerConfigurer` | `spring-webmvc` | 空实现 |
 | `ViewControllerRegistry` | `spring-webmvc` | 空实现 |
+| `ViewControllerRegistration` | `spring-webmvc` | 完整实现（转发/重定向视图控制器，`bridgeViewControllers` 的翻译对象） |
 | `ViewResolverRegistry` | `spring-webmvc` | 空实现 |
 | `ValidatorRegistration` | `spring-webmvc` | 完整实现（`getValidator`/`setValidator`） |
 | `RequestBodyAdvice` / `ResponseBodyAdvice` | `spring-webmvc` | 接口 |
@@ -72,6 +73,11 @@ Spring MVC 的兼容层（如 Servlet 容器 + `spring-webmvc`）依赖的天然
 // WebMvcConfigurerBridge.java
 public void initComponentPhase1() {
     Map<String, WebMvcConfigurer> configurers = webContext.getCtx().getBeansOfType(WebMvcConfigurer.class);
+    if (configurers.isEmpty()) {
+        return;                                   // 无配置者：整个 bridge 空转
+    }
+    warnUnsupportedOverrides(configurers);        // 对无法翻译的回调告警（不静默丢弃）
+
     // 创建 Shim 收集器（Spring MVC 原版类型）
     InterceptorRegistry shimInterceptorRegistry = new InterceptorRegistry();
     CorsRegistry shimCorsRegistry = new CorsRegistry();
@@ -84,7 +90,7 @@ public void initComponentPhase1() {
         configurer.addResourceHandlers(shimResourceRegistry);
     }
 
-    // ② 翻译：Shim → 框架 Registry
+    // ② 翻译：Shim → 框架 Registry（11 个 bridge* 方法）
     bridgeInterceptors(shimInterceptorRegistry);
     bridgeCorsMappings(shimCorsRegistry);
     bridgeResourceHandlers(shimResourceRegistry);
@@ -95,6 +101,7 @@ public void initComponentPhase1() {
     bridgeReturnValueHandlers(configurers);
     bridgeHandlerExceptionResolvers(configurers);
     bridgeConfigureValidator(configurers);
+    bridgeViewControllers(configurers);
 }
 ```
 
@@ -113,6 +120,7 @@ public void initComponentPhase1() {
 // WebMvcConfigurerBridge.java
 protected void bridgeInterceptors(InterceptorRegistry shimRegistry) {
     List<InterceptorRegistration> shimRegistrations = shimRegistry.getRegistrations();
+    long defaultSeq = 0;                                   // 未显式设 order 时按添加顺序编号
     for (InterceptorRegistration shimReg : shimRegistrations) {
         HandlerInterceptorWrapper wrapper = new HandlerInterceptorWrapper(shimReg.getInterceptor());
         InterceptorRegistration frameworkReg = new InterceptorRegistration(wrapper);
@@ -122,7 +130,12 @@ protected void bridgeInterceptors(InterceptorRegistry shimRegistry) {
         for (String excludePattern : shimReg.getExcludePatterns()) {
             frameworkReg.excludePathPatterns(excludePattern);
         }
-        frameworkReg.order(shimReg.getOrder());
+        // 用户设了 order 就用用户的；没设则按添加顺序 × 100 保序（DEFAULT_INTERCEPTOR_ORDER_STEP）
+        if (shimReg.isOrderSet()) {
+            frameworkReg.order(shimReg.getOrder());
+        } else {
+            frameworkReg.order(defaultSeq++ * DEFAULT_INTERCEPTOR_ORDER_STEP);
+        }
         if (shimReg.getPathMatcher() != null) {
             frameworkReg.pathMatcher(shimReg.getPathMatcher());
         }
@@ -159,13 +172,18 @@ protected void bridgeInterceptors(InterceptorRegistry shimRegistry) {
 public class SupportWebFilterRegistry extends WebFilterRegistry {
     public SupportWebFilterRegistry(DispatcherHandler dispatcherHandler) {
         super(dispatcherHandler);
-        autoRegisterWebComponent(jakarta.servlet.Filter.class,
-                filter -> wrapFilterToRegistration(new FilterWrapper(filter), resolveUrlPatterns(filter)));
+        autoRegisterWebComponent(jakarta.servlet.Filter.class, filter -> {
+            WebFilterRegistration registration = wrapFilterToRegistration(new FilterWrapper(filter));
+            String[] patterns = resolveUrlPatterns(filter);   // 读 @WebFilter 的 urlPatterns
+            if (patterns.length > 0) {
+                registration.addPathPatterns(patterns);       // 有模式才加，否则保持全匹配
+            }
+        });
     }
 }
 ```
 
-`autoRegisterWebComponent` 扫描 Spring 容器中所有 `jakarta.servlet.Filter` 类型的 Bean，对每个 Filter 创建 `FilterWrapper` → 包装为 `WebFilterRegistration` → 注册到 `WebFilterRegistry`。
+`autoRegisterWebComponent` 扫描 Spring 容器中所有 `jakarta.servlet.Filter` 类型的 Bean，对每个 Filter 创建 `FilterWrapper` → 包装为 `WebFilterRegistration` → 注册到 `WebFilterRegistry`。注意 `wrapFilterToRegistration` 只有**单参**重载（`WebFilterRegistry.java`），urlPatterns 是注册后再 `addPathPatterns` 补的。
 
 ### 3.2 `FilterWrapper`：实例级唯一标识
 
@@ -252,7 +270,9 @@ public void doFilter(ServletRequest servletRequest, ServletResponse servletRespo
 // SupportInterceptorRegistry.java
 public SupportInterceptorRegistry() {
     super();
-    autoRegisterWebComponent(InterceptorRegistration.class, this::convert);
+    // 注意用全限定名：本文件已 import 框架自己的同名接口
+    autoRegisterWebComponent(org.springframework.web.servlet.config.annotation.InterceptorRegistration.class,
+            this::convert);
     // 只自动注册 MappedInterceptor（自带路径规则）；普通 HandlerInterceptor Bean 不在此列
     autoRegisterWebComponent(org.springframework.web.servlet.handler.MappedInterceptor.class, this::convert);
 }
@@ -274,6 +294,10 @@ public SupportInterceptorRegistry() {
 public boolean preHandle(WebServerHttpRequest request, WebServerHttpResponse response, Object handler) throws Exception {
     HttpServletRequest servletRequest = extractRequest(request);
     HttpServletResponse servletResponse = extractResponse(request);
+    if (servletRequest == null || servletResponse == null) {
+        log.warn("...");            // 非 Servlet 上下文（如纯 API 路径）：跳过该拦截器
+        return true;
+    }
     return interceptor.preHandle(servletRequest, servletResponse, handler);
 }
 
@@ -343,9 +367,10 @@ public void afterConcurrentHandlingStarted(WebServerHttpRequest request, ...) th
 // PerfHttpServletRequest.java
 Cookie sessionCookie = new Cookie(manager.getCookieName(), session.getId());
 sessionCookie.setPath(manager.getCookiePath());
-sessionCookie.setHttpOnly(true);
+sessionCookie.setHttpOnly(manager.isCookieHttpOnly());   // 跟随配置，不写死 true
 boolean secure = manager.isCookieSecure();
-if (!secure) {
+// 仅在部署方显式信任转发头时才采信 X-Forwarded-Proto——否则客户端可自行决定 Cookie 是否带 Secure
+if (!secure && isForwardedHeadersTrusted(webContextOf(request))) {
     String forwardedProto = request.getHeaders().getFirst("X-Forwarded-Proto");
     secure = "https".equalsIgnoreCase(forwardedProto);
 }
@@ -500,10 +525,12 @@ resolveViewName("jsp:hello") → new JspView("/jsp/hello.jsp")   // jsp: 前缀 
 ```java
 // HttpSessionStorage.java
 public interface HttpSessionStorage {
-    HttpSessionData getSession(String sessionId);
+    @Nullable HttpSessionData getSession(String sessionId);
     HttpSessionData createSession();
     void saveSession(HttpSessionData session);
     void removeSession(String sessionId);
+    /** session ID 轮换原语：复制属性到新 ID 的数据上（防固定会话攻击） */
+    default HttpSessionData replaceSessionCopyingAttributes(String oldId, HttpSessionData newData) { ... }
     default void shutdown() {}
 }
 ```
@@ -614,15 +641,19 @@ public StaticArgumentResolver getResolver(MethodParameter parameter, ...) {
 **内部类 `SpringHandlerMethodArgumentResolver`**在运行时解析参数：
 
 ```java
-// SpringHandlerMethodArgumentResolverProvider.java
-public Object resolveArgument(WebServerHttpRequest request, WebServerHttpResponse response) throws Exception {
-    HttpServletRequest servletRequest = ServletAttribute.getRequest(request.getRequestContext());
-    if (servletRequest == null) {
-        servletRequest = new PerfHttpServletRequest(request);
-        servletResponse = new PerfHttpServletResponse(response);
+// SpringHandlerMethodArgumentResolverProvider.java（私有内部类，持有 methodParameter 字段）
+private class SpringHandlerMethodArgumentResolver implements StaticArgumentResolver {
+    @Override
+    public Object resolveArgument(WebServerHttpRequest request, WebServerHttpResponse response) throws Exception {
+        HttpServletRequest servletRequest = ServletAttribute.getRequest(request.getRequestContext());
+        HttpServletResponse servletResponse = ServletAttribute.getResponse(request.getRequestContext());
+        if (servletRequest == null) {
+            servletRequest = new PerfHttpServletRequest(request);
+            servletResponse = new PerfHttpServletResponse(response);
+        }
+        NativeWebRequest webRequest = new ServletWebRequest(servletRequest, servletResponse);
+        return resolver.resolveArgument(methodParameter, null, webRequest, null);
     }
-    NativeWebRequest webRequest = new ServletWebRequest(servletRequest, servletResponse);
-    return resolver.resolveArgument(methodParameter, null, webRequest, null);
 }
 ```
 
@@ -644,6 +675,7 @@ public Object resolveArgument(WebServerHttpRequest request, WebServerHttpRespons
 // ResponseBodyEmitterReturnValueResolver.java
 protected void preInitializeEmitter(StreamEmitter emitter, WebServerHttpRequest req, WebServerHttpResponse resp) throws Exception {
     super.preInitializeEmitter(emitter, req, resp);
+    ResponseBodyEmitter responseBodyEmitter = (ResponseBodyEmitter) emitter;   // 先取局部变量
     if (emitter instanceof ResponseBodyEmitter) {
         HttpHeaders mutableHeaders = new HttpHeaders(resp.getHeaders());
         AdapterUtil.setEncodeFunction(responseBodyEmitter, (data, out) -> encodeToStream(mutableHeaders, data, out));
