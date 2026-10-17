@@ -193,7 +193,8 @@ public void handle(WebServerHttpRequest req, WebServerHttpResponse resp) {
 // DispatcherHandler.java
 protected void handleWithMappingResult(WebServerHttpRequest req, WebServerHttpResponse resp,
                                       MappingResult mappingResult) {
-    // 通过 BizPoolRegistry 使用 Phase3 预缓存的线程池，无映射或未标注 @RunInPool 时为 null → EventLoop 同步处理
+    // 通过 BizPoolRegistry 用 Phase3 预缓存的线程池：返回 null（无映射 / @RunInPool(EVENTLOOP) /
+    // default-execute-mode=eventloop）→ EventLoop 同步；返回非 null（缺省 default 池 / @RunInPool 命名池）→ 切业务线程
     ExecutorService executor = bizPoolRegistry.determinePool(req, mappingResult);
     if (executor != null) {
         resp.armTimeoutIfAbsent();             // 移交前武装异步超时（缺失才装，不覆盖 @ReactiveSupport 配置）
@@ -585,7 +586,7 @@ protected void invokeWithRealResult(WebServerHttpRequest req, WebServerHttpRespo
 }
 ```
 
-`postHandle` + `afterCompletion` 都取用 `cachedInterceptors`（同 preHandle）。`afterCompletion` 传 `exception`——即使业务抛了异常，`afterCompletion` 仍对已通过 preHandle 的拦截器执行清理，这是 Spring 的标准语义。`flushResponse` 只在 `resp.isHandled()` 时 flush，避免重复写。
+`postHandle` + `afterCompletion` 都取用 `cachedInterceptors`（同 preHandle）。`afterCompletion` 传 `exception`——即使业务抛了异常，`afterCompletion` 仍对已通过 preHandle 的拦截器执行清理，这是 Spring 的标准语义。`flushResponse` 的判据是先 `isStreaming()` 分流，再 `resp.isHandled() && !resp.isCommitted()`，避免重复写。
 
 ### 9.2 handleException：catch-safe
 
@@ -716,7 +717,7 @@ public OutputStream getBody() {
 响应 body 缓冲延迟到首次 `getBody()` 才分配——无 body 的请求（204、304、CORS 预检）零分配。Netty 子类 `NettyServerHttpResponse` 进一步用 `ByteBuf` 替代 `ByteArrayOutputStream`，大 body（>4KB）走 `duplicate()` 零拷贝视图（[05 篇](05-server-and-http.md) 展开）。
 
 ```java
-// BaseWebServerHttpRequest.java, 85
+// BaseWebServerHttpRequest.java（filterIndex 字段与 getFilterIndexAndIncrement 方法）
 protected int filterIndex = 0;
 public int getFilterIndexAndIncrement() { return filterIndex++; }
 ```

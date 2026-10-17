@@ -64,7 +64,7 @@ public void initReturnValueResolver() {
 | JSON | `JsonBodyReturnValueResolver` | `@ResponseBody` 注解 | `HttpBodyCodecRegistry.writeBody` |
 | 拓展 | `WrapMessageConverterReturnValueResolver` | 用户注册的 `HttpMessageConverter` | `messageConverter.write` |
 
-**注册顺序 = 线性扫描的匹配顺序**。异步分组排在最前，确保 `DeferredResult` 等异步类型在同步类型之前被匹配——否则 `JsonBodyReturnValueResolver`（`supportsReturnValue` 始终返回 true）会"吃掉"所有异步返回值。
+**扫描顺序由 `@Order`/`getOrder()` 决定**（`initRealComponentList` 过 `AnnotationAwareOrderComparator.sort`，注册顺序只作稳定排序的 tiebreak）。异步分组排在最前，确保 `DeferredResult` 等异步类型在同步类型之前被匹配——否则 `JsonBodyReturnValueResolver`（对异步返回值返回 false、其余返回 true）会"吃掉"它们。
 
 ### 1.2 `ReturnValueResolver` 接口
 
@@ -81,7 +81,7 @@ public interface ReturnValueResolver extends WebComponent {
 
 - `supportsReturnType`（类型检查，静态）：用于启动期和异步内联类型预匹配。只看方法签名，不依赖具体返回值实例。
 - `supportsReturnValue`（值检查，运行时）：查看具体的返回值对象。例如 `HttpEntityReturnValueResolver.supportsReturnValue`检查 `returnValue instanceof HttpEntity`——运行时才能确定。
-- `JsonBodyReturnValueResolver.supportsReturnValue` 始终返回 `true`——这是兜底行为：`@ResponseBody` 注解的方法，任何返回值都交给 `HttpBodyCodecRegistry.writeBody` 处理。
+- `JsonBodyReturnValueResolver.supportsReturnValue` **对异步返回值返回 false、其余返回 true**（`returnValueResolverRegistry == null || !registry.isAsyncReturnValue(...)`）——这是兜底行为：`@ResponseBody` 注解的方法，非异步的返回值都交给 `HttpBodyCodecRegistry.writeBody` 处理。
 
 ---
 
@@ -220,6 +220,8 @@ protected boolean skipResolve(Object returnValue, MappingHandlerMethod mappingCo
     if (returnValue == null) {
         if (mappingContext != null && mappingContext.getMethod().getReturnType() == void.class && !resp.isHandled()) {
             resp.setHandled();    // void 方法返回 null → 标记已处理
+        } else if (mappingContext != null && !resp.isHandled()) {
+            resp.setHandled();    // 非 void 方法返回 null 也必须标记已处理，否则响应永不 flush（客户端挂到 504）
         }
         return true;
     }
@@ -227,9 +229,10 @@ protected boolean skipResolve(Object returnValue, MappingHandlerMethod mappingCo
 }
 ```
 
-两个分支：
+三个分支：
 
 - **`returnValue == null` + `void` 方法**：`void` 方法返回 null 是正常行为，`setHandled()` 标记已处理，框架不再写 body。
+- **`returnValue == null` + 非 `void` 方法**：同样要 `setHandled()`——否则响应永不 flush，客户端会一直挂到超时 504（源码注释即此论证）。
 - **`resp.isHandled()` 为 true**：响应已被 Filter/Interceptor 或异常处理器提前写出，跳过返回值解析。
 
 ---
@@ -245,14 +248,16 @@ public boolean supportsReturnType(MethodParameter returnType, MappingHandlerMeth
             returnType.hasMethodAnnotation(ResponseBody.class));
 }
 public boolean supportsReturnValue(Object returnValue, WebServerHttpRequest req, WebServerHttpResponse resp) {
-    return true;   // 始终返回 true——@ResponseBody 方法的所有返回值都走 HttpBodyCodecRegistry
+    // 异步返回值（DeferredResult/StreamEmitter 等）不在此兜底——要放行给异步分组
+    return returnValueResolverRegistry == null
+            || !returnValueResolverRegistry.isAsyncReturnValue(returnValue, req, resp);
 }
 public void resolveReturnValue(Object returnValue, MethodParameter returnType, ...) throws Exception {
     httpBodyCodecRegistry.writeBody(returnValue, returnType, req, resp);
 }
 ```
 
-`supportsReturnType` 检查类级别或方法级别的 `@ResponseBody` 注解。`supportsReturnValue` 始终返回 true——因为 `@ResponseBody` 的语义是"所有返回值都写到响应体"，不需要按值做二次判断。
+`supportsReturnType` 检查类级别或方法级别的 `@ResponseBody` 注解。`supportsReturnValue` 只对**非异步**返回值返回 true——`@ResponseBody` 的语义是"所有返回值都写到响应体"，但异步类型必须放行给异步分组，否则会被这个兜底 Resolver 抢先。
 
 `getOrder()` 返回 `Integer.MAX_VALUE - 100`，确保在 `initRealComponentList` 排序时排在后位——这样 `HttpEntityReturnValueResolver` 等更具体的 Resolver 在线性扫描中优先匹配。
 

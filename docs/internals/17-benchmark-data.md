@@ -91,6 +91,8 @@
 
 ### 2.1 每请求分配量
 
+> **可核验性**：`docs/benchmark.md` 只公布 **json / get / sse** 三项的每请求分配；下表其余行（bytes / valid / async / bytesLarge）与 **perf-support 整列**取自该次运行的原始报告，报告未随仓库发布，**不可在仓库内复验**。
+
 | 场景 | perf | perf-support | tomcat | undertow | webflux |
 |------|------|-------------|--------|----------|---------|
 | get | 10.7KB | 13.2KB | 37.3KB | 35.6KB | 50.0KB |
@@ -107,9 +109,11 @@
 2. **tomcat 每请求分配 ~2–3x perf**（get 37.3KB vs 10.7KB），归因运行时匹配（`AntPathMatcher.match` 每次创建 `StringBuilder`）+ Facade 包装器（`RequestFacade`/`ResponseFacade` 每请求 ~2–3KB）+ `ConcurrentHashMap` 属性存储。
 3. **webflux 每请求分配最高**（get 50.0KB），归因响应式链对象——每个 `Mono`/`Flux` 操作创建一个 `Lambda` 对象 + `Subscription` 对象，链式调用累积大量短期对象。
 4. **perf-support 比 perf 多 ~2–3KB/请求**（get 13.2KB vs 10.7KB），归因 Servlet 适配对象创建（`PerfHttpServletRequest`/`PerfHttpServletResponse` 包装）。这是兼容 Spring MVC 的代价，约 +23% 分配量。
-5. **sse 场景 perf 分配 310.4KB/请求**——高于 tomcat 的 233.9KB，归因 `MpscArrayQueue` 高频分配（每消息一个 `ByteBuf`）。但 perf 吞吐 7.72x tomcat，单位时间分配率更高（4489MB/s vs 440MB/s），GC 压力通过更高吞吐摊薄。
+5. **sse 场景 perf 分配 310.4KB/请求**——高于 tomcat 的 233.9KB，归因 `MpscArrayQueue` 高频分配（每消息一个 `ByteBuf`）。但 perf 吞吐 7.72x tomcat，单位时间分配率更高（按吞吐 × 每请求分配推算约 4631MB/s vs 452MB/s，见 §2.3），GC 压力通过更高吞吐摊薄。
 
 ### 2.2 GC 暂停时间
+
+> **可核验性**：`docs/benchmark.md` 只给容器级「平均暂停」一列，不按 API 拆分；下表按场景的数值取自原始报告，**不可在仓库内复验**。
 
 | 场景 | perf 平均暂停 | tomcat 平均暂停 | 倍数 |
 |------|-------------|---------------|------|
@@ -176,6 +180,8 @@
 ## 四、延迟分析归因
 
 ### 4.1 p50 延迟（json 场景，16线程）
+
+> **可核验性**：`docs/benchmark.md` 的延迟表只到 **p99.9**；`p90` 与 `p99.99` 两列取自原始报告，**不可在仓库内复验**。p50/p99/p99.9 三列与 `benchmark.md` 一致（perf 0.22 / 0.38 / 0.47ms，tomcat 0.32 / 0.66 / 1.03ms）。
 
 | 容器 | p50 | p90 | p99 | p99.9 | p99.99 |
 |------|-----|-----|-----|-------|--------|

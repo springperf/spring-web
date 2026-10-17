@@ -119,7 +119,7 @@ public int consumerSize()        { return consumerSize; }     // 业务池最大
 
 ### 3.1 `CustomInvoker` 接口
 
-`BatchInvoker` 实现 `CustomInvoker` 接口（[09 篇](09-invoker-bytecode.md) 第七条），是框架中唯一一个在启动期被注入到 `PathMappingContext` 的自定义调用器。
+`BatchInvoker` 实现 `CustomInvoker` 接口（[09 篇](09-invoker-bytecode.md) 第七条），是**批处理场景**在启动期被注入到 `PathMappingContext` 的自定义调用器。同族实现还有 `ServletInvoker`、`ViewControllerInvoker`、`ResourceRequestHandler`、`OperationHandlerInvoker`、`LinksOperationInvoker`——它们分属 servlet / 视图控制器 / 静态资源 / Actuator 等场景，`CustomInvoker` 是这些「非标准控制器处理器」的统一契约。
 
 ### 3.2 `invoke` 方法
 
@@ -310,7 +310,7 @@ public void enqueue(BatchRequest<?> request) {
 |------|---------------|-----------|-----------|
 | **BLOCK**（默认） | `publishEvent` | 阻塞等待 RingBuffer 有空间 → TCP 反压 | 连接挂起 |
 | **DROP** | `tryPublishEvent` | 失败时 `BatchRequest.setError(BatchOverflowException)`，异步完成 | 429 Too Many Requests |
-| **THROW** | `tryPublishEvent` | 失败时同步抛 `BatchOverflowException` → 框架异常处理路径 | **429** Too Many Requests（`BatchOverflowException` 即 `@ResponseStatus(429)`，非 404/500） |
+| **THROW** | `tryPublishEvent` | 失败时同步抛 `BatchOverflowException` → 框架异常处理路径 | **429** Too Many Requests（`BatchOverflowException extends ResponseStatusException`，构造器传 `HttpStatus.TOO_MANY_REQUESTS`；不是 404/500，也没有 `@ResponseStatus` 注解） |
 
 `DROP` 与 `THROW` 的区别：`DROP` 不阻塞 EventLoop，请求通过 `BatchRequest.setError` 异步完成（走 `DeferredResult` 处理路径）；`THROW` 同步抛出，由框架的异常处理路径响应。
 
@@ -411,7 +411,7 @@ private void processBatch(List<BatchRequest<?>> batch) {
 
 | 指标名 | 记录方法 | 埋点位置 | 类型 | Tag |
 |--------|---------|---------|------|-----|
-| `batch.enqueue.total` | `recordEnqueue` | `DisruptorQueue.enqueue` 每次尝试（含停机直处理分支） | Counter | `queue` |
+| `batch.enqueue.total` | `recordEnqueue` | `DisruptorQueue.enqueue`：停机直处理分支（false）+ 三种背压的**成功**路径；DROP 失败不记 enqueue（只记 drop） | Counter | `queue` |
 | `batch.enqueue.rejected` | `recordEnqueue(success=false)` | 入队失败（`total` 中未成功的部分） | Counter | `queue` |
 | `batch.enqueue.dropped` | `recordDrop` | `DisruptorQueue.enqueue` DROP 失败分支 | Counter | `queue` |
 | `batch.enqueue.overflow` | `recordOverflow` | `DisruptorQueue.enqueue` THROW 失败分支 | Counter | `queue` |
@@ -490,7 +490,7 @@ public class BatchOverflowException extends ResponseStatusException {
 | 线程模型 | 三线程隔离（生产者 / 消费者 / 业务池） | 生产者和消费者共享线程池或固定线程 |
 | 方法体替换 | `BatchInvoker` 启动期替换，原方法体不执行 | 无等效机制，需业务代码手动封装 |
 | 等待策略 | 4 种（BLOCKING / YIELDING / SLEEPING / BUSY_SPIN） | 无（通常 `BlockingQueue.take()` 或 `poll(timeout)`） |
-| 可观测性 | 8 个指标 SPI，Micrometer 集成 | 无标准指标，需自行埋点 |
+| 可观测性 | 9 个指标（`BatchMetrics` SPI + starter 的 Micrometer 实现） | 无标准指标，需自行埋点 |
 | 超时兜底 | `BatchRequest` 30s 默认超时 + `completed` 守卫 | 无标准超时机制 |
 | 停机安全 | 3 步优雅停机（drain → flush → awaitTermination） | 无标准停机流程 |
 | 与异步框架集成 | 原生集成 `DeferredResult` 异步处理路径 | 通常与 Spring MVC 异步独立 |
@@ -502,7 +502,7 @@ public class BatchOverflowException extends ResponseStatusException {
 2. 使用 Spring Integration 或类似框架的聚合器（Aggregator），但需要额外引入消息中间件。
 3. 批处理逻辑与业务代码耦合，队列满、超时、错误处理都需要手动管理。
 
-`spring-web-batch` 把这一切下沉到框架层：**注解声明批量方法 → 框架自动攒批 → Disruptor 无锁入队 → 三级背压链 → 8 个指标可观测**。用户在业务代码中只需要关心"拿到一批请求，逐个 `setResult`"。
+`spring-web-batch` 把这一切下沉到框架层：**注解声明批量方法 → 框架自动攒批 → Disruptor 无锁入队 → 三级背压链 → 9 个指标可观测**。用户在业务代码中只需要关心"拿到一批请求，逐个 `setResult`"。
 
 ---
 
@@ -514,7 +514,7 @@ public class BatchOverflowException extends ResponseStatusException {
 2. **`BatchInvoker` 方法体替换** → `InvokableHandlerMethod.setInvoker(batchInvoker)`（签名 `public void setInvoker(Invoker invoker)`），运行时反射创建 `BatchRequest` 实例并入队，原方法体完全不执行。
 3. **`DisruptorQueue` 无锁入队** → `ProducerType.MULTI` CAS claim，`BatchEvent` 预分配零 GC，`normalizeRingBufferSize` C8/C12 保护，三种背压策略（BLOCK/DROP/THROW）。
 4. **`BufferingBatchHandler` 攒批消费** → `endOfBatch` + `maxBatchSize` 双触发，`bizExecutor` 零核心线程 + `SynchronousQueue` + `CallerRunsPolicy` 自然背压，`handleBatchError` 逐个 `setError` 防挂起。
-5. **三级背压链** → RingBuffer 满 → EventLoop 阻塞 → TCP 反压（BLOCK 模式）；或 `tryPublishEvent` 失败 + `BatchOverflowException` 429（DROP/THROW 模式）。
+5. **三级背压链** → RingBuffer 满 → 生产者线程（默认 `default` 业务池 worker）阻塞 → TCP 反压（BLOCK 模式）；或 `tryPublishEvent` 失败 + `BatchOverflowException` 429（DROP/THROW 模式）。
 6. **9 个指标埋点** → `BatchMetrics` SPI 定义 6 个记录方法（由 starter 的 `MicrometerBatchMetrics` 实现为 9 个指标），`queue` Tag 值 `batch:<ClassName>.<methodName>`，`NoOpBatchMetrics` 默认零开销。
 7. **安全网** → 停机竞态窗口由 `DeferredResult` 30s 超时兜底；`BatchRequest.completed` 守卫防止重复回调；`BatchExceptionHandler` 捕获消费者异常；`BatchOverflowException` 映射 429。
 
