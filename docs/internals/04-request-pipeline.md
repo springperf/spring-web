@@ -147,7 +147,7 @@ try {
 }
 ```
 
-这一行 `msg.retain()` 是整套引用计数链的第一站，值得单独说清。Netty 的 `channelRead` 默认在返回时释放入站消息（ 的 `ReferenceCountUtil.release`），但框架要让 `FullHttpRequest` 的 `ByteBuf` 跨入业务逻辑、甚至跨线程使用，所以必须在构造 `req` 前 `retain` 一次，让 `req` 持有一份独立引用。`req.release()` 在 `httpHandle` 返回后释放这次 retain——与 `channelRead` 的 finally release 合起来保证：**Netty 原始消息的引用计数在两条路径上都对称收尾，不泄漏、不提前释放**。
+这一行 `msg.retain()` 是整套引用计数链的第一站，值得单独说清。Netty 的 `channelRead` 默认在返回时释放入站消息（`NettyHttpHandler.channelRead` 内的 `ReferenceCountUtil.release`：正常路径在 `finally`，pipelining 提前 return 前显式释放），但框架要让 `FullHttpRequest` 的 `ByteBuf` 跨入业务逻辑、甚至跨线程使用，所以必须在构造 `req` 前 `retain` 一次，让 `req` 持有一份独立引用。`req.release()` 在 `httpHandle` 返回后释放这次 retain——与 `channelRead` 的 finally release 合起来保证：**Netty 原始消息的引用计数在两条路径上都对称收尾，不泄漏、不提前释放**。
 
 跨业务线程时还会再叠一层 `acquire/release`（第四节），形成"Netty retain → req 持有 → 跨线程 acquire → 业务线程 release → req.release → Netty release"的完整链。每一步都显式、可追踪——这是 [01 篇](01-design-philosophy.md) 原则 4（避免阻塞 / 显式引用计数）的硬要求。
 
@@ -177,7 +177,7 @@ public void handle(WebServerHttpRequest req, WebServerHttpResponse resp) {
 }
 ```
 
-路由匹配发生在 `handle`，**仍在 EventLoop 线程**（注释  明示）。`mappingRegistry.mapping(req)` 返回 `MappingResult`，内部走的是 [03 篇](03-component-lifecycle.md) **Phase3** 由 `MappingRegistry.initComponentPhase3()` → `optimizeMapping()` 构建的多级优化器链（精确路径 `HashMap.get` O(1) → 前缀 → 后缀 → 兜底遍历，详见 [06 篇](06-routing-engine.md)）。
+路由匹配发生在 `handle`，**仍在 EventLoop 线程**（`DispatcherHandler.java` 行内注释明示）。`mappingRegistry.mapping(req)` 返回 `MappingResult`，内部走的是 [03 篇](03-component-lifecycle.md) **Phase3** 由 `MappingRegistry.initComponentPhase3()` → `optimizeMapping()` 构建的多级优化器链（精确路径 `HashMap.get` O(1) → 前缀 → 后缀 → 兜底遍历，详见 [06 篇](06-routing-engine.md)）。
 
 本篇不展开优化器链的内部（那是 06 篇的范畴），只标注一件事：**路由匹配这一步产出的 `MappingResult` 被写回 request，成为后续所有环节取用缓存的"钥匙"**。`DefaultFilterChain` 链尾取 `MappingResult.get(request)`（`DefaultFilterChain.java`）、`PathMappingContext.get(request)` 也是从 `MappingResult` 反查（`PathMappingContext.java`）。一次匹配的结果在整条链路上被反复复用，**绝不重复匹配**——这又是"运行时只做查表"的兑现。
 
@@ -222,7 +222,7 @@ protected void handleWithMappingResult(WebServerHttpRequest req, WebServerHttpRe
 }
 ```
 
-`bizPoolRegistry.determinePool(req, mappingResult)` 取用的是 [03 篇](03-component-lifecycle.md) 深潜过的 `BizPoolRegistry` `methodCache` 槽位：`BizPoolRegistry` 持 `BIZ_POOL_KEY = MappingCacheKey.createMethodCacheKey(Object.class)`（`BizPoolRegistry.java`），`determinePool` 内部 `mappingContext.get(BIZ_POOL_KEY)` → 命中 `NO_POOL` 哨兵返回 `null`，否则按 `defaultExecuteMode` 策略调 `resolvePool`，从 `pools` 取出启动期由 `initDefaultPoolFromConfig()` 创建的 `default` `ThreadPoolExecutor`（/，`resolvePool` 经 `pools.get` 取出 ），并 `set` 回写缓存（default 池 ；EventLoop 哨兵 /）。**首次请求懒缓存，后续请求一次数组直取**。
+`bizPoolRegistry.determinePool(req, mappingResult)` 取用的是 [03 篇](03-component-lifecycle.md) 深潜过的 `BizPoolRegistry` `methodCache` 槽位：`BizPoolRegistry` 持 `BIZ_POOL_KEY = MappingCacheKey.createMethodCacheKey(Object.class)`（`BizPoolRegistry.java`），`determinePool` 内部 `mappingContext.get(BIZ_POOL_KEY)` → 命中 `NO_POOL` 哨兵返回 `null`，否则按 `defaultExecuteMode` 策略调 `resolvePool`，从 `pools` 取出启动期由 `initDefaultPoolFromConfig()` 创建的 `default` `ThreadPoolExecutor`（`resolvePool` 先 `pools.get(poolName)`，未命中再兜底 `webContext.getCtx().getBean(poolName, ExecutorService.class)` 并 `register`），并 `set` 回写缓存（default 池写 `ThreadPoolExecutor` 实例；EventLoop 分支写 `NO_POOL` 哨兵）。**首次请求懒缓存，后续请求一次数组直取**。
 
 ### 4.2 三分支语义
 
@@ -297,7 +297,7 @@ protected DefaultFilterChain resolveFilterChain(WebServerHttpRequest request) {
 }
 ```
 
-这里取用的正是 [03 篇](03-component-lifecycle.md) 点名的 `PathMappingContext.cachedFilterChain` 实例字段（`PathMappingContext.java`、``）。三类不走 `MappingCacheKey` 整型索引的 Registry 之一（另两类是 `InterceptorRegistry.cachedInterceptors`、`CorsRegistry.corsConfigurationProvider`），因为存的是 `DefaultFilterChain` 这个有类型的领域对象，不需要整型寻址。get-null-check + DCL 模式与 `MappingCacheKey` 消费者完全一致，只是存储位置在实例字段而非 `Object[]` 槽位。
+这里取用的正是 [03 篇](03-component-lifecycle.md) 点名的 `PathMappingContext.cachedFilterChain` 实例字段（`PathMappingContext.java`）。三类不走 `MappingCacheKey` 整型索引的 Registry 之一（另两类是 `InterceptorRegistry.cachedInterceptors`、`CorsRegistry.corsConfigurationProvider`），因为存的是 `DefaultFilterChain` 这个有类型的领域对象，不需要整型寻址。get-null-check + DCL 模式与 `MappingCacheKey` 消费者完全一致，只是存储位置在实例字段而非 `Object[]` 槽位。
 
 `initCachedFilters`（`WebFilterRegistry.java`）的三态启动期推断是 Phase3 预匹配的延伸：`matchPathRuleToCached` 返回 `ALWAYS`（直接加入）/ `RUNTIME`（包 `RuntimeMappingWebFilter`）/ `NEVER`（跳过）。无路径规则的 filter 永远匹配，有路径规则的交给 `RuntimeMappingWebFilter` 在运行时按请求路径匹配——**启动期能确定的绝不留到运行时，必须运行时匹配的才包装**。
 
@@ -371,7 +371,7 @@ Tomcat：  分配容器线程 → Filter 链 → 路由匹配(DispatcherServlet.
 
 **优点：方法注解定义线程池。** 路由先于线程切换，`determinePool`（`BizPoolRegistry.java`）才能从路由结果取出目标方法（`mappingContext.getMethod()`）读 `@RunInPool` 注解，按方法粒度选池：`@RunInPool(EVENTLOOP)` 留 EventLoop 零切换，`@RunInPool("ioPool")` 切命名池，无注解走全局 `defaultExecuteMode`。IO 密集方法走 ioPool、CPU 密集方法走 cpuPool、要零切换的留 EventLoop——声明式、方法级、框架内置。Tomcat 的线程先于路由，容器线程早已分配，业务方法即便有注解也无法在进 Filter 链前按注解切池，只能在方法体内手工 `CompletableFuture.supplyAsync(task, executor)`——声明式的方法级池选择在容器线程模型下做不到。
 
-**优点：Filter 链方法级预计算。** 路由结果在 Filter 链之前就确定，`PathMappingContext.cachedFilterChain`（ 实例字段，DCL）在首请求时按路由结果的路径规则预编译整条 Filter 链（`initCachedFilters` 的 ALWAYS/RUNTIME/NEVER 三态，§5.1），CORS Provider、拦截器数组（`cachedInterceptors`）同样基于已确定路由预匹配。后续请求一次直取，零运行时匹配。Tomcat 的 Filter 链是全局固定的（`FilterRegistrationBean` 注册时的全局链），带路径条件的 Filter（如 Spring Security 的 `FilterSecurityInterceptor`）要在 Filter 内运行时各自重新 parse 路径、重新 match——每个带条件的 Filter 都重复一遍路由信息计算，无法由容器统一预编译到方法粒度。
+**优点：Filter 链方法级预计算。** 路由结果在 Filter 链之前就确定，`PathMappingContext.cachedFilterChain`（`PathMappingContext` 实例字段，DCL）在首请求时按路由结果的路径规则预编译整条 Filter 链（`initCachedFilters` 的 ALWAYS/RUNTIME/NEVER 三态，§5.1），CORS Provider、拦截器数组（`cachedInterceptors`）同样基于已确定路由预匹配。后续请求一次直取，零运行时匹配。Tomcat 的 Filter 链是全局固定的（`FilterRegistrationBean` 注册时的全局链），带路径条件的 Filter（如 Spring Security 的 `FilterSecurityInterceptor`）要在 Filter 内运行时各自重新 parse 路径、重新 match——每个带条件的 Filter 都重复一遍路由信息计算，无法由容器统一预编译到方法粒度。
 
 **优点：EventLoop 线程隔离。** 路由在 EventLoop 上做（轻量查表 `O(1)~O(n)`，注释明示），重活切业务线程，I/O 线程不被业务阻塞。Tomcat 的容器线程"一包到底"——I/O 读写与业务处理同线程，业务慢直接占住容器线程，靠线程数（如 200）兜底，线程数即并发上限。
 
@@ -502,7 +502,7 @@ public Object invoke(Object[] args, WebServerHttpRequest request, WebServerHttpR
 }
 ```
 
-运行时只做 `invoker.invoke(args)`——`invoker` 是启动期一次性初始化好的（ 字段、`` initInvoker），运行时不再选、不再反射。`invoker` 的三选逻辑全在构造期：
+运行时只做 `invoker.invoke(args)`——`invoker` 是启动期一次性初始化好的（`invoker` 字段、`initInvoker()` 方法），运行时不再选、不再反射。`invoker` 的三选逻辑全在构造期：
 
 ```java
 // InvokableHandlerMethod.java, 65-74
@@ -538,7 +538,7 @@ private Invoker initInvoker() {
 | B | `@Optimize` + 非 native-image | `FastInvoker`（ASM 生成 `INVOKEVIRTUAL`） | ~10ns |
 | C | 默认 / FastInvoker 失败回退 / GraalVM | `MethodHandleInvoker` | ~30ns |
 
-路径 B 的失败回退是健壮性设计：ASM 字节码生成可能在某些 JVM 或受限环境失败，`catch Throwable` 后回退到路径 C 的 `MethodHandleInvoker`，保证功能不丢、只是退到次优调用。GraalVM native-image 下（`` `IN_NATIVE_IMAGE` 检测）直接跳过路径 B——封闭世界不支持运行时字节码生成，强行生成会异常。
+路径 B 的失败回退是健壮性设计：ASM 字节码生成可能在某些 JVM 或受限环境失败，`catch Throwable` 后回退到路径 C 的 `MethodHandleInvoker`，保证功能不丢、只是退到次优调用。GraalVM native-image 下（`IN_NATIVE_IMAGE` 检测）直接跳过路径 B——封闭世界不支持运行时字节码生成，强行生成会异常。
 
 ### 8.1 MethodHandleInvoker：invokeExact 与签名适配
 
@@ -602,7 +602,7 @@ protected void handleException(Throwable ex, WebServerHttpRequest req, WebServer
 }
 ```
 
-双层 catch：`exceptionRegistry.handle` 若自己抛异常（业务 `@ExceptionHandler` 写错）， 再 catch 住只记日志，不让异常继续上抛把连接打断。这是 [01 篇](01-design-philosophy.md) 原则 6（避免魔法行为）在异常路径的延伸——**异常处理本身不能成为新的异常源**。`flushResponse` 同样 catch-safe（ catch IOException 只记日志）。
+双层 catch：`exceptionRegistry.handle` 若自己抛异常（业务 `@ExceptionHandler` 写错）， 再 catch 住只记日志，不让异常继续上抛把连接打断。这是 [01 篇](01-design-philosophy.md) 原则 6（避免魔法行为）在异常路径的延伸——**异常处理本身不能成为新的异常源**。`flushResponse` 同样 catch-safe（`flushResponse` 内 catch `IOException` 只记日志）。
 
 ### 9.3 404/405 与未匹配
 
@@ -651,7 +651,7 @@ public void asyncDispatch(WebServerHttpRequest req, WebServerHttpResponse resp, 
 异步请求（`DeferredResult`/`Callable`/`ResponseEntity` + `@ReactiveSupport` 等）在 `doHandle` 的 finally 走分支：`afterConcurrentHandlingStarted` 通知拦截器"异步开始"，把计时戳存进 `fastAttributes`，**释放当前线程**（请求线程回到 default 池或 EventLoop）。等异步结果就绪，框架在某个线程上调 `asyncDispatch` 恢复：
 
 -  `resetHandled()`——首次 `doHandle` 时返回值处理器把 `handled` 置 true（标记响应"已处理"，但 body 还没写），异步恢复时 reset，让后续 `resolveReturnValue` 能真正写 body。
-- `` `concurrentResult` 是 `Throwable` ? 走异常处理 : 走返回值处理（取用 `methodCache` 槽位，同 `doHandle`）。
+- `concurrentResult` 是 `Throwable` ? 走异常处理 : 走返回值处理（取用 `methodCache` 槽位，同 `doHandle`）。
 -  补 `postHandle`/`afterCompletion`——异步请求的拦截器后处理推迟到恢复时才做。
 - 取回 `METRICS_START_ATTR`（一次 `fastAttributes` 数组直取），算完整耗时 `recordRequest`。
 
@@ -701,7 +701,7 @@ protected boolean setCommitted() {
 }
 ```
 
-`handled` 标记"响应已被某段代码接管"（写 body、sendError 等），CAS 保证全请求只成功一次——重复写（如 `doHandle` 正常返回后又 `handleException`）会被  的 `setHandled()` 返回 false 拦住，只 `log.warn` 不重复写。`committed` 标记"响应已刷到底层 channel"，提交即 `setTimeout(null,-1)` 取消超时——避免已完成的请求还触发超时 **504**（`BaseWebServerHttpResponse.defaultHandleTimeout` 发的是 `GATEWAY_TIMEOUT`；503 是异步请求超时那条路径，两者不可混谈）。两个 CAS 把"响应状态机"做到无锁、单次、确定。
+`handled` 标记"响应已被某段代码接管"（写 body、sendError 等），CAS 保证全请求只成功一次——重复写（如 `doHandle` 正常返回后又 `handleException`）会被 `BaseWebServerHttpResponse` 的 `setHandled()` 返回 false 拦住，只 `log.warn` 不重复写。`committed` 标记"响应已刷到底层 channel"，提交即 `setTimeout(null,-1)` 取消超时——避免已完成的请求还触发超时 **504**（`BaseWebServerHttpResponse.defaultHandleTimeout` 发的是 `GATEWAY_TIMEOUT`；503 是异步请求超时那条路径，两者不可混谈）。两个 CAS 把"响应状态机"做到无锁、单次、确定。
 
 ### 11.3 getBody 延迟分配与 filterIndex 游标
 

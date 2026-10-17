@@ -41,7 +41,7 @@ ADR 编号 1–10，与 [00-README](00-README.md) 及 [18 篇](18-spi-extension.
 - 否则 → `createCommonInvoker()` → `MethodHandles.lookup().unreflect(method).bindTo(bean)` + `MethodHandleInvoker`；
 - ASM 生成失败 `catch (Throwable)` 降级到 MethodHandle，保证可用性。
 
-`IN_NATIVE_IMAGE` 守卫（ `System.getProperty("org.graalvm.nativeimage.imagecode") != null`）检测 GraalVM 环境，native-image 下强制走 MethodHandle，绕开运行时字节码生成的限制。
+`IN_NATIVE_IMAGE` 守卫（`System.getProperty("org.graalvm.nativeimage.imagecode") != null`）检测 GraalVM 环境，native-image 下强制走 MethodHandle，绕开运行时字节码生成的限制。
 
 ### 后果
 
@@ -63,7 +63,7 @@ Netty 的 EventLoop 单线程模型天然适合 I/O 密集型场景，但若业�
 
 ### 决策
 
-以 **default 业务线程池为基线**：无 `@RunInPool` 注解的方法按 `pool.default-execute-mode`（缺省 `"default"`，`PropertiesConstant.java`）解析到 default 池——`determinePool` 返回非 `null`，`executor.execute(...)` 切换到业务线程。仅当显式标注 `@RunInPool(EVENTLOOP)` 或配置 `pool.default-execute-mode=eventloop` 时，`determinePool` 才返回 `null`（`BizPoolRegistry.java`），直接在 EventLoop 调 `handleWithFilter`。`DispatcherHandler.handleWithMappingResult`（ 方法定义）按 `bizPoolRegistry.determinePool(req, mappingResult)` 返回值分派：非 `null` → 切业务池，`null` → EventLoop 同步。`determinePool` 的 `req+mappingResult` 重载（`BizPoolRegistry.java`）委托 `MappingHandlerMethod` 重载，三级解析：① `@RunInPool(EVENTLOOP)` → `null`；② `@RunInPool("name")` → 命名池；③ 无注解 → `defaultExecuteMode`，`null`/`"eventloop"` → `null`，否则 → 该名池（缺省 default 池）。默认池配置 `core=50, max=200, keepAlive=60s`（`BizPoolRegistry.java`，/ 两处 `ThreadPoolExecutor` 构造），`@RunInPool("name")` 可指定命名池。基准测试通过 `application.properties:5` 显式设 `pool.default-execute-mode=eventloop` 跑在 EventLoop 模式。
+以 **default 业务线程池为基线**：无 `@RunInPool` 注解的方法按 `pool.default-execute-mode`（缺省 `"default"`，`PropertiesConstant.java`）解析到 default 池——`determinePool` 返回非 `null`，`executor.execute(...)` 切换到业务线程。仅当显式标注 `@RunInPool(EVENTLOOP)` 或配置 `pool.default-execute-mode=eventloop` 时，`determinePool` 才返回 `null`（`BizPoolRegistry.java`），直接在 EventLoop 调 `handleWithFilter`。`DispatcherHandler.handleWithMappingResult`（`DispatcherHandler.java` 方法定义）按 `bizPoolRegistry.determinePool(req, mappingResult)` 返回值分派：非 `null` → 切业务池，`null` → EventLoop 同步。`determinePool` 的 `req+mappingResult` 重载（`BizPoolRegistry.java`）委托 `MappingHandlerMethod` 重载，三级解析：① `@RunInPool(EVENTLOOP)` → `null`；② `@RunInPool("name")` → 命名池；③ 无注解 → `defaultExecuteMode`，`null`/`"eventloop"` → `null`，否则 → 该名池（缺省 default 池）。默认池配置 `core=50, max=200, keepAlive=60s`（`BizPoolRegistry.java`，/ 两处 `ThreadPoolExecutor` 构造），`@RunInPool("name")` 可指定命名池。基准测试通过 `application.properties:5` 显式设 `pool.default-execute-mode=eventloop` 跑在 EventLoop 模式。
 
 ### 后果
 
@@ -109,7 +109,7 @@ Bean 层覆盖有两个硬约束：其一，core 的 Registry 是 `WebComponent`
 
 ### 决策
 
-`SupportXxx` 放在 support 子包（**新 Java 包**），`extends` core 的 `XxxRegistry`，重写两点：① `getComponentName()` 返回**父类简单名**（`SupportDispatcherHandler.java` 返回 `DispatcherHandler.class.getSimpleName()` = "DispatcherHandler"，与 core 默认值同名）；② `getOrder()` 返回更高优先级（ `Ordered.LOWEST_PRECEDENCE - 30000`，比 core 默认 `LOWEST_PRECEDENCE - 10000` 更小 = 更高优先级）。
+`SupportXxx` 放在 support 子包（**新 Java 包**），`extends` core 的 `XxxRegistry`，重写两点：① `getComponentName()` 返回**父类简单名**（`SupportDispatcherHandler.java` 返回 `DispatcherHandler.class.getSimpleName()` = "DispatcherHandler"，与 core 默认值同名）；② `getOrder()` 返回更高优先级（`Ordered.LOWEST_PRECEDENCE - 30000`，比 core 默认 `LOWEST_PRECEDENCE - 10000` 更小 = 更高优先级）。
 
 注册流程：core 的 `DispatcherHandler` 由 `SpringWebAutoConfiguration.java` 注册为 Bean，support 的 `SupportDispatcherHandler` 由 `SpringWebServletAutoConfiguration.java` 注册为 Bean。`WebContext` 初始化时 `getBeansOfType(DispatcherHandler.class)` 扫到两个子类型，`getComponentName` 同为 "DispatcherHandler" → `WebComponentContainer.registerWebComponent` 同名冲突 →  `AnnotationAwareOrderComparator.sort` 选 order 更小者为胜（support 胜），败者（core）`destroy`。同样模式覆盖 `SupportInterceptorRegistry`/`SupportWebFilterRegistry`/`SupportHttpBodyCodecInterceptorRegistry`。
 
@@ -133,7 +133,7 @@ Bean 层覆盖有两个硬约束：其一，core 的 Registry 是 `WebComponent`
 
 ### 决策
 
-batch 用 **LMAX Disruptor**。`BatchRegistry.java` 为每个 `@BatchMapping` 方法创建独立的 `DisruptorQueue`（封装 Disruptor `RingBuffer`），存入 `queues` Map（ `Map<String, DisruptorQueue>`）。`BufferingBatchHandler` 作为 Disruptor 的唯一消费者，`onEvent` 攒批后通过 `SynchronousQueue` + `CallerRunsPolicy` 线程池提交到 `bizExecutor`（[16 篇](16-code-spotlights.md) 聚光灯 9）。
+batch 用 **LMAX Disruptor**。`BatchRegistry.java` 为每个 `@BatchMapping` 方法创建独立的 `DisruptorQueue`（封装 Disruptor `RingBuffer`），存入 `queues` Map（`Map<String, DisruptorQueue>`）。`BufferingBatchHandler` 作为 Disruptor 的唯一消费者，`onEvent` 攒批后通过 `SynchronousQueue` + `CallerRunsPolicy` 线程池提交到 `bizExecutor`（[16 篇](16-code-spotlights.md) 聚光灯 9）。
 
 SSE 场景则用自研 `MpscArrayQueue`（ADR 6）——两者场景不同：batch 是**跨连接攒批 + 批量提交**，Disruptor 的 `SequenceBarrier`/批量发布/`endOfBatch` 信号天然适配；SSE 是**单连接多消息流式**，`MpscArrayQueue` 轻量足够，无需 Disruptor 的栅栏机制。
 
@@ -159,7 +159,7 @@ SSE/流式输出需生产者（EventLoop 或业务线程）→ 消费者（Event
 
 ### 决策
 
-`AbstractNettyStreamSender` 用 `MpscArrayQueue` 固定容量 65536（ `MAX_QUEUED_EVENTS = 65536`， `new MpscArrayQueue<>(MAX_QUEUED_EVENTS)`）。队列满时 `enqueueWithBackpressure` 自旋 `Thread.yield()` / `LockSupport.parkNanos(1000)` 背压——不丢数据，生产者短暂挂起等待消费者腾出槽位。
+`AbstractNettyStreamSender` 用 `MpscArrayQueue` 固定容量 65536（`MAX_QUEUED_EVENTS = 65536`，`new MpscArrayQueue<>(MAX_QUEUED_EVENTS)`）。队列满时 `enqueueWithBackpressure` 自旋 `Thread.yield()` / `LockSupport.parkNanos(1000)` 背压——不丢数据，生产者短暂挂起等待消费者腾出槽位。
 
 ### 后果
 
@@ -177,9 +177,9 @@ SSE/流式输出需生产者（EventLoop 或业务线程）→ 消费者（Event
 
 ### 背景
 
-`AbstractNettyStreamSender` 的 `send()` 先 `preSendCheck()` 读 `completed` 字段（ `volatile boolean completed`），再 `enqueueWithBackpressure` + `scheduleDrain`。`complete()` 写 `this.completed = true` 后 `scheduleDrain()`。`wip`（ `AtomicInteger`）与 `completed` 是两个独立的无锁字段——`preSendCheck` 读 `completed` 与 `complete` 写 `completed` 之间无线性化。
+`AbstractNettyStreamSender` 的 `send()` 先 `preSendCheck()` 读 `completed` 字段（`volatile boolean completed`），再 `enqueueWithBackpressure` + `scheduleDrain`。`complete()` 写 `this.completed = true` 后 `scheduleDrain()`。`wip`（`AtomicInteger`）与 `completed` 是两个独立的无锁字段——`preSendCheck` 读 `completed` 与 `complete` 写 `completed` 之间无线性化。
 
-理论竞态：`complete()` 置位 `completed` 后、drain 写出 `LastHttpContent` 终止帧（ `onAllDataWritten`）前，若生产者恰好 `send` 一条事件，`preSendCheck` 可能尚未读到 `completed=true`，该事件入队后可能被 drain 写到终止帧之后丢失。
+理论竞态：`complete()` 置位 `completed` 后、drain 写出 `LastHttpContent` 终止帧（`onAllDataWritten`）前，若生产者恰好 `send` 一条事件，`preSendCheck` 可能尚未读到 `completed=true`，该事件入队后可能被 drain 写到终止帧之后丢失。
 
 ### 决策
 
@@ -187,7 +187,7 @@ SSE/流式输出需生产者（EventLoop 或业务线程）→ 消费者（Event
 
 ### 后果
 
-- **收益**：`send`/`complete`/`scheduleDrain` 全无锁（ /  `scheduleDrain` 的 `wip.getAndIncrement()==0` 单线程 drain），这是 SSE 吞吐 7.72x tomcat（[17 篇](17-benchmark-data.md) 1.3 节）的性能前提；无锁字段读写让 drain loop 无等待。
+- **收益**：`send`/`complete`/`scheduleDrain` 全无锁（`scheduleDrain` 只在 `wip.getAndIncrement()==0` 时由单线程 drain），这是 SSE 吞吐 7.72x tomcat（[17 篇](17-benchmark-data.md) 1.3 节）的性能前提；无锁字段读写让 drain loop 无等待。
 - **代价**：理论竞态客观存在——最后一条事件可能在 `complete` 边界丢失（极低概率，需生产者 `send` 与 `complete` 精确并发且时序卡在 `preSendCheck` 与 `complete` 写 `completed` 之间）。
 - **边界**：仅"最后一条边界事件"可能丢失，已入队数据由 drain loop 保证不丢——`afterDrain()` 的 `wip.compareAndSet(0,1)` + `queue.isEmpty()` 双重检查防止 drain 完成瞬间的残留数据丢失。若用户的 `complete` 与 `send` 严格有序（同一线程或存在 happens-before 关系），竞态不触发。重新审视条件：若未来支持多线程并发 `send` + `complete` 且要求严格不丢，需引入线性化（如 `volatile` + CAS 或 sender 层锁），但当前调用模型不触发，加锁是过早优化。
 
@@ -207,9 +207,9 @@ SSE/流式输出需生产者（EventLoop 或业务线程）→ 消费者（Event
 
 ### 决策
 
-`static Map` 按 `Method`/`Class` 维度 `computeIfAbsent` 唯一（`MappingHandlerMethod.java` `classCacheInstanceMap.computeIfAbsent(userClass, ...)`、 `methodCacheInstanceMap.computeIfAbsent(userMethod, ...)`）。实例字段 `methodCache`/`classCache`（ `volatile Object[]`）指向 static map 里的同一个 `Object[]`——多 path 共享一份缓存。per-instance 数组会让多 path 各持一份缓存，破坏唯一性，内存浪费。
+`static Map` 按 `Method`/`Class` 维度 `computeIfAbsent` 唯一（`MappingHandlerMethod.java` `classCacheInstanceMap.computeIfAbsent(userClass, ...)`、 `methodCacheInstanceMap.computeIfAbsent(userMethod, ...)`）。实例字段 `methodCache`/`classCache`（`volatile Object[]`）指向 static map 里的同一个 `Object[]`——多 path 共享一份缓存。per-instance 数组会让多 path 各持一份缓存，破坏唯一性，内存浪费。
 
-`HttpBodyCodecRegistry` 同模式：`static MappingCacheKey`（ `TARGET_TYPE_CACHE_KEY`、 `READ_BODY_CONVERTER_CACHE_KEY`、 `WRITE_NEGOTIATION_CACHE_KEY`）作为静态常量；registry 用 `liveNegotiationCaches`（ `Set<Map<String, NegotiationCacheEntry>>`）记录自己创建的 inner map，converter 变更时逐个 `clear`（避免泄漏）。 注释明言："存进 ctx 的 methodCache 数组槽……PathMappingContext 按方法共享实例，首次 computeIfAbsent 后 getCache 即字段读"。
+`HttpBodyCodecRegistry` 同模式：`static MappingCacheKey`（`TARGET_TYPE_CACHE_KEY`、`READ_BODY_CONVERTER_CACHE_KEY`、`WRITE_NEGOTIATION_CACHE_KEY`）作为静态常量；registry 用 `liveNegotiationCaches`（`Set<Map<String, NegotiationCacheEntry>>`）记录自己创建的 inner map，converter 变更时逐个 `clear`（避免泄漏）。 注释明言："存进 ctx 的 methodCache 数组槽……PathMappingContext 按方法共享实例，首次 computeIfAbsent 后 getCache 即字段读"。
 
 ### 后果
 
@@ -261,9 +261,9 @@ SSE/流式输出需生产者（EventLoop 或业务线程）→ 消费者（Event
 
 ### 决策
 
-**复用 Spring Bean 类型扫描，但收口在 `WebComponentContainer`**。不发明 `@WebComponent` 注解（[18 篇](18-spi-extension.md) 引子已纠偏"框架没有 `@WebComponent` 注解"），SPI 靠 Spring `@Component`/`@Configuration`+`@Bean` 成为 Bean，框架按类型取 Bean（`getBeansOfType` / `autoRegisterWebComponent` / `getWebComponentWithDefault`），排序靠 `Ordered`/`@Order` 经 `AnnotationAwareOrderComparator.sort` 统一处理（`WebComponentContainer.java` / ）。
+**复用 Spring Bean 类型扫描，但收口在 `WebComponentContainer`**。不发明 `@WebComponent` 注解（[18 篇](18-spi-extension.md) 引子已纠偏"框架没有 `@WebComponent` 注解"），SPI 靠 Spring `@Component`/`@Configuration`+`@Bean` 成为 Bean，框架按类型取 Bean（`getBeansOfType` / `autoRegisterWebComponent` / `getWebComponentWithDefault`），排序靠 `Ordered`/`@Order` 经 `AnnotationAwareOrderComparator.sort` 统一处理（`WebComponentContainer.java`、`WebComponent.java`）。
 
-`WebComponentContainer`（ `autoRegisterWebComponent` 登记、 `registerWebComponent` 冲突解析 + 动态注册按 state 追 phase）把"扫描 + 排序 + 固化"收口在一处。`RouterOptimizer` 是反例边界——`getOptimizerTemplate` 返回固定链（`MappingRegistry.java`），**不扫描 Bean**，扩展靠继承重写 `protected` 方法。这是 12 SPI 中唯一不靠类型发现的扩展点，因为路由优化器是"框架内部路由结构的选择策略"，暴露为 Bean 会破坏 `PathMappingContext` 的内聚。
+`WebComponentContainer`（`autoRegisterWebComponent` 登记、`registerWebComponent` 冲突解析 + 动态注册按 state 追 phase）把"扫描 + 排序 + 固化"收口在一处。`RouterOptimizer` 是反例边界——`getOptimizerTemplate` 返回固定链（`MappingRegistry.java`），**不扫描 Bean**，扩展靠继承重写 `protected` 方法。这是 12 SPI 中唯一不靠类型发现的扩展点，因为路由优化器是"框架内部路由结构的选择策略"，暴露为 Bean 会破坏 `PathMappingContext` 的内聚。
 
 ### 后果
 
@@ -271,7 +271,7 @@ SSE/流式输出需生产者（EventLoop 或业务线程）→ 消费者（Event
 - **代价**：`WebComponent` 同名覆盖机制是隐式的（ADR 4），不读源码难发现；`@Conditional` 无法精细控制 `WebComponent` 注册时序——这就是 support 模块用同名覆盖而非 `@ConditionalOnMissingBean` 的原因（ADR 4）。
 - **边界**：`RouterOptimizer` 不走类型发现（内部路由结构策略，暴露破坏内聚）；其余 11 个 SPI 全走类型发现。重新审视条件：若未来出现需要"条件化注册 WebComponent"的场景，不应在框架层引入 `@Conditional` 语义，而应在 `WebComponentContainer.registerWebComponent` 内增加条件判断——保持"框架收口"而非"委托 Spring 条件化"。
 
-**关联**：[18 篇](18-spi-extension.md) 全篇（已引用本条为 ADR 10）、[01 篇](01-design-philosophy.md) 设计哲学（ 显式 SPI 原则）。
+**关联**：[18 篇](18-spi-extension.md) 全篇（已引用本条为 ADR 10）、[01 篇](01-design-philosophy.md) 设计哲学（原则 6：显式 SPI）。
 
 ---
 

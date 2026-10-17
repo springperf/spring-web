@@ -48,15 +48,18 @@ WebContext extends WebComponentContainer                      ← 唯一根容�
        getOrder() = Integer.MAX_VALUE                        （Ordered 组件排序用，非 SmartLifecycle）
 ```
 
-**根接口 `WebComponent`**（[`WebComponent.java`](../../spring-web/src/main/java/io/springperf/web/context/WebComponent.java)）只定义三样东西：`getComponentName()`（默认取简单类名，作为冲突解决的身份标识 ）、`initWithWebContext()`（注入上下文钩子，默认空 ）、`getOrder()`（默认 `LOWEST_PRECEDENCE - 10000`，让组件排在多数 Spring bean 之前但晚于框架内部 ）。它继承 `Ordered`——**排序是组件体系的一等公民**，后文的冲突解决、递归顺序都依赖它。
+**根接口 `WebComponent`**（[`WebComponent.java`](../../spring-web/src/main/java/io/springperf/web/context/WebComponent.java)）只定义三样东西：`getComponentName()`（默认取简单类名，作为冲突解决的身份标识）、`initWithWebContext()`（注入上下文钩子，默认空）、`getOrder()`（默认 `LOWEST_PRECEDENCE - 10000`，让组件排在多数 Spring bean 之前但晚于框架内部）。它继承 `Ordered`——**排序是组件体系的一等公民**，后文的冲突解决、递归顺序都依赖它。
 
-**三阶段契约 `LifecycleWebComponent`**（[`LifecycleWebComponent.java`](../../spring-web/src/main/java/io/springperf/web/context/LifecycleWebComponent.java)）在根接口上叠加四个 `default` 空方法，把"初始化"拆成三阶段 + 销毁。接口注释  明确三阶段语义：
+**三阶段契约 `LifecycleWebComponent`**（[`LifecycleWebComponent.java`](../../spring-web/src/main/java/io/springperf/web/context/LifecycleWebComponent.java)）在根接口上叠加四个 `default` 空方法，把"初始化"拆成三阶段 + 销毁。接口注释明确三阶段语义：
 
 - **Phase 1** — bean scanning, metadata collection, data structure construction（`scan and collect metadata`）
-- **Phase 2** — cross-component wiring, index building- **Phase 3** — optimization, caching, final preparation for request handling- **destroyComponent** — idempotent cleanup
+- **Phase 2** — cross-component wiring, index building
+- **Phase 3** — optimization, caching, final preparation for request handling
+- **destroyComponent** — idempotent cleanup
+
 关键设计：三个 Phase 都是 `default` 空——**组件可以只 override 它需要的阶段，不需要的阶段零成本跳过**。这解释了为什么有的 Registry 只有 Phase2 override、有的只有 Phase3——它们各自声明自己关心的事，不被迫实现空壳。
 
-**叶子基类 `BaseWebComponent`**（[`BaseWebComponent.java`](../../spring-web/src/main/java/io/springperf/web/context/BaseWebComponent.java)）极简：一个 `protected WebContext webContext` 字段+ 把 `initWithWebContext` 实现为赋值。它**不持有子组件表、不管理状态机**——是"原子组件"的落脚点。两个叶子型 Registry（`BizPoolRegistry`、`WebDataBinderRegistry`）直接继承它。
+**叶子基类 `BaseWebComponent`**（[`BaseWebComponent.java`](../../spring-web/src/main/java/io/springperf/web/context/BaseWebComponent.java)）极简：一个 `protected WebContext webContext` 字段，并把 `initWithWebContext` 实现为赋值。它**不持有子组件表、不管理状态机**——是"原子组件"的落脚点。两个叶子型 Registry（`BizPoolRegistry`、`WebDataBinderRegistry`）直接继承它。
 
 **容器基类 `WebComponentContainer`**（[`WebComponentContainer.java`](../../spring-web/src/main/java/io/springperf/web/context/WebComponentContainer.java)）是体系的核心：它叠加状态机、子组件表、自动注册声明表、冲突解决 + 生命周期重放、CAS 守卫的递归初始化。11 个容器型 Registry 继承它。它的全部机制后面分节展开。
 
@@ -101,15 +104,15 @@ public void initWithWebContext(WebContext webContext) {
 }
 ```
 
-四个阶段方法  结构同构——CAS 推进 + `super` 调用 + 递归子组件：
+四个阶段方法结构同构——CAS 推进 + `super` 调用 + 递归子组件：
 
-| 方法 | CAS 转换 | 行号 | 递归调用 |
-|------|----------|------|----------|
-| `initWithWebContext` | `NEW → INIT_CONTEXT` |  | `component.initWithWebContext`  |
-| `initComponentPhase1` | `INIT_CONTEXT → PHASE1` |  | `initComponentPhase1(component)`  |
-| `initComponentPhase2` | `PHASE1 → PHASE2` |  | `initComponentPhase2(component)`  |
-| `initComponentPhase3` | `PHASE2 → PHASE3` |  | `initComponentPhase3(component)`  |
-| `destroyComponent` | `PHASE3 → DESTROY` |  | `destroyComponent(component)`  |
+| 方法 | CAS 转换 | 递归调用 |
+|------|----------|----------|
+| `initWithWebContext` | `NEW → INIT_CONTEXT` | `component.initWithWebContext(webContext)` |
+| `initComponentPhase1` | `INIT_CONTEXT → PHASE1` | `initComponentPhase1(component)` |
+| `initComponentPhase2` | `PHASE1 → PHASE2` | `initComponentPhase2(component)` |
+| `initComponentPhase3` | `PHASE2 → PHASE3` | `initComponentPhase3(component)` |
+| `destroyComponent` | `PHASE3 → DESTROY` | `destroyComponent(component)` |
 
 递归调度器对每个子组件做 `instanceof LifecycleWebComponent` 检查——只对实现了三阶段契约的组件调对应方法，纯 `WebComponent` 被跳过。这意味着**容器树里可以混入非生命周期组件**（如某些叶子 Bean），递归不会对它们误调 Phase。
 
@@ -139,14 +142,14 @@ public void initWithWebContext(WebContext webContext) {
 > 接口注释：cross-component wiring, index building
 此时 Phase1 已全部完成，所有元数据就绪，组件可以安全地解析对其他组件的引用、构建索引、建立跨结构连接。这一阶段的标志动作是 `initRealComponentList`（`WebComponentContainer.java`）——把自动注册进来的子组件按 `@Order` 排序后固化成运行时列表。
 
-7 个 Registry override Phase2：InterceptorRegistry、HttpBodyCodecRegistry、CorsRegistry、ExceptionRegistry、AsyncSupportRegistry、ResourceHandlerRegistry、HttpBodyCodecInterceptorRegistry。它们的 Phase2 多是 `initRealComponentList` + 排序构建不可变列表（如 `HttpBodyCodecRegistry` 的 `allSupportedMediaTypes` 排序后不可变 list，摘要 ）。
+7 个 Registry override Phase2：InterceptorRegistry、HttpBodyCodecRegistry、CorsRegistry、ExceptionRegistry、AsyncSupportRegistry、ResourceHandlerRegistry、HttpBodyCodecInterceptorRegistry。它们的 Phase2 多是 `initRealComponentList` + 排序构建不可变列表（如 `HttpBodyCodecRegistry` 的 `allSupportedMediaTypes` 排序后不可变 list，摘要）。
 
 ### Phase 3 · 优化、缓存、fail-fast 校验
 
 > 接口注释：optimization, caching, final preparation for request handling
 这是"启动时确定"的决战阶段：路由树压缩、模式预编译、缓存预计算、**fail-fast 校验**。4 个 Registry override Phase3：
 
-- **`MappingRegistry.initComponentPhase3`**（摘要  → `optimizeMapping `）：分桶（精确/单级通配/全通配）+ `FullPathRouterOptimizer` 等多级优化器链构建。这是 [03 篇 §性能原理 3](../performance-principles.md) 的 O(1) 路由落地。
+- **`MappingRegistry.initComponentPhase3`**（摘要 → `optimizeMapping`）：分桶（精确/单级通配/全通配）+ `FullPathRouterOptimizer` 等多级优化器链构建。这是 [03 篇 §性能原理 3](../performance-principles.md) 的 O(1) 路由落地。
 - **`ArgumentResolverRegistry.initComponentPhase3`**（摘要）：`if (props.getBoolean(CHECK_ON_STARTUP, true)) validateAllParametersResolvable()`。**只校验不创建解析器**——这是混合缓存模式的关键，见第七节。
 - **`WebFilterRegistry.initComponentPhase3`**（摘要）：`initRealComponentList` + `initAllFilters`，预构建 `allFilters` 与 `unmatchedChain`。
 - **`BizPoolRegistry.initComponentPhase3`**（摘要）：`ctx.getBeansOfType(ExecutorService.class)` 自动发现业务线程池 Bean，注册到 `pools` Map，运行时 `determinePool` 按名取用。
@@ -343,22 +346,22 @@ WebContext（根容器，getOrder=MAX_VALUE 最后启动）
 | # | Registry | 继承 | Phase override | MAPPING_CACHE_KEY | 急切产物（启动期） | 懒缓存产物（首次请求） | 运行时入口 |
 |---|----------|------|---------------|-------------------|-------------------|----------------------|-----------|
 | 1 | MappingRegistry | 容器 | P1+P3 | — | 路由元数据 + 分桶 + 优化器链 | — | `mapping(req)` |
-| 2 | InterceptorRegistry | 容器 | P2 | — | `runtimeMappingInterceptors` 列表 | per-ctx 拦截器数组（DCL ，PathMappingContext 实例字段 `cachedInterceptors`） | `preHandle`/`postHandle`/`afterCompletion` |
-| 3 | ArgumentResolverRegistry | 容器 | P3 | method（`MethodArgContext[]` ） | 13 个 StaticArgumentResolverProvider + Phase3 **只校验** | per-method `MethodArgContext[]`（get-null-check ） | `resolveArguments` |
-| 4 | ReturnValueResolverRegistry | 容器 | 无 | method（`MethodReturnValueContext` ） | 13 个内置 ReturnValueResolver + SPI 扩展 | per-method 主 resolver + async/Optional 内联 resolver（两层懒缓存 ） | `resolveReturnValue` |
+| 2 | InterceptorRegistry | 容器 | P2 | — | `runtimeMappingInterceptors` 列表 | per-ctx 拦截器数组（DCL，`PathMappingContext` 实例字段 `cachedInterceptors`） | `preHandle`/`postHandle`/`afterCompletion` |
+| 3 | ArgumentResolverRegistry | 容器 | P3 | method（`MethodArgContext[]`） | 13 个 StaticArgumentResolverProvider + Phase3 **只校验** | per-method `MethodArgContext[]`（get-null-check） | `resolveArguments` |
+| 4 | ReturnValueResolverRegistry | 容器 | 无 | method（`MethodReturnValueContext`） | 13 个内置 ReturnValueResolver + SPI 扩展 | per-method 主 resolver + async/Optional 内联 resolver（两层懒缓存） | `resolveReturnValue` |
 | 5 | HttpBodyCodecRegistry | 容器 | P2 | — | `allSupportedMediaTypes` 不可变 list + 1 个内置 converter + SPI 扩展 | per-ctx READ/WRITE converter + write 协商表（cap 64/method） | `readBody`/`writeBody` |
-| 6 | HttpBodyCodecInterceptorRegistry | 容器 | P2 | **class**（`HttpBodyCodecInterceptor[]` ） | ControllerAdvice 收集 | per-ctx `HttpBodyCodecInterceptor[]`（get-null-check ） | `beforeBodyRead`/`afterBodyRead`/`beforeBodyWrite` |
-| 7 | CorsRegistry | 容器 | P2 | — | `WebCorsProcessor` default | per-ctx `CorsConfigurationProvider`（get-null-check ） | `corsHandle`/`getCorsConfiguration` |
-| 8 | ExceptionRegistry | 容器 | P2 | — | 2 个内置 resolver + SPI 扩展 | **无懒缓存**（每请求线性扫描 ） | `handle`/`doHandle` |
+| 6 | HttpBodyCodecInterceptorRegistry | 容器 | P2 | **class**（`HttpBodyCodecInterceptor[]`） | ControllerAdvice 收集 | per-ctx `HttpBodyCodecInterceptor[]`（get-null-check） | `beforeBodyRead`/`afterBodyRead`/`beforeBodyWrite` |
+| 7 | CorsRegistry | 容器 | P2 | — | `WebCorsProcessor` default | per-ctx `CorsConfigurationProvider`（get-null-check） | `corsHandle`/`getCorsConfiguration` |
+| 8 | ExceptionRegistry | 容器 | P2 | — | 2 个内置 resolver + SPI 扩展 | **无懒缓存**（每请求线性扫描） | `handle`/`doHandle` |
 | 9 | AsyncSupportRegistry | 容器 | P2 | — | `defaultTaskExecutor`（from BizPoolRegistry） | 无（interceptor chain per-call） | `startCallableProcessing`/`startDeferredResultProcessing` |
 | 10 | ResourceHandlerRegistry | 容器 | P2 | — | `PathMappingContext` 构建并注册进 MappingRegistry | 无（仅启动期） | 无（委托 MappingRegistry） |
-| 11 | WebFilterRegistry | 容器 | **P3** | — | `allFilters` + `unmatchedChain` 预构建 | per-ctx `DefaultFilterChain`（DCL ） | `doFilter`/`resolveFilterChain` |
-| 12 | **BizPoolRegistry** | **叶子** | **P3** | method（`Object.class`） | `default` 池（`initDefaultPoolFromConfig` ）+ 自动发现 `ExecutorService` Bean | per-method 池决策（NO_POOL 哨兵等） | `determinePool` |
-| 13 | **WebDataBinderRegistry** | **叶子** | P1 | **class** ×3（`CONVERSION_SERVICE`/`VALIDATOR`/`BINDER_FACTORY` ） | `initBinderAdviceCache` + default services | per-class ConversionService/Validator/BinderFactory（get-null-check ） | 经 ArgumentResolverRegistry 调用 |
+| 11 | WebFilterRegistry | 容器 | **P3** | — | `allFilters` + `unmatchedChain` 预构建 | per-ctx `DefaultFilterChain`（DCL） | `doFilter`/`resolveFilterChain` |
+| 12 | **BizPoolRegistry** | **叶子** | **P3** | method（`Object.class`） | `default` 池（`initDefaultPoolFromConfig`）+ 自动发现 `ExecutorService` Bean | per-method 池决策（NO_POOL 哨兵等） | `determinePool` |
+| 13 | **WebDataBinderRegistry** | **叶子** | P1 | **class** ×3（`CONVERSION_SERVICE`/`VALIDATOR`/`BINDER_FACTORY`） | `initBinderAdviceCache` + default services | per-class ConversionService/Validator/BinderFactory（get-null-check） | 经 ArgumentResolverRegistry 调用 |
 
 **关键观察**：
 
-1. **MAPPING_CACHE_KEY 的两种类型**：`method`（每方法共享数组）用于 ArgumentResolverRegistry/ReturnValueResolverRegistry/BizPoolRegistry；`class`（每控制器类共享数组）用于 HttpBodyCodecInterceptorRegistry/WebDataBinderRegistry。两池索引独立、绝不碰撞——机制见第八节。**例外**：InterceptorRegistry/CorsRegistry/WebFilterRegistry 不走 MappingCacheKey，而是直接操作 PathMappingContext 的实例字段（`cachedInterceptors`/`corsConfigurationProvider`/`cachedFilterChain`，见 `PathMappingContext.java`/ 等），三者存的是 `List`/`Provider`/`FilterChain` 等有类型的领域对象，不需要整型索引寻址——get-null-check 或 DCL 模式与 MappingCacheKey 消费者相同，只是存储位置在实例字段而非 `Object[]` 槽位。
+1. **MAPPING_CACHE_KEY 的两种类型**：`method`（每方法共享数组）用于 ArgumentResolverRegistry/ReturnValueResolverRegistry/BizPoolRegistry；`class`（每控制器类共享数组）用于 HttpBodyCodecInterceptorRegistry/WebDataBinderRegistry。两池索引独立、绝不碰撞——机制见第八节。**例外**：InterceptorRegistry/CorsRegistry/WebFilterRegistry 不走 MappingCacheKey，而是直接操作 PathMappingContext 的实例字段（`cachedInterceptors`/`corsConfigurationProvider`/`cachedFilterChain`，见 `PathMappingContext.java` 等），三者存的是 `List`/`Provider`/`FilterChain` 等有类型的领域对象，不需要整型索引寻址——get-null-check 或 DCL 模式与 MappingCacheKey 消费者相同，只是存储位置在实例字段而非 `Object[]` 槽位。
 2. **3 个 Registry 无懒缓存**：`ExceptionRegistry`、`AsyncSupportRegistry`、`ResourceHandlerRegistry`。前两者每请求线性扫描 resolver/构建 interceptor chain，后者仅启动期工作。它们的选择各有理由：异常处理低频、异步 interceptor chain 因异步语义难预缓存、资源处理器纯启动期。
 3. **override Phase3 的 Registry 有四个**：`MappingRegistry`（构建路由优化器链）、`ArgumentResolverRegistry`（参数可解析性校验）、`WebFilterRegistry`（pre-build `unmatchedChain`）与叶子型 `BizPoolRegistry`（自动发现业务线程池 Bean）。显式 ctor 亦非 `WebFilterRegistry` 独有——`InterceptorRegistry` 同样有（auto-register `InterceptorRegistration` + `HandlerInterceptor`）。
 
@@ -379,7 +382,7 @@ WebContext（根容器，getOrder=MAX_VALUE 最后启动）
 
 | Registry | 懒缓存对象 | 时机 | 守卫方式 |
 |----------|-----------|------|---------|
-| ArgumentResolverRegistry | `MethodArgContext[]`（含每参数选定的 resolver） | 首次解析该方法 | get-null-check（，**无 synchronized**） |
+| ArgumentResolverRegistry | `MethodArgContext[]`（含每参数选定的 resolver） | 首次解析该方法 | get-null-check（**无 synchronized**） |
 | ReturnValueResolverRegistry | 主 resolver + async/Optional 内联 resolver | 首次处理该返回值 | get-null-check + 两层 |
 | InterceptorRegistry | per-ctx 拦截器数组 | 首次匹配该方法 | **DCL synchronized** |
 | WebFilterRegistry | per-ctx `DefaultFilterChain` | 首次过滤该路径 | **DCL synchronized** |
@@ -399,7 +402,7 @@ if (webContext.getProps().getBoolean(PropertiesConstant.CHECK_ON_STARTUP, true))
 }
 ```
 
-`validateAllParametersResolvable`（摘要）遍历 `mappingRegistry.getMappingContextList()`，对每个参数调 `isParameterResolvable` + `validateModelAttributeConstructor`——**只判断"能不能解析"，不创建解析器实例存进缓存**。源码注释  明示："keeping memory footprint zero for endpoints that are never called"。
+`validateAllParametersResolvable`（摘要）遍历 `mappingRegistry.getMappingContextList()`，对每个参数调 `isParameterResolvable` + `validateModelAttributeConstructor`——**只判断"能不能解析"，不创建解析器实例存进缓存**。源码注释明示："keeping memory footprint zero for endpoints that are never called"。
 
 真正的解析器选择懒到 `getMethodArgContexts`——首次请求某方法时，`mappingContext.get(MAPPING_CACHE_KEY)` 命中 null → 创建 `MethodArgContext[]` → `initStaticArgResolverSupport`为每参数跑 `providers.supports` + fallback 选 resolver 存入 `defaultArgumentResolver` → `set` 写进数组。之后同方法请求直接 `array[index]` 取已选定的 resolver。
 
@@ -518,7 +521,7 @@ public <T> void set(MappingCacheKey<T> key, T value) {
 }
 ```
 
-**唯一上锁的点是扩容**——且用 DCL（double-checked locking）：先无锁检查 `index >= cache.length`，只有需要扩容才进 `synchronized` 块，块内重读数组防并发扩容，`Arrays.copyOf` 扩容后回填 map（`setCache` ）。**正常写入（`index < cache.length`）完全无锁**——`cache[index] = value` 一条 `astore` 指令。
+**唯一上锁的点是扩容**——且用 DCL（double-checked locking）：先无锁检查 `index >= cache.length`，只有需要扩容才进 `synchronized` 块，块内重读数组防并发扩容，`Arrays.copyOf` 扩容后回填 map（`setCache`）。**正常写入（`index < cache.length`）完全无锁**——`cache[index] = value` 一条 `astore` 指令。
 
 为什么写入可以无锁？因为 `index` 在启动期已由 `MappingCacheKey` 的 `AtomicInteger` 全局分配且**永不复用**——每个 key 对应固定槽位，不同 key 写不同 index，无竞争。同一 index 的并发写（首次请求重复构建，见第七节）结果幂等——多写一次相同的 resolver 实例，无正确性问题。`volatile Object[]` 保证数组引用的可见性，`aaload`/`astore` 对引用类型读写本身原子。
 
@@ -627,7 +630,7 @@ if (kept != webComponent) {
 3. **`log.warn` 显式告知"用了谁、废弃了谁"**——业务方能在启动日志看到覆盖关系，而非在某个请求出诡异行为后才发现某组件被悄悄换掉。这是 [01 篇原则 6](01-design-philosophy.md#原则-6--避免魔法行为显式-spi显式-fail-fast不靠隐式猜测) "避免魔法行为"的代码落地。
 4. **败者被 `destroyComponent`**：新者胜则旧者销毁（释放线程池等资源）；旧者胜则新者直接 return 被丢弃（新者从未初始化，无需 destroy）。资源不泄漏、状态不残留。
 
-> 注意冲突解决发生在重放逻辑**之前**（ 在  前）——即先决定"留谁"，再对留存的组件补跑生命周期。
+> 注意冲突解决发生在重放逻辑**之前**（`webComponents.compute` 内的排序取舍在前，`initWithWebContext`/`initComponentPhaseN` 的补跑在后）——即先决定"留谁"，再对留存的组件补跑生命周期。
 
 ---
 

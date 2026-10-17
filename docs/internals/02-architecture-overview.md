@@ -414,7 +414,7 @@ module.md（[`../../.agent/context/module.md`](../../.agent/context/module.md)�
 
 ### 校正一：生命周期触发点
 
-**module.md 表述**（`module.md`、、）：
+**module.md 表述**（`module.md` 原文）：
 
 > `WebContext implements InitializingBean → 驱动整个组件生命周期`
 > `WebContext.afterPropertiesSet() → initWithWebContext() → initComponentPhase1/2/3`

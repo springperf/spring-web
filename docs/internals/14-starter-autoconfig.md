@@ -188,7 +188,7 @@ private static void assertNoSpringMvcConflict() {
 }
 ```
 
-`BeanFactoryPostProcessor` 在 bean 定义加载后、实例化前执行（ 注释 D9），比原 `webContext` bean 方法（实例化阶段）更早暴露问题。用户如果同时引入了 `spring-boot-starter-web`（Tomcat）和本框架的 starter，会在启动初期立即收到 `IllegalStateException`，避免两个 Web 服务器冲突。
+`BeanFactoryPostProcessor` 在 bean 定义加载后、实例化前执行（`SpringWebAutoConfiguration.springMvcConflictGuard()` 注释 D9），比原 `webContext` bean 方法（实例化阶段）更早暴露问题。用户如果同时引入了 `spring-boot-starter-web`（Tomcat）和本框架的 starter，会在启动初期立即收到 `IllegalStateException`，避免两个 Web 服务器冲突。
 
 ---
 
@@ -274,15 +274,15 @@ protected WebFilterRegistration createFilterWrapper(AbstractFilterRegistrationBe
 2. 注册 CORS 配置（从 `CorsEndpointProperties` 读取）。
 3. 注册 `LinksOperationInvoker`（`/actuator` 根路径，返回端点链接列表）。
 4. 遍历 `WebEndpointsSupplier.getEndpoints()`，对每个端点的每个 `WebOperation`：
-   - 构建 `OperationHandlerInvoker`（，适配 `WebOperation` 调用为 `Invoker` 接口）。
-   - 创建 `ActuatorPathMappingContext`（，继承 `PathMappingContext`，含 `WebServerNamespace`）。
+   - 构建 `OperationHandlerInvoker`（适配 `WebOperation` 调用为 `Invoker` 接口）。
+   - 创建 `ActuatorPathMappingContext`（继承 `PathMappingContext`，含 `WebServerNamespace`）。
    - 调用 `registerRoute`，根据是否有管理端口注册到主 `MappingRegistry` 或管理端口 `MappingRegistry`。
 
 ### 4.4 管理端口隔离
 
 `management.server.port` 配置时，`ManagementServerInfrastructure`创建独立的组件容器（`WebContext` 的副本），包含独立的 `DispatcherHandler`、`MappingRegistry` 和 `NettyHttpServer`。管理端口只处理 Actuator 端点，业务请求不进入管理端口，管理端口的负载不影响业务端口。
 
-`management.server.port` 与 `server.port` 必须不同（，`IllegalStateException` 校验）。
+`management.server.port` 与 `server.port` 必须不同（`IllegalStateException` 校验）。
 
 ---
 

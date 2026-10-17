@@ -119,25 +119,25 @@ public void start() {
 
 I/O 层配置默认值集中如下（均来自 [`PropertiesConstant.java`](../../spring-web/src/main/java/io/springperf/web/context/PropertiesConstant.java)）：
 
-| 属性键 | 默认值 | 含义 | 源码行 |
-|--------|--------|------|--------|
-| `server.port` | `8080` | HTTP 端口 | |
-| `server.netty.workers` | `0`（自动=CPU×2） | worker 线程数 | |
-| `server.netty.write-buffer-low-watermark` | `8192`（8KB） | 背压低水位 | |
-| `server.netty.write-buffer-high-watermark` | `32768`（32KB） | 背压高水位 | |
-| `server.http.read-timeout` | `0`（关闭） | 聚合前**读空闲**超时（防慢客户端占用连接）；默认关闭（性能优先）；生产环境通常由代理 / 网关回收空闲连接，网关覆盖不到的边界请显式设置（Tomcat `connectionTimeout` 默认 20s） | |
-| `server.http.max-content-length` | `4194304`（4MB） | 聚合上限 | |
-| `server.http.max-initial-line-length` | `4096`（4KB） | 请求行长度上限 | |
-| `server.max-http-request-header-size` | `8192`（8KB） | 合并请求头总大小上限 | |
-| `server.http.max-chunk-size` | `8192`（8KB） | 单 chunk 上限 | |
-| `server.http2.enabled` | `false` | HTTP/2 开关 | |
-| `server.forward-headers-strategy` | `NONE` | 转发头策略：`NONE`/`FALSE` 不信任；`FRAMEWORK`/`NATIVE` 信任解析 `Forwarded` / `X-Forwarded-*` | |
-| `server.shutdown.grace-period` | `30s` | 优雅关闭等待 | |
-| `server.netty.so-backlog` | `1024` | TCP 连接队列长度 | |
-| `server.netty.tcp-nodelay` | `true` | 禁用 Nagle 算法 | |
-| `server.netty.so-keepalive` | `true` | TCP keepalive 探测 | |
-| `server.netty.so-reuseaddr` | `true` | 重用本地地址 | |
-| `server.netty.allocator-type` | `pooled` | ByteBuf 分配器类型 | | |
+| 属性键 | 默认值 | 含义 |
+|--------|--------|------|
+| `server.port` | `8080` | HTTP 端口 |
+| `server.netty.workers` | `0`（自动=CPU×2） | worker 线程数 |
+| `server.netty.write-buffer-low-watermark` | `8192`（8KB） | 背压低水位 |
+| `server.netty.write-buffer-high-watermark` | `32768`（32KB） | 背压高水位 |
+| `server.http.read-timeout` | `0`（关闭） | 聚合前**读空闲**超时（防慢客户端占用连接）；默认关闭（性能优先）；生产环境通常由代理 / 网关回收空闲连接，网关覆盖不到的边界请显式设置（Tomcat `connectionTimeout` 默认 20s） |
+| `server.http.max-content-length` | `4194304`（4MB） | 聚合上限 |
+| `server.http.max-initial-line-length` | `4096`（4KB） | 请求行长度上限 |
+| `server.max-http-request-header-size` | `8192`（8KB） | 合并请求头总大小上限 |
+| `server.http.max-chunk-size` | `8192`（8KB） | 单 chunk 上限 |
+| `server.http2.enabled` | `false` | HTTP/2 开关 |
+| `server.forward-headers-strategy` | `NONE` | 转发头策略：`NONE`/`FALSE` 不信任；`FRAMEWORK`/`NATIVE` 信任解析 `Forwarded` / `X-Forwarded-*` |
+| `server.shutdown.grace-period` | `30s` | 优雅关闭等待 |
+| `server.netty.so-backlog` | `1024` | TCP 连接队列长度 |
+| `server.netty.tcp-nodelay` | `true` | 禁用 Nagle 算法 |
+| `server.netty.so-keepalive` | `true` | TCP keepalive 探测 |
+| `server.netty.so-reuseaddr` | `true` | 重用本地地址 |
+| `server.netty.allocator-type` | `pooled` | ByteBuf 分配器类型 |
 
 ### 1.4 `actualPort` 写入 `local.server.port`
 

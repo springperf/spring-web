@@ -82,7 +82,7 @@ public void initComponentPhase2() throws Exception {
 `install` 方法做五件事：
 
 1. **缓存 `BatchRequestMetaData`**：将元数据通过 `BATCH_META_CACHE_KEY` 缓存到 `singleCtx`（单请求 `PathMappingContext`）上，供后续 `BatchInvoker` 使用。
-2. **创建 `DisruptorQueue`**：按 `queueName`（`batch:<ClassName>.<methodName>`）创建队列，`putIfAbsent` 防重复安装，冲突时 `shutdown` 新队列再抛异常（，修复前直接抛导致线程泄漏）。
+2. **创建 `DisruptorQueue`**：按 `queueName`（`batch:<ClassName>.<methodName>`）创建队列，`putIfAbsent` 防重复安装，冲突时 `shutdown` 新队列再抛异常（修复前直接抛导致线程泄漏）。
 3. **替换 Invoker**：`singleCtx.setInvoker(new BatchInvoker(meta, queue))`——这是"方法体替换"语义的实现点。
 4. **矫正返回值类型**：`setEffectiveReturnType`让 `ReturnValueResolverRegistry` 能正确解析 `BatchRequest<X>` 中的泛型内联类型 `X`。
 5. **虚拟线程模式下取消 `@RunInPool`**：`if (virtualThreads) poolRegistry.setDefaultPool(reg.singleCtx(), null)`——虚拟线程的 `default` 池以虚拟线程执行任务，而 single 路径只做入队（微秒级、不阻塞），走它反而多一次线程切换，故置空默认池让入队留在 EventLoop。**未开虚拟线程时不设置**，遵循全局 `pool.default-execute-mode`（默认 `default` 业务池）。两种情况下用户显式 `@RunInPool` 都优先（`setDefaultPool` 仅在无注解时生效）。
@@ -92,7 +92,7 @@ public void initComponentPhase2() throws Exception {
 `BatchScanner.scan`分三步：
 
 1. **`findBatchMethods`**：扫描所有 `@Controller` Bean，查找带 `@BatchMapping` 的方法，收集为 `BatchMethodCandidate` 列表。
-2. **`findSingleMethod`**：对每个 `@BatchMapping` 方法，按方法名从同一 Bean 的 `PathMappingContext` 列表中查找关联的单请求方法。如果找到多个同名方法，检查方法签名是否一致——不一致时抛异常（，避免歧义匹配）。
+2. **`findSingleMethod`**：对每个 `@BatchMapping` 方法，按方法名从同一 Bean 的 `PathMappingContext` 列表中查找关联的单请求方法。如果找到多个同名方法，检查方法签名是否一致——不一致时抛异常（避免歧义匹配）。
 3. **`resolveRequestType`**：从 `@BatchMapping` 方法的第一参数 `List<X>` 中提取泛型参数 `X`，确保 `X extends BatchRequest<?>`。这是连接"单请求方法参数类型"与"批量请求构造函数"的关键桥梁。
 
 ### 2.3 `BatchRequestMetaData`：元数据容器
