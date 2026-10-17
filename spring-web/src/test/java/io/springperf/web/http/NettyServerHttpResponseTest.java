@@ -439,9 +439,8 @@ class NettyServerHttpResponseTest {
     }
 
     /**
-     * flush 路径（非 writeBytes）：响应头超限降级为最小 500 时，本次 flush 已经 takePendingBuf()
-     * 摘出来的业务 body 必须被就地释放——writeHeaderTooLarge 只释放 this.buf（字段已摘空 → null），
-     * 若本分支不释放，这块池化 buf 从此不可达（paranoid 实测泄漏路径，见
+     * flush 路径（非 writeBytes）：响应头超限降级为最小 500 时，本次 flush 已经 takePendingBuf() 摘出来的业务 body 必须被就地释放——writeHeaderTooLarge 只释放
+     * this.buf（字段已摘空 → null）， 若本分支不释放，这块池化 buf 从此不可达（paranoid 实测泄漏路径，见
      * ResponseHeaderLimitE2eTest#oversizedResponseHeaders_degradeToMinimal500）。
      */
     @Test
@@ -452,8 +451,8 @@ class NettyServerHttpResponseTest {
         ByteBuf body = Unpooled.buffer(64);
         when(allocator.buffer(256)).thenReturn(body);
 
-        NettyServerHttpResponse resp =
-                new NettyServerHttpResponse(webContext, ctx, true, new ResponseLimitConfig(-1, 512), 0L);
+        NettyServerHttpResponse resp = new NettyServerHttpResponse(webContext, ctx, true,
+                new ResponseLimitConfig(-1, 512), 0L);
         char[] bigHeader = new char[2000];
         java.util.Arrays.fill(bigHeader, 'b');
         resp.getHeaders().set("X-Big", new String(bigHeader));
@@ -465,8 +464,8 @@ class NettyServerHttpResponseTest {
 
         ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
         verify(ctx).writeAndFlush(captor.capture());
-        io.netty.handler.codec.http.FullHttpResponse fr =
-                (io.netty.handler.codec.http.FullHttpResponse) captor.getValue();
+        io.netty.handler.codec.http.FullHttpResponse fr = (io.netty.handler.codec.http.FullHttpResponse) captor
+                .getValue();
         assertEquals(io.netty.handler.codec.http.HttpResponseStatus.INTERNAL_SERVER_ERROR, fr.status());
         assertEquals(0, fr.content().readableBytes(), "降级响应体必须为空（业务内容已丢弃）");
     }
