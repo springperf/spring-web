@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.NotSerializableException;
 import java.io.ObjectInputFilter;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -332,10 +333,43 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
 
     /**
      * 序列化会话：排除名单命中或不可序列化的属性被跳过（warn），其余正常写入。 整体序列化异常时返回 null（放弃本次落盘）。
+     * <p>
+     * <b>快路径只序列化一次</b>：逐属性「试序列化」判别会把每个属性写两遍（试一次 + 正式一次）， 而该方法在「响应写完成」回调里执行、与会话属性数线性相关。改为先整体写一次；
+     * 仅当它因不可序列化属性失败时，才回退到逐属性剔除的慢路径。正常路径因此从 2N 次序列化降到 1 次。
+     * </p>
      */
     @Nullable
     private byte[] serialize(HttpSessionData session) {
-        // 构造可序列化的副本：跳过排除名单与不可序列化属性
+        try {
+            return toBytes(buildCopy(session, false));
+        } catch (NotSerializableException e) {
+            // 慢路径：定位并剔除不可序列化属性后重试（同时让用户看到是哪个属性被丢）
+            return serializeDroppingUnserializable(session);
+        } catch (Exception e) {
+            log.warn("Failed to serialize session {}: {}", session.getId(), e.toString());
+            return null;
+        }
+    }
+
+    /** 慢路径：逐属性试序列化，剔除不可序列化项后整体再写一次。 */
+    @Nullable
+    private byte[] serializeDroppingUnserializable(HttpSessionData session) {
+        HttpSessionData copy = buildCopy(session, true);
+        try {
+            return toBytes(copy);
+        } catch (Exception e) {
+            log.warn("Failed to serialize session {}: {}", session.getId(), e.toString());
+            return null;
+        }
+    }
+
+    /**
+     * 构造可序列化的会话副本。
+     *
+     * @param checkEachValue
+     *            true 时逐属性试序列化并剔除失败项（慢路径）；false 时只按类型粗筛，交给整体序列化去发现不可序列化的引用图
+     */
+    private HttpSessionData buildCopy(HttpSessionData session, boolean checkEachValue) {
         HttpSessionData copy = new HttpSessionData(session.getId(), session.getCreationTime());
         copy.setLastAccessedTime(session.getLastAccessedTime());
         copy.setMaxInactiveInterval(session.getMaxInactiveInterval());
@@ -359,25 +393,22 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
                         value.getClass().getName());
                 continue;
             }
-            // 走到这里 value 已被确认可序列化：原先第二处 instanceof 因此恒真
-            // （BC_VACUOUS_INSTANCEOF），改为直接校验
-            if (!isActuallySerializable((Serializable) value)) {
+            if (checkEachValue && !isActuallySerializable((Serializable) value)) {
                 log.warn("Session attribute '{}' ({}) failed serialization check, skipped from persistence", name,
                         value.getClass().getName());
                 continue;
             }
             copy.setAttribute(name, value);
         }
-        try {
-            ByteArrayOutputStream bos = new ByteArrayOutputStream(256);
-            try (ObjectOutputStream oos = new ObjectOutputStream(bos)) {
-                oos.writeObject(copy);
-            }
-            return bos.toByteArray();
-        } catch (Exception e) {
-            log.warn("Failed to serialize session {}: {}", session.getId(), e.toString());
-            return null;
+        return copy;
+    }
+
+    private static byte[] toBytes(HttpSessionData session) throws IOException {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream(256);
+        try (ObjectOutputStream oos = new ObjectOutputStream(bos)) {
+            oos.writeObject(session);
         }
+        return bos.toByteArray();
     }
 
     /** 试序列化单个属性，判定其是否真正可序列化（含其引用图）。 */
@@ -388,6 +419,11 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    @Override
+    public boolean hasBlockingSave() {
+        return true;
     }
 
     @Override
