@@ -12,7 +12,7 @@ import io.springperf.web.batch.metrics.NoOpBatchMetrics;
 import io.springperf.web.core.pool.VirtualThreadSupport;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -50,12 +50,15 @@ public class DisruptorQueue {
             boolean virtualThreads) {
         this.queueName = queueName;
         this.metrics = metrics != null ? metrics : NoOpBatchMetrics.INSTANCE;
-        int size = normalizeRingBufferSize(meta.ringBufferSize());
-        int consumerSize = meta.consumerSize();
-
-        if (size < 64 || size > 256 * 1024) {
-            log.warn("Queue [{}] ringBufferSize={} is unusual; expected range [64, 262144]", queueName, size);
+        int configuredSize = meta.ringBufferSize();
+        int size = normalizeRingBufferSize(configuredSize);
+        // 只对「归一化前后不一致」告警：normalizeRingBufferSize 的返回值恒在 [64, 262144]，
+        // 若判断归一化后的 size 则条件恒假、告警永不出现（配置错误会被静默接受）。
+        if (configuredSize != size) {
+            log.warn("Queue [{}] ringBufferSize={} normalized to {} (expected a power of two within [64, 262144])",
+                    queueName, configuredSize, size);
         }
+        int consumerSize = meta.consumerSize();
 
         this.disruptor = new Disruptor<>(BatchEvent::new, size, r -> {
             Thread t = new Thread(r, "batch-disruptor-" + queueName);
@@ -108,8 +111,13 @@ public class DisruptorQueue {
         // halted 设置（synchronized 包裹），代价是每次 enqueue 一次 monitor 进入/退出。
         if (halted.get()) {
             metrics.recordEnqueue(queueName, false);
-            // 停机期间零星请求不走 Disruptor，直接调 batch 方法处理
-            batchHandler.processDirectly(Collections.singletonList(request));
+            // 停机期间零星请求不走 Disruptor，直接调 batch 方法处理。
+            // 注意：此处同步执行业务，调用线程即生产者。若生产者是 EventLoop
+            // （pool.default-execute-mode=eventloop 或虚拟线程零切换路径），慢批量方法会
+            // 阻塞该 EventLoop 上的其他请求。窗口仅限停机瞬间，故不改成"先提交 bizExecutor"
+            // ——彼时 bizExecutor 可能已 shutdown，提交会被 CallerRunsPolicy 静默丢弃，
+            // 反而让请求只能等 30s 超时。
+            batchHandler.processDirectly(List.of(request));
             return;
         }
         switch (backpressure) {
@@ -168,6 +176,14 @@ public class DisruptorQueue {
         return ringBuffer.getBufferSize();
     }
 
+    /**
+     * 三步优雅停机：先 drain RingBuffer，再冲刷 handler 残余 buffer，最后等待在途批处理完成。
+     * <p>
+     * 最坏耗时可叠加到 60s 以上：Step 2 的 {@code flushRemaining()} 会向 bizExecutor 提交任务， 若池已满员则 {@code CallerRunsPolicy} 让<b>调用
+     * shutdown 的线程</b>（通常是 Spring 容器关闭线程）同步执行整批业务； Step 3 再最多等待 {@code awaitTermination(30s)}。停机慢时应优先怀疑批量方法本身耗时，而非
+     * Disruptor。
+     * </p>
+     */
     public void shutdown() {
         if (!halted.compareAndSet(false, true))
             return;
@@ -191,6 +207,10 @@ public class DisruptorQueue {
             batchHandler.flushRemaining();
         } catch (Exception e) {
             log.warn("Error flushing remaining batch for queue [{}]", queueName, e);
+        } finally {
+            // 关窗必须在 flushRemaining 之后：否则迟到的定时任务可能把刚冲刷掉的请求
+            // 再次取走（buffer 已空则无害，但顺序反了会出现「取走后又来一个定时任务」的竞态）。
+            batchHandler.closeWindow();
         }
 
         // Step 3: Wait for in-flight batch processing to complete
