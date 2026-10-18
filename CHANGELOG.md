@@ -24,6 +24,19 @@
 - **`+json` 后缀媒体类型**：`application/vnd.spring-boot.actuator.v2+json` 这类带前缀的 `+json` 类型此前不匹配 JSON 转换器，导致 Actuator 端点返回 200 + 空 body
 - **String 请求体**：`@RequestBody String` 在 `application/json` 下必然 400（框架从未注册 `StringHttpMessageConverter`）；补上并让它排在 Jackson 之前（Spring 语义：String 原样读取，不按 JSON 解析）
 
+## [3.5.8] - 未发布
+
+> 开发中版本：`project.version` 已在开发前提升为 `3.5.8`，本节条目随提交累积，发版时补日期。
+
+### 修复
+
+- **Servlet 规范语义**：`HttpSession.setAttribute(name, null)` 等价于 `removeAttribute`（原先抛 NPE）；`HttpServletResponse.getHeaders(name)` 无该头返回空集合（原先返回 `null`）；`getDateHeader` 对存在但无法解析的日期抛 `IllegalArgumentException`（原先回退 `-1`，掩盖上游协议错误）
+- **`AsyncContext` 语义**：同一异步周期内重复 `startAsync()` 抛 `IllegalStateException`；`isAsyncStarted()` 在 `complete()`/`dispatch()` 后返回 `false`；`complete()` 幂等（`onComplete` 每周期只触发一次）；`addListener(listener, req, resp)` 的事件携带注册时传入的 req/resp；`dispatch(path)` 期间 `DispatcherType` 为 `ASYNC`；`hasOriginalRequestAndResponse()` 按实际传入的 req/resp 判定
+- **持久化会话落盘移出 EventLoop**：响应写完成回调运行在 Netty EventLoop 上，原先在此直接序列化 + `Files.write` + `ATOMIC_MOVE`，会阻塞同一 loop 负责的所有连接。现按 `HttpSessionStorage.hasBlockingSave()` 判定，阻塞型存储改走单线程有界队列（容量 4096，满则丢弃并告警；停机最多等待 5 秒把在途保存落完）
+- **会话序列化开销**：快路径只整体序列化一次，仅在失败时回退到逐属性剔除（原先每个属性「试序列化 + 正式序列化」，共 2N 次）
+- **`ServletContext` 动态注册**：`addServlet` / `addFilter` / `addJspFile` / `createServlet` / `createFilter` 改为抛 `UnsupportedOperationException`（规范为该能力缺失指定的信号），不再返回 `null` 让调用方误判注册成功
+- **`ServletContext.setSessionTrackingModes()` 实际生效**：原先为空实现，程序化配置被静默丢弃；现做规范校验（集合非空且必须含 `COOKIE` 或 `SSL`）并影响会话 Cookie 下发与 `encodeURL`
+
 ## [3.5.7] - 20261008
 
 > ⚠️ **本版含破坏性变更**：配置键、响应分帧、Servlet `flush` 语义、条件请求/Range、

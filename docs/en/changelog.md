@@ -25,6 +25,19 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **`+json` suffix media types**: prefixed `+json` types such as `application/vnd.spring-boot.actuator.v2+json` did not match the JSON converter, so Actuator endpoints returned 200 with an empty body
 - **String request bodies**: `@RequestBody String` always failed with 400 under `application/json` (the framework never registered a `StringHttpMessageConverter`); it is now registered and ordered ahead of Jackson (Spring semantics: Strings are read as-is, not parsed as JSON)
 
+## [3.5.8] - Unreleased
+
+> In development: `project.version` was raised to `3.5.8` before development started; entries accumulate here and the date is filled in at release time.
+
+### Fixed
+
+- **Servlet specification semantics**: `HttpSession.setAttribute(name, null)` now equals `removeAttribute` (previously threw NPE); `HttpServletResponse.getHeaders(name)` returns an empty collection when the header is absent (previously `null`); `getDateHeader` throws `IllegalArgumentException` for a present but unparseable date (previously fell back to `-1`, hiding protocol errors upstream)
+- **`AsyncContext` semantics**: a second `startAsync()` within the same async cycle throws `IllegalStateException`; `isAsyncStarted()` returns `false` after `complete()`/`dispatch()`; `complete()` is idempotent (`onComplete` fires once per cycle); `addListener(listener, req, resp)` events carry the request/response registered with them; `DispatcherType` is `ASYNC` during `dispatch(path)`; `hasOriginalRequestAndResponse()` reflects the req/resp actually passed in
+- **Persistent-session writes moved off the EventLoop**: the response-completion callback runs on a Netty EventLoop, where the old code serialized, called `Files.write` and did an `ATOMIC_MOVE` inline, stalling every connection on that loop. `HttpSessionStorage.hasBlockingSave()` now decides: blocking stores go through a single-threaded bounded queue (capacity 4096, drop-and-warn when full; shutdown waits up to 5 seconds for pending saves)
+- **Session serialization cost**: the fast path serializes the whole session once and only falls back to per-attribute filtering on failure (previously every attribute was serialized twice: a trial pass plus the real one)
+- **`ServletContext` dynamic registration**: `addServlet` / `addFilter` / `addJspFile` / `createServlet` / `createFilter` now throw `UnsupportedOperationException` (the signal the specification defines for a missing capability) instead of returning `null` and letting callers believe registration succeeded
+- **`ServletContext.setSessionTrackingModes()` now takes effect**: previously an empty implementation that silently dropped programmatic configuration; it now validates per the specification (non-empty, must contain `COOKIE` or `SSL`) and affects session cookie emission and `encodeURL`
+
 ## [3.5.7] - 20261008
 
 > ⚠️ **This release contains breaking changes**: configuration keys, response framing,

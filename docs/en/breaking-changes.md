@@ -19,6 +19,7 @@
 
 | Version | Date | Subject |
 |---------|------|---------|
+| **3.5.8** | Unreleased | Servlet specification semantics tightened: dynamic registration fails explicitly, repeated `startAsync` and unparseable date headers throw |
 | **3.5.7** | 2026-10-08 | Configuration keys aligned with Spring Boot / Tomcat: old key aliases removed, extension-point signatures and compat-layer classes adjusted |
 
 ---
@@ -288,6 +289,7 @@ an observable behaviour change:
 | `getOutputStream()` | returned a new instance every call | the same response returns **the same instance** (Servlet spec); invalidated and recreated after `rebind` |
 | JSR-356 `Session.setMaxIdleTimeout` | only assigned a field (the idle timeout had no effect) | propagated to the Netty pipeline's `IdleStateHandler` (`<=0` removes idle detection) |
 | per-frame WebSocket limit | fixed text 8KB / binary 64KB | new `WebSocketHandlerRegistration#setMessageSizeLimit` overrides it per path (defaults unchanged) |
+| `WebSocketSession#getHandshakeHeaders()` | returned a custom `SpringHeadersAdapter` (case-sensitive; writes such as `add` were silently dropped) | returns a standard `HttpHeaders` (case-insensitive, multi-value writes work); `SpringHeadersAdapter` removed |
 | `@WebFilter`'s `urlPatterns` | read without proxy/inherited sources → silently promoted to a global filter | looked up with `findMergedAnnotation` along superclasses and interfaces; `urlPatterns` really restricts the path |
 
 - Related commits: `df3c238f`, `89385c3d`, `a1b0a509`, `756f31f8`, `1b1f33b3` (`54069908`, `e33d4a9b` lock them with E2E)
@@ -344,5 +346,18 @@ an observable behaviour change:
 | configuration-centre refresh | a change needed a restart to take effect | listens for `EnvironmentChangeEvent` (**by class name**, so no compile-time Spring Cloud dependency) → clears the framework property cache; `WebContext.refreshProperties()` can also be called manually. A failed refresh keeps the old value per field (see 7.11) |
 
 - Related commits: `e6088584`, `30d1bf12`, `6aa5bd5f`, `9b6779ac`, `4f7ebbbf`, `24d4f768`
+
+---
+
+## [3.5.8] - Unreleased
+
+| Item | Old behaviour | New behaviour |
+|---|---|---|
+| `ServletContext.addServlet` / `addFilter` / `addJspFile` / `createServlet` / `createFilter` | returned `null` or did nothing, so callers could believe registration succeeded | throw `UnsupportedOperationException` (the signal the specification defines for a missing capability). **Migration**: register servlets/filters as Spring beans, or use `@WebServlet` / `@WebFilter` |
+| `HttpServletRequest.startAsync()` called again within the same async cycle | returned the existing `AsyncContext` | throws `IllegalStateException`. **Migration**: drop the duplicate call; start a new cycle only after `dispatch` / `complete` |
+| `HttpServletRequest.getDateHeader(name)` with a present but unparseable date | returned `-1`, indistinguishable from "header absent" | throws `IllegalArgumentException`. **Migration**: handle the exception as a parse failure; do not test for `-1` |
+| `ServletContext.setSessionTrackingModes()` | empty implementation: both valid and invalid arguments were silently ignored | takes effect and validates (non-empty, must contain `COOKIE` or `SSL`); invalid arguments throw `IllegalArgumentException`. **Migration**: pass a set that includes `COOKIE`/`SSL`; URL-only configurations that used to be ignored now fail |
+| `HttpServletResponse.getHeaders(name)` when the header is absent | returned `null` | returns an empty collection (Servlet 6.0 contract). **No migration needed**; removes an NPE risk |
+| `HttpSession.setAttribute(name, null)` | threw `NullPointerException` (the underlying `ConcurrentHashMap` rejects null values) | equivalent to `removeAttribute(name)` (spec §7.5). **No migration needed**; code that relied on the exception should call `removeAttribute` instead |
 
 

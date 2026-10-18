@@ -14,6 +14,7 @@
 
 | 版本 | 日期 | 主题 |
 |------|------|------|
+| **3.5.8** | 未发布 | Servlet 规范语义收紧：动态注册改为显式失败，重复 `startAsync` 与日期头解析改为抛异常 |
 | **3.5.7** | 2026-10-08 | 配置键对齐 Spring Boot / Tomcat：移除旧配置键别名，扩展点签名与兼容层类调整 |
 
 ---
@@ -270,6 +271,7 @@
 | `getOutputStream()` | 每次返回新实例 | 同一响应返回**同一实例**（Servlet 规范）；`rebind` 后失效重建 |
 | JSR-356 `Session.setMaxIdleTimeout` | 仅赋值字段（空闲超时实际不生效） | 传播到 Netty pipeline 的 `IdleStateHandler`（`<=0` 移除空闲检测） |
 | WebSocket 单帧上限 | 固定 text 8KB / binary 64KB | 新增 `WebSocketHandlerRegistration#setMessageSizeLimit` 按路径覆盖（默认值不变） |
+| `WebSocketSession#getHandshakeHeaders()` | 返回自研 `SpringHeadersAdapter`（大小写敏感，`add` 等写操作静默丢失） | 返回标准 `HttpHeaders`（大小写不敏感、多值可写）；`SpringHeadersAdapter` 已移除 |
 | `@WebFilter` 的 `urlPatterns` | 读注解不含代理/继承来源 → 静默升格为全局 Filter | 用 `findMergedAnnotation` 沿超类/接口查找；`urlPatterns` 真正限制路径 |
 
 - 相关提交：`df3c238f`、`89385c3d`、`a1b0a509`、`756f31f8`、`1b1f33b3`（`54069908`、`e33d4a9b` 为其 E2E 锁定）
@@ -325,3 +327,17 @@
 | 配置中心动态刷新 | 改了配置需重启才生效 | 监听 `EnvironmentChangeEvent`（**按类名监听**，不引入 Spring Cloud 编译期依赖 ✓）→ 清空框架属性缓存；亦可调用 `WebContext.refreshProperties()` 手动触发。刷新失败逐字段保留旧值（见 7.11） |
 
 - 相关提交：`e6088584`、`30d1bf12`、`6aa5bd5f`、`9b6779ac`、`4f7ebbbf`、`24d4f768`
+
+---
+
+## [3.5.8] - 未发布
+
+| 项 | 旧行为 | 新行为 |
+|---|---|---|
+| `ServletContext.addServlet` / `addFilter` / `addJspFile` / `createServlet` / `createFilter` | 返回 `null` 或空实现，调用方可能误判注册成功 | 抛 `UnsupportedOperationException`（规范为该能力缺失指定的信号）。**迁移**：改用 Spring Bean 注册 servlet/filter，或 `@WebServlet` / `@WebFilter` |
+| `HttpServletRequest.startAsync()`（同一异步周期内重复调用） | 返回已存在的 `AsyncContext` | 抛 `IllegalStateException`。**迁移**：去掉重复调用；需要新一轮异步须先 `dispatch` / `complete` |
+| `HttpServletRequest.getDateHeader(name)`（值存在但无法解析为 HTTP 日期） | 返回 `-1`，与「头不存在」不可区分 | 抛 `IllegalArgumentException`。**迁移**：调用方按异常处理解析失败，不要以 `-1` 判定 |
+| `ServletContext.setSessionTrackingModes()` | 空实现：合法与非法入参一律静默忽略 | 生效并校验（集合非空且必须含 `COOKIE` 或 `SSL`），非法入参抛 `IllegalArgumentException`。**迁移**：传入 `COOKIE`/`SSL` 参与的组合；此前被静默忽略的 URL-only 配置会失败 |
+| `HttpServletResponse.getHeaders(name)`（头不存在） | 返回 `null` | 返回空集合（Servlet 6.0 契约）。**无需迁移**，仅消除 NPE 风险 |
+| `HttpSession.setAttribute(name, null)` | 抛 `NullPointerException`（底层 `ConcurrentHashMap` 拒绝 null value） | 等价 `removeAttribute(name)`（规范 §7.5）。**无需迁移**；此前依赖该异常判断的代码改用 `removeAttribute` |
+
