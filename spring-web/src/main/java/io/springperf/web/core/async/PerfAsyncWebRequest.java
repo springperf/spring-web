@@ -50,6 +50,15 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest
         return resolved;
     }
 
+    /**
+     * 错误处理是否正在进行。**有意非 volatile**：读方只经 {@link #completeErrorCallback} → 写 future listener 在 EventLoop
+     * 执行（{@code NettyServerHttpResponse.addRespEventListener}），而写方在此之前必有一次 {@code ctx.writeAndFlush}——Netty 对非
+     * EventLoop 调用线程会 {@code safeExecute} 提交写任务， 「任务提交」本身即 happens-before（JLS 17.4.5）。写方自身就是 EventLoop 时（超时路径）则同线程读写。
+     * <p>
+     * <b>若将来出现不经写 future listener 而直接触发 errorHandler 的新路径，必须先给该字段补 volatile</b>， 否则 EventLoop
+     * 侧可能长期读到过期值（错误处理被重复触发或整个跳过）。
+     * </p>
+     */
     protected boolean errorHandlingInProgress;
     private long timeoutMillis = -1;
     /**

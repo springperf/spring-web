@@ -421,6 +421,21 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
         return new ByteArrayInputStream(body);
     }
 
+    /**
+     * body 的就地读取：小 body 拷贝为 byte[]，超过 {@code server.http.max-in-memory-size}（默认 4KB）时改为 {@link #largeBodyBuf} 视图并令
+     * {@code body = EMPTY_BODY}。
+     * <p>
+     * {@code largeBodyBuf} <b>有意不加 volatile</b>——可见性由两侧的线程交接保证，而不是字段自身：
+     * </p>
+     * <ul>
+     * <li>写与读发生在同一次 dispatch 线程（同步模型）；</li>
+     * <li>跨线程（异步重放）之前必有 {@code executor.execute/submit} 的提交 happens-before， 或 {@code PerfAsyncWebRequest.state} 的
+     * CAS（volatile 写 → volatile 读）；</li>
+     * <li>EventLoop 上没有 {@code getBody()} 调用点：body 读取只发生在参数解析（业务池/dispatch 线程）。</li>
+     * </ul>
+     * <b>因此：新增任何「EventLoop 上读 body」的路径之前，必须先给该字段补 volatile 或改为显式交接</b>， 否则那条路径可能读到 null 而静默返回空 body（无异常、无日志）。
+     * </p>
+     */
     protected byte[] getBodyBytes() {
         if (body == null) {
             synchronized (this) {
