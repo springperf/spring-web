@@ -1,5 +1,6 @@
 package io.springperf.web.websocket.jsr;
 
+import io.springperf.web.websocket.server.NettyWebSocketSession;
 import jakarta.websocket.CloseReason;
 import jakarta.websocket.MessageHandler;
 import jakarta.websocket.RemoteEndpoint;
@@ -89,6 +90,32 @@ class JsrWebSocketSessionTest {
     }
 
     @Test
+    void isSecure_nullUri_returnsFalse() {
+        // 某些容器/测试桩的 getUri() 为 null：不能 NPE，按非安全处理
+        assertFalse(session.isSecure());
+    }
+
+    @Test
+    void setMaxIdleTimeout_propagatesToNettySession() {
+        // 修复前只赋值字段、pipeline 的 IdleStateHandler 不变，导致 JSR 的
+        // Session.setMaxIdleTimeout 完全不生效。这里断言真的委托到底层会话。
+        NettyWebSocketSession netty = mock(NettyWebSocketSession.class);
+        JsrWebSocketSession jsr = new JsrWebSocketSession(netty, container, codecRegistry, Collections.emptyMap());
+
+        jsr.setMaxIdleTimeout(30000);
+
+        assertEquals(30000L, jsr.getMaxIdleTimeout());
+        verify(netty).setMaxIdleTimeout(30000L);
+    }
+
+    @Test
+    void setMaxIdleTimeout_nonNettySession_onlyStoresValue() {
+        // 非 Netty 实现（自定义 WebSocketSession）不得被强转：只存值即可
+        assertDoesNotThrow(() -> session.setMaxIdleTimeout(1234));
+        assertEquals(1234L, session.getMaxIdleTimeout());
+    }
+
+    @Test
     void isOpen_delegates() {
         when(springSession.isOpen()).thenReturn(true);
         assertTrue(session.isOpen());
@@ -165,6 +192,35 @@ class JsrWebSocketSessionTest {
     void getRequestParameterMap_noQuery_empty() {
         when(springSession.getUri()).thenReturn(URI.create("ws://h/ws"));
         assertTrue(session.getRequestParameterMap().isEmpty());
+    }
+
+    @Test
+    void getRequestParameterMap_emptyQuery_empty() {
+        // "ws://h/ws?" 的 rawQuery 是空串而非 null：两条早退分支都要走到
+        when(springSession.getUri()).thenReturn(URI.create("ws://h/ws?"));
+        assertTrue(session.getRequestParameterMap().isEmpty());
+    }
+
+    @Test
+    void getRequestParameterMap_keyWithoutEquals_emptyValue() {
+        // "?flag"：没有 '=' 的参数名同样要出现，值为空串（jakarta.websocket 契约）
+        when(springSession.getUri()).thenReturn(URI.create("ws://h/ws?flag&x=1"));
+
+        Map<String, java.util.List<String>> params = session.getRequestParameterMap();
+
+        assertEquals(Collections.singletonList(""), params.get("flag"));
+        assertEquals(Collections.singletonList("1"), params.get("x"));
+    }
+
+    @Test
+    void getQueryString_nullUri_returnsNull() {
+        assertNull(session.getQueryString());
+        assertTrue(session.getRequestParameterMap().isEmpty());
+    }
+
+    @Test
+    void getCodecRegistry_returnsInjected() {
+        assertSame(codecRegistry, session.getCodecRegistry());
     }
 
     @Test
