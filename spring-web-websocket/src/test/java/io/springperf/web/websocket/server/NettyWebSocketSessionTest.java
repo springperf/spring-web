@@ -45,7 +45,7 @@ class NettyWebSocketSessionTest {
 
     private NettyWebSocketSession newSession(EmbeddedChannel channel) {
         return new NettyWebSocketSession(channel, uri,
-                new SpringHeadersAdapter(new io.netty.handler.codec.http.DefaultHttpHeaders(false)), "chat",
+                new org.springframework.http.HttpHeaders(), "chat",
                 new InetSocketAddress("127.0.0.1", 8080), new InetSocketAddress("192.168.1.5", 5000), null, null);
     }
 

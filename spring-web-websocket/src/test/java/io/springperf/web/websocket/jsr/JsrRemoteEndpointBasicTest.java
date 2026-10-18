@@ -4,7 +4,6 @@ import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.springperf.web.websocket.server.NettyWebSocketSession;
-import io.springperf.web.websocket.server.SpringHeadersAdapter;
 import javax.websocket.EncodeException;
 import javax.websocket.RemoteEndpoint;
 import org.junit.jupiter.api.Test;
@@ -248,7 +247,7 @@ class JsrRemoteEndpointBasicTest {
     private RemoteEndpoint.Basic newBatchedRemote(EmbeddedChannel channel) {
         NettyWebSocketSession nettySession = new NettyWebSocketSession(channel,
                 java.net.URI.create("ws://localhost/ws"),
-                new SpringHeadersAdapter(new io.netty.handler.codec.http.DefaultHttpHeaders(false)), null,
+                new org.springframework.http.HttpHeaders(), null,
                 new java.net.InetSocketAddress("127.0.0.1", 8080), null, null, null);
         JsrWebSocketSession jsrSession = new JsrWebSocketSession(nettySession, new JsrWebSocketContainer(),
                 codecRegistry, java.util.Collections.emptyMap());

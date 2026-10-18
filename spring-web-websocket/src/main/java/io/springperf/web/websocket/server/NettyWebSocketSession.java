@@ -42,7 +42,7 @@ public class NettyWebSocketSession implements WebSocketSession {
     private final String id;
     private final Channel channel;
     private final URI uri;
-    private final SpringHeadersAdapter handshakeHeaders;
+    private final org.springframework.http.HttpHeaders handshakeHeaders;
     private final String acceptedProtocol;
     private final InetSocketAddress localAddress;
     private final InetSocketAddress remoteAddress;
@@ -50,6 +50,9 @@ public class NettyWebSocketSession implements WebSocketSession {
     @Nullable
     private final WebSocketHandler handler;
     private final Map<String, Object> attributes = new ConcurrentHashMap<>();
+
+    /** 握手协商成功的扩展；未协商时为不可变空列表。volatile：握手写、业务跨线程读。 */
+    private volatile List<WebSocketExtension> extensions = Collections.emptyList();
 
     /** 默认文本消息上限（8KB），与 Spring WebSocket 的默认值一致。 */
     public static final int DEFAULT_TEXT_MESSAGE_SIZE_LIMIT = 8 * 1024;
@@ -72,7 +75,7 @@ public class NettyWebSocketSession implements WebSocketSession {
      */
     private final AtomicBoolean closeNotified = new AtomicBoolean(false);
 
-    public NettyWebSocketSession(Channel channel, URI uri, SpringHeadersAdapter handshakeHeaders,
+    public NettyWebSocketSession(Channel channel, URI uri, org.springframework.http.HttpHeaders handshakeHeaders,
                                   String acceptedProtocol, InetSocketAddress localAddress,
                                   InetSocketAddress remoteAddress, Principal principal,
                                   @Nullable WebSocketHandler handler) {
@@ -208,7 +211,7 @@ public class NettyWebSocketSession implements WebSocketSession {
         }
     }
 
-    private void notifyTransportError(Throwable cause) {
+    void notifyTransportError(Throwable cause) {
         if (handler != null) {
             try {
                 handler.handleTransportError(this, cause);
@@ -321,11 +324,21 @@ public class NettyWebSocketSession implements WebSocketSession {
 
     @Override
     public List<WebSocketExtension> getExtensions() {
-        return Collections.emptyList();
+        return extensions;
+    }
+
+    /** 握手完成时由路由层写入协商成功的扩展（如 permessage-deflate）。 */
+    public void setExtensions(List<WebSocketExtension> extensions) {
+        this.extensions = extensions == null ? Collections.emptyList() : extensions;
     }
 
     public void setOpen(boolean open) {
         this.open = open;
+    }
+
+    /** 包内访问器：背压队列挂在 channel attribute 上，需要拿到通道本身。 */
+    Channel channel() {
+        return channel;
     }
 
     /**
