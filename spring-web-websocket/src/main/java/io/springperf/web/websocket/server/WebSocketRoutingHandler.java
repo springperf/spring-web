@@ -52,10 +52,13 @@ import java.util.Map;
 @ChannelHandler.Sharable
 public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
 
-    private static final AttributeKey<NettyWebSocketSession> SESSION_KEY = AttributeKey.valueOf("ws.session");
-    private static final AttributeKey<WebSocketHandler> HANDLER_KEY = AttributeKey.valueOf("ws.handler");
-    /** 进行中的分片消息聚合状态；无分片时为 null。仅在 EventLoop 线程读写。 */
-    private static final AttributeKey<FragmentState> FRAGMENT_KEY = AttributeKey.valueOf("ws.fragment.state");
+    /**
+     * 单连接聚合状态：会话、handler、分片状态收进一个对象，每帧只做 1 次 attribute 查询。
+     * <p>
+     * 修复前每帧要查 3~4 次 channel attribute（session / handler / fragment 各一个 key）。 这些字段只在 EventLoop 线程读写，故无需同步。
+     * </p>
+     */
+    private static final AttributeKey<WsConnection> CONNECTION_KEY = AttributeKey.valueOf("ws.connection");
 
     private static final String WS_DECODER = "ws-decoder";
     private static final String WS_ENCODER = "ws-encoder";
@@ -87,6 +90,19 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
 
         void release() {
             buffer.release();
+        }
+    }
+
+    /** 单连接聚合状态。字段只在 EventLoop 线程读写。 */
+    private static final class WsConnection {
+        final NettyWebSocketSession session;
+        final WebSocketHandler handler;
+        /** 进行中的分片消息聚合状态；无分片时为 null。 */
+        FragmentState fragment;
+
+        WsConnection(NettyWebSocketSession session, WebSocketHandler handler) {
+            this.session = session;
+            this.handler = handler;
         }
     }
 
@@ -253,8 +269,8 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
         pipeline.addBefore(currentName, WS_ENCODER, new WebSocket08FrameEncoder(false));
         removeHttpHandlers(pipeline);
 
-        ctx.channel().attr(SESSION_KEY).set(session);
-        ctx.channel().attr(HANDLER_KEY).set(result.handler);
+        WsConnection connection = new WsConnection(session, result.handler);
+        ctx.channel().attr(CONNECTION_KEY).set(connection);
 
         try {
             result.handler.afterConnectionEstablished(session);
@@ -302,12 +318,13 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
     }
 
     private void handleWebSocketFrame(ChannelHandlerContext ctx, WebSocketFrame frame) {
-        NettyWebSocketSession session = ctx.channel().attr(SESSION_KEY).get();
-        WebSocketHandler handler = ctx.channel().attr(HANDLER_KEY).get();
-        if (handler == null || session == null) {
+        WsConnection connection = ctx.channel().attr(CONNECTION_KEY).get();
+        if (connection == null) {
             ctx.close();
             return;
         }
+        NettyWebSocketSession session = connection.session;
+        WebSocketHandler handler = connection.handler;
 
         try {
             if (frame instanceof TextWebSocketFrame || frame instanceof BinaryWebSocketFrame) {
@@ -316,7 +333,7 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
                 // 分片进行中又来数据帧即协议违规，与该帧自身 FIN 无关（RFC 6455 §5.4：
                 // 分片消息的后续帧必须全是 continuation）。必须先判违规再判 FIN，
                 // 否则 FIN=1 的侵入帧会被当成完整消息静默派发，同时丢掉正在聚合的消息。
-                if (ctx.channel().attr(FRAGMENT_KEY).get() != null) {
+                if (connection.fragment != null) {
                     failProtocol(ctx, session, handler, "new data frame while a fragmented message is in progress");
                     return;
                 }
@@ -332,22 +349,25 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
                 } else {
                     // 分片起始帧（FIN=0）：建立聚合状态；按首片大小预分配，减少扩容复制
                     FragmentState state = new FragmentState(text, ctx.alloc(), Math.max(256, content.readableBytes()));
+                    // 先挂到连接状态：超限路径统一由 releaseFragment 释放缓冲并复位
+                    connection.fragment = state;
                     if (!appendFragment(ctx, session, handler, state, content, text)) {
+                        releaseFragment(connection);
                         return;
                     }
-                    ctx.channel().attr(FRAGMENT_KEY).set(state);
                 }
             } else if (frame instanceof ContinuationWebSocketFrame) {
-                FragmentState state = ctx.channel().attr(FRAGMENT_KEY).get();
+                FragmentState state = connection.fragment;
                 if (state == null) {
                     failProtocol(ctx, session, handler, "continuation frame without a fragmented message in progress");
                     return;
                 }
                 if (!appendFragment(ctx, session, handler, state, frame.content(), state.text)) {
+                    releaseFragment(connection);
                     return;
                 }
                 if (frame.isFinalFragment()) {
-                    ctx.channel().attr(FRAGMENT_KEY).set(null);
+                    connection.fragment = null;
                     try {
                         dispatchMessage(handler, session, state.text, state.buffer);
                     } finally {
@@ -376,7 +396,7 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
                 }
                 // RFC 6455 §7.4.1: 服务端必须回显 Close 帧，再关闭 TCP
                 ctx.writeAndFlush(close.retain()).addListener(ChannelFutureListener.CLOSE);
-                releaseFragment(ctx);
+                releaseFragment(connection);
                 return; // frame released in finally, retained copy lives for write
             }
         } catch (Exception e) {
@@ -424,7 +444,6 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
         if (state.buffer.readableBytes() + incoming > limit) {
             log.warn("WebSocket fragmented message exceeds {} limit ({}), closing session {}", text ? "text" : "binary",
                     limit, session.getId());
-            releaseFragment(ctx);
             failProtocol(ctx, session, handler, "fragmented message exceeds size limit");
             return false;
         }
@@ -454,8 +473,12 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
         return false;
     }
 
-    private void releaseFragment(ChannelHandlerContext ctx) {
-        FragmentState state = ctx.channel().attr(FRAGMENT_KEY).getAndSet(null);
+    private void releaseFragment(WsConnection connection) {
+        if (connection == null) {
+            return;
+        }
+        FragmentState state = connection.fragment;
+        connection.fragment = null;
         if (state != null) {
             state.release();
         }
@@ -474,11 +497,10 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        WebSocketHandler handler = ctx.channel().attr(HANDLER_KEY).get();
-        NettyWebSocketSession session = ctx.channel().attr(SESSION_KEY).get();
-        if (handler != null && session != null) {
+        WsConnection connection = ctx.channel().attr(CONNECTION_KEY).get();
+        if (connection != null) {
             try {
-                handler.handleTransportError(session, cause);
+                connection.handler.handleTransportError(connection.session, cause);
             } catch (Exception e) {
                 log.error("TransportError handler failed", e);
             }
@@ -497,9 +519,10 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
         if (evt instanceof IdleStateEvent) {
-            WebSocketHandler handler = ctx.channel().attr(HANDLER_KEY).get();
-            NettyWebSocketSession session = ctx.channel().attr(SESSION_KEY).get();
-            if (handler != null && session != null) {
+            WsConnection connection = ctx.channel().attr(CONNECTION_KEY).get();
+            if (connection != null) {
+                WebSocketHandler handler = connection.handler;
+                NettyWebSocketSession session = connection.session;
                 log.warn("WebSocket idle timeout, closing session {}", session.getId());
                 try {
                     handler.handleTransportError(session, new java.io.IOException("Connection idle timeout"));
@@ -520,23 +543,36 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
-        WebSocketHandler handler = ctx.channel().attr(HANDLER_KEY).get();
-        NettyWebSocketSession session = ctx.channel().attr(SESSION_KEY).get();
+        WsConnection connection = ctx.channel().attr(CONNECTION_KEY).get();
         // 幂等通知：Netty 保证 channelInactive 触发时 channel 已 inactive，故不能用 isOpen()
         // （= open && channel.isActive()）做守卫——那样恒为 false，除「对端发 Close 帧」外的
         // 所有断连路径（TCP 断开/RST、服务端 close()、空闲超时、传输异常）都会丢失回调。
         // markCloseNotified 用 CAS 保证四条路径竞争下恰好通知一次。
-        if (handler != null && session != null && session.markCloseNotified()) {
-            session.setOpen(false);
-            try {
-                handler.afterConnectionClosed(session, CloseStatus.GOING_AWAY);
-            } catch (Exception e) {
-                log.error("afterConnectionClosed failed", e);
+        if (connection != null) {
+            NettyWebSocketSession session = connection.session;
+            if (session.markCloseNotified()) {
+                session.setOpen(false);
+                try {
+                    connection.handler.afterConnectionClosed(session, CloseStatus.GOING_AWAY);
+                } catch (Exception e) {
+                    log.error("afterConnectionClosed failed", e);
+                }
             }
         }
         // 无论是否已通知过关闭，都要丢弃进行中的分片缓冲：连接已断，聚合永不完成
-        releaseFragment(ctx);
+        releaseFragment(connection);
         ctx.fireChannelInactive();
+    }
+
+    /**
+     * 取回握手后挂在 channel 上的会话（{@code WebSocketRoutingHandler} 的包内诊断入口，也供测试驱动主动 close）。
+     *
+     * @return 会话；未完成握手或非 WebSocket 连接时为 null
+     */
+    @Nullable
+    static NettyWebSocketSession sessionOf(Channel channel) {
+        WsConnection connection = channel.attr(CONNECTION_KEY).get();
+        return connection != null ? connection.session : null;
     }
 
     // ---- per-path 配置解析（有 per-path 覆盖则使用，否则回退全局） ----
