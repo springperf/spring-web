@@ -346,7 +346,7 @@ public void afterConcurrentHandlingStarted(WebServerHttpRequest request, ...) th
 | `upgrade()` | 见 5.10 WebSocket 升级 |
 | `startAsync()`/`getAsyncContext()` 等 | 见 5.8 AsyncContext |
 | `login()/logout()/authenticate()` | 见 5.9 认证与安全 |
-| `getDispatcherType()` | 可设置字段（`forward` 时 `FORWARD`、`include` 时 `INCLUDE`） |
+| `getDispatcherType()` | 可设置字段（`forward` 时 `FORWARD`、`include` 时 `INCLUDE`、异步 `dispatch(path)` 期间为 `ASYNC`） |
 | `getServletPath()` / `getPathInfo()` | `getServletPath` 返回应用内路径（`request.getPath()`）；`getPathInfo` 返回空字符串（路由整路径匹配，无剩余路径）。这是 Jasper 解析 `jsp:include` / `jsp:forward` 相对路径的前提 |
 
 **`NettyHttpServletRequest extends PerfHttpServletRequest`**：在 Netty 环境覆盖网络/安全方法——`getRemoteAddr/getRemoteHost/getRemotePort/getLocalAddr/getLocalName/getLocalPort`（真实 `InetSocketAddress`）、`getScheme()/isSecure()`（从 URI 检测 HTTPS）、`getRequestURL()`（完整 URL）。由 `ServletAttribute.createPerfRequest()` 工厂方法根据请求类型选择。
@@ -442,7 +442,8 @@ private static final RequestAttribute<ServletAdapterContext> ADAPTER_CTX =
   - `getInitParameter()` 从 `WebContext` 配置读取；`getSessionCookieConfig()` 返回可配置的 `SessionCookieConfig` 实现。
   - `getRequestDispatcher()/getNamedDispatcher()` 返回 `PerfRequestDispatcher`。
   - `TEMPDIR` 属性：构造时创建应用级临时目录（`java.io.tmpdir` 下），供 JSP 编译（Jasper scratchdir）等容器能力使用。
-- **限制**：动态注册（`addServlet`/`addFilter`）返回 null、`getContext()` 返回 null（单上下文架构）。
+- **限制**：动态注册（`addServlet`/`addFilter`/`addJspFile`/`createServlet`/`createFilter`）抛
+  `UnsupportedOperationException`（规范为该能力缺失指定的信号，避免调用方误判注册成功）、`getContext()` 返回 null（单上下文架构）。
 
 ### 5.7 `RequestDispatcher`：forward / include
 
@@ -457,10 +458,16 @@ private static final RequestAttribute<ServletAdapterContext> ADAPTER_CTX =
 
 `PerfAsyncContext`包装框架的 `PerfAsyncWebRequest`（异步状态机 `NEW → ASYNC_STARTED → DISPATCHED → COMPLETED`）：
 
-- **startAsync**：`PerfHttpServletRequest.startAsync()` 创建并缓存到 `RequestContext`（`RequestAttribute`），同一请求内复用。
-- **dispatch()**：委托 `asyncWebRequest.dispatch()`；**dispatch(path)** 通过 `SupportDispatcherHandler.forward()` 分派到指定路径。
-- **complete()**：委托 `asyncWebRequest.complete()`，触发 `onComplete`。
-- **监听器回调**：`CopyOnWriteArrayList` 线程安全。`onComplete`/`onTimeout`/`onError` 均触发。**懒注册**——仅当 `addListener()` 或 `setTimeout()` 时通过 `ensureHandlersRegistered()` 桥接底层 timeout/error handler，避免覆盖框架 Callable/DeferredResult 路径的 handler。
+- **startAsync**：`PerfHttpServletRequest.startAsync()` 创建并缓存到 `RequestContext`（`RequestAttribute`）。**一个异步周期只允许一次**，
+  重复调用抛 `IllegalStateException`（规范 §2.3）。
+- **isAsyncStarted()**：异步已 `dispatch`/`complete` 后返回 `false`（属性本身不清理，`PerfAsyncContext` 用 `completed` 标记周期结束）。
+- **dispatch()**：委托 `asyncWebRequest.dispatch()`；**dispatch(path)** 通过 `SupportDispatcherHandler.forward()` 分派到指定路径，
+  期间 `getDispatcherType()` 为 `ASYNC`（分派结束恢复原值），结束后异步周期即结束。
+- **complete()**：委托 `asyncWebRequest.complete()`；幂等 —— `onComplete` 每个周期只触发一次。
+- **监听器回调**：`CopyOnWriteArrayList` 线程安全。`onComplete`/`onTimeout`/`onError` 均触发；`addListener(listener, req, resp)`
+  注册的事件携带传入的 request/response。**懒注册**——仅当 `addListener()` 或 `setTimeout()` 时通过 `ensureHandlersRegistered()`
+  桥接底层 timeout/error handler，避免覆盖框架 Callable/DeferredResult 路径的 handler。
+- **hasOriginalRequestAndResponse()**：仅无参 `startAsync()` 为 `true`；传入包装后的 req/resp 时为 `false`。
 - **setTimeout()**：委托并调用 `scheduleTimeoutIfNeeded()`。
 
 ### 5.9 认证与安全
@@ -581,7 +588,8 @@ public HttpSessionData getSession(String sessionId) {
 |------|------|------|
 | 获取 session | `getSession(sessionId)` | 从 `storage.getSession()` 获取，包装为 `PerfHttpSession`，设置 `onInvalidateCallback` 为 `storage.removeSession()` |
 | 创建 session | `createSession()` | `storage.createSession()` → 包装为 `PerfHttpSession` → 触发 `HttpSessionListener.sessionCreated` |
-| 保存 session | `saveSession(session)` | `storage.saveSession(session.getData())` |
+| 保存 session | `saveSession(session)` | `storage.saveSession(session.getData())`，同步语义（存储 SPI 的原始契约） |
+| 响应结束保存 | `saveSessionAfterResponse(session)` | 阻塞型存储（`storage.hasBlockingSave()`，文件存储为 true）转独立单线程队列，其余同步保存 —— 响应写完成回调运行在 Netty EventLoop，不能在此写盘 |
 | 变更 session ID | `changeSessionId(oldSession)` | 创建新 `HttpSessionData`（新 ID + 旧属性），移除旧 session |
 | Cookie 配置 | `cookieName`/`cookiePath`/`sameSite`/`cookieSecure` | 从 `server.servlet.session.cookie.*` 配置读取 |
 
@@ -590,6 +598,7 @@ public HttpSessionData getSession(String sessionId) {
 `PerfHttpSession`完整实现 `HttpSession` 接口，包含 `HttpSessionListener`/`HttpSessionAttributeListener` 事件触发。**额外实现**：
 
 - **`HttpSessionBindingListener` 支持**：`setAttribute`（替换时对旧值 `valueUnbound`、对新值 `valueBound`）、`removeAttribute`（`valueUnbound`）、`invalidate`（遍历所有属性 `valueUnbound`）。
+- **`setAttribute(name, null)`**：等价于 `removeAttribute(name)`（规范 §7.5，同样触发 `valueUnbound`）；底层 `ConcurrentHashMap` 不接受 null value，故在入口拦截。
 - **`invalidate()`**：设置 `invalid=true`、遍历属性触发 `valueUnbound`、触发 `onInvalidateCallback`（`storage.removeSession`）、触发 `sessionDestroyed` 事件。
 
 `PerfServletContext`（原 `MinimalServletContext` 从 `PerfHttpSession` 内部类迁移出来）是实现 `ServletContext` + `WebComponent` 的独立类，注册到 `WebContext`，供 `getServletContext()` 与 `HttpSession.getServletContext()` 共用。详见 5.6 ServletContext。
@@ -724,6 +733,7 @@ protected boolean initContextHolders(WebServerHttpRequest req, WebServerHttpResp
 
 `SessionFlushListener`实现 `WriteRespEventListener`，在响应写入完成/失败时持久化 session：
 
+
 ```java
 // SupportDispatcherHandler.java
 private void flushSession() {
@@ -733,13 +743,18 @@ private void flushSession() {
     PerfHttpSessionManager manager = request.getWebContext()
             .getWebComponent(PerfHttpSessionManager.class);
     if (manager != null) {
-        session.markAccessed();
-        manager.saveSession(session);
+        // 本方法在 Netty 写完成回调（EventLoop 线程）执行：
+        // 阻塞型存储由 manager 转到后台线程，内存存储保持同步
+        manager.saveSessionAfterResponse(session);
     }
 }
 ```
 
 通过 `WriteRespEventListener` 接入 Netty 的 `ChannelFuture` 回调，确保在同步/异步/流式场景下均在正确的生命周期点执行 session 持久化。
+
+> **不要在这里直接调 `saveSession()`**：该回调运行在 EventLoop 上，文件存储的「序列化 + `Files.write` + `ATOMIC_MOVE`」
+> 会阻塞同一 EventLoop 负责的所有连接。`saveSessionAfterResponse()` 对 `hasBlockingSave()==true` 的存储使用
+> 单线程有界队列（容量 4096，满则丢弃并告警），停机时最多等待 5 秒把在途保存落完。
 
 ---
 
@@ -800,7 +815,7 @@ private void flushSession() {
 3. **`FilterWrapper` 实例级唯一标识** → `IdentityHashMap` + `AtomicLong` 确保同类不同实例不被去重误杀（修复 `System.identityHashCode` 碰撞）。
 4. **`HandlerInterceptorWrapper` 四阶段适配** → `preHandle`/`postHandle`(null modelAndView)/`afterCompletion`(NestedServletException)/(`AsyncHandlerInterceptor` 可选)。
 5. **`PerfHttpServletRequest`/`Response` 委托 + `rebind`** → 包装框架请求/响应为 `HttpServletRequest`/`HttpServletResponse`，`rebind` 支持 Filter 包装链。
-6. **Session 体系从零实现** → `HttpSessionStorage` SPI + `InMemoryHttpSessionStorage` 默认实现 + `PerfHttpSessionManager` 管理器 + `SessionFlushListener` 在 `ChannelFuture` 回调中持久化（含 `HttpSessionBindingListener` 回调）。
+6. **Session 体系从零实现** → `HttpSessionStorage` SPI + `InMemoryHttpSessionStorage` 默认实现 + `PerfHttpSessionManager` 管理器 + `SessionFlushListener` 在 `ChannelFuture` 回调中持久化（含 `HttpSessionBindingListener` 回调；阻塞型存储经单线程队列落盘，不占 EventLoop）。
 7. **桥接适配器启动期决策** → `SpringHandlerMethodArgumentResolverProvider` 的 `supports` 在启动期调用，消除每请求 dispatch（替代旧 `RuntimeArgumentResolver`）。
 8. **Servlet 规范桥接扩展** → `PerfServletContext`/`PerfRequestDispatcher`（forward/include）/`PerfAsyncContext`/`Authenticator`/`upgrade()` 等，补齐依赖 Servlet API 的上层框架所需语义。
 
