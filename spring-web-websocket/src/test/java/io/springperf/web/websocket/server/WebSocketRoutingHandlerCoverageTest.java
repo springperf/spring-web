@@ -13,6 +13,7 @@ import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.PongWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.ReferenceCountUtil;
@@ -20,12 +21,15 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.PongMessage;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketHandler;
+import org.springframework.web.socket.WebSocketMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import org.mockito.ArgumentCaptor;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -180,6 +184,27 @@ class WebSocketRoutingHandlerCoverageTest {
         Object outbound = channel.readOutbound();
         assertNotNull(outbound, "Ping 帧应触发 Pong 回写");
         ReferenceCountUtil.release(outbound);
+    }
+
+    @Test
+    void pongFrame_deliversApplicationDataToHandler() throws Exception {
+        // 修复前入站 Pong 一律用 EMPTY_PAYLOAD，@OnMessage(PongMessage) 拿不到对端回显的数据
+        handler = mock(WebSocketHandler.class);
+        channel = newChannel(new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), null, false, null));
+        channel.pipeline().fireChannelRead(upgradeRequest("/ws", null));
+        channel.runPendingTasks();
+        verify(handler, timeout(2000)).afterConnectionEstablished(any(WebSocketSession.class));
+        drainHandshakeResponse();
+
+        channel.pipeline().fireChannelRead(new PongWebSocketFrame(Unpooled.wrappedBuffer(new byte[] { 7, 8 })));
+
+        ArgumentCaptor<WebSocketMessage> captor = ArgumentCaptor.forClass(WebSocketMessage.class);
+        verify(handler, timeout(2000)).handleMessage(any(WebSocketSession.class), captor.capture());
+        assertTrue(captor.getValue() instanceof PongMessage);
+        ByteBuffer data = ((PongMessage) captor.getValue()).getPayload();
+        byte[] actual = new byte[data.remaining()];
+        data.duplicate().get(actual);
+        assertArrayEquals(new byte[] { 7, 8 }, actual);
     }
 
     /* ==================== Close 帧 ==================== */
