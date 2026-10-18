@@ -16,18 +16,21 @@ public class BatchRequestMetaData {
     private final BatchMapping.Backpressure backpressure;
     private final Constructor<?> singleMethodCtor;
     private final int maxBatchSize;
+    private final int batchWindowMillis;
     private final int consumerSize;
 
-    public BatchRequestMetaData(Method batchMethod,
-                                Class<?> beanType,
-                                Class<? extends BatchRequest<?>> requestType,
-                                String queueName,
-                                int ringBufferSize,
-                                BatchMapping.WaitStrategy waitStrategy,
-                                BatchMapping.Backpressure backpressure,
-                                Constructor<?> singleMethodCtor,
-                                int maxBatchSize,
-                                int consumerSize) {
+    public BatchRequestMetaData(Method batchMethod, Class<?> beanType, Class<? extends BatchRequest<?>> requestType,
+            String queueName, int ringBufferSize, BatchMapping.WaitStrategy waitStrategy,
+            BatchMapping.Backpressure backpressure, Constructor<?> singleMethodCtor, int maxBatchSize,
+            int consumerSize) {
+        this(batchMethod, beanType, requestType, queueName, ringBufferSize, waitStrategy, backpressure,
+                singleMethodCtor, maxBatchSize, 0, consumerSize);
+    }
+
+    public BatchRequestMetaData(Method batchMethod, Class<?> beanType, Class<? extends BatchRequest<?>> requestType,
+            String queueName, int ringBufferSize, BatchMapping.WaitStrategy waitStrategy,
+            BatchMapping.Backpressure backpressure, Constructor<?> singleMethodCtor, int maxBatchSize,
+            int batchWindowMillis, int consumerSize) {
         this.batchMethod = batchMethod;
         this.beanType = beanType;
         this.requestType = requestType;
@@ -37,17 +40,56 @@ public class BatchRequestMetaData {
         this.backpressure = backpressure;
         this.singleMethodCtor = singleMethodCtor;
         this.maxBatchSize = maxBatchSize;
+        this.batchWindowMillis = batchWindowMillis;
         this.consumerSize = consumerSize;
     }
 
-    public Method batchMethod() { return batchMethod; }
-    public Class<?> beanType() { return beanType; }
-    public Class<? extends BatchRequest<?>> requestType() { return requestType; }
-    public String queueName() { return queueName; }
-    public int ringBufferSize() { return ringBufferSize; }
-    public BatchMapping.WaitStrategy waitStrategy() { return waitStrategy; }
-    public BatchMapping.Backpressure backpressure() { return backpressure; }
-    public Constructor<?> singleMethodCtor() { return singleMethodCtor; }
-    public int maxBatchSize() { return maxBatchSize; }
-    public int consumerSize() { return consumerSize; }
+    public Method batchMethod() {
+        return batchMethod;
+    }
+
+    public Class<?> beanType() {
+        return beanType;
+    }
+
+    public Class<? extends BatchRequest<?>> requestType() {
+        return requestType;
+    }
+
+    public String queueName() {
+        return queueName;
+    }
+
+    public int ringBufferSize() {
+        return ringBufferSize;
+    }
+
+    public BatchMapping.WaitStrategy waitStrategy() {
+        return waitStrategy;
+    }
+
+    public BatchMapping.Backpressure backpressure() {
+        return backpressure;
+    }
+
+    public Constructor<?> singleMethodCtor() {
+        return singleMethodCtor;
+    }
+
+    public int maxBatchSize() {
+        return maxBatchSize;
+    }
+
+    /**
+     * 攒批时间窗口（毫秒），0 = 关闭。
+     *
+     * @see BatchMapping#batchWindowMillis()
+     */
+    public int batchWindowMillis() {
+        return batchWindowMillis;
+    }
+
+    public int consumerSize() {
+        return consumerSize;
+    }
 }
