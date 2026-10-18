@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 端点级 {@link Decoder}/{@link Encoder} 实例管理。
@@ -23,6 +24,9 @@ import java.util.Map;
  */
 public class JsrCodecRegistry {
 
+    /** 「该类型没有可用 codec」的负缓存标记：连「找不到」也要缓存，否则每次落空都全表扫描。 */
+    private static final Object NO_CODEC = new Object();
+
     private final List<Decoder> decoderInstances = new ArrayList<>();
     private final List<Encoder> encoderInstances = new ArrayList<>();
 
@@ -32,7 +36,19 @@ public class JsrCodecRegistry {
     private final Map<Class<?>, Encoder.Text<?>> textEncoders = new HashMap<>();
     private final Map<Class<?>, Encoder.Binary<?>> binaryEncoders = new HashMap<>();
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
+    /**
+     * 解析结果缓存（连接级，注册表本身即 per-connection）：{@code @OnMessage} 参数类型与发送对象类型在一条连接内是固定的小集合， 缓存后每帧/每次发送不再做 isAssignableFrom
+     * 全表扫描。
+     * <p>
+     * 用 ConcurrentHashMap：发送侧可能由多个业务线程并发调用（与批处理开关同为跨线程可见）。
+     * </p>
+     */
+    private final Map<Class<?>, Object> textDecoderCache = new ConcurrentHashMap<>();
+    private final Map<Class<?>, Object> binaryDecoderCache = new ConcurrentHashMap<>();
+    private final Map<Class<?>, Object> textEncoderCache = new ConcurrentHashMap<>();
+    private final Map<Class<?>, Object> binaryEncoderCache = new ConcurrentHashMap<>();
+
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public JsrCodecRegistry(JsrEndpointConfigAdapter config) {
         EndpointConfig endpointConfig = config;
         for (Class<? extends Decoder> decoderClass : config.getDecoders()) {
@@ -84,7 +100,7 @@ public class JsrCodecRegistry {
         if (String.class == targetType) {
             return text;
         }
-        Decoder.Text decoder = findTextDecoder(textDecoders, targetType);
+        Decoder.Text decoder = textDecoderFor(targetType);
         if (decoder == null) {
             throw new javax.websocket.DecodeException(text, "No Decoder.Text for type " + targetType.getName());
         }
@@ -109,7 +125,7 @@ public class JsrCodecRegistry {
         if (ByteBuffer.class == targetType) {
             return buf;
         }
-        Decoder.Binary decoder = findBinaryDecoder(binaryDecoders, targetType);
+        Decoder.Binary decoder = binaryDecoderFor(targetType);
         if (decoder == null) {
             throw new javax.websocket.DecodeException(buf, "No Decoder.Binary for type " + targetType.getName());
         }
@@ -127,11 +143,11 @@ public class JsrCodecRegistry {
     @SuppressWarnings({"rawtypes", "unchecked"})
     public EncodedPayload encode(Object data, boolean preferText) throws EncodeException {
         Class<?> type = data.getClass();
-        Encoder.Text textEncoder = findTextEncoder(textEncoders, type);
+        Encoder.Text textEncoder = textEncoderFor(type);
         if (textEncoder != null && preferText) {
             return EncodedPayload.text((String) textEncoder.encode(data));
         }
-        Encoder.Binary binaryEncoder = findBinaryEncoder(binaryEncoders, type);
+        Encoder.Binary binaryEncoder = binaryEncoderFor(type);
         if (binaryEncoder != null) {
             return EncodedPayload.binary((ByteBuffer) binaryEncoder.encode(data));
         }
@@ -141,7 +157,64 @@ public class JsrCodecRegistry {
         throw new EncodeException(data, "No matching Encoder for type " + type.getName());
     }
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
+    // ===================== 解析结果缓存（命中即返回，未命中扫描一次并连负结果一起缓存） =====================
+
+    /**
+     * 包内测试钩子：四张解析缓存的条目总数。
+     * <p>
+     * 用于验证「同一类型只解析一次、负结果也缓存」这一性能契约（生产代码不调用）。
+     * </p>
+     */
+    int cachedCodecCount() {
+        return textDecoderCache.size() + binaryDecoderCache.size() + textEncoderCache.size()
+                + binaryEncoderCache.size();
+    }
+
+    @SuppressWarnings("rawtypes")
+    private Decoder.Text textDecoderFor(Class<?> targetType) {
+        Object cached = textDecoderCache.get(targetType);
+        if (cached == null) {
+            Decoder.Text found = findTextDecoder(textDecoders, targetType);
+            cached = found != null ? found : NO_CODEC;
+            textDecoderCache.put(targetType, cached);
+        }
+        return cached == NO_CODEC ? null : (Decoder.Text) cached;
+    }
+
+    @SuppressWarnings("rawtypes")
+    private Decoder.Binary binaryDecoderFor(Class<?> targetType) {
+        Object cached = binaryDecoderCache.get(targetType);
+        if (cached == null) {
+            Decoder.Binary found = findBinaryDecoder(binaryDecoders, targetType);
+            cached = found != null ? found : NO_CODEC;
+            binaryDecoderCache.put(targetType, cached);
+        }
+        return cached == NO_CODEC ? null : (Decoder.Binary) cached;
+    }
+
+    @SuppressWarnings("rawtypes")
+    private Encoder.Text textEncoderFor(Class<?> targetType) {
+        Object cached = textEncoderCache.get(targetType);
+        if (cached == null) {
+            Encoder.Text found = findTextEncoder(textEncoders, targetType);
+            cached = found != null ? found : NO_CODEC;
+            textEncoderCache.put(targetType, cached);
+        }
+        return cached == NO_CODEC ? null : (Encoder.Text) cached;
+    }
+
+    @SuppressWarnings("rawtypes")
+    private Encoder.Binary binaryEncoderFor(Class<?> targetType) {
+        Object cached = binaryEncoderCache.get(targetType);
+        if (cached == null) {
+            Encoder.Binary found = findBinaryEncoder(binaryEncoders, targetType);
+            cached = found != null ? found : NO_CODEC;
+            binaryEncoderCache.put(targetType, cached);
+        }
+        return cached == NO_CODEC ? null : (Encoder.Binary) cached;
+    }
+
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     private static Decoder.Text findTextDecoder(Map map, Class<?> targetType) {
         Object found = map.get(targetType);
         if (found != null) {
