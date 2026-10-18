@@ -1,5 +1,19 @@
 package io.springperf.web.core.cors;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+import org.springframework.context.EmbeddedValueResolverAware;
+import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.http.HttpMethod;
+import org.springframework.lang.Nullable;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringValueResolver;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.cors.CorsConfiguration;
+
 import io.springperf.web.context.WebComponentContainer;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.cors.provider.CorsConfigurationProvider;
@@ -34,7 +48,12 @@ public class CorsRegistry extends WebComponentContainer implements EmbeddedValue
 
     private static final CorsConfigurationProvider DEFAULT_CORS_CONFIGURATION_PROVIDER = new NoneCorsConfigurationProvider();
 
-    private final List<CorsRegistration> registrations = new ArrayList<>();
+    /**
+     * CORS 注册表。用 {@link CopyOnWriteArrayList}：读侧（{@link #createCorsConfigurationProvider}， 每路由首次命中时遍历）无锁，写侧只有
+     * {@link #addActuatorCorsConfiguration} 一处且发生在运行期 （Actuator 端点动态注册）。读多写极少正是 COW 的适用场景；此前用 ArrayList 时写侧加了
+     * {@code synchronized} 而读侧裸奔，并发注册与首次命中重叠会抛 ConcurrentModificationException 或漏掉 registration。
+     */
+    private final List<CorsRegistration> registrations = new CopyOnWriteArrayList<>();
 
     private WebCorsProcessor webCorsProcessor;
 
