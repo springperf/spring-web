@@ -1,6 +1,7 @@
 package io.springperf.web.websocket.server;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.websocketx.*;
@@ -22,6 +23,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.URI;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.Collections;
 import java.util.List;
@@ -52,9 +54,32 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
 
     private static final AttributeKey<NettyWebSocketSession> SESSION_KEY = AttributeKey.valueOf("ws.session");
     private static final AttributeKey<WebSocketHandler> HANDLER_KEY = AttributeKey.valueOf("ws.handler");
+    /** 进行中的分片消息聚合状态；无分片时为 null。仅在 EventLoop 线程读写。 */
+    private static final AttributeKey<FragmentState> FRAGMENT_KEY = AttributeKey.valueOf("ws.fragment.state");
 
     private static final String WS_DECODER = "ws-decoder";
     private static final String WS_ENCODER = "ws-encoder";
+
+    /**
+     * 分片消息的累积状态。
+     * <p>
+     * RFC 6455 的分片规则：起始帧 opcode 为 text/binary 且 {@code FIN=0}，中间帧 opcode 为 continuation 且 {@code FIN=0}， 末帧 opcode 为
+     * continuation 且 {@code FIN=1}。文本分片必须按<b>字节</b>累积后一次性解码——UTF-8 多字节字符可能跨分片， 逐帧 decode 会产生乱码。
+     * </p>
+     */
+    private static final class FragmentState {
+        final boolean text;
+        final ByteBuf buffer;
+
+        FragmentState(boolean text) {
+            this.text = text;
+            this.buffer = Unpooled.buffer();
+        }
+
+        void release() {
+            buffer.release();
+        }
+    }
 
     private final Map<String, WebSocketHandler> handlerMap;
     private final String subProtocols;
@@ -147,18 +172,29 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
             return;
         }
 
-        handshaker.handshake(ctx.channel(), (FullHttpRequest) req).addListener((ChannelFutureListener) future -> {
-            if (!future.isSuccess()) {
-                log.error("WebSocket handshake failed for {}", path, future.cause());
-                // 握手失败：请求不再被使用，释放调用方持有的原始引用
-                // （netty handshake 内部 retain 的引用由 WebSocketServerHandshaker$2
-                // 在 fireChannelRead 时释放，此处释放原始引用）。
-                ReferenceCountUtil.release(req);
-                ctx.close();
-                return;
-            }
-            afterHandshakeSuccess(ctx, req, path, handshaker, result);
-        });
+        try {
+            handshaker.handshake(ctx.channel(), (FullHttpRequest) req).addListener((ChannelFutureListener) future -> {
+                if (!future.isSuccess()) {
+                    log.error("WebSocket handshake failed for {}", path, future.cause());
+                    // 握手失败：请求不再被使用，释放调用方持有的原始引用
+                    // （netty handshake 内部 retain 的引用由 WebSocketServerHandshaker$2
+                    // 在 fireChannelRead 时释放，此处释放原始引用）。
+                    ReferenceCountUtil.release(req);
+                    ctx.close();
+                    return;
+                }
+                afterHandshakeSuccess(ctx, req, path, handshaker, result);
+            });
+        } catch (Exception e) {
+            // handshake() 同步抛异常时也要释放原始引用。已知场景：pipeline 缺少
+            // HttpRequestDecoder/HttpServerCodec 时 handshake() 内部抛 IllegalStateException
+            // （见 WebSocketRoutingHandlerUpgradeRemovalTest），该异常从 channelRead 冒泡到
+            // exceptionCaught，而那里只 ctx.close() 不 release——每次泄漏一个 FullHttpRequest
+            // （含 content ByteBuf）。此路径与上面的失败 listener 对称。
+            log.error("WebSocket handshake threw synchronously for {}", path, e);
+            ReferenceCountUtil.release(req);
+            ctx.close();
+        }
     }
 
     private void afterHandshakeSuccess(ChannelHandlerContext ctx, HttpRequest req, String path,
@@ -264,13 +300,45 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
         }
 
         try {
-            if (frame instanceof TextWebSocketFrame) {
-                handler.handleMessage(session, new TextMessage(((TextWebSocketFrame) frame).text()));
-            } else if (frame instanceof BinaryWebSocketFrame) {
-                ByteBuf buf = frame.content();
-                byte[] bytes = new byte[buf.readableBytes()];
-                buf.readBytes(bytes);
-                handler.handleMessage(session, new BinaryMessage(ByteBuffer.wrap(bytes)));
+            if (frame instanceof TextWebSocketFrame || frame instanceof BinaryWebSocketFrame) {
+                boolean text = frame instanceof TextWebSocketFrame;
+                ByteBuf content = frame.content();
+                // 分片进行中又来数据帧即协议违规，与该帧自身 FIN 无关（RFC 6455 §5.4：
+                // 分片消息的后续帧必须全是 continuation）。必须先判违规再判 FIN，
+                // 否则 FIN=1 的侵入帧会被当成完整消息静默派发，同时丢掉正在聚合的消息。
+                if (ctx.channel().attr(FRAGMENT_KEY).get() != null) {
+                    failProtocol(ctx, session, handler, "new data frame while a fragmented message is in progress");
+                    return;
+                }
+                if (frame.isFinalFragment()) {
+                    // 未分片的完整消息，直接派发
+                    dispatchMessage(handler, session, text, content);
+                } else {
+                    // 分片起始帧（FIN=0）：建立聚合状态
+                    FragmentState state = new FragmentState(text);
+                    if (!appendFragment(ctx, session, handler, state, content, text)) {
+                        return;
+                    }
+                    ctx.channel().attr(FRAGMENT_KEY).set(state);
+                }
+            } else if (frame instanceof ContinuationWebSocketFrame) {
+                FragmentState state = ctx.channel().attr(FRAGMENT_KEY).get();
+                if (state == null) {
+                    failProtocol(ctx, session, handler, "continuation frame without a fragmented message in progress");
+                    return;
+                }
+                if (!appendFragment(ctx, session, handler, state, frame.content(), state.text)) {
+                    return;
+                }
+                if (frame.isFinalFragment()) {
+                    ctx.channel().attr(FRAGMENT_KEY).set(null);
+                    try {
+                        dispatchMessage(handler, session, state.text, state.buffer);
+                    } finally {
+                        state.release();
+                    }
+                    return;
+                }
             } else if (frame instanceof PingWebSocketFrame) {
                 ctx.writeAndFlush(new PongWebSocketFrame(frame.content().retain()));
             } else if (frame instanceof PongWebSocketFrame) {
@@ -280,13 +348,19 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
                 int code = close.statusCode() >= 0 ? close.statusCode() : 1005;
                 CloseStatus status = new CloseStatus(code, close.reasonText());
                 session.setOpen(false);
-                try {
-                    handler.afterConnectionClosed(session, status);
-                } catch (Exception e) {
-                    log.error("afterConnectionClosed failed", e);
+                // 与其他三条断连路径（TCP 断开、close()、异常）共用同一幂等入口：
+                // 这里先到就用对端给的 status 通知，随后回显并关 channel 时 channelInactive
+                // 再进来会被 markCloseNotified 挡掉，不会重复。
+                if (session.markCloseNotified()) {
+                    try {
+                        handler.afterConnectionClosed(session, status);
+                    } catch (Exception e) {
+                        log.error("afterConnectionClosed failed", e);
+                    }
                 }
                 // RFC 6455 §7.4.1: 服务端必须回显 Close 帧，再关闭 TCP
                 ctx.writeAndFlush(close.retain()).addListener(ChannelFutureListener.CLOSE);
+                releaseFragment(ctx);
                 return; // frame released in finally, retained copy lives for write
             }
         } catch (Exception e) {
@@ -299,6 +373,66 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
         } finally {
             frame.release();
         }
+    }
+
+    /**
+     * 派发一条完整消息。分片文本在此一次性解码，保证跨分片的 UTF-8 多字节字符不乱码。
+     * <p>
+     * 受检异常不在此处吞掉：统一抛给调用方的 try/catch，与原有「WebSocket handler error」 处理路径一致（转 {@code handleTransportError}），避免分片消息的失败被静默丢弃。
+     * </p>
+     */
+    private void dispatchMessage(WebSocketHandler handler, NettyWebSocketSession session, boolean text, ByteBuf content)
+            throws Exception {
+        if (text) {
+            handler.handleMessage(session, new TextMessage(content.toString(StandardCharsets.UTF_8)));
+        } else {
+            byte[] bytes = new byte[content.readableBytes()];
+            content.readBytes(bytes);
+            handler.handleMessage(session, new BinaryMessage(ByteBuffer.wrap(bytes)));
+        }
+    }
+
+    /**
+     * 把一个分片的内容追加进聚合缓冲。
+     * <p>
+     * 上限用 session 的 text/binary message size limit：无界累积会让一个恶意客户端靠无限分片把堆打满。 超限即释放状态、关闭连接并返回 false（调用方应直接 return，交由
+     * finally 释放 frame）。
+     * </p>
+     *
+     * @return false 表示已超限并已处理，调用方不应继续
+     */
+    private boolean appendFragment(ChannelHandlerContext ctx, NettyWebSocketSession session, WebSocketHandler handler,
+            FragmentState state, ByteBuf content, boolean text) {
+        int limit = text ? session.getTextMessageSizeLimit() : session.getBinaryMessageSizeLimit();
+        int incoming = content.readableBytes();
+        if (state.buffer.readableBytes() + incoming > limit) {
+            log.warn("WebSocket fragmented message exceeds {} limit ({}), closing session {}", text ? "text" : "binary",
+                    limit, session.getId());
+            releaseFragment(ctx);
+            failProtocol(ctx, session, handler, "fragmented message exceeds size limit");
+            return false;
+        }
+        // writeBytes 是拷贝，不接管 content 的引用；原始引用由外层 finally 的 frame.release() 释放
+        state.buffer.writeBytes(content);
+        return true;
+    }
+
+    private void releaseFragment(ChannelHandlerContext ctx) {
+        FragmentState state = ctx.channel().attr(FRAGMENT_KEY).getAndSet(null);
+        if (state != null) {
+            state.release();
+        }
+    }
+
+    private void failProtocol(ChannelHandlerContext ctx, NettyWebSocketSession session, WebSocketHandler handler,
+            String reason) {
+        log.warn("WebSocket protocol violation on session {}: {}", session.getId(), reason);
+        try {
+            handler.handleTransportError(session, new IOException("WebSocket protocol violation: " + reason));
+        } catch (Exception e) {
+            log.error("TransportError handler failed", e);
+        }
+        ctx.close();
     }
 
     @Override
@@ -351,7 +485,11 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
     public void channelInactive(ChannelHandlerContext ctx) {
         WebSocketHandler handler = ctx.channel().attr(HANDLER_KEY).get();
         NettyWebSocketSession session = ctx.channel().attr(SESSION_KEY).get();
-        if (handler != null && session != null && session.isOpen()) {
+        // 幂等通知：Netty 保证 channelInactive 触发时 channel 已 inactive，故不能用 isOpen()
+        // （= open && channel.isActive()）做守卫——那样恒为 false，除「对端发 Close 帧」外的
+        // 所有断连路径（TCP 断开/RST、服务端 close()、空闲超时、传输异常）都会丢失回调。
+        // markCloseNotified 用 CAS 保证四条路径竞争下恰好通知一次。
+        if (handler != null && session != null && session.markCloseNotified()) {
             session.setOpen(false);
             try {
                 handler.afterConnectionClosed(session, CloseStatus.GOING_AWAY);
@@ -359,6 +497,8 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
                 log.error("afterConnectionClosed failed", e);
             }
         }
+        // 无论是否已通知过关闭，都要丢弃进行中的分片缓冲：连接已断，聚合永不完成
+        releaseFragment(ctx);
         ctx.fireChannelInactive();
     }
 
