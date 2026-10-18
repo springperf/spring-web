@@ -1,6 +1,5 @@
 package io.springperf.web.autoconfigure;
 
-import io.springperf.web.view.ViewProperties;
 import io.springperf.web.view.retval.ViewReturnValueResolver;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
