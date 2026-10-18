@@ -57,17 +57,27 @@ public class JsrEndpointConfigAdapter implements ServerEndpointConfig {
     private static Configurator newConfigurator(JsrEndpointMetadata metadata) {
         Class<? extends Configurator> configuratorClass = metadata.getConfiguratorClass();
         if (configuratorClass == null || configuratorClass == Configurator.class) {
-            // 默认 Configurator：直接构造端点实例，避免依赖容器平台 Configurator
-            // （jakarta.websocket 默认 getEndpointInstance 委托 ServerContainer 平台实现）。
+            // 默认 Configurator：直接构造端点实例、直接放行 Origin，避免依赖容器平台 Configurator
+            // （jakarta.websocket 基类的 getEndpointInstance/checkOrigin 都委托 ServerContainer 平台实现，
+            // 而本框架没有平台容器，调用基类实现会直接抛 RuntimeException）。
             return new Configurator() {
                 @Override
                 public <T> T getEndpointInstance(Class<T> endpointClass) throws InstantiationException {
                     return instantiateEndpoint(endpointClass);
                 }
+
+                @Override
+                public boolean checkOrigin(String originHeaderValue) {
+                    // 规范语义：默认放行所有来源
+                    return true;
+                }
             };
         }
         try {
             final Configurator delegate = configuratorClass.getDeclaredConstructor().newInstance();
+            // 同上：基类 checkOrigin 要 ServiceLoader 找平台 configurator，脱离容器时抛
+            // RuntimeException("Cannot load platform configurator")。未覆写即按规范默认放行，不去碰平台实现。
+            final boolean overridesCheckOrigin = overridesMethod(delegate, "checkOrigin", String.class);
             return new Configurator() {
                 @Override
                 public <T> T getEndpointInstance(Class<T> endpointClass) throws InstantiationException {
@@ -86,7 +96,7 @@ public class JsrEndpointConfigAdapter implements ServerEndpointConfig {
 
                 @Override
                 public boolean checkOrigin(String originHeaderValue) {
-                    return delegate.checkOrigin(originHeaderValue);
+                    return !overridesCheckOrigin || delegate.checkOrigin(originHeaderValue);
                 }
 
                 @Override
@@ -98,6 +108,17 @@ public class JsrEndpointConfigAdapter implements ServerEndpointConfig {
         } catch (Exception ex) {
             throw new IllegalStateException("Failed to instantiate ServerEndpointConfig.Configurator "
                     + configuratorClass.getName() + " for endpoint " + metadata.getEndpointClass().getName(), ex);
+        }
+    }
+
+    /**
+     * 判断 {@code Configurator} 子类是否自己覆写了某个方法：基类实现依赖平台容器，不能落到它上面。
+     */
+    private static boolean overridesMethod(Object configurator, String name, Class<?>... parameterTypes) {
+        try {
+            return configurator.getClass().getMethod(name, parameterTypes).getDeclaringClass() != Configurator.class;
+        } catch (NoSuchMethodException ex) {
+            return false;
         }
     }
 

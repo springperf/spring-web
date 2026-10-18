@@ -7,6 +7,7 @@ import jakarta.websocket.RemoteEndpoint;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.WebSocketExtension;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
@@ -47,15 +48,6 @@ class JsrWebSocketSessionTest {
     }
 
     @Test
-    void addMessageHandler_unsupported() {
-        assertThrows(UnsupportedOperationException.class, () -> session.addMessageHandler(mock(MessageHandler.class)));
-        assertThrows(UnsupportedOperationException.class,
-                () -> session.addMessageHandler(String.class, mock(MessageHandler.Whole.class)));
-        assertThrows(UnsupportedOperationException.class,
-                () -> session.addMessageHandler(String.class, mock(MessageHandler.Partial.class)));
-    }
-
-    @Test
     void getMessageHandlers_empty() {
         assertTrue(session.getMessageHandlers().isEmpty());
     }
@@ -63,6 +55,114 @@ class JsrWebSocketSessionTest {
     @Test
     void removeMessageHandler_noop() {
         session.removeMessageHandler(mock(MessageHandler.class));
+    }
+
+    /* ==================== 动态 MessageHandler 注册 ==================== */
+
+    @Test
+    void addMessageHandler_anonymousWhole_infersTypeFromGenerics() {
+        when(springSession.isOpen()).thenReturn(true);
+        MessageHandler handler = new MessageHandler.Whole<String>() {
+            @Override
+            public void onMessage(String message) {
+            }
+        };
+
+        session.addMessageHandler(handler);
+
+        assertTrue(session.getMessageHandlers().contains(handler));
+    }
+
+    /** 规范：无 Class 的重载在泛型被擦除（lambda）时必须失败，提示改用带 Class 的重载。 */
+    @Test
+    void addMessageHandler_lambdaWithoutClass_throwsIllegalState() {
+        when(springSession.isOpen()).thenReturn(true);
+        MessageHandler handler = (MessageHandler.Whole<String>) message -> {
+        };
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> session.addMessageHandler(handler));
+        assertTrue(ex.getMessage().contains("addMessageHandler(Class"), ex.getMessage());
+    }
+
+    /** 规范：每种原生消息类型最多一个 handler，重复注册抛 IllegalStateException。 */
+    @Test
+    void addMessageHandler_duplicateNativeType_throwsIllegalState() {
+        when(springSession.isOpen()).thenReturn(true);
+        session.addMessageHandler(String.class, message -> {
+        });
+
+        assertThrows(IllegalStateException.class, () -> session.addMessageHandler(String.class, message -> {
+        }));
+    }
+
+    @Test
+    void addMessageHandler_textAndBinaryCoexist() {
+        when(springSession.isOpen()).thenReturn(true);
+        session.addMessageHandler(String.class, message -> {
+        });
+        session.addMessageHandler(byte[].class, message -> {
+        });
+
+        assertEquals(2, session.getMessageHandlers().size());
+    }
+
+    /** 注解 {@code @OnMessage} 占用某原生类型后，同类型的动态注册必须被拒绝。 */
+    @Test
+    void addMessageHandler_annotatedTypeOccupied_throwsIllegalState() {
+        when(springSession.isOpen()).thenReturn(true);
+        session.markAnnotatedMessageType(String.class);
+
+        assertThrows(IllegalStateException.class, () -> session.addMessageHandler(String.class, message -> {
+        }));
+    }
+
+    /** 注解占用 text 不影响 binary 的动态注册。 */
+    @Test
+    void addMessageHandler_annotatedTextStillAllowsBinary() {
+        when(springSession.isOpen()).thenReturn(true);
+        session.markAnnotatedMessageType(String.class);
+
+        session.addMessageHandler(byte[].class, message -> {
+        });
+
+        assertEquals(1, session.getMessageHandlers().size());
+    }
+
+    @Test
+    void addMessageHandler_afterClose_throwsIllegalState() {
+        when(springSession.isOpen()).thenReturn(false);
+
+        assertThrows(IllegalStateException.class, () -> session.addMessageHandler(String.class, message -> {
+        }));
+    }
+
+    @Test
+    void addMessageHandler_unresolvableType_throwsIllegalArgument() {
+        when(springSession.isOpen()).thenReturn(true);
+
+        assertThrows(IllegalArgumentException.class, () -> session.addMessageHandler(Runnable.class, message -> {
+        }));
+    }
+
+    @Test
+    void removeMessageHandler_removesRegisteredHandler() {
+        when(springSession.isOpen()).thenReturn(true);
+        MessageHandler.Whole<String> handler = message -> {
+        };
+        session.addMessageHandler(String.class, handler);
+
+        session.removeMessageHandler(handler);
+
+        assertTrue(session.getMessageHandlers().isEmpty());
+    }
+
+    @Test
+    void getMessageHandlers_isUnmodifiable() {
+        when(springSession.isOpen()).thenReturn(true);
+        session.addMessageHandler(String.class, message -> {
+        });
+
+        assertThrows(UnsupportedOperationException.class, () -> session.getMessageHandlers().clear());
     }
 
     @Test
@@ -79,6 +179,22 @@ class JsrWebSocketSessionTest {
     @Test
     void getNegotiatedExtensions_empty() {
         assertTrue(session.getNegotiatedExtensions().isEmpty());
+    }
+
+    /** 握手协商成功时（如 permessage-deflate）必须如实上报，否则业务误判「压缩未生效」。 */
+    @Test
+    void getNegotiatedExtensions_mapsNegotiatedExtension() {
+        when(springSession.getExtensions()).thenReturn(java.util.List
+                .of(new WebSocketExtension("permessage-deflate", Map.of("server_no_context_takeover", ""))));
+
+        java.util.List<jakarta.websocket.Extension> extensions = session.getNegotiatedExtensions();
+
+        assertEquals(1, extensions.size());
+        jakarta.websocket.Extension extension = extensions.get(0);
+        assertEquals("permessage-deflate", extension.getName());
+        assertEquals(1, extension.getParameters().size());
+        assertEquals("server_no_context_takeover", extension.getParameters().get(0).getName());
+        assertEquals("", extension.getParameters().get(0).getValue());
     }
 
     @Test
@@ -212,6 +328,93 @@ class JsrWebSocketSessionTest {
         assertEquals(Collections.singletonList("1"), params.get("x"));
     }
 
+    /** 规范：参数值按 {@code application/x-www-form-urlencoded} 解码（%XX 与 '+'）。 */
+    @Test
+    void getRequestParameterMap_decodesEncodedValues() {
+        when(springSession.getUri()).thenReturn(URI.create("ws://h/ws?name=hello%20world&plus=a+b"));
+
+        Map<String, java.util.List<String>> params = session.getRequestParameterMap();
+
+        assertEquals(Collections.singletonList("hello world"), params.get("name"));
+        assertEquals(Collections.singletonList("a b"), params.get("plus"), "'+' 按 x-www-form-urlencoded 解为空格");
+    }
+
+    /** 非法百分号编码不能抛给业务：一个坏参数不该让整条会话的参数读取失败。 */
+    @Test
+    void decodeParameter_malformedEscape_returnsRawValue() {
+        assertEquals("%ZZ", JsrWebSocketSession.decodeParameter("%ZZ"));
+        assertEquals("%2", JsrWebSocketSession.decodeParameter("%2"));
+        assertEquals("hello world", JsrWebSocketSession.decodeParameter("hello%20world"));
+    }
+
+    /**
+     * POJO 同时配了 text 与 binary Decoder 时，两种帧都会交给 {@code @OnMessage}，所以两类都必须占位。
+     */
+    @Test
+    void markAnnotatedMessageType_pojoWithBothDecoders_occupiesTextAndBinary() {
+        when(springSession.isOpen()).thenReturn(true);
+        JsrWebSocketSession dual = new JsrWebSocketSession(springSession, new JsrWebSocketContainer(),
+                new JsrCodecRegistry(new JsrEndpointConfigAdapter(new JsrEndpointMetadata(DualDecoderEndpoint.class))),
+                Collections.emptyMap());
+
+        dual.markAnnotatedMessageType(DualMessage.class);
+
+        assertThrows(IllegalStateException.class, () -> dual.addMessageHandler(String.class, message -> {
+        }));
+        assertThrows(IllegalStateException.class, () -> dual.addMessageHandler(byte[].class, message -> {
+        }));
+    }
+
+    @jakarta.websocket.server.ServerEndpoint(value = "/dual", decoders = { DualTextDecoder.class,
+            DualBinaryDecoder.class })
+    static class DualDecoderEndpoint {
+    }
+
+    static class DualMessage {
+    }
+
+    public static class DualTextDecoder implements jakarta.websocket.Decoder.Text<DualMessage> {
+
+        @Override
+        public DualMessage decode(String s) {
+            return new DualMessage();
+        }
+
+        @Override
+        public boolean willDecode(String s) {
+            return true;
+        }
+
+        @Override
+        public void init(jakarta.websocket.EndpointConfig config) {
+        }
+
+        @Override
+        public void destroy() {
+        }
+    }
+
+    public static class DualBinaryDecoder implements jakarta.websocket.Decoder.Binary<DualMessage> {
+
+        @Override
+        public DualMessage decode(java.nio.ByteBuffer bytes) {
+            return new DualMessage();
+        }
+
+        @Override
+        public boolean willDecode(java.nio.ByteBuffer bytes) {
+            return true;
+        }
+
+        @Override
+        public void init(jakarta.websocket.EndpointConfig config) {
+        }
+
+        @Override
+        public void destroy() {
+        }
+    }
+
     @Test
     void getQueryString_nullUri_returnsNull() {
         assertNull(session.getQueryString());
@@ -244,5 +447,179 @@ class JsrWebSocketSessionTest {
     @Test
     void getOpenSessions_empty() {
         assertTrue(session.getOpenSessions().isEmpty());
+    }
+
+    /* ==================== 注册类型判定的剩余分支 ==================== */
+
+    @Test
+    void addMessageHandler_classPartial_registersPartialHandler() {
+        when(springSession.isOpen()).thenReturn(true);
+        MessageHandler.Partial<String> partial = (part, last) -> {
+        };
+
+        session.addMessageHandler(String.class, partial);
+
+        assertTrue(session.getMessageHandlers().contains(partial));
+    }
+
+    /** 规范：Partial 只允许 text(String) 与 binary(byte[]/ByteBuffer)，其他类型必须被拒绝。 */
+    @Test
+    void addMessageHandler_partialWithPojoType_rejected() {
+        when(springSession.isOpen()).thenReturn(true);
+        MessageHandler.Partial<Object> partial = (part, last) -> {
+        };
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> session.addMessageHandler(Object.class, partial));
+        assertTrue(ex.getMessage().contains("partial handlers support"), ex.getMessage());
+    }
+
+    @Test
+    void addMessageHandler_readerTypeOccupiesText() {
+        when(springSession.isOpen()).thenReturn(true);
+        session.addMessageHandler(java.io.Reader.class, (MessageHandler.Whole<java.io.Reader>) reader -> {
+        });
+
+        // Reader 走文本帧，占的是 text 类型
+        assertThrows(IllegalStateException.class, () -> session.addMessageHandler(String.class, message -> {
+        }));
+    }
+
+    @Test
+    void addMessageHandler_inputStreamTypeOccupiesBinary() {
+        when(springSession.isOpen()).thenReturn(true);
+        session.addMessageHandler(java.io.InputStream.class, (MessageHandler.Whole<java.io.InputStream>) stream -> {
+        });
+
+        assertThrows(IllegalStateException.class, () -> session.addMessageHandler(byte[].class, bytes -> {
+        }));
+    }
+
+    @Test
+    void addMessageHandler_pojoWithTextDecoderOccupiesText() {
+        when(springSession.isOpen()).thenReturn(true);
+        JsrCodecRegistry registry = new JsrCodecRegistry(
+                new JsrEndpointConfigAdapter(new JsrEndpointMetadata(TextDecoderEndpoint.class)));
+        JsrWebSocketSession decodable = new JsrWebSocketSession(springSession, container, registry, Map.of());
+
+        decodable.addMessageHandler(Pojo.class, (MessageHandler.Whole<Pojo>) pojo -> {
+        });
+
+        assertThrows(IllegalStateException.class, () -> decodable.addMessageHandler(String.class, message -> {
+        }));
+    }
+
+    @Test
+    void addMessageHandler_pojoWithBinaryDecoderOccupiesBinary() {
+        when(springSession.isOpen()).thenReturn(true);
+        JsrCodecRegistry registry = new JsrCodecRegistry(
+                new JsrEndpointConfigAdapter(new JsrEndpointMetadata(BinaryDecoderEndpoint.class)));
+        JsrWebSocketSession decodable = new JsrWebSocketSession(springSession, container, registry, Map.of());
+
+        decodable.addMessageHandler(BinaryPojo.class, (MessageHandler.Whole<BinaryPojo>) pojo -> {
+        });
+
+        assertThrows(IllegalStateException.class, () -> decodable.addMessageHandler(byte[].class, bytes -> {
+        }));
+    }
+
+    static final class Pojo {
+    }
+
+    static final class BinaryPojo {
+    }
+
+    @jakarta.websocket.server.ServerEndpoint(value = "/text-decoder", decoders = PojoTextDecoder.class)
+    static class TextDecoderEndpoint {
+    }
+
+    public static class PojoTextDecoder implements jakarta.websocket.Decoder.Text<Pojo> {
+
+        @Override
+        public Pojo decode(String s) {
+            return new Pojo();
+        }
+
+        @Override
+        public boolean willDecode(String s) {
+            return true;
+        }
+    }
+
+    @jakarta.websocket.server.ServerEndpoint(value = "/binary-decoder", decoders = PojoBinaryDecoder.class)
+    static class BinaryDecoderEndpoint {
+    }
+
+    public static class PojoBinaryDecoder implements jakarta.websocket.Decoder.Binary<BinaryPojo> {
+
+        @Override
+        public BinaryPojo decode(java.nio.ByteBuffer bytes) {
+            return new BinaryPojo();
+        }
+
+        @Override
+        public boolean willDecode(java.nio.ByteBuffer bytes) {
+            return true;
+        }
+    }
+
+    /* ==================== getOpenSessions 的同 endpoint 语义 ==================== */
+
+    @Test
+    void getOpenSessions_visibleToOtherSessionsOfSameEndpoint() {
+        JsrWebSocketContainer shared = new JsrWebSocketContainer();
+        JsrWebSocketSession first = new JsrWebSocketSession(springSession, shared, codecRegistry, Map.of(), "/room");
+        JsrWebSocketSession second = new JsrWebSocketSession(springSession, shared, codecRegistry, Map.of(), "/room");
+        JsrWebSocketSession other = new JsrWebSocketSession(springSession, shared, codecRegistry, Map.of(), "/other");
+        shared.registerSession("/room", first);
+        shared.registerSession("/room", second);
+        shared.registerSession("/other", other);
+
+        assertEquals(2, first.getOpenSessions().size(), "同一 endpoint 的会话必须互相可见");
+        assertTrue(first.getOpenSessions().contains(second));
+        assertEquals(1, other.getOpenSessions().size(), "不同 endpoint 的会话不能混进来");
+    }
+
+    /* ==================== 批处理发送路径 ==================== */
+
+    @Test
+    void getSpringSession_returnsDelegate() {
+        assertSame(springSession, session.getSpringSession());
+    }
+
+    @Test
+    void send_withNettySessionAndNoFlush_usesBatchedPath() throws IOException {
+        NettyWebSocketSession netty = mock(NettyWebSocketSession.class);
+        JsrWebSocketSession jsr = new JsrWebSocketSession(netty, container, codecRegistry, Map.of());
+
+        jsr.send(new org.springframework.web.socket.TextMessage("batched"), false);
+
+        // flush=false 时必须走 Netty 的暂存发送，等 flushBatch 统一刷出
+        verify(netty).sendMessage(any(org.springframework.web.socket.WebSocketMessage.class), eq(false));
+        verify(netty, never()).sendMessage(any(org.springframework.web.socket.WebSocketMessage.class));
+    }
+
+    @Test
+    void send_withFlush_goesStraightToTransport() throws IOException {
+        NettyWebSocketSession netty = mock(NettyWebSocketSession.class);
+        JsrWebSocketSession jsr = new JsrWebSocketSession(netty, container, codecRegistry, Map.of());
+
+        jsr.send(new org.springframework.web.socket.TextMessage("now"), true);
+
+        verify(netty).sendMessage(any(org.springframework.web.socket.WebSocketMessage.class));
+        verify(netty, never()).sendMessage(any(org.springframework.web.socket.WebSocketMessage.class), eq(false));
+    }
+
+    /* ==================== 查询参数解析的空对 ==================== */
+
+    @Test
+    void getRequestParameterMap_emptyPairSkipped() {
+        when(springSession.getUri()).thenReturn(URI.create("ws://localhost/ws?a=1&&b=2"));
+
+        Map<String, java.util.List<String>> params = session.getRequestParameterMap();
+
+        assertEquals(java.util.List.of("1"), params.get("a"));
+        assertEquals(java.util.List.of("2"), params.get("b"));
+        assertEquals(2, params.size(), "空对这一项应被跳过，而不是产生一个空键");
     }
 }
