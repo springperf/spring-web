@@ -305,6 +305,30 @@ class JsrCodecRegistryTest {
         assertNotNull(payload.getBinary());
     }
 
+    @Test
+    void codecResolution_cachedPerType_includingNegativeResults() throws DecodeException, EncodeException {
+        JsrCodecRegistry registry = registry(Endpoint.class);
+
+        registry.decodeText("a", MyPojo.class);
+        assertEquals(1, registry.cachedCodecCount(), "首次解析应写入缓存");
+        registry.decodeText("b", MyPojo.class);
+        assertEquals(1, registry.cachedCodecCount(), "同一类型第二次解析必须命中缓存，不再全表扫描");
+
+        assertThrows(DecodeException.class, () -> registry.decodeText("x", StringBuilder.class));
+        assertEquals(2, registry.cachedCodecCount(), "「找不到 decoder」也要缓存负结果");
+        assertThrows(DecodeException.class, () -> registry.decodeText("y", StringBuilder.class));
+        assertEquals(2, registry.cachedCodecCount(), "负结果同样只解析一次");
+
+        registry.decodeBinary(ByteBuffer.wrap("d".getBytes(StandardCharsets.UTF_8)), MyPojo.class);
+        assertEquals(3, registry.cachedCodecCount());
+        registry.encode(new MyPojo("x"), true);
+        assertEquals(4, registry.cachedCodecCount());
+        registry.encode(new MyPojo("x"), false);
+        assertEquals(5, registry.cachedCodecCount(), "文本/二进制编码器各占一条缓存");
+        registry.encode(new MyPojo("x"), false);
+        assertEquals(5, registry.cachedCodecCount());
+    }
+
     public static class NoNoArgDecoder implements Decoder.Text<MyPojo> {
         public NoNoArgDecoder(String arg) {
         }
