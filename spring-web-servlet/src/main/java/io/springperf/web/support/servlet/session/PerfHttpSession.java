@@ -76,6 +76,12 @@ public class PerfHttpSession implements HttpSession {
     @Override
     public void setAttribute(String name, Object value) {
         checkValid();
+        // Servlet 规范 §7.5：value 为 null 等价于 removeAttribute(name)。
+        // 转发前必须拦截：底层 attributes 是 ConcurrentHashMap，put(name, null) 会抛 NPE。
+        if (value == null) {
+            removeAttribute(name);
+            return;
+        }
         Object oldValue = data.getAttribute(name);
         data.setAttribute(name, value);
         if (oldValue != null) {

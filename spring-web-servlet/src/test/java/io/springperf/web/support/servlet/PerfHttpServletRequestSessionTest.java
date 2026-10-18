@@ -166,10 +166,19 @@ class PerfHttpServletRequestSessionTest {
     /* ==================== async ==================== */
 
     @Test
-    void startAsync_existingAsyncContext_returnsExisting() {
+    void startAsync_existingAsyncContext_throwsIllegalState() {
+        // Servlet 规范：同一异步周期内再次 startAsync 必须失败（修复前静默返回同一个实例）
         PerfAsyncContext ctx = mock(PerfAsyncContext.class);
         PerfAsyncContext.set(requestContext, ctx);
-        assertSame(ctx, newReq().startAsync());
+        assertThrows(IllegalStateException.class, () -> newReq().startAsync());
+    }
+
+    @Test
+    void isAsyncStarted_completedContext_false() {
+        PerfAsyncContext ctx = mock(PerfAsyncContext.class);
+        when(ctx.isCompleted()).thenReturn(true);
+        PerfAsyncContext.set(requestContext, ctx);
+        assertFalse(newReq().isAsyncStarted());
     }
 
     @Test
