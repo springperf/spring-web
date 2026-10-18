@@ -199,6 +199,34 @@ The cost is up to one extra window of waiting per batch, i.e. the per-request la
 
 > Measured counter-example: 10ms IO with a 5ms window produced *lower* throughput than no window at all — the wait consumed half of the IO time. The window should be well below the IO latency.
 
+#### Gains and Costs, Quantified
+
+Those recommendations come from a parameter sweep (closed model, concurrency 100, `consumerSize=8`, `maxBatchSize=100`). Gains and costs must be read separately — they do not always hold together:
+
+**Gain — always holds, independent of IO latency**: IO call count drops 3~10x and IO cost per request drops 4~10x. That *is* the IO elimination, and it relieves the database/downstream even when throughput does not move.
+
+**Throughput — only cashes out when IO is slow enough**:
+
+| IO latency | Best window | Throughput | IO cost per request |
+|------------|-------------|------------|---------------------|
+| 50ms | 25ms (1/2) | **+15% ~ +45%** | 6.6ms → 0.64ms (10x) |
+| 20ms | 10ms (1/2) | -22% ~ +3% (flat) | 2.6ms → 0.74ms (3.5x) |
+
+The reason: for a window to raise throughput, the consumer side (bizExecutor) has to be the bottleneck. At 20ms IO with `consumerSize=8` there is already 400 batches/sec of headroom, so the bottleneck is elsewhere and the window only removes IO calls.
+
+**Latency — counter-intuitively it *drops* for slow IO**. In the 50ms case p50 fell from ~110ms to ~79ms (**-30ms**): without a window 100 concurrent requests split into ~10 batches and a request queues behind the earlier ones; with a window one batch covers them and latency ≈ 25ms window + 50ms IO. **Removing queueing rounds beats the extra window wait.**
+
+**Loss zone**: as the window approaches the IO latency, the batch cycle becomes window + IO and every arriving request piles up, producing a tidal pattern with occasional p99 spikes (one run hit 492ms). The window should not reach the IO latency itself.
+
+#### So, Should You Turn It On?
+
+| Goal | Recommendation |
+|------|----------------|
+| Reduce database / downstream load | **Yes.** The gain is certain regardless of IO latency |
+| Raise throughput, IO > 20ms | **Yes**, at 1/2 of the IO latency |
+| Raise throughput, IO < 20ms | Little to gain — check whether the bottleneck is really here |
+| Ultra-low latency | Careful. At fast IO p50 may not improve at all |
+
 ---
 
 ## Architecture
