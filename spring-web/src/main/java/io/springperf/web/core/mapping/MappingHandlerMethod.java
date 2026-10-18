@@ -107,6 +107,16 @@ public class MappingHandlerMethod extends InvokableHandlerMethod {
      * <p>
      * 注意：该方法只清槽位值，<b>不删除 map 条目</b>，因此不释放 Class/Method 键； 需要释放键（防 ClassLoader 泄漏）请用 {@link #clearAllCaches()}。
      * </p>
+     * </p>
+     * <p>
+     * <b>已知窗口（有意接受，勿视为疏漏）</b>：清槽（上方步骤 1/2）与另一线程在 {@link #set} 的无锁分支
+     * （{@code cache[index] = value}）之间没有互斥。并发时后者可能把<b>旧值</b>写回刚被清空的槽位，而该实例的 本地字段已被置
+     * null——下次访问从静态表取到的正是这个被污染的槽，表现为「配置刷新后个别路由仍用旧解析结果」。
+     * </p>
+     * <p>
+     * 接受理由：触发条件是「配置中心动态刷新」与「同一时刻请求命中同一 key」同时发生，概率极低；彻底修复需要给 静态表引入 epoch/版本号机制，代价是每请求多一次版本比较，与热点路径零开销的目标冲突。若将来出现刷新后
+     * 行为不一致的现场问题，第一嫌疑就是这里，请优先复现该窗口，而不是怀疑解析逻辑本身。
+     * </p>
      */
     public static <T> void clearCache(MappingCacheKey<T> key) {
         int index = key.index;

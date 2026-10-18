@@ -216,6 +216,16 @@ public abstract class BaseWebServerHttpRequest implements WebServerHttpRequest, 
         return AsyncSupportUtils.getAsyncWebRequest(this, (WebServerHttpResponse) response);
     }
 
+    /**
+     * Accept-Language 解析结果（懒初始化）。
+     * <p>
+     * {@code locales} <b>有意不加 volatile</b>：首次解析只发生在 dispatch 线程——读方是 {@code LocaleResolverProvider}（参数解析）与
+     * {@code ResponseStatusExceptionResolver}（异常渲染）， 二者都在业务池/dispatch 线程；CORS 预检与 404/405 渲染路径不读 Locale；异步重放的跨线程读之前有
+     * {@code PerfAsyncWebRequest.dispatch()} 的 {@code state} CAS。
+     * </p>
+     * <b>若将来在 EventLoop 上新增 Locale 读取（如内容协商前置到匹配阶段），必须先给该字段补 volatile。</b>
+     * </p>
+     */
     public List<Locale> getLocales() {
         if (locales == null) {
             String header = getHeaders().getFirst("Accept-Language");

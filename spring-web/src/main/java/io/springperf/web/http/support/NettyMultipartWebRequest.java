@@ -38,27 +38,43 @@ public class NettyMultipartWebRequest extends DefaultFullHttpRequest {
         this.interfaceHttpDataList = decoder.getBodyHttpDatas();
     }
 
+    /**
+     * 把 decoder 解析出的 part 分摊进 parameters / files / parts 三个视图。
+     * <p>
+     * <b>必须整段加锁</b>：调用方有两条线程路径——{@code NettyServerHttpRequest.parseParameters} 在 {@code synchronized(request)} 内调
+     * {@link #getParameters()}，而 {@code getMultiFileMap()} / {@code getPartMap()}（{@code @RequestPart} /
+     * {@code MultipartFile} 参数解析）<b>完全无锁</b>。 两者可能在「EventLoop 超时/异常渲染读参数」与「业务线程解析 part 参数」之间重叠：若解析本身不互斥， 两个线程会并发向三个
+     * {@code LinkedMultiValueMap} add，且 {@code parsed} 无同步发布—— 表现为重复条目、{@code ConcurrentModificationException} 或半初始化的
+     * map。
+     * </p>
+     * <p>
+     * 锁序恒为 request → multipart（或无锁 → multipart），不存在反向持锁，无死锁面。 构建完成后三个 map 只读，故读侧无需再持锁。
+     * </p>
+     */
     protected void parseIfNeeded() {
-        if (parsed) {
-            return;
-        }
-        for (InterfaceHttpData interfaceHttpData : interfaceHttpDataList) {
-            switch (interfaceHttpData.getHttpDataType()) {
-                case Attribute:
-                    NettyAttributeMessage attributeMessage = new NettyAttributeMessage((Attribute) interfaceHttpData);
-                    parameters.add(interfaceHttpData.getName(), attributeMessage);
-                    parts.add(interfaceHttpData.getName(), attributeMessage);
-                    break;
-                case FileUpload:
-                    NettyMultipartFile nettyMultipartFile = new NettyMultipartFile((FileUpload) interfaceHttpData);
-                    files.add(interfaceHttpData.getName(), nettyMultipartFile);
-                    parts.add(interfaceHttpData.getName(), nettyMultipartFile);
-                    break;
-                default:
-                    break;
+        synchronized (this) {
+            if (parsed) {
+                return;
             }
+            for (InterfaceHttpData interfaceHttpData : interfaceHttpDataList) {
+                switch (interfaceHttpData.getHttpDataType()) {
+                    case Attribute:
+                        NettyAttributeMessage attributeMessage = new NettyAttributeMessage(
+                                (Attribute) interfaceHttpData);
+                        parameters.add(interfaceHttpData.getName(), attributeMessage);
+                        parts.add(interfaceHttpData.getName(), attributeMessage);
+                        break;
+                    case FileUpload:
+                        NettyMultipartFile nettyMultipartFile = new NettyMultipartFile((FileUpload) interfaceHttpData);
+                        files.add(interfaceHttpData.getName(), nettyMultipartFile);
+                        parts.add(interfaceHttpData.getName(), nettyMultipartFile);
+                        break;
+                    default:
+                        break;
+                }
+            }
+            parsed = true;
         }
-        parsed = true;
     }
 
     public MultiValueMap<String, NettyAttributeMessage> getParameters() {

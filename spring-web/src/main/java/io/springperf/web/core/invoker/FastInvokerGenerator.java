@@ -39,6 +39,11 @@ public class FastInvokerGenerator {
             throw new UnsupportedOperationException("FastInvokerGenerator is not supported in GraalVM native-image, "
                     + "falling back to MethodHandleInvoker");
         }
+        // 必须用 computeIfAbsent 而不是「先 get、缺失再生成后 putIfAbsent」的双段式：
+        // generateClass 内含 defineClass，同一 ClassLoader 下并发 define 同名类会让第二个线程抛
+        // LinkageError: duplicate class definition。CHM 的原子复合操作保证每个 Method 只生成一次，
+        // 代价是 mapping function 在 bin 锁内执行——这里接受，因为它只发生在启动期首次访问
+        // （后续全部命中缓存），且 invoker 生成不访问其它共享状态、无递归修改同一 map 的行为。
         Class<?> invokerClass = invokerClassCache.computeIfAbsent(method, (m) -> generateClass(controllerClass, m));
         Constructor<?> ctor = invokerClass.getConstructor(controllerClass);
         return (Invoker) ctor.newInstance(controller);
