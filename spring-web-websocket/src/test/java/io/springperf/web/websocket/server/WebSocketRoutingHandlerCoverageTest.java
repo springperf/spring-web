@@ -1,5 +1,6 @@
 package io.springperf.web.websocket.server;
 
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.embedded.EmbeddedChannel;
@@ -15,6 +16,13 @@ import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PongWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.WebSocket08FrameDecoder;
+import io.netty.handler.codec.http.websocketx.WebSocket08FrameEncoder;
+import io.netty.handler.codec.http.websocketx.extensions.WebSocketClientExtension;
+import io.netty.handler.codec.http.websocketx.extensions.WebSocketExtensionData;
+import io.netty.handler.codec.http.websocketx.extensions.WebSocketServerExtension;
+import io.netty.handler.codec.http.websocketx.extensions.compression.PerMessageDeflateClientExtensionHandshaker;
+import io.netty.handler.codec.http.websocketx.extensions.compression.PerMessageDeflateServerExtensionHandshaker;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.ReferenceCountUtil;
 import org.junit.jupiter.api.AfterEach;
@@ -205,6 +213,127 @@ class WebSocketRoutingHandlerCoverageTest {
         byte[] actual = new byte[data.remaining()];
         data.duplicate().get(actual);
         assertArrayEquals(new byte[] { 7, 8 }, actual);
+    }
+
+    /* ==================== permessage-deflate 协商 ==================== */
+
+    @Test
+    void permessageDeflate_negotiatedInHandshake_andInboundFrameDecoded() throws Exception {
+        handler = mock(WebSocketHandler.class);
+        channel = newChannel(new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), null, true, null));
+
+        PerMessageDeflateClientExtensionHandshaker clientHandshaker = new PerMessageDeflateClientExtensionHandshaker();
+        WebSocketExtensionData requestData = clientHandshaker.newRequestData();
+        FullHttpRequest req = upgradeRequest("/ws", null);
+        // 客户端提议：permessage-deflate + 无值参数（考察解析器对 client_max_window_bits 的处理）
+        req.headers().set(HttpHeaderNames.SEC_WEBSOCKET_EXTENSIONS, requestData.name() + "; client_max_window_bits");
+        channel.pipeline().fireChannelRead(req);
+        channel.runPendingTasks();
+
+        verify(handler, timeout(2000)).afterConnectionEstablished(any(WebSocketSession.class));
+        String response = readHandshakeResponseText();
+        assertTrue(response.toLowerCase().contains("sec-websocket-extensions:"), "协商成功必须在握手响应里回显扩展，实际响应：" + response);
+        assertTrue(response.toLowerCase().contains("permessage-deflate"), response);
+
+        // 客户端按协商结果压缩一帧，服务端业务应收到解压后的明文
+        WebSocketServerExtension serverExtension = new PerMessageDeflateServerExtensionHandshaker()
+                .handshakeExtension(requestData);
+        assertNotNull(serverExtension);
+        WebSocketClientExtension clientExtension = clientHandshaker
+                .handshakeExtension(serverExtension.newReponseData());
+        assertNotNull(clientExtension);
+
+        EmbeddedChannel clientEncoder = new EmbeddedChannel(new WebSocket08FrameEncoder(true),
+                clientExtension.newExtensionEncoder());
+        clientEncoder.writeOutbound(new TextWebSocketFrame("compressed-hello"));
+        ByteBuf wire = clientEncoder.readOutbound();
+        assertNotNull(wire);
+
+        channel.writeInbound(wire);
+
+        ArgumentCaptor<WebSocketMessage> captor = ArgumentCaptor.forClass(WebSocketMessage.class);
+        verify(handler, timeout(2000)).handleMessage(any(WebSocketSession.class), captor.capture());
+        assertEquals("compressed-hello", ((TextMessage) captor.getValue()).getPayload(), "RSV1 帧必须先解压再交给业务，否则业务拿到的是乱码");
+        clientEncoder.finishAndReleaseAll();
+    }
+
+    @Test
+    void permessageDeflate_outboundFrameIsCompressed() throws Exception {
+        handler = mock(WebSocketHandler.class);
+        doAnswer(invocation -> {
+            WebSocketSession session = invocation.getArgument(0);
+            TextMessage message = invocation.getArgument(1);
+            session.sendMessage(new TextMessage("echo:" + message.getPayload()));
+            return null;
+        }).when(handler).handleMessage(any(WebSocketSession.class), any(TextMessage.class));
+        channel = newChannel(new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), null, true, null));
+
+        PerMessageDeflateClientExtensionHandshaker clientHandshaker = new PerMessageDeflateClientExtensionHandshaker();
+        WebSocketExtensionData requestData = clientHandshaker.newRequestData();
+        FullHttpRequest req = upgradeRequest("/ws", null);
+        req.headers().set(HttpHeaderNames.SEC_WEBSOCKET_EXTENSIONS, requestData.name());
+        channel.pipeline().fireChannelRead(req);
+        channel.runPendingTasks();
+        verify(handler, timeout(2000)).afterConnectionEstablished(any(WebSocketSession.class));
+        readHandshakeResponseText();
+
+        // 服务端发一帧文本；出站方向必须先压缩再帧编码
+        sessionOf(channel).sendMessage(new TextMessage("echo:hi"));
+
+        WebSocketServerExtension serverExtension = new PerMessageDeflateServerExtensionHandshaker()
+                .handshakeExtension(requestData);
+        WebSocketClientExtension clientExtension = clientHandshaker
+                .handshakeExtension(serverExtension.newReponseData());
+        EmbeddedChannel clientDecoder = new EmbeddedChannel(new WebSocket08FrameDecoder(false, true, 64 * 1024),
+                clientExtension.newExtensionDecoder());
+
+        Object outbound = channel.readOutbound();
+        assertNotNull(outbound, "服务端应写出帧");
+        clientDecoder.writeInbound(outbound);
+        Object decoded = clientDecoder.readInbound();
+        assertTrue(decoded instanceof TextWebSocketFrame);
+        assertEquals("echo:hi", ((TextWebSocketFrame) decoded).text());
+        ReferenceCountUtil.release(decoded);
+        clientDecoder.finishAndReleaseAll();
+    }
+
+    @Test
+    void allowExtensionsFallsBackToRejectingRsvFrames_whenClientOffersNone() throws Exception {
+        handler = mock(WebSocketHandler.class);
+        channel = newChannel(new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), null, true, null));
+
+        channel.pipeline().fireChannelRead(upgradeRequest("/ws", null));
+        channel.runPendingTasks();
+        verify(handler, timeout(2000)).afterConnectionEstablished(any(WebSocketSession.class));
+        String response = readHandshakeResponseText();
+        assertFalse(response.toLowerCase().contains("sec-websocket-extensions:"), "客户端没提扩展时不得回显扩展头：" + response);
+
+        // 未协商却发来 RSV1 帧：必须按协议违规关闭连接，而不是把压缩数据当明文交给业务。
+        // Netty 的 rsv 字段是原始位集，RSV1 位对应 4（encoder 内部 rsv << 4）。
+        EmbeddedChannel clientEncoder = new EmbeddedChannel(new WebSocket08FrameEncoder(true));
+        clientEncoder.writeOutbound(new TextWebSocketFrame(true, 4, "rsv1-without-negotiation"));
+        ByteBuf wire = clientEncoder.readOutbound();
+        assertNotNull(wire);
+
+        channel.writeInbound(wire);
+
+        assertFalse(channel.isActive(), "未协商扩展时 RSV1 帧必须被解码器拒绝并关闭连接");
+        verify(handler, never()).handleMessage(any(WebSocketSession.class), any());
+        clientEncoder.finishAndReleaseAll();
+    }
+
+    private String readHandshakeResponseText() {
+        StringBuilder text = new StringBuilder();
+        Object outbound;
+        while ((outbound = channel.readOutbound()) != null) {
+            if (outbound instanceof ByteBuf) {
+                text.append(((ByteBuf) outbound).toString(java.nio.charset.StandardCharsets.UTF_8));
+            } else {
+                text.append(outbound);
+            }
+            ReferenceCountUtil.release(outbound);
+        }
+        return text.toString();
     }
 
     /* ==================== Close 帧 ==================== */
