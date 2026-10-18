@@ -18,6 +18,7 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.EnumSet;
 import java.util.EventListener;
 import java.util.HashMap;
 import java.util.Map;
@@ -39,14 +40,19 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
     /** 暴露给 {@link ServletContext#TEMPDIR} 的属性值（创建失败回退到系统临时目录，保持非空）。 */
     private final java.io.File tempDirAttribute;
 
-    private int sessionTimeout;
-    private String requestCharacterEncoding = "UTF-8";
-    private String responseCharacterEncoding = "UTF-8";
+    /*
+     * 会话/编码配置：启动期由配置写入，运行期仍可被 ServletContext 的 setter 修改，
+     * 读取方是请求线程（会话创建、请求/响应编码），故全部 volatile。
+     */
+    private volatile int sessionTimeout;
+    private volatile String requestCharacterEncoding = "UTF-8";
+    private volatile String responseCharacterEncoding = "UTF-8";
     /** server.servlet.encoding.force-request：为 true 时忽略业务对请求编码的显式设置。 */
-    private boolean forceRequestEncoding;
+    private volatile boolean forceRequestEncoding;
     /** server.servlet.encoding.force-response：为 true 时忽略业务对响应编码的显式设置。 */
-    private boolean forceResponseEncoding;
-    private Set<SessionTrackingMode> sessionTrackingModes = Collections.singleton(SessionTrackingMode.COOKIE);
+    private volatile boolean forceResponseEncoding;
+    /** 启动期从配置读取，运行期可被 {@link #setSessionTrackingModes} 修改；请求线程读取，故 volatile。 */
+    private volatile Set<SessionTrackingMode> sessionTrackingModes = Collections.singleton(SessionTrackingMode.COOKIE);
 
     public PerfServletContext(WebContext webContext) {
         this.webContext = webContext;
@@ -402,30 +408,42 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
 
     // ===================== Servlet Registration =====================
 
+    /**
+     * 动态注册不受支持时的统一失败方式。
+     * <p>
+     * 规范为这些方法指定的「不支持」信号就是 {@link UnsupportedOperationException}；原先返回 null 会让调用方 以为注册成功（或静默跳过），能力丢失却无任何痕迹 —— 与模块其余
+     * fail-fast 策略也不一致。
+     * </p>
+     */
+    private static UnsupportedOperationException dynamicRegistrationUnsupported(String method) {
+        return new UnsupportedOperationException(method + " is not supported: this framework has no Servlet container "
+                + "registry. Register a Spring bean instead (or annotate with @WebServlet/@WebFilter).");
+    }
+
     @Override
     public ServletRegistration.Dynamic addServlet(String servletName, String className) {
-        return null;
+        throw dynamicRegistrationUnsupported("addServlet(String, String)");
     }
 
     @Override
     public ServletRegistration.Dynamic addServlet(String servletName, jakarta.servlet.Servlet servlet) {
-        return null;
+        throw dynamicRegistrationUnsupported("addServlet(String, Servlet)");
     }
 
     @Override
     public ServletRegistration.Dynamic addServlet(String servletName,
             Class<? extends jakarta.servlet.Servlet> servletClass) {
-        return null;
+        throw dynamicRegistrationUnsupported("addServlet(String, Class)");
     }
 
     @Override
     public ServletRegistration.Dynamic addJspFile(String servletName, String jspFile) {
-        return null;
+        throw dynamicRegistrationUnsupported("addJspFile(String, String)");
     }
 
     @Override
     public <T extends jakarta.servlet.Servlet> T createServlet(Class<T> c) {
-        return null;
+        throw dynamicRegistrationUnsupported("createServlet(Class)");
     }
 
     @Override
@@ -442,23 +460,23 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
 
     @Override
     public FilterRegistration.Dynamic addFilter(String filterName, String className) {
-        return null;
+        throw dynamicRegistrationUnsupported("addFilter(String, String)");
     }
 
     @Override
     public FilterRegistration.Dynamic addFilter(String filterName, jakarta.servlet.Filter filter) {
-        return null;
+        throw dynamicRegistrationUnsupported("addFilter(String, Filter)");
     }
 
     @Override
     public FilterRegistration.Dynamic addFilter(String filterName,
             Class<? extends jakarta.servlet.Filter> filterClass) {
-        return null;
+        throw dynamicRegistrationUnsupported("addFilter(String, Class)");
     }
 
     @Override
     public <T extends jakarta.servlet.Filter> T createFilter(Class<T> c) {
-        return null;
+        throw dynamicRegistrationUnsupported("createFilter(Class)");
     }
 
     @Override
@@ -497,8 +515,24 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
         return sessionCookieConfig;
     }
 
+    /**
+     * 设置有效的会话跟踪模式（原先为空实现：程序化配置被静默丢弃，与 {@code getEffectiveSessionTrackingModes()} 的返回值自相矛盾）。
+     * <p>
+     * 规范约束：集合不得为空，且必须包含 {@link SessionTrackingMode#COOKIE} 或 {@link SessionTrackingMode#SSL}（URL 重写只能作为补充手段）。
+     * 生效后会话 Cookie 的下发与 {@code encodeURL} 的 URL 重写都会按新配置工作。
+     * </p>
+     */
     @Override
     public void setSessionTrackingModes(Set<SessionTrackingMode> sessionTrackingModes) {
+        if (sessionTrackingModes == null || sessionTrackingModes.isEmpty()) {
+            throw new IllegalArgumentException("sessionTrackingModes must not be null or empty");
+        }
+        if (!sessionTrackingModes.contains(SessionTrackingMode.COOKIE)
+                && !sessionTrackingModes.contains(SessionTrackingMode.SSL)) {
+            throw new IllegalArgumentException(
+                    "COOKIE or SSL must be present in sessionTrackingModes: " + sessionTrackingModes);
+        }
+        this.sessionTrackingModes = Collections.unmodifiableSet(EnumSet.copyOf(sessionTrackingModes));
     }
 
     @Override
