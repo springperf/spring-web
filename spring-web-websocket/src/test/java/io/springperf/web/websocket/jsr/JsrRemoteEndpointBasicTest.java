@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -112,6 +113,38 @@ class JsrRemoteEndpointBasicTest {
     void sendObject_textEncoder_sendsText() throws IOException, EncodeException {
         remote.sendObject("world");
         verify(springSession).sendMessage(new TextMessage("encoded:world"));
+    }
+
+    @jakarta.websocket.server.ServerEndpoint(value = "/bin", encoders = { BinEncoder.class })
+    static class BinaryCodecEndpoint {
+    }
+
+    public static class BinEncoder implements jakarta.websocket.Encoder.Binary<byte[]> {
+        @Override
+        public ByteBuffer encode(byte[] o) {
+            return ByteBuffer.wrap(o);
+        }
+
+        @Override
+        public void init(jakarta.websocket.EndpointConfig config) {
+        }
+
+        @Override
+        public void destroy() {
+        }
+    }
+
+    @Test
+    void sendObject_binaryEncoder_sendsBinaryMessage() throws Exception {
+        // 编码器声明为 Encoder.Binary 时必须走 BinaryMessage：误走 TextMessage 会让对端按文本解析二进制载荷
+        JsrCodecRegistry binRegistry = new JsrCodecRegistry(
+                new JsrEndpointConfigAdapter(new JsrEndpointMetadata(BinaryCodecEndpoint.class)));
+        JsrWebSocketSession binSession = new JsrWebSocketSession(springSession, new JsrWebSocketContainer(),
+                binRegistry, java.util.Collections.emptyMap());
+
+        new JsrRemoteEndpointBasic(binSession, binRegistry).sendObject(new byte[] { 1, 2, 3 });
+
+        verify(springSession).sendMessage(argThat(msg -> msg instanceof BinaryMessage));
     }
 
     @Test

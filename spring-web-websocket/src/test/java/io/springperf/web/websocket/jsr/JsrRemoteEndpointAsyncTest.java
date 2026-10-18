@@ -182,4 +182,27 @@ class JsrRemoteEndpointAsyncTest {
         remote.sendObject(new Object(), handler);
         verify(handler).onResult(argThat(result -> !result.isOK()));
     }
+
+    @Test
+    void sendBinary_handler_success() throws IOException {
+        // handler 重载此前只有失败用例：成功路径不打 onResult 会让调用方永远等不到完成回调
+        SendHandler handler = mock(SendHandler.class);
+        ByteBuffer buf = ByteBuffer.wrap("x".getBytes(StandardCharsets.UTF_8));
+
+        remote.sendBinary(buf, handler);
+
+        verify(springSession).sendMessage(new BinaryMessage(buf));
+        verify(handler).onResult(argThat(SendResult::isOK));
+    }
+
+    @Test
+    void sendObject_handler_binaryEncoder_sendsBinaryMessage() throws IOException {
+        JsrRemoteEndpointAsync binRemote = binaryRemote();
+        SendHandler handler = mock(SendHandler.class);
+
+        binRemote.sendObject(new byte[] { 1, 2, 3 }, handler);
+
+        verify(springSession).sendMessage(argThat(msg -> msg instanceof BinaryMessage));
+        verify(handler).onResult(argThat(SendResult::isOK));
+    }
 }
