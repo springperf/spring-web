@@ -33,5 +33,13 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- perf 测试用 OkHttp 做 closed-model 负载：连接池 + keep-alive。
+             TestRestTemplate 底层是 SimpleClientHttpRequestFactory，每请求新建连接，
+             客户端开销会淹没被测差异，不能用于性能对照。 -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>
