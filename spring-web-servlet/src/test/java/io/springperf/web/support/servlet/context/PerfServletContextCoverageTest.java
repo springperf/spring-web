@@ -11,11 +11,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.io.File;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -301,7 +303,25 @@ class PerfServletContextCoverageTest {
         assertEquals(1, def.size());
         assertTrue(def.contains(SessionTrackingMode.COOKIE));
         assertNotNull(servletContext.getEffectiveSessionTrackingModes());
-        assertDoesNotThrow(() -> servletContext.setSessionTrackingModes(Collections.singleton(SessionTrackingMode.URL)));
+    }
+
+    @Test
+    void setSessionTrackingModes_appliesToEffectiveModes() {
+        // 修复前是空实现：程序化设置被静默丢弃，getEffectiveSessionTrackingModes 仍返回旧值
+        servletContext.setSessionTrackingModes(
+                new HashSet<>(Arrays.asList(SessionTrackingMode.COOKIE, SessionTrackingMode.URL)));
+        Set<SessionTrackingMode> effective = servletContext.getEffectiveSessionTrackingModes();
+        assertEquals(2, effective.size());
+        assertTrue(effective.contains(SessionTrackingMode.URL));
+    }
+
+    @Test
+    void setSessionTrackingModes_withoutCookieOrSsl_throwsIllegalArgument() {
+        // Servlet 规范：URL 重写只能作为 COOKIE/SSL 的补充，单独出现非法
+        assertThrows(IllegalArgumentException.class,
+                () -> servletContext.setSessionTrackingModes(Collections.singleton(SessionTrackingMode.URL)));
+        assertThrows(IllegalArgumentException.class, () -> servletContext.setSessionTrackingModes(Collections.emptySet()));
+        assertThrows(IllegalArgumentException.class, () -> servletContext.setSessionTrackingModes(null));
     }
 
     @Test
@@ -388,22 +408,34 @@ class PerfServletContextCoverageTest {
         assertEquals("GBK", servletContext.getResponseCharacterEncoding());
     }
 
-    /* ==================== 注册类空实现 ==================== */
+    /* ==================== 注册类：动态注册显式失败，查询按「未注册」返回 ==================== */
 
     @Test
-    void registrationMethods_noopOrNull() {
-        assertNull(servletContext.addServlet("n", "class"));
-        assertNull(servletContext.addServlet("n", mock(javax.servlet.Servlet.class)));
-        assertNull(servletContext.addServlet("n", javax.servlet.Servlet.class));
-        assertNull(servletContext.addJspFile("n", "x.jsp"));
-        assertNull(servletContext.createServlet(javax.servlet.Servlet.class));
+    void dynamicRegistration_throwsUnsupportedOperation() {
+        // 规范为「不支持动态注册」指定的信号是 UnsupportedOperationException；
+        // 原先返回 null 会让调用方误以为注册成功（或静默跳过），能力丢失却无痕迹。
+        assertThrows(UnsupportedOperationException.class, () -> servletContext.addServlet("n", "class"));
+        assertThrows(UnsupportedOperationException.class,
+                () -> servletContext.addServlet("n", mock(javax.servlet.Servlet.class)));
+        assertThrows(UnsupportedOperationException.class,
+                () -> servletContext.addServlet("n", javax.servlet.Servlet.class));
+        assertThrows(UnsupportedOperationException.class, () -> servletContext.addJspFile("n", "x.jsp"));
+        assertThrows(UnsupportedOperationException.class,
+                () -> servletContext.createServlet(javax.servlet.Servlet.class));
+
+        assertThrows(UnsupportedOperationException.class, () -> servletContext.addFilter("n", "class"));
+        assertThrows(UnsupportedOperationException.class,
+                () -> servletContext.addFilter("n", mock(javax.servlet.Filter.class)));
+        assertThrows(UnsupportedOperationException.class,
+                () -> servletContext.addFilter("n", javax.servlet.Filter.class));
+        assertThrows(UnsupportedOperationException.class,
+                () -> servletContext.createFilter(javax.servlet.Filter.class));
+    }
+
+    @Test
+    void registrationQueries_reportNotRegistered() {
         assertNull(servletContext.getServletRegistration("n"));
         assertTrue(servletContext.getServletRegistrations().isEmpty());
-
-        assertNull(servletContext.addFilter("n", "class"));
-        assertNull(servletContext.addFilter("n", mock(javax.servlet.Filter.class)));
-        assertNull(servletContext.addFilter("n", javax.servlet.Filter.class));
-        assertNull(servletContext.createFilter(javax.servlet.Filter.class));
         assertNull(servletContext.getFilterRegistration("n"));
         assertTrue(servletContext.getFilterRegistrations().isEmpty());
 
