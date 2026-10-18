@@ -378,7 +378,7 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
             } else if (frame instanceof PingWebSocketFrame) {
                 ctx.writeAndFlush(new PongWebSocketFrame(frame.content().retain()));
             } else if (frame instanceof PongWebSocketFrame) {
-                handler.handleMessage(session, new PongMessage(EMPTY_PAYLOAD));
+                handler.handleMessage(session, toPongMessage(((PongWebSocketFrame) frame).content()));
             } else if (frame instanceof CloseWebSocketFrame) {
                 CloseWebSocketFrame close = (CloseWebSocketFrame) frame;
                 int code = close.statusCode() >= 0 ? close.statusCode() : 1005;
@@ -437,6 +437,22 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
      *
      * @return false 表示已超限并已处理，调用方不应继续
      */
+    /**
+     * 入站 Pong 帧 → Spring {@link PongMessage}。必须拷贝：帧在 {@code finally} 里 release， 交给业务的 ByteBuffer
+     * 不能是帧内容的视图；空载荷仍复用共享常量，避免每帧分配。
+     * <p>
+     * 修复前这里无条件用 {@code EMPTY_PAYLOAD}，{@code @OnMessage(PongMessage)} 永远拿不到对端回显的数据。
+     * </p>
+     */
+    private static PongMessage toPongMessage(ByteBuf content) {
+        if (!content.isReadable()) {
+            return new PongMessage(EMPTY_PAYLOAD);
+        }
+        byte[] bytes = new byte[content.readableBytes()];
+        content.getBytes(content.readerIndex(), bytes);
+        return new PongMessage(ByteBuffer.wrap(bytes));
+    }
+
     private boolean appendFragment(ChannelHandlerContext ctx, NettyWebSocketSession session, WebSocketHandler handler,
             FragmentState state, ByteBuf content, boolean text) {
         int limit = text ? session.getTextMessageSizeLimit() : session.getBinaryMessageSizeLimit();

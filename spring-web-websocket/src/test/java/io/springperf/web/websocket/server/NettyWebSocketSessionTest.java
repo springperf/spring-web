@@ -1,5 +1,6 @@
 package io.springperf.web.websocket.server;
 
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
@@ -231,6 +232,36 @@ class NettyWebSocketSessionTest {
         f1.release();
         f2.release();
         channel.finishAndReleaseAll();
+    }
+
+    @Test
+    void sendPingPong_preservesApplicationData() throws Exception {
+        // 修复前 toFrame 用无参构造，应用数据被静默丢弃（JSR sendPing(payload)/Spring PingMessage(payload) 都失效）
+        EmbeddedChannel channel = new EmbeddedChannel();
+        NettyWebSocketSession session = newSession(channel);
+        ByteBuffer pingPayload = ByteBuffer.wrap(new byte[] { 1, 2, 3 });
+        ByteBuffer pongPayload = ByteBuffer.wrap(new byte[] { 4, 5 });
+        session.sendMessage(new PingMessage(pingPayload));
+        session.sendMessage(new PongMessage(pongPayload));
+        channel.runPendingTasks();
+
+        WebSocketFrame f1 = channel.readOutbound();
+        WebSocketFrame f2 = channel.readOutbound();
+        assertTrue(f1 instanceof PingWebSocketFrame);
+        assertTrue(f2 instanceof PongWebSocketFrame);
+        assertArrayEquals(new byte[] { 1, 2, 3 }, readableBytes(f1.content()));
+        assertArrayEquals(new byte[] { 4, 5 }, readableBytes(f2.content()));
+        assertEquals(0, pingPayload.position(), "发送不得消耗调用方的 ByteBuffer");
+        assertEquals(0, pongPayload.position());
+        f1.release();
+        f2.release();
+        channel.finishAndReleaseAll();
+    }
+
+    private static byte[] readableBytes(ByteBuf buf) {
+        byte[] bytes = new byte[buf.readableBytes()];
+        buf.getBytes(buf.readerIndex(), bytes);
+        return bytes;
     }
 
     @Test

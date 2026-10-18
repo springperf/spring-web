@@ -100,10 +100,15 @@ class JsrEndpointWebSocketHandlerBranchesTest {
     @ServerEndpoint("/pong")
     public static class PongReturnEndpoint {
         public static final AtomicInteger PONG_HANDLED = new AtomicInteger();
+        public static final AtomicReference<byte[]> PONG_PAYLOAD = new AtomicReference<>();
 
         @OnMessage
         public void onPong(PongMessage pong) {
             PONG_HANDLED.incrementAndGet();
+            ByteBuffer data = pong.getApplicationData();
+            byte[] bytes = new byte[data.remaining()];
+            data.duplicate().get(bytes);
+            PONG_PAYLOAD.set(bytes);
         }
     }
 
@@ -314,6 +319,8 @@ class JsrEndpointWebSocketHandlerBranchesTest {
                 new org.springframework.web.socket.PongMessage(ByteBuffer.wrap(new byte[] { 1, 2 })));
 
         assertEquals(1, PongReturnEndpoint.PONG_HANDLED.get());
+        assertArrayEquals(new byte[] { 1, 2 }, PongReturnEndpoint.PONG_PAYLOAD.get(),
+                "Pong 的应用数据必须原样交给 @OnMessage(PongMessage)");
     }
 
     @Test
