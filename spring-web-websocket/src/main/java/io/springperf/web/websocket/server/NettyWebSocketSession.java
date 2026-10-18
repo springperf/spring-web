@@ -18,6 +18,7 @@ import java.security.Principal;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -53,6 +54,16 @@ public class NettyWebSocketSession implements WebSocketSession {
     private int binaryMessageSizeLimit = 64 * 1024;
 
     private volatile boolean open = true;
+
+    /**
+     * 「已通知 afterConnectionClosed」的幂等标记。
+     * <p>
+     * 必须与 {@link #open} 分开：断连有四条路径（对端 Close 帧、服务端 {@link #close}、TCP 断开、 传输异常/空闲超时），它们到达的先后取决于网络与调度，任何一条先到都应通知、且只通知一次。
+     * 若用 {@code isOpen()} 做守卫则一条都通知不了——Netty 保证 {@code channelInactive} 触发时 channel 已 inactive，而
+     * {@code isOpen() = open && channel.isActive()} 恒为 false，见 WebSocketRoutingHandler#channelInactive。
+     * </p>
+     */
+    private final AtomicBoolean closeNotified = new AtomicBoolean(false);
 
     public NettyWebSocketSession(Channel channel, URI uri, SpringHeadersAdapter handshakeHeaders,
             String acceptedProtocol, InetSocketAddress localAddress, InetSocketAddress remoteAddress,
@@ -246,6 +257,20 @@ public class NettyWebSocketSession implements WebSocketSession {
 
     public void setOpen(boolean open) {
         this.open = open;
+    }
+
+    /**
+     * 尝试标记「已通知关闭」。返回 true 表示本次调用赢得了通知权，调用方应触发 {@code afterConnectionClosed}； 返回 false 表示其他路径已通知过，调用方必须跳过。
+     * <p>
+     * 这是断连通知的唯一入口：对端 Close 帧、服务端 {@link #close}、TCP 断开、传输异常/空闲超时 四条路径都经由它，谁先到谁通知，后到的静默退出，从而保证恰好一次。
+     * </p>
+     */
+    public boolean markCloseNotified() {
+        return closeNotified.compareAndSet(false, true);
+    }
+
+    public boolean isCloseNotified() {
+        return closeNotified.get();
     }
 
     @Override

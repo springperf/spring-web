@@ -63,6 +63,39 @@ class WebSocketRoutingHandlerUpgradeRemovalTest {
         channel.finishAndReleaseAll();
     }
 
+    /**
+     * 回归：handshake() <b>同步抛异常</b>时也必须释放请求原始引用。
+     * <p>
+     * 缺失 {@code HttpServerCodec} 时 Netty 的 handshaker 会在开工早期抛 {@code IllegalStateException}（它检查 pipeline 里有无
+     * decoder），该异常从 channelRead 冒泡到 exceptionCaught，而那里只 ctx.close() 不 release——修复前每次泄漏一个 FullHttpRequest（含 content
+     * ByteBuf）。
+     * </p>
+     */
+    @Test
+    void handshakeThrowsSynchronously_releasesRequest() {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        // 故意不加 HttpServerCodec：handshaker.handshake() 会同步抛异常
+        channel.pipeline().addLast(new HttpObjectAggregator(64 * 1024));
+        channel.pipeline()
+                .addLast(new WebSocketRoutingHandler(Map.of("/ws", mock(WebSocketHandler.class)), null, false, null));
+
+        FullHttpRequest req = upgradeRequest("/ws");
+        channel.pipeline().fireChannelRead(req);
+        channel.runPendingTasks();
+
+        assertEquals(0, req.refCnt(), "handshake() 同步抛异常时也必须释放请求，否则泄漏一个 FullHttpRequest");
+        assertThatChannelIsInactiveOrEmpty(channel);
+        channel.finishAndReleaseAll();
+    }
+
+    private static void assertThatChannelIsInactiveOrEmpty(EmbeddedChannel channel) {
+        // 异常路径应当关闭连接；这里只要求不残留未释放的 inbound/outbound
+        Object leftover;
+        while ((leftover = channel.readOutbound()) != null) {
+            io.netty.util.ReferenceCountUtil.release(leftover);
+        }
+    }
+
     private static FullHttpRequest upgradeRequest(String path) {
         // 用 Unpooled.buffer(0)：可管理 refCnt 的真实缓冲。wrappedBuffer(new byte[0])
         // 返回 EMPTY_BUFFER（release 是 no-op、refCnt 恒 0），无法用于泄漏回归断言。

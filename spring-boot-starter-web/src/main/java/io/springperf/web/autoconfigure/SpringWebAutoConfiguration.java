@@ -16,6 +16,7 @@ import io.springperf.web.server.NettyHttpServer;
 import io.springperf.web.server.PipelineCustomizer;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -80,6 +81,13 @@ public class SpringWebAutoConfiguration {
 
         @Bean
         @ConditionalOnMissingBean
+        // 必须与类级 @ConditionalOnClass 并存：@ConditionalOnClass 只证明 classpath 上有这个类，
+        // 不证明容器里有 MeterRegistry Bean。而本方法的 meterRegistry 是强依赖参数——
+        // 用户引入 micrometer-tracing-bridge-* 等只带 micrometer-core、不创建 registry 的库时
+        // （spring-boot-actuator-autoconfigure 在本模块是 provided），缺少本守卫会直接抛
+        // NoSuchBeanDefinitionException 使应用起不来。
+        // 与 SpringWebBatchAutoConfiguration 的写法保持一致。
+        @ConditionalOnBean(io.micrometer.core.instrument.MeterRegistry.class)
         public WebMetrics micrometerWebMetrics(io.micrometer.core.instrument.MeterRegistry meterRegistry,
                 NettyHttpServer nettyHttpServer) {
             // Register Netty-level Gauges
