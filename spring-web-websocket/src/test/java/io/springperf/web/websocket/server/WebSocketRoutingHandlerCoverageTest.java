@@ -4,21 +4,16 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
-import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpObjectAggregator;
-import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpServerCodec;
-import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
-import io.netty.handler.codec.http.websocketx.PongWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
-import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.ReferenceCountUtil;
 import org.junit.jupiter.api.AfterEach;
@@ -29,7 +24,6 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.WebSocketSession;
 
-import io.springperf.web.websocket.server.NettyWebSocketSession;
 import org.mockito.ArgumentCaptor;
 
 import java.util.ArrayList;
@@ -293,6 +287,43 @@ class WebSocketRoutingHandlerCoverageTest {
         session.close(new CloseStatus(CloseStatus.NORMAL.getCode(), "server-going-away"));
 
         verify(handler, timeout(2000)).afterConnectionClosed(any(WebSocketSession.class), any(CloseStatus.class));
+    }
+
+    @Test
+    void closeFrame_handlerThrows_stillEchoesClose() throws Exception {
+        // 业务回调抛异常不能吞掉 RFC 6455 §7.4.1 要求回显的 Close 帧：
+        // 否则对端一直等回执、连接僵死到超时。
+        handler = mock(WebSocketHandler.class);
+        doThrow(new RuntimeException("close hook boom")).when(handler)
+                .afterConnectionClosed(any(WebSocketSession.class), any(CloseStatus.class));
+        channel = newChannel(new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), null, false, null));
+        channel.pipeline().fireChannelRead(upgradeRequest("/ws", null));
+        channel.runPendingTasks();
+        drainHandshakeResponse();
+
+        channel.pipeline().fireChannelRead(new CloseWebSocketFrame(1000, "bye"));
+
+        Object outbound = channel.readOutbound();
+        assertNotNull(outbound, "回调抛异常时仍必须回显 Close 帧");
+        ReferenceCountUtil.release(outbound);
+    }
+
+    @Test
+    void channelInactive_handlerThrows_stillCompletesTeardown() throws Exception {
+        // 回调抛异常不能让 channelInactive 中断：中断后 fireChannelInactive 不再向下传播，
+        // 后续 handler 的资源清理（引用计数、连接统计）会整体丢失。
+        handler = mock(WebSocketHandler.class);
+        doThrow(new RuntimeException("close hook boom")).when(handler)
+                .afterConnectionClosed(any(WebSocketSession.class), any(CloseStatus.class));
+        channel = newChannel(new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), null, false, null));
+        channel.pipeline().fireChannelRead(upgradeRequest("/ws", null));
+        channel.runPendingTasks();
+        drainHandshakeResponse();
+
+        assertDoesNotThrow(() -> channel.close().sync(), "业务回调抛异常不得从 channelInactive 逃逸");
+
+        verify(handler, timeout(2000)).afterConnectionClosed(any(WebSocketSession.class), any(CloseStatus.class));
+        assertFalse(channel.isOpen(), "连接拆除应正常完成");
     }
 
     /* ==================== Origin 校验 ==================== */
