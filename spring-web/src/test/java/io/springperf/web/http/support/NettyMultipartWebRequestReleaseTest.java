@@ -1,9 +1,13 @@
 package io.springperf.web.http.support;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Field;
+import java.nio.charset.StandardCharsets;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -14,6 +18,7 @@ import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory;
 import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
@@ -165,5 +170,63 @@ class NettyMultipartWebRequestReleaseTest {
         for (InterfaceHttpData data : multipart.getInterfaceHttpDataList()) {
             assertEquals(0, data.refCnt(), "retain 3 次后对称 release，part data 引用应归零（修复前泄漏 1 个引用）");
         }
+    }
+
+    @Test
+    void release_afterBusinessClosesFileStream_freesEverything() throws IOException {
+        String boundary = "----B4";
+        String body = "--" + boundary + "\r\n"
+                + "Content-Disposition: form-data; name=\"file1\"; filename=\"a.txt\"\r\n"
+                + "Content-Type: text/plain\r\n\r\n" + "hello\r\n" + "--" + boundary + "--\r\n";
+        ByteBuf content = Unpooled.copiedBuffer(body, StandardCharsets.UTF_8);
+        FullHttpRequest req = buildMultipartRequest(content);
+
+        SupportMultipartResolver resolver = new SupportMultipartResolver();
+        resolver.start(req);
+        resolver.consume(req);
+        NettyMultipartWebRequest multipart = resolver.finish();
+
+        InterfaceHttpData data = multipart.getInterfaceHttpDataList().get(0);
+        // decoder 对本请求体解析出的是 Attribute（FileUpload 的关闭语义由
+        // NettyMultipartFileTest 用真实 MemoryFileUpload 覆盖），attribute 走同款
+        // duplicate + false 构造，同样是 P0 的入口。
+        NettyAttributeMessage part = new NettyAttributeMessage((Attribute) data);
+        // 业务侧按惯例读 part 流并关闭。修复前 getBody() 用单参 ByteBufInputStream，
+        // close() 直接把 data 归零（P0 入口）；这里断言关闭后 data 仍持引用。
+        try (InputStream in = part.getBody()) {
+            assertEquals(part.getSize(), in.readAllBytes().length, "读流应得到该 part 的全部字节");
+        }
+        assertTrue(data.refCnt() > 0, "关闭流不得提前释放 part data（P0 回归）");
+
+        boolean last = multipart.release();
+        // 修复前：destroy() 抛 IllegalReferenceCountException 被外层 catch 吞掉 → 返回 false，
+        // 且兜底循环被跳过、undecodedChunk 池化缓冲每请求泄漏。
+        assertTrue(last, "release 应成功返回 true（destroy 不得抛异常被吞）");
+        assertEquals(0, refCntOfUndecodedChunk(multipart.getDecoder()), "undecodedChunk 必须释放");
+        for (InterfaceHttpData d : multipart.getInterfaceHttpDataList()) {
+            assertEquals(0, d.refCnt(), "part data 应全部归零");
+        }
+    }
+
+    @Test
+    void release_whenDestroyThrows_stillRunsFallbackLoop() {
+        String boundary = "----B5";
+        String body = "--" + boundary + "\r\n" + "Content-Disposition: form-data; name=\"a\"\r\n\r\n" + "b\r\n" + "--"
+                + boundary + "--\r\n";
+        ByteBuf content = Unpooled.copiedBuffer(body, StandardCharsets.UTF_8);
+        FullHttpRequest req = buildMultipartRequest(content);
+
+        SupportMultipartResolver resolver = new SupportMultipartResolver();
+        resolver.start(req);
+        resolver.consume(req);
+        NettyMultipartWebRequest multipart = resolver.finish();
+
+        // 模拟「外部提前释放」：把 part data 归零，使 destroy() 内部的无守卫 release 抛
+        // IllegalReferenceCountException。P0 修复要求该异常被单独捕获、兜底循环继续执行，
+        // 而不是把整段 release 吞掉返回 false（修复前返回 false）。
+        for (InterfaceHttpData data : multipart.getInterfaceHttpDataList()) {
+            data.release();
+        }
+        assertTrue(multipart.release(), "destroy() 抛异常时兜底循环仍须执行，release 应返回 true");
     }
 }

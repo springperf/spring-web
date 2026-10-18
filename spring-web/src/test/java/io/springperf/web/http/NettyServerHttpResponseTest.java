@@ -8,6 +8,7 @@ import static org.mockito.Mockito.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PipedInputStream;
@@ -600,6 +601,43 @@ class NettyServerHttpResponseTest {
         assertNotNull(contentType, "writeFile 应推导并写入 Content-Type");
         assertTrue(contentType.contains("text/html"), "html 文件应推导为 text/html，实际: " + contentType);
         htmlFile.delete();
+    }
+
+    @Test
+    void writeStream_headRequest_closesInputStream() {
+        ChannelFuture future = mock(ChannelFuture.class);
+        when(ctx.writeAndFlush(any())).thenReturn(future);
+        when(future.isSuccess()).thenReturn(true);
+        when(future.addListener(any())).thenReturn(future);
+
+        // HEAD：只写 headers + LastHttpContent 收尾，不写 body，且必须关闭 input。
+        // 修复前该分支提前 return，streamCopy 的 finally 与 catch 里的关闭都到不了，
+        // 非文件 Resource 的 HEAD 请求每请求泄漏一个 InputStream / 文件句柄（P0）。
+        CloseTrackingInputStream input = new CloseTrackingInputStream(
+                new ByteArrayInputStream("x".getBytes(StandardCharsets.UTF_8)));
+        response.markAsHeadRequest();
+        response.writeStream(input);
+
+        assertTrue(input.closed, "HEAD 分支必须关闭 input（P0 回归）");
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(ctx, times(2)).writeAndFlush(captor.capture());
+        assertTrue(captor.getAllValues().get(0) instanceof HttpResponse, "首帧应是响应头");
+        assertTrue(captor.getAllValues().get(1) instanceof LastHttpContent, "次帧应是收尾块");
+    }
+
+    private static final class CloseTrackingInputStream extends FilterInputStream {
+
+        private boolean closed;
+
+        private CloseTrackingInputStream(InputStream in) {
+            super(in);
+        }
+
+        @Override
+        public void close() throws IOException {
+            closed = true;
+            super.close();
+        }
     }
 
     @Test
