@@ -1,6 +1,7 @@
 package io.springperf.web.support.servlet;
 
 import io.springperf.web.http.WebServerHttpResponse;
+import io.springperf.web.support.servlet.context.PerfServletContext;
 import io.springperf.web.support.servlet.context.ServletAdapterContext;
 import jakarta.servlet.SessionTrackingMode;
 import jakarta.servlet.ServletContext;
@@ -225,6 +226,36 @@ class PerfHttpServletResponseTest {
         writer.flush();
         assertEquals("segment", baos.toString("UTF-8"), "显式 flush 应先把编码缓冲写入响应体");
         verify(response).flushChunked();
+    }
+
+    // 空 flush 不应凭空发出 chunked 提交（本框架约定：无正文时由请求收尾决定是否提交）
+    @Test
+    void getWriter_flushWithoutContent_doesNotCommit() throws Exception {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        lenient().when(response.getBody()).thenReturn(baos);
+        lenient().when(response.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
+        servletResponse.getWriter().flush();
+        verify(response, never()).flushChunked();
+    }
+
+    // write(int)/write(char[]) 是 print(char) 与 write(char[]) 的实际落点：
+    // 漏标 handled 会让「写了内容但未 flush」的响应永远发不出去
+    @Test
+    void getWriter_printChar_marksBodyWritten() throws Exception {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        lenient().when(response.getBody()).thenReturn(baos);
+        lenient().when(response.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
+        servletResponse.getWriter().print('x');
+        verify(response).setHandled();
+    }
+
+    @Test
+    void getWriter_writeCharArray_marksBodyWritten() throws Exception {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        lenient().when(response.getBody()).thenReturn(baos);
+        lenient().when(response.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
+        servletResponse.getWriter().write(new char[] { 'a', 'b' });
+        verify(response).setHandled();
     }
 
     @Test
@@ -530,6 +561,124 @@ class PerfHttpServletResponseTest {
         assertThrows(IllegalStateException.class, () -> servletResponse.sendError(500, "oops"));
     }
 
+    // ---- sendRedirect：相对 location 必须由容器转成绝对 URL（Servlet 规范 sendRedirect 契约） ----
+
+    @Test
+    void sendRedirect_relativeLocation_resolvedAgainstRequestDirectory() {
+        servletResponse.setAdapterContext(adapterFor("http", "localhost", 8080, "/app/forms/edit"));
+
+        servletResponse.sendRedirect("next");
+
+        verify(headers).set(io.netty.handler.codec.http.HttpHeaders.Names.LOCATION,
+                "http://localhost:8080/app/forms/next");
+    }
+
+    @Test
+    void sendRedirect_relativeLocation_parentSegmentNormalisedAndQueryKept() {
+        servletResponse.setAdapterContext(adapterFor("http", "localhost", 8080, "/app/forms/edit"));
+
+        servletResponse.sendRedirect("../list?page=2");
+
+        verify(headers).set(io.netty.handler.codec.http.HttpHeaders.Names.LOCATION,
+                "http://localhost:8080/app/list?page=2");
+    }
+
+    @Test
+    void sendRedirect_relativeLocation_fragmentKept() {
+        servletResponse.setAdapterContext(adapterFor("http", "localhost", 8080, "/app/edit"));
+
+        servletResponse.sendRedirect("next#top");
+
+        verify(headers).set(io.netty.handler.codec.http.HttpHeaders.Names.LOCATION,
+                "http://localhost:8080/app/next#top");
+    }
+
+    @Test
+    void sendRedirect_relativeLocation_neverEscapesRoot() {
+        servletResponse.setAdapterContext(adapterFor("http", "localhost", 8080, "/edit"));
+
+        servletResponse.sendRedirect("../../a");
+
+        verify(headers).set(io.netty.handler.codec.http.HttpHeaders.Names.LOCATION, "http://localhost:8080/a");
+    }
+
+    @Test
+    void sendRedirect_networkPathReference_untouched() {
+        servletResponse.sendRedirect("//cdn.example/lib.js");
+
+        verify(headers).set(io.netty.handler.codec.http.HttpHeaders.Names.LOCATION, "//cdn.example/lib.js");
+    }
+
+    @Test
+    void sendRedirect_relativeLocation_withoutRequestContext_staysRootRelative() {
+        servletResponse.sendRedirect("next");
+
+        verify(headers).set(io.netty.handler.codec.http.HttpHeaders.Names.LOCATION, "/next");
+    }
+
+    // ---- sendError：include-* 的 on-param 模式需按当前请求参数决定是否透出 ----
+
+    @Test
+    void sendError_messageParam_present_includesMessage() {
+        servletResponse.setAdapterContext(adapterWithParams("message", "true"));
+
+        servletResponse.sendError(500, "boom");
+
+        // 参数顺序：status, message, cause, includeStacktraceOnParam, includeMessageOnParam,
+        // includeBindingErrorsOnParam
+        verify(response).sendError(HttpStatus.INTERNAL_SERVER_ERROR, "boom", null, false, true, false);
+    }
+
+    @Test
+    void sendError_paramExplicitlyFalse_countsAsAbsent() {
+        servletResponse.setAdapterContext(adapterWithParams("message", "false"));
+
+        servletResponse.sendError(500, "boom");
+
+        verify(response).sendError(HttpStatus.INTERNAL_SERVER_ERROR, "boom", null, false, false, false);
+    }
+
+    @Test
+    void sendError_traceAndErrorsParams_forwarded() {
+        servletResponse.setAdapterContext(adapterWithParams("trace", "", "errors", "true"));
+
+        servletResponse.sendError(400);
+
+        verify(response).sendError(HttpStatus.BAD_REQUEST, null, null, true, false, true);
+    }
+
+    // ---- setCharacterEncoding：force-response=true 时忽略业务覆盖 ----
+
+    @Test
+    void setCharacterEncoding_forceResponse_ignored() {
+        PerfServletContext ctx = mock(PerfServletContext.class);
+        when(ctx.isForceResponseEncoding()).thenReturn(true);
+        PerfHttpServletRequest perfRequest = mock(PerfHttpServletRequest.class);
+        when(perfRequest.getServletContext()).thenReturn(ctx);
+        ServletAdapterContext adapter = mock(ServletAdapterContext.class);
+        when(adapter.getPerfRequest()).thenReturn(perfRequest);
+        servletResponse.setAdapterContext(adapter);
+
+        servletResponse.setCharacterEncoding("GBK");
+
+        verify(response, never()).setCharacterEncoding(any(java.nio.charset.Charset.class));
+    }
+
+    // ---- 容器级响应编码：server.servlet.encoding.charset 在适配器创建期写入，构成业务可覆盖的默认值 ----
+
+    @Test
+    void constructor_appliesContainerResponseEncoding() {
+        io.springperf.web.context.WebContext webContext = mock(io.springperf.web.context.WebContext.class);
+        when(response.getWebContext()).thenReturn(webContext);
+        PerfServletContext servletContext = mock(PerfServletContext.class);
+        when(servletContext.getResponseCharacterEncoding()).thenReturn("GBK");
+        when(webContext.getWebComponent(PerfServletContext.class)).thenReturn(servletContext);
+
+        new PerfHttpServletResponse(response);
+
+        verify(response).setCharacterEncoding(java.nio.charset.Charset.forName("GBK"));
+    }
+
     @Test
     void encodeURL_null_returnsNull() {
         assertNull(servletResponse.encodeURL(null));
@@ -727,5 +876,35 @@ class PerfHttpServletResponseTest {
     void getOutputStream_multipleCalls_allowed() throws Exception {
         assertNotNull(servletResponse.getOutputStream());
         assertNotNull(servletResponse.getOutputStream());
+    }
+
+    /** 构造只提供 scheme/host/port/requestURI 的适配器上下文（用于相对 location 解析）。 */
+    private ServletAdapterContext adapterFor(String scheme, String serverName, int port, String requestUri) {
+        ServletAdapterContext adapter = mock(ServletAdapterContext.class);
+        HttpServletRequest httpRequest = mock(HttpServletRequest.class);
+        when(adapter.getRequest()).thenReturn(httpRequest);
+        when(httpRequest.getScheme()).thenReturn(scheme);
+        when(httpRequest.getServerName()).thenReturn(serverName);
+        when(httpRequest.getServerPort()).thenReturn(port);
+        when(httpRequest.getRequestURI()).thenReturn(requestUri);
+        return adapter;
+    }
+
+    /**
+     * 构造带请求参数表的适配器上下文（用于 sendError 的 on-param 透传）。
+     * <p>
+     * {@code sendError} 会依次询问 trace / message / errors 三个参数，未列出的必须显式打桩为 {@code null}， 否则 Mockito 的严格桩校验会以
+     * {@code PotentialStubbingProblem} 拒绝执行。
+     * </p>
+     */
+    private ServletAdapterContext adapterWithParams(String... nameValuePairs) {
+        ServletAdapterContext adapter = mock(ServletAdapterContext.class);
+        HttpServletRequest httpRequest = mock(HttpServletRequest.class);
+        when(adapter.getRequest()).thenReturn(httpRequest);
+        lenient().when(httpRequest.getParameter(anyString())).thenReturn(null);
+        for (int i = 0; i + 1 < nameValuePairs.length; i += 2) {
+            when(httpRequest.getParameter(nameValuePairs[i])).thenReturn(nameValuePairs[i + 1]);
+        }
+        return adapter;
     }
 }
