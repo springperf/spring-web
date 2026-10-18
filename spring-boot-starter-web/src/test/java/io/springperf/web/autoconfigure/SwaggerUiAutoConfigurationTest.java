@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
 
 class SwaggerUiAutoConfigurationTest {
 
