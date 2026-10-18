@@ -9,6 +9,7 @@ import javax.websocket.RemoteEndpoint;
 import javax.websocket.Session;
 import javax.websocket.WebSocketContainer;
 import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.WebSocketMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
@@ -38,6 +39,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public class JsrWebSocketSession implements Session {
 
     private final WebSocketSession springSession;
+    /**
+     * 底层 Netty 会话（提供「写但不 flush」的批处理原语）。构造期解析一次，避免每次发送做类型判定； 非 Netty 实现（测试桩、其他容器）为 {@code null}，批处理退化为逐条立即发送。
+     */
+    private final NettyWebSocketSession nettySession;
     private final JsrWebSocketContainer container;
     private final JsrCodecRegistry codecRegistry;
     private final Map<String, String> pathParameters;
@@ -53,6 +58,8 @@ public class JsrWebSocketSession implements Session {
                                JsrCodecRegistry codecRegistry,
                                Map<String, String> pathParameters) {
         this.springSession = springSession;
+        this.nettySession = springSession instanceof NettyWebSocketSession ? (NettyWebSocketSession) springSession
+                : null;
         this.container = container;
         this.codecRegistry = codecRegistry;
         this.pathParameters = new HashMap<>(pathParameters);
@@ -62,6 +69,29 @@ public class JsrWebSocketSession implements Session {
 
     public WebSocketSession getSpringSession() {
         return springSession;
+    }
+
+    /**
+     * 发送消息，{@code flush=false} 时由底层 Netty 会话把帧暂存到 outbound buffer，等 {@link #flushBatch()} 统一刷出。
+     * <p>
+     * 底层不是 Netty 实现时没有「暂存」能力，退化为逐条立即发送（语义正确，只是拿不到批处理收益）。
+     * </p>
+     */
+    void send(WebSocketMessage<?> message, boolean flush) throws IOException {
+        if (nettySession == null || flush) {
+            springSession.sendMessage(message);
+        } else {
+            nettySession.sendMessage(message, false);
+        }
+    }
+
+    /**
+     * 刷出批处理中暂存的帧；底层非 Netty 实现时为无操作（每帧都已立即发送）。
+     */
+    void flushBatch() {
+        if (nettySession != null) {
+            nettySession.flushBatch();
+        }
     }
 
     @Override
