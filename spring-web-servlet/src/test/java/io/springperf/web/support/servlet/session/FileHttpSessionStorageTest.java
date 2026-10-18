@@ -178,6 +178,47 @@ class FileHttpSessionStorageTest {
         }
     }
 
+    /** 可序列化外壳包着不可序列化字段：类型粗筛能过，只有整体序列化才会失败。 */
+    private static final class BrokenHolder implements Serializable {
+        private static final long serialVersionUID = 1L;
+        @SuppressWarnings("unused")
+        final Object payload = new NotSerializable();
+    }
+
+    /**
+     * 快路径（整体序列化一次）失败后必须回退到逐属性剔除的慢路径：<b>坏属性被丢、好属性照常落盘</b>。
+     * <p>
+     * 这条路径只在「属性本身 is Serializable，但引用图里有不可序列化对象」时触发；它与 {@link #notSerializableAttribute_skippedOthersPersisted}
+     * 覆盖的是不同的判定点（后者在类型粗筛就被拦下）。
+     * </p>
+     */
+    @Test
+    void serializableValueWithNonSerializableGraph_droppedOthersPersisted() throws Exception {
+        HttpSessionData data = storage.createSession();
+        data.setMaxInactiveInterval(3600);
+        data.setAttribute("good", new SerializableValue("keep"));
+        data.setAttribute("broken", new BrokenHolder());
+        storage.saveSession(data);
+        String id = data.getId();
+        storage.shutdown();
+
+        FileHttpSessionStorage restarted = new FileHttpSessionStorage(tempDir);
+        try {
+            HttpSessionData restored = restarted.getSession(id);
+            assertNotNull(restored, "整体落盘不得因子图不可序列化而失败");
+            assertNotNull(restored.getAttribute("good"), "可序列化属性应保留");
+            assertNull(restored.getAttribute("broken"), "引用图不可序列化的属性应被剔除");
+        } finally {
+            restarted.shutdown();
+        }
+    }
+
+    @Test
+    void hasBlockingSave_true() {
+        // 文件落盘是阻塞 IO：manager 据此把保存切到后台线程（不能阻塞 EventLoop）
+        assertTrue(storage.hasBlockingSave());
+    }
+
     @Test
     void excludedAttribute_notPersisted() throws Exception {
         Path dir = tempDir.resolve("excluded");
