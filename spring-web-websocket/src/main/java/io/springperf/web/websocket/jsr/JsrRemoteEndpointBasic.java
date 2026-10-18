@@ -33,6 +33,15 @@ public class JsrRemoteEndpointBasic implements RemoteEndpoint.Basic {
     private final JsrWebSocketSession session;
     private final JsrCodecRegistry codecRegistry;
 
+    /**
+     * JSR-356 批处理开关。开启后 {@code sendXxx} 只把帧写入 Netty outbound buffer， 直到 {@link #flushBatch()}（或关闭批处理）才落网，
+     * 多条小消息因此合并为一次系统调用。
+     * <p>
+     * volatile：开关可能由非发送线程设置，而发送线程必须立刻看到新值，否则「关闭批处理」后仍有消息被暂存。
+     * </p>
+     */
+    private volatile boolean batchingAllowed;
+
     public JsrRemoteEndpointBasic(JsrWebSocketSession session, JsrCodecRegistry codecRegistry) {
         this.session = session;
         this.codecRegistry = codecRegistry;
@@ -40,22 +49,22 @@ public class JsrRemoteEndpointBasic implements RemoteEndpoint.Basic {
 
     @Override
     public void sendText(String text) throws IOException {
-        session.getSpringSession().sendMessage(new TextMessage(text));
+        session.send(new TextMessage(text), !batchingAllowed);
     }
 
     @Override
     public void sendBinary(ByteBuffer data) throws IOException {
-        session.getSpringSession().sendMessage(new BinaryMessage(data));
+        session.send(new BinaryMessage(data), !batchingAllowed);
     }
 
     @Override
     public void sendText(String partialMessage, boolean isLast) throws IOException {
-        session.getSpringSession().sendMessage(new TextMessage(partialMessage, isLast));
+        session.send(new TextMessage(partialMessage, isLast), !batchingAllowed);
     }
 
     @Override
     public void sendBinary(ByteBuffer partialByte, boolean isLast) throws IOException {
-        session.getSpringSession().sendMessage(new BinaryMessage(partialByte, isLast));
+        session.send(new BinaryMessage(partialByte, isLast), !batchingAllowed);
     }
 
     @Override
@@ -72,34 +81,39 @@ public class JsrRemoteEndpointBasic implements RemoteEndpoint.Basic {
     public void sendObject(Object data) throws IOException, EncodeException {
         JsrCodecRegistry.EncodedPayload payload = codecRegistry.encode(data, true);
         if (payload.isText()) {
-            session.getSpringSession().sendMessage(new TextMessage(payload.getText()));
+            session.send(new TextMessage(payload.getText()), !batchingAllowed);
         } else {
-            session.getSpringSession().sendMessage(new BinaryMessage(payload.getBinary()));
+            session.send(new BinaryMessage(payload.getBinary()), !batchingAllowed);
         }
     }
 
     @Override
     public void setBatchingAllowed(boolean allowed) throws IOException {
-        // 批处理首期忽略
+        if (batchingAllowed && !allowed) {
+            // 由开转关：已写入但未 flush 的帧必须在返回前刷出，否则会滞留到下一次 flush 或连接关闭
+            session.flushBatch();
+        }
+        batchingAllowed = allowed;
     }
 
     @Override
     public boolean getBatchingAllowed() {
-        return false;
+        return batchingAllowed;
     }
 
     @Override
     public void flushBatch() throws IOException {
-        // 无批处理，无操作
+        session.flushBatch();
     }
 
     @Override
     public void sendPing(ByteBuffer applicationData) throws IOException, IllegalArgumentException {
-        session.getSpringSession().sendMessage(new org.springframework.web.socket.PingMessage(applicationData));
+        // 控制帧不受批处理影响：ping/pong 直接影响对端保活与空闲检测，滞留到下一次 flush 会被当作心跳丢失
+        session.send(new org.springframework.web.socket.PingMessage(applicationData), true);
     }
 
     @Override
     public void sendPong(ByteBuffer applicationData) throws IOException, IllegalArgumentException {
-        session.getSpringSession().sendMessage(new org.springframework.web.socket.PongMessage(applicationData));
+        session.send(new org.springframework.web.socket.PongMessage(applicationData), true);
     }
 }

@@ -91,6 +91,53 @@ class NettyWebSocketSessionTest {
     }
 
     @Test
+    void sendMessageWithoutFlush_defersFrameUntilFlushBatch() throws Exception {
+        // 批处理原语：flush=false 只写 outbound buffer，必须由 flushBatch() 显式刷出
+        EmbeddedChannel channel = new EmbeddedChannel();
+        NettyWebSocketSession session = newSession(channel);
+        session.sendMessage(new TextMessage("batched"), false);
+        channel.runPendingTasks();
+
+        assertNull(channel.readOutbound(), "flush=false 的帧不得立即落网");
+
+        session.flushBatch();
+        WebSocketFrame out = channel.readOutbound();
+        assertTrue(out instanceof TextWebSocketFrame);
+        assertEquals("batched", ((TextWebSocketFrame) out).text());
+        out.release();
+        channel.finishAndReleaseAll();
+    }
+
+    @Test
+    void flushBatch_fromNonEventLoop_defersToEventLoop() {
+        // 业务线程调用时必须投递到 EventLoop：直接 flush 会与仍在排队中的 write 乱序，导致漏刷
+        Channel channel = mock(Channel.class);
+        EventLoop loop = mock(EventLoop.class);
+        when(channel.eventLoop()).thenReturn(loop);
+        when(loop.inEventLoop()).thenReturn(false);
+
+        NettyWebSocketSession session = new NettyWebSocketSession(channel, uri, null, null, null, null, null, null);
+        session.flushBatch();
+
+        ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
+        verify(loop).execute(task.capture());
+        verify(channel, never()).flush();
+
+        task.getValue().run();
+        verify(channel).flush();
+    }
+
+    @Test
+    void flushBatch_onClosedSession_doesNotThrow() throws Exception {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        NettyWebSocketSession session = newSession(channel);
+        session.setOpen(false);
+
+        session.flushBatch();
+        channel.finishAndReleaseAll();
+    }
+
+    @Test
     void sendBinaryMessage_writesBinaryFrame() throws Exception {
         EmbeddedChannel channel = new EmbeddedChannel();
         NettyWebSocketSession session = newSession(channel);
