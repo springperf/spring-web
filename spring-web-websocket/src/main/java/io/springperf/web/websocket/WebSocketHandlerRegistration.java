@@ -57,6 +57,13 @@ public class WebSocketHandlerRegistration {
         return subProtocols;
     }
 
+    /**
+     * 是否允许协商 WebSocket 扩展。目前仅支持 {@code permessage-deflate}：开启后服务端在握手时与客户端协商， 协商成功则双向压缩（控制帧不压缩）；客户端未提扩展则不启用压缩，此时带 RSV
+     * 位的帧会被解码器拒绝， 而不是当作普通数据交给业务。
+     *
+     * @param allowExtensions
+     *            是否参与扩展协商
+     */
     public WebSocketHandlerRegistration setAllowExtensions(boolean allowExtensions) {
         this.allowExtensions = allowExtensions;
         return this;

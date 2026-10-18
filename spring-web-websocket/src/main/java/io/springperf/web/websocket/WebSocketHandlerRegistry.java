@@ -101,7 +101,11 @@ public class WebSocketHandlerRegistry {
     }
 
     /**
-     * 设置是否允许 WebSocket 扩展协商（如 permessage-deflate 压缩）。 默认 false。
+     * 设置是否参与 WebSocket 扩展协商（permessage-deflate 压缩）。默认 false。
+     * <p>
+     * 开启后握手会解析客户端的 {@code Sec-WebSocket-Extensions}：协商成功则双向压缩（控制帧不压缩）， 并只在此时才让帧解码器接受 RSV 位；客户端未提或参数不可接受则不启用压缩，此时带 RSV
+     * 位的帧按协议违规拒绝。
+     * </p>
      */
     public WebSocketHandlerRegistry setAllowExtensions(boolean allowExtensions) {
         this.allowExtensions = allowExtensions;

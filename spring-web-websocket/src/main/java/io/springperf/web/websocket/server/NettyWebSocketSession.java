@@ -52,8 +52,14 @@ public class NettyWebSocketSession implements WebSocketSession {
     private final WebSocketHandler handler;
     private final Map<String, Object> attributes = new ConcurrentHashMap<>();
 
-    private int textMessageSizeLimit = 8 * 1024;
-    private int binaryMessageSizeLimit = 64 * 1024;
+    /** 默认文本消息上限（8KB），与 Spring WebSocket 的默认值一致。 */
+    public static final int DEFAULT_TEXT_MESSAGE_SIZE_LIMIT = 8 * 1024;
+
+    /** 默认二进制消息上限（64KB），与 Spring WebSocket 的默认值一致。 */
+    public static final int DEFAULT_BINARY_MESSAGE_SIZE_LIMIT = 64 * 1024;
+
+    private int textMessageSizeLimit = DEFAULT_TEXT_MESSAGE_SIZE_LIMIT;
+    private int binaryMessageSizeLimit = DEFAULT_BINARY_MESSAGE_SIZE_LIMIT;
 
     private volatile boolean open = true;
 
