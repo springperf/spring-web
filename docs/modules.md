@@ -434,6 +434,8 @@ destroyComponent()     → 资源释放
 
 支持路径模式匹配（含 `{pathVariable}`）、per-handler 覆盖的 Origin 校验/空闲超时/心跳保活、以及背压队列。
 
+支持 `permessage-deflate` 压缩（`setAllowExtensions(true)`）：握手时解析客户端的 `Sec-WebSocket-Extensions` 并回写协商结果，协商成功后在帧编解码器两侧插入压缩器/解压器；客户端未提或无可用参数时不做任何压缩，且带 RSV 位的帧按协议违规拒绝（不会把压缩数据当明文交给业务）。帧解码器的最大帧长度取自 per-path 的 `messageSizeLimit`，未配置时为 text 8KB / binary 64KB 的较大者。
+
 JSR-356 端点的 `RemoteEndpoint.setBatchingAllowed(true)` 支持真批处理：开启后 `sendText`/`sendBinary`/`sendObject` 只写入 Netty outbound buffer，由 `flushBatch()` 合并为一次系统调用；`sendPing`/`sendPong` 以及关闭批处理（`setBatchingAllowed(false)`）时立即刷出。攒批上限是 Netty outbound buffer 的高水位（默认 64KB），到水位即提前刷出——不会为省一次 flush 而让后续帧掉进背压队列被丢弃。
 
 ### 使用
