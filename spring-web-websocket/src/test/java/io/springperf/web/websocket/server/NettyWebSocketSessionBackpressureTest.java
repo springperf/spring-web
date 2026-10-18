@@ -8,6 +8,7 @@ import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.util.AttributeKey;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.socket.BinaryMessage;
+import org.springframework.web.socket.WebSocketHandler;
 
 import java.lang.reflect.Field;
 import java.net.URI;
@@ -18,7 +19,11 @@ import java.util.Queue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -57,28 +62,50 @@ class NettyWebSocketSessionBackpressureTest {
     }
 
     /**
-     * 队列容量达到 100 时丢最旧一帧：不丢会让内存无界增长，丢了不 release 会让 ByteBuf 泄漏。 两条都必须成立，所以断言既看容量也看引用计数。
+     * 队列溢出的兜底策略是「关闭连接并上报」，不是「丢最旧帧」。
+     * <p>
+     * WebSocket 没有消息级重传，丢一帧等于业务状态不可恢复地分叉，且丢最旧帧时应用很可能已假设它送达； 断开连接才能让业务通过 handleTransportError 明确感知并决定补偿。
+     * </p>
      */
     @Test
-    void enqueueAndBackpressure_queueFull_dropsOldestAndReleases() throws Exception {
+    void enqueueAndBackpressure_queueFull_closesConnectionAndNotifies() throws Exception {
+        EmbeddedChannel channel = spy(new EmbeddedChannel());
+        when(channel.isWritable()).thenReturn(false);
+        WebSocketHandler handler = mock(WebSocketHandler.class);
+        NettyWebSocketSession session = new NettyWebSocketSession(channel, URI.create("ws://localhost/ws"), null, null,
+                null, null, null, handler);
+
+        for (int i = 0; i <= 100; i++) { // 前 100 帧填满队列，第 101 帧触发溢出
+            session.sendMessage(new BinaryMessage(ByteBuffer.wrap(new byte[] { (byte) i })));
+        }
+        channel.runPendingTasks();
+
+        // 断言「close 被调用」而不是 channel.isActive()：Mockito spy 与真实 EmbeddedChannel 共享
+        // pipeline/unsafe（见本文件 drainBackpressureQueue_stopsWhenBufferFillsAgain 的同类说明），
+        // spy 上的 isActive() 会读到未同步的旧状态，断言会假失败。
+        verify(channel).close();
+        verify(handler).handleTransportError(eq(session), argThat(t -> t instanceof java.io.IOException));
+        Queue<WebSocketFrame> queue = backpressureQueueOf(channel);
+        assertTrue(queue.isEmpty(), "关闭时队列中未写出的帧必须全部释放");
+        channel.finishAndReleaseAll();
+    }
+
+    /** 溢出必须让异步发送的 future 异常完成：调用方据此知道消息没发出去。 */
+    @Test
+    void sendMessageCompletion_backpressureOverflow_completesExceptionally() throws Exception {
         EmbeddedChannel channel = spy(new EmbeddedChannel());
         when(channel.isWritable()).thenReturn(false);
         NettyWebSocketSession session = new NettyWebSocketSession(channel, URI.create("ws://localhost/ws"), null, null,
                 null, null, null, null);
 
-        session.sendMessage(new BinaryMessage(ByteBuffer.wrap(new byte[] { 0 })));
-        channel.runPendingTasks();
-        Queue<WebSocketFrame> queue = backpressureQueueOf(channel);
-        WebSocketFrame oldest = queue.peek();
-        assertEquals(1, oldest.refCnt());
-
-        for (int i = 1; i < 100; i++) {
+        for (int i = 0; i < 100; i++) {
             session.sendMessage(new BinaryMessage(ByteBuffer.wrap(new byte[] { (byte) i })));
         }
+        java.util.concurrent.CompletableFuture<Void> completion = session
+                .sendMessageCompletion(new BinaryMessage(ByteBuffer.wrap(new byte[] { 9 })), false);
         channel.runPendingTasks();
 
-        assertEquals(99, queue.size(), "第 100 帧入队后必须丢弃最旧一帧，队列容量不超过阈值");
-        assertEquals(0, oldest.refCnt(), "被丢弃的帧必须 release，否则 ByteBuf 泄漏");
+        assertTrue(completion.isCompletedExceptionally(), "溢出时 future 必须异常完成，否则调用方以为发出去了");
         channel.finishAndReleaseAll();
     }
 
@@ -104,7 +131,7 @@ class NettyWebSocketSessionBackpressureTest {
         EmbeddedChannel channel = new EmbeddedChannel();
         channel.attr(backpressureKey()).set(new LinkedList<>());
 
-        NettyWebSocketSession.drainBackpressureQueue(channel);
+        WsBackpressureQueue.drain(channel);
 
         assertNull(channel.readOutbound());
         channel.finishAndReleaseAll();
@@ -127,7 +154,7 @@ class NettyWebSocketSessionBackpressureTest {
         queue.add(new TextWebSocketFrame("q2"));
         channel.attr(backpressureKey()).set(queue);
 
-        NettyWebSocketSession.drainBackpressureQueue(channel);
+        WsBackpressureQueue.drain(channel);
 
         assertEquals(1, queue.size(), "写缓冲再次满时应跳出循环，剩余帧留待下次事件");
         Object out = channel.readOutbound();
@@ -146,7 +173,7 @@ class NettyWebSocketSessionBackpressureTest {
 
     @SuppressWarnings("unchecked")
     private static AttributeKey<Queue<WebSocketFrame>> backpressureKey() throws Exception {
-        Field keyField = NettyWebSocketSession.class.getDeclaredField("BACKPRESSURE_QUEUE_KEY");
+        Field keyField = WsBackpressureQueue.class.getDeclaredField("QUEUE_KEY");
         keyField.setAccessible(true);
         return (AttributeKey<Queue<WebSocketFrame>>) keyField.get(null);
     }

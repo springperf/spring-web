@@ -20,6 +20,8 @@ import org.springframework.web.socket.WebSocketSession;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -107,6 +109,111 @@ class JsrEndpointWebSocketHandlerIntegrationTest {
         handler.afterConnectionClosed(springSession, CloseStatus.NORMAL);
 
         assertEquals("room-9", TestEchoEndpoint.CLOSE_ROOM_ID.get());
+    }
+
+    /**
+     * {@code Configurator#checkOrigin} 必须真正接进握手：判定失败时不得升级（不登记会话、连接被关闭）。
+     */
+    @Test
+    void handshake_configuratorRejectsOrigin_forbidden() {
+        JsrEndpointMetadata metadata = new JsrEndpointMetadata(OriginGuardedEndpoint.class);
+        JsrWebSocketContainer container = new JsrWebSocketContainer();
+        JsrEndpointWebSocketHandler guarded = new JsrEndpointWebSocketHandler(metadata, container);
+
+        channel = new EmbeddedChannel();
+        channel.pipeline().addLast(new HttpServerCodec());
+        channel.pipeline().addLast(new HttpObjectAggregator(64 * 1024));
+        channel.pipeline().addLast(new WebSocketRoutingHandler(Map.of("/ws/jsr/origin", guarded), null, false, null));
+
+        channel.pipeline().fireChannelRead(upgradeRequest("/ws/jsr/origin"));
+        channel.runPendingTasks();
+
+        assertNotNull(channel.readOutbound(), "拒绝升级必须写回响应");
+        assertTrue(container.openSessionsOf(metadata.getPath()).isEmpty(), "被拒绝的连接不得登记为打开会话");
+        assertFalse(channel.isOpen(), "拒绝后应关闭连接");
+    }
+
+    @jakarta.websocket.server.ServerEndpoint(value = "/ws/jsr/origin", configurator = RejectingConfigurator.class)
+    public static class OriginGuardedEndpoint {
+    }
+
+    public static class RejectingConfigurator extends jakarta.websocket.server.ServerEndpointConfig.Configurator {
+        @Override
+        public boolean checkOrigin(String originHeaderValue) {
+            return false;
+        }
+    }
+
+    /**
+     * 动态注册的真实用法：端点在 {@code @OnOpen} 里给会话加 handler，之后到达的文本帧由它消费。
+     */
+    @Test
+    void dynamicMessageHandler_registeredInOnOpen_receivesTextFrames() throws Exception {
+        DynamicEndpoint.RECEIVED.clear();
+        JsrEndpointMetadata metadata = new JsrEndpointMetadata(DynamicEndpoint.class);
+        JsrEndpointWebSocketHandler handler = new JsrEndpointWebSocketHandler(metadata, new JsrWebSocketContainer());
+        WebSocketSession springSession = mockSession("ws://localhost/ws/jsr/dynamic");
+
+        handler.afterConnectionEstablished(springSession);
+        handler.handleMessage(springSession, new TextMessage("first"));
+        handler.handleMessage(springSession, new TextMessage("second"));
+
+        assertEquals(java.util.Arrays.asList("first", "second"), DynamicEndpoint.RECEIVED);
+    }
+
+    /** 规范：每种原生消息类型最多一个 handler；{@code @OnMessage} 已占用 text 时动态注册必须被拒。 */
+    @Test
+    void dynamicMessageHandler_forTypeOwnedByOnMessage_isRejected() throws Exception {
+        ConflictingEndpoint.ERROR.set(null);
+        JsrEndpointMetadata metadata = new JsrEndpointMetadata(ConflictingEndpoint.class);
+        JsrEndpointWebSocketHandler handler = new JsrEndpointWebSocketHandler(metadata, new JsrWebSocketContainer());
+
+        handler.afterConnectionEstablished(mockSession("ws://localhost/ws/jsr/conflict"));
+
+        assertTrue(ConflictingEndpoint.ERROR.get() instanceof IllegalStateException,
+                "应抛 IllegalStateException，实际：" + ConflictingEndpoint.ERROR.get());
+    }
+
+    private static WebSocketSession mockSession(String uri) {
+        WebSocketSession springSession = mock(WebSocketSession.class);
+        org.mockito.Mockito.when(springSession.getUri()).thenReturn(java.net.URI.create(uri));
+        org.mockito.Mockito.when(springSession.getAttributes())
+                .thenReturn(new java.util.concurrent.ConcurrentHashMap<>());
+        org.mockito.Mockito.when(springSession.isOpen()).thenReturn(true);
+        return springSession;
+    }
+
+    /** 只有动态 handler 的端点。 */
+    @jakarta.websocket.server.ServerEndpoint("/ws/jsr/dynamic")
+    public static class DynamicEndpoint {
+
+        static final java.util.List<String> RECEIVED = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+        @jakarta.websocket.OnOpen
+        public void onOpen(jakarta.websocket.Session session) {
+            session.addMessageHandler(String.class, (jakarta.websocket.MessageHandler.Whole<String>) RECEIVED::add);
+        }
+    }
+
+    /** {@code @OnMessage} 已占用 text 的端点：再注册 text handler 必须失败。 */
+    @jakarta.websocket.server.ServerEndpoint("/ws/jsr/conflict")
+    public static class ConflictingEndpoint {
+
+        static final java.util.concurrent.atomic.AtomicReference<Throwable> ERROR = new java.util.concurrent.atomic.AtomicReference<>();
+
+        @jakarta.websocket.OnOpen
+        public void onOpen(jakarta.websocket.Session session) {
+            try {
+                session.addMessageHandler(String.class, (jakarta.websocket.MessageHandler.Whole<String>) message -> {
+                });
+            } catch (RuntimeException ex) {
+                ERROR.set(ex);
+            }
+        }
+
+        @jakarta.websocket.OnMessage
+        public void onMessage(String message) {
+        }
     }
 
     @Test
