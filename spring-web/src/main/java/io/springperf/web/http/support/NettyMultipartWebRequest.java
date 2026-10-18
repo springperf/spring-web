@@ -94,38 +94,47 @@ public class NettyMultipartWebRequest extends DefaultFullHttpRequest {
     }
 
     public boolean release() {
+        boolean last;
         try {
-            // 与 retain() 完全对称：每次 release() 都对应地对每个 part data release 一次。
-            // 修复前仅在 last=true 时 release 一次：acquire/retain K≥1 次后 data.refCnt
-            // 保留 K 个引用不归零（K≥2 时泄漏 K-1），Netty 引用计数 LEAK 检测会告警。
-            // 注意：destroy() 内 cleanRequestHttpData 对 part data 的 release 是【无守卫】的，
-            // 故本方法必须在 data 尚持 refCnt=1 时先行 destroy（见下方 last 分支）。
-            boolean last = super.release();
-            if (last) {
-                // 销毁 decoder：释放 undecodedChunk 池化缓冲与磁盘临时文件。
-                // 必须【先于】下方 parts 循环执行：destroy() 内部 cleanRequestHttpData 会对
-                // requestFileDeleteMap 中仍持 refCnt=1 的 part data 做无守卫 release（归零并
-                // 清理磁盘临时文件），再释放 undecodedChunk。若先循环把 part data 释放到
-                // refCnt=0，cleanRequestHttpData 会对 refCnt=0 的 data 做无守卫 release 抛
-                // IllegalReferenceCountException，destroy() 在 cleanFiles 处中断，
-                // undecodedChunk 池化缓冲每请求泄漏（P1：74575a5 复辟 16d0f55 的修复）。
-                // last=true 保证业务读取线程均已结束（其 release 已发生），destroy 不破坏并发读取。
+            last = super.release();
+        } catch (Exception ex) {
+            log.debug("super.release() failed", ex);
+            return false;
+        }
+        if (last) {
+            // 销毁 decoder：释放 undecodedChunk 池化缓冲与磁盘临时文件。
+            // 必须【先于】下方 parts 循环执行：destroy() 内部 cleanRequestHttpData 会对
+            // requestFileDeleteMap 中仍持 refCnt=1 的 part data 做无守卫 release（归零并
+            // 清理磁盘临时文件），再释放 undecodedChunk。若先循环把 part data 释放到
+            // refCnt=0，cleanRequestHttpData 会对 refCnt=0 的 data 做无守卫 release 抛
+            // IllegalReferenceCountException，destroy() 在 cleanFiles 处中断，
+            // undecodedChunk 池化缓冲每请求泄漏（P1：74575a5 复辟 16d0f55 的修复）。
+            // last=true 保证业务读取线程均已结束（其 release 已发生），destroy 不破坏并发读取。
+            //
+            // destroy() 单独 try/catch：它的异常不得跳过下方兜底循环。除上述顺序问题外，
+            // 外部提前释放（业务侧用单参 ByteBufInputStream 关流）也会让 cleanRequestHttpData
+            // 抛同一异常——那一次异常曾把整段兜底逻辑连同 undecodedChunk 一起吞掉（P0）。
+            try {
                 if (decoder != null) {
                     decoder.destroy();
                 }
+            } catch (Exception ex) {
+                log.debug("decoder.destroy() failed, continuing with the fallback loop", ex);
             }
-            // 兜底对称递减：destroy 只覆盖 requestFileDeleteMap 内 part；此处补齐非 map 内
-            // data（如 InternalAttribute）及 retain 未配平的额外引用。
-            // refCnt()>0 守卫保证幂等（destroy 已释放的 data 在此跳过，重复 release 亦安全）。
+        }
+        // 兜底对称递减：destroy 只覆盖 requestFileDeleteMap 内 part；此处补齐非 map 内
+        // data（如 InternalAttribute）及 retain 未配平的额外引用。
+        // refCnt()>0 守卫保证幂等（destroy 已释放的 data 在此跳过，重复 release 亦安全）。
+        try {
             for (InterfaceHttpData interfaceHttpData : interfaceHttpDataList) {
                 if (interfaceHttpData.refCnt() > 0) {
                     interfaceHttpData.release();
                 }
             }
-            return last;
-        } catch (Exception ignored) {
-            log.debug("release failed", ignored);
+        } catch (Exception ex) {
+            log.debug("part data release failed", ex);
             return false;
         }
+        return last;
     }
 }
