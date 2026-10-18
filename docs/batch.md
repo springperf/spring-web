@@ -13,6 +13,7 @@
 - [快速开始](#快速开始)
 - [@BatchMapping 注解](#batchmapping-注解)
 - [架构设计](#架构设计)
+  - [攒批机制与批大小](#攒批机制与批大小)
 - [可观测性](#可观测性)
 - [配置参考](#配置参考)
 - [注意事项](#注意事项)
@@ -114,6 +115,7 @@ public @interface BatchMapping {
     Backpressure backpressure() default Backpressure.BLOCK;
     String method() default "";
     int maxBatchSize() default 100;
+    int batchWindowMillis() default 0;
     int consumerSize() default -1;
 
     enum WaitStrategy { YIELDING, BLOCKING, SLEEPING, BUSY_SPIN }
@@ -166,6 +168,34 @@ bizExecutor 线程池（0 ~ consumerSize 个）
 - **生产者**：由默认线程模型决定——是 `default` 业务线程池（遵循 `pool.default-execute-mode`），只是调用 `BatchInvoker` 入队（微秒级、不阻塞），无需 `@RunInPool`
 - **消费者**：Disruptor 单消费者线程不断从 RingBuffer 拉取事件
 - **业务线程池**：0 核心线程、`SynchronousQueue`、`CallerRunsPolicy`——空闲时零线程占用，满负荷时消费者线程自行执行形成背压
+
+### 攒批机制与批大小
+
+**批处理模块的收益完全取决于批大小**：一次批量 IO 替代 N 次单条 IO，N 越大，消除的 IO 越多。但默认配置下批大小长期停留在 1~3，`maxBatchSize=100` 形同虚设。原因在于攒批的触发方式：
+
+`BufferingBatchHandler` 把每批请求提交到 bizExecutor 时走的是 `executor.execute()`——**异步提交，IO 在业务线程上执行，不阻塞 Disruptor 消费者线程**。而消费者处理一个事件只是把请求加入 buffer（纳秒级），因此它几乎总能追上空队列；Disruptor 的 `endOfBatch` 信号在「没有更多可用事件」时置位，于是消费者每拿到 1 个事件就落盘一批。
+
+> 换句话说：**批大小不是由 `maxBatchSize` 决定的，而是由「消费者处理一个事件期间生产者发布了多少个新事件」决定的。** 在 IO 主导的场景里，这个数通常接近 1。
+
+消费者唯一会被阻塞的时刻，是 bizExecutor 满员、`CallerRunsPolicy` 让消费者线程自己执行 IO。只有那时 RingBuffer 才会积压、批大小才会冲高。这带来一个反直觉的后果：**`consumerSize` 与批大小直接对冲**——并行度调大，消费更快，积压更少，批大小更小。
+
+| 配置（100ms IO，并发 100，实测） | 批大小 | 每请求 IO 成本 | QPS |
+|---|---|---|---|
+| `consumerSize=8`（合理并行度） | 2.8 | 106.5ms → 38.2ms（2.8x） | 632 |
+| `consumerSize=1`（牺牲并行度） | 35.2 | 106.5ms → 3.1ms（34x） | 458 |
+| `consumerSize=8` + `batchWindowMillis=5` | 17.8 | 106.5ms → 6.1ms（17x） | 611 |
+
+**解法是开启时间窗口。** `batchWindowMillis > 0` 时，本批第一个事件到达即启动窗口，期间继续累积，直到「攒满 `maxBatchSize`」或「窗口到期」才刷出。这样批大小由配置保证，不再依赖业务池偶然饱和；`consumerSize` 用于复用多核（取核数级别即可，不应超配），两者不再互斥。
+
+窗口的代价是每个批次最多多等一个窗口，即单请求延迟上界约等于窗口值。经验取值：
+
+| IO 延迟 | 建议窗口 | 说明 |
+|---------|---------|------|
+| < 5ms | 0（关闭） | 批量收益不足以覆盖等待成本 |
+| 5 ~ 20ms | IO 延迟的 1/4 | 收益大于等待成本 |
+| > 20ms | IO 延迟的 1/2 | IO 越慢，值得等得越久 |
+
+> 实测反例：10ms IO 配 5ms 窗口，吞吐反而低于不开窗口——等待成本占了 IO 时间的一半。窗口应显著小于 IO 延迟。
 
 ---
 
