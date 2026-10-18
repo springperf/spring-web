@@ -310,10 +310,6 @@
         <Class name="io.springperf.web.http.WebHttpHeaders"/>
         <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS"/>
     </Match>
-    <Match>
-        <Class name="io.springperf.web.websocket.server.SpringHeadersAdapter"/>
-        <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS"/>
-    </Match>
 
     <!-- 继承 Netty DefaultFullHttpRequest 的 equals（请求行 + 头部 + 内容）；multipart parts
          由 body 派生，不改变同一性语义。 -->
