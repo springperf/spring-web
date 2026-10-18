@@ -103,6 +103,29 @@ class PerfHttpSessionTest {
     }
 
     @Test
+    void setAttribute_null_removesAttribute() {
+        // Servlet 规范 §7.5：null 值等价于 removeAttribute（修复前 ConcurrentHashMap.put(k, null) 抛 NPE）
+        session.setAttribute("key", "value");
+        session.setAttribute("key", null);
+        assertNull(session.getAttribute("key"));
+    }
+
+    @Test
+    void setAttribute_null_whenAbsent_doesNotThrow() {
+        assertDoesNotThrow(() -> session.setAttribute("missing", null));
+        assertNull(session.getAttribute("missing"));
+    }
+
+    @Test
+    void setAttribute_null_withBindingListener_callsValueUnbound() {
+        TestBindingListener listener = new TestBindingListener();
+        session.setAttribute("key", listener);
+        session.setAttribute("key", null);
+        assertTrue(listener.unbound, "置 null 等同于移除，应触发 valueUnbound");
+        assertEquals("key", listener.unboundName);
+    }
+
+    @Test
     void getAttributeNames() {
         session.setAttribute("k1", "v1");
         session.setAttribute("k2", "v2");

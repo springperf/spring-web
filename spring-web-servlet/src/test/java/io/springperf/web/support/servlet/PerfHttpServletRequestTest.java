@@ -135,9 +135,10 @@ class PerfHttpServletRequestTest {
     }
 
     @Test
-    void getDateHeader_invalid_returnsMinusOne() {
+    void getDateHeader_invalid_throwsIllegalArgument() {
+        // Servlet 规范：头存在但无法解析 → IllegalArgumentException（-1 仅表示「头不存在」）
         when(headers.getFirst("Date")).thenReturn("not-a-date");
-        assertEquals(-1L, servletRequest.getDateHeader("Date"));
+        assertThrows(IllegalArgumentException.class, () -> servletRequest.getDateHeader("Date"));
     }
 
     @Test
@@ -349,13 +350,16 @@ class PerfHttpServletRequestTest {
     }
 
     @Test
-    void httpHeaderDateParser_empty_returnsMinusOne() {
-        assertEquals(-1L, PerfHttpServletRequest.HttpHeaderDateParser.parseDate(""));
+    void httpHeaderDateParser_empty_throwsIllegalArgument() {
+        // Servlet 规范：日期头存在但无法解析 → IllegalArgumentException（-1 只表示「头不存在」）
+        assertThrows(IllegalArgumentException.class,
+                () -> PerfHttpServletRequest.HttpHeaderDateParser.parseDate(""));
     }
 
     @Test
-    void httpHeaderDateParser_garbage_returnsMinusOne() {
-        assertEquals(-1L, PerfHttpServletRequest.HttpHeaderDateParser.parseDate("this is not a date"));
+    void httpHeaderDateParser_garbage_throwsIllegalArgument() {
+        assertThrows(IllegalArgumentException.class,
+                () -> PerfHttpServletRequest.HttpHeaderDateParser.parseDate("this is not a date"));
     }
 
     @Test
@@ -412,6 +416,32 @@ class PerfHttpServletRequestTest {
     @Test
     void startAsync_throwsIllegalStateWithoutResponse() {
         assertThrows(IllegalStateException.class, () -> servletRequest.startAsync());
+    }
+
+    @Test
+    void startAsync_whenAlreadyStarted_throwsIllegalState() {
+        // Servlet 规范：同一异步周期内再次 startAsync 必须失败（修复前静默返回同一个 AsyncContext）
+        PerfAsyncContext existing = mock(PerfAsyncContext.class);
+        doReturn(existing).when(requestContext).getAttribute(any(io.springperf.web.http.RequestAttribute.class));
+
+        assertThrows(IllegalStateException.class, () -> servletRequest.startAsync());
+    }
+
+    @Test
+    void isAsyncStarted_falseWhenNoAsyncContext() {
+        assertFalse(servletRequest.isAsyncStarted());
+    }
+
+    @Test
+    void isAsyncStarted_reflectsCycleState() {
+        PerfAsyncContext asyncContext = mock(PerfAsyncContext.class);
+        doReturn(asyncContext).when(requestContext).getAttribute(any(io.springperf.web.http.RequestAttribute.class));
+
+        when(asyncContext.isCompleted()).thenReturn(false);
+        assertTrue(servletRequest.isAsyncStarted());
+
+        when(asyncContext.isCompleted()).thenReturn(true);
+        assertFalse(servletRequest.isAsyncStarted(), "异步已 dispatch/complete 后 isAsyncStarted 必须为 false");
     }
 
     @Test
