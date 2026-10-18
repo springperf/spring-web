@@ -10,6 +10,7 @@ import jakarta.websocket.OnMessage;
 import jakarta.websocket.OnOpen;
 import jakarta.websocket.PongMessage;
 import jakarta.websocket.Session;
+import jakarta.websocket.server.PathParam;
 import jakarta.websocket.server.ServerEndpoint;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.socket.BinaryMessage;
@@ -19,7 +20,9 @@ import org.springframework.web.socket.WebSocketSession;
 
 import java.net.URI;
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -152,11 +155,71 @@ class JsrEndpointWebSocketHandlerBranchesTest {
     }
 
     private WebSocketSession mockSession() {
+        return mockSession("ws://localhost/ws/jsr/room-1");
+    }
+
+    private WebSocketSession mockSession(String uri) {
         WebSocketSession session = mock(WebSocketSession.class);
-        when(session.getUri()).thenReturn(URI.create("ws://localhost/ws/jsr/room-1"));
+        when(session.getUri()).thenReturn(URI.create(uri));
         when(session.getAttributes()).thenReturn(new ConcurrentHashMap<>());
         when(session.isOpen()).thenReturn(true);
         return session;
+    }
+
+    @ServerEndpoint("/session-path/{room}")
+    public static class SessionPathEndpoint {
+        public static final List<String> SEEN = new CopyOnWriteArrayList<>();
+
+        @OnMessage
+        public void onMessage(Session session, @PathParam("room") String room, String message) {
+            SEEN.add(room + ":" + message + ":" + (session != null));
+        }
+    }
+
+    @ServerEndpoint("/no-message-param")
+    public static class NoMessageParamEndpoint {
+        public static final AtomicInteger INVOCATIONS = new AtomicInteger();
+
+        @OnMessage
+        public void onMessage(Session session) {
+            INVOCATIONS.incrementAndGet();
+        }
+    }
+
+    @Test
+    void messageArgs_templateReusedAcrossMessages_andMessageSlotCleared() throws Exception {
+        SessionPathEndpoint.SEEN.clear();
+        JsrEndpointWebSocketHandler handler = handler(SessionPathEndpoint.class);
+        WebSocketSession session = mockSession("ws://localhost/session-path/room-7");
+        handler.afterConnectionEstablished(session);
+
+        Object[] template = handler.onMessageArgsOf(session);
+        assertEquals(3, template.length);
+        assertTrue(template[0] instanceof JsrWebSocketSession, "SESSION 槽位在连接建立时即固定");
+        assertEquals("room-7", template[1], "@PathParam 槽位同样在连接建立时固定");
+
+        handler.handleMessage(session, new TextMessage("a"));
+        assertEquals(List.of("room-7:a:true"), SessionPathEndpoint.SEEN);
+        assertNull(template[2], "派发结束后必须清空消息槽位，否则上一帧的 payload 会一直挂在连接状态上");
+
+        handler.handleMessage(session, new TextMessage("b"));
+        assertEquals(List.of("room-7:a:true", "room-7:b:true"), SessionPathEndpoint.SEEN);
+        assertSame(template, handler.onMessageArgsOf(session), "实参数组必须在连接内复用，不逐消息重建");
+    }
+
+    @Test
+    void handleMessage_withoutMessageParam_invokesWithConstantArgsOnly() throws Exception {
+        NoMessageParamEndpoint.INVOCATIONS.set(0);
+        JsrEndpointWebSocketHandler handler = handler(NoMessageParamEndpoint.class);
+        WebSocketSession session = mockSession();
+        handler.afterConnectionEstablished(session);
+
+        handler.handleMessage(session, new TextMessage("ignored"));
+
+        assertEquals(1, NoMessageParamEndpoint.INVOCATIONS.get(), "无消息参数时也必须正常派发");
+        Object[] template = handler.onMessageArgsOf(session);
+        assertEquals(1, template.length);
+        assertTrue(template[0] instanceof JsrWebSocketSession);
     }
 
     private JsrEndpointWebSocketHandler handler(Class<?> endpointClass) {
@@ -214,6 +277,7 @@ class JsrEndpointWebSocketHandlerBranchesTest {
         handler.handleMessage(session, new TextMessage("hi"));
 
         assertEquals(1, ThrowingOnErrorEndpoint.ERROR_INVOCATIONS.get(), "@OnMessage 抛异常应翻译为 @OnError");
+        assertNull(handler.onMessageArgsOf(session)[0], "异常路径同样要清空消息槽位");
     }
 
     @Test
