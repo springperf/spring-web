@@ -1,5 +1,9 @@
 package io.springperf.web.websocket.jsr;
 
+import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
+import io.springperf.web.websocket.server.NettyWebSocketSession;
+import io.springperf.web.websocket.server.SpringHeadersAdapter;
 import jakarta.websocket.SendHandler;
 import jakarta.websocket.SendResult;
 import org.junit.jupiter.api.Test;
@@ -111,10 +115,44 @@ class JsrRemoteEndpointAsyncTest {
     }
 
     @Test
-    void batching_noop() throws IOException {
-        remote.setBatchingAllowed(true);
+    void setBatchingAllowed_togglesFlag() throws IOException {
         assertFalse(remote.getBatchingAllowed());
+        remote.setBatchingAllowed(true);
+        assertTrue(remote.getBatchingAllowed());
+        remote.setBatchingAllowed(false);
+        assertFalse(remote.getBatchingAllowed());
+    }
+
+    /** Async 与 Basic 共用底层 outbound buffer：批处理开启时 sendXxx 也不得逐条落网。 */
+    @Test
+    void batching_defersFramesUntilFlushBatch() throws Exception {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        NettyWebSocketSession nettySession = new NettyWebSocketSession(channel,
+                java.net.URI.create("ws://localhost/ws"),
+                new SpringHeadersAdapter(new io.netty.handler.codec.http.DefaultHttpHeaders(false)), null,
+                new java.net.InetSocketAddress("127.0.0.1", 8080), null, null, null);
+        JsrWebSocketSession jsrSession = new JsrWebSocketSession(nettySession, new JsrWebSocketContainer(),
+                codecRegistry, Collections.emptyMap());
+
+        jakarta.websocket.RemoteEndpoint.Async batched = jsrSession.getAsyncRemote();
+        batched.setBatchingAllowed(true);
+        assertTrue(batched.sendText("a").isDone(), "帧写入 outbound buffer 后 future 即完成（flush 由调用方控制）");
+        assertNull(channel.readOutbound(), "开启批处理时不得逐条落网");
+
+        batched.flushBatch();
+        TextWebSocketFrame frame = channel.readOutbound();
+        assertEquals("a", frame.text());
+        frame.release();
+        channel.finishAndReleaseAll();
+    }
+
+    @Test
+    void batching_nonNettySession_fallsBackToImmediateSend() throws Exception {
+        remote.setBatchingAllowed(true);
+        remote.sendText("hello").get();
         remote.flushBatch();
+
+        verify(springSession).sendMessage(new TextMessage("hello"));
     }
 
     @Test
