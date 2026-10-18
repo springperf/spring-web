@@ -519,7 +519,14 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
         }
         try {
             if (headRequest) {
-                // HEAD：不发 body——发送 headers 后立即发 LastHttpContent 收尾
+                // HEAD：不发 body——发送 headers 后立即发 LastHttpContent 收尾。
+                // 流必须在此关闭：本分支不会提交 streamCopy，其 finally 与 catch 里的关闭都到不了，
+                // 而非文件 Resource 的 HEAD 请求每请求都会泄漏一个 InputStream / 文件句柄（P0）。
+                try {
+                    input.close();
+                } catch (IOException closeEx) {
+                    log.debug("input close failed on HEAD path", closeEx);
+                }
                 addRespEventListener(ctx.writeAndFlush(response), false);
                 ChannelFuture lastFuture = ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
                 addRespEventListener(lastFuture, true);

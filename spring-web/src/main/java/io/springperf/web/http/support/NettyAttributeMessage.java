@@ -39,7 +39,9 @@ public class NettyAttributeMessage implements HttpInputMessagePart {
 
     @Override
     public InputStream getBody() throws IOException {
-        return new ByteBufInputStream(attribute.getByteBuf());
+        // 与 NettyMultipartFile 同款：duplicate 隔离 readerIndex，false = 关闭不 release，
+        // 所有权归 decoder.destroy()（P0，见该处注释）。
+        return new ByteBufInputStream(attribute.getByteBuf().duplicate(), false);
     }
 
     @Override

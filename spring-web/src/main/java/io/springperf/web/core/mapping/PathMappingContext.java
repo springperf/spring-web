@@ -38,7 +38,7 @@ public class PathMappingContext extends MappingHandlerMethod {
      * volatile：否则锁外的读者可能观察到非空引用但其内部 elementData/元素尚未完成发布，导致该请求静默少执行若干拦截器或过滤器。
      */
     private volatile List<HandlerInterceptor> cachedInterceptors;
-    private CorsConfigurationProvider corsConfigurationProvider;
+    private volatile CorsConfigurationProvider corsConfigurationProvider;
     private volatile DefaultFilterChain cachedFilterChain;
 
     public PathMappingContext(HandlerMethod handlerMethod, List<Matcher> matchers, String pathRule) {

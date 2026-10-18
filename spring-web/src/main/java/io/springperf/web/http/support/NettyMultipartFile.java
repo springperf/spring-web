@@ -57,7 +57,12 @@ public class NettyMultipartFile implements MultipartFile, HttpInputMessagePart {
 
     @Override
     public java.io.InputStream getInputStream() {
-        return new ByteBufInputStream(fileUpload.content());
+        // duplicate() 隔离 readerIndex（业务读流不得推进 data 自己的 readerIndex，否则后续
+        // fileUpload.get() 读到空）；false = close 时不 release：part content 的所有权归
+        // HttpPostRequestDecoder.destroy()，单参构造的「关闭即 release」会让业务侧按惯例
+        // try-with-resources 后 data 归零，随后 destroy() 的无守卫 release 抛
+        // IllegalReferenceCountException，连带 release() 的兜底循环被跳过（P0）。
+        return new ByteBufInputStream(fileUpload.content().duplicate(), false);
     }
 
     @Override
@@ -67,7 +72,7 @@ public class NettyMultipartFile implements MultipartFile, HttpInputMessagePart {
 
     @Override
     public InputStream getBody() throws IOException {
-        return new ByteBufInputStream(fileUpload.getByteBuf());
+        return new ByteBufInputStream(fileUpload.getByteBuf().duplicate(), false);
     }
 
     @Override
