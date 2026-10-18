@@ -28,7 +28,7 @@ public class PathMappingContext extends MappingHandlerMethod {
     private final List<MediaType> producibleMediaTypes;
     private final List<MediaType> producibleMediaTypesView;
     private volatile List<HandlerInterceptor> cachedInterceptors;
-    private CorsConfigurationProvider corsConfigurationProvider;
+    private volatile CorsConfigurationProvider corsConfigurationProvider;
     private volatile DefaultFilterChain cachedFilterChain;
 
 
