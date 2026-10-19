@@ -97,7 +97,7 @@ public void initComponentPhase2() throws Exception {
 
 ### 2.3 `BatchRequestMetaData`：元数据容器
 
-`BatchRequestMetaData`（10 个字段）是扫描阶段的产物，包含了运行期所需的一切信息：
+`BatchRequestMetaData`（11 个字段）是扫描阶段的产物，包含了运行期所需的一切信息：
 
 ```java
 // BatchRequestMetaData.java
@@ -110,6 +110,7 @@ public BatchMapping.WaitStrategy waitStrategy()               // 等待策略
 public BatchMapping.Backpressure backpressure()               // 背压策略
 public Constructor<?> singleMethodCtor()                      // 单方法参数匹配的构造函数
 public int maxBatchSize()        { return maxBatchSize; }     // 攒批阈值
+public int batchWindowMillis()   { return batchWindowMillis; } // 攒批时间窗口，0=关闭（见 §5.2）
 public int consumerSize()        { return consumerSize; }     // 业务池最大线程数
 ```
 
@@ -343,29 +344,73 @@ public void shutdown() {
 
 ## 五、攒批消费：`BufferingBatchHandler`
 
-### 5.1 `onEvent`：攒批逻辑
+### 5.1 攒批的两个阶段：阈值 flush 与窗口 flush
 
-`BufferingBatchHandler` 实现 `EventHandler<BatchEvent>`，是 Disruptor 的唯一消费者：
+`BufferingBatchHandler` 实现 `EventHandler<BatchEvent>`，是 Disruptor 的唯一消费者。**攒批存在两条互斥的触发路径，由 `batchWindowMillis` 决定走哪条**：
 
 ```java
-// BufferingBatchHandler.java
-public void onEvent(BatchEvent event, long sequence, boolean endOfBatch) {
-    buffer.add(event.request());
+// BufferingBatchHandler.onEvent（窗口关闭，默认）
+buffer.add(request);
+if (maxBatchSize > 0 && buffer.size() >= maxBatchSize) {
+    flush();
+} else if (endOfBatch) {
+    flush();
+}
 
-    boolean shouldFlush = endOfBatch
-            || (maxBatchSize > 0 && buffer.size() >= maxBatchSize);
-    if (shouldFlush) {
-        flush();
-    }
+// BufferingBatchHandler.onEvent（窗口开启）
+buffer.add(request);
+if (maxBatchSize > 0 && buffer.size() >= maxBatchSize) {
+    flush();
+} else if (buffer.size() == 1) {
+    startWindowLocked();   // 只排一次任务，不响应 endOfBatch
 }
 ```
 
-攒批触发条件：`endOfBatch`（Disruptor 在批量发布结束时给消费者的信号）或 `buffer.size() >= maxBatchSize`（默认 100）。
+**阈值 flush**（两条路径都有）：攒满 `maxBatchSize` 立即刷，不等窗口。
 
-`flush()`将当前 buffer 原子替换为新 ArrayList，提交到 `bizExecutor`：
+**窗口 flush**（仅窗口开启）：本批第一个事件到达时向共享调度线程排一个到期任务，期间继续累积，到期把整批一次性提交。到期判断在 `flushOnWindow()` 中，与 `onEvent` 通过 `bufferLock` 互斥。
+
+### 5.2 为什么默认（无窗口）攒不起批
+
+这是本模块最容易踩的坑，值得单独说清楚。`flush()` 的提交方式是：
 
 ```java
-// BufferingBatchHandler.java
+private void flush() {
+    if (buffer.isEmpty()) return;
+    List<BatchRequest<?>> batch = buffer;
+    buffer = new ArrayList<>();
+    executor.execute(() -> processBatch(batch));   // 异步提交
+}
+```
+
+`executor.execute()` 是**异步**的——IO 在 bizExecutor 的 worker 上执行，**Disruptor 消费者线程不被阻塞**。而消费者处理一个事件只是 `buffer.add()`（纳秒级），于是它几乎总能追上空队列；Disruptor 的 `endOfBatch` 在「没有更多可用事件」时置位，消费者每拿到 1 个事件就落盘一批。
+
+> 结论：**无窗口时，批大小 = 「消费者处理一个事件期间生产者发布了多少个新事件」，通常接近 1**，`maxBatchSize` 形同虚设。
+
+消费者唯一被阻塞的时刻是 bizExecutor 满员、`CallerRunsPolicy` 让消费者线程自己执行 IO。只有那时 RingBuffer 才积压、批大小才冲高。因此 **`consumerSize` 与批大小直接对冲**：并行度调大 → 消费更快 → 积压更少 → 批更小。
+
+实测（100ms IO、并发 100、JDK 17）：
+
+| 配置 | 批大小 | 每请求 IO 成本 | QPS |
+|---|---|---|---|
+| `consumerSize=8`（合理并行度） | 2.8 | 106.5ms → 38.2ms（2.8x） | 632 |
+| `consumerSize=1` | 35.2 | 106.5ms → 3.1ms（34x） | 458 |
+| `consumerSize=8` + `batchWindowMillis=5` | 17.8 | 106.5ms → 6.1ms（17x） | 611 |
+
+**窗口是唯一能同时拿到「并行度」与「大批」的手段**：它把刷出时机从「消费者追上空队列」改成「窗口到期」，批大小由配置保证。代价是每批最多多等一个窗口（单请求延迟上界 ≈ 窗口值），故窗口应取 IO 延迟的 1/4 ~ 1/2——实测 10ms IO 配 5ms 窗口，吞吐反而低于不开窗口。
+
+### 5.3 窗口的并发设计
+
+| 关注点 | 处理 |
+|---|---|
+| 消费者线程 vs 调度线程 | `bufferLock` 保护「add」与「取走并替换 list」；持锁时间仅数十纳秒，远小于窗口周期 |
+| 调度线程数 | 全进程共享单个 `batch-window` daemon 线程，按启用窗口的队列数引用计数；归零时关停 |
+| 停机顺序 | `DisruptorQueue.shutdown()` 中 `flushRemaining()` → `closeWindow()`，防止迟到任务重复提交 |
+| 向后兼容 | `batchWindowMillis` 默认 0，此时 `endOfBatch` 分支与历史行为完全一致，`bufferLock` 无争用 |
+
+`flush()` 将当前 buffer 原子替换为新 ArrayList，提交到 `bizExecutor`：
+
+```java
 private void flush() {
     if (buffer.isEmpty()) return;
     List<BatchRequest<?>> batch = buffer;
