@@ -1,2 +1,10 @@
 server:
   port: 8081
+
+# 批量 IO 性能对照实验（BatchIoEliminationPerfTest）专用调优：
+# baseline 端点每请求占用一个业务线程等待模拟 IO，高并发档位（400）下默认 max=200 会成为瓶颈，
+# 使 baseline 的吞吐被线程数而非 IO 延迟限制——那测出的就不是「IO 消除」的差异了。
+pool:
+  core-pool-size: 50
+  max-pool-size: 600
+  keep-alive-time: 60
