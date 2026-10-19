@@ -65,7 +65,13 @@ public class BatchRegistry extends BaseWebComponent {
     @Override
     public void destroyComponent() throws Exception {
         for (DisruptorQueue queue : queues.values()) {
-            queue.shutdown();
+            try {
+                queue.shutdown();
+            } catch (Exception e) {
+                // 单个队列停机失败不能阻断其余队列的清理：Disruptor 消费者线程与 bizExecutor
+                // 线程都是非 daemon，漏关任何一个都会让 JVM 无法退出。
+                log.error("Error shutting down batch queue [{}]", queue.queueName(), e);
+            }
         }
         queues.clear();
         registrations.clear();

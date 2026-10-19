@@ -8,6 +8,7 @@ import org.springframework.core.MethodParameter;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.stereotype.Controller;
 import org.springframework.util.ClassUtils;
+import org.springframework.util.ReflectionUtils;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -48,7 +49,7 @@ public class BatchScanner {
 
             BatchRequestMetaData meta = new BatchRequestMetaData(c.method, c.beanType, requestType, queueName,
                     ann.ringBufferSize(), ann.waitStrategy(), ann.backpressure(), singleMethodCtor, ann.maxBatchSize(),
-                    consumerSize);
+                    ann.batchWindowMillis(), consumerSize);
 
             result.add(new BatchHandlerRegistration(c.bean, singleCtx, meta));
             log.info("Batch queue [{}] registered: batchMethod={}, singleMethod={}, requestType={}", queueName,
@@ -74,7 +75,11 @@ public class BatchScanner {
                 continue;
             Class<?> targetClass = ClassUtils.getUserClass(bean.getClass());
 
-            for (Method method : targetClass.getDeclaredMethods()) {
+            // 与 MappingRegistry.initComponentPhase1 保持一致：getUniqueDeclaredMethods 收集
+            // 父类/接口声明的方法并按 override 去重。若改用 getDeclaredMethods，父类声明的
+            // @BatchMapping 不会被安装——单请求映射照常注册但方法体不被替换，请求会走到
+            // 用户写的原始实现（通常是 return null），表现为静默拿到空响应。
+            for (Method method : ReflectionUtils.getUniqueDeclaredMethods(targetClass)) {
                 BatchMapping ann = AnnotatedElementUtils.findMergedAnnotation(method, BatchMapping.class);
                 if (ann != null) {
                     method.setAccessible(true);

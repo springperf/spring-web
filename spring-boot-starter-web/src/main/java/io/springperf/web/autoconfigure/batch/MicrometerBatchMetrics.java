@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
 
 /**
  * Micrometer-based {@link BatchMetrics} implementation.
@@ -24,9 +25,9 @@ import java.util.concurrent.atomic.AtomicLong;
  * <li>{@code batch.queue.capacity} — Gauge, ring buffer total capacity</li>
  * </ul>
  * <p>
- * The per-queue caches use {@code ConcurrentHashMap}, but gauge registration is performed <em>outside</em> any mapping
- * function (see {@link #registerRemainingGauge}): registering while holding a CHM bin lock would call into
- * {@code MeterRegistry} under that lock and widen the lock-ordering surface.
+ * All meters (including the per-queue gauges) are obtained through {@link #getOrRegister}, which performs registration
+ * <em>outside</em> any {@code ConcurrentHashMap} mapping function: registering while holding a CHM bin lock would call
+ * into {@code MeterRegistry} under that lock and widen the lock-ordering surface.
  * </p>
  */
 public class MicrometerBatchMetrics implements BatchMetrics {
@@ -51,10 +52,8 @@ public class MicrometerBatchMetrics implements BatchMetrics {
     private final Map<String, DistributionSummary> batchSizeSummaries = new ConcurrentHashMap<>();
 
     /**
-     * Per-queue gauge backing values. Registration is deliberately <em>not</em> done inside a
-     * {@code ConcurrentHashMap.computeIfAbsent} mapping function: the mapping function would run while holding a CHM
-     * bin lock and call into {@code MeterRegistry}, widening the lock-ordering surface. See
-     * {@link #registerRemainingGauge} / {@link #registerCapacityGauge} for the placeholder-then-register pattern.
+     * Per-queue gauge backing values. 与 Counter/Timer/Summary 一样经由 {@link #getOrRegister} 获取： 注册动作在 CHM 锁外执行，避免「持 bin
+     * 锁调 MeterRegistry」的锁序面。早期版本只对 gauge 做了 占位式规避，Counter/Timer/Summary 仍走 {@code computeIfAbsent}，同一风险只堵了一半。
      */
     private final Map<String, AtomicInteger> remainingCapacities = new ConcurrentHashMap<>();
     private final Map<String, AtomicLong> capacityTotals = new ConcurrentHashMap<>();
@@ -87,8 +86,8 @@ public class MicrometerBatchMetrics implements BatchMetrics {
         // 成败分开打 tag：此前 success 形参被忽略，成功与失败的耗时混在同一条时间序列里，
         // 失败批次的耗时（通常更高）会污染延迟指标的分位数。
         Map<String, Timer> cache = success ? successTimers : failureTimers;
-        Timer timer = cache.computeIfAbsent(queueName,
-                k -> Timer.builder("batch.process.duration")
+        Timer timer = getOrRegister(cache, queueName,
+                () -> Timer.builder("batch.process.duration")
                         .tags(TAG_QUEUE, queueName, TAG_OUTCOME, success ? OUTCOME_SUCCESS : OUTCOME_FAILURE)
                         .register(meterRegistry));
         timer.record(durationNanos, java.util.concurrent.TimeUnit.NANOSECONDS);
@@ -121,42 +120,55 @@ public class MicrometerBatchMetrics implements BatchMetrics {
      * {@code MeterRegistry.register}， 与 MeterRegistry 内部锁形成潜在死锁面。
      */
     private AtomicInteger registerRemainingGauge(String queueName, int remaining) {
-        AtomicInteger placeholder = new AtomicInteger(remaining);
-        AtomicInteger existing = remainingCapacities.putIfAbsent(queueName, placeholder);
-        if (existing != null) {
-            return existing;
-        }
-        // 本线程赢得占位：在锁外完成注册
-        Gauge.builder("batch.queue.remaining", placeholder, AtomicInteger::get).tag(TAG_QUEUE, queueName)
-                .strongReference(true).register(meterRegistry);
-        return placeholder;
+        return getOrRegister(remainingCapacities, queueName, () -> {
+            AtomicInteger placeholder = new AtomicInteger(remaining);
+            Gauge.builder("batch.queue.remaining", placeholder, AtomicInteger::get).tag(TAG_QUEUE, queueName)
+                    .strongReference(true).register(meterRegistry);
+            return placeholder;
+        });
     }
 
     private AtomicLong registerCapacityGauge(String queueName, int total) {
-        AtomicLong placeholder = new AtomicLong(total);
-        AtomicLong existing = capacityTotals.putIfAbsent(queueName, placeholder);
-        if (existing != null) {
-            return existing;
-        }
-        Gauge.builder("batch.queue.capacity", placeholder, AtomicLong::get).tag(TAG_QUEUE, queueName)
-                .strongReference(true).register(meterRegistry);
-        return placeholder;
+        return getOrRegister(capacityTotals, queueName, () -> {
+            AtomicLong placeholder = new AtomicLong(total);
+            Gauge.builder("batch.queue.capacity", placeholder, AtomicLong::get).tag(TAG_QUEUE, queueName)
+                    .strongReference(true).register(meterRegistry);
+            return placeholder;
+        });
     }
 
     // ------------------------------------------------------------------
     // Cache helpers
     // ------------------------------------------------------------------
 
+    /**
+     * 统一的 meter/占位值获取入口。
+     * <p>
+     * 注册动作刻意放在 {@link Map#putIfAbsent} <b>之外</b>执行：若写在 {@code ConcurrentHashMap.computeIfAbsent} 的 mapping function
+     * 里，会在持有 CHM bin 锁时调用 {@code MeterRegistry.register}，与 MeterRegistry 内部锁形成潜在死锁面。
+     * </p>
+     * <p>
+     * 并发下可能出现两个线程都完成注册：Micrometer 的 {@code register} 是幂等的（同名 meter 返回同一实例）， 且 cache 中只保留先占位者，因此不会重复注册出第二条序列。
+     * </p>
+     */
+    private <T> T getOrRegister(Map<String, T> cache, String queueName, Supplier<T> registrar) {
+        T existing = cache.get(queueName);
+        if (existing != null) {
+            return existing;
+        }
+        T created = registrar.get();
+        T raced = cache.putIfAbsent(queueName, created);
+        return raced != null ? raced : created;
+    }
+
     private Counter counter(Map<String, Counter> cache, String name, String queueName) {
-        return cache.computeIfAbsent(queueName, k -> {
-            // register() is idempotent per MeterRegistry, but we cache to avoid builder allocation
-            return Counter.builder(name).tag(TAG_QUEUE, queueName).register(meterRegistry);
-        });
+        // register() is idempotent per MeterRegistry, but we cache to avoid builder allocation
+        return getOrRegister(cache, queueName,
+                () -> Counter.builder(name).tag(TAG_QUEUE, queueName).register(meterRegistry));
     }
 
     private DistributionSummary summary(Map<String, DistributionSummary> cache, String name, String queueName) {
-        return cache.computeIfAbsent(queueName, k -> {
-            return DistributionSummary.builder(name).tag(TAG_QUEUE, queueName).register(meterRegistry);
-        });
+        return getOrRegister(cache, queueName,
+                () -> DistributionSummary.builder(name).tag(TAG_QUEUE, queueName).register(meterRegistry));
     }
 }

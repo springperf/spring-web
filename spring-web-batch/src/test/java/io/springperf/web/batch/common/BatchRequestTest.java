@@ -68,4 +68,46 @@ class BatchRequestTest {
         assertThat(req.isCompleted()).isTrue();
         assertThat(((Throwable) req.getResult()).getMessage()).isEqualTo("first");
     }
+
+    /** 覆盖 {@code protected BatchRequest(Long)}：子类可用自定义超时，且守卫语义不变。 */
+    private static class CustomTimeoutRequest extends BatchRequest<String> {
+        CustomTimeoutRequest(long timeout) {
+            super(timeout);
+        }
+    }
+
+    @Test
+    void customTimeoutConstructor_worksAndGuardsFirstWins() {
+        CustomTimeoutRequest req = new CustomTimeoutRequest(12345L);
+        assertThat(req.isCompleted()).isFalse();
+        assertThat(req.setResult("ok")).isTrue();
+        assertThat(req.setResult("again")).isFalse();
+        assertThat(req.getResult()).isEqualTo("ok");
+    }
+
+    @Test
+    void concurrentSetResult_onlyOneWins() throws Exception {
+        // compareAndSet 守卫的回归：N 个线程并发完成同一请求，只允许一个 setResult 生效
+        for (int round = 0; round < 200; round++) {
+            TestRequest req = new TestRequest();
+            int threads = 8;
+            java.util.concurrent.CyclicBarrier barrier = new java.util.concurrent.CyclicBarrier(threads);
+            java.util.List<java.util.concurrent.Future<Boolean>> futures = new java.util.ArrayList<>();
+            java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(threads);
+            for (int i = 0; i < threads; i++) {
+                futures.add(pool.submit(() -> {
+                    barrier.await();
+                    return req.setResult("x");
+                }));
+            }
+            int wins = 0;
+            for (java.util.concurrent.Future<Boolean> f : futures) {
+                if (f.get()) {
+                    wins++;
+                }
+            }
+            pool.shutdown();
+            assertThat(wins).isEqualTo(1);
+        }
+    }
 }

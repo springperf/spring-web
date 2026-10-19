@@ -151,6 +151,37 @@ class BufferingBatchHandlerTest {
         assertThat(r2.isCompleted()).isTrue();
     }
 
+    /**
+     * 业务异常经 {@code InvocationTargetException} 抛出走第一个 catch；反射调用本身失败（如方法不可访问）抛的是 {@code IllegalAccessException}，必须由
+     * {@code catch (Throwable)} 兜底——否则该请求既不会被 setError 也不会被记录，客户端只能等 30s 超时。
+     */
+    @Test
+    void processBatch_nonReflectiveFailure_setsErrorToo() throws Exception {
+        Method inaccessible = InaccessibleService.class.getDeclaredMethod("handle", List.class);
+        BatchRequestMetaData inaccessibleMeta = new BatchRequestMetaData(inaccessible, InaccessibleService.class, null,
+                "test-queue", 1024, BatchMapping.WaitStrategy.BLOCKING, BatchMapping.Backpressure.BLOCK, null, 0, 4);
+        BufferingBatchHandler handler = new BufferingBatchHandler(executor, inaccessibleMeta, new InaccessibleService(),
+                0);
+
+        BatchRequest<String> req = new BatchRequest<String>() {
+        };
+        handler.onEvent(newEvent(req), 0L, true);
+
+        ArgumentCaptor<Runnable> captor = ArgumentCaptor.forClass(Runnable.class);
+        verify(executor).execute(captor.capture());
+        captor.getValue().run();
+
+        assertThat(req.isCompleted()).isTrue();
+        assertThat(req.getResult()).isInstanceOf(IllegalAccessException.class);
+    }
+
+    static class InaccessibleService {
+        /** 私有方法：未 setAccessible 时反射 invoke 抛 IllegalAccessException。 */
+        @SuppressWarnings("unused")
+        private void handle(List<? extends BatchRequest<?>> batch) {
+        }
+    }
+
     @Test
     void processBatch_alreadyCompletedRequestsSkippedInErrorHandling() {
         Object badBean = new Object();
