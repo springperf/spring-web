@@ -10,7 +10,7 @@ import org.springframework.aot.hint.TypeReference;
 import org.springframework.boot.web.context.WebServerApplicationContext;
 import org.springframework.util.concurrent.ListenableFutureCallback;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 验证 {@link SpringWebRuntimeHints} 的可达性提示：事件路径与 ListenableFuture 异步回调路径。 JVM 模式下本 registrar 不被调用（由 Spring AOT

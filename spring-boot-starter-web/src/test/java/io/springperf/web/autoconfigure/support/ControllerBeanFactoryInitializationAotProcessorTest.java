@@ -23,7 +23,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * 验证 {@link ControllerBeanFactoryInitializationAotProcessor}： 为 {@code @Controller} 处理方法与 {@code @ControllerAdvice}
