@@ -17,7 +17,6 @@ import java.io.ObjectInputFilter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 
 @Slf4j
 public class PerfHttpSessionManager extends BaseWebComponent {
