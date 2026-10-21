@@ -86,6 +86,14 @@ class WebSocketRoutingHandlerCoverageTest {
         }
     }
 
+    /** 取回握手时挂在 channel 上的 session，用于主动 close 等操作。 */
+    private NettyWebSocketSession sessionOf(EmbeddedChannel ch) {
+        NettyWebSocketSession session = ch
+                .attr(io.netty.util.AttributeKey.<NettyWebSocketSession> valueOf("ws.session")).get();
+        assertNotNull(session, "握手成功后 channel 上应挂有 session");
+        return session;
+    }
+
     private static FullHttpRequest upgradeRequest(String path, String origin) {
         FullHttpRequest req = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, path,
                 Unpooled.buffer(0));
@@ -243,9 +251,48 @@ class WebSocketRoutingHandlerCoverageTest {
         channel.runPendingTasks();
         verify(handler, timeout(2000)).afterConnectionEstablished(any(WebSocketSession.class));
 
-        channel.pipeline().fireChannelInactive();
+        // 必须真正 close()：Netty 保证 channelInactive 触发时 channel 已 inactive，
+        // 这正是修复前 isOpen() 守卫恒为 false、回调丢失的成因。
+        // 旧写法用 fireChannelInactive() 而 channel 仍 active，断言会假通过。
+        channel.close().sync();
 
         verify(handler, timeout(2000)).afterConnectionClosed(any(WebSocketSession.class), eq(CloseStatus.GOING_AWAY));
+    }
+
+    @Test
+    void channelInactive_notifiesExactlyOnce() throws Exception {
+        handler = mock(WebSocketHandler.class);
+        channel = newChannel(new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), null, false, null));
+        channel.pipeline().fireChannelRead(upgradeRequest("/ws", null));
+        channel.runPendingTasks();
+        verify(handler, timeout(2000)).afterConnectionEstablished(any(WebSocketSession.class));
+        drainHandshakeResponse();
+
+        // 先发 Close 帧（该路径先赢得通知权），再真正关闭 TCP。
+        // 两条路径竞争下 afterConnectionClosed 必须只触发一次，且用对端给的 status。
+        channel.pipeline().fireChannelRead(new CloseWebSocketFrame(1000, "bye"));
+        channel.close().sync();
+
+        verify(handler, timeout(2000)).afterConnectionClosed(any(WebSocketSession.class),
+                eq(new CloseStatus(1000, "bye")));
+        verify(handler, times(1)).afterConnectionClosed(any(WebSocketSession.class), any(CloseStatus.class));
+    }
+
+    @Test
+    void serverInitiatedClose_notifiesAfterClosed() throws Exception {
+        // 服务端主动 close()：只写 Close 帧后关 channel，自己不通知，
+        // 回调应由随后的 channelInactive 补上（修复前这条路径完全丢失）。
+        handler = mock(WebSocketHandler.class);
+        channel = newChannel(new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), null, false, null));
+        channel.pipeline().fireChannelRead(upgradeRequest("/ws", null));
+        channel.runPendingTasks();
+        verify(handler, timeout(2000)).afterConnectionEstablished(any(WebSocketSession.class));
+        drainHandshakeResponse();
+
+        WebSocketSession session = sessionOf(channel);
+        session.close(new CloseStatus(CloseStatus.NORMAL.getCode(), "server-going-away"));
+
+        verify(handler, timeout(2000)).afterConnectionClosed(any(WebSocketSession.class), any(CloseStatus.class));
     }
 
     /* ==================== Origin 校验 ==================== */
