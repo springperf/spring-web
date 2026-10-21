@@ -186,11 +186,12 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
                 afterHandshakeSuccess(ctx, req, path, handshaker, result);
             });
         } catch (Exception e) {
-            // handshake() 同步抛异常时也要释放原始引用。已知场景：pipeline 缺少
-            // HttpRequestDecoder/HttpServerCodec 时 handshake() 内部抛 IllegalStateException
-            // （见 WebSocketRoutingHandlerUpgradeRemovalTest），该异常从 channelRead 冒泡到
-            // exceptionCaught，而那里只 ctx.close() 不 release——每次泄漏一个 FullHttpRequest
-            // （含 content ByteBuf）。此路径与上面的失败 listener 对称。
+            // handshake() 同步抛异常时也要释放原始引用。注意与上一条的区别：pipeline 缺少
+            // HttpRequestDecoder/HttpServerCodec 时 Netty 并不抛异常，而是把返回的 promise
+            // 置失败——那条路径由上面的 listener 释放。这里覆盖的是握手内部的 pipeline 操作
+            // 本身抛错，例如同名 wsdecoder/wsencoder 已存在时 addBefore 抛 ChannelPipelineException。
+            // 此类异常若不在此释放，会冒泡到 exceptionCaught，而那里只 ctx.close() 不 release，
+            // 每次泄漏一个 FullHttpRequest（含 content ByteBuf）。
             log.error("WebSocket handshake threw synchronously for {}", path, e);
             ReferenceCountUtil.release(req);
             ctx.close();

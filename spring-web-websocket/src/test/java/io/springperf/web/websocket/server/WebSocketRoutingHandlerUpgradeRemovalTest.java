@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 
@@ -64,17 +65,17 @@ class WebSocketRoutingHandlerUpgradeRemovalTest {
     }
 
     /**
-     * 回归：handshake() <b>同步抛异常</b>时也必须释放请求原始引用。
+     * 回归：pipeline 缺少 {@code HttpServerCodec} 时握手失败，请求原始引用仍须归零。
      * <p>
-     * 缺失 {@code HttpServerCodec} 时 Netty 的 handshaker 会在开工早期抛 {@code IllegalStateException}（它检查 pipeline 里有无
-     * decoder），该异常从 channelRead 冒泡到 exceptionCaught，而那里只 ctx.close() 不 release——修复前每次泄漏一个 FullHttpRequest（含 content
-     * ByteBuf）。
+     * 注意这条路径<b>不是</b>同步抛异常：Netty 的 handshaker 检测不到 decoder 时把返回的 promise 置失败
+     * （{@code No HttpDecoder and no HttpServerCodec in the pipeline}），由失败 listener 释放请求。
+     * 用例名与断言都按这个真实行为写——此前的名字声称验证「同步抛异常」，实际走的是 listener，同步 catch 一行都没执行（JaCoCo 实测该分支 cb=0）。
      * </p>
      */
     @Test
-    void handshakeThrowsSynchronously_releasesRequest() {
+    void handshakeMissingCodec_failsAsynchronously_releasesRequest() {
         EmbeddedChannel channel = new EmbeddedChannel();
-        // 故意不加 HttpServerCodec：handshaker.handshake() 会同步抛异常
+        // 故意不加 HttpServerCodec：handshaker 会把 promise 置失败
         channel.pipeline().addLast(new HttpObjectAggregator(64 * 1024));
         channel.pipeline()
                 .addLast(new WebSocketRoutingHandler(Map.of("/ws", mock(WebSocketHandler.class)), null, false, null));
@@ -83,7 +84,36 @@ class WebSocketRoutingHandlerUpgradeRemovalTest {
         channel.pipeline().fireChannelRead(req);
         channel.runPendingTasks();
 
+        assertEquals(0, req.refCnt(), "握手失败时也必须释放请求，否则泄漏一个 FullHttpRequest");
+        assertThatChannelIsInactiveOrEmpty(channel);
+        channel.finishAndReleaseAll();
+    }
+
+    /**
+     * 回归：handshake() <b>同步抛异常</b>时也必须释放请求原始引用。
+     * <p>
+     * 要真正走进同步 {@code catch}，须让握手内部的 pipeline 操作自身抛错： {@code WebSocketServerHandshaker.handshake} 用 {@code addBefore}
+     * 插入名为 {@code wsdecoder}/{@code wsencoder} 的 handler，名字已存在时同步抛
+     * {@code ChannelPipelineException}（例如连接上已残留上一轮握手的通道处理器）。该异常若不在此释放，会冒泡到 {@code exceptionCaught}，而那里只
+     * {@code ctx.close()} 不 release——每次泄漏一个 FullHttpRequest（含 content ByteBuf）。
+     * </p>
+     */
+    @Test
+    void handshakeThrowsSynchronously_releasesRequest() {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        channel.pipeline().addLast(new HttpServerCodec());
+        channel.pipeline().addLast(new HttpObjectAggregator(64 * 1024));
+        // 预置同名 handler，使握手内部的 addBefore 抛 ChannelPipelineException
+        channel.pipeline().addLast("wsdecoder", new io.netty.channel.ChannelInboundHandlerAdapter());
+        channel.pipeline()
+                .addLast(new WebSocketRoutingHandler(Map.of("/ws", mock(WebSocketHandler.class)), null, false, null));
+
+        FullHttpRequest req = upgradeRequest("/ws");
+        channel.pipeline().fireChannelRead(req);
+        channel.runPendingTasks();
+
         assertEquals(0, req.refCnt(), "handshake() 同步抛异常时也必须释放请求，否则泄漏一个 FullHttpRequest");
+        assertFalse(channel.isOpen(), "同步抛异常后应关闭连接，不再复用该通道");
         assertThatChannelIsInactiveOrEmpty(channel);
         channel.finishAndReleaseAll();
     }
