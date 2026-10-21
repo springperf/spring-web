@@ -11,7 +11,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 
 /**
  * JSR-356 {@link RemoteEndpoint.Async} 实现。

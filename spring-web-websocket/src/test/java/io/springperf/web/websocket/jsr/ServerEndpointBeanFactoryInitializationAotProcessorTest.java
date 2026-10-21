@@ -11,7 +11,8 @@ import org.springframework.beans.factory.aot.BeanFactoryInitializationAotContrib
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * 验证 {@link ServerEndpointBeanFactoryInitializationAotProcessor}： 为 Bean 发现的 {@code @ServerEndpoint} 端点注册无参构造器 +
