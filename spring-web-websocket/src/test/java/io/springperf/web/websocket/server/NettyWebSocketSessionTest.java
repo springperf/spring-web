@@ -114,6 +114,7 @@ class NettyWebSocketSessionTest {
         Channel channel = mock(Channel.class);
         EventLoop loop = mock(EventLoop.class);
         when(channel.eventLoop()).thenReturn(loop);
+        when(channel.isActive()).thenReturn(true);
         when(loop.inEventLoop()).thenReturn(false);
 
         NettyWebSocketSession session = new NettyWebSocketSession(channel, uri, null, null, null, null, null, null);
@@ -124,6 +125,47 @@ class NettyWebSocketSessionTest {
         verify(channel, never()).flush();
 
         task.getValue().run();
+        verify(channel).flush();
+    }
+
+    @Test
+    void flushBatch_onInactiveChannel_skipsEventLoop() {
+        // 通道已断且 EventLoop 可能已终止：此时 execute 会抛 RejectedExecutionException，
+        // 而该 unchecked 异常会直接抛给业务线程（JSR 的 flushBatch 只声明 IOException）
+        Channel channel = mock(Channel.class);
+        EventLoop loop = mock(EventLoop.class);
+        when(channel.eventLoop()).thenReturn(loop);
+        when(channel.isActive()).thenReturn(false);
+        when(loop.inEventLoop()).thenReturn(false);
+
+        NettyWebSocketSession session = new NettyWebSocketSession(channel, uri, null, null, null, null, null, null);
+        assertDoesNotThrow(session::flushBatch);
+
+        verify(loop, never()).execute(any(Runnable.class));
+        verify(channel, never()).flush();
+    }
+
+    @Test
+    void sendWithoutFlush_crossingHighWatermark_flushesEarly() throws Exception {
+        // 攒批把帧压进 outbound buffer：越过高水位后后续帧只能进背压队列（满 100 帧丢最旧帧）。
+        // 必须到水位就提前 flush，否则批处理会引入「静默丢消息」这条新路径。
+        Channel channel = mock(Channel.class);
+        EventLoop loop = mock(EventLoop.class);
+        ChannelFuture future = mock(ChannelFuture.class);
+        when(channel.eventLoop()).thenReturn(loop);
+        when(loop.inEventLoop()).thenReturn(true);
+        when(channel.isActive()).thenReturn(true);
+        // 入口可写，写入后越过高水位
+        when(channel.isWritable()).thenReturn(true, false);
+        when(channel.write(any(WebSocketFrame.class))).thenReturn(future);
+
+        NettyWebSocketSession session = new NettyWebSocketSession(channel, uri, null, null, null, null, null, null);
+        session.sendMessage(new TextMessage("x"), false);
+
+        ArgumentCaptor<WebSocketFrame> written = ArgumentCaptor.forClass(WebSocketFrame.class);
+        verify(channel).write(written.capture());
+        written.getValue().release();
+        verify(channel, never()).writeAndFlush(any(WebSocketFrame.class));
         verify(channel).flush();
     }
 

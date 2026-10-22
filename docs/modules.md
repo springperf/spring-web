@@ -434,7 +434,7 @@ destroyComponent()     → 资源释放
 
 支持路径模式匹配（含 `{pathVariable}`）、per-handler 覆盖的 Origin 校验/空闲超时/心跳保活、以及背压队列。
 
-JSR-356 端点的 `RemoteEndpoint.setBatchingAllowed(true)` 支持真批处理：开启后 `sendText`/`sendBinary`/`sendObject` 只写入 Netty outbound buffer，由 `flushBatch()` 合并为一次系统调用；`sendPing`/`sendPong` 以及关闭批处理（`setBatchingAllowed(false)`）时立即刷出。
+JSR-356 端点的 `RemoteEndpoint.setBatchingAllowed(true)` 支持真批处理：开启后 `sendText`/`sendBinary`/`sendObject` 只写入 Netty outbound buffer，由 `flushBatch()` 合并为一次系统调用；`sendPing`/`sendPong` 以及关闭批处理（`setBatchingAllowed(false)`）时立即刷出。攒批上限是 Netty outbound buffer 的高水位（默认 64KB），到水位即提前刷出——不会为省一次 flush 而让后续帧掉进背压队列被丢弃。
 
 ### 使用
 

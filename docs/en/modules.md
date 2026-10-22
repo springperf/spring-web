@@ -438,7 +438,7 @@ Lightweight WebSocket module based on Spring WebSocket API + Netty, routing WebS
 
 Supports path pattern matching (including `{pathVariable}`), per-handler override of Origin validation/idle timeout/heartbeat keepalive, and backpressure queues.
 
-JSR-356 endpoints support real batching via `RemoteEndpoint.setBatchingAllowed(true)`: `sendText`/`sendBinary`/`sendObject` only write into the Netty outbound buffer and `flushBatch()` sends them in a single system call; `sendPing`/`sendPong` and disabling batching (`setBatchingAllowed(false)`) flush immediately.
+JSR-356 endpoints support real batching via `RemoteEndpoint.setBatchingAllowed(true)`: `sendText`/`sendBinary`/`sendObject` only write into the Netty outbound buffer and `flushBatch()` sends them in a single system call; `sendPing`/`sendPong` and disabling batching (`setBatchingAllowed(false)`) flush immediately. The batch is capped by the Netty outbound buffer high watermark (64KB by default) and flushes early when it is reached, so saving a flush never costs frames to the backpressure queue.
 
 ### Usage
 

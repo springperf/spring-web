@@ -173,6 +173,12 @@ public class NettyWebSocketSession implements WebSocketSession {
                 notifyTransportError(f.cause());
             }
         });
+        if (!flush && !channel.isWritable()) {
+            // 攒批把帧压进 outbound buffer，一旦越过高水位，后续帧只能进背压队列（满 100 帧丢最旧帧）。
+            // 攒批场景下这条丢弃路径比逐条 flush 时容易命中得多，故到水位就提前刷出：
+            // 批处理省的是 flush 次数，不能拿消息完整性去换。
+            channel.flush();
+        }
     }
 
     /**
@@ -182,6 +188,12 @@ public class NettyWebSocketSession implements WebSocketSession {
      * </p>
      */
     public void flushBatch() {
+        // 通道已关闭：outbound buffer 里的帧不会再落网，且 EventLoop 可能已终止（execute 会抛
+        // RejectedExecutionException，把 unchecked 异常扔给业务线程）。注意判的是 channel 活性而非
+        // session 的 open 标志——关闭握手期间仍需把已暂存的帧刷出去。
+        if (!channel.isActive()) {
+            return;
+        }
         if (channel.eventLoop().inEventLoop()) {
             channel.flush();
         } else {

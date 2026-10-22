@@ -202,6 +202,21 @@ class WebSocketFragmentTest {
     }
 
     @Test
+    @DisplayName("首片即超限：关闭连接，不把聚合缓冲挂到连接上")
+    void firstFragmentExceedingSizeLimit_closesWithoutLeakingBuffer() throws Exception {
+        establishSession();
+
+        // session 默认 text limit 8KB：首片 9KB 直接超限。聚合状态必须在 append 之前挂到连接上，
+        // 否则超限路径里新建的 ByteBuf 既没被 release、也没进 channelInactive 的清理范围（孤儿缓冲）。
+        channel.pipeline().fireChannelRead(new TextWebSocketFrame(false, 0, Unpooled.wrappedBuffer(new byte[9216])));
+
+        verify(handler, timeout(2000)).handleTransportError(any(WebSocketSession.class),
+                any(java.io.IOException.class));
+        assertFalse(channel.isActive(), "首片超限同样应关闭连接");
+        verify(handler, times(0)).handleMessage(any(WebSocketSession.class), any(TextMessage.class));
+    }
+
+    @Test
     @DisplayName("连接断开时丢弃进行中的分片缓冲，不留孤儿 ByteBuf")
     void channelClosedMidFragment_releasesBuffer() throws Exception {
         establishSession();
