@@ -106,6 +106,28 @@ class NettyWebSocketSessionTest {
     }
 
     @Test
+    void sendBinaryMessage_twiceWithSameBuffer_sendsPayloadBothTimes() throws Exception {
+        // 回归：toFrame 曾直接对调用方的 ByteBuffer 做 get(byte[])，会推进 position。
+        // 同一个 buffer 发第二次就只剩 0 字节——静默丢消息且不报错，复用池化 buffer 的调用方必踩。
+        EmbeddedChannel channel = new EmbeddedChannel();
+        NettyWebSocketSession session = newSession(channel);
+        ByteBuffer payload = ByteBuffer.wrap(new byte[] { 1, 2, 3 });
+
+        session.sendMessage(new BinaryMessage(payload));
+        session.sendMessage(new BinaryMessage(payload));
+        channel.runPendingTasks();
+
+        WebSocketFrame first = channel.readOutbound();
+        WebSocketFrame second = channel.readOutbound();
+        assertArrayEquals(new byte[] { 1, 2, 3 }, io.netty.buffer.ByteBufUtil.getBytes(first.content()));
+        assertArrayEquals(new byte[] { 1, 2, 3 }, io.netty.buffer.ByteBufUtil.getBytes(second.content()), "第二次发送不得变空");
+        assertEquals(0, payload.position(), "发送不得消耗调用方的 ByteBuffer");
+        first.release();
+        second.release();
+        channel.finishAndReleaseAll();
+    }
+
+    @Test
     void sendPingPong_writesFrames() throws Exception {
         EmbeddedChannel channel = new EmbeddedChannel();
         NettyWebSocketSession session = newSession(channel);

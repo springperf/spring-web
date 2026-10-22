@@ -1,7 +1,7 @@
 package io.springperf.web.websocket.server;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.*;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.websocketx.*;
@@ -60,6 +60,9 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
     private static final String WS_DECODER = "ws-decoder";
     private static final String WS_ENCODER = "ws-encoder";
 
+    /** 空载荷常量：Pong 帧不携带应用数据时复用，避免每帧 {@code new byte[0]} + {@code wrap}。 */
+    private static final ByteBuffer EMPTY_PAYLOAD = ByteBuffer.allocate(0);
+
     /**
      * 分片消息的累积状态。
      * <p>
@@ -71,9 +74,15 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
         final boolean text;
         final ByteBuf buffer;
 
-        FragmentState(boolean text) {
+        /**
+         * @param alloc
+         *            通道的分配器（池化）；用 {@code Unpooled.buffer()} 会让大消息分片时一路扩容复制并产生额外 GC
+         * @param initialCapacity
+         *            按首片大小预分配，避免从默认 256 字节反复扩容
+         */
+        FragmentState(boolean text, ByteBufAllocator alloc, int initialCapacity) {
             this.text = text;
-            this.buffer = Unpooled.buffer();
+            this.buffer = alloc.buffer(initialCapacity);
         }
 
         void release() {
@@ -312,11 +321,17 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
                     return;
                 }
                 if (frame.isFinalFragment()) {
-                    // 未分片的完整消息，直接派发
+                    // 未分片的完整消息：同样按该 opcode 的 size limit 校验。
+                    // decoder 的 maxFrameSize 只能有一个值，取的是 max(textLimit, binaryLimit)，
+                    // 因此 text 限制较小时单帧文本会绕过限制（分片路径按各自限制拒绝）——
+                    // 不在此处校验，单帧就成了绕过 size limit 的通道。
+                    if (!checkMessageSize(ctx, session, handler, text, content)) {
+                        return;
+                    }
                     dispatchMessage(handler, session, text, content);
                 } else {
-                    // 分片起始帧（FIN=0）：建立聚合状态
-                    FragmentState state = new FragmentState(text);
+                    // 分片起始帧（FIN=0）：建立聚合状态；按首片大小预分配，减少扩容复制
+                    FragmentState state = new FragmentState(text, ctx.alloc(), Math.max(256, content.readableBytes()));
                     if (!appendFragment(ctx, session, handler, state, content, text)) {
                         return;
                     }
@@ -343,7 +358,7 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
             } else if (frame instanceof PingWebSocketFrame) {
                 ctx.writeAndFlush(new PongWebSocketFrame(frame.content().retain()));
             } else if (frame instanceof PongWebSocketFrame) {
-                handler.handleMessage(session, new PongMessage(ByteBuffer.wrap(new byte[0])));
+                handler.handleMessage(session, new PongMessage(EMPTY_PAYLOAD));
             } else if (frame instanceof CloseWebSocketFrame) {
                 CloseWebSocketFrame close = (CloseWebSocketFrame) frame;
                 int code = close.statusCode() >= 0 ? close.statusCode() : 1005;
@@ -416,6 +431,27 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
         // writeBytes 是拷贝，不接管 content 的引用；原始引用由外层 finally 的 frame.release() 释放
         state.buffer.writeBytes(content);
         return true;
+    }
+
+    /**
+     * 校验单帧消息是否超出该 opcode 的 size limit，超限即按协议违规关闭连接。
+     * <p>
+     * 与 {@link #appendFragment} 用同一套限制，保证「切成两片被拒、一次发完被收」这种不一致不再存在。
+     * </p>
+     *
+     * @return false 表示已超限并已处理，调用方不应继续
+     */
+    private boolean checkMessageSize(ChannelHandlerContext ctx, NettyWebSocketSession session, WebSocketHandler handler,
+            boolean text, ByteBuf content) {
+        int limit = text ? session.getTextMessageSizeLimit() : session.getBinaryMessageSizeLimit();
+        int size = content.readableBytes();
+        if (size <= limit) {
+            return true;
+        }
+        log.warn("WebSocket message exceeds {} limit ({} > {}), closing session {}", text ? "text" : "binary", size,
+                limit, session.getId());
+        failProtocol(ctx, session, handler, "message exceeds size limit");
+        return false;
     }
 
     private void releaseFragment(ChannelHandlerContext ctx) {

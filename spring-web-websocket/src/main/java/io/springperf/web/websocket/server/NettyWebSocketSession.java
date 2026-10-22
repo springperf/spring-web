@@ -182,7 +182,9 @@ public class NettyWebSocketSession implements WebSocketSession {
             return new TextWebSocketFrame(((TextMessage) message).isLast(), NO_RSV,
                     ((TextMessage) message).getPayload());
         } else if (message instanceof BinaryMessage) {
-            ByteBuffer buf = ((BinaryMessage) message).getPayload();
+            // 用 duplicate() 读取：get(byte[]) 会推进 position，若直接读调用方的 buffer，
+            // 同一个 ByteBuffer 发第二次就只剩 0 字节（静默丢消息，且不报错）。
+            ByteBuffer buf = ((BinaryMessage) message).getPayload().duplicate();
             byte[] bytes = new byte[buf.remaining()];
             buf.get(bytes);
             return new BinaryWebSocketFrame(((BinaryMessage) message).isLast(), NO_RSV, Unpooled.wrappedBuffer(bytes));
@@ -198,7 +200,8 @@ public class NettyWebSocketSession implements WebSocketSession {
     private void enqueueAndBackpressure(WebSocketMessage<?> message) {
         Queue<WebSocketFrame> queue = channel.attr(BACKPRESSURE_QUEUE_KEY).get();
         if (queue == null) {
-            Queue<WebSocketFrame> newQueue = new LinkedList<>();
+            // ArrayDeque 无逐帧 Node 分配、遍历局部性更好；队列本身只在 eventLoop 线程访问
+            Queue<WebSocketFrame> newQueue = new ArrayDeque<>();
             channel.attr(BACKPRESSURE_QUEUE_KEY).set(newQueue);
             // 通道关闭时释放队列中未写出的帧（Binary/Text 帧持有 ByteBuf 引用）。
             // 仅 clear() 会泄漏引用；帧始终由 eventLoop 线程串行入队/排空，此处同样安全。

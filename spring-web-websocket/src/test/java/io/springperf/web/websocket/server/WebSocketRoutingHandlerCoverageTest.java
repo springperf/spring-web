@@ -203,6 +203,44 @@ class WebSocketRoutingHandlerCoverageTest {
         ReferenceCountUtil.release(outbound);
     }
 
+    /* ==================== size limit：单帧与分片必须一致 ==================== */
+
+    @Test
+    void singleTextFrameOverLimit_rejected() throws Exception {
+        // decoder 的 maxFrameSize = max(textLimit, binaryLimit) = 64KB，20KB 文本单帧能过 Netty 解码，
+        // 但 session 的文本限制是 8KB。修复前只有分片路径校验，单帧直接派发——
+        // 于是同一条消息"切成两片被拒、一次发完被收"，单帧成了绕过 size limit 的通道。
+        handler = mock(WebSocketHandler.class);
+        channel = newChannel(new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), null, false, null));
+        channel.pipeline().fireChannelRead(upgradeRequest("/ws", null));
+        channel.runPendingTasks();
+        drainHandshakeResponse();
+
+        char[] big = new char[20 * 1024];
+        java.util.Arrays.fill(big, 'a');
+        channel.pipeline().fireChannelRead(new TextWebSocketFrame(new String(big)));
+        channel.runPendingTasks();
+
+        verify(handler, timeout(2000)).handleTransportError(any(WebSocketSession.class), any());
+        verify(handler, never()).handleMessage(any(WebSocketSession.class), any());
+        assertFalse(channel.isOpen(), "超限的单帧消息必须关闭连接，与分片路径一致");
+    }
+
+    @Test
+    void singleTextFrameWithinLimit_dispatched() throws Exception {
+        handler = mock(WebSocketHandler.class);
+        channel = newChannel(new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), null, false, null));
+        channel.pipeline().fireChannelRead(upgradeRequest("/ws", null));
+        channel.runPendingTasks();
+        drainHandshakeResponse();
+
+        char[] ok = new char[4 * 1024];
+        java.util.Arrays.fill(ok, 'a');
+        channel.pipeline().fireChannelRead(new TextWebSocketFrame(new String(ok)));
+
+        verify(handler, timeout(2000)).handleMessage(any(WebSocketSession.class), any(TextMessage.class));
+    }
+
     /* ==================== 异常兜底 ==================== */
 
     @Test
