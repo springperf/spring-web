@@ -48,12 +48,15 @@ public class JsrEndpointWebSocketHandler implements WebSocketHandler {
     private final JsrEndpointConfigAdapter config;
     private final ServerEndpointConfig.Configurator configurator;
     private final JsrWebSocketContainer container;
+    /** {@code @OnMessage} 实参中消息体的下标；无消息参数时为 -1。 */
+    private final int messageArgIndex;
 
     public JsrEndpointWebSocketHandler(JsrEndpointMetadata metadata, JsrWebSocketContainer container) {
         this.metadata = metadata;
         this.config = new JsrEndpointConfigAdapter(metadata);
         this.configurator = config.getConfigurator();
         this.container = container;
+        this.messageArgIndex = indexOfMessageParam(metadata.getOnMessageParams());
         // 回调方法在连接建立时一次性置为 accessible。setAccessible 是 @CallerSensitive，
         // 每次调用都要过模块/安全管理器检查——放在 invoke 里等于每条消息付一次纯开销。
         makeAccessible(metadata.getOnOpen());
@@ -68,6 +71,15 @@ public class JsrEndpointWebSocketHandler implements WebSocketHandler {
         }
     }
 
+    private static int indexOfMessageParam(List<JsrEndpointMetadata.ParamSpec> specs) {
+        for (int i = 0; i < specs.size(); i++) {
+            if (specs.get(i).kind == JsrEndpointMetadata.ParamKind.MESSAGE) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     // ===================== Spring WebSocketHandler =====================
 
     @Override
@@ -77,7 +89,11 @@ public class JsrEndpointWebSocketHandler implements WebSocketHandler {
         Map<String, String> pathParams = resolvePathParameters(springSession);
         JsrWebSocketSession jsrSession = new JsrWebSocketSession(springSession, container, codecRegistry, pathParams);
 
-        springSession.getAttributes().put(STATE_KEY, new JsrConnectionState(endpoint, jsrSession, codecRegistry));
+        // 实参模板：SESSION / EndpointConfig / @PathParam 都是连接级常量，只有消息槽位逐帧变化，
+        // 因此在连接建立时建好数组，消息路径不再每次 new Object[n] + switch 分发。
+        Object[] onMessageArgs = resolveArgs(metadata.getOnMessageParams(), jsrSession, config, null, null, null);
+        springSession.getAttributes().put(STATE_KEY,
+                new JsrConnectionState(endpoint, jsrSession, codecRegistry, onMessageArgs));
 
         Method onOpen = metadata.getOnOpen();
         if (onOpen != null) {
@@ -104,13 +120,22 @@ public class JsrEndpointWebSocketHandler implements WebSocketHandler {
         }
         JsrEndpointMetadata.ParamSpec messageParam = metadata.getMessageParam();
         Object decoded = decode(message, messageParam, state.codecRegistry);
-        Object[] args = resolveArgs(metadata.getOnMessageParams(), state.jsrSession, config, decoded, null, null);
+        // 复用连接级实参模板：帧派发由 channel 的 EventLoop 串行执行，且 Method#invoke 不保留数组引用。
+        // 退出时清空消息槽位，避免把上一帧的大 payload 一直挂在连接状态上。
+        Object[] args = state.onMessageArgs;
+        if (messageArgIndex >= 0) {
+            args[messageArgIndex] = decoded;
+        }
         Object returnValue;
         try {
             returnValue = invokeWithReturn(state.endpoint, onMessage, args);
         } catch (InvocationTargetException ex) {
             handleEndpointError(state, ex.getTargetException());
             return;
+        } finally {
+            if (messageArgIndex >= 0) {
+                args[messageArgIndex] = null;
+            }
         }
         if (returnValue != null) {
             sendReturnValue(springSession, returnValue, state.codecRegistry);
@@ -308,16 +333,31 @@ public class JsrEndpointWebSocketHandler implements WebSocketHandler {
         return (JsrConnectionState) springSession.getAttributes().get(STATE_KEY);
     }
 
+    /**
+     * 包内测试钩子：连接上复用的 {@code @OnMessage} 实参模板。
+     * <p>
+     * 用于验证「模板不逐消息重建、退出时清空消息槽位」这一性能契约（生产代码不调用）。
+     * </p>
+     */
+    Object[] onMessageArgsOf(WebSocketSession springSession) {
+        JsrConnectionState state = getState(springSession);
+        return state != null ? state.onMessageArgs : null;
+    }
+
     /** 单连接状态。 */
     private static final class JsrConnectionState {
         final Object endpoint;
         final JsrWebSocketSession jsrSession;
         final JsrCodecRegistry codecRegistry;
+        /** {@code @OnMessage} 实参模板：常量槽位已填好，消息槽位逐帧覆盖后清空。 */
+        final Object[] onMessageArgs;
 
-        JsrConnectionState(Object endpoint, JsrWebSocketSession jsrSession, JsrCodecRegistry codecRegistry) {
+        JsrConnectionState(Object endpoint, JsrWebSocketSession jsrSession, JsrCodecRegistry codecRegistry,
+                Object[] onMessageArgs) {
             this.endpoint = endpoint;
             this.jsrSession = jsrSession;
             this.codecRegistry = codecRegistry;
+            this.onMessageArgs = onMessageArgs;
         }
     }
 }
