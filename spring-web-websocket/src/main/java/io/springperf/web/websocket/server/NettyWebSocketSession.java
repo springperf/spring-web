@@ -1,5 +1,6 @@
 package io.springperf.web.websocket.server;
 
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
@@ -228,11 +229,32 @@ public class NettyWebSocketSession implements WebSocketSession {
             buf.get(bytes);
             return new BinaryWebSocketFrame(((BinaryMessage) message).isLast(), NO_RSV, Unpooled.wrappedBuffer(bytes));
         } else if (message instanceof PingMessage) {
-            return new PingWebSocketFrame();
+            return new PingWebSocketFrame(copyControlPayload(((PingMessage) message).getPayload()));
         } else if (message instanceof PongMessage) {
-            return new PongWebSocketFrame();
+            return new PongWebSocketFrame(copyControlPayload(((PongMessage) message).getPayload()));
         }
         return null;
+    }
+
+    /**
+     * 拷贝 Ping/Pong 的应用数据（RFC 6455 §5.5.2/§5.5.3，控制帧载荷上限 125 字节）。
+     * <p>
+     * 必须拷贝而非用 {@code Unpooled.wrappedBuffer(ByteBuffer)} 共享：JSR 的 {@code sendPing/sendPong} 与 Spring 的
+     * {@code PingMessage/PongMessage} 都不约束调用方在返回后不再改动 buffer，而帧要等 flush 才落网（批处理下更晚）， 共享内存会让调用方复用池化 buffer 时写坏待发数据。125
+     * 字节以内的拷贝成本可忽略。
+     * </p>
+     * <p>
+     * 修复前这里用无参构造，应用数据被静默丢弃。
+     * </p>
+     */
+    private static ByteBuf copyControlPayload(ByteBuffer payload) {
+        ByteBuffer source = payload.duplicate();
+        if (!source.hasRemaining()) {
+            return Unpooled.EMPTY_BUFFER;
+        }
+        byte[] bytes = new byte[source.remaining()];
+        source.get(bytes);
+        return Unpooled.wrappedBuffer(bytes);
     }
 
     @SuppressWarnings("unchecked")

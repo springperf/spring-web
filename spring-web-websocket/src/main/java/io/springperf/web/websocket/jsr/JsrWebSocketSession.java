@@ -13,6 +13,7 @@ import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.security.Principal;
 import java.util.Collections;
 import java.util.HashMap;
@@ -90,6 +91,20 @@ public class JsrWebSocketSession implements Session {
     void flushBatch() {
         if (nettySession != null) {
             nettySession.flushBatch();
+        }
+    }
+
+    /** RFC 6455 §5.5：控制帧载荷上限 125 字节。 */
+    static final int MAX_CONTROL_FRAME_PAYLOAD = 125;
+
+    /**
+     * 校验 Ping/Pong 的载荷长度。JSR-356 规定超限抛 {@link IllegalArgumentException}：超限控制帧是协议违规，
+     * 对端会直接以协议错误断开连接，所以必须在发送前拒绝，而不是把非法帧写出去。
+     */
+    static void checkControlFramePayload(ByteBuffer applicationData) {
+        if (applicationData != null && applicationData.remaining() > MAX_CONTROL_FRAME_PAYLOAD) {
+            throw new IllegalArgumentException("Control frame payload must not exceed " + MAX_CONTROL_FRAME_PAYLOAD
+                    + " bytes, but was " + applicationData.remaining());
         }
     }
 

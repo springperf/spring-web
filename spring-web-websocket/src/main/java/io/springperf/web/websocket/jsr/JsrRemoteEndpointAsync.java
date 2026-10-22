@@ -157,12 +157,14 @@ public class JsrRemoteEndpointAsync implements RemoteEndpoint.Async {
 
     @Override
     public void sendPing(ByteBuffer applicationData) throws IOException, IllegalArgumentException {
+        JsrWebSocketSession.checkControlFramePayload(applicationData);
         // 控制帧不受批处理影响：心跳滞留会触发对端空闲超时
         session.send(new org.springframework.web.socket.PingMessage(applicationData), true);
     }
 
     @Override
     public void sendPong(ByteBuffer applicationData) throws IOException, IllegalArgumentException {
+        JsrWebSocketSession.checkControlFramePayload(applicationData);
         session.send(new org.springframework.web.socket.PongMessage(applicationData), true);
     }
 }

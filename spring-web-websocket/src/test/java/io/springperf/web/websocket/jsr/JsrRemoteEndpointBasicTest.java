@@ -14,8 +14,10 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -218,6 +220,29 @@ class JsrRemoteEndpointBasicTest {
         assertTrue(channel.readOutbound() instanceof TextWebSocketFrame);
         assertTrue(channel.readOutbound() instanceof PingWebSocketFrame);
         channel.finishAndReleaseAll();
+    }
+
+    @Test
+    void sendPing_payloadReachesFrame() throws Exception {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        RemoteEndpoint.Basic batched = newBatchedRemote(channel);
+
+        batched.sendPing(ByteBuffer.wrap(new byte[] { 1, 2 }));
+
+        PingWebSocketFrame frame = channel.readOutbound();
+        assertNotNull(frame, "Ping 帧必须立即落网（心跳不受批处理影响）");
+        byte[] actual = new byte[frame.content().readableBytes()];
+        frame.content().getBytes(frame.content().readerIndex(), actual);
+        assertArrayEquals(new byte[] { 1, 2 }, actual, "JSR 的 sendPing 应用数据不得被丢弃");
+        frame.release();
+        channel.finishAndReleaseAll();
+    }
+
+    @Test
+    void sendPingPong_oversizedPayload_rejected() throws IOException {
+        // RFC 6455 §5.5 + JSR-356：控制帧载荷上限 125 字节，超限是协议违规，必须在发送前拒绝
+        assertThrows(IllegalArgumentException.class, () -> remote.sendPing(ByteBuffer.wrap(new byte[126])));
+        assertThrows(IllegalArgumentException.class, () -> remote.sendPong(ByteBuffer.wrap(new byte[126])));
     }
 
     /** 底层不是 Netty 实现时没有暂存能力：必须退化为逐条立即发送，而不是静默丢弃消息。 */

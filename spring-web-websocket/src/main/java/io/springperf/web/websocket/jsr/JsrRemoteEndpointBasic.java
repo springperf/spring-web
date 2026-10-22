@@ -108,12 +108,14 @@ public class JsrRemoteEndpointBasic implements RemoteEndpoint.Basic {
 
     @Override
     public void sendPing(ByteBuffer applicationData) throws IOException, IllegalArgumentException {
+        JsrWebSocketSession.checkControlFramePayload(applicationData);
         // 控制帧不受批处理影响：ping/pong 直接影响对端保活与空闲检测，滞留到下一次 flush 会被当作心跳丢失
         session.send(new org.springframework.web.socket.PingMessage(applicationData), true);
     }
 
     @Override
     public void sendPong(ByteBuffer applicationData) throws IOException, IllegalArgumentException {
+        JsrWebSocketSession.checkControlFramePayload(applicationData);
         session.send(new org.springframework.web.socket.PongMessage(applicationData), true);
     }
 }

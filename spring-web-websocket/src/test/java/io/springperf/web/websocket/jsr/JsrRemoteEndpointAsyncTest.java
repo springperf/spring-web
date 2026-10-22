@@ -147,6 +147,14 @@ class JsrRemoteEndpointAsyncTest {
     }
 
     @Test
+    void sendPingOversizedPayload_rejected() throws IOException {
+        // 与 Basic 同一约束：控制帧载荷 125 字节上限，超限必须在发送前抛 IllegalArgumentException
+        assertThrows(IllegalArgumentException.class, () -> remote.sendPing(ByteBuffer.wrap(new byte[126])));
+        assertThrows(IllegalArgumentException.class, () -> remote.sendPong(ByteBuffer.wrap(new byte[126])));
+        verify(springSession, never()).sendMessage(any());
+    }
+
+    @Test
     void batching_nonNettySession_fallsBackToImmediateSend() throws Exception {
         remote.setBatchingAllowed(true);
         remote.sendText("hello").get();
