@@ -309,7 +309,30 @@ SSE/流式输出需生产者（EventLoop 或业务线程）→ 消费者（Event
 
 ---
 
-## 小结：十一条决策的共同主线
+## ADR 12：WebSocket 收发不做零拷贝（保 Spring `WebSocketMessage` 契约与批处理安全）
+
+### 背景
+
+WebSocket 模块有两处显眼的拷贝：接收侧把二进制帧的 `ByteBuf` 拷成 `byte[]` 再 `ByteBuffer.wrap`；发送侧把 `BinaryMessage` 的 `ByteBuffer` 再拷成 `byte[]` 交给 `Unpooled.wrappedBuffer`。两处都能用 `ByteBuf.nioBuffer()` / `Unpooled.wrappedBuffer(ByteBuffer)` 共享内存直接消掉，看起来是白捡的收益。
+
+### 决策
+
+**都不改**，理由分别落在"对外契约"和"批处理语义"上：
+
+- **接收侧**：模块对外暴露的是 Spring 的 `WebSocketHandler#handleMessage(WebSocketSession, WebSocketMessage<?>)`，`BinaryMessage` 的载荷类型就是 `byte[]`。零拷贝等于把 `ByteBuf` 视图交出去，其有效期绑定到帧的 `release()`——用户回调返回后立即失效。要么改公共契约（引入"仅回调期间有效"的寿命约定），要么把引用计数管理暴露给业务代码，两者都与"SpringMVC/Spring WebSocket 无侵入替换"的定位冲突。
+- **发送侧**：`Unpooled.wrappedBuffer(ByteBuffer)` 会让帧直接引用调用方的 buffer，而写操作**不保证同步落网**——`RemoteEndpoint.setBatchingAllowed(true)` 下帧先进 outbound buffer，等 `flushBatch()`（见 [`docs/modules.md`](../modules.md) 的批处理说明）：业务线程在此期间复用池化 buffer 就会写坏待发数据。**发送侧零拷贝与延迟 flush 在语义上互斥**：要零拷贝就得放弃批处理，或要求调用方显式移交所有权。
+
+### 后果
+
+- **收益**：`WebSocketMessage` 契约不变（业务方收到的 `byte[]` 可自由持有）；调用方复用池化 `ByteBuffer` 是安全的（发送时即拷贝）；批处理可以安全地延迟 flush。
+- **代价**：每帧二进制消息两次内存拷贝（收/发各一次），数十 KB 以上大消息在 memcpy 与 GC 上可见；文本路径本身需要 UTF-8 解码成 `String`，零拷贝省不掉这一步。
+- **边界 / 重新审视条件**：若未来①出现绕过 Spring `WebSocketMessage` 的"内部帧直通"专用 SPI；或②提供显式的所有权移交 API（如 `sendBinaryOwned(ByteBuf)`，契约写明调用方让出 buffer）——两者都是契约级设计变更，届时再评估零拷贝。
+
+**关联**：[`docs/modules.md`](../modules.md) WebSocket 章节（`flushBatch` 语义）、`spring-web-websocket` 的 `NettyWebSocketSession#sendMessage(WebSocketMessage, boolean)`。
+
+---
+
+## 小结：十二条决策的共同主线
 
 | # | 决策 | 状态 | 代价 | 边界核心 |
 |---|------|------|------|---------|
@@ -324,8 +347,9 @@ SSE/流式输出需生产者（EventLoop 或业务线程）→ 消费者（Event
 | 9 | fail-fast 启动校验 | 已采纳 | 启动期遍历成本 | 动态注册时退化为注册时校验 |
 | 10 | 显式 SPI 收口 vs `@Conditional` | 已采纳 | 同名覆盖机制隐式 | `RouterOptimizer` 不走类型发现 |
 | 11 | Servlet 容器语义下沉管线，键名与实现模块分离 | 已采纳 | 键命名空间与模块错位 + multipart 双家族并存 | 引入 reactive 栈或统一键家族时重新审视 |
+| 12 | WebSocket 收发不做零拷贝 | 已采纳 | 每帧两次拷贝 | 出现帧直通 SPI 或所有权移交 API 时重评估 |
 
-十一条决策背后是三条一以贯之的主线：
+十二条决策背后是三条一以贯之的主线：
 
 1. **启动期确定性 + 运行时零开销**（ADR 1/3/9）：把"确定"从运行时前移到启动期——ASM 字节码生成、`int index` 分配、fail-fast 校验都在启动期完成，运行时只做数组索引与无锁 drain。这与 [16 篇](16-code-spotlights.md) 小结的"启动期做尽计算，运行时只做最必要的事"完全一致。
 2. **显式优于隐式，但不发明轮子**（ADR 4/10）：`@RunInPool` 显式声明执行位置（命名业务池或 EventLoop）、`WebComponent` 显式收口 SPI 发现——框架在关键决策点让用户显式表态（而非靠惯例推断）；但又不发明 `@WebComponent` 注解，复用 Spring `Ordered`/`@Order` 与 `AnnotationAwareOrderComparator`，扩展方零学习成本。
