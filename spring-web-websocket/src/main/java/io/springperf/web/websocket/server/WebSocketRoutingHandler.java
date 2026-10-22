@@ -5,6 +5,9 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.*;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.websocketx.*;
+import io.netty.handler.codec.http.websocketx.extensions.WebSocketExtensionData;
+import io.netty.handler.codec.http.websocketx.extensions.WebSocketServerExtension;
+import io.netty.handler.codec.http.websocketx.extensions.compression.PerMessageDeflateServerExtensionHandshaker;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
@@ -25,7 +28,9 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -60,8 +65,19 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
      */
     private static final AttributeKey<WsConnection> CONNECTION_KEY = AttributeKey.valueOf("ws.connection");
 
-    private static final String WS_DECODER = "ws-decoder";
-    private static final String WS_ENCODER = "ws-encoder";
+    /**
+     * {@code WebSocketServerHandshaker.handshake()} 自己插入的帧编解码器名字（Netty 内部约定，无公开常量）。 扩展编解码器必须相对它们插入：它们才是真正做「字节 ↔
+     * 帧」转换的那一对。
+     */
+    private static final String NETTY_WS_DECODER = "wsdecoder";
+    private static final String NETTY_WS_ENCODER = "wsencoder";
+    private static final String WS_DEFLATE_DECODER = "ws-deflate-decoder";
+    private static final String WS_DEFLATE_ENCODER = "ws-deflate-encoder";
+
+    /**
+     * permessage-deflate 协商器（无状态，可跨连接共享）。默认参数：6 级压缩、接受客户端窗口位协商、不带 context takeover 偏好。
+     */
+    private static final PerMessageDeflateServerExtensionHandshaker PERMESSAGE_DEFLATE = new PerMessageDeflateServerExtensionHandshaker();
 
     /** 空载荷常量：Pong 帧不携带应用数据时复用，避免每帧 {@code new byte[0]} + {@code wrap}。 */
     private static final ByteBuffer EMPTY_PAYLOAD = ByteBuffer.allocate(0);
@@ -185,9 +201,16 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
 
         String wsUrl = buildWebSocketUrl(ctx, req, path);
         String effectiveSubProtocols = resolveSubProtocols(result.registration);
-        boolean effectiveExtensions = resolveAllowExtensions(result.registration);
+        boolean extensionOffered = resolveAllowExtensions(result.registration);
+        // 只有真正协商成功才让帧解码器接受 RSV 位：仅仅 allowExtensions=true 而客户端没提扩展时，
+        // 客户端发来的 RSV1 压缩帧会被当成普通帧交给业务（静默乱码）。
+        WebSocketServerExtension negotiatedExtension = extensionOffered ? negotiatePerMessageDeflate(req.headers())
+                : null;
+        boolean rsvAllowed = negotiatedExtension != null;
+        // 帧上限交给握手器创建的解码器：它才是真正做「字节 → 帧」的那一环。
+        // 之前用 3 参构造（隐式 64KB）再加一个自有 decoder，导致 per-path 上限 > 64KB 时被前置 decoder 拦掉。
         WebSocketServerHandshakerFactory factory = new WebSocketServerHandshakerFactory(wsUrl, effectiveSubProtocols,
-                effectiveExtensions);
+                rsvAllowed, resolveMaxFrameSize(result.registration));
         WebSocketServerHandshaker handshaker = factory.newHandshaker(req);
 
         if (handshaker == null) {
@@ -198,7 +221,19 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
         }
 
         try {
-            handshaker.handshake(ctx.channel(), (FullHttpRequest) req).addListener((ChannelFutureListener) future -> {
+            ChannelFuture handshake;
+            if (negotiatedExtension != null) {
+                // 协商结果必须写在握手响应里，客户端才会启用压缩。本框架是手写握手（不经过
+                // WebSocketServerProtocolHandler，也就不会触发 Netty 的 HANDSHAKE_COMPLETE 事件），
+                // 因此这里自己写响应头、握手完成后再自己装编解码器。
+                HttpHeaders responseHeaders = new DefaultHttpHeaders().set(HttpHeaderNames.SEC_WEBSOCKET_EXTENSIONS,
+                        toExtensionHeaderValue(negotiatedExtension.newReponseData()));
+                handshake = handshaker.handshake(ctx.channel(), (FullHttpRequest) req, responseHeaders,
+                        ctx.channel().newPromise());
+            } else {
+                handshake = handshaker.handshake(ctx.channel(), (FullHttpRequest) req);
+            }
+            handshake.addListener((ChannelFutureListener) future -> {
                 if (!future.isSuccess()) {
                     log.error("WebSocket handshake failed for {}", path, future.cause());
                     // 握手失败：请求不再被使用，释放调用方持有的原始引用
@@ -208,7 +243,7 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
                     ctx.close();
                     return;
                 }
-                afterHandshakeSuccess(ctx, req, path, handshaker, result);
+                afterHandshakeSuccess(ctx, req, path, handshaker, result, negotiatedExtension);
             });
         } catch (Exception e) {
             // handshake() 同步抛异常时也要释放原始引用。注意与上一条的区别：pipeline 缺少
@@ -224,7 +259,8 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
     }
 
     private void afterHandshakeSuccess(ChannelHandlerContext ctx, HttpRequest req, String path,
-            WebSocketServerHandshaker handshaker, PathMatchResult result) {
+            WebSocketServerHandshaker handshaker, PathMatchResult result,
+            @Nullable WebSocketServerExtension negotiatedExtension) {
         // 构建 URI 和 Headers
         URI sessionUri = buildSessionUri(req);
         SpringHeadersAdapter springHeaders = new SpringHeadersAdapter(req.headers());
@@ -261,12 +297,14 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
                     effectiveIdleTimeout, java.util.concurrent.TimeUnit.MILLISECONDS));
         }
 
-        // 从 session 的 sizeLimit 决定 decoder 的最大帧载荷长度
-        int maxFrameSize = Math.max(session.getTextMessageSizeLimit(), session.getBinaryMessageSizeLimit());
-        boolean effectiveExtensions = resolveAllowExtensions(result.registration);
-        pipeline.addBefore(currentName, WS_DECODER,
-                new WebSocket08FrameDecoder(false, effectiveExtensions, maxFrameSize));
-        pipeline.addBefore(currentName, WS_ENCODER, new WebSocket08FrameEncoder(false));
+        // 帧编解码器由 WebSocketServerHandshaker.handshake() 自己装好（Netty 的 "wsdecoder"/"wsencoder"），
+        // 这里不再重复添加一套：以前额外加的 ws-decoder/ws-encoder 从不参与字节↔帧转换，只是每帧多跑一层空转。
+        if (negotiatedExtension != null) {
+            // 入站：字节 → 帧解码(wsdecoder) → 解压 → 业务；出站：业务 → 压缩 → 帧编码(wsencoder) → 字节。
+            // 故解压器插在 wsdecoder 之后、压缩器插在 wsencoder 之后（更靠近 tail，出站先经过它）。
+            pipeline.addAfter(NETTY_WS_DECODER, WS_DEFLATE_DECODER, negotiatedExtension.newExtensionDecoder());
+            pipeline.addAfter(NETTY_WS_ENCODER, WS_DEFLATE_ENCODER, negotiatedExtension.newExtensionEncoder());
+        }
         removeHttpHandlers(pipeline);
 
         WsConnection connection = new WsConnection(session, result.handler);
@@ -299,6 +337,106 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
         // 持有的原始引用（HttpObjectAggregator fireChannelRead 转移的所有权）。
         // 修复前不释放：每次 WS 握手泄漏 1 个 FullHttpRequest 引用，触发 Netty LEAK 检测。
         ReferenceCountUtil.release(req);
+    }
+
+    /**
+     * 解码器的最大帧载荷长度：per-path 覆盖优先，否则取会话默认值中较大的那个（text 8KB / binary 64KB）。
+     * <p>
+     * 单帧长度上限只是一个技术上限；真正的 text/binary 语义上限仍由 {@code checkMessageSize} 按消息类型分别校验。
+     * </p>
+     */
+    private int resolveMaxFrameSize(@Nullable io.springperf.web.websocket.WebSocketHandlerRegistration registration) {
+        long limit = resolveMessageSizeLimit(registration);
+        if (limit > 0) {
+            return (int) limit;
+        }
+        return Math.max(NettyWebSocketSession.DEFAULT_TEXT_MESSAGE_SIZE_LIMIT,
+                NettyWebSocketSession.DEFAULT_BINARY_MESSAGE_SIZE_LIMIT);
+    }
+
+    /**
+     * 把协商出的扩展转成 {@code Sec-WebSocket-Extensions} 的响应头值。
+     * <p>
+     * {@link WebSocketExtensionData} 没有重写 {@code toString()}（直接拼会得到 {@code Class@hash}），必须自己拼。
+     * </p>
+     */
+    private static String toExtensionHeaderValue(WebSocketExtensionData data) {
+        StringBuilder value = new StringBuilder(data.name());
+        data.parameters().forEach((name, parameterValue) -> {
+            value.append("; ").append(name);
+            if (!parameterValue.isEmpty()) {
+                value.append('=').append(parameterValue);
+            }
+        });
+        return value.toString();
+    }
+
+    /**
+     * 从升级请求里协商 permessage-deflate。
+     * <p>
+     * 直接复用 Netty 的协商器（参数、窗口位、no-context-takeover 都由它决定），只自己负责「解析请求头 → 写响应头 → 装编解码器」这三步，因为本框架不走
+     * {@code WebSocketServerProtocolHandler}，Netty 的 {@code WebSocketServerExtensionHandler} 依赖它抛出的
+     * {@code HANDSHAKE_COMPLETE} 事件，用不上。
+     * </p>
+     *
+     * @return 协商成功的扩展；客户端未提或参数不可接受时为 null（不启用压缩）
+     */
+    @Nullable
+    private static WebSocketServerExtension negotiatePerMessageDeflate(HttpHeaders requestHeaders) {
+        for (String value : requestHeaders.getAll(HttpHeaderNames.SEC_WEBSOCKET_EXTENSIONS)) {
+            for (WebSocketExtensionData data : parseExtensionHeader(value)) {
+                WebSocketServerExtension extension = PERMESSAGE_DEFLATE.handshakeExtension(data);
+                if (extension != null) {
+                    return extension;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 解析 {@code Sec-WebSocket-Extensions} 的一个头值，例如 {@code "permessage-deflate; client_max_window_bits, x-unknown"} → 两个
+     * {@link WebSocketExtensionData}。
+     * <p>
+     * Netty 的解析工具类不在公开 API 里，这里按 RFC 6455 §9.1 的最小语法实现：逗号分条目、分号分参数、 无值参数（如 {@code client_max_window_bits}）记为空串。
+     * </p>
+     */
+    private static List<WebSocketExtensionData> parseExtensionHeader(String value) {
+        List<WebSocketExtensionData> result = new ArrayList<>(2);
+        for (String entry : value.split(",")) {
+            String trimmedEntry = entry.trim();
+            if (trimmedEntry.isEmpty()) {
+                continue;
+            }
+            String[] tokens = trimmedEntry.split(";");
+            Map<String, String> parameters = new HashMap<>(2);
+            for (int i = 1; i < tokens.length; i++) {
+                String token = tokens[i].trim();
+                if (token.isEmpty()) {
+                    continue;
+                }
+                int eq = token.indexOf('=');
+                if (eq < 0) {
+                    // 无值参数：no_context_takeover 这类布尔开关必须保留（Netty 用 containsKey 判断）；
+                    // 但 *_window_bits 是数值参数，浏览器常发的 `client_max_window_bits`（无值）会让 Netty 的
+                    // 协商器 parseInt("") 直接抛异常。忽略它等价于「不回该参数」，对端按 15 位默认窗口处理，协议合法。
+                    if (!token.endsWith("_window_bits")) {
+                        parameters.put(token, "");
+                    }
+                } else {
+                    parameters.put(token.substring(0, eq).trim(), unquote(token.substring(eq + 1).trim()));
+                }
+            }
+            result.add(new WebSocketExtensionData(tokens[0].trim(), parameters));
+        }
+        return result;
+    }
+
+    private static String unquote(String value) {
+        if (value.length() >= 2 && value.charAt(0) == '"' && value.charAt(value.length() - 1) == '"') {
+            return value.substring(1, value.length() - 1);
+        }
+        return value;
     }
 
     private void removeHttpHandlers(ChannelPipeline pipeline) {
