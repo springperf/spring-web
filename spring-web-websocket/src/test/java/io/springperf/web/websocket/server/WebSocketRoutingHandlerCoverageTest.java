@@ -82,8 +82,7 @@ class WebSocketRoutingHandlerCoverageTest {
 
     /** 取回握手时挂在 channel 上的 session，用于主动 close 等操作。 */
     private NettyWebSocketSession sessionOf(EmbeddedChannel ch) {
-        NettyWebSocketSession session = ch
-                .attr(io.netty.util.AttributeKey.<NettyWebSocketSession> valueOf("ws.session")).get();
+        NettyWebSocketSession session = WebSocketRoutingHandler.sessionOf(ch);
         assertNotNull(session, "握手成功后 channel 上应挂有 session");
         return session;
     }
