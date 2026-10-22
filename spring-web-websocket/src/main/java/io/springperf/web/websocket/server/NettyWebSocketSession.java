@@ -2,6 +2,7 @@ package io.springperf.web.websocket.server;
 
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.handler.codec.http.websocketx.*;
 import io.netty.handler.timeout.IdleStateHandler;
@@ -126,16 +127,30 @@ public class NettyWebSocketSession implements WebSocketSession {
 
     @Override
     public void sendMessage(WebSocketMessage<?> message) throws IOException {
+        sendMessage(message, true);
+    }
+
+    /**
+     * 发送消息，由调用方决定是否立即 flush。
+     * <p>
+     * {@code flush=false} 时帧只进入 Netty 的 outbound buffer，直到显式 {@link #flushBatch()}、 后续任意一次 flush 写或会话关闭（Close 帧自身
+     * flush）才真正落网。JSR-356 的 {@code RemoteEndpoint.setBatchingAllowed(true)} 依赖该原语把多条小消息合并为一次系统调用。
+     * </p>
+     *
+     * @param flush
+     *            {@code true} 立即落网（默认语义）；{@code false} 暂存待批量刷出
+     */
+    public void sendMessage(WebSocketMessage<?> message, boolean flush) throws IOException {
         if (!isOpen()) {
             throw new IOException("Session " + id + " is closed");
         }
         // EventLoop 串行化 write，防止多线程并发导致帧交织
         if (channel.eventLoop().inEventLoop()) {
-            doSendMessage(message);
+            doSendMessage(message, flush);
         } else {
             channel.eventLoop().execute(() -> {
                 try {
-                    doSendMessage(message);
+                    doSendMessage(message, flush);
                 } catch (Exception e) {
                     notifyTransportError(e);
                 }
@@ -143,22 +158,34 @@ public class NettyWebSocketSession implements WebSocketSession {
         }
     }
 
-    private void doSendMessage(WebSocketMessage<?> message) {
+    private void doSendMessage(WebSocketMessage<?> message, boolean flush) {
         if (!channel.isWritable()) {
             enqueueAndBackpressure(message);
             return;
         }
-        flushMessage(message);
+        WebSocketFrame frame = toFrame(message);
+        if (frame == null) {
+            return;
+        }
+        ChannelFuture future = flush ? channel.writeAndFlush(frame) : channel.write(frame);
+        future.addListener((ChannelFutureListener) f -> {
+            if (!f.isSuccess() && handler != null) {
+                notifyTransportError(f.cause());
+            }
+        });
     }
 
-    private void flushMessage(WebSocketMessage<?> message) {
-        WebSocketFrame frame = toFrame(message);
-        if (frame != null) {
-            channel.writeAndFlush(frame).addListener((ChannelFutureListener) future -> {
-                if (!future.isSuccess() && handler != null) {
-                    notifyTransportError(future.cause());
-                }
-            });
+    /**
+     * 刷出当前累积在 outbound buffer 中的帧（JSR-356 {@code RemoteEndpoint#flushBatch()} 的底层原语）。
+     * <p>
+     * 非 EventLoop 线程调用时投递到 EventLoop 执行，与 {@link #sendMessage} 走同一条 FIFO 投递队列， 因此不会出现「flush 抢在其前的 write 之前执行」而漏刷的情况。
+     * </p>
+     */
+    public void flushBatch() {
+        if (channel.eventLoop().inEventLoop()) {
+            channel.flush();
+        } else {
+            channel.eventLoop().execute(channel::flush);
         }
     }
 
@@ -244,6 +271,7 @@ public class NettyWebSocketSession implements WebSocketSession {
     @Override
     public void close(CloseStatus status) throws IOException {
         open = false;
+        // writeAndFlush 会连带刷出批处理中暂存的帧，保证关闭前已发送但未 flush 的消息不丢失
         channel.writeAndFlush(new CloseWebSocketFrame(status.getCode(), status.getReason()))
                 .addListener(ChannelFutureListener.CLOSE);
     }

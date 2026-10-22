@@ -1,6 +1,12 @@
 package io.springperf.web.websocket.jsr;
 
+import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
+import io.springperf.web.websocket.server.NettyWebSocketSession;
+import io.springperf.web.websocket.server.SpringHeadersAdapter;
 import jakarta.websocket.EncodeException;
+import jakarta.websocket.RemoteEndpoint;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.socket.*;
 
@@ -8,7 +14,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -148,10 +156,88 @@ class JsrRemoteEndpointBasicTest {
     }
 
     @Test
-    void batching_noop() throws IOException {
-        remote.setBatchingAllowed(true);
+    void setBatchingAllowed_togglesFlag() throws IOException {
         assertFalse(remote.getBatchingAllowed());
+        remote.setBatchingAllowed(true);
+        assertTrue(remote.getBatchingAllowed());
+        remote.setBatchingAllowed(false);
+        assertFalse(remote.getBatchingAllowed());
+    }
+
+    /** 批处理开启后消息必须停在 outbound buffer，只有 flushBatch 才落网——否则「批处理」等价于逐条发送。 */
+    @Test
+    void batching_defersFramesUntilFlushBatch() throws Exception {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        RemoteEndpoint.Basic batched = newBatchedRemote(channel);
+
+        batched.setBatchingAllowed(true);
+        batched.sendText("a");
+        batched.sendText("b");
+        channel.runPendingTasks();
+        assertNull(channel.readOutbound(), "开启批处理时不得逐条落网");
+
+        batched.flushBatch();
+        TextWebSocketFrame first = channel.readOutbound();
+        TextWebSocketFrame second = channel.readOutbound();
+        assertEquals("a", first.text());
+        assertEquals("b", second.text());
+        assertNull(channel.readOutbound(), "flushBatch 应一次刷出全部暂存帧");
+        first.release();
+        second.release();
+        channel.finishAndReleaseAll();
+    }
+
+    /** JSR-356 语义：把 batching 由 true 改为 false 时，必须先把暂存帧刷出。 */
+    @Test
+    void setBatchingAllowed_falseFlushesPendingBatch() throws Exception {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        RemoteEndpoint.Basic batched = newBatchedRemote(channel);
+
+        batched.setBatchingAllowed(true);
+        batched.sendText("a");
+        assertNull(channel.readOutbound());
+
+        batched.setBatchingAllowed(false);
+        TextWebSocketFrame frame = channel.readOutbound();
+        assertEquals("a", frame.text());
+        frame.release();
+        channel.finishAndReleaseAll();
+    }
+
+    /** 控制帧不受批处理影响：心跳滞留会被对端当作空闲超时。 */
+    @Test
+    void batching_pingIsFlushedImmediately() throws Exception {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        RemoteEndpoint.Basic batched = newBatchedRemote(channel);
+
+        batched.setBatchingAllowed(true);
+        batched.sendText("a");
+        batched.sendPing(ByteBuffer.wrap(new byte[] { 1 }));
+        channel.runPendingTasks();
+
+        assertTrue(channel.readOutbound() instanceof TextWebSocketFrame);
+        assertTrue(channel.readOutbound() instanceof PingWebSocketFrame);
+        channel.finishAndReleaseAll();
+    }
+
+    /** 底层不是 Netty 实现时没有暂存能力：必须退化为逐条立即发送，而不是静默丢弃消息。 */
+    @Test
+    void batching_nonNettySession_fallsBackToImmediateSend() throws IOException {
+        remote.setBatchingAllowed(true);
+        remote.sendText("hello");
         remote.flushBatch();
+
+        verify(springSession).sendMessage(new TextMessage("hello"));
+    }
+
+    private RemoteEndpoint.Basic newBatchedRemote(EmbeddedChannel channel) {
+        NettyWebSocketSession nettySession = new NettyWebSocketSession(channel,
+                java.net.URI.create("ws://localhost/ws"),
+                new SpringHeadersAdapter(new io.netty.handler.codec.http.DefaultHttpHeaders(false)), null,
+                new java.net.InetSocketAddress("127.0.0.1", 8080), null, null, null);
+        JsrWebSocketSession jsrSession = new JsrWebSocketSession(nettySession, new JsrWebSocketContainer(),
+                codecRegistry, java.util.Collections.emptyMap());
+        return jsrSession.getBasicRemote();
     }
 
     @Test
