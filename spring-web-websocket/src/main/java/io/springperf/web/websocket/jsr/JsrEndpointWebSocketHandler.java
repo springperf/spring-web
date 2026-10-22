@@ -54,6 +54,18 @@ public class JsrEndpointWebSocketHandler implements WebSocketHandler {
         this.config = new JsrEndpointConfigAdapter(metadata);
         this.configurator = config.getConfigurator();
         this.container = container;
+        // 回调方法在连接建立时一次性置为 accessible。setAccessible 是 @CallerSensitive，
+        // 每次调用都要过模块/安全管理器检查——放在 invoke 里等于每条消息付一次纯开销。
+        makeAccessible(metadata.getOnOpen());
+        makeAccessible(metadata.getOnMessage());
+        makeAccessible(metadata.getOnClose());
+        makeAccessible(metadata.getOnError());
+    }
+
+    private static void makeAccessible(Method method) {
+        if (method != null) {
+            method.setAccessible(true);
+        }
     }
 
     // ===================== Spring WebSocketHandler =====================
@@ -239,12 +251,11 @@ public class JsrEndpointWebSocketHandler implements WebSocketHandler {
     }
 
     private void invoke(Object endpoint, Method method, Object[] args) throws Exception {
-        method.setAccessible(true);
+        // accessible 已在构造期设置（见 makeAccessible），此处不再每条消息重复设置
         method.invoke(endpoint, args);
     }
 
     private Object invokeWithReturn(Object endpoint, Method method, Object[] args) throws Exception {
-        method.setAccessible(true);
         return method.invoke(endpoint, args);
     }
 
