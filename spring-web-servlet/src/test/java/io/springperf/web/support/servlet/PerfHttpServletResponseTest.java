@@ -101,6 +101,14 @@ class PerfHttpServletResponseTest {
     }
 
     @Test
+    void getHeaders_absentHeader_returnsEmptyCollection() {
+        // Servlet 6.0 契约：无该头返回空集合；底层 HttpHeaders.get 声明为 @Nullable（修复前直接返回 null）
+        when(headers.get("X-Absent")).thenReturn(null);
+        assertNotNull(servletResponse.getHeaders("X-Absent"));
+        assertTrue(servletResponse.getHeaders("X-Absent").isEmpty());
+    }
+
+    @Test
     void getHeaderNames_returnsSet() {
         java.util.Set<String> names = new java.util.HashSet<>(java.util.Arrays.asList("Content-Type", "X-Custom"));
         when(headers.keySet()).thenReturn(names);

@@ -407,7 +407,10 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
 
     @Override
     public Collection<String> getHeaders(String name) {
-        return response.getHeaders().get(name);
+        // Servlet 6.0 契约：无该响应头时返回空集合，而非 null。
+        // 底层 Spring HttpHeaders.get 声明为 @Nullable，此处必须兜底（与 request 侧 getHeaders 对称）。
+        Collection<String> values = response.getHeaders().get(name);
+        return values != null ? values : java.util.Collections.emptyList();
     }
 
     @Override

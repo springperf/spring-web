@@ -165,6 +165,7 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
     @Override
     public long getDateHeader(String name) {
         String value = getHeader(name);
+        // Servlet 规范：头不存在返回 -1；存在但无法解析为 RFC 日期时抛 IllegalArgumentException
         return value != null ? HttpHeaderDateParser.parseDate(value) : -1;
     }
 
@@ -392,7 +393,8 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
     public AsyncContext startAsync() throws IllegalStateException {
         PerfAsyncContext existing = PerfAsyncContext.get(request.getRequestContext());
         if (existing != null) {
-            return existing;
+            // Servlet 规范：同一异步周期内再次 startAsync 必须失败（否则二次启动被静默吞成同一个上下文）
+            throw new IllegalStateException("startAsync() has already been called for this request");
         }
         WebServerHttpResponse webResponse = getDelegateResponse();
         if (webResponse == null) {
@@ -402,7 +404,7 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
                 webResponse);
         asyncWebRequest.startAsync();
         PerfAsyncContext asyncContext = new PerfAsyncContext(asyncWebRequest, request, webResponse, this,
-                ServletAttribute.getResponse(request.getRequestContext()));
+                ServletAttribute.getResponse(request.getRequestContext()), true);
         PerfAsyncContext.set(request.getRequestContext(), asyncContext);
         return asyncContext;
     }
@@ -412,7 +414,7 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
             throws IllegalStateException {
         PerfAsyncContext existing = PerfAsyncContext.get(request.getRequestContext());
         if (existing != null) {
-            return existing;
+            throw new IllegalStateException("startAsync() has already been called for this request");
         }
         WebServerHttpResponse webResponse = getDelegateResponse();
         if (webResponse == null) {
@@ -421,8 +423,11 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
         PerfAsyncWebRequest asyncWebRequest = (PerfAsyncWebRequest) AsyncSupportUtils.getAsyncWebRequest(request,
                 webResponse);
         asyncWebRequest.startAsync();
+        HttpServletResponse ownResponse = ServletAttribute.getResponse(request.getRequestContext());
+        // 规范 hasOriginalRequestAndResponse()：仅当传入的正是本包装的原始 request/response 时才为 true
+        boolean originalRequestResponse = servletRequest == this && servletResponse == ownResponse;
         PerfAsyncContext asyncContext = new PerfAsyncContext(asyncWebRequest, request, webResponse, servletRequest,
-                servletResponse);
+                servletResponse, originalRequestResponse);
         PerfAsyncContext.set(request.getRequestContext(), asyncContext);
         return asyncContext;
     }
@@ -430,7 +435,8 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
     @Override
     public boolean isAsyncStarted() {
         PerfAsyncContext ctx = PerfAsyncContext.get(request.getRequestContext());
-        return ctx != null;
+        // 规范：已 complete / 已 dispatch 的请求不再处于异步模式（属性本身不清理，故需查状态）
+        return ctx != null && !ctx.isCompleted();
     }
 
     @Override
@@ -907,15 +913,18 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
         private static final DateTimeFormatter[] FORMATS = { RFC_1123_FORMAT, RFC_1036_FORMAT, ASCTIME_FORMAT };
 
         public static long parseDate(String value) {
-            if (value == null)
+            if (value == null) {
                 return -1L;
+            }
             for (DateTimeFormatter formatter : FORMATS) {
                 try {
                     return Instant.from(formatter.parse(value)).toEpochMilli();
                 } catch (DateTimeParseException ignored) {
                 }
             }
-            return -1L;
+            // Servlet 规范：日期头存在但无法按 RFC 1123/1036/asctime 解析时必须显式失败，
+            // 不能回退成 -1（-1 的语义是「头不存在」，会掩盖上游协议错误）。
+            throw new IllegalArgumentException("Cannot parse date header value: " + value);
         }
     }
 }

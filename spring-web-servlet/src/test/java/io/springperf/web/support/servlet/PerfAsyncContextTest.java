@@ -36,7 +36,8 @@ class PerfAsyncContextTest {
     @BeforeEach
     void setUp() {
         lenient().when(webRequest.getRequestContext()).thenReturn(requestContext);
-        asyncContext = new PerfAsyncContext(asyncWebRequest, webRequest, webResponse, servletRequest, servletResponse);
+        asyncContext = new PerfAsyncContext(asyncWebRequest, webRequest, webResponse, servletRequest, servletResponse,
+                true);
     }
 
     @Test
@@ -52,6 +53,74 @@ class PerfAsyncContextTest {
     @Test
     void hasOriginalRequestAndResponse_returnsTrue() {
         assertTrue(asyncContext.hasOriginalRequestAndResponse());
+    }
+
+    @Test
+    void hasOriginalRequestAndResponse_falseWhenWrappedRequestUsed() {
+        // 规范：仅当 startAsync 传入的就是原始 request/response 时为 true
+        PerfAsyncContext wrapped = new PerfAsyncContext(asyncWebRequest, webRequest, webResponse,
+                mock(jakarta.servlet.ServletRequest.class), servletResponse, false);
+        assertFalse(wrapped.hasOriginalRequestAndResponse());
+    }
+
+    @Test
+    void complete_marksCycleCompleted() {
+        assertFalse(asyncContext.isCompleted());
+        asyncContext.complete();
+        assertTrue(asyncContext.isCompleted());
+    }
+
+    @Test
+    void dispatch_marksCycleCompleted() {
+        // 规范：isAsyncStarted 在异步已 dispatch/complete 后必须为 false
+        asyncContext.dispatch();
+        assertTrue(asyncContext.isCompleted());
+    }
+
+    @Test
+    void complete_twice_firesOnCompleteOnlyOnce() throws Exception {
+        AsyncListener listener = mock(AsyncListener.class);
+        asyncContext.addListener(listener);
+        asyncContext.complete();
+        asyncContext.complete();
+        verify(listener, times(1)).onComplete(any(AsyncEvent.class));
+    }
+
+    @Test
+    void addListener_overload_eventCarriesRegisteredRequestAndResponse() throws Exception {
+        AsyncListener listener = mock(AsyncListener.class);
+        jakarta.servlet.ServletRequest wrappedRequest = mock(jakarta.servlet.ServletRequest.class);
+        jakarta.servlet.ServletResponse wrappedResponse = mock(jakarta.servlet.ServletResponse.class);
+        asyncContext.addListener(listener, wrappedRequest, wrappedResponse);
+
+        asyncContext.complete();
+
+        org.mockito.ArgumentCaptor<AsyncEvent> captor = org.mockito.ArgumentCaptor.forClass(AsyncEvent.class);
+        verify(listener).onComplete(captor.capture());
+        assertSame(wrappedRequest, captor.getValue().getSuppliedRequest());
+        assertSame(wrappedResponse, captor.getValue().getSuppliedResponse());
+    }
+
+    @Test
+    void dispatch_withPath_dispatcherTypeIsAsyncDuringForward() {
+        PerfHttpServletRequest perfRequest = mock(PerfHttpServletRequest.class);
+        when(perfRequest.getDispatcherType()).thenReturn(jakarta.servlet.DispatcherType.REQUEST);
+        PerfAsyncContext context = new PerfAsyncContext(asyncWebRequest, webRequest, webResponse, perfRequest,
+                servletResponse, true);
+        io.springperf.web.support.SupportDispatcherHandler supportHandler = mock(
+                io.springperf.web.support.SupportDispatcherHandler.class);
+        io.springperf.web.context.WebContext webContext = mock(io.springperf.web.context.WebContext.class);
+        when(webRequest.getWebContext()).thenReturn(webContext);
+        when(webContext.getDispatcherHandler()).thenReturn(supportHandler);
+        doAnswer(invocation -> {
+            verify(perfRequest).setDispatcherType(jakarta.servlet.DispatcherType.ASYNC);
+            return null;
+        }).when(supportHandler).forward(webRequest, webResponse, "/async-target");
+
+        context.dispatch("/async-target");
+
+        // 分派结束后恢复原值，避免影响同一请求后续代码
+        verify(perfRequest).setDispatcherType(jakarta.servlet.DispatcherType.REQUEST);
     }
 
     @Test

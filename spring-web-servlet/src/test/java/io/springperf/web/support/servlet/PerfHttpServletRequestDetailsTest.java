@@ -72,10 +72,10 @@ class PerfHttpServletRequestDetailsTest {
     }
 
     @Test
-    void getDateHeader_invalid_returnsMinusOne() {
+    void getDateHeader_invalid_throwsIllegalArgument() {
         headers("Date", "not-a-date");
         PerfHttpServletRequest servletReq = new PerfHttpServletRequest(request);
-        assertEquals(-1L, servletReq.getDateHeader("Date"));
+        assertThrows(IllegalArgumentException.class, () -> servletReq.getDateHeader("Date"));
     }
 
     @Test
