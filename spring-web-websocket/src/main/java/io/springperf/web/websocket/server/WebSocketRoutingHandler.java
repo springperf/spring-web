@@ -1,36 +1,24 @@
 package io.springperf.web.websocket.server;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.channel.*;
-import io.netty.handler.codec.http.*;
-import io.netty.handler.codec.http.websocketx.*;
-import io.netty.handler.codec.http.websocketx.extensions.WebSocketExtensionData;
-import io.netty.handler.codec.http.websocketx.extensions.WebSocketServerExtension;
-import io.netty.handler.codec.http.websocketx.extensions.compression.PerMessageDeflateServerExtensionHandshaker;
-import io.netty.handler.ssl.SslHandler;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.QueryStringDecoder;
+import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.timeout.IdleStateEvent;
-import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.AttributeKey;
-import io.netty.util.ReferenceCountUtil;
-import io.springperf.web.core.cors.CorsUtils;
-import io.springperf.web.server.NettyHttpHandler;
 import io.springperf.web.util.PathPatternUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.Nullable;
 import org.springframework.util.RouteMatcher;
-import org.springframework.web.socket.*;
+import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.WebSocketHandler;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.SocketAddress;
-import java.net.URI;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.security.Principal;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -40,10 +28,10 @@ import java.util.Map;
  * 放置在 {@code HttpObjectAggregator} 之前，拦截带 {@code Upgrade: websocket} 头的 HTTP 请求。匹配到已注册路径后：
  * </p>
  * <ol>
- * <li>使用 {@link WebSocketServerHandshaker} 完成 HTTP 升级握手</li>
- * <li>将 pipeline 从 HTTP 模式切换为 WebSocket 帧模式</li>
- * <li>创建 {@link NettyWebSocketSession}，调用 Spring 的 {@link WebSocketHandler}</li>
- * <li>后续 WebSocket 帧直接委托给 Spring handler</li>
+ * <li>路由：按精确路径 / 路径模式找到 {@link WebSocketHandler} 及其注册配置</li>
+ * <li>握手：交给 {@link WebSocketHandshakeHandler} 完成 Origin 准入、升级、pipeline 切换与会话建立</li>
+ * <li>后续 WebSocket 帧交给 {@link WebSocketFrameDispatcher} 按 RFC 6455 语义分发</li>
+ * <li>连接生命周期（空闲、异常、断开）由本类回调到 handler</li>
  * </ol>
  * <p>
  * 非 WebSocket 升级请求透传，不影响正常 HTTP 处理。
@@ -63,58 +51,14 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
      * 修复前每帧要查 3~4 次 channel attribute（session / handler / fragment 各一个 key）。 这些字段只在 EventLoop 线程读写，故无需同步。
      * </p>
      */
-    private static final AttributeKey<WsConnection> CONNECTION_KEY = AttributeKey.valueOf("ws.connection");
-
-    /**
-     * {@code WebSocketServerHandshaker.handshake()} 自己插入的帧编解码器名字（Netty 内部约定，无公开常量）。 扩展编解码器必须相对它们插入：它们才是真正做「字节 ↔
-     * 帧」转换的那一对。
-     */
-    private static final String NETTY_WS_DECODER = "wsdecoder";
-    private static final String NETTY_WS_ENCODER = "wsencoder";
-    private static final String WS_DEFLATE_DECODER = "ws-deflate-decoder";
-    private static final String WS_DEFLATE_ENCODER = "ws-deflate-encoder";
-
-    /**
-     * permessage-deflate 协商器（无状态，可跨连接共享）。默认参数：6 级压缩、接受客户端窗口位协商、不带 context takeover 偏好。
-     */
-    private static final PerMessageDeflateServerExtensionHandshaker PERMESSAGE_DEFLATE = new PerMessageDeflateServerExtensionHandshaker();
-
-    /** 空载荷常量：Pong 帧不携带应用数据时复用，避免每帧 {@code new byte[0]} + {@code wrap}。 */
-    private static final ByteBuffer EMPTY_PAYLOAD = ByteBuffer.allocate(0);
-
-    /**
-     * 分片消息的累积状态。
-     * <p>
-     * RFC 6455 的分片规则：起始帧 opcode 为 text/binary 且 {@code FIN=0}，中间帧 opcode 为 continuation 且 {@code FIN=0}， 末帧 opcode 为
-     * continuation 且 {@code FIN=1}。文本分片必须按<b>字节</b>累积后一次性解码——UTF-8 多字节字符可能跨分片， 逐帧 decode 会产生乱码。
-     * </p>
-     */
-    private static final class FragmentState {
-        final boolean text;
-        final ByteBuf buffer;
-
-        /**
-         * @param alloc
-         *            通道的分配器（池化）；用 {@code Unpooled.buffer()} 会让大消息分片时一路扩容复制并产生额外 GC
-         * @param initialCapacity
-         *            按首片大小预分配，避免从默认 256 字节反复扩容
-         */
-        FragmentState(boolean text, ByteBufAllocator alloc, int initialCapacity) {
-            this.text = text;
-            this.buffer = alloc.buffer(initialCapacity);
-        }
-
-        void release() {
-            buffer.release();
-        }
-    }
+    static final AttributeKey<WsConnection> CONNECTION_KEY = AttributeKey.valueOf("ws.connection");
 
     /** 单连接聚合状态。字段只在 EventLoop 线程读写。 */
-    private static final class WsConnection {
+    static final class WsConnection {
         final NettyWebSocketSession session;
         final WebSocketHandler handler;
-        /** 进行中的分片消息聚合状态；无分片时为 null。 */
-        FragmentState fragment;
+        /** 进行中的分片消息聚合状态；无分片时为 null（由 {@link WebSocketFrameDispatcher} 维护）。 */
+        WebSocketFrameDispatcher.FragmentState fragment;
 
         WsConnection(NettyWebSocketSession session, WebSocketHandler handler) {
             this.session = session;
@@ -123,11 +67,7 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
     }
 
     private final Map<String, WebSocketHandler> handlerMap;
-    private final String subProtocols;
-    private final boolean allowExtensions;
-    private final List<String> allowedOrigins;
-    private final long idleTimeout;
-    private final long heartbeatInterval;
+    private final WebSocketHandshakeHandler handshakeHandler;
     @Nullable
     private final io.springperf.web.websocket.WebSocketHandlerRegistry registry;
 
@@ -159,11 +99,9 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
             boolean allowExtensions, List<String> allowedOrigins, long idleTimeout, long heartbeatInterval,
             @Nullable io.springperf.web.websocket.WebSocketHandlerRegistry registry) {
         this.handlerMap = handlerMap;
-        this.subProtocols = subProtocols;
-        this.allowExtensions = allowExtensions;
-        this.allowedOrigins = allowedOrigins;
-        this.idleTimeout = idleTimeout;
-        this.heartbeatInterval = heartbeatInterval;
+        // 全局默认值（子协议 / 扩展 / 白名单 / 空闲 / 心跳）随握手器一起下沉，路由侧不再持有
+        this.handshakeHandler = new WebSocketHandshakeHandler(subProtocols, allowExtensions, allowedOrigins,
+                idleTimeout, heartbeatInterval);
         this.registry = registry;
     }
 
@@ -178,7 +116,8 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
             }
         }
         if (msg instanceof WebSocketFrame) {
-            handleWebSocketFrame(ctx, (WebSocketFrame) msg);
+            // 帧语义（分片聚合、size limit、控制帧、Close 语义）全部委托给 WebSocketFrameDispatcher
+            WebSocketFrameDispatcher.dispatch(ctx, (WebSocketFrame) msg);
             return;
         }
         ctx.fireChannelRead(msg);
@@ -186,467 +125,12 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
 
     private void handleWebSocketUpgrade(ChannelHandlerContext ctx, HttpRequest req) {
         String path = new QueryStringDecoder(req.uri()).path();
-        PathMatchResult result = resolveHandler(path);
-        if (result == null) {
+        WebSocketPathMatch match = resolveHandler(path);
+        if (match == null) {
             ctx.fireChannelRead(req);
             return;
         }
-
-        // Origin 校验：优先使用 per-path 配置，回退到全局默认
-        List<String> effectiveOrigins = resolveOrigins(result.registration);
-        if (!checkOrigin(req, ctx, effectiveOrigins)) {
-            sendForbiddenResponse(ctx, req);
-            return;
-        }
-
-        String wsUrl = buildWebSocketUrl(ctx, req, path);
-        String effectiveSubProtocols = resolveSubProtocols(result.registration);
-        boolean extensionOffered = resolveAllowExtensions(result.registration);
-        // 只有真正协商成功才让帧解码器接受 RSV 位：仅仅 allowExtensions=true 而客户端没提扩展时，
-        // 客户端发来的 RSV1 压缩帧会被当成普通帧交给业务（静默乱码）。
-        WebSocketServerExtension negotiatedExtension = extensionOffered ? negotiatePerMessageDeflate(req.headers())
-                : null;
-        boolean rsvAllowed = negotiatedExtension != null;
-        // 帧上限交给握手器创建的解码器：它才是真正做「字节 → 帧」的那一环。
-        // 之前用 3 参构造（隐式 64KB）再加一个自有 decoder，导致 per-path 上限 > 64KB 时被前置 decoder 拦掉。
-        WebSocketServerHandshakerFactory factory = new WebSocketServerHandshakerFactory(wsUrl, effectiveSubProtocols,
-                rsvAllowed, resolveMaxFrameSize(result.registration));
-        WebSocketServerHandshaker handshaker = factory.newHandshaker(req);
-
-        if (handshaker == null) {
-            WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(ctx.channel());
-            // 拒绝路径不将请求透传下游，释放 FullHttpRequest 引用（含 content ByteBuf）
-            ReferenceCountUtil.release(req);
-            return;
-        }
-
-        try {
-            ChannelFuture handshake;
-            if (negotiatedExtension != null) {
-                // 协商结果必须写在握手响应里，客户端才会启用压缩。本框架是手写握手（不经过
-                // WebSocketServerProtocolHandler，也就不会触发 Netty 的 HANDSHAKE_COMPLETE 事件），
-                // 因此这里自己写响应头、握手完成后再自己装编解码器。
-                HttpHeaders responseHeaders = new DefaultHttpHeaders().set(HttpHeaderNames.SEC_WEBSOCKET_EXTENSIONS,
-                        toExtensionHeaderValue(negotiatedExtension.newReponseData()));
-                handshake = handshaker.handshake(ctx.channel(), (FullHttpRequest) req, responseHeaders,
-                        ctx.channel().newPromise());
-            } else {
-                handshake = handshaker.handshake(ctx.channel(), (FullHttpRequest) req);
-            }
-            handshake.addListener((ChannelFutureListener) future -> {
-                if (!future.isSuccess()) {
-                    log.error("WebSocket handshake failed for {}", path, future.cause());
-                    // 握手失败：请求不再被使用，释放调用方持有的原始引用
-                    // （netty handshake 内部 retain 的引用由 WebSocketServerHandshaker$2
-                    // 在 fireChannelRead 时释放，此处释放原始引用）。
-                    ReferenceCountUtil.release(req);
-                    ctx.close();
-                    return;
-                }
-                afterHandshakeSuccess(ctx, req, path, handshaker, result, negotiatedExtension);
-            });
-        } catch (Exception e) {
-            // handshake() 同步抛异常时也要释放原始引用。注意与上一条的区别：pipeline 缺少
-            // HttpRequestDecoder/HttpServerCodec 时 Netty 并不抛异常，而是把返回的 promise
-            // 置失败——那条路径由上面的 listener 释放。这里覆盖的是握手内部的 pipeline 操作
-            // 本身抛错，例如同名 wsdecoder/wsencoder 已存在时 addBefore 抛 ChannelPipelineException。
-            // 此类异常若不在此释放，会冒泡到 exceptionCaught，而那里只 ctx.close() 不 release，
-            // 每次泄漏一个 FullHttpRequest（含 content ByteBuf）。
-            log.error("WebSocket handshake threw synchronously for {}", path, e);
-            ReferenceCountUtil.release(req);
-            ctx.close();
-        }
-    }
-
-    private void afterHandshakeSuccess(ChannelHandlerContext ctx, HttpRequest req, String path,
-            WebSocketServerHandshaker handshaker, PathMatchResult result,
-            @Nullable WebSocketServerExtension negotiatedExtension) {
-        // 构建 URI 和 Headers
-        URI sessionUri = buildSessionUri(req);
-        SpringHeadersAdapter springHeaders = new SpringHeadersAdapter(req.headers());
-        // SocketAddress 不保证是 InetSocketAddress（如 EmbeddedChannel 的 EmbeddedSocketAddress、
-        // 未绑定连接时为 null），强转会 CCE 中断握手完成回调。防御性转换，非 InetSocketAddress 时
-        // 返回 null（真实 TCP 连接下始终是 InetSocketAddress，行为不变）。
-        InetSocketAddress localAddr = toInetSocketAddress(ctx.channel().localAddress());
-        InetSocketAddress remoteAddr = toInetSocketAddress(ctx.channel().remoteAddress());
-
-        // 从 TLS 提取客户端证书 Principal
-        Principal principal = extractTlsPrincipal(ctx);
-        NettyWebSocketSession session = new NettyWebSocketSession(ctx.channel(), sessionUri, springHeaders,
-                handshaker.selectedSubprotocol(), localAddr, remoteAddr, principal, result.handler);
-
-        // 将路径变量存入 session attributes（如 roomId=123）
-        session.getAttributes().putAll(result.uriVariables);
-
-        // per-path 帧上限覆盖（L14）：注册时配置 messageSizeLimit 则覆盖 session 默认 8KB/64KB，
-        // 随后 decoder 的最大帧载荷长度取自覆盖后的值。
-        long effectiveMessageSizeLimit = resolveMessageSizeLimit(result.registration);
-        if (effectiveMessageSizeLimit > 0) {
-            session.setTextMessageSizeLimit((int) effectiveMessageSizeLimit);
-            session.setBinaryMessageSizeLimit((int) effectiveMessageSizeLimit);
-        }
-
-        // 切换 pipeline：移除 HTTP handler，添加 WebSocket 帧编解码器
-        ChannelPipeline pipeline = ctx.pipeline();
-        String currentName = ctx.name();
-
-        // 空闲超时检测（支持 per-path 覆盖）
-        long effectiveIdleTimeout = resolveIdleTimeout(result.registration);
-        if (effectiveIdleTimeout > 0) {
-            pipeline.addBefore(currentName, "ws-idle", new IdleStateHandler(effectiveIdleTimeout, effectiveIdleTimeout,
-                    effectiveIdleTimeout, java.util.concurrent.TimeUnit.MILLISECONDS));
-        }
-
-        // 帧编解码器由 WebSocketServerHandshaker.handshake() 自己装好（Netty 的 "wsdecoder"/"wsencoder"），
-        // 这里不再重复添加一套：以前额外加的 ws-decoder/ws-encoder 从不参与字节↔帧转换，只是每帧多跑一层空转。
-        if (negotiatedExtension != null) {
-            // 入站：字节 → 帧解码(wsdecoder) → 解压 → 业务；出站：业务 → 压缩 → 帧编码(wsencoder) → 字节。
-            // 故解压器插在 wsdecoder 之后、压缩器插在 wsencoder 之后（更靠近 tail，出站先经过它）。
-            pipeline.addAfter(NETTY_WS_DECODER, WS_DEFLATE_DECODER, negotiatedExtension.newExtensionDecoder());
-            pipeline.addAfter(NETTY_WS_ENCODER, WS_DEFLATE_ENCODER, negotiatedExtension.newExtensionEncoder());
-        }
-        removeHttpHandlers(pipeline);
-
-        WsConnection connection = new WsConnection(session, result.handler);
-        ctx.channel().attr(CONNECTION_KEY).set(connection);
-
-        try {
-            result.handler.afterConnectionEstablished(session);
-        } catch (Exception e) {
-            log.error("WebSocketHandler.afterConnectionEstablished failed", e);
-            try {
-                session.close(CloseStatus.SERVER_ERROR);
-            } catch (IOException ex) {
-                log.debug("session.close(SERVER_ERROR) failed", ex);
-            }
-        }
-
-        // 主动心跳保活（支持 per-path 覆盖）
-        long effectiveHeartbeat = resolveHeartbeatInterval(result.registration);
-        if (effectiveHeartbeat > 0 && session.isOpen()) {
-            java.util.concurrent.ScheduledFuture<?> hbFuture = ctx.channel().eventLoop().scheduleAtFixedRate(() -> {
-                if (session.isOpen() && ctx.channel().isWritable()) {
-                    ctx.writeAndFlush(new PingWebSocketFrame());
-                }
-            }, effectiveHeartbeat, effectiveHeartbeat, java.util.concurrent.TimeUnit.MILLISECONDS);
-            ctx.channel().closeFuture().addListener(f -> hbFuture.cancel(false));
-        }
-
-        // 释放握手请求的原始引用。netty handshake 内部 retain 的引用由
-        // WebSocketServerHandshaker$2 在 fireChannelRead 时消费释放；此处释放调用方
-        // 持有的原始引用（HttpObjectAggregator fireChannelRead 转移的所有权）。
-        // 修复前不释放：每次 WS 握手泄漏 1 个 FullHttpRequest 引用，触发 Netty LEAK 检测。
-        ReferenceCountUtil.release(req);
-    }
-
-    /**
-     * 解码器的最大帧载荷长度：per-path 覆盖优先，否则取会话默认值中较大的那个（text 8KB / binary 64KB）。
-     * <p>
-     * 单帧长度上限只是一个技术上限；真正的 text/binary 语义上限仍由 {@code checkMessageSize} 按消息类型分别校验。
-     * </p>
-     */
-    private int resolveMaxFrameSize(@Nullable io.springperf.web.websocket.WebSocketHandlerRegistration registration) {
-        long limit = resolveMessageSizeLimit(registration);
-        if (limit > 0) {
-            return (int) limit;
-        }
-        return Math.max(NettyWebSocketSession.DEFAULT_TEXT_MESSAGE_SIZE_LIMIT,
-                NettyWebSocketSession.DEFAULT_BINARY_MESSAGE_SIZE_LIMIT);
-    }
-
-    /**
-     * 把协商出的扩展转成 {@code Sec-WebSocket-Extensions} 的响应头值。
-     * <p>
-     * {@link WebSocketExtensionData} 没有重写 {@code toString()}（直接拼会得到 {@code Class@hash}），必须自己拼。
-     * </p>
-     */
-    private static String toExtensionHeaderValue(WebSocketExtensionData data) {
-        StringBuilder value = new StringBuilder(data.name());
-        data.parameters().forEach((name, parameterValue) -> {
-            value.append("; ").append(name);
-            if (!parameterValue.isEmpty()) {
-                value.append('=').append(parameterValue);
-            }
-        });
-        return value.toString();
-    }
-
-    /**
-     * 从升级请求里协商 permessage-deflate。
-     * <p>
-     * 直接复用 Netty 的协商器（参数、窗口位、no-context-takeover 都由它决定），只自己负责「解析请求头 → 写响应头 → 装编解码器」这三步，因为本框架不走
-     * {@code WebSocketServerProtocolHandler}，Netty 的 {@code WebSocketServerExtensionHandler} 依赖它抛出的
-     * {@code HANDSHAKE_COMPLETE} 事件，用不上。
-     * </p>
-     *
-     * @return 协商成功的扩展；客户端未提或参数不可接受时为 null（不启用压缩）
-     */
-    @Nullable
-    private static WebSocketServerExtension negotiatePerMessageDeflate(HttpHeaders requestHeaders) {
-        for (String value : requestHeaders.getAll(HttpHeaderNames.SEC_WEBSOCKET_EXTENSIONS)) {
-            for (WebSocketExtensionData data : parseExtensionHeader(value)) {
-                WebSocketServerExtension extension = PERMESSAGE_DEFLATE.handshakeExtension(data);
-                if (extension != null) {
-                    return extension;
-                }
-            }
-        }
-        return null;
-    }
-
-    /**
-     * 解析 {@code Sec-WebSocket-Extensions} 的一个头值，例如 {@code "permessage-deflate; client_max_window_bits, x-unknown"} → 两个
-     * {@link WebSocketExtensionData}。
-     * <p>
-     * Netty 的解析工具类不在公开 API 里，这里按 RFC 6455 §9.1 的最小语法实现：逗号分条目、分号分参数、 无值参数（如 {@code client_max_window_bits}）记为空串。
-     * </p>
-     */
-    private static List<WebSocketExtensionData> parseExtensionHeader(String value) {
-        List<WebSocketExtensionData> result = new ArrayList<>(2);
-        for (String entry : value.split(",")) {
-            String trimmedEntry = entry.trim();
-            if (trimmedEntry.isEmpty()) {
-                continue;
-            }
-            String[] tokens = trimmedEntry.split(";");
-            Map<String, String> parameters = new HashMap<>(2);
-            for (int i = 1; i < tokens.length; i++) {
-                String token = tokens[i].trim();
-                if (token.isEmpty()) {
-                    continue;
-                }
-                int eq = token.indexOf('=');
-                if (eq < 0) {
-                    // 无值参数：no_context_takeover 这类布尔开关必须保留（Netty 用 containsKey 判断）；
-                    // 但 *_window_bits 是数值参数，浏览器常发的 `client_max_window_bits`（无值）会让 Netty 的
-                    // 协商器 parseInt("") 直接抛异常。忽略它等价于「不回该参数」，对端按 15 位默认窗口处理，协议合法。
-                    if (!token.endsWith("_window_bits")) {
-                        parameters.put(token, "");
-                    }
-                } else {
-                    parameters.put(token.substring(0, eq).trim(), unquote(token.substring(eq + 1).trim()));
-                }
-            }
-            result.add(new WebSocketExtensionData(tokens[0].trim(), parameters));
-        }
-        return result;
-    }
-
-    private static String unquote(String value) {
-        if (value.length() >= 2 && value.charAt(0) == '"' && value.charAt(value.length() - 1) == '"') {
-            return value.substring(1, value.length() - 1);
-        }
-        return value;
-    }
-
-    private void removeHttpHandlers(ChannelPipeline pipeline) {
-        safeRemove(pipeline, NettyHttpHandler.class);
-        safeRemove(pipeline, io.netty.handler.stream.ChunkedWriteHandler.class);
-        safeRemove(pipeline, io.netty.handler.codec.http.HttpObjectAggregator.class);
-        safeRemove(pipeline, io.netty.handler.codec.http.HttpServerCodec.class);
-        // HTTP 层 ReadTimeoutHandler（Http2ChannelInitializer 在 readTimeout>0 时添加）在 WS
-        // 升级后必须移除，否则空闲 WebSocket 会被 ReadTimeoutException 误杀。
-        safeRemove(pipeline, io.netty.handler.timeout.ReadTimeoutHandler.class);
-    }
-
-    private static void safeRemove(ChannelPipeline pipeline, Class<? extends ChannelHandler> handlerType) {
-        if (pipeline.get(handlerType) != null) {
-            pipeline.remove(handlerType);
-        }
-    }
-
-    private void handleWebSocketFrame(ChannelHandlerContext ctx, WebSocketFrame frame) {
-        WsConnection connection = ctx.channel().attr(CONNECTION_KEY).get();
-        if (connection == null) {
-            ctx.close();
-            return;
-        }
-        NettyWebSocketSession session = connection.session;
-        WebSocketHandler handler = connection.handler;
-
-        try {
-            if (frame instanceof TextWebSocketFrame || frame instanceof BinaryWebSocketFrame) {
-                boolean text = frame instanceof TextWebSocketFrame;
-                ByteBuf content = frame.content();
-                // 分片进行中又来数据帧即协议违规，与该帧自身 FIN 无关（RFC 6455 §5.4：
-                // 分片消息的后续帧必须全是 continuation）。必须先判违规再判 FIN，
-                // 否则 FIN=1 的侵入帧会被当成完整消息静默派发，同时丢掉正在聚合的消息。
-                if (connection.fragment != null) {
-                    failProtocol(ctx, session, handler, "new data frame while a fragmented message is in progress");
-                    return;
-                }
-                if (frame.isFinalFragment()) {
-                    // 未分片的完整消息：同样按该 opcode 的 size limit 校验。
-                    // decoder 的 maxFrameSize 只能有一个值，取的是 max(textLimit, binaryLimit)，
-                    // 因此 text 限制较小时单帧文本会绕过限制（分片路径按各自限制拒绝）——
-                    // 不在此处校验，单帧就成了绕过 size limit 的通道。
-                    if (!checkMessageSize(ctx, session, handler, text, content)) {
-                        return;
-                    }
-                    dispatchMessage(handler, session, text, content);
-                } else {
-                    // 分片起始帧（FIN=0）：建立聚合状态；按首片大小预分配，减少扩容复制
-                    FragmentState state = new FragmentState(text, ctx.alloc(), Math.max(256, content.readableBytes()));
-                    // 先挂到连接状态：超限路径统一由 releaseFragment 释放缓冲并复位
-                    connection.fragment = state;
-                    if (!appendFragment(ctx, session, handler, state, content, text)) {
-                        releaseFragment(connection);
-                        return;
-                    }
-                }
-            } else if (frame instanceof ContinuationWebSocketFrame) {
-                FragmentState state = connection.fragment;
-                if (state == null) {
-                    failProtocol(ctx, session, handler, "continuation frame without a fragmented message in progress");
-                    return;
-                }
-                if (!appendFragment(ctx, session, handler, state, frame.content(), state.text)) {
-                    releaseFragment(connection);
-                    return;
-                }
-                if (frame.isFinalFragment()) {
-                    connection.fragment = null;
-                    try {
-                        dispatchMessage(handler, session, state.text, state.buffer);
-                    } finally {
-                        state.release();
-                    }
-                    return;
-                }
-            } else if (frame instanceof PingWebSocketFrame) {
-                ctx.writeAndFlush(new PongWebSocketFrame(frame.content().retain()));
-            } else if (frame instanceof PongWebSocketFrame) {
-                handler.handleMessage(session, toPongMessage(((PongWebSocketFrame) frame).content()));
-            } else if (frame instanceof CloseWebSocketFrame) {
-                CloseWebSocketFrame close = (CloseWebSocketFrame) frame;
-                int code = close.statusCode() >= 0 ? close.statusCode() : 1005;
-                CloseStatus status = new CloseStatus(code, close.reasonText());
-                session.setOpen(false);
-                // 与其他三条断连路径（TCP 断开、close()、异常）共用同一幂等入口：
-                // 这里先到就用对端给的 status 通知，随后回显并关 channel 时 channelInactive
-                // 再进来会被 markCloseNotified 挡掉，不会重复。
-                if (session.markCloseNotified()) {
-                    try {
-                        handler.afterConnectionClosed(session, status);
-                    } catch (Exception e) {
-                        log.error("afterConnectionClosed failed", e);
-                    }
-                }
-                // RFC 6455 §7.4.1: 服务端必须回显 Close 帧，再关闭 TCP
-                ctx.writeAndFlush(close.retain()).addListener(ChannelFutureListener.CLOSE);
-                releaseFragment(connection);
-                return; // frame released in finally, retained copy lives for write
-            }
-        } catch (Exception e) {
-            log.error("WebSocket handler error", e);
-            try {
-                handler.handleTransportError(session, e);
-            } catch (Exception ex) {
-                log.error("TransportError handler failed", ex);
-            }
-        } finally {
-            frame.release();
-        }
-    }
-
-    /**
-     * 派发一条完整消息。分片文本在此一次性解码，保证跨分片的 UTF-8 多字节字符不乱码。
-     * <p>
-     * 受检异常不在此处吞掉：统一抛给调用方的 try/catch，与原有「WebSocket handler error」 处理路径一致（转 {@code handleTransportError}），避免分片消息的失败被静默丢弃。
-     * </p>
-     */
-    private void dispatchMessage(WebSocketHandler handler, NettyWebSocketSession session, boolean text, ByteBuf content)
-            throws Exception {
-        if (text) {
-            handler.handleMessage(session, new TextMessage(content.toString(StandardCharsets.UTF_8)));
-        } else {
-            byte[] bytes = new byte[content.readableBytes()];
-            content.readBytes(bytes);
-            handler.handleMessage(session, new BinaryMessage(ByteBuffer.wrap(bytes)));
-        }
-    }
-
-    /**
-     * 把一个分片的内容追加进聚合缓冲。
-     * <p>
-     * 上限用 session 的 text/binary message size limit：无界累积会让一个恶意客户端靠无限分片把堆打满。 超限即释放状态、关闭连接并返回 false（调用方应直接 return，交由
-     * finally 释放 frame）。
-     * </p>
-     *
-     * @return false 表示已超限并已处理，调用方不应继续
-     */
-    /**
-     * 入站 Pong 帧 → Spring {@link PongMessage}。必须拷贝：帧在 {@code finally} 里 release， 交给业务的 ByteBuffer
-     * 不能是帧内容的视图；空载荷仍复用共享常量，避免每帧分配。
-     * <p>
-     * 修复前这里无条件用 {@code EMPTY_PAYLOAD}，{@code @OnMessage(PongMessage)} 永远拿不到对端回显的数据。
-     * </p>
-     */
-    private static PongMessage toPongMessage(ByteBuf content) {
-        if (!content.isReadable()) {
-            return new PongMessage(EMPTY_PAYLOAD);
-        }
-        byte[] bytes = new byte[content.readableBytes()];
-        content.getBytes(content.readerIndex(), bytes);
-        return new PongMessage(ByteBuffer.wrap(bytes));
-    }
-
-    private boolean appendFragment(ChannelHandlerContext ctx, NettyWebSocketSession session, WebSocketHandler handler,
-            FragmentState state, ByteBuf content, boolean text) {
-        int limit = text ? session.getTextMessageSizeLimit() : session.getBinaryMessageSizeLimit();
-        int incoming = content.readableBytes();
-        if (state.buffer.readableBytes() + incoming > limit) {
-            log.warn("WebSocket fragmented message exceeds {} limit ({}), closing session {}", text ? "text" : "binary",
-                    limit, session.getId());
-            failProtocol(ctx, session, handler, "fragmented message exceeds size limit");
-            return false;
-        }
-        // writeBytes 是拷贝，不接管 content 的引用；原始引用由外层 finally 的 frame.release() 释放
-        state.buffer.writeBytes(content);
-        return true;
-    }
-
-    /**
-     * 校验单帧消息是否超出该 opcode 的 size limit，超限即按协议违规关闭连接。
-     * <p>
-     * 与 {@link #appendFragment} 用同一套限制，保证「切成两片被拒、一次发完被收」这种不一致不再存在。
-     * </p>
-     *
-     * @return false 表示已超限并已处理，调用方不应继续
-     */
-    private boolean checkMessageSize(ChannelHandlerContext ctx, NettyWebSocketSession session, WebSocketHandler handler,
-            boolean text, ByteBuf content) {
-        int limit = text ? session.getTextMessageSizeLimit() : session.getBinaryMessageSizeLimit();
-        int size = content.readableBytes();
-        if (size <= limit) {
-            return true;
-        }
-        log.warn("WebSocket message exceeds {} limit ({} > {}), closing session {}", text ? "text" : "binary", size,
-                limit, session.getId());
-        failProtocol(ctx, session, handler, "message exceeds size limit");
-        return false;
-    }
-
-    private void releaseFragment(WsConnection connection) {
-        if (connection == null) {
-            return;
-        }
-        FragmentState state = connection.fragment;
-        connection.fragment = null;
-        if (state != null) {
-            state.release();
-        }
-    }
-
-    private void failProtocol(ChannelHandlerContext ctx, NettyWebSocketSession session, WebSocketHandler handler,
-            String reason) {
-        log.warn("WebSocket protocol violation on session {}: {}", session.getId(), reason);
-        try {
-            handler.handleTransportError(session, new IOException("WebSocket protocol violation: " + reason));
-        } catch (Exception e) {
-            log.error("TransportError handler failed", e);
-        }
-        ctx.close();
+        handshakeHandler.upgrade(ctx, req, match);
     }
 
     @Override
@@ -665,7 +149,7 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelWritabilityChanged(ChannelHandlerContext ctx) {
         if (ctx.channel().isWritable()) {
-            NettyWebSocketSession.drainBackpressureQueue(ctx.channel());
+            WsBackpressureQueue.drain(ctx.channel());
         }
         ctx.fireChannelWritabilityChanged();
     }
@@ -679,7 +163,7 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
                 NettyWebSocketSession session = connection.session;
                 log.warn("WebSocket idle timeout, closing session {}", session.getId());
                 try {
-                    handler.handleTransportError(session, new java.io.IOException("Connection idle timeout"));
+                    handler.handleTransportError(session, new IOException("Connection idle timeout"));
                 } catch (Exception e) {
                     log.error("Idle timeout handler failed", e);
                 }
@@ -714,7 +198,7 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
             }
         }
         // 无论是否已通知过关闭，都要丢弃进行中的分片缓冲：连接已断，聚合永不完成
-        releaseFragment(connection);
+        WebSocketFrameDispatcher.releaseFragment(connection);
         ctx.fireChannelInactive();
     }
 
@@ -729,135 +213,17 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
         return connection != null ? connection.session : null;
     }
 
-    // ---- per-path 配置解析（有 per-path 覆盖则使用，否则回退全局） ----
-
-    @Nullable
-    private List<String> resolveOrigins(@Nullable io.springperf.web.websocket.WebSocketHandlerRegistration reg) {
-        if (reg != null && reg.getAllowedOrigins() != null)
-            return reg.getAllowedOrigins();
-        return allowedOrigins;
-    }
-
-    private String resolveSubProtocols(@Nullable io.springperf.web.websocket.WebSocketHandlerRegistration reg) {
-        if (reg != null && reg.getSubProtocols() != null)
-            return reg.getSubProtocols();
-        return subProtocols;
-    }
-
-    private boolean resolveAllowExtensions(@Nullable io.springperf.web.websocket.WebSocketHandlerRegistration reg) {
-        if (reg != null && reg.getAllowExtensions() != null)
-            return reg.getAllowExtensions();
-        return allowExtensions;
-    }
-
-    private long resolveIdleTimeout(@Nullable io.springperf.web.websocket.WebSocketHandlerRegistration reg) {
-        if (reg != null && reg.getIdleTimeout() != null)
-            return reg.getIdleTimeout();
-        return idleTimeout;
-    }
-
-    private long resolveHeartbeatInterval(@Nullable io.springperf.web.websocket.WebSocketHandlerRegistration reg) {
-        if (reg != null && reg.getHeartbeatInterval() != null)
-            return reg.getHeartbeatInterval();
-        return heartbeatInterval;
-    }
-
-    private long resolveMessageSizeLimit(@Nullable io.springperf.web.websocket.WebSocketHandlerRegistration reg) {
-        if (reg != null && reg.getMessageSizeLimit() != null)
-            return reg.getMessageSizeLimit();
-        return -1;
-    }
-
-    @Nullable
-    private static InetSocketAddress toInetSocketAddress(SocketAddress address) {
-        return address instanceof InetSocketAddress ? (InetSocketAddress) address : null;
-    }
-
     /**
-     * 从 SslHandler 提取 TLS 客户端证书 Principal。 无 TLS 或无客户端证书时返回 null。
-     */
-    @Nullable
-    private static Principal extractTlsPrincipal(ChannelHandlerContext ctx) {
-        SslHandler sslHandler = ctx.pipeline().get(SslHandler.class);
-        if (sslHandler == null) {
-            return null;
-        }
-        try {
-            return sslHandler.engine().getSession().getPeerPrincipal();
-        } catch (Exception e) {
-            log.debug("No TLS client certificate available", e);
-            return null;
-        }
-    }
-
-    /**
-     * 校验 WebSocket 握手请求的 Origin 头。
-     * <p>
-     * 未配置 allowedOrigins（null）时跳过校验（兼容非浏览器客户端）。 显式配置为空列表时拒绝所有带 Origin 头的跨域请求。 复用 {@link CorsUtils} 的 origin 解析逻辑。
-     * </p>
+     * 解析请求路径：先精确匹配（快速路径，无路径变量），再走 {@link RouteMatcher} 模式匹配（支持 {@code /**} 通配、{@code {roomId}}）。
      *
-     * @param effectiveOrigins
-     *            优先使用 per-path 配置，null 时使用全局默认
+     * @return 命中结果；无匹配时返回 null（调用方透传给下游 HTTP 处理）
      */
-    private boolean checkOrigin(HttpRequest req, ChannelHandlerContext ctx, @Nullable List<String> effectiveOrigins) {
-        List<String> origins = effectiveOrigins != null ? effectiveOrigins : allowedOrigins;
-        if (origins == null) {
-            return true; // 未配置，允许所有来源
-        }
-        if (origins.isEmpty()) {
-            // 显式配置为空列表 = 拒绝所有跨域请求（仅允许无 Origin 头的同源/非浏览器客户端）
-            return req.headers().get(HttpHeaderNames.ORIGIN) == null;
-        }
-        String origin = req.headers().get(HttpHeaderNames.ORIGIN);
-        if (origin == null) {
-            return true; // 非浏览器客户端无 Origin 头
-        }
-        if (origins.contains("*")) {
-            return true;
-        }
-        // 与配置的允许来源逐一匹配
-        for (String allowed : origins) {
-            if (allowed.equals(origin)) {
-                return true;
-            }
-        }
-        log.warn("WebSocket connection rejected: origin '{}' not allowed", origin);
-        return false;
-    }
-
-    private static void sendForbiddenResponse(ChannelHandlerContext ctx, HttpRequest req) {
-        io.netty.handler.codec.http.DefaultHttpResponse resp = new io.netty.handler.codec.http.DefaultHttpResponse(
-                req.protocolVersion(), HttpResponseStatus.FORBIDDEN);
-        if (HttpUtil.isKeepAlive(req)) {
-            resp.headers().set(io.netty.handler.codec.http.HttpHeaderNames.CONNECTION, "close");
-        }
-        ctx.writeAndFlush(resp).addListener(ChannelFutureListener.CLOSE);
-        // 拒绝路径不将请求透传下游，释放 FullHttpRequest 引用（含 content ByteBuf）。
-        // （握手成功路径由 WebSocketServerHandshaker.handshake 接管并释放，此处只处理拒绝路径。）
-        ReferenceCountUtil.release(req);
-    }
-
-    private static final class PathMatchResult {
-        final WebSocketHandler handler;
-        final io.springperf.web.websocket.WebSocketHandlerRegistration registration;
-        final Map<String, String> uriVariables;
-
-        PathMatchResult(WebSocketHandler handler, io.springperf.web.websocket.WebSocketHandlerRegistration registration,
-                Map<String, String> uriVariables) {
-            this.handler = handler;
-            this.registration = registration;
-            this.uriVariables = uriVariables;
-        }
-    }
-
-    private PathMatchResult resolveHandler(String path) {
+    @Nullable
+    private WebSocketPathMatch resolveHandler(String path) {
         // 1. 精确匹配（快速路径，无路径变量）
         WebSocketHandler handler = handlerMap.get(path);
         if (handler != null) {
-            io.springperf.web.websocket.WebSocketHandlerRegistration reg = registry != null
-                    ? registry.getRegistration(path)
-                    : null;
-            return new PathMatchResult(handler, reg, Collections.emptyMap());
+            return new WebSocketPathMatch(path, handler, registrationOf(path), Collections.emptyMap());
         }
 
         // 2. RouteMatcher 模式匹配（支持 /** 通配、{roomId} 路径变量等）
@@ -866,31 +232,16 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
         for (Map.Entry<String, WebSocketHandler> entry : handlerMap.entrySet()) {
             Map<String, String> variables = routeMatcher.matchAndExtract(entry.getKey(), route);
             if (variables != null) {
-                io.springperf.web.websocket.WebSocketHandlerRegistration reg = registry != null
-                        ? registry.getRegistration(entry.getKey())
-                        : null;
-                return new PathMatchResult(entry.getValue(), reg, variables);
+                return new WebSocketPathMatch(path, entry.getValue(), registrationOf(entry.getKey()), variables);
             }
         }
 
         return null;
     }
 
-    private static String buildWebSocketUrl(ChannelHandlerContext ctx, HttpRequest req, String path) {
-        String host = req.headers().get(HttpHeaderNames.HOST);
-        if (host == null) {
-            InetSocketAddress addr = (InetSocketAddress) ctx.channel().localAddress();
-            host = addr.getHostString() + ":" + addr.getPort();
-        }
-        String scheme = ctx.pipeline().get(SslHandler.class) != null ? "wss" : "ws";
-        return scheme + "://" + host + path;
-    }
-
-    private URI buildSessionUri(HttpRequest req) {
-        try {
-            return URI.create(req.uri());
-        } catch (Exception e) {
-            return URI.create("/");
-        }
+    /** per-path 注册配置；未接入 registry（如直接构造 handlerMap）时为 null，握手侧按全局默认处理。 */
+    @Nullable
+    private io.springperf.web.websocket.WebSocketHandlerRegistration registrationOf(String path) {
+        return registry != null ? registry.getRegistration(path) : null;
     }
 }

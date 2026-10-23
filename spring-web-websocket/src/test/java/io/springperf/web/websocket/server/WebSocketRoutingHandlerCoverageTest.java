@@ -31,6 +31,7 @@ import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.PongMessage;
 import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketExtension;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.WebSocketMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -230,10 +231,15 @@ class WebSocketRoutingHandlerCoverageTest {
         channel.pipeline().fireChannelRead(req);
         channel.runPendingTasks();
 
-        verify(handler, timeout(2000)).afterConnectionEstablished(any(WebSocketSession.class));
+        ArgumentCaptor<WebSocketSession> sessionCaptor = ArgumentCaptor.forClass(WebSocketSession.class);
+        verify(handler, timeout(2000)).afterConnectionEstablished(sessionCaptor.capture());
         String response = readHandshakeResponseText();
         assertTrue(response.toLowerCase().contains("sec-websocket-extensions:"), "协商成功必须在握手响应里回显扩展，实际响应：" + response);
         assertTrue(response.toLowerCase().contains("permessage-deflate"), response);
+        // 会话必须如实上报协商结果：业务/TCK 以此判断压缩是否生效
+        List<WebSocketExtension> reported = sessionCaptor.getValue().getExtensions();
+        assertEquals(1, reported.size(), "协商成功必须上报 1 个扩展，实际：" + reported);
+        assertEquals("permessage-deflate", reported.get(0).getName());
 
         // 客户端按协商结果压缩一帧，服务端业务应收到解压后的明文
         WebSocketServerExtension serverExtension = new PerMessageDeflateServerExtensionHandshaker()
@@ -255,6 +261,20 @@ class WebSocketRoutingHandlerCoverageTest {
         verify(handler, timeout(2000)).handleMessage(any(WebSocketSession.class), captor.capture());
         assertEquals("compressed-hello", ((TextMessage) captor.getValue()).getPayload(), "RSV1 帧必须先解压再交给业务，否则业务拿到的是乱码");
         clientEncoder.finishAndReleaseAll();
+    }
+
+    /** 客户端未提议扩展时不协商：会话不得假报扩展（否则业务会误以为压缩生效）。 */
+    @Test
+    void getExtensions_emptyWhenClientOffersNoExtension() throws Exception {
+        handler = mock(WebSocketHandler.class);
+        channel = newChannel(new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), null, true, null));
+
+        channel.pipeline().fireChannelRead(upgradeRequest("/ws", null));
+        channel.runPendingTasks();
+
+        ArgumentCaptor<WebSocketSession> sessionCaptor = ArgumentCaptor.forClass(WebSocketSession.class);
+        verify(handler, timeout(2000)).afterConnectionEstablished(sessionCaptor.capture());
+        assertTrue(sessionCaptor.getValue().getExtensions().isEmpty(), "客户端未提议扩展时 getExtensions() 必须为空");
     }
 
     @Test
@@ -562,6 +582,75 @@ class WebSocketRoutingHandlerCoverageTest {
         verify(handler, timeout(2000)).afterConnectionEstablished(any(WebSocketSession.class));
     }
 
+    /**
+     * handler 级校验（{@link WebSocketOriginValidator}，JSR-356 的 {@code Configurator#checkOrigin} 走这里）： 白名单放行后仍可被 handler
+     * 否决，必须 403 且不建立连接。
+     */
+    @Test
+    void handlerOriginValidator_rejected_forbidden() throws Exception {
+        WebSocketHandler validator = mock(WebSocketHandler.class,
+                withSettings().extraInterfaces(WebSocketOriginValidator.class));
+        when(((WebSocketOriginValidator) validator).isOriginAllowed("http://evil.com")).thenReturn(false);
+        channel = newChannel(new WebSocketRoutingHandler(Collections.singletonMap("/ws", validator), null, false,
+                Collections.singletonList("*")));
+
+        channel.pipeline().fireChannelRead(upgradeRequest("/ws", "http://evil.com"));
+        channel.runPendingTasks();
+
+        Object outbound = channel.readOutbound();
+        assertNotNull(outbound, "handler 拒绝来源时必须写回响应");
+        if (outbound instanceof io.netty.handler.codec.http.HttpResponse) {
+            assertEquals(io.netty.handler.codec.http.HttpResponseStatus.FORBIDDEN,
+                    ((io.netty.handler.codec.http.HttpResponse) outbound).status());
+        }
+        verify(validator, never()).afterConnectionEstablished(any());
+    }
+
+    /** handler 判定抛异常时必须 fail-closed：放异常逃逸会让连接既不升级也不响应，客户端只能干等超时。 */
+    @Test
+    void handlerOriginValidator_throws_forbidden() throws Exception {
+        WebSocketHandler validator = mock(WebSocketHandler.class,
+                withSettings().extraInterfaces(WebSocketOriginValidator.class));
+        when(((WebSocketOriginValidator) validator).isOriginAllowed(any()))
+                .thenThrow(new IllegalStateException("boom"));
+        channel = newChannel(
+                new WebSocketRoutingHandler(Collections.singletonMap("/ws", validator), null, false, null));
+
+        channel.pipeline().fireChannelRead(upgradeRequest("/ws", "http://evil.com"));
+        channel.runPendingTasks();
+
+        assertNotNull(channel.readOutbound(), "判定抛异常也应写回响应");
+        verify(validator, never()).afterConnectionEstablished(any());
+    }
+
+    @Test
+    void handlerOriginValidator_allowed_upgrades() throws Exception {
+        WebSocketHandler validator = mock(WebSocketHandler.class,
+                withSettings().extraInterfaces(WebSocketOriginValidator.class));
+        when(((WebSocketOriginValidator) validator).isOriginAllowed(any())).thenReturn(true);
+        channel = newChannel(
+                new WebSocketRoutingHandler(Collections.singletonMap("/ws", validator), null, false, null));
+
+        channel.pipeline().fireChannelRead(upgradeRequest("/ws", null));
+        channel.runPendingTasks();
+
+        verify(validator, timeout(2000)).afterConnectionEstablished(any(WebSocketSession.class));
+    }
+
+    /**
+     * RFC 6455 §9.1 的扩展参数可以是 quoted-string，值里允许出现逗号/分号：切分必须引号感知， 否则 {@code Sec-WebSocket-Extensions} 会被切坏，协商直接失败。
+     */
+    @Test
+    void splitOutsideQuotes_keepsDelimitersInsideQuotes() {
+        // 切分本身不 trim（调用方负责），这里去掉首尾空白后再断言
+        assertEquals(List.of("a=1", "b=\"x,y\"", "c=2"),
+                WebSocketExtensionNegotiator.splitOutsideQuotes("a=1, b=\"x,y\", c=2", ',').stream().map(String::trim)
+                        .collect(java.util.stream.Collectors.toList()));
+        assertEquals(List.of("permessage-deflate", "p=\"v;1\""),
+                WebSocketExtensionNegotiator.splitOutsideQuotes("permessage-deflate; p=\"v;1\"", ';').stream()
+                        .map(String::trim).collect(java.util.stream.Collectors.toList()));
+    }
+
     /* ==================== per-path 配置覆盖 ==================== */
 
     @Test
@@ -626,5 +715,19 @@ class WebSocketRoutingHandlerCoverageTest {
                 "per-path messageSizeLimit 应覆盖 session 默认 8KB text 上限");
         assertEquals(1024 * 1024, ((NettyWebSocketSession) session).getBinaryMessageSizeLimit(),
                 "per-path messageSizeLimit 应覆盖 session 默认 64KB binary 上限");
+    }
+
+    @Test
+    void upgradeRequestForUnregisteredPath_isPassedThrough() {
+        handler = mock(WebSocketHandler.class);
+        channel = newChannel(newRouting(handler, null, false, null, -1, -1));
+
+        // 带 Upgrade 头但路径未注册：同一端口上混跑普通 HTTP 的关键行为，必须原样透传
+        channel.writeInbound(upgradeRequest("/other", null));
+
+        assertEquals(1, passthrough.size(), "未注册路径的升级请求必须交给下游 HTTP 处理");
+        assertNull(WebSocketRoutingHandler.sessionOf(channel), "透传路径不能建立 WebSocket 会话");
+        ReferenceCountUtil.release(passthrough.get(0));
+        passthrough.clear();
     }
 }
