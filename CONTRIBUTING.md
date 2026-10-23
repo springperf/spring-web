@@ -309,8 +309,8 @@ one carries the instance that produced it.
 
 ### Binary Compatibility (japicmp)
 
-- The latest published version is `3.5.6` (the next release is planned as `3.5.7`), so the canonical
-  invocation is `mvn -Pcompat -Dcompat.oldVersion=3.5.6 verify` (profile `compat`, property-activated):
+- The latest published version is `3.5.7` (the next release is planned as `3.5.8`), so the canonical
+  invocation is `mvn -Pcompat -Dcompat.oldVersion=3.5.7 verify` (profile `compat`, property-activated):
   it compares each module's freshly built jar against that released artifact. pom-packaging modules are
   skipped automatically, and three modules have **no baseline at all** on purpose: `spring-web-test`,
   `spring-web-support-test` and `spring-web-benchmark` set `maven.deploy.skip=true`, so nothing was ever
