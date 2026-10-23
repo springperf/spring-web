@@ -1,9 +1,10 @@
 package io.springperf.web.websocket.jsr;
 
 import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.springperf.web.websocket.server.NettyWebSocketSession;
-import io.springperf.web.websocket.server.SpringHeadersAdapter;
+import org.springframework.http.HttpHeaders;
 import jakarta.websocket.SendHandler;
 import jakarta.websocket.SendResult;
 import org.junit.jupiter.api.Test;
@@ -128,20 +129,44 @@ class JsrRemoteEndpointAsyncTest {
     void batching_defersFramesUntilFlushBatch() throws Exception {
         EmbeddedChannel channel = new EmbeddedChannel();
         NettyWebSocketSession nettySession = new NettyWebSocketSession(channel,
-                java.net.URI.create("ws://localhost/ws"),
-                new SpringHeadersAdapter(new io.netty.handler.codec.http.DefaultHttpHeaders(false)), null,
+                java.net.URI.create("ws://localhost/ws"), new HttpHeaders(), null,
                 new java.net.InetSocketAddress("127.0.0.1", 8080), null, null, null);
         JsrWebSocketSession jsrSession = new JsrWebSocketSession(nettySession, new JsrWebSocketContainer(),
                 codecRegistry, Collections.emptyMap());
 
         jakarta.websocket.RemoteEndpoint.Async batched = jsrSession.getAsyncRemote();
         batched.setBatchingAllowed(true);
-        assertTrue(batched.sendText("a").isDone(), "帧写入 outbound buffer 后 future 即完成（flush 由调用方控制）");
+        java.util.concurrent.Future<Void> future = batched.sendText("a");
+        // future 绑定的是「帧写入完成」而非「入队即完成」：EmbeddedChannel 需驱动一次任务队列
+        channel.runPendingTasks();
+        assertTrue(future.isDone(), "帧写入 outbound buffer 后 future 即完成（flush 由调用方控制）");
         assertNull(channel.readOutbound(), "开启批处理时不得逐条落网");
 
         batched.flushBatch();
         TextWebSocketFrame frame = channel.readOutbound();
         assertEquals("a", frame.text());
+        frame.release();
+        channel.finishAndReleaseAll();
+    }
+
+    /** Async 同样受 position 契约约束：完成时把 position 推进到 limit，调用方随即可复用 buffer。 */
+    @Test
+    void sendBinary_completionAdvancesPosition() throws Exception {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        NettyWebSocketSession nettySession = new NettyWebSocketSession(channel,
+                java.net.URI.create("ws://localhost/ws"), new HttpHeaders(), null,
+                new java.net.InetSocketAddress("127.0.0.1", 8080), null, null, null);
+        JsrWebSocketSession jsrSession = new JsrWebSocketSession(nettySession, new JsrWebSocketContainer(),
+                codecRegistry, Collections.emptyMap());
+        ByteBuffer payload = ByteBuffer.wrap(new byte[] { 7, 8 });
+
+        java.util.concurrent.Future<Void> future = jsrSession.getAsyncRemote().sendBinary(payload);
+        channel.runPendingTasks();
+        future.get(2, java.util.concurrent.TimeUnit.SECONDS);
+
+        assertEquals(payload.limit(), payload.position());
+        BinaryWebSocketFrame frame = channel.readOutbound();
+        assertEquals(2, frame.content().readableBytes(), "推进 position 不得影响已发出的数据");
         frame.release();
         channel.finishAndReleaseAll();
     }

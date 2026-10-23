@@ -364,4 +364,76 @@ class JsrEndpointWebSocketHandlerBranchesTest {
         JsrEndpointWebSocketHandler handler = handler(NoDefaultCtorEndpoint.class);
         assertThrows(IllegalStateException.class, () -> handler.afterConnectionEstablished(mockSession()));
     }
+
+    /* ==================== 动态 MessageHandler 的原生类型分派 ==================== */
+
+    @ServerEndpoint("/throwing-open")
+    public static class ThrowingOnOpenEndpoint {
+        @OnOpen
+        public void onOpen() {
+            throw new IllegalStateException("open fail");
+        }
+    }
+
+    @Test
+    void onOpenFailure_cleansUpStateAndRegistration() {
+        JsrWebSocketContainer container = new JsrWebSocketContainer();
+        JsrEndpointWebSocketHandler handler = new JsrEndpointWebSocketHandler(
+                new JsrEndpointMetadata(ThrowingOnOpenEndpoint.class), container);
+        WebSocketSession session = mockSession();
+
+        assertThrows(Exception.class, () -> handler.afterConnectionEstablished(session));
+
+        assertTrue(session.getAttributes().isEmpty(), "@OnOpen 失败后连接状态不能留在 attributes 里");
+        assertTrue(container.openSessionsOf("/throwing-open").isEmpty(), "失败的连接必须从在线会话表移除");
+    }
+
+    @Test
+    void dynamicBinaryHandler_receivesBinaryPayload() throws Exception {
+        JsrWebSocketContainer container = new JsrWebSocketContainer();
+        JsrEndpointWebSocketHandler handler = new JsrEndpointWebSocketHandler(
+                new JsrEndpointMetadata(NoOnMessageEndpoint.class), container);
+        WebSocketSession session = mockSession();
+        handler.afterConnectionEstablished(session);
+
+        List<Object> received = new CopyOnWriteArrayList<>();
+        JsrWebSocketSession jsrSession = (JsrWebSocketSession) container.openSessionsOf("/no-message").iterator()
+                .next();
+        jsrSession.addMessageHandler(new jakarta.websocket.MessageHandler.Whole<ByteBuffer>() {
+            @Override
+            public void onMessage(ByteBuffer message) {
+                received.add(message);
+            }
+        });
+
+        handler.handleMessage(session, new BinaryMessage(ByteBuffer.wrap(new byte[] { 4, 5 })));
+
+        assertEquals(1, received.size(), "动态注册的 binary handler 必须拿到消息");
+        assertEquals(2, ((ByteBuffer) received.get(0)).remaining());
+    }
+
+    @Test
+    void dynamicPongHandler_receivesPongPayload() throws Exception {
+        JsrWebSocketContainer container = new JsrWebSocketContainer();
+        JsrEndpointWebSocketHandler handler = new JsrEndpointWebSocketHandler(
+                new JsrEndpointMetadata(NoOnMessageEndpoint.class), container);
+        WebSocketSession session = mockSession();
+        handler.afterConnectionEstablished(session);
+
+        List<Object> received = new CopyOnWriteArrayList<>();
+        JsrWebSocketSession jsrSession = (JsrWebSocketSession) container.openSessionsOf("/no-message").iterator()
+                .next();
+        jsrSession.addMessageHandler(new jakarta.websocket.MessageHandler.Whole<PongMessage>() {
+            @Override
+            public void onMessage(PongMessage message) {
+                received.add(message);
+            }
+        });
+
+        handler.handleMessage(session,
+                new org.springframework.web.socket.PongMessage(ByteBuffer.wrap(new byte[] { 1 })));
+
+        assertEquals(1, received.size(), "动态注册的 pong handler 必须拿到 Pong");
+        assertEquals(1, ((PongMessage) received.get(0)).getApplicationData().remaining());
+    }
 }

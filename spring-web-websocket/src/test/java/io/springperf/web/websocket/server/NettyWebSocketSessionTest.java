@@ -15,6 +15,7 @@ import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.timeout.IdleStateHandler;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.PingMessage;
@@ -44,8 +45,7 @@ class NettyWebSocketSessionTest {
     private URI uri = URI.create("ws://localhost:8080/ws");
 
     private NettyWebSocketSession newSession(EmbeddedChannel channel) {
-        return new NettyWebSocketSession(channel, uri,
-                new SpringHeadersAdapter(new io.netty.handler.codec.http.DefaultHttpHeaders(false)), "chat",
+        return new NettyWebSocketSession(channel, uri, new HttpHeaders(), "chat",
                 new InetSocketAddress("127.0.0.1", 8080), new InetSocketAddress("192.168.1.5", 5000), null, null);
     }
 
@@ -273,6 +273,151 @@ class NettyWebSocketSessionTest {
         channel.finishAndReleaseAll();
     }
 
+    /**
+     * JSR-356 {@code RemoteEndpoint.Basic} 的同步语义：业务线程调用必须等到帧真正写入才返回。
+     */
+    @Test
+    void sendMessageAndWait_fromBusinessThread_waitsForCompletion() throws Exception {
+        Channel channel = mock(Channel.class);
+        EventLoop loop = mock(EventLoop.class);
+        ChannelFuture future = mock(ChannelFuture.class);
+        when(channel.eventLoop()).thenReturn(loop);
+        when(channel.isActive()).thenReturn(true);
+        when(channel.isWritable()).thenReturn(true);
+        when(loop.inEventLoop()).thenReturn(false);
+        org.mockito.Mockito.doAnswer(invocation -> {
+            ((Runnable) invocation.getArgument(0)).run();
+            return null;
+        }).when(loop).execute(org.mockito.ArgumentMatchers.any());
+        when(channel.writeAndFlush(org.mockito.ArgumentMatchers.any())).thenReturn(future);
+        when(future.isSuccess()).thenReturn(true);
+        when(future.addListener(org.mockito.ArgumentMatchers.any(ChannelFutureListener.class)))
+                .thenAnswer(invocation -> {
+                    invocation.getArgument(0, ChannelFutureListener.class).operationComplete(future);
+                    return future;
+                });
+
+        NettyWebSocketSession session = new NettyWebSocketSession(channel, uri, null, null, null, null, null, null);
+        session.sendMessageAndWait(new TextMessage("sync"));
+
+        org.mockito.Mockito.verify(channel).writeAndFlush(org.mockito.ArgumentMatchers.any(TextWebSocketFrame.class));
+    }
+
+    /**
+     * 真正证明「等待」而不是「恰好立即完成」：写入的 future 由测试线程延迟完成，发送线程必须一直阻塞到那一刻。
+     */
+    @Test
+    void sendMessageAndWait_blocksUntilWriteCompletes() throws Exception {
+        Channel channel = mock(Channel.class);
+        EventLoop loop = mock(EventLoop.class);
+        ChannelFuture future = mock(ChannelFuture.class);
+        java.util.concurrent.atomic.AtomicReference<ChannelFutureListener> captured = new java.util.concurrent.atomic.AtomicReference<>();
+        when(channel.eventLoop()).thenReturn(loop);
+        when(channel.isActive()).thenReturn(true);
+        when(channel.isWritable()).thenReturn(true);
+        when(loop.inEventLoop()).thenReturn(false);
+        org.mockito.Mockito.doAnswer(invocation -> {
+            ((Runnable) invocation.getArgument(0)).run();
+            return null;
+        }).when(loop).execute(org.mockito.ArgumentMatchers.any());
+        when(channel.writeAndFlush(org.mockito.ArgumentMatchers.any())).thenReturn(future);
+        when(future.isSuccess()).thenReturn(true);
+        when(future.addListener(org.mockito.ArgumentMatchers.any(ChannelFutureListener.class)))
+                .thenAnswer(invocation -> {
+                    captured.set(invocation.getArgument(0, ChannelFutureListener.class));
+                    return future;
+                });
+
+        NettyWebSocketSession session = new NettyWebSocketSession(channel, uri, null, null, null, null, null, null);
+        java.util.concurrent.atomic.AtomicReference<Throwable> failure = new java.util.concurrent.atomic.AtomicReference<>();
+        Thread sender = new Thread(() -> {
+            try {
+                session.sendMessageAndWait(new TextMessage("slow"));
+            } catch (Throwable t) {
+                failure.set(t);
+            }
+        });
+        sender.start();
+
+        sender.join(150);
+        assertTrue(sender.isAlive(), "写入尚未完成时 sendMessageAndWait 必须阻塞");
+        assertNull(failure.get());
+
+        captured.get().operationComplete(future);
+        sender.join(2000);
+        assertFalse(sender.isAlive(), "写入完成后应返回");
+        assertNull(failure.get());
+    }
+
+    /** 写入失败必须冒泡成 IOException——调用方据此决定是否重试或断开。 */
+    @Test
+    void sendMessageAndWait_writeFailure_throwsIOException() throws Exception {
+        Channel channel = mock(Channel.class);
+        EventLoop loop = mock(EventLoop.class);
+        ChannelFuture future = mock(ChannelFuture.class);
+        when(channel.eventLoop()).thenReturn(loop);
+        when(channel.isActive()).thenReturn(true);
+        when(channel.isWritable()).thenReturn(true);
+        when(loop.inEventLoop()).thenReturn(false);
+        org.mockito.Mockito.doAnswer(invocation -> {
+            ((Runnable) invocation.getArgument(0)).run();
+            return null;
+        }).when(loop).execute(org.mockito.ArgumentMatchers.any());
+        when(channel.writeAndFlush(org.mockito.ArgumentMatchers.any())).thenReturn(future);
+        when(future.isSuccess()).thenReturn(false);
+        when(future.cause()).thenReturn(new java.io.IOException("boom"));
+        when(future.addListener(org.mockito.ArgumentMatchers.any(ChannelFutureListener.class)))
+                .thenAnswer(invocation -> {
+                    invocation.getArgument(0, ChannelFutureListener.class).operationComplete(future);
+                    return future;
+                });
+
+        NettyWebSocketSession session = new NettyWebSocketSession(channel, uri, null, null, null, null, null, null);
+        assertThrows(java.io.IOException.class, () -> session.sendMessageAndWait(new TextMessage("sync")));
+    }
+
+    /** EventLoop 线程内不得等待自己排队中的写任务（会死锁），必须直接写。 */
+    @Test
+    void sendMessageAndWait_inEventLoop_writesWithoutDeadlock() throws Exception {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        NettyWebSocketSession session = newSession(channel);
+
+        session.sendMessageAndWait(new TextMessage("now"));
+
+        TextWebSocketFrame frame = channel.readOutbound();
+        assertNotNull(frame);
+        assertEquals("now", frame.text());
+        frame.release();
+        channel.finishAndReleaseAll();
+    }
+
+    @Test
+    void sendMessageAndWait_closedSession_throwsIOException() throws Exception {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        NettyWebSocketSession session = newSession(channel);
+        session.setOpen(false);
+
+        assertThrows(java.io.IOException.class, () -> session.sendMessageAndWait(new TextMessage("x")));
+    }
+
+    /** 批处理模式：完成信号定义在「写入 outbound buffer」，等 flush 会死锁。 */
+    @Test
+    void sendMessageCompletion_batched_completesWithoutFlush() throws Exception {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        NettyWebSocketSession session = newSession(channel);
+
+        java.util.concurrent.CompletableFuture<Void> completion = session.sendMessageCompletion(new TextMessage("b"),
+                false);
+
+        assertTrue(completion.isDone(), "批处理下不能等 flush 才完成");
+        assertTrue(channel.outboundMessages().isEmpty(), "批处理时不得逐条落网");
+        session.flushBatch();
+        TextWebSocketFrame frame = channel.readOutbound();
+        assertEquals("b", frame.text());
+        frame.release();
+        channel.finishAndReleaseAll();
+    }
+
     @Test
     void close_writesCloseFrameAndClosesChannel() throws Exception {
         EmbeddedChannel channel = new EmbeddedChannel();
@@ -374,7 +519,7 @@ class NettyWebSocketSessionTest {
                         "ws.backpressure.queue"))
                 .set(queue);
 
-        NettyWebSocketSession.drainBackpressureQueue(channel);
+        WsBackpressureQueue.drain(channel);
         channel.runPendingTasks();
 
         assertTrue(queue.isEmpty(), "drain 应清空背压队列");
@@ -387,7 +532,7 @@ class NettyWebSocketSessionTest {
     @Test
     void drainBackpressureQueue_emptyQueue_noop() {
         EmbeddedChannel channel = new EmbeddedChannel();
-        NettyWebSocketSession.drainBackpressureQueue(channel);
+        WsBackpressureQueue.drain(channel);
         assertNull(channel.readOutbound());
         channel.finishAndReleaseAll();
     }

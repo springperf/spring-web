@@ -1,16 +1,19 @@
 package io.springperf.web.websocket.jsr;
 
 import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.springperf.web.websocket.server.NettyWebSocketSession;
-import io.springperf.web.websocket.server.SpringHeadersAdapter;
+import org.springframework.http.HttpHeaders;
 import jakarta.websocket.EncodeException;
 import jakarta.websocket.RemoteEndpoint;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.socket.*;
 
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.Writer;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
@@ -21,8 +24,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 class JsrRemoteEndpointBasicTest {
@@ -113,10 +118,116 @@ class JsrRemoteEndpointBasicTest {
         verify(springSession).sendMessage(new BinaryMessage(buf));
     }
 
+    /**
+     * 消息边界是 flush/close 而不是每次 write：write 阶段不得落网，否则一条业务消息会被拆成多条 WebSocket 消息。
+     */
     @Test
-    void getSendStream_unsupported() {
-        assertThrows(UnsupportedOperationException.class, remote::getSendStream);
-        assertThrows(UnsupportedOperationException.class, remote::getSendWriter);
+    void getSendStream_buffersUntilFlush_sendsSingleBinaryMessage() throws IOException {
+        OutputStream out = remote.getSendStream();
+        out.write(new byte[] { 1, 2 });
+        out.write(3);
+        verify(springSession, times(0)).sendMessage(any());
+
+        out.flush();
+
+        org.mockito.ArgumentCaptor<WebSocketMessage<?>> captor = org.mockito.ArgumentCaptor
+                .forClass(WebSocketMessage.class);
+        verify(springSession).sendMessage(captor.capture());
+        assertTrue(captor.getValue() instanceof BinaryMessage, "getSendStream 必须走二进制消息");
+        assertArrayEquals(new byte[] { 1, 2, 3 }, payloadBytes(((BinaryMessage) captor.getValue()).getPayload()));
+    }
+
+    /** 缓冲已空时再次 flush 不得发出空消息——空 WebSocket 消息对端无法区分于业务空内容。 */
+    @Test
+    void getSendStream_flushTwice_secondFlushSendsNothing() throws IOException {
+        OutputStream out = remote.getSendStream();
+        out.write(1);
+        out.flush();
+        out.flush();
+
+        verify(springSession, times(1)).sendMessage(any());
+    }
+
+    @Test
+    void getSendStream_closeSendsBufferAndIsIdempotent() throws IOException {
+        OutputStream out = remote.getSendStream();
+        out.write(new byte[] { 9 });
+        out.close();
+        out.close();
+
+        verify(springSession, times(1)).sendMessage(argThat(msg -> msg instanceof BinaryMessage));
+        assertThrows(IOException.class, () -> out.write(1), "关闭后写入必须抛 IOException");
+    }
+
+    @Test
+    void getSendWriter_flush_sendsTextMessage() throws IOException {
+        Writer writer = remote.getSendWriter();
+        writer.write("hello");
+        verify(springSession, times(0)).sendMessage(any());
+
+        writer.flush();
+
+        org.mockito.ArgumentCaptor<WebSocketMessage<?>> captor = org.mockito.ArgumentCaptor
+                .forClass(WebSocketMessage.class);
+        verify(springSession).sendMessage(captor.capture());
+        assertTrue(captor.getValue() instanceof TextMessage, "getSendWriter 必须走文本消息");
+        assertEquals("hello", ((TextMessage) captor.getValue()).getPayload());
+    }
+
+    /**
+     * 代理对（emoji）被 write 边界切开时必须由编码器补齐：否则会把半个字符编成 {@code ?}，对端收到乱码。
+     */
+    @Test
+    void getSendWriter_surrogateSplitAcrossWrites_stillEncodesWholeChar() throws IOException {
+        String emoji = "\uD83D\uDE00";
+        Writer writer = remote.getSendWriter();
+        writer.write(emoji.toCharArray(), 0, 1);
+        writer.write(emoji.toCharArray(), 1, 1);
+        writer.close();
+
+        org.mockito.ArgumentCaptor<WebSocketMessage<?>> captor = org.mockito.ArgumentCaptor
+                .forClass(WebSocketMessage.class);
+        verify(springSession).sendMessage(captor.capture());
+        assertEquals(emoji, ((TextMessage) captor.getValue()).getPayload());
+    }
+
+    @Test
+    void getSendWriter_closeIsIdempotentAndRejectsWriteAfterClose() throws IOException {
+        Writer writer = remote.getSendWriter();
+        writer.write("x");
+        writer.close();
+        writer.close();
+
+        verify(springSession, times(1)).sendMessage(argThat(msg -> msg instanceof TextMessage));
+        assertThrows(IOException.class, () -> writer.write("y"), "关闭后写入必须抛 IOException");
+    }
+
+    /** 端到端：一次 flush 只落一帧 final 的二进制帧——帧边界即消息边界，写侧不能被拆成多帧。 */
+    @Test
+    void getSendStream_endToEnd_singleFinalFrame() throws Exception {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        RemoteEndpoint.Basic endpoint = newBatchedRemote(channel);
+
+        OutputStream out = endpoint.getSendStream();
+        out.write(new byte[] { 7, 8 });
+        out.flush();
+
+        BinaryWebSocketFrame frame = channel.readOutbound();
+        assertNotNull(frame, "flush 后必须有帧落网");
+        assertTrue(frame.isFinalFragment(), "整条消息必须一次发出（final 帧）");
+        byte[] actual = new byte[frame.content().readableBytes()];
+        frame.content().getBytes(frame.content().readerIndex(), actual);
+        assertArrayEquals(new byte[] { 7, 8 }, actual);
+        assertNull(channel.readOutbound(), "一条流式消息只能产生一帧");
+        frame.release();
+        channel.finishAndReleaseAll();
+    }
+
+    private static byte[] payloadBytes(ByteBuffer buffer) {
+        ByteBuffer copy = buffer.duplicate();
+        byte[] bytes = new byte[copy.remaining()];
+        copy.get(bytes);
+        return bytes;
     }
 
     @Test
@@ -164,6 +275,38 @@ class JsrRemoteEndpointBasicTest {
         assertTrue(remote.getBatchingAllowed());
         remote.setBatchingAllowed(false);
         assertFalse(remote.getBatchingAllowed());
+    }
+
+    /**
+     * 规范（jakarta.websocket RemoteEndpoint#sendBinary）：发送成功后 {@code ByteBuffer.position()} 必须等于 limit。
+     * <p>
+     * 底层用 duplicate 读取不会替你推进，Basic 必须补上；依赖该副作用的代码（循环发送、池化回收）行为才与其他实现一致。
+     * </p>
+     */
+    @Test
+    void sendBinary_advancesPositionToLimit() throws Exception {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        RemoteEndpoint.Basic basic = newBatchedRemote(channel);
+        ByteBuffer payload = ByteBuffer.wrap(new byte[] { 1, 2, 3 });
+
+        basic.sendBinary(payload);
+
+        assertEquals(payload.limit(), payload.position(), "发送成功后 position 应推进到 limit");
+        BinaryWebSocketFrame frame = channel.readOutbound();
+        assertEquals(3, frame.content().readableBytes(), "推进 position 不得影响已发出的数据");
+        frame.release();
+        channel.finishAndReleaseAll();
+    }
+
+    /** 底层无法保证「返回即已发送完成」时不得推进 position：否则底层实现会读到空数据。 */
+    @Test
+    void sendBinary_nonNettySession_doesNotAdvancePosition() throws IOException {
+        ByteBuffer payload = ByteBuffer.wrap(new byte[] { 1, 2, 3 });
+
+        remote.sendBinary(payload);
+
+        assertEquals(0, payload.position(), "非 Netty 后端不保证完成，推进 position 会丢数据");
+        verify(springSession).sendMessage(any());
     }
 
     /** 批处理开启后消息必须停在 outbound buffer，只有 flushBatch 才落网——否则「批处理」等价于逐条发送。 */
@@ -257,8 +400,7 @@ class JsrRemoteEndpointBasicTest {
 
     private RemoteEndpoint.Basic newBatchedRemote(EmbeddedChannel channel) {
         NettyWebSocketSession nettySession = new NettyWebSocketSession(channel,
-                java.net.URI.create("ws://localhost/ws"),
-                new SpringHeadersAdapter(new io.netty.handler.codec.http.DefaultHttpHeaders(false)), null,
+                java.net.URI.create("ws://localhost/ws"), new HttpHeaders(), null,
                 new java.net.InetSocketAddress("127.0.0.1", 8080), null, null, null);
         JsrWebSocketSession jsrSession = new JsrWebSocketSession(nettySession, new JsrWebSocketContainer(),
                 codecRegistry, java.util.Collections.emptyMap());

@@ -1,10 +1,12 @@
 package io.springperf.web.websocket.jsr;
 
+import io.springperf.web.websocket.server.WebSocketOriginValidator;
 import jakarta.websocket.CloseReason;
 import jakarta.websocket.EndpointConfig;
 import jakarta.websocket.PongMessage;
 import jakarta.websocket.server.ServerEndpointConfig;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.Nullable;
 import org.springframework.util.RouteMatcher;
 import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.CloseStatus;
@@ -34,13 +36,18 @@ import java.util.Map;
  * 由于 {@link WebSocketHandler} 被连接间共享（{@code @Sharable}）， 每次连接的状态（端点实例、JSR Session、编解码器）存放在
  * {@link WebSocketSession#getAttributes()} 中，避免跨连接串扰。
  * </p>
+ * <p>
+ * {@link ServerEndpointConfig.Configurator} 目前只有 {@code getEndpointInstance} 与 {@code checkOrigin} 生效 （后者经
+ * {@link WebSocketOriginValidator} 接入手写握手）；{@code modifyHandshake} 不会被调用——本框架没有 JSR 容器那套握手拦截点，需要改握手响应头请用框架自己的
+ * {@code HandshakeInterceptor}。
+ * </p>
  *
  * @author huangcanda
  *
  * @since 3.5.6
  */
 @Slf4j
-public class JsrEndpointWebSocketHandler implements WebSocketHandler {
+public class JsrEndpointWebSocketHandler implements WebSocketHandler, WebSocketOriginValidator {
 
     private static final String STATE_KEY = JsrEndpointWebSocketHandler.class.getName() + ".state";
 
@@ -87,7 +94,15 @@ public class JsrEndpointWebSocketHandler implements WebSocketHandler {
         Object endpoint = instantiateEndpoint();
         JsrCodecRegistry codecRegistry = new JsrCodecRegistry(config);
         Map<String, String> pathParams = resolvePathParameters(springSession);
-        JsrWebSocketSession jsrSession = new JsrWebSocketSession(springSession, container, codecRegistry, pathParams);
+        JsrWebSocketSession jsrSession = new JsrWebSocketSession(springSession, container, codecRegistry, pathParams,
+                metadata.getPath());
+        // 先标记 @OnMessage 占用的原生消息类型，再回调 @OnOpen：@OnOpen 里注册同类型的动态 handler 必须立刻被拒绝
+        JsrEndpointMetadata.ParamSpec messageParam = metadata.getMessageParam();
+        if (messageParam != null) {
+            jsrSession.markAnnotatedMessageType(messageParam.type);
+        }
+        // 先登记再回调 @OnOpen：JSR 允许 @OnOpen 里就用 getOpenSessions() 广播/自检
+        container.registerSession(metadata.getPath(), jsrSession);
 
         // 实参模板：SESSION / EndpointConfig / @PathParam 都是连接级常量，只有消息槽位逐帧变化，
         // 因此在连接建立时建好数组，消息路径不再每次 new Object[n] + switch 分发。
@@ -103,8 +118,9 @@ public class JsrEndpointWebSocketHandler implements WebSocketHandler {
             } catch (Exception ex) {
                 // @OnOpen 抛异常 → 外层握手处理器会 close(SERVER_ERROR)，而 open=false 后
                 // channelInactive 被跳过，afterConnectionClosed 永不回调 → 必须在此兜底：
-                // 回收会话状态并销毁 Decoder/Encoder（避免连接失败导致 codec/endpoint 实例泄漏）
+                // 回收会话状态与在线会话登记并销毁 Decoder/Encoder（避免连接失败导致 codec/endpoint 实例泄漏）
                 springSession.getAttributes().remove(STATE_KEY);
+                container.unregisterSession(metadata.getPath(), jsrSession);
                 codecRegistry.destroy();
                 throw ex;
             }
@@ -114,6 +130,24 @@ public class JsrEndpointWebSocketHandler implements WebSocketHandler {
     @Override
     public void handleMessage(WebSocketSession springSession, WebSocketMessage<?> message) throws Exception {
         JsrConnectionState state = getState(springSession);
+        // 动态 handler 优先：某原生消息类型一旦被动态注册，该类型就由它独占（注册阶段已与 @OnMessage 互斥），
+        // 未被动态注册的类型仍走注解路径。
+        if (state != null) {
+            JsrMessageHandlers handlers = state.jsrSession.handlers();
+            if (!handlers.isEmpty()) {
+                try {
+                    if (deliverToMessageHandlers(handlers, message, state.codecRegistry)) {
+                        return;
+                    }
+                } catch (jakarta.websocket.DecodeException ex) {
+                    throw ex;
+                } catch (RuntimeException ex) {
+                    // 与注解路径一致：业务异常归一为 @OnError，不打断后续消息
+                    handleEndpointError(state, ex);
+                    return;
+                }
+            }
+        }
         Method onMessage = metadata.getOnMessage();
         if (onMessage == null) {
             return;
@@ -171,14 +205,27 @@ public class JsrEndpointWebSocketHandler implements WebSocketHandler {
                 invoke(state.endpoint, onClose, args);
             }
         } finally {
-            // @OnClose 自身异常也不能跳过 Decoder/Encoder 销毁（避免 codec 实例泄漏）
+            // @OnClose 自身异常也不能跳过在线会话注销与 Decoder/Encoder 销毁
+            container.unregisterSession(metadata.getPath(), state.jsrSession);
             state.codecRegistry.destroy();
         }
     }
 
+    /**
+     * 恒为 false：框架只向 handler 交付完整消息。因此动态注册的 {@link jakarta.websocket.MessageHandler.Partial} 也按
+     * 「整条消息即唯一分片、{@code last=true}」交付（规范允许实现自选分片方案）。
+     */
     @Override
     public boolean supportsPartialMessages() {
         return false;
+    }
+
+    /**
+     * JSR-356 的 {@code Configurator#checkOrigin}：在路由层白名单之外再判一次。默认实现返回 true， 因此没有自定义 Configurator 的端点行为不变。
+     */
+    @Override
+    public boolean isOriginAllowed(@Nullable String origin) {
+        return configurator.checkOrigin(origin);
     }
 
     // ===================== 内部实现 =====================
@@ -220,6 +267,27 @@ public class JsrEndpointWebSocketHandler implements WebSocketHandler {
         RouteMatcher.Route route = routeMatcher.parseRoute(requestPath);
         Map<String, String> variables = routeMatcher.matchAndExtract(metadata.getPath(), route);
         return variables != null ? variables : java.util.Collections.emptyMap();
+    }
+
+    /**
+     * 把消息交付给动态注册的 handler。
+     *
+     * @return true 表示该消息已被动态 handler 消费
+     */
+    private static boolean deliverToMessageHandlers(JsrMessageHandlers handlers, WebSocketMessage<?> message,
+            JsrCodecRegistry codecRegistry) throws jakarta.websocket.DecodeException {
+        if (message instanceof TextMessage) {
+            return handlers.deliverText(((TextMessage) message).getPayload(), codecRegistry);
+        }
+        if (message instanceof BinaryMessage) {
+            return handlers.deliverBinary(((BinaryMessage) message).getPayload(), codecRegistry);
+        }
+        if (message instanceof org.springframework.web.socket.PongMessage) {
+            org.springframework.web.socket.PongMessage pong = (org.springframework.web.socket.PongMessage) message;
+            ByteBuffer data = pong.getPayload();
+            return handlers.deliverPong((PongMessage) () -> data);
+        }
+        return false;
     }
 
     private Object decode(WebSocketMessage<?> message, JsrEndpointMetadata.ParamSpec messageParam,

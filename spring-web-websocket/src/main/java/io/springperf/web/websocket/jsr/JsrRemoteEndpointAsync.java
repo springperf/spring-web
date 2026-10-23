@@ -4,8 +4,10 @@ import jakarta.websocket.EncodeException;
 import jakarta.websocket.RemoteEndpoint;
 import jakarta.websocket.SendHandler;
 import jakarta.websocket.SendResult;
+import org.springframework.lang.Nullable;
 import org.springframework.web.socket.BinaryMessage;
 import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketMessage;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -15,8 +17,8 @@ import java.util.concurrent.Future;
 /**
  * JSR-356 {@link RemoteEndpoint.Async} 实现。
  * <p>
- * 底层 {@link org.springframework.web.socket.WebSocketSession#sendMessage} 为同步写入 （EventLoop 串行化），因此此处以 CompletableFuture
- * 包装：发送成功即返回已完成的 future， 发送失败则返回已异常完成的 future。流式发送首期不支持。
+ * 返回的 future / {@link SendHandler} 回调绑定到帧真正写入完成的时刻（底层 {@code sendMessageCompletion}）： 发送成功即正常完成，失败即异常完成，语义与规范一致。
+ * 流式发送只存在于 {@link RemoteEndpoint.Basic}（{@code getSendStream()} / {@code getSendWriter()}），本接口没有对应方法。
  * </p>
  * <p>
  * 批处理（{@link #setBatchingAllowed(boolean)}）开启时，future/回调在帧被写入 outbound buffer 后即完成， 而非等待 flush —— flush 时机由调用方通过
@@ -62,78 +64,66 @@ public class JsrRemoteEndpointAsync implements RemoteEndpoint.Async {
 
     @Override
     public void sendText(String text, SendHandler handler) {
-        try {
-            session.send(new TextMessage(text), !batchingAllowed);
-            handler.onResult(new SendResult());
-        } catch (IOException ex) {
-            handler.onResult(new SendResult(ex));
-        }
+        session.sendAsync(new TextMessage(text), !batchingAllowed)
+                .whenComplete((ignored, error) -> handler.onResult(toSendResult(error)));
     }
 
     @Override
     public Future<Void> sendText(String text) {
-        try {
-            session.send(new TextMessage(text), !batchingAllowed);
-            return CompletableFuture.completedFuture(null);
-        } catch (IOException ex) {
-            CompletableFuture<Void> f = new CompletableFuture<>();
-            f.completeExceptionally(ex);
-            return f;
-        }
+        return session.sendAsync(new TextMessage(text), !batchingAllowed);
     }
 
+    /**
+     * 异步发送二进制消息；完成时按规范把 {@code data} 的 position 推进到 limit（调用方在 future 完成后才能复用该 buffer）。
+     */
     @Override
     public Future<Void> sendBinary(ByteBuffer data) {
-        try {
-            session.send(new BinaryMessage(data), !batchingAllowed);
-            return CompletableFuture.completedFuture(null);
-        } catch (IOException ex) {
-            CompletableFuture<Void> f = new CompletableFuture<>();
-            f.completeExceptionally(ex);
-            return f;
-        }
+        return session.sendAsync(new BinaryMessage(data), !batchingAllowed).whenComplete((ignored, error) -> {
+            if (error == null) {
+                session.markBufferConsumed(data);
+            }
+        });
     }
 
     @Override
     public void sendBinary(ByteBuffer data, SendHandler handler) {
-        try {
-            session.send(new BinaryMessage(data), !batchingAllowed);
-            handler.onResult(new SendResult());
-        } catch (IOException ex) {
-            handler.onResult(new SendResult(ex));
-        }
+        session.sendAsync(new BinaryMessage(data), !batchingAllowed).whenComplete((ignored, error) -> {
+            if (error == null) {
+                session.markBufferConsumed(data);
+            }
+            handler.onResult(toSendResult(error));
+        });
     }
 
     @Override
     public Future<Void> sendObject(Object data) {
         try {
-            JsrCodecRegistry.EncodedPayload payload = codecRegistry.encode(data, true);
-            if (payload.isText()) {
-                session.send(new TextMessage(payload.getText()), !batchingAllowed);
-            } else {
-                session.send(new BinaryMessage(payload.getBinary()), !batchingAllowed);
-            }
-            return CompletableFuture.completedFuture(null);
-        } catch (IOException | EncodeException ex) {
-            CompletableFuture<Void> f = new CompletableFuture<>();
-            f.completeExceptionally(ex);
-            return f;
+            return session.sendAsync(encodeMessage(data), !batchingAllowed);
+        } catch (EncodeException ex) {
+            CompletableFuture<Void> failed = new CompletableFuture<>();
+            failed.completeExceptionally(ex);
+            return failed;
         }
     }
 
     @Override
     public void sendObject(Object data, SendHandler handler) {
         try {
-            JsrCodecRegistry.EncodedPayload payload = codecRegistry.encode(data, true);
-            if (payload.isText()) {
-                session.send(new TextMessage(payload.getText()), !batchingAllowed);
-            } else {
-                session.send(new BinaryMessage(payload.getBinary()), !batchingAllowed);
-            }
-            handler.onResult(new SendResult());
-        } catch (IOException | EncodeException ex) {
+            session.sendAsync(encodeMessage(data), !batchingAllowed)
+                    .whenComplete((ignored, error) -> handler.onResult(toSendResult(error)));
+        } catch (EncodeException ex) {
             handler.onResult(new SendResult(ex));
         }
+    }
+
+    /** POJO → 文本或二进制消息（编码失败按规范抛 {@link EncodeException}）。 */
+    private WebSocketMessage<?> encodeMessage(Object data) throws EncodeException {
+        JsrCodecRegistry.EncodedPayload payload = codecRegistry.encode(data, true);
+        return payload.isText() ? new TextMessage(payload.getText()) : new BinaryMessage(payload.getBinary());
+    }
+
+    private static SendResult toSendResult(@Nullable Throwable error) {
+        return error == null ? new SendResult() : new SendResult(error);
     }
 
     @Override

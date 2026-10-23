@@ -1,24 +1,27 @@
 package io.springperf.web.websocket.server;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
-import io.netty.handler.codec.http.websocketx.*;
+import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.timeout.IdleStateHandler;
-import io.netty.util.AttributeKey;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.lang.Nullable;
 import org.springframework.web.socket.*;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.nio.ByteBuffer;
 import java.security.Principal;
-import java.util.*;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -34,16 +37,12 @@ import java.util.concurrent.atomic.AtomicLong;
 public class NettyWebSocketSession implements WebSocketSession {
 
     private static final AtomicLong sessionIdCounter = new AtomicLong(0);
-    private static final AttributeKey<Queue<WebSocketFrame>> BACKPRESSURE_QUEUE_KEY = AttributeKey
-            .valueOf("ws.backpressure.queue");
     private static final String IDLE_HANDLER_NAME = "ws-idle";
-    /** WebSocket 帧的 rsv 位：本项目不使用任何扩展协商，恒为 0。 */
-    private static final int NO_RSV = 0;
 
     private final String id;
     private final Channel channel;
     private final URI uri;
-    private final SpringHeadersAdapter handshakeHeaders;
+    private final HttpHeaders handshakeHeaders;
     private final String acceptedProtocol;
     private final InetSocketAddress localAddress;
     private final InetSocketAddress remoteAddress;
@@ -51,6 +50,14 @@ public class NettyWebSocketSession implements WebSocketSession {
     @Nullable
     private final WebSocketHandler handler;
     private final Map<String, Object> attributes = new ConcurrentHashMap<>();
+
+    /**
+     * 握手协商成功的扩展；未协商时为不可变空列表。
+     * <p>
+     * volatile：握手在 EventLoop 上写入，而业务可能从其他线程查询（与 {@code getExtensions()} 的读语义一致）。
+     * </p>
+     */
+    private volatile List<WebSocketExtension> extensions = Collections.emptyList();
 
     /** 默认文本消息上限（8KB），与 Spring WebSocket 的默认值一致。 */
     public static final int DEFAULT_TEXT_MESSAGE_SIZE_LIMIT = 8 * 1024;
@@ -73,9 +80,9 @@ public class NettyWebSocketSession implements WebSocketSession {
      */
     private final AtomicBoolean closeNotified = new AtomicBoolean(false);
 
-    public NettyWebSocketSession(Channel channel, URI uri, SpringHeadersAdapter handshakeHeaders,
-            String acceptedProtocol, InetSocketAddress localAddress, InetSocketAddress remoteAddress,
-            Principal principal, @Nullable WebSocketHandler handler) {
+    public NettyWebSocketSession(Channel channel, URI uri, HttpHeaders handshakeHeaders, String acceptedProtocol,
+            InetSocketAddress localAddress, InetSocketAddress remoteAddress, Principal principal,
+            @Nullable WebSocketHandler handler) {
         this.id = "ws-" + sessionIdCounter.incrementAndGet();
         this.channel = channel;
         this.uri = uri;
@@ -165,26 +172,138 @@ public class NettyWebSocketSession implements WebSocketSession {
         }
     }
 
-    private void doSendMessage(WebSocketMessage<?> message, boolean flush) {
-        if (!channel.isWritable()) {
-            enqueueAndBackpressure(message);
+    /**
+     * 同步发送：返回时消息已交给传输层（{@code flush=true} 时已落网）。
+     * <p>
+     * JSR-356 {@code RemoteEndpoint.Basic} 的规范语义是「返回时整条消息已发出」，而 {@link #sendMessage} 从业务线程调用只入队即返回， 所以 Basic 走这条路径。
+     * </p>
+     * <p>
+     * EventLoop 线程内不做等待：等待自己排队中的写任务会死锁，而此刻 {@code write} 已在同一线程内完成入队。
+     * </p>
+     */
+    public void sendMessageAndWait(WebSocketMessage<?> message) throws IOException {
+        sendMessageAndWait(message, true);
+    }
+
+    /**
+     * 同步发送，由调用方决定是否立即 flush（批处理模式下 {@code flush=false}）。
+     *
+     * @throws IOException
+     *             会话已关闭、EventLoop 已终止或写入失败
+     */
+    public void sendMessageAndWait(WebSocketMessage<?> message, boolean flush) throws IOException {
+        if (channel.eventLoop().inEventLoop()) {
+            if (!isOpen()) {
+                throw new IOException("Session " + id + " is closed");
+            }
+            doSendMessage(message, flush);
             return;
         }
-        WebSocketFrame frame = toFrame(message);
+        awaitCompletion(sendMessageCompletion(message, flush));
+    }
+
+    /**
+     * 异步发送，返回的 future 在帧真正写入后完成（失败时为异常完成）。
+     * <p>
+     * 供 JSR-356 {@code RemoteEndpoint.Async} 使用：规范要求二进制发送成功后把调用方 {@code ByteBuffer} 的 position 推进到 limit，
+     * 这需要一个"发送完成"的信号。
+     * </p>
+     */
+    public CompletableFuture<Void> sendMessageCompletion(WebSocketMessage<?> message, boolean flush) {
+        CompletableFuture<Void> completion = new CompletableFuture<>();
+        if (!isOpen()) {
+            completion.completeExceptionally(new IOException("Session " + id + " is closed"));
+            return completion;
+        }
+        if (channel.eventLoop().inEventLoop()) {
+            doSendMessage(message, flush, completion);
+        } else {
+            try {
+                channel.eventLoop().execute(() -> doSendMessage(message, flush, completion));
+            } catch (RejectedExecutionException ex) {
+                completion
+                        .completeExceptionally(new IOException("Session " + id + " event loop rejected the send", ex));
+            }
+        }
+        return completion;
+    }
+
+    private void awaitCompletion(CompletableFuture<Void> completion) throws IOException {
+        try {
+            completion.get();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while sending a WebSocket message on session " + id, ex);
+        } catch (ExecutionException ex) {
+            Throwable cause = ex.getCause() == null ? ex : ex.getCause();
+            if (cause instanceof IOException) {
+                throw (IOException) cause;
+            }
+            throw new IOException("Failed to send a WebSocket message on session " + id + ": " + cause.getMessage(),
+                    cause);
+        }
+    }
+
+    private void doSendMessage(WebSocketMessage<?> message, boolean flush) {
+        doSendMessage(message, flush, null);
+    }
+
+    /**
+     * 发送实现体：{@code completion} 非空时在帧写入后完成。
+     * <p>
+     * Spring 的异步发送路径传 {@code null}，避免每条消息都分配一个 {@link CompletableFuture}。
+     * </p>
+     */
+    private void doSendMessage(WebSocketMessage<?> message, boolean flush,
+            @Nullable CompletableFuture<Void> completion) {
+        if (!channel.isWritable()) {
+            Throwable overflow = enqueueAndBackpressure(message);
+            if (overflow != null) {
+                completeExceptionally(completion, overflow);
+            } else {
+                completeQuietly(completion);
+            }
+            return;
+        }
+        WebSocketFrame frame = WsFrameCodec.encode(message);
         if (frame == null) {
+            completeQuietly(completion);
             return;
         }
         ChannelFuture future = flush ? channel.writeAndFlush(frame) : channel.write(frame);
+        if (!flush) {
+            // Netty 对未 flush 的 write，其 future 要到真正 flush 时才完成。批处理模式下「完成」的语义是
+            // 「已写入 outbound buffer」（帧已拷贝、调用方的 buffer 已消费），若也去等 flush 完成，
+            // 同步发送会一直阻塞到调用方自己 flush——那是死锁。发送失败仍由下面的 listener 通知业务。
+            completeQuietly(completion);
+        }
         future.addListener((ChannelFutureListener) f -> {
-            if (!f.isSuccess() && handler != null) {
+            if (f.isSuccess()) {
+                completeQuietly(completion);
+                return;
+            }
+            if (handler != null) {
                 notifyTransportError(f.cause());
             }
+            completeExceptionally(completion, f.cause());
         });
         if (!flush && !channel.isWritable()) {
-            // 攒批把帧压进 outbound buffer，一旦越过高水位，后续帧只能进背压队列（满 100 帧丢最旧帧）。
-            // 攒批场景下这条丢弃路径比逐条 flush 时容易命中得多，故到水位就提前刷出：
+            // 攒批把帧压进 outbound buffer，一旦越过高水位，后续帧只能进背压队列。
+            // 攒批场景下这条路径比逐条 flush 时容易命中得多，故到水位就提前刷出：
             // 批处理省的是 flush 次数，不能拿消息完整性去换。
             channel.flush();
+        }
+    }
+
+    private static void completeQuietly(@Nullable CompletableFuture<Void> completion) {
+        if (completion != null) {
+            completion.complete(null);
+        }
+    }
+
+    private static void completeExceptionally(@Nullable CompletableFuture<Void> completion, Throwable cause) {
+        if (completion != null) {
+            completion.completeExceptionally(cause);
         }
     }
 
@@ -208,7 +327,8 @@ public class NettyWebSocketSession implements WebSocketSession {
         }
     }
 
-    private void notifyTransportError(Throwable cause) {
+    /** 把传输层失败转交业务 handler；无 handler 时降级为 WARN（握手前构造的诊断用会话）。 */
+    void notifyTransportError(Throwable cause) {
         if (handler != null) {
             try {
                 handler.handleTransportError(this, cause);
@@ -220,92 +340,14 @@ public class NettyWebSocketSession implements WebSocketSession {
         }
     }
 
+    /**
+     * 通道不可写时把消息排入背压队列（队列本身见 {@link WsBackpressureQueue}）。
+     *
+     * @return {@code null} 表示已入队；非 {@code null} 表示队列溢出（连接已被关闭），值是应上报给业务的失败原因
+     */
     @Nullable
-    private WebSocketFrame toFrame(WebSocketMessage<?> message) {
-        if (message instanceof TextMessage) {
-            // 透传 isLast：JSR-356 分片发送会用 last=false 标记非尾片，若一律按 final 帧写出，
-            // 客户端会把每个分片当作独立完整消息，分片消息即被静默拆解破坏。
-            return new TextWebSocketFrame(((TextMessage) message).isLast(), NO_RSV,
-                    ((TextMessage) message).getPayload());
-        } else if (message instanceof BinaryMessage) {
-            // 用 duplicate() 读取：get(byte[]) 会推进 position，若直接读调用方的 buffer，
-            // 同一个 ByteBuffer 发第二次就只剩 0 字节（静默丢消息，且不报错）。
-            ByteBuffer buf = ((BinaryMessage) message).getPayload().duplicate();
-            byte[] bytes = new byte[buf.remaining()];
-            buf.get(bytes);
-            return new BinaryWebSocketFrame(((BinaryMessage) message).isLast(), NO_RSV, Unpooled.wrappedBuffer(bytes));
-        } else if (message instanceof PingMessage) {
-            return new PingWebSocketFrame(copyControlPayload(((PingMessage) message).getPayload()));
-        } else if (message instanceof PongMessage) {
-            return new PongWebSocketFrame(copyControlPayload(((PongMessage) message).getPayload()));
-        }
-        return null;
-    }
-
-    /**
-     * 拷贝 Ping/Pong 的应用数据（RFC 6455 §5.5.2/§5.5.3，控制帧载荷上限 125 字节）。
-     * <p>
-     * 必须拷贝而非用 {@code Unpooled.wrappedBuffer(ByteBuffer)} 共享：JSR 的 {@code sendPing/sendPong} 与 Spring 的
-     * {@code PingMessage/PongMessage} 都不约束调用方在返回后不再改动 buffer，而帧要等 flush 才落网（批处理下更晚）， 共享内存会让调用方复用池化 buffer 时写坏待发数据。125
-     * 字节以内的拷贝成本可忽略。
-     * </p>
-     * <p>
-     * 修复前这里用无参构造，应用数据被静默丢弃。
-     * </p>
-     */
-    private static ByteBuf copyControlPayload(ByteBuffer payload) {
-        ByteBuffer source = payload.duplicate();
-        if (!source.hasRemaining()) {
-            return Unpooled.EMPTY_BUFFER;
-        }
-        byte[] bytes = new byte[source.remaining()];
-        source.get(bytes);
-        return Unpooled.wrappedBuffer(bytes);
-    }
-
-    @SuppressWarnings("unchecked")
-    private void enqueueAndBackpressure(WebSocketMessage<?> message) {
-        Queue<WebSocketFrame> queue = channel.attr(BACKPRESSURE_QUEUE_KEY).get();
-        if (queue == null) {
-            // ArrayDeque 无逐帧 Node 分配、遍历局部性更好；队列本身只在 eventLoop 线程访问
-            Queue<WebSocketFrame> newQueue = new ArrayDeque<>();
-            channel.attr(BACKPRESSURE_QUEUE_KEY).set(newQueue);
-            // 通道关闭时释放队列中未写出的帧（Binary/Text 帧持有 ByteBuf 引用）。
-            // 仅 clear() 会泄漏引用；帧始终由 eventLoop 线程串行入队/排空，此处同样安全。
-            channel.closeFuture().addListener(f -> {
-                WebSocketFrame pending;
-                while ((pending = newQueue.poll()) != null) {
-                    pending.release();
-                }
-            });
-            queue = newQueue;
-        }
-        WebSocketFrame frame = toFrame(message);
-        if (frame != null) {
-            queue.offer(frame);
-        }
-        if (queue.size() >= 100) {
-            log.warn("WebSocket backpressure queue full (100), dropping oldest frame");
-            WebSocketFrame dropped = queue.poll();
-            if (dropped != null)
-                dropped.release();
-        }
-    }
-
-    /**
-     * 排空背压队列。由 {@code BackpressureHandler} 在通道恢复可写时调用。
-     */
-    static void drainBackpressureQueue(Channel channel) {
-        Queue<WebSocketFrame> queue = channel.attr(BACKPRESSURE_QUEUE_KEY).get();
-        if (queue == null || queue.isEmpty())
-            return;
-        WebSocketFrame frame;
-        while ((frame = queue.poll()) != null) {
-            channel.writeAndFlush(frame);
-            if (channel.bytesBeforeUnwritable() <= 0 && !queue.isEmpty()) {
-                break; // 写缓冲区再次满时退出，等下一次 writability 事件
-            }
-        }
+    private Throwable enqueueAndBackpressure(WebSocketMessage<?> message) {
+        return WsBackpressureQueue.enqueue(this, message);
     }
 
     @Override
@@ -323,11 +365,26 @@ public class NettyWebSocketSession implements WebSocketSession {
 
     @Override
     public List<WebSocketExtension> getExtensions() {
-        return Collections.emptyList();
+        return extensions;
+    }
+
+    /**
+     * 握手完成时由路由层写入协商成功的扩展（如 permessage-deflate）。
+     * <p>
+     * 用 setter 而不是构造器参数：构造器是公开 API，加参数会破坏既有调用方（二进制兼容）。
+     * </p>
+     */
+    public void setExtensions(List<WebSocketExtension> extensions) {
+        this.extensions = extensions == null ? Collections.emptyList() : extensions;
     }
 
     public void setOpen(boolean open) {
         this.open = open;
+    }
+
+    /** 包内访问器：背压队列挂在 channel attribute 上，需要拿到通道本身。 */
+    Channel channel() {
+        return channel;
     }
 
     /**

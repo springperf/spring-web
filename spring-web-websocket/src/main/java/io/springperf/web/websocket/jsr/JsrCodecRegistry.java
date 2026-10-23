@@ -134,6 +134,23 @@ public class JsrCodecRegistry {
     }
 
     /**
+     * 该类型能否由文本帧解码得到（{@link String} 内建，其余查 {@link Decoder.Text}）。
+     * <p>
+     * 供 {@code Session#addMessageHandler(Class, MessageHandler)} 在注册阶段判定 handler 属于哪种原生消息类型。
+     * </p>
+     */
+    boolean canDecodeText(Class<?> targetType) {
+        return String.class == targetType || textDecoderFor(targetType) != null;
+    }
+
+    /**
+     * 该类型能否由二进制帧解码得到（{@code byte[]}/{@link ByteBuffer} 内建，其余查 {@link Decoder.Binary}）。
+     */
+    boolean canDecodeBinary(Class<?> targetType) {
+        return byte[].class == targetType || ByteBuffer.class == targetType || binaryDecoderFor(targetType) != null;
+    }
+
+    /**
      * 将对象编码为 {@link EncodedPayload}（实际发送由调用方处理）。
      *
      * @param data
