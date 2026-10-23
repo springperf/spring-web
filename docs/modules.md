@@ -430,13 +430,19 @@ destroyComponent()     → 资源释放
 
 轻量 WebSocket 模块，基于 Spring WebSocket API + Netty，将 WebSocket 升级请求接入 Netty pipeline。
 
-`WebSocketRoutingHandler` 作为 `ChannelInboundHandler` 注入 Netty pipeline，拦截 `Upgrade: websocket` 请求完成握手，随后将 pipeline 从 HTTP 模式切换为 WebSocket 帧模式。握手后创建 `NettyWebSocketSession`（实现 Spring 的 `WebSocketSession`），后续帧直接委托给用户定义的 `WebSocketHandler`。
+`WebSocketRoutingHandler` 作为 `ChannelInboundHandler` 注入 Netty pipeline，拦截 `Upgrade: websocket` 请求完成握手，随后将 pipeline 从 HTTP 模式切换为 WebSocket 帧模式。握手后创建 `NettyWebSocketSession`（实现 Spring 的 `WebSocketSession`），后续帧按 RFC 6455 语义分发（分片聚合、size limit、控制帧、Close 语义）后落到用户定义的 `WebSocketHandler`。
 
-支持路径模式匹配（含 `{pathVariable}`）、per-handler 覆盖的 Origin 校验/空闲超时/心跳保活、以及背压队列。
+支持路径模式匹配（含 `{pathVariable}`）、per-handler 覆盖的 Origin 校验/空闲超时/心跳保活、以及背压队列（满 100 帧即关闭连接并回调 `handleTransportError`，不丢帧）。
 
-支持 `permessage-deflate` 压缩（`setAllowExtensions(true)`）：握手时解析客户端的 `Sec-WebSocket-Extensions` 并回写协商结果，协商成功后在帧编解码器两侧插入压缩器/解压器；客户端未提或无可用参数时不做任何压缩，且带 RSV 位的帧按协议违规拒绝（不会把压缩数据当明文交给业务）。帧解码器的最大帧长度取自 per-path 的 `messageSizeLimit`，未配置时为 text 8KB / binary 64KB 的较大者。
+支持 `permessage-deflate` 压缩（`setAllowExtensions(true)`）：握手时解析客户端的 `Sec-WebSocket-Extensions` 并回写协商结果，协商成功后在帧编解码器两侧插入压缩器/解压器；客户端未提或无可用参数时不做任何压缩，且带 RSV 位的帧按协议违规拒绝（不会把压缩数据当明文交给业务）。帧解码器的最大帧长度取自 per-path 的 `messageSizeLimit`，未配置时为 text 8KB / binary 64KB 的较大者。协商结果经 `getExtensions()` 对外可见（JSR-356 端点对应 `Session#getNegotiatedExtensions()`），业务不必自行推断压缩是否生效。
 
-JSR-356 端点的 `RemoteEndpoint.setBatchingAllowed(true)` 支持真批处理：开启后 `sendText`/`sendBinary`/`sendObject` 只写入 Netty outbound buffer，由 `flushBatch()` 合并为一次系统调用；`sendPing`/`sendPong` 以及关闭批处理（`setBatchingAllowed(false)`）时立即刷出。攒批上限是 Netty outbound buffer 的高水位（默认 64KB），到水位即提前刷出——不会为省一次 flush 而让后续帧掉进背压队列被丢弃。
+JSR-356 端点的 `RemoteEndpoint.setBatchingAllowed(true)` 支持真批处理：开启后 `sendText`/`sendBinary`/`sendObject` 只写入 Netty outbound buffer，由 `flushBatch()` 合并为一次系统调用；`sendPing`/`sendPong` 以及关闭批处理（`setBatchingAllowed(false)`）时立即刷出。攒批上限是 Netty outbound buffer 的高水位（默认 64KB），到水位即提前刷出——不会为省一次 flush 而让后续帧压进背压队列。
+
+`RemoteEndpoint.Basic` 是同步语义：业务线程调用 `sendText`/`sendBinary` 会等到帧真正写入才返回（EventLoop 线程内直接写、不等待，避免自锁）；非阻塞发送请用 `getAsyncRemote()`。二进制发送成功后按规范把调用方 `ByteBuffer` 的 position 推进到 limit，`Async` 则在发送完成时推进。
+
+`Session#addMessageHandler` 支持动态注册：每种原生消息类型（text / binary / pong）最多一个 handler，与 `@OnMessage` 互斥——同一类型重复注册抛 `IllegalStateException`。本框架只交付完整消息，故 `MessageHandler.Partial` 以「整条消息即唯一分片、`last=true`」回调；`addMessageHandler(MessageHandler)` 在泛型被擦除（lambda 等）时按规范抛 `IllegalStateException`，需改用带 `Class` 的重载。
+
+流式发送 `RemoteEndpoint.Basic.getSendStream()` / `getSendWriter()` 在容器侧缓冲：`write()` 只累积，`flush()` / `close()` 时把累积内容作为一条完整消息发出（文本走 UTF-8 增量编码，代理对被 write 边界切开也不会损坏）。`ServerEndpointConfig.Configurator` 中 `getEndpointInstance` 与 `checkOrigin` 生效（后者在路由层 Origin 白名单之外再判一次；未覆写时按规范默认放行所有来源），`modifyHandshake` 不会被调用——需要改握手响应头请用框架自己的 `HandshakeInterceptor`。
 
 ### 使用
 
