@@ -14,6 +14,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Collections;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -112,6 +114,95 @@ class PerfHttpSessionManagerTest {
         manager.saveSession(session);
         PerfHttpSession retrieved = manager.getSession(session.getId());
         assertEquals("value", retrieved.getAttribute("key"));
+    }
+
+    /* ==================== 响应结束后的保存：阻塞型存储不得占用 EventLoop ==================== */
+
+    /** 模拟文件/远程存储：保存是阻塞的，且记录执行线程。 */
+    private static final class BlockingStorage implements HttpSessionStorage {
+        final java.util.concurrent.ConcurrentMap<String, HttpSessionData> sessions = new java.util.concurrent.ConcurrentHashMap<>();
+        final java.util.concurrent.atomic.AtomicReference<Thread> saveThread = new java.util.concurrent.atomic.AtomicReference<>();
+        final java.util.concurrent.CountDownLatch saved = new java.util.concurrent.CountDownLatch(1);
+
+        @Override
+        public HttpSessionData getSession(String sessionId) {
+            return sessions.get(sessionId);
+        }
+
+        @Override
+        public HttpSessionData createSession() {
+            HttpSessionData data = new HttpSessionData("s-" + System.nanoTime(), System.currentTimeMillis());
+            sessions.put(data.getId(), data);
+            return data;
+        }
+
+        @Override
+        public void saveSession(HttpSessionData session) {
+            saveThread.set(Thread.currentThread());
+            sessions.put(session.getId(), session);
+            saved.countDown();
+        }
+
+        @Override
+        public void removeSession(String sessionId) {
+            sessions.remove(sessionId);
+        }
+
+        @Override
+        public boolean hasBlockingSave() {
+            return true;
+        }
+    }
+
+    private PerfHttpSessionManager newManagerWithStorage(HttpSessionStorage storage) {
+        when(webContext.getBeanFromCtx(HttpSessionStorage.class)).thenReturn(storage);
+        PerfHttpSessionManager blockingManager = new PerfHttpSessionManager();
+        blockingManager.initWithWebContext(webContext);
+        return blockingManager;
+    }
+
+    @Test
+    void saveSessionAfterResponse_blockingStorage_runsOffCallerThread() throws Exception {
+        BlockingStorage storage = new BlockingStorage();
+        PerfHttpSessionManager blockingManager = newManagerWithStorage(storage);
+        try {
+            PerfHttpSession session = blockingManager.createSession();
+            Thread caller = Thread.currentThread();
+
+            blockingManager.saveSessionAfterResponse(session);
+
+            assertTrue(storage.saved.await(2, TimeUnit.SECONDS), "保存应最终执行");
+            assertNotSame(caller, storage.saveThread.get(), "阻塞型存储的保存不得占用调用线程（EventLoop）");
+            assertEquals("session-save", storage.saveThread.get().getName());
+        } finally {
+            blockingManager.destroyComponent();
+        }
+    }
+
+    @Test
+    void saveSessionAfterResponse_invalidOrNullSession_skipped() throws Exception {
+        BlockingStorage storage = new BlockingStorage();
+        PerfHttpSessionManager blockingManager = newManagerWithStorage(storage);
+        try {
+            blockingManager.saveSessionAfterResponse(null);
+
+            PerfHttpSession session = blockingManager.createSession();
+            session.invalidate();
+            blockingManager.saveSessionAfterResponse(session);
+
+            assertFalse(storage.saved.await(200, TimeUnit.MILLISECONDS), "失效会话不得再落盘");
+        } finally {
+            blockingManager.destroyComponent();
+        }
+    }
+
+    @Test
+    void saveSessionAfterResponse_inMemoryStorage_savesSynchronously() {
+        // 内存存储无阻塞 IO：不上线程池，保存立即可见
+        PerfHttpSession session = manager.createSession();
+        session.setAttribute("k", "v");
+        manager.saveSessionAfterResponse(session);
+        assertEquals("v", manager.getSession(session.getId()).getAttribute("k"));
     }
 
     @Test

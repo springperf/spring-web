@@ -48,4 +48,17 @@ public interface HttpSessionStorage {
      */
     default void shutdown() {
     }
+
+    /**
+     * 保存是否涉及阻塞 IO（文件 / 远程存储）。
+     * <p>
+     * 为 true 时，{@code PerfHttpSessionManager} 会把「响应结束后的会话保存」交给后台线程执行 —— 响应写完成回调运行在 Netty EventLoop
+     * 上，在那里直接写盘会阻塞同一 EventLoop 负责的所有连接。纯内存实现保持 false（保存代价可忽略，留在原线程更省一次调度）。
+     * </p>
+     *
+     * @return true 表示保存会阻塞，请求路径上应异步化
+     */
+    default boolean hasBlockingSave() {
+        return false;
+    }
 }

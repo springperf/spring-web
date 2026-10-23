@@ -202,8 +202,9 @@ public class SupportDispatcherHandler extends DispatcherHandler {
             }
             PerfHttpSessionManager manager = request.getWebContext().getWebComponent(PerfHttpSessionManager.class);
             if (manager != null) {
-                session.markAccessed();
-                manager.saveSession(session);
+                // 本方法运行在 Netty 写完成回调（EventLoop 线程）：阻塞型存储由 manager 转到后台线程，
+                // 否则一次会话序列化 + 落盘会卡住该 EventLoop 上的所有连接。
+                manager.saveSessionAfterResponse(session);
             }
         }
     }

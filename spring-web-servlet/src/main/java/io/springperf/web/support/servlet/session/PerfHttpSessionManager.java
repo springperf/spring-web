@@ -17,6 +17,10 @@ import java.io.ObjectInputFilter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 public class PerfHttpSessionManager extends BaseWebComponent {
@@ -38,20 +42,36 @@ public class PerfHttpSessionManager extends BaseWebComponent {
     /** Session 属性名，用于存储当前已认证的 {@link java.security.Principal}。 */
     public static final String PRINCIPAL_KEY = PerfHttpSessionManager.class.getName() + ".PRINCIPAL";
 
-    private HttpSessionStorage storage;
-    private ServletContext servletContext;
-    private Authenticator authenticator;
-    private List<HttpSessionListener> sessionListeners = Collections.emptyList();
-    private List<HttpSessionAttributeListener> attributeListeners = Collections.emptyList();
+    /** 会话保存队列容量：阻塞型存储的保存只走这条队列，满则丢弃（不反压请求线程）。 */
+    private static final int SAVE_QUEUE_CAPACITY = 4096;
+
+    /** 停机时等待在途保存落盘的上限（秒）。 */
+    private static final int SAVE_SHUTDOWN_TIMEOUT_SECONDS = 5;
+
+    /*
+     * 以下字段都是「启动期写入一次、运行期只读」的配置快照，但读取方分布在请求线程与
+     * 会话保存线程（saveExecutor 的 lambda 捕获了 this）等多个线程 —— 全部 volatile 建立可见性。
+     */
+    private volatile HttpSessionStorage storage;
+    private volatile ServletContext servletContext;
+    private volatile Authenticator authenticator;
+    private volatile List<HttpSessionListener> sessionListeners = Collections.emptyList();
+    private volatile List<HttpSessionAttributeListener> attributeListeners = Collections.emptyList();
+
+    /** 单线程保存执行器：保证同一会话的保存按触发顺序落盘；仅阻塞型存储创建。 */
+    private volatile ThreadPoolExecutor saveExecutor;
+
+    /** 队列满告警只打一次，避免过载时刷爆日志。 */
+    private final java.util.concurrent.atomic.AtomicBoolean saveQueueFullWarned = new java.util.concurrent.atomic.AtomicBoolean();
 
     // ---- Cookie 配置 ----
-    private String cookieName = DEFAULT_SESSION_COOKIE_NAME;
-    private String cookiePath = "/";
-    private String sameSite;
-    private boolean cookieSecure;
-    private String cookieDomain;
-    private int cookieMaxAge = -1;
-    private boolean cookieHttpOnly = true;
+    private volatile String cookieName = DEFAULT_SESSION_COOKIE_NAME;
+    private volatile String cookiePath = "/";
+    private volatile String sameSite;
+    private volatile boolean cookieSecure;
+    private volatile String cookieDomain;
+    private volatile int cookieMaxAge = -1;
+    private volatile boolean cookieHttpOnly = true;
 
     /**
      * SameSite 配置值规范化为 Netty {@code CookieHeaderNames.SameSite} 枚举的精确常量名 （Lax/Strict/None——注意非全大写）：配置大小写不敏感，未知值忽略并告警。
@@ -83,6 +103,9 @@ public class PerfHttpSessionManager extends BaseWebComponent {
         this.servletContext = servletCtx;
         HttpSessionStorage bean = webContext.getBeanFromCtx(HttpSessionStorage.class);
         this.storage = bean != null ? bean : createDefaultStorage(webContext);
+        // 阻塞型存储（文件/远程）的保存必须离开 EventLoop；内存存储保持同步，省一次线程调度
+        shutdownSaveExecutor();
+        this.saveExecutor = this.storage.hasBlockingSave() ? createSaveExecutor() : null;
         // Scan for Authenticator bean
         this.authenticator = webContext.getBeanFromCtx(Authenticator.class);
         // Scan for HttpSessionListener and HttpSessionAttributeListener beans
@@ -149,6 +172,22 @@ public class PerfHttpSessionManager extends BaseWebComponent {
                     dir.toAbsolutePath(), exclude, filterSpec.trim());
         }
         return new FileHttpSessionStorage(dir, exclude, deserializationFilter);
+    }
+
+    /**
+     * 创建单线程保存执行器（daemon，队列有界）。
+     * <p>
+     * 单线程是刻意的：同一会话的多次保存必须按触发顺序落盘（后写覆盖先写），多线程会让 ATOMIC_MOVE 之间的先后不可预测。 队列有界 + {@link ThreadPoolExecutor.AbortPolicy}，由
+     * {@link #saveSessionAfterResponse} 捕获拒绝并丢弃，避免过载时反压 EventLoop。
+     * </p>
+     */
+    private static ThreadPoolExecutor createSaveExecutor() {
+        return new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(SAVE_QUEUE_CAPACITY),
+                r -> {
+                    Thread thread = new Thread(r, "session-save");
+                    thread.setDaemon(true);
+                    return thread;
+                }, new ThreadPoolExecutor.AbortPolicy());
     }
 
     @Override
@@ -254,10 +293,67 @@ public class PerfHttpSessionManager extends BaseWebComponent {
         storage.saveSession(session.getData());
     }
 
+    /**
+     * 响应写完成后的会话保存入口（原 SessionFlushListener 直接调 {@link #saveSession}）。
+     * <p>
+     * 该入口运行在 Netty EventLoop 的写完成回调上，因此对阻塞型存储（文件/远程）必须切到后台线程： 在 EventLoop 上写盘会串行化该 loop 负责的所有连接。内存存储仍同步执行（一次
+     * Map put，没必要多一次调度）。
+     * </p>
+     * <p>
+     * 队列满时丢弃本次保存并告警：会话数据仍在内存中（后续请求会再次触发保存）， 宁可丢一次 lastAccessedTime/落盘，也不能反向阻塞请求线程。
+     * </p>
+     */
+    public void saveSessionAfterResponse(PerfHttpSession session) {
+        if (session == null || session.isInvalid()) {
+            return;
+        }
+        if (!storage.hasBlockingSave() || saveExecutor == null) {
+            session.markAccessed();
+            saveSession(session);
+            return;
+        }
+        try {
+            saveExecutor.execute(() -> {
+                try {
+                    session.markAccessed();
+                    saveSession(session);
+                } catch (RuntimeException e) {
+                    log.warn("Failed to persist session {}: {}", session.getId(), e.toString());
+                }
+            });
+        } catch (RejectedExecutionException e) {
+            if (saveQueueFullWarned.compareAndSet(false, true)) {
+                log.warn("Session save queue is full (capacity {}), dropping this save. Session data stays in memory; "
+                        + "further requests will retry. This indicates saves are slower than request rate.",
+                        SAVE_QUEUE_CAPACITY);
+            }
+        }
+    }
+
     @Override
     public void destroyComponent() throws Exception {
+        shutdownSaveExecutor();
         storage.shutdown();
         super.destroyComponent();
+    }
+
+    /** 关闭保存线程并等待在途保存落盘（有界等待，避免停机被慢磁盘拖死）。 */
+    private void shutdownSaveExecutor() {
+        ThreadPoolExecutor executor = saveExecutor;
+        if (executor == null) {
+            return;
+        }
+        saveExecutor = null;
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(SAVE_SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                log.warn("Session save queue did not drain within {}s, {} pending save(s) dropped",
+                        SAVE_SHUTDOWN_TIMEOUT_SECONDS, executor.shutdownNow().size());
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            executor.shutdownNow();
+        }
     }
 
     public PerfHttpSession changeSessionId(PerfHttpSession oldSession) {
