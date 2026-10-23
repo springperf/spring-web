@@ -129,8 +129,8 @@ class WebSocketE2eTest extends BaseE2ETest {
     // ========= 新增高价值测试用例 =========
 
     /**
-     * 验证二进制消息的编解码和回显。 覆盖 {@code NettyWebSocketSession.toFrame()} 的 BinaryWebSocketFrame 分支 和
-     * {@code WebSocketRoutingHandler.handleWebSocketFrame()} 的 BinaryWebSocketFrame 分支。 价值：二进制帧处理是完全独立的代码路径，Text/Binary
+     * 验证二进制消息的编解码和回显。 覆盖 {@code WsFrameCodec.encode()} 的 BinaryWebSocketFrame 分支 和
+     * {@code WebSocketFrameDispatcher.dispatch()} 的 BinaryWebSocketFrame 分支。 价值：二进制帧处理是完全独立的代码路径，Text/Binary
      * 共享逻辑极少，无覆盖则二进制帧可能完全不可用。
      */
     @Test
