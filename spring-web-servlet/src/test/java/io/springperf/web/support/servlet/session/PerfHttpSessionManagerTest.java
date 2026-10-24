@@ -4,7 +4,9 @@ import io.springperf.web.context.WebContext;
 import io.springperf.web.support.servlet.Authenticator;
 import io.springperf.web.support.servlet.context.PerfServletContext;
 import jakarta.servlet.http.HttpSessionAttributeListener;
+import jakarta.servlet.http.HttpSessionBindingEvent;
 import jakarta.servlet.http.HttpSessionEvent;
+import jakarta.servlet.http.HttpSessionIdListener;
 import jakarta.servlet.http.HttpSessionListener;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -123,6 +126,9 @@ class PerfHttpSessionManagerTest {
         final java.util.concurrent.ConcurrentMap<String, HttpSessionData> sessions = new java.util.concurrent.ConcurrentHashMap<>();
         final java.util.concurrent.atomic.AtomicReference<Thread> saveThread = new java.util.concurrent.atomic.AtomicReference<>();
         final java.util.concurrent.CountDownLatch saved = new java.util.concurrent.CountDownLatch(1);
+        final AtomicInteger saveAttempts = new AtomicInteger();
+        /** 置 true 时保存抛异常，用于验证后台保存失败不扩散到请求线程/后续保存。 */
+        volatile boolean failOnSave;
 
         @Override
         public HttpSessionData getSession(String sessionId) {
@@ -138,7 +144,13 @@ class PerfHttpSessionManagerTest {
 
         @Override
         public void saveSession(HttpSessionData session) {
+            saveAttempts.incrementAndGet();
             saveThread.set(Thread.currentThread());
+            if (failOnSave) {
+                // 先放行等待方，再抛：让测试能确定"本次保存确实被执行过并失败"
+                saved.countDown();
+                throw new IllegalStateException("simulated storage failure");
+            }
             sessions.put(session.getId(), session);
             saved.countDown();
         }
@@ -205,6 +217,57 @@ class PerfHttpSessionManagerTest {
         assertEquals("v", manager.getSession(session.getId()).getAttribute("k"));
     }
 
+    /** 轮询等待条件成立（最长 2s），用于无法用 latch 表达的"后台已执行第 N 次"这类断言。 */
+    private static void awaitTrue(String message, java.util.function.BooleanSupplier condition)
+            throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+        while (System.nanoTime() < deadline) {
+            if (condition.getAsBoolean()) {
+                return;
+            }
+            Thread.sleep(10L);
+        }
+        fail(message);
+    }
+
+    @Test
+    void saveSessionAfterResponse_storageThrows_failureStaysInBackground() throws Exception {
+        // 后台保存抛异常必须被吞在保存任务内：既不能冒到请求线程，也不能让后续保存永远不执行
+        BlockingStorage storage = new BlockingStorage();
+        PerfHttpSessionManager blockingManager = newManagerWithStorage(storage);
+        try {
+            storage.failOnSave = true;
+            PerfHttpSession session = blockingManager.createSession();
+
+            assertDoesNotThrow(() -> blockingManager.saveSessionAfterResponse(session));
+            assertTrue(storage.saved.await(2, TimeUnit.SECONDS), "失败的保存也应已被执行");
+            assertEquals("session-save", storage.saveThread.get().getName());
+
+            storage.failOnSave = false;
+            blockingManager.saveSessionAfterResponse(session);
+            awaitTrue("一次保存失败不应让保存线程池失去后续调度能力", () -> storage.saveAttempts.get() >= 2);
+            assertTrue(storage.sessions.containsKey(session.getId()), "后续保存应真正落盘");
+        } finally {
+            blockingManager.destroyComponent();
+        }
+    }
+
+    @Test
+    void saveSessionAfterResponse_afterDestroy_savesOnCallerThread() throws Exception {
+        // 停机流程会关掉保存线程池（saveExecutor=null）。此后仍在途的响应不得丢掉会话数据：
+        // 退化为调用线程同步保存（此时已不再有 EventLoop 抢占问题）。
+        BlockingStorage storage = new BlockingStorage();
+        PerfHttpSessionManager blockingManager = newManagerWithStorage(storage);
+        PerfHttpSession session = blockingManager.createSession();
+        blockingManager.destroyComponent();
+
+        Thread caller = Thread.currentThread();
+        blockingManager.saveSessionAfterResponse(session);
+
+        assertTrue(storage.saved.await(1, TimeUnit.SECONDS), "停机后仍应保存会话");
+        assertSame(caller, storage.saveThread.get(), "保存线程池已关闭，应退化到调用线程同步保存");
+    }
+
     @Test
     void changeSessionId_createsNewId() {
         PerfHttpSession oldSession = manager.createSession();
@@ -241,6 +304,36 @@ class PerfHttpSessionManagerTest {
     @Test
     void getSession_null_returnsNull() {
         assertNull(manager.getSession(null));
+    }
+
+    @Test
+    void getSession_expiredSession_returnsNull() {
+        // maxInactiveInterval 由 createSession 写入后，过期判定发生在存储层；
+        // manager 必须把"过期即不存在"透传给调用方，而不是返回一个已过期会话。
+        PerfHttpSession session = manager.createSession();
+        String id = session.getId();
+        session.getData().setMaxInactiveInterval(1);
+        session.getData().setLastAccessedTime(System.currentTimeMillis() - 100_000L);
+
+        assertNull(manager.getSession(id), "过期会话不应被 manager 返回");
+    }
+
+    @Test
+    void createSession_negativeServletTimeout_keepsStorageDefault() {
+        // ServletContext#getSessionTimeout 返回负值表示"不超时"（Servlet 规范语义）。
+        // 此时不得写入负数/0 覆盖存储默认值，避免把"永不超时"误写成某个过期时限。
+        PerfServletContext servletCtx = mock(PerfServletContext.class);
+        when(servletCtx.getSessionTimeout()).thenReturn(-1);
+        when(webContext.getWebComponent(PerfServletContext.class)).thenReturn(servletCtx);
+
+        PerfHttpSessionManager newManager = new PerfHttpSessionManager();
+        newManager.initWithWebContext(webContext);
+        try {
+            assertEquals(0, newManager.createSession().getMaxInactiveInterval(),
+                    "负超时（不过期）时 maxInactiveInterval 应保持存储默认值 0");
+        } finally {
+            assertDoesNotThrow(newManager::destroyComponent);
+        }
     }
 
     @Test
@@ -306,6 +399,77 @@ class PerfHttpSessionManagerTest {
         assertEquals(2, creations.get());
     }
 
+    /* ==================== 运行期动态注册（ServletContext#addListener 的落地入口） ==================== */
+
+    @Test
+    void addSessionListener_runtimeRegistration_participatesInDispatch() {
+        AtomicInteger creations = new AtomicInteger();
+        HttpSessionListener runtimeListener = new HttpSessionListener() {
+            @Override
+            public void sessionCreated(HttpSessionEvent event) {
+                creations.incrementAndGet();
+            }
+        };
+
+        manager.addSessionListener(runtimeListener);
+        // 启动期扫描完成后再注册的监听器必须对后续会话生效（listener 列表是活引用）
+        manager.createSession();
+
+        assertSame(runtimeListener, manager.getSessionListeners().get(0));
+        assertEquals(1, creations.get(), "运行期注册的 HttpSessionListener 应收到 sessionCreated");
+    }
+
+    @Test
+    void addAttributeListener_runtimeRegistration_dispatchesAddedReplacedRemoved() {
+        AtomicInteger added = new AtomicInteger();
+        AtomicInteger replaced = new AtomicInteger();
+        AtomicInteger removed = new AtomicInteger();
+        HttpSessionAttributeListener runtimeListener = new HttpSessionAttributeListener() {
+            @Override
+            public void attributeAdded(HttpSessionBindingEvent event) {
+                added.incrementAndGet();
+            }
+
+            @Override
+            public void attributeReplaced(HttpSessionBindingEvent event) {
+                replaced.incrementAndGet();
+            }
+
+            @Override
+            public void attributeRemoved(HttpSessionBindingEvent event) {
+                removed.incrementAndGet();
+            }
+        };
+
+        manager.addAttributeListener(runtimeListener);
+        PerfHttpSession session = manager.createSession();
+        session.setAttribute("k", "v1");
+        session.setAttribute("k", "v2");
+        session.removeAttribute("k");
+
+        assertSame(runtimeListener, manager.getAttributeListeners().get(0));
+        assertEquals(1, added.get(), "首次绑定应触发 attributeAdded");
+        assertEquals(1, replaced.get(), "覆盖同名属性应触发 attributeReplaced");
+        assertEquals(1, removed.get(), "移除属性应触发 attributeRemoved");
+    }
+
+    @Test
+    void listenerGetters_returnUnmodifiableSnapshots() {
+        // getter 暴露的是不可变视图：调用方无法绕过 addXxxListener 直接改内部列表
+        assertThrows(UnsupportedOperationException.class,
+                () -> manager.getSessionListeners().add(mock(HttpSessionListener.class)));
+        assertThrows(UnsupportedOperationException.class,
+                () -> manager.getAttributeListeners().add(mock(HttpSessionAttributeListener.class)));
+        assertThrows(UnsupportedOperationException.class,
+                () -> manager.getSessionIdListeners().add(mock(HttpSessionIdListener.class)));
+    }
+
+    @Test
+    void getSessionIdListeners_defaultEmpty() {
+        assertNotNull(manager.getSessionIdListeners());
+        assertTrue(manager.getSessionIdListeners().isEmpty(), "未配置 HttpSessionIdListener bean 时列表应为空");
+    }
+
     @Test
     void cookieConfig_customNamePathAndSecure() {
         when(props.get(eq(PerfHttpSessionManager.COOKIE_NAME_KEY), anyString())).thenReturn("MYCOOKIE");
@@ -331,6 +495,47 @@ class PerfHttpSessionManagerTest {
     }
 
     @Test
+    void cookieConfig_unknownSameSite_isIgnored() {
+        // 未知值走 canonicalSameSite 的 default 分支：忽略（不猜），而不是抛异常打断启动
+        when(props.get(eq(PerfHttpSessionManager.COOKIE_SAME_SITE_KEY), anyString())).thenReturn("weird");
+        PerfHttpSessionManager newManager = new PerfHttpSessionManager();
+        newManager.initWithWebContext(webContext);
+        assertNull(newManager.getSameSite());
+    }
+
+    @Test
+    void cookieConfig_domainMaxAgeHttpOnlyDefaults() {
+        assertNull(manager.getCookieDomain(), "未配置 domain 时不应凭空生成");
+        assertEquals(-1, manager.getCookieMaxAge(), "默认无 Max-Age（会话级 cookie）");
+        assertTrue(manager.isCookieHttpOnly(), "HttpOnly 必须默认开启");
+    }
+
+    @Test
+    void cookieConfig_domainMaxAgeAndHttpOnlyCustomized() {
+        when(props.get(eq(PerfHttpSessionManager.COOKIE_DOMAIN_KEY), isNull())).thenReturn(".example.com");
+        when(props.get(eq(PerfHttpSessionManager.COOKIE_MAX_AGE_KEY), isNull())).thenReturn("3600");
+        when(props.getBoolean(eq(PerfHttpSessionManager.COOKIE_HTTP_ONLY_KEY), eq(true))).thenReturn(false);
+
+        PerfHttpSessionManager newManager = new PerfHttpSessionManager();
+        newManager.initWithWebContext(webContext);
+
+        assertEquals(".example.com", newManager.getCookieDomain());
+        assertEquals(3600, newManager.getCookieMaxAge());
+        assertFalse(newManager.isCookieHttpOnly());
+    }
+
+    @Test
+    void cookieConfig_invalidMaxAge_fallsBackToSessionCookie() {
+        // 写错的 max-age 不能让启动失败，也不能把非法值当 0（0 会立刻删除 cookie）
+        when(props.get(eq(PerfHttpSessionManager.COOKIE_MAX_AGE_KEY), isNull())).thenReturn("not-a-number");
+
+        PerfHttpSessionManager newManager = new PerfHttpSessionManager();
+        newManager.initWithWebContext(webContext);
+
+        assertEquals(-1, newManager.getCookieMaxAge());
+    }
+
+    @Test
     void destroyComponent_shutsDownStorage() {
         HttpSessionStorage storage = mock(HttpSessionStorage.class);
         lenient().when(webContext.getBeanFromCtx(HttpSessionStorage.class)).thenReturn(storage);
@@ -349,6 +554,39 @@ class PerfHttpSessionManagerTest {
         assertNotNull(fresh);
         assertNull(manager.getSession(old.getId()));
         assertEquals("v", fresh.getAttribute("k"));
+    }
+
+    @Test
+    void changeSessionId_notifiesSessionIdListenersWithOldId() {
+        // Servlet 规范：ID 轮换必须通知 HttpSessionIdListener，且事件里是持有「新 ID」的会话 + 旧 ID。
+        // 防会话固定攻击的场景依赖这条通知去迁移审计/安全上下文。
+        java.util.concurrent.atomic.AtomicReference<HttpSessionEvent> captured = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<String> capturedOldId = new java.util.concurrent.atomic.AtomicReference<>();
+        HttpSessionIdListener idListener = (event, oldSessionId) -> {
+            captured.set(event);
+            capturedOldId.set(oldSessionId);
+        };
+        manager.addSessionIdListener(idListener);
+
+        PerfHttpSession old = manager.createSession();
+        String oldId = old.getId();
+        PerfHttpSession fresh = manager.changeSessionId(old);
+
+        assertNotNull(captured.get(), "changeSessionId 必须触发 sessionIdChanged");
+        assertEquals(oldId, capturedOldId.get(), "事件里的旧 ID 应为轮换前的 ID");
+        assertSame(fresh, captured.get().getSession(), "事件应携带持有新 ID 的会话");
+        assertEquals(fresh.getId(), captured.get().getSession().getId());
+    }
+
+    @Test
+    void changeSessionId_newSessionIsNotNewAndKeepsTimeout() {
+        PerfHttpSession old = manager.createSession();
+        old.setMaxInactiveInterval(600);
+
+        PerfHttpSession fresh = manager.changeSessionId(old);
+
+        assertFalse(fresh.isNew(), "ID 轮换是续用既有会话，不应标记为新建");
+        assertEquals(600, fresh.getMaxInactiveInterval(), "轮换不应丢失会话超时配置");
     }
 
     @Test
