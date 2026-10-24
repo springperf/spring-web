@@ -338,6 +338,38 @@ public final class PropertiesConstant {
     public static final String SERVLET_CONTEXT_PARAMETERS_PREFIX = "server.servlet.context-parameters.";
 
     /**
+     * {@code server.servlet.jsp.development}：Jasper 开发模式，映射为 init-param {@code development}。
+     * <p>
+     * <b>默认 false（生产语义）</b>：Jasper 自身默认 {@code true}（每次请求检查 JSP 是否被修改并重编译， 便于热更新但带来文件时间戳检查与常驻内存开销）。本框架以「生产可用」为默认，
+     * 需要边改边看请显式设为 {@code true}。
+     * </p>
+     */
+    public static final String SERVLET_JSP_DEVELOPMENT = "server.servlet.jsp.development";
+    public static final boolean SERVLET_JSP_DEVELOPMENT_DEFAULT = false;
+
+    /**
+     * {@code server.servlet.jsp.keep-generated}：是否保留 Jasper 生成的 Java 源文件， 映射为 init-param {@code keepgenerated}（默认 false）。
+     */
+    public static final String SERVLET_JSP_KEEP_GENERATED = "server.servlet.jsp.keep-generated";
+    public static final boolean SERVLET_JSP_KEEP_GENERATED_DEFAULT = false;
+
+    /**
+     * {@code server.servlet.jsp.trim-spaces}：是否裁剪模板输出中的多余空白，映射为 init-param {@code trimSpaces}（默认 false）。
+     */
+    public static final String SERVLET_JSP_TRIM_SPACES = "server.servlet.jsp.trim-spaces";
+    public static final boolean SERVLET_JSP_TRIM_SPACES_DEFAULT = false;
+
+    /**
+     * {@code server.servlet.jsp.init-parameters.*}：Jasper 初始参数显式块，键名与 Jasper 的 init-param 完全一致， 原样透传（如
+     * {@code server.servlet.jsp.init-parameters.compilerSourceVM=17}）。
+     * <p>
+     * <b>优先级最高</b>：同名参数覆盖上面三个类型化配置键，便于使用 Jasper 全部参数（{@code fork}、{@code genStringAsCharArray}、
+     * {@code engineOptionsClass} 等）。
+     * </p>
+     */
+    public static final String SERVLET_JSP_INIT_PARAMETERS_PREFIX = "server.servlet.jsp.init-parameters.";
+
+    /**
      * 对齐 {@code server.servlet.virtual-server-name}：ServletContext 虚拟服务器名（默认 localhost）。 原键 {@code server.virtual-host}
      * 已改名，不留旧键。
      */

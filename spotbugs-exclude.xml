@@ -873,6 +873,13 @@
         <Class name="io.springperf.web.support.async.stream.ResponseBodyEmitterReturnValueResolver$StreamingHttpOutputMessage"/>
         <Bug pattern="EI_EXPOSE_REP"/>
     </Match>
+    <!-- JasperJspServlet.webContext：JSP servlet 需持有框架上下文才能把 Jasper 的实例管理接到
+         Spring（优先取容器里的 InstanceManager bean，否则用 AutowireCapableBeanFactory）。
+         webContext 是框架自身基础设施对象，防御性拷贝没有语义。 -->
+    <Match>
+        <Class name="io.springperf.web.support.servlet.JasperJspServlet"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
     <Match>
         <Class name="io.springperf.web.support.servlet.PerfAsyncContext"/>
         <Bug pattern="EI_EXPOSE_REP"/>
