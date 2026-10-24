@@ -90,6 +90,17 @@
 >
 > **矩阵参数（path parameter）**：路由匹配前会剥离每个路径段内 `;` 之后的内容（对齐 Spring `UrlPathHelper.removeSemicolonContent=true`），故 `/foo;jsessionid=X` 匹配 `/foo`；`getRequestURI()` 仍返回未剥离的原始 URI，`getServletPath()` 返回剥离后的路径（与 Tomcat 一致）。
 
+## JSP（server.servlet.jsp.*）
+
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `server.servlet.jsp.development` | `false` | Jasper 开发模式。**框架默认 false（生产语义）**——Jasper 自身默认 true，会检查 JSP 是否被修改并重编译；设为 false 后 JSP 改动需重启生效 |
+| `server.servlet.jsp.keep-generated` | `false` | 保留 Jasper 生成的 Java 源文件（透传为 Jasper 参数 `keepgenerated`） |
+| `server.servlet.jsp.trim-spaces` | `false` | 裁剪 JSP 输出中的多余空白（透传为 Jasper 参数 `trimSpaces`，注意大写 S） |
+| `server.servlet.jsp.init-parameters.*` | 无 | Jasper 初始参数显式块：键名与 Jasper 参数名一致、原样透传（如 `server.servlet.jsp.init-parameters.compilerSourceVM=17`）。**同名项覆盖上面三个键**；其余可用参数见 Jasper 的 `EmbeddedServletOptions`（`fork`、`genStringAsCharArray`、`engineOptionsClass` 等） |
+
+> **JSP 实例管理与 Spring 容器**：Jasper 用 `InstanceManager` 创建 JSP / tag 生成类的实例，解析顺序为：`ServletContext` 上已存在的 `InstanceManager`（如 Tomcat 自带的实现，不覆盖）→ Spring 容器中的 `InstanceManager` bean → 框架的 `SpringInstanceManager`（经 `AutowireCapableBeanFactory` 创建，JSP 生成类可获得依赖注入与 `@PostConstruct` / `@PreDestroy` 回调）→ `SimpleInstanceManager`（没有 Spring 上下文时的兜底）。
+
 ## 响应压缩（server.compression.*）
 
 | 配置项 | 默认值 | 说明 |

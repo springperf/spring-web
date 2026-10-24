@@ -124,6 +124,9 @@ EXTERNAL_TYPES = {
     # (b) 本仓主代码 import 的外部依赖（包名即来源）
     'AnnotationConfigApplicationContext': 'org.springframework.context.annotation',
     'AntPathMatcher': 'org.springframework.util',
+    # JSP 实例管理接入 Spring（SpringInstanceManager / JasperJspServlet 的 import）
+    'AutowireCapableBeanFactory': 'org.springframework.beans.factory.config',
+    'SimpleInstanceManager': 'org.apache.tomcat（InstanceManager 的裸反射实现）',
     'CallableProcessingInterceptor': 'org.springframework.web.context.request.async',
     'ChunkedWriteHandler': 'io.netty.handler.stream',
     'DecoderException': 'io.netty.handler.codec',
@@ -163,6 +166,7 @@ EXTERNAL_TYPES = {
     'ServerHttpRequest': 'org.springframework.http.server',
     'ServerHttpResponse': 'org.springframework.http.server',
     'Servlet': 'jakarta.servlet',
+    'ServletContext': 'jakarta.servlet',
     'WebSocketHandler': 'org.springframework.web.socket',
     'WebSocketSession': 'org.springframework.web.socket',
     # (b') .agent/context/module.md 纳入扫描后（2026-10）暴露的外部类型。
