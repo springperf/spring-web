@@ -4,12 +4,18 @@ import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.context.LifecycleWebComponent;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.support.servlet.PerfRequestDispatcher;
+import io.springperf.web.support.servlet.session.PerfHttpSessionManager;
 import jakarta.servlet.FilterRegistration;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletContextEvent;
+import jakarta.servlet.ServletContextListener;
 import jakarta.servlet.ServletRegistration;
 import jakarta.servlet.SessionCookieConfig;
 import jakarta.servlet.SessionTrackingMode;
+import jakarta.servlet.http.HttpSessionAttributeListener;
+import jakarta.servlet.http.HttpSessionIdListener;
+import jakarta.servlet.http.HttpSessionListener;
 import jakarta.servlet.descriptor.JspConfigDescriptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,8 +47,7 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
     private final java.io.File tempDirAttribute;
 
     /*
-     * 会话/编码配置：启动期由配置写入，运行期仍可被 ServletContext 的 setter 修改，
-     * 读取方是请求线程（会话创建、请求/响应编码），故全部 volatile。
+     * 会话/编码配置：启动期由配置写入，运行期仍可被 ServletContext 的 setter 修改， 读取方是请求线程（会话创建、请求/响应编码），故全部 volatile。
      */
     private volatile int sessionTimeout;
     private volatile String requestCharacterEncoding = "UTF-8";
@@ -53,6 +58,9 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
     private volatile boolean forceResponseEncoding;
     /** 启动期从配置读取，运行期可被 {@link #setSessionTrackingModes} 修改；请求线程读取，故 volatile。 */
     private volatile Set<SessionTrackingMode> sessionTrackingModes = Collections.singleton(SessionTrackingMode.COOKIE);
+
+    /** {@link ServletContextListener}：启动期 bean 扫描 + 运行期 {@code addListener} 追加。 */
+    private final java.util.concurrent.CopyOnWriteArrayList<ServletContextListener> contextListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     public PerfServletContext(WebContext webContext) {
         this.webContext = webContext;
@@ -77,8 +85,47 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
      * 仅删除本实例实际创建的目录（{@code tempDir != null}）；创建失败回退到系统 临时目录时（{@code tempDir == null}）不执行删除，避免误删共享目录。
      * </p>
      */
+    /**
+     * 启动期收集 {@link ServletContextListener} bean 并派发 {@code contextInitialized}（原先是完全不派发）。
+     * <p>
+     * 运行期通过 {@code addListener} 注册的监听器不补发该事件 —— 事件已经发生，这与规范「只派发注册之后的事件」一致。
+     * </p>
+     */
+    @Override
+    public void initComponentPhase1() {
+        org.springframework.context.ApplicationContext ctx = webContext.getCtx();
+        if (ctx != null) {
+            contextListeners.addAll(ctx.getBeansOfType(ServletContextListener.class).values());
+        }
+        if (contextListeners.isEmpty()) {
+            return;
+        }
+        ServletContextEvent event = new ServletContextEvent(this);
+        for (ServletContextListener listener : contextListeners) {
+            try {
+                listener.contextInitialized(event);
+            } catch (RuntimeException e) {
+                // 单个监听器失败不阻断启动（与容器行为一致），但必须带类名报出来
+                log.error("ServletContextListener {} failed in contextInitialized", listener.getClass().getName(), e);
+            }
+        }
+        log.info("ServletContext initialized with {} listener(s)", contextListeners.size());
+    }
+
     @Override
     public void destroyComponent() {
+        // Servlet 规范：contextDestroyed 先于其它组件销毁，且按初始化的逆序通知
+        java.util.List<ServletContextListener> listeners = new java.util.ArrayList<>(contextListeners);
+        for (int i = listeners.size() - 1; i >= 0; i--) {
+            ServletContextListener listener = listeners.get(i);
+            try {
+                listener.contextDestroyed(new ServletContextEvent(this));
+            } catch (RuntimeException e) {
+                // 一个监听器失败不得中断停机流程，但必须带上下文报出来
+                log.error("ServletContextListener {} failed in contextDestroyed", listener.getClass().getName(), e);
+            }
+        }
+        contextListeners.clear();
         if (tempDir != null && tempDir.exists()) {
             deleteRecursively(tempDir);
             log.debug("Cleaned up temp dir {}", tempDir.getAbsolutePath());
@@ -491,21 +538,113 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
 
     // ===================== Listeners =====================
 
+    /**
+     * 动态注册监听器（原先是空实现：注册「成功」但永不回调，是最难排查的一类静默）。
+     * <p>
+     * 支持 {@link ServletContextListener}（生命周期）与 {@link HttpSessionListener} / {@link HttpSessionAttributeListener} /
+     * {@link HttpSessionIdListener}（会话）。不支持的类型抛 {@link IllegalArgumentException} ——
+     * 请求级监听器（{@code ServletRequestListener} 等）本框架没有请求事件派发点， 注册即等于画饼，必须显形。
+     * </p>
+     * <p>
+     * 与 Tomcat 的差异（有意）：Tomcat 在容器初始化后调用 {@code addListener} 会抛 {@link IllegalStateException}；本框架允许运行期注册， 但只派发注册之后发生的事件
+     * —— 需要完整生命周期回调（尤其是 {@code contextInitialized}）的监听器请声明为 Spring bean。
+     * </p>
+     */
     @Override
     public void addListener(String className) {
+        if (className == null) {
+            throw new IllegalArgumentException("Listener class name must not be null");
+        }
+        Class<?> clazz;
+        try {
+            clazz = Class.forName(className, true, Thread.currentThread().getContextClassLoader());
+        } catch (ClassNotFoundException e) {
+            throw new IllegalArgumentException("Listener class not found: " + className, e);
+        }
+        if (!EventListener.class.isAssignableFrom(clazz)) {
+            throw new IllegalArgumentException("Class does not implement java.util.EventListener: " + className);
+        }
+        @SuppressWarnings("unchecked")
+        Class<? extends EventListener> listenerClass = (Class<? extends EventListener>) clazz;
+        addListener(listenerClass);
     }
 
     @Override
     public <T extends EventListener> T createListener(Class<T> c) {
-        return null;
+        return instantiateListener(c);
     }
 
     @Override
     public void addListener(Class<? extends EventListener> listenerClass) {
+        if (listenerClass == null) {
+            throw new IllegalArgumentException("Listener class must not be null");
+        }
+        addListener(instantiateListener(listenerClass));
     }
 
     @Override
     public <T extends EventListener> void addListener(T t) {
+        if (t == null) {
+            throw new IllegalArgumentException("Listener must not be null");
+        }
+        if (t instanceof ServletContextListener) {
+            contextListeners.add((ServletContextListener) t);
+            log.debug("Registered ServletContextListener {}", t.getClass().getName());
+            return;
+        }
+        if (t instanceof HttpSessionListener) {
+            requireSessionManager(t).addSessionListener((HttpSessionListener) t);
+            return;
+        }
+        if (t instanceof HttpSessionAttributeListener) {
+            requireSessionManager(t).addAttributeListener((HttpSessionAttributeListener) t);
+            return;
+        }
+        if (t instanceof HttpSessionIdListener) {
+            requireSessionManager(t).addSessionIdListener((HttpSessionIdListener) t);
+            return;
+        }
+        throw new IllegalArgumentException("Unsupported listener type: " + t.getClass().getName()
+                + ". Supported: ServletContextListener, HttpSessionListener, HttpSessionAttributeListener, "
+                + "HttpSessionIdListener. (HttpSessionBindingListener is registered as a session attribute; "
+                + "request-level listeners have no dispatch point in this framework.)");
+    }
+
+    /**
+     * 实例化监听器：反射创建后交给 Spring 做一次依赖注入（与 bean 语义对齐，但不注册为 bean）。
+     *
+     * @throws IllegalArgumentException
+     *             无公共无参构造器 / 构造失败 / 类型非法
+     */
+    private <T extends EventListener> T instantiateListener(Class<T> listenerClass) {
+        if (listenerClass == null) {
+            throw new IllegalArgumentException("Listener class must not be null");
+        }
+        T listener;
+        try {
+            listener = listenerClass.getDeclaredConstructor().newInstance();
+        } catch (ReflectiveOperationException | SecurityException e) {
+            throw new IllegalArgumentException("Cannot instantiate listener " + listenerClass.getName()
+                    + " (a public no-arg constructor is required)", e);
+        }
+        org.springframework.context.ApplicationContext ctx = webContext.getCtx();
+        if (ctx != null) {
+            try {
+                ctx.getAutowireCapableBeanFactory().autowireBean(listener);
+            } catch (RuntimeException e) {
+                throw new IllegalStateException("Failed to autowire listener " + listenerClass.getName(), e);
+            }
+        }
+        return listener;
+    }
+
+    private PerfHttpSessionManager requireSessionManager(EventListener listener) {
+        PerfHttpSessionManager manager = webContext.getWebComponent(PerfHttpSessionManager.class);
+        if (manager == null) {
+            throw new IllegalStateException("Cannot register " + listener.getClass().getName()
+                    + ": session support is not enabled (PerfHttpSessionManager is not registered)");
+        }
+        return manager;
     }
 
     // ===================== Session =====================
@@ -518,8 +657,8 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
     /**
      * 设置有效的会话跟踪模式（原先为空实现：程序化配置被静默丢弃，与 {@code getEffectiveSessionTrackingModes()} 的返回值自相矛盾）。
      * <p>
-     * 规范约束：集合不得为空，且必须包含 {@link SessionTrackingMode#COOKIE} 或 {@link SessionTrackingMode#SSL}（URL 重写只能作为补充手段）。
-     * 生效后会话 Cookie 的下发与 {@code encodeURL} 的 URL 重写都会按新配置工作。
+     * 规范约束：集合不得为空，且必须包含 {@link SessionTrackingMode#COOKIE} 或 {@link SessionTrackingMode#SSL}（URL 重写只能作为补充手段）。 生效后会话
+     * Cookie 的下发与 {@code encodeURL} 的 URL 重写都会按新配置工作。
      * </p>
      */
     @Override

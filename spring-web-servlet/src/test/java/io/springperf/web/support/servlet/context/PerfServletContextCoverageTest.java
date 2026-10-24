@@ -433,12 +433,26 @@ class PerfServletContextCoverageTest {
         assertTrue(servletContext.getServletRegistrations().isEmpty());
         assertNull(servletContext.getFilterRegistration("n"));
         assertTrue(servletContext.getFilterRegistrations().isEmpty());
-
-        assertDoesNotThrow(() -> servletContext.addListener("x"));
-        assertNull(servletContext.createListener(jakarta.servlet.ServletContextListener.class));
-        assertDoesNotThrow(() -> servletContext.addListener(jakarta.servlet.ServletContextListener.class));
-        assertDoesNotThrow(() -> servletContext.addListener(mock(jakarta.servlet.ServletContextListener.class)));
         assertDoesNotThrow(() -> servletContext.declareRoles("role"));
         assertNull(servletContext.getJspConfigDescriptor());
+    }
+
+    @Test
+    void addListener_rejectsUnresolvableOrNonInstantiableListener() {
+        // 动态注册已不是空实现：类名解析失败必须显形（Tomcat 同样抛 IllegalArgumentException），
+        // 而不是"注册成功但永不回调"这种最难排查的静默。
+        assertThrows(IllegalArgumentException.class, () -> servletContext.addListener("x"));
+        // 接口没有公共无参构造器，无法实例化
+        assertThrows(IllegalArgumentException.class,
+                () -> servletContext.createListener(jakarta.servlet.ServletContextListener.class));
+        assertThrows(IllegalArgumentException.class,
+                () -> servletContext.addListener(jakarta.servlet.ServletContextListener.class));
+        assertThrows(IllegalArgumentException.class, () -> servletContext.addListener((String) null));
+    }
+
+    @Test
+    void addListener_acceptsListenerInstance() {
+        // 已实例化的监听器可直接注册；运行期注册只对之后发生的事件生效
+        assertDoesNotThrow(() -> servletContext.addListener(mock(jakarta.servlet.ServletContextListener.class)));
     }
 }

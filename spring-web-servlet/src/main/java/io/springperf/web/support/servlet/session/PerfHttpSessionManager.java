@@ -12,12 +12,13 @@ import org.springframework.core.Ordered;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.http.HttpSessionAttributeListener;
 import jakarta.servlet.http.HttpSessionEvent;
+import jakarta.servlet.http.HttpSessionIdListener;
 import jakarta.servlet.http.HttpSessionListener;
 import java.io.ObjectInputFilter;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -49,14 +50,18 @@ public class PerfHttpSessionManager extends BaseWebComponent {
     private static final int SAVE_SHUTDOWN_TIMEOUT_SECONDS = 5;
 
     /*
-     * 以下字段都是「启动期写入一次、运行期只读」的配置快照，但读取方分布在请求线程与
-     * 会话保存线程（saveExecutor 的 lambda 捕获了 this）等多个线程 —— 全部 volatile 建立可见性。
+     * 以下字段都是「启动期写入一次、运行期只读」的配置快照，但读取方分布在请求线程与 会话保存线程（saveExecutor 的 lambda 捕获了 this）等多个线程 —— 全部 volatile 建立可见性。
      */
     private volatile HttpSessionStorage storage;
     private volatile ServletContext servletContext;
     private volatile Authenticator authenticator;
-    private volatile List<HttpSessionListener> sessionListeners = Collections.emptyList();
-    private volatile List<HttpSessionAttributeListener> attributeListeners = Collections.emptyList();
+    /*
+     * 监听器列表是「活」的：既由启动期 bean 扫描填入，也可在运行期通过 ServletContext#addListener 追加。用 CopyOnWriteArrayList 是为了让「追加」与「请求线程遍历派发」
+     * 不加锁共存，并把 live 引用交给每个 PerfHttpSession —— 运行期注册的监听器对已存在的会话包装同样生效。
+     */
+    private final CopyOnWriteArrayList<HttpSessionListener> sessionListeners = new CopyOnWriteArrayList<>();
+    private final CopyOnWriteArrayList<HttpSessionAttributeListener> attributeListeners = new CopyOnWriteArrayList<>();
+    private final CopyOnWriteArrayList<HttpSessionIdListener> sessionIdListeners = new CopyOnWriteArrayList<>();
 
     /** 单线程保存执行器：保证同一会话的保存按触发顺序落盘；仅阻塞型存储创建。 */
     private volatile ThreadPoolExecutor saveExecutor;
@@ -108,10 +113,13 @@ public class PerfHttpSessionManager extends BaseWebComponent {
         this.saveExecutor = this.storage.hasBlockingSave() ? createSaveExecutor() : null;
         // Scan for Authenticator bean
         this.authenticator = webContext.getBeanFromCtx(Authenticator.class);
-        // Scan for HttpSessionListener and HttpSessionAttributeListener beans
-        this.sessionListeners = new ArrayList<>(webContext.getCtx().getBeansOfType(HttpSessionListener.class).values());
-        this.attributeListeners = new ArrayList<>(
-                webContext.getCtx().getBeansOfType(HttpSessionAttributeListener.class).values());
+        // Scan for session listeners（同一实例可能实现多个接口，分别进入对应列表）
+        this.sessionListeners.clear();
+        this.sessionListeners.addAll(webContext.getCtx().getBeansOfType(HttpSessionListener.class).values());
+        this.attributeListeners.clear();
+        this.attributeListeners.addAll(webContext.getCtx().getBeansOfType(HttpSessionAttributeListener.class).values());
+        this.sessionIdListeners.clear();
+        this.sessionIdListeners.addAll(webContext.getCtx().getBeansOfType(HttpSessionIdListener.class).values());
 
         // Read cookie configuration
         this.cookieName = webContext.getProps().get(COOKIE_NAME_KEY, DEFAULT_SESSION_COOKIE_NAME);
@@ -207,14 +215,31 @@ public class PerfHttpSessionManager extends BaseWebComponent {
         return storage;
     }
 
+    /** 运行期动态注册（{@code ServletContext#addListener} 的落地入口）。 */
+    public void addSessionListener(HttpSessionListener listener) {
+        sessionListeners.add(listener);
+    }
+
+    /** 运行期动态注册（{@code ServletContext#addListener} 的落地入口）。 */
+    public void addAttributeListener(HttpSessionAttributeListener listener) {
+        attributeListeners.add(listener);
+    }
+
+    /** 运行期动态注册（{@code ServletContext#addListener} 的落地入口）。 */
+    public void addSessionIdListener(HttpSessionIdListener listener) {
+        sessionIdListeners.add(listener);
+    }
+
     public List<HttpSessionListener> getSessionListeners() {
-        // 只读视图；字段为 null 时保持原有返回 null 的行为
-        return sessionListeners == null ? null : java.util.Collections.unmodifiableList(sessionListeners);
+        return Collections.unmodifiableList(sessionListeners);
     }
 
     public List<HttpSessionAttributeListener> getAttributeListeners() {
-        // 只读视图（与 getSessionListeners 同型）；字段为 null 时保持原有返回 null 的行为
-        return attributeListeners == null ? null : java.util.Collections.unmodifiableList(attributeListeners);
+        return Collections.unmodifiableList(attributeListeners);
+    }
+
+    public List<HttpSessionIdListener> getSessionIdListeners() {
+        return Collections.unmodifiableList(sessionIdListeners);
     }
 
     public String getCookieName() {
@@ -296,8 +321,8 @@ public class PerfHttpSessionManager extends BaseWebComponent {
     /**
      * 响应写完成后的会话保存入口（原 SessionFlushListener 直接调 {@link #saveSession}）。
      * <p>
-     * 该入口运行在 Netty EventLoop 的写完成回调上，因此对阻塞型存储（文件/远程）必须切到后台线程： 在 EventLoop 上写盘会串行化该 loop 负责的所有连接。内存存储仍同步执行（一次
-     * Map put，没必要多一次调度）。
+     * 该入口运行在 Netty EventLoop 的写完成回调上，因此对阻塞型存储（文件/远程）必须切到后台线程： 在 EventLoop 上写盘会串行化该 loop 负责的所有连接。内存存储仍同步执行（一次 Map
+     * put，没必要多一次调度）。
      * </p>
      * <p>
      * 队列满时丢弃本次保存并告警：会话数据仍在内存中（后续请求会再次触发保存）， 宁可丢一次 lastAccessedTime/落盘，也不能反向阻塞请求线程。
@@ -323,8 +348,9 @@ public class PerfHttpSessionManager extends BaseWebComponent {
             });
         } catch (RejectedExecutionException e) {
             if (saveQueueFullWarned.compareAndSet(false, true)) {
-                log.warn("Session save queue is full (capacity {}), dropping this save. Session data stays in memory; "
-                        + "further requests will retry. This indicates saves are slower than request rate.",
+                log.warn(
+                        "Session save queue is full (capacity {}), dropping this save. Session data stays in memory; "
+                                + "further requests will retry. This indicates saves are slower than request rate.",
                         SAVE_QUEUE_CAPACITY);
             }
         }
@@ -367,6 +393,13 @@ public class PerfHttpSessionManager extends BaseWebComponent {
         PerfHttpSession newSession = new PerfHttpSession(newData, servletContext, sessionListeners, attributeListeners);
         newSession.setNotNew();
         newSession.setOnInvalidateCallback(() -> storage.removeSession(newData.getId()));
+        // Servlet 规范：会话 ID 变更后通知 HttpSessionIdListener（事件里是持有新 ID 的会话，另带旧 ID）
+        if (!sessionIdListeners.isEmpty()) {
+            HttpSessionEvent event = new HttpSessionEvent(newSession);
+            for (HttpSessionIdListener listener : sessionIdListeners) {
+                listener.sessionIdChanged(event, oldId);
+            }
+        }
         return newSession;
     }
 }
