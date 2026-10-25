@@ -41,7 +41,7 @@ To use FreeMarker or Beetl instead, swap `thymeleaf` for:
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `spring.web.view.engine` | none (all available) | Enabled template engines (comma-separated): `thymeleaf` / `freemarker` / `beetl`; the special value `none` registers no engine (only `redirect:` works, and the "no ViewResolver" startup check is skipped); **when unset every available engine on the classpath is registered** |
+| `spring.web.view.engine` | none (all available) | Enabled template engines (comma-separated): `thymeleaf` / `freemarker` / `beetl`; the special value `none` registers no engine (only `redirect:` works, and the "no ViewResolver" startup check is skipped) and **must be used alone**; **when unset every available engine on the classpath is registered** |
 | `spring.thymeleaf.prefix` | `templates/` | Thymeleaf template prefix (classpath-relative) |
 | `spring.thymeleaf.suffix` | `.html` | Thymeleaf template suffix |
 | `spring.thymeleaf.cache` | `true` | Template cache and the view-name-to-View resolution cache; `false` for hot reload |
@@ -52,7 +52,7 @@ To use FreeMarker or Beetl instead, swap `thymeleaf` for:
 | `spring.freemarker.cache` | `true` | Template cache and the resolution cache |
 | `spring.freemarker.enabled` | `true` | Whether the resolver is enabled; same semantics as Thymeleaf |
 | `spring.freemarker.order` | `Integer.MAX_VALUE - 9980` | View resolver order |
-| `spring.freemarker.content-type` | `text/html;charset=UTF-8` | Response Content-Type; its `charset` also determines the response byte encoding |
+| `spring.freemarker.content-type` | `text/html;charset=UTF-8` | Response Content-Type; its `charset` also determines the response byte encoding; invalid values fail startup |
 | `spring.beetl.prefix` | `templates/` | Beetl template prefix (classpath-relative) |
 | `spring.beetl.suffix` | `.btl` | Beetl template suffix |
 | `spring.beetl.cache` | `true` | Template cache and the resolution cache |
@@ -63,7 +63,7 @@ To use FreeMarker or Beetl instead, swap `thymeleaf` for:
 
 Templates are loaded from the classpath `templates/` directory by default (Spring Boot convention).
 
-> Built-in engines resolve in the order Thymeleaf → FreeMarker → Beetl → JSP, adjustable via each `order` property. With `cache=true`, resolution results (including "template absent") are cached; templates added at runtime become visible after a restart or with caching disabled.
+> Built-in engines resolve in the order Thymeleaf → FreeMarker → Beetl → JSP, adjustable via each `order` property. With `cache=true`, resolution results (including "template absent") are cached with a 1024-entry cap; exceeding it evicts the oldest entry only. Templates deployed at runtime become visible immediately after calling `ViewResolverRegistry.invalidateViewCaches()` (see section 9), or after disabling the cache / restarting.
 
 ---
 
@@ -285,6 +285,8 @@ Read this before migrating a page-oriented project. **Aligned** capabilities (vi
 1. **String dual-semantics decided by module inclusion**: without `spring-web-view`, String returns keep their JSON behavior; once the module is included (even if no engine is enabled), a String returned without `@ResponseBody` is a view name and startup fails with "no ViewResolver registered". Set `spring.web.view.engine=none` when only `redirect:` is used.
 2. **Threading model**: template rendering runs on the handler's current thread. By default handlers run on the `default` business pool; if `pool.default-execute-mode=eventloop` or `@RunInPool(EVENTLOOP)` is used, rendering happens on the EventLoop — watch for blocking.
 3. **Spring 6.x note**: in Spring 6.x `ModelMap` no longer implements `Model`; the framework always injects `ExtendedModelMap` (a `ModelMap` subclass that implements `Model`) to support all three parameter types.
+4. **Property refresh boundary**: `WebContext.refreshProperties()` only clears property snapshots and does not rebuild `TemplateEngine`; changes to `spring.{thymeleaf,freemarker,beetl}.*` require a restart. Use `invalidateViewCaches()` for templates deployed at runtime (see section 9).
+5. **Invalid config fails at startup**: `spring.thymeleaf.mode` and `spring.freemarker.content-type` are validated while the engine is initialized; invalid values abort startup with the property name and valid options instead of producing a 500 on the first request.
 
 ---
 
@@ -310,7 +312,30 @@ Return `null` to defer to the next `ViewResolver` in the chain.
 
 ---
 
-## 9. Related Documents
+## 9. Cache Invalidation and Performance Boundaries
+
+**Cache invalidation**: with `cache=true`, both view-name-to-View resolutions and "template absent" negatives are cached, capped at 1024 entries; exceeding the cap evicts only the oldest entry. After deploying new templates at runtime, call:
+
+```java
+@Autowired
+private WebContext webContext;
+
+public void onTemplateDeployed() {
+    ViewResolverRegistry registry = webContext.getWebComponentWithDefault(
+            ViewResolverRegistry.class, new ViewResolverRegistry());
+    registry.invalidateViewCaches();
+}
+```
+
+`ViewResolverRegistry` is created lazily by `WebContext#getWebComponentWithDefault` and is **not a Spring Bean**; you can also call `invalidateCache()` directly on an injected engine `ViewResolver` bean. With `cache=false` nothing is cached and no invalidation is needed. Property refresh is a separate matter (see key note 4 in section 7).
+
+**Module positioning**: `spring-web-view` is a **compatibility adapter** for the Spring MVC view layer, not a standalone rendering-performance layer. Rendering runs synchronously on the handler's current thread; each render builds `IWebContext` / `IWebExchange` adapters and copies model variables. There is no output-buffer reuse, fragment cache, async rendering or content negotiation. For high-throughput SSR, prefer static pre-rendering or a custom `View` that reuses rendered output; with `pool.default-execute-mode=eventloop` or `@RunInEventloop`, avoid blocking rendering in view methods.
+
+**Resolver chain boundaries**: the `ViewResolver` list is fixed during startup Phase1, so resolvers registered at runtime do not participate in resolution (they are still covered by `invalidateViewCaches()`). Any resolver exception terminates the chain with its root cause preserved; later engines are not tried.
+
+---
+
+## 10. Related Documents
 
 - [Modules](modules.md) — `spring-web-view` module architecture
 - [Configuration](configuration.md) — all properties

@@ -16,10 +16,8 @@ import io.springperf.web.view.ViewProperties;
 import io.springperf.web.view.ViewResolverRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.MethodParameter;
-import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -54,7 +52,7 @@ public class ViewReturnValueResolver extends BaseWebComponent implements ReturnV
             if (mapping.getMethod().getReturnType() != String.class) {
                 continue;
             }
-            if (hasResponseBody(mapping.getMethod(), mapping.getUserClass())) {
+            if (ViewResolverRegistry.hasResponseBody(mapping.getMethod(), mapping.getUserClass())) {
                 continue;
             }
             mapping.set(VIEW_NAME_KEY, Boolean.TRUE);
@@ -168,10 +166,5 @@ public class ViewReturnValueResolver extends BaseWebComponent implements ReturnV
             return new RedirectView(viewName.substring(9));
         }
         return viewResolverRegistry.resolve(viewName, req);
-    }
-
-    private static boolean hasResponseBody(java.lang.reflect.Method method, Class<?> clazz) {
-        return AnnotatedElementUtils.hasAnnotation(method, ResponseBody.class)
-                || AnnotatedElementUtils.hasAnnotation(clazz, ResponseBody.class);
     }
 }

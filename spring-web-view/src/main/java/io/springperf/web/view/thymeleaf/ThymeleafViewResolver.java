@@ -66,11 +66,19 @@ public class ThymeleafViewResolver extends BaseWebComponent implements ViewResol
     }
 
     private void initEngine() {
+        TemplateMode templateMode;
+        String configured = mode != null && !mode.isEmpty() ? mode.toUpperCase(Locale.ROOT) : "HTML";
+        try {
+            templateMode = TemplateMode.valueOf(configured);
+        } catch (IllegalArgumentException ex) {
+            // 配置错误在启动期暴露，附合法取值，避免 IllegalArgumentException 无上下文
+            throw new IllegalStateException("Invalid " + ViewProperties.THYMELEAF_MODE + ": '" + mode
+                    + "' (expected HTML/XML/TEXT/JAVASCRIPT/CSS/RAW)", ex);
+        }
         ClassLoaderTemplateResolver templateResolver = new ClassLoaderTemplateResolver();
         templateResolver.setPrefix(prefix);
         templateResolver.setSuffix(suffix);
-        templateResolver.setTemplateMode(TemplateMode
-                .valueOf(mode != null && !mode.isEmpty() ? mode.toUpperCase(java.util.Locale.ROOT) : "HTML"));
+        templateResolver.setTemplateMode(templateMode);
         templateResolver.setCacheable(cacheable);
         if (cacheTtlMs > 0) {
             templateResolver.setCacheTTLMs(cacheTtlMs);
@@ -118,6 +126,11 @@ public class ThymeleafViewResolver extends BaseWebComponent implements ViewResol
     @Override
     public boolean isEnabled() {
         return enabled;
+    }
+
+    @Override
+    public void invalidateCache() {
+        viewCache.invalidate();
     }
 
     private static class ThymeleafView implements View {

@@ -99,6 +99,11 @@ public class BeetlViewResolver extends BaseWebComponent implements ViewResolver 
         return enabled;
     }
 
+    @Override
+    public void invalidateCache() {
+        viewCache.invalidate();
+    }
+
     private static class BeetlView implements View {
         private final GroupTemplate groupTemplate;
         private final String templatePath;

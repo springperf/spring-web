@@ -11,6 +11,7 @@ import io.springperf.web.view.ViewCache;
 import io.springperf.web.view.ViewProperties;
 import io.springperf.web.view.ViewResolver;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.http.MediaType;
 
 import java.io.OutputStreamWriter;
 import java.io.Writer;
@@ -41,8 +42,10 @@ public class FreemarkerViewResolver extends BaseWebComponent implements ViewReso
         this.suffix = ViewProperties.resolve(webContext.getProps(), ViewProperties.FREEMARKER_SUFFIX,
                 ViewProperties.FREEMARKER_SUFFIX_DEFAULT);
         this.encoding = ViewProperties.VIEW_ENCODING_DEFAULT;
-        this.contentType = webContext.getProps().get(ViewProperties.FREEMARKER_CONTENT_TYPE,
+        String configuredContentType = webContext.getProps().get(ViewProperties.FREEMARKER_CONTENT_TYPE,
                 ViewProperties.FREEMARKER_CONTENT_TYPE_DEFAULT);
+        this.contentType = configuredContentType != null ? configuredContentType
+                : ViewProperties.FREEMARKER_CONTENT_TYPE_DEFAULT;
         this.enabled = ViewProperties.resolveBoolean(webContext.getProps(), ViewProperties.FREEMARKER_ENABLED,
                 ViewProperties.FREEMARKER_ENABLED_DEFAULT);
         this.order = ViewProperties.resolveOrder(webContext.getProps(), ViewProperties.FREEMARKER_ORDER,
@@ -58,6 +61,13 @@ public class FreemarkerViewResolver extends BaseWebComponent implements ViewReso
     }
 
     private void initEngine(boolean cacheable) {
+        // 配置错误在启动期暴露：运行期 applyContentType 也会解析该值，放到每请求才抛异常太晚
+        try {
+            MediaType.parseMediaType(contentType);
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalStateException("Invalid " + ViewProperties.FREEMARKER_CONTENT_TYPE
+                    + ": '" + contentType + "'", ex);
+        }
         this.configuration = new Configuration(Configuration.VERSION_2_3_33);
         configuration.setDefaultEncoding(encoding);
         if (settings != null) {
@@ -115,6 +125,11 @@ public class FreemarkerViewResolver extends BaseWebComponent implements ViewReso
     @Override
     public boolean isEnabled() {
         return enabled;
+    }
+
+    @Override
+    public void invalidateCache() {
+        viewCache.invalidate();
     }
 
     private static class FreemarkerView implements View {

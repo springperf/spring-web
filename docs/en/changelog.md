@@ -44,6 +44,9 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **View resolution cost**: template existence probing and View creation are now cached by view name (`cache=false` keeps hot reload; FreeMarker includes the locale in the cache key), removing N classpath lookups per request
 - **View error semantics**: resolution exceptions keep their cause instead of being silently skipped; an unresolvable `ModelAndView` now throws instead of returning a blank 200; Content-Type and response encoding are decided in one place by `ViewReturnValueResolver.applyContentType()`, 302 no longer carries `text/html`, and a 3xx status set on `ModelAndView` is preserved
 - **View configuration**: built-in engine order is deterministic and configurable (`spring.{engine}.order`, `spring.web.view.jsp.order`); `spring.freemarker.enabled` added, disabled engines no longer bypass startup fail-fast; the never-read `spring.beetl.mode` is removed
+- **View resolution cache**: concurrent resolution of the same view name loads only once and failures are no longer cached; exceeding the cap evicts the oldest entry instead of clearing the whole cache; `ViewResolverRegistry.invalidateViewCaches()` makes templates deployed at runtime visible immediately
+- **View config validation and metadata**: invalid `spring.thymeleaf.mode` / `spring.freemarker.content-type` now fail startup with a clear exception; the `spring.web.view.engine` default constant is aligned with auto-configuration semantics; IDE metadata is completed and guarded by a key/default-value consistency test
+- **View module boundary docs**: clarifies that this module is a Spring MVC compatibility adapter (synchronous rendering, per-request exchange objects, no output/fragment cache), that property refresh does not rebuild template engines, and that the resolver list is a startup snapshot
 
 ## [3.5.7] - 20261008
 

@@ -2,6 +2,7 @@
 
 - **生成时间 / Generated at**：2026-10-08 22:50:16
 - **环境 / Environment**：Windows_NT / java version "17.0.9" 2023-10-17 LTS
+- **数据提示 / Data note**：本表是 2026-10-08 的全仓聚合快照，早于 2026-11-06 的 `spring-web-view` 缓存重构（新增 `ViewCache` 等类）；视图模块数据需重跑 `scripts/coverage-report.ps1` 后才会刷新。本报告由脚本生成，请勿手工修改表格数值。
 - **覆盖范围 / Scope**：库模块，**单测 + E2E 合并口径**（JaCoCo，coverage-aggregate 模块 report-aggregate 合并后的 jacoco.csv）
   Library modules, unit tests **plus E2E** (JaCoCo, merged jacoco.csv from the coverage-aggregate module)
 - **覆盖目标 / Targets**：spring-web ≥90%，其余库模块 ≥80%（✅=达标 ✓，❌=未达标 ✗）

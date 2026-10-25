@@ -212,4 +212,22 @@ class FreemarkerViewResolverTest {
 
         verify(resp, never()).getHeaders();
     }
+
+    @Test
+    void initWithWebContext_invalidContentType_failsFast() {
+        when(props.get(ViewProperties.FREEMARKER_CONTENT_TYPE, ViewProperties.FREEMARKER_CONTENT_TYPE_DEFAULT))
+                .thenReturn("not a media type");
+        IllegalStateException ex = assertThrows(IllegalStateException.class, this::buildResolver);
+        assertTrue(ex.getMessage().contains(ViewProperties.FREEMARKER_CONTENT_TYPE));
+    }
+
+    @Test
+    void invalidateCache_reloadsView() throws Exception {
+        FreemarkerViewResolver resolver = buildResolver();
+        View first = resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class));
+        assertSame(first, resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class)));
+
+        resolver.invalidateCache();
+        assertNotSame(first, resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class)));
+    }
 }
