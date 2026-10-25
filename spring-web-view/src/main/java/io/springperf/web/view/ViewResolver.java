@@ -21,4 +21,14 @@ public interface ViewResolver extends WebComponent {
     default boolean isEnabled() {
         return true;
     }
+
+    /**
+     * 使本解析器持有的解析结果缓存失效。
+     * <p>
+     * 运行期新增或替换模板后，由 {@link ViewResolverRegistry#invalidateViewCaches()} 统一调用；
+     * 无缓存的自定义实现保持默认空实现。
+     * </p>
+     */
+    default void invalidateCache() {
+    }
 }

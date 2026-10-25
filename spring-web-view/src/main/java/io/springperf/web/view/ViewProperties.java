@@ -7,8 +7,10 @@ public final class ViewProperties {
     private ViewProperties() {
     }
 
+    /** 多选引擎（逗号分隔）；特殊值 {@code none} 表示不注册任何引擎，且只能单独使用。 */
     public static final String ENGINE = "spring.web.view.engine";
-    public static final String ENGINE_DEFAULT = "thymeleaf";
+    /** 未配置时不过滤引擎，由 classpath 装配决定，与 {@code ViewEngineCondition} 及配置文档一致。 */
+    public static final String ENGINE_DEFAULT = "";
 
     /** 内置 ViewResolver 的 order 基准，与 {@code WebComponent} 默认 order 对齐；自定义 resolver 默认排在内置之前。 */
     public static final int VIEW_ORDER_BASE = Integer.MAX_VALUE - 10000;

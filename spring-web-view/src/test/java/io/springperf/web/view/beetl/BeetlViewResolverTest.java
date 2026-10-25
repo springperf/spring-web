@@ -155,4 +155,14 @@ class BeetlViewResolverTest {
     void getOrder_defaultIsExplicit() {
         assertEquals(ViewProperties.BEETL_ORDER_DEFAULT, buildResolver().getOrder());
     }
+
+    @Test
+    void invalidateCache_reloadsView() throws Exception {
+        BeetlViewResolver resolver = buildResolver();
+        View first = resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class));
+        assertSame(first, resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class)));
+
+        resolver.invalidateCache();
+        assertNotSame(first, resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class)));
+    }
 }

@@ -303,11 +303,11 @@ management.server.max-content-length=1048576
 
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
-| `spring.web.view.engine` | 无（全部可用） | 启用的模板引擎列表（逗号分隔）：`thymeleaf` / `freemarker` / `beetl`；**不配置则注册所有 classpath 上可用的引擎** |
+| `spring.web.view.engine` | 无（全部可用） | 启用的模板引擎列表（逗号分隔）：`thymeleaf` / `freemarker` / `beetl`；特殊值 `none` 表示不注册任何引擎，**只能单独使用**；**不配置则注册所有 classpath 上可用的引擎** |
 | `spring.thymeleaf.prefix` | `templates/` | Thymeleaf 模板前缀（classpath 相对路径） |
 | `spring.thymeleaf.suffix` | `.html` | Thymeleaf 模板后缀 |
 | `spring.thymeleaf.cache` | `true` | 模板缓存与「视图名 → View」解析结果缓存（开发可设 `false` 热改） |
-| `spring.thymeleaf.mode` | `HTML` | 模板模式（Thymeleaf `TemplateMode`，如 `HTML` / `HTML5` / `TEXT`） |
+| `spring.thymeleaf.mode` | `HTML` | 模板模式（Thymeleaf `TemplateMode`）：`HTML` / `XML` / `TEXT` / `JAVASCRIPT` / `CSS` / `RAW`；非法值启动期拦截 |
 | `spring.thymeleaf.cache-ttl` | 无（`-1`，不过期） | 模板缓存 TTL（Duration 风格，如 `10m`）；`<=0` 表示不过期 |
 | `spring.thymeleaf.enabled` | `true` | 是否启用 Thymeleaf；`false` 时不参与视图解析，也不计入启动期校验 |
 | `spring.thymeleaf.order` | `Integer.MAX_VALUE - 9990` | 视图解析顺序（值小者优先） |
@@ -318,7 +318,7 @@ management.server.max-content-length=1048576
 | `spring.freemarker.order` | `Integer.MAX_VALUE - 9980` | 视图解析顺序 |
 | `spring.freemarker.template-loader-path` | 无（回退 `prefix`） | FreeMarker 模板加载路径；**配置后覆盖 `prefix`** |
 | `spring.freemarker.settings` | 无 | FreeMarker 原生 settings（键值对，如 `datetime_format=yyyy-MM-dd`） |
-| `spring.freemarker.content-type` | `text/html;charset=UTF-8` | FreeMarker 输出的 Content-Type；其中 `charset` 同时决定响应字节编码 |
+| `spring.freemarker.content-type` | `text/html;charset=UTF-8` | FreeMarker 输出的 Content-Type；其中 `charset` 同时决定响应字节编码；非法值启动期拦截 |
 | `spring.beetl.prefix` | `templates/` | Beetl 模板前缀（classpath 相对路径） |
 | `spring.beetl.suffix` | `.btl` | Beetl 模板后缀 |
 | `spring.beetl.cache` | `true` | 模板缓存与解析结果缓存 |
