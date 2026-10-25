@@ -197,11 +197,23 @@ class DynamicRegistrationTest {
     // ==================== 窗口 ====================
 
     @Test
-    void afterInitialization_registrationIsRejectedWithIllegalState() {
+    void afterInitialization_allWriteOperationsAreRejectedWithIllegalState() {
+        ServletRegistration.Dynamic servletRegistration = servletContext.addServlet("dyn", mock(Servlet.class));
+        FilterRegistration.Dynamic filterRegistration = servletContext.addFilter("dynF", new TrackingFilter());
+
         servletContext.initComponentPhase2();
 
         assertThrows(IllegalStateException.class, () -> servletContext.addServlet("n", mock(Servlet.class)));
         assertThrows(IllegalStateException.class, () -> servletContext.addFilter("n", new TrackingFilter()));
+        // 已登记的注册项同样必须拒绝：Phase1/Phase3 之后这些修改永远不会被认领，静默接受等于骗调用方
+        assertThrows(IllegalStateException.class, () -> servletRegistration.addMapping("/late"));
+        assertThrows(IllegalStateException.class, () -> servletRegistration.setInitParameter("k", "v"));
+        assertThrows(IllegalStateException.class, () -> servletRegistration.setAsyncSupported(true));
+        assertThrows(IllegalStateException.class,
+                () -> servletRegistration.setServletSecurity(new ServletSecurityElement()));
+        assertThrows(IllegalStateException.class,
+                () -> filterRegistration.addMappingForUrlPatterns(null, true, "/late/*"));
+        assertThrows(IllegalStateException.class, () -> filterRegistration.setInitParameter("k", "v"));
     }
 
     @Test

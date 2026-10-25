@@ -69,7 +69,7 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
     private final java.util.concurrent.ConcurrentMap<String, DynamicServletRegistration> servletRegistrations = new java.util.concurrent.ConcurrentHashMap<>();
 
     /** Filter 注册表：Spring bean filter 由 {@code SupportWebFilterRegistry} 自行收集，这里只放 {@code addFilter} 的动态项。 */
-    private final java.util.concurrent.ConcurrentHashMap<String, DynamicFilterRegistration> filterRegistrations = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.concurrent.ConcurrentMap<String, DynamicFilterRegistration> filterRegistrations = new java.util.concurrent.ConcurrentHashMap<>();
 
     /** url-pattern → servlet name：同一 pattern 不允许被两个 servlet 占用（规范要求由 addMapping 返回冲突集合）。 */
     private final java.util.concurrent.ConcurrentHashMap<String, String> urlPatternOwners = new java.util.concurrent.ConcurrentHashMap<>();
@@ -501,7 +501,7 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
     /**
      * 窗口外注册的统一失败方式：规范要求容器初始化完成后 {@code addServlet}/{@code addFilter} 抛 {@link IllegalStateException}，而不是"注册成功但永不生效"。
      */
-    private void requireRegistrationOpen(String method) {
+    void requireRegistrationOpen(String method) {
         if (initialized) {
             throw new IllegalStateException(method + " must be called during ServletContext initialization "
                     + "(ServletContextListener#contextInitialized). Dynamic registration after startup is not "
@@ -509,7 +509,7 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
         }
     }
 
-    private static String validateRegistrationName(String name) {
+    static String validateRegistrationName(String name) {
         if (name == null || name.isEmpty()) {
             throw new IllegalArgumentException("Registration name must not be null or empty");
         }
@@ -606,6 +606,8 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
      */
     public ServletRegistration.Dynamic registerBeanServlet(String name, jakarta.servlet.Servlet servlet,
             String[] urlPatterns, Map<String, String> initParams) {
+        // 与 addServlet 同一窗口：注册表在 Phase1 之后不会再被认领，晚于窗口写入等于静默无效
+        requireRegistrationOpen("registerBeanServlet");
         String registrationName = validateRegistrationName(name);
         DynamicServletRegistration registration = new DynamicServletRegistration(registrationName, servlet, this);
         if (initParams != null && !initParams.isEmpty()) {
@@ -676,7 +678,7 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
         if (filter == null) {
             throw new IllegalArgumentException("Filter must not be null");
         }
-        DynamicFilterRegistration registration = new DynamicFilterRegistration(name, filter);
+        DynamicFilterRegistration registration = new DynamicFilterRegistration(name, filter, this);
         if (filterRegistrations.putIfAbsent(name, registration) != null) {
             throw new IllegalArgumentException(
                     "A filter registration with name '" + name + "' already exists in this ServletContext");
