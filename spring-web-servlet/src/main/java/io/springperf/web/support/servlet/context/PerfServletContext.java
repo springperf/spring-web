@@ -62,6 +62,21 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
     /** {@link ServletContextListener}：启动期 bean 扫描 + 运行期 {@code addListener} 追加。 */
     private final java.util.concurrent.CopyOnWriteArrayList<ServletContextListener> contextListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
 
+    /**
+     * Servlet 注册表：Spring bean servlet 与 {@code addServlet} 动态注册共用同一张表， Phase1 由 {@code SupportServletRegistry}
+     * 统一认领（init + 注册路由）。
+     */
+    private final java.util.concurrent.ConcurrentMap<String, DynamicServletRegistration> servletRegistrations = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Filter 注册表：Spring bean filter 由 {@code SupportWebFilterRegistry} 自行收集，这里只放 {@code addFilter} 的动态项。 */
+    private final java.util.concurrent.ConcurrentHashMap<String, DynamicFilterRegistration> filterRegistrations = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** url-pattern → servlet name：同一 pattern 不允许被两个 servlet 占用（规范要求由 addMapping 返回冲突集合）。 */
+    private final java.util.concurrent.ConcurrentHashMap<String, String> urlPatternOwners = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** 动态注册窗口：Phase2 起（Phase1 的 contextInitialized 已全部回调完）按规范拒绝 addServlet/addFilter。 */
+    private volatile boolean initialized;
+
     public PerfServletContext(WebContext webContext) {
         this.webContext = webContext;
         this.mimeTypes = loadMimeTypes();
@@ -110,6 +125,34 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
             }
         }
         log.info("ServletContext initialized with {} listener(s)", contextListeners.size());
+    }
+
+    /**
+     * 关闭动态注册窗口。
+     * <p>
+     * 规范（Servlet 6.0 §4.4.1）只允许在 {@code ServletContextListener#contextInitialized} 或
+     * {@code ServletContainerInitializer#onStartup} 期间调用 {@code addServlet}/{@code addFilter}；Phase1 结束即视为容器已初始化，
+     * 之后再调用必须抛 {@link IllegalStateException}。
+     * </p>
+     */
+    @Override
+    public void initComponentPhase2() {
+        this.initialized = true;
+        log.debug(
+                "Dynamic servlet/filter registration window closed: {} servlet registration(s), {} filter registration(s)",
+                servletRegistrations.size(), filterRegistrations.size());
+    }
+
+    /**
+     * 必须先于 {@code SupportServletRegistry} / {@code SupportWebFilterRegistry} 的 Phase1 执行： 只有先派发
+     * {@code contextInitialized}，监听器里 {@code addServlet} 登记的项才能被它们认领。
+     * <p>
+     * 不能依赖声明顺序 —— 各组件的默认 order 相同，而排序输入来自 {@code ConcurrentHashMap.values()}，顺序不确定。
+     * </p>
+     */
+    @Override
+    public int getOrder() {
+        return org.springframework.core.Ordered.LOWEST_PRECEDENCE - 20000;
     }
 
     @Override
@@ -456,84 +499,233 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
     // ===================== Servlet Registration =====================
 
     /**
-     * 动态注册不受支持时的统一失败方式。
-     * <p>
-     * 规范为这些方法指定的「不支持」信号就是 {@link UnsupportedOperationException}；原先返回 null 会让调用方 以为注册成功（或静默跳过），能力丢失却无任何痕迹 —— 与模块其余
-     * fail-fast 策略也不一致。
-     * </p>
+     * 窗口外注册的统一失败方式：规范要求容器初始化完成后 {@code addServlet}/{@code addFilter} 抛 {@link IllegalStateException}，而不是"注册成功但永不生效"。
      */
-    private static UnsupportedOperationException dynamicRegistrationUnsupported(String method) {
-        return new UnsupportedOperationException(method + " is not supported: this framework has no Servlet container "
-                + "registry. Register a Spring bean instead (or annotate with @WebServlet/@WebFilter).");
+    private void requireRegistrationOpen(String method) {
+        if (initialized) {
+            throw new IllegalStateException(method + " must be called during ServletContext initialization "
+                    + "(ServletContextListener#contextInitialized). Dynamic registration after startup is not "
+                    + "allowed by the Servlet specification; declare a Spring bean or @WebServlet/@WebFilter instead.");
+        }
+    }
+
+    private static String validateRegistrationName(String name) {
+        if (name == null || name.isEmpty()) {
+            throw new IllegalArgumentException("Registration name must not be null or empty");
+        }
+        return name;
     }
 
     @Override
     public ServletRegistration.Dynamic addServlet(String servletName, String className) {
-        throw dynamicRegistrationUnsupported("addServlet(String, String)");
+        requireRegistrationOpen("addServlet(String, String)");
+        String name = validateRegistrationName(servletName);
+        if (className == null) {
+            throw new IllegalArgumentException("Servlet class name must not be null");
+        }
+        Class<?> clazz;
+        try {
+            clazz = Class.forName(className, true, Thread.currentThread().getContextClassLoader());
+        } catch (ClassNotFoundException e) {
+            throw new IllegalArgumentException("Servlet class not found: " + className, e);
+        }
+        if (!jakarta.servlet.Servlet.class.isAssignableFrom(clazz)) {
+            throw new IllegalArgumentException("Class does not implement jakarta.servlet.Servlet: " + className);
+        }
+        @SuppressWarnings("unchecked")
+        Class<? extends jakarta.servlet.Servlet> servletClass = (Class<? extends jakarta.servlet.Servlet>) clazz;
+        return addServlet(name, servletClass);
     }
 
     @Override
     public ServletRegistration.Dynamic addServlet(String servletName, jakarta.servlet.Servlet servlet) {
-        throw dynamicRegistrationUnsupported("addServlet(String, Servlet)");
+        requireRegistrationOpen("addServlet(String, Servlet)");
+        String name = validateRegistrationName(servletName);
+        if (servlet == null) {
+            throw new IllegalArgumentException("Servlet must not be null");
+        }
+        DynamicServletRegistration registration = new DynamicServletRegistration(name, servlet, this);
+        if (servletRegistrations.putIfAbsent(name, registration) != null) {
+            throw new IllegalArgumentException(
+                    "A servlet registration with name '" + name + "' already exists in this ServletContext");
+        }
+        log.debug("Dynamically registered servlet '{}' ({})", name, servlet.getClass().getName());
+        return registration;
     }
 
     @Override
     public ServletRegistration.Dynamic addServlet(String servletName,
             Class<? extends jakarta.servlet.Servlet> servletClass) {
-        throw dynamicRegistrationUnsupported("addServlet(String, Class)");
+        requireRegistrationOpen("addServlet(String, Class)");
+        String name = validateRegistrationName(servletName);
+        if (servletClass == null) {
+            throw new IllegalArgumentException("Servlet class must not be null");
+        }
+        return addServlet(name, instantiate(servletClass, "servlet"));
     }
 
     @Override
     public ServletRegistration.Dynamic addJspFile(String servletName, String jspFile) {
-        throw dynamicRegistrationUnsupported("addJspFile(String, String)");
+        // JSP 已有统一路由（JspViewResolver#/**/*.jsp），再开一个 servlet 级 jspFile 映射会与它竞争同一条路径
+        throw new UnsupportedOperationException("addJspFile is not supported: JSPs are routed by JspViewResolver "
+                + "(/**/*.jsp). Return a 'jsp:name' view, or addServlet(JasperJspServlet.class) with an explicit mapping.");
     }
 
     @Override
     public <T extends jakarta.servlet.Servlet> T createServlet(Class<T> c) {
-        throw dynamicRegistrationUnsupported("createServlet(Class)");
+        return instantiate(c, "servlet");
     }
 
     @Override
     public ServletRegistration getServletRegistration(String servletName) {
-        return null;
+        return servletName == null ? null : servletRegistrations.get(servletName);
     }
 
     @Override
     public Map<String, ? extends ServletRegistration> getServletRegistrations() {
-        return Collections.emptyMap();
+        return Collections.unmodifiableMap(new java.util.LinkedHashMap<>(servletRegistrations));
+    }
+
+    /**
+     * 登记一个 Spring bean servlet（Phase1 由 {@code SupportServletRegistry} 调用）。
+     * <p>
+     * 与动态注册共用同一张注册表，{@link #getServletRegistrations()} 才能返回完整视图。同名冲突属于配置错误（fail-fast）： 两个来源都想用同一个 servlet
+     * name，运行期无法判断该用哪个。
+     * </p>
+     *
+     * @param name
+     *            注册名
+     * @param servlet
+     *            servlet 实例（bean）
+     * @param urlPatterns
+     *            已解析的 url-pattern
+     * @param initParams
+     *            已解析的 init parameters
+     *
+     * @return 注册项
+     */
+    public ServletRegistration.Dynamic registerBeanServlet(String name, jakarta.servlet.Servlet servlet,
+            String[] urlPatterns, Map<String, String> initParams) {
+        String registrationName = validateRegistrationName(name);
+        DynamicServletRegistration registration = new DynamicServletRegistration(registrationName, servlet, this);
+        if (initParams != null && !initParams.isEmpty()) {
+            registration.setInitParameters(initParams);
+        }
+        java.util.Set<String> conflicts = registration.addMapping(urlPatterns);
+        if (!conflicts.isEmpty()) {
+            throw new IllegalStateException("Servlet '" + registrationName
+                    + "' maps url-pattern(s) already taken by another servlet: " + conflicts);
+        }
+        if (servletRegistrations.putIfAbsent(registrationName, registration) != null) {
+            throw new IllegalStateException(
+                    "Duplicate servlet registration name '" + registrationName + "': declared by "
+                            + servlet.getClass().getName() + " and another registration. Rename one of them.");
+        }
+        return registration;
+    }
+
+    /**
+     * 取走尚未认领的 servlet 注册项（Phase1 由 {@code SupportServletRegistry} 调用）。
+     * <p>
+     * 认领后条目仍保留在 {@link #getServletRegistrations()} 视图中，只是不再重复 init / 注册路由。
+     * </p>
+     */
+    public java.util.List<DynamicServletRegistration> claimServletRegistrations() {
+        java.util.List<DynamicServletRegistration> claimed = new java.util.ArrayList<>();
+        for (DynamicServletRegistration registration : servletRegistrations.values()) {
+            if (registration.markClaimedIfUnclaimed()) {
+                claimed.add(registration);
+            }
+        }
+        return claimed;
+    }
+
+    /** 同一 url-pattern 是否已被另一个 servlet 占用（动态注册的 addMapping 用它返回冲突集合）。 */
+    boolean isUrlPatternTaken(String urlPattern, String servletName) {
+        String owner = urlPatternOwners.putIfAbsent(urlPattern, servletName);
+        return owner != null && !owner.equals(servletName);
     }
 
     // ===================== Filter Registration =====================
 
     @Override
     public FilterRegistration.Dynamic addFilter(String filterName, String className) {
-        throw dynamicRegistrationUnsupported("addFilter(String, String)");
+        requireRegistrationOpen("addFilter(String, String)");
+        String name = validateRegistrationName(filterName);
+        if (className == null) {
+            throw new IllegalArgumentException("Filter class name must not be null");
+        }
+        Class<?> clazz;
+        try {
+            clazz = Class.forName(className, true, Thread.currentThread().getContextClassLoader());
+        } catch (ClassNotFoundException e) {
+            throw new IllegalArgumentException("Filter class not found: " + className, e);
+        }
+        if (!jakarta.servlet.Filter.class.isAssignableFrom(clazz)) {
+            throw new IllegalArgumentException("Class does not implement jakarta.servlet.Filter: " + className);
+        }
+        @SuppressWarnings("unchecked")
+        Class<? extends jakarta.servlet.Filter> filterClass = (Class<? extends jakarta.servlet.Filter>) clazz;
+        return addFilter(name, filterClass);
     }
 
     @Override
     public FilterRegistration.Dynamic addFilter(String filterName, jakarta.servlet.Filter filter) {
-        throw dynamicRegistrationUnsupported("addFilter(String, Filter)");
+        requireRegistrationOpen("addFilter(String, Filter)");
+        String name = validateRegistrationName(filterName);
+        if (filter == null) {
+            throw new IllegalArgumentException("Filter must not be null");
+        }
+        DynamicFilterRegistration registration = new DynamicFilterRegistration(name, filter);
+        if (filterRegistrations.putIfAbsent(name, registration) != null) {
+            throw new IllegalArgumentException(
+                    "A filter registration with name '" + name + "' already exists in this ServletContext");
+        }
+        log.debug("Dynamically registered filter '{}' ({})", name, filter.getClass().getName());
+        return registration;
     }
 
     @Override
     public FilterRegistration.Dynamic addFilter(String filterName,
             Class<? extends jakarta.servlet.Filter> filterClass) {
-        throw dynamicRegistrationUnsupported("addFilter(String, Class)");
+        requireRegistrationOpen("addFilter(String, Class)");
+        String name = validateRegistrationName(filterName);
+        if (filterClass == null) {
+            throw new IllegalArgumentException("Filter class must not be null");
+        }
+        return addFilter(name, instantiate(filterClass, "filter"));
     }
 
     @Override
     public <T extends jakarta.servlet.Filter> T createFilter(Class<T> c) {
-        throw dynamicRegistrationUnsupported("createFilter(Class)");
+        return instantiate(c, "filter");
     }
 
     @Override
     public FilterRegistration getFilterRegistration(String filterName) {
-        return null;
+        return filterName == null ? null : filterRegistrations.get(filterName);
     }
 
     @Override
     public Map<String, ? extends FilterRegistration> getFilterRegistrations() {
-        return Collections.emptyMap();
+        return Collections.unmodifiableMap(new java.util.LinkedHashMap<>(filterRegistrations));
+    }
+
+    /**
+     * 取走尚未认领的 filter 注册项（Phase3 由 {@code SupportWebFilterRegistry} 调用）。
+     * <p>
+     * 与 servlet 不同，Spring bean 的 filter 由 {@code SupportWebFilterRegistry} 自己的容器收集， 因此
+     * {@link #getFilterRegistrations()} 只反映动态注册项。
+     * </p>
+     */
+    public java.util.List<DynamicFilterRegistration> claimFilterRegistrations() {
+        java.util.List<DynamicFilterRegistration> claimed = new java.util.ArrayList<>();
+        for (DynamicFilterRegistration registration : filterRegistrations.values()) {
+            if (registration.markClaimedIfUnclaimed()) {
+                claimed.add(registration);
+            }
+        }
+        return claimed;
     }
 
     // ===================== Listeners =====================
@@ -620,22 +812,36 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
         if (listenerClass == null) {
             throw new IllegalArgumentException("Listener class must not be null");
         }
-        T listener;
+        return instantiate(listenerClass, "listener");
+    }
+
+    /**
+     * 反射实例化 + 交给 Spring 做一次依赖注入（与 bean 语义对齐，但不注册为 bean）。
+     * <p>
+     * {@code createServlet}/{@code createFilter}/监听器实例化共用：动态注册的组件同样能拿到 Spring 依赖。
+     * </p>
+     */
+    private <T> T instantiate(Class<T> type, String kind) {
+        if (type == null) {
+            throw new IllegalArgumentException(kind + " class must not be null");
+        }
+        T instance;
         try {
-            listener = listenerClass.getDeclaredConstructor().newInstance();
+            instance = type.getDeclaredConstructor().newInstance();
         } catch (ReflectiveOperationException | SecurityException e) {
-            throw new IllegalArgumentException("Cannot instantiate listener " + listenerClass.getName()
-                    + " (a public no-arg constructor is required)", e);
+            throw new IllegalArgumentException(
+                    "Cannot instantiate " + kind + " " + type.getName() + " (a public no-arg constructor is required)",
+                    e);
         }
         org.springframework.context.ApplicationContext ctx = webContext.getCtx();
         if (ctx != null) {
             try {
-                ctx.getAutowireCapableBeanFactory().autowireBean(listener);
+                ctx.getAutowireCapableBeanFactory().autowireBean(instance);
             } catch (RuntimeException e) {
-                throw new IllegalStateException("Failed to autowire listener " + listenerClass.getName(), e);
+                throw new IllegalStateException("Failed to autowire " + kind + " " + type.getName(), e);
             }
         }
-        return listener;
+        return instance;
     }
 
     private PerfHttpSessionManager requireSessionManager(EventListener listener) {

@@ -1,5 +1,6 @@
 package io.springperf.web.support.servlet;
 
+import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.mapping.MappingRegistry;
 import io.springperf.web.core.mapping.PathMappingContext;
@@ -8,6 +9,7 @@ import jakarta.servlet.Servlet;
 import jakarta.servlet.ServletConfig;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -15,13 +17,18 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationContext;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
 
@@ -34,8 +41,8 @@ class SupportServletRegistryTest {
     @Mock
     MappingRegistry mappingRegistry;
 
-    @Mock
-    PerfServletContext servletContext;
+    /** 用真实实现：动态注册项与 bean servlet 共用同一张注册表，mock 掉就看不清认领逻辑。 */
+    private PerfServletContext servletContext;
 
     @Mock
     ApplicationContext applicationContext;
@@ -76,10 +83,21 @@ class SupportServletRegistryTest {
     }
 
     private void mockEnvironment(Map<String, Servlet> beans) {
+        ApplicationProperties props = mock(ApplicationProperties.class);
+        lenient().when(props.getPropertyNames(anyString())).thenReturn(Collections.emptyList());
+        doReturn(props).when(webContext).getProps();
+        servletContext = new PerfServletContext(webContext);
         doReturn(mappingRegistry).when(webContext).getWebComponent(MappingRegistry.class);
         doReturn(servletContext).when(webContext).getWebComponent(PerfServletContext.class);
         doReturn(applicationContext).when(webContext).getCtx();
         doReturn(beans).when(applicationContext).getBeansOfType(Servlet.class);
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (servletContext != null) {
+            servletContext.destroyComponent();
+        }
     }
 
     @Test
@@ -166,5 +184,54 @@ class SupportServletRegistryTest {
         registry.destroyComponent();
 
         assertThat(servlet.destroyCalls).isEqualTo(1);
+    }
+
+    // ==================== 动态注册（addServlet）认领 ====================
+
+    @Test
+    void initComponentPhase1_claimsDynamicallyRegisteredServlet() throws Exception {
+        mockEnvironment(new LinkedHashMap<>());
+        TrackingServlet servlet = new TrackingServlet();
+        jakarta.servlet.ServletRegistration.Dynamic dynamic = servletContext.addServlet("dyn", servlet);
+        dynamic.addMapping("/dyn", "/dyn/*");
+
+        SupportServletRegistry registry = new SupportServletRegistry();
+        registry.initWithWebContext(webContext);
+        registry.initComponentPhase1();
+
+        ArgumentCaptor<PathMappingContext> captor = ArgumentCaptor.forClass(PathMappingContext.class);
+        verify(mappingRegistry, times(2)).registerMapping(captor.capture());
+        List<String> pathRules = captor.getAllValues().stream().map(PathMappingContext::getPathRule)
+                .collect(java.util.stream.Collectors.toList());
+        assertThat(pathRules).containsExactlyInAnyOrder("/dyn", "/dyn/**");
+        assertThat(servlet.initCalls).isEqualTo(1);
+    }
+
+    @Test
+    void initComponentPhase1_dynamicServletWithoutMapping_isNotInitialized() throws Exception {
+        mockEnvironment(new LinkedHashMap<>());
+        TrackingServlet servlet = new TrackingServlet();
+        servletContext.addServlet("dyn", servlet);
+
+        SupportServletRegistry registry = new SupportServletRegistry();
+        registry.initWithWebContext(webContext);
+        registry.initComponentPhase1();
+
+        assertThat(servlet.initCalls).isZero();
+        verify(mappingRegistry, times(0)).registerMapping(any(PathMappingContext.class));
+    }
+
+    @Test
+    void initComponentPhase1_nameClashBetweenBeanAndDynamicServlet_failsFast() throws Exception {
+        Map<String, Servlet> beans = new LinkedHashMap<>();
+        beans.put("demo", new AnnotatedServlet());
+        mockEnvironment(beans);
+        servletContext.addServlet("demo", mock(Servlet.class));
+
+        SupportServletRegistry registry = new SupportServletRegistry();
+        registry.initWithWebContext(webContext);
+
+        assertThrows(IllegalStateException.class, () -> registry.initComponentPhase1(),
+                "同名 servlet 来自两个来源时无法判断用哪个，必须启动失败");
     }
 }

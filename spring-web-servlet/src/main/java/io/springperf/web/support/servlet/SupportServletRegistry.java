@@ -3,6 +3,7 @@ package io.springperf.web.support.servlet;
 import io.springperf.web.context.BaseWebComponent;
 import io.springperf.web.core.mapping.MappingRegistry;
 import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.support.servlet.context.DynamicServletRegistration;
 import io.springperf.web.support.servlet.context.PerfServletContext;
 import jakarta.servlet.Servlet;
 import jakarta.servlet.ServletException;
@@ -38,9 +39,23 @@ public class SupportServletRegistry extends BaseWebComponent {
             return;
         }
         PerfServletContext servletContext = getWebContext().getWebComponent(PerfServletContext.class);
+        if (servletContext == null) {
+            // 无 ServletContext 时退化为原路径：没有 init-param/ServletContext 语义，直接 init + 注册
+            log.warn("PerfServletContext not available, Servlet beans will be initialized without a ServletContext");
+            Map<String, Servlet> beans = new LinkedHashMap<>(getWebContext().getCtx().getBeansOfType(Servlet.class));
+            for (Servlet servlet : beans.values()) {
+                registerServlet(servlet, null, mappingRegistry);
+            }
+            return;
+        }
+        // 1) Spring bean servlet 先进入统一注册表：静态注册先占 url-pattern，动态注册才知道冲突
         Map<String, Servlet> beans = new LinkedHashMap<>(getWebContext().getCtx().getBeansOfType(Servlet.class));
         for (Servlet servlet : beans.values()) {
-            registerServlet(servlet, servletContext, mappingRegistry);
+            registerBeanServlet(servlet, servletContext);
+        }
+        // 2) 静态 + 动态（contextInitialized 里 addServlet 的）统一 init 并注册路由
+        for (DynamicServletRegistration registration : servletContext.claimServletRegistrations()) {
+            initAndMap(registration, servletContext, mappingRegistry);
         }
     }
 
@@ -50,6 +65,49 @@ public class SupportServletRegistry extends BaseWebComponent {
             servlet.destroy();
         }
         initializedServlets.clear();
+    }
+
+    /**
+     * 把 Spring bean servlet 登记到 ServletContext 的注册表（解析 {@link WebServlet} 后由
+     * {@code PerfServletContext#registerBeanServlet} 统一存放）。解析不出 url-pattern 的 servlet 仍然跳过，避免 {@code /**} 遮蔽控制器。
+     */
+    private void registerBeanServlet(Servlet servlet, PerfServletContext servletContext) {
+        WebServlet webServlet = AnnotatedElementUtils.findMergedAnnotation(servlet.getClass(), WebServlet.class);
+        String servletName = resolveServletName(webServlet, servlet);
+        String[] urlPatterns = resolveUrlPatterns(webServlet);
+        if (urlPatterns == null) {
+            // 无 @WebServlet 且无显式 URL pattern：无法确定路由，跳过注册避免 /** 全路径通配遮蔽控制器
+            log.warn(
+                    "Servlet {} has no @WebServlet url-pattern, skipping route registration. "
+                            + "Annotate it with @WebServlet(urlPatterns=...) to expose it as a route.",
+                    servlet.getClass().getName());
+            return;
+        }
+        servletContext.registerBeanServlet(servletName, servlet, urlPatterns, resolveInitParams(webServlet));
+    }
+
+    /**
+     * 认领一条注册项：{@code servlet.init()} 一次，每个 url-pattern 注册一条路由。
+     * <p>
+     * 没有 url-pattern 的 servlet（动态注册了但忘了 addMapping）不会收到请求，按规范不 init，并告警——避免"看起来注册成功"。
+     * </p>
+     */
+    private void initAndMap(DynamicServletRegistration registration, PerfServletContext servletContext,
+            MappingRegistry mappingRegistry) throws ServletException {
+        if (registration.getMappings().isEmpty()) {
+            log.warn("Servlet '{}' has no url-pattern mapping, it will not receive any request",
+                    registration.getName());
+            return;
+        }
+        Servlet servlet = registration.getServlet();
+        servlet.init(new PerfServletConfig(registration.getName(), servletContext, registration.getInitParameters()));
+        initializedServlets.add(servlet);
+        ServletInvoker invoker = new ServletInvoker(servlet);
+        for (String mapping : registration.getMappings()) {
+            String pathRule = toPathRule(mapping);
+            mappingRegistry.registerMapping(new PathMappingContext(invoker, pathRule));
+            log.info("Mapped Servlet {} -> {}", registration.getName(), pathRule);
+        }
     }
 
     private void registerServlet(Servlet servlet, PerfServletContext servletContext, MappingRegistry mappingRegistry)

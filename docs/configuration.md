@@ -101,6 +101,40 @@
 
 > **JSP 实例管理与 Spring 容器**：Jasper 用 `InstanceManager` 创建 JSP / tag 生成类的实例，解析顺序为：`ServletContext` 上已存在的 `InstanceManager`（如 Tomcat 自带的实现，不覆盖）→ Spring 容器中的 `InstanceManager` bean → 框架的 `SpringInstanceManager`（经 `AutowireCapableBeanFactory` 创建，JSP 生成类可获得依赖注入与 `@PostConstruct` / `@PreDestroy` 回调）→ `SimpleInstanceManager`（没有 Spring 上下文时的兜底）。
 
+## 动态注册 Servlet / Filter（ServletContext#addServlet / addFilter）
+
+Servlet 3.0+ 允许在启动期用 `ServletContext` 编程式注册组件。本框架遵循规范的时间窗口：
+
+| 能力 | 行为 |
+|------|------|
+| `addServlet(name, Servlet)` / `addServlet(name, Class)` / `addServlet(name, className)` | 在 `ServletContextListener#contextInitialized` 期间登记，Phase1 由框架统一 `init()` 并注册路由 |
+| `addFilter(name, Filter)` / 同名 Class/字符串重载 | 在 `contextInitialized` 期间登记，Phase3 追加到 filter 链尾部；`setInitParameter` 经 `filter.init()` 生效 |
+| `createServlet` / `createFilter` | 只创建实例（反射 + Spring 依赖注入），不注册 |
+| `getServletRegistration(s)` / `getFilterRegistration(s)` | 返回真实注册项；servlet 视图包含 Spring bean servlet 与动态注册项 |
+| 窗口外调用 `addServlet` / `addFilter` | 抛 `IllegalStateException`（规范要求），不会静默无效 |
+| `addJspFile` | 不支持：JSP 由 `JspViewResolver` 统一路由（`/**/*.jsp`），请返回 `jsp:` 视图名 |
+| `addMapping` 的 URL pattern 冲突 | 返回冲突集合（规范契约），不会覆盖已有 servlet 的映射 |
+| `FilterRegistration#addMappingForServletNames` | 不支持：框架按路径规则路由，没有 servlet name 到请求的映射表 |
+| `addMappingForUrlPatterns(isMatchAfter=false)` | 不支持：filter 顺序由 `@Order` 固定，只能追加到链尾 |
+| 非 `DispatcherType.REQUEST` | 不支持：框架没有 FORWARD/ERROR 派发 |
+| `setServletSecurity` / `setMultipartConfig` | 没有对应的请求级模型：前者返回全部映射表示「未应用」，后者只记录并告警 |
+
+```java
+@Component
+public class DynamicRegistration implements ServletContextListener {
+    @Override
+    public void contextInitialized(ServletContextEvent event) {
+        ServletContext context = event.getServletContext();
+        context.addServlet("hello", helloServlet).addMapping("/hello");
+        FilterRegistration.Dynamic filter = context.addFilter("header", headerFilter);
+        filter.setInitParameter("value", "on");
+        filter.addMappingForUrlPatterns(EnumSet.of(DispatcherType.REQUEST), true, "/hello/*");
+    }
+}
+```
+
+> 与 Spring bean 声明的差异：bean servlet 没有同名冲突可言；若动态注册的 name 与 `@WebServlet(name=...)` 相同，启动会失败（两个来源无法判断用哪个），而不是其中之一被静默丢弃。
+
 ## 响应压缩（server.compression.*）
 
 | 配置项 | 默认值 | 说明 |

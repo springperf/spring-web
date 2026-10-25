@@ -403,28 +403,63 @@ class PerfServletContextCoverageTest {
         assertEquals("GBK", servletContext.getResponseCharacterEncoding());
     }
 
-    /* ==================== 注册类：动态注册显式失败，查询按「未注册」返回 ==================== */
+    /* ==================== 注册类：窗口内可登记，窗口外按规范拒绝 ==================== */
 
     @Test
-    void dynamicRegistration_throwsUnsupportedOperation() {
-        // 规范为「不支持动态注册」指定的信号是 UnsupportedOperationException；
-        // 原先返回 null 会让调用方误以为注册成功（或静默跳过），能力丢失却无痕迹。
-        assertThrows(UnsupportedOperationException.class, () -> servletContext.addServlet("n", "class"));
-        assertThrows(UnsupportedOperationException.class,
-                () -> servletContext.addServlet("n", mock(jakarta.servlet.Servlet.class)));
-        assertThrows(UnsupportedOperationException.class,
-                () -> servletContext.addServlet("n", jakarta.servlet.Servlet.class));
-        assertThrows(UnsupportedOperationException.class, () -> servletContext.addJspFile("n", "x.jsp"));
-        assertThrows(UnsupportedOperationException.class,
-                () -> servletContext.createServlet(jakarta.servlet.Servlet.class));
+    void dynamicRegistration_insideInitializationWindow_isRegistered() {
+        jakarta.servlet.Servlet servlet = mock(jakarta.servlet.Servlet.class);
+        jakarta.servlet.ServletRegistration.Dynamic servletRegistration = servletContext.addServlet("dyn", servlet);
 
-        assertThrows(UnsupportedOperationException.class, () -> servletContext.addFilter("n", "class"));
-        assertThrows(UnsupportedOperationException.class,
+        assertSame(servletRegistration, servletContext.getServletRegistration("dyn"));
+        assertSame(servletRegistration, servletContext.getServletRegistrations().get("dyn"));
+
+        jakarta.servlet.Filter filter = mock(jakarta.servlet.Filter.class);
+        jakarta.servlet.FilterRegistration.Dynamic filterRegistration = servletContext.addFilter("dynF", filter);
+
+        assertSame(filterRegistration, servletContext.getFilterRegistration("dynF"));
+        assertSame(filterRegistration, servletContext.getFilterRegistrations().get("dynF"));
+    }
+
+    @Test
+    void dynamicRegistration_afterInitialization_throwsIllegalState() {
+        // 规范：容器初始化完成后 addServlet/addFilter 必须抛 IllegalStateException（而不是静默无效）
+        servletContext.initComponentPhase2();
+
+        assertThrows(IllegalStateException.class,
+                () -> servletContext.addServlet("n", mock(jakarta.servlet.Servlet.class)));
+        assertThrows(IllegalStateException.class,
                 () -> servletContext.addFilter("n", mock(jakarta.servlet.Filter.class)));
-        assertThrows(UnsupportedOperationException.class,
-                () -> servletContext.addFilter("n", jakarta.servlet.Filter.class));
-        assertThrows(UnsupportedOperationException.class,
-                () -> servletContext.createFilter(jakarta.servlet.Filter.class));
+    }
+
+    @Test
+    void dynamicRegistration_duplicateName_throwsIllegalArgument() {
+        servletContext.addServlet("dup", mock(jakarta.servlet.Servlet.class));
+        assertThrows(IllegalArgumentException.class,
+                () -> servletContext.addServlet("dup", mock(jakarta.servlet.Servlet.class)));
+
+        servletContext.addFilter("dupF", mock(jakarta.servlet.Filter.class));
+        assertThrows(IllegalArgumentException.class,
+                () -> servletContext.addFilter("dupF", mock(jakarta.servlet.Filter.class)));
+    }
+
+    @Test
+    void addJspFile_isRejectedWithGuidance() {
+        // JSP 已有统一路由（JspViewResolver#/**/*.jsp），servlet 级 jspFile 映射会与它竞争同一条路径
+        assertThrows(UnsupportedOperationException.class, () -> servletContext.addJspFile("n", "x.jsp"));
+    }
+
+    @Test
+    void createServletAndFilter_doNotRegister() {
+        jakarta.servlet.Servlet servlet = servletContext.createServlet(TrackingServlet.class);
+        assertNotNull(servlet);
+        assertTrue(servletContext.getServletRegistrations().isEmpty(), "createXxx 只创建实例，不注册");
+
+        assertThrows(IllegalArgumentException.class, () -> servletContext.createServlet(jakarta.servlet.Servlet.class));
+        assertThrows(IllegalArgumentException.class, () -> servletContext.createFilter(jakarta.servlet.Filter.class));
+    }
+
+    /** 公开无参构造器，供 createServlet 反射实例化。 */
+    public static class TrackingServlet extends jakarta.servlet.http.HttpServlet {
     }
 
     @Test
