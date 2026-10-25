@@ -40,6 +40,9 @@
 - **批处理容量指标落地**：`batch.queue.remaining` / `batch.queue.capacity` 原先没有任何采集方（Gauge 永不注册），现于队列启动预热、每批处理结束与 DROP / THROW 失败时上报
 - **批处理启动告警**：未设置 `batchWindowMillis` 的队列、以及多队列 `consumerSize` 之和超过核数时，启动期告警——避免默认配置静默退化为「每请求一次 IO」
 - **批处理窗口调度器竞态**：登记与注销共用同一把静态锁，并按 handler 记录登记所在的调度器实例；修复无窗口队列停机时误关其他队列仍在使用的调度器、以及 `schedule()` 被拒后异常冒到消费者的问题
+- **视图渲染解析开销**：模板存在性探测与 View 构造改为按视图名缓存（`cache=false` 保持热改；FreeMarker 缓存键含 locale），不再每请求做 N 次 classpath 查询
+- **视图渲染错误语义**：解析异常保留 cause 不再静默跳过；`ModelAndView` 的未解析视图改为抛异常而非空白 200；Content-Type 与响应编码统一由 `ViewReturnValueResolver.applyContentType()` 决定，302 不再带 `text/html`，并保留 `ModelAndView` 指定的 3xx 状态码
+- **视图配置面**：内置引擎 order 确定且可配（`spring.{engine}.order`、`spring.web.view.jsp.order`）；补 `spring.freemarker.enabled`，禁用引擎不再绕过启动期 fail-fast；移除从未被读取的 `spring.beetl.mode`
 
 ## [3.5.7] - 20261008
 

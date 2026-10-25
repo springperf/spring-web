@@ -41,6 +41,9 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Batch capacity metrics now emitted**: `batch.queue.remaining` / `batch.queue.capacity` had no producer at all (the gauges were never registered); they are now reported at queue startup, after every batch, and on DROP / THROW failure
 - **Batch startup warnings**: queues without `batchWindowMillis`, and multi-queue configurations whose `consumerSize` sum exceeds the core count, now warn at startup — so the default configuration no longer silently degrades to one IO per request
 - **Batch window scheduler race**: registration and deregistration now share one static lock and record which scheduler instance a handler registered with; fixes a windowless queue's shutdown cancelling the scheduler other queues still use, and `schedule()` rejections surfacing to the consumer
+- **View resolution cost**: template existence probing and View creation are now cached by view name (`cache=false` keeps hot reload; FreeMarker includes the locale in the cache key), removing N classpath lookups per request
+- **View error semantics**: resolution exceptions keep their cause instead of being silently skipped; an unresolvable `ModelAndView` now throws instead of returning a blank 200; Content-Type and response encoding are decided in one place by `ViewReturnValueResolver.applyContentType()`, 302 no longer carries `text/html`, and a 3xx status set on `ModelAndView` is preserved
+- **View configuration**: built-in engine order is deterministic and configurable (`spring.{engine}.order`, `spring.web.view.jsp.order`); `spring.freemarker.enabled` added, disabled engines no longer bypass startup fail-fast; the never-read `spring.beetl.mode` is removed
 
 ## [3.5.7] - 20261008
 

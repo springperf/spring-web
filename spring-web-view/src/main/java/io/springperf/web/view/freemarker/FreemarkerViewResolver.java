@@ -7,14 +7,15 @@ import io.springperf.web.context.WebContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.view.View;
+import io.springperf.web.view.ViewCache;
 import io.springperf.web.view.ViewProperties;
 import io.springperf.web.view.ViewResolver;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.http.MediaType;
 
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Map;
 
@@ -26,6 +27,9 @@ public class FreemarkerViewResolver extends BaseWebComponent implements ViewReso
     private String encoding;
     private String contentType;
     private java.util.Properties settings;
+    private boolean enabled = true;
+    private int order = ViewProperties.FREEMARKER_ORDER_DEFAULT;
+    private ViewCache viewCache = new ViewCache(true);
 
     @Override
     public void initWithWebContext(WebContext webContext) {
@@ -39,12 +43,17 @@ public class FreemarkerViewResolver extends BaseWebComponent implements ViewReso
         this.encoding = ViewProperties.VIEW_ENCODING_DEFAULT;
         this.contentType = webContext.getProps().get(ViewProperties.FREEMARKER_CONTENT_TYPE,
                 ViewProperties.FREEMARKER_CONTENT_TYPE_DEFAULT);
+        this.enabled = ViewProperties.resolveBoolean(webContext.getProps(), ViewProperties.FREEMARKER_ENABLED,
+                ViewProperties.FREEMARKER_ENABLED_DEFAULT);
+        this.order = ViewProperties.resolveOrder(webContext.getProps(), ViewProperties.FREEMARKER_ORDER,
+                ViewProperties.FREEMARKER_ORDER_DEFAULT);
         String settingsRaw = webContext.getProps().get(ViewProperties.FREEMARKER_SETTINGS, null);
         if (settingsRaw != null && !settingsRaw.trim().isEmpty()) {
             this.settings = parseSettings(settingsRaw);
         }
         boolean cacheable = ViewProperties.resolveBoolean(webContext.getProps(), ViewProperties.FREEMARKER_CACHE,
                 ViewProperties.FREEMARKER_CACHE_DEFAULT);
+        this.viewCache = new ViewCache(cacheable);
         initEngine(cacheable);
     }
 
@@ -82,34 +91,51 @@ public class FreemarkerViewResolver extends BaseWebComponent implements ViewReso
 
     @Override
     public View resolveViewName(String viewName, Locale locale, WebServerHttpRequest req) throws Exception {
-        String fullName = viewName.endsWith(suffix) ? viewName : viewName + suffix;
-        String fullPath = prefix + fullName;
-        if (!new ClassPathResource(fullPath).exists()) {
+        if (!enabled) {
             return null;
         }
-        Template template = configuration.getTemplate(fullName, locale);
-        return new FreemarkerView(template, encoding, contentType);
+        // FreeMarker 的 Template 与 locale 相关，缓存键必须带 locale
+        String cacheKey = locale == null ? viewName : viewName + '\u0000' + locale;
+        return viewCache.resolve(cacheKey, key -> {
+            String fullName = viewName.endsWith(suffix) ? viewName : viewName + suffix;
+            String fullPath = prefix + fullName;
+            if (!new ClassPathResource(fullPath).exists()) {
+                return null;
+            }
+            Template template = configuration.getTemplate(fullName, locale);
+            return new FreemarkerView(template, contentType);
+        });
+    }
+
+    @Override
+    public int getOrder() {
+        return order;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return enabled;
     }
 
     private static class FreemarkerView implements View {
         private final Template template;
-        private final String encoding;
         private final String contentType;
 
-        FreemarkerView(Template template, String encoding, String contentType) {
+        FreemarkerView(Template template, String contentType) {
             this.template = template;
-            this.encoding = encoding;
             this.contentType = contentType;
+        }
+
+        @Override
+        public String getContentType() {
+            return contentType;
         }
 
         @Override
         public void render(Map<String, ?> model, WebServerHttpRequest req, WebServerHttpResponse resp)
                 throws Exception {
-            if (contentType != null && !contentType.isEmpty()) {
-                resp.getHeaders().setContentType(MediaType.parseMediaType(contentType));
-            }
             Charset charset = resp.getCharacterEncoding() != null ? resp.getCharacterEncoding()
-                    : Charset.forName(encoding);
+                    : StandardCharsets.UTF_8;
             try (Writer writer = new OutputStreamWriter(resp.getBody(), charset)) {
                 template.process(model, writer);
                 writer.flush();

@@ -8,14 +8,16 @@ import org.junit.jupiter.api.Test;
 import org.springframework.core.Ordered;
 import org.thymeleaf.web.IWebExchange;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 
 /**
- * {@link WebExchangeProvider} 选择机制与默认实现。
+ * {@link WebExchangeProvider} 契约与默认实现。
+ * <p>
+ * 「按 order 选择首个 supports 的 provider」这一选择逻辑属于 {@code ThymeleafViewResolver.selectProvider}，
+ * 由 {@code ThymeleafViewResolverTest} 直接调用真实方法覆盖；此处不再复刻一份选择算法，
+ * 避免测试只验证测试自己的代码而从未进入产品分支。
+ * </p>
  */
 class WebExchangeProviderTest {
 
@@ -52,64 +54,8 @@ class WebExchangeProviderTest {
     }
 
     @Test
-    void customProvider_takesPrecedenceByOrder() {
-        // 模拟 servlet 场景：order 更小的 provider 优先命中
-        RecordingProvider high = new RecordingProvider(Ordered.HIGHEST_PRECEDENCE);
-        DefaultWebExchangeProvider low = new DefaultWebExchangeProvider();
-
-        List<WebExchangeProvider> ordered = new ArrayList<>();
-        ordered.add(high);
-        ordered.add(low);
-
-        WebExchangeProvider selected = select(ordered, req);
-        assertSame(high, selected, "应选择 order 最小的支持者");
-    }
-
-    @Test
-    void customProvider_notSupporting_fallsBackToDefault() {
-        RecordingProvider unsupporting = new RecordingProvider(Ordered.HIGHEST_PRECEDENCE);
-        unsupporting.supported = false;
-        DefaultWebExchangeProvider low = new DefaultWebExchangeProvider();
-
-        List<WebExchangeProvider> ordered = new ArrayList<>();
-        ordered.add(unsupporting);
-        ordered.add(low);
-
-        WebExchangeProvider selected = select(ordered, req);
-        assertSame(low, selected, "不支持时应回退到兜底 provider");
-    }
-
-    /** 与 ThymeleafViewResolver.selectProvider 相同的选择语义。 */
-    private static WebExchangeProvider select(List<WebExchangeProvider> providers, WebServerHttpRequest request) {
-        for (WebExchangeProvider provider : providers) {
-            if (provider.supports(request)) {
-                return provider;
-            }
-        }
-        return new DefaultWebExchangeProvider();
-    }
-
-    private static class RecordingProvider implements WebExchangeProvider {
-        private final int order;
-        boolean supported = true;
-
-        RecordingProvider(int order) {
-            this.order = order;
-        }
-
-        @Override
-        public int getOrder() {
-            return order;
-        }
-
-        @Override
-        public boolean supports(WebServerHttpRequest request) {
-            return supported;
-        }
-
-        @Override
-        public IWebExchange createExchange(WebServerHttpRequest request, WebServerHttpResponse response) {
-            return new DefaultWebExchangeProvider().createExchange(request, response);
-        }
+    void viewResolver_spi_isEnabledByDefault() {
+        ViewResolver resolver = (name, locale, request) -> null;
+        assertTrue(resolver.isEnabled());
     }
 }

@@ -124,4 +124,59 @@ class ThymeleafViewResolverTest {
 
         verify(custom).createExchange(req, resp);
     }
+
+    @Test
+    void resolveViewName_cached_returnsSameViewInstance() throws Exception {
+        ThymeleafViewResolver resolver = buildResolver();
+        View first = resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class));
+        View second = resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class));
+        assertSame(first, second, "模板缓存开启时同一视图名应复用同一 View 实例");
+    }
+
+    @Test
+    void resolveViewName_cacheDisabled_returnsFreshView() throws Exception {
+        when(props.get(ViewProperties.THYMELEAF_CACHE, null)).thenReturn("false");
+        ThymeleafViewResolver resolver = buildResolver();
+        View first = resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class));
+        View second = resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class));
+        assertNotSame(first, second, "cache=false 必须保持热改语义，不缓存 View");
+    }
+
+    @Test
+    void resolveViewName_enabledFalse_isDisabledAndReturnsNull() throws Exception {
+        when(props.get(ViewProperties.THYMELEAF_ENABLED, null)).thenReturn("false");
+        ThymeleafViewResolver resolver = buildResolver();
+        assertFalse(resolver.isEnabled());
+        assertNull(resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class)));
+    }
+
+    @Test
+    void getOrder_defaultIsDeterministic() {
+        assertEquals(ViewProperties.THYMELEAF_ORDER_DEFAULT, buildResolver().getOrder());
+        assertTrue(ViewProperties.THYMELEAF_ORDER_DEFAULT < ViewProperties.FREEMARKER_ORDER_DEFAULT);
+        assertTrue(ViewProperties.FREEMARKER_ORDER_DEFAULT < ViewProperties.BEETL_ORDER_DEFAULT);
+        assertTrue(ViewProperties.BEETL_ORDER_DEFAULT < ViewProperties.JSP_ORDER_DEFAULT);
+    }
+
+    @Test
+    void selectProvider_prefersFirstSupportingProvider() {
+        io.springperf.web.view.WebExchangeProvider first = mock(io.springperf.web.view.WebExchangeProvider.class);
+        when(first.supports(any(WebServerHttpRequest.class))).thenReturn(false);
+        io.springperf.web.view.WebExchangeProvider second = mock(io.springperf.web.view.WebExchangeProvider.class);
+        when(second.supports(any(WebServerHttpRequest.class))).thenReturn(true);
+        when(webContext.getWebComponents(io.springperf.web.view.WebExchangeProvider.class))
+                .thenReturn(java.util.List.of(first, second));
+
+        ThymeleafViewResolver resolver = buildResolver();
+        assertSame(second, resolver.selectProvider(mock(WebServerHttpRequest.class)));
+    }
+
+    @Test
+    void selectProvider_noMatch_fallsBackToDefault() {
+        when(webContext.getWebComponents(io.springperf.web.view.WebExchangeProvider.class))
+                .thenReturn(java.util.Collections.emptyList());
+        ThymeleafViewResolver resolver = buildResolver();
+        assertInstanceOf(io.springperf.web.view.DefaultWebExchangeProvider.class,
+                resolver.selectProvider(mock(WebServerHttpRequest.class)));
+    }
 }

@@ -340,4 +340,10 @@
 | `ServletContext.setSessionTrackingModes()` | 空实现：合法与非法入参一律静默忽略 | 生效并校验（集合非空且必须含 `COOKIE` 或 `SSL`），非法入参抛 `IllegalArgumentException`。**迁移**：传入 `COOKIE`/`SSL` 参与的组合；此前被静默忽略的 URL-only 配置会失败 |
 | `HttpServletResponse.getHeaders(name)`（头不存在） | 返回 `null` | 返回空集合（Servlet 6.0 契约）。**无需迁移**，仅消除 NPE 风险 |
 | `HttpSession.setAttribute(name, null)` | 抛 `NullPointerException`（底层 `ConcurrentHashMap` 拒绝 null value） | 等价 `removeAttribute(name)`（规范 §7.5）。**无需迁移**；此前依赖该异常判断的代码改用 `removeAttribute` |
+| `ViewResolverRegistry.resolve()` 中有解析器抛异常 | 记录 WARN 后跳过该解析器，根因被「无法解析视图名」掩盖 | 抛 `IllegalStateException` 并保留原始异常作为 cause。**迁移**：修复模板或配置错误，不要依赖「跳过」语义 |
+| `ModelAndView` 指向不存在的视图名 | 静默返回 200 + 空白响应体 | 抛 `IllegalArgumentException`（与 String 视图名链路一致）。**迁移**：确保视图名可解析，或在 `@ExceptionHandler` 中处理 |
+| 视图响应的 `Content-Type` 与编码 | 由各引擎分别设置；FreeMarker 的 `content-type` 可能与响应字节编码不一致，`redirect:` 也带 `text/html` | 统一由 `ViewReturnValueResolver.applyContentType()` 决定：Content-Type 自带 `charset` 时同步到响应编码；`redirect:` 不设置 Content-Type。**迁移**：自定义头请实现 `View.getContentType()` |
+| `RedirectView` 的状态码 | 无条件设置 302 | 保留 `ModelAndView` 指定的 3xx 状态码。**无需迁移** |
+| `spring.beetl.mode` | 已定义但从未被读取 | 移除。**无需迁移** |
+| 视图名解析结果 | 每请求执行模板存在性探测并新建 View | `cache=true` 时按视图名缓存（含未解析结果）。**迁移**：运行期新增模板需重启或关闭模板缓存 |
 

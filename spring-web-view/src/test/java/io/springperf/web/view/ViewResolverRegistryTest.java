@@ -46,8 +46,18 @@ class ViewResolverRegistryTest {
     void hasViewResolvers_true_afterRegisteringResolver() {
         ViewResolver resolver = mock(ViewResolver.class);
         when(resolver.getComponentName()).thenReturn("testResolver");
+        when(resolver.isEnabled()).thenReturn(true);
         registry.registerWebComponent(resolver);
         assertTrue(registry.hasViewResolvers());
+    }
+
+    @Test
+    void hasViewResolvers_false_whenAllResolversDisabled() {
+        ViewResolver disabled = mock(ViewResolver.class);
+        when(disabled.getComponentName()).thenReturn("disabledResolver");
+        when(disabled.isEnabled()).thenReturn(false);
+        registry.registerWebComponent(disabled);
+        assertFalse(registry.hasViewResolvers(), "禁用引擎不应让启动期校验误判为「有可用引擎」");
     }
 
     @Test
@@ -109,7 +119,7 @@ class ViewResolverRegistryTest {
     }
 
     @Test
-    void resolve_resolverThrows_skipsAndReturnsNull() throws Exception {
+    void resolve_resolverThrows_propagatesWithCause() throws Exception {
         ViewResolver r1 = mock(ViewResolver.class);
         when(r1.getComponentName()).thenReturn("r1");
         when(r1.getOrder()).thenReturn(10);
@@ -122,10 +132,13 @@ class ViewResolverRegistryTest {
         registry.initComponentPhase1();
 
         WebServerHttpRequest req = mockReq();
-        when(r1.resolveViewName(any(), any(), any())).thenThrow(new RuntimeException("boom"));
-        when(r2.resolveViewName(any(), any(), any())).thenReturn(null);
+        RuntimeException cause = new RuntimeException("template syntax error");
+        when(r1.resolveViewName(any(), any(), any())).thenThrow(cause);
 
-        assertNull(registry.resolve("home", req));
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> registry.resolve("home", req));
+        assertSame(cause, ex.getCause(), "模板语法错误等根因必须保留");
+        assertTrue(ex.getMessage().contains("home"));
+        verify(r2, never()).resolveViewName(any(), any(), any());
     }
 
     @Test
