@@ -140,6 +140,43 @@ class BatchRegistryPhase2Test {
         }
     }
 
+    /**
+     * 默认 {@code batchWindowMillis=0} 时批大小实测长期在 1~3，{@code maxBatchSize} 形同虚设。 启动期必须显式告警，不能静默退化成「没有批处理」。
+     */
+    @Test
+    void initComponentPhase2_warnsWhenWindowDisabled() throws Exception {
+        ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory
+                .getLogger(BatchRegistry.class);
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> appender = new ch.qos.logback.core.read.ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext(TestConfig.class)) {
+            BatchController bean = ctx.getBean(BatchController.class);
+            PathMappingContext singleCtx = mappingFor(bean, "single", String.class);
+
+            WebContext webContext = mock(WebContext.class);
+            when(webContext.getCtx()).thenReturn(ctx);
+            MappingRegistry mappingRegistry = mock(MappingRegistry.class);
+            when(mappingRegistry.getMappingContextList()).thenReturn(Collections.singletonList(singleCtx));
+            when(webContext.getWebComponent(MappingRegistry.class)).thenReturn(mappingRegistry);
+            when(webContext.getWebComponent(BizPoolRegistry.class)).thenReturn(null);
+
+            BatchRegistry registry = new BatchRegistry();
+            registry.initWithWebContext(webContext);
+            registry.initComponentPhase2();
+            try {
+                boolean warned = appender.list.stream()
+                        .anyMatch(e -> e.getLevel() == ch.qos.logback.classic.Level.WARN
+                                && e.getFormattedMessage().contains("batchWindowMillis"));
+                assertTrue(warned, "未设置 batchWindowMillis 的队列应在启动期告警，实际日志: " + appender.list);
+            } finally {
+                registry.destroyComponent();
+            }
+        } finally {
+            logger.detachAppender(appender);
+        }
+    }
+
     @Test
     void setMetrics_null_resetsToNoOp() {
         BatchRegistry registry = new BatchRegistry();
