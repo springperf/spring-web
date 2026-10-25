@@ -26,14 +26,30 @@ public class FilterWrapper implements WebFilter, LifecycleWebComponent {
 
     private volatile boolean initialized;
 
+    /** 动态注册时显式给定的组件名（{@code null} → 按实例身份自动分配）。 */
+    private final String explicitName;
+
+    /** 动态注册时显式给定的 init parameters（{@code null} → 从 {@code @WebFilter} 解析）。 */
+    private final Map<String, String> explicitInitParams;
+
     public FilterWrapper(javax.servlet.Filter filter) {
-        this.filter = filter;
-        this.order = WebFilter.defaultOrder;
+        this(filter, WebFilter.defaultOrder, null, null);
     }
 
     public FilterWrapper(javax.servlet.Filter filter, int order) {
+        this(filter, order, null, null);
+    }
+
+    /**
+     * 动态注册（{@code ServletContext#addFilter}）用构造器：组件名与 init-param 来自 {@code FilterRegistration}，而不是注解。
+     */
+    public FilterWrapper(javax.servlet.Filter filter, int order, String componentName,
+            Map<String, String> initParams) {
         this.filter = filter;
         this.order = order;
+        this.explicitName = componentName;
+        this.explicitInitParams = initParams == null ? null
+                : Collections.unmodifiableMap(new java.util.LinkedHashMap<>(initParams));
     }
 
     @Override
@@ -60,9 +76,11 @@ public class FilterWrapper implements WebFilter, LifecycleWebComponent {
      * </ol>
      */
     protected Map<String, String> resolveInitParams() {
-        javax.servlet.annotation.WebFilter webFilter =
-                AnnotatedElementUtils.findMergedAnnotation(filter.getClass(),
-                        javax.servlet.annotation.WebFilter.class);
+        if (explicitInitParams != null) {
+            return explicitInitParams;
+        }
+        javax.servlet.annotation.WebFilter webFilter = AnnotatedElementUtils.findMergedAnnotation(filter.getClass(),
+                javax.servlet.annotation.WebFilter.class);
         if (webFilter == null) {
             return Collections.emptyMap();
         }
@@ -127,8 +145,11 @@ public class FilterWrapper implements WebFilter, LifecycleWebComponent {
 
     @Override
     public String getComponentName() {
-        return COMPONENT_NAMES.computeIfAbsent(filter, f ->
-                f.getClass().getName() + "@" + NEXT_INSTANCE_ID.getAndIncrement());
+        if (explicitName != null) {
+            return explicitName;
+        }
+        return COMPONENT_NAMES.computeIfAbsent(filter,
+                f -> f.getClass().getName() + "@" + NEXT_INSTANCE_ID.getAndIncrement());
     }
 
     @Override

@@ -101,6 +101,40 @@ All configuration properties are set in `application.properties`.
 
 > **JSP instance management and the Spring container**: Jasper creates instances of JSP / tag generated classes through `InstanceManager`. Resolution order: an `InstanceManager` already present on the `ServletContext` (e.g. provided by Tomcat, never overwritten) → an `InstanceManager` bean in the Spring container → the framework's `SpringInstanceManager` (created through `AutowireCapableBeanFactory`, so JSP generated classes get dependency injection and `@PostConstruct` / `@PreDestroy` callbacks) → `SimpleInstanceManager` (fallback when no Spring context is available).
 
+## Dynamic Servlet / Filter Registration (ServletContext#addServlet / addFilter)
+
+Servlet 3.0+ allows programmatic registration through the `ServletContext`. The framework follows the specification's time window:
+
+| Capability | Behaviour |
+|------------|-----------|
+| `addServlet(name, Servlet)` / `addServlet(name, Class)` / `addServlet(name, className)` | Registered during `ServletContextListener#contextInitialized`; Phase 1 calls `init()` and maps the routes |
+| `addFilter(name, Filter)` and the Class/String overloads | Registered during `contextInitialized`; Phase 3 appends it to the end of the filter chain, and `setInitParameter` reaches the filter through `init()` |
+| `createServlet` / `createFilter` | Only creates the instance (reflection + Spring dependency injection), does not register |
+| `getServletRegistration(s)` / `getFilterRegistration(s)` | Return real registrations; the servlet view contains Spring bean servlets and dynamic ones |
+| Calling `addServlet` / `addFilter` after startup | Throws `IllegalStateException` (as the specification requires) instead of silently doing nothing |
+| `addJspFile` | Not supported: JSPs are routed by `JspViewResolver` (`/**/*.jsp`); return a `jsp:` view name instead |
+| URL pattern conflict in `addMapping` | Returns the conflicting patterns (specification contract) instead of overriding another servlet's mapping |
+| `FilterRegistration#addMappingForServletNames` | Not supported: the framework routes by path rule and has no servlet-name lookup table |
+| `addMappingForUrlPatterns(isMatchAfter=false)` | Not supported: filter order is fixed by `@Order`, a dynamic filter can only be appended |
+| Dispatcher types other than `REQUEST` | Not supported: the framework has no FORWARD/ERROR dispatch |
+| `setServletSecurity` / `setMultipartConfig` | No request-level model exists: the former returns all mappings as "not applied", the latter only records a warning |
+
+```java
+@Component
+public class DynamicRegistration implements ServletContextListener {
+    @Override
+    public void contextInitialized(ServletContextEvent event) {
+        ServletContext context = event.getServletContext();
+        context.addServlet("hello", helloServlet).addMapping("/hello");
+        FilterRegistration.Dynamic filter = context.addFilter("header", headerFilter);
+        filter.setInitParameter("value", "on");
+        filter.addMappingForUrlPatterns(EnumSet.of(DispatcherType.REQUEST), true, "/hello/*");
+    }
+}
+```
+
+> Difference from bean declarations: a dynamic registration whose name collides with `@WebServlet(name=...)` fails the startup instead of silently dropping one of the two sources, because there is no way to tell which one should win.
+
 ## Response Compression (server.compression.*)
 
 | Property | Default | Description |
