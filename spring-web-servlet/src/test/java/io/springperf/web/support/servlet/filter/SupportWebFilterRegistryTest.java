@@ -140,4 +140,64 @@ class SupportWebFilterRegistryTest {
 
     static class AdminOnlyFilterSub extends AdminOnlyFilter {
     }
+
+    // ==================== 动态注册（addFilter）认领 ====================
+
+    @Test
+    void initComponentPhase3_appendsDynamicallyRegisteredFilterWithInitParams() throws Exception {
+        WebContext webContext = mock(WebContext.class);
+        ApplicationContext ctx = mock(ApplicationContext.class);
+        when(webContext.getCtx()).thenReturn(ctx);
+        when(ctx.getBeansOfType(any(Class.class))).thenReturn(Collections.emptyMap());
+        io.springperf.web.context.ApplicationProperties props = mock(
+                io.springperf.web.context.ApplicationProperties.class);
+        when(props.getPropertyNames(org.mockito.ArgumentMatchers.anyString())).thenReturn(Collections.emptyList());
+        when(webContext.getProps()).thenReturn(props);
+        PerfServletContext servletContext = new PerfServletContext(webContext);
+        when(webContext.getWebComponent(any(Class.class))).thenReturn(servletContext);
+        try {
+            TrackingFilter filter = new TrackingFilter();
+            jakarta.servlet.FilterRegistration.Dynamic dynamic = servletContext.addFilter("dyn", filter);
+            dynamic.setInitParameter("k", "v");
+            dynamic.addMappingForUrlPatterns(null, true, "/dyn/*");
+
+            SupportWebFilterRegistry registry = new SupportWebFilterRegistry(mock(DispatcherHandler.class));
+            registry.initWithWebContext(webContext);
+            registry.initComponentPhase1();
+            registry.initComponentPhase2();
+            registry.initComponentPhase3();
+
+            assertEquals(1, filter.initCalls, "动态注册的 filter 必须走 init（否则 init-param 永远不生效）");
+            assertEquals("v", filter.initParam);
+            List<?> allFilters = (List<?>) org.springframework.test.util.ReflectionTestUtils.getField(registry,
+                    "allFilters");
+            assertNotNull(allFilters);
+            assertEquals(1, allFilters.size(), "动态注册的 filter 应进入 filter 链");
+            assertInstanceOf(io.springperf.web.core.filter.RuntimeMappingWebFilter.class, allFilters.get(0),
+                    "有路径规则时应包装为运行时匹配");
+        } finally {
+            servletContext.destroyComponent();
+        }
+    }
+
+    /** 记录 init 次数与 init-param：动态注册的 setInitParameter 必须真的传到 filter。 */
+    static class TrackingFilter implements jakarta.servlet.Filter {
+        int initCalls;
+        String initParam;
+
+        @Override
+        public void init(jakarta.servlet.FilterConfig filterConfig) {
+            initCalls++;
+            initParam = filterConfig.getInitParameter("k");
+        }
+
+        @Override
+        public void doFilter(jakarta.servlet.ServletRequest request, jakarta.servlet.ServletResponse response,
+                jakarta.servlet.FilterChain chain) {
+        }
+
+        @Override
+        public void destroy() {
+        }
+    }
 }

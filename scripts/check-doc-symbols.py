@@ -167,6 +167,8 @@ EXTERNAL_TYPES = {
     'ServerHttpResponse': 'org.springframework.http.server',
     'Servlet': 'jakarta.servlet',
     'ServletContext': 'jakarta.servlet',
+    'ServletContextEvent': 'jakarta.servlet',
+    'ServletContextListener': 'jakarta.servlet',
     'WebSocketHandler': 'org.springframework.web.socket',
     'WebSocketSession': 'org.springframework.web.socket',
     # (b') .agent/context/module.md 纳入扫描后（2026-10）暴露的外部类型。
