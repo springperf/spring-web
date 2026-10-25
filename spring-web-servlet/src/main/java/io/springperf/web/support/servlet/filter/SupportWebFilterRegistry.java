@@ -37,7 +37,8 @@ public class SupportWebFilterRegistry extends WebFilterRegistry {
      * 必须在 {@code super.initComponentPhase3()} 之后执行：父类会清空并重建 {@code registrations}，先追加会被冲掉。
      * </p>
      * <p>
-     * 组件名加 {@code dynamic:} 前缀：容器按组件名去重，动态 filter 的重名（与某个 bean filter 的 name 相同）不应导致 已有 filter 被丢弃。
+     * 组件名用注册名本身：它同时是 {@code FilterConfig#getFilterName()} 的返回值，规范要求返回注册名（加前缀会污染 用户代码里的按名查找）。动态 filter 的 wrapper
+     * 不进容器，不参与容器的按名去重。
      * </p>
      */
     private void appendDynamicFilterRegistrations() {
@@ -57,8 +58,8 @@ public class SupportWebFilterRegistry extends WebFilterRegistry {
                         dynamic.getName());
                 continue;
             }
-            FilterWrapper wrapper = new FilterWrapper(dynamic.getFilter(), dynamic.getOrder(),
-                    "dynamic:" + dynamic.getName(), dynamic.getInitParameters());
+            FilterWrapper wrapper = new FilterWrapper(dynamic.getFilter(), dynamic.getName(),
+                    dynamic.getInitParameters());
             // 动态 filter 的 init-param 只有走 init 才能生效（bean filter 的 init 由框架另行处理）
             wrapper.initWithWebContext(getWebContext());
             WebFilterRegistration registration = wrapFilterToRegistration(wrapper);

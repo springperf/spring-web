@@ -20,8 +20,12 @@ import java.util.Set;
  * {@code SupportServletRegistry} 认领：调用 {@code servlet.init()}，并把每个 url-pattern 转成框架路由。
  * </p>
  * <p>
- * 本框架没有 Servlet 安全约束、servlet 级 multipart 与 load-on-startup 的调度模型，相关 setter 只记录配置并返回「未应用」： {@link #setServletSecurity}
- * 返回全部映射表示一条都没应用，{@link #setMultipartConfig} 打印一次告警。 这类能力缺口必须显形，不能假装接受。
+ * <b>所有写方法在窗口关闭后抛 {@link IllegalStateException}</b>（规范要求）：注册表在 Phase1 之后不再被认领，晚到的
+ * {@code addMapping}/参数修改永远不会被消费，必须显形而不是静默无效。
+ * </p>
+ * <p>
+ * 本框架没有 Servlet 安全约束、servlet 级 multipart、load-on-startup 与 per-servlet async 的调度模型，相关 setter 只告警：
+ * {@link #setServletSecurity} 返回全部映射表示一条都没应用。能力缺口必须显形，不能假装接受。
  * </p>
  */
 @Slf4j
@@ -39,13 +43,7 @@ public class DynamicServletRegistration implements ServletRegistration.Dynamic {
 
     private final Set<String> mappings = new LinkedHashSet<>(4);
 
-    private volatile boolean asyncSupported;
-
     private volatile boolean claimed;
-
-    private volatile int loadOnStartup = -1;
-
-    private MultipartConfigElement multipartConfig;
 
     private String runAsRole;
 
@@ -58,6 +56,7 @@ public class DynamicServletRegistration implements ServletRegistration.Dynamic {
 
     @Override
     public Set<String> addMapping(String... urlPatterns) {
+        servletContext.requireRegistrationOpen("ServletRegistration.addMapping");
         if (urlPatterns == null || urlPatterns.length == 0) {
             throw new IllegalArgumentException("urlPatterns must not be null or empty");
         }
@@ -113,6 +112,7 @@ public class DynamicServletRegistration implements ServletRegistration.Dynamic {
 
     @Override
     public boolean setInitParameter(String name, String value) {
+        servletContext.requireRegistrationOpen("ServletRegistration.setInitParameter");
         if (name == null || name.isEmpty()) {
             throw new IllegalArgumentException("Init parameter name must not be null or empty");
         }
@@ -133,6 +133,7 @@ public class DynamicServletRegistration implements ServletRegistration.Dynamic {
 
     @Override
     public Set<String> setInitParameters(Map<String, String> initParameters) {
+        servletContext.requireRegistrationOpen("ServletRegistration.setInitParameters");
         if (initParameters == null) {
             throw new IllegalArgumentException("initParameters must not be null");
         }
@@ -152,11 +153,15 @@ public class DynamicServletRegistration implements ServletRegistration.Dynamic {
 
     @Override
     public void setLoadOnStartup(int loadOnStartup) {
-        this.loadOnStartup = loadOnStartup;
+        servletContext.requireRegistrationOpen("ServletRegistration.setLoadOnStartup");
+        // 框架在 Phase1 统一 init 所有 servlet，没有懒加载语义，load-on-startup 无对应调度
+        log.warn("Servlet {} : setLoadOnStartup({}) has no effect, servlets are initialized during startup", name,
+                loadOnStartup);
     }
 
     @Override
     public Set<String> setServletSecurity(ServletSecurityElement constraint) {
+        servletContext.requireRegistrationOpen("ServletRegistration.setServletSecurity");
         // 本框架没有请求级安全约束模型，返回全部映射 = 一条都没应用（规范允许返回未能应用的 URL pattern 集合）
         Set<String> notApplied = new LinkedHashSet<>(getMappings());
         log.warn("Servlet {} : setServletSecurity is not supported by this framework, "
@@ -167,7 +172,7 @@ public class DynamicServletRegistration implements ServletRegistration.Dynamic {
 
     @Override
     public void setMultipartConfig(MultipartConfigElement multipartConfig) {
-        this.multipartConfig = multipartConfig;
+        servletContext.requireRegistrationOpen("ServletRegistration.setMultipartConfig");
         // 框架的 multipart 解析是全局的，per-servlet 配置无法生效；静默接受会造成"以为限制了大小"的错觉
         log.warn(
                 "Servlet {} : per-servlet multipart-config is not supported, the global multipart configuration applies",
@@ -176,34 +181,21 @@ public class DynamicServletRegistration implements ServletRegistration.Dynamic {
 
     @Override
     public void setRunAsRole(String roleName) {
+        servletContext.requireRegistrationOpen("ServletRegistration.setRunAsRole");
         this.runAsRole = roleName;
     }
 
     @Override
     public void setAsyncSupported(boolean isAsyncSupported) {
-        this.asyncSupported = isAsyncSupported;
-    }
-
-    int getLoadOnStartup() {
-        return loadOnStartup;
-    }
-
-    MultipartConfigElement getMultipartConfig() {
-        return multipartConfig;
-    }
-
-    boolean isAsyncSupported() {
-        return asyncSupported;
+        servletContext.requireRegistrationOpen("ServletRegistration.setAsyncSupported");
+        // async 支持在本框架是全局行为，per-servlet 开关无法落地
+        log.warn("Servlet {} : setAsyncSupported({}) has no effect, async support is a global setting", name,
+                isAsyncSupported);
     }
 
     /** 被登记的 servlet 实例（{@code SupportServletRegistry} 认领后用于 init 与路由绑定）。 */
     public Servlet getServlet() {
         return servlet;
-    }
-
-    /** 是否已被 {@code SupportServletRegistry} 认领（认领后不再重复 init/注册路由）。 */
-    boolean isClaimed() {
-        return claimed;
     }
 
     /** 原子认领：返回 true 表示本次调用方负责 init + 注册路由（并发重复认领会返回 false）。 */
