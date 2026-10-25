@@ -79,7 +79,8 @@ class ViewReturnValueResolverTest {
 
     private void stubEngine(String engine) {
         when(webContext.getProps()).thenReturn(props);
-        when(props.get(ViewProperties.ENGINE, ViewProperties.ENGINE_DEFAULT)).thenReturn(engine);
+        // 默认值是编译期常量，宽松匹配第二个参数可避免默认值调整后桩参数失配
+        when(props.get(eq(ViewProperties.ENGINE), any())).thenReturn(engine);
     }
 
     // ==================== 运行时主路径 ====================

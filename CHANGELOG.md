@@ -5,6 +5,7 @@
 本项目遵循 [语义化版本控制](https://semver.org/lang/zh-CN/)。
 
 ## [2.7.7] - 20261013
+)
 
 > ⚠️ **本版含破坏性变更**：配置键、响应分帧、Servlet `flush` 语义、条件请求/Range、
 > 扩展点签名均有调整，**升级前请先读 [破坏性变更说明](docs/breaking-changes.md)**。
