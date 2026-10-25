@@ -10,6 +10,9 @@ public final class ViewProperties {
     public static final String ENGINE = "spring.web.view.engine";
     public static final String ENGINE_DEFAULT = "thymeleaf";
 
+    /** 内置 ViewResolver 的 order 基准，与 {@code WebComponent} 默认 order 对齐；自定义 resolver 默认排在内置之前。 */
+    public static final int VIEW_ORDER_BASE = Integer.MAX_VALUE - 10000;
+
     // ---- Thymeleaf（对齐 spring.thymeleaf.*）----
     public static final String THYMELEAF_PREFIX = "spring.thymeleaf.prefix";
     public static final String THYMELEAF_PREFIX_DEFAULT = "templates/";
@@ -22,8 +25,11 @@ public final class ViewProperties {
     public static final String THYMELEAF_CACHE_TTL = "spring.thymeleaf.cache-ttl";
     public static final String THYMELEAF_ENABLED = "spring.thymeleaf.enabled";
     public static final boolean THYMELEAF_ENABLED_DEFAULT = true;
+    /** 模板文件的读取编码；响应字符集由 Content-Type 决定，不受此键控制。 */
     public static final String THYMELEAF_ENCODING = "spring.thymeleaf.encoding";
     public static final String THYMELEAF_ENCODING_DEFAULT = "UTF-8";
+    public static final String THYMELEAF_ORDER = "spring.thymeleaf.order";
+    public static final int THYMELEAF_ORDER_DEFAULT = VIEW_ORDER_BASE + 10;
 
     // ---- Freemarker（对齐 spring.freemarker.*）----
     public static final String FREEMARKER_PREFIX = "spring.freemarker.prefix";
@@ -32,10 +38,14 @@ public final class ViewProperties {
     public static final String FREEMARKER_SUFFIX_DEFAULT = ".ftl";
     public static final String FREEMARKER_CACHE = "spring.freemarker.cache";
     public static final boolean FREEMARKER_CACHE_DEFAULT = true;
+    public static final String FREEMARKER_ENABLED = "spring.freemarker.enabled";
+    public static final boolean FREEMARKER_ENABLED_DEFAULT = true;
     public static final String FREEMARKER_TEMPLATE_LOADER_PATH = "spring.freemarker.template-loader-path";
     public static final String FREEMARKER_SETTINGS = "spring.freemarker.settings";
     public static final String FREEMARKER_CONTENT_TYPE = "spring.freemarker.content-type";
     public static final String FREEMARKER_CONTENT_TYPE_DEFAULT = "text/html;charset=UTF-8";
+    public static final String FREEMARKER_ORDER = "spring.freemarker.order";
+    public static final int FREEMARKER_ORDER_DEFAULT = VIEW_ORDER_BASE + 20;
 
     // ---- Beetl（对齐 spring.beetl.*）----
     public static final String BEETL_PREFIX = "spring.beetl.prefix";
@@ -44,16 +54,19 @@ public final class ViewProperties {
     public static final String BEETL_SUFFIX_DEFAULT = ".btl";
     public static final String BEETL_CACHE = "spring.beetl.cache";
     public static final boolean BEETL_CACHE_DEFAULT = true;
-    /** Beetl 模板模式（对齐 spring.beetl.mode，如 HTML）；Beetl 无原生 mode 概念，保留配置以对称 thymeleaf/freemarker。 */
-    public static final String BEETL_MODE = "spring.beetl.mode";
-    public static final String BEETL_MODE_DEFAULT = "HTML";
-    /** Beetl 模板缓存 TTL（对齐 spring.beetl.cache-ttl，Duration 风格；小于等于 0 表示不过期）。 */
+    /** Beetl 模板缓存 TTL（Duration 风格；小于等于 0 表示不过期）。 */
     public static final String BEETL_CACHE_TTL = "spring.beetl.cache-ttl";
-    /** Beetl 是否启用（对齐 spring.beetl.enabled）：false 时 resolveViewName 直接返回 null。 */
+    /** Beetl 是否启用：false 时解析器不参与视图解析，也不计入启动期校验。 */
     public static final String BEETL_ENABLED = "spring.beetl.enabled";
     public static final boolean BEETL_ENABLED_DEFAULT = true;
+    public static final String BEETL_ORDER = "spring.beetl.order";
+    public static final int BEETL_ORDER_DEFAULT = VIEW_ORDER_BASE + 30;
 
-    /** 视图默认编码（Freemarker/Beetl 未单独配置时使用，对齐 Boot 的 UTF-8 默认）。 */
+    /** JSP 视图解析器 order（实现位于 spring-web-servlet）。 */
+    public static final String JSP_ORDER = "spring.web.view.jsp.order";
+    public static final int JSP_ORDER_DEFAULT = VIEW_ORDER_BASE + 40;
+
+    /** 视图默认编码（模板文件读取；响应字符集由 Content-Type 决定）。 */
     public static final String VIEW_ENCODING_DEFAULT = "UTF-8";
 
     /**
@@ -74,5 +87,18 @@ public final class ViewProperties {
     /** Duration 风格读取（毫秒）。 */
     public static long resolveDurationMillis(ApplicationProperties props, String key, long def) {
         return props.getDurationMillis(key, def);
+    }
+
+    /** 读取整数型 order；非法值启动期 fail-fast，不静默回退默认。 */
+    public static int resolveOrder(ApplicationProperties props, String key, int def) {
+        String v = props.get(key, null);
+        if (v == null || v.trim().isEmpty()) {
+            return def;
+        }
+        try {
+            return Integer.parseInt(v.trim());
+        } catch (NumberFormatException ex) {
+            throw new IllegalStateException("Invalid integer value for '" + key + "': " + v, ex);
+        }
     }
 }

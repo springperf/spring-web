@@ -17,6 +17,8 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class FreemarkerViewResolverTest {
@@ -150,5 +152,64 @@ class FreemarkerViewResolverTest {
         assertTrue(errors.isEmpty(), "并发渲染不应抛异常或输出错乱: " + errors);
         // 关键回归：共享 Template 实例的 outputEncoding 不应被并发渲染改写（修复前为 "UTF-8"）
         assertNull(template.getOutputEncoding(), "共享 Template 的 outputEncoding 不应被并发渲染改写");
+    }
+
+    @Test
+    void resolveViewName_cached_returnsSameViewInstance() throws Exception {
+        FreemarkerViewResolver resolver = buildResolver();
+        View first = resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class));
+        View second = resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class));
+        assertSame(first, second);
+    }
+
+    @Test
+    void resolveViewName_differentLocale_usesDifferentCacheKey() throws Exception {
+        FreemarkerViewResolver resolver = buildResolver();
+        View us = resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class));
+        View fr = resolver.resolveViewName("hello", Locale.FRANCE, mock(WebServerHttpRequest.class));
+        assertNotNull(us);
+        assertNotNull(fr);
+        assertNotSame(us, fr, "FreeMarker Template 与 locale 相关，缓存键必须区分 locale");
+    }
+
+    @Test
+    void resolveViewName_cacheDisabled_returnsFreshView() throws Exception {
+        when(props.get(ViewProperties.FREEMARKER_CACHE, null)).thenReturn("false");
+        FreemarkerViewResolver resolver = buildResolver();
+        View first = resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class));
+        View second = resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class));
+        assertNotSame(first, second);
+    }
+
+    @Test
+    void resolveViewName_enabledFalse_isDisabledAndReturnsNull() throws Exception {
+        when(props.get(ViewProperties.FREEMARKER_ENABLED, null)).thenReturn("false");
+        FreemarkerViewResolver resolver = buildResolver();
+        assertFalse(resolver.isEnabled());
+        assertNull(resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class)));
+    }
+
+    @Test
+    void getOrder_defaultIsExplicit() {
+        assertEquals(ViewProperties.FREEMARKER_ORDER_DEFAULT, buildResolver().getOrder());
+    }
+
+    @Test
+    void viewRender_contentTypeProvidedByView_notWrittenDuringRender() throws Exception {
+        when(props.get(ViewProperties.FREEMARKER_CONTENT_TYPE, ViewProperties.FREEMARKER_CONTENT_TYPE_DEFAULT))
+                .thenReturn("text/html;charset=ISO-8859-1");
+        FreemarkerViewResolver resolver = buildResolver();
+        View view = resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class));
+        assertEquals("text/html;charset=ISO-8859-1", view.getContentType());
+
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        when(resp.getCharacterEncoding()).thenReturn(StandardCharsets.ISO_8859_1);
+        ByteArrayOutputStream body = new ByteArrayOutputStream();
+        when(resp.getBody()).thenReturn(body);
+        Map<String, Object> model = new HashMap<>();
+        model.put("name", "Perf");
+        view.render(model, mock(WebServerHttpRequest.class), resp);
+
+        verify(resp, never()).getHeaders();
     }
 }

@@ -92,4 +92,9 @@ class JspViewResolverTest {
         resolver.initWithWebContext(webContext);
         assertDoesNotThrow(() -> resolver.initComponentPhase1());
     }
+
+    @Test
+    void getOrder_defaultIsExplicit() {
+        assertEquals(io.springperf.web.view.ViewProperties.JSP_ORDER_DEFAULT, new JspViewResolver().getOrder());
+    }
 }

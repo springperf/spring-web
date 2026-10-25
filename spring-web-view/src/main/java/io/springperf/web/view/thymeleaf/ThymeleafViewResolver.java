@@ -6,6 +6,7 @@ import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.view.DefaultWebExchangeProvider;
 import io.springperf.web.view.View;
+import io.springperf.web.view.ViewCache;
 import io.springperf.web.view.ViewProperties;
 import io.springperf.web.view.ViewResolver;
 import io.springperf.web.view.WebExchangeProvider;
@@ -31,10 +32,13 @@ public class ThymeleafViewResolver extends BaseWebComponent implements ViewResol
     private String prefix;
     private String suffix;
     private boolean cacheable;
+    /** 模板文件的读取编码，不决定响应字符集。 */
     private String encoding;
     private String mode;
     private long cacheTtlMs = -1L;
     private boolean enabled = true;
+    private int order = ViewProperties.THYMELEAF_ORDER_DEFAULT;
+    private ViewCache viewCache = new ViewCache(true);
     /** 按 order 升序的 exchange provider 链；首个 supports() 为 true 者被使用。 */
     private List<WebExchangeProvider> exchangeProviders;
 
@@ -50,9 +54,13 @@ public class ThymeleafViewResolver extends BaseWebComponent implements ViewResol
         this.mode = webContext.getProps().get(ViewProperties.THYMELEAF_MODE, ViewProperties.THYMELEAF_MODE_DEFAULT);
         this.cacheTtlMs = ViewProperties.resolveDurationMillis(webContext.getProps(),
                 ViewProperties.THYMELEAF_CACHE_TTL, -1L);
-        this.enabled = ViewProperties.resolveBoolean(webContext.getProps(),
-                ViewProperties.THYMELEAF_ENABLED, ViewProperties.THYMELEAF_ENABLED_DEFAULT);
-        this.encoding = webContext.getProps().get(ViewProperties.THYMELEAF_ENCODING, ViewProperties.THYMELEAF_ENCODING_DEFAULT);
+        this.enabled = ViewProperties.resolveBoolean(webContext.getProps(), ViewProperties.THYMELEAF_ENABLED,
+                ViewProperties.THYMELEAF_ENABLED_DEFAULT);
+        this.encoding = webContext.getProps().get(ViewProperties.THYMELEAF_ENCODING,
+                ViewProperties.THYMELEAF_ENCODING_DEFAULT);
+        this.order = ViewProperties.resolveOrder(webContext.getProps(), ViewProperties.THYMELEAF_ORDER,
+                ViewProperties.THYMELEAF_ORDER_DEFAULT);
+        this.viewCache = new ViewCache(cacheable);
         // 确保默认 provider 已注册（getWebComponentWithDefault 会在缺失时注册并返回它），
         // 随后按 order 取全量 provider 列表（AnnotationAwareOrderComparator 已排序）。
         webContext.getWebComponentWithDefault(WebExchangeProvider.class, new DefaultWebExchangeProvider());
@@ -77,8 +85,9 @@ public class ThymeleafViewResolver extends BaseWebComponent implements ViewResol
 
     /**
      * 按 order 选择第一个支持当前请求的 exchange provider；无匹配时退回默认实现。
+     * 包可见以便同包测试直接验证真实选择逻辑。
      */
-    private WebExchangeProvider selectProvider(WebServerHttpRequest req) {
+    WebExchangeProvider selectProvider(WebServerHttpRequest req) {
         List<WebExchangeProvider> providers = this.exchangeProviders;
         if (providers != null) {
             for (WebExchangeProvider provider : providers) {
@@ -95,11 +104,23 @@ public class ThymeleafViewResolver extends BaseWebComponent implements ViewResol
         if (!enabled) {
             return null;
         }
-        String fullPath = prefix + viewName + suffix;
-        if (!new ClassPathResource(fullPath).exists()) {
-            return null;
-        }
-        return new ThymeleafView(templateEngine, viewName, encoding, this);
+        return viewCache.resolve(viewName, name -> {
+            String fullPath = prefix + name + suffix;
+            if (!new ClassPathResource(fullPath).exists()) {
+                return null;
+            }
+            return new ThymeleafView(templateEngine, name, encoding, this);
+        });
+    }
+
+    @Override
+    public int getOrder() {
+        return order;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return enabled;
     }
 
     private static class ThymeleafView implements View {

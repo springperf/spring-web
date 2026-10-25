@@ -130,4 +130,10 @@ class WebExchangeProviderTest {
             return new DefaultWebExchangeProvider().createExchange(request, response);
         }
     }
+
+    @Test
+    void viewResolver_spi_isEnabledByDefault() {
+        ViewResolver resolver = (name, locale, request) -> null;
+        assertTrue(resolver.isEnabled());
+    }
 }
