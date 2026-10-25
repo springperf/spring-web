@@ -4,6 +4,7 @@ import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -12,14 +13,21 @@ import java.util.Map;
 public class RedirectView implements View {
 
     private final String redirectUrl;
+    private final HttpStatusCode status;
 
     public RedirectView(String redirectUrl) {
+        this(redirectUrl, HttpStatus.FOUND);
+    }
+
+    /** 允许调用方（如 ModelAndView）指定 301/307 等重定向状态码，覆盖默认的 302。 */
+    public RedirectView(String redirectUrl, HttpStatusCode status) {
         this.redirectUrl = redirectUrl;
+        this.status = status != null ? status : HttpStatus.FOUND;
     }
 
     @Override
     public void render(Map<String, ?> model, WebServerHttpRequest req, WebServerHttpResponse resp) throws Exception {
-        resp.setStatusCode(HttpStatus.FOUND);
+        resp.setStatusCode(status);
         String location = buildLocation(redirectUrl, req);
         String query = buildQueryString(model);
         if (!query.isEmpty()) {

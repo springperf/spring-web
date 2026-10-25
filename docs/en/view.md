@@ -2,7 +2,7 @@
 
 # View Rendering
 
-The framework supports Spring MVC-style server-side rendering (SSR) with built-in Thymeleaf / FreeMarker template engine adapters, provided by the optional `spring-web-view` module. API-first projects do not need to include this module — String return values keep their JSON behavior, with zero disruption.
+The framework supports Spring MVC-style server-side rendering (SSR) with built-in Thymeleaf / FreeMarker / Beetl template engine adapters, provided by the optional `spring-web-view` module. API-first projects that do not include this module keep their JSON behavior for String return values; **once the module is included**, a String returned without `@ResponseBody` is a view name, and startup fails if no template engine is enabled (set `spring.web.view.engine=none` to keep only `redirect:`).
 
 ---
 
@@ -44,13 +44,26 @@ To use FreeMarker or Beetl instead, swap `thymeleaf` for:
 | `spring.web.view.engine` | none (all available) | Enabled template engines (comma-separated): `thymeleaf` / `freemarker` / `beetl`; the special value `none` registers no engine (only `redirect:` works, and the "no ViewResolver" startup check is skipped); **when unset every available engine on the classpath is registered** |
 | `spring.thymeleaf.prefix` | `templates/` | Thymeleaf template prefix (classpath-relative) |
 | `spring.thymeleaf.suffix` | `.html` | Thymeleaf template suffix |
-| `spring.thymeleaf.cache` | `true` | Template cache (set `false` in development for hot reload) |
+| `spring.thymeleaf.cache` | `true` | Template cache and the view-name-to-View resolution cache; `false` for hot reload |
+| `spring.thymeleaf.enabled` | `true` | Whether the resolver is enabled; when `false` it is excluded from view resolution and startup validation |
+| `spring.thymeleaf.order` | `Integer.MAX_VALUE - 9990` | View resolver order (lower wins) |
 | `spring.freemarker.prefix` | `templates/` | FreeMarker template prefix (classpath-relative) |
 | `spring.freemarker.suffix` | `.ftl` | FreeMarker template suffix |
-| `spring.freemarker.cache` | `true` | Template cache |
-| `spring.thymeleaf.encoding` | `UTF-8` | Rendering charset, also written to `Content-Type`; FreeMarker/Beetl default UTF-8 (no separate key, aligned with Boot) |
+| `spring.freemarker.cache` | `true` | Template cache and the resolution cache |
+| `spring.freemarker.enabled` | `true` | Whether the resolver is enabled; same semantics as Thymeleaf |
+| `spring.freemarker.order` | `Integer.MAX_VALUE - 9980` | View resolver order |
+| `spring.freemarker.content-type` | `text/html;charset=UTF-8` | Response Content-Type; its `charset` also determines the response byte encoding |
+| `spring.beetl.prefix` | `templates/` | Beetl template prefix (classpath-relative) |
+| `spring.beetl.suffix` | `.btl` | Beetl template suffix |
+| `spring.beetl.cache` | `true` | Template cache and the resolution cache |
+| `spring.beetl.enabled` | `true` | Whether the resolver is enabled; same semantics as Thymeleaf |
+| `spring.beetl.order` | `Integer.MAX_VALUE - 9970` | View resolver order |
+| `spring.web.view.jsp.order` | `Integer.MAX_VALUE - 9960` | JSP view resolver order |
+| `spring.thymeleaf.encoding` | `UTF-8` | Character encoding used to **read template files**; the response charset comes from the Content-Type |
 
 Templates are loaded from the classpath `templates/` directory by default (Spring Boot convention).
+
+> Built-in engines resolve in the order Thymeleaf → FreeMarker → Beetl → JSP, adjustable via each `order` property. With `cache=true`, resolution results (including "template absent") are cached; templates added at runtime become visible after a restart or with caching disabled.
 
 ---
 
@@ -172,7 +185,7 @@ Standard Thymeleaf expressions are supported: `${...}`, `#{...}`, `@{...}` (URL 
 
 ## 5. Multiple Engines Coexisting
 
-Multiple `ViewResolver`s can be registered at once; within the **same request pipeline** they are tried in `getOrder()` order. Each resolver decides whether it owns a view name by "template existence probing" — if its own `prefix + viewName + suffix` template exists it returns a `View`, otherwise `null` so the next resolver gets a chance.
+Multiple `ViewResolver`s can be registered at once; within the **same request pipeline** they are tried in `getOrder()` order. The built-in engines have a fixed default order (Thymeleaf → FreeMarker → Beetl → JSP), adjustable via each `order` property; custom resolvers rank ahead of the built-ins by default. Each resolver decides whether it owns a view name by "template existence probing" — if its own `prefix + viewName + suffix` template exists it returns a `View`, otherwise `null` so the next resolver gets a chance. With `cache=true` both the probe result and the View are cached by view name (FreeMarker also includes the locale in its cache key); `cache=false` keeps probing on every request for hot reload.
 
 ```
 /view/hello     → thymeleaf checks templates/hello.html  → exists → hit
@@ -180,7 +193,7 @@ Multiple `ViewResolver`s can be registered at once; within the **same request pi
                  → beetl checks templates/hello.btl
 ```
 
-- Templates with the same name but different suffixes (`hello.html` / `hello.ftl` / `hello.btl`) can coexist — whichever exists wins, with `order` deciding priority
+- Templates with the same name but different suffixes (`hello.html` / `hello.ftl` / `hello.btl`) can coexist, with `order` deciding priority; defaults are deterministic and can be changed via `spring.{engine}.order`
 - Different view names may use different engines: `hello` → thymeleaf, `report` → freemarker, `page-btl` → beetl — as long as each template file exists
 - `spring.web.view.engine` registers every available engine when unset; a comma-separated subset (e.g. `thymeleaf,beetl`) narrows it
 
@@ -269,7 +282,7 @@ Read this before migrating a page-oriented project. **Aligned** capabilities (vi
 
 ### Key notes
 
-1. **String dual-semantics decided by registration**: view-name interpretation for String returns only activates once a `ViewResolver` is registered (an engine dependency is present); pure API projects keep their behavior.
+1. **String dual-semantics decided by module inclusion**: without `spring-web-view`, String returns keep their JSON behavior; once the module is included (even if no engine is enabled), a String returned without `@ResponseBody` is a view name and startup fails with "no ViewResolver registered". Set `spring.web.view.engine=none` when only `redirect:` is used.
 2. **Threading model**: template rendering runs on the handler's current thread. By default handlers run on the `default` business pool; if `pool.default-execute-mode=eventloop` or `@RunInPool(EVENTLOOP)` is used, rendering happens on the EventLoop — watch for blocking.
 3. **Spring 6.x note**: in Spring 6.x `ModelMap` no longer implements `Model`; the framework always injects `ExtendedModelMap` (a `ModelMap` subclass that implements `Model`) to support all three parameter types.
 

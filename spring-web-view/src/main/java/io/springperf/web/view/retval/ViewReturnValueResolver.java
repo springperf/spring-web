@@ -18,9 +18,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -45,6 +47,8 @@ public class ViewReturnValueResolver extends BaseWebComponent implements ReturnV
         if (mappingRegistry == null) {
             return;
         }
+        // 注册表查询会分配并排序列表，启动期只取一次
+        boolean hasResolvers = viewResolverRegistry.hasViewResolvers();
         List<String> unresolvedViewMethods = new ArrayList<>();
         for (PathMappingContext mapping : mappingRegistry.getMappingContextList()) {
             if (mapping.getMethod().getReturnType() != String.class) {
@@ -54,11 +58,11 @@ public class ViewReturnValueResolver extends BaseWebComponent implements ReturnV
                 continue;
             }
             mapping.set(VIEW_NAME_KEY, Boolean.TRUE);
-            if (!viewResolverRegistry.hasViewResolvers()) {
+            if (!hasResolvers) {
                 unresolvedViewMethods.add(mapping.getUserClass().getSimpleName() + "#" + mapping.getMethod().getName());
             }
         }
-        if (!unresolvedViewMethods.isEmpty() && !viewResolverRegistry.hasViewResolvers()) {
+        if (!unresolvedViewMethods.isEmpty() && !hasResolvers) {
             // 显式 engine=none：仅 redirect: 场景（无需模板引擎），跳过 fail-fast
             if (isViewEngineDisabled()) {
                 log.warn(
@@ -103,15 +107,10 @@ public class ViewReturnValueResolver extends BaseWebComponent implements ReturnV
         if (!(returnValue instanceof String)) {
             return false;
         }
-        String viewName = (String) returnValue;
         PathMappingContext ctx = PathMappingContext.get(req);
-        boolean viewMethod = ctx != null && Boolean.TRUE.equals(ctx.get(VIEW_NAME_KEY));
-        // redirect: 同样要求视图方法标记：@RestController/@ResponseBody 方法返回 "redirect:/x"
-        // 字符串时应作为 JSON 文本输出，而非被劫持成 302（Spring MVC 行为）
-        if (viewName.startsWith("redirect:")) {
-            return viewMethod;
-        }
-        return viewMethod;
+        // 包括 redirect: —— @RestController/@ResponseBody 方法返回 "redirect:/x" 字符串时
+        // 应作为 JSON 文本输出，而非被劫持成 302（Spring MVC 行为）
+        return ctx != null && Boolean.TRUE.equals(ctx.get(VIEW_NAME_KEY));
     }
 
     @Override
@@ -125,18 +124,38 @@ public class ViewReturnValueResolver extends BaseWebComponent implements ReturnV
             throw new IllegalArgumentException("Unable to resolve view name '" + viewName
                     + "' with any registered ViewResolver (thymeleaf/freemarker/beetl/jsp)");
         }
-        String contentType = view.getContentType();
-        if (contentType != null) {
-            resp.getHeaders().set(HttpHeaders.CONTENT_TYPE, contentType);
-        } else {
-            Charset charset = resp.getCharacterEncoding();
-            if (charset == null) {
-                charset = Charset.forName("UTF-8");
-            }
-            resp.getHeaders().set(HttpHeaders.CONTENT_TYPE, "text/html;charset=" + charset.name());
-        }
+        applyContentType(view, resp);
         resp.setHandled();
         view.render(ModelContext.getOrCreate(req), req, resp);
+    }
+
+    /**
+     * 视图响应的 Content-Type 与响应编码由这里统一决定：View 提供的 Content-Type 原样保留，
+     * 仅当其中自带 charset 时同步到响应编码（保证 Writer 与响应头一致）；未提供则回退
+     * {@code text/html} + 响应编码。重定向无响应体，不设置 Content-Type。
+     * <p>
+     * 供 {@code ModelAndViewReturnValueResolver} 复用，避免两条链路各写一套导致头与字节编码错配。
+     * </p>
+     */
+    public static void applyContentType(View view, WebServerHttpResponse resp) {
+        HttpHeaders headers = resp.getHeaders();
+        if (view instanceof RedirectView) {
+            headers.remove(HttpHeaders.CONTENT_TYPE);
+            return;
+        }
+        String contentType = view.getContentType();
+        if (contentType == null || contentType.isEmpty()) {
+            Charset charset = resp.getCharacterEncoding() != null ? resp.getCharacterEncoding()
+                    : StandardCharsets.UTF_8;
+            contentType = "text/html;charset=" + charset.name();
+        } else {
+            // 自定义 Content-Type 原样保留，不擅自追加 charset；自带 charset 时才同步响应编码
+            Charset charset = MediaType.parseMediaType(contentType).getCharset();
+            if (charset != null) {
+                resp.setCharacterEncoding(charset);
+            }
+        }
+        headers.set(HttpHeaders.CONTENT_TYPE, contentType);
     }
 
     @Override
