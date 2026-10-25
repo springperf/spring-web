@@ -42,6 +42,16 @@ public class FilterWrapper implements WebFilter, LifecycleWebComponent {
 
     /**
      * 动态注册（{@code ServletContext#addFilter}）用构造器：组件名与 init-param 来自 {@code FilterRegistration}，而不是注解。
+     * <p>
+     * 动态项恒追加到链尾（Phase3 之后不再排序），因此 order 取默认值，不再暴露"可调顺序"的假象。
+     * </p>
+     */
+    public FilterWrapper(jakarta.servlet.Filter filter, String componentName, Map<String, String> initParams) {
+        this(filter, WebFilter.defaultOrder, componentName, initParams);
+    }
+
+    /**
+     * 动态注册（{@code ServletContext#addFilter}）用构造器：组件名与 init-param 来自 {@code FilterRegistration}，而不是注解。
      */
     public FilterWrapper(jakarta.servlet.Filter filter, int order, String componentName,
             Map<String, String> initParams) {

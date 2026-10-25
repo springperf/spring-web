@@ -169,6 +169,7 @@ class SupportWebFilterRegistryTest {
 
             assertEquals(1, filter.initCalls, "动态注册的 filter 必须走 init（否则 init-param 永远不生效）");
             assertEquals("v", filter.initParam);
+            assertEquals("dyn", filter.filterName, "FilterConfig#getFilterName 必须返回注册名，不能带内部前缀");
             List<?> allFilters = (List<?>) org.springframework.test.util.ReflectionTestUtils.getField(registry,
                     "allFilters");
             assertNotNull(allFilters);
@@ -180,15 +181,17 @@ class SupportWebFilterRegistryTest {
         }
     }
 
-    /** 记录 init 次数与 init-param：动态注册的 setInitParameter 必须真的传到 filter。 */
+    /** 记录 init 次数、init-param 与 filter name：动态注册的配置必须真的传到 filter，且名字是注册名。 */
     static class TrackingFilter implements jakarta.servlet.Filter {
         int initCalls;
         String initParam;
+        String filterName;
 
         @Override
         public void init(jakarta.servlet.FilterConfig filterConfig) {
             initCalls++;
             initParam = filterConfig.getInitParameter("k");
+            filterName = filterConfig.getFilterName();
         }
 
         @Override
