@@ -3,8 +3,14 @@ package io.springperf.web.support.servlet.filter;
 import io.springperf.web.core.DispatcherHandler;
 import io.springperf.web.core.filter.WebFilterRegistration;
 import io.springperf.web.core.filter.WebFilterRegistry;
+import io.springperf.web.support.servlet.context.DynamicFilterRegistration;
+import io.springperf.web.support.servlet.context.PerfServletContext;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 
+import java.util.List;
+
+@Slf4j
 public class SupportWebFilterRegistry extends WebFilterRegistry {
 
     public SupportWebFilterRegistry(DispatcherHandler dispatcherHandler) {
@@ -17,6 +23,53 @@ public class SupportWebFilterRegistry extends WebFilterRegistry {
             }
             return registration;
         });
+    }
+
+    @Override
+    public void initComponentPhase3() throws Exception {
+        super.initComponentPhase3();
+        appendDynamicFilterRegistrations();
+    }
+
+    /**
+     * 认领 ServletContext 初始化窗口内 {@code addFilter} 的登记项，包装后追加到 filter 链尾。
+     * <p>
+     * 必须在 {@code super.initComponentPhase3()} 之后执行：父类会清空并重建 {@code registrations}，先追加会被冲掉。
+     * </p>
+     * <p>
+     * 组件名加 {@code dynamic:} 前缀：容器按组件名去重，动态 filter 的重名（与某个 bean filter 的 name 相同）不应导致 已有 filter 被丢弃。
+     * </p>
+     */
+    private void appendDynamicFilterRegistrations() {
+        PerfServletContext servletContext = getWebContext().getWebComponent(PerfServletContext.class);
+        if (servletContext == null) {
+            return;
+        }
+        List<DynamicFilterRegistration> dynamicRegistrations = servletContext.claimFilterRegistrations();
+        if (dynamicRegistrations.isEmpty()) {
+            return;
+        }
+        int appended = 0;
+        for (DynamicFilterRegistration dynamic : dynamicRegistrations) {
+            if (dynamic.getUrlPatternMappings().isEmpty()) {
+                // 规范允许先 addFilter 再 addMapping；但窗口结束时仍无映射，这个 filter 永远不会被调用
+                log.warn("Filter '{}' has no url-pattern mapping, it will not be applied to any request",
+                        dynamic.getName());
+                continue;
+            }
+            FilterWrapper wrapper = new FilterWrapper(dynamic.getFilter(), dynamic.getOrder(),
+                    "dynamic:" + dynamic.getName(), dynamic.getInitParameters());
+            // 动态 filter 的 init-param 只有走 init 才能生效（bean filter 的 init 由框架另行处理）
+            wrapper.initWithWebContext(getWebContext());
+            WebFilterRegistration registration = wrapFilterToRegistration(wrapper);
+            registration.addPathPatterns(dynamic.getUrlPatternMappings().toArray(new String[0]));
+            registrations.add(registration);
+            appended++;
+        }
+        if (appended > 0) {
+            initAllFilters();
+            log.info("Appended {} dynamically registered filter(s) to the filter chain", appended);
+        }
     }
 
     /**
