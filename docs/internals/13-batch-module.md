@@ -281,6 +281,7 @@ public void enqueue(BatchRequest<?> request) {
         case DROP:
             if (!ringBuffer.tryPublishEvent(translator, request)) {
                 metrics.recordDrop(queueName);
+                reportCapacity();   // 队列满正是容量指标最需要被看到的时刻
                 if (request.isCompleted()) {
                     log.warn("Queue [{}] drop failed — request already completed (likely timed out), "
                             + "client will not receive overflow signal", queueName);
@@ -294,6 +295,7 @@ public void enqueue(BatchRequest<?> request) {
         case THROW:
             if (!ringBuffer.tryPublishEvent(translator, request)) {
                 metrics.recordOverflow(queueName);
+                reportCapacity();
                 throw new BatchOverflowException(queueName);
             }
             metrics.recordEnqueue(queueName, true);
@@ -324,8 +326,12 @@ public void enqueue(BatchRequest<?> request) {
 public void shutdown() {
     if (!halted.compareAndSet(false, true)) return;
 
-    // Step 1: 优雅 drain Disruptor RingBuffer——消费所有已发布事件
-    disruptor.shutdown();  // 或 fallback 到 disruptor.halt()
+    // Step 1: 带硬上界的 drain（无参 shutdown() 等价于 shutdown(-1, MILLISECONDS)，即无限等待）
+    try {
+        disruptor.shutdown(5, TimeUnit.SECONDS);
+    } catch (TimeoutException e) {
+        disruptor.halt();   // 未消费请求由 DeferredResult 超时兜底
+    }
 
     // Step 2: 冲刷 BufferingBatchHandler 中残余的 buffer
     batchHandler.flushRemaining();
@@ -338,7 +344,11 @@ public void shutdown() {
 }
 ```
 
-三步顺序是必要的：先停 Disruptor 消费者（不再拉取新事件）→ 冲刷残余 buffer（`flushRemaining` 处理 `shutdown` 前已拉取但未提交的 `BatchRequest`）→ 等待业务线程池完成正在执行的批处理。`awaitTermination(30s)` 超时后 `shutdownNow`，防止线程泄漏。
+三步顺序是必要的：先停 Disruptor 消费者（不再拉取新事件）→ 冲刷残余 buffer（`flushRemaining` 处理 `shutdown` 前已拉取但未提交的 `BatchRequest`）→ 等待业务线程池完成正在执行的批处理。
+
+**Step 1 必须用带超时的重载**：Disruptor 3.4.x 的无参 `shutdown()` 内部是 `shutdown(-1, MILLISECONDS)`——`timeout < 0` 时循环永不超时，等于无限等待 backlog 清空。而 bizExecutor 满员时消费者被 `CallerRunsPolicy` 拖入业务执行，backlog 清空速度就等于业务处理速度，容器关闭会没有上界。改成 5 秒上界后，超时即 `halt()`，未消费的请求由 `DeferredResult` 超时兜底——宁可快速完成关机。Step 3 的 `awaitTermination(30s)` 只覆盖业务池，不覆盖 Step 1。
+
+另外，业务池的拒绝策略在池已 shutdown 时**抛出 `RejectedExecutionException`**（而不是静默丢弃），由 `BufferingBatchHandler#submit` 逐条 `setError` 完成批次——批次不会消失，也不会让请求一直挂到超时。
 
 ---
 
@@ -404,7 +414,8 @@ private void flush() {
 | 关注点 | 处理 |
 |---|---|
 | 消费者线程 vs 调度线程 | `bufferLock` 保护「add」与「取走并替换 list」；持锁时间仅数十纳秒，远小于窗口周期 |
-| 调度线程数 | 全进程共享单个 `batch-window` daemon 线程，按启用窗口的队列数引用计数；归零时关停 |
+| 调度线程数 | 全进程共享单个 `batch-window` daemon 线程；每个 handler 只登记一次并记录「登记在哪个实例上」，登记/注销/关停在同一把静态锁内完成——无窗口队列停机时不会误减其他队列的份额 |
+| 任务被拒 | 调度器正在关闭时 `schedule()` 可能抛 `RejectedExecutionException`：捕获后立即刷出本批，不让请求挂到超时 |
 | 停机顺序 | `DisruptorQueue.shutdown()` 中 `flushRemaining()` → `closeWindow()`，防止迟到任务重复提交 |
 | 向后兼容 | `batchWindowMillis` 默认 0，此时 `endOfBatch` 分支与历史行为完全一致，`bufferLock` 无争用 |
 
@@ -442,11 +453,17 @@ private void processBatch(List<BatchRequest<?>> batch) {
     } finally {
         metrics.recordBatchProcessed(meta.queueName(), batchSize,
                 System.nanoTime() - start, success);
+        failUncompleted(batch);   // 漏调 setResult 的请求必须有结论
+        reportCapacity();         // 容量 Gauge 的常规采样点
     }
 }
 ```
 
-`@BatchMapping` 方法执行失败时，`handleBatchError`遍历所有未完成的 request，调用 `setError(cause)` 完成每个请求的异常响应——**不会出现"一个请求失败，整批请求无响应挂起"**。
+`@BatchMapping` 方法执行失败时，`handleBatchError` 遍历所有未完成的 request，调用 `setError(cause)` 完成每个请求的异常响应——**不会出现"一个请求失败，整批请求无响应挂起"**。
+
+`failUncompleted` 补上另一半：批量方法**正常返回**但漏调 `setResult`（按 id 查 map 后漏 key 是最常见的形态）时，未完成的请求会以 `IllegalStateException` 完成并打一条 WARN（含完成数 / 总数）。没有这道兜底，这些请求只能静默挂满 30 秒超时，既没有正确响应也没有排查线索。
+
+> 这条兜底同时明确了契约：批量方法必须在返回前完成批内所有请求。把 `setResult` 丢给其他线程异步执行后立即返回的用法不在支持范围内。
 
 ---
 
@@ -463,12 +480,16 @@ private void processBatch(List<BatchRequest<?>> batch) {
 | `batch.process.duration` | `recordBatchProcessed` | `BufferingBatchHandler.processBatch` finally | Timer | `queue` + `outcome=success/failure`（成败分序列，避免失败批次污染分位数） |
 | `batch.process.batch.size` | `recordBatchProcessed` | 同上（DistributionSummary 维度） | DistributionSummary | `queue` |
 | `batch.process.requests` | `recordRequestCompleted` | `BufferingBatchHandler.processBatch` 成功时 | Counter | `queue` |
-| `batch.queue.remaining` | `reportQueueCapacity` | Gauge，按队列懒注册 | Gauge | `queue` |
-| `batch.queue.capacity` | `reportQueueCapacity` | Gauge，按队列懒注册 | Gauge | `queue` |
+| `batch.queue.remaining` | `reportQueueCapacity` | `DisruptorQueue` 构造预热一次 + `processBatch` finally（每批）+ DROP / THROW 失败补报 | Gauge | `queue` |
+| `batch.queue.capacity` | `reportQueueCapacity` | 同上 | Gauge | `queue` |
 
 所有指标的 `queue` Tag 值为 `batch:<ClassName>.<methodName>`（如 `batch:BatchUserController.batchGetUser`，由 `BatchScanner.resolveQueueName` 生成）。
 
-两个 Gauge 采用「外部 map 占位 + 锁外注册」的写法（刻意不用 `ConcurrentHashMap.computeIfAbsent`——那会在持有 CHM bin 锁时调用 `MeterRegistry.register`，与 MeterRegistry 内部锁形成潜在死锁面）。**注意**：当前代码中 `reportQueueCapacity` 没有任何调度调用方，因此这两个 Gauge 实际不会注册——需要容量监控时应在自己的采集侧调用该 SPI 方法。
+两个 Gauge 采用「外部 map 占位 + 锁外注册」的写法（刻意不用 `ConcurrentHashMap.computeIfAbsent`——那会在持有 CHM bin 锁时调用 `MeterRegistry.register`，与 MeterRegistry 内部锁形成潜在死锁面）。
+
+**采样策略**：容量是「水位」类指标，用批次频率采样即可，因此埋点放在 `processBatch` 结束处，而不是 `enqueue` 的生产者热路径上。`DisruptorQueue` 构造末尾会预热上报一次，把 Gauge 的首次注册（会进 `MeterRegistry`）留在启动阶段，而不是留给背压瞬间的生产者线程（可能是 EventLoop）。DROP / THROW 入队失败时会额外补报一次——队列满、批次可能不再产生，这正是容量指标最需要被看到的时刻。
+
+代价是它不是实时读数：批次停止产生且没有入队失败时，Gauge 停在最后一次采样值。
 
 `NoOpBatchMetrics`是默认实现，所有方法空操作——当 Micrometer 不在类路径时，零开销（实现类 `MicrometerBatchMetrics` 位于 `spring-boot-starter-web`，由 `SpringWebBatchAutoConfiguration` 在 `MeterRegistry` 存在时注入）。
 
@@ -558,12 +579,12 @@ public class BatchOverflowException extends ResponseStatusException {
 1. **`BatchRegistry` + `BatchScanner` 启动期扫描** → 扫描 `@BatchMapping`，关联单请求方法，解析 `BatchRequest` 泛型类型，缓存 `BatchRequestMetaData` 到 `PathMappingContext`。
 2. **`BatchInvoker` 方法体替换** → `InvokableHandlerMethod.setInvoker(batchInvoker)`（签名 `public void setInvoker(Invoker invoker)`），运行时反射创建 `BatchRequest` 实例并入队，原方法体完全不执行。
 3. **`DisruptorQueue` 无锁入队** → `ProducerType.MULTI` CAS claim，`BatchEvent` 预分配零 GC，`normalizeRingBufferSize` C8/C12 保护，三种背压策略（BLOCK/DROP/THROW）。
-4. **`BufferingBatchHandler` 攒批消费** → `endOfBatch` + `maxBatchSize` 双触发，`bizExecutor` 零核心线程 + `SynchronousQueue` + `CallerRunsPolicy` 自然背压，`handleBatchError` 逐个 `setError` 防挂起。
+4. **`BufferingBatchHandler` 攒批消费** → `endOfBatch` + `maxBatchSize` 双触发（`batchWindowMillis > 0` 时改为「窗口到期 + 攒满」），`bizExecutor` 零核心线程 + `SynchronousQueue` + `CallerRunsPolicy` 自然背压，`handleBatchError` / `failUncompleted` 逐个 `setError` 防挂起。
 5. **三级背压链** → RingBuffer 满 → 生产者线程（默认 `default` 业务池 worker）阻塞 → TCP 反压（BLOCK 模式）；或 `tryPublishEvent` 失败 + `BatchOverflowException` 429（DROP/THROW 模式）。
-6. **9 个指标埋点** → `BatchMetrics` SPI 定义 6 个记录方法（由 starter 的 `MicrometerBatchMetrics` 实现为 9 个指标），`queue` Tag 值 `batch:<ClassName>.<methodName>`，`NoOpBatchMetrics` 默认零开销。
-7. **安全网** → 停机竞态窗口由 `DeferredResult` 30s 超时兜底；`BatchRequest.completed` 守卫防止重复回调；`BatchExceptionHandler` 捕获消费者异常；`BatchOverflowException` 映射 429。
+6. **9 个指标埋点** → `BatchMetrics` SPI 定义 6 个记录方法（由 starter 的 `MicrometerBatchMetrics` 实现为 9 个指标，容量 Gauge 在启动预热 + 每批 + 背压失败时采样），`queue` Tag 值 `batch:<ClassName>.<methodName>`，`NoOpBatchMetrics` 默认零开销。
+7. **安全网** → Step 1 的 drain 有 5s 硬上界、业务池拒绝时逐条 `setError`；批量方法漏完成请求由 `failUncompleted` 收尾；停机竞态窗口由 `DeferredResult` 30s 超时兜底；`BatchRequest.completed` 守卫防止重复回调；`BatchExceptionHandler` 捕获消费者异常；`BatchOverflowException` 映射 429。
 
-这一层的克制体现在：**不把批处理留给业务代码，也不为批处理引入复杂的消息中间件。** LMAX Disruptor 提供无锁的环形缓冲区，`ProducerType.MULTI` 支持多生产者并发入队，`SynchronousQueue` + `CallerRunsPolicy` 在零额外线程的基础上实现了自然背压——**没有调度线程、没有定时器、没有额外的队列线程**，三个线程层次（handler 执行线程 / Disruptor 消费者 / bizExecutor 工作者）形成了一条干净的反压链。`@BatchMapping` 方法体替换语义让用户无需修改单请求方法——框架层面透明的"请求聚合"，是 [01 篇](01-design-philosophy.md) 原则 2（零侵入）在批处理场景的落地。
+这一层的克制体现在：**不把批处理留给业务代码，也不为批处理引入复杂的消息中间件。** LMAX Disruptor 提供无锁的环形缓冲区，`ProducerType.MULTI` 支持多生产者并发入队，`SynchronousQueue` + `CallerRunsPolicy` 在零额外线程的基础上实现了自然背压——**默认（`batchWindowMillis=0`）下没有调度线程、没有定时器、没有额外的队列线程**；只有显式开启窗口才引入一个全进程共享的 `batch-window` daemon 线程（按队列登记、无使用者时关停）。三个线程层次（handler 执行线程 / Disruptor 消费者 / bizExecutor 工作者）形成了一条干净的反压链。`@BatchMapping` 方法体替换语义让用户无需修改单请求方法——框架层面透明的"请求聚合"，是 [01 篇](01-design-philosophy.md) 原则 2（零侵入）在批处理场景的落地。
 
 ---
 

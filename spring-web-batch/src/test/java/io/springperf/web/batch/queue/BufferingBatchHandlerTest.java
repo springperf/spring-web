@@ -3,6 +3,7 @@ package io.springperf.web.batch.queue;
 import io.springperf.web.batch.annotation.BatchMapping;
 import io.springperf.web.batch.common.BatchRequest;
 import io.springperf.web.batch.common.BatchRequestMetaData;
+import io.springperf.web.batch.metrics.NoOpBatchMetrics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,6 +14,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
@@ -226,6 +229,92 @@ class BufferingBatchHandlerTest {
         }), 0L, false);
         handler.flushRemaining();
         verify(executor, times(1)).execute(any(Runnable.class));
+    }
+
+    /**
+     * 业务池在停机后拒绝任务时，批次不能静默消失——否则批内请求只能等 DeferredResult 超时（默认 30s）。
+     */
+    @Test
+    void submit_executorRejects_failsRequestsExplicitly() {
+        Executor rejecting = r -> {
+            throw new RejectedExecutionException("pool is shut down");
+        };
+        BufferingBatchHandler handler = new BufferingBatchHandler(rejecting, meta, bean, 0);
+
+        BatchRequest<String> req = new BatchRequest<String>() {
+        };
+        handler.onEvent(newEvent(req), 0L, true);
+
+        assertThat(req.isCompleted()).isTrue();
+        assertThat(req.getResult()).isInstanceOf(RejectedExecutionException.class);
+    }
+
+    /**
+     * 批量方法「正常返回但漏调 setResult」必须以显式错误收尾：不兜底的话客户端要悬停到 30s 超时， 且日志里没有任何线索。
+     */
+    @Test
+    void processBatch_handlerReturnsWithoutCompleting_failsRequestInsteadOfHanging() {
+        // TestService.handle 是空实现：不给任何请求设置结果
+        BufferingBatchHandler handler = new BufferingBatchHandler(executor, meta, bean, 0);
+
+        BatchRequest<String> req = new BatchRequest<String>() {
+        };
+        handler.onEvent(newEvent(req), 0L, true);
+
+        ArgumentCaptor<Runnable> captor = ArgumentCaptor.forClass(Runnable.class);
+        verify(executor).execute(captor.capture());
+        captor.getValue().run();
+
+        assertThat(req.isCompleted()).as("漏完成的请求必须被显式失败，而不是挂到超时").isTrue();
+        assertThat(req.getResult()).isInstanceOf(IllegalStateException.class);
+    }
+
+    /** 每批处理结束后上报一次 RingBuffer 容量（Gauge 数据源）。 */
+    @Test
+    void processBatch_reportsCapacityOncePerBatch() {
+        AtomicInteger reports = new AtomicInteger();
+        BufferingBatchHandler handler = new BufferingBatchHandler(executor, meta, bean, 0, NoOpBatchMetrics.INSTANCE,
+                reports::incrementAndGet);
+
+        handler.onEvent(newEvent(new BatchRequest<String>() {
+        }), 0L, true);
+
+        ArgumentCaptor<Runnable> captor = ArgumentCaptor.forClass(Runnable.class);
+        verify(executor).execute(captor.capture());
+        captor.getValue().run();
+
+        assertThat(reports).hasValue(1);
+    }
+
+    /** 指标上报失败不得改变业务批次的结果。 */
+    @Test
+    void processBatch_capacityReportFails_batchResultUnaffected() throws Exception {
+        Method completing = CompletingService.class.getDeclaredMethod("handle", List.class);
+        BatchRequestMetaData completingMeta = new BatchRequestMetaData(completing, CompletingService.class, null,
+                "test-queue", 1024, BatchMapping.WaitStrategy.BLOCKING, BatchMapping.Backpressure.BLOCK, null, 0, 4);
+        BufferingBatchHandler handler = new BufferingBatchHandler(executor, completingMeta, new CompletingService(), 0,
+                NoOpBatchMetrics.INSTANCE, () -> {
+                    throw new IllegalStateException("meter registry closed");
+                });
+
+        BatchRequest<String> req = new BatchRequest<String>() {
+        };
+        handler.onEvent(newEvent(req), 0L, true);
+
+        ArgumentCaptor<Runnable> captor = ArgumentCaptor.forClass(Runnable.class);
+        verify(executor).execute(captor.capture());
+        captor.getValue().run();
+
+        assertThat(req.getResult()).isEqualTo("ok");
+    }
+
+    static class CompletingService {
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        public void handle(List<? extends BatchRequest<?>> batch) {
+            for (BatchRequest request : batch) {
+                request.setResult("ok");
+            }
+        }
     }
 
     private static BatchEvent newEvent(BatchRequest<?> request) {

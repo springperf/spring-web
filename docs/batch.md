@@ -198,6 +198,8 @@ bizExecutor 线程池（0 ~ consumerSize 个；开虚拟线程时为虚拟线程
 
 > 实测反例：10ms IO 配 5ms 窗口，吞吐反而低于不开窗口——等待成本占了 IO 时间的一半。窗口应显著小于 IO 延迟。
 
+正因为默认值下批处理几乎不生效，**启动期会对每个未设置 `batchWindowMillis` 的队列打一条 WARN**（列出队列名）。这条日志出现时，该队列实际是按「每个请求一次 IO」在跑，`maxBatchSize` 不起作用——IO 密集型场景应显式设置窗口。
+
 #### 收益与成本的定量结论
 
 上面的经验值来自参数扫描实测（closed model，并发 100，`consumerSize=8`，`maxBatchSize=100`）。收益和成本要分开看，它们并非同时成立：
@@ -268,16 +270,19 @@ bizExecutor 线程池（0 ~ consumerSize 个；开虚拟线程时为虚拟线程
 | 指标名 | 类型 | Tag | 说明 |
 |--------|------|-----|------|
 | `batch.enqueue.total` | Counter | `queue` | 总入队尝试数 |
-| `batch.enqueue.rejected` | Counter | `queue` | 入队失败数（`total` 中未成功的部分） |
+| `batch.enqueue.rejected` | Counter | `queue` | 停机期入队被拒数（`total` 中未成功的部分；DROP / THROW 的溢出另计入 `dropped` / `overflow`） |
 | `batch.enqueue.dropped` | Counter | `queue` | 背压丢弃数 |
 | `batch.enqueue.overflow` | Counter | `queue` | 溢出异常数 |
 | `batch.process.duration` | Timer | `queue` + `outcome=success/failure` | 批处理耗时（成败分序列，避免失败批次污染分位数） |
 | `batch.process.batch.size` | DistributionSummary | `queue` | 批大小分布 |
-| `batch.process.requests` | Counter | `queue` | 请求完成数 |
-| `batch.queue.remaining` | Gauge | `queue` | RingBuffer 剩余容量 |
+| `batch.process.requests` | Counter | `queue` | 请求完成数（仅统计批量方法正常返回的批次） |
+| `batch.queue.remaining` | Gauge | `queue` | RingBuffer 剩余容量（见下方采样时机） |
 | `batch.queue.capacity` | Gauge | `queue` | RingBuffer 总容量 |
 
 所有指标均带有 `queue` Tag，值为 `batch:<ClassName>.<methodName>`（由 `BatchScanner` 生成）。
+
+> **容量 Gauge 的采样时机**：队列启动时预热上报一次（Gauge 首次注册落在启动阶段，不进请求路径），之后每批处理结束刷新一次；当 RingBuffer 满导致 DROP / THROW 入队失败时立即补报一次。
+> 采样不依赖额外线程，也不会在正常入队路径上产生额外开销。因此它是「水位」而非「实时读数」—— 批次停止产生时数值会停在最后一次采样点。
 
 ### 监控建议
 
@@ -313,6 +318,8 @@ bizExecutor 线程池（0 ~ consumerSize 个；开虚拟线程时为虚拟线程
 
 **该值用于复用多核，取核数级别即可，不应超配。** 调大它并不会带来更高的批处理吞吐上限之外的收益——反而会减小批大小（消费更快 → 积压更少），削弱批量消除 IO 的效果。需要更大批量时应开 `batchWindowMillis`，而不是调大 `consumerSize`。
 
+> **每个 `@BatchMapping` 方法都有独立的 bizExecutor**：N 个队列的最坏并发是 N × `consumerSize`。默认值（核数）是按单队列设计的，多队列部署时应显式设置 `consumerSize`，使总和不超过核数——超过时启动期会告警。
+
 > **虚拟线程**：`spring.threads.virtual.enabled=true`（JDK 21+）时，业务池的**线程**改为虚拟线程（线程名 `batch-virtual-*`）——`consumerSize`、`SynchronousQueue`、`CallerRunsPolicy` 语义全部不变，池满时仍由消费者线程自执行形成背压；批量方法内的阻塞 IO 只挂起虚拟线程，不再占用平台线程。
 
 ---
@@ -322,6 +329,14 @@ bizExecutor 线程池（0 ~ consumerSize 个；开虚拟线程时为虚拟线程
 ### 方法体替换语义
 
 `@BatchMapping` 安装后，被关联的 `@RequestMapping` 方法体**不会执行**。`BatchInvoker` 直接根据构造函数参数创建 `BatchRequest` 实例并入队。如果单请求方法中有日志、校验等逻辑，它们不会运行——这些应在 `@BatchMapping` 方法中处理。
+
+### 批量方法必须完成批内每个请求
+
+批量方法返回后，框架会扫描批内仍然未完成的请求，以 `IllegalStateException` 完成它们（客户端收到 500）并打一条 WARN（含队列名与「完成数 / 总数」）。
+
+这是兜底而非正常路径：漏调 `setResult`（例如按 id 查到 map 后漏了某个 key）如果不处理，那些请求只能静默挂满 30 秒超时，既没有正确响应也没有排查线索。
+
+> 因此**不要在批量方法里把 `setResult` 交给其他线程异步执行后立即返回**——当前契约要求批量方法返回前完成批内所有请求。
 
 ### 超时处理
 
@@ -345,7 +360,21 @@ public class GetUserRequest extends BatchRequest<UserResp> {
 | RingBuffer 满，背压 DROP | 请求设置 `BatchOverflowException` | 429 |
 | RingBuffer 满，背压 THROW | 同步抛出异常 | 429 |
 | 批量处理异常 | 遍历所有未完成的 request 调用 `setError(e)` | 500 |
+| 批量方法返回但漏调 `setResult` | 框架为未完成的 request `setError(IllegalStateException)` 并打 WARN | 500 |
+| 停机期业务池已关闭、批次提交被拒 | 逐条 `setError(RejectedExecutionException)`，批次不静默丢弃 | 500 |
 | 请求超时 | `DeferredResult` 超时回调 | 503 |
+
+### 停机
+
+`shutdown()` 分三步，每步都有上界：
+
+| 步骤 | 行为 | 上界 |
+|------|------|------|
+| 1. drain RingBuffer | 等消费者消费完已发布事件 | **5 秒**；超时即 `halt()`，未消费的请求由 `DeferredResult` 超时兜底 |
+| 2. 冲刷残余 buffer | `flushRemaining()` 把攒批缓冲整批提交 | 池满员时由 `CallerRunsPolicy` 让关闭线程同步执行整批业务 |
+| 3. 等待在途批次 | `awaitTermination` | 30 秒，超时 `shutdownNow()` |
+
+> 停机慢时应优先怀疑批量方法本身耗时，而不是 Disruptor：Step 2 / Step 3 的时间都与批量方法耗时直接相关。
 
 ### 调试建议
 

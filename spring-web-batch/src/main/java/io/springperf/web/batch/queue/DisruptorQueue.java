@@ -1,6 +1,7 @@
 package io.springperf.web.batch.queue;
 
 import com.lmax.disruptor.RingBuffer;
+import com.lmax.disruptor.TimeoutException;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 import io.springperf.web.batch.annotation.BatchMapping;
@@ -13,6 +14,7 @@ import io.springperf.web.core.pool.VirtualThreadSupport;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -21,6 +23,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 public class DisruptorQueue {
+
+    /**
+     * 停机时 RingBuffer 的 drain 上界（秒）。超时即 halt：未消费的请求不再等消费线程， 由 {@code DeferredResult} 超时兜底——宁可快速完成关机，也不让容器关闭无限挂起。
+     */
+    private static final long DRAIN_TIMEOUT_SECONDS = 5L;
 
     private final Disruptor<BatchEvent> disruptor;
     private final RingBuffer<BatchEvent> ringBuffer;
@@ -82,20 +89,30 @@ public class DisruptorQueue {
         ThreadFactory bizThreadFactory = useVirtualThreads
                 ? VirtualThreadSupport.newThreadFactory("batch-virtual-" + queueName + "-")
                 : platformThreadFactory(queueName);
+        // 池满 → 消费者线程自行执行（背压）；池已 shutdown → 抛出，由 BufferingBatchHandler#submit
+        // 逐条 setError。早期版本在此静默丢弃任务，批内请求只能等 DeferredResult 超时。
         this.bizExecutor = new ThreadPoolExecutor(0, consumerSize, 60L, TimeUnit.SECONDS, new SynchronousQueue<>(),
                 bizThreadFactory, (r, executor) -> {
-                    if (!executor.isShutdown()) {
-                        r.run(); // CallerRunsPolicy — consumer thread executes directly
+                    if (executor.isShutdown()) {
+                        throw new RejectedExecutionException(
+                                "Batch biz executor for queue [" + queueName + "] is shut down");
                     }
+                    r.run(); // CallerRunsPolicy — consumer thread executes directly
                 });
 
-        this.batchHandler = new BufferingBatchHandler(bizExecutor, meta, bean, meta.maxBatchSize(), metrics);
+        // RingBuffer 在 Disruptor 构造时即已创建；提前取引用，供容量上报回调使用
+        this.ringBuffer = disruptor.getRingBuffer();
+        this.batchHandler = new BufferingBatchHandler(bizExecutor, meta, bean, meta.maxBatchSize(), metrics,
+                this::reportCapacity);
         this.disruptor.handleEventsWith(this.batchHandler);
         this.disruptor.handleExceptionsWith(new BatchExceptionHandler(queueName));
         this.disruptor.start();
 
-        this.ringBuffer = disruptor.getRingBuffer();
         this.backpressure = meta.backpressure();
+
+        // 启动期预热一次容量上报：把 Gauge 的首次注册放在启动线程上，而不是留给背压瞬间的
+        // 生产者线程（可能是 EventLoop）——首次注册会进 MeterRegistry，不该出现在请求路径。
+        reportCapacity();
 
         log.info("Batch disruptor [{}] started: ringBufferSize={}, waitStrategy={}, consumerSize={}, bizExecutor={}",
                 queueName, size, meta.waitStrategy(), consumerSize,
@@ -124,6 +141,8 @@ public class DisruptorQueue {
             case DROP:
                 if (!ringBuffer.tryPublishEvent(translator, request)) {
                     metrics.recordDrop(queueName);
+                    // 队列满正是容量指标最需要被看到的时刻：批次可能不再产生，不能只靠批后采样
+                    reportCapacity();
                     if (request.isCompleted()) {
                         log.warn("Queue [{}] drop failed — request already completed (likely timed out), "
                                 + "client will not receive overflow signal", queueName);
@@ -137,6 +156,7 @@ public class DisruptorQueue {
             case THROW:
                 if (!ringBuffer.tryPublishEvent(translator, request)) {
                     metrics.recordOverflow(queueName);
+                    reportCapacity();
                     throw new BatchOverflowException(queueName);
                 }
                 metrics.recordEnqueue(queueName, true);
@@ -179,24 +199,28 @@ public class DisruptorQueue {
     /**
      * 三步优雅停机：先 drain RingBuffer，再冲刷 handler 残余 buffer，最后等待在途批处理完成。
      * <p>
-     * 最坏耗时可叠加到 60s 以上：Step 2 的 {@code flushRemaining()} 会向 bizExecutor 提交任务， 若池已满员则 {@code CallerRunsPolicy} 让<b>调用
-     * shutdown 的线程</b>（通常是 Spring 容器关闭线程）同步执行整批业务； Step 3 再最多等待 {@code awaitTermination(30s)}。停机慢时应优先怀疑批量方法本身耗时，而非
-     * Disruptor。
+     * 每一步都有上界：Step 1 最多 {@value #DRAIN_TIMEOUT_SECONDS}s（超时 halt，未消费请求由 DeferredResult 超时兜底）； Step 2
+     * 在池满员时由 {@code CallerRunsPolicy} 让<b>调用 shutdown 的线程</b>（通常是 Spring 容器关闭线程）同步执行整批业务； Step 3 最多
+     * {@code awaitTermination(30s)}。停机慢时应优先怀疑批量方法本身耗时，而非 Disruptor。
      * </p>
      */
     public void shutdown() {
         if (!halted.compareAndSet(false, true))
             return;
 
-        // Step 1: Gracefully drain the Disruptor RingBuffer — consume all published events
+        // Step 1: drain the Disruptor RingBuffer with a hard bound.
+        // 不能用无参 disruptor.shutdown()：Disruptor 3.4.x 内部等价于 shutdown(-1, MILLISECONDS)，
+        // 即无限等待 backlog 清空——bizExecutor 满员时消费者被 CallerRunsPolicy 拖入业务，
+        // backlog 清空速度 = 业务处理速度，容器关闭会没有上界。
         try {
-            disruptor.shutdown();
+            disruptor.shutdown(DRAIN_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            log.warn("Drain of queue [{}] exceeded {}s, halting - unconsumed requests fall back to "
+                    + "DeferredResult timeout", queueName, DRAIN_TIMEOUT_SECONDS, e);
+            haltQuietly();
         } catch (Exception e) {
             log.warn("Error draining disruptor for queue [{}], forcing halt", queueName, e);
-            try {
-                disruptor.halt();
-            } catch (Exception ignored) {
-            }
+            haltQuietly();
         }
 
         // Step 2: Flush any remaining buffer in the batch handler
@@ -226,6 +250,21 @@ public class DisruptorQueue {
         }
 
         log.info("Batch disruptor [{}] shut down gracefully", queueName);
+    }
+
+    private void haltQuietly() {
+        try {
+            disruptor.halt();
+        } catch (Exception ignored) {
+            // halt 只是尽力而为：即便失败，进程退出时线程也会被回收
+        }
+    }
+
+    /**
+     * 上报当前 RingBuffer 剩余容量（Gauge 数据源）。由 {@link BufferingBatchHandler} 在每批处理结束后调用， 队列满导致的入队失败会额外补报一次。
+     */
+    private void reportCapacity() {
+        metrics.reportQueueCapacity(queueName, (int) ringBuffer.remainingCapacity(), ringBuffer.getBufferSize());
     }
 
     static int normalizeRingBufferSize(int size) {

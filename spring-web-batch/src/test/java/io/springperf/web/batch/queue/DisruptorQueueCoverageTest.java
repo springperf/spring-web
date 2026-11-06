@@ -302,6 +302,29 @@ class DisruptorQueueCoverageTest {
         }
     }
 
+    /* ==================== 容量指标 ==================== */
+
+    /**
+     * 回归：{@code BatchMetrics#reportQueueCapacity} 曾经没有任何生产调用方，对外文档承诺的
+     * {@code batch.queue.remaining} / {@code batch.queue.capacity} Gauge 因此永远不会注册。
+     */
+    @Test
+    void processBatch_reportsQueueCapacity() throws Exception {
+        BatchMetrics metrics = mock(BatchMetrics.class);
+        queue = new DisruptorQueue("cap-" + SEQ.incrementAndGet(), meta(BatchMapping.Backpressure.BLOCK),
+                new FastService(), metrics);
+
+        // 启动期预热一次：Gauge 首次注册不能落在请求路径上
+        verify(metrics).reportQueueCapacity(anyString(), anyInt(), anyInt());
+
+        BatchRequest<String> r = request();
+        queue.enqueue(r);
+        awaitResult(r);
+
+        // 批次处理结束后再次上报
+        verify(metrics, timeout(2000).atLeast(2)).reportQueueCapacity(anyString(), anyInt(), anyInt());
+    }
+
     @Test
     void shutdown_thenShutdown_idempotent() throws Exception {
         queue = new DisruptorQueue("idem-" + SEQ.incrementAndGet(), meta(BatchMapping.Backpressure.BLOCK),

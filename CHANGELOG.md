@@ -36,6 +36,10 @@
 - **会话序列化开销**：快路径只整体序列化一次，仅在失败时回退到逐属性剔除（原先每个属性「试序列化 + 正式序列化」，共 2N 次）
 - **`ServletContext` 动态注册**：`addServlet` / `addFilter` / `addJspFile` / `createServlet` / `createFilter` 改为抛 `UnsupportedOperationException`（规范为该能力缺失指定的信号），不再返回 `null` 让调用方误判注册成功
 - **`ServletContext.setSessionTrackingModes()` 实际生效**：原先为空实现，程序化配置被静默丢弃；现做规范校验（集合非空且必须含 `COOKIE` 或 `SSL`）并影响会话 Cookie 下发与 `encodeURL`
+- **批处理停机与完成兜底**：RingBuffer drain 加 5 秒硬上界（无参 `Disruptor.shutdown()` 等价于 `shutdown(-1, MILLISECONDS)`，容器关闭可能无限挂起）；业务池已关闭时被拒的批次逐条 `setError` 而非静默丢弃；批量方法返回后仍未完成的请求以 `IllegalStateException` 收尾并告警，不再静默挂到 30 秒超时
+- **批处理容量指标落地**：`batch.queue.remaining` / `batch.queue.capacity` 原先没有任何采集方（Gauge 永不注册），现于队列启动预热、每批处理结束与 DROP / THROW 失败时上报
+- **批处理启动告警**：未设置 `batchWindowMillis` 的队列、以及多队列 `consumerSize` 之和超过核数时，启动期告警——避免默认配置静默退化为「每请求一次 IO」
+- **批处理窗口调度器竞态**：登记与注销共用同一把静态锁，并按 handler 记录登记所在的调度器实例；修复无窗口队列停机时误关其他队列仍在使用的调度器、以及 `schedule()` 被拒后异常冒到消费者的问题
 
 ## [3.5.7] - 20261008
 

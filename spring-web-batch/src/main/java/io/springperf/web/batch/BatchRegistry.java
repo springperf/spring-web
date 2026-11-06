@@ -30,7 +30,6 @@ public class BatchRegistry extends BaseWebComponent {
             .createMethodCacheKey(BatchRequestMetaData.class);
 
     private final Map<String, DisruptorQueue> queues = new ConcurrentHashMap<>();
-    private final List<BatchHandlerRegistration> registrations = new ArrayList<>();
     private BatchMetrics metrics = NoOpBatchMetrics.INSTANCE;
 
     /**
@@ -59,7 +58,39 @@ public class BatchRegistry extends BaseWebComponent {
         for (BatchHandlerRegistration reg : registrations) {
             install(reg);
         }
-        this.registrations.addAll(registrations);
+        warnOnSuboptimalConfig(registrations);
+    }
+
+    /**
+     * 启动期对两类「配置看起来正常、实际拿不到收益或会超配」的组合显式告警，避免静默降级为「没有批处理」：
+     * <ul>
+     * <li>{@code batchWindowMillis=0}：刷出时机由 {@code endOfBatch} 决定，批大小实测长期在 1~3，{@code maxBatchSize} 形同虚设；</li>
+     * <li>多个队列的 {@code consumerSize} 之和超过 CPU 核数：每个 {@code @BatchMapping} 都持有独立的 bizExecutor，
+     * 默认值（核数）是按单队列设计的。</li>
+     * </ul>
+     */
+    private void warnOnSuboptimalConfig(List<BatchHandlerRegistration> registrations) {
+        List<String> noWindow = new ArrayList<>();
+        long workerBudget = 0;
+        for (BatchHandlerRegistration reg : registrations) {
+            BatchRequestMetaData meta = reg.meta();
+            if (meta.batchWindowMillis() <= 0) {
+                noWindow.add(meta.queueName());
+            }
+            workerBudget += meta.consumerSize();
+        }
+        if (!noWindow.isEmpty()) {
+            log.warn("Batch queues without batchWindowMillis ({}): {} - batch size is decided by endOfBatch and "
+                    + "typically stays at 1~3, so maxBatchSize is effectively unused; set batchWindowMillis "
+                    + "(about 1/4~1/2 of the downstream IO latency) for IO-bound handlers", noWindow.size(),
+                    String.join(", ", noWindow));
+        }
+        int cores = Runtime.getRuntime().availableProcessors();
+        if (registrations.size() > 1 && workerBudget > cores) {
+            log.warn("Batch config allows up to {} concurrent batch workers across {} queues (CPU cores={}) - "
+                    + "each @BatchMapping owns a dedicated bizExecutor; set consumerSize explicitly so that the "
+                    + "sum stays within the core count", workerBudget, registrations.size(), cores);
+        }
     }
 
     @Override
@@ -74,7 +105,6 @@ public class BatchRegistry extends BaseWebComponent {
             }
         }
         queues.clear();
-        registrations.clear();
         log.info("BatchRegistry destroyed");
     }
 
