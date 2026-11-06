@@ -10,12 +10,12 @@ import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.view.RedirectView;
 import io.springperf.web.view.View;
 import io.springperf.web.view.ViewResolverRegistry;
+import io.springperf.web.view.retval.ViewReturnValueResolver;
 import org.springframework.core.MethodParameter;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.web.servlet.ModelAndView;
 
-import java.nio.charset.Charset;
 import java.util.Map;
 
 public class ModelAndViewReturnValueResolver extends BaseWebComponent implements ReturnValueResolver {
@@ -57,21 +57,14 @@ public class ModelAndViewReturnValueResolver extends BaseWebComponent implements
             resp.setStatusCode(status);
         }
 
-        View view = resolveView(viewName, req);
+        View view = resolveView(viewName, status, req);
         if (view == null) {
-            return;
+            // 与 String 视图名链路保持一致：不得静默产出空白 200
+            throw new IllegalArgumentException("Unable to resolve view name '" + viewName
+                    + "' with any registered ViewResolver (thymeleaf/freemarker/beetl/jsp)");
         }
 
-        String contentType = view.getContentType();
-        if (contentType != null) {
-            resp.getHeaders().set(HttpHeaders.CONTENT_TYPE, contentType);
-        } else {
-            Charset charset = resp.getCharacterEncoding();
-            if (charset == null) {
-                charset = Charset.forName("UTF-8");
-            }
-            resp.getHeaders().set(HttpHeaders.CONTENT_TYPE, "text/html;charset=" + charset.name());
-        }
+        ViewReturnValueResolver.applyContentType(view, resp);
         resp.setHandled();
 
         Map<String, Object> model = mav.getModel();
@@ -86,9 +79,10 @@ public class ModelAndViewReturnValueResolver extends BaseWebComponent implements
         return Integer.MAX_VALUE - 200;
     }
 
-    private View resolveView(String viewName, WebServerHttpRequest req) {
+    private View resolveView(String viewName, HttpStatus status, WebServerHttpRequest req) {
         if (viewName.startsWith("redirect:")) {
-            return new RedirectView(viewName.substring(9));
+            HttpStatusCode redirectStatus = status != null && status.is3xxRedirection() ? status : HttpStatus.FOUND;
+            return new RedirectView(viewName.substring(9), redirectStatus);
         }
         return viewResolverRegistry.resolve(viewName, req);
     }

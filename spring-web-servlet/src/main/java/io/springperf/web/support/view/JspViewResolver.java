@@ -3,6 +3,7 @@ package io.springperf.web.support.view;
 import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.BaseWebComponent;
 import io.springperf.web.context.PropertiesConstant;
+import io.springperf.web.context.WebContext;
 import io.springperf.web.core.mapping.MappingRegistry;
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.http.WebServerHttpRequest;
@@ -11,6 +12,7 @@ import io.springperf.web.support.servlet.PerfServletConfig;
 import io.springperf.web.support.servlet.ServletInvoker;
 import io.springperf.web.support.servlet.context.PerfServletContext;
 import io.springperf.web.view.View;
+import io.springperf.web.view.ViewProperties;
 import io.springperf.web.view.ViewResolver;
 import lombok.extern.slf4j.Slf4j;
 
@@ -46,6 +48,7 @@ public class JspViewResolver extends BaseWebComponent implements ViewResolver {
 
     private final String prefix;
     private final String suffix;
+    private int order = ViewProperties.JSP_ORDER_DEFAULT;
 
     public JspViewResolver() {
         this("/jsp/", JSP_SUFFIX);
@@ -54,6 +57,21 @@ public class JspViewResolver extends BaseWebComponent implements ViewResolver {
     public JspViewResolver(String prefix, String suffix) {
         this.prefix = prefix;
         this.suffix = suffix;
+    }
+
+    @Override
+    public void initWithWebContext(WebContext webContext) {
+        super.initWithWebContext(webContext);
+        ApplicationProperties props = webContext.getProps();
+        if (props != null) {
+            this.order = ViewProperties.resolveOrder(props, ViewProperties.JSP_ORDER,
+                    ViewProperties.JSP_ORDER_DEFAULT);
+        }
+    }
+
+    @Override
+    public int getOrder() {
+        return order;
     }
 
     @Override

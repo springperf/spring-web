@@ -2,7 +2,7 @@
 
 # 视图渲染（View Rendering）
 
-本框架支持 Spring MVC 风格的服务器端渲染（SSR），内置 Thymeleaf / FreeMarker 模板引擎适配，通过 `spring-web-view` 可选模块提供。API-first 项目无需引入该模块，String 返回值继续保持 JSON 行为，零惊扰。
+本框架支持 Spring MVC 风格的服务器端渲染（SSR），内置 Thymeleaf / FreeMarker / Beetl 模板引擎适配，通过 `spring-web-view` 可选模块提供。未引入该模块的 API-first 项目，String 返回值继续保持 JSON 行为；**一旦引入本模块**，无 `@ResponseBody` 的 String 返回值即视为视图名，若此时没有任何已启用的模板引擎，启动期会直接失败（设置 `spring.web.view.engine=none` 可显式只保留 `redirect:`）。
 
 ---
 
@@ -62,16 +62,26 @@
 | `spring.web.view.engine` | 无（全部可用） | 启用的模板引擎列表（逗号分隔）：`thymeleaf` / `freemarker` / `beetl`；特殊值 `none` = 不注册任何引擎（仅支持 `redirect:`，并跳过「无 ViewResolver」的启动校验）；**不配置则注册 classpath 上所有可用引擎** |
 | `spring.thymeleaf.prefix` | `templates/` | Thymeleaf 模板前缀（classpath 相对路径） |
 | `spring.thymeleaf.suffix` | `.html` | Thymeleaf 模板后缀 |
-| `spring.thymeleaf.cache` | `true` | 是否开启模板缓存（生产开启，开发可设 `false` 热改） |
+| `spring.thymeleaf.cache` | `true` | 模板缓存与「视图名 → View」解析结果缓存；`false` 用于开发期热改 |
+| `spring.thymeleaf.enabled` | `true` | 是否启用；`false` 时该解析器不参与视图解析，也不计入启动期校验 |
+| `spring.thymeleaf.order` | `Integer.MAX_VALUE - 9990` | 视图解析顺序（值小者优先） |
 | `spring.freemarker.prefix` | `templates/` | FreeMarker 模板前缀（classpath 相对路径） |
 | `spring.freemarker.suffix` | `.ftl` | FreeMarker 模板后缀 |
-| `spring.freemarker.cache` | `true` | 是否开启模板缓存 |
+| `spring.freemarker.cache` | `true` | 模板缓存与解析结果缓存 |
+| `spring.freemarker.enabled` | `true` | 是否启用；语义同 Thymeleaf |
+| `spring.freemarker.order` | `Integer.MAX_VALUE - 9980` | 视图解析顺序 |
+| `spring.freemarker.content-type` | `text/html;charset=UTF-8` | 响应 Content-Type；其中的 `charset` 同时决定响应字节编码 |
 | `spring.beetl.prefix` | `templates/` | Beetl 模板前缀（classpath 相对路径） |
 | `spring.beetl.suffix` | `.btl` | Beetl 模板后缀 |
-| `spring.beetl.cache` | `true` | 是否开启模板缓存 |
-| `spring.thymeleaf.encoding` | `UTF-8` | 渲染字符集，同时写入 `Content-Type`；FreeMarker / Beetl 默认 UTF-8（与 Boot 行为一致，无独立编码键） |
+| `spring.beetl.cache` | `true` | 模板缓存与解析结果缓存 |
+| `spring.beetl.enabled` | `true` | 是否启用；语义同 Thymeleaf |
+| `spring.beetl.order` | `Integer.MAX_VALUE - 9970` | 视图解析顺序 |
+| `spring.web.view.jsp.order` | `Integer.MAX_VALUE - 9960` | JSP 视图解析顺序 |
+| `spring.thymeleaf.encoding` | `UTF-8` | **模板文件的读取编码**；响应字符集由 Content-Type 决定，不受此键控制 |
 
 模板默认从 classpath 的 `templates/` 目录加载（Spring Boot 惯例）。
+
+> 内置引擎默认顺序为 Thymeleaf → FreeMarker → Beetl → JSP，可由各自的 `order` 键调整。解析结果（含「模板不存在」）在 `cache=true` 时缓存；运行期新增模板需重启或关闭模板缓存后才可见。
 
 ---
 
@@ -193,7 +203,7 @@ public String save(@ModelAttribute UserForm form) {
 
 ## 五、多引擎共存
 
-多个 `ViewResolver` 可同时注册，在**同一个请求管线**中按 `getOrder()` 顺序依次尝试。每个 ViewResolver 通过"模板存在性探测"决定是否接管某个视图名——自己的 `prefix + viewName + suffix` 模板存在则返回 `View`，否则返回 `null` 交给下一个 resolver。
+多个 `ViewResolver` 可同时注册，在**同一个请求管线**中按 `getOrder()` 顺序依次尝试。内置引擎有确定的默认顺序（Thymeleaf → FreeMarker → Beetl → JSP），可通过各自的 `order` 配置键调整；自定义 resolver 默认排在内置引擎之前。每个 ViewResolver 通过"模板存在性探测"决定是否接管某个视图名——自己的 `prefix + viewName + suffix` 模板存在则返回 `View`，否则返回 `null` 交给下一个 resolver。探测结果与 View 实例在 `cache=true` 时按视图名缓存（FreeMarker 的缓存键额外包含 locale）；`cache=false` 保持每次探测以支持热改。
 
 ```
 /view/hello     → thymeleaf 检查 templates/hello.html  → 存在 → 命中
@@ -201,7 +211,7 @@ public String save(@ModelAttribute UserForm form) {
                  → beetl 检查 templates/hello.btl
 ```
 
-- 同名不同后缀的模板（`hello.html`/`hello.ftl`/`hello.btl`）可共存，哪个存在用哪个，由 order 决定优先顺序
+- 同名不同后缀的模板（`hello.html`/`hello.ftl`/`hello.btl`）可共存，由 order 决定优先顺序；默认值确定，也可用 `spring.{engine}.order` 调整
 - 不同视图名用不同引擎：`hello` → thymeleaf，`report` → freemarker，`page-btl` → beetl，只需各自的模板文件存在
 - `spring.web.view.engine` 不配置时注册全部可用引擎；也可逗号分隔指定子集（如 `thymeleaf,beetl`）
 
@@ -290,7 +300,7 @@ public String jspView(Model model) {
 
 ### 关键说明
 
-1. **String 双语义由注册决定**：仅当注册了 `ViewResolver`（引入引擎依赖）后，无 `@ResponseBody` 的 String 才视为视图名；纯 API 项目行为不变。
+1. **String 双语义由模块引入决定**：不引入 `spring-web-view` 时，String 返回值保持 JSON 行为；一旦引入该模块（即使没有注册任何已启用的引擎），无 `@ResponseBody` 的 String 即视为视图名，且启动期会因「无可用 ViewResolver」而 fail-fast。仅使用 `redirect:` 时设 `spring.web.view.engine=none`。
 2. **线程模型**：模板渲染在 handler 当前线程执行。默认 handler 运行在 `default` 业务线程池；若配置 `pool.default-execute-mode=eventloop` 或方法标注 `@RunInPool(EVENTLOOP)`，渲染会发生在 EventLoop 上，请注意阻塞风险。
 3. **Spring 6.x 类型注意**：Spring 6.x 中 `ModelMap` 不再实现 `Model` 接口，框架统一注入 `ExtendedModelMap`（`ModelMap` 子类且实现 `Model`）以兼容三种参数类型。
 

@@ -22,7 +22,24 @@
       "name": "spring.thymeleaf.cache",
       "type": "java.lang.Boolean",
       "defaultValue": true,
-      "description": "Enable Thymeleaf template cache."
+      "description": "Enable Thymeleaf template cache and the view-name-to-View resolution cache. Set false for hot reload."
+    },
+    {
+      "name": "spring.thymeleaf.enabled",
+      "type": "java.lang.Boolean",
+      "defaultValue": true,
+      "description": "Whether the Thymeleaf view resolver is enabled. A disabled resolver is excluded from startup validation."
+    },
+    {
+      "name": "spring.thymeleaf.order",
+      "type": "java.lang.Integer",
+      "description": "View resolver order (lower wins). Defaults place thymeleaf before freemarker, beetl and jsp."
+    },
+    {
+      "name": "spring.thymeleaf.encoding",
+      "type": "java.lang.String",
+      "defaultValue": "UTF-8",
+      "description": "Character encoding used to read Thymeleaf template files. The response charset comes from the Content-Type."
     },
     {
       "name": "spring.freemarker.prefix",
@@ -40,7 +57,18 @@
       "name": "spring.freemarker.cache",
       "type": "java.lang.Boolean",
       "defaultValue": true,
-      "description": "Enable FreeMarker template cache."
+      "description": "Enable FreeMarker template cache and the view-name-to-View resolution cache. Set false for hot reload."
+    },
+    {
+      "name": "spring.freemarker.enabled",
+      "type": "java.lang.Boolean",
+      "defaultValue": true,
+      "description": "Whether the FreeMarker view resolver is enabled. A disabled resolver is excluded from startup validation."
+    },
+    {
+      "name": "spring.freemarker.order",
+      "type": "java.lang.Integer",
+      "description": "View resolver order (lower wins). Defaults place thymeleaf before freemarker, beetl and jsp."
     },
     {
       "name": "spring.beetl.prefix",
@@ -58,13 +86,7 @@
       "name": "spring.beetl.cache",
       "type": "java.lang.Boolean",
       "defaultValue": true,
-      "description": "Enable Beetl template cache."
-    },
-    {
-      "name": "spring.beetl.mode",
-      "type": "java.lang.String",
-      "defaultValue": "HTML",
-      "description": "Beetl template mode (kept for symmetry with thymeleaf/freemarker)."
+      "description": "Enable Beetl template cache and the view-name-to-View resolution cache. Set false for hot reload."
     },
     {
       "name": "spring.beetl.cache-ttl",
@@ -75,13 +97,17 @@
       "name": "spring.beetl.enabled",
       "type": "java.lang.Boolean",
       "defaultValue": true,
-      "description": "Whether the Beetl view resolver is enabled. When false, resolveViewName returns null."
+      "description": "Whether the Beetl view resolver is enabled. A disabled resolver is excluded from startup validation."
     },
     {
-      "name": "spring.thymeleaf.encoding",
-      "type": "java.lang.String",
-      "defaultValue": "UTF-8",
-      "description": "Character encoding for Thymeleaf template rendering. FreeMarker/Beetl default UTF-8 (no separate key, aligned with Boot)."
+      "name": "spring.beetl.order",
+      "type": "java.lang.Integer",
+      "description": "View resolver order (lower wins). Defaults place thymeleaf before freemarker, beetl and jsp."
+    },
+    {
+      "name": "spring.web.view.jsp.order",
+      "type": "java.lang.Integer",
+      "description": "JSP view resolver order (lower wins). Defaults after thymeleaf, freemarker and beetl."
     }
   ]
 }

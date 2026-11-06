@@ -58,8 +58,17 @@ public class ViewResolverRegistry extends WebComponentContainer {
         }
     }
 
+    /**
+     * 是否存在已启用的视图解析器。禁用（{@code spring.*.enabled=false}）的解析器不计入，
+     * 以便启动期 fail-fast 仍能发现「引入了视图模块但没有任何可用引擎」。
+     */
     public boolean hasViewResolvers() {
-        return !getWebComponents(ViewResolver.class).isEmpty();
+        for (ViewResolver resolver : getWebComponents(ViewResolver.class)) {
+            if (resolver.isEnabled()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public View resolve(String viewName, WebServerHttpRequest req) {
@@ -74,8 +83,9 @@ public class ViewResolverRegistry extends WebComponentContainer {
                     return view;
                 }
             } catch (Exception ex) {
-                // 不吞异常：resolver 初始化失败/解析失败是配置或模板问题，必须可见，避免产出空白 200
-                log.warn("ViewResolver {} failed to resolve view '{}'", resolver.getClass().getName(), viewName, ex);
+                // 保留根因：模板语法错误/初始化失败不能被后续 resolver 的 null 掩盖成泛化 500
+                throw new IllegalStateException("ViewResolver " + resolver.getClass().getName()
+                        + " failed to resolve view '" + viewName + "'", ex);
             }
         }
         return null;

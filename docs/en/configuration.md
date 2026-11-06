@@ -307,23 +307,27 @@ When `spring-boot-starter-actuator` is on the classpath, the framework auto-regi
 | `spring.web.view.engine` | none (all available) | Enabled template engines (comma-separated): `thymeleaf` / `freemarker` / `beetl`; **if unset, all engines on the classpath are registered** |
 | `spring.thymeleaf.prefix` | `templates/` | Thymeleaf template prefix (classpath-relative) |
 | `spring.thymeleaf.suffix` | `.html` | Thymeleaf template suffix |
-| `spring.thymeleaf.cache` | `true` | Template cache (set `false` in development for hot reload) |
+| `spring.thymeleaf.cache` | `true` | Template cache and the view-name-to-View resolution cache (set `false` in development for hot reload) |
 | `spring.thymeleaf.mode` | `HTML` | Template mode (Thymeleaf `TemplateMode`, e.g. `HTML` / `HTML5` / `TEXT`) |
 | `spring.thymeleaf.cache-ttl` | none (`-1`, never expires) | Template cache TTL (Duration style, e.g. `10m`); `<=0` means never expires |
-| `spring.thymeleaf.enabled` | `true` | Whether Thymeleaf is enabled; when `false` the engine takes no part in view resolution |
+| `spring.thymeleaf.enabled` | `true` | Whether Thymeleaf is enabled; when `false` it is excluded from view resolution and startup validation |
+| `spring.thymeleaf.order` | `Integer.MAX_VALUE - 9990` | View resolver order (lower wins) |
 | `spring.freemarker.prefix` | `templates/` | FreeMarker template prefix (classpath-relative) |
 | `spring.freemarker.suffix` | `.ftl` | FreeMarker template suffix |
-| `spring.freemarker.cache` | `true` | Template cache |
+| `spring.freemarker.cache` | `true` | Template cache and the resolution cache |
+| `spring.freemarker.enabled` | `true` | Whether FreeMarker is enabled; same semantics as Thymeleaf |
+| `spring.freemarker.order` | `Integer.MAX_VALUE - 9980` | View resolver order |
 | `spring.freemarker.template-loader-path` | none (falls back to `prefix`) | FreeMarker template loader path; **overrides `prefix` when set** |
 | `spring.freemarker.settings` | none | FreeMarker native settings (key=value pairs, e.g. `datetime_format=yyyy-MM-dd`) |
-| `spring.freemarker.content-type` | `text/html;charset=UTF-8` | Content-Type written by FreeMarker |
+| `spring.freemarker.content-type` | `text/html;charset=UTF-8` | Content-Type written by FreeMarker; its `charset` also determines the response byte encoding |
 | `spring.beetl.prefix` | `templates/` | Beetl template prefix (classpath-relative) |
 | `spring.beetl.suffix` | `.btl` | Beetl template suffix |
-| `spring.beetl.cache` | `true` | Template cache |
-| `spring.beetl.mode` | `HTML` | Beetl template mode (Beetl has no native mode concept; kept for symmetry with the other two engines) |
+| `spring.beetl.cache` | `true` | Template cache and the resolution cache |
 | `spring.beetl.cache-ttl` | none (`-1`, never expires) | Beetl template cache TTL (Duration style); only takes effect when the chosen cache implementation supports TTL (e.g. CaffeineCache) |
-| `spring.beetl.enabled` | `true` | Whether Beetl is enabled; when `false` `resolveViewName` returns null directly |
-| `spring.thymeleaf.encoding` | `UTF-8` | Rendering charset, also written to `Content-Type`; FreeMarker/Beetl default UTF-8 (no separate key, aligned with Boot) |
+| `spring.beetl.enabled` | `true` | Whether Beetl is enabled; when `false` it is excluded from view resolution and startup validation |
+| `spring.beetl.order` | `Integer.MAX_VALUE - 9970` | View resolver order |
+| `spring.web.view.jsp.order` | `Integer.MAX_VALUE - 9960` | JSP view resolver order |
+| `spring.thymeleaf.encoding` | `UTF-8` | Character encoding used to **read template files**; the response charset comes from the Content-Type |
 | `spring.mvc.view.prefix` | `/jsp/` | Prefix for **JSP views only** (aligns with Boot's JSP semantics); template engines use their own `spring.{engine}.prefix` |
 | `spring.mvc.view.suffix` | `.jsp` | Suffix for **JSP views only** |
 

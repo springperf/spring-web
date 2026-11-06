@@ -105,10 +105,12 @@ class ModelAndViewReturnValueResolverTest {
     }
 
     @Test
-    void resolveReturnValue_viewNotFound_returns() throws Exception {
+    void resolveReturnValue_viewNotFound_throws() throws Exception {
         ModelAndView mav = new ModelAndView("missing");
         when(viewResolverRegistry.resolve(eq("missing"), eq(req))).thenReturn(null);
-        resolver.resolveReturnValue(mav, mavParam(), req, resp);
+        assertThrows(IllegalArgumentException.class,
+                () -> resolver.resolveReturnValue(mav, mavParam(), req, resp),
+                "未解析视图不得静默产出空白 200");
         verify(resp, never()).setHandled();
     }
 
@@ -182,6 +184,29 @@ class ModelAndViewReturnValueResolverTest {
 
         verify(resp).setHandled();
         assertTrue(headers.getFirst(HttpHeaders.LOCATION).contains("/app/home"));
+    }
+
+    @Test
+    void resolveReturnValue_redirect_preservesCustom3xxStatus() throws Exception {
+        HttpHeaders headers = new HttpHeaders();
+        when(resp.getHeaders()).thenReturn(headers);
+        when(req.getRequestContext()).thenReturn(requestContext);
+        Map<RequestAttribute<?>, Object> attrs = new HashMap<>();
+        when(requestContext.getAttribute(any(RequestAttribute.class))).thenAnswer(inv -> attrs.get(inv.getArgument(0)));
+        doAnswer(inv -> {
+            attrs.put(inv.getArgument(0), inv.getArgument(1));
+            return null;
+        }).when(requestContext).setAttribute(any(RequestAttribute.class), any());
+        when(req.getWebContext()).thenReturn(webContext);
+        when(webContext.getContextPath()).thenReturn("/app");
+
+        ModelAndView mav = new ModelAndView("redirect:/home");
+        mav.setStatus(HttpStatus.MOVED_PERMANENTLY);
+        resolver.resolveReturnValue(mav, mavParam(), req, resp);
+
+        verify(resp, atLeastOnce()).setStatusCode(HttpStatus.MOVED_PERMANENTLY);
+        verify(resp, never()).setStatusCode(HttpStatus.FOUND);
+        assertNull(headers.getFirst(HttpHeaders.CONTENT_TYPE));
     }
 
     @Test

@@ -22,6 +22,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.method.HandlerMethod;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -29,6 +30,8 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -170,7 +173,7 @@ class ViewReturnValueResolverTest {
         verify(resp).setStatusCode(HttpStatus.FOUND);
         assertTrue(headers.getFirst(HttpHeaders.LOCATION).contains("/api/home"),
                 "302 Location 应含 context-path，实际: " + headers.getFirst(HttpHeaders.LOCATION));
-        assertTrue(headers.getFirst(HttpHeaders.CONTENT_TYPE).startsWith("text/html"));
+        assertNull(headers.getFirst(HttpHeaders.CONTENT_TYPE), "302 无响应体，不应声明 text/html");
     }
 
     @Test
@@ -252,6 +255,61 @@ class ViewReturnValueResolverTest {
 
         ViewReturnValueResolver resolver = buildResolver();
         assertDoesNotThrow(resolver::initComponentPhase2);
+    }
+
+    @Test
+    void applyContentType_customCharset_syncsResponseEncoding() {
+        View view = mock(View.class);
+        when(view.getContentType()).thenReturn("text/html;charset=ISO-8859-1");
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        HttpHeaders headers = new HttpHeaders();
+        when(resp.getHeaders()).thenReturn(headers);
+
+        ViewReturnValueResolver.applyContentType(view, resp);
+
+        assertEquals("text/html;charset=ISO-8859-1", headers.getFirst(HttpHeaders.CONTENT_TYPE));
+        verify(resp).setCharacterEncoding(StandardCharsets.ISO_8859_1);
+    }
+
+    @Test
+    void applyContentType_nullContentType_fallsBackToResponseEncoding() {
+        View view = mock(View.class);
+        when(view.getContentType()).thenReturn(null);
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        HttpHeaders headers = new HttpHeaders();
+        when(resp.getHeaders()).thenReturn(headers);
+        when(resp.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_16BE);
+
+        ViewReturnValueResolver.applyContentType(view, resp);
+
+        assertEquals("text/html;charset=UTF-16BE", headers.getFirst(HttpHeaders.CONTENT_TYPE));
+        assertSame(StandardCharsets.UTF_16BE, resp.getCharacterEncoding());
+    }
+
+    @Test
+    void applyContentType_customContentTypeWithoutCharset_isPreserved() {
+        View view = mock(View.class);
+        when(view.getContentType()).thenReturn("application/xhtml+xml");
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        HttpHeaders headers = new HttpHeaders();
+        when(resp.getHeaders()).thenReturn(headers);
+
+        ViewReturnValueResolver.applyContentType(view, resp);
+
+        assertEquals("application/xhtml+xml", headers.getFirst(HttpHeaders.CONTENT_TYPE),
+                "自定义 Content-Type 应原样保留，不得擅自追加 charset");
+    }
+
+    @Test
+    void applyContentType_redirect_removesContentType() {
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(HttpHeaders.CONTENT_TYPE, "text/html");
+        when(resp.getHeaders()).thenReturn(headers);
+
+        ViewReturnValueResolver.applyContentType(new RedirectView("/home"), resp);
+
+        assertNull(headers.getFirst(HttpHeaders.CONTENT_TYPE));
     }
 
     static class TestController {

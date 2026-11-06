@@ -149,4 +149,21 @@ class RedirectViewTest {
         view.render(model, mockReq(""), resp);
         assertTrue(resp.getHeaders().getFirst(HttpHeaders.LOCATION).contains("i=42"));
     }
+
+    @Test
+    void render_custom3xxStatus_isPreserved() throws Exception {
+        RedirectView view = new RedirectView("/home", HttpStatus.MOVED_PERMANENTLY);
+        WebServerHttpResponse resp = mockResp();
+        view.render(null, mockReq(""), resp);
+        verify(resp).setStatusCode(HttpStatus.MOVED_PERMANENTLY);
+        verify(resp, never()).setStatusCode(HttpStatus.FOUND);
+    }
+
+    @Test
+    void render_nullStatus_fallsBackTo302() throws Exception {
+        RedirectView view = new RedirectView("/home", null);
+        WebServerHttpResponse resp = mockResp();
+        view.render(null, mockReq(""), resp);
+        verify(resp).setStatusCode(HttpStatus.FOUND);
+    }
 }

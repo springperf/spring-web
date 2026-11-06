@@ -133,4 +133,26 @@ class BeetlViewResolverTest {
             resolver.initWithWebContext(ttlContext);
         }, "cache-ttl 配置应正常初始化");
     }
+
+    @Test
+    void resolveViewName_cached_returnsSameViewInstance() throws Exception {
+        BeetlViewResolver resolver = buildResolver();
+        View first = resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class));
+        View second = resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class));
+        assertSame(first, second);
+    }
+
+    @Test
+    void resolveViewName_cacheDisabled_returnsFreshView() throws Exception {
+        when(props.get(ViewProperties.BEETL_CACHE, null)).thenReturn("false");
+        BeetlViewResolver resolver = buildResolver();
+        View first = resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class));
+        View second = resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class));
+        assertNotSame(first, second);
+    }
+
+    @Test
+    void getOrder_defaultIsExplicit() {
+        assertEquals(ViewProperties.BEETL_ORDER_DEFAULT, buildResolver().getOrder());
+    }
 }
