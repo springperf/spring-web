@@ -232,4 +232,40 @@ class ViewResolverRegistryTest {
         registry.initComponentPhase1();
         assertDoesNotThrow(registry::initComponentPhase3);
     }
+
+    @Test
+    void initComponentPhase3_checkOnStartupDisabled_returnsEarly() throws Exception {
+        ApplicationProperties props = mock(ApplicationProperties.class);
+        when(props.get(PropertiesConstant.CONTEXT_PATH, "/")).thenReturn("/");
+        when(props.getBoolean(PropertiesConstant.CHECK_ON_STARTUP, true)).thenReturn(false);
+        WebContext context = new WebContext(mock(DispatcherHandler.class), props);
+        ApplicationContext appCtx = mock(ApplicationContext.class);
+        when(appCtx.getBeansOfType(any())).thenReturn(Collections.emptyMap());
+        context.setCtx(appCtx);
+
+        ViewResolver resolver = mock(ViewResolver.class);
+        when(resolver.getComponentName()).thenReturn("enabledResolver");
+        when(resolver.isEnabled()).thenReturn(true);
+        ViewResolverRegistry reg = new ViewResolverRegistry();
+        reg.registerWebComponent(resolver);
+        reg.initWithWebContext(context);
+        reg.initComponentPhase1();
+        assertDoesNotThrow(reg::initComponentPhase3);
+    }
+
+    @Test
+    void invalidateViewCaches_invokesAllRegisteredResolvers() {
+        ViewResolver r1 = mock(ViewResolver.class);
+        when(r1.getComponentName()).thenReturn("r1");
+        ViewResolver r2 = mock(ViewResolver.class);
+        when(r2.getComponentName()).thenReturn("r2");
+        registry.registerWebComponent(r1);
+        registry.registerWebComponent(r2);
+        registry.initWithWebContext(webContext);
+
+        registry.invalidateViewCaches();
+
+        verify(r1).invalidateCache();
+        verify(r2).invalidateCache();
+    }
 }

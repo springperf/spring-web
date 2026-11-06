@@ -91,7 +91,21 @@ public class ViewResolverRegistry extends WebComponentContainer {
         return null;
     }
 
-    static boolean hasResponseBody(java.lang.reflect.Method method, Class<?> clazz) {
+    /**
+     * 使所有已注册解析器的解析结果缓存失效，用于运行期新增/替换模板后主动刷新。
+     * <p>
+     * 取实时组件列表而非 Phase1 快照，运行期注册的 resolver 也能被覆盖。配置刷新不会重建模板引擎
+     * （{@code spring.thymeleaf.*}、{@code spring.freemarker.*}、{@code spring.beetl.*} 属启动期固化配置），
+     * 本方法只清解析结果缓存。
+     * </p>
+     */
+    public void invalidateViewCaches() {
+        for (ViewResolver resolver : getWebComponents(ViewResolver.class)) {
+            resolver.invalidateCache();
+        }
+    }
+
+    public static boolean hasResponseBody(java.lang.reflect.Method method, Class<?> clazz) {
         return AnnotatedElementUtils.hasAnnotation(method, ResponseBody.class)
                 || AnnotatedElementUtils.hasAnnotation(clazz, ResponseBody.class);
     }

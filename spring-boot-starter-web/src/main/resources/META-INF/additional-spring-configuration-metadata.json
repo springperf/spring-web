@@ -108,6 +108,33 @@
       "name": "spring.web.view.jsp.order",
       "type": "java.lang.Integer",
       "description": "JSP view resolver order (lower wins). Defaults after thymeleaf, freemarker and beetl."
+    },
+    {
+      "name": "spring.thymeleaf.mode",
+      "type": "java.lang.String",
+      "defaultValue": "HTML",
+      "description": "Thymeleaf TemplateMode: HTML, XML, TEXT, JAVASCRIPT, CSS or RAW. Invalid values fail startup."
+    },
+    {
+      "name": "spring.thymeleaf.cache-ttl",
+      "type": "java.time.Duration",
+      "description": "Template cache TTL (Duration style, e.g. 10m); <=0 means never expires."
+    },
+    {
+      "name": "spring.freemarker.template-loader-path",
+      "type": "java.lang.String",
+      "description": "FreeMarker template loader path (classpath-relative); overrides spring.freemarker.prefix when set."
+    },
+    {
+      "name": "spring.freemarker.settings",
+      "type": "java.lang.String",
+      "description": "FreeMarker native settings as comma-separated key=value pairs."
+    },
+    {
+      "name": "spring.freemarker.content-type",
+      "type": "java.lang.String",
+      "defaultValue": "text/html;charset=UTF-8",
+      "description": "Response Content-Type; its charset determines the response byte encoding. Invalid values fail startup."
     }
   ]
 }

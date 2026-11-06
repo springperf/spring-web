@@ -43,6 +43,9 @@
 - **视图渲染解析开销**：模板存在性探测与 View 构造改为按视图名缓存（`cache=false` 保持热改；FreeMarker 缓存键含 locale），不再每请求做 N 次 classpath 查询
 - **视图渲染错误语义**：解析异常保留 cause 不再静默跳过；`ModelAndView` 的未解析视图改为抛异常而非空白 200；Content-Type 与响应编码统一由 `ViewReturnValueResolver.applyContentType()` 决定，302 不再带 `text/html`，并保留 `ModelAndView` 指定的 3xx 状态码
 - **视图配置面**：内置引擎 order 确定且可配（`spring.{engine}.order`、`spring.web.view.jsp.order`）；补 `spring.freemarker.enabled`，禁用引擎不再绕过启动期 fail-fast；移除从未被读取的 `spring.beetl.mode`
+- **视图解析缓存**：同一视图名并发解析只加载一次，解析失败不再被缓存；容量超限改为逐条淘汰而非清空全表；新增 `ViewResolverRegistry.invalidateViewCaches()`，运行期投放新模板后可立即生效
+- **视图配置校验与元数据**：`spring.thymeleaf.mode`、`spring.freemarker.content-type` 的非法值改为启动期以明确异常中断；`spring.web.view.engine` 默认值常量与装配语义对齐；补全 IDE 配置元数据并新增键/默认值一致性测试
+- **视图模块边界文档**：明确该模块是 SpringMVC 兼容适配层（同步渲染、每请求构造 exchange、无输出/片段缓存），说明配置刷新不重建模板引擎、resolver 列表为启动期快照
 
 ## [3.5.7] - 20261008
 

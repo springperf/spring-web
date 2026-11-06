@@ -179,4 +179,21 @@ class ThymeleafViewResolverTest {
         assertInstanceOf(io.springperf.web.view.DefaultWebExchangeProvider.class,
                 resolver.selectProvider(mock(WebServerHttpRequest.class)));
     }
+
+    @Test
+    void initWithWebContext_invalidMode_failsFast() {
+        when(props.get(ViewProperties.THYMELEAF_MODE, ViewProperties.THYMELEAF_MODE_DEFAULT)).thenReturn("HTML5");
+        IllegalStateException ex = assertThrows(IllegalStateException.class, this::buildResolver);
+        assertTrue(ex.getMessage().contains(ViewProperties.THYMELEAF_MODE));
+    }
+
+    @Test
+    void invalidateCache_reloadsView() throws Exception {
+        ThymeleafViewResolver resolver = buildResolver();
+        View first = resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class));
+        assertSame(first, resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class)));
+
+        resolver.invalidateCache();
+        assertNotSame(first, resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class)));
+    }
 }
