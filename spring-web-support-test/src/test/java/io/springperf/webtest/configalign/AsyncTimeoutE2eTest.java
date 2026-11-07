@@ -13,10 +13,9 @@ import org.springframework.web.context.request.async.DeferredResult;
 import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code spring.mvc.async.request-timeout} E2E：超时未完成的 DeferredResult 由框架定时器回收为 504；及时完成则正常 200。
+ * {@code spring.mvc.async.request-timeout} E2E：超时未完成的 DeferredResult 按 Spring 语义回收为 503；及时完成则正常 200。
  */
 @SpringBootTest(classes = { io.springperf.webtest.SupportTestApplication.class,
         AsyncTimeoutE2eTest.AsyncConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "spring.mvc.async.request-timeout=500ms")
@@ -38,9 +37,9 @@ class AsyncTimeoutE2eTest {
                 .execute();
         try {
             int code = resp.code();
-            // Spring MVC 语义：异步超时经 AsyncRequestTimeoutException 映射为 503；
-            // 框架默认超时兜底为 504。两者均表示「异步请求超时回收」。
-            assertTrue(code == 503 || code == 504, "500ms 超时未完成的 DeferredResult 应被框架回收（503/504），实际 " + code);
+            // Spring 语义：异步超时经 AsyncRequestTimeoutException 映射为 503（见 ResponseStatusExceptionResolver）。
+            // 504 只属于 server.http.timeout 的响应超时，本用例未配置该属性，不得接受两种结果。
+            assertEquals(503, code, "500ms 异步超时未完成的 DeferredResult 应被回收为 503，实际 " + code);
         } finally {
             resp.close();
         }

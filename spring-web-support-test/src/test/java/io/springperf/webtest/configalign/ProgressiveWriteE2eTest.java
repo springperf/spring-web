@@ -95,6 +95,8 @@ class ProgressiveWriteE2eTest {
             AtomicLong firstByteAt = new AtomicLong();
             String resp = readAllRecordingFirstByte(s, firstByteAt);
             long firstByteDelay = firstByteAt.get() - start;
+            // 首字节从未到达时 firstByteAt=0，delay 为大负数反而 <1000；先断言确实到达再做时序比较
+            assertTrue(firstByteAt.get() > 0, "首字节必须真正到达，实际 firstByteAt=" + firstByteAt.get());
             assertTrue(firstByteDelay < 1000, "首段应在处理器结束前到达（实测首字节 " + firstByteDelay + "ms，睡眠 1500ms）");
             assertTrue(resp.contains("stage-1") && resp.contains("stage-2"), "两段都应送达，实际:\n" + resp);
             // 线上 header 名大小写不敏感：Netty 常量以小写写出（transfer-encoding），统一按小写比对
@@ -107,7 +109,9 @@ class ProgressiveWriteE2eTest {
         try (Socket s = open()) {
             write(s, "GET /e2e-prog/staged?sleep=200 HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
             String resp = readAllRecordingFirstByte(s, new AtomicLong());
-            assertTrue(!resp.contains("Content-Length:"), "已提交为 chunked 后不得再带 Content-Length（两者互斥），实际:\n" + resp);
+            // 同文件其它用例已按小写比对：Netty 头名以小写写出，大小写敏感会让该断言漏判
+            assertTrue(!resp.toLowerCase().contains("content-length:"),
+                    "已提交为 chunked 后不得再带 Content-Length（两者互斥），实际:\n" + resp);
         }
     }
 

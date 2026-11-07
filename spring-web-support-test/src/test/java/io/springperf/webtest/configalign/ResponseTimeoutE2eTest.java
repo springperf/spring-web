@@ -96,7 +96,7 @@ class ResponseTimeoutE2eTest {
         try (Socket s = open()) {
             write(s, "GET /e2e-timeout/slow?ms=2500 HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
             String resp = readAll(s, 8000);
-            assertTrue(resp.contains("504"), "应先返回 504，实际:\n" + resp);
+            assertTrue(resp.startsWith("HTTP/1.1 504"), "应先返回 504 状态行，实际:\n" + resp);
             assertEquals(1, countStatusLines(resp), "迟到的处理器完成不得补写第二个响应，实际:\n" + resp);
             assertTrue(!resp.contains("slow-done"), "迟到的响应体不得出现在客户端，实际:\n" + resp);
         }
@@ -150,15 +150,11 @@ class ResponseTimeoutE2eTest {
                     "504 响应声明了 Connection: close，同连接不可复用，实际:\n" + first);
             write(s, "GET /e2e-timeout/slow?ms=100 HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
             String second = readAll(s, 6000);
-            // 1s 响应超时在整包负载下仍可能被 100ms 处理器触发，因此 200 与 504 都是可接受的终态；
-            // 但只接受这两种确定状态行，并分别锁定响应体语义，杜绝「任意状态行也算复用」。
-            assertTrue(second.startsWith("HTTP/1.1 200") || second.startsWith("HTTP/1.1 504"),
-                    "504 之后同连接应仍可服务（200 或超时 504 均证明复用），实际:\n" + second);
-            if (second.startsWith("HTTP/1.1 200")) {
-                assertTrue(second.contains("slow-done"), "复用连接上的 200 应带回处理器结果，实际:\n" + second);
-            } else {
-                assertFalse(second.contains("slow-done"), "超时响应不得混入处理器结果，实际:\n" + second);
-            }
+            // 「连接可复用」的唯一证明是第二个请求被正常服务：100ms 处理器若再拿 504，
+            // 说明超时计时器未随新请求重置，属于真实回归，不能因为「也收到了响应」而放行。
+            assertTrue(second.startsWith("HTTP/1.1 200"),
+                    "504 之后同连接应仍能服务第二个请求（200），实际:\n" + second);
+            assertTrue(second.contains("slow-done"), "复用连接上的 200 应带回处理器结果，实际:\n" + second);
             assertEquals(1, countStatusLines(second), "第二个响应不得与前一个拼接，实际:\n" + second);
         }
     }

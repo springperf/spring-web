@@ -194,18 +194,26 @@ class AsyncSseRobustnessE2eTest {
     @Test
     void sse_lateSendErrorAfterCommit_streamNotCorrupted_noHang() throws Exception {
         int baseline = activeRequestRefs();
+        StringBuilder received = new StringBuilder();
         try (Response resp = get("/e2e-rob/sse-late-error")) {
+            assertEquals(200, resp.code());
             // 首块已提交（响应头 + 第一段 SSE 帧已发出）
             String first = resp.body().source().readUtf8Line();
             assertNotNull(first, "应至少收到首段");
-            // 之后业务线程在已提交响应上 sendError：设计要求是「不悬挂、不覆盖已提交流、
-            // 不写第二个终止块」；客户端可能感知为异常截断或错误体，故只断言可读完/不悬挂。
+            assertTrue(first.contains("late-1"), "首段内容应为 late-1，实际: " + first);
+            received.append(first).append('\n');
+            // 已提交响应上的 sendError 允许以截断/关闭收尾，但已读内容仍须满足下方「不污染」断言；
+            // catch 不再等于「本用例通过」。
             try {
-                resp.body().string();
+                received.append(resp.body().source().readUtf8());
             } catch (IOException expectedTruncationOrClose) {
                 // 允许：拒绝写出 → 连接关闭导致客户端读到截断
             }
         }
+        String body = received.toString();
+        assertFalse(body.contains("late-error"), "已提交的 SSE 流不得被迟到 sendError 覆盖为错误体，实际:\n" + body);
+        assertTrue(body.indexOf("late-1", body.indexOf("late-1") + 1) < 0,
+                "首帧不得被重复写入（不得写第二个终止块），实际:\n" + body);
         assertRefsBackTo(baseline);
     }
 
@@ -569,14 +577,20 @@ class AsyncSseRobustnessE2eTest {
     @Test
     void reactive_sourceErrors_streamTruncated_refsBack() throws Exception {
         int baseline = activeRequestRefs();
+        boolean truncated = false;
         try (Response resp = get("/e2e-rob/reactive-error")) {
             assertEquals(200, resp.code());
+            String first = resp.body().source().readUtf8Line();
+            assertNotNull(first, "onError 前应至少送达首个事件");
+            assertTrue(first.contains("rx-e[1]"), "首个事件应含 rx-e[1] 载荷，实际: " + first);
             try {
                 resp.body().string();
             } catch (IOException expectedTruncation) {
                 // onError → completeWithError：以截断示人（同 sse-error 语义）
+                truncated = true;
             }
         }
+        assertTrue(truncated, "onError 必须让客户端读到截断的 chunked 流（不得写 LastHttpContent）");
         assertRefsBackTo(baseline);
     }
 

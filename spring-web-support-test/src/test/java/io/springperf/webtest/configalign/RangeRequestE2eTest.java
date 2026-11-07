@@ -78,7 +78,8 @@ class RangeRequestE2eTest {
         Response resp = get(PATH);
         try {
             assertEquals(200, resp.code());
-            assertNotNull(resp.body().string());
+            // OkHttp 的 string() 永不返回 null（空体为 ""），assertNotNull 恒真，删除该无意义断言；
+            // 本用例的实质断言是下方 Accept-Ranges: bytes。
         } finally {
             resp.close();
         }

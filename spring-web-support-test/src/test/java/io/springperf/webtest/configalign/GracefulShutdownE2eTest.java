@@ -170,7 +170,8 @@ class GracefulShutdownE2eTest {
             } catch (IOException e) {
                 break;
             }
-            if (resp.contains("503")) {
+            // "503" 可能出现在 Content-Length / body / 其它 header 值中，必须锁定状态行
+            if (resp.startsWith("HTTP/1.1 503")) {
                 rejected = resp;
                 break;
             }
@@ -178,7 +179,8 @@ class GracefulShutdownE2eTest {
                 break;
             }
         }
-        assertTrue(rejected != null && rejected.contains("503"), "关闭触发后新请求应被 503 拒绝，实际:\n" + rejected);
+        assertTrue(rejected != null && rejected.startsWith("HTTP/1.1 503"),
+                "关闭触发后新请求应被 503 拒绝，实际:\n" + rejected);
 
         // ---- 在途渐进式请求必须完整送达（关闭不得截断流） ----
         String rest = readAll(a);
@@ -190,7 +192,8 @@ class GracefulShutdownE2eTest {
 
         // ---- 关闭完成后：新连接被拒绝（acceptor 已关） ----
         assertTrue(closed.await(30, TimeUnit.SECONDS), "上下文关闭应在宽限期内完成");
-        assertThrows(Exception.class,
+        // 任意 Exception（DNS/SSL/配置错误）都算通过就无法证明 acceptor 已关闭
+        assertThrows(java.io.IOException.class,
                 () -> CLIENT
                         .newCall(new okhttp3.Request.Builder().url("http://localhost:" + port + "/e2e-gs/ping").build())
                         .execute(),

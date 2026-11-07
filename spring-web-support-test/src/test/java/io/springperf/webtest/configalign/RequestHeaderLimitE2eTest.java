@@ -59,13 +59,16 @@ class RequestHeaderLimitE2eTest {
                 n = in.read(buf);
             } catch (java.net.SocketTimeoutException e) {
                 // 读超时不等于「拒绝」：服务端无响应可能是挂起，不能算通过
-                throw new AssertionError("超限请求头应在 3s 内给出明确拒绝（431/400 或连接关闭），实际读超时", e);
+                throw new AssertionError("超限请求头应在 3s 内给出明确拒绝（400），实际读超时", e);
             } catch (java.net.SocketException e) {
-                n = -1; // 服务端直接关闭 TCP 连接，属于本配置下的合法拒绝
+                // 与读超时同一标准：连接被重置、一个字节都没读到，同样无法证明服务端已明确拒绝
+                throw new AssertionError("超限请求头应在 3s 内给出明确拒绝（400），实际连接被重置", e);
             }
             String response = n > 0 ? new String(buf, 0, n, java.nio.charset.StandardCharsets.UTF_8) : "";
-            assertTrue(n < 0 || response.startsWith("HTTP/1.1 431") || response.startsWith("HTTP/1.1 400"),
-                    "超限请求头应被明确拒绝（431/400 或连接关闭），实际响应: " + response);
+            // 对齐 Netty HttpObjectAggregator：解码失败的请求头由框架回 400 后优雅关闭（不是 431）；
+            // 禁止用「n < 0 / 连接关闭」替代协议断言。
+            assertTrue(response.startsWith("HTTP/1.1 400"),
+                    "超限请求头应返回 400 状态行，实际响应: " + response);
         }
     }
 
