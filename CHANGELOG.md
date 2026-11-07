@@ -53,6 +53,7 @@
 - **视图渲染边界修复**：`PerfWebRequest` 在 https 且无显式端口时返回 443（原固定 80，会让 `@{...}` 生成错误绝对 URL）；三个引擎统一支持「视图名已带后缀」（Thymeleaf 改为向 `TemplateEngine` 传去掉后缀的纯模板名）；`resolveBoolean` 对非 `true`/`false` 值启动期 fail-fast（原静默当 false）
 - **重定向目标与响应编码**：`//host` 协议相对目标不再拼 context-path；新增可选 `spring.web.view.redirect-hosts` 白名单（未配置时不限制，可阻断 userinfo 混淆）；自定义 Content-Type 未带 charset 时补上响应实际编码，避免响应头与 Writer 字节编码错配
 - **视图缓存淘汰与失效**：`ViewCache.trackInsertion` 遇队首仍在加载的条目不再放弃本轮淘汰（放回队尾继续扫描，队列长度做上限防死循环）；`invalidate()` 与 `trackInsertion()` 互斥，避免两个容器的清空与插入交错
+- **显式 Content-Type 与返回值类型不匹配**：`HttpBodyCodecRegistry` 原先静默不写响应体，客户端收到 200 + 空 body；现抛 `HttpMessageNotWritableException` 并由 `ExceptionRegistry` 收敛为 500，与内容协商失败及 Spring MVC 语义一致
 
 ## [3.5.7] - 20261008
 

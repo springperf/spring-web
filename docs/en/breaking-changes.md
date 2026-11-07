@@ -336,5 +336,6 @@ an observable behaviour change:
 | View names that already include the suffix (`hello.html` / `hello.btl`) | supported only by FreeMarker; Thymeleaf / Beetl produced `hello.html.html` / `hello.btl.btl` | all three built-in engines support them. **No migration needed** |
 | Protocol-relative `redirect://host` target | prefixed with a non-empty context path, producing `/app//host` | used as an external target as-is. **No migration needed** |
 | `IWebRequest#getServerPort()` for HTTPS without an explicit port | always returned 80 | returns 443. **No migration needed** |
+| `@ResponseBody` return value with a preset `Content-Type` and no matching `HttpBodyConverter` | silently returned 200 with an empty body; the return value was dropped | throws `HttpMessageNotWritableException`, mapped to 500 by `ExceptionRegistry`. **Migration**: make the preset Content-Type match the return type (use `application/json` for objects), or write the response on the Servlet side and return `void` |
 
 

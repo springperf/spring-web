@@ -323,4 +323,5 @@
 | 带后缀的视图名（`hello.html` / `hello.btl`） | 仅 FreeMarker 支持，Thymeleaf / Beetl 会拼成 `hello.html.html` / `hello.btl.btl` | 三个内置引擎统一支持。**无需迁移** |
 | `redirect://host` 协议相对目标 | 非空 context-path 下被拼成 `/app//host` | 直接作为外部目标使用。**无需迁移** |
 | https 且无显式端口时的 `IWebRequest#getServerPort()` | 固定返回 80 | 返回 443。**无需迁移** |
+| 已显式设置 `Content-Type` 且无匹配 `HttpBodyConverter` 的 `@ResponseBody` 返回值 | 静默返回 200 + 空响应体，返回值被丢弃 | 抛 `HttpMessageNotWritableException`，经 `ExceptionRegistry` 映射为 500。**迁移**：让显式 Content-Type 与返回值类型匹配（返回对象时用 `application/json`），或由 Servlet 侧自行写响应并返回 `void` |
 

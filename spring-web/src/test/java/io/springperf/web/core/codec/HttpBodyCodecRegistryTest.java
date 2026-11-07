@@ -570,7 +570,7 @@ class HttpBodyCodecRegistryTest {
     // ---- writeBody : 边界情况 ----
 
     @Test
-    void writeBody_contentTypeAlreadySet_noConverter_silentlySkips() throws Exception {
+    void writeBody_contentTypeAlreadySet_noConverter_throwsHttpMessageNotWritable() throws Exception {
         stubPathMapping();
         HttpHeaders respHeaders = new HttpHeaders();
         respHeaders.setContentType(MediaType.APPLICATION_XML);
@@ -579,9 +579,14 @@ class HttpBodyCodecRegistryTest {
                 .thenReturn(false);
         registry.converters.add(converter1);
 
-        // 等价旧实现：content-type 已设置但无匹配 converter → 静默不写、不抛异常
-        registry.writeBody("body", parameter, request, response);
+        // 显式 CT + 无匹配 converter 必须显式失败：旧行为是静默返回，客户端拿到 200 空 body
+        HttpMessageNotWritableException ex = assertThrows(HttpMessageNotWritableException.class,
+                () -> registry.writeBody("body", parameter, request, response));
 
+        assertTrue(ex.getMessage().contains("application/xml"),
+                "异常应带预设 Content-Type 上下文，实际 " + ex.getMessage());
+        assertTrue(ex.getMessage().contains(String.class.getName()),
+                "异常应带返回值类型上下文，实际 " + ex.getMessage());
         verify(converter1, never()).write(any(), any(), any(), any(), any(), any(), any());
     }
 

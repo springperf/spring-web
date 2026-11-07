@@ -114,19 +114,36 @@ class ServletBridgeE2eTest extends BaseE2ETest {
 
     @Test
     void setContentType_returnsType() throws IOException {
-        // 端点实际验证的是 response.setContentType() 落到响应头（返回值 Map 在当前实现下不写入 body），
-        // 用两个不同输入锁定「响应头随入参变化」，避免硬编码值也能通过。
+        // 端点由 Servlet 侧自行写出 getContentType() 回读值；响应头与 body 必须同时随入参变化，
+        // 避免硬编码值、或「显式 CT 后返回值被静默丢弃」也能通过。
         assertEquals("text/plain", requestContentType("text/plain"));
         assertEquals("text/html", requestContentType("text/html"));
     }
 
+    @Test
+    void explicitContentType_withoutMatchingConverter_failsLoudly() throws IOException {
+        Request request = new Request.Builder().url(base() + "/servlet-bridge/content-type-conflict").build();
+        try (Response resp = CLIENT.newCall(request).execute()) {
+            String responseBody = resp.body().string();
+            assertEquals(500, resp.code(),
+                    "无匹配 converter 时不得静默返回 200 空 body，应由 ExceptionRegistry 收敛为 500，实际 " + responseBody);
+            assertFalse(responseBody.contains("be-silently-dropped"),
+                    "冲突响应不得包含控制器返回值，实际 " + responseBody);
+        }
+    }
+
     private String requestContentType(String value) throws IOException {
         String requestBody = "{\"contentType\":\"" + value + "\"}";
-        okhttp3.RequestBody body = okhttp3.RequestBody.create(requestBody, okhttp3.MediaType.get("application/json"));
+        RequestBody body = RequestBody.create(requestBody, MediaType.get("application/json"));
         Request request = new Request.Builder().url(base() + "/servlet-bridge/content-type").post(body).build();
         try (Response resp = CLIENT.newCall(request).execute()) {
             assertEquals(200, resp.code());
-            return resp.header("Content-Type");
+            String header = resp.header("Content-Type");
+            String responseBody = resp.body().string();
+            assertEquals(value, header);
+            assertTrue(responseBody.startsWith(value + "|"), "body 应回读 contentType，实际 " + responseBody);
+            assertFalse(responseBody.endsWith("|"), "body 应回读非空 characterEncoding，实际 " + responseBody);
+            return header;
         }
     }
 

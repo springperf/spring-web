@@ -54,6 +54,7 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **View rendering edge cases**: `PerfWebRequest` returns 443 for HTTPS without an explicit port (it returned 80, producing wrong absolute URLs from `@{...}`); all three engines now accept view names that already include the suffix (Thymeleaf passes a suffix-free template name to `TemplateEngine`); `resolveBoolean` aborts startup on values other than `true`/`false` instead of silently treating them as false
 - **Redirect targets and response encoding**: protocol-relative `//host` targets are no longer prefixed with the context path; a new optional `spring.web.view.redirect-hosts` allowlist (unrestricted when unset, rejects userinfo confusion) was added; a custom Content-Type without a charset now gains the actual response charset so the header matches the bytes written by the Writer
 - **View cache eviction and invalidation**: `ViewCache.trackInsertion` no longer abandons eviction when the oldest entry is still loading (it re-queues that entry and keeps scanning, bounded by the queue length); `invalidate()` and `trackInsertion()` are mutually exclusive so clearing and inserting the two containers cannot interleave
+- **Preset Content-Type with no matching converter**: `HttpBodyCodecRegistry` previously wrote nothing and the client received 200 with an empty body; it now throws `HttpMessageNotWritableException`, which `ExceptionRegistry` maps to 500, matching negotiation failures and Spring MVC semantics
 
 ## [3.5.7] - 20261008
 
