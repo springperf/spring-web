@@ -87,8 +87,7 @@ public class ProxyE2eTest {
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            assertTrue(resp.code() >= 400,
-                    "Missing required @RequestParam should return 4xx, got " + resp.code());
+            assertEquals(400, resp.code(), "Missing required @RequestParam should return 400, got " + resp.code());
         }
     }
 

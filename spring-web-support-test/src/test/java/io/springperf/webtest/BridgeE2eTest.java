@@ -238,15 +238,14 @@ public class BridgeE2eTest extends BaseE2ETest {
     @Test
     void async_timeout_triggersWithExplicitWebAsyncTaskTimeout() throws Exception {
         // 端点以 WebAsyncTask 显式配置 100ms 超时，任务沉睡 500ms——超时应在任务完成前触发并打断。
-        // 因此无论框架把超时映射为多少状态码，"too-late" 都不应作为完成结果返回；
-        // 用可证伪断言（而非恒真的"任意状态码都行"）锁定超时确实生效。
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/bridge/async/timeout")
-                .get()
-                .build();
+        // 超时必须同时满足两个条件：映射到超时类状态码（503/504），且任务完成结果不得作为响应返回。
+        // 原写法是 code>=400 || !contains("too-late") 的「或」，任意 4xx/5xx 都能绕过 body 校验。
+        Request req = new Request.Builder().url(baseUrl() + "/bridge/async/timeout").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             String body = resp.body().string();
-            assertTrue(resp.code() >= 400 || !body.contains("too-late"),
+            assertTrue(resp.code() == 503 || resp.code() == 504,
+                    "异步超时应映射为 503/504，实际 code=" + resp.code() + ", body=" + body);
+            assertFalse(body.contains("too-late"),
                     "超时打断后不应返回任务完成结果 'too-late'（code=" + resp.code() + ", body=" + body + "）");
         }
     }

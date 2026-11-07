@@ -184,7 +184,7 @@ class GracefulShutdownE2eTest {
         String rest = readAll(a);
         String full = first + rest;
         assertTrue(full.contains("gs-part-2"), "在途渐进式请求应在优雅关闭期间完整送达，实际:\n" + full);
-        assertTrue(full.contains("connection: close") || full.contains("Connection: close"),
+        assertTrue(full.toLowerCase().contains("connection: close"),
                 "在途请求应以关闭连接收尾，实际:\n" + full);
         a.close();
 

@@ -103,18 +103,18 @@ class ConnectionSemanticsE2eTest {
                     + "Expect: 100-continue\r\n" + "Content-Length: " + json.length() + "\r\n"
                     + "Connection: close\r\n\r\n").getBytes(StandardCharsets.UTF_8));
             out.flush();
-            // 等待 100 Continue
+            // 等待 100 Continue：用例名锁定的是两段式应答，中间响应必须是确定的 100 状态行，
+            // 不允许「没收到 100 就当成合法分支直接返回」，也不允许用子串 contains("100") 弱判。
             String interim = readAll(in, 1);
-            if (!interim.contains("100")) {
-                // 框架可能直接返回最终响应（不中间应答，RFC 允许）——继续校验最终 200
-                assertTrue(interim.contains("HTTP/1.1 200"), "未返回 100 时应直接给出最终响应，实际:\n" + interim);
-                return;
-            }
+            assertTrue(interim.startsWith("HTTP/1.1 100"), "Expect: 100-continue 应先收到 100 中间响应，实际:\n" + interim);
+            assertTrue(interim.contains("Continue"), "100 中间响应应带 Continue reason phrase，实际:\n" + interim);
             // 收到 100 后发送 body
             out.write(json.getBytes(StandardCharsets.UTF_8));
             out.flush();
             String finalResponse = readAll(in, 1);
-            assertTrue(finalResponse.contains("HTTP/1.1 200"), "100-continue 后应返回 200，实际:\n" + finalResponse);
+            assertTrue(finalResponse.startsWith("HTTP/1.1 200"), "100-continue 后应返回 200，实际:\n" + finalResponse);
+            assertTrue(finalResponse.contains("echo:{\"a\":1}"),
+                    "body 必须在 100 之后被完整读取并回显，实际:\n" + finalResponse);
         }
     }
 
@@ -127,7 +127,8 @@ class ConnectionSemanticsE2eTest {
             out.write(("GET /e2e-conn/hit HTTP/1.0\r\n\r\n").getBytes(StandardCharsets.UTF_8));
             out.flush();
             String response = readAll(in, 1);
-            assertTrue(response.contains("HTTP/1."), "HTTP/1.0 无 Host 请求仍应被服务，实际:\n" + response);
+            assertTrue(response.startsWith("HTTP/1.1 200"), "HTTP/1.0 无 Host 请求仍应被服务（200），实际:\n" + response);
+            assertTrue(response.contains("hit-body"), "应回显目标端点内容，实际:\n" + response);
         }
     }
 

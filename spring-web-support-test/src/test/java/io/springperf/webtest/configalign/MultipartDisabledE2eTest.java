@@ -12,7 +12,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
+import java.io.IOException;
 import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -42,8 +44,8 @@ class MultipartDisabledE2eTest {
         try {
             String body = resp.body().string();
             assertEquals(200, resp.code(), body);
-            assertEquals("not-multipart", body.trim(),
-                    "enabled=false 时管线不安装 multipart 聚合器，getParts 应报非 multipart 请求，实际 " + body);
+            assertEquals("not-multipart:Not a multipart request", body.trim(),
+                    "enabled=false 时 getParts() 必须抛出 ServletException(\"Not a multipart request\")，实际 " + body);
         } finally {
             resp.close();
         }
@@ -63,9 +65,12 @@ class MultipartDisabledE2eTest {
         public String parts(HttpServletRequest request) {
             try {
                 return "parts=" + request.getParts().size();
-            } catch (Exception e) {
-                // 对齐 Boot/Tomcat：multipart 关闭后 getParts 报"非 multipart 请求"
-                return "not-multipart";
+            } catch (ServletException e) {
+                // 对齐 Boot/Tomcat：multipart 关闭后 getParts 报"非 multipart 请求"。
+                // 回传框架异常的 message 而非写死字符串，避免把任何无关异常都算作预期结果。
+                return "not-multipart:" + e.getMessage();
+            } catch (IOException e) {
+                return "io-error:" + e.getClass().getName();
             }
         }
     }

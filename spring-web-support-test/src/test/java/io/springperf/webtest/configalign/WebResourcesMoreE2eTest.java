@@ -37,10 +37,21 @@ class WebResourcesMoreE2eTest {
         }
     }
 
+    private String body(String path) throws Exception {
+        okhttp3.Response resp = CLIENT.newCall(new okhttp3.Request.Builder().url(url(path)).build()).execute();
+        try {
+            return resp.body().string();
+        } finally {
+            resp.close();
+        }
+    }
+
     @Test
     void customLocation_servedUnderPathPattern() throws Exception {
         assertEquals(200, code("/res/e2e-custom.txt"),
                 "static-locations=custom-static + path-pattern=/res/** 应命中 /res/e2e-custom.txt");
+        assertEquals("e2e-custom-ok", body("/res/e2e-custom.txt").trim(),
+                "命中 /res/** 时必须真的返回 custom-static 下的资源内容");
     }
 
     @Test

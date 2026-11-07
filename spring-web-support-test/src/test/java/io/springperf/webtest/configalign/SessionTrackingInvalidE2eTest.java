@@ -17,11 +17,7 @@ class SessionTrackingInvalidE2eTest {
 
     @Test
     void invalidTrackingMode_failsFastOnStartup() {
-        // 2.7.x 版本层适配：本用例用裸 SpringApplication 启动，没有 TestContext 的 TestTypeExcludeFilter，
-        // 故包内 @TestConfiguration 会被组件扫描到并注册同名 bean（countingWebMetrics）。master（Boot 3.5 /
-        // Spring 6）同场景不报错，本分支（Boot 2.7 / Spring 5.3）会先抛 BeanDefinitionOverrideException 掩盖
-        // 真正的目标错误 —— 显式允许覆盖，让 tracking-modes 绑定失败如 master 一样浮出。
-        Throwable thrown = assertThrows(Throwable.class,
+        RuntimeException thrown = assertThrows(RuntimeException.class,
                 () -> new SpringApplication(ConfigAlignTestApp.class).run("--server.port=0",
                         "--server.servlet.context-path=/", "--server.servlet.session.tracking-modes=nope",
                         "--spring.main.allow-bean-definition-overriding=true"),

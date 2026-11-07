@@ -18,6 +18,7 @@ import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -143,19 +144,21 @@ class ResponseTimeoutE2eTest {
             write(s, "GET /e2e-timeout/slow?ms=2500 HTTP/1.1\r\nHost: localhost\r\n\r\n");
             // 6s 窗口：504 应在 2.5s 左右到达，留 2.4x 余量抗整包运行时的调度抖动
             String first = readAll(s, 6000);
-            assertTrue(first.contains("504"), "首个请求应 504，实际:\n" + first);
-
-            // 连接保持可用：后续请求应正常响应（除非 504 声明了 Connection: close）
-            if (first.toLowerCase().contains("connection: close")) {
-                return; // 已声明关闭则不再复用
-            }
+            assertTrue(first.startsWith("HTTP/1.1 504"), "首个请求应 504，实际:\n" + first);
+            // 504 若声明 Connection: close，则「同连接可复用」这一契约本身不成立；必须判失败而不是静默跳过复用校验
+            assertFalse(first.toLowerCase().contains("connection: close"),
+                    "504 响应声明了 Connection: close，同连接不可复用，实际:\n" + first);
             write(s, "GET /e2e-timeout/slow?ms=100 HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
             String second = readAll(s, 6000);
-            // 本用例锁定的是「504 之后同连接仍可复用」——即服务端在该连接上**受理并完整回答了**
-            // 第二个请求。1s 响应超时在负载高的整包运行中可能仍被触发（100ms 的处理器被调度延迟），
-            // 那是 fastHandler_unaffected 用例的职责；此处允许 200 或 504，但必须是该连接上的
-            // **完整单一响应**（连接被静默关闭 → 空响应；响应拼接 → 多个状态行，都会失败）。
-            assertTrue(second.contains("HTTP/1.1 "), "504 之后同连接应仍可服务（200 或超时 504 均证明复用），实际:\n" + second);
+            // 1s 响应超时在整包负载下仍可能被 100ms 处理器触发，因此 200 与 504 都是可接受的终态；
+            // 但只接受这两种确定状态行，并分别锁定响应体语义，杜绝「任意状态行也算复用」。
+            assertTrue(second.startsWith("HTTP/1.1 200") || second.startsWith("HTTP/1.1 504"),
+                    "504 之后同连接应仍可服务（200 或超时 504 均证明复用），实际:\n" + second);
+            if (second.startsWith("HTTP/1.1 200")) {
+                assertTrue(second.contains("slow-done"), "复用连接上的 200 应带回处理器结果，实际:\n" + second);
+            } else {
+                assertFalse(second.contains("slow-done"), "超时响应不得混入处理器结果，实际:\n" + second);
+            }
             assertEquals(1, countStatusLines(second), "第二个响应不得与前一个拼接，实际:\n" + second);
         }
     }

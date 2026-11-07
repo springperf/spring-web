@@ -53,7 +53,9 @@ class AccessLogE2eTest {
                     try {
                         // JDK 8 适配：Files.readString 是 JDK 11 API；改为显式 UTF-8 读取（语义等价）
                         sb.append(new String(Files.readAllBytes(p), java.nio.charset.StandardCharsets.UTF_8));
-                    } catch (IOException ignored) {
+                    } catch (IOException e) {
+                        // 日志读取失败必须让用例显式失败：静默跳过会伪装成「日志没写」
+                        throw new java.io.UncheckedIOException("读取访问日志失败: " + p, e);
                     }
                 });
             }

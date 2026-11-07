@@ -17,7 +17,9 @@ import java.time.Duration;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 请求体/响应语义 E2E：chunked（未知长度）请求体、空 body @RequestBody → 400、 缺 Content-Type → 415、204 No Content（ResponseEntity.noContent
@@ -87,7 +89,9 @@ class RequestBodySemanticsE2eTest {
                 .post(RequestBody.create("{\"a\":1}".getBytes(), null)).build()).execute();
         try {
             int code = resp.code();
-            assertEquals(true, code == 415 || code == 400, "缺 Content-Type 的 @RequestBody 应 415（或 400），实际 " + code);
+            String body = resp.body().string();
+            assertTrue(code == 415 || code == 400, "缺 Content-Type 的 @RequestBody 应被拒绝（415/400），实际 " + code);
+            assertFalse(body.contains("keys:"), "缺 Content-Type 时不得把请求体解析成功并执行业务方法，实际 " + body);
         } finally {
             resp.close();
         }

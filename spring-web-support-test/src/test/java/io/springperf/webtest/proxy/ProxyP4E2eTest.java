@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * P4 E2E 测试：produces/consumes 正条件、@CrossOrigin、DeferredResult、
@@ -92,7 +93,7 @@ public class ProxyP4E2eTest {
             assertEquals(200, resp.code());
             String raw = resp.body().string();
             Map<String, Object> body = MAPPER.readValue(raw, Map.class);
-            assertEquals(true, body.get("accepted"));
+            assertTrue(Boolean.TRUE.equals(body.get("accepted")), "consumes=application/json 应接受请求，实际 " + raw);
         }
     }
 

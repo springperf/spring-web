@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * {@code server.max-http-request-header-size} E2E：合并请求头超上限被拒绝， 正常小头请求不受影响。
@@ -56,12 +57,15 @@ class RequestHeaderLimitE2eTest {
             int n;
             try {
                 n = in.read(buf);
-            } catch (java.net.SocketException | java.net.SocketTimeoutException e) {
-                n = -1; // 无响应直接关闭：按"已拒绝"处理
+            } catch (java.net.SocketTimeoutException e) {
+                // 读超时不等于「拒绝」：服务端无响应可能是挂起，不能算通过
+                throw new AssertionError("超限请求头应在 3s 内给出明确拒绝（431/400 或连接关闭），实际读超时", e);
+            } catch (java.net.SocketException e) {
+                n = -1; // 服务端直接关闭 TCP 连接，属于本配置下的合法拒绝
             }
             String response = n > 0 ? new String(buf, 0, n, java.nio.charset.StandardCharsets.UTF_8) : "";
-            boolean rejected = n <= 0 || response.startsWith("HTTP/1.1 4") || response.startsWith("HTTP/1.1 5");
-            assertEquals(true, rejected, "超限请求头应被拒绝（4xx/5xx 或连接关闭），实际响应: " + response);
+            assertTrue(n < 0 || response.startsWith("HTTP/1.1 431") || response.startsWith("HTTP/1.1 400"),
+                    "超限请求头应被明确拒绝（431/400 或连接关闭），实际响应: " + response);
         }
     }
 

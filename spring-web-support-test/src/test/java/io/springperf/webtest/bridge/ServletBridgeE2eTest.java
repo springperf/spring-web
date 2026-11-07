@@ -114,11 +114,19 @@ class ServletBridgeE2eTest extends BaseE2ETest {
 
     @Test
     void setContentType_returnsType() throws IOException {
-        String requestBody = "{\"contentType\":\"text/plain\"}";
+        // 端点实际验证的是 response.setContentType() 落到响应头（返回值 Map 在当前实现下不写入 body），
+        // 用两个不同输入锁定「响应头随入参变化」，避免硬编码值也能通过。
+        assertEquals("text/plain", requestContentType("text/plain"));
+        assertEquals("text/html", requestContentType("text/html"));
+    }
+
+    private String requestContentType(String value) throws IOException {
+        String requestBody = "{\"contentType\":\"" + value + "\"}";
         okhttp3.RequestBody body = okhttp3.RequestBody.create(requestBody, okhttp3.MediaType.get("application/json"));
         Request request = new Request.Builder().url(base() + "/servlet-bridge/content-type").post(body).build();
         try (Response resp = CLIENT.newCall(request).execute()) {
-            assertTrue(resp.isSuccessful());
+            assertEquals(200, resp.code());
+            return resp.header("Content-Type");
         }
     }
 
