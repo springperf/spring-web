@@ -57,11 +57,11 @@
 
 | 类 / Class | 未覆盖行 / Missed | 总行 / Total | 覆盖率 / Coverage |
 |---|---|---|---|
-| FreemarkerViewResolver | 15 | 63 | 76.2% |
 | ViewProperties | 4 | 36 | 88.9% |
 | BeetlViewResolver | 3 | 41 | 92.7% |
 | RedirectView | 2 | 59 | 96.6% |
 | ViewCache | 2 | 51 | 96.1% |
+| ViewResolverRegistry | 1 | 50 | 98% |
 
 ### spring-web-servlet
 
