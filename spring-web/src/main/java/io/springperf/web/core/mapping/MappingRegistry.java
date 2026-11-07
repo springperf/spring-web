@@ -269,8 +269,9 @@ public class MappingRegistry extends WebComponentContainer {
                         pathMatchedCtxs = PathMappingContext.getMatchPathMappingContexts(req);
                         if (pathMatchedCtxs != null && pathMatchedCtxs.length > 0) {
                             if (isMethodMismatch(pathMatchedCtxs, req)) {
-                                // 方法不匹配：停止后续 optimizer 穿透（如 /** catch-all 不应覆盖 405）
-                                return MappingResult.pathMatched(pathMatchedCtxs, true);
+                                // 方法不匹配：停止后续 optimizer 穿透（如 /** catch-all 不应覆盖 405），
+                                // 但 Allow 头仍需列出其它 optimizer 中同样能匹配该路径的映射方法。
+                                return MappingResult.pathMatched(mergePathMatchedContexts(req, pathMatchedCtxs), true);
                             }
                             // 非 method 条件不匹配：记录上下文，但继续检查后续 optimizer（通配符 catch-all）
                         }
@@ -287,8 +288,28 @@ public class MappingRegistry extends WebComponentContainer {
     }
 
     /**
-     * 判定「路径匹配但条件不满足」的具体原因（对齐 Spring MVC 状态码语义）：
-     * consumes 不匹配 → 415、produces 不匹配 → 406，其余按 404 处理。
+     * 405 时补齐 Allow 头所需的上下文：{@code SimpleRouter} 每次 route() 覆盖请求属性，
+     * 首个 optimizer 只能看到自己名下的映射。这里按路径规则从全部注册映射补入其它 optimizer 的上下文，
+     * 仅用于收集允许的方法，不改变路由决策（仍是 405）。
+     */
+    private PathMappingContext[] mergePathMatchedContexts(WebServerHttpRequest req,
+            PathMappingContext[] firstMatched) {
+        List<PathMappingContext> merged = new ArrayList<>();
+        for (PathMappingContext ctx : firstMatched) {
+            merged.add(ctx);
+        }
+        String path = req.getPath();
+        for (PathMappingContext ctx : mappingContextList) {
+            if (merged.contains(ctx) || !PathPatternUtils.getMatcher().match(ctx.getPathRule(), path)) {
+                continue;
+            }
+            merged.add(ctx);
+        }
+        return merged.toArray(new PathMappingContext[0]);
+    }
+
+    /**
+     * 判定「路径匹配但条件不满足」的具体原因（对齐 Spring MVC 状态码语义）： consumes 不匹配 → 415、produces 不匹配 → 406，其余按 404 处理。
      */
     private static MappingResult.MismatchKind resolveConditionMismatch(PathMappingContext[] contexts,
             WebServerHttpRequest req) {
