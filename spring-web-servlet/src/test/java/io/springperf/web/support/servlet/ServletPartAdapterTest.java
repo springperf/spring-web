@@ -66,8 +66,13 @@ class ServletPartAdapterTest {
 
     @Test
     void delete_noOp() throws Exception {
-        ServletPartAdapter adapter = new ServletPartAdapter(mockPart());
+        HttpInputMessagePart part = mockPart();
+        ServletPartAdapter adapter = new ServletPartAdapter(part);
+        org.mockito.Mockito.clearInvocations(part);
+
         assertDoesNotThrow(adapter::delete);
+
+        org.mockito.Mockito.verifyNoInteractions(part);
     }
 
     @Test

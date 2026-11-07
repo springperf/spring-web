@@ -84,7 +84,6 @@ class PerfHttpSessionManagerTest {
         // P0 回归：新 session 必须带上非零 maxInactiveInterval（默认 30 分钟），
         // 否则 InMemoryHttpSessionStorage.isExpired() 恒为 false，session 永不过期 → 无界内存增长。
         PerfHttpSession session = manager.createSession();
-        assertTrue(session.getMaxInactiveInterval() > 0);
         assertEquals(30 * 60, session.getMaxInactiveInterval());
     }
 
@@ -112,11 +111,20 @@ class PerfHttpSessionManagerTest {
 
     @Test
     void saveSession_persistsData() {
-        PerfHttpSession session = manager.createSession();
-        session.setAttribute("key", "value");
-        manager.saveSession(session);
-        PerfHttpSession retrieved = manager.getSession(session.getId());
-        assertEquals("value", retrieved.getAttribute("key"));
+        InMemoryHttpSessionStorage backing = new InMemoryHttpSessionStorage();
+        HttpSessionStorage storage = spy(backing);
+        PerfHttpSessionManager recordingManager = newManagerWithStorage(storage);
+        try {
+            PerfHttpSession session = recordingManager.createSession();
+            session.setAttribute("key", "value");
+
+            recordingManager.saveSession(session);
+
+            verify(storage).saveSession(session.getData());
+            assertEquals("value", recordingManager.getSession(session.getId()).getAttribute("key"));
+        } finally {
+            backing.shutdown();
+        }
     }
 
     /* ==================== 响应结束后的保存：阻塞型存储不得占用 EventLoop ==================== */
@@ -203,6 +211,7 @@ class PerfHttpSessionManagerTest {
             blockingManager.saveSessionAfterResponse(session);
 
             assertFalse(storage.saved.await(200, TimeUnit.MILLISECONDS), "失效会话不得再落盘");
+            assertEquals(0, storage.saveAttempts.get(), "失效/null 会话不得进入存储保存路径");
         } finally {
             blockingManager.destroyComponent();
         }
@@ -211,10 +220,26 @@ class PerfHttpSessionManagerTest {
     @Test
     void saveSessionAfterResponse_inMemoryStorage_savesSynchronously() {
         // 内存存储无阻塞 IO：不上线程池，保存立即可见
-        PerfHttpSession session = manager.createSession();
-        session.setAttribute("k", "v");
-        manager.saveSessionAfterResponse(session);
-        assertEquals("v", manager.getSession(session.getId()).getAttribute("k"));
+        InMemoryHttpSessionStorage backing = new InMemoryHttpSessionStorage();
+        HttpSessionStorage storage = spy(backing);
+        java.util.concurrent.atomic.AtomicReference<Thread> saveThread = new java.util.concurrent.atomic.AtomicReference<>();
+        doAnswer(inv -> {
+            saveThread.set(Thread.currentThread());
+            return null;
+        }).when(storage).saveSession(any());
+        PerfHttpSessionManager recordingManager = newManagerWithStorage(storage);
+        try {
+            PerfHttpSession session = recordingManager.createSession();
+            session.setAttribute("k", "v");
+
+            recordingManager.saveSessionAfterResponse(session);
+
+            verify(storage).saveSession(session.getData());
+            assertSame(Thread.currentThread(), saveThread.get(), "内存存储必须在调用线程同步保存");
+            assertEquals("v", recordingManager.getSession(session.getId()).getAttribute("k"));
+        } finally {
+            backing.shutdown();
+        }
     }
 
     /** 轮询等待条件成立（最长 2s），用于无法用 latch 表达的"后台已执行第 N 次"这类断言。 */
@@ -298,7 +323,7 @@ class PerfHttpSessionManagerTest {
 
     @Test
     void getOrder() {
-        assertTrue(manager.getOrder() < Integer.MAX_VALUE);
+        assertEquals(org.springframework.core.Ordered.LOWEST_PRECEDENCE - 10000, manager.getOrder());
     }
 
     @Test

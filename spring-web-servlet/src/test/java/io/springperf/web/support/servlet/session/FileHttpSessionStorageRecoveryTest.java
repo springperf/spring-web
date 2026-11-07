@@ -56,7 +56,7 @@ class FileHttpSessionStorageRecoveryTest {
     }
 
     @Test
-    void constructor_nullExcludeListFallsBackToEmptySet() {
+    void constructor_nullExcludeListFallsBackToEmptySet() throws Exception {
         FileHttpSessionStorage storage = new FileHttpSessionStorage(tempDir, null);
         opened.add(storage);
 
@@ -64,8 +64,13 @@ class FileHttpSessionStorageRecoveryTest {
         session.setAttribute("user", "alice");
         storage.saveSession(session);
 
-        assertTrue(Files.exists(tempDir.resolve(session.getId() + ".session")),
-                "null 排除名单应回退为空集合，属性仍可正常落盘");
+        Path file = tempDir.resolve(session.getId() + ".session");
+        assertTrue(Files.exists(file), "null 排除名单应回退为空集合，属性仍可正常落盘");
+        try (java.io.ObjectInputStream ois = new java.io.ObjectInputStream(Files.newInputStream(file))) {
+            HttpSessionData restored = (HttpSessionData) ois.readObject();
+            assertEquals("alice", restored.getAttribute("user"), "落盘内容必须包含会话属性");
+            assertEquals(session.getMaxInactiveInterval(), restored.getMaxInactiveInterval());
+        }
     }
 
     @Test

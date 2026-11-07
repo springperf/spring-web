@@ -74,10 +74,16 @@ class PerfServletContextCoverageTest {
 
     @Test
     void attributeNames_containsSetAttributes() {
+        java.util.Set<String> expected = new java.util.HashSet<>(
+                java.util.Collections.list(servletContext.getAttributeNames()));
         servletContext.setAttribute("a", 1);
         servletContext.setAttribute("b", 2);
-        Enumeration<String> names = servletContext.getAttributeNames();
-        assertTrue(names.hasMoreElements());
+
+        java.util.Set<String> names = new java.util.HashSet<>(
+                java.util.Collections.list(servletContext.getAttributeNames()));
+        expected.addAll(java.util.Arrays.asList("a", "b"));
+
+        assertEquals(expected, names, "getAttributeNames 必须恰好包含初始属性与本次写入的 a、b");
     }
 
     /* ==================== Init Parameters ==================== */
@@ -158,8 +164,12 @@ class PerfServletContextCoverageTest {
     }
 
     @Test
-    void virtualServerName_defaultIsLocalhost() {
-        assertEquals("localhost", servletContext.getVirtualServerName());
+    void virtualServerName_readsConfiguredValue() {
+        when(props.get(org.mockito.ArgumentMatchers.eq(
+                io.springperf.web.context.PropertiesConstant.SERVLET_VIRTUAL_SERVER_NAME), anyString()))
+                .thenReturn("edge-1");
+
+        assertEquals("edge-1", servletContext.getVirtualServerName(), "应读取配置的虚拟服务器名，而非默认值回显");
     }
 
     // ==================== server.servlet.encoding.force-request / force-response ====================
@@ -232,11 +242,15 @@ class PerfServletContextCoverageTest {
 
     @Test
     void versions_andNames() {
+        when(props.get(org.mockito.ArgumentMatchers.eq(
+                io.springperf.web.context.PropertiesConstant.SERVLET_APPLICATION_DISPLAY_NAME), anyString()))
+                .thenReturn("custom-app");
+
         assertEquals(6, servletContext.getMajorVersion());
         assertEquals(0, servletContext.getMinorVersion());
         assertEquals(6, servletContext.getEffectiveMajorVersion());
         assertEquals(0, servletContext.getEffectiveMinorVersion());
-        assertEquals("spring-perf-web", servletContext.getServletContextName());
+        assertEquals("custom-app", servletContext.getServletContextName(), "display name 应读取配置值");
         assertEquals("spring-perf-web", servletContext.getServerInfo());
         assertEquals("localhost", servletContext.getVirtualServerName());
         assertNull(servletContext.getContext("/other"));
@@ -326,7 +340,7 @@ class PerfServletContextCoverageTest {
 
     @Test
     void sessionTimeout_defaultAndSettable() {
-        assertTrue(servletContext.getSessionTimeout() > 0);
+        assertEquals(30, servletContext.getSessionTimeout(), "默认 session 超时为 30 分钟");
         servletContext.setSessionTimeout(120);
         assertEquals(120, servletContext.getSessionTimeout());
     }
@@ -493,6 +507,12 @@ class PerfServletContextCoverageTest {
     @Test
     void addListener_acceptsListenerInstance() {
         // 已实例化的监听器可直接注册；运行期注册只对之后发生的事件生效
-        assertDoesNotThrow(() -> servletContext.addListener(mock(javax.servlet.ServletContextListener.class)));
+        javax.servlet.ServletContextListener listener = mock(javax.servlet.ServletContextListener.class);
+        assertDoesNotThrow(() -> servletContext.addListener(listener));
+
+        servletContext.destroyComponent();
+
+        org.mockito.Mockito.verify(listener).contextDestroyed(org.mockito.ArgumentMatchers
+                .argThat(event -> event != null && event.getServletContext() == servletContext));
     }
 }

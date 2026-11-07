@@ -113,8 +113,11 @@ class PerfAsyncContextTest {
 
         context.dispatch("/async-target");
 
+        verify(supportHandler).forward(webRequest, webResponse, "/async-target");
+        org.mockito.InOrder inOrder = inOrder(perfRequest);
+        inOrder.verify(perfRequest).setDispatcherType(javax.servlet.DispatcherType.ASYNC);
         // 分派结束后恢复原值，避免影响同一请求后续代码
-        verify(perfRequest).setDispatcherType(javax.servlet.DispatcherType.REQUEST);
+        inOrder.verify(perfRequest).setDispatcherType(javax.servlet.DispatcherType.REQUEST);
     }
 
     @Test

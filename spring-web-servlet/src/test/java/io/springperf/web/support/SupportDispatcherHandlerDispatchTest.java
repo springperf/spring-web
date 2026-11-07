@@ -91,7 +91,7 @@ class SupportDispatcherHandlerDispatchTest {
 
     @Test
     void getOrder_usesLowestPrecedenceMinusOffset() {
-        assertTrue(handler.getOrder() < Integer.MAX_VALUE);
+        assertEquals(org.springframework.core.Ordered.LOWEST_PRECEDENCE - 30000, handler.getOrder());
     }
 
     @Test
@@ -164,8 +164,12 @@ class SupportDispatcherHandlerDispatchTest {
 
         handler.include(req, resp, "/fragment");
 
-        verify(returnValueResolverRegistry).resolveReturnValue(any(), eq(pathContext), any(), any());
-        assertEquals(HttpStatus.OK, resp.getStatus(), "include 不应修改外层响应状态码");
+        org.mockito.ArgumentCaptor<WebServerHttpResponse> wrapped = org.mockito.ArgumentCaptor
+                .forClass(WebServerHttpResponse.class);
+        verify(returnValueResolverRegistry).resolveReturnValue(any(), eq(pathContext), any(), wrapped.capture());
+        assertNotSame(resp, wrapped.getValue(), "include 必须使用包装响应");
+        wrapped.getValue().setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR);
+        verify(resp, never()).setStatusCode(any(org.springframework.http.HttpStatus.class));
         assertNull(RequestContextHolder.getRequestAttributes());
     }
 

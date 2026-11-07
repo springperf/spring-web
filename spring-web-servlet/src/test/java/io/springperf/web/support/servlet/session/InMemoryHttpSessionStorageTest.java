@@ -98,7 +98,12 @@ class InMemoryHttpSessionStorageTest {
         InMemoryHttpSessionStorage storage = new InMemoryHttpSessionStorage();
         try {
             HttpSessionData data = storage.createSession();
+            data.setAttribute("k", "v");
+
             assertDoesNotThrow(() -> storage.saveSession(data));
+
+            assertSame(data, storage.getSession(data.getId()), "no-op 保存不得替换或移除会话对象");
+            assertEquals("v", storage.getSession(data.getId()).getAttribute("k"));
         } finally {
             storage.shutdown();
         }
@@ -119,10 +124,17 @@ class InMemoryHttpSessionStorageTest {
     }
 
     @Test
-    void shutdown_interruptsCleanupThread() {
+    void shutdown_interruptsCleanupThread() throws Exception {
         InMemoryHttpSessionStorage storage = new InMemoryHttpSessionStorage();
+        java.lang.reflect.Field field = InMemoryHttpSessionStorage.class.getDeclaredField("cleanupThread");
+        field.setAccessible(true);
+        Thread cleanupThread = (Thread) field.get(storage);
+
         assertDoesNotThrow(storage::shutdown);
         assertDoesNotThrow(storage::shutdown, "重复 shutdown 应安全");
+
+        cleanupThread.join(1_000L);
+        assertFalse(cleanupThread.isAlive(), "shutdown 应中断并终止清理线程");
     }
 
     @Test
@@ -135,7 +147,10 @@ class InMemoryHttpSessionStorageTest {
         assertEquals(1, data.getAttribute("a"));
         assertEquals("x", data.getAttribute("b"));
         assertEquals(2, data.getAttributes().size());
-        assertTrue(data.getAttributes() instanceof Map);
+        Map<String, Object> readOnlyAttributes = data.getAttributes();
+        assertThrows(UnsupportedOperationException.class, () -> readOnlyAttributes.put("c", 3),
+                "getAttributes() 必须是只读视图，防止绕过 session 属性事件");
+        assertEquals(2, readOnlyAttributes.size());
         data.removeAttribute("a");
         assertNull(data.getAttribute("a"));
         data.clearAttributes();

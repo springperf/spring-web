@@ -235,6 +235,8 @@ class JspViewResolverTest {
         JspViewResolver resolver = new JspViewResolver();
         resolver.initWithWebContext(webContext);
         assertDoesNotThrow(() -> resolver.initComponentPhase1());
+        verify(webContext).getWebComponent(MappingRegistry.class);
+        verifyNoInteractions(mappingRegistry);
     }
 
     @Test

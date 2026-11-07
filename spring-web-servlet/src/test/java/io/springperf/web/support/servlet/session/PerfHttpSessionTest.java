@@ -98,7 +98,11 @@ class PerfHttpSessionTest {
 
     @Test
     void removeAttribute_notExists_doesNothing() {
+        session.setAttribute("keep", "value");
+
         session.removeAttribute("nonexistent");
+
+        assertEquals("value", session.getAttribute("keep"), "移除不存在的属性不得影响其它属性");
     }
 
     @Test
@@ -185,8 +189,15 @@ class PerfHttpSessionTest {
 
     @Test
     void removeAttribute_nonBindingListener_doesNotCallValueUnbound() {
+        TestBindingListener listener = new TestBindingListener();
+        session.setAttribute("bound", listener);
         session.setAttribute("key", "plain-value");
+
         session.removeAttribute("key");
+
+        assertNull(session.getAttribute("key"), "普通属性应被移除");
+        assertFalse(listener.unbound, "移除普通值不得触发其它属性的 valueUnbound");
+        assertSame(listener, session.getAttribute("bound"));
     }
 
     @Test
@@ -203,7 +214,12 @@ class PerfHttpSessionTest {
     @Test
     void invalidate_nonBindingListener_doesNotCallValueUnbound() {
         session.setAttribute("k1", "plain");
+
         session.invalidate();
+
+        assertTrue(session.isInvalid(), "invalidate 应标记会话失效");
+        assertNull(data.getAttribute("k1"), "invalidate 应清空普通属性");
+        assertThrows(IllegalStateException.class, () -> session.getAttribute("k1"));
     }
 
     // ===================== Listeners =====================
@@ -260,11 +276,13 @@ class PerfHttpSessionTest {
 
     @Test
     void markAccessed_updatesLastAccessedTime() {
-        long before = data.getLastAccessedTime();
+        long before = System.currentTimeMillis();
         session.markAccessed();
-        assertTrue(session.getLastAccessedTime() > before,
-                "markAccessed 应把最后访问时间更新为当前时间（" + before + " -> "
-                        + session.getLastAccessedTime() + "）");
+        long accessed = session.getLastAccessedTime();
+
+        assertTrue(accessed >= before && accessed <= System.currentTimeMillis(),
+                "markAccessed 应把最后访问时间更新为当前墙钟时间（" + accessed + "）");
+        assertNotEquals(data.getCreationTime(), accessed, "不得复用会话创建时间");
     }
 
     @Test
@@ -321,6 +339,7 @@ class PerfHttpSessionTest {
         // 不会把测试变成依赖 sleeps 的脆弱用例。多轮 + 栅栏起跑使漏检概率趋近于 0。
         int threads = 16;
         ExecutorService pool = Executors.newFixedThreadPool(threads);
+        java.util.Queue<Throwable> unexpectedFailures = new java.util.concurrent.ConcurrentLinkedQueue<>();
         try {
             for (int round = 0; round < 200; round++) {
                 SlowIsInvalidData slowData = new SlowIsInvalidData("session-" + round, 1000L);
@@ -342,6 +361,7 @@ class PerfHttpSessionTest {
                                 // Servlet 规范语义：已被其它线程失效的会话重复 invalidate 抛异常
                             }
                         } catch (Throwable t) {
+                            unexpectedFailures.add(t);
                             Thread.currentThread().interrupt();
                         } finally {
                             done.countDown();
@@ -349,6 +369,8 @@ class PerfHttpSessionTest {
                     });
                 }
                 assertTrue(done.await(10, TimeUnit.SECONDS), "round " + round + ": 并发 invalidate 未在超时前完成");
+                assertTrue(unexpectedFailures.isEmpty(),
+                        "round " + round + ": 并发 invalidate 出现非预期异常 " + unexpectedFailures);
                 assertEquals(2, destroyed.get(),
                         "round " + round + ": 并发 invalidate 下 sessionDestroyed 与 onInvalidateCallback 各应恰好触发一次");
             }

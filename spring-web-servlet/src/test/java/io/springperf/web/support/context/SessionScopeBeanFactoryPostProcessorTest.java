@@ -51,6 +51,9 @@ class SessionScopeBeanFactoryPostProcessorTest {
 
         SessionScopeBeanFactoryPostProcessor processor = new SessionScopeBeanFactoryPostProcessor();
         assertDoesNotThrow(() -> processor.postProcessBeanFactory(bf));
+        assertNotNull(bf.getRegisteredScope(SessionScopeBeanFactoryPostProcessor.SESSION_SCOPE_NAME),
+                "无 session bean 时也应注册 scope，避免 getBean 时 scope 缺失");
+        assertEquals("singleton", bf.getBeanDefinition("normalBean").getScope(), "普通 bean 定义不得被改写");
     }
 
     @Test

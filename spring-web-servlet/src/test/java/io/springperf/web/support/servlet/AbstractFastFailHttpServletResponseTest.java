@@ -72,14 +72,24 @@ class AbstractFastFailHttpServletResponseTest {
     }
 
     @Test
-    void ignoreMethods_doNotThrow() {
-        assertDoesNotThrow(() -> response.setCharacterEncoding("UTF-8"));
-        assertDoesNotThrow(() -> response.setContentLength(100));
-        assertDoesNotThrow(() -> response.setContentLengthLong(100L));
-        assertDoesNotThrow(() -> response.setContentType("text/plain"));
-        assertDoesNotThrow(() -> response.setBufferSize(1024));
-        assertDoesNotThrow(() -> response.flushBuffer());
-        assertDoesNotThrow(() -> response.setLocale(Locale.CHINA));
+    void ignoreMethods_doNotThrow() throws Exception {
+        response.setCharacterEncoding("GBK");
+        response.setContentLength(100);
+        response.setContentLengthLong(100L);
+        response.setContentType("text/plain");
+        response.setBufferSize(1024);
+        response.flushBuffer();
+        response.setLocale(Locale.CHINA);
+
+        // no-op setter 不得改变任何可观察状态，也不得让快速失败的方法变成可用
+        assertEquals("UTF-8", response.getCharacterEncoding());
+        assertNull(response.getContentType());
+        assertEquals(0, response.getBufferSize());
+        assertFalse(response.isCommitted());
+        assertEquals(Locale.getDefault(), response.getLocale());
+        assertTrue(response.getHeaderNames().isEmpty());
+        assertEquals(HttpServletResponse.SC_OK, response.getStatus());
+        assertThrows(UnsupportedOperationException.class, response::getWriter);
     }
 
     @Test

@@ -47,7 +47,9 @@ class ServletAdapterContextTest {
         ctx.rebindFrameworkRequest(webRequest);
         ctx.rebindFrameworkResponse(webResponse);
 
-        assertSame(request, ctx.getRequest());
-        assertSame(response, ctx.getResponse());
+        org.mockito.Mockito.verify(request).rebind(webRequest);
+        org.mockito.Mockito.verify(response).rebind(webResponse);
+        assertSame(request, ctx.getRequest(), "rebind 不应替换 servlet 包装器本身");
+        assertSame(response, ctx.getResponse(), "rebind 不应替换 servlet 包装器本身");
     }
 }

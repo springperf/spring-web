@@ -87,10 +87,12 @@ class JspViewTest {
     void render_nullModel_onlyForwards() throws Exception {
         bindAdapter();
         RequestDispatcher dispatcher = mock(RequestDispatcher.class);
-        when(servletRequest.getRequestDispatcher(anyString())).thenReturn(dispatcher);
+        when(servletRequest.getRequestDispatcher("/jsp/c.jsp")).thenReturn(dispatcher);
 
         assertDoesNotThrow(() -> new JspView("/jsp/c.jsp").render(null, req, resp));
 
+        verify(dispatcher).forward(servletRequest, servletResponse);
+        verify(requestContext, never()).setAttribute(anyString(), any());
         verify(resp).setHandled();
     }
 }

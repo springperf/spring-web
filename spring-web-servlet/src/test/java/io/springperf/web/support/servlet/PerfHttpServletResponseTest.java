@@ -97,7 +97,7 @@ class PerfHttpServletResponseTest {
     void getHeaders_returnsCollection() {
         java.util.Collection<String> values = java.util.Arrays.asList("a", "b");
         when(headers.get("X-Custom")).thenReturn((java.util.List<String>) (java.util.List) values);
-        assertTrue(servletResponse.getHeaders("X-Custom").containsAll(values));
+        assertEquals(values, servletResponse.getHeaders("X-Custom"));
     }
 
     @Test
@@ -280,7 +280,11 @@ class PerfHttpServletResponseTest {
 
     @Test
     void setBufferSize_doesNothing() {
-        servletResponse.setBufferSize(8192);
+        clearInvocations(response);
+
+        assertDoesNotThrow(() -> servletResponse.setBufferSize(8192));
+
+        verifyNoInteractions(response);
     }
 
     @Test
@@ -355,14 +359,29 @@ class PerfHttpServletResponseTest {
 
     @Test
     void setDateHeader_formatsAndSetsHeader() {
-        servletResponse.setDateHeader("Date", 0);
-        verify(headers).set(eq("Date"), anyString());
+        long epochMillis = 1_700_000_000_000L;
+        servletResponse.setDateHeader("Date", epochMillis);
+        verify(headers).set(eq("Date"), argThat(value -> isRfc1123Of(value, epochMillis)));
     }
 
     @Test
     void addDateHeader_formatsAndAddsHeader() {
-        servletResponse.addDateHeader("Date", 0);
-        verify(headers).add(eq("Date"), anyString());
+        long epochMillis = 1_700_000_000_000L;
+        servletResponse.addDateHeader("Date", epochMillis);
+        verify(headers).add(eq("Date"), argThat(value -> isRfc1123Of(value, epochMillis)));
+    }
+
+    /** RFC 1123 字符串必须能被解析回原始时间戳，否则说明格式/时区写错。 */
+    private static boolean isRfc1123Of(String value, long epochMillis) {
+        if (value == null) {
+            return false;
+        }
+        try {
+            return java.time.ZonedDateTime.parse(value, java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME)
+                    .toInstant().toEpochMilli() == epochMillis;
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     @Test
@@ -470,13 +489,15 @@ class PerfHttpServletResponseTest {
         verify(response).setCharacterEncoding(java.nio.charset.Charset.forName("GBK"));
     }
 
+    // 未绑定 ServletAdapterContext 时无 session tracking 上下文，URL 必须原样返回；
+    // URL tracking 启用/禁用分支由下方 encodeURL_appendsJSessionId* 用例精确覆盖。
     @Test
-    void encodeURL_returnsUrl() {
+    void encodeURL_withoutAdapterContext_returnsUrlUnchanged() {
         assertEquals("/test", servletResponse.encodeURL("/test"));
     }
 
     @Test
-    void encodeRedirectURL_returnsUrl() {
+    void encodeRedirectURL_withoutAdapterContext_returnsUrlUnchanged() {
         assertEquals("/test", servletResponse.encodeRedirectURL("/test"));
     }
 
@@ -810,7 +831,21 @@ class PerfHttpServletResponseTest {
         Cookie cookie = new Cookie("name", "value");
         servletResponse.addCookie(cookie);
 
-        verify(headers).add(argThat(name -> "Set-Cookie".equals(name)), argThat(value -> value.contains("name=value")));
+        verify(headers).add(argThat(name -> "Set-Cookie".equals(name)),
+                argThat(value -> staticCookieParts(value).equals(new java.util.HashSet<>(java.util.Collections.singletonList("name=value")))));
+    }
+
+    @Test
+    void addCookie_sessionCookie_omitsPersistenceAttributes() {
+        servletResponse.addCookie(new Cookie("name", "value"));
+
+        org.mockito.ArgumentCaptor<String> captor = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(headers).add(eq("Set-Cookie"), captor.capture());
+        String setCookie = captor.getValue();
+        assertFalse(setCookie.contains("Max-Age="),
+                "Servlet 会话 Cookie(maxAge<0) 不应输出 Max-Age；负值会被浏览器视为立即过期，实际 " + setCookie);
+        assertFalse(setCookie.contains("Expires="),
+                "Servlet 会话 Cookie(maxAge<0) 不应输出 Expires，实际 " + setCookie);
     }
 
     @Test
@@ -824,16 +859,27 @@ class PerfHttpServletResponseTest {
         servletResponse.addCookie(cookie);
 
         verify(headers).add(argThat(name -> "Set-Cookie".equals(name)),
-                argThat(value -> value.contains("session=token") && value.contains("Domain=example.com")
-                        && value.contains("Path=/app") && value.contains("Max-Age=3600") && value.contains("Secure")
-                        && value.contains("HTTPOnly")));
+                argThat(value -> staticCookieParts(value).equals(new java.util.HashSet<>(java.util.Arrays.asList(
+                        "session=token", "Domain=example.com", "Path=/app",
+                        "Max-Age=3600", "Secure", "HTTPOnly")))));
+    }
+
+    /**
+     * 解析 Set-Cookie 的静态属性片段；Expires 由 maxAge 动态生成，比较时排除。
+     * 会话 Cookie（maxAge<0）不应出现 Max-Age，此项由下方回归用例显式断言。
+     */
+    private static java.util.Set<String> staticCookieParts(String setCookie) {
+        return java.util.Arrays.stream(setCookie.split("; "))
+                .filter(part -> !part.startsWith("Expires="))
+                .collect(java.util.stream.Collectors.toSet());
     }
 
     @Test
     void addCookie_nullValue_becomesEmpty() {
         Cookie cookie = new Cookie("name", null);
         servletResponse.addCookie(cookie);
-        verify(headers).add(argThat(name -> "Set-Cookie".equals(name)), argThat(value -> value.contains("name=")));
+        verify(headers).add(argThat(name -> "Set-Cookie".equals(name)),
+                argThat(value -> staticCookieParts(value).equals(new java.util.HashSet<>(java.util.Collections.singletonList("name=")))));
     }
 
     @Test
@@ -882,8 +928,8 @@ class PerfHttpServletResponseTest {
 
     @Test
     void getOutputStream_multipleCalls_allowed() throws Exception {
-        assertNotNull(servletResponse.getOutputStream());
-        assertNotNull(servletResponse.getOutputStream());
+        assertSame(servletResponse.getOutputStream(), servletResponse.getOutputStream(),
+                "Servlet 规范：同一响应多次 getOutputStream 必须返回同一实例");
     }
 
     /** 构造只提供 scheme/host/port/requestURI 的适配器上下文（用于相对 location 解析）。 */

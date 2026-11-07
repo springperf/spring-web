@@ -73,7 +73,8 @@ class DynamicRegistrationTest {
 
         IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
                 () -> servletContext.addServlet("dup", mock(Servlet.class)));
-        assertTrue(failure.getMessage().contains("dup"));
+        assertEquals("A servlet registration with name 'dup' already exists in this ServletContext",
+                failure.getMessage());
     }
 
     @Test
@@ -280,7 +281,7 @@ class DynamicRegistrationTest {
         assertThrows(IllegalArgumentException.class, () -> registration.setInitParameter("", "v"));
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> registration.setInitParameter("k", null));
-        assertTrue(ex.getMessage().contains("k"));
+        assertEquals("Init parameter value must not be null: k", ex.getMessage());
     }
 
     @Test

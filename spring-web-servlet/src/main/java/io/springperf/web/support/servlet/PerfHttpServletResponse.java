@@ -380,7 +380,12 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
         if (cookie.getPath() != null) {
             nettyCookie.setPath(cookie.getPath());
         }
-        nettyCookie.setMaxAge(cookie.getMaxAge());
+        // Servlet 语义：maxAge < 0 表示浏览器会话级 Cookie，不下发 Max-Age/Expires。
+        // Netty 用 Long.MIN_VALUE 表示「未设置」；若把 -1 原样传入，会被编码成
+        // "Max-Age=-1; Expires=<now>"，浏览器视为立即过期，默认会话 Cookie 直接失效。
+        if (cookie.getMaxAge() >= 0) {
+            nettyCookie.setMaxAge(cookie.getMaxAge());
+        }
         nettyCookie.setSecure(cookie.getSecure());
         nettyCookie.setHttpOnly(cookie.isHttpOnly());
         if (sameSite != null) {
