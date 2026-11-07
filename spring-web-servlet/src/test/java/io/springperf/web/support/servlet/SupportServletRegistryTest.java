@@ -7,6 +7,7 @@ import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.support.servlet.context.PerfServletContext;
 import jakarta.servlet.Servlet;
 import jakarta.servlet.ServletConfig;
+import jakarta.servlet.annotation.WebInitParam;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import org.junit.jupiter.api.AfterEach;
@@ -17,6 +18,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationContext;
 
+import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -233,5 +235,104 @@ class SupportServletRegistryTest {
 
         assertThrows(IllegalStateException.class, () -> registry.initComponentPhase1(),
                 "同名 servlet 来自两个来源时无法判断用哪个，必须启动失败");
+    }
+
+    // ==================== 退化路径与注解解析 ====================
+
+    @WebServlet(value = "/value-only")
+    static class ValueServlet extends HttpServlet {
+    }
+
+    @WebServlet
+    static class EmptyServlet extends HttpServlet {
+    }
+
+    @WebServlet(urlPatterns = "/params", initParams = {
+            @WebInitParam(name = "k1", value = "v1"), @WebInitParam(name = "k2", value = "v2") })
+    static class ParamServlet extends HttpServlet {
+        ServletConfig config;
+
+        @Override
+        public void init(ServletConfig config) {
+            this.config = config;
+        }
+    }
+
+    private static WebServlet annotationOf(Class<?> type) {
+        return type.getAnnotation(WebServlet.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, String> initParamsOf(WebServlet annotation) throws Exception {
+        Method m = SupportServletRegistry.class.getDeclaredMethod("resolveInitParams", WebServlet.class);
+        m.setAccessible(true);
+        return (Map<String, String>) m.invoke(new SupportServletRegistry(), new Object[] { annotation });
+    }
+
+    @Test
+    void initComponentPhase1_missingMappingRegistry_returnsBeforeTouchingBeans() throws Exception {
+        doReturn(null).when(webContext).getWebComponent(MappingRegistry.class);
+
+        SupportServletRegistry registry = new SupportServletRegistry();
+        registry.initWithWebContext(webContext);
+        registry.initComponentPhase1();
+
+        org.mockito.Mockito.verifyNoInteractions(applicationContext);
+    }
+
+    @Test
+    void initComponentPhase1_missingServletContext_usesLegacyRegistration() throws Exception {
+        ParamServlet servlet = new ParamServlet();
+        doReturn(mappingRegistry).when(webContext).getWebComponent(MappingRegistry.class);
+        doReturn(null).when(webContext).getWebComponent(PerfServletContext.class);
+        doReturn(applicationContext).when(webContext).getCtx();
+        doReturn(Map.of("params", servlet)).when(applicationContext).getBeansOfType(Servlet.class);
+
+        SupportServletRegistry registry = new SupportServletRegistry();
+        registry.initWithWebContext(webContext);
+        registry.initComponentPhase1();
+
+        assertThat(servlet.config).isNotNull();
+        assertThat(servlet.config.getServletContext()).isNull();
+        assertThat(servlet.config.getInitParameter("k1")).isEqualTo("v1");
+        assertThat(servlet.config.getInitParameter("k2")).isEqualTo("v2");
+        verify(mappingRegistry).registerMapping(any(PathMappingContext.class));
+    }
+
+    @Test
+    void initComponentPhase1_missingServletContext_skipsUnannotatedBean() throws Exception {
+        TrackingServlet servlet = new TrackingServlet();
+        doReturn(mappingRegistry).when(webContext).getWebComponent(MappingRegistry.class);
+        doReturn(null).when(webContext).getWebComponent(PerfServletContext.class);
+        doReturn(applicationContext).when(webContext).getCtx();
+        doReturn(Map.of("plain", servlet)).when(applicationContext).getBeansOfType(Servlet.class);
+
+        SupportServletRegistry registry = new SupportServletRegistry();
+        registry.initWithWebContext(webContext);
+        registry.initComponentPhase1();
+
+        assertThat(servlet.initCalls).isZero();
+        verify(mappingRegistry, org.mockito.Mockito.never()).registerMapping(any(PathMappingContext.class));
+    }
+
+    @Test
+    void resolveUrlPatterns_fallsBackToValueAttribute() {
+        assertThat(SupportServletRegistry.resolveUrlPatterns(annotationOf(ValueServlet.class)))
+                .containsExactly("/value-only");
+    }
+
+    @Test
+    void resolveUrlPatterns_emptyAnnotationReturnsNull() {
+        assertThat(SupportServletRegistry.resolveUrlPatterns(annotationOf(EmptyServlet.class))).isNull();
+    }
+
+    @Test
+    void resolveInitParams_handlesNullEmptyAndPopulatedAnnotations() throws Exception {
+        assertThat(initParamsOf(null)).isEmpty();
+        assertThat(initParamsOf(annotationOf(AnnotatedServlet.class))).isEmpty();
+
+        Map<String, String> params = initParamsOf(annotationOf(ParamServlet.class));
+        assertThat(params).hasSize(2).containsEntry("k1", "v1").containsEntry("k2", "v2");
+        assertThat(params.keySet()).containsExactly("k1", "k2");
     }
 }
