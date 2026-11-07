@@ -224,15 +224,10 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
                 });
             } catch (RejectedExecutionException e) {
                 req.release();
-                if (!executor.isShutdown()) {
-                    // 业务线程池负载过高（队列满 + 线程数已达上限），返回 503
-                    // 不在 EventLoop 重试，避免阻塞 I/O 线程拖垮服务器
-                    resp.getHeaders().set(HttpHeaders.RETRY_AFTER, "5");
-                    sendError(resp, HttpStatus.SERVICE_UNAVAILABLE, "Too many requests");
-                } else {
-                    // 优雅关闭中，业务线程池已关闭，直接在 EventLoop 兜底执行
-                    handleWithFilter(req, resp, mappingResult);
-                }
+                // 队列满或优雅关闭中业务池已 shutdown：统一 503，不在 EventLoop 兜底执行业务，
+                // 否则关闭期的慢 handler 会阻塞 I/O 线程（stop() 后新请求本来就返回 503）。
+                resp.getHeaders().set(HttpHeaders.RETRY_AFTER, "5");
+                sendError(resp, HttpStatus.SERVICE_UNAVAILABLE, "Too many requests");
             }
         } else {
             handleWithFilter(req, resp, mappingResult);
@@ -332,11 +327,10 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
         ResponseStatusException ex = new StacklessResponseStatusException(status);
         try {
             exceptionRegistry.handle(ex, req, resp);
-            // advice/异常解析器可能只写 body 不 commit（sendError 才内置 flush）——
-            // 此处兜底提交，否则 @ControllerAdvice 定制的 404/405 响应永不发出（客户端挂死）
-            flushResponse(req, resp);
         } finally {
             interceptorRegistry.afterCompletion(req, resp, ex);
+            // 收尾只在 finally 做一次：advice/异常解析器可能只写 body 不 commit，
+            // 此处兜底提交即可（flushResponse 幂等，try 里再刷一次没有收益）。
             flushResponse(req, resp);
         }
     }
@@ -373,6 +367,15 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
             }
         } catch (Exception e) {
             log.error("CORS preflight handling failed", e);
+            // 内层吞异常会让外层 handleWithNoFullMatch 收不到，客户端只能等请求超时；
+            // 显式写 500。若 CORS 处理器已标记 handled，sendError 会被拒，需再兜底 flush
+            // 提交已写出的状态/内容（flush 由 setCommitted 保证幂等）。
+            sendError(resp, HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error");
+            try {
+                resp.flush();
+            } catch (java.io.IOException flushEx) {
+                log.debug("flush failed after CORS preflight error", flushEx);
+            }
         }
     }
 
@@ -385,17 +388,30 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
             webFilterRegistry.doFilter(req, resp);
         } catch (Throwable ex) {
             // Filter 链内抛异常时，handleAfterFilter（正常路径的上下文初始化点）不会执行。
-            // 这里与 handleAfterFilter 对称：初始化上下文后走异常处理与 afterCompletion，
+            // 这里与 handleAfterFilter 对称：初始化上下文后走异常处理与收尾，
             // 结束时清理，避免异常处理器/拦截器读到 null 或上一线程残留的 ThreadLocal 值。
             initContext = initContextHolders(req, resp);
             try {
                 handleException(ex, req, resp);
-                invokeWithRealResult(req, resp, null, ex);
+                finishFilterException(req, resp, mappingResult, ex);
             } finally {
                 if (initContext) {
                     removeContextHolders(req, resp);
                 }
             }
+        }
+    }
+
+    /** Filter 链异常的收尾：handler 未执行，按 Spring 语义不调 postHandle。 */
+    private void finishFilterException(WebServerHttpRequest req, WebServerHttpResponse resp,
+            MappingResult mappingResult, Throwable ex) {
+        try {
+            interceptorRegistry.afterCompletion(req, resp, ex);
+            publishRequestHandledEvent(req, resp, mappingResult);
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+        } finally {
+            flushResponse(req, resp);
         }
     }
 
