@@ -53,8 +53,11 @@ class JsrWebSocketSessionTest {
     }
 
     @Test
-    void removeMessageHandler_noop() {
+    void removeMessageHandler_unregisteredHandler_onClosedSession_isTolerated() {
+        when(springSession.isOpen()).thenReturn(false);
         session.removeMessageHandler(mock(MessageHandler.class));
+        assertTrue(session.getMessageHandlers().isEmpty(),
+                "已关闭会话上移除未注册 handler 是常见清理动作，不得报错也不得改动注册表");
     }
 
     /* ==================== 动态 MessageHandler 注册 ==================== */
@@ -184,8 +187,8 @@ class JsrWebSocketSessionTest {
     /** 握手协商成功时（如 permessage-deflate）必须如实上报，否则业务误判「压缩未生效」。 */
     @Test
     void getNegotiatedExtensions_mapsNegotiatedExtension() {
-        when(springSession.getExtensions()).thenReturn(java.util.List
-                .of(new WebSocketExtension("permessage-deflate", Map.of("server_no_context_takeover", ""))));
+        when(springSession.getExtensions()).thenReturn(java.util.Collections
+                .singletonList(new WebSocketExtension("permessage-deflate", Collections.singletonMap("server_no_context_takeover", ""))));
 
         java.util.List<javax.websocket.Extension> extensions = session.getNegotiatedExtensions();
 
@@ -500,7 +503,7 @@ class JsrWebSocketSessionTest {
         when(springSession.isOpen()).thenReturn(true);
         JsrCodecRegistry registry = new JsrCodecRegistry(
                 new JsrEndpointConfigAdapter(new JsrEndpointMetadata(TextDecoderEndpoint.class)));
-        JsrWebSocketSession decodable = new JsrWebSocketSession(springSession, container, registry, Map.of());
+        JsrWebSocketSession decodable = new JsrWebSocketSession(springSession, container, registry, Collections.emptyMap());
 
         decodable.addMessageHandler(Pojo.class, (MessageHandler.Whole<Pojo>) pojo -> {
         });
@@ -514,7 +517,7 @@ class JsrWebSocketSessionTest {
         when(springSession.isOpen()).thenReturn(true);
         JsrCodecRegistry registry = new JsrCodecRegistry(
                 new JsrEndpointConfigAdapter(new JsrEndpointMetadata(BinaryDecoderEndpoint.class)));
-        JsrWebSocketSession decodable = new JsrWebSocketSession(springSession, container, registry, Map.of());
+        JsrWebSocketSession decodable = new JsrWebSocketSession(springSession, container, registry, Collections.emptyMap());
 
         decodable.addMessageHandler(BinaryPojo.class, (MessageHandler.Whole<BinaryPojo>) pojo -> {
         });
@@ -586,9 +589,9 @@ class JsrWebSocketSessionTest {
     @Test
     void getOpenSessions_visibleToOtherSessionsOfSameEndpoint() {
         JsrWebSocketContainer shared = new JsrWebSocketContainer();
-        JsrWebSocketSession first = new JsrWebSocketSession(springSession, shared, codecRegistry, Map.of(), "/room");
-        JsrWebSocketSession second = new JsrWebSocketSession(springSession, shared, codecRegistry, Map.of(), "/room");
-        JsrWebSocketSession other = new JsrWebSocketSession(springSession, shared, codecRegistry, Map.of(), "/other");
+        JsrWebSocketSession first = new JsrWebSocketSession(springSession, shared, codecRegistry, Collections.emptyMap(), "/room");
+        JsrWebSocketSession second = new JsrWebSocketSession(springSession, shared, codecRegistry, Collections.emptyMap(), "/room");
+        JsrWebSocketSession other = new JsrWebSocketSession(springSession, shared, codecRegistry, Collections.emptyMap(), "/other");
         shared.registerSession("/room", first);
         shared.registerSession("/room", second);
         shared.registerSession("/other", other);
@@ -608,7 +611,7 @@ class JsrWebSocketSessionTest {
     @Test
     void send_withNettySessionAndNoFlush_usesBatchedPath() throws IOException {
         NettyWebSocketSession netty = mock(NettyWebSocketSession.class);
-        JsrWebSocketSession jsr = new JsrWebSocketSession(netty, container, codecRegistry, Map.of());
+        JsrWebSocketSession jsr = new JsrWebSocketSession(netty, container, codecRegistry, Collections.emptyMap());
 
         jsr.send(new org.springframework.web.socket.TextMessage("batched"), false);
 
@@ -620,7 +623,7 @@ class JsrWebSocketSessionTest {
     @Test
     void send_withFlush_goesStraightToTransport() throws IOException {
         NettyWebSocketSession netty = mock(NettyWebSocketSession.class);
-        JsrWebSocketSession jsr = new JsrWebSocketSession(netty, container, codecRegistry, Map.of());
+        JsrWebSocketSession jsr = new JsrWebSocketSession(netty, container, codecRegistry, Collections.emptyMap());
 
         jsr.send(new org.springframework.web.socket.TextMessage("now"), true);
 
@@ -636,8 +639,8 @@ class JsrWebSocketSessionTest {
 
         Map<String, java.util.List<String>> params = session.getRequestParameterMap();
 
-        assertEquals(java.util.List.of("1"), params.get("a"));
-        assertEquals(java.util.List.of("2"), params.get("b"));
+        assertEquals(java.util.Arrays.asList("1"), params.get("a"));
+        assertEquals(java.util.Arrays.asList("2"), params.get("b"));
         assertEquals(2, params.size(), "空对这一项应被跳过，而不是产生一个空键");
     }
 }

@@ -1,4 +1,5 @@
 package io.springperf.web.websocket.server;
+import java.util.Arrays;
 
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -58,13 +59,13 @@ class WebSocketUpgradePolicyTest {
 
     @Test
     void resolve_perPathOverridesGlobal_andFallsBackWhenRegistrationOrFieldMissing() {
-        WebSocketUpgradePolicy policy = newPolicy(List.of("https://a.example"));
+        WebSocketUpgradePolicy policy = newPolicy(Arrays.asList("https://a.example"));
         WebSocketHandlerRegistration reg = new WebSocketHandlerRegistration(mock(WebSocketHandler.class), "/ws")
                 .setAllowedOrigins("https://b.example").setSubProtocols("v2").setAllowExtensions(false)
                 .setIdleTimeout(1_000).setHeartbeatInterval(2_000).setMessageSizeLimit(4_096);
 
         // per-path 覆盖：每个字段独立生效
-        assertEquals(List.of("https://b.example"), policy.resolveOrigins(reg));
+        assertEquals(Arrays.asList("https://b.example"), policy.resolveOrigins(reg));
         assertEquals("v2", policy.resolveSubProtocols(reg));
         assertFalse(policy.resolveAllowExtensions(reg));
         assertEquals(1_000, policy.resolveIdleTimeout(reg));
@@ -72,7 +73,7 @@ class WebSocketUpgradePolicyTest {
         assertEquals(4_096, policy.resolveMessageSizeLimit(reg));
 
         // 无注册信息（精确匹配但未注册）→ 全部回退全局默认
-        assertEquals(List.of("https://a.example"), policy.resolveOrigins(null));
+        assertEquals(Arrays.asList("https://a.example"), policy.resolveOrigins(null));
         assertEquals("chat", policy.resolveSubProtocols(null));
         assertTrue(policy.resolveAllowExtensions(null));
         assertEquals(30_000, policy.resolveIdleTimeout(null));
@@ -88,10 +89,8 @@ class WebSocketUpgradePolicyTest {
 
     @Test
     void resolveMaxFrameSize_usesPerPathLimitOrLargestDefault() {
-        long largestDefault = Math.max(NettyWebSocketSession.DEFAULT_TEXT_MESSAGE_SIZE_LIMIT,
-                NettyWebSocketSession.DEFAULT_BINARY_MESSAGE_SIZE_LIMIT);
-
-        assertEquals(largestDefault, newPolicy(null).resolveMaxFrameSize(null));
+        assertEquals(64 * 1024L, newPolicy(null).resolveMaxFrameSize(null),
+                "默认最大帧长用硬编码期望值，避免与实现按同一公式自证");
 
         WebSocketHandlerRegistration limited = new WebSocketHandlerRegistration(mock(WebSocketHandler.class), "/ws")
                 .setMessageSizeLimit(4_096);
@@ -100,10 +99,10 @@ class WebSocketUpgradePolicyTest {
         // 0 / 负数在注册对象里等价于「未覆盖」，不能作为解码器上限（否则所有帧都超限）
         WebSocketHandlerRegistration zero = new WebSocketHandlerRegistration(mock(WebSocketHandler.class), "/ws")
                 .setMessageSizeLimit(0);
-        assertEquals(largestDefault, newPolicy(null).resolveMaxFrameSize(zero));
+        assertEquals(64 * 1024L, newPolicy(null).resolveMaxFrameSize(zero));
         WebSocketHandlerRegistration negative = new WebSocketHandlerRegistration(mock(WebSocketHandler.class), "/ws")
                 .setMessageSizeLimit(-1);
-        assertEquals(largestDefault, newPolicy(null).resolveMaxFrameSize(negative));
+        assertEquals(64 * 1024L, newPolicy(null).resolveMaxFrameSize(negative));
     }
 
     @Test
@@ -115,7 +114,7 @@ class WebSocketUpgradePolicyTest {
 
     @Test
     void checkOrigin_emptyListRejectsBrowserButAllowsMissingOriginHeader() {
-        WebSocketUpgradePolicy policy = newPolicy(List.of());
+        WebSocketUpgradePolicy policy = newPolicy(Arrays.asList());
         // 显式空列表 = 只允许不带 Origin 的非浏览器客户端
         assertFalse(policy.checkOrigin(request("https://a.example"), null));
         assertTrue(policy.checkOrigin(request(null), null));
@@ -123,8 +122,8 @@ class WebSocketUpgradePolicyTest {
 
     @Test
     void checkOrigin_wildcardAndExactMatchAccepted_otherOriginsRejected() {
-        assertTrue(newPolicy(List.of("*")).checkOrigin(request("https://any.example"), null));
-        WebSocketUpgradePolicy exact = newPolicy(List.of("https://a.example"));
+        assertTrue(newPolicy(Arrays.asList("*")).checkOrigin(request("https://any.example"), null));
+        WebSocketUpgradePolicy exact = newPolicy(Arrays.asList("https://a.example"));
         assertTrue(exact.checkOrigin(request("https://a.example"), null));
         assertFalse(exact.checkOrigin(request("https://b.example"), null));
     }
@@ -132,7 +131,7 @@ class WebSocketUpgradePolicyTest {
     @Test
     void checkOrigin_perPathConfigurationWins() {
         // 全局拒绝，per-path 放行
-        WebSocketUpgradePolicy policy = newPolicy(List.of("https://a.example"));
+        WebSocketUpgradePolicy policy = newPolicy(Arrays.asList("https://a.example"));
         WebSocketHandlerRegistration allowB = new WebSocketHandlerRegistration(mock(WebSocketHandler.class), "/ws")
                 .setAllowedOrigins("https://b.example");
         assertTrue(policy.checkOrigin(request("https://b.example"), allowB));
@@ -214,5 +213,7 @@ class WebSocketUpgradePolicyTest {
         assertEquals("close", resp.headers().get(HttpHeaderNames.CONNECTION));
         // 拒绝路径不透传请求，必须自己释放（否则每次拒绝泄漏一个引用）
         assertEquals(0, req.refCnt());
+        assertFalse(channel.isOpen(), "sendForbiddenResponse 必须挂 CLOSE listener，拒绝后不能复用连接");
+        assertTrue(channel.closeFuture().isDone(), "关闭必须已完成");
     }
 }

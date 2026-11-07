@@ -11,15 +11,33 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class JsrCodecRegistryTest {
 
-    @ServerEndpoint(value = "/ws", decoders = {MyTextDecoder.class, MyBinaryDecoder.class},
-            encoders = {MyTextEncoder.class, MyBinaryEncoder.class})
-    static class Endpoint {}
+    private static final java.util.concurrent.atomic.AtomicInteger DESTROY_COUNT =
+            new java.util.concurrent.atomic.AtomicInteger();
+
+    @ServerEndpoint(value = "/ws", decoders = { MyTextDecoder.class, MyBinaryDecoder.class }, encoders = {
+            MyTextEncoder.class, MyBinaryEncoder.class })
+    static class Endpoint {
+    }
 
     public static class MyTextDecoder implements Decoder.Text<MyPojo> {
-        @Override public MyPojo decode(String s) { return new MyPojo(s.toUpperCase()); }
-        @Override public boolean willDecode(String s) { return true; }
-        @Override public void init(EndpointConfig config) {}
-        @Override public void destroy() {}
+        @Override
+        public MyPojo decode(String s) {
+            return new MyPojo(s.toUpperCase());
+        }
+
+        @Override
+        public boolean willDecode(String s) {
+            return true;
+        }
+
+        @Override
+        public void init(EndpointConfig config) {
+        }
+
+        @Override
+        public void destroy() {
+            DESTROY_COUNT.incrementAndGet();
+        }
     }
 
     public static class MyBinaryDecoder implements Decoder.Binary<MyPojo> {
@@ -28,23 +46,51 @@ class JsrCodecRegistryTest {
             b.get(arr);
             return new MyPojo(new String(arr, StandardCharsets.UTF_8));
         }
-        @Override public boolean willDecode(ByteBuffer b) { return true; }
-        @Override public void init(EndpointConfig config) {}
-        @Override public void destroy() {}
+
+        @Override
+        public boolean willDecode(ByteBuffer b) {
+            return true;
+        }
+
+        @Override
+        public void init(EndpointConfig config) {
+        }
+
+        @Override
+        public void destroy() {
+            DESTROY_COUNT.incrementAndGet();
+        }
     }
 
     public static class MyTextEncoder implements Encoder.Text<MyPojo> {
-        @Override public String encode(MyPojo o) { return o.getValue(); }
-        @Override public void init(EndpointConfig config) {}
-        @Override public void destroy() {}
+        @Override
+        public String encode(MyPojo o) {
+            return o.getValue();
+        }
+
+        @Override
+        public void init(EndpointConfig config) {
+        }
+
+        @Override
+        public void destroy() {
+            DESTROY_COUNT.incrementAndGet();
+        }
     }
 
     public static class MyBinaryEncoder implements Encoder.Binary<MyPojo> {
         @Override public ByteBuffer encode(MyPojo o) {
             return ByteBuffer.wrap(o.getValue().getBytes(StandardCharsets.UTF_8));
         }
-        @Override public void init(EndpointConfig config) {}
-        @Override public void destroy() {}
+
+        @Override
+        public void init(EndpointConfig config) {
+        }
+
+        @Override
+        public void destroy() {
+            DESTROY_COUNT.incrementAndGet();
+        }
     }
 
     public static class MySubBinaryDecoder implements Decoder.Binary<MyPojoSub> {
@@ -53,9 +99,20 @@ class JsrCodecRegistryTest {
             b.get(arr);
             return new MyPojoSub(new String(arr, StandardCharsets.UTF_8));
         }
-        @Override public boolean willDecode(ByteBuffer b) { return true; }
-        @Override public void init(EndpointConfig config) {}
-        @Override public void destroy() {}
+
+        @Override
+        public boolean willDecode(ByteBuffer b) {
+            return true;
+        }
+
+        @Override
+        public void init(EndpointConfig config) {
+        }
+
+        @Override
+        public void destroy() {
+            DESTROY_COUNT.incrementAndGet();
+        }
     }
 
     public static class MyPojo {
@@ -140,6 +197,8 @@ class JsrCodecRegistryTest {
         JsrCodecRegistry.EncodedPayload payload = registry.encode(new MyPojo("x"), true);
         assertFalse(payload.isText());
         assertNotNull(payload.getBinary());
+        assertEquals("x", StandardCharsets.UTF_8.decode(payload.getBinary().duplicate()).toString(),
+                "二进制编码器必须产出真实编码内容");
     }
 
     @Test
@@ -148,6 +207,8 @@ class JsrCodecRegistryTest {
         JsrCodecRegistry.EncodedPayload payload = registry.encode(new MyPojo("x"), false);
         assertFalse(payload.isText());
         assertNotNull(payload.getBinary());
+        assertEquals("x", StandardCharsets.UTF_8.decode(payload.getBinary().duplicate()).toString(),
+                "优先二进制时也必须产出真实编码内容");
     }
 
     @Test
@@ -160,8 +221,13 @@ class JsrCodecRegistryTest {
 
     @Test
     void destroy_invokesDestroyOnInstances() {
+        DESTROY_COUNT.set(0);
         JsrCodecRegistry registry = registry(Endpoint.class);
-        assertDoesNotThrow(registry::destroy);
+
+        registry.destroy();
+
+        assertEquals(4, DESTROY_COUNT.get(),
+                "Endpoint 声明的 2 个 Decoder + 2 个 Encoder 都必须各调用一次 destroy()");
     }
 
     @Test
@@ -178,10 +244,24 @@ class JsrCodecRegistryTest {
     }
 
     public static class MySubTextDecoder implements Decoder.Text<MyPojoSub> {
-        @Override public MyPojoSub decode(String s) { return new MyPojoSub(s.toUpperCase()); }
-        @Override public boolean willDecode(String s) { return true; }
-        @Override public void init(EndpointConfig config) {}
-        @Override public void destroy() {}
+        @Override
+        public MyPojoSub decode(String s) {
+            return new MyPojoSub(s.toUpperCase());
+        }
+
+        @Override
+        public boolean willDecode(String s) {
+            return true;
+        }
+
+        @Override
+        public void init(EndpointConfig config) {
+        }
+
+        @Override
+        public void destroy() {
+            DESTROY_COUNT.incrementAndGet();
+        }
     }
 
     @Test
@@ -256,10 +336,26 @@ class JsrCodecRegistryTest {
     }
 
     public static class NoNoArgDecoder implements Decoder.Text<MyPojo> {
-        public NoNoArgDecoder(String arg) {}
-        @Override public MyPojo decode(String s) { return null; }
-        @Override public boolean willDecode(String s) { return true; }
-        @Override public void init(EndpointConfig config) {}
-        @Override public void destroy() {}
+        public NoNoArgDecoder(String arg) {
+        }
+
+        @Override
+        public MyPojo decode(String s) {
+            return null;
+        }
+
+        @Override
+        public boolean willDecode(String s) {
+            return true;
+        }
+
+        @Override
+        public void init(EndpointConfig config) {
+        }
+
+        @Override
+        public void destroy() {
+            DESTROY_COUNT.incrementAndGet();
+        }
     }
 }

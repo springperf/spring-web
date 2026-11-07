@@ -1,4 +1,5 @@
 package io.springperf.web.websocket.jsr;
+import java.util.Arrays;
 
 import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
@@ -94,7 +95,7 @@ class JsrEndpointWebSocketHandlerIntegrationTest {
         handler.handleMessage(springSession, new TextMessage("hello"));
 
         assertEquals(java.util.Arrays.asList("room-7:hello"), TestEchoEndpoint.MESSAGES);
-        verify(springSession).sendMessage(any(TextMessage.class));
+        verify(springSession).sendMessage(new TextMessage("echo:room-7:hello"));
     }
 
     @Test
@@ -126,7 +127,7 @@ class JsrEndpointWebSocketHandlerIntegrationTest {
         channel = new EmbeddedChannel();
         channel.pipeline().addLast(new HttpServerCodec());
         channel.pipeline().addLast(new HttpObjectAggregator(64 * 1024));
-        channel.pipeline().addLast(new WebSocketRoutingHandler(Map.of("/ws/jsr/origin", guarded), null, false, null));
+        channel.pipeline().addLast(new WebSocketRoutingHandler(Collections.singletonMap("/ws/jsr/origin", guarded), null, false, null));
 
         channel.pipeline().fireChannelRead(upgradeRequest("/ws/jsr/origin"));
         channel.runPendingTasks();

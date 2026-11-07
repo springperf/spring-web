@@ -60,7 +60,7 @@ class SpringHeadersConversionTest {
         assertEquals("v", headers.getFirst("x-new"));
 
         headers.set("X-Multi", "only");
-        assertEquals(List.of("only"), headers.get("x-multi"));
+        assertEquals(Arrays.asList("only"), headers.get("x-multi"));
     }
 
     @Test

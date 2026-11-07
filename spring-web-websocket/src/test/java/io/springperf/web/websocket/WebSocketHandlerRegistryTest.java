@@ -1,8 +1,11 @@
 package io.springperf.web.websocket;
+import java.util.Arrays;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -61,6 +64,8 @@ class WebSocketHandlerRegistryTest {
         WebSocketHandlerRegistry registry = new WebSocketHandlerRegistry();
         registry.setAllowedOrigins("http://a.com", "http://b.com");
         assertEquals(2, registry.getAllowedOrigins().size());
+        assertEquals(Arrays.asList("http://a.com", "http://b.com"), registry.getAllowedOrigins(),
+                "允许的 Origin 必须按传入顺序精确保留，不能只校验数量");
     }
 
     @Test

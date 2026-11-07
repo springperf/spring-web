@@ -106,6 +106,11 @@ class NettyWebSocketSessionBackpressureTest {
         channel.runPendingTasks();
 
         assertTrue(completion.isCompletedExceptionally(), "溢出时 future 必须异常完成，否则调用方以为发出去了");
+        java.util.concurrent.ExecutionException cause = org.junit.jupiter.api.Assertions.assertThrows(
+                java.util.concurrent.ExecutionException.class, completion::get);
+        assertTrue(cause.getCause() instanceof java.io.IOException, "溢出失败原因必须是 IOException");
+        assertTrue(cause.getCause().getMessage().contains("overflow (100 frames)"),
+                "失败原因必须写明队列溢出，实际：" + cause.getCause().getMessage());
         channel.finishAndReleaseAll();
     }
 
@@ -121,7 +126,9 @@ class NettyWebSocketSessionBackpressureTest {
         channel.runPendingTasks();
 
         Queue<WebSocketFrame> queue = backpressureQueueOf(channel);
-        assertTrue(queue == null || queue.isEmpty(), "无法转成帧的消息不应占用背压队列");
+        assertTrue(queue != null, "背压队列应随通道创建，不能用「队列不存在」兜底");
+        assertTrue(queue.isEmpty(), "无法转成帧的消息不应占用背压队列");
+        assertNull(channel.readOutbound(), "不可转换的消息不得写出任何帧");
         channel.finishAndReleaseAll();
     }
 

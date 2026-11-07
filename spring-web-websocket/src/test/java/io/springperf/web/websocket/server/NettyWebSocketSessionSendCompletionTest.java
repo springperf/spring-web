@@ -74,6 +74,9 @@ class NettyWebSocketSessionSendCompletionTest {
         Throwable cause = completion.handle((v, e) -> e).join();
         assertInstanceOf(IOException.class, cause);
         assertNotNull(cause.getCause(), "原始 RejectedExecutionException 必须作为 cause 保留");
+        assertInstanceOf(java.util.concurrent.RejectedExecutionException.class, cause.getCause(),
+                "cause 必须是原始拒绝异常本身");
+        assertEquals("shutting down", cause.getCause().getMessage(), "cause 不能是被重新包装过的异常");
     }
 
     @Test
@@ -81,22 +84,32 @@ class NettyWebSocketSessionSendCompletionTest {
         // execute 什么都不做：帧永远写不出去，等待方只能被中断唤醒
         EventLoop eventLoop = mock(EventLoop.class);
         when(eventLoop.inEventLoop()).thenReturn(false);
+        java.util.concurrent.CountDownLatch dispatched = new java.util.concurrent.CountDownLatch(1);
+        doAnswer(invocation -> {
+            dispatched.countDown();
+            return null;
+        }).when(eventLoop).execute(any());
         NettyWebSocketSession session = newSession(dispatchChannel(eventLoop));
 
         AtomicReference<Throwable> failure = new AtomicReference<>();
+        java.util.concurrent.atomic.AtomicBoolean flagRestored = new java.util.concurrent.atomic.AtomicBoolean(false);
         Thread worker = new Thread(() -> {
             try {
                 session.sendMessageAndWait(new TextMessage("x"));
             } catch (Throwable t) {
                 failure.set(t);
+                // JDK8 在线程终止时会清除中断标志，必须在抛出点当场采样
+                flagRestored.set(Thread.currentThread().isInterrupted());
             }
         }, "ws-send-interrupt-test");
         worker.start();
+        assertTrue(dispatched.await(2, java.util.concurrent.TimeUnit.SECONDS),
+                "发送任务必须已投递，否则 interrupt 时机不确定");
         worker.interrupt();
         worker.join(5_000);
 
         assertInstanceOf(IOException.class, failure.get(), "中断必须转成 IOException，符合 Spring 的 sendMessage 契约");
-        assertTrue(worker.isInterrupted(), "中断标志必须被恢复，不能把 InterruptedException 吞掉");
+        assertTrue(flagRestored.get(), "中断标志必须被恢复，不能把 InterruptedException 吞掉");
     }
 
     @Test

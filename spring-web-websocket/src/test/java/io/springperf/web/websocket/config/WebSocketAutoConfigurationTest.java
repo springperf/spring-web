@@ -37,6 +37,8 @@ class WebSocketAutoConfigurationTest {
         WebSocketRoutingHandler handler = config.webSocketRoutingHandler(registry, customizer, Arrays.asList());
         assertNotNull(handler);
         // 无端点时不注入 customizer
+        assertTrue(customizer.getAfterAggregatorHandlers().isEmpty(),
+                "无端点时不应向 afterAggregator 注入任何 handler");
     }
 
     @Test

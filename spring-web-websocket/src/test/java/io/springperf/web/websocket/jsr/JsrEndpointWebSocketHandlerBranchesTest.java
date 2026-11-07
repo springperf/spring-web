@@ -1,4 +1,5 @@
 package io.springperf.web.websocket.jsr;
+import java.util.Arrays;
 
 import javax.websocket.CloseReason;
 import javax.websocket.Decoder;
@@ -87,14 +88,20 @@ class JsrEndpointWebSocketHandlerBranchesTest {
     @ServerEndpoint("/config-close")
     public static class ConfigCloseEndpoint {
         public static final AtomicReference<String> OPEN_CONFIG = new AtomicReference<>();
+        public static final AtomicReference<EndpointConfig> OPEN_CONFIG_OBJECT = new AtomicReference<>();
+        public static final AtomicReference<CloseReason> CLOSE_REASON = new AtomicReference<>();
+        public static final AtomicInteger CLOSE_INVOCATIONS = new AtomicInteger();
 
         @OnOpen
         public void onOpen(Session session, EndpointConfig config) {
             OPEN_CONFIG.set(config.toString());
+            OPEN_CONFIG_OBJECT.set(config);
         }
 
         @OnClose
         public void onClose(CloseReason reason) {
+            CLOSE_REASON.set(reason);
+            CLOSE_INVOCATIONS.incrementAndGet();
         }
     }
 
@@ -221,11 +228,11 @@ class JsrEndpointWebSocketHandlerBranchesTest {
         assertEquals("room-7", template[1], "@PathParam 槽位同样在连接建立时固定");
 
         handler.handleMessage(session, new TextMessage("a"));
-        assertEquals(List.of("room-7:a:true"), SessionPathEndpoint.SEEN);
+        assertEquals(Arrays.asList("room-7:a:true"), SessionPathEndpoint.SEEN);
         assertNull(template[2], "派发结束后必须清空消息槽位，否则上一帧的 payload 会一直挂在连接状态上");
 
         handler.handleMessage(session, new TextMessage("b"));
-        assertEquals(List.of("room-7:a:true", "room-7:b:true"), SessionPathEndpoint.SEEN);
+        assertEquals(Arrays.asList("room-7:a:true", "room-7:b:true"), SessionPathEndpoint.SEEN);
         assertSame(template, handler.onMessageArgsOf(session), "实参数组必须在连接内复用，不逐消息重建");
     }
 
@@ -307,18 +314,30 @@ class JsrEndpointWebSocketHandlerBranchesTest {
     @Test
     void onOpen_withEndpointConfigParam_injected() throws Exception {
         ConfigCloseEndpoint.OPEN_CONFIG.set(null);
+        ConfigCloseEndpoint.OPEN_CONFIG_OBJECT.set(null);
         JsrEndpointWebSocketHandler handler = handler(ConfigCloseEndpoint.class);
         WebSocketSession session = mockSession();
         handler.afterConnectionEstablished(session);
         assertNotNull(ConfigCloseEndpoint.OPEN_CONFIG.get(), "EndpointConfig 应注入 @OnOpen 参数");
+        EndpointConfig injected = ConfigCloseEndpoint.OPEN_CONFIG_OBJECT.get();
+        assertNotNull(injected, "注入的必须是真实 EndpointConfig 对象");
+        assertEquals(ConfigCloseEndpoint.OPEN_CONFIG.get(), injected.toString(),
+                "端点记录的 config 字符串必须来自注入对象本身");
     }
 
     @Test
     void onClose_withCloseReasonParam_injected() throws Exception {
+        ConfigCloseEndpoint.CLOSE_REASON.set(null);
+        ConfigCloseEndpoint.CLOSE_INVOCATIONS.set(0);
         JsrEndpointWebSocketHandler handler = handler(ConfigCloseEndpoint.class);
         WebSocketSession session = mockSession();
         handler.afterConnectionEstablished(session);
-        assertDoesNotThrow(() -> handler.afterConnectionClosed(session, CloseStatus.NORMAL));
+        handler.afterConnectionClosed(session, CloseStatus.NORMAL);
+        assertEquals(1, ConfigCloseEndpoint.CLOSE_INVOCATIONS.get(), "@OnClose 必须被调用一次");
+        CloseReason reason = ConfigCloseEndpoint.CLOSE_REASON.get();
+        assertNotNull(reason, "CloseReason 必须注入 @OnClose 参数，而不是 null");
+        assertEquals(CloseStatus.NORMAL.getCode(), reason.getCloseCode().getCode(),
+                "CloseStatus.NORMAL 必须映射为 1000");
     }
 
     @Test
@@ -401,8 +420,10 @@ class JsrEndpointWebSocketHandlerBranchesTest {
                 new JsrEndpointMetadata(ThrowingOnOpenEndpoint.class), container);
         WebSocketSession session = mockSession();
 
-        assertThrows(Exception.class, () -> handler.afterConnectionEstablished(session));
-
+        Exception ex = assertThrows(Exception.class, () -> handler.afterConnectionEstablished(session));
+        assertTrue(ex instanceof java.lang.reflect.InvocationTargetException
+                        || ex.getCause() instanceof IllegalStateException,
+                "@OnOpen 的业务异常必须保留（直接抛出或作为反射包装的 cause），实际：" + ex);
         assertTrue(session.getAttributes().isEmpty(), "@OnOpen 失败后连接状态不能留在 attributes 里");
         assertTrue(container.openSessionsOf("/throwing-open").isEmpty(), "失败的连接必须从在线会话表移除");
     }

@@ -1,4 +1,5 @@
 package io.springperf.web.websocket.server;
+import java.util.Collections;
 
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.http.websocketx.ContinuationWebSocketFrame;
@@ -16,6 +17,7 @@ import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -47,7 +49,7 @@ class WebSocketFrameDispatcherTest {
 
     private EmbeddedChannel newChannel(WebSocketHandler handler, NettyWebSocketSession[] outSession) {
         EmbeddedChannel ch = new EmbeddedChannel();
-        ch.pipeline().addLast(new WebSocketRoutingHandler(Map.of()));
+        ch.pipeline().addLast(new WebSocketRoutingHandler(Collections.emptyMap()));
         NettyWebSocketSession session = new NettyWebSocketSession(ch, URI.create("/ws"), new HttpHeaders(), null, null,
                 null, null, handler);
         ch.attr(WebSocketRoutingHandler.CONNECTION_KEY).set(new WebSocketRoutingHandler.WsConnection(session, handler));
@@ -60,7 +62,7 @@ class WebSocketFrameDispatcherTest {
     @Test
     void frameBeforeHandshake_closesChannelAndReleasesFrame() {
         channel = new EmbeddedChannel();
-        channel.pipeline().addLast(new WebSocketRoutingHandler(Map.of()));
+        channel.pipeline().addLast(new WebSocketRoutingHandler(Collections.emptyMap()));
 
         TextWebSocketFrame frame = new TextWebSocketFrame("early");
         channel.writeInbound(frame);
@@ -86,7 +88,13 @@ class WebSocketFrameDispatcherTest {
 
         assertNull(connection.fragment, "超限后必须复位聚合状态并释放缓冲");
         assertFalse(channel.isOpen());
-        verify(handler).handleTransportError(any(), any());
+        org.mockito.ArgumentCaptor<Throwable> error = org.mockito.ArgumentCaptor.forClass(Throwable.class);
+        verify(handler).handleTransportError(any(), error.capture());
+        org.junit.jupiter.api.Assertions.assertInstanceOf(java.io.IOException.class, error.getValue(),
+                "超限应上报 IOException");
+        org.junit.jupiter.api.Assertions.assertTrue(
+                error.getValue().getMessage().toLowerCase().contains("limit"),
+                "异常必须说明消息超限原因，实际：" + error.getValue().getMessage());
         verify(handler, never()).handleMessage(any(), any());
     }
 
@@ -102,7 +110,7 @@ class WebSocketFrameDispatcherTest {
         verify(handler, times(2)).handleMessage(any(), captor.capture());
 
         List<ByteBuffer> payloads = captor.getAllValues().stream().map(message -> ((PongMessage) message).getPayload())
-                .toList();
+                .collect(Collectors.toList());
         assertEquals(0, payloads.get(0).remaining(), "空 Pong 交给业务的载荷应为空");
         assertSame(payloads.get(0), payloads.get(1), "空载荷应复用共享常量，避免每帧分配");
     }

@@ -1,4 +1,5 @@
 package io.springperf.web.websocket.server;
+import java.util.Arrays;
 
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaderNames;
@@ -58,6 +59,8 @@ class WebSocketExtensionNegotiatorTest {
         WebSocketServerExtension extension = WebSocketExtensionNegotiator
                 .negotiate(headers("x-unknown", "permessage-deflate"));
         assertNotNull(extension, "第一个头值无匹配时要继续看后续头值");
+        assertEquals("permessage-deflate", extension.newReponseData().name(),
+                "必须选中的是后续头值里的 permessage-deflate");
     }
 
     @Test
@@ -67,6 +70,9 @@ class WebSocketExtensionNegotiatorTest {
         WebSocketServerExtension extension = WebSocketExtensionNegotiator
                 .negotiate(headers("permessage-deflate; client_max_window_bits"));
         assertNotNull(extension);
+        assertEquals("permessage-deflate", extension.newReponseData().name());
+        assertFalse(extension.newReponseData().parameters().containsKey("client_max_window_bits"),
+                "无值参数必须被丢弃，不能原样回给客户端");
     }
 
     @Test
@@ -152,9 +158,9 @@ class WebSocketExtensionNegotiatorTest {
 
     @Test
     void splitOutsideQuotes_splitsOnlyOutsideQuotes() {
-        assertEquals(List.of("a", "b"), WebSocketExtensionNegotiator.splitOutsideQuotes("a,b", ','));
+        assertEquals(Arrays.asList("a", "b"), WebSocketExtensionNegotiator.splitOutsideQuotes("a,b", ','));
         // 引号内的逗号不切分
-        assertEquals(List.of("a", "\"b,c\""), WebSocketExtensionNegotiator.splitOutsideQuotes("a,\"b,c\"", ','));
-        assertEquals(List.of(""), WebSocketExtensionNegotiator.splitOutsideQuotes("", ','));
+        assertEquals(Arrays.asList("a", "\"b,c\""), WebSocketExtensionNegotiator.splitOutsideQuotes("a,\"b,c\"", ','));
+        assertEquals(Arrays.asList(""), WebSocketExtensionNegotiator.splitOutsideQuotes("", ','));
     }
 }

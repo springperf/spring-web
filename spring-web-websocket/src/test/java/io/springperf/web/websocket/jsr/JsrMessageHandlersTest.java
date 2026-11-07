@@ -1,4 +1,5 @@
 package io.springperf.web.websocket.jsr;
+import java.util.Arrays;
 
 import javax.websocket.Decoder;
 import javax.websocket.EndpointConfig;
@@ -73,7 +74,7 @@ class JsrMessageHandlersTest {
         handlers.add(JsrMessageHandlers.TEXT, String.class, (MessageHandler.Whole<String>) received::add, false);
 
         assertTrue(handlers.deliverText("hello", codecRegistry));
-        assertEquals(List.of("hello"), received);
+        assertEquals(Arrays.asList("hello"), received);
     }
 
     @Test
@@ -94,7 +95,7 @@ class JsrMessageHandlersTest {
         }, false);
 
         assertTrue(handlers.deliverText("pojo-text", codecRegistry));
-        assertEquals(List.of("pojo-text"), received);
+        assertEquals(Arrays.asList("pojo-text"), received);
     }
 
     @Test
@@ -106,18 +107,20 @@ class JsrMessageHandlersTest {
 
         handlers.deliverText("payload", codecRegistry);
 
-        assertEquals(List.of("payload"), received);
+        assertEquals(Arrays.asList("payload"), received);
     }
 
     @Test
     void deliverBinary_byteArrayAndByteBuffer() throws Exception {
         JsrMessageHandlers handlers = new JsrMessageHandlers();
-        List<String> received = new ArrayList<>();
+        List<byte[]> captured = new ArrayList<>();
         handlers.add(JsrMessageHandlers.BINARY, byte[].class,
-                (MessageHandler.Whole<byte[]>) bytes -> received.add("bytes:" + bytes.length), false);
+                (MessageHandler.Whole<byte[]>) captured::add, false);
 
         assertTrue(handlers.deliverBinary(ByteBuffer.wrap(new byte[] { 1, 2, 3 }), codecRegistry));
-        assertEquals(List.of("bytes:3"), received);
+        assertEquals(1, captured.size(), "二进制消息必须交付一次");
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new byte[] { 1, 2, 3 }, captured.get(0),
+                "必须逐字节交付原始载荷，只校验长度会放过内容损坏");
     }
 
     @Test
@@ -134,7 +137,7 @@ class JsrMessageHandlersTest {
 
         handlers.deliverBinary(ByteBuffer.wrap(new byte[] { 42 }), codecRegistry);
 
-        assertEquals(List.of("42"), received);
+        assertEquals(Arrays.asList("42"), received);
     }
 
     /** 本框架的消息模型是完整消息，因此 Partial 以「唯一分片 + last=true」交付。 */
@@ -147,7 +150,7 @@ class JsrMessageHandlersTest {
 
         assertTrue(handlers.deliverText("chunk", codecRegistry));
 
-        assertEquals(List.of("chunk/true"), received);
+        assertEquals(Arrays.asList("chunk/true"), received);
     }
 
     @Test
@@ -159,7 +162,7 @@ class JsrMessageHandlersTest {
 
         ByteBuffer data = ByteBuffer.wrap(new byte[] { 9, 9 });
         assertTrue(handlers.deliverPong((PongMessage) () -> data));
-        assertEquals(List.of("pong:2"), received);
+        assertEquals(Arrays.asList("pong:2"), received);
     }
 
     @Test
@@ -285,9 +288,10 @@ class JsrMessageHandlersTest {
         handlers.add(JsrMessageHandlers.BINARY, Message.class,
                 (MessageHandler.Whole<Message>) message -> received.add(message.getValue()), false);
 
-        handlers.deliverBinary(ByteBuffer.wrap(new byte[] { 7 }), binaryRegistry);
-
-        assertEquals(List.of("bin"), received, "自定义 binary Decoder 必须参与转换");
+        assertTrue(handlers.deliverBinary(ByteBuffer.wrap(new byte[] { 7 }), binaryRegistry),
+                "自定义 decoder 的载荷必须被交付成功");
+        assertEquals(Arrays.asList("bin:7"), received,
+                "decoder 必须收到真实载荷字节，硬编码返回值会让断言自证");
     }
 
     @ServerEndpoint(value = "/binary-decoder", decoders = BinaryMessageDecoder.class)
@@ -307,7 +311,7 @@ class JsrMessageHandlersTest {
 
         @Override
         public Message decode(ByteBuffer bytes) {
-            return new Message("bin");
+            return new Message("bin:" + bytes.get(bytes.position()));
         }
 
         @Override

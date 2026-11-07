@@ -49,7 +49,8 @@ class JsrRemoteEndpointAsyncTest {
         SendHandler handler = mock(SendHandler.class);
         remote.sendText("hello", handler);
         verify(springSession).sendMessage(new TextMessage("hello"));
-        verify(handler).onResult(any(SendResult.class));
+        verify(handler, times(1)).onResult(argThat(SendResult::isOK));
+        verifyNoMoreInteractions(handler);
     }
 
     @Test
@@ -72,7 +73,10 @@ class JsrRemoteEndpointAsyncTest {
     void sendText_future_failure() throws IOException {
         doThrow(new IOException("boom")).when(springSession).sendMessage(any(TextMessage.class));
         Future<Void> future = remote.sendText("hello");
-        assertThrows(java.util.concurrent.ExecutionException.class, future::get);
+        java.util.concurrent.ExecutionException ex = assertThrows(java.util.concurrent.ExecutionException.class,
+                future::get);
+        assertTrue(ex.getCause() instanceof IOException, "原始 IOException 必须保留为 cause");
+        assertEquals("boom", ex.getCause().getMessage(), "cause 必须来自实际写失败，而不是被换掉的异常");
     }
 
     @Test
@@ -102,7 +106,9 @@ class JsrRemoteEndpointAsyncTest {
     void sendObject_handler_success() throws IOException {
         SendHandler handler = mock(SendHandler.class);
         remote.sendObject("world", handler);
-        verify(handler).onResult(any(SendResult.class));
+        verify(springSession).sendMessage(new TextMessage("encoded:world"));
+        verify(handler, times(1)).onResult(argThat(SendResult::isOK));
+        verifyNoMoreInteractions(handler);
     }
 
     @Test
@@ -265,5 +271,72 @@ class JsrRemoteEndpointAsyncTest {
 
         verify(springSession).sendMessage(argThat(msg -> msg instanceof BinaryMessage));
         verify(handler).onResult(argThat(SendResult::isOK));
+    }
+
+    /* ==================== 真实 Netty 异步通道（非 mock 同步降级） ==================== */
+
+    private javax.websocket.RemoteEndpoint.Async realNettyAsync(EmbeddedChannel channel) {
+        NettyWebSocketSession nettySession = new NettyWebSocketSession(channel,
+                java.net.URI.create("ws://localhost/ws"), new HttpHeaders(), null,
+                new java.net.InetSocketAddress("127.0.0.1", 8080), null, null, null);
+        JsrWebSocketSession jsrSession = new JsrWebSocketSession(nettySession, new JsrWebSocketContainer(),
+                codecRegistry, Collections.emptyMap());
+        return jsrSession.getAsyncRemote();
+    }
+
+    @Test
+    void realNettySession_sendText_futureCompletesAfterFrameIsWritten() throws Exception {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        javax.websocket.RemoteEndpoint.Async async = realNettyAsync(channel);
+
+        Future<Void> future = async.sendText("netty");
+        channel.runPendingTasks();
+
+        assertTrue(future.isDone(), "真实通道上 future 必须在帧写入后完成");
+        assertNull(future.get(2, java.util.concurrent.TimeUnit.SECONDS),
+                "正常完成应返回 null；异常完成会抛 ExecutionException，不会走到这里");
+        TextWebSocketFrame frame = channel.readOutbound();
+        assertNotNull(frame, "必须真的向 Netty 通道写出帧");
+        assertEquals("netty", frame.text());
+        frame.release();
+        channel.finishAndReleaseAll();
+    }
+
+    @Test
+    void realNettySession_sendText_handlerGetsSuccessOnlyAfterWrite() throws Exception {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        javax.websocket.RemoteEndpoint.Async async = realNettyAsync(channel);
+        SendHandler handler = mock(SendHandler.class);
+
+        async.sendText("netty", handler);
+        channel.runPendingTasks();
+
+        verify(handler, times(1)).onResult(argThat(SendResult::isOK));
+        verifyNoMoreInteractions(handler);
+        TextWebSocketFrame frame = channel.readOutbound();
+        assertNotNull(frame, "回调成功的同时帧必须真的写出");
+        assertEquals("netty", frame.text());
+        frame.release();
+        channel.finishAndReleaseAll();
+    }
+
+    @Test
+    void realNettySession_closedSession_futureFailsWithIOException() throws Exception {
+        EmbeddedChannel channel = new EmbeddedChannel();
+        NettyWebSocketSession nettySession = new NettyWebSocketSession(channel,
+                java.net.URI.create("ws://localhost/ws"), new HttpHeaders(), null,
+                new java.net.InetSocketAddress("127.0.0.1", 8080), null, null, null);
+        JsrWebSocketSession jsrSession = new JsrWebSocketSession(nettySession, new JsrWebSocketContainer(),
+                codecRegistry, Collections.emptyMap());
+        nettySession.setOpen(false);
+
+        Future<Void> future = jsrSession.getAsyncRemote().sendText("x");
+
+        java.util.concurrent.ExecutionException ex = assertThrows(java.util.concurrent.ExecutionException.class,
+                future::get);
+        assertInstanceOf(IOException.class, ex.getCause(), "关闭会话必须让 future 异常完成为 IOException");
+        assertTrue(ex.getCause().getMessage().contains("is closed"), "失败原因必须说明会话已关闭");
+        assertNull(channel.readOutbound(), "已关闭会话不得写出帧");
+        channel.finishAndReleaseAll();
     }
 }

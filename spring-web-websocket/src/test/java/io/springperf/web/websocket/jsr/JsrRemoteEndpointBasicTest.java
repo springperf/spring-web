@@ -96,16 +96,25 @@ class JsrRemoteEndpointBasicTest {
     }
 
     @Test
-    void sendText_partialAndLast_sendsFullText() throws IOException {
+    void sendText_lastFragment_sendsFullText() throws IOException {
         remote.sendText("part", true);
-        verify(springSession).sendMessage(new TextMessage("part"));
+        org.mockito.ArgumentCaptor<WebSocketMessage<?>> captor = org.mockito.ArgumentCaptor
+                .forClass(WebSocketMessage.class);
+        verify(springSession).sendMessage(captor.capture());
+        assertEquals("part", ((TextMessage) captor.getValue()).getPayload());
+        assertTrue(captor.getValue().isLast(), "equals 忽略 isLast，必须显式断言 last=true");
     }
 
     @Test
-    void sendBinary_partialAndLast_sendsFullBinary() throws IOException {
+    void sendBinary_nonLastFragment_sendsBinaryWithIsLastFalse() throws IOException {
         ByteBuffer buf = ByteBuffer.wrap("x".getBytes(StandardCharsets.UTF_8));
         remote.sendBinary(buf, false);
-        verify(springSession).sendMessage(new BinaryMessage(buf));
+        org.mockito.ArgumentCaptor<WebSocketMessage<?>> captor = org.mockito.ArgumentCaptor
+                .forClass(WebSocketMessage.class);
+        verify(springSession).sendMessage(captor.capture());
+        assertFalse(captor.getValue().isLast(), "equals 忽略 isLast，必须显式断言 last=false 未被丢弃");
+        ByteBuffer payload = ((BinaryMessage) captor.getValue()).getPayload();
+        assertEquals((byte) 'x', payload.get(payload.position()), "二进制内容必须是原始字节");
     }
 
     /**
@@ -145,7 +154,12 @@ class JsrRemoteEndpointBasicTest {
         out.close();
         out.close();
 
-        verify(springSession, times(1)).sendMessage(argThat(msg -> msg instanceof BinaryMessage));
+        org.mockito.ArgumentCaptor<WebSocketMessage<?>> captor = org.mockito.ArgumentCaptor
+                .forClass(WebSocketMessage.class);
+        verify(springSession, times(1)).sendMessage(captor.capture());
+        assertTrue(captor.getValue() instanceof BinaryMessage, "关闭流必须走二进制消息");
+        ByteBuffer payload = ((BinaryMessage) captor.getValue()).getPayload();
+        assertEquals((byte) 9, payload.get(payload.position()), "关闭流必须写出真实累积字节");
         assertThrows(IOException.class, () -> out.write(1), "关闭后写入必须抛 IOException");
     }
 
