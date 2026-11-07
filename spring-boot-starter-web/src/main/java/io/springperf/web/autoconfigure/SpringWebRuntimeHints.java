@@ -27,6 +27,15 @@ import org.springframework.util.concurrent.ListenableFutureCallback;
  * BeanFactory 实际内容注册（本 registrar 不重复）。</li>
  * </ul>
  * <p>
+ * <b>与静态 {@code META-INF/native-image/.../*.json} 的关系</b>：两轨互补，不是互相替代。
+ * 静态 {@code reflect-config.json} / {@code proxy-config.json} 提供 AOT 无法自动发现的框架内部类、
+ * registry/resolver/provider 与 SPI 接口基线；静态 {@code resource-config.json} 提供 {@code spring.factories}、
+ * {@code .imports} 与配置文件兜底。本 registrar 只补 AOT 构建期才确定或 Spring Boot AOT 不感知的部分。
+ * 事件用的双接口代理在两轨重复登记是有意的双保险：Spring Boot native 构建始终经 {@code process-aot}，
+ * 静态条目与 AOT 生成配置会同时生效，保留可避免改变既有行为。
+ * 两轨的重复/互补/独占关系由 {@code NativeImageHintsConsistencyTest} 锁定。
+ * </p>
+ * <p>
  * {@code classLoader} 为 null 是 {@link RuntimeHintsRegistrar} 契约允许的输入；只有资源探测需要它，
  * 代理/反射注册与 classLoader 无关，必须始终执行。
  * </p>

@@ -2,9 +2,9 @@
   "resources": [
     {"pattern": "\\QMETA-INF/spring.factories\\E"},
     {"pattern": "\\QMETA-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports\\E"},
-    {"pattern": "\\QMETA-INF/spring/\\E"},
+    {"pattern": "\\QMETA-INF/spring/\\E.*"},
     {"pattern": "\\QMETA-INF/additional-spring-configuration-metadata.json\\E"},
-    {"pattern": "application\\.properties$"},
+    {"pattern": "application(-[A-Za-z0-9_-]+)?\\.(properties|yml|yaml)$"},
     {"pattern": "\\Qtemplates/\\E.*"},
     {"pattern": "\\Qstatic/\\E.*"},
     {"pattern": "\\QMETA-INF/resources/\\E.*"},
