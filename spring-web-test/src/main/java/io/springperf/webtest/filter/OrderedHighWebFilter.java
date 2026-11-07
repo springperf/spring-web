@@ -20,6 +20,8 @@ public class OrderedHighWebFilter implements WebFilter {
     public void doFilter(WebServerHttpRequest request, WebServerHttpResponse response,
             io.springperf.web.core.filter.FilterChain chain) throws Exception {
         response.getHeaders().add(HEADER_NAME, "executed");
+        // @Order(100) 晚于 @Order(5)，因此本值应排在 X-Order 的第二位
+        response.getHeaders().add(OrderedLowWebFilter.ORDER_HEADER, "high");
         chain.doFilter(request, response);
     }
 }

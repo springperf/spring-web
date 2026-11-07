@@ -23,11 +23,14 @@ public class ConditionalRequestE2ETest extends BaseE2ETest {
         Request req = new Request.Builder().url(staticUrl() + "/test.txt").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
-            String body = resp.body().string();
-            assertEquals("Hello, Static Resource!", body.trim(), "静态资源应返回完整内容");
+            // 不做 trim：test.txt 无行尾换行，trim 会掩盖多/少字节的问题
+            assertEquals("Hello, Static Resource!", resp.body().string(), "静态资源应返回完整内容");
             String etag = resp.header("ETag");
             assertNotNull(etag, "静态资源应返回 ETag");
             assertNotNull(resp.header("Last-Modified"), "静态资源应返回 Last-Modified");
+            // WebTestConfig 注册时 setCachePeriod(3600)，此处验证确实落到了响应头
+            assertEquals("max-age=3600, must-revalidate", resp.header("Cache-Control"),
+                    "静态资源应按 cachePeriod 写出 Cache-Control，实际: " + resp.headers());
         }
     }
 
@@ -44,6 +47,12 @@ public class ConditionalRequestE2ETest extends BaseE2ETest {
         Request req = new Request.Builder().url(staticUrl() + "/test.txt").header("If-None-Match", etag).get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(304, resp.code(), "ETag 匹配应返回 304");
+            // RFC 9110 §15.4.5：304 必须带上与 200 一致的校验器与缓存指令，否则客户端无从续期
+            assertEquals(etag, resp.header("ETag"), "304 应携带与 200 相同的 ETag");
+            assertNotNull(resp.header("Last-Modified"), "304 应携带 Last-Modified");
+            assertNotNull(resp.header("Cache-Control"), "304 应携带 Cache-Control");
+            String body = resp.body() != null ? resp.body().string() : null;
+            assertTrue(body == null || body.isEmpty(), "304 不应有 body，实际: " + body);
         }
     }
 
@@ -61,7 +70,7 @@ public class ConditionalRequestE2ETest extends BaseE2ETest {
                 .header("If-None-Match", "\"non-existent-etag\"").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code(), "ETag 不匹配应返回 200");
-            assertEquals("Hello, Static Resource!", resp.body().string().trim(), "应返回完整静态资源内容");
+            assertEquals("Hello, Static Resource!", resp.body().string(), "应返回完整静态资源内容");
         }
     }
 
@@ -84,7 +93,7 @@ public class ConditionalRequestE2ETest extends BaseE2ETest {
                 .header("If-Modified-Since", "Thu, 01 Jan 1970 00:00:00 GMT").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code(), "If-Modified-Since 早于 Last-Modified 应返回 200");
-            assertEquals("Hello, Static Resource!", resp.body().string().trim(), "应返回完整静态资源内容");
+            assertEquals("Hello, Static Resource!", resp.body().string(), "应返回完整静态资源内容");
         }
     }
 

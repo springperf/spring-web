@@ -82,18 +82,28 @@ public class GracefulShutdownE2eTest {
         assertTrue(com.alibaba.fastjson2.JSON.parseObject(body).get("now") instanceof Number,
                 "in-flight 请求应完整返回 {\"now\":<时间戳>}，实际: " + body);
 
-        // 4. 停机后新请求被拒绝（503 或连接被拒）；超时/EOF 等基础设施故障不算成功停机
-        Request newReq = new Request.Builder().url(url("/api/core/bytes")).get().build();
-        boolean rejected = false;
-        try (Response resp = CLIENT.newCall(newReq).execute()) {
-            rejected = resp.code() == 503;
-        } catch (java.io.IOException e) {
-            rejected = isConnectionRejection(e);
-            if (!rejected) {
-                org.junit.jupiter.api.Assertions.fail("停机后新请求失败原因不是连接被拒/503: " + e);
+        // 4. 停机后新请求被拒绝（503 或连接被拒）；超时/EOF 等基础设施故障不算成功停机。
+        // 必须用独立连接池：共享 CLIENT 里那条刚跑完慢请求的连接仍在池中，
+        // 复用它会让"服务端是否真的拒绝新请求"退化成对 OkHttp 池状态的依赖。
+        OkHttpClient probeClient = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3))
+                .readTimeout(Duration.ofSeconds(5)).retryOnConnectionFailure(false).build();
+        try {
+            Request newReq = new Request.Builder().url(url("/api/core/bytes")).header("Connection", "close").get()
+                    .build();
+            boolean rejected = false;
+            try (Response resp = probeClient.newCall(newReq).execute()) {
+                rejected = resp.code() == 503;
+            } catch (java.io.IOException e) {
+                rejected = isConnectionRejection(e);
+                if (!rejected) {
+                    org.junit.jupiter.api.Assertions.fail("停机后新请求失败原因不是连接被拒/503: " + e);
+                }
             }
+            assertTrue(rejected, "停机后新请求应返回 503 或连接被拒");
+        } finally {
+            probeClient.connectionPool().evictAll();
+            probeClient.dispatcher().executorService().shutdown();
         }
-        assertTrue(rejected, "停机后新请求应返回 503 或连接被拒");
     }
 
     /** 只接受"连接被拒/重置"，超时、EOF、TLS 等故障不算优雅停机的正确拒绝语义 */

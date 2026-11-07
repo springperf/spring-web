@@ -2,17 +2,19 @@ package io.springperf.webtest;
 
 import com.alibaba.fastjson2.JSON;
 import io.springperf.web.server.NettyHttpServer;
+import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.time.Duration;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -33,20 +35,41 @@ class E2EThicknessTest extends BaseE2ETest {
     private NettyHttpServer nettyHttpServer;
 
     /** 发起请求并返回响应 body JSON 中指定字段 */
-    @SuppressWarnings("unchecked")
     private Number getIntField(String path, String field) throws Exception {
+        return getIntField(CLIENT, path, field);
+    }
+
+    /** 指定客户端版本（连接身份断言要用独立连接池，见 {@link #freshClient()}） */
+    @SuppressWarnings("unchecked")
+    private Number getIntField(OkHttpClient client, String path, String field) throws Exception {
         Request req = new Request.Builder().url(url(path)).get().build();
-        try (Response resp = CLIENT.newCall(req).execute()) {
+        try (Response resp = client.newCall(req).execute()) {
             assertEquals(200, resp.code(), "GET " + path + " 应 200");
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
             return (Number) body.get(field);
         }
     }
 
+    /** 独立连接池客户端：共享 CLIENT 里可能有余留空闲连接，会污染"同一连接"类的判定。 */
+    private static OkHttpClient freshClient() {
+        return new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3)).readTimeout(Duration.ofSeconds(10))
+                .writeTimeout(Duration.ofSeconds(10)).build();
+    }
+
+    private static void closeQuietly(OkHttpClient client) {
+        client.connectionPool().evictAll();
+        client.dispatcher().executorService().shutdown();
+    }
+
+    /** 取当前连接的对端端口（连接身份） */
+    private int remotePort(OkHttpClient client) throws Exception {
+        return getIntField(client, "/api/thickness/conn-id", "remotePort").intValue();
+    }
+
     @Test
     void keepAlive_sequentialRequestsReuseConnection() throws Exception {
-        // 连续请求同一资源：keep-alive 下应复用同一条 TCP 连接（对端端口不变），
-        // 且服务器当前连接数保持增长为 0 或 1（无连接泄漏）
+        // 连续请求同一资源：keep-alive 下应复用同一条 TCP 连接（对端端口不变）；
+        // 活动连接数最多因首请求新建一条（before 已含其它测试类留在共享连接池里的空闲连接）
         int before = nettyHttpServer.getActiveConnectionCount();
         int port = -1;
         for (int i = 0; i < 5; i++) {
@@ -56,32 +79,34 @@ class E2EThicknessTest extends BaseE2ETest {
             assertEquals(port, current, "keep-alive 连接应在连续请求间被复用");
         }
         int after = nettyHttpServer.getActiveConnectionCount();
-        assertTrue(after <= before + 1, "复用后连接数不应显著增长: before=" + before + " after=" + after);
+        assertTrue(after <= before + 1, "复用后连接数不应增长超过 1 条: before=" + before + " after=" + after);
     }
 
     @Test
-    void keepAlive_clientWithConnectionPool_staysBounded() throws Exception {
-        // 100 个串行请求走同一连接池：活跃连接数应保持在一个小范围（不会因响应解析错误而反复建连）
+    void keepAlive_sequentialRequestsUseSingleConnection() throws Exception {
+        // 50 个串行请求走同一连接池：只应出现 1 条连接（server.max-keep-alive-requests 默认 0=不限）
         Set<Integer> observed = new HashSet<>();
         for (int i = 0; i < 50; i++) {
             observed.add(getIntField("/api/thickness/conn-id", "remotePort").intValue());
         }
-        assertTrue(observed.size() <= 3, "串行请求应复用少量连接，实际 " + observed.size());
+        assertEquals(1, observed.size(), "串行请求应复用同一条连接，实际出现 " + observed.size() + " 条: " + observed);
     }
 
     @Test
     void concurrentIsolation_eachRequestGetsOwnPath() throws Exception {
-        // 并发请求同一路径：结果只收集不判定，由主线程精确断言，避免工作线程异常被吞
+        // 每个请求打不同路径（path-var 回显 token），才能发现响应串包；
+        // 工作线程内只收集不判定（AssertionError 是 Error，submit 的 Future 不 get 会被静默吞掉）
         int n = 8;
         ExecutorService pool = Executors.newFixedThreadPool(n);
         CountDownLatch latch = new CountDownLatch(n);
         AtomicReference<Throwable> unexpected = new AtomicReference<>();
-        ConcurrentLinkedQueue<String> bodies = new ConcurrentLinkedQueue<>();
+        Map<String, String> received = new ConcurrentHashMap<>();
         try {
             for (int i = 0; i < n; i++) {
+                String token = "tok-" + i;
                 pool.submit(() -> {
-                    try (Response resp = get(url("/api/core/bytes"))) {
-                        bodies.add(resp.body().string());
+                    try (Response resp = get(url("/api/edge/path-var/" + token))) {
+                        received.put(token, resp.body().string());
                     } catch (Throwable t) {
                         unexpected.compareAndSet(null, t);
                     } finally {
@@ -91,10 +116,9 @@ class E2EThicknessTest extends BaseE2ETest {
             }
             assertTrue(latch.await(10, TimeUnit.SECONDS), "并发请求应在超时前完成");
             assertNull(unexpected.get(), "并发请求不得抛异常: " + unexpected.get());
-            assertEquals(n, bodies.size(), "每个并发请求都应拿到自己的响应");
-            for (String body : bodies) {
-                assertEquals("Hello, Bytes!", body, "并发请求响应不得串扰");
-            }
+            assertEquals(n, received.size(), "每个并发请求都应拿到自己的响应");
+            received.forEach((token, body) -> assertEquals(token, JSON.parseObject(body).getString("id"),
+                    "并发请求响应串扰：请求 " + token + " 收到 " + body));
         } finally {
             pool.shutdownNow();
         }
@@ -110,7 +134,7 @@ class E2EThicknessTest extends BaseE2ETest {
         CountDownLatch latch = new CountDownLatch(4);
         AtomicReference<Throwable> unexpected = new AtomicReference<>();
         AtomicReference<String> asyncBody = new AtomicReference<>();
-        ConcurrentLinkedQueue<String> syncBodies = new ConcurrentLinkedQueue<>();
+        Map<String, String> syncBodies = new ConcurrentHashMap<>();
 
         try {
             pool.submit(() -> { // 慢异步
@@ -123,9 +147,10 @@ class E2EThicknessTest extends BaseE2ETest {
                 }
             });
             for (int i = 0; i < 3; i++) {
+                String token = "sync-" + i;
                 pool.submit(() -> {
-                    try (Response r = get(url("/api/core/bytes"))) {
-                        syncBodies.add(r.body().string());
+                    try (Response r = get(url("/api/edge/path-var/" + token))) {
+                        syncBodies.put(token, r.body().string());
                     } catch (Throwable t) {
                         unexpected.compareAndSet(null, t);
                     } finally {
@@ -133,14 +158,13 @@ class E2EThicknessTest extends BaseE2ETest {
                     }
                 });
             }
-            assertTrue(latch.await(10, TimeUnit.SECONDS));
+            assertTrue(latch.await(10, TimeUnit.SECONDS), "并发请求应在超时前完成");
             assertNull(unexpected.get(), "并发请求不得抛异常: " + unexpected.get());
             Map<String, Object> async = JSON.parseObject(asyncBody.get(), Map.class);
             assertTrue(async.get("now") instanceof Number, "慢异步应返回 {\"now\":<时间戳>}，实际: " + asyncBody.get());
             assertEquals(3, syncBodies.size(), "3 个同步请求都应拿到各自的响应");
-            for (String body : syncBodies) {
-                assertEquals("Hello, Bytes!", body, "并发请求响应不得串扰");
-            }
+            syncBodies.forEach((token, body) -> assertEquals(token, JSON.parseObject(body).getString("id"),
+                    "慢异步不得串到同步请求的响应：请求 " + token + " 收到 " + body));
         } finally {
             pool.shutdownNow();
         }
@@ -149,25 +173,45 @@ class E2EThicknessTest extends BaseE2ETest {
     @Test
     void failedRequest_doesNotCorruptConnection() throws Exception {
         // 先发一个触发异常路径的请求（参数类型不匹配），随后同一连接上的正常请求必须仍能正确解析。
-        // Response 必须关闭，否则连接不会归还连接池，测出来的"复用"是假的。
-        for (int i = 0; i < 3; i++) {
-            try (Response errorResp = get(url("/api/p1/type-mismatch?id=abc"))) {
-                assertEquals(400, errorResp.code(), "异常请求应返回确定的错误码，实际: " + errorResp.code());
+        // 必须显式核对 remotePort：只断言 body 时，服务端关连接 + OkHttp 重连也能通过；
+        // 用独立连接池排除共享 CLIENT 里余留空闲连接的干扰。
+        OkHttpClient client = freshClient();
+        try {
+            int port = remotePort(client);
+            for (int i = 0; i < 3; i++) {
+                try (Response errorResp = client
+                        .newCall(new Request.Builder().url(url("/api/p1/type-mismatch?id=abc")).get().build())
+                        .execute()) {
+                    assertEquals(400, errorResp.code(), "异常请求应返回确定的错误码，实际: " + errorResp.code());
+                }
+                try (Response okResp = client.newCall(new Request.Builder().url(url("/api/core/bytes")).get().build())
+                        .execute()) {
+                    assertEquals("Hello, Bytes!", okResp.body().string(), "异常请求后连接应仍可正确复用");
+                }
+                assertEquals(port, remotePort(client), "4xx 后应复用同一条连接（远程端口不变）");
             }
-            try (Response okResp = get(url("/api/core/bytes"))) {
-                assertEquals("Hello, Bytes!", okResp.body().string(), "异常请求后连接应仍可正确复用");
-            }
+        } finally {
+            closeQuietly(client);
         }
     }
 
     @Test
     void errorThenKeepAlive_sameSocketStillUsable() throws Exception {
-        // 触发 500（bad-pool）后，同一连接后续请求正常返回
-        try (Response errorResp = get(url("/api/core/pool/bad-pool"))) {
-            assertEquals(500, errorResp.code(), "bad-pool 应返回 500，实际: " + errorResp.code());
-        }
-        try (Response okResp = get(url("/api/core/bytes"))) {
-            assertEquals("Hello, Bytes!", okResp.body().string(), "500 后连接应保持可用");
+        // 触发 500（bad-pool）后，同一连接后续请求正常返回（用 remotePort 证明还是同一条 socket）
+        OkHttpClient client = freshClient();
+        try {
+            int port = remotePort(client);
+            try (Response errorResp = client
+                    .newCall(new Request.Builder().url(url("/api/core/pool/bad-pool")).get().build()).execute()) {
+                assertEquals(500, errorResp.code(), "bad-pool 应返回 500，实际: " + errorResp.code());
+            }
+            try (Response okResp = client.newCall(new Request.Builder().url(url("/api/core/bytes")).get().build())
+                    .execute()) {
+                assertEquals("Hello, Bytes!", okResp.body().string(), "500 后连接应保持可用");
+            }
+            assertEquals(port, remotePort(client), "500 后应仍是同一条连接（远程端口不变）");
+        } finally {
+            closeQuietly(client);
         }
     }
 

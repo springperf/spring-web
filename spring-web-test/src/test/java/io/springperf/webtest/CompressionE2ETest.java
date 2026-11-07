@@ -46,6 +46,15 @@ public class CompressionE2ETest {
         }
     }
 
+    /** 取未压缩响应的原始字节（不主动带 Accept-Encoding，用于给"不压缩"类断言做体积前置校验）。 */
+    private byte[] bodyPlainBytes(String path) throws IOException {
+        Request req = new Request.Builder().url(url(path)).get().build();
+        try (Response resp = client.newCall(req).execute()) {
+            assertEquals(200, resp.code());
+            return resp.body().bytes();
+        }
+    }
+
     private Response gzipRequest(String path, String userAgent) throws IOException {
         Request.Builder b = new Request.Builder().url(url(path)).header("Accept-Encoding", "gzip");
         if (userAgent != null) {
@@ -88,9 +97,13 @@ public class CompressionE2ETest {
 
     @Test
     void binaryLarge_isNotCompressed_byMimeWhitelist() throws Exception {
+        // 先确认 payload 确实超过 min-response-size：否则"因为太小所以不压缩"会让本用例假通过
+        int plainSize = bodyPlainBytes("/compression/binary-large").length;
+        assertTrue(plainSize > 2048, "payload 必须超过 min-response-size，实际: " + plainSize);
         try (Response resp = gzipRequest("/compression/binary-large", null)) {
             assertEquals(200, resp.code());
             assertNull(resp.header("Content-Encoding"), "application/octet-stream is not in the whitelist");
+            assertEquals(plainSize, resp.body().bytes().length, "未压缩响应应是完整原始字节");
         }
     }
 
@@ -108,9 +121,13 @@ public class CompressionE2ETest {
 
     @Test
     void excludedUserAgent_isNotCompressed() throws Exception {
+        // 同 largeJson：先确认 payload 够大，否则"体积不足未压缩"会冒充"UA 被排除"
+        String plain = bodyPlain("/compression/json-large");
+        assertTrue(plain.length() > 2000, "payload 必须超过 min-response-size，实际: " + plain.length());
         try (Response resp = gzipRequest("/compression/json-large", "BadBot/1.0")) {
             assertEquals(200, resp.code());
             assertNull(resp.header("Content-Encoding"), "BadBot matches excluded-user-agents");
+            assertEquals(plain, resp.body().string(), "被排除的 UA 应拿到与普通请求一致的明文");
         }
     }
 }
