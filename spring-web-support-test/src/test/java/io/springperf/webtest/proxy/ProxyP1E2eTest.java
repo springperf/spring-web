@@ -75,7 +75,7 @@ public class ProxyP1E2eTest {
         Request req = new Request.Builder().url(baseUrl() + "/proxy-p1/mixed/abc")
                 .post(RequestBody.create(JSON, "\"body\"")).addHeader("X-Custom", "hdr").build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            assertTrue(resp.code() >= 400, "Missing required @RequestParam should return 4xx, got " + resp.code());
+            assertEquals(400, resp.code(), "Missing required @RequestParam should return 400, got " + resp.code());
         }
     }
 
@@ -91,7 +91,7 @@ public class ProxyP1E2eTest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(400, resp.code());
             String body = resp.body().string();
-            assertNotNull(body);
+            assertFalse(body.contains("got:"), "空 body 命中 required @RequestBody 时不得执行业务方法，实际 " + body);
         }
     }
 
@@ -124,7 +124,7 @@ public class ProxyP1E2eTest {
     void getRequiredHeader_withProxy_missing_returns400() throws Exception {
         Request req = new Request.Builder().url(baseUrl() + "/proxy-p1/required-header").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            assertTrue(resp.code() >= 400, "Missing required @RequestHeader should return 4xx, got " + resp.code());
+            assertEquals(400, resp.code(), "Missing required @RequestHeader should return 400, got " + resp.code());
         }
     }
 

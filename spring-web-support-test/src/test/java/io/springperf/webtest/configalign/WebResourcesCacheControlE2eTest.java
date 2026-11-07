@@ -8,6 +8,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -32,8 +33,10 @@ class WebResourcesCacheControlE2eTest {
         try {
             assertEquals(200, resp.code());
             String cacheControl = resp.header("Cache-Control");
-            assertTrue(cacheControl != null && cacheControl.contains("max-age=3600"),
-                    "1h 应解析为 max-age=3600，实际 Cache-Control=" + cacheControl);
+            assertNotNull(cacheControl, "静态资源应下发 Cache-Control");
+            assertTrue(java.util.Arrays.stream(cacheControl.split(",")).map(String::trim)
+                            .anyMatch(directive -> directive.equals("max-age=3600")),
+                    "1h 应解析为精确的 max-age=3600 指令，实际 Cache-Control=" + cacheControl);
         } finally {
             resp.close();
         }

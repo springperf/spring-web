@@ -52,7 +52,9 @@ class AccessLogE2eTest {
                 files.filter(p -> p.getFileName().toString().endsWith(".log")).forEach(p -> {
                     try {
                         sb.append(Files.readString(p));
-                    } catch (IOException ignored) {
+                    } catch (IOException e) {
+                        // 日志读取失败必须让用例显式失败：静默跳过会伪装成「日志没写」
+                        throw new java.io.UncheckedIOException("读取访问日志失败: " + p, e);
                     }
                 });
             }

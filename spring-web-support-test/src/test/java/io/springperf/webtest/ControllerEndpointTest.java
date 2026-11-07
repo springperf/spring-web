@@ -12,6 +12,7 @@ import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class ControllerEndpointTest extends BaseE2ETest {
 
@@ -52,6 +53,9 @@ public class ControllerEndpointTest extends BaseE2ETest {
         Request req = new Request.Builder().url(baseUrl() + "/demo/echo").post(body).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(201, resp.code());
+            String responseBody = resp.body().string();
+            assertTrue(responseBody.contains("\"message\":\"test\""), "POST echo 应回显请求体，实际 " + responseBody);
+            assertTrue(responseBody.contains("\"received\":true"), "POST echo 应补写 received=true，实际 " + responseBody);
         }
     }
 
@@ -59,8 +63,9 @@ public class ControllerEndpointTest extends BaseE2ETest {
     void testAsyncEndpoint() throws Exception {
         Request req = new Request.Builder().url(baseUrl() + "/demo/async").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            assertEquals(200, resp.code(),
-                    "async 端点异常，body=" + resp.body().string() + " retry-after=" + resp.header("Retry-After"));
+            String responseBody = resp.body().string();
+            assertEquals(200, resp.code(), "async 端点异常，body=" + responseBody);
+            assertTrue(responseBody.contains("\"now\":"), "异步端点应返回 now 时间戳，实际 " + responseBody);
         }
     }
 }

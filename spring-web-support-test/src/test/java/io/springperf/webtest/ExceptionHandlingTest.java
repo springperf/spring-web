@@ -7,7 +7,6 @@ import okhttp3.Response;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class ExceptionHandlingTest extends BaseE2ETest {
 
@@ -29,7 +28,7 @@ public class ExceptionHandlingTest extends BaseE2ETest {
                 .method("DELETE", RequestBody.create(MediaType.parse("text/plain"), "")).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             int code = resp.code();
-            assertTrue(code == 405 || code == 404, "Expected 405 or 404, got " + code);
+            assertEquals(405, code, "DELETE /echo 应返回 405 Method Not Allowed, got " + code);
         }
     }
 }

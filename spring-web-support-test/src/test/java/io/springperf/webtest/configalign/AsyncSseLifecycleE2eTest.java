@@ -20,6 +20,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Flow;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -149,13 +150,15 @@ class AsyncSseLifecycleE2eTest {
         int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-async/sse-error")) {
             assertEquals(200, resp.code());
+            boolean truncated = false;
             try {
                 resp.body().string();
             } catch (java.io.IOException expected) {
                 // 设计要求如此：异常终止不写 LastHttpContent、直接关闭连接，让客户端感知
                 // 「异常截断」——chunked 流读到 EOF 正是该信号（见 onAllDataFailed 注释）。
-                // 此处只要求：请求不悬挂、且不出现双重终止块（编码器异常）。
+                truncated = true;
             }
+            assertTrue(truncated, "业务异常终止必须让客户端读到截断的 chunked 流（不得写 LastHttpContent）");
         }
         assertRefsBackTo(baseline);
     }
@@ -165,9 +168,10 @@ class AsyncSseLifecycleE2eTest {
         int baseline = activeRequestRefs();
         try (Response resp = get("/e2e-async/dr-late")) {
             int code = resp.code();
-            resp.body().string();
-            // 超时响应状态码由框架实现决定；此处只要求「请求不悬挂」（结果迟到不得二次写）
-            assertTrue(code >= 200 && code < 600, "应得到确定的状态码，实际 " + code);
+            String body = resp.body().string();
+            // 超时必须落到确定的超时类状态码，且迟到的结果不得被补写进响应
+            assertTrue(code == 503 || code == 504, "DeferredResult 超时应映射为 503/504，实际 " + code + ", body=" + body);
+            assertFalse(body.contains("late-result"), "迟到的处理器结果不得二次写入响应，实际:\n" + body);
         }
         assertRefsBackTo(baseline);
     }

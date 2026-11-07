@@ -97,6 +97,7 @@ class WebSocketE2eTest extends BaseE2ETest {
     void multipleTextMessages_allEchoed() throws Exception {
         CountDownLatch latch = new CountDownLatch(3);
         java.util.List<String> received = new java.util.concurrent.CopyOnWriteArrayList<>();
+        AtomicReference<Throwable> failure = new AtomicReference<>();
 
         wsClient = new OkHttpClient.Builder().readTimeout(5, TimeUnit.SECONDS).build();
         Request request = new Request.Builder().url(wsUrl("/ws/echo")).build();
@@ -116,12 +117,14 @@ class WebSocketE2eTest extends BaseE2ETest {
 
             @Override
             public void onFailure(@NotNull WebSocket ws, @NotNull Throwable t, Response response) {
+                failure.set(t);
                 while (latch.getCount() > 0)
                     latch.countDown();
             }
         });
 
         assertTrue(latch.await(5, TimeUnit.SECONDS), "timeout waiting for messages");
+        assertNull(failure.get(), "WebSocket 连接失败: " + failure.get());
         assertEquals(3, received.size());
         assertTrue(received.containsAll(java.util.Arrays.asList("msg1", "msg2", "msg3")));
     }
@@ -234,6 +237,7 @@ class WebSocketE2eTest extends BaseE2ETest {
         int totalMessages = threadCount * messagesPerThread;
         CountDownLatch latch = new CountDownLatch(totalMessages);
         java.util.List<String> received = new java.util.concurrent.CopyOnWriteArrayList<>();
+        AtomicReference<Throwable> failure = new AtomicReference<>();
 
         wsClient = new OkHttpClient.Builder().readTimeout(10, TimeUnit.SECONDS).build();
         Request request = new Request.Builder().url(wsUrl("/ws/echo")).build();
@@ -253,12 +257,14 @@ class WebSocketE2eTest extends BaseE2ETest {
 
             @Override
             public void onFailure(@NotNull WebSocket ws, @NotNull Throwable t, Response response) {
+                failure.set(t);
                 while (latch.getCount() > 0)
                     latch.countDown();
             }
         });
 
         assertTrue(openLatch.await(5, TimeUnit.SECONDS), "connection not opened");
+        assertNull(failure.get(), "WebSocket 连接失败: " + failure.get());
 
         // 多线程并发发送
         java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(threadCount);
@@ -271,7 +277,7 @@ class WebSocketE2eTest extends BaseE2ETest {
             });
         }
         executor.shutdown();
-        executor.awaitTermination(10, TimeUnit.SECONDS);
+        assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS), "并发发送任务应在 10s 内完成");
 
         assertTrue(latch.await(15, TimeUnit.SECONDS),
                 "timeout waiting for " + totalMessages + " messages, got " + received.size());

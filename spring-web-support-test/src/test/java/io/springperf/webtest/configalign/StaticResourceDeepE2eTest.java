@@ -126,7 +126,7 @@ class StaticResourceDeepE2eTest {
     void pathTraversal_rejectedAs404() throws Exception {
         okhttp3.Response resp = get("/e2e-note.txt/../../application.properties");
         try {
-            assertTrue(resp.code() == 404 || resp.code() == 400, "路径穿越应被拒绝（404/400），实际 " + resp.code());
+            assertEquals(404, resp.code(), "路径穿越应按 404 拒绝，实际 " + resp.code());
         } finally {
             resp.close();
         }

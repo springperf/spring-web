@@ -148,7 +148,7 @@ class ConnectionProtectionE2eTest {
         while (System.currentTimeMillis() < deadline) {
             try (Socket s = open()) {
                 write(s, "GET /e2e-proto/ok HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
-                if (readUntilEof(s).contains("200")) {
+                if (readUntilEof(s).contains("HTTP/1.1 200")) {
                     return true;
                 }
             } catch (IOException ignored) {
@@ -167,8 +167,8 @@ class ConnectionProtectionE2eTest {
                 Socket b = open()) {
             write(a, okRequest());
             write(b, okRequest());
-            assertTrue(readUntilEof(a).contains("200"), "限额内的第 1 个连接应被服务");
-            assertTrue(readUntilEof(b).contains("200"), "限额内的第 2 个连接应被服务");
+            assertTrue(readUntilEof(a).contains("HTTP/1.1 200"), "限额内的第 1 个连接应被服务");
+            assertTrue(readUntilEof(b).contains("HTTP/1.1 200"), "限额内的第 2 个连接应被服务");
         }
         assertTrue(awaitServiceable(), "释放后应能继续服务");
     }
@@ -182,8 +182,8 @@ class ConnectionProtectionE2eTest {
             // 必须「精确读完整响应」，不能等 socket 读超时：readUntilEof 会各等满 5s，
             // 期间 server.http.read-timeout=1s 会把这两条空闲连接回收、腾出限额，
             // 第 3 个连接就不再被拒（本用例曾在整包运行中因此假失败）。
-            assertTrue(readOneResponse(a).contains("200"));
-            assertTrue(readOneResponse(b).contains("200"));
+            assertTrue(readOneResponse(a).contains("HTTP/1.1 200"));
+            assertTrue(readOneResponse(b).contains("HTTP/1.1 200"));
 
             // 第 3 个连接：超过 server.max-connections=2，应在 TCP 层被直接关闭
             try (Socket c = open()) {
@@ -201,8 +201,8 @@ class ConnectionProtectionE2eTest {
         try {
             write(a, "GET /e2e-proto/ok HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
             write(b, okRequest());
-            assertTrue(readUntilEof(a).contains("200"));
-            assertTrue(readUntilEof(b).contains("200"));
+            assertTrue(readUntilEof(a).contains("HTTP/1.1 200"));
+            assertTrue(readUntilEof(b).contains("HTTP/1.1 200"));
 
             // a 已由服务端关闭（Connection: close）→ 计数应随之释放
             assertTrue(awaitServiceable(), "客户端声明 Connection: close 后连接应被回收，腾出限额");
@@ -219,8 +219,8 @@ class ConnectionProtectionE2eTest {
         try {
             write(a, okRequest());
             write(b, okRequest());
-            assertTrue(readUntilEof(a).contains("200"));
-            assertTrue(readUntilEof(b).contains("200"));
+            assertTrue(readUntilEof(a).contains("HTTP/1.1 200"));
+            assertTrue(readUntilEof(b).contains("HTTP/1.1 200"));
         } finally {
             a.close();
         }
@@ -250,7 +250,7 @@ class ConnectionProtectionE2eTest {
     void keepAliveIdle_afterResponse_closedByReadTimeout() throws Exception {
         try (Socket s = open()) {
             write(s, okRequest());
-            assertTrue(readUntilEof(s).contains("200"), "首个请求应正常响应");
+            assertTrue(readUntilEof(s).contains("HTTP/1.1 200"), "首个请求应正常响应");
             // 复用连接但不发新请求：空闲超过 read-timeout 应被回收
             assertTrue(awaitEof(s, 4000), "保持连接空闲超过 read-timeout 应被关闭");
         }

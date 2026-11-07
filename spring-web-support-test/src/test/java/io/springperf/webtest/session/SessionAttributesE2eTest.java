@@ -71,8 +71,8 @@ public class SessionAttributesE2eTest extends BaseE2ETest {
         try (Response resp = clientB.newCall(new Request.Builder().url(baseUrl() + "/step2").get().build()).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
-            assertTrue(body.contains("\"name\":null") || !body.contains("\"name\":\"a\""),
-                    "isolated session should NOT see name=a, got: " + body);
+            assertTrue(body.contains("\"name\":null"),
+                    "isolated session should see an empty wizard (name=null), got: " + body);
         }
         // A 会话仍保留
         try (Response resp = clientA.newCall(new Request.Builder().url(baseUrl() + "/step2").get().build()).execute()) {

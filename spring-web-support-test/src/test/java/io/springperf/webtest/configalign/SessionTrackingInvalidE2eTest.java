@@ -17,7 +17,7 @@ class SessionTrackingInvalidE2eTest {
 
     @Test
     void invalidTrackingMode_failsFastOnStartup() {
-        Throwable thrown = assertThrows(Throwable.class,
+        RuntimeException thrown = assertThrows(RuntimeException.class,
                 () -> new SpringApplication(ConfigAlignTestApp.class).run("--server.port=0",
                         "--server.servlet.context-path=/", "--server.servlet.session.tracking-modes=nope"),
                 "非法 tracking-modes 应在启动期失败");
