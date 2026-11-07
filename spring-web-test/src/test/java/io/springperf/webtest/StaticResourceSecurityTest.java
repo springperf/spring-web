@@ -164,21 +164,29 @@ public class StaticResourceSecurityTest extends BaseE2ETest {
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(405, resp.code(), "静态资源 POST 应返回 405 Method Not Allowed");
+            assertEquals("GET", resp.header("Allow"),
+                    "静态资源 405 应返回 Allow 头，实际响应头: " + resp.headers());
         }
     }
 
     /** HEAD 应自动映射到 GET（RFC 7231 §4.3.2），返回 200 且无 body */
     @Test
     void staticResource_withHead_shouldReturn200NoBody() throws Exception {
-        Request req = new Request.Builder()
-                .url(base() + "/static/test.txt")
-                .head()
-                .build();
+        // HEAD 的 Content-Length 必须与 GET 的实际字节数一致，仅判头存在抓不到长度错配
+        Request getReq = new Request.Builder().url(base() + "/static/test.txt").get().build();
+        int expectedLength;
+        try (Response getResp = CLIENT.newCall(getReq).execute()) {
+            expectedLength = getResp.body().bytes().length;
+        }
+
+        Request req = new Request.Builder().url(base() + "/static/test.txt").head().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code(), "静态资源 HEAD 应自动映射到 GET 返回 200");
             String body = resp.body() != null ? resp.body().string() : null;
             assertTrue(body == null || body.isEmpty(), "HEAD 不应有 body，实际: " + body);
-            assertNotNull(resp.header("Content-Length"));
+            String contentLength = resp.header("Content-Length");
+            assertNotNull(contentLength, "HEAD 应返回 Content-Length");
+            assertEquals(expectedLength, Integer.parseInt(contentLength), "HEAD Content-Length 应等于 GET body 字节数");
         }
     }
 
@@ -191,6 +199,8 @@ public class StaticResourceSecurityTest extends BaseE2ETest {
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(405, resp.code(), "静态资源 DELETE 应返回 405");
+            assertEquals("GET", resp.header("Allow"),
+                    "静态资源 405 应返回 Allow 头，实际响应头: " + resp.headers());
         }
     }
 }

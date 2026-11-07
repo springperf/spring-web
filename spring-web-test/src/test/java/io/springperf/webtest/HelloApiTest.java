@@ -109,7 +109,9 @@ public class HelloApiTest extends BaseE2ETest {
         Request req = new Request.Builder().url(baseUrl() + "/async").get().build();
         try (Response resp = shortClient.newCall(req).execute()) {
             assertEquals(200, resp.code());
-            assertNotNull(resp.body().string());
+            String body = resp.body().string();
+            Map<String, Object> result = JSON.parseObject(body, Map.class);
+            assertTrue(result.get("now") instanceof Number, "/async 应返回 {\"now\":<时间戳>}，实际: " + body);
         }
     }
 
@@ -137,61 +139,63 @@ public class HelloApiTest extends BaseE2ETest {
     @Test
     void testSse() throws Exception {
         Request request = new Request.Builder().url(baseUrl() + "/sse").get().build();
-        CountDownLatch latch = new CountDownLatch(8);
-        CLIENT.newCall(request).enqueue(new Callback() {
-            @Override
-            public void onFailure(Call call, IOException e) {
-                fail("SSE request failed: " + e.getMessage());
-            }
-
-            @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                assertEquals(200, response.code());
-                assertTrue(response.header("Content-Type").contains("text/event-stream"));
-                BufferedSource source = response.body().source();
-                while (!source.exhausted()) {
-                    String line = source.readUtf8Line();
-                    System.out.println("line: " + line);
-                    if (line == null) continue;
-                    if (line.startsWith("data:")) {
-                        latch.countDown();
-                    }
-                }
-            }
-        });
-        assertTrue(latch.await(5, TimeUnit.SECONDS),
-                "Should receive at least 8 SSE events within timeout");
+        assertSseFrames(request, "world + ");
     }
 
     @Test
     void testSseFast() throws Exception {
         // 测试 TaskExecutor 快速发送场景（0间隔），验证 complete() before initialize() 竞态已修复
         Request request = new Request.Builder().url(baseUrl() + "/sse-fast").get().build();
-        AtomicInteger count = new AtomicInteger(0);
-        CountDownLatch latch = new CountDownLatch(1);
+        assertSseFrames(request, "fast-");
+    }
+
+    /** 回调线程内的 JUnit 断言失败只会表现为超时，故收集全部帧后由主线程精确断言。 */
+    private void assertSseFrames(Request request, String expectedPrefix) throws Exception {
+        CountDownLatch done = new CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicReference<Throwable> failure = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.ConcurrentLinkedQueue<String> frames = new java.util.concurrent.ConcurrentLinkedQueue<>();
+        java.util.concurrent.atomic.AtomicInteger status = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.atomic.AtomicReference<String> contentType = new java.util.concurrent.atomic.AtomicReference<>();
         CLIENT.newCall(request).enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
-                fail("SSE fast request failed: " + e.getMessage());
+                failure.set(e);
+                done.countDown();
             }
 
             @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                assertEquals(200, response.code());
-                assertTrue(response.header("Content-Type").contains("text/event-stream"));
-                BufferedSource source = response.body().source();
-                while (!source.exhausted()) {
-                    String line = source.readUtf8Line();
-                    if (line == null) continue;
-                    System.out.println(line);
-                    if (line.startsWith("data:")) {
-                        count.incrementAndGet();
+            public void onResponse(Call call, Response response) {
+                try (Response resp = response) {
+                    status.set(resp.code());
+                    contentType.set(resp.header("Content-Type"));
+                    BufferedSource source = resp.body().source();
+                    while (!source.exhausted()) {
+                        String line = source.readUtf8Line();
+                        if (line != null && line.startsWith("data:")) {
+                            frames.add(unquote(line.substring(5).trim()));
+                        }
                     }
+                } catch (Throwable t) {
+                    failure.set(t);
+                } finally {
+                    done.countDown();
                 }
-                latch.countDown();
             }
         });
-        assertTrue(latch.await(5, TimeUnit.SECONDS), "SSE fast should complete within timeout");
-        assertTrue(count.get() >= 10, "Should receive all 10 fast SSE events, got: " + count.get());
+        assertTrue(done.await(10, TimeUnit.SECONDS), "SSE 应在超时前结束");
+        assertNull(failure.get(), "SSE 请求不得失败: " + failure.get());
+        assertEquals(200, status.get());
+        assertTrue(contentType.get() != null && contentType.get().contains("text/event-stream"),
+                "SSE Content-Type 应为 text/event-stream，实际: " + contentType.get());
+        assertEquals(10, frames.size(), "应收到全部 10 帧，实际帧: " + frames);
+        int i = 0;
+        for (String frame : frames) {
+            assertEquals(expectedPrefix + i, frame, "第 " + i + " 帧内容或顺序不正确，实际帧: " + frames);
+            i++;
+        }
+    }
+
+    private static String unquote(String s) {
+        return s.length() >= 2 && s.startsWith("\"") && s.endsWith("\"") ? s.substring(1, s.length() - 1) : s;
     }
 }

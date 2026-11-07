@@ -128,8 +128,9 @@ public class RawH2cServerTest {
                     .build();
 
             try (Response response = client.newCall(request).execute()) {
-                System.out.println("Status: " + response.code() + " Body: " + response.body().string());
-                assertTrue(response.isSuccessful());
+                String body = response.body().string();
+                assertEquals(200, response.code(), "自定义 h2c 服务应返回 200，实际: " + response.code());
+                org.junit.jupiter.api.Assertions.assertFalse(body.isEmpty(), "自定义 h2c 服务应返回非空 body");
                 assertEquals(Protocol.H2_PRIOR_KNOWLEDGE, response.protocol());
             }
 

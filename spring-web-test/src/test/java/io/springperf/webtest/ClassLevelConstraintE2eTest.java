@@ -28,6 +28,9 @@ public class ClassLevelConstraintE2eTest extends BaseE2ETest {
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
+            String respBody = resp.body().string();
+            assertEquals("ok", com.alibaba.fastjson2.JSON.parseObject(respBody).getString("status"),
+                    "类级约束端点应返回 {\"status\":\"ok\"}，实际: " + respBody);
         }
     }
 

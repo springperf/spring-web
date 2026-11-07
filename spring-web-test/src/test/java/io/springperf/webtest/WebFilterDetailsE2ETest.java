@@ -23,8 +23,7 @@ public class WebFilterDetailsE2ETest extends BaseE2ETest {
                 .get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(404, resp.code());
-            assertNotNull(resp.header("X-Test-Filter"),
-                    "即使 404，filter 也应执行并添加响应头");
+            assertEquals("applied", resp.header("X-Test-Filter"), "即使 404，filter 也应写入精确头值");
         }
     }
 
@@ -35,8 +34,7 @@ public class WebFilterDetailsE2ETest extends BaseE2ETest {
                 .get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(500, resp.code());
-            assertNotNull(resp.header("X-Test-Filter"),
-                    "异常响应也应经过 filter 链");
+            assertEquals("applied", resp.header("X-Test-Filter"), "异常响应也应经过 filter 链并写入精确头值");
         }
     }
 
@@ -60,6 +58,7 @@ public class WebFilterDetailsE2ETest extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(403, resp.code());
             assertEquals("blocked", resp.header("X-Blocking-Filter"));
+            assertFalse(resp.body().string().contains("not-reach-here"), "阻断后 handler 不得执行");
         }
     }
 }

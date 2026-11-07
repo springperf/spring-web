@@ -25,8 +25,8 @@ public class CoreFeaturesParamAdvancedTest extends BaseE2ETest {
             assertEquals(200, resp.code());
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
             assertEquals("hello", body.get("required"));
-            // Verify the response handles missing optional/defaultValue params gracefully
-            assertNotNull(body, "Response body should not be null");
+            // 未传 def 时应回落到 @RequestParam(defaultValue = "defaultVal")
+            assertEquals("defaultVal", body.get("withDefault"));
         }
     }
 
@@ -82,8 +82,8 @@ public class CoreFeaturesParamAdvancedTest extends BaseE2ETest {
             assertEquals(200, resp.code());
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
             assertEquals("req-value", body.get("required"));
-            // optional header not sent - verify response handles it
-            assertNotNull(body, "Response body should not be null");
+            // 未传 X-With-Default 时应回落到 @RequestHeader(defaultValue = "defaultHeaderVal")
+            assertEquals("defaultHeaderVal", body.get("withDefault"));
         }
     }
 

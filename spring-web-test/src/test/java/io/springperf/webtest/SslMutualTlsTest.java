@@ -132,10 +132,12 @@ public class SslMutualTlsTest {
                 .get()
                 .build();
         // client-auth=need 下，缺少客户端证书会触发 TLS 握手失败（IO 层异常）
-        assertThrows(java.io.IOException.class, () -> {
+        java.io.IOException ex = assertThrows(java.io.IOException.class, () -> {
             try (Response resp = clientWithoutCert().newCall(req).execute()) {
-                assertTrue(resp.code() >= 400, "缺证书不应返回 2xx，实际 " + resp.code());
+                org.junit.jupiter.api.Assertions.fail("缺客户端证书时不应成功返回响应，实际状态码: " + resp.code());
             }
         });
+        org.junit.jupiter.api.Assertions.assertFalse(ex instanceof java.net.SocketTimeoutException,
+                "超时不能算作 mTLS 握手拒绝，实际: " + ex);
     }
 }

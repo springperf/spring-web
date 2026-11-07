@@ -71,8 +71,8 @@ public class ActuatorHealthTest extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String contentType = resp.header("Content-Type", "");
-            assertTrue(contentType.contains("vnd.spring-boot.actuator.v3")
-                    || contentType.contains("json"), "V3 Accept should be accepted: " + contentType);
+            assertEquals("application/vnd.spring-boot.actuator.v3+json", contentType.split(";")[0].trim(),
+                    "V3 Accept 应产出 v3 media type，实际: " + contentType);
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
             assertEquals("UP", body.get("status"));
         }
@@ -87,6 +87,9 @@ public class ActuatorHealthTest extends BaseE2ETest {
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
+            String contentType = resp.header("Content-Type", "");
+            assertEquals("application/vnd.spring-boot.actuator.v2+json", contentType.split(";")[0].trim(),
+                    "V2 Accept 应产出 v2 media type，实际: " + contentType);
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
             assertEquals("UP", body.get("status"));
         }

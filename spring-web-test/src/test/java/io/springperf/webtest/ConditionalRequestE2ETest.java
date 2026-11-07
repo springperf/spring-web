@@ -22,7 +22,7 @@ public class ConditionalRequestE2ETest extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
-            assertTrue(body.contains("Hello, Static Resource!"));
+            assertEquals("Hello, Static Resource!", body.trim(), "静态资源应返回完整内容");
             String etag = resp.header("ETag");
             assertNotNull(etag, "静态资源应返回 ETag");
             assertNotNull(resp.header("Last-Modified"), "静态资源应返回 Last-Modified");
@@ -70,7 +70,7 @@ public class ConditionalRequestE2ETest extends BaseE2ETest {
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code(), "ETag 不匹配应返回 200");
-            assertTrue(resp.body().string().contains("Hello"));
+            assertEquals("Hello, Static Resource!", resp.body().string().trim(), "应返回完整静态资源内容");
         }
     }
 
@@ -100,22 +100,32 @@ public class ConditionalRequestE2ETest extends BaseE2ETest {
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code(), "If-Modified-Since 早于 Last-Modified 应返回 200");
-            assertTrue(resp.body().string().contains("Hello"));
+            assertEquals("Hello, Static Resource!", resp.body().string().trim(), "应返回完整静态资源内容");
         }
     }
 
     @Test
     void headRequest_staticResource_noBodyButHeaders() throws Exception {
+        // 先用 GET 取得真实元数据，HEAD 只断言"存在"无法发现长度/ETag 错配
+        Request getReq = new Request.Builder().url(staticUrl() + "/test.txt").get().build();
+        int expectedLength;
+        String expectedEtag;
+        try (Response getResp = CLIENT.newCall(getReq).execute()) {
+            expectedLength = getResp.body().bytes().length;
+            expectedEtag = getResp.header("ETag");
+        }
+
         Request req = new Request.Builder().url(staticUrl() + "/test.txt").head().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body() != null ? resp.body().string() : null;
             assertTrue(body == null || body.isEmpty(), "HEAD 不应有 body，实际: " + body);
-            // HEAD 仍应返回真实元数据头
-            assertNotNull(resp.header("Content-Length"), "HEAD 应返回 Content-Length");
-            assertNotNull(resp.header("ETag"), "HEAD 应返回 ETag");
+            assertEquals(expectedLength, Integer.parseInt(resp.header("Content-Length")),
+                    "HEAD 的 Content-Length 应等于 GET body 字节数");
+            assertEquals(expectedEtag, resp.header("ETag"), "HEAD 的 ETag 应与 GET 一致");
             assertNotNull(resp.header("Last-Modified"), "HEAD 应返回 Last-Modified");
-            assertNotNull(resp.header("Content-Type"), "HEAD 应返回 Content-Type");
+            assertEquals("text/plain", resp.header("Content-Type", "").split(";")[0].trim(),
+                    "HEAD 的 Content-Type 应为 text/plain，实际: " + resp.header("Content-Type"));
         }
     }
 

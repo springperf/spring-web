@@ -33,21 +33,17 @@ public class LargeBodyE2ETest extends BaseE2ETest {
 
     @Test
     void largePost_shouldReturn201() throws Exception {
-        Request req = new Request.Builder()
-                .url(url("/api/demo/echo"))
-                .post(RequestBody.create(JSON_MEDIA, LARGE_BODY))
+        String expectedData = JSON.parseObject(LARGE_BODY).getString("data");
+        Request req = new Request.Builder().url(url("/api/demo/echo")).post(RequestBody.create(JSON_MEDIA, LARGE_BODY))
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            System.out.println("Status: " + resp.code());
-            String body = resp.body().string();
-            System.out.println("Body length: " + body.length());
             assertEquals(201, resp.code());
-
             @SuppressWarnings("unchecked")
-            Map<String, Object> map = JSON.parseObject(body, Map.class);
-            assertTrue(map.containsKey("received"));
+            Map<String, Object> map = JSON.parseObject(resp.body().string(), Map.class);
             assertEquals(true, map.get("received"));
             assertEquals(10240, map.get("count"));
+            assertEquals(expectedData, map.get("data"), "100KB data 必须逐字节完整回显，实际长度: "
+                    + String.valueOf(map.get("data")).length());
         }
     }
 
@@ -57,6 +53,8 @@ public class LargeBodyE2ETest extends BaseE2ETest {
         int threadCount = 4;
         int requestsPerThread = 5;
         java.util.concurrent.atomic.AtomicInteger failures = new java.util.concurrent.atomic.AtomicInteger(0);
+        java.util.concurrent.atomic.AtomicReference<Throwable> firstError = new java.util.concurrent.atomic.AtomicReference<>();
+        String expectedData = JSON.parseObject(LARGE_BODY).getString("data");
 
         Thread[] threads = new Thread[threadCount];
         for (int t = 0; t < threadCount; t++) {
@@ -68,13 +66,15 @@ public class LargeBodyE2ETest extends BaseE2ETest {
                                 .post(RequestBody.create(JSON_MEDIA, LARGE_BODY))
                                 .build();
                         try (Response resp = CLIENT.newCall(req).execute()) {
-                            if (resp.code() != 201) {
-                                System.err.println("FAIL: " + resp.code() + " " + resp.body().string());
+                            @SuppressWarnings("unchecked")
+                            Map<String, Object> map = JSON.parseObject(resp.body().string(), Map.class);
+                            if (resp.code() != 201 || !Integer.valueOf(10240).equals(map.get("count"))
+                                    || !expectedData.equals(map.get("data"))) {
                                 failures.incrementAndGet();
                             }
                         }
-                    } catch (Exception e) {
-                        System.err.println("EXCEPTION: " + e.getMessage());
+                    } catch (Throwable e) {
+                        firstError.compareAndSet(null, e);
                         failures.incrementAndGet();
                     }
                 }
@@ -84,6 +84,7 @@ public class LargeBodyE2ETest extends BaseE2ETest {
         for (Thread t : threads) {
             t.join();
         }
-        assertEquals(0, failures.get(), "Concurrent large POST requests should all succeed");
+        org.junit.jupiter.api.Assertions.assertNull(firstError.get(), "并发请求不得抛异常: " + firstError.get());
+        assertEquals(0, failures.get(), "20 个并发大请求都应返回 201 且 data 完整");
     }
 }

@@ -71,19 +71,15 @@ public class SslServerTest {
     @Test
     void httpRequest_shouldBeRejected() {
         // 主端口仅监听 HTTPS：明文 HTTP 请求应因 TLS 握手失败被拒绝（IO 层异常），而非返回 200
-        Request req = new Request.Builder()
-                .url(url("/api/actuator/health"))
-                .get()
-                .build();
-        assertThrows(java.io.IOException.class, () -> {
-            try (Response resp = new OkHttpClient.Builder()
-                    .connectTimeout(Duration.ofSeconds(2))
-                    .readTimeout(Duration.ofSeconds(2))
-                    .build()
-                    .newCall(req).execute()) {
+        Request req = new Request.Builder().url(url("/api/actuator/health")).get().build();
+        java.io.IOException ex = assertThrows(java.io.IOException.class, () -> {
+            try (Response resp = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(2))
+                    .readTimeout(Duration.ofSeconds(2)).build().newCall(req).execute()) {
                 // Should not reach here
             }
         });
+        org.junit.jupiter.api.Assertions.assertFalse(ex instanceof java.net.SocketTimeoutException,
+                "超时不能算作 TLS 握手拒绝（可能只是端口未监听），实际: " + ex);
     }
 
     private static SSLContext trustAllSslContext() {

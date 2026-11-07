@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 回归 #11：{@code WebServerInitializedEvent} 必须在服务器启动阶段发布，早于 {@code ApplicationReadyEvent}，
@@ -26,13 +25,16 @@ class WebServerInitializedEventOrderTest {
     @Autowired
     Recorder recorder;
 
+    @org.springframework.boot.test.web.server.LocalServerPort
+    int serverPort;
+
     @Test
     void webServerInitializedEvent_isPublishedBeforeApplicationReady() {
         List<String> events = recorder.events;
         assertEquals(2, events.size(), "应恰好记录一次初始化事件与一次 ready 事件: " + events);
         assertEquals("initialized", events.get(0), "WebServerInitializedEvent 必须先发布");
         assertEquals("ready", events.get(1));
-        assertTrue(recorder.port > 0, "事件必须携带真实绑定端口");
+        assertEquals(serverPort, recorder.port, "事件端口应等于实际绑定端口，实际: " + recorder.port);
     }
 
     static class Recorder {

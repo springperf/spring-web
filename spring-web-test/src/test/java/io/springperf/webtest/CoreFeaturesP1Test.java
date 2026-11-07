@@ -64,6 +64,9 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(201, resp.code());
+            String body = resp.body().string();
+            assertEquals(201, com.alibaba.fastjson2.JSON.parseObject(body).getIntValue("status"),
+                    "@ResponseStatus 端点应返回 {\"status\":201}，实际: " + body);
         }
     }
 
@@ -75,6 +78,9 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(202, resp.code());
+            String body = resp.body().string();
+            assertEquals(202, com.alibaba.fastjson2.JSON.parseObject(body).getIntValue("status"),
+                    "@ResponseStatus 端点应返回 {\"status\":202}，实际: " + body);
         }
     }
 
@@ -125,11 +131,11 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
                 .method("OPTIONS", null)
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            int code = resp.code();
-            assertTrue(code == 200 || code == 204);
+            assertEquals(200, resp.code(), "类级 @CrossOrigin 预检应返回确定状态码，实际: " + resp.code());
             String allowOrigin = resp.header("Access-Control-Allow-Origin");
-            assertNotNull(allowOrigin);
-            assertTrue(allowOrigin.contains("class-level.example.com"));
+            assertEquals("http://class-level.example.com", allowOrigin,
+                    "类级 @CrossOrigin 应精确回显允许的来源，实际: " + resp.headers());
+            assertNotNull(resp.header("Access-Control-Allow-Methods"), "预检应返回 Allow-Methods");
         }
     }
 
@@ -143,8 +149,8 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String allowOrigin = resp.header("Access-Control-Allow-Origin");
-            assertNotNull(allowOrigin);
-            assertTrue(allowOrigin.contains("class-level.example.com"));
+            assertEquals("http://class-level.example.com", allowOrigin,
+                    "类级 @CrossOrigin 实际请求应精确回显来源，实际: " + resp.headers());
         }
     }
 
@@ -152,38 +158,43 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
 
     @Test
     void sseJsonEmitter_receivesSseEvents() throws Exception {
-        Request req = new Request.Builder()
-                .url(p1Url() + "/sse-json")
-                .get()
-                .build();
-        CountDownLatch latch = new CountDownLatch(1);
+        Request req = new Request.Builder().url(p1Url() + "/sse-json").get().build();
+        CountDownLatch done = new CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicReference<Throwable> failure = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<String> data = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicInteger status = new java.util.concurrent.atomic.AtomicInteger();
         CLIENT.newCall(req).enqueue(new okhttp3.Callback() {
             @Override
             public void onFailure(okhttp3.Call call, java.io.IOException e) {
-                fail("SSE request failed: " + e.getMessage());
+                failure.set(e);
+                done.countDown();
             }
 
             @Override
             public void onResponse(okhttp3.Call call, Response response) {
-                assertEquals(200, response.code());
-                assertNotNull(response.header("Content-Type"));
-                try {
-                    BufferedSource source = response.body().source();
+                try (Response resp = response) {
+                    status.set(resp.code());
+                    BufferedSource source = resp.body().source();
                     while (!source.exhausted()) {
                         String line = source.readUtf8Line();
                         if (line != null && line.startsWith("data:")) {
-                            String data = line.substring(5).trim();
-                            assertTrue(data.contains("hello"), "SSE data should contain msg");
-                            latch.countDown();
+                            data.set(line.substring(5).trim());
                             break;
                         }
                     }
-                } catch (Exception e) {
-                    fail("Failed to read SSE stream: " + e.getMessage());
+                } catch (Throwable t) {
+                    failure.set(t);
+                } finally {
+                    done.countDown();
                 }
             }
         });
-        assertTrue(latch.await(10, TimeUnit.SECONDS), "Should receive SSE event within timeout");
+        assertTrue(done.await(10, TimeUnit.SECONDS), "SSE 事件应在超时前收到");
+        assertNull(failure.get(), "SSE 请求不得失败: " + failure.get());
+        assertEquals(200, status.get());
+        assertNotNull(data.get(), "应收到 SSE data 帧");
+        assertEquals("hello", com.alibaba.fastjson2.JSON.parseObject(data.get()).getString("msg"),
+                "SSE data 应为 {\"msg\":\"hello\"}，实际: " + data.get());
     }
 
     // ==================== 7. @Optimize 启用 ====================
@@ -196,6 +207,9 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
+            String body = resp.body().string();
+            assertEquals(true, com.alibaba.fastjson2.JSON.parseObject(body).get("optimized"),
+                    "@Optimize 端点应返回 {\"optimized\":true}，实际: " + body);
         }
     }
 
@@ -212,7 +226,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
-            assertTrue(body.contains("Hello"), "Resource should contain file content");
+            assertEquals("Hello, Static Resource!", body.trim(), "资源下载应返回 test.txt 完整内容，实际: " + body);
         }
     }
 
@@ -224,9 +238,8 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
-            String body = resp.body().string();
-            assertNotNull(body);
-            assertFalse(body.isEmpty(), "File download should return content");
+            // 端点返回模块根目录的 pom.xml：逐字节比对，任意非空响应（含错误页）都不再能通过
+            assertArrayEquals(java.nio.file.Files.readAllBytes(new java.io.File("pom.xml").toPath()), resp.body().bytes());
         }
     }
 
@@ -290,8 +303,8 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
-            assertTrue(body.contains("duplicate"),
-                    "Response should indicate which duplicate method was invoked, got: " + body);
+            assertTrue(body.matches("duplicate-(first|second)"),
+                    "应命中两个重复 mapping 中的某一个方法，实际: " + body);
         }
     }
 }

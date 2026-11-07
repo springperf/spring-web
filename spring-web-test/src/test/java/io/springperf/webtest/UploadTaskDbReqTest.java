@@ -42,7 +42,7 @@ public class UploadTaskDbReqTest extends BaseE2ETest {
             assertEquals(1, ((Number) body.get("seq")).intValue());
             assertEquals("1.0,2.0", body.get("dbVersionList"));
             assertEquals("test.sql", body.get("fileOriginalFilename"));
-            assertNotNull(body.get("fileSize"));
+            assertEquals(27, ((Number) body.get("fileSize")).intValue(), "上传内容应为 27 字节完整回读");
         }
     }
 
@@ -71,7 +71,7 @@ public class UploadTaskDbReqTest extends BaseE2ETest {
             assertEquals(2, ((Number) body.get("seq")).intValue());
             assertNull(body.get("dbVersionList"));
             assertEquals("data.sql", body.get("fileOriginalFilename"));
-            assertNotNull(body.get("fileSize"));
+            assertEquals(9, ((Number) body.get("fileSize")).intValue(), "上传内容应为 9 字节完整回读");
         }
     }
 

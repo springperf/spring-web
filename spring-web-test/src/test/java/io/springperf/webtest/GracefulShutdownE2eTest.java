@@ -83,16 +83,32 @@ public class GracefulShutdownE2eTest {
         assertNotNull(slow);
         assertEquals(200, slow.code(), "in-flight 请求应返回 200，实际 " + slow.code());
         String body = slow.body() != null ? slow.body().string() : "";
-        assertFalse(body.isEmpty(), "in-flight 请求 body 应为完整输出");
+        assertTrue(com.alibaba.fastjson2.JSON.parseObject(body).get("now") instanceof Number,
+                "in-flight 请求应完整返回 {\"now\":<时间戳>}，实际: " + body);
 
-        // 4. 停机后新请求被拒绝（503 或连接被拒）
+        // 4. 停机后新请求被拒绝（503 或连接被拒）；超时/EOF 等基础设施故障不算成功停机
         Request newReq = new Request.Builder().url(url("/api/core/bytes")).get().build();
         boolean rejected = false;
         try (Response resp = CLIENT.newCall(newReq).execute()) {
             rejected = resp.code() == 503;
         } catch (java.io.IOException e) {
-            rejected = true; // 停机后新连接被拒
+            rejected = isConnectionRejection(e);
+            if (!rejected) {
+                org.junit.jupiter.api.Assertions.fail("停机后新请求失败原因不是连接被拒/503: " + e);
+            }
         }
         assertTrue(rejected, "停机后新请求应返回 503 或连接被拒");
+    }
+
+    /** 只接受"连接被拒/重置"，超时、EOF、TLS 等故障不算优雅停机的正确拒绝语义 */
+    private static boolean isConnectionRejection(java.io.IOException e) {
+        Throwable cur = e;
+        while (cur != null) {
+            if (cur instanceof java.net.ConnectException || cur instanceof java.net.SocketException) {
+                return true;
+            }
+            cur = cur.getCause();
+        }
+        return false;
     }
 }

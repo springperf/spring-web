@@ -28,9 +28,8 @@ public class CoreFeaturesReturnValueAdvancedTest extends BaseE2ETest {
         // OkHttp 可完整读取，不应超时。超时即视为实现缺陷。
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
-            String body = resp.body().string();
-            assertNotNull(body);
-            assertFalse(body.isEmpty(), "File download should return content");
+            // 端点返回模块根目录的 pom.xml：逐字节比对，任意非空响应（含错误页）都不再能通过
+            assertArrayEquals(java.nio.file.Files.readAllBytes(new java.io.File("pom.xml").toPath()), resp.body().bytes());
         }
     }
 

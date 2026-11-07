@@ -33,28 +33,33 @@ public class CoreFeaturesExceptionTest extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(400, resp.code());
             Map<String, Object> map = JSON.parseObject(resp.body().string(), Map.class);
-            assertTrue(map.containsKey("error"));
+            assertEquals("bad argument", map.get("error"));
             assertEquals("global-handler", map.get("from"));
         }
     }
 
     @Test
     void testResponseStatusException() throws Exception {
-        Request req = new Request.Builder().url(baseUrl() + "/exception/response-status-exception").get().build();
+        // 显式 Accept: application/json → ErrorPageRenderer 产出 JSON 错误体，可精确校验 status 字段
+        Request req = new Request.Builder().url(baseUrl() + "/exception/response-status-exception")
+                .header("Accept", "application/json").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(509, resp.code());
             String b = resp.body().string();
-            assertTrue(b.contains("error") || b.contains("带宽限制"));
+            assertEquals(509, com.alibaba.fastjson2.JSON.parseObject(b).getIntValue("status"),
+                    "错误体应标明 509，实际: " + b);
         }
     }
 
     @Test
     void testCustomStatusException() throws Exception {
-        Request req = new Request.Builder().url(baseUrl() + "/exception/custom-status-exception").get().build();
+        Request req = new Request.Builder().url(baseUrl() + "/exception/custom-status-exception")
+                .header("Accept", "application/json").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(404, resp.code());
             String b = resp.body().string();
-            assertTrue(b.contains("error") || b.contains("not found"));
+            assertEquals(404, com.alibaba.fastjson2.JSON.parseObject(b).getIntValue("status"),
+                    "错误体应标明 404，实际: " + b);
         }
     }
 
