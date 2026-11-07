@@ -10,7 +10,7 @@
 
 `spring-boot-starter-web` 模块的职责是**把框架的 40+ 个核心组件通过 Spring Boot 的自动配置机制（条件注解 + `AutoConfiguration.imports`）组装成一个开箱即用的 Web 服务器**。用户只需引入一个 starter 依赖，所有组件自动就位，配置通过 `application.properties` 覆盖。
 
-**核心问题**：14 个 `AutoConfiguration` 类如何分工？条件装配链如何编排？Actuator、OpenAPI、SBA、Spring Data 等生态组件如何桥接？
+**核心问题**：15 个自动配置类如何分工？条件装配链如何编排？Actuator、OpenAPI、SBA、Spring Data 等生态组件如何桥接？
 
 ---
 
@@ -18,10 +18,11 @@
 
 ### 1.1 注册入口
 
-`spring-boot-starter-web` 在 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports` 中注册了 14 个自动配置类（Spring Boot 3.x 标准格式，取代了旧版 `spring.factories`）：
+`spring-boot-starter-web` 在 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports` 中注册了 15 个自动配置类（Spring Boot 3.x 标准格式，取代了旧版 `spring.factories`）：
 
 ```properties
 io.springperf.web.autoconfigure.SpringWebAutoConfiguration
+io.springperf.web.autoconfigure.SpringWebRuntimeHintsConfiguration
 io.springperf.web.autoconfigure.WebServerInitializedEventAutoConfiguration
 io.springperf.web.autoconfigure.SpringWebServletAutoConfiguration
 io.springperf.web.autoconfigure.SpringWebMvcSupportAutoConfiguration
@@ -36,6 +37,12 @@ io.springperf.web.autoconfigure.JspViewAutoConfiguration
 io.springperf.web.autoconfigure.SpringWebViewExchangeAutoConfiguration
 io.springperf.web.autoconfigure.SpringWebPropertyRefreshAutoConfiguration
 ```
+
+全部 15 个类使用 `@AutoConfiguration`（隐含 `proxyBeanMethods=false`），不再依赖 `.imports` 文件的书写顺序：
+以 `SpringWebAutoConfiguration` 为根，依赖 `WebContext` 的配置用 `@AutoConfigureAfter(SpringWebAutoConfiguration.class)` 显式声明顺序，
+`SpringWebMvcSupportAutoConfiguration` 排在 Servlet 桥接之后，`SwaggerUiAutoConfiguration` 排在 `OpenApiAutoConfiguration` 之后；
+SBA 桥接保留既有的 `@AutoConfigureBefore(name=...)`。`AutoConfigurationContractTest` 锁定条目集合、注解规范与排序引用的可达性，
+`AutoConfigurationConditionTest` / `OpenApiSwitchConditionTest` 用 `ApplicationContextRunner` 做真实条件求值。
 
 额外在 `spring.factories` 中注册了一个 `ApplicationContextFactory`：
 
@@ -61,6 +68,7 @@ io.springperf.web.autoconfigure.support.WebServerApplicationContextFactory
 | 9 | `SpringWebViewAutoConfiguration` / `JspViewAutoConfiguration` / `SpringWebViewExchangeAutoConfiguration` | 相应视图引擎在类路径 | 视图渲染：Thymeleaf / FreeMarker / Beetl、JSP、ViewExchange |
 | 10 | `SpringWebBatchAutoConfiguration` | `BatchMapping` 在类路径 | Batch 模块：`BatchRegistry` + Micrometer 指标 |
 | 11 | `SpringWebPropertyRefreshAutoConfiguration` | `@ConditionalOnBean(WebContext.class)` + `@AutoConfigureAfter(SpringWebAutoConfiguration.class)` | 属性热刷新 |
+| 12 | `SpringWebRuntimeHintsConfiguration` | 无条件（独立注册） | GraalVM 可达性提示；与事件自动配置解耦，避免被 `exclude` 连带丢失 |
 
 ---
 
@@ -430,7 +438,7 @@ public PerfApplicationFactory perfApplicationFactory(
 
 | 维度 | 本框架 starter | Spring Boot MVC starter |
 |------|---------------|------------------------|
-| 自动配置类数量 | 14 个 | 30+ 个（`spring-boot-autoconfigure`） |
+| 自动配置类数量 | 15 个 | 30+ 个（`spring-boot-autoconfigure`） |
 | 核心 Server | `NettyHttpServer`（`SmartLifecycle`） | `TomcatServletWebServerFactory`（`WebServerFactory`） |
 | 条件装配 | 全部 `@ConditionalOnClass` 字符串形式 | 同 Spring Boot 标准 |
 | 应用上下文 | 非 Servlet 的 `AnnotationConfigApplicationContext`（AOT/native 下为 `GenericApplicationContext`） | `AnnotationConfigServletWebServerApplicationContext` |
@@ -447,7 +455,7 @@ public PerfApplicationFactory perfApplicationFactory(
 | GraalVM 支持 | `RuntimeHintsRegistrar` 条件注册 | `RuntimeHintsRegistrar` + AOT 构建期 |
 | 冲突检测 | `BeanFactoryPostProcessor` 早期检测 `DispatcherServlet` | 无（Tomcat 是默认） |
 
-**核心差异**：Spring Boot MVC 的自动配置围绕 `DispatcherServlet` 和 Servlet 容器（Tomcat/Undertow/Jetty）展开，30+ 个配置类覆盖了数据源、事务、安全、验证等企业级功能。本框架的 starter 只有 14 个配置类，聚焦于**让 Netty 框架在 Spring Boot 容器中"开箱即用"**，以及**与 Spring 生态主要组件（Actuator、SBA、OpenAPI、Spring Data）的桥接**。框架的模块化设计（`spring-web` / `spring-web-view` / `spring-web-servlet` / `spring-web-mvc-support` / `spring-web-batch`）通过条件注解自然映射到自动配置的开关——用户只需要引入对应模块的依赖，相关配置自动激活。
+**核心差异**：Spring Boot MVC 的自动配置围绕 `DispatcherServlet` 和 Servlet 容器（Tomcat/Undertow/Jetty）展开，30+ 个配置类覆盖了数据源、事务、安全、验证等企业级功能。本框架的 starter 只有 15 个配置类，聚焦于**让 Netty 框架在 Spring Boot 容器中"开箱即用"**，以及**与 Spring 生态主要组件（Actuator、SBA、OpenAPI、Spring Data）的桥接**。框架的模块化设计（`spring-web` / `spring-web-view` / `spring-web-servlet` / `spring-web-mvc-support` / `spring-web-batch`）通过条件注解自然映射到自动配置的开关——用户只需要引入对应模块的依赖，相关配置自动激活。
 
 ---
 
@@ -455,14 +463,14 @@ public PerfApplicationFactory perfApplicationFactory(
 
 回到引子的问题：40+ 个核心组件如何被 Spring Boot 自动装配？
 
-1. **14 个 `AutoConfiguration` 类分工明确** → 核心（`SpringWebAutoConfiguration`）、桥接（`SpringWebServletAutoConfiguration` 与 `SpringWebMvcSupportAutoConfiguration`）、Actuator（`ActuatorEndpointAutoConfiguration`）、视图（`SpringWebViewAutoConfiguration` / `JspViewAutoConfiguration` / `SpringWebViewExchangeAutoConfiguration`）、生态集成（OpenAPI/SBA/Spring Data/Batch/属性刷新），各司其职，条件注解自然隔离。
+1. **15 个自动配置类分工明确** → 核心（`SpringWebAutoConfiguration`）、桥接（`SpringWebServletAutoConfiguration` 与 `SpringWebMvcSupportAutoConfiguration`）、Actuator（`ActuatorEndpointAutoConfiguration`）、视图（`SpringWebViewAutoConfiguration` / `JspViewAutoConfiguration` / `SpringWebViewExchangeAutoConfiguration`）、生态集成（OpenAPI/SBA/Spring Data/Batch/属性刷新），各司其职，条件注解自然隔离。
 2. **`WebContext` 驱动生命周期** → `NettyHttpServer.start()`（`SmartLifecycle` 最后启动）触发 `WebContext.startLifecycle()` 三阶段；`WebContext` 不实现 `InitializingBean`，没有 `afterPropertiesSet`（早期版本的留空覆写已删除）。
 3. **`ActuatorEndpointHandlerMapping` 通过 `WebComponent` 生命周期注册路由** → Phase 1 扫描 Actuator 端点，Phase 2 触发路由优化器，与管理端口基础设施无缝集成。
 4. **事件适配** → JDK 动态代理包装 `WebServerApplicationContext` 后发射 `PerfWebServerInitializedEvent`，`RuntimeHintsRegistrar` 注册 GraalVM 可达性提示。
 5. **生态桥接** → `FilterWrapper` 转换 `jakarta.servlet.Filter`，`WebMvcConfigurerBridge` 桥接 `WebMvcConfigurer`，`OpenApiAdapter` 遍历 `MappingRegistry`，`PerfApplicationFactory` 替换 SBA 默认工厂。
 6. **冲突检测** → `BeanFactoryPostProcessor` 在容器初始化早期检测 `spring-boot-starter-web` 冲突，`BeanDefinitionRegistryPostProcessor` 移除 Spring Data 的冲突 BPP。
 
-这一层的克制体现在：**不重复造 Spring Boot 的轮子，也不为了"自动配置"引入复杂的条件逻辑。** 14 个配置类每个都只做一件事——创建核心 Bean、桥接 Support 模块、集成 Actuator、适配生态组件。条件注解用的都是 `@ConditionalOnClass` 字符串形式（不触发类加载），`@ConditionalOnMissingBean` 允许用户覆盖。`PerfWebServer` 只有 3 个方法（`start`/`stop`/`getPort`），`WebServerApplicationContextFactory` 只有 4 行——"足够简单到不需要文档"的接口，是本框架的设计哲学在自动配置层的体现。
+这一层的克制体现在：**不重复造 Spring Boot 的轮子，也不为了"自动配置"引入复杂的条件逻辑。** 15 个配置类每个都只做一件事——创建核心 Bean、桥接 Support 模块、集成 Actuator、适配生态组件。条件注解用的都是 `@ConditionalOnClass` 字符串形式（不触发类加载），`@ConditionalOnMissingBean` 允许用户覆盖。`PerfWebServer` 只有 3 个方法（`start`/`stop`/`getPort`），`WebServerApplicationContextFactory` 只有 4 行——"足够简单到不需要文档"的接口，是本框架的设计哲学在自动配置层的体现。
 
 ---
 

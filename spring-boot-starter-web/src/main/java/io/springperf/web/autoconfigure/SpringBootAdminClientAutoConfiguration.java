@@ -5,12 +5,12 @@ import de.codecentric.boot.admin.client.registration.ApplicationFactory;
 import io.springperf.web.autoconfigure.admin.PerfApplicationFactory;
 import org.springframework.boot.actuate.autoconfigure.endpoint.web.WebEndpointProperties;
 import org.springframework.boot.actuate.autoconfigure.web.server.ManagementServerProperties;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureBefore;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.web.ServerProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 
 /**
@@ -28,7 +28,7 @@ import org.springframework.core.env.Environment;
  *
  * @since 1.0.4
  */
-@Configuration(proxyBeanMethods = false)
+@AutoConfiguration
 @ConditionalOnClass(name = "de.codecentric.boot.admin.client.registration.ApplicationFactory")
 @AutoConfigureBefore(name = "de.codecentric.boot.admin.client.config.AdminClientAutoConfiguration")
 public class SpringBootAdminClientAutoConfiguration {

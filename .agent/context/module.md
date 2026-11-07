@@ -542,7 +542,9 @@ spring-boot-starter-web
 │   ├── WebServerInitializedEventAutoConfiguration  Netty 启动后发射 WebServerInitializedEvent
 │   │   └── 使 Spring Cloud 服务注册（Nacos/Eureka/Consul）感知服务器就绪
 │   │
-│   ├── SpringWebRuntimeHints                  GraalVM 可达性提示（@ImportRuntimeHints，AOT 构建期采集）
+│   ├── SpringWebRuntimeHintsConfiguration     独立承载 GraalVM 可达性提示（@AutoConfiguration + @ImportRuntimeHints）
+│   │
+│   ├── SpringWebRuntimeHints                  GraalVM 可达性提示 registrar（AOT 构建期采集）
 │   │
 │   ├── SpringDataWebCompatibilityAutoConfiguration  Spring Data 兼容（条件：ProjectingArgumentResolverRegistrar 在 classpath）
 │   │   └── 启动时移除 ProjectingArgumentResolverRegistrar 的 BPP
@@ -570,7 +572,7 @@ spring-boot-starter-web
 │       └── ControllerBeanFactoryInitializationAotProcessor  为 @Controller/DTO 注册 AOT 反射 hints
 │
 └── resources/META-INF/
-    ├── spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports  注册 14 个 AutoConfiguration
+    ├── spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports  注册 15 个 @AutoConfiguration
     ├── spring/aot.factories              AOT 处理器（BeanFactoryInitializationAotProcessor）
     ├── spring.factories                  仅注册 ApplicationContextFactory（WebServerApplicationContextFactory）
     ├── additional-spring-configuration-metadata.json  配置元数据（IDE 提示）
@@ -587,7 +589,7 @@ spring-boot-starter-web
 ```
 Spring 容器启动（refresh 完成）
   ↓
-NettyHttpServer.start()      → SmartLifecycle，phase=Integer.MAX_VALUE（最后启动）
+NettyHttpServer.start()      → SmartLifecycle，phase=Integer.MAX_VALUE-2048（对齐 Boot WebServerStartStopLifecycle）
   ↓
 WebContext.startLifecycle()  → CAS 守卫，单次执行
   ↓
