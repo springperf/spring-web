@@ -2,6 +2,7 @@ package io.springperf.web.autoconfigure.actuator.server;
 
 import io.springperf.web.context.PropertiesConstant;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.source.ConfigurationPropertySources;
 import org.springframework.mock.env.MockEnvironment;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -169,6 +170,27 @@ class ManagementServerSettingsTest {
         assertNull(resolve(env).getSslContext(), "显式 enabled=false 必须关闭 SSL，即使继承了主服务器证书");
     }
 
+    // ==================== 回归：真实 Boot Environment 的 attached 属性源 ====================
+
+    @Test
+    void ssl_managementOverridesSurviveBootAttachedPropertySource() {
+        MockEnvironment env = managementEnv().withProperty("management.server.ssl.certificate", CERT)
+                .withProperty("management.server.ssl.certificate-private-key", KEY);
+        ConfigurationPropertySources.attach(env);
+
+        assertNotNull(resolve(env).getSslContext(),
+                "Boot 附加的 configurationProperties 快照不得遮蔽管理侧覆盖");
+    }
+
+    @Test
+    void http2_managementOverridesSurviveBootAttachedPropertySource() {
+        MockEnvironment env = managementEnv().withProperty("server.http2.enabled", "true")
+                .withProperty("management.server.http2.enabled", "false");
+        ConfigurationPropertySources.attach(env);
+
+        assertFalse(resolve(env).getHttp2Enabled(), "attached 快照存在时按名查询回退仍须生效");
+    }
+
     // ==================== 异常流程 / 错误输入 ====================
 
     @Test
@@ -217,9 +239,11 @@ class ManagementServerSettingsTest {
     @Test
     void nestedSslKeys_areAllowedAsWholeGroup() {
         MockEnvironment env = managementEnv().withProperty("management.server.ssl.client-auth", "need")
-                .withProperty("management.server.ssl.enabled-protocols", "TLSv1.3");
+                .withProperty("management.server.ssl.enabled-protocols", "TLSv1.3")
+                .withProperty("management.server.ssl.certificate", CERT)
+                .withProperty("management.server.ssl.certificate-private-key", KEY);
 
-        assertNotNull(resolve(env));
+        assertNotNull(resolve(env).getSslContext(), "ssl.* 整组键可覆盖并仍能构建 SslContext");
     }
 
     @Test
