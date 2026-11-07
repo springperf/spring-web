@@ -1,6 +1,7 @@
 # Auto Configure
 org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
 io.springperf.web.autoconfigure.SpringWebAutoConfiguration,\
+io.springperf.web.autoconfigure.WebServerInitializedEventAutoConfiguration,\
 io.springperf.web.autoconfigure.SpringWebServletAutoConfiguration,\
 io.springperf.web.autoconfigure.SpringWebMvcSupportAutoConfiguration,\
 io.springperf.web.autoconfigure.ActuatorEndpointAutoConfiguration,\

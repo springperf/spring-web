@@ -65,21 +65,6 @@ public class SpringWebAutoConfiguration {
         return new AccessLogWebFilter(format, AccessLogWriter.fromProperties(props));
     }
 
-    /**
-     * 在 Netty 服务器启动完成后发射 {@code WebServerInitializedEvent}，
-     * 使 Spring Cloud 服务注册（Nacos/Eureka/Consul）等组件正确感知服务器就绪。
-     */
-    @Bean
-    public ApplicationListener<ApplicationReadyEvent> webServerInitializedEventPublisher(
-            NettyHttpServer nettyHttpServer, ApplicationContext applicationContext) {
-        return event -> {
-            if (nettyHttpServer.isRunning()) {
-                WebServer webServer = new PerfWebServer(nettyHttpServer.getActualPort(), nettyHttpServer);
-                applicationContext.publishEvent(new PerfWebServerInitializedEvent(webServer, applicationContext));
-            }
-        };
-    }
-
     @Bean @ConditionalOnMissingBean @ConditionalOnClass(name = "javax.validation.Validator")
     public Validator validator() { return new OptionalValidatorFactoryBean(); }
 

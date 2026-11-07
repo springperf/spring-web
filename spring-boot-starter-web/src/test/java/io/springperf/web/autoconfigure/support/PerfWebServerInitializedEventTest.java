@@ -6,8 +6,14 @@ import org.springframework.boot.web.context.WebServerApplicationContext;
 import org.springframework.boot.web.context.WebServerInitializedEvent;
 import org.springframework.boot.web.server.WebServer;
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.ConfigurableApplicationContext;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -35,6 +41,20 @@ class PerfWebServerInitializedEventTest {
         // 事件 source 是 WebServer（父类构造 super(webServer)）
         assertSame(webServer, event.getSource());
         assertTrue(event instanceof WebServerInitializedEvent);
+    }
+
+    @Test
+    void proxy_alsoImplementsConfigurableApplicationContext() {
+        NettyHttpServer server = mock(NettyHttpServer.class);
+        ApplicationContext ctx = mock(ApplicationContext.class);
+        when(ctx.getDisplayName()).thenReturn("delegate-name");
+
+        PerfWebServerInitializedEvent event = new PerfWebServerInitializedEvent(new PerfWebServer(8080, server), ctx);
+        WebServerApplicationContext appCtx = event.getApplicationContext();
+
+        ConfigurableApplicationContext configurable = assertInstanceOf(ConfigurableApplicationContext.class, appCtx,
+                "生态组件常把 event.getApplicationContext() 强转为 ConfigurableApplicationContext");
+        assertEquals("delegate-name", configurable.getDisplayName(), "代理方法仍委托给真实上下文");
     }
 
     @Test
