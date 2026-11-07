@@ -49,9 +49,9 @@
 |---|---|---|---|
 | Http2ChannelInitializer.Http2OrHttp1Handler | 43 | 43 | 0% |
 | DispatcherHandler | 27 | 264 | 89.8% |
-| NettyServerHttpResponse | 20 | 387 | 94.8% |
 | NettyHttpHandler | 19 | 162 | 88.3% |
-| ResourceRequestHandler | 17 | 292 | 94.2% |
+| NettyServerHttpResponse | 19 | 387 | 95.1% |
+| ResourceRequestHandler | 15 | 292 | 94.9% |
 
 ### spring-web-view
 
@@ -112,4 +112,6 @@
 | OpenApiAdapter | 7 | 238 | 97.1% |
 | SpringWebAutoConfiguration.MicrometerWebMetricsConfiguration | 6 | 16 | 62.5% |
 | ActuatorEndpointHandlerMapping | 6 | 62 | 90.3% |
+| SpringWebAutoConfiguration.MicrometerWebMetricsConfiguration | 6 | 16 | 62.5% |
+| SpringWebServletAutoConfiguration | 5 | 57 | 91.2% |
 

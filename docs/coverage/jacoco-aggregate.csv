@@ -57,10 +57,10 @@ coverage-aggregate/spring-web,io.springperf.web.core,LocaleConfig.LazyRequestLoc
 coverage-aggregate/spring-web,io.springperf.web.core,DispatcherHandler,65,924,10,96,23,241,12,72,2,28
 coverage-aggregate/spring-web,io.springperf.web.core,LocaleConfig.DefaultLocaleSnapshot,0,9,0,0,0,4,0,1,0,1
 coverage-aggregate/spring-web,io.springperf.web.core.resource,ResourceHandlerRegistry,0,116,1,9,0,23,1,7,0,3
-coverage-aggregate/spring-web,io.springperf.web.core.resource,ResourceRequestHandler,71,1236,38,168,17,275,33,97,0,27
+coverage-aggregate/spring-web,io.springperf.web.core.resource,ResourceRequestHandler,65,1242,34,172,15,277,29,101,0,27
 coverage-aggregate/spring-web,io.springperf.web.core.resource,ResourceHandlerRegistration,0,199,0,22,0,44,0,24,0,13
 coverage-aggregate/spring-web,io.springperf.web.core.resource,WebResourcesConfig,6,144,4,18,2,31,4,15,0,8
-coverage-aggregate/spring-web,io.springperf.web.core.resource,ResourceRequestHandler.RangeInputStream,30,122,10,18,8,34,9,11,1,5
+coverage-aggregate/spring-web,io.springperf.web.core.resource,ResourceRequestHandler.RangeInputStream,0,152,2,26,0,42,2,18,0,6
 coverage-aggregate/spring-web,io.springperf.web.http,BaseWebServerHttpResponse,31,415,3,33,5,121,4,54,1,39
 coverage-aggregate/spring-web,io.springperf.web.http,ConnectionContext,0,20,0,0,0,8,0,5,0,5
 coverage-aggregate/spring-web,io.springperf.web.http,WebServerHttpRequest,13,0,2,0,4,0,4,0,3,0
@@ -77,7 +77,7 @@ coverage-aggregate/spring-web,io.springperf.web.http,BackpressureHandler,0,58,0,
 coverage-aggregate/spring-web,io.springperf.web.http,WebServerHttpResponse,31,11,0,0,15,4,11,2,11,2
 coverage-aggregate/spring-web,io.springperf.web.http,BaseWebServerHttpRequest.AcceptLanguageLocaleCache,5,20,1,1,2,5,2,3,1,3
 coverage-aggregate/spring-web,io.springperf.web.http,NettyHttpHeadersAdapter,0,348,0,36,0,81,0,41,0,23
-coverage-aggregate/spring-web,io.springperf.web.http,NettyServerHttpResponse,65,1429,31,183,20,367,31,123,1,46
+coverage-aggregate/spring-web,io.springperf.web.http,NettyServerHttpResponse,60,1434,29,185,19,368,29,125,1,46
 coverage-aggregate/spring-web,io.springperf.web.core.retval.resolver.async,ListenableFutureReturnValueResolver,0,24,0,2,0,8,0,5,0,4
 coverage-aggregate/spring-web,io.springperf.web.core.retval.resolver.async,CallableReturnValueResolver,0,24,0,0,0,6,0,4,0,4
 coverage-aggregate/spring-web,io.springperf.web.core.retval.resolver.async,ListenableFutureAdapter.new ListenableFutureCallback() {...},0,18,0,0,0,5,0,3,0,3
@@ -254,7 +254,7 @@ coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,PerfHttp
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,PerfHttpServletResponse.CommitOnFlushPrintWriter,0,57,0,2,0,22,0,8,0,7
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,ServletPartAdapter,0,57,0,2,0,14,0,12,0,11
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.session,PerfHttpSessionManager,52,648,7,51,11,158,7,59,1,35
-coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.session,FileHttpSessionStorage,180,821,23,85,44,201,24,66,3,33
+coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.session,FileHttpSessionStorage,118,883,21,87,31,214,21,69,1,35
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.session,HttpSessionStorage,0,38,0,2,0,10,0,4,0,3
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.session,InMemoryHttpSessionStorage,4,175,0,10,2,41,1,17,1,12
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.session,PerfHttpSession,0,332,0,34,0,91,0,39,0,22
@@ -421,7 +421,7 @@ coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.actua
 coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.actuator.server,ManagementNettyHttpServer.new ChannelInitializer() {...},0,84,0,0,0,10,0,2,0,2
 coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.actuator.server,ManagementServerSettings.new PropertySource() {...},12,0,0,0,2,0,2,0,2,0
 coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.metrics,MicrometerWebMetrics,4,280,0,12,0,46,1,17,1,11
-coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.openapi,OpenApiAdapter,22,1110,37,179,7,231,37,91,0,20
+coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.openapi,OpenApiAdapter,5,1127,18,198,2,236,18,110,0,20
 coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.openapi,OpenApiDocController,0,132,0,4,0,32,0,7,0,5
 coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.batch,MicrometerBatchMetrics,0,317,0,14,0,60,0,24,0,17
 coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.admin,PerfApplicationFactory,22,238,10,31,9,54,11,29,1,18
