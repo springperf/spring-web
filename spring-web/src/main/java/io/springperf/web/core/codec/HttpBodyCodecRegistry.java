@@ -363,8 +363,13 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
                 return;
             }
         }
-        // Content-Type 已明确指定但无匹配 converter 时，保持与旧实现一致：静默不写响应体。
-        // （旧 chooseWriteMediaType 路径在 content-type concrete 时同样找不到 converter 也会静默返回。）
+        // Content-Type 已明确指定但没有 converter 能写出该返回值类型：必须显式失败。
+        // 旧实现在此静默返回，客户端会拿到 200 + 显式 CT + 空 body，返回值被无声丢弃且无任何
+        // 日志/异常可查；与 path2 协商失败抛异常、以及 Spring MVC 的
+        // HttpMessageNotWritableException 语义保持一致。异常由 DispatcherHandler 收敛到
+        // ExceptionRegistry，不会抛给 Netty。
+        throw new HttpMessageNotWritableException(
+                "No HttpBodyConverter for " + valueType.getName() + " with preset Content-Type " + contentType);
     }
 
     protected List<MediaType> getAcceptableMediaTypes(WebServerHttpRequest request) {

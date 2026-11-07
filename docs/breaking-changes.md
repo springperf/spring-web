@@ -583,6 +583,7 @@
 ### 一、模块拆分：`spring-web-support` 一分为二
 
 **变更**：`spring-web-support` 不再存在，拆分为
+)
 
 - `spring-web-servlet`：纯 Servlet 桥接（Filter / Servlet / `HttpSession` / JSP / `@SessionAttribute` 等官方 `spring-web` 语义），**零 SpringMVC 依赖**；
 - `spring-web-mvc-support`：SpringMVC 兼容桥接（`org.springframework.web.servlet.*` 重写类、`WebMvcConfigurer` / `HandlerInterceptor` / `RequestBodyAdvice` 桥接），**依赖 `spring-web-servlet`**。
