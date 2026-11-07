@@ -24,18 +24,16 @@ public abstract class BaseE2ETest {
     public static final OkHttpClient CLIENT;
 
     static {
-        HttpLoggingInterceptor logging =
-                new HttpLoggingInterceptor(message -> {
-                    System.out.println("[OKHTTP] " + message);
-                });
-        logging.setLevel(HttpLoggingInterceptor.Level.HEADERS);
-        CLIENT = new OkHttpClient.Builder()
-                .connectTimeout(Duration.ofSeconds(3))
-                .readTimeout(Duration.ofSeconds(30))
-                .writeTimeout(Duration.ofSeconds(30))
-                .retryOnConnectionFailure(true)
-                .addInterceptor(logging)
-                .build();
+        HttpLoggingInterceptor logging = new HttpLoggingInterceptor(message -> {
+            System.out.println("[OKHTTP] " + message);
+        });
+        // 默认静默：HEADERS 级日志会为全量 E2E 的每个请求打印全部头（含 CORS/Vary 等长头），
+        // 噪音大且拖慢执行。排查网络问题时用 -Dspringperf.e2e.http-log=headers 显式打开。
+        logging.setLevel("headers".equalsIgnoreCase(System.getProperty("springperf.e2e.http-log", ""))
+                ? HttpLoggingInterceptor.Level.HEADERS
+                : HttpLoggingInterceptor.Level.NONE);
+        CLIENT = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(3)).readTimeout(Duration.ofSeconds(10))
+                .writeTimeout(Duration.ofSeconds(10)).retryOnConnectionFailure(true).addInterceptor(logging).build();
         // 共享 CLIENT 跨测试类复用，不能在每个类 @AfterAll 关闭（会破坏后续类执行）；
         // 注册 JVM hook 仅在整个进程退出时清理连接池/调度线程，OkHttp 默认 daemon 线程不阻塞退出
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {

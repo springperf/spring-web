@@ -16,10 +16,15 @@ public class OrderedLowWebFilter implements WebFilter {
 
     public static final String HEADER_NAME = "X-Order-Low";
 
+    /** 两个有序 filter 共同追加的 header：按出现顺序即可判定执行次序（同名 header 多值保留）。 */
+    public static final String ORDER_HEADER = "X-Order";
+
     @Override
     public void doFilter(WebServerHttpRequest request, WebServerHttpResponse response,
                          io.springperf.web.core.filter.FilterChain chain) throws Exception {
         response.getHeaders().add(HEADER_NAME, "executed");
+        // @Order(5) 先于 @Order(100)，因此本值应排在 X-Order 的首位
+        response.getHeaders().add(ORDER_HEADER, "low");
         chain.doFilter(request, response);
     }
 }

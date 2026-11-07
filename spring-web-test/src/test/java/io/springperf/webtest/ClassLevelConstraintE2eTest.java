@@ -9,7 +9,10 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * E2E 验证类级别 @RequestMapping 约束（method/params/headers/consumes/produces）在路由匹配中生效。
+ * E2E 验证类级别 @RequestMapping 的 <b>method</b> 约束在路由匹配中生效。
+ * <p>
+ * 类级 params/headers/consumes/produces 约束目前没有对应的测试端点，故未覆盖（原注释声称覆盖五类，与实现不符）。
+ * </p>
  */
 public class ClassLevelConstraintE2eTest extends BaseE2ETest {
 
@@ -41,7 +44,8 @@ public class ClassLevelConstraintE2eTest extends BaseE2ETest {
                 .get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            assertEquals(405, resp.code());
+            assertEquals(405, resp.code(), "类级 method=POST 约束下 GET 应 405");
+            assertEquals("POST", resp.header("Allow"), "405 的 Allow 应反映类级约束允许的方法，实际响应头: " + resp.headers());
         }
     }
 }

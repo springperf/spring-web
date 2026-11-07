@@ -8,7 +8,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * E2E: cover real controller endpoints previously not referenced by any E2E test.
@@ -56,9 +57,8 @@ public class UncoveredEndpointsE2ETest extends BaseE2ETest {
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
-            String body = resp.body().string();
-            assertTrue(body.contains("method=POST"), "should contain method, got: " + body);
-            assertTrue(body.contains("hello-entity"), "should contain body, got: " + body);
+            // 控制器返回格式固定（P0TestController#requestEntity），用精确等值替代两个 contains
+            assertEquals("method=POST,body=hello-entity", resp.body().string(), "RequestEntity 应拿到完整请求方法与 body");
         }
     }
 
@@ -123,14 +123,15 @@ public class UncoveredEndpointsE2ETest extends BaseE2ETest {
     }
 
     @Test
-    void interceptorPass_returnsInterceptedFalse() throws Exception {
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/core/interceptor/pass")
-                .get().build();
+    void interceptorRejectsLoginRequiredEndpoint() throws Exception {
+        // LoginInterceptor 对方法名 "name" 抛 ResponseStatusException(UNAUTHORIZED)。
+        // 端点本身返回固定串 "should be blocked"，因此必须反向断言它没有跑到 handler
+        // （原用例断言控制器里硬编码的 intercepted=false，属恒真断言）。
+        Request req = new Request.Builder().url(baseUrl() + "/core/name").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            assertEquals(200, resp.code());
-            Map<String, Object> body = com.alibaba.fastjson2.JSON.parseObject(resp.body().string(), Map.class);
-            assertEquals(false, body.get("intercepted"));
+            String body = resp.body().string();
+            assertEquals(401, resp.code(), "未登录访问受保护端点应 401，实际: " + resp.code() + " body=" + body);
+            assertFalse(body.contains("should be blocked"), "拦截后 handler 不得执行，实际: " + body);
         }
     }
 

@@ -26,27 +26,30 @@ public class SecurityE2ETest extends BaseE2ETest {
         try (java.net.Socket socket = new java.net.Socket("localhost", serverPort)) {
             socket.setSoTimeout(5000);
             java.io.OutputStream out = socket.getOutputStream();
-            java.io.InputStream in = socket.getInputStream();
             out.write(rawRequest.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             out.flush();
-
-            byte[] buf = new byte[4096];
-            StringBuilder sb = new StringBuilder();
-            int n;
-            while ((n = in.read(buf)) != -1) {
-                sb.append(new String(buf, 0, n, java.nio.charset.StandardCharsets.UTF_8));
-                if (sb.toString().contains("\r\n\r\n")) {
-                    break;
-                }
-            }
-            String head = sb.toString();
-            int sp1 = head.indexOf(' ');
-            int sp2 = sp1 >= 0 ? head.indexOf(' ', sp1 + 1) : -1;
-            if (sp2 < 0) {
-                return 0;
-            }
-            return Integer.parseInt(head.substring(sp1 + 1, sp2).trim());
+            return readStatus(socket.getInputStream());
         }
+    }
+
+    /** 从响应头中解析状态码；连接被直接关闭（无响应）时返回 0。 */
+    private static int readStatus(java.io.InputStream in) throws Exception {
+        byte[] buf = new byte[4096];
+        StringBuilder sb = new StringBuilder();
+        int n;
+        while ((n = in.read(buf)) != -1) {
+            sb.append(new String(buf, 0, n, java.nio.charset.StandardCharsets.UTF_8));
+            if (sb.indexOf("\r\n\r\n") >= 0) {
+                break;
+            }
+        }
+        String head = sb.toString();
+        int sp1 = head.indexOf(' ');
+        int sp2 = sp1 >= 0 ? head.indexOf(' ', sp1 + 1) : -1;
+        if (sp2 < 0) {
+            return 0;
+        }
+        return Integer.parseInt(head.substring(sp1 + 1, sp2).trim());
     }
 
     /* ==================== multipart 大小限制 ==================== */
@@ -69,6 +72,76 @@ public class SecurityE2ETest extends BaseE2ETest {
 
         int status = rawHttpExchange(requestLine);
         assertEquals(413, status, "超大 Content-Length 的 multipart 请求必须被 413 拒绝，实际状态码: " + status);
+    }
+
+    @Test
+    void multipartChunkedBody_processed() throws Exception {
+        // 正面对照：chunked（无 Content-Length）的正常 multipart 必须被完整解析。
+        // 没有这条，下面的超限用例无法区分"被 413 拒绝"与"chunked 请求根本没被读取"。
+        String payload = "--boundary\r\nContent-Disposition: form-data; name=\"projectId\"\r\n\r\n7\r\n"
+                + "--boundary\r\nContent-Disposition: form-data; name=\"seq\"\r\n\r\n1\r\n--boundary--\r\n";
+        String raw = rawChunkedMultipart(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8), 4096);
+        assertTrue(raw.contains("\"projectId\":7"), "chunked multipart 应被完整解析，实际响应: " + raw);
+    }
+
+    @Test
+    void multipartChunkedBody_exceedingLimit_rejectedWith413() throws Exception {
+        // 无 Content-Length（chunked）时无法按头 fast-fail：必须由流式聚合层在累计超限时兜住 413。
+        // 这正是审计修复的 DoS 面 —— 只测头部的 fast-fail 无法证明流式路径也受同一上限保护。
+        String prefix = "--boundary\r\nContent-Disposition: form-data; name=\"x\"\r\n\r\n";
+        byte[] payload = new byte[4 * 1024 * 1024 + 64 * 1024];
+        java.util.Arrays.fill(payload, (byte) 'y');
+        System.arraycopy(prefix.getBytes(java.nio.charset.StandardCharsets.UTF_8), 0, payload, 0, prefix.length());
+        String raw = rawChunkedMultipart(payload, 8192);
+        assertTrue(raw.startsWith("HTTP/1.1 413"), "chunked multipart 累计超限必须被 413 拒绝，实际响应: " + raw);
+    }
+
+    /** 以 chunked 方式发送给定 payload，返回服务端原始响应文本（连接被 RST 时返回空串）。 */
+    private String rawChunkedMultipart(byte[] payload, int chunkSize) throws Exception {
+        java.nio.charset.Charset ascii = java.nio.charset.StandardCharsets.US_ASCII;
+        try (java.net.Socket socket = new java.net.Socket("localhost", serverPort)) {
+            socket.setSoTimeout(5000);
+            java.io.OutputStream out = socket.getOutputStream();
+            java.io.InputStream in = socket.getInputStream();
+            // 边写边读：服务端回 413 后立即关闭连接，若响应没被及时读走，RST 会把它冲掉
+            java.util.concurrent.atomic.AtomicReference<String> rawResp = new java.util.concurrent.atomic.AtomicReference<>(
+                    "");
+            Thread reader = new Thread(() -> {
+                try {
+                    java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+                    byte[] b = new byte[4096];
+                    int r;
+                    while ((r = in.read(b)) != -1 && buf.size() < 8192) {
+                        buf.write(b, 0, r);
+                    }
+                    rawResp.set(new String(buf.toByteArray(), java.nio.charset.StandardCharsets.UTF_8));
+                } catch (Exception ignored) {
+                    // 连接被 RST 时读不到响应，保留空串由断言给出明确失败
+                }
+            });
+            reader.setDaemon(true);
+            reader.start();
+
+            String head = "POST /api/upload/db-req HTTP/1.1\r\n" + "Host: localhost\r\n"
+                    + "Content-Type: multipart/form-data; boundary=boundary\r\n" + "Transfer-Encoding: chunked\r\n"
+                    + "Connection: close\r\n\r\n";
+            out.write(head.getBytes(ascii));
+            out.flush();
+            try {
+                for (int offset = 0; offset < payload.length; offset += chunkSize) {
+                    int size = Math.min(chunkSize, payload.length - offset);
+                    out.write((Integer.toHexString(size) + "\r\n").getBytes(ascii));
+                    out.write(payload, offset, size);
+                    out.write("\r\n".getBytes(ascii));
+                }
+                out.write("0\r\n\r\n".getBytes(ascii));
+                out.flush();
+            } catch (java.io.IOException ignored) {
+                // 服务端累计超限后会先回 413 再关闭连接，此后写入失败属预期
+            }
+            reader.join(10000);
+            return rawResp.get();
+        }
     }
 
     @Test
@@ -131,18 +204,35 @@ public class SecurityE2ETest extends BaseE2ETest {
     /* ==================== CORS 来源校验 ==================== */
 
     @Test
-    void cors_unconfiguredOrigin_notEchoed() throws Exception {
-        // 未配置 CORS 的路径：响应不应携带 ACAO，更不应回显任意来源
-        Request req = new Request.Builder()
-                .url(baseUrl() + "/demo/echo?received=x")
-                .header("Origin", "http://evil.example.com")
-                .get()
+    void cors_allowedOrigin_echoedExactly() throws Exception {
+        // 所有映射由 WebTestConfig 的全局 CorsRegistration（/**）统一配置
+        // （allowedOrigins=http://example.com、allowCredentials=true）。
+        // 用非重定向端点：/demo/echo 的 GET 返回 302，断言会读到 302 响应头而非业务响应。
+        Request req = new Request.Builder().url(baseUrl() + "/core/bytes").header("Origin", "http://example.com").get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            String acao = resp.header("Access-Control-Allow-Origin");
-            // 只允许无 ACAO 头，或回显配置中允许的来源；通配与任意来源都不接受
-            assertTrue(acao == null || "http://example.com".equals(acao),
-                    "未配置 CORS 的路径不得回显请求来源或返回通配来源, 实际: " + acao);
+            assertEquals(200, resp.code());
+            assertEquals("http://example.com", resp.header("Access-Control-Allow-Origin"),
+                    "允许的来源应精确回显，实际头: " + resp.headers());
+            assertEquals("true", resp.header("Access-Control-Allow-Credentials"),
+                    "allowCredentials=true 时应回写 ACAC，实际头: " + resp.headers());
+            assertTrue(String.join(",", resp.headers("Vary")).contains("Origin"), "CORS 响应应带 Vary: Origin");
+        }
+    }
+
+    @Test
+    void cors_disallowedOrigin_notEchoed() throws Exception {
+        // 不在白名单的来源：不得回显来源，也不得回写 ACAC。
+        // 原断言是 "acao == null || example.com" 的析取，把"固定回显白名单值"也判为通过，
+        // 无法发现"不校验 Origin 直接吐固定 ACAO"的实现。
+        Request req = new Request.Builder().url(baseUrl() + "/core/bytes").header("Origin", "http://evil.example.com")
+                .get().build();
+        try (Response resp = CLIENT.newCall(req).execute()) {
+            // 与 Spring 的 DefaultCorsProcessor 一致：来源不被允许时直接拒绝（403），
+            // 且不得回显任何 ACAO/ACAC
+            assertEquals(403, resp.code(), "未授权来源应被 CORS 层拒绝，实际: " + resp.code());
+            assertNull(resp.header("Access-Control-Allow-Origin"), "未授权来源不得回显 ACAO，实际头: " + resp.headers());
+            assertNull(resp.header("Access-Control-Allow-Credentials"), "未授权来源不得回写 ACAC，实际头: " + resp.headers());
         }
     }
 

@@ -15,7 +15,8 @@ import org.springframework.core.env.MapPropertySource;
 import java.util.Collections;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * E2E：配置中心动态刷新。
@@ -89,12 +90,15 @@ class PropertyRefreshE2eTest extends BaseE2ETest {
 
     @Test
     void builtinDefaultKey_unaffectedByRefresh() throws Exception {
-        // 未配置的内置键：刷新前后都应返回同一个默认值（验证回退路径未破坏）
+        // 未配置的内置键：刷新前后都应返回同一个默认值（验证回退路径未破坏）。
+        // 必须同时断言它就是文档化的默认值 —— 只比较"刷新前后相等"时，两次都取到同一个错值也会通过。
         Request request = new Request.Builder().url(url("/api/dynamic-prop")).get().build();
         long before;
         try (Response resp = CLIENT.newCall(request).execute()) {
             before = JSON.parseObject(resp.body().string()).getLongValue("asyncTimeout");
         }
+        assertEquals(io.springperf.web.context.PropertiesConstant.ASYNC_REQUEST_TIMEOUT_DEFAULT, before,
+                "未配置时应回退到文档化默认值");
 
         setDynamicProperty("x");
         publishEnvironmentChange();

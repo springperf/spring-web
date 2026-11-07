@@ -28,7 +28,9 @@ public class CorsAndStaticTest extends BaseE2ETest {
             assertEquals("http://example.com", resp.header("Access-Control-Allow-Origin"),
                     "ACAO 应精确回显允许的来源，实际: " + resp.headers());
             String methods = resp.header("Access-Control-Allow-Methods");
-            assertEquals("GET", methods, "预检应精确回显被请求的方法，实际: " + methods);
+            // WebTestConfig 的全局注册（/**）与 @CrossOrigin(GET) 按 Spring 的 combine 语义取并集，
+            // 所以允许方法是配置合并后的集合，而非单个 "GET"
+            assertEquals("GET,POST,PUT,DELETE", methods, "预检应回写合并后的允许方法，实际: " + methods);
             assertNotNull(resp.header("Vary"), "CORS 预检必须包含 Vary header");
             assertTrue(String.join(",", resp.headers("Vary")).contains("Origin"),
                     "Vary 应包含 Origin，实际: " + resp.headers("Vary"));
@@ -45,8 +47,7 @@ public class CorsAndStaticTest extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = Objects.toString(resp.body().string(), "");
-            assertEquals("annotated", JSON.parseObject(body).get("cors"),
-                    "@CrossOrigin 端点应返回业务 JSON，实际: " + body);
+            assertEquals("annotated", JSON.parseObject(body).get("cors"), "@CrossOrigin 端点应返回业务 JSON，实际: " + body);
             assertEquals("http://example.com", resp.header("Access-Control-Allow-Origin"),
                     "@CrossOrigin(origins=...) 应精确回显允许的来源，实际: " + resp.headers());
         }

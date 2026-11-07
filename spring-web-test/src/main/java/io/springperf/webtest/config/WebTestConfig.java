@@ -21,11 +21,10 @@ public class WebTestConfig {
 
     @Bean
     public CorsRegistration corsRegistration() {
-        return new CorsRegistration("/api/**")
-                .allowedOrigins("http://example.com")
-                .allowedMethods("GET", "POST", "PUT", "DELETE")
-                .allowCredentials(true)
-                .maxAge(3600);
+        // 注册模式按映射路径规则匹配（不含 context-path，如 /core/bytes）：
+        // 写成 /api/** 会因为首段被当成 "api" 而永不命中，使这份全局配置成为死配置。
+        return new CorsRegistration("/**").allowedOrigins("http://example.com")
+                .allowedMethods("GET", "POST", "PUT", "DELETE").allowCredentials(true).maxAge(3600);
     }
 
     @Bean
