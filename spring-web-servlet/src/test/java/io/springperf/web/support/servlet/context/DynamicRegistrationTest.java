@@ -5,6 +5,7 @@ import io.springperf.web.context.WebContext;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterRegistration;
+import jakarta.servlet.MultipartConfigElement;
 import jakarta.servlet.Servlet;
 import jakarta.servlet.ServletRegistration;
 import jakarta.servlet.ServletSecurityElement;
@@ -14,7 +15,9 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -244,5 +247,130 @@ class DynamicRegistrationTest {
         @Override
         public void destroy() {
         }
+    }
+
+    // ==================== 剩余参数校验与 no-op setter ====================
+
+    @Test
+    void validatePattern_acceptsAllSpecFormsAndRejectsNull() {
+        assertEquals("/", DynamicServletRegistration.validatePattern(" / "));
+        assertEquals("/api/*", DynamicServletRegistration.validatePattern(" /api/* "));
+        assertEquals("*.json", DynamicServletRegistration.validatePattern("*.json"));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> DynamicServletRegistration.validatePattern(null));
+        assertTrue(ex.getMessage().contains("must not be null"));
+    }
+
+    @Test
+    void servletRegistration_exposesRunAsRoleAndClassName() {
+        ServletRegistration.Dynamic registration = servletContext.addServlet("meta", new TrackingServlet());
+
+        assertNull(registration.getRunAsRole());
+        assertEquals(TrackingServlet.class.getName(), registration.getClassName());
+    }
+
+    @Test
+    void servletSetInitParameter_rejectsInvalidNameAndNullValue() {
+        ServletRegistration.Dynamic registration = servletContext.addServlet("params", mock(Servlet.class));
+
+        assertThrows(IllegalArgumentException.class, () -> registration.setInitParameter(null, "v"));
+        assertThrows(IllegalArgumentException.class, () -> registration.setInitParameter("", "v"));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> registration.setInitParameter("k", null));
+        assertTrue(ex.getMessage().contains("k"));
+    }
+
+    @Test
+    void servletSetInitParameters_rejectsNullMap() {
+        ServletRegistration.Dynamic registration = servletContext.addServlet("params", mock(Servlet.class));
+
+        assertThrows(IllegalArgumentException.class, () -> registration.setInitParameters(null));
+    }
+
+    @Test
+    void servletNoOpSetters_keepMappingsIntactAndRecordRunAsRole() {
+        ServletRegistration.Dynamic registration = servletContext.addServlet("noop", mock(Servlet.class));
+        registration.addMapping("/keep");
+
+        registration.setLoadOnStartup(1);
+        registration.setMultipartConfig(new MultipartConfigElement("/tmp"));
+        registration.setRunAsRole("admin");
+        registration.setAsyncSupported(true);
+
+        assertEquals("admin", registration.getRunAsRole(), "setRunAsRole 是唯一有状态的 setter");
+        assertEquals(Set.of("/keep"), Set.copyOf(registration.getMappings()));
+    }
+
+    @Test
+    void filterAddMapping_rejectsNullOrEmptyUrlPatterns() {
+        FilterRegistration.Dynamic registration = servletContext.addFilter("f", new TrackingFilter());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> registration.addMappingForUrlPatterns(null, true));
+        assertThrows(IllegalArgumentException.class,
+                () -> registration.addMappingForUrlPatterns(null, true, (String[]) null));
+    }
+
+    @Test
+    void filterAddMapping_acceptsNullEmptyAndRequestOnlyDispatcherTypes() {
+        FilterRegistration.Dynamic registration = servletContext.addFilter("f", new TrackingFilter());
+
+        registration.addMappingForUrlPatterns(null, true, "/a");
+        registration.addMappingForUrlPatterns(EnumSet.noneOf(DispatcherType.class), true, "/b");
+        registration.addMappingForUrlPatterns(EnumSet.of(DispatcherType.REQUEST), true, "/c");
+
+        assertEquals(Set.of("/a", "/b", "/c"), Set.copyOf(registration.getUrlPatternMappings()));
+    }
+
+    @Test
+    void filterRegistration_exposesClassName() {
+        FilterRegistration.Dynamic registration = servletContext.addFilter("f", new TrackingFilter());
+        assertEquals(TrackingFilter.class.getName(), registration.getClassName());
+    }
+
+    @Test
+    void filterSetInitParameter_rejectsInvalidNameAndNullValue() {
+        FilterRegistration.Dynamic registration = servletContext.addFilter("f", new TrackingFilter());
+
+        assertThrows(IllegalArgumentException.class, () -> registration.setInitParameter(null, "v"));
+        assertThrows(IllegalArgumentException.class, () -> registration.setInitParameter("", "v"));
+        assertThrows(IllegalArgumentException.class, () -> registration.setInitParameter("k", null));
+    }
+
+    @Test
+    void filterSetInitParameter_duplicateReturnsFalse() {
+        FilterRegistration.Dynamic registration = servletContext.addFilter("f", new TrackingFilter());
+
+        assertTrue(registration.setInitParameter("k", "v1"));
+        assertFalse(registration.setInitParameter("k", "v2"));
+        assertEquals("v1", registration.getInitParameter("k"));
+    }
+
+    @Test
+    void filterSetInitParameters_appliesMapAndReportsConflicts() {
+        FilterRegistration.Dynamic registration = servletContext.addFilter("f", new TrackingFilter());
+        registration.setInitParameter("taken", "v1");
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("fresh", "v2");
+        params.put("taken", "v3");
+
+        assertEquals(Set.of("taken"), registration.setInitParameters(params));
+        assertEquals("v2", registration.getInitParameter("fresh"));
+        assertEquals("v1", registration.getInitParameter("taken"));
+        assertTrue(registration.setInitParameters(Collections.emptyMap()).isEmpty());
+        assertThrows(IllegalArgumentException.class, () -> registration.setInitParameters(null));
+    }
+
+    @Test
+    void filterSetAsyncSupported_doesNotAlterConfiguration() {
+        FilterRegistration.Dynamic registration = servletContext.addFilter("f", new TrackingFilter());
+        registration.setInitParameter("k", "v");
+        registration.addMappingForUrlPatterns(null, true, "/a");
+
+        registration.setAsyncSupported(true);
+
+        assertEquals("v", registration.getInitParameter("k"));
+        assertEquals(Set.of("/a"), Set.copyOf(registration.getUrlPatternMappings()));
     }
 }
