@@ -20,9 +20,9 @@ class SseEmitterTest {
     ServerHttpResponse serverHttpResponse;
 
     @Test
-    void defaultConstructor_createsEmitter() {
+    void defaultConstructor_hasNoTimeout() {
         SseEmitter emitter = new SseEmitter();
-        assertNotNull(emitter);
+        assertNull(emitter.getTimeout());
     }
 
     @Test
@@ -60,6 +60,10 @@ class SseEmitterTest {
 
         Set<SseEmitter.DataWithMediaType> result = builder.build();
         assertFalse(result.isEmpty());
+        assertEquals(MediaType.valueOf("text/plain;charset=UTF-8"), result.iterator().next().getMediaType(),
+                "SSE 文本行应以 text/plain;charset=UTF-8 输出");
+        assertTrue(result.stream().anyMatch(part -> "payload".equals(part.getData())),
+                "data() 的业务对象应原样入集，实际: " + concat(result));
     }
 
     @Test
@@ -113,14 +117,25 @@ class SseEmitterTest {
         Set<SseEmitter.DataWithMediaType> result = SseEmitter.event().id("1").name("msg").reconnectTime(1000L)
                 .comment("test").data("hello").build();
 
-        assertFalse(result.isEmpty());
+        String all = concat(result);
+        assertTrue(all.contains("id:1"), () -> "缺少 id 行，实际: " + all);
+        assertTrue(all.contains("event:msg"), () -> "缺少 event 行，实际: " + all);
+        assertTrue(all.contains("retry:1000"), () -> "缺少 retry 行，实际: " + all);
+        assertTrue(all.contains(":test"), () -> "缺少 comment 行，实际: " + all);
+        assertTrue(all.contains("data:") && all.contains("hello"), () -> "缺少 data 行，实际: " + all);
     }
 
     @Test
-    void eventBuilder_multipleData_accumulates() {
+    void eventBuilder_multipleData_keepsEveryPayload() {
         Set<SseEmitter.DataWithMediaType> result = SseEmitter.event().data("first").data("second").build();
 
-        assertTrue(result.size() >= 2);
+        String all = concat(result);
+        assertTrue(all.contains("first"), () -> "第一段数据丢失，实际: " + all);
+        assertTrue(all.contains("second"), () -> "第二段数据丢失，实际: " + all);
+    }
+
+    private static String concat(Set<SseEmitter.DataWithMediaType> parts) {
+        return parts.stream().map(d -> String.valueOf(d.getData())).reduce("", String::concat);
     }
 
     @Test

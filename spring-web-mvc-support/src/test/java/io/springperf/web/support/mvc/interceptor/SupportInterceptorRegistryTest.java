@@ -61,7 +61,8 @@ class SupportInterceptorRegistryTest {
         SupportInterceptorRegistry registry = new SupportInterceptorRegistry();
         InterceptorRegistration result = registry.convert(reg);
 
-        assertNotNull(result);
+        // 必须包成 HandlerInterceptorWrapper：直接把 Spring 拦截器塞进框架注册项会类型不匹配/不生效
+        assertInstanceOf(HandlerInterceptorWrapper.class, field(result, "interceptor"));
     }
 
     @Test
@@ -114,18 +115,18 @@ class SupportInterceptorRegistryTest {
 
     @SuppressWarnings("unchecked")
     private static java.util.List<String> readList(InterceptorRegistration registration, String fieldName) {
+        return (java.util.List<String>) field(registration, fieldName);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> T field(Object target, String fieldName) {
         try {
-            java.lang.reflect.Field field = InterceptorRegistration.class.getDeclaredField(fieldName);
+            java.lang.reflect.Field field = target.getClass().getDeclaredField(fieldName);
             field.setAccessible(true);
-            return (java.util.List<String>) field.get(registration);
+            return (T) field.get(target);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-    }
-
-    @Test
-    void constructor_doesNotThrow() {
-        assertDoesNotThrow(SupportInterceptorRegistry::new);
     }
 
     // ---- Helper classes ----

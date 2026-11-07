@@ -52,13 +52,23 @@ class ResponseBodyEmitterReturnValueResolverTest {
 
     @Test
     void preInitializeEmitter_withResponseBodyEmitter_setsEncodeFunction() throws Exception {
-        ResponseBodyEmitter emitter = spy(new ResponseBodyEmitter());
+        ResponseBodyEmitter emitter = new ResponseBodyEmitter();
         when(resp.getHeaders()).thenReturn(respHeaders);
+        HttpBodyConverter converter = mock(HttpBodyConverter.class);
+        when(converter.canWrite(null, String.class, null)).thenReturn(true);
+        doAnswer(invocation -> {
+            invocation.getArgument(3, org.springframework.http.HttpOutputMessage.class).getBody()
+                    .write("sse-body".getBytes(StandardCharsets.UTF_8));
+            return null;
+        }).when(converter).write(eq("payload"), isNull(), isNull(), any());
+        when(codecRegistry.getConverters()).thenReturn(Collections.singletonList(converter));
 
         resolver.preInitializeEmitter(emitter, req, resp);
 
-        verify(resp).getHeaders();
-        // verify no exception
+        // 通过真实编码路径验证 encodeFunction 已被注入：若 AdapterUtil.setEncodeFunction 退化为空实现，这里拿不到任何字节
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        emitter.encode("payload", out);
+        assertEquals("sse-body", out.toString(StandardCharsets.UTF_8));
     }
 
     @Test
@@ -90,7 +100,7 @@ class ResponseBodyEmitterReturnValueResolverTest {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         resolver.encodeToStream(new HttpHeaders(), "data", baos);
 
-        assertTrue(baos.size() > 0);
+        assertEquals("converted", baos.toString(StandardCharsets.UTF_8));
     }
 
     @Test
@@ -110,7 +120,9 @@ class ResponseBodyEmitterReturnValueResolverTest {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         resolver.encodeToStream(new HttpHeaders(), dataWithType, baos);
 
-        assertTrue(baos.size() > 0);
+        assertEquals("encoded", baos.toString(StandardCharsets.UTF_8));
+        // 必须把包装体解包后再交给 converter，否则 converter 拿到的是 DataWithMediaType 而非业务数据
+        verify(converter).write(eq("data"), isNull(), eq(MediaType.TEXT_PLAIN), any());
     }
 
     @Test

@@ -5,15 +5,19 @@ import io.springperf.web.core.mapping.MappingHandlerMethod;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.Ordered;
+import org.springframework.web.context.request.NativeWebRequest;
+import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -79,7 +83,12 @@ class SpringHandlerMethodArgumentResolverProviderTest {
         Object result = staticResolver.resolveArgument(request, response);
 
         assertEquals("resolved-value", result, "应把参数解析委托给 Spring resolver");
-        verify(delegate).resolveArgument(eq(methodParameter), any(), any(), any());
+        ArgumentCaptor<NativeWebRequest> webRequestCaptor = ArgumentCaptor.forClass(NativeWebRequest.class);
+        verify(delegate).resolveArgument(eq(methodParameter), isNull(), webRequestCaptor.capture(), isNull());
+        // 适配器的意义就是把框架请求转成 Spring 侧可见的 ServletWebRequest，用 any() 会把这一层漏掉
+        ServletWebRequest servletWebRequest = assertInstanceOf(ServletWebRequest.class, webRequestCaptor.getValue());
+        assertSame(servletRequest, servletWebRequest.getRequest());
+        assertSame(servletResponse, servletWebRequest.getResponse());
     }
 
     @Test
