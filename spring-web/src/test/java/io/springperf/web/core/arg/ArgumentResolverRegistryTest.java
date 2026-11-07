@@ -193,14 +193,16 @@ class ArgumentResolverRegistryTest {
     // ----- validateIfApplicable -----
 
     @Test
-    void validateIfApplicable_noValidator_doesNotThrow() throws Exception {
+    void validateIfApplicable_noValidator_leavesArgumentUnvalidated() throws Exception {
         Method method = getClass().getMethod("requestParamMethod", String.class);
         MethodParameter mp = new MethodParameter(method, 0);
         mp.initParameterNameDiscovery(new org.springframework.core.DefaultParameterNameDiscoverer());
         MethodArgContext argCtx = new MethodArgContext(mp);
 
-        assertDoesNotThrow(() ->
-                registry.validateIfApplicable("test", argCtx, mock(WebServerHttpRequest.class), mock(MappingHandlerMethod.class)));
+        assertDoesNotThrow(() -> registry.validateIfApplicable("test", argCtx, mock(WebServerHttpRequest.class),
+                mock(MappingHandlerMethod.class)));
+        // 无可选 validator 时不得写入任何 validator（否则后续请求会误用上一次的实例）
+        assertNull(argCtx.getValidator());
     }
 
     @Test

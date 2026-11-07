@@ -119,12 +119,10 @@ class NettyServerHttpRequestLifecycleTest {
     }
 
     @Test
-    void release_withoutBoundResponse_isNoop() {
-        // 未绑定响应（如仅构造 request 做解析测试）时 release 不应抛异常
+    void release_withoutBoundResponse_stillReleasesRequest() {
+        // 未绑定响应（如仅构造 request 做解析测试）时不得级联到响应，但请求自身引用必须被释放
         NettyServerHttpRequest req = newBareRequest();
-        assertDoesNotThrow(() -> {
-            req.release();
-        });
+        assertTrue(req.release(), "首次 release 应报告为「最后一次引用释放」");
     }
 
     @Test

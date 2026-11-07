@@ -11,8 +11,6 @@ import java.io.File;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ScheduledFuture;
@@ -206,31 +204,55 @@ class NettyServerHttpResponseTest {
 
     @Test
     void writeStream_doesNotBlockCaller_onSlowSource() throws Exception {
-        // 慢速源：writer 缓慢写入且暂不关闭管道；若读取同步进行则会阻塞调用线程
-        PipedOutputStream pos = new PipedOutputStream();
-        PipedInputStream pis = new PipedInputStream(pos);
-        Thread writer = new Thread(() -> {
-            try {
-                pos.write("slow".getBytes(StandardCharsets.UTF_8));
-                Thread.sleep(2000);
-                pos.close();
-            } catch (Exception ignored) {
-                // 测试结束后忽略
+        // 源在第一次 read 处阻塞直到测试放行：若读取是同步的，writeStream 会卡在这里
+        java.util.concurrent.CountDownLatch readingStarted = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch allowRead = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicReference<Thread> readThread = new java.util.concurrent.atomic.AtomicReference<>();
+        InputStream slow = new InputStream() {
+            private boolean firstRead = true;
+
+            @Override
+            public int read() {
+                throw new UnsupportedOperationException("streamCopy 只使用 read(byte[]) 批量读");
             }
-        });
-        writer.start();
+
+            @Override
+            public int read(byte[] b, int off, int len) throws IOException {
+                if (!firstRead) {
+                    return -1;
+                }
+                firstRead = false;
+                readThread.set(Thread.currentThread());
+                readingStarted.countDown();
+                try {
+                    if (!allowRead.await(10, TimeUnit.SECONDS)) {
+                        throw new IOException("读取未被测试放行");
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException(e);
+                }
+                b[off] = 'x';
+                return 1;
+            }
+        };
 
         ChannelFuture future = mock(ChannelFuture.class);
         when(ctx.writeAndFlush(any())).thenReturn(future);
         when(future.isSuccess()).thenReturn(true);
         when(future.addListener(any())).thenReturn(future);
+        when(ctx.channel().isActive()).thenReturn(true);
         when(ctx.channel().isWritable()).thenReturn(true);
+        when(ctx.alloc().buffer(anyInt(), anyInt())).thenReturn(Unpooled.buffer(8));
 
-        long start = System.nanoTime();
-        response.writeStream(pis); // 不应阻塞调用线程（读取已卸载到线程池）
-        long elapsedMs = (System.nanoTime() - start) / 1_000_000;
-        assertTrue(elapsedMs < 1000, "writeStream 不应在慢速源上阻塞调用线程，实际耗时 " + elapsedMs + "ms");
-        writer.join(3000);
+        try {
+            // 关键证据：源仍阻塞在 read 上，writeStream 却已返回 → 读取确实被卸载
+            response.writeStream(slow);
+            assertTrue(readingStarted.await(5, TimeUnit.SECONDS), "读取应已交棒到后台线程");
+            assertNotSame(Thread.currentThread(), readThread.get(), "InputStream.read 必须在业务线程池执行");
+        } finally {
+            allowRead.countDown();
+        }
     }
 
     @Test
@@ -275,8 +297,19 @@ class NettyServerHttpResponseTest {
         when(future.addListener(any())).thenReturn(future);
 
         assertDoesNotThrow(() -> response.writeFile(testFile));
-        verify(ctx, atLeast(2)).writeAndFlush(any());
-        verify(ctx).write(any());
+
+        // 头 + 终结帧都要写出，且文件体长度必须与真实字节数一致（零拷贝 FileRegion）
+        ArgumentCaptor<Object> flushed = ArgumentCaptor.forClass(Object.class);
+        verify(ctx, times(2)).writeAndFlush(flushed.capture());
+        assertEquals("file content".getBytes(StandardCharsets.UTF_8).length,
+                ((HttpResponse) flushed.getAllValues().get(0)).headers().getInt(HttpHeaderNames.CONTENT_LENGTH),
+                "Content-Length 必须等于文件字节数");
+        assertTrue(flushed.getAllValues().get(1) instanceof LastHttpContent, "必须补发 LastHttpContent 收尾");
+        ArgumentCaptor<Object> body = ArgumentCaptor.forClass(Object.class);
+        verify(ctx).write(body.capture());
+        FileRegion region = assertInstanceOf(FileRegion.class, body.getValue(), "文件体应以零拷贝 FileRegion 写出");
+        assertEquals("file content".getBytes(StandardCharsets.UTF_8).length, region.count(),
+                "FileRegion 长度必须等于文件字节数");
 
         testFile.delete();
     }
@@ -424,11 +457,14 @@ class NettyServerHttpResponseTest {
     }
 
     @Test
-    void writeFile_handlesSyncException() {
+    void writeFile_headerWriteThrows_propagatesOriginalCause() {
         when(ctx.writeAndFlush(any())).thenThrow(new RuntimeException("write error"));
 
+        // 失败点在「写响应头」而非文件读取：文件是否存在与本次断言无关
         File nonexistent = new File("should_not_exist_12345");
-        assertThrows(RuntimeException.class, () -> response.writeFile(nonexistent));
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> response.writeFile(nonexistent));
+        assertEquals("write error", ex.getCause().getMessage(),
+                "应向上传播写头失败本身，而不是 FileNotFound 等其他异常");
     }
 
     // ========== P2-A: 关闭响应头 validateHeaders 校验 ==========
@@ -550,6 +586,8 @@ class NettyServerHttpResponseTest {
 
         InputStream input = new ByteArrayInputStream("x".getBytes(StandardCharsets.UTF_8));
         assertDoesNotThrow(() -> response.writeStream(input));
+        // 校验关闭不是「静默放弃」：响应仍须真正写出
+        verify(ctx).writeAndFlush(any());
     }
 
     // ========== 响应侧零拷贝：框架视图与 Netty 响应共享 DefaultHttpHeaders 存储 ==========
@@ -657,6 +695,8 @@ class NettyServerHttpResponseTest {
         response.writeBytes("x".getBytes(StandardCharsets.UTF_8));
         // 空值边界：早退分支的关流动作不得因 input 为 null 引入 NPE
         assertDoesNotThrow(() -> response.writeStream((InputStream) null));
+        // 已提交后必须早退：不得再写出第二帧
+        verify(ctx, times(1)).writeAndFlush(any());
     }
 
     private static final class CloseTrackingInputStream extends FilterInputStream {

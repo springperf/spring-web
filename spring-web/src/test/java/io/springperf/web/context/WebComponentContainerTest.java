@@ -110,17 +110,19 @@ class WebComponentContainerTest {
         java.util.concurrent.CyclicBarrier barrier = new java.util.concurrent.CyclicBarrier(threads);
         java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(threads);
         java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(threads);
+        java.util.concurrent.Future<?>[] futures = new java.util.concurrent.Future<?>[threads];
         LifecycleWebComponent[] comps = new LifecycleWebComponent[threads];
         for (int i = 0; i < threads; i++) {
             final int idx = i;
             comps[idx] = mock(LifecycleWebComponent.class);
             when(comps[idx].getComponentName()).thenReturn("same");
             when(comps[idx].getOrder()).thenReturn(100 + idx);
-            pool.submit(() -> {
+            futures[idx] = pool.submit(() -> {
                 try {
                     barrier.await();
                     container.registerWebComponent(comps[idx]);
                 } catch (Exception e) {
+                    // 交给 Future 携带，主线程 get() 时回传（不再静默丢失）
                     throw new RuntimeException(e);
                 } finally {
                     done.countDown();
@@ -129,6 +131,10 @@ class WebComponentContainerTest {
         }
         assertTrue(done.await(10, java.util.concurrent.TimeUnit.SECONDS));
         pool.shutdownNow();
+        // 工作线程异常必须回传主线程：submit 的 Future 不 get，注册失败也会「绿」
+        for (java.util.concurrent.Future<?> future : futures) {
+            assertDoesNotThrow(() -> future.get(1, java.util.concurrent.TimeUnit.SECONDS), "并发注册线程不得抛异常");
+        }
 
         assertEquals(1, container.webComponents.size(), "并发同名注册后容器应只保留一个组件");
         // order 最小的 comps[0](100) 无论何时注册都会替换现存活者，且不会被更高 order 抢位，

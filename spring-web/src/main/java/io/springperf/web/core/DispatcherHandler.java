@@ -190,6 +190,11 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
         return mappingRegistry;
     }
 
+    /** 仅供测试：暴露 corsRegistry（包可见，不进公开 API）。 */
+    CorsRegistry corsRegistryForTest() {
+        return corsRegistry;
+    }
+
     protected void handleWithMappingResult(WebServerHttpRequest req, WebServerHttpResponse resp, MappingResult mappingResult) {
         // 通过 BizPoolRegistry 用 Phase3 预缓存的线程池：返回 null（无映射 / @RunInPool(EVENTLOOP) / default-execute-mode=eventloop）→ EventLoop 同步；返回非 null（缺省 default 池 / @RunInPool 命名池）→ 切业务线程
         ExecutorService executor = bizPoolRegistry.determinePool(req, mappingResult);

@@ -200,6 +200,8 @@ class AsyncSupportRegistryTest {
         WebAsyncTask<String> webAsyncTask = new WebAsyncTask<>(() -> "ok");
 
         assertDoesNotThrow(() -> registry.startCallableProcessing(asyncWebRequest, webAsyncTask));
+        // 证明确实走到异步装配（回调被注册），而不是因 null 兜底提前返回
+        verify(asyncWebRequest).setAsyncReadyCallback(any(Runnable.class));
     }
 
     @Test

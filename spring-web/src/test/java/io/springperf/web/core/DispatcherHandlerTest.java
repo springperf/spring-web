@@ -290,7 +290,7 @@ class DispatcherHandlerTest {
     }
 
     @Test
-    void doHandle_preHandleReturnsFalse_returnsEarly() throws Exception {
+    void doHandle_preHandleReturnsFalse_returnsEarly() throws Throwable {
         WebServerHttpRequest req = createRequest();
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
         PathMappingContext mappingContext = mock(PathMappingContext.class);
@@ -300,6 +300,9 @@ class DispatcherHandlerTest {
 
         handler.doHandle(req, resp, mappingContext);
 
+        // 提前返回：收尾 flush 必须发生，处理器绝不能被调用
+        verify(resp).flush();
+        verify(mappingContext, never()).invoke(any(), any(), any());
         verifyNoInteractions(argumentResolverRegistry);
     }
 

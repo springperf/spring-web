@@ -159,8 +159,8 @@ class NettyHttpHeadersAdapterDetailsTest {
         HttpHeaders netty = new DefaultHttpHeaders(false);
         netty.set("Content-Type", "application/json");
         WebHttpHeaders view = new WebHttpHeaders(new NettyHttpHeadersAdapter(netty, true));
-        // 不缓存：等值即可，不要求同一实例
-        assertEquals(view.getContentType(), view.getContentType());
+        // 不缓存：每次都直接读 Netty headers 当前值（原来的 assertEquals(x, x) 恒真，无证伪能力）
+        assertEquals(MediaType.APPLICATION_JSON, view.getContentType(), "应读到构造时底层已有的 Content-Type");
 
         view.setContentType(null);
         assertNull(view.getContentType(), "setContentType(null) 后应返回 null");

@@ -196,10 +196,11 @@ class ResponseTimeoutArmingTest {
         verify(eventLoop, times(2)).schedule(any(Runnable.class), eq(60000L), eq(TimeUnit.MILLISECONDS));
     }
 
-    /** 起 n 个线程同时执行 action（各 loop 次），全部结束后才返回。 */
+    /** 起 n 个线程同时执行 action（各 loop 次），全部结束后才返回；工作线程异常必须回传主线程。 */
     private static void runConcurrently(int n, int loop, Runnable action) throws InterruptedException {
         CountDownLatch start = new CountDownLatch(1);
         CountDownLatch done = new CountDownLatch(n);
+        java.util.concurrent.atomic.AtomicReference<Throwable> failure = new java.util.concurrent.atomic.AtomicReference<>();
         for (int i = 0; i < n; i++) {
             Thread t = new Thread(() -> {
                 try {
@@ -209,6 +210,8 @@ class ResponseTimeoutArmingTest {
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
+                } catch (Throwable e) {
+                    failure.compareAndSet(null, e);
                 } finally {
                     done.countDown();
                 }
@@ -217,6 +220,7 @@ class ResponseTimeoutArmingTest {
         }
         start.countDown();
         assertTrue(done.await(30, TimeUnit.SECONDS), "并发任务未在时限内结束");
+        assertNull(failure.get(), "并发任务不得抛出异常: " + failure.get());
     }
 
     private NettyServerHttpResponse newResponse() {
