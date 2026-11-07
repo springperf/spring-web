@@ -233,7 +233,7 @@ coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,PerfRequ
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,PerfHttpPrincipal,5,59,3,5,2,16,3,9,0,8
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,PerfServletConfig,10,29,1,1,3,8,3,4,2,4
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,ServletAttribute,0,90,0,8,0,24,0,12,0,8
-coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,SupportServletRegistry,147,262,15,35,30,66,12,24,1,10
+coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,SupportServletRegistry,0,409,1,49,0,96,1,35,0,11
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,JasperJspServlet,20,112,3,9,7,31,4,8,1,5
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,PerfHttpServletResponse.new OutputStream() {...},20,24,0,0,6,6,2,3,2,3
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,PerfHttpServletResponse.new ServletOutputStream() {...},12,51,0,0,3,14,1,7,1,7
@@ -263,8 +263,8 @@ coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.context,
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.context,PerfServletContext.PerfSessionCookieConfig,0,88,0,2,0,31,0,19,0,18
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.context,DynamicServletRegistration,73,252,9,29,21,55,15,23,6,13
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.context,ServletAdapterContext,4,51,0,0,2,20,1,10,1,10
-coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.context,PerfServletContext,151,1552,39,143,38,387,39,130,2,76
-coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.context,DynamicFilterRegistration,85,167,17,17,19,40,16,17,3,13
+coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.context,PerfServletContext,51,1652,21,161,17,408,21,148,0,78
+coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.context,DynamicFilterRegistration,83,169,16,18,18,41,15,18,3,13
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.arg.provider,SessionAttributeArgumentResolverProvider,2,62,1,9,1,14,1,8,0,4
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.arg.provider,ServletResponseProvider,0,19,0,0,0,5,0,4,0,4
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.arg.provider,HttpServletResponseProvider,0,19,0,0,0,5,0,4,0,4
