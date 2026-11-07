@@ -249,7 +249,7 @@ protected void handleWithMappingResult(WebServerHttpRequest req, WebServerHttpRe
 
 ---
 
-## 聚光灯 7：`WebMvcConfigurerBridge`——翻译中枢，兼容零侵入
+## 聚光灯 7：`WebMvcConfigurerBridge`——翻译中枢：Shim 收集与常见回调桥接
 
 ### 问题
 
@@ -299,8 +299,8 @@ public class WebMvcConfigurerBridge extends BaseWebComponent {
 
 - **Spring 原生 Registry 作 Shim**：`shimInterceptorRegistry`/`shimCorsRegistry`/`shimResourceRegistry` 直接 `new` Spring MVC 的原生 Registry，`WebMvcConfigurer` 写入时不知道自己在被"收集"——它们就是 Spring 标准 API。收集后由 `bridgeInterceptors`/`bridgeCorsMappings`/`bridgeResourceHandlers` 读取 shim 的注册列表翻译到框架 Registry。
 - **单阶段收集+翻译**：收集与翻译都在 `initComponentPhase1` 内完成，循环写完 shim 立即 bridge，无跨阶段时序依赖。跑在 Phase 1 是为确保框架 Registry 自身初始化前注入用户配置。
-- **全量兼容**：11 个桥接方法覆盖 `addViewControllers`/`addInterceptors`/`addCorsMappings`/`addResourceHandlers`/`addFormatters`/`configureAsyncSupport`/`addArgumentResolvers`/`extendMessageConverters`/`addReturnValueHandlers`/`extendHandlerExceptionResolvers`/`configureValidator`。
-- **零侵入**：用户代码只操作 Spring 标准接口，框架通过 Shim 收集器透明拦截。
+- **常用回调覆盖**：11 个桥接方法覆盖 `addViewControllers`/`addInterceptors`/`addCorsMappings`/`addResourceHandlers`/`addFormatters`/`configureAsyncSupport`/`addArgumentResolvers`/`extendMessageConverters`/`addReturnValueHandlers`/`extendHandlerExceptionResolvers`/`configureValidator`。
+- **用户侧无框架专用 API**：用户代码只操作 Spring 标准接口，框架通过 Shim 收集器透明拦截；未覆盖的回调会打 WARN（见 12 篇 2.1）。
 
 ---
 

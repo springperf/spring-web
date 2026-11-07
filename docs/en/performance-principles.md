@@ -378,7 +378,7 @@ When two descriptions are separated by `→` in the same cell, the left side is 
 |-----------|-----------|------------|---------|
 | Servlet API | **Bridge compatible** (`spring-web-servlet` module) | Native | Not supported |
 | Actuator | **Native support** + standalone management port | Native | Native |
-| `@RequestMapping` | **Fully compatible** | Native | Native |
+| `@RequestMapping` | **Core usage compatible** (see the [Migration Guide](quickstart.md) for differences) | Native | Native |
 | `javax.validation` | Supported | Supported | Supported |
 | Spring Data | Bridge compatible | Native | Native |
 | Minimum heap | **~24MB** | ~26MB | ~25MB |
