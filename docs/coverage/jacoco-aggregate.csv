@@ -261,7 +261,7 @@ coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.session,
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.session,HttpSessionData,0,101,0,6,0,31,0,19,0,16
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.context,EncodingConfig,0,56,0,0,0,14,0,6,0,6
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.context,PerfServletContext.PerfSessionCookieConfig,0,88,0,2,0,31,0,19,0,18
-coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.context,DynamicServletRegistration,69,256,6,32,20,56,12,26,6,13
+coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.context,DynamicServletRegistration,0,325,0,38,0,76,0,38,0,19
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.context,ServletAdapterContext,4,51,0,0,2,20,1,10,1,10
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.context,PerfServletContext,269,1434,57,125,70,355,53,116,5,73
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.context,DynamicFilterRegistration,85,167,17,17,19,40,16,17,3,13
