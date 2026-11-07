@@ -230,6 +230,57 @@ class ViewCacheTest {
         assertEquals(MAX_SIZE, views.size());
     }
 
+    @Test
+    void trackInsertion_inFlightAtHead_stillEvictsLaterCompletedEntries() throws Exception {
+        ViewCache cache = new ViewCache(true);
+        ConcurrentMap<String, CompletableFuture<View>> views = viewsOf(cache);
+        ConcurrentLinkedQueue<String> queue = queueOf(cache);
+
+        views.put("inflight", new CompletableFuture<>());
+        queue.add("inflight");
+        fillCompleted(views, queue, MAX_SIZE);
+
+        invokeTrackInsertion(cache, "extra");
+
+        assertTrue(views.containsKey("inflight"), "仍在加载的条目不能被淘汰");
+        assertFalse(views.containsKey("v0"), "旧实现遇队首 in-flight 直接 return，会漏掉后续可淘汰条目");
+        assertEquals(MAX_SIZE, views.size(), "应收敛到容量上限");
+        assertTrue(queue.contains("inflight"), "未完成条目应放回队列尾部");
+    }
+
+    @Test
+    void invalidate_concurrentWithResolve_keepsCacheUsable() throws Exception {
+        ViewCache cache = new ViewCache(true);
+        int threads = 8;
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(threads);
+        AtomicInteger failures = new AtomicInteger();
+        for (int i = 0; i < threads; i++) {
+            final int id = i;
+            Thread t = new Thread(() -> {
+                try {
+                    start.await();
+                    for (int j = 0; j < 100; j++) {
+                        if (id % 2 == 0) {
+                            cache.invalidate();
+                        } else {
+                            cache.resolve("v" + (j % 8), key -> VIEW);
+                        }
+                    }
+                } catch (Throwable ex) {
+                    failures.incrementAndGet();
+                } finally {
+                    done.countDown();
+                }
+            });
+            t.start();
+        }
+        start.countDown();
+        assertTrue(done.await(10, TimeUnit.SECONDS));
+        assertEquals(0, failures.get(), "并发失效与解析不应抛异常");
+        assertSame(VIEW, cache.resolve("home", key -> VIEW), "失效后缓存仍可用");
+    }
+
     private static void fillCompleted(ConcurrentMap<String, CompletableFuture<View>> views,
             ConcurrentLinkedQueue<String> queue, int count) {
         for (int i = 0; i < count; i++) {

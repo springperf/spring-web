@@ -107,7 +107,7 @@ public class FreemarkerViewResolver extends BaseWebComponent implements ViewReso
         // FreeMarker 的 Template 与 locale 相关，缓存键必须带 locale
         String cacheKey = locale == null ? viewName : viewName + '\u0000' + locale;
         return viewCache.resolve(cacheKey, key -> {
-            String fullName = viewName.endsWith(suffix) ? viewName : viewName + suffix;
+            String fullName = ViewProperties.withSuffix(viewName, suffix);
             String fullPath = prefix + fullName;
             if (!new ClassPathResource(fullPath).exists()) {
                 return null;
@@ -130,6 +130,10 @@ public class FreemarkerViewResolver extends BaseWebComponent implements ViewReso
     @Override
     public void invalidateCache() {
         viewCache.invalidate();
+        // 缓存中的 View 持有 Template 实例，Configuration 也缓存模板；两者都清才能让替换生效
+        if (configuration != null) {
+            configuration.clearTemplateCache();
+        }
     }
 
     private static class FreemarkerView implements View {

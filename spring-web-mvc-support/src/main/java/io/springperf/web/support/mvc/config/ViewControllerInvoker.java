@@ -10,14 +10,13 @@ import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.view.RedirectView;
 import io.springperf.web.view.View;
 import io.springperf.web.view.ViewResolverRegistry;
-import org.springframework.http.HttpHeaders;
+import io.springperf.web.view.retval.ViewReturnValueResolver;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.util.Assert;
 import org.springframework.util.ReflectionUtils;
 
 import java.lang.reflect.Method;
-import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.List;
 
@@ -71,18 +70,8 @@ public class ViewControllerInvoker implements CustomInvoker {
             throw new IllegalArgumentException("Unable to resolve view name '" + viewName
                     + "' with any registered ViewResolver (thymeleaf/freemarker/beetl/jsp)");
         }
-        String contentType = view.getContentType();
-        if (contentType != null) {
-            resp.getHeaders().set(HttpHeaders.CONTENT_TYPE, contentType);
-        } else {
-            Charset charset = resp.getCharacterEncoding();
-            if (charset == null) {
-                charset = Charset.forName("UTF-8");
-            }
-            resp.getHeaders().set(HttpHeaders.CONTENT_TYPE, "text/html;charset=" + charset.name());
-        }
-        resp.setHandled();
-        view.render(ModelContext.getOrCreate(req), req, resp);
+        ViewReturnValueResolver.applyContentType(view, resp);
+        ViewReturnValueResolver.renderView(view, ModelContext.getOrCreate(req), req, resp);
     }
 
     private View resolveView(String name, WebServerHttpRequest req, WebServerHttpResponse resp) {

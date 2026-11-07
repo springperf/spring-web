@@ -22,6 +22,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.method.HandlerMethod;
 
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
@@ -240,13 +241,25 @@ class ViewReturnValueResolverTest {
     }
 
     @Test
-    void engineNone_mixedList_skipsFailFast() throws Exception {
-        // 逗号分隔多选：含 none 时视为禁用全部模板引擎
+    void engineNone_mixedList_failsFast() throws Exception {
+        // none 只能单独使用：混写必须在启动期中断，不能静默跳过 fail-fast
         stubEngine("none,thymeleaf");
         when(viewResolverRegistry.hasViewResolvers()).thenReturn(false);
 
         ViewReturnValueResolver resolver = buildResolver();
-        assertDoesNotThrow(resolver::initComponentPhase2);
+        IllegalStateException ex = assertThrows(IllegalStateException.class, resolver::initComponentPhase2);
+        assertTrue(ex.getMessage().contains("must be used alone"));
+    }
+
+    @Test
+    void engineInvalidValue_failsFast() throws Exception {
+        stubEngine("thymeleaf,typo");
+        when(viewResolverRegistry.hasViewResolvers()).thenReturn(false);
+
+        ViewReturnValueResolver resolver = buildResolver();
+        IllegalStateException ex = assertThrows(IllegalStateException.class, resolver::initComponentPhase2);
+        assertTrue(ex.getMessage().contains(ViewProperties.ENGINE));
+        assertTrue(ex.getMessage().contains("typo"));
     }
 
     @Test
@@ -257,6 +270,45 @@ class ViewReturnValueResolverTest {
         ViewReturnValueResolver resolver = buildResolver();
         assertDoesNotThrow(resolver::initComponentPhase2);
     }
+
+    // ==================== 统一渲染入口 ====================
+
+    @Test
+    void renderView_success_marksHandledAfterRender() throws Exception {
+        View view = mock(View.class);
+        WebServerHttpRequest req = mock(WebServerHttpRequest.class);
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+
+        ViewReturnValueResolver.renderView(view, Collections.emptyMap(), req, resp);
+
+        verify(view).render(any(), eq(req), eq(resp));
+        verify(resp).setHandled();
+        verify(resp, org.mockito.Mockito.never()).resetBuffer();
+    }
+
+    @Test
+    void renderView_failure_resetsBufferAndDoesNotMarkHandled() throws Exception {
+        IllegalStateException boom = new IllegalStateException("render failed");
+        WebServerHttpRequest req = mock(WebServerHttpRequest.class);
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        ByteArrayOutputStream body = new ByteArrayOutputStream();
+        when(resp.getBody()).thenReturn(body);
+        View view = (model, request, response) -> {
+            response.getBody().write("PARTIAL-HTML".getBytes(StandardCharsets.UTF_8));
+            throw boom;
+        };
+
+        IllegalStateException thrown = assertThrows(IllegalStateException.class,
+                () -> ViewReturnValueResolver.renderView(view, Collections.emptyMap(), req, resp));
+
+        assertSame(boom, thrown, "渲染异常必须原样抛出");
+        assertEquals("PARTIAL-HTML", new String(body.toByteArray(), StandardCharsets.UTF_8),
+                "用例须先写出半截页面，否则无法证明 resetBuffer 的必要性");
+        verify(resp).resetBuffer();
+        verify(resp, org.mockito.Mockito.never()).setHandled();
+    }
+
+    // ==================== Content-Type ====================
 
     @Test
     void applyContentType_customCharset_syncsResponseEncoding() {
@@ -288,17 +340,33 @@ class ViewReturnValueResolverTest {
     }
 
     @Test
-    void applyContentType_customContentTypeWithoutCharset_isPreserved() {
+    void applyContentType_customContentTypeWithoutCharset_appendsResponseCharset() {
         View view = mock(View.class);
         when(view.getContentType()).thenReturn("application/xhtml+xml");
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
         HttpHeaders headers = new HttpHeaders();
         when(resp.getHeaders()).thenReturn(headers);
+        when(resp.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
 
         ViewReturnValueResolver.applyContentType(view, resp);
 
-        assertEquals("application/xhtml+xml", headers.getFirst(HttpHeaders.CONTENT_TYPE),
-                "自定义 Content-Type 应原样保留，不得擅自追加 charset");
+        assertEquals("application/xhtml+xml;charset=UTF-8", headers.getFirst(HttpHeaders.CONTENT_TYPE),
+                "头必须声明 Writer 实际使用的编码，否则浏览器按自身默认编码解析");
+        verify(resp).setCharacterEncoding(StandardCharsets.UTF_8);
+    }
+
+    @Test
+    void applyContentType_customContentTypeWithoutCharset_usesNonDefaultResponseCharset() {
+        View view = mock(View.class);
+        when(view.getContentType()).thenReturn("application/xhtml+xml");
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        HttpHeaders headers = new HttpHeaders();
+        when(resp.getHeaders()).thenReturn(headers);
+        when(resp.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_16BE);
+
+        ViewReturnValueResolver.applyContentType(view, resp);
+
+        assertEquals("application/xhtml+xml;charset=UTF-16BE", headers.getFirst(HttpHeaders.CONTENT_TYPE));
     }
 
     @Test

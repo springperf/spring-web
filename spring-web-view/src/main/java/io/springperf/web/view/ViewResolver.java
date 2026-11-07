@@ -23,10 +23,10 @@ public interface ViewResolver extends WebComponent {
     }
 
     /**
-     * 使本解析器持有的解析结果缓存失效。
+     * 使本解析器的解析结果与模板引擎内部缓存失效。
      * <p>
      * 运行期新增或替换模板后，由 {@link ViewResolverRegistry#invalidateViewCaches()} 统一调用；
-     * 无缓存的自定义实现保持默认空实现。
+     * 内置实现须同时清模板引擎缓存，否则替换后的模板不会生效。无缓存的自定义实现保持默认空实现。
      * </p>
      */
     default void invalidateCache() {

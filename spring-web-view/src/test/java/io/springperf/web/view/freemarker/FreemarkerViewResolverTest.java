@@ -230,4 +230,17 @@ class FreemarkerViewResolverTest {
         resolver.invalidateCache();
         assertNotSame(first, resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class)));
     }
+
+    @Test
+    void invalidateCache_clearsEngineTemplateCache() throws Exception {
+        FreemarkerViewResolver resolver = buildResolver();
+        freemarker.template.Configuration configuration = mock(freemarker.template.Configuration.class);
+        java.lang.reflect.Field field = FreemarkerViewResolver.class.getDeclaredField("configuration");
+        field.setAccessible(true);
+        field.set(resolver, configuration);
+
+        resolver.invalidateCache();
+
+        verify(configuration).clearTemplateCache();
+    }
 }
