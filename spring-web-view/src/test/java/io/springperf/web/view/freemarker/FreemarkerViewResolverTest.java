@@ -32,8 +32,8 @@ class FreemarkerViewResolverTest {
         when(props.get(ViewProperties.FREEMARKER_PREFIX, ViewProperties.FREEMARKER_PREFIX_DEFAULT))
                 .thenReturn("templates/");
         when(props.get(ViewProperties.FREEMARKER_SUFFIX, ViewProperties.FREEMARKER_SUFFIX_DEFAULT)).thenReturn(".ftl");
-        when(props.getBoolean(ViewProperties.FREEMARKER_CACHE, ViewProperties.FREEMARKER_CACHE_DEFAULT))
-                .thenReturn(true);
+        // cache 由 ViewProperties.resolveBoolean 经 props.get(key, null) 读取，getBoolean 是死桩；
+        // 未配置即回退默认 true，覆盖 false 的用例在方法内用 props.get(eq(KEY), isNull()) 精确桩。
         webContext = mock(WebContext.class);
         when(webContext.getProps()).thenReturn(props);
     }
@@ -56,6 +56,17 @@ class FreemarkerViewResolverTest {
         FreemarkerViewResolver resolver = buildResolver();
         View view = resolver.resolveViewName("hello.ftl", Locale.US, mock(WebServerHttpRequest.class));
         assertNotNull(view);
+
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        when(resp.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
+        ByteArrayOutputStream body = new ByteArrayOutputStream();
+        when(resp.getBody()).thenReturn(body);
+        Map<String, Object> model = new HashMap<>();
+        model.put("name", "Suffix");
+        view.render(model, mock(WebServerHttpRequest.class), resp);
+
+        assertTrue(new String(body.toByteArray(), StandardCharsets.UTF_8).contains("Hello, Suffix!"),
+                "后缀不应被拼成 hello.ftl.ftl");
     }
 
     @Test
@@ -80,8 +91,8 @@ class FreemarkerViewResolverTest {
         view.render(model, req, resp);
 
         String output = new String(body.toByteArray(), StandardCharsets.UTF_8);
-        assertTrue(output.contains("Hello"), "渲染输出应包含模板内容: " + output);
-        assertTrue(output.contains("Perf"), "渲染输出应包含 model 值: " + output);
+        assertTrue(output.contains("Hello, Perf!"), "模板文本与 model 值应组成完整输出: " + output);
+        assertFalse(output.contains("${name}"), "FreeMarker 表达式必须被求值: " + output);
     }
 
     @Test

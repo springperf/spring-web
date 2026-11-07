@@ -72,9 +72,10 @@ class BeetlViewResolverTest {
         model.put("name", "Perf");
         view.render(model, req, resp);
 
+        // 模板文件带 UTF-8 BOM，输出首字符是 U+FEFF，因此不做整串等值比较
         String output = new String(body.toByteArray(), StandardCharsets.UTF_8);
-        assertTrue(output.contains("Hello"), "渲染输出应包含模板内容: " + output);
-        assertTrue(output.contains("Perf"), "渲染输出应包含 model 值: " + output);
+        assertTrue(output.contains("Hello, Perf!"), "模板文本与 model 值必须在正确位置被替换: " + output);
+        assertFalse(output.contains("${name}"), "Beetl 表达式必须被求值: " + output);
     }
 
     @Test
@@ -89,10 +90,13 @@ class BeetlViewResolverTest {
         ByteArrayOutputStream body = new ByteArrayOutputStream();
         when(resp.getBody()).thenReturn(body);
 
-        view.render(new HashMap<>(), req, resp);
+        Map<String, Object> model = new HashMap<>();
+        model.put("name", "Suffix");
+        view.render(model, req, resp);
 
         String output = new String(body.toByteArray(), StandardCharsets.UTF_8);
-        assertTrue(output.contains("Hello"), "模板路径不应被拼成 hello.btl.btl: " + output);
+        assertTrue(output.contains("Hello, Suffix!"), "模板路径不应被拼成 hello.btl.btl: " + output);
+        assertFalse(output.contains("${name}"), "Beetl 表达式必须被求值: " + output);
     }
 
     // ==================== spring.beetl.enabled / cache / cache-ttl ====================
@@ -110,6 +114,7 @@ class BeetlViewResolverTest {
 
         BeetlViewResolver resolver = new BeetlViewResolver();
         resolver.initWithWebContext(disabledContext);
+        assertFalse(resolver.isEnabled());
         // 即使模板存在，enabled=false 也应返回 null
         assertNull(resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class)));
     }
@@ -122,7 +127,7 @@ class BeetlViewResolverTest {
     }
 
     @Test
-    void initWithWebContext_cacheDisabled_doesNotThrow() {
+    void initWithWebContext_cacheDisabled_usesNoCache() throws Exception {
         ApplicationProperties noCacheProps = mock(ApplicationProperties.class);
         when(noCacheProps.get(ViewProperties.BEETL_PREFIX, ViewProperties.BEETL_PREFIX_DEFAULT))
                 .thenReturn("templates/");
@@ -131,14 +136,16 @@ class BeetlViewResolverTest {
         WebContext noCacheContext = mock(WebContext.class);
         when(noCacheContext.getProps()).thenReturn(noCacheProps);
 
-        assertDoesNotThrow(() -> {
-            BeetlViewResolver resolver = new BeetlViewResolver();
-            resolver.initWithWebContext(noCacheContext);
-        }, "cache=false 应使用 NoCache 且正常初始化");
+        BeetlViewResolver resolver = new BeetlViewResolver();
+        resolver.initWithWebContext(noCacheContext);
+
+        assertEquals(BeetlViewResolver.NO_CACHE_CLASS,
+                groupTemplateOf(resolver).getProgramCache().getClass().getName(),
+                "cache=false 必须切到 NoCache 实现，否则运行期替换模板不会生效");
     }
 
     @Test
-    void initWithWebContext_cacheTtlConfigured_doesNotThrow() {
+    void initWithWebContext_cacheTtlConfigured_setsCacheDuration() throws Exception {
         ApplicationProperties ttlProps = mock(ApplicationProperties.class);
         when(ttlProps.get(ViewProperties.BEETL_PREFIX, ViewProperties.BEETL_PREFIX_DEFAULT)).thenReturn("templates/");
         when(ttlProps.get(ViewProperties.BEETL_SUFFIX, ViewProperties.BEETL_SUFFIX_DEFAULT)).thenReturn(".btl");
@@ -146,10 +153,17 @@ class BeetlViewResolverTest {
         WebContext ttlContext = mock(WebContext.class);
         when(ttlContext.getProps()).thenReturn(ttlProps);
 
-        assertDoesNotThrow(() -> {
-            BeetlViewResolver resolver = new BeetlViewResolver();
-            resolver.initWithWebContext(ttlContext);
-        }, "cache-ttl 配置应正常初始化");
+        BeetlViewResolver resolver = new BeetlViewResolver();
+        resolver.initWithWebContext(ttlContext);
+
+        assertEquals("60", groupTemplateOf(resolver).getConf().getPs().getProperty("cache.duration"),
+                "cache-ttl=60000ms 应换算为 Beetl 的 60 秒 cache.duration");
+    }
+
+    private static org.beetl.core.GroupTemplate groupTemplateOf(BeetlViewResolver resolver) throws Exception {
+        java.lang.reflect.Field field = BeetlViewResolver.class.getDeclaredField("groupTemplate");
+        field.setAccessible(true);
+        return (org.beetl.core.GroupTemplate) field.get(resolver);
     }
 
     @Test
