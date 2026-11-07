@@ -20,7 +20,7 @@ I/O 层的设计哲学是"适配而非重造"：
 
 ## 一、NettyHttpServer：启动序列与生命周期
 
-`NettyHttpServer` 是整个 I/O 层的入口，单类承担"启动 + 配置 + 优雅关闭 + 指标暴露"四职责。索引中提及的 `AbstractNettyWebServer` 在源码中不存在——这是早期规划阶段的命名，实际只有一个具体类：
+`NettyHttpServer` 是整个 I/O 层的入口，单类承担"启动 + 配置 + 优雅关闭 + 指标暴露"四职责，也是 I/O 层唯一的具体入口类：
 
 ```java
 // NettyHttpServer.java
@@ -190,7 +190,7 @@ public int getOrder() {
 
 ## 二、优雅关闭两阶段：`stop` 与 `destroyComponent`
 
-索引中没有单列"优雅关闭"要点，但它是 I/O 层正确性的关键，且体现了[原则 4](01-design-philosophy.md#原则-4--避免阻塞非阻塞-io--显式引用计数) 对"在途请求"的尊重。关闭分两阶段，刻意把 EventLoop 关闭推迟：
+优雅关闭是 I/O 层正确性的关键，且体现了[原则 4](01-design-philosophy.md#原则-4--避免阻塞非阻塞-io--显式引用计数) 对"在途请求"的尊重。关闭分两阶段，刻意把 EventLoop 关闭推迟：
 
 ```java
 // NettyHttpServer.java  —— 第一阶段：stop
@@ -321,7 +321,7 @@ private void addHttp11Handlers(ChannelPipeline p) {
 | 9 | `addKeepAlive` | keep-alive 策略 | 按 `server.keep-alive-timeout` / `server.max-keep-alive-requests` 决定是否复用连接 |
 | 10 | `httpHandler` | `NettyHttpHandler` 入口 | 见 [§4](#四nettyhttphandler入口适配层) |
 
-**索引中写的 `SslHandler` → `HttpTrafficHandler` 是早期规划命名**，实际 HTTP/1.1 管线里没有叫 `HttpTrafficHandler` 的类——业务 handler 就是 `NettyHttpHandler`，背压由独立的 `BackpressureHandler` 担当。`SslHandler` 只在分支 A/B（TLS）出现，分支 D（明文默认）没有。
+HTTP/1.1 管线的业务 handler 是 `NettyHttpHandler`，背压由独立的 `BackpressureHandler` 担当。`SslHandler` 只在分支 A/B（TLS）出现，分支 D（明文默认）没有。
 
 ### 3.3 `addAggregator`：multipart 分流
 
@@ -596,7 +596,7 @@ public List<String> put(String key, List<String> value) {
 1. **版本兼容**：`Netty4HeadersAdapter` 仅 Spring 6.1+，而本框架要兼容 Spring Boot 2.4.x 起的多个版本（2.7.x 分支基于 Spring 5.3）。
 2. **语义**：`writable` 标志支持"只读视图"模式——某些场景只需读 header 不应被改，`checkWritable()` 抛异常而非静默写入，符合[原则 6](01-design-philosophy.md#原则-6--避免魔法行为显式-spi显式-fail-fast不靠隐式猜测)。
 
-**附带修复一个旧 bug**：旧实现把 header 拷进 `LinkedMultiValueMap`（大小写敏感），导致 Netty 原生的大小写不敏感解析丢失——小写 key 的 `get("content-type")` 拿不到 `Content-Type` 的值。直接委托 Netty headers 保留了原生大小写不敏感，这个问题随之消失。
+直接委托 Netty headers 保留了原生大小写不敏感语义；若拷进 `LinkedMultiValueMap`（大小写敏感），小写 key 的 `get("content-type")` 将取不到 `Content-Type` 的值。
 
 ### 5.2 `WebHttpHeaders`：常量名直通（解析缓存已被移除）
 
@@ -606,7 +606,7 @@ public List<String> put(String key, List<String> value) {
 |------|------|
 | 常量名直通 | 当底层存储是可写的 `NettyHttpHeadersAdapter` 时，Content-Type 的读写走 `HttpHeaderNames` 常量名直通 Netty，省掉按 String 名查找与 `AsciiString` 名字重算哈希 |
 
-> **一处被移除的优化（勿再当作现存机制）**：早期版本曾用 `cachedContentType` 字段缓存 `getContentType()` 的 `parseMediaType` 结果，**该缓存已被移除**——类注释说明它只能由 `setContentType(MediaType)` 失效，而 `set(HttpHeaders.CONTENT_TYPE, ...)` / `put(...)` 改的是同一个底层 header 却不会清缓存，实测命中 `NoSuchMethodException`（`MediaType.valueOf`）。当前类只保留 `private final HttpHeaders rawHeaders` 一个字段。
+> `getContentType()` 不做缓存：`set` / `put` 可以改同一个底层 header，却无法让基于 `setContentType(MediaType)` 失效的缓存保持正确。当前类只保留 `private final HttpHeaders rawHeaders` 一个字段。
 
 ```java
 // WebHttpHeaders.java
@@ -617,7 +617,6 @@ public class WebHttpHeaders extends HttpHeaders implements MultiValueMap<String,
 }
 ```
 
-> **历史注记**：master 早期曾在此类用 `static final boolean` + `MethodHandle`（`HEADERS_IS_MULTI_VALUE_MAP`、`AS_MULTI_VALUE_MAP`）在类加载期区分 Spring 6.x / 7.x 的 `HttpHeaders` 语义。该兼容层已随 4.x 适配整体移出 master（改由 `4.1.x` 分支承接），现为 `super` 直调，消除了每请求的 varargs 分配与 `invokeWithArguments` 慢路径。
 
 ### 5.3 body 零拷贝分级：阈值 `server.http.max-in-memory-size`（默认 4096）
 
@@ -666,7 +665,7 @@ protected byte[] getBodyBytes() {           // protected，非 private
 | `size <= 4096`（含 `size == 0`） | `ByteBufUtil.getBytes` 复制到堆 `byte[]`（`size==0` 返回空数组，非 `EMPTY_BODY` 单例） | 小 body 复制代价低，堆 `byte[]` 无引用计数管理负担，业务侧用完即 GC |
 | `size > 4096` | `content.duplicate()` 共享视图，`body` 置 `EMPTY_BODY` 单例占位 | 大 body 复制代价高，duplicate 不拷贝字节、不 +refCnt，直接共享 ByteBuf 的可读区域 |
 
-**索引中写的 `retainedDuplicate` 实际是 `duplicate`**——这是早期规划措辞与实现的关键差异。`retainedDuplicate` 会 `+refCnt`，`duplicate` 不递增。本框架用 `duplicate`（不 +refCnt），因为大 body 的存活由**请求对象自身的 retain/release 链**保证（见 [§5.5](#55-acquirerelease引用计数契约)），duplicate 出来的视图不独立持有引用。`ByteBufInputStream` 构造传 `false`（不 release）也对应这点——流关闭时不 release，避免重复释放。
+本框架用 `duplicate`，而不是 `retainedDuplicate`。`retainedDuplicate` 会 `+refCnt`，`duplicate` 不递增。本框架用 `duplicate`（不 +refCnt），因为大 body 的存活由**请求对象自身的 retain/release 链**保证（见 [§5.5](#55-acquirerelease引用计数契约)），duplicate 出来的视图不独立持有引用。`ByteBufInputStream` 构造传 `false`（不 release）也对应这点——流关闭时不 release，避免重复释放。
 
 **为什么默认阈值是 4096？** 这是经验值：4KB 以下的 body（绝大多数 JSON API 请求）复制到堆更划算——堆 `byte[]` 无堆外内存管理开销，GC 友好；超过 4KB 后复制代价上升，且堆外 ByteBuf 的零拷贝优势（省 heap→direct 拷贝）显现。
 
@@ -877,7 +876,7 @@ public void addRespEventListener(ChannelFuture channelFuture, boolean isComplete
 }
 ```
 
-`WriteRespEventListener`（[](../../spring-web/src/main/java/io/springperf/web/http/WriteRespEventListener.java)）定义四个回调：`completeSuccessCallback`/`completeErrorCallback`/`writeStreamSuccessCallback`/`writeStreamErrorCallback`（后两个有 default 实现）。`CompositeWriteRespEventListener`（[](../../spring-web/src/main/java/io/springperf/web/http/BaseWebServerHttpResponse.java)）合并多监听器广播。
+`WriteRespEventListener`（[源码](../../spring-web/src/main/java/io/springperf/web/http/WriteRespEventListener.java)）定义四个回调：`completeSuccessCallback`/`completeErrorCallback`/`writeStreamSuccessCallback`/`writeStreamErrorCallback`（后两个有 default 实现）。`CompositeWriteRespEventListener`（[源码](../../spring-web/src/main/java/io/springperf/web/http/BaseWebServerHttpResponse.java)）合并多监听器广播。
 
 `NettyServerHttpResponse` 还有个静态 `LOG_ERROR_ON_FAILURE`（见 [`NettyServerHttpResponse.java`](../../spring-web/src/main/java/io/springperf/web/http/NettyServerHttpResponse.java)）——默认监听器，对 `ClosedChannelException` 静默（连接已关闭时写失败是预期行为，不刷错误日志）。无显式 listener 时用这个默认，避免每连接刷一堆无意义错误日志。
 

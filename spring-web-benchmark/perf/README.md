@@ -103,7 +103,6 @@ sd、配对 t、符号检验 p、分段稳定性），直接翻日志尾部即�
 |---|---|---|
 | `JDK17` | 自动探测 | Windows 侧 JDK（跑 JMH 客户端） |
 | `SERVLET_JAR` | `D:/maven/repository/.../javax.servlet-api-4.0.1.jar` | benchmark pom 里是 provided 作用域，必须显式补 |
-)
 | `BASELINE_WT` | 空 | 基线 worktree 路径；不设则 A/B 脚本跳过基线组 |
 | `PERF_OUT` | `spring-web-benchmark/target/perf-reports` | 报告输出 |
 | `WSL_JAVA_HOME` | WSL 内 JDK 17 安装路径 | WSL 侧 JDK，按本机环境设置 |

@@ -220,7 +220,7 @@ public void asyncDispatch(WebServerHttpRequest req, WebServerHttpResponse resp, 
 // StreamEmitter.java
 public void send(T data) throws IOException {
     if (complete.get()) {
-        throw new IllegalStateException("...");   // send-after-complete 直接拒绝（E2E 实测修复）
+        throw new IllegalStateException("...");   // send-after-complete 直接拒绝
     }
     Object payload = data;
     if (earlyEncode) {

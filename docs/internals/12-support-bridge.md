@@ -4,7 +4,7 @@
 
 ---
 
-## 引子：兼容层不牺牲性能
+## 引子：兼容层的性能代价与边界
 
 `spring-web-servlet` 与 `spring-web-mvc-support` 是框架的兼容层。它的目标是：**让 Spring MVC 生态的组件（`WebMvcConfigurer`、`HandlerInterceptor`、`javax.servlet.Filter`、`@ControllerAdvice`、`HttpMessageConverter`、Session 等）不修改一行代码就能无缝工作在 Netty 容器上，同时不引入每请求的反射或类型推断。**
 

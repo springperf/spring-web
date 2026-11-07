@@ -49,10 +49,9 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
   memory and never copied from an existing comment: the defaults live in
   `META-INF/spring-configuration-metadata.json` inside `spring-boot-autoconfigure-<version>.jar` (read the key
   there, not from a comment). When the values differ, write **both** numbers and say plainly that it is this
-  framework's choice. "Aligned with Boot" printed next to a value Boot does not use is the one wording mistake
-  this repository keeps making, twice so far: `spring.mvc.publish-request-handled-events` (ours `false`, Boot
-  `true`) and `server.http.multipart.max-part-header-size` (ours `8192`, Boot/Tomcat `512B`). The second sat in a
-  **code comment**, so this rule covers comments and javadoc, not just the manuals.
+  framework's choice — e.g. `spring.mvc.publish-request-handled-events` (ours `false`, Boot `true`) and
+  `server.http.multipart.max-part-header-size` (ours `8192`, Boot/Tomcat `512B`). This rule covers comments
+  and javadoc as well as the manuals.
 - "Semantically aligned with `<Boot key>`" is allowed only when it names the *meaning* of the key **and** the
   differing default stays visible in the same sentence (`server.http.multipart.max-part-count`: our `-1` and
   Boot's `50` both mean "non-positive disables the cap"). When the claim is about an idiom rather than a value,
@@ -82,7 +81,6 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 - The contract-doc checker (`python scripts/check-docs.py` + `python scripts/check-doc-symbols.py`) is
   ported to this branch and is run against this tree (72 markdown files, 0 defects; the symbol checker
   carries a small branch-specific allow-list for the `master` section of `docs/(en/)compatibility.md`).
-)
 - `scripts/check-docs.sh` also runs `scripts/check-doc-symbols.py`, which checks that the keys, classes and
   members the **contract docs** name actually exist - including keys the code builds by concatenation
   (`"server.ssl." + "enabled"`, `"management.endpoints.web.exposure" + ".include"`), which a plain literal scan
@@ -124,9 +122,8 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 - The `netty-leaks` job runs `scripts/check-netty-leaks.sh --run --online --clean 1` with
   `-Dio.netty.leakDetection.level=paranoid` (plus `targetRecords=16`) and fails on any `LEAK: ByteBuf`
   report. The script treats a missing paranoid property as a warning so it stays usable offline; the job
-  re-checks it with `grep -q`, because "zero leaks" must not come from a detector that never ran. Use
-  `--online` in CI: the default `-o` fails on a cold local repository, and that failure is not a leak
-  verdict.
+  re-checks it with `grep -q` to confirm the detector actually ran. Use `--online` in CI: the default
+  `-o` requires a populated local Maven repository.
 
 ### Version Matrix, Architecture and Mutation
 
@@ -144,7 +141,7 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
   report-only. The mapping package alone produces ~435 mutants in about a minute; survived mutants need
   human triage before a threshold means anything.
 - The `build` job also emits an aggregate SBOM (`target/bom.json`) as an artifact. It is for delivery
-  traceability only - this project does not publish to Maven Central.
+  traceability only; released artifacts are published to Maven Central (see the `compat` baseline below).
 
 ### Metric and Sync Contracts
 
@@ -157,13 +154,12 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
   annotation package is what users type in their own code, so missing `@param`/`@return` there is an
   error. The single-package check is a plain `javadoc` invocation because the Maven plugin has no
   "one subpackage" switch.
-- `scripts/sync-audit.py --target 2.7.x --whitelist <local list>` produces a branch-sync report with
+- `scripts/sync-audit.py --target <branch> --whitelist <file>` produces a branch-sync report with
   three sections: files only on the base branch, files only on the target branch, and same-name files
-  with line deltas. It never decides "must sync" - 505 same-name files differ between `master` and
-  `2.7.x` simply because adaptation rewrites are normal. The whitelist holds version-boundary paths
+  with line deltas. It reports differences; it never decides "must sync" — same-name files legitimately
+  differ between branches because of adaptation rewrites. The whitelist holds version-boundary paths
   only (native-image, Spring AI, virtual threads, Thymeleaf WebExchange); feature gaps must not be
-  whitelisted. Reports and whitelists are local, untracked artifacts — see the script's
-  `--output` / `--whitelist` options for where to put them.
+  whitelisted. See the script's `--output` / `--whitelist` options for the report location.
 
 ### Formatting
 
@@ -174,7 +170,6 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 - Keep the conventions by hand: 4-space indent, no trailing whitespace, LF in the index.
   `.gitattributes` declares `* text=auto` (LF in the index; `*.sh` stays LF, `*.bat`/`*.cmd` checkout as CRLF),
   so a CRLF working tree compares clean against the LF-based index and line endings never show up as phantom diffs.
-)
 
 ### Static Analysis & Binary Compatibility
 
@@ -211,8 +206,8 @@ Practices for verifying claims and gates before trusting them.
   not enough - the guard lives in `handleAfterFilter`. The servlet path is a genuine exception on top of that,
   because `SupportDispatcherHandler` returns `init || requestAttributes != null` and therefore always reports
   true there.
-- **Never edit files and start a build in the same batch.** An edit issued alongside a build can land after
-  the compiler has read the file, and the result describes a state that never existed. Land the edit, then build.
+- **Finish edits before starting a build.** A build started while files are still being written can read a
+  mixed state; land the changes first, then build.
 - **Prove a new gate can fail before trusting it.** A check that has never been seen red is a claim, not a
   check: introduce a deliberate change, confirm the gate reports failure, then revert it.
 - **A reactor-wide red is a hypothesis until it is isolated.** Re-run the failing class alone, then the
@@ -224,10 +219,8 @@ Practices for verifying claims and gates before trusting them.
   unused-import removals the format profile performs; doclint rejects a `ul` inside a `p` that both the
   formatter and the format assertion accept; the markdown checker verifies formatting and links but never
   whether a sentence is true; and `check-doc-symbols.py` only checks that a named symbol exists.
-- **After a deliberate mutation, revert it in the same breath, and never through a command that can be
-  blocked.** Breaking a guard on purpose is the only way to prove a test is not vacuous, so it is worth
-  doing - but the broken state looks like ordinary code and can outlive the run that created it. Revert with
-  the edit tool rather than a git command, and read the reverted lines back afterwards; that check is cheap.
+- **After a deliberate mutation, revert it immediately.** Breaking a guard on purpose proves a test is not
+  vacuous, but the broken state must not outlive the run; read the reverted lines back afterwards.
 
 ### Binary Compatibility (japicmp)
 
@@ -258,7 +251,6 @@ Practices for verifying claims and gates before trusting them.
   `<parameter>` block (parameter names are taken from the plugin descriptor).
 - breaking-changes.md records the intentional breaks; the japicmp report is its machine-checkable
   counterpart — every reported failure must be reviewed (fix it, or record it there), never silenced.
-)
 
 - There is **no** binary-compatibility gate on this branch: the `compat` / `compat-file` profiles and the
   japicmp plugin live in master's `pom.xml` and are not ported. Upgrades are therefore validated by
@@ -295,7 +287,7 @@ Practices for verifying claims and gates before trusting them.
   Pass `--skip` / `-SkipTests` to re-aggregate existing data without running Maven (takes seconds).
 - Benchmark JFR recordings can be checked for truncated stack traces with
   `spring-web-benchmark/check-jfr-truncation.sh <jfr file or dir>` (non-zero exit when truncation is found);
-  see [Benchmarks](docs/benchmark.md).
+  see [Benchmarks](docs/en/benchmark.md).
 
 - The invariant-bearing tests were audited for whether they assert what they claim. Mostly they do; the 128
   `assertDoesNotThrow` sites turned up seven where the name promised a result and the body only ruled out an
@@ -319,7 +311,6 @@ Practices for verifying claims and gates before trusting them.
   argument instead (`LocaleConfig`'s race does have a regression test, `defaultLocaleContextStaysConsistentWithLocaleSetDefault`).
   The invariant-bearing tests (those guarding resource and lifecycle behaviour) were reviewed in depth;
   the remaining files were covered by the smell sweep.
-)
 
 ### PR Checklist
 

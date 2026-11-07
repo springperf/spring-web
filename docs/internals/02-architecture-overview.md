@@ -11,7 +11,6 @@
 读完本篇，你应能回答：**为什么这套框架要拆成四个 jar，而不是塞进一个？support 和 batch 为什么是 `provided` 依赖？一个请求从 Netty 字节到业务方法，到底经过了哪些模块的哪些类？**
 
 本篇另有一项隐性职责：**校正 `../../.agent/context/module.md` 中两处与当前源码不符的描述**。module.md 是架构概览基线，仍有效，但其中"生命周期由 `afterPropertiesSet()` 触发"和"support 的 `servlet/filter/match/` 子包"两点与当前分支源码矛盾——本篇以源码行号为准，给出校正。
-)
 
 ---
 
@@ -99,7 +98,7 @@ support 与 batch 对 starter 是 `provided`，这是一个有意的设计决策
 
 - **`provided` 的 Maven 语义**：编译期可见（starter 的 autoconfig 能引用 support 的类），但不传递到最终应用 classpath。
 - **实际效果**：用户应用的 `pom.xml` 若显式引入 `spring-web-servlet` 或 `spring-web-mvc-support`，对应桥接层进 classpath，starter 的 `SpringWebServletAutoConfiguration` / `SpringWebMvcSupportAutoConfiguration`（`@ConditionalOnClass` 命中）自动激活；若不引入，桥接层不存在，核心仍能独立运行。
-- **哲学对应**：这恰好是 [01 篇 原则 6](01-design-philosophy.md#) "避免魔法行为——显式 SPI、显式 fail-fast"的反面印证——这里不是"靠条件猜测"，而是"依赖是否在场本身就是显式声明"。条件装配的触发条件（classpath 上有某个类）是用户用 Maven 坐标写明的，可追溯、可排查。
+- **哲学对应**：这恰好是 [01 篇 原则 6](01-design-philosophy.md) "避免魔法行为——显式 SPI、显式 fail-fast"的反面印证——这里不是"靠条件猜测"，而是"依赖是否在场本身就是显式声明"。条件装配的触发条件（classpath 上有某个类）是用户用 Maven 坐标写明的，可追溯、可排查。
 
 ### 1.3 starter 排除 Tomcat 的"反向防线"
 
@@ -410,7 +409,6 @@ if (shuttingDown) {
 ## 五、两处容易误读的实现位置
 
 module.md（[`../../.agent/context/module.md`](../../.agent/context/module.md)）是架构概览基线，整体仍有效。但写作本篇时核对源码发现两处与当前分支源码不符，逐一校正如下。
-)
 
 ### 生命周期触发点
 
@@ -480,7 +478,6 @@ public class RuntimeMappingWebFilter implements WebFilter {
 ```
 
 **校正结论**：路径匹配的核心 Filter 包装是 `spring-web` 的 `core/filter/RuntimeMappingWebFilter`，不在 support。support 的 `support.servlet.filter` 是 Servlet `javax.servlet.Filter` 的桥接层，与核心路径匹配无关。module.md 描述的 support `match/` 子包在当前源码中不存在（疑为历史重构后未同步的过时描述）。
-)
 
 > 涉及 Filter / 路径匹配时一律以 `core/filter` 为准；support 的 Servlet Filter 桥接留到 [12 篇](12-support-bridge.md) 详述。
 
@@ -529,7 +526,7 @@ support 模块在 `src/main/java/org/springframework/web/servlet/` 等路径下*
 - [13 篇](13-batch-module.md) 展开 batch 的 Disruptor 聚合切入点；
 - [14 篇](14-starter-autoconfig.md) 展开 starter 的 15 个自动配置类与零冲突防线。
 
-记住两个校正（生命周期由 `start()` 触发、路径匹配 Filter 在 `core/filter`），后续阅读源码就不会在错误的位置扑空。
+注意两点：生命周期由 `start()` 触发、路径匹配 Filter 位于 `core/filter`。
 
 ---
 

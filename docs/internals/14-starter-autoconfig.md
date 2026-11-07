@@ -281,7 +281,6 @@ protected WebFilterRegistration createFilterWrapper(AbstractFilterRegistrationBe
 ---
 
 ## 五、事件适配
-)
 
 ### 5.1 事件：`PerfWebServerInitializedEvent`
 
@@ -304,7 +303,6 @@ public ApplicationListener<ApplicationReadyEvent> webServerInitializedEventPubli
 
 这使 Spring Cloud 服务注册（Nacos/Eureka/Consul）等组件能正确感知服务器就绪。
 
-)
 ## 六、生态集成
 
 ### 6.1 Spring Data 兼容

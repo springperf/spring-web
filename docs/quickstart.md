@@ -232,7 +232,7 @@ public ResourceHandlerRegistration resourceHandlerRegistration() {
 </dependency>
 ```
 
-**可无缝迁移**（无需改代码）：
+**多数视图代码无需改动**：
 
 - `@Controller` 方法返回无 `@ResponseBody` 的 String → 视图名
 - `Model` / `ModelMap` 参数注入、`ModelAndView` 返回
