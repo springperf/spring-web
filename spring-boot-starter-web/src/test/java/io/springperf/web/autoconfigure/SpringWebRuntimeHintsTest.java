@@ -38,6 +38,16 @@ class SpringWebRuntimeHintsTest {
         assertTrue(hasResources, "应注册 classpath 资源提示（元数据/模板/静态资源）");
     }
 
+    @Test
+    void registersProxyAndReflectionHintsEvenWithoutClassLoader() {
+        // RuntimeHintsRegistrar 契约允许 classLoader 为 null；只有资源探测依赖它
+        RuntimeHints hints = new RuntimeHints();
+        registrar.registerHints(hints, null);
+
+        assertJdkProxy(hints, WebServerApplicationContext.class);
+        assertReflectionType(hints, PerfWebServer.class);
+    }
+
     private RuntimeHints register() {
         RuntimeHints hints = new RuntimeHints();
         registrar.registerHints(hints, getClass().getClassLoader());

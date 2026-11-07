@@ -35,12 +35,10 @@ public class SpringWebRuntimeHints implements RuntimeHintsRegistrar {
         hints.reflection().registerType(PerfWebServer.class, MemberCategory.INVOKE_PUBLIC_CONSTRUCTORS);
         hints.reflection().registerType(PerfWebServerInitializedEvent.class, MemberCategory.INVOKE_PUBLIC_CONSTRUCTORS);
 
-        // RuntimeHintsRegistrar 的契约允许 classLoader 为 null（上游标注 @Nullable），而资源注册依赖它做探测
-        if (classLoader == null) {
-            return;
+        // 资源探测需要 classLoader；契约允许 null，此时仅跳过这一组提示（代理/反射与 classLoader 无关）
+        if (classLoader != null) {
+            registerResourceHints(hints, classLoader);
         }
-
-        registerResourceHints(hints, classLoader);
     }
 
     private static void registerResourceHints(RuntimeHints hints, ClassLoader classLoader) {
