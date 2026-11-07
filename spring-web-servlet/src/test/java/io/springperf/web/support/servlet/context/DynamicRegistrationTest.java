@@ -375,4 +375,13 @@ class DynamicRegistrationTest {
         assertEquals("v", registration.getInitParameter("k"));
         assertEquals(java.util.Collections.singleton("/a"), new java.util.LinkedHashSet<>(registration.getUrlPatternMappings()));
     }
+
+    @Test
+    void filterAddMapping_multipleDispatcherTypesIsUnsupported() {
+        FilterRegistration.Dynamic registration = servletContext.addFilter("f", new TrackingFilter());
+
+        assertThrows(UnsupportedOperationException.class,
+                () -> registration.addMappingForUrlPatterns(
+                        EnumSet.of(DispatcherType.REQUEST, DispatcherType.FORWARD), true, "/d"));
+    }
 }
