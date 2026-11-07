@@ -149,7 +149,7 @@ props.put("local.server.port", String.valueOf(this.actualPort));
 ctx.getEnvironment().getPropertySources().addFirst(new MapPropertySource("netty-local-server-port", props));
 ```
 
-当配置 `server.port=0`（随机端口）时，实际端口要在 `bind` 后才知道。框架以 **context 级 `MapPropertySource`（`addFirst`）** 暴露 `local.server.port`，让 `@LocalServerPort` 注入、actuator、集成测试都能拿到真实端口——对齐 Spring Boot 的 `WebServerInitializedEvent` 语义（[SBA + WebServerInitializedEvent](../../) 兼容性记忆有记录）。**刻意不写 JVM 全局系统属性**：主端口与管理端口是两个 context，全局属性会互相覆盖（源码注释即此论证）。
+当配置 `server.port=0`（随机端口）时，实际端口要在 `bind` 后才知道。框架以 **context 级 `MapPropertySource`（`addFirst`）** 暴露 `local.server.port`，让 `@LocalServerPort` 注入、actuator、集成测试都能拿到真实端口——对齐 Spring Boot 的 `WebServerInitializedEvent` 语义。**刻意不写 JVM 全局系统属性**：主端口与管理端口是两个 context，全局属性会互相覆盖（源码注释即此论证）。
 
 ### 1.5 启动失败：`shutdownGracefully(0,0,SECONDS)` 防线程残留
 
@@ -530,7 +530,7 @@ private void handleRequest(ChannelHandlerContext ctx, FullHttpRequest msg) {
 
 **⑤ `msg.retain()` 在构造 `req` 前。** 这是 [原则 4](01-design-philosophy.md#原则-4--避免阻塞非阻塞-io--显式引用计数) 的精确落地：请求对象即将跨线程（EventLoop → 业务池，见 [04 篇](04-request-pipeline.md) `handleWithMappingResult` 的 `acquire`），必须先 `retain` 给业务侧加一次引用，否则入口 `finally release` 后业务侧拿到的 ByteBuf 已释放。
 
-**⑥ `catch Throwable` 500 兜底。** 任何异常不抛给 Netty（Netty 的 `ExceptionCaught` 会关闭连接），而是收敛成 500 响应写回——这是 [`development.md`](../../.agent/rule/development.md) "异常统一收敛到 ExceptionRegistry 不抛给 Netty" 在 I/O 层的兜底。
+**⑥ `catch Throwable` 500 兜底。** 任何异常不抛给 Netty（Netty 的 `ExceptionCaught` 会关闭连接），而是收敛成 500 响应写回——这是 "异常统一收敛到 ExceptionRegistry、不抛给 Netty" 在 I/O 层的兜底。
 
 ### 4.3 `HttpHandler` 策略接口：主端口 vs 管理端口
 

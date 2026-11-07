@@ -206,9 +206,8 @@ public class DynamicRegistration implements ServletContextListener {
 | `server.http.multipart.max-part-header-size` | `8192` | 单个 multipart part 的 header 字节上限（`<=0` 不限），超限由增量扫描抛 `DecoderException` → **400**。**默认值与 Boot 不同**：Boot/Tomcat 的同名键默认 `512B`，本项目为 `8192` |
 | `server.http.read-timeout` | `0`（关闭） | 读**空闲**超时（支持 `30s` 写法；`<=0` 关闭）。只约束读空闲：**正在处理的请求不会被掐断**（慢 SQL / 下游调用 / 异步挂起的处理器耗时可超过该值，响应仍会送达）；仅回收真正空闲的连接与半截请求，语义对齐 Tomcat `connectionTimeout`。**默认关闭**（Tomcat 默认 20s）：本项目默认不施加连接级隐式限制，生产环境**通常由代理 / 网关回收空闲连接**；网关覆盖不到的边界（直连 / 东西向、应用↔网关这一跳的对端猝死）见本表后说明，无法保证时请显式设置 |
 
-> **完整清单**：以上为常用项。全部已支持键由 `SupportedPropertiesTest` 维护并校验——新增配置键若未登记到
-> `META-INF/additional-spring-configuration-metadata.json`，构建会失败。运行
-> `mvn -pl spring-web test -Dtest=SupportedPropertiesTest -Dperf.props.dump=dump.txt` 可导出完整清单。
+> **完整清单**：以上为常用项。全部已支持键登记在 `META-INF/additional-spring-configuration-metadata.json`，
+> 在 IDE 中可获得补全与说明。
 
 ## 优雅关闭
 

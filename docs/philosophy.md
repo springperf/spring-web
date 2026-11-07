@@ -168,7 +168,7 @@ IO 优化的最优解不是"让等待 IO 的时间去干别的活"，而是**让
 
 ---
 
-## 零妥协：高性能与原生体验兼得
+## 高性能与原生体验兼得
 
 读到这你可能在想："所以我要换一个框架，重写所有代码？"
 
@@ -196,7 +196,7 @@ IO 优化的最优解不是"让等待 IO 的时间去干别的活"，而是**让
 </dependency>
 ```
 
-代码完全不用动。`@RestController` 还是 `@RestController`，`@RequestMapping` 还是 `@RequestMapping`，`@Validated` 还是 `@Validated`。
+绝大多数业务代码无需改动。`@RestController` 还是 `@RestController`，`@RequestMapping` 还是 `@RequestMapping`，`@Validated` 还是 `@Validated`；少数需要调整的差异（如 `forward:`、Thymeleaf `#session`、静态资源配置）见[快速上手](quickstart.md)。
 
 为什么能做到？因为本项目的设计前提就是**兼容 Spring 编程模型**。我们把性能优化的复杂性封装在了框架内部，而不是推给开发者。启动时预计算、字节码生成、O(1) 路由——这些技术细节对业务代码完全透明。
 

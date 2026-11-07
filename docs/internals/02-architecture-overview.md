@@ -10,11 +10,11 @@
 
 读完本篇，你应能回答：**为什么这套框架要拆成四个 jar，而不是塞进一个？support 和 batch 为什么是 `provided` 依赖？一个请求从 Netty 字节到业务方法，到底经过了哪些模块的哪些类？**
 
-本篇另有一项隐性职责：**校正 `../../.agent/context/module.md` 中两处与当前源码不符的描述**。module.md 是架构概览基线，仍有效，但其中"生命周期由 `afterPropertiesSet()` 触发"和"support 的 `servlet/filter/match/` 子包"两点与 `master` 当前源码矛盾——本篇以源码行号为准，给出校正。
+本篇另明确两处容易误读的实现位置：生命周期由 `NettyHttpServer.start()` → `WebContext.startLifecycle()` 触发，而非 `afterPropertiesSet()`；路径匹配工具位于核心 `core/filter`，support 中不存在 `servlet/filter/match/` 子包。
 
 ---
 
-## 一、四模块职责矩阵
+## 一、核心模块职责矩阵
 
 顶层 `pom.xml` 聚合了 12 个模块（[`pom.xml`](../../pom.xml)），本系列聚焦其中与 Web 框架直接相关的几个：
 
@@ -134,13 +134,11 @@ Tomcat 的 `spring-boot-starter-web` 一旦混入，会和本框架在自动装�
 | Disruptor | 3.4.4 | `pom.xml` |
 | Java | 17 | `pom.xml` |
 
-> **分支定位**：master 只维护 Spring Boot 3.5.x，**不含 4.x 适配**；4.0/4.1 的适配代码在 `4.1.x` 分支，2.4~2.7（Java 8 / javax）在 `2.7.x` 分支。同步规则见 [`.agent/context/4.1.x-adaptation-checklist.md`](../../.agent/context/4.1.x-adaptation-checklist.md)。
-
 ---
 
 ## 二、spring-web 核心包拓扑
 
-四模块中，`spring-web` 是真正的核心。它的源码根包 `io.springperf.web` 下的包结构如下（以实际 `Glob` 结果为准，非凭记忆）：
+四模块中，`spring-web` 是真正的核心。它的源码根包 `io.springperf.web` 下的包结构如下：
 
 ```
 io.springperf.web
@@ -213,11 +211,11 @@ io.springperf.web
 
 **观察一：`core` 是"请求处理主链路"的集中地。** 14 个子包对应请求处理的各个关注点——从 `filter`（前置过滤）到 `mapping`（路由）到 `arg`/`retval`/`invoker`（参数/返回值/调用）到 `interceptor`/`cors`/`exception`（横切）到 `async`/`resource`/`pool`/`metrics`/`model`。`DispatcherHandler` 持有其中九个 Registry 的引用（[`DispatcherHandler.java`](../../spring-web/src/main/java/io/springperf/web/core/DispatcherHandler.java)），是这条链的编排者。
 
-**观察二：核心 `filter` 包内含 `RuntimeMappingWebFilter`，这是"路径匹配的 Filter 包装"的真正落点。** 这一事实将在 [§五 校正二](#五与-modulemd-的差异校正) 展开——它纠正了 module.md 把路径匹配工具归到 support 的描述。
+**观察二：核心 `filter` 包内含 `RuntimeMappingWebFilter`，这是"路径匹配的 Filter 包装"的真正落点。** 这一事实将在 [§五 第二处](#五两处容易误读的实现位置) 展开——路径匹配工具不在 support。
 
 ### 2.2 support 与 batch 的包拓扑（简表）
 
-support 的源码在 `io.springperf.web.support.*`（[`Glob` 结果](../../spring-web-servlet/src/main/java/io/springperf/web/support) 与 [`spring-web-mvc-support`](../../spring-web-mvc-support/src/main/java/io/springperf/web/support)），按桥接职责分包：
+support 的源码在 `io.springperf.web.support.*`（[源码目录](../../spring-web-servlet/src/main/java/io/springperf/web/support) 与 [`spring-web-mvc-support`](../../spring-web-mvc-support/src/main/java/io/springperf/web/support)），按桥接职责分包：
 
 | support 子包 | 职责 | 代表类 |
 |--------------|------|--------|
@@ -239,9 +237,9 @@ batch 的源码在 `io.springperf.web.batch.*`，核心是 Disruptor 透明聚�
 
 ## 三、启动期协作时序
 
-### 3.1 完整启动链（校正版）
+### 3.1 完整启动链
 
-module.md 的启动时序图（`module.md`）把生命周期触发点写成 `WebContext.afterPropertiesSet()`——**这与当前源码不符**。校正后的完整链路如下：
+生命周期触发点为 `NettyHttpServer.start()` → `WebContext.startLifecycle()`，完整链路如下：
 
 ```
 Spring Boot 启动
@@ -288,7 +286,7 @@ Spring Boot 启动
 
 ### 3.2 为什么生命周期锚定在 `start()` 而非 Bean 初始化期
 
-`WebContext` **不实现** `InitializingBean`：框架早期版本确实有一个留空的 `afterPropertiesSet()`，该覆写**已被删除**，初始化**只**经 `startLifecycle()` 一条路径（全仓主代码里 `afterPropertiesSet` 仅剩一条注释）。
+`WebContext` **不实现** `InitializingBean`，没有 `afterPropertiesSet()`，初始化**只**经 `startLifecycle()` 一条路径。
 
 真正编排三阶段的是 `startLifecycle()`（[`WebContext.java`](../../spring-web/src/main/java/io/springperf/web/context/WebContext.java)），由 `NettyHttpServer.start()` 显式触发（[`NettyHttpServer.java`](../../spring-web/src/main/java/io/springperf/web/server/NettyHttpServer.java)）。
 
@@ -408,18 +406,18 @@ if (shuttingDown) {
 
 ---
 
-## 五、与 module.md 的差异校正
+## 五、两处容易误读的实现位置
 
-module.md（[`../../.agent/context/module.md`](../../.agent/context/module.md)）是架构概览基线，整体仍有效。但写作本篇时核对源码发现两处与 `master` 当前源码不符，逐一校正如下。
+[`modules.md`](../modules.md) 是架构概览基线；以下两处实现位置容易误读，按当前源码说明。
 
-### 校正一：生命周期触发点
+### 生命周期触发点
 
-**module.md 表述**（`module.md` 原文）：
+**常见误解**：
 
 > `WebContext implements InitializingBean → 驱动整个组件生命周期`
 > `WebContext.afterPropertiesSet() → initWithWebContext() → initComponentPhase1/2/3`
 
-**源码事实**（`WebContext` 不实现 `InitializingBean`；`afterPropertiesSet` 覆写已被删除）：
+**当前实现**：
 
 ```java
 // WebContext.java
@@ -448,17 +446,17 @@ public void start() {
 }
 ```
 
-**校正结论**：`WebContext` 不实现 `InitializingBean`（`afterPropertiesSet()` 已删除，初始化**只**经 `startLifecycle()`）；真正触发三阶段的是 `NettyHttpServer.start()`（由 Spring `SmartLifecycle` 机制在 refresh 末尾按 phase 顺序调用）→ `WebContext.startLifecycle()`。理由见 [§3.2](#32-为什么生命周期锚定在-start-而非-bean-初始化期)。
+**结论**：`WebContext` 不实现 `InitializingBean`（没有 `afterPropertiesSet()`，初始化**只**经 `startLifecycle()`）；真正触发三阶段的是 `NettyHttpServer.start()`（由 Spring `SmartLifecycle` 机制在 refresh 末尾按 phase 顺序调用）→ `WebContext.startLifecycle()`。理由见 [§3.2](#32-为什么生命周期锚定在-start-而非-bean-初始化期)。
 
-> 这与 [01 篇总纲](01-design-philosophy.md#一总纲启动时确定性) 已埋的修正一致，本篇给出完整时序链。后续 [03 篇](03-component-lifecycle.md) 将展开 `startLifecycle` 内部三阶段的具体机制。
+> 完整时序链见 [01 篇总纲](01-design-philosophy.md#一总纲启动时确定性)。后续 [03 篇](03-component-lifecycle.md) 将展开 `startLifecycle` 内部三阶段的具体机制。
 
-### 校正二：support 的 `servlet/filter/match/` 子包
+### 路径匹配工具的落点
 
-**module.md 表述**（`module.md`）：
+**常见误解**：
 
 > `servlet/filter/` 下含 `match/` 子包，路径匹配工具 `Exact/Prefix/Suffix/PathMatch`
 
-**源码事实**（`Glob spring-web-servlet/src/main/java/io/springperf/web/**/*.java` 与 `spring-web-mvc-support/src/main/java/io/springperf/web/**/*.java` 全量结果）：
+**当前实现**：
 
 support 的 `support.servlet.filter` 包下实际只有四个类，**无 `match/` 子包**：
 
@@ -479,9 +477,9 @@ public class RuntimeMappingWebFilter implements WebFilter {
 }
 ```
 
-**校正结论**：路径匹配的核心 Filter 包装是 `spring-web` 的 `core/filter/RuntimeMappingWebFilter`，不在 support。support 的 `support.servlet.filter` 是 Servlet `jakarta.servlet.Filter` 的桥接层，与核心路径匹配无关。module.md 描述的 support `match/` 子包在当前源码中不存在（疑为历史重构后未同步的过时描述）。
+**结论**：路径匹配的核心 Filter 包装是 `spring-web` 的 `core/filter/RuntimeMappingWebFilter`，不在 support。support 的 `support.servlet.filter` 是 Servlet `jakarta.servlet.Filter` 的桥接层，与核心路径匹配无关。support 下不存在 `match/` 子包。
 
-> 这一校正对阅读源码很重要：若按 module.md 旧述去 support 找路径匹配，会扑空。本系列后续涉及 Filter/路径匹配时，一律以 `core/filter` 为准；support 的 Servlet Filter 桥接留到 [12 篇](12-support-bridge.md) 详述。
+> 涉及 Filter / 路径匹配时一律以 `core/filter` 为准；support 的 Servlet Filter 桥接留到 [12 篇](12-support-bridge.md) 详述。
 
 ---
 
@@ -520,7 +518,7 @@ support 模块在 `src/main/java/org/springframework/web/servlet/` 等路径下*
 
 本篇给的四张图——职责矩阵、包拓扑、启动时序、请求调用链——是后续 17 篇的导航坐标。后续每讲一个机制，都会落回这四张图的某个坐标：
 
-- [03 篇](03-component-lifecycle.md) 展开 `startLifecycle` 内部三阶段与 Registry 体系（[§3.1](#31-完整启动链校正版) 的中段）；
+- [03 篇](03-component-lifecycle.md) 展开 `startLifecycle` 内部三阶段与 Registry 体系（[§3.1](#31-完整启动链) 的中段）；
 - [04 篇](04-request-pipeline.md) 展开 `handleWithMappingResult` → `doHandle` 的请求管线（[§4](#四一次请求的跨模块调用链) 的 `web` 段）；
 - [05-10 篇](05-server-and-http.md) 逐个深潜 `server`/`http`/`mapping`/`arg`/`retval`/`invoker`/横切包；
 - [11 篇](11-async-streaming.md) 展开 `async/stream` 与 `AbstractNettyStreamSender`；

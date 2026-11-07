@@ -2,7 +2,7 @@
 
 # Spring WebPerf
 
-A high-performance Netty-based web framework, compatible with the Spring MVC programming model — high performance, zero compromise.
+A high-performance Netty-based web framework, compatible with the Spring MVC programming model.
 
 ## Origin
 
@@ -20,7 +20,7 @@ Same business logic — only the transport layer changed from a message queue to
 
 ### Hotspot Analysis
 
-The common characteristic of these overheads: **runtime recomputation instead of startup-time precomputation**. All the information needed is known before a request arrives, yet Spring re-looks-up, re-matches, and re-creates at runtime. This framework resolves all metadata at startup and does only table lookups at runtime — none of the following overheads exist in this project.
+The common characteristic of these overheads: **runtime recomputation instead of startup-time precomputation**. All the information needed is known before a request arrives, yet Spring re-looks-up, re-matches, and re-creates at runtime. This framework resolves all metadata at startup and does only table lookups at runtime, so each of the following overheads is removed or moved to startup.
 
 <p align="center">
 <img src="../images/perf-cpu-breakdown-en.svg" alt="Where Does the CPU Go? — Framework Runtime Overhead"/>
@@ -259,7 +259,7 @@ Since 2024, AI large language models have brought two transformations: **how we 
 
 AI coding tools (Copilot, Cursor, Claude Code, etc.) are deeply integrated into daily development. But AI has a clear **boundary** when optimizing performance: it reads business code and analyzes business-level hotspots — loops, SQL, caching. **Framework-level overhead is opaque to AI** — AI doesn't know how many reflective calls or iterations Spring MVC performs per request; it assumes these are "necessary costs." Therefore, AI's performance optimization ceiling is the baseline performance of the underlying framework.
 
-This means: AI can optimize your business layer to the extreme, but if the underlying framework wastes 60% of CPU per request (see [Origin chapter](#origin) hotspot analysis), AI's optimization is locked into the remaining 40%. By eliminating this 60% framework overhead, this framework expands AI's optimization coverage from "40% business layer" to "100% total."
+This means: AI can optimize your business layer to the extreme, but if the underlying framework wastes 60% of CPU per request (see [Origin chapter](#origin) hotspot analysis), AI's optimization is locked into the remaining 40%. By removing this framework overhead, the optimization headroom is no longer confined to the business layer.
 
 **AI reduces development cost; high-performance frameworks reduce operational cost. The higher the framework baseline, the higher AI's optimization ceiling.**
 
@@ -273,7 +273,7 @@ This means:
 
 - The same server resources can support **12.6x** more concurrent SSE connections
 - Lower latency per token push — shorter "time-to-first-token" from the user's perspective
-- In AI Gateway, LLM Proxy, streaming inference, and similar scenarios, this framework can replace Nginx/Envoy as a proxy layer, performing high-performance streaming forwarding at the application layer
+- In AI Gateway, LLM Proxy, streaming inference, and similar scenarios, this framework can handle high-performance streaming forwarding at the application layer; TLS termination and routing are typically still handled by a proxy layer such as Nginx/Envoy
 
 This project's deep optimization of SSE isn't coincidental — when AI's core protocol matches the framework's design strengths, performance advantages shift from "nice-to-have" to "infrastructure necessity."
 

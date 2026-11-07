@@ -378,10 +378,9 @@ public AbstractNettyStreamSender(StreamEmitter emitter, PerfAsyncWebRequest asyn
 // AbstractNettyStreamSender.java
 protected void scheduleDrain() {
     // 统一走 wip 计数：仅当无 drain 在执行（wip 从 0 递增）才真正调用/调度 drain。
-    // 修复前 inEventLoop 分支无条件直接 drain()——drain 执行中 flushContent 的写完成
-    // 回调（同步 Publisher → request → onNext → send）重入时又直接调 drain()，
-    // 递归深度随同步元素数增长，Flux.range(1, N) 长流 StackOverflowError。
-    // 现在重入请求只递增 wip，由当前 drain 末尾 missed 循环消化，继续排空新数据。
+    // 重入请求只递增 wip，由当前 drain 末尾的 missed 循环消化，继续排空新数据；
+    // 这样 flushContent 写完成回调（同步 Publisher → request → onNext → send）重入时
+    // 不会再次直接调 drain()，递归深度不随同步元素数增长，长流不会 StackOverflowError。
     if (wip.getAndIncrement() == 0) {
         if (eventLoop.inEventLoop()) {
             drain();                        // 已在 EventLoop：同步执行
@@ -396,7 +395,7 @@ protected void scheduleDrain() {
 - **返回 0**：当前无 drain 在执行，本线程负责执行 drain。
 - **返回 >0**：已有 drain 在执行，只需递增 wip 计数，当前 drain 完成后通过 `missed` 循环会看到新入队的数据。
 
-**关键修复**：修复前 `inEventLoop` 分支无条件直接 `drain()`。当 `flushContent` 的写完成回调（同步 `Publisher` 的 `request` → `onNext` → `send`）重入时，再次直接调 `drain()`，递归深度随同步元素数增长——`Flux.range(1, N)` 长流 `StackOverflowError`。现在重入请求只递增 wip，由当前 drain 末尾的 `missed` 循环消化。
+**调度语义**：`scheduleDrain()` 统一经 `wip.getAndIncrement()` 关口，重入请求只递增 wip，由当前 drain 末尾的 `missed` 循环消化。这样 `flushContent` 的写完成回调（同步 `Publisher` 的 `request` → `onNext` → `send`）重入时不会再次直接调 `drain()`，递归深度不随同步元素数增长，`Flux.range(1, N)` 长流不会 `StackOverflowError`。
 
 ### 4.3 `enqueueWithBackpressure()`：自旋等待
 
@@ -493,8 +492,8 @@ protected void flushContent(ByteBuf buf) {
 // DefaultNettyStreamSender.java
 if (!channel.isActive()) {
     queue.clear();
-    wip.set(0);  // 修复前不递减 wip（残留非 0），后续 complete() 的
-                 // scheduleDrain getAndIncrement 返回非 0 被吞，onAllDataWritten 永不执行
+    wip.set(0);  // 复位 wip，避免残留非 0 导致后续 complete() 的
+                 // scheduleDrain getAndIncrement 返回非 0 被吞、onAllDataWritten 永不执行
     if (completed && !lastHttpContentWritten) {
         lastHttpContentWritten = true;
         onAllDataWritten();
@@ -503,7 +502,7 @@ if (!channel.isActive()) {
 }
 ```
 
-注释记录了修复历史：修复前不递减 wip（残留非 0），后续 `complete()` 的 `scheduleDrain` 的 `getAndIncrement` 返回非 0 被吞，`onAllDataWritten` 永不执行，异步请求挂起。`wip.set(0)` 必须在 `completed` 检查**之前**复位：跨线程 `complete()` 的 `getAndIncrement` 与 `set(0)` 在同一 `AtomicInteger` 上构成全序，无论先后，都能保证最终有一次 drain 观察到 `completed=true` 完成流。
+`wip.set(0)` 用于复位残留的 wip 计数：若不复位而让 wip 保持非 0，后续 `complete()` 的 `scheduleDrain` 中 `getAndIncrement` 返回非 0 会被吞掉，`onAllDataWritten` 永不执行，异步请求挂起。`wip.set(0)` 必须在 `completed` 检查**之前**复位：跨线程 `complete()` 的 `getAndIncrement` 与 `set(0)` 在同一 `AtomicInteger` 上构成全序，无论先后，都能保证最终有一次 drain 观察到 `completed=true` 完成流。
 
 ---
 
@@ -834,7 +833,7 @@ protected ReactiveConfig getReactiveConfig(WebServerHttpRequest request) {
 }
 ```
 
-注释记录了修复历史：修复前误用仍为 null 的 `reactiveConfig` 取 `streamEmitterType`，首次请求必 NPE。
+此处必须先构造好 `reactiveConfig` 再读取；若误用仍为 null 的 `reactiveConfig` 取 `streamEmitterType`，首次请求必 NPE。
 
 ### 9.4 `PublisherToStreamEmitterAdapter`：订阅者 + 背压
 
@@ -853,7 +852,7 @@ public void onSubscribe(Subscription s) {
         }
     };
     emitter.onWriteCallback(writeCallback);
-    // 修复前在 subscribe() 返回后事后读取 emitter.getWriteCallbackHandler()，
+    // writeCallback 在 onSubscribe 内立即注册；若等 subscribe() 返回后再读取，
     // 对 onSubscribe 异步投递的 Publisher 拿到 null → 流停滞
     if (asyncWebRequest != null) {
         asyncWebRequest.addWriteCallbackHandler(writeCallback);
@@ -1020,7 +1019,7 @@ public void setWritableCallback(Runnable callback) {
 | 编码错误处理 | `writerIndex` 回退 + `onEncodeError` 回调 | 抛出异常中断流 |
 | 超长消息 | `Unpooled.wrappedBuffer` 零拷贝 | 写 ByteBuf 后 flush |
 
-**核心差异**：Spring MVC 的异步流式依赖 `BlockingQueue` + 业务线程阻塞写，每个连接消耗一个线程。本框架的 `MpscArrayQueue` + `AtomicInteger wip` drain loop 将所有写入统一在 EventLoop 线程，线程数 = CPU 核，不随连接增长。`wip` 抵御重入（修复前 `StackOverflowError`），`afterDrain` 的 re-drain 检查防止残留数据丢失（修复前 `wip` 残留导致数据丢失），`channel inactive` 分支的 `wip.set(0)` 确保跨线程最终完成。
+**核心差异**：Spring MVC 的异步流式依赖 `BlockingQueue` + 业务线程阻塞写，每个连接消耗一个线程。本框架的 `MpscArrayQueue` + `AtomicInteger wip` drain loop 将所有写入统一在 EventLoop 线程，线程数 = CPU 核，不随连接增长。`wip` 抵御重入（避免 `StackOverflowError`），`afterDrain` 的 re-drain 检查防止残留数据丢失（避免 `wip` 残留），`channel inactive` 分支的 `wip.set(0)` 确保跨线程最终完成。
 
 ---
 
@@ -1030,13 +1029,13 @@ public void setWritableCallback(Runnable callback) {
 
 1. **`AsyncSupportRegistry` 统一挂起** → `DeferredResult`/`Callable`/`StreamEmitter`/`Publisher` 四类异步返回值通过 `startDeferredResultProcessing` 或 `startCallableProcessing` 挂起，`PerfAsyncWebRequest` 四态原子状态机确保线程安全。
 2. **`StreamEmitter` 双缓冲交付** → `earlySendDataList` 缓冲初始化前的数据，`initialize()` 时 `sendAll` 批量交付，避免逐条 drain 破坏批量 flush。
-3. **`MpscArrayQueue` + `AtomicInteger wip` 无锁 drain loop** → `scheduleDrain()` 一次调度，`drain()` 批量编码 + `missed` 循环消化重入，`afterDrain()` re-drain 检查残留。三处修复（wip 重入 `StackOverflowError`、wip 残留数据丢失、channel inactive 流挂起）记录了 drain loop 的演进。
+3. **`MpscArrayQueue` + `AtomicInteger wip` 无锁 drain loop** → `scheduleDrain()` 一次调度，`drain()` 批量编码 + `missed` 循环消化重入，`afterDrain()` re-drain 检查残留。wip 重入 `StackOverflowError`、wip 残留数据丢失、channel inactive 流挂起三类边界，分别由 wip 计数、re-drain 检查与 `wip.set(0)` 复位兜住。
 4. **`DefaultNettyStreamSender` / `EarlyEncodeNettyStreamSender` 两路实现** → 延迟编码在 EventLoop 编码，避免 App 线程竞争 PoolArena 锁；早编码在 App 线程编码，EventLoop 只做拷贝。
 5. **SSE 协议完整编码** → `SseEmitter` 的 `\n` 续行处理、`ServerSentEvent` 字段编码、`SseJsonEmitter` JSON 序列化。
 6. **响应式背压** → `highWaterMark/lowWaterMark` 水位控制，`tryRequest` 按队列深度补充请求，`@ReactiveSupport` 注解自定义参数。
 7. **`BackpressureHandler` 写水位联动** → `@Sharable` 单例监听 `channelWritabilityChanged`，`false→true` 触发 `scheduleDrain()` 恢复排空。
 
-这一层的克制体现在：**SSE 和流式不依赖锁、不依赖阻塞队列。** 整个流式写入路径是纯 `MpscArrayQueue.offer()` + `AtomicInteger.getAndIncrement()` + `channel.writeAndFlush()`，没有 `synchronized`、`ReentrantLock`、`BlockingQueue.put()`。`wip` 计数器抵御重入、`afterDrain` 检查残留、`channel inactive` 复位确保完成——三处修复都是对 drain loop 边界的完美诠释，而非对"加锁"的让步。
+这一层的克制体现在：**SSE 和流式不依赖锁、不依赖阻塞队列。** 整个流式写入路径是纯 `MpscArrayQueue.offer()` + `AtomicInteger.getAndIncrement()` + `channel.writeAndFlush()`，没有 `synchronized`、`ReentrantLock`、`BlockingQueue.put()`。`wip` 计数器抵御重入、`afterDrain` 检查残留、`channel inactive` 复位确保完成——这三类处理都是对 drain loop 边界的完整体现，而非对"加锁"的让步。
 
 ---
 

@@ -313,7 +313,7 @@ public class CustomJsonConverter implements JsonConverter {
 }
 ```
 
-**注意**：框架默认使用 `JacksonConverter`——`AsyncSupportRegistry` 通过 `getWebComponentWithDefault(JsonConverter.class, ...)` 获取。`JsonConverter` **没有** Spring Bean 自动注册机制：声明一个 `JsonConverter` Bean 不会被框架吸收，`@Primary` / `@Order` 也无从生效。如需替换，需自行向 `WebContext` 注册该组件（当前非公开 SPI）。
+**注意**：框架默认使用 `JacksonConverter`——`AsyncSupportRegistry` 通过 `getWebComponentWithDefault(JsonConverter.class, ...)` 获取。`JsonConverter` **没有** Spring Bean 自动注册机制：声明一个 `JsonConverter` Bean 不会被框架吸收，`@Primary` / `@Order` 也无从生效。如需替换，需自行向 `WebContext` 注册该组件；该替换点目前未提供面向应用的配置入口。
 
 ---
 
@@ -399,7 +399,7 @@ public class HeavyController {
 依次尝试 `PrefixPathRouterOptimizer` / `SuffixPathRouterOptimizer` / `LoopPathPatternRouterOptimizer` /
 `FullPathRouterOptimizer`，选中的优化器在启动期把映射列表预构建为高效路由结构。
 
-如需自定义策略，需继承 `MappingRegistry` 并覆写优化器装配逻辑（当前非公开 SPI）。
+如需自定义策略，需继承 `MappingRegistry` 并覆写优化器装配逻辑；该替换点目前未提供面向应用的配置入口。
 
 ---
 
@@ -487,12 +487,12 @@ public class MyExchangeProvider implements WebExchangeProvider {
 ```xml
 <dependency>
     <groupId>org.springdoc</groupId>
-    <artifactId>springdoc-openapi-ui</artifactId>
-    <version>1.7.0</version>
+    <artifactId>springdoc-openapi-starter-common</artifactId>
+    <version>${springdoc.version}</version>
 </dependency>
 ```
 
-添加依赖后 `OpenApiAutoConfiguration` 自动激活（`@ConditionalOnClass(OpenApiCustomiser.class)`），无需手动配置。
+当前 master 基线使用 `springdoc-openapi-starter-common`（版本由 `springdoc.version` 统一管理，见根 `pom.xml`）；`2.7.x` 分支对应的是 `springdoc-openapi-ui:1.7.0`。添加依赖后 `OpenApiAutoConfiguration` 自动激活（`@ConditionalOnClass(OpenApiCustomizer.class)`），无需手动配置。完整示例见 `spring-web-examples/spring-web-example-openapi/pom.xml`。
 
 ### 架构
 
