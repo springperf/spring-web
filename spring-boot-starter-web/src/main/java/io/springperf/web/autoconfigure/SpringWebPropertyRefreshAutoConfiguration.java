@@ -39,7 +39,7 @@ import lombok.extern.slf4j.Slf4j;
 public class SpringWebPropertyRefreshAutoConfiguration {
 
     /** Spring Cloud Context 的配置变更事件全限定类名（按名匹配，避免编译期依赖）。 */
-    private static final String ENVIRONMENT_CHANGE_EVENT = "org.springframework.cloud.context.environment.EnvironmentChangeEvent";
+    static final String ENVIRONMENT_CHANGE_EVENT = "org.springframework.cloud.context.environment.EnvironmentChangeEvent";
 
     /**
      * 低优先级监听器：仅处理配置变更事件，其余事件直接忽略。

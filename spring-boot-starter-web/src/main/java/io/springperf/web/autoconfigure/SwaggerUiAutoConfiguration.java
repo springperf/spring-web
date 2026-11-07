@@ -5,6 +5,7 @@ import io.springperf.web.core.resource.ResourceHandlerRegistration;
 import org.springdoc.core.customizers.OpenApiCustomiser;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,15 +21,22 @@ import org.springframework.context.annotation.Configuration;
  *   <li>{@link ResourceHandlerRegistration} — serves Swagger UI static resources from
  *       the webjar under {@code /swagger-ui/**}</li>
  * </ul>
- *
- * <p>Users can override individual beans, e.g. define their own {@code OpenApiDocController}
- * or a custom {@code ResourceHandlerRegistration} named {@code swaggerUiResourceHandler}.</p>
+ * <p>
+ * Users can override individual beans, e.g. define their own {@code OpenApiDocController} or a custom
+ * {@code ResourceHandlerRegistration} named {@code swaggerUiResourceHandler}.
+ * </p>
+ * <p>
+ * {@code springperf.openapi.enabled=false} backs off this whole configuration (the docs controller depends on the
+ * {@link OpenApiCustomiser} created by {@link OpenApiAutoConfiguration}); {@code springperf.swagger-ui.enabled=false}
+ * only backs off the static resource handler.
+ * </p>
  *
  * @see OpenApiAutoConfiguration
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnClass(OpenApiCustomiser.class)
-@EnableConfigurationProperties({SwaggerUiProperties.class, OpenApiProperties.class})
+@ConditionalOnProperty(prefix = "springperf.openapi", name = "enabled", havingValue = "true", matchIfMissing = true)
+@EnableConfigurationProperties({ SwaggerUiProperties.class, OpenApiProperties.class })
 public class SwaggerUiAutoConfiguration {
 
     @Bean
@@ -39,6 +47,8 @@ public class SwaggerUiAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnProperty(prefix = "springperf.swagger-ui", name = "enabled", havingValue = "true", matchIfMissing = true)
+    @ConditionalOnMissingBean(name = "swaggerUiResourceHandler")
     public ResourceHandlerRegistration swaggerUiResourceHandler(SwaggerUiProperties swaggerUiProperties) {
         return new ResourceHandlerRegistration("/swagger-ui/**")
                 .addResourceLocations("classpath:/META-INF/resources/webjars/swagger-ui/"
