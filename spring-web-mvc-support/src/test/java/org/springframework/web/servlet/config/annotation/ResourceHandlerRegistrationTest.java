@@ -56,10 +56,12 @@ class ResourceHandlerRegistrationTest {
 
     @Test
     void chainedCalls_returnsSelf() {
-        ResourceHandlerRegistration reg = new ResourceHandlerRegistration("/static/**")
-                .addResourceLocations("classpath:/static/").setCachePeriod(600).setCacheControl(CacheControl.noCache());
+        ResourceHandlerRegistration reg = new ResourceHandlerRegistration("/static/**");
+        // 方法名承诺 returnsSelf，就必须 assertSame
+        assertSame(reg, reg.addResourceLocations("classpath:/static/"));
+        assertSame(reg, reg.setCachePeriod(600));
+        assertSame(reg, reg.setCacheControl(CacheControl.noCache()));
 
-        assertNotNull(reg);
         assertEquals(1, reg.getLocationValues().size());
         assertEquals(Integer.valueOf(600), reg.getCachePeriod());
     }

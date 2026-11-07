@@ -36,5 +36,8 @@ class CorsRegistryTest {
 
         assertEquals(1, registry.getRegistrations().size());
         assertSame(reg, registry.getRegistrations().get(0));
+        // 方法名承诺 persistsConfig：链式调用后的配置必须仍在同一注册项上
+        assertEquals(java.util.List.of("https://example.com"), reg.getCorsConfiguration().getAllowedOrigins());
+        assertEquals(java.util.List.of("GET"), reg.getCorsConfiguration().getAllowedMethods());
     }
 }
