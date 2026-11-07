@@ -68,30 +68,26 @@
 > `ConversionService.convert(Object, TypeDescriptor)`（6.1 才新增）。用 3.0/3.1 的依赖构建会直接编译失败；
 > 若改用 3.5 构建、把产物拿到 6.0 运行时执行，则会在 `@RequestParam` / `@PathVariable` 等命名值参数的转换
 > 路径上抛 `NoSuchMethodError`（`Error`，`@ExceptionHandler` 接不住）。两个方向都不可用，故从 3.2 起算。
-> 兼容性由 `ci.yml` 的 `spring-boot-versions` 矩阵（3.2 / 3.3 / 3.4）跑核心模块 + starter **单测**验证——只验证
-> `compile` 证明不了运行期符号存在。
+> 该范围由 Spring Boot 3.2 / 3.3 / 3.4 的核心模块与 starter 测试验证；仅通过编译无法证明运行期符号存在。
 
 ### 跨版本敏感点
 
-master 的跨版本风险集中在 starter 自动配置层，`spring-boot-versions` job 正是因为覆盖到
-`-pl spring-boot-starter-web -am test` 才能证明这些点在 3.2 / 3.3 / 3.4 上可用。
+跨版本风险集中在 starter 自动配置层；覆盖 starter 模块的测试才能证明这些点在 3.2 / 3.3 / 3.4 上可用。
 
 | 敏感点 | 风险 | 覆盖用例 | 降级策略 |
 |--------|------|---------|---------|
-| `ApiVersion`（actuator 内部枚举 `V2/V3/LATEST`） | 3.x 小版本改名/改值 | starter 单测 + `ActuatorEndpointAutoConfiguration` 条件装配 | 编译期即暴露，无静默降级 |
-| `DelegatingFilterProxyRegistrationBean#getTargetBeanName()`（protected 反射） | Boot 调整签名后 filter 静默消失 | `SpringWebServletAutoConfigurationCreateFilterWrapperTest` | 返回 null 跳过并打 WARN，不吞异常 |
-| `ConfigurationPropertySources` + Boot `Ssl` 的 `Binder` 绑定 | 聚合属性源语义变化会让管理端口 SSL / 覆盖失效 | `ManagementServerSettingsTest`、`SslContextFactoryTest` | 绑定失败 fail-fast |
-| `@AutoConfiguration` 排序与条件注解 | 低版本排序不同会让条件装配退让 | `AutoConfigurationContractTest`、`AutoConfigurationConditionTest` | 显式 `@AutoConfigureAfter` 固定顺序 |
+| `ApiVersion`（actuator 内部枚举 `V2/V3/LATEST`） | 3.x 小版本改名/改值 | starter 单测 + 条件装配测试 | 编译期即暴露，无静默降级 |
+| `DelegatingFilterProxyRegistrationBean#getTargetBeanName()`（protected 反射） | Boot 调整签名后 filter 静默消失 | Filter 桥接测试 | 返回 null 跳过并打 WARN，不吞异常 |
+| `ConfigurationPropertySources` + Boot `Ssl` 的 `Binder` 绑定 | 聚合属性源语义变化会让管理端口 SSL / 覆盖失效 | 管理端口与 SSL 绑定测试 | 绑定失败 fail-fast |
+| `@AutoConfiguration` 排序与条件注解 | 低版本排序不同会让条件装配退让 | 自动装配契约测试 | 显式 `@AutoConfigureAfter` 固定顺序 |
 
-> **E2E 覆盖口径**：3.5 跑全量 `@SpringBootTest`（`ci.yml` 的 JDK 矩阵）；3.2 / 3.3 / 3.4 / 3.5 由
-> `spring-boot-e2e-matrix.yml` 每周（或手动 `workflow_dispatch`）跑最小冒烟集
-> （`AdditionalEndpointsE2ETest` / `ManagementPortConflictTest` / `WebServerInitializedEventOrderTest`）。
+> **E2E 覆盖范围**：3.5 跑全量 `@SpringBootTest`；3.2 / 3.3 / 3.4 / 3.5 另跑最小冒烟集。
 > 因此「3.2.x ~ 3.5.x」指核心 + starter 单测已验证，E2E 全量仅 3.5。
 
 ### 额外特性
 
 - **虚拟线程**：JDK 21+ 下 `spring.threads.virtual.enabled=true` 启用，`default` 业务线程池与 batch 的批量方法（`@BatchMapping`）均改用虚拟线程执行（只替换线程类型：`pool.*` 上限/队列语义与 batch 的 `consumerSize` 上限、背压语义均保持不变）——反射调用 `Thread.ofVirtual`，兼容 JDK 17 编译，JDK < 21 时告警并回落平台线程。实现见 [`VirtualThreadSupport`](../spring-web/src/main/java/io/springperf/web/core/pool/VirtualThreadSupport.java) / [`BizPoolRegistry`](../spring-web/src/main/java/io/springperf/web/core/pool/BizPoolRegistry.java)；E2E 覆盖见 [`VirtualThreadE2ETest`](../spring-web-test/src/test/java/io/springperf/webtest/VirtualThreadE2ETest.java) 与 [`BatchVirtualThreadE2ETest`](../spring-web-support-test/src/test/java/io/springperf/webtest/batch/BatchVirtualThreadE2ETest.java)
-- **GraalVM native-image**：`FastInvokerGenerator` 在 native-image 下自动降级为 `MethodHandle` 调用；`SpringWebRuntimeHints` 注册事件路径/资源/异步回调可达性提示；`ControllerBeanFactoryInitializationAotProcessor`（经 `META-INF/spring/aot.factories`）在 AOT 构建期自动为 `@Controller` 处理方法与 DTO 注册反射/序列化 hints。静态 `META-INF/native-image/.../{reflect,proxy,resource}-config.json` 与 AOT 动态 hints **互补**：前者提供 AOT 无法自动发现的框架内部类/SPI 接口/资源基线，后者补 AOT 构建期才确定的部分；静态 `reflect-config.json` 不再登记自动配置类（构造提示由 `process-aot` 生成），两轨有意重叠的代理/资源条目保留为双保险，关系由 `NativeImageHintsConsistencyTest` 锁定
+- **GraalVM native-image**：`FastInvokerGenerator` 在 native-image 下自动降级为 `MethodHandle` 调用；`SpringWebRuntimeHints` 注册事件路径/资源/异步回调可达性提示；`ControllerBeanFactoryInitializationAotProcessor`（经 `META-INF/spring/aot.factories`）在 AOT 构建期自动为 `@Controller` 处理方法与 DTO 注册反射/序列化 hints。静态 `META-INF/native-image/.../{reflect,proxy,resource}-config.json` 与 AOT 动态 hints **互补**：前者提供 AOT 无法自动发现的框架内部类/SPI 接口/资源基线，后者补 AOT 构建期才确定的部分；静态 `reflect-config.json` 不再登记自动配置类（构造提示由 `process-aot` 生成），两轨有意重叠的代理/资源条目保留为双保险
 - **WebSocket**：基于 Jakarta WebSocket 的自动配置
 
 ### GraalVM native-image 支持矩阵
@@ -102,9 +98,9 @@ master 的跨版本风险集中在 starter 自动配置层，`spring-boot-versio
 | SB4（4.0.x/4.1.x，`4.1.x` 分支） | ❌ 不支持 | 4.x 的事件桥接需运行时 `defineClass`（native 封闭世界禁止）；`4.1.x` 分支上显式文档化排除 |
 | epoll transport | ✅ 已验证 | Netty epoll `.so` 已在 Linux 原生构建环境验证通过（NIO transport 亦已在 Windows native 验证） |
 | WebSocket `@ServerEndpoint` | ⚠️ 需注册为 Bean | native 下 classpath 扫描不可用，`JsrEndpointScanner` 自动降级为 Bean 发现，端点需显式注册为 Spring Bean |
-| 原生构建验证 | ✅ Windows / Linux 均已验 | Windows：`mvn -Pnative package`（GraalVM + MSVC，`vcvars64` 环境 + `-H:-CheckToolchain`）；Linux：CI `ubuntu-latest` 以 `scripts/native-smoke-test.sh` 作为门禁（构建 + 启动 + 8 条请求链路断言） |
+| 原生构建验证 | ✅ Windows / Linux 均已验 | Windows 与 Linux 均完成原生构建、启动与 8 条请求链路断言 |
 
-> **CI 冒烟覆盖边界**：`scripts/native-smoke-test.sh` 针对 `spring-web-example-rest` 逐条断言 `/health` 的 JSON 序列化、`GET/POST/PUT/DELETE /api/users` 的控制器方法反射与 `@PathVariable` / `@RequestBody` 绑定、业务错误分支以及框架 404 分支，用于验证 `ControllerBeanFactoryInitializationAotProcessor` 生成的反射/DTO hints 在原生镜像中确实可用；脚本、控制器路由与 `native-image.yml` 的对应关系由 `NativeSmokeContractTest` 锁定。视图模板、异步返回值与独立管理端口不在此覆盖范围内：示例模块不含模板或 `management.server.port`，且只有 `spring-web-example-rest` 绑定了 `process-aot` 与 `native` profile。
+> **原生镜像冒烟覆盖范围**：已验证 `/health` 的 JSON 序列化、控制器方法反射与 `@PathVariable` / `@RequestBody` 绑定、业务错误分支及框架 404 分支，用于确认 AOT 生成的反射/DTO hints 在原生镜像中可用。视图模板、异步返回值与独立管理端口不在此覆盖范围内。
 
 ---
 

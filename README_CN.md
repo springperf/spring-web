@@ -18,7 +18,7 @@
 <img src="docs/images/perf-benchmark.svg" alt="Performance Benchmark Chart"/>
 </p>
 
-> 在 7 个接口 × 3 个并发度的对比中，吞吐均领先 Spring MVC（Tomcat/Undertow）与 WebFlux。json 16t p50 延迟仅 Tomcat 的 **69%**、每请求内存分配仅其 **43%**、4 线程堆占用 **24MB**（全场最低）。上述为 2026-08 单次 JMH 快照，in-process 测试条件与对比框架版本见[完整 Benchmark 报告](docs/benchmark.md)。
+> 在 7 个接口 × 3 个并发度的对比中，吞吐均领先 Spring MVC（Tomcat/Undertow）与 WebFlux。json 16t p50 延迟仅 Tomcat 的 **69%**、每请求内存分配仅其 **43%**、4 线程堆占用 **24MB**（本次对比中最低）。上述为 2026-08 单次 JMH 快照，in-process 测试条件与对比框架版本见[完整 Benchmark 报告](docs/benchmark.md)。
 >
 > [完整 Benchmark 报告](docs/benchmark.md) · [性能原理详解](docs/performance-principles.md)
 
@@ -34,7 +34,7 @@
 >
 > 这引发了一个思考：如果把 Spring MVC 主流功能中那些不必要的运行时开销全部消除，性能能提升多少？
 >
-> **Spring WebPerf 由此而生。** 目标：在兼容 Spring 生态的前提下，最大程度释放 Web 框架的性能。
+> **Spring WebPerf 由此而生。** 目标：在复用 Spring 主流编程模型的前提下，最大程度释放 Web 框架的性能。
 >
 > [查看 Benchmark 报告](docs/benchmark.md) · [性能原理详解](docs/performance-principles.md) · [项目缘起全文](docs/overview.md) · [更新日志](CHANGELOG.md) · [破坏性变更](docs/breaking-changes.md)
 
@@ -50,7 +50,7 @@ Spring WebPerf 是一个基于 **Netty** 构建的高性能 Web 框架，定位�
 
 - **高性能** — 启动期固化路由与处理器元数据（部分参数解析器、拦截器/过滤器链在首次请求时懒缓存）；控制器方法调用走 MethodHandle/ASM，避免运行期反射；精确路径 O(1) HashMap 路由；GC 友好设计
 - **Netty 驱动** — 基于 Netty 4.1 事件驱动 I/O，请求默认在 `default` 业务线程池执行以保护 EventLoop，可按方法粒度通过 `@RunInPool` 调度到自定义线程池或直接到 EventLoop
-- **Spring 生态兼容** — 支持 `@RestController`、`@RequestMapping`、`@Validated`、`@ExceptionHandler`、`HandlerInterceptor` 等 Spring 注解与抽象，零侵入迁移
+- **Spring 生态兼容** — 支持 `@RestController`、`@RequestMapping`、`@Validated`、`@ExceptionHandler`、`HandlerInterceptor` 等 Spring 注解与抽象，多数控制器代码无需改动；例外与 `spring-webmvc` 二选一限制见[迁移指南](docs/quickstart.md)及下方脚注
 - **异步原生** — 内置 DeferredResult、Callable、SseEmitter、StreamEmitter、Reactive Streams 支持，SSE 吞吐达 Spring MVC 的 12.63x（4 线程）/ 7.72x（16 线程）
 - **批量处理** — 基于 Disruptor 的请求聚合批处理，透明地将并发请求合并为批量操作；开启攒批窗口后，IO 密集场景吞吐可提升数倍（默认窗口关闭，需按[批处理指南](docs/batch.md)配置 `batchWindowMillis`）。支持背压策略、等待策略、线程池隔离
 - **灵活扩展** — 参数解析器、返回值处理器、编解码 Advice、拦截器、过滤器等关键节点均提供 SPI
@@ -142,7 +142,7 @@ management:
 | bytesLarge | **18,250** ops/s | **1.82x** | **1.45x** | **1.55x** |
 | sse | **13,323** ops/s | **12.63x** | — | **5.08x** |
 
-perf 框架吞吐是 Servlet 容器的 **1.45\~12.6x**，p50 延迟 **0.10\~0.11ms**（同类框架最低）。SSE 4 线程达 Spring MVC 的 **12.63x**、16 线程 **7.72x**。详情见 [完整对比报告](docs/benchmark.md)。
+perf 框架吞吐是 Servlet 容器的 **1.45\~12.6x**，p50 延迟 **0.10\~0.11ms**（本次对比中最低）。SSE 4 线程达 Spring MVC 的 **12.63x**、16 线程 **7.72x**。详情见 [完整对比报告](docs/benchmark.md)。
 
 ---
 

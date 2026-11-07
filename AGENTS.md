@@ -9,8 +9,8 @@
 ## 项目概述
 
 基于 Netty 构建的高性能自定义 Web 框架，作为 SpringMVC 的替代方案。
-通过依赖该框架并移除 SpringMVC 依赖，即可无缝完成业务项目的 Web 框架替换并获得高性能。
-复用 Spring/SpringWeb 的 DI、`@RequestMapping`、校验、拦截器等概念，让业务代码无侵入使用。
+通过依赖该框架并移除 SpringMVC 依赖，即可在多数场景完成业务项目的 Web 框架替换并获得高性能。
+复用 Spring/SpringWeb 的 DI、`@RequestMapping`、校验、拦截器等概念，让多数控制器代码无需改动；Servlet/MVC 生态需引入对应桥接模块。
 
 ## 项目配置
 

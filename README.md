@@ -18,7 +18,7 @@ A high-performance Netty-based web framework, compatible with the Spring MVC pro
 <img src="docs/images/perf-benchmark-en.svg" alt="Performance Benchmark Chart"/>
 </p>
 
-> perf leads in all **7 APIs × 3 concurrency levels** vs Spring MVC (Tomcat/Undertow) and WebFlux. json p50 at 16 threads is just **69%** of Tomcat, allocation per request **43%** of it, and heap at 4 threads is **24MB** (the lowest). These figures come from a single JMH snapshot (2026-08, in-process); see the [full benchmark report](docs/en/benchmark.md) for the test environment and comparison framework versions.
+> perf leads in all **7 APIs × 3 concurrency levels** vs Spring MVC (Tomcat/Undertow) and WebFlux. json p50 at 16 threads is just **69%** of Tomcat, allocation per request **43%** of it, and heap at 4 threads is **24MB** (the lowest in this comparison). These figures come from a single JMH snapshot (2026-08, in-process); see the [full benchmark report](docs/en/benchmark.md) for the test environment and comparison framework versions.
 >
 > [Full Benchmark Report](docs/en/benchmark.md) · [Performance Principles](docs/en/performance-principles.md)
 
@@ -34,7 +34,7 @@ A high-performance Netty-based web framework, compatible with the Spring MVC pro
 >
 > This raised a question: what if we eliminated all unnecessary runtime overhead from the mainstream Spring MVC feature set? How much could performance improve?
 >
-> **Spring WebPerf was born from this question.** Goal: maximize web framework performance while remaining fully compatible with the Spring ecosystem.
+> **Spring WebPerf was born from this question.** Goal: maximize web framework performance while reusing the mainstream Spring programming model.
 >
 > [View Benchmark Report](docs/en/benchmark.md) · [Performance Principles](docs/en/performance-principles.md) · [Full Origin Story](docs/en/overview.md) · [Changelog](docs/en/changelog.md) · [Breaking Changes](docs/en/breaking-changes.md)
 
@@ -50,7 +50,7 @@ Spring WebPerf is a high-performance web framework built on **Netty 4.1**, desig
 
 - **High Performance** — Routing and handler metadata are pre-resolved at startup (some argument resolvers and interceptor/filter chains are lazily cached on the first request); controller invocation uses MethodHandle/ASM instead of runtime reflection; O(1) HashMap routing for exact paths; GC-friendly design
 - **Netty-Driven** — Built on Netty 4.1 event-driven I/O; requests execute on the `default` business thread pool by default to protect the EventLoop, with method-level `@RunInPool` to schedule to a custom pool or directly to the EventLoop as needed
-- **Spring Ecosystem Compatible** — Supports `@RestController`, `@RequestMapping`, `@Validated`, `@ExceptionHandler`, `HandlerInterceptor`, and other Spring annotations and abstractions — zero-code migration
+- **Spring Ecosystem Compatible** — Supports `@RestController`, `@RequestMapping`, `@Validated`, `@ExceptionHandler`, `HandlerInterceptor`, and other Spring annotations and abstractions — most controller code needs no changes; see the [Migration Guide](docs/en/quickstart.md) for the exceptions and the `spring-webmvc` coexistence restriction below
 - **Async Native** — Built-in support for DeferredResult, Callable, SseEmitter, StreamEmitter, Reactive Streams; SSE throughput reaches 12.63x of Spring MVC at 4 threads / 7.72x at 16 threads
 - **Batch Processing** — Disruptor-based request aggregation that transparently merges concurrent requests into batch operations; with a batching window enabled, IO-bound workloads can gain several times the throughput (the window is off by default — configure `batchWindowMillis` per the [batch guide](docs/en/batch.md)). Supports backpressure strategies, wait strategies, and thread pool isolation
 - **Extensible** — SPI at every key juncture: argument resolvers, return value handlers, codec interceptors, filters, interceptors
@@ -142,7 +142,7 @@ JMH benchmark results on JDK 17 + G1GC (1GB heap, 4 threads):
 | bytesLarge | **18,250** ops/s | **1.82x** | **1.45x** | **1.55x** |
 | sse | **13,323** ops/s | **12.63x** | — | **5.08x** |
 
-The perf framework delivers **1.45\~12.6x** throughput over Servlet containers, with **0.10\~0.11ms** p50 latency (lowest among peers). SSE reaches **12.63x** of Spring MVC at 4 threads and **7.72x** at 16 threads. See [full comparison report](docs/en/benchmark.md).
+The perf framework delivers **1.45\~12.6x** throughput over Servlet containers, with **0.10\~0.11ms** p50 latency (lowest in this comparison). SSE reaches **12.63x** of Spring MVC at 4 threads and **7.72x** at 16 threads. See [full comparison report](docs/en/benchmark.md).
 
 ---
 

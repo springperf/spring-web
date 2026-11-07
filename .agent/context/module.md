@@ -439,7 +439,7 @@ spring-web-view
 freemarker/                         FreemarkerViewResolver（备用引擎，engine=freemarker）
 beetl/                              BeetlViewResolver（引擎，engine=beetl，GroupTemplate + ClassLoader 显式绑定）
 
-**多引擎共存（方案 A）**：多个 ViewResolver 同时注册，每个 `resolveViewName` 通过 `ClassPathResource(prefix+viewName+suffix).exists()` 做模板存在性探测——存在返回 View，不存在返回 null 交给下一个 resolver。`spring.web.view.engine` 多选（逗号分隔，不配置则注册全部可用引擎），由 `ViewEngineCondition` 自定义 Condition 驱动。
+**多引擎共存**：多个 ViewResolver 同时注册，每个 `resolveViewName` 通过 `ClassPathResource(prefix+viewName+suffix).exists()` 做模板存在性探测——存在返回 View，不存在返回 null 交给下一个 resolver。`spring.web.view.engine` 多选（逗号分隔，不配置则注册全部可用引擎），由 `ViewEngineCondition` 自定义 Condition 驱动。
 
 spring-web-mvc-support/mvc/retval/
 └── ModelAndViewReturnValueResolver  直接类型访问（非反射）桥接 org.springframework.web.servlet.ModelAndView

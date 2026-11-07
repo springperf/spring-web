@@ -204,7 +204,7 @@ Multiple `ViewResolver`s can be registered at once; within the **same request pi
 
 ## 6. JSP Views (Optional)
 
-Beyond template engines, `spring-web-servlet` renders JSP through **Apache Jasper** (dependency `org.apache.tomcat.embed:tomcat-embed-jasper`, optional). Unlike template engines, JSP is a "compile-to-servlet" container technology and must go through the servlet bridge — see the [support-bridge internals (Chinese)](../internals/12-support-bridge.md#512-jsp-视图apache-jasper).
+Beyond template engines, `spring-web-servlet` renders JSP through **Apache Jasper** (dependency `org.apache.tomcat.embed:tomcat-embed-jasper`, optional). Unlike template engines, JSP is a "compile-to-servlet" container technology and must go through the servlet bridge; the JSP/JSTL setup is described below.
 
 ### 1. Dependencies
 

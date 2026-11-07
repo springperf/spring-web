@@ -72,31 +72,28 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 > against 3.0/3.1 fails at compile time; building against 3.5 and executing on a 6.0 runtime fails at
 > `@RequestParam` / `@PathVariable` conversion with `NoSuchMethodError` (an `Error`, which
 > `@ExceptionHandler` cannot catch). Neither direction works, so the range starts at 3.2. Coverage is
-> verified by the `spring-boot-versions` matrix in `ci.yml` (3.2 / 3.3 / 3.4) running core-module and starter
-> **tests** - a green `compile` says nothing about runtime symbol resolution.
+> verified by tests on Spring Boot 3.2 / 3.3 / 3.4; a green `compile` says nothing about runtime symbol
+> resolution.
 
 ### Cross-version Sensitive Points
 
-The cross-version risk on master lives in the starter auto-configuration layer. The
-`spring-boot-versions` job covers it precisely because it runs
-`-pl spring-boot-starter-web -am test` instead of the core module alone.
+The cross-version risk lives in the starter auto-configuration layer, so the verification covers the starter module, not just the core.
 
 | Sensitive point | Risk | Covered by | Fallback |
 |-----------------|------|------------|----------|
-| `ApiVersion` (internal actuator enum `V2/V3/LATEST`) | Renamed / revalued in a 3.x minor | starter tests + `ActuatorEndpointAutoConfiguration` conditions | Fails at compile time, no silent degradation |
-| `DelegatingFilterProxyRegistrationBean#getTargetBeanName()` (protected reflection) | A Boot signature change would silently drop filters | `SpringWebServletAutoConfigurationCreateFilterWrapperTest` | Returns null, skips the filter and logs a WARN |
-| `ConfigurationPropertySources` + Boot `Ssl` binding via `Binder` | Aggregated property-source semantics may break management-port SSL and overrides | `ManagementServerSettingsTest`, `SslContextFactoryTest` | Fails fast on binding errors |
-| `@AutoConfiguration` ordering and conditions | Different ordering on older versions can back off conditions | `AutoConfigurationContractTest`, `AutoConfigurationConditionTest` | Explicit `@AutoConfigureAfter` fixes the order |
+| `ApiVersion` (internal actuator enum `V2/V3/LATEST`) | Renamed / revalued in a 3.x minor | starter tests + condition tests | Fails at compile time, no silent degradation |
+| `DelegatingFilterProxyRegistrationBean#getTargetBeanName()` (protected reflection) | A Boot signature change would silently drop filters | Filter bridge tests | Returns null, skips the filter and logs a WARN |
+| `ConfigurationPropertySources` + Boot `Ssl` binding via `Binder` | Aggregated property-source semantics may break management-port SSL and overrides | management-port and SSL binding tests | Fails fast on binding errors |
+| `@AutoConfiguration` ordering and conditions | Different ordering on older versions can back off conditions | auto-configuration contract tests | Explicit `@AutoConfigureAfter` fixes the order |
 
-> **E2E coverage scope**: 3.5 runs the full `@SpringBootTest` suite (`ci.yml` JDK matrix); 3.2 / 3.3 / 3.4 / 3.5
-> run a minimal smoke set weekly (or on manual `workflow_dispatch`) via `spring-boot-e2e-matrix.yml`:
-> `AdditionalEndpointsE2ETest` / `ManagementPortConflictTest` / `WebServerInitializedEventOrderTest`.
-> So "3.2.x ~ 3.5.x" means core + starter tests are verified; the full E2E suite is verified on 3.5 only.
+> **E2E coverage scope**: 3.5 runs the full `@SpringBootTest` suite; 3.2 / 3.3 / 3.4 / 3.5 also run a minimal
+> smoke set. So "3.2.x ~ 3.5.x" means core + starter tests are verified; the full E2E suite is verified on 3.5
+> only.
 
 ### Additional Features
 
 - **Virtual threads**: enable with `spring.threads.virtual.enabled=true` on JDK 21+ and both the `default` business pool and batch methods (`@BatchMapping`) switch to virtual threads (only the thread type changes: `pool.*` bounds/queueing and batch's `consumerSize` cap + backpressure semantics are all unchanged) — via reflection on `Thread.ofVirtual`, so it compiles on JDK 17; below JDK 21 it warns and falls back to platform threads. Implemented in [`VirtualThreadSupport`](../../spring-web/src/main/java/io/springperf/web/core/pool/VirtualThreadSupport.java) / [`BizPoolRegistry`](../../spring-web/src/main/java/io/springperf/web/core/pool/BizPoolRegistry.java). E2E coverage: [`VirtualThreadE2ETest`](../../spring-web-test/src/test/java/io/springperf/webtest/VirtualThreadE2ETest.java) and [`BatchVirtualThreadE2ETest`](../../spring-web-support-test/src/test/java/io/springperf/webtest/batch/BatchVirtualThreadE2ETest.java)
-- **GraalVM native-image**: `FastInvokerGenerator` degrades to `MethodHandle` calls under native-image; `SpringWebRuntimeHints` registers event-path/resource/async-callback reachability hints; `ControllerBeanFactoryInitializationAotProcessor` (via `META-INF/spring/aot.factories`) auto-registers reflection/serialization hints for user `@Controller` methods and DTOs at AOT build time. The static `META-INF/native-image/.../{reflect,proxy,resource}-config.json` files and the AOT-generated hints are **complementary**: the former supply the baseline of framework internals, SPI interfaces and resources that AOT cannot discover, while the latter add what is only known at AOT build time. The static `reflect-config.json` no longer registers auto-configuration classes (constructor hints come from `process-aot`); intentionally overlapping proxy/resource entries are kept as a belt-and-suspenders measure, and `NativeImageHintsConsistencyTest` locks this relationship
+- **GraalVM native-image**: `FastInvokerGenerator` degrades to `MethodHandle` calls under native-image; `SpringWebRuntimeHints` registers event-path/resource/async-callback reachability hints; `ControllerBeanFactoryInitializationAotProcessor` (via `META-INF/spring/aot.factories`) auto-registers reflection/serialization hints for user `@Controller` methods and DTOs at AOT build time. The static `META-INF/native-image/.../{reflect,proxy,resource}-config.json` files and the AOT-generated hints are **complementary**: the former supply the baseline of framework internals, SPI interfaces and resources that AOT cannot discover, while the latter add what is only known at AOT build time. The static `reflect-config.json` no longer registers auto-configuration classes (constructor hints come from `process-aot`); intentionally overlapping proxy/resource entries are kept as a belt-and-suspenders measure.
 - **WebSocket**: auto-configuration based on Jakarta WebSocket
 
 ### GraalVM native-image Support Matrix
@@ -107,9 +104,9 @@ The cross-version risk on master lives in the starter auto-configuration layer. 
 | SB4 (4.0.x/4.1.x, `4.1.x` branch) | ❌ Not supported | The 4.x event bridge needs runtime `defineClass` (forbidden in closed world); explicitly documented as excluded on the `4.1.x` branch |
 | epoll transport | ✅ Verified | Netty epoll `.so` verified in a Linux native build environment (NIO transport also verified on Windows native) |
 | WebSocket `@ServerEndpoint` | ⚠️ Register as Bean | classpath scanning unavailable under native; `JsrEndpointScanner` auto-degrades to Bean discovery |
-| Native build verification | ✅ Windows & Linux verified | Windows: `mvn -Pnative package` (GraalVM + MSVC, `vcvars64` env + `-H:-CheckToolchain`); Linux: CI `ubuntu-latest` gates on `scripts/native-smoke-test.sh` (build + launch + 8 request-chain assertions) |
+| Native build verification | ✅ Windows & Linux verified | Native build, launch and 8 request-chain assertions verified on both Windows and Linux |
 
-> **CI smoke coverage scope**: `scripts/native-smoke-test.sh` asserts, against `spring-web-example-rest`, JSON serialization on `/health`, controller-method reflection and `@PathVariable` / `@RequestBody` binding across `GET/POST/PUT/DELETE /api/users`, the business error branch, and the framework 404 branch. This verifies that the reflection/DTO hints produced by `ControllerBeanFactoryInitializationAotProcessor` really work in the native image. `NativeSmokeContractTest` locks the relationship between the script, the controller routes and `native-image.yml`. View templates, async return values and a separate management port are **not** covered: no example module ships templates or `management.server.port`, and only `spring-web-example-rest` binds `process-aot` and the `native` profile.
+> **Native-image smoke coverage**: verified JSON serialization on `/health`, controller-method reflection and `@PathVariable` / `@RequestBody` binding, the business error branch and the framework 404 branch, confirming that the AOT-generated reflection/DTO hints work in the native image. View templates, async return values and a separate management port are **not** covered.
 
 ---
 

@@ -110,7 +110,7 @@ public BatchMapping.WaitStrategy waitStrategy()               // 等待策略
 public BatchMapping.Backpressure backpressure()               // 背压策略
 public Constructor<?> singleMethodCtor()                      // 单方法参数匹配的构造函数
 public int maxBatchSize()        { return maxBatchSize; }     // 攒批阈值
-public int batchWindowMillis()   { return batchWindowMillis; } // 攒批时间窗口，0=关闭（见 §5.2）
+public int batchWindowMillis()   { return batchWindowMillis; } // 攒批时间窗口，0=关闭（见 §5.1）
 public int consumerSize()        { return consumerSize; }     // 业务池最大线程数
 ```
 
@@ -430,7 +430,7 @@ private void flush() {
 }
 ```
 
-### 5.2 `processBatch`：批量执行
+### 5.4 `processBatch`：批量执行
 
 `processBatch`反射调用 `@BatchMapping` 方法：
 
@@ -584,7 +584,7 @@ public class BatchOverflowException extends ResponseStatusException {
 6. **9 个指标埋点** → `BatchMetrics` SPI 定义 6 个记录方法（由 starter 的 `MicrometerBatchMetrics` 实现为 9 个指标，容量 Gauge 在启动预热 + 每批 + 背压失败时采样），`queue` Tag 值 `batch:<ClassName>.<methodName>`，`NoOpBatchMetrics` 默认零开销。
 7. **安全网** → Step 1 的 drain 有 5s 硬上界、业务池拒绝时逐条 `setError`；批量方法漏完成请求由 `failUncompleted` 收尾；停机竞态窗口由 `DeferredResult` 30s 超时兜底；`BatchRequest.completed` 守卫防止重复回调；`BatchExceptionHandler` 捕获消费者异常；`BatchOverflowException` 映射 429。
 
-这一层的克制体现在：**不把批处理留给业务代码，也不为批处理引入复杂的消息中间件。** LMAX Disruptor 提供无锁的环形缓冲区，`ProducerType.MULTI` 支持多生产者并发入队，`SynchronousQueue` + `CallerRunsPolicy` 在零额外线程的基础上实现了自然背压——**默认（`batchWindowMillis=0`）下没有调度线程、没有定时器、没有额外的队列线程**；只有显式开启窗口才引入一个全进程共享的 `batch-window` daemon 线程（按队列登记、无使用者时关停）。三个线程层次（handler 执行线程 / Disruptor 消费者 / bizExecutor 工作者）形成了一条干净的反压链。`@BatchMapping` 方法体替换语义让用户无需修改单请求方法——框架层面透明的"请求聚合"，是 [01 篇](01-design-philosophy.md) 原则 2（零侵入）在批处理场景的落地。
+这一层的克制体现在：**不把批处理留给业务代码，也不为批处理引入复杂的消息中间件。** LMAX Disruptor 提供无锁的环形缓冲区，`ProducerType.MULTI` 支持多生产者并发入队，`SynchronousQueue` + `CallerRunsPolicy` 在零额外线程的基础上实现了自然背压——**默认（`batchWindowMillis=0`）下没有调度线程、没有定时器、没有额外的队列线程**；只有显式开启窗口才引入一个全进程共享的 `batch-window` daemon 线程（按队列登记、无使用者时关停）。三个线程层次（handler 执行线程 / Disruptor 消费者 / bizExecutor 工作者）形成了一条干净的反压链。`@BatchMapping` 方法体替换语义让用户无需修改单请求方法——框架层面透明的"请求聚合"，是 [01 篇](01-design-philosophy.md) 原则 2（单请求方法保持不变）在批处理场景的落地。
 
 ---
 

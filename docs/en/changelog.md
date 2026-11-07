@@ -27,7 +27,7 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [3.5.8] - Unreleased
 
-> In development: `3.5.8` has not been released yet. This section collects its changes; the release date is filled in when it ships.
+> In development: `3.5.8` has not been released yet. This section collects its changes.
 
 ### Fixed
 
@@ -59,13 +59,13 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 > ⚠️ **This release contains breaking changes**: configuration keys, response framing,
 > Servlet `flush` semantics, conditional requests / ranges and extension-point signatures
-> have all changed. **Read the [breaking changes guide](../breaking-changes.md) before upgrading.**
+> have all changed. **Read the [breaking changes guide](breaking-changes.md) before upgrading.**
 
 ### Added
 
 - **Static resources & views**: pluggable `WebExchangeProvider` SPI so templates can access the real session and principal; view/encoding configuration keys unified
 - **HTTP protocol semantics**: conditional requests (`If-None-Match` / `If-Modified-Since`), byte ranges (including multi-range `multipart/byteranges` and `Accept-Ranges`), and response framing now follow RFC 7231/7232/7233
-- **Server configuration aligned with Spring Boot**: a set of keys covering connection and request limits, keep-alive timeout/request count, multipart limits, error-response policy and i18n binding (see the configuration reference and the 3.5.7 section of the [breaking changes guide](../breaking-changes.md))
+- **Server configuration aligned with Spring Boot**: a set of keys covering connection and request limits, keep-alive timeout/request count, multipart limits, error-response policy and i18n binding (see the configuration reference and the 3.5.7 section of the [breaking changes guide](breaking-changes.md))
 - **Batch processing**: `@BatchMapping` can run on virtual threads (JDK 21+), preserving the `consumerSize` bound and backpressure semantics
 - **Configuration refresh**: property snapshots and refresh driven by Spring Cloud environment changes
 
@@ -74,8 +74,8 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Branch strategy**: `master` is now **pure Spring Boot 3.5.x** — the Spring Boot 4 / Spring Framework 7 compatibility layer that had accumulated on it (the version branches and MethodHandles in `WebHttpHeaders`, `MediaTypeUtils`, `ResponseStatusExceptionAdapter`, `Boot4WebServerInitializedEventBridge`, SB4 Maven profiles, etc.) has been removed entirely. 4.x adaptation now lives on the `4.1.x` branch.
 - **Response framing**: `flush(true)` changed from one-shot to progressive (chunked) output
 - **Servlet `PrintWriter`**: `print` / `println` no longer auto-commit (matching Tomcat's `autoFlush=false`)
-- **Extension-point signature changes** (source-level incompatible; see the extension-point signatures part of the 3.5.7 section in the [breaking changes guide](../breaking-changes.md))
-- **Error mapping** for sessions, redirects and conditional requests adjusted; management-port and forwarding semantics adjusted (both in the 3.5.7 section of the [breaking changes guide](../breaking-changes.md))
+- **Extension-point signature changes** (source-level incompatible; see the extension-point signatures part of the 3.5.7 section in the [breaking changes guide](breaking-changes.md))
+- **Error mapping** for sessions, redirects and conditional requests adjusted; management-port and forwarding semantics adjusted (both in the 3.5.7 section of the [breaking changes guide](breaking-changes.md))
 
 ### Security
 
@@ -199,7 +199,6 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Documentation
 
-- **AI context migration**: `CLAUDE.md` / `.claude` moved to `AGENTS.md` / `.agent`
 - **Benchmark data refresh**: WSL / multi-instance trend data updated
 - **Internals**: servlet bridge / async streaming / batch module docs completed
 
@@ -247,7 +246,6 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Documentation
 
 - **README default language switched to English**, added `README_CN.md`
-- **`module.md` and other AI context docs updated**
 
 ## [3.2.3] - 20260710
 

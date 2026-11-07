@@ -102,7 +102,7 @@ Measures a framework's ability to turn concurrency into throughput.
 
 ### 1.3 Analysis
 
-- **perf scales the best**: json concurrency scaling is +52%, **3.1x** that of Spring MVC (+17%) and 4.7x that of WebFlux (+11%). Spring MVC's thread pool does grow with concurrency, but only marginally — thread contention and context switching eat most of the added concurrency; perf's EventLoop model has no such overhead and keeps converting concurrency into throughput.
+- **perf has the highest scaling ratio in this comparison**: json concurrency scaling is +52%, **3.1x** that of Spring MVC (+17%) and 4.7x that of WebFlux (+11%). Spring MVC's thread pool does grow with concurrency, but only marginally — thread contention and context switching eat most of the added concurrency; perf's EventLoop model has no such overhead and keeps converting concurrency into throughput.
 - **perf saturates last**: perf is still growing at 48 threads (another +7% from 32→48), while WebFlux peaks and falls back at 32 (20,166→18,981). This directly reflects perf's **extremely low per-request processing cost** — the server has spare compute that only higher client concurrency can fully load.
 
 ## 2. Full-API Comparison at High Concurrency (48 threads, ops/sec)
