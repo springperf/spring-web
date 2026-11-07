@@ -8,6 +8,7 @@ import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.TypeHint;
 import org.springframework.aot.hint.TypeReference;
 import org.springframework.boot.web.context.WebServerApplicationContext;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.util.concurrent.ListenableFutureCallback;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -34,6 +35,23 @@ class SpringWebRuntimeHintsTest {
         RuntimeHints hints = register();
 
         assertJdkProxy(hints, ListenableFutureCallback.class);
+        assertReflectionType(hints, ListenableFutureCallback.class);
+    }
+
+    @Test
+    void eventProxyAlsoCoversConfigurableApplicationContext() {
+        assertJdkProxy(register(), ConfigurableApplicationContext.class);
+    }
+
+    @Test
+    void registersProxyAndReflectionHintsEvenWithoutClassLoader() {
+        // RuntimeHintsRegistrar 契约允许 classLoader 为 null；只有资源探测依赖它
+        RuntimeHints hints = new RuntimeHints();
+        registrar.registerHints(hints, null);
+
+        assertJdkProxy(hints, WebServerApplicationContext.class);
+        assertJdkProxy(hints, ListenableFutureCallback.class);
+        assertReflectionType(hints, PerfWebServer.class);
         assertReflectionType(hints, ListenableFutureCallback.class);
     }
 
