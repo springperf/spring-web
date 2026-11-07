@@ -2,7 +2,6 @@ package io.springperf.webtest;
 
 import okhttp3.MediaType;
 import okhttp3.Request;
-import okhttp3.RequestBody;
 import okhttp3.Response;
 import org.junit.jupiter.api.Test;
 
@@ -39,8 +38,10 @@ public class AdditionalEndpointsE2ETest extends BaseE2ETest {
         Request req = new Request.Builder().url(baseUrl() + "/binder/test").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
-            Map<String, Object> body = com.alibaba.fastjson2.JSON.parseObject(resp.body().string(), Map.class);
-            assertNull(body.get("value"));
+            String raw = resp.body().string();
+            // 必须确认"键存在且值为 null"：只断言 body.get("value") == null 时，
+            // 字段被整体丢弃（未绑定）也会通过。
+            assertTrue(raw.contains("\"value\":null"), "缺参时应序列化出 value:null（键必须存在），实际: " + raw);
         }
     }
 
@@ -110,18 +111,24 @@ public class AdditionalEndpointsE2ETest extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
-            assertEquals(Locale.getDefault().toLanguageTag(), body,
-                    "无 Accept-Language 时应回退 JVM 默认 Locale，实际: " + body);
+            assertEquals(Locale.getDefault().toLanguageTag(), body, "无 Accept-Language 时应回退 JVM 默认 Locale，实际: " + body);
         }
     }
 
     @Test
-    void optimizeCheck_invokesWithOptimizer() throws Exception {
+    void optimizeCheck_runsOnBizPoolNotEventLoop() throws Exception {
+        // @Optimize 只在启动期切换 FastInvoker（isOptimize() 的判定由 spring-web 的
+        // InvokableHandlerMethodTest 覆盖），对 HTTP 响应没有可观察差异。E2E 只能守两件真事：
+        // 注解标注的方法仍可正常执行，且没有被错误调度到 EventLoop 上执行（handler 里的 optimized 字段
+        // 是控制器常量，不能作为 @Optimize 生效的证据）。
         Request req = new Request.Builder().url(baseUrl() + "/p1/optimize-check").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = com.alibaba.fastjson2.JSON.parseObject(resp.body().string(), Map.class);
-            assertEquals(true, body.get("optimized"));
+            String thread = (String) body.get("thread");
+            assertNotNull(thread, "@Optimize 端点应返回执行线程名，实际: " + body);
+            assertFalse(thread.startsWith("nioEventLoopGroup") || thread.startsWith("epollEventLoopGroup"),
+                    "@Optimize 方法应在业务线程池执行，实际线程: " + thread);
         }
     }
 

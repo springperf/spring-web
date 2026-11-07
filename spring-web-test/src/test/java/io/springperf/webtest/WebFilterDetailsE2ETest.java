@@ -1,10 +1,14 @@
 package io.springperf.webtest;
 
+import io.springperf.webtest.filter.OrderedLowWebFilter;
 import okhttp3.Request;
 import okhttp3.Response;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * E2E: WebFilter behavior details — filter headers still applied on non-200 paths (404), and ordered filters both
@@ -35,12 +39,16 @@ public class WebFilterDetailsE2ETest extends BaseE2ETest {
     }
 
     @Test
-    void orderedFilters_bothHeadersPresent() throws Exception {
+    void orderedFilters_executeInAscendingOrder() throws Exception {
+        // 只断言"两个 filter 都写了头"无法发现顺序颠倒：两个 filter 各自写常量 "executed"。
+        // 这里让二者追加到同一个多值 header，按出现顺序判定 @Order 的升序语义（5 在 100 之前）。
         Request req = new Request.Builder().url(baseUrl() + "/core/bytes").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             assertEquals("executed", resp.header("X-Order-Low"));
             assertEquals("executed", resp.header("X-Order-High"));
+            assertEquals(List.of("low", "high"), resp.headers(OrderedLowWebFilter.ORDER_HEADER),
+                    "filter 应按 @Order 升序执行，实际: " + resp.headers(OrderedLowWebFilter.ORDER_HEADER));
         }
     }
 
