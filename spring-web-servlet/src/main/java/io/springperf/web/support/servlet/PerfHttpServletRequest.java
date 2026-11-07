@@ -34,7 +34,9 @@ import java.security.Principal;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoField;
 import java.util.*;
 
 public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
@@ -906,8 +908,15 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
     static class HttpHeaderDateParser {
         private static final DateTimeFormatter RFC_1123_FORMAT = DateTimeFormatter.RFC_1123_DATE_TIME
                 .withLocale(Locale.US).withZone(ZoneId.of("GMT"));
-        private static final DateTimeFormatter RFC_1036_FORMAT = DateTimeFormatter
-                .ofPattern("EEEE, dd-MMM-yy HH:mm:ss zzz", Locale.US).withZone(ZoneId.of("GMT"));
+        // RFC 850/1036 使用两位年份：按固定 50 年窗口解释（50-99 → 19xx，00-49 → 20xx）。
+        // 规范的窗口相对当前年份，但静态 formatter 无法动态化（请求路径不应产生临时对象）。
+        // ofPattern("yy") 会把 70 解析成 2070，与文本中的 DayOfWeek 冲突导致整条解析失败。
+        private static final DateTimeFormatter RFC_1036_FORMAT = new DateTimeFormatterBuilder()
+                .appendPattern("EEEE, dd-MMM-")
+                .appendValueReduced(ChronoField.YEAR, 2, 2, 1950)
+                .appendPattern(" HH:mm:ss zzz")
+                .toFormatter(Locale.US)
+                .withZone(ZoneId.of("GMT"));
         private static final DateTimeFormatter ASCTIME_FORMAT = DateTimeFormatter
                 .ofPattern("EEE MMM d HH:mm:ss yyyy", Locale.US).withZone(ZoneId.of("GMT"));
         private static final DateTimeFormatter[] FORMATS = { RFC_1123_FORMAT, RFC_1036_FORMAT, ASCTIME_FORMAT };

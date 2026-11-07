@@ -244,7 +244,7 @@ coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,PerfAsyn
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,AbstractFastFailHttpServletRequest,0,202,0,0,0,74,0,73,0,73
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,PerfHttpServletRequest,103,1327,30,178,25,342,26,155,1,76
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,AbstractFastFailHttpServletResponse,6,79,0,0,2,34,2,34,2,34
-coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,PerfHttpServletRequest.HttpHeaderDateParser,3,70,0,4,1,13,1,4,1,2
+coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,PerfHttpServletRequest.HttpHeaderDateParser,3,81,0,4,1,17,1,4,1,2
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,PerfHttpServletRequest.NettyServletInputStream,0,28,0,2,0,9,0,6,0,5
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,ForwardWebServerHttpRequest,6,86,2,8,2,24,2,8,0,5
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,SpringInstanceManager,8,76,2,8,1,22,2,9,0,6
