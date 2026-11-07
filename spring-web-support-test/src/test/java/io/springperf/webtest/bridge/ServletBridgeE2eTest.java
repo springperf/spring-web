@@ -108,6 +108,11 @@ class ServletBridgeE2eTest extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(request).execute()) {
             assertTrue(resp.isSuccessful());
             String body = resp.body().string();
+            // 方法名锁定的是 characterEncoding；端点已回读该字段，必须校验其存在且非 null，
+            // 不能只断言 dispatcherType 就宣称 UTF-8 已验证。
+            assertTrue(body.contains("\"characterEncoding\""), "应回读 characterEncoding 字段，实际 body=" + body);
+            assertTrue(!body.contains("\"characterEncoding\":null"),
+                    "getCharacterEncoding() 不应为 null（默认 UTF-8），实际 body=" + body);
             assertTrue(body.contains("\"dispatcherType\":\"REQUEST\""));
         }
     }

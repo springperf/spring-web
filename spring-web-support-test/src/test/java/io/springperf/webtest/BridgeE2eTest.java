@@ -238,13 +238,18 @@ public class BridgeE2eTest extends BaseE2ETest {
     @Test
     void async_timeout_triggersWithExplicitWebAsyncTaskTimeout() throws Exception {
         // 端点以 WebAsyncTask 显式配置 100ms 超时，任务沉睡 500ms——超时应在任务完成前触发并打断。
-        // 超时必须同时满足两个条件：映射到超时类状态码（503/504），且任务完成结果不得作为响应返回。
-        // 原写法是 code>=400 || !contains("too-late") 的「或」，任意 4xx/5xx 都能绕过 body 校验。
+        // 超时必须同时满足两个条件：响应是明确的错误态，且任务完成结果不得作为响应返回。
+        // 宿主 SupportTestApplication 的 GlobalExceptionHandler(@ExceptionHandler(Throwable.class)) 会把
+        // AsyncRequestTimeoutException 兜底为 200 + {"code":500}；未被 advice 接管时框架按 Spring 语义写 503。
+        // 二者由异步超时与 advice 的时序竞态决定，锁单一状态码会让用例 flaky；但必须各自带出证据，
+        // 且「2xx 且非业务错误体」「任意 4xx/5xx」「504 响应超时」一律不算通过。
         Request req = new Request.Builder().url(baseUrl() + "/bridge/async/timeout").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             String body = resp.body().string();
-            assertTrue(resp.code() == 503 || resp.code() == 504,
-                    "异步超时应映射为 503/504，实际 code=" + resp.code() + ", body=" + body);
+            boolean frameworkTimeout = resp.code() == 503;
+            boolean adviceError = resp.code() == 200 && body.contains("\"code\":500");
+            assertTrue(frameworkTimeout || adviceError,
+                    "异步超时应以 503 或业务错误体(code=500)结束，实际 code=" + resp.code() + ", body=" + body);
             assertFalse(body.contains("too-late"),
                     "超时打断后不应返回任务完成结果 'too-late'（code=" + resp.code() + ", body=" + body + "）");
         }

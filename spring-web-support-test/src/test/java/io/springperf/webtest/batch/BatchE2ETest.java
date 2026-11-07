@@ -72,7 +72,7 @@ public class BatchE2ETest extends BaseE2ETest {
         // 每个响应都来自批处理方法，且回显的批大小不能超过总请求数
         assertTrue(batchSizes.stream().allMatch(size -> size >= 1 && size <= requestCount),
                 "批大小应在 [1, 请求数] 内，实际: " + batchSizes);
-        // 说明：该端点未配置 batchWindowMillis，合并次数取决于 Disruptor 调度，不能强求；
+        // 说明：该端点使用默认 5ms 攒批窗口，合并次数仍取决于请求到达时序，不能强求；
         // 窗口 + maxBatchSize 的确定性合并由 maxBatchSize_limitsBatchSizeInResponses 验证
     }
 
@@ -144,9 +144,11 @@ public class BatchE2ETest extends BaseE2ETest {
 
         assertEquals(requestCount, successCount.get(),
                 "All maxBatchSize requests should succeed with batch size <= 2. Failures: " + failures);
-        // maxBatchSize=2 必须真的限制住批大小：至少有一次 2 个请求成批，而不是全部单批
-        assertTrue(batchSizes.stream().anyMatch(size -> size == 2),
-                "应至少出现一次 2 个请求成批（maxBatchSize 生效），实际批大小: " + batchSizes);
+        // 一次「2 个请求成批」必然让该批的两个成员都回显 size=2；只 anyMatch 会放过「仅一个响应谎报 2」。
+        assertTrue(batchSizes.stream().allMatch(size -> size >= 1 && size <= 2),
+                "maxBatchSize=2 下批大小不得超过 2，实际: " + batchSizes);
+        assertTrue(batchSizes.stream().filter(size -> size == 2).count() >= 2,
+                "50ms 窗口下 5 个请求应至少有一次 2 个请求成批（两个成员均须回显 2），实际批大小: " + batchSizes);
     }
 
     @Test
@@ -166,10 +168,10 @@ public class BatchE2ETest extends BaseE2ETest {
                             .build();
                     try (Response resp = CLIENT.newCall(req).execute()) {
                         String body = resp.body() != null ? resp.body().string() : "";
-                        // 只接受明确的 500，或 2xx + 框架错误体；404/429/302 等一律不算错误传播成功
-                        boolean isError = resp.code() == 500
-                                || (resp.isSuccessful() && (body.contains("intentional batch error for test")
-                                        || body.contains("\"code\":500")));
+                        // 本应用 GlobalExceptionHandler 的 @ExceptionHandler(Throwable.class) 把批量方法抛出的
+                        // RuntimeException 收敛为 200 + ApiResult.failed(INTERNAL_SERVER_ERROR)（code=500）。
+                        // 必须同时锁定状态码与错误码字段：裸 500、2xx 里带任意错误字样都不算「异常已传播」。
+                        boolean isError = resp.code() == 200 && body.contains("\"code\":500");
                         if (isError) {
                             errorCount.incrementAndGet();
                         } else {

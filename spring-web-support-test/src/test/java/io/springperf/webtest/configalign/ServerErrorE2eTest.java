@@ -58,12 +58,16 @@ class ServerErrorE2eTest {
         assertTrue(body.startsWith("500|"), "应返回 500，实际 " + body);
         // 兜底渲染的 message 字段受 include-message 策略控制（always 时暴露，never 时隐藏）
         assertTrue(body.contains("\"message\""), "include-message=always 时错误体应含 message 字段，实际 " + body);
+        assertTrue(body.contains("boom-msg-e2e"),
+                "include-message=always 时 message 字段必须带出异常文本，而非只有空字段名，实际 " + body);
     }
 
     @Test
     void stacktrace_onParam_traceTrue_shows() throws Exception {
         String body = body("/e2e-err/boom?trace=true");
-        assertTrue(body.contains("E2eBoomException"), "include-stacktrace=on-param 且 ?trace=true 应暴露异常栈，实际 " + body);
+        // 与 stacktrace_onParam_absent_hidden 使用同一判据（栈帧），避免「只出现类名」也算暴露了栈
+        assertTrue(body.contains("at io.springperf"), "include-stacktrace=on-param 且 ?trace=true 应暴露栈帧，实际 " + body);
+        assertTrue(body.contains("E2eBoomException"), "栈中应含异常类名，实际 " + body);
     }
 
     @Test
@@ -76,8 +80,10 @@ class ServerErrorE2eTest {
     void whitelabelDisabled_errorBody_notHtmlPage() throws Exception {
         String body = body("/definitely-missing-e2e-err");
         assertTrue(body.startsWith("404|"), "应返回 404，实际 " + body);
-        assertFalse(body.contains("<html") && body.contains("whitelabel"),
-                "whitelabel.enabled=false 时不渲染 HTML whitelabel 页，实际 " + body);
+        // 必须用两个独立断言：assertFalse(A && B) 在「只缺其中一个」时恒真，等于没验证
+        String lower = body.toLowerCase(java.util.Locale.ROOT);
+        assertFalse(lower.contains("<html"), "whitelabel.enabled=false 时不得渲染 HTML 错误页，实际 " + body);
+        assertFalse(lower.contains("whitelabel"), "错误体不得带 whitelabel 页特征，实际 " + body);
     }
 
     @TestConfiguration

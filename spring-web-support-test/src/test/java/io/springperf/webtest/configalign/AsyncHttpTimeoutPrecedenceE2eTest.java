@@ -114,7 +114,7 @@ class AsyncTimeoutWinsE2eTest {
     void lateAsyncCompletion_afterAsyncTimeout_dropped() throws Exception {
         Response resp = get("/e2e-at/async?ms=4000");
         try {
-            assertTrue(resp.code() >= 500, "异步超时应以错误状态结束，实际 " + resp.code());
+            assertEquals(503, resp.code(), "异步超时(1s)应由异步机制结束请求（Spring 语义 503），实际 " + resp.code());
             String body = resp.body().string();
             assertTrue(!body.contains("async-done"), "异步超时后到达的结果不得写入响应，实际 " + body);
         } finally {

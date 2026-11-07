@@ -6,14 +6,15 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.boot.SpringApplication;
 import org.springframework.context.ConfigurableApplicationContext;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -67,10 +68,10 @@ class SessionPersistenceE2eTest {
             ctx1.close();
         }
 
-        // ---- 重启落盘验证：store-dir 应有 *.session 文件 ----
-        try (Stream<Path> files = Files.list(storeDir)) {
-            assertTrue(files.anyMatch(p -> p.getFileName().toString().endsWith(".session")), "持久化目录应存在 *.session 文件");
-        }
+        // ---- 重启落盘验证：必须是本次会话对应的 <sessionId>.session 且非空 ----
+        Path sessionFile = storeDir.resolve(sessionId + ".session");
+        assertTrue(Files.exists(sessionFile), "持久化目录应存在本次会话的文件: " + sessionFile);
+        assertTrue(Files.size(sessionFile) > 0, "会话文件不得为空: " + sessionFile);
 
         // ---- 实例 2：同一 store-dir，携带旧 Cookie，会话属性应恢复 ----
         ConfigurableApplicationContext ctx2 = new SpringApplication(io.springperf.webtest.SupportTestApplication.class)
@@ -139,7 +140,18 @@ class SessionPersistenceE2eTest {
             ctx1.close();
         }
 
-        // ---- 重启：kept 应恢复，secret 不应恢复（未落盘） ----
+        // ---- 落盘字节校验：/session/get 只回读 greeting，无法观察 secret/kept 是否落盘。
+        // FileHttpSessionStorage 用 JDK 序列化（String 值以明文写入），故直接检查 <sessionId>.session 字节：
+        // 排除名单外的属性必须出现，命中排除名单的 secret 必须不出现。 ----
+        Path sessionFile = storeDir.resolve(sessionId + ".session");
+        assertTrue(Files.exists(sessionFile), "应生成本次会话的持久化文件: " + sessionFile);
+        String persisted = new String(Files.readAllBytes(sessionFile), StandardCharsets.ISO_8859_1);
+        assertTrue(persisted.contains("hello-persist"), "greeting 必须落盘，实际文件内容: " + persisted);
+        assertTrue(persisted.contains("kept-value"), "排除名单外的 kept 属性必须落盘，实际文件内容: " + persisted);
+        assertFalse(persisted.contains("secret-value"),
+                "persistent-exclude=secret 命中的属性不得落盘，实际文件内容: " + persisted);
+
+        // ---- 重启：greeting 应从磁盘恢复（secret 未落盘已由上一步证明） ----
         ConfigurableApplicationContext ctx2 = new SpringApplication(io.springperf.webtest.SupportTestApplication.class)
                 .run(args);
         try {
@@ -148,8 +160,7 @@ class SessionPersistenceE2eTest {
             try {
                 assertEquals(200, resp.code());
                 String body = resp.body().string();
-                assertTrue(body.contains("hello-persist"), "排除名单外的属性应恢复（greeting 正常持久化），实际 body=" + body);
-                assertTrue(!body.contains("secret-value"), "persistent-exclude 命中的属性不应落盘恢复，实际 body=" + body);
+                assertTrue(body.contains("hello-persist"), "排除名单外的属性应从磁盘恢复，实际 body=" + body);
             } finally {
                 resp.close();
             }

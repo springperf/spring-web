@@ -81,7 +81,10 @@ class AccessLogE2eTest {
         // 落盘是异步缓冲，轮询等待
         String logs = waitForLog("first");
         assertTrue(logs.contains("/e2e-accesslog/first"), "访问日志应包含请求路径，实际:\n" + logs);
-        assertTrue(logs.contains("200"), "访问日志应包含状态码，实际:\n" + logs);
+        // "200" 可能来自字节数、耗时或其它请求；要求本次路径与状态码出现在同一日志行
+        assertTrue(logs.lines().anyMatch(line -> line.contains("/e2e-accesslog/first")
+                        && java.util.regex.Pattern.compile("\\b200\\b").matcher(line).find()),
+                "访问日志应在同一行记录本次请求路径与状态码 200，实际:\n" + logs);
     }
 
     @Test

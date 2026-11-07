@@ -97,7 +97,10 @@ class ConfigAlignmentE2eTest {
             assertEquals(404, resp.code());
             String contentType = resp.header("Content-Type", "");
             assertTrue(contentType.startsWith("text/html"), "whitelabel 默认开启应为 HTML 错误页，实际 " + contentType);
-            assertTrue(resp.body().string().contains("404"), "错误页应包含状态码");
+            String body = resp.body().string();
+            assertTrue(body.toLowerCase(java.util.Locale.ROOT).contains("<html"),
+                    "whitelabel 默认开启应渲染 HTML 错误页，实际 " + body);
+            assertTrue(body.contains("404"), "错误页应包含状态码 404，实际 " + body);
         } finally {
             resp.close();
         }
