@@ -341,12 +341,20 @@ When `spring-boot-starter-actuator` is on the classpath, the framework auto-regi
 | `springperf.openapi.title` | `Spring Perf Web API` | API document title |
 | `springperf.openapi.version` | `1.0.0` | API document version |
 | `springperf.openapi.description` | `Spring Perf Web API` | API document description |
+| `springperf.openapi.enabled` | `true` | Set to false to back off the whole OpenAPI integration: document customizer, `/v3/api-docs` controller and Swagger UI resources |
 
 ## Swagger UI
 
 | Property | Default | Description |
 |----------|---------|-------------|
 | `springperf.swagger-ui.webjar-version` | `5.2.0` | Swagger UI webjar version, must match `org.webjars:swagger-ui` dependency version |
+| `springperf.swagger-ui.enabled` | `true` | Set to false to back off only the `/swagger-ui/**` static resources; OpenAPI document endpoints stay available. A user-defined `swaggerUiResourceHandler` bean also backs off the auto-configured one |
+
+## Framework Switches
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `springperf.web.mvc-conflict-check.enabled` | `true` | Fails startup when the official Spring MVC `DispatcherServlet` is on the classpath. Set to false only when spring-webmvc is a transitive dependency and Spring MVC is not actually used |
 
 ## Complete Configuration Example
 

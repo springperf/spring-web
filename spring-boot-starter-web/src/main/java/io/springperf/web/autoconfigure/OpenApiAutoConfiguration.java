@@ -4,6 +4,7 @@ import io.springperf.web.autoconfigure.openapi.OpenApiAdapter;
 import io.springperf.web.context.WebContext;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -23,6 +24,7 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnClass(OpenApiCustomizer.class)
+@ConditionalOnProperty(prefix = "springperf.openapi", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class OpenApiAutoConfiguration {
 
     @Bean

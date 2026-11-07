@@ -61,4 +61,16 @@ class SpringWebAutoConfigurationAdditionalTest {
         assertNotNull(registry.get("netty.connections.active").gauge());
         assertNotNull(registry.get("netty.eventloop.pending.tasks").gauge());
     }
+
+    @Test
+    void pendingTasksGauge_beforeServerStart_returnsZero() {
+        MeterRegistry registry = new SimpleMeterRegistry();
+        // mock 的 getWorkerGroup() 为 null，模拟服务器尚未 start() 时首次采集指标
+        NettyHttpServer server = mock(NettyHttpServer.class);
+
+        new SpringWebAutoConfiguration.MicrometerWebMetricsConfiguration()
+                .micrometerWebMetrics(registry, server);
+
+        assertEquals(0d, registry.get("netty.eventloop.pending.tasks").gauge().value(), 0d);
+    }
 }

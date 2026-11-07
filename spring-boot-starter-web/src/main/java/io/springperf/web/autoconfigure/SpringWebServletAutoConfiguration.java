@@ -167,6 +167,9 @@ public class SpringWebServletAutoConfiguration implements ApplicationContextAwar
             ReflectionUtils.makeAccessible(method);
             return (String) ReflectionUtils.invokeMethod(method, registration);
         }
+        // Boot 若调整 protected 方法签名，这里静默返回 null 会让 filter 悄悄消失；显式告警便于定位版本不兼容。
+        log.warn("DelegatingFilterProxyRegistrationBean.getTargetBeanName() is unavailable in this Spring Boot "
+                + "version; delegating filters will be skipped. Please check Boot compatibility.");
         return null;
     }
 
