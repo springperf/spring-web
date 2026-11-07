@@ -4,6 +4,7 @@
 - **环境 / Environment**：Windows_NT / openjdk version "1.8.0_502"
 )
 )
+)
 - **覆盖范围 / Scope**：库模块，**单测 + E2E 合并口径**（JaCoCo，coverage-aggregate 模块 report-aggregate 合并后的 jacoco.csv）
   Library modules, unit tests **plus E2E** (JaCoCo, merged jacoco.csv from the coverage-aggregate module)
 - **覆盖目标 / Targets**：spring-web ≥90%，其余库模块 ≥80%（✅=达标 ✓，❌=未达标 ✗）
@@ -24,6 +25,7 @@
 | spring-web-websocket | 90.5% | 1041/1150 | 81.3% | 365/449 | 91.1% | 95.5% | 24 | ≥80% | ✅ |
 | spring-boot-starter-web | 90.5% | 1033/1142 | 77.3% | 419/542 | 91.6% | 86.8% | 45 | ≥80% | ✅ |
 | **汇总 / Total** | **90%** | **13545/15052** | **78.4%** | **5652/7205** | **89.3%** | **92.1%** | | | |
+)
 )
 )
 
