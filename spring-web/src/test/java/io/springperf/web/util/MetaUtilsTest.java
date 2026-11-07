@@ -75,7 +75,7 @@ class MetaUtilsTest {
         mp.initParameterNameDiscovery(new org.springframework.core.DefaultParameterNameDiscoverer());
         // Second parameter has @RequestParam without explicit name, should fall back to param name
         String name = MetaUtils.getParameterName(mp, RequestParam.class);
-        assertNotNull(name);
+        assertEquals(mp.getParameterName(), name, "无显式 value 时应回退到真实参数名");
     }
 
     @Test
@@ -98,7 +98,7 @@ class MetaUtilsTest {
         MethodParameter mp = new MethodParameter(method, 0);
         mp.initParameterNameDiscovery(new org.springframework.core.DefaultParameterNameDiscoverer());
         String name = MetaUtils.getParameterName(mp, RequestParam.class);
-        assertNotNull(name);
+        assertEquals(mp.getParameterName(), name, "无匹配注解时应回退到真实参数名");
     }
 
     @Test

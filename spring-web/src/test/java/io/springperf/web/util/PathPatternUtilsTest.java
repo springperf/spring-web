@@ -129,13 +129,14 @@ class PathPatternUtilsTest {
     }
 
     @Test
-    void getParser_returnsNonNull() {
-        assertNotNull(PathPatternUtils.getParser());
+    void getParser_parsesPattern() {
+        assertEquals("/api/{id}", PathPatternUtils.getParser().parse("/api/{id}").getPatternString());
     }
 
     @Test
-    void getMatcher_returnsNonNull() {
-        assertNotNull(PathPatternUtils.getMatcher());
+    void getMatcher_matchesPattern() {
+        assertTrue(PathPatternUtils.getMatcher().match("/api/*", "/api/42"));
+        assertFalse(PathPatternUtils.getMatcher().match("/api/*", "/other/42"));
     }
 
     // ---- matchPathRuleToCached ----

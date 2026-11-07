@@ -456,15 +456,16 @@ class ServletFilterPatternUtilsTest {
 
     @Test
     void validateServletPattern_invalidPatterns_returnDescription() {
-        assertNotNull(ServletFilterPatternUtils.validateServletPattern(""));
-        assertNotNull(ServletFilterPatternUtils.validateServletPattern("api/test/*"));
-        assertNotNull(ServletFilterPatternUtils.validateServletPattern("api/health"));
-        assertNotNull(ServletFilterPatternUtils.validateServletPattern("api/{id}"));
+        assertEquals("pattern 为空", ServletFilterPatternUtils.validateServletPattern(""));
+        assertTrue(ServletFilterPatternUtils.validateServletPattern("api/test/*").contains("不符合 Servlet URL 模式规范"));
+        assertTrue(ServletFilterPatternUtils.validateServletPattern("api/health").contains("缺少前导 /"));
+        assertTrue(ServletFilterPatternUtils.validateServletPattern("api/{id}").contains("不符合 Servlet URL 模式规范"),
+                "含 Ant 变量的模式应走通配符分支");
     }
 
     @Test
     void validateServletPattern_nullPattern_returnsDescription() {
-        assertNotNull(ServletFilterPatternUtils.validateServletPattern(null));
+        assertEquals("pattern 为空", ServletFilterPatternUtils.validateServletPattern(null));
     }
 
     // ========== patternsDisjoint 补充分支 ==========

@@ -35,7 +35,8 @@ class WebContextTest {
 
     @Test
     void constructor_registersDispatcherHandler() {
-        assertNotNull(webContext.webComponents.get("DispatcherHandler"));
+        assertSame(handler, webContext.webComponents.get("DispatcherHandler"),
+                "必须注册构造时传入的 DispatcherHandler，而不是任意占位对象");
     }
 
     @Test
@@ -49,17 +50,20 @@ class WebContextTest {
     }
 
     @Test
-    void startLifecycle_triggersFullLifecycle() {
+    void startLifecycle_triggersFullLifecycle() throws Exception {
         webContext.startLifecycle();
-        // Lifecycle should have run through phase3
-        assertNotNull(webContext.getWebContext());
+        assertSame(webContext, webContext.getWebContext(), "自引用必须在初始化时建立");
+        // 真正证明三个阶段都被驱动，而不是只验证对象非 null
+        verify(handler).initComponentPhase1();
+        verify(handler).initComponentPhase2();
+        verify(handler).initComponentPhase3();
     }
 
     @Test
     void startLifecycle_initsDispatcherHandler() {
         webContext.startLifecycle();
-        // DispatcherHandler's initWithWebContext should have been called during init
-        verify(handler, atLeast(1)).initWithWebContext(webContext);
+        // 生命周期只允许 initialize 一次；atLeast(1) 会放过重复初始化
+        verify(handler, times(1)).initWithWebContext(webContext);
     }
 
     @Test
@@ -130,10 +134,14 @@ class WebContextTest {
     }
 
     @Test
-    void lifecycle_doubleInitIsIdempotent() {
+    void lifecycle_doubleInitIsIdempotent() throws Exception {
         webContext.startLifecycle();
         webContext.startLifecycle();
-        // Should not throw - second call is no-op due to AtomicBoolean guard
+        // 幂等的可观测证据：第二次调用不得再次驱动任何阶段
+        verify(handler, times(1)).initWithWebContext(webContext);
+        verify(handler, times(1)).initComponentPhase1();
+        verify(handler, times(1)).initComponentPhase2();
+        verify(handler, times(1)).initComponentPhase3();
     }
 
     @Test
@@ -145,7 +153,9 @@ class WebContextTest {
                 .when(failing).initComponentPhase1();
         webContext.registerWebComponent(failing);
 
-        assertThrows(RuntimeException.class, () -> webContext.startLifecycle());
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> webContext.startLifecycle());
+        assertEquals("Failed to start WebContext lifecycle", ex.getMessage());
+        assertEquals("phase1 boom", ex.getCause().getMessage(), "原始失败原因必须保留在 cause 中");
 
         // 失败后应清理已初始化组件，并复位 lifecycleStarted
         verify(failing).destroyComponent();
@@ -167,7 +177,9 @@ class WebContextTest {
         doThrow(new IllegalStateException("phase2 boom")).when(failing).initComponentPhase2();
         webContext.registerWebComponent(failing);
 
-        assertThrows(RuntimeException.class, () -> webContext.startLifecycle());
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> webContext.startLifecycle());
+        assertEquals("Failed to start WebContext lifecycle", ex.getMessage());
+        assertEquals("phase2 boom", ex.getCause().getMessage(), "原始失败原因必须保留在 cause 中");
 
         verify(normal).destroyComponent();
         verify(failing).destroyComponent();
@@ -177,7 +189,7 @@ class WebContextTest {
     void destroy_thenStartLifecycle_restartsCleanly() throws Exception {
         // F：destroy 后应支持重新 start 完整生命周期
         webContext.startLifecycle();
-        assertTrue(webContext.getWebContext() != null);
+        assertSame(webContext, webContext.getWebContext());
 
         webContext.destroy();
 

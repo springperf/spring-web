@@ -161,6 +161,14 @@ class NettyServerHttpResponseTest {
 
         InputStream input = new ByteArrayInputStream("test data".getBytes(StandardCharsets.UTF_8));
         assertDoesNotThrow(() -> response.writeStream(input));
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(ctx, atLeastOnce()).writeAndFlush(captor.capture());
+        HttpResponse headers = captor.getAllValues().stream().filter(HttpResponse.class::isInstance)
+                .map(HttpResponse.class::cast).findFirst().orElseThrow();
+        assertEquals("chunked", headers.headers().get(HttpHeaderNames.TRANSFER_ENCODING));
+        assertNull(headers.headers().get(HttpHeaderNames.CONTENT_LENGTH),
+                "chunked 模式不得同时声明 Content-Length");
     }
 
     // ========== 2-10：writeStream 应将慢速源的「读取」卸载到业务线程池，避免阻塞调用/EventLoop 线程 ==========
@@ -260,7 +268,10 @@ class NettyServerHttpResponseTest {
         when(future.cause()).thenReturn(new RuntimeException("test error"));
 
         response.addRespEventListener(future, true);
-        // no listener set -> uses LOG_ERROR_ON_FAILURE, just verify no throw
+
+        // 未设置业务 listener 时必须挂载默认失败监听器，且处理失败不能抛
+        verify(future).addListener(NettyServerHttpResponse.LOG_ERROR_ON_FAILURE);
+        assertDoesNotThrow(() -> NettyServerHttpResponse.LOG_ERROR_ON_FAILURE.operationComplete(future));
     }
 
     @Test
@@ -327,10 +338,12 @@ class NettyServerHttpResponseTest {
     }
 
     @Test
-    void setWritableCallback_setsCallback() {
+    void setWritableCallback_offloadsToEventLoop() {
         Runnable callback = mock(Runnable.class);
         response.setWritableCallback(callback);
-        // verifying no throw
+
+        // 当前线程不是 EventLoop：装配任务必须投递到 EventLoop 执行
+        verify(eventLoop).execute(any(Runnable.class));
     }
 
     @Test
@@ -743,8 +756,11 @@ class NettyServerHttpResponseTest {
         when(future.isSuccess()).thenReturn(true);
         when(future.addListener(any())).thenReturn(future);
 
+        ByteBuf data = response.getBuf();
         response.getBody().write("x".getBytes(StandardCharsets.UTF_8));
         response.flush();
-        response.release(); // 应无异常、无 double-release
+        response.release();
+
+        assertEquals(1, data.refCnt(), "flush 后 buf 所有权已转移，release() 不得再次释放");
     }
 }
