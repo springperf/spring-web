@@ -184,6 +184,9 @@ class HttpBodyCodecRegistryCoverageTest {
     @Test
     void writeBody_nullValue_returnsImmediately() throws Exception {
         registry.writeBody(null, null, null, null);
+
+        // 名称为 returnsImmediately：必须证明未触碰任何拦截器
+        verifyNoInteractions(interceptorRegistry);
     }
 
     @Test

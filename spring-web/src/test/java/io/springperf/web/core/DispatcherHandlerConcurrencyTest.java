@@ -1,5 +1,21 @@
 package io.springperf.web.core;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.*;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.arg.ArgumentResolverRegistry;
 import io.springperf.web.core.async.AsyncSupportRegistry;
@@ -147,6 +163,8 @@ class DispatcherHandlerConcurrencyTest {
 
         assertNull(firstError.get(), "No thread should throw an exception");
         assertEquals(threadCount, successCount.get(), "All threads should complete successfully");
+        // 证明每个线程都真正走过路由匹配，而不是仅“没抛异常”
+        verify(mappingRegistry, times(threadCount)).mapping(any());
     }
 
     @Test
@@ -155,11 +173,14 @@ class DispatcherHandlerConcurrencyTest {
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
         CountDownLatch latch = new CountDownLatch(threadCount);
         AtomicInteger successCount = new AtomicInteger(0);
+        AtomicReference<Throwable> firstError = new AtomicReference<>();
+        Map<String, MappingResult> expectedByUri = new ConcurrentHashMap<>();
 
-        PathMappingContext mappingContext = mock(PathMappingContext.class);
-        MappingResult matched = MappingResult.matched(mappingContext);
         when(mappingRegistry.mapping(any())).thenAnswer(invocation -> {
             WebServerHttpRequest req = invocation.getArgument(0);
+            String uri = req.getUriStr();
+            MappingResult matched = MappingResult.matched(mock(PathMappingContext.class));
+            expectedByUri.put(uri, matched);
             MappingResult.set(req, matched);
             return matched;
         });
@@ -177,7 +198,8 @@ class DispatcherHandlerConcurrencyTest {
                     WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
                     handler.handle(req, resp);
                     successCount.incrementAndGet();
-                } catch (Throwable ignored) {
+                } catch (Throwable t) {
+                    firstError.compareAndSet(null, t);
                 } finally {
                     latch.countDown();
                 }
@@ -187,7 +209,10 @@ class DispatcherHandlerConcurrencyTest {
         latch.await();
         executor.shutdown();
 
+        assertNull(firstError.get(), "No thread should throw an exception");
         assertEquals(threadCount, successCount.get(), "All threads should complete successfully");
+        assertEquals(threadCount, expectedByUri.size(), "每个线程的 URI 都应独立进入映射");
+        verify(mappingRegistry, times(threadCount)).mapping(any());
     }
 
     @Test

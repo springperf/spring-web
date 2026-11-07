@@ -511,8 +511,11 @@ class WebComponentContainerTest {
         container.registerWebComponent(plain);
 
         container.initComponentPhase1();
-        // Non-LifecycleWebComponent does not get phase1 called (initWithWebContext IS called during auto-init)
-        // Verify no exception thrown during phase transition
+        // 非 LifecycleWebComponent 不进入生命周期列表，phase1 自然不可能被调用
+        assertTrue(container.getWebComponents(LifecycleWebComponent.class).isEmpty(),
+                "非 LifecycleWebComponent 不应出现在生命周期组件列表中");
+        assertSame(plain, container.getWebComponent(WebComponent.class), "组件仍应被容器持有");
+        verify(plain).initWithWebContext(webContext);
     }
 
     @Test

@@ -173,8 +173,20 @@ class StreamBackpressureFlowTest {
             new SyncRangePublisher(200_000).subscribe(adapter);
             StreamEmitterUtil.initializeWithStreamSender(emitter, sender);
         });
-        // 全部同步元素已写出（outbound 至少含一个 HttpContent 帧）
-        assertTrue(channel.outboundMessages().size() > 0, "同步元素应全部写出");
+        // 全部同步元素必须写出：拼出完整出站字节流并校验最后一条
+        StringBuilder all = new StringBuilder();
+        Object out;
+        while ((out = channel.readOutbound()) != null) {
+            if (out instanceof io.netty.buffer.ByteBuf) {
+                all.append(((io.netty.buffer.ByteBuf) out).toString(java.nio.charset.StandardCharsets.UTF_8));
+            } else if (out instanceof io.netty.handler.codec.http.HttpContent) {
+                all.append(((io.netty.handler.codec.http.HttpContent) out).content()
+                        .toString(java.nio.charset.StandardCharsets.UTF_8));
+            }
+            io.netty.util.ReferenceCountUtil.release(out);
+        }
+        assertTrue(all.toString().contains("v199999"),
+                "最后一条同步元素必须写出，实际长度=" + all.length());
     }
 
     /**

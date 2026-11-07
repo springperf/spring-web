@@ -11,6 +11,24 @@ import io.springperf.web.core.mapping.MappingRegistry;
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.lang.reflect.Method;
+import java.util.Collections;
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.core.DefaultParameterNameDiscoverer;
@@ -23,23 +41,6 @@ import org.springframework.validation.Validator;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.method.HandlerMethod;
-
-import java.lang.reflect.Method;
-import java.util.Collections;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 class ArgumentResolverRegistryCoverageTest {
 
@@ -141,14 +142,23 @@ class ArgumentResolverRegistryCoverageTest {
     void initComponentPhase3_skipsValidationWhenCheckOff() throws Exception {
         WebContext wc = realWebContext();
         when(wc.getProps().getBoolean(PropertiesConstant.CHECK_ON_STARTUP, true)).thenReturn(false);
+        MappingRegistry mr = registerMappingRegistry(wc,
+                Collections.singletonList(mappingContext("complexParam", UnresolvableArg.class)));
+
         driveLifecycle(wc).initComponentPhase3();
+
+        // 关闭 check-on-startup 时不得触碰 MappingRegistry
+        verify(mr, never()).getMappingContextList();
     }
 
     @Test
     void initComponentPhase3_validatesWhenCheckOn_missingMappingRegistryReturns() throws Exception {
         WebContext wc = realWebContext();
         when(wc.getProps().getBoolean(PropertiesConstant.CHECK_ON_STARTUP, true)).thenReturn(true);
-        driveLifecycle(wc).initComponentPhase3();
+        assertNull(wc.getWebComponent(MappingRegistry.class), "前置条件：未注册 MappingRegistry");
+
+        assertDoesNotThrow(() -> driveLifecycle(wc).initComponentPhase3(),
+                "缺少 MappingRegistry 时应提前返回而不是抛异常");
     }
 
     @Test

@@ -72,10 +72,4 @@ class NettyHttpServerDetailsTest {
         assertDoesNotThrow(server::destroyComponent);
     }
 
-    /** SslExceptionHandler 实例单例可复用（@Sharable） */
-    @Test
-    void sslExceptionHandler_singleton() {
-        assertSame(NettyHttpServer.SslExceptionHandler.INSTANCE,
-                NettyHttpServer.SslExceptionHandler.INSTANCE);
-    }
 }

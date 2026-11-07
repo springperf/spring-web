@@ -125,6 +125,8 @@ class ResponseTimeoutArmingTest {
         NettyServerHttpResponse resp = newResponse();
 
         assertNotNull(resp.setTimeout());
+        // 必须真正在 EventLoop 上按配置延迟调度，而不是仅返回一个非 null future
+        verify(eventLoop).schedule(any(Runnable.class), eq(1000L), eq(TimeUnit.MILLISECONDS));
     }
 
     /**

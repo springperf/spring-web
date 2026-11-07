@@ -2,6 +2,7 @@ package io.springperf.web.server;
 
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.ServerChannel;
+import io.netty.channel.epoll.Epoll;
 import io.netty.channel.epoll.EpollServerSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
@@ -17,18 +18,16 @@ import static org.junit.jupiter.api.Assertions.*;
 class NettyTransportTest {
 
     @Test
-    void isEpollAvailable_returnsBooleanWithoutThrowing() {
-        // 不关心具体值，只验证不抛异常（native 库缺失时也能安全返回 false）
-        boolean result = NettyTransport.isEpollAvailable();
-        assertTrue(result == true || result == false);
+    void isEpollAvailable_matchesNettyEpoll() {
+        assertEquals(Epoll.isAvailable(), NettyTransport.isEpollAvailable(),
+                "isEpollAvailable 必须与 Netty Epoll.isAvailable() 一致");
     }
 
     @Test
-    void useEpoll_auto_onNonEpollPlatform_returnsFalse() {
-        if (NettyTransport.isEpollAvailable()) {
-            return; // 若平台实际支持 epoll（Linux），auto 应为 true，跳过此断言
-        }
-        assertFalse(NettyTransport.useEpoll("auto"));
+    void useEpoll_auto_followsEpollAvailability() {
+        // 原实现在支持 epoll 的平台直接 return，等于零断言；auto 语义应与可用性一致
+        assertEquals(NettyTransport.isEpollAvailable(), NettyTransport.useEpoll("auto"),
+                "auto 模式必须跟随 epoll 实际可用性");
     }
 
     @Test
@@ -38,13 +37,14 @@ class NettyTransportTest {
     }
 
     @Test
-    void useEpoll_epoll_onNonEpollPlatform_throwsIllegalState() {
+    void useEpoll_epoll_matchesAvailability() {
         if (NettyTransport.isEpollAvailable()) {
-            return;
+            assertTrue(NettyTransport.useEpoll("epoll"), "epoll 可用时强制 epoll 应启用");
+        } else {
+            IllegalStateException ex = assertThrows(IllegalStateException.class,
+                    () -> NettyTransport.useEpoll("epoll"));
+            assertTrue(ex.getMessage().contains("epoll"), "异常信息应说明 epoll 不可用");
         }
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> NettyTransport.useEpoll("epoll"));
-        assertTrue(ex.getMessage().contains("epoll"));
     }
 
     @Test

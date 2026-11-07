@@ -17,6 +17,7 @@ import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.ReferenceCountUtil;
@@ -53,7 +54,10 @@ class SupportMultipartAggregatorFirstChunkTest {
 
     private static void assertErrorResponseWritten(EmbeddedChannel channel) {
         Object written = channel.readOutbound();
-        assertNotNull(written, "异常分支必须写出 400/413 响应，而不是裸异常关闭连接");
+        assertTrue(written instanceof HttpResponse, "异常分支必须写出 HTTP 响应而不是裸异常关闭连接");
+        HttpResponse response = (HttpResponse) written;
+        assertTrue(response.status().code() == 400 || response.status().code() == 413,
+                "异常分支应返回 400/413，实际 " + response.status().code());
         ReferenceCountUtil.release(written);
     }
 
@@ -112,9 +116,8 @@ class SupportMultipartAggregatorFirstChunkTest {
         assertTrue(out.isEmpty());
         assertErrorResponseWritten(channel);
         verify(resolver, never()).finish();
-        if (fromDecoderException) {
-            verify(resolver, atLeastOnce()).abort();
-        }
+        // TooLongFrameException 与 DecoderException 两条异常路径都必须 abort，避免残留 decoder 资源
+        verify(resolver, atLeastOnce()).abort();
         channel.finishAndReleaseAll();
     }
 
@@ -140,9 +143,8 @@ class SupportMultipartAggregatorFirstChunkTest {
         assertTrue(out.isEmpty());
         assertErrorResponseWritten(channel);
         verify(resolver).finish();
-        if (fromDecoderException) {
-            verify(resolver, atLeastOnce()).abort();
-        }
+        // TooLongFrameException 与 DecoderException 两条异常路径都必须 abort，避免残留 decoder 资源
+        verify(resolver, atLeastOnce()).abort();
         channel.finishAndReleaseAll();
     }
 

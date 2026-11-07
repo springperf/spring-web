@@ -2,6 +2,7 @@ package io.springperf.web.http.support;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -144,10 +145,14 @@ class NettyMultipartWebRequestReleaseTest {
         resolver.consume(req);
         NettyMultipartWebRequest multipart = resolver.finish();
 
-        multipart.release();
-        // 幂等：第二次 release 不抛异常（request 已归零，super.release() 抛异常被 catch 吞；
-        // destroy 已执行过一次，二次进入时 part data 均已归零，循环守卫跳过）
-        multipart.release();
+        assertTrue(multipart.release(), "首次 release 应成功执行 destroy");
+        // 幂等：第二次 release 不抛异常且明确返回 false（request 已归零，super.release() 异常被捕获）
+        assertFalse(multipart.release(), "destroy 已执行后二次 release 应安全返回 false");
+
+        assertEquals(0, ReferenceCountUtil.refCnt(multipart), "release 后请求 refCnt 应为 0");
+        for (InterfaceHttpData data : multipart.getInterfaceHttpDataList()) {
+            assertEquals(0, data.refCnt(), "part data 应全部归零");
+        }
     }
 
     @Test
