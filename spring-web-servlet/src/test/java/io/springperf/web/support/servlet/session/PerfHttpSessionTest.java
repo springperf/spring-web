@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpSessionListener;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -145,6 +146,8 @@ class PerfHttpSessionTest {
         session.setAttribute("key", "value");
         session.invalidate();
         assertTrue(session.isInvalid());
+        // 只断言 getAttribute 抛异常只能证明「已失效」，必须直接查底层属性表是否真的清空
+        assertNull(data.getAttribute("key"), "invalidate 必须清空底层属性表");
         assertThrows(IllegalStateException.class, () -> session.getAttribute("key"));
     }
 
@@ -232,7 +235,12 @@ class PerfHttpSessionTest {
         attrListeners.add(attrListener);
         session = new PerfHttpSession(data, servletContext, new ArrayList<>(), attrListeners);
         session.setAttribute("key", "value");
-        verify(attrListener).attributeAdded(any(HttpSessionBindingEvent.class));
+        ArgumentCaptor<HttpSessionBindingEvent> captor = ArgumentCaptor.forClass(HttpSessionBindingEvent.class);
+        verify(attrListener).attributeAdded(captor.capture());
+        HttpSessionBindingEvent event = captor.getValue();
+        assertEquals("key", event.getName());
+        assertEquals("value", event.getValue());
+        assertSame(session, event.getSession(), "事件必须携带触发它的会话实例");
     }
 
     @Test
@@ -243,7 +251,13 @@ class PerfHttpSessionTest {
         session = new PerfHttpSession(data, servletContext, new ArrayList<>(), attrListeners);
         session.setAttribute("key", "old");
         session.setAttribute("key", "new");
-        verify(attrListener).attributeReplaced(any(HttpSessionBindingEvent.class));
+        ArgumentCaptor<HttpSessionBindingEvent> captor = ArgumentCaptor.forClass(HttpSessionBindingEvent.class);
+        verify(attrListener).attributeReplaced(captor.capture());
+        HttpSessionBindingEvent event = captor.getValue();
+        assertEquals("key", event.getName());
+        // Servlet 规范：attributeReplaced 事件必须携带被替换的旧值，传成新值说明实现有误
+        assertEquals("old", event.getValue(), "attributeReplaced 必须携带旧值");
+        assertSame(session, event.getSession());
     }
 
     @Test
@@ -254,7 +268,12 @@ class PerfHttpSessionTest {
         session = new PerfHttpSession(data, servletContext, new ArrayList<>(), attrListeners);
         session.setAttribute("key", "value");
         session.removeAttribute("key");
-        verify(attrListener).attributeRemoved(any(HttpSessionBindingEvent.class));
+        ArgumentCaptor<HttpSessionBindingEvent> captor = ArgumentCaptor.forClass(HttpSessionBindingEvent.class);
+        verify(attrListener).attributeRemoved(captor.capture());
+        HttpSessionBindingEvent event = captor.getValue();
+        assertEquals("key", event.getName());
+        assertEquals("value", event.getValue(), "attributeRemoved 必须携带被移除的旧值");
+        assertSame(session, event.getSession());
     }
 
     @Test
@@ -264,7 +283,9 @@ class PerfHttpSessionTest {
         sessionListeners.add(sessionListener);
         session = new PerfHttpSession(data, servletContext, sessionListeners, new ArrayList<>());
         session.invalidate();
-        verify(sessionListener).sessionDestroyed(any(HttpSessionEvent.class));
+        ArgumentCaptor<HttpSessionEvent> captor = ArgumentCaptor.forClass(HttpSessionEvent.class);
+        verify(sessionListener).sessionDestroyed(captor.capture());
+        assertSame(session, captor.getValue().getSession(), "sessionDestroyed 必须携带被销毁的会话实例");
     }
 
     @Test

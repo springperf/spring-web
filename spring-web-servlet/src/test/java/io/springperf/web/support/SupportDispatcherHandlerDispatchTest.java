@@ -16,9 +16,11 @@ import io.springperf.web.core.retval.ReturnValueResolverRegistry;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
+import io.springperf.web.support.servlet.ForwardWebServerHttpRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -116,8 +118,14 @@ class SupportDispatcherHandlerDispatchTest {
 
         handler.forward(req, resp, "/missing");
 
-        verify(exceptionRegistry).handle(any(), any(), any());
-        verify(interceptorRegistry).afterCompletion(any(), any(), any());
+        // 全 any() 只证明「调用过」：必须锁定 forward 传给路由/异常处理的是改写过路径的包装请求
+        ArgumentCaptor<WebServerHttpRequest> forwardedReq = ArgumentCaptor.forClass(WebServerHttpRequest.class);
+        verify(mappingRegistry).mapping(forwardedReq.capture());
+        assertInstanceOf(ForwardWebServerHttpRequest.class, forwardedReq.getValue());
+        assertEquals("/missing", forwardedReq.getValue().getPath(), "forward 必须以目标路径重新做路由匹配");
+        verify(exceptionRegistry).handle(any(Throwable.class),
+                isA(ForwardWebServerHttpRequest.class), same(resp));
+        verify(interceptorRegistry).afterCompletion(isA(ForwardWebServerHttpRequest.class), same(resp), any());
         assertNull(RequestContextHolder.getRequestAttributes(), "forward 后应清理 RequestContextHolder");
         assertNull(LocaleContextHolder.getLocaleContext(), "forward 后应清理 LocaleContextHolder");
     }
@@ -134,9 +142,14 @@ class SupportDispatcherHandlerDispatchTest {
 
         handler.forward(req, resp, "/target");
 
-        verify(returnValueResolverRegistry).resolveReturnValue(any(), eq(pathContext), any(), any());
-        verify(interceptorRegistry).postHandle(any(), any(), any());
-        verify(interceptorRegistry).afterCompletion(any(), any(), any());
+        ArgumentCaptor<WebServerHttpRequest> forwardedReq = ArgumentCaptor.forClass(WebServerHttpRequest.class);
+        verify(mappingRegistry).mapping(forwardedReq.capture());
+        assertInstanceOf(ForwardWebServerHttpRequest.class, forwardedReq.getValue());
+        assertEquals("/target", forwardedReq.getValue().getPath(), "命中路径也必须以目标路径参与路由");
+        verify(returnValueResolverRegistry).resolveReturnValue(any(), eq(pathContext),
+                isA(ForwardWebServerHttpRequest.class), same(resp));
+        verify(interceptorRegistry).postHandle(isA(ForwardWebServerHttpRequest.class), same(resp), any());
+        verify(interceptorRegistry).afterCompletion(isA(ForwardWebServerHttpRequest.class), same(resp), any());
         assertNull(RequestContextHolder.getRequestAttributes());
     }
 
@@ -163,7 +176,13 @@ class SupportDispatcherHandlerDispatchTest {
 
         handler.include(req, resp, "/fragment");
 
-        verify(exceptionRegistry).handle(any(), any(), any());
+        ArgumentCaptor<WebServerHttpRequest> includedReq = ArgumentCaptor.forClass(WebServerHttpRequest.class);
+        verify(mappingRegistry).mapping(includedReq.capture());
+        assertInstanceOf(ForwardWebServerHttpRequest.class, includedReq.getValue());
+        assertEquals("/fragment", includedReq.getValue().getPath(), "include 必须以目标路径重新做路由匹配");
+        // include 必须把「阻止 flush 的包装响应」传下去，直接传原始 resp 会让目标提交外层响应
+        verify(exceptionRegistry).handle(any(Throwable.class),
+                isA(ForwardWebServerHttpRequest.class), argThat(r -> r != resp));
         assertNull(RequestContextHolder.getRequestAttributes());
     }
 

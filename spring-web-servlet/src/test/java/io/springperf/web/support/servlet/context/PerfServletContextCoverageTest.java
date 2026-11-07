@@ -88,7 +88,8 @@ class PerfServletContextCoverageTest {
         assertTrue(servletContext.setInitParameter("p1", "v1"));
         assertFalse(servletContext.setInitParameter("p1", "v2"), "重复设置应返回 false");
         assertEquals("v1", servletContext.getInitParameter("p1"));
-        assertNotNull(servletContext.getInitParameterNames());
+        // getInitParameterNames 返回 initParameters 的 keySet 枚举，此时恰为 ["p1"]
+        assertEquals(java.util.List.of("p1"), java.util.Collections.list(servletContext.getInitParameterNames()));
     }
 
     // ==================== server.servlet.context-parameters.* 显式块 ====================
