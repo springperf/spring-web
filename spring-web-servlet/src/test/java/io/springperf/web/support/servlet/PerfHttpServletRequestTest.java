@@ -105,8 +105,8 @@ class PerfHttpServletRequestTest {
     @Test
     void getHeaders_returnsEnumeration() {
         when(headers.get("Accept-Language")).thenReturn(Arrays.asList("en-US", "en"));
-        assertTrue(Collections.list(servletRequest.getHeaders("Accept-Language"))
-                .containsAll(Arrays.asList("en-US", "en")));
+        assertEquals(Arrays.asList("en-US", "en"),
+                Collections.list(servletRequest.getHeaders("Accept-Language")));
     }
 
     @Test
@@ -119,19 +119,22 @@ class PerfHttpServletRequestTest {
     @Test
     void getDateHeader_rfc1123_returnsTimestamp() {
         when(headers.getFirst("Date")).thenReturn("Thu, 01 Dec 2022 00:00:00 GMT");
-        assertTrue(servletRequest.getDateHeader("Date") > 0);
+        assertEquals(java.time.Instant.parse("2022-12-01T00:00:00Z").toEpochMilli(),
+                servletRequest.getDateHeader("Date"));
     }
 
     @Test
     void getDateHeader_rfc1036_returnsTimestamp() {
         when(headers.getFirst("Date")).thenReturn("Thursday, 01-Dec-22 00:00:00 GMT");
-        assertTrue(servletRequest.getDateHeader("Date") > 0);
+        assertEquals(java.time.Instant.parse("2022-12-01T00:00:00Z").toEpochMilli(),
+                servletRequest.getDateHeader("Date"));
     }
 
     @Test
     void getDateHeader_asctime_returnsTimestamp() {
         when(headers.getFirst("Date")).thenReturn("Thu Dec 1 00:00:00 2022");
-        assertTrue(servletRequest.getDateHeader("Date") > 0);
+        assertEquals(java.time.Instant.parse("2022-12-01T00:00:00Z").toEpochMilli(),
+                servletRequest.getDateHeader("Date"));
     }
 
     @Test
@@ -255,8 +258,7 @@ class PerfHttpServletRequestTest {
         when(paramMap.keySet()).thenReturn(new HashSet<>(Arrays.asList("a", "b")));
         when(request.getParameterMap()).thenReturn(paramMap);
         Set<String> nameSet = new HashSet<>(Collections.list(servletRequest.getParameterNames()));
-        assertTrue(nameSet.contains("a"));
-        assertTrue(nameSet.contains("b"));
+        assertEquals(new HashSet<>(Arrays.asList("a", "b")), nameSet);
     }
 
     @Test
@@ -284,7 +286,7 @@ class PerfHttpServletRequestTest {
         attrs.put("k2", "v2");
         when(requestContext.getAttributes()).thenReturn(attrs);
         Set<String> nameSet = new HashSet<>(Collections.list(servletRequest.getAttributeNames()));
-        assertTrue(nameSet.containsAll(Arrays.asList("k1", "k2")));
+        assertEquals(new HashSet<>(Arrays.asList("k1", "k2")), nameSet);
     }
 
     @Test
@@ -364,7 +366,8 @@ class PerfHttpServletRequestTest {
 
     @Test
     void httpHeaderDateParser_rfc1123() {
-        assertTrue(PerfHttpServletRequest.HttpHeaderDateParser.parseDate("Thu, 01 Dec 2022 00:00:00 GMT") > 0);
+        assertEquals(java.time.Instant.parse("2022-12-01T00:00:00Z").toEpochMilli(),
+                PerfHttpServletRequest.HttpHeaderDateParser.parseDate("Thu, 01 Dec 2022 00:00:00 GMT"));
     }
 
     @Test
@@ -462,7 +465,11 @@ class PerfHttpServletRequestTest {
 
     @Test
     void logout_doesNothing() throws jakarta.servlet.ServletException {
-        servletRequest.logout();
+        assertNull(servletRequest.getSessionManager(), "前置条件：WebContext 未注册 session manager");
+
+        assertDoesNotThrow(() -> servletRequest.logout());
+
+        verifyNoInteractions(requestContext);
     }
 
     @Test
@@ -538,7 +545,13 @@ class PerfHttpServletRequestTest {
 
     @Test
     void upgrade_createsHandler() throws Exception {
-        servletRequest.upgrade(TestHttpUpgradeHandler.class);
+        TestHttpUpgradeHandler handler = assertDoesNotThrow(
+                () -> servletRequest.upgrade(TestHttpUpgradeHandler.class));
+
+        assertNotNull(handler);
+        assertTrue(handler.initialized.await(2, java.util.concurrent.TimeUnit.SECONDS),
+                "upgrade 应异步调用 handler.init");
+        assertNotNull(handler.connection, "init 应收到 WebConnection");
     }
 
     @Test
@@ -548,8 +561,13 @@ class PerfHttpServletRequestTest {
     }
 
     static class TestHttpUpgradeHandler implements jakarta.servlet.http.HttpUpgradeHandler {
+        final java.util.concurrent.CountDownLatch initialized = new java.util.concurrent.CountDownLatch(1);
+        volatile jakarta.servlet.http.WebConnection connection;
+
         @Override
         public void init(jakarta.servlet.http.WebConnection wc) {
+            connection = wc;
+            initialized.countDown();
         }
 
         @Override

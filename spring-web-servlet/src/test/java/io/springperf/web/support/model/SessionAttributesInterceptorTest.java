@@ -142,13 +142,21 @@ class SessionAttributesInterceptorTest {
 
     @Test
     void postHandle_nonHandlerObject_returnsGracefully() {
-        interceptor.postHandle(mockRequest(mockContext()), mock(WebServerHttpResponse.class), "plain", null);
+        WebServerHttpRequest request = mockRequest(mockContext());
+
+        assertDoesNotThrow(() -> interceptor.postHandle(request, mock(WebServerHttpResponse.class), "plain", null));
+
+        assertNull(ModelContext.get(request), "非 handler 对象不应创建 Model");
     }
 
     @Test
     void postHandle_handlerWithoutSessionAttrs_returnsGracefully() throws Exception {
-        interceptor.postHandle(mockRequest(mockContext()), mock(WebServerHttpResponse.class),
-                handler(PlainController.class, "hello"), null);
+        WebServerHttpRequest request = mockRequest(mockContext());
+
+        assertDoesNotThrow(() -> interceptor.postHandle(request, mock(WebServerHttpResponse.class),
+                handler(PlainController.class, "hello"), null));
+
+        assertNull(ModelContext.get(request), "无 @SessionAttributes 的 handler 不应创建 Model");
     }
 
     @Test

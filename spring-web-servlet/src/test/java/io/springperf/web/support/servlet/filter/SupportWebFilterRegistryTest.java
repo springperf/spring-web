@@ -13,7 +13,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -25,8 +24,16 @@ import static org.mockito.Mockito.when;
 class SupportWebFilterRegistryTest {
 
     @Test
-    void constructor_doesNotThrow() {
-        assertDoesNotThrow(() -> new SupportWebFilterRegistry(mock(DispatcherHandler.class)));
+    void constructor_registersServletFilterAutoRegistration() throws Exception {
+        SupportWebFilterRegistry registry = new SupportWebFilterRegistry(mock(DispatcherHandler.class));
+
+        java.lang.reflect.Field field = io.springperf.web.context.WebComponentContainer.class
+                .getDeclaredField("autoRegisterComponentMap");
+        field.setAccessible(true);
+        java.util.Map<?, ?> factories = (java.util.Map<?, ?>) field.get(registry);
+
+        assertTrue(factories.containsKey(jakarta.servlet.Filter.class),
+                "构造器必须注册 Filter → WebFilterRegistration 的自动包装工厂");
     }
 
     @Test

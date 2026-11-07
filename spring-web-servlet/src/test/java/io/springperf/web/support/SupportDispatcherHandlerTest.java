@@ -89,9 +89,13 @@ class SupportDispatcherHandlerTest {
 
     @Test
     void removeContextHolders_resetsRequestContextHolder() {
+        ServletRequestAttributes attributes = org.mockito.Mockito.mock(ServletRequestAttributes.class);
+        RequestContextHolder.setRequestAttributes(attributes);
+        assertSame(attributes, RequestContextHolder.getRequestAttributes(), "前置条件：holder 已持有属性");
+
         SupportDispatcherHandler handler = new SupportDispatcherHandler();
         handler.removeContextHolders(req, resp);
 
-        assertNull(RequestContextHolder.getRequestAttributes());
+        assertNull(RequestContextHolder.getRequestAttributes(), "removeContextHolders 必须清空 holder");
     }
 }

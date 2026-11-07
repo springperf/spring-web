@@ -119,8 +119,11 @@ class PerfAsyncContextTest {
 
         context.dispatch("/async-target");
 
+        verify(supportHandler).forward(webRequest, webResponse, "/async-target");
+        var inOrder = inOrder(perfRequest);
+        inOrder.verify(perfRequest).setDispatcherType(jakarta.servlet.DispatcherType.ASYNC);
         // 分派结束后恢复原值，避免影响同一请求后续代码
-        verify(perfRequest).setDispatcherType(jakarta.servlet.DispatcherType.REQUEST);
+        inOrder.verify(perfRequest).setDispatcherType(jakarta.servlet.DispatcherType.REQUEST);
     }
 
     @Test

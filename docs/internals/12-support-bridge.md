@@ -347,6 +347,8 @@ public void afterConcurrentHandlingStarted(WebServerHttpRequest request, ...) th
 | `getDispatcherType()` | 可设置字段（`forward` 时 `FORWARD`、`include` 时 `INCLUDE`、异步 `dispatch(path)` 期间为 `ASYNC`） |
 | `getServletPath()` / `getPathInfo()` | `getServletPath` 返回应用内路径（`request.getPath()`）；`getPathInfo` 返回空字符串（路由整路径匹配，无剩余路径）。这是 Jasper 解析 `jsp:include` / `jsp:forward` 相对路径的前提 |
 
+`ServletPartAdapter` 的 `delete()` 为有意 no-op、`write(String)` 显式抛 `UnsupportedOperationException`：上传临时文件由容器在请求结束统一清理（`NettyMultipartWebRequest.release()` → `HttpPostRequestDecoder.destroy()`），提前删除会与该清理链重复操作同一 `HttpData`；文件转存请走 `MultipartFile.transferTo`。
+
 **`NettyHttpServletRequest extends PerfHttpServletRequest`**：在 Netty 环境覆盖网络/安全方法——`getRemoteAddr/getRemoteHost/getRemotePort/getLocalAddr/getLocalName/getLocalPort`（真实 `InetSocketAddress`）、`getScheme()/isSecure()`（从 URI 检测 HTTPS）、`getRequestURL()`（完整 URL）。由 `ServletAttribute.createPerfRequest()` 工厂方法根据请求类型选择。
 
 **`getDelegateRequest()`/`getDelegateResponse()`**：供子类和 dispatch 逻辑访问底层委托对象。

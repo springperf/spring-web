@@ -52,7 +52,11 @@ class HttpServletRequestProviderTest {
     }
 
     @Test
-    void getResolver_returnsNonNullResolver() {
-        assertNotNull(provider.getResolver(methodParameter, mappingContext, null));
+    void getResolver_reusesResolverInstance() {
+        Object first = provider.getResolver(methodParameter, mappingContext, null);
+
+        assertNotNull(first);
+        assertSame(first, provider.getResolver(methodParameter, mappingContext, null),
+                "resolver 应复用同一实例，避免重复创建");
     }
 }

@@ -94,7 +94,8 @@ class AbstractFastFailHttpServletRequestTest {
 
     @Test
     void getLocales_containsDefault() {
-        assertTrue(request.getLocales().hasMoreElements());
+        assertEquals(java.util.Collections.singletonList(Locale.getDefault()),
+                java.util.Collections.list(request.getLocales()));
     }
 
     @Test
