@@ -23,9 +23,13 @@ class SessionTrackingInvalidE2eTest {
 
     @Test
     void invalidTrackingMode_failsFastOnStartup() {
+<<<<<<< HEAD
         assumeTrue(hasServletContainer(), "需要 Servlet 容器（Boot 的 servlet 自动配置）才会绑定 server.servlet.* 属性");
 
         Throwable thrown = assertThrows(Throwable.class,
+=======
+        RuntimeException thrown = assertThrows(RuntimeException.class,
+>>>>>>> b0d4a1ca (test(spring-web-support-test): tighten overly permissive E2E assertions)
                 () -> new SpringApplication(ConfigAlignTestApp.class).run("--server.port=0",
                         "--server.servlet.context-path=/", "--server.servlet.session.tracking-modes=nope"),
                 "非法 tracking-modes 应在启动期失败");

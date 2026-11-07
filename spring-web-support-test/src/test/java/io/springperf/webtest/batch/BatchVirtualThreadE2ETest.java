@@ -6,6 +6,8 @@ import okhttp3.Request;
 import okhttp3.Response;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.condition.EnabledForJreRange;
+import org.junit.jupiter.api.condition.JRE;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 
@@ -13,15 +15,18 @@ import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * 开启虚拟线程时（{@code spring.threads.virtual.enabled=true} + JDK 21+）， {@code @BatchMapping} 的批量方法应由虚拟线程执行 —— 与 default
  * 业务池的虚拟线程语义一致。
+ * <p>
+ * 本类在 JDK 17（本仓源码基线）下会被 JUnit 显式跳过而非静默 pass；要覆盖该路径，CI 必须有 JDK 21+ 的 job。
+ * </p>
  */
 @SpringBootTest(classes = SupportTestApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "server.servlet.context-path=/api", "spring.threads.virtual.enabled=true" })
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@EnabledForJreRange(min = JRE.JAVA_21)
 class BatchVirtualThreadE2ETest {
 
     @LocalServerPort
@@ -32,8 +37,6 @@ class BatchVirtualThreadE2ETest {
 
     @Test
     void batchHandler_runsOnVirtualThread() throws Exception {
-        assumeTrue(Runtime.version().feature() >= 21, "虚拟线程需要 JDK 21+，当前 JDK " + Runtime.version().feature());
-
         Request req = new Request.Builder().url("http://localhost:" + serverPort + "/api/batch/thread?msg=hello").get()
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {

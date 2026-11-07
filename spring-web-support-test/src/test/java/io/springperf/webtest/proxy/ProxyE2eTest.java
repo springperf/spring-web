@@ -68,7 +68,7 @@ public class ProxyE2eTest {
     void get_withoutRequiredParam_returns400() throws Exception {
         Request req = new Request.Builder().url(baseUrl() + "/proxy-api/get").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            assertTrue(resp.code() >= 400, "Missing required @RequestParam should return 4xx, got " + resp.code());
+            assertEquals(400, resp.code(), "Missing required @RequestParam should return 400, got " + resp.code());
         }
     }
 

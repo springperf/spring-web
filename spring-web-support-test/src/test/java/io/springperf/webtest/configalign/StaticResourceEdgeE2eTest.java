@@ -114,7 +114,7 @@ class StaticResourceEdgeE2eTest {
         try {
             assertEquals(200, resp.code());
             assertNull(resp.header("Content-Encoding"), "未声明 gzip 时不得下发压缩表示");
-            assertTrue(resp.body().string().length() > 0);
+            assertEquals("e2e-static-ok", resp.body().string().trim(), "未声明 gzip 时应返回未压缩的原始实体内容");
         } finally {
             resp.close();
         }
@@ -148,7 +148,7 @@ class StaticResourceEdgeE2eTest {
     void encodedPathTraversal_rejected() throws Exception {
         Response resp = get("/%2e%2e/%2e%2e/etc/passwd");
         try {
-            assertTrue(resp.code() == 404 || resp.code() == 400, "编码后的路径穿越应被拒绝，实际 " + resp.code());
+            assertEquals(404, resp.code(), "编码后的路径穿越应按 404 拒绝，实际 " + resp.code());
         } finally {
             resp.close();
         }

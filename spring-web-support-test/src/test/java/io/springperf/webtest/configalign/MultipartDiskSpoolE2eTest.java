@@ -178,7 +178,8 @@ class MultipartDiskSpoolE2eTest {
                 .newCall(new Request.Builder().url("http://localhost:" + port + "/e2e-spool/upload").post(body).build())
                 .execute();
         try {
-            assertTrue(resp.code() >= 400, "超过 spring.servlet.multipart.max-file-size 应被拒绝，实际 " + resp.code());
+            // 实测契约：multipart 单文件超限映射为 413 Payload Too Large，而非笼统的 4xx
+            assertEquals(413, resp.code(), "超过 spring.servlet.multipart.max-file-size 应被 413 拒绝，实际 " + resp.code());
         } finally {
             resp.close();
         }
