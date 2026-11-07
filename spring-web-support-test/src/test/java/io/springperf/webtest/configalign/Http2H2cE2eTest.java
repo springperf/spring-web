@@ -118,8 +118,8 @@ class Http2H2cE2eTest {
         try {
             assertEquals(200, resp.code());
             String body = resp.body().string();
-            assertEquals(40000, body.length(), "跨多帧的大响应体应完整（Content-Length 帧语义）");
-            assertTrue(body.startsWith("L") && body.endsWith("L"), "首尾字符应保持完整");
+            // 只校验长度 + 首尾字符会放过中间 39998 字节的乱码/丢失/重排，必须逐字节比对
+            assertEquals("L" + "x".repeat(39998) + "L", body, "跨多帧的大响应体必须逐字节完整");
         } finally {
             resp.close();
         }

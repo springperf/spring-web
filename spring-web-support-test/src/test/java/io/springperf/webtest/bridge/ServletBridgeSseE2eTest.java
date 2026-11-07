@@ -70,16 +70,22 @@ class ServletBridgeSseE2eTest extends BaseE2ETest {
     @Test
     void sse_servletBridgeBusinessError_truncated_refsReturnToBaseline() throws Exception {
         int baseline = activeRequestRefs();
+        boolean truncated = false;
         try (Response resp = CLIENT.newCall(new Request.Builder().url(url("/api/servlet-bridge/sse-error")).build())
                 .execute()) {
             assertEquals(200, resp.code());
+            // 首段断言必须在 catch 之外：IOException 不得跳过唯一的内容校验（同 AsyncSseLifecycleE2eTest 语义）
+            String first = resp.body().source().readUtf8Line();
+            assertNotNull(first, "异常终止前首段应已送达");
+            assertTrue(first.contains("bridge-err-1"), "首段内容应为 bridge-err-1，实际: " + first);
             try {
-                String body = resp.body().string();
-                assertTrue(body.contains("bridge-err-1"), "首段应送达，实际:\n" + body);
+                resp.body().string();
             } catch (java.io.IOException expectedTruncation) {
-                // 异常终止 = 以截断示人（与 native 语义一致）
+                // 业务异常终止不写 LastHttpContent，客户端感知为截断
+                truncated = true;
             }
         }
+        assertTrue(truncated, "业务异常终止必须让客户端读到截断的 chunked 流（不得写 LastHttpContent）");
         long deadline = System.currentTimeMillis() + 5000;
         while (activeRequestRefs() != baseline && System.currentTimeMillis() < deadline) {
             Thread.sleep(20);

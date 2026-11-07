@@ -94,7 +94,9 @@ class ErrorAttributesOnParamE2eTest {
     @Test
     void stacktrace_exposedWithParam() throws Exception {
         String body = body("/e2e-ea/boom?trace=true");
-        assertTrue(body.contains("EaOnParamBoom"), "?trace=true 应暴露异常栈，实际 " + body);
+        // 与 hidden / paramFalse 用例使用同一判据（栈帧），避免「错误体里只出现类名」也算暴露了栈
+        assertTrue(body.contains("at io.springperf"), "?trace=true 应暴露栈帧，实际 " + body);
+        assertTrue(body.contains("EaOnParamBoom"), "栈中应含异常类名，实际 " + body);
     }
 
     @Test

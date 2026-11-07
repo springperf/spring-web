@@ -40,8 +40,9 @@ public class SessionFixationE2ETest extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(prewarm).execute()) {
             assertEquals(200, resp.code());
             Map<String, Object> body = parseBody(resp.body().string());
+            // String.valueOf(null) 得到 "null" 字符串，assertNotNull 恒真；必须断言字段本身存在
+            assertNotNull(body.get("sessionId"), "预置 session 应返回 sessionId");
             oldSessionId = String.valueOf(body.get("sessionId"));
-            assertNotNull(oldSessionId);
             // 捕获服务端种下的 session cookie，登录请求必须携带它（模拟攻击者预置）
             java.util.List<String> cookies = resp.headers("Set-Cookie");
             for (String c : cookies) {
@@ -77,7 +78,8 @@ public class SessionFixationE2ETest extends BaseE2ETest {
             // 认证失败：应用内 Throwable 兜底映射为 200 + 内部错误业务码（INTERNAL_SERVER_ERROR）
             Map<String, Object> body = parseBody(resp.body().string());
             Object code = body.get("code");
-            assertNotEquals("0", String.valueOf(code), "认证失败不应返回成功码");
+            // 锁定具体失败码：字段缺失("null")、任意错误码、垃圾值都不再放行
+            assertEquals("500", String.valueOf(code), "认证失败应返回业务错误码 500，实际 " + code);
         }
     }
 

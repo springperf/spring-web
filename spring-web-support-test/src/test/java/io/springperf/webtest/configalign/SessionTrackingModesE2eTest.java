@@ -93,8 +93,8 @@ class SessionTrackingModesE2eTest {
         }
 
         // 关键：不带 Cookie，仅凭 URI 中的 ;jsessionid= 回访，会话必须被识别
-        String path = encodedUrl.replace(";jsessionid=" + sessionId, ";jsessionid=" + sessionId);
-        Response get = CLIENT.newCall(new Request.Builder().url(url(path)).build()).execute();
+        // 原写法把 ;jsessionid=X 替换成完全相同的 ;jsessionid=X，是恒等操作；直接用重写后的 URL
+        Response get = CLIENT.newCall(new Request.Builder().url(url(encodedUrl)).build()).execute();
         try {
             assertEquals(200, get.code(), "URI 携带 ;jsessionid= 的请求应正常路由（矩阵参数不得影响路径匹配），实际 " + get.code());
             String body = get.body().string();

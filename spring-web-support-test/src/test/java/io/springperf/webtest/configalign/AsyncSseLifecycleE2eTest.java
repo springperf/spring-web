@@ -111,8 +111,13 @@ class AsyncSseLifecycleE2eTest {
             assertEquals(200, resp.code());
             // 读到 EOF（服务端写完 LastHttpContent 后关闭）—— 证明终止块存在、流正常收尾
             String body = resp.body().string();
+            // deliversAllChunks：三块都要到，且必须保序（端点依次 send chunk-1/2/3）
             assertTrue(body.contains("chunk-1"), "应收到首块，实际:\n" + body);
+            assertTrue(body.contains("chunk-2"), "应收到中间块，实际:\n" + body);
             assertTrue(body.contains("chunk-3"), "应收到末块，实际:\n" + body);
+            assertTrue(body.indexOf("chunk-1") < body.indexOf("chunk-2")
+                            && body.indexOf("chunk-2") < body.indexOf("chunk-3"),
+                    "三块必须按序送达，实际:\n" + body);
         }
         assertRefsBackTo(baseline);
     }
@@ -169,8 +174,8 @@ class AsyncSseLifecycleE2eTest {
         try (Response resp = get("/e2e-async/dr-late")) {
             int code = resp.code();
             String body = resp.body().string();
-            // 超时必须落到确定的超时类状态码，且迟到的结果不得被补写进响应
-            assertTrue(code == 503 || code == 504, "DeferredResult 超时应映射为 503/504，实际 " + code + ", body=" + body);
+            // 超时必须落到确定的状态码（异步超时 = 503），且迟到的结果不得被补写进响应
+            assertEquals(503, code, "DeferredResult 超时应映射为 503，实际 " + code + ", body=" + body);
             assertFalse(body.contains("late-result"), "迟到的处理器结果不得二次写入响应，实际:\n" + body);
         }
         assertRefsBackTo(baseline);
