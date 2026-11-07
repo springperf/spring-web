@@ -1,5 +1,6 @@
 package io.springperf.web.websocket.server;
 
+import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PongWebSocketFrame;
@@ -18,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -58,6 +60,8 @@ class WsFrameCodecTest {
         // 回归点：共享调用方 buffer 会在其被复用时写坏待发数据，故必须是拷贝
         pingPayload.put(0, (byte) 99);
         assertEquals(1, ping.content().getByte(0), "控制帧载荷必须是拷贝，不能是调用方 buffer 的视图");
+        assertEquals(2, ping.content().getByte(1), "控制帧载荷第 2 字节必须原样拷贝");
+        assertEquals(3, ping.content().getByte(2), "控制帧载荷第 3 字节必须原样拷贝");
 
         PongWebSocketFrame pong = (PongWebSocketFrame) WsFrameCodec
                 .encode(new PongMessage(ByteBuffer.wrap(new byte[] { 7 })));
@@ -69,7 +73,8 @@ class WsFrameCodecTest {
     void emptyControlPayload_usesEmptyBuffer() {
         PingWebSocketFrame ping = (PingWebSocketFrame) WsFrameCodec.encode(new PingMessage(ByteBuffer.allocate(0)));
         assertEquals(0, ping.content().readableBytes());
-        assertTrue(ping.content().refCnt() >= 1, "空载荷也必须是可安全 release 的 buffer");
+        assertSame(Unpooled.EMPTY_BUFFER, ping.content(),
+                "空载荷必须复用 Unpooled.EMPTY_BUFFER，而不是新建 buffer");
     }
 
     @Test

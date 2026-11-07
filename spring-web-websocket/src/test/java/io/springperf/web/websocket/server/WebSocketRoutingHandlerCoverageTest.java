@@ -169,6 +169,12 @@ class WebSocketRoutingHandlerCoverageTest {
         channel.runPendingTasks();
 
         verify(handler, timeout(2000)).afterConnectionEstablished(any(WebSocketSession.class));
+        String response = readHandshakeResponseText();
+        assertTrue(response.startsWith("HTTP/1.1 101 Switching Protocols"),
+                "握手成功必须回 101，实际响应：" + response);
+        assertTrue(response.toLowerCase().contains("sec-websocket-accept:"), "101 必须带 Sec-WebSocket-Accept 头");
+        assertTrue(response.contains("s3pPLMBiTxaQ9kYGzzhZRbK+xOo="), "Accept 必须按 nonce 正确计算");
+        assertNotNull(WebSocketRoutingHandler.sessionOf(channel), "握手成功后 channel 上必须挂会话");
     }
 
     /* ==================== 帧转发 ==================== */
@@ -185,18 +191,31 @@ class WebSocketRoutingHandlerCoverageTest {
         // Text 帧
         TextWebSocketFrame text = new TextWebSocketFrame("hello");
         channel.pipeline().fireChannelRead(text);
-        verify(handler, timeout(2000)).handleMessage(any(WebSocketSession.class), any(TextMessage.class));
+        ArgumentCaptor<TextMessage> textMsg = ArgumentCaptor.forClass(TextMessage.class);
+        verify(handler, timeout(2000)).handleMessage(any(WebSocketSession.class), textMsg.capture());
+        assertEquals("hello", textMsg.getValue().getPayload(), "文本帧必须原样交付业务");
 
         // Binary 帧
         BinaryWebSocketFrame binary = new BinaryWebSocketFrame(Unpooled.wrappedBuffer(new byte[] { 1, 2, 3 }));
         channel.pipeline().fireChannelRead(binary);
-        verify(handler, timeout(2000)).handleMessage(any(WebSocketSession.class), any(BinaryMessage.class));
+        ArgumentCaptor<BinaryMessage> binaryMsg = ArgumentCaptor.forClass(BinaryMessage.class);
+        verify(handler, timeout(2000)).handleMessage(any(WebSocketSession.class), binaryMsg.capture());
+        ByteBuffer payload = binaryMsg.getValue().getPayload();
+        byte[] bytes = new byte[payload.remaining()];
+        payload.duplicate().get(bytes);
+        assertArrayEquals(new byte[] { 1, 2, 3 }, bytes, "二进制帧必须逐字节交付业务");
 
         // Ping → 回显 Pong（经 ws-encoder 编码为 ByteBuf 或保留原帧）
         PingWebSocketFrame ping = new PingWebSocketFrame();
         channel.pipeline().fireChannelRead(ping);
         Object outbound = channel.readOutbound();
         assertNotNull(outbound, "Ping 帧应触发 Pong 回写");
+        if (outbound instanceof ByteBuf) {
+            assertEquals(0x8A, ((ByteBuf) outbound).getUnsignedByte(0) & 0xFF,
+                    "回写必须是 Pong 帧（opcode 0xA），不能是别的控制帧");
+        } else {
+            assertInstanceOf(PongWebSocketFrame.class, outbound, "Ping 必须回 Pong 而不是其它帧");
+        }
         ReferenceCountUtil.release(outbound);
     }
 
@@ -314,6 +333,9 @@ class WebSocketRoutingHandlerCoverageTest {
 
         Object outbound = channel.readOutbound();
         assertNotNull(outbound, "服务端应写出帧");
+        assertTrue(outbound instanceof ByteBuf, "出站帧应已被 ws-encoder 编码成 ByteBuf");
+        assertEquals(0xC1, ((ByteBuf) outbound).getUnsignedByte(0) & 0xFF,
+                "压缩帧必须置 RSV1，否则说明出站没有走 permessage-deflate 编码器");
         clientDecoder.writeInbound(outbound);
         Object decoded = clientDecoder.readInbound();
         assertTrue(decoded instanceof TextWebSocketFrame);
@@ -448,7 +470,11 @@ class WebSocketRoutingHandlerCoverageTest {
 
         channel.pipeline().fireUserEventTriggered(IdleStateEvent.ALL_IDLE_STATE_EVENT);
 
-        verify(handler, timeout(2000)).handleTransportError(any(WebSocketSession.class), any());
+        ArgumentCaptor<Throwable> error = ArgumentCaptor.forClass(Throwable.class);
+        verify(handler, timeout(2000)).handleTransportError(any(WebSocketSession.class), error.capture());
+        assertInstanceOf(java.io.IOException.class, error.getValue(), "空闲超时必须上报 IOException");
+        assertEquals("Connection idle timeout", error.getValue().getMessage(), "空闲超时原因必须明确");
+        assertFalse(channel.isOpen(), "空闲超时后必须关闭连接");
     }
 
     /* ==================== 连接关闭 ==================== */
@@ -519,9 +545,12 @@ class WebSocketRoutingHandlerCoverageTest {
 
         channel.pipeline().fireChannelRead(new CloseWebSocketFrame(1000, "bye"));
 
+        verify(handler, timeout(2000)).afterConnectionClosed(any(WebSocketSession.class),
+                eq(new CloseStatus(1000, "bye")));
         Object outbound = channel.readOutbound();
         assertNotNull(outbound, "回调抛异常时仍必须回显 Close 帧");
         ReferenceCountUtil.release(outbound);
+        assertFalse(channel.isOpen(), "回显 Close 帧后必须关闭连接");
     }
 
     @Test
@@ -553,13 +582,10 @@ class WebSocketRoutingHandlerCoverageTest {
         channel.pipeline().fireChannelRead(upgradeRequest("/ws", "http://evil.com"));
         channel.runPendingTasks();
 
-        // 403 响应被写出
-        Object outbound = channel.readOutbound();
-        assertNotNull(outbound);
-        if (outbound instanceof io.netty.handler.codec.http.HttpResponse) {
-            assertEquals(io.netty.handler.codec.http.HttpResponseStatus.FORBIDDEN,
-                    ((io.netty.handler.codec.http.HttpResponse) outbound).status());
-        }
+        // 403 响应经 HttpServerCodec 编码成 ByteBuf，必须无条件精确断言状态行
+        String response = readHandshakeResponseText();
+        assertTrue(response.startsWith("HTTP/1.1 403 Forbidden"), "拒绝来源必须回 403，实际响应：" + response);
+        assertFalse(channel.isOpen(), "回 403 后必须关闭连接");
         verify(handler, never()).afterConnectionEstablished(any());
     }
 
@@ -602,12 +628,10 @@ class WebSocketRoutingHandlerCoverageTest {
         channel.pipeline().fireChannelRead(upgradeRequest("/ws", "http://evil.com"));
         channel.runPendingTasks();
 
-        Object outbound = channel.readOutbound();
-        assertNotNull(outbound, "handler 拒绝来源时必须写回响应");
-        if (outbound instanceof io.netty.handler.codec.http.HttpResponse) {
-            assertEquals(io.netty.handler.codec.http.HttpResponseStatus.FORBIDDEN,
-                    ((io.netty.handler.codec.http.HttpResponse) outbound).status());
-        }
+        String response = readHandshakeResponseText();
+        assertTrue(response.startsWith("HTTP/1.1 403 Forbidden"),
+                "handler 级拒绝来源必须回 403，实际响应：" + response);
+        assertFalse(channel.isOpen(), "回 403 后必须关闭连接");
         verify(validator, never()).afterConnectionEstablished(any());
     }
 
@@ -624,7 +648,10 @@ class WebSocketRoutingHandlerCoverageTest {
         channel.pipeline().fireChannelRead(upgradeRequest("/ws", "http://evil.com"));
         channel.runPendingTasks();
 
-        assertNotNull(channel.readOutbound(), "判定抛异常也应写回响应");
+        String response = readHandshakeResponseText();
+        assertTrue(response.startsWith("HTTP/1.1 403 Forbidden"),
+                "checkOrigin 抛异常也必须 fail-closed 回 403，实际响应：" + response);
+        assertFalse(channel.isOpen(), "回 403 后必须关闭连接");
         verify(validator, never()).afterConnectionEstablished(any());
     }
 
@@ -672,8 +699,12 @@ class WebSocketRoutingHandlerCoverageTest {
         channel.runPendingTasks();
 
         verify(handler, timeout(2000)).afterConnectionEstablished(any(WebSocketSession.class));
-        // per-path idleTimeout>0 → 应安装 IdleStateHandler
-        assertNotNull(channel.pipeline().get("ws-idle"), "per-path idleTimeout 应安装 IdleStateHandler");
+        // per-path idleTimeout 必须覆盖全局值（全局 5000，per-path 2000）
+        io.netty.handler.timeout.IdleStateHandler idle = (io.netty.handler.timeout.IdleStateHandler) channel.pipeline()
+                .get("ws-idle");
+        assertNotNull(idle, "per-path idleTimeout>0 → 应安装 IdleStateHandler");
+        assertEquals(2000, idle.getAllIdleTimeInMillis(),
+                "per-path idleTimeout=2000 必须覆盖全局 5000，否则断言会被全局配置兜底");
     }
 
     @Test
@@ -694,9 +725,26 @@ class WebSocketRoutingHandlerCoverageTest {
     void channelWritabilityChanged_writable_drainsQueue() throws Exception {
         handler = mock(WebSocketHandler.class);
         channel = newChannel(new WebSocketRoutingHandler(Collections.singletonMap("/ws", handler), null, false, null));
+        java.util.Queue<io.netty.handler.codec.http.websocketx.WebSocketFrame> queue = new java.util.LinkedList<>();
+        queue.add(new TextWebSocketFrame("q1"));
+        queue.add(new TextWebSocketFrame("q2"));
+        channel.attr(io.netty.util.AttributeKey
+                .<java.util.Queue<io.netty.handler.codec.http.websocketx.WebSocketFrame>> valueOf(
+                        "ws.backpressure.queue"))
+                .set(queue);
 
         channel.pipeline().fireChannelWritabilityChanged();
-        assertNull(channel.pipeline().get("ws.session"));
+
+        assertTrue(queue.isEmpty(), "恢复可写时必须排空整个背压队列");
+        Object first = channel.readOutbound();
+        assertTrue(first instanceof TextWebSocketFrame, "第一帧应按入队顺序写出");
+        assertEquals("q1", ((TextWebSocketFrame) first).text());
+        ReferenceCountUtil.release(first);
+        Object second = channel.readOutbound();
+        assertTrue(second instanceof TextWebSocketFrame, "第二帧也必须写出，不能只写第一帧");
+        assertEquals("q2", ((TextWebSocketFrame) second).text());
+        ReferenceCountUtil.release(second);
+        assertNull(channel.readOutbound(), "队列排空后不得多写帧");
     }
 
     /* ==================== L14：per-path 帧上限覆盖 ==================== */

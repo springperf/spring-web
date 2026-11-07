@@ -52,10 +52,10 @@ class JsrEndpointMetadataTest {
         assertEquals("/ws/chat/{roomId}", metadata.getPath());
         assertEquals(0, metadata.getSubprotocols().length);
         assertEquals(AnnotatedEndpoint.class, metadata.getEndpointClass());
-        assertNotNull(metadata.getOnOpen());
-        assertNotNull(metadata.getOnMessage());
-        assertNotNull(metadata.getOnClose());
-        assertNotNull(metadata.getOnError());
+        assertEquals("onOpen", metadata.getOnOpen().getName());
+        assertEquals("onMessage", metadata.getOnMessage().getName());
+        assertEquals("onClose", metadata.getOnClose().getName());
+        assertEquals("onError", metadata.getOnError().getName());
         assertTrue(metadata.isInstantiable());
     }
 

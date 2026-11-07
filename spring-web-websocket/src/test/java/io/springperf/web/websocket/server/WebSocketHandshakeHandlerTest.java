@@ -141,7 +141,8 @@ class WebSocketHandshakeHandlerTest {
 
         assertTrue(readOutboundText().startsWith("HTTP/1.1 426 Upgrade Required"));
         assertNull(WebSocketRoutingHandler.sessionOf(channel), "版本不支持时不能建会话");
-        assertNull(channel.pipeline().get(SslHandler.class));
+        assertNull(channel.pipeline().get("wsdecoder"), "版本不支持时不得安装 WebSocket 帧解码器");
+        assertNull(channel.pipeline().get("wsencoder"), "版本不支持时不得安装 WebSocket 帧编码器");
     }
 
     @Test
@@ -216,7 +217,7 @@ class WebSocketHandshakeHandlerTest {
     }
 
     @Test
-    void tlsConnection_reportsPeerPrincipalAndUsesWssScheme() throws Exception {
+    void tlsConnection_reportsPeerPrincipal() throws Exception {
         WebSocketHandler handler = mock(WebSocketHandler.class);
         Principal principal = () -> "CN=client";
         SslHandler sslHandler = mockSslHandler(principal);
@@ -231,6 +232,9 @@ class WebSocketHandshakeHandlerTest {
         NettyWebSocketSession session = WebSocketRoutingHandler.sessionOf(channel);
         assertNotNull(session);
         assertSame(principal, session.getPrincipal(), "TLS 客户端证书必须透出为 session principal");
+        assertNotNull(session.getUri(), "TLS 握手同样要建立会话 URI");
+        assertNull(session.getUri().getScheme(),
+                "当前实现的 session URI 是相对路径，wss scheme 未透出（WebSocketHandshakeHandler 的 wss 只用于握手器）");
     }
 
     @Test
@@ -286,8 +290,13 @@ class WebSocketHandshakeHandlerTest {
 
         // 业务侧已关闭会话（但 TCP 尚未断开）：心跳不能再往已关闭的会话上写
         WebSocketRoutingHandler.sessionOf(channel).setOpen(false);
+        // 向同一 eventLoop 挂一个定时任务作为「调度确实被驱动」的确定信号，
+        // 否则「无出站」也可能是调度根本没跑，断言恒绿。
+        java.util.concurrent.CountDownLatch tick = new java.util.concurrent.CountDownLatch(1);
+        channel.eventLoop().schedule(tick::countDown, 1, java.util.concurrent.TimeUnit.MILLISECONDS);
         Thread.sleep(20);
         channel.runScheduledPendingTasks();
+        assertEquals(0, tick.getCount(), "必须确认定时任务真的被驱动过，否则「无出站」断言恒绿");
 
         assertNull(channel.readOutbound(), "会话已关闭时不得继续发心跳");
     }

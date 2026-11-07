@@ -23,10 +23,14 @@ class JsrEndpointConfigAdapterTest {
     }
 
     public static class CustomConfigurator extends ServerEndpointConfig.Configurator {
+        static final CustomEndpoint INSTANCE = new CustomEndpoint();
+        static final java.util.concurrent.atomic.AtomicInteger INVOCATIONS = new java.util.concurrent.atomic.AtomicInteger();
+
         @Override
         public <T> T getEndpointInstance(Class<T> endpointClass) throws InstantiationException {
             if (endpointClass == CustomEndpoint.class) {
-                return endpointClass.cast(new CustomEndpoint());
+                INVOCATIONS.incrementAndGet();
+                return endpointClass.cast(INSTANCE);
             }
             return super.getEndpointInstance(endpointClass);
         }
@@ -49,17 +53,19 @@ class JsrEndpointConfigAdapterTest {
         ServerEndpointConfig.Configurator configurator = adapter.getConfigurator();
         BasicEndpoint instance = configurator.getEndpointInstance(BasicEndpoint.class);
         assertNotNull(instance);
-        assertTrue(instance instanceof BasicEndpoint);
+        assertEquals(BasicEndpoint.class, instance.getClass(), "默认 Configurator 必须反射构造端点类本身");
     }
 
     @Test
     void customConfigurator_delegatesGetEndpointInstance() throws Exception {
+        CustomConfigurator.INVOCATIONS.set(0);
         JsrEndpointMetadata metadata = new JsrEndpointMetadata(CustomEndpoint.class);
         JsrEndpointConfigAdapter adapter = new JsrEndpointConfigAdapter(metadata);
         ServerEndpointConfig.Configurator configurator = adapter.getConfigurator();
         CustomEndpoint instance = configurator.getEndpointInstance(CustomEndpoint.class);
         assertNotNull(instance);
-        assertTrue(instance instanceof CustomEndpoint);
+        assertSame(CustomConfigurator.INSTANCE, instance, "必须委托给用户 Configurator 返回的实例");
+        assertEquals(1, CustomConfigurator.INVOCATIONS.get(), "用户 Configurator 必须被实际调用一次");
     }
 
     /**
