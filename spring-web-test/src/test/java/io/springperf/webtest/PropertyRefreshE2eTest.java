@@ -89,14 +89,20 @@ class PropertyRefreshE2eTest extends BaseE2ETest {
 
     @Test
     void builtinDefaultKey_unaffectedByRefresh() throws Exception {
-        // 未配置的内置键：刷新前后都应返回默认值（验证回退路径未破坏）
+        // 未配置的内置键：刷新前后都应返回同一个默认值（验证回退路径未破坏）
+        Request request = new Request.Builder().url(url("/api/dynamic-prop")).get().build();
+        long before;
+        try (Response resp = CLIENT.newCall(request).execute()) {
+            before = JSON.parseObject(resp.body().string()).getLongValue("asyncTimeout");
+        }
+
         setDynamicProperty("x");
         publishEnvironmentChange();
 
-        Request request = new Request.Builder().url(url("/api/dynamic-prop")).get().build();
         try (Response resp = CLIENT.newCall(request).execute()) {
-            JSONObject json = JSON.parseObject(resp.body().string());
-            assertNotNull(json.get("asyncTimeout"), "内置键应始终可读");
+            String body = resp.body().string();
+            JSONObject json = JSON.parseObject(body);
+            assertEquals(before, json.getLongValue("asyncTimeout"), "内置默认值不应受刷新影响，实际: " + body);
         }
     }
 }

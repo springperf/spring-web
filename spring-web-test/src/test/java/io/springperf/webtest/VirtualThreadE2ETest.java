@@ -6,13 +6,15 @@ import okhttp3.Request;
 import okhttp3.Response;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.condition.DisabledForJreRange;
+import org.junit.jupiter.api.condition.EnabledForJreRange;
+import org.junit.jupiter.api.condition.JRE;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.time.Duration;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * 3.2.x 虚拟线程集成测试。
@@ -45,10 +47,8 @@ public class VirtualThreadE2ETest {
     }
 
     @Test
+    @EnabledForJreRange(min = JRE.JAVA_21)
     void bizPool_shouldUseVirtualThread() throws Exception {
-        assumeTrue(Runtime.version().feature() >= 21,
-                "Virtual threads require JDK 21+, skipping on JDK " + Runtime.version().feature());
-
         Request req = new Request.Builder().url(baseUrl() + "/core/pool/virtual-thread").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
@@ -64,14 +64,11 @@ public class VirtualThreadE2ETest {
     }
 
     @Test
+    @DisabledForJreRange(min = JRE.JAVA_21)
     void runInPool_withDefaultPool_shouldUsePlatformThread() throws Exception {
         // 本用例仅在虚拟线程不可用的 JDK（<21）上有效：类级属性 spring.threads.virtual.enabled=true
         // 在 JDK 21+ 会令默认业务池使用虚拟线程（perf-virtual-），与"默认池应使用平台线程"矛盾。
-        // JDK 21+ 由 bizPool_shouldUseVirtualThread 覆盖虚拟线程语义，此处跳过。
-        assumeTrue(Runtime.version().feature() < 21,
-                "Default pool is virtual on JDK 21+ when spring.threads.virtual.enabled=true; skipping on JDK "
-                        + Runtime.version().feature());
-
+        // JDK 21+ 由 bizPool_shouldUseVirtualThread 覆盖虚拟线程语义。
         Request req = new Request.Builder().url(baseUrl() + "/core/pool/biz-pool").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
@@ -92,9 +89,10 @@ public class VirtualThreadE2ETest {
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
             assertNotNull(body);
 
-            boolean isVirtual = body.containsKey("isVirtual") && (boolean) body.get("isVirtual");
-            // EventLoop 始终使用平台线程
-            assertFalse(isVirtual, "EventLoop should NOT use virtual threads");
+            // 不能用 containsKey && get 的短路写法：字段缺失时结果为 false，assertFalse 恒通过
+            assertTrue(body.containsKey("isVirtual"), "端点必须返回 isVirtual 字段，实际: " + body);
+            assertEquals(false, body.get("isVirtual"), "EventLoop 始终使用平台线程，实际: " + body);
+            assertNotNull(body.get("thread"), "端点应返回 thread 字段，实际: " + body);
         }
     }
 
@@ -103,7 +101,7 @@ public class VirtualThreadE2ETest {
         Request req = new Request.Builder().url(baseUrl() + "/core/pool/bad-pool").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             // 不存在池应返回 500
-            assertTrue(resp.code() >= 500, "Expected 5xx for non-existent pool, got " + resp.code());
+            assertEquals(500, resp.code(), "不存在的线程池应返回 500，实际: " + resp.code());
         }
     }
 }

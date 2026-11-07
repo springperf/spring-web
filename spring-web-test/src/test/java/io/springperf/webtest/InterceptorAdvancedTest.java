@@ -53,6 +53,9 @@ public class InterceptorAdvancedTest extends BaseE2ETest {
         Request req = new Request.Builder().url(baseUrl() + "/core/name").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(401, resp.code(), "Non-excluded path matching interceptor condition should be blocked");
+            String body = resp.body() != null ? resp.body().string() : "";
+            org.junit.jupiter.api.Assertions.assertFalse(body.contains("should be blocked"),
+                    "preHandle 拦截后 handler 不得执行，实际 body: " + body);
         }
     }
 

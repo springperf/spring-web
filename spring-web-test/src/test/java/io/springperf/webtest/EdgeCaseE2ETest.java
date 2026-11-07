@@ -109,6 +109,7 @@ public class EdgeCaseE2ETest extends BaseE2ETest {
         Request req = new Request.Builder().url(edge() + "/only-get").post(RequestBody.create("", JSON_TYPE)).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(405, resp.code(), "仅 GET 的端点收到 POST 应返回 405");
+            assertEquals("GET", resp.header("Allow"), "405 应返回 Allow 头，实际响应头: " + resp.headers());
         }
     }
 
@@ -117,6 +118,7 @@ public class EdgeCaseE2ETest extends BaseE2ETest {
         Request req = new Request.Builder().url(edge() + "/only-get").delete().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(405, resp.code(), "仅 GET 的端点收到 DELETE 应返回 405");
+            assertEquals("GET", resp.header("Allow"), "405 应返回 Allow 头，实际响应头: " + resp.headers());
         }
     }
 

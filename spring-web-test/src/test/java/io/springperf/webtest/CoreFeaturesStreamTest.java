@@ -25,67 +25,83 @@ public class CoreFeaturesStreamTest extends BaseE2ETest {
     @Test
     void testStreamJson() throws Exception {
         Request request = new Request.Builder().url(baseUrl() + "/stream-json").get().build();
-        CountDownLatch latch = new CountDownLatch(3);
-        AtomicInteger count = new AtomicInteger(0);
+        CountDownLatch done = new CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicReference<Throwable> failure = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.ConcurrentLinkedQueue<Integer> indices = new java.util.concurrent.ConcurrentLinkedQueue<>();
+        AtomicInteger status = new AtomicInteger();
         CLIENT.newCall(request).enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
-                fail("Stream request failed: " + e.getMessage());
+                failure.set(e);
+                done.countDown();
             }
 
             @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                assertEquals(200, response.code());
-                BufferedSource source = response.body().source();
-                while (!source.exhausted()) {
-                    String line = source.readUtf8Line();
-                    if (line == null || line.isEmpty()) {
-                        continue;
-                    }
-                    try {
+            public void onResponse(Call call, Response response) {
+                // 回调线程里的断言失败只会变成超时，统一收集结果由主线程断言
+                try (Response resp = response) {
+                    status.set(resp.code());
+                    BufferedSource source = resp.body().source();
+                    while (!source.exhausted()) {
+                        String line = source.readUtf8Line();
+                        if (line == null || line.isEmpty()) {
+                            continue;
+                        }
                         Map<String, Object> m = JSON.parseObject(line, Map.class);
                         if (m != null && m.containsKey("index")) {
-                            count.incrementAndGet();
-                            latch.countDown();
+                            indices.add(((Number) m.get("index")).intValue());
                         }
-                    } catch (Exception ignored) {
-                        // skip non-json lines
                     }
+                } catch (Throwable t) {
+                    failure.set(t);
+                } finally {
+                    done.countDown();
                 }
             }
         });
-        assertTrue(latch.await(10, TimeUnit.SECONDS), "Did not receive all stream JSON events");
-        assertEquals(3, count.get());
+        assertTrue(done.await(10, TimeUnit.SECONDS), "流式响应应在超时前结束");
+        assertNull(failure.get(), "流式响应不得抛异常或 JSON 解析失败: " + failure.get());
+        assertEquals(200, status.get());
+        assertEquals(java.util.Arrays.asList(0, 1, 2), new java.util.ArrayList<>(indices),
+                "应按顺序返回 index 0/1/2，实际: " + indices);
     }
 
     @Test
     void testTextStream() throws Exception {
         Request request = new Request.Builder().url(baseUrl() + "/text-stream").get().build();
-        CountDownLatch latch = new CountDownLatch(2);
-        StringBuilder sb = new StringBuilder();
+        CountDownLatch done = new CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicReference<Throwable> failure = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.ConcurrentLinkedQueue<String> lines = new java.util.concurrent.ConcurrentLinkedQueue<>();
+        AtomicInteger status = new AtomicInteger();
         CLIENT.newCall(request).enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
-                fail("Text stream request failed: " + e.getMessage());
+                failure.set(e);
+                done.countDown();
             }
 
             @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                assertEquals(200, response.code());
-                BufferedSource source = response.body().source();
-                while (!source.exhausted()) {
-                    String line = source.readUtf8Line();
-                    if (line == null) {
-                        continue;
+            public void onResponse(Call call, Response response) {
+                try (Response resp = response) {
+                    status.set(resp.code());
+                    BufferedSource source = resp.body().source();
+                    while (!source.exhausted()) {
+                        String line = source.readUtf8Line();
+                        if (line != null && !line.isEmpty()) {
+                            lines.add(line);
+                        }
                     }
-                    sb.append(line).append("\n");
-                    latch.countDown();
+                } catch (Throwable t) {
+                    failure.set(t);
+                } finally {
+                    done.countDown();
                 }
             }
         });
-        assertTrue(latch.await(10, TimeUnit.SECONDS), "Did not receive all text stream events");
-        String result = sb.toString();
-        assertTrue(result.contains("line1"));
-        assertTrue(result.contains("line2"));
+        assertTrue(done.await(10, TimeUnit.SECONDS), "文本流应在超时前结束");
+        assertNull(failure.get(), "文本流不得抛异常: " + failure.get());
+        assertEquals(200, status.get());
+        assertEquals(java.util.Arrays.asList("line1", "line2"), new java.util.ArrayList<>(lines),
+                "应按顺序返回 line1/line2，实际: " + lines);
     }
 }

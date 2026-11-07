@@ -1,5 +1,7 @@
 package io.springperf.webtest;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import io.springperf.web.autoconfigure.actuator.server.ManagementNettyHttpServer;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.OkHttpClient;
@@ -20,6 +22,8 @@ import org.springframework.test.context.ContextConfiguration;
 import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -71,11 +75,35 @@ public class ActuatorSbaExactTest {
                 .header("Accept", "application/vnd.spring-boot.actuator.v2+json").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             String body = resp.body() != null ? resp.body().string() : "<empty>";
-            log.info("GET {} -> {} bodyLength={} contentType={}", endpoint, resp.code(), body.length(),
-                    resp.header("Content-Type"));
+            String contentType = resp.header("Content-Type", "");
+            log.info("GET {} -> {} bodyLength={} contentType={}", endpoint, resp.code(), body.length(), contentType);
             assertEquals(200, resp.code(), "SBA v2 GET " + endpoint + " should return 200. Body: " + body);
-            // 验证 body 能被 SBA 解析（非空 JSON）
-            assertTrue(body.startsWith("{") && body.endsWith("}"), "Body should be valid JSON object. Body: " + body);
+            assertEquals("application/vnd.spring-boot.actuator.v2+json", contentType.split(";")[0].trim(),
+                    "SBA v2 Accept 应产出 v2 media type，实际: " + contentType);
+            // 首尾字符判断无法区分真实端点响应与错误 JSON，按端点校验各自的结构字段
+            JSONObject json = JSON.parseObject(body);
+            assertNotNull(json, "SBA 端点必须返回合法 JSON 对象. Body: " + body);
+            assertFalse(json.containsKey("error"), "SBA 端点不得返回错误 JSON. Body: " + body);
+            switch (endpoint) {
+                case "" -> {
+                    JSONObject links = json.getJSONObject("_links");
+                    assertNotNull(links, "links 端点应返回 _links. Body: " + body);
+                    assertFalse(links.isEmpty(), "links 端点应返回可用链接. Body: " + body);
+                }
+                case "/health" -> assertEquals("UP", json.getString("status"), "Body: " + body);
+                case "/metrics" -> assertNotNull(json.get("names"), "Body: " + body);
+                case "/env" -> assertNotNull(json.get("activeProfiles"), "Body: " + body);
+                case "/beans", "/mappings", "/configprops", "/conditions" -> assertNotNull(json.get("contexts"),
+                        "Body: " + body);
+                case "/loggers" -> assertNotNull(json.get("levels"), "Body: " + body);
+                case "/threaddump" -> assertNotNull(json.get("threads"), "Body: " + body);
+                case "/scheduledtasks" -> assertNotNull(json.get("cron"), "Body: " + body);
+                case "/caches" -> assertNotNull(json.get("cacheManagers"), "Body: " + body);
+                case "/info" -> {
+                    // info 无配置时允许返回空对象，但必须是合法 JSON 且不含 error（上面已校验）
+                }
+                default -> assertFalse(json.isEmpty(), "端点应返回非空 JSON 对象. Body: " + body);
+            }
         }
     }
 }

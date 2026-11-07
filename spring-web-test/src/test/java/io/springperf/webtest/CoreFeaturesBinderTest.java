@@ -9,7 +9,6 @@ import java.util.Map;
 import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class CoreFeaturesBinderTest extends BaseE2ETest {
 
@@ -24,10 +23,7 @@ public class CoreFeaturesBinderTest extends BaseE2ETest {
             assertEquals(200, resp.code());
             Map<String, Object> body = JSON.parseObject(Objects.toString(resp.body().string(), "{}"), Map.class);
             String value = Objects.toString(body.get("value"), "");
-            assertTrue(value.startsWith("edited:"),
-                    "PropertyEditor should prepend 'edited:' to the value, got: " + value);
-            assertTrue(value.contains("hello"),
-                    "The original value 'hello' should be present in the edited result, got: " + value);
+            assertEquals("edited:hello", value, "@InitBinder 的 PropertyEditor 应精确改写字段值，实际: " + value);
         }
     }
 }

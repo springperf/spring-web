@@ -6,6 +6,7 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 import org.junit.jupiter.api.Test;
 
+import java.util.Locale;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -56,25 +57,37 @@ public class AdditionalEndpointsE2ETest extends BaseE2ETest {
 
     @Test
     void responseStatusException_returnsBandwidthExceeded() throws Exception {
-        Request req = new Request.Builder().url(baseUrl() + "/core/exception/response-status-exception").get().build();
+        Request req = new Request.Builder().url(baseUrl() + "/core/exception/response-status-exception")
+                .header("Accept", "application/json").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(509, resp.code(), "ResponseStatusException 应透传其状态码");
+            String body = resp.body().string();
+            assertEquals(509, com.alibaba.fastjson2.JSON.parseObject(body).getIntValue("status"),
+                    "错误体应标明 509，实际: " + body);
         }
     }
 
     @Test
     void customStatusException_returnsAnnotatedStatus() throws Exception {
-        Request req = new Request.Builder().url(baseUrl() + "/core/exception/custom-status-exception").get().build();
+        Request req = new Request.Builder().url(baseUrl() + "/core/exception/custom-status-exception")
+                .header("Accept", "application/json").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(404, resp.code(), "@ResponseStatus 自定义异常应返回其状态码");
+            String body = resp.body().string();
+            assertEquals(404, com.alibaba.fastjson2.JSON.parseObject(body).getIntValue("status"),
+                    "错误体应标明 404，实际: " + body);
         }
     }
 
     @Test
     void failingExceptionHandler_returns500() throws Exception {
-        Request req = new Request.Builder().url(baseUrl() + "/core/exception/failing-handler").get().build();
+        Request req = new Request.Builder().url(baseUrl() + "/core/exception/failing-handler")
+                .header("Accept", "application/json").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(500, resp.code(), "@ExceptionHandler 自身抛异常应最终回退 500");
+            String body = resp.body().string();
+            assertEquals(500, com.alibaba.fastjson2.JSON.parseObject(body).getIntValue("status"),
+                    "错误体应标明 500，实际: " + body);
         }
     }
 
@@ -84,9 +97,10 @@ public class AdditionalEndpointsE2ETest extends BaseE2ETest {
                 .header("Accept-Language", "fr-FR, fr;q=0.9, en;q=0.8").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
-            // 框架 LocaleResolverProvider 基于 LocaleContextHolder（未配置解析器时用系统默认），
-            // 不按 Accept-Language 解析 controller 参数；此处仅验证 locale 参数可正常注入。
-            assertNotNull(resp.body().string(), "locale 参数应注入有效值");
+            // 框架 LocaleConfig 默认 accept-header 策略：带 Accept-Language 时按请求首选 Locale 注入，
+            // 控制器返回 locale.toLanguageTag()。原先"仅验证非空"的断言等于没测。
+            String body = resp.body().string();
+            assertEquals("fr-FR", body, "应解析 Accept-Language 的首选 Locale，实际: " + body);
         }
     }
 
@@ -95,7 +109,9 @@ public class AdditionalEndpointsE2ETest extends BaseE2ETest {
         Request req = new Request.Builder().url(baseUrl() + "/p0/locale").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
-            assertNotNull(resp.body().string());
+            String body = resp.body().string();
+            assertEquals(Locale.getDefault().toLanguageTag(), body,
+                    "无 Accept-Language 时应回退 JVM 默认 Locale，实际: " + body);
         }
     }
 
@@ -126,6 +142,8 @@ public class AdditionalEndpointsE2ETest extends BaseE2ETest {
             assertEquals(200, resp.code(), "拦截器返回 false 时应写 200 空 body");
             String body = resp.body() != null ? resp.body().string() : null;
             assertTrue(body == null || body.isEmpty(), "应无业务 body，实际: " + body);
+            assertFalse(body != null && body.contains("should-not-be-reached"),
+                    "拦截器返回 false 时 handler 不得执行，实际: " + body);
         }
     }
 }

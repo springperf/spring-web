@@ -1,5 +1,6 @@
 package io.springperf.webtest;
 
+import com.alibaba.fastjson2.JSON;
 import okhttp3.Request;
 import okhttp3.Response;
 import org.junit.jupiter.api.Test;
@@ -20,16 +21,14 @@ public class CorsAndStaticTest extends BaseE2ETest {
                 .header("Origin", "http://example.com").header("Access-Control-Request-Method", "GET")
                 .method("OPTIONS", null).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            int code = resp.code();
-            assertTrue(code == 200 || code == 204, "Expected 200 or 204 for CORS preflight, got " + code);
-            // 验证 CORS 响应头
-            String allowOrigin = resp.header("Access-Control-Allow-Origin");
-            assertNotNull(allowOrigin, "CORS preflight must include Access-Control-Allow-Origin");
-            assertTrue(allowOrigin.contains("http://example.com"),
-                    "Access-Control-Allow-Origin should contain the allowed origin");
-            assertNotNull(resp.header("Access-Control-Allow-Methods"),
-                    "CORS preflight must include Access-Control-Allow-Methods");
-            assertNotNull(resp.header("Vary"), "CORS preflight must include Vary header");
+            assertEquals(200, resp.code(), "CORS 预检应返回确定状态码，实际: " + resp.code());
+            assertEquals("http://example.com", resp.header("Access-Control-Allow-Origin"),
+                    "ACAO 应精确回显允许的来源，实际: " + resp.headers());
+            String methods = resp.header("Access-Control-Allow-Methods");
+            assertEquals("GET", methods, "预检应精确回显被请求的方法，实际: " + methods);
+            assertNotNull(resp.header("Vary"), "CORS 预检必须包含 Vary header");
+            assertTrue(String.join(",", resp.headers("Vary")).contains("Origin"),
+                    "Vary 应包含 Origin，实际: " + resp.headers("Vary"));
         }
     }
 
@@ -40,7 +39,10 @@ public class CorsAndStaticTest extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = Objects.toString(resp.body().string(), "");
-            assertTrue(body.contains("cors"));
+            assertEquals("annotated", JSON.parseObject(body).get("cors"),
+                    "@CrossOrigin 端点应返回业务 JSON，实际: " + body);
+            assertEquals("http://example.com", resp.header("Access-Control-Allow-Origin"),
+                    "@CrossOrigin(origins=...) 应精确回显允许的来源，实际: " + resp.headers());
         }
     }
 

@@ -7,6 +7,7 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 import org.junit.jupiter.api.Test;
 
+import java.util.Locale;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -55,12 +56,13 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
 
     @Test
     void locale_withAcceptLanguage_returnsParsedLocale() throws Exception {
-        Request req = new Request.Builder().url(p0Url() + "/locale").header("Accept-Language", "zh-CN").get().build();
+        // 用与 JVM 默认语言不同的值，避免"恰好等于默认 Locale"时连不解析 Accept-Language 也能通过
+        Request req = new Request.Builder().url(p0Url() + "/locale").header("Accept-Language", "fr-FR").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
-            // 框架 LocaleResolver 解析 Accept-Language，控制器返回 toLanguageTag()
+            // 框架 LocaleConfig 默认 accept-header 策略，控制器返回 locale.toLanguageTag()
             String body = resp.body().string();
-            assertEquals("zh-CN", body, "应解析 Accept-Language 为对应 Locale，实际: " + body);
+            assertEquals("fr-FR", body, "应解析 Accept-Language 为对应 Locale，实际: " + body);
         }
     }
 
@@ -70,8 +72,8 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
-            assertNotNull(body, "Default locale should be returned");
-            assertFalse(body.isEmpty());
+            assertEquals(Locale.getDefault().toLanguageTag(), body,
+                    "无 Accept-Language 时应返回 JVM 默认 Locale，实际: " + body);
         }
     }
 

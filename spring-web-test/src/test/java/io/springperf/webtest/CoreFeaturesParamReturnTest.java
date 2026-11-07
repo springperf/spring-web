@@ -23,7 +23,8 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = Objects.toString(resp.body().string(), "");
-            assertTrue(body.contains("my-value"), "应回显 X-Custom-Header 值，实际: " + body);
+            assertEquals("my-value", com.alibaba.fastjson2.JSON.parseObject(body).getString("xCustomHeader"),
+                    "应精确回显 X-Custom-Header 值，实际: " + body);
         }
     }
 
@@ -52,8 +53,8 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
-            assertTrue(body.contains("\"status\"") && body.contains("\"ok\""),
-                    "DeferredResult 应返回异步结果 {\"status\":\"ok\"}，实际: " + body);
+            assertEquals("ok", com.alibaba.fastjson2.JSON.parseObject(body).getString("status"),
+                    "DeferredResult 应返回 {\"status\":\"ok\"}，实际: " + body);
         }
     }
 
@@ -63,8 +64,8 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
-            assertTrue(body.contains("\"from\"") && body.contains("callable"),
-                    "Callable 应返回异步结果 {\"from\":\"callable\"}，实际: " + body);
+            assertEquals("callable", com.alibaba.fastjson2.JSON.parseObject(body).getString("from"),
+                    "Callable 应返回 {\"from\":\"callable\"}，实际: " + body);
         }
     }
 
@@ -93,10 +94,11 @@ public class CoreFeaturesParamReturnTest extends BaseE2ETest {
         Request req = new Request.Builder().url(baseUrl() + "/resource").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
-            assertNotNull(resp.header("Content-Type"));
+            assertEquals("text/plain", resp.header("Content-Type", "").split(";")[0].trim(),
+                    "ClassPathResource 应返回 text/plain，实际: " + resp.header("Content-Type"));
             // 读取 body 验证资源内容（static/test.txt）
             String body = resp.body().string();
-            assertTrue(body.contains("Hello, Static Resource!"), "Resource 应返回文件内容，实际: " + body);
+            assertEquals("Hello, Static Resource!", body.trim(), "Resource 应返回文件完整内容，实际: " + body);
         }
     }
 
