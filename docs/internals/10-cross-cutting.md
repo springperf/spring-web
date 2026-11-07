@@ -88,7 +88,7 @@ public boolean preHandle(WebServerHttpRequest request, WebServerHttpResponse res
 }
 ```
 
-关键语义：`preHandle` 返回 `false` 时，**仅对已通过 preHandle 的拦截器**逆序调用 `afterCompletion`（`afterCompletionForPassed`）。未进入的拦截器未持有资源，不应收到回调。注释记录了修复历史——修复前对所有拦截器调用 `afterCompletion`，会误触发尚未 `preHandle` 的拦截器的回调。
+关键语义：`preHandle` 返回 `false` 时，**仅对已通过 preHandle 的拦截器**逆序调用 `afterCompletion`（`afterCompletionForPassed`）。未进入的拦截器未持有资源，不应收到回调；若对所有拦截器调用 `afterCompletion`，会误触发尚未执行 `preHandle` 的拦截器。
 
 ### 1.4 `RuntimeMappingInterceptor`
 

@@ -93,6 +93,8 @@
 
 > **可核验性**：`docs/benchmark.md` 只公布 **json / get / sse** 三项的每请求分配；下表其余行（bytes / valid / async / bytesLarge）与 **perf-support 整列**取自该次运行的原始报告，报告未随仓库发布，**不可在仓库内复验**。
 
+下表为 **4 线程**档位（json 每请求分配 perf 10.1KB / tomcat 23.4KB）；§2.3 的对照表为 **16 线程**档位（23.8KB），两处数值不同是档位不同，并非矛盾。
+
 | 场景 | perf | perf-support | tomcat | undertow | webflux |
 |------|------|-------------|--------|----------|---------|
 | get | 10.7KB | 13.2KB | 37.3KB | 35.6KB | 50.0KB |

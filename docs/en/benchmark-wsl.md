@@ -18,7 +18,7 @@
 | Async throughput (async, 48 threads) | **44,104 ops/s** | **3.06x** (14,407) | **1.84x** (23,996) |
 | High-concurrency latency (json, 48 threads, p50) | **0.92 ms** | 3.16 ms (**29%**) | 1.95 ms (**47%**) |
 
-**perf ranks first in every comparison across all 7 APIs × 3 concurrency levels (16/32/48 threads) — no exceptions.**
+**perf leads in throughput across all 7 APIs × 3 concurrency levels (16/32/48 threads).**
 
 The most striking finding: **perf's advantage keeps growing as concurrency increases.** WebFlux peaks and falls back at 32 threads, Spring MVC barely scales, while perf is still growing at 48 threads — the higher the concurrency, the greater the framework advantage.
 
@@ -145,7 +145,7 @@ perf's advantage comes from deliberate engineering trade-offs at the framework-d
 
 ## 4. Key Findings
 
-1. **Concurrency scaling crushes the competition**: json 16→48 threads, perf gains **+52%** vs Spring MVC's +17%; the advantage multiple grows from 2.29x to **2.96x** — the higher the concurrency, the bigger perf's lead.
+1. **Concurrency scaling advantage**: json 16→48 threads, perf gains **+52%** vs Spring MVC's +17%; the advantage multiple grows from 2.29x to **2.96x** — the higher the concurrency, the bigger perf's lead.
 2. **Absolute high-concurrency throughput lead**: json at 48 threads hits **43,896 ops/s** — 2.96x Spring MVC, 2.31x WebFlux.
 3. **SSE long-connection advantage**: 5,715 ops/s at 48 threads, **2.63x** Spring MVC; p50 latency 7.23ms, only **1/3** of MVC's 21.46ms — EventLoop + lock-free Drain Loop pay off most in long-connection scenarios.
 4. **Async, parameter binding, and validation are the strongest scenarios**: async / get / valid reach **3.06x / 3.34x / 3.08x** against Spring MVC — the engineering payoff of pre-caching + zero reflection concentrates under high concurrency.

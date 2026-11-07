@@ -4,9 +4,9 @@
 
 ---
 
-## 引子：工程美学的"十张快照"
+## 引子：十张有代表性的实现快照
 
-前 15 篇从架构到性能、从桥接到自动配置，完整描述了框架的每个模块。本篇是"欣赏篇"——挑十个"体现工程美感"的具体实现，每个用 30–80 行讲透设计意图与巧妙处。
+前 15 篇从架构到性能、从桥接到自动配置，完整描述了框架的每个模块。本篇选取十个有代表性的具体实现，每个用 30–80 行讲透设计意图与巧妙处。
 
 这些实现共同体现一个哲学：**启动期做尽计算，运行时只做最必要的事。**
 
@@ -318,7 +318,7 @@ public class WebMvcConfigurerBridge extends BaseWebComponent {
 // FilterWrapper.java
 public class FilterWrapper implements WebFilter, LifecycleWebComponent {
 
-    // C4：实例级唯一标识。同类不同实例（如 Spring Security 同 filter 类多实例）
+    // 实例级唯一标识。同类不同实例（如 Spring Security 同 filter 类多实例）
     // 不得被 WebComponentContainer 按类名去重误杀；同实例重复包装返回同一名字。
     private static final Map<jakarta.servlet.Filter, String> COMPONENT_NAMES =
             Collections.synchronizedMap(new IdentityHashMap<>());          // 线程安全
@@ -464,7 +464,7 @@ public class SupportDispatcherHandler extends DispatcherHandler {
 | 9 | `BufferingBatchHandler` | 创建 Disruptor + bizExecutor | `onEvent()` 攒批 + `flush()` 提交 |
 | 10 | `SupportDispatcherHandler` | 扩展 `DispatcherHandler` | `ChannelFuture` 回调驱动 session 持久化 |
 
-8 个在启动期（或首次请求前）完成计算和缓存，2 个（`acquire`/`release` 和 `ChannelFuture` 回调）在运行时以最小的代价完成关键时序控制。这不是巧合，而是框架设计原则的必然结果——**把"确定"从运行时前移到启动期，运行时只保留"不确定"的部分**，这正是 [01 篇](01-design-philosophy.md) 原则 1（零匹配）和原则 5（零反射）在代码层面的完美呈现。
+8 个在启动期（或首次请求前）完成计算和缓存，2 个（`acquire`/`release` 和 `ChannelFuture` 回调）在运行时以最小的代价完成关键时序控制。这不是巧合，而是框架设计原则的必然结果——**把"确定"从运行时前移到启动期，运行时只保留"不确定"的部分**，这正是 [01 篇](01-design-philosophy.md) 原则 1（零匹配）和原则 5（零反射）在代码层面的完整体现。
 
 ---
 

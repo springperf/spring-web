@@ -36,7 +36,7 @@
 | Spring Framework | **5.3.x** | 随 Spring Boot 管理 |  |
 | JDK | **8、11、17** | 8、11、17 已验证 | 编译目标 `java.version=8` |
 | Servlet API | **javax.servlet 4.0.1** | 4.0.x |  |
-| Netty | **4.1.115.Final** | 4.1.x（当前为手动覆盖版本） | Spring Boot 2.7.x 默认管理更低版本 |
+| Netty | **4.1.137.Final** | 4.1.x（当前为手动覆盖版本） | Spring Boot 2.7.x 默认管理更低版本 |
 | Jackson | **2.17.2** | 2.17.x（当前为手动覆盖版本） | Spring Boot 2.7.x 默认管理 2.13.x |
 | Lombok | **1.18.24** | 1.18.x |  |
 | JMH | **1.37** | 1.37 | 仅 benchmark 模块使用 |
@@ -182,9 +182,9 @@ master 的跨版本风险集中在 starter 自动配置层，`spring-boot-versio
 | 分支 | Spring Framework | `ModelMap` 是否实现 `Model` | 框架注入实现 | 备注 |
 |------|----------------|---------------------------|--------------|------|
 | `master` | 6.2.x | ❌ 否 | `ExtendedModelMap`（`ModelMap` 子类且实现 `Model`） | 统一注入 `ExtendedModelMap` 以兼容 `Model`/`ModelMap`/`ExtendedModelMap` 三种参数声明 |
-| `2.7.x` | 5.3.x | ✅ 是 | `ExtendedModelMap`（backport 时可简化） | `ModelMap` 本身即可 cast 到 `Model` |
+| `2.7.x` | 5.3.x | ✅ 是 | `ExtendedModelMap` | `ModelMap` 本身即可 cast 到 `Model` |
 
-> **Backport 提示**：`spring-web` core 的 `ModelContext.getOrCreate()` 在 2.7.x 分支无需特别处理——Spring 5.3 的 `ModelMap` 已实现 `Model`，可复用同一实现。
+> 在 `2.7.x` 分支上，Spring 5.3 的 `ModelMap` 已实现 `Model`，`spring-web` core 的 `ModelContext.getOrCreate()` 可复用同一实现。
 
 ### Thymeleaf / FreeMarker 版本矩阵
 

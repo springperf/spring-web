@@ -313,7 +313,7 @@ public class CustomJsonConverter implements JsonConverter {
 }
 ```
 
-**Note**: the framework uses `JacksonConverter` by default — `AsyncSupportRegistry` obtains it via `getWebComponentWithDefault(JsonConverter.class, ...)`. `JsonConverter` has **no** Spring Bean auto-registration: a `JsonConverter` bean is never absorbed by the framework, so `@Primary` / `@Order` have no effect. To replace it you must register the component with `WebContext` yourself (not a public SPI today).
+**Note**: the framework uses `JacksonConverter` by default — `AsyncSupportRegistry` obtains it via `getWebComponentWithDefault(JsonConverter.class, ...)`. `JsonConverter` has **no** Spring Bean auto-registration: a `JsonConverter` bean is never absorbed by the framework, so `@Primary` / `@Order` have no effect. To replace it you must register the component with `WebContext` yourself; there is no application-facing configuration entry point for this today.
 
 ---
 
@@ -400,7 +400,7 @@ Route optimizers are **wired in by the framework** and are not a Spring Bean ext
 `LoopPathPatternRouterOptimizer` / `FullPathRouterOptimizer` in turn based on the path shape, and the selected
 optimizer pre-builds the mapping list into an efficient route structure at startup.
 
-For a custom strategy you must subclass `MappingRegistry` and override the optimizer wiring (not a public SPI today).
+For a custom strategy you must subclass `MappingRegistry` and override the optimizer wiring; there is no application-facing configuration entry point for this today.
 
 ---
 
@@ -492,12 +492,12 @@ This framework does not use Spring MVC, so SpringDoc cannot discover routes thro
 ```xml
 <dependency>
     <groupId>org.springdoc</groupId>
-    <artifactId>springdoc-openapi-ui</artifactId>
-    <version>1.7.0</version>
+    <artifactId>springdoc-openapi-starter-common</artifactId>
+    <version>${springdoc.version}</version>
 </dependency>
 ```
 
-After adding the dependency, `OpenApiAutoConfiguration` activates automatically (`@ConditionalOnClass(OpenApiCustomiser.class)`), no manual configuration required.
+The current master baseline uses `springdoc-openapi-starter-common` (version managed by `springdoc.version` in the root `pom.xml`); the `2.7.x` branch uses `springdoc-openapi-ui:1.7.0`. After adding the dependency, `OpenApiAutoConfiguration` activates automatically (`@ConditionalOnClass(OpenApiCustomizer.class)`), no manual configuration required. See `spring-web-examples/spring-web-example-openapi/pom.xml` for a complete example.
 
 ### Architecture
 

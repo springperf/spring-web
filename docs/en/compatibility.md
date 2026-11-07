@@ -39,7 +39,7 @@ The lowest supported line across the three branches is **Spring Boot 2.7.x** (va
 | Spring Framework | **5.3.x** | Managed by Spring Boot | |
 | JDK | **8, 11, 17** | 8, 11, 17 verified | Compile target `java.version=8` |
 | Servlet API | **javax.servlet 4.0.1** | 4.0.x | |
-| Netty | **4.1.115.Final** | 4.1.x (manually overridden) | Spring Boot 2.7.x manages a lower version by default |
+| Netty | **4.1.137.Final** | 4.1.x (manually overridden) | Spring Boot 2.7.x manages a lower version by default |
 | Jackson | **2.17.2** | 2.17.x (manually overridden) | Spring Boot 2.7.x manages 2.13.x by default |
 | Lombok | **1.18.24** | 1.18.x | |
 | JMH | **1.37** | 1.37 | Benchmark module only |
@@ -191,9 +191,9 @@ The view rendering module depends on Spring's `org.springframework.ui` types. Be
 | Branch | Spring Framework | `ModelMap` implements `Model`? | Framework injection type | Notes |
 |--------|-----------------|-------------------------------|--------------------------|-------|
 | `master` | 6.2.x | ❌ No | `ExtendedModelMap` (subclass of `ModelMap` and implements `Model`) | Always injects `ExtendedModelMap` to support `Model`/`ModelMap`/`ExtendedModelMap` declarations |
-| `2.7.x` | 5.3.x | ✅ Yes | `ExtendedModelMap` (simpler on backport) | `ModelMap` itself is castable to `Model` |
+| `2.7.x` | 5.3.x | ✅ Yes | `ExtendedModelMap` | `ModelMap` itself is castable to `Model` |
 
-> **Backport note**: `ModelContext.getOrCreate()` in `spring-web` core needs no special handling on 2.7.x — Spring 5.3's `ModelMap` already implements `Model`, so the same implementation can be reused.
+> On the `2.7.x` branch, Spring 5.3's `ModelMap` already implements `Model`, so the same `ModelContext.getOrCreate()` implementation can be reused.
 
 ### Thymeleaf / FreeMarker Version Matrix
 
