@@ -1,6 +1,6 @@
 package io.springperf.web.autoconfigure;
 
-import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.context.annotation.ImportRuntimeHints;
 
 /**
@@ -10,7 +10,7 @@ import org.springframework.context.annotation.ImportRuntimeHints;
  * AOT 构建期会连带丢失全部 hints。这里与事件配置解耦，作为独立自动配置注册。
  * </p>
  */
-@Configuration(proxyBeanMethods = false)
+@AutoConfiguration
 @ImportRuntimeHints(SpringWebRuntimeHints.class)
 public class SpringWebRuntimeHintsConfiguration {
 }
