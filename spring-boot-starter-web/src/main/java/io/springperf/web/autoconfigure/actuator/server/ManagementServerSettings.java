@@ -6,6 +6,7 @@ import io.springperf.web.context.PropertiesConstant;
 import io.springperf.web.server.CompressionConfig;
 import io.springperf.web.server.KeepAliveConfig;
 import io.springperf.web.server.ResponseLimitConfig;
+import org.springframework.boot.context.properties.source.ConfigurationPropertySources;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.EnumerablePropertySource;
 import org.springframework.core.env.Environment;
@@ -217,6 +218,12 @@ public final class ManagementServerSettings {
         if (environment instanceof ConfigurableEnvironment) {
             ConfigurableEnvironment configurable = (ConfigurableEnvironment) environment;
             for (PropertySource<?> source : configurable.getPropertySources()) {
+                // Boot 启动时 attach 的 configurationProperties 是原 Environment 的聚合快照。
+                // Binder 会优先直接返回该快照，从而完全忽略本作用域的覆盖属性源；其底层属性源已逐项复制，
+                // 因此这里跳过它，让 Binder 从当前 MutablePropertySources 重新构建。
+                if (ConfigurationPropertySources.isAttachedConfigurationPropertySource(source)) {
+                    continue;
+                }
                 sources.addLast(source);
             }
         } else {
@@ -250,14 +257,46 @@ public final class ManagementServerSettings {
         return Collections.unmodifiableSet(keys);
     }
 
-    /** 把白名单内的 {@code server.X} 查询映射到 {@code management.server.X}；未配置返回 null 以继续回退。 */
-    private static final class ManagementOverridePropertySource extends PropertySource<Object> {
+    /**
+     * 把白名单内的 {@code server.X} 查询映射到 {@code management.server.X}；未配置返回 null 以继续回退。
+     * <p>
+     * 必须实现 {@link EnumerablePropertySource}：Spring Boot {@code Binder} 绑定聚合对象（如 {@code Ssl}）时
+     * 需要枚举 {@code server.ssl.*} 属性名，非可枚举源会让绑定结果为空、管理端口 SSL 静默失效。
+     * </p>
+     */
+    private static final class ManagementOverridePropertySource extends EnumerablePropertySource<Object> {
 
         private final Environment environment;
 
         ManagementOverridePropertySource(Environment environment) {
             super("managementServerOverrides");
             this.environment = environment;
+        }
+
+        @Override
+        public String[] getPropertyNames() {
+            if (!(environment instanceof ConfigurableEnvironment)) {
+                return new String[0];
+            }
+            ConfigurableEnvironment configurable = (ConfigurableEnvironment) environment;
+            List<String> names = new ArrayList<>();
+            for (PropertySource<?> source : configurable.getPropertySources()) {
+                if (!(source instanceof EnumerablePropertySource)) {
+                    continue;
+                }
+                EnumerablePropertySource<?> enumerable = (EnumerablePropertySource<?>) source;
+                for (String name : enumerable.getPropertyNames()) {
+                    if (!name.startsWith(MANAGEMENT_PREFIX)) {
+                        continue;
+                    }
+                    String suffix = name.substring(MANAGEMENT_PREFIX.length());
+                    String mapped = SERVER_PREFIX + suffix;
+                    if (isOverridable(suffix) && !names.contains(mapped)) {
+                        names.add(mapped);
+                    }
+                }
+            }
+            return names.toArray(new String[0]);
         }
 
         @Override
