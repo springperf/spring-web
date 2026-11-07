@@ -22,27 +22,28 @@ class CorsRegistrationTest {
     }
 
     @Test
-    void allowedOrigins_setsOrigins() {
+    void allowedOrigins_replacesDefaultsEntirely() {
         CorsRegistration reg = new CorsRegistration("/api/**").allowedOrigins("https://example.com");
-        assertTrue(reg.getCorsConfiguration().getAllowedOrigins().contains("https://example.com"));
+        // Spring 语义是"替换"默认值：contains 断言会漏掉"默认 * 仍残留"（安全配置被放宽）
+        assertEquals(java.util.Arrays.asList("https://example.com"), reg.getCorsConfiguration().getAllowedOrigins());
     }
 
     @Test
-    void allowedMethods_setsMethods() {
+    void allowedMethods_replacesDefaultsEntirely() {
         CorsRegistration reg = new CorsRegistration("/api/**").allowedMethods("GET", "POST");
-        assertTrue(reg.getCorsConfiguration().getAllowedMethods().contains("GET"));
+        assertEquals(java.util.Arrays.asList("GET", "POST"), reg.getCorsConfiguration().getAllowedMethods());
     }
 
     @Test
-    void allowedHeaders_setsHeaders() {
+    void allowedHeaders_replacesDefaultsEntirely() {
         CorsRegistration reg = new CorsRegistration("/api/**").allowedHeaders("X-Custom");
-        assertTrue(reg.getCorsConfiguration().getAllowedHeaders().contains("X-Custom"));
+        assertEquals(java.util.Arrays.asList("X-Custom"), reg.getCorsConfiguration().getAllowedHeaders());
     }
 
     @Test
     void exposedHeaders_setsHeaders() {
         CorsRegistration reg = new CorsRegistration("/api/**").exposedHeaders("X-Result");
-        assertTrue(reg.getCorsConfiguration().getExposedHeaders().contains("X-Result"));
+        assertEquals(java.util.Arrays.asList("X-Result"), reg.getCorsConfiguration().getExposedHeaders());
     }
 
     @Test
@@ -59,14 +60,13 @@ class CorsRegistrationTest {
 
     @Test
     void chainedCalls_returnsSelf() {
-        CorsRegistration reg = new CorsRegistration("/api/**")
-                .allowedOrigins("*")
-                .allowedMethods("GET")
-                .allowedHeaders("X-Hdr")
-                .exposedHeaders("X-Res")
-                .allowCredentials(false)
-                .maxAge(100);
-        assertNotNull(reg);
+        CorsRegistration reg = new CorsRegistration("/api/**");
+        // 方法名承诺 returnsSelf，就必须 assertSame（断言非空无法证明链式返回的是自身）
+        assertAll(() -> assertSame(reg, reg.allowedOrigins("*")),
+                () -> assertSame(reg, reg.allowedMethods("GET")),
+                () -> assertSame(reg, reg.allowedHeaders("X-Hdr")),
+                () -> assertSame(reg, reg.exposedHeaders("X-Res")),
+                () -> assertSame(reg, reg.allowCredentials(false)), () -> assertSame(reg, reg.maxAge(100)));
         assertEquals("/api/**", reg.getPathPattern());
     }
 }

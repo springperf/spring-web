@@ -16,18 +16,12 @@ import java.io.ByteArrayInputStream;
 import java.lang.reflect.Type;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class SupportHttpBodyCodecInterceptorRegistryTest {
-
-    @Test
-    void constructor_doesNotThrow() {
-        assertDoesNotThrow(SupportHttpBodyCodecInterceptorRegistry::new);
-    }
 
     @Test
     void initWithWebContext_scansAdviceAndWrapsAsInterceptors() {
@@ -86,14 +80,6 @@ class SupportHttpBodyCodecInterceptorRegistryTest {
                 interceptor.afterBodyRead("raw", in, param, String.class, converter));
         assertEquals("empty-body",
                 interceptor.handleEmptyBodyRead(null, in, param, String.class, converter));
-    }
-
-    private static void assertDoesNotThrow(Runnable r) {
-        try {
-            r.run();
-        } catch (Exception e) {
-            throw new org.opentest4j.AssertionFailedError("不应抛异常", e);
-        }
     }
 
     @ControllerAdvice

@@ -203,4 +203,20 @@ class SpringMvcTypesTest {
         mav.getModelMap().addAttribute("key", "value");
         assertEquals("value", mav.getModel().get("key"));
     }
+
+    @Test
+    void modelAndView_addObjectWithoutName_derivesNameFromType() {
+        ModelAndView mav = new ModelAndView("test");
+        mav.addObject("value");
+
+        // key 由 Conventions.getVariableName 按类型推导（String -> "string"）；只断言"非空"会漏掉命名推导错误
+        assertEquals("value", mav.getModel().get("string"));
+    }
+
+    @Test
+    void modelAndView_toString_containsViewInfo() {
+        ModelAndView mav = new ModelAndView("testView");
+
+        assertTrue(mav.toString().contains("testView"));
+    }
 }

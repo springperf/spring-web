@@ -11,26 +11,27 @@ import static org.junit.jupiter.api.Assertions.*;
 class ResponseBodyEmitterTest {
 
     @Test
-    void defaultConstructor_createsEmitter() {
-        ResponseBodyEmitter emitter = new ResponseBodyEmitter();
-        assertNotNull(emitter);
+    void defaultConstructor_initialStateEmpty() {
+        TestEmitter emitter = new TestEmitter();
+        assertNull(emitter.getTimeout());
+        assertEquals(0, emitter.earlySendSize(), "新建 emitter 不应有早发缓冲数据");
+        assertFalse(emitter.isComplete());
     }
 
     @Test
     void timeoutConstructor_createsEmitterWithTimeout() {
         ResponseBodyEmitter emitter = new ResponseBodyEmitter(5000L);
-        assertNotNull(emitter);
         assertEquals(5000L, emitter.getTimeout().longValue());
     }
 
     @Test
-    void timeoutConstructor_nullTimeout_createsEmitter() {
+    void timeoutConstructor_nullTimeout_createsEmitterWithoutTimeout() {
         ResponseBodyEmitter emitter = new ResponseBodyEmitter(null);
-        assertNotNull(emitter);
+        assertNull(emitter.getTimeout(), "null 超时不应被解释为某个具体值");
     }
 
     @Test
-    void send_withNullMediaType_callsSend() throws Exception {
+    void send_withNullMediaType_buffersRawData() throws Exception {
         TestEmitter emitter = new TestEmitter();
         emitter.send("data", null);
         // 未初始化 sender 时数据应进入早发缓冲（原样入队，不包裹 DataWithMediaType）
@@ -52,7 +53,7 @@ class ResponseBodyEmitterTest {
     }
 
     @Test
-    void send_withoutMediaType_callsSend() throws Exception {
+    void send_withoutMediaType_buffersRawData() throws Exception {
         TestEmitter emitter = new TestEmitter();
         emitter.send("data");
         assertEquals(1, emitter.earlySendSize());

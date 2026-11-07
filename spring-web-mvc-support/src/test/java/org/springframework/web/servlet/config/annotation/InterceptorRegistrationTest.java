@@ -81,12 +81,12 @@ class InterceptorRegistrationTest {
 
     @Test
     void chainedCalls_returnsSelf() {
-        InterceptorRegistration reg = new InterceptorRegistration(interceptor)
-                .addPathPatterns("/api/**")
-                .excludePathPatterns("/api/public/**")
-                .order(1);
+        InterceptorRegistration reg = new InterceptorRegistration(interceptor);
+        // 方法名承诺 returnsSelf，就必须 assertSame
+        assertSame(reg, reg.addPathPatterns("/api/**"));
+        assertSame(reg, reg.excludePathPatterns("/api/public/**"));
+        assertSame(reg, reg.order(1));
 
-        assertNotNull(reg);
         assertEquals(1, reg.getIncludePatterns().size());
         assertEquals(1, reg.getExcludePatterns().size());
         assertEquals(1, reg.getOrder());

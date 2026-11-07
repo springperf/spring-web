@@ -11,6 +11,7 @@ import io.springperf.web.view.ViewResolverRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.MethodParameter;
@@ -129,7 +130,11 @@ class ModelAndViewReturnValueResolverTest {
         resolver.resolveReturnValue(mav, mavParam(), req, resp);
 
         verify(resp).setHandled();
-        verify(view).render(any(), eq(req), eq(resp));
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> modelCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(view).render(modelCaptor.capture(), eq(req), eq(resp));
+        // 用例名强调 withModel：MAV 里的模型必须真的交到视图渲染，丢字段即失败
+        assertEquals("Perf", modelCaptor.getValue().get("name"));
         assertEquals("text/html;charset=UTF-8", headers.getFirst(HttpHeaders.CONTENT_TYPE));
     }
 
@@ -176,8 +181,10 @@ class ModelAndViewReturnValueResolverTest {
         ModelAndView mav = new ModelAndView("redirect:/home");
         resolver.resolveReturnValue(mav, mavParam(), req, resp);
 
+        // 用例名是 sets302，状态码必须被断言：只校验 Location 时，返回 200 空 body 的错误实现也能过
+        verify(resp).setStatusCode(HttpStatus.FOUND);
         verify(resp).setHandled();
-        assertTrue(headers.getFirst(HttpHeaders.LOCATION).contains("/app/home"));
+        assertEquals("/app/home", headers.getFirst(HttpHeaders.LOCATION), "Location 应精确拼接 context-path");
     }
 
     @Test
