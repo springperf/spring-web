@@ -222,7 +222,7 @@ coverage-aggregate/spring-web,io.springperf.web.server,NettyHttpServer,46,418,9,
 coverage-aggregate/spring-web,io.springperf.web.server,ErrorPageRenderer.ErrorResponseBody,0,15,0,0,0,6,0,3,0,3
 coverage-aggregate/spring-web,io.springperf.web.server,Http2ChannelInitializer.Http2OrHttp1Handler,265,0,14,0,43,0,9,0,2,0
 coverage-aggregate/spring-web,io.springperf.web.server,NettyMetricsHandler,0,60,0,4,0,19,0,8,0,6
-coverage-aggregate/spring-web,io.springperf.web.server,NettyHttpHandler,67,515,16,70,19,143,16,44,1,16
+coverage-aggregate/spring-web,io.springperf.web.server,NettyHttpHandler,67,515,15,71,19,143,15,45,1,16
 coverage-aggregate/spring-web,io.springperf.web.core.mapping,PathMappingContext,0,191,0,20,0,50,0,27,0,17
 coverage-aggregate/spring-web,io.springperf.web.core.mapping,MappingHandlerMethod,0,273,0,28,0,67,0,26,0,12
 coverage-aggregate/spring-web,io.springperf.web.core.mapping,MappingResult.MismatchKind,0,33,0,0,0,2,0,1,0,1
@@ -254,7 +254,7 @@ coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,PerfHttp
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,PerfHttpServletResponse.CommitOnFlushPrintWriter,0,57,0,2,0,22,0,8,0,7
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,ServletPartAdapter,0,57,0,2,0,14,0,12,0,11
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.session,PerfHttpSessionManager,52,648,7,51,11,158,7,59,1,35
-coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.session,FileHttpSessionStorage,118,883,21,87,31,214,21,69,1,35
+coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.session,FileHttpSessionStorage,91,910,17,91,25,220,17,73,0,36
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.session,HttpSessionStorage,0,38,0,2,0,10,0,4,0,3
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.session,InMemoryHttpSessionStorage,4,175,0,10,2,41,1,17,1,12
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.session,PerfHttpSession,0,332,0,34,0,91,0,39,0,22
@@ -421,7 +421,7 @@ coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.actua
 coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.actuator.server,ManagementNettyHttpServer.new ChannelInitializer() {...},0,84,0,0,0,10,0,2,0,2
 coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.actuator.server,ManagementServerSettings.new PropertySource() {...},12,0,0,0,2,0,2,0,2,0
 coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.metrics,MicrometerWebMetrics,4,280,0,12,0,46,1,17,1,11
-coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.openapi,OpenApiAdapter,5,1127,18,198,2,236,18,110,0,20
+coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.openapi,OpenApiAdapter,2,1130,5,211,2,236,5,123,0,20
 coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.openapi,OpenApiDocController,0,132,0,4,0,32,0,7,0,5
 coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.batch,MicrometerBatchMetrics,0,317,0,14,0,60,0,24,0,17
 coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.admin,PerfApplicationFactory,22,238,10,31,9,54,11,29,1,18
