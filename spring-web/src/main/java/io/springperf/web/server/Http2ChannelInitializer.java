@@ -210,16 +210,19 @@ public class Http2ChannelInitializer extends ChannelInitializer<SocketChannel> {
                 }
 
                 // We have enough — decide
+                // remove(this) 会同步触发 handlerRemoved 并把 accumulator 字段置 null，
+                // 必须提前固定局部引用，否则分片前言/回退路径会把 null 送进 pipeline。
                 ChannelPipeline pipe = ctx.pipeline();
-                accumulator.retain(); // retain before remove(this) frees it
-                if (startsWithPreface(accumulator)) {
+                ByteBuf preface = accumulator;
+                preface.retain(); // retain before remove(this) frees it
+                if (startsWithPreface(preface)) {
                     pipe.addBefore(pipe.context(this).name(), "h2-frame-codec", frameCodec);
                     pipe.addAfter("h2-frame-codec", "h2-multiplex", multiplexHandler);
                     pipe.remove(this);
-                    pipe.fireChannelRead(accumulator);
+                    pipe.fireChannelRead(preface);
                 } else {
                     pipe.remove(this);
-                    pipe.fireChannelRead(accumulator);
+                    pipe.fireChannelRead(preface);
                 }
             }
 

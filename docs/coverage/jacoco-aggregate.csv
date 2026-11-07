@@ -3,10 +3,10 @@ coverage-aggregate/spring-web,io.springperf.web.core.async.reactive,PublisherToD
 coverage-aggregate/spring-web,io.springperf.web.core.async.reactive,ReactiveReturnValueResolver,16,561,16,74,6,128,16,43,0,14
 coverage-aggregate/spring-web,io.springperf.web.core.async.reactive,PublisherToStreamEmitterAdapter,2,165,2,16,0,52,2,19,0,12
 coverage-aggregate/spring-web,io.springperf.web.core.async.reactive,ReactiveConfig,0,52,0,4,0,15,0,5,0,3
-coverage-aggregate/spring-web,io.springperf.web.http.support,SupportMultipartResolver,62,635,23,85,14,143,21,50,0,17
+coverage-aggregate/spring-web,io.springperf.web.http.support,SupportMultipartResolver,62,635,22,86,14,143,20,51,0,17
 coverage-aggregate/spring-web,io.springperf.web.http.support,NettyMultipartFile,3,159,1,11,1,34,1,20,0,15
 coverage-aggregate/spring-web,io.springperf.web.http.support,NettyMultipartWebRequest,9,205,3,16,3,55,3,17,0,10
-coverage-aggregate/spring-web,io.springperf.web.http.support,SupportMultipartAggregator,78,196,4,16,23,62,6,17,3,10
+coverage-aggregate/spring-web,io.springperf.web.http.support,SupportMultipartAggregator,0,274,2,18,0,85,2,21,0,13
 coverage-aggregate/spring-web,io.springperf.web.http.support,NettyAttributeMessage,3,66,0,4,1,18,0,10,0,8
 coverage-aggregate/spring-web,io.springperf.web.core.cors,PerfCorsProcessor.NoFlushWebServerHttpResponse,0,8,0,0,0,4,0,2,0,2
 coverage-aggregate/spring-web,io.springperf.web.core.cors,PerfCorsProcessor,0,94,1,13,0,23,1,9,0,3
@@ -22,14 +22,14 @@ coverage-aggregate/spring-web,org.springframework.web.context.request.async,WebA
 coverage-aggregate/spring-web,org.springframework.web.context.request.async,WebAsyncSupportUtils.CallableInterceptorChainAdapter,0,4,0,0,0,2,0,1,0,1
 coverage-aggregate/spring-web,org.springframework.web.context.request.async,WebAsyncSupportUtils.DeferredResultInterceptorChainAdapter,0,4,0,0,0,2,0,1,0,1
 coverage-aggregate/spring-web,io.springperf.web.core.async.stream,SseJsonEmitter,0,28,0,0,0,10,0,3,0,3
-coverage-aggregate/spring-web,io.springperf.web.core.async.stream,AbstractNettyStreamSender,51,384,11,47,12,107,10,37,1,17
+coverage-aggregate/spring-web,io.springperf.web.core.async.stream,AbstractNettyStreamSender,45,390,10,48,11,108,9,38,1,17
 coverage-aggregate/spring-web,io.springperf.web.core.async.stream,StreamJsonEmitter,0,38,0,4,0,16,0,6,0,4
 coverage-aggregate/spring-web,io.springperf.web.core.async.stream,SseEmitter,20,246,4,22,5,77,5,23,2,13
-coverage-aggregate/spring-web,io.springperf.web.core.async.stream,EarlyEncodeNettyStreamSender,43,76,11,15,14,27,8,7,0,2
+coverage-aggregate/spring-web,io.springperf.web.core.async.stream,EarlyEncodeNettyStreamSender,8,111,5,21,3,38,5,10,0,2
 coverage-aggregate/spring-web,io.springperf.web.core.async.stream,DefaultStreamSenderFactory,0,18,0,2,0,4,0,3,0,2
 coverage-aggregate/spring-web,io.springperf.web.core.async.stream,DefaultNettyStreamSender,0,121,1,19,0,41,1,11,0,2
 coverage-aggregate/spring-web,io.springperf.web.core.async.stream,TextStreamEmitter,9,37,0,4,4,16,2,7,2,5
-coverage-aggregate/spring-web,io.springperf.web.core.async.stream,StreamEmitter,11,245,2,26,4,70,4,28,2,16
+coverage-aggregate/spring-web,io.springperf.web.core.async.stream,StreamEmitter,6,250,1,27,3,71,3,29,2,16
 coverage-aggregate/spring-web,io.springperf.web.core.async.stream,StreamEmitterReturnValueResolver,1,97,2,10,1,24,2,10,0,6
 coverage-aggregate/spring-web,io.springperf.web.core.async.stream,StreamEmitterUtil,3,45,1,1,1,17,2,4,1,4
 coverage-aggregate/spring-web,io.springperf.web.core.invoker,InvokableHandlerMethod,14,201,2,20,4,50,2,25,0,16
@@ -65,7 +65,7 @@ coverage-aggregate/spring-web,io.springperf.web.http,BaseWebServerHttpResponse,3
 coverage-aggregate/spring-web,io.springperf.web.http,ConnectionContext,0,20,0,0,0,8,0,5,0,5
 coverage-aggregate/spring-web,io.springperf.web.http,WebServerHttpRequest,13,0,2,0,4,0,4,0,3,0
 coverage-aggregate/spring-web,io.springperf.web.http,WebHttpHeaders,3,137,2,10,1,42,2,28,0,24
-coverage-aggregate/spring-web,io.springperf.web.http,WebServerHttpResponseWrapper,39,112,0,0,15,38,8,25,8,25
+coverage-aggregate/spring-web,io.springperf.web.http,WebServerHttpResponseWrapper,0,151,0,0,0,53,0,33,0,33
 coverage-aggregate/spring-web,io.springperf.web.http,RequestAttribute,3,29,0,0,1,8,1,5,1,5
 coverage-aggregate/spring-web,io.springperf.web.http,ParameterLimitExceededException,0,19,0,0,0,6,0,3,0,3
 coverage-aggregate/spring-web,io.springperf.web.http,NettyServerHttpRequest,4,824,17,125,1,175,17,83,0,29
@@ -74,7 +74,7 @@ coverage-aggregate/spring-web,io.springperf.web.http,BaseWebServerHttpRequest,7,
 coverage-aggregate/spring-web,io.springperf.web.http,WriteRespEventListener,0,6,0,0,0,3,0,2,0,2
 coverage-aggregate/spring-web,io.springperf.web.http,BaseWebServerHttpResponse.CompositeWriteRespEventListener,0,87,0,8,0,23,0,10,0,6
 coverage-aggregate/spring-web,io.springperf.web.http,BackpressureHandler,0,58,0,10,0,19,0,8,0,3
-coverage-aggregate/spring-web,io.springperf.web.http,WebServerHttpResponse,42,0,0,0,19,0,13,0,13,0
+coverage-aggregate/spring-web,io.springperf.web.http,WebServerHttpResponse,31,11,0,0,15,4,11,2,11,2
 coverage-aggregate/spring-web,io.springperf.web.http,BaseWebServerHttpRequest.AcceptLanguageLocaleCache,5,20,1,1,2,5,2,3,1,3
 coverage-aggregate/spring-web,io.springperf.web.http,NettyHttpHeadersAdapter,0,348,0,36,0,81,0,41,0,23
 coverage-aggregate/spring-web,io.springperf.web.http,NettyServerHttpResponse,65,1429,31,183,20,367,31,123,1,46
@@ -99,7 +99,7 @@ coverage-aggregate/spring-web,io.springperf.web.core.filter,AccessLogWebFilter.T
 coverage-aggregate/spring-web,io.springperf.web.core.filter,DefaultFilterChain,0,41,0,2,0,12,0,3,0,2
 coverage-aggregate/spring-web,io.springperf.web.core.filter,WebFilter,2,0,0,0,1,0,1,0,1,0
 coverage-aggregate/spring-web,io.springperf.web.core.filter,AccessLogWebFilter,1,188,2,20,0,48,2,17,0,8
-coverage-aggregate/spring-web,io.springperf.web.core.filter,AccessLogWriter,30,352,8,38,12,84,8,28,0,13
+coverage-aggregate/spring-web,io.springperf.web.core.filter,AccessLogWriter,22,360,6,40,8,88,6,30,0,13
 coverage-aggregate/spring-web,io.springperf.web.core.filter,RuntimeMappingWebFilter,2,132,2,16,0,27,2,14,0,7
 coverage-aggregate/spring-web,io.springperf.web.core.filter,AccessLogWebFilter.Token,0,77,0,4,0,9,0,5,0,3
 coverage-aggregate/spring-web,io.springperf.web.core.filter,AccessLogWriter.new AccessLogWriter() {...},0,3,0,0,0,1,0,1,0,1
@@ -174,7 +174,7 @@ coverage-aggregate/spring-web,io.springperf.web.context,WebComponentWrapperUtils
 coverage-aggregate/spring-web,io.springperf.web.context,PropertyRefreshHandler,0,18,0,0,0,7,0,3,0,3
 coverage-aggregate/spring-web,io.springperf.web.context,PropertiesConstant,0,181,0,0,0,31,0,2,0,2
 coverage-aggregate/spring-web,io.springperf.web.context,BaseWebComponent,0,10,0,0,0,4,0,3,0,3
-coverage-aggregate/spring-web,io.springperf.web.context,ApplicationProperties,118,579,20,53,21,128,17,41,0,20
+coverage-aggregate/spring-web,io.springperf.web.context,ApplicationProperties,50,647,14,59,8,141,14,44,0,20
 coverage-aggregate/spring-web,io.springperf.web.context,LifecycleWebComponent,0,4,0,0,0,4,0,4,0,4
 coverage-aggregate/spring-web,io.springperf.web.core.codec,HttpBodyCodecRegistry,27,1031,22,176,6,247,19,103,0,23
 coverage-aggregate/spring-web,io.springperf.web.core.codec,HttpBodyConverter,0,25,0,0,0,5,0,4,0,4
@@ -198,10 +198,10 @@ coverage-aggregate/spring-web,io.springperf.web.core.interceptor,InterceptorRegi
 coverage-aggregate/spring-web,io.springperf.web.core.interceptor,InterceptorRegistration,8,122,3,7,3,32,4,19,1,17
 coverage-aggregate/spring-web,io.springperf.web.core.interceptor,HandlerInterceptor,2,3,0,0,1,3,1,3,1,3
 coverage-aggregate/spring-web,io.springperf.web.core.interceptor,RuntimeMappingInterceptor,0,148,0,20,0,29,0,20,0,10
-coverage-aggregate/spring-web,io.springperf.web.server,ErrorPageRenderer,89,622,23,77,18,131,22,44,1,10
+coverage-aggregate/spring-web,io.springperf.web.server,ErrorPageRenderer,57,654,12,88,11,138,10,56,0,11
 coverage-aggregate/spring-web,io.springperf.web.server,NettyHttpHandler.new WriteRespEventListener() {...},0,28,0,0,0,5,0,3,0,3
 coverage-aggregate/spring-web,io.springperf.web.server,KeepAliveConfig,0,49,0,4,0,11,0,8,0,6
-coverage-aggregate/spring-web,io.springperf.web.server,Http2ChannelInitializer.new ChannelInboundHandlerAdapter() {...},88,96,10,10,21,21,7,7,0,4
+coverage-aggregate/spring-web,io.springperf.web.server,Http2ChannelInitializer.new ChannelInboundHandlerAdapter() {...},2,181,1,19,1,42,1,13,0,4
 coverage-aggregate/spring-web,io.springperf.web.server,ErrorResponseConfig.IncludePolicy,0,21,0,0,0,2,0,1,0,1
 coverage-aggregate/spring-web,io.springperf.web.server,KeepAliveHandler,0,115,3,15,0,32,3,14,0,8
 coverage-aggregate/spring-web,io.springperf.web.server,ReadIdleTimeoutHandler,5,95,2,8,2,33,2,13,0,10
@@ -240,7 +240,7 @@ coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,PerfHttp
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,AbstractFastFailHttpServletRequest.new ServletConnection() {...},0,18,0,0,0,5,0,5,0,5
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,PerfWebConnection,0,28,0,4,0,11,0,6,0,4
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,ServletInvoker,7,49,0,0,2,13,0,7,0,7
-coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,PerfAsyncContext.Registration,8,55,4,4,0,11,4,3,0,3
+coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,PerfAsyncContext.Registration,0,63,0,8,0,11,0,7,0,3
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,AbstractFastFailHttpServletRequest,0,202,0,0,0,74,0,73,0,73
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,PerfHttpServletRequest,106,1324,33,175,25,342,29,152,1,76
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet,AbstractFastFailHttpServletResponse,6,79,0,0,2,34,2,34,2,34
@@ -407,8 +407,8 @@ coverage-aggregate/spring-web-batch,io.springperf.web.batch.queue,BatchEvent,0,1
 coverage-aggregate/spring-web-batch,io.springperf.web.batch.queue,DisruptorQueue,75,419,6,37,20,91,7,31,1,15
 coverage-aggregate/spring-web-batch,io.springperf.web.batch.queue,BatchEventTranslator,0,7,0,0,0,3,0,2,0,2
 coverage-aggregate/spring-web-batch,io.springperf.web.batch.queue,BatchExceptionHandler,0,57,0,6,0,12,0,8,0,5
-coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.support,ControllerBeanFactoryInitializationAotProcessor,5,352,17,55,3,70,17,25,0,6
-coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.support,ControllerBeanFactoryInitializationAotProcessor.Contribution,0,108,2,8,0,20,2,5,0,2
+coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.support,ControllerBeanFactoryInitializationAotProcessor,1,356,12,60,1,72,12,30,0,6
+coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.support,ControllerBeanFactoryInitializationAotProcessor.Contribution,0,108,1,9,0,20,1,6,0,2
 coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.support,WebServerApplicationContextFactory,0,25,0,6,0,8,0,5,0,2
 coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.support,PerfWebServerInitializedEvent,0,32,0,0,0,5,0,3,0,3
 coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.support,PerfWebServerInitializedEvent.new InvocationHandler() {...},0,36,2,6,0,6,2,4,0,2
@@ -461,4 +461,4 @@ coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.actua
 coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.actuator,ActuatorEndpointHandlerMapping,12,228,4,20,6,56,4,14,0,6
 coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.actuator,ActuatorMappingDescriptionProvider,4,421,3,33,0,80,3,27,0,12
 coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.actuator,ManagementDispatcherHandler,5,101,0,8,2,28,1,10,1,6
-coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.actuator,ActuatorPathMappingContext,18,289,15,35,4,65,13,24,0,12
+coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.actuator,ActuatorPathMappingContext,14,293,8,42,3,66,6,31,0,12
