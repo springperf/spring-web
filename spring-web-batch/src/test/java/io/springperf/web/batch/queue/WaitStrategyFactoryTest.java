@@ -12,6 +12,9 @@ class WaitStrategyFactoryTest {
     void blocking() {
         WaitStrategy strategy = WaitStrategyFactory.create(BatchMapping.WaitStrategy.BLOCKING);
         assertThat(strategy).isInstanceOf(BlockingWaitStrategy.class);
+        // 每次创建必须是独立实例：Disruptor 的 wait strategy 持有内部状态，不能共享
+        assertThat(WaitStrategyFactory.create(BatchMapping.WaitStrategy.BLOCKING))
+                .isNotSameAs(WaitStrategyFactory.create(BatchMapping.WaitStrategy.BLOCKING));
     }
 
     @Test

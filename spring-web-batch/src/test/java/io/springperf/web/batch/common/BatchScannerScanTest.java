@@ -24,7 +24,9 @@ class BatchScannerScanTest {
 
     @Controller
     public static class BatchController {
-        @BatchMapping(method = "single", ringBufferSize = 64, maxBatchSize = 5, consumerSize = 2)
+        @BatchMapping(method = "single", ringBufferSize = 64, maxBatchSize = 5, consumerSize = 2,
+                waitStrategy = BatchMapping.WaitStrategy.YIELDING, backpressure = BatchMapping.Backpressure.THROW,
+                batchWindowMillis = 7)
         public void batch(List<EchoRequest> requests) {
         }
 
@@ -134,7 +136,12 @@ class BatchScannerScanTest {
             assertEquals(64, meta.ringBufferSize());
             assertEquals(5, meta.maxBatchSize());
             assertEquals(2, meta.consumerSize());
+            assertEquals(BatchMapping.WaitStrategy.YIELDING, meta.waitStrategy());
+            assertEquals(BatchMapping.Backpressure.THROW, meta.backpressure());
+            assertEquals(7, meta.batchWindowMillis());
             assertNotNull(meta.singleMethodCtor());
+            assertEquals(1, meta.singleMethodCtor().getParameterCount());
+            assertEquals(String.class, meta.singleMethodCtor().getParameterTypes()[0]);
         }
     }
 
@@ -155,8 +162,10 @@ class BatchScannerScanTest {
     void scan_emptyMappings_singleNotFound_throws() throws Exception {
         try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext(TestConfig.class)) {
             BatchScanner scanner = new BatchScanner();
-            assertThrows(IllegalStateException.class,
+            IllegalStateException ex = assertThrows(IllegalStateException.class,
                     () -> scanner.scan(ctx, Collections.emptyList()));
+            assertTrue(ex.getMessage().contains("no mappings for this bean"),
+                    "应明确指出该 bean 没有任何映射: " + ex.getMessage());
         }
     }
 
@@ -168,8 +177,10 @@ class BatchScannerScanTest {
             BadRequestTypeController bean = ctx.getBean(BadRequestTypeController.class);
             PathMappingContext singleCtx = mappingFor(bean, "bad", String.class);
             BatchScanner scanner = new BatchScanner();
-            assertThrows(IllegalStateException.class,
+            IllegalStateException ex = assertThrows(IllegalStateException.class,
                     () -> scanner.scan(ctx, Collections.singletonList(singleCtx)));
+            assertTrue(ex.getMessage().contains("must have a List<? extends BatchRequest<?>> as its first parameter"),
+                    "应指出首个参数必须是 BatchRequest 列表: " + ex.getMessage());
         }
     }
 
@@ -181,8 +192,10 @@ class BatchScannerScanTest {
             TooManyParamsController bean = ctx.getBean(TooManyParamsController.class);
             PathMappingContext singleCtx = mappingFor(bean, "bad", EchoRequest.class);
             BatchScanner scanner = new BatchScanner();
-            assertThrows(IllegalStateException.class,
+            IllegalStateException ex = assertThrows(IllegalStateException.class,
                     () -> scanner.scan(ctx, Collections.singletonList(singleCtx)));
+            assertTrue(ex.getMessage().contains("must have exactly one parameter"),
+                    "应指出批量方法只能有一个参数: " + ex.getMessage());
         }
     }
 
@@ -254,7 +267,10 @@ class BatchScannerScanTest {
             GenericTypeVariableController bean = ctx.getBean(GenericTypeVariableController.class);
             PathMappingContext singleCtx = mappingFor(bean, "single", String.class);
             BatchScanner scanner = new BatchScanner();
-            assertThrows(IllegalStateException.class, () -> scanner.scan(ctx, Collections.singletonList(singleCtx)));
+            IllegalStateException ex = assertThrows(IllegalStateException.class,
+                    () -> scanner.scan(ctx, Collections.singletonList(singleCtx)));
+            assertTrue(ex.getMessage().contains("must have a List<? extends BatchRequest<?>> as its first parameter"),
+                    "类型变量实参应被判定为非法首参: " + ex.getMessage());
         }
     }
 
@@ -266,9 +282,10 @@ class BatchScannerScanTest {
             NoMatchingCtorController bean = ctx.getBean(NoMatchingCtorController.class);
             PathMappingContext singleCtx = mappingFor(bean, "single", String.class);
             BatchScanner scanner = new BatchScanner();
-            assertThrows(IllegalStateException.class,
-                    () -> scanner.scan(ctx, Collections.singletonList(singleCtx)),
-                    "BatchRequest 缺少与 single 方法参数匹配的构造函数应抛异常");
+            IllegalStateException ex = assertThrows(IllegalStateException.class,
+                    () -> scanner.scan(ctx, Collections.singletonList(singleCtx)));
+            assertTrue(ex.getMessage().contains("must have a constructor matching method"),
+                    "BatchRequest 缺少与 single 方法参数匹配的构造函数应抛异常: " + ex.getMessage());
         }
     }
 
@@ -352,7 +369,10 @@ class BatchScannerScanTest {
             RawListController bean = ctx.getBean(RawListController.class);
             PathMappingContext singleCtx = mappingFor(bean, "bad", String.class);
             BatchScanner scanner = new BatchScanner();
-            assertThrows(IllegalStateException.class, () -> scanner.scan(ctx, Collections.singletonList(singleCtx)));
+            IllegalStateException ex = assertThrows(IllegalStateException.class,
+                    () -> scanner.scan(ctx, Collections.singletonList(singleCtx)));
+            assertTrue(ex.getMessage().contains("must have a List<? extends BatchRequest<?>> as its first parameter"),
+                    "原始类型 List 应被判定为非法首参: " + ex.getMessage());
         }
     }
 
@@ -374,7 +394,10 @@ class BatchScannerScanTest {
             NonListFirstParamController bean = ctx.getBean(NonListFirstParamController.class);
             PathMappingContext singleCtx = mappingFor(bean, "bad", String.class);
             BatchScanner scanner = new BatchScanner();
-            assertThrows(IllegalStateException.class, () -> scanner.scan(ctx, Collections.singletonList(singleCtx)));
+            IllegalStateException ex = assertThrows(IllegalStateException.class,
+                    () -> scanner.scan(ctx, Collections.singletonList(singleCtx)));
+            assertTrue(ex.getMessage().contains("must have a List<? extends BatchRequest<?>> as its first parameter"),
+                    "非 List 首参应被判定为非法: " + ex.getMessage());
         }
     }
 
@@ -397,7 +420,10 @@ class BatchScannerScanTest {
             NestedGenericController bean = ctx.getBean(NestedGenericController.class);
             PathMappingContext singleCtx = mappingFor(bean, "bad", String.class);
             BatchScanner scanner = new BatchScanner();
-            assertThrows(IllegalStateException.class, () -> scanner.scan(ctx, Collections.singletonList(singleCtx)));
+            IllegalStateException ex = assertThrows(IllegalStateException.class,
+                    () -> scanner.scan(ctx, Collections.singletonList(singleCtx)));
+            assertTrue(ex.getMessage().contains("must have a List<? extends BatchRequest<?>> as its first parameter"),
+                    "嵌套泛型实参不是 BatchRequest 子类时应判定为非法: " + ex.getMessage());
         }
     }
 

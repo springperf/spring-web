@@ -1,5 +1,8 @@
 package io.springperf.web.batch;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import io.springperf.web.batch.annotation.BatchMapping;
 import io.springperf.web.batch.common.BatchHandlerRegistration;
 import io.springperf.web.batch.common.BatchRequest;
@@ -9,6 +12,7 @@ import io.springperf.web.context.WebContext;
 import io.springperf.web.core.mapping.PathMappingContext;
 import io.springperf.web.core.pool.BizPoolRegistry;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.method.HandlerMethod;
 
 import java.lang.reflect.Constructor;
@@ -18,6 +22,7 @@ import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -52,6 +57,10 @@ class BatchRegistryInstallConflictTest {
         Method install = BatchRegistry.class.getDeclaredMethod("install", BatchHandlerRegistration.class);
         install.setAccessible(true);
 
+        Logger logger = (Logger) LoggerFactory.getLogger(DisruptorQueue.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
         try {
             // 首次安装成功：Disruptor 线程启动
             install.invoke(registry, newRegistration());
@@ -61,10 +70,20 @@ class BatchRegistryInstallConflictTest {
             InvocationTargetException ex =
                     assertThrows(InvocationTargetException.class, () -> install.invoke(registry, newRegistration()));
             assertTrue(ex.getCause() instanceof IllegalStateException, "冲突应抛 IllegalStateException");
+            String message = ex.getCause().getMessage();
+            assertTrue(message.contains("Queue [" + QUEUE + "] already exists"), "异常应指出冲突队列: " + message);
+            assertTrue(message.contains("handle"), "异常应指出冲突的 @BatchMapping 方法: " + message);
+            assertTrue(message.contains("DummyBatchBean"), "异常应指出冲突的 bean 类型: " + message);
 
             // 冲突路径新建的 queue 已被 shutdown，其 Disruptor 线程终止，只剩首次那个
             awaitDisruptorThreadCount(QUEUE, 1);
+            long shutdownLogs = appender.list.stream()
+                    .filter(e -> e.getFormattedMessage().contains("shut down gracefully"))
+                    .filter(e -> e.getFormattedMessage().contains(QUEUE))
+                    .count();
+            assertEquals(1, shutdownLogs, "冲突路径新建的队列必须先 shutdown 释放线程");
         } finally {
+            logger.detachAppender(appender);
             // 无论如何都清理已安装的队列，避免非 daemon Disruptor 线程泄漏挂住测试 JVM
             shutdownQueues(registry);
         }

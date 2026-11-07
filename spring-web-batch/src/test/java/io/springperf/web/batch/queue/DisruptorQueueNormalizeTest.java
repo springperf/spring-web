@@ -71,7 +71,26 @@ class DisruptorQueueNormalizeTest {
         // 而非静默 4096、更非 2^30（2^30 槽位预分配 BatchEvent 必然 OOM）
         int result = DisruptorQueue.normalizeRingBufferSize(Integer.MAX_VALUE);
         assertThat(result).isEqualTo(1 << 18);
-        assertThat(Integer.bitCount(result)).isEqualTo(1); // 是 2 的幂
+    }
+
+    @Test
+    void integerMinBecomes4096() {
+        assertThat(DisruptorQueue.normalizeRingBufferSize(Integer.MIN_VALUE)).isEqualTo(4096);
+    }
+
+    @Test
+    void exactCeilingStaysAtCeiling() {
+        assertThat(DisruptorQueue.normalizeRingBufferSize(1 << 18)).isEqualTo(1 << 18);
+    }
+
+    @Test
+    void ceilingPlusOneClampsToCeiling() {
+        assertThat(DisruptorQueue.normalizeRingBufferSize((1 << 18) + 1)).isEqualTo(1 << 18);
+    }
+
+    @Test
+    void size65RoundsUpTo128() {
+        assertThat(DisruptorQueue.normalizeRingBufferSize(65)).isEqualTo(128);
     }
 
     @Test

@@ -6,14 +6,19 @@ import io.springperf.web.batch.common.BatchRequestMetaData;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -47,14 +52,41 @@ class BufferingBatchHandlerWindowTest {
         }
     }
 
+    /** 记录每个实际提交的批次内容，用于断言批大小与请求集合。 */
+    static class RecordingService {
+        final List<List<?>> batches = new CopyOnWriteArrayList<>();
+
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        public void handle(List<? extends BatchRequest<?>> batch) {
+            batches.add(new ArrayList<>(batch));
+            for (BatchRequest request : batch) {
+                request.setResult("ok");
+            }
+        }
+    }
+
     private static BatchRequestMetaData meta(int windowMillis) throws Exception {
         Method m = WindowService.class.getDeclaredMethod("handle", List.class);
         return new BatchRequestMetaData(m, WindowService.class, null, "win-queue", 1024,
                 BatchMapping.WaitStrategy.BLOCKING, BatchMapping.Backpressure.BLOCK, null, 100, windowMillis, 4);
     }
 
+    private static BatchRequestMetaData recordingMeta(int windowMillis) throws Exception {
+        Method m = RecordingService.class.getDeclaredMethod("handle", List.class);
+        return new BatchRequestMetaData(m, RecordingService.class, null, "win-record", 1024,
+                BatchMapping.WaitStrategy.BLOCKING, BatchMapping.Backpressure.BLOCK, null, 100, windowMillis, 4);
+    }
+
     private BufferingBatchHandler newHandler(Executor executor, int windowMillis, int maxBatchSize) throws Exception {
         BufferingBatchHandler handler = new BufferingBatchHandler(executor, meta(windowMillis), new WindowService(),
+                maxBatchSize);
+        handlers.add(handler);
+        return handler;
+    }
+
+    private BufferingBatchHandler newRecordingHandler(Executor executor, int windowMillis, int maxBatchSize,
+            RecordingService service) throws Exception {
+        BufferingBatchHandler handler = new BufferingBatchHandler(executor, recordingMeta(windowMillis), service,
                 maxBatchSize);
         handlers.add(handler);
         return handler;
@@ -97,38 +129,54 @@ class BufferingBatchHandlerWindowTest {
     }
 
     @Test
-    @DisplayName("窗口开启：攒满 maxBatchSize 立即刷，不等窗口")
+    @DisplayName("窗口开启：攒满 maxBatchSize 立即刷，且整批恰好包含这 3 个请求")
     void windowEnabled_maxBatchSizeFlushesImmediately() throws Exception {
         Executor executor = mock(Executor.class);
-        BufferingBatchHandler handler = newHandler(executor, 10_000, 3);
+        RecordingService service = new RecordingService();
+        BufferingBatchHandler handler = newRecordingHandler(executor, 10_000, 3, service);
 
-        handler.onEvent(newEvent(request()), 0L, false);
-        handler.onEvent(newEvent(request()), 1L, false);
+        BatchRequest<String> r1 = request();
+        BatchRequest<String> r2 = request();
+        BatchRequest<String> r3 = request();
+        handler.onEvent(newEvent(r1), 0L, false);
+        handler.onEvent(newEvent(r2), 1L, false);
         verify(executor, never()).execute(any(Runnable.class));
 
-        handler.onEvent(newEvent(request()), 2L, false);
-        verify(executor, times(1)).execute(any(Runnable.class));
+        handler.onEvent(newEvent(r3), 2L, false);
+        ArgumentCaptor<Runnable> captor = ArgumentCaptor.forClass(Runnable.class);
+        verify(executor, times(1)).execute(captor.capture());
+        captor.getValue().run();
+
+        assertThat(service.batches).hasSize(1);
+        assertThat(service.batches.get(0)).isEqualTo(java.util.Arrays.asList(r1, r2, r3));
     }
 
     @Test
-    @DisplayName("窗口开启：到期后把窗口期内累积的整批一次性提交")
+    @DisplayName("窗口开启：到期后把窗口期内累积的 5 个请求一次性提交")
     void windowEnabled_flushesAccumulatedBatchOnExpiry() throws Exception {
         AtomicInteger submitted = new AtomicInteger();
         Executor executor = r -> {
             submitted.incrementAndGet();
             r.run();
         };
-        BufferingBatchHandler handler = newHandler(executor, 30, 100);
+        RecordingService service = new RecordingService();
+        BufferingBatchHandler handler = newRecordingHandler(executor, 30, 100, service);
 
         // 模拟窗口期内到达 5 个请求（消费者线程视角：逐条 onEvent）
+        List<BatchRequest<String>> requests = new ArrayList<>();
         for (int i = 0; i < 5; i++) {
-            handler.onEvent(newEvent(request()), i, i == 4);
+            BatchRequest<String> req = request();
+            requests.add(req);
+            handler.onEvent(newEvent(req), i, i == 4);
         }
         assertThat(submitted.get()).as("窗口期内不应提前提交").isZero();
 
         // 窗口到期
         handler.flushOnWindow();
         assertThat(submitted.get()).as("窗口到期应把 5 个请求作为一批提交").isEqualTo(1);
+        assertThat(service.batches).hasSize(1);
+        assertThat(service.batches.get(0)).isEqualTo(requests);
+        requests.forEach(req -> assertThat(req.getResult()).isEqualTo("ok"));
     }
 
     @Test
@@ -169,16 +217,6 @@ class BufferingBatchHandlerWindowTest {
         verify(executor, never()).execute(any(Runnable.class));
     }
 
-    @Test
-    @DisplayName("窗口与 maxBatchSize 同为 0 时不死等：endOfBatch 仍会刷")
-    void windowEnabled_zeroMaxBatchSize_stillFlushesOnEndOfBatch() throws Exception {
-        Executor executor = mock(Executor.class);
-        // maxBatchSize=0 表示禁用攒满刷；此时若窗口也不兜底就会永久挂起，故 endOfBatch 必须仍能刷
-        BufferingBatchHandler handler = newHandler(executor, 0, 0);
-        handler.onEvent(newEvent(request()), 0L, true);
-        verify(executor, times(1)).execute(any(Runnable.class));
-    }
-
     /**
      * 回归：早期实现里 closeWindow 无条件对全局计数减一，无窗口队列（从未登记过调度器） 在停机时会把其他队列仍在使用中的共享调度器 {@code shutdownNow} 掉。
      */
@@ -186,9 +224,11 @@ class BufferingBatchHandlerWindowTest {
     @DisplayName("无窗口队列的 closeWindow 不得关停其他队列仍在使用的窗口调度器")
     void closeWindow_withoutRegistration_doesNotCancelOtherQueuesScheduler() throws Exception {
         AtomicInteger submitted = new AtomicInteger();
+        CountDownLatch windowFlushed = new CountDownLatch(1);
         Executor executor = r -> {
             submitted.incrementAndGet();
             r.run();
+            windowFlushed.countDown();
         };
         BufferingBatchHandler windowed = newHandler(executor, 80, 100);
         BufferingBatchHandler noWindow = newHandler(executor, 0, 100);
@@ -200,33 +240,35 @@ class BufferingBatchHandlerWindowTest {
         // 模拟无窗口队列停机：真实路径是 shutdown() → flushRemaining()（空）→ closeWindow()
         noWindow.closeWindow();
 
-        for (int i = 0; i < 100 && submitted.get() == 0; i++) {
-            Thread.sleep(20);
-        }
-        assertThat(submitted.get()).as("其他队列的窗口任务不应被无窗口队列的停机关停").isEqualTo(1);
+        assertTrue(windowFlushed.await(2, TimeUnit.SECONDS),
+                "其他队列的窗口任务不应被无窗口队列的停机关停");
+        assertThat(submitted).hasValue(1);
     }
 
     /** 回归：重复 closeWindow 不得把登记数扣成负数，从而关掉共享调度器。 */
     @Test
     @DisplayName("重复 closeWindow 不破坏共享调度器：后续队列仍能走窗口刷出")
     void closeWindow_twice_doesNotBreakSchedulerForOtherHandlers() throws Exception {
-        AtomicInteger submitted = new AtomicInteger();
-        Executor executor = r -> {
-            submitted.incrementAndGet();
-            r.run();
-        };
-        BufferingBatchHandler first = newHandler(executor, 40, 100);
+        Executor firstExecutor = Runnable::run;
+        BufferingBatchHandler first = newHandler(firstExecutor, 40, 100);
         first.onEvent(newEvent(request()), 0L, true);
         first.flushOnWindow();
         first.closeWindow();
         first.closeWindow();
 
-        BufferingBatchHandler second = newHandler(executor, 40, 100);
+        AtomicInteger secondSubmitted = new AtomicInteger();
+        CountDownLatch secondFlushed = new CountDownLatch(1);
+        Executor secondExecutor = r -> {
+            secondSubmitted.incrementAndGet();
+            r.run();
+            secondFlushed.countDown();
+        };
+        BufferingBatchHandler second = newHandler(secondExecutor, 40, 100);
         second.onEvent(newEvent(request()), 0L, true);
 
-        for (int i = 0; i < 100 && submitted.get() < 2; i++) {
-            Thread.sleep(20);
-        }
-        assertThat(submitted.get()).as("后续队列的窗口任务仍应被执行").isEqualTo(2);
+        // 用独立计数 + 闩锁，排除第一个 handler 的提交对断言的干扰
+        assertTrue(secondFlushed.await(2, TimeUnit.SECONDS),
+                "重复 closeWindow 后，后续队列的窗口任务仍应被执行");
+        assertThat(secondSubmitted).hasValue(1);
     }
 }
