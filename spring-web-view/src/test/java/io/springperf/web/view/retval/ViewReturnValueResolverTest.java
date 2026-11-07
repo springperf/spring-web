@@ -6,6 +6,7 @@ import io.springperf.web.core.mapping.MappingHandlerMethod;
 import io.springperf.web.core.mapping.MappingRegistry;
 import io.springperf.web.core.mapping.MappingResult;
 import io.springperf.web.core.mapping.PathMappingContext;
+import io.springperf.web.core.model.ModelContext;
 import io.springperf.web.http.RequestAttribute;
 import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
@@ -16,16 +17,20 @@ import io.springperf.web.view.ViewProperties;
 import io.springperf.web.view.ViewResolverRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.ui.ModelMap;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.method.HandlerMethod;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -36,9 +41,12 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -54,13 +62,16 @@ class ViewReturnValueResolverTest {
     @Mock
     ApplicationProperties props;
 
+    /** buildResolver 构造的真实视图方法，用于断言 initComponentPhase2 确实写入了 VIEW_NAME_KEY。 */
+    private PathMappingContext viewMapping;
+
     private ViewReturnValueResolver buildResolver() throws Exception {
-        PathMappingContext mapping = new PathMappingContext(
+        viewMapping = new PathMappingContext(
                 new HandlerMethod(new TestController(), TestController.class.getMethod("view")),
                 Collections.emptyList(), "/view");
         // mappingRegistry 相关 stub 仅 initComponentPhase2 使用，运行时用例不需要 → lenient
         org.mockito.Mockito.lenient().when(mappingRegistry.getMappingContextList())
-                .thenReturn(Collections.singletonList(mapping));
+                .thenReturn(Collections.singletonList(viewMapping));
         org.mockito.Mockito.lenient().when(webContext.getWebComponent(MappingRegistry.class))
                 .thenReturn(mappingRegistry);
         when(webContext.getWebComponentWithDefault(eq(ViewResolverRegistry.class), any()))
@@ -69,6 +80,11 @@ class ViewReturnValueResolverTest {
         ViewReturnValueResolver resolver = new ViewReturnValueResolver();
         resolver.initWithWebContext(webContext);
         return resolver;
+    }
+
+    private void assertViewNameKeyMarked() throws Exception {
+        assertEquals(Boolean.TRUE, viewMapping.get(viewNameKey()),
+                "initComponentPhase2 必须给 String 视图方法写入 VIEW_NAME_KEY，删掉它视图会退化成 JSON 文本");
     }
 
     @SuppressWarnings("unchecked")
@@ -173,8 +189,8 @@ class ViewReturnValueResolverTest {
 
         verify(resp).setHandled();
         verify(resp).setStatusCode(HttpStatus.FOUND);
-        assertTrue(headers.getFirst(HttpHeaders.LOCATION).contains("/api/home"),
-                "302 Location 应含 context-path，实际: " + headers.getFirst(HttpHeaders.LOCATION));
+        assertEquals("/api/home", headers.getFirst(HttpHeaders.LOCATION),
+                "302 Location 应为 context-path + 视图路径，实际: " + headers.getFirst(HttpHeaders.LOCATION));
         assertNull(headers.getFirst(HttpHeaders.CONTENT_TYPE), "302 无响应体，不应声明 text/html");
     }
 
@@ -197,10 +213,14 @@ class ViewReturnValueResolverTest {
         when(resp.getHeaders()).thenReturn(headers);
         when(viewResolverRegistry.resolve(eq("home"), eq(req))).thenReturn(view);
 
+        ModelMap model = ModelContext.getOrCreate(req);
+        model.addAttribute("marker", "from-controller");
+
         resolver.resolveReturnValue("home", null, req, resp);
 
         verify(resp).setHandled();
-        verify(view).render(any(), eq(req), eq(resp));
+        verify(view).render(argThat(m -> m == model && "from-controller".equals(m.get("marker"))),
+                eq(req), eq(resp));
         assertEquals("text/html;charset=UTF-8", headers.getFirst(HttpHeaders.CONTENT_TYPE));
     }
 
@@ -214,8 +234,8 @@ class ViewReturnValueResolverTest {
 
         assertThrows(IllegalArgumentException.class, () -> resolver.resolveReturnValue("missing", null, req, resp));
 
-        verify(resp, org.mockito.Mockito.never()).setHandled();
-        verify(resp, org.mockito.Mockito.never()).setStatusCode(any());
+        verify(resp, never()).setHandled();
+        verify(resp, never()).setStatusCode(any());
     }
 
     // ==================== 配置期 fail-fast ====================
@@ -232,12 +252,14 @@ class ViewReturnValueResolverTest {
 
     @Test
     void engineNone_withoutResolver_skipsFailFast() throws Exception {
-        // 显式 engine=none：仅 redirect 场景，不应 fail-fast
+        // 显式 engine=none：仅 redirect 场景，不应 fail-fast；
+        // 但仍必须打上 VIEW_NAME_KEY，否则 redirect: 也会退化成 JSON 文本
         stubEngine("none");
         when(viewResolverRegistry.hasViewResolvers()).thenReturn(false);
 
         ViewReturnValueResolver resolver = buildResolver();
         assertDoesNotThrow(resolver::initComponentPhase2);
+        assertViewNameKeyMarked();
     }
 
     @Test
@@ -269,6 +291,59 @@ class ViewReturnValueResolverTest {
 
         ViewReturnValueResolver resolver = buildResolver();
         assertDoesNotThrow(resolver::initComponentPhase2);
+        assertViewNameKeyMarked();
+    }
+
+    @Test
+    void initComponentPhase2_marksStringViewMethodsOnly() throws Exception {
+        class Controller {
+            public String home() {
+                return "home";
+            }
+
+            @ResponseBody
+            public String api() {
+                return "api";
+            }
+
+            public int count() {
+                return 1;
+            }
+        }
+        PathMappingContext view = new PathMappingContext(
+                new HandlerMethod(new Controller(), Controller.class.getMethod("home")),
+                Collections.emptyList(), "/home");
+        PathMappingContext json = new PathMappingContext(
+                new HandlerMethod(new Controller(), Controller.class.getMethod("api")),
+                Collections.emptyList(), "/api");
+        PathMappingContext nonString = new PathMappingContext(
+                new HandlerMethod(new Controller(), Controller.class.getMethod("count")),
+                Collections.emptyList(), "/count");
+        when(mappingRegistry.getMappingContextList()).thenReturn(List.of(view, json, nonString));
+        when(webContext.getWebComponent(MappingRegistry.class)).thenReturn(mappingRegistry);
+        when(webContext.getWebComponentWithDefault(eq(ViewResolverRegistry.class), any()))
+                .thenReturn(viewResolverRegistry);
+        when(viewResolverRegistry.hasViewResolvers()).thenReturn(true);
+
+        ViewReturnValueResolver resolver = new ViewReturnValueResolver();
+        resolver.initWithWebContext(webContext);
+        assertDoesNotThrow(resolver::initComponentPhase2);
+
+        assertEquals(Boolean.TRUE, view.get(viewNameKey()));
+        assertNull(json.get(viewNameKey()), "@ResponseBody 方法不得被标记为视图方法");
+        assertNull(nonString.get(viewNameKey()), "非 String 返回值不得被标记为视图方法");
+    }
+
+    @Test
+    void initComponentPhase2_noMappingRegistry_returnsEarly() throws Exception {
+        when(webContext.getWebComponent(MappingRegistry.class)).thenReturn(null);
+        when(webContext.getWebComponentWithDefault(eq(ViewResolverRegistry.class), any()))
+                .thenReturn(viewResolverRegistry);
+
+        ViewReturnValueResolver resolver = new ViewReturnValueResolver();
+        resolver.initWithWebContext(webContext);
+        assertDoesNotThrow(resolver::initComponentPhase2);
+        verify(mappingRegistry, never()).getMappingContextList();
     }
 
     // ==================== 统一渲染入口 ====================
@@ -281,9 +356,10 @@ class ViewReturnValueResolverTest {
 
         ViewReturnValueResolver.renderView(view, Collections.emptyMap(), req, resp);
 
-        verify(view).render(any(), eq(req), eq(resp));
-        verify(resp).setHandled();
-        verify(resp, org.mockito.Mockito.never()).resetBuffer();
+        InOrder order = inOrder(view, resp);
+        order.verify(view).render(any(), eq(req), eq(resp));
+        order.verify(resp).setHandled();
+        verify(resp, never()).resetBuffer();
     }
 
     @Test
@@ -302,10 +378,10 @@ class ViewReturnValueResolverTest {
                 () -> ViewReturnValueResolver.renderView(view, Collections.emptyMap(), req, resp));
 
         assertSame(boom, thrown, "渲染异常必须原样抛出");
-        assertEquals("PARTIAL-HTML", new String(body.toByteArray(), StandardCharsets.UTF_8),
-                "用例须先写出半截页面，否则无法证明 resetBuffer 的必要性");
+        // 仅守卫用例自身的前置条件：mock 的 resetBuffer() 不会清空这个流，不能当作产品行为的证据
+        assertTrue(body.size() > 0, "用例须先写出半截页面，否则无法证明 resetBuffer 的必要性");
         verify(resp).resetBuffer();
-        verify(resp, org.mockito.Mockito.never()).setHandled();
+        verify(resp, never()).setHandled();
     }
 
     // ==================== Content-Type ====================
@@ -336,7 +412,8 @@ class ViewReturnValueResolverTest {
         ViewReturnValueResolver.applyContentType(view, resp);
 
         assertEquals("text/html;charset=UTF-16BE", headers.getFirst(HttpHeaders.CONTENT_TYPE));
-        assertSame(StandardCharsets.UTF_16BE, resp.getCharacterEncoding());
+        // 该分支只读取响应编码拼进 Content-Type，不应反过来改写响应编码
+        verify(resp, never()).setCharacterEncoding(any());
     }
 
     @Test

@@ -28,14 +28,32 @@ class FreemarkerViewResolverSettingsTest {
     private ApplicationProperties props;
     private WebContext webContext;
 
+    /** FreemarkerViewResolver 允许读取的配置键；读到其它键说明配置读取跑偏，直接让用例失败。 */
+    private static final java.util.Set<String> READ_KEYS = java.util.Set.of(
+            ViewProperties.FREEMARKER_TEMPLATE_LOADER_PATH,
+            ViewProperties.FREEMARKER_PREFIX,
+            ViewProperties.FREEMARKER_SUFFIX,
+            ViewProperties.FREEMARKER_CONTENT_TYPE,
+            ViewProperties.FREEMARKER_ENABLED,
+            ViewProperties.FREEMARKER_ORDER,
+            ViewProperties.FREEMARKER_SETTINGS,
+            ViewProperties.FREEMARKER_CACHE);
+
     @BeforeEach
     void setUp() {
         props = mock(ApplicationProperties.class);
-        lenient().when(props.get(anyString(), any())).thenAnswer(inv -> inv.getArgument(1));
-        lenient().when(props.get(eq(ViewProperties.FREEMARKER_PREFIX), any())).thenReturn("templates/");
-        lenient().when(props.get(eq(ViewProperties.FREEMARKER_SUFFIX), any())).thenReturn(".ftl");
+        when(props.get(anyString(), any())).thenAnswer(inv -> {
+            String key = inv.getArgument(0);
+            if (!READ_KEYS.contains(key)) {
+                throw new AssertionError("读取了未登记的 Freemarker 配置键: " + key);
+            }
+            return inv.getArgument(1);
+        });
+        // 精确桩必须放在兜底之后：Mockito 以最后声明的桩优先
+        when(props.get(eq(ViewProperties.FREEMARKER_PREFIX), any())).thenReturn("templates/");
+        when(props.get(eq(ViewProperties.FREEMARKER_SUFFIX), any())).thenReturn(".ftl");
         webContext = mock(WebContext.class);
-        lenient().when(webContext.getProps()).thenReturn(props);
+        when(webContext.getProps()).thenReturn(props);
     }
 
     private FreemarkerViewResolver resolver() {
@@ -152,10 +170,15 @@ class FreemarkerViewResolverSettingsTest {
         ByteArrayOutputStream body = new ByteArrayOutputStream();
         when(resp.getBody()).thenReturn(body);
         Map<String, Object> model = new HashMap<>();
-        model.put("name", "Perf");
+        // 非 ASCII 才能区分 UTF-8 与 ISO-8859-1 / GBK 等 ASCII 兼容编码
+        model.put("name", "性能");
 
         view.render(model, mock(WebServerHttpRequest.class), resp);
 
-        assertTrue(new String(body.toByteArray(), StandardCharsets.UTF_8).contains("Perf"));
+        byte[] bytes = body.toByteArray();
+        assertTrue(new String(bytes, StandardCharsets.UTF_8).contains("Hello, 性能!"),
+                "响应编码缺省时应按 UTF-8 写出: " + new String(bytes, StandardCharsets.UTF_8));
+        assertFalse(new String(bytes, StandardCharsets.ISO_8859_1).contains("性能"),
+                "UTF-8 字节用 Latin-1 解码应得到乱码，说明字节确实是多字节 UTF-8");
     }
 }

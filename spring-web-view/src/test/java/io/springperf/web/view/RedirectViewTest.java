@@ -85,7 +85,7 @@ class RedirectViewTest {
         RedirectView view = new RedirectView("/home");
         WebServerHttpResponse resp = mockResp();
         view.render(null, mockReq(""), resp);
-        assertFalse(resp.getHeaders().getFirst(HttpHeaders.LOCATION).contains("?"));
+        assertEquals("/home", resp.getHeaders().getFirst(HttpHeaders.LOCATION));
     }
 
     @Test
@@ -93,7 +93,7 @@ class RedirectViewTest {
         RedirectView view = new RedirectView("/home");
         WebServerHttpResponse resp = mockResp();
         view.render(new LinkedHashMap<>(), mockReq(""), resp);
-        assertFalse(resp.getHeaders().getFirst(HttpHeaders.LOCATION).contains("?"));
+        assertEquals("/home", resp.getHeaders().getFirst(HttpHeaders.LOCATION));
     }
 
     @Test
@@ -105,11 +105,8 @@ class RedirectViewTest {
         model.put("page", 2);
         model.put("flag", true);
         view.render(model, mockReq(""), resp);
-        String location = resp.getHeaders().getFirst(HttpHeaders.LOCATION);
-        assertTrue(location.startsWith("/search?"));
-        assertTrue(location.contains("q=hello+world"), "q 应 URL 编码，实际: " + location);
-        assertTrue(location.contains("page=2"));
-        assertTrue(location.contains("flag=true"));
+        assertEquals("/search?q=hello+world&page=2&flag=true",
+                resp.getHeaders().getFirst(HttpHeaders.LOCATION));
     }
 
     @Test
@@ -120,8 +117,7 @@ class RedirectViewTest {
         model.put("a", null);
         model.put("b", "1");
         view.render(model, mockReq(""), resp);
-        assertFalse(resp.getHeaders().getFirst(HttpHeaders.LOCATION).contains("a="));
-        assertTrue(resp.getHeaders().getFirst(HttpHeaders.LOCATION).contains("b=1"));
+        assertEquals("/x?b=1", resp.getHeaders().getFirst(HttpHeaders.LOCATION));
     }
 
     @Test
@@ -132,8 +128,7 @@ class RedirectViewTest {
         model.put("obj", new Object());
         model.put("list", java.util.List.of(1, 2));
         view.render(model, mockReq(""), resp);
-        assertFalse(resp.getHeaders().getFirst(HttpHeaders.LOCATION).contains("obj="));
-        assertFalse(resp.getHeaders().getFirst(HttpHeaders.LOCATION).contains("list="));
+        assertEquals("/x", resp.getHeaders().getFirst(HttpHeaders.LOCATION));
     }
 
     @Test
@@ -143,9 +138,7 @@ class RedirectViewTest {
         Map<String, Object> model = new LinkedHashMap<>();
         model.put("k e y", "v&a=b/c");
         view.render(model, mockReq(""), resp);
-        String location = resp.getHeaders().getFirst(HttpHeaders.LOCATION);
-        assertFalse(location.contains(" "), "空格不应出现在 Location，实际: " + location);
-        assertFalse(location.contains("&a"), "值内 & 应被编码，实际: " + location);
+        assertEquals("/x?k+e+y=v%26a%3Db%2Fc", resp.getHeaders().getFirst(HttpHeaders.LOCATION));
     }
 
     @Test
@@ -155,7 +148,7 @@ class RedirectViewTest {
         Map<String, Object> model = new LinkedHashMap<>();
         model.put("i", 42);
         view.render(model, mockReq(""), resp);
-        assertTrue(resp.getHeaders().getFirst(HttpHeaders.LOCATION).contains("i=42"));
+        assertEquals("/x?i=42", resp.getHeaders().getFirst(HttpHeaders.LOCATION));
     }
 
     @Test
@@ -209,8 +202,10 @@ class RedirectViewTest {
         RedirectView view = new RedirectView("//evil.com/path");
         WebServerHttpResponse resp = mockResp();
         WebServerHttpRequest req = mockReq("", "trusted.example.com");
-        assertThrows(IllegalArgumentException.class, () -> view.render(null, req, resp),
-                "//host 也必须受白名单约束");
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> view.render(null, req, resp), "//host 也必须受白名单约束");
+        assertTrue(ex.getMessage().contains(ViewProperties.REDIRECT_HOSTS),
+                "必须是白名单拒绝，而不是别的 IAE: " + ex.getMessage());
     }
 
     @Test
@@ -219,7 +214,10 @@ class RedirectViewTest {
         RedirectView view = new RedirectView("https://trusted.example.com@evil.com/path");
         WebServerHttpResponse resp = mockResp();
         WebServerHttpRequest req = mockReq("", "trusted.example.com");
-        assertThrows(IllegalArgumentException.class, () -> view.render(null, req, resp));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> view.render(null, req, resp));
+        assertTrue(ex.getMessage().contains(ViewProperties.REDIRECT_HOSTS),
+                "必须是白名单拒绝，而不是别的 IAE: " + ex.getMessage());
     }
 
     @Test
@@ -228,7 +226,10 @@ class RedirectViewTest {
         RedirectView view = new RedirectView("http://[invalid/path");
         WebServerHttpResponse resp = mockResp();
         WebServerHttpRequest req = mockReq("", "trusted.example.com");
-        assertThrows(IllegalArgumentException.class, () -> view.render(null, req, resp));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> view.render(null, req, resp));
+        assertTrue(ex.getMessage().contains(ViewProperties.REDIRECT_HOSTS),
+                "必须是白名单拒绝，而不是 URI 解析异常直接冒泡: " + ex.getMessage());
     }
 
     @Test

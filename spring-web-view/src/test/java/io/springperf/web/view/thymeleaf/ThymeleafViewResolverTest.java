@@ -33,9 +33,9 @@ class ThymeleafViewResolverTest {
         when(props.get(ViewProperties.THYMELEAF_PREFIX, ViewProperties.THYMELEAF_PREFIX_DEFAULT))
                 .thenReturn("templates/");
         when(props.get(ViewProperties.THYMELEAF_SUFFIX, ViewProperties.THYMELEAF_SUFFIX_DEFAULT)).thenReturn(".html");
-        when(props.getBoolean(ViewProperties.THYMELEAF_CACHE, ViewProperties.THYMELEAF_CACHE_DEFAULT)).thenReturn(true);
-        when(props.getBoolean(ViewProperties.THYMELEAF_ENABLED, ViewProperties.THYMELEAF_ENABLED_DEFAULT))
-                .thenReturn(true);
+        // cache / enabled 由 ViewProperties.resolveBoolean 经 props.get(key, null) 读取，
+        // 不能用 getBoolean 打桩（产品代码从不调用它）。未配置即回退默认 true；
+        // 需要覆盖 false 的用例在方法内用 props.get(eq(KEY), isNull()) 精确桩。
         when(props.get(ViewProperties.THYMELEAF_ENCODING, ViewProperties.THYMELEAF_ENCODING_DEFAULT))
                 .thenReturn("UTF-8");
         webContext = mock(WebContext.class);
@@ -81,8 +81,8 @@ class ThymeleafViewResolverTest {
         view.render(model, req, resp);
 
         String output = new String(body.toByteArray(), StandardCharsets.UTF_8);
-        assertTrue(output.contains("Hello"), "渲染输出应包含模板内容: " + output);
-        assertTrue(output.contains("Perf"), "渲染输出应包含 model 值: " + output);
+        assertTrue(output.contains("Hello, <span>Perf</span>!"), "表达式必须在正确位置求值: " + output);
+        assertFalse(output.contains(">world<"), "模板占位文本应被 model 值替换: " + output);
     }
 
     @Test
@@ -101,10 +101,12 @@ class ThymeleafViewResolverTest {
         ByteArrayOutputStream body = new ByteArrayOutputStream();
         when(resp.getBody()).thenReturn(body);
 
-        view.render(new HashMap<>(), req, resp);
+        Map<String, Object> model = new HashMap<>();
+        model.put("name", "Suffix");
+        view.render(model, req, resp);
 
         String output = new String(body.toByteArray(), StandardCharsets.UTF_8);
-        assertTrue(output.contains("Hello"),
+        assertTrue(output.contains("Hello, <span>Suffix</span>!"),
                 "TemplateEngine 必须收到去掉后缀的模板名，否则会去找 hello.html.html: " + output);
     }
 
