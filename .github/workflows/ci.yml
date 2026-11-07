@@ -37,7 +37,6 @@ jobs:
             ||
             contains(fromJSON('["17", "21"]'), matrix.java)
             && !(github.ref == 'refs/heads/2.7.x' || github.base_ref == '2.7.x')
-          )
 
       - name: Upload test reports
         if: failure()
