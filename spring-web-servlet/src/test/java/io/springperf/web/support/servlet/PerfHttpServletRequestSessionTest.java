@@ -501,10 +501,14 @@ class PerfHttpServletRequestSessionTest {
 
     @Test
     void logout_noSession_noop() {
-        sessionManager();
+        PerfHttpSessionManager manager = sessionManager();
         headers("Other", "x");
         when(request.getHeaders()).thenReturn(new HttpHeaders());
         assertDoesNotThrow(() -> newReq().logout());
+        // 无会话时 logout 只能 no-op：不得创建/查询会话，也不得在请求上下文写入会话属性
+        verify(manager, never()).createSession();
+        verify(manager, never()).getSession(anyString());
+        assertNull(fastAttrs.get(PerfHttpSessionManager.SESSION_ATTR_KEY), "logout 不得缓存新会话");
     }
 
     @Test

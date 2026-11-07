@@ -41,10 +41,16 @@ class PerfHttpServletFilterChainTest {
         verify(filterChain, times(2)).doFilter(request, response);
     }
 
-    @Test void doFilter_propagatesExceptionFromWrappedChain() throws Exception {
-        doThrow(new RuntimeException("filter error")).when(filterChain).doFilter(request, response);
+    @Test
+    void doFilter_propagatesExceptionFromWrappedChain() throws Exception {
+        RuntimeException cause = new RuntimeException("filter error");
+        doThrow(cause).when(filterChain).doFilter(request, response);
         PerfHttpServletFilterChain chain = new PerfHttpServletFilterChain(request, response, filterChain);
-        org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class, () -> chain.doFilter(servletRequest, servletResponse));
+        // 生产 doFilter 用 @SneakyThrows 直接委托，异常必须原样传播、不得包装或替换
+        org.junit.jupiter.api.Assertions.assertSame(cause,
+                org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class,
+                        () -> chain.doFilter(servletRequest, servletResponse)),
+                "必须原样传播底层链异常，不得包装或替换");
     }
 
     // Filter 用 Wrapper 包装后继续调用链时，适配上下文必须换成新包装，

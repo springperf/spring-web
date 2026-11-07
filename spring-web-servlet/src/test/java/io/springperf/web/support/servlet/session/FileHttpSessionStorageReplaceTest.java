@@ -62,7 +62,9 @@ class FileHttpSessionStorageReplaceTest {
 
         assertNotEquals(old.getId(), copy.getId());
         assertTrue(copy.getAttributes().isEmpty());
-        assertEquals(old.getMaxInactiveInterval(), copy.getMaxInactiveInterval());
+        // createSession 不设置该值，HttpSessionData 默认为 0；copy 复制同源值，故分别断言而非互比
+        assertEquals(0, old.getMaxInactiveInterval());
+        assertEquals(0, copy.getMaxInactiveInterval());
     }
 
     @Test
@@ -72,18 +74,10 @@ class FileHttpSessionStorageReplaceTest {
 
     @Test
     void fileOf_rejectsIdThatEscapesStoreDir() throws Exception {
-        Method fileOf = FileHttpSessionStorage.class.getDeclaredMethod("fileOf", String.class);
-        fileOf.setAccessible(true);
-
+        // 复用 callFileOf 解包反射异常；fileOf 对越界 id 直接抛 IllegalArgumentException
         for (String unsafe : new String[] { "../escape", "a/b", "..\\windows" }) {
-            Exception ex = assertThrows(Exception.class, () -> {
-                try {
-                    fileOf.invoke(storage, unsafe);
-                } catch (java.lang.reflect.InvocationTargetException e) {
-                    throw (Exception) e.getCause();
-                }
-            }, "不安全 id 应被拒绝: " + unsafe);
-            assertTrue(ex instanceof IllegalArgumentException, "实际异常: " + ex);
+            assertThrows(IllegalArgumentException.class, () -> callFileOf(unsafe),
+                    "不安全 id 应被拒绝: " + unsafe);
         }
     }
 

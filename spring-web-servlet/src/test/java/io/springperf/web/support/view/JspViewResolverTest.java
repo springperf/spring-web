@@ -161,6 +161,10 @@ class JspViewResolverTest {
         // getPropertyNames 未桩化 → 返回 null（脱离 ConfigurableEnvironment 的真实语义），不得 NPE
         Map<String, String> params = JspViewResolver.buildJspInitParameters(props);
         assertEquals(3, params.size());
+        // 无显式块时仅三个类型化键，且均取生产默认 false
+        assertEquals("false", params.get(JspViewResolver.JASPER_PARAM_DEVELOPMENT));
+        assertEquals("false", params.get(JspViewResolver.JASPER_PARAM_KEEP_GENERATED));
+        assertEquals("false", params.get(JspViewResolver.JASPER_PARAM_TRIM_SPACES));
     }
 
     @Test

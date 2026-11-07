@@ -191,8 +191,17 @@ class PerfHttpServletRequestDetailsTest {
     void rebind_sameRequest_keepsCookies() throws Exception {
         headers("Cookie", "a=1");
         PerfHttpServletRequest servletReq = new PerfHttpServletRequest(request);
-        servletReq.getCookies();
+        Cookie[] before = servletReq.getCookies();
+        assertEquals(1, before.length);
+        assertEquals("a", before[0].getName());
+        assertEquals("1", before[0].getValue());
+
         servletReq.rebind(request); // same instance
-        assertEquals(1, servletReq.getCookies().length);
+        Cookie[] after = servletReq.getCookies();
+        assertEquals(1, after.length);
+        assertEquals("a", after[0].getName(), "rebind 后 cookie 名不得被改写");
+        assertEquals("1", after[0].getValue(), "rebind 后 cookie 值不得被改写");
+        // 生产 rebind 仅在 delegate 变化时清 cookies；同实例必须复用缓存数组
+        assertSame(before, after, "rebind 同一请求必须保留 cookies 缓存");
     }
 }

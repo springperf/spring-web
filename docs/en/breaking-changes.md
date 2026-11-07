@@ -170,19 +170,21 @@ already-accepted requests, but they **reject requests/responses that used to pas
 
 | Item | Old behaviour | New behaviour |
 |---|---|---|
-| Management port HTTP/2 and body limit | Wrongly reused the main server keys | Dedicated keys `management.server.http2.enabled`, `management.server.max-content-length` |
-| Management port equal to the main port | Any random port (`0`) counted as a conflict and **blocked startup** | Conflicts only when both are explicitly configured to the **same non-zero** port |
-| `RequestDispatcher.forward` | Cleared written headers and **forced status 200** | Only resets the buffer: written headers and status are **preserved**; also fixes the swapped `FORWARD_SERVLET_PATH`/`FORWARD_PATH_INFO` and strips the leading `?` from `FORWARD_QUERY_STRING` |
-| Non-`void` method returning `null` | Not marked handled → the response was never flushed (client hung until timeout) | Treated as "a completed response with no body" and marked handled (`void` methods unchanged) |
-| Plain `HandlerInterceptor` beans (`spring-web-mvc-support`) | Auto-registered globally | **No longer** auto-registered (aligned with Spring MVC): register via `addInterceptors` or declare a `MappedInterceptor` |
-| `postHandle` / `afterCompletion` traversal order | Reverse | Same (forward) direction as `preHandle`; when `preHandle` returns early, those that did not pass still get `afterCompletion` in reverse |
-| Malformed multipart payloads | Closed the connection with a raw exception | **400** with a graceful close (`TooLongFrameException` remains **413**) |
-| Streaming responses (`writeStream`) | Read the `InputStream` on the EventLoop → slow sources caused I/O **head-of-line blocking** | Read is offloaded to the business pool (default pool; a dedicated fallback pool when absent; **never** back to the EventLoop), written in 8KB chunks with writability backpressure |
-| `Content-Type` of `writeFile` / `writeStream` | Always `application/octet-stream` | Respects a caller-set value; otherwise derived from the file extension (`writeFile`); falls back to `octet-stream` |
-| `getOutputStream()` | Returned a new instance each call | Returns the **same instance** per response (Servlet spec); recreated after a `rebind` |
-| JSR-356 `Session.setMaxIdleTimeout` | Assigned a field only (the idle timeout never took effect) | Propagated to the pipeline's `IdleStateHandler` (`<=0` removes idle detection) |
-| WebSocket frame size limit | Fixed text 8KB / binary 64KB | New `WebSocketHandlerRegistration#setMessageSizeLimit` per path (defaults unchanged) |
-| `@WebFilter` `urlPatterns` | The annotation was not read through proxies/superclasses → silently promoted to a global filter | Uses `findMergedAnnotation` across superclasses/interfaces; `urlPatterns` genuinely restricts the path |
+| HTTP/2 and request-body limits on the management port | reused main-server keys (`server.http2.enabled`, `server.http.max-content-length`) | dedicated keys `management.server.http2.enabled`, `management.server.max-content-length` (the prefix no longer borrows the main server's) |
+| management port equal to the main port | treated as a conflict - **blocking startup** - even when either was the random port (`0`) | conflicts only when both are explicitly configured to the **same non-zero** port |
+| `RequestDispatcher.forward` | cleared written response headers and **forced status 200** | only resets the buffer (discarding the uncommitted body): written headers and status are **kept** (as the Servlet spec requires); also fixes the swapped `FORWARD_SERVLET_PATH`/`FORWARD_PATH_INFO` and strips the leading `?` from `FORWARD_QUERY_STRING` |
+| `RequestDispatcher.include` | `INCLUDE_QUERY_STRING` stored the full URI (e.g. `/original?page=1`, including the path and `?`); `INCLUDE_SERVLET_PATH` kept `?` when the path had a query | `INCLUDE_QUERY_STRING` stores only the query string (the target path's query takes precedence, otherwise the original request's; the attribute is removed when absent); `INCLUDE_SERVLET_PATH` uses the path without the query (Servlet spec: include attributes describe the target resource) |
+| non-`void` method returning `null` | not marked handled → the response was never flushed (the client waited until timeout) | treated as a completed response with no body and marked handled (`void` methods unchanged) |
+| plain `HandlerInterceptor` bean (`spring-web-mvc-support`) | registered globally automatically | **no longer** registered automatically (matching Spring MVC): register through `addInterceptors` or declare a `MappedInterceptor` (which also avoids the same instance being registered twice and running twice) |
+| `postHandle` / `afterCompletion` traversal order | reverse | **same (forward) order** as `preHandle`; when `preHandle` returns early, the interceptors that did not pass still get `afterCompletion` in reverse |
+| malformed multipart message | raw exception, connection closed | **400** and a graceful close (`TooLongFrameException` stays **413**) |
+| streaming responses (`writeStream`) | read the `InputStream` on the event loop → a slow source (DB cursor, network stream) caused **head-of-line blocking** on I/O | the read is offloaded to the business pool (the default pool; ForkJoin when absent; **never** falling back to the event loop), written in 8KB chunks with writability-based backpressure |
+| `Content-Type` for `writeFile` / `writeStream` | always `application/octet-stream` | respects the value the caller already set, otherwise derives it from the file extension (`writeFile`); `octet-stream` remains the last resort |
+| `getOutputStream()` | returned a new instance every call | the same response returns **the same instance** (Servlet spec); invalidated and recreated after `rebind` |
+| JSR-356 `Session.setMaxIdleTimeout` | only assigned a field (the idle timeout had no effect) | propagated to the Netty pipeline's `IdleStateHandler` (`<=0` removes idle detection) |
+| per-frame WebSocket limit | fixed text 8KB / binary 64KB | new `WebSocketHandlerRegistration#setMessageSizeLimit` overrides it per path (defaults unchanged) |
+| `WebSocketSession#getHandshakeHeaders()` | returned a custom `SpringHeadersAdapter` (case-sensitive; writes such as `add` were silently dropped) | returns a standard `HttpHeaders` (case-insensitive, multi-value writes work); `SpringHeadersAdapter` removed |
+| `@WebFilter`'s `urlPatterns` | read without proxy/inherited sources → silently promoted to a global filter | looked up with `findMergedAnnotation` along superclasses and interfaces; `urlPatterns` really restricts the path |
 
 #### 4.9 Framing and Servlet reset semantics
 

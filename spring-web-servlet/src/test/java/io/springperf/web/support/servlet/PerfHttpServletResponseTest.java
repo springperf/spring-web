@@ -887,8 +887,10 @@ class PerfHttpServletResponseTest {
         servletResponse.setSameSite("Lax");
         Cookie cookie = new Cookie("name", "value");
         servletResponse.addCookie(cookie);
+        // 精确比对整条 Set-Cookie：contains 会放过 "SameSite=Laxxxx"、重复属性或值被改写
         verify(headers).add(argThat(name -> "Set-Cookie".equals(name)),
-                argThat(value -> value.contains("SameSite=Lax")));
+                argThat(value -> staticCookieParts(value)
+                        .equals(new java.util.HashSet<>(java.util.Arrays.asList("name=value", "SameSite=Lax")))));
     }
 
     @Test
@@ -897,12 +899,15 @@ class PerfHttpServletResponseTest {
         when(response.getBody()).thenReturn(baos);
         when(response.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
 
-        servletResponse.getWriter().write("x");
+        PrintWriter writerBefore = servletResponse.getWriter();
+        writerBefore.write("x");
         servletResponse.flushBuffer();
         assertEquals("x", baos.toString("UTF-8"));
 
         servletResponse.rebind(response);
         assertSame(response, servletResponse.getResponse());
+        // 生产 rebind 仅在 delegate 变化时清缓存；同实例必须复用 Writer，否则已有编码器缓冲会丢内容
+        assertSame(writerBefore, servletResponse.getWriter(), "rebind 同一响应必须保留 cachedWriter");
     }
 
     @Test
@@ -910,7 +915,8 @@ class PerfHttpServletResponseTest {
         ByteArrayOutputStream baos1 = new ByteArrayOutputStream();
         when(response.getBody()).thenReturn(baos1);
         when(response.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
-        servletResponse.getWriter().write("one");
+        PrintWriter writerBefore = servletResponse.getWriter();
+        writerBefore.write("one");
         servletResponse.flushBuffer();
         assertEquals("one", baos1.toString("UTF-8"));
 
@@ -920,6 +926,8 @@ class PerfHttpServletResponseTest {
         when(newResponse.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
         servletResponse.rebind(newResponse);
 
+        // rebind 到新 delegate 必须重建 Writer，否则旧编码器会继续写进旧响应体
+        assertNotSame(writerBefore, servletResponse.getWriter(), "换响应必须重建 Writer");
         servletResponse.getWriter().write("two");
         servletResponse.flushBuffer();
         assertEquals("two", baos2.toString("UTF-8"));

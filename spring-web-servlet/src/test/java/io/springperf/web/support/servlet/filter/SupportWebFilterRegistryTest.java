@@ -2,6 +2,7 @@ package io.springperf.web.support.servlet.filter;
 
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.DispatcherHandler;
+import io.springperf.web.core.filter.RuntimeMappingWebFilter;
 import io.springperf.web.core.filter.WebFilterRegistration;
 import io.springperf.web.core.filter.WebFilterRegistry;
 import io.springperf.web.support.servlet.context.PerfServletContext;
@@ -13,10 +14,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -62,10 +60,11 @@ class SupportWebFilterRegistryTest {
 
         // 容器中应存在包装了 servlet Filter 的 WebFilterRegistration，其内部 filter 为 FilterWrapper
         List<WebFilterRegistration> registrations = registry.getWebComponents(WebFilterRegistration.class);
-        assertTrue(!registrations.isEmpty(), "javax.servlet.Filter Bean 应被扫描并注册为 WebFilterRegistration");
-        Object wrapped = getFilterField(registrations.get(0));
-        assertInstanceOf(FilterWrapper.class, wrapped, "注册的 filter 应为 FilterWrapper");
-        assertNotNull(wrapped, "包装后的 FilterWrapper 不得为 null");
+        assertEquals(1, registrations.size(), "应恰好注册一个 WebFilter");
+        FilterWrapper wrapper = assertInstanceOf(FilterWrapper.class, getFilterField(registrations.get(0)),
+                "注册的 filter 应为 FilterWrapper");
+        assertSame(servletFilter, org.springframework.test.util.ReflectionTestUtils.getField(wrapper, "filter"),
+                "FilterWrapper 必须包装扫描到的那个 servlet Filter Bean");
     }
 
     private static Object getFilterField(WebFilterRegistration registration) throws Exception {
@@ -91,8 +90,8 @@ class SupportWebFilterRegistryTest {
 
         List<WebFilterRegistration> registrations = registry.getWebComponents(WebFilterRegistration.class);
         assertEquals(1, registrations.size(), "应恰好注册一个 WebFilter");
-        assertTrue(readPatterns(registrations.get(0)).contains("/admin/*"),
-                "@WebFilter urlPatterns 应映射到 WebFilter 的 include 路径");
+        assertEquals(java.util.Arrays.asList("/admin/*"), readPatterns(registrations.get(0)),
+                "@WebFilter urlPatterns 必须原样映射，不得混入全局 pattern");
     }
 
     @Test
@@ -116,9 +115,12 @@ class SupportWebFilterRegistryTest {
 
     @javax.servlet.annotation.WebFilter(urlPatterns = "/admin/*")
     static class AdminOnlyFilter implements javax.servlet.Filter {
+        int doFilterCalls;
+
         @Override
         public void doFilter(javax.servlet.ServletRequest request, javax.servlet.ServletResponse response,
                 javax.servlet.FilterChain chain) {
+            doFilterCalls++;
         }
 
         @Override
@@ -145,7 +147,34 @@ class SupportWebFilterRegistryTest {
         assertEquals("/admin/*", patterns[0]);
     }
 
+    @Test
+    void resolveUrlPatterns_valueOnlyAnnotation_usesValueFallback() {
+        // resolveUrlPatterns 有 urlPatterns.length == 0 → value() 的回退分支，删掉会把
+        // @WebFilter("/x") 声明的过滤器静默升格为全局，正是本文件其它用例在防的安全回归。
+        assertArrayEquals(new String[] { "/value-only" },
+                SupportWebFilterRegistry.resolveUrlPatterns(new ValueOnlyFilter()));
+    }
+
     static class AdminOnlyFilterSub extends AdminOnlyFilter {
+    }
+
+    @javax.servlet.annotation.WebFilter("/value-only")
+    static class ValueOnlyFilter implements javax.servlet.Filter {
+        int doFilterCalls;
+
+        @Override
+        public void init(javax.servlet.FilterConfig filterConfig) {
+        }
+
+        @Override
+        public void doFilter(javax.servlet.ServletRequest request, javax.servlet.ServletResponse response,
+                javax.servlet.FilterChain chain) {
+            doFilterCalls++;
+        }
+
+        @Override
+        public void destroy() {
+        }
     }
 
     // ==================== 动态注册（addFilter）认领 ====================
@@ -181,8 +210,23 @@ class SupportWebFilterRegistryTest {
                     "allFilters");
             assertNotNull(allFilters);
             assertEquals(1, allFilters.size(), "动态注册的 filter 应进入 filter 链");
-            assertInstanceOf(io.springperf.web.core.filter.RuntimeMappingWebFilter.class, allFilters.get(0),
+            RuntimeMappingWebFilter runtime = assertInstanceOf(RuntimeMappingWebFilter.class, allFilters.get(0),
                     "有路径规则时应包装为运行时匹配");
+            assertTrue(runtime.matches("/dyn/page"), "动态注册的 filter 必须对匹配路径生效");
+            assertFalse(runtime.matches("/other"), "不得静默升格为全局 filter");
+            assertInstanceOf(FilterWrapper.class, runtime.getDelegate(), "链上的 delegate 应是 FilterWrapper");
+
+            // 注册进链还不够：必须在一次匹配路径的请求中真的被调用
+            io.springperf.web.http.WebServerHttpRequest httpRequest = mock(
+                    io.springperf.web.http.WebServerHttpRequest.class);
+            io.springperf.web.http.WebServerHttpResponse httpResponse = mock(
+                    io.springperf.web.http.WebServerHttpResponse.class);
+            io.springperf.web.core.filter.FilterChain filterChain = mock(
+                    io.springperf.web.core.filter.FilterChain.class);
+            when(httpRequest.getPath()).thenReturn("/dyn/page");
+            when(httpRequest.getRequestContext()).thenReturn(mock(io.springperf.web.http.RequestContext.class));
+            runtime.doFilter(httpRequest, httpResponse, filterChain);
+            assertEquals(1, filter.doFilterCalls, "动态注册的 filter 必须在匹配路径的请求中被调用一次");
         } finally {
             servletContext.destroyComponent();
         }
@@ -191,6 +235,7 @@ class SupportWebFilterRegistryTest {
     /** 记录 init 次数、init-param 与 filter name：动态注册的配置必须真的传到 filter，且名字是注册名。 */
     static class TrackingFilter implements javax.servlet.Filter {
         int initCalls;
+        int doFilterCalls;
         String initParam;
         String filterName;
 
@@ -204,6 +249,7 @@ class SupportWebFilterRegistryTest {
         @Override
         public void doFilter(javax.servlet.ServletRequest request, javax.servlet.ServletResponse response,
                 javax.servlet.FilterChain chain) {
+            doFilterCalls++;
         }
 
         @Override
