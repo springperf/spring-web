@@ -48,20 +48,20 @@
 | 类 / Class | 未覆盖行 / Missed | 总行 / Total | 覆盖率 / Coverage |
 |---|---|---|---|
 | Http2ChannelInitializer.Http2OrHttp1Handler | 43 | 43 | 0% |
+| DispatcherHandler | 27 | 264 | 89.8% |
 | SupportMultipartAggregator | 23 | 85 | 72.9% |
-| ApplicationProperties | 21 | 149 | 85.9% |
 | Http2ChannelInitializer.new ChannelInboundHandlerAdapter() {...} | 21 | 42 | 50% |
-| NettyServerHttpResponse | 20 | 374 | 94.7% |
+| ApplicationProperties | 21 | 149 | 85.9% |
 
 ### spring-web-view
 
 | 类 / Class | 未覆盖行 / Missed | 总行 / Total | 覆盖率 / Coverage |
 |---|---|---|---|
-| FreemarkerViewResolver | 16 | 41 | 61% |
-| ThymeleafViewResolver | 3 | 40 | 92.5% |
-| ViewReturnValueResolver | 2 | 62 | 96.8% |
-| BeetlViewResolver | 2 | 31 | 93.5% |
-| RedirectView | 2 | 35 | 94.3% |
+| FreemarkerViewResolver | 15 | 63 | 76.2% |
+| ViewProperties | 4 | 36 | 88.9% |
+| BeetlViewResolver | 3 | 41 | 92.7% |
+| RedirectView | 2 | 59 | 96.6% |
+| ViewCache | 2 | 51 | 96.1% |
 
 ### spring-web-servlet
 
@@ -87,21 +87,21 @@
 
 | 类 / Class | 未覆盖行 / Missed | 总行 / Total | 覆盖率 / Coverage |
 |---|---|---|---|
-| DisruptorQueue | 20 | 97 | 79.4% |
-| BatchScanner | 6 | 96 | 93.8% |
-| NoOpBatchMetrics | 3 | 8 | 62.5% |
-| BatchRequest | 2 | 15 | 86.7% |
-| BufferingBatchHandler | 1 | 47 | 97.9% |
+| DisruptorQueue | 20 | 111 | 82% |
+| BufferingBatchHandler | 8 | 145 | 94.5% |
+| NoOpBatchMetrics | 2 | 8 | 75% |
+| BatchScanner | 2 | 97 | 97.9% |
+| BatchHandlerRegistration | 0 | 8 | 100% |
 
 ### spring-web-websocket
 
 | 类 / Class | 未覆盖行 / Missed | 总行 / Total | 覆盖率 / Coverage |
 |---|---|---|---|
-| WebSocketRoutingHandler | 44 | 260 | 83.1% |
-| NettyWebSocketSession | 20 | 130 | 84.6% |
-| JsrEndpointWebSocketHandler | 13 | 138 | 90.6% |
-| JsrCodecRegistry | 7 | 110 | 93.6% |
-| JsrEndpointMetadata | 6 | 106 | 94.3% |
+| JsrEndpointWebSocketHandler | 15 | 182 | 91.8% |
+| WebSocketFrameDispatcher | 8 | 105 | 92.4% |
+| JsrCodecRegistry | 7 | 143 | 95.1% |
+| WebSocketRoutingHandler | 6 | 91 | 93.4% |
+| JsrEndpointMetadata | 5 | 106 | 95.3% |
 
 ### spring-boot-starter-web
 
@@ -110,6 +110,6 @@
 | PerfApplicationFactory | 13 | 75 | 82.7% |
 | ManagementNettyHttpServer | 9 | 67 | 86.6% |
 | OpenApiAdapter | 7 | 238 | 97.1% |
-| SpringWebAutoConfiguration.MicrometerWebMetricsConfiguration | 7 | 14 | 50% |
+| SpringWebAutoConfiguration.MicrometerWebMetricsConfiguration | 6 | 16 | 62.5% |
 | ActuatorEndpointHandlerMapping | 6 | 62 | 90.3% |
 
