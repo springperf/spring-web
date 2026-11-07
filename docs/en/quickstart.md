@@ -298,10 +298,12 @@ Yes. Spring Security's Filter Chain is bridged via the `spring-web-servlet` modu
 
 ### Q: Which scenarios benefit most from performance improvements?
 
-- Small request scenarios (JSON echo, parameter queries): 1.6~2.1x
-- SSE / streaming push: 3.8x
-- Resource-constrained environments (1c1g, 2c2g): even larger gap
-- Large request/response scenarios: 2.3x (2.31x for 100KB response body)
+The multiples below come from the [benchmark report](benchmark.md) (JDK 17, 4/8/16 threads, vs Spring MVC + Tomcat); constrained-environment data is in the [WSL external report](benchmark-wsl.md).
+
+- Small request scenarios (JSON echo, parameter queries): about 1.6~2.3x
+- SSE / streaming push: 12.63x (4 threads) / 7.72x (16 threads)
+- Constrained environments (WSL2 4c/2g, 48 threads): json throughput reaches 2.96x; the lead grows with concurrency
+- Large response bodies: the smallest gain, about 1.82x for a 100KB body (throughput is dominated by transfer bandwidth)
 
 ### Q: Are there any risks after migration?
 

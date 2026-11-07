@@ -82,31 +82,28 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 - The contract-doc checker (`python scripts/check-docs.py` + `python scripts/check-doc-symbols.py`) is
   ported to this branch and is run against this tree (72 markdown files, 0 defects; the symbol checker
   carries a small branch-specific allow-list for the `master` section of `docs/(en/)compatibility.md`).
+)
 - `scripts/check-docs.sh` also runs `scripts/check-doc-symbols.py`, which checks that the keys, classes and
   members the **contract docs** name actually exist - including keys the code builds by concatenation
   (`"server.ssl." + "enabled"`, `"management.endpoints.web.exposure" + ".include"`), which a plain literal scan
-  misses: the first run reported 34 such keys, all of them false alarms for exactly that reason.
+  misses.
   One limit is deliberate and written in the file: it does not check whether a sentence is **true**. Its
   unknown-class rule **is** a gate, carried by an explicit allow-list (`EXTERNAL_TYPES`) whose every entry names
   where the symbol
   comes from - a class defined in a doc snippet, a package this repository imports, or a class found in a local
-  jar, with the measured name collisions called out (the `ServiceLoader` hit was surefire, the
-  `ExceptionHandler` import was disruptor, and `HandlerExecutionChain` was in no local jar at all because
-  `spring-webmvc` is not on this machine). The triage that built the list is what justified the gate: it is how
-  the docs calling `ModelContext` by the name `ModelSupport` was found. When the rule fires on something
-  legitimate, add an entry with its origin - do not widen the rule. `member` references whose owner is unknown
-  go through the same rule, which closes the gap that let `ModelSupport.getOrCreate()` pass.
-  Files whose job is to list **removed** keys and members (`docs/breaking-changes.md`, `docs/(en/)changelog.md`)
-  are exempt from those rules in code, and `CONTRIBUTING.md`'s japicmp section from the member rule.
+  jar. When the rule fires on something legitimate, add an entry with its origin - do not widen the rule.
+  `member` references whose owner is unknown go through the same rule.
+  Files whose job is to list **removed** keys and members (`docs/breaking-changes.md`,
+  `docs/en/breaking-changes.md`, `docs/en/changelog.md`) are exempt from those rules in code
+  (the root `CHANGELOG.md` is outside the scanner's scope), and `CONTRIBUTING.md`'s japicmp
+  section from the member rule.
   Four documents are user-facing and must stay **paired**: `CHANGELOG.md`, `docs/configuration.md`,
   `docs/compatibility.md` and `docs/breaking-changes.md` each have a mirror under `docs/en/`, and
   `check-docs.py` enforces it (a missing side is a defect) - change one side and you change the other.
 - The same entry point runs `scripts/check-doc-structure.py`, which checks markdown **structure** rather
   than content: leftover CJK-parenthesis debris (`（ ）`, `（，`), empty inline code spans, table row/column
   mismatches and fully empty columns, unbalanced code fences, and `.java` file references that name no
-  tracked file. Its first full run over 73 files found four real defects - a duplicated table row in both
-  `docs/extensions.md` and its English mirror, an unescaped `||` that split a table cell in
-  `docs/en/configuration.md`, and a stale source-file name left over from a rename. `.agent/` files other than
+  tracked file. `.agent/` files other than
   `module.md` are out of scope for the file-existence rule, matching `check-doc-symbols.py`: backport
   checklists exist to name files that only the other branch has.
 
@@ -165,7 +162,8 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
   with line deltas. It never decides "must sync" - 505 same-name files differ between `master` and
   `2.7.x` simply because adaptation rewrites are normal. The whitelist holds version-boundary paths
   only (native-image, Spring AI, virtual threads, Thymeleaf WebExchange); feature gaps must not be
-  whitelisted. Reports and whitelists live under `docs/feature/` (git-ignored, local ledger).
+  whitelisted. Reports and whitelists are local, untracked artifacts — see the script's
+  `--output` / `--whitelist` options for where to put them.
 
 ### Formatting
 
@@ -176,6 +174,7 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 - Keep the conventions by hand: 4-space indent, no trailing whitespace, LF in the index.
   `.gitattributes` declares `* text=auto` (LF in the index; `*.sh` stays LF, `*.bat`/`*.cmd` checkout as CRLF),
   so a CRLF working tree compares clean against the LF-based index and line endings never show up as phantom diffs.
+)
 
 ### Static Analysis & Binary Compatibility
 
@@ -202,8 +201,7 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
   this branch has no machine gate that produces that list (master uses japicmp for it).
 ### Verification Discipline
 
-Handbook of habits that were paid for. Each one cost this repository a wrong statement or a wasted run, so each
-one carries the instance that produced it.
+Practices for verifying claims and gates before trusting them.
 
 - **Trace a claim to the code that decides it, not to where it is cheapest to read.** A statement about
   behaviour has to be checked at the point that controls it, including its call sites. Reading
@@ -214,32 +212,53 @@ one carries the instance that produced it.
   because `SupportDispatcherHandler` returns `init || requestAttributes != null` and therefore always reports
   true there.
 - **Never edit files and start a build in the same batch.** An edit issued alongside a build can land after
-  the compiler has read the file, and the result describes a state that never existed. This happened twice in
-  one session; both runs had to be thrown away and repeated serially. Land the edit, then build.
+  the compiler has read the file, and the result describes a state that never existed. Land the edit, then build.
 - **Prove a new gate can fail before trusting it.** A check that has never been seen red is a claim, not a
-  check. The format assertion added to `static-analysis` was validated by appending one blank line to
-  `docs/configuration.md` and watching it report failure, then reverting. It then earned its place on the
-  first real run, catching a javadoc rewrap that `formatter:validate` had passed.
-- **A red on this machine is a hypothesis until it is isolated.** Re-run the failing class alone, then the
-  module alone, and read the error text before theorising. Measured: two reactor-only failures, twenty-eight
-  cascading timeouts in `AsyncSseRobustnessE2eTest` and one reset in `ChunkedRequestE2eTest`, were both green
-  in isolation - and the second carried a Windows-only error code, so it is not a Linux CI risk at all.
-- **Re-read the file or the tree; do not work from a summary or from memory.** Three times in one session a
-  remembered "known issue" turned out to be already fixed (`check-doc-symbols.py` reports unknown owners of
-  `Class.member` now, and the `CONTRIBUTING` entry about that rule had already been corrected). Memory of a
-  compacted history is a hypothesis about the tree, and the tree is one command away.
+  check: introduce a deliberate change, confirm the gate reports failure, then revert it.
+- **A reactor-wide red is a hypothesis until it is isolated.** Re-run the failing class alone, then the
+  module alone, and read the error text before theorising; isolated failures and environment-specific errors
+  need different explanations.
+- **Re-read the file or the tree; do not work from a summary or from memory.** A remembered "known issue"
+  may already be fixed. A summary is a hypothesis about the tree, and the tree is one command away.
 - **Know which checker covers what.** They are not interchangeable. `formatter:validate` does not see the
   unused-import removals the format profile performs; doclint rejects a `ul` inside a `p` that both the
   formatter and the format assertion accept; the markdown checker verifies formatting and links but never
   whether a sentence is true; and `check-doc-symbols.py` only checks that a named symbol exists.
 - **After a deliberate mutation, revert it in the same breath, and never through a command that can be
   blocked.** Breaking a guard on purpose is the only way to prove a test is not vacuous, so it is worth
-  doing - but the broken state looks like ordinary code and can outlive the run that created it. That
-  happened here: the revert was chained behind a command whose permission prompt timed out, so a mutated
-  `batchBuf.release()` stayed in the working tree and was caught only by re-reading the file. Revert with the
-  edit tool rather than a git command, and read the reverted lines back afterwards; that check is cheap.
+  doing - but the broken state looks like ordinary code and can outlive the run that created it. Revert with
+  the edit tool rather than a git command, and read the reverted lines back afterwards; that check is cheap.
 
-### Binary Compatibility
+### Binary Compatibility (japicmp)
+
+- The latest published version is `3.5.7` (the next release is planned as `3.5.8`), so the canonical
+  invocation is `mvn -Pcompat -Dcompat.oldVersion=3.5.7 verify` (profile `compat`, property-activated):
+  it compares each module's freshly built jar against that released artifact. pom-packaging modules are
+  skipped automatically, and three modules have **no baseline at all** on purpose: `spring-web-test`,
+  `spring-web-support-test` and `spring-web-benchmark` set `maven.deploy.skip=true`, so nothing was ever
+  published for them. The remaining seven published modules - spring-web, spring-web-servlet,
+  spring-web-websocket, spring-web-mvc-support, spring-boot-starter-web, spring-web-view, spring-web-batch
+  - are the full sweep.
+- **Local jars can shadow the released artifact**: when a version is already installed in the local
+  repository, Maven may resolve that copy instead of the published jar and compare the build with itself.
+  Use `compat-file` with a jar fetched into an isolated repository to bypass repository resolution:
+
+  ```bash
+  # fetch the released jar through an isolated local repo, so the shadowing copy stays untouched
+  ./mvnw -q dependency:copy -Dartifact=io.github.springperf:spring-web:3.5.6:jar \
+      -Dtransitive=false -DoutputDirectory=_baseline -Dmaven.repo.local=_m2tmp
+  ./mvnw -Pcompat-file -Dcompat.oldJar="$PWD/_baseline/spring-web-3.5.6.jar" verify -DskipTests
+  ```
+
+- **The `compat` profile reports; it does not fail**: with japicmp 0.26.2, the `Treat changes as errors`
+  block reads `No` for every category (any / binary / source / semantic), so a MAJOR-incompatible delta
+  still ends in BUILD SUCCESS. To turn it into a real gate, set one of
+  `breakBuildBasedOnSemanticVersioning`, `breakBuildOnBinaryIncompatibleModifications`,
+  `breakBuildOnSourceIncompatibleModifications` or `breakBuildOnModifications` inside its
+  `<parameter>` block (parameter names are taken from the plugin descriptor).
+- breaking-changes.md records the intentional breaks; the japicmp report is its machine-checkable
+  counterpart — every reported failure must be reviewed (fix it, or record it there), never silenced.
+)
 
 - There is **no** binary-compatibility gate on this branch: the `compat` / `compat-file` profiles and the
   japicmp plugin live in master's `pom.xml` and are not ported. Upgrades are therefore validated by
@@ -298,8 +317,9 @@ one carries the instance that produced it.
 - Two gaps are known and deliberate. `BaseWebServerHttpRequest.parameterMap` - the one real concurrency fix -
   has no test, because a `volatile` visibility bug is not reproducible in a unit test; the fix carries the
   argument instead (`LocaleConfig`'s race does have a regression test, `defaultLocaleContextStaysConsistentWithLocaleSetDefault`).
-  And the audit read the invariant-bearing tests rather than all 562: the sweep covered the smells, the deep
-  read covered the ones guarding resource and lifecycle behaviour.
+  The invariant-bearing tests (those guarding resource and lifecycle behaviour) were reviewed in depth;
+  the remaining files were covered by the smell sweep.
+)
 
 ### PR Checklist
 

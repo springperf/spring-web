@@ -9,6 +9,7 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 > ⚠️ **This release contains breaking changes**: configuration keys, response framing, Servlet
 > `flush` semantics, conditional requests / Range, and extension-point signatures all changed —
 > read the [breaking changes](breaking-changes.md) before upgrading.
+)
 
 ### Added
 
@@ -24,6 +25,7 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Servlet `PrintWriter`**: `print` / `println` no longer auto-commit (aligned with Tomcat `autoFlush=false`); call `flush()` / `flushBuffer()` explicitly
 - **Extension-point signatures changed** (source-incompatible; see "Extension-point signature changes" in the 2.7.7 section of the breaking changes)
 - **Session, redirect and conditional-request error mappings** adjusted; management port and forwarding semantics adjusted (both in the 2.7.7 section of the breaking changes)
+)
 
 ### Security
 

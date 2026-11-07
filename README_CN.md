@@ -2,7 +2,7 @@
 
 # Spring WebPerf
 
-基于 Netty 的高性能 Web 框架，兼容 Spring MVC 编程模型，零妥协的性能方案。
+基于 Netty 的高性能 Web 框架，兼容 Spring MVC 编程模型。
 
 [![CI](https://github.com/springperf/spring-web/actions/workflows/ci.yml/badge.svg)](https://github.com/springperf/spring-web/actions/workflows/ci.yml)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.springperf/spring-web)](https://central.sonatype.com/artifact/io.github.springperf/spring-web)
@@ -18,7 +18,7 @@
 <img src="docs/images/perf-benchmark.svg" alt="Performance Benchmark Chart"/>
 </p>
 
-> 全部 7 个接口 × 3 个并发度，对比 Spring MVC（Tomcat/Undertow）与 WebFlux **100% 领先，无一例外**。json 16t p50 延迟仅 Tomcat 的 **69%**、每请求内存分配仅其 **43%**、4 线程堆占用 **24MB**（全场最低）。上述为 2026-08 单次 JMH 快照，in-process 测试条件与对比框架版本见[完整 Benchmark 报告](docs/benchmark.md)。
+> 在 7 个接口 × 3 个并发度的对比中，吞吐均领先 Spring MVC（Tomcat/Undertow）与 WebFlux。json 16t p50 延迟仅 Tomcat 的 **69%**、每请求内存分配仅其 **43%**、4 线程堆占用 **24MB**（全场最低）。上述为 2026-08 单次 JMH 快照，in-process 测试条件与对比框架版本见[完整 Benchmark 报告](docs/benchmark.md)。
 >
 > [完整 Benchmark 报告](docs/benchmark.md) · [性能原理详解](docs/performance-principles.md)
 
@@ -52,7 +52,7 @@ Spring WebPerf 是一个基于 **Netty** 构建的高性能 Web 框架，定位�
 - **Netty 驱动** — 基于 Netty 4.1 事件驱动 I/O，请求默认在 `default` 业务线程池执行以保护 EventLoop，可按方法粒度通过 `@RunInPool` 调度到自定义线程池或直接到 EventLoop
 - **Spring 生态兼容** — 支持 `@RestController`、`@RequestMapping`、`@Validated`、`@ExceptionHandler`、`HandlerInterceptor` 等 Spring 注解与抽象，零侵入迁移
 - **异步原生** — 内置 DeferredResult、Callable、SseEmitter、StreamEmitter、Reactive Streams 支持，SSE 吞吐达 Spring MVC 的 12.63x（4 线程）/ 7.72x（16 线程）
-- **批量处理** — 基于 Disruptor 的请求聚合批处理，透明地将并发请求合并为批量操作，吞吐量可提升数倍；支持背压策略、等待策略、线程池隔离
+- **批量处理** — 基于 Disruptor 的请求聚合批处理，透明地将并发请求合并为批量操作；开启攒批窗口后，IO 密集场景吞吐可提升数倍（默认窗口关闭，需按[批处理指南](docs/batch.md)配置 `batchWindowMillis`）。支持背压策略、等待策略、线程池隔离
 - **灵活扩展** — 参数解析器、返回值处理器、编解码 Advice、拦截器、过滤器等关键节点均提供 SPI
 - **生态桥接** — `spring-web-servlet` 桥接 Servlet `Filter` / `Servlet` / `HttpSession` / JSP；`spring-web-mvc-support` 桥接 Spring MVC `HandlerInterceptor`、`RequestBodyAdvice` / `ResponseBodyAdvice`
 - **服务端渲染** — 可选 `spring-web-view` 模块支持 Thymeleaf / FreeMarker / Beetl 模板引擎，`@Controller` + `Model` + 视图名编程模型与 Spring MVC 一致

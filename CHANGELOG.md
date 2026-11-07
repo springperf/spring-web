@@ -5,6 +5,7 @@
 本项目遵循 [语义化版本控制](https://semver.org/lang/zh-CN/)。
 
 ## [2.7.7] - 20261013
+)
 
 > ⚠️ **本版含破坏性变更**：配置键、响应分帧、Servlet `flush` 语义、条件请求/Range、
 > 扩展点签名均有调整，**升级前请先读 [破坏性变更说明](docs/breaking-changes.md)**。
@@ -23,6 +24,7 @@
 - **Servlet `PrintWriter`**：`print` / `println` 不再自动提交（对齐 Tomcat `autoFlush=false`），需显式 `flush()` / `flushBuffer()`
 - **扩展点签名变更**（源码级不兼容，详见破坏性变更说明的 2.7.7 节「扩展点签名变更」）
 - **会话、重定向与条件请求的错误映射**调整；管理端口与转发语义调整（均见破坏性变更说明的 2.7.7 节）
+)
 
 ### 安全
 

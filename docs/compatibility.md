@@ -10,9 +10,9 @@
 
 | 分支 | 对应 Spring Boot | 状态 | 维护策略 |
 |------|-----------------|------|---------|
-| `2.7.x` | 2.4.x ~ 2.7.x | 下游适配分支 | 从 master 同步 + 降级适配，基于 javax.servlet（见 [2.7.x 迁移清单](../.agent/context/2.7.x-migration-checklist.md)） |
+| `2.7.x` | 2.4.x ~ 2.7.x | 下游适配分支 | 从 master 同步 + 降级适配，基于 javax.servlet |
 | `master` | **3.5.x** | **开发基线** | 新功能优先合入此处；**不含任何 Spring Boot 4 / Spring Framework 7 兼容代码** |
-| `4.1.x` | 4.0.x ~ 4.1.x | 下游适配分支 | 从 master 同步 + 升级适配（见 [4.1.x 适配指南](../.agent/context/4.1.x-adaptation-checklist.md)） |
+| `4.1.x` | 4.0.x ~ 4.1.x | 下游适配分支 | 从 master 同步 + 升级适配 |
 
 同步方向始终是 `master → 4.1.x` / `master → 2.7.x`；版本适配代码只存在于下游分支。
 
@@ -122,9 +122,9 @@
 | 分支 | Spring Framework | `ModelMap` 是否实现 `Model` | 框架注入实现 | 备注 |
 |------|----------------|---------------------------|--------------|------|
 | `master` | 6.2.x | ❌ 否 | `ExtendedModelMap`（`ModelMap` 子类且实现 `Model`） | 统一注入 `ExtendedModelMap` 以兼容 `Model`/`ModelMap`/`ExtendedModelMap` 三种参数声明 |
-| `2.7.x` | 5.3.x | ✅ 是 | `ExtendedModelMap`（backport 时可简化） | `ModelMap` 本身即可 cast 到 `Model` |
+| `2.7.x` | 5.3.x | ✅ 是 | `ExtendedModelMap` | `ModelMap` 本身即可 cast 到 `Model` |
 
-> **Backport 提示**：`spring-web` core 的 `ModelContext.getOrCreate()` 在 2.7.x 分支无需特别处理——Spring 5.3 的 `ModelMap` 已实现 `Model`，可复用同一实现。
+> 在 `2.7.x` 分支上，Spring 5.3 的 `ModelMap` 已实现 `Model`，`spring-web` core 的 `ModelContext.getOrCreate()` 可复用同一实现。
 
 ### Thymeleaf / FreeMarker 版本矩阵
 

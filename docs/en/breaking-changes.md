@@ -23,9 +23,17 @@
 
 ## [2.7.7] - 2026-10-13
 
-### 1. Removals and renames
+### 1. P0 removals
 
-| Removed key | Replacement | Old → new semantics / migration |
+| Removed old key | Replacement | Old semantics | New semantics / migration |
+|---|---|---|---|
+| `server.use-forwarded-headers` (boolean) | `server.forward-headers-strategy` (enum) | `true` = trust forwarded headers | Enum: `NONE`/`FALSE` = do not trust; `FRAMEWORK`/`NATIVE` = trust (parse `Forwarded` / `X-Forwarded-*`).<br>Migration: `server.use-forwarded-headers=true` → `server.forward-headers-strategy=FRAMEWORK` |
+
+---
+
+### 2. P1 renames (old keys removed)
+
+| Removed old key | Replacement | Migration |
 |---|---|---|
 | `server.use-forwarded-headers` (boolean) | `server.forward-headers-strategy` (enum) | `true` = trust forwarded headers → enum `NONE`/`FALSE` = untrusted, `FRAMEWORK`/`NATIVE` = trusted (parses `Forwarded` / `X-Forwarded-*`).<br>Migration: `server.use-forwarded-headers=true` → `server.forward-headers-strategy=FRAMEWORK` |
 | `server.shutdown.timeout` (ms) | `server.shutdown.grace-period` (Duration) | `server.shutdown.timeout=30000` → `server.shutdown.grace-period=30s` |

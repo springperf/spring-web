@@ -37,7 +37,7 @@ All configuration properties are set in `application.properties`.
 
 > Related guards: `server.http.multipart.max-part-count` (max part count), `server.http.multipart.max-part-header-size` (max single-part header size, exceeding it returns 400), `server.http.max-ranges` (max byte ranges in a multi-range request; default `100` = no extra tightening, **effective cap = min(value, 100)** because the underlying `HttpRange` parser rejects more than 100 ranges, so this key tightens rather than raises; `0` = disable multi-range, negative = no extra limit; above the cap the `Range` header is ignored per RFC 9110 §14.2 and the full entity is returned), `server.http.max-pipelined-requests` (max same-connection requests queued while a response is in flight, default `16`; `<=0` = unlimited. Reaching the limit **pauses reads** (`autoRead=false`) rather than closing the connection or rejecting requests, because pipelining requires in-order responses; unread bytes stay in the socket buffer so TCP flow control provides backpressure, and reads resume once the queue drains).
 >
-> **Why multipart keys span two namespaces**: `spring.servlet.multipart.*` (Boot-aligned upload config: size limits, spilling) vs `server.http.multipart.*` (framework-native pipeline guards: part count, header size). This framework executes Servlet container semantics early in the Netty pipeline (aggregation/validation happens before the Servlet bridge), hence guard keys belong to the HTTP protocol family. See [Design Decision ADR 11](../internals/19-design-decisions.md) for the layering rationale. (Chinese only.)
+> **Why multipart keys span two namespaces**: `spring.servlet.multipart.*` (Boot-aligned upload config: size limits, spilling) vs `server.http.multipart.*` (framework-native pipeline guards: part count, header size). This framework executes Servlet container semantics early in the Netty pipeline (aggregation/validation happens before the Servlet bridge), hence guard keys belong to the HTTP protocol family. See [Design Decision ADR 11](../internals/19-design-decisions.md) for the layering rationale (that document is currently available in Chinese only).
 
 ## Static Resources
 
@@ -206,10 +206,8 @@ public class DynamicRegistration implements ServletContextListener {
 | `server.http.multipart.max-part-header-size` | `8192` | Max header bytes per multipart part (`<=0` unlimited); exceeding it makes the incremental scan throw `DecoderException` and the aggregator answer **400**. **The default differs from Boot**: Boot/Tomcat default this key to `512B`, this framework to `8192` |
 | `server.http.read-timeout` | `0` (disabled) | Read **idle** timeout (supports the `30s` form; `<=0` disables). It only bounds read inactivity: **in-flight requests are never killed** (a slow SQL call / downstream call / suspended async handler may exceed it and still deliver its response); only genuinely idle connections and stalled half-requests are reclaimed. Aligns with Tomcat `connectionTimeout` semantics. **Disabled by default** (Tomcat defaults to 20s): this framework applies no implicit connection-level limit by default, in production the proxy / gateway **normally reclaims idle connections**; the edges it cannot cover (direct / east-west traffic, the app-to-gateway hop when the peer dies) are listed in the note under this table, set it explicitly when you cannot guarantee them |
 
-> **Full list**: the entries above are the common ones. Every supported key is maintained and validated by
-> `SupportedPropertiesTest` — adding a key without registering it in
-> `META-INF/additional-spring-configuration-metadata.json` fails the build. Run
-> `mvn -pl spring-web test -Dtest=SupportedPropertiesTest -Dperf.props.dump=dump.txt` to export the full list.
+> **Full list**: the entries above are the common ones. Every supported key is registered in
+> `META-INF/additional-spring-configuration-metadata.json`, so IDEs can provide completion and documentation.
 
 ## Graceful Shutdown
 

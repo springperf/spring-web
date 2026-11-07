@@ -170,7 +170,7 @@ The takeaway: **comparable or better performance + lowest migration cost = where
 
 ---
 
-## Zero Compromise: Performance Without Sacrificing Developer Experience
+## Performance Without Sacrificing Developer Experience
 
 By now you might be thinking: "So I need to switch frameworks and rewrite all my code?"
 
@@ -198,7 +198,7 @@ All it takes is one dependency change in your `pom.xml`:
 </dependency>
 ```
 
-Zero code changes. `@RestController` stays `@RestController`, `@RequestMapping` stays `@RequestMapping`, `@Validated` stays `@Validated`.
+Most business code needs no changes. `@RestController` stays `@RestController`, `@RequestMapping` stays `@RequestMapping`, `@Validated` stays `@Validated`; the few differences that do need adjusting (such as `forward:`, Thymeleaf `#session`, and static-resource configuration) are listed in the [quickstart](quickstart.md).
 
 How is this possible? Because the project was designed from day one to **be compatible with the Spring programming model.** We encapsulated performance complexity inside the framework, not pushed it onto developers. Startup pre-computation, bytecode generation, O(1) routing — these technical details are completely transparent to business code.
 

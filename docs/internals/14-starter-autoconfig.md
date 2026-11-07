@@ -189,7 +189,7 @@ private static void assertNoSpringMvcConflict() {
 }
 ```
 
-`BeanFactoryPostProcessor` 在 bean 定义加载后、实例化前执行（`SpringWebAutoConfiguration.springMvcConflictGuard()` 注释 D9），比原 `webContext` bean 方法（实例化阶段）更早暴露问题。用户如果同时引入了 `spring-boot-starter-web`（Tomcat）和本框架的 starter，会在启动初期立即收到 `IllegalStateException`，避免两个 Web 服务器冲突。
+`BeanFactoryPostProcessor` 在 bean 定义加载后、实例化前执行（`SpringWebAutoConfiguration.springMvcConflictGuard()`），比原 `webContext` bean 方法（实例化阶段）更早暴露问题。用户如果同时引入了 `spring-boot-starter-web`（Tomcat）和本框架的 starter，会在启动初期立即收到 `IllegalStateException`，避免两个 Web 服务器冲突。
 
 ---
 
@@ -281,6 +281,7 @@ protected WebFilterRegistration createFilterWrapper(AbstractFilterRegistrationBe
 ---
 
 ## 五、事件适配
+)
 
 ### 5.1 事件：`PerfWebServerInitializedEvent`
 
@@ -303,6 +304,7 @@ public ApplicationListener<ApplicationReadyEvent> webServerInitializedEventPubli
 
 这使 Spring Cloud 服务注册（Nacos/Eureka/Consul）等组件能正确感知服务器就绪。
 
+)
 ## 六、生态集成
 
 ### 6.1 Spring Data 兼容

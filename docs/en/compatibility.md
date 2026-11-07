@@ -11,9 +11,9 @@ adaptation branches (2.7.x / 4.1.x).
 
 | Branch | Spring Boot | Status | Maintenance Strategy |
 |--------|-------------|--------|---------------------|
-| `2.7.x` | 2.4.x ~ 2.7.x | Downstream adaptation | Synced from master + downgrade adaptation; based on javax.servlet (see [2.7.x migration checklist](../../.agent/context/2.7.x-migration-checklist.md)) |
+| `2.7.x` | 2.4.x ~ 2.7.x | Downstream adaptation | Synced from master + downgrade adaptation; based on javax.servlet |
 | `master` | **3.5.x** | **Development baseline** | New features merged here first; **contains no Spring Boot 4 / Spring Framework 7 compatibility code** |
-| `4.1.x` | 4.0.x ~ 4.1.x | Downstream adaptation | Synced from master + upgrade adaptation (see [4.1.x adaptation guide](../../.agent/context/4.1.x-adaptation-checklist.md)) |
+| `4.1.x` | 4.0.x ~ 4.1.x | Downstream adaptation | Synced from master + upgrade adaptation |
 
 Sync direction is always `master → 4.1.x` / `master → 2.7.x`; version adaptation code lives only
 in the downstream branches.
@@ -126,9 +126,9 @@ The view rendering module depends on Spring's `org.springframework.ui` types. Be
 | Branch | Spring Framework | `ModelMap` implements `Model`? | Framework injection type | Notes |
 |--------|-----------------|-------------------------------|--------------------------|-------|
 | `master` | 6.2.x | ❌ No | `ExtendedModelMap` (subclass of `ModelMap` and implements `Model`) | Always injects `ExtendedModelMap` to support `Model`/`ModelMap`/`ExtendedModelMap` declarations |
-| `2.7.x` | 5.3.x | ✅ Yes | `ExtendedModelMap` (simpler on backport) | `ModelMap` itself is castable to `Model` |
+| `2.7.x` | 5.3.x | ✅ Yes | `ExtendedModelMap` | `ModelMap` itself is castable to `Model` |
 
-> **Backport note**: `ModelContext.getOrCreate()` in `spring-web` core needs no special handling on 2.7.x — Spring 5.3's `ModelMap` already implements `Model`, so the same implementation can be reused.
+> On the `2.7.x` branch, Spring 5.3's `ModelMap` already implements `Model`, so the same `ModelContext.getOrCreate()` implementation can be reused.
 
 ### Thymeleaf / FreeMarker Version Matrix
 

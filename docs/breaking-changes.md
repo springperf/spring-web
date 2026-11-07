@@ -21,9 +21,17 @@
 
 ## [2.7.7] - 2026-10-13
 
-### 一、移除项与改名项
+### 一、P0 移除项
 
-| 移除的旧键 | 替代键 | 旧语义 → 新语义 / 迁移说明 |
+| 移除的旧键 | 替代键 | 旧语义 | 新语义 / 迁移说明 |
+|---|---|---|---|
+| `server.use-forwarded-headers`（boolean） | `server.forward-headers-strategy`（枚举） | `true`=信任转发头 | 枚举 `NONE`/`FALSE`=不信任；`FRAMEWORK`/`NATIVE`=信任（解析 `Forwarded` / `X-Forwarded-*`）。<br>迁移：`server.use-forwarded-headers=true` → `server.forward-headers-strategy=FRAMEWORK` |
+
+---
+
+### 二、P1 改名项（旧键移除）
+
+| 移除的旧键 | 替代键 | 迁移说明 |
 |---|---|---|
 | `server.use-forwarded-headers`（boolean） | `server.forward-headers-strategy`（枚举） | `true`=信任转发头 → 枚举 `NONE`/`FALSE`=不信任，`FRAMEWORK`/`NATIVE`=信任（解析 `Forwarded` / `X-Forwarded-*`）。<br>迁移：`server.use-forwarded-headers=true` → `server.forward-headers-strategy=FRAMEWORK` |
 | `server.shutdown.timeout`（ms） | `server.shutdown.grace-period`（Duration） | `server.shutdown.timeout=30000` → `server.shutdown.grace-period=30s` |
