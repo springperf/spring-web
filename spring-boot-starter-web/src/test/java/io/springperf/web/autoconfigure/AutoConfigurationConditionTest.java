@@ -63,12 +63,14 @@ class AutoConfigurationConditionTest {
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     assertThat(context).doesNotHaveBean(SpringWebPropertyRefreshAutoConfiguration.class);
+                    assertThat(context).doesNotHaveBean("perfWebPropertyRefreshListener");
                 });
 
         runner.withConfiguration(AutoConfigurations.of(SpringWebPropertyRefreshAutoConfiguration.class))
                 .withBean(WebContext.class, () -> mock(WebContext.class)).run(context -> {
                     assertThat(context).hasNotFailed();
-                    assertThat(context).hasSingleBean(SpringWebPropertyRefreshAutoConfiguration.class);
+                    // 断言 @Bean 实际产出的监听器，而不只是配置类自身被注册
+                    assertThat(context).hasBean("perfWebPropertyRefreshListener");
                 });
     }
 

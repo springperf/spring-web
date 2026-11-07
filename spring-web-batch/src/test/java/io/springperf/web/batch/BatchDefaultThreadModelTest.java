@@ -1,5 +1,6 @@
 package io.springperf.web.batch;
 
+import io.springperf.web.annotation.RunInPool;
 import io.springperf.web.batch.annotation.BatchMapping;
 import io.springperf.web.batch.common.BatchRequest;
 import io.springperf.web.context.ApplicationProperties;
@@ -21,7 +22,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -35,7 +35,8 @@ import static org.mockito.Mockito.when;
  * {@code determinePool} 实际解析出哪个执行器）：
  * <ul>
  * <li>未开虚拟线程 → 遵循全局默认 {@code pool.default-execute-mode}（本例为 default 业务池）；</li>
- * <li>开启虚拟线程（JDK 21+）→ EventLoop（{@code determinePool} 返回 null）。</li>
+ * <li>开启虚拟线程（JDK 21+）→ EventLoop（{@code determinePool} 返回 null）；</li>
+ * <li>显式 {@code @RunInPool} → 优先于上述默认，不与虚拟线程开关联动。</li>
  * </ul>
  */
 class BatchDefaultThreadModelTest {
@@ -72,6 +73,18 @@ class BatchDefaultThreadModelTest {
         }
     }
 
+    /** 显式 @RunInPool 场景：验证它优先于虚拟线程带来的 EventLoop 默认。 */
+    @Controller
+    public static class PinnedController {
+        @BatchMapping(method = "singlePinned", ringBufferSize = 64, maxBatchSize = 5, consumerSize = 1)
+        public void batchPinned(List<EchoRequest> requests) {
+        }
+
+        @RunInPool("default")
+        public void singlePinned(String data) {
+        }
+    }
+
     @Configuration
     static class PlainConfig {
         @Bean
@@ -88,26 +101,46 @@ class BatchDefaultThreadModelTest {
         }
     }
 
+    @Configuration
+    static class PinnedConfig {
+        @Bean
+        public PinnedController pinnedController() {
+            return new PinnedController();
+        }
+    }
+
+    private record ResolvedSingle(ExecutorService resolved, ExecutorService defaultPool) {
+    }
+
     @Test
     void singlePath_usesDefaultBusinessPool_whenVirtualThreadsDisabled() throws Exception {
-        ExecutorService resolved = resolveSingleDispatchExecutor(false);
-        assertFalse(resolved == null, "未开虚拟线程时应落在 default 业务池，而不是 EventLoop");
+        ResolvedSingle resolved = resolveSingleDispatchExecutor(PlainController.class, PlainConfig.class, "single",
+                false);
+        assertSame(resolved.defaultPool(), resolved.resolved(), "未开虚拟线程时应落在 default 业务池，而不是 EventLoop");
     }
 
     @Test
     void singlePath_usesEventLoop_whenVirtualThreadsEnabled() throws Exception {
         assumeTrue(Runtime.version().feature() >= 21, "虚拟线程需要 JDK 21+，当前 JDK " + Runtime.version().feature());
-        assertNull(resolveSingleDispatchExecutor(true), "开启虚拟线程时 single 路径应留在 EventLoop（零切换）");
+        ResolvedSingle resolved = resolveSingleDispatchExecutor(VtController.class, VtConfig.class, "singleVt", true);
+        assertNull(resolved.resolved(), "开启虚拟线程时 single 路径应留在 EventLoop（零切换）");
+    }
+
+    @Test
+    void explicitRunInPool_winsOverVirtualThreadDefault() throws Exception {
+        assumeTrue(Runtime.version().feature() >= 21, "虚拟线程需要 JDK 21+，当前 JDK " + Runtime.version().feature());
+        ResolvedSingle resolved = resolveSingleDispatchExecutor(PinnedController.class, PinnedConfig.class,
+                "singlePinned", true);
+        assertSame(resolved.defaultPool(), resolved.resolved(),
+                "显式 @RunInPool 必须优先于虚拟线程写入的 EventLoop 默认");
     }
 
     /**
      * 装配真实的 BizPoolRegistry + BatchRegistry，返回 {@code @BatchMapping} single 处理器 最终解析到的执行器（{@code null} =
-     * EventLoop），并校验它与虚拟线程开关的预期一致。
+     * EventLoop）及默认池，由调用方按输入场景断言。
      */
-    private ExecutorService resolveSingleDispatchExecutor(boolean virtualThreadsEnabled) throws Exception {
-        Class<?> controllerType = virtualThreadsEnabled ? VtController.class : PlainController.class;
-        Class<?> configType = virtualThreadsEnabled ? VtConfig.class : PlainConfig.class;
-        String singleMethod = virtualThreadsEnabled ? "singleVt" : "single";
+    private ResolvedSingle resolveSingleDispatchExecutor(Class<?> controllerType, Class<?> configType,
+            String singleMethod, boolean virtualThreadsEnabled) throws Exception {
         try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext(configType)) {
             Object bean = ctx.getBean(controllerType);
             HandlerMethod hm = new HandlerMethod(bean, controllerType.getMethod(singleMethod, String.class));
@@ -139,14 +172,7 @@ class BatchDefaultThreadModelTest {
             registry.initWithWebContext(webContext);
             try {
                 registry.initComponentPhase2();
-                boolean virtual = poolRegistry.usesVirtualThreads();
-                ExecutorService resolved = poolRegistry.determinePool(singleCtx);
-                if (virtual) {
-                    assertNull(resolved, "开启虚拟线程时应落在 EventLoop");
-                } else {
-                    assertSame(poolRegistry.getDefaultPool(), resolved, "未开虚拟线程时应落在 default 业务池");
-                }
-                return resolved;
+                return new ResolvedSingle(poolRegistry.determinePool(singleCtx), poolRegistry.getDefaultPool());
             } finally {
                 registry.destroyComponent();
                 poolRegistry.destroyComponent();

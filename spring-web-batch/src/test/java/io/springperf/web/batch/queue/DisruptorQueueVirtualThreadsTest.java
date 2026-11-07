@@ -13,8 +13,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
@@ -73,9 +76,9 @@ class DisruptorQueueVirtualThreadsTest {
         SaturatedService.THREADS.clear();
     }
 
-    private static BatchRequestMetaData capturingMeta() throws Exception {
+    private static BatchRequestMetaData capturingMeta(String queueName) throws Exception {
         Method m = ThreadCapturingService.class.getDeclaredMethod("handle", List.class);
-        return new BatchRequestMetaData(m, ThreadCapturingService.class, null, "vtq-" + SEQ.incrementAndGet(), 64,
+        return new BatchRequestMetaData(m, ThreadCapturingService.class, null, queueName, 64,
                 BatchMapping.WaitStrategy.BLOCKING, BatchMapping.Backpressure.BLOCK, null, 2, 2);
     }
 
@@ -91,18 +94,25 @@ class DisruptorQueueVirtualThreadsTest {
         for (int i = 0; i < 200 && r.getResult() == null; i++) {
             Thread.sleep(20);
         }
+        if (r.getResult() == null) {
+            fail("等待批量方法完成超时: " + r);
+        }
     }
 
     private Thread runOneBatch(boolean virtualThreads) throws Exception {
-        queue = new DisruptorQueue("vtq-" + SEQ.incrementAndGet(), capturingMeta(), new ThreadCapturingService(), null,
+        String queueName = "vtq-" + SEQ.incrementAndGet();
+        queue = new DisruptorQueue(queueName, capturingMeta(queueName), new ThreadCapturingService(), null,
                 virtualThreads);
-        queue.enqueue(new BatchRequest<String>() {
-        });
+        BatchRequest<String> request = new BatchRequest<String>() {
+        };
+        queue.enqueue(request);
         for (int i = 0; i < 200 && ThreadCapturingService.LAST_THREAD.get() == null; i++) {
             Thread.sleep(20);
         }
         Thread t = ThreadCapturingService.LAST_THREAD.get();
         assertNotNull(t, "批量方法应已被执行");
+        awaitResult(request);
+        assertEquals("ok", request.getResult());
         return t;
     }
 
@@ -120,14 +130,17 @@ class DisruptorQueueVirtualThreadsTest {
         awaitResult(first);
         awaitResult(second);
 
-        assertTrue(SaturatedService.THREADS.stream().anyMatch(n -> n.startsWith("batch-disruptor-")),
-                "池满时后续批次应由消费者线程自执行（背压），实际执行线程: " + SaturatedService.THREADS);
+        assertEquals("ok", first.getResult());
+        assertEquals("ok", second.getResult());
+        assertThat(SaturatedService.THREADS).as("池满时后续批次应由消费者线程自执行（背压）")
+                .contains("batch-disruptor-" + queueName);
     }
 
     @Test
     void platformMode_runsOnBatchWorkerThread() throws Exception {
         Thread t = runOneBatch(false);
-        assertTrue(t.getName().startsWith("batch-worker-"), "默认应为平台工作线程，实际: " + t.getName());
+        assertEquals("batch-worker-" + queue.queueName(), t.getName(),
+                "默认应为平台工作线程，实际: " + t.getName());
     }
 
     @Test
@@ -139,7 +152,8 @@ class DisruptorQueueVirtualThreadsTest {
     void virtualThreadMode_runsOnVirtualThread() throws Exception {
         assumeTrue(Runtime.version().feature() >= 21, "虚拟线程需要 JDK 21+，当前 JDK " + Runtime.version().feature());
         Thread t = runOneBatch(true);
-        assertTrue(t.getName().startsWith("batch-virtual-"), "应使用虚拟线程工厂，实际: " + t.getName());
+        assertTrue(t.getName().startsWith("batch-virtual-" + queue.queueName()),
+                "应使用虚拟线程工厂，实际: " + t.getName());
         Method isVirtual = Thread.class.getMethod("isVirtual");
         assertTrue((boolean) isVirtual.invoke(t), "执行线程应为虚拟线程");
     }
@@ -148,7 +162,7 @@ class DisruptorQueueVirtualThreadsTest {
     void virtualThreadMode_whenPoolSaturated_consumerThreadExecutesInline() throws Exception {
         assumeTrue(Runtime.version().feature() >= 21, "虚拟线程需要 JDK 21+，当前 JDK " + Runtime.version().feature());
         assertSaturatedBatchRunsInlineOnConsumerThread(true);
-        assertTrue(SaturatedService.THREADS.stream().anyMatch(n -> n.startsWith("batch-virtual-")),
-                "池未满时仍应在虚拟线程上执行，实际执行线程: " + SaturatedService.THREADS);
+        assertThat(SaturatedService.THREADS).as("池未满时仍应在虚拟线程上执行")
+                .anyMatch(name -> name.startsWith("batch-virtual-" + queue.queueName()));
     }
 }

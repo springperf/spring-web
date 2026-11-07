@@ -4,6 +4,7 @@ import io.springperf.web.batch.common.BatchRequest;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 @SuppressWarnings("unchecked")
 class BatchExceptionHandlerTest {
@@ -21,6 +22,9 @@ class BatchExceptionHandlerTest {
         handler.handleEventException(ex, 1L, event);
 
         assertThat(req.isCompleted()).isTrue();
+        // handler 的唯一职责是把原始异常写入请求，必须校验错误对象本身
+        assertThat(req.hasResult()).isTrue();
+        assertThat(req.getResult()).isSameAs(ex);
     }
 
     @Test
@@ -33,29 +37,29 @@ class BatchExceptionHandlerTest {
 
         handler.handleEventException(new RuntimeException("late error"), 1L, event);
 
-        assertThat(req.isCompleted()).isTrue(); // still completed from setResult
+        // 已完成的请求不得被错误覆盖——这是 "skip" 的真实语义
+        assertThat(req.getResult()).isEqualTo("ok");
+        assertThat(req.isCompleted()).isTrue();
     }
 
     @Test
     void handleEventException_handlesNullEvent() {
-        // Should not throw NPE
-        handler.handleEventException(new RuntimeException("null event"), 1L, null);
+        assertDoesNotThrow(() -> handler.handleEventException(new RuntimeException("null event"), 1L, null));
     }
 
     @Test
     void handleEventException_handlesNullRequest() {
         BatchEvent event = new BatchEvent();
-        handler.handleEventException(new RuntimeException("null req"), 1L, event);
-        // Should not throw NPE
+        assertDoesNotThrow(() -> handler.handleEventException(new RuntimeException("null req"), 1L, event));
     }
 
     @Test
     void handleOnStartException_doesNotThrow() {
-        handler.handleOnStartException(new RuntimeException("start fail"));
+        assertDoesNotThrow(() -> handler.handleOnStartException(new RuntimeException("start fail")));
     }
 
     @Test
     void handleOnShutdownException_doesNotThrow() {
-        handler.handleOnShutdownException(new RuntimeException("shutdown fail"));
+        assertDoesNotThrow(() -> handler.handleOnShutdownException(new RuntimeException("shutdown fail")));
     }
 }

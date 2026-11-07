@@ -18,7 +18,8 @@ public class BatchEchoController {
     public void batchEcho(List<EchoBatchRequest> requests) {
         for (EchoBatchRequest req : requests) {
             String injectedMsg = req.msg != null ? req.msg : "null";
-            req.setResult("batched:" + requests.size() + ":msg=" + injectedMsg);
+            req.setResult("batched:" + requests.size() + ":msg=" + injectedMsg + ":thread="
+                    + Thread.currentThread().getName());
         }
     }
 
@@ -45,11 +46,13 @@ public class BatchEchoController {
         return null;
     }
 
-    @BatchMapping(method = "echoBatchSize", maxBatchSize = 2)
+    // 窗口是 maxBatchSize 生效的前提：无窗口时消费者逐条 endOfBatch，批大小长期停在 1
+    @BatchMapping(method = "echoBatchSize", maxBatchSize = 2, batchWindowMillis = 50)
     public void batchEchoBatchSize(List<EchoBatchRequest> requests) {
         for (EchoBatchRequest req : requests) {
             String injectedMsg = req.msg != null ? req.msg : "null";
-            req.setResult("batched:" + requests.size() + ":msg=" + injectedMsg + ":maxBatchSize=2");
+            req.setResult("batched:" + requests.size() + ":msg=" + injectedMsg + ":thread="
+                    + Thread.currentThread().getName());
         }
     }
 
@@ -72,7 +75,8 @@ public class BatchEchoController {
     public void batchEchoConsumers(List<EchoBatchRequest> requests) {
         for (EchoBatchRequest req : requests) {
             String injectedMsg = req.msg != null ? req.msg : "null";
-            req.setResult("consumed:" + requests.size() + ":msg=" + injectedMsg + ":consumerSize=2");
+            req.setResult("consumed:" + requests.size() + ":msg=" + injectedMsg + ":thread="
+                    + Thread.currentThread().getName());
         }
     }
 

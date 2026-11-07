@@ -23,7 +23,10 @@ public abstract class BatchRequest<R> extends DeferredResult<R> {
 
     @Override
     public final boolean setResult(R result) {
-        if (!completed.compareAndSet(false, true)) {
+        // isSetOrExpired 先行：父类在「只置 expired、尚未写结果」的窗口会拒绝 setResult，
+        // 若先置 completed 再写，就会出现「父类无结果、内部却已完成」的不一致，
+        // 后续 failUncompleted 会跳过该请求，导致请求静默失联。
+        if (isSetOrExpired() || !completed.compareAndSet(false, true)) {
             return false;
         }
         return super.setResult(result);
@@ -31,7 +34,7 @@ public abstract class BatchRequest<R> extends DeferredResult<R> {
 
     @Override
     public boolean setErrorResult(Object result) {
-        if (!completed.compareAndSet(false, true)) {
+        if (isSetOrExpired() || !completed.compareAndSet(false, true)) {
             return false;
         }
         return super.setErrorResult(result);

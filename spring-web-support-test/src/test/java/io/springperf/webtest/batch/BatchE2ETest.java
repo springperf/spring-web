@@ -14,17 +14,21 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class BatchE2ETest extends BaseE2ETest {
 
-    private String baseUrl() {
-        return url("/api/batch/echo?msg=hello");
-    }
-
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+
+    /** 解析响应前缀后的批大小，如 {@code batched:3:msg=...} → 3。 */
+    private static Integer parseBatchSize(String body, String prefix) {
+        Matcher matcher = Pattern.compile("^" + prefix + ":(\\d+):").matcher(body);
+        return matcher.find() ? Integer.valueOf(matcher.group(1)) : null;
+    }
 
     @Test
     void batchRequests_areProcessedByBatchHandler() throws Exception {
@@ -32,16 +36,22 @@ public class BatchE2ETest extends BaseE2ETest {
         ExecutorService executor = Executors.newFixedThreadPool(requestCount);
         CountDownLatch latch = new CountDownLatch(requestCount);
         AtomicInteger successCount = new AtomicInteger(0);
+        List<Integer> batchSizes = new CopyOnWriteArrayList<>();
         List<String> failures = new CopyOnWriteArrayList<>();
 
         for (int i = 0; i < requestCount; i++) {
+            final String msg = "hello-" + i;
             executor.submit(() -> {
                 try {
-                    Request req = new Request.Builder().url(baseUrl()).get().build();
+                    Request req = new Request.Builder().url(url("/api/batch/echo?msg=" + msg)).get().build();
                     try (Response resp = CLIENT.newCall(req).execute()) {
                         String body = resp.body() != null ? resp.body().string() : "";
-                        if (resp.code() == 200 && body.startsWith("batched:") && body.contains("msg=hello")) {
+                        Integer batchSize = parseBatchSize(body, "batched");
+                        // 线程名以 batch- 开头即证明走了 @BatchMapping 路径（EventLoop 线程名不是这个前缀）
+                        if (resp.code() == 200 && batchSize != null && body.contains("msg=" + msg)
+                                && body.contains(":thread=batch-")) {
                             successCount.incrementAndGet();
+                            batchSizes.add(batchSize);
                         } else {
                             failures.add(resp.code() + ":" + body);
                         }
@@ -58,16 +68,21 @@ public class BatchE2ETest extends BaseE2ETest {
         executor.shutdown();
 
         assertEquals(requestCount, successCount.get(),
-                "All requests should return 200 with msg=hello injected. Failures: " + failures);
+                "All requests should return 200 with their own msg injected. Failures: " + failures);
+        // 每个响应都来自批处理方法，且回显的批大小不能超过总请求数
+        assertTrue(batchSizes.stream().allMatch(size -> size >= 1 && size <= requestCount),
+                "批大小应在 [1, 请求数] 内，实际: " + batchSizes);
+        // 说明：该端点未配置 batchWindowMillis，合并次数取决于 Disruptor 调度，不能强求；
+        // 窗口 + maxBatchSize 的确定性合并由 maxBatchSize_limitsBatchSizeInResponses 验证
     }
 
     @Test
     void singleRequest_alsoProcessedByBatchHandler() throws Exception {
-        Request req = new Request.Builder().url(baseUrl()).get().build();
+        Request req = new Request.Builder().url(url("/api/batch/echo?msg=hello")).get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
-            assertTrue(body.startsWith("batched:"), "Response should come from batch handler: " + body);
+            assertEquals(1, parseBatchSize(body, "batched"), "单请求应单独成批: " + body);
             assertTrue(body.contains("msg=hello"), "Response should contain injected msg=hello: " + body);
         }
     }
@@ -92,7 +107,7 @@ public class BatchE2ETest extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
-            assertTrue(body.startsWith("batched:"), "Should be batched: " + body);
+            assertEquals(1, parseBatchSize(body, "batched"), "单请求应单独成批: " + body);
             assertTrue(body.contains("msg=helloMulti"), "Missing msg injection: " + body);
             assertTrue(body.contains("name=testUser"), "Missing body.name injection: " + body);
             assertTrue(body.contains("age=25"), "Missing body.age injection: " + body);
@@ -106,16 +121,22 @@ public class BatchE2ETest extends BaseE2ETest {
         ExecutorService executor = Executors.newFixedThreadPool(requestCount);
         CountDownLatch latch = new CountDownLatch(requestCount);
         AtomicInteger successCount = new AtomicInteger(0);
+        List<Integer> batchSizes = new CopyOnWriteArrayList<>();
         List<String> failures = new CopyOnWriteArrayList<>();
 
         for (int i = 0; i < requestCount; i++) {
+            final String msg = "test-" + i;
             executor.submit(() -> {
                 try {
-                    Request req = new Request.Builder().url(url("/api/batch/echo-batchsize?msg=test")).get().build();
+                    Request req = new Request.Builder().url(url("/api/batch/echo-batchsize?msg=" + msg)).get()
+                            .build();
                     try (Response resp = CLIENT.newCall(req).execute()) {
                         String body = resp.body() != null ? resp.body().string() : "";
-                        if (resp.code() == 200 && body.contains(":maxBatchSize=2")) {
+                        Integer batchSize = parseBatchSize(body, "batched");
+                        if (resp.code() == 200 && batchSize != null && batchSize <= 2
+                                && body.contains("msg=" + msg) && body.contains(":thread=batch-")) {
                             successCount.incrementAndGet();
+                            batchSizes.add(batchSize);
                         } else {
                             failures.add(resp.code() + ":" + body);
                         }
@@ -132,7 +153,10 @@ public class BatchE2ETest extends BaseE2ETest {
         executor.shutdown();
 
         assertEquals(requestCount, successCount.get(),
-                "All maxBatchSize requests should succeed. Failures: " + failures);
+                "All maxBatchSize requests should succeed with batch size <= 2. Failures: " + failures);
+        // maxBatchSize=2 必须真的限制住批大小：至少有一次 2 个请求成批，而不是全部单批
+        assertTrue(batchSizes.stream().anyMatch(size -> size == 2),
+                "应至少出现一次 2 个请求成批（maxBatchSize 生效），实际批大小: " + batchSizes);
     }
 
     @Test
@@ -149,16 +173,14 @@ public class BatchE2ETest extends BaseE2ETest {
                     Request req = new Request.Builder().url(url("/api/batch/echo-error?msg=test")).get().build();
                     try (Response resp = CLIENT.newCall(req).execute()) {
                         String body = resp.body() != null ? resp.body().string() : "";
-                        if (resp.isSuccessful()) {
-                            // Successful response — check body for wrapped error
-                            if (body.contains("\"code\":500")) {
-                                errorCount.incrementAndGet();
-                            } else {
-                                failures.add(resp.code() + ":" + body);
-                            }
-                        } else {
-                            // Non-2xx status code also indicates error propagation
+                        // 只接受明确的 500，或 2xx + 框架错误体；404/429/302 等一律不算错误传播成功
+                        boolean isError = resp.code() == 500
+                                || (resp.isSuccessful() && (body.contains("intentional batch error for test")
+                                        || body.contains("\"code\":500")));
+                        if (isError) {
                             errorCount.incrementAndGet();
+                        } else {
+                            failures.add(resp.code() + ":" + body);
                         }
                     }
                 } catch (Exception e) {
@@ -176,8 +198,12 @@ public class BatchE2ETest extends BaseE2ETest {
                 "All requests should receive error response. Failures: " + failures);
     }
 
+    /**
+     * consumerSize=2 的语义：批量方法在 bizExecutor 上执行；池满时由 Disruptor 消费者线程 自执行（CallerRunsPolicy 背压）。两种线程都属于 batch
+     * 线程模型，不能要求“全部在 worker 线程”。
+     */
     @Test
-    void maxConsumers_processesAllRequestsInWorkerPool() throws Exception {
+    void maxConsumers_processesAllRequestsInBatchThreadModel() throws Exception {
         int requestCount = 5;
         ExecutorService executor = Executors.newFixedThreadPool(requestCount);
         CountDownLatch latch = new CountDownLatch(requestCount);
@@ -185,12 +211,17 @@ public class BatchE2ETest extends BaseE2ETest {
         List<String> failures = new CopyOnWriteArrayList<>();
 
         for (int i = 0; i < requestCount; i++) {
+            final String msg = "test-" + i;
             executor.submit(() -> {
                 try {
-                    Request req = new Request.Builder().url(url("/api/batch/echo-consumers?msg=test")).get().build();
+                    Request req = new Request.Builder().url(url("/api/batch/echo-consumers?msg=" + msg)).get()
+                            .build();
                     try (Response resp = CLIENT.newCall(req).execute()) {
                         String body = resp.body() != null ? resp.body().string() : "";
-                        if (resp.code() == 200 && body.startsWith("consumed:") && body.contains(":consumerSize=2")) {
+                        Integer batchSize = parseBatchSize(body, "consumed");
+                        // 批量方法必须运行在 batch 线程模型（worker 池或消费者线程背压），而不是 EventLoop
+                        if (resp.code() == 200 && batchSize != null && body.contains("msg=" + msg)
+                                && body.contains("thread=batch-")) {
                             successCount.incrementAndGet();
                         } else {
                             failures.add(resp.code() + ":" + body);
@@ -208,6 +239,6 @@ public class BatchE2ETest extends BaseE2ETest {
         executor.shutdown();
 
         assertEquals(requestCount, successCount.get(),
-                "All maxConsumers requests should succeed. Failures: " + failures);
+                "All maxConsumers requests should run in the batch thread model. Failures: " + failures);
     }
 }
