@@ -345,5 +345,14 @@
 | 视图响应的 `Content-Type` 与编码 | 由各引擎分别设置；FreeMarker 的 `content-type` 可能与响应字节编码不一致，`redirect:` 也带 `text/html` | 统一由 `ViewReturnValueResolver.applyContentType()` 决定：Content-Type 自带 `charset` 时同步到响应编码；`redirect:` 不设置 Content-Type。**迁移**：自定义头请实现 `View.getContentType()` |
 | `RedirectView` 的状态码 | 无条件设置 302 | 保留 `ModelAndView` 指定的 3xx 状态码。**无需迁移** |
 | `spring.beetl.mode` | 已定义但从未被读取 | 移除。**无需迁移** |
-| 视图名解析结果 | 每请求执行模板存在性探测并新建 View | `cache=true` 时按视图名缓存（含未解析结果）。**迁移**：运行期新增模板需重启或关闭模板缓存 |
+| 视图名解析结果 | 每请求执行模板存在性探测并新建 View | `cache=true` 时按视图名缓存（含未解析结果）。**迁移**：运行期新增或替换模板后调用 `ViewResolverRegistry.invalidateViewCaches()`，或关闭模板缓存 |
+| 视图渲染中途抛异常 | 响应已提前标记 handled，500 错误响应被拒绝，客户端收到 200 + 半截 HTML；异常处理器返回的错误页拼接在半截页面之后 | 丢弃半截内容并交 `ExceptionRegistry` 处理（500 错误页或异常处理器错误页）。**无需迁移** |
+| `spring.web.view.engine` 取值 | 未知值与 `none` 混写被静默忽略，可能拖到首次视图请求才 500 | 启动期抛 `IllegalStateException`；`none` 只能单独使用。**迁移**：修正配置值，单独使用 `none` |
+| `engine=none` 时的内置 JSP | 仍会装配 `JspViewResolver` | 不再装配内置 JSP；自定义 `ViewResolver` Bean 不受影响。**迁移**：需要 JSP 时不要设 `none` |
+| `ViewControllerInvoker` 的 `redirect:` 响应 | 带 `text/html` Content-Type | 与另两条链路一致，不设置 Content-Type。**无需迁移** |
+| `spring.{thymeleaf,freemarker,beetl}.{cache,enabled}` 取值 | 非 true/false 值被静默当成 false | 启动期抛 `IllegalStateException`（含配置键与实际值）。**迁移**：改成 true/false |
+| 自定义 Content-Type 未带 charset | 响应头原样保留，Writer 却按响应编码写字节，两者可能不一致 | 响应头追加 `;charset=<响应编码>`。**迁移**：需精确控制时在配置值里显式写 charset |
+| 带后缀的视图名（`hello.html` / `hello.btl`） | 仅 FreeMarker 支持，Thymeleaf / Beetl 会拼成 `hello.html.html` / `hello.btl.btl` | 三个内置引擎统一支持。**无需迁移** |
+| `redirect://host` 协议相对目标 | 非空 context-path 下被拼成 `/app//host` | 直接作为外部目标使用。**无需迁移** |
+| https 且无显式端口时的 `IWebRequest#getServerPort()` | 固定返回 80 | 返回 443。**无需迁移** |
 

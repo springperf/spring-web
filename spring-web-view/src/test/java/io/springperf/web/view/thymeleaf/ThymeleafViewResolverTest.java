@@ -86,6 +86,29 @@ class ThymeleafViewResolverTest {
     }
 
     @Test
+    void viewRender_nameWithSuffix_rendersSameTemplate() throws Exception {
+        ThymeleafViewResolver resolver = buildResolver();
+        View view = resolver.resolveViewName("hello.html", Locale.US, mock(WebServerHttpRequest.class));
+        assertNotNull(view, "带后缀的视图名应能解析");
+
+        WebServerHttpRequest req = mock(WebServerHttpRequest.class);
+        when(req.getLocale()).thenReturn(Locale.US);
+        WebContext wc = mock(WebContext.class);
+        when(wc.getContextPath()).thenReturn("");
+        when(req.getWebContext()).thenReturn(wc);
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        when(resp.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
+        ByteArrayOutputStream body = new ByteArrayOutputStream();
+        when(resp.getBody()).thenReturn(body);
+
+        view.render(new HashMap<>(), req, resp);
+
+        String output = new String(body.toByteArray(), StandardCharsets.UTF_8);
+        assertTrue(output.contains("Hello"),
+                "TemplateEngine 必须收到去掉后缀的模板名，否则会去找 hello.html.html: " + output);
+    }
+
+    @Test
     void initWithWebContext_registersDefaultProviderWhenAbsent() {
         ThymeleafViewResolver resolver = new ThymeleafViewResolver();
         resolver.initWithWebContext(webContext);
@@ -195,5 +218,18 @@ class ThymeleafViewResolverTest {
 
         resolver.invalidateCache();
         assertNotSame(first, resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class)));
+    }
+
+    @Test
+    void invalidateCache_clearsEngineTemplateCache() throws Exception {
+        ThymeleafViewResolver resolver = buildResolver();
+        org.thymeleaf.TemplateEngine engine = mock(org.thymeleaf.TemplateEngine.class);
+        java.lang.reflect.Field field = ThymeleafViewResolver.class.getDeclaredField("templateEngine");
+        field.setAccessible(true);
+        field.set(resolver, engine);
+
+        resolver.invalidateCache();
+
+        verify(engine).clearTemplateCache();
     }
 }

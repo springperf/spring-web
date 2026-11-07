@@ -143,4 +143,14 @@ public class ViewRenderTest extends BaseE2ETest {
             assertTrue(body.contains("handled: boom"), "Exception handler should render error view, got: " + body);
         }
     }
+
+    @Test
+    void renderFailure_returns500WithoutPartialHtml() throws Exception {
+        Request req = new Request.Builder().url(url("/api/view/render-boom")).get().build();
+        try (Response resp = CLIENT.newCall(req).execute()) {
+            assertEquals(500, resp.code(), "渲染中途抛异常必须落到 500，不能返回 200 加半截页面");
+            String body = resp.body().string();
+            assertFalse(body.contains("RENDER-BOOM-PARTIAL"), "半截 HTML 必须被丢弃，实际: " + body);
+        }
+    }
 }

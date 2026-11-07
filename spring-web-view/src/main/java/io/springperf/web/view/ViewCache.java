@@ -19,8 +19,8 @@ import java.util.concurrent.ConcurrentMap;
  * 容量上限防止视图名由外部输入拼接时无界增长；超限只淘汰最早的已完成条目，不清空全表（避免缓存抖动）。
  * </p>
  * <p>
- * 负结果同样缓存，因此缓存开启时运行期新增的模板需调用 {@link #invalidate()}（或经
- * {@link ViewResolverRegistry#invalidateViewCaches()} 统一触发）后才可见。
+ * 负结果同样缓存，因此缓存开启时运行期新增或替换的模板需调用 {@link #invalidate()}（或经
+ * {@link ViewResolverRegistry#invalidateViewCaches()} 统一触发，后者还会清模板引擎内部缓存）后才可见。
  * </p>
  */
 public final class ViewCache {
@@ -89,9 +89,12 @@ public final class ViewCache {
         }
     }
 
-    private void trackInsertion(String key) {
+    private synchronized void trackInsertion(String key) {
         insertionOrder.add(key);
-        while (views.size() > MAX_SIZE) {
+        // 队首是仍在加载的条目时不能就此放弃淘汰：放回队尾，继续扫描后续已完成条目。
+        // 用队列长度做上限，避免「全部条目都未完成」时反复扫描同一个 key 造成死循环。
+        int attempts = insertionOrder.size();
+        while (views.size() > MAX_SIZE && attempts-- > 0) {
             String oldest = insertionOrder.poll();
             if (oldest == null) {
                 return;
@@ -102,15 +105,15 @@ public final class ViewCache {
             }
             if (!current.isDone() || current.isCompletedExceptionally()) {
                 insertionOrder.add(oldest);
-                return;
+                continue;
             }
             // 只淘汰这一个 key；淘汰造成的缓存未命中不影响正确性
             views.remove(oldest, current);
         }
     }
 
-    /** 运行期新增/替换模板后主动失效；配置刷新不重建模板引擎，需由调用方显式触发。 */
-    public void invalidate() {
+    /** 运行期新增/替换模板后主动失效；与 trackInsertion 互斥，避免两个容器的清空与插入交错。 */
+    public synchronized void invalidate() {
         views.clear();
         insertionOrder.clear();
     }

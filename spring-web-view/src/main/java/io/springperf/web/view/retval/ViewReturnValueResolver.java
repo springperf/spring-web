@@ -23,6 +23,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 public class ViewReturnValueResolver extends BaseWebComponent implements ReturnValueResolver {
@@ -77,22 +78,16 @@ public class ViewReturnValueResolver extends BaseWebComponent implements ReturnV
     }
 
     /**
-     * 是否显式禁用了全部模板引擎（{@code spring.web.view.engine} 配置含 {@code none}）。
+     * 是否显式禁用了全部内置模板引擎（{@code spring.web.view.engine=none}）。
      * <p>
      * 此时仅支持 {@code redirect:} 视图名，无模板引擎时不应触发 fail-fast。
+     * 配置取值的合法性由 {@link ViewProperties#parseEngines(String)} 统一校验。
      * </p>
      */
     private boolean isViewEngineDisabled() {
-        String engine = webContext.getProps().get(ViewProperties.ENGINE, ViewProperties.ENGINE_DEFAULT);
-        if (engine == null || engine.trim().isEmpty()) {
-            return false;
-        }
-        for (String item : engine.split(",")) {
-            if (item.trim().equalsIgnoreCase("none")) {
-                return true;
-            }
-        }
-        return false;
+        return ViewProperties.parseEngines(
+                webContext.getProps().get(ViewProperties.ENGINE, ViewProperties.ENGINE_DEFAULT))
+                .contains(ViewProperties.ENGINE_NONE);
     }
 
     @Override
@@ -123,16 +118,16 @@ public class ViewReturnValueResolver extends BaseWebComponent implements ReturnV
                     + "' with any registered ViewResolver (thymeleaf/freemarker/beetl/jsp)");
         }
         applyContentType(view, resp);
-        resp.setHandled();
-        view.render(ModelContext.getOrCreate(req), req, resp);
+        renderView(view, ModelContext.getOrCreate(req), req, resp);
     }
 
     /**
-     * 视图响应的 Content-Type 与响应编码由这里统一决定：View 提供的 Content-Type 原样保留，
-     * 仅当其中自带 charset 时同步到响应编码（保证 Writer 与响应头一致）；未提供则回退
-     * {@code text/html} + 响应编码。重定向无响应体，不设置 Content-Type。
+     * 视图响应的 Content-Type 与响应编码由这里统一决定：View 提供 Content-Type 时保留其媒体类型与参数，
+     * 自带 charset 时同步到响应编码；未带 charset 时把响应实际编码补进 Content-Type，保证 Writer 写出的字节
+     * 与响应头声明一致。未提供 Content-Type 则回退 {@code text/html} + 响应编码。重定向无响应体，不设置 Content-Type。
      * <p>
-     * 供 {@code ModelAndViewReturnValueResolver} 复用，避免两条链路各写一套导致头与字节编码错配。
+     * 供 {@code ModelAndViewReturnValueResolver} 与 {@code ViewControllerInvoker} 复用，
+     * 避免两条链路各写一套导致头与字节编码错配。
      * </p>
      */
     public static void applyContentType(View view, WebServerHttpResponse resp) {
@@ -147,13 +142,38 @@ public class ViewReturnValueResolver extends BaseWebComponent implements ReturnV
                     : StandardCharsets.UTF_8;
             contentType = "text/html;charset=" + charset.name();
         } else {
-            // 自定义 Content-Type 原样保留，不擅自追加 charset；自带 charset 时才同步响应编码
             Charset charset = MediaType.parseMediaType(contentType).getCharset();
             if (charset != null) {
                 resp.setCharacterEncoding(charset);
+            } else {
+                // 头未声明 charset 时浏览器会按自身默认编码解析，而 Writer 用的是 resp 编码，两者会错配
+                Charset responseCharset = resp.getCharacterEncoding() != null ? resp.getCharacterEncoding()
+                        : StandardCharsets.UTF_8;
+                resp.setCharacterEncoding(responseCharset);
+                contentType = contentType + ";charset=" + responseCharset.name();
             }
         }
         headers.set(HttpHeaders.CONTENT_TYPE, contentType);
+    }
+
+    /**
+     * 视图统一渲染入口：渲染成功后才标记响应已处理；渲染失败时丢弃缓冲区里的半截页面。
+     * <p>
+     * 模板引擎直接向响应体输出流写入，中途抛异常时缓冲区已留有部分 HTML。若响应已被标记为
+     * handled，异常链路的错误响应会因 {@code setHandled()} 失败而被放弃，客户端收到 200 加半截页面；
+     * 异常处理器返回的错误页则会拼接在半截页面之后（该路径不清缓冲区）。因此失败时必须清空缓冲，
+     * 且不能提前置位 handled。
+     * </p>
+     */
+    public static void renderView(View view, Map<String, ?> model, WebServerHttpRequest req,
+            WebServerHttpResponse resp) throws Exception {
+        try {
+            view.render(model, req, resp);
+        } catch (Exception | Error ex) {
+            resp.resetBuffer();
+            throw ex;
+        }
+        resp.setHandled();
     }
 
     @Override

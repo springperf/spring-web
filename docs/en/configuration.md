@@ -304,7 +304,8 @@ When `spring-boot-starter-actuator` is on the classpath, the framework auto-regi
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `spring.web.view.engine` | none (all available) | Enabled template engines (comma-separated): `thymeleaf` / `freemarker` / `beetl`; the special value `none` registers no engine and **must be used alone**; **if unset, all engines on the classpath are registered** |
+| `spring.web.view.engine` | none (all available) | Enabled template engines (comma-separated): `thymeleaf` / `freemarker` / `beetl`; the special value `none` registers no built-in engine (including JSP) and **must be used alone**; **if unset, all engines on the classpath are registered**. Unknown values and mixing `none` with other engines abort startup; custom `ViewResolver` beans are unaffected |
+| `spring.web.view.redirect-hosts` | unset (unrestricted) | Allowlist of external redirect hosts (comma-separated, case-insensitive); unrestricted when unset. Applies to `http://`, `https://` and `//host` targets; internal relative paths are unaffected. A target host outside the list throws `IllegalArgumentException` |
 | `spring.thymeleaf.prefix` | `templates/` | Thymeleaf template prefix (classpath-relative) |
 | `spring.thymeleaf.suffix` | `.html` | Thymeleaf template suffix |
 | `spring.thymeleaf.cache` | `true` | Template cache and the view-name-to-View resolution cache (set `false` in development for hot reload) |

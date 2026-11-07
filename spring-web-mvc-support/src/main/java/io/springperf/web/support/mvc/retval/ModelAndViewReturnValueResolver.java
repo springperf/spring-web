@@ -65,13 +65,12 @@ public class ModelAndViewReturnValueResolver extends BaseWebComponent implements
         }
 
         ViewReturnValueResolver.applyContentType(view, resp);
-        resp.setHandled();
 
         Map<String, Object> model = mav.getModel();
         if (model != null && !model.isEmpty()) {
             ModelContext.getOrCreate(req).addAllAttributes(model);
         }
-        view.render(ModelContext.getOrCreate(req), req, resp);
+        ViewReturnValueResolver.renderView(view, ModelContext.getOrCreate(req), req, resp);
     }
 
     @Override

@@ -92,11 +92,11 @@ public class ViewResolverRegistry extends WebComponentContainer {
     }
 
     /**
-     * 使所有已注册解析器的解析结果缓存失效，用于运行期新增/替换模板后主动刷新。
+     * 使所有已注册解析器的解析结果与模板引擎内部缓存失效，用于运行期新增/替换模板后主动刷新。
      * <p>
      * 取实时组件列表而非 Phase1 快照，运行期注册的 resolver 也能被覆盖。配置刷新不会重建模板引擎
      * （{@code spring.thymeleaf.*}、{@code spring.freemarker.*}、{@code spring.beetl.*} 属启动期固化配置），
-     * 本方法只清解析结果缓存。
+     * 本方法只清缓存、不重建引擎。
      * </p>
      */
     public void invalidateViewCaches() {

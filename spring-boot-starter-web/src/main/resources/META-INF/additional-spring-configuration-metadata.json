@@ -7,6 +7,12 @@
       "description": "Template engines (comma-separated): thymeleaf, freemarker, beetl. Empty -> register all available on classpath."
     },
     {
+      "name": "spring.web.view.redirect-hosts",
+      "type": "java.lang.String",
+      "defaultValue": "",
+      "description": "Comma-separated allowlist of external redirect hosts. Empty -> no restriction. Applies to http://, https:// and //host targets."
+    },
+    {
       "name": "spring.thymeleaf.prefix",
       "type": "java.lang.String",
       "defaultValue": "templates/",
