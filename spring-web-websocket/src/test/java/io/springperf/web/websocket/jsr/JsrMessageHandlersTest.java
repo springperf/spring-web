@@ -112,12 +112,14 @@ class JsrMessageHandlersTest {
     @Test
     void deliverBinary_byteArrayAndByteBuffer() throws Exception {
         JsrMessageHandlers handlers = new JsrMessageHandlers();
-        List<String> received = new ArrayList<>();
+        List<byte[]> captured = new ArrayList<>();
         handlers.add(JsrMessageHandlers.BINARY, byte[].class,
-                (MessageHandler.Whole<byte[]>) bytes -> received.add("bytes:" + bytes.length), false);
+                (MessageHandler.Whole<byte[]>) captured::add, false);
 
         assertTrue(handlers.deliverBinary(ByteBuffer.wrap(new byte[] { 1, 2, 3 }), codecRegistry));
-        assertEquals(List.of("bytes:3"), received);
+        assertEquals(1, captured.size(), "二进制消息必须交付一次");
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new byte[] { 1, 2, 3 }, captured.get(0),
+                "必须逐字节交付原始载荷，只校验长度会放过内容损坏");
     }
 
     @Test
@@ -285,9 +287,10 @@ class JsrMessageHandlersTest {
         handlers.add(JsrMessageHandlers.BINARY, Message.class,
                 (MessageHandler.Whole<Message>) message -> received.add(message.getValue()), false);
 
-        handlers.deliverBinary(ByteBuffer.wrap(new byte[] { 7 }), binaryRegistry);
-
-        assertEquals(List.of("bin"), received, "自定义 binary Decoder 必须参与转换");
+        assertTrue(handlers.deliverBinary(ByteBuffer.wrap(new byte[] { 7 }), binaryRegistry),
+                "自定义 decoder 的载荷必须被交付成功");
+        assertEquals(List.of("bin:7"), received,
+                "decoder 必须收到真实载荷字节，硬编码返回值会让断言自证");
     }
 
     @ServerEndpoint(value = "/binary-decoder", decoders = BinaryMessageDecoder.class)
@@ -298,7 +301,7 @@ class JsrMessageHandlersTest {
 
         @Override
         public Message decode(ByteBuffer bytes) {
-            return new Message("bin");
+            return new Message("bin:" + bytes.get(bytes.position()));
         }
 
         @Override

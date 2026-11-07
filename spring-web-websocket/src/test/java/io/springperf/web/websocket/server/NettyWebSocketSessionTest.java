@@ -176,7 +176,8 @@ class NettyWebSocketSessionTest {
         NettyWebSocketSession session = newSession(channel);
         session.setOpen(false);
 
-        session.flushBatch();
+        assertDoesNotThrow(session::flushBatch, "会话逻辑关闭后仍应允许 flush 已缓存的帧");
+        assertNull(channel.readOutbound(), "flush 本身不得新写出帧");
         channel.finishAndReleaseAll();
     }
 
@@ -322,9 +323,11 @@ class NettyWebSocketSessionTest {
         }).when(loop).execute(org.mockito.ArgumentMatchers.any());
         when(channel.writeAndFlush(org.mockito.ArgumentMatchers.any())).thenReturn(future);
         when(future.isSuccess()).thenReturn(true);
+        java.util.concurrent.CountDownLatch listenerAttached = new java.util.concurrent.CountDownLatch(1);
         when(future.addListener(org.mockito.ArgumentMatchers.any(ChannelFutureListener.class)))
                 .thenAnswer(invocation -> {
                     captured.set(invocation.getArgument(0, ChannelFutureListener.class));
+                    listenerAttached.countDown();
                     return future;
                 });
 
@@ -339,7 +342,8 @@ class NettyWebSocketSessionTest {
         });
         sender.start();
 
-        sender.join(150);
+        assertTrue(listenerAttached.await(2, java.util.concurrent.TimeUnit.SECONDS),
+                "写入与完成回调必须已建立，否则阻塞断言只是靠 sleep 猜时机");
         assertTrue(sender.isAlive(), "写入尚未完成时 sendMessageAndWait 必须阻塞");
         assertNull(failure.get());
 
@@ -410,6 +414,8 @@ class NettyWebSocketSessionTest {
                 false);
 
         assertTrue(completion.isDone(), "批处理下不能等 flush 才完成");
+        assertFalse(completion.isCompletedExceptionally(), "批处理完成必须是正常完成，异常完成不算已写入");
+        assertNull(completion.join(), "正常完成的 future 结果应为 null");
         assertTrue(channel.outboundMessages().isEmpty(), "批处理时不得逐条落网");
         session.flushBatch();
         TextWebSocketFrame frame = channel.readOutbound();
@@ -476,7 +482,9 @@ class NettyWebSocketSessionTest {
         NettyWebSocketSession s2 = newSession(c2);
         assertNotEquals(s1, s2);
         assertEquals(s1, s1);
-        assertEquals(s1.hashCode(), s1.hashCode());
+        assertEquals(s1.getId().hashCode(), s1.hashCode(), "hashCode 必须基于 id");
+        assertEquals(s2.getId().hashCode(), s2.hashCode(), "hashCode 必须基于 id");
+        assertNotEquals(s1.hashCode(), s2.hashCode(), "不同 id 的会话 hashCode 应不同");
         assertNotEquals(s1, "not-a-session");
         assertNotEquals(s1, null);
         c1.finishAndReleaseAll();
@@ -718,10 +726,16 @@ class NettyWebSocketSessionTest {
         when(loop.inEventLoop()).thenReturn(true);
         when(channel.writeAndFlush(any(WebSocketFrame.class))).thenReturn(future);
         when(future.isSuccess()).thenReturn(false);
+        // 写失败通知在 listener 里执行：必须真正触发 operationComplete，否则 isSuccess() 桩从未被消费
+        org.mockito.Mockito.doAnswer(inv -> {
+            ((ChannelFutureListener) inv.getArgument(0)).operationComplete(future);
+            return future;
+        }).when(future).addListener(any());
 
         NettyWebSocketSession session = new NettyWebSocketSession(channel, uri, null, null, null, null, null, null);
         assertDoesNotThrow(() -> session.sendMessage(new TextMessage("x")));
 
+        verify(future).isSuccess();
         ArgumentCaptor<WebSocketFrame> written = ArgumentCaptor.forClass(WebSocketFrame.class);
         verify(channel).writeAndFlush(written.capture());
         written.getValue().release();

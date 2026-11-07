@@ -11,6 +11,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class JsrCodecRegistryTest {
 
+    private static final java.util.concurrent.atomic.AtomicInteger DESTROY_COUNT =
+            new java.util.concurrent.atomic.AtomicInteger();
+
     @ServerEndpoint(value = "/ws", decoders = { MyTextDecoder.class, MyBinaryDecoder.class }, encoders = {
             MyTextEncoder.class, MyBinaryEncoder.class })
     static class Endpoint {
@@ -33,6 +36,7 @@ class JsrCodecRegistryTest {
 
         @Override
         public void destroy() {
+            DESTROY_COUNT.incrementAndGet();
         }
     }
 
@@ -55,6 +59,7 @@ class JsrCodecRegistryTest {
 
         @Override
         public void destroy() {
+            DESTROY_COUNT.incrementAndGet();
         }
     }
 
@@ -70,6 +75,7 @@ class JsrCodecRegistryTest {
 
         @Override
         public void destroy() {
+            DESTROY_COUNT.incrementAndGet();
         }
     }
 
@@ -85,6 +91,7 @@ class JsrCodecRegistryTest {
 
         @Override
         public void destroy() {
+            DESTROY_COUNT.incrementAndGet();
         }
     }
 
@@ -107,6 +114,7 @@ class JsrCodecRegistryTest {
 
         @Override
         public void destroy() {
+            DESTROY_COUNT.incrementAndGet();
         }
     }
 
@@ -198,6 +206,8 @@ class JsrCodecRegistryTest {
         JsrCodecRegistry.EncodedPayload payload = registry.encode(new MyPojo("x"), true);
         assertFalse(payload.isText());
         assertNotNull(payload.getBinary());
+        assertEquals("x", StandardCharsets.UTF_8.decode(payload.getBinary().duplicate()).toString(),
+                "二进制编码器必须产出真实编码内容");
     }
 
     @Test
@@ -206,6 +216,8 @@ class JsrCodecRegistryTest {
         JsrCodecRegistry.EncodedPayload payload = registry.encode(new MyPojo("x"), false);
         assertFalse(payload.isText());
         assertNotNull(payload.getBinary());
+        assertEquals("x", StandardCharsets.UTF_8.decode(payload.getBinary().duplicate()).toString(),
+                "优先二进制时也必须产出真实编码内容");
     }
 
     @Test
@@ -219,8 +231,13 @@ class JsrCodecRegistryTest {
 
     @Test
     void destroy_invokesDestroyOnInstances() {
+        DESTROY_COUNT.set(0);
         JsrCodecRegistry registry = registry(Endpoint.class);
-        assertDoesNotThrow(registry::destroy);
+
+        registry.destroy();
+
+        assertEquals(4, DESTROY_COUNT.get(),
+                "Endpoint 声明的 2 个 Decoder + 2 个 Encoder 都必须各调用一次 destroy()");
     }
 
     @Test
@@ -254,6 +271,7 @@ class JsrCodecRegistryTest {
 
         @Override
         public void destroy() {
+            DESTROY_COUNT.incrementAndGet();
         }
     }
 
@@ -349,6 +367,7 @@ class JsrCodecRegistryTest {
 
         @Override
         public void destroy() {
+            DESTROY_COUNT.incrementAndGet();
         }
     }
 }

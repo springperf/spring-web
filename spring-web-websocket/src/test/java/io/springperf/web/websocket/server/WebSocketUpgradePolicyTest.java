@@ -88,10 +88,8 @@ class WebSocketUpgradePolicyTest {
 
     @Test
     void resolveMaxFrameSize_usesPerPathLimitOrLargestDefault() {
-        long largestDefault = Math.max(NettyWebSocketSession.DEFAULT_TEXT_MESSAGE_SIZE_LIMIT,
-                NettyWebSocketSession.DEFAULT_BINARY_MESSAGE_SIZE_LIMIT);
-
-        assertEquals(largestDefault, newPolicy(null).resolveMaxFrameSize(null));
+        assertEquals(64 * 1024L, newPolicy(null).resolveMaxFrameSize(null),
+                "默认最大帧长用硬编码期望值，避免与实现按同一公式自证");
 
         WebSocketHandlerRegistration limited = new WebSocketHandlerRegistration(mock(WebSocketHandler.class), "/ws")
                 .setMessageSizeLimit(4_096);
@@ -100,10 +98,10 @@ class WebSocketUpgradePolicyTest {
         // 0 / 负数在注册对象里等价于「未覆盖」，不能作为解码器上限（否则所有帧都超限）
         WebSocketHandlerRegistration zero = new WebSocketHandlerRegistration(mock(WebSocketHandler.class), "/ws")
                 .setMessageSizeLimit(0);
-        assertEquals(largestDefault, newPolicy(null).resolveMaxFrameSize(zero));
+        assertEquals(64 * 1024L, newPolicy(null).resolveMaxFrameSize(zero));
         WebSocketHandlerRegistration negative = new WebSocketHandlerRegistration(mock(WebSocketHandler.class), "/ws")
                 .setMessageSizeLimit(-1);
-        assertEquals(largestDefault, newPolicy(null).resolveMaxFrameSize(negative));
+        assertEquals(64 * 1024L, newPolicy(null).resolveMaxFrameSize(negative));
     }
 
     @Test
@@ -214,5 +212,7 @@ class WebSocketUpgradePolicyTest {
         assertEquals("close", resp.headers().get(HttpHeaderNames.CONNECTION));
         // 拒绝路径不透传请求，必须自己释放（否则每次拒绝泄漏一个引用）
         assertEquals(0, req.refCnt());
+        assertFalse(channel.isOpen(), "sendForbiddenResponse 必须挂 CLOSE listener，拒绝后不能复用连接");
+        assertTrue(channel.closeFuture().isDone(), "关闭必须已完成");
     }
 }

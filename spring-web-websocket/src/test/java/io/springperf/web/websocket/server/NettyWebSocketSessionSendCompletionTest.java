@@ -74,6 +74,9 @@ class NettyWebSocketSessionSendCompletionTest {
         Throwable cause = completion.handle((v, e) -> e).join();
         assertInstanceOf(IOException.class, cause);
         assertNotNull(cause.getCause(), "原始 RejectedExecutionException 必须作为 cause 保留");
+        assertInstanceOf(java.util.concurrent.RejectedExecutionException.class, cause.getCause(),
+                "cause 必须是原始拒绝异常本身");
+        assertEquals("shutting down", cause.getCause().getMessage(), "cause 不能是被重新包装过的异常");
     }
 
     @Test
@@ -81,6 +84,11 @@ class NettyWebSocketSessionSendCompletionTest {
         // execute 什么都不做：帧永远写不出去，等待方只能被中断唤醒
         EventLoop eventLoop = mock(EventLoop.class);
         when(eventLoop.inEventLoop()).thenReturn(false);
+        java.util.concurrent.CountDownLatch dispatched = new java.util.concurrent.CountDownLatch(1);
+        doAnswer(invocation -> {
+            dispatched.countDown();
+            return null;
+        }).when(eventLoop).execute(any());
         NettyWebSocketSession session = newSession(dispatchChannel(eventLoop));
 
         AtomicReference<Throwable> failure = new AtomicReference<>();
@@ -92,6 +100,8 @@ class NettyWebSocketSessionSendCompletionTest {
             }
         }, "ws-send-interrupt-test");
         worker.start();
+        assertTrue(dispatched.await(2, java.util.concurrent.TimeUnit.SECONDS),
+                "发送任务必须已投递，否则 interrupt 时机不确定");
         worker.interrupt();
         worker.join(5_000);
 

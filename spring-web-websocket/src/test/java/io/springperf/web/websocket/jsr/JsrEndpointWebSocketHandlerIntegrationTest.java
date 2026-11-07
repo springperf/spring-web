@@ -91,7 +91,7 @@ class JsrEndpointWebSocketHandlerIntegrationTest {
         handler.handleMessage(springSession, new TextMessage("hello"));
 
         assertEquals(java.util.Arrays.asList("room-7:hello"), TestEchoEndpoint.MESSAGES);
-        verify(springSession).sendMessage(any(TextMessage.class));
+        verify(springSession).sendMessage(new TextMessage("echo:room-7:hello"));
     }
 
     @Test

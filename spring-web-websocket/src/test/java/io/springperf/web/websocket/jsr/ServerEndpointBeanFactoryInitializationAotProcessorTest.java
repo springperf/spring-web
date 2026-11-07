@@ -55,9 +55,12 @@ class ServerEndpointBeanFactoryInitializationAotProcessorTest {
     }
 
     private static void assertMethodInvokeHint(RuntimeHints hints, String methodName) {
-        boolean registered = hints.reflection().typeHints().flatMap(org.springframework.aot.hint.TypeHint::methods)
-                .map(org.springframework.aot.hint.ExecutableHint::getName).anyMatch(methodName::equals);
-        assertTrue(registered, "回调方法 " + methodName + " 应注册反射 hint");
+        org.springframework.aot.hint.TypeHint typeHint = hints.reflection().getTypeHint(ChatEndpoint.class);
+        assertNotNull(typeHint, "端点类必须注册反射 hint");
+        assertTrue(typeHint.methods()
+                        .anyMatch(method -> method.getName().equals(methodName)
+                                && method.getMode() == org.springframework.aot.hint.ExecutableMode.INVOKE),
+                "端点类的 " + methodName + " 必须注册 INVOKE 方法 hint");
     }
 
     @ServerEndpoint("/chat")

@@ -21,6 +21,11 @@ class JsrEndpointScannerTest {
     public static class ScannedEndpoint {
     }
 
+    /** 刻意不注册为 Spring Bean：只有 scanClasspath() 真正执行，它才可能出现在结果里。 */
+    @ServerEndpoint("/ws/classpath-only")
+    public static class ClasspathOnlyEndpoint {
+    }
+
     @Configuration
     static class TestConfig {
         @Bean
@@ -87,7 +92,9 @@ class JsrEndpointScannerTest {
             JsrEndpointScanner scanner = new JsrEndpointScanner(ctx);
             List<Class<?>> classes = scanner.scan();
 
-            assertTrue(classes.contains(ScannedEndpoint.class), "classpath 扫描应发现 @ServerEndpoint 类");
+            assertTrue(classes.contains(ClasspathOnlyEndpoint.class),
+                    "classpath 扫描必须发现未注册为 Bean 的 @ServerEndpoint 类，否则断言会被 Bean 扫描兜底而恒绿");
+            assertTrue(classes.contains(ScannedEndpoint.class), "Bean 端点也应出现在结果里");
         }
     }
 
@@ -102,8 +109,11 @@ class JsrEndpointScannerTest {
             JsrEndpointScanner scanner = new JsrEndpointScanner(ctx);
             List<Class<?>> classes = scanner.scan();
 
+            assertTrue(classes.contains(ClasspathOnlyEndpoint.class), "必须真的执行过 classpath 扫描");
             assertEquals(1, classes.stream().filter(c -> c == ScannedEndpoint.class).count(),
                     "classpath 扫描与 Bean 扫描结果应去重");
+            assertEquals(1, classes.stream().filter(c -> c == ClasspathOnlyEndpoint.class).count(),
+                    "非 Bean 端点只应由 classpath 扫描命中一次");
         }
     }
 

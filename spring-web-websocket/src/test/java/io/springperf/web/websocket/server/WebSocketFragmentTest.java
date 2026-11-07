@@ -208,12 +208,16 @@ class WebSocketFragmentTest {
 
         // session 默认 text limit 8KB：首片 9KB 直接超限。聚合状态必须在 append 之前挂到连接上，
         // 否则超限路径里新建的 ByteBuf 既没被 release、也没进 channelInactive 的清理范围（孤儿缓冲）。
-        channel.pipeline().fireChannelRead(new TextWebSocketFrame(false, 0, Unpooled.wrappedBuffer(new byte[9216])));
+        io.netty.buffer.ByteBuf oversized = Unpooled.wrappedBuffer(new byte[9216]);
+        channel.pipeline().fireChannelRead(new TextWebSocketFrame(false, 0, oversized));
 
         verify(handler, timeout(2000)).handleTransportError(any(WebSocketSession.class),
                 any(java.io.IOException.class));
         assertFalse(channel.isActive(), "首片超限同样应关闭连接");
         verify(handler, times(0)).handleMessage(any(WebSocketSession.class), any(TextMessage.class));
+        assertEquals(0, oversized.refCnt(), "超限帧的 ByteBuf 必须被释放，不能泄漏");
+        WebSocketRoutingHandler.WsConnection connection = channel.attr(WebSocketRoutingHandler.CONNECTION_KEY).get();
+        assertFalse(connection.fragment != null, "超限后聚合状态必须复位，不能留下孤儿缓冲");
     }
 
     @Test
@@ -222,6 +226,9 @@ class WebSocketFragmentTest {
         establishSession();
 
         channel.pipeline().fireChannelRead(new TextWebSocketFrame(false, 0, "half"));
+        WebSocketRoutingHandler.WsConnection connection = channel.attr(WebSocketRoutingHandler.CONNECTION_KEY).get();
+        assertFalse(connection.fragment == null, "前置条件：未结束的分片必须建立聚合状态");
+        io.netty.buffer.ByteBuf buffer = connection.fragment.buffer;
 
         // 直接关闭：聚合永不完成，缓冲必须被释放（由 releaseFragment 处理）
         channel.close();
@@ -229,6 +236,7 @@ class WebSocketFragmentTest {
         verify(handler, timeout(2000)).afterConnectionClosed(any(WebSocketSession.class), any());
         // 无派发、无泄漏断言外的异常
         verify(handler, times(0)).handleMessage(any(WebSocketSession.class), any(TextMessage.class));
+        assertEquals(0, buffer.refCnt(), "连接断开时必须释放聚合缓冲，否则泄漏 ByteBuf");
     }
 
     /* ==================== Ping/Pong 与分片互不干扰 ==================== */
@@ -240,7 +248,16 @@ class WebSocketFragmentTest {
 
         channel.pipeline().fireChannelRead(new TextWebSocketFrame(false, 0, "part1-"));
         channel.pipeline().fireChannelRead(new io.netty.handler.codec.http.websocketx.PingWebSocketFrame());
-        drainOutbound(); // Pong 回写
+        Object pong = channel.readOutbound();
+        assertFalse(pong == null, "分片之间收到 Ping 必须回 Pong");
+        if (pong instanceof io.netty.buffer.ByteBuf) {
+            assertEquals(0x8A, ((io.netty.buffer.ByteBuf) pong).getUnsignedByte(0) & 0xFF,
+                    "控制帧回写必须是 Pong（opcode 0xA）");
+        } else {
+            assertFalse(!(pong instanceof io.netty.handler.codec.http.websocketx.PongWebSocketFrame),
+                    "必须回 Pong 而不是其它帧");
+        }
+        io.netty.util.ReferenceCountUtil.release(pong);
         channel.pipeline().fireChannelRead(new ContinuationWebSocketFrame(true, 0, "part2"));
 
         ArgumentCaptor<TextMessage> captor = ArgumentCaptor.forClass(TextMessage.class);
