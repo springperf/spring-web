@@ -22,10 +22,11 @@ class NettyHttpServerTest {
     }
 
     @Test
-    void getPhase_returnsMaxValue() {
+    void getPhase_matchesBootWebServerStartStopLifecycle() {
         WebContext webContext = mock(WebContext.class);
         NettyHttpServer server = new NettyHttpServer(webContext);
-        assertEquals(Integer.MAX_VALUE, server.getPhase());
+        // 与 Boot WebServerStartStopLifecycle 对齐，确保 WebServerInitializedEvent 早于 ApplicationReadyEvent
+        assertEquals(Integer.MAX_VALUE - 2048, server.getPhase());
     }
 
     @Test

@@ -55,7 +55,7 @@ public class WebContext extends WebComponentContainer implements DisposableBean,
      * 清空框架级配置缓存，使后续读取回落到 Spring {@code Environment} 最新值。
      * <p>
      * 供配置中心动态刷新调用（如 Spring Cloud 的 {@code EnvironmentChangeEvent}， 见 starter 的
-     * {@code SpringWebCloudRefreshAutoConfiguration}），业务代码亦可主动调用。
+     * {@code SpringWebPropertyRefreshAutoConfiguration}），业务代码亦可主动调用。
      * </p>
      * <p>
      * <b>不影响</b>启动期已固化进 Netty bootstrap / 线程池 / 模板引擎的配置

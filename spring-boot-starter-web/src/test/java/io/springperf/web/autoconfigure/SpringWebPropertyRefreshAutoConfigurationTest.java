@@ -9,6 +9,7 @@ import org.springframework.context.ApplicationListener;
 
 import java.util.Set;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
 /**
@@ -27,6 +28,13 @@ class SpringWebPropertyRefreshAutoConfigurationTest {
     void setUp() {
         webContext = mock(WebContext.class);
         listener = new SpringWebPropertyRefreshAutoConfiguration().perfWebPropertyRefreshListener(webContext);
+    }
+
+    /** 按类名匹配是有意的零编译期依赖设计；此用例防止常量拼写漂移导致刷新静默失效。 */
+    @Test
+    void eventClassName_matchesSpringCloudPublicApi() {
+        assertEquals(EnvironmentChangeEvent.class.getName(),
+                SpringWebPropertyRefreshAutoConfiguration.ENVIRONMENT_CHANGE_EVENT);
     }
 
     @Test
