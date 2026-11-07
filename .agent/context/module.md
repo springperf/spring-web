@@ -571,7 +571,7 @@ spring-boot-starter-web
 ```
 Spring 容器启动（refresh 完成）
   ↓
-NettyHttpServer.start()      → SmartLifecycle，phase=Integer.MAX_VALUE（最后启动）
+NettyHttpServer.start()      → SmartLifecycle，phase=Integer.MAX_VALUE-2048（对齐 Boot WebServerStartStopLifecycle）
   ↓
 WebContext.startLifecycle()  → CAS 守卫，单次执行
   ↓
