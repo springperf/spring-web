@@ -43,17 +43,20 @@ class PerfHttpServletRequestEdgeTest {
     }
 
     @Test
-    void getDateHeader_acceptsRfc1123AndAsctimeButNotRfc1036() {
+    void getDateHeader_acceptsAllThreeHttpDateFormats() {
         headers.set("Date", "Thu, 01 Jan 1970 00:00:00 GMT");
         assertEquals(0L, servletRequest.getDateHeader("Date"));
 
         headers.set("Date", "Thu Jan 1 00:00:00 1970");
         assertEquals(0L, servletRequest.getDateHeader("Date"));
 
-        // FORMATS 声明了 RFC 1036，但当前实现无法产出 Instant；锁定实际契约，
-        // 避免「声称支持」与运行时行为静默漂移。
+        // 两位年份按 HTTP 50 年滑动窗口解释：70 → 1970、94 → 1994、22 → 2022
         headers.set("Date", "Thursday, 01-Jan-70 00:00:00 GMT");
-        assertThrows(IllegalArgumentException.class, () -> servletRequest.getDateHeader("Date"));
+        assertEquals(0L, servletRequest.getDateHeader("Date"));
+        headers.set("Date", "Sunday, 06-Nov-94 08:49:37 GMT");
+        assertEquals(784111777000L, servletRequest.getDateHeader("Date"));
+        headers.set("Date", "Thursday, 01-Dec-22 00:00:00 GMT");
+        assertEquals(1669852800000L, servletRequest.getDateHeader("Date"));
     }
 
     @Test
