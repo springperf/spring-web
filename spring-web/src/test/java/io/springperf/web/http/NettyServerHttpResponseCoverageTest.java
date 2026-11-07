@@ -71,7 +71,7 @@ class NettyServerHttpResponseCoverageTest {
     }
 
     @Test
-    void logErrorOnFailure_logsWarnForGenericFailure() {
+    void logErrorOnFailure_swallowsGenericFailure() {
         NettyServerHttpResponse resp = newResponse(false);
         ChannelFuture future = mock(ChannelFuture.class);
         resp.addRespEventListener(future, false);
@@ -300,14 +300,15 @@ class NettyServerHttpResponseCoverageTest {
     }
 
     @Test
-    void writeFile_writeThrows_propagatesAfterClosingChannel() throws Exception {
+    void writeFile_bodyWriteThrows_propagatesOriginalCause() throws Exception {
         File file = File.createTempFile("wfp", ".bin");
         try {
             java.nio.file.Files.write(file.toPath(), "hello".getBytes(StandardCharsets.UTF_8));
             NettyServerHttpResponse resp = newResponse(false);
             when(ctx.writeAndFlush(any())).thenReturn(mock(ChannelFuture.class));
             when(ctx.write(any())).thenThrow(new RuntimeException("region write failed"));
-            assertThrows(RuntimeException.class, () -> resp.writeFile(file));
+            RuntimeException ex = assertThrows(RuntimeException.class, () -> resp.writeFile(file));
+            assertEquals("region write failed", ex.getCause().getMessage(), "应传播写体失败本身");
         } finally {
             file.delete();
         }

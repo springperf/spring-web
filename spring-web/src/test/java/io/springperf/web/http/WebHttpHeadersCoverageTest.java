@@ -93,8 +93,6 @@ class WebHttpHeadersCoverageTest {
         h.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
         assertEquals("application/json", netty.get("Content-Type"), "应直接写入 Netty headers");
         assertEquals(org.springframework.http.MediaType.APPLICATION_JSON, h.getContentType());
-        // 不缓存：等值即可，不要求同一实例（见 WebHttpHeaders 类注释的权衡说明）
-        assertEquals(h.getContentType(), h.getContentType());
 
         org.springframework.http.MediaType textual = org.springframework.http.MediaType
                 .parseMediaType("text/plain;charset=UTF-8");

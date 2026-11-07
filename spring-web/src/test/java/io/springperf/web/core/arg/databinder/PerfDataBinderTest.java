@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import java.util.HashMap;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -75,12 +76,17 @@ class PerfDataBinderTest {
     }
 
     @Test
-    void bind_withNullMultiFileMap_doesNotThrow() {
+    void bind_withNullMultiFileMap_stillBindsParameters() {
         TestBean bean = new TestBean();
         PerfDataBinder binder = new PerfDataBinder(bean, "test");
-        when(request.getParameterMapArray()).thenReturn(new HashMap<>());
+        Map<String, String[]> params = new HashMap<>();
+        params.put("name", new String[] { "bound" });
+        when(request.getParameterMapArray()).thenReturn(params);
         when(request.getMultiFileMap()).thenReturn(null);
+
         assertDoesNotThrow(() -> binder.bind(request));
+        // 无 multipart 不能导致普通参数绑定被整体跳过
+        assertEquals("bound", bean.getName());
     }
 
     @Test

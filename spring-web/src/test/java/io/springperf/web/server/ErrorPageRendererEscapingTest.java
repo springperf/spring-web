@@ -13,10 +13,15 @@ import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.springperf.web.server.ErrorResponseConfig.IncludePolicy;
 
 /** 错误响应体的转义、Accept 协商、绑定错误提取与 problem+json 可选字段矩阵。 */
 class ErrorPageRendererEscapingTest {
+
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private static ErrorResponseConfig jsonConfig(IncludePolicy message, IncludePolicy binding) {
         return new ErrorResponseConfig(IncludePolicy.NEVER, message, binding, false, "/error", false);
@@ -26,6 +31,17 @@ class ErrorPageRendererEscapingTest {
         return ErrorPageRenderer
                 .build(HttpStatus.BAD_REQUEST, message, cause, jsonConfig(IncludePolicy.ALWAYS, binding), false, false)
                 .getBody();
+    }
+
+    /**
+     * 解析响应体：字符串拼接出的畸形 JSON（漏转义、多引号等）会在这里直接失败， 而不是靠子串匹配「看起来对」。
+     */
+    private static JsonNode json(String body) {
+        try {
+            return JSON.readTree(body);
+        } catch (Exception e) {
+            throw new AssertionError("错误响应体必须是合法 JSON，实际: " + body, e);
+        }
     }
 
     private static BindException bindException(String field, String error) {
@@ -49,15 +65,18 @@ class ErrorPageRendererEscapingTest {
             String body = jsonBody(entry.getKey(), null, IncludePolicy.NEVER);
             assertTrue(body.contains("\"message\":\"" + entry.getValue() + "\""),
                     "控制字符应转义为 " + entry.getValue());
+            assertEquals(entry.getKey(), json(body).get("message").asText(), "转义后解码必须还原原值");
         }
     }
 
     @Test
     void jsonString_escapesOtherControlCharactersAsUnicode() {
         for (int c : new int[] { 0x00, 0x01, 0x1f }) {
-            String expected = String.format("\\u%04x", c);
-            assertTrue(jsonBody(String.valueOf((char) c), null, IncludePolicy.NEVER).contains(expected),
-                    "0x" + Integer.toHexString(c) + " 应转义为 " + expected);
+            String raw = String.valueOf((char) c);
+            String body = jsonBody(raw, null, IncludePolicy.NEVER);
+            assertTrue(body.contains(String.format("\\u%04x", c)),
+                    "0x" + Integer.toHexString(c) + " 应转义为 \\u 形式（裸控制字符会破坏 JSON）");
+            assertEquals(raw, json(body).get("message").asText(), "解码后应还原该控制字符");
         }
     }
 
@@ -85,8 +104,10 @@ class ErrorPageRendererEscapingTest {
         ErrorPageRenderer.ErrorResponseBody body = ErrorPageRenderer.build(null, "boom", null,
                 jsonConfig(IncludePolicy.ALWAYS, IncludePolicy.NEVER), false, false, "application/json");
 
-        assertTrue(body.getBody().contains("\"status\":500"));
-        assertTrue(body.getBody().contains("500 Internal Server Error"));
+        JsonNode node = json(body.getBody());
+        assertEquals(500, node.get("status").asInt());
+        assertEquals("500 Internal Server Error", node.get("error").asText());
+        assertEquals("boom", node.get("message").asText());
     }
 
     @Test
@@ -111,8 +132,7 @@ class ErrorPageRendererEscapingTest {
     void extractBindingErrors_bindException_exposesFieldErrors() {
         String body = jsonBody("validation failed", bindException("name", "must not be blank"), IncludePolicy.ALWAYS);
 
-        assertTrue(body.contains("\"errors\":"));
-        assertTrue(body.contains("\"name\":\"must not be blank\""));
+        assertEquals("must not be blank", json(body).get("errors").get("name").asText());
     }
 
     @Test
@@ -124,16 +144,16 @@ class ErrorPageRendererEscapingTest {
 
         String body = jsonBody("validation failed", ex, IncludePolicy.ALWAYS);
 
-        assertTrue(body.contains("\"arg\":\"invalid argument\""));
+        assertEquals("invalid argument", json(body).get("errors").get("arg").asText());
     }
 
     @Test
     void extractBindingErrors_plainExceptionAndEmptyResultYieldNoErrors() {
-        assertFalse(jsonBody("m", new IllegalStateException("plain"), IncludePolicy.ALWAYS).contains("\"errors\""));
-        assertFalse(jsonBody("m", null, IncludePolicy.ALWAYS).contains("\"errors\""));
+        assertFalse(json(jsonBody("m", new IllegalStateException("plain"), IncludePolicy.ALWAYS)).has("errors"));
+        assertFalse(json(jsonBody("m", null, IncludePolicy.ALWAYS)).has("errors"));
 
         BeanPropertyBindingResult empty = new BeanPropertyBindingResult(new Object(), "target");
-        assertFalse(jsonBody("m", new BindException(empty), IncludePolicy.ALWAYS).contains("\"errors\""));
+        assertFalse(json(jsonBody("m", new BindException(empty), IncludePolicy.ALWAYS)).has("errors"));
     }
 
     @Test
@@ -144,26 +164,27 @@ class ErrorPageRendererEscapingTest {
                 bindException("name", "must not be blank"), cfg, false, false);
 
         assertTrue(body.getContentType().startsWith("application/problem+json"));
-        String json = body.getBody();
-        assertTrue(json.contains("\"type\":\"about:blank\""));
-        assertTrue(json.contains("\"status\":404"));
-        assertTrue(json.contains("\"title\":\"404 NOT_FOUND\""));
-        assertTrue(json.contains("\"detail\":\"detail\\\"quoted\""));
-        assertTrue(json.contains("\"instance\":\"/error\""));
-        assertTrue(json.contains("\"trace\":"));
-        assertTrue(json.contains("\"errors\":{"));
+        JsonNode node = json(body.getBody());
+        assertEquals("about:blank", node.get("type").asText());
+        assertEquals(404, node.get("status").asInt());
+        assertEquals("404 NOT_FOUND", node.get("title").asText());
+        assertEquals("detail\"quoted", node.get("detail").asText(), "detail 内的引号必须转义且解码一致");
+        assertEquals("/error", node.get("instance").asText());
+        assertTrue(node.get("trace").asText().contains("BindException"), "trace 应携带栈信息");
+        assertEquals("must not be blank", node.get("errors").get("name").asText());
     }
 
     @Test
     void problemDetails_omitsAllNullOptionalFields() {
         ErrorResponseConfig cfg = new ErrorResponseConfig(IncludePolicy.NEVER, IncludePolicy.NEVER,
                 IncludePolicy.NEVER, false, null, true);
-        String json = ErrorPageRenderer.build(HttpStatus.BAD_REQUEST, "hidden", null, cfg, false, false).getBody();
+        JsonNode node = json(ErrorPageRenderer.build(HttpStatus.BAD_REQUEST, "hidden", null, cfg, false, false)
+                .getBody());
 
-        assertFalse(json.contains("\"detail\""));
-        assertFalse(json.contains("\"instance\""));
-        assertFalse(json.contains("\"trace\""));
-        assertFalse(json.contains("\"errors\""));
+        assertFalse(node.has("detail"));
+        assertFalse(node.has("instance"));
+        assertFalse(node.has("trace"));
+        assertFalse(node.has("errors"));
     }
 
     private static class Sample {

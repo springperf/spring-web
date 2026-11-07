@@ -381,9 +381,13 @@ class ResourceRequestHandlerTest {
     // ----- cache -----
 
     @Test
-    void clearCache_doesNotThrow() {
-        handler.getResource("/css/style.css");
+    void clearCache_dropsCachedEntries() {
+        Resource first = handler.getResource("/css/style.css");
+        assertNotNull(first);
+
         assertDoesNotThrow(() -> handler.clearCache());
+        // 清空后必须重新解析，而不是继续返回缓存里的同一个实例
+        assertNotSame(first, handler.getResource("/css/style.css"), "clearCache 后不得命中旧缓存");
     }
 
     @Test

@@ -262,6 +262,8 @@ class ExceptionHandlerExceptionResolverDetailsTest {
 
         assertDoesNotThrow(
                 () -> resolver.invokeAndWriteError(handlerMethod, new RuntimeException("boom"), request, response));
+        // 被吞的是「写错误响应失败」本身，首次 500 写出必须真的发生过
+        verify(response).sendError(eq(HttpStatus.INTERNAL_SERVER_ERROR), any(String.class));
     }
 
     /* ==================== handler 返回 void + 已处理 ==================== */

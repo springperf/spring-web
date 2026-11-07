@@ -132,14 +132,15 @@ class DispatcherHandlerRequestHandledEventTest {
     }
 
     @Test
-    void publish_noPublisher_doesNotThrow() throws Exception {
+    void publish_noPublisher_stillCompletesRequest() throws Exception {
         DispatcherHandler handler = buildHandler(true, null);
         WebServerHttpRequest req = createRequest("GET", "/api/hello");
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
         when(resp.getStatus()).thenReturn(HttpStatus.OK);
 
-        // 无发布器时应静默跳过，不抛异常
+        // 无发布器时应静默跳过，且请求照常走完 404 收尾（不是被吞在这一步）
         org.junit.jupiter.api.Assertions
                 .assertDoesNotThrow(() -> handler.handleAfterFilter(req, resp, MappingResult.notFound()));
+        verify(resp).sendError(HttpStatus.NOT_FOUND, "Not Found");
     }
 }

@@ -110,8 +110,11 @@ class Http2ChannelInitializerTest {
                 Collections.singletonList(before), Collections.singletonList(after));
         init.initChannel(channel(pipeline));
 
-        verify(pipeline).addLast(before);
-        verify(pipeline).addLast(after);
+        // 「injectedInOrder」必须真的锁顺序：before 在聚合器之前、after 在其后
+        org.mockito.InOrder inOrder = inOrder(pipeline);
+        inOrder.verify(pipeline).addLast(before);
+        inOrder.verify(pipeline).addLast(any(io.netty.handler.codec.http.HttpObjectAggregator.class));
+        inOrder.verify(pipeline).addLast(after);
     }
 
     @Test

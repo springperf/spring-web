@@ -54,8 +54,11 @@ class WebFilterRegistryTest {
     }
 
     @Test
-    void constructor_doesNotThrow() {
-        assertNotNull(new WebFilterRegistry(mock(DispatcherHandler.class)));
+    void constructor_registersNoFiltersUntilInit() {
+        WebFilterRegistry registry = new WebFilterRegistry(mock(DispatcherHandler.class));
+
+        // 构造期只登记 auto-register 的类，真正扫描 Spring 容器发生在 initWithWebContext
+        assertTrue(registry.getWebComponents(WebFilter.class).isEmpty(), "构造期不应注册任何 filter");
     }
 
     @Test

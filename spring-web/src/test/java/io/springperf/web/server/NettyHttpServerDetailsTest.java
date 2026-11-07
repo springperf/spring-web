@@ -65,9 +65,11 @@ class NettyHttpServerDetailsTest {
     }
 
     @Test
-    void destroyComponent_withoutStart_doesNotThrow() throws Exception {
+    void destroyComponent_withoutStart_leavesServerStoppedAndIsIdempotent() throws Exception {
         NettyHttpServer server = new NettyHttpServer(mock(WebContext.class));
         assertDoesNotThrow(server::destroyComponent);
+        assertFalse(server.isRunning(), "未启动就销毁也不得进入运行态");
+        assertDoesNotThrow(server::destroyComponent, "重复销毁必须幂等");
     }
 
 }
