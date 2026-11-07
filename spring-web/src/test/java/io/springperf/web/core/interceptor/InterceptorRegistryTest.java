@@ -309,6 +309,9 @@ class InterceptorRegistryTest {
                 .thenReturn(Collections.singletonList(interceptor));
 
         registry.postHandle(request, response, "result");
+
+        // 必须证明异常路径确实被触发，否则不调拦截器的实现也会通过
+        verify(interceptor).postHandle(any(), any(), any(), any());
     }
 
     // ---- afterCompletion ----
@@ -338,6 +341,8 @@ class InterceptorRegistryTest {
                 .thenReturn(Collections.singletonList(interceptor));
 
         registry.afterCompletion(request, response, null);
+
+        verify(interceptor).afterCompletion(any(), any(), any(), any());
     }
 
     @Test
@@ -380,6 +385,8 @@ class InterceptorRegistryTest {
                 .thenReturn(Collections.singletonList(interceptor));
 
         registry.afterConcurrentHandlingStarted(request, response);
+
+        verify(interceptor).afterConcurrentHandlingStarted(any(), any(), any());
     }
 
     // ---- 404/405 无 mappingContext 时的路径级拦截器过滤 ----

@@ -116,7 +116,18 @@ class AbstractNettyStreamSenderDetailsTest {
         assertDoesNotThrow(() -> sender.complete(true, null));
         channel.runPendingTasks();
         channel.runPendingTasks();
-        assertTrue(sender.queueSize() == 0 || channel.isActive(), "complete 后应安全排空队列并结束流");
+
+        assertFalse(channel.isActive(), "closeChannelOnComplete=true 应在收尾后关闭通道");
+
+        boolean lastContentSeen = false;
+        Object out;
+        while ((out = channel.readOutbound()) != null) {
+            if (out instanceof io.netty.handler.codec.http.LastHttpContent) {
+                lastContentSeen = true;
+            }
+            io.netty.util.ReferenceCountUtil.release(out);
+        }
+        assertTrue(lastContentSeen, "正常完成应写出 LastHttpContent 终止块");
     }
 
     @Test

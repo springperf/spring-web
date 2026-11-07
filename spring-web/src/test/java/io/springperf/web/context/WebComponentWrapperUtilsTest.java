@@ -59,6 +59,7 @@ class WebComponentWrapperUtilsTest {
 
         List<WebComponent> result = WebComponentWrapperUtils.getComponents(container, WebComponent.class);
         assertEquals(2, result.size());
+        assertTrue(result.containsAll(List.of(comp1, comp2)), "应返回全部已注册组件，而不是任意两个对象");
     }
 
     @Test
@@ -72,14 +73,17 @@ class WebComponentWrapperUtilsTest {
         WebComponent comp = mock(WebComponent.class);
         when(comp.getComponentName()).thenReturn("direct");
         WebComponentWrapperUtils.registerComponent(container, comp);
-        assertNotNull(container.webComponents.get("direct"));
+        assertSame(comp, container.webComponents.get("direct"), "WebComponent 应原样注册，不得再包装");
     }
 
     @Test
     void registerComponent_withNonWebComponent_wrapsIt() {
         TestService service = new TestService();
         WebComponentWrapperUtils.registerComponent(container, service);
-        assertNotNull(container.webComponents.get("TestService"));
+
+        WebComponent stored = container.webComponents.get("TestService");
+        assertInstanceOf(WebComponentWrapper.class, stored, "非 WebComponent 必须包装后注册");
+        assertSame(service, ((WebComponentWrapper<?>) stored).getComponent(), "包装器必须持有原始对象");
     }
 
     @Test

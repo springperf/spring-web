@@ -44,14 +44,17 @@ class JacksonConverterTest {
     @Test
     void defaultConstructor_createsMapper() {
         JacksonConverter converter = new JacksonConverter();
-        assertNotNull(converter);
+        assertEquals("{\"k\":\"v\"}", converter.toJson(Map.of("k", "v")));
     }
 
     @Test
     void constructor_withMapper_usesCustomMapper() {
         ObjectMapper customMapper = new ObjectMapper();
+        customMapper.enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
         JacksonConverter converter = new JacksonConverter(customMapper);
-        assertNotNull(converter);
+
+        assertTrue(converter.toJson(Map.of("k", "v")).contains("\n"),
+                "自定义 ObjectMapper 的缩进配置必须生效");
     }
 
     @Test
@@ -171,7 +174,8 @@ class JacksonConverterTest {
     @Test
     void fromJson_invalidJson_throwsException() {
         JacksonConverter converter = new JacksonConverter();
-        assertThrows(Exception.class, () -> converter.fromJson("{invalid}", Map.class));
+        assertThrows(com.fasterxml.jackson.core.JsonProcessingException.class,
+                () -> converter.fromJson("{invalid}", Map.class));
     }
 
     @Test

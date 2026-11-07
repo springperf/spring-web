@@ -65,8 +65,13 @@ class FastInvokerGeneratorCoverageTest {
     }
 
     @Test
-    void instantiate_defaultConstructor() {
-        assertNotNull(new FastInvokerGenerator());
+    void instantiate_defaultConstructor() throws Throwable {
+        FastController ctl = new FastController();
+        Method method = FastController.class.getMethod("hello", String.class);
+
+        Invoker invoker = new FastInvokerGenerator().createInvoker(ctl, FastController.class, method);
+
+        assertEquals("Hello x", invoker.invoke(new Object[] { "x" }));
     }
 
     @Test

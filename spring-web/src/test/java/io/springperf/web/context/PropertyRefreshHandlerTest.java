@@ -1,6 +1,5 @@
 package io.springperf.web.context;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
@@ -63,13 +62,13 @@ class PropertyRefreshHandlerTest {
 
     @Test
     void refresh_isIdempotent() {
-        when(env.getProperty(anyString())).thenReturn(null);
+        when(env.getProperty(PropertiesConstant.POOL_CORE_POOL_SIZE)).thenReturn("7");
         PropertyRefreshHandler handler = new PropertyRefreshHandler(webContext);
 
-        assertDoesNotThrow(() -> {
-            handler.refresh();
-            handler.refresh();
-        });
+        handler.refresh();
+        assertEquals(7, props.getInt(PropertiesConstant.POOL_CORE_POOL_SIZE));
+        handler.refresh();
+        assertEquals(7, props.getInt(PropertiesConstant.POOL_CORE_POOL_SIZE), "重复刷新应保持可读且结果一致");
     }
 
     @Test

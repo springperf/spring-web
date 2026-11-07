@@ -146,6 +146,11 @@ class SupportedPropertiesTest {
         for (String key : metadataOnly) {
             sb.append("  ").append(key).append('\n');
         }
+
+        // 诊断输出不能作为唯一行为：至少断言收集结果自洽
+        assertTrue(codeKeys.contains("server.port"), "应收集到核心配置键 server.port");
+        assertTrue(metadataOnly.stream().noneMatch(codeKeys::contains), "metadata-only 集合不得与代码键重叠");
+
         System.out.println(sb);
 
         String dumpPath = System.getProperty("perf.props.dump");

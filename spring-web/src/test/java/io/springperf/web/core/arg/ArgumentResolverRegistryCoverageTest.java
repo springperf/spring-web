@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -143,14 +144,23 @@ class ArgumentResolverRegistryCoverageTest {
     void initComponentPhase3_skipsValidationWhenCheckOff() throws Exception {
         WebContext wc = realWebContext();
         when(wc.getProps().getBoolean(PropertiesConstant.CHECK_ON_STARTUP, true)).thenReturn(false);
+        MappingRegistry mr = registerMappingRegistry(wc,
+                Collections.singletonList(mappingContext("complexParam", UnresolvableArg.class)));
+
         driveLifecycle(wc).initComponentPhase3();
+
+        // 关闭 check-on-startup 时不得触碰 MappingRegistry
+        verify(mr, never()).getMappingContextList();
     }
 
     @Test
     void initComponentPhase3_validatesWhenCheckOn_missingMappingRegistryReturns() throws Exception {
         WebContext wc = realWebContext();
         when(wc.getProps().getBoolean(PropertiesConstant.CHECK_ON_STARTUP, true)).thenReturn(true);
-        driveLifecycle(wc).initComponentPhase3();
+        assertNull(wc.getWebComponent(MappingRegistry.class), "前置条件：未注册 MappingRegistry");
+
+        assertDoesNotThrow(() -> driveLifecycle(wc).initComponentPhase3(),
+                "缺少 MappingRegistry 时应提前返回而不是抛异常");
     }
 
     @Test

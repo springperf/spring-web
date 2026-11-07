@@ -92,8 +92,9 @@ class SegmentTest {
 
     @Test
     void constants_singletons() {
-        assertSame(Segment.SINGLE_WILDCARD, Segment.SINGLE_WILDCARD);
-        assertSame(Segment.MULTI_WILDCARD, Segment.MULTI_WILDCARD);
+        // 自比较恒真；必须经真实解析路径证明工厂复用同一常量实例
+        assertSame(Segment.SINGLE_WILDCARD, Segment.parse("/api/*").get(1));
+        assertSame(Segment.MULTI_WILDCARD, Segment.parse("/api/**").get(1));
         assertEquals(SegKind.SINGLE_WILDCARD, Segment.SINGLE_WILDCARD.kind);
         assertEquals(SegKind.MULTI_WILDCARD, Segment.MULTI_WILDCARD.kind);
     }

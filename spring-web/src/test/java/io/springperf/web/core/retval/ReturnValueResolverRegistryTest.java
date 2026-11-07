@@ -419,7 +419,16 @@ class ReturnValueResolverRegistryTest {
     @Test
     void initReturnValueResolver_registersAllResolvers() {
         registry.initReturnValueResolver();
-        assertFalse(getResolversList().isEmpty());
+        List<ReturnValueResolver> resolvers = getResolversList();
+
+        assertEquals(13, resolvers.size(), "内置解析器应全部注册");
+        assertEquals(resolvers.size(), new java.util.HashSet<>(resolvers).size(), "解析器不应重复注册");
+
+        List<String> names = resolvers.stream().map(r -> r.getClass().getSimpleName()).toList();
+        assertTrue(names.contains("JsonBodyReturnValueResolver"), "缺少 JSON 返回值解析器: " + names);
+        assertTrue(names.contains("HttpEntityReturnValueResolver"), "缺少 HttpEntity 解析器: " + names);
+        assertTrue(names.contains("DeferredResultReturnValueResolver"), "缺少 DeferredResult 解析器: " + names);
+        assertTrue(names.contains("FileReturnValueResolver"), "缺少 File 解析器: " + names);
     }
 
     // ==================== helpers ====================

@@ -50,7 +50,7 @@ class ConnectionContextTest {
     }
 
     @Test
-    void updateWritable_and_onWritable_interact() {
+    void updateWritable_storesStateWithoutFiringCallback() {
         ConnectionContext ctx = new ConnectionContext();
         AtomicBoolean fired = new AtomicBoolean(false);
         ctx.setOnWritable(() -> fired.set(true));
@@ -60,8 +60,7 @@ class ConnectionContextTest {
 
         ctx.updateWritable(true);
         assertTrue(ctx.lastWritable());
-        // BackpressureHandler checks lastWritable before calling onWritable,
-        // but ConnectionContext itself just stores state
-        assertTrue(ctx.lastWritable());
+        // BackpressureHandler 负责在边沿触发回调；ConnectionContext 自身只存状态
+        assertFalse(fired.get(), "ConnectionContext 不应自行触发 onWritable");
     }
 }

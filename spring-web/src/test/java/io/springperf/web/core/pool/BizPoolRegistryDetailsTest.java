@@ -202,13 +202,15 @@ class BizPoolRegistryDetailsTest {
      */
     @Test
     void initDefaultPool_virtualThreadsMode_stillHonorsPoolBounds() throws Exception {
-        assumeTrue(Runtime.version().feature() >= 21, "虚拟线程需要 JDK 21+");
         ExecutorService pool = initDefaultPoolWith(webContext, true, 1, 2, 7);
         assertTrue(pool instanceof ThreadPoolExecutor);
         ThreadPoolExecutor tpe = (ThreadPoolExecutor) pool;
         assertEquals(1, tpe.getCorePoolSize(), "core-pool-size 应生效");
         assertEquals(2, tpe.getMaximumPoolSize(), "max-pool-size 应生效");
         assertEquals(7, tpe.getQueue().remainingCapacity(), "queue-capacity 应生效");
+
+        // 线程类型才依赖 JDK 21+；JDK<21 时上面的池边界断言仍有效（回退平台线程）
+        assumeTrue(Runtime.version().feature() >= 21, "虚拟线程需要 JDK 21+");
         Thread t = tpe.getThreadFactory().newThread(() -> {
         });
         Method isVirtual = Thread.class.getMethod("isVirtual");
