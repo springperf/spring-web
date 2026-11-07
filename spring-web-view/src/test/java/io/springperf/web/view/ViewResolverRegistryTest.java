@@ -24,10 +24,11 @@ class ViewResolverRegistryTest {
 
     private WebContext webContext;
     private ViewResolverRegistry registry;
+    private ApplicationProperties props;
 
     @BeforeEach
     void setUp() {
-        ApplicationProperties props = mock(ApplicationProperties.class);
+        props = mock(ApplicationProperties.class);
         when(props.get(PropertiesConstant.CONTEXT_PATH, "/")).thenReturn("/");
         when(props.getBoolean(PropertiesConstant.CHECK_ON_STARTUP, true)).thenReturn(true);
         webContext = new WebContext(mock(DispatcherHandler.class), props);
@@ -76,6 +77,14 @@ class ViewResolverRegistryTest {
         return req;
     }
 
+    /** mock 的布尔默认值是 false，启动期相关用例必须显式桩 isEnabled，否则整段检测逻辑不会被执行。 */
+    private static ViewResolver enabledResolver(String name) {
+        ViewResolver resolver = mock(ViewResolver.class);
+        when(resolver.getComponentName()).thenReturn(name);
+        when(resolver.isEnabled()).thenReturn(true);
+        return resolver;
+    }
+
     @Test
     void resolve_firstMatchingResolverWins() throws Exception {
         ViewResolver r1 = mock(ViewResolver.class);
@@ -116,6 +125,7 @@ class ViewResolverRegistryTest {
         when(r2.resolveViewName(eq("home"), any(), eq(req))).thenReturn(view);
 
         assertSame(view, registry.resolve("home", req));
+        verify(r1).resolveViewName(eq("home"), eq(Locale.US), eq(req));
     }
 
     @Test
@@ -184,28 +194,30 @@ class ViewResolverRegistryTest {
 
     @Test
     void initComponentPhase3_withoutResolvers_returnsEarly() throws Exception {
+        MappingRegistry mappings = spy(new MappingRegistry());
+        webContext.registerWebComponent(mappings);
         registry.initWithWebContext(webContext);
         registry.initComponentPhase1();
         assertDoesNotThrow(registry::initComponentPhase3);
+        // 容器里即便有 MappingRegistry，没有启用引擎时也不得进入遍历
+        verify(mappings, never()).getMappingContextList();
     }
 
     @Test
     void initComponentPhase3_noMappingRegistry_returnsEarly() throws Exception {
-        ViewResolver r1 = mock(ViewResolver.class);
-        when(r1.getComponentName()).thenReturn("r1");
-        registry.registerWebComponent(r1);
+        registry.registerWebComponent(enabledResolver("r1"));
         registry.initWithWebContext(webContext);
         registry.initComponentPhase1();
         assertDoesNotThrow(registry::initComponentPhase3);
+        // 必须真的越过 hasViewResolvers 守卫，否则「无 MappingRegistry」这条分支从未被执行
+        verify(props, atLeastOnce()).getBoolean(PropertiesConstant.CHECK_ON_STARTUP, true);
     }
 
     @Test
-    void initComponentPhase3_withMappingRegistry_detectsViewMethods() throws Exception {
-        ViewResolver r1 = mock(ViewResolver.class);
-        when(r1.getComponentName()).thenReturn("r1");
-        registry.registerWebComponent(r1);
+    void initComponentPhase3_withMappingRegistry_iteratesViewMethods() throws Exception {
+        registry.registerWebComponent(enabledResolver("r1"));
 
-        MappingRegistry mappingRegistry = new MappingRegistry();
+        MappingRegistry mappingRegistry = spy(new MappingRegistry());
         webContext.registerWebComponent(mappingRegistry);
 
         class Controller {
@@ -223,26 +235,70 @@ class ViewResolverRegistryTest {
         registry.initWithWebContext(webContext);
         registry.initComponentPhase1();
         assertDoesNotThrow(registry::initComponentPhase3);
+        // 检测逻辑唯一的可观测产物是 INFO 日志（本模块 SLF4J 为 NOP），故这里锁定「确实进入遍历」；
+        // @ResponseBody 筛选正确性由 hasResponseBody_* 与 ViewReturnValueResolverTest 的 VIEW_NAME_KEY 用例守住。
+        verify(mappingRegistry, times(1)).getMappingContextList();
+    }
+
+    @Test
+    void initComponentPhase3_noViewMethods_shortCircuitsDetection() throws Exception {
+        registry.registerWebComponent(enabledResolver("r1"));
+        MappingRegistry mappingRegistry = spy(new MappingRegistry());
+        webContext.registerWebComponent(mappingRegistry);
+
+        class Controller {
+            @ResponseBody
+            public String api() {
+                return "api";
+            }
+
+            public int count() {
+                return 1;
+            }
+        }
+        PathMappingContext json = mock(PathMappingContext.class);
+        when(json.getMethod()).thenReturn(Controller.class.getMethod("api"));
+        // getUserClass() 返回 Class<?>，thenReturn 无法过泛型捕获，改用 doReturn
+        doReturn(Controller.class).when(json).getUserClass();
+        PathMappingContext nonString = mock(PathMappingContext.class);
+        when(nonString.getMethod()).thenReturn(Controller.class.getMethod("count"));
+        mappingRegistry.registerMapping(json);
+        mappingRegistry.registerMapping(nonString);
+
+        registry.initWithWebContext(webContext);
+        registry.initComponentPhase1();
+        // 注册/组件初始化期间也可能读过这两个 mapping，只统计检测阶段
+        clearInvocations(json, nonString);
+        assertDoesNotThrow(registry::initComponentPhase3);
+
+        verify(mappingRegistry, times(1)).getMappingContextList();
+        // 非 String 返回值应在第一个条件短路，无需判定注解（覆盖筛选条件的 false 分支）
+        verify(nonString).getMethod();
+        verify(nonString, never()).getUserClass();
+        // @ResponseBody 方法在第二条件被排除；若误入 viewMethods.add 会再取一次 userClass
+        verify(json, times(2)).getMethod();
+        verify(json, times(1)).getUserClass();
     }
 
     @Test
     void initComponentPhase3_checkOnStartupDisabled_returnsEarly() throws Exception {
-        ApplicationProperties props = mock(ApplicationProperties.class);
-        when(props.get(PropertiesConstant.CONTEXT_PATH, "/")).thenReturn("/");
-        when(props.getBoolean(PropertiesConstant.CHECK_ON_STARTUP, true)).thenReturn(false);
-        WebContext context = new WebContext(mock(DispatcherHandler.class), props);
+        ApplicationProperties disabledProps = mock(ApplicationProperties.class);
+        when(disabledProps.get(PropertiesConstant.CONTEXT_PATH, "/")).thenReturn("/");
+        when(disabledProps.getBoolean(PropertiesConstant.CHECK_ON_STARTUP, true)).thenReturn(false);
+        WebContext context = new WebContext(mock(DispatcherHandler.class), disabledProps);
         ApplicationContext appCtx = mock(ApplicationContext.class);
         when(appCtx.getBeansOfType(any())).thenReturn(Collections.emptyMap());
         context.setCtx(appCtx);
 
-        ViewResolver resolver = mock(ViewResolver.class);
-        when(resolver.getComponentName()).thenReturn("enabledResolver");
-        when(resolver.isEnabled()).thenReturn(true);
+        MappingRegistry mappings = spy(new MappingRegistry());
+        context.registerWebComponent(mappings);
         ViewResolverRegistry reg = new ViewResolverRegistry();
-        reg.registerWebComponent(resolver);
+        reg.registerWebComponent(enabledResolver("enabledResolver"));
         reg.initWithWebContext(context);
         reg.initComponentPhase1();
         assertDoesNotThrow(reg::initComponentPhase3);
+        verify(disabledProps, atLeastOnce()).getBoolean(PropertiesConstant.CHECK_ON_STARTUP, true);
+        verify(mappings, never()).getMappingContextList();
     }
 
     @Test

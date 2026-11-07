@@ -2,6 +2,10 @@ package io.springperf.web.view;
 
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
+import io.springperf.web.view.beetl.BeetlViewResolver;
+import io.springperf.web.view.freemarker.FreemarkerViewResolver;
+import io.springperf.web.view.thymeleaf.ThymeleafViewResolver;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.Ordered;
 
@@ -132,8 +136,10 @@ class WebExchangeProviderTest {
     }
 
     @Test
-    void viewResolver_spi_isEnabledByDefault() {
-        ViewResolver resolver = (name, locale, request) -> null;
-        assertTrue(resolver.isEnabled());
+    void builtInViewResolvers_startEnabled() {
+        // 用真实实现类验证「默认启用」契约，而不是拿 lambda 去断言接口 default 方法自己返回 true
+        assertTrue(new ThymeleafViewResolver().isEnabled());
+        assertTrue(new FreemarkerViewResolver().isEnabled());
+        assertTrue(new BeetlViewResolver().isEnabled());
     }
 }

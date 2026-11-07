@@ -76,6 +76,7 @@ class ViewCacheTest {
         };
 
         int threads = 16;
+        Thread[] workers = new Thread[threads];
         CountDownLatch start = new CountDownLatch(1);
         CountDownLatch done = new CountDownLatch(threads);
         AtomicInteger failures = new AtomicInteger();
@@ -90,12 +91,29 @@ class ViewCacheTest {
                     done.countDown();
                 }
             });
+            workers[i] = t;
             t.start();
         }
         start.countDown();
         assertTrue(loaderEntered.await(5, TimeUnit.SECONDS), "至少一个线程应进入加载");
-        // 放行前留出窗口，让其余线程都走到占位判断；无单飞时它们会各自触发 loader
-        Thread.sleep(30);
+        // 不靠固定 sleep：等到除加载线程外的 worker 都进入等待状态再放行。
+        // 否则「无单飞」的实现可能因其它线程尚未启动而侥幸只加载一次。
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        int waiting;
+        do {
+            waiting = 0;
+            for (Thread worker : workers) {
+                Thread.State state = worker.getState();
+                if (state == Thread.State.WAITING || state == Thread.State.TIMED_WAITING) {
+                    waiting++;
+                }
+            }
+            if (waiting >= threads - 1) {
+                break;
+            }
+            Thread.yield();
+        } while (System.nanoTime() < deadline);
+        assertTrue(waiting >= threads - 1, "其余线程应都已阻塞在占位结果上，实际等待数: " + waiting);
         release.countDown();
         assertTrue(done.await(10, TimeUnit.SECONDS));
         assertEquals(0, failures.get());
@@ -211,7 +229,10 @@ class ViewCacheTest {
         invokeTrackInsertion(cache, "extra");
 
         assertTrue(views.containsKey("inflight"), "仍在加载的条目不能被淘汰");
+        assertFalse(views.containsKey("v0"), "跳过 in-flight 后仍须淘汰最早的已完成条目");
+        assertEquals(MAX_SIZE, views.size(), "容量应收敛到上限");
         assertTrue(queue.contains("inflight"), "未完成条目应放回队列尾部等待下次淘汰");
+        assertEquals("v1", queue.peek(), "in-flight 应被移到队尾，不得继续占住队首");
     }
 
     @Test
@@ -251,6 +272,11 @@ class ViewCacheTest {
     @Test
     void invalidate_concurrentWithResolve_keepsCacheUsable() throws Exception {
         ViewCache cache = new ViewCache(true);
+        AtomicInteger seedLoads = new AtomicInteger();
+        ViewCache.Loader seedLoader = countingLoader(seedLoads, VIEW);
+        assertSame(VIEW, cache.resolve("seed", seedLoader));
+        assertEquals(1, seedLoads.get());
+
         int threads = 8;
         CountDownLatch start = new CountDownLatch(1);
         CountDownLatch done = new CountDownLatch(threads);
@@ -278,7 +304,38 @@ class ViewCacheTest {
         start.countDown();
         assertTrue(done.await(10, TimeUnit.SECONDS));
         assertEquals(0, failures.get(), "并发失效与解析不应抛异常");
-        assertSame(VIEW, cache.resolve("home", key -> VIEW), "失效后缓存仍可用");
+        assertSame(VIEW, cache.resolve("seed", seedLoader), "失效后缓存仍可用");
+        assertEquals(2, seedLoads.get(),
+                "invalidate() 必须真的清空过缓存；若它是 no-op，seed 不会重新加载");
+    }
+
+    @Test
+    void trackInsertion_allInFlight_stopsAfterOneScan() throws Exception {
+        ViewCache cache = new ViewCache(true);
+        ConcurrentMap<String, CompletableFuture<View>> views = viewsOf(cache);
+        ConcurrentLinkedQueue<String> queue = queueOf(cache);
+        for (int i = 0; i <= MAX_SIZE; i++) {
+            String key = "v" + i;
+            views.put(key, new CompletableFuture<>());
+            queue.add(key);
+        }
+
+        invokeTrackInsertion(cache, "extra");
+
+        assertEquals(MAX_SIZE + 1, views.size(), "全部条目仍在加载时不得淘汰任何条目");
+        assertTrue(views.containsKey("v0"), "扫描次数用尽后应直接结束，不得反复挪动同一批 key");
+    }
+
+    @Test
+    void trackInsertion_queueOnlyContainsUnknownKey_doesNotEvict() throws Exception {
+        ViewCache cache = new ViewCache(true);
+        ConcurrentMap<String, CompletableFuture<View>> views = viewsOf(cache);
+        fillCompleted(views, new ConcurrentLinkedQueue<>(), MAX_SIZE + 1);
+
+        invokeTrackInsertion(cache, "extra");
+
+        assertEquals(MAX_SIZE + 1, views.size(), "队列里的 key 不在 views 中时只能跳过，不得淘汰其它条目");
+        assertTrue(views.containsKey("v0"));
     }
 
     private static void fillCompleted(ConcurrentMap<String, CompletableFuture<View>> views,
