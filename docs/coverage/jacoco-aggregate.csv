@@ -136,7 +136,7 @@ coverage-aggregate/spring-web,io.springperf.web.util,DataSizeUtils,0,91,0,14,0,2
 coverage-aggregate/spring-web,io.springperf.web.util,Object2LongOpenHashMap,12,328,3,31,3,72,3,29,0,15
 coverage-aggregate/spring-web,io.springperf.web.util,DefaultLoggerUtil,3,4,0,0,1,1,1,1,1,1
 coverage-aggregate/spring-web,io.springperf.web.util,MetaUtils,7,310,8,66,1,70,9,34,1,5
-coverage-aggregate/spring-web,io.springperf.web.util,ServletFilterPatternUtils,37,611,31,185,8,137,28,101,1,20
+coverage-aggregate/spring-web,io.springperf.web.util,ServletFilterPatternUtils,37,611,30,186,8,137,27,102,1,20
 coverage-aggregate/spring-web,io.springperf.web.util,WebUtils,3,112,0,26,1,28,1,17,1,4
 coverage-aggregate/spring-web,io.springperf.web.util,PathPatternUtils,37,480,14,102,9,121,13,65,2,17
 coverage-aggregate/spring-web,io.springperf.web.core.arg.provider,ModelAttributeResolverProvider,0,50,0,2,0,9,0,5,0,4
@@ -263,7 +263,7 @@ coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.context,
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.context,PerfServletContext.PerfSessionCookieConfig,0,88,0,2,0,31,0,19,0,18
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.context,DynamicServletRegistration,73,252,9,29,21,55,15,23,6,13
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.context,ServletAdapterContext,4,51,0,0,2,20,1,10,1,10
-coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.context,PerfServletContext,269,1434,57,125,70,355,53,116,5,73
+coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.context,PerfServletContext,151,1552,39,143,38,387,39,130,2,76
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.servlet.context,DynamicFilterRegistration,85,167,17,17,19,40,16,17,3,13
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.arg.provider,SessionAttributeArgumentResolverProvider,2,62,1,9,1,14,1,8,0,4
 coverage-aggregate/spring-web-servlet,io.springperf.web.support.arg.provider,ServletResponseProvider,0,19,0,0,0,5,0,4,0,4
@@ -371,8 +371,8 @@ coverage-aggregate/spring-web-websocket,io.springperf.web.websocket.server,Netty
 coverage-aggregate/spring-web-view,io.springperf.web.view.exchange,PerfWebRequest,6,230,7,19,0,44,7,29,0,23
 coverage-aggregate/spring-web-view,io.springperf.web.view.exchange,PerfWebExchange,1,126,1,11,0,31,1,21,0,16
 coverage-aggregate/spring-web-view,io.springperf.web.view.exchange,PerfWebApplication,1,62,1,1,0,14,1,10,0,10
-coverage-aggregate/spring-web-view,io.springperf.web.view.freemarker,FreemarkerViewResolver,85,205,13,13,15,48,10,12,1,8
-coverage-aggregate/spring-web-view,io.springperf.web.view.freemarker,FreemarkerViewResolver.FreemarkerView,1,34,1,1,0,11,1,3,0,3
+coverage-aggregate/spring-web-view,io.springperf.web.view.freemarker,FreemarkerViewResolver,2,288,2,24,0,63,2,20,0,9
+coverage-aggregate/spring-web-view,io.springperf.web.view.freemarker,FreemarkerViewResolver.FreemarkerView,0,35,0,2,0,11,0,4,0,3
 coverage-aggregate/spring-web-view,io.springperf.web.view.beetl,BeetlViewResolver.BeetlView,1,38,1,1,0,12,1,2,0,2
 coverage-aggregate/spring-web-view,io.springperf.web.view.beetl,BeetlViewResolver,10,169,2,10,3,38,3,11,1,7
 coverage-aggregate/spring-web-view,io.springperf.web.view.retval,ViewReturnValueResolver,2,266,4,34,1,71,4,27,0,12
@@ -416,7 +416,7 @@ coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.suppo
 coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.actuator.server,ManagementNettyHttpServer,46,248,9,7,9,62,6,15,0,13
 coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.actuator.server,ManagementServerSettings,16,516,6,42,5,97,6,43,0,25
 coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.actuator.server,SslContextFactory.new PropertySource() {...},0,12,0,0,0,2,0,2,0,2
-coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.actuator.server,SslContextFactory,15,313,13,39,2,70,12,24,0,10
+coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.actuator.server,SslContextFactory,15,313,10,42,2,70,9,27,0,10
 coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.actuator.server,ManagementServerSettings.ManagementOverridePropertySource,5,108,4,16,2,19,4,9,0,3
 coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.actuator.server,ManagementNettyHttpServer.new ChannelInitializer() {...},0,84,0,0,0,10,0,2,0,2
 coverage-aggregate/spring-boot-starter-web,io.springperf.web.autoconfigure.actuator.server,ManagementServerSettings.new PropertySource() {...},12,0,0,0,2,0,2,0,2,0
