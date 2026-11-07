@@ -147,11 +147,14 @@ class ReturnValueResolverRegistryCoverageTest {
 
     @Test
     void isAsyncReturnValue_unsupportedValue_cachesFalse() {
-        RejectingAsyncResolver rejecting = new RejectingAsyncResolver();
+        RejectingAsyncResolver rejecting = spy(new RejectingAsyncResolver());
         registry.addResolver(rejecting);
 
         assertFalse(registry.isAsyncReturnValue("zzz", req, resp));
         assertFalse(registry.isAsyncReturnValue("zzz", req, resp));
+
+        // 命中 false 缓存：第二次不得再询问 resolver，否则「cachesFalse」名不副实
+        verify(rejecting, times(1)).supportsReturnValue(any(), any(), any());
     }
 
     @Test

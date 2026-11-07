@@ -292,15 +292,16 @@ class SupportMultipartResolverTest {
     }
 
     @Test
-    void location_blank_usesNettyDefault() {
-        // 空 location：不调用 setBaseDir，不应抛异常
+    void location_blank_usesNettyTempDir() throws Exception {
+        // 空 location：不调用 setBaseDir，落盘交给 Netty 默认目录（系统临时目录）
         byte[] body = multipartFileBody(10);
-        assertDoesNotThrow(() -> runWithFactoryConfig(body, -1L, "  "));
-    }
+        NettyMultipartWebRequest req = runWithFactoryConfig(body, 1L, "  ");
+        io.netty.handler.codec.http.multipart.FileUpload upload = (io.netty.handler.codec.http.multipart.FileUpload) req
+                .getInterfaceHttpDataList().get(0);
 
-    @Test
-    void fullConstructor_createsFactoryWithoutError() {
-        SupportMultipartResolver resolver = new SupportMultipartResolver(-1, -1, 8192, -1L, 0L, "");
-        assertNotNull(resolver);
+        assertTrue(isOnDisk(upload), "空 location 时仍应落盘");
+        String tmpDir = new java.io.File(System.getProperty("java.io.tmpdir")).getAbsolutePath();
+        String path = upload.getFile().getAbsolutePath();
+        assertTrue(path.startsWith(tmpDir), "空 location 应落到系统临时目录 " + tmpDir + "，实际：" + path);
     }
 }

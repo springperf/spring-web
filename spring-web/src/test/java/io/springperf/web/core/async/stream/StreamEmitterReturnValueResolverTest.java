@@ -19,7 +19,10 @@ import org.springframework.http.server.ServerHttpResponse;
 
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.async.AsyncSupportRegistry;
+import io.springperf.web.core.async.AsyncSupportUtils;
+import io.springperf.web.core.async.PerfAsyncWebRequest;
 import io.springperf.web.core.mapping.MappingHandlerMethod;
+import io.springperf.web.http.RequestContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 
@@ -116,9 +119,11 @@ class StreamEmitterReturnValueResolverTest {
     @Test
     void resolveReturnValue_unwrapsResponseEntity() throws Exception {
         // 设置 streamSenderFactory 通过反射，避免依赖 StaticUtil 调用链
+        StreamSenderFactory factory = mock(StreamSenderFactory.class);
+        when(factory.create(any(), any())).thenReturn(mock(StreamSender.class));
         Field factoryField = StreamEmitterReturnValueResolver.class.getDeclaredField("streamSenderFactory");
         factoryField.setAccessible(true);
-        factoryField.set(resolver, mock(StreamSenderFactory.class));
+        factoryField.set(resolver, factory);
 
         StreamEmitter emitter = new StreamEmitter() {
             @Override
@@ -134,12 +139,18 @@ class StreamEmitterReturnValueResolverTest {
         HttpHeaders respHeaders = new HttpHeaders();
         when(response.getHeaders()).thenReturn(respHeaders);
 
-        // resolveReturnValue 会调用 StreamEmitterUtil 的静态方法，预期抛出异常
-        assertThrows(Exception.class, () -> resolver.resolveReturnValue(entity, null, request, response));
+        // 异步上下文必须可用：缺桩时 requestContext 为 null，原用例的 assertThrows(Exception.class) 把 NPE 一并吞了
+        RequestContext requestContext = mock(RequestContext.class);
+        PerfAsyncWebRequest asyncWebRequest = mock(PerfAsyncWebRequest.class);
+        when(request.getRequestContext()).thenReturn(requestContext);
+        when(requestContext.getAttribute(AsyncSupportUtils.WEB_ASYNC_REQUEST_ATTRIBUTE)).thenReturn(asyncWebRequest);
 
-        // 验证 ResponseEntity 的状态码和 headers 已被设置
+        resolver.resolveReturnValue(entity, null, request, response);
+
+        // 验证 ResponseEntity 的状态码和 headers 已被设置，且 body 交给了 sender 工厂
         verify(response).setStatusCode(HttpStatus.ACCEPTED);
         assertTrue(respHeaders.containsKey("X-Custom"));
+        verify(factory).create(eq(emitter), eq(asyncWebRequest));
     }
 
     // ===== helpers =====

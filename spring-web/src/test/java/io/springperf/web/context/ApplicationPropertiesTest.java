@@ -245,9 +245,20 @@ class ApplicationPropertiesTest {
 
     @Test
     void get_missingKey_nullDefault_notCached() {
-        ApplicationProperties props = createProperties("nonexistent", null);
+        Map<String, String> values = new HashMap<>();
+        Environment env = mock(Environment.class);
+        when(env.getProperty(anyString(), nullable(String.class))).thenAnswer(invocation -> {
+            String key = invocation.getArgument(0);
+            String defaultValue = invocation.getArgument(1);
+            return values.getOrDefault(key, defaultValue);
+        });
+        ApplicationProperties props = new ApplicationProperties();
+        props.setEnvironment(env);
+
         assertNull(props.get("missing.key", null));
-        assertNull(props.get("missing.key", null), "null 值不缓存，每次重查 Environment");
+        // null 结果不得进缓存：同一 key 后续有值时必须立即可见（缓存实现会永远返回 null）
+        values.put("missing.key", "late");
+        assertEquals("late", props.get("missing.key", null), "null 值不缓存，每次重查 Environment");
     }
 
     @Test

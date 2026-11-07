@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 /** 核心模块服务器启动事件：发布时机、空上下文兜底、与 Boot lifecycle 的 phase 对齐。 */
@@ -36,12 +37,15 @@ class NettyServerStartedEventTest {
     }
 
     @Test
-    void publishServerStartedEvent_withoutContext_isNoOp() {
+    void publishServerStartedEvent_withoutContext_touchesNothingElse() {
         WebContext webContext = mock(WebContext.class);
         when(webContext.getCtx()).thenReturn(null);
 
         assertDoesNotThrow(() -> invokePublish(new NettyHttpServer(webContext)),
                 "单测直接构造服务器、没有真实上下文时不得抛异常");
+        // 无上下文时必须直接返回，不能改从别处取组件再发布
+        verify(webContext).getCtx();
+        verifyNoMoreInteractions(webContext);
     }
 
     @Test

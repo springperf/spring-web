@@ -3,7 +3,7 @@ package io.springperf.web.core.arg;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -134,9 +134,12 @@ class ArgumentResolverRegistryCoverageTest {
         ArgumentResolverRegistry registry = new ArgumentResolverRegistry();
         registry.initWithWebContext(wc);
 
-        assertNotNull(registry.webDataBinderRegistry);
-        assertNotNull(registry.requestParamResolverProvider);
-        assertNotNull(registry.modelAttributeResolverProvider);
+        assertInstanceOf(WebDataBinderRegistry.class, registry.webDataBinderRegistry);
+        // 兜底 provider 必须真正进入启用列表，否则 @RequestParam / 复杂类型的兜底解析会在运行期才失效
+        assertTrue(registry.staticArgumentResolverProviders.contains(registry.requestParamResolverProvider),
+                "@RequestParam 兜底 provider 必须已注册");
+        assertTrue(registry.staticArgumentResolverProviders.contains(registry.modelAttributeResolverProvider),
+                "@ModelAttribute 兜底 provider 必须已注册");
         assertFalse(registry.staticArgumentResolverProviders.isEmpty());
     }
 
@@ -194,9 +197,12 @@ class ArgumentResolverRegistryCoverageTest {
         registry.initWithWebContext(wc);
         registry.modelAttributeResolverProvider = null;
 
-        registerMappingRegistry(wc, Collections.singletonList(mappingContext("simpleParam", String.class)));
+        MappingRegistry mr = registerMappingRegistry(wc,
+                Collections.singletonList(mappingContext("simpleParam", String.class)));
 
         assertDoesNotThrow(registry::validateAllParametersResolvable);
+        // 证明确实遍历了映射而不是空转
+        verify(mr).getMappingContextList();
     }
 
     @Test
@@ -245,6 +251,8 @@ class ArgumentResolverRegistryCoverageTest {
 
         assertDoesNotThrow(() -> registry.validateIfApplicable(new SmartTarget(), argCtx,
                 mock(WebServerHttpRequest.class), mock(MappingHandlerMethod.class)));
+        // 必须真的查询过候选 validator：空列表是「无可选」，不是「跳过校验逻辑」
+        verify(binder).getValidators(any());
     }
 
     @Test

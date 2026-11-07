@@ -178,7 +178,7 @@ class JacksonHttpBodyConverterCoverageTest {
     }
 
     @Test
-    void write_withJsonViewMappingContext_usesViewAndCaches() throws Exception {
+    void write_withJsonViewMappingContext_appliesView() throws Exception {
         PathMappingContext mapping = realMapping("get");
 
         ByteArrayOutputStream out1 = new ByteArrayOutputStream();

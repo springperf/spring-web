@@ -80,6 +80,8 @@ class NettyHttpServerStartTest {
         try {
             server.start();
             assertTrue(server.isRunning());
+            // 无 ConfigurableApplicationContext 时仍须完成端口绑定，只是跳过端口发布
+            assertTrue(server.getActualPort() > 0, "无 ApplicationContext 也必须完成端口绑定");
         } finally {
             server.stop();
             server.destroyComponent();
@@ -88,14 +90,30 @@ class NettyHttpServerStartTest {
 
     @Test
     void start_withPipelineCustomizer_injectsBeforeAndAfterHandlers() throws Exception {
+        // handlerAdded 在子 channel 组装管线时触发：必须真连一次，才能证明 customizer 落到了实际管线
+        java.util.concurrent.CountDownLatch handlerAdded = new java.util.concurrent.CountDownLatch(2);
         PipelineCustomizer customizer = new PipelineCustomizer()
-                .addBeforeAggregator(new io.netty.channel.ChannelInboundHandlerAdapter())
-                .addAfterAggregator(new io.netty.channel.ChannelInboundHandlerAdapter());
+                .addBeforeAggregator(new io.netty.channel.ChannelInboundHandlerAdapter() {
+                    @Override
+                    public void handlerAdded(io.netty.channel.ChannelHandlerContext ctx) {
+                        handlerAdded.countDown();
+                    }
+                })
+                .addAfterAggregator(new io.netty.channel.ChannelInboundHandlerAdapter() {
+                    @Override
+                    public void handlerAdded(io.netty.channel.ChannelHandlerContext ctx) {
+                        handlerAdded.countDown();
+                    }
+                });
 
         NettyHttpServer server = newServer(null, customizer);
         try {
             server.start();
             assertTrue(server.isRunning());
+            try (java.net.Socket ignored = new java.net.Socket("127.0.0.1", server.getActualPort())) {
+                assertTrue(handlerAdded.await(3, java.util.concurrent.TimeUnit.SECONDS),
+                        "before/after 注入的 handler 必须进入子 channel 管线");
+            }
         } finally {
             server.stop();
             server.destroyComponent();

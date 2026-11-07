@@ -14,6 +14,7 @@ class DefaultLoggerUtilTest {
 
     @Test
     void log_isSlf4jLogger() {
+        // 本模块测试类路径没有 slf4j 绑定，实际拿到的是 NOPLogger，无法断言 logger 名称/级别
         assertTrue(DefaultLoggerUtil.log instanceof Logger);
     }
 

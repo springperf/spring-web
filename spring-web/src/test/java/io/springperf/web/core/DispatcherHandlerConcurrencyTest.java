@@ -1,7 +1,9 @@
 package io.springperf.web.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 import java.util.HashMap;
@@ -10,11 +12,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.arg.ArgumentResolverRegistry;
@@ -147,7 +153,7 @@ class DispatcherHandlerConcurrencyTest {
             });
         }
 
-        latch.await();
+        assertTrue(latch.await(10, TimeUnit.SECONDS), "并发请求未在 10 秒内结束");
         executor.shutdown();
 
         assertNull(firstError.get(), "No thread should throw an exception");
@@ -195,7 +201,7 @@ class DispatcherHandlerConcurrencyTest {
             });
         }
 
-        latch.await();
+        assertTrue(latch.await(10, TimeUnit.SECONDS), "并发请求未在 10 秒内结束");
         executor.shutdown();
 
         assertNull(firstError.get(), "No thread should throw an exception");
@@ -210,6 +216,7 @@ class DispatcherHandlerConcurrencyTest {
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
         CountDownLatch latch = new CountDownLatch(threadCount);
         AtomicInteger successCount = new AtomicInteger(0);
+        AtomicReference<Throwable> firstError = new AtomicReference<>();
 
         MappingResult notFound = MappingResult.notFound();
         when(mappingRegistry.mapping(any())).thenAnswer(invocation -> {
@@ -225,22 +232,31 @@ class DispatcherHandlerConcurrencyTest {
                     WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
                     handler.handle(req, resp);
                     successCount.incrementAndGet();
-                } catch (Throwable ignored) {
+                } catch (Throwable t) {
+                    firstError.compareAndSet(null, t);
                 } finally {
                     latch.countDown();
                 }
             });
         }
 
-        latch.await();
+        assertTrue(latch.await(10, TimeUnit.SECONDS), "并发请求未在 10 秒内结束");
         executor.shutdown();
 
+        assertNull(firstError.get(), "请求处理线程不得抛异常: " + firstError.get());
         assertEquals(threadCount, successCount.get(), "All threads should complete");
-        verify(exceptionRegistry, times(threadCount)).handle(any(), any(), any());
+        // 404 语义必须落到异常解析链：捕获交给 ExceptionRegistry 的异常并核对状态码
+        ArgumentCaptor<Throwable> exceptionCaptor = ArgumentCaptor.forClass(Throwable.class);
+        verify(exceptionRegistry, times(threadCount)).handle(exceptionCaptor.capture(), any(), any());
+        for (Throwable ex : exceptionCaptor.getAllValues()) {
+            ResponseStatusException statusEx = assertInstanceOf(ResponseStatusException.class, ex,
+                    "未匹配应以 ResponseStatusException 承载状态码");
+            assertEquals(HttpStatus.NOT_FOUND, statusEx.getStatusCode(), "所有线程都应得到 404");
+        }
     }
 
     @Test
-    void concurrentHandle_withExecutorPool_isolationMaintained() throws Exception {
+    void concurrentHandle_withExecutorPool_allThreadsComplete() throws Exception {
         ExecutorService bizPool = Executors.newCachedThreadPool();
         int threadCount = 8;
         ExecutorService testExecutor = Executors.newFixedThreadPool(threadCount);
@@ -275,11 +291,13 @@ class DispatcherHandlerConcurrencyTest {
             });
         }
 
-        latch.await();
+        assertTrue(latch.await(10, TimeUnit.SECONDS), "并发请求未在 10 秒内结束");
         testExecutor.shutdown();
         bizPool.shutdown();
 
         assertNull(firstError.get(), "No thread should throw");
         assertEquals(threadCount, successCount.get(), "All threads should complete with executor offload");
+        // 证明每个请求确实走了「交棒线程池」分支，而不是仅没抛异常
+        verify(bizPoolRegistry, times(threadCount)).determinePool(any(), any());
     }
 }

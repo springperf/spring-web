@@ -86,9 +86,11 @@ class WebDataBinderRegistryCoverageTest {
                     AdviceAndLocalController.class.getMethod("handle"));
             List<InvocableHandlerMethod> methods = registry.getInitBinderMethods(mapping);
             assertEquals(2, methods.size());
-            for (InvocableHandlerMethod method : methods) {
-                assertNotNull(method.getMethod());
-            }
+            // 顺序固定：@ControllerAdvice 的全局 @InitBinder 在前，控制器局部在后
+            assertEquals(BinderAdvice.class, methods.get(0).getMethod().getDeclaringClass(),
+                    "全局 @ControllerAdvice @InitBinder 应优先执行");
+            assertEquals(AdviceAndLocalController.class, methods.get(1).getMethod().getDeclaringClass(),
+                    "控制器局部 @InitBinder 应紧随其后");
 
             WebDataBinderFactory factory = registry.getWebDataBinderFactory(mapping);
             assertInstanceOf(PerfDataBinderFactory.class, factory);

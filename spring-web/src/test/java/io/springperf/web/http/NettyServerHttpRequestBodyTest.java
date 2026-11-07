@@ -238,6 +238,7 @@ class NettyServerHttpRequestBodyTest {
             start.countDown();
             req.release(); // EventLoop finally：提交后立即执行
             async.join(2000);
+            assertFalse(async.isAlive(), "iteration " + i + ": 异步读取线程未在 2s 内结束");
             if (error.get() != null) {
                 throw new AssertionError("iteration " + i + ": " + error.get().getMessage(), error.get());
             }

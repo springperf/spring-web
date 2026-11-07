@@ -110,8 +110,9 @@ class DispatcherHandlerDispatchTest {
 
         handler.handle(req, resp);
 
-        // 关闭 TRACE：不进入 mapping，直接按 notFound 处理
+        // 关闭 TRACE：不进入 mapping，直接按 notFound 处理（短路后仍必须写出 404）
         verify(handler.mappingRegistryForTest(), never()).mapping(any());
+        verify(resp).sendError(HttpStatus.NOT_FOUND, "Not Found");
     }
 
     @Test
@@ -127,6 +128,7 @@ class DispatcherHandlerDispatchTest {
         handler.handle(req, resp);
 
         verify(handler.mappingRegistryForTest()).mapping(req);
+        verify(resp).sendError(HttpStatus.NOT_FOUND, "Not Found");
     }
 
     @Test
@@ -141,6 +143,7 @@ class DispatcherHandlerDispatchTest {
         handler.handle(req, resp);
 
         verify(handler.mappingRegistryForTest(), never()).mapping(any());
+        verify(resp).sendError(HttpStatus.NOT_FOUND, "Not Found");
     }
 
     @Test
@@ -153,6 +156,7 @@ class DispatcherHandlerDispatchTest {
         handler.handle(req, resp);
 
         verify(handler.mappingRegistryForTest(), never()).mapping(any());
+        verify(resp).sendError(HttpStatus.NOT_FOUND, "Not Found");
     }
 
     @Test
@@ -167,6 +171,7 @@ class DispatcherHandlerDispatchTest {
         handler.handle(req, resp);
 
         verify(handler.mappingRegistryForTest(), never()).mapping(any());
+        verify(resp).sendError(HttpStatus.NOT_FOUND, "Not Found");
     }
 
     @Test
@@ -187,8 +192,9 @@ class DispatcherHandlerDispatchTest {
 
         handler.handle(req, resp);
 
-        // 预检放行 → mapping 被调用（未短路）
+        // 预检放行 → mapping 被调用（未短路），并由 CORS 预检分支收尾
         verify(handler.mappingRegistryForTest()).mapping(req);
+        verify(handler.corsRegistryForTest()).corsHandle(req, resp);
     }
 
     @Test
@@ -204,5 +210,6 @@ class DispatcherHandlerDispatchTest {
         handler.handle(req, resp);
 
         verify(handler.mappingRegistryForTest()).mapping(req);
+        verify(resp).sendError(HttpStatus.NOT_FOUND, "Not Found");
     }
 }
