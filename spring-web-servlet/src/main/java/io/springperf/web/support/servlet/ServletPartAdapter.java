@@ -44,11 +44,17 @@ public class ServletPartAdapter implements Part {
 
     @Override
     public void write(String fileName) throws IOException {
+        // 显式不支持：文件转存走 MultipartFile.transferTo。若在此实现需自行处理路径校验与
+        // FileUpload 所有权转移，会与请求末尾 decoder.destroy() 的清理链冲突。
         throw new UnsupportedOperationException("write is not supported");
     }
 
     @Override
     public void delete() throws IOException {
+        // 有意 no-op：上传临时文件由容器在请求结束统一清理
+        // （NettyMultipartWebRequest.release() → HttpPostRequestDecoder.destroy() → cleanRequestHttpData）。
+        // Servlet 规范中 Part.delete() 是可选的提前释放；提前删除会与请求末尾的清理链
+        // 重复操作同一 HttpData，破坏引用计数不变式。
     }
 
     @Override

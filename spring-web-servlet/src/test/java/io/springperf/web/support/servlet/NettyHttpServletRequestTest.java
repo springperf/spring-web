@@ -87,4 +87,18 @@ class NettyHttpServletRequestTest {
         String url = servletReq.getRequestURL().toString();
         assertFalse(url.contains(":80"), "HTTP 默认端口 80 应省略: " + url);
     }
+
+    @Test
+    void getRequestURL_httpsPort443_omitsPort() {
+        WebServerHttpRequest req = mockRequest(URI.create("https://public.example.com:443/test"), null,
+                new InetSocketAddress("127.0.0.1", 443));
+        when(req.getUriStr()).thenReturn("/test");
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.set("Host", "public.example.com");
+        when(req.getHeaders()).thenReturn(headers);
+        NettyHttpServletRequest servletReq = new NettyHttpServletRequest(req);
+
+        assertEquals("https://public.example.com/test", servletReq.getRequestURL().toString(),
+                "HTTPS 默认端口 443 应省略，且 scheme/host 应来自实际请求");
+    }
 }

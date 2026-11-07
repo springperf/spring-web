@@ -91,6 +91,12 @@ class FileHttpSessionStorageTest {
         Path file = tempDir.resolve(data.getId() + ".session");
         assertTrue(Files.exists(file), "应写入 <id>.session 文件");
         assertTrue(Files.size(file) > 0);
+        try (java.io.ObjectInputStream ois = new java.io.ObjectInputStream(Files.newInputStream(file))) {
+            HttpSessionData restored = (HttpSessionData) ois.readObject();
+            assertTrue(restored.getAttribute("user") instanceof SerializableValue,
+                    "落盘属性应保持可序列化类型");
+            assertEquals("alice", ((SerializableValue) restored.getAttribute("user")).text);
+        }
     }
 
     @Test

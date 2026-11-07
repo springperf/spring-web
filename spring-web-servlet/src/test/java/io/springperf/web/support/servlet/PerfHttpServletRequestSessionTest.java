@@ -279,10 +279,16 @@ class PerfHttpServletRequestSessionTest {
     void getRequestedSessionId_cachedSession_returnsItsId() {
         PerfHttpSessionManager manager = sessionManager();
         when(manager.getCookieName()).thenReturn("SESSION");
-        PerfHttpSession session = mock(PerfHttpSession.class);
-        when(session.getId()).thenReturn("sid");
-        fastAttrs.put(PerfHttpSessionManager.SESSION_ATTR_KEY, session);
-        assertEquals("sid", newReq().getRequestedSessionId());
+        PerfHttpSession first = mock(PerfHttpSession.class);
+        when(first.getId()).thenReturn("cached-1");
+        fastAttrs.put(PerfHttpSessionManager.SESSION_ATTR_KEY, first);
+        assertEquals("cached-1", newReq().getRequestedSessionId());
+
+        // 换一个缓存会话，返回值必须随之变化（否则实现硬编码常量也能通过）
+        PerfHttpSession second = mock(PerfHttpSession.class);
+        when(second.getId()).thenReturn("cached-2");
+        fastAttrs.put(PerfHttpSessionManager.SESSION_ATTR_KEY, second);
+        assertEquals("cached-2", newReq().getRequestedSessionId());
     }
 
     @Test
@@ -400,7 +406,13 @@ class PerfHttpServletRequestSessionTest {
         PerfHttpServletRequest req = newReq();
         req.getSession(true);
         assertEquals("new", req.changeSessionId());
-        verify(resp).addCookie(any(Cookie.class));
+        org.mockito.ArgumentCaptor<Cookie> cookieCaptor = org.mockito.ArgumentCaptor.forClass(Cookie.class);
+        verify(resp).addCookie(cookieCaptor.capture());
+        Cookie cookie = cookieCaptor.getValue();
+        assertEquals("SESSION", cookie.getName(), "轮换后应使用配置的 cookie 名");
+        assertEquals("new", cookie.getValue(), "cookie 值必须是轮换后的新 session id");
+        assertEquals("/", cookie.getPath());
+        assertFalse(cookie.getSecure());
     }
 
     /* ==================== security ==================== */
@@ -574,7 +586,13 @@ class PerfHttpServletRequestSessionTest {
         });
         req.rebind(newRequest);
         Cookie[] after = req.getCookies();
-        assertNotEquals(before[0].getValue(), after[0].getValue());
+
+        assertEquals(1, before.length);
+        assertEquals("SESSION", before[0].getName());
+        assertEquals("old", before[0].getValue(), "前置条件：rebind 前 cookie 为旧值");
+        assertEquals(1, after.length);
+        assertEquals("SESSION", after[0].getName());
+        assertEquals("new", after[0].getValue(), "rebind 后 cookie 必须来自新请求");
     }
 
     @Test
@@ -583,8 +601,11 @@ class PerfHttpServletRequestSessionTest {
     }
 
     @Test
-    void getRequestURL_https443_omitsPort() {
-        // getScheme 固定 http，走 port!=80 分支附加端口；此处验证 scheme 为 http 时端口逻辑
+    void getRequestURL_httpWithPort443_appendsPort() {
+        // 本用例直接 new PerfHttpServletRequest（非 Netty 主路径），其 getScheme() 硬编码 http：
+        // 443 对 http 不是默认端口，故应保留端口。
+        // https:443 省略由主路径 NettyHttpServletRequest 实现，见
+        // NettyHttpServletRequestTest#getRequestURL_httpsPort443_omitsPort 与 ForwardedRedirectE2eTest。
         headers("Host", "example.com:443");
         when(request.getUriStr()).thenReturn("/secure");
         when(webContext.getProps()).thenReturn(mock(io.springperf.web.context.ApplicationProperties.class));

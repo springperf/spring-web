@@ -42,11 +42,13 @@ class PerfWebConnectionTest {
     void close_nullInputStream() throws Exception {
         PerfWebConnection conn = new PerfWebConnection(null, outputStream);
         conn.close();
+        verify(outputStream).close();
     }
 
     @Test
     void close_nullOutputStream() throws Exception {
         PerfWebConnection conn = new PerfWebConnection(inputStream, null);
         conn.close();
+        verify(inputStream).close();
     }
 }

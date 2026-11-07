@@ -296,7 +296,10 @@ class SupportServletRegistryTest {
         assertThat(servlet.config.getServletContext()).isNull();
         assertThat(servlet.config.getInitParameter("k1")).isEqualTo("v1");
         assertThat(servlet.config.getInitParameter("k2")).isEqualTo("v2");
-        verify(mappingRegistry).registerMapping(any(PathMappingContext.class));
+        org.mockito.ArgumentCaptor<PathMappingContext> captor = org.mockito.ArgumentCaptor
+                .forClass(PathMappingContext.class);
+        verify(mappingRegistry).registerMapping(captor.capture());
+        assertThat(captor.getValue().getPathRule()).isEqualTo("/params");
     }
 
     @Test
