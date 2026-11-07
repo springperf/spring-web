@@ -361,7 +361,7 @@ public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
 //              + 泛型参数递归展开（ResponseEntity<Map<String, User>> → User）
 ```
 
-`process-aot` 端到端效果（`spring-web-example-rest`）：`HealthController`/`UserController` 全部方法进入 `reflect-config.json` 的 `methods`（INVOKE）段，`User`/`ApiResult` DTO 注册字段/构造器 hints；`GlobalExceptionHandler`（`@RestControllerAdvice`）的 `handleValidation`/`handleIllegalArg`/`handleUnknown` 同样进入 `methods` 段。示例模块默认构建绑定 `process-aot`，原生编译用 `-Pnative`（`scripts/native-smoke-test.sh`，Linux + GraalVM）。
+`process-aot` 端到端效果（`spring-web-example-rest`）：`HealthController`/`UserController` 全部方法进入 `reflect-config.json` 的 `methods`（INVOKE）段，`User`/`ApiResult` DTO 注册字段/构造器 hints；`GlobalExceptionHandler`（`@RestControllerAdvice`）的 `handleValidation`/`handleIllegalArg`/`handleUnknown` 同样进入 `methods` 段。示例模块默认构建绑定 `process-aot`，原生编译用 `-Pnative`（`scripts/native-smoke-test.sh`，Linux + GraalVM）。该脚本在原生镜像启动后逐条请求两个控制器的全部端点，验证上述 hints 是运行期真正生效，而不只是构建期生成；用例清单由 `NativeSmokeContractTest` 锁定。
 
 ### 5.4 WebSocket 端点 AOT hints：`ServerEndpointBeanFactoryInitializationAotProcessor`
 
