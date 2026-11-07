@@ -65,6 +65,10 @@ class DynamicRegistrationTest {
         ServletRegistration.Dynamic registration = servletContext.addServlet("dyn", TrackingServlet.class.getName());
 
         assertInstanceOf(TrackingServlet.class, ((DynamicServletRegistration) registration).getServlet());
+        // 类名路径与实例路径一致：同样登记进 servletRegistrations，可被查询到
+        assertEquals("dyn", registration.getName());
+        assertSame(registration, servletContext.getServletRegistration("dyn"));
+        assertEquals(1, servletContext.getServletRegistrations().size());
     }
 
     @Test
@@ -189,6 +193,10 @@ class DynamicRegistrationTest {
         FilterRegistration.Dynamic registration = servletContext.addFilter("dynF", TrackingFilter.class.getName());
 
         assertInstanceOf(TrackingFilter.class, ((DynamicFilterRegistration) registration).getFilter());
+        // 类名路径与实例路径一致：同样登记进 filterRegistrations，可被查询到
+        assertEquals("dynF", registration.getName());
+        assertSame(registration, servletContext.getFilterRegistration("dynF"));
+        assertEquals(1, servletContext.getFilterRegistrations().size());
     }
 
     @Test

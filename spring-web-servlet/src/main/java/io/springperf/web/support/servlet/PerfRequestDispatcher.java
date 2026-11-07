@@ -20,9 +20,18 @@ import java.io.IOException;
 public class PerfRequestDispatcher implements RequestDispatcher {
 
     private final String path;
+    /** 目标资源路径（不含查询串），用于 {@code INCLUDE_SERVLET_PATH}。 */
+    private final String targetPath;
+    /** {@code getRequestDispatcher(path)} 路径自带的查询串，无则为 {@code null}。 */
+    private final String targetQueryString;
 
     public PerfRequestDispatcher(String path) {
         this.path = path;
+        // 路径可以自带查询串（如 "/x?a=1"）：SupportDispatcherHandler 内的
+        // ForwardWebServerHttpRequest 会自行拆分出纯路径，这里同步拆一次供 include 属性使用。
+        int queryIdx = path == null ? -1 : path.indexOf('?');
+        this.targetPath = queryIdx >= 0 ? path.substring(0, queryIdx) : path;
+        this.targetQueryString = queryIdx >= 0 ? path.substring(queryIdx + 1) : null;
     }
 
     @Override
@@ -43,11 +52,8 @@ public class PerfRequestDispatcher implements RequestDispatcher {
         // 本框架 getServletPath()=getPath()，pathInfo 恒为 ""。
         requestContext.setAttribute(RequestDispatcher.FORWARD_SERVLET_PATH, webRequest.getPath());
         requestContext.setAttribute(RequestDispatcher.FORWARD_PATH_INFO, "");
-        // 修正 2-20：QUERY_STRING 不应含前导 '?'（规范要求纯查询串）
-        String forwardUriWithQuery = webRequest.getUriStrWithQuery();
-        int forwardQIdx = forwardUriWithQuery.indexOf('?');
-        requestContext.setAttribute(RequestDispatcher.FORWARD_QUERY_STRING,
-                forwardQIdx >= 0 ? forwardUriWithQuery.substring(forwardQIdx + 1) : null);
+        // 修正 2-20：FORWARD_QUERY_STRING 记录「原始请求」的纯查询串，不含 path、不含前导 '?'
+        requestContext.setAttribute(RequestDispatcher.FORWARD_QUERY_STRING, queryStringOf(webRequest));
 
         // Set dispatcher type to FORWARD
         if (request instanceof PerfHttpServletRequest) {
@@ -79,12 +85,16 @@ public class PerfRequestDispatcher implements RequestDispatcher {
             ((PerfHttpServletRequest) request).setDispatcherType(DispatcherType.INCLUDE);
         }
 
-        // Save include attributes in request context
+        // INCLUDE_* 描述「被包含的目标资源」（Servlet 规范 / RequestDispatcher javadoc）。
+        // QUERY_STRING 只写查询串本身，不含 path、不含前导 '?'；目标路径自带查询串时优先用它，
+        // 否则沿用原始请求的查询串（ForwardWebServerHttpRequest 也会把原始 query 带到目标）。
+        // 无查询串时写 null：RequestContext.setAttribute(name, null) 等价于移除属性。
+        String includeQueryString = targetQueryString != null ? targetQueryString : queryStringOf(webRequest);
         requestContext.setAttribute(RequestDispatcher.INCLUDE_REQUEST_URI, webRequest.getUriStr());
         requestContext.setAttribute(RequestDispatcher.INCLUDE_CONTEXT_PATH, webContext.getContextPath());
-        requestContext.setAttribute(RequestDispatcher.INCLUDE_SERVLET_PATH, path);
+        requestContext.setAttribute(RequestDispatcher.INCLUDE_SERVLET_PATH, targetPath);
         requestContext.setAttribute(RequestDispatcher.INCLUDE_PATH_INFO, "");
-        requestContext.setAttribute(RequestDispatcher.INCLUDE_QUERY_STRING, webRequest.getUriStrWithQuery());
+        requestContext.setAttribute(RequestDispatcher.INCLUDE_QUERY_STRING, includeQueryString);
 
         DispatcherHandler dispatcher = webContext.getDispatcherHandler();
         if (!(dispatcher instanceof SupportDispatcherHandler)) {
@@ -97,6 +107,16 @@ public class PerfRequestDispatcher implements RequestDispatcher {
                 ((PerfHttpServletRequest) request).setDispatcherType(originalDispatcherType);
             }
         }
+    }
+
+    /**
+     * 取请求 URI 中的纯查询串（不含 path、不含前导 {@code '?'}）；无查询串时返回 {@code null}。
+     * 只切第一个 {@code '?'}，后续内容（含 {@code '%'} 编码与其它 {@code '?'}）原样保留，不解码。
+     */
+    private static String queryStringOf(WebServerHttpRequest webRequest) {
+        String uriWithQuery = webRequest.getUriStrWithQuery();
+        int queryIdx = uriWithQuery == null ? -1 : uriWithQuery.indexOf('?');
+        return queryIdx >= 0 ? uriWithQuery.substring(queryIdx + 1) : null;
     }
 
     private static WebServerHttpRequest resolveWebRequest(ServletRequest request) throws ServletException {

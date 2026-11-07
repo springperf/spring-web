@@ -200,6 +200,9 @@ class AbstractFastFailHttpServletRequestTest {
         assertNotNull(requestId);
         assertEquals(requestId, request.getProtocolRequestId());
         assertFalse(requestId.isEmpty());
+        // 两个 getter 返回同一字段，等值断言本身恒真；补一条能捕获格式回归的独立断言
+        // 生产为 Long.toHexString(递增计数器)，恒为小写十六进制
+        assertTrue(requestId.matches("[0-9a-f]+"), "requestId 应为小写十六进制递增计数: " + requestId);
     }
 
     @Test
@@ -213,9 +216,10 @@ class AbstractFastFailHttpServletRequestTest {
     void getServletConnection_reportsConnectionInfo() {
         jakarta.servlet.ServletConnection connection = request.getServletConnection();
         assertNotNull(connection);
-        assertNotNull(connection.getConnectionId());
+        // 生产把 requestId 同时用作 connectionId 与 protocolConnectionId，非空断言抓不到错绑
+        assertEquals(request.getRequestId(), connection.getConnectionId());
         assertEquals("HTTP/1.1", connection.getProtocol());
-        assertNotNull(connection.getProtocolConnectionId());
+        assertEquals(request.getRequestId(), connection.getProtocolConnectionId());
         assertFalse(connection.isSecure());
     }
 

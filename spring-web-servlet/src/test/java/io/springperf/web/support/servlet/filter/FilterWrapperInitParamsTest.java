@@ -8,6 +8,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebFilter;
 import jakarta.servlet.annotation.WebInitParam;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.util.Map;
 
@@ -92,7 +93,13 @@ class FilterWrapperInitParamsTest {
         wrapper.initWithWebContext(webContext);
         wrapper.initWithWebContext(webContext);
 
-        verify(filter, times(1)).init(any(FilterConfig.class));
+        // 捕获实际传给 filter.init 的 FilterConfig，核验上下文、名称与空 init 参数
+        ArgumentCaptor<FilterConfig> captor = ArgumentCaptor.forClass(FilterConfig.class);
+        verify(filter, times(1)).init(captor.capture());
+        FilterConfig cfg = captor.getValue();
+        assertSame(servletContext, cfg.getServletContext());
+        assertEquals(wrapper.getComponentName(), cfg.getFilterName());
+        assertFalse(cfg.getInitParameterNames().hasMoreElements(), "无 initParams 时名称枚举应为空");
         assertEquals(5, wrapper.getOrder());
     }
 

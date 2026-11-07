@@ -1,12 +1,14 @@
 package io.springperf.web.support.servlet.context;
 
 import io.springperf.web.context.WebContext;
+import io.springperf.web.support.servlet.PerfRequestDispatcher;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -103,17 +105,22 @@ class PerfServletContextTest {
 
     @Test
     void getClassLoader_returnsContextClassLoader() {
-        assertNotNull(servletContext.getClassLoader());
+        assertSame(Thread.currentThread().getContextClassLoader(), servletContext.getClassLoader());
     }
 
     @Test
     void getRequestDispatcher_returnsDispatcher() {
-        assertNotNull(servletContext.getRequestDispatcher("/test"));
+        jakarta.servlet.RequestDispatcher d = servletContext.getRequestDispatcher("/test");
+        assertInstanceOf(PerfRequestDispatcher.class, d);
+        assertEquals("/test", ReflectionTestUtils.getField(d, "path"));
     }
 
     @Test
     void getNamedDispatcher_returnsDispatcher() {
-        assertNotNull(servletContext.getNamedDispatcher("testServlet"));
+        jakarta.servlet.RequestDispatcher d = servletContext.getNamedDispatcher("testServlet");
+        assertInstanceOf(PerfRequestDispatcher.class, d);
+        // 生产 getNamedDispatcher 会为名称自动补 "/" 前缀
+        assertEquals("/testServlet", ReflectionTestUtils.getField(d, "path"));
     }
 
     @Test

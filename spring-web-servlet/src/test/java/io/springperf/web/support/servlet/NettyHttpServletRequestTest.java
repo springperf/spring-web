@@ -22,6 +22,9 @@ class NettyHttpServletRequestTest {
         when(req.getURI()).thenReturn(uri);
         when(req.getHeaders()).thenReturn(new org.springframework.http.HttpHeaders());
         when(req.getPath()).thenReturn(uri.getPath());
+        // getRequestURI() 读的是 getUriStr()（不是 getPath()）：缺这个 stub 会让 URL 拼出 "null" 路径，
+        // 而 startsWith/contains 型断言仍会通过，等于没测到 URL 构造。
+        when(req.getUriStr()).thenReturn(uri.getPath());
         return req;
     }
 
@@ -52,9 +55,9 @@ class NettyHttpServletRequestTest {
     void remoteAddressNull_fallsBackToSuper() {
         WebServerHttpRequest req = mockRequest(URI.create("http://localhost:8080/test"), null, null);
         NettyHttpServletRequest servletReq = new NettyHttpServletRequest(req);
-        // 无 remoteAddress，走父类实现（不抛异常）
-        assertNotNull(servletReq.getRemoteAddr());
-        assertNotNull(servletReq.getLocalAddr());
+        // 无 remoteAddress，父类回退到固定的 127.0.0.1
+        assertEquals("127.0.0.1", servletReq.getRemoteAddr());
+        assertEquals("127.0.0.1", servletReq.getLocalAddr());
     }
 
     @Test
@@ -73,10 +76,9 @@ class NettyHttpServletRequestTest {
         WebServerHttpRequest req = mockRequest(URI.create("http://localhost:8080/test"),
                 new InetSocketAddress("192.168.1.10", 5000), new InetSocketAddress("127.0.0.1", 8080));
         NettyHttpServletRequest servletReq = new NettyHttpServletRequest(req);
-        // getRequestURI 来自父类（基于 request.getPath 等），此处验证 URL 含端口
-        String url = servletReq.getRequestURL().toString();
-        assertTrue(url.startsWith("http://"), "URL 应以 scheme 开头: " + url);
-        assertTrue(url.contains(":8080"), "自定义端口应包含: " + url);
+
+        assertEquals("http://localhost:8080/test", servletReq.getRequestURL().toString(),
+                "非默认端口必须保留，scheme/host/path/port 均需精确");
     }
 
     @Test
@@ -84,15 +86,15 @@ class NettyHttpServletRequestTest {
         WebServerHttpRequest req = mockRequest(URI.create("http://localhost:80/test"), null,
                 new InetSocketAddress("127.0.0.1", 80));
         NettyHttpServletRequest servletReq = new NettyHttpServletRequest(req);
-        String url = servletReq.getRequestURL().toString();
-        assertFalse(url.contains(":80"), "HTTP 默认端口 80 应省略: " + url);
+
+        assertEquals("http://localhost/test", servletReq.getRequestURL().toString(),
+                "HTTP 默认端口 80 应省略，且 path 必须完整拼入 URL");
     }
 
     @Test
     void getRequestURL_httpsPort443_omitsPort() {
         WebServerHttpRequest req = mockRequest(URI.create("https://public.example.com:443/test"), null,
                 new InetSocketAddress("127.0.0.1", 443));
-        when(req.getUriStr()).thenReturn("/test");
         org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
         headers.set("Host", "public.example.com");
         when(req.getHeaders()).thenReturn(headers);
