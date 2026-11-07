@@ -81,6 +81,24 @@ The lowest supported line across the three branches is **Spring Boot 2.7.x** (va
 > core-module **tests** - a green `compile` says nothing about runtime symbol resolution. A future 4.2
 > release will be appended to the matrix while keeping 4.1.
 
+### Cross-version Sensitive Points
+
+The cross-version risk on master lives in the starter auto-configuration layer. The
+`spring-boot-versions` job covers it precisely because it runs
+`-pl spring-boot-starter-web -am test` instead of the core module alone.
+
+| Sensitive point | Risk | Covered by | Fallback |
+|-----------------|------|------------|----------|
+| `ApiVersion` (internal actuator enum `V2/V3/LATEST`) | Renamed / revalued in a 3.x minor | starter tests + `ActuatorEndpointAutoConfiguration` conditions | Fails at compile time, no silent degradation |
+| `DelegatingFilterProxyRegistrationBean#getTargetBeanName()` (protected reflection) | A Boot signature change would silently drop filters | `SpringWebServletAutoConfigurationCreateFilterWrapperTest` | Returns null, skips the filter and logs a WARN |
+| `ConfigurationPropertySources` + Boot `Ssl` binding via `Binder` | Aggregated property-source semantics may break management-port SSL and overrides | `ManagementServerSettingsTest`, `SslContextFactoryTest` | Fails fast on binding errors |
+| `@AutoConfiguration` ordering and conditions | Different ordering on older versions can back off conditions | `AutoConfigurationContractTest`, `AutoConfigurationConditionTest` | Explicit `@AutoConfigureAfter` fixes the order |
+
+> **E2E coverage scope**: 3.5 runs the full `@SpringBootTest` suite (`ci.yml` JDK matrix); 3.2 / 3.3 / 3.4 / 3.5
+> run a minimal smoke set weekly (or on manual `workflow_dispatch`) via `spring-boot-e2e-matrix.yml`:
+> `AdditionalEndpointsE2ETest` / `ManagementPortConflictTest` / `WebServerInitializedEventOrderTest`.
+> So "3.2.x ~ 3.5.x" means core + starter tests are verified; the full E2E suite is verified on 3.5 only.
+
 ### Additional Features
 
 - **Virtual threads**: enable with `spring.threads.virtual.enabled=true` on JDK 21+ and both the `default` business pool and batch methods (`@BatchMapping`) switch to virtual threads (only the thread type changes: `pool.*` bounds/queueing and batch's `consumerSize` cap + backpressure semantics are all unchanged) — via reflection on `Thread.ofVirtual`, so it compiles on JDK 17; below JDK 21 it warns and falls back to platform threads. Implemented in [`VirtualThreadSupport`](../../spring-web/src/main/java/io/springperf/web/core/pool/VirtualThreadSupport.java) / [`BizPoolRegistry`](../../spring-web/src/main/java/io/springperf/web/core/pool/BizPoolRegistry.java). E2E coverage: [`VirtualThreadE2ETest`](../../spring-web-test/src/test/java/io/springperf/webtest/VirtualThreadE2ETest.java) and [`BatchVirtualThreadE2ETest`](../../spring-web-support-test/src/test/java/io/springperf/webtest/batch/BatchVirtualThreadE2ETest.java)

@@ -74,8 +74,25 @@
 | Lombok | **1.18.46** | 1.18.30+ | JDK 17+ 兼容性要求高版本 |
 | JMH | **1.37** | 1.37 | 仅 benchmark 模块使用 |
 
-> 兼容性由 `ci.yml` 的 `spring-boot-versions` 矩阵（4.0 / 4.1）跑核心模块**单测**验证——只验证
+> 兼容性由 `ci.yml` 的 `spring-boot-versions` 矩阵（4.0 / 4.1）跑核心模块 + starter **单测**验证——只验证
 > `compile` 证明不了运行期符号存在。将来支持 4.2 时会在矩阵中追加 4.2 并保留 4.1。
+
+### 跨版本敏感点
+
+master 的跨版本风险集中在 starter 自动配置层，`spring-boot-versions` job 正是因为覆盖到
+`-pl spring-boot-starter-web -am test` 才能证明这些点在 3.2 / 3.3 / 3.4 上可用。
+
+| 敏感点 | 风险 | 覆盖用例 | 降级策略 |
+|--------|------|---------|---------|
+| `ApiVersion`（actuator 内部枚举 `V2/V3/LATEST`） | 3.x 小版本改名/改值 | starter 单测 + `ActuatorEndpointAutoConfiguration` 条件装配 | 编译期即暴露，无静默降级 |
+| `DelegatingFilterProxyRegistrationBean#getTargetBeanName()`（protected 反射） | Boot 调整签名后 filter 静默消失 | `SpringWebServletAutoConfigurationCreateFilterWrapperTest` | 返回 null 跳过并打 WARN，不吞异常 |
+| `ConfigurationPropertySources` + Boot `Ssl` 的 `Binder` 绑定 | 聚合属性源语义变化会让管理端口 SSL / 覆盖失效 | `ManagementServerSettingsTest`、`SslContextFactoryTest` | 绑定失败 fail-fast |
+| `@AutoConfiguration` 排序与条件注解 | 低版本排序不同会让条件装配退让 | `AutoConfigurationContractTest`、`AutoConfigurationConditionTest` | 显式 `@AutoConfigureAfter` 固定顺序 |
+
+> **E2E 覆盖口径**：3.5 跑全量 `@SpringBootTest`（`ci.yml` 的 JDK 矩阵）；3.2 / 3.3 / 3.4 / 3.5 由
+> `spring-boot-e2e-matrix.yml` 每周（或手动 `workflow_dispatch`）跑最小冒烟集
+> （`AdditionalEndpointsE2ETest` / `ManagementPortConflictTest` / `WebServerInitializedEventOrderTest`）。
+> 因此「3.2.x ~ 3.5.x」指核心 + starter 单测已验证，E2E 全量仅 3.5。
 
 ### 额外特性
 
