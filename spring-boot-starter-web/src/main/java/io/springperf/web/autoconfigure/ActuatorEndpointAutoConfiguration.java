@@ -1,11 +1,10 @@
 package io.springperf.web.autoconfigure;
 
-import io.netty.handler.ssl.SslContext;
 import io.springperf.web.autoconfigure.actuator.ActuatorEndpointHandlerMapping;
 import io.springperf.web.autoconfigure.actuator.ActuatorMappingDescriptionProvider;
 import io.springperf.web.autoconfigure.actuator.ManagementServerInfrastructure;
 import io.springperf.web.autoconfigure.actuator.server.ManagementNettyHttpServer;
-import io.springperf.web.autoconfigure.actuator.server.SslContextFactory;
+import io.springperf.web.autoconfigure.actuator.server.ManagementServerSettings;
 import io.springperf.web.context.WebContext;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.actuate.autoconfigure.endpoint.expose.IncludeExcludeEndpointFilter;
@@ -43,7 +42,6 @@ import java.util.stream.Collectors;
 public class ActuatorEndpointAutoConfiguration {
 
     private static final String DEFAULT_EXPOSED_ENDPOINTS = "info";
-    private static final int DEFAULT_MAX_CONTENT_LENGTH = 1024 * 1024;
 
     @Bean
     @ConditionalOnMissingBean
@@ -100,9 +98,13 @@ public class ActuatorEndpointAutoConfiguration {
         int mainPort = environment.getProperty("server.port", int.class, 8080);
         // L11：两端口任一为随机端口(0)时跳过冲突校验——OS 会分配不同端口，不会真实冲突；
         // 仅当两者都显式配置了相同且非 0 的端口时才真正冲突。修复前字面比较 0==0 误报并阻断启动。
-        if (mgmtPort > 0 && mainPort > 0 && mgmtPort == mainPort)
-            throw new IllegalStateException(
-                    "management.server.port (" + mgmtPort + ") must be different from server.port (" + mainPort + ")");
+        if (mgmtPort > 0 && mainPort > 0 && mgmtPort == mainPort) {
+            // 本框架为管理端点启动独立的 Netty 服务器，不支持与主服务器共用同一个监听端口；
+            // 因此同端口场景下管理专属的 SSL / address / 协议栈覆盖也一并拒绝，避免出现「配了却不生效」。
+            throw new IllegalStateException("management.server.port (" + mgmtPort
+                    + ") must be different from server.port (" + mainPort + "): the management endpoints run on a "
+                    + "dedicated Netty server and cannot share the main server port");
+        }
         String basePath = webEndpointProperties.getBasePath();
         return new ManagementServerInfrastructure(webContext, basePath);
     }
@@ -113,16 +115,11 @@ public class ActuatorEndpointAutoConfiguration {
     public ManagementNettyHttpServer managementNettyHttpServer(WebContext webContext,
             ManagementServerInfrastructure managementServerInfrastructure, WebEndpointProperties webEndpointProperties,
             Environment environment) {
-        int mgmtPort = environment.getProperty("management.server.port", int.class, 0);
-        // 管理端口独立配置：HTTP/2 与 max-content-length 均取自 management.server.* 前缀，
-        // 不再误用主服务器 server.* 的配置（修复前两者都取主服务器值，无法独立配置管理端口）。
-        boolean http2Enabled = environment.getProperty("management.server.http2.enabled", boolean.class, false);
-        SslContext sslContext = SslContextFactory.createServerSslContext(environment, "management.server.ssl.",
-                http2Enabled);
+        // 单一快照：management.server.X 显式覆盖，未配置则继承 server.X（含 SSL、HTTP/2、管线限制）。
+        // ALPN 与 HTTP/2 管线共用快照里的同一个 http2Enabled，避免协商与管线读到不同来源。
+        ManagementServerSettings settings = ManagementServerSettings.resolve(environment);
         ManagementNettyHttpServer server = new ManagementNettyHttpServer(webContext,
-                webEndpointProperties.getBasePath(), managementServerInfrastructure.getDispatcherHandler(), mgmtPort,
-                environment.getProperty("management.server.max-content-length", int.class, DEFAULT_MAX_CONTENT_LENGTH),
-                sslContext);
+                webEndpointProperties.getBasePath(), managementServerInfrastructure.getDispatcherHandler(), settings);
         webContext.registerWebComponent(server);
         return server;
     }

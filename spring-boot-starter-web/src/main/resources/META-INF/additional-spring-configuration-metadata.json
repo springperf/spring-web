@@ -141,6 +141,26 @@
       "type": "java.lang.String",
       "defaultValue": "text/html;charset=UTF-8",
       "description": "Response Content-Type; its charset determines the response byte encoding. Invalid values fail startup."
+    },
+    {
+      "name": "management.server.http2.enabled",
+      "type": "java.lang.Boolean",
+      "description": "HTTP/2 for the dedicated management server. Defaults to server.http2.enabled. The same value drives ALPN negotiation and the Netty pipeline; server-level settings are fixed at startup and require a restart."
+    },
+    {
+      "name": "management.server.max-content-length",
+      "type": "java.lang.Integer",
+      "description": "Maximum request body size (bytes) for the management server. Defaults to server.http.max-content-length. management.server.http.max-content-length is also accepted; this legacy key takes precedence."
+    },
+    {
+      "name": "management.server.max-connections",
+      "type": "java.lang.Integer",
+      "description": "Maximum concurrent connections for the management server. Defaults to server.max-connections."
+    },
+    {
+      "name": "management.server.shutdown.grace-period",
+      "type": "java.time.Duration",
+      "description": "Graceful shutdown period for the management server EventLoopGroups. Defaults to server.shutdown.grace-period."
     }
   ]
 }

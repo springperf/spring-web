@@ -2,6 +2,8 @@ package io.springperf.web.autoconfigure;
 
 import io.springperf.web.autoconfigure.actuator.ActuatorMappingDescriptionProvider;
 import io.springperf.web.autoconfigure.actuator.ManagementServerInfrastructure;
+import io.springperf.web.autoconfigure.actuator.server.ManagementNettyHttpServer;
+import io.springperf.web.autoconfigure.actuator.server.ManagementServerSettings;
 import io.springperf.web.context.WebContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +22,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.core.env.Environment;
 import org.springframework.mock.env.MockEnvironment;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -223,5 +226,76 @@ class ActuatorEndpointAutoConfigurationTest {
         environment.setProperty("server.port", "0");
         WebEndpointProperties props = new WebEndpointProperties();
         assertDoesNotThrow(() -> config.managementServerInfrastructure(webContext, props, environment));
+    }
+
+    // ========== 配置作用域：默认继承 server.* / management.server.* 显式覆盖 / L3 fail-fast ==========
+
+    @Test
+    void managementNettyHttpServer_http2DefaultsToServerValue() throws Exception {
+        environment.setProperty("management.server.port", "9093");
+        environment.setProperty("server.http2.enabled", "true");
+
+        ManagementNettyHttpServer server = config.managementNettyHttpServer(webContext, infrastructureMock(),
+                new WebEndpointProperties(), environment);
+
+        assertTrue(settingsOf(server).getHttp2Enabled(),
+                "未配置 management.server.http2.enabled 时必须继承 server.http2.enabled");
+    }
+
+    @Test
+    void managementNettyHttpServer_http2ManagementOverrideWins() throws Exception {
+        environment.setProperty("management.server.port", "9094");
+        environment.setProperty("server.http2.enabled", "true");
+        environment.setProperty("management.server.http2.enabled", "false");
+
+        ManagementNettyHttpServer server = config.managementNettyHttpServer(webContext, infrastructureMock(),
+                new WebEndpointProperties(), environment);
+
+        assertFalse(settingsOf(server).getHttp2Enabled(), "ALPN 与管线必须读到同一个覆盖后的开关");
+    }
+
+    @Test
+    void managementNettyHttpServer_maxContentLengthDefaultsToServerValue() throws Exception {
+        environment.setProperty("management.server.port", "9095");
+        environment.setProperty("server.http.max-content-length", "8192");
+
+        ManagementNettyHttpServer server = config.managementNettyHttpServer(webContext, infrastructureMock(),
+                new WebEndpointProperties(), environment);
+
+        assertEquals(8192, settingsOf(server).getMaxContentLength());
+    }
+
+    @Test
+    void managementNettyHttpServer_sslInheritsServerCertificate() throws Exception {
+        environment.setProperty("management.server.port", "9096");
+        environment.setProperty("server.ssl.certificate", "classpath:ssl/cert.pem");
+        environment.setProperty("server.ssl.certificate-private-key", "classpath:ssl/key.pem");
+
+        ManagementNettyHttpServer server = config.managementNettyHttpServer(webContext, infrastructureMock(),
+                new WebEndpointProperties(), environment);
+
+        assertNotNull(settingsOf(server).getSslContext(), "主服务器配置了证书时，管理端口默认应继承 SSL");
+    }
+
+    @Test
+    void managementNettyHttpServer_l3OverrideFailsFast() {
+        environment.setProperty("management.server.port", "9097");
+        environment.setProperty("management.server.http.timeout", "1000");
+
+        assertThrows(IllegalStateException.class, () -> config.managementNettyHttpServer(webContext,
+                infrastructureMock(), new WebEndpointProperties(), environment));
+    }
+
+    private ManagementServerInfrastructure infrastructureMock() {
+        ManagementServerInfrastructure infra = mock(ManagementServerInfrastructure.class);
+        lenient().when(infra.getDispatcherHandler())
+                .thenReturn(mock(io.springperf.web.autoconfigure.actuator.ManagementDispatcherHandler.class));
+        return infra;
+    }
+
+    private static ManagementServerSettings settingsOf(ManagementNettyHttpServer server) throws Exception {
+        Field field = ManagementNettyHttpServer.class.getDeclaredField("settings");
+        field.setAccessible(true);
+        return (ManagementServerSettings) field.get(server);
     }
 }
