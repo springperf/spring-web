@@ -3,11 +3,13 @@
 - **生成时间 / Generated at**：2026-10-12 16:02:18
 - **环境 / Environment**：Windows_NT / openjdk version "1.8.0_502"
 )
+)
 - **覆盖范围 / Scope**：库模块，**单测 + E2E 合并口径**（JaCoCo，coverage-aggregate 模块 report-aggregate 合并后的 jacoco.csv）
   Library modules, unit tests **plus E2E** (JaCoCo, merged jacoco.csv from the coverage-aggregate module)
 - **覆盖目标 / Targets**：spring-web ≥90%，其余库模块 ≥80%（✅=达标 ✓，❌=未达标 ✗）
   spring-web ≥90%, other library modules ≥80% (✅=met, ❌=missed)
 - **汇总 / Summary**：行/Line 90% · 分支/Branch 78.4% · 指令/Instr 89.3% · 方法/Method 92.1%
+)
 
 ## 一、覆盖率总览 / 1. Coverage Overview
 
@@ -21,6 +23,7 @@
 | spring-web-websocket | 90.5% | 1041/1150 | 81.3% | 365/449 | 91.1% | 95.5% | 24 | ≥80% | ✅ |
 | spring-boot-starter-web | 90.5% | 1033/1142 | 77.3% | 419/542 | 91.6% | 86.8% | 45 | ≥80% | ✅ |
 | **汇总 / Total** | **90%** | **13545/15052** | **78.4%** | **5652/7205** | **89.3%** | **92.1%** | | | |
+)
 
 ## 二、测试规模 / 2. Test Count
 
@@ -37,6 +40,7 @@
 | E2E spring-web-test | 263 |
 | E2E spring-web-support-test | 526 |
 | **E2E 合计 / E2E total** | **789** |
+)
 
 > 说明 / Note：本脚本会运行库模块 + E2E 模块；E2E 触发的库模块覆盖由聚合模块合并后计入第一节。
 > Both library and E2E modules are run; E2E-driven library coverage is merged in by the aggregate module.
@@ -52,6 +56,7 @@
 | NettyHttpHandler | 47 | 162 | 71% |
 | Http2ChannelInitializer.Http2OrHttp1Handler | 43 | 43 | 0% |
 | Http2ChannelInitializer.new ChannelInboundHandlerAdapter() {...} | 41 | 42 | 2.4% |
+)
 
 ### spring-web-view
 
@@ -62,6 +67,7 @@
 | ThymeleafViewResolver | 3 | 40 | 92.5% |
 | RedirectView | 2 | 35 | 94.3% |
 | BeetlViewResolver | 2 | 31 | 93.5% |
+)
 
 ### spring-web-servlet
 
@@ -72,6 +78,7 @@
 | PerfServletContext | 38 | 267 | 85.8% |
 | PerfHttpServletRequest | 36 | 362 | 90.1% |
 | SupportDispatcherHandler.SessionFlushListener | 14 | 17 | 17.6% |
+)
 
 ### spring-web-mvc-support
 
@@ -92,6 +99,7 @@
 | BufferingBatchHandler | 3 | 49 | 93.9% |
 | BatchRequest | 2 | 13 | 84.6% |
 | BatchScanner | 2 | 96 | 97.9% |
+)
 
 ### spring-web-websocket
 
@@ -102,6 +110,7 @@
 | JsrEndpointWebSocketHandler | 13 | 138 | 90.6% |
 | JsrCodecRegistry | 7 | 110 | 93.6% |
 | JsrEndpointMetadata | 6 | 107 | 94.4% |
+)
 
 ### spring-boot-starter-web
 
@@ -112,4 +121,5 @@
 | PerfApplicationFactory | 9 | 64 | 85.9% |
 | ActuatorEndpointHandlerMapping | 7 | 55 | 87.3% |
 | SpringWebServletAutoConfiguration | 7 | 54 | 87% |
+)
 
