@@ -185,14 +185,21 @@ public class ServletBridgeTestController {
         return result;
     }
 
+    /**
+     * 只验证 Servlet 响应 API 本身：显式 setContentType 后由 Servlet 侧自行写出 getContentType() 回读值，
+     * 返回 void，避免「显式 Content-Type + @ResponseBody 返回值」两种语义叠加导致返回值被丢弃。
+     */
     @PostMapping("/content-type")
-    public Map<String, String> setContentType(@RequestBody Map<String, String> body, HttpServletRequest request,
-            HttpServletResponse response) {
+    public void setContentType(@RequestBody Map<String, String> body, HttpServletResponse response) throws IOException {
         response.setContentType(body.get("contentType"));
-        Map<String, String> result = new HashMap<>();
-        result.put("contentType", response.getContentType());
-        result.put("characterEncoding", response.getCharacterEncoding());
-        return result;
+        response.getWriter().write(response.getContentType() + "|" + response.getCharacterEncoding());
+    }
+
+    /** 显式 Content-Type 与返回值类型无匹配 converter：用于锁定「不得静默 200 空 body」的契约。 */
+    @GetMapping("/content-type-conflict")
+    public Map<String, String> contentTypeConflict(HttpServletResponse response) {
+        response.setContentType("text/plain");
+        return Collections.singletonMap("shouldNot", "be-silently-dropped");
     }
 
     @GetMapping("/auth-type")

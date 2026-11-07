@@ -340,8 +340,9 @@ class HttpBodyCodecRegistryWriteNegotiationTest {
 
         write("a", optimizeReturnType);
 
-        // produces 协商出 concrete mediaType 但无 converter 支持 → 静默不写
-        // （与原 writeWithConverter 找不到 converter 的行为一致）。
+        // produces 协商出 concrete mediaType 但无 converter 支持 → path2a 保持历史行为：静默不写
+        // （注意：path1「响应已设 Content-Type」无匹配 converter 已改为抛
+        // HttpMessageNotWritableException，不再与本分支同语义）。
         verify(converter, never()).write(any(), any(), any(), any(), any(), any(), any());
     }
 

@@ -15,6 +15,7 @@
 
 | Version | Date | Topic |
 |---------|------|-------|
+| **2.7.8** | Unreleased | A preset `Content-Type` that does not match the return type now fails explicitly |
 | **2.7.7** | 2026-10-13 | Configuration keys aligned with Spring Boot (old keys removed / renamed), response framing and Servlet `flush` semantics, conditional requests and Range, extension-point signatures |
 | **2.7.6** | 2026-09-10 | Module split (`spring-web-support` → `spring-web-servlet` + `spring-web-mvc-support`), tightened `redirect:` semantics, view resolution no longer silent, production-grade Netty / pool defaults |
 | **2.7.4** | 2026-08-06 | `JsonConverter` gained the abstract method `toJsonBytes(Object)` |
@@ -223,6 +224,14 @@ already-accepted requests, but they **reject requests/responses that used to pas
 | `spring.mvc.view.prefix` / `.suffix` | — | **New**, Boot-aligned: prefix/suffix for **JSP views only**; template engines keep their own `spring.{engine}.prefix/suffix` |
 | Session persistence and encoding forcing | — | `server.servlet.session.persistent` / `.store-dir` / `.persistent-exclude` (JDK serialization, one file per session, `transient` attributes not persisted); `server.servlet.encoding.force` / `.force-request` / `.force-response` |
 | Dynamic config-centre refresh | A change required a restart | Listens for `EnvironmentChangeEvent` (**by class name**, adding no compile-time Spring Cloud dependency) → clears the framework property caches; `WebContext.refreshProperties()` can also be called manually |
+
+---
+
+## [2.7.8] - Unreleased
+
+| Item | Old behaviour | New behaviour |
+|---|---|---|
+| `@ResponseBody` return value with a preset `Content-Type` and no matching `HttpBodyConverter` | silently returned 200 with an empty body; the return value was dropped | throws `HttpMessageNotWritableException`, mapped to 500 by `ExceptionRegistry`. **Migration**: make the preset Content-Type match the return type (use `application/json` for objects), or write the response on the Servlet side and return `void` |
 
 ---
 

@@ -13,6 +13,7 @@
 
 | 版本 | 日期 | 主题 |
 |------|------|------|
+| **2.7.8** | 未发布 | 预设 `Content-Type` 与返回值类型不匹配时改为显式失败 |
 | **2.7.7** | 2026-10-13 | 配置键对齐 Spring Boot（旧键移除/改名）、响应分帧与 Servlet `flush` 语义、条件请求与 Range、扩展点签名 |
 | **2.7.6** | 2026-09-10 | 模块拆分（`spring-web-support` → `spring-web-servlet` + `spring-web-mvc-support`）、`redirect:` 语义收紧、视图解析失败不再静默、生产级 Netty / 线程池默认值 |
 | **2.7.4** | 2026-08-06 | `JsonConverter` 接口新增抽象方法 `toJsonBytes(Object)` |
@@ -217,6 +218,14 @@
 | `spring.mvc.view.prefix` / `.suffix` | — | **新增**，语义对齐 Boot：**仅 JSP 视图**的前后缀；模板引擎仍用各自的 `spring.{engine}.prefix/suffix` |
 | 会话持久化与编码强制 | — | `server.servlet.session.persistent` / `.store-dir` / `.persistent-exclude`（JDK 序列化，每 session 一文件，不落盘 `transient` 属性）；`server.servlet.encoding.force` / `.force-request` / `.force-response` |
 | 配置中心动态刷新 | 改了配置需重启才生效 | 监听 `EnvironmentChangeEvent`（**按类名监听**，不引入 Spring Cloud 编译期依赖）→ 清空框架属性缓存；亦可调用 `WebContext.refreshProperties()` 手动触发 |
+
+---
+
+## [2.7.8] - 未发布
+
+| 项 | 旧行为 | 新行为 |
+|---|---|---|
+| 已显式设置 `Content-Type` 且无匹配 `HttpBodyConverter` 的 `@ResponseBody` 返回值 | 静默返回 200 + 空响应体，返回值被丢弃 | 抛 `HttpMessageNotWritableException`，经 `ExceptionRegistry` 映射为 500。**迁移**：让显式 Content-Type 与返回值类型匹配（返回对象时用 `application/json`），或由 Servlet 侧自行写响应并返回 `void` |
 
 ---
 
