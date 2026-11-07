@@ -246,7 +246,6 @@ class BatchWindowTradeoffTest {
                     best = r;
                 }
             }
-            double ratio = io == 20 ? 0.25 : 0.5;
             sb.append(String.format(
                     "IO %dms：吞吐峰值在窗口 %dms（%.2fx，p50 %.2fms vs 基线 %.2fms），" + "约为 IO 延迟的 %d/%d；IO 成本降幅 %.1fx%n", io,
                     best.window, best.qps / base.qps, best.p50Nanos / 1e6, base.p50Nanos / 1e6, best.window, io,

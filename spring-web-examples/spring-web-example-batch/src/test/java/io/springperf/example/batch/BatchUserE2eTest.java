@@ -11,8 +11,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.ResponseEntity;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -46,6 +46,9 @@ class BatchUserE2eTest {
         assertThat(resp.getStatusCode().value()).isEqualTo(200);
         assertThat(resp.getBody()).isNotNull();
         assertThat(resp.getBody()).startsWith("created:");
+        // 响应必须回显实际注入的参数值，而不只是类型前缀
+        assertThat(resp.getBody()).contains("name=testUser");
+        assertThat(resp.getBody()).endsWith("age=30");
     }
 
     @Test
@@ -75,7 +78,7 @@ class BatchUserE2eTest {
         ExecutorService executor = Executors.newFixedThreadPool(requestCount);
         CountDownLatch latch = new CountDownLatch(requestCount);
         AtomicInteger successCount = new AtomicInteger(0);
-        List<String> failures = new ArrayList<>();
+        List<String> failures = new CopyOnWriteArrayList<>();
 
         for (int i = 0; i < requestCount; i++) {
             int idx = i;
@@ -91,8 +94,11 @@ class BatchUserE2eTest {
                     ResponseEntity<String> resp = t.postForEntity("/batch/users?name=concurrent-" + idx, body,
                             String.class);
 
+                    // 每个响应必须带回自己的 name 与 age，防止批量回调把结果串到别的请求上
                     if (resp.getStatusCode().value() == 200 && resp.getBody() != null
-                            && resp.getBody().startsWith("created:")) {
+                            && resp.getBody().startsWith("created:")
+                            && resp.getBody().contains("name=concurrent-" + idx)
+                            && resp.getBody().contains("age=" + (20 + idx))) {
                         successCount.incrementAndGet();
                     } else {
                         failures.add("status=" + resp.getStatusCode().value() + ", body=" + resp.getBody());
@@ -120,7 +126,7 @@ class BatchUserE2eTest {
         ExecutorService executor = Executors.newFixedThreadPool(requestCount);
         CountDownLatch latch = new CountDownLatch(requestCount);
         AtomicInteger successCount = new AtomicInteger(0);
-        List<String> failures = new ArrayList<>();
+        List<String> failures = new CopyOnWriteArrayList<>();
 
         for (int i = 0; i < requestCount; i++) {
             String id = "id-" + i;
@@ -131,8 +137,8 @@ class BatchUserE2eTest {
 
                     ResponseEntity<String> resp = t.getForEntity("/batch/users/" + id + "?fields=name", String.class);
 
-                    if (resp.getStatusCode().value() == 200 && resp.getBody() != null
-                            && resp.getBody().startsWith("user:") && resp.getBody().contains(id)) {
+                    if (resp.getStatusCode().value() == 200 && resp.getBody() != null && resp.getBody().startsWith("user:")
+                            && resp.getBody().contains(id) && resp.getBody().contains("fields=name")) {
                         successCount.incrementAndGet();
                     } else {
                         failures.add(

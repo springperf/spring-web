@@ -5,6 +5,7 @@ import org.springframework.util.ReflectionUtils;
 
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -20,6 +21,18 @@ class BatchScannerTest {
     static class ParameterizedTypeHandler {
         @SuppressWarnings("unused")
         public void handle(List<BatchRequest<String>> requests) {
+        }
+    }
+
+    static class RawListHandler {
+        @SuppressWarnings("unused")
+        public void handle(List requests) {
+        }
+    }
+
+    static class MapHandler {
+        @SuppressWarnings("unused")
+        public void handle(Map<String, EchoBatchRequest> requests) {
         }
     }
 
@@ -49,8 +62,21 @@ class BatchScannerTest {
     }
 
     @Test
+    void resolveRequestType_rawList_returnsNull() throws Exception {
+        // 原始类型 List（无泛型实参）无法确定 BatchRequest 子类型
+        Method method = RawListHandler.class.getDeclaredMethod("handle", List.class);
+        assertThat(invokeResolveRequestType(method)).isNull();
+    }
+
+    @Test
+    void resolveRequestType_mapFirstParam_returnsNull() throws Exception {
+        // 首个参数不是 List，即使内部泛型是 BatchRequest 子类也不合法
+        Method method = MapHandler.class.getDeclaredMethod("handle", Map.class);
+        assertThat(invokeResolveRequestType(method)).isNull();
+    }
+
+    @Test
     void resolveRequestType_noParameter_returnsNull() throws Exception {
-        Method method = RawTypeHandler.class.getDeclaredMethod("handle", List.class);
         Method noParam = BatchScannerTest.class.getDeclaredMethod("noParamMethod");
         Class<? extends BatchRequest<?>> result = invokeResolveRequestType(noParam);
         assertThat(result).isNull();
