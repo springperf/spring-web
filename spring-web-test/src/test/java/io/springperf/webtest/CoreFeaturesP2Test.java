@@ -117,7 +117,7 @@ public class CoreFeaturesP2Test extends BaseE2ETest {
             assertEquals(500, resp.code());
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
             assertEquals("parent", body.get("handler"));
-            assertTrue(((String) body.get("error")).contains("parent exception"));
+            assertEquals("parent exception occurred", body.get("error"));
         }
     }
 
@@ -128,7 +128,7 @@ public class CoreFeaturesP2Test extends BaseE2ETest {
             assertEquals(400, resp.code());
             Map<String, Object> body = JSON.parseObject(resp.body().string(), Map.class);
             assertEquals("child", body.get("handler"));
-            assertTrue(((String) body.get("error")).contains("child exception"));
+            assertEquals("child exception occurred", body.get("error"));
         }
     }
 
@@ -144,7 +144,9 @@ public class CoreFeaturesP2Test extends BaseE2ETest {
             // 错误策略对齐 Boot（4.10）：sendError 的 message 默认不外露
             // （server.error.include-message=never），body 为 whitelabel 错误页（含状态码），
             // 不再包含 filter 传入的 message 字面量。
-            assertTrue(body.contains("403"), "实际 body=" + body);
+            org.junit.jupiter.api.Assertions.assertFalse(body.contains("not-reach-here"),
+                    "filter 阻断后 handler 不得执行，实际: " + body);
+            assertTrue(body.contains("403"), "错误页应标明 403，实际 body=" + body);
         }
     }
 

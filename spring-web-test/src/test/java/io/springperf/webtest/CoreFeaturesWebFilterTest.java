@@ -30,7 +30,7 @@ public class CoreFeaturesWebFilterTest extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String filterHeader = resp.header("X-Test-Filter");
-            assertNotNull(filterHeader, "WebFilter should apply to all endpoints");
+            assertEquals("applied", filterHeader, "WebFilter 应在所有端点写入精确头值");
         }
     }
 }

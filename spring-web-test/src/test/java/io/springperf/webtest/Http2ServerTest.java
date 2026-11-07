@@ -44,9 +44,13 @@ public class Http2ServerTest {
         Request request = new Request.Builder().url(url("/core/text-stream")).get().build();
 
         try (Response response = client.newCall(request).execute()) {
-            System.out.println("Test1 Status: " + response.code() + " Body: " + response.body().string());
-            assertTrue(response.isSuccessful());
+            String body = response.body().string();
+            assertEquals(200, response.code(), "h2c 流式请求应返回 200，实际: " + response.code());
             assertEquals(Protocol.H2_PRIOR_KNOWLEDGE, response.protocol());
+            assertEquals(java.util.Arrays.asList("line1", "line2"),
+                    java.util.Arrays.stream(body.trim().split("\\R")).map(String::trim).filter(s -> !s.isEmpty())
+                            .collect(java.util.stream.Collectors.toList()),
+                    "h2c 流式响应应完整返回两行，实际: " + body);
         }
     }
 
@@ -61,10 +65,11 @@ public class Http2ServerTest {
                 .post(okhttp3.RequestBody.create(jsonBody, okhttp3.MediaType.get("application/json"))).build();
 
         try (Response response = client.newCall(request).execute()) {
-            assertTrue(response.isSuccessful(), "h2c POST 应成功，实际状态码: " + response.code());
+            assertEquals(200, response.code(), "h2c POST 应成功，实际状态码: " + response.code());
             assertEquals(Protocol.H2_PRIOR_KNOWLEDGE, response.protocol(), "请求应通过 h2c 传输");
             String body = response.body().string();
-            assertTrue(body.contains("test"), "响应应回显请求体 name=test，实际: " + body);
+            assertEquals("test", com.alibaba.fastjson2.JSON.parseObject(body).getJSONObject("received").getString("name"),
+                    "响应应精确回显请求体 name=test，实际: " + body);
         }
     }
 
@@ -77,8 +82,10 @@ public class Http2ServerTest {
         Request request = new Request.Builder().url(url("/hello")).get().build();
 
         try (Response response = client.newCall(request).execute()) {
-            System.out.println("GET Status: " + response.code() + " Body: " + response.body().string());
-            assertTrue(response.isSuccessful());
+            String body = response.body().string();
+            assertEquals(200, response.code(), "context-path 下的 h2c GET 应返回 200，实际: " + response.code());
+            assertEquals(Protocol.H2_PRIOR_KNOWLEDGE, response.protocol(), "context-path 路由也应走 h2c");
+            org.junit.jupiter.api.Assertions.assertFalse(body.isEmpty(), "/hello 应返回非空响应体");
         }
     }
 }

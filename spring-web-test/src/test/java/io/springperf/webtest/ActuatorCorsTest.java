@@ -42,10 +42,13 @@ public class ActuatorCorsTest {
         Request req = new Request.Builder().url(actuatorBase() + "/health").header("Origin", "http://example.com")
                 .header("Access-Control-Request-Method", "GET").method("OPTIONS", null).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
-            int code = resp.code();
-            assertTrue(code == 200 || code == 204, "Expected 200 or 204 for CORS preflight, got " + code);
+            assertEquals(200, resp.code(), "CORS 预检应返回确定状态码，实际: " + resp.code());
             String allowOrigin = resp.header("Access-Control-Allow-Origin");
             assertEquals("http://example.com", allowOrigin);
+            String methods = resp.header("Access-Control-Allow-Methods");
+            assertNotNull(methods, "预检应返回配置的 Allow-Methods");
+            assertTrue(methods.contains("GET") && methods.contains("POST"),
+                    "Allow-Methods 应包含配置的 GET/POST，实际: " + methods);
         }
     }
 
@@ -58,7 +61,8 @@ public class ActuatorCorsTest {
             String allowOrigin = resp.header("Access-Control-Allow-Origin");
             assertEquals("http://example.com", allowOrigin);
             String body = Objects.toString(resp.body().string(), "");
-            assertTrue(body.contains("\"status\""));
+            assertEquals("UP", com.alibaba.fastjson2.JSON.parseObject(body).getString("status"),
+                    "health 应返回 status=UP，实际: " + body);
         }
     }
 
@@ -70,7 +74,8 @@ public class ActuatorCorsTest {
         // 且响应头不得回显被拒来源。不得以"超时豁免"掩盖实现缺陷。
         try (Response resp = CLIENT.newCall(req).execute()) {
             String allowOrigin = resp.header("Access-Control-Allow-Origin");
-            assertFalse("http://evil.com".equals(allowOrigin), "Disallowed origin should not be in CORS header");
+            assertTrue(allowOrigin == null || "http://example.com".equals(allowOrigin),
+                    "被拒来源不得被回显，也不得返回通配来源，实际: " + allowOrigin);
             assertTrue(resp.code() == 403, "不被允许的来源应被 403 拒绝，实际 " + resp.code());
         }
     }

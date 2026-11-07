@@ -45,6 +45,11 @@ public class CoreFeaturesContentNegotiationTest extends BaseE2ETest {
                 .build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
+            String body = resp.body().string();
+            assertEquals("json", com.alibaba.fastjson2.JSON.parseObject(body).getString("format"),
+                    "produces=application/json 应返回 {\"format\":\"json\"}，实际: " + body);
+            assertEquals("application/json", resp.header("Content-Type", "").split(";")[0].trim(),
+                    "produces 应决定响应的 Content-Type");
         }
     }
 

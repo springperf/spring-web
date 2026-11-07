@@ -67,6 +67,7 @@ public class UncoveredEndpointsE2ETest extends BaseE2ETest {
                 .build();
         try (Response resp = CLIENT.newCall(post).execute()) {
             assertEquals(200, resp.code());
+            assertEquals("multi-method-ok", resp.body().string(), "POST 分支应命中同一 handler 并返回相同结果");
         }
     }
 
@@ -120,7 +121,9 @@ public class UncoveredEndpointsE2ETest extends BaseE2ETest {
         Request req = new Request.Builder().url(baseUrl() + "/upload/ping").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
-            assertNotNull(resp.body().string());
+            String body = resp.body().string();
+            Map<String, Object> result = com.alibaba.fastjson2.JSON.parseObject(body, Map.class);
+            assertEquals("ok", result.get("status"), "/upload/ping 应返回 {\"status\":\"ok\"}，实际: " + body);
         }
     }
 }

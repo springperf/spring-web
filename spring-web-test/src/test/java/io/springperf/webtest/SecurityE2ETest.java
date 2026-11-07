@@ -65,7 +65,7 @@ public class SecurityE2ETest extends BaseE2ETest {
                 + "Content-Disposition: form-data; name=\"x\"\r\n\r\n" + "y\r\n" + "--boundary--\r\n";
 
         int status = rawHttpExchange(requestLine);
-        assertTrue(status >= 400 && status < 500, "超大 Content-Length 的 multipart 请求必须被拒绝（4xx），实际状态码: " + status);
+        assertEquals(413, status, "超大 Content-Length 的 multipart 请求必须被 413 拒绝，实际状态码: " + status);
     }
 
     @Test
@@ -79,6 +79,13 @@ public class SecurityE2ETest extends BaseE2ETest {
 
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code(), "正常 multipart 请求应正常处理");
+            String body = resp.body().string();
+            Map<String, Object> result = com.alibaba.fastjson2.JSON.parseObject(body, Map.class);
+            assertEquals(1, ((Number) result.get("projectId")).intValue(), "实际: " + body);
+            assertEquals(1, ((Number) result.get("seq")).intValue(), "实际: " + body);
+            assertEquals("1.0", result.get("dbVersionList"), "实际: " + body);
+            assertEquals("small.txt", result.get("fileOriginalFilename"), "实际: " + body);
+            assertEquals(13, ((Number) result.get("fileSize")).intValue(), "实际: " + body);
         }
     }
 
@@ -86,12 +93,18 @@ public class SecurityE2ETest extends BaseE2ETest {
 
     @Test
     void staticResource_dotDotTraversal_rejected() throws Exception {
-        for (String path : new String[] { "/static/../../etc/passwd", "/static/..%2f..%2fetc%2fpasswd",
-                "/static/%2e%2e/%2e%2e/etc/passwd", "/static/....//....//etc/passwd",
-                "/static/..\\..\\windows\\win.ini" }) {
+        // 全部改用编码后的路径：OkHttp 会规范化明文 "../"（见 StaticResourceSecurityTest 的说明），
+        // 不编码的 payload 根本到不了服务端，测的只是客户端 URL 规范化。
+        for (String path : new String[] { "/static/..%2f..%2fetc%2fpasswd", "/static/%2e%2e/%2e%2e/etc/passwd",
+                "/static/....//....//etc/passwd", "/static/..%5c..%5cwindows%5cwin.ini",
+                "/static/%252e%252e%252fetc%252fpasswd" }) {
             Request req = new Request.Builder().url(baseUrl() + path).get().build();
             try (Response resp = CLIENT.newCall(req).execute()) {
-                assertNotEquals(200, resp.code(), "路径遍历请求应被拒绝: " + path + " (got " + resp.code() + ")");
+                String body = resp.body().string();
+                assertEquals(404, resp.code(), "路径遍历请求应被 404 拒绝: " + path + " body=" + body);
+                assertFalse(body.contains("root:"), "路径遍历不得泄露 /etc/passwd: " + path);
+                assertFalse(body.contains("[fonts]"), "路径遍历不得泄露 win.ini: " + path);
+                assertFalse(body.contains("Hello, Static Resource!"), "路径遍历不得返回静态资源正文: " + path);
             }
         }
     }
@@ -101,7 +114,7 @@ public class SecurityE2ETest extends BaseE2ETest {
         Request req = new Request.Builder().url(baseUrl() + "/static/test.txt").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
-            assertTrue(resp.body().string().contains("Hello, Static Resource!"));
+            assertEquals("Hello, Static Resource!", resp.body().string().trim(), "正常静态资源应返回完整内容");
         }
     }
 
@@ -114,8 +127,9 @@ public class SecurityE2ETest extends BaseE2ETest {
                 .header("Origin", "http://evil.example.com").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             String acao = resp.header("Access-Control-Allow-Origin");
-            // 允许无 ACAO 头；但绝不能回显恶意来源
-            assertTrue(acao == null || !acao.contains("evil.example.com"), "未配置 CORS 的路径不应回显任意 Origin");
+            // 只允许无 ACAO 头，或回显配置中允许的来源；通配与任意来源都不接受
+            assertTrue(acao == null || "http://example.com".equals(acao),
+                    "未配置 CORS 的路径不得回显请求来源或返回通配来源, 实际: " + acao);
         }
     }
 
@@ -123,14 +137,18 @@ public class SecurityE2ETest extends BaseE2ETest {
 
     @Test
     void unhandledExceptionResponse_doesNotLeakDetails() throws Exception {
-        // /core/exception/illegal-argument 无显式 @ExceptionHandler，走应用兜底 handler：
-        // 框架契约 = 不泄露异常类名与堆栈帧（异常消息是否回显取决于应用自身 handler）
+        // 兜底 handler 返回 400 + {"error":"bad argument","from":"global-handler"}（GlobalExceptionHandler），
+        // 框架契约 = 不泄露异常类名与堆栈帧。只做负向断言时，200 空响应也能通过。
         Request req = new Request.Builder().url(baseUrl() + "/core/exception/illegal-argument").get().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             String body = resp.body().string();
-            assertFalse(body.contains("IllegalArgumentException"), "500 响应不应泄露异常类名: " + body);
-            assertFalse(body.contains("at io.springperf"), "500 响应不应泄露堆栈帧: " + body);
-            assertFalse(body.contains("Exception"), "500 响应不应泄露堆栈帧: " + body);
+            assertEquals(400, resp.code(), "应走全局兜底 handler 返回 400，实际: " + body);
+            Map<String, Object> result = com.alibaba.fastjson2.JSON.parseObject(body, Map.class);
+            assertEquals("bad argument", result.get("error"), "应回显异常消息但不泄露类名，实际: " + body);
+            assertEquals("global-handler", result.get("from"), "实际: " + body);
+            assertFalse(body.contains("IllegalArgumentException"), "响应不应泄露异常类名: " + body);
+            assertFalse(body.contains("at io.springperf"), "响应不应泄露堆栈帧: " + body);
+            assertFalse(body.contains("Exception"), "响应不应泄露异常类名/堆栈: " + body);
         }
     }
 }
