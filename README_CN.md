@@ -18,7 +18,7 @@
 <img src="docs/images/perf-benchmark.svg" alt="Performance Benchmark Chart"/>
 </p>
 
-> 全部 7 个接口 × 3 个并发度，对比 Spring MVC（Tomcat/Undertow）与 WebFlux **100% 领先，无一例外**。json 16t p50 延迟仅 Tomcat 的 **69%**、每请求内存分配仅其 **43%**、4 线程堆占用 **24MB**（全场最低）。
+> 全部 7 个接口 × 3 个并发度，对比 Spring MVC（Tomcat/Undertow）与 WebFlux **100% 领先，无一例外**。json 16t p50 延迟仅 Tomcat 的 **69%**、每请求内存分配仅其 **43%**、4 线程堆占用 **24MB**（全场最低）。上述为 2026-08 单次 JMH 快照，in-process 测试条件与对比框架版本见[完整 Benchmark 报告](docs/benchmark.md)。
 >
 > [完整 Benchmark 报告](docs/benchmark.md) · [性能原理详解](docs/performance-principles.md)
 
@@ -42,13 +42,13 @@
 
 ## 简介
 
-Spring WebPerf 是一个基于 **Netty** 构建的高性能 Web 框架，定位为 Spring MVC 的高性能替代方案。它保留了 Spring 开发者熟悉的编程模型（注解驱动、依赖注入、拦截器等），但通过启动时预缓存、零反射运行时等优化手段，在兼容 Spring 生态的前提下提供更高的吞吐量和更低的资源占用。
+Spring WebPerf 是一个基于 **Netty** 构建的高性能 Web 框架，定位为 Spring MVC 的高性能替代方案。它保留了 Spring 开发者熟悉的编程模型（注解驱动、依赖注入、拦截器等），但通过启动期预解析路由与处理器元数据、控制器方法调用改用 MethodHandle/ASM 等优化手段，在兼容 Spring 生态的前提下提供更高的吞吐量和更低的资源占用。
 
 ---
 
 ## 核心特性
 
-- **高性能** — 启动时预缓存全部元数据，运行时零反射零匹配；ASM 字节码生成替代反射调用；O(1) HashMap 路由；GC 友好设计
+- **高性能** — 启动期固化路由与处理器元数据（部分参数解析器、拦截器/过滤器链在首次请求时懒缓存）；控制器方法调用走 MethodHandle/ASM，避免运行期反射；精确路径 O(1) HashMap 路由；GC 友好设计
 - **Netty 驱动** — 基于 Netty 4.1 事件驱动 I/O，请求默认在 `default` 业务线程池执行以保护 EventLoop，可按方法粒度通过 `@RunInPool` 调度到自定义线程池或直接到 EventLoop
 - **Spring 生态兼容** — 支持 `@RestController`、`@RequestMapping`、`@Validated`、`@ExceptionHandler`、`HandlerInterceptor` 等 Spring 注解与抽象，零侵入迁移
 - **异步原生** — 内置 DeferredResult、Callable、SseEmitter、StreamEmitter、Reactive Streams 支持，SSE 吞吐达 Spring MVC 的 12.63x（4 线程）/ 7.72x（16 线程）
@@ -160,7 +160,7 @@ perf 框架吞吐是 Servlet 容器的 **1.45\~12.6x**，p50 延迟 **0.10\~0.11
 | I/O 模型 | Netty 非阻塞传输 + EventLoop 处理 | Servlet 阻塞 I/O + 容器线程 |
 | 线程模型 | EventLoop 直接处理或 `@RunInPool` 按需切换 | 固定容器线程池 |
 | 方法调用 | ASM / MethodHandle（~10-30ns） | `Method.invoke()` 反射（~200ns） |
-| 参数解析 | 启动时预缓存，运行时直接调用 | 每次请求遍历 + `synchronized` 缓存 |
+| 参数解析 | 启动期校验 + 首请求懒缓存解析器，运行时按索引直调 | 每次请求遍历 + `synchronized` 缓存 |
 | 路由 | O(1) HashMap 多级优化器 | `AntPathMatcher` 线性遍历 |
 | Servlet API | 通过 `spring-web-servlet` 桥接 | 原生支持 |
 | Actuator | 原生支持 | 原生支持 |

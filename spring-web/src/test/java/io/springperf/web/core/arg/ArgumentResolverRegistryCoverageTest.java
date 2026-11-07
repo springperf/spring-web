@@ -276,6 +276,31 @@ class ArgumentResolverRegistryCoverageTest {
     }
 
     @Test
+    void validateIfApplicable_reselectsValidatorForDifferentTargetType() throws Exception {
+        ArgumentResolverRegistry registry = new ArgumentResolverRegistry();
+        WebDataBinderRegistry binder = mock(WebDataBinderRegistry.class);
+        when(binder.getConversionService(any())).thenReturn(new DefaultFormattingConversionService());
+        when(binder.getMessageCodesResolver()).thenReturn(mock(MessageCodesResolver.class));
+        Validator forString = mock(Validator.class);
+        Validator forInteger = mock(Validator.class);
+        when(forString.supports(String.class)).thenReturn(true);
+        when(forInteger.supports(Integer.class)).thenReturn(true);
+        when(binder.getValidators(any())).thenReturn(java.util.Arrays.asList(forString, forInteger));
+        registry.webDataBinderRegistry = binder;
+
+        Method method = getClass().getMethod("validatedParam", SmartTarget.class);
+        MethodArgContext argCtx = new MethodArgContext(new MethodParameter(method, 0));
+        WebServerHttpRequest req = mock(WebServerHttpRequest.class);
+        when(req.getRequestContext()).thenReturn(mock(io.springperf.web.http.RequestContext.class));
+        MappingHandlerMethod mapping = mock(MappingHandlerMethod.class);
+
+        assertDoesNotThrow(() -> registry.validateIfApplicable("first", argCtx, req, mapping));
+        assertSame(forString, argCtx.getValidator());
+        assertDoesNotThrow(() -> registry.validateIfApplicable(Integer.valueOf(1), argCtx, req, mapping));
+        assertSame(forInteger, argCtx.getValidator(), "目标类型变化时必须重新选取 validator");
+    }
+
+    @Test
     void getWebDataBinderRegistry_returnsField() {
         ArgumentResolverRegistry registry = new ArgumentResolverRegistry();
         WebDataBinderRegistry binder = mock(WebDataBinderRegistry.class);

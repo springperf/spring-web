@@ -18,7 +18,7 @@ A high-performance Netty-based web framework, compatible with Spring MVC program
 <img src="docs/images/perf-benchmark-en.svg" alt="Performance Benchmark Chart"/>
 </p>
 
-> **100% win rate** — perf is **#1 on all 7 APIs × 3 concurrency levels** vs Spring MVC (Tomcat/Undertow) and WebFlux, no exceptions. json p50 at 16 threads is just **69%** of Tomcat, allocation per request **43%** of it, and heap at 4 threads is **24MB** (the lowest).
+> **100% win rate** — perf is **#1 on all 7 APIs × 3 concurrency levels** vs Spring MVC (Tomcat/Undertow) and WebFlux, no exceptions. json p50 at 16 threads is just **69%** of Tomcat, allocation per request **43%** of it, and heap at 4 threads is **24MB** (the lowest). These figures come from a single JMH snapshot (2026-08, in-process); see the [full benchmark report](docs/en/benchmark.md) for the test environment and comparison framework versions.
 >
 > [Full Benchmark Report](docs/en/benchmark.md) · [Performance Principles](docs/en/performance-principles.md)
 
@@ -42,13 +42,13 @@ A high-performance Netty-based web framework, compatible with Spring MVC program
 
 ## Introduction
 
-Spring WebPerf is a high-performance web framework built on **Netty 4.1**, designed as a high-performance alternative to Spring MVC. It preserves the familiar Spring programming model (annotation-driven, dependency injection, interceptors, etc.), but through startup pre-caching, zero-reflection runtime, and other engineering optimizations, delivering higher throughput and lower resource consumption while staying compatible with the Spring ecosystem.
+Spring WebPerf is a high-performance web framework built on **Netty 4.1**, designed as a high-performance alternative to Spring MVC. It preserves the familiar Spring programming model (annotation-driven, dependency injection, interceptors, etc.), but resolves routing and handler metadata at startup and invokes controllers via MethodHandle/ASM instead of runtime reflection, delivering higher throughput and lower resource consumption while staying compatible with the Spring ecosystem.
 
 ---
 
 ## Key Features
 
-- **High Performance** — Pre-caches all metadata at startup, zero reflection and zero matching at runtime; ASM bytecode generation replaces reflective invocation; O(1) HashMap routing; GC-friendly design
+- **High Performance** — Routing and handler metadata are pre-resolved at startup (some argument resolvers and interceptor/filter chains are lazily cached on the first request); controller invocation uses MethodHandle/ASM instead of runtime reflection; O(1) HashMap routing for exact paths; GC-friendly design
 - **Netty-Driven** — Built on Netty 4.1 event-driven I/O; requests execute on the `default` business thread pool by default to protect the EventLoop, with method-level `@RunInPool` to schedule to a custom pool or directly to the EventLoop as needed
 - **Spring Ecosystem Compatible** — Supports `@RestController`, `@RequestMapping`, `@Validated`, `@ExceptionHandler`, `HandlerInterceptor`, and other Spring annotations and abstractions — zero-code migration
 - **Async Native** — Built-in support for DeferredResult, Callable, SseEmitter, StreamEmitter, Reactive Streams; SSE throughput reaches 12.63x of Spring MVC at 4 threads / 7.72x at 16 threads
@@ -160,7 +160,7 @@ The perf framework delivers **1.45\~12.6x** throughput over Servlet containers, 
 | I/O model | Netty non-blocking transport + EventLoop | Servlet blocking I/O + container threads |
 | Thread model | EventLoop direct or `@RunInPool` on-demand | Fixed container thread pool |
 | Method invocation | ASM / MethodHandle (~10-30ns) | `Method.invoke()` reflection (~200ns) |
-| Argument resolution | Pre-cached at startup, direct call at runtime | Per-request iteration + `synchronized` cache |
+| Argument resolution | Startup validation + first-request lazy resolver caching, then indexed direct calls | Per-request iteration + `synchronized` cache |
 | Routing | O(1) HashMap multi-level optimizer | `AntPathMatcher` linear traversal |
 | Servlet API | Bridged via `spring-web-servlet` | Native |
 | Actuator | Native | Native |

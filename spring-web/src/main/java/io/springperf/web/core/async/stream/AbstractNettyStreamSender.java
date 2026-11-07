@@ -2,6 +2,8 @@ package io.springperf.web.core.async.stream;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 
@@ -34,6 +36,11 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
     protected static final Logger log = LoggerFactory.getLogger(AbstractNettyStreamSender.class);
 
     protected static final int MAX_QUEUED_EVENTS = 65536;
+
+    /** 满队列背压等待上限：channel 长期 active 却不可写时不至于永久占用生产者线程。 */
+    private static final long DEFAULT_ENQUEUE_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(30);
+    protected volatile long enqueueTimeoutNanos = DEFAULT_ENQUEUE_TIMEOUT_NANOS;
+    private final AtomicBoolean retryScheduled = new AtomicBoolean(false);
 
     protected final Channel channel;
     protected final EventExecutor eventLoop;
@@ -126,14 +133,20 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
     /**
      * 入队并等待空位（背压自旋）。
      * <p>
-     * 队列满时短暂自旋等待 drain 消费腾出空间；自旋中重复 {@link #preSendCheck()} 以在 channel 关闭或流完成时立即失败，避免无限自旋。
+     * 队列满时短暂自旋等待 drain 消费腾出空间；自旋中重复 {@link #preSendCheck()} 以在 channel 关闭或流完成时立即失败。
+     * 另设超时上限：channel 长期 active 却始终不可写时，不能让生产者线程无限自旋占用。
      */
     private void enqueueWithBackpressure(Object data) throws IOException {
+        long deadline = System.nanoTime() + enqueueTimeoutNanos;
         for (int spins = 0;; spins++) {
             if (queue.offer(data)) {
                 return;
             }
             preSendCheck();
+            if (System.nanoTime() - deadline >= 0) {
+                throw new IOException("Stream backpressure timeout: queue full for "
+                        + TimeUnit.NANOSECONDS.toMillis(enqueueTimeoutNanos) + "ms");
+            }
             if (spins < 10) {
                 Thread.yield();
             } else {
@@ -181,12 +194,15 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
      */
     protected void afterDrain() {
         if (!queue.isEmpty()) {
-            // 队列仍有数据：channel 可写则继续 drain。
-            // channel 不可写或 reschedule 失败（wip 已被其他线程设置）时什么都不做：
-            // 依赖 BackpressureHandler 的 writable callback（不可写 -> 可写）触发
-            // scheduleDrain() 恢复排空。严禁丢弃队列数据或提前结束流，否则会截断 SSE 响应。
-            if (channel.isWritable() && wip.compareAndSet(0, 1)) {
-                eventLoop.execute(this::drain);
+            // 队列仍有数据：channel 可写则继续 drain；不可写时除 BackpressureHandler 的
+            // writable callback 外再挂一个定时重检——回调可能在不可写前就已注册、或边沿被漏掉。
+            // 严禁丢弃队列数据或提前结束流，否则会截断 SSE 响应。
+            if (channel.isWritable()) {
+                if (wip.compareAndSet(0, 1)) {
+                    eventLoop.execute(this::drain);
+                }
+            } else {
+                scheduleDrainRetry();
             }
             return;
         }
@@ -198,6 +214,24 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
             } else {
                 onAllDataWritten();
             }
+        }
+    }
+
+    /** 不可写时的兜底重检：1s 后若队列仍非空且连接存活，重新调度 drain。 */
+    private void scheduleDrainRetry() {
+        if (!retryScheduled.compareAndSet(false, true)) {
+            return;
+        }
+        try {
+            eventLoop.schedule(() -> {
+                retryScheduled.set(false);
+                if (!queue.isEmpty() && channel.isActive()) {
+                    scheduleDrain();
+                }
+            }, 1, TimeUnit.SECONDS);
+        } catch (RuntimeException e) {
+            retryScheduled.set(false);
+            log.debug("failed to schedule drain retry", e);
         }
     }
 
