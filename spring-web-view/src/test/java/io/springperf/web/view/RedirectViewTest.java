@@ -1,5 +1,6 @@
 package io.springperf.web.view;
 
+import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
@@ -16,9 +17,16 @@ import static org.mockito.Mockito.*;
 class RedirectViewTest {
 
     private WebServerHttpRequest mockReq(String contextPath) {
+        return mockReq(contextPath, null);
+    }
+
+    private WebServerHttpRequest mockReq(String contextPath, String allowedHosts) {
         WebServerHttpRequest req = mock(WebServerHttpRequest.class);
         WebContext wc = mock(WebContext.class);
+        ApplicationProperties props = mock(ApplicationProperties.class);
+        when(props.get(ViewProperties.REDIRECT_HOSTS, null)).thenReturn(allowedHosts);
         when(wc.getContextPath()).thenReturn(contextPath);
+        when(wc.getProps()).thenReturn(props);
         when(req.getWebContext()).thenReturn(wc);
         return req;
     }
@@ -165,5 +173,69 @@ class RedirectViewTest {
         WebServerHttpResponse resp = mockResp();
         view.render(null, mockReq(""), resp);
         verify(resp).setStatusCode(HttpStatus.FOUND);
+    }
+
+    // ==================== 外部目标与 host 白名单 ====================
+
+    @Test
+    void render_protocolRelativeUrl_usesAsIs() throws Exception {
+        RedirectView view = new RedirectView("//external.com/path");
+        WebServerHttpResponse resp = mockResp();
+        view.render(null, mockReq("/app"), resp);
+        assertEquals("//external.com/path", resp.getHeaders().getFirst(HttpHeaders.LOCATION),
+                "协议相对 URL 是外部目标，不应拼 context-path");
+    }
+
+    @Test
+    void render_allowedExternalHost_passes() throws Exception {
+        RedirectView view = new RedirectView("https://Partner.example.com/path");
+        WebServerHttpResponse resp = mockResp();
+        view.render(null, mockReq("", "partner.example.com, self.example.com"), resp);
+        assertEquals("https://Partner.example.com/path", resp.getHeaders().getFirst(HttpHeaders.LOCATION));
+    }
+
+    @Test
+    void render_disallowedExternalHost_throws() {
+        RedirectView view = new RedirectView("http://evil.com/path");
+        WebServerHttpResponse resp = mockResp();
+        WebServerHttpRequest req = mockReq("", "trusted.example.com");
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> view.render(null, req, resp));
+        assertTrue(ex.getMessage().contains(ViewProperties.REDIRECT_HOSTS));
+    }
+
+    @Test
+    void render_disallowedProtocolRelativeHost_throws() {
+        RedirectView view = new RedirectView("//evil.com/path");
+        WebServerHttpResponse resp = mockResp();
+        WebServerHttpRequest req = mockReq("", "trusted.example.com");
+        assertThrows(IllegalArgumentException.class, () -> view.render(null, req, resp),
+                "//host 也必须受白名单约束");
+    }
+
+    @Test
+    void render_userInfoBypass_isRejected() {
+        // userinfo 不是 host：trusted.example.com@evil.com 的真实 host 是 evil.com
+        RedirectView view = new RedirectView("https://trusted.example.com@evil.com/path");
+        WebServerHttpResponse resp = mockResp();
+        WebServerHttpRequest req = mockReq("", "trusted.example.com");
+        assertThrows(IllegalArgumentException.class, () -> view.render(null, req, resp));
+    }
+
+    @Test
+    void render_malformedExternalUrl_isRejected() {
+        // 畸形 URL 解析失败时也必须拒绝，不能让白名单被绕过
+        RedirectView view = new RedirectView("http://[invalid/path");
+        WebServerHttpResponse resp = mockResp();
+        WebServerHttpRequest req = mockReq("", "trusted.example.com");
+        assertThrows(IllegalArgumentException.class, () -> view.render(null, req, resp));
+    }
+
+    @Test
+    void render_internalPath_ignoresHostWhitelist() throws Exception {
+        RedirectView view = new RedirectView("/home");
+        WebServerHttpResponse resp = mockResp();
+        view.render(null, mockReq("/app", "trusted.example.com"), resp);
+        assertEquals("/app/home", resp.getHeaders().getFirst(HttpHeaders.LOCATION));
     }
 }

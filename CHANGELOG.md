@@ -46,6 +46,13 @@
 - **视图解析缓存**：同一视图名并发解析只加载一次，解析失败不再被缓存；容量超限改为逐条淘汰而非清空全表；新增 `ViewResolverRegistry.invalidateViewCaches()`，运行期投放新模板后可立即生效
 - **视图配置校验与元数据**：`spring.thymeleaf.mode`、`spring.freemarker.content-type` 的非法值改为启动期以明确异常中断；`spring.web.view.engine` 默认值常量与装配语义对齐；补全 IDE 配置元数据并新增键/默认值一致性测试
 - **视图模块边界文档**：明确该模块是 SpringMVC 兼容适配层（同步渲染、每请求构造 exchange、无输出/片段缓存），说明配置刷新不重建模板引擎、resolver 列表为启动期快照
+- **视图渲染失败错误响应**：渲染中途抛异常时响应已被提前标记 handled，`sendError()` 被拒绝，客户端收到 200 + 半截 HTML；异常处理器返回的错误页还会拼接在半截页面之后。现统一由 `ViewReturnValueResolver.renderView()` 渲染：成功后才置位 handled，失败时清空已缓冲内容再抛，异常交 `ExceptionRegistry` 处理；`ModelAndView` 与 `ViewControllerInvoker` 两条链路一并复用
+- **视图缓存失效覆盖引擎内部缓存**：`invalidateViewCaches()` 原先只清「视图名 → View」解析结果，运行期替换模板仍命中 Thymeleaf / FreeMarker / Beetl 的旧模板；现同步清三个引擎的内部模板缓存
+- **`spring.web.view.engine` 取值校验**：未知引擎名与 `none` 混写改为启动期以明确异常中断；`engine=none` 也阻止内置 JSP 装配（自定义 `ViewResolver` Bean 不受影响）
+- **视图控制器统一 Content-Type**：`ViewControllerInvoker` 改为复用 `applyContentType()`，`redirect:` 不再带 `text/html`，Content-Type 自带 charset 时同步响应编码
+- **视图渲染边界修复**：`PerfWebRequest` 在 https 且无显式端口时返回 443（原固定 80，会让 `@{...}` 生成错误绝对 URL）；三个引擎统一支持「视图名已带后缀」（Thymeleaf 改为向 `TemplateEngine` 传去掉后缀的纯模板名）；`resolveBoolean` 对非 `true`/`false` 值启动期 fail-fast（原静默当 false）
+- **重定向目标与响应编码**：`//host` 协议相对目标不再拼 context-path；新增可选 `spring.web.view.redirect-hosts` 白名单（未配置时不限制，可阻断 userinfo 混淆）；自定义 Content-Type 未带 charset 时补上响应实际编码，避免响应头与 Writer 字节编码错配
+- **视图缓存淘汰与失效**：`ViewCache.trackInsertion` 遇队首仍在加载的条目不再放弃本轮淘汰（放回队尾继续扫描，队列长度做上限防死循环）；`invalidate()` 与 `trackInsertion()` 互斥，避免两个容器的清空与插入交错
 
 ## [3.5.7] - 20261008
 

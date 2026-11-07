@@ -303,7 +303,8 @@ management.server.max-content-length=1048576
 
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
-| `spring.web.view.engine` | 无（全部可用） | 启用的模板引擎列表（逗号分隔）：`thymeleaf` / `freemarker` / `beetl`；特殊值 `none` 表示不注册任何引擎，**只能单独使用**；**不配置则注册所有 classpath 上可用的引擎** |
+| `spring.web.view.engine` | 无（全部可用） | 启用的模板引擎列表（逗号分隔）：`thymeleaf` / `freemarker` / `beetl`；特殊值 `none` 表示不注册任何内置引擎（含 JSP），**只能单独使用**；**不配置则注册所有 classpath 上可用的引擎**。未知值与 `none` 混写在启动期以明确异常中断；自定义 `ViewResolver` Bean 不受此配置影响 |
+| `spring.web.view.redirect-hosts` | 无（不限制） | 允许的外部重定向 host 白名单（逗号分隔，大小写不敏感）；未配置时不限制。对 `http://`、`https://` 与 `//host` 目标生效，站内相对路径不受影响；目标 host 不在列表内时抛 `IllegalArgumentException` |
 | `spring.thymeleaf.prefix` | `templates/` | Thymeleaf 模板前缀（classpath 相对路径） |
 | `spring.thymeleaf.suffix` | `.html` | Thymeleaf 模板后缀 |
 | `spring.thymeleaf.cache` | `true` | 模板缓存与「视图名 → View」解析结果缓存（开发可设 `false` 热改） |

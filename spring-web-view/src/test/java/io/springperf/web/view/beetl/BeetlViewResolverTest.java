@@ -77,6 +77,24 @@ class BeetlViewResolverTest {
         assertTrue(output.contains("Perf"), "渲染输出应包含 model 值: " + output);
     }
 
+    @Test
+    void viewRender_nameWithSuffix_rendersSameTemplate() throws Exception {
+        BeetlViewResolver resolver = buildResolver();
+        View view = resolver.resolveViewName("hello.btl", Locale.US, mock(WebServerHttpRequest.class));
+        assertNotNull(view, "带后缀的视图名应能解析");
+
+        WebServerHttpRequest req = mock(WebServerHttpRequest.class);
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        when(resp.getCharacterEncoding()).thenReturn(StandardCharsets.UTF_8);
+        ByteArrayOutputStream body = new ByteArrayOutputStream();
+        when(resp.getBody()).thenReturn(body);
+
+        view.render(new HashMap<>(), req, resp);
+
+        String output = new String(body.toByteArray(), StandardCharsets.UTF_8);
+        assertTrue(output.contains("Hello"), "模板路径不应被拼成 hello.btl.btl: " + output);
+    }
+
     // ==================== spring.beetl.enabled / cache / cache-ttl ====================
 
     @Test
@@ -164,5 +182,20 @@ class BeetlViewResolverTest {
 
         resolver.invalidateCache();
         assertNotSame(first, resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class)));
+    }
+
+    @Test
+    void invalidateCache_clearsEngineProgramCache() throws Exception {
+        BeetlViewResolver resolver = buildResolver();
+        org.beetl.core.GroupTemplate groupTemplate = mock(org.beetl.core.GroupTemplate.class);
+        org.beetl.core.runtime.IBeetlCache programCache = mock(org.beetl.core.runtime.IBeetlCache.class);
+        when(groupTemplate.getProgramCache()).thenReturn(programCache);
+        java.lang.reflect.Field field = BeetlViewResolver.class.getDeclaredField("groupTemplate");
+        field.setAccessible(true);
+        field.set(resolver, groupTemplate);
+
+        resolver.invalidateCache();
+
+        org.mockito.Mockito.verify(programCache).clearAll();
     }
 }

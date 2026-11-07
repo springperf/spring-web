@@ -4,6 +4,7 @@ import io.springperf.web.support.view.JspViewResolver;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 
 /**
@@ -14,12 +15,13 @@ import org.springframework.context.annotation.Configuration;
  * </p>
  * <p>
  * 激活后 {@link JspViewResolver} 作为 {@code ViewResolver} Bean 被 {@code ViewResolverRegistry} 自动吸收，并在 Phase 1 注册 Jasper JSP
- * 路由。
+ * 路由。{@code spring.web.view.engine=none} 时不装配内置 JSP 引擎。
  * </p>
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnClass(name = { "org.apache.jasper.servlet.JspServlet", "io.springperf.web.view.View",
         "io.springperf.web.support.view.JspViewResolver" })
+@Conditional(ViewEngineCondition.Jsp.class)
 public class JspViewAutoConfiguration {
 
     @Bean

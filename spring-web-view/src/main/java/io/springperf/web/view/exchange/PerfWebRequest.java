@@ -49,7 +49,12 @@ public class PerfWebRequest implements IWebRequest {
     @Override
     public Integer getServerPort() {
         URI uri = nativeReq.getURI();
-        return uri != null && uri.getPort() > 0 ? uri.getPort() : 80;
+        if (uri != null && uri.getPort() > 0) {
+            return uri.getPort();
+        }
+        // core 的 getURI() 已按 Forwarded / X-Forwarded-Proto / SslHandler 确定 scheme，
+        // 无显式端口时须按 scheme 取默认端口，否则 https 站点上 @{...} 会生成 :80 的错误绝对 URL
+        return "https".equalsIgnoreCase(getScheme()) ? 443 : 80;
     }
 
     @Override

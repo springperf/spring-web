@@ -1,5 +1,7 @@
 package io.springperf.web.view;
 
+import io.springperf.web.context.ApplicationProperties;
+import io.springperf.web.context.WebContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import org.springframework.http.HttpHeaders;
@@ -7,8 +9,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 
 import java.io.UnsupportedEncodingException;
+import java.net.URI;
 import java.net.URLEncoder;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 public class RedirectView implements View {
 
@@ -38,7 +45,12 @@ public class RedirectView implements View {
     }
 
     private static String buildLocation(String url, WebServerHttpRequest req) {
-        if (url.startsWith("http://") || url.startsWith("https://")) {
+        if (isExternalTarget(url)) {
+            Set<String> allowedHosts = allowedHosts(req);
+            if (!allowedHosts.isEmpty() && !isAllowedHost(url, allowedHosts)) {
+                throw new IllegalArgumentException("Redirect target host is not allowed by '"
+                        + ViewProperties.REDIRECT_HOSTS + "': " + url);
+            }
             return url;
         }
         String cp = req.getWebContext().getContextPath();
@@ -46,6 +58,45 @@ public class RedirectView implements View {
             return cp + url;
         }
         return cp + "/" + url;
+    }
+
+    /** http(s) 绝对 URL 与 {@code //host} 协议相对 URL 都是外部目标；其余一律按站内相对路径处理。 */
+    private static boolean isExternalTarget(String url) {
+        return url.startsWith("http://") || url.startsWith("https://") || url.startsWith("//");
+    }
+
+    /** 未配置白名单时不限制外部目标，保持既有行为；配置后仅放行列表内的 host。 */
+    private static Set<String> allowedHosts(WebServerHttpRequest req) {
+        WebContext wc = req.getWebContext();
+        ApplicationProperties props = wc != null ? wc.getProps() : null;
+        String raw = props != null ? props.get(ViewProperties.REDIRECT_HOSTS, null) : null;
+        if (raw == null || raw.trim().isEmpty()) {
+            return Collections.emptySet();
+        }
+        Set<String> hosts = new LinkedHashSet<>();
+        for (String item : raw.split(",")) {
+            String host = item.trim().toLowerCase(Locale.ROOT);
+            if (!host.isEmpty()) {
+                hosts.add(host);
+            }
+        }
+        return hosts;
+    }
+
+    private static boolean isAllowedHost(String url, Set<String> allowedHosts) {
+        String host = extractHost(url);
+        return host != null && allowedHosts.contains(host.toLowerCase(Locale.ROOT));
+    }
+
+    private static String extractHost(String url) {
+        try {
+            // 协议相对 URL 需补 scheme 才能被 URI 解析
+            URI uri = URI.create(url.startsWith("//") ? "https:" + url : url);
+            return uri.getHost();
+        } catch (IllegalArgumentException ex) {
+            // 畸形 URL 一律视为不允许，避免绕过白名单
+            return null;
+        }
     }
 
     private static String buildQueryString(Map<String, ?> model) {

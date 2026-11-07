@@ -419,10 +419,10 @@ spring-web-view
 ├── （Model 容器已移至 spring-web core：io.springperf.web.core.model.ModelContext，
 │     原 ModelSupport 之名已废弃；懒创建 ExtendedModelMap，挂 RequestContext，请求结束释放）
 ├── ViewProperties.java             配置键（spring.web.view.*）
-├── arg/ModelArgumentResolverProvider  Model 参数注入 + postProcess 5 步 Model 初始化
-│   └── order=HIGHEST_PRECEDENCE+100，先于 ModelAttributeResolver 兜底
 ├── retval/ViewReturnValueResolver  无 @ResponseBody 的 String → 视图名
-│   └── order=MAX-200，低于 JsonBodyReturnValueResolver（MAX-100），supportsReturnValue 通过 PathMappingContext.get() 判断方法注解
+│   ├── order=MAX-200，低于 JsonBodyReturnValueResolver（MAX-100），supportsReturnValue 通过 PathMappingContext.get() 判断方法注解
+│   └── 静态 applyContentType()/renderView()：三条渲染链路共用；成功后才 setHandled，失败清缓冲区
+（Model 参数解析由 spring-web core 的 core/arg/provider/ModelArgumentResolverProvider 提供，不在本模块）
 ├── WebExchangeProvider             SPI：按环境提供模板 IWebExchange（extends WebComponent，有序）
 │   ├── supports(request) — 能力探测；createExchange(req, resp) — 构造 exchange
 │   └── DefaultWebExchangeProvider  兜底（order=LOWEST_PRECEDENCE，supports 恒 true，session/principal 为 null）
@@ -453,9 +453,9 @@ spring-web-mvc-support/mvc/retval/
 | 插槽 | 注册方式 | 时机 |
 |------|---------|------|
 | `ViewReturnValueResolver` / `ModelAndViewReturnValueResolver` | Spring Bean → `ReturnValueResolverRegistry.registerWebComponent(ReturnValueResolver.class)` 自动吸入 | Phase1 |
-| `ModelArgumentResolverProvider` | Spring Bean → `ArgumentResolverRegistry.registerWebComponent(StaticArgumentResolverProvider.class)` 自动吸入 | INIT_CONTEXT |
+| `ModelArgumentResolverProvider`（位于 `spring-web` core） | `ArgumentResolverRegistry` 硬编码 `registerWebComponent(new ModelArgumentResolverProvider())`，**非 Spring Bean** | INIT_CONTEXT |
 | `ThymeleafViewResolver` / `FreemarkerViewResolver` | Spring Bean → `ViewResolverRegistry.registerWebComponent(ViewResolver.class)` 自动吸入 | INIT_CONTEXT → Phase1 |
-| `ViewResolverRegistry` 本体 | `SpringWebViewAutoConfiguration` @Bean → `webContext.registerWebComponent()` | 构造时 |
+| `ViewResolverRegistry` 本体 | `ViewReturnValueResolver` / `ModelAndViewReturnValueResolver` 经 `webContext.getWebComponentWithDefault(..., new ViewResolverRegistry())` 懒创建，**不是 Spring Bean** | INIT_CONTEXT |
 
 **请求管线落点**：
 

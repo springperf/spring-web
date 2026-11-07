@@ -2,7 +2,7 @@
 
 # 视图渲染（View Rendering）
 
-本框架支持 Spring MVC 风格的服务器端渲染（SSR），内置 Thymeleaf / FreeMarker / Beetl 模板引擎适配，通过 `spring-web-view` 可选模块提供。未引入该模块的 API-first 项目，String 返回值继续保持 JSON 行为；**一旦引入本模块**，无 `@ResponseBody` 的 String 返回值即视为视图名，若此时没有任何已启用的模板引擎，启动期会直接失败（设置 `spring.web.view.engine=none` 可显式只保留 `redirect:`）。
+本框架支持 Spring MVC 风格的服务器端渲染（SSR），内置 Thymeleaf / FreeMarker / Beetl 模板引擎适配，通过 `spring-web-view` 可选模块提供。未引入该模块的 API-first 项目，String 返回值继续保持 JSON 行为；**一旦引入本模块**，无 `@ResponseBody` 的 String 返回值即视为视图名；若应用中存在这类视图方法且没有任何可用的 `ViewResolver`，启动期会直接失败（设置 `spring.web.view.engine=none` 可显式只保留 `redirect:`）。纯 API 项目即使引入本模块且未配置引擎也不会启动失败。
 
 ---
 
@@ -59,7 +59,8 @@
 
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
-| `spring.web.view.engine` | 无（全部可用） | 启用的模板引擎列表（逗号分隔）：`thymeleaf` / `freemarker` / `beetl`；特殊值 `none` = 不注册任何引擎（仅支持 `redirect:`，并跳过「无 ViewResolver」的启动校验），**只能单独使用，不要与其他引擎混写**；**不配置则注册 classpath 上所有可用引擎** |
+| `spring.web.view.engine` | 无（全部可用） | 启用的模板引擎列表（逗号分隔）：`thymeleaf` / `freemarker` / `beetl`；特殊值 `none` = 不注册任何内置引擎（含 JSP，仅支持 `redirect:`，并跳过「无 ViewResolver」的启动校验），**只能单独使用，启动期强制校验**；**不配置则注册 classpath 上所有可用引擎**。未知引擎名与 `none` 混写会在启动期以明确异常中断；自定义 `ViewResolver` Bean 不受此配置影响 |
+| `spring.web.view.redirect-hosts` | 无（不限制） | 允许的外部重定向 host 白名单（逗号分隔，大小写不敏感）；未配置时不限制。对 `http://`、`https://` 与 `//host` 目标生效，站内相对路径不受影响；目标 host 不在列表内时抛 `IllegalArgumentException` |
 | `spring.thymeleaf.prefix` | `templates/` | Thymeleaf 模板前缀（classpath 相对路径） |
 | `spring.thymeleaf.suffix` | `.html` | Thymeleaf 模板后缀 |
 | `spring.thymeleaf.cache` | `true` | 模板缓存与「视图名 → View」解析结果缓存；`false` 用于开发期热改 |
@@ -81,7 +82,7 @@
 
 模板默认从 classpath 的 `templates/` 目录加载（Spring Boot 惯例）。
 
-> 内置引擎默认顺序为 Thymeleaf → FreeMarker → Beetl → JSP，可由各自的 `order` 键调整。解析结果（含「模板不存在」）在 `cache=true` 时缓存，容量上限 1024 且超限只淘汰最早的条目；运行期投放新模板可调用 `ViewResolverRegistry.invalidateViewCaches()` 立即生效（见第九节），或关闭模板缓存 / 重启。
+> 内置引擎默认顺序为 Thymeleaf → FreeMarker → Beetl → JSP，可由各自的 `order` 键调整。解析结果（含「模板不存在」）在 `cache=true` 时缓存，容量上限 1024 且超限只淘汰最早的条目；运行期新增或替换模板后调用 `ViewResolverRegistry.invalidateViewCaches()` 立即生效（见第九节，会同时清三个引擎的内部模板缓存），或关闭模板缓存 / 重启。
 
 ---
 
@@ -136,6 +137,8 @@ public ModelAndView modelAndView(@RequestParam(defaultValue = "MAV") String name
 ### 4. redirect 重定向
 
 视图名前缀 `redirect:` 触发 302 重定向，model 中的标量属性自动序列化为 query 参数：
+
+> 外部目标（`http://`、`https://`、`//host`）原样使用，不会拼 context-path。配置 `spring.web.view.redirect-hosts`（逗号分隔的 host 白名单）后，仅白名单内的 host 会被放行；未配置时不限制。白名单按 URI 的真实 host 判定，`https://trusted.example.com@evil.com` 不会因 userinfo 混淆而被误放行。
 
 ```java
 @GetMapping("/save")
@@ -293,18 +296,21 @@ public String jspView(Model model) {
 | `redirect:` flash 属性（PRG） | `RedirectAttributes` + `FlashMap` | ❌ 不支持 | 改用 query 参数 |
 | `forward:` 前缀 | `RequestDispatcher.forward` | ❌ 不支持（Netty 无 forward 语义） | 改用 `redirect:` 或直接返回视图 |
 | Thymeleaf `#request` / `#response` / `#session` 表达式对象 | `WebContext` 提供 servlet 对象 | ⚠️ 这些表达式对象自 **Thymeleaf 3.1** 起被官方移除；框架改为把 **session 属性注入上下文变量**（同名时 **model 优先**），Servlet 场景（引入 `spring-web-servlet`）下由 `ServletWebExchangeProvider` 提供**真实** session / principal / cookie | 模板写 `${user}` 而非 `${session.user}`；需要 `IWebExchange` 时见[扩展点 §14](extensions.md) |
-| Content Negotiation（Accept 选视图） | `ContentNegotiationManager` | ❌ 不支持（始终 `text/html`） | — |
+| Content Negotiation（Accept 选视图） | `ContentNegotiationManager` | ❌ 不支持（默认 `text/html`，可由 `View.getContentType()` 或 `spring.freemarker.content-type` 指定） | — |
 | `WebMvcConfigurer.configureViewResolvers` | 配置视图解析器 | ❌ 不支持 | 通过 `@Bean` 注册自定义 `ViewResolver` 或用配置项 |
 | `Map<String,Object>` 参数 | 视为 Model | ❌ 不支持（避免与 `@ModelAttribute` 兜底冲突） | 改用 `Model` 参数 |
 | `BindingAwareModelMap` | 使用的实现类 | 使用 `ExtendedModelMap` | 行为等价，特有方法不可用 |
 
 ### 关键说明
 
-1. **String 双语义由模块引入决定**：不引入 `spring-web-view` 时，String 返回值保持 JSON 行为；一旦引入该模块（即使没有注册任何已启用的引擎），无 `@ResponseBody` 的 String 即视为视图名，且启动期会因「无可用 ViewResolver」而 fail-fast。仅使用 `redirect:` 时设 `spring.web.view.engine=none`。
+1. **String 双语义由模块引入决定**：不引入 `spring-web-view` 时，String 返回值保持 JSON 行为；一旦引入该模块，无 `@ResponseBody` 的 String 即视为视图名。仅当应用中存在这类视图方法且没有可用 `ViewResolver` 时才在启动期 fail-fast；纯 API 项目未配置引擎不会启动失败。仅使用 `redirect:` 时设 `spring.web.view.engine=none`。
 2. **线程模型**：模板渲染在 handler 当前线程执行。默认 handler 运行在 `default` 业务线程池；若配置 `pool.default-execute-mode=eventloop` 或方法标注 `@RunInPool(EVENTLOOP)`，渲染会发生在 EventLoop 上，请注意阻塞风险。
 3. **Spring 6.x 类型注意**：Spring 6.x 中 `ModelMap` 不再实现 `Model` 接口，框架统一注入 `ExtendedModelMap`（`ModelMap` 子类且实现 `Model`）以兼容三种参数类型。
-4. **配置刷新边界**：`WebContext.refreshProperties()` 只清属性快照，不重建 `TemplateEngine`；修改 `spring.{thymeleaf,freemarker,beetl}.*` 后需重启。运行期投放模板请用 `invalidateViewCaches()`（见第九节）。
-5. **非法配置启动期拦截**：`spring.thymeleaf.mode` 与 `spring.freemarker.content-type` 在解析引擎初始化时校验，非法值附带配置键与合法取值直接中断启动，不会拖到首次请求才报 500。
+4. **配置刷新边界**：`WebContext.refreshProperties()` 只清属性快照，不重建 `TemplateEngine`；修改 `spring.{thymeleaf,freemarker,beetl}.*` 后需重启。运行期新增或替换模板请用 `invalidateViewCaches()`（见第九节）。
+5. **非法配置启动期拦截**：`spring.web.view.engine`（未知值、`none` 混写）、`spring.thymeleaf.mode`、`spring.freemarker.content-type`、`spring.{engine}.order` 与各布尔配置（`cache` / `enabled`）均在启动期校验，非法值附带配置键与合法取值直接中断启动，不会拖到首次请求才报 500。
+6. **渲染失败语义**：模板渲染中途抛异常时，已写出的部分内容会被丢弃，异常交 `ExceptionRegistry`（500 错误页或异常处理器错误页），不会返回 200 + 半截 HTML。
+7. **Content-Type 与字节编码**：`applyContentType()` 统一决定三条渲染链路的响应头；自定义 Content-Type 未带 charset 时会补上响应实际编码，避免浏览器按自身默认编码解出乱码。
+8. **视图名后缀与绝对 URL**：三个内置引擎都接受「已带后缀」的视图名，`spring.{engine}.suffix` 只在缺失时补齐。模板 `@{...}` 生成的绝对 URL，其 scheme 由 core 的转发头策略（`server.forward-headers-strategy`、`Forwarded` / `X-Forwarded-Proto`）与 TLS 决定，host/port 取自 `Host` 头；无显式端口时按 scheme 取 80 / 443。
 
 ---
 
@@ -332,7 +338,7 @@ public class MyViewResolver extends BaseWebComponent implements ViewResolver {
 
 ## 九、缓存失效与性能边界
 
-**缓存失效**：`cache=true` 时，「视图名 → View」的解析结果与「模板不存在」负结果都会被缓存，容量上限 1024，超限只淘汰最早条目。运行期投放新模板后调用：
+**缓存失效**：`cache=true` 时，「视图名 → View」的解析结果与「模板不存在」负结果都会被缓存，容量上限 1024，超限只淘汰最早条目。运行期新增或替换模板后调用：
 
 ```java
 @Autowired
@@ -345,9 +351,11 @@ public void onTemplateDeployed() {
 }
 ```
 
-`ViewResolverRegistry` 由 `WebContext#getWebComponentWithDefault` 懒创建，**不是 Spring Bean**；也可直接对注入的某个 `ViewResolver` Bean 调用 `invalidateCache()`。`cache=false` 完全不缓存，无需失效。配置刷新不在此列（见第七节关键说明 4）。
+`ViewResolverRegistry` 由 `WebContext#getWebComponentWithDefault` 懒创建，**不是 Spring Bean**；也可直接对注入的某个 `ViewResolver` Bean 调用 `invalidateCache()`（内置实现同时清模板引擎内部缓存）。`cache=false` 完全不缓存，无需失效。配置刷新不在此列（见第七节关键说明 4）。
 
 **模块定位**：`spring-web-view` 是 SpringMVC 视图层的**兼容适配层**，不是独立的渲染性能层。渲染在 handler 当前线程同步执行，每次渲染会构造 `IWebContext` / `IWebExchange` 适配器并复制 model 变量；未提供输出缓冲复用、片段缓存、异步渲染与内容协商。高吞吐 SSR 场景建议静态化模板输出或自行实现 `View` 复用渲染结果；配置了 `pool.default-execute-mode=eventloop` 或 `@RunInEventloop` 时，避免在视图方法中做阻塞式渲染。
+
+**引擎依赖边界**：`WebExchangeProvider` / `PerfWebExchange` 等 exchange 适配直接实现 Thymeleaf 的 `org.thymeleaf.web.*` 接口。即使只使用 FreeMarker / Beetl / JSP，classpath 上也需要 `thymeleaf`（各引擎依赖均为 `provided`，需显式引入）；Servlet 场景的真实 session / principal 桥接同样依赖该抽象。
 
 **解析链边界**：`ViewResolver` 列表在启动期 Phase1 固化，运行期新注册的 resolver 不参与解析（但仍会被 `invalidateViewCaches()` 覆盖）；链中任一 resolver 抛异常即终止解析并保留根因，不会继续尝试后续引擎。
 
