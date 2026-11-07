@@ -49,9 +49,9 @@
 |---|---|---|---|
 | Http2ChannelInitializer.Http2OrHttp1Handler | 43 | 43 | 0% |
 | DispatcherHandler | 27 | 264 | 89.8% |
-| SupportMultipartAggregator | 23 | 85 | 72.9% |
-| Http2ChannelInitializer.new ChannelInboundHandlerAdapter() {...} | 21 | 42 | 50% |
-| ApplicationProperties | 21 | 149 | 85.9% |
+| NettyServerHttpResponse | 20 | 387 | 94.8% |
+| NettyHttpHandler | 19 | 162 | 88.3% |
+| ResourceRequestHandler | 17 | 292 | 94.2% |
 
 ### spring-web-view
 

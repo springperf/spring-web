@@ -49,6 +49,8 @@ class ManagementNettyHttpServerTest {
                 1048576);
 
         assertNotNull(server);
+        assertFalse(server.isRunning(), "构造后未启动");
+        assertEquals(Integer.MAX_VALUE, server.getPhase());
     }
 
     @Test
@@ -57,6 +59,8 @@ class ManagementNettyHttpServerTest {
                 1048576, null);
 
         assertNotNull(server);
+        assertFalse(server.isRunning(), "构造后未启动");
+        assertEquals(Integer.MAX_VALUE, server.getPhase());
     }
 
     @Test
