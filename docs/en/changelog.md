@@ -9,7 +9,6 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 > ⚠️ **This release contains breaking changes**: configuration keys, response framing, Servlet
 > `flush` semantics, conditional requests / Range, and extension-point signatures all changed —
 > read the [breaking changes](breaking-changes.md) before upgrading.
-)
 
 ### Added
 

@@ -83,6 +83,11 @@ public class ViewController {
         return "hello";
     }
 
+    @GetMapping("/render-boom")
+    public String renderBoom() {
+        return "render-boom";
+    }
+
     @GetMapping("/boom")
     public String boom() {
         throw new IllegalStateException("boom");

@@ -80,7 +80,7 @@ public class BeetlViewResolver extends BaseWebComponent implements ViewResolver 
             return null;
         }
         return viewCache.resolve(viewName, name -> {
-            String templatePath = prefix + name + suffix;
+            String templatePath = prefix + ViewProperties.withSuffix(name, suffix);
             if (!new ClassPathResource(templatePath).exists()) {
                 return null;
             }
@@ -102,6 +102,10 @@ public class BeetlViewResolver extends BaseWebComponent implements ViewResolver 
     @Override
     public void invalidateCache() {
         viewCache.invalidate();
+        // Beetl 的 getTemplate 走 programCache；NoCache 实现下 clearAll 为空操作
+        if (groupTemplate != null && groupTemplate.getProgramCache() != null) {
+            groupTemplate.getProgramCache().clearAll();
+        }
     }
 
     private static class BeetlView implements View {

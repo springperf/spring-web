@@ -113,11 +113,13 @@ public class ThymeleafViewResolver extends BaseWebComponent implements ViewResol
             return null;
         }
         return viewCache.resolve(viewName, name -> {
-            String fullPath = prefix + name + suffix;
+            String fullPath = prefix + ViewProperties.withSuffix(name, suffix);
             if (!new ClassPathResource(fullPath).exists()) {
                 return null;
             }
-            return new ThymeleafView(templateEngine, name, encoding, this);
+            // TemplateEngine 的 resolver 会再拼一次 suffix，因此这里必须传去掉后缀的纯模板名；
+            // 2.7.x 保留按 spring.thymeleaf.encoding 决定响应字符集，故继续把 encoding 传入 View。
+            return new ThymeleafView(templateEngine, ViewProperties.withoutSuffix(name, suffix), encoding, this);
         });
     }
 
@@ -134,6 +136,10 @@ public class ThymeleafViewResolver extends BaseWebComponent implements ViewResol
     @Override
     public void invalidateCache() {
         viewCache.invalidate();
+        // 解析结果缓存之外，TemplateEngine 仍持有已解析模板；不清则运行期替换的模板不会生效
+        if (templateEngine != null) {
+            templateEngine.clearTemplateCache();
+        }
     }
 
     private static class ThymeleafView implements View {
