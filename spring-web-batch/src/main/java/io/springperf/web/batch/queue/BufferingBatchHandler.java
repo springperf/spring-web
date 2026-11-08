@@ -52,10 +52,9 @@ public class BufferingBatchHandler implements EventHandler<BatchEvent> {
      * 窗口调度器；全进程共享一个 daemon 线程，仅在 {@link #SCHEDULER_LOCK} 内读写。
      * <p>
      * 这里刻意用 {@link Timer} 而不是 {@code ScheduledExecutorService}：后者内部基于
-     * {@code LockSupport.parkNanos}，在部分 Windows 环境上 1~10ms 的延迟会被系统定时器粒度
-     * 统一放大到约 15ms，使 {@code batchWindowMillis=3/5} 这类小窗口实际按 15ms 运行
-     * （快 IO 场景净亏损、低负载白等）。{@code Timer} 走 {@code Object.wait(timeout)}，
-     * 实测 3ms → 约 3ms、5ms → 约 5ms、25ms → 约 25ms。
+     * {@code LockSupport.parkNanos}，小窗口（1~10ms）的到期精度不足，{@code batchWindowMillis=3/5}
+     * 这类小窗口会失去意义（快 IO 场景净亏损、低负载白等）。{@code Timer} 走 {@code Object.wait(timeout)}，
+     * 实测小窗口按标称值到期。
      * </p>
      * <p>
      * 代价：Timer 线程不捕获任务异常，任一未捕获异常都会终止整个共享调度线程，

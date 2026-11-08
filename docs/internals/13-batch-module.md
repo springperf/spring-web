@@ -412,7 +412,7 @@ private void flush() {
 | `consumerSize=1` | 35.2 | 106.5ms → 3.1ms（34x） | 458 |
 | `consumerSize=8` + `batchWindowMillis=5` | 17.8 | 106.5ms → 6.1ms（17x） | 611 |
 
-**窗口是唯一能同时拿到「并行度」与「大批」的手段**：它把刷出时机从「消费者追上空队列」改成「窗口到期」，批大小由配置保证。代价是每批最多多等一个窗口（单请求延迟上界 ≈ 窗口值），默认窗口取 5ms：修复调度精度后，并发 100 下 5 / 10 / 20 / 50ms IO 四档吞吐分别为关窗的 1.30x / 2.14x / 1.71x / 1.54x；10ms 档因平台定时粒度量化反而更差，详见[批处理文档](../batch.md)。
+**窗口是唯一能同时拿到「并行度」与「大批」的手段**：它把刷出时机从「消费者追上空队列」改成「窗口到期」，批大小由配置保证。代价是每批最多多等一个窗口（单请求延迟上界 ≈ 窗口值），默认窗口取 5ms：修复调度精度后，并发 100 下 5 / 10 / 20 / 50ms IO 四档吞吐分别为关窗的 1.30x / 2.14x / 1.71x / 1.54x，详见[批处理文档](../batch.md)。
 
 ### 5.3 窗口的并发设计
 
@@ -420,7 +420,7 @@ private void flush() {
 |---|---|
 | 消费者线程 vs 调度线程 | `bufferLock` 保护「add」与「取走并替换 list」；持锁时间仅数十纳秒，远小于窗口周期 |
 | 调度线程数 | 全进程共享单个 `batch-window` daemon 线程；每个 handler 只登记一次并记录「登记在哪个实例上」，登记/注销/关停在同一把静态锁内完成——无窗口队列停机时不会误减其他队列的份额 |
-| 调度精度 | 用 `java.util.Timer`（内部走 `Object.wait(timeout)`）而非 `ScheduledThreadPoolExecutor`（内部走 `LockSupport.parkNanos`）：后者在部分 Windows 环境把 1~10ms 的延迟统一放大到约 15ms，使 `batchWindowMillis=3/5` 名存实亡。Timer 线程不捕获任务异常，故 TimerTask 内自行收敛 `Throwable`，避免一个队列的异常终止整个共享调度线程 |
+| 调度精度 | 用 `java.util.Timer`（内部走 `Object.wait(timeout)`）而非 `ScheduledThreadPoolExecutor`（内部走 `LockSupport.parkNanos`）：后者的小窗口到期精度不足，使 `batchWindowMillis=3/5` 名存实亡。Timer 线程不捕获任务异常，故 TimerTask 内自行收敛 `Throwable`，避免一个队列的异常终止整个共享调度线程 |
 | 任务被拒 | 调度器正在关闭时 `schedule()` 会抛 `IllegalStateException`：捕获后立即刷出本批，不让请求挂到超时 |
 | 停机顺序 | `DisruptorQueue.shutdown()` 中 `flushRemaining()` → `closeWindow()`，防止迟到任务重复提交 |
 | 显式关闭 | `batchWindowMillis=0` 时走 `endOfBatch` 分支（2.7.8 前的历史行为），`bufferLock` 无争用、不创建窗口调度线程 |
