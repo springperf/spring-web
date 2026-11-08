@@ -324,6 +324,6 @@
 | 带后缀的视图名（`hello.html` / `hello.btl`） | 仅 FreeMarker 支持，Thymeleaf / Beetl 会拼成 `hello.html.html` / `hello.btl.btl` | 三个内置引擎统一支持。**无需迁移** |
 | `redirect://host` 协议相对目标 | 非空 context-path 下被拼成 `/app//host` | 直接作为外部目标使用。**无需迁移** |
 | https 且无显式端口时的 `IWebRequest#getServerPort()` | 固定返回 80 | 返回 443。**无需迁移** |
-| 已显式设置 `Content-Type` 且无匹配 `HttpBodyConverter` 的 `@ResponseBody` 返回值 | 静默返回 200 + 空响应体，返回值被丢弃 | 抛 `HttpMessageNotWritableException`，经 `ExceptionRegistry` 映射为 500。**迁移**：让显式 Content-Type 与返回值类型匹配（返回对象时用 `application/json`），或由 Servlet 侧自行写响应并返回 `void` |
+| `@ResponseBody` 返回值无匹配 `HttpBodyConverter`（已显式设置 `Content-Type`，或 `produces` 协商出的类型无人能写） | 静默返回 200 + 空响应体，返回值被丢弃；`produces` 分支连 `produces` 声明的 Content-Type 都不会写 | 抛 `HttpMessageNotWritableException`，经 `ExceptionRegistry` 映射为 500。**迁移**：让目标 Content-Type 与返回值类型匹配（返回对象时用 `application/json`），或由 Servlet 侧自行写响应并返回 `void`。`StreamingResponseBody` 这类本框架未实现的返回类型现在也会明确报错，不再静默空响应 |
 | `@BatchMapping.batchWindowMillis` 默认值 | 3.5.7 无攒批窗口：`endOfBatch` / `maxBatchSize` 决定刷出 | 默认启用 5ms 攒批窗口，批大小由窗口保证，单请求最多多等一个窗口。**迁移**：低负载 + 极快 IO（< 5ms）、极致低延迟，或需要「无窗口」对照基准时，显式写 `batchWindowMillis=0` |
 

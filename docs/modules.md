@@ -247,7 +247,7 @@ destroyComponent()     → 资源释放
 | Spring 参数解析器 | `SpringHandlerMethodArgumentResolverProvider` 适配 `HandlerMethodArgumentResolver` |
 | Spring 返回值处理器 | `SpringHandlerMethodReturnValueHandlerAdapter` 适配 `HandlerMethodReturnValueHandler`；`ModelAndViewReturnValueResolver` 桥接 `ModelAndView` |
 | Spring 异常解析器 | `SpringHandlerExceptionResolverAdapter` 适配 `HandlerExceptionResolver` |
-| ResponseBodyEmitter | `ResponseBodyEmitterReturnValueResolver`（含 mvc `SseEmitter`；**不含** `StreamingResponseBody`——它是独立 `@FunctionalInterface`，非 `StreamEmitter`，当前无 resolver） |
+| ResponseBodyEmitter | `ResponseBodyEmitterReturnValueResolver`（含 mvc `SseEmitter`；**不含** `StreamingResponseBody`——它是独立 `@FunctionalInterface`，非 `StreamEmitter`，当前无 resolver，这类返回值按 fail-fast 返回 500 而非静默空响应） |
 | 重写的 Spring MVC API | `org.springframework.web.servlet.*`：`HandlerInterceptor`、`ModelAndView`、`View`、`MappedInterceptor`、`WebMvcConfigurer`、`InterceptorRegistration`、`RequestBodyAdvice` / `ResponseBodyAdvice` 等 |
 
 ### 使用场景
