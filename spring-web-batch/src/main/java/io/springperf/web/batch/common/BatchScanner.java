@@ -20,8 +20,19 @@ import java.util.stream.Collectors;
 @Slf4j
 public class BatchScanner {
 
-    public List<BatchHandlerRegistration> scan(ApplicationContext ctx,
-                                                List<PathMappingContext> allMappings) {
+    public List<BatchHandlerRegistration> scan(ApplicationContext ctx, List<PathMappingContext> allMappings) {
+        return scan(ctx, allMappings, BatchDefaults.standard());
+    }
+
+    /**
+     * 扫描 {@code @BatchMapping} 方法并解析元数据。
+     *
+     * @param defaults
+     *            {@code springperf.batch.*} 全局默认值：注解未显式声明的属性用它兜底，见 {@link BatchDefaults}
+     */
+    public List<BatchHandlerRegistration> scan(ApplicationContext ctx, List<PathMappingContext> allMappings,
+            BatchDefaults defaults) {
+        BatchDefaults effective = defaults != null ? defaults : BatchDefaults.standard();
         Map<Object, List<PathMappingContext>> byBean = allMappings.stream()
                 .collect(Collectors.groupingBy(PathMappingContext::getBean));
 
@@ -47,12 +58,13 @@ public class BatchScanner {
             }
 
             String queueName = resolveQueueName(c.beanType, c.method);
-            int consumerSize = resolveConsumerSize(ann, c.method);
+            int consumerSize = resolveConsumerSize(ann, effective);
             Constructor<?> singleMethodCtor = resolveSingleMethodCtor(requestType, singleCtx);
 
             BatchRequestMetaData meta = new BatchRequestMetaData(c.method, c.beanType, requestType, queueName,
-                    ann.ringBufferSize(), ann.waitStrategy(), ann.backpressure(), singleMethodCtor, ann.maxBatchSize(),
-                    ann.batchWindowMillis(), consumerSize);
+                    effective.resolveRingBufferSize(ann), effective.resolveWaitStrategy(ann),
+                    effective.resolveBackpressure(ann), singleMethodCtor, effective.resolveMaxBatchSize(ann),
+                    effective.resolveWindowMillis(ann), consumerSize);
 
             result.add(new BatchHandlerRegistration(c.bean, singleCtx, meta));
             log.info("Batch queue [{}] registered: batchMethod={}, singleMethod={}, requestType={}",
@@ -181,8 +193,8 @@ public class BatchScanner {
     // Consumer size
     // ------------------------------------------------------------------
 
-    private int resolveConsumerSize(BatchMapping ann, Method batchMethod) {
-        int consumerSize = ann.consumerSize();
+    private int resolveConsumerSize(BatchMapping ann, BatchDefaults defaults) {
+        int consumerSize = defaults.resolveConsumerSize(ann);
         return consumerSize > 0 ? consumerSize : Runtime.getRuntime().availableProcessors();
     }
 

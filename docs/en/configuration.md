@@ -251,6 +251,21 @@ public class DynamicRegistration implements ServletContextListener {
 | `pool.keep-alive-time` | `60` | Idle thread keep-alive time (seconds) |
 | `pool.queue-capacity` | `100` | Task queue capacity. Bounded by default so that `maxPoolSize` takes effect and overload returns 503 instead of queueing unboundedly (set to 1 when ≤ 0) |
 | `pool.default-execute-mode` | `default` | Default execution mode when no `@RunInPool`. `eventloop`=EventLoop, other values = pool name |
+## Batch Processing (springperf.batch.*)
+
+Global defaults for `@BatchMapping` attributes; an explicit annotation value wins over the global key. Read once at startup.
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `springperf.batch.window-millis` | `5` | Accumulation window in ms, `0` disables it globally |
+| `springperf.batch.max-batch-size` | `100` | Max requests per batch |
+| `springperf.batch.consumer-size` | `-1` | bizExecutor concurrency cap, `-1` = CPU cores |
+| `springperf.batch.ring-buffer-size` | `4096` | Ring buffer capacity; non-power-of-two values are normalised with a warning |
+| `springperf.batch.wait-strategy` | `BLOCKING` | `YIELDING` / `BLOCKING` / `SLEEPING` / `BUSY_SPIN`, case-insensitive |
+| `springperf.batch.backpressure` | `BLOCK` | `BLOCK` / `DROP` / `THROW`, case-insensitive |
+
+See the [batch guide](batch.md#configuration-guide) for values and boundaries.
+
 ## SSL Configuration
 
 Standard Spring Boot SSL configuration:

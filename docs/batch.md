@@ -304,6 +304,35 @@ bizExecutor 线程池（0 ~ consumerSize 个）
 
 ## 配置参考
 
+### 全局默认值（`springperf.batch.*`）
+
+多个队列需要同一套调优值时，不必逐个改注解——配置全局键即可，注解保持默认写法：
+
+| 键 | 默认 | 对应注解属性 | 说明 |
+|------|--------|------|------|
+| `springperf.batch.window-millis` | `5` | `batchWindowMillis` | 攒批时间窗口（毫秒），`0` = 全局关闭 |
+| `springperf.batch.max-batch-size` | `100` | `maxBatchSize` | 单批最大请求数 |
+| `springperf.batch.consumer-size` | `-1` | `consumerSize` | bizExecutor 并发上限，`-1` = CPU 核数 |
+| `springperf.batch.ring-buffer-size` | `4096` | `ringBufferSize` | 非 2 的幂时由队列归一化并告警 |
+| `springperf.batch.wait-strategy` | `BLOCKING` | `waitStrategy` | 忽略大小写，`busy-spin` / `BUSY_SPIN` 均可 |
+| `springperf.batch.backpressure` | `BLOCK` | `backpressure` | 同上 |
+
+```properties
+# 低负载 + 快 IO：所有队列的窗口收敛到 3ms，注解不用改
+springperf.batch.window-millis=3
+# 多队列部署：并发总和控制在核数内
+springperf.batch.consumer-size=4
+```
+
+优先级：**注解显式声明 > 全局键 > 注解内置默认值**。只在注解没写（保持默认值）时，全局键才生效。
+
+几条边界：
+
+- **只在启动期生效**：队列在启动扫描 `@BatchMapping` 时一次建成，之后改键不会重建队列（与 `pool.core-pool-size` 同类）。
+- **写「内置默认值」等于没写**：Java 注解在运行期区分不出「未声明」与「显式写成默认值」，所以全局 `window-millis=3` 时，`@BatchMapping(batchWindowMillis = 5)` 仍取 3。要单独覆盖，写一个不同的值（如 `0` 关闭窗口、或 `8`）。
+- **取值非法直接启动失败**，报错带键名与可选值（`wait-strategy` 写错会列出 `[YIELDING, BLOCKING, SLEEPING, BUSY_SPIN]`），不会静默回落到默认值。
+- **留痕**：启动期打印一行生效值，例如 `Batch global defaults: windowMillis=3, ... (configured: springperf.batch.window-millis)`；`configured: none, all built-in` 表示全部用内置默认。
+
 ### 参数调优
 
 | 场景 | 推荐配置 | 说明 |

@@ -1,5 +1,6 @@
 package io.springperf.web.batch;
 
+import io.springperf.web.batch.common.BatchDefaults;
 import io.springperf.web.batch.common.BatchHandlerRegistration;
 import io.springperf.web.batch.common.BatchRequest;
 import io.springperf.web.batch.common.BatchRequestMetaData;
@@ -51,8 +52,14 @@ public class BatchRegistry extends BaseWebComponent {
         ApplicationContext ctx = webContext.getCtx();
         MappingRegistry mappingRegistry = webContext.getWebComponent(MappingRegistry.class);
 
-        List<BatchHandlerRegistration> registrations = new BatchScanner()
-                .scan(ctx, mappingRegistry.getMappingContextList());
+        // springperf.batch.*：全局默认值（启动期读一次，之后改键不重建队列）
+        BatchDefaults defaults = BatchDefaults.fromProperties(webContext.getProps());
+        log.info("Batch global defaults: {} (configured: {})", defaults.describe(),
+                defaults.configuredKeys().isEmpty() ? "none, all built-in"
+                        : String.join(", ", defaults.configuredKeys()));
+
+        List<BatchHandlerRegistration> registrations = new BatchScanner().scan(ctx,
+                mappingRegistry.getMappingContextList(), defaults);
 
         for (BatchHandlerRegistration reg : registrations) {
             install(reg);
@@ -63,8 +70,8 @@ public class BatchRegistry extends BaseWebComponent {
     /**
      * 启动期对两类「配置看起来正常、实际拿不到收益或会超配」的组合显式告警：
      * <ul>
-     * <li>显式关闭窗口（{@code batchWindowMillis=0}）：刷出时机回到 {@code endOfBatch}，批大小取决于 RingBuffer 瞬时积压，
-     * {@code maxBatchSize} 很难达到；</li>
+     * <li>窗口被关闭（{@code batchWindowMillis=0}，注解或 {@code springperf.batch.window-millis=0} 均可）：刷出时机回到
+     * {@code endOfBatch}，批大小取决于 RingBuffer 瞬时积压，{@code maxBatchSize} 很难达到；</li>
      * <li>多个队列的 {@code consumerSize} 之和超过 CPU 核数：每个 {@code @BatchMapping} 都持有独立的 bizExecutor，
      * 默认值（核数）是按单队列设计的。</li>
      * </ul>
@@ -80,7 +87,7 @@ public class BatchRegistry extends BaseWebComponent {
             workerBudget += meta.consumerSize();
         }
         if (!noWindow.isEmpty()) {
-            log.warn("Batch queues with batchWindowMillis explicitly disabled ({}): {} - flushing falls back to "
+            log.warn("Batch queues with batchWindowMillis resolved to <= 0 ({}): {} - flushing falls back to "
                     + "endOfBatch, so batch size depends on momentary RingBuffer backlog and maxBatchSize is rarely "
                     + "reached; keep the default 5ms window (or 2~3ms for very fast downstream IO) unless the extra "
                     + "latency is unacceptable", noWindow.size(), String.join(", ", noWindow));

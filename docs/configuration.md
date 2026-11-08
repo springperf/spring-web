@@ -251,6 +251,21 @@ public class DynamicRegistration implements ServletContextListener {
 | `pool.keep-alive-time` | `60` | 空闲线程存活时间（秒） |
 | `pool.queue-capacity` | `100` | 任务队列容量。默认有界：使 `maxPoolSize` 生效，满员时返回 503 而非无限排队（≤0 时设为 1） |
 | `pool.default-execute-mode` | `default` | 无 `@RunInPool` 时方法的执行位置。`eventloop`=EventLoop，其他值为线程池名称 |
+## 批处理（springperf.batch.*）
+
+`@BatchMapping` 注解属性的全局默认值；注解显式声明优先于全局键。仅在启动期读取一次。
+
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `springperf.batch.window-millis` | `5` | 攒批时间窗口（毫秒），`0` = 全局关闭 |
+| `springperf.batch.max-batch-size` | `100` | 单批最大请求数 |
+| `springperf.batch.consumer-size` | `-1` | bizExecutor 并发上限，`-1` = CPU 核数 |
+| `springperf.batch.ring-buffer-size` | `4096` | 环形缓冲区容量，非 2 的幂时归一化并告警 |
+| `springperf.batch.wait-strategy` | `BLOCKING` | `YIELDING` / `BLOCKING` / `SLEEPING` / `BUSY_SPIN`，忽略大小写 |
+| `springperf.batch.backpressure` | `BLOCK` | `BLOCK` / `DROP` / `THROW`，忽略大小写 |
+
+取值与边界详见[批处理文档](batch.md#配置参考)。
+
 ## SSL 配置
 
 标准 Spring Boot SSL 配置：

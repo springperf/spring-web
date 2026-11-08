@@ -1,11 +1,13 @@
 package io.springperf.web.batch;
 
 import io.springperf.web.batch.annotation.BatchMapping;
+import io.springperf.web.batch.common.BatchDefaults;
 import io.springperf.web.batch.common.BatchRequest;
 import io.springperf.web.batch.invoker.BatchInvoker;
 import io.springperf.web.batch.metrics.BatchMetrics;
 import io.springperf.web.batch.metrics.NoOpBatchMetrics;
 import io.springperf.web.batch.queue.DisruptorQueue;
+import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.mapping.MappingRegistry;
 import io.springperf.web.core.mapping.PathMappingContext;
@@ -14,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.method.HandlerMethod;
 
@@ -60,8 +63,20 @@ class BatchRegistryPhase2Test {
         }
     }
 
+    /** 不声明任何属性：全部走注解内置默认值，或由 {@code springperf.batch.*} 覆盖。 */
+    @Controller
+    public static class DefaultController {
+        @BatchMapping(method = "single")
+        public void batch(List<EchoRequest> requests) {
+        }
+
+        public void single(String data) {
+        }
+    }
+
     @Configuration
     static class TestConfig {
+
         @Bean
         public BatchController batchController() {
             return new BatchController();

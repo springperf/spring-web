@@ -316,6 +316,35 @@ All metrics carry a `queue` tag valued `batch:<ClassName>.<methodName>` (generat
 
 ## Configuration Guide
 
+### Global Defaults (`springperf.batch.*`)
+
+When several queues need the same tuning, do not edit every annotation — set the global keys instead and leave the annotations at their defaults:
+
+| Key | Default | Annotation attribute | Notes |
+|------|--------|------|------|
+| `springperf.batch.window-millis` | `5` | `batchWindowMillis` | Accumulation window in ms, `0` disables it globally |
+| `springperf.batch.max-batch-size` | `100` | `maxBatchSize` | Max requests per batch |
+| `springperf.batch.consumer-size` | `-1` | `consumerSize` | bizExecutor concurrency cap, `-1` = CPU cores |
+| `springperf.batch.ring-buffer-size` | `4096` | `ringBufferSize` | Non-power-of-two values are normalised by the queue with a warning |
+| `springperf.batch.wait-strategy` | `BLOCKING` | `waitStrategy` | Case-insensitive; `busy-spin` and `BUSY_SPIN` both work |
+| `springperf.batch.backpressure` | `BLOCK` | `backpressure` | Same as above |
+
+```properties
+# Low traffic + fast IO: 3ms window on every queue, no annotation edits
+springperf.batch.window-millis=3
+# Many queues: keep the total concurrency within the core count
+springperf.batch.consumer-size=4
+```
+
+Precedence: **explicit annotation value > global key > annotation built-in default**. A global key only applies to queues that keep the default.
+
+Boundaries worth knowing:
+
+- **Startup only**: queues are built once while `@BatchMapping` methods are scanned; changing a key later does not rebuild them (same as `pool.core-pool-size`).
+- **Writing the built-in default is the same as not writing it**: Java annotations cannot distinguish "undeclared" from "explicitly set to the default" at runtime, so with `window-millis=3`, `@BatchMapping(batchWindowMillis = 5)` still resolves to 3. Use a different value to override locally (`0` to disable the window, or `8`).
+- **Invalid values fail startup** with the key name and the allowed values (`wait-strategy` reports `[YIELDING, BLOCKING, SLEEPING, BUSY_SPIN]`); they never fall back silently.
+- **Visibility**: one line at startup shows the effective values, e.g. `Batch global defaults: windowMillis=3, ... (configured: springperf.batch.window-millis)`; `configured: none, all built-in` means nothing was set.
+
 ### Tuning Recommendations
 
 | Scenario | Recommended Configuration | Notes |
