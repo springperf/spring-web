@@ -238,11 +238,11 @@ class BatchRegistryPhase2Test {
                 "显式关闭 batchWindowMillis 的队列应在启动期告警");
     }
 
-    /** 未声明窗口的队列使用默认 5ms，不应再出现「默认即告警」。 */
+    /** 未声明窗口的队列使用默认 2ms，不应再出现「默认即告警」。 */
     @Test
     void initComponentPhase2_doesNotWarnWithDefaultWindow() throws Exception {
         assertFalse(windowWarningLogged(BatchController.class),
-                "未声明窗口的队列使用默认 5ms，不应触发窗口告警");
+                "未声明窗口的队列使用默认 2ms，不应触发窗口告警");
     }
 
     /** {@code springperf.batch.window-millis=0} 等于全局关闭窗口，同样必须告警——不能因为不是注解声明就沉默。 */

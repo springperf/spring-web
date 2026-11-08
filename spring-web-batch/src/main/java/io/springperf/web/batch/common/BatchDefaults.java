@@ -18,7 +18,7 @@ import io.springperf.web.context.ApplicationProperties;
  * </p>
  * <p>
  * <b>已知边界</b>：Java 注解在运行期无法区分「未声明」与「显式写成内置默认值」——反射读到的都是同一个值，因此以
- * 「取值等于注解内置默认值」判定为未声明。给某队列单独 {@code @BatchMapping(batchWindowMillis = 5)} 想顶掉全局
+ * 「取值等于注解内置默认值」判定为未声明。给某队列单独 {@code @BatchMapping(batchWindowMillis = 2)} 想顶掉全局
  * {@code springperf.batch.window-millis=3} 是做不到的（两者取值相同）；改成任何不同的值（如 {@code 0} = 关闭窗口、
  * 或 {@code 8}）即可显式覆盖。
  * </p>
@@ -234,7 +234,7 @@ public final class BatchDefaults {
     }
 
     /**
-     * 注解内置默认值，反射读取而非硬编码：注解默认值调整后（例如窗口 5ms → 3ms）这里会自动跟随，不会出现「全局未配置却
+     * 注解内置默认值，反射读取而非硬编码：注解默认值调整后（例如窗口 2ms → 5ms）这里会自动跟随，不会出现「全局未配置却
      * 用到旧默认值」的静默漂移。
      */
     private static final class AnnotationDefaults {

@@ -5,7 +5,7 @@
       "type": "java.lang.Integer",
       "description": "Accumulation window in milliseconds applied to every @BatchMapping that keeps the annotation default; 0 disables the window globally.",
       "sourceType": "io.springperf.web.batch.common.BatchDefaults",
-      "defaultValue": 5
+      "defaultValue": 2
     },
     {
       "name": "springperf.batch.max-batch-size",

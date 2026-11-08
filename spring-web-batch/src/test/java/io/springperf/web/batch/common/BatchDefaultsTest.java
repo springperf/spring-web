@@ -42,7 +42,7 @@ class BatchDefaultsTest {
     @Test
     void standard_matchesAnnotationDefaults() {
         BatchDefaults defaults = BatchDefaults.standard();
-        assertEquals(5, defaults.windowMillis());
+        assertEquals(2, defaults.windowMillis());
         assertEquals(100, defaults.maxBatchSize());
         assertEquals(-1, defaults.consumerSize(), "-1 = 未声明，最终由核数兜底");
         assertEquals(4096, defaults.ringBufferSize());
@@ -95,7 +95,7 @@ class BatchDefaultsTest {
     void fromProperties_blankValue_isTreatedAsAbsent() {
         MockEnvironment env = new MockEnvironment().withProperty(BatchDefaults.WINDOW_MILLIS, "  ");
         BatchDefaults defaults = from(env);
-        assertEquals(5, defaults.windowMillis(), "空白值不应把窗口解析成 0（那会静默关闭攒批）");
+        assertEquals(2, defaults.windowMillis(), "空白值不应把窗口解析成 0（那会静默关闭攒批）");
         assertTrue(defaults.configuredKeys().isEmpty());
     }
 
