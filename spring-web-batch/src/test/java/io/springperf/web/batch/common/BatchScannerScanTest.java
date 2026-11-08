@@ -1,11 +1,13 @@
 package io.springperf.web.batch.common;
 
 import io.springperf.web.batch.annotation.BatchMapping;
+import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.core.mapping.PathMappingContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.method.HandlerMethod;
 
@@ -157,6 +159,64 @@ class BatchScannerScanTest {
             assertEquals(1, result.size());
             assertEquals(5, result.get(0).meta().batchWindowMillis(),
                     "注解未声明 batchWindowMillis 时应采用 5ms 默认值");
+        }
+    }
+
+    @Test
+    void scan_globalDefaults_applyToUndeclaredAttributes() throws Exception {
+        try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext()) {
+            ctx.registerBean(DefaultConsumerController.class);
+            ctx.refresh();
+            DefaultConsumerController bean = ctx.getBean(DefaultConsumerController.class);
+            PathMappingContext singleCtx = mappingFor(bean, "single", String.class);
+
+            MockEnvironment env = new MockEnvironment().withProperty(BatchDefaults.WINDOW_MILLIS, "3")
+                    .withProperty(BatchDefaults.MAX_BATCH_SIZE, "250").withProperty(BatchDefaults.CONSUMER_SIZE, "3")
+                    .withProperty(BatchDefaults.RING_BUFFER_SIZE, "128")
+                    .withProperty(BatchDefaults.WAIT_STRATEGY, "YIELDING")
+                    .withProperty(BatchDefaults.BACKPRESSURE, "THROW");
+            BatchDefaults defaults = BatchDefaults.fromProperties(new ApplicationProperties(env));
+
+            List<BatchHandlerRegistration> result = new BatchScanner().scan(ctx,
+                    Collections.singletonList(singleCtx), defaults);
+
+            assertEquals(1, result.size());
+            BatchRequestMetaData meta = result.get(0).meta();
+            assertEquals(3, meta.batchWindowMillis(), "springperf.batch.window-millis 应作用于未声明窗口的队列");
+            assertEquals(250, meta.maxBatchSize());
+            assertEquals(3, meta.consumerSize());
+            assertEquals(128, meta.ringBufferSize());
+            assertEquals(BatchMapping.WaitStrategy.YIELDING, meta.waitStrategy());
+            assertEquals(BatchMapping.Backpressure.THROW, meta.backpressure());
+        }
+    }
+
+    @Test
+    void scan_globalDefaults_doNotOverrideExplicitAnnotation() throws Exception {
+        try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext(TestConfig.class)) {
+            BatchController bean = ctx.getBean(BatchController.class);
+            PathMappingContext singleCtx = mappingFor(bean, "single", String.class);
+
+            // BatchController 把六个属性全部显式写死，全局键不得改动其中任何一项
+            BatchDefaults defaults = BatchDefaults
+                    .fromProperties(new ApplicationProperties(new MockEnvironment()
+                            .withProperty(BatchDefaults.WINDOW_MILLIS, "3")
+                            .withProperty(BatchDefaults.MAX_BATCH_SIZE, "250")
+                            .withProperty(BatchDefaults.CONSUMER_SIZE, "3")
+                            .withProperty(BatchDefaults.RING_BUFFER_SIZE, "128")
+                            .withProperty(BatchDefaults.WAIT_STRATEGY, "BUSY_SPIN")
+                            .withProperty(BatchDefaults.BACKPRESSURE, "DROP")));
+
+            List<BatchHandlerRegistration> result = new BatchScanner().scan(ctx,
+                    Collections.singletonList(singleCtx), defaults);
+
+            BatchRequestMetaData meta = result.get(0).meta();
+            assertEquals(7, meta.batchWindowMillis());
+            assertEquals(5, meta.maxBatchSize());
+            assertEquals(2, meta.consumerSize());
+            assertEquals(64, meta.ringBufferSize());
+            assertEquals(BatchMapping.WaitStrategy.YIELDING, meta.waitStrategy());
+            assertEquals(BatchMapping.Backpressure.THROW, meta.backpressure());
         }
     }
 

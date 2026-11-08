@@ -37,6 +37,7 @@
 - **WebSocket 压缩扩展**：`setAllowExtensions(true)` 现在真正协商 `permessage-deflate`（此前是空开关，未协商的压缩帧会被当明文交给业务）；协商结果可通过 `getExtensions()` / `Session#getNegotiatedExtensions()` 读取，按端点设置的 `messageSizeLimit` 也随之生效
 - **WebSocket JSR-356 语义补齐**：`RemoteEndpoint.Basic` 为同步发送；`getSendStream()` / `getSendWriter()` 缓冲后按整条消息发出；`setBatchingAllowed()` / `flushBatch()` 真正攒批；`Session.addMessageHandler()` 支持动态注册；自定义 `Configurator` 的 `getEndpointInstance()` / `checkOrigin()` 生效；Ping / Pong 帧现在携带应用数据，超 125 字节按规范拒绝
 - **批处理攒批时间窗口**：`@BatchMapping` 新增 `batchWindowMillis`（默认 `5`ms，设为 `0` 可关闭）。窗口内持续累积，直到达到 `maxBatchSize` 或窗口到期才提交，批大小由配置保证而非依赖业务池偶然饱和；实测中高并发下 IO 次数降 4~5 倍、吞吐不低于关窗。低负载且下游 IO 极快（< 5ms）时建议调小或关闭，取值建议见 [批处理文档](docs/batch.md)
+- **批处理全局默认值**：新增 `springperf.batch.*`（`window-millis` / `max-batch-size` / `consumer-size` / `ring-buffer-size` / `wait-strategy` / `backpressure`），多个队列统一调优不必逐个改注解。优先级为「注解显式声明 > 全局键 > 注解内置默认值」，仅启动期读取一次；取值非法直接启动失败并点名键名与可选值，启动日志打印生效值与实际配置的键，不静默回落。已知边界：注解显式写回内置默认值时与「未声明」不可区分，此时以全局键为准。详见[批处理配置参考](docs/batch.md#配置参考)
 - **视图运行期缓存失效**：新增 `ViewResolverRegistry.invalidateViewCaches()`，运行期投放或替换模板后调用即可生效（同时清理 Thymeleaf / FreeMarker / Beetl 内部模板缓存）；视图解析结果按视图名缓存，`cache=false` 仍保留热改
 - **视图配置**：新增 `spring.{thymeleaf,freemarker,beetl}.order`、`spring.web.view.jsp.order`（引擎解析顺序确定且可配）与 `spring.freemarker.enabled`；新增可选的 `spring.web.view.redirect-hosts` 外部重定向 host 白名单；移除从未被读取的 `spring.beetl.mode`
 - **自动配置开关**：新增 `springperf.openapi.enabled`、`springperf.swagger-ui.enabled`（可分别关闭文档端点与 Swagger UI 资源）、`springperf.web.mvc-conflict-check.enabled`（三方库传递引入 Spring MVC 时可跳过启动期冲突检查）

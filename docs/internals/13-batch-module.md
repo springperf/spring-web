@@ -69,15 +69,20 @@ public void initComponentPhase2() throws Exception {
     ApplicationContext ctx = webContext.getCtx();
     MappingRegistry mappingRegistry = webContext.getWebComponent(MappingRegistry.class);
 
+    // springperf.batch.*：全局默认值，启动期读一次（之后改键不重建队列）
+    BatchDefaults defaults = BatchDefaults.fromProperties(webContext.getProps());
+
     List<BatchHandlerRegistration> registrations = new BatchScanner()
-            .scan(ctx, mappingRegistry.getMappingContextList());
+            .scan(ctx, mappingRegistry.getMappingContextList(), defaults);
 
     for (BatchHandlerRegistration reg : registrations) {
         install(reg);
     }
-    this.registrations.addAll(registrations);
+    warnOnSuboptimalConfig(registrations);
 }
 ```
+
+`BatchDefaults` 只做「注解未显式声明时的兜底」：判定手段是「取值等于注解内置默认值」——注解内置默认值由反射读取（`AnnotationDefaults`），不硬编码，避免注解默认值调整后全局未配置时仍用旧值。优先级为「注解显式声明 > `springperf.batch.*` > 注解内置默认值」，因此显式写成内置默认值的注解无法与「未声明」区分（Java 注解运行期不给这个信息），要局部覆盖必须写不同的值；取值非法时启动期直接失败并点名键名与可选值。取值与边界见[批处理文档](../batch.md#配置参考)。
 
 `install` 方法做五件事：
 

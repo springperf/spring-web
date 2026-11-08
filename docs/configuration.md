@@ -253,6 +253,21 @@ public class DynamicRegistration implements ServletContextListener {
 | `pool.default-execute-mode` | `default` | 无 `@RunInPool` 时方法的执行位置。`eventloop`=EventLoop，其他值为线程池名称 |
 | `spring.threads.virtual.enabled` | `false` | JDK 21+：设为 `true` 时框架密集执行点改用虚拟线程——`default` 业务池与 batch 的批量方法（`@BatchMapping`）均以虚拟线程执行（只替换线程类型：`pool.*` 上限/队列语义与 batch 的 `consumerSize` 上限、背压语义均保持不变）；JDK < 21 时启动告警并回落平台线程 |
 
+## 批处理（springperf.batch.*）
+
+`@BatchMapping` 注解属性的全局默认值；注解显式声明优先于全局键。仅在启动期读取一次。
+
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `springperf.batch.window-millis` | `5` | 攒批时间窗口（毫秒），`0` = 全局关闭 |
+| `springperf.batch.max-batch-size` | `100` | 单批最大请求数 |
+| `springperf.batch.consumer-size` | `-1` | bizExecutor 并发上限，`-1` = CPU 核数 |
+| `springperf.batch.ring-buffer-size` | `4096` | 环形缓冲区容量，非 2 的幂时归一化并告警 |
+| `springperf.batch.wait-strategy` | `BLOCKING` | `YIELDING` / `BLOCKING` / `SLEEPING` / `BUSY_SPIN`，忽略大小写 |
+| `springperf.batch.backpressure` | `BLOCK` | `BLOCK` / `DROP` / `THROW`，忽略大小写 |
+
+取值与边界详见[批处理文档](batch.md#配置参考)。
+
 ## SSL 配置
 
 标准 Spring Boot SSL 配置：

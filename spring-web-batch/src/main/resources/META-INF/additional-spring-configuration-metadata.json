@@ -1,0 +1,46 @@
+{
+  "properties": [
+    {
+      "name": "springperf.batch.window-millis",
+      "type": "java.lang.Integer",
+      "description": "Accumulation window in milliseconds applied to every @BatchMapping that keeps the annotation default; 0 disables the window globally.",
+      "sourceType": "io.springperf.web.batch.common.BatchDefaults",
+      "defaultValue": 5
+    },
+    {
+      "name": "springperf.batch.max-batch-size",
+      "type": "java.lang.Integer",
+      "description": "Max requests per batch applied to every @BatchMapping that keeps the annotation default.",
+      "sourceType": "io.springperf.web.batch.common.BatchDefaults",
+      "defaultValue": 100
+    },
+    {
+      "name": "springperf.batch.consumer-size",
+      "type": "java.lang.Integer",
+      "description": "bizExecutor concurrency cap applied to every @BatchMapping that keeps the annotation default; -1 means CPU cores.",
+      "sourceType": "io.springperf.web.batch.common.BatchDefaults",
+      "defaultValue": -1
+    },
+    {
+      "name": "springperf.batch.ring-buffer-size",
+      "type": "java.lang.Integer",
+      "description": "Ring buffer capacity applied to every @BatchMapping that keeps the annotation default; values that are not a power of two are normalised with a warning.",
+      "sourceType": "io.springperf.web.batch.common.BatchDefaults",
+      "defaultValue": 4096
+    },
+    {
+      "name": "springperf.batch.wait-strategy",
+      "type": "io.springperf.web.batch.annotation.BatchMapping$WaitStrategy",
+      "description": "Disruptor wait strategy applied to every @BatchMapping that keeps the annotation default; case-insensitive, hyphens allowed (e.g. busy-spin).",
+      "sourceType": "io.springperf.web.batch.common.BatchDefaults",
+      "defaultValue": "BLOCKING"
+    },
+    {
+      "name": "springperf.batch.backpressure",
+      "type": "io.springperf.web.batch.annotation.BatchMapping$Backpressure",
+      "description": "Backpressure strategy applied to every @BatchMapping that keeps the annotation default; case-insensitive.",
+      "sourceType": "io.springperf.web.batch.common.BatchDefaults",
+      "defaultValue": "BLOCK"
+    }
+  ]
+}
