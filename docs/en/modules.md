@@ -382,7 +382,7 @@ The default `WebMetrics` implementation is `NoOpWebMetrics` (zero overhead); whe
 
 ## spring-web-batch (Batch Request Processing)
 
-Transparent aggregation batch processing module. Merges high-concurrency same-type requests into a batch, processing all requests with a single batch business logic execution; it can significantly improve throughput when IO latency is high enough to make the consumer the bottleneck (measured ranges in the [Batch Guide](batch.md)).
+Transparent aggregation batch processing module. Merges high-concurrency same-type requests into a batch, processing all requests with a single batch business logic execution; it can significantly improve throughput when IO latency is high enough to make the consumer the bottleneck (see the [Batch Guide](batch.md) for tuning guidance).
 
 > Full documentation: [Batch Processing Module](batch.md) — complete examples, @BatchMapping reference, observability metrics, tuning guide
 
@@ -390,7 +390,7 @@ Transparent aggregation batch processing module. Merges high-concurrency same-ty
 
 - **Pipeline semantics unchanged** — Filters, interceptors execute per-request, unaffected
 - **Async reuse** — `BatchRequest<R>` extends `DeferredResult<R>`, leveraging the framework's existing async processing for suspend/resume
-- **Batching window on by default** — `batchWindowMillis=5` guarantees the batch size with a time window; setting it explicitly to 0 falls back to Disruptor `endOfBatch` / `maxBatchSize`, see the [Batch Guide](batch.md)
+- **Batching window on by default** — `batchWindowMillis=2` guarantees the batch size with a time window; setting it explicitly to 0 falls back to Disruptor `endOfBatch` / `maxBatchSize`, see the [Batch Guide](batch.md)
 - **Single-request methods stay unchanged** — add a `@BatchMapping` method and a `BatchRequest` subclass; existing single-request methods need no changes
 
 ### Architecture
