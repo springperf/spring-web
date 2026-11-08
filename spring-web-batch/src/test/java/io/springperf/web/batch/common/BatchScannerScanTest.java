@@ -146,6 +146,21 @@ class BatchScannerScanTest {
     }
 
     @Test
+    void scan_undeclaredWindow_usesFiveMillisDefault() throws Exception {
+        try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext()) {
+            ctx.registerBean(DefaultConsumerController.class);
+            ctx.refresh();
+            DefaultConsumerController bean = ctx.getBean(DefaultConsumerController.class);
+            PathMappingContext singleCtx = mappingFor(bean, "single", String.class);
+            List<BatchHandlerRegistration> result = new BatchScanner().scan(ctx, Collections.singletonList(singleCtx));
+
+            assertEquals(1, result.size());
+            assertEquals(5, result.get(0).meta().batchWindowMillis(),
+                    "注解未声明 batchWindowMillis 时应采用 5ms 默认值");
+        }
+    }
+
+    @Test
     void scan_noBatchMethods_returnsEmpty() throws Exception {
         try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext()) {
             ctx.registerBean(PlainController.class);

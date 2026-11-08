@@ -38,7 +38,7 @@ class BatchRequestMetaDataTest {
         assertThat(meta.backpressure()).isEqualTo(BatchMapping.Backpressure.BLOCK);
         assertThat(meta.singleMethodCtor()).isSameAs(ctor);
         assertThat(meta.maxBatchSize()).isEqualTo(64);
-        // 10 参重载的契约：batchWindowMillis 默认关闭（0）
+        // 10 参兼容重载的契约：等价于显式关闭窗口（0），与注解默认值相互独立
         assertThat(meta.batchWindowMillis()).isZero();
         assertThat(meta.consumerSize()).isEqualTo(4);
     }
@@ -57,5 +57,11 @@ class BatchRequestMetaDataTest {
         assertThat(meta.consumerSize()).isEqualTo(4);
         assertThat(meta.waitStrategy()).isEqualTo(BatchMapping.WaitStrategy.YIELDING);
         assertThat(meta.backpressure()).isEqualTo(BatchMapping.Backpressure.THROW);
+    }
+
+    @Test
+    void annotationDefault_enablesFiveMillisWindow() throws Exception {
+        // 默认值变更属用户可见行为，钉死契约：BatchScanner 会把该值带入 BatchRequestMetaData
+        assertThat(BatchMapping.class.getDeclaredMethod("batchWindowMillis").getDefaultValue()).isEqualTo(5);
     }
 }

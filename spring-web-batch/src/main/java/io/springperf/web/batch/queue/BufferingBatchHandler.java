@@ -11,11 +11,10 @@ import org.slf4j.LoggerFactory;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 public class BufferingBatchHandler implements EventHandler<BatchEvent> {
@@ -35,6 +34,9 @@ public class BufferingBatchHandler implements EventHandler<BatchEvent> {
      */
     private final long windowNanos;
 
+    /** 窗口毫秒数；{@link Timer#schedule(TimerTask, long)} 以毫秒为单位。 */
+    private final long windowMillis;
+
     /**
      * buffer 的锁。关闭窗口时 {@link #onEvent} 是唯一的访问者（Disruptor 消费者单线程）， 本锁不会被争用；开启窗口后定时器线程也会进来取批，才需要互斥。
      * <p>
@@ -48,8 +50,21 @@ public class BufferingBatchHandler implements EventHandler<BatchEvent> {
 
     /**
      * 窗口调度器；全进程共享一个 daemon 线程，仅在 {@link #SCHEDULER_LOCK} 内读写。
+     * <p>
+     * 这里刻意用 {@link Timer} 而不是 {@code ScheduledExecutorService}：后者内部基于
+     * {@code LockSupport.parkNanos}，在部分 Windows 环境上 1~10ms 的延迟会被系统定时器粒度
+     * 统一放大到约 15ms，使 {@code batchWindowMillis=3/5} 这类小窗口实际按 15ms 运行
+     * （快 IO 场景净亏损、低负载白等）。{@code Timer} 走 {@code Object.wait(timeout)}，
+     * 实测 3ms → 约 3ms、5ms → 约 5ms、25ms → 约 25ms。
+     * </p>
+     * <p>
+     * 代价：Timer 线程不捕获任务异常，任一未捕获异常都会终止整个共享调度线程，
+     * 因此 {@link #scheduleWindowLocked()} 里的 TimerTask 必须自行收敛 {@code Throwable}。
+     * 另外 Timer 以 {@code currentTimeMillis()} 计算到期时间，短窗口受系统时钟回拨影响
+     * 可忽略，但不适用于长周期定时。
+     * </p>
      */
-    private static volatile ScheduledExecutorService windowScheduler;
+    private static volatile Timer windowScheduler;
 
     /** {@link #windowScheduler} 当前实例上的登记数（只在 {@link #SCHEDULER_LOCK} 内变更）。 */
     private static long windowTaskCount;
@@ -58,7 +73,7 @@ public class BufferingBatchHandler implements EventHandler<BatchEvent> {
      * 保护「获取/创建调度器 + 登记/注销」的静态锁。
      * <p>
      * 登记与注销必须共用同一把锁：早期版本用独立的 AtomicLong 计数、关闭动作不在锁内， 存在「关掉别的队列刚重建的调度器」以及
-     * {@code schedule()} 抛 {@code RejectedExecutionException} 冒到消费者的竞态。
+     * {@code schedule()} 抛异常冒到消费者的竞态。
      * </p>
      */
     private static final Object SCHEDULER_LOCK = new Object();
@@ -70,7 +85,7 @@ public class BufferingBatchHandler implements EventHandler<BatchEvent> {
      * 调度器被重建后旧实例的登记自动失效（{@link #windowTaskCount} 随重建归零）。
      * </p>
      */
-    private volatile ScheduledExecutorService registeredScheduler;
+    private volatile Timer registeredScheduler;
 
     private volatile boolean windowClosed;
 
@@ -95,6 +110,7 @@ public class BufferingBatchHandler implements EventHandler<BatchEvent> {
         this.metrics = metrics != null ? metrics : NoOpBatchMetrics.INSTANCE;
         this.afterBatchAction = afterBatchAction;
         this.windowNanos = resolveWindowNanos(meta);
+        this.windowMillis = TimeUnit.NANOSECONDS.toMillis(this.windowNanos);
     }
 
     private static long resolveWindowNanos(BatchRequestMetaData meta) {
@@ -175,9 +191,21 @@ public class BufferingBatchHandler implements EventHandler<BatchEvent> {
             return false;
         }
         try {
-            ensureScheduler().schedule(this::flushOnWindow, windowNanos, TimeUnit.NANOSECONDS);
+            ensureScheduler().schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    try {
+                        flushOnWindow();
+                    } catch (Throwable t) {
+                        // Timer 线程不捕获任务异常：未捕获异常会终止整个共享调度线程，
+                        // 让其他队列的窗口任务永不到期。必须在这里收敛，仅记录上下文。
+                        log.error("Batch window task failed for queue [{}]", meta.queueName(), t);
+                    }
+                }
+            }, windowMillis);
             return false;
-        } catch (RejectedExecutionException e) {
+        } catch (IllegalStateException e) {
+            // Timer 已 cancel（停机竞态）或线程已终止：立即刷出，别让请求挂到 DeferredResult 超时
             log.warn("Window scheduler rejected task for queue [{}] - flushing immediately", meta.queueName(), e);
             return true;
         }
@@ -222,7 +250,7 @@ public class BufferingBatchHandler implements EventHandler<BatchEvent> {
             windowClosed = true;
         }
         synchronized (SCHEDULER_LOCK) {
-            ScheduledExecutorService scheduler = registeredScheduler;
+            Timer scheduler = registeredScheduler;
             registeredScheduler = null;
             if (scheduler == null || scheduler != windowScheduler) {
                 // 从未登记（无窗口或没收到过事件），或该实例已被重建：不碰当前调度器的登记数
@@ -231,7 +259,9 @@ public class BufferingBatchHandler implements EventHandler<BatchEvent> {
             if (--windowTaskCount <= 0) {
                 windowTaskCount = 0;
                 windowScheduler = null;
-                scheduler.shutdownNow();
+                // cancel 会丢弃未到期的任务：flushRemaining 已在此前冲刷残余缓冲，
+                // 迟到的窗口任务不应再把停机后的请求重新提交
+                scheduler.cancel();
             }
         }
     }
@@ -248,19 +278,13 @@ public class BufferingBatchHandler implements EventHandler<BatchEvent> {
      * {@code schedule()} 的竞态。
      * </p>
      */
-    private ScheduledExecutorService ensureScheduler() {
+    private Timer ensureScheduler() {
         synchronized (SCHEDULER_LOCK) {
-            ScheduledExecutorService scheduler = windowScheduler;
-            if (scheduler == null || scheduler.isShutdown()) {
-                scheduler = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
-                    @Override
-                    public Thread newThread(Runnable r) {
-                        // daemon：窗口调度是辅助线程，不应拖住 JVM 退出
-                        Thread t = new Thread(r, "batch-window");
-                        t.setDaemon(true);
-                        return t;
-                    }
-                });
+            Timer scheduler = windowScheduler;
+            if (scheduler == null) {
+                // daemon：窗口调度是辅助线程，不应拖住 JVM 退出。
+                // Timer 的任务异常已由 TimerTask#run 自行收敛，线程不会因业务异常终止。
+                scheduler = new Timer("batch-window", true);
                 windowScheduler = scheduler;
                 // 新实例从零开始计数：旧实例的登记随其关闭一并失效
                 windowTaskCount = 0;

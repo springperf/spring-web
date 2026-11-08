@@ -386,7 +386,7 @@ destroyComponent()     → 资源释放
 
 - **不改管线语义** — Filter、Interceptor 逐请求执行，不受影响
 - **异步复用** — `BatchRequest<R>` 继承 `DeferredResult<R>`，利用框架已有的异步处理机制挂起/恢复请求
-- **攒批窗口可选** — 默认 `batchWindowMillis=0`，由 Disruptor `endOfBatch` 或 `maxBatchSize` 决定刷出；显式开启窗口后才按时间窗口攒批，见[批处理指南](batch.md)
+- **攒批窗口默认开启** — `batchWindowMillis=5`，批大小由时间窗口保证；显式设为 0 才回到 Disruptor `endOfBatch` / `maxBatchSize` 决定刷出，见[批处理指南](batch.md)
 - **单请求方法保持不变** — 需新增 `@BatchMapping` 批量方法与 `BatchRequest` 子类，现有单请求方法无需改动
 
 ### 架构

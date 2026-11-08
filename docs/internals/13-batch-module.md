@@ -110,7 +110,7 @@ public BatchMapping.WaitStrategy waitStrategy()               // 等待策略
 public BatchMapping.Backpressure backpressure()               // 背压策略
 public Constructor<?> singleMethodCtor()                      // 单方法参数匹配的构造函数
 public int maxBatchSize()        { return maxBatchSize; }     // 攒批阈值
-public int batchWindowMillis()   { return batchWindowMillis; } // 攒批时间窗口，0=关闭（见 §5.1）
+public int batchWindowMillis()   { return batchWindowMillis; } // 攒批时间窗口，默认 5ms；0=显式关闭（见 §5.1）
 public int consumerSize()        { return consumerSize; }     // 业务池最大线程数
 ```
 
@@ -356,10 +356,10 @@ public void shutdown() {
 
 ### 5.1 攒批的两个阶段：阈值 flush 与窗口 flush
 
-`BufferingBatchHandler` 实现 `EventHandler<BatchEvent>`，是 Disruptor 的唯一消费者。**攒批存在两条互斥的触发路径，由 `batchWindowMillis` 决定走哪条**：
+`BufferingBatchHandler` 实现 `EventHandler<BatchEvent>`，是 Disruptor 的唯一消费者。**攒批存在两条互斥的触发路径，由 `batchWindowMillis` 决定走哪条（默认 5ms，走窗口路径）**：
 
 ```java
-// BufferingBatchHandler.onEvent（窗口关闭，默认）
+// BufferingBatchHandler.onEvent（显式关闭窗口时）
 buffer.add(request);
 if (maxBatchSize > 0 && buffer.size() >= maxBatchSize) {
     flush();
@@ -380,9 +380,9 @@ if (maxBatchSize > 0 && buffer.size() >= maxBatchSize) {
 
 **窗口 flush**（仅窗口开启）：本批第一个事件到达时向共享调度线程排一个到期任务，期间继续累积，到期把整批一次性提交。到期判断在 `flushOnWindow()` 中，与 `onEvent` 通过 `bufferLock` 互斥。
 
-### 5.2 为什么默认（无窗口）攒不起批
+### 5.2 为什么关闭窗口时攒不起批
 
-这是本模块最容易踩的坑，值得单独说清楚。`flush()` 的提交方式是：
+这是理解窗口价值的背景，值得单独说清楚（2.7.8 起默认已开启 5ms 窗口，只有显式 `batchWindowMillis=0` 才走这条路径）。`flush()` 的提交方式是：
 
 ```java
 private void flush() {
@@ -399,7 +399,7 @@ private void flush() {
 
 消费者唯一被阻塞的时刻是 bizExecutor 满员、`CallerRunsPolicy` 让消费者线程自己执行 IO。只有那时 RingBuffer 才积压、批大小才冲高。因此 **`consumerSize` 与批大小直接对冲**：并行度调大 → 消费更快 → 积压更少 → 批更小。
 
-实测（100ms IO、并发 100、JDK 17）：
+实测（100ms IO、并发 100、JDK 17，窗口精度修复前，用于说明机制）：
 
 | 配置 | 批大小 | 每请求 IO 成本 | QPS |
 |---|---|---|---|
@@ -407,7 +407,7 @@ private void flush() {
 | `consumerSize=1` | 35.2 | 106.5ms → 3.1ms（34x） | 458 |
 | `consumerSize=8` + `batchWindowMillis=5` | 17.8 | 106.5ms → 6.1ms（17x） | 611 |
 
-**窗口是唯一能同时拿到「并行度」与「大批」的手段**：它把刷出时机从「消费者追上空队列」改成「窗口到期」，批大小由配置保证。代价是每批最多多等一个窗口（单请求延迟上界 ≈ 窗口值），故窗口应取 IO 延迟的 1/4 ~ 1/2——实测 10ms IO 配 5ms 窗口，吞吐反而低于不开窗口。
+**窗口是唯一能同时拿到「并行度」与「大批」的手段**：它把刷出时机从「消费者追上空队列」改成「窗口到期」，批大小由配置保证。代价是每批最多多等一个窗口（单请求延迟上界 ≈ 窗口值），默认窗口取 5ms：修复调度精度后，并发 100 下 5 / 10 / 20 / 50ms IO 四档吞吐分别为关窗的 1.30x / 2.14x / 1.71x / 1.54x；10ms 档因平台定时粒度量化反而更差，详见[批处理文档](../batch.md)。
 
 ### 5.3 窗口的并发设计
 
@@ -415,9 +415,10 @@ private void flush() {
 |---|---|
 | 消费者线程 vs 调度线程 | `bufferLock` 保护「add」与「取走并替换 list」；持锁时间仅数十纳秒，远小于窗口周期 |
 | 调度线程数 | 全进程共享单个 `batch-window` daemon 线程；每个 handler 只登记一次并记录「登记在哪个实例上」，登记/注销/关停在同一把静态锁内完成——无窗口队列停机时不会误减其他队列的份额 |
-| 任务被拒 | 调度器正在关闭时 `schedule()` 可能抛 `RejectedExecutionException`：捕获后立即刷出本批，不让请求挂到超时 |
+| 调度精度 | 用 `java.util.Timer`（内部走 `Object.wait(timeout)`）而非 `ScheduledThreadPoolExecutor`（内部走 `LockSupport.parkNanos`）：后者在部分 Windows 环境把 1~10ms 的延迟统一放大到约 15ms，使 `batchWindowMillis=3/5` 名存实亡。Timer 线程不捕获任务异常，故 TimerTask 内自行收敛 `Throwable`，避免一个队列的异常终止整个共享调度线程 |
+| 任务被拒 | 调度器正在关闭时 `schedule()` 会抛 `IllegalStateException`：捕获后立即刷出本批，不让请求挂到超时 |
 | 停机顺序 | `DisruptorQueue.shutdown()` 中 `flushRemaining()` → `closeWindow()`，防止迟到任务重复提交 |
-| 向后兼容 | `batchWindowMillis` 默认 0，此时 `endOfBatch` 分支与历史行为完全一致，`bufferLock` 无争用 |
+| 显式关闭 | `batchWindowMillis=0` 时走 `endOfBatch` 分支（2.7.8 前的历史行为），`bufferLock` 无争用、不创建窗口调度线程 |
 
 `flush()` 将当前 buffer 原子替换为新 ArrayList，提交到 `bizExecutor`：
 
@@ -579,12 +580,12 @@ public class BatchOverflowException extends ResponseStatusException {
 1. **`BatchRegistry` + `BatchScanner` 启动期扫描** → 扫描 `@BatchMapping`，关联单请求方法，解析 `BatchRequest` 泛型类型，缓存 `BatchRequestMetaData` 到 `PathMappingContext`。
 2. **`BatchInvoker` 方法体替换** → `InvokableHandlerMethod.setInvoker(batchInvoker)`（签名 `public void setInvoker(Invoker invoker)`），运行时反射创建 `BatchRequest` 实例并入队，原方法体完全不执行。
 3. **`DisruptorQueue` 无锁入队** → `ProducerType.MULTI` CAS claim，`BatchEvent` 预分配零 GC，`normalizeRingBufferSize` 上下限保护，三种背压策略（BLOCK/DROP/THROW）。
-4. **`BufferingBatchHandler` 攒批消费** → `endOfBatch` + `maxBatchSize` 双触发（`batchWindowMillis > 0` 时改为「窗口到期 + 攒满」），`bizExecutor` 零核心线程 + `SynchronousQueue` + `CallerRunsPolicy` 自然背压，`handleBatchError` / `failUncompleted` 逐个 `setError` 防挂起。
+4. **`BufferingBatchHandler` 攒批消费** → `endOfBatch` + `maxBatchSize` 双触发（默认 5ms 窗口下为「窗口到期 + 攒满」；显式 0 才走 `endOfBatch`），`bizExecutor` 零核心线程 + `SynchronousQueue` + `CallerRunsPolicy` 自然背压，`handleBatchError` / `failUncompleted` 逐个 `setError` 防挂起。
 5. **三级背压链** → RingBuffer 满 → 生产者线程（默认 `default` 业务池 worker）阻塞 → TCP 反压（BLOCK 模式）；或 `tryPublishEvent` 失败 + `BatchOverflowException` 429（DROP/THROW 模式）。
 6. **9 个指标埋点** → `BatchMetrics` SPI 定义 6 个记录方法（由 starter 的 `MicrometerBatchMetrics` 实现为 9 个指标，容量 Gauge 在启动预热 + 每批 + 背压失败时采样），`queue` Tag 值 `batch:<ClassName>.<methodName>`，`NoOpBatchMetrics` 默认零开销。
 7. **安全网** → Step 1 的 drain 有 5s 硬上界、业务池拒绝时逐条 `setError`；批量方法漏完成请求由 `failUncompleted` 收尾；停机竞态窗口由 `DeferredResult` 30s 超时兜底；`BatchRequest.completed` 守卫防止重复回调；`BatchExceptionHandler` 捕获消费者异常；`BatchOverflowException` 映射 429。
 
-这一层的克制体现在：**不把批处理留给业务代码，也不为批处理引入复杂的消息中间件。** LMAX Disruptor 提供无锁的环形缓冲区，`ProducerType.MULTI` 支持多生产者并发入队，`SynchronousQueue` + `CallerRunsPolicy` 在零额外线程的基础上实现了自然背压——**默认（`batchWindowMillis=0`）下没有调度线程、没有定时器、没有额外的队列线程**；只有显式开启窗口才引入一个全进程共享的 `batch-window` daemon 线程（按队列登记、无使用者时关停）。三个线程层次（handler 执行线程 / Disruptor 消费者 / bizExecutor 工作者）形成了一条干净的反压链。`@BatchMapping` 方法体替换语义让用户无需修改单请求方法——框架层面透明的"请求聚合"，是 [01 篇](01-design-philosophy.md) 原则 2（单请求方法保持不变）在批处理场景的落地。
+这一层的克制体现在：**不把批处理留给业务代码，也不为批处理引入复杂的消息中间件。** LMAX Disruptor 提供无锁的环形缓冲区，`ProducerType.MULTI` 支持多生产者并发入队，`SynchronousQueue` + `CallerRunsPolicy` 在零额外线程的基础上实现了自然背压——默认 5ms 窗口会引入一个全进程共享的 `batch-window` daemon 线程（按队列登记、无使用者时关停）；显式把 `batchWindowMillis` 设为 0 时则没有调度线程、没有定时器、没有额外的队列线程。三个线程层次（handler 执行线程 / Disruptor 消费者 / bizExecutor 工作者）形成了一条干净的反压链。`@BatchMapping` 方法体替换语义让用户无需修改单请求方法——框架层面透明的"请求聚合"，是 [01 篇](01-design-philosophy.md) 原则 2（单请求方法保持不变）在批处理场景的落地。
 
 ---
 

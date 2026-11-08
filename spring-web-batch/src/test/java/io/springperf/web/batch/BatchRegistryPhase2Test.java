@@ -48,6 +48,18 @@ class BatchRegistryPhase2Test {
         }
     }
 
+    /** 显式关闭窗口的队列，用于验证「只有显式 0 才告警」。 */
+    @Controller
+    public static class NoWindowController {
+        @BatchMapping(method = "single", ringBufferSize = 64, maxBatchSize = 5, batchWindowMillis = 0,
+                consumerSize = 1)
+        public void batch(List<EchoRequest> requests) {
+        }
+
+        public void single(String data) {
+        }
+    }
+
     @Configuration
     static class TestConfig {
         @Bean
