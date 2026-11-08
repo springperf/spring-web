@@ -148,7 +148,7 @@ class BatchScannerScanTest {
     }
 
     @Test
-    void scan_undeclaredWindow_usesFiveMillisDefault() throws Exception {
+    void scan_undeclaredWindow_usesTwoMillisDefault() throws Exception {
         try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext()) {
             ctx.registerBean(DefaultConsumerController.class);
             ctx.refresh();
@@ -157,8 +157,8 @@ class BatchScannerScanTest {
             List<BatchHandlerRegistration> result = new BatchScanner().scan(ctx, Collections.singletonList(singleCtx));
 
             assertEquals(1, result.size());
-            assertEquals(5, result.get(0).meta().batchWindowMillis(),
-                    "注解未声明 batchWindowMillis 时应采用 5ms 默认值");
+            assertEquals(2, result.get(0).meta().batchWindowMillis(),
+                    "注解未声明 batchWindowMillis 时应采用 2ms 默认值");
         }
     }
 

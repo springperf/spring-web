@@ -20,7 +20,7 @@ import java.util.Map;
  * <li>{@code GET /perf/io/batch-parallel/{id}} —— {@code consumerSize=8}，<b>合理并行度、无窗口</b></li>
  * <li>{@code GET /perf/io/batch-aggregate/{id}} —— {@code consumerSize=1}，<b>极端聚合</b>：用并行度换攒批能力</li>
  * <li>{@code GET /perf/io/batch-window/{id}} —— {@code consumerSize=8} +
- * {@code batchWindowMillis=5}，<b>窗口攒批</b>：并行度与攒批能力兼得</li>
+ * {@code batchWindowMillis=2}，<b>窗口攒批</b>：并行度与攒批能力兼得</li>
  * </ul>
  * <p>
  * 因为 {@link SimulatedIoRepository#findById} 与 {@link SimulatedIoRepository#findByIds} 的等待时间严格一致， 各端测出的 QPS / IO 次数 / IO
@@ -70,7 +70,7 @@ public class PerfIoController {
     }
 
     /**
-     * 实验组 C（窗口攒批）：{@code consumerSize=8} 保持合理并行度，同时用 5ms 窗口把批大小交给配置保证， 而不是依赖 bizExecutor 偶然饱和。这是 「并行度与攒批能力兼得」的唯一路径。
+     * 实验组 C（窗口攒批）：{@code consumerSize=8} 保持合理并行度，同时用 2ms 窗口把批大小交给配置保证， 而不是依赖 bizExecutor 偶然饱和。这是 「并行度与攒批能力兼得」的唯一路径。
      */
     @GetMapping("/batch-window/{id}")
     public PerfIoRequest batchWindow(@PathVariable String id) {
@@ -84,7 +84,7 @@ public class PerfIoController {
      * {@code consumerSize / ioLatency × 平均批大小}，三者缺一不可。 {@code consumerSize} 用于复用多核，不应超过核数。
      * </p>
      * <p>
-     * 对照实验必须显式关闭窗口：默认 5ms 窗口会让三组端点都生效，失去「无窗口」基线。
+     * 对照实验必须显式关闭窗口：默认 2ms 窗口会让三组端点都生效，失去「无窗口」基线。
      * </p>
      */
     @BatchMapping(method = "batchParallel", maxBatchSize = 100, ringBufferSize = 8192, batchWindowMillis = 0, consumerSize = 8)
@@ -99,11 +99,11 @@ public class PerfIoController {
     }
 
     /**
-     * 窗口攒批配置：{@code consumerSize=8}（复用多核，不超配）+ {@code batchWindowMillis=5}（批大小由窗口保证）。 5ms 也是
+     * 窗口攒批配置：{@code consumerSize=8}（复用多核，不超配）+ {@code batchWindowMillis=2}（批大小由窗口保证）。 2ms 也是
      * {@link io.springperf.web.batch.annotation.BatchMapping#batchWindowMillis()} 的默认值，这里显式写出以标明实验变量：
      * 远小于 10ms 以上的 IO 延迟，等待成本低于攒批收益。
      */
-    @BatchMapping(method = "batchWindow", maxBatchSize = 100, ringBufferSize = 8192, batchWindowMillis = 5, consumerSize = 8)
+    @BatchMapping(method = "batchWindow", maxBatchSize = 100, ringBufferSize = 8192, batchWindowMillis = 2, consumerSize = 8)
     public void batchWindowFind(List<PerfIoRequest> requests) {
         batchIo(requests);
     }

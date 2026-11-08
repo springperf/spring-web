@@ -90,8 +90,8 @@ public class BatchRegistry extends BaseWebComponent {
         if (!noWindow.isEmpty()) {
             log.warn("Batch queues with batchWindowMillis resolved to <= 0 ({}): {} - flushing falls back to "
                     + "endOfBatch, so batch size depends on momentary RingBuffer backlog and maxBatchSize is rarely "
-                    + "reached; keep the default 5ms window (or 2~3ms for very fast downstream IO) unless the extra "
-                    + "latency is unacceptable", noWindow.size(), String.join(", ", noWindow));
+                    + "reached; keep the default 2ms window unless the extra latency is unacceptable", noWindow.size(),
+                    String.join(", ", noWindow));
         }
         int cores = Runtime.getRuntime().availableProcessors();
         if (registrations.size() > 1 && workerBudget > cores) {

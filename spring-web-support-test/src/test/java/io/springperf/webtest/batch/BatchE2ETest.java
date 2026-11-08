@@ -72,7 +72,7 @@ public class BatchE2ETest extends BaseE2ETest {
         // 每个响应都来自批处理方法，且回显的批大小不能超过总请求数
         assertTrue(batchSizes.stream().allMatch(size -> size >= 1 && size <= requestCount),
                 "批大小应在 [1, 请求数] 内，实际: " + batchSizes);
-        // 说明：该端点使用默认 5ms 攒批窗口，合并次数仍取决于请求到达时序，不能强求；
+        // 说明：该端点使用默认 2ms 攒批窗口，合并次数仍取决于请求到达时序，不能强求；
         // 窗口 + maxBatchSize 的确定性合并由 maxBatchSize_limitsBatchSizeInResponses 验证
     }
 
