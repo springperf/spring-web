@@ -203,12 +203,13 @@
 - **自动配置开关**：新增 `springperf.openapi.enabled`、`springperf.swagger-ui.enabled`（可分别关闭文档端点与 Swagger UI 资源）、`springperf.web.mvc-conflict-check.enabled`（三方库传递引入 Spring MVC 时可跳过启动期冲突检查）
 - **管理端口与 SSL 配置**：`management.server.*` 统一按「管理端口专属值 → 主服务器 `server.*` → 默认值」解析，HTTP/2、请求体上限、SSL 等可按需覆盖（SSL 开关同样遵循该回退）；SSL 配置改用 Spring Boot 的 `Ssl` 模型绑定，非法 `client-auth`、空 keystore 或缺失凭据在启动期直接报错
 - **服务就绪时机**：`WebServerInitializedEvent` 改为在 Netty 实际绑定端口后发布，服务注册组件（Nacos / Eureka / Consul）感知就绪的时机更准确
+- **`StreamingResponseBody` 支持**：返回 `StreamingResponseBody`（含 `ResponseEntity<StreamingResponseBody>`）现在会真正流式写出——`writeTo` 在业务线程池执行，字节按 8KB 分帧经既有流式写出通道送达，客户端可边写边读；`produces` 声明了具体类型时写入该 `Content-Type`，HEAD 只发响应头。此前该类型无解析器，按内容协商失败返回 500
 
 ### 变更
 
 - **Servlet 规范语义收紧**：同一异步周期内重复 `startAsync()` 抛 `IllegalStateException`；`complete()` 幂等、`isAsyncStarted()` 在 `complete()` / `dispatch()` 后返回 `false`；`dispatch()` 期间 `DispatcherType` 为 `ASYNC`；`addListener(listener, req, resp)` 的事件携带注册时的 req/resp；`getHeaders(name)` 无该头返回空集合；`getDateHeader()` 对存在但无法解析的日期抛 `IllegalArgumentException`；`setAttribute(name, null)` 等价 `removeAttribute`；`setSessionTrackingModes()` 现在生效并按规范校验（集合非空且必须含 `COOKIE` 或 `SSL`）
 - **视图错误不再静默**：视图解析异常保留原始 cause 不再被跳过；`ModelAndView` 指向不存在的视图抛异常而非 200 空白页；渲染中途抛异常不再返回 200 + 半截 HTML，改为清空缓冲后交给异常处理器（500 或自定义错误页）；`redirect:` 不再带 `text/html`，并保留 `ModelAndView` 指定的 3xx 状态码
-- **内容协商失败显式报错**：无匹配转换器的 `@ResponseBody` 返回值一律 500（原先静默返回 200 + 空响应体），同时覆盖「已显式设置 `Content-Type`」与「`produces` 协商出类型」两条链路——此前只做了前者，走 `produces` 的返回值（如 `StreamingResponseBody`）仍被静默丢弃，连 `produces` 声明的 Content-Type 都不写。与 Spring MVC 语义一致
+- **内容协商失败显式报错**：无匹配转换器的 `@ResponseBody` 返回值一律 500（原先静默返回 200 + 空响应体），同时覆盖「已显式设置 `Content-Type`」与「`produces` 协商出类型」两条链路——此前只做了前者，走 `produces` 的返回值仍被静默丢弃，连 `produces` 声明的 Content-Type 都不写。与 Spring MVC 语义一致
 - **配置启动期校验**：`spring.web.view.engine` 的未知值、`none` 与其他引擎混写、`spring.thymeleaf.mode` / `spring.freemarker.content-type` 非法值、以及视图引擎 `cache` / `enabled` 非 `true` / `false` 的值，均改为启动期报错而非静默忽略；`engine=none` 时不再装配内置 JSP（自定义 `ViewResolver` Bean 不受影响）
 - **批处理默认启用攒批窗口**：相比 3.5.7，未显式配置的 `@BatchMapping` 现在默认按 5ms 窗口攒批（批大小由窗口保证，单请求延迟上界增加约 5ms）。若下游 IO 极快或负载很低、希望保留旧版「消费者追上空队列即刷出」的行为，显式写 `batchWindowMillis = 0`；启动期提示也改为仅在显式关闭时出现
 

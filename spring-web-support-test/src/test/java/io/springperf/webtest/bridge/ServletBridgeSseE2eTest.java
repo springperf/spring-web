@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -133,29 +133,185 @@ class ServletBridgeSseE2eTest extends BaseE2ETest {
     }
 
     /**
-     * {@code StreamingResponseBody} 当前**不受支持**，但不得静默丢弃（行为固化用例）。
+     * {@code StreamingResponseBody}：由 {@code StreamingResponseBodyReturnValueResolver} 认领后正常流式写出。
      * <p>
-     * 它与 emitter 无关：只是独立 {@code @FunctionalInterface}（{@code writeTo(OutputStream)}）， 既没有 {@code StreamEmitter} 的
-     * resolver 认领，也没有 converter 能写。此前返回值被静默忽略，客户端拿到 200 + 空 body（连
-     * {@code produces} 声明的 Content-Type 都不写），服务端零异常零日志 —— 是最难排查的一类降级。
-     * 现在协商出 {@code text/plain} 却无 converter 可写 → fail-fast 500，与「显式 Content-Type
-     * 无匹配 converter」一致。
-     * </p>
-     * <p>
-     * 若将来实现了对应 resolver（真正支持 SRB），本用例会失败并提示改为正向断言——这正是它的作用。
+     * 此前该类型无 resolver → 协商出 text/plain 却无 converter → 500。现在异步生命周期复用 Callable 通道、
+     * 帧写出复用 StreamSender（与 SSE / Flux 同一条路径）：200 + 声明的 Content-Type + 分帧送达，
+     * 客户端读到 EOF 说明终止块已写。
      * </p>
      */
     @Test
-    void streamingResponseBody_failsFastInsteadOfSilentEmptyBody() throws Exception {
+    void streamingResponseBody_streamsFramesAndTerminates() throws Exception {
         try (Response resp = CLIENT
                 .newCall(new Request.Builder().url(url("/api/servlet-bridge/streaming-response-body")).build())
                 .execute()) {
             String body = resp.body().string();
-            assertEquals(500, resp.code(),
-                    "无 resolver 认领的返回类型必须 fail-fast（500），不得静默 200 + 空 body。实际 code=" + resp.code()
-                            + ", body=[" + body + "]");
-            assertFalse(body.contains("srb-1"), "若此处出现内容，说明 StreamingResponseBody 已被支持——请把本用例改为正向断言。实际:\n" + body);
+            assertEquals(200, resp.code(), "StreamingResponseBody 应被正常流式写出，实际 body=[" + body + "]");
+            assertEquals("srb-1srb-2", body, "帧内容与顺序必须保持");
+            String contentType = resp.header("Content-Type");
+            assertNotNull(contentType, "produces 声明的 Content-Type 必须写出");
+            assertTrue(contentType.contains("text/plain"), "实际: " + contentType);
         }
+        assertRefsZeroed();
+    }
+
+    /**
+     * 大流量：逐帧校验「帧号连续 + 内容未错位」。
+     * <p>
+     * 端点每帧前 4 字节写大端帧号，其余填充 {@code 'x'}。若帧顺序错乱、丢帧，或复用同一缓冲导致
+     * 内容被后续写入覆盖，帧号或填充字节会在这里对不上。
+     * </p>
+     */
+    @Test
+    void streamingResponseBody_largePayloadIsFramedAndComplete() throws Exception {
+        int frames = 200;
+        try (Response resp = CLIENT.newCall(new Request.Builder()
+                .url(url("/api/servlet-bridge/streaming-response-body-large?frames=" + frames)).build()).execute()) {
+            byte[] body = resp.body().bytes();
+            assertEquals(200, resp.code());
+            assertEquals(frames * 1000, body.length, "大流量必须逐帧完整送达");
+            for (int i = 0; i < frames; i++) {
+                int offset = i * 1000;
+                int sequence = ((body[offset] & 0xff) << 24) | ((body[offset + 1] & 0xff) << 16)
+                        | ((body[offset + 2] & 0xff) << 8) | (body[offset + 3] & 0xff);
+                assertEquals(i, sequence, "第 " + i + " 帧的帧号错位（帧序错乱或缓冲复用覆盖）");
+                assertEquals('x', body[offset + 4], "第 " + i + " 帧填充内容被破坏");
+                assertEquals('x', body[offset + 999], "第 " + i + " 帧尾部内容被破坏");
+            }
+        }
+        assertRefsZeroed();
+    }
+
+    /** {@code ResponseEntity<StreamingResponseBody>}：状态码与自定义头必须生效。 */
+    @Test
+    void streamingResponseBody_responseEntityAppliesStatusAndHeaders() throws Exception {
+        try (Response resp = CLIENT
+                .newCall(new Request.Builder().url(url("/api/servlet-bridge/streaming-response-body-entity")).build())
+                .execute()) {
+            assertEquals(201, resp.code());
+            assertEquals("yes", resp.header("X-Srb"));
+            assertEquals("entity-srb", resp.body().string());
+        }
+        assertRefsZeroed();
+    }
+
+    /** 未声明 {@code produces} 时不得替用户编造 Content-Type。 */
+    @Test
+    void streamingResponseBody_withoutProducesDoesNotInventContentType() throws Exception {
+        try (Response resp = CLIENT.newCall(
+                new Request.Builder().url(url("/api/servlet-bridge/streaming-response-body-no-produces")).build())
+                .execute()) {
+            assertEquals(200, resp.code());
+            assertEquals("no-produces", resp.body().string());
+            assertNull(resp.header("Content-Type"), "未声明 produces 时不得编造 Content-Type");
+        }
+        assertRefsZeroed();
+    }
+
+    /** 0 字节：必须写终止块，客户端读到 EOF（空 body）而不是挂到读超时。 */
+    @Test
+    void streamingResponseBody_emptyStreamTerminatesWithoutHanging() throws Exception {
+        try (Response resp = CLIENT.newCall(
+                new Request.Builder().url(url("/api/servlet-bridge/streaming-response-body-empty")).build()).execute()) {
+            assertEquals(200, resp.code());
+            assertEquals("", resp.body().string(), "0 字节流必须写出终止块（读到 EOF 即空 body），否则会挂到读超时");
+        }
+        assertRefsZeroed();
+    }
+
+    /** HEAD：只发响应头，不得返回 body，也不得因多次 flush 打出 WARN 洪水。 */
+    @Test
+    void streamingResponseBody_headRequestSendsHeadersWithoutBody() throws Exception {
+        try (Response resp = CLIENT.newCall(
+                new Request.Builder().url(url("/api/servlet-bridge/streaming-response-body")).head().build())
+                .execute()) {
+            assertEquals(200, resp.code());
+            String contentType = resp.header("Content-Type");
+            assertNotNull(contentType, "HEAD 仍需给出与 GET 一致的 Content-Type");
+            assertTrue(contentType.contains("text/plain"), "实际: " + contentType);
+            assertEquals("", resp.body().string(), "HEAD 不得返回 body");
+        }
+        assertRefsZeroed();
+    }
+
+    /**
+     * 写出任何字节之前失败：头已提交（chunked），客户端必然看到 200，随后只能截断连接。
+     * <p>
+     * 这是与 Spring MVC 的唯一行为差异（Spring 有 Servlet 容器兜着未提交状态，能改写成 500）。
+     * 用例固化「绝不伪装成正常结束」——若换成写终止块，客户端会把截断当成 200 完整响应。
+     * </p>
+     */
+    @Test
+    void streamingResponseBody_throwsBeforeFirstFrame_truncatesConnection() throws Exception {
+        boolean truncated = false;
+        try (Response resp = CLIENT.newCall(
+                new Request.Builder().url(url("/api/servlet-bridge/streaming-response-body-throw-before")).build())
+                .execute()) {
+            assertEquals(200, resp.code(), "flushChunked 已提交响应头，客户端必然看到 200");
+            try {
+                resp.body().string();
+            } catch (java.io.IOException expectedTruncation) {
+                truncated = true;
+            }
+        }
+        assertTrue(truncated, "写前失败必须截断连接，不得写终止块伪装成 200 正常结束");
+        assertRefsZeroed();
+    }
+
+    /** 写出若干帧之后失败：已送达的前缀保留，连接截断，不补「200 正常结束」的尾巴。 */
+    @Test
+    void streamingResponseBody_throwsAfterFrames_deliversPrefixThenTruncates() throws Exception {
+        java.io.ByteArrayOutputStream received = new java.io.ByteArrayOutputStream();
+        boolean truncated = false;
+        try (Response resp = CLIENT.newCall(
+                new Request.Builder().url(url("/api/servlet-bridge/streaming-response-body-throw-mid")).build())
+                .execute()) {
+            assertEquals(200, resp.code());
+            try {
+                byte[] buffer = new byte[4096];
+                int read;
+                while ((read = resp.body().source().read(buffer)) != -1) {
+                    received.write(buffer, 0, read);
+                }
+            } catch (java.io.IOException expectedTruncation) {
+                truncated = true;
+            }
+        }
+        assertTrue(truncated, "中途失败必须截断连接（不得写终止块），否则客户端无法感知失败");
+        assertTrue(received.size() >= 8192, "失败前已入队的帧应已送达，实际收到 " + received.size() + " 字节");
+        for (byte b : received.toByteArray()) {
+            assertEquals('y', b, "已送达前缀的内容不得被破坏");
+        }
+        assertRefsZeroed();
+    }
+
+    /**
+     * 客户端提前断开：服务端必须尽快感知并释放异步生命周期。
+     * <p>
+     * 端点会写满约 10s；断言在 5s 内引用归零。若断连后仍在把剩余帧「写完」（全部丢弃、CPU 空转），
+     * 或卡在背压自旋里，这里会超时失败。
+     * </p>
+     */
+    @Test
+    void streamingResponseBody_clientDisconnects_asyncLifecycleIsReleased() throws Exception {
+        int baseline = activeRequestRefs();
+        Response resp = CLIENT.newCall(
+                new Request.Builder().url(url("/api/servlet-bridge/streaming-response-body-slow")).build())
+                .execute();
+        assertEquals(200, resp.code());
+        // 读到首批数据即断开：后续帧的写出必须因断连失败
+        resp.body().source().readByteArray(100);
+        // 流进行中必须真的持有引用，否则本类所有「归零」断言都是空转
+        assertTrue(activeRequestRefs() > baseline,
+                "流式进行中应持有异步引用，实际 " + activeRequestRefs() + "（=基线 " + baseline + "）");
+        resp.close();
+
+        long deadline = System.currentTimeMillis() + 5000;
+        while (activeRequestRefs() != baseline && System.currentTimeMillis() < deadline) {
+            Thread.sleep(20);
+        }
+        assertEquals(baseline, activeRequestRefs(),
+                "客户端断开后异步生命周期必须尽快释放（残留即说明线程卡在背压等待，或仍在空写剩余帧）");
     }
 
     /** 异步持有者引用归零（桥接模式的异步生命周期同样受此不变式约束）。 */
