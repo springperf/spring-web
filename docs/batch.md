@@ -115,7 +115,7 @@ public @interface BatchMapping {
     Backpressure backpressure() default Backpressure.BLOCK;
     String method() default "";
     int maxBatchSize() default 100;
-    int batchWindowMillis() default 5;
+    int batchWindowMillis() default 2;
     int consumerSize() default -1;
 
     enum WaitStrategy { YIELDING, BLOCKING, SLEEPING, BUSY_SPIN }
@@ -132,7 +132,7 @@ public @interface BatchMapping {
 | `backpressure` | BLOCK | 背压策略，见下方表格 |
 | `method` | "" | 被关联的单请求方法名，默认与批量处理方法同名 |
 | `maxBatchSize` | 100 | 单次批处理最大请求数，达到该值触发批量处理 |
-| `batchWindowMillis` | 5 | 攒批时间窗口（毫秒），0 = 显式关闭。**默认开启**，批大小由窗口保证而非依赖 RingBuffer 瞬时积压；低负载 + 极快 IO（< 5ms）可设 0 或 2~3ms，见[攒批机制与批大小](#攒批机制与批大小) |
+| `batchWindowMillis` | 2 | 攒批时间窗口（毫秒），0 = 显式关闭。**默认开启**，批大小由窗口保证而非依赖 RingBuffer 瞬时积压；中高并发下 2ms 已足够，低负载（在途请求撑不满一批）可设 0，见[攒批机制与批大小](#攒批机制与批大小) |
 | `consumerSize` | -1 | 业务线程池（bizExecutor）最大并发处理线程数，默认 CPU 核数；Disruptor 消费者线程独立，**不占该配额**。开启虚拟线程（JDK 21+）后执行线程改为虚拟线程，配额语义不变；此时建议保持 `waitStrategy=BLOCKING`——`BUSY_SPIN`/`YIELDING` 不会卸载虚拟线程，会长期占住载体线程 |
 
 ### 背压策略
@@ -172,7 +172,7 @@ bizExecutor 线程池（0 ~ consumerSize 个；开虚拟线程时为虚拟线程
 
 ### 攒批机制与批大小
 
-**批处理模块的收益完全取决于批大小**：一次批量 IO 替代 N 次单条 IO，N 越大，消除的 IO 越多。默认开启 5ms 攒批窗口就是为了保证批大小；若显式设为 0，批大小会回落到 RingBuffer 瞬时积压的水平，`maxBatchSize=100` 很难达到。原因在于攒批的触发方式：
+**批处理模块的收益完全取决于批大小**：一次批量 IO 替代 N 次单条 IO，N 越大，消除的 IO 越多。默认开启 2ms 攒批窗口就是为了保证批大小；若显式设为 0，批大小会回落到 RingBuffer 瞬时积压的水平，`maxBatchSize=100` 很难达到。原因在于攒批的触发方式：
 
 `BufferingBatchHandler` 把每批请求提交到 bizExecutor 时走的是 `executor.execute()`——**异步提交，IO 在业务线程上执行，不阻塞 Disruptor 消费者线程**。而消费者处理一个事件只是把请求加入 buffer（纳秒级），因此它几乎总能追上空队列；Disruptor 的 `endOfBatch` 信号在「没有更多可用事件」时置位，于是消费者每拿到 1 个事件就落盘一批。
 
@@ -180,60 +180,24 @@ bizExecutor 线程池（0 ~ consumerSize 个；开虚拟线程时为虚拟线程
 
 消费者唯一会被阻塞的时刻，是 bizExecutor 满员、`CallerRunsPolicy` 让消费者线程自己执行 IO。只有那时 RingBuffer 才会积压、批大小才会冲高。这带来一个反直觉的后果：**`consumerSize` 与批大小直接对冲**——并行度调大，消费更快，积压更少，批大小更小。
 
-| 配置（100ms IO，并发 100，窗口精度修复前实测，用于说明机制） | 批大小 | 每请求 IO 成本 | QPS |
-|---|---|---|---|
-| `consumerSize=8`（合理并行度） | 2.8 | 106.5ms → 38.2ms（2.8x） | 632 |
-| `consumerSize=1`（牺牲并行度） | 35.2 | 106.5ms → 3.1ms（34x） | 458 |
-| `consumerSize=8` + `batchWindowMillis=5` | 17.8 | 106.5ms → 6.1ms（17x） | 611 |
+**默认已启用时间窗口。** `batchWindowMillis > 0`（默认 2ms）时，本批第一个事件到达即启动窗口，期间继续累积，直到「攒满 `maxBatchSize`」或「窗口到期」才刷出。这样批大小由配置保证，不再依赖业务池偶然饱和；`consumerSize` 用于复用多核（取核数级别即可，不应超配），两者不再互斥。显式设为 0 才回到上面的 `endOfBatch` 路径。
 
-**默认已启用时间窗口。** `batchWindowMillis > 0`（默认 5ms）时，本批第一个事件到达即启动窗口，期间继续累积，直到「攒满 `maxBatchSize`」或「窗口到期」才刷出。这样批大小由配置保证，不再依赖业务池偶然饱和；`consumerSize` 用于复用多核（取核数级别即可，不应超配），两者不再互斥。显式设为 0 才回到上面的 `endOfBatch` 路径。
+窗口的代价是每个批次最多多等一个窗口，即单请求延迟上界约等于窗口值。默认值取 2ms：中高并发下它已能把在途请求
+攒成接近 `maxBatchSize` 的批，IO 次数随之降低数倍，而 p50 基本不变。窗口再加大，批大小受在途请求数封顶、不会
+继续增长，只是白付等待。
 
-窗口的代价是每个批次最多多等一个窗口，即单请求延迟上界约等于窗口值。默认值 5ms 来自窗口调度精度修复后的参数扫描
-（closed model，并发 100，`consumerSize=8`，`maxBatchSize=100`，下游 IO 5 / 10 / 20 / 50ms）：四档吞吐分别为不开窗口的
-**1.30x / 2.14x / 1.71x / 1.54x**，批大小 64~100，IO 次数降 4~5 倍，p50 / p99 同步下降。低负载（并发 1~4）时
-按平均延迟（并发 / QPS）计算约 +0~6ms，属于纯等待成本。
-
-| IO 延迟 / 负载 | 建议窗口 | 说明 |
+| 场景 / 目标 | 建议窗口 | 说明 |
 |---|---|---|
-| 常规 DB / RPC（≥ 5ms），中高并发 | 5（默认） | 收益已完全兑现，无需调参 |
-| 低负载 + 极快 IO（< 5ms） | 0 或 2~3ms | 等待成本占比高，实测并发 4 / 5ms IO 下吞吐低于关窗 |
-| 慢 IO（> 50ms） | 5，或按需上调后压测 | 5ms 已能攒满 `maxBatchSize`；加大窗口的收益不稳定，先压测 |
+| 常规 DB / RPC（≥ 5ms），中高并发 | 2（默认） | 收益已兑现；加大窗口不会让批更大 |
+| 想降低数据库 / 下游压力 | 2（默认） | IO 次数随批大小成倍下降，与 IO 延迟无关 |
+| 低负载（在途请求撑不满一批） | 0（显式关闭） | 窗口是纯等待成本，批大小被在途请求数卡死 |
+| 慢 IO（> 50ms） | 2（默认） | 2ms 已接近在途上限；需要更大批量先压测 |
 | 极致低延迟 | 0（显式关闭） | 单请求也要等满窗口，延迟敏感场景主动关闭 |
+| 想加大窗口到 10ms 以上 | 先压测 | 2ms 通常已接近在途上限，加大收益不明显 |
 
 显式把 `batchWindowMillis` 设为 0 时，启动期会为每个关闭窗口的队列打一条 WARN（列出队列名），提示该队列的批大小
-取决于 RingBuffer 瞬时积压、`maxBatchSize` 很难达到。未声明该参数的队列使用默认 5ms，不会再被告警；需要旧行为
+取决于 RingBuffer 瞬时积压、`maxBatchSize` 很难达到。未声明该参数的队列使用默认 2ms，不会再被告警；需要旧行为
 可显式写 `batchWindowMillis = 0`。
-
-#### 收益与成本的定量结论
-
-以下数据来自窗口调度精度修复后的参数扫描（closed model，JDK 17，`consumerSize=8`，`maxBatchSize=100`，
-并发 1 / 4 / 100，下游 IO 5 / 10 / 20 / 50ms）。绝对值受机器与负载模型影响，重点看相对趋势。
-
-**高并发（并发 100）——默认 5ms 稳定优于不开窗口**：
-
-| IO 延迟 | W=0 QPS | W=3 | W=5（默认） | W=10 | W=25 | W=5 批大小 / IO 次数 |
-|---|---|---|---|---|---|---|
-| 5ms | 3176 | 1.32x | **1.30x** | — | — | 64.1 / 194（W0：11.4 / 837） |
-| 10ms | 3001 | 1.44x | **2.14x** | 0.93x | — | 100 / 193（W0：9.0 / 1002） |
-| 20ms | 1693 | 1.57x | **1.71x** | 1.11x | — | 68.0 / 128（W0：10.0 / 510） |
-| 50ms | 1061 | 1.37x | **1.54x** | 1.23x | 1.51x | 100 / 49（W0：12.3 / 258） |
-
-收益来自「批量消除 IO」：IO 次数普遍降 4~5 倍，p50 / p99 同步下降（20ms 档 p99 206 → 48ms）。W=3 与 W=5 的差别
-已接近基线噪声，但 W=5 在 10 / 20 / 50ms 三档都更高，故取 5 为默认值。
-
-**低负载（并发 1~4）——等待是纯成本**：稀疏流量下第一个请求排完窗口任务后没有第二个请求来摊薄，只能等窗口到期。
-并发 1 / 10ms IO 下 W=5 的 QPS 约为关窗的 0.84x、p50 16 → 30ms（直方图分桶约 16ms 一档，与平均延迟口径不同）；并发 4 / 5ms IO 下约 0.76x。
-但慢 IO 档仍可能持平或略优（并发 4 / 50ms IO，W=5 为 1.05x）。这类场景建议显式设 0 或 2~3ms。
-
-#### 结论：该不该保留默认窗口
-
-| 目标 | 建议 |
-|------|------|
-| 降低数据库 / 下游压力 | **保持默认 5ms**。IO 次数确定下降，与 IO 延迟无关 |
-| 中高并发 + IO ≥ 10ms 提升吞吐 | **保持默认 5ms**，收益最明显 |
-| 低负载 + 极快 IO（< 5ms） | 显式设 0 或 2~3ms |
-| 极致低延迟 | 显式设 0 |
-| 想加大窗口到 10ms 以上 | 先压测；5ms 通常已攒满 `maxBatchSize` |
 
 ---
 
@@ -307,7 +271,7 @@ bizExecutor 线程池（0 ~ consumerSize 个；开虚拟线程时为虚拟线程
 
 | 键 | 默认 | 对应注解属性 | 说明 |
 |------|--------|------|------|
-| `springperf.batch.window-millis` | `5` | `batchWindowMillis` | 攒批时间窗口（毫秒），`0` = 全局关闭 |
+| `springperf.batch.window-millis` | `2` | `batchWindowMillis` | 攒批时间窗口（毫秒），`0` = 全局关闭 |
 | `springperf.batch.max-batch-size` | `100` | `maxBatchSize` | 单批最大请求数 |
 | `springperf.batch.consumer-size` | `-1` | `consumerSize` | bizExecutor 并发上限，`-1` = CPU 核数 |
 | `springperf.batch.ring-buffer-size` | `4096` | `ringBufferSize` | 非 2 的幂时由队列归一化并告警 |
@@ -326,7 +290,7 @@ springperf.batch.consumer-size=4
 几条边界：
 
 - **只在启动期生效**：队列在启动扫描 `@BatchMapping` 时一次建成，之后改键不会重建队列（与 `pool.core-pool-size` 同类）。
-- **写「内置默认值」等于没写**：Java 注解在运行期区分不出「未声明」与「显式写成默认值」，所以全局 `window-millis=3` 时，`@BatchMapping(batchWindowMillis = 5)` 仍取 3。要单独覆盖，写一个不同的值（如 `0` 关闭窗口、或 `8`）。
+- **写「内置默认值」等于没写**：Java 注解在运行期区分不出「未声明」与「显式写成默认值」，所以全局 `window-millis=3` 时，`@BatchMapping(batchWindowMillis = 2)` 仍取 3。要单独覆盖，写一个不同的值（如 `0` 关闭窗口、或 `5`）。
 - **取值非法直接启动失败**，报错带键名与可选值（`wait-strategy` 写错会列出 `[YIELDING, BLOCKING, SLEEPING, BUSY_SPIN]`），不会静默回落到默认值。
 - **留痕**：启动期打印一行生效值，例如 `Batch global defaults: windowMillis=3, ... (configured: springperf.batch.window-millis)`；`configured: none, all built-in` 表示全部用内置默认。
 
@@ -334,13 +298,13 @@ springperf.batch.consumer-size=4
 
 | 场景 | 推荐配置 | 说明 |
 |------|---------|------|
-| 高吞吐、可接受延迟 | `ringBufferSize=16384, maxBatchSize=500`（窗口保持默认 5ms） | 大 buffer 降低丢包，大 batch 提升吞吐；默认窗口已能保证批大小达到 `maxBatchSize` |
+| 高吞吐、可接受延迟 | `ringBufferSize=16384, maxBatchSize=500`（窗口保持默认 2ms） | 大 buffer 降低丢包，大 batch 提升吞吐；默认窗口已能保证批大小达到 `maxBatchSize` |
 | 低延迟敏感 | `ringBufferSize=1024, maxBatchSize=50, waitStrategy=BUSY_SPIN, batchWindowMillis=0` | 关闭窗口省掉等待；小 buffer 减少排队，BUSY_SPIN 降低延迟。**开启 `spring.threads.virtual.enabled` 时改用 `BLOCKING`**：`BUSY_SPIN`/`YIELDING` 在虚拟线程上不会卸载，会长期占住载体线程 |
 | 资源受限（1c1g） | `ringBufferSize=4096, consumerSize=1` | 单消费者线程，省资源。批大小会自然偏大（消费慢→积压），可显式设 `batchWindowMillis=0` 省掉窗口调度线程 |
-| 批量 DB 查询 | `maxBatchSize=200, batchWindowMillis=5` | 多数数据库 IN 查询 200 条以内性能最佳；窗口让批大小趋近 200 |
-| 批量 RPC 调用 | `maxBatchSize=50, consumerSize=4`（窗口保持默认 5ms） | 多线程并行 RPC，单批不宜过大；5ms 已能攒满批 |
-| 慢 IO（>50ms） | 窗口保持默认 5ms（需要更大批量时再试 25ms 并压测） | 实测 50ms IO 档 5ms 窗口吞吐 1.54x、批大小已到 100（满批），25ms 档跨轮测得 1.51~1.57x，与默认值差异在噪声内 |
-| 降低下游压力（IO <20ms） | 窗口保持默认 5ms | 实测 IO 次数降 4~5 倍、吞吐同时提升（10ms 档 2.14x），可减轻数据库压力 |
+| 批量 DB 查询 | `maxBatchSize=200, batchWindowMillis=2` | 多数数据库 IN 查询 200 条以内性能最佳；窗口让批大小趋近 200 |
+| 批量 RPC 调用 | `maxBatchSize=50, consumerSize=4`（窗口保持默认 2ms） | 多线程并行 RPC，单批不宜过大；2ms 已能攒满批 |
+| 慢 IO（>50ms） | 窗口保持默认 2ms（需要更大批量时再压测） | 2ms 已接近在途上限，加大窗口的收益不明显 |
+| 降低下游压力（IO <20ms） | 窗口保持默认 2ms | IO 次数随批大小成倍下降、吞吐同时提升，可减轻数据库压力 |
 
 ### 消费者线程池
 
@@ -352,7 +316,7 @@ springperf.batch.consumer-size=4
 - 达到上限时，消费者线程自行执行，形成背压
 - 无需手动调优核心线程数
 
-**该值用于复用多核，取核数级别即可，不应超配。** 调大它并不会带来更高的批处理吞吐上限之外的收益——反而会减小批大小（消费更快 → 积压更少），削弱批量消除 IO 的效果。需要更大批量时应调整 `batchWindowMillis`（默认 5ms），而不是调大 `consumerSize`。
+**该值用于复用多核，取核数级别即可，不应超配。** 调大它并不会带来更高的批处理吞吐上限之外的收益——反而会减小批大小（消费更快 → 积压更少），削弱批量消除 IO 的效果。需要更大批量时应调整 `batchWindowMillis`（默认 2ms），而不是调大 `consumerSize`。
 
 > **每个 `@BatchMapping` 方法都有独立的 bizExecutor**：N 个队列的最坏并发是 N × `consumerSize`。默认值（核数）是按单队列设计的，多队列部署时应显式设置 `consumerSize`，使总和不超过核数——超过时启动期会告警。
 
