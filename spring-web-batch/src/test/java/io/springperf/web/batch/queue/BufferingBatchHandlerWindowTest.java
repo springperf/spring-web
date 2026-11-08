@@ -274,11 +274,11 @@ class BufferingBatchHandlerWindowTest {
 
     /**
      * 精度回归：{@code ScheduledThreadPoolExecutor} 内部基于 {@code LockSupport.parkNanos}，
-     * 在部分 Windows 环境会把 1~10ms 的延迟统一放大到约 15ms（系统定时器粒度），
-     * 使 {@code batchWindowMillis=3/5} 名存实亡。改用 {@code Timer} 后 3ms 实测约 3ms。
+     * 在粗粒度系统定时器上会把 1~10ms 的延迟统一放大到约 15ms，使
+     * {@code batchWindowMillis=3/5} 名存实亡。改用 {@code Timer} 后 3ms 实测约 3ms。
      * <p>
-     * 取多次采样的中位数，排除偶发线程调度抖动；阈值 12ms 足以区分「约 3ms」与「约 15ms」，
-     * 在调度器本就精确的平台（Linux）上同样成立，不会因平台差异误报。
+     * 取多次采样的中位数，排除偶发线程调度抖动；阈值 12ms 足以区分「约 3ms」与「约 15ms」。
+     * 中位数会打印到测试输出，便于对照不同环境下的实际到期精度。
      * </p>
      */
     @Test
@@ -300,7 +300,8 @@ class BufferingBatchHandlerWindowTest {
         }
         elapsedMillis.sort(Long::compareTo);
         long median = elapsedMillis.get(elapsedMillis.size() / 2);
-        assertThat(median).as("3ms 窗口到期中位数（旧实现在 Windows 上约 15ms）：%s", elapsedMillis)
+        System.out.println("[batch-window] 3ms window: median expiry " + median + "ms, samples " + elapsedMillis);
+        assertThat(median).as("3ms 窗口到期中位数（旧实现约 15ms）：%s", elapsedMillis)
                 .isLessThan(12L);
     }
 
