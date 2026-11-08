@@ -25,7 +25,7 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **`+json` suffix media types**: prefixed `+json` types such as `application/vnd.spring-boot.actuator.v2+json` did not match the JSON converter, so Actuator endpoints returned 200 with an empty body
 - **String request bodies**: `@RequestBody String` always failed with 400 under `application/json` (the framework never registered a `StringHttpMessageConverter`); it is now registered and ordered ahead of Jackson (Spring semantics: Strings are read as-is, not parsed as JSON)
 
-## [3.5.8] - Unreleased
+## [3.5.8] - 20261123
 
 > ⚠️ **This release contains breaking changes**: Servlet specification semantics, view error
 > and content-negotiation behaviour, and the validation of several configuration values have
@@ -54,6 +54,7 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Content-negotiation failures are explicit**: an `@ResponseBody` return value with no matching converter now yields 500 instead of a silent 200 with an empty body, on both paths — a preset `Content-Type` and a media type negotiated from `produces`. Only the first path was covered before, so values going through `produces` were still dropped silently and not even the declared Content-Type reached the client. Matches Spring MVC semantics
 - **Startup validation for configuration**: unknown `spring.web.view.engine` values, `none` mixed with other engines, invalid `spring.thymeleaf.mode` / `spring.freemarker.content-type` values, and non-`true`/`false` values for engine `cache` / `enabled` now abort startup instead of being silently ignored; `engine=none` also disables built-in JSP auto-configuration (custom `ViewResolver` beans are unaffected)
 - **Batching window on by default**: compared with 3.5.7, an `@BatchMapping` method that leaves `batchWindowMillis` undeclared now accumulates requests in a 2ms window (batch size guaranteed by the window, at most one extra window of per-request latency). If traffic is low and you want the old flush-as-soon-as-the-consumer-catches-up behaviour, set `batchWindowMillis = 0` explicitly; the startup warning now appears only when the window is explicitly disabled
+- **API consolidation (binary incompatible)**: `SpringHeadersAdapter` (the WebSocket header adapter) is removed by the split refactor and the `NettyWebSocketSession` constructor now takes Netty's `HttpHeaders`; the never-read `ViewProperties.BEETL_MODE` / `BEETL_MODE_DEFAULT` constants are removed together with `spring.beetl.mode`; `WebServerInitializedEventAutoConfiguration#webServerInitializedEventPublisher(...)` is removed (the event is now driven by `NettyServerStartedEvent` once the port is bound). Migration notes are in the 3.5.8 section of the [breaking changes guide](breaking-changes.md)
 
 ### Fixed
 

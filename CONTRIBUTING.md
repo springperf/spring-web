@@ -209,31 +209,34 @@ Practices for verifying claims and gates before trusting them.
 
 ### Binary Compatibility (japicmp)
 
-- The latest published version is `3.5.7` (the next release is planned as `3.5.8`), so the canonical
-  invocation is `mvn -Pcompat -Dcompat.oldVersion=3.5.7 verify` (profile `compat`, property-activated):
+- The latest published version is `3.5.8` (the next release is planned as `3.5.9`), so the canonical
+  invocation is `mvn -Pcompat -Dcompat.oldVersion=3.5.8 verify` (profile `compat`, property-activated):
   it compares each module's freshly built jar against that released artifact. pom-packaging modules are
   skipped automatically, and three modules have **no baseline at all** on purpose: `spring-web-test`,
   `spring-web-support-test` and `spring-web-benchmark` set `maven.deploy.skip=true`, so nothing was ever
   published for them. The remaining seven published modules - spring-web, spring-web-servlet,
   spring-web-websocket, spring-web-mvc-support, spring-boot-starter-web, spring-web-view, spring-web-batch
-  - are the full sweep.
+  - are the full sweep. **The `binary-compat` CI job only scans `spring-web`** (`-pl spring-web -am`), so
+  sweep the other six locally before a release - 3.5.8 shipped three unregistered breaks (websocket, view,
+  starter) that only the local sweep caught.
 - **Local jars can shadow the released artifact**: when a version is already installed in the local
   repository, Maven may resolve that copy instead of the published jar and compare the build with itself.
   Use `compat-file` with a jar fetched into an isolated repository to bypass repository resolution:
 
   ```bash
   # fetch the released jar through an isolated local repo, so the shadowing copy stays untouched
-  ./mvnw -q dependency:copy -Dartifact=io.github.springperf:spring-web:3.5.6:jar \
+  ./mvnw -q dependency:copy -Dartifact=io.github.springperf:spring-web:3.5.7:jar \
       -Dtransitive=false -DoutputDirectory=_baseline -Dmaven.repo.local=_m2tmp
-  ./mvnw -Pcompat-file -Dcompat.oldJar="$PWD/_baseline/spring-web-3.5.6.jar" verify -DskipTests
+  ./mvnw -Pcompat-file -Dcompat.oldJar="$PWD/_baseline/spring-web-3.5.7.jar" verify -DskipTests
   ```
 
-- **The `compat` profile reports; it does not fail**: with japicmp 0.26.2, the `Treat changes as errors`
-  block reads `No` for every category (any / binary / source / semantic), so a MAJOR-incompatible delta
-  still ends in BUILD SUCCESS. To turn it into a real gate, set one of
-  `breakBuildBasedOnSemanticVersioning`, `breakBuildOnBinaryIncompatibleModifications`,
-  `breakBuildOnSourceIncompatibleModifications` or `breakBuildOnModifications` inside its
-  `<parameter>` block (parameter names are taken from the plugin descriptor).
+- **What the `compat` profile actually gates**: the root pom sets
+  `breakBuildOnBinaryIncompatibleModifications=true`, so a *binary* break fails the build (verified on
+  3.5.8: it went red on three modules before their exclusions were registered). The `Treat changes as
+  errors` block still reads `No` for every category, so source-only and semantic deltas are reported and
+  pass. To also fail on those, set `breakBuildOnSourceIncompatibleModifications` or
+  `breakBuildBasedOnSemanticVersioning` inside the plugin's `<parameter>` block (parameter names come from
+  the plugin descriptor).
 - breaking-changes.md records the intentional breaks; the japicmp report is its machine-checkable
   counterpart — every reported failure must be reviewed (fix it, or record it there), never silenced.
 

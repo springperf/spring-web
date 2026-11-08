@@ -473,20 +473,20 @@
                 </plugin>
                 <!-- 二进制兼容对比：compat profile 由 -Dcompat.oldVersion 显式激活（需仓库/本地
                      存在该版本的构件），避免无基线时误触发。用法：
-                     mvn -Pcompat -Dcompat.oldVersion=3.5.6 verify -->
+                     mvn -Pcompat -Dcompat.oldVersion=3.5.8 verify -->
                 <plugin>
                     <groupId>com.github.siom79.japicmp</groupId>
                     <artifactId>japicmp-maven-plugin</artifactId>
                     <version>${japicmp-maven-plugin.version}</version>
                     <configuration>
-                        <!-- 3.5.7 首次启用本门禁的一次性豁免（登记日期 2026-10-08）。
-                             本门禁拿「同一 minor 系列的上一个 release tag」（此刻 = 3.5.6）当基线，而 3.5.6
-                             发布时这些门禁并不存在（其 ci.yml 只有 build 一个 job，根 pom 无 japicmp/spotbugs/
-                             formatter，scripts/ 亦无 check-docs.sh），故 3.5.6→3.5.7 期间**有意**累积的变更
-                             全部落在「首次比对」里。下面逐条列出已核对为有意的项并注明依据（写法同 SpotBugs 的
-                             exclude 惯例：能改的真修、设计使然的逐条写依据），使门禁自本次起重新生效 ——
-                             本清单之外的**任何**新增不兼容都会让构建失败。
-                             迁移说明见 docs/breaking-changes.md（§二 配置键、7.3 扩展点签名）。
+                        <!-- 门禁基线 =「同一 minor 系列的上一个 release tag」，当前为 3.5.7（3.5.8 定版时更新）。
+                             第一段豁免来自 3.5.7 首次启用本门禁（登记日期 2026-10-08）：当时基线为 3.5.6，
+                             而 3.5.6 发布时这些门禁并不存在（其 ci.yml 只有 build 一个 job，根 pom 无 japicmp/
+                             spotbugs/formatter，scripts/ 亦无 check-docs.sh），故 3.5.6→3.5.7 期间**有意**累积的
+                             变更全部落在「首次比对」里。下面逐条列出已核对为有意的项并注明依据（写法同 SpotBugs 的
+                             exclude 惯例：能改的真修、设计使然的逐条写依据）——本清单之外的**任何**新增不兼容
+                             都会让构建失败。3.5.7 之前的条目在基线切到 3.5.7 后不再被报告，保留作为历史记录。
+                             迁移说明见 docs/breaking-changes.md（§二 配置键、7.3 扩展点签名、3.5.8 节 API 收敛）。
                              japicmp 的 exclude 语法为 package.Class / package.Class#member；方法可附带
                              参数类型表（用于区分重载）。 -->
                         <parameter>
@@ -517,6 +517,17 @@
                                      default（报告自身亦记作 Method new default）。 -->
                                 <exclude>io.springperf.web.core.metrics.CountingWebMetrics</exclude>
                                 <exclude>io.springperf.web.server.ErrorResponseConfig</exclude>
+                                <!-- 3.5.8 登记（2026-11-23）：基线自本次发布起切到 3.5.7，以下都是
+                                     3.5.7→3.5.8 期间有意做的 API 收敛，迁移写法见
+                                     docs/breaking-changes.md 3.5.8 节末尾的三行 API 收敛条目。 -->
+                                <!-- WebSocket 拆分重构（967e6b67）：内部头适配器删除；Session 构造器改收 Netty HttpHeaders -->
+                                <exclude>io.springperf.web.websocket.server.SpringHeadersAdapter</exclude>
+                                <exclude>io.springperf.web.websocket.server.NettyWebSocketSession#NettyWebSocketSession(io.netty.channel.Channel, java.net.URI, io.springperf.web.websocket.server.SpringHeadersAdapter, java.lang.String, java.net.InetSocketAddress, java.net.InetSocketAddress, java.security.Principal, org.springframework.web.socket.WebSocketHandler)</exclude>
+                                <!-- 从未被读取的 spring.beetl.mode 连同常量一起移除 -->
+                                <exclude>io.springperf.web.view.ViewProperties#BEETL_MODE</exclude>
+                                <exclude>io.springperf.web.view.ViewProperties#BEETL_MODE_DEFAULT</exclude>
+                                <!-- 服务就绪时机重构：改由端口绑定后的 NettyServerStartedEvent 驱动，旧工厂方法移除 -->
+                                <exclude>io.springperf.web.autoconfigure.WebServerInitializedEventAutoConfiguration#webServerInitializedEventPublisher(io.springperf.web.server.NettyHttpServer, org.springframework.context.ApplicationContext)</exclude>
                             </excludes>
                         </parameter>
                     </configuration>
@@ -685,7 +696,7 @@
 
     <profiles>
         <!-- 二进制兼容对比（P1，提炼自 mybatis-parent）：显式给出上一发布版本才激活。
-             用法：mvn -Pcompat -Dcompat.oldVersion=3.5.5 verify
+             用法：mvn -Pcompat -Dcompat.oldVersion=3.5.8 verify
              （基线构件需存在于本地仓库或远端仓库；pom 打包模块自动跳过） -->
         <profile>
             <id>compat</id>
