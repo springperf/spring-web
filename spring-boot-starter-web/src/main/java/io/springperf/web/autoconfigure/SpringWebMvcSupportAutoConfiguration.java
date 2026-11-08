@@ -6,6 +6,7 @@ import io.springperf.web.support.codec.interceptor.SupportHttpBodyCodecIntercept
 import io.springperf.web.support.mvc.config.WebMvcConfigurerBridge;
 import io.springperf.web.support.mvc.interceptor.SupportInterceptorRegistry;
 import io.springperf.web.support.mvc.retval.ModelAndViewReturnValueResolver;
+import io.springperf.web.support.mvc.retval.StreamingResponseBodyReturnValueResolver;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -38,7 +39,22 @@ public class SpringWebMvcSupportAutoConfiguration {
     @Bean @ConditionalOnMissingBean
     public ResponseBodyEmitterReturnValueResolver responseBodyEmitterReturnValueResolver() { return new ResponseBodyEmitterReturnValueResolver(); }
 
-    @Bean @ConditionalOnMissingBean
+    /**
+     * {@link org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody} 支持。
+     * <p>
+     * 不要再注册 Spring MVC 自带的 {@code StreamingResponseBodyReturnValueHandler}：它会经
+     * {@code SpringHandlerMethodReturnValueHandlerAdapter} 先认领，并在 {@code ServletWebRequest} 上
+     * 查找 {@code WebAsyncManager} 直接失败。
+     * </p>
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public StreamingResponseBodyReturnValueResolver streamingResponseBodyReturnValueResolver() {
+        return new StreamingResponseBodyReturnValueResolver();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
     public WebMvcConfigurerBridge webMvcConfigurerBridge(WebContext webContext) {
         WebMvcConfigurerBridge bridge = new WebMvcConfigurerBridge();
         webContext.registerWebComponent(bridge);

@@ -53,7 +53,7 @@ Spring MVC 的兼容层（如 Servlet 容器 + `spring-webmvc`）依赖的天然
 | `ValidatorRegistration` | `spring-webmvc` | 完整实现（`getValidator`/`setValidator`） |
 | `RequestBodyAdvice` / `ResponseBodyAdvice` | `spring-webmvc` | 接口 |
 | `ResponseBodyEmitter` / mvc `SseEmitter` | `spring-webmvc` | 完整实现（extends 框架 `StreamEmitter`，经 `ResponseBodyEmitterReturnValueResolver` 注入 encodeFunction） |
-| `StreamingResponseBody` | `spring-webmvc` | **未实现**：它只是独立 `@FunctionalInterface`（`void writeTo(OutputStream)`），不是 `StreamEmitter`，没有任何 resolver 认领它 → 返回值会被静默忽略；如需流式输出，请改用 emitter 或 `InputStream` 返回值 |
+| `StreamingResponseBody` | `spring-webmvc` | 完整实现（`StreamingResponseBodyReturnValueResolver`）：走 Callable 异步通道执行 `writeTo`，字节按 8KB 分帧交给 `StreamSender`，与 SSE / Flux 同一条写出路径；支持 `ResponseEntity` 包装、`produces` 决定 Content-Type、HEAD 仅响应头。 **不要**再注册 Spring MVC 自带的 `StreamingResponseBodyReturnValueHandler`——它会经 `SpringHandlerMethodReturnValueHandlerAdapter` 先认领，并在 `ServletWebRequest` 上查 `WebAsyncManager` 直接失败 |
 | `ResponseEntityExceptionHandler` | `spring-webmvc` | `@ControllerAdvice` 15 个标准异常处理 |
 | `AdapterUtil` | `spring-webmvc` | 工具类（`setEncodeFunction`/`getEncodeFunction`） |
 

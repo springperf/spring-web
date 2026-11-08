@@ -105,8 +105,8 @@ public class ServletBridgeTestController {
     }
 
     /**
-     * {@code StreamingResponseBody}：独立 {@code @FunctionalInterface}（不是 StreamEmitter）， 当前无 resolver 认领 →
-     * 协商出 {@code produces} 声明的类型后无 converter 可写，按 fail-fast 返回 500（见 ServletBridgeSseE2eTest）。
+     * {@code StreamingResponseBody}：经 Callable 通道执行 {@code writeTo}，字节走既有 StreamSender 通道，
+     * 由 {@code StreamingResponseBodyReturnValueResolver} 认领（见 ServletBridgeSseE2eTest）。
      */
     @GetMapping(value = "/streaming-response-body", produces = "text/plain;charset=UTF-8")
     public org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody streamingResponseBody() {
@@ -114,6 +114,103 @@ public class ServletBridgeTestController {
             out.write("srb-1".getBytes(java.nio.charset.StandardCharsets.UTF_8));
             out.write("srb-2".getBytes(java.nio.charset.StandardCharsets.UTF_8));
         };
+    }
+
+    /**
+     * 大流量：N 帧 × 1000 字节，每帧前 4 字节为大端帧号、其余填充 {@code 'x'}。
+     * <p>
+     * 帧号让客户端能逐帧校验「顺序 + 偏移 + 无丢帧」——单纯全填充同一字节时，帧顺序错乱或复用缓冲
+     * 覆盖内容都无法被察觉。
+     * </p>
+     */
+    @GetMapping(value = "/streaming-response-body-large", produces = "application/octet-stream")
+    public org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody streamingResponseBodyLarge(
+            @RequestParam(value = "frames", defaultValue = "200") int frames) {
+        return out -> {
+            for (int i = 0; i < frames; i++) {
+                byte[] chunk = new byte[1000];
+                java.util.Arrays.fill(chunk, (byte) 'x');
+                chunk[0] = (byte) (i >>> 24);
+                chunk[1] = (byte) (i >>> 16);
+                chunk[2] = (byte) (i >>> 8);
+                chunk[3] = (byte) i;
+                out.write(chunk);
+            }
+        };
+    }
+
+    /**
+     * 写出任何字节之前抛异常。响应头已由 {@code flushChunked()} 提交，只能关连接
+     * （客户端见 200 + 截断）——这是复用 {@code StreamSender} 的既定语义，与 SSE / Flux 一致。
+     */
+    @GetMapping(value = "/streaming-response-body-throw-before", produces = "text/plain;charset=UTF-8")
+    public org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody streamingResponseBodyThrowBefore() {
+        return out -> {
+            throw new IllegalStateException("srb-before-boom");
+        };
+    }
+
+    /** 写出 5 帧后抛异常：已送达的字节保留，随后连接被截断（不得补一个 200 正常结束的尾巴）。 */
+    @GetMapping(value = "/streaming-response-body-throw-mid", produces = "application/octet-stream")
+    public org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody streamingResponseBodyThrowMid() {
+        return out -> {
+            byte[] chunk = new byte[20000];
+            java.util.Arrays.fill(chunk, (byte) 'y');
+            out.write(chunk);
+            try {
+                // 留出时间让 StreamSender 把已入队的帧真正写出，客户端才能断言「前缀已送达」
+                Thread.sleep(200);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            throw new IllegalStateException("srb-mid-boom");
+        };
+    }
+
+    /** 0 字节：仍须写出终止块，客户端能读到 EOF 而不是挂到读超时。 */
+    @GetMapping(value = "/streaming-response-body-empty", produces = "text/plain;charset=UTF-8")
+    public org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody streamingResponseBodyEmpty() {
+        return out -> {
+        };
+    }
+
+    /**
+     * 慢速长流（每 5ms 一帧 8KB，最长约 10s）：供「客户端提前断开」用例使用。
+     * <p>
+     * 客户端关闭后，下一次 {@code sendFrame} 必须尽快失败并让异步引用归零——不能把整个流「写」完
+     * （全部丢弃、CPU 空转），也不能卡在背压自旋里。
+     * </p>
+     */
+    @GetMapping(value = "/streaming-response-body-slow", produces = "application/octet-stream")
+    public org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody streamingResponseBodySlow() {
+        return out -> {
+            byte[] chunk = new byte[8192];
+            java.util.Arrays.fill(chunk, (byte) 'z');
+            for (int i = 0; i < 2000; i++) {
+                out.write(chunk);
+                try {
+                    Thread.sleep(5);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        };
+    }
+
+    /** {@code ResponseEntity} 形态：status/headers 必须生效。 */
+    @GetMapping("/streaming-response-body-entity")
+    public org.springframework.http.ResponseEntity<org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody> streamingResponseBodyEntity() {
+        return org.springframework.http.ResponseEntity.status(201)
+                .header("X-Srb", "yes")
+                .contentType(org.springframework.http.MediaType.TEXT_PLAIN)
+                .body(out -> out.write("entity-srb".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+    }
+
+    /** 无 {@code produces}：不得编造 Content-Type。 */
+    @GetMapping("/streaming-response-body-no-produces")
+    public org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody streamingResponseBodyNoProduces() {
+        return out -> out.write("no-produces".getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     /** 桥接模式 SSE 异常终止：发一段后 completeWithError → 截断收尾（与 native 语义一致）。 */
