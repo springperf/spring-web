@@ -42,8 +42,8 @@ public class LargeBodyE2ETest extends BaseE2ETest {
             Map<String, Object> map = JSON.parseObject(resp.body().string(), Map.class);
             assertEquals(true, map.get("received"));
             assertEquals(10240, map.get("count"));
-            assertEquals(expectedData, map.get("data"), "100KB data 必须逐字节完整回显，实际长度: "
-                    + String.valueOf(map.get("data")).length());
+            assertEquals(expectedData, map.get("data"),
+                    "100KB data 必须逐字节完整回显，实际长度: " + String.valueOf(map.get("data")).length());
         }
     }
 

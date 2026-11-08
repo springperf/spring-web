@@ -13,18 +13,16 @@ import io.springperf.web.context.ApplicationProperties;
 /**
  * {@code springperf.batch.*} 全局默认值：为所有 {@link BatchMapping} 方法提供同一套兜底取值，免去逐个注解重复配置。
  * <p>
- * <b>优先级</b>：注解显式声明 &gt; {@code springperf.batch.*} &gt; 注解内置默认值。不配任何键时全部回落到
- * {@link #standard()}，行为与未引入本类前完全一致。
+ * <b>优先级</b>：注解显式声明 &gt; {@code springperf.batch.*} &gt; 注解内置默认值。不配任何键时全部回落到 {@link #standard()}，行为与未引入本类前完全一致。
  * </p>
  * <p>
- * <b>已知边界</b>：Java 注解在运行期无法区分「未声明」与「显式写成内置默认值」——反射读到的都是同一个值，因此以
- * 「取值等于注解内置默认值」判定为未声明。给某队列单独 {@code @BatchMapping(batchWindowMillis = 2)} 想顶掉全局
- * {@code springperf.batch.window-millis=3} 是做不到的（两者取值相同）；改成任何不同的值（如 {@code 0} = 关闭窗口、
- * 或 {@code 8}）即可显式覆盖。
+ * <b>已知边界</b>：Java 注解在运行期无法区分「未声明」与「显式写成内置默认值」——反射读到的都是同一个值，因此以 「取值等于注解内置默认值」判定为未声明。给某队列单独
+ * {@code @BatchMapping(batchWindowMillis = 2)} 想顶掉全局 {@code springperf.batch.window-millis=3} 是做不到的（两者取值相同）；改成任何不同的值（如
+ * {@code 0} = 关闭窗口、 或 {@code 8}）即可显式覆盖。
  * </p>
  * <p>
- * <b>生效时机</b>：只在启动期扫描 {@code @BatchMapping} 时读取一次；队列建立后改键不会重建队列（与
- * {@code pool.core-pool-size}、{@code server.netty.*} 等同为启动期键）。取值不合法时启动期直接失败，并指出键名与可选值。
+ * <b>生效时机</b>：只在启动期扫描 {@code @BatchMapping} 时读取一次；队列建立后改键不会重建队列（与 {@code pool.core-pool-size}、{@code server.netty.*}
+ * 等同为启动期键）。取值不合法时启动期直接失败，并指出键名与可选值。
  * </p>
  */
 public final class BatchDefaults {
@@ -71,7 +69,8 @@ public final class BatchDefaults {
     private final List<String> configuredKeys;
 
     private BatchDefaults(int windowMillis, int maxBatchSize, int consumerSize, int ringBufferSize,
-            BatchMapping.WaitStrategy waitStrategy, BatchMapping.Backpressure backpressure, List<String> configuredKeys) {
+            BatchMapping.WaitStrategy waitStrategy, BatchMapping.Backpressure backpressure,
+            List<String> configuredKeys) {
         this.windowMillis = windowMillis;
         this.maxBatchSize = maxBatchSize;
         this.consumerSize = consumerSize;
@@ -91,7 +90,9 @@ public final class BatchDefaults {
      *
      * @param props
      *            框架配置访问器；{@code null}（未接入 Spring Environment 的场景）等价于 {@link #standard()}
+     *
      * @return 解析后的全局默认值，缺省项回落到注解内置默认值
+     *
      * @throws IllegalArgumentException
      *             键存在但取值无法解析（非整数 / 不是合法枚举名）
      */
@@ -137,8 +138,8 @@ public final class BatchDefaults {
     }
 
     /**
-     * 注解的 {@code consumerSize} 默认 {@code -1}（= CPU 核数），与「未声明」同义；全局键缺省同为 {@code -1}， 因此两者任一为
-     * {@code -1} 都回落到「CPU 核数」这一层语义（由 {@link BatchScanner} 最终解析）。
+     * 注解的 {@code consumerSize} 默认 {@code -1}（= CPU 核数），与「未声明」同义；全局键缺省同为 {@code -1}， 因此两者任一为 {@code -1} 都回落到「CPU
+     * 核数」这一层语义（由 {@link BatchScanner} 最终解析）。
      */
     public int resolveConsumerSize(BatchMapping ann) {
         return pick(ann.consumerSize(), AnnotationDefaults.CONSUMER_SIZE, consumerSize);
@@ -211,13 +212,12 @@ public final class BatchDefaults {
         try {
             return Integer.parseInt(raw.trim());
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException(
-                    "Invalid value for [" + key + "]: '" + raw + "' is not an integer", e);
+            throw new IllegalArgumentException("Invalid value for [" + key + "]: '" + raw + "' is not an integer", e);
         }
     }
 
-    private static <E extends Enum<E>> E resolveEnum(ApplicationProperties props, String key, E fallback,
-            Class<E> type, List<String> configured) {
+    private static <E extends Enum<E>> E resolveEnum(ApplicationProperties props, String key, E fallback, Class<E> type,
+            List<String> configured) {
         String raw = props.get(key, null);
         if (raw == null || raw.trim().isEmpty()) {
             return fallback;
@@ -234,8 +234,7 @@ public final class BatchDefaults {
     }
 
     /**
-     * 注解内置默认值，反射读取而非硬编码：注解默认值调整后（例如窗口 2ms → 5ms）这里会自动跟随，不会出现「全局未配置却
-     * 用到旧默认值」的静默漂移。
+     * 注解内置默认值，反射读取而非硬编码：注解默认值调整后（例如窗口 2ms → 5ms）这里会自动跟随，不会出现「全局未配置却 用到旧默认值」的静默漂移。
      */
     private static final class AnnotationDefaults {
 

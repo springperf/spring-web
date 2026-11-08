@@ -79,8 +79,7 @@ class BatchRegistryInstallConflictTest {
             awaitDisruptorThreadCount(QUEUE, 1);
             long shutdownLogs = appender.list.stream()
                     .filter(e -> e.getFormattedMessage().contains("shut down gracefully"))
-                    .filter(e -> e.getFormattedMessage().contains(QUEUE))
-                    .count();
+                    .filter(e -> e.getFormattedMessage().contains(QUEUE)).count();
             assertEquals(1, shutdownLogs, "冲突路径新建的队列必须先 shutdown 释放线程");
         } finally {
             logger.detachAppender(appender);

@@ -61,8 +61,8 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest
      */
     protected boolean errorHandlingInProgress;
     /**
-     * 超时是否已宣告到点（见 {@link #claimTimeoutResult()}）。**非 volatile**：写入与读取都在
-     * {@code synchronized (this)} 内（与 {@link #concurrentResult} 同一把锁），无需额外可见性。
+     * 超时是否已宣告到点（见 {@link #claimTimeoutResult()}）。**非 volatile**：写入与读取都在 {@code synchronized (this)} 内（与
+     * {@link #concurrentResult} 同一把锁），无需额外可见性。
      */
     private boolean timeoutClaimed;
     private long timeoutMillis = -1;
@@ -131,17 +131,16 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest
      * 超时路径抢占用结果槽。**必须在超时拦截器链之前调用**。
      * <p>
      * 为什么需要「先占位」：{@code CallableInterceptorChain#triggerAfterTimeout} 第一件事是
-     * {@code taskFuture.cancel(true)}——被中断的任务线程会立刻带着 {@code InterruptedException}
-     * 走 {@link #setConcurrentResultAndDispatch}，与超时线程竞写结果槽。谁先写谁赢，而刚被中断的
-     * 任务线程几乎总是更快，于是本该 503 的超时被降级成任务侧的 500。占位把这个竞态变成确定性顺序：
-     * <b>超时到点之后</b>到达的任务结果一律丢弃，到点之前到达的仍然有效（先到先得不变）。
+     * {@code taskFuture.cancel(true)}——被中断的任务线程会立刻带着 {@code InterruptedException} 走
+     * {@link #setConcurrentResultAndDispatch}，与超时线程竞写结果槽。谁先写谁赢，而刚被中断的 任务线程几乎总是更快，于是本该 503 的超时被降级成任务侧的
+     * 500。占位把这个竞态变成确定性顺序： <b>超时到点之后</b>到达的任务结果一律丢弃，到点之前到达的仍然有效（先到先得不变）。
      * </p>
      * <p>
      * {@code state} 已不在 ASYNC_STARTED（已 dispatch / 已完结）时不占位：此时没有可写的结果槽。
      * </p>
      *
-     * @return {@code true} 表示占位成功，后续须用 {@link #setTimeoutResultAndDispatch} 写入超时结果；
-     *         {@code false} 表示任务结果已先占位（超时是迟到方），调用方应直接放弃
+     * @return {@code true} 表示占位成功，后续须用 {@link #setTimeoutResultAndDispatch} 写入超时结果； {@code false}
+     *         表示任务结果已先占位（超时是迟到方），调用方应直接放弃
      */
     public boolean claimTimeoutResult() {
         synchronized (this) {
@@ -156,8 +155,7 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest
     /**
      * 写入超时结果并 dispatch：唯一被允许在超时占位之后落地的入口。
      * <p>
-     * 与 {@link #setConcurrentResultAndDispatch} 的差别仅在于不受超时占位拦截（否则超时结果自己也写不进去），
-     * 先到先得与「已完成不分发」的语义完全一致。
+     * 与 {@link #setConcurrentResultAndDispatch} 的差别仅在于不受超时占位拦截（否则超时结果自己也写不进去）， 先到先得与「已完成不分发」的语义完全一致。
      * </p>
      */
     public void setTimeoutResultAndDispatch(Object result) {

@@ -199,8 +199,8 @@ public class DisruptorQueue {
     /**
      * 三步优雅停机：先 drain RingBuffer，再冲刷 handler 残余 buffer，最后等待在途批处理完成。
      * <p>
-     * 每一步都有上界：Step 1 最多 {@value #DRAIN_TIMEOUT_SECONDS}s（超时 halt，未消费请求由 DeferredResult 超时兜底）； Step 2
-     * 在池满员时由 {@code CallerRunsPolicy} 让<b>调用 shutdown 的线程</b>（通常是 Spring 容器关闭线程）同步执行整批业务； Step 3 最多
+     * 每一步都有上界：Step 1 最多 {@value #DRAIN_TIMEOUT_SECONDS}s（超时 halt，未消费请求由 DeferredResult 超时兜底）； Step 2 在池满员时由
+     * {@code CallerRunsPolicy} 让<b>调用 shutdown 的线程</b>（通常是 Spring 容器关闭线程）同步执行整批业务； Step 3 最多
      * {@code awaitTermination(30s)}。停机慢时应优先怀疑批量方法本身耗时，而非 Disruptor。
      * </p>
      */

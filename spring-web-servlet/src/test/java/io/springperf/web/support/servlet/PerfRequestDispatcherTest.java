@@ -61,7 +61,7 @@ class PerfRequestDispatcherTest {
 
         // getAttribute/setAttribute 落到 Map：让「include 期间可见 / 返回后恢复」可被真实断言，而不是只验证调用次数
         lenient().when(requestContext.getAttribute(anyString()))
-                .thenAnswer(inv -> attributes.get(inv.<String>getArgument(0)));
+                .thenAnswer(inv -> attributes.get(inv.<String> getArgument(0)));
         lenient().doAnswer(inv -> {
             String name = inv.getArgument(0);
             Object value = inv.getArgument(1);
@@ -95,14 +95,10 @@ class PerfRequestDispatcherTest {
         return snapshot;
     }
 
-    private static final String[] INCLUDE_ATTRIBUTE_NAMES = {
-            RequestDispatcher.INCLUDE_REQUEST_URI,
-            RequestDispatcher.INCLUDE_CONTEXT_PATH,
-            RequestDispatcher.INCLUDE_SERVLET_PATH,
-            RequestDispatcher.INCLUDE_PATH_INFO,
-            RequestDispatcher.INCLUDE_QUERY_STRING,
-            RequestDispatcher.INCLUDE_MAPPING,
-    };
+    private static final String[] INCLUDE_ATTRIBUTE_NAMES = { RequestDispatcher.INCLUDE_REQUEST_URI,
+            RequestDispatcher.INCLUDE_CONTEXT_PATH, RequestDispatcher.INCLUDE_SERVLET_PATH,
+            RequestDispatcher.INCLUDE_PATH_INFO, RequestDispatcher.INCLUDE_QUERY_STRING,
+            RequestDispatcher.INCLUDE_MAPPING, };
 
     private void assertNoIncludeAttributesLeaked() {
         for (String name : INCLUDE_ATTRIBUTE_NAMES) {
@@ -184,8 +180,7 @@ class PerfRequestDispatcherTest {
         dispatcher.include(servletRequest, servletResponse);
 
         assertEquals("/api/target", snapshot.get(RequestDispatcher.INCLUDE_REQUEST_URI), "内层 include 覆盖外层值");
-        assertEquals("/outer/uri", attributes.get(RequestDispatcher.INCLUDE_REQUEST_URI),
-                "返回后必须恢复外层值，而不是一律移除");
+        assertEquals("/outer/uri", attributes.get(RequestDispatcher.INCLUDE_REQUEST_URI), "返回后必须恢复外层值，而不是一律移除");
         assertSame(outerMapping, attributes.get(RequestDispatcher.INCLUDE_MAPPING));
         assertFalse(attributes.containsKey(RequestDispatcher.INCLUDE_SERVLET_PATH), "外层没有的属性仍应移除");
     }
@@ -254,10 +249,8 @@ class PerfRequestDispatcherTest {
     void include_restoresDispatcherTypeAndAttributesOnException() {
         attributes.put(RequestDispatcher.INCLUDE_REQUEST_URI, "/outer/uri");
         doAnswer(inv -> {
-            assertEquals(DispatcherType.INCLUDE, servletRequest.getDispatcherType(),
-                    "异常路径下 include 执行期间也必须是 INCLUDE");
-            assertEquals("/api/target", attributes.get(RequestDispatcher.INCLUDE_REQUEST_URI),
-                    "异常路径下属性也必须已写入目标值");
+            assertEquals(DispatcherType.INCLUDE, servletRequest.getDispatcherType(), "异常路径下 include 执行期间也必须是 INCLUDE");
+            assertEquals("/api/target", attributes.get(RequestDispatcher.INCLUDE_REQUEST_URI), "异常路径下属性也必须已写入目标值");
             throw new RuntimeException("include failed");
         }).when(dispatcherHandler).include(any(), any(), any());
 

@@ -26,29 +26,24 @@ import java.util.Arrays;
 /**
  * Netty {@link SslContext} 工厂工具类。
  * <p>
- * 配置来源统一为 Spring Boot 的强类型 {@link Ssl} 模型：通过 {@link Binder} 把
- * {@code server.ssl.*}（主服务器）或 scoped Environment 下的 {@code server.ssl.*}
- * （管理服务器，由 {@code management.server.ssl.*} 覆盖后回退）绑定成同一个 {@link Ssl} 对象。
- * 主/管理两侧因此共享同一套属性命名、枚举校验、{@code enabled} 语义与 relaxed binding，
- * 不再各写一套字符串前缀解析。
+ * 配置来源统一为 Spring Boot 的强类型 {@link Ssl} 模型：通过 {@link Binder} 把 {@code server.ssl.*}（主服务器）或 scoped Environment 下的
+ * {@code server.ssl.*} （管理服务器，由 {@code management.server.ssl.*} 覆盖后回退）绑定成同一个 {@link Ssl} 对象。
+ * 主/管理两侧因此共享同一套属性命名、枚举校验、{@code enabled} 语义与 relaxed binding， 不再各写一套字符串前缀解析。
  * </p>
  * <p>
  * <b>支持的 {@link Ssl} 字段</b>：{@code enabled}、{@code key-store}、
  * {@code key-store-password}、{@code key-store-type}、{@code key-password}、
  * {@code certificate}、{@code certificate-private-key}、{@code client-auth}、
- * {@code enabled-protocols}、{@code ciphers}、{@code trust-store}、
- * {@code trust-store-password}、{@code trust-store-type}。
+ * {@code enabled-protocols}、{@code ciphers}、{@code trust-store}、 {@code trust-store-password}、{@code trust-store-type}。
  * 支持 PKCS12/JKS 密钥库与 PEM 证书两种格式；{@code classpath:} 资源以 stream 方式加载。
  * </p>
  * <p>
- * <b>启停语义（对齐 {@link Ssl#isEnabled(Ssl)}）</b>：未绑定任何 SSL 属性时视为未启用；
- * {@code enabled} 默认 {@code true}，配置 {@code key-store} 或 {@code certificate} 即隐式启用；
- * 显式 {@code enabled=false} 一律关闭，即使残留证书配置。
- * 非法 {@code client-auth} 值由 Binder 在启动期抛错，不再静默降级为 NONE。
+ * <b>启停语义（对齐 {@link Ssl#isEnabled(Ssl)}）</b>：未绑定任何 SSL 属性时视为未启用； {@code enabled} 默认 {@code true}，配置 {@code key-store} 或
+ * {@code certificate} 即隐式启用； 显式 {@code enabled=false} 一律关闭，即使残留证书配置。 非法 {@code client-auth} 值由 Binder 在启动期抛错，不再静默降级为
+ * NONE。
  * </p>
  * <p>
- * <b>尚未支持</b>：{@code spring.ssl.bundle.*} / {@code server.ssl.bundle}、SNI、证书热重载；
- * 这类属性绑定后不参与构建，变更服务器级 SSL 配置需要重启应用。
+ * <b>尚未支持</b>：{@code spring.ssl.bundle.*} / {@code server.ssl.bundle}、SNI、证书热重载； 这类属性绑定后不参与构建，变更服务器级 SSL 配置需要重启应用。
  * </p>
  */
 public final class SslContextFactory {
@@ -66,6 +61,7 @@ public final class SslContextFactory {
      *            Spring Environment；主服务器传原始 Environment，管理服务器传带覆盖属性源的 scoped Environment
      * @param prefix
      *            属性前缀，如 {@code "server.ssl."}；仅用于定位绑定根名称，不再逐键拼接读取
+     *
      * @return SslContext，未配置 SSL 或显式关闭时返回 null
      */
     public static SslContext createServerSslContext(Environment env, String prefix) {
@@ -81,6 +77,7 @@ public final class SslContextFactory {
      *            SSL 属性前缀
      * @param http2Enabled
      *            是否启用 HTTP/2（配置 ALPN）
+     *
      * @return SslContext，未配置 SSL 或显式关闭时返回 null
      */
     public static SslContext createServerSslContext(Environment env, String prefix, boolean http2Enabled) {
@@ -91,8 +88,7 @@ public final class SslContextFactory {
     }
 
     /**
-     * 强类型入口：从已经绑定好的 Boot {@link Ssl} 对象构建 {@link SslContext}。
-     * 主服务器与管理服务器最终都汇聚到这里，便于未来接入 {@code SslBundle} / 证书热重载。
+     * 强类型入口：从已经绑定好的 Boot {@link Ssl} 对象构建 {@link SslContext}。 主服务器与管理服务器最终都汇聚到这里，便于未来接入 {@code SslBundle} / 证书热重载。
      */
     public static SslContext createServerSslContext(Ssl ssl, boolean http2Enabled) {
         if (!Ssl.isEnabled(ssl)) {
@@ -134,8 +130,8 @@ public final class SslContextFactory {
     }
 
     /**
-     * Binder 的 {@code ConfigurationPropertySources#get} 要求 ConfigurableEnvironment。
-     * 生产环境必然满足；对仍传入普通 Environment 的既有调用方，用委托属性源适配，保持 public API 兼容。
+     * Binder 的 {@code ConfigurationPropertySources#get} 要求 ConfigurableEnvironment。 生产环境必然满足；对仍传入普通 Environment
+     * 的既有调用方，用委托属性源适配，保持 public API 兼容。
      */
     private static Binder binderFor(Environment env) {
         if (env instanceof ConfigurableEnvironment) {
@@ -164,8 +160,8 @@ public final class SslContextFactory {
 
         String keyStorePath = ssl.getKeyStore();
         if (!hasText(keyStorePath)) {
-            throw new IllegalStateException("SSL is enabled but neither certificate/certificate-private-key "
-                    + "nor key-store is configured");
+            throw new IllegalStateException(
+                    "SSL is enabled but neither certificate/certificate-private-key " + "nor key-store is configured");
         }
         String keyStorePassword = ssl.getKeyStorePassword();
         String keyStoreType = hasText(ssl.getKeyStoreType()) ? ssl.getKeyStoreType() : DEFAULT_STORE_TYPE;

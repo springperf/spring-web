@@ -24,9 +24,7 @@ class BatchDefaultsTest {
         public void explicitWindow() {
         }
 
-        @BatchMapping(method = "single", ringBufferSize = 64, maxBatchSize = 5, consumerSize = 3,
-                waitStrategy = BatchMapping.WaitStrategy.YIELDING, backpressure = BatchMapping.Backpressure.THROW,
-                batchWindowMillis = 9)
+        @BatchMapping(method = "single", ringBufferSize = 64, maxBatchSize = 5, consumerSize = 3, waitStrategy = BatchMapping.WaitStrategy.YIELDING, backpressure = BatchMapping.Backpressure.THROW, batchWindowMillis = 9)
         public void explicitAll() {
         }
     }
@@ -79,8 +77,9 @@ class BatchDefaultsTest {
         assertEquals(16384, defaults.ringBufferSize());
         assertEquals(BatchMapping.WaitStrategy.YIELDING, defaults.waitStrategy(), "枚举应忽略大小写");
         assertEquals(BatchMapping.Backpressure.THROW, defaults.backpressure());
-        assertEquals(List.of(BatchDefaults.WINDOW_MILLIS, BatchDefaults.MAX_BATCH_SIZE, BatchDefaults.CONSUMER_SIZE,
-                BatchDefaults.RING_BUFFER_SIZE, BatchDefaults.WAIT_STRATEGY, BatchDefaults.BACKPRESSURE),
+        assertEquals(
+                List.of(BatchDefaults.WINDOW_MILLIS, BatchDefaults.MAX_BATCH_SIZE, BatchDefaults.CONSUMER_SIZE,
+                        BatchDefaults.RING_BUFFER_SIZE, BatchDefaults.WAIT_STRATEGY, BatchDefaults.BACKPRESSURE),
                 defaults.configuredKeys(), "configuredKeys 用于启动日志留痕，应按声明顺序列出真正配置的键");
     }
 

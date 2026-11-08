@@ -92,8 +92,8 @@ class OpenApiAdapterResidualBranchesTest {
         Set<String> usedIds = new LinkedHashSet<>();
 
         Operation op = (Operation) invoke(new OpenApiAdapter(mock(WebContext.class)), "buildOperation",
-                new Class<?>[] { PathMappingContext.class, Method.class, String.class, Set.class },
-                route("/no-method"), null, "Endpoints", usedIds);
+                new Class<?>[] { PathMappingContext.class, Method.class, String.class, Set.class }, route("/no-method"),
+                null, "Endpoints", usedIds);
 
         assertNull(op.getOperationId(), "无 Method 时不得伪造 operationId");
         assertNull(op.getSummary());
@@ -135,8 +135,7 @@ class OpenApiAdapterResidualBranchesTest {
     void resolveRequestSchema_nestedGenericFallsBackToRawCollection() throws Exception {
         Parameter param = method("nestedBody", List.class).getParameters()[0];
 
-        Schema<?> schema = (Schema<?>) invoke(null, "resolveRequestSchema",
-                new Class<?>[] { Parameter.class }, param);
+        Schema<?> schema = (Schema<?>) invoke(null, "resolveRequestSchema", new Class<?>[] { Parameter.class }, param);
 
         assertEquals("array", schema.getType());
         assertEquals("object", schema.getItems().getType(), "嵌套泛型无法取到 Class 实参时应退回裸集合");
@@ -161,8 +160,8 @@ class OpenApiAdapterResidualBranchesTest {
         PathItem item = new PathItem();
 
         invoke(new OpenApiAdapter(mock(WebContext.class)), "setPathItemOperation",
-                new Class<?>[] { PathItem.class, HttpMethod.class, Operation.class },
-                item, HttpMethod.TRACE, new Operation());
+                new Class<?>[] { PathItem.class, HttpMethod.class, Operation.class }, item, HttpMethod.TRACE,
+                new Operation());
 
         assertNull(item.getGet());
         assertNull(item.getPost());
@@ -175,18 +174,19 @@ class OpenApiAdapterResidualBranchesTest {
 
     @Test
     void resolveProperties_guardRejectsNonBindableTypes() throws Exception {
-        Class<?>[] guarded = { null, int.class, String[].class, SampleEnum.class, List.class, Map.class,
-                String.class, javax.crypto.Cipher.class, jakarta.servlet.ServletRequest.class };
+        Class<?>[] guarded = { null, int.class, String[].class, SampleEnum.class, List.class, Map.class, String.class,
+                javax.crypto.Cipher.class, jakarta.servlet.ServletRequest.class };
         for (Class<?> type : guarded) {
-            Object result = invoke(null, "resolveProperties",
-                    new Class<?>[] { Class.class, Set.class }, type, new LinkedHashSet<Class<?>>());
+            Object result = invoke(null, "resolveProperties", new Class<?>[] { Class.class, Set.class }, type,
+                    new LinkedHashSet<Class<?>>());
             assertNull(result, "守卫应拒绝: " + (type == null ? "null" : type.getName()));
         }
 
         Set<Class<?>> visiting = new LinkedHashSet<>();
         visiting.add(Samples.class);
-        assertNull(invoke(null, "resolveProperties", new Class<?>[] { Class.class, Set.class },
-                Samples.class, visiting), "visiting 命中必须掐断递归展开");
+        assertNull(
+                invoke(null, "resolveProperties", new Class<?>[] { Class.class, Set.class }, Samples.class, visiting),
+                "visiting 命中必须掐断递归展开");
     }
 
     @Test

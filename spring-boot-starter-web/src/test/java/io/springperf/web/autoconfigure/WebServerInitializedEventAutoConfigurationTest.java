@@ -58,8 +58,8 @@ class WebServerInitializedEventAutoConfigurationTest {
     @Test
     void publisher_doesNotDependOnApplicationReadyEvent() throws Exception {
         // 回归 #11：监听器必须订阅服务器启动事件，而不是 ApplicationReadyEvent
-        java.lang.reflect.Method method = WebServerInitializedEventAutoConfiguration.class.getMethod(
-                "webServerInitializedEventPublisher", ApplicationContext.class);
+        java.lang.reflect.Method method = WebServerInitializedEventAutoConfiguration.class
+                .getMethod("webServerInitializedEventPublisher", ApplicationContext.class);
         String generic = method.getGenericReturnType().getTypeName();
         assertTrue(generic.contains(NettyServerStartedEvent.class.getName()),
                 "监听器泛型应为 NettyServerStartedEvent，事件不得延迟到 ApplicationReadyEvent");

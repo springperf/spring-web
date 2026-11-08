@@ -844,8 +844,7 @@ class PerfHttpServletResponseTest {
         String setCookie = captor.getValue();
         assertFalse(setCookie.contains("Max-Age="),
                 "Servlet 会话 Cookie(maxAge<0) 不应输出 Max-Age；负值会被浏览器视为立即过期，实际 " + setCookie);
-        assertFalse(setCookie.contains("Expires="),
-                "Servlet 会话 Cookie(maxAge<0) 不应输出 Expires，实际 " + setCookie);
+        assertFalse(setCookie.contains("Expires="), "Servlet 会话 Cookie(maxAge<0) 不应输出 Expires，实际 " + setCookie);
     }
 
     @Test
@@ -859,18 +858,15 @@ class PerfHttpServletResponseTest {
         servletResponse.addCookie(cookie);
 
         verify(headers).add(argThat(name -> "Set-Cookie".equals(name)),
-                argThat(value -> staticCookieParts(value).equals(java.util.Set.of(
-                        "session=token", "Domain=example.com", "Path=/app",
-                        "Max-Age=3600", "Secure", "HTTPOnly"))));
+                argThat(value -> staticCookieParts(value).equals(java.util.Set.of("session=token", "Domain=example.com",
+                        "Path=/app", "Max-Age=3600", "Secure", "HTTPOnly"))));
     }
 
     /**
-     * 解析 Set-Cookie 的静态属性片段；Expires 由 maxAge 动态生成，比较时排除。
-     * 会话 Cookie（maxAge<0）不应出现 Max-Age，此项由下方回归用例显式断言。
+     * 解析 Set-Cookie 的静态属性片段；Expires 由 maxAge 动态生成，比较时排除。 会话 Cookie（maxAge<0）不应出现 Max-Age，此项由下方回归用例显式断言。
      */
     private static java.util.Set<String> staticCookieParts(String setCookie) {
-        return java.util.Arrays.stream(setCookie.split("; "))
-                .filter(part -> !part.startsWith("Expires="))
+        return java.util.Arrays.stream(setCookie.split("; ")).filter(part -> !part.startsWith("Expires="))
                 .collect(java.util.stream.Collectors.toSet());
     }
 
@@ -889,8 +885,7 @@ class PerfHttpServletResponseTest {
         servletResponse.addCookie(cookie);
         // 精确比对整条 Set-Cookie：contains 会放过 "SameSite=Laxxxx"、重复属性或值被改写
         verify(headers).add(argThat(name -> "Set-Cookie".equals(name)),
-                argThat(value -> staticCookieParts(value)
-                        .equals(java.util.Set.of("name=value", "SameSite=Lax"))));
+                argThat(value -> staticCookieParts(value).equals(java.util.Set.of("name=value", "SameSite=Lax"))));
     }
 
     @Test

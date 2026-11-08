@@ -56,8 +56,7 @@ class JsrWebSocketSessionTest {
     void removeMessageHandler_unregisteredHandler_onClosedSession_isTolerated() {
         when(springSession.isOpen()).thenReturn(false);
         session.removeMessageHandler(mock(MessageHandler.class));
-        assertTrue(session.getMessageHandlers().isEmpty(),
-                "已关闭会话上移除未注册 handler 是常见清理动作，不得报错也不得改动注册表");
+        assertTrue(session.getMessageHandlers().isEmpty(), "已关闭会话上移除未注册 handler 是常见清理动作，不得报错也不得改动注册表");
     }
 
     /* ==================== 动态 MessageHandler 注册 ==================== */

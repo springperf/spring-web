@@ -59,8 +59,7 @@ public class ViewResolverRegistry extends WebComponentContainer {
     }
 
     /**
-     * 是否存在已启用的视图解析器。禁用（{@code spring.*.enabled=false}）的解析器不计入，
-     * 以便启动期 fail-fast 仍能发现「引入了视图模块但没有任何可用引擎」。
+     * 是否存在已启用的视图解析器。禁用（{@code spring.*.enabled=false}）的解析器不计入， 以便启动期 fail-fast 仍能发现「引入了视图模块但没有任何可用引擎」。
      */
     public boolean hasViewResolvers() {
         for (ViewResolver resolver : getWebComponents(ViewResolver.class)) {
@@ -84,8 +83,9 @@ public class ViewResolverRegistry extends WebComponentContainer {
                 }
             } catch (Exception ex) {
                 // 保留根因：模板语法错误/初始化失败不能被后续 resolver 的 null 掩盖成泛化 500
-                throw new IllegalStateException("ViewResolver " + resolver.getClass().getName()
-                        + " failed to resolve view '" + viewName + "'", ex);
+                throw new IllegalStateException(
+                        "ViewResolver " + resolver.getClass().getName() + " failed to resolve view '" + viewName + "'",
+                        ex);
             }
         }
         return null;
@@ -95,8 +95,7 @@ public class ViewResolverRegistry extends WebComponentContainer {
      * 使所有已注册解析器的解析结果与模板引擎内部缓存失效，用于运行期新增/替换模板后主动刷新。
      * <p>
      * 取实时组件列表而非 Phase1 快照，运行期注册的 resolver 也能被覆盖。配置刷新不会重建模板引擎
-     * （{@code spring.thymeleaf.*}、{@code spring.freemarker.*}、{@code spring.beetl.*} 属启动期固化配置），
-     * 本方法只清缓存、不重建引擎。
+     * （{@code spring.thymeleaf.*}、{@code spring.freemarker.*}、{@code spring.beetl.*} 属启动期固化配置）， 本方法只清缓存、不重建引擎。
      * </p>
      */
     public void invalidateViewCaches() {

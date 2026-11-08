@@ -18,8 +18,8 @@ import java.lang.reflect.Proxy;
  * <p>
  * 由于本框架使用 {@code AnnotationConfigApplicationContext}（非 {@code WebServerApplicationContext}）， 通过 JDK 动态代理将实际上下文包装为
  * {@link WebServerApplicationContext}，仅覆盖 {@link WebServerApplicationContext#getWebServer()} 返回本框架的 WebServer 实现。
- * 代理同时实现 {@link ConfigurableApplicationContext}：部分生态组件会把
- * {@code event.getApplicationContext()} 强转为该接口，仅实现 {@code WebServerApplicationContext} 会抛
+ * 代理同时实现 {@link ConfigurableApplicationContext}：部分生态组件会把 {@code event.getApplicationContext()} 强转为该接口，仅实现
+ * {@code WebServerApplicationContext} 会抛
  * ClassCastException。生产上下文（{@code AnnotationConfigApplicationContext}）本身实现该接口，故所有方法可直接委托。
  * </p>
  *

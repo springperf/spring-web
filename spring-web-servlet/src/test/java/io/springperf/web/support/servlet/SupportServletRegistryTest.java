@@ -247,8 +247,8 @@ class SupportServletRegistryTest {
     static class EmptyServlet extends HttpServlet {
     }
 
-    @WebServlet(urlPatterns = "/params", initParams = {
-            @WebInitParam(name = "k1", value = "v1"), @WebInitParam(name = "k2", value = "v2") })
+    @WebServlet(urlPatterns = "/params", initParams = { @WebInitParam(name = "k1", value = "v1"),
+            @WebInitParam(name = "k2", value = "v2") })
     static class ParamServlet extends HttpServlet {
         ServletConfig config;
 

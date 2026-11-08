@@ -120,8 +120,7 @@ public class PerfRequestDispatcher implements RequestDispatcher {
     }
 
     /**
-     * 写入 {@code INCLUDE_*} 属性。这些属性描述「被包含的目标资源」（Servlet 规范 / {@code RequestDispatcher} javadoc），
-     * 而非原始请求：
+     * 写入 {@code INCLUDE_*} 属性。这些属性描述「被包含的目标资源」（Servlet 规范 / {@code RequestDispatcher} javadoc）， 而非原始请求：
      * <ul>
      * <li>{@code INCLUDE_REQUEST_URI} = contextPath + 目标路径（原实现误写原始请求 URI，与 SERVLET_PATH 不自洽）；</li>
      * <li>{@code INCLUDE_SERVLET_PATH} = 目标路径，{@code INCLUDE_PATH_INFO} = ""（本框架 {@code getServletPath() = getPath()}、
@@ -132,7 +131,8 @@ public class PerfRequestDispatcher implements RequestDispatcher {
      * <li>{@code INCLUDE_MAPPING}（Servlet 4.0+）值为 {@link HttpServletMapping}，按目标路径构造精确映射。</li>
      * </ul>
      */
-    private void setIncludeAttributes(RequestContext requestContext, WebServerHttpRequest webRequest, String contextPath) {
+    private void setIncludeAttributes(RequestContext requestContext, WebServerHttpRequest webRequest,
+            String contextPath) {
         requestContext.setAttribute(RequestDispatcher.INCLUDE_REQUEST_URI, includeRequestUri(contextPath, targetPath));
         requestContext.setAttribute(RequestDispatcher.INCLUDE_CONTEXT_PATH, contextPath);
         requestContext.setAttribute(RequestDispatcher.INCLUDE_SERVLET_PATH, targetPath);
@@ -157,9 +157,9 @@ public class PerfRequestDispatcher implements RequestDispatcher {
     }
 
     /**
-     * 按路径构造精确映射。本框架没有 Servlet url-pattern，{@code getRequestDispatcher(path)} 等价于 path 派发，
-     * 因此 {@code pattern} 即目标路径、{@code mappingMatch} 恒为 {@link MappingMatch#EXACT}。
-     * {@code servletName} 返回空串：include/forward 目标由 MVC 路由处理，没有 Servlet 名称。
+     * 按路径构造精确映射。本框架没有 Servlet url-pattern，{@code getRequestDispatcher(path)} 等价于 path 派发， 因此 {@code pattern}
+     * 即目标路径、{@code mappingMatch} 恒为 {@link MappingMatch#EXACT}。 {@code servletName} 返回空串：include/forward 目标由 MVC
+     * 路由处理，没有 Servlet 名称。
      */
     private static HttpServletMapping pathMapping(String path) {
         return new ExactPathHttpServletMapping(path);
@@ -201,8 +201,8 @@ public class PerfRequestDispatcher implements RequestDispatcher {
     }
 
     /**
-     * 取请求 URI 中的纯查询串（不含 path、不含前导 {@code '?'}）；无查询串时返回 {@code null}。
-     * 只切第一个 {@code '?'}，后续内容（含 {@code '%'} 编码与其它 {@code '?'}）原样保留，不解码。
+     * 取请求 URI 中的纯查询串（不含 path、不含前导 {@code '?'}）；无查询串时返回 {@code null}。 只切第一个 {@code '?'}，后续内容（含 {@code '%'} 编码与其它
+     * {@code '?'}）原样保留，不解码。
      */
     private static String queryStringOf(WebServerHttpRequest webRequest) {
         String uriWithQuery = webRequest.getUriStrWithQuery();

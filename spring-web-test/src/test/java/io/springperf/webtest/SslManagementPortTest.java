@@ -111,8 +111,7 @@ public class SslManagementPortTest {
                     .readTimeout(Duration.ofSeconds(2)).build().newCall(req).execute()) {
             }
         });
-        assertFalse(ex instanceof java.net.SocketTimeoutException,
-                "超时不能算作 TLS 握手拒绝（可能只是端口未监听），实际: " + ex);
+        assertFalse(ex instanceof java.net.SocketTimeoutException, "超时不能算作 TLS 握手拒绝（可能只是端口未监听），实际: " + ex);
     }
 
     private static SSLContext trustAllSslContext() {

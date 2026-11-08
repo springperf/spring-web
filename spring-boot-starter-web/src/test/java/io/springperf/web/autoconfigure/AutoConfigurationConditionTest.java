@@ -13,8 +13,7 @@ import static org.mockito.Mockito.mock;
 /**
  * 对自动配置做真实条件求值（而非 new Config() 直接调 @Bean 方法）。
  * <p>
- * 覆盖 classpath 条件退让、方法级/类级 {@code @ConditionalOnBean}、以及 RuntimeHints 与事件配置的解耦。
- * 这些配置均不创建 NettyHttpServer，因此不会启动端口。
+ * 覆盖 classpath 条件退让、方法级/类级 {@code @ConditionalOnBean}、以及 RuntimeHints 与事件配置的解耦。 这些配置均不创建 NettyHttpServer，因此不会启动端口。
  * </p>
  */
 class AutoConfigurationConditionTest {
@@ -24,8 +23,8 @@ class AutoConfigurationConditionTest {
     @Test
     void servletBridge_backsOffWhenServletModuleIsAbsent() {
         runner.withConfiguration(AutoConfigurations.of(SpringWebServletAutoConfiguration.class))
-                .withClassLoader(new FilteredClassLoader(
-                        "io.springperf.web.support.servlet.context.ServletAdapterContext"))
+                .withClassLoader(
+                        new FilteredClassLoader("io.springperf.web.support.servlet.context.ServletAdapterContext"))
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     assertThat(context).doesNotHaveBean(SpringWebServletAutoConfiguration.class);

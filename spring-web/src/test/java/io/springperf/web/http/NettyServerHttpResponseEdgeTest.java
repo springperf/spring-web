@@ -57,8 +57,7 @@ class NettyServerHttpResponseEdgeTest {
     }
 
     private NettyServerHttpResponse response(boolean keepAlive, int headerLimit) {
-        return new NettyServerHttpResponse(webContext, ctx, keepAlive,
-                new ResponseLimitConfig(-1, headerLimit), 0L);
+        return new NettyServerHttpResponse(webContext, ctx, keepAlive, new ResponseLimitConfig(-1, headerLimit), 0L);
     }
 
     private static Object invoke(Object target, String name, Class<?>[] types, Object... args) throws Exception {
@@ -139,8 +138,7 @@ class NettyServerHttpResponseEdgeTest {
         resp.getHeaders().add("X", "1234");
         resp.getHeaders().add("X", "1234");
 
-        assertFalse((Boolean) invoke(resp, "responseHeadersExceedLimit", new Class<?>[0]),
-                "同名多值只应计首个，否则会误判超限");
+        assertFalse((Boolean) invoke(resp, "responseHeadersExceedLimit", new Class<?>[0]), "同名多值只应计首个，否则会误判超限");
     }
 
     @Test
@@ -156,8 +154,7 @@ class NettyServerHttpResponseEdgeTest {
             FullHttpResponse error = (FullHttpResponse) written.getValue();
             assertEquals(500, error.status().code());
             assertEquals("0", error.headers().get(HttpHeaderNames.CONTENT_LENGTH));
-            assertEquals(keepAlive ? "keep-alive" : "close",
-                    error.headers().get(HttpHeaderNames.CONNECTION));
+            assertEquals(keepAlive ? "keep-alive" : "close", error.headers().get(HttpHeaderNames.CONNECTION));
             verify(channelFuture, times(keepAlive ? 0 : 1)).addListener(eq(ChannelFutureListener.CLOSE));
             error.release();
         }

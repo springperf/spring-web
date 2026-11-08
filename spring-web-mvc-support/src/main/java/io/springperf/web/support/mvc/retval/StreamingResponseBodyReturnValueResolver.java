@@ -27,14 +27,12 @@ import io.springperf.web.http.WebServerHttpResponse;
 /**
  * {@link StreamingResponseBody} 返回值解析器。
  * <p>
- * 写法对标两条既有路径：异步生命周期复用 {@code CallableReturnValueResolver} 的
- * {@code startCallableProcessing}（线程池、超时、拦截器链、结果槽、引用计数全部现成），
- * 帧写出复用 {@code ReactiveReturnValueResolver} 使用的 {@code StreamSender}（背压、终止块、
- * HEAD、断连清理全部现成）。
+ * 写法对标两条既有路径：异步生命周期复用 {@code CallableReturnValueResolver} 的 {@code startCallableProcessing}（线程池、超时、拦截器链、结果槽、引用计数全部现成），
+ * 帧写出复用 {@code ReactiveReturnValueResolver} 使用的 {@code StreamSender}（背压、终止块、 HEAD、断连清理全部现成）。
  * </p>
  * <p>
- * 与 Spring MVC 的差异：Spring 由 Servlet 容器在 async 完成时写终止块，此处没有容器兜底，
- * 故由 {@link ByteStreamEmitter#complete()} 交给 sender 的 {@code LastHttpContent} 写出。
+ * 与 Spring MVC 的差异：Spring 由 Servlet 容器在 async 完成时写终止块，此处没有容器兜底， 故由 {@link ByteStreamEmitter#complete()} 交给 sender 的
+ * {@code LastHttpContent} 写出。
  * </p>
  */
 public class StreamingResponseBodyReturnValueResolver extends BaseAsyncReturnValueResolver {
@@ -115,8 +113,7 @@ public class StreamingResponseBodyReturnValueResolver extends BaseAsyncReturnVal
     /**
      * Content-Type 规则：已设置则保留；{@code produces} 恰好一个具体类型则写它；否则不写。
      * <p>
-     * 不做 Accept 二次协商：映射阶段 {@code ConsumeOrProduceMatcher} 已按 Accept 匹配过，
-     * 能进入本方法即说明该类型可接受。也不兜底 octet-stream——那是替用户编造事实。
+     * 不做 Accept 二次协商：映射阶段 {@code ConsumeOrProduceMatcher} 已按 Accept 匹配过， 能进入本方法即说明该类型可接受。也不兜底 octet-stream——那是替用户编造事实。
      * </p>
      */
     private void applyContentTypeIfAbsent(WebServerHttpRequest req, WebServerHttpResponse resp) {

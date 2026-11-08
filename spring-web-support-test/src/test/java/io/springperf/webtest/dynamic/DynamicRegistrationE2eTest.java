@@ -14,8 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * 动态注册（{@code ServletContext#addServlet/addFilter}）的端到端验证。
  * <p>
- * {@link DynamicRegistrationInitializer} 在 {@code contextInitialized} 里登记， 请求路径证明：路由真的注册了、filter 真的进了链、
- * filter 的 init-param 真的生效。
+ * {@link DynamicRegistrationInitializer} 在 {@code contextInitialized} 里登记， 请求路径证明：路由真的注册了、filter 真的进了链、 filter 的
+ * init-param 真的生效。
  * </p>
  */
 class DynamicRegistrationE2eTest extends BaseE2ETest {
@@ -34,8 +34,7 @@ class DynamicRegistrationE2eTest extends BaseE2ETest {
     void dynamicallyRegisteredFilter_appliesWithInitParams() throws IOException {
         Request request = new Request.Builder().url(url("/api/dyn/hello")).build();
         try (Response response = CLIENT.newCall(request).execute()) {
-            assertEquals("on", response.header("X-Dyn-Filter"),
-                    "动态注册 filter 的 setInitParameter 必须经 init() 传到 filter");
+            assertEquals("on", response.header("X-Dyn-Filter"), "动态注册 filter 的 setInitParameter 必须经 init() 传到 filter");
         }
     }
 

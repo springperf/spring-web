@@ -22,8 +22,7 @@ public class ErrorScenariosTest extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(400, resp.code());
             String errorBody = resp.body().string();
-            org.junit.jupiter.api.Assertions.assertTrue(errorBody.contains("400"),
-                    "校验失败响应应标明状态码，实际: " + errorBody);
+            org.junit.jupiter.api.Assertions.assertTrue(errorBody.contains("400"), "校验失败响应应标明状态码，实际: " + errorBody);
         }
 
         // 对照：同一端点合法输入必须成功并回显 name。

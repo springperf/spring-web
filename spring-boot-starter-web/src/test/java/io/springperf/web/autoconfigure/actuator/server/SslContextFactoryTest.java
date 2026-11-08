@@ -22,9 +22,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * SSL 强类型绑定契约测试：正常流程、非法配置 fail-fast、边界与空值。
- * 使用真实 {@link MockEnvironment} 驱动 {@link org.springframework.boot.context.properties.bind.Binder}，
- * 不再 mock Environment 的字符串读取，以便覆盖 relaxed binding 与枚举转换。
+ * SSL 强类型绑定契约测试：正常流程、非法配置 fail-fast、边界与空值。 使用真实 {@link MockEnvironment} 驱动
+ * {@link org.springframework.boot.context.properties.bind.Binder}， 不再 mock Environment 的字符串读取，以便覆盖 relaxed binding
+ * 与枚举转换。
  */
 class SslContextFactoryTest {
 
@@ -41,8 +41,7 @@ class SslContextFactoryTest {
 
     @Test
     void createServerSslContext_pemFromClasspath_streamBased() {
-        assertNotNull(SslContextFactory.createServerSslContext(pemEnv(), PREFIX),
-                "classpath PEM 配置应能成功构建 SslContext");
+        assertNotNull(SslContextFactory.createServerSslContext(pemEnv(), PREFIX), "classpath PEM 配置应能成功构建 SslContext");
     }
 
     @Test
@@ -54,8 +53,7 @@ class SslContextFactoryTest {
                     .withProperty(PREFIX + "key-store-password", "changeit")
                     .withProperty(PREFIX + "key-store-type", "PKCS12");
 
-            assertNotNull(SslContextFactory.createServerSslContext(env, PREFIX),
-                    "PKCS12 密钥库配置应能构建 SslContext");
+            assertNotNull(SslContextFactory.createServerSslContext(env, PREFIX), "PKCS12 密钥库配置应能构建 SslContext");
         } finally {
             keyStore.delete();
         }
@@ -118,8 +116,7 @@ class SslContextFactoryTest {
         ssl.setCertificate(CERT);
         ssl.setCertificatePrivateKey(KEY);
 
-        assertNotNull(SslContextFactory.createServerSslContext(ssl, false),
-                "主/管理两侧最终都汇聚到强类型入口");
+        assertNotNull(SslContextFactory.createServerSslContext(ssl, false), "主/管理两侧最终都汇聚到强类型入口");
     }
 
     // ==================== 异常流程 / 错误输入（fail-fast） ====================
@@ -130,8 +127,7 @@ class SslContextFactoryTest {
 
         IllegalStateException ex = assertThrows(IllegalStateException.class,
                 () -> SslContextFactory.createServerSslContext(env, PREFIX));
-        assertTrue(ex.getCause().getMessage().contains("neither certificate"),
-                "启用 SSL 却缺少证书/密钥库时必须给出明确原因，而不是空指针");
+        assertTrue(ex.getCause().getMessage().contains("neither certificate"), "启用 SSL 却缺少证书/密钥库时必须给出明确原因，而不是空指针");
     }
 
     @Test
@@ -139,8 +135,7 @@ class SslContextFactoryTest {
         MockEnvironment env = pemEnv().withProperty(PREFIX + "client-auth", "bogus");
 
         IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> SslContextFactory.createServerSslContext(env, PREFIX),
-                "非法 client-auth 必须在绑定期失败，不得静默回退 NONE");
+                () -> SslContextFactory.createServerSslContext(env, PREFIX), "非法 client-auth 必须在绑定期失败，不得静默回退 NONE");
         assertTrue(ex.getMessage().contains("server.ssl"), "异常必须带配置前缀上下文");
     }
 
@@ -226,8 +221,8 @@ class SslContextFactoryTest {
 
     @Test
     void openInputStream_nullPath_throwsIllegalArgument() throws Exception {
-        java.lang.reflect.InvocationTargetException ex = assertThrows(
-                java.lang.reflect.InvocationTargetException.class, () -> invokeOpenInputStream(null));
+        java.lang.reflect.InvocationTargetException ex = assertThrows(java.lang.reflect.InvocationTargetException.class,
+                () -> invokeOpenInputStream(null));
         assertInstanceOf(IllegalArgumentException.class, ex.getCause());
     }
 
@@ -284,7 +279,8 @@ class SslContextFactoryTest {
     }
 
     private static String readAllOutput(InputStream in) throws Exception {
-        try (in; Scanner sc = new Scanner(in, "UTF-8")) {
+        try (in;
+                Scanner sc = new Scanner(in, "UTF-8")) {
             sc.useDelimiter("\\A");
             return sc.hasNext() ? sc.next() : "";
         }

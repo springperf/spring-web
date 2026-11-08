@@ -67,8 +67,7 @@ class RequestHeaderLimitE2eTest {
             String response = n > 0 ? new String(buf, 0, n, java.nio.charset.StandardCharsets.UTF_8) : "";
             // 对齐 Netty HttpObjectAggregator：解码失败的请求头由框架回 400 后优雅关闭（不是 431）；
             // 禁止用「n < 0 / 连接关闭」替代协议断言。
-            assertTrue(response.startsWith("HTTP/1.1 400"),
-                    "超限请求头应返回 400 状态行，实际响应: " + response);
+            assertTrue(response.startsWith("HTTP/1.1 400"), "超限请求头应返回 400 状态行，实际响应: " + response);
         }
     }
 

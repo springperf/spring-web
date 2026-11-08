@@ -17,9 +17,8 @@ import static org.mockito.Mockito.mock;
 /**
  * {@link WebExchangeProvider} 契约与默认实现。
  * <p>
- * 「按 order 选择首个 supports 的 provider」这一选择逻辑属于 {@code ThymeleafViewResolver.selectProvider}，
- * 由 {@code ThymeleafViewResolverTest} 直接调用真实方法覆盖；此处不再复刻一份选择算法，
- * 避免测试只验证测试自己的代码而从未进入产品分支。
+ * 「按 order 选择首个 supports 的 provider」这一选择逻辑属于 {@code ThymeleafViewResolver.selectProvider}， 由
+ * {@code ThymeleafViewResolverTest} 直接调用真实方法覆盖；此处不再复刻一份选择算法， 避免测试只验证测试自己的代码而从未进入产品分支。
  * </p>
  */
 class WebExchangeProviderTest {

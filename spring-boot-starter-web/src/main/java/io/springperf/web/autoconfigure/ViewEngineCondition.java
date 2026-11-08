@@ -14,8 +14,7 @@ import java.util.Set;
  * <li>配置为多值列表（逗号分隔）→ 列表包含当前引擎名则放行</li>
  * <li>否则禁用</li>
  * </ul>
- * 取值合法性与 {@code none} 独占约束由 {@link ViewProperties#parseEngines(String)} 统一校验，
- * 非法配置在装配期即中断启动，不会拖到首次视图请求才 500。
+ * 取值合法性与 {@code none} 独占约束由 {@link ViewProperties#parseEngines(String)} 统一校验， 非法配置在装配期即中断启动，不会拖到首次视图请求才 500。
  */
 public class ViewEngineCondition implements Condition {
 
@@ -44,8 +43,7 @@ public class ViewEngineCondition implements Condition {
     }
 
     /**
-     * JSP 不属于多选引擎列表：除 {@code engine=none} 外一律放行（含显式指定了其他引擎的情形）。
-     * 自定义 {@code ViewResolver} Bean 由用户自行装配，不受此条件约束。
+     * JSP 不属于多选引擎列表：除 {@code engine=none} 外一律放行（含显式指定了其他引擎的情形）。 自定义 {@code ViewResolver} Bean 由用户自行装配，不受此条件约束。
      */
     public static class Jsp implements Condition {
         @Override
@@ -57,8 +55,7 @@ public class ViewEngineCondition implements Condition {
 
     @Override
     public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
-        Set<String> engines = ViewProperties.parseEngines(
-                context.getEnvironment().getProperty(ViewProperties.ENGINE));
+        Set<String> engines = ViewProperties.parseEngines(context.getEnvironment().getProperty(ViewProperties.ENGINE));
         return engines.isEmpty() || engines.contains(engineName);
     }
 }

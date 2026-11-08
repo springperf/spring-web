@@ -132,8 +132,7 @@ class WebSocketRoutingHandlerUpgradeRemovalTest {
     /** 失败路径不得写出 101，也不得挂会话——否则 refCnt==0 无法区分「成功释放」与「失败释放」。 */
     private static void assertNoSuccessfulUpgrade(EmbeddedChannel channel) {
         String response = readOutboundText(channel);
-        assertFalse(response.contains("101 Switching Protocols"),
-                "握手失败路径不得写出 101 响应，实际响应：" + response);
+        assertFalse(response.contains("101 Switching Protocols"), "握手失败路径不得写出 101 响应，实际响应：" + response);
         assertNull(WebSocketRoutingHandler.sessionOf(channel), "握手失败时不得建立会话");
     }
 

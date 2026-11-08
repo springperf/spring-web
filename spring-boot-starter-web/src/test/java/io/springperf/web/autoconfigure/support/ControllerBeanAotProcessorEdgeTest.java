@@ -26,8 +26,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 class ControllerBeanAotProcessorEdgeTest {
 
     private final DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
-    private final ControllerBeanFactoryInitializationAotProcessor processor =
-            new ControllerBeanFactoryInitializationAotProcessor();
+    private final ControllerBeanFactoryInitializationAotProcessor processor = new ControllerBeanFactoryInitializationAotProcessor();
 
     private static RuntimeHints apply(BeanFactoryInitializationAotContribution contribution) {
         RuntimeHints hints = new RuntimeHints();
@@ -62,8 +61,7 @@ class ControllerBeanAotProcessorEdgeTest {
         assertNull(hints.reflection().getTypeHint(String.class), "java.* 应被过滤");
         assertNull(hints.reflection().getTypeHint(Map.class), "java.util.* 应被过滤");
         assertNull(hints.reflection().getTypeHint(ResponseEntity.class), "org.springframework.* 应被过滤");
-        assertNull(hints.reflection().getTypeHint(io.springperf.web.context.WebContext.class),
-                "框架内部包应被精确过滤");
+        assertNull(hints.reflection().getTypeHint(io.springperf.web.context.WebContext.class), "框架内部包应被精确过滤");
         assertNull(hints.reflection().getTypeHint(io.netty.buffer.ByteBuf.class), "io.netty.* 应被过滤");
     }
 

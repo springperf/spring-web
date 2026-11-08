@@ -72,8 +72,7 @@ public class CoreFeaturesP0Test extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
-            assertEquals(Locale.getDefault().toLanguageTag(), body,
-                    "无 Accept-Language 时应返回 JVM 默认 Locale，实际: " + body);
+            assertEquals(Locale.getDefault().toLanguageTag(), body, "无 Accept-Language 时应返回 JVM 默认 Locale，实际: " + body);
         }
     }
 

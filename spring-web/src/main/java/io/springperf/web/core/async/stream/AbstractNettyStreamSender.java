@@ -133,8 +133,8 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
     /**
      * 入队并等待空位（背压自旋）。
      * <p>
-     * 队列满时短暂自旋等待 drain 消费腾出空间；自旋中重复 {@link #preSendCheck()} 以在 channel 关闭或流完成时立即失败。
-     * 另设超时上限：channel 长期 active 却始终不可写时，不能让生产者线程无限自旋占用。
+     * 队列满时短暂自旋等待 drain 消费腾出空间；自旋中重复 {@link #preSendCheck()} 以在 channel 关闭或流完成时立即失败。 另设超时上限：channel 长期 active
+     * 却始终不可写时，不能让生产者线程无限自旋占用。
      */
     private void enqueueWithBackpressure(Object data) throws IOException {
         long deadline = System.nanoTime() + enqueueTimeoutNanos;

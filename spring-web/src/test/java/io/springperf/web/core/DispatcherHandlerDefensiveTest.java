@@ -19,19 +19,16 @@ class DispatcherHandlerDefensiveTest {
     void isAsyncStillPending_requestContextFailureReturnsFalse() throws Exception {
         WebServerHttpRequest request = mock(WebServerHttpRequest.class);
         when(request.getRequestContext()).thenThrow(new IllegalStateException("boom"));
-        Method method = DispatcherHandler.class.getDeclaredMethod("isAsyncStillPending",
-                WebServerHttpRequest.class);
+        Method method = DispatcherHandler.class.getDeclaredMethod("isAsyncStillPending", WebServerHttpRequest.class);
         method.setAccessible(true);
 
-        assertFalse((Boolean) method.invoke(null, request),
-                "拿不到 RequestContext 时必须保守地判定为「非挂起」，让收尾继续");
+        assertFalse((Boolean) method.invoke(null, request), "拿不到 RequestContext 时必须保守地判定为「非挂起」，让收尾继续");
     }
 
     @Test
     void sendError_responseFailureIsSwallowed() throws Exception {
         WebServerHttpResponse response = mock(WebServerHttpResponse.class);
-        doThrow(new IllegalStateException("boom")).when(response)
-                .sendError(any(HttpStatus.class), anyString());
+        doThrow(new IllegalStateException("boom")).when(response).sendError(any(HttpStatus.class), anyString());
 
         DispatcherHandler.sendError(response, HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error");
 

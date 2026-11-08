@@ -52,15 +52,12 @@ public class BufferingBatchHandler implements EventHandler<BatchEvent> {
      * 窗口调度器；全进程共享一个 daemon 线程，仅在 {@link #SCHEDULER_LOCK} 内读写。
      * <p>
      * 这里刻意用 {@link Timer} 而不是 {@code ScheduledExecutorService}：后者内部基于
-     * {@code LockSupport.parkNanos}，小窗口（1~10ms）的到期精度不足，{@code batchWindowMillis=3/5}
-     * 这类小窗口会失去意义（快 IO 场景净亏损、低负载白等）。{@code Timer} 走 {@code Object.wait(timeout)}，
-     * 实测小窗口按标称值到期。
+     * {@code LockSupport.parkNanos}，小窗口（1~10ms）的到期精度不足，{@code batchWindowMillis=3/5} 这类小窗口会失去意义（快 IO
+     * 场景净亏损、低负载白等）。{@code Timer} 走 {@code Object.wait(timeout)}， 实测小窗口按标称值到期。
      * </p>
      * <p>
-     * 代价：Timer 线程不捕获任务异常，任一未捕获异常都会终止整个共享调度线程，
-     * 因此 {@link #scheduleWindowLocked()} 里的 TimerTask 必须自行收敛 {@code Throwable}。
-     * 另外 Timer 以 {@code currentTimeMillis()} 计算到期时间，短窗口受系统时钟回拨影响
-     * 可忽略，但不适用于长周期定时。
+     * 代价：Timer 线程不捕获任务异常，任一未捕获异常都会终止整个共享调度线程， 因此 {@link #scheduleWindowLocked()} 里的 TimerTask 必须自行收敛 {@code Throwable}。
+     * 另外 Timer 以 {@code currentTimeMillis()} 计算到期时间，短窗口受系统时钟回拨影响 可忽略，但不适用于长周期定时。
      * </p>
      */
     private static volatile Timer windowScheduler;
@@ -71,8 +68,7 @@ public class BufferingBatchHandler implements EventHandler<BatchEvent> {
     /**
      * 保护「获取/创建调度器 + 登记/注销」的静态锁。
      * <p>
-     * 登记与注销必须共用同一把锁：早期版本用独立的 AtomicLong 计数、关闭动作不在锁内， 存在「关掉别的队列刚重建的调度器」以及
-     * {@code schedule()} 抛异常冒到消费者的竞态。
+     * 登记与注销必须共用同一把锁：早期版本用独立的 AtomicLong 计数、关闭动作不在锁内， 存在「关掉别的队列刚重建的调度器」以及 {@code schedule()} 抛异常冒到消费者的竞态。
      * </p>
      */
     private static final Object SCHEDULER_LOCK = new Object();
@@ -80,8 +76,8 @@ public class BufferingBatchHandler implements EventHandler<BatchEvent> {
     /**
      * 本 handler 已登记到哪个调度器实例；{@code null} 表示未登记（无窗口，或还没收到过事件）。
      * <p>
-     * 用「登记在哪个实例上」而不是一个计数器，是为了让关闭动作只减自己那一份：无窗口队列即使没有登记过， 停机时也不会误减其他队列的登记数。
-     * 调度器被重建后旧实例的登记自动失效（{@link #windowTaskCount} 随重建归零）。
+     * 用「登记在哪个实例上」而不是一个计数器，是为了让关闭动作只减自己那一份：无窗口队列即使没有登记过， 停机时也不会误减其他队列的登记数。 调度器被重建后旧实例的登记自动失效（{@link #windowTaskCount}
+     * 随重建归零）。
      * </p>
      */
     private volatile Timer registeredScheduler;
@@ -350,9 +346,10 @@ public class BufferingBatchHandler implements EventHandler<BatchEvent> {
             unfinished++;
         }
         if (unfinished > 0) {
-            log.warn("Batch method [{}] completed {} of {} requests from queue [{}] - "
-                    + "the remaining ones failed explicitly instead of hanging until timeout", meta.batchMethod().getName(),
-                    batch.size() - unfinished, batch.size(), meta.queueName());
+            log.warn(
+                    "Batch method [{}] completed {} of {} requests from queue [{}] - "
+                            + "the remaining ones failed explicitly instead of hanging until timeout",
+                    meta.batchMethod().getName(), batch.size() - unfinished, batch.size(), meta.queueName());
         }
     }
 

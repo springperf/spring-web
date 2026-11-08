@@ -139,8 +139,7 @@ class BeetlViewResolverTest {
         BeetlViewResolver resolver = new BeetlViewResolver();
         resolver.initWithWebContext(noCacheContext);
 
-        assertEquals(BeetlViewResolver.NO_CACHE_CLASS,
-                groupTemplateOf(resolver).getProgramCache().getClass().getName(),
+        assertEquals(BeetlViewResolver.NO_CACHE_CLASS, groupTemplateOf(resolver).getProgramCache().getClass().getName(),
                 "cache=false 必须切到 NoCache 实现，否则运行期替换模板不会生效");
     }
 

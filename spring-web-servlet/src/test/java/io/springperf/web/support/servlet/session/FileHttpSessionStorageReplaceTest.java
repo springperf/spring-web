@@ -76,16 +76,15 @@ class FileHttpSessionStorageReplaceTest {
     void fileOf_rejectsIdThatEscapesStoreDir() throws Exception {
         // 复用 callFileOf 解包反射异常；fileOf 对越界 id 直接抛 IllegalArgumentException
         for (String unsafe : new String[] { "../escape", "a/b", "..\\windows" }) {
-            assertThrows(IllegalArgumentException.class, () -> callFileOf(unsafe),
-                    "不安全 id 应被拒绝: " + unsafe);
+            assertThrows(IllegalArgumentException.class, () -> callFileOf(unsafe), "不安全 id 应被拒绝: " + unsafe);
         }
     }
 
     @Test
     void fileOf_rejectsNullAndEmptyIds() {
         for (String invalid : new String[] { null, "" }) {
-            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                    () -> callFileOf(invalid), "空 id 必须在任何文件操作前被拒绝: " + invalid);
+            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> callFileOf(invalid),
+                    "空 id 必须在任何文件操作前被拒绝: " + invalid);
             assertTrue(ex.getMessage().contains("must not be empty"));
         }
     }
@@ -94,8 +93,7 @@ class FileHttpSessionStorageReplaceTest {
     void saveSession_unserializableAttributeSkipsPersistence() {
         HttpSessionData healthy = storage.createSession();
         storage.saveSession(healthy);
-        assertTrue(Files.exists(tempDir.resolve(healthy.getId() + ".session")),
-                "前置条件：正常会话可落盘，确保后续断言不是假通过");
+        assertTrue(Files.exists(tempDir.resolve(healthy.getId() + ".session")), "前置条件：正常会话可落盘，确保后续断言不是假通过");
 
         HttpSessionData session = storage.createSession();
         session.setAttribute("broken", new BrokenSerializable());

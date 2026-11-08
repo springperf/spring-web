@@ -74,8 +74,7 @@ class NettyWebSocketSessionSendCompletionTest {
         Throwable cause = completion.handle((v, e) -> e).join();
         assertInstanceOf(IOException.class, cause);
         assertNotNull(cause.getCause(), "原始 RejectedExecutionException 必须作为 cause 保留");
-        assertInstanceOf(java.util.concurrent.RejectedExecutionException.class, cause.getCause(),
-                "cause 必须是原始拒绝异常本身");
+        assertInstanceOf(java.util.concurrent.RejectedExecutionException.class, cause.getCause(), "cause 必须是原始拒绝异常本身");
         assertEquals("shutting down", cause.getCause().getMessage(), "cause 不能是被重新包装过的异常");
     }
 
@@ -100,8 +99,7 @@ class NettyWebSocketSessionSendCompletionTest {
             }
         }, "ws-send-interrupt-test");
         worker.start();
-        assertTrue(dispatched.await(2, java.util.concurrent.TimeUnit.SECONDS),
-                "发送任务必须已投递，否则 interrupt 时机不确定");
+        assertTrue(dispatched.await(2, java.util.concurrent.TimeUnit.SECONDS), "发送任务必须已投递，否则 interrupt 时机不确定");
         worker.interrupt();
         worker.join(5_000);
 

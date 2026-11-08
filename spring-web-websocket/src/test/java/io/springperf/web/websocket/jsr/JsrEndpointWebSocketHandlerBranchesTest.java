@@ -301,8 +301,7 @@ class JsrEndpointWebSocketHandlerBranchesTest {
         assertNotNull(ConfigCloseEndpoint.OPEN_CONFIG.get(), "EndpointConfig 应注入 @OnOpen 参数");
         EndpointConfig injected = ConfigCloseEndpoint.OPEN_CONFIG_OBJECT.get();
         assertNotNull(injected, "注入的必须是真实 EndpointConfig 对象");
-        assertEquals(ConfigCloseEndpoint.OPEN_CONFIG.get(), injected.toString(),
-                "端点记录的 config 字符串必须来自注入对象本身");
+        assertEquals(ConfigCloseEndpoint.OPEN_CONFIG.get(), injected.toString(), "端点记录的 config 字符串必须来自注入对象本身");
     }
 
     @Test
@@ -316,8 +315,7 @@ class JsrEndpointWebSocketHandlerBranchesTest {
         assertEquals(1, ConfigCloseEndpoint.CLOSE_INVOCATIONS.get(), "@OnClose 必须被调用一次");
         CloseReason reason = ConfigCloseEndpoint.CLOSE_REASON.get();
         assertNotNull(reason, "CloseReason 必须注入 @OnClose 参数，而不是 null");
-        assertEquals(CloseStatus.NORMAL.getCode(), reason.getCloseCode().getCode(),
-                "CloseStatus.NORMAL 必须映射为 1000");
+        assertEquals(CloseStatus.NORMAL.getCode(), reason.getCloseCode().getCode(), "CloseStatus.NORMAL 必须映射为 1000");
     }
 
     @Test
@@ -401,7 +399,8 @@ class JsrEndpointWebSocketHandlerBranchesTest {
         WebSocketSession session = mockSession();
 
         Exception ex = assertThrows(Exception.class, () -> handler.afterConnectionEstablished(session));
-        assertTrue(ex instanceof java.lang.reflect.InvocationTargetException
+        assertTrue(
+                ex instanceof java.lang.reflect.InvocationTargetException
                         || ex.getCause() instanceof IllegalStateException,
                 "@OnOpen 的业务异常必须保留（直接抛出或作为反射包装的 cause），实际：" + ex);
         assertTrue(session.getAttributes().isEmpty(), "@OnOpen 失败后连接状态不能留在 attributes 里");

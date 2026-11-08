@@ -58,8 +58,7 @@ class ManagementServerSettingsTest {
     void protocolLimits_defaultToServerValues() {
         MockEnvironment env = managementEnv().withProperty("server.http.read-timeout", "12s")
                 .withProperty("server.http.max-initial-line-length", "2048")
-                .withProperty("server.max-connections", "77")
-                .withProperty("server.shutdown.grace-period", "5s");
+                .withProperty("server.max-connections", "77").withProperty("server.shutdown.grace-period", "5s");
 
         ManagementServerSettings settings = resolve(env);
         assertEquals(12000L, settings.getReadTimeoutMillis());
@@ -105,8 +104,7 @@ class ManagementServerSettingsTest {
     @Test
     void addressAndTransport_managementOverridesWin() {
         MockEnvironment env = managementEnv().withProperty("server.address", "127.0.0.1")
-                .withProperty("server.netty.transport", "epoll")
-                .withProperty("management.server.address", "0.0.0.0")
+                .withProperty("server.netty.transport", "epoll").withProperty("management.server.address", "0.0.0.0")
                 .withProperty("management.server.netty.transport", "nio");
 
         ManagementServerSettings settings = resolve(env);
@@ -117,8 +115,7 @@ class ManagementServerSettingsTest {
     @Test
     void protocolLimits_managementOverridesWin() {
         MockEnvironment env = managementEnv().withProperty("server.http.read-timeout", "12s")
-                .withProperty("server.max-connections", "77")
-                .withProperty("management.server.http.read-timeout", "3s")
+                .withProperty("server.max-connections", "77").withProperty("management.server.http.read-timeout", "3s")
                 .withProperty("management.server.max-connections", "5");
 
         ManagementServerSettings settings = resolve(env);
@@ -137,8 +134,7 @@ class ManagementServerSettingsTest {
     @Test
     void ssl_managementEnableOverridesInheritedDisabled() {
         MockEnvironment env = managementEnv().withProperty("server.ssl.enabled", "false")
-                .withProperty("server.ssl.certificate", CERT)
-                .withProperty("server.ssl.certificate-private-key", KEY)
+                .withProperty("server.ssl.certificate", CERT).withProperty("server.ssl.certificate-private-key", KEY)
                 .withProperty("management.server.ssl.enabled", "true");
 
         assertNotNull(resolve(env).getSslContext(), "主服务器关闭 SSL 时，管理侧可显式 enabled=true 独立启用");
@@ -147,8 +143,7 @@ class ManagementServerSettingsTest {
     @Test
     void ssl_serverEnabledFalseIsInherited() {
         MockEnvironment env = managementEnv().withProperty("server.ssl.enabled", "false")
-                .withProperty("server.ssl.certificate", CERT)
-                .withProperty("server.ssl.certificate-private-key", KEY);
+                .withProperty("server.ssl.certificate", CERT).withProperty("server.ssl.certificate-private-key", KEY);
 
         assertNull(resolve(env).getSslContext(), "未配置管理侧开关时应继承主服务器的 enabled=false");
     }
@@ -178,8 +173,7 @@ class ManagementServerSettingsTest {
                 .withProperty("management.server.ssl.certificate-private-key", KEY);
         ConfigurationPropertySources.attach(env);
 
-        assertNotNull(resolve(env).getSslContext(),
-                "Boot 附加的 configurationProperties 快照不得遮蔽管理侧覆盖");
+        assertNotNull(resolve(env).getSslContext(), "Boot 附加的 configurationProperties 快照不得遮蔽管理侧覆盖");
     }
 
     @Test

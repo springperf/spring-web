@@ -150,13 +150,11 @@ class SupportMultipartAggregatorFirstChunkTest {
 
     @Test
     void constructorsWithExplicitLimitsKeepHttpObjectAggregatorInboundContract() throws Exception {
-        for (SupportMultipartAggregator aggregator : List.of(
-                new SupportMultipartAggregator(MAX, 2),
-                new SupportMultipartAggregator(MAX, 2, 512),
-                new SupportMultipartAggregator(MAX, 2, 512, 4096L),
+        for (SupportMultipartAggregator aggregator : List.of(new SupportMultipartAggregator(MAX, 2),
+                new SupportMultipartAggregator(MAX, 2, 512), new SupportMultipartAggregator(MAX, 2, 512, 4096L),
                 new SupportMultipartAggregator(MAX, 2, 512, 4096L, 1024L, null))) {
-            assertTrue(aggregator.acceptInboundMessage(
-                    new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/upload")));
+            assertTrue(aggregator
+                    .acceptInboundMessage(new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/upload")));
             assertFalse(aggregator.acceptInboundMessage(request()),
                     "FullHttpMessage 由 HttpObjectAggregator 契约拒绝，不能直接入站");
         }

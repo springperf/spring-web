@@ -55,8 +55,7 @@ class BatchRegistryPhase2Test {
     /** 显式关闭窗口的队列，用于验证「只有显式 0 才告警」。 */
     @Controller
     public static class NoWindowController {
-        @BatchMapping(method = "single", ringBufferSize = 64, maxBatchSize = 5, batchWindowMillis = 0,
-                consumerSize = 1)
+        @BatchMapping(method = "single", ringBufferSize = 64, maxBatchSize = 5, batchWindowMillis = 0, consumerSize = 1)
         public void batch(List<EchoRequest> requests) {
         }
 
@@ -186,8 +185,7 @@ class BatchRegistryPhase2Test {
     }
 
     /**
-     * 启动只装单个队列的 {@link BatchRegistry}，返回启动期是否出现窗口配置相关 WARN。
-     * 各窗口用例共用同一套容器与 mock，避免重复搭建。
+     * 启动只装单个队列的 {@link BatchRegistry}，返回启动期是否出现窗口配置相关 WARN。 各窗口用例共用同一套容器与 mock，避免重复搭建。
      *
      * @param props
      *            {@code springperf.batch.*} 全局配置；{@code null} 表示未接入配置（等价于全部内置默认值）
@@ -216,9 +214,8 @@ class BatchRegistryPhase2Test {
             registry.initWithWebContext(webContext);
             registry.initComponentPhase2();
             try {
-                return appender.list.stream()
-                        .anyMatch(e -> e.getLevel() == ch.qos.logback.classic.Level.WARN
-                                && e.getFormattedMessage().contains("batchWindowMillis"));
+                return appender.list.stream().anyMatch(e -> e.getLevel() == ch.qos.logback.classic.Level.WARN
+                        && e.getFormattedMessage().contains("batchWindowMillis"));
             } finally {
                 registry.destroyComponent();
             }
@@ -234,15 +231,13 @@ class BatchRegistryPhase2Test {
     /** 显式 {@code batchWindowMillis=0} 关闭窗口后，{@code maxBatchSize} 很难达到，启动期应告警。 */
     @Test
     void initComponentPhase2_warnsWhenWindowExplicitlyDisabled() throws Exception {
-        assertTrue(windowWarningLogged(NoWindowController.class),
-                "显式关闭 batchWindowMillis 的队列应在启动期告警");
+        assertTrue(windowWarningLogged(NoWindowController.class), "显式关闭 batchWindowMillis 的队列应在启动期告警");
     }
 
     /** 未声明窗口的队列使用默认 2ms，不应再出现「默认即告警」。 */
     @Test
     void initComponentPhase2_doesNotWarnWithDefaultWindow() throws Exception {
-        assertFalse(windowWarningLogged(BatchController.class),
-                "未声明窗口的队列使用默认 2ms，不应触发窗口告警");
+        assertFalse(windowWarningLogged(BatchController.class), "未声明窗口的队列使用默认 2ms，不应触发窗口告警");
     }
 
     /** {@code springperf.batch.window-millis=0} 等于全局关闭窗口，同样必须告警——不能因为不是注解声明就沉默。 */
@@ -250,8 +245,7 @@ class BatchRegistryPhase2Test {
     void initComponentPhase2_warnsWhenGlobalWindowDisabled() throws Exception {
         ApplicationProperties props = new ApplicationProperties(
                 new MockEnvironment().withProperty(BatchDefaults.WINDOW_MILLIS, "0"));
-        assertTrue(windowWarningLogged(BatchController.class, props),
-                "全局关闭窗口后，未声明窗口的队列应照常告警");
+        assertTrue(windowWarningLogged(BatchController.class, props), "全局关闭窗口后，未声明窗口的队列应照常告警");
     }
 
     /** {@code springperf.batch.*} 必须经 BatchRegistry 真正进入队列元数据（bufferSize 可观测）。 */
@@ -265,9 +259,9 @@ class BatchRegistryPhase2Test {
 
             WebContext webContext = mock(WebContext.class);
             when(webContext.getCtx()).thenReturn(ctx);
-            when(webContext.getProps()).thenReturn(new ApplicationProperties(new MockEnvironment()
-                    .withProperty(BatchDefaults.RING_BUFFER_SIZE, "256")
-                    .withProperty(BatchDefaults.CONSUMER_SIZE, "1")));
+            when(webContext.getProps()).thenReturn(
+                    new ApplicationProperties(new MockEnvironment().withProperty(BatchDefaults.RING_BUFFER_SIZE, "256")
+                            .withProperty(BatchDefaults.CONSUMER_SIZE, "1")));
             MappingRegistry mappingRegistry = mock(MappingRegistry.class);
             when(mappingRegistry.getMappingContextList()).thenReturn(Collections.singletonList(singleCtx));
             when(webContext.getWebComponent(MappingRegistry.class)).thenReturn(mappingRegistry);
@@ -279,8 +273,7 @@ class BatchRegistryPhase2Test {
                 registry.initComponentPhase2();
                 DisruptorQueue queue = queuesOf(registry).get("batch:DefaultController.batch");
                 assertNotNull(queue, "全局键不应影响队列安装");
-                assertEquals(256, queue.bufferSize(),
-                        "springperf.batch.ring-buffer-size 应覆盖未声明 ringBufferSize 的队列");
+                assertEquals(256, queue.bufferSize(), "springperf.batch.ring-buffer-size 应覆盖未声明 ringBufferSize 的队列");
             } finally {
                 registry.destroyComponent();
             }

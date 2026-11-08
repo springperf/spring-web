@@ -67,8 +67,7 @@ class ServletResponseProviderTest {
         Object first = provider.getResolver(methodParameter, mappingContext, null);
 
         assertNotNull(first);
-        assertSame(first, provider.getResolver(methodParameter, mappingContext, null),
-                "resolver 应复用同一实例，避免重复创建");
+        assertSame(first, provider.getResolver(methodParameter, mappingContext, null), "resolver 应复用同一实例，避免重复创建");
     }
 
     @Test
@@ -84,7 +83,6 @@ class ServletResponseProviderTest {
 
         StaticArgumentResolver resolver = provider.getResolver(methodParameter, mappingContext, null);
 
-        assertSame(servletResponse, resolver.resolveArgument(request, response),
-                "resolver 必须注入当前请求的 ServletResponse");
+        assertSame(servletResponse, resolver.resolveArgument(request, response), "resolver 必须注入当前请求的 ServletResponse");
     }
 }

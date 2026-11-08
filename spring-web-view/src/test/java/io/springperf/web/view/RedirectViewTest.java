@@ -105,8 +105,7 @@ class RedirectViewTest {
         model.put("page", 2);
         model.put("flag", true);
         view.render(model, mockReq(""), resp);
-        assertEquals("/search?q=hello+world&page=2&flag=true",
-                resp.getHeaders().getFirst(HttpHeaders.LOCATION));
+        assertEquals("/search?q=hello+world&page=2&flag=true", resp.getHeaders().getFirst(HttpHeaders.LOCATION));
     }
 
     @Test
@@ -192,8 +191,7 @@ class RedirectViewTest {
         RedirectView view = new RedirectView("http://evil.com/path");
         WebServerHttpResponse resp = mockResp();
         WebServerHttpRequest req = mockReq("", "trusted.example.com");
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> view.render(null, req, resp));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> view.render(null, req, resp));
         assertTrue(ex.getMessage().contains(ViewProperties.REDIRECT_HOSTS));
     }
 
@@ -202,10 +200,9 @@ class RedirectViewTest {
         RedirectView view = new RedirectView("//evil.com/path");
         WebServerHttpResponse resp = mockResp();
         WebServerHttpRequest req = mockReq("", "trusted.example.com");
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> view.render(null, req, resp), "//host 也必须受白名单约束");
-        assertTrue(ex.getMessage().contains(ViewProperties.REDIRECT_HOSTS),
-                "必须是白名单拒绝，而不是别的 IAE: " + ex.getMessage());
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> view.render(null, req, resp),
+                "//host 也必须受白名单约束");
+        assertTrue(ex.getMessage().contains(ViewProperties.REDIRECT_HOSTS), "必须是白名单拒绝，而不是别的 IAE: " + ex.getMessage());
     }
 
     @Test
@@ -214,10 +211,8 @@ class RedirectViewTest {
         RedirectView view = new RedirectView("https://trusted.example.com@evil.com/path");
         WebServerHttpResponse resp = mockResp();
         WebServerHttpRequest req = mockReq("", "trusted.example.com");
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> view.render(null, req, resp));
-        assertTrue(ex.getMessage().contains(ViewProperties.REDIRECT_HOSTS),
-                "必须是白名单拒绝，而不是别的 IAE: " + ex.getMessage());
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> view.render(null, req, resp));
+        assertTrue(ex.getMessage().contains(ViewProperties.REDIRECT_HOSTS), "必须是白名单拒绝，而不是别的 IAE: " + ex.getMessage());
     }
 
     @Test
@@ -226,8 +221,7 @@ class RedirectViewTest {
         RedirectView view = new RedirectView("http://[invalid/path");
         WebServerHttpResponse resp = mockResp();
         WebServerHttpRequest req = mockReq("", "trusted.example.com");
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> view.render(null, req, resp));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> view.render(null, req, resp));
         assertTrue(ex.getMessage().contains(ViewProperties.REDIRECT_HOSTS),
                 "必须是白名单拒绝，而不是 URI 解析异常直接冒泡: " + ex.getMessage());
     }

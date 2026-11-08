@@ -30,14 +30,9 @@ class FreemarkerViewResolverSettingsTest {
 
     /** FreemarkerViewResolver 允许读取的配置键；读到其它键说明配置读取跑偏，直接让用例失败。 */
     private static final java.util.Set<String> READ_KEYS = java.util.Set.of(
-            ViewProperties.FREEMARKER_TEMPLATE_LOADER_PATH,
-            ViewProperties.FREEMARKER_PREFIX,
-            ViewProperties.FREEMARKER_SUFFIX,
-            ViewProperties.FREEMARKER_CONTENT_TYPE,
-            ViewProperties.FREEMARKER_ENABLED,
-            ViewProperties.FREEMARKER_ORDER,
-            ViewProperties.FREEMARKER_SETTINGS,
-            ViewProperties.FREEMARKER_CACHE);
+            ViewProperties.FREEMARKER_TEMPLATE_LOADER_PATH, ViewProperties.FREEMARKER_PREFIX,
+            ViewProperties.FREEMARKER_SUFFIX, ViewProperties.FREEMARKER_CONTENT_TYPE, ViewProperties.FREEMARKER_ENABLED,
+            ViewProperties.FREEMARKER_ORDER, ViewProperties.FREEMARKER_SETTINGS, ViewProperties.FREEMARKER_CACHE);
 
     @BeforeEach
     void setUp() {
@@ -142,8 +137,7 @@ class FreemarkerViewResolverSettingsTest {
         assertFalse(resolver.isEnabled());
         assertNull(resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class)));
         resolver.invalidateCache();
-        assertNull(resolver.resolveViewName("hello", null, mock(WebServerHttpRequest.class)),
-                "禁用后清理缓存也不应恢复解析");
+        assertNull(resolver.resolveViewName("hello", null, mock(WebServerHttpRequest.class)), "禁用后清理缓存也不应恢复解析");
     }
 
     @Test

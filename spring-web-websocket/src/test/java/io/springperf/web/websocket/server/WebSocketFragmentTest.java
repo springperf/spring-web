@@ -251,8 +251,7 @@ class WebSocketFragmentTest {
         Object pong = channel.readOutbound();
         assertFalse(pong == null, "分片之间收到 Ping 必须回 Pong");
         if (pong instanceof io.netty.buffer.ByteBuf) {
-            assertEquals(0x8A, ((io.netty.buffer.ByteBuf) pong).getUnsignedByte(0) & 0xFF,
-                    "控制帧回写必须是 Pong（opcode 0xA）");
+            assertEquals(0x8A, ((io.netty.buffer.ByteBuf) pong).getUnsignedByte(0) & 0xFF, "控制帧回写必须是 Pong（opcode 0xA）");
         } else {
             assertFalse(!(pong instanceof io.netty.handler.codec.http.websocketx.PongWebSocketFrame),
                     "必须回 Pong 而不是其它帧");

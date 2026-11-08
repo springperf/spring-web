@@ -93,8 +93,8 @@ public class ActuatorSbaExactTest {
                 case "/health" -> assertEquals("UP", json.getString("status"), "Body: " + body);
                 case "/metrics" -> assertNotNull(json.get("names"), "Body: " + body);
                 case "/env" -> assertNotNull(json.get("activeProfiles"), "Body: " + body);
-                case "/beans", "/mappings", "/configprops", "/conditions" -> assertNotNull(json.get("contexts"),
-                        "Body: " + body);
+                case "/beans", "/mappings", "/configprops", "/conditions" ->
+                        assertNotNull(json.get("contexts"), "Body: " + body);
                 case "/loggers" -> assertNotNull(json.get("levels"), "Body: " + body);
                 case "/threaddump" -> assertNotNull(json.get("threads"), "Body: " + body);
                 case "/scheduledtasks" -> assertNotNull(json.get("cron"), "Body: " + body);

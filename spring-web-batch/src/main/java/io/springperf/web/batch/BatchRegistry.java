@@ -73,8 +73,7 @@ public class BatchRegistry extends BaseWebComponent {
      * <ul>
      * <li>窗口被关闭（{@code batchWindowMillis=0}，注解或 {@code springperf.batch.window-millis=0} 均可）：刷出时机回到
      * {@code endOfBatch}，批大小取决于 RingBuffer 瞬时积压，{@code maxBatchSize} 很难达到；</li>
-     * <li>多个队列的 {@code consumerSize} 之和超过 CPU 核数：每个 {@code @BatchMapping} 都持有独立的 bizExecutor，
-     * 默认值（核数）是按单队列设计的。</li>
+     * <li>多个队列的 {@code consumerSize} 之和超过 CPU 核数：每个 {@code @BatchMapping} 都持有独立的 bizExecutor， 默认值（核数）是按单队列设计的。</li>
      * </ul>
      */
     private void warnOnSuboptimalConfig(List<BatchHandlerRegistration> registrations) {

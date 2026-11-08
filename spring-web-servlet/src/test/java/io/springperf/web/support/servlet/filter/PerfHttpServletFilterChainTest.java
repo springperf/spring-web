@@ -53,10 +53,8 @@ class PerfHttpServletFilterChainTest {
         doThrow(cause).when(filterChain).doFilter(request, response);
         PerfHttpServletFilterChain chain = new PerfHttpServletFilterChain(request, response, filterChain);
         // 生产 doFilter 用 @SneakyThrows 直接委托，异常必须原样传播、不得包装或替换
-        org.junit.jupiter.api.Assertions.assertSame(cause,
-                org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class,
-                        () -> chain.doFilter(servletRequest, servletResponse)),
-                "必须原样传播底层链异常，不得包装或替换");
+        org.junit.jupiter.api.Assertions.assertSame(cause, org.junit.jupiter.api.Assertions.assertThrows(
+                RuntimeException.class, () -> chain.doFilter(servletRequest, servletResponse)), "必须原样传播底层链异常，不得包装或替换");
     }
 
     // Filter 用 Wrapper 包装后继续调用链时，适配上下文必须换成新包装，

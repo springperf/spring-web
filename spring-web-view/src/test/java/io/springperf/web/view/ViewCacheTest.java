@@ -126,11 +126,10 @@ class ViewCacheTest {
         AtomicInteger loads = new AtomicInteger();
         IllegalStateException boom = new IllegalStateException("template broken");
 
-        IllegalStateException thrown = assertThrows(IllegalStateException.class,
-                () -> cache.resolve("home", key -> {
-                    loads.incrementAndGet();
-                    throw boom;
-                }));
+        IllegalStateException thrown = assertThrows(IllegalStateException.class, () -> cache.resolve("home", key -> {
+            loads.incrementAndGet();
+            throw boom;
+        }));
         assertSame(boom, thrown, "加载异常必须原样抛出");
         assertSame(VIEW, cache.resolve("home", countingLoader(loads, VIEW)));
         assertEquals(2, loads.get(), "失败结果不可缓存，后续请求应能重试");
@@ -211,8 +210,7 @@ class ViewCacheTest {
         failed.completeExceptionally(raw);
         viewsOf(cache).put("home", failed);
 
-        CompletionException ex = assertThrows(CompletionException.class,
-                () -> cache.resolve("home", key -> VIEW));
+        CompletionException ex = assertThrows(CompletionException.class, () -> cache.resolve("home", key -> VIEW));
         assertSame(raw, ex.getCause());
     }
 
@@ -305,8 +303,7 @@ class ViewCacheTest {
         assertTrue(done.await(10, TimeUnit.SECONDS));
         assertEquals(0, failures.get(), "并发失效与解析不应抛异常");
         assertSame(VIEW, cache.resolve("seed", seedLoader), "失效后缓存仍可用");
-        assertEquals(2, seedLoads.get(),
-                "invalidate() 必须真的清空过缓存；若它是 no-op，seed 不会重新加载");
+        assertEquals(2, seedLoads.get(), "invalidate() 必须真的清空过缓存；若它是 no-op，seed 不会重新加载");
     }
 
     @Test

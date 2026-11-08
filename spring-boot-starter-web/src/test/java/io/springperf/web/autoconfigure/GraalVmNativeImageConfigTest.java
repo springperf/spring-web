@@ -16,8 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * 验证 GraalVM native-image 静态配置文件的自洽性。
  * <p>
- * 不只验「文件存在」：配置文件里的类名、代理接口、资源正则都必须真实可达/可用，
- * 且 {@code AutoConfiguration.imports} 中登记的自动配置类必须全部能在 classpath 上加载。
+ * 不只验「文件存在」：配置文件里的类名、代理接口、资源正则都必须真实可达/可用， 且 {@code AutoConfiguration.imports} 中登记的自动配置类必须全部能在 classpath 上加载。
  * 两轨之间的重复/互补/独占关系由 {@link NativeImageHintsConsistencyTest} 校验。
  * </p>
  */
@@ -26,8 +25,7 @@ class GraalVmNativeImageConfigTest {
     private static final String BASE_PATH = "META-INF/native-image/io.github.springperf/spring-boot-starter-web";
 
     /** 既作 classpath 资源名，也作 resource-config 正则要覆盖的真实路径。 */
-    private static final String IMPORTS_PATH =
-            "META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports";
+    private static final String IMPORTS_PATH = "META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports";
 
     private final ObjectMapper mapper = new ObjectMapper();
 

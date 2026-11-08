@@ -73,8 +73,7 @@ class WsFrameCodecTest {
     void emptyControlPayload_usesEmptyBuffer() {
         PingWebSocketFrame ping = (PingWebSocketFrame) WsFrameCodec.encode(new PingMessage(ByteBuffer.allocate(0)));
         assertEquals(0, ping.content().readableBytes());
-        assertSame(Unpooled.EMPTY_BUFFER, ping.content(),
-                "空载荷必须复用 Unpooled.EMPTY_BUFFER，而不是新建 buffer");
+        assertSame(Unpooled.EMPTY_BUFFER, ping.content(), "空载荷必须复用 Unpooled.EMPTY_BUFFER，而不是新建 buffer");
     }
 
     @Test

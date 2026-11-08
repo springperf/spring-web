@@ -156,9 +156,9 @@ class PerfServletContextCoverageTest {
 
     @Test
     void virtualServerName_readsConfiguredValue() {
-        when(props.get(org.mockito.ArgumentMatchers.eq(
-                io.springperf.web.context.PropertiesConstant.SERVLET_VIRTUAL_SERVER_NAME), anyString()))
-                .thenReturn("edge-1");
+        when(props.get(org.mockito.ArgumentMatchers
+                .eq(io.springperf.web.context.PropertiesConstant.SERVLET_VIRTUAL_SERVER_NAME), anyString()))
+                        .thenReturn("edge-1");
 
         assertEquals("edge-1", servletContext.getVirtualServerName(), "应读取配置的虚拟服务器名，而非默认值回显");
     }
@@ -234,9 +234,9 @@ class PerfServletContextCoverageTest {
 
     @Test
     void versions_andNames() {
-        when(props.get(org.mockito.ArgumentMatchers.eq(
-                io.springperf.web.context.PropertiesConstant.SERVLET_APPLICATION_DISPLAY_NAME), anyString()))
-                .thenReturn("custom-app");
+        when(props.get(org.mockito.ArgumentMatchers
+                .eq(io.springperf.web.context.PropertiesConstant.SERVLET_APPLICATION_DISPLAY_NAME), anyString()))
+                        .thenReturn("custom-app");
 
         assertEquals(6, servletContext.getMajorVersion());
         assertEquals(0, servletContext.getMinorVersion());

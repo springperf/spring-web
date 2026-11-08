@@ -93,8 +93,7 @@ class FileHttpSessionStorageTest {
         assertTrue(Files.size(file) > 0);
         try (java.io.ObjectInputStream ois = new java.io.ObjectInputStream(Files.newInputStream(file))) {
             HttpSessionData restored = (HttpSessionData) ois.readObject();
-            assertTrue(restored.getAttribute("user") instanceof SerializableValue,
-                    "落盘属性应保持可序列化类型");
+            assertTrue(restored.getAttribute("user") instanceof SerializableValue, "落盘属性应保持可序列化类型");
             assertEquals("alice", ((SerializableValue) restored.getAttribute("user")).text);
         }
     }

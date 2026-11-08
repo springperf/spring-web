@@ -165,8 +165,7 @@ class WebSocketRoutingHandlerCoverageTest {
 
         verify(handler, timeout(2000)).afterConnectionEstablished(any(WebSocketSession.class));
         String response = readHandshakeResponseText();
-        assertTrue(response.startsWith("HTTP/1.1 101 Switching Protocols"),
-                "握手成功必须回 101，实际响应：" + response);
+        assertTrue(response.startsWith("HTTP/1.1 101 Switching Protocols"), "握手成功必须回 101，实际响应：" + response);
         assertTrue(response.toLowerCase().contains("sec-websocket-accept:"), "101 必须带 Sec-WebSocket-Accept 头");
         assertTrue(response.contains("s3pPLMBiTxaQ9kYGzzhZRbK+xOo="), "Accept 必须按 nonce 正确计算");
         assertNotNull(WebSocketRoutingHandler.sessionOf(channel), "握手成功后 channel 上必须挂会话");
@@ -206,8 +205,7 @@ class WebSocketRoutingHandlerCoverageTest {
         Object outbound = channel.readOutbound();
         assertNotNull(outbound, "Ping 帧应触发 Pong 回写");
         if (outbound instanceof ByteBuf) {
-            assertEquals(0x8A, ((ByteBuf) outbound).getUnsignedByte(0) & 0xFF,
-                    "回写必须是 Pong 帧（opcode 0xA），不能是别的控制帧");
+            assertEquals(0x8A, ((ByteBuf) outbound).getUnsignedByte(0) & 0xFF, "回写必须是 Pong 帧（opcode 0xA），不能是别的控制帧");
         } else {
             assertInstanceOf(PongWebSocketFrame.class, outbound, "Ping 必须回 Pong 而不是其它帧");
         }
@@ -624,8 +622,7 @@ class WebSocketRoutingHandlerCoverageTest {
         channel.runPendingTasks();
 
         String response = readHandshakeResponseText();
-        assertTrue(response.startsWith("HTTP/1.1 403 Forbidden"),
-                "handler 级拒绝来源必须回 403，实际响应：" + response);
+        assertTrue(response.startsWith("HTTP/1.1 403 Forbidden"), "handler 级拒绝来源必须回 403，实际响应：" + response);
         assertFalse(channel.isOpen(), "回 403 后必须关闭连接");
         verify(validator, never()).afterConnectionEstablished(any());
     }
@@ -698,8 +695,7 @@ class WebSocketRoutingHandlerCoverageTest {
         io.netty.handler.timeout.IdleStateHandler idle = (io.netty.handler.timeout.IdleStateHandler) channel.pipeline()
                 .get("ws-idle");
         assertNotNull(idle, "per-path idleTimeout>0 → 应安装 IdleStateHandler");
-        assertEquals(2000, idle.getAllIdleTimeInMillis(),
-                "per-path idleTimeout=2000 必须覆盖全局 5000，否则断言会被全局配置兜底");
+        assertEquals(2000, idle.getAllIdleTimeInMillis(), "per-path idleTimeout=2000 必须覆盖全局 5000，否则断言会被全局配置兜底");
     }
 
     @Test
@@ -723,8 +719,8 @@ class WebSocketRoutingHandlerCoverageTest {
         java.util.Queue<io.netty.handler.codec.http.websocketx.WebSocketFrame> queue = new java.util.LinkedList<>();
         queue.add(new TextWebSocketFrame("q1"));
         queue.add(new TextWebSocketFrame("q2"));
-        channel.attr(io.netty.util.AttributeKey
-                .<java.util.Queue<io.netty.handler.codec.http.websocketx.WebSocketFrame>> valueOf(
+        channel.attr(
+                io.netty.util.AttributeKey.<java.util.Queue<io.netty.handler.codec.http.websocketx.WebSocketFrame>> valueOf(
                         "ws.backpressure.queue"))
                 .set(queue);
 

@@ -41,8 +41,7 @@ class NettyServerStartedEventTest {
         WebContext webContext = mock(WebContext.class);
         when(webContext.getCtx()).thenReturn(null);
 
-        assertDoesNotThrow(() -> invokePublish(new NettyHttpServer(webContext)),
-                "单测直接构造服务器、没有真实上下文时不得抛异常");
+        assertDoesNotThrow(() -> invokePublish(new NettyHttpServer(webContext)), "单测直接构造服务器、没有真实上下文时不得抛异常");
         // 无上下文时必须直接返回，不能改从别处取组件再发布
         verify(webContext).getCtx();
         verifyNoMoreInteractions(webContext);

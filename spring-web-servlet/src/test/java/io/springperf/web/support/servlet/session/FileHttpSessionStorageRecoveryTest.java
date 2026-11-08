@@ -172,8 +172,7 @@ class FileHttpSessionStorageRecoveryTest {
 
         storage.saveSession(session);
 
-        assertFalse(Files.exists(tempDir.resolve(real.getId() + ".session")),
-                "锁内重查发现失效后不得再落盘");
+        assertFalse(Files.exists(tempDir.resolve(real.getId() + ".session")), "锁内重查发现失效后不得再落盘");
         assertSame(real, readSessions(storage).get(real.getId()), "不得用 spy 覆盖在册会话");
     }
 
@@ -191,8 +190,8 @@ class FileHttpSessionStorageRecoveryTest {
             }
         };
 
-        Method buildCopy = FileHttpSessionStorage.class.getDeclaredMethod("buildCopy",
-                HttpSessionData.class, boolean.class);
+        Method buildCopy = FileHttpSessionStorage.class.getDeclaredMethod("buildCopy", HttpSessionData.class,
+                boolean.class);
         buildCopy.setAccessible(true);
         HttpSessionData copy = (HttpSessionData) buildCopy.invoke(storage, source, false);
 

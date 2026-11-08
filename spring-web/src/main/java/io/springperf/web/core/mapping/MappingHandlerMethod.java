@@ -156,9 +156,8 @@ public class MappingHandlerMethod extends InvokableHandlerMethod {
      * 重启场景防 metaspace 泄漏）。
      * </p>
      * <p>
-     * 只清静态表，<b>不动存活实例的本地快路径字段</b>：{@code INSTANCES} 是 JVM 全局集合，同一进程内可能还有其它正在运行的
-     * WebContext（多 context 测试 / 热重启），连带置空会让它们丢失仅在此处缓存的元数据。存活实例随其上下文一起被 GC
-     * 回收；如需让存活实例的某个槽位失效，用 {@code clearCache(key)}（它明确针对单个 key）。
+     * 只清静态表，<b>不动存活实例的本地快路径字段</b>：{@code INSTANCES} 是 JVM 全局集合，同一进程内可能还有其它正在运行的 WebContext（多 context 测试 /
+     * 热重启），连带置空会让它们丢失仅在此处缓存的元数据。存活实例随其上下文一起被 GC 回收；如需让存活实例的某个槽位失效，用 {@code clearCache(key)}（它明确针对单个 key）。
      * </p>
      */
     public static void clearAllCaches() {

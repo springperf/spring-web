@@ -11,8 +11,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class JsrCodecRegistryTest {
 
-    private static final java.util.concurrent.atomic.AtomicInteger DESTROY_COUNT =
-            new java.util.concurrent.atomic.AtomicInteger();
+    private static final java.util.concurrent.atomic.AtomicInteger DESTROY_COUNT = new java.util.concurrent.atomic.AtomicInteger();
 
     @ServerEndpoint(value = "/ws", decoders = { MyTextDecoder.class, MyBinaryDecoder.class }, encoders = {
             MyTextEncoder.class, MyBinaryEncoder.class })
@@ -236,8 +235,7 @@ class JsrCodecRegistryTest {
 
         registry.destroy();
 
-        assertEquals(4, DESTROY_COUNT.get(),
-                "Endpoint 声明的 2 个 Decoder + 2 个 Encoder 都必须各调用一次 destroy()");
+        assertEquals(4, DESTROY_COUNT.get(), "Endpoint 声明的 2 个 Decoder + 2 个 Encoder 都必须各调用一次 destroy()");
     }
 
     @Test

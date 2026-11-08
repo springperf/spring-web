@@ -15,11 +15,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * 回归 #11：{@code WebServerInitializedEvent} 必须在服务器启动阶段发布，早于 {@code ApplicationReadyEvent}，
- * 且携带真实绑定端口（Spring Cloud 服务注册依赖此时机与端口）。
+ * 回归 #11：{@code WebServerInitializedEvent} 必须在服务器启动阶段发布，早于 {@code ApplicationReadyEvent}， 且携带真实绑定端口（Spring Cloud
+ * 服务注册依赖此时机与端口）。
  */
-@SpringBootTest(classes = { TestApplication.class, WebServerInitializedEventOrderTest.RecorderConfig.class },
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(classes = { TestApplication.class,
+        WebServerInitializedEventOrderTest.RecorderConfig.class }, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class WebServerInitializedEventOrderTest {
 
     @Autowired

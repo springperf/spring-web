@@ -83,8 +83,8 @@ class ResourceRequestHandlerConditionalTest {
     }
 
     private static boolean ifRangeAllows(WebServerHttpRequest req, Resource resource) throws Exception {
-        return (Boolean) callStatic("ifRangeAllows",
-                new Class<?>[] { WebServerHttpRequest.class, Resource.class }, req, resource);
+        return (Boolean) callStatic("ifRangeAllows", new Class<?>[] { WebServerHttpRequest.class, Resource.class }, req,
+                resource);
     }
 
     private static String etagOf(Resource resource) throws Exception {
@@ -180,16 +180,14 @@ class ResourceRequestHandlerConditionalTest {
     @Test
     void gzipProbeCachesNegativeResult(@TempDir Path dir) throws Exception {
         Resource resource = new FileSystemResource(createFile(dir));
-        assertNull(call(handler, "getGzipResource",
-                new Class<?>[] { Resource.class, WebServerHttpRequest.class }, resource, request),
-                "无 Accept-Encoding 时不应探测 .gz");
+        assertNull(call(handler, "getGzipResource", new Class<?>[] { Resource.class, WebServerHttpRequest.class },
+                resource, request), "无 Accept-Encoding 时不应探测 .gz");
 
         requestHeaders.set(HttpHeaders.ACCEPT_ENCODING, "gzip");
-        assertNull(call(handler, "getGzipResource",
-                new Class<?>[] { Resource.class, WebServerHttpRequest.class }, resource, request));
-        assertNull(call(handler, "getGzipResource",
-                new Class<?>[] { Resource.class, WebServerHttpRequest.class }, resource, request),
-                "第二次应命中 NO_GZIP 负缓存");
+        assertNull(call(handler, "getGzipResource", new Class<?>[] { Resource.class, WebServerHttpRequest.class },
+                resource, request));
+        assertNull(call(handler, "getGzipResource", new Class<?>[] { Resource.class, WebServerHttpRequest.class },
+                resource, request), "第二次应命中 NO_GZIP 负缓存");
 
         @SuppressWarnings("unchecked")
         ConcurrentMap<String, Resource> cache = (ConcurrentMap<String, Resource>) readField(handler,

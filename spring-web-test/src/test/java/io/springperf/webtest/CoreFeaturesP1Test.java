@@ -261,8 +261,7 @@ public class CoreFeaturesP1Test extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(200, resp.code());
             String body = resp.body().string();
-            assertTrue(body.matches("duplicate-(first|second)"),
-                    "应命中两个重复 mapping 中的某一个方法，实际: " + body);
+            assertTrue(body.matches("duplicate-(first|second)"), "应命中两个重复 mapping 中的某一个方法，实际: " + body);
         }
     }
 }

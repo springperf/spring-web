@@ -43,8 +43,9 @@ public class ManagementPortConflictTest {
                 // 仅 ctx.isRunning() 无法证明两个端口真的绑定并提供 HTTP 服务
                 OkHttpClient client = new OkHttpClient.Builder().connectTimeout(java.time.Duration.ofSeconds(3))
                         .readTimeout(java.time.Duration.ofSeconds(5)).build();
-                try (Response r = client.newCall(new Request.Builder()
-                        .url("http://localhost:" + serverPort + "/api/core/bytes").get().build()).execute()) {
+                try (Response r = client.newCall(
+                        new Request.Builder().url("http://localhost:" + serverPort + "/api/core/bytes").get().build())
+                        .execute()) {
                     assertEquals(200, r.code(), "主端口应提供业务端点，实际: " + r.code());
                     assertEquals("Hello, Bytes!", r.body().string(), "主端口响应内容应正确");
                 }

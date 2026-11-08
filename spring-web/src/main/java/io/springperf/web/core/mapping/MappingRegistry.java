@@ -293,12 +293,10 @@ public class MappingRegistry extends WebComponentContainer {
     }
 
     /**
-     * 405 时补齐 Allow 头所需的上下文：{@code SimpleRouter} 每次 route() 覆盖请求属性，
-     * 首个 optimizer 只能看到自己名下的映射。这里按路径规则从全部注册映射补入其它 optimizer 的上下文，
-     * 仅用于收集允许的方法，不改变路由决策（仍是 405）。
+     * 405 时补齐 Allow 头所需的上下文：{@code SimpleRouter} 每次 route() 覆盖请求属性， 首个 optimizer 只能看到自己名下的映射。这里按路径规则从全部注册映射补入其它
+     * optimizer 的上下文， 仅用于收集允许的方法，不改变路由决策（仍是 405）。
      */
-    private PathMappingContext[] mergePathMatchedContexts(WebServerHttpRequest req,
-            PathMappingContext[] firstMatched) {
+    private PathMappingContext[] mergePathMatchedContexts(WebServerHttpRequest req, PathMappingContext[] firstMatched) {
         List<PathMappingContext> merged = new ArrayList<>();
         for (PathMappingContext ctx : firstMatched) {
             merged.add(ctx);

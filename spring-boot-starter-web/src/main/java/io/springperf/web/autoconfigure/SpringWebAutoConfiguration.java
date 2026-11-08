@@ -133,9 +133,8 @@ public class SpringWebAutoConfiguration {
      * D9：冲突检测提前到容器初始化早期。BeanFactoryPostProcessor 在 bean 定义加载后、 实例化前执行，比原 webContext bean 方法（实例化阶段）更早暴露问题。 静态 @Bean
      * 确保本类实例化前即可注册该 post-processor。
      * <p>
-     * 判定只依赖官方 Spring MVC 的 {@code DispatcherServlet}；框架自行重写的
-     * {@code org.springframework.web.servlet.*} 不含该类，因此不会误报。若该类只是三方库传递依赖、
-     * 并不会启用 Spring MVC，可用 {@link #MVC_CONFLICT_CHECK_PROPERTY}=false 显式关闭本守卫。
+     * 判定只依赖官方 Spring MVC 的 {@code DispatcherServlet}；框架自行重写的 {@code org.springframework.web.servlet.*}
+     * 不含该类，因此不会误报。若该类只是三方库传递依赖、 并不会启用 Spring MVC，可用 {@link #MVC_CONFLICT_CHECK_PROPERTY}=false 显式关闭本守卫。
      * </p>
      */
     @Bean

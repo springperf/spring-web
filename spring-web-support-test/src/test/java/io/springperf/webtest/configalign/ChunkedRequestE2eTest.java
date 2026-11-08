@@ -97,8 +97,7 @@ class ChunkedRequestE2eTest {
     }
 
     /**
-     * 断言「服务器明确拒绝了该请求」：必须解析出 400 状态行。
-     * 空响应（挂起 / 静默关闭 / 一个字节都没读到）判失败，不能再算「已拒绝」。
+     * 断言「服务器明确拒绝了该请求」：必须解析出 400 状态行。 空响应（挂起 / 静默关闭 / 一个字节都没读到）判失败，不能再算「已拒绝」。
      */
     private static void assertRejected(String response, String message) {
         assertFalse(response.isEmpty(), message + "：服务端未给出任何响应（挂起或静默关闭）");

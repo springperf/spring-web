@@ -78,14 +78,13 @@ class PerfHttpServletRequestEdgeTest {
             }
         };
 
-        assertTrue(new PerfHttpServletRequest.NettyServletInputStream(broken).isFinished(),
-                "available() 失败时应保守地视为已结束");
+        assertTrue(new PerfHttpServletRequest.NettyServletInputStream(broken).isFinished(), "available() 失败时应保守地视为已结束");
     }
 
     @Test
     void nettyServletInputStream_isFinished_whenBytesRemain() {
-        assertFalse(new PerfHttpServletRequest.NettyServletInputStream(
-                new ByteArrayInputStream(new byte[] { 1 })).isFinished());
+        assertFalse(new PerfHttpServletRequest.NettyServletInputStream(new ByteArrayInputStream(new byte[] { 1 }))
+                .isFinished());
     }
 
     @Test

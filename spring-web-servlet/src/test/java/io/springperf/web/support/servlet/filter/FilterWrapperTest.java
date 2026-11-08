@@ -130,8 +130,9 @@ class FilterWrapperTest {
 
         FilterWrapper wrapper = new FilterWrapper(servletFilter);
 
-        assertSame(failure, assertThrows(jakarta.servlet.ServletException.class,
-                () -> wrapper.doFilter(request, response, chain)), "servlet filter 异常应原样传播");
+        assertSame(failure,
+                assertThrows(jakarta.servlet.ServletException.class, () -> wrapper.doFilter(request, response, chain)),
+                "servlet filter 异常应原样传播");
         // servlet filter 抛异常时必须短路，不得继续放行框架链
         verify(chain, never()).doFilter(any(WebServerHttpRequest.class), any(WebServerHttpResponse.class));
     }

@@ -280,8 +280,7 @@ public class NettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
     /**
      * 端口绑定成功后立即发布框架启动事件，starter 监听后转换成 Boot 标准 {@code WebServerInitializedEvent}。
      * <p>
-     * 单测直接 {@code new NettyHttpServer(...)} 时 WebContext 可能没有真实 ApplicationContext，此时静默跳过；
-     * 生产路径由 Spring 注入，事件一定发布。
+     * 单测直接 {@code new NettyHttpServer(...)} 时 WebContext 可能没有真实 ApplicationContext，此时静默跳过； 生产路径由 Spring 注入，事件一定发布。
      * </p>
      */
     private void publishServerStartedEvent() {

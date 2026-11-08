@@ -48,8 +48,8 @@ public class RedirectView implements View {
         if (isExternalTarget(url)) {
             Set<String> allowedHosts = allowedHosts(req);
             if (!allowedHosts.isEmpty() && !isAllowedHost(url, allowedHosts)) {
-                throw new IllegalArgumentException("Redirect target host is not allowed by '"
-                        + ViewProperties.REDIRECT_HOSTS + "': " + url);
+                throw new IllegalArgumentException(
+                        "Redirect target host is not allowed by '" + ViewProperties.REDIRECT_HOSTS + "': " + url);
             }
             return url;
         }

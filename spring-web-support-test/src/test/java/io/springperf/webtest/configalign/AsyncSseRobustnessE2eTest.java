@@ -212,8 +212,7 @@ class AsyncSseRobustnessE2eTest {
         }
         String body = received.toString();
         assertFalse(body.contains("late-error"), "已提交的 SSE 流不得被迟到 sendError 覆盖为错误体，实际:\n" + body);
-        assertTrue(body.indexOf("late-1", body.indexOf("late-1") + 1) < 0,
-                "首帧不得被重复写入（不得写第二个终止块），实际:\n" + body);
+        assertTrue(body.indexOf("late-1", body.indexOf("late-1") + 1) < 0, "首帧不得被重复写入（不得写第二个终止块），实际:\n" + body);
         assertRefsBackTo(baseline);
     }
 

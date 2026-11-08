@@ -152,8 +152,7 @@ class ResponseTimeoutE2eTest {
             String second = readAll(s, 6000);
             // 「连接可复用」的唯一证明是第二个请求被正常服务：100ms 处理器若再拿 504，
             // 说明超时计时器未随新请求重置，属于真实回归，不能因为「也收到了响应」而放行。
-            assertTrue(second.startsWith("HTTP/1.1 200"),
-                    "504 之后同连接应仍能服务第二个请求（200），实际:\n" + second);
+            assertTrue(second.startsWith("HTTP/1.1 200"), "504 之后同连接应仍能服务第二个请求（200），实际:\n" + second);
             assertTrue(second.contains("slow-done"), "复用连接上的 200 应带回处理器结果，实际:\n" + second);
             assertEquals(1, countStatusLines(second), "第二个响应不得与前一个拼接，实际:\n" + second);
         }

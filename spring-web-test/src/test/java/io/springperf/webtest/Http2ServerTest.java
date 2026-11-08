@@ -47,9 +47,9 @@ public class Http2ServerTest {
             String body = response.body().string();
             assertEquals(200, response.code(), "h2c 流式请求应返回 200，实际: " + response.code());
             assertEquals(Protocol.H2_PRIOR_KNOWLEDGE, response.protocol());
-            assertEquals(java.util.Arrays.asList("line1", "line2"),
-                    java.util.Arrays.stream(body.trim().split("\\R")).map(String::trim).filter(s -> !s.isEmpty())
-                            .collect(java.util.stream.Collectors.toList()),
+            assertEquals(
+                    java.util.Arrays.asList("line1", "line2"), java.util.Arrays.stream(body.trim().split("\\R"))
+                            .map(String::trim).filter(s -> !s.isEmpty()).collect(java.util.stream.Collectors.toList()),
                     "h2c 流式响应应完整返回两行，实际: " + body);
         }
     }
@@ -68,7 +68,8 @@ public class Http2ServerTest {
             assertEquals(200, response.code(), "h2c POST 应成功，实际状态码: " + response.code());
             assertEquals(Protocol.H2_PRIOR_KNOWLEDGE, response.protocol(), "请求应通过 h2c 传输");
             String body = response.body().string();
-            assertEquals("test", com.alibaba.fastjson2.JSON.parseObject(body).getJSONObject("received").getString("name"),
+            assertEquals("test",
+                    com.alibaba.fastjson2.JSON.parseObject(body).getJSONObject("received").getString("name"),
                     "响应应精确回显请求体 name=test，实际: " + body);
         }
     }

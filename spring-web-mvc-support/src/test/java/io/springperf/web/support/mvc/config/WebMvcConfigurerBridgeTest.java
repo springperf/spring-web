@@ -354,8 +354,7 @@ class WebMvcConfigurerBridgeTest {
         List<io.springperf.web.core.resource.ResourceHandlerRegistration> regs = resourceHandlerRegistry
                 .getWebComponents(io.springperf.web.core.resource.ResourceHandlerRegistration.class);
         assertEquals(1, regs.size());
-        assertEquals(List.of("classpath:/static"), regs.get(0).getLocationValues(),
-                "资源根应被搬运（框架侧会去掉尾部 /）");
+        assertEquals(List.of("classpath:/static"), regs.get(0).getLocationValues(), "资源根应被搬运（框架侧会去掉尾部 /）");
         assertEquals(Integer.valueOf(3600), regs.get(0).getCachePeriod());
         assertEquals("max-age=3600", regs.get(0).getCacheControl().getHeaderValue());
 
@@ -712,8 +711,7 @@ class WebMvcConfigurerBridgeTest {
         assertEquals(1, converters.size());
         // 分支选择必须被断言：非 Generic 转换器走 Adapted 适配器，走错会丢类型/泛型信息
         assertInstanceOf(AdaptedHttpBodyConverter.class, converters.get(0));
-        assertEquals(Ordered.LOWEST_PRECEDENCE - 20000, converters.get(0).getOrder(),
-                "未标注 @Order 的转换器应获得低优先级默认值");
+        assertEquals(Ordered.LOWEST_PRECEDENCE - 20000, converters.get(0).getOrder(), "未标注 @Order 的转换器应获得低优先级默认值");
     }
 
     @Test
@@ -735,8 +733,9 @@ class WebMvcConfigurerBridgeTest {
         assertEquals(1, converters.size());
         assertInstanceOf(WrappedHttpBodyConverter.class, converters.get(0),
                 "Generic 转换器必须走 WrappedHttpBodyConverter 以保留泛型信息");
-        assertEquals(genericConverter, ((io.springperf.web.context.WebComponentWrapper<?>) converters.get(0))
-                .getComponent(), "包装的必须是用户提供的那个转换器实例");
+        assertEquals(genericConverter,
+                ((io.springperf.web.context.WebComponentWrapper<?>) converters.get(0)).getComponent(),
+                "包装的必须是用户提供的那个转换器实例");
     }
 
     @Test
@@ -1082,9 +1081,8 @@ class WebMvcConfigurerBridgeTest {
                 }));
 
         assertDoesNotThrow(() -> bridge.initComponentPhase1());
-        assertEquals(1,
-                frameworkRegistry
-                        .getWebComponents(io.springperf.web.core.interceptor.InterceptorRegistration.class).size(),
+        assertEquals(1, frameworkRegistry
+                .getWebComponents(io.springperf.web.core.interceptor.InterceptorRegistration.class).size(),
                 "告警路径不得中断后续桥接");
     }
 
@@ -1113,9 +1111,8 @@ class WebMvcConfigurerBridgeTest {
                 }));
 
         assertDoesNotThrow(() -> bridge.initComponentPhase1());
-        assertEquals(1,
-                frameworkRegistry
-                        .getWebComponents(io.springperf.web.core.interceptor.InterceptorRegistration.class).size());
+        assertEquals(1, frameworkRegistry
+                .getWebComponents(io.springperf.web.core.interceptor.InterceptorRegistration.class).size());
     }
 
     // ========== addViewControllers 桥接 ==========
@@ -1166,8 +1163,7 @@ class WebMvcConfigurerBridgeTest {
         }
         assertEquals(java.util.Set.of("/home", "/old", "/ping"), paths, "三种 view controller 都应注册为框架路由");
         for (PathMappingContext mapping : mappings) {
-            assertEquals(ViewControllerInvoker.class, mapping.getUserClass(),
-                    "视图控制器路由必须由 ViewControllerInvoker 承载");
+            assertEquals(ViewControllerInvoker.class, mapping.getUserClass(), "视图控制器路由必须由 ViewControllerInvoker 承载");
         }
     }
 

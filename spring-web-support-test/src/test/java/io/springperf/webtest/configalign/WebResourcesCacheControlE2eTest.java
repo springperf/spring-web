@@ -34,7 +34,8 @@ class WebResourcesCacheControlE2eTest {
             assertEquals(200, resp.code());
             String cacheControl = resp.header("Cache-Control");
             assertNotNull(cacheControl, "静态资源应下发 Cache-Control");
-            assertTrue(java.util.Arrays.stream(cacheControl.split(",")).map(String::trim)
+            assertTrue(
+                    java.util.Arrays.stream(cacheControl.split(",")).map(String::trim)
                             .anyMatch(directive -> directive.equals("max-age=3600")),
                     "1h 应解析为精确的 max-age=3600 指令，实际 Cache-Control=" + cacheControl);
         } finally {

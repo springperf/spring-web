@@ -30,8 +30,8 @@ import java.util.concurrent.TimeUnit;
  * 当 {@code management.server.port} 配置且与 {@code server.port} 不同时， 启动第二个 Netty 服务器仅用于 Actuator 端点。
  * </p>
  * <p>
- * 所有服务器级配置由 {@link ManagementServerSettings} 在启动期固化：默认继承 {@code server.*}，
- * 白名单内的 {@code management.server.*} 显式覆盖。SSL 与 HTTP/2 同源于该快照。
+ * 所有服务器级配置由 {@link ManagementServerSettings} 在启动期固化：默认继承 {@code server.*}， 白名单内的 {@code management.server.*} 显式覆盖。SSL 与
+ * HTTP/2 同源于该快照。
  * </p>
  * <p>
  * 实现 {@link SmartLifecycle}，{@link #getPhase()} 返回 {@link Integer#MAX_VALUE} 与主服务器一致，确保在 Spring 上下文就绪后启动。
@@ -69,8 +69,8 @@ public class ManagementNettyHttpServer implements SmartLifecycle, LifecycleWebCo
     /** 兼容旧调用方：从共享 WebContext 的 ApplicationProperties 构造快照（不做前缀回退）。 */
     public ManagementNettyHttpServer(WebContext webContext, String contextPath, HttpHandler handler, int port,
             int maxContentLength, SslContext sslContext) {
-        this(webContext, contextPath, handler, ManagementServerSettings.fromApplicationProperties(
-                webContext.getProps(), port, maxContentLength, sslContext));
+        this(webContext, contextPath, handler, ManagementServerSettings.fromApplicationProperties(webContext.getProps(),
+                port, maxContentLength, sslContext));
     }
 
     public ManagementNettyHttpServer(WebContext webContext, String contextPath, HttpHandler handler,
@@ -111,8 +111,9 @@ public class ManagementNettyHttpServer implements SmartLifecycle, LifecycleWebCo
                     @Override
                     protected void initChannel(SocketChannel ch) {
                         Http2ChannelInitializer innerInit = new Http2ChannelInitializer(http2Enabled, sslContext,
-                                maxContentLength, settings.getReadTimeoutMillis(),
-                                false, // supportMultipart = false (management port uses HttpObjectAggregator)
+                                maxContentLength, settings.getReadTimeoutMillis(), false, // supportMultipart = false
+                                                                                          // (management port uses
+                                                                                          // HttpObjectAggregator)
                                 nettyHttpHandler, Collections.emptyList(), Collections.emptyList(),
                                 settings.getMaxInitialLineLength(), settings.getMaxRequestHeaderSize(),
                                 settings.getMaxChunkSize(), settings.getMultipartMaxPartCount(),

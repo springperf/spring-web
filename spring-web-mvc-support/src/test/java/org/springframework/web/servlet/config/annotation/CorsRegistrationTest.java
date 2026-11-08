@@ -62,10 +62,8 @@ class CorsRegistrationTest {
     void chainedCalls_returnsSelf() {
         CorsRegistration reg = new CorsRegistration("/api/**");
         // 方法名承诺 returnsSelf，就必须 assertSame（断言非空无法证明链式返回的是自身）
-        assertAll(() -> assertSame(reg, reg.allowedOrigins("*")),
-                () -> assertSame(reg, reg.allowedMethods("GET")),
-                () -> assertSame(reg, reg.allowedHeaders("X-Hdr")),
-                () -> assertSame(reg, reg.exposedHeaders("X-Res")),
+        assertAll(() -> assertSame(reg, reg.allowedOrigins("*")), () -> assertSame(reg, reg.allowedMethods("GET")),
+                () -> assertSame(reg, reg.allowedHeaders("X-Hdr")), () -> assertSame(reg, reg.exposedHeaders("X-Res")),
                 () -> assertSame(reg, reg.allowCredentials(false)), () -> assertSame(reg, reg.maxAge(100)));
         assertEquals("/api/**", reg.getPathPattern());
     }

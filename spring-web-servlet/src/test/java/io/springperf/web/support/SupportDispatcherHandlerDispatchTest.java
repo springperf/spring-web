@@ -123,8 +123,7 @@ class SupportDispatcherHandlerDispatchTest {
         verify(mappingRegistry).mapping(forwardedReq.capture());
         assertInstanceOf(ForwardWebServerHttpRequest.class, forwardedReq.getValue());
         assertEquals("/missing", forwardedReq.getValue().getPath(), "forward 必须以目标路径重新做路由匹配");
-        verify(exceptionRegistry).handle(any(Throwable.class),
-                isA(ForwardWebServerHttpRequest.class), same(resp));
+        verify(exceptionRegistry).handle(any(Throwable.class), isA(ForwardWebServerHttpRequest.class), same(resp));
         verify(interceptorRegistry).afterCompletion(isA(ForwardWebServerHttpRequest.class), same(resp), any());
         assertNull(RequestContextHolder.getRequestAttributes(), "forward 后应清理 RequestContextHolder");
         assertNull(LocaleContextHolder.getLocaleContext(), "forward 后应清理 LocaleContextHolder");
@@ -181,8 +180,8 @@ class SupportDispatcherHandlerDispatchTest {
         assertInstanceOf(ForwardWebServerHttpRequest.class, includedReq.getValue());
         assertEquals("/fragment", includedReq.getValue().getPath(), "include 必须以目标路径重新做路由匹配");
         // include 必须把「阻止 flush 的包装响应」传下去，直接传原始 resp 会让目标提交外层响应
-        verify(exceptionRegistry).handle(any(Throwable.class),
-                isA(ForwardWebServerHttpRequest.class), argThat(r -> r != resp));
+        verify(exceptionRegistry).handle(any(Throwable.class), isA(ForwardWebServerHttpRequest.class),
+                argThat(r -> r != resp));
         assertNull(RequestContextHolder.getRequestAttributes());
     }
 

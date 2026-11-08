@@ -132,15 +132,13 @@ class DisruptorQueueVirtualThreadsTest {
 
         assertEquals("ok", first.getResult());
         assertEquals("ok", second.getResult());
-        assertThat(SaturatedService.THREADS).as("池满时后续批次应由消费者线程自执行（背压）")
-                .contains("batch-disruptor-" + queueName);
+        assertThat(SaturatedService.THREADS).as("池满时后续批次应由消费者线程自执行（背压）").contains("batch-disruptor-" + queueName);
     }
 
     @Test
     void platformMode_runsOnBatchWorkerThread() throws Exception {
         Thread t = runOneBatch(false);
-        assertEquals("batch-worker-" + queue.queueName(), t.getName(),
-                "默认应为平台工作线程，实际: " + t.getName());
+        assertEquals("batch-worker-" + queue.queueName(), t.getName(), "默认应为平台工作线程，实际: " + t.getName());
     }
 
     @Test
@@ -152,8 +150,7 @@ class DisruptorQueueVirtualThreadsTest {
     void virtualThreadMode_runsOnVirtualThread() throws Exception {
         assumeTrue(Runtime.version().feature() >= 21, "虚拟线程需要 JDK 21+，当前 JDK " + Runtime.version().feature());
         Thread t = runOneBatch(true);
-        assertTrue(t.getName().startsWith("batch-virtual-" + queue.queueName()),
-                "应使用虚拟线程工厂，实际: " + t.getName());
+        assertTrue(t.getName().startsWith("batch-virtual-" + queue.queueName()), "应使用虚拟线程工厂，实际: " + t.getName());
         Method isVirtual = Thread.class.getMethod("isVirtual");
         assertTrue((boolean) isVirtual.invoke(t), "执行线程应为虚拟线程");
     }

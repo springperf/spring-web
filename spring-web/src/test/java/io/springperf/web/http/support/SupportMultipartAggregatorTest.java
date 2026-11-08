@@ -221,8 +221,8 @@ class SupportMultipartAggregatorTest {
     void malformedHead_decoderFailure_returns400AndCloses() {
         EmbeddedChannel channel = new EmbeddedChannel(new SupportMultipartAggregator(1024 * 1024));
         DefaultHttpRequest head = multipartHead();
-        head.setDecoderResult(io.netty.handler.codec.DecoderResult
-                .failure(new IllegalArgumentException("simulated bad header")));
+        head.setDecoderResult(
+                io.netty.handler.codec.DecoderResult.failure(new IllegalArgumentException("simulated bad header")));
 
         channel.writeInbound(head);
 
