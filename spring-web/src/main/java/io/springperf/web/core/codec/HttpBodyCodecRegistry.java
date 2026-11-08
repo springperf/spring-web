@@ -309,9 +309,13 @@ public class HttpBodyCodecRegistry extends WebComponentContainer {
             }
         }
         if (bestConverter == null) {
-            // 仅 2a 可能：produces 协商出 concrete mediaType 但无 converter 支持 → 静默不写
-            // （与原 writeWithConverter 找不到 converter 的行为一致）。
-            return;
+            // 仅 2a 可能：produces 协商出 concrete mediaType 但无 converter 支持。
+            // 不得静默返回 —— 那样客户端拿到 200 + 空 body（连 CT 都不会写），返回值被无声丢弃，
+            // 服务端零异常零日志，是最难排查的一类降级。与「预设 Content-Type 无 converter」
+            // （writeWithConverter）和「Accept 与 produces 无交集」（上方 bestMediaType == null）保持一致，
+            // 也让 StreamingResponseBody 这类本框架未实现的返回类型在迁移时立刻暴露。
+            throw new HttpMessageNotWritableException("No HttpBodyConverter for " + valueType.getName()
+                    + " with negotiated Content-Type " + bestMediaType);
         }
         // 协商成功（含命中校验失败回退）后写缓存；命中成功路径 cached != null，直接跳过。
         // 必须在此处（bestMediaType 已 concrete 化）写入，保证缓存条目与尾段写出的 mediaType 一致。
