@@ -188,12 +188,15 @@ class AsyncSupportRegistryDetailsTest {
         };
         registry.addCallableInterceptors(Collections.singletonList(returningInterceptor));
         WebAsyncTask<String> task = new WebAsyncTask<>(() -> "ok");
+        // 超时回调先占位再跑拦截器链；占位失败（任务结果已先到）时整段跳过
+        when(asyncWebRequest.claimTimeoutResult()).thenReturn(true);
 
         registry.startCallableProcessing(asyncWebRequest, task);
 
         assertNotNull(timeoutHandler);
         timeoutHandler.run();
-        verify(asyncWebRequest).setConcurrentResultAndDispatch("timeout-result");
+        // 自定义拦截器的超时结果经超时专用入口落地（普通入口在占位后会被丢弃）
+        verify(asyncWebRequest).setTimeoutResultAndDispatch("timeout-result");
     }
 
     @Test

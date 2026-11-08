@@ -13,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.DispatcherHandler;
@@ -198,6 +199,53 @@ class PerfAsyncWebRequestTest {
         clearInvocations(request);
         asyncWebRequest.setConcurrentResultAndDispatch("result");
         verify(request, never()).getWebContext();
+    }
+
+    /**
+     * 超时占位后，被取消任务的结果必须被丢弃。
+     * <p>
+     * 回归：{@code CallableInterceptorChain#triggerAfterTimeout} 第一件事是 {@code cancel(true)}，被中断的任务线程会立刻
+     * 带着 {@code InterruptedException} 抢写结果槽——修复前超时线程总是输，503 被降级成任务侧 500。
+     * </p>
+     */
+    @Test
+    void claimTimeoutResult_dropsLaterTaskResult() {
+        when(request.getWebContext()).thenReturn(webContext);
+        when(webContext.getDispatcherHandler()).thenReturn(dispatcherHandler);
+        asyncWebRequest.startAsync();
+
+        assertTrue(asyncWebRequest.claimTimeoutResult(), "结果槽为空时应占位成功");
+
+        asyncWebRequest.setConcurrentResultAndDispatch(new InterruptedException("sleep interrupted"));
+        verify(dispatcherHandler, never()).asyncDispatch(any(), any(), any());
+
+        AsyncRequestTimeoutException timeout = new AsyncRequestTimeoutException();
+        asyncWebRequest.setTimeoutResultAndDispatch(timeout);
+        verify(dispatcherHandler).asyncDispatch(same(request), same(response), same(timeout));
+        assertTrue(asyncWebRequest.isErrorHandlingInProgress());
+    }
+
+    @Test
+    void claimTimeoutResult_whenTaskResultAlreadyPublished_returnsFalse() {
+        when(request.getWebContext()).thenReturn(webContext);
+        when(webContext.getDispatcherHandler()).thenReturn(dispatcherHandler);
+        asyncWebRequest.startAsync();
+        asyncWebRequest.setConcurrentResultAndDispatch("done");
+
+        assertFalse(asyncWebRequest.claimTimeoutResult(), "任务结果已先占位时超时不得夺权（先到先得不变）");
+        verify(dispatcherHandler, times(1)).asyncDispatch(any(), any(), any());
+    }
+
+    @Test
+    void setTimeoutResultAndDispatch_whenResultAlreadySet_isNoOp() {
+        when(request.getWebContext()).thenReturn(webContext);
+        when(webContext.getDispatcherHandler()).thenReturn(dispatcherHandler);
+        asyncWebRequest.startAsync();
+        asyncWebRequest.claimTimeoutResult();
+        asyncWebRequest.setTimeoutResultAndDispatch("first");
+        asyncWebRequest.setTimeoutResultAndDispatch("second");
+
+        verify(dispatcherHandler, times(1)).asyncDispatch(same(request), same(response), eq("first"));
     }
 
     @Test
