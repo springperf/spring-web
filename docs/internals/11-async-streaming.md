@@ -288,6 +288,31 @@ public synchronized void complete() {
 
 `complete` 标记在 `initialize()` 中也被检查：如果数据在 `initialize` 之前就送完了（`complete=true`），`initialize` 直接触发 `deferredResult.setResult(null)` 和 `s.complete()`。
 
+### 2.4 `ByteStreamEmitter`：`StreamingResponseBody` 的字节桥
+
+`StreamingResponseBody`（`void writeTo(OutputStream)`）没有自己的流式机制，它把两条既有路径拼起来：
+
+| 环节 | 复用的路径 |
+| --- | --- |
+| 线程池 / 30s 超时 / 拦截器链 / 结果槽 / 引用计数 | `CallableReturnValueResolver` 的 `startCallableProcessing` |
+| 帧写出 / 背压 / 终止块 / HEAD / 断连清理 | `ReactiveReturnValueResolver` 使用的 `StreamSender` |
+
+`ByteStreamEmitter extends StreamEmitter<byte[]>`，`encode` 就是 `out.write((byte[]) data)`；`writeTo` 侧由一个 8KB 攒帧的 `OutputStream` 调 `sendFrame`。三个与基类不同的地方：
+
+1. **不注册 `DeferredResult`**：派发由 Callable 通道完成，因此覆写 `complete()` 时只调 `sender.complete()`，不调 `deferredResult.setResult(null)`（那个 `DeferredResult` 没有监听者）。派发与终结的顺序仍与 §2.3 一致：callable 里先 `setConcurrentResultAndDispatch(null)`，再 `emitter.complete()`；反过来终止块的写完成回调会把状态推到 `COMPLETED`，`dispatch()` 的 CAS 失败，`afterCompletion` 与指标被静默跳过。
+2. **`complete()` 先建 sender 再置 `complete` 标志**：`initialize()` 在 `complete` 已置位时会补调一次 `sender.complete()`（支持「先终止、后 initialize」的同步出错 Publisher）。先置位会让终止块写两次，第二次在编码器 `INIT` 态抛 `unexpected message type: LastHttpContent`。
+3. **自己的在途水位**：`StreamSender` 的队列上限是 65536 条（按 SSE 小事件设计），对 8KB 帧等于 512MB。`sendFrame` 用 `queueSize() >= 32` 自旋压回约 256KB，慢客户端因此不会把堆吃满。
+
+响应头由 resolver 在启动异步前用 `flushChunked()` 提交（与 `ResponseBodyEmitterReturnValueResolver` 的 `extendResponseAndFlush(..., true)` 一致）。这也解释了为什么 `DispatcherHandler.flushResponse` 无需为 SRB 特判：`isStreaming()` 已为 `true`，收尾走流式分支且异步未完成时直接返回。
+
+三个容易踩的边界：
+
+- **0 字节**：即便 `writeTo` 一个字节都没写，`complete()` 仍会建 sender 并写终止块。头已按 chunked 提交，不写终止块客户端会挂到读超时。
+- **HEAD**：`sendFrame` 直接丢帧，不建 sender；收尾只发一次响应头。若照常逐帧 flush，第二次起会走 `already committed` 分支，每 8KB 打一条 WARN。
+- **显式 `Content-Length`**：会被 `Transfer-Encoding: chunked` 覆盖（RFC 7230 §3.3.1），不报错。
+
+代价：`writeTo` 在写出第一帧之前抛异常时，响应头已经发出，只能关闭连接（客户端看到 200 + 截断），无法再改写成 500。SSE / Flux 路径同样如此。
+
 ---
 
 ## 三、`StreamSender` 体系：EventLoop 编码 vs App 线程编码

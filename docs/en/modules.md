@@ -251,7 +251,8 @@ Bridges Spring MVC ecosystem components (`WebMvcConfigurer`, `HandlerInterceptor
 | Spring argument resolvers | `SpringHandlerMethodArgumentResolverProvider` adapts `HandlerMethodArgumentResolver` |
 | Spring return value handlers | `SpringHandlerMethodReturnValueHandlerAdapter` adapts `HandlerMethodReturnValueHandler`; `ModelAndViewReturnValueResolver` bridges `ModelAndView` |
 | Spring exception resolvers | `SpringHandlerExceptionResolverAdapter` adapts `HandlerExceptionResolver` |
-| ResponseBodyEmitter | `ResponseBodyEmitterReturnValueResolver` (incl. mvc `SseEmitter`; **not** `StreamingResponseBody` — a standalone `@FunctionalInterface`, not a `StreamEmitter`, no resolver yet, so such values fail fast with 500 instead of an empty response) |
+| ResponseBodyEmitter | `ResponseBodyEmitterReturnValueResolver` (incl. mvc `SseEmitter`) |
+| StreamingResponseBody | `StreamingResponseBodyReturnValueResolver` (`writeTo` runs on the business thread pool; bytes are framed in 8KB chunks over the StreamSender channel; supports `ResponseEntity` wrapping, `produces`-derived Content-Type, and HEAD with headers only) |
 | Rewritten Spring MVC API | `org.springframework.web.servlet.*`: `HandlerInterceptor`, `ModelAndView`, `View`, `MappedInterceptor`, `WebMvcConfigurer`, `InterceptorRegistration`, `RequestBodyAdvice` / `ResponseBodyAdvice`, etc. |
 
 ### Use Cases
