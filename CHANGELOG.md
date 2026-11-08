@@ -220,7 +220,7 @@
 - **405 与关闭中请求**：405 响应的 `Allow` 头汇总所有可用方法；优雅关闭期间被拒的请求返回 503
 - **批处理停机与完成兜底**：停机 drain 加 5 秒上界（此前可能无限挂起）；业务线程池已关闭时被拒的批次逐条报错而非静默丢弃；批量方法返回后仍未完成的请求立即失败，不再挂到 30 秒超时
 - **HTTP 日期头**：支持 RFC 850 / 1036 的两位年份日期（此前被判为无法解析）
-- **转发与包含**：`INCLUDE_QUERY_STRING` 按规范只放 query string，`INCLUDE_SERVLET_PATH` 去掉 query
+- **转发与包含**：`INCLUDE_QUERY_STRING` 按规范只放 query string、`INCLUDE_SERVLET_PATH` 去掉 query；`INCLUDE_REQUEST_URI` 改为目标资源 URI（contextPath + 目标路径，此前误写原始请求 URI），补上 Servlet 4.0+ 的 `INCLUDE_MAPPING` / `FORWARD_MAPPING`，include 结束后不再残留 `INCLUDE_*` 属性（嵌套 include 恢复外层值）
 - **HTTP/2**：修复 h2c preface 分片时的空指针
 - **上传与流式响应**：并发解析 multipart 不再产生重复条目；关闭上传流、HEAD 请求、响应头超限降级等路径不再泄漏流、文件句柄或缓冲区
 - **WebSocket 帧处理**：分片帧按 RFC 6455 聚合后再交给业务；各种断连路径的关闭回调只触发一次；握手异常时释放请求；二进制发送不再消耗调用方 `ByteBuffer`；单帧消息与批量发送同样受大小限制和背压水位约束

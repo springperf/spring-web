@@ -500,7 +500,7 @@
 |---|---|---|
 | 管理端口的 HTTP/2 与请求体上限 | 误用主服务器键（`server.http2.enabled`、`server.http.max-content-length`） | 独立键 `management.server.http2.enabled`、`management.server.max-content-length`（前缀不再借主服务器） |
 | 管理端口与主端口相同 | 任一为随机端口（`0`）时也判为冲突、**阻断启动** | 仅当两者都显式配置为**相同且非 0** 时才报冲突 |
-| `RequestDispatcher.forward` | 清空已写入的响应头并**强制状态 200** | 仅重置缓冲（丢弃未提交 body）：**保留**已写响应头与状态码（符合 Servlet 规范）；并修正 `FORWARD_SERVLET_PATH`/`FORWARD_PATH_INFO` 颠倒、`FORWARD_QUERY_STRING` 去掉前导 `?` |
+| `RequestDispatcher.forward` | 清空已写入的响应头并**强制状态 200** | 仅重置缓冲（丢弃未提交 body）：**保留**已写响应头与状态码（符合 Servlet 规范）；并修正 `FORWARD_SERVLET_PATH`/`FORWARD_PATH_INFO` 颠倒、`FORWARD_QUERY_STRING` 去掉前导 `?`、补上 `FORWARD_MAPPING`（Servlet 4.0+，值为 `HttpServletMapping`） |
 | `RequestDispatcher.include` | `INCLUDE_REQUEST_URI` 写**原始请求** URI（与目标路径的 `INCLUDE_SERVLET_PATH` 不自洽）；`INCLUDE_QUERY_STRING` 写入完整 URI（如 `/original?page=1`，含 path 与 `?`）；路径自带 query 时 `INCLUDE_SERVLET_PATH` 也带 `?`；`INCLUDE_MAPPING` 未设置；include 返回后 `INCLUDE_*` 仍残留 | `INCLUDE_REQUEST_URI` = contextPath + 目标路径，`INCLUDE_SERVLET_PATH` 用不含 query 的纯路径，`INCLUDE_QUERY_STRING` 只写纯查询串（目标路径自带 query 优先，否则沿用原始请求 query，无 query 时移除属性）；新增 `INCLUDE_MAPPING`（Servlet 4.0+，值为 `HttpServletMapping`）；include 结束（含异常）恢复 6 个 `INCLUDE_*` 旧值，嵌套 include 恢复外层值、不再残留 |
 | 非 `void` 方法返回 `null` | 不标记 handled → 响应永不 flush（客户端挂到超时） | 视为「无响应体的已完成响应」并标记 handled（`void` 方法行为不变） |
 | 普通 `HandlerInterceptor` Bean（`spring-web-mvc-support`） | 自动全局注册 | **不再**自动注册（与 Spring MVC 一致）：请经 `addInterceptors` 注册或声明 `MappedInterceptor`（也避免同一实例两路注册导致重复执行） |
