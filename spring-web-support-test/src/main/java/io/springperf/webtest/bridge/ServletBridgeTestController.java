@@ -106,7 +106,7 @@ public class ServletBridgeTestController {
 
     /**
      * {@code StreamingResponseBody}：独立 {@code @FunctionalInterface}（不是 StreamEmitter）， 当前无 resolver 认领 →
-     * 用于固化「未实现」的实测行为（见 ServletBridgeSseE2eTest）。
+     * 协商出 {@code produces} 声明的类型后无 converter 可写，按 fail-fast 返回 500（见 ServletBridgeSseE2eTest）。
      */
     @GetMapping(value = "/streaming-response-body", produces = "text/plain;charset=UTF-8")
     public org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody streamingResponseBody() {
