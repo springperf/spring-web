@@ -11,9 +11,11 @@ import io.springperf.web.json.JsonConverter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationContext;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.context.request.async.CallableProcessingInterceptor;
 import org.springframework.web.context.request.async.DeferredResult;
 import org.springframework.web.context.request.async.DeferredResultProcessingInterceptor;
@@ -240,6 +242,44 @@ class AsyncSupportRegistryTest {
         Object fallback = getFallbackExecutor(registry);
         assertNotNull(fallback, "无默认池时兜底 executor 应被懒加载创建");
         assertInstanceOf(org.springframework.core.task.SimpleAsyncTaskExecutor.class, fallback);
+    }
+
+    /**
+     * 超时回调必须 dispatch「超时结果」而不是任务结果。
+     * <p>
+     * 回归：拦截器链第一件事是 {@code cancel(true)}，被中断的任务会把 {@code InterruptedException} 写成结果，
+     * 客户端因此拿到 500 而不是 503。占位后只有超时拦截器返回的 {@code AsyncRequestTimeoutException} 能落地。
+     * </p>
+     */
+    @Test
+    void startCallableProcessing_timeout_dispatchesTimeoutException() throws Exception {
+        when(asyncWebRequest.claimTimeoutResult()).thenReturn(true);
+        ArgumentCaptor<Runnable> timeoutHandler = ArgumentCaptor.forClass(Runnable.class);
+
+        registry.startCallableProcessing(asyncWebRequest, new WebAsyncTask<>(100L, () -> "too-late"));
+
+        verify(asyncWebRequest).addTimeoutHandler(timeoutHandler.capture());
+        timeoutHandler.getValue().run();
+
+        ArgumentCaptor<Object> result = ArgumentCaptor.forClass(Object.class);
+        verify(asyncWebRequest).setTimeoutResultAndDispatch(result.capture());
+        assertInstanceOf(AsyncRequestTimeoutException.class, result.getValue(),
+                "超时结果必须是 AsyncRequestTimeoutException（由 ResponseStatusExceptionResolver 映射为 503）");
+        verify(asyncWebRequest, never()).setConcurrentResultAndDispatch(any());
+    }
+
+    /** 任务结果已先占位（claim 失败）：超时是迟到方，不得再写入任何结果。 */
+    @Test
+    void startCallableProcessing_timeout_whenClaimFails_doesNotDispatch() throws Exception {
+        ArgumentCaptor<Runnable> timeoutHandler = ArgumentCaptor.forClass(Runnable.class);
+
+        registry.startCallableProcessing(asyncWebRequest, new WebAsyncTask<>(100L, () -> "too-late"));
+
+        verify(asyncWebRequest).addTimeoutHandler(timeoutHandler.capture());
+        timeoutHandler.getValue().run();
+
+        verify(asyncWebRequest, never()).setTimeoutResultAndDispatch(any());
+        verify(asyncWebRequest, never()).setConcurrentResultAndDispatch(any());
     }
 
     private static Object getFallbackExecutor(AsyncSupportRegistry registry) throws Exception {

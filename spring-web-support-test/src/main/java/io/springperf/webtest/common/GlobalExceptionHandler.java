@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.List;
@@ -131,6 +132,23 @@ public class GlobalExceptionHandler {
     public ApiResult<?> handleError(MethodArgumentTypeMismatchException ex) {
         log.error("服务器异常：{}", ex.getMessage(), ex);
         return ApiResult.failed(PARAM_ERROR);
+    }
+
+    /**
+     * 异步请求超时 → 503。
+     * <p>
+     * 必须单独声明，否则会被下面的 {@link #handleError(Throwable)} 兜底成 200 + {@code {"code":500}}，
+     * 「超时」与「任务自身抛异常」在客户端侧就完全不可区分了。503 与框架
+     * {@code ResponseStatusExceptionResolver} 对 {@code AsyncRequestTimeoutException} 的映射一致
+     * （对齐 Spring {@code DefaultHandlerExceptionResolver}）。
+     * </p>
+     */
+    @ExceptionHandler(value = AsyncRequestTimeoutException.class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    @ResponseBody
+    public ApiResult<?> handleError(AsyncRequestTimeoutException e) {
+        log.warn("异步请求超时：{}", e.getMessage());
+        return ApiResult.failed(SERVICE_UNAVAILABLE);
     }
 
     /**

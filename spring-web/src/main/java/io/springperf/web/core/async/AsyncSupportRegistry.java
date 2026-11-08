@@ -129,9 +129,16 @@ public class AsyncSupportRegistry extends WebComponentContainer {
         WebAsyncSupportUtils.CallableInterceptorChainAdapter interceptorChain = WebAsyncSupportUtils.newCallableInterceptorChain(webAsyncTask, callableInterceptors);
 
         asyncWebRequest.addTimeoutHandler(() -> {
+            // 先占位、再跑拦截器链：triggerAfterTimeout 内部第一件事是 taskFuture.cancel(true)，
+            // 被中断的任务线程会立刻带着 InterruptedException 抢写结果槽，把超时降级成任务侧 500。
+            // 占位保证「超时到点之后到达的任务结果不再被采纳」（见 PerfAsyncWebRequest#claimTimeoutResult）。
+            if (!asyncWebRequest.claimTimeoutResult()) {
+                return;
+            }
             Object result = interceptorChain.triggerAfterTimeout(asyncWebRequest, callable);
+            // RESULT_NONE：拦截器自行接管了响应（RESPONSE_HANDLED），由它负责收尾；此处不写结果。
             if (result != CallableProcessingInterceptor.RESULT_NONE) {
-                asyncWebRequest.setConcurrentResultAndDispatch(result);
+                asyncWebRequest.setTimeoutResultAndDispatch(result);
             }
         });
 

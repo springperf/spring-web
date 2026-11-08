@@ -10,14 +10,9 @@ public enum ApiErrorCode {
 
     COMMON_SUCCESS(                 200, "请求成功"),
 
-	UNAUTHORIZED(                   401, "请求未授权"),
-	FORBIDDEN(                      403, "请求被拒绝"),
-	NOT_FOUND(                      404, "未找到请求资源"),
-	METHOD_NOT_SUPPORTED(           405, "不支持当前请求方法"),
-	MEDIA_TYPE_NOT_SUPPORTED(       415, "不支持当前媒体类型"),
-	PARAM_ERROR(                    400, "请求参数错误或缺失"),
-	INTERNAL_SERVER_ERROR(          500, "服务器异常"),
-	;
+    UNAUTHORIZED(401, "请求未授权"), FORBIDDEN(403, "请求被拒绝"), NOT_FOUND(404, "未找到请求资源"),
+    METHOD_NOT_SUPPORTED(405, "不支持当前请求方法"), MEDIA_TYPE_NOT_SUPPORTED(415, "不支持当前媒体类型"), PARAM_ERROR(400, "请求参数错误或缺失"),
+    INTERNAL_SERVER_ERROR(500, "服务器异常"), SERVICE_UNAVAILABLE(503, "服务暂不可用"),;
 
 	private final Integer code;
 	private final String msg;
