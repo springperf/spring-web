@@ -50,18 +50,17 @@
 | Http2ChannelInitializer.Http2OrHttp1Handler | 43 | 43 | 0% |
 | DispatcherHandler | 27 | 264 | 89.8% |
 | NettyHttpHandler | 19 | 162 | 88.3% |
-| NettyServerHttpResponse | 19 | 387 | 95.1% |
 | ResourceRequestHandler | 15 | 292 | 94.9% |
 
 ### spring-web-view
 
 | 类 / Class | 未覆盖行 / Missed | 总行 / Total | 覆盖率 / Coverage |
 |---|---|---|---|
-| ViewProperties | 4 | 36 | 88.9% |
-| BeetlViewResolver | 3 | 41 | 92.7% |
+| ViewProperties | 4 | 37 | 89.2% |
+| ViewCache | 3 | 51 | 94.1% |
+| BeetlViewResolver | 2 | 41 | 95.1% |
 | RedirectView | 2 | 59 | 96.6% |
-| ViewCache | 2 | 51 | 96.1% |
-| ViewResolverRegistry | 1 | 50 | 98% |
+| ThymeleafViewResolver | 1 | 55 | 98.2% |
 
 ### spring-web-servlet
 
@@ -78,6 +77,7 @@
 | 类 / Class | 未覆盖行 / Missed | 总行 / Total | 覆盖率 / Coverage |
 |---|---|---|---|
 | WebMvcConfigurer | 9 | 19 | 52.6% |
+| ByteStreamEmitter | 8 | 47 | 83% |
 | ModelAndView | 6 | 67 | 91% |
 | ResponseBodyEmitterReturnValueResolver | 5 | 31 | 83.9% |
 | SupportInterceptorRegistry | 4 | 34 | 88.2% |
@@ -89,9 +89,9 @@
 |---|---|---|---|
 | DisruptorQueue | 20 | 111 | 82% |
 | BufferingBatchHandler | 8 | 145 | 94.5% |
+| BatchDefaults.AnnotationDefaults | 3 | 13 | 76.9% |
+| BatchScanner | 2 | 100 | 98% |
 | NoOpBatchMetrics | 2 | 8 | 75% |
-| BatchScanner | 2 | 97 | 97.9% |
-| BatchHandlerRegistration | 0 | 8 | 100% |
 
 ### spring-web-websocket
 

@@ -10,7 +10,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -85,6 +87,10 @@ class FileUploadE2eTest {
         ResponseEntity<byte[]> downloadResp = rest.exchange("/files/download?filename=" + filename, HttpMethod.GET,
                 null, byte[].class);
         assertThat(downloadResp.getStatusCode().value()).isEqualTo(200);
+        assertThat(downloadResp.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_OCTET_STREAM);
+        assertThat(downloadResp.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION)).contains(filename);
+        // 只断言状态码会让「200 + 空 body」蒙混过关：下载内容必须与上传内容逐字节一致
+        assertThat(downloadResp.getBody()).isEqualTo(content.getBytes(StandardCharsets.UTF_8));
 
         String diskContent = new String(Files.readAllBytes(tempUploadDir.resolve(filename)), StandardCharsets.UTF_8);
         assertThat(diskContent).isEqualTo(content);
