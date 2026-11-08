@@ -389,7 +389,7 @@ Transparent aggregation batch processing module. Merges high-concurrency same-ty
 
 - **Pipeline semantics unchanged** — Filters, interceptors execute per-request, unaffected
 - **Async reuse** — `BatchRequest<R>` extends `DeferredResult<R>`, leveraging the framework's existing async processing for suspend/resume
-- **Optional batching window** — `batchWindowMillis=0` by default, so Disruptor `endOfBatch` or `maxBatchSize` decides when to flush; a time window is used only when explicitly enabled, see the [Batch Guide](batch.md)
+- **Batching window on by default** — `batchWindowMillis=5` guarantees the batch size with a time window; setting it explicitly to 0 falls back to Disruptor `endOfBatch` / `maxBatchSize`, see the [Batch Guide](batch.md)
 - **Single-request methods stay unchanged** — add a `@BatchMapping` method and a `BatchRequest` subclass; existing single-request methods need no changes
 
 ### Architecture

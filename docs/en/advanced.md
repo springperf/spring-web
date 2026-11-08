@@ -204,8 +204,8 @@ public @interface BatchMapping {
     /** Max batch size. When reached, triggers batch processing. Also triggered by Disruptor endOfBatch signal. Default 100. */
     int maxBatchSize() default 100;
 
-    /** Batching window (ms). 0 = off (default): endOfBatch or maxBatchSize decides when to flush; enabling it guarantees batch size by window. */
-    int batchWindowMillis() default 0;
+    /** Batching window (ms). 5ms by default guarantees batch size; set 0 to explicitly disable it and fall back to endOfBatch / maxBatchSize. */
+    int batchWindowMillis() default 5;
 
     /** Max concurrent processing threads (bizExecutor cap; the Disruptor consumer thread is separate and does not count). Default: CPU cores. */
     int consumerSize() default -1;

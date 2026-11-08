@@ -271,4 +271,68 @@ class BufferingBatchHandlerWindowTest {
                 "重复 closeWindow 后，后续队列的窗口任务仍应被执行");
         assertThat(secondSubmitted).hasValue(1);
     }
+
+    /**
+     * 精度回归：{@code ScheduledThreadPoolExecutor} 内部基于 {@code LockSupport.parkNanos}，
+     * 在部分 Windows 环境会把 1~10ms 的延迟统一放大到约 15ms（系统定时器粒度），
+     * 使 {@code batchWindowMillis=3/5} 名存实亡。改用 {@code Timer} 后 3ms 实测约 3ms。
+     * <p>
+     * 取多次采样的中位数，排除偶发线程调度抖动；阈值 12ms 足以区分「约 3ms」与「约 15ms」，
+     * 在调度器本就精确的平台（Linux）上同样成立，不会因平台差异误报。
+     * </p>
+     */
+    @Test
+    @DisplayName("小窗口精度回归：3ms 窗口不应被放大到系统定时器粒度（约 15ms）")
+    void windowEnabled_smallWindowIsNotQuantizedToTimerTick() throws Exception {
+        List<Long> elapsedMillis = new ArrayList<>();
+        for (int i = 0; i < 7; i++) {
+            CountDownLatch flushed = new CountDownLatch(1);
+            Executor executor = r -> {
+                r.run();
+                flushed.countDown();
+            };
+            BufferingBatchHandler handler = newHandler(executor, 3, 100);
+            long start = System.nanoTime();
+            handler.onEvent(newEvent(request()), 0L, true);
+            assertTrue(flushed.await(1, TimeUnit.SECONDS), "窗口任务应在 1 秒内到期");
+            elapsedMillis.add((System.nanoTime() - start) / 1_000_000L);
+            handler.closeWindow();
+        }
+        elapsedMillis.sort(Long::compareTo);
+        long median = elapsedMillis.get(elapsedMillis.size() / 2);
+        assertThat(median).as("3ms 窗口到期中位数（旧实现在 Windows 上约 15ms）：%s", elapsedMillis)
+                .isLessThan(12L);
+    }
+
+    /**
+     * Timer 线程不捕获任务异常：任一未捕获异常都会终止整个共享调度线程，
+     * 导致其他队列的窗口任务永不到期。TimerTask#run 必须自行收敛 {@code Throwable}。
+     * <p>
+     * 若收敛失效，后续队列的 {@code schedule()} 会抛 {@code IllegalStateException}
+     * 并走「立即刷出」兜底，因此除了断言任务最终触发，还要断言它确实等过了窗口期，
+     * 否则无法与「调度线程已死」区分开。
+     * </p>
+     */
+    @Test
+    @DisplayName("窗口任务抛异常不得终止共享调度线程，后续队列仍按期刷出")
+    void windowTaskFailure_doesNotKillSharedScheduler() throws Exception {
+        BufferingBatchHandler failing = newHandler(r -> {
+            throw new IllegalStateException("simulated executor failure");
+        }, 20, 100);
+        failing.onEvent(newEvent(request()), 0L, true);
+
+        CountDownLatch later = new CountDownLatch(1);
+        BufferingBatchHandler healthy = newHandler(r -> {
+            r.run();
+            later.countDown();
+        }, 20, 100);
+        long start = System.nanoTime();
+        healthy.onEvent(newEvent(request()), 0L, true);
+
+        assertTrue(later.await(2, TimeUnit.SECONDS),
+                "窗口任务异常后共享调度线程仍应存活，后续队列的窗口任务应正常到期");
+        assertThat((System.nanoTime() - start) / 1_000_000L)
+                .as("后续队列应等满窗口，而不是因调度器失效被立即刷出")
+                .isGreaterThanOrEqualTo(10L);
+    }
 }

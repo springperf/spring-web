@@ -187,34 +187,49 @@
 
 ## [3.5.8] - 未发布
 
-> 开发中版本：`3.5.8` 尚未发布，本节汇总该版本的变更。
+> ⚠️ **本版含破坏性变更**：Servlet 规范语义、视图错误与内容协商、部分配置项的校验方式均有调整，
+> **升级前请先读 [破坏性变更说明](docs/breaking-changes.md) 的 3.5.8 节**。
+
+### 新增
+
+- **Servlet / Filter 动态注册**：`ServletContext.addServlet()` / `addFilter()` 现在按 Servlet 规范返回 `ServletRegistration.Dynamic` / `FilterRegistration.Dynamic`，可配置 URL 映射、初始化参数、`load-on-startup`、`async-supported` 等；注册仅在 `ServletContextListener#contextInitialized()` 期间开放，窗口关闭后的写操作抛 `IllegalStateException`，重名与 URL 冲突也会明确报错。`addJspFile()` 仍不支持（JSP 由 `jsp:` 视图统一路由），`createServlet()` / `createFilter()` 可用
+- **Servlet 监听器运行期注册**：`ServletContext.addListener()` 现在真正生效，支持 `ServletContextListener`、`HttpSessionListener`、`HttpSessionAttributeListener` 与 `HttpSessionIdListener`；会话 ID 轮换会通知 ID 监听器。运行期注册的监听器只收到注册之后发生的事件，需要完整生命周期回调的监听器请声明为 Spring Bean
+- **JSP 生产默认配置**：新增 `server.servlet.jsp.development`（默认 `false`，改动 JSP 需重启生效）、`keep-generated`、`trim-spaces` 与 `init-parameters.*`（透传 Jasper，显式项优先）；Jasper 实例改由 Spring 管理，JSP 与标签类可获得依赖注入
+- **WebSocket 压缩扩展**：`setAllowExtensions(true)` 现在真正协商 `permessage-deflate`（此前是空开关，未协商的压缩帧会被当明文交给业务）；协商结果可通过 `getExtensions()` / `Session#getNegotiatedExtensions()` 读取，按端点设置的 `messageSizeLimit` 也随之生效
+- **WebSocket JSR-356 语义补齐**：`RemoteEndpoint.Basic` 为同步发送；`getSendStream()` / `getSendWriter()` 缓冲后按整条消息发出；`setBatchingAllowed()` / `flushBatch()` 真正攒批；`Session.addMessageHandler()` 支持动态注册；自定义 `Configurator` 的 `getEndpointInstance()` / `checkOrigin()` 生效；Ping / Pong 帧现在携带应用数据，超 125 字节按规范拒绝
+- **批处理攒批时间窗口**：`@BatchMapping` 新增 `batchWindowMillis`（默认 `5`ms，设为 `0` 可关闭）。窗口内持续累积，直到达到 `maxBatchSize` 或窗口到期才提交，批大小由配置保证而非依赖业务池偶然饱和；实测中高并发下 IO 次数降 4~5 倍、吞吐不低于关窗。低负载且下游 IO 极快（< 5ms）时建议调小或关闭，取值建议见 [批处理文档](docs/batch.md)
+- **视图运行期缓存失效**：新增 `ViewResolverRegistry.invalidateViewCaches()`，运行期投放或替换模板后调用即可生效（同时清理 Thymeleaf / FreeMarker / Beetl 内部模板缓存）；视图解析结果按视图名缓存，`cache=false` 仍保留热改
+- **视图配置**：新增 `spring.{thymeleaf,freemarker,beetl}.order`、`spring.web.view.jsp.order`（引擎解析顺序确定且可配）与 `spring.freemarker.enabled`；新增可选的 `spring.web.view.redirect-hosts` 外部重定向 host 白名单；移除从未被读取的 `spring.beetl.mode`
+- **自动配置开关**：新增 `springperf.openapi.enabled`、`springperf.swagger-ui.enabled`（可分别关闭文档端点与 Swagger UI 资源）、`springperf.web.mvc-conflict-check.enabled`（三方库传递引入 Spring MVC 时可跳过启动期冲突检查）
+- **管理端口与 SSL 配置**：`management.server.*` 统一按「管理端口专属值 → 主服务器 `server.*` → 默认值」解析，HTTP/2、请求体上限、SSL 等可按需覆盖（SSL 开关同样遵循该回退）；SSL 配置改用 Spring Boot 的 `Ssl` 模型绑定，非法 `client-auth`、空 keystore 或缺失凭据在启动期直接报错
+- **服务就绪时机**：`WebServerInitializedEvent` 改为在 Netty 实际绑定端口后发布，服务注册组件（Nacos / Eureka / Consul）感知就绪的时机更准确
+
+### 变更
+
+- **Servlet 规范语义收紧**：同一异步周期内重复 `startAsync()` 抛 `IllegalStateException`；`complete()` 幂等、`isAsyncStarted()` 在 `complete()` / `dispatch()` 后返回 `false`；`dispatch()` 期间 `DispatcherType` 为 `ASYNC`；`addListener(listener, req, resp)` 的事件携带注册时的 req/resp；`getHeaders(name)` 无该头返回空集合；`getDateHeader()` 对存在但无法解析的日期抛 `IllegalArgumentException`；`setAttribute(name, null)` 等价 `removeAttribute`；`setSessionTrackingModes()` 现在生效并按规范校验（集合非空且必须含 `COOKIE` 或 `SSL`）
+- **视图错误不再静默**：视图解析异常保留原始 cause 不再被跳过；`ModelAndView` 指向不存在的视图抛异常而非 200 空白页；渲染中途抛异常不再返回 200 + 半截 HTML，改为清空缓冲后交给异常处理器（500 或自定义错误页）；`redirect:` 不再带 `text/html`，并保留 `ModelAndView` 指定的 3xx 状态码
+- **内容协商失败显式报错**：已显式设置 `Content-Type` 却无匹配转换器的返回值改为 500（原先静默返回 200 + 空响应体），与 Spring MVC 语义一致
+- **配置启动期校验**：`spring.web.view.engine` 的未知值、`none` 与其他引擎混写、`spring.thymeleaf.mode` / `spring.freemarker.content-type` 非法值、以及视图引擎 `cache` / `enabled` 非 `true` / `false` 的值，均改为启动期报错而非静默忽略；`engine=none` 时不再装配内置 JSP（自定义 `ViewResolver` Bean 不受影响）
+- **批处理默认启用攒批窗口**：相比 3.5.7，未显式配置的 `@BatchMapping` 现在默认按 5ms 窗口攒批（批大小由窗口保证，单请求延迟上界增加约 5ms）。若下游 IO 极快或负载很低、希望保留旧版「消费者追上空队列即刷出」的行为，显式写 `batchWindowMillis = 0`；启动期提示也改为仅在显式关闭时出现
 
 ### 修复
 
-- **Servlet 规范语义**：`HttpSession.setAttribute(name, null)` 等价于 `removeAttribute`（原先抛 NPE）；`HttpServletResponse.getHeaders(name)` 无该头返回空集合（原先返回 `null`）；`getDateHeader` 对存在但无法解析的日期抛 `IllegalArgumentException`（原先回退 `-1`，掩盖上游协议错误）
-- **`AsyncContext` 语义**：同一异步周期内重复 `startAsync()` 抛 `IllegalStateException`；`isAsyncStarted()` 在 `complete()`/`dispatch()` 后返回 `false`；`complete()` 幂等（`onComplete` 每周期只触发一次）；`addListener(listener, req, resp)` 的事件携带注册时传入的 req/resp；`dispatch(path)` 期间 `DispatcherType` 为 `ASYNC`；`hasOriginalRequestAndResponse()` 按实际传入的 req/resp 判定
-- **持久化会话落盘移出 EventLoop**：响应写完成回调运行在 Netty EventLoop 上，原先在此直接序列化 + `Files.write` + `ATOMIC_MOVE`，会阻塞同一 loop 负责的所有连接。现按 `HttpSessionStorage.hasBlockingSave()` 判定，阻塞型存储改走单线程有界队列（容量 4096，满则丢弃并告警；停机最多等待 5 秒把在途保存落完）
-- **会话序列化开销**：快路径只整体序列化一次，仅在失败时回退到逐属性剔除（原先每个属性「试序列化 + 正式序列化」，共 2N 次）
-- **`ServletContext` 动态注册**：`addServlet` / `addFilter` / `addJspFile` / `createServlet` / `createFilter` 改为抛 `UnsupportedOperationException`（规范为该能力缺失指定的信号），不再返回 `null` 让调用方误判注册成功
-- **`ServletContext.setSessionTrackingModes()` 实际生效**：原先为空实现，程序化配置被静默丢弃；现做规范校验（集合非空且必须含 `COOKIE` 或 `SSL`）并影响会话 Cookie 下发与 `encodeURL`
-- **批处理停机与完成兜底**：RingBuffer drain 加 5 秒硬上界（无参 `Disruptor.shutdown()` 等价于 `shutdown(-1, MILLISECONDS)`，容器关闭可能无限挂起）；业务池已关闭时被拒的批次逐条 `setError` 而非静默丢弃；批量方法返回后仍未完成的请求以 `IllegalStateException` 收尾并告警，不再静默挂到 30 秒超时
-- **批处理容量指标落地**：`batch.queue.remaining` / `batch.queue.capacity` 原先没有任何采集方（Gauge 永不注册），现于队列启动预热、每批处理结束与 DROP / THROW 失败时上报
-- **批处理启动告警**：未设置 `batchWindowMillis` 的队列、以及多队列 `consumerSize` 之和超过核数时，启动期告警——避免默认配置静默退化为「每请求一次 IO」
-- **批处理窗口调度器竞态**：登记与注销共用同一把静态锁，并按 handler 记录登记所在的调度器实例；修复无窗口队列停机时误关其他队列仍在使用的调度器、以及 `schedule()` 被拒后异常冒到消费者的问题
-- **视图渲染解析开销**：模板存在性探测与 View 构造改为按视图名缓存（`cache=false` 保持热改；FreeMarker 缓存键含 locale），不再每请求做 N 次 classpath 查询
-- **视图渲染错误语义**：解析异常保留 cause 不再静默跳过；`ModelAndView` 的未解析视图改为抛异常而非空白 200；Content-Type 与响应编码统一由 `ViewReturnValueResolver.applyContentType()` 决定，302 不再带 `text/html`，并保留 `ModelAndView` 指定的 3xx 状态码
-- **视图配置面**：内置引擎 order 确定且可配（`spring.{engine}.order`、`spring.web.view.jsp.order`）；补 `spring.freemarker.enabled`，禁用引擎不再绕过启动期 fail-fast；移除从未被读取的 `spring.beetl.mode`
-- **视图解析缓存**：同一视图名并发解析只加载一次，解析失败不再被缓存；容量超限改为逐条淘汰而非清空全表；新增 `ViewResolverRegistry.invalidateViewCaches()`，运行期投放新模板后可立即生效
-- **视图配置校验与元数据**：`spring.thymeleaf.mode`、`spring.freemarker.content-type` 的非法值改为启动期以明确异常中断；`spring.web.view.engine` 默认值常量与装配语义对齐；补全 IDE 配置元数据并新增键/默认值一致性测试
-- **视图模块边界文档**：明确该模块是 SpringMVC 兼容适配层（同步渲染、每请求构造 exchange、无输出/片段缓存），说明配置刷新不重建模板引擎、resolver 列表为启动期快照
-- **视图渲染失败错误响应**：渲染中途抛异常时响应已被提前标记 handled，`sendError()` 被拒绝，客户端收到 200 + 半截 HTML；异常处理器返回的错误页还会拼接在半截页面之后。现统一由 `ViewReturnValueResolver.renderView()` 渲染：成功后才置位 handled，失败时清空已缓冲内容再抛，异常交 `ExceptionRegistry` 处理；`ModelAndView` 与 `ViewControllerInvoker` 两条链路一并复用
-- **视图缓存失效覆盖引擎内部缓存**：`invalidateViewCaches()` 原先只清「视图名 → View」解析结果，运行期替换模板仍命中 Thymeleaf / FreeMarker / Beetl 的旧模板；现同步清三个引擎的内部模板缓存
-- **`spring.web.view.engine` 取值校验**：未知引擎名与 `none` 混写改为启动期以明确异常中断；`engine=none` 也阻止内置 JSP 装配（自定义 `ViewResolver` Bean 不受影响）
-- **视图控制器统一 Content-Type**：`ViewControllerInvoker` 改为复用 `applyContentType()`，`redirect:` 不再带 `text/html`，Content-Type 自带 charset 时同步响应编码
-- **视图渲染边界修复**：`PerfWebRequest` 在 https 且无显式端口时返回 443（原固定 80，会让 `@{...}` 生成错误绝对 URL）；三个引擎统一支持「视图名已带后缀」（Thymeleaf 改为向 `TemplateEngine` 传去掉后缀的纯模板名）；`resolveBoolean` 对非 `true`/`false` 值启动期 fail-fast（原静默当 false）
-- **重定向目标与响应编码**：`//host` 协议相对目标不再拼 context-path；新增可选 `spring.web.view.redirect-hosts` 白名单（未配置时不限制，可阻断 userinfo 混淆）；自定义 Content-Type 未带 charset 时补上响应实际编码，避免响应头与 Writer 字节编码错配
-- **视图缓存淘汰与失效**：`ViewCache.trackInsertion` 遇队首仍在加载的条目不再放弃本轮淘汰（放回队尾继续扫描，队列长度做上限防死循环）；`invalidate()` 与 `trackInsertion()` 互斥，避免两个容器的清空与插入交错
-- **显式 Content-Type 与返回值类型不匹配**：`HttpBodyCodecRegistry` 原先静默不写响应体，客户端收到 200 + 空 body；现抛 `HttpMessageNotWritableException` 并由 `ExceptionRegistry` 收敛为 500，与内容协商失败及 Spring MVC 语义一致
+- **攒批小窗口按配置生效**：`batchWindowMillis` 设为 3~5ms 这类小值时，在部分 Windows 环境会被系统定时器粒度放大到约 15ms——快 IO 场景吞吐不升反降、低负载请求白等。修复后窗口按标称值触发，`maxBatchSize` 的攒批效果真正兑现
+- **会话 Cookie**：Servlet 默认会话 Cookie（`maxAge=-1`）不再被写成 `Max-Age=-1` / `Expires=<now>` 而立即过期
+- **持久化会话**：启用文件会话存储时，落盘不再运行在网络线程上拖慢同一线程上的其他连接；停机时最多等待 5 秒把在途保存写完
+- **405 与关闭中请求**：405 响应的 `Allow` 头汇总所有可用方法；优雅关闭期间被拒的请求返回 503
+- **批处理停机与完成兜底**：停机 drain 加 5 秒上界（此前可能无限挂起）；业务线程池已关闭时被拒的批次逐条报错而非静默丢弃；批量方法返回后仍未完成的请求立即失败，不再挂到 30 秒超时
+- **HTTP 日期头**：支持 RFC 850 / 1036 的两位年份日期（此前被判为无法解析）
+- **转发与包含**：`INCLUDE_QUERY_STRING` 按规范只放 query string，`INCLUDE_SERVLET_PATH` 去掉 query
+- **HTTP/2**：修复 h2c preface 分片时的空指针
+- **上传与流式响应**：并发解析 multipart 不再产生重复条目；关闭上传流、HEAD 请求、响应头超限降级等路径不再泄漏流、文件句柄或缓冲区
+- **WebSocket 帧处理**：分片帧按 RFC 6455 聚合后再交给业务；各种断连路径的关闭回调只触发一次；握手异常时释放请求；二进制发送不再消耗调用方 `ByteBuffer`；单帧消息与批量发送同样受大小限制和背压水位约束
+- **重定向与编码**：`//host` 协议相对目标不再拼 context-path；https 无显式端口时模板取到 443（绝对 URL 正确）；带后缀的视图名三个引擎统一支持；自定义 Content-Type 未带 charset 时补上响应实际编码
+
+### 安全
+
+- **SSE 协议注入**：`id` / `event` 字段中的换行在写入前拒绝，避免上游值伪造额外 SSE 字段（此前依赖 Spring 补丁版本的行为）
+- **外部重定向白名单**：可选 `spring.web.view.redirect-hosts` 限制外部重定向目标，可阻断含 userinfo 混淆的地址
 
 ## [3.5.7] - 20261008
 > ⚠️ **本版含破坏性变更**：配置键、响应分帧、Servlet `flush` 语义、条件请求/Range、

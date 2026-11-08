@@ -25,8 +25,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 量化 {@code batchWindowMillis} 的收益与成本。
  * <p>
- * <b>为什么要单独分析</b>：窗口把刷出时机从「消费者追上空队列」改成「窗口到期」，批大小因此上升——这是收益； 但每个批次最多多等一个窗口，单请求延迟随之上升——这是成本。两者方向相反，且都随窗口值单调变化，
- * 必然存在一个净收益峰值。文档里「窗口取 IO 延迟的 1/4 ~ 1/2」是经验值，这里用实测数据验证它、并给出拐点位置。
+ * <b>为什么要单独分析</b>：窗口把刷出时机从「消费者追上空队列」改成「窗口到期」，批大小因此上升——这是收益； 但每个批次最多多等一个窗口，单请求延迟随之上升——这是成本。这里用实测数据量化两者的净效果，
+ * 为 {@code BatchMapping#batchWindowMillis()} 选默认值提供依据，并观察更大窗口是否还有额外收益。
+ * </p>
+ * <p>
+ * 结论一律由本轮实测数据得出，不预设「窗口越大越差」或固定的经验比例：窗口调度精度修复后，
+ * 并发 100、下游 IO 5~50ms 下 5ms 窗口稳定优于关窗，继续加大窗口的收益不稳定（且 10ms 档在部分平台会被量化到约 15ms）。
  * </p>
  * <p>
  * <b>实验设计</b>：队列级 closed-model 负载——固定 IO 延迟 L、并发 C、{@code consumerSize}、{@code maxBatchSize}， 只扫描窗口值 W。
@@ -56,7 +60,7 @@ class BatchWindowTradeoffTest {
     /** 合理并行度：贴近典型核数，不超配。窗口分析必须固定它，否则批大小会被并行度扰动。 */
     private static final int CONSUMER_SIZE = 8;
 
-    /** (ioLatencyMillis, windowMillis) —— 窗口从 0 扫到等于 IO 延迟，覆盖「收益区 → 拐点 → 亏损区」。 */
+    /** (ioLatencyMillis, windowMillis) —— 窗口从 0 扫到等于 IO 延迟，覆盖「无窗口 → 小窗口 → 窗口与 IO 等长」。 */
     private static final int[][] MATRIX = { { 20, 0 }, { 20, 2 }, { 20, 5 }, { 20, 10 }, { 20, 20 }, { 50, 0 },
             { 50, 10 }, { 50, 25 }, { 50, 50 } };
 
@@ -251,8 +255,10 @@ class BatchWindowTradeoffTest {
                     best.window, best.qps / base.qps, best.p50Nanos / 1e6, base.p50Nanos / 1e6, best.window, io,
                     base.ioCostPerRequestNanos / best.ioCostPerRequestNanos));
             Row worst = group.get(group.size() - 1);
-            sb.append(String.format("        窗口=%dms（等于 IO 延迟）时吞吐 %.2fx、p50 %+.2fms —— 已进入亏损区%n", worst.window,
-                    worst.qps / base.qps, (worst.p50Nanos - base.p50Nanos) / 1e6));
+            // 结论必须由本轮实测数据得出，不能沿袭旧实现的硬编码判断（旧调度器把小窗口放大到约 15ms 时才成立）
+            sb.append(String.format("        窗口=%dms（等于 IO 延迟）时吞吐 %.2fx、p50 %+.2fms —— %s%n", worst.window,
+                    worst.qps / base.qps, (worst.p50Nanos - base.p50Nanos) / 1e6,
+                    worst.qps < base.qps ? "低于不开窗口" : "仍不低于不开窗口"));
         }
         System.out.println(sb);
     }

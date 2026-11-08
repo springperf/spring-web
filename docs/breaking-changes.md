@@ -12,7 +12,7 @@
 | 版本 | 日期 | 主题 |
 |------|------|------|
 | **2.7.8** | 2026-11-26 | 支持的 Spring Boot 收敛为 2.7.x；预设 `Content-Type` 与返回值类型不匹配时改为显式失败 |
-| **3.5.8** | 2026-11-25（预计） | Servlet 规范语义收紧并真正实现动态注册；批处理默认启用 2ms 攒批窗口；重复 `startAsync` 与日期头解析改为抛异常 |
+| **3.5.8** | 2026-11-25（预计） | Servlet 规范语义收紧并真正实现动态注册；批处理默认启用 5ms 攒批窗口；重复 `startAsync` 与日期头解析改为抛异常 |
 | **2.7.7** | 2026-10-13 | 配置键对齐 Spring Boot（旧键移除/改名）、响应分帧与 Servlet `flush` 语义、条件请求与 Range、扩展点签名 |
 | **3.5.7** | 2026-10-08 | 配置键对齐 Spring Boot / Tomcat：移除旧配置键别名，扩展点签名与兼容层类调整 |
 | **2.7.6** | 2026-09-10 | 模块拆分（`spring-web-support` → `spring-web-servlet` + `spring-web-mvc-support`）、`redirect:` 语义收紧、视图解析失败不再静默、生产级 Netty / 线程池默认值 |
@@ -45,7 +45,7 @@
 | `redirect://host` 协议相对目标 | 非空 context-path 下被拼成 `/app//host` | 直接作为外部目标使用。**无需迁移** |
 | https 且无显式端口时的 `IWebRequest#getServerPort()` | 固定返回 80 | 返回 443。**无需迁移** |
 | `@ResponseBody` 返回值无匹配 `HttpBodyConverter`（已显式设置 `Content-Type`，或 `produces` 协商出的类型无人能写） | 静默返回 200 + 空响应体，返回值被丢弃；`produces` 分支连 `produces` 声明的 Content-Type 都不会写 | 抛 `HttpMessageNotWritableException`，经 `ExceptionRegistry` 映射为 500。**迁移**：让目标 Content-Type 与返回值类型匹配（返回对象时用 `application/json`），或由 Servlet 侧自行写响应并返回 `void`。其他本框架未实现的返回类型同样明确报错，不再静默空响应（`StreamingResponseBody` 自 2.7.8 起已支持，不再走此路径） |
-| `@BatchMapping.batchWindowMillis` 默认值 | 2.7.7 无攒批窗口：`endOfBatch` / `maxBatchSize` 决定刷出 | 默认启用 2ms 攒批窗口，批大小由窗口保证，单请求最多多等一个窗口。**迁移**：低负载（在途请求撑不满一批）、极致低延迟，或需要「无窗口」对照基准时，显式写 `batchWindowMillis=0` |
+| `@BatchMapping.batchWindowMillis` 默认值 | 2.7.7 无攒批窗口：`endOfBatch` / `maxBatchSize` 决定刷出 | 默认启用 5ms 攒批窗口，批大小由窗口保证，单请求最多多等一个窗口。**迁移**：低负载（在途请求撑不满一批）、极致低延迟，或需要「无窗口」对照基准时，显式写 `batchWindowMillis=0` |
 
 ---
 
@@ -74,7 +74,7 @@
 | `redirect://host` 协议相对目标 | 非空 context-path 下被拼成 `/app//host` | 直接作为外部目标使用。**无需迁移** |
 | https 且无显式端口时的 `IWebRequest#getServerPort()` | 固定返回 80 | 返回 443。**无需迁移** |
 | `@ResponseBody` 返回值无匹配 `HttpBodyConverter`（已显式设置 `Content-Type`，或 `produces` 协商出的类型无人能写） | 静默返回 200 + 空响应体，返回值被丢弃；`produces` 分支连 `produces` 声明的 Content-Type 都不会写 | 抛 `HttpMessageNotWritableException`，经 `ExceptionRegistry` 映射为 500。**迁移**：让目标 Content-Type 与返回值类型匹配（返回对象时用 `application/json`），或由 Servlet 侧自行写响应并返回 `void`。其他本框架未实现的返回类型同样明确报错，不再静默空响应（`StreamingResponseBody` 自 3.5.8 起已支持，不再走此路径） |
-| `@BatchMapping.batchWindowMillis` 默认值 | 3.5.7 无攒批窗口：`endOfBatch` / `maxBatchSize` 决定刷出 | 默认启用 2ms 攒批窗口，批大小由窗口保证，单请求最多多等一个窗口。**迁移**：低负载（在途请求撑不满一批）、极致低延迟，或需要「无窗口」对照基准时，显式写 `batchWindowMillis=0` |
+| `@BatchMapping.batchWindowMillis` 默认值 | 3.5.7 无攒批窗口：`endOfBatch` / `maxBatchSize` 决定刷出 | 默认启用 5ms 攒批窗口，批大小由窗口保证，单请求最多多等一个窗口。**迁移**：低负载（在途请求撑不满一批）、极致低延迟，或需要「无窗口」对照基准时，显式写 `batchWindowMillis=0` |
 | `io.springperf.web.websocket.server.SpringHeadersAdapter` | public 类，把 Netty `HttpHeaders` 适配成 Spring `HttpHeaders`；`NettyWebSocketSession` 构造器接收它 | 类已移除（适配逻辑内联），`NettyWebSocketSession` 构造器的第三个参数改为 Spring 的 `org.springframework.http.HttpHeaders`。**迁移**：不要直接 new `NettyWebSocketSession`（会话由框架创建）；需要 Spring 头视图时自行 `new HttpHeaders()` 并逐项复制 Netty 头 |
 | `ViewProperties.BEETL_MODE` / `BEETL_MODE_DEFAULT` | public 常量，对应同样从未被读取的 `spring.beetl.mode` | 常量随配置键一起移除。**迁移**：删除常量引用；该配置此前本就不生效 |
 | `WebServerInitializedEventAutoConfiguration#webServerInitializedEventPublisher(NettyHttpServer, ApplicationContext)` | public 工厂方法，构造监听 `ApplicationReadyEvent` 的事件发布器 | 方法仍在，签名改为 `(ApplicationContext)`，返回的监听器改监听 `NettyServerStartedEvent`（服务器从事件中取），发布时机提前到端口绑定后。**迁移**：直接调用该方法的地方去掉 `NettyHttpServer` 参数；监听 `WebServerInitializedEvent` 即可，发布时机只会更早、更准 |

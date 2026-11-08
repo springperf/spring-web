@@ -62,9 +62,10 @@ public class BatchRegistry extends BaseWebComponent {
     }
 
     /**
-     * 启动期对两类「配置看起来正常、实际拿不到收益或会超配」的组合显式告警，避免静默降级为「没有批处理」：
+     * 启动期对两类「配置看起来正常、实际拿不到收益或会超配」的组合显式告警：
      * <ul>
-     * <li>{@code batchWindowMillis=0}：刷出时机由 {@code endOfBatch} 决定，批大小实测长期在 1~3，{@code maxBatchSize} 形同虚设；</li>
+     * <li>显式关闭窗口（{@code batchWindowMillis=0}）：刷出时机回到 {@code endOfBatch}，批大小取决于 RingBuffer 瞬时积压，
+     * {@code maxBatchSize} 很难达到；</li>
      * <li>多个队列的 {@code consumerSize} 之和超过 CPU 核数：每个 {@code @BatchMapping} 都持有独立的 bizExecutor，
      * 默认值（核数）是按单队列设计的。</li>
      * </ul>
@@ -80,10 +81,10 @@ public class BatchRegistry extends BaseWebComponent {
             workerBudget += meta.consumerSize();
         }
         if (!noWindow.isEmpty()) {
-            log.warn("Batch queues without batchWindowMillis ({}): {} - batch size is decided by endOfBatch and "
-                    + "typically stays at 1~3, so maxBatchSize is effectively unused; set batchWindowMillis "
-                    + "(about 1/4~1/2 of the downstream IO latency) for IO-bound handlers", noWindow.size(),
-                    String.join(", ", noWindow));
+            log.warn("Batch queues with batchWindowMillis explicitly disabled ({}): {} - flushing falls back to "
+                    + "endOfBatch, so batch size depends on momentary RingBuffer backlog and maxBatchSize is rarely "
+                    + "reached; keep the default 5ms window (or 2~3ms for very fast downstream IO) unless the extra "
+                    + "latency is unacceptable", noWindow.size(), String.join(", ", noWindow));
         }
         int cores = Runtime.getRuntime().availableProcessors();
         if (registrations.size() > 1 && workerBudget > cores) {
