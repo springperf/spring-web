@@ -259,7 +259,7 @@ Global defaults for `@BatchMapping` attributes; an explicit annotation value win
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `springperf.batch.window-millis` | `5` | Accumulation window in ms, `0` disables it globally |
+| `springperf.batch.window-millis` | `2` | Accumulation window in ms, `0` disables it globally |
 | `springperf.batch.max-batch-size` | `100` | Max requests per batch |
 | `springperf.batch.consumer-size` | `-1` | bizExecutor concurrency cap, `-1` = CPU cores |
 | `springperf.batch.ring-buffer-size` | `4096` | Ring buffer capacity; non-power-of-two values are normalised with a warning |

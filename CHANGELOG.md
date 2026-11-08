@@ -36,7 +36,7 @@
 - **JSP 生产默认配置**：新增 `server.servlet.jsp.development`（默认 `false`，改动 JSP 需重启生效）、`keep-generated`、`trim-spaces` 与 `init-parameters.*`（透传 Jasper，显式项优先）；Jasper 实例改由 Spring 管理，JSP 与标签类可获得依赖注入
 - **WebSocket 压缩扩展**：`setAllowExtensions(true)` 现在真正协商 `permessage-deflate`（此前是空开关，未协商的压缩帧会被当明文交给业务）；协商结果可通过 `getExtensions()` / `Session#getNegotiatedExtensions()` 读取，按端点设置的 `messageSizeLimit` 也随之生效
 - **WebSocket JSR-356 语义补齐**：`RemoteEndpoint.Basic` 为同步发送；`getSendStream()` / `getSendWriter()` 缓冲后按整条消息发出；`setBatchingAllowed()` / `flushBatch()` 真正攒批；`Session.addMessageHandler()` 支持动态注册；自定义 `Configurator` 的 `getEndpointInstance()` / `checkOrigin()` 生效；Ping / Pong 帧现在携带应用数据，超 125 字节按规范拒绝
-- **批处理攒批时间窗口**：`@BatchMapping` 新增 `batchWindowMillis`（默认 `5`ms，设为 `0` 可关闭）。窗口内持续累积，直到达到 `maxBatchSize` 或窗口到期才提交，批大小由配置保证而非依赖业务池偶然饱和；实测中高并发下 IO 次数降 4~5 倍、吞吐不低于关窗。低负载且下游 IO 极快（< 5ms）时建议调小或关闭，取值建议见 [批处理文档](docs/batch.md)
+- **批处理攒批时间窗口**：`@BatchMapping` 新增 `batchWindowMillis`（默认 `2`ms，设为 `0` 可关闭）。窗口内持续累积，直到达到 `maxBatchSize` 或窗口到期才提交，批大小由配置保证而非依赖业务池偶然饱和；中高并发下 IO 次数成倍下降、吞吐同时提升。低负载（在途请求撑不满一批）时窗口只是等待成本，建议显式关闭，取值建议见 [批处理文档](docs/batch.md)
 - **批处理全局默认值**：新增 `springperf.batch.*`（`window-millis` / `max-batch-size` / `consumer-size` / `ring-buffer-size` / `wait-strategy` / `backpressure`），多个队列统一调优不必逐个改注解。优先级为「注解显式声明 > 全局键 > 注解内置默认值」，仅启动期读取一次；取值非法直接启动失败并点名键名与可选值，启动日志打印生效值与实际配置的键，不静默回落。已知边界：注解显式写回内置默认值时与「未声明」不可区分，此时以全局键为准。详见[批处理配置参考](docs/batch.md#配置参考)
 - **视图运行期缓存失效**：新增 `ViewResolverRegistry.invalidateViewCaches()`，运行期投放或替换模板后调用即可生效（同时清理 Thymeleaf / FreeMarker / Beetl 内部模板缓存）；视图解析结果按视图名缓存，`cache=false` 仍保留热改
 - **视图配置**：新增 `spring.{thymeleaf,freemarker,beetl}.order`、`spring.web.view.jsp.order`（引擎解析顺序确定且可配）与 `spring.freemarker.enabled`；新增可选的 `spring.web.view.redirect-hosts` 外部重定向 host 白名单；移除从未被读取的 `spring.beetl.mode`
@@ -51,12 +51,12 @@
 - **视图错误不再静默**：视图解析异常保留原始 cause 不再被跳过；`ModelAndView` 指向不存在的视图抛异常而非 200 空白页；渲染中途抛异常不再返回 200 + 半截 HTML，改为清空缓冲后交给异常处理器（500 或自定义错误页）；`redirect:` 不再带 `text/html`，并保留 `ModelAndView` 指定的 3xx 状态码
 - **内容协商失败显式报错**：无匹配转换器的 `@ResponseBody` 返回值一律 500（原先静默返回 200 + 空响应体），同时覆盖「已显式设置 `Content-Type`」与「`produces` 协商出类型」两条链路——此前只做了前者，走 `produces` 的返回值仍被静默丢弃，连 `produces` 声明的 Content-Type 都不写。与 Spring MVC 语义一致
 - **配置启动期校验**：`spring.web.view.engine` 的未知值、`none` 与其他引擎混写、`spring.thymeleaf.mode` / `spring.freemarker.content-type` 非法值、以及视图引擎 `cache` / `enabled` 非 `true` / `false` 的值，均改为启动期报错而非静默忽略；`engine=none` 时不再装配内置 JSP（自定义 `ViewResolver` Bean 不受影响）
-- **批处理默认启用攒批窗口**：相比 3.5.7，未显式配置的 `@BatchMapping` 现在默认按 5ms 窗口攒批（批大小由窗口保证，单请求延迟上界增加约 5ms）。若下游 IO 极快或负载很低、希望保留旧版「消费者追上空队列即刷出」的行为，显式写 `batchWindowMillis = 0`；启动期提示也改为仅在显式关闭时出现
+- **批处理默认启用攒批窗口**：相比 3.5.7，未显式配置的 `@BatchMapping` 现在默认按 2ms 窗口攒批（批大小由窗口保证，单请求延迟上界增加约 2ms）。若负载很低、希望保留旧版「消费者追上空队列即刷出」的行为，显式写 `batchWindowMillis = 0`；启动期提示也改为仅在显式关闭时出现
 
 ### 修复
 
 - **异步超时稳定按 503 收尾**：`WebAsyncTask` / `Callable` 超时后，被取消任务抛出的 `InterruptedException` 会与超时结果抢写响应槽——客户端可能拿到 500，任务若不响应中断甚至会拿到迟到的 200 + 正常结果，超时等于失效。现在超时一旦到点，此后到达的任务结果一律丢弃，按 3.5.7 起的约定稳定返回 503
-- **攒批小窗口按配置生效**：`batchWindowMillis` 设为 3~5ms 这类小值时，到期会被定时器粒度放大——快 IO 场景吞吐不升反降、低负载请求白等。修复后窗口按标称值触发，`maxBatchSize` 的攒批效果真正兑现
+- **攒批小窗口按配置生效**：`batchWindowMillis` 设为 2~5ms 这类小值时，到期会被定时器粒度放大——快 IO 场景吞吐不升反降、低负载请求白等。修复后窗口按标称值触发，`maxBatchSize` 的攒批效果真正兑现
 - **会话 Cookie**：Servlet 默认会话 Cookie（`maxAge=-1`）不再被写成 `Max-Age=-1` / `Expires=<now>` 而立即过期
 - **持久化会话**：启用文件会话存储时，落盘不再运行在网络线程上拖慢同一线程上的其他连接；停机时最多等待 5 秒把在途保存写完
 - **405 与关闭中请求**：405 响应的 `Allow` 头汇总所有可用方法；优雅关闭期间被拒的请求返回 503

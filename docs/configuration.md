@@ -259,7 +259,7 @@ public class DynamicRegistration implements ServletContextListener {
 
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
-| `springperf.batch.window-millis` | `5` | 攒批时间窗口（毫秒），`0` = 全局关闭 |
+| `springperf.batch.window-millis` | `2` | 攒批时间窗口（毫秒），`0` = 全局关闭 |
 | `springperf.batch.max-batch-size` | `100` | 单批最大请求数 |
 | `springperf.batch.consumer-size` | `-1` | bizExecutor 并发上限，`-1` = CPU 核数 |
 | `springperf.batch.ring-buffer-size` | `4096` | 环形缓冲区容量，非 2 的幂时归一化并告警 |

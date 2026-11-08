@@ -204,8 +204,8 @@ public @interface BatchMapping {
     /** 单次批处理最大请求数。达到该值时触发批量处理。Disruptor endOfBatch 信号也会触发。默认 100。 */
     int maxBatchSize() default 100;
 
-    /** 攒批时间窗口（毫秒）。默认 5ms，由窗口保证批大小；设为 0 显式关闭，回到 endOfBatch / maxBatchSize 决定刷出。 */
-    int batchWindowMillis() default 5;
+    /** 攒批时间窗口（毫秒）。默认 2ms，由窗口保证批大小；设为 0 显式关闭，回到 endOfBatch / maxBatchSize 决定刷出。 */
+    int batchWindowMillis() default 2;
 
     /** 最大并发处理线程数（bizExecutor 上限；Disruptor 消费者线程独立，不占该配额）。默认 CPU 核数。 */
     int consumerSize() default -1;
