@@ -60,8 +60,8 @@ class BatchRequestMetaDataTest {
     }
 
     @Test
-    void annotationDefault_enablesFiveMillisWindow() throws Exception {
+    void annotationDefault_enablesTwoMillisWindow() throws Exception {
         // 默认值变更属用户可见行为，钉死契约：BatchScanner 会把该值带入 BatchRequestMetaData
-        assertThat(BatchMapping.class.getDeclaredMethod("batchWindowMillis").getDefaultValue()).isEqualTo(5);
+        assertThat(BatchMapping.class.getDeclaredMethod("batchWindowMillis").getDefaultValue()).isEqualTo(2);
     }
 }

@@ -30,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * </p>
  * <p>
  * 结论一律由本轮实测数据得出，不预设「窗口越大越差」或固定的经验比例：窗口调度精度修复后，
- * 并发 100、下游 IO 5~50ms 下 5ms 窗口稳定优于关窗，继续加大窗口的收益不稳定。
+ * 并发 100、下游 IO 5~50ms 下 2ms 窗口已是净收益拐点（批大小≈在途上限），更大窗口换不来更大批。
  * </p>
  * <p>
  * <b>实验设计</b>：队列级 closed-model 负载——固定 IO 延迟 L、并发 C、{@code consumerSize}、{@code maxBatchSize}， 只扫描窗口值 W。
@@ -53,8 +53,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 @EnabledIfSystemProperty(named = "perf.enabled", matches = "true")
 class BatchWindowTradeoffTest {
 
-    /** 并发连接数：closed model 的在途请求上限。 */
-    private static final int CONCURRENCY = 100;
+    /**
+     * 并发连接数：closed model 的在途请求上限（可覆盖，{@code -Dperf.tradeoff.concurrency=16}）。
+     * <p>
+     * 高并发下 100 个在途请求本身就能在窗口到期前把 maxBatchSize 填满，窗口大小几乎不影响批大小；
+     * 低并发下到达稀疏、堆不满一批，窗口才直接决定「等多久换多少聚合」，是选默认值的另一半依据。
+     * </p>
+     */
+    private static final int CONCURRENCY = Integer.getInteger("perf.tradeoff.concurrency", 100);
 
     private static final long MEASURE_SECONDS = 3L;
 
@@ -66,18 +72,46 @@ class BatchWindowTradeoffTest {
     private static final int CONSUMER_SIZE = 8;
 
     /**
-     * 扫描网格：每个 IO 延迟都扫同一组窗口，按「IO 延迟升序、窗口升序」排列；分组打印依赖这个顺序。
+     * 默认扫描网格：4 档 IO × 5 档窗口，按「IO 升序、窗口升序」排列；分组打印依赖这个顺序。
      * <p>
-     * 网格保持整齐（每个 IO 档 5 个窗口）而不是只扫「有收益的窗口」，这样任一档出现异常值都不会被
+     * 网格保持整齐（每个 IO 档同样多的窗口）而不是只扫「有收益的窗口」，这样任一档出现异常值都不会被
      * 缺格掩盖。25ms 档用于观察「窗口明显大于 IO 延迟」时的表现。
      * </p>
+     * <p>
+     * 需要细看某个区间时用系统属性覆盖，不必改代码：{@code -Dperf.tradeoff.io=5,10}
+     * {@code -Dperf.tradeoff.windows=0,1,2,3,5}。
+     * </p>
      */
-    private static final int[][] MATRIX = { { 5, 0 }, { 5, 3 }, { 5, 5 }, { 5, 10 }, { 5, 25 }, { 10, 0 }, { 10, 3 },
-            { 10, 5 }, { 10, 10 }, { 10, 25 }, { 20, 0 }, { 20, 3 }, { 20, 5 }, { 20, 10 }, { 20, 25 }, { 50, 0 },
-            { 50, 3 }, { 50, 5 }, { 50, 10 }, { 50, 25 } };
+    private static final int[][] MATRIX;
 
-    /** 参与扫描的 IO 延迟，顺序与 {@link #MATRIX} 一致。 */
-    private static final int[] IO_LATENCIES = { 5, 10, 20, 50 };
+    /** 参与扫描的 IO 延迟（可覆盖）。 */
+    private static final int[] IO_LATENCIES = parseInts("perf.tradeoff.io", new int[] { 5, 10, 20, 50 });
+
+    /** 参与扫描的窗口值（可覆盖）。 */
+    private static final int[] WINDOWS = parseInts("perf.tradeoff.windows", new int[] { 0, 3, 5, 10, 25 });
+
+    static {
+        MATRIX = new int[IO_LATENCIES.length * WINDOWS.length][];
+        int p = 0;
+        for (int io : IO_LATENCIES) {
+            for (int w : WINDOWS) {
+                MATRIX[p++] = new int[] { io, w };
+            }
+        }
+    }
+
+    private static int[] parseInts(String key, int[] fallback) {
+        String raw = System.getProperty(key);
+        if (raw == null || raw.trim().isEmpty()) {
+            return fallback;
+        }
+        String[] parts = raw.split(",");
+        int[] values = new int[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            values[i] = Integer.parseInt(parts[i].trim());
+        }
+        return values;
+    }
 
     /** 具体请求类型：批量方法需要能调 {@code setResult(String)}，通配捕获下无法通过编译。 */
     public static class TradeoffRequest extends BatchRequest<String> {
@@ -249,7 +283,8 @@ class BatchWindowTradeoffTest {
                 .append(CONCURRENCY).append(" · consumerSize ").append(CONSUMER_SIZE).append(" · maxBatchSize ")
                 .append(MAX_BATCH_SIZE).append(System.lineSeparator());
         sb.append(String.format("%8s %10s %10s %10s %10s %12s %12s %14s %12s %12s%n", "窗口(ms)", "QPS", "p50(ms)",
-                "p99(ms)", "批大小", "IO次数", "每次IO(ms)", "每请求IO(ms)", "吞吐vs W=0", "p50 vs W=0"));
+                "p99(ms)", "批大小", "IO次数", "每次IO(ms)", "每请求IO(ms)", "吞吐vs W=" + base.window,
+                "p50 vs W=" + base.window));
         for (Row r : rows) {
             sb.append(String.format("%8d %10.0f %10.2f %10.2f %10.1f %12d %12.2f %14.3f %11.2fx %11.2fms%n", r.window,
                     r.qps, r.p50Nanos / 1e6, r.p99Nanos / 1e6, r.avgBatchSize, r.ioCount, r.ioPerCallNanos / 1e6,
@@ -278,11 +313,16 @@ class BatchWindowTradeoffTest {
             sb.append(String.format("IO %dms：吞吐峰值在窗口 %dms（%.2fx vs W=0，p50 %.2fms vs 基线 %.2fms）；IO 成本降幅 %.1fx%n",
                     io, best.window, best.qps / base.qps, best.p50Nanos / 1e6, base.p50Nanos / 1e6,
                     base.ioCostPerRequestNanos / best.ioCostPerRequestNanos));
-            Row widest = group.get(group.size() - 1);
+            Row widest = group.get(0);
+            for (Row r : group) {
+                if (r.window > widest.window) {
+                    widest = r;
+                }
+            }
             // 结论必须由本轮实测数据得出，不能沿袭旧实现时代的硬编码判断（那套判断建立在窗口到期不准的前提上）
             sb.append(String.format("        最大窗口 %dms 时吞吐 %.2fx、p50 %+.2fms —— %s%n", widest.window,
                     widest.qps / base.qps, (widest.p50Nanos - base.p50Nanos) / 1e6,
-                    widest.qps < base.qps ? "低于不开窗口" : "仍不低于不开窗口"));
+                    widest.qps < base.qps ? "低于窗口 " + base.window + "ms" : "仍不低于窗口 " + base.window + "ms"));
         }
         System.out.println(sb);
     }
