@@ -204,10 +204,6 @@ about +0~6ms of mean latency (concurrency / QPS).
 | Slow IO (> 50ms) | 5, or raise after benchmarking | 5ms already fills `maxBatchSize`; a larger window has no stable gain, so benchmark first |
 | Ultra-low latency | 0 (explicitly off) | Even a lone request waits for the window to expire |
 
-> **About the 10ms setting**: on some platforms (for example `Object.wait(10)` on Windows) a 10ms window is
-> quantised to about 15ms and measured clearly worse than 5ms (0.93x vs 2.14x at 10ms IO). If a larger window
-> is really needed, jump to 25ms and benchmark; do not stop at 10ms.
-
 Setting `batchWindowMillis` explicitly to 0 makes startup log one WARN per queue with the window disabled
 (queue names listed): the batch size then depends on momentary RingBuffer backlog and `maxBatchSize` is rarely
 reached. Queues that leave the attribute undeclared use the default 5ms and are no longer warned about; write
@@ -229,8 +225,7 @@ values depend on the machine and load model — read the relative trends.
 | 50ms | 1061 | 1.37x | **1.54x** | 1.23x | 1.51x | 100 / 49 (W0: 12.3 / 258) |
 
 The gain is IO elimination: 4~5x fewer IO calls and lower p50 / p99 (20ms p99 206 → 48ms). W=3 and W=5 are
-within baseline noise of each other, but W=5 wins at 10 / 20 / 50ms, hence the default. W=10 falls back
-sharply, mostly because of platform timer quantisation.
+within baseline noise of each other, but W=5 wins at 10 / 20 / 50ms, hence the default.
 
 **Low concurrency (1~4) — waiting is pure cost**: with sparse traffic the first request schedules the window
 task and nothing arrives to share it, so it waits for the full window. At concurrency 1 / 10ms IO, W=5 reached
@@ -246,7 +241,7 @@ slightly (concurrency 4 / 50ms IO: 1.05x). Use 0 or 2~3ms for these workloads.
 | Raise throughput at medium/high concurrency, IO >= 10ms | **Keep the default 5ms**, where the gain is largest |
 | Low traffic + very fast IO (< 5ms) | Set 0 or 2~3ms explicitly |
 | Ultra-low latency | Set 0 explicitly |
-| Raising the window above 10ms | Benchmark first; 5ms usually already fills `maxBatchSize`, and 10ms is quantised on some platforms |
+| Raising the window above 10ms | Benchmark first; 5ms usually already fills `maxBatchSize` |
 
 ---
 
@@ -353,7 +348,7 @@ Boundaries worth knowing:
 | Latency-sensitive | `ringBufferSize=1024, maxBatchSize=50, waitStrategy=BUSY_SPIN, batchWindowMillis=0` | Disable the window to avoid waiting; small buffer, aggressive wait. **With `spring.threads.virtual.enabled` use `BLOCKING` instead**: `BUSY_SPIN`/`YIELDING` never unmount a virtual thread and hold a carrier |
 | Resource-constrained (1c1g) | `ringBufferSize=4096, consumerSize=1` | Single consumer thread. Batch size grows naturally (slow consumption → backlog); set `batchWindowMillis=0` explicitly to skip the scheduler thread |
 | Batch DB queries | `maxBatchSize=200, batchWindowMillis=5` | Most DB IN queries perform best at ~200; the window drives the batch size toward 200 |
-| Batch RPC calls | `maxBatchSize=50, consumerSize=4` (keep the default 5ms window) | Parallel RPC, smaller batches; 5ms already fills the batch and a 10ms window is quantised on some platforms |
+| Batch RPC calls | `maxBatchSize=50, consumerSize=4` (keep the default 5ms window) | Parallel RPC, smaller batches; 5ms already fills the batch |
 | Slow IO (>50ms) | Keep the default 5ms window (try 25ms only after benchmarking) | Measured at 50ms IO: 5ms reaches 1.54x throughput with a full batch of 100, while 25ms measures 1.51~1.57x across runs — within noise of the default |
 | Reduce downstream load (IO <20ms) | Keep the default 5ms window | Measured 4~5x fewer IO calls and higher throughput at the same time (2.14x at 10ms IO), easing database pressure |
 

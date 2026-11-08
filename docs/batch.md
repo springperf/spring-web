@@ -200,9 +200,6 @@ bizExecutor 线程池（0 ~ consumerSize 个；开虚拟线程时为虚拟线程
 | 慢 IO（> 50ms） | 5，或按需上调后压测 | 5ms 已能攒满 `maxBatchSize`；加大窗口的收益不稳定，先压测 |
 | 极致低延迟 | 0（显式关闭） | 单请求也要等满窗口，延迟敏感场景主动关闭 |
 
-> **关于 10ms 档**：部分平台（如 Windows 上的 `Object.wait(10)`）会把 10ms 窗口量化到约 15ms，实测吞吐明显低于
-> 5ms（10ms IO 档 0.93x vs 2.14x）。需要更大窗口时建议跳到 25ms 并自行压测，不要停在 10ms。
-
 显式把 `batchWindowMillis` 设为 0 时，启动期会为每个关闭窗口的队列打一条 WARN（列出队列名），提示该队列的批大小
 取决于 RingBuffer 瞬时积压、`maxBatchSize` 很难达到。未声明该参数的队列使用默认 5ms，不会再被告警；需要旧行为
 可显式写 `batchWindowMillis = 0`。
@@ -222,7 +219,7 @@ bizExecutor 线程池（0 ~ consumerSize 个；开虚拟线程时为虚拟线程
 | 50ms | 1061 | 1.37x | **1.54x** | 1.23x | 1.51x | 100 / 49（W0：12.3 / 258） |
 
 收益来自「批量消除 IO」：IO 次数普遍降 4~5 倍，p50 / p99 同步下降（20ms 档 p99 206 → 48ms）。W=3 与 W=5 的差别
-已接近基线噪声，但 W=5 在 10 / 20 / 50ms 三档都更高，故取 5 为默认值；W=10 明显回落，主要受平台定时粒度量化影响。
+已接近基线噪声，但 W=5 在 10 / 20 / 50ms 三档都更高，故取 5 为默认值。
 
 **低负载（并发 1~4）——等待是纯成本**：稀疏流量下第一个请求排完窗口任务后没有第二个请求来摊薄，只能等窗口到期。
 并发 1 / 10ms IO 下 W=5 的 QPS 约为关窗的 0.84x、p50 16 → 30ms（直方图分桶约 16ms 一档，与平均延迟口径不同）；并发 4 / 5ms IO 下约 0.76x。
@@ -236,7 +233,7 @@ bizExecutor 线程池（0 ~ consumerSize 个；开虚拟线程时为虚拟线程
 | 中高并发 + IO ≥ 10ms 提升吞吐 | **保持默认 5ms**，收益最明显 |
 | 低负载 + 极快 IO（< 5ms） | 显式设 0 或 2~3ms |
 | 极致低延迟 | 显式设 0 |
-| 想加大窗口到 10ms 以上 | 先压测；5ms 通常已攒满 `maxBatchSize`，10ms 档在部分平台会被量化放大 |
+| 想加大窗口到 10ms 以上 | 先压测；5ms 通常已攒满 `maxBatchSize` |
 
 ---
 
@@ -341,7 +338,7 @@ springperf.batch.consumer-size=4
 | 低延迟敏感 | `ringBufferSize=1024, maxBatchSize=50, waitStrategy=BUSY_SPIN, batchWindowMillis=0` | 关闭窗口省掉等待；小 buffer 减少排队，BUSY_SPIN 降低延迟。**开启 `spring.threads.virtual.enabled` 时改用 `BLOCKING`**：`BUSY_SPIN`/`YIELDING` 在虚拟线程上不会卸载，会长期占住载体线程 |
 | 资源受限（1c1g） | `ringBufferSize=4096, consumerSize=1` | 单消费者线程，省资源。批大小会自然偏大（消费慢→积压），可显式设 `batchWindowMillis=0` 省掉窗口调度线程 |
 | 批量 DB 查询 | `maxBatchSize=200, batchWindowMillis=5` | 多数数据库 IN 查询 200 条以内性能最佳；窗口让批大小趋近 200 |
-| 批量 RPC 调用 | `maxBatchSize=50, consumerSize=4`（窗口保持默认 5ms） | 多线程并行 RPC，单批不宜过大；5ms 已能攒满批，10ms 档在部分平台会被定时粒度放大 |
+| 批量 RPC 调用 | `maxBatchSize=50, consumerSize=4`（窗口保持默认 5ms） | 多线程并行 RPC，单批不宜过大；5ms 已能攒满批 |
 | 慢 IO（>50ms） | 窗口保持默认 5ms（需要更大批量时再试 25ms 并压测） | 实测 50ms IO 档 5ms 窗口吞吐 1.54x、批大小已到 100（满批），25ms 档跨轮测得 1.51~1.57x，与默认值差异在噪声内 |
 | 降低下游压力（IO <20ms） | 窗口保持默认 5ms | 实测 IO 次数降 4~5 倍、吞吐同时提升（10ms 档 2.14x），可减轻数据库压力 |
 
