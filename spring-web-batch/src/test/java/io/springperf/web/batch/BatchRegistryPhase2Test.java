@@ -1,11 +1,13 @@
 package io.springperf.web.batch;
 
 import io.springperf.web.batch.annotation.BatchMapping;
+import io.springperf.web.batch.common.BatchDefaults;
 import io.springperf.web.batch.common.BatchRequest;
 import io.springperf.web.batch.invoker.BatchInvoker;
 import io.springperf.web.batch.metrics.BatchMetrics;
 import io.springperf.web.batch.metrics.NoOpBatchMetrics;
 import io.springperf.web.batch.queue.DisruptorQueue;
+import io.springperf.web.context.ApplicationProperties;
 import io.springperf.web.context.WebContext;
 import io.springperf.web.core.mapping.MappingRegistry;
 import io.springperf.web.core.mapping.PathMappingContext;
@@ -14,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.method.HandlerMethod;
 
@@ -61,8 +64,20 @@ class BatchRegistryPhase2Test {
         }
     }
 
+    /** 不声明任何属性：全部走注解内置默认值，或由 {@code springperf.batch.*} 覆盖。 */
+    @Controller
+    public static class DefaultController {
+        @BatchMapping(method = "single")
+        public void batch(List<EchoRequest> requests) {
+        }
+
+        public void single(String data) {
+        }
+    }
+
     @Configuration
     static class TestConfig {
+
         @Bean
         public BatchController batchController() {
             return new BatchController();
@@ -172,9 +187,12 @@ class BatchRegistryPhase2Test {
 
     /**
      * 启动只装单个队列的 {@link BatchRegistry}，返回启动期是否出现窗口配置相关 WARN。
-     * 两个窗口用例共用同一套容器与 mock，避免重复搭建。
+     * 各窗口用例共用同一套容器与 mock，避免重复搭建。
+     *
+     * @param props
+     *            {@code springperf.batch.*} 全局配置；{@code null} 表示未接入配置（等价于全部内置默认值）
      */
-    private boolean windowWarningLogged(Class<?> controllerClass) throws Exception {
+    private boolean windowWarningLogged(Class<?> controllerClass, ApplicationProperties props) throws Exception {
         ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory
                 .getLogger(BatchRegistry.class);
         ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> appender = new ch.qos.logback.core.read.ListAppender<>();
@@ -188,6 +206,7 @@ class BatchRegistryPhase2Test {
 
             WebContext webContext = mock(WebContext.class);
             when(webContext.getCtx()).thenReturn(ctx);
+            when(webContext.getProps()).thenReturn(props);
             MappingRegistry mappingRegistry = mock(MappingRegistry.class);
             when(mappingRegistry.getMappingContextList()).thenReturn(Collections.singletonList(singleCtx));
             when(webContext.getWebComponent(MappingRegistry.class)).thenReturn(mappingRegistry);
@@ -208,6 +227,10 @@ class BatchRegistryPhase2Test {
         }
     }
 
+    private boolean windowWarningLogged(Class<?> controllerClass) throws Exception {
+        return windowWarningLogged(controllerClass, null);
+    }
+
     /** 显式 {@code batchWindowMillis=0} 关闭窗口后，{@code maxBatchSize} 很难达到，启动期应告警。 */
     @Test
     void initComponentPhase2_warnsWhenWindowExplicitlyDisabled() throws Exception {
@@ -220,6 +243,48 @@ class BatchRegistryPhase2Test {
     void initComponentPhase2_doesNotWarnWithDefaultWindow() throws Exception {
         assertFalse(windowWarningLogged(BatchController.class),
                 "未声明窗口的队列使用默认 5ms，不应触发窗口告警");
+    }
+
+    /** {@code springperf.batch.window-millis=0} 等于全局关闭窗口，同样必须告警——不能因为不是注解声明就沉默。 */
+    @Test
+    void initComponentPhase2_warnsWhenGlobalWindowDisabled() throws Exception {
+        ApplicationProperties props = new ApplicationProperties(
+                new MockEnvironment().withProperty(BatchDefaults.WINDOW_MILLIS, "0"));
+        assertTrue(windowWarningLogged(BatchController.class, props),
+                "全局关闭窗口后，未声明窗口的队列应照常告警");
+    }
+
+    /** {@code springperf.batch.*} 必须经 BatchRegistry 真正进入队列元数据（bufferSize 可观测）。 */
+    @Test
+    void initComponentPhase2_appliesGlobalDefaultsFromProps() throws Exception {
+        try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext()) {
+            ctx.registerBean(DefaultController.class);
+            ctx.refresh();
+            DefaultController bean = ctx.getBean(DefaultController.class);
+            PathMappingContext singleCtx = mappingFor(bean, "single", String.class);
+
+            WebContext webContext = mock(WebContext.class);
+            when(webContext.getCtx()).thenReturn(ctx);
+            when(webContext.getProps()).thenReturn(new ApplicationProperties(new MockEnvironment()
+                    .withProperty(BatchDefaults.RING_BUFFER_SIZE, "256")
+                    .withProperty(BatchDefaults.CONSUMER_SIZE, "1")));
+            MappingRegistry mappingRegistry = mock(MappingRegistry.class);
+            when(mappingRegistry.getMappingContextList()).thenReturn(Collections.singletonList(singleCtx));
+            when(webContext.getWebComponent(MappingRegistry.class)).thenReturn(mappingRegistry);
+            when(webContext.getWebComponent(BizPoolRegistry.class)).thenReturn(null);
+
+            BatchRegistry registry = new BatchRegistry();
+            registry.initWithWebContext(webContext);
+            try {
+                registry.initComponentPhase2();
+                DisruptorQueue queue = queuesOf(registry).get("batch:DefaultController.batch");
+                assertNotNull(queue, "全局键不应影响队列安装");
+                assertEquals(256, queue.bufferSize(),
+                        "springperf.batch.ring-buffer-size 应覆盖未声明 ringBufferSize 的队列");
+            } finally {
+                registry.destroyComponent();
+            }
+        }
     }
 
     @Test
