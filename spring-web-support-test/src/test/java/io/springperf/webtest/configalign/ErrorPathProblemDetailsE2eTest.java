@@ -109,8 +109,7 @@ class ErrorPathProblemDetailsE2eTest {
             String contentType = resp.header("Content-Type", "");
             String body = resp.body().string();
             assertEquals(404, resp.code(), body);
-            assertTrue(contentType.startsWith("application/problem+json"),
-                    "404 也应走 problem+json，实际 " + contentType);
+            assertTrue(contentType.startsWith("application/problem+json"), "404 也应走 problem+json，实际 " + contentType);
             // 方法名承诺的是 problem+json 响应体：解析字段值，不能只校验 Content-Type
             JsonNode json = new ObjectMapper().readTree(body);
             assertEquals(404, json.path("status").asInt(), "problem+json 的 status 应为 404，实际 " + body);

@@ -135,8 +135,7 @@ public class StaticResourceSecurityTest extends BaseE2ETest {
                 .post(okhttp3.RequestBody.create("", okhttp3.MediaType.parse("text/plain; charset=utf-8"))).build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(405, resp.code(), "静态资源 POST 应返回 405 Method Not Allowed");
-            assertEquals("GET", resp.header("Allow"),
-                    "静态资源 405 应返回 Allow 头，实际响应头: " + resp.headers());
+            assertEquals("GET", resp.header("Allow"), "静态资源 405 应返回 Allow 头，实际响应头: " + resp.headers());
         }
     }
 
@@ -167,8 +166,7 @@ public class StaticResourceSecurityTest extends BaseE2ETest {
         Request req = new Request.Builder().url(base() + "/static/test.txt").delete().build();
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(405, resp.code(), "静态资源 DELETE 应返回 405");
-            assertEquals("GET", resp.header("Allow"),
-                    "静态资源 405 应返回 Allow 头，实际响应头: " + resp.headers());
+            assertEquals("GET", resp.header("Allow"), "静态资源 405 应返回 Allow 头，实际响应头: " + resp.headers());
         }
     }
 }

@@ -33,8 +33,8 @@ class SpringWebAutoConfigurationTest {
     /** 用 mock 替换 NettyHttpServer / Validator，避免单测真的启动端口或探测 Bean Validation 实现。 */
     private final ApplicationContextRunner guardRunner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(SpringWebAutoConfiguration.class))
-            .withBean("nettyHttpServer", NettyHttpServer.class, () -> mock(NettyHttpServer.class))
-            .withBean("validator", org.springframework.validation.Validator.class,
+            .withBean("nettyHttpServer", NettyHttpServer.class, () -> mock(NettyHttpServer.class)).withBean("validator",
+                    org.springframework.validation.Validator.class,
                     () -> mock(org.springframework.validation.Validator.class));
 
     @Test
@@ -167,8 +167,7 @@ class SpringWebAutoConfigurationTest {
         IllegalStateException ex = assertThrows(IllegalStateException.class,
                 () -> SpringWebAutoConfiguration.assertNoSpringMvcConflict(true));
         assertTrue(ex.getMessage().contains("DispatcherServlet"));
-        assertTrue(ex.getMessage().contains(SpringWebAutoConfiguration.MVC_CONFLICT_CHECK_PROPERTY),
-                "报错必须告知用户如何关闭守卫");
+        assertTrue(ex.getMessage().contains(SpringWebAutoConfiguration.MVC_CONFLICT_CHECK_PROPERTY), "报错必须告知用户如何关闭守卫");
     }
 
     @Test

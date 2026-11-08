@@ -315,8 +315,7 @@ class DynamicRegistrationTest {
     void filterAddMapping_rejectsNullOrEmptyUrlPatterns() {
         FilterRegistration.Dynamic registration = servletContext.addFilter("f", new TrackingFilter());
 
-        assertThrows(IllegalArgumentException.class,
-                () -> registration.addMappingForUrlPatterns(null, true));
+        assertThrows(IllegalArgumentException.class, () -> registration.addMappingForUrlPatterns(null, true));
         assertThrows(IllegalArgumentException.class,
                 () -> registration.addMappingForUrlPatterns(null, true, (String[]) null));
     }
@@ -387,8 +386,7 @@ class DynamicRegistrationTest {
     void filterAddMapping_multipleDispatcherTypesIsUnsupported() {
         FilterRegistration.Dynamic registration = servletContext.addFilter("f", new TrackingFilter());
 
-        assertThrows(UnsupportedOperationException.class,
-                () -> registration.addMappingForUrlPatterns(
-                        EnumSet.of(DispatcherType.REQUEST, DispatcherType.FORWARD), true, "/d"));
+        assertThrows(UnsupportedOperationException.class, () -> registration
+                .addMappingForUrlPatterns(EnumSet.of(DispatcherType.REQUEST, DispatcherType.FORWARD), true, "/d"));
     }
 }

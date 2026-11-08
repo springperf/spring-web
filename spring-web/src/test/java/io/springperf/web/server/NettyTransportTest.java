@@ -28,8 +28,7 @@ class NettyTransportTest {
     @Test
     void useEpoll_auto_followsEpollAvailability() {
         // 原实现在支持 epoll 的平台直接 return，等于零断言；auto 语义应与可用性一致
-        assertEquals(NettyTransport.isEpollAvailable(), NettyTransport.useEpoll("auto"),
-                "auto 模式必须跟随 epoll 实际可用性");
+        assertEquals(NettyTransport.isEpollAvailable(), NettyTransport.useEpoll("auto"), "auto 模式必须跟随 epoll 实际可用性");
     }
 
     @Test

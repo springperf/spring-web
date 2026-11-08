@@ -24,37 +24,29 @@ import java.util.Set;
 
 /**
  * 管理端口服务器的启动期不可变配置快照。
- *
  * <p>
- * <b>配置语义（对齐 Spring Boot 的「默认继承 + 窄覆盖」模型）</b>：管理端口默认与主服务器使用完全相同的
- * {@code server.*} 配置；仅当显式配置白名单内的 {@code management.server.*} 键时才覆盖该值。解析规则统一为
- * {@code management.server.X → server.X → 框架默认值}，由一个带覆盖属性源的 scoped {@link Environment} 实现，
- * 不为每个配置键单独写分支。
+ * <b>配置语义（对齐 Spring Boot 的「默认继承 + 窄覆盖」模型）</b>：管理端口默认与主服务器使用完全相同的 {@code server.*} 配置；仅当显式配置白名单内的
+ * {@code management.server.*} 键时才覆盖该值。解析规则统一为 {@code management.server.X → server.X → 框架默认值}，由一个带覆盖属性源的 scoped
+ * {@link Environment} 实现， 不为每个配置键单独写分支。
  * </p>
- *
  * <p>
  * <b>作用域分层</b>：
  * </p>
  * <ul>
  * <li>L1（公开可覆盖）：port / address / ssl.* / max-content-length / max-connections / shutdown.grace-period；</li>
- * <li>L2（允许但不宣传，协议栈参数）：http2.enabled / netty.transport / compression.* / keep-alive / 各类 HTTP 限制。
- * 同一开关的所有消费点（ALPN 与 HTTP/2 管线）必须读本快照的同一个字段；</li>
+ * <li>L2（允许但不宣传，协议栈参数）：http2.enabled / netty.transport / compression.* / keep-alive / 各类 HTTP 限制。 同一开关的所有消费点（ALPN 与
+ * HTTP/2 管线）必须读本快照的同一个字段；</li>
  * <li>L3（禁止覆盖）：最终落到共享 {@code WebContext} 单例上的键（如 {@code server.http.timeout}、
- * {@code server.max-parameter-count}、{@code server.servlet.*}、{@code pool.*}）。这类键配置了
- * {@code management.server.*} 镜像时，{@link #validate(Environment)} 在启动期直接抛出
- * {@link IllegalStateException}，避免「配置写了但静默不生效」。</li>
+ * {@code server.max-parameter-count}、{@code server.servlet.*}、{@code pool.*}）。这类键配置了 {@code management.server.*}
+ * 镜像时，{@link #validate(Environment)} 在启动期直接抛出 {@link IllegalStateException}，避免「配置写了但静默不生效」。</li>
  * </ul>
- *
  * <p>
- * <b>SSL 开关同样遵循回退</b>：{@code management.server.ssl.enabled} 未配置时继承
- * {@code server.ssl.enabled}。因此主服务器显式关闭 SSL、但管理端口需要 HTTPS 时，必须显式配置
- * {@code management.server.ssl.enabled=true} 并给出管理侧证书；仅配置证书不足以覆盖继承来的关闭开关。
+ * <b>SSL 开关同样遵循回退</b>：{@code management.server.ssl.enabled} 未配置时继承 {@code server.ssl.enabled}。因此主服务器显式关闭 SSL、但管理端口需要
+ * HTTPS 时，必须显式配置 {@code management.server.ssl.enabled=true} 并给出管理侧证书；仅配置证书不足以覆盖继承来的关闭开关。
  * </p>
- *
  * <p>
- * <b>生命周期</b>：本快照在 bean 创建期一次性解析并固化，Spring Cloud 的
- * {@code EnvironmentChangeEvent} 只会清空共享 {@code WebContext} 的配置缓存，<b>不会</b>重建服务器级配置
- * （port / SSL / EventLoop 线程数 / 管线限制等），变更这些配置需要重启应用。
+ * <b>生命周期</b>：本快照在 bean 创建期一次性解析并固化，Spring Cloud 的 {@code EnvironmentChangeEvent} 只会清空共享 {@code WebContext}
+ * 的配置缓存，<b>不会</b>重建服务器级配置 （port / SSL / EventLoop 线程数 / 管线限制等），变更这些配置需要重启应用。
  * </p>
  */
 public final class ManagementServerSettings {
@@ -159,8 +151,8 @@ public final class ManagementServerSettings {
     /**
      * L3 fail-fast：拒绝「镜像了 {@code server.*} 键、但管理服务器无法独立承载」的覆盖。
      * <p>
-     * 只检查与 {@link PropertiesConstant} 中已知 {@code server.*} 键同名的后缀，Spring Boot 自有的
-     * {@code management.server.*} 键（如 {@code add-application-context-header}）不在其中，不会被误伤。
+     * 只检查与 {@link PropertiesConstant} 中已知 {@code server.*} 键同名的后缀，Spring Boot 自有的 {@code management.server.*} 键（如
+     * {@code add-application-context-header}）不在其中，不会被误伤。
      * </p>
      */
     static void validate(Environment environment) {
@@ -204,9 +196,8 @@ public final class ManagementServerSettings {
     }
 
     /**
-     * 构造「管理覆盖优先、主服务器兜底」的 Environment：覆盖属性源在最前，随后是应用原始属性源。
-     * 覆盖源未命中时返回 null，{@link org.springframework.core.env.PropertySourcesPropertyResolver} 会继续查找
-     * 后面的 {@code server.X}，从而实现缺省继承。
+     * 构造「管理覆盖优先、主服务器兜底」的 Environment：覆盖属性源在最前，随后是应用原始属性源。 覆盖源未命中时返回
+     * null，{@link org.springframework.core.env.PropertySourcesPropertyResolver} 会继续查找 后面的 {@code server.X}，从而实现缺省继承。
      */
     private static Environment scopedEnvironment(Environment environment) {
         StandardEnvironment scoped = new StandardEnvironment();
@@ -256,8 +247,8 @@ public final class ManagementServerSettings {
     /**
      * 把白名单内的 {@code server.X} 查询映射到 {@code management.server.X}；未配置返回 null 以继续回退。
      * <p>
-     * 必须实现 {@link EnumerablePropertySource}：Spring Boot {@code Binder} 绑定聚合对象（如 {@code Ssl}）时
-     * 需要枚举 {@code server.ssl.*} 属性名，非可枚举源会让绑定结果为空、管理端口 SSL 静默失效。
+     * 必须实现 {@link EnumerablePropertySource}：Spring Boot {@code Binder} 绑定聚合对象（如 {@code Ssl}）时 需要枚举 {@code server.ssl.*}
+     * 属性名，非可枚举源会让绑定结果为空、管理端口 SSL 静默失效。
      * </p>
      */
     private static final class ManagementOverridePropertySource extends EnumerablePropertySource<Object> {

@@ -100,8 +100,8 @@ public class PerfIoController {
 
     /**
      * 窗口攒批配置：{@code consumerSize=8}（复用多核，不超配）+ {@code batchWindowMillis=2}（批大小由窗口保证）。 2ms 也是
-     * {@link io.springperf.web.batch.annotation.BatchMapping#batchWindowMillis()} 的默认值，这里显式写出以标明实验变量：
-     * 远小于 10ms 以上的 IO 延迟，等待成本低于攒批收益。
+     * {@link io.springperf.web.batch.annotation.BatchMapping#batchWindowMillis()} 的默认值，这里显式写出以标明实验变量： 远小于 10ms 以上的 IO
+     * 延迟，等待成本低于攒批收益。
      */
     @BatchMapping(method = "batchWindow", maxBatchSize = 100, ringBufferSize = 8192, batchWindowMillis = 2, consumerSize = 8)
     public void batchWindowFind(List<PerfIoRequest> requests) {

@@ -240,8 +240,7 @@ class BufferingBatchHandlerWindowTest {
         // 模拟无窗口队列停机：真实路径是 shutdown() → flushRemaining()（空）→ closeWindow()
         noWindow.closeWindow();
 
-        assertTrue(windowFlushed.await(2, TimeUnit.SECONDS),
-                "其他队列的窗口任务不应被无窗口队列的停机关停");
+        assertTrue(windowFlushed.await(2, TimeUnit.SECONDS), "其他队列的窗口任务不应被无窗口队列的停机关停");
         assertThat(submitted).hasValue(1);
     }
 
@@ -267,19 +266,15 @@ class BufferingBatchHandlerWindowTest {
         second.onEvent(newEvent(request()), 0L, true);
 
         // 用独立计数 + 闩锁，排除第一个 handler 的提交对断言的干扰
-        assertTrue(secondFlushed.await(2, TimeUnit.SECONDS),
-                "重复 closeWindow 后，后续队列的窗口任务仍应被执行");
+        assertTrue(secondFlushed.await(2, TimeUnit.SECONDS), "重复 closeWindow 后，后续队列的窗口任务仍应被执行");
         assertThat(secondSubmitted).hasValue(1);
     }
 
     /**
-     * 精度回归：{@code ScheduledThreadPoolExecutor} 内部基于 {@code LockSupport.parkNanos}，
-     * 小窗口（1~10ms）的到期精度不足，使 {@code batchWindowMillis=3/5} 名存实亡。
-     * 改用 {@code Timer} 后窗口按标称值到期。
+     * 精度回归：{@code ScheduledThreadPoolExecutor} 内部基于 {@code LockSupport.parkNanos}， 小窗口（1~10ms）的到期精度不足，使
+     * {@code batchWindowMillis=3/5} 名存实亡。 改用 {@code Timer} 后窗口按标称值到期。
      * <p>
-     * 取多次采样的中位数，排除偶发线程调度抖动；阈值取标称值的 4 倍，既留出足够的调度抖动余量，
-     * 又能挡住「小窗口被粗粒度定时器向上取整」这类实现退化。
-     * 中位数会打印到测试输出，便于对照不同环境下的实际到期精度。
+     * 取多次采样的中位数，排除偶发线程调度抖动；阈值取标称值的 4 倍，既留出足够的调度抖动余量， 又能挡住「小窗口被粗粒度定时器向上取整」这类实现退化。 中位数会打印到测试输出，便于对照不同环境下的实际到期精度。
      * </p>
      */
     @Test
@@ -302,16 +297,13 @@ class BufferingBatchHandlerWindowTest {
         elapsedMillis.sort(Long::compareTo);
         long median = elapsedMillis.get(elapsedMillis.size() / 2);
         System.out.println("[batch-window] 3ms window: median expiry " + median + "ms, samples " + elapsedMillis);
-        assertThat(median).as("3ms 窗口到期中位数应远小于标称值的 4 倍：%s", elapsedMillis)
-                .isLessThan(12L);
+        assertThat(median).as("3ms 窗口到期中位数应远小于标称值的 4 倍：%s", elapsedMillis).isLessThan(12L);
     }
 
     /**
-     * Timer 线程不捕获任务异常：任一未捕获异常都会终止整个共享调度线程，
-     * 导致其他队列的窗口任务永不到期。TimerTask#run 必须自行收敛 {@code Throwable}。
+     * Timer 线程不捕获任务异常：任一未捕获异常都会终止整个共享调度线程， 导致其他队列的窗口任务永不到期。TimerTask#run 必须自行收敛 {@code Throwable}。
      * <p>
-     * 若收敛失效，后续队列的 {@code schedule()} 会抛 {@code IllegalStateException}
-     * 并走「立即刷出」兜底，因此除了断言任务最终触发，还要断言它确实等过了窗口期，
+     * 若收敛失效，后续队列的 {@code schedule()} 会抛 {@code IllegalStateException} 并走「立即刷出」兜底，因此除了断言任务最终触发，还要断言它确实等过了窗口期，
      * 否则无法与「调度线程已死」区分开。
      * </p>
      */
@@ -331,10 +323,7 @@ class BufferingBatchHandlerWindowTest {
         long start = System.nanoTime();
         healthy.onEvent(newEvent(request()), 0L, true);
 
-        assertTrue(later.await(2, TimeUnit.SECONDS),
-                "窗口任务异常后共享调度线程仍应存活，后续队列的窗口任务应正常到期");
-        assertThat((System.nanoTime() - start) / 1_000_000L)
-                .as("后续队列应等满窗口，而不是因调度器失效被立即刷出")
-                .isGreaterThanOrEqualTo(10L);
+        assertTrue(later.await(2, TimeUnit.SECONDS), "窗口任务异常后共享调度线程仍应存活，后续队列的窗口任务应正常到期");
+        assertThat((System.nanoTime() - start) / 1_000_000L).as("后续队列应等满窗口，而不是因调度器失效被立即刷出").isGreaterThanOrEqualTo(10L);
     }
 }

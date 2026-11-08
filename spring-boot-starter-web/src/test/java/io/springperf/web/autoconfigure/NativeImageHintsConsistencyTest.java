@@ -26,27 +26,41 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * 双轨可达性元数据对照台账（可执行版）。
  * <p>
- * 全仓只有 starter 带静态 {@code META-INF/native-image/.../*.json}；核心模块没有。
- * 其中约 70 条 {@code io.springperf.web.core.*} registry/resolver/provider 是 AOT 无法自动发现的反射基线，
- * 而 {@code ControllerBeanFactoryInitializationAotProcessor} 只按 BeanFactory 补用户 Controller/DTO。
- * 因此两轨是<b>互补</b>关系，不是「以 RuntimeHints 为唯一权威」：
+ * 全仓只有 starter 带静态 {@code META-INF/native-image/.../*.json}；核心模块没有。 其中约 70 条 {@code io.springperf.web.core.*}
+ * registry/resolver/provider 是 AOT 无法自动发现的反射基线， 而 {@code ControllerBeanFactoryInitializationAotProcessor} 只按
+ * BeanFactory 补用户 Controller/DTO。 因此两轨是<b>互补</b>关系，不是「以 RuntimeHints 为唯一权威」：
  * </p>
- *
  * <table border="1">
  * <caption>静态 json ↔ Spring AOT 动态 hints</caption>
- * <tr><th>类别</th><th>仅静态 json</th><th>仅 AOT 动态</th><th>两轨重叠（有意保留兜底）</th></tr>
- * <tr><td>反射</td><td>框架内部类、SPI provider</td>
- *     <td>{@code PerfWebServer*} / {@code ListenableFuture*} / 用户 Controller+DTO</td><td>—</td></tr>
- * <tr><td>代理</td><td>10 个框架 SPI 接口</td><td>{@code ListenableFutureCallback}</td>
- *     <td>{@code WebServerApplicationContext + ConfigurableApplicationContext}</td></tr>
- * <tr><td>资源</td><td>{@code spring.factories}、{@code .imports}、配置文件</td>
- *     <td>按实际文件枚举的模板/静态资源</td><td>配置元数据、四个资源目录</td></tr>
+ * <tr>
+ * <th>类别</th>
+ * <th>仅静态 json</th>
+ * <th>仅 AOT 动态</th>
+ * <th>两轨重叠（有意保留兜底）</th>
+ * </tr>
+ * <tr>
+ * <td>反射</td>
+ * <td>框架内部类、SPI provider</td>
+ * <td>{@code PerfWebServer*} / {@code ListenableFuture*} / 用户 Controller+DTO</td>
+ * <td>—</td>
+ * </tr>
+ * <tr>
+ * <td>代理</td>
+ * <td>10 个框架 SPI 接口</td>
+ * <td>{@code ListenableFutureCallback}</td>
+ * <td>{@code WebServerApplicationContext + ConfigurableApplicationContext}</td>
+ * </tr>
+ * <tr>
+ * <td>资源</td>
+ * <td>{@code spring.factories}、{@code .imports}、配置文件</td>
+ * <td>按实际文件枚举的模板/静态资源</td>
+ * <td>配置元数据、四个资源目录</td>
+ * </tr>
  * </table>
  * <p>
- * 重叠项（事件代理、资源目录）保留为双保险：Spring Boot native 构建始终经 {@code process-aot}，
- * 静态配置与 AOT 生成配置同时生效，不删以免改变既有行为。静态 reflect 中的 4 个
- * {@code *AutoConfiguration} 条目已删除——批次 B 把 15 个类统一为 {@code @AutoConfiguration} 后，
- * AOT 会为 bean 定义生成构造代码，手工留 4/15 既不全又制造「已覆盖」的错觉。
+ * 重叠项（事件代理、资源目录）保留为双保险：Spring Boot native 构建始终经 {@code process-aot}， 静态配置与 AOT 生成配置同时生效，不删以免改变既有行为。静态 reflect 中的 4 个
+ * {@code *AutoConfiguration} 条目已删除——批次 B 把 15 个类统一为 {@code @AutoConfiguration} 后， AOT 会为 bean 定义生成构造代码，手工留 4/15
+ * 既不全又制造「已覆盖」的错觉。
  * </p>
  */
 @SuppressWarnings({ "deprecation", "removal" })
@@ -54,8 +68,7 @@ class NativeImageHintsConsistencyTest {
 
     private static final String BASE_PATH = "META-INF/native-image/io.github.springperf/spring-boot-starter-web";
 
-    private static final String IMPORTS_PATH =
-            "META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports";
+    private static final String IMPORTS_PATH = "META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports";
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -95,10 +108,8 @@ class NativeImageHintsConsistencyTest {
     @Test
     void staticOnlyFrameworkSpiInterfaces_areNotRegisteredByRuntimeHints() throws Exception {
         List<String> staticProxies = proxyConfig().stream().flatMap(List::stream).toList();
-        assertTrue(staticProxies.contains(WebComponent.class.getName()),
-                "proxy-config.json 缺少框架 SPI 接口基线");
-        assertFalse(hasProxy(registerHints(), WebComponent.class),
-                "WebComponent 代理应由静态 json 独占，避免两轨重复维护");
+        assertTrue(staticProxies.contains(WebComponent.class.getName()), "proxy-config.json 缺少框架 SPI 接口基线");
+        assertFalse(hasProxy(registerHints(), WebComponent.class), "WebComponent 代理应由静态 json 独占，避免两轨重复维护");
     }
 
     /** 静态侧独占：AOT 无法自动发现框架内部 registry/resolver，必须由静态 reflect 覆盖。 */
@@ -107,8 +118,7 @@ class NativeImageHintsConsistencyTest {
         List<String> staticReflect = reflectNames();
         RuntimeHints hints = registerHints();
         for (String name : List.of("io.springperf.web.core.DispatcherHandler",
-                "io.springperf.web.core.mapping.MappingRegistry",
-                "io.springperf.web.core.arg.ArgumentResolverRegistry",
+                "io.springperf.web.core.mapping.MappingRegistry", "io.springperf.web.core.arg.ArgumentResolverRegistry",
                 "io.springperf.web.core.retval.ReturnValueResolverRegistry")) {
             assertTrue(staticReflect.contains(name), "静态 reflect-config 缺少框架内部类: " + name);
             assertFalse(hasReflection(hints, name), name + " 不应由 RuntimeHints 重复注册");
@@ -121,8 +131,7 @@ class NativeImageHintsConsistencyTest {
         List<String> staticReflect = reflectNames();
         List<String> registered = imports();
         List<String> duplicates = staticReflect.stream().filter(registered::contains).toList();
-        assertTrue(duplicates.isEmpty(),
-                "自动配置类的构造提示由 process-aot 生成，静态 reflect-config.json 不应重复登记: " + duplicates);
+        assertTrue(duplicates.isEmpty(), "自动配置类的构造提示由 process-aot 生成，静态 reflect-config.json 不应重复登记: " + duplicates);
     }
 
     private RuntimeHints registerHints() {
@@ -141,8 +150,7 @@ class NativeImageHintsConsistencyTest {
     }
 
     private static boolean hasReflection(RuntimeHints hints, String typeName) {
-        return hints.reflection().typeHints().map(TypeHint::getType)
-                .anyMatch(t -> t.getName().equals(typeName));
+        return hints.reflection().typeHints().map(TypeHint::getType).anyMatch(t -> t.getName().equals(typeName));
     }
 
     private List<List<String>> proxyConfig() throws Exception {

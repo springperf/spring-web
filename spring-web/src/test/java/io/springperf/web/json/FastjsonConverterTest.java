@@ -38,8 +38,7 @@ class FastjsonConverterTest {
         String payload = "{\"@type\":\"java.lang.Runtime\"}";
 
         com.alibaba.fastjson2.JSONException ex = assertThrows(com.alibaba.fastjson2.JSONException.class,
-                () -> converter.fromJson(payload, Object.class),
-                "含 @type 的载荷应被拒绝（ErrorOnNotSupportAutoType）");
+                () -> converter.fromJson(payload, Object.class), "含 @type 的载荷应被拒绝（ErrorOnNotSupportAutoType）");
         assertNotNull(ex.getMessage(), "拒绝原因不应为空");
     }
 
@@ -52,8 +51,7 @@ class FastjsonConverterTest {
         Map<?, ?> result = (Map<?, ?>) converter.fromJson(payload, Map.class);
 
         assertEquals("v", result.get("k"), "普通字段必须正常解析");
-        assertFalse(result.values().stream().anyMatch(v -> v instanceof ProcessBuilder),
-                "@type 不得导致任意类型实例化");
+        assertFalse(result.values().stream().anyMatch(v -> v instanceof ProcessBuilder), "@type 不得导致任意类型实例化");
     }
 
     @Test
@@ -165,8 +163,7 @@ class FastjsonConverterTest {
     void fromJson_invalidJson_throwsException() {
         FastjsonConverter converter = new FastjsonConverter();
 
-        assertThrows(com.alibaba.fastjson2.JSONException.class,
-                () -> converter.fromJson("{invalid}", Map.class));
+        assertThrows(com.alibaba.fastjson2.JSONException.class, () -> converter.fromJson("{invalid}", Map.class));
         assertThrows(com.alibaba.fastjson2.JSONException.class,
                 () -> converter.fromJson("{invalid}".getBytes(), Map.class));
     }

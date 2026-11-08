@@ -98,8 +98,7 @@ class NettyHttpServerStartTest {
                     public void handlerAdded(io.netty.channel.ChannelHandlerContext ctx) {
                         handlerAdded.countDown();
                     }
-                })
-                .addAfterAggregator(new io.netty.channel.ChannelInboundHandlerAdapter() {
+                }).addAfterAggregator(new io.netty.channel.ChannelInboundHandlerAdapter() {
                     @Override
                     public void handlerAdded(io.netty.channel.ChannelHandlerContext ctx) {
                         handlerAdded.countDown();

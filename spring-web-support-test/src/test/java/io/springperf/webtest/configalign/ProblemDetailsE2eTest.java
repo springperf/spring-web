@@ -43,7 +43,8 @@ class ProblemDetailsE2eTest {
             assertTrue(contentType.startsWith("application/problem+json"),
                     "problemdetails 开启后错误响应应为 RFC 7807，实际 " + contentType);
             // 解析 JSON 校验字段值，而不是「含 "status" 字样且某处出现 500」
-            com.fasterxml.jackson.databind.JsonNode json = new com.fasterxml.jackson.databind.ObjectMapper().readTree(body);
+            com.fasterxml.jackson.databind.JsonNode json = new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readTree(body);
             assertEquals(500, json.path("status").asInt(), "problem+json 的 status 应为 500，实际 " + body);
             assertTrue(json.path("title").isTextual(), "problem+json 应含 title 字段，实际 " + body);
         } finally {
@@ -62,7 +63,8 @@ class ProblemDetailsE2eTest {
             assertTrue(contentType.startsWith("application/problem+json"),
                     "404 也应渲染为 problem+json，实际 " + contentType + " body=" + body);
             // 方法名承诺的是 problem+json 响应体，不能只校验 Content-Type
-            com.fasterxml.jackson.databind.JsonNode json = new com.fasterxml.jackson.databind.ObjectMapper().readTree(body);
+            com.fasterxml.jackson.databind.JsonNode json = new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readTree(body);
             assertEquals(404, json.path("status").asInt(), "problem+json 的 status 应为 404，实际 " + body);
             assertTrue(json.path("title").isTextual(), "problem+json 应含 title 字段，实际 " + body);
         } finally {

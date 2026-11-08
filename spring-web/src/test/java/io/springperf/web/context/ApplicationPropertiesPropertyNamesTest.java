@@ -28,11 +28,10 @@ class ApplicationPropertiesPropertyNamesTest {
 
     @Test
     void getPropertyNames_filtersByPrefixAndDeduplicatesAcrossSources() {
-        MockEnvironment env = new MockEnvironment()
-                .withProperty(PREFIX + "alpha", "1")
-                .withProperty("unrelated.key", "x");
-        env.getPropertySources().addFirst(new MapPropertySource("second",
-                Map.of(PREFIX + "alpha", "2", PREFIX + "beta", "3")));
+        MockEnvironment env = new MockEnvironment().withProperty(PREFIX + "alpha", "1").withProperty("unrelated.key",
+                "x");
+        env.getPropertySources()
+                .addFirst(new MapPropertySource("second", Map.of(PREFIX + "alpha", "2", PREFIX + "beta", "3")));
 
         List<String> names = with(env).getPropertyNames(PREFIX);
 
@@ -80,8 +79,7 @@ class ApplicationPropertiesPropertyNamesTest {
 
     @Test
     void clearCache_badMaxParameterCount_keepsOldValueAndRefreshesOtherFields() {
-        MockEnvironment env = new MockEnvironment()
-                .withProperty(PropertiesConstant.SERVER_MAX_PARAMETER_COUNT, "100")
+        MockEnvironment env = new MockEnvironment().withProperty(PropertiesConstant.SERVER_MAX_PARAMETER_COUNT, "100")
                 .withProperty(PropertiesConstant.HTTP_TIMEOUT, "10s")
                 .withProperty(PropertiesConstant.HTTP_MAX_IN_MEMORY_SIZE, "1024");
         ApplicationProperties props = with(env);
@@ -99,8 +97,7 @@ class ApplicationPropertiesPropertyNamesTest {
 
     @Test
     void clearCache_badDuration_keepsOldValueAndRefreshesOtherFields() {
-        MockEnvironment env = new MockEnvironment()
-                .withProperty(PropertiesConstant.SERVER_MAX_PARAMETER_COUNT, "100")
+        MockEnvironment env = new MockEnvironment().withProperty(PropertiesConstant.SERVER_MAX_PARAMETER_COUNT, "100")
                 .withProperty(PropertiesConstant.HTTP_TIMEOUT, "10s")
                 .withProperty(PropertiesConstant.HTTP_MAX_IN_MEMORY_SIZE, "1024");
         ApplicationProperties props = with(env);
@@ -118,8 +115,7 @@ class ApplicationPropertiesPropertyNamesTest {
 
     @Test
     void clearCache_badMaxInMemorySize_keepsOldValueAndRefreshesOtherFields() {
-        MockEnvironment env = new MockEnvironment()
-                .withProperty(PropertiesConstant.SERVER_MAX_PARAMETER_COUNT, "100")
+        MockEnvironment env = new MockEnvironment().withProperty(PropertiesConstant.SERVER_MAX_PARAMETER_COUNT, "100")
                 .withProperty(PropertiesConstant.HTTP_TIMEOUT, "10s")
                 .withProperty(PropertiesConstant.HTTP_MAX_IN_MEMORY_SIZE, "1024");
         ApplicationProperties props = with(env);

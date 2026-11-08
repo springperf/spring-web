@@ -105,8 +105,8 @@ public class ServletBridgeTestController {
     }
 
     /**
-     * {@code StreamingResponseBody}：经 Callable 通道执行 {@code writeTo}，字节走既有 StreamSender 通道，
-     * 由 {@code StreamingResponseBodyReturnValueResolver} 认领（见 ServletBridgeSseE2eTest）。
+     * {@code StreamingResponseBody}：经 Callable 通道执行 {@code writeTo}，字节走既有 StreamSender 通道， 由
+     * {@code StreamingResponseBodyReturnValueResolver} 认领（见 ServletBridgeSseE2eTest）。
      */
     @GetMapping(value = "/streaming-response-body", produces = "text/plain;charset=UTF-8")
     public org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody streamingResponseBody() {
@@ -119,8 +119,7 @@ public class ServletBridgeTestController {
     /**
      * 大流量：N 帧 × 1000 字节，每帧前 4 字节为大端帧号、其余填充 {@code 'x'}。
      * <p>
-     * 帧号让客户端能逐帧校验「顺序 + 偏移 + 无丢帧」——单纯全填充同一字节时，帧顺序错乱或复用缓冲
-     * 覆盖内容都无法被察觉。
+     * 帧号让客户端能逐帧校验「顺序 + 偏移 + 无丢帧」——单纯全填充同一字节时，帧顺序错乱或复用缓冲 覆盖内容都无法被察觉。
      * </p>
      */
     @GetMapping(value = "/streaming-response-body-large", produces = "application/octet-stream")
@@ -140,8 +139,8 @@ public class ServletBridgeTestController {
     }
 
     /**
-     * 写出任何字节之前抛异常。响应头已由 {@code flushChunked()} 提交，只能关连接
-     * （客户端见 200 + 截断）——这是复用 {@code StreamSender} 的既定语义，与 SSE / Flux 一致。
+     * 写出任何字节之前抛异常。响应头已由 {@code flushChunked()} 提交，只能关连接 （客户端见 200 + 截断）——这是复用 {@code StreamSender} 的既定语义，与 SSE / Flux
+     * 一致。
      */
     @GetMapping(value = "/streaming-response-body-throw-before", produces = "text/plain;charset=UTF-8")
     public org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody streamingResponseBodyThrowBefore() {
@@ -177,8 +176,7 @@ public class ServletBridgeTestController {
     /**
      * 慢速长流（每 5ms 一帧 8KB，最长约 10s）：供「客户端提前断开」用例使用。
      * <p>
-     * 客户端关闭后，下一次 {@code sendFrame} 必须尽快失败并让异步引用归零——不能把整个流「写」完
-     * （全部丢弃、CPU 空转），也不能卡在背压自旋里。
+     * 客户端关闭后，下一次 {@code sendFrame} 必须尽快失败并让异步引用归零——不能把整个流「写」完 （全部丢弃、CPU 空转），也不能卡在背压自旋里。
      * </p>
      */
     @GetMapping(value = "/streaming-response-body-slow", produces = "application/octet-stream")
@@ -201,8 +199,7 @@ public class ServletBridgeTestController {
     /** {@code ResponseEntity} 形态：status/headers 必须生效。 */
     @GetMapping("/streaming-response-body-entity")
     public org.springframework.http.ResponseEntity<org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody> streamingResponseBodyEntity() {
-        return org.springframework.http.ResponseEntity.status(201)
-                .header("X-Srb", "yes")
+        return org.springframework.http.ResponseEntity.status(201).header("X-Srb", "yes")
                 .contentType(org.springframework.http.MediaType.TEXT_PLAIN)
                 .body(out -> out.write("entity-srb".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
     }
@@ -283,8 +280,8 @@ public class ServletBridgeTestController {
     }
 
     /**
-     * 只验证 Servlet 响应 API 本身：显式 setContentType 后由 Servlet 侧自行写出 getContentType() 回读值，
-     * 返回 void，避免「显式 Content-Type + @ResponseBody 返回值」两种语义叠加导致返回值被丢弃。
+     * 只验证 Servlet 响应 API 本身：显式 setContentType 后由 Servlet 侧自行写出 getContentType() 回读值， 返回 void，避免「显式 Content-Type
+     * + @ResponseBody 返回值」两种语义叠加导致返回值被丢弃。
      */
     @PostMapping("/content-type")
     public void setContentType(@RequestBody Map<String, String> body, HttpServletResponse response) throws IOException {

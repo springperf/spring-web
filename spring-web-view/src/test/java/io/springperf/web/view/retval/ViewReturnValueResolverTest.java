@@ -219,8 +219,7 @@ class ViewReturnValueResolverTest {
         resolver.resolveReturnValue("home", null, req, resp);
 
         verify(resp).setHandled();
-        verify(view).render(argThat(m -> m == model && "from-controller".equals(m.get("marker"))),
-                eq(req), eq(resp));
+        verify(view).render(argThat(m -> m == model && "from-controller".equals(m.get("marker"))), eq(req), eq(resp));
         assertEquals("text/html;charset=UTF-8", headers.getFirst(HttpHeaders.CONTENT_TYPE));
     }
 
@@ -311,14 +310,14 @@ class ViewReturnValueResolverTest {
             }
         }
         PathMappingContext view = new PathMappingContext(
-                new HandlerMethod(new Controller(), Controller.class.getMethod("home")),
-                Collections.emptyList(), "/home");
+                new HandlerMethod(new Controller(), Controller.class.getMethod("home")), Collections.emptyList(),
+                "/home");
         PathMappingContext json = new PathMappingContext(
-                new HandlerMethod(new Controller(), Controller.class.getMethod("api")),
-                Collections.emptyList(), "/api");
+                new HandlerMethod(new Controller(), Controller.class.getMethod("api")), Collections.emptyList(),
+                "/api");
         PathMappingContext nonString = new PathMappingContext(
-                new HandlerMethod(new Controller(), Controller.class.getMethod("count")),
-                Collections.emptyList(), "/count");
+                new HandlerMethod(new Controller(), Controller.class.getMethod("count")), Collections.emptyList(),
+                "/count");
         when(mappingRegistry.getMappingContextList()).thenReturn(List.of(view, json, nonString));
         when(webContext.getWebComponent(MappingRegistry.class)).thenReturn(mappingRegistry);
         when(webContext.getWebComponentWithDefault(eq(ViewResolverRegistry.class), any()))

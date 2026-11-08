@@ -58,8 +58,7 @@ class ServerErrorE2eTest {
         assertTrue(body.startsWith("500|"), "应返回 500，实际 " + body);
         // 兜底渲染的 message 字段受 include-message 策略控制（always 时暴露，never 时隐藏）
         assertTrue(body.contains("\"message\""), "include-message=always 时错误体应含 message 字段，实际 " + body);
-        assertTrue(body.contains("boom-msg-e2e"),
-                "include-message=always 时 message 字段必须带出异常文本，而非只有空字段名，实际 " + body);
+        assertTrue(body.contains("boom-msg-e2e"), "include-message=always 时 message 字段必须带出异常文本，而非只有空字段名，实际 " + body);
     }
 
     @Test

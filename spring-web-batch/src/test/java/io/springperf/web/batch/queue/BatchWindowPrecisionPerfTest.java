@@ -29,8 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 统计量取中位数（排除偶发调度抖动）与 p90（看尾部），同时打印全部样本，便于判断某个档位是否存在系统性放大。
  * </p>
  * <p>
- * 运行方式：{@code mvn -pl spring-web-batch test -Dperf.enabled=true -Dgroups=perf}，
- * 可用 {@code -Dperf.window=1,2,3,5,10} 覆盖扫描档位，{@code -Dperf.window.samples=30} 覆盖采样次数。
+ * 运行方式：{@code mvn -pl spring-web-batch test -Dperf.enabled=true -Dgroups=perf}， 可用 {@code -Dperf.window=1,2,3,5,10}
+ * 覆盖扫描档位，{@code -Dperf.window.samples=30} 覆盖采样次数。
  * </p>
  */
 @Tag("perf")
@@ -77,12 +77,12 @@ class BatchWindowPrecisionPerfTest {
             double p90 = samples.get((int) Math.ceil(samples.size() * 0.9) - 1) / 1e6;
             double min = samples.get(0) / 1e6;
             double max = samples.get(samples.size() - 1) / 1e6;
-            System.out.printf("[batch-window-precision] window=%2dms median=%5.2fms p90=%5.2fms min=%5.2fms max=%5.2fms "
-                    + "overshoot=%+5.2fms%n", windowMillis, median, p90, min, max, median - windowMillis);
+            System.out
+                    .printf("[batch-window-precision] window=%2dms median=%5.2fms p90=%5.2fms min=%5.2fms max=%5.2fms "
+                            + "overshoot=%+5.2fms%n", windowMillis, median, p90, min, max, median - windowMillis);
             // 只挡住「小窗口被粗粒度定时器整档放大」这类实现退化，不追求亚毫秒级精度：
             // 中位数过冲超过 4ms 说明该档位已名存实亡
-            assertThat(median - windowMillis)
-                    .as("%dms 窗口的到期中位数不应被放大：samples=%s", windowMillis, samples)
+            assertThat(median - windowMillis).as("%dms 窗口的到期中位数不应被放大：samples=%s", windowMillis, samples)
                     .isLessThan(4.0);
         }
     }
@@ -94,7 +94,8 @@ class BatchWindowPrecisionPerfTest {
             r.run();
             flushed.countDown();
         };
-        BufferingBatchHandler handler = new BufferingBatchHandler(executor, meta(windowMillis), new WindowService(), 100);
+        BufferingBatchHandler handler = new BufferingBatchHandler(executor, meta(windowMillis), new WindowService(),
+                100);
         handlers.add(handler);
         BatchEvent event = new BatchEvent();
         event.request = new BatchRequest<String>() {

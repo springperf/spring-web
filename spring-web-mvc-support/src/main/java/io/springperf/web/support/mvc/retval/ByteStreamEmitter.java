@@ -14,14 +14,13 @@ import io.springperf.web.core.async.stream.StreamSenderFactory;
 /**
  * 把 {@code StreamingResponseBody} 的字节流接入既有 {@link StreamSender} 通道（与 SSE / Flux 同一条写出路径）。
  * <p>
- * 异步生命周期由 Callable 通道（{@code AsyncSupportRegistry#startCallableProcessing}）管理；本类只负责
- * 「字节 → 帧」以及把结束信号交给 {@link StreamSender}：背压、终止块、HEAD 特判、断连清队列与错误关连接
- * 全部继承自 {@code AbstractNettyStreamSender}，不在这里重复实现。
+ * 异步生命周期由 Callable 通道（{@code AsyncSupportRegistry#startCallableProcessing}）管理；本类只负责 「字节 → 帧」以及把结束信号交给
+ * {@link StreamSender}：背压、终止块、HEAD 特判、断连清队列与错误关连接 全部继承自 {@code AbstractNettyStreamSender}，不在这里重复实现。
  * </p>
  * <p>
- * 响应头必须由调用方在绑定本 emitter 之前用 {@code flushChunked()} 提交（与
- * {@code ResponseBodyEmitterReturnValueResolver} 的 {@code extendResponseAndFlush(..., true)} 一致）：
- * {@link StreamSender} 直接写 {@code DefaultHttpContent}，编码器必须已处于 chunked 状态。
+ * 响应头必须由调用方在绑定本 emitter 之前用 {@code flushChunked()} 提交（与 {@code ResponseBodyEmitterReturnValueResolver} 的
+ * {@code extendResponseAndFlush(..., true)} 一致）： {@link StreamSender} 直接写 {@code DefaultHttpContent}，编码器必须已处于 chunked
+ * 状态。
  * </p>
  */
 public class ByteStreamEmitter extends StreamEmitter<byte[]> {
@@ -30,8 +29,7 @@ public class ByteStreamEmitter extends StreamEmitter<byte[]> {
     private static final int FRAME_SIZE = 8192;
 
     /**
-     * 在途帧水位。{@link StreamSender} 的队列上限按 SSE 小事件设计（65536 条，对 8KB 帧等于 512MB），
-     * 这里压到 32 帧 ≈ 256KB，避免慢客户端把整块堆内存吃满。
+     * 在途帧水位。{@link StreamSender} 的队列上限按 SSE 小事件设计（65536 条，对 8KB 帧等于 512MB）， 这里压到 32 帧 ≈ 256KB，避免慢客户端把整块堆内存吃满。
      */
     private static final int MAX_INFLIGHT_FRAMES = 32;
 
@@ -89,8 +87,7 @@ public class ByteStreamEmitter extends StreamEmitter<byte[]> {
     /**
      * 正常结束。即便从未写出过字节也必须建 sender：chunked 头已提交，不写终止块客户端会挂到读超时。
      * <p>
-     * HEAD 分支由 {@code onAllDataWritten} 的 {@code isCommitted && !isStreaming} 判定跳过终止块，
-     * 不会再补一个 {@code LastHttpContent}。
+     * HEAD 分支由 {@code onAllDataWritten} 的 {@code isCommitted && !isStreaming} 判定跳过终止块， 不会再补一个 {@code LastHttpContent}。
      * </p>
      */
     @Override

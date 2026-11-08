@@ -140,10 +140,9 @@ public class GlobalExceptionHandler {
     /**
      * 异步请求超时 → 503。
      * <p>
-     * 必须单独声明，否则会被下面的 {@link #handleError(Throwable)} 兜底成 200 + {@code {"code":500}}，
-     * 「超时」与「任务自身抛异常」在客户端侧就完全不可区分了。503 与框架
-     * {@code ResponseStatusExceptionResolver} 对 {@code AsyncRequestTimeoutException} 的映射一致
-     * （对齐 Spring {@code DefaultHandlerExceptionResolver}）。
+     * 必须单独声明，否则会被下面的 {@link #handleError(Throwable)} 兜底成 200 + {@code {"code":500}}， 「超时」与「任务自身抛异常」在客户端侧就完全不可区分了。503
+     * 与框架 {@code ResponseStatusExceptionResolver} 对 {@code AsyncRequestTimeoutException} 的映射一致 （对齐 Spring
+     * {@code DefaultHandlerExceptionResolver}）。
      * </p>
      */
     @ExceptionHandler(value = AsyncRequestTimeoutException.class)

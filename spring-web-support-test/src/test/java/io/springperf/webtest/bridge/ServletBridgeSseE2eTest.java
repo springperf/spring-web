@@ -135,9 +135,8 @@ class ServletBridgeSseE2eTest extends BaseE2ETest {
     /**
      * {@code StreamingResponseBody}：由 {@code StreamingResponseBodyReturnValueResolver} 认领后正常流式写出。
      * <p>
-     * 此前该类型无 resolver → 协商出 text/plain 却无 converter → 500。现在异步生命周期复用 Callable 通道、
-     * 帧写出复用 StreamSender（与 SSE / Flux 同一条路径）：200 + 声明的 Content-Type + 分帧送达，
-     * 客户端读到 EOF 说明终止块已写。
+     * 此前该类型无 resolver → 协商出 text/plain 却无 converter → 500。现在异步生命周期复用 Callable 通道、 帧写出复用 StreamSender（与 SSE / Flux
+     * 同一条路径）：200 + 声明的 Content-Type + 分帧送达， 客户端读到 EOF 说明终止块已写。
      * </p>
      */
     @Test
@@ -158,15 +157,16 @@ class ServletBridgeSseE2eTest extends BaseE2ETest {
     /**
      * 大流量：逐帧校验「帧号连续 + 内容未错位」。
      * <p>
-     * 端点每帧前 4 字节写大端帧号，其余填充 {@code 'x'}。若帧顺序错乱、丢帧，或复用同一缓冲导致
-     * 内容被后续写入覆盖，帧号或填充字节会在这里对不上。
+     * 端点每帧前 4 字节写大端帧号，其余填充 {@code 'x'}。若帧顺序错乱、丢帧，或复用同一缓冲导致 内容被后续写入覆盖，帧号或填充字节会在这里对不上。
      * </p>
      */
     @Test
     void streamingResponseBody_largePayloadIsFramedAndComplete() throws Exception {
         int frames = 200;
-        try (Response resp = CLIENT.newCall(new Request.Builder()
-                .url(url("/api/servlet-bridge/streaming-response-body-large?frames=" + frames)).build()).execute()) {
+        try (Response resp = CLIENT
+                .newCall(new Request.Builder()
+                        .url(url("/api/servlet-bridge/streaming-response-body-large?frames=" + frames)).build())
+                .execute()) {
             byte[] body = resp.body().bytes();
             assertEquals(200, resp.code());
             assertEquals(frames * 1000, body.length, "大流量必须逐帧完整送达");
@@ -211,8 +211,9 @@ class ServletBridgeSseE2eTest extends BaseE2ETest {
     /** 0 字节：必须写终止块，客户端读到 EOF（空 body）而不是挂到读超时。 */
     @Test
     void streamingResponseBody_emptyStreamTerminatesWithoutHanging() throws Exception {
-        try (Response resp = CLIENT.newCall(
-                new Request.Builder().url(url("/api/servlet-bridge/streaming-response-body-empty")).build()).execute()) {
+        try (Response resp = CLIENT
+                .newCall(new Request.Builder().url(url("/api/servlet-bridge/streaming-response-body-empty")).build())
+                .execute()) {
             assertEquals(200, resp.code());
             assertEquals("", resp.body().string(), "0 字节流必须写出终止块（读到 EOF 即空 body），否则会挂到读超时");
         }
@@ -222,8 +223,8 @@ class ServletBridgeSseE2eTest extends BaseE2ETest {
     /** HEAD：只发响应头，不得返回 body，也不得因多次 flush 打出 WARN 洪水。 */
     @Test
     void streamingResponseBody_headRequestSendsHeadersWithoutBody() throws Exception {
-        try (Response resp = CLIENT.newCall(
-                new Request.Builder().url(url("/api/servlet-bridge/streaming-response-body")).head().build())
+        try (Response resp = CLIENT
+                .newCall(new Request.Builder().url(url("/api/servlet-bridge/streaming-response-body")).head().build())
                 .execute()) {
             assertEquals(200, resp.code());
             String contentType = resp.header("Content-Type");
@@ -237,8 +238,7 @@ class ServletBridgeSseE2eTest extends BaseE2ETest {
     /**
      * 写出任何字节之前失败：头已提交（chunked），客户端必然看到 200，随后只能截断连接。
      * <p>
-     * 这是与 Spring MVC 的唯一行为差异（Spring 有 Servlet 容器兜着未提交状态，能改写成 500）。
-     * 用例固化「绝不伪装成正常结束」——若换成写终止块，客户端会把截断当成 200 完整响应。
+     * 这是与 Spring MVC 的唯一行为差异（Spring 有 Servlet 容器兜着未提交状态，能改写成 500）。 用例固化「绝不伪装成正常结束」——若换成写终止块，客户端会把截断当成 200 完整响应。
      * </p>
      */
     @Test
@@ -263,8 +263,9 @@ class ServletBridgeSseE2eTest extends BaseE2ETest {
     void streamingResponseBody_throwsAfterFrames_deliversPrefixThenTruncates() throws Exception {
         java.io.ByteArrayOutputStream received = new java.io.ByteArrayOutputStream();
         boolean truncated = false;
-        try (Response resp = CLIENT.newCall(
-                new Request.Builder().url(url("/api/servlet-bridge/streaming-response-body-throw-mid")).build())
+        try (Response resp = CLIENT
+                .newCall(
+                        new Request.Builder().url(url("/api/servlet-bridge/streaming-response-body-throw-mid")).build())
                 .execute()) {
             assertEquals(200, resp.code());
             try {
@@ -288,30 +289,27 @@ class ServletBridgeSseE2eTest extends BaseE2ETest {
     /**
      * 客户端提前断开：服务端必须尽快感知并释放异步生命周期。
      * <p>
-     * 端点会写满约 10s；断言在 5s 内引用归零。若断连后仍在把剩余帧「写完」（全部丢弃、CPU 空转），
-     * 或卡在背压自旋里，这里会超时失败。
+     * 端点会写满约 10s；断言在 5s 内引用归零。若断连后仍在把剩余帧「写完」（全部丢弃、CPU 空转）， 或卡在背压自旋里，这里会超时失败。
      * </p>
      */
     @Test
     void streamingResponseBody_clientDisconnects_asyncLifecycleIsReleased() throws Exception {
         int baseline = activeRequestRefs();
-        Response resp = CLIENT.newCall(
-                new Request.Builder().url(url("/api/servlet-bridge/streaming-response-body-slow")).build())
+        Response resp = CLIENT
+                .newCall(new Request.Builder().url(url("/api/servlet-bridge/streaming-response-body-slow")).build())
                 .execute();
         assertEquals(200, resp.code());
         // 读到首批数据即断开：后续帧的写出必须因断连失败
         resp.body().source().readByteArray(100);
         // 流进行中必须真的持有引用，否则本类所有「归零」断言都是空转
-        assertTrue(activeRequestRefs() > baseline,
-                "流式进行中应持有异步引用，实际 " + activeRequestRefs() + "（=基线 " + baseline + "）");
+        assertTrue(activeRequestRefs() > baseline, "流式进行中应持有异步引用，实际 " + activeRequestRefs() + "（=基线 " + baseline + "）");
         resp.close();
 
         long deadline = System.currentTimeMillis() + 5000;
         while (activeRequestRefs() != baseline && System.currentTimeMillis() < deadline) {
             Thread.sleep(20);
         }
-        assertEquals(baseline, activeRequestRefs(),
-                "客户端断开后异步生命周期必须尽快释放（残留即说明线程卡在背压等待，或仍在空写剩余帧）");
+        assertEquals(baseline, activeRequestRefs(), "客户端断开后异步生命周期必须尽快释放（残留即说明线程卡在背压等待，或仍在空写剩余帧）");
     }
 
     /** 异步持有者引用归零（桥接模式的异步生命周期同样受此不变式约束）。 */

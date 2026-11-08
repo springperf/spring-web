@@ -162,8 +162,7 @@ class ArgumentResolverRegistryCoverageTest {
         when(wc.getProps().getBoolean(PropertiesConstant.CHECK_ON_STARTUP, true)).thenReturn(true);
         assertNull(wc.getWebComponent(MappingRegistry.class), "前置条件：未注册 MappingRegistry");
 
-        assertDoesNotThrow(() -> driveLifecycle(wc).initComponentPhase3(),
-                "缺少 MappingRegistry 时应提前返回而不是抛异常");
+        assertDoesNotThrow(() -> driveLifecycle(wc).initComponentPhase3(), "缺少 MappingRegistry 时应提前返回而不是抛异常");
     }
 
     @Test

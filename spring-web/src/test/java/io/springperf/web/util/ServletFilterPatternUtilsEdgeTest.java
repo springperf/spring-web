@@ -23,32 +23,29 @@ class ServletFilterPatternUtilsEdgeTest {
         assertNull(ServletFilterPatternUtils.validateServletPattern("*.json"));
         assertNull(ServletFilterPatternUtils.validateServletPattern("/exact/path"));
 
-        assertTrue(ServletFilterPatternUtils.validateServletPattern("api/test/*")
-                .contains("不符合 Servlet URL 模式规范"));
-        assertTrue(ServletFilterPatternUtils.validateServletPattern("/api/{id}")
-                .contains("不符合 Servlet URL 模式规范"));
-        assertTrue(ServletFilterPatternUtils.validateServletPattern("api/test")
-                .contains("缺少前导 /"));
+        assertTrue(ServletFilterPatternUtils.validateServletPattern("api/test/*").contains("不符合 Servlet URL 模式规范"));
+        assertTrue(ServletFilterPatternUtils.validateServletPattern("/api/{id}").contains("不符合 Servlet URL 模式规范"));
+        assertTrue(ServletFilterPatternUtils.validateServletPattern("api/test").contains("缺少前导 /"));
     }
 
     @Test
     void matchPathRuleToCached_combinesIncludeAndExcludeResults() {
-        assertEquals(ContainmentResult.ALWAYS,
-                ServletFilterPatternUtils.matchPathRuleToCached(Collections.emptyList(), Collections.emptyList(), "/api"));
+        assertEquals(ContainmentResult.ALWAYS, ServletFilterPatternUtils.matchPathRuleToCached(Collections.emptyList(),
+                Collections.emptyList(), "/api"));
 
-        assertEquals(ContainmentResult.ALWAYS, ServletFilterPatternUtils
-                .matchPathRuleToCached(List.of("/*"), Collections.emptyList(), "/api"));
-        assertEquals(ContainmentResult.NEVER, ServletFilterPatternUtils
-                .matchPathRuleToCached(List.of("/other/*"), Collections.emptyList(), "/api"));
-        assertEquals(ContainmentResult.ALWAYS, ServletFilterPatternUtils
-                .matchPathRuleToCached(Collections.emptyList(), List.of("/other/*"), "/api"));
-        assertEquals(ContainmentResult.NEVER, ServletFilterPatternUtils
-                .matchPathRuleToCached(Collections.emptyList(), List.of("/api/*"), "/api"),
+        assertEquals(ContainmentResult.ALWAYS,
+                ServletFilterPatternUtils.matchPathRuleToCached(List.of("/*"), Collections.emptyList(), "/api"));
+        assertEquals(ContainmentResult.NEVER,
+                ServletFilterPatternUtils.matchPathRuleToCached(List.of("/other/*"), Collections.emptyList(), "/api"));
+        assertEquals(ContainmentResult.ALWAYS,
+                ServletFilterPatternUtils.matchPathRuleToCached(Collections.emptyList(), List.of("/other/*"), "/api"));
+        assertEquals(ContainmentResult.NEVER,
+                ServletFilterPatternUtils.matchPathRuleToCached(Collections.emptyList(), List.of("/api/*"), "/api"),
                 "排除集完全包含 pathRule 时应判定为永不适用");
-        assertEquals(ContainmentResult.NEVER, ServletFilterPatternUtils
-                .matchPathRuleToCached(List.of("/*"), List.of("/*"), "/api"));
-        assertEquals(ContainmentResult.RUNTIME, ServletFilterPatternUtils
-                .matchPathRuleToCached(List.of("/api/*"), List.of("/other/*"), "*.json"),
+        assertEquals(ContainmentResult.NEVER,
+                ServletFilterPatternUtils.matchPathRuleToCached(List.of("/*"), List.of("/*"), "/api"));
+        assertEquals(ContainmentResult.RUNTIME,
+                ServletFilterPatternUtils.matchPathRuleToCached(List.of("/api/*"), List.of("/other/*"), "*.json"),
                 "prefix 与 suffix 的包含关系只能在运行期判定");
     }
 

@@ -279,8 +279,7 @@ class RangeRequestE2eTest {
             assertEquals(200, resp.code(), "超过 server.http.max-ranges 应忽略 Range 返回整实体，实际 " + resp.code());
             String contentType = resp.header("Content-Type");
             assertNotNull(contentType, "整实体响应应带 Content-Type，实际 " + resp.headers());
-            assertFalse(contentType.contains("multipart/byteranges"),
-                    "不得返回 multipart/byteranges，实际 " + contentType);
+            assertFalse(contentType.contains("multipart/byteranges"), "不得返回 multipart/byteranges，实际 " + contentType);
             assertEquals(String.valueOf(full.length()), resp.header("Content-Length"), "整实体应带完整 Content-Length");
             assertEquals(full, resp.body().string(), "应返回完整实体内容");
         } finally {

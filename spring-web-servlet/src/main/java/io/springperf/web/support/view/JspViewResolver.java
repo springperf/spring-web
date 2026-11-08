@@ -64,8 +64,7 @@ public class JspViewResolver extends BaseWebComponent implements ViewResolver {
         super.initWithWebContext(webContext);
         ApplicationProperties props = webContext.getProps();
         if (props != null) {
-            this.order = ViewProperties.resolveOrder(props, ViewProperties.JSP_ORDER,
-                    ViewProperties.JSP_ORDER_DEFAULT);
+            this.order = ViewProperties.resolveOrder(props, ViewProperties.JSP_ORDER, ViewProperties.JSP_ORDER_DEFAULT);
         }
     }
 

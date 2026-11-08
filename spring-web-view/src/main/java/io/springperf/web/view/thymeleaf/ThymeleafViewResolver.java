@@ -89,8 +89,7 @@ public class ThymeleafViewResolver extends BaseWebComponent implements ViewResol
     }
 
     /**
-     * 按 order 选择第一个支持当前请求的 exchange provider；无匹配时退回默认实现。
-     * 包可见以便同包测试直接验证真实选择逻辑。
+     * 按 order 选择第一个支持当前请求的 exchange provider；无匹配时退回默认实现。 包可见以便同包测试直接验证真实选择逻辑。
      */
     WebExchangeProvider selectProvider(WebServerHttpRequest req) {
         List<WebExchangeProvider> providers = this.exchangeProviders;

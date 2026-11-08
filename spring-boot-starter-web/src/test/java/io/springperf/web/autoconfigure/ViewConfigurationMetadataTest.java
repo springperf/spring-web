@@ -16,8 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 锁死「配置键单一真源」：ViewProperties 中每个 spring.* 常量都必须在 IDE 元数据里登记，
- * 关键默认值也必须与常量一致，避免手写 JSON 随代码演进漂移。
+ * 锁死「配置键单一真源」：ViewProperties 中每个 spring.* 常量都必须在 IDE 元数据里登记， 关键默认值也必须与常量一致，避免手写 JSON 随代码演进漂移。
  */
 class ViewConfigurationMetadataTest {
 

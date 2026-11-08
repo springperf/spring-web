@@ -56,8 +56,8 @@ public class SpringWebMvcSupportAutoConfiguration {
      * {@link org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody} 支持。
      * <p>
      * 不要再注册 Spring MVC 自带的 {@code StreamingResponseBodyReturnValueHandler}：它会经
-     * {@code SpringHandlerMethodReturnValueHandlerAdapter} 先认领，并在 {@code ServletWebRequest} 上
-     * 查找 {@code WebAsyncManager} 直接失败。
+     * {@code SpringHandlerMethodReturnValueHandlerAdapter} 先认领，并在 {@code ServletWebRequest} 上 查找
+     * {@code WebAsyncManager} 直接失败。
      * </p>
      */
     @Bean

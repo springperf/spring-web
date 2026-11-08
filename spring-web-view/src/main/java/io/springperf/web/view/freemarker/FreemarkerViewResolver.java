@@ -65,8 +65,8 @@ public class FreemarkerViewResolver extends BaseWebComponent implements ViewReso
         try {
             MediaType.parseMediaType(contentType);
         } catch (IllegalArgumentException ex) {
-            throw new IllegalStateException("Invalid " + ViewProperties.FREEMARKER_CONTENT_TYPE
-                    + ": '" + contentType + "'", ex);
+            throw new IllegalStateException(
+                    "Invalid " + ViewProperties.FREEMARKER_CONTENT_TYPE + ": '" + contentType + "'", ex);
         }
         this.configuration = new Configuration(Configuration.VERSION_2_3_33);
         configuration.setDefaultEncoding(encoding);

@@ -60,8 +60,7 @@ class PerfServletContextConfigEdgeTest {
         return new ClassLoader() {
             @Override
             public InputStream getResourceAsStream(String name) {
-                return calls.getAndIncrement() == hitIndex
-                        ? new ByteArrayInputStream(new byte[] { 42 }) : null;
+                return calls.getAndIncrement() == hitIndex ? new ByteArrayInputStream(new byte[] { 42 }) : null;
             }
         };
     }
@@ -69,8 +68,8 @@ class PerfServletContextConfigEdgeTest {
     @Test
     void readConfig_sessionModes_skipsBlankUnknownAndSsl() {
         ApplicationProperties props = mock(ApplicationProperties.class);
-        doReturn("COOKIE, ,BOGUS, SSL , URL").when(props)
-                .get(eq(PropertiesConstant.SERVLET_SESSION_TRACKING_MODES), isNull());
+        doReturn("COOKIE, ,BOGUS, SSL , URL").when(props).get(eq(PropertiesConstant.SERVLET_SESSION_TRACKING_MODES),
+                isNull());
 
         PerfServletContext context = newContext(mock(WebContext.class), props);
 
@@ -84,8 +83,7 @@ class PerfServletContextConfigEdgeTest {
     @Test
     void readConfig_allUnknownModesKeepsDefault() {
         ApplicationProperties props = mock(ApplicationProperties.class);
-        doReturn("BOGUS, ").when(props)
-                .get(eq(PropertiesConstant.SERVLET_SESSION_TRACKING_MODES), isNull());
+        doReturn("BOGUS, ").when(props).get(eq(PropertiesConstant.SERVLET_SESSION_TRACKING_MODES), isNull());
 
         PerfServletContext context = newContext(mock(WebContext.class), props);
 
@@ -210,8 +208,8 @@ class PerfServletContextConfigEdgeTest {
         ClassLoader original = Thread.currentThread().getContextClassLoader();
         Thread.currentThread().setContextClassLoader(null);
         try {
-            try (InputStream in = context.getResourceAsStream(
-                    "/io/springperf/web/support/servlet/context/PerfServletContext.class")) {
+            try (InputStream in = context
+                    .getResourceAsStream("/io/springperf/web/support/servlet/context/PerfServletContext.class")) {
                 assertNotNull(in);
                 assertTrue(in.read() >= 0, "回退后应能读到真实的 class 字节");
             }
@@ -249,9 +247,8 @@ class PerfServletContextConfigEdgeTest {
         assertEquals(1, context.claimServletRegistrations().size());
         assertTrue(context.claimServletRegistrations().isEmpty(), "同一注册项只能认领一次");
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> context.registerBeanServlet("beta", new PerfServletContextValidationTest.SampleServlet(),
-                        new String[] { "/same" }, Map.of()));
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> context.registerBeanServlet("beta",
+                new PerfServletContextValidationTest.SampleServlet(), new String[] { "/same" }, Map.of()));
         assertTrue(ex.getMessage().contains("already taken"));
     }
 

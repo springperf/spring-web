@@ -10,17 +10,15 @@ import java.util.concurrent.ConcurrentMap;
  * 视图名到 {@link View} 的解析结果缓存，同时缓存「未解析」负结果。
  * <p>
  * 模板存在性探测（{@code ClassPathResource.exists()}）与 View 构造原本每请求执行，多引擎共存时按 resolver 数量放大。
- * 本缓存把这部分开销移到首次解析；{@code cacheable=false}（对应 {@code spring.*.cache=false}）时完全旁路，
- * 保留开发期热改模板的语义——此时新增模板无需重启即可被发现。
+ * 本缓存把这部分开销移到首次解析；{@code cacheable=false}（对应 {@code spring.*.cache=false}）时完全旁路， 保留开发期热改模板的语义——此时新增模板无需重启即可被发现。
  * </p>
  * <p>
- * 每个 key 以 {@link CompletableFuture} 占位：并发下只有一个线程执行 loader，其余线程等待同一结果；
- * 加载失败会从表中移除占位并唤醒等待者抛出原异常，绝不把失败永久缓存。
+ * 每个 key 以 {@link CompletableFuture} 占位：并发下只有一个线程执行 loader，其余线程等待同一结果； 加载失败会从表中移除占位并唤醒等待者抛出原异常，绝不把失败永久缓存。
  * 容量上限防止视图名由外部输入拼接时无界增长；超限只淘汰最早的已完成条目，不清空全表（避免缓存抖动）。
  * </p>
  * <p>
- * 负结果同样缓存，因此缓存开启时运行期新增或替换的模板需调用 {@link #invalidate()}（或经
- * {@link ViewResolverRegistry#invalidateViewCaches()} 统一触发，后者还会清模板引擎内部缓存）后才可见。
+ * 负结果同样缓存，因此缓存开启时运行期新增或替换的模板需调用 {@link #invalidate()}（或经 {@link ViewResolverRegistry#invalidateViewCaches()}
+ * 统一触发，后者还会清模板引擎内部缓存）后才可见。
  * </p>
  */
 public final class ViewCache {

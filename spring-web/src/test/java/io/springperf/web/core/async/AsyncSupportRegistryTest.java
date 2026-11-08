@@ -219,8 +219,8 @@ class AsyncSupportRegistryTest {
     /**
      * 超时回调必须 dispatch「超时结果」而不是任务结果。
      * <p>
-     * 回归：拦截器链第一件事是 {@code cancel(true)}，被中断的任务会把 {@code InterruptedException} 写成结果，
-     * 客户端因此拿到 500 而不是 503。占位后只有超时拦截器返回的 {@code AsyncRequestTimeoutException} 能落地。
+     * 回归：拦截器链第一件事是 {@code cancel(true)}，被中断的任务会把 {@code InterruptedException} 写成结果， 客户端因此拿到 500 而不是 503。占位后只有超时拦截器返回的
+     * {@code AsyncRequestTimeoutException} 能落地。
      * </p>
      */
     @Test

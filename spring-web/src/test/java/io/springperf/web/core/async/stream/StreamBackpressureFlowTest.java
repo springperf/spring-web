@@ -184,8 +184,7 @@ class StreamBackpressureFlowTest {
             }
             io.netty.util.ReferenceCountUtil.release(out);
         }
-        assertTrue(all.toString().contains("v199999"),
-                "最后一条同步元素必须写出，实际长度=" + all.length());
+        assertTrue(all.toString().contains("v199999"), "最后一条同步元素必须写出，实际长度=" + all.length());
     }
 
     /**

@@ -53,8 +53,7 @@ class JacksonConverterTest {
         customMapper.enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
         JacksonConverter converter = new JacksonConverter(customMapper);
 
-        assertTrue(converter.toJson(Map.of("k", "v")).contains("\n"),
-                "自定义 ObjectMapper 的缩进配置必须生效");
+        assertTrue(converter.toJson(Map.of("k", "v")).contains("\n"), "自定义 ObjectMapper 的缩进配置必须生效");
     }
 
     @Test

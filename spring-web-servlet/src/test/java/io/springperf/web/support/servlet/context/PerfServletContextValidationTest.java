@@ -174,8 +174,7 @@ class PerfServletContextValidationTest {
     void destroyComponent_removesNestedTempContent() throws Exception {
         File tempDir = (File) servletContext.getAttribute(ServletContext.TEMPDIR);
         assertNotNull(tempDir);
-        assertTrue(tempDir.getName().startsWith("spring-perf-web-"),
-                "前置条件：只清理本实例创建的目录，避免误删共享临时目录");
+        assertTrue(tempDir.getName().startsWith("spring-perf-web-"), "前置条件：只清理本实例创建的目录，避免误删共享临时目录");
         File nested = new File(tempDir, "nested");
         assertTrue(nested.mkdirs());
         Files.write(new File(nested, "child").toPath(), new byte[] { 1 });

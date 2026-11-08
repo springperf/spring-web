@@ -46,8 +46,7 @@ public class CoreFeaturesExceptionTest extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(509, resp.code());
             String b = resp.body().string();
-            assertEquals(509, com.alibaba.fastjson2.JSON.parseObject(b).getIntValue("status"),
-                    "错误体应标明 509，实际: " + b);
+            assertEquals(509, com.alibaba.fastjson2.JSON.parseObject(b).getIntValue("status"), "错误体应标明 509，实际: " + b);
         }
     }
 
@@ -58,8 +57,7 @@ public class CoreFeaturesExceptionTest extends BaseE2ETest {
         try (Response resp = CLIENT.newCall(req).execute()) {
             assertEquals(404, resp.code());
             String b = resp.body().string();
-            assertEquals(404, com.alibaba.fastjson2.JSON.parseObject(b).getIntValue("status"),
-                    "错误体应标明 404，实际: " + b);
+            assertEquals(404, com.alibaba.fastjson2.JSON.parseObject(b).getIntValue("status"), "错误体应标明 404，实际: " + b);
         }
     }
 

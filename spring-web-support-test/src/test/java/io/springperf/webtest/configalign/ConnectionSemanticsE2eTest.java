@@ -113,8 +113,7 @@ class ConnectionSemanticsE2eTest {
             out.flush();
             String finalResponse = readAll(in, 1);
             assertTrue(finalResponse.startsWith("HTTP/1.1 200"), "100-continue 后应返回 200，实际:\n" + finalResponse);
-            assertTrue(finalResponse.contains("echo:{\"a\":1}"),
-                    "body 必须在 100 之后被完整读取并回显，实际:\n" + finalResponse);
+            assertTrue(finalResponse.contains("echo:{\"a\":1}"), "body 必须在 100 之后被完整读取并回显，实际:\n" + finalResponse);
         }
     }
 

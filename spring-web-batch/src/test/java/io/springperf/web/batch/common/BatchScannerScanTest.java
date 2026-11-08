@@ -26,9 +26,7 @@ class BatchScannerScanTest {
 
     @Controller
     public static class BatchController {
-        @BatchMapping(method = "single", ringBufferSize = 64, maxBatchSize = 5, consumerSize = 2,
-                waitStrategy = BatchMapping.WaitStrategy.YIELDING, backpressure = BatchMapping.Backpressure.THROW,
-                batchWindowMillis = 7)
+        @BatchMapping(method = "single", ringBufferSize = 64, maxBatchSize = 5, consumerSize = 2, waitStrategy = BatchMapping.WaitStrategy.YIELDING, backpressure = BatchMapping.Backpressure.THROW, batchWindowMillis = 7)
         public void batch(List<EchoRequest> requests) {
         }
 
@@ -157,8 +155,7 @@ class BatchScannerScanTest {
             List<BatchHandlerRegistration> result = new BatchScanner().scan(ctx, Collections.singletonList(singleCtx));
 
             assertEquals(1, result.size());
-            assertEquals(2, result.get(0).meta().batchWindowMillis(),
-                    "注解未声明 batchWindowMillis 时应采用 2ms 默认值");
+            assertEquals(2, result.get(0).meta().batchWindowMillis(), "注解未声明 batchWindowMillis 时应采用 2ms 默认值");
         }
     }
 
@@ -177,8 +174,8 @@ class BatchScannerScanTest {
                     .withProperty(BatchDefaults.BACKPRESSURE, "THROW");
             BatchDefaults defaults = BatchDefaults.fromProperties(new ApplicationProperties(env));
 
-            List<BatchHandlerRegistration> result = new BatchScanner().scan(ctx,
-                    Collections.singletonList(singleCtx), defaults);
+            List<BatchHandlerRegistration> result = new BatchScanner().scan(ctx, Collections.singletonList(singleCtx),
+                    defaults);
 
             assertEquals(1, result.size());
             BatchRequestMetaData meta = result.get(0).meta();
@@ -198,17 +195,14 @@ class BatchScannerScanTest {
             PathMappingContext singleCtx = mappingFor(bean, "single", String.class);
 
             // BatchController 把六个属性全部显式写死，全局键不得改动其中任何一项
-            BatchDefaults defaults = BatchDefaults
-                    .fromProperties(new ApplicationProperties(new MockEnvironment()
-                            .withProperty(BatchDefaults.WINDOW_MILLIS, "3")
-                            .withProperty(BatchDefaults.MAX_BATCH_SIZE, "250")
-                            .withProperty(BatchDefaults.CONSUMER_SIZE, "3")
-                            .withProperty(BatchDefaults.RING_BUFFER_SIZE, "128")
-                            .withProperty(BatchDefaults.WAIT_STRATEGY, "BUSY_SPIN")
-                            .withProperty(BatchDefaults.BACKPRESSURE, "DROP")));
+            BatchDefaults defaults = BatchDefaults.fromProperties(new ApplicationProperties(new MockEnvironment()
+                    .withProperty(BatchDefaults.WINDOW_MILLIS, "3").withProperty(BatchDefaults.MAX_BATCH_SIZE, "250")
+                    .withProperty(BatchDefaults.CONSUMER_SIZE, "3").withProperty(BatchDefaults.RING_BUFFER_SIZE, "128")
+                    .withProperty(BatchDefaults.WAIT_STRATEGY, "BUSY_SPIN")
+                    .withProperty(BatchDefaults.BACKPRESSURE, "DROP")));
 
-            List<BatchHandlerRegistration> result = new BatchScanner().scan(ctx,
-                    Collections.singletonList(singleCtx), defaults);
+            List<BatchHandlerRegistration> result = new BatchScanner().scan(ctx, Collections.singletonList(singleCtx),
+                    defaults);
 
             BatchRequestMetaData meta = result.get(0).meta();
             assertEquals(7, meta.batchWindowMillis());
@@ -239,8 +233,7 @@ class BatchScannerScanTest {
             BatchScanner scanner = new BatchScanner();
             IllegalStateException ex = assertThrows(IllegalStateException.class,
                     () -> scanner.scan(ctx, Collections.emptyList()));
-            assertTrue(ex.getMessage().contains("no mappings for this bean"),
-                    "应明确指出该 bean 没有任何映射: " + ex.getMessage());
+            assertTrue(ex.getMessage().contains("no mappings for this bean"), "应明确指出该 bean 没有任何映射: " + ex.getMessage());
         }
     }
 

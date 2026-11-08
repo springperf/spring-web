@@ -11,8 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
 /**
- * E2E 用视图解析器：命中 {@code render-boom} 时先写出半截 HTML 再抛异常，
- * 用于验证渲染失败时错误响应能覆盖半截页面、而不是返回 200。
+ * E2E 用视图解析器：命中 {@code render-boom} 时先写出半截 HTML 再抛异常， 用于验证渲染失败时错误响应能覆盖半截页面、而不是返回 200。
  */
 @Component
 public class RenderBoomViewResolver extends BaseWebComponent implements ViewResolver {

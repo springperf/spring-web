@@ -90,8 +90,7 @@ class WebSocketFrameDispatcherTest {
         verify(handler).handleTransportError(any(), error.capture());
         org.junit.jupiter.api.Assertions.assertInstanceOf(java.io.IOException.class, error.getValue(),
                 "超限应上报 IOException");
-        org.junit.jupiter.api.Assertions.assertTrue(
-                error.getValue().getMessage().toLowerCase().contains("limit"),
+        org.junit.jupiter.api.Assertions.assertTrue(error.getValue().getMessage().toLowerCase().contains("limit"),
                 "异常必须说明消息超限原因，实际：" + error.getValue().getMessage());
         verify(handler, never()).handleMessage(any(), any());
     }

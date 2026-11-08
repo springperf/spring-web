@@ -25,12 +25,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 量化 {@code batchWindowMillis} 的收益与成本。
  * <p>
- * <b>为什么要单独分析</b>：窗口把刷出时机从「消费者追上空队列」改成「窗口到期」，批大小因此上升——这是收益； 但每个批次最多多等一个窗口，单请求延迟随之上升——这是成本。这里用实测数据量化两者的净效果，
- * 为 {@code BatchMapping#batchWindowMillis()} 选默认值提供依据，并观察更大窗口是否还有额外收益。
+ * <b>为什么要单独分析</b>：窗口把刷出时机从「消费者追上空队列」改成「窗口到期」，批大小因此上升——这是收益； 但每个批次最多多等一个窗口，单请求延迟随之上升——这是成本。这里用实测数据量化两者的净效果， 为
+ * {@code BatchMapping#batchWindowMillis()} 选默认值提供依据，并观察更大窗口是否还有额外收益。
  * </p>
  * <p>
- * 结论一律由本轮实测数据得出，不预设「窗口越大越差」或固定的经验比例：窗口调度精度修复后，
- * 并发 100、下游 IO 5~50ms 下 2ms 窗口已是净收益拐点（批大小≈在途上限），更大窗口换不来更大批。
+ * 结论一律由本轮实测数据得出，不预设「窗口越大越差」或固定的经验比例：窗口调度精度修复后， 并发 100、下游 IO 5~50ms 下 2ms 窗口已是净收益拐点（批大小≈在途上限），更大窗口换不来更大批。
  * </p>
  * <p>
  * <b>实验设计</b>：队列级 closed-model 负载——固定 IO 延迟 L、并发 C、{@code consumerSize}、{@code maxBatchSize}， 只扫描窗口值 W。
@@ -42,8 +41,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * </p>
  * <p>
  * <b>读数前先看「每次IO(ms)」列</b>：{@code SimulatedIoRepository} 用 {@code LockSupport.parkNanos} 模拟 round-trip，
- * 该列给出真实的单次等待。若它明显大于标称延迟，说明这一档的模拟 IO 没有按标称值到期，
- * 该档的 QPS / 批大小不能拿去和别的档横向比较。
+ * 该列给出真实的单次等待。若它明显大于标称延迟，说明这一档的模拟 IO 没有按标称值到期， 该档的 QPS / 批大小不能拿去和别的档横向比较。
  * </p>
  * <p>
  * 运行方式：{@code mvn -pl spring-web-examples/spring-web-example-batch test -Dperf.enabled=true -Dgroups=perf}
@@ -56,8 +54,7 @@ class BatchWindowTradeoffTest {
     /**
      * 并发连接数：closed model 的在途请求上限（可覆盖，{@code -Dperf.tradeoff.concurrency=16}）。
      * <p>
-     * 高并发下 100 个在途请求本身就能在窗口到期前把 maxBatchSize 填满，窗口大小几乎不影响批大小；
-     * 低并发下到达稀疏、堆不满一批，窗口才直接决定「等多久换多少聚合」，是选默认值的另一半依据。
+     * 高并发下 100 个在途请求本身就能在窗口到期前把 maxBatchSize 填满，窗口大小几乎不影响批大小； 低并发下到达稀疏、堆不满一批，窗口才直接决定「等多久换多少聚合」，是选默认值的另一半依据。
      * </p>
      */
     private static final int CONCURRENCY = Integer.getInteger("perf.tradeoff.concurrency", 100);
@@ -74,12 +71,10 @@ class BatchWindowTradeoffTest {
     /**
      * 默认扫描网格：4 档 IO × 5 档窗口，按「IO 升序、窗口升序」排列；分组打印依赖这个顺序。
      * <p>
-     * 网格保持整齐（每个 IO 档同样多的窗口）而不是只扫「有收益的窗口」，这样任一档出现异常值都不会被
-     * 缺格掩盖。25ms 档用于观察「窗口明显大于 IO 延迟」时的表现。
+     * 网格保持整齐（每个 IO 档同样多的窗口）而不是只扫「有收益的窗口」，这样任一档出现异常值都不会被 缺格掩盖。25ms 档用于观察「窗口明显大于 IO 延迟」时的表现。
      * </p>
      * <p>
-     * 需要细看某个区间时用系统属性覆盖，不必改代码：{@code -Dperf.tradeoff.io=5,10}
-     * {@code -Dperf.tradeoff.windows=0,1,2,3,5}。
+     * 需要细看某个区间时用系统属性覆盖，不必改代码：{@code -Dperf.tradeoff.io=5,10} {@code -Dperf.tradeoff.windows=0,1,2,3,5}。
      * </p>
      */
     private static final int[][] MATRIX;
@@ -283,8 +278,7 @@ class BatchWindowTradeoffTest {
                 .append(CONCURRENCY).append(" · consumerSize ").append(CONSUMER_SIZE).append(" · maxBatchSize ")
                 .append(MAX_BATCH_SIZE).append(System.lineSeparator());
         sb.append(String.format("%8s %10s %10s %10s %10s %12s %12s %14s %12s %12s%n", "窗口(ms)", "QPS", "p50(ms)",
-                "p99(ms)", "批大小", "IO次数", "每次IO(ms)", "每请求IO(ms)", "吞吐vs W=" + base.window,
-                "p50 vs W=" + base.window));
+                "p99(ms)", "批大小", "IO次数", "每次IO(ms)", "每请求IO(ms)", "吞吐vs W=" + base.window, "p50 vs W=" + base.window));
         for (Row r : rows) {
             sb.append(String.format("%8d %10.0f %10.2f %10.2f %10.1f %12d %12.2f %14.3f %11.2fx %11.2fms%n", r.window,
                     r.qps, r.p50Nanos / 1e6, r.p99Nanos / 1e6, r.avgBatchSize, r.ioCount, r.ioPerCallNanos / 1e6,
@@ -310,8 +304,8 @@ class BatchWindowTradeoffTest {
                     best = r;
                 }
             }
-            sb.append(String.format("IO %dms：吞吐峰值在窗口 %dms（%.2fx vs W=0，p50 %.2fms vs 基线 %.2fms）；IO 成本降幅 %.1fx%n",
-                    io, best.window, best.qps / base.qps, best.p50Nanos / 1e6, base.p50Nanos / 1e6,
+            sb.append(String.format("IO %dms：吞吐峰值在窗口 %dms（%.2fx vs W=0，p50 %.2fms vs 基线 %.2fms）；IO 成本降幅 %.1fx%n", io,
+                    best.window, best.qps / base.qps, best.p50Nanos / 1e6, base.p50Nanos / 1e6,
                     base.ioCostPerRequestNanos / best.ioCostPerRequestNanos));
             Row widest = group.get(0);
             for (Row r : group) {

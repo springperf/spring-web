@@ -34,8 +34,7 @@ import org.springframework.boot.web.server.context.WebServerApplicationContext;
  * 两轨的重复/互补/独占关系由 {@code NativeImageHintsConsistencyTest} 锁定。
  * </p>
  * <p>
- * {@code classLoader} 为 null 是 {@link RuntimeHintsRegistrar} 契约允许的输入；只有资源探测需要它，
- * 代理/反射注册与 classLoader 无关，必须始终执行。
+ * {@code classLoader} 为 null 是 {@link RuntimeHintsRegistrar} 契约允许的输入；只有资源探测需要它， 代理/反射注册与 classLoader 无关，必须始终执行。
  * </p>
  */
 public class SpringWebRuntimeHints implements RuntimeHintsRegistrar {

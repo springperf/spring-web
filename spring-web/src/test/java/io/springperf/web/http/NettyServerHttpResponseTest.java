@@ -165,8 +165,7 @@ class NettyServerHttpResponseTest {
         HttpResponse headers = captor.getAllValues().stream().filter(HttpResponse.class::isInstance)
                 .map(HttpResponse.class::cast).findFirst().orElseThrow();
         assertEquals("chunked", headers.headers().get(HttpHeaderNames.TRANSFER_ENCODING));
-        assertNull(headers.headers().get(HttpHeaderNames.CONTENT_LENGTH),
-                "chunked 模式不得同时声明 Content-Length");
+        assertNull(headers.headers().get(HttpHeaderNames.CONTENT_LENGTH), "chunked 模式不得同时声明 Content-Length");
     }
 
     // ========== 2-10：writeStream 应将慢速源的「读取」卸载到业务线程池，避免阻塞调用/EventLoop 线程 ==========
@@ -277,8 +276,7 @@ class NettyServerHttpResponseTest {
         ArgumentCaptor<Object> body = ArgumentCaptor.forClass(Object.class);
         verify(ctx).write(body.capture());
         FileRegion region = assertInstanceOf(FileRegion.class, body.getValue(), "文件体应以零拷贝 FileRegion 写出");
-        assertEquals("file content".getBytes(StandardCharsets.UTF_8).length, region.count(),
-                "FileRegion 长度必须等于文件字节数");
+        assertEquals("file content".getBytes(StandardCharsets.UTF_8).length, region.count(), "FileRegion 长度必须等于文件字节数");
 
         testFile.delete();
     }
@@ -432,8 +430,7 @@ class NettyServerHttpResponseTest {
         // 失败点在「写响应头」而非文件读取：文件是否存在与本次断言无关
         File nonexistent = new File("should_not_exist_12345");
         RuntimeException ex = assertThrows(RuntimeException.class, () -> response.writeFile(nonexistent));
-        assertEquals("write error", ex.getCause().getMessage(),
-                "应向上传播写头失败本身，而不是 FileNotFound 等其他异常");
+        assertEquals("write error", ex.getCause().getMessage(), "应向上传播写头失败本身，而不是 FileNotFound 等其他异常");
     }
 
     // ========== P2-A: 关闭响应头 validateHeaders 校验 ==========

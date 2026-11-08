@@ -63,8 +63,7 @@ class ErrorPageRendererEscapingTest {
 
         for (Map.Entry<String, String> entry : cases.entrySet()) {
             String body = jsonBody(entry.getKey(), null, IncludePolicy.NEVER);
-            assertTrue(body.contains("\"message\":\"" + entry.getValue() + "\""),
-                    "控制字符应转义为 " + entry.getValue());
+            assertTrue(body.contains("\"message\":\"" + entry.getValue() + "\""), "控制字符应转义为 " + entry.getValue());
             assertEquals(entry.getKey(), json(body).get("message").asText(), "转义后解码必须还原原值");
         }
     }
@@ -112,8 +111,8 @@ class ErrorPageRendererEscapingTest {
 
     @Test
     void acceptsHtml_negotiatesContentType() {
-        ErrorResponseConfig cfg = new ErrorResponseConfig(IncludePolicy.NEVER, IncludePolicy.NEVER,
-                IncludePolicy.NEVER, true, "/error", false);
+        ErrorResponseConfig cfg = new ErrorResponseConfig(IncludePolicy.NEVER, IncludePolicy.NEVER, IncludePolicy.NEVER,
+                true, "/error", false);
 
         for (String accept : new String[] { null, "", "   ", "*/*", "text/html", "TEXT/HTML" }) {
             ErrorPageRenderer.ErrorResponseBody body = ErrorPageRenderer.build(HttpStatus.NOT_FOUND, "m", null, cfg,
@@ -123,8 +122,7 @@ class ErrorPageRendererEscapingTest {
         for (String accept : new String[] { "application/json", "application/problem+json" }) {
             ErrorPageRenderer.ErrorResponseBody body = ErrorPageRenderer.build(HttpStatus.NOT_FOUND, "m", null, cfg,
                     false, false, accept);
-            assertTrue(body.getContentType().startsWith("application/json"),
-                    "Accept=" + accept + " 应返回 JSON");
+            assertTrue(body.getContentType().startsWith("application/json"), "Accept=" + accept + " 应返回 JSON");
         }
     }
 
@@ -176,10 +174,10 @@ class ErrorPageRendererEscapingTest {
 
     @Test
     void problemDetails_omitsAllNullOptionalFields() {
-        ErrorResponseConfig cfg = new ErrorResponseConfig(IncludePolicy.NEVER, IncludePolicy.NEVER,
-                IncludePolicy.NEVER, false, null, true);
-        JsonNode node = json(ErrorPageRenderer.build(HttpStatus.BAD_REQUEST, "hidden", null, cfg, false, false)
-                .getBody());
+        ErrorResponseConfig cfg = new ErrorResponseConfig(IncludePolicy.NEVER, IncludePolicy.NEVER, IncludePolicy.NEVER,
+                false, null, true);
+        JsonNode node = json(
+                ErrorPageRenderer.build(HttpStatus.BAD_REQUEST, "hidden", null, cfg, false, false).getBody());
 
         assertFalse(node.has("detail"));
         assertFalse(node.has("instance"));

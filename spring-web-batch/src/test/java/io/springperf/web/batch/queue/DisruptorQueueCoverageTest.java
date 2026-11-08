@@ -118,9 +118,10 @@ class DisruptorQueueCoverageTest {
             queue = new DisruptorQueue(oddMeta.queueName(), oddMeta, new FastService());
 
             assertEquals(128, queue.bufferSize(), "100 应归一化到 128");
-            assertTrue(appender.list.stream()
-                    .anyMatch(e -> e.getLevel() == ch.qos.logback.classic.Level.WARN
-                            && e.getFormattedMessage().contains("normalized to 128")),
+            assertTrue(
+                    appender.list.stream()
+                            .anyMatch(e -> e.getLevel() == ch.qos.logback.classic.Level.WARN
+                                    && e.getFormattedMessage().contains("normalized to 128")),
                     "非 2 幂尺寸应告警归一化结果，实际日志: " + appender.list);
         } finally {
             logger.detachAppender(appender);
@@ -143,8 +144,7 @@ class DisruptorQueueCoverageTest {
 
         assertEquals("ok", r.getResult(), "回落后仍应正常处理请求");
         assertNotNull(FastService.LAST_THREAD.get());
-        assertEquals("batch-worker-" + m.queueName(), FastService.LAST_THREAD.get().getName(),
-                "虚拟线程不可用时必须回落到平台工作线程");
+        assertEquals("batch-worker-" + m.queueName(), FastService.LAST_THREAD.get().getName(), "虚拟线程不可用时必须回落到平台工作线程");
     }
 
     /* ==================== enqueue BLOCK ==================== */
@@ -186,8 +186,7 @@ class DisruptorQueueCoverageTest {
 
         assertEquals("ok", r.getResult(), "停机后请求应被 processDirectly 处理");
         assertEquals(1, FastService.INVOKED.get(), "每个停机后请求只应触发一次批量方法");
-        assertSame(Thread.currentThread(), FastService.LAST_THREAD.get(),
-                "processDirectly 必须在生产者线程同步执行，而不是另起线程");
+        assertSame(Thread.currentThread(), FastService.LAST_THREAD.get(), "processDirectly 必须在生产者线程同步执行，而不是另起线程");
     }
 
     /* ==================== 查询方法 ==================== */
@@ -284,8 +283,7 @@ class DisruptorQueueCoverageTest {
             Object errorResult = overflow.getResult();
             assertTrue(errorResult instanceof BatchOverflowException,
                     "DROP 失败应写入 BatchOverflowException（映射 429），实际: " + errorResult);
-            assertEquals(HttpStatus.TOO_MANY_REQUESTS,
-                    ((BatchOverflowException) errorResult).getStatusCode());
+            assertEquals(HttpStatus.TOO_MANY_REQUESTS, ((BatchOverflowException) errorResult).getStatusCode());
             verify(metrics).recordDrop(eq(m.queueName()));
             verify(metrics, never()).recordOverflow(anyString());
         } finally {
@@ -335,8 +333,8 @@ class DisruptorQueueCoverageTest {
     /* ==================== 容量指标 ==================== */
 
     /**
-     * 回归：{@code BatchMetrics#reportQueueCapacity} 曾经没有任何生产调用方，对外文档承诺的
-     * {@code batch.queue.remaining} / {@code batch.queue.capacity} Gauge 因此永远不会注册。
+     * 回归：{@code BatchMetrics#reportQueueCapacity} 曾经没有任何生产调用方，对外文档承诺的 {@code batch.queue.remaining} /
+     * {@code batch.queue.capacity} Gauge 因此永远不会注册。
      */
     @Test
     void processBatch_reportsQueueCapacity() throws Exception {
@@ -372,8 +370,7 @@ class DisruptorQueueCoverageTest {
 
             long gracefulLogs = appender.list.stream()
                     .filter(e -> e.getFormattedMessage().contains("shut down gracefully"))
-                    .filter(e -> e.getFormattedMessage().contains(m.queueName()))
-                    .count();
+                    .filter(e -> e.getFormattedMessage().contains(m.queueName())).count();
             assertEquals(1, gracefulLogs, "第二次 shutdown 必须直接返回，不得重复执行停机流程");
         } finally {
             logger.detachAppender(appender);

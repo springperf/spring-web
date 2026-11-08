@@ -58,8 +58,7 @@ class WebSocketExtensionNegotiatorTest {
         WebSocketServerExtension extension = WebSocketExtensionNegotiator
                 .negotiate(headers("x-unknown", "permessage-deflate"));
         assertNotNull(extension, "第一个头值无匹配时要继续看后续头值");
-        assertEquals("permessage-deflate", extension.newReponseData().name(),
-                "必须选中的是后续头值里的 permessage-deflate");
+        assertEquals("permessage-deflate", extension.newReponseData().name(), "必须选中的是后续头值里的 permessage-deflate");
     }
 
     @Test

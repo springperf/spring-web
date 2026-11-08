@@ -116,8 +116,7 @@ class AsyncSseLifecycleE2eTest {
             assertTrue(body.contains("chunk-2"), "应收到中间块，实际:\n" + body);
             assertTrue(body.contains("chunk-3"), "应收到末块，实际:\n" + body);
             assertTrue(body.indexOf("chunk-1") < body.indexOf("chunk-2")
-                            && body.indexOf("chunk-2") < body.indexOf("chunk-3"),
-                    "三块必须按序送达，实际:\n" + body);
+                    && body.indexOf("chunk-2") < body.indexOf("chunk-3"), "三块必须按序送达，实际:\n" + body);
         }
         assertRefsBackTo(baseline);
     }

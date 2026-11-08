@@ -131,8 +131,7 @@ class BatchDefaultThreadModelTest {
         assumeTrue(Runtime.version().feature() >= 21, "虚拟线程需要 JDK 21+，当前 JDK " + Runtime.version().feature());
         ResolvedSingle resolved = resolveSingleDispatchExecutor(PinnedController.class, PinnedConfig.class,
                 "singlePinned", true);
-        assertSame(resolved.defaultPool(), resolved.resolved(),
-                "显式 @RunInPool 必须优先于虚拟线程写入的 EventLoop 默认");
+        assertSame(resolved.defaultPool(), resolved.resolved(), "显式 @RunInPool 必须优先于虚拟线程写入的 EventLoop 默认");
     }
 
     /**

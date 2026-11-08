@@ -82,8 +82,8 @@ class NettyHttpHandlerErrorPathTest {
         DefaultFullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app");
         nettyHandler.channelRead(channel.pipeline().firstContext(), request);
 
-        org.mockito.ArgumentCaptor<WebServerHttpRequest> captor =
-                org.mockito.ArgumentCaptor.forClass(WebServerHttpRequest.class);
+        org.mockito.ArgumentCaptor<WebServerHttpRequest> captor = org.mockito.ArgumentCaptor
+                .forClass(WebServerHttpRequest.class);
         verify(handler).httpHandle(captor.capture(), any(WebServerHttpResponse.class));
 
         assertEquals("/", captor.getValue().getPath(), "contextPath 恰好等于请求路径时应归一为 /");
@@ -98,8 +98,8 @@ class NettyHttpHandlerErrorPathTest {
         DefaultFullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/app/hello");
         nettyHandler.channelRead(channel.pipeline().firstContext(), request);
 
-        org.mockito.ArgumentCaptor<WebServerHttpRequest> captor =
-                org.mockito.ArgumentCaptor.forClass(WebServerHttpRequest.class);
+        org.mockito.ArgumentCaptor<WebServerHttpRequest> captor = org.mockito.ArgumentCaptor
+                .forClass(WebServerHttpRequest.class);
         verify(handler).httpHandle(captor.capture(), any(WebServerHttpResponse.class));
 
         assertEquals("/hello", captor.getValue().getPath(), "匹配到的 contextPath 前缀必须剥离");

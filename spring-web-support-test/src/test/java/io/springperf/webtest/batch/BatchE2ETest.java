@@ -128,13 +128,12 @@ public class BatchE2ETest extends BaseE2ETest {
             final String msg = "test-" + i;
             executor.submit(() -> {
                 try {
-                    Request req = new Request.Builder().url(url("/api/batch/echo-batchsize?msg=" + msg)).get()
-                            .build();
+                    Request req = new Request.Builder().url(url("/api/batch/echo-batchsize?msg=" + msg)).get().build();
                     try (Response resp = CLIENT.newCall(req).execute()) {
                         String body = resp.body() != null ? resp.body().string() : "";
                         Integer batchSize = parseBatchSize(body, "batched");
-                        if (resp.code() == 200 && batchSize != null && batchSize <= 2
-                                && body.contains("msg=" + msg) && body.contains(":thread=batch-")) {
+                        if (resp.code() == 200 && batchSize != null && batchSize <= 2 && body.contains("msg=" + msg)
+                                && body.contains(":thread=batch-")) {
                             successCount.incrementAndGet();
                             batchSizes.add(batchSize);
                         } else {
@@ -216,8 +215,7 @@ public class BatchE2ETest extends BaseE2ETest {
             final String msg = "test-" + i;
             executor.submit(() -> {
                 try {
-                    Request req = new Request.Builder().url(url("/api/batch/echo-consumers?msg=" + msg)).get()
-                            .build();
+                    Request req = new Request.Builder().url(url("/api/batch/echo-consumers?msg=" + msg)).get().build();
                     try (Response resp = CLIENT.newCall(req).execute()) {
                         String body = resp.body() != null ? resp.body().string() : "";
                         Integer batchSize = parseBatchSize(body, "consumed");

@@ -110,14 +110,12 @@ class OpenApiAdapterBranchesTest {
         assertTrue(unclosed.getParameters() == null || unclosed.getParameters().isEmpty());
 
         Operation regex = new Operation();
-        call(adapter, "addPathParameters", new Class<?>[] { String.class, Operation.class },
-                "/api/{id:[0-9]+}", regex);
+        call(adapter, "addPathParameters", new Class<?>[] { String.class, Operation.class }, "/api/{id:[0-9]+}", regex);
         assertEquals(1, regex.getParameters().size());
         assertEquals("id", regex.getParameters().get(0).getName());
 
         Operation multiple = new Operation();
-        call(adapter, "addPathParameters", new Class<?>[] { String.class, Operation.class },
-                "/api/{a}/{b}", multiple);
+        call(adapter, "addPathParameters", new Class<?>[] { String.class, Operation.class }, "/api/{a}/{b}", multiple);
         assertEquals(2, multiple.getParameters().size());
         assertEquals("b", multiple.getParameters().get(1).getName());
     }
@@ -127,12 +125,10 @@ class OpenApiAdapterBranchesTest {
         OpenApiAdapter adapter = new OpenApiAdapter(mock(WebContext.class));
         PathMappingContext ctx = mock(PathMappingContext.class);
         doReturn(null).when(ctx).getBeanType();
-        assertEquals("Endpoints", call(adapter, "extractTagName",
-                new Class<?>[] { PathMappingContext.class }, ctx));
+        assertEquals("Endpoints", call(adapter, "extractTagName", new Class<?>[] { PathMappingContext.class }, ctx));
 
         doReturn(SampleController.class).when(ctx).getBeanType();
-        assertEquals("Sample", call(adapter, "extractTagName",
-                new Class<?>[] { PathMappingContext.class }, ctx));
+        assertEquals("Sample", call(adapter, "extractTagName", new Class<?>[] { PathMappingContext.class }, ctx));
     }
 
     @Test
@@ -141,8 +137,7 @@ class OpenApiAdapterBranchesTest {
         PathItem item = new PathItem();
         Operation operation = new Operation().operationId("optionsOp");
 
-        call(adapter, "setPathItemOperation",
-                new Class<?>[] { PathItem.class, HttpMethod.class, Operation.class },
+        call(adapter, "setPathItemOperation", new Class<?>[] { PathItem.class, HttpMethod.class, Operation.class },
                 item, HttpMethod.OPTIONS, operation);
 
         assertSame(operation, item.getOptions());

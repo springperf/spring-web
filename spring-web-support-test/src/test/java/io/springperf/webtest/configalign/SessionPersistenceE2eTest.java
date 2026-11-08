@@ -143,8 +143,7 @@ class SessionPersistenceE2eTest {
         String persisted = new String(Files.readAllBytes(sessionFile), StandardCharsets.ISO_8859_1);
         assertTrue(persisted.contains("hello-persist"), "greeting 必须落盘，实际文件内容: " + persisted);
         assertTrue(persisted.contains("kept-value"), "排除名单外的 kept 属性必须落盘，实际文件内容: " + persisted);
-        assertFalse(persisted.contains("secret-value"),
-                "persistent-exclude=secret 命中的属性不得落盘，实际文件内容: " + persisted);
+        assertFalse(persisted.contains("secret-value"), "persistent-exclude=secret 命中的属性不得落盘，实际文件内容: " + persisted);
 
         // ---- 重启：greeting 应从磁盘恢复（secret 未落盘已由上一步证明） ----
         ConfigurableApplicationContext ctx2 = new SpringApplication(io.springperf.webtest.SupportTestApplication.class)

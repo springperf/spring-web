@@ -348,7 +348,8 @@ public final class PropertiesConstant {
     public static final boolean SERVLET_JSP_DEVELOPMENT_DEFAULT = false;
 
     /**
-     * {@code server.servlet.jsp.keep-generated}：是否保留 Jasper 生成的 Java 源文件， 映射为 init-param {@code keepgenerated}（默认 false）。
+     * {@code server.servlet.jsp.keep-generated}：是否保留 Jasper 生成的 Java 源文件， 映射为 init-param {@code keepgenerated}（默认
+     * false）。
      */
     public static final String SERVLET_JSP_KEEP_GENERATED = "server.servlet.jsp.keep-generated";
     public static final boolean SERVLET_JSP_KEEP_GENERATED_DEFAULT = false;

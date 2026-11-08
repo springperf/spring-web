@@ -84,8 +84,7 @@ class BatchInvokerTest {
         Constructor<?> ctor = ExplodingRequest.class.getDeclaredConstructor(String.class);
         BatchInvoker invoker = new BatchInvoker(meta(ExplodingRequest.class, ctor), queue);
 
-        assertThatThrownBy(() -> invoker.invoke(new Object[] { "x" }))
-                .isInstanceOf(InvocationTargetException.class)
+        assertThatThrownBy(() -> invoker.invoke(new Object[] { "x" })).isInstanceOf(InvocationTargetException.class)
                 .hasCauseInstanceOf(IllegalStateException.class);
         verify(queue, times(0)).enqueue(any());
     }
@@ -96,8 +95,7 @@ class BatchInvokerTest {
         BatchInvoker invoker = new BatchInvoker(meta(TestRequest.class, ctor), queue);
         doThrow(new BatchOverflowException("test-queue")).when(queue).enqueue(any());
 
-        assertThatThrownBy(() -> invoker.invoke(new Object[] { "hello" }))
-                .isInstanceOf(BatchOverflowException.class);
+        assertThatThrownBy(() -> invoker.invoke(new Object[] { "hello" })).isInstanceOf(BatchOverflowException.class);
     }
 
     @Test

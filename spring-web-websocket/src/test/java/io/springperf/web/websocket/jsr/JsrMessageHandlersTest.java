@@ -113,8 +113,7 @@ class JsrMessageHandlersTest {
     void deliverBinary_byteArrayAndByteBuffer() throws Exception {
         JsrMessageHandlers handlers = new JsrMessageHandlers();
         List<byte[]> captured = new ArrayList<>();
-        handlers.add(JsrMessageHandlers.BINARY, byte[].class,
-                (MessageHandler.Whole<byte[]>) captured::add, false);
+        handlers.add(JsrMessageHandlers.BINARY, byte[].class, (MessageHandler.Whole<byte[]>) captured::add, false);
 
         assertTrue(handlers.deliverBinary(ByteBuffer.wrap(new byte[] { 1, 2, 3 }), codecRegistry));
         assertEquals(1, captured.size(), "二进制消息必须交付一次");
@@ -287,10 +286,8 @@ class JsrMessageHandlersTest {
         handlers.add(JsrMessageHandlers.BINARY, Message.class,
                 (MessageHandler.Whole<Message>) message -> received.add(message.getValue()), false);
 
-        assertTrue(handlers.deliverBinary(ByteBuffer.wrap(new byte[] { 7 }), binaryRegistry),
-                "自定义 decoder 的载荷必须被交付成功");
-        assertEquals(List.of("bin:7"), received,
-                "decoder 必须收到真实载荷字节，硬编码返回值会让断言自证");
+        assertTrue(handlers.deliverBinary(ByteBuffer.wrap(new byte[] { 7 }), binaryRegistry), "自定义 decoder 的载荷必须被交付成功");
+        assertEquals(List.of("bin:7"), received, "decoder 必须收到真实载荷字节，硬编码返回值会让断言自证");
     }
 
     @ServerEndpoint(value = "/binary-decoder", decoders = BinaryMessageDecoder.class)

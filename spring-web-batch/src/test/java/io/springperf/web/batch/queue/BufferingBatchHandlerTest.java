@@ -277,8 +277,7 @@ class BufferingBatchHandlerTest {
     }
 
     /**
-     * 竞态：容器超时先到，批次方法正常返回但漏调 setResult，走 {@code failUncompleted} 兜底。
-     * 兜底同样不得覆盖超时错误。
+     * 竞态：容器超时先到，批次方法正常返回但漏调 setResult，走 {@code failUncompleted} 兜底。 兜底同样不得覆盖超时错误。
      */
     @Test
     void processBatch_timedOutRequestIsNotOverwrittenByFallback() {
@@ -360,8 +359,7 @@ class BufferingBatchHandlerTest {
 
         assertThat(req.isCompleted()).as("漏完成的请求必须被显式失败，而不是挂到超时").isTrue();
         assertThat(req.getResult()).isInstanceOf(IllegalStateException.class);
-        assertThat(((Throwable) req.getResult()).getMessage())
-                .contains("returned without completing request")
+        assertThat(((Throwable) req.getResult()).getMessage()).contains("returned without completing request")
                 .contains("test-queue");
     }
 

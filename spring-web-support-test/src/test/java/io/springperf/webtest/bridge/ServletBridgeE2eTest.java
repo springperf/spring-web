@@ -132,8 +132,7 @@ class ServletBridgeE2eTest extends BaseE2ETest {
             String responseBody = resp.body().string();
             assertEquals(500, resp.code(),
                     "无匹配 converter 时不得静默返回 200 空 body，应由 ExceptionRegistry 收敛为 500，实际 " + responseBody);
-            assertFalse(responseBody.contains("be-silently-dropped"),
-                    "冲突响应不得包含控制器返回值，实际 " + responseBody);
+            assertFalse(responseBody.contains("be-silently-dropped"), "冲突响应不得包含控制器返回值，实际 " + responseBody);
         }
     }
 

@@ -204,8 +204,8 @@ class PerfAsyncWebRequestTest {
     /**
      * 超时占位后，被取消任务的结果必须被丢弃。
      * <p>
-     * 回归：{@code CallableInterceptorChain#triggerAfterTimeout} 第一件事是 {@code cancel(true)}，被中断的任务线程会立刻
-     * 带着 {@code InterruptedException} 抢写结果槽——修复前超时线程总是输，503 被降级成任务侧 500。
+     * 回归：{@code CallableInterceptorChain#triggerAfterTimeout} 第一件事是 {@code cancel(true)}，被中断的任务线程会立刻 带着
+     * {@code InterruptedException} 抢写结果槽——修复前超时线程总是输，503 被降级成任务侧 500。
      * </p>
      */
     @Test

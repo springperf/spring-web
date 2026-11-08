@@ -109,8 +109,8 @@ class BatchRequestTest {
     /**
      * 容器只置 expired 标志、尚未写入结果的窗口（Spring 内部状态，用反射模拟）。
      * <p>
-     * 此时父类 {@code setResult} 会拒绝写入；如果 {@code BatchRequest} 先置 completed 再写入，
-     * 就会出现「父类无结果、内部却标记已完成」的不一致——后续 {@code failUncompleted} 会跳过该请求， 请求静默失联。
+     * 此时父类 {@code setResult} 会拒绝写入；如果 {@code BatchRequest} 先置 completed 再写入， 就会出现「父类无结果、内部却标记已完成」的不一致——后续
+     * {@code failUncompleted} 会跳过该请求， 请求静默失联。
      * </p>
      */
     @Test

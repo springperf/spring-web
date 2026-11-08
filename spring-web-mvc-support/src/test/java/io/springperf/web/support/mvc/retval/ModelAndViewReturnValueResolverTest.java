@@ -109,8 +109,7 @@ class ModelAndViewReturnValueResolverTest {
     void resolveReturnValue_viewNotFound_throws() throws Exception {
         ModelAndView mav = new ModelAndView("missing");
         when(viewResolverRegistry.resolve(eq("missing"), eq(req))).thenReturn(null);
-        assertThrows(IllegalArgumentException.class,
-                () -> resolver.resolveReturnValue(mav, mavParam(), req, resp),
+        assertThrows(IllegalArgumentException.class, () -> resolver.resolveReturnValue(mav, mavParam(), req, resp),
                 "未解析视图不得静默产出空白 200");
         verify(resp, never()).setHandled();
     }

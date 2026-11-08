@@ -179,15 +179,13 @@ class GracefulShutdownE2eTest {
                 break;
             }
         }
-        assertTrue(rejected != null && rejected.startsWith("HTTP/1.1 503"),
-                "关闭触发后新请求应被 503 拒绝，实际:\n" + rejected);
+        assertTrue(rejected != null && rejected.startsWith("HTTP/1.1 503"), "关闭触发后新请求应被 503 拒绝，实际:\n" + rejected);
 
         // ---- 在途渐进式请求必须完整送达（关闭不得截断流） ----
         String rest = readAll(a);
         String full = first + rest;
         assertTrue(full.contains("gs-part-2"), "在途渐进式请求应在优雅关闭期间完整送达，实际:\n" + full);
-        assertTrue(full.toLowerCase().contains("connection: close"),
-                "在途请求应以关闭连接收尾，实际:\n" + full);
+        assertTrue(full.toLowerCase().contains("connection: close"), "在途请求应以关闭连接收尾，实际:\n" + full);
         a.close();
 
         // ---- 关闭完成后：新连接被拒绝（acceptor 已关） ----

@@ -67,8 +67,7 @@ class SslContextFactoryDefaultsTest {
         Ssl ssl = pemSsl();
         ssl.setTrustStore("classpath:no-such-truststore.p12");
 
-        assertNotNull(SslContextFactory.createServerSslContext(ssl, false),
-                "未配置 client-auth 时不应加载 trust-store");
+        assertNotNull(SslContextFactory.createServerSslContext(ssl, false), "未配置 client-auth 时不应加载 trust-store");
     }
 
     @Test

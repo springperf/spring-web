@@ -32,28 +32,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class AutoConfigurationContractTest {
 
-    private static final String IMPORTS_RESOURCE =
-            "META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports";
+    private static final String IMPORTS_RESOURCE = "META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports";
 
     private static final String PREFIX = "io.springperf.web.autoconfigure.";
 
     /** 唯一真源：新增/删除自动配置必须同步更新本集合与 .imports。 */
-    private static final Set<String> EXPECTED = Set.of(
-            PREFIX + "SpringWebAutoConfiguration",
-            PREFIX + "SpringWebRuntimeHintsConfiguration",
-            PREFIX + "WebServerInitializedEventAutoConfiguration",
-            PREFIX + "SpringWebServletAutoConfiguration",
-            PREFIX + "SpringWebMvcSupportAutoConfiguration",
-            PREFIX + "ActuatorEndpointAutoConfiguration",
-            PREFIX + "SpringDataWebCompatibilityAutoConfiguration",
-            PREFIX + "SpringBootAdminClientAutoConfiguration",
-            PREFIX + "OpenApiAutoConfiguration",
-            PREFIX + "SwaggerUiAutoConfiguration",
-            PREFIX + "SpringWebViewAutoConfiguration",
-            PREFIX + "SpringWebBatchAutoConfiguration",
-            PREFIX + "JspViewAutoConfiguration",
-            PREFIX + "SpringWebViewExchangeAutoConfiguration",
-            PREFIX + "SpringWebPropertyRefreshAutoConfiguration");
+    private static final Set<String> EXPECTED = Set.of(PREFIX + "SpringWebAutoConfiguration",
+            PREFIX + "SpringWebRuntimeHintsConfiguration", PREFIX + "WebServerInitializedEventAutoConfiguration",
+            PREFIX + "SpringWebServletAutoConfiguration", PREFIX + "SpringWebMvcSupportAutoConfiguration",
+            PREFIX + "ActuatorEndpointAutoConfiguration", PREFIX + "SpringDataWebCompatibilityAutoConfiguration",
+            PREFIX + "SpringBootAdminClientAutoConfiguration", PREFIX + "OpenApiAutoConfiguration",
+            PREFIX + "SwaggerUiAutoConfiguration", PREFIX + "SpringWebViewAutoConfiguration",
+            PREFIX + "SpringWebBatchAutoConfiguration", PREFIX + "JspViewAutoConfiguration",
+            PREFIX + "SpringWebViewExchangeAutoConfiguration", PREFIX + "SpringWebPropertyRefreshAutoConfiguration");
 
     @Test
     void importsFile_matchesExpectedRegistrationSet() throws Exception {
@@ -97,9 +88,8 @@ class AutoConfigurationContractTest {
     void beanConditionalClasses_declareExplicitOrdering() throws Exception {
         for (String name : imports()) {
             Class<?> type = load(name);
-            boolean hasBeanCondition = type.isAnnotationPresent(ConditionalOnBean.class)
-                    || Arrays.stream(type.getDeclaredMethods())
-                            .anyMatch(m -> m.isAnnotationPresent(ConditionalOnBean.class));
+            boolean hasBeanCondition = type.isAnnotationPresent(ConditionalOnBean.class) || Arrays
+                    .stream(type.getDeclaredMethods()).anyMatch(m -> m.isAnnotationPresent(ConditionalOnBean.class));
             if (!hasBeanCondition) {
                 continue;
             }

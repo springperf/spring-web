@@ -105,8 +105,7 @@ class PerfHttpServletRequestTest {
     @Test
     void getHeaders_returnsEnumeration() {
         when(headers.get("Accept-Language")).thenReturn(Arrays.asList("en-US", "en"));
-        assertEquals(Arrays.asList("en-US", "en"),
-                Collections.list(servletRequest.getHeaders("Accept-Language")));
+        assertEquals(Arrays.asList("en-US", "en"), Collections.list(servletRequest.getHeaders("Accept-Language")));
     }
 
     @Test
@@ -358,8 +357,7 @@ class PerfHttpServletRequestTest {
     @Test
     void httpHeaderDateParser_empty_throwsIllegalArgument() {
         // Servlet 规范：日期头存在但无法解析 → IllegalArgumentException（-1 只表示「头不存在」）
-        assertThrows(IllegalArgumentException.class,
-                () -> PerfHttpServletRequest.HttpHeaderDateParser.parseDate(""));
+        assertThrows(IllegalArgumentException.class, () -> PerfHttpServletRequest.HttpHeaderDateParser.parseDate(""));
     }
 
     @Test
@@ -549,12 +547,10 @@ class PerfHttpServletRequestTest {
 
     @Test
     void upgrade_createsHandler() throws Exception {
-        TestHttpUpgradeHandler handler = assertDoesNotThrow(
-                () -> servletRequest.upgrade(TestHttpUpgradeHandler.class));
+        TestHttpUpgradeHandler handler = assertDoesNotThrow(() -> servletRequest.upgrade(TestHttpUpgradeHandler.class));
 
         assertNotNull(handler);
-        assertTrue(handler.initialized.await(2, java.util.concurrent.TimeUnit.SECONDS),
-                "upgrade 应异步调用 handler.init");
+        assertTrue(handler.initialized.await(2, java.util.concurrent.TimeUnit.SECONDS), "upgrade 应异步调用 handler.init");
         assertNotNull(handler.connection, "init 应收到 WebConnection");
     }
 

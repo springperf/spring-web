@@ -583,10 +583,8 @@ class HttpBodyCodecRegistryTest {
         HttpMessageNotWritableException ex = assertThrows(HttpMessageNotWritableException.class,
                 () -> registry.writeBody("body", parameter, request, response));
 
-        assertTrue(ex.getMessage().contains("application/xml"),
-                "异常应带预设 Content-Type 上下文，实际 " + ex.getMessage());
-        assertTrue(ex.getMessage().contains(String.class.getName()),
-                "异常应带返回值类型上下文，实际 " + ex.getMessage());
+        assertTrue(ex.getMessage().contains("application/xml"), "异常应带预设 Content-Type 上下文，实际 " + ex.getMessage());
+        assertTrue(ex.getMessage().contains(String.class.getName()), "异常应带返回值类型上下文，实际 " + ex.getMessage());
         verify(converter1, never()).write(any(), any(), any(), any(), any(), any(), any());
     }
 

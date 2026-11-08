@@ -39,8 +39,8 @@ class AccessLogWriterEdgeTest {
         assertTrue(Files.exists(foreign), "非本 writer 命名的文件不应误删");
         assertTrue(Files.exists(malformed), "日期非法的同名格式文件不应误删");
         assertTrue(Files.exists(wrongSuffix), "后缀不匹配的文件不应误删");
-        assertTrue(Files.exists(tempDir.resolve(
-                "access" + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE) + ".log")));
+        assertTrue(Files
+                .exists(tempDir.resolve("access" + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE) + ".log")));
     }
 
     @Test

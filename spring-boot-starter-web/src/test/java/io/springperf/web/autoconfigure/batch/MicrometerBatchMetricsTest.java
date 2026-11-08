@@ -132,15 +132,11 @@ class MicrometerBatchMetricsTest {
         } finally {
             pool.shutdownNow();
         }
-        assertEquals(1,
-                registry.getMeters().stream()
-                        .filter(m -> "batch.queue.remaining".equals(m.getId().getName())
-                                && "q1".equals(m.getId().getTag("queue")))
-                        .count(),
-                "并发首次注册不应产生重复 gauge");
-        assertEquals(1, registry.getMeters().stream()
-                .filter(m -> "batch.queue.capacity".equals(m.getId().getName())
-                        && "q1".equals(m.getId().getTag("queue")))
+        assertEquals(1, registry.getMeters().stream().filter(
+                m -> "batch.queue.remaining".equals(m.getId().getName()) && "q1".equals(m.getId().getTag("queue")))
+                .count(), "并发首次注册不应产生重复 gauge");
+        assertEquals(1, registry.getMeters().stream().filter(
+                m -> "batch.queue.capacity".equals(m.getId().getName()) && "q1".equals(m.getId().getTag("queue")))
                 .count());
         // 并发写入的最终值必须是某一次上报（remaining 100..115、capacity 200），而不是 0/丢失
         assertEquals(200.0, registry.get("batch.queue.capacity").tag("queue", "q1").gauge().value(), 0.001);

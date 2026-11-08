@@ -80,13 +80,12 @@ public class ViewReturnValueResolver extends BaseWebComponent implements ReturnV
     /**
      * 是否显式禁用了全部内置模板引擎（{@code spring.web.view.engine=none}）。
      * <p>
-     * 此时仅支持 {@code redirect:} 视图名，无模板引擎时不应触发 fail-fast。
-     * 配置取值的合法性由 {@link ViewProperties#parseEngines(String)} 统一校验。
+     * 此时仅支持 {@code redirect:} 视图名，无模板引擎时不应触发 fail-fast。 配置取值的合法性由 {@link ViewProperties#parseEngines(String)} 统一校验。
      * </p>
      */
     private boolean isViewEngineDisabled() {
-        return ViewProperties.parseEngines(
-                webContext.getProps().get(ViewProperties.ENGINE, ViewProperties.ENGINE_DEFAULT))
+        return ViewProperties
+                .parseEngines(webContext.getProps().get(ViewProperties.ENGINE, ViewProperties.ENGINE_DEFAULT))
                 .contains(ViewProperties.ENGINE_NONE);
     }
 
@@ -122,12 +121,10 @@ public class ViewReturnValueResolver extends BaseWebComponent implements ReturnV
     }
 
     /**
-     * 视图响应的 Content-Type 与响应编码由这里统一决定：View 提供 Content-Type 时保留其媒体类型与参数，
-     * 自带 charset 时同步到响应编码；未带 charset 时把响应实际编码补进 Content-Type，保证 Writer 写出的字节
-     * 与响应头声明一致。未提供 Content-Type 则回退 {@code text/html} + 响应编码。重定向无响应体，不设置 Content-Type。
+     * 视图响应的 Content-Type 与响应编码由这里统一决定：View 提供 Content-Type 时保留其媒体类型与参数， 自带 charset 时同步到响应编码；未带 charset 时把响应实际编码补进
+     * Content-Type，保证 Writer 写出的字节 与响应头声明一致。未提供 Content-Type 则回退 {@code text/html} + 响应编码。重定向无响应体，不设置 Content-Type。
      * <p>
-     * 供 {@code ModelAndViewReturnValueResolver} 与 {@code ViewControllerInvoker} 复用，
-     * 避免两条链路各写一套导致头与字节编码错配。
+     * 供 {@code ModelAndViewReturnValueResolver} 与 {@code ViewControllerInvoker} 复用， 避免两条链路各写一套导致头与字节编码错配。
      * </p>
      */
     public static void applyContentType(View view, WebServerHttpResponse resp) {
@@ -159,14 +156,12 @@ public class ViewReturnValueResolver extends BaseWebComponent implements ReturnV
     /**
      * 视图统一渲染入口：渲染成功后才标记响应已处理；渲染失败时丢弃缓冲区里的半截页面。
      * <p>
-     * 模板引擎直接向响应体输出流写入，中途抛异常时缓冲区已留有部分 HTML。若响应已被标记为
-     * handled，异常链路的错误响应会因 {@code setHandled()} 失败而被放弃，客户端收到 200 加半截页面；
-     * 异常处理器返回的错误页则会拼接在半截页面之后（该路径不清缓冲区）。因此失败时必须清空缓冲，
-     * 且不能提前置位 handled。
+     * 模板引擎直接向响应体输出流写入，中途抛异常时缓冲区已留有部分 HTML。若响应已被标记为 handled，异常链路的错误响应会因 {@code setHandled()} 失败而被放弃，客户端收到 200 加半截页面；
+     * 异常处理器返回的错误页则会拼接在半截页面之后（该路径不清缓冲区）。因此失败时必须清空缓冲， 且不能提前置位 handled。
      * </p>
      */
-    public static void renderView(View view, Map<String, ?> model, WebServerHttpRequest req,
-            WebServerHttpResponse resp) throws Exception {
+    public static void renderView(View view, Map<String, ?> model, WebServerHttpRequest req, WebServerHttpResponse resp)
+            throws Exception {
         try {
             view.render(model, req, resp);
         } catch (Exception | Error ex) {

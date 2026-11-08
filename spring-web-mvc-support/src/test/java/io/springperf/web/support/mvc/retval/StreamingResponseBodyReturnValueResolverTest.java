@@ -148,8 +148,7 @@ class StreamingResponseBodyReturnValueResolverTest {
     @Test
     void resolveReturnValue_responseEntityAppliesStatusAndHeaders() throws Exception {
         ResponseEntity<StreamingResponseBody> entity = ResponseEntity.status(HttpStatus.CREATED)
-                .header("X-Trace", "abc")
-                .body(out -> out.write(1));
+                .header("X-Trace", "abc").body(out -> out.write(1));
 
         resolver.resolveReturnValue(entity, null, req, resp);
 
@@ -183,8 +182,7 @@ class StreamingResponseBodyReturnValueResolverTest {
     /**
      * 顺序不变式：先派发结果（触发 postHandle / afterCompletion / 指标），再写终止块。
      * <p>
-     * 反过来时终止块的写完成回调会先把异步状态推到 COMPLETED，使 {@code dispatch()} 的 CAS 失败，
-     * 异步收尾被整个跳过。这两行的顺序只能靠测试锁死——调换后没有任何编译或运行时信号。
+     * 反过来时终止块的写完成回调会先把异步状态推到 COMPLETED，使 {@code dispatch()} 的 CAS 失败， 异步收尾被整个跳过。这两行的顺序只能靠测试锁死——调换后没有任何编译或运行时信号。
      * </p>
      */
     @Test

@@ -83,8 +83,7 @@ public final class ViewProperties {
     private static final Set<String> VALID_ENGINES = Set.of("thymeleaf", "freemarker", "beetl");
 
     /**
-     * 解析 {@link #ENGINE}：未配置返回空集合（不过滤引擎，由 classpath 装配决定）；
-     * 其余情形返回小写引擎名集合。非法值与 {@code none} 混写都在启动期以明确异常中断，不静默降级。
+     * 解析 {@link #ENGINE}：未配置返回空集合（不过滤引擎，由 classpath 装配决定）； 其余情形返回小写引擎名集合。非法值与 {@code none} 混写都在启动期以明确异常中断，不静默降级。
      */
     public static Set<String> parseEngines(String raw) {
         if (raw == null || raw.trim().isEmpty()) {
@@ -133,8 +132,7 @@ public final class ViewProperties {
         if ("false".equalsIgnoreCase(value)) {
             return false;
         }
-        throw new IllegalStateException("Invalid boolean value for '" + key + "': '" + v
-                + "' (expected true/false)");
+        throw new IllegalStateException("Invalid boolean value for '" + key + "': '" + v + "' (expected true/false)");
     }
 
     /** Duration 风格读取（毫秒）。 */
@@ -163,6 +161,7 @@ public final class ViewProperties {
     /** 去掉视图名已带的后缀（Thymeleaf 的 TemplateEngine 会自行补后缀，须传纯模板名）。 */
     public static String withoutSuffix(String viewName, String suffix) {
         return suffix != null && !suffix.isEmpty() && viewName.endsWith(suffix)
-                ? viewName.substring(0, viewName.length() - suffix.length()) : viewName;
+                ? viewName.substring(0, viewName.length() - suffix.length())
+                : viewName;
     }
 }

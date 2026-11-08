@@ -88,8 +88,7 @@ class WebSocketUpgradePolicyTest {
 
     @Test
     void resolveMaxFrameSize_usesPerPathLimitOrLargestDefault() {
-        assertEquals(64 * 1024L, newPolicy(null).resolveMaxFrameSize(null),
-                "默认最大帧长用硬编码期望值，避免与实现按同一公式自证");
+        assertEquals(64 * 1024L, newPolicy(null).resolveMaxFrameSize(null), "默认最大帧长用硬编码期望值，避免与实现按同一公式自证");
 
         WebSocketHandlerRegistration limited = new WebSocketHandlerRegistration(mock(WebSocketHandler.class), "/ws")
                 .setMessageSizeLimit(4_096);
