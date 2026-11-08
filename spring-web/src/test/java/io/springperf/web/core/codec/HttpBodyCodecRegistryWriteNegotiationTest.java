@@ -335,18 +335,20 @@ class HttpBodyCodecRegistryWriteNegotiationTest {
     }
 
     @Test
-    void writeBody_optimizeMethodWithProduces_noConverter_silentNoWrite() throws Exception {
+    void writeBody_optimizeMethodWithProduces_noConverter_throws() throws Exception {
         HttpBodyConverter converter = mock(HttpBodyConverter.class);
         when(converter.canWrite(any(), any(), any(), any(), any(), any())).thenReturn(false);
         registry.converters.add(converter);
         setMatchedContext(optimizedProduceContext());
 
-        write("a", optimizeReturnType);
+        // produces 协商出 concrete mediaType 但无 converter 支持 → 必须显式失败。
+        // 旧行为是静默 return：客户端拿到 200 + 空 body（连 CT 都没写），返回值被无声丢弃。
+        HttpMessageNotWritableException ex = assertThrows(HttpMessageNotWritableException.class,
+                () -> write("a", optimizeReturnType));
 
-        // produces 协商出 concrete mediaType 但无 converter 支持 → path2a 保持历史行为：静默不写
-        // （注意：path1「响应已设 Content-Type」无匹配 converter 已改为抛
-        // HttpMessageNotWritableException，不再与本分支同语义）。
         verify(converter, never()).write(any(), any(), any(), any(), any(), any(), any());
+        assertTrue(ex.getMessage().contains("java.lang.String") && ex.getMessage().contains("application/json"),
+                "消息必须带返回值类型与协商出的 Content-Type，便于定位：" + ex.getMessage());
     }
 
     @Test

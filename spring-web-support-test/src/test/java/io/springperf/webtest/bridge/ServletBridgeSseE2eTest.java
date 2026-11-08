@@ -133,19 +133,27 @@ class ServletBridgeSseE2eTest extends BaseE2ETest {
     }
 
     /**
-     * {@code StreamingResponseBody} 当前**不受支持**（行为固化用例）。
+     * {@code StreamingResponseBody} 当前**不受支持**，但不得静默丢弃（行为固化用例）。
      * <p>
-     * 它与 emitter 无关：只是独立 {@code @FunctionalInterface}（{@code writeTo(OutputStream)}）， 既不是 {@code StreamEmitter} 也没有
-     * resolver 认领 → 返回值被静默忽略，客户端拿到 200 + 空 body。 若将来实现了对应 resolver（或改为 fail-fast 报错），本用例会失败并提示更新——这正是它的作用。
+     * 它与 emitter 无关：只是独立 {@code @FunctionalInterface}（{@code writeTo(OutputStream)}）， 既没有 {@code StreamEmitter} 的
+     * resolver 认领，也没有 converter 能写。此前返回值被静默忽略，客户端拿到 200 + 空 body（连
+     * {@code produces} 声明的 Content-Type 都不写），服务端零异常零日志 —— 是最难排查的一类降级。
+     * 现在协商出 {@code text/plain} 却无 converter 可写 → fail-fast 500，与「显式 Content-Type
+     * 无匹配 converter」一致。
+     * </p>
+     * <p>
+     * 若将来实现了对应 resolver（真正支持 SRB），本用例会失败并提示改为正向断言——这正是它的作用。
      * </p>
      */
     @Test
-    void streamingResponseBody_isNotSupported_documentsGap() throws Exception {
+    void streamingResponseBody_failsFastInsteadOfSilentEmptyBody() throws Exception {
         try (Response resp = CLIENT
                 .newCall(new Request.Builder().url(url("/api/servlet-bridge/streaming-response-body")).build())
                 .execute()) {
-            assertEquals(200, resp.code(), "当前实现下应为 200（无 resolver 认领 → 静默空响应）");
             String body = resp.body().string();
+            assertEquals(500, resp.code(),
+                    "无 resolver 认领的返回类型必须 fail-fast（500），不得静默 200 + 空 body。实际 code=" + resp.code()
+                            + ", body=[" + body + "]");
             assertFalse(body.contains("srb-1"), "若此处出现内容，说明 StreamingResponseBody 已被支持——请把本用例改为正向断言。实际:\n" + body);
         }
     }
