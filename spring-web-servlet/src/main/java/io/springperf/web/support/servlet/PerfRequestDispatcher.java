@@ -12,8 +12,10 @@ import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
+import javax.servlet.http.HttpServletMapping;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponseWrapper;
+import javax.servlet.http.MappingMatch;
 
 import java.io.IOException;
 
@@ -54,6 +56,9 @@ public class PerfRequestDispatcher implements RequestDispatcher {
         requestContext.setAttribute(RequestDispatcher.FORWARD_PATH_INFO, "");
         // 修正 2-20：FORWARD_QUERY_STRING 记录「原始请求」的纯查询串，不含 path、不含前导 '?'
         requestContext.setAttribute(RequestDispatcher.FORWARD_QUERY_STRING, queryStringOf(webRequest));
+        // FORWARD_MAPPING 描述「原始请求」的映射（Servlet 4.0+，值为 HttpServletMapping 而非 String）；
+        // 本框架 getServletPath() = getPath()、按路径精确派发，故用原始请求路径构造 EXACT 映射。
+        requestContext.setAttribute(RequestDispatcher.FORWARD_MAPPING, pathMapping(webRequest.getPath()));
 
         // Set dispatcher type to FORWARD
         if (request instanceof PerfHttpServletRequest) {
@@ -78,34 +83,120 @@ public class PerfRequestDispatcher implements RequestDispatcher {
         WebContext webContext = webRequest.getWebContext();
         RequestContext requestContext = webRequest.getRequestContext();
 
-        // Save and set dispatcher type to INCLUDE
+        // 校验前移：原实现在写完 INCLUDE_* 属性之后才校验 dispatcher，校验抛异常时属性已写入且无人清理
+        DispatcherHandler dispatcher = webContext.getDispatcherHandler();
+        if (!(dispatcher instanceof SupportDispatcherHandler)) {
+            throw new ServletException("DispatcherHandler is not a SupportDispatcherHandler");
+        }
+
+        // 保存 include 前的 INCLUDE_* 旧值：嵌套 include 结束后必须恢复「外层」的值，而不是一律移除
+        String oldRequestUri = (String) requestContext.getAttribute(RequestDispatcher.INCLUDE_REQUEST_URI);
+        String oldContextPath = (String) requestContext.getAttribute(RequestDispatcher.INCLUDE_CONTEXT_PATH);
+        String oldServletPath = (String) requestContext.getAttribute(RequestDispatcher.INCLUDE_SERVLET_PATH);
+        String oldPathInfo = (String) requestContext.getAttribute(RequestDispatcher.INCLUDE_PATH_INFO);
+        String oldQueryString = (String) requestContext.getAttribute(RequestDispatcher.INCLUDE_QUERY_STRING);
+        Object oldMapping = requestContext.getAttribute(RequestDispatcher.INCLUDE_MAPPING);
+
         DispatcherType originalDispatcherType = null;
         if (request instanceof PerfHttpServletRequest) {
             originalDispatcherType = ((PerfHttpServletRequest) request).getDispatcherType();
             ((PerfHttpServletRequest) request).setDispatcherType(DispatcherType.INCLUDE);
         }
-
-        // INCLUDE_* 描述「被包含的目标资源」（Servlet 规范 / RequestDispatcher javadoc）。
-        // QUERY_STRING 只写查询串本身，不含 path、不含前导 '?'；目标路径自带查询串时优先用它，
-        // 否则沿用原始请求的查询串（ForwardWebServerHttpRequest 也会把原始 query 带到目标）。
-        // 无查询串时写 null：RequestContext.setAttribute(name, null) 等价于移除属性。
-        String includeQueryString = targetQueryString != null ? targetQueryString : queryStringOf(webRequest);
-        requestContext.setAttribute(RequestDispatcher.INCLUDE_REQUEST_URI, webRequest.getUriStr());
-        requestContext.setAttribute(RequestDispatcher.INCLUDE_CONTEXT_PATH, webContext.getContextPath());
-        requestContext.setAttribute(RequestDispatcher.INCLUDE_SERVLET_PATH, targetPath);
-        requestContext.setAttribute(RequestDispatcher.INCLUDE_PATH_INFO, "");
-        requestContext.setAttribute(RequestDispatcher.INCLUDE_QUERY_STRING, includeQueryString);
-
-        DispatcherHandler dispatcher = webContext.getDispatcherHandler();
-        if (!(dispatcher instanceof SupportDispatcherHandler)) {
-            throw new ServletException("DispatcherHandler is not a SupportDispatcherHandler");
-        }
         try {
+            setIncludeAttributes(requestContext, webRequest, webContext.getContextPath());
             ((SupportDispatcherHandler) dispatcher).include(webRequest, webResponse, path);
         } finally {
-            if (request instanceof PerfHttpServletRequest && originalDispatcherType != null) {
+            // 回填旧值：null 等价于移除（RequestContext.setAttribute(name, null)）
+            requestContext.setAttribute(RequestDispatcher.INCLUDE_REQUEST_URI, oldRequestUri);
+            requestContext.setAttribute(RequestDispatcher.INCLUDE_CONTEXT_PATH, oldContextPath);
+            requestContext.setAttribute(RequestDispatcher.INCLUDE_SERVLET_PATH, oldServletPath);
+            requestContext.setAttribute(RequestDispatcher.INCLUDE_PATH_INFO, oldPathInfo);
+            requestContext.setAttribute(RequestDispatcher.INCLUDE_QUERY_STRING, oldQueryString);
+            requestContext.setAttribute(RequestDispatcher.INCLUDE_MAPPING, oldMapping);
+            if (originalDispatcherType != null) {
                 ((PerfHttpServletRequest) request).setDispatcherType(originalDispatcherType);
             }
+        }
+    }
+
+    /**
+     * 写入 {@code INCLUDE_*} 属性。这些属性描述「被包含的目标资源」（Servlet 规范 / {@code RequestDispatcher} javadoc），
+     * 而非原始请求：
+     * <ul>
+     * <li>{@code INCLUDE_REQUEST_URI} = contextPath + 目标路径（原实现误写原始请求 URI，与 SERVLET_PATH 不自洽）；</li>
+     * <li>{@code INCLUDE_SERVLET_PATH} = 目标路径，{@code INCLUDE_PATH_INFO} = ""（本框架 {@code getServletPath() = getPath()}、
+     * pathInfo 恒为空串，见 {@code PerfHttpServletRequest#getPathInfo()}）；</li>
+     * <li>{@code INCLUDE_QUERY_STRING} 只写查询串本身，不含 path、不含前导 {@code '?'}；目标路径自带查询串时优先用它，
+     * 否则沿用原始请求的查询串（{@code ForwardWebServerHttpRequest} 也会把原始 query 带到目标）；无查询串时写 null
+     * （{@code RequestContext.setAttribute(name, null)} 等价于移除属性）；</li>
+     * <li>{@code INCLUDE_MAPPING}（Servlet 4.0+）值为 {@link HttpServletMapping}，按目标路径构造精确映射。</li>
+     * </ul>
+     */
+    private void setIncludeAttributes(RequestContext requestContext, WebServerHttpRequest webRequest, String contextPath) {
+        requestContext.setAttribute(RequestDispatcher.INCLUDE_REQUEST_URI, includeRequestUri(contextPath, targetPath));
+        requestContext.setAttribute(RequestDispatcher.INCLUDE_CONTEXT_PATH, contextPath);
+        requestContext.setAttribute(RequestDispatcher.INCLUDE_SERVLET_PATH, targetPath);
+        requestContext.setAttribute(RequestDispatcher.INCLUDE_PATH_INFO, "");
+        requestContext.setAttribute(RequestDispatcher.INCLUDE_QUERY_STRING,
+                targetQueryString != null ? targetQueryString : queryStringOf(webRequest));
+        requestContext.setAttribute(RequestDispatcher.INCLUDE_MAPPING, pathMapping(targetPath));
+    }
+
+    /** 被包含资源的 request URI：contextPath + 目标路径（目标路径已相对 context，见 {@code NettyHttpHandler} 的剥离逻辑）。 */
+    private static String includeRequestUri(String contextPath, String targetPath) {
+        if (targetPath == null || targetPath.isEmpty()) {
+            return contextPath == null ? "" : contextPath;
+        }
+        if (contextPath == null || contextPath.isEmpty()) {
+            return targetPath;
+        }
+        if (targetPath.startsWith("/")) {
+            return contextPath + targetPath;
+        }
+        return contextPath + "/" + targetPath;
+    }
+
+    /**
+     * 按路径构造精确映射。本框架没有 Servlet url-pattern，{@code getRequestDispatcher(path)} 等价于 path 派发，
+     * 因此 {@code pattern} 即目标路径、{@code mappingMatch} 恒为 {@link MappingMatch#EXACT}。
+     * {@code servletName} 返回空串：include/forward 目标由 MVC 路由处理，没有 Servlet 名称。
+     */
+    private static HttpServletMapping pathMapping(String path) {
+        return new ExactPathHttpServletMapping(path);
+    }
+
+    /** 不可变、线程安全的 {@link HttpServletMapping} 实现（EXACT 语义见该接口 javadoc 的示例表格）。 */
+    private static final class ExactPathHttpServletMapping implements HttpServletMapping {
+
+        /** url-pattern，保留前导 {@code '/'}。 */
+        private final String pattern;
+        /** EXACT 语义要求匹配值**省略**前导 {@code '/'}；根路径为空串。 */
+        private final String matchValue;
+
+        ExactPathHttpServletMapping(String path) {
+            String normalized = path == null ? "" : path;
+            this.pattern = normalized;
+            this.matchValue = normalized.startsWith("/") ? normalized.substring(1) : normalized;
+        }
+
+        @Override
+        public String getMatchValue() {
+            return matchValue;
+        }
+
+        @Override
+        public String getPattern() {
+            return pattern;
+        }
+
+        @Override
+        public String getServletName() {
+            return "";
+        }
+
+        @Override
+        public MappingMatch getMappingMatch() {
+            return MappingMatch.EXACT;
         }
     }
 

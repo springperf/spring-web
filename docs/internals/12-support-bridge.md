@@ -443,8 +443,10 @@ private static final RequestAttribute<ServletAdapterContext> ADAPTER_CTX =
 
 `PerfRequestDispatcher implements RequestDispatcher`，配合 `SupportDispatcherHandler.forward()/include()`：
 
-- **`forward()`**：检查 `isCommitted`（已提交抛 `IllegalStateException`）→ 设置 `DispatcherType.FORWARD` → **只重置 body buffer**（`webResponse.resetBuffer()`；Servlet 规范只要求丢弃未提交 body，**不清空已写响应头、不强制状态 200`）→ 通过 `ForwardWebServerHttpRequest` 包装请求（覆盖 `getPath()/getUriStr()/getURI()`，保留/替换 query string）→ `mappingRegistry.mapping()` 重映射 → `handleAfterFilter()` 重新 dispatch（**跳过 filter 链**，与 Tomcat 一致）。
-- **`include()`**：设置并恢复 `DispatcherType.INCLUDE` → `IncludeResponseWrapper` 阻止 flush、隔离 status/header（`setStatusCode`/`sendError` 空操作，`getHeaders()` 返回独立实例）。`INCLUDE_SERVLET_PATH` 设置为 include 目标路径（供 Jasper 定位被包含 JSP）；`INCLUDE_PATH_INFO` 为空字符串（底层 `ConcurrentHashMap` 不允许 null value）。
+- **`forward()`**：检查 `isCommitted`（已提交抛 `IllegalStateException`）→ 设置 `DispatcherType.FORWARD` → **只重置 body buffer**（`webResponse.resetBuffer()`；Servlet 规范只要求丢弃未提交 body，**不清空已写响应头、不强制状态 200**）→ 通过 `ForwardWebServerHttpRequest` 包装请求（覆盖 `getPath()/getUriStr()/getURI()`，保留/替换 query string）→ `mappingRegistry.mapping()` 重映射 → `handleAfterFilter()` 重新 dispatch（**跳过 filter 链**，与 Tomcat 一致）。`FORWARD_*` 六项属性齐全（含 Servlet 4.0+ 的 `FORWARD_MAPPING`，值为按原始请求路径构造的 `HttpServletMapping`）。
+- **`include()`**：**先校验 dispatcher 类型**（失败时不写任何属性）→ **保存 6 个 `INCLUDE_*` 旧值** → 写入目标资源属性、设置 `DispatcherType.INCLUDE` → `IncludeResponseWrapper` 阻止 flush、隔离 status/header（`setStatusCode`/`sendError` 空操作，`getHeaders()` 返回独立实例）→ `finally` 恢复 `INCLUDE_*` 旧值（`null` 即移除）与 dispatcherType。
+  - `INCLUDE_REQUEST_URI` = contextPath + 目标路径（**不是**原始请求 URI）；`INCLUDE_SERVLET_PATH` = 目标路径（供 Jasper 定位被包含 JSP）；`INCLUDE_PATH_INFO` 为空字符串（本框架 `getPathInfo()` 恒为空串）；`INCLUDE_MAPPING`（Servlet 4.0+）为按目标路径构造的 `HttpServletMapping`（`EXACT` 映射、`servletName` 为空串——include 目标由 MVC 路由处理，没有 Servlet 名称）。
+  - **嵌套 include**：恢复的是「外层」写入的值，而非一律移除；异常路径同样恢复，include 返回后属性不会残留。
 - **context holders 保护**：forward/include 均在 `try/finally` 中保存恢复 `LocaleContextHolder`/`RequestContextHolder`，避免与原始请求双重初始化冲突。
 - **Filter 包装兼容**：`resolveWebRequest()/resolveWebResponse()` 解开 `HttpServletRequestWrapper`/`HttpServletResponseWrapper` 找到底层请求。
 
