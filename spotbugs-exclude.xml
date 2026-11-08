@@ -873,6 +873,16 @@
         <Class name="io.springperf.web.support.async.stream.ResponseBodyEmitterReturnValueResolver$StreamingHttpOutputMessage"/>
         <Bug pattern="EI_EXPOSE_REP"/>
     </Match>
+    <!-- ByteStreamEmitter.asyncWebRequest：由 StreamingResponseBodyReturnValueResolver 从当前
+         exchange 取出的异步上下文（AsyncSupportUtils.getAsyncWebRequest），构造器只保存、随后原样
+         交给 StreamSenderFactory.create(emitter, request) 建立写出通道。背压、超时、完成回调都挂在
+         这同一个实例上，防御性拷贝既无可用的拷贝语义，也会切断与调用方异步状态的关联——按字段豁免
+         （类级豁免会顺带放过 senderFactory 等其余字段）。 -->
+    <Match>
+        <Class name="io.springperf.web.support.mvc.retval.ByteStreamEmitter"/>
+        <Field name="asyncWebRequest"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
     <!-- JasperJspServlet.webContext：JSP servlet 需持有框架上下文才能把 Jasper 的实例管理接到
          Spring（优先取容器里的 InstanceManager bean，否则用 AutowireCapableBeanFactory）。
          webContext 是框架自身基础设施对象，防御性拷贝没有语义。 -->
