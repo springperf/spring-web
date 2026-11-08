@@ -208,12 +208,13 @@
 
 - **Servlet 规范语义收紧**：同一异步周期内重复 `startAsync()` 抛 `IllegalStateException`；`complete()` 幂等、`isAsyncStarted()` 在 `complete()` / `dispatch()` 后返回 `false`；`dispatch()` 期间 `DispatcherType` 为 `ASYNC`；`addListener(listener, req, resp)` 的事件携带注册时的 req/resp；`getHeaders(name)` 无该头返回空集合；`getDateHeader()` 对存在但无法解析的日期抛 `IllegalArgumentException`；`setAttribute(name, null)` 等价 `removeAttribute`；`setSessionTrackingModes()` 现在生效并按规范校验（集合非空且必须含 `COOKIE` 或 `SSL`）
 - **视图错误不再静默**：视图解析异常保留原始 cause 不再被跳过；`ModelAndView` 指向不存在的视图抛异常而非 200 空白页；渲染中途抛异常不再返回 200 + 半截 HTML，改为清空缓冲后交给异常处理器（500 或自定义错误页）；`redirect:` 不再带 `text/html`，并保留 `ModelAndView` 指定的 3xx 状态码
-- **内容协商失败显式报错**：已显式设置 `Content-Type` 却无匹配转换器的返回值改为 500（原先静默返回 200 + 空响应体），与 Spring MVC 语义一致
+- **内容协商失败显式报错**：无匹配转换器的 `@ResponseBody` 返回值一律 500（原先静默返回 200 + 空响应体），同时覆盖「已显式设置 `Content-Type`」与「`produces` 协商出类型」两条链路——此前只做了前者，走 `produces` 的返回值（如 `StreamingResponseBody`）仍被静默丢弃，连 `produces` 声明的 Content-Type 都不写。与 Spring MVC 语义一致
 - **配置启动期校验**：`spring.web.view.engine` 的未知值、`none` 与其他引擎混写、`spring.thymeleaf.mode` / `spring.freemarker.content-type` 非法值、以及视图引擎 `cache` / `enabled` 非 `true` / `false` 的值，均改为启动期报错而非静默忽略；`engine=none` 时不再装配内置 JSP（自定义 `ViewResolver` Bean 不受影响）
 - **批处理默认启用攒批窗口**：相比 3.5.7，未显式配置的 `@BatchMapping` 现在默认按 5ms 窗口攒批（批大小由窗口保证，单请求延迟上界增加约 5ms）。若下游 IO 极快或负载很低、希望保留旧版「消费者追上空队列即刷出」的行为，显式写 `batchWindowMillis = 0`；启动期提示也改为仅在显式关闭时出现
 
 ### 修复
 
+- **异步超时稳定按 503 收尾**：`WebAsyncTask` / `Callable` 超时后，被取消任务抛出的 `InterruptedException` 会与超时结果抢写响应槽——客户端可能拿到 500，任务若不响应中断甚至会拿到迟到的 200 + 正常结果，超时等于失效。现在超时一旦到点，此后到达的任务结果一律丢弃，按 3.5.7 起的约定稳定返回 503
 - **攒批小窗口按配置生效**：`batchWindowMillis` 设为 3~5ms 这类小值时，在部分 Windows 环境会被系统定时器粒度放大到约 15ms——快 IO 场景吞吐不升反降、低负载请求白等。修复后窗口按标称值触发，`maxBatchSize` 的攒批效果真正兑现
 - **会话 Cookie**：Servlet 默认会话 Cookie（`maxAge=-1`）不再被写成 `Max-Age=-1` / `Expires=<now>` 而立即过期
 - **持久化会话**：启用文件会话存储时，落盘不再运行在网络线程上拖慢同一线程上的其他连接；停机时最多等待 5 秒把在途保存写完
