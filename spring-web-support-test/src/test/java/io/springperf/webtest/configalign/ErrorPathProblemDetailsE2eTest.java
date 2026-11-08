@@ -1,5 +1,7 @@
 package io.springperf.webtest.configalign;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -103,9 +106,18 @@ class ErrorPathProblemDetailsE2eTest {
     void notFound_alsoProblemJson() throws Exception {
         Response resp = get("/e2e-pdp/definitely-missing");
         try {
-            assertEquals(404, resp.code());
-            assertTrue(resp.header("Content-Type", "").startsWith("application/problem+json"),
-                    "404 也应走 problem+json，实际 " + resp.header("Content-Type"));
+            String contentType = resp.header("Content-Type", "");
+            String body = resp.body().string();
+            assertEquals(404, resp.code(), body);
+            assertTrue(contentType.startsWith("application/problem+json"),
+                    "404 也应走 problem+json，实际 " + contentType);
+            // 方法名承诺的是 problem+json 响应体：解析字段值，不能只校验 Content-Type
+            JsonNode json = new ObjectMapper().readTree(body);
+            assertEquals(404, json.path("status").asInt(), "problem+json 的 status 应为 404，实际 " + body);
+            assertEquals("about:blank", json.path("type").asText(), "未分类错误的 type 应为 about:blank，实际 " + body);
+            assertFalse(json.path("title").asText().isEmpty(), "problem+json 应含非空 title，实际 " + body);
+            assertEquals("/custom-err", json.path("instance").asText(),
+                    "server.error.path 应作为 problem+json 的 instance 暴露，实际 " + body);
         } finally {
             resp.close();
         }
