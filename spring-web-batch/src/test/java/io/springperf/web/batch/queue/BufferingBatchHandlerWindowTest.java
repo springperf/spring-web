@@ -301,6 +301,7 @@ class BufferingBatchHandlerWindowTest {
         }
         elapsedMillis.sort(Long::compareTo);
         long median = elapsedMillis.get(elapsedMillis.size() / 2);
+        System.out.println("[batch-window] 3ms window: median expiry " + median + "ms, samples " + elapsedMillis);
         assertThat(median).as("3ms 窗口到期中位数（JDK8+Windows 定时粒度约 15ms）：%s", elapsedMillis)
                 .isLessThan(20L);
     }
