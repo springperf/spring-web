@@ -46,7 +46,7 @@ public class BatchEchoController {
         return null;
     }
 
-    // 窗口是 maxBatchSize 生效的前提：无窗口时消费者逐条 endOfBatch，批大小长期停在 1
+    // 窗口负责把请求攒到一起，maxBatchSize 才有机会生效；这里用 50ms + maxBatchSize=2 让 E2E 能稳定断言批大小上限
     @BatchMapping(method = "echoBatchSize", maxBatchSize = 2, batchWindowMillis = 50)
     public void batchEchoBatchSize(List<EchoBatchRequest> requests) {
         for (EchoBatchRequest req : requests) {

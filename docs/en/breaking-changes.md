@@ -14,7 +14,7 @@
 
 | Version | Date | Subject |
 |---------|------|---------|
-| **3.5.8** | Unreleased | Servlet specification semantics tightened: dynamic registration fails explicitly, repeated `startAsync` and unparseable date headers throw |
+| **3.5.8** | Unreleased | Servlet specification semantics tightened and dynamic registration actually implemented; batching window on by default (5ms); repeated `startAsync` and unparseable date headers throw |
 | **3.5.7** | 2026-10-08 | Configuration keys aligned with Spring Boot / Tomcat: old key aliases removed, extension-point signatures and compat-layer classes adjusted |
 
 ---
@@ -316,7 +316,7 @@ an observable behaviour change:
 
 | Item | Old behaviour | New behaviour |
 |---|---|---|
-| `ServletContext.addServlet` / `addFilter` / `addJspFile` / `createServlet` / `createFilter` | returned `null` or did nothing, so callers could believe registration succeeded | throw `UnsupportedOperationException` (the signal the specification defines for a missing capability). **Migration**: register servlets/filters as Spring beans, or use `@WebServlet` / `@WebFilter` |
+| `ServletContext.addServlet` / `addFilter` | returned `null` or did nothing, so callers could believe registration succeeded | now return the spec-defined `ServletRegistration.Dynamic` / `FilterRegistration.Dynamic` with URL mappings, init parameters, `load-on-startup` and `async-supported`. Registration is open only during `ServletContextListener#contextInitialized()`; later writes throw `IllegalStateException`, and duplicate names or clashing URL patterns are reported. `addJspFile()` remains unsupported (JSPs are routed through `jsp:` views); `createServlet()` / `createFilter()` are available. **Migration**: compatibility code that checked for a `null` return should use the returned Dynamic object instead |
 | `HttpServletRequest.startAsync()` called again within the same async cycle | returned the existing `AsyncContext` | throws `IllegalStateException`. **Migration**: drop the duplicate call; start a new cycle only after `dispatch` / `complete` |
 | `HttpServletRequest.getDateHeader(name)` with a present but unparseable date | returned `-1`, indistinguishable from "header absent" | throws `IllegalArgumentException`. **Migration**: handle the exception as a parse failure; do not test for `-1` |
 | `ServletContext.setSessionTrackingModes()` | empty implementation: both valid and invalid arguments were silently ignored | takes effect and validates (non-empty, must contain `COOKIE` or `SSL`); invalid arguments throw `IllegalArgumentException`. **Migration**: pass a set that includes `COOKIE`/`SSL`; URL-only configurations that used to be ignored now fail |
@@ -338,5 +338,6 @@ an observable behaviour change:
 | Protocol-relative `redirect://host` target | prefixed with a non-empty context path, producing `/app//host` | used as an external target as-is. **No migration needed** |
 | `IWebRequest#getServerPort()` for HTTPS without an explicit port | always returned 80 | returns 443. **No migration needed** |
 | `@ResponseBody` return value with a preset `Content-Type` and no matching `HttpBodyConverter` | silently returned 200 with an empty body; the return value was dropped | throws `HttpMessageNotWritableException`, mapped to 500 by `ExceptionRegistry`. **Migration**: make the preset Content-Type match the return type (use `application/json` for objects), or write the response on the Servlet side and return `void` |
+| `@BatchMapping.batchWindowMillis` default | 3.5.7 had no batching window: `endOfBatch` / `maxBatchSize` decided when to flush | A 5ms window is on by default, so the batch size is guaranteed by the window and a request may wait up to one extra window. **Migration**: set `batchWindowMillis=0` explicitly for low traffic with very fast IO (< 5ms), ultra-low latency, or no-window benchmark baselines |
 
 

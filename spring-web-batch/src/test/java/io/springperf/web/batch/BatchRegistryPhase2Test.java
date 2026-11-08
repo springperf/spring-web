@@ -49,6 +49,18 @@ class BatchRegistryPhase2Test {
         }
     }
 
+    /** 显式关闭窗口的队列，用于验证「只有显式 0 才告警」。 */
+    @Controller
+    public static class NoWindowController {
+        @BatchMapping(method = "single", ringBufferSize = 64, maxBatchSize = 5, batchWindowMillis = 0,
+                consumerSize = 1)
+        public void batch(List<EchoRequest> requests) {
+        }
+
+        public void single(String data) {
+        }
+    }
+
     @Configuration
     static class TestConfig {
         @Bean
@@ -159,17 +171,19 @@ class BatchRegistryPhase2Test {
     }
 
     /**
-     * 默认 {@code batchWindowMillis=0} 时批大小实测长期在 1~3，{@code maxBatchSize} 形同虚设。 启动期必须显式告警，不能静默退化成「没有批处理」。
+     * 启动只装单个队列的 {@link BatchRegistry}，返回启动期是否出现窗口配置相关 WARN。
+     * 两个窗口用例共用同一套容器与 mock，避免重复搭建。
      */
-    @Test
-    void initComponentPhase2_warnsWhenWindowDisabled() throws Exception {
+    private boolean windowWarningLogged(Class<?> controllerClass) throws Exception {
         ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory
                 .getLogger(BatchRegistry.class);
         ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> appender = new ch.qos.logback.core.read.ListAppender<>();
         appender.start();
         logger.addAppender(appender);
-        try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext(TestConfig.class)) {
-            BatchController bean = ctx.getBean(BatchController.class);
+        try (AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext()) {
+            ctx.registerBean(controllerClass);
+            ctx.refresh();
+            Object bean = ctx.getBean(controllerClass);
             PathMappingContext singleCtx = mappingFor(bean, "single", String.class);
 
             WebContext webContext = mock(WebContext.class);
@@ -183,16 +197,29 @@ class BatchRegistryPhase2Test {
             registry.initWithWebContext(webContext);
             registry.initComponentPhase2();
             try {
-                boolean warned = appender.list.stream()
+                return appender.list.stream()
                         .anyMatch(e -> e.getLevel() == ch.qos.logback.classic.Level.WARN
                                 && e.getFormattedMessage().contains("batchWindowMillis"));
-                assertTrue(warned, "未设置 batchWindowMillis 的队列应在启动期告警，实际日志: " + appender.list);
             } finally {
                 registry.destroyComponent();
             }
         } finally {
             logger.detachAppender(appender);
         }
+    }
+
+    /** 显式 {@code batchWindowMillis=0} 关闭窗口后，{@code maxBatchSize} 很难达到，启动期应告警。 */
+    @Test
+    void initComponentPhase2_warnsWhenWindowExplicitlyDisabled() throws Exception {
+        assertTrue(windowWarningLogged(NoWindowController.class),
+                "显式关闭 batchWindowMillis 的队列应在启动期告警");
+    }
+
+    /** 未声明窗口的队列使用默认 5ms，不应再出现「默认即告警」。 */
+    @Test
+    void initComponentPhase2_doesNotWarnWithDefaultWindow() throws Exception {
+        assertFalse(windowWarningLogged(BatchController.class),
+                "未声明窗口的队列使用默认 5ms，不应触发窗口告警");
     }
 
     @Test

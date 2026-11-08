@@ -115,7 +115,7 @@ public @interface BatchMapping {
     Backpressure backpressure() default Backpressure.BLOCK;
     String method() default "";
     int maxBatchSize() default 100;
-    int batchWindowMillis() default 0;
+    int batchWindowMillis() default 5;
     int consumerSize() default -1;
 
     enum WaitStrategy { YIELDING, BLOCKING, SLEEPING, BUSY_SPIN }
@@ -132,7 +132,7 @@ public @interface BatchMapping {
 | `backpressure` | BLOCK | Backpressure strategy (see table) |
 | `method` | "" | Single-request method name to intercept; defaults to the batch method name |
 | `maxBatchSize` | 100 | Max requests per batch before flushing |
-| `batchWindowMillis` | 0 | Batching time window in milliseconds; 0 = disabled. **Decides whether the batch size can actually reach `maxBatchSize`; the slower the IO, the more you want it on** - see [Batching Mechanism and Batch Size](#batching-mechanism-and-batch-size) |
+| `batchWindowMillis` | 5 | Batching time window in milliseconds; 0 = explicitly disabled. **On by default**, so the batch size is guaranteed by the window instead of by momentary RingBuffer backlog; use 0 or 2~3ms for low traffic with very fast IO (< 5ms) - see [Batching Mechanism and Batch Size](#batching-mechanism-and-batch-size) |
 | `consumerSize` | -1 | Max concurrent processing threads of the business pool (bizExecutor); defaults to available processors. The Disruptor consumer thread is separate and does **not** count against this cap. With virtual threads enabled (JDK 21+) only the executing threads become virtual and the cap is unchanged. Keep `waitStrategy=BLOCKING` in that mode: `BUSY_SPIN`/`YIELDING` never unmount a virtual thread, so they hold a carrier thread |
 
 ### Backpressure Strategies
@@ -174,61 +174,79 @@ bizExecutor pool (0 ~ consumerSize threads; virtual threads when enabled)
 
 ### Batching Mechanism and Batch Size
 
-**Everything this module buys you depends on batch size**: one batched IO replaces N single-row IOs, so the larger N is, the more IO is eliminated. But under the default configuration the batch size sits at 1~3 and `maxBatchSize=100` never takes effect. The reason is how flushing is triggered:
+**Everything this module buys you depends on batch size**: one batched IO replaces N single-row IOs, so the larger N is, the more IO is eliminated. The default 5ms window exists to guarantee the batch size; setting it explicitly to 0 drops the batch size back to the momentary RingBuffer backlog, where `maxBatchSize=100` rarely takes effect. The reason is how flushing is triggered:
 
 `BufferingBatchHandler` submits each batch to bizExecutor via `executor.execute()` — **asynchronous, so IO runs on a business thread and never blocks the Disruptor consumer thread**. Handling one event is just appending to a buffer (nanoseconds), so the consumer almost always catches up with the empty queue; Disruptor's `endOfBatch` signal is set when no further events are available, so the consumer flushes after every single event.
 
-> Put differently: **the batch size is not set by `maxBatchSize`, but by how many new events the producers publish while the consumer handles one event.** In IO-dominated workloads that number is close to 1.
+> Put differently (**only when the window is explicitly disabled**): the batch size is not set by `maxBatchSize`, but by how many new events the producers publish while the consumer handles one event. In IO-dominated workloads that number is close to 1.
 
 The only moment the consumer blocks is when bizExecutor is saturated and `CallerRunsPolicy` makes the consumer thread run the IO itself. Only then does the ring buffer back up and the batch size spike. This produces a counter-intuitive consequence: **`consumerSize` and batch size are in direct opposition** — more parallelism means faster consumption, less backlog, smaller batches.
 
-| Config (100ms IO, concurrency 100, measured) | Batch size | IO cost per request | QPS |
+| Config (100ms IO, concurrency 100, measured before the scheduler precision fix; shown for the mechanism) | Batch size | IO cost per request | QPS |
 |---|---|---|---|
 | `consumerSize=8` (sane parallelism) | 2.8 | 106.5ms → 38.2ms (2.8x) | 632 |
 | `consumerSize=1` (trades parallelism away) | 35.2 | 106.5ms → 3.1ms (34x) | 458 |
 | `consumerSize=8` + `batchWindowMillis=5` | 17.8 | 106.5ms → 6.1ms (17x) | 611 |
 
-**The fix is the time window.** With `batchWindowMillis > 0`, the first event of a batch starts the window and accumulation continues until either `maxBatchSize` is reached or the window expires. The batch size is then guaranteed by configuration instead of by accidental pool saturation, and `consumerSize` is free to do its real job — reusing cores (core count is enough, do not over-provision) — without the two fighting each other.
+**The time window is on by default.** With `batchWindowMillis > 0` (default 5ms), the first event of a batch starts the window and accumulation continues until either `maxBatchSize` is reached or the window expires. The batch size is then guaranteed by configuration instead of by accidental pool saturation, and `consumerSize` is free to do its real job — reusing cores (core count is enough, do not over-provision) — without the two fighting each other. Setting it explicitly to 0 returns to the `endOfBatch` path above.
 
-The cost is up to one extra window of waiting per batch, i.e. the per-request latency upper bound is roughly the window value. Recommended values:
+The cost is up to one extra window of waiting per batch, i.e. the per-request latency upper bound is roughly
+the window value. The 5ms default comes from a parameter sweep run after the window scheduler precision fix
+(closed model, concurrency 100, `consumerSize=8`, `maxBatchSize=100`, downstream IO 5 / 10 / 20 / 50ms):
+throughput was **1.30x / 2.14x / 1.71x / 1.54x** of the no-window baseline, batch size reached 64~100,
+IO calls dropped 4~5x, and p50 / p99 fell with it. At low load (concurrency 1~4) the waiting is pure cost,
+about +0~6ms of mean latency (concurrency / QPS).
 
-| IO latency | Suggested window | Rationale |
-|------------|------------------|-----------|
-| < 5ms | 0 (off) | Batching gain does not cover the wait |
-| 5 ~ 20ms | 1/4 of IO latency | Gain outweighs the wait |
-| > 20ms | 1/2 of IO latency | Slower IO justifies waiting longer |
+| IO latency / load | Suggested window | Rationale |
+|---|---|---|
+| Typical DB / RPC (>= 5ms), medium-to-high concurrency | 5 (default) | The gain is already fully realised; no tuning needed |
+| Low traffic + very fast IO (< 5ms) | 0 or 2~3ms | Waiting dominates; measured below the no-window baseline at concurrency 4 / 5ms IO |
+| Slow IO (> 50ms) | 5, or raise after benchmarking | 5ms already fills `maxBatchSize`; a larger window has no stable gain, so benchmark first |
+| Ultra-low latency | 0 (explicitly off) | Even a lone request waits for the window to expire |
 
-> Measured counter-example: 10ms IO with a 5ms window produced *lower* throughput than no window at all — the wait consumed half of the IO time. The window should be well below the IO latency.
+> **About the 10ms setting**: on some platforms (for example `Object.wait(10)` on Windows) a 10ms window is
+> quantised to about 15ms and measured clearly worse than 5ms (0.93x vs 2.14x at 10ms IO). If a larger window
+> is really needed, jump to 25ms and benchmark; do not stop at 10ms.
 
-Because batching is effectively inert under the default value, **startup logs a WARN for every queue without `batchWindowMillis`** (queue names listed). When that line appears, the queue is running one IO per request and `maxBatchSize` does nothing — IO-bound handlers should set the window explicitly.
+Setting `batchWindowMillis` explicitly to 0 makes startup log one WARN per queue with the window disabled
+(queue names listed): the batch size then depends on momentary RingBuffer backlog and `maxBatchSize` is rarely
+reached. Queues that leave the attribute undeclared use the default 5ms and are no longer warned about; write
+`batchWindowMillis = 0` explicitly if you need the old behaviour.
 
 #### Gains and Costs, Quantified
 
-Those recommendations come from a parameter sweep (closed model, concurrency 100, `consumerSize=8`, `maxBatchSize=100`). Gains and costs must be read separately — they do not always hold together:
+The numbers below come from the parameter sweep after the window scheduler precision fix (closed model, JDK 17,
+`consumerSize=8`, `maxBatchSize=100`, concurrency 1 / 4 / 100, downstream IO 5 / 10 / 20 / 50ms). Absolute
+values depend on the machine and load model — read the relative trends.
 
-**Gain — always holds, independent of IO latency**: IO call count drops 3~10x and IO cost per request drops 4~10x. That *is* the IO elimination, and it relieves the database/downstream even when throughput does not move.
+**High concurrency (100) — the 5ms default consistently beats no window**:
 
-**Throughput — only cashes out when IO is slow enough**:
+| IO latency | W=0 QPS | W=3 | W=5 (default) | W=10 | W=25 | W=5 batch size / IO calls |
+|---|---|---|---|---|---|---|
+| 5ms | 3176 | 1.32x | **1.30x** | — | — | 64.1 / 194 (W0: 11.4 / 837) |
+| 10ms | 3001 | 1.44x | **2.14x** | 0.93x | — | 100 / 193 (W0: 9.0 / 1002) |
+| 20ms | 1693 | 1.57x | **1.71x** | 1.11x | — | 68.0 / 128 (W0: 10.0 / 510) |
+| 50ms | 1061 | 1.37x | **1.54x** | 1.23x | 1.51x | 100 / 49 (W0: 12.3 / 258) |
 
-| IO latency | Best window | Throughput | IO cost per request |
-|------------|-------------|------------|---------------------|
-| 50ms | 25ms (1/2) | **+15% ~ +45%** | 6.6ms → 0.64ms (10x) |
-| 20ms | 10ms (1/2) | -22% ~ +3% (flat) | 2.6ms → 0.74ms (3.5x) |
+The gain is IO elimination: 4~5x fewer IO calls and lower p50 / p99 (20ms p99 206 → 48ms). W=3 and W=5 are
+within baseline noise of each other, but W=5 wins at 10 / 20 / 50ms, hence the default. W=10 falls back
+sharply, mostly because of platform timer quantisation.
 
-The reason: for a window to raise throughput, the consumer side (bizExecutor) has to be the bottleneck. At 20ms IO with `consumerSize=8` there is already 400 batches/sec of headroom, so the bottleneck is elsewhere and the window only removes IO calls.
+**Low concurrency (1~4) — waiting is pure cost**: with sparse traffic the first request schedules the window
+task and nothing arrives to share it, so it waits for the full window. At concurrency 1 / 10ms IO, W=5 reached
+about 0.84x of the no-window QPS with p50 16 → 30ms (histogram buckets are ~16ms wide, so this is not the
+same measure as mean latency); at concurrency 4 / 5ms IO about 0.76x. Slow IO can still break even or win
+slightly (concurrency 4 / 50ms IO: 1.05x). Use 0 or 2~3ms for these workloads.
 
-**Latency — counter-intuitively it *drops* for slow IO**. In the 50ms case p50 fell from ~110ms to ~79ms (**-30ms**): without a window 100 concurrent requests split into ~10 batches and a request queues behind the earlier ones; with a window one batch covers them and latency ≈ 25ms window + 50ms IO. **Removing queueing rounds beats the extra window wait.**
-
-**Loss zone**: as the window approaches the IO latency, the batch cycle becomes window + IO and every arriving request piles up, producing a tidal pattern with occasional p99 spikes (one run hit 492ms). The window should not reach the IO latency itself.
-
-#### So, Should You Turn It On?
+#### So, Should You Keep the Default Window?
 
 | Goal | Recommendation |
 |------|----------------|
-| Reduce database / downstream load | **Yes.** The gain is certain regardless of IO latency |
-| Raise throughput, IO > 20ms | **Yes**, at 1/2 of the IO latency |
-| Raise throughput, IO < 20ms | Little to gain — check whether the bottleneck is really here |
-| Ultra-low latency | Careful. At fast IO p50 may not improve at all |
+| Reduce database / downstream load | **Keep the default 5ms.** Fewer IO calls regardless of IO latency |
+| Raise throughput at medium/high concurrency, IO >= 10ms | **Keep the default 5ms**, where the gain is largest |
+| Low traffic + very fast IO (< 5ms) | Set 0 or 2~3ms explicitly |
+| Ultra-low latency | Set 0 explicitly |
+| Raising the window above 10ms | Benchmark first; 5ms usually already fills `maxBatchSize`, and 10ms is quantised on some platforms |
 
 ---
 
@@ -302,13 +320,13 @@ All metrics carry a `queue` tag valued `batch:<ClassName>.<methodName>` (generat
 
 | Scenario | Recommended Configuration | Notes |
 |----------|--------------------------|-------|
-| High throughput, latency-tolerant | `ringBufferSize=16384, maxBatchSize=500, batchWindowMillis=10` | Larger buffer, larger batches; the window makes the batch size actually reach `maxBatchSize` |
-| Latency-sensitive | `ringBufferSize=1024, maxBatchSize=50, waitStrategy=BUSY_SPIN` | Small buffer, aggressive wait. **With `spring.threads.virtual.enabled` use `BLOCKING` instead**: `BUSY_SPIN`/`YIELDING` never unmount a virtual thread and hold a carrier |
-| Resource-constrained (1c1g) | `ringBufferSize=4096, consumerSize=1` | Single consumer thread. Batch size grows naturally (slow consumption → backlog), so no window is needed |
+| High throughput, latency-tolerant | `ringBufferSize=16384, maxBatchSize=500` (keep the default 5ms window) | Larger buffer, larger batches; the default window already lets the batch size reach `maxBatchSize` |
+| Latency-sensitive | `ringBufferSize=1024, maxBatchSize=50, waitStrategy=BUSY_SPIN, batchWindowMillis=0` | Disable the window to avoid waiting; small buffer, aggressive wait. **With `spring.threads.virtual.enabled` use `BLOCKING` instead**: `BUSY_SPIN`/`YIELDING` never unmount a virtual thread and hold a carrier |
+| Resource-constrained (1c1g) | `ringBufferSize=4096, consumerSize=1` | Single consumer thread. Batch size grows naturally (slow consumption → backlog); set `batchWindowMillis=0` explicitly to skip the scheduler thread |
 | Batch DB queries | `maxBatchSize=200, batchWindowMillis=5` | Most DB IN queries perform best at ~200; the window drives the batch size toward 200 |
-| Batch RPC calls | `maxBatchSize=50, consumerSize=4, batchWindowMillis=10` | Parallel RPC, smaller batches; window at 1/4~1/2 of the RPC latency |
-| Slow IO (>50ms) | `batchWindowMillis=25` | The slower the IO, the more waiting pays off — measured +15~45% throughput, ~30ms lower p50, 10x less IO cost per request |
-| Reduce downstream load (IO <20ms) | `batchWindowMillis=5` | Throughput may not move, but IO calls certainly drop 3x+, easing database pressure |
+| Batch RPC calls | `maxBatchSize=50, consumerSize=4` (keep the default 5ms window) | Parallel RPC, smaller batches; 5ms already fills the batch and a 10ms window is quantised on some platforms |
+| Slow IO (>50ms) | Keep the default 5ms window (try 25ms only after benchmarking) | Measured at 50ms IO: 5ms reaches 1.54x throughput with a full batch of 100, while 25ms measures 1.51~1.57x across runs — within noise of the default |
+| Reduce downstream load (IO <20ms) | Keep the default 5ms window | Measured 4~5x fewer IO calls and higher throughput at the same time (2.14x at 10ms IO), easing database pressure |
 
 ### Consumer Thread Pool
 
@@ -319,7 +337,7 @@ The pool uses `SynchronousQueue` + `CallerRunsPolicy`:
 - Consumer self-executes at capacity (backpressure)
 - No manual core thread tuning needed
 
-**This value exists to reuse cores — the core count is enough, do not over-provision it.** Raising it buys nothing beyond a higher batch-processing throughput ceiling, and it actively *shrinks* the batch size (faster consumption → less backlog), weakening the very IO elimination the module is for. When you need bigger batches, turn on `batchWindowMillis` rather than raising `consumerSize`.
+**This value exists to reuse cores — the core count is enough, do not over-provision it.** Raising it buys nothing beyond a higher batch-processing throughput ceiling, and it actively *shrinks* the batch size (faster consumption → less backlog), weakening the very IO elimination the module is for. When you need bigger batches, tune `batchWindowMillis` (5ms by default) rather than raising `consumerSize`.
 
 > **Every `@BatchMapping` method owns a dedicated bizExecutor**: worst-case concurrency across N queues is N × `consumerSize`. The default (core count) is designed for a single queue — with multiple queues set `consumerSize` explicitly so the sum stays within the core count; startup warns when it does not.
 

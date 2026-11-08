@@ -11,7 +11,7 @@
 
 | 版本 | 日期 | 主题 |
 |------|------|------|
-| **3.5.8** | 未发布 | Servlet 规范语义收紧：动态注册改为显式失败，重复 `startAsync` 与日期头解析改为抛异常 |
+| **3.5.8** | 未发布 | Servlet 规范语义收紧并真正实现动态注册；批处理默认启用 5ms 攒批窗口；重复 `startAsync` 与日期头解析改为抛异常 |
 | **3.5.7** | 2026-10-08 | 配置键对齐 Spring Boot / Tomcat：移除旧配置键别名，扩展点签名与兼容层类调整 |
 
 ---
@@ -303,7 +303,7 @@
 
 | 项 | 旧行为 | 新行为 |
 |---|---|---|
-| `ServletContext.addServlet` / `addFilter` / `addJspFile` / `createServlet` / `createFilter` | 返回 `null` 或空实现，调用方可能误判注册成功 | 抛 `UnsupportedOperationException`（规范为该能力缺失指定的信号）。**迁移**：改用 Spring Bean 注册 servlet/filter，或 `@WebServlet` / `@WebFilter` |
+| `ServletContext.addServlet` / `addFilter` | 返回 `null` 或空实现，调用方可能误判注册成功 | 按 Servlet 规范返回 `ServletRegistration.Dynamic` / `FilterRegistration.Dynamic`，可配 URL 映射、初始化参数、`load-on-startup`、`async-supported`；仅在 `ServletContextListener#contextInitialized()` 期间开放注册，之后写操作抛 `IllegalStateException`，重名与 URL 冲突会明确报错。`addJspFile()` 仍不支持（JSP 走 `jsp:` 视图），`createServlet()` / `createFilter()` 可用。**迁移**：原先按返回 `null` 判失败的兼容代码改为使用返回的 Dynamic 对象 |
 | `HttpServletRequest.startAsync()`（同一异步周期内重复调用） | 返回已存在的 `AsyncContext` | 抛 `IllegalStateException`。**迁移**：去掉重复调用；需要新一轮异步须先 `dispatch` / `complete` |
 | `HttpServletRequest.getDateHeader(name)`（值存在但无法解析为 HTTP 日期） | 返回 `-1`，与「头不存在」不可区分 | 抛 `IllegalArgumentException`。**迁移**：调用方按异常处理解析失败，不要以 `-1` 判定 |
 | `ServletContext.setSessionTrackingModes()` | 空实现：合法与非法入参一律静默忽略 | 生效并校验（集合非空且必须含 `COOKIE` 或 `SSL`），非法入参抛 `IllegalArgumentException`。**迁移**：传入 `COOKIE`/`SSL` 参与的组合；此前被静默忽略的 URL-only 配置会失败 |
@@ -325,4 +325,5 @@
 | `redirect://host` 协议相对目标 | 非空 context-path 下被拼成 `/app//host` | 直接作为外部目标使用。**无需迁移** |
 | https 且无显式端口时的 `IWebRequest#getServerPort()` | 固定返回 80 | 返回 443。**无需迁移** |
 | 已显式设置 `Content-Type` 且无匹配 `HttpBodyConverter` 的 `@ResponseBody` 返回值 | 静默返回 200 + 空响应体，返回值被丢弃 | 抛 `HttpMessageNotWritableException`，经 `ExceptionRegistry` 映射为 500。**迁移**：让显式 Content-Type 与返回值类型匹配（返回对象时用 `application/json`），或由 Servlet 侧自行写响应并返回 `void` |
+| `@BatchMapping.batchWindowMillis` 默认值 | 3.5.7 无攒批窗口：`endOfBatch` / `maxBatchSize` 决定刷出 | 默认启用 5ms 攒批窗口，批大小由窗口保证，单请求最多多等一个窗口。**迁移**：低负载 + 极快 IO（< 5ms）、极致低延迟，或需要「无窗口」对照基准时，显式写 `batchWindowMillis=0` |
 

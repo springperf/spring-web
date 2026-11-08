@@ -83,21 +83,25 @@ public class PerfIoController {
      * {@code maxBatchSize=100} 与并发档位对齐（并发 100 时可满批）；{@code consumerSize=8} 是贴近典型核数的合理并行度—— IO 是阻塞式的，批处理吞吐上限 ≈
      * {@code consumerSize / ioLatency × 平均批大小}，三者缺一不可。 {@code consumerSize} 用于复用多核，不应超过核数。
      * </p>
+     * <p>
+     * 对照实验必须显式关闭窗口：默认 5ms 窗口会让三组端点都生效，失去「无窗口」基线。
+     * </p>
      */
-    @BatchMapping(method = "batchParallel", maxBatchSize = 100, ringBufferSize = 8192, consumerSize = 8)
+    @BatchMapping(method = "batchParallel", maxBatchSize = 100, ringBufferSize = 8192, batchWindowMillis = 0, consumerSize = 8)
     public void batchParallelFind(List<PerfIoRequest> requests) {
         batchIo(requests);
     }
 
-    /** 极端聚合配置：{@code consumerSize=1}，用并行度换攒批能力——仅作旋钮另一端的对照。 */
-    @BatchMapping(method = "batchAggregate", maxBatchSize = 100, ringBufferSize = 8192, consumerSize = 1)
+    /** 极端聚合配置：{@code consumerSize=1}，用并行度换攒批能力——仅作旋钮另一端的对照，同样显式关闭窗口。 */
+    @BatchMapping(method = "batchAggregate", maxBatchSize = 100, ringBufferSize = 8192, batchWindowMillis = 0, consumerSize = 1)
     public void batchAggregateFind(List<PerfIoRequest> requests) {
         batchIo(requests);
     }
 
     /**
-     * 窗口攒批配置：{@code consumerSize=8}（复用多核，不超配）+ {@code batchWindowMillis=5}（批大小由窗口保证）。 窗口取 5ms：远小于 10ms 以上的 IO
-     * 延迟，等待成本低于攒批收益。
+     * 窗口攒批配置：{@code consumerSize=8}（复用多核，不超配）+ {@code batchWindowMillis=5}（批大小由窗口保证）。 5ms 也是
+     * {@link io.springperf.web.batch.annotation.BatchMapping#batchWindowMillis()} 的默认值，这里显式写出以标明实验变量：
+     * 远小于 10ms 以上的 IO 延迟，等待成本低于攒批收益。
      */
     @BatchMapping(method = "batchWindow", maxBatchSize = 100, ringBufferSize = 8192, batchWindowMillis = 5, consumerSize = 8)
     public void batchWindowFind(List<PerfIoRequest> requests) {
