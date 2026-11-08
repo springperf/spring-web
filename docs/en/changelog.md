@@ -222,7 +222,7 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 
 - **Async timeouts now end in a stable 503**: after a `WebAsyncTask` / `Callable` timeout, the `InterruptedException` thrown by the cancelled task raced the timeout result for the response slot — clients could get a 500, and a task that ignores interrupts could even return a late 200 with the real result, making the timeout useless. Once the timeout fires, any task result arriving afterwards is now discarded, so the 503 promised since 3.5.7 is delivered consistently
-- **Small batching windows now take effect as configured**: on some Windows environments, `batchWindowMillis` values such as 3~5ms were rounded up to the system timer granularity (about 15ms), so fast-IO workloads lost throughput and low-traffic requests waited for nothing. The window now fires at its configured value, so `maxBatchSize` aggregation works as intended
+- **Small batching windows now take effect as configured**: `batchWindowMillis` values such as 3~5ms were rounded up to the timer granularity, so fast-IO workloads lost throughput and low-traffic requests waited for nothing. The window now fires at its configured value, so `maxBatchSize` aggregation works as intended
 - **Session cookies**: the default Servlet session cookie (`maxAge=-1`) is no longer emitted as `Max-Age=-1` / `Expires=<now>`, which made browsers expire it immediately
 - **Persistent sessions**: with file-backed session storage, saving no longer runs on the network thread and stalls other connections on that thread; shutdown waits up to 5 seconds for in-flight saves
 - **405 and shutdown requests**: the 405 `Allow` header now aggregates every available method; requests rejected during graceful shutdown return 503
