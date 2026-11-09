@@ -30,8 +30,11 @@ public class MethodArgContext {
 
     protected String bindingResultAttrKey;
 
-    /** 参数校验器，首次调用时懒加载 */
+    /** 参数校验器，按目标类型懒加载；{@link #validatorTargetClass} 变化时重新选取 */
     protected Validator validator;
+
+    /** 缓存 {@link #validator} 时对应的目标类型，用于多态参数切换时失效缓存 */
+    protected Class<?> validatorTargetClass;
 
     public MethodArgContext(MethodParameter methodParameter) {
         this.methodParameter = methodParameter;

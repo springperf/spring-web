@@ -497,11 +497,15 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
     @Override
     public void writeStream(InputStream input, long contentLength) {
         if (!setCommitted()) {
+            // 本方法持有流的关闭责任（调用方直接传 resource.getInputStream()），
+            // 早退分支也必须关闭，否则已提交响应时每请求泄漏一个 InputStream / 文件句柄。
+            closeQuietly(input);
             return;
         }
         applySwallowLimit();
         if (responseHeadersExceedLimit()) {
             writeHeaderTooLarge();
+            closeQuietly(input);
             return;
         }
         // InputStream 无法推断 MIME：调用方若已预先 setContentType 则尊重之，否则回退 octet-stream
@@ -522,11 +526,7 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
                 // HEAD：不发 body——发送 headers 后立即发 LastHttpContent 收尾。
                 // 流必须在此关闭：本分支不会提交 streamCopy，其 finally 与 catch 里的关闭都到不了，
                 // 而非文件 Resource 的 HEAD 请求每请求都会泄漏一个 InputStream / 文件句柄（P0）。
-                try {
-                    input.close();
-                } catch (IOException closeEx) {
-                    log.debug("input close failed on HEAD path", closeEx);
-                }
+                closeQuietly(input);
                 addRespEventListener(ctx.writeAndFlush(response), false);
                 ChannelFuture lastFuture = ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
                 addRespEventListener(lastFuture, true);
@@ -543,13 +543,20 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
             ExecutorService streamPool = resolveStreamPool();
             streamPool.submit(() -> streamCopy(input));
         } catch (Exception ex) {
-            // ensure input closed on error
-            try {
-                input.close();
-            } catch (IOException ignored) {
-                log.debug("input close failed", ignored);
-            }
+            closeQuietly(input);
             throw new RuntimeException(ex);
+        }
+    }
+
+    /** 统一关闭流：{@code writeStream} 的所有提前返回与异常路径都必须经过这里。 */
+    private static void closeQuietly(InputStream input) {
+        if (input == null) {
+            return;
+        }
+        try {
+            input.close();
+        } catch (IOException e) {
+            log.debug("input close failed", e);
         }
     }
 
@@ -795,6 +802,9 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
             ConnectionContext conn = attrs.connCtx;
             if (conn == null) {
                 conn = new ConnectionContext();
+                // 与实际可写状态对齐：默认 lastWritable=true 时，若创建前已不可写，
+                // BackpressureHandler 的 false→true 边沿判定会漏掉恢复事件。
+                conn.updateWritable(ctx.channel().isWritable());
                 attrs.connCtx = conn;
             }
             conn.setOnWritable(callback);

@@ -678,6 +678,26 @@ class DispatcherHandlerTest {
         verify(exceptionRegistry).handle(filterEx, req, resp);
     }
 
+    @Test
+    void handle_filterThrows_doesNotInvokePostHandle() throws Exception {
+        WebServerHttpRequest req = createRequest();
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        PathMappingContext mappingContext = mock(PathMappingContext.class);
+        MappingResult matched = MappingResult.matched(mappingContext);
+        MappingResult.set(req, matched);
+        when(mappingRegistry.mapping(req)).thenReturn(matched);
+        when(bizPoolRegistry.determinePool(eq(req), eq(matched))).thenReturn(null);
+        RuntimeException filterEx = new RuntimeException("filter boom");
+        doThrow(filterEx).when(webFilterRegistry).doFilter(any(), any());
+
+        handler.handle(req, resp);
+
+        // handler 未执行：按 Spring 语义不调 postHandle，但仍需 afterCompletion 与异常收尾
+        verify(interceptorRegistry, never()).postHandle(any(), any(), any());
+        verify(interceptorRegistry).afterCompletion(req, resp, filterEx);
+        verify(exceptionRegistry).handle(filterEx, req, resp);
+    }
+
     // ==================== initWithWebContext ====================
 
     @Test
@@ -778,23 +798,26 @@ class DispatcherHandlerTest {
     }
 
     @Test
-    void handleWithMappingResult_executorShuttingDown_fallsBackToEventLoop() throws Exception {
+    void handleWithMappingResult_executorShuttingDown_returns503() throws Exception {
         WebServerHttpRequest req = createRequest();
         WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        HttpHeaders headers = new HttpHeaders();
+        when(resp.getHeaders()).thenReturn(headers);
         PathMappingContext mappingContext = mock(PathMappingContext.class);
         MappingResult matched = MappingResult.matched(mappingContext);
         MappingResult.set(req, matched);
         ExecutorService executor = mock(ExecutorService.class);
         when(bizPoolRegistry.determinePool(req, matched)).thenReturn(executor);
-        when(executor.isShutdown()).thenReturn(true);
         doThrow(new RejectedExecutionException("pool shutdown")).when(executor).execute(any(Runnable.class));
 
         handler.handleWithMappingResult(req, resp, matched);
 
-        // 优雅关闭中：回退到 EventLoop 兜底执行
+        // 关闭期同样返回 503，不在 EventLoop 上执行业务 handler 阻塞 I/O 线程
         verify(req).acquire();
         verify(req).release();
-        verify(webFilterRegistry).doFilter(req, resp);
+        assertEquals("5", headers.getFirst("Retry-After"));
+        verify(resp).sendError(HttpStatus.SERVICE_UNAVAILABLE, "Too many requests");
+        verify(webFilterRegistry, never()).doFilter(any(), any());
     }
 
     @Test

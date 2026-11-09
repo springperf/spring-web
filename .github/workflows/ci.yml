@@ -184,7 +184,8 @@ jobs:
 
   static-analysis:
     # SpotBugs + modernizer（提炼自 mybatis-parent）：独立成 job，避免给 8/11 旧 JDK 矩阵添负担
-    # （SpotBugs 自身要求较新的 JDK 运行）。现阶段 report-only，triage 后翻开关成为硬门禁。
+    # （SpotBugs 自身要求较新的 JDK 运行）。SpotBugs check 已绑定 verify 为硬门禁（Default 档）；
+    # 只有 modernizer 仍是 report-only，待 triage 后再考虑翻开关。
     if: github.ref == 'refs/heads/master' || github.base_ref == 'master'
     runs-on: ubuntu-latest
     timeout-minutes: 20

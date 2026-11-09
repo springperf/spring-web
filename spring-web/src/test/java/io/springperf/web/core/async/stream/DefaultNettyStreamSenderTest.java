@@ -258,6 +258,29 @@ class DefaultNettyStreamSenderTest {
         assertEquals(10, written, "所有已发送数据必须完整写出，不允许截断");
     }
 
+    @Test
+    void send_queueFullBeyondTimeout_throwsIOException() throws Exception {
+        DefaultNettyStreamSender sender = new DefaultNettyStreamSender(emitter, asyncWebRequest);
+        sender.enqueueTimeoutNanos = java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(1);
+        for (int i = 0; i < AbstractNettyStreamSender.MAX_QUEUED_EVENTS; i++) {
+            sender.queue.offer("x");
+        }
+
+        // channel 仍 active、completed=false，队列却永远没有空位：自旋必须有上限。
+        assertThrows(IOException.class, () -> sender.send("overflow"));
+    }
+
+    @Test
+    void afterDrain_notWritable_schedulesRetry() throws Exception {
+        when(channel.isWritable()).thenReturn(false);
+        DefaultNettyStreamSender sender = new DefaultNettyStreamSender(emitter, asyncWebRequest);
+
+        sender.send("a");
+
+        // 不可写时除 writable callback 外，还必须有 1s 定时重检兜底。
+        verify(eventLoop).schedule(any(Runnable.class), eq(1L), eq(java.util.concurrent.TimeUnit.SECONDS));
+    }
+
     /**
      * 不变量：批缓冲**为空时绝不写出** {@code DefaultHttpContent}。空的 content 在 chunked 传输里等价于终止块， 会让响应体**提前结束**，而且不抛任何错 —— 是最难查的一类症状。
      * 本用例覆盖"所有条目 encode 都抛错 → writerIndex 回滚到 0 → 尾部只剩空 buffer"这条唯一路径。

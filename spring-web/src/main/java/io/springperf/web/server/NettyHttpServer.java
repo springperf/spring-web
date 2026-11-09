@@ -63,6 +63,13 @@ public class NettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
 
     @Override
     public void start() {
+        // 防御性重入保护：重复 start() 会新建并覆盖 bossGroup/workerGroup 字段，
+        // 使旧 EventLoopGroup 脱离 destroyComponent() 的关闭链。Spring 标准生命周期有
+        // isRunning() 守卫，此处兜底手工调用 / stop() 后再次 start() 的场景。
+        if (running) {
+            log.info("Netty Server already running on port {}, skip start()", this.actualPort);
+            return;
+        }
         // 在 Netty 启动前触发 WebContext 生命周期，确保所有 WebComponent 已完成初始化
         webContext.startLifecycle();
         // 启动期预解析优雅关闭时长，配置错误在此 fail-fast（避免关闭时才暴露）

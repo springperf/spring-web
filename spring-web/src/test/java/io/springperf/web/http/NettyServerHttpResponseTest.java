@@ -625,6 +625,28 @@ class NettyServerHttpResponseTest {
         assertTrue(captor.getAllValues().get(1) instanceof LastHttpContent, "次帧应是收尾块");
     }
 
+    @Test
+    void writeStream_afterCommitted_closesInputStream() {
+        when(ctx.writeAndFlush(any())).thenReturn(mock(ChannelFuture.class));
+        // 先提交响应，第二次 writeStream 会在 !setCommitted() 处早退；
+        // 早退分支同样由 writeStream 负责关流，否则每请求泄漏一个文件句柄。
+        response.writeBytes("x".getBytes(StandardCharsets.UTF_8));
+        CloseTrackingInputStream input = new CloseTrackingInputStream(
+                new ByteArrayInputStream("x".getBytes(StandardCharsets.UTF_8)));
+
+        response.writeStream(input);
+
+        assertTrue(input.closed, "已提交响应的早退分支必须关闭 input");
+    }
+
+    @Test
+    void writeStream_afterCommitted_nullInput_doesNotThrow() {
+        when(ctx.writeAndFlush(any())).thenReturn(mock(ChannelFuture.class));
+        response.writeBytes("x".getBytes(StandardCharsets.UTF_8));
+        // 空值边界：早退分支的关流动作不得因 input 为 null 引入 NPE
+        assertDoesNotThrow(() -> response.writeStream((InputStream) null));
+    }
+
     private static final class CloseTrackingInputStream extends FilterInputStream {
 
         private boolean closed;

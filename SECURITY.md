@@ -19,6 +19,7 @@ We will respond and address the issue as soon as possible.
 
 | Version | Supported |
 |---------|-----------|
+| 4.1.x (Spring Boot 4.0/4.1 branch) | Yes |
 | 3.5.x (master branch, Spring Boot 3.x) | Yes |
 | 2.7.x (maintenance branch, Spring Boot 2.x) | Yes |
 | < 2.7 | No |

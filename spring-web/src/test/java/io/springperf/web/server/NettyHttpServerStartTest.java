@@ -101,4 +101,24 @@ class NettyHttpServerStartTest {
             server.destroyComponent();
         }
     }
+
+    @Test
+    void start_twice_doesNotReplaceEventLoopGroups() throws Exception {
+        ConfigurableApplicationContext ctx = mock(ConfigurableApplicationContext.class);
+        ConfigurableEnvironment env = mock(ConfigurableEnvironment.class);
+        when(ctx.getEnvironment()).thenReturn(env);
+        when(env.getPropertySources()).thenReturn(new MutablePropertySources());
+
+        NettyHttpServer server = newServer(ctx, null);
+        try {
+            server.start();
+            Object workerGroup = server.getWorkerGroup();
+            server.start();
+            assertSame(workerGroup, server.getWorkerGroup(), "重复 start 不得新建并覆盖 EventLoopGroup");
+            assertTrue(server.isRunning());
+        } finally {
+            server.stop();
+            server.destroyComponent();
+        }
+    }
 }

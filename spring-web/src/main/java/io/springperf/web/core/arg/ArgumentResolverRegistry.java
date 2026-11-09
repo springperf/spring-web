@@ -158,6 +158,9 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
                 args[i] = methodArgContext.defaultArgumentResolver.resolveArgument(request, response);
                 validateIfApplicable(args[i], methodArgContext, request, mappingContext);
             } else {
+                // 兜底路径：check-on-startup=false 或自定义 provider 返回 null 时显式告警，
+                // 避免静默传 null 让配置错误以 handler 内 NPE 的形式暴露。
+                log.warn("No argument resolver for parameter {} of {}", i, mappingContext.getMethod());
                 args[i] = null;
             }
         }
@@ -195,9 +198,13 @@ public class ArgumentResolverRegistry extends WebComponentContainer {
             return;
         }
         Validator validator = methodArgContext.validator;
-        if (validator == null) {
+        Class<?> targetClass = target.getClass();
+        // 缓存按「目标类型」而非仅按方法：注册了多个类型特化 Validator 且参数运行期多态时，
+        // 复用首次解析出的校验器会误用/跳过校验，类型变化时重新选取。
+        if (validator == null || methodArgContext.validatorTargetClass != targetClass) {
             validator = getValidator(target, mappingContext);
             methodArgContext.validator = validator;
+            methodArgContext.validatorTargetClass = validator == null ? null : targetClass;
         }
         if (validator == null) {
             return;

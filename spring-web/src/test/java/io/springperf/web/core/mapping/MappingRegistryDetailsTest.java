@@ -191,6 +191,25 @@ class MappingRegistryDetailsTest {
     }
 
     @Test
+    void mapping_methodMismatch_allowContextsSpanOptimizers() {
+        MappingRegistry registry = new MappingRegistry();
+        // 精确路径 GET 归 FullPathRouterOptimizer，通配 PUT 归 LoopPathPatternRouterOptimizer。
+        registry.registerMapping(createPathMappingContext("/api/user",
+                Collections.singletonList(new HttpMethodMatcher(new HttpMethod[] { HttpMethod.GET }))));
+        registry.registerMapping(createPathMappingContext("/api/**",
+                Collections.singletonList(new HttpMethodMatcher(new HttpMethod[] { HttpMethod.PUT }))));
+        registry.initComponentPhase3();
+
+        WebServerHttpRequest req = mockRequest("/api/user", HttpMethod.POST);
+        MappingResult result = registry.mapping(req);
+
+        assertFalse(result.isMatched());
+        assertTrue(result.isMethodMismatch());
+        assertEquals(2, result.getPathMatchedContexts().length,
+                "405 的 Allow 头应覆盖跨 optimizer 的同路径匹配映射，而非只有首个 optimizer");
+    }
+
+    @Test
     void mapping_nonMethodMismatch_returnsPathMatchedWithout405Flag() {
         MappingRegistry registry = new MappingRegistry();
         // 路径命中但条件不满足（无 HttpMethodMatcher → 非方法失败），继续后续 optimizer 后返回 pathMatched
