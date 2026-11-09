@@ -62,8 +62,10 @@ class SpringWebAutoConfigurationTest {
     @Test
     void nettyHttpServer_createsNettyHttpServer() {
         io.springperf.web.context.WebContext webContext = mock(io.springperf.web.context.WebContext.class);
-        Environment environment = mock(Environment.class);
-        when(environment.getProperty("server.http2.enabled", boolean.class, false)).thenReturn(false);
+        // SSL 现由 Binder 绑定 Boot Ssl 模型，Binder 要求 ConfigurableEnvironment；
+        // 用真实 MockEnvironment 而非 Mockito mock，贴近生产 Boot Environment 的行为。
+        Environment environment = new org.springframework.mock.env.MockEnvironment()
+                .withProperty("server.http2.enabled", "false");
 
         NettyHttpServer server = config.nettyHttpServer(webContext, environment, mock(ObjectProvider.class));
         assertNotNull(server);
