@@ -161,6 +161,12 @@
       "name": "management.server.shutdown.grace-period",
       "type": "java.time.Duration",
       "description": "Graceful shutdown period for the management server EventLoopGroups. Defaults to server.shutdown.grace-period."
+    },
+    {
+      "name": "springperf.web.mvc-conflict-check.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Fail startup when the official Spring MVC DispatcherServlet is on the classpath. Set to false only when spring-webmvc is a transitive dependency and Spring MVC is not actually used.",
+      "defaultValue": true
     }
   ]
 }

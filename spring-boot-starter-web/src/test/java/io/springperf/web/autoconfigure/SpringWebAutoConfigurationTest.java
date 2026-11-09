@@ -8,21 +8,34 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.env.Environment;
 
+import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class SpringWebAutoConfigurationTest {
 
     private final SpringWebAutoConfiguration config = new SpringWebAutoConfiguration();
+
+    /** 用 mock 替换 NettyHttpServer / Validator，避免单测真的启动端口或探测 Bean Validation 实现。 */
+    private final ApplicationContextRunner guardRunner = new ApplicationContextRunner()
+            .withConfiguration(AutoConfigurations.of(SpringWebAutoConfiguration.class))
+            .withBean("nettyHttpServer", NettyHttpServer.class, () -> mock(NettyHttpServer.class))
+            .withBean("validator", org.springframework.validation.Validator.class,
+                    () -> mock(org.springframework.validation.Validator.class));
 
     @Test
     void dispatcherHandler_createsNewDispatcherHandler() {
@@ -57,6 +70,13 @@ class SpringWebAutoConfigurationTest {
         when(props.get(anyString(), anyString())).thenReturn("/");
 
         assertNotNull(config.webContext(Collections.singletonList(handler), props));
+    }
+
+    @Test
+    void webContext_withoutDispatcherHandler_failsFast() {
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> config.webContext(Collections.emptyList(), mock(ApplicationProperties.class)));
+        assertTrue(ex.getMessage().contains("DispatcherHandler"));
     }
 
     @Test
@@ -108,5 +128,56 @@ class SpringWebAutoConfigurationTest {
         BeanFactoryPostProcessor guard = (BeanFactoryPostProcessor) m.invoke(null);
 
         assertDoesNotThrow(() -> guard.postProcessBeanFactory(mock(ConfigurableListableBeanFactory.class)));
+    }
+
+    @Test
+    void springMvcConflictGuard_registeredByDefault() {
+        guardRunner.run(context -> {
+            assertThat(context).hasNotFailed();
+            assertThat(context).hasBean("springMvcConflictGuard");
+        });
+    }
+
+    @Test
+    void springMvcConflictGuard_disabledByProperty() {
+        guardRunner.withPropertyValues(SpringWebAutoConfiguration.MVC_CONFLICT_CHECK_PROPERTY + "=false")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).doesNotHaveBean("springMvcConflictGuard");
+                });
+    }
+
+    @Test
+    void springMvcConflictGuard_enabledByDefaultAndCanBeDisabled() throws Exception {
+        Method m = SpringWebAutoConfiguration.class.getMethod("springMvcConflictGuard");
+        ConditionalOnProperty condition = m.getAnnotation(ConditionalOnProperty.class);
+        assertNotNull(condition);
+        assertArrayEquals(new String[] { SpringWebAutoConfiguration.MVC_CONFLICT_CHECK_PROPERTY }, condition.name());
+        assertEquals("true", condition.havingValue());
+        assertTrue(condition.matchIfMissing(), "默认必须启用守卫，仅允许显式 false 关闭");
+    }
+
+    @Test
+    void springMvcConflictGuard_whenSpringMvcAbsent_passes() {
+        assertDoesNotThrow(() -> SpringWebAutoConfiguration.assertNoSpringMvcConflict(false));
+    }
+
+    @Test
+    void springMvcConflictGuard_whenSpringMvcPresent_failsFast() {
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> SpringWebAutoConfiguration.assertNoSpringMvcConflict(true));
+        assertTrue(ex.getMessage().contains("DispatcherServlet"));
+        assertTrue(ex.getMessage().contains(SpringWebAutoConfiguration.MVC_CONFLICT_CHECK_PROPERTY),
+                "报错必须告知用户如何关闭守卫");
+    }
+
+    @Test
+    void mvcConflictCheckProperty_isDocumentedInMetadata() throws Exception {
+        try (InputStream in = getClass().getClassLoader()
+                .getResourceAsStream("META-INF/additional-spring-configuration-metadata.json")) {
+            assertNotNull(in, "IDE 配置元数据不在 classpath");
+            String metadata = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            assertTrue(metadata.contains(SpringWebAutoConfiguration.MVC_CONFLICT_CHECK_PROPERTY));
+        }
     }
 }

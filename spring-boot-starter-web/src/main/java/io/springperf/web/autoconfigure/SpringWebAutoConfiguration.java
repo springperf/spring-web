@@ -23,6 +23,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
+import org.springframework.util.ClassUtils;
 import org.springframework.validation.Validator;
 import org.springframework.validation.beanvalidation.OptionalValidatorFactoryBean;
 
@@ -30,6 +31,12 @@ import java.util.List;
 
 @ConditionalOnClass(DispatcherHandler.class)
 public class SpringWebAutoConfiguration {
+
+    /** 显式关闭 Spring MVC 冲突守卫；用于官方 spring-webmvc 只是三方库传递依赖的场景。 */
+    static final String MVC_CONFLICT_CHECK_PROPERTY = "springperf.web.mvc-conflict-check.enabled";
+
+    /** 官方 Spring MVC 的标志类；本框架重写的 org.springframework.web.servlet.* 不含此类。 */
+    static final String SPRING_MVC_INDICATOR = "org.springframework.web.servlet.DispatcherServlet";
 
     @Bean
     @ConditionalOnMissingBean
@@ -46,6 +53,12 @@ public class SpringWebAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public WebContext webContext(List<DispatcherHandler> dispatcherHandlers, ApplicationProperties props) {
+        if (dispatcherHandlers.isEmpty()) {
+            throw new IllegalStateException("No DispatcherHandler bean is available in the application context; "
+                    + "ensure SpringWebAutoConfiguration is not excluded and a DispatcherHandler bean is declared.");
+        }
+        // Spring 注入的 List 已按 @Order/Ordered 排序：servlet 桥接层可同时注册 SupportDispatcherHandler，
+        // 此处取优先级最高的一个，与既有行为保持一致。
         return new WebContext(dispatcherHandlers.get(0), props);
     }
 
@@ -97,6 +110,10 @@ public class SpringWebAutoConfiguration {
 
             io.micrometer.core.instrument.Gauge.builder("netty.eventloop.pending.tasks", nettyHttpServer, server -> {
                 EventLoopGroup group = server.getWorkerGroup();
+                if (group == null) {
+                    // NettyHttpServer.start() 之前 workerGroup 尚未创建，Gauge 采集不能因此抛 NPE。
+                    return 0d;
+                }
                 long total = 0;
                 for (EventExecutor executor : group) {
                     if (executor instanceof SingleThreadEventExecutor) {
@@ -113,19 +130,27 @@ public class SpringWebAutoConfiguration {
     /**
      * D9：冲突检测提前到容器初始化早期。BeanFactoryPostProcessor 在 bean 定义加载后、 实例化前执行，比原 webContext bean 方法（实例化阶段）更早暴露问题。 静态 @Bean
      * 确保本类实例化前即可注册该 post-processor。
+     * <p>
+     * 判定只依赖官方 Spring MVC 的 {@code DispatcherServlet}；框架自行重写的
+     * {@code org.springframework.web.servlet.*} 不含该类，因此不会误报。若该类只是三方库传递依赖、
+     * 并不会启用 Spring MVC，可用 {@link #MVC_CONFLICT_CHECK_PROPERTY}=false 显式关闭本守卫。
+     * </p>
      */
     @Bean
+    @ConditionalOnProperty(name = MVC_CONFLICT_CHECK_PROPERTY, havingValue = "true", matchIfMissing = true)
     public static BeanFactoryPostProcessor springMvcConflictGuard() {
-        return beanFactory -> assertNoSpringMvcConflict();
+        ClassLoader classLoader = SpringWebAutoConfiguration.class.getClassLoader();
+        return beanFactory -> assertNoSpringMvcConflict(ClassUtils.isPresent(SPRING_MVC_INDICATOR, classLoader));
     }
 
-    private static void assertNoSpringMvcConflict() {
-        try {
-            Class.forName("org.springframework.web.servlet.DispatcherServlet");
-        } catch (ClassNotFoundException e) {
+    /** 显式传入判定结果，便于覆盖「冲突存在」这一在测试 classpath 上无法真实复现的分支。 */
+    static void assertNoSpringMvcConflict(boolean springMvcPresent) {
+        if (!springMvcPresent) {
             return;
         }
-        throw new IllegalStateException("Detected spring-boot-starter-web on the classpath. "
-                + "Perf Actuator integration conflicts with Spring MVC Actuator integration.");
+        throw new IllegalStateException("Detected Spring MVC (" + SPRING_MVC_INDICATOR
+                + ") on the classpath together with perf-spring-web: both provide a dispatcher for HTTP requests. "
+                + "Remove spring-webmvc / spring-boot-starter-web from the dependencies, or set "
+                + MVC_CONFLICT_CHECK_PROPERTY + "=false to disable this guard when Spring MVC is not actually used.");
     }
 }

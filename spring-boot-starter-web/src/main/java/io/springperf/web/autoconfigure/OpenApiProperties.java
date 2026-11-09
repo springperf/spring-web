@@ -20,6 +20,17 @@ public class OpenApiProperties {
     /** API document description. */
     private String description = "Spring Perf Web API";
 
+    /** Whether the OpenAPI integration (customizer, docs endpoint and Swagger UI) is enabled. */
+    private boolean enabled = true;
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
     public String getTitle() {
         return title;
     }

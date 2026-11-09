@@ -340,12 +340,20 @@ management.server.max-content-length=1048576
 | `springperf.openapi.title` | `Spring Perf Web API` | API 文档标题 |
 | `springperf.openapi.version` | `1.0.0` | API 文档版本 |
 | `springperf.openapi.description` | `Spring Perf Web API` | API 文档描述 |
+| `springperf.openapi.enabled` | `true` | 关闭后整套 OpenAPI 集成退让：不注册文档定制器、`/v3/api-docs` 控制器及 Swagger UI 资源 |
 
 ## Swagger UI
 
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
 | `springperf.swagger-ui.webjar-version` | `5.2.0` | Swagger UI webjar 版本，需匹配 `org.webjars:swagger-ui` 依赖版本 |
+| `springperf.swagger-ui.enabled` | `true` | 关闭后仅退让 `/swagger-ui/**` 静态资源，OpenAPI 文档端点仍可用；用户自定义同名 `swaggerUiResourceHandler` bean 亦会令自动装配退让 |
+
+## 框架开关
+
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `springperf.web.mvc-conflict-check.enabled` | `true` | 启动时检测官方 Spring MVC（`org.springframework.web.servlet.DispatcherServlet`）冲突。若该类仅由三方库传递引入、并未启用 MVC，可设为 `false` 跳过守卫 |
 
 ## 完整配置示例
 

@@ -27,7 +27,7 @@ import lombok.extern.slf4j.Slf4j;
  * 修改上述配置后请重启进程；不要因为调用过 {@link #refresh()} 就认为它们已生效。
  * </p>
  * <p>
- * <b>触发方式</b>：由 starter 侧的 {@code SpringWebCloudRefreshAutoConfiguration} 监听 Spring Cloud
+ * <b>触发方式</b>：由 starter 侧的 {@code SpringWebPropertyRefreshAutoConfiguration} 监听 Spring Cloud
  * {@code EnvironmentChangeEvent} 后调用（见该类）。 业务代码也可主动调用以配合自定义刷新通道。
  * </p>
  *

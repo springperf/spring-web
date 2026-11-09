@@ -1,5 +1,6 @@
 package io.springperf.example.swaggerui;
 
+import io.springperf.web.autoconfigure.SwaggerUiProperties;
 import io.springperf.web.server.NettyHttpServer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,7 +48,8 @@ class SwaggerUiE2eTest {
 
     @Test
     void swaggerUiStaticResources_classpathFound() {
-        ClassPathResource resource = new ClassPathResource("META-INF/resources/webjars/swagger-ui/5.2.0/index.html");
+        ClassPathResource resource = new ClassPathResource(
+                "META-INF/resources/webjars/swagger-ui/" + SwaggerUiProperties.DEFAULT_WEBJAR_VERSION + "/index.html");
         assertThat(resource.exists()).as("swagger-ui index.html should exist on classpath").isTrue();
         assertThat(resource.isReadable()).isTrue();
     }
