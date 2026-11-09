@@ -30,7 +30,8 @@ import java.util.concurrent.TimeUnit;
  * 当 {@code management.server.port} 配置且与 {@code server.port} 不同时， 启动第二个 Netty 服务器仅用于 Actuator 端点。
  * </p>
  * <p>
- * 支持通过 {@code management.server.ssl.*} 配置 SSL/TLS。
+ * 所有服务器级配置由 {@link ManagementServerSettings} 在启动期固化：默认继承 {@code server.*}，
+ * 白名单内的 {@code management.server.*} 显式覆盖。SSL 与 HTTP/2 同源于该快照。
  * </p>
  * <p>
  * 实现 {@link SmartLifecycle}，{@link #getPhase()} 返回 {@link Integer#MAX_VALUE} 与主服务器一致，确保在 Spring 上下文就绪后启动。
@@ -47,6 +48,7 @@ public class ManagementNettyHttpServer implements SmartLifecycle, LifecycleWebCo
     private final int port;
     private final int maxContentLength;
     private final SslContext sslContext;
+    private final ManagementServerSettings settings;
     private boolean http2Enabled;
 
     private EventLoopGroup bossGroup;
@@ -56,7 +58,7 @@ public class ManagementNettyHttpServer implements SmartLifecycle, LifecycleWebCo
     private volatile int actualPort;
     /** 管理服务器独立的连接计数（与主服务器各自计数，不共享全局单例）。 */
     private final NettyMetricsHandler metricsHandler = new NettyMetricsHandler();
-    /** 优雅关闭等待时长（毫秒），启动期预解析自 {@code server.shutdown.grace-period}，关闭时传入 EventLoopGroup.shutdownGracefully。 */
+    /** 优雅关闭等待时长（毫秒），来自配置快照，关闭时传入 EventLoopGroup.shutdownGracefully。 */
     private long shutdownGraceMillis = PropertiesConstant.SERVER_SHUTDOWN_GRACE_PERIOD_DEFAULT;
 
     public ManagementNettyHttpServer(WebContext webContext, String contextPath, HttpHandler handler, int port,
@@ -64,39 +66,41 @@ public class ManagementNettyHttpServer implements SmartLifecycle, LifecycleWebCo
         this(webContext, contextPath, handler, port, maxContentLength, null);
     }
 
+    /** 兼容旧调用方：从共享 WebContext 的 ApplicationProperties 构造快照（不做前缀回退）。 */
     public ManagementNettyHttpServer(WebContext webContext, String contextPath, HttpHandler handler, int port,
             int maxContentLength, SslContext sslContext) {
+        this(webContext, contextPath, handler, ManagementServerSettings.fromApplicationProperties(
+                webContext.getProps(), port, maxContentLength, sslContext));
+    }
+
+    public ManagementNettyHttpServer(WebContext webContext, String contextPath, HttpHandler handler,
+            ManagementServerSettings settings) {
         this.webContext = webContext;
         this.contextPath = contextPath;
         this.handler = handler;
-        this.port = port;
-        this.maxContentLength = maxContentLength;
-        this.sslContext = sslContext;
+        this.settings = settings;
+        this.port = settings.getPort();
+        this.maxContentLength = settings.getMaxContentLength();
+        this.sslContext = settings.getSslContext();
+        this.shutdownGraceMillis = settings.getShutdownGraceMillis();
     }
 
     @Override
     public void start() {
-        this.http2Enabled = webContext.getProps().getBoolean(PropertiesConstant.HTTP2_ENABLED, false);
+        // 与 ALPN 共用快照里的同一个开关，杜绝「协商 h2、管线却是 http/1.1」的撕裂
+        this.http2Enabled = settings.getHttp2Enabled();
         // 触发 WebContext 生命周期（WebComponent 初始化），AtomicBoolean 保证幂等
         webContext.startLifecycle();
-        // 启动期预解析优雅关闭时长，配置错误在此 fail-fast（避免关闭时才暴露）
-        this.shutdownGraceMillis = webContext.getProps().getDurationMillis(
-                PropertiesConstant.SERVER_SHUTDOWN_GRACE_PERIOD,
-                PropertiesConstant.SERVER_SHUTDOWN_GRACE_PERIOD_DEFAULT);
-        // 预解析最大连接数（≤0 不限制），注入连接计数 handler（启动期 fail-fast）
-        metricsHandler.setMaxConnections(webContext.getProps().getInt(PropertiesConstant.SERVER_MAX_CONNECTIONS));
+        metricsHandler.setMaxConnections(settings.getMaxConnections());
 
-        String transportMode = webContext.getProps().get(PropertiesConstant.SERVER_NETTY_TRANSPORT,
-                PropertiesConstant.SERVER_NETTY_TRANSPORT_DEFAULT);
+        String transportMode = settings.getTransport();
         bossGroup = NettyTransport.newBossGroup(1, transportMode);
         workerGroup = NettyTransport.newWorkerGroup(0, transportMode);
 
-        // 启动期预解析压缩配置：供管线注入与 NettyHttpHandler（决定是否每请求写 UA）共用，仅解析一次
-        CompressionConfig compressionConfig = CompressionConfig.fromProperties(webContext.getProps());
-        // 启动期预解析 keep-alive 配置：供管线注入（请求计数 / 空闲超时），仅解析一次
-        KeepAliveConfig keepAliveConfig = KeepAliveConfig.fromProperties(webContext.getProps());
-        // 启动期预解析响应写出层限制（swallow-size / 响应头大小），仅解析一次
-        ResponseLimitConfig responseLimitConfig = ResponseLimitConfig.fromProperties(webContext.getProps());
+        // 全部来自启动期固化的快照：management.server.* 显式覆盖，否则继承 server.*
+        CompressionConfig compressionConfig = settings.getCompression();
+        KeepAliveConfig keepAliveConfig = settings.getKeepAlive();
+        ResponseLimitConfig responseLimitConfig = settings.getResponseLimit();
         NettyHttpHandler nettyHttpHandler = new NettyHttpHandler(webContext, "", handler, compressionConfig.isEnabled(),
                 responseLimitConfig);
         this.nettyHttpHandler = nettyHttpHandler;
@@ -107,24 +111,19 @@ public class ManagementNettyHttpServer implements SmartLifecycle, LifecycleWebCo
                     @Override
                     protected void initChannel(SocketChannel ch) {
                         Http2ChannelInitializer innerInit = new Http2ChannelInitializer(http2Enabled, sslContext,
-                                maxContentLength,
-                                webContext.getProps().getDurationMillis(PropertiesConstant.HTTP_READ_TIMEOUT,
-                                        PropertiesConstant.HTTP_READ_TIMEOUT_DEFAULT),
+                                maxContentLength, settings.getReadTimeoutMillis(),
                                 false, // supportMultipart = false (management port uses HttpObjectAggregator)
                                 nettyHttpHandler, Collections.emptyList(), Collections.emptyList(),
-                                webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_INITIAL_LINE_LENGTH),
-                                webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_REQUEST_HEADER_SIZE),
-                                webContext.getProps().getInt(PropertiesConstant.HTTP_MAX_CHUNK_SIZE),
-                                webContext.getProps().getInt(PropertiesConstant.HTTP_MULTIPART_MAX_PART_COUNT),
-                                webContext.getProps().getInt(PropertiesConstant.HTTP_MULTIPART_MAX_PART_HEADER_SIZE),
-                                compressionConfig, keepAliveConfig);
+                                settings.getMaxInitialLineLength(), settings.getMaxRequestHeaderSize(),
+                                settings.getMaxChunkSize(), settings.getMultipartMaxPartCount(),
+                                settings.getMultipartMaxPartHeaderSize(), compressionConfig, keepAliveConfig);
                         ch.pipeline().addLast(metricsHandler);
                         ch.pipeline().addLast(innerInit);
                     }
                 });
 
         try {
-            String bindAddress = webContext.getProps().get(PropertiesConstant.SERVER_ADDRESS, null);
+            String bindAddress = settings.getBindAddress();
             java.net.InetSocketAddress bindSocketAddress = (bindAddress != null && !bindAddress.trim().isEmpty())
                     ? new java.net.InetSocketAddress(bindAddress.trim(), port)
                     : new java.net.InetSocketAddress(port);

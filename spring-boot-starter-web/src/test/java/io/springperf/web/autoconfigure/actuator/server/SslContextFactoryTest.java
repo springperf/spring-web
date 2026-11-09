@@ -63,6 +63,23 @@ class SslContextFactoryTest {
     }
 
     @Test
+    void isSslEnabled_explicitFalse_beatsKeyStore() throws Exception {
+        when(env.getProperty(eq("test.ssl.enabled"), eq(Boolean.class))).thenReturn(false);
+        when(env.containsProperty("test.ssl.key-store")).thenReturn(true);
+
+        assertFalse(invokeIsSslEnabled(env, "test.ssl."),
+                "显式 enabled=false 必须关闭 SSL，残留 key-store 不得重新启用");
+    }
+
+    @Test
+    void createServerSslContext_explicitFalse_withKeyStore_returnsNull() {
+        when(env.getProperty(eq("server.ssl.enabled"), eq(Boolean.class))).thenReturn(false);
+        when(env.containsProperty("server.ssl.key-store")).thenReturn(true);
+
+        assertNull(SslContextFactory.createServerSslContext(env, "server.ssl."));
+    }
+
+    @Test
     void isSslEnabled_enabledNull_hasKeyStore() throws Exception {
         when(env.getProperty(eq("test.ssl.enabled"), eq(Boolean.class))).thenReturn(null);
         when(env.containsProperty("test.ssl.key-store")).thenReturn(true);

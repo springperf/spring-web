@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
  * <b>支持的属性</b>
  * </p>
  * <ul>
- * <li>{@code xxx.enabled} — 是否启用 SSL（配置 key-store 或 certificate 时隐式启用）</li>
+ * <li>{@code xxx.enabled} — 是否启用 SSL（显式值优先，{@code false} 可关闭；未配置时 key-store 或 certificate 存在即隐式启用）</li>
  * <li>{@code xxx.key-store} — 密钥库路径（支持 classpath: 前缀）</li>
  * <li>{@code xxx.key-store-password} — 密钥库密码</li>
  * <li>{@code xxx.key-store-type} — 密钥库类型（默认 PKCS12）</li>
@@ -49,7 +49,9 @@ public final class SslContextFactory {
      * @param env
      *            Spring Environment
      * @param prefix
-     *            属性前缀，如 {@code "server.ssl."} 或 {@code "management.server.ssl."}
+     *            属性前缀，如 {@code "server.ssl."} 或 {@code "management.server.ssl."}。
+     *            管理端口自动配置传入的是带覆盖属性源的 scoped Environment（仍用 {@code "server.ssl."} 前缀），
+     *            由该属性源完成 {@code management.server.ssl.* → server.ssl.*} 的回退
      *
      * @return SslContext，未配置 SSL 时返回 null
      */
@@ -166,25 +168,22 @@ public final class SslContextFactory {
     }
 
     /**
-     * 判断 SSL 是否已配置启用。 满足以下任一条件即视为启用：
+     * 判断 SSL 是否已配置启用。
      * <ol>
-     * <li>{@code xxx.enabled=true} 显式配置</li>
-     * <li>{@code xxx.key-store} 已配置</li>
-     * <li>{@code xxx.certificate} 已配置</li>
+     * <li>显式配置了 {@code xxx.enabled} 时以其值为准——{@code false} 必须关闭 SSL，
+     * 即使残留 key-store / certificate 配置（对齐 Spring Boot {@code Ssl.isEnabled} 语义）；</li>
+     * <li>未配置时，存在 {@code xxx.key-store} 或 {@code xxx.certificate} 即隐式启用。</li>
      * </ol>
      */
     private static boolean isSslEnabled(Environment env, String prefix) {
         Boolean enabled = env.getProperty(prefix + "enabled", Boolean.class);
-        if (Boolean.TRUE.equals(enabled)) {
-            return true;
+        if (enabled != null) {
+            return enabled;
         }
         if (env.containsProperty(prefix + "key-store")) {
             return true;
         }
-        if (env.containsProperty(prefix + "certificate")) {
-            return true;
-        }
-        return false;
+        return env.containsProperty(prefix + "certificate");
     }
 
     private static InputStream openInputStream(String path) throws Exception {
