@@ -65,3 +65,6 @@ __pycache__/
 /.workbuddy/
 /.codebuddy/
 /.vscode/
+
+# 内部文档与过程台账的私有根：对外不可见，整目录不入库
+/.private/
