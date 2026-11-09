@@ -6,10 +6,11 @@ import io.springperf.web.support.codec.interceptor.SupportHttpBodyCodecIntercept
 import io.springperf.web.support.mvc.config.WebMvcConfigurerBridge;
 import io.springperf.web.support.mvc.interceptor.SupportInterceptorRegistry;
 import io.springperf.web.support.mvc.retval.ModelAndViewReturnValueResolver;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 
 /**
  * SpringMVC 兼容层自动装配。仅在 classpath 存在 {@code spring-web-mvc-support} 时激活。
@@ -20,7 +21,8 @@ import org.springframework.context.annotation.Configuration;
  * 返回值解析、{@code ModelAndView} 桥接等。
  * </p>
  */
-@Configuration
+@AutoConfiguration
+@AutoConfigureAfter(SpringWebServletAutoConfiguration.class)
 @ConditionalOnClass(name = "org.springframework.web.servlet.HandlerInterceptor")
 public class SpringWebMvcSupportAutoConfiguration {
 

@@ -5,10 +5,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.beans.factory.support.BeanDefinitionRegistryPostProcessor;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingClass;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 
 /**
  * Auto-configuration to remove Spring Data's {@code ProjectingArgumentResolverRegistrar} BeanPostProcessor when
@@ -31,7 +32,8 @@ import org.springframework.context.annotation.Configuration;
  *
  * @since 1.0.1
  */
-@Configuration
+@AutoConfiguration
+@AutoConfigureAfter(SpringWebAutoConfiguration.class)
 @ConditionalOnClass(name = "org.springframework.data.web.config.ProjectingArgumentResolverRegistrar")
 @ConditionalOnMissingClass("org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter")
 public class SpringDataWebCompatibilityAutoConfiguration {

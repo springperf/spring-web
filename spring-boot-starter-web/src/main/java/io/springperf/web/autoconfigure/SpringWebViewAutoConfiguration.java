@@ -2,6 +2,8 @@ package io.springperf.web.autoconfigure;
 
 import io.springperf.web.view.retval.ViewReturnValueResolver;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
@@ -9,7 +11,8 @@ import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 
 @Slf4j
-@Configuration
+@AutoConfiguration
+@AutoConfigureAfter(SpringWebAutoConfiguration.class)
 @ConditionalOnClass(name = "io.springperf.web.view.ViewResolverRegistry")
 public class SpringWebViewAutoConfiguration {
 

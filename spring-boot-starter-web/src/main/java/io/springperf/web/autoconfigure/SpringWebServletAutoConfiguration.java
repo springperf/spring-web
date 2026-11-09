@@ -20,6 +20,8 @@ import io.springperf.web.support.servlet.filter.SupportWebFilterRegistry;
 import io.springperf.web.support.servlet.session.PerfHttpSessionManager;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeansException;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.web.servlet.AbstractFilterRegistrationBean;
@@ -27,7 +29,6 @@ import org.springframework.boot.web.servlet.DelegatingFilterProxyRegistrationBea
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.AnnotationAwareOrderUtils;
 import org.springframework.lang.Nullable;
 import org.springframework.util.ReflectionUtils;
@@ -43,7 +44,8 @@ import java.lang.reflect.Method;
  * </p>
  */
 @Slf4j
-@Configuration
+@AutoConfiguration
+@AutoConfigureAfter(SpringWebAutoConfiguration.class)
 @ConditionalOnClass(name = "io.springperf.web.support.servlet.context.ServletAdapterContext")
 public class SpringWebServletAutoConfiguration implements ApplicationContextAware {
 

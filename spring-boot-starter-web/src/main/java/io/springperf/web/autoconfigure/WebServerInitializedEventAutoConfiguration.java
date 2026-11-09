@@ -4,11 +4,12 @@ import io.springperf.web.autoconfigure.support.PerfWebServer;
 import io.springperf.web.autoconfigure.support.PerfWebServerInitializedEvent;
 import io.springperf.web.server.NettyHttpServer;
 import io.springperf.web.server.NettyServerStartedEvent;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.web.server.WebServer;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 
 /**
  * 把核心模块的 {@link NettyServerStartedEvent} 转换成 Spring Boot 标准的
@@ -22,7 +23,8 @@ import org.springframework.context.annotation.Configuration;
  * native-image 可达性提示已解耦到 {@link SpringWebRuntimeHintsConfiguration}，本配置被排除时不会连带丢失。
  * </p>
  */
-@Configuration(proxyBeanMethods = false)
+@AutoConfiguration
+@AutoConfigureAfter(SpringWebAutoConfiguration.class)
 public class WebServerInitializedEventAutoConfiguration {
 
     @Bean

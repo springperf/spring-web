@@ -1,11 +1,11 @@
 package io.springperf.web.autoconfigure;
 
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 
 import io.springperf.web.context.WebContext;
 import lombok.extern.slf4j.Slf4j;
@@ -30,7 +30,7 @@ import lombok.extern.slf4j.Slf4j;
  * @see io.springperf.web.context.PropertyRefreshHandler
  */
 @Slf4j
-@Configuration
+@AutoConfiguration
 // 两个条件都是必要的：本类的 @Bean 方法直接以 WebContext 为参数，而 WebContext 由主自动配置创建。
 // 用户若排除了 SpringWebAutoConfiguration 却保留本项，缺 @ConditionalOnBean 会因找不到 WebContext 而启动失败；
 // 缺 @AutoConfigureAfter 则无法保证 WebContext 已就绪。

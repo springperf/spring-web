@@ -506,7 +506,7 @@ support 与 batch 是 `provided` 依赖，用户按需引入。这带来两个�
 
 ### 6.3 starter 的"零配置 + 零冲突"
 
-starter 聚合自动装配（14 个 AutoConfiguration，详见 [14 篇](14-starter-autoconfig.md)），用户只需 `spring-boot-starter-web` 一行依赖即可启动。同时它在依赖源头排除 Tomcat 的 `spring-boot-starter-web`（[§1.3](#13-starter-排除-tomcat-的反向防线)），并在 `SpringWebAutoConfiguration` 启动期检测 SpringMVC 冲突抛 `IllegalStateException`——"零冲突"是显式防线，不是运气。
+starter 聚合自动装配（15 个自动配置类，详见 [14 篇](14-starter-autoconfig.md)），用户只需 `spring-boot-starter-web` 一行依赖即可启动。同时它在依赖源头排除 Tomcat 的 `spring-boot-starter-web`（[§1.3](#13-starter-排除-tomcat-的反向防线)），并在 `SpringWebAutoConfiguration` 启动期检测 SpringMVC 冲突抛 `IllegalStateException`——"零冲突"是显式防线，不是运气。
 
 ### 6.4 同包覆盖：support 桥接的根基
 
@@ -526,7 +526,7 @@ support 模块在 `src/main/java/org/springframework/web/servlet/` 等路径下*
 - [11 篇](11-async-streaming.md) 展开 `async/stream` 与 `AbstractNettyStreamSender`；
 - [12 篇](12-support-bridge.md) 展开 support 的同包覆盖与 `WebMvcConfigurerBridge`；
 - [13 篇](13-batch-module.md) 展开 batch 的 Disruptor 聚合切入点；
-- [14 篇](14-starter-autoconfig.md) 展开 starter 的 14 个 AutoConfiguration 与零冲突防线。
+- [14 篇](14-starter-autoconfig.md) 展开 starter 的 15 个自动配置类与零冲突防线。
 
 记住两个校正（生命周期由 `start()` 触发、路径匹配 Filter 在 `core/filter`），后续阅读源码就不会在错误的位置扑空。
 

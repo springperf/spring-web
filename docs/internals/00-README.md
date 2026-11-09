@@ -290,10 +290,10 @@
 
 #### 14 · spring-boot-starter-web：自动装配与零冲突启动 `14-starter-autoconfig.md`
 
-- **定位**：装配层。讲清 starter 如何经 `META-INF/spring/...AutoConfiguration.imports` 注册 14 个 `AutoConfiguration`（`spring.factories` 只注册 `ApplicationContextFactory`），如何检测冲突并 fail-fast，如何独立部署 Actuator 管理端口。
+- **定位**：装配层。讲清 starter 如何经 `META-INF/spring/...AutoConfiguration.imports` 注册 15 个 `@AutoConfiguration`（`spring.factories` 只注册 `ApplicationContextFactory`），如何检测冲突并 fail-fast，如何独立部署 Actuator 管理端口。
 - **核心问题**：`SpringWebAutoConfiguration` 如何检测并拒绝 `spring-boot-starter-web`(MVC) 同存？`ActuatorEndpointAutoConfiguration` 如何用独立 `ManagementNettyHttpServer` 隔离管理端口？`SpringBootAdminClientAutoConfiguration` 如何注册 `PerfApplicationFactory` 兼容 SBA？`WebServerApplicationContextFactory` 为何改用非 Servlet 的 `AnnotationConfigApplicationContext`？
 - **覆盖要点**：
-  1. `.imports` 注册的 14 个 `AutoConfiguration` 一览与各自条件。
+  1. `.imports` 注册的 15 个 `@AutoConfiguration` 一览与各自条件、显式排序注解。
   2. `SpringWebAutoConfiguration`：核心装配；冲突检测抛 `IllegalStateException`（记忆 `sba-web-server-initialized-event` 兼容背景）。
   3. `SpringWebServletAutoConfiguration` 与 `SpringWebMvcSupportAutoConfiguration`：装配 support 桥接。
   4. `SpringDataWebCompatibilityAutoConfiguration`：Spring Data 兼容（分页/排序）。
@@ -303,7 +303,7 @@
   8. OpenAPI/SwaggerUi 自动装配。
   9. `WebServerApplicationContextFactory`：为何用非 Servlet 的 `AnnotationConfigApplicationContext`（AOT / native-image 下返回 `GenericApplicationContext`）。
   10. `PerfWebServer`：`WebServer` 抽象的实现，与 Spring Boot `WebServer` 契约对齐。
-- **源码依据**：`META-INF/spring/...AutoConfiguration.imports`、14 个 `*AutoConfiguration` 类、`PerfWebServer`、`WebServerApplicationContextFactory`、`ManagementNettyHttpServer`/`ManagementDispatcherHandler`。
+- **源码依据**：`META-INF/spring/...AutoConfiguration.imports`、15 个自动配置类（含不以 `AutoConfiguration` 结尾的 `SpringWebRuntimeHintsConfiguration`）、`PerfWebServer`、`WebServerApplicationContextFactory`、`ManagementNettyHttpServer`/`ManagementDispatcherHandler`。
 - **与既有文档关系**：`advanced.md` Actuator/CORS 章节的内部化；记忆 `sba-web-server-initialized-event` / `wsl-external-migrated-to-master` 的代码层。
 - **阅读前提**：核对 `.imports` 实际注册项与各 `@ConditionalOn*` 条件。
 
