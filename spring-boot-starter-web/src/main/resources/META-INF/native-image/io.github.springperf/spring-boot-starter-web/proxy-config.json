@@ -8,5 +8,6 @@
   ["io.springperf.web.core.codec.HttpBodyConverter"],
   ["io.springperf.web.context.LifecycleWebComponent"],
   ["io.springperf.web.http.WebServerHttpRequest"],
-  ["io.springperf.web.http.WebServerHttpResponse"]
+  ["io.springperf.web.http.WebServerHttpResponse"],
+  ["org.springframework.boot.web.context.WebServerApplicationContext", "org.springframework.context.ConfigurableApplicationContext"]
 ]

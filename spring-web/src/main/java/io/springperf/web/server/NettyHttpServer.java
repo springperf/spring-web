@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.core.Ordered;
@@ -159,6 +160,10 @@ public class NettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
             }
             throw new IllegalStateException("Failed to start Netty", e);
         }
+        // 对齐 Boot WebServerStartStopLifecycle#start()：端口绑定成功后立即发布事件，
+        // 不延迟到 ContextRefreshedEvent / ApplicationReadyEvent。
+        // 必须置于 try-catch 之外：监听器异常不得误入「绑定失败清理」分支（此时 serverChannel 已打开）。
+        publishServerStartedEvent();
     }
 
     @ChannelHandler.Sharable
@@ -260,7 +265,23 @@ public class NettyHttpServer implements SmartLifecycle, LifecycleWebComponent {
 
     @Override
     public int getPhase() {
-        return Integer.MAX_VALUE;
+        // 对齐 Boot WebServerStartStopLifecycle（SmartLifecycle.DEFAULT_PHASE - 2048）：
+        // 服务器必须先于依赖 WebServerInitializedEvent 的 SmartLifecycle（如 Spring Cloud 服务注册）启动。
+        return Integer.MAX_VALUE - 2048;
+    }
+
+    /**
+     * 端口绑定成功后立即发布框架启动事件，starter 监听后转换成 Boot 标准 {@code WebServerInitializedEvent}。
+     * <p>
+     * 单测直接 {@code new NettyHttpServer(...)} 时 WebContext 可能没有真实 ApplicationContext，此时静默跳过；
+     * 生产路径由 Spring 注入，事件一定发布。
+     * </p>
+     */
+    private void publishServerStartedEvent() {
+        ApplicationContext ctx = webContext.getCtx();
+        if (ctx != null) {
+            ctx.publishEvent(new NettyServerStartedEvent(this));
+        }
     }
 
     @Override

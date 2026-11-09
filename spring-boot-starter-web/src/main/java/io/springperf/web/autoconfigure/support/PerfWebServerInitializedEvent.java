@@ -4,6 +4,7 @@ import org.springframework.boot.web.context.WebServerApplicationContext;
 import org.springframework.boot.web.context.WebServerInitializedEvent;
 import org.springframework.boot.web.server.WebServer;
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.ConfigurableApplicationContext;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -17,6 +18,9 @@ import java.lang.reflect.Proxy;
  * <p>
  * 由于本框架使用 {@code AnnotationConfigApplicationContext}（非 {@code WebServerApplicationContext}）， 通过 JDK 动态代理将实际上下文包装为
  * {@link WebServerApplicationContext}，仅覆盖 {@link WebServerApplicationContext#getWebServer()} 返回本框架的 WebServer 实现。
+ * 代理同时实现 {@link ConfigurableApplicationContext}：部分生态组件会把
+ * {@code event.getApplicationContext()} 强转为该接口，仅实现 {@code WebServerApplicationContext} 会抛
+ * ClassCastException。生产上下文（{@code AnnotationConfigApplicationContext}）本身实现该接口，故所有方法可直接委托。
  * </p>
  *
  * @author huangcanda
@@ -38,14 +42,15 @@ public class PerfWebServerInitializedEvent extends WebServerInitializedEvent {
     }
 
     /**
-     * 通过 JDK 动态代理将普通 ApplicationContext 包装为 WebServerApplicationContext。
+     * 通过 JDK 动态代理将普通 ApplicationContext 包装为 WebServerApplicationContext + ConfigurableApplicationContext。
      * <p>
-     * 所有方法委托给真实的 ApplicationContext，仅 {@code getWebServer()} 返回给定的 WebServer。
+     * 所有方法委托给真实的 ApplicationContext，仅 {@code getWebServer()} / {@code getServerNamespace()} 特判。
      * </p>
      */
     private static WebServerApplicationContext createProxy(WebServer webServer, ApplicationContext delegate) {
         return (WebServerApplicationContext) Proxy.newProxyInstance(WebServerApplicationContext.class.getClassLoader(),
-                new Class<?>[] { WebServerApplicationContext.class }, new InvocationHandler() {
+                new Class<?>[] { WebServerApplicationContext.class, ConfigurableApplicationContext.class },
+                new InvocationHandler() {
                     @Override
                     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
                         if ("getWebServer".equals(method.getName()) && method.getParameterCount() == 0) {
@@ -54,7 +59,7 @@ public class PerfWebServerInitializedEvent extends WebServerInitializedEvent {
                         if ("getServerNamespace".equals(method.getName()) && method.getParameterCount() == 0) {
                             return null;
                         }
-                        // equals/hashCode/toString 也委托给真实上下文
+                        // equals/hashCode/toString 及其余上下文方法均委托给真实上下文
                         return method.invoke(delegate, args);
                     }
                 });

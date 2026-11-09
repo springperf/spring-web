@@ -7,6 +7,7 @@ import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.RuntimeHintsRegistrar;
 import org.springframework.aot.hint.support.FilePatternResourceHintsRegistrar;
 import org.springframework.boot.web.context.WebServerApplicationContext;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.util.concurrent.ListenableFuture;
 import org.springframework.util.concurrent.ListenableFutureCallback;
 
@@ -15,7 +16,8 @@ import org.springframework.util.concurrent.ListenableFutureCallback;
  * <p>
  * 注册四类元数据：
  * <ul>
- * <li>JDK 动态代理：事件用代理把真实上下文包装为 {@link WebServerApplicationContext}， native 下代理接口必须显式注册；异步返回 {@code ListenableFuture} 时
+ * <li>JDK 动态代理：事件用代理把真实上下文包装为 {@link WebServerApplicationContext} +
+ * {@link ConfigurableApplicationContext}， native 下代理接口必须显式注册；异步返回 {@code ListenableFuture} 时
  * {@link io.springperf.web.core.retval.resolver.async.ListenableFutureAdapter} 注册 {@link ListenableFutureCallback}
  * 的回调实现；</li>
  * <li>反射：{@code ListenableFuture#addCallback} 回调路径；</li>
@@ -24,29 +26,29 @@ import org.springframework.util.concurrent.ListenableFutureCallback;
  * {@link io.springperf.web.autoconfigure.support.ControllerBeanFactoryInitializationAotProcessor} 在 AOT 构建期按
  * BeanFactory 实际内容注册（本 registrar 不重复）。</li>
  * </ul>
+ * <p>
+ * {@code classLoader} 为 null 是 {@link RuntimeHintsRegistrar} 契约允许的输入；只有资源探测需要它，
+ * 代理/反射注册与 classLoader 无关，必须始终执行。
+ * </p>
  */
 public class SpringWebRuntimeHints implements RuntimeHintsRegistrar {
 
     @Override
     public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
-        // 事件路径：JDK 动态代理包装 WebServerApplicationContext
-        hints.proxies().registerJdkProxy(WebServerApplicationContext.class);
+        // 事件路径：JDK 动态代理包装 WebServerApplicationContext + ConfigurableApplicationContext
+        hints.proxies().registerJdkProxy(WebServerApplicationContext.class, ConfigurableApplicationContext.class);
         hints.reflection().registerType(PerfWebServer.class, MemberCategory.INVOKE_PUBLIC_CONSTRUCTORS);
         hints.reflection().registerType(PerfWebServerInitializedEvent.class, MemberCategory.INVOKE_PUBLIC_CONSTRUCTORS);
 
-        // RuntimeHintsRegistrar 的契约允许 classLoader 为 null（上游标注 @Nullable），而以下注册
-        // 全部依赖它做 classpath 探测（getResource），故整体跳过。
-        if (classLoader == null) {
-            return;
-        }
-
-        // ListenableFuture 异步返回路径：代理 + 回调反射
+        // ListenableFuture 异步返回路径：代理 + 回调反射（不依赖 classLoader）
         hints.proxies().registerJdkProxy(ListenableFutureCallback.class);
         hints.reflection().registerType(ListenableFutureCallback.class, MemberCategory.INVOKE_PUBLIC_METHODS);
         hints.reflection().registerType(ListenableFuture.class, MemberCategory.INVOKE_PUBLIC_METHODS);
 
-        // 框架强依赖的 classpath 资源
-        registerResourceHints(hints, classLoader);
+        // 资源探测需要 classLoader；契约允许 null，此时仅跳过这一组提示
+        if (classLoader != null) {
+            registerResourceHints(hints, classLoader);
+        }
     }
 
     private static void registerResourceHints(RuntimeHints hints, ClassLoader classLoader) {
