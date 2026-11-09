@@ -58,7 +58,7 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 
 | Dependency | Current Version | Verified Range | Notes |
 |------------|----------------|----------------|-------|
-| Spring Boot | **3.5.16** | 3.2.x ~ 3.5.x | Switch via Maven profile (`-Pspring-boot-3.2` ~ `-Pspring-boot-3.5`); for 4.x see the `4.1.x` branch |
+| Spring Boot | **3.5.16** | 3.2.x ~ 3.5.x (core + starter tests) | Switch via Maven profile (`-Pspring-boot-3.2` ~ `-Pspring-boot-3.5`); for 4.x see the `4.1.x` branch; E2E coverage is described under "Cross-version Sensitive Points" below |
 | Spring Framework | **6.2.x** | 6.1.x ~ 6.2.x | Managed by Spring Boot |
 | JDK | **17** | 17 / 21 / 25 (CI matrix, see [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)) | Compile target `java.version=17`; JDK 21+ supports virtual threads (see below) |
 | Servlet API | **jakarta.servlet 6.0** | 6.0.x | javax.servlet incompatible |
@@ -72,8 +72,26 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 > against 3.0/3.1 fails at compile time; building against 3.5 and executing on a 6.0 runtime fails at
 > `@RequestParam` / `@PathVariable` conversion with `NoSuchMethodError` (an `Error`, which
 > `@ExceptionHandler` cannot catch). Neither direction works, so the range starts at 3.2. Coverage is
-> verified by the `spring-boot-versions` matrix in `ci.yml` (3.2 / 3.3 / 3.4) running core-module
+> verified by the `spring-boot-versions` matrix in `ci.yml` (3.2 / 3.3 / 3.4) running core-module and starter
 > **tests** - a green `compile` says nothing about runtime symbol resolution.
+
+### Cross-version Sensitive Points
+
+The cross-version risk on master lives in the starter auto-configuration layer. The
+`spring-boot-versions` job covers it precisely because it runs
+`-pl spring-boot-starter-web -am test` instead of the core module alone.
+
+| Sensitive point | Risk | Covered by | Fallback |
+|-----------------|------|------------|----------|
+| `ApiVersion` (internal actuator enum `V2/V3/LATEST`) | Renamed / revalued in a 3.x minor | starter tests + `ActuatorEndpointAutoConfiguration` conditions | Fails at compile time, no silent degradation |
+| `DelegatingFilterProxyRegistrationBean#getTargetBeanName()` (protected reflection) | A Boot signature change would silently drop filters | `SpringWebServletAutoConfigurationCreateFilterWrapperTest` | Returns null, skips the filter and logs a WARN |
+| `ConfigurationPropertySources` + Boot `Ssl` binding via `Binder` | Aggregated property-source semantics may break management-port SSL and overrides | `ManagementServerSettingsTest`, `SslContextFactoryTest` | Fails fast on binding errors |
+| `@AutoConfiguration` ordering and conditions | Different ordering on older versions can back off conditions | `AutoConfigurationContractTest`, `AutoConfigurationConditionTest` | Explicit `@AutoConfigureAfter` fixes the order |
+
+> **E2E coverage scope**: 3.5 runs the full `@SpringBootTest` suite (`ci.yml` JDK matrix); 3.2 / 3.3 / 3.4 / 3.5
+> run a minimal smoke set weekly (or on manual `workflow_dispatch`) via `spring-boot-e2e-matrix.yml`:
+> `AdditionalEndpointsE2ETest` / `ManagementPortConflictTest` / `WebServerInitializedEventOrderTest`.
+> So "3.2.x ~ 3.5.x" means core + starter tests are verified; the full E2E suite is verified on 3.5 only.
 
 ### Additional Features
 

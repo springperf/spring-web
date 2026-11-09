@@ -99,6 +99,8 @@ jobs:
   spring-boot-versions:
     # 「支持 3.2~3.4」必须由单测证明，不能只 compile：换 Spring 版本会改变行为
     # （例：ServerSentEvent 拒绝换行的校验是 6.2 某个补丁才加的），运行期还会暴露缺失符号。
+    # 覆盖到 starter：ApiVersion / Binder / protected 反射等跨版本敏感点都在自动配置层，
+    # 只跑核心模块单测等于没测（见 docs/compatibility.md「跨版本敏感点」）。
     if: github.ref == 'refs/heads/master' || github.base_ref == 'master'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -116,10 +118,12 @@ jobs:
           distribution: temurin
           cache: maven
 
-      - name: Test spring-web on Spring Boot ${{ matrix.boot }}
-        # 只跑核心模块：全 reactor × 3 个版本会拖长 PR 反馈；nightly 若需要可扩到 -am 全量。
+      - name: Test spring-web + starter on Spring Boot ${{ matrix.boot }}
+        # -pl spring-boot-starter-web -am 会把核心模块一并编译/测试，同时覆盖自动配置层。
+        # 全 reactor × 3 版本仍太重；真实启动服务器的 E2E 交给 nightly 的
+        # spring-boot-e2e-matrix.yml（手动 workflow_dispatch 亦可触发）。
         run: >
-          ./mvnw -Pspring-boot-${{ matrix.boot }} -pl spring-web -am test
+          ./mvnw -Pspring-boot-${{ matrix.boot }} -pl spring-boot-starter-web -am test
           -Djacoco.skip=true -Dspotbugs.skip=true -Dmodernizer.skip=true
           --batch-mode --no-transfer-progress
 

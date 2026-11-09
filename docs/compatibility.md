@@ -55,7 +55,7 @@
 
 | 依赖 | 当前版本 | 已验证兼容范围 | 说明 |
 |------|---------|---------------|------|
-| Spring Boot | **3.5.16** | 3.2.x ~ 3.5.x | 通过 Maven Profile 切换（`-Pspring-boot-3.2` ~ `-Pspring-boot-3.5`）；4.x 见 `4.1.x` 分支 |
+| Spring Boot | **3.5.16** | 3.2.x ~ 3.5.x（核心 + starter 单测） | 通过 Maven Profile 切换（`-Pspring-boot-3.2` ~ `-Pspring-boot-3.5`）；4.x 见 `4.1.x` 分支；E2E 覆盖范围见下方「跨版本敏感点」 |
 | Spring Framework | **6.2.x** | 6.1.x ~ 6.2.x | 随 Spring Boot 管理 |
 | JDK | **17** | 17 / 21 / 25（CI 矩阵，见 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)） | 编译目标 `java.version=17`；JDK 21 起支持虚拟线程（见下） |
 | Servlet API | **jakarta.servlet 6.0** | 6.0.x | javax.servlet 不兼容 |
@@ -68,8 +68,25 @@
 > `ConversionService.convert(Object, TypeDescriptor)`（6.1 才新增）。用 3.0/3.1 的依赖构建会直接编译失败；
 > 若改用 3.5 构建、把产物拿到 6.0 运行时执行，则会在 `@RequestParam` / `@PathVariable` 等命名值参数的转换
 > 路径上抛 `NoSuchMethodError`（`Error`，`@ExceptionHandler` 接不住）。两个方向都不可用，故从 3.2 起算。
-> 兼容性由 `ci.yml` 的 `spring-boot-versions` 矩阵（3.2 / 3.3 / 3.4）跑核心模块**单测**验证——只验证
+> 兼容性由 `ci.yml` 的 `spring-boot-versions` 矩阵（3.2 / 3.3 / 3.4）跑核心模块 + starter **单测**验证——只验证
 > `compile` 证明不了运行期符号存在。
+
+### 跨版本敏感点
+
+master 的跨版本风险集中在 starter 自动配置层，`spring-boot-versions` job 正是因为覆盖到
+`-pl spring-boot-starter-web -am test` 才能证明这些点在 3.2 / 3.3 / 3.4 上可用。
+
+| 敏感点 | 风险 | 覆盖用例 | 降级策略 |
+|--------|------|---------|---------|
+| `ApiVersion`（actuator 内部枚举 `V2/V3/LATEST`） | 3.x 小版本改名/改值 | starter 单测 + `ActuatorEndpointAutoConfiguration` 条件装配 | 编译期即暴露，无静默降级 |
+| `DelegatingFilterProxyRegistrationBean#getTargetBeanName()`（protected 反射） | Boot 调整签名后 filter 静默消失 | `SpringWebServletAutoConfigurationCreateFilterWrapperTest` | 返回 null 跳过并打 WARN，不吞异常 |
+| `ConfigurationPropertySources` + Boot `Ssl` 的 `Binder` 绑定 | 聚合属性源语义变化会让管理端口 SSL / 覆盖失效 | `ManagementServerSettingsTest`、`SslContextFactoryTest` | 绑定失败 fail-fast |
+| `@AutoConfiguration` 排序与条件注解 | 低版本排序不同会让条件装配退让 | `AutoConfigurationContractTest`、`AutoConfigurationConditionTest` | 显式 `@AutoConfigureAfter` 固定顺序 |
+
+> **E2E 覆盖口径**：3.5 跑全量 `@SpringBootTest`（`ci.yml` 的 JDK 矩阵）；3.2 / 3.3 / 3.4 / 3.5 由
+> `spring-boot-e2e-matrix.yml` 每周（或手动 `workflow_dispatch`）跑最小冒烟集
+> （`AdditionalEndpointsE2ETest` / `ManagementPortConflictTest` / `WebServerInitializedEventOrderTest`）。
+> 因此「3.2.x ~ 3.5.x」指核心 + starter 单测已验证，E2E 全量仅 3.5。
 
 ### 额外特性
 
