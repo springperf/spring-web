@@ -14,10 +14,11 @@ import java.util.regex.PatternSyntaxException;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * 验证 GraalVM native-image 配置文件的正确性。
+ * 验证 GraalVM native-image 静态配置文件的自洽性。
  * <p>
  * 不只验「文件存在」：配置文件里的类名、代理接口、资源正则都必须真实可达/可用，
  * 且 {@code AutoConfiguration.imports} 中登记的自动配置类必须全部能在 classpath 上加载。
+ * 两轨之间的重复/互补/独占关系由 {@link NativeImageHintsConsistencyTest} 校验。
  * </p>
  */
 class GraalVmNativeImageConfigTest {
@@ -113,10 +114,16 @@ class GraalVmNativeImageConfigTest {
                 fail("resource-config.json 存在非法正则: " + pattern + " -> " + e.getDescription());
             }
         }
-        assertTrue(patterns.stream().anyMatch(p -> p.contains("spring.factories")),
-                "Missing spring.factories resource pattern");
-        assertTrue(patterns.stream().anyMatch(p -> Pattern.compile(p).matcher(IMPORTS_PATH).matches()),
-                "没有 pattern 能匹配 " + IMPORTS_PATH);
+        // 逐条实测：目录 pattern 必须覆盖目录内文件，配置文件 pattern 必须覆盖 yml/yaml 与 profile 变体
+        List<String> samples = List.of("META-INF/spring.factories", IMPORTS_PATH, "META-INF/spring/aot.factories",
+                "META-INF/additional-spring-configuration-metadata.json", "application.properties",
+                "application-dev.properties", "application.yml", "application.yaml", "application-prod.yaml",
+                "templates/index.html", "static/app.css", "META-INF/resources/webjars/swagger-ui/index.html",
+                "public/robots.txt");
+        for (String sample : samples) {
+            assertTrue(patterns.stream().anyMatch(p -> Pattern.compile(p).matcher(sample).matches()),
+                    "没有 pattern 能匹配 " + sample);
+        }
     }
 
     // ============ 工具方法 ============

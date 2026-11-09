@@ -74,7 +74,7 @@
 ### 额外特性
 
 - **虚拟线程**：JDK 21+ 下 `spring.threads.virtual.enabled=true` 启用，`default` 业务线程池与 batch 的批量方法（`@BatchMapping`）均改用虚拟线程执行（只替换线程类型：`pool.*` 上限/队列语义与 batch 的 `consumerSize` 上限、背压语义均保持不变）——反射调用 `Thread.ofVirtual`，兼容 JDK 17 编译，JDK < 21 时告警并回落平台线程。实现见 [`VirtualThreadSupport`](../spring-web/src/main/java/io/springperf/web/core/pool/VirtualThreadSupport.java) / [`BizPoolRegistry`](../spring-web/src/main/java/io/springperf/web/core/pool/BizPoolRegistry.java)；E2E 覆盖见 [`VirtualThreadE2ETest`](../spring-web-test/src/test/java/io/springperf/webtest/VirtualThreadE2ETest.java) 与 [`BatchVirtualThreadE2ETest`](../spring-web-support-test/src/test/java/io/springperf/webtest/batch/BatchVirtualThreadE2ETest.java)
-- **GraalVM native-image**：`FastInvokerGenerator` 在 native-image 下自动降级为 `MethodHandle` 调用；`SpringWebRuntimeHints` 注册事件路径/资源/异步回调可达性提示；`ControllerBeanFactoryInitializationAotProcessor`（经 `META-INF/spring/aot.factories`）在 AOT 构建期自动为 `@Controller` 处理方法与 DTO 注册反射/序列化 hints
+- **GraalVM native-image**：`FastInvokerGenerator` 在 native-image 下自动降级为 `MethodHandle` 调用；`SpringWebRuntimeHints` 注册事件路径/资源/异步回调可达性提示；`ControllerBeanFactoryInitializationAotProcessor`（经 `META-INF/spring/aot.factories`）在 AOT 构建期自动为 `@Controller` 处理方法与 DTO 注册反射/序列化 hints。静态 `META-INF/native-image/.../{reflect,proxy,resource}-config.json` 与 AOT 动态 hints **互补**：前者提供 AOT 无法自动发现的框架内部类/SPI 接口/资源基线，后者补 AOT 构建期才确定的部分；静态 `reflect-config.json` 不再登记自动配置类（构造提示由 `process-aot` 生成），两轨有意重叠的代理/资源条目保留为双保险，关系由 `NativeImageHintsConsistencyTest` 锁定
 - **WebSocket**：基于 Jakarta WebSocket 的自动配置
 
 ### GraalVM native-image 支持矩阵

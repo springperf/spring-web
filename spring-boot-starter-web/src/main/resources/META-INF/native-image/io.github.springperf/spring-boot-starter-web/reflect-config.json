@@ -329,22 +329,6 @@
     "allDeclaredConstructors": true
   },
   {
-    "name": "io.springperf.web.autoconfigure.SpringWebAutoConfiguration",
-    "allDeclaredConstructors": true
-  },
-  {
-    "name": "io.springperf.web.autoconfigure.SpringWebServletAutoConfiguration",
-    "allDeclaredConstructors": true
-  },
-  {
-    "name": "io.springperf.web.autoconfigure.SpringWebMvcSupportAutoConfiguration",
-    "allDeclaredConstructors": true
-  },
-  {
-    "name": "io.springperf.web.autoconfigure.OpenApiAutoConfiguration",
-    "allDeclaredConstructors": true
-  },
-  {
     "name": "io.springperf.web.autoconfigure.openapi.OpenApiAdapter",
     "allDeclaredConstructors": true,
     "allDeclaredMethods": true
