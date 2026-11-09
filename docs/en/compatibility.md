@@ -107,7 +107,9 @@ The cross-version risk on master lives in the starter auto-configuration layer. 
 | SB4 (4.0.x/4.1.x, `4.1.x` branch) | ❌ Not supported | The 4.x event bridge needs runtime `defineClass` (forbidden in closed world); explicitly documented as excluded on the `4.1.x` branch |
 | epoll transport | ✅ Verified | Netty epoll `.so` verified in a Linux native build environment (NIO transport also verified on Windows native) |
 | WebSocket `@ServerEndpoint` | ⚠️ Register as Bean | classpath scanning unavailable under native; `JsrEndpointScanner` auto-degrades to Bean discovery |
-| Native build verification | ✅ Windows & Linux verified | Windows: `mvn -Pnative package` (GraalVM + MSVC, `vcvars64` env + `-H:-CheckToolchain`); Linux: CI `ubuntu-latest` runs `scripts/native-smoke-test.sh` (build + launch + request-flow assertions) |
+| Native build verification | ✅ Windows & Linux verified | Windows: `mvn -Pnative package` (GraalVM + MSVC, `vcvars64` env + `-H:-CheckToolchain`); Linux: CI `ubuntu-latest` gates on `scripts/native-smoke-test.sh` (build + launch + 8 request-chain assertions) |
+
+> **CI smoke coverage scope**: `scripts/native-smoke-test.sh` asserts, against `spring-web-example-rest`, JSON serialization on `/health`, controller-method reflection and `@PathVariable` / `@RequestBody` binding across `GET/POST/PUT/DELETE /api/users`, the business error branch, and the framework 404 branch. This verifies that the reflection/DTO hints produced by `ControllerBeanFactoryInitializationAotProcessor` really work in the native image. `NativeSmokeContractTest` locks the relationship between the script, the controller routes and `native-image.yml`. View templates, async return values and a separate management port are **not** covered: no example module ships templates or `management.server.port`, and only `spring-web-example-rest` binds `process-aot` and the `native` profile.
 
 ---
 

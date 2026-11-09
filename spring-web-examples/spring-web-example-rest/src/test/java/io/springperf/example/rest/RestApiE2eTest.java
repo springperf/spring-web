@@ -127,4 +127,13 @@ class RestApiE2eTest {
         assertThat(resp.getBody().get("code")).isEqualTo(404);
         assertThat(resp.getBody().get("message")).isEqualTo("user not found");
     }
+
+    @Test
+    void unknownRoute_returns404() {
+        // native smoke 脚本用同一条路径断言框架 404 分支；先在 JVM 侧锁定 HTTP 状态码，
+        // 这样脚本里 `assert_response ... 404` 的期望值有本机可验证的依据。
+        ResponseEntity<String> resp = rest.getForEntity("/no-such-route", String.class);
+
+        assertThat(resp.getStatusCodeValue()).isEqualTo(404);
+    }
 }

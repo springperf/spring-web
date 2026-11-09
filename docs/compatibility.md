@@ -102,7 +102,9 @@ master 的跨版本风险集中在 starter 自动配置层，`spring-boot-versio
 | SB4（4.0.x/4.1.x，`4.1.x` 分支） | ❌ 不支持 | 4.x 的事件桥接需运行时 `defineClass`（native 封闭世界禁止）；`4.1.x` 分支上显式文档化排除 |
 | epoll transport | ✅ 已验证 | Netty epoll `.so` 已在 Linux 原生构建环境验证通过（NIO transport 亦已在 Windows native 验证） |
 | WebSocket `@ServerEndpoint` | ⚠️ 需注册为 Bean | native 下 classpath 扫描不可用，`JsrEndpointScanner` 自动降级为 Bean 发现，端点需显式注册为 Spring Bean |
-| 原生构建验证 | ✅ Windows / Linux 均已验 | Windows：`mvn -Pnative package`（GraalVM + MSVC，`vcvars64` 环境 + `-H:-CheckToolchain`）；Linux：CI `ubuntu-latest` 运行 `scripts/native-smoke-test.sh`（构建 + 启动 + 请求链路断言）通过 |
+| 原生构建验证 | ✅ Windows / Linux 均已验 | Windows：`mvn -Pnative package`（GraalVM + MSVC，`vcvars64` 环境 + `-H:-CheckToolchain`）；Linux：CI `ubuntu-latest` 以 `scripts/native-smoke-test.sh` 作为门禁（构建 + 启动 + 8 条请求链路断言） |
+
+> **CI 冒烟覆盖边界**：`scripts/native-smoke-test.sh` 针对 `spring-web-example-rest` 逐条断言 `/health` 的 JSON 序列化、`GET/POST/PUT/DELETE /api/users` 的控制器方法反射与 `@PathVariable` / `@RequestBody` 绑定、业务错误分支以及框架 404 分支，用于验证 `ControllerBeanFactoryInitializationAotProcessor` 生成的反射/DTO hints 在原生镜像中确实可用；脚本、控制器路由与 `native-image.yml` 的对应关系由 `NativeSmokeContractTest` 锁定。视图模板、异步返回值与独立管理端口不在此覆盖范围内：示例模块不含模板或 `management.server.port`，且只有 `spring-web-example-rest` 绑定了 `process-aot` 与 `native` profile。
 
 ---
 
