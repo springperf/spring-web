@@ -377,7 +377,7 @@ destroyComponent()     → 资源释放
 
 ## spring-web-batch（批量请求处理）
 
-透明聚合批量处理模块，将高并发同类型请求合并为一批，一次批量业务逻辑处理完所有请求，显著提升 IO 密集型场景的吞吐。
+透明聚合批量处理模块，将高并发同类型请求合并为一批，一次批量业务逻辑处理完所有请求；在 IO 延迟较高、消费端成为瓶颈时可显著提升吞吐（实测区间见[批处理指南](batch.md)）。
 
 > 详细文档：[Batch 批处理模块](batch.md) — 包含完整示例、@BatchMapping 详解、可观测性指标、配置调优指南
 
@@ -385,8 +385,8 @@ destroyComponent()     → 资源释放
 
 - **不改管线语义** — Filter、Interceptor 逐请求执行，不受影响
 - **异步复用** — `BatchRequest<R>` 继承 `DeferredResult<R>`，利用框架已有的异步处理机制挂起/恢复请求
-- **无主动攒批** — 不设时间窗口，消费者处理速度慢于生产时自然积压
-- **无侵入** — 引入依赖后即可使用，无需改动现有代码结构
+- **攒批窗口可选** — 默认 `batchWindowMillis=0`，由 Disruptor `endOfBatch` 或 `maxBatchSize` 决定刷出；显式开启窗口后才按时间窗口攒批，见[批处理指南](batch.md)
+- **单请求方法保持不变** — 需新增 `@BatchMapping` 批量方法与 `BatchRequest` 子类，现有单请求方法无需改动
 
 ### 架构
 

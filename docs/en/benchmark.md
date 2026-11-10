@@ -8,7 +8,7 @@
 
 > **Note:** `perf` is the benchmark profile for this project's Spring WebPerf — "native Netty + 5 WebFilters + 3 Interceptors" (see *Container Profiles* below). `perf-support` is the same stack plus a Servlet bridge layer, used to measure bridge overhead.
 >
-> **Data source:** Throughput / latency / GC / memory all from a single `benchmark-reports/` run (2026-08-14, thrpt + sample dual mode). That directory is a local run artifact and is not distributed with the repository; see [How to Run](#how-to-run) to reproduce it. JDK 17.0.9, 4/8/16 threads. In-process mode shares a single JVM across 16 cores; the thread ceiling is set at ≤ core count (16t). For higher concurrency see [benchmark-wsl.md](../benchmark-wsl.md) (WSL external — client and server CPUs separated).
+> **Data source:** Throughput / latency / GC / memory all from a single `benchmark-reports/` run (2026-08-14, thrpt + sample dual mode). That directory is a local run artifact and is not distributed with the repository; see [How to Run](#how-to-run) to reproduce it. JDK 17.0.9, 4/8/16 threads. In-process mode shares a single JVM across 16 cores; the thread ceiling is set at ≤ core count (16t). For higher concurrency see [benchmark-wsl.md](benchmark-wsl.md) (WSL external — client and server CPUs separated).
 
 ---
 
@@ -47,7 +47,7 @@ Across **7 APIs × 3 concurrency levels (4/8/16 threads)**, perf is **#1 on ever
 | Concurrency | 4, 8, 16 threads (written `4t` for 4 threads) |
 | OS | Windows 10 (in-process mode, client and server share one JVM) |
 
-> **Note:** JMH (Java Microbenchmark Harness) measures code performance precisely; warmup rounds let the JIT reach steady state so compilation doesn't skew results. This document is the standard-environment (in-process) dataset; constrained-environment data (WSL2 4c/2g, Linux server) is in [benchmark-wsl.md](../benchmark-wsl.md).
+> **Note:** JMH (Java Microbenchmark Harness) measures code performance precisely; warmup rounds let the JIT reach steady state so compilation doesn't skew results. This document is the standard-environment (in-process) dataset; constrained-environment data (WSL2 4c/2g, Linux server) is in [benchmark-wsl.md](benchmark-wsl.md).
 >
 > **Choosing concurrency levels:** in-process mode shares 16 cores between client threads and server. When client threads exceed the core count (>16t), the machine becomes oversubscribed: client threads steal CPU share, light-API throughput drops and gaps between frameworks flatten out. So the in-process ceiling is set at ≤ core count (4/8/16); for a fair high-concurrency comparison use WSL external mode.
 
@@ -77,7 +77,7 @@ Versions below are the actual resolved artifacts from the project's `spring-boot
 | OkHttp (JMH client) | **4.12.0** |
 | JMH | **1.37** |
 
-> **Version source:** perf runs on native Netty (see [configuration](../../README.md)); the other four container versions are governed by Spring Boot 3.2.12 dependency management (Spring Framework 6.1.15 → Spring MVC / WebFlux, Tomcat 10.1.33, Undertow 2.3.17.Final, Reactor Netty 1.1.24). Netty 4.1.115.Final / Jackson 2.17.2 / OkHttp 4.12.0 in that table are the versions **actually used for this run** (a benchmark-snapshot anchor, see the test date) and are **not** what today's `master` pom declares (currently Netty `4.1.137.Final`). To reproduce, pin `spring-boot.version` and `netty.version` in `pom.xml`.
+> **Version source:** perf runs on native Netty (see [configuration](configuration.md)); the other four container versions are governed by Spring Boot 3.2.12 dependency management (Spring Framework 6.1.15 → Spring MVC / WebFlux, Tomcat 10.1.33, Undertow 2.3.17.Final, Reactor Netty 1.1.24). Netty 4.1.115.Final / Jackson 2.17.2 / OkHttp 4.12.0 in that table are the versions **actually used for this run** (a benchmark-snapshot anchor, see the test date) and are **not** what today's `master` pom declares (currently Netty `4.1.137.Final`). To reproduce, pin `spring-boot.version` and `netty.version` in `pom.xml`.
 
 ## Benchmarked APIs
 
@@ -251,7 +251,7 @@ At 4 threads perf's heap is **24MB** — the lowest of all frameworks. As thread
 
 perf's advantage comes from framework-level engineering trade-offs, not a generic "Netty beats Tomcat" claim.
 
-> For the full architecture decisions and engineering trade-offs, see [performance principles](../performance-principles.md).
+> For the full architecture decisions and engineering trade-offs, see [performance principles](performance-principles.md).
 
 ### Core differences
 
@@ -269,7 +269,7 @@ perf's advantage comes from framework-level engineering trade-offs, not a generi
 
 ### One-line summary
 
-This framework eliminates every runtime "lookup" and "match" via **deterministic startup-time resolution** — that is the root cause of the performance gain. Bytecode generation then removes reflection from method invocation on top (~200ns → ~30ns). See [performance principles](../performance-principles.md) for the full comparison table.
+This framework eliminates every runtime "lookup" and "match" via **deterministic startup-time resolution** — that is the root cause of the performance gain. Bytecode generation then removes reflection from method invocation on top (~200ns → ~30ns). See [performance principles](performance-principles.md) for the full comparison table.
 
 ---
 
@@ -300,7 +300,7 @@ perf-support is perf (native Netty) plus a Servlet bridge layer, used to quantif
 
 ## How to Run
 
-> This framework's benchmarks run in two modes. This page documents **mode 1 (in-process, standard environment)**; mode 2 (WSL external, constrained environment) is in [Benchmark Run Guide](../benchmark-run.md) and [`scripts/WSL_SETUP.md`](../../spring-web-benchmark/scripts/WSL_SETUP.md).
+> This framework's benchmarks run in two modes. This page documents **mode 1 (in-process, standard environment)**; mode 2 (WSL external, constrained environment) is in [Benchmark Run Guide](benchmark-run.md) and [`scripts/WSL_SETUP.md`](../../spring-web-benchmark/scripts/WSL_SETUP.md).
 
 ### Prerequisites
 
@@ -328,6 +328,38 @@ Use `benchmark-all.sh` for a one-shot run: compile, classpath build, multi-profi
 ```
 
 > **Concurrency levels:** in-process mode recommends thread counts ≤ machine cores (4/8/16 on this 16-core box). Exceeding the core count enters oversubscription, where measurement degrades to "scheduling efficiency of client+server sharing CPU" and flattens framework gaps (§8). For higher concurrency use WSL external mode.
+
+### Netty ByteBuf Leak Gate / Soak
+
+Netty's `ResourceLeakDetector` reports leaks only at **paranoid** level, and the report goes through
+`java.util.logging` (`reportTracedLeak` / `reportUntracedLeak`) with a platform-locale date prefix — on a
+Chinese Windows host those lines are GBK bytes, so a plain UTF-8 grep misses them and the gate must read the
+log in its actual encoding. Only 4 access records are kept by default (the log says
+`leak records were discarded`), so `targetRecords` must be set as well or the evidence is incomplete:
+
+```bash
+# Test level: full suite, 3 rounds (fresh JVM each), verified and summarized automatically
+./scripts/check-netty-leaks.sh --run 3
+
+# Verify existing logs (Windows: -Paths, semicolon-separated)
+./scripts/check-netty-leaks.sh full-paranoid.log
+./scripts/check-netty-leaks.ps1 -Paths "full-paranoid.log;logs\"
+
+# Load-level soak: paranoid under real benchmark load (embedded server and benchmark threads share one JVM)
+mvn -o -Pbenchmark-perf compile
+mvn -o -Pbenchmark-perf dependency:build-classpath -Dmdep.outputFile=target/cp-perf.txt -q
+java -cp "target/classes;$(cat target/cp-perf.txt)" \
+  -Dbenchmark.profile.name=soak -Dbenchmark.output.dir=benchmark-reports/soak \
+  -Dbenchmark.include='io\.springperf\.benchmark\.servlet\.PerfBenchmark\.get' -Djmh.forks=1 \
+  "-Dbenchmark.jvm.extraArgs=-Dio.netty.leakDetection.level=paranoid -Dio.netty.leakDetection.targetRecords=16" \
+  io.springperf.benchmark.BenchmarkRunner
+./scripts/check-netty-leaks.sh soak.log
+```
+
+Exit codes: `0` = no leak reports; `1` = leak reports found (`Created at:` is the allocation site);
+`2` = usage/environment error. A green result requires **report count = 0** *and* a
+`io.netty.leakDetection.level = paranoid` property dump in the log — otherwise "no reports" may just mean the
+detection level never took effect (`--run` adds `-XshowSettings:properties` for this self-check).
 
 #### CLI reference
 
@@ -433,4 +465,4 @@ spring-web-benchmark/benchmark-reports/
 |-------|--------|--------|
 | SSE fails on Undertow | Spring MVC (Undertow) / sse | Undertow SSE implementation limitation (4t/8t all FAIL; 16t thrpt ran but sample latency still FAIL) |
 | bytesLarge throughput dips at high concurrency | perf / bytesLarge | 100KB write-buffer pressure; every container dips 8→16t (perf 19,111→15,603) — left for future optimization |
-| In-process oversubscription at high concurrency | all / high concurrency | When client threads exceed core count (>16t), in-process measurement degrades to "scheduling efficiency of client+server sharing CPU": light-API throughput drops and framework gaps flatten. This is a measurement-model limitation, not a server defect. Verified with JFR: at 64t client threads steal 74% of CPU samples, the server's 4 EventLoops get only 22%. For a fair high-concurrency comparison use [benchmark-wsl.md](../benchmark-wsl.md) (WSL external — client/server CPU separated) |
+| In-process oversubscription at high concurrency | all / high concurrency | When client threads exceed core count (>16t), in-process measurement degrades to "scheduling efficiency of client+server sharing CPU": light-API throughput drops and framework gaps flatten. This is a measurement-model limitation, not a server defect. Verified with JFR: at 64t client threads steal 74% of CPU samples, the server's 4 EventLoops get only 22%. For a fair high-concurrency comparison use [benchmark-wsl.md](benchmark-wsl.md) (WSL external — client/server CPU separated) |

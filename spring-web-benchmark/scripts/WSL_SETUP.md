@@ -43,7 +43,7 @@ echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> ~/.bashrc
 
 ### 2.3 Windows 侧
 
-- Maven（PATH 中），JDK（源码兼容 8，构建用 8/17 均可）
+- Maven（PATH 中），JDK 17（master 基线；Java 8 仅 `2.7.x` 分支）
 - `curl`（就绪探测用；Windows 10 自带）
 - WSL 发行版已启动过至少一次（`wsl --shutdown` 后需先启动过，脚本才能取到 IP）
 

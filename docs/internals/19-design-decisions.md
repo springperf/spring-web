@@ -19,7 +19,7 @@
 - **后果**：收益、代价、边界条件三条。边界条件是最重要的部分——它标明"这条决策在什么前提下成立、何时该推翻"。
 - **关联**：指向论证细节的前文章节，避免重复。
 
-ADR 编号 1–10，与 [00-README](00-README.md) 及 [18 篇](18-spi-extension.md) 已引用的 ADR 2 / 9 / 10 一致。
+ADR 编号 1–12，共 12 条决策；[00-README](00-README.md) 与 [18 篇](18-spi-extension.md) 引用其中的 ADR 2 / 9 / 10。
 
 ---
 
@@ -319,7 +319,7 @@ WebSocket 模块有两处显眼的拷贝：接收侧把二进制帧的 `ByteBuf`
 
 **都不改**，理由分别落在"对外契约"和"批处理语义"上：
 
-- **接收侧**：模块对外暴露的是 Spring 的 `WebSocketHandler#handleMessage(WebSocketSession, WebSocketMessage<?>)`，`BinaryMessage` 的载荷类型就是 `byte[]`。零拷贝等于把 `ByteBuf` 视图交出去，其有效期绑定到帧的 `release()`——用户回调返回后立即失效。要么改公共契约（引入"仅回调期间有效"的寿命约定），要么把引用计数管理暴露给业务代码，两者都与"SpringMVC/Spring WebSocket 无侵入替换"的定位冲突。
+- **接收侧**：模块对外暴露的是 Spring 的 `WebSocketHandler#handleMessage(WebSocketSession, WebSocketMessage<?>)`，`BinaryMessage` 的载荷类型就是 `byte[]`。零拷贝等于把 `ByteBuf` 视图交出去，其有效期绑定到帧的 `release()`——用户回调返回后立即失效。要么改公共契约（引入"仅回调期间有效"的寿命约定），要么把引用计数管理暴露给业务代码，两者都与"保持 Spring WebSocket API 兼容"的定位冲突。
 - **发送侧**：`Unpooled.wrappedBuffer(ByteBuffer)` 会让帧直接引用调用方的 buffer，而写操作**不保证同步落网**——`RemoteEndpoint.setBatchingAllowed(true)` 下帧先进 outbound buffer，等 `flushBatch()`（见 [`docs/modules.md`](../modules.md) 的批处理说明）：业务线程在此期间复用池化 buffer 就会写坏待发数据。**发送侧零拷贝与延迟 flush 在语义上互斥**：要零拷贝就得放弃批处理，或要求调用方显式移交所有权。
 
 ### 后果

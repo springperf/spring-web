@@ -57,7 +57,7 @@ public void initComponentPhase1() {
 
 关键设计：
 
-- **`LinkedHashMap` 保序**。`ctx.getBeansWithAnnotation(Controller.class)` 返回的 Map 在有重复路径/方法时，迭代顺序决定选择结果。`LinkedHashMap` 保证先注册的 Bean 胜出。这是历史上「映射顺序不确定」问题的代码体现——早期用 `HashMap` 时迭代顺序不确定，导致重复映射在不同启动中表现不一致。
+- **`LinkedHashMap` 保序**。`ctx.getBeansWithAnnotation(Controller.class)` 返回的 Map 在有重复路径/方法时，迭代顺序决定选择结果。`LinkedHashMap` 保证先注册的 Bean 胜出，避免 `HashMap` 迭代顺序不确定导致重复映射在不同启动中表现不一致。
 - **`getUniqueDeclaredMethods`**。`ReflectionUtils.getUniqueDeclaredMethods` 收集继承/接口方法并按 override 去重，确保父类声明的 `@RequestMapping` 方法也能被扫描到。
 - **`resolvePlaceholders`**。路径中的 `${...}` 占位符在启动期由 `Environment.resolvePlaceholders` 解析，运行时不再碰配置。
 
@@ -604,7 +604,7 @@ public void buildOptimizerPipeline() {
 }
 ```
 
-也就是说，**动态注册的路径同样经过 `optimizeMapping`**（`ActuatorEndpointHandlerMapping` 注册完即触发 `buildOptimizerPipeline()`），并非「只能被 `FullPathRouterOptimizer` 覆盖」。这也是「Phase3 之后才出现的映射不在任何优化器里」这一旧说法的修正——主服务器的 `optimizeMapping` 确实是 Phase3 一次性流程，但管理端点的路由不依赖它。
+也就是说，**动态注册的路径同样经过 `optimizeMapping`**（`ActuatorEndpointHandlerMapping` 注册完即触发 `buildOptimizerPipeline()`），并非「只能被 `FullPathRouterOptimizer` 覆盖」。主服务器的 `optimizeMapping` 确实是 Phase3 一次性流程，但管理端点的路由不依赖它。
 
 > **注意**：`FullPathRouterOptimizer.getRouteMap()` 现返回 `Collections.unmodifiableMap(routeMap)` **只读视图**（`FullPathRouterOptimizer.java:19-22`），不能再向其中 `put`——那是早期实现，直接调用会抛 `UnsupportedOperationException`。动态注册的唯一入口是 `registerMapping(ctx)`。
 

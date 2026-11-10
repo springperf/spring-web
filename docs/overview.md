@@ -138,7 +138,7 @@ WebFlux（Netty 运行时，4,173 样本）与 MVC 问题模式高度相似，�
 
 需要的是一个**从根本上消除框架运行时开销**的方案。
 
-于是我启动了 **Spring Performance Engineering** 项目。核心思想：在启动阶段完成所有元数据的解析和匹配，运行时只做"查表"操作——零反射、零匹配、零临时分配。同时完全兼容 Spring 的编程模型（`@RequestMapping`、`@RequestParam`、`@RequestBody`、`@ExceptionHandler`、`HandlerInterceptor` 等），让业务代码零侵入迁移。
+于是我启动了 **Spring Performance Engineering** 项目。核心思想：在启动阶段完成所有元数据的解析和匹配，运行时只做"查表"操作——零反射、零匹配、零临时分配。同时复用 Spring 的主流编程模型（`@RequestMapping`、`@RequestParam`、`@RequestBody`、`@ExceptionHandler`、`HandlerInterceptor` 等），让多数业务代码无需改动即可迁移；存在差异或需要桥接的部分见下文兼容边界与[迁移指南](quickstart.md)。
 
 ### 成果
 

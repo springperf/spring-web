@@ -49,10 +49,9 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
   memory and never copied from an existing comment: the defaults live in
   `META-INF/spring-configuration-metadata.json` inside `spring-boot-autoconfigure-<version>.jar` (read the key
   there, not from a comment). When the values differ, write **both** numbers and say plainly that it is this
-  framework's choice. "Aligned with Boot" printed next to a value Boot does not use is the one wording mistake
-  this repository keeps making, twice so far: `spring.mvc.publish-request-handled-events` (ours `false`, Boot
-  `true`) and `server.http.multipart.max-part-header-size` (ours `8192`, Boot/Tomcat `512B`). The second sat in a
-  **code comment**, so this rule covers comments and javadoc, not just the manuals.
+  framework's choice — e.g. `spring.mvc.publish-request-handled-events` (ours `false`, Boot `true`) and
+  `server.http.multipart.max-part-header-size` (ours `8192`, Boot/Tomcat `512B`). This rule covers comments
+  and javadoc as well as the manuals.
 - "Semantically aligned with `<Boot key>`" is allowed only when it names the *meaning* of the key **and** the
   differing default stays visible in the same sentence (`server.http.multipart.max-part-count`: our `-1` and
   Boot's `50` both mean "non-positive disables the cap"). When the claim is about an idiom rather than a value,
@@ -73,29 +72,12 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
   must also install `RequestContextHolder` - so on a servlet deployment the holder is still reset once per
   request even with the flag off. Enum-valued keys are mapped case-insensitively onto the framework's exact
   constant names, and unknown values are logged and ignored.
-- `scripts/check-docs.sh` also runs `scripts/check-doc-symbols.py`, which checks that the keys, classes and
-  members the **contract docs** name actually exist - including keys the code builds by concatenation
-  (`"server.ssl." + "enabled"`, `"management.endpoints.web.exposure" + ".include"`), which a plain literal scan
-  misses.
-  One limit is deliberate and written in the file: it does not check whether a sentence is **true**. Its
-  unknown-class rule **is** a gate, carried by an explicit allow-list (`EXTERNAL_TYPES`) whose every entry names
-  where the symbol
-  comes from - a class defined in a doc snippet, a package this repository imports, or a class found in a local
-  jar. When the rule fires on something legitimate, add an entry with its origin - do not widen the rule.
-  `member` references whose owner is unknown go through the same rule.
-  Files whose job is to list **removed** keys and members (`docs/breaking-changes.md`,
-  `docs/en/breaking-changes.md`, `docs/en/changelog.md`) are exempt from those rules in code
-  (the root `CHANGELOG.md` is outside the scanner's scope), and `CONTRIBUTING.md`'s japicmp
-  section from the member rule.
-  Four documents are user-facing and must stay **paired**: `CHANGELOG.md`, `docs/configuration.md`,
-  `docs/compatibility.md` and `docs/breaking-changes.md` each have a mirror under `docs/en/`, and
-  `check-docs.py` enforces it (a missing side is a defect) - change one side and you change the other.
-- The same entry point runs `scripts/check-doc-structure.py`, which checks markdown **structure** rather
-  than content: leftover CJK-parenthesis debris (`（ ）`, `（，`), empty inline code spans, table row/column
-  mismatches and fully empty columns, unbalanced code fences, and `.java` file references that name no
-  tracked file. `.agent/` files other than
-  `module.md` are out of scope for the file-existence rule, matching `check-doc-symbols.py`: backport
-  checklists exist to name files that only the other branch has.
+- `scripts/check-docs.sh` runs three checkers: `check-docs.py` (links, anchors, encoding and headings),
+  `check-doc-symbols.py` (keys, classes and members named in the contract docs really exist) and
+  `check-doc-structure.py` (markdown structure). Run it after editing any document.
+- Four user-facing documents must stay **paired**: `CHANGELOG.md`, `docs/configuration.md`,
+  `docs/compatibility.md` and `docs/breaking-changes.md` each have a mirror under `docs/en/`;
+  `check-docs.py` treats a missing side as a defect, so change one side and you change the other.
 
 ### Coverage and Leak Gates
 
@@ -114,9 +96,8 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 - The `netty-leaks` job runs `scripts/check-netty-leaks.sh --run --online --clean 1` with
   `-Dio.netty.leakDetection.level=paranoid` (plus `targetRecords=16`) and fails on any `LEAK: ByteBuf`
   report. The script treats a missing paranoid property as a warning so it stays usable offline; the job
-  re-checks it with `grep -q`, because "zero leaks" must not come from a detector that never ran. Use
-  `--online` in CI: the default `-o` fails on a cold local repository, and that failure is not a leak
-  verdict.
+  re-checks it with `grep -q` to confirm the detector actually ran. Use `--online` in CI: the default
+  `-o` requires a populated local Maven repository.
 
 ### Version Matrix, Architecture and Mutation
 
@@ -134,7 +115,7 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
   report-only. The mapping package alone produces ~435 mutants in about a minute; survived mutants need
   human triage before a threshold means anything.
 - The `build` job also emits an aggregate SBOM (`target/bom.json`) as an artifact. It is for delivery
-  traceability only - this project does not publish to Maven Central.
+  traceability only; released artifacts are published to Maven Central (see the `compat` baseline below).
 
 ### Metric and Sync Contracts
 
@@ -147,13 +128,12 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
   annotation package is what users type in their own code, so missing `@param`/`@return` there is an
   error. The single-package check is a plain `javadoc` invocation because the Maven plugin has no
   "one subpackage" switch.
-- `scripts/sync-audit.py --target 2.7.x --whitelist <local list>` produces a branch-sync report with
+- `scripts/sync-audit.py --target <branch> --whitelist <file>` produces a branch-sync report with
   three sections: files only on the base branch, files only on the target branch, and same-name files
-  with line deltas. It never decides "must sync" - 505 same-name files differ between `master` and
-  `2.7.x` simply because adaptation rewrites are normal. The whitelist holds version-boundary paths
+  with line deltas. It reports differences; it never decides "must sync" — same-name files legitimately
+  differ between branches because of adaptation rewrites. The whitelist holds version-boundary paths
   only (native-image, Spring AI, virtual threads, Thymeleaf WebExchange); feature gaps must not be
-  whitelisted. Reports and whitelists are local, untracked artifacts — see the script's
-  `--output` / `--whitelist` options for where to put them.
+  whitelisted. See the script's `--output` / `--whitelist` options for the report location.
 
 ### Formatting
 
@@ -182,58 +162,12 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 - Relax it temporarily with `./mvnw verify -Dspotbugs.threshold=High`.
   The pom references the property (`${spotbugs.threshold}`), so the command line really overrides it;
   a literal value there would win instead and silently ignore `-D`.
-- Medium inventory: **0**. The main families and their resolution:
-  `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` **230 -> 0**: 33 findings genuinely fixed (defensive copies and
-  read-only wrappers for caller-owned configuration and framework-built collections), the rest
-  recorded per class with the reason - the framework hands its own infrastructure objects to user
-  code and adapters, registers extension points by sharing them, returns what Servlet/JSR contract
-  demands, or exposes reflection handles that cannot be copied.
-  `NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE` **51 -> 0**: three rounds, every finding fixed at the cause
-  rather than suppressed. Two recurring shapes: (a) "check then call the getter again"
-  (`if (x.getY() != null) { x.getY() ... }`, or `hasParameterAnnotation(a)` before
-  `getParameterAnnotation(a)`) - now a single call whose value is null-checked, which the analyser can
-  follow and which also removes duplicate reflection lookups on hot paths; (b) a genuinely nullable
-  result dereferenced directly (`Path.getFileName()`, `MultiValueMap.get()`,
-  `ResolvableType.resolve()`, `ResponseEntity.getBody()`, OkHttp `Response.body()`,
-  `URI.getScheme()/getPath()`, `ControllerAdviceBean.getBeanType()`,
-  `BeanDefinition.getBeanClassName()`, `getParameterAnnotation()`) - now guarded, with the no-value case
-  mapped to the semantics the call site needs (empty array, empty map, early return, or a clear
-  exception).
-- `RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE` **28 -> 0**. Root cause of most of them: `WebServerHttpRequest`
-  extends Spring's `ServerHttpRequest` from the jar, so the contract of
-  `getURI` / `getRemoteAddress` / `getLocalAddress` was invisible to the analyser, and its two null
-  detectors then assumed opposite things about the same call. Redeclaring those three methods in our own
-  interface with the real contract (`@NonNull` URI, `@Nullable` addresses) made the guards in that
-  interface necessary instead of redundant. Six further guards must stay - one is demanded by its own test
-  (`JsrEndpointScannerTest#scan_beanNamesForAnnotationNull_returnsEmpty`), the others protect
-  `protected` non-final methods replaced by spies in tests or come from a third-party producer - so they
-  are excluded per class with the reason in `spotbugs-exclude.xml`, never deleted.
-  Annotations must be placed on the **overrides the analyser resolves** (`NettyServerHttpRequest` and
-  `WebServerHttpRequestWrapper`), not only on the interface method. Verify with the gate itself
-  (`spotbugs:check`); a report XML that is still being written is not evidence of a green gate.
-- `VA_FORMAT_STRING_USES_NEWLINE` **28 -> 0**: `\n` became `%n` in the 28 `printf` format strings of
-  `ReportGenerator` (verified as a pure substitution; tests were checked first because the report text is
-  asserted on).
-- `CT_CONSTRUCTOR_THROW` **20 -> 0** across 13 classes, each inspected individually: ten constructors only
-  validate arguments and assign fields; three call an overridable method from the constructor (nothing
-  overrides them in this repository, so the risk stays theoretical); `FileHttpSessionStorage` starts its
-  cleanup thread after every field is assigned, which its exclusion says explicitly so that a future
-  subclass triggers the refactor.
-- `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` **230 -> 0**: 44 findings genuinely fixed (defensive copies and read-only
-  views), the rest recorded per class **and per field** with the reason. The first pass exempted whole
-  classes, which a review showed was too broad - it also swallowed getters returning collections the class
-  builds itself - so the exemptions were narrowed to class+field and 11 more getters fixed. Three stay
-  exempt because their tests `assertSame` the same live instance, and those exclusions name the tests.
-- The concurrency family (`AT_NONATOMIC_64BIT_PRIMITIVE` 7, `AT_STALE_THREAD_WRITE_OF_PRIMITIVE` 5,
-  `IS2_INCONSISTENT_SYNC` 3): one real fix (`BaseWebServerHttpRequest.parameterMap` was double-checked
-  locking without `volatile`), the rest exempted per class with the JMM argument - configuration snapshots
-  written by the starting thread before any request is served, so the write happens-before the reader
-  threads by the `Thread.start` rule.
-- The gate runs at `threshold=Default`: the medium tier reached zero, so gating on it is signal, not noise.
-- A format sweep must be **verified structurally inert**: parsed
-  with a Java parser (comments off, imports sorted) it shows 785 files identical, 359 differing only in
-  import order, **0** type-body changes and **0** import additions or removals. The 22 `pom.xml` files did
-  gain the canonical XML declaration - a real but harmless non-format change worth knowing about.
+- SpotBugs findings are fixed at the cause where possible; the remaining ones are exempted per class (or per
+  class + field) with a written rationale in `spotbugs-exclude.xml`. Never delete a guard that a test or a
+  contract needs, and never widen an exclusion to silence a family of findings. The medium tier is gated at
+  `threshold=Default`, so a regression fails the build.
+- A format sweep must be **verified structurally inert**: compare the parsed sources (comments off, imports
+  sorted) and confirm no type-body changes and no import additions or removals before committing it.
 - Tip: `spotbugs:spotbugs` analyses `target/classes`, so run `compile` (or `test-compile`) in the same
   invocation — otherwise the report still describes the previous build.
 - Gotcha: a single module built without `-am` (`./mvnw verify -pl <module>`) is analysed against the
@@ -257,8 +191,8 @@ Practices for verifying claims and gates before trusting them.
   not enough - the guard lives in `handleAfterFilter`. The servlet path is a genuine exception on top of that,
   because `SupportDispatcherHandler` returns `init || requestAttributes != null` and therefore always reports
   true there.
-- **Never edit files and start a build in the same batch.** An edit issued alongside a build can land after
-  the compiler has read the file, and the result describes a state that never existed. Land the edit, then build.
+- **Finish edits before starting a build.** A build started while files are still being written can read a
+  mixed state; land the changes first, then build.
 - **Prove a new gate can fail before trusting it.** A check that has never been seen red is a claim, not a
   check: introduce a deliberate change, confirm the gate reports failure, then revert it.
 - **A reactor-wide red is a hypothesis until it is isolated.** Re-run the failing class alone, then the
@@ -270,10 +204,8 @@ Practices for verifying claims and gates before trusting them.
   unused-import removals the format profile performs; doclint rejects a `ul` inside a `p` that both the
   formatter and the format assertion accept; the markdown checker verifies formatting and links but never
   whether a sentence is true; and `check-doc-symbols.py` only checks that a named symbol exists.
-- **After a deliberate mutation, revert it in the same breath, and never through a command that can be
-  blocked.** Breaking a guard on purpose is the only way to prove a test is not vacuous, so it is worth
-  doing - but the broken state looks like ordinary code and can outlive the run that created it. Revert with
-  the edit tool rather than a git command, and read the reverted lines back afterwards; that check is cheap.
+- **After a deliberate mutation, revert it immediately.** Breaking a guard on purpose proves a test is not
+  vacuous, but the broken state must not outlive the run; read the reverted lines back afterwards.
 
 ### Binary Compatibility (japicmp)
 
@@ -327,30 +259,15 @@ Practices for verifying claims and gates before trusting them.
   Pass `--skip` / `-SkipTests` to re-aggregate existing data without running Maven (takes seconds).
 - Benchmark JFR recordings can be checked for truncated stack traces with
   `spring-web-benchmark/check-jfr-truncation.sh <jfr file or dir>` (non-zero exit when truncation is found);
-  see [Benchmarks](docs/benchmark.md).
+  see [Benchmarks](docs/en/benchmark.md).
 
-- The invariant-bearing tests were audited for whether they assert what they claim. Mostly they do; the 128
-  `assertDoesNotThrow` sites turned up seven where the name promised a result and the body only ruled out an
-  exception - three `SslContextFactoryTest` cases now assert the context is non-null (as their sibling tests
-  already did) and four were renamed to `doesNotThrow` because the promised effect is not observable through
-  the public API (`BeetlViewResolver` exposes no initialised state; the empty-route warning is
-  implementation-side; the bridged-callback case has no registry getter). The swallow-size
-  E2E drives a raw socket and asserts the connection is really gone - a read that times out becomes an explicit
-  `AssertionError` rather than a pass - and covers the boundary where the body equals the limit, so `>` versus
-  `>=` cannot pass by accident. The async/SSE lifecycle E2E reads a per-context counter
-  (`CountingWebMetrics#activeAsyncLifecycles()`, resolved through the `WebMetrics` component the test registers;
-  the counter used to be a JVM-wide static, which coupled unrelated suites) and requires it to fall back to zero
-  inside a bounded poll, so a leaked holder fails instead of being collected
-  later, and one case aborts an idle stream where only `channelInactive` can release. The fast-path parameter
-  lookup test asserts the limit cannot be bypassed, and the `maxInactiveInterval` regression is pinned by name.
-  The usual false-assurance smells are absent: no `@Disabled`/`@Ignore` in any of the 559 test files, no empty
-  catch, no `assertTrue(true)`. The 48 `Thread.sleep` calls are bounded polls or semantically required waits
-  (a 1 s session expiry waits 1.6 s, ETag granularity waits 1.1 s, the slow producers live in test fixtures).
-- Two gaps are known and deliberate. `BaseWebServerHttpRequest.parameterMap` - the one real concurrency fix -
-  has no test, because a `volatile` visibility bug is not reproducible in a unit test; the fix carries the
-  argument instead (`LocaleConfig`'s race does have a regression test, `defaultLocaleContextStaysConsistentWithLocaleSetDefault`).
-  The invariant-bearing tests (those guarding resource and lifecycle behaviour) were reviewed in depth;
-  the remaining files were covered by the smell sweep.
+- Tests that guard resource and lifecycle behaviour are reviewed for whether they assert what they claim;
+  assertions that only rule out an exception are renamed or strengthened, and bounded polls use explicit
+  timeouts rather than passing on a timeout. No `@Disabled` / `@Ignore`, empty catch or `assertTrue(true)`.
+- Two gaps are known and deliberate. `BaseWebServerHttpRequest.parameterMap` — the concurrency fix — has no
+  test, because a `volatile` visibility bug is not reproducible in a unit test; the fix carries the
+  argument instead (`LocaleConfig`'s race does have a regression test,
+  `defaultLocaleContextStaysConsistentWithLocaleSetDefault`).
 
 ### PR Checklist
 

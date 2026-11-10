@@ -99,7 +99,7 @@ DispatcherHandler.invokeWithRealResult   DispatcherHandler.java
 
 ### 2.1 它才是真正的入口，不是 RuntimeMappingWebFilter
 
-00-README 索引把入口写成"Netty `ChannelInboundHandler` → `RuntimeMappingWebFilter` → `DispatcherHandler`"。核对源码后修正：**`RuntimeMappingWebFilter` 不是入口，它是 Filter 链内的一个运行时包装节点**（见第五节）。真正的 Netty→框架入口是 `NettyHttpHandler`：
+**`RuntimeMappingWebFilter` 不是入口，它是 Filter 链内的一个运行时包装节点**（见第五节）。真正的 Netty→框架入口是 `NettyHttpHandler`：
 
 ```java
 // NettyHttpHandler.java

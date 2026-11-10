@@ -10,7 +10,7 @@
 
 先说一个容易产生的误解：**框架里没有 `@WebComponent` 注解**。`WebComponent` 是一个 `extends Ordered` 的接口（`WebComponent.java`），SPI 的发现全部走 Spring 原生的 Bean 类型扫描（`getBeansOfType` / `autoRegisterWebComponent` / `getWebComponentWithDefault`），排序全部走 `Ordered.getOrder()` / `@Order` 经 `AnnotationAwareOrderComparator.sort` 统一处理。这带来了一个好处：扩展方只要把实现类注册成 Spring Bean，框架自动发现，零额外注解。
 
-更关键的是，发现不止一种模式——经核对共 **四种**，对应四类扩展需求。本篇先讲统一契约与排序基础设施，再讲四种模式，再给 12 SPI 的四元组总表，最后逐个给最小扩展示例骨架。
+更关键的是，发现不止一种模式——共 **四种**，对应四类扩展需求。本篇先讲统一契约与排序基础设施，再讲四种模式，再给 12 SPI 的四元组总表，最后逐个给最小扩展示例骨架。
 
 ---
 
@@ -31,7 +31,7 @@ public interface WebComponent extends Ordered {
 - **`getComponentName()`** 默认返回类简单名，用于冲突解析与日志（见聚光灯 8 的 `FilterWrapper` 唯一命名）。
 - **`initWithWebContext`** 是构造后、分阶段初始化前的依赖注入钩子，各 Registry 在此扫描 Spring 容器。
 
-纠正点：不存在 `@WebComponent` 注解，`annotation/` 包下有 `@RunInPool`、`@RunInEventloop`、`@ReactiveSupport`、`@Optimize` 四个运行时注解（`@RunInEventloop` 是 `@RunInPool(EVENTLOOP)` 的元注解别名）。SPI 的"发现注解"实际是 Spring 的 `@Component`/`@Configuration`+`@Bean`（让实现成为 Bean），框架按类型取 Bean。
+注意：不存在 `@WebComponent` 注解，`annotation/` 包下有 `@RunInPool`、`@RunInEventloop`、`@ReactiveSupport`、`@Optimize` 四个运行时注解（`@RunInEventloop` 是 `@RunInPool(EVENTLOOP)` 的元注解别名）。SPI 的"发现注解"实际是 Spring 的 `@Component`/`@Configuration`+`@Bean`（让实现成为 Bean），框架按类型取 Bean。
 
 ---
 
@@ -56,7 +56,7 @@ public interface WebComponent extends Ordered {
 
 ## 三、四种发现模式
 
-核对 12 个 SPI 后，发现机制按扩展需求分四种：
+12 个 SPI 的发现机制按扩展需求分四种：
 
 | 模式 | 机制 | 缓存形态 | 适用 SPI |
 |------|------|---------|---------|
@@ -109,7 +109,7 @@ public class MyAuthFilter implements WebFilter {
 ```
 框架在 `WebFilterRegistry` 构造期登记 `WebFilter.class`，phase3 `initAllFilters` 扫描到此 Bean，经三段式 `ALWAYS/RUNTIME/NEVER` 缓存入链。
 
-### 5.2 HandlerInterceptor（模式 A，裸 Bean 单独提序）
+### 5.2 HandlerInterceptor（裸 Bean 单独提序）
 
 ```java
 @Component

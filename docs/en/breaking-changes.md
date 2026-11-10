@@ -2,18 +2,13 @@
 
 > [中文版](../breaking-changes.md)
 
-> This file is a **cumulative, cross-version ledger**: it does not belong to any one version. Whenever a
-> release introduces a breaking change, **add a section at the end** and register a row in the version index
-> above it. The **complete** item list for a release (new features and fixes included) lives in `CHANGELOG.md`.
+> This file records, version by version, the breaking changes that **require action when upgrading**:
+> removals, renames, signature or visibility changes, and tightened semantics. Every item states either the
+> **migration action** or **why none is needed**; the complete item list for a release (new features and
+> fixes included) lives in `CHANGELOG.md`.
 >
-> - **Scope**: items that force the user to act when upgrading - removals, renames, signature or visibility
->   changes, tightened semantics. New features and ordinary fixes do not belong here.
-> - **Recording rule**: every item states either the **migration action** or **why none is needed**. Intentional
->   changes that the binary-compatibility gate (japicmp, configured in the root `pom.xml`) reports as breaking
->   must be matched one by one in this file - japicmp's report is this ledger's machine-checkable counterpart
->   (see `CONTRIBUTING.md`).
-> - **Version numbers and dates** follow `CHANGELOG.md`; section headings carry the version, so reference a
->   section by its version, not by the numbered heading (numbers shift as versions are added).
+> - **Version numbers and dates** follow `CHANGELOG.md`; reference a section by its version, not by the
+>   numbered heading (numbers shift as versions are added).
 
 ## Version Index
 
@@ -155,13 +150,12 @@ an observable behaviour change:
   extension-point signatures); they ship with the same release as the configuration migration and need to be assessed together.
 - A project that did not migrate the old keys starts with the defaults (no error, the old configuration silently
   stops applying); after upgrading, confirm through logs or tests that the configuration took effect.
-- If a code example (`spring-web-examples`) still uses an old key, it needs updating too (see the corresponding PR).
+- If a code example (`spring-web-examples`) still uses an old key, it needs updating too.
 
 ---
 ### 7. Behaviour and API changes (not config keys, same release)
 
-> Not directly related to the key migration, but to be assessed together with it. Everything here landed in the
-> "E2E-driven protocol alignment" batch; the commit hashes are in the listed "related commits".
+> Not directly related to the key migration, but to be assessed together with it.
 
 #### 7.1 Response framing: `flush(true)` became progressive chunked output
 
@@ -171,14 +165,12 @@ an observable behaviour change:
 
 - Impact: code and load scripts that rely on the old semantics (a `Content-Length` after committing, or "no more writes after commit") need adjusting.
 - Migration: use `flush(false)` for a one-shot commit; use `flushChunked()` for progressive output of unknown length, with the framework's `endStream()` finishing it.
-- Related commits: `41f4e785`
 
 #### 7.2 Servlet `PrintWriter`: `print/println` no longer auto-commit (matching Tomcat `autoFlush=false`)
 
 - Old behaviour: `getWriter().println(...)` committed the response immediately (`autoFlush=true`).
 - New behaviour: `println` **does not commit**; only an explicit `flush()` / `flushBuffer()` / `getOutputStream().flush()` commits. The first write marks the response as taken over by the application; the framework still commits while finishing, so nothing is lost.
 - Migration: code that relied on `println` to drive the commit (hand-rolled streaming loops) must call `flush()` explicitly.
-- Related commits: `10a0f9d0`
 
 #### 7.3 Extension-point signature changes (source-level incompatible)
 
@@ -192,13 +184,12 @@ an observable behaviour change:
 
 | Item | Old behaviour | New behaviour |
 |---|---|---|
-| `WebServerHttpRequest` gained `getURI()` / `getRemoteAddress()` / `getLocalAddress()` | - | **Added (abstract methods, not `default`)**. ⚠️ Code that implements this interface outside the framework **must implement** all three or it will not compile (source-level incompatible); `BaseWebServerHttpRequest` also narrows the visibility of its `attributes` field. Reported by japicmp against the released 3.5.6. Related commit: `553bd0ee` |
-| `ListenableFutureAdapter`: `public` no-arg constructor, `isAvailable()`, extendability | constructor made `private`, `isAvailable()` removed, class marked `final` | the class is demoted from a public extension point to a **framework-internal helper**: code that extends it or calls `new` on it is out of luck. **`ListenableFuture` return-value support itself remains** (through `ListenableFutureReturnValueResolver` + `isAssignableFrom`/`isInstance`). Part of the Spring Boot 4 compat-layer cleanup. Related commit: `8f51de19` |
-| compat-layer classes `ResponseStatusExceptionAdapter` (with `getHeaders(ResponseStatusException)`, its constructor and superclass) and `MediaTypeUtils` (with `compareSpecificity` / `sortBySpecificity`, its constructor, `APPLICATION_STREAM_JSON` and the two `COMPARATOR` constants) | - | **Removed entirely**. `master` converged on pure Spring Boot 3.5.x, so the Spring Boot 4 / Spring Framework 7 compatibility layer is gone (the `WebHttpHeaders` version branches, the MethodHandle calls and so on with it). Code that needs MediaType ordering should use the comparator built into `org.springframework.http.MediaType`. Related commit: `8f51de19` |
+| `WebServerHttpRequest` gained `getURI()` / `getRemoteAddress()` / `getLocalAddress()` | - | **Added (abstract methods, not `default`)**. ⚠️ Code that implements this interface outside the framework **must implement** all three or it will not compile (source-level incompatible); `BaseWebServerHttpRequest` also narrows the visibility of its `attributes` field. Reported by japicmp against the released 3.5.6. |
+| `ListenableFutureAdapter`: `public` no-arg constructor, `isAvailable()`, extendability | constructor made `private`, `isAvailable()` removed, class marked `final` | the class is demoted from a public extension point to a **framework-internal helper**: code that extends it or calls `new` on it is out of luck. **`ListenableFuture` return-value support itself remains** (through `ListenableFutureReturnValueResolver` + `isAssignableFrom`/`isInstance`). Part of the Spring Boot 4 compat-layer cleanup. |
+| compat-layer classes `ResponseStatusExceptionAdapter` (with `getHeaders(ResponseStatusException)`, its constructor and superclass) and `MediaTypeUtils` (with `compareSpecificity` / `sortBySpecificity`, its constructor, `APPLICATION_STREAM_JSON` and the two `COMPARATOR` constants) | - | **Removed entirely**. the mainline targets pure Spring Boot 3.5.x, so the Spring Boot 4 / Spring Framework 7 compatibility layer is gone (the `WebHttpHeaders` version branches, the MethodHandle calls and so on with it). Code that needs MediaType ordering should use the comparator built into `org.springframework.http.MediaType`. |
 
 - Note: the methods `WebServerHttpResponse` gained (`flushChunked`/`endStream`/`isStreaming`/`markStreamCompleted`/`setBeforeCommit`) are all `default` and require **no** change to existing implementations. **Exception**: `markStreamCompleted` later changed from `void` to `boolean` (preemptive ownership of the terminating chunk, see 7.10) - implementations that override it must follow the signature (returning `true` means this call won the write).
 - Migration: code that overrides or calls the methods above follows the new signatures.
-- Related commits: `41f4e785`, `e6cdab8d`
 
 #### 7.4 Conditional requests and error-body exposure tightened
 
@@ -212,14 +203,12 @@ an observable behaviour change:
 | `If-Range` mismatch | - | the `Range` is ignored and the full entity returned (never a fragment inconsistent with the new entity) |
 
 - Impact: client / CDN cache behaviour and error bodies change (more standards-conformant).
-- Related commits: `f1bba5f9`, `e6cdab8d`
 
 #### 7.5 New: `Accept-Ranges` and multi-range requests (`multipart/byteranges`)
 
 - Static resources now advertise `Accept-Ranges: bytes`; a single range → `206` + `Content-Range` (unsatisfiable → `416` + `Content-Range: bytes */len`); multiple ranges → `206` + `Content-Type: multipart/byteranges; boundary=...` (previously multi-range fell back to the whole entity); gated by `If-Range` (strong entity-tag comparison / HTTP date).
 - Streaming responses of known length now use a `Content-Length` frame (previously always chunked, which made Netty silently drop a preset `Content-Length`).
 - New protective key `server.http.max-ranges`: the **effective limit is min(this value, 100)** - the `Range` header is parsed by Spring's `HttpRange`, which throws `Too many ranges` above 100 ranges (and the framework then ignores the header as "Range unavailable"), so this key is for **tightening below 100** (e.g. allowing only `2` ranges); setting it above 100 does not relax anything. `0` = no multi-range, a negative value = this layer adds no limit. Over the limit the `Range` header is ignored per RFC 9110 §14.2 and the whole entity is returned - the range count is **not** truncated (that would hand the client a representation it did not ask for), and `416` is **not** returned (the request itself is valid).
-- Related commits: `e6cdab8d`, `f1bba5f9`, `ead49073` (the limit was added in this batch)
 
 #### 7.6 Timeouts, error-body negotiation and same-connection serialisation
 
@@ -237,7 +226,6 @@ an observable behaviour change:
 | `spring.servlet.multipart.enabled=false` | the multipart aggregator was installed anyway | not installed (`getParts` reports "not a multipart request" as the spec says) |
 | `*.ms` / `*.us` / `*.ns` duration suffixes | `parseDurationMillis` matched the `s` branch first, so `500ms` parsed as `500m` and threw | multi-character suffixes match first; `ms` / `us` / `ns` work |
 
-- Related commits: `efba12d7`, `b246675f`, `d1c30851`, `267359b7`, `2f505e2f`
 
 #### 7.7 Error mapping for sessions, redirects and conditional requests
 
@@ -251,7 +239,6 @@ an observable behaviour change:
 | `server.servlet.encoding.charset` | only used to "prevent the application from overriding it", never as the container default | becomes the **default encoding** of the request/response adapters (re-applied after a Filter wrapper rebinds them; `force-*` semantics unchanged) |
 | `isRequestedSessionIdFromCookie()` / `isRequestedSessionIdFromURL()` | the former decided from "id is non-null" (counting a fallback newly created session as cookie-sourced); the latter was always `false` | both reflect the id's **real origin** (Cookie / URI) |
 
-- Related commits: `56b16d40`, `85b98205`, `64de3eef`, `ff33fe73` (`9b1d361a` locks them with E2E, 47 cases)
 
 #### 7.8 Management port, forwarding semantics and other behaviour adjustments
 
@@ -272,7 +259,6 @@ an observable behaviour change:
 | `WebSocketSession#getHandshakeHeaders()` | returned a custom `SpringHeadersAdapter` (case-sensitive; writes such as `add` were silently dropped) | returns a standard `HttpHeaders` (case-insensitive, multi-value writes work); `SpringHeadersAdapter` removed |
 | `@WebFilter`'s `urlPatterns` | read without proxy/inherited sources → silently promoted to a global filter | looked up with `findMergedAnnotation` along superclasses and interfaces; `urlPatterns` really restricts the path |
 
-- Related commits: `df3c238f`, `89385c3d`, `a1b0a509`, `756f31f8`, `1b1f33b3` (`54069908`, `e33d4a9b` lock them with E2E)
 
 #### 7.9 Framing and Servlet reset semantics
 
@@ -282,7 +268,6 @@ an observable behaviour change:
 | `resetBuffer()` / `reset()` on a committed response | silently cleared the buffer, so callers thought they could take back what had already been sent | throws `IllegalStateException` (Servlet spec §5.6); `forward` / `sendRedirect` check `isCommitted` first and are unaffected |
 | `resetBuffer()` versus the Writer's encoding buffer | only the body buffer was cleared → content "written but not flushed" stayed in the encoding buffer and was flushed out by the before-commit callback, so the **discard semantics did not hold** | the encoding buffer is flushed into the body buffer before clearing, making the discard semantics real |
 
-- Related commits: `e8e16f87`, `890f4345` (`09ddf4bc`, `335c8a17`, `a567726c`, `f68dd351` lock them with E2E)
 
 #### 7.10 Async / SSE lifecycle and reference counting
 
@@ -297,7 +282,6 @@ an observable behaviour change:
 | writing a response body after the exchange ended | kept allocating pooled buffers (whose content could never be written) → ByteBuf leak | `getBuf()` logs **ERROR** and returns an **unpooled** discard buffer; when committed, `flushChunked`/`writeAndFlush` refuse to write and **release that buffer in place** (with a warning) |
 | return value is a reactive type with no resolver claiming it | silently "200 + empty body" (the hardest degradation to diagnose) | logs a **WARN** about the missing `ReactiveAdapter` (most common cause: reactor not on the classpath) |
 
-- Related commits: `fe722450`, `685eaa0c`, `61003c38`, `66204e80`, `11c3ae53` (`219f28a0`, `ebba0f80`, `03f820aa`, `4d838675`, `91d495ad`, `dad4294c`, `249efc50`, `0a346fa2` lock them with E2E / contract tests)
 
 #### 7.11 Observable changes from the performance work (JFR-driven, equivalence first)
 
@@ -311,8 +295,7 @@ an observable behaviour change:
 | when the response timeout is armed | a timer was armed at the start of every request | armed **on demand** (as a fallback when a synchronous section ends uncommitted, or while waiting on async/streaming): a synchronous request that committed on the event loop no longer produces a schedule/cancel pair, and **streaming responses longer than `server.http.timeout` no longer log the "committed, refusing to write" WARN** (pure noise removal, no content rewritten) |
 | `spring.mvc.publish-request-handled-events` default | `true` (publishing `ServletRequestHandledEvent` on every completed request) | **`false`** (**deliberately off in this project**, Boot's default is the opposite, `true`: the event is of no real use to most applications and publishing it per request is pure overhead). Applications that rely on it for monitoring/auditing must **enable it explicitly** (see the configuration reference) |
 
-- Equivalence evidence (JFR numbers are in the individual commits): `@RequestParam` fast path **-21% CPU samples per request**, **-8.8%** allocations per GET; fast-path eligibility is decided **at construction** (an earlier "exceed the threshold mid-lookup and fall back" variant could be bypassed by an early return and defeat the hash-DoS defence; a regression test caught it); `canDeserialize` probing is cached per `mappingContext` (**constraint**: the default `ObjectMapper`'s capability set is treated as static, so changing it at runtime requires clearing both that key and `READ_JAVA_TYPE`/`WRITE_TYPE_SERIALIZABLE`; custom mappers are not cached, keeping the per-request switching semantics).
-- Related commits: `f515ae43`, `b6091749`, `bf1b88c8`, `59dc0ecb`, `21c3f8b1`, `2ec4e7c6`, `f3f9fa43`, `1708ed48`, `392747f8`, `d8c382cd`, `26281555`, `580ac83b`, `0254200d`, `5c3a23d2`
+- Implementation constraints and measured impact: `@RequestParam` fast path **-21% CPU samples per request**, **-8.8%** allocations per GET; fast-path eligibility is decided **at construction** (so a runtime fallback cannot bypass the hash-DoS defence); `canDeserialize` probing is cached per `mappingContext` (**constraint**: the default `ObjectMapper`'s capability set is treated as static, so changing it at runtime requires clearing both that key and `READ_JAVA_TYPE`/`WRITE_TYPE_SERIALIZABLE`; custom mappers are not cached, keeping the per-request switching semantics).
 
 #### 7.12 View layer: visible template changes and new extension points
 
@@ -325,7 +308,6 @@ an observable behaviour change:
 | session persistence and forced encoding | - | `server.servlet.session.persistent` / `.store-dir` / `.persistent-exclude` (JDK serialization, one file per session, `transient` attributes are not written); `server.servlet.encoding.force` / `.force-request` / `.force-response` |
 | configuration-centre refresh | a change needed a restart to take effect | listens for `EnvironmentChangeEvent` (**by class name**, so no compile-time Spring Cloud dependency) → clears the framework property cache; `WebContext.refreshProperties()` can also be called manually. A failed refresh keeps the old value per field (see 7.11) |
 
-- Related commits: `e6088584`, `30d1bf12`, `6aa5bd5f`, `9b6779ac`, `4f7ebbbf`, `24d4f768`
 
 ---
 

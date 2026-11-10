@@ -138,7 +138,7 @@ This problem couldn't be solved by switching Servlet containers — switching To
 
 What was needed was a **fundamental elimination of framework runtime overhead**.
 
-So I launched the **Spring Performance Engineering** project. Core idea: resolve and match all metadata at startup — runtime only does "table lookups" — zero reflection, zero matching, zero temporary allocation. All while remaining fully compatible with Spring's programming model (`@RequestMapping`, `@RequestParam`, `@RequestBody`, `@ExceptionHandler`, `HandlerInterceptor`, etc.), enabling zero-code migration.
+So I launched the **Spring Performance Engineering** project. Core idea: resolve and match all metadata at startup — runtime only does "table lookups" — zero reflection, zero matching, zero temporary allocation. All while reusing Spring's mainstream programming model (`@RequestMapping`, `@RequestParam`, `@RequestBody`, `@ExceptionHandler`, `HandlerInterceptor`, etc.), so most business code needs no changes to migrate; the cases that differ or need a bridge module are listed below and in the [Migration Guide](quickstart.md).
 
 ### Results
 

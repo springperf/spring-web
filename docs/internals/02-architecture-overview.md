@@ -98,7 +98,7 @@ support 与 batch 对 starter 是 `provided`，这是一个有意的设计决策
 
 - **`provided` 的 Maven 语义**：编译期可见（starter 的 autoconfig 能引用 support 的类），但不传递到最终应用 classpath。
 - **实际效果**：用户应用的 `pom.xml` 若显式引入 `spring-web-servlet` 或 `spring-web-mvc-support`，对应桥接层进 classpath，starter 的 `SpringWebServletAutoConfiguration` / `SpringWebMvcSupportAutoConfiguration`（`@ConditionalOnClass` 命中）自动激活；若不引入，桥接层不存在，核心仍能独立运行。
-- **哲学对应**：这恰好是 [01 篇 原则 6](01-design-philosophy.md#) "避免魔法行为——显式 SPI、显式 fail-fast"的反面印证——这里不是"靠条件猜测"，而是"依赖是否在场本身就是显式声明"。条件装配的触发条件（classpath 上有某个类）是用户用 Maven 坐标写明的，可追溯、可排查。
+- **哲学对应**：这恰好是 [01 篇 原则 6](01-design-philosophy.md) "避免魔法行为——显式 SPI、显式 fail-fast"的反面印证——这里不是"靠条件猜测"，而是"依赖是否在场本身就是显式声明"。条件装配的触发条件（classpath 上有某个类）是用户用 Maven 坐标写明的，可追溯、可排查。
 
 ### 1.3 starter 排除 Tomcat 的"反向防线"
 
@@ -526,7 +526,7 @@ support 模块在 `src/main/java/org/springframework/web/servlet/` 等路径下*
 - [13 篇](13-batch-module.md) 展开 batch 的 Disruptor 聚合切入点；
 - [14 篇](14-starter-autoconfig.md) 展开 starter 的 15 个自动配置类与零冲突防线。
 
-记住两个校正（生命周期由 `start()` 触发、路径匹配 Filter 在 `core/filter`），后续阅读源码就不会在错误的位置扑空。
+注意两点：生命周期由 `start()` 触发、路径匹配 Filter 位于 `core/filter`。
 
 ---
 

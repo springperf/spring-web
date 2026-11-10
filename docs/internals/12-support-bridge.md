@@ -4,9 +4,9 @@
 
 ---
 
-## 引子：兼容层不牺牲性能
+## 引子：兼容层的性能代价与边界
 
-`spring-web-servlet` 与 `spring-web-mvc-support` 是框架的兼容层。它的目标是：**让 Spring MVC 生态的组件（`WebMvcConfigurer`、`HandlerInterceptor`、`jakarta.servlet.Filter`、`@ControllerAdvice`、`HttpMessageConverter`、Session 等）不修改一行代码就能无缝工作在 Netty 容器上，同时不引入每请求的反射或类型推断。**
+`spring-web-servlet` 与 `spring-web-mvc-support` 是框架的兼容层。它的目标是：**让 Spring MVC 生态的组件（`WebMvcConfigurer`、`HandlerInterceptor`、`jakarta.servlet.Filter`、`@ControllerAdvice`、`HttpMessageConverter`、Session 等）多数场景无需改动即可工作在 Netty 容器上（未覆盖的回调与 Servlet 规范限制见 1.1、5.6~5.10），同时不引入每请求的反射或类型推断。**
 
 Spring MVC 的兼容层（如 Servlet 容器 + `spring-webmvc`）依赖的天然假设是"运行在 Servlet 容器中"——`HttpServletRequest`/`HttpServletResponse`、`FilterChain`、`Session` 都是容器提供的。本框架用 Netty 替代了 Tomcat/Jetty，所以 support 的职责是：
 
@@ -15,7 +15,7 @@ Spring MVC 的兼容层（如 Servlet 容器 + `spring-webmvc`）依赖的天然
 3. **`PerfHttpServletRequest/Response`** 包装框架的 `WebServerHttpRequest/Response` 为 `HttpServletRequest`/`HttpServletResponse`。
 4. **`FilterWrapper`/`HandlerInterceptorWrapper`** 把 Servlet Filter 和 Spring MVC Interceptor 适配为框架的 `WebFilter`/`HandlerInterceptor`。
 5. **Session 体系** 从零实现 `HttpSession` 接口，通过 `HttpSessionStorage` SPI 可插拔存储。
-6. **Servlet 规范完整桥接** 覆盖 `ServletContext`、`RequestDispatcher`（forward/include）、`AsyncContext`、认证（`Authenticator`）、WebSocket `upgrade` 等，让依赖 Servlet API 的代码无侵入运行。详见第五节 5.6~5.10。
+6. **Servlet 规范完整桥接** 覆盖 `ServletContext`、`RequestDispatcher`（forward/include）、`AsyncContext`、认证（`Authenticator`）、WebSocket `upgrade` 等，让依赖 Servlet API 的多数代码无需改动即可运行。详见第五节 5.6~5.10。
 7. **Servlet 对象路由与 JSP** 支持把 `jakarta.servlet.Servlet` 对象注册为框架路由（`ServletInvoker` / `SupportServletRegistry` / `ServletRequest(Response)Provider`），并集成 Apache Jasper 提供 JSP / JSTL 渲染（`JasperJspServlet` / `JspViewResolver` / `JspView`）。详见第五节 5.11~5.12。
 
 ---

@@ -296,7 +296,7 @@ protected WebFilterRegistration createFilterWrapper(AbstractFilterRegistrationBe
 
 ## 五、事件适配与 AOT 提示
 
-> 当前 master 收敛为纯 Spring Boot 3.5.x，**不含** SB4 事件适配桥接；4.x 事件适配由 `4.1.x` 分支承接。
+> 主线面向纯 Spring Boot 3.5.x，**不含** SB4 事件适配桥接；4.x 事件适配由 `4.1.x` 分支承接。
 
 ### 5.1 事件：`PerfWebServerInitializedEvent`
 

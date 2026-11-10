@@ -378,7 +378,7 @@ void drain() {
 |------|-----------|------------|---------|
 | Servlet API | **桥接兼容**（`spring-web-servlet` 模块） | 原生支持 | 不支持 |
 | Actuator | **原生支持** + 独立管理端口 | 原生支持 | 原生支持 |
-| `@RequestMapping` | **全兼容** | 原生 | 原生 |
+| `@RequestMapping` | **核心用法兼容**（差异见[迁移指南](quickstart.md)） | 原生 | 原生 |
 | `javax.validation` | 支持 | 支持 | 支持 |
 | Spring Data | 桥接兼容 | 原生 | 原生 |
 | 最小堆占用 | **~24MB** | ~26MB | ~25MB |

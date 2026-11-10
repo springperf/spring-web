@@ -157,12 +157,12 @@ Only with both does the entire pipeline run clean.
 | Dimension | WebPerf (this project) | Spring WebFlux | Vert.x |
 |-----------|--------------------------|----------------|--------|
 | Programming style | Synchronous Spring MVC | Reactive Reactor | Callback/Future |
-| Learning curve | Zero | High | Medium-high |
+| Learning curve | Same as Spring MVC | High | Medium-high |
 | Code readability | Sequential execution | Chained calls | Callback nesting |
 | Virtual threads | Naturally compatible | Diminished value | Naturally compatible |
 | Batching support | Built-in (Disruptor) | Must implement | Must implement |
 
-The takeaway: **comparable or better performance + lowest migration cost = where this project sits.**
+The takeaway: **comparable or better performance in this comparison, while keeping the Spring MVC programming model to reduce migration cost; the parts that need adjusting are listed in the [Migration Guide](quickstart.md).**
 
 <p align="center">
 <img src="../images/philosophy-staged-improvement-en.svg" alt="Staged performance improvement"/>
@@ -202,7 +202,7 @@ Most business code needs no changes. `@RestController` stays `@RestController`, 
 
 How is this possible? Because the project was designed from day one to **be compatible with the Spring programming model.** We encapsulated performance complexity inside the framework, not pushed it onto developers. Startup pre-computation, bytecode generation, O(1) routing — these technical details are completely transparent to business code.
 
-**You don't have to choose between "performance" and "developer productivity." You get both.**
+**Reusing the Spring programming model keeps most business code unchanged while the framework carries the performance work; the cases that need adjusting are listed in the [Migration Guide](quickstart.md).**
 
 ---
 
