@@ -26,26 +26,6 @@
 
 ## [3.5.7] - 2026-10-08
 
-> **Why this version carries breaking changes in a minor release**: this list was drafted for "the next major
-> version", but ships as **3.5.7** (a minor) - breaking changes inside a minor release are a **deliberate
-> one-time exception** (the alignment work done between 3.5.6 and 3.5.7). That exception is registered
-> item-by-item as an exemption for the binary-compatibility gate (japicmp); the rationale is in the comments
-> around the japicmp configuration in the root `pom.xml`. **From here on, any new incompatibility fails the gate.**
->
-> Companion workstream: `docs/feature/config-alignment-springmvc-tomcat.md` (that directory is gitignored and
-> kept locally only).
-
-### Background
-
-During the `config-alignment` workstream (P0/P1) the framework gained a set of standard configuration keys
-aligned with Spring Boot / Tomcat, and for a while kept the old keys as aliases (double read: new key first,
-old key as fallback).
-
-The decision was to **stop carrying historical compatibility**: the old keys are **removed outright** in this
-release, keeping only the Boot-aligned names. This file is the release's "breaking changes list" for upgraders.
-
----
-
 ### 1. P0 removals
 
 | Removed old key | Replacement | Old semantics | New semantics / migration |

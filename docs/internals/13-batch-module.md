@@ -82,7 +82,7 @@ public void initComponentPhase2() throws Exception {
 `install` 方法做五件事：
 
 1. **缓存 `BatchRequestMetaData`**：将元数据通过 `BATCH_META_CACHE_KEY` 缓存到 `singleCtx`（单请求 `PathMappingContext`）上，供后续 `BatchInvoker` 使用。
-2. **创建 `DisruptorQueue`**：按 `queueName`（`batch:<ClassName>.<methodName>`）创建队列，`putIfAbsent` 防重复安装，冲突时 `shutdown` 新队列再抛异常（修复前直接抛导致线程泄漏）。
+2. **创建 `DisruptorQueue`**：按 `queueName`（`batch:<ClassName>.<methodName>`）创建队列，`putIfAbsent` 防重复安装，冲突时先 `shutdown` 新队列再抛异常（直接抛出会留下未停止的消费线程）。
 3. **替换 Invoker**：`singleCtx.setInvoker(new BatchInvoker(meta, queue))`——这是"方法体替换"语义的实现点。
 4. **矫正返回值类型**：`setEffectiveReturnType`让 `ReturnValueResolverRegistry` 能正确解析 `BatchRequest<X>` 中的泛型内联类型 `X`。
 5. **虚拟线程模式下取消 `@RunInPool`**：`if (virtualThreads) poolRegistry.setDefaultPool(reg.singleCtx(), null)`——虚拟线程的 `default` 池以虚拟线程执行任务，而 single 路径只做入队（微秒级、不阻塞），走它反而多一次线程切换，故置空默认池让入队留在 EventLoop。**未开虚拟线程时不设置**，遵循全局 `pool.default-execute-mode`（默认 `default` 业务池）。两种情况下用户显式 `@RunInPool` 都优先（`setDefaultPool` 仅在无注解时生效）。
@@ -236,7 +236,7 @@ this.bizExecutor = new ThreadPoolExecutor(0, consumerSize, 60L, TimeUnit.SECONDS
 - **自然背压**：`SynchronousQueue` 没有缓冲容量，提交任务时必须有一个工作线程在 `take()`。如果没有空闲线程，新建线程直到 `maximumPoolSize`。达到上限后触发 `CallerRunsPolicy`——Disruptor 消费者线程自行执行 `processBatch`，此时消费者不再从 RingBuffer 拉取新事件，RingBuffer 逐渐填满，生产者线程（默认 `default` 业务池 worker）因 RingBuffer 满而阻塞，最终反压到 TCP 层。
 - **无需预热**：无核心线程，无需手动调优。
 
-### 4.3 `normalizeRingBufferSize`：C8/C12 保护
+### 4.3 `normalizeRingBufferSize`：上下限保护
 
 `normalizeRingBufferSize`将配置值归一化为 2 的 N 次幂，附带两个保护：
 
@@ -244,12 +244,12 @@ this.bizExecutor = new ThreadPoolExecutor(0, consumerSize, 60L, TimeUnit.SECONDS
 // DisruptorQueue.java
 static int normalizeRingBufferSize(int size) {
     if (size <= 0) return 4096;
-    // C8: 禁止退化尺寸。ringBufferSize=1 意味着单槽队列，并发批处理下灾难性
+    // 禁止退化尺寸。ringBufferSize=1 意味着单槽队列，并发批处理下灾难性
     // 背压/丢请求；<64 一律提升到最小可用尺寸 64。
     if (size < 64) return 64;
     int result = Integer.highestOneBit(size);
     if (result < size) result <<= 1;
-    // C12: 上限即 2^18=262144。Disruptor RingBuffer 按 capacity 预分配全部 BatchEvent
+    // 上限即 2^18=262144。Disruptor RingBuffer 按 capacity 预分配全部 BatchEvent
     // 槽位，2^18 × ~24B ≈ 6MB 堆；任何大于 262144 的请求都回退到该上限（而非可用到
     // 2^30——那需要 25GB+ 堆，必然 OOM）。
     return result > 0 && result <= (1 << 18) ? result : 1 << 18;
@@ -258,8 +258,8 @@ static int normalizeRingBufferSize(int size) {
 
 | 保护 | 条件 | 行为 |
 |------|------|------|
-| **C8** | `size < 64` | 回退到 64，防止退化尺寸（如 `ringBufferSize=1` 导致灾难性背压） |
-| **C12** | `result > 1<<18`（含 `<=0` 的溢出为负） | 回退到 262144（~6MB）；**任何大于 262144 的配置都被压到该上限** |
+| **下限保护** | `size < 64` | 回退到 64，防止退化尺寸（如 `ringBufferSize=1` 导致灾难性背压） |
+| **上限保护** | `result > 1<<18`（含 `<=0` 的溢出为负） | 回退到 262144（~6MB）；**任何大于 262144 的配置都被压到该上限** |
 
 ### 4.4 `enqueue`：三种背压策略
 
@@ -268,7 +268,7 @@ static int normalizeRingBufferSize(int size) {
 ```java
 // DisruptorQueue.java
 public void enqueue(BatchRequest<?> request) {
-    // 已知边界（Tier 1 评审确认，保持零锁热路径）：
+    // 已知边界（保持零锁热路径）：
     // halted 检查与 publish 之间存在纳秒级竞态窗口——enqueue 读到 halted=false 后，
     // shutdown 恰好完成 disruptor.shutdown()（drain 全部已发布事件 + 停消费线程），
     // 随后本线程才发布 → 事件滞留环形缓冲无人消费，该请求由 DeferredResult 30s 超时兜底。
@@ -503,7 +503,7 @@ private void processBatch(List<BatchRequest<?>> batch) {
 
 ```java
 // DisruptorQueue.java 注释
-// 已知边界（Tier 1 评审确认，保持零锁热路径）：halted 检查与 publish 之间存在纳秒级
+// 已知边界（保持零锁热路径）：halted 检查与 publish 之间存在纳秒级
 // 竞态窗口——enqueue 读到 halted=false 后，shutdown 恰好完成 disruptor.shutdown()
 // （drain 全部已发布事件 + 停消费线程），随后本线程才发布 → 事件滞留环形缓冲无人
 // 消费，该请求由 DeferredResult 30s 超时兜底。仅停机瞬间概率性发生，可接受。
@@ -578,7 +578,7 @@ public class BatchOverflowException extends ResponseStatusException {
 
 1. **`BatchRegistry` + `BatchScanner` 启动期扫描** → 扫描 `@BatchMapping`，关联单请求方法，解析 `BatchRequest` 泛型类型，缓存 `BatchRequestMetaData` 到 `PathMappingContext`。
 2. **`BatchInvoker` 方法体替换** → `InvokableHandlerMethod.setInvoker(batchInvoker)`（签名 `public void setInvoker(Invoker invoker)`），运行时反射创建 `BatchRequest` 实例并入队，原方法体完全不执行。
-3. **`DisruptorQueue` 无锁入队** → `ProducerType.MULTI` CAS claim，`BatchEvent` 预分配零 GC，`normalizeRingBufferSize` C8/C12 保护，三种背压策略（BLOCK/DROP/THROW）。
+3. **`DisruptorQueue` 无锁入队** → `ProducerType.MULTI` CAS claim，`BatchEvent` 预分配零 GC，`normalizeRingBufferSize` 上下限保护，三种背压策略（BLOCK/DROP/THROW）。
 4. **`BufferingBatchHandler` 攒批消费** → `endOfBatch` + `maxBatchSize` 双触发（`batchWindowMillis > 0` 时改为「窗口到期 + 攒满」），`bizExecutor` 零核心线程 + `SynchronousQueue` + `CallerRunsPolicy` 自然背压，`handleBatchError` / `failUncompleted` 逐个 `setError` 防挂起。
 5. **三级背压链** → RingBuffer 满 → 生产者线程（默认 `default` 业务池 worker）阻塞 → TCP 反压（BLOCK 模式）；或 `tryPublishEvent` 失败 + `BatchOverflowException` 429（DROP/THROW 模式）。
 6. **9 个指标埋点** → `BatchMetrics` SPI 定义 6 个记录方法（由 starter 的 `MicrometerBatchMetrics` 实现为 9 个指标，容量 Gauge 在启动预热 + 每批 + 背压失败时采样），`queue` Tag 值 `batch:<ClassName>.<methodName>`，`NoOpBatchMetrics` 默认零开销。

@@ -373,4 +373,4 @@ pipeline.addLast(new ChunkedWriteHandler());              // 支持 ChunkedInput
 
 ---
 
-> **下一篇**：[16 · 代码聚光灯](16-code-spotlights.md)——十个"体现工程美感"的具体实现，逐个用 30–80 行讲透设计意图与巧妙处。
+> **下一篇**：[16 · 代码聚光灯](16-code-spotlights.md)——十个有代表性的具体实现，逐个用 30–80 行讲透设计意图与巧妙处。

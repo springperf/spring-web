@@ -1,7 +1,6 @@
 # perf/ —— 性能分析脚本
 
-配套文档：`docs/feature/performance-analysis-methodology.md`
-（方法论；该目录未纳入 git 跟踪）
+本目录存放性能分析的测量脚本。各脚本的用途、判定口径与结果文件见下文。
 
 ## 前置
 
@@ -16,7 +15,7 @@ mvn -o -pl spring-web-benchmark -Pbenchmark-perf compile
 
 ## 用法速查
 
-一键挂机（睡前跑，三阶段都不含在内中断）：`overnight.sh`，见下节。
+一次跑完三个阶段：`overnight.sh`，见下节。
 
 ```bash
 cd spring-web-benchmark/perf
@@ -46,7 +45,7 @@ python alloc-diff.py <base.txt> <cur.txt>     # 两版本差值
 
 | 脚本 | 用途 |
 |------|------|
-| `overnight.sh` | 挂机入口，串起下面三个阶段 |
+| `overnight.sh` | 一键入口，串起下面三个阶段 |
 | `measure-alloc.sh` | 服务端分配量（TLAB 精确计数） |
 | `heap-noise.sh` | 测当前口径的噪声 sd，判断能否分辨目标差异 |
 | `wsl-abba2.sh` | WSL 分离吞吐 ABBA，含三条判定 |
@@ -62,14 +61,14 @@ python alloc-diff.py <base.txt> <cur.txt>     # 两版本差值
 
 > `verify-throughput.sh` 与 `noise-probe.sh` 是快速探查手段，**不能代替 `wsl-abba2.sh` 出结论**。
 
-##挂机跑（overnight.sh）
+## 一键运行（overnight.sh）
 
-一次跑完三个阶段，**任何一步失败都记录但继续**，不会因为服务端起不来就整夜中断。
+一次跑完三个阶段，**任何一步失败都记录但继续**，单阶段失败不会中断整轮测量。
 日志与结果都落在 `target/perf-reports/`。
 
 ```bash
 cd spring-web-benchmark/perf
-export BASELINE_WT=/d/workspace/springperf/baseline-41   # 不设则跳过所有基线组
+export BASELINE_WT=<基线 worktree 路径>   # 不设则跳过所有基线组
 ./overnight.sh                # 全阶段：alloc thrpt noise
 ./overnight.sh alloc          # 只跑分配量（~3 min，最可信）
 ./overnight.sh thrpt          # 只跑吞吐 ABBA（每轮 ~2.6 min）
@@ -93,7 +92,7 @@ OVERNIGHT_ROUNDS=30 ./overnight.sh thrpt   # 覆盖默认 18 轮
 | `heap-1g.txt` | 噪声测量原始输出 |
 | `overnight-*.log` | 完整日志（含每阶段成败） |
 
-早上看结果：吞吐统计由 `wsl-abba2.sh` 末尾的 python 自动打印（BASE/CUR 均值、
+结果读取：吞吐统计由 `wsl-abba2.sh` 末尾的 python 自动打印（BASE/CUR 均值、
 sd、配对 t、符号检验 p、分段稳定性），直接翻日志尾部即可。
 
 ## 配置
@@ -103,11 +102,11 @@ sd、配对 t、符号检验 p、分段稳定性），直接翻日志尾部即�
 | 变量 | 默认 | 说明 |
 |---|---|---|
 | `JDK17` | 自动探测 | Windows 侧 JDK（跑 JMH 客户端） |
-| `SERVLET_JAR` | `D:/maven/repository/.../jakarta.servlet-api-6.1.0.jar` | benchmark pom 里是 provided 作用域，必须显式补 |
+| `SERVLET_JAR` | 本机 Maven 仓库中的 `jakarta.servlet-api-6.1.0.jar` | benchmark pom 里是 provided 作用域，必须显式补 |
 | `BASELINE_WT` | 空 | 基线 worktree 路径；不设则 A/B 脚本跳过基线组 |
 | `PERF_OUT` | `spring-web-benchmark/target/perf-reports` | 报告输出 |
-| `WSL_JAVA_HOME` | `/home/hcd/jdk17` | WSL 侧 JDK |
-| `WSL_MVN_REPO` | `/mnt/d/maven/repository` | WSL 侧离线仓库 |
+| `WSL_JAVA_HOME` | WSL 内 JDK 17 安装路径 | WSL 侧 JDK，按本机环境设置 |
+| `WSL_MVN_REPO` | WSL 内可访问的 Maven 仓库路径 | WSL 侧离线仓库，按本机环境设置 |
 
 ## 已知失效的 JVM 参数
 
@@ -116,4 +115,4 @@ sd、配对 t、符号检验 p、分段稳定性），直接翻日志尾部即�
 | `-XX:+UseParallelGC` | 结果表为空（与 Netty 不兼容） |
 | `-XX:-TieredCompilation` | 预热期过长，短迭代跑不完 |
 
-详见方法论文档 §2.5。
+以上两项不要加入基准脚本的 JVM 参数。

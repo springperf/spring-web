@@ -39,7 +39,7 @@ This guide explains how to migrate a standard Spring AI project to this framewor
 </dependency>
 ```
 
-> The Spring AI version is managed by the **root pom's `spring-ai-bom`** (`spring-ai.version`); the example project inherits it through the parent, so no declaration is needed in the example pom.
+> Manage the Spring AI version through `spring-ai-bom`. The `spring-web-examples` projects in this repository inherit it through their parent, so the example poms do not declare a version.
 
 ---
 
@@ -123,6 +123,7 @@ The application class needs `@ConfigurationPropertiesScan` (as `AiApplication` i
 
 ```java
 @SpringBootApplication
+@ConfigurationPropertiesScan
 public class Application {
     public static void main(String[] args) {
         SpringApplication.run(Application.class, args);

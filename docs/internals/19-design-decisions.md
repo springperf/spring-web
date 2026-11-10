@@ -6,9 +6,9 @@
 
 ## 引子：把"为什么"沉淀下来
 
-前 18 篇讲了框架"是什么"（架构）、"怎么做到的"（代码）、"快多少"（数据）。本篇是"决策篇"——用 ADR（Architecture Decision Record）风格，把 10 条关键取舍的**背景 / 决策 / 后果**沉淀下来。
+前 18 篇讲了框架"是什么"（架构）、"怎么做到的"（代码）、"快多少"（数据）。本篇是"决策篇"——用 ADR（Architecture Decision Record）风格，把 12 条关键取舍的**背景 / 决策 / 后果**沉淀下来。
 
-本篇每条决策都可追溯到 `file:line` 的代码证据，依据来自对应类的源码与注释，辅以既定设计记录。本篇不重复论证"怎么做"的细节——那是 [15 篇](15-performance-optimizations.md)（性能优化三元组）、[16 篇](16-code-spotlights.md)（代码聚光灯）、[18 篇](18-spi-extension.md)（SPI 机制）的职责。本篇只回答**"面临什么取舍、选了什么、代价是什么、何时该重新审视"**。
+本篇每条决策都可追溯到 `file:line` 的代码证据，依据来自对应类的源码与注释。本篇不重复论证"怎么做"的细节——那是 [15 篇](15-performance-optimizations.md)（性能优化三元组）、[16 篇](16-code-spotlights.md)（代码聚光灯）、[18 篇](18-spi-extension.md)（SPI 机制）的职责。本篇只回答**"面临什么取舍、选了什么、代价是什么、何时该重新审视"**。
 
 ### 阅读约定
 
@@ -67,7 +67,7 @@ Netty 的 EventLoop 单线程模型天然适合 I/O 密集型场景，但若业�
 
 ### 后果
 
-- **收益**：默认 default 池兼容阻塞型业务（JDBC、同步 RPC），不拖垮 EventLoop；需要极致低延迟时可经 `@RunInPool(EVENTLOOP)` 或 `pool.default-execute-mode=eventloop` 切回 EventLoop——基准测试即用 eventloop 模式取得 `json` 64 线程反超 16 线程（[15 篇](15-performance-optimizations.md) 优化 6）。
+- **收益**：默认 default 池兼容阻塞型业务（JDBC、同步 RPC），不拖垮 EventLoop；需要极致低延迟时可经 `@RunInPool(EVENTLOOP)` 或 `pool.default-execute-mode=eventloop` 切回 EventLoop——基准测试即使用该模式；更高并发档位的对比见 [benchmark-wsl.md](../benchmark-wsl.md)（WSL external，客户端/服务端 CPU 分离）。
 - **代价**：默认每请求一次线程切换（~5–10μs）+ `executor.execute` 提交开销；切回 EventLoop 模式需用户自行保证业务非阻塞——误把阻塞逻辑放 EventLoop 会拖慢该 EventLoop 上所有连接（与 WebFlux 同样的约束）。
 - **边界**：SSE/流式发送方必须在 EventLoop 串行化 `writeAndFlush`（无锁 drain loop 前提），`@RunInPool` 不适用于流式发送方——流式场景的生产者即便在业务线程，最终 drain 仍 `eventLoop.execute(this::drain)` 回到 EventLoop（[16 篇](16-code-spotlights.md) 聚光灯 4）。重新审视条件：若默认池 50/200 的配额在特定负载下成为瓶颈，需调参而非改模型；若全栈非阻塞且追求零切换，可整体切 eventloop 模式。
 
@@ -155,7 +155,7 @@ SSE 场景则用自研 `MpscArrayQueue`（ADR 6）——两者场景不同：bat
 
 SSE/流式输出需生产者（EventLoop 或业务线程）→ 消费者（EventLoop writer）的通信队列。可选：① 无界队列（`LinkedBlockingQueue`）——永不阻塞生产者，但慢消费者下数据无限堆积导致 OOM；② 有界 `MpscArrayQueue` ——队列满则背压，但生产者需等待。
 
-> **纠偏**：[00-README](00-README.md) 原标题曾写作 `MpscUnboundedArrayQueue`，源码核对后实为**有界** `MpscArrayQueue`（`AbstractNettyStreamSender.java` import、 字段、 构造）。本条以源码为准。
+> 队列为**有界** `MpscArrayQueue`（`AbstractNettyStreamSender.java` import、 字段、 构造）。
 
 ### 决策
 
@@ -191,7 +191,7 @@ SSE/流式输出需生产者（EventLoop 或业务线程）→ 消费者（Event
 - **代价**：理论竞态客观存在——最后一条事件可能在 `complete` 边界丢失（极低概率，需生产者 `send` 与 `complete` 精确并发且时序卡在 `preSendCheck` 与 `complete` 写 `completed` 之间）。
 - **边界**：仅"最后一条边界事件"可能丢失，已入队数据由 drain loop 保证不丢——`afterDrain()` 的 `wip.compareAndSet(0,1)` + `queue.isEmpty()` 双重检查防止 drain 完成瞬间的残留数据丢失。若用户的 `complete` 与 `send` 严格有序（同一线程或存在 happens-before 关系），竞态不触发。重新审视条件：若未来支持多线程并发 `send` + `complete` 且要求严格不丢，需引入线性化（如 `volatile` + CAS 或 sender 层锁），但当前调用模型不触发，加锁是过早优化。
 
-> **决策核心**："修方案前先读完整调用链，回答：① 并发是真的还是理论？② 后果是否违背用户预期？③ 改动是否破坏既有设计意图？三点不过一律不动"。此三点在本条均通过——竞态是理论窗口、丢失符合用户预期、加锁破坏无锁设计。
+> **决策核心**：竞态是理论窗口、边界事件丢失符合用户预期、加锁会破坏无锁设计，因此保持现状不加锁。
 
 **关联**：[11 篇](11-async-streaming.md) 四节、[16 篇](16-code-spotlights.md) 聚光灯 4、[17 篇](17-benchmark-data.md) SSE 归因。
 
@@ -237,7 +237,7 @@ SSE/流式输出需生产者（EventLoop 或业务线程）→ 消费者（Event
 
 - `BizPoolRegistry.resolvePool` 池名不存在抛 `IllegalStateException`——`@RunInPool("name")` 的池名必须在 phase3 `getBeansOfType(ExecutorService)` 收的 `pools` Map 中；
 - `ArgumentResolverRegistry.validateAllParametersResolvable` phase3 遍历所有 `@RequestMapping` 方法的参数，对每个参数调 provider 的 `supports()`，无 provider 可解析则抛 `IllegalStateException`；
-- `@RunInPool` 缺池名、缺 arg resolver when `check-on-startup=true` 等均启动期校验（见 `development.md` fail-fast 条目）。
+- `@RunInPool` 缺池名、缺 arg resolver when `check-on-startup=true` 等均启动期校验。
 
 关键细节：`validateAllParametersResolvable` 对**普通参数**只查 `supports()` 不创建实例—— 注释明言 "does NOT create or cache any resolver, keeping memory footprint zero for endpoints that are never called"。**例外**：`@ModelAttribute` 无默认构造器的参数由 `validateModelAttributeConstructor` 调 `getResolver()` 预创建，为的是启动期就暴露 `InstantiationException`。普通参数的真正 `resolveArgument` 延迟到首请求 DCL `getMethodArgContexts` → `initStaticArgResolverSupport` 才创建并缓存。这是 fail-fast 与零闲置内存的折中。
 
@@ -247,7 +247,7 @@ SSE/流式输出需生产者（EventLoop 或业务线程）→ 消费者（Event
 - **代价**：校验有启动期成本（遍历所有 mapping 方法的参数），但一次性且普通参数只查 `supports()` 不创建实例，零闲置内存；启动时间略增（可接受）。
 - **边界**：运行时仍有兜底 fail——`resolvePool` 在首请求懒解析 `@RunInPool` 注解时才触发（注解值理论上运行时可变，但池名校验逻辑复用 ，保证启动期与运行时一致）。重新审视条件：若某些扩展点无法在启动期确定（如动态注册的 mapping），fail-fast 退化为"动态注册时校验"（`WebComponentContainer.registerWebComponent` 按 state 追 phase，[18 篇](18-spi-extension.md) 七节），但不放弃校验本身。
 
-**关联**：[18 篇](18-spi-extension.md) 六节（已引用为 ADR 9，含"校验可达≠预创建实例"纠偏）、`development.md`。
+**关联**：[18 篇](18-spi-extension.md) 六节（ADR 9：校验可达≠预创建实例）。
 
 ---
 
@@ -261,7 +261,7 @@ SSE/流式输出需生产者（EventLoop 或业务线程）→ 消费者（Event
 
 ### 决策
 
-**复用 Spring Bean 类型扫描，但收口在 `WebComponentContainer`**。不发明 `@WebComponent` 注解（[18 篇](18-spi-extension.md) 引子已纠偏"框架没有 `@WebComponent` 注解"），SPI 靠 Spring `@Component`/`@Configuration`+`@Bean` 成为 Bean，框架按类型取 Bean（`getBeansOfType` / `autoRegisterWebComponent` / `getWebComponentWithDefault`），排序靠 `Ordered`/`@Order` 经 `AnnotationAwareOrderComparator.sort` 统一处理（`WebComponentContainer.java`、`WebComponent.java`）。
+**复用 Spring Bean 类型扫描，但收口在 `WebComponentContainer`**。不发明 `@WebComponent` 注解，SPI 靠 Spring `@Component`/`@Configuration`+`@Bean` 成为 Bean，框架按类型取 Bean（`getBeansOfType` / `autoRegisterWebComponent` / `getWebComponentWithDefault`），排序靠 `Ordered`/`@Order` 经 `AnnotationAwareOrderComparator.sort` 统一处理（`WebComponentContainer.java`、`WebComponent.java`）。
 
 `WebComponentContainer`（`autoRegisterWebComponent` 登记、`registerWebComponent` 冲突解析 + 动态注册按 state 追 phase）把"扫描 + 排序 + 固化"收口在一处。`RouterOptimizer` 是反例边界——`getOptimizerTemplate` 返回固定链（`MappingRegistry.java`），**不扫描 Bean**，扩展靠继承重写 `protected` 方法。这是 12 SPI 中唯一不靠类型发现的扩展点，因为路由优化器是"框架内部路由结构的选择策略"，暴露为 Bean 会破坏 `PathMappingContext` 的内聚。
 
@@ -353,7 +353,7 @@ WebSocket 模块有两处显眼的拷贝：接收侧把二进制帧的 `ByteBuf`
 
 1. **启动期确定性 + 运行时零开销**（ADR 1/3/9）：把"确定"从运行时前移到启动期——ASM 字节码生成、`int index` 分配、fail-fast 校验都在启动期完成，运行时只做数组索引与无锁 drain。这与 [16 篇](16-code-spotlights.md) 小结的"启动期做尽计算，运行时只做最必要的事"完全一致。
 2. **显式优于隐式，但不发明轮子**（ADR 4/10）：`@RunInPool` 显式声明执行位置（命名业务池或 EventLoop）、`WebComponent` 显式收口 SPI 发现——框架在关键决策点让用户显式表态（而非靠惯例推断）；但又不发明 `@WebComponent` 注解，复用 Spring `Ordered`/`@Order` 与 `AnnotationAwareOrderComparator`，扩展方零学习成本。
-3. **接受理论缺陷，拒绝过早防御**（ADR 7/8）：`complete` 边界竞态、静态 Map 扩容并发窗口都是已知接受的理论缺陷——因为它们在当前调用模型下不触发，加锁/per-instance 化会破坏无锁 drain loop 与多 path 共享缓存的既有设计。决策核心是"修方案前先读完整调用链，回答：并发是真的还是理论？后果是否违背用户预期？改动是否破坏既有设计意图？三点不过一律不动"。
+3. **接受理论缺陷，拒绝过早防御**（ADR 7/8）：`complete` 边界竞态、静态 Map 扩容并发窗口都是已知接受的理论缺陷——因为它们在当前调用模型下不触发，加锁/per-instance 化会破坏无锁 drain loop 与多 path 共享缓存的既有设计。取舍标准是：竞态是否真实可触发、后果是否违背用户预期、改动是否破坏既有设计意图。
 
 这三条主线在 [01 篇](01-design-philosophy.md) 设计哲学中已有原则性表述（零匹配、零反射、显式 SPI），本篇把它们落实为可追溯 `file:line` 的具体取舍记录——**每个"为什么这么设计"都能在源码中找到证据，每个"代价与边界"都标明何时该重新审视**。
 

@@ -207,7 +207,7 @@ protected Object convertWithGenericType(Object arg) {
 }
 ```
 
-`TypeDescriptor` 携带完整的泛型信息（如 `List<Integer>`），`ConversionService` 做元素级转换。注释记录了修复历史：**原本只 catch `ConversionFailedException`，漏掉 `ConverterNotFoundException`（目标类型无 String→T 转换器），导致该错误逸出为 500。修复后 catch 父类 `ConversionException`，统一收敛为 400。**
+`TypeDescriptor` 携带完整的泛型信息（如 `List<Integer>`），`ConversionService` 做元素级转换。转换异常统一 catch 父类 `ConversionException`，收敛为 400：`ConversionFailedException` 与 `ConverterNotFoundException`（目标类型无 String→T 转换器）都归此路径，避免该错误逸出为 500。
 
 ### 4.2 `isContainer` 保护
 
@@ -271,7 +271,7 @@ protected Object doResolveArgument(WebServerHttpRequest request, WebServerHttpRe
 1. `BeanUtils.findPrimaryConstructor`（Spring 5.3+ 的构造器推断，优先 Kotlin 主构造器）
 2. 如果只有一个构造器，使用它
 3. 否则尝试 `getDeclaredConstructor()`（无参构造器）
-4. 如果无参构造器不存在且参数数 > 0，抛 `IllegalStateException`——**D3 fail-fast**，在 Phase3 校验中暴露
+4. 如果无参构造器不存在且参数数 > 0，抛 `IllegalStateException`——**fail-fast**，在 Phase3 校验中暴露
 
 ### 6.2 `PerfDataBinder.bind`
 
@@ -456,7 +456,7 @@ public Object[] resolveArguments(MappingHandlerMethod mappingContext, WebServerH
 
 回到引子的问题：业务方法的参数值从哪来？
 
-1. **Provider 启动期决策** → 12 个内置 Provider 按优先级遍历，`supports` 命中即创建 Resolver 实例。
+1. **Provider 启动期决策** → 13 个内置 Provider 按优先级遍历，`supports` 命中即创建 Resolver 实例。
 2. **`MethodArgContext[]` 数组缓存** → `MappingCacheKey` 方法级缓存，运行时 `array[i]` 直取。
 3. **`AbstractSupportResolverProvider` 四路分流** → 一个基类覆盖四种参数类型（MultiValueMap/Map/Collection/SingleValue），子类只需声明数据源。
 4. **`AbstractNamedValueResolver` 类型转换 + 空值处理** → 串联 resolveByName → handleNull/Empty → convert，统一处理命名值参数。

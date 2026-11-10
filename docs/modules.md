@@ -182,7 +182,7 @@ handleAfterFilter() — 初始化上下文
 - `LifecycleWebComponent` — 带生命周期方法的组件（3 阶段初始化 + 销毁）
 - `BaseWebComponent` — 持有 `WebContext` 引用的抽象基类
 - `WebComponentContainer` — 组件注册表基础实现
-- `WebContext` — 应用上下文，实现 `InitializingBean`，驱动各组件生命周期
+- `WebContext` — 应用上下文，继承 `WebComponentContainer` 并实现 `DisposableBean`、`ApplicationContextAware`，持有并驱动各组件生命周期
 
 组件初始化阶段：
 ```

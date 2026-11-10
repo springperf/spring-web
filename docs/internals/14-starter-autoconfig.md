@@ -196,7 +196,7 @@ private static void assertNoSpringMvcConflict() {
 }
 ```
 
-`BeanFactoryPostProcessor` 在 bean 定义加载后、实例化前执行（`SpringWebAutoConfiguration.springMvcConflictGuard()` 注释 D9），比原 `webContext` bean 方法（实例化阶段）更早暴露问题。用户如果同时引入了 `spring-boot-starter-web`（Tomcat）和本框架的 starter，会在启动初期立即收到 `IllegalStateException`，避免两个 Web 服务器冲突。
+`BeanFactoryPostProcessor` 在 bean 定义加载后、实例化前执行（`SpringWebAutoConfiguration.springMvcConflictGuard()`），比原 `webContext` bean 方法（实例化阶段）更早暴露问题。用户如果同时引入了 `spring-boot-starter-web`（Tomcat）和本框架的 starter，会在启动初期立即收到 `IllegalStateException`，避免两个 Web 服务器冲突。
 
 ---
 
@@ -296,11 +296,7 @@ protected WebFilterRegistration createFilterWrapper(AbstractFilterRegistrationBe
 
 ## 五、事件适配与 AOT 提示
 
-> **⚠️ 章节修订（2026-09-30）**：master 已收敛为纯 Spring Boot 3.5.x，
-> 原「SB3 / SB4 事件适配」中的 SB4 桥接（`Boot4WebServerInitializedEventBridge`
-> 及其 ASM 运行时字节码生成、字符串条件守卫互斥加载）**已全部移除**，
-> 相应小节已删除。4.x 事件适配改由 `4.1.x` 分支承接，
-> 见 [4.1.x 适配指南](../../.agent/context/4.1.x-adaptation-checklist.md)。
+> 当前 master 收敛为纯 Spring Boot 3.5.x，**不含** SB4 事件适配桥接；4.x 事件适配由 `4.1.x` 分支承接。
 
 ### 5.1 事件：`PerfWebServerInitializedEvent`
 
@@ -361,7 +357,7 @@ public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
 //              + 泛型参数递归展开（ResponseEntity<Map<String, User>> → User）
 ```
 
-`process-aot` 端到端效果（`spring-web-example-rest`）：`HealthController`/`UserController` 全部方法进入 `reflect-config.json` 的 `methods`（INVOKE）段，`User`/`ApiResult` DTO 注册字段/构造器 hints；`GlobalExceptionHandler`（`@RestControllerAdvice`）的 `handleValidation`/`handleIllegalArg`/`handleUnknown` 同样进入 `methods` 段。示例模块默认构建绑定 `process-aot`，原生编译用 `-Pnative`（`scripts/native-smoke-test.sh`，Linux + GraalVM）。该脚本在原生镜像启动后逐条请求两个控制器的全部端点，验证上述 hints 是运行期真正生效，而不只是构建期生成；用例清单由 `NativeSmokeContractTest` 锁定。
+`process-aot` 端到端效果（`spring-web-example-rest`）：`HealthController`/`UserController` 全部方法进入 `reflect-config.json` 的 `methods`（INVOKE）段，`User`/`ApiResult` DTO 注册字段/构造器 hints；`GlobalExceptionHandler`（`@RestControllerAdvice`）的 `handleValidation`/`handleIllegalArg`/`handleUnknown` 同样进入 `methods` 段。示例模块默认构建绑定 `process-aot`，原生编译用 `-Pnative`（`scripts/native-smoke-test.sh`，Linux + GraalVM）。该脚本在原生镜像启动后逐条请求两个控制器的全部端点，验证上述 hints 是运行期真正生效，而不只是构建期生成。
 
 ### 5.4 WebSocket 端点 AOT hints：`ServerEndpointBeanFactoryInitializationAotProcessor`
 

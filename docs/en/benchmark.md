@@ -8,7 +8,7 @@
 
 > **Note:** `perf` is the benchmark profile for this project's Spring WebPerf — "native Netty + 5 WebFilters + 3 Interceptors" (see *Container Profiles* below). `perf-support` is the same stack plus a Servlet bridge layer, used to measure bridge overhead.
 >
-> **Data source:** Throughput / latency / GC / memory all from `benchmark-reports/20260814-221509` (thrpt + sample dual mode). JDK 17.0.9, 4/8/16 threads. In-process mode shares a single JVM across 16 cores; the thread ceiling is set at ≤ core count (16t). For higher concurrency see [benchmark-wsl.md](../benchmark-wsl.md) (WSL external — client and server CPUs separated).
+> **Data source:** Throughput / latency / GC / memory all from a single `benchmark-reports/` run (2026-08-14, thrpt + sample dual mode). That directory is a local run artifact and is not distributed with the repository; see [How to Run](#how-to-run) to reproduce it. JDK 17.0.9, 4/8/16 threads. In-process mode shares a single JVM across 16 cores; the thread ceiling is set at ≤ core count (16t). For higher concurrency see [benchmark-wsl.md](../benchmark-wsl.md) (WSL external — client and server CPUs separated).
 
 ---
 
@@ -24,7 +24,7 @@
 
 > Heap figures come from the same benchmark run (`json` scenario, 4 threads); see [version source](#framework-versions) below for the container version matrix.
 
-Across **7 APIs × 3 concurrency levels (4/8/16 threads)**, perf is **#1 on every API at every level** (no exceptions). The most dramatic advantage is SSE: at 16t throughput reaches **7.72x** Spring MVC and p50 latency is only **13%** of Tomcat's.
+Across **7 APIs × 3 concurrency levels (4/8/16 threads)**, perf is **#1 on every API at every level**. The most dramatic advantage is SSE: at 16t throughput reaches **7.72x** Spring MVC and p50 latency is only **13%** of Tomcat's.
 
 > **On scaling ratios:** perf's json 4→16 thread scaling is +95%, lower than Spring MVC (+129%) and WebFlux (+161%) — but that is because perf at 4t already runs near saturation (37,508 vs Spring MVC's 19,900): a high base, hence a small marginal gain. In absolute 16t throughput perf still leads 73,286 vs 45,481 (**1.61x**). A lower scaling ratio ≠ weaker scaling; absolute throughput is #1 throughout.
 
@@ -142,12 +142,12 @@ Throughput growth from 4 → 16 threads; how well each framework extends under c
 
 ### 1.4 Analysis
 
-- **#1 on every API at every level**: perf leads all 7 APIs × 3 concurrency levels (4/8/16) with no exceptions; at 16t the advantage spans 1.22x (bytes) to 7.72x (sse).
+- **#1 on every API at every level**: perf leads all 7 APIs × 3 concurrency levels (4/8/16); at 16t the advantage spans 1.22x (bytes) to 7.72x (sse).
 - **Biggest multiple at low concurrency**: at 4t json 1.88x, get 2.26x, async 2.12x, sse 12.63x — the EventLoop-driven model pulls ahead of the thread-pool model even at low concurrency.
 - **Multiple narrows but stays #1 at 16t**: as threads grow, perf's advantage ratio eases (json 1.88→1.61x, bytes 1.56→1.22x) because pooled frameworks (Tomcat) close some of their 4t under-utilization gap; absolute 16t throughput still leads everywhere (json 73,286 vs 45,481).
 - **bytes leads at every level**: perf bytes 1.56x at 4t, 1.54x at 8t, and 74,540 (**1.22x**) Tomcat at 16t — #1 at all three levels.
 - **bytesLarge large responses**: throughput is dominated by 100KB transfer bandwidth; perf 16t 15,603 still leads (Tomcat 11,555). All containers dip from 8→16t (write-buffer pressure).
-- **SSE is dominant**: perf SSE 4t 12.63x, 8t 11.90x, 16t 7.72x (vs Tomcat). The EventLoop + lock-free Drain Loop model maximizes its advantage on long-lived connections.
+- **SSE leads by the largest margin**: perf SSE 4t 12.63x, 8t 11.90x, 16t 7.72x (vs Tomcat). The EventLoop + lock-free Drain Loop model maximizes its advantage on long-lived connections.
 - **webflux is not a total loss**: on async, webflux 4t 24,297 (perf 1.67x), 16t 57,109 (perf 1.32x) — its reactive model comes closest to perf on async endpoints.
 
 ---
@@ -240,8 +240,8 @@ At 4 threads perf's heap is **24MB** — the lowest of all frameworks. As thread
 
 ## 5. Key Conclusions
 
-1. **#1 on every API at every level**: perf wins all 7 APIs × 3 concurrency levels (4/8/16) with no exceptions; at 16t the advantage spans 1.22x–7.72x.
-2. **SSE is dominant**: SSE throughput at 16t is **7.72x** Spring MVC (14,920 vs 1,933); p50 is only **13%** of Tomcat — the EventLoop + lock-free Drain Loop maximizes its edge on long-lived connections.
+1. **#1 on every API at every level**: perf leads all 7 APIs × 3 concurrency levels (4/8/16); at 16t the advantage spans 1.22x–7.72x.
+2. **SSE leads by the largest margin**: SSE throughput at 16t is **7.72x** Spring MVC (14,920 vs 1,933); p50 is only **13%** of Tomcat — the EventLoop + lock-free Drain Loop maximizes its edge on long-lived connections.
 3. **Low latency, delivered**: json p50 at 16t is **0.22ms** — 69% of Tomcat (0.32ms); small-payload p50 at 4t is 0.10–0.28ms, the lowest across the board.
 4. **Allocation efficiency**: json/get per-request allocation is 43%/29% of Spring MVC and 31%/21% of WebFlux — fewer allocations mean fewer GC pauses and better cache locality.
 5. **Lowest memory at low concurrency**: perf heap is 24MB at 4t (lowest); frameworks converge at high concurrency.
@@ -304,7 +304,7 @@ perf-support is perf (native Netty) plus a Servlet bridge layer, used to quantif
 
 ### Prerequisites
 
-JDK 17+, Maven 3.6+, and a completed `mvn install -DskipTests` build. This report was produced on JDK 17; pointing `JAVA_HOME` at 17 on this machine reproduces the same numbers.
+JDK 17+, Maven 3.6+, and a completed `mvn install -DskipTests` build. This report was produced on JDK 17 — use the same JDK version (`JAVA_HOME`) to reproduce the same figures.
 
 ### Script (recommended)
 

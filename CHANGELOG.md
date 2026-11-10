@@ -12,7 +12,7 @@
 
 ### 变更
 
-- **分支定位**：本分支（`4.1.x`）**专用 Spring Boot 4.1**（`-Pspring-boot-4.0` 可切 4.0），**不再兼顾 3.5.x**——「一份代码同时支持两版」的目标由 master（纯 3.5.x）与本分支的分工取代。默认构建即为 4.1，无需 `-P` 切换。master 侧的差异与同步规则见 [4.1.x 适配指南](.agent/context/4.1.x-adaptation-checklist.md)
+- **分支定位**：本分支（`4.1.x`）**专用 Spring Boot 4.1**（`-Pspring-boot-4.0` 可切 4.0），**不再兼顾 3.5.x**——「一份代码同时支持两版」的目标由 master（纯 3.5.x）与本分支的分工取代。默认构建即为 4.1，无需 `-P` 切换。master 与本分支的差异见 [版本兼容性说明](docs/compatibility.md)
 - **兼容层整体移除**：`WebHttpHeaders` 的 8 个 MethodHandle 版本分支、`Boot4WebServerInitializedEventBridge` 的 ASM 运行时字节码生成、`ResponseStatusExceptionAdapter` 的方法名反射探测、`ListenableFutureAdapter`（Spring 7 已无该类型，原实现是死代码）等，均已删除，改为直接面向 Spring 7 / Jackson 3 的 API 实现
 - **JSON 栈迁移到 Jackson 3**：`com.fasterxml.jackson.databind` → `tools.jackson.databind`（注解仍用 `com.fasterxml.jackson.annotation`）。Jackson 3 把 `FAIL_ON_NULL_FOR_PRIMITIVES` 默认值由 `false` 改为 `true`，本框架经 `JacksonMappers.defaultMapper()` 显式关闭以保持与 master 一致
 - **Netty 跟随 Boot 4 BOM**：`4.1.137.Final` → `4.2.15.Final`（Boot 4 的基线）。删除了本项目对 14 个 Netty artifact 的钉版
@@ -26,7 +26,7 @@
 
 ## [3.5.8] - 未发布
 
-> 开发中版本：`project.version` 已在开发前提升为 `3.5.8`，本节条目随提交累积，发版时补日期。
+> 开发中版本：`3.5.8` 尚未发布，本节汇总该版本的变更，发布日期在正式发版时补齐。
 
 ### 修复
 
@@ -69,7 +69,7 @@
 
 ### 变更
 
-- **分支策略**：`master` 收敛为**纯 Spring Boot 3.5.x**——此前叠加的 Spring Boot 4 / Spring Framework 7 兼容层（`WebHttpHeaders` 的版本分支与 MethodHandle、`MediaTypeUtils`、`ResponseStatusExceptionAdapter`、`Boot4WebServerInitializedEventBridge`、SB4 Maven Profile 等）已全部移除；4.x 适配改由 `4.1.x` 分支承接（同步规则见 [4.1.x 适配指南](.agent/context/4.1.x-adaptation-checklist.md)）
+- **分支策略**：`master` 收敛为**纯 Spring Boot 3.5.x**——此前叠加的 Spring Boot 4 / Spring Framework 7 兼容层（`WebHttpHeaders` 的版本分支与 MethodHandle、`MediaTypeUtils`、`ResponseStatusExceptionAdapter`、`Boot4WebServerInitializedEventBridge`、SB4 Maven Profile 等）已全部移除；4.x 适配改由 `4.1.x` 分支承接
 - **响应分帧**：`flush(true)` 由「一次性」改为 chunked 渐进式输出
 - **Servlet `PrintWriter`**：`print`/`println` 不再自动提交（对齐 Tomcat `autoFlush=false`）
 - **扩展点签名变更**（源码级不兼容，详见 [破坏性变更说明](docs/breaking-changes.md) 的 3.5.7 节「扩展点签名变更」）

@@ -13,7 +13,7 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- **Branch positioning**: this branch (`4.1.x`) is **dedicated to Spring Boot 4.1** (`-Pspring-boot-4.0` switches to 4.0) and **no longer supports 3.5.x** — the "one codebase for both" goal is served by the division between master (pure 3.5.x) and this branch. 4.1 is the default build; no `-P` needed. The differences and sync rules are in the [4.1.x adaptation guide](../../.agent/context/4.1.x-adaptation-checklist.md)
+- **Branch positioning**: this branch (`4.1.x`) is **dedicated to Spring Boot 4.1** (`-Pspring-boot-4.0` switches to 4.0) and **no longer supports 3.5.x** — the "one codebase for both" goal is served by the division between master (pure 3.5.x) and this branch. 4.1 is the default build; no `-P` needed.
 - **Compatibility layer removed wholesale**: the eight MethodHandle version branches in `WebHttpHeaders`, the ASM runtime bytecode generation in `Boot4WebServerInitializedEventBridge`, the reflective method-name probing in `ResponseStatusExceptionAdapter`, and `ListenableFutureAdapter` (Spring 7 no longer has the type; the old implementation was dead code) are all gone — the code now targets the Spring 7 / Jackson 3 APIs directly
 - **JSON stack migrated to Jackson 3**: `com.fasterxml.jackson.databind` → `tools.jackson.databind` (annotations still `com.fasterxml.jackson.annotation`). Jackson 3 flips the default of `FAIL_ON_NULL_FOR_PRIMITIVES` from `false` to `true`; the framework disables it explicitly via `JacksonMappers.defaultMapper()` to keep behaviour aligned with master
 - **Netty now follows the Boot 4 BOM**: `4.1.137.Final` → `4.2.15.Final` (Boot 4's baseline). The project's own pins on 14 Netty artifacts were removed
@@ -27,7 +27,7 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [3.5.8] - Unreleased
 
-> In development: `project.version` was raised to `3.5.8` before development started; entries accumulate here and the date is filled in at release time.
+> In development: `3.5.8` has not been released yet. This section collects its changes; the release date is filled in when it ships.
 
 ### Fixed
 
@@ -71,7 +71,7 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- **Branch strategy**: `master` is now **pure Spring Boot 3.5.x** — the Spring Boot 4 / Spring Framework 7 compatibility layer that had accumulated on it (the version branches and MethodHandles in `WebHttpHeaders`, `MediaTypeUtils`, `ResponseStatusExceptionAdapter`, `Boot4WebServerInitializedEventBridge`, SB4 Maven profiles, etc.) has been removed entirely. 4.x adaptation now lives on the `4.1.x` branch; see the [4.1.x adaptation guide](../../.agent/context/4.1.x-adaptation-checklist.md)
+- **Branch strategy**: `master` is now **pure Spring Boot 3.5.x** — the Spring Boot 4 / Spring Framework 7 compatibility layer that had accumulated on it (the version branches and MethodHandles in `WebHttpHeaders`, `MediaTypeUtils`, `ResponseStatusExceptionAdapter`, `Boot4WebServerInitializedEventBridge`, SB4 Maven profiles, etc.) has been removed entirely. 4.x adaptation now lives on the `4.1.x` branch.
 - **Response framing**: `flush(true)` changed from one-shot to progressive (chunked) output
 - **Servlet `PrintWriter`**: `print` / `println` no longer auto-commit (matching Tomcat's `autoFlush=false`)
 - **Extension-point signature changes** (source-level incompatible; see the extension-point signatures part of the 3.5.7 section in the [breaking changes guide](../breaking-changes.md))

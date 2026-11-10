@@ -4,7 +4,7 @@
 
 把被测服务端放进 WSL2（限 4c / 2g），客户端（OkHttp JMH）跑在 Windows 宿主机，两者资源隔离。相比 in-process 模式（服务端与客户端同 JVM 抢 CPU），external 模式服务端是 Linux + 受限资源，更接近生产。
 
-> **一句话上手**：环境准备就绪后，`./scripts/wsl-run-all.sh --sampleTime` 一条命令跑完全部 5 个 profile × 7 API 的吞吐+延迟压测（约 4.5h），睡一觉醒来直接看 `spring-web-benchmark/benchmark-reports/{run-id}/report.md`。详见 [§3 一键全量压测](#3-一键全量压测wsl-run-allsh)。
+> **一句话上手**：环境准备就绪后，`./scripts/wsl-run-all.sh --sampleTime` 一条命令跑完全部 5 个 profile × 7 API 的吞吐+延迟压测（约 4.5h），结果落在 `spring-web-benchmark/benchmark-reports/{run-id}/report.md`。详见 [§3 一键全量压测](#3-一键全量压测wsl-run-allsh)。
 
 ## 1. 架构
 
@@ -47,9 +47,9 @@ echo 'export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> ~/.bashrc
 - `curl`（就绪探测用；Windows 10 自带）
 - WSL 发行版已启动过至少一次（`wsl --shutdown` 后需先启动过，脚本才能取到 IP）
 
-### 2.4 断网挂机：离线 Maven 依赖
+### 2.4 离线运行：Maven 依赖预置
 
-`wsl-run-all.sh` 强制 `mvn -o` 离线运行（避免断网挂机时卡在连阿里云重试）。**首次必须先在线构建一次**把所有依赖拉进本地 `.m2`：
+`wsl-run-all.sh` 强制 `mvn -o` 离线运行（避免无网络时卡在镜像仓库重试）。**首次必须先在线构建一次**把所有依赖拉进本地 `.m2`：
 
 ```bash
 cd <项目根>
@@ -60,7 +60,7 @@ mvn -pl spring-web-benchmark -am install -DskipTests   # 在线，拉全依赖
 
 ## 3. 一键全量压测（wsl-run-all.sh）
 
-推荐主路径。自动完成：全量编译 → 逐 profile 构建 → WSL 启动服务端 + 就绪探测 → Windows 跑 JMH → 优雅停止 → 生成 Markdown 报告。单 profile 失败不中断整体（记 FAIL 继续），适合睡前挂机。
+推荐主路径。自动完成：全量编译 → 逐 profile 构建 → WSL 启动服务端 + 就绪探测 → Windows 跑 JMH → 优雅停止 → 生成 Markdown 报告。单 profile 失败不中断整体（记 FAIL 继续），适合长时间无人值守运行。
 
 ```bash
 cd spring-web-benchmark
@@ -139,17 +139,17 @@ spring-web-benchmark/benchmark-reports/
 
 - **单 profile FAIL 不中断整体**：编译/classpath/服务端未就绪/JMH 失败均记 FAIL 继续下一个，报告头部列出失败列表。
 - **服务端启动容错**：就绪探测（90s）失败会自动清理残留并重试一次，二次失败才跳过。
-- **防干扰**：自动启动 WSL keepalive 进程（防 profile 间隙 VM 空闲关闭）+ Windows no-sleep（防断网挂机时系统睡眠中断压测）。
+- **防干扰**：自动启动 WSL keepalive 进程（防 profile 间隙 VM 空闲关闭）+ Windows no-sleep（防止长时间运行时系统睡眠中断压测）。
 - **JFR 默认关**：实测 JFR profile 模式拖慢服务端 ~38% 吞吐；TPS 数据取自 JMH 客户端结果 JSON 不受影响，但 --jfr 建议仅用于热点分析场景。
 
 ### 3.7 常用组合
 
 ```bash
-# 正式全量，吞吐+延迟（推荐，睡醒看报告）
+# 正式全量，吞吐+延迟（推荐，约 4.5h）
 ./scripts/wsl-run-all.sh --sampleTime
 # 只测 perf/tomcat 的 json+bytes，64 线程
 ./scripts/wsl-run-all.sh --profiles perf,tomcat --apis json,bytes --threads 64
-# 并发伸缩矩阵（宣传稿 §1 数据）
+# 并发伸缩矩阵（benchmark-wsl.md §1 数据）
 ./scripts/wsl-run-all.sh --sampleTime --thread-list 16,32,48
 ```
 
@@ -210,4 +210,4 @@ spring-web-benchmark/benchmark-reports/
 - **in-process / external 结果不可横向直接对比**：前者 Windows 无约束、后者 Linux 4c2g，分开报告。
 - **两个 WSL2 发行版共享同一个 VM 资源限制**：客户端仍放 Windows，不要放第二个 WSL2。
 - **内存快照**：external 模式下 `memory-<profile>.json` 不再生成（服务端不在这台 JVM）。
-- **报告入口**：对外宣传稿见 `docs/benchmark-wsl.md`（中）/ `docs/en/benchmark-wsl.md`（英），标准环境（JDK 8 in-process）见 `docs/benchmark.md`。
+- **报告入口**：受限环境数据见 `docs/benchmark-wsl.md`（中）/ `docs/en/benchmark-wsl.md`（英），标准环境（JDK 17 in-process）见 `docs/benchmark.md`。

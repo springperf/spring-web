@@ -11,9 +11,9 @@ adaptation branches (2.7.x / 4.1.x).
 
 | Branch | Spring Boot | Status | Maintenance Strategy |
 |--------|-------------|--------|---------------------|
-| `2.7.x` | 2.4.x ~ 2.7.x | Downstream adaptation | Synced from master + downgrade adaptation; based on javax.servlet (see [2.7.x migration checklist](../../.agent/context/2.7.x-migration-checklist.md)) |
+| `2.7.x` | 2.4.x ~ 2.7.x | Downstream adaptation | Synced from master + downgrade adaptation; based on javax.servlet |
 | `master` | **3.5.x** | **Development baseline** | New features merged here first; **contains no Spring Boot 4 / Spring Framework 7 compatibility code** |
-| `4.1.x` | 4.0.x ~ 4.1.x | Downstream adaptation | Synced from master + upgrade adaptation (see [4.1.x adaptation guide](../../.agent/context/4.1.x-adaptation-checklist.md)) |
+| `4.1.x` | 4.0.x ~ 4.1.x | Downstream adaptation | Synced from master + upgrade adaptation |
 
 Sync direction is always `master → 4.1.x` / `master → 2.7.x`; version adaptation code lives only
 in the downstream branches.
@@ -39,7 +39,7 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 | Spring Framework | **5.3.x** | Managed by Spring Boot | |
 | JDK | **8, 11, 17** | 8, 11, 17 verified | Compile target `java.version=8` |
 | Servlet API | **javax.servlet 4.0.1** | 4.0.x | |
-| Netty | **4.1.115.Final** | 4.1.x (manually overridden) | Spring Boot 2.7.x manages a lower version by default |
+| Netty | **4.1.137.Final** | 4.1.x (manually overridden) | Spring Boot 2.7.x manages a lower version by default |
 | Jackson | **2.17.2** | 2.17.x (manually overridden) | Spring Boot 2.7.x manages 2.13.x by default |
 | Lombok | **1.18.24** | 1.18.x | |
 | JMH | **1.37** | 1.37 | Benchmark module only |
@@ -146,9 +146,9 @@ The view rendering module depends on Spring's `org.springframework.ui` types. Be
 | Branch | Spring Framework | `ModelMap` implements `Model`? | Framework injection type | Notes |
 |--------|-----------------|-------------------------------|--------------------------|-------|
 | `master` | 6.2.x | ❌ No | `ExtendedModelMap` (subclass of `ModelMap` and implements `Model`) | Always injects `ExtendedModelMap` to support `Model`/`ModelMap`/`ExtendedModelMap` declarations |
-| `2.7.x` | 5.3.x | ✅ Yes | `ExtendedModelMap` (simpler on backport) | `ModelMap` itself is castable to `Model` |
+| `2.7.x` | 5.3.x | ✅ Yes | `ExtendedModelMap` | `ModelMap` itself is castable to `Model` |
 
-> **Backport note**: `ModelContext.getOrCreate()` in `spring-web` core needs no special handling on 2.7.x — Spring 5.3's `ModelMap` already implements `Model`, so the same implementation can be reused.
+> On the `2.7.x` branch, Spring 5.3's `ModelMap` already implements `Model`, so the same `ModelContext.getOrCreate()` implementation can be reused.
 
 ### Thymeleaf / FreeMarker Version Matrix
 

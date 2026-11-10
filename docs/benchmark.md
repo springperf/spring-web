@@ -8,7 +8,7 @@
 
 > **说明：** 本文中的 `perf` 是本项目 Spring WebPerf 的 Benchmark Profile 代号，对应"原生 Netty + 5 WebFilter + 3 Interceptor"配置（详见下方"容器说明"）。`perf-support` 是在此基础上叠加 Servlet 桥接层的配置，用于评估桥接开销。
 >
-> **数据来源：** 吞吐 / 延迟 / GC / 内存均取自 `benchmark-reports/20260814-221509`（thrpt + sample 双模式）。JDK 17.0.9，4/8/16 线程。in-process 模式客户端与服务端共享同一 JVM 的 16 核，档位上限取 ≤ 核数（16t）；更高并发请参考 [benchmark-wsl.md](benchmark-wsl.md)（WSL external，客户端/服务端 CPU 分离）。
+> **数据来源：** 吞吐 / 延迟 / GC / 内存均取自一次 `benchmark-reports/` 运行（2026-08-14，thrpt + sample 双模式）。该目录是本地运行产物，不随仓库分发；复现步骤见[如何运行](#如何运行)。JDK 17.0.9，4/8/16 线程。in-process 模式客户端与服务端共享同一 JVM 的 16 核，档位上限取 ≤ 核数（16t）；更高并发请参考 [benchmark-wsl.md](benchmark-wsl.md)（WSL external，客户端/服务端 CPU 分离）。
 
 ---
 
@@ -24,7 +24,7 @@
 
 > 堆内存数据取自同一次基准运行的 `json` 场景稳态堆（4 线程）；容器的版本口径见下文[版本来源](#对比框架版本)。
 
-perf 在 7 个接口 × 3 个并发度（4/8/16 线程）对比中，**全部接口、全部并发度第一**（无一例外）。SSE 场景优势最显著（16 线程吞吐达 Spring MVC 的 **7.72 倍**、p50 延迟仅其 **13%**）。
+perf 在 7 个接口 × 3 个并发度（4/8/16 线程）对比中，**全部接口、全部并发度吞吐第一**。SSE 场景优势最显著（16 线程吞吐达 Spring MVC 的 **7.72 倍**、p50 延迟仅其 **13%**）。
 
 > **伸缩比说明：** perf json 4→16 线程伸缩比 +95%，低于 Spring MVC（+129%）与 WebFlux（+161%）——但这源于 perf 4 线程绝对吞吐已接近饱和（37,508 vs Spring MVC 19,900）、基数高、边际增量小；16 线程绝对吞吐 perf 73,286 仍为 Spring MVC 45,481 的 **1.61 倍**。低伸缩比 ≠ 扩展能力差，绝对吞吐始终第一。
 
@@ -142,12 +142,12 @@ perf 在 7 个接口 × 3 个并发度（4/8/16 线程）对比中，**全部接
 
 ### 1.4 分析
 
-- **全接口、全并发度第一**：perf 在 7 接口 × 3 并发度（4/8/16）对比中全部第一，无一例外。16t 高并发下优势倍数 1.22x（bytes）~7.72x（sse）。
+- **全接口、全并发度第一**：perf 在 7 接口 × 3 并发度（4/8/16）对比中吞吐全部第一。16t 高并发下优势倍数 1.22x（bytes）~7.72x（sse）。
 - **低并发优势倍数最大**：4t 时 json 1.88x、get 2.26x、async 2.12x、sse 12.63x——EventLoop 直接驱动在低并发即与线程池模型拉开差距。
 - **16t 倍数回落但绝对领先**：随线程增加 perf 优势倍数略降（json 1.88→1.61x、bytes 1.56→1.22x），因 Tomcat 等线程池框架从 4t 的低利用率追赶；但 16t 绝对吞吐 perf 仍全面领先（json 73,286 vs 45,481）。
 - **bytes 全并发度领先**：perf bytes 4t 1.56x、8t 1.54x、16t 74,540 达 Tomcat（61,042）的 **1.22x**，所有档位均第一。
 - **bytesLarge 大响应体**：吞吐受 100KB 传输带宽主导，perf 16t 15,603 仍第一（Tomcat 11,555）；所有容器 8→16t 均回落（写缓冲压力）。
-- **SSE 碾压性优势**：perf SSE 4t 12.63x、8t 11.90x、16t 7.72x（vs Tomcat）。EventLoop + 无锁 Drain Loop 模型在长连接场景优势最大化。
+- **SSE 优势最显著**：perf SSE 4t 12.63x、8t 11.90x、16t 7.72x（vs Tomcat）。EventLoop + 无锁 Drain Loop 模型在长连接场景优势最大化。
 - **webflux 非全输**：async 场景 webflux 4t 24,297（perf 1.67x）、16t 57,109（perf 1.32x），其响应式模型在异步场景最接近 perf。
 
 ---
@@ -240,8 +240,8 @@ perf 在 json/get 场景每请求仅分配 **10.1~10.7KB**，是 Spring MVC 的 
 
 ## 5. 关键结论
 
-1. **全接口、全并发度第一**：perf 在 7 接口 × 3 并发度（4/8/16）对比中全部第一，无一例外；16t 优势倍数 1.22x~7.72x。
-2. **SSE 碾压性优势**：SSE 吞吐 16t 达 **7.72x** vs Spring MVC（14,920 vs 1,933），p50 延迟仅 Tomcat 的 **13%**——EventLoop + 无锁 Drain Loop 在长连接场景优势最大化。
+1. **全接口、全并发度第一**：perf 在 7 接口 × 3 并发度（4/8/16）对比中吞吐全部第一；16t 优势倍数 1.22x~7.72x。
+2. **SSE 优势最显著**：SSE 吞吐 16t 达 **7.72x** vs Spring MVC（14,920 vs 1,933），p50 延迟仅 Tomcat 的 **13%**——EventLoop + 无锁 Drain Loop 在长连接场景优势最大化。
 3. **低延迟同步兑现**：json 16t p50 **0.22ms**，仅 Tomcat（0.32ms）的 69%；小包 4t p50 0.10~0.28ms，全面最低。
 4. **分配效率**：json/get 每请求分配仅 Spring MVC 的 43%/29%、WebFlux 的 31%/21%，低分配 = 更少 GC 暂停、更高缓存局部性。
 5. **内存占用低并发最低**：perf 堆占用 4t 24MB（最低），高并发下各框架趋同。
@@ -399,7 +399,7 @@ JDK 17+、Maven 3.6+，项目已执行 `mvn install -DskipTests` 完成整体构
 
 Netty 的 `ResourceLeakDetector` 只在 **paranoid** 级别报告泄漏，且报告走 `java.util.logging`
 （`reportTracedLeak` / `reportUntracedLeak`），行首带平台 locale 的日期前缀——中文 Windows 下是 GBK
-字节，朴素的 UTF-8 grep 会「看不见」这些行（本仓库曾因此把 22 条报告误判成 0 泄漏）。另外默认只保留
+字节，朴素的 UTF-8 grep 会「看不见」这些行，门禁必须按实际编码读取。另外默认只保留
 4 条 access records，其余被丢弃（日志里会写 `leak records were discarded`），故门禁必须同时给
 `targetRecords`，否则证据不完整：
 
@@ -472,5 +472,5 @@ spring-web-benchmark/benchmark-reports/
 | 问题 | 影响 | 状态 |
 |------|------|------|
 | sse Undertow 失败 | Spring MVC (Undertow) / sse | Undertow SSE 实现限制（4t/8t 全部 FAIL，16t 吞吐可运行但 sample 延迟仍 FAIL） |
-| bytesLarge 高并发吞吐反降 | perf / bytesLarge | 100KB 写缓冲压力，所有容器 8→16t 均回落（perf 19,111→15,603），待优化 |
+| bytesLarge 高并发吞吐反降 | perf / bytesLarge | 100KB 写缓冲压力，所有容器 8→16t 均回落（perf 19,111→15,603）；高并发公平对比请用 WSL external 模式 |
 | in-process 高并发超订阅 | 全部 / 高并发 | 客户端线程 > 核数（>16t）时，in-process 测量退化为"客户端+服务端共享 CPU 的调度效率"，轻接口吞吐回落、框架间差距被抹平。这是测量模型限制，非服务端缺陷。已用 JFR 验证：64t 下客户端线程抢占 74% CPU 采样，服务端 4 EventLoop 仅 22%。高并发公平对比请用 [benchmark-wsl.md](benchmark-wsl.md)（WSL external，客户端/服务端 CPU 分离） |

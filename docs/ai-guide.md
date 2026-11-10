@@ -39,7 +39,7 @@
 </dependency>
 ```
 
-> Spring AI 版本通过**根 pom 的 `spring-ai-bom`** 统一管理（`spring-ai.version`），示例项目经 parent 继承，无需在示例 pom 中重复声明。
+> Spring AI 版本建议通过 `spring-ai-bom` 统一管理；本仓库的 `spring-web-examples` 示例项目经 parent 继承，因此示例 pom 中无需重复声明。
 
 ---
 

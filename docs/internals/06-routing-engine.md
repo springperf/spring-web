@@ -332,17 +332,17 @@ public boolean support(List<PathMappingContext> list) {
 - 前缀的 `prefixPathIndex = i - 1`，后缀的 `suffixPathIndex = i`。
 - 后缀的 `suffixPathMap` 存的是尾部子串（`pathStrList.subList(pathStrList.size() - reversedIndex, ...)`）。
 
-### 6.3 修复历史：从头数 bug
+### 6.3 路由映射的确定性
 
-`initAndRemove` 中的注释记录了修复历史：
+`initAndRemove` 中后缀路径的索引从尾部锚定：
 
 ```java
 // SuffixPathRouterOptimizer.java
-// 修复前误用 slashIndexList[suffixPathIndex - 1]（从头数），
+// 若误用 slashIndexList[suffixPathIndex - 1]（从头取索引），
 // substring 必含通配段，routeMap 永不填充。
 ```
 
-修复前，`suffixPath` 用 `slashIndexList[suffixPathIndex - 1]` 从头部取索引，截取的子串包含通配段，导致 `routeMap` 中的所有 key 都含通配符，`HashMap.get` 永远匹配不上。修复后改用 `slashIndexList[slashIndexList.length - suffixPathIndex]` 从尾部锚定，`substring` 取到的后缀是纯字面路径，`HashMap.get` 才能正确命中。
+`suffixPath` 用 `slashIndexList[slashIndexList.length - suffixPathIndex]` 从尾部锚定，`substring` 取到的后缀是纯字面路径，`HashMap.get` 才能正确命中；若改用 `slashIndexList[suffixPathIndex - 1]` 从头部取索引，截取的子串会包含通配段，导致 `routeMap` 中的所有 key 都含通配符，`HashMap.get` 永远匹配不上。
 
 ### 6.4 运行时边界保护
 
@@ -643,7 +643,7 @@ public void buildOptimizerPipeline() {
 - **不重复造轮子**。`RouteMatcher` 适配 Spring 的 `PathPatternRouteMatcher`/`SimpleRouteMatcher`，路径变量提取复用 Spring 实现——框架只在"Spring 做不了"的地方（启动期评分、三桶分流、O(1) 查表）才动手。
 - **不把 405 当异常**。`isMethodMismatch` 把这个逻辑从 `ExceptionRegistry` 拉回路由层，用精确的短路判断避免 catch-all 污染。
 
-这些克制把路由匹配从"每请求 O(n) 遍历"降为"95% 情况 O(1) 查表 + 5% 情况有限遍历"。在 benchmark 里，这个差距是路由维度最主要的性能来源——[17 篇](17-benchmark-data.md) 的数据会给出可量化的对比。
+这些克制把路由匹配从"每请求 O(n) 遍历"降为"90%+ 情况 O(1) 查表 + 其余情况有限遍历"。在 benchmark 里，这个差距是路由维度最主要的性能来源——[17 篇](17-benchmark-data.md) 的数据会给出可量化的对比。
 
 ---
 

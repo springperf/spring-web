@@ -158,7 +158,7 @@ public class CurrentUserArgProvider implements StaticArgumentResolverProvider {
     }
 }
 ```
-**注意纠偏**：phase3 `validateAllParametersResolvable` 对普通参数只调 `supports()` 校验"可达"——注释明言"does NOT create or cache any resolver, keeping memory footprint zero for endpoints that are never called"。**例外**：`@ModelAttribute` 且无默认构造器的参数，`validateModelAttributeConstructor` 会调 `getResolver()` **预创建** resolver 以在启动期 fail-fast（否则要等运行时第一次绑定才暴露 `InstantiationException`）。普通参数的真正 `resolveArgument` 在首请求 DCL `getMethodArgContexts`→`initStaticArgResolverSupport` 才创建并缓存。这与 [15 篇](15-performance-optimizations.md) 优化 1"启动预缓存"的差异见第六节。
+phase3 `validateAllParametersResolvable` 对普通参数只调 `supports()` 校验"可达"——注释明言"does NOT create or cache any resolver, keeping memory footprint zero for endpoints that are never called"。**例外**：`@ModelAttribute` 且无默认构造器的参数，`validateModelAttributeConstructor` 会调 `getResolver()` **预创建** resolver 以在启动期 fail-fast（否则要等运行时第一次绑定才暴露 `InstantiationException`）。普通参数的真正 `resolveArgument` 在首请求 DCL `getMethodArgContexts`→`initStaticArgResolverSupport` 才创建并缓存。这与 [15 篇](15-performance-optimizations.md) 优化 1"启动预缓存"的差异见第六节。
 
 ### 5.6 HttpBodyCodecInterceptor（模式 A，@ControllerAdvice 扫描）
 
@@ -240,9 +240,9 @@ public class MyMappingRegistry extends MappingRegistry {
 
 ---
 
-## 六、纠偏：启动期"校验可达"≠"预创建实例"
+## 六、启动期"校验可达"≠"预创建实例"
 
-第五节 5.5 暴露一个容易误读的点。`module.md` 归纳"启动时预创建解析器实例"，但源码显示 `StaticArgumentResolverProvider` 的解析器**启动期不预创建**：
+第五节 5.5 暴露一个容易误读的点。启动期只校验解析器"可达"，并非预创建实例；源码显示 `StaticArgumentResolverProvider` 的解析器**启动期不预创建**：
 
 | 阶段 | `ArgumentResolverRegistry` 实际做的事 |
 |------|-------------------------------------|

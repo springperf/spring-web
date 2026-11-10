@@ -2,7 +2,7 @@
 
 # Spring WebPerf
 
-A high-performance Netty-based web framework, compatible with Spring MVC programming model — high performance, zero compromise.
+A high-performance Netty-based web framework, compatible with the Spring MVC programming model.
 
 [![CI](https://github.com/springperf/spring-web/actions/workflows/ci.yml/badge.svg)](https://github.com/springperf/spring-web/actions/workflows/ci.yml)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.springperf/spring-web)](https://central.sonatype.com/artifact/io.github.springperf/spring-web)
@@ -18,7 +18,7 @@ A high-performance Netty-based web framework, compatible with Spring MVC program
 <img src="docs/images/perf-benchmark-en.svg" alt="Performance Benchmark Chart"/>
 </p>
 
-> **100% win rate** — perf is **#1 on all 7 APIs × 3 concurrency levels** vs Spring MVC (Tomcat/Undertow) and WebFlux, no exceptions. json p50 at 16 threads is just **69%** of Tomcat, allocation per request **43%** of it, and heap at 4 threads is **24MB** (the lowest). These figures come from a single JMH snapshot (2026-08, in-process); see the [full benchmark report](docs/en/benchmark.md) for the test environment and comparison framework versions.
+> perf leads in all **7 APIs × 3 concurrency levels** vs Spring MVC (Tomcat/Undertow) and WebFlux. json p50 at 16 threads is just **69%** of Tomcat, allocation per request **43%** of it, and heap at 4 threads is **24MB** (the lowest). These figures come from a single JMH snapshot (2026-08, in-process); see the [full benchmark report](docs/en/benchmark.md) for the test environment and comparison framework versions.
 >
 > [Full Benchmark Report](docs/en/benchmark.md) · [Performance Principles](docs/en/performance-principles.md)
 
@@ -36,7 +36,7 @@ A high-performance Netty-based web framework, compatible with Spring MVC program
 >
 > **Spring WebPerf was born from this question.** Goal: maximize web framework performance while remaining fully compatible with the Spring ecosystem.
 >
-> [View Benchmark Report](docs/en/benchmark.md) · [Performance Principles](docs/en/performance-principles.md) · [Full Origin Story](docs/en/overview.md) · [Changelog](CHANGELOG.md) · [Breaking Changes](docs/en/breaking-changes.md)
+> [View Benchmark Report](docs/en/benchmark.md) · [Performance Principles](docs/en/performance-principles.md) · [Full Origin Story](docs/en/overview.md) · [Changelog](docs/en/changelog.md) · [Breaking Changes](docs/en/breaking-changes.md)
 
 ---
 
@@ -52,7 +52,7 @@ Spring WebPerf is a high-performance web framework built on **Netty 4.1**, desig
 - **Netty-Driven** — Built on Netty 4.1 event-driven I/O; requests execute on the `default` business thread pool by default to protect the EventLoop, with method-level `@RunInPool` to schedule to a custom pool or directly to the EventLoop as needed
 - **Spring Ecosystem Compatible** — Supports `@RestController`, `@RequestMapping`, `@Validated`, `@ExceptionHandler`, `HandlerInterceptor`, and other Spring annotations and abstractions — zero-code migration
 - **Async Native** — Built-in support for DeferredResult, Callable, SseEmitter, StreamEmitter, Reactive Streams; SSE throughput reaches 12.63x of Spring MVC at 4 threads / 7.72x at 16 threads
-- **Batch Processing** — Disruptor-based request aggregation that transparently merges concurrent requests into batch operations, boosting throughput by multiple times; supports backpressure strategies, wait strategies, and thread pool isolation
+- **Batch Processing** — Disruptor-based request aggregation that transparently merges concurrent requests into batch operations; with a batching window enabled, IO-bound workloads can gain several times the throughput (the window is off by default — configure `batchWindowMillis` per the [batch guide](docs/en/batch.md)). Supports backpressure strategies, wait strategies, and thread pool isolation
 - **Extensible** — SPI at every key juncture: argument resolvers, return value handlers, codec interceptors, filters, interceptors
 - **Ecosystem Bridge** — `spring-web-servlet` bridges Servlet `Filter` / `Servlet` / `HttpSession` / JSP; `spring-web-mvc-support` bridges Spring MVC `HandlerInterceptor`, `RequestBodyAdvice` / `ResponseBodyAdvice`
 - **Server-Side Rendering** — Optional `spring-web-view` module adds Thymeleaf / FreeMarker / Beetl template rendering; `@Controller` + `Model` + view-name programming model matches Spring MVC

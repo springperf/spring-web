@@ -80,14 +80,14 @@
 - **定位**：全系列的"地图"。一张图看懂四个 Maven 模块的依赖、职责、关键包结构，以及启动时它们如何协作。
 - **核心问题**：`spring-web` / `spring-web-servlet` / `spring-web-mvc-support` / `spring-web-batch` / `spring-boot-starter-web` 各自边界在哪？一个 HTTP 请求从 Netty `Channel` 到业务方法再到响应字节，跨了哪些模块的哪些类？
 - **覆盖要点**：
-  1. 四模块职责矩阵（模块 / 依赖谁 / 被谁依赖 / 关键包 / 是否可选）。
+  1. 核心模块职责矩阵（模块 / 依赖谁 / 被谁依赖 / 关键包 / 是否可选）。
   2. `spring-web` 核心包拓扑：`context`（`WebContext`）、`handler`（`DispatcherHandler`）、`registry`（13 个 Registry）、`server`（Netty 服务器）、`http`（请求/响应适配）、`route`（路由优化器）、`argument`/`returnvalue`/`invoker`（解析与调用）、`filter`（`WebFilter` SPI）、`async`/`stream`（异步流式）、`cors`/`exception`/`binder`/`resource`（横切）。
-  3. 启动期协作时序：`WebServerApplicationContextFactory` → refresh → `SmartLifecycle.start()`（`NettyHttpServer` phase=MAX 最后）→ `WebContext.startLifecycle()` → Phase1/2/3 → `MappingRegistry.optimizeMapping()` → `bind` → 就绪。（校正：`WebContext` 不实现 `InitializingBean`、没有 `afterPropertiesSet()`——早期版本那个留空的覆写已被删除；触发者只有 `NettyHttpServer.start()` → `startLifecycle()` 一条路径，见 01/02 篇校正）
+  3. 启动期协作时序：`WebServerApplicationContextFactory` → refresh → `SmartLifecycle.start()`（`NettyHttpServer` phase=MAX 最后）→ `WebContext.startLifecycle()` → Phase1/2/3 → `MappingRegistry.optimizeMapping()` → `bind` → 就绪。（`WebContext` 不实现 `InitializingBean`、没有 `afterPropertiesSet()`；触发者只有 `NettyHttpServer.start()` → `startLifecycle()` 一条路径）
   4. 一次请求的调用链（ASCII），标注每一步所属层次（`[web]`/`[netty]`）。
   5. 路径匹配归核心 `RuntimeMappingWebFilter`（`core/filter`），非 support 子包。
-- **源码依据**：`module.md`（架构图基线）+ 四模块 `pom.xml` + `spring-web` 根包下的包结构 + `WebContext` / `WebServerApplicationContext` / `NettyHttpServer` 入口类。
-- **与既有文档关系**：是 `overview.md` 的内部结构补充；`module.md` 的代码级校正版。
-- **阅读前提**：`module.md` 内容较多，可按需查阅对应片段；包结构以实际目录为准。
+- **源码依据**：`modules.md`（架构图基线）+ 四模块 `pom.xml` + `spring-web` 根包下的包结构 + `WebContext` / `WebServerApplicationContext` / `NettyHttpServer` 入口类。
+- **与既有文档关系**：是 `overview.md` 与 `modules.md` 的内部结构补充。
+- **阅读前提**：`modules.md` 内容较多，可按需查阅对应片段；包结构以实际目录为准。
 
 ---
 
@@ -213,7 +213,7 @@
   3. `ExceptionResolverRegistry`：异常解析链，`@ControllerAdvice` 启动期全量扫描缓存异常处理方法；与 Spring MVC `ExceptionHandlerExceptionResolver` 运行时查找对比。
   4. `CorsRegistry` / `WebCorsProcessor`：CORS 预检（`OPTIONS`）短路、正式请求注入 `Access-Control-*` 头。
   5. `WebDataBinderRegistry` / `PerfDataBinder`：移除 `fieldMarkerPrefix` 等无用功能，最小化绑定路径；`@InitBinder` 启动期缓存。
-  6. `ResourceHandlerRegistry`：静态资源映射，`DefaultFileRegion` sendfile；classpath/location 解析（含双斜杠 bug 的防御，见记忆 `resource-handler-double-slash-fix`）。
+  6. `ResourceHandlerRegistry`：静态资源映射，`DefaultFileRegion` sendfile；classpath/location 解析（含双斜杠 bug 的防御）。
 - **源码依据**：`InterceptorRegistry`、`ExceptionResolverRegistry`、`CorsRegistry`/`WebCorsProcessor`、`WebDataBinderRegistry`/`PerfDataBinder`、`ResourceHandlerRegistry`。
 - **与既有文档关系**：`performance-principles.md` §1 拦截器/异常行的代码层；`extensions.md` `HandlerExceptionResolver`/`WebCorsProcessor` 的内部化。
 - **阅读前提**：核对各 Registry 的 Phase3 预匹配产物结构。
@@ -230,13 +230,13 @@
   1. `AsyncSupportRegistry`：`DeferredResult`/`Callable`/`ListenableFuture`/`CompletableFuture` 的统一挂起-恢复模型。
   2. `DeferredResultReturnValueResolver`：挂起请求、`setResult`/`setError`/`onTimeout` 恢复。
   3. SSE：`SseEmitter` → `AbstractNettyStreamSender`；有界 `MpscArrayQueue` 多生产者单消费者；`AtomicInteger wip` drain loop 伪代码与真代码对照。
-  4. **wip 计数器边界**（记忆 `sse_fix_channel_write`）：生产者快于 drain 时 wip 残留的处理，drain 循环的 missed 重入；complete 边界事件丢失属既定可接受设计（记忆 `defensive-fixes-confirm-call-model`）。
+  4. **wip 计数器边界**：生产者快于 drain 时 wip 残留的处理，drain 循环的 missed 重入；complete 边界事件丢失属既定可接受设计。
   5. 背压：`channel.isWritable()` + `BackpressureHandler.INSTANCE` 单例；`WriteBufferWaterMark` 联动。
   6. 响应式：`ReactiveReturnValueResolver` 把 `Publisher` 适配为流式或 `DeferredResult`；`@ReactiveSupport(highWaterMark/lowWaterMark)` 水位。
   7. 线程模型：SSE 写入统一在 EventLoop，线程数 = CPU 核，不随连接增长；对比 Spring MVC 每连接一线程。
 - **源码依据**：`AsyncSupportRegistry`、`DeferredResultReturnValueResolver`、`AbstractNettyStreamSender`（drain loop）、`BackpressureHandler`、`ReactiveReturnValueResolver`、`@ReactiveSupport`。
 - **与既有文档关系**：`performance-principles.md` §7 的代码层；`advanced.md` SSE/响应式章节的内部化。
-- **阅读前提**：`AbstractNettyStreamSender.drain()` 必须实读，wip 边界描述按记忆谨慎措辞，不臆断"完美无缺"。
+- **阅读前提**：`AbstractNettyStreamSender.drain()` 必须实读，wip 边界需按源码实际行为描述。
 
 ---
 
@@ -252,10 +252,10 @@
   3. **`HandlerInterceptorWrapper`**：`preHandle`/`postHandle`(传 null modelAndView)/`afterCompletion`(Throwable→Exception `NestedServletException` 包裹)/`afterConcurrentHandlingStarted`；双路径 servlet 视图提取（`ServletAttribute` 缓存优先，`RequestContextHolder` fallback）。
   4. **`SupportInterceptorRegistry`**：双类型扫描（`InterceptorRegistration` vs `HandlerInterceptor`）；`MappedInterceptor` vs plain；`AnnotationAwareOrderUtils.findOrder` 排序。
   5. **`SpringHandlerMethodArgumentResolverProvider` / `SpringHandlerMethodReturnValueHandlerAdapter` / `SpringHandlerExceptionResolverAdapter`**：把 Spring 生态的 `HandlerMethodArgumentResolver`/`HandlerMethodReturnValueHandler`/`HandlerExceptionResolver` 适配为本框架 `StaticArgumentResolver`/`ReturnValueResolver`/`HandlerExceptionResolver`；启动期 `supports` 决策消除每请求 dispatch（替代旧 `RuntimeArgumentResolver`）。
-  6. **Filter 体系**：`FilterWrapper`（`IdentityHashMap<Filter,String>`+`AtomicLong` 实例级唯一 ID——记忆中 `IdentityHashMap` 解决 identityHashCode 碰撞致安全 Filter 丢失）、`PerfHttpServletFilterChain`、`PerfHttpServletRequest/Response`（rebind、`NettyServletInputStream`、cookie 编解码、session）。
+  6. **Filter 体系**：`FilterWrapper`（`IdentityHashMap<Filter,String>`+`AtomicLong` 实例级唯一 ID——`IdentityHashMap` 解决 identityHashCode 碰撞致安全 Filter 丢失）、`PerfHttpServletFilterChain`、`PerfHttpServletRequest/Response`（rebind、`NettyServletInputStream`、cookie 编解码、session）。
   7. **`AbstractFastFailHttpServletRequest/Response`**：80+ 方法 fail-fast（"not running in a Servlet container"）或默认返回。
   8. **Codec 拦截器桥接**：`RequestBodyAdviceCodecInterceptor`（读侧）/`ResponseBodyAdviceCodecInterceptor`（写侧），`SupportHttpBodyCodecInterceptorRegistry` 启动期收集 `ControllerAdviceBean`。
-  9. **`ResponseBodyEmitterReturnValueResolver`**：extends `StreamEmitterReturnValueResolver` implements `LifecycleWebComponent`；`preInitializeEmitter` 注入 `AdapterUtil.setEncodeFunction`；`encodeToStream` 兜底（记忆 `perf-support-sse-converter-missing`：缺 converter 时 String→UTF-8/byte[] fallback）。
+  9. **`ResponseBodyEmitterReturnValueResolver`**：extends `StreamEmitterReturnValueResolver` implements `LifecycleWebComponent`；`preInitializeEmitter` 注入 `AdapterUtil.setEncodeFunction`；`encodeToStream` 兜底（缺 converter 时 String→UTF-8/byte[] fallback）。
   10. **`SupportDispatcherHandler`**：`getOrder=LOWEST_PRECEDENCE-30000`；`initContextHolders` override（`RequestContextHolder` set/reset）；`WriteRespEventListener`/`SessionFlushListener` 用 Netty `ChannelFuture` 驱动 session 持久化。
   11. **Session 体系**：`PerfHttpSession`/`PerfHttpSessionManager`/`HttpSessionData`/`HttpSessionStorage`(SPI)/`InMemoryHttpSessionStorage`(默认 + daemon 过期清理)；session cookie 安全（httpOnly、secure via config/X-Forwarded-Proto、SameSite）。
   12. **`ResponseEntityExceptionHandler`**：`@ControllerAdvice` 15 个标准异常处理。
@@ -294,7 +294,7 @@
 - **核心问题**：`SpringWebAutoConfiguration` 如何检测并拒绝 `spring-boot-starter-web`(MVC) 同存？`ActuatorEndpointAutoConfiguration` 如何用独立 `ManagementNettyHttpServer` 隔离管理端口？`SpringBootAdminClientAutoConfiguration` 如何注册 `PerfApplicationFactory` 兼容 SBA？`WebServerApplicationContextFactory` 为何改用非 Servlet 的 `AnnotationConfigApplicationContext`？
 - **覆盖要点**：
   1. `.imports` 注册的 15 个 `@AutoConfiguration` 一览与各自条件、显式排序注解。
-  2. `SpringWebAutoConfiguration`：核心装配；冲突检测抛 `IllegalStateException`（记忆 `sba-web-server-initialized-event` 兼容背景）。
+  2. `SpringWebAutoConfiguration`：核心装配；冲突检测抛 `IllegalStateException`。
   3. `SpringWebServletAutoConfiguration` 与 `SpringWebMvcSupportAutoConfiguration`：装配 support 桥接。
   4. `SpringDataWebCompatibilityAutoConfiguration`：Spring Data 兼容（分页/排序）。
   5. `ActuatorEndpointAutoConfiguration`：独立 `ManagementNettyHttpServer` + `ManagementDispatcherHandler`，与主端口隔离。
@@ -304,7 +304,7 @@
   9. `WebServerApplicationContextFactory`：为何用非 Servlet 的 `AnnotationConfigApplicationContext`（AOT / native-image 下返回 `GenericApplicationContext`）。
   10. `PerfWebServer`：`WebServer` 抽象的实现，与 Spring Boot `WebServer` 契约对齐。
 - **源码依据**：`META-INF/spring/...AutoConfiguration.imports`、15 个自动配置类（含不以 `AutoConfiguration` 结尾的 `SpringWebRuntimeHintsConfiguration`）、`PerfWebServer`、`WebServerApplicationContextFactory`、`ManagementNettyHttpServer`/`ManagementDispatcherHandler`。
-- **与既有文档关系**：`advanced.md` Actuator/CORS 章节的内部化；记忆 `sba-web-server-initialized-event` / `wsl-external-migrated-to-master` 的代码层。
+- **与既有文档关系**：`advanced.md` Actuator/CORS 章节的内部化。
 - **阅读前提**：核对 `.imports` 实际注册项与各 `@ConditionalOn*` 条件。
 
 ---
@@ -326,13 +326,12 @@
   8. Netty 传输 opts（`TCP_NODELAY`/`DefaultFileRegion`/`WriteBufferWaterMark`）。
 - **源码依据**：综合引用 03–11 的源码锚点 + Spring 同位实现（引用 Spring Framework 公开源码位置，标注版本）。
 - **与既有文档关系**：`performance-principles.md` 的"同位对比"补完。
-- **阅读前提**：03–11 已完成（本篇为汇总对比篇，应最后写）。
 
 #### 16 · 代码聚光灯：十个值得反复读的实现 `16-code-spotlights.md`
 
-- **定位**：欣赏篇。挑十个"体现工程美感"的具体实现，逐个用 30–80 行讲透设计意图与巧妙处。
+- **定位**：代码聚光灯。选取十个有代表性的具体实现，逐个用 30–80 行讲透设计意图与巧妙处。
 - **核心问题**：哪些实现最能代表"启动时确定性 + 运行时零开销"哲学？它们的巧妙在哪？
-- **覆盖要点**（候选）：
+- **覆盖要点**：
   1. `MappingCacheKey` 整型索引数组（预缓存核心）；
   2. `FastInvokerGenerator` ASM 生成（调用零反射）；
   3. 多级 RouterOptimizer 链短路（路由 O(1)）；
@@ -345,7 +344,6 @@
   10. `SupportDispatcherHandler` ChannelFuture 驱动 session 持久化。
 - **源码依据**：各对应类的关键方法。
 - **与既有文档关系**：全系列唯一的"赏析"篇，串联前文。
-- **阅读前提**：03–13 已完成。
 
 #### 17 · Benchmark 数据解读与归因 `17-benchmark-data.md`
 
@@ -356,7 +354,7 @@
   2. GC/分配归因：perf 每请求 10.1–10.7KB（预缓存+零临时对象）vs tomcat 23.2–38.6KB（运行时匹配+包装器）vs webflux 32.6–51.8KB（响应式链对象）；sse perf 310.4–313.9KB/请求（高吞吐下的分配）vs tomcat 219.5–233.9KB。
   3. 内存归因：perf 4 线程堆 24MB（全场最低，json 场景稳态）→ 16 线程 55MB；tomcat 26MB → 58MB（容器内部缓冲）。
   4. 伸缩比：perf json 4→16t +95%，低于 Tomcat +129% 与 WebFlux +161%——但 16t 绝对吞吐仍为 Tomcat 的 1.61x，「低伸缩比 ≠ 扩展能力差」。
-  5. undertow sse FAIL：归因其 SSE 实现的稳定性问题（非本框架优势，客观标注）。
+  5. undertow sse FAIL：该档位未取得有效结果，按基准报告原样标注 FAIL（非本框架优势）。
   6. perf vs perf-support：support 桥接的额外开销（heap 基本持平、吞吐有损耗），归因 servlet 适配对象创建；该列未列入 `benchmark.md`，不可复验。
 - **源码依据**：`docs/benchmark.md` + 前文机制锚点。
 - **与既有文档关系**：`benchmark.md`/`benchmark-wsl.md` 的归因版。
@@ -379,20 +377,19 @@
 
 - **定位**：决策篇。用 ADR（Architecture Decision Record）风格记录关键取舍的"背景 / 决策 / 后果"。
 - **核心问题**：为什么选 ASM 而非全用 MethodHandle？为什么默认业务线程池而非全 EventLoop？为什么 `int index` 而非 `ConcurrentHashMap`？为什么 support 用同包同名覆盖而非新包？为什么 Disruptor 而非自研队列？
-- **覆盖要点**（候选 ADR，10–15 条）：
+- **覆盖要点**（ADR，10–15 条）：
   1. ASM vs 全 MethodHandle；
   2. 默认业务池 vs 全 EventLoop；
   3. `int index` + `Object[]` vs `ConcurrentHashMap`；
   4. 同包同名覆盖 vs 新包桥接；
   5. Disruptor vs 自研无锁队列；
   6. 有界 `MpscArrayQueue` vs `LinkedBlockingQueue`（SSE）；
-  7. `complete` 边界事件丢失可接受（记忆 `defensive-fixes-confirm-call-model`）；
-  8. 静态 Map 唯一性是有意设计（记忆同上）；
+  7. `complete` 边界事件丢失可接受；
+  8. 静态 Map 唯一性是有意设计；
   9. fail-fast 启动校验 vs 运行时降级；
   10. 显式 SPI vs Spring `@Conditional` 自动发现。
 - **源码依据**：对应类与注释 + 既定设计记录。
 - **与既有文档关系**：全系列收尾，把"为什么这么设计"沉淀为可追溯记录。
-- **阅读前提**：07–13 已完成，决策有代码证据。
 
 ---
 

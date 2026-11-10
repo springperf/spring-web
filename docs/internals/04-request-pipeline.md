@@ -479,9 +479,9 @@ protected void doHandle(WebServerHttpRequest req, WebServerHttpResponse resp,
 
 这张表是本篇串联 03 篇的核心价值：**doHandle 的 8 段，每一段都是一次缓存直取，没有一段做运行时匹配**。03 篇讲的"启动时算一次"，在这里兑现为"doHandle 跑一次只做查表"。
 
-### 7.1 preHandle 返回 false 的语义修正
+### 7.1 preHandle 返回 false 的回调语义
 
-注释记录了一个已修复的语义点：Spring `HandlerExecutionChain.applyPreHandle` 规定 `preHandle` 返回 false 时，`afterCompletion` 只对已通过的拦截器执行，不执行 `postHandle`，也不再全量回调 `afterCompletion`。修复前 `finally` 里的 `invokeWithRealResult` 无条件再回调一次，导致已通过者双调、未进入者误收回调。修复后用 `preHandlePassed` 标志位把关，false 时跳过 `invokeWithRealResult`——`preHandle` 返回 false 直接 `resp.flush(); return`，干净短路。
+Spring `HandlerExecutionChain.applyPreHandle` 规定 `preHandle` 返回 false 时，`afterCompletion` 只对已通过的拦截器执行，不执行 `postHandle`，也不再全量回调 `afterCompletion`。`preHandlePassed` 标志位把关这一语义：false 时跳过 `invokeWithRealResult`，`preHandle` 返回 false 直接 `resp.flush(); return`，干净短路，避免已通过者双调、未进入者误收回调。
 
 ### 7.2 METRICS_START_ATTR 与 fastAttributes
 

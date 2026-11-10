@@ -67,7 +67,7 @@ WebContext extends WebComponentContainer                      ← 唯一根容�
 
 ### 11 容器型 vs 2 叶子型
 
-13 个 Registry 按 `extends` 声明分为两类（Grep 全量确认）：
+13 个 Registry 按 `extends` 声明分为两类：
 
 | 类型 | 数量 | Registry | 特征 |
 |------|------|----------|------|
@@ -172,7 +172,7 @@ Phase1（自建）→ Phase2（互连）→ Phase3（优化+校验）
 
 ### 不走 InitializingBean：afterPropertiesSet 已被删除
 
-`WebContext` **不实现** `InitializingBean`，也没有 `afterPropertiesSet()`——早期版本曾留空实现，该覆写**已被删除**（全仓主代码 grep `afterPropertiesSet`/`InitializingBean` 于 `WebContext` 零命中）：
+`WebContext` **不实现** `InitializingBean`，也没有 `afterPropertiesSet()`：
 
 ```java
 // WebContext.java
@@ -282,7 +282,7 @@ public void initWithWebContext(WebContext webContext) {
 
 ### 依赖拉取：共享型 vs 私有型
 
-容器型 Registry 在各自 `initWithWebContext` 里也会 `getWebComponentWithDefault` 拉取依赖。Grep 全部 13 个 Registry 的拉取语句，发现一个**刻意的架构不对称性**：
+容器型 Registry 在各自 `initWithWebContext` 里也会 `getWebComponentWithDefault` 拉取依赖。13 个 Registry 的拉取语句呈现一个**刻意的架构不对称性**：
 
 | 拉取者 | 拉取的依赖 | 前缀 | 落点 |
 |--------|-----------|------|------|
@@ -653,7 +653,7 @@ public void initComponentPhase3() throws Exception {
 `validateAllParametersResolvable`（摘要）遍历 `mappingRegistry.getMappingContextList()` 的每一个 `PathMappingContext`，对每个参数：
 
 1. **`isParameterResolvable`**：遍历 13 个 `StaticArgumentResolverProvider` 的 `supports`，命中则通过；不命中走 fallback——简单类型 → `requestParamResolverProvider`，否则 → `modelAttributeResolverProvider`。全不匹配则抛异常。
-2. **`validateModelAttributeConstructor`**（D3 fail-fast）：标注 `@ModelAttribute` 且无默认构造器的类，**启动直接失败**——而不是等到运行时第一次绑定才发现 `InstantiationException`。
+2. **`validateModelAttributeConstructor`**（fail-fast）：标注 `@ModelAttribute` 且无默认构造器的类，**启动直接失败**——而不是等到运行时第一次绑定才发现 `InstantiationException`。
 
 校验开关 `CHECK_ON_STARTUP` 默认 `true`，可通过配置关闭（用于某些启动速度敏感、愿意接受运行时降级的场景）。这是显式的"校验可配"而非"魔法默认"——又是 [01 篇原则 6](01-design-philosophy.md#原则-6--避免魔法行为显式-spi显式-fail-fast不靠隐式猜测) 的体现。
 
@@ -663,7 +663,7 @@ public void initComponentPhase3() throws Exception {
 
 这条原则的依据是：生产环境的请求处理必须行为确定。一个参数解析器匹配不上的端点，如果在运行时才暴露，可能表现为：部分请求 500、参数静默为 null、绑定行为非预期——这些都是难排查的"魔法行为"。在 Phase3 fail-fast，把"配置错误"转化为"启动失败"，让开发者在部署前就发现——这是"启动时确定"在可靠性维度的延伸。
 
-除 ArgumentResolverRegistry 外，MappingRegistry 的 Phase1 也有隐式 fail-fast：`ReflectionUtils.getUniqueDeclaredMethods` 对非法映射会抛异常（D4 修复后重复映射容忍，但非法映射仍 fail-fast）；`WebDataBinderRegistry` 的 Phase1 对无默认构造器的 `@ModelAttribute` 经 `validateModelAttributeConstructor` 间接 fail-fast。
+除 ArgumentResolverRegistry 外，MappingRegistry 的 Phase1 也有隐式 fail-fast：`ReflectionUtils.getUniqueDeclaredMethods` 对非法映射会抛异常（重复映射容忍，但非法映射仍 fail-fast）；`WebDataBinderRegistry` 的 Phase1 对无默认构造器的 `@ModelAttribute` 经 `validateModelAttributeConstructor` 间接 fail-fast。
 
 ---
 

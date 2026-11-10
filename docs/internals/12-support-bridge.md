@@ -11,14 +11,12 @@
 Spring MVC 的兼容层（如 Servlet 容器 + `spring-webmvc`）依赖的天然假设是"运行在 Servlet 容器中"——`HttpServletRequest`/`HttpServletResponse`、`FilterChain`、`Session` 都是容器提供的。本框架用 Netty 替代了 Tomcat/Jetty，所以 support 的职责是：
 
 1. **重写 `org.springframework.web.servlet.*` 部分类**（纯接口/default 方法），消除对 `spring-webmvc` 的编译期依赖。
-2. **`WebMvcConfigurerBridge`** 把 10 类 `WebMvcConfigurer` 回调翻译为框架内部 Registry 的注册动作。
+2. **`WebMvcConfigurerBridge`** 把 11 类 `WebMvcConfigurer` 回调翻译为框架内部 Registry 的注册动作。
 3. **`PerfHttpServletRequest/Response`** 包装框架的 `WebServerHttpRequest/Response` 为 `HttpServletRequest`/`HttpServletResponse`。
 4. **`FilterWrapper`/`HandlerInterceptorWrapper`** 把 Servlet Filter 和 Spring MVC Interceptor 适配为框架的 `WebFilter`/`HandlerInterceptor`。
 5. **Session 体系** 从零实现 `HttpSession` 接口，通过 `HttpSessionStorage` SPI 可插拔存储。
 6. **Servlet 规范完整桥接** 覆盖 `ServletContext`、`RequestDispatcher`（forward/include）、`AsyncContext`、认证（`Authenticator`）、WebSocket `upgrade` 等，让依赖 Servlet API 的代码无侵入运行。详见第五节 5.6~5.10。
 7. **Servlet 对象路由与 JSP** 支持把 `jakarta.servlet.Servlet` 对象注册为框架路由（`ServletInvoker` / `SupportServletRegistry` / `ServletRequest(Response)Provider`），并集成 Apache Jasper 提供 JSP / JSTL 渲染（`JasperJspServlet` / `JspViewResolver` / `JspView`）。详见第五节 5.11~5.12。
-
-> 完整的支持矩阵、配置项与已知限制，见 `docs/feature/servlet-spec-support.md`（该目录 gitignored，仅本地维护）。
 
 ---
 
@@ -55,7 +53,7 @@ Spring MVC 的兼容层（如 Servlet 容器 + `spring-webmvc`）依赖的天然
 | `ValidatorRegistration` | `spring-webmvc` | 完整实现（`getValidator`/`setValidator`） |
 | `RequestBodyAdvice` / `ResponseBodyAdvice` | `spring-webmvc` | 接口 |
 | `ResponseBodyEmitter` / mvc `SseEmitter` | `spring-webmvc` | 完整实现（extends 框架 `StreamEmitter`，经 `ResponseBodyEmitterReturnValueResolver` 注入 encodeFunction） |
-| `StreamingResponseBody` | `spring-webmvc` | **未实现**：它只是独立 `@FunctionalInterface`（`void writeTo(OutputStream)`），不是 `StreamEmitter`，没有任何 resolver 认领它 → 返回值会被静默忽略（需实现 resolver 或改用 emitter/`InputStream` 返回值） |
+| `StreamingResponseBody` | `spring-webmvc` | **未实现**：它只是独立 `@FunctionalInterface`（`void writeTo(OutputStream)`），不是 `StreamEmitter`，没有任何 resolver 认领它 → 返回值会被静默忽略；如需流式输出，请改用 emitter 或 `InputStream` 返回值 |
 | `ResponseEntityExceptionHandler` | `spring-webmvc` | `@ControllerAdvice` 15 个标准异常处理 |
 | `AdapterUtil` | `spring-webmvc` | 工具类（`setEncodeFunction`/`getEncodeFunction`） |
 
@@ -223,7 +221,7 @@ public String getComponentName() {
 }
 ```
 
-注释记录了设计决策：`WebComponentContainer` 按 `getComponentName()` 去重。同类不同实例（不同 bean 名/order/urlPattern，如 Spring Security 同 filter 类的多实例）不得被按类名去重误杀。使用 `IdentityHashMap` 按实例身份分配唯一递增 ID——同实例同一 ID（去重语义不变），不同实例绝不碰撞。修复前用 `System.identityHashCode`，两个不同实例可能碰撞同一 hash，容器误判为同实例而静默销毁低 order 者（安全过滤器被丢 = 静默安全回归）。
+设计决策：`WebComponentContainer` 按 `getComponentName()` 去重。同类不同实例（不同 bean 名/order/urlPattern，如 Spring Security 同 filter 类的多实例）不得被按类名去重误杀。使用 `IdentityHashMap` 按实例身份分配唯一递增 ID——同实例同一 ID（去重语义不变），不同实例绝不碰撞。若改用 `System.identityHashCode`，两个不同实例可能碰撞同一 hash，容器会误判为同实例而静默销毁低 order 者（安全过滤器被丢 = 静默安全回归）。
 
 ### 3.3 Filter 生命周期与 `FilterConfig`
 

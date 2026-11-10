@@ -60,50 +60,40 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
   `initContextHolders`/`resetContextHolders` pattern (save, set, reset, honouring `threadContextInheritable`),
   which is exactly what `SupportDispatcherHandler` implements - a reader can check that, and cannot check
   "aligns with Spring MVC".
-- The markdown checker verifies formatting only; it cannot tell whether a sentence is true. Behavioural prose is
-  audited against the code (the last pass covered 21 keys in both languages: 504 on `server.http.timeout`, 413 on
-  `max-file-size`, 400 for part count and part header size through `DecoderException`, 503 from pool rejection,
-  the minimal 500 on response-header overflow, dropped connections for `max-connections`, and the `>= 0` / `> 0`
-  guards behind "zero forbids multi-range" and "non-positive means unlimited").
-- Two narrative claims were checked against their sources instead of being trusted. The `same-site` row says an
-  early version upper-cased the value before handing it to Netty's enum, so `strict` threw; history agrees -
-  `00231995` added `configuredSameSite.toUpperCase()` and `ad24377e` removed it - and the current code maps the
-  value case-insensitively onto Netty's exact constant names (`Lax`/`Strict`/`None`, deliberately not
-  upper-case) and logs and ignores unknown values. The `locale-bind` row says that with the key off the framework
-  never touches `LocaleContextHolder` and that an application setting it itself must clean up; the code returns
-  early from `initContextHolders` and both `removeContextHolders` call sites sit behind `if (initContext)`.
-  That holds on the native path, but `spring-web-servlet` overrides `initContextHolders` and returns
-  `init || requestAttributes != null`, which is always true there because it must also install
-  `RequestContextHolder` - so on a servlet deployment the holder is still reset once per request even with the
-  flag off. An earlier wording of the constant and of both manuals generalised the native behaviour to both
-  paths; they now spell out the two separately.
-  Spring's own source (`spring-context-6.2.19-sources.jar`) confirms the last part of that row: `getLocale()`
-  falls back to the system default when no context is bound, "a replacement for `Locale.getDefault()`".
+- The markdown checker verifies formatting only; it cannot tell whether a sentence is true. Behavioural prose
+  must be audited against the code in both languages, including the status codes and boundary semantics behind
+  the configuration keys (504 on `server.http.timeout`, 413 on `max-file-size`, 400 for part count and part
+  header size through `DecoderException`, 503 from pool rejection, the minimal 500 on response-header overflow,
+  dropped connections for `max-connections`, and the `>= 0` / `> 0` guards behind "zero forbids multi-range"
+  and "non-positive means unlimited").
+- Document the native path and the servlet-bridge path separately. With `spring.web.locale-bind` off, the
+  native path returns early from `initContextHolders` and never touches `LocaleContextHolder`; both
+  `removeContextHolders` call sites sit behind `if (initContext)`. `spring-web-servlet` overrides
+  `initContextHolders` and returns `init || requestAttributes != null`, which is always true there because it
+  must also install `RequestContextHolder` - so on a servlet deployment the holder is still reset once per
+  request even with the flag off. Enum-valued keys are mapped case-insensitively onto the framework's exact
+  constant names, and unknown values are logged and ignored.
 - `scripts/check-docs.sh` also runs `scripts/check-doc-symbols.py`, which checks that the keys, classes and
   members the **contract docs** name actually exist - including keys the code builds by concatenation
   (`"server.ssl." + "enabled"`, `"management.endpoints.web.exposure" + ".include"`), which a plain literal scan
-  misses: the first run reported 34 such keys, all of them false alarms for exactly that reason.
+  misses.
   One limit is deliberate and written in the file: it does not check whether a sentence is **true**. Its
   unknown-class rule **is** a gate, carried by an explicit allow-list (`EXTERNAL_TYPES`) whose every entry names
   where the symbol
   comes from - a class defined in a doc snippet, a package this repository imports, or a class found in a local
-  jar, with the measured name collisions called out (the `ServiceLoader` hit was surefire, the
-  `ExceptionHandler` import was disruptor, and `HandlerExecutionChain` was in no local jar at all because
-  `spring-webmvc` is not on this machine). The triage that built the list is what justified the gate: it is how
-  the docs calling `ModelContext` by the name `ModelSupport` was found. When the rule fires on something
-  legitimate, add an entry with its origin - do not widen the rule. `member` references whose owner is unknown
-  go through the same rule, which closes the gap that let `ModelSupport.getOrCreate()` pass.
-  Files whose job is to list **removed** keys and members (`docs/breaking-changes.md`, `docs/(en/)changelog.md`)
-  are exempt from those rules in code, and `CONTRIBUTING.md`'s japicmp section from the member rule.
+  jar. When the rule fires on something legitimate, add an entry with its origin - do not widen the rule.
+  `member` references whose owner is unknown go through the same rule.
+  Files whose job is to list **removed** keys and members (`docs/breaking-changes.md`,
+  `docs/en/breaking-changes.md`, `docs/en/changelog.md`) are exempt from those rules in code
+  (the root `CHANGELOG.md` is outside the scanner's scope), and `CONTRIBUTING.md`'s japicmp
+  section from the member rule.
   Four documents are user-facing and must stay **paired**: `CHANGELOG.md`, `docs/configuration.md`,
   `docs/compatibility.md` and `docs/breaking-changes.md` each have a mirror under `docs/en/`, and
   `check-docs.py` enforces it (a missing side is a defect) - change one side and you change the other.
 - The same entry point runs `scripts/check-doc-structure.py`, which checks markdown **structure** rather
   than content: leftover CJK-parenthesis debris (`（ ）`, `（，`), empty inline code spans, table row/column
   mismatches and fully empty columns, unbalanced code fences, and `.java` file references that name no
-  tracked file. Its first full run over 73 files found four real defects - a duplicated table row in both
-  `docs/extensions.md` and its English mirror, an unescaped `||` that split a table cell in
-  `docs/en/configuration.md`, and a stale source-file name left over from a rename. `.agent/` files other than
+  tracked file. `.agent/` files other than
   `module.md` are out of scope for the file-existence rule, matching `check-doc-symbols.py`: backport
   checklists exist to name files that only the other branch has.
 
@@ -162,7 +152,8 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
   with line deltas. It never decides "must sync" - 505 same-name files differ between `master` and
   `2.7.x` simply because adaptation rewrites are normal. The whitelist holds version-boundary paths
   only (native-image, Spring AI, virtual threads, Thymeleaf WebExchange); feature gaps must not be
-  whitelisted. Reports and whitelists live under `docs/feature/` (git-ignored, local ledger).
+  whitelisted. Reports and whitelists are local, untracked artifacts — see the script's
+  `--output` / `--whitelist` options for where to put them.
 
 ### Formatting
 
@@ -176,29 +167,22 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
   mix formatting changes into feature commits.
 - CI enforces it by rewriting and asserting: the `static-analysis` job runs the profile above and then
   `git diff --exit-code`, failing with the resulting diff if anything changed (fix by running the profile
-  locally and committing the result). It used to run `formatter:validate`, which checks formatting only and
-  cannot see the unused-import removals the profile also performs - measured: validate reported clean while a
-  module-scoped format run rewrote 44 files.
-  **Run that validate locally before committing Java changes.** Measured: a series of javadoc and
-  comment edits went in over five commits on a verification loop of `compile` + `javadoc` + the docs
-  checker, which never ran the formatter, so the gate would have failed on `PropertiesConstant.java`
-  and nine other files; the failure reads
-  `File '…' has not been previously formatted`. Compile and tests passing say nothing about it.
+  locally and committing the result). `formatter:validate` checks formatting only and cannot see the
+  unused-import removals the profile also performs. **Run the format profile locally before committing Java
+  changes** - the gate's failure reads `File '…' has not been previously formatted`, and compile plus tests
+  passing say nothing about it.
 - SpotBugs is a hard gate at **Default** (high + medium) through `spotbugs:check`, bound to `verify`.
-  The first full scan reported 2745 findings repo-wide; 2375 of them come from JMH `jmh_generated`
-  stubs, the Spring-API mirrors and Spring's CGLIB-generated subclasses, which `spotbugs-exclude.xml`
-  excludes with a written rationale.
-  The 10 high-priority findings were reviewed one by one and are exempted individually, and the whole
-  medium tier was then burned down from 416 to 0 - fixed where fixable, otherwise reviewed and
-  recorded per class, each with its reason in the same file.
-- modernizer is **report-only** and not yet a gate: a real run reports 331 violations repo-wide (an
-  earlier "0 violations" reading of mine was wrong - the `-q` flag had suppressed the plugin output,
-  so the grep found nothing and I mistook that for a clean result). Flipping `failOnViolations` needs
-  the same treatment the SpotBugs backlog got: cluster by rule, fix what is real, exempt the rest.
+  Generated sources (JMH `jmh_generated` stubs, the Spring-API mirrors and Spring's CGLIB-generated
+  subclasses) are excluded in `spotbugs-exclude.xml` with a written rationale. High-priority findings are
+  exempted individually; medium findings are fixed where possible, otherwise reviewed and recorded per class
+  (or per class + field) with the reason in the same file. Never delete a guard that a test or a contract needs.
+- modernizer is **report-only** and not yet a gate. Flipping `failOnViolations` requires clustering the
+  violations by rule, fixing what is real and exempting the rest. A `-q` Maven run suppresses plugin output,
+  so a grep over that output is not evidence of a clean result.
 - Relax it temporarily with `./mvnw verify -Dspotbugs.threshold=High`.
   The pom references the property (`${spotbugs.threshold}`), so the command line really overrides it;
   a literal value there would win instead and silently ignore `-D`.
-- Medium inventory: **0**. How each family ended:
+- Medium inventory: **0**. The main families and their resolution:
   `EI_EXPOSE_REP`/`EI_EXPOSE_REP2` **230 -> 0**: 33 findings genuinely fixed (defensive copies and
   read-only wrappers for caller-owned configuration and framework-built collections), the rest
   recorded per class with the reason - the framework hands its own infrastructure objects to user
@@ -224,13 +208,9 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
   (`JsrEndpointScannerTest#scan_beanNamesForAnnotationNull_returnsEmpty`), the others protect
   `protected` non-final methods replaced by spies in tests or come from a third-party producer - so they
   are excluded per class with the reason in `spotbugs-exclude.xml`, never deleted.
-  **Correction (later review)**: the count above was published as zero but seven findings survived in
-  `NettyHttpServletRequest`, and the interface annotation does not reach them, because the analyser reads
-  the annotation on the declaration it resolves - the **overrides** in `NettyServerHttpRequest` and
-  `WebServerHttpRequestWrapper` - not the interface method. Annotating those four overrides is what actually
-  cleared the family; the gate now passes at `Default` with zero findings. Why the earlier verification
-  missed it: the report XML was read while a background build was still writing it, so a partially
-  written file looked clean. Only the gate itself (`spotbugs:check`) answers "is the gate green".
+  Annotations must be placed on the **overrides the analyser resolves** (`NettyServerHttpRequest` and
+  `WebServerHttpRequestWrapper`), not only on the interface method. Verify with the gate itself
+  (`spotbugs:check`); a report XML that is still being written is not evidence of a green gate.
 - `VA_FORMAT_STRING_USES_NEWLINE` **28 -> 0**: `\n` became `%n` in the 28 `printf` format strings of
   `ReportGenerator` (verified as a pure substitution; tests were checked first because the report text is
   asserted on).
@@ -250,28 +230,24 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
   written by the starting thread before any request is served, so the write happens-before the reader
   threads by the `Thread.start` rule.
 - The gate runs at `threshold=Default`: the medium tier reached zero, so gating on it is signal, not noise.
-- The 1093-file format sweep (`019eafe3`) was **verified structurally inert** rather than assumed: parsed
+- A format sweep must be **verified structurally inert**: parsed
   with a Java parser (comments off, imports sorted) it shows 785 files identical, 359 differing only in
   import order, **0** type-body changes and **0** import additions or removals. The 22 `pom.xml` files did
   gain the canonical XML declaration - a real but harmless non-format change worth knowing about.
 - Tip: `spotbugs:spotbugs` analyses `target/classes`, so run `compile` (or `test-compile`) in the same
   invocation — otherwise the report still describes the previous build.
 - Gotcha: a single module built without `-am` (`./mvnw verify -pl <module>`) is analysed against the
-  **installed** upstream jars rather than the reactor. Measured: `verify -pl spring-web-servlet` reported
-  the seven `RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE` findings in `NettyHttpServletRequest` that the full
-  reactor clears, because the `@Nullable` on `NettyServerHttpRequest`'s overrides existed only in the
-  working tree, not in the `spring-web` jar Maven resolved from the repository. Run the gate from the root,
-  or `install` the upstream module first.
+  **installed** upstream jars rather than the reactor, which can report findings the full reactor clears.
+  Run the gate from the root, or `install` the upstream module first.
 - Gotcha: `threshold` only takes effect at plugin level - inside an `<execution>` configuration it is
-  ignored (measured: the check still failed with 180 findings instead of 0).
+  ignored.
 - `.gitattributes` declares `* text=auto` (LF in the index; `*.sh` stays LF,
   `*.bat`/`*.cmd` checkout as CRLF), so a CRLF working tree compares clean against the
   LF-based index and line endings never show up as phantom diffs.
 
 ### Verification Discipline
 
-Handbook of habits that were paid for. Each one cost this repository a wrong statement or a wasted run, so each
-one carries the instance that produced it.
+Practices for verifying claims and gates before trusting them.
 
 - **Trace a claim to the code that decides it, not to where it is cheapest to read.** A statement about
   behaviour has to be checked at the point that controls it, including its call sites. Reading
@@ -282,30 +258,22 @@ one carries the instance that produced it.
   because `SupportDispatcherHandler` returns `init || requestAttributes != null` and therefore always reports
   true there.
 - **Never edit files and start a build in the same batch.** An edit issued alongside a build can land after
-  the compiler has read the file, and the result describes a state that never existed. This happened twice in
-  one session; both runs had to be thrown away and repeated serially. Land the edit, then build.
+  the compiler has read the file, and the result describes a state that never existed. Land the edit, then build.
 - **Prove a new gate can fail before trusting it.** A check that has never been seen red is a claim, not a
-  check. The format assertion added to `static-analysis` was validated by appending one blank line to
-  `docs/configuration.md` and watching it report failure, then reverting. It then earned its place on the
-  first real run, catching a javadoc rewrap that `formatter:validate` had passed.
-- **A red on this machine is a hypothesis until it is isolated.** Re-run the failing class alone, then the
-  module alone, and read the error text before theorising. Measured: two reactor-only failures, twenty-eight
-  cascading timeouts in `AsyncSseRobustnessE2eTest` and one reset in `ChunkedRequestE2eTest`, were both green
-  in isolation - and the second carried a Windows-only error code, so it is not a Linux CI risk at all.
-- **Re-read the file or the tree; do not work from a summary or from memory.** Three times in one session a
-  remembered "known issue" turned out to be already fixed (`check-doc-symbols.py` reports unknown owners of
-  `Class.member` now, and the `CONTRIBUTING` entry about that rule had already been corrected). Memory of a
-  compacted history is a hypothesis about the tree, and the tree is one command away.
+  check: introduce a deliberate change, confirm the gate reports failure, then revert it.
+- **A reactor-wide red is a hypothesis until it is isolated.** Re-run the failing class alone, then the
+  module alone, and read the error text before theorising; isolated failures and environment-specific errors
+  need different explanations.
+- **Re-read the file or the tree; do not work from a summary or from memory.** A remembered "known issue"
+  may already be fixed. A summary is a hypothesis about the tree, and the tree is one command away.
 - **Know which checker covers what.** They are not interchangeable. `formatter:validate` does not see the
   unused-import removals the format profile performs; doclint rejects a `ul` inside a `p` that both the
   formatter and the format assertion accept; the markdown checker verifies formatting and links but never
   whether a sentence is true; and `check-doc-symbols.py` only checks that a named symbol exists.
 - **After a deliberate mutation, revert it in the same breath, and never through a command that can be
   blocked.** Breaking a guard on purpose is the only way to prove a test is not vacuous, so it is worth
-  doing - but the broken state looks like ordinary code and can outlive the run that created it. That
-  happened here: the revert was chained behind a command whose permission prompt timed out, so a mutated
-  `batchBuf.release()` stayed in the working tree and was caught only by re-reading the file. Revert with the
-  edit tool rather than a git command, and read the reverted lines back afterwards; that check is cheap.
+  doing - but the broken state looks like ordinary code and can outlive the run that created it. Revert with
+  the edit tool rather than a git command, and read the reverted lines back afterwards; that check is cheap.
 
 ### Binary Compatibility (japicmp)
 
@@ -314,26 +282,12 @@ one carries the instance that produced it.
   it compares each module's freshly built jar against that released artifact. pom-packaging modules are
   skipped automatically, and three modules have **no baseline at all** on purpose: `spring-web-test`,
   `spring-web-support-test` and `spring-web-benchmark` set `maven.deploy.skip=true`, so nothing was ever
-  published for them (`dependency:copy` fails with "Unable to find/resolve artifact", and so does the
-  comparison). Covering the seven published modules - spring-web, spring-web-servlet, spring-web-websocket,
-  spring-web-mvc-support, spring-boot-starter-web, spring-web-view, spring-web-batch - is the full sweep. **Do not use that form on a machine that has this version installed locally** —
-  this one has: `D:\maven\repository\...\spring-web\3.5.6` holds a 501 KB locally built jar while the
-  published one is 419 KB (different sha256), and repository resolution picks the local copy, silently
-  comparing the current build with itself. On such a machine use `compat-file` with a jar fetched into an
-  isolated repository (the recipe below). Ran that way against the published 3.5.6, the report says
-  `semver MAJOR` and every item it flags is accounted for in breaking-changes.md (the six renamed config
-  constants, `DispatcherHandler.flushResponse(WebServerHttpResponse)`, `NettyServerHttpResponse.CONN_CTX`,
-  and the 11-argument `Http2ChannelInitializer` constructor). **It reports; it does not fail.** Measured with 0.26.2: the report's
-  `Treat changes as errors` block reads `No` for every category (any / binary / source / semantic), so a
-  MAJOR-incompatible delta still ends in BUILD SUCCESS. To make the profile a real gate, set one of these
-  inside its `<parameter>` block (names read from the plugin descriptor, not from memory):
-  `breakBuildBasedOnSemanticVersioning`, `breakBuildOnBinaryIncompatibleModifications`,
-  `breakBuildOnSourceIncompatibleModifications` or `breakBuildOnModifications`.
-- **Gotcha — silent self-comparison**: while master still carries the version number of the last
-  release, a locally `install`ed jar shadows the released artifact and the comparison degenerates into
-  "3.5.6 vs 3.5.6", which cheerfully reports *No incompatible changes*. Measured: the locally installed
-  `spring-web-3.5.6.jar` and Central's differ (501 KB vs 419 KB, different sha256). When in doubt,
-  compare against a file — that bypasses repository resolution entirely:
+  published for them. The remaining seven published modules - spring-web, spring-web-servlet,
+  spring-web-websocket, spring-web-mvc-support, spring-boot-starter-web, spring-web-view, spring-web-batch
+  - are the full sweep.
+- **Local jars can shadow the released artifact**: when a version is already installed in the local
+  repository, Maven may resolve that copy instead of the published jar and compare the build with itself.
+  Use `compat-file` with a jar fetched into an isolated repository to bypass repository resolution:
 
   ```bash
   # fetch the released jar through an isolated local repo, so the shadowing copy stays untouched
@@ -342,14 +296,12 @@ one carries the instance that produced it.
   ./mvnw -Pcompat-file -Dcompat.oldJar="$PWD/_baseline/spring-web-3.5.6.jar" verify -DskipTests
   ```
 
-- First real comparison (master vs released 3.5.6, `spring-web`) reported the expected intentional
-  breaks: removed constants `ASYNC_TIMEOUT*`, `HTTP_MAX_HEADER_SIZE*`, `SERVER_SHUTDOWN_TIMEOUT*`,
-  `USE_FORWARDED_HEADERS`, a removed `DispatcherHandler` method, a removed `NettyServerHttpResponse`
-  field and an `Http2ChannelInitializer` constructor. The constants line up with the config-key renames
-  recorded below; the last two are now named in breaking-changes.md, with the signatures taken from the
-  report itself (a later run against the 3.2.4 baseline printed the removed 11-argument
-  `Http2ChannelInitializer` constructor next to its 15-argument replacement, and the removed
-  `NettyServerHttpResponse.CONN_CTX` field).
+- **The `compat` profile reports; it does not fail**: with japicmp 0.26.2, the `Treat changes as errors`
+  block reads `No` for every category (any / binary / source / semantic), so a MAJOR-incompatible delta
+  still ends in BUILD SUCCESS. To turn it into a real gate, set one of
+  `breakBuildBasedOnSemanticVersioning`, `breakBuildOnBinaryIncompatibleModifications`,
+  `breakBuildOnSourceIncompatibleModifications` or `breakBuildOnModifications` inside its
+  `<parameter>` block (parameter names are taken from the plugin descriptor).
 - breaking-changes.md records the intentional breaks; the japicmp report is its machine-checkable
   counterpart — every reported failure must be reviewed (fix it, or record it there), never silenced.
 
@@ -397,8 +349,8 @@ one carries the instance that produced it.
 - Two gaps are known and deliberate. `BaseWebServerHttpRequest.parameterMap` - the one real concurrency fix -
   has no test, because a `volatile` visibility bug is not reproducible in a unit test; the fix carries the
   argument instead (`LocaleConfig`'s race does have a regression test, `defaultLocaleContextStaysConsistentWithLocaleSetDefault`).
-  And the audit read the invariant-bearing tests rather than all 559: the sweep covered the smells, the deep
-  read covered the ones guarding resource and lifecycle behaviour.
+  The invariant-bearing tests (those guarding resource and lifecycle behaviour) were reviewed in depth;
+  the remaining files were covered by the smell sweep.
 
 ### PR Checklist
 

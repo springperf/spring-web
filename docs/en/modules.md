@@ -185,7 +185,7 @@ Supported return value types:
 - `LifecycleWebComponent` — Component with lifecycle methods (3-phase init + destroy)
 - `BaseWebComponent` — Abstract base class holding `WebContext` reference
 - `WebComponentContainer` — Component registry base implementation
-- `WebContext` — Application context, implements `InitializingBean`, drives component lifecycle
+- `WebContext` — Application context, extends `WebComponentContainer` and implements `DisposableBean` and `ApplicationContextAware`, holding and driving component lifecycle
 
 Component initialization phases:
 
