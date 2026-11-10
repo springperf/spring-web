@@ -289,8 +289,7 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
                 handleOnNoMatchMappingContext(rq, rs, mr);
             }
         } catch (Throwable e) {
-            log.error("dispatcher error", e);
-            sendError(rs, HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error");
+            sendInternalError(rs, e, "dispatcher error");
         }
     }
 
@@ -366,16 +365,30 @@ public class DispatcherHandler extends BaseWebComponent implements HttpHandler {
                 resp.flush();
             }
         } catch (Exception e) {
-            log.error("CORS preflight handling failed", e);
-            // 内层吞异常会让外层 handleWithNoFullMatch 收不到，客户端只能等请求超时；
-            // 显式写 500。若 CORS 处理器已标记 handled，sendError 会被拒，需再兜底 flush
-            // 提交已写出的状态/内容（flush 由 setCommitted 保证幂等）。
-            sendError(resp, HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error");
-            try {
-                resp.flush();
-            } catch (java.io.IOException flushEx) {
-                log.debug("flush failed after CORS preflight error", flushEx);
-            }
+            sendInternalError(resp, e, "CORS preflight handling failed");
+        }
+    }
+
+    /**
+     * 未匹配/异常路径的统一 500 收尾：记录异常上下文、写错误响应，再兜底 flush 一次。
+     * <p>
+     * 内层 CORS 处理器已标记 handled 时 sendError 会被拒，此时兜底 flush 负责提交已写出的状态/内容；
+     * flush 由 setCommitted 保证幂等，因此对 sendError 已提交的路径是无操作。
+     * </p>
+     * <p>
+     * 注意：这里只收敛「异常 → 500 → flush」这一类重复。其余 flush/sendError 分散在
+     * doHandle / handleAfterFilter / finishFilterException 等路径，是<b>有意为之</b>：正常路径顺序为
+     * flush → publishEvent，异常路径为 afterCompletion → publishEvent → flush，且
+     * SupportDispatcherHandler 的 include 包装会屏蔽 flush/sendError。抽成 final 模板会破坏这些语义。
+     * </p>
+     */
+    private void sendInternalError(WebServerHttpResponse resp, Throwable e, String message) {
+        log.error(message, e);
+        sendError(resp, HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error");
+        try {
+            resp.flush();
+        } catch (java.io.IOException flushEx) {
+            log.debug("flush failed after internal error response", flushEx);
         }
     }
 

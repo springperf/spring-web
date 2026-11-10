@@ -214,4 +214,78 @@ class SupportMultipartAggregatorTest {
         ((FullHttpResponse) out).release();
         channel.finishAndReleaseAll();
     }
+
+    /* ==================== 异常路径补充：请求头解码失败 / finish 失败 / 连接关闭 ==================== */
+
+    @Test
+    void malformedHead_decoderFailure_returns400AndCloses() {
+        EmbeddedChannel channel = new EmbeddedChannel(new SupportMultipartAggregator(1024 * 1024));
+        DefaultHttpRequest head = multipartHead();
+        head.setDecoderResult(io.netty.handler.codec.DecoderResult
+                .failure(new IllegalArgumentException("simulated bad header")));
+
+        channel.writeInbound(head);
+
+        Object out = channel.readOutbound();
+        assertTrue(out instanceof FullHttpResponse, "请求头解码失败应在聚合层直接回 400");
+        FullHttpResponse resp = (FullHttpResponse) out;
+        assertEquals(HttpResponseStatus.BAD_REQUEST, resp.status());
+        assertEquals("close", resp.headers().get(HttpHeaderNames.CONNECTION), "坏请求应关闭连接");
+        resp.release();
+        channel.finishAndReleaseAll();
+    }
+
+    @Test
+    void multipartFinish_tooLongFrame_returns413() {
+        SupportMultipartResolver resolver = new SupportMultipartResolver() {
+            @Override
+            public NettyMultipartWebRequest finish() {
+                throw new io.netty.handler.codec.TooLongFrameException("simulated file too large");
+            }
+        };
+        EmbeddedChannel channel = new EmbeddedChannel(new SupportMultipartAggregator(1024 * 1024, resolver));
+
+        channel.writeInbound(multipartHead());
+        channel.writeInbound(new DefaultLastHttpContent());
+
+        Object out = channel.readOutbound();
+        assertTrue(out instanceof FullHttpResponse, "finish 阶段文件超限应回 413");
+        assertEquals(HttpResponseStatus.REQUEST_ENTITY_TOO_LARGE, ((FullHttpResponse) out).status());
+        ((FullHttpResponse) out).release();
+        channel.finishAndReleaseAll();
+    }
+
+    @Test
+    void multipartFinish_decoderException_returns400() {
+        SupportMultipartResolver resolver = new SupportMultipartResolver() {
+            @Override
+            public NettyMultipartWebRequest finish() {
+                throw new DecoderException("simulated part count exceeded");
+            }
+        };
+        EmbeddedChannel channel = new EmbeddedChannel(new SupportMultipartAggregator(1024 * 1024, resolver));
+
+        channel.writeInbound(multipartHead());
+        channel.writeInbound(new DefaultLastHttpContent());
+
+        Object out = channel.readOutbound();
+        assertTrue(out instanceof FullHttpResponse, "finish 阶段解码失败应回 400");
+        assertEquals(HttpResponseStatus.BAD_REQUEST, ((FullHttpResponse) out).status());
+        ((FullHttpResponse) out).release();
+        channel.finishAndReleaseAll();
+    }
+
+    @Test
+    void channelInactive_releasesMultipartState() {
+        SupportMultipartResolver resolver = new SupportMultipartResolver();
+        EmbeddedChannel channel = new EmbeddedChannel(new SupportMultipartAggregator(1024 * 1024, resolver));
+
+        channel.writeInbound(multipartHead());
+        assertTrue(resolver.isMultipartMode());
+
+        channel.pipeline().fireChannelInactive();
+        assertFalse(resolver.isMultipartMode(), "连接关闭后 multipart 状态应复位");
+
+        channel.finishAndReleaseAll();
+    }
 }

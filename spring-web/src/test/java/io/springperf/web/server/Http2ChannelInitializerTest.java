@@ -20,6 +20,12 @@ import io.springperf.web.http.support.SupportMultipartAggregator;
 /**
  * 验证 {@link Http2ChannelInitializer} 的 HTTP/1.1 管线构建： handler 顺序、aggregator 选择（multipart/simple）、before/after
  * 注入、readTimeout 条件。
+ * <p>
+ * 覆盖边界：ALPN/TLS 分支的 {@code Http2OrHttp1Handler} 是 private static 内部类，仅在
+ * sslContext != null && http2Enabled 时安装，其 configurePipeline 必须由真实 TLS 握手 + ALPN 协商触发。
+ * 本类使用 mock / EmbeddedChannel 只覆盖明文管线组装，该分支目前无单测覆盖（覆盖率报告中的 0% 即由此产生）；
+ * 补测需引入证书与真实握手，属集成测试范畴，不在本类范围内。
+ * </p>
  */
 class Http2ChannelInitializerTest {
 
