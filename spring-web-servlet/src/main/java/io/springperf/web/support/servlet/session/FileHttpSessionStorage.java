@@ -447,6 +447,9 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
                 return;
             }
             sessions.put(id, session);
+            // 快照「本轮要序列化的内容版本」：序列化耗时期间业务线程可能继续写属性，
+            // 该快照只代表本次 payload 的内容；回填时据此判断是否需要在下个请求再落盘一次。
+            long versionSnapshot = session.getContentVersion();
             byte[] payload = serialize(session);
             if (payload == null) {
                 return;
@@ -457,6 +460,8 @@ public class FileHttpSessionStorage implements HttpSessionStorage {
             try {
                 Files.write(tmp, payload);
                 Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                // 真正写盘成功后才回填：失败时不推进版本，下个请求会重试落盘
+                session.markPersisted(versionSnapshot, session.getLastAccessedTime());
             } catch (IOException e) {
                 log.warn("Failed to persist session {} to {}: {}", id, target, e.toString());
                 deleteFileQuietly(tmp);
