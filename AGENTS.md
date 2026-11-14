@@ -17,7 +17,7 @@
 - Java 8 源码兼容（`pom.xml` 的 `java.version=8`）
 - 多版本兼容：默认 Spring Boot **2.7.18**，Profile 覆盖 **2.4 / 2.5 / 2.6 / 2.7**（`-Pspring-boot-*` 切换）
 - Netty 4.1.137.Final
-- Jackson 2.17.2、Fastjson 2.0.60（provided）
+- Jackson 2.18.12、Fastjson 2.0.60（provided）
 - Lombok 1.18.24
 - 测试：Spring Boot Test + JUnit 5.8.2 + OkHttp 4.12.0 + AssertJ 3.22.0 + Mockito 4.5.1 + Actuator
 

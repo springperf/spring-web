@@ -63,7 +63,9 @@
              属宽松处理（分别按「移除 Content-Length」「当作合法 chunked」继续服务），
              4.1.13x 起按 RFC 7230 §3.3.3 直接拒绝 → 请求走私防护由解码器提供，框架侧无需特判。 -->
         <netty.version>4.1.137.Final</netty.version>
-        <jackson.version>2.17.2</jackson.version>
+        <jackson.version>2.18.12</jackson.version>
+        <!-- Jackson 注解组件可独立于 core/databind 对齐版本 -->
+        <jackson-annotations.version>2.18.12</jackson-annotations.version>
         <lombok.version>1.18.24</lombok.version>
         <fastjson2.version>2.0.60</fastjson2.version>
         <junit-jupiter.version>5.8.2</junit-jupiter.version>
