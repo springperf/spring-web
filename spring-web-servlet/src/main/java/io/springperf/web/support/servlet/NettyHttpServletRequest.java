@@ -142,11 +142,12 @@ public class NettyHttpServletRequest extends PerfHttpServletRequest {
 
     @Override
     public StringBuffer getRequestURL() {
-        StringBuffer sb = new StringBuffer();
-        sb.append(getScheme()).append("://");
+        StringBuffer sb = new StringBuffer(64);
+        // scheme 只取一次：此处的 getScheme() 走 getURI().getScheme()，原实现调了两次
+        String scheme = getScheme();
+        sb.append(scheme).append("://");
         sb.append(getServerName());
         int port = getServerPort();
-        String scheme = getScheme();
         if ((!"http".equals(scheme) || port != 80) && (!"https".equals(scheme) || port != 443)) {
             sb.append(':').append(port);
         }

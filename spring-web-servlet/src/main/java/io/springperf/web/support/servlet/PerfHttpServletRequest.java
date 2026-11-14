@@ -137,11 +137,12 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
 
     @Override
     public StringBuffer getRequestURL() {
-        StringBuffer sb = new StringBuffer();
-        sb.append(getScheme()).append("://");
+        StringBuffer sb = new StringBuffer(64);
+        // scheme 只取一次：getScheme() 可能走 header/配置解析，原实现调了两次
+        String scheme = getScheme();
+        sb.append(scheme).append("://");
         sb.append(getServerName());
         int port = getServerPort();
-        String scheme = getScheme();
         if ((!"http".equals(scheme) || port != 80) && (!"https".equals(scheme) || port != 443)) {
             sb.append(':').append(port);
         }
