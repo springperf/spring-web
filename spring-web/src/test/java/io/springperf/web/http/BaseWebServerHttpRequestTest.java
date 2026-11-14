@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -147,6 +148,18 @@ class BaseWebServerHttpRequestTest {
         TestRequest req = new TestRequest(webContext, "/test", "/test", new HttpHeaders(), params);
         assertEquals(1, req.getParameterMapArray().size());
         assertArrayEquals(new String[] { "1", "2" }, req.getParameterMapArray().get("a"));
+    }
+
+    @Test
+    void getParameterMapArray_isCachedAndUnmodifiable() {
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("a", "1");
+        TestRequest req = new TestRequest(webContext, "/test", "/test", new HttpHeaders(), params);
+
+        Map<String, String[]> first = req.getParameterMapArray();
+        assertSame(first, req.getParameterMapArray(), "重复调用应复用缓存，不应每请求重建 Map 与值数组");
+        assertThrows(UnsupportedOperationException.class, () -> first.put("b", new String[] { "2" }),
+                "返回值为只读视图（Servlet 规范要求 getParameterMap 不可修改）");
     }
 
     @Test
