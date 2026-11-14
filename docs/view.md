@@ -138,7 +138,7 @@ public ModelAndView modelAndView(@RequestParam(defaultValue = "MAV") String name
 
 视图名前缀 `redirect:` 触发 302 重定向，model 中的标量属性自动序列化为 query 参数：
 
-> 外部目标（`http://`、`https://`、`//host`）原样使用，不会拼 context-path。配置 `spring.web.view.redirect-hosts`（逗号分隔的 host 白名单）后，仅白名单内的 host 会被放行；未配置时不限制。白名单按 URI 的真实 host 判定，`https://trusted.example.com@evil.com` 不会因 userinfo 混淆而被误放行。
+> 外部目标（`http://`、`https://`、`//host`）原样使用，不会拼 context-path。配置 `spring.web.view.redirect-hosts`（逗号分隔的 host 白名单）后，仅白名单内的 host 会被放行；未配置时不限制。白名单按 URI 的真实 host 判定，`https://trusted.example.com@evil.com` 不会因 userinfo 混淆而被误放行。解析结果按配置串缓存，配置值变更后立即按新值生效（无需重启），不会沿用上一次的解析结果。
 
 ```java
 @GetMapping("/save")
