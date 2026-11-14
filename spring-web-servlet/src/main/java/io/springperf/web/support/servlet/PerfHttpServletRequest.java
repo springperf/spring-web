@@ -48,6 +48,20 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
     private volatile boolean calledInputStream;
     private volatile boolean calledReader;
 
+    /**
+     * getRequestedSessionId 的「客户端提交的 id」部分缓存（cookie 或 URL 路径参数）。
+     * <p>
+     * 该值在一次请求内不变（cookie 头与 URI 固定），但其解析涉及遍历 Cookie[]、逐字符扫 URI、 {@link #indexOfIgnoreCase} 的 O(n×token) 匹配；而 getSession
+     * / isRequestedSessionIdValid / isRequestedSessionIdFromXxx / 响应侧 encodeSessionUrl 会在一次请求内反复调用，故解析一次后缓存。
+     * </p>
+     * <p>
+     * <b>只缓存客户端提交部分，不缓存「回退到本次新建会话 id」的结果</b>：后者在请求处理过程中随 getSession(true) 的出现而变化，必须每次动态读取 {@link #getCachedSession()}。
+     * </p>
+     */
+    private volatile String cachedClientSessionId;
+    /** cachedClientSessionId 是否已解析（双检锁的发布标志）。 */
+    private volatile boolean clientSessionIdParsed;
+
     public PerfHttpServletRequest(WebServerHttpRequest request) {
         this.request = request;
         applyContainerRequestEncoding();
@@ -100,6 +114,11 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
         if (this.request != request) {
             this.request = request;
             this.cookies = null;
+            // 底层委托变了（Filter 包装）：cookie 头/URI 可能不同，客户端 session id 解析结果必须失效
+            this.cachedClientSessionId = null;
+            this.clientSessionIdParsed = false;
+            this.requestedSessionIdFromCookie = false;
+            this.requestedSessionIdFromUrl = false;
             applyContainerRequestEncoding();
         }
     }
@@ -417,36 +436,61 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
         // 修正 2-21：优先返回客户端提交的 session id（cookie），符合 Servlet 规范。
         // 此 id 用于会话固定检测、isRequestedSessionIdValid 等语义，必须反映「客户端实际携带」的标识，
         // 而非本次请求内新建/轮换后的 id（如 changeSessionId 之后）。
-        String cookieName = DEFAULT_SESSION_COOKIE_NAME;
-        PerfHttpSessionManager manager = getSessionManager();
-        if (manager != null) {
-            cookieName = manager.getCookieName();
+        String fromClient = resolveClientSessionId();
+        // cookie 命中即视为「客户端已提交」，即使其 value 为空也不回退到本次新建的会话 id
+        // （与改动前一致：命中后直接返回 cookie.getValue()）。仅当 cookie/URL 都未命中时才回退。
+        if (requestedSessionIdFromCookie || fromClient != null) {
+            return fromClient;
         }
-        Cookie[] allCookies = getCookies();
-        if (allCookies != null) {
-            for (Cookie cookie : allCookies) {
-                if (cookieName.equals(cookie.getName())) {
-                    requestedSessionIdFromCookie = true;
-                    requestedSessionIdFromUrl = false;
-                    return cookie.getValue();
+        // 请求未携带任何 session 标识、但本次请求已新建会话时，回退到新建 id（供 URL 重写编码 jsessionid）。
+        // 这一段是动态的（getSession(true) 可能在请求处理中途发生），不能进缓存，须每次读取。
+        PerfHttpSession cached = getCachedSession();
+        return cached != null ? cached.getId() : null;
+    }
+
+    /**
+     * 解析并缓存「客户端提交的 session id」（cookie 优先，其次 URL 路径参数），同时维护两个来源标志。
+     * <p>
+     * 双检锁：cookie/URI 在一次请求内不变，且解析有实际成本（遍历 Cookie[] + URI 逐字符扫描 + 大小写不敏感匹配），一次请求内被多处调用，故只解析一次。volatile 写
+     * {@link #clientSessionIdParsed} 发布结果，读侧首次判断无锁。
+     * </p>
+     *
+     * @return 客户端提交的 id；null 表示客户端未携带（此时调用方需回退到新建会话 id）
+     */
+    private String resolveClientSessionId() {
+        if (clientSessionIdParsed) {
+            return cachedClientSessionId;
+        }
+        synchronized (this) {
+            if (clientSessionIdParsed) {
+                return cachedClientSessionId;
+            }
+            String cookieName = DEFAULT_SESSION_COOKIE_NAME;
+            PerfHttpSessionManager manager = getSessionManager();
+            if (manager != null) {
+                cookieName = manager.getCookieName();
+            }
+            Cookie[] allCookies = getCookies();
+            if (allCookies != null) {
+                for (Cookie cookie : allCookies) {
+                    if (cookieName.equals(cookie.getName())) {
+                        requestedSessionIdFromCookie = true;
+                        requestedSessionIdFromUrl = false;
+                        cachedClientSessionId = cookie.getValue();
+                        clientSessionIdParsed = true;
+                        return cachedClientSessionId;
+                    }
                 }
             }
+            requestedSessionIdFromCookie = false;
+            // URL 重写回读（Servlet 规范 §7.1）：/path;jsessionid=ID。Cookie 优先于 URL 路径参数
+            // （与 Tomcat 一致）。这是 URL 跟踪模式的读侧——只写不读会让跨请求会话静默丢失。
+            String fromUrl = parseSessionIdFromUri(request.getUriStr());
+            cachedClientSessionId = fromUrl;
+            requestedSessionIdFromUrl = fromUrl != null;
+            clientSessionIdParsed = true;
+            return cachedClientSessionId;
         }
-        requestedSessionIdFromCookie = false;
-        // URL 重写回读（Servlet 规范 §7.1）：/path;jsessionid=ID。Cookie 优先于 URL 路径参数
-        // （与 Tomcat 一致）。这是 URL 跟踪模式的读侧——只写不读会让跨请求会话静默丢失。
-        String fromUrl = parseSessionIdFromUri(request.getUriStr());
-        if (fromUrl != null) {
-            requestedSessionIdFromUrl = true;
-            return fromUrl;
-        }
-        requestedSessionIdFromUrl = false;
-        // 请求未携带任何 session 标识、但本次请求已新建会话时，回退到新建 id（供 URL 重写编码 jsessionid）。
-        PerfHttpSession cached = getCachedSession();
-        if (cached != null) {
-            return cached.getId();
-        }
-        return null;
     }
 
     /**
@@ -548,14 +592,15 @@ public class PerfHttpServletRequest extends AbstractFastFailHttpServletRequest {
         // 必须反映「id 是否来自客户端 Cookie」：getRequestedSessionId 的「回退新建会话 id」
         // 不能被当成 Cookie 来源，否则 encodeURL 的 Cookie 分支误判、URL 重写永不在纯 URL
         // 跟踪模式下生效（tracking-modes=url 会话跨请求丢失）。
-        getRequestedSessionId();
+        // 触发解析（若尚未解析）后直接读标志；解析结果已缓存，不再重复遍历 Cookie/URI。
+        resolveClientSessionId();
         return requestedSessionIdFromCookie;
     }
 
     @Override
     public boolean isRequestedSessionIdFromURL() {
-        // 与 isRequestedSessionIdFromCookie 同样的解析时机：先跑一遍 getRequestedSessionId 定源
-        getRequestedSessionId();
+        // 与 isRequestedSessionIdFromCookie 同样的解析时机：先确保解析定源，再读缓存的来源标志
+        resolveClientSessionId();
         return requestedSessionIdFromUrl;
     }
 
