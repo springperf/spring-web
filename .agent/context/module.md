@@ -415,6 +415,8 @@ spring-web-view
 │   ├── hasViewResolvers() — 空则 String 保持 JSON 行为（条件化开关）
 │   └── initComponentPhase3 — 校验并提示视图方法签名
 ├── RedirectView.java               redirect: 前缀 → 302 + query 序列化
+├── ViewBodyWriter.java             视图输出 Writer：128 字符分块编码直写响应体
+│                                   （JDK OutputStreamWriter 每实例固定分配 8 KB 缓冲，短模板尤其不划算）
 ├── （Model 容器已移至 spring-web core：io.springperf.web.core.model.ModelContext，
 │     原 ModelSupport 之名已废弃；懒创建 ExtendedModelMap，挂 RequestContext，请求结束释放）
 ├── ViewProperties.java             配置键（spring.web.view.*）
