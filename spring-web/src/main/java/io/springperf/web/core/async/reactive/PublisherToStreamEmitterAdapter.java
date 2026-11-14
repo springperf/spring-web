@@ -72,15 +72,29 @@ public class PublisherToStreamEmitterAdapter implements Subscriber<Object> {
             // （每个断连客户端留下一个仍在运行的源）。断连钩子让取消不再依赖后续投递。
             asyncWebRequest.addConnectionCloseHandler(() -> tryCancel(new IOException("client disconnected")));
         }
-        subscription.request(config.getHighWaterMark());
+        // 单次 request 不得超过队列容量：同步 Publisher 会在 request() 内同步投递全部元素，
+        // 超出队列空间时 enqueueWithBackpressure 自旋等待 drain，而 drain 正被同一调用栈阻塞 → 死锁。
+        subscription.request(Math.min(config.getHighWaterMark(), queueRoom()));
+    }
+
+    /** 容量 ≤0 视为未知（如未 stub 的 mock），按无界处理，避免误把 request 钳成 0。 */
+    private int queueRoom() {
+        int capacity = sender.queueCapacity();
+        return capacity > 0 ? capacity : Integer.MAX_VALUE;
     }
 
     protected void tryRequest() {
         if (terminated) {
             return;
         }
-        if (sender.queueSize() < config.getLowWaterMark()) {
-            subscription.request(config.getHighWaterMark() - sender.queueSize());
+        int queued = sender.queueSize();
+        if (queued < config.getLowWaterMark()) {
+            // 同样受队列剩余空间约束，且补到 highWaterMark 为止；无剩余空间时不请求。
+            int room = queueRoom() - queued;
+            int request = Math.min(config.getHighWaterMark() - queued, room);
+            if (request > 0) {
+                subscription.request(request);
+            }
         }
     }
 

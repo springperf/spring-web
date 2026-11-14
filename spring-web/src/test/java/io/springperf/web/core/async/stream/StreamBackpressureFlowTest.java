@@ -155,6 +155,21 @@ class StreamBackpressureFlowTest {
     }
 
     @Test
+    void onSubscribe_highWaterMarkBeyondCapacity_requestsOnlyQueueCapacity() throws Exception {
+        SseEmitter emitter = new SseEmitter();
+        DefaultNettyStreamSender sender = new DefaultNettyStreamSender(emitter, asyncWebRequest);
+        // highWaterMark 远大于队列容量：同步 Publisher 会在 request 内同步投递，
+        // 若按 highWaterMark 请求，入队自旋等的是被同一调用栈阻塞的 drain → 死锁。
+        PublisherToStreamEmitterAdapter adapter = new PublisherToStreamEmitterAdapter(emitter, sender,
+                new ReactiveConfig(50_000, 1, -1), asyncWebRequest);
+        Subscription subscription = mock(Subscription.class);
+
+        adapter.onSubscribe(subscription);
+
+        verify(subscription).request(sender.queueCapacity());
+    }
+
+    @Test
     void syncPublisher_largeCount_noStackOverflow() throws Exception {
         // 回归：同步 Publisher（如 Flux.range / fromIterable）在快速 socket 上写完成立即回调。
         // 修复前 scheduleDrain 的 inEventLoop 分支无条件 drain()：drain → flushContent 写完成

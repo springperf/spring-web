@@ -159,13 +159,13 @@ SSE/流式输出需生产者（EventLoop 或业务线程）→ 消费者（Event
 
 ### 决策
 
-`AbstractNettyStreamSender` 用 `MpscArrayQueue` 固定容量 65536（`MAX_QUEUED_EVENTS = 65536`，`new MpscArrayQueue<>(MAX_QUEUED_EVENTS)`）。队列满时 `enqueueWithBackpressure` 自旋 `Thread.yield()` / `LockSupport.parkNanos(1000)` 背压——不丢数据，生产者短暂挂起等待消费者腾出槽位。
+`AbstractNettyStreamSender` 用有界 `MpscArrayQueue`，容量为配置项 `server.http.stream-max-queued-events`（默认 4096，建连时解析，`new MpscArrayQueue<>(maxQueuedEvents)`）。队列满时 `enqueueWithBackpressure` 自旋 `Thread.yield()` / `LockSupport.parkNanos(1000)` 背压——不丢数据，生产者短暂挂起等待消费者腾出槽位。
 
 ### 后果
 
 - **收益**：有界防 OOM（慢消费者不会让队列无限堆积导致堆溢出）；`MpscArrayQueue` 多生产者单消费者无锁 CAS 入队（[15 篇](15-performance-optimizations.md) 优化 7）；背压沿 `channel.isWritable()` + `WriteBufferWaterMark` 传导到 TCP 层，形成"消费者慢 → 队列满 → 生产者挂 → TCP 反压"的完整背压链。
-- **代价**：65536 是经验值，极端高频 SSE（远超正常速率）可能触发背压自旋，`parkNanos(1000)` 约 1μs 级 CPU 自旋开销；队列满时生产者阻塞，若生产者在 EventLoop，会短暂拖慢该 EventLoop 上其他连接的 I/O。
-- **边界**：65536 足够覆盖正常 SSE 速率（单连接每秒数千消息 × 消费者 drain 速度远快于生产），背压是"宁可慢不可崩"的取舍。重新审视条件：若出现 SSE 背压日志频繁，应先排查消费者 drain 是否被阻塞（如 `channel.isWritable()=false` 持续），而非直接调大容量——调大只是延缓 OOM，不解决慢消费根因。
+- **代价**：容量从 65536 降到 4096 后，极端高频 SSE（远超正常速率）更早触发背压自旋，`parkNanos(1000)` 约 1μs 级 CPU 自旋开销；队列满时生产者阻塞，若生产者在 EventLoop，会短暂拖慢该 EventLoop 上其他连接的 I/O。作为交换，每连接队列数组从约 256KB 降到约 16KB——1000 长连接实测 251.9MB → 16.7MB（−235.2MB），这是 SSE 内存占用的大头。A/B 基准下吞吐无劣化迹象（本机噪声 ±60%，不做定量结论）。
+- **边界**：4096 足够覆盖正常 SSE 速率（单连接每秒数千消息 × 消费者 drain 速度远快于生产；4096 条 × 200B ≈ 800KB 缓冲远超默认 highWaterMark 32KB），背压是"宁可慢不可崩"的取舍。重新审视条件：若出现 SSE 背压日志频繁，应先排查消费者 drain 是否被阻塞（如 `channel.isWritable()=false` 持续），而非直接调大容量——调大只是延缓 OOM，不解决慢消费根因；确需更多缓冲时优先调该配置而非改代码常量。
 
 **关联**：[11 篇](11-async-streaming.md) 四节、[15 篇](15-performance-optimizations.md) 优化 7、[16 篇](16-code-spotlights.md) 聚光灯 4、[17 篇](17-benchmark-data.md) SSE 场景归因。
 

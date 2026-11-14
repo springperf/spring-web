@@ -301,7 +301,7 @@ public synchronized void complete() {
 
 1. **不注册 `DeferredResult`**：派发由 Callable 通道完成，因此覆写 `complete()` 时只调 `sender.complete()`，不调 `deferredResult.setResult(null)`（那个 `DeferredResult` 没有监听者）。派发与终结的顺序仍与 §2.3 一致：callable 里先 `setConcurrentResultAndDispatch(null)`，再 `emitter.complete()`；反过来终止块的写完成回调会把状态推到 `COMPLETED`，`dispatch()` 的 CAS 失败，`afterCompletion` 与指标被静默跳过。
 2. **`complete()` 先建 sender 再置 `complete` 标志**：`initialize()` 在 `complete` 已置位时会补调一次 `sender.complete()`（支持「先终止、后 initialize」的同步出错 Publisher）。先置位会让终止块写两次，第二次在编码器 `INIT` 态抛 `unexpected message type: LastHttpContent`。
-3. **自己的在途水位**：`StreamSender` 的队列上限是 65536 条（按 SSE 小事件设计），对 8KB 帧等于 512MB。`sendFrame` 用 `queueSize() >= 32` 自旋压回约 256KB，慢客户端因此不会把堆吃满。
+3. **自己的在途水位**：`StreamSender` 的队列上限默认 4096 条（可用 `server.http.stream-max-queued-events` 调整），对 8KB 帧约 32MB；极端配置到 65536 条时仍是 512MB，故 `sendFrame` 另用 `queueSize() >= 32` 自旋压回约 256KB，慢客户端不会把堆吃满。
 
 响应头由 resolver 在启动异步前用 `flushChunked()` 提交（与 `ResponseBodyEmitterReturnValueResolver` 的 `extendResponseAndFlush(..., true)` 一致）。这也解释了为什么 `DispatcherHandler.flushResponse` 无需为 SRB 特判：`isStreaming()` 已为 `true`，收尾走流式分支且异步未完成时直接返回。
 
@@ -378,17 +378,24 @@ public static StreamSender initStreamSenderAndStartAsync(StreamEmitter emitter, 
 
 ```java
 // AbstractNettyStreamSender.java
-protected static final int MAX_QUEUED_EVENTS = 65536;
+// 默认值由 server.http.stream-max-queued-events 覆盖（建连时解析一次）
+protected static final int DEFAULT_MAX_QUEUED_EVENTS = 4096;
 
 protected final MpscArrayQueue<Object> queue;     // 多生产者单消费者无锁队列
+protected final int maxQueuedEvents;               // 本连接实际容量（配置值或默认值）
 protected final AtomicInteger wip = new AtomicInteger(0);  // 排空计数器
 protected volatile boolean completed;              // 完成标记
 
 public AbstractNettyStreamSender(StreamEmitter emitter, PerfAsyncWebRequest asyncWebRequest) {
-    this.queue = new MpscArrayQueue<>(MAX_QUEUED_EVENTS);
+    this.maxQueuedEvents = resolveMaxQueuedEvents(this.resp.getWebContext());
+    this.queue = new MpscArrayQueue<>(maxQueuedEvents);
     this.resp.setWritableCallback(this::scheduleDrain);  // 注册背压回调
 }
 ```
+
+队列容量**不是硬编码**：`server.http.stream-max-queued-events`（默认 4096）在每条流建连时解析，配置刷新只影响后续新建的流。默认值从 65536 降到 4096 是实证决策——JCTools 在构造时一次性分配底层 `Object[]`，每连接由约 256KB 降到约 16KB；1000 长连接实测 251.9MB → 16.7MB，1 万连接约 2.5GB → 167MB。JCTools 会把非 2 的幂配置向上取整，配置值小于 2 则 fail-fast。
+
+**容量与背压的隐含约束**：`PublisherToStreamEmitterAdapter` 的 `request` 批量必须 ≤ 队列剩余空间（`StreamSender.queueCapacity()`）。同步 Publisher 在 `request()` 内同步投递全部元素；若一次请求超过队列空间，第 capacity+1 条会在 `enqueueWithBackpressure` 自旋等待 drain，而 drain 正被同一调用栈阻塞——30s 超时后流中断。原 65536 恰好覆盖常见 `highWaterMark=50000` 而掩盖了该约束；现在 `onSubscribe` 与 `tryRequest` 均按容量 clamp。
 
 | 组件 | 角色 | 说明 |
 |------|------|------|

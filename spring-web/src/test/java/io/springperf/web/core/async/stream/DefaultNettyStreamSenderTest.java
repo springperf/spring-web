@@ -25,6 +25,9 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.concurrent.EventExecutor;
+import io.springperf.web.context.ApplicationProperties;
+import io.springperf.web.context.PropertiesConstant;
+import io.springperf.web.context.WebContext;
 import io.springperf.web.core.async.PerfAsyncWebRequest;
 import io.springperf.web.http.NettyServerHttpResponse;
 
@@ -46,6 +49,10 @@ class DefaultNettyStreamSenderTest {
     EventExecutor eventLoop;
     @Mock
     ChannelFuture channelFuture;
+    @Mock
+    WebContext webContext;
+    @Mock
+    ApplicationProperties props;
 
     @Captor
     ArgumentCaptor<DefaultHttpContent> httpContentCaptor;
@@ -75,6 +82,39 @@ class DefaultNettyStreamSenderTest {
         DefaultNettyStreamSender sender = new DefaultNettyStreamSender(emitter, asyncWebRequest);
         assertEquals(0, sender.queueSize());
         assertNotNull(sender);
+    }
+
+    @Test
+    void constructor_configuredQueueCapacity_appliesToQueue() throws Exception {
+        when(nativeResponse.getWebContext()).thenReturn(webContext);
+        when(webContext.getProps()).thenReturn(props);
+        when(props.getInt(PropertiesConstant.STREAM_MAX_QUEUED_EVENTS)).thenReturn(1024);
+
+        DefaultNettyStreamSender sender = new DefaultNettyStreamSender(emitter, asyncWebRequest);
+
+        assertEquals(1024, sender.maxQueuedEvents);
+        for (int i = 0; i < 1024; i++) {
+            assertTrue(sender.queue.offer("x"));
+        }
+        assertFalse(sender.queue.offer("overflow"), "配置值必须真正成为队列容量上限");
+    }
+
+    @Test
+    void constructor_nullWebContext_fallsBackToDefaultCapacity() throws Exception {
+        // setUp 未 stub getWebContext()：Mockito 默认返回 null，覆盖单元测试替身场景
+        DefaultNettyStreamSender sender = new DefaultNettyStreamSender(emitter, asyncWebRequest);
+        assertEquals(AbstractNettyStreamSender.DEFAULT_MAX_QUEUED_EVENTS, sender.maxQueuedEvents);
+    }
+
+    @Test
+    void constructor_invalidQueueCapacity_failsFast() throws Exception {
+        when(nativeResponse.getWebContext()).thenReturn(webContext);
+        when(webContext.getProps()).thenReturn(props);
+        when(props.getInt(PropertiesConstant.STREAM_MAX_QUEUED_EVENTS)).thenReturn(1);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> new DefaultNettyStreamSender(emitter, asyncWebRequest));
+        assertTrue(ex.getMessage().contains(PropertiesConstant.STREAM_MAX_QUEUED_EVENTS));
     }
 
     @Test
@@ -262,12 +302,39 @@ class DefaultNettyStreamSenderTest {
     void send_queueFullBeyondTimeout_throwsIOException() throws Exception {
         DefaultNettyStreamSender sender = new DefaultNettyStreamSender(emitter, asyncWebRequest);
         sender.enqueueTimeoutNanos = java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(1);
-        for (int i = 0; i < AbstractNettyStreamSender.MAX_QUEUED_EVENTS; i++) {
+        for (int i = 0; i < AbstractNettyStreamSender.DEFAULT_MAX_QUEUED_EVENTS; i++) {
             sender.queue.offer("x");
         }
 
         // channel 仍 active、completed=false，队列却永远没有空位：自旋必须有上限。
         assertThrows(IOException.class, () -> sender.send("overflow"));
+    }
+
+    @Test
+    void send_queueFullThenSpaceFreed_enqueuesAfterSpin() throws Exception {
+        DefaultNettyStreamSender sender = new DefaultNettyStreamSender(emitter, asyncWebRequest);
+        // 超时放宽，确保等待线程调度不会误触发超时；本用例验证延迟 deadline 不妨碍自旋成功入队。
+        sender.enqueueTimeoutNanos = java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+        for (int i = 0; i < AbstractNettyStreamSender.DEFAULT_MAX_QUEUED_EVENTS; i++) {
+            sender.queue.offer("x");
+        }
+
+        // 自旋期间另一线程腾出空位：覆盖 lazy deadline 已计算、自旋中成功入队的路径。
+        Thread releaser = new Thread(() -> {
+            try {
+                Thread.sleep(30);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            sender.queue.poll();
+        });
+        releaser.start();
+        try {
+            assertDoesNotThrow(() -> sender.send("late"));
+            verify(emitter, atLeastOnce()).encode(eq("late"), any());
+        } finally {
+            releaser.join(1000);
+        }
     }
 
     @Test

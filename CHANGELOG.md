@@ -4,27 +4,7 @@
 
 本项目遵循 [语义化版本控制](https://semver.org/lang/zh-CN/)。
 
-## [4.1.7] - 20261008
-
-> **关于本版本**：`4.1.x` 是从 `master`（纯 Spring Boot 3.5.x）**拆分出来独立发布**的下游分支，
-> 首个发布版本号为 **`4.1.7`**：Spring Boot 4.0 / 4.1 + Spring Framework 7 + Jackson 3，不再兼顾 3.5.x。
-> 因此首个版本的变更包含「分支拆分与适配」本身，其余条目与 master 的 `3.5.7` 基本一致（后者原文附于本节之后）。
-
-### 变更
-
-- **分支定位**：本分支（`4.1.x`）**专用 Spring Boot 4.1**（`-Pspring-boot-4.0` 可切 4.0），**不再兼顾 3.5.x**——「一份代码同时支持两版」的目标由 master（纯 3.5.x）与本分支的分工取代。默认构建即为 4.1，无需 `-P` 切换。master 与本分支的差异见 [版本兼容性说明](docs/compatibility.md)
-- **兼容层整体移除**：`WebHttpHeaders` 的 8 个 MethodHandle 版本分支、`Boot4WebServerInitializedEventBridge` 的 ASM 运行时字节码生成、`ResponseStatusExceptionAdapter` 的方法名反射探测、`ListenableFutureAdapter`（Spring 7 已无该类型，原实现是死代码）等，均已删除，改为直接面向 Spring 7 / Jackson 3 的 API 实现
-- **JSON 栈迁移到 Jackson 3**：`com.fasterxml.jackson.databind` → `tools.jackson.databind`（注解仍用 `com.fasterxml.jackson.annotation`）。Jackson 3 把 `FAIL_ON_NULL_FOR_PRIMITIVES` 默认值由 `false` 改为 `true`，本框架经 `JacksonMappers.defaultMapper()` 显式关闭以保持与 master 一致
-- **Netty 跟随 Boot 4 BOM**：`4.1.137.Final` → `4.2.15.Final`（Boot 4 的基线）。删除了本项目对 14 个 Netty artifact 的钉版
-- **Spring AI 升到 2.x**：1.x 针对 Boot 3，其 `OpenAiApi` 调用了 Spring 7 已改签名的 `HttpHeaders.addAll(MultiValueMap)`
-
-### 修复
-
-- **转发头解析**：补上 `X-Forwarded-Host` / `X-Forwarded-Port` / `X-Forwarded-Prefix` 的支持。此前只有 scheme（proto）被解析，host/port 一直借 Boot 的 `ForwardedHeaderFilter` 兜底——而 Boot 4 的 `spring-boot-starter-web` 不再传递 servlet 容器，该 filter 无处挂载
-- **`+json` 后缀媒体类型**：`application/vnd.spring-boot.actuator.v2+json` 这类带前缀的 `+json` 类型此前不匹配 JSON 转换器，导致 Actuator 端点返回 200 + 空 body
-- **String 请求体**：`@RequestBody String` 在 `application/json` 下必然 400（框架从未注册 `StringHttpMessageConverter`）；补上并让它排在 Jackson 之前（Spring 语义：String 原样读取，不按 JSON 解析）
-
-## [3.5.8] - 20261123
+## [3.5.8] - 未发布
 
 > ⚠️ **本版含破坏性变更**：Servlet 规范语义、视图错误与内容协商、部分配置项的校验方式均有调整，
 > **升级前请先读 [破坏性变更说明](docs/breaking-changes.md) 的 3.5.8 节**。
@@ -53,6 +33,7 @@
 - **配置启动期校验**：`spring.web.view.engine` 的未知值、`none` 与其他引擎混写、`spring.thymeleaf.mode` / `spring.freemarker.content-type` 非法值、以及视图引擎 `cache` / `enabled` 非 `true` / `false` 的值，均改为启动期报错而非静默忽略；`engine=none` 时不再装配内置 JSP（自定义 `ViewResolver` Bean 不受影响）
 - **批处理默认启用攒批窗口**：相比 3.5.7，未显式配置的 `@BatchMapping` 现在默认按 2ms 窗口攒批（批大小由窗口保证，单请求延迟上界增加约 2ms）。若负载很低、希望保留旧版「消费者追上空队列即刷出」的行为，显式写 `batchWindowMillis = 0`；启动期提示也改为仅在显式关闭时出现
 - **API 收敛（二进制不兼容）**：`SpringHeadersAdapter`（WebSocket 头适配器）随拆分重构移除，`NettyWebSocketSession` 构造器改为接收 Netty 的 `HttpHeaders`；从未被读取的 `ViewProperties.BEETL_MODE` / `BEETL_MODE_DEFAULT` 常量随 `spring.beetl.mode` 一起删除；`WebServerInitializedEventAutoConfiguration#webServerInitializedEventPublisher(...)` 移除（事件改由端口绑定后的 `NettyServerStartedEvent` 驱动）。迁移写法见[破坏性变更说明](docs/breaking-changes.md)的 3.5.8 节
+- **流式队列容量可配置且默认下调**：新增 `server.http.stream-max-queued-events`（默认 `4096`），SSE / 字节流发送器的入队缓冲由硬编码 `65536` 改为建连时按配置解析。JCTools 数组一次性分配，每连接由约 256KB 降到约 16KB（1000 长连接实测 251.9MB → 16.7MB，1 万连接约 2.5GB → 167MB）；A/B 基准每请求分配 314.7KB → 95.8KB（−69.6%），吞吐无劣化迹象。非 2 的幂由 JCTools 向上取整，小于 2 时 fail-fast。背压退出的 `System.nanoTime()` 同时延迟到首次入队失败后再取，快路径不再支付该调用。同步 Publisher 的 `request` 批量同时被约束到队列剩余空间：`highWaterMark` 大于容量时，此前隐含依赖 65536 覆盖常见 50000，降容量后会因入队自旋等待同栈 drain 而死锁（30s 超时），该约束已修复并补回归测试
 
 ### 修复
 
@@ -73,6 +54,26 @@
 
 - **SSE 协议注入**：`id` / `event` 字段中的换行在写入前拒绝，避免上游值伪造额外 SSE 字段（此前依赖 Spring 补丁版本的行为）
 - **外部重定向白名单**：可选 `spring.web.view.redirect-hosts` 限制外部重定向目标，可阻断含 userinfo 混淆的地址
+
+## [4.1.7] - 20261008
+
+> **关于本版本**：`4.1.x` 是从 `master`（纯 Spring Boot 3.5.x）**拆分出来独立发布**的下游分支，
+> 首个发布版本号为 **`4.1.7`**：Spring Boot 4.0 / 4.1 + Spring Framework 7 + Jackson 3，不再兼顾 3.5.x。
+> 因此首个版本的变更包含「分支拆分与适配」本身，其余条目与 master 的 `3.5.7` 基本一致（后者原文附于本节之后）。
+
+### 变更
+
+- **分支定位**：本分支（`4.1.x`）**专用 Spring Boot 4.1**（`-Pspring-boot-4.0` 可切 4.0），**不再兼顾 3.5.x**——「一份代码同时支持两版」的目标由 master（纯 3.5.x）与本分支的分工取代。默认构建即为 4.1，无需 `-P` 切换。master 与本分支的差异见 [版本兼容性说明](docs/compatibility.md)
+- **兼容层整体移除**：`WebHttpHeaders` 的 8 个 MethodHandle 版本分支、`Boot4WebServerInitializedEventBridge` 的 ASM 运行时字节码生成、`ResponseStatusExceptionAdapter` 的方法名反射探测、`ListenableFutureAdapter`（Spring 7 已无该类型，原实现是死代码）等，均已删除，改为直接面向 Spring 7 / Jackson 3 的 API 实现
+- **JSON 栈迁移到 Jackson 3**：`com.fasterxml.jackson.databind` → `tools.jackson.databind`（注解仍用 `com.fasterxml.jackson.annotation`）。Jackson 3 把 `FAIL_ON_NULL_FOR_PRIMITIVES` 默认值由 `false` 改为 `true`，本框架经 `JacksonMappers.defaultMapper()` 显式关闭以保持与 master 一致
+- **Netty 跟随 Boot 4 BOM**：`4.1.137.Final` → `4.2.15.Final`（Boot 4 的基线）。删除了本项目对 14 个 Netty artifact 的钉版
+- **Spring AI 升到 2.x**：1.x 针对 Boot 3，其 `OpenAiApi` 调用了 Spring 7 已改签名的 `HttpHeaders.addAll(MultiValueMap)`
+
+### 修复
+
+- **转发头解析**：补上 `X-Forwarded-Host` / `X-Forwarded-Port` / `X-Forwarded-Prefix` 的支持。此前只有 scheme（proto）被解析，host/port 一直借 Boot 的 `ForwardedHeaderFilter` 兜底——而 Boot 4 的 `spring-boot-starter-web` 不再传递 servlet 容器，该 filter 无处挂载
+- **`+json` 后缀媒体类型**：`application/vnd.spring-boot.actuator.v2+json` 这类带前缀的 `+json` 类型此前不匹配 JSON 转换器，导致 Actuator 端点返回 200 + 空 body
+- **String 请求体**：`@RequestBody String` 在 `application/json` 下必然 400（框架从未注册 `StringHttpMessageConverter`）；补上并让它排在 Jackson 之前（Spring 语义：String 原样读取，不按 JSON 解析）
 
 ## [3.5.7] - 20261008
 
