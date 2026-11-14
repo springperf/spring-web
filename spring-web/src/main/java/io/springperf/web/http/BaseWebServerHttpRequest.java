@@ -38,6 +38,16 @@ public abstract class BaseWebServerHttpRequest implements WebServerHttpRequest, 
      * JMM（否则 异步 dispatch 的另一线程可能看到"非 null 但未完全发布"的引用）。
      */
     private volatile MultiValueMap<String, String> parameterMap;
+
+    /**
+     * {@link #getParameterMapArray()} 的缓存视图。<b>懒初始化 + 双检锁</b>（同 {@link #parameterMap}）： 每次调用都新建 HashMap + 对每个值
+     * {@code toArray} 是热路径上的纯重复劳动（表单绑定、{@code @RequestParam} 绑定都会调用），而 {@link #parameterMap} 一旦解析就不再变化。
+     * <p>
+     * 返回不可修改视图（Servlet 规范要求 {@code getParameterMap()} 只读）：既省掉每请求的拷贝分配，也避免调用方 修改缓存内容。值数组仍与底层共享，与 Tomcat 行为一致。
+     * </p>
+     */
+    private volatile Map<String, String[]> parameterMapArray;
+
     private Charset characterEncoding = StandardCharsets.UTF_8;
     private List<Locale> locales;
     protected final Object[] fastAttributes = new Object[RequestAttribute.getMaxSize()];
@@ -116,13 +126,22 @@ public abstract class BaseWebServerHttpRequest implements WebServerHttpRequest, 
     }
 
     public Map<String, String[]> getParameterMapArray() {
-        MultiValueMap<String, String> pm = getParameterMap();
-        Map<String, String[]> arr = new HashMap<>();
-        // 用 entrySet 而非 keySet + get：后者对每个键多做一次哈希查找（本方法是热路径）
-        for (Map.Entry<String, List<String>> entry : pm.entrySet()) {
-            arr.put(entry.getKey(), entry.getValue().toArray(new String[0]));
+        Map<String, String[]> cached = parameterMapArray;
+        if (cached != null) {
+            return cached;
         }
-        return arr;
+        synchronized (this) {
+            if (parameterMapArray == null) {
+                MultiValueMap<String, String> pm = getParameterMap();
+                Map<String, String[]> arr = new HashMap<>(pm.size());
+                // 用 entrySet 而非 keySet + get：后者对每个键多做一次哈希查找
+                for (Map.Entry<String, List<String>> entry : pm.entrySet()) {
+                    arr.put(entry.getKey(), entry.getValue().toArray(new String[0]));
+                }
+                parameterMapArray = Collections.unmodifiableMap(arr);
+            }
+            return parameterMapArray;
+        }
     }
 
     public String getParameter(String name) {
