@@ -272,6 +272,16 @@ class PerfServletContextCoverageTest {
     }
 
     @Test
+    void getResource_cachesHitResult() {
+        URL first = servletContext.getResource("/perf-web/placeholder.txt");
+        assertNotNull(first);
+        assertSame(first, servletContext.getResource("/perf-web/placeholder.txt"), "命中结果应缓存复用，避免每次 4 次 ClassLoader 查找");
+        // 未命中同样走缓存：重复查找结果一致（均为 null）且不抛
+        assertNull(servletContext.getResource("no-such-resource-98765.txt"));
+        assertNull(servletContext.getResource("no-such-resource-98765.txt"));
+    }
+
+    @Test
     void getResourceAsStream_knownResource_returnsStream() throws Exception {
         try (InputStream in = servletContext.getResourceAsStream("/perf-web/placeholder.txt")) {
             assertNotNull(in);

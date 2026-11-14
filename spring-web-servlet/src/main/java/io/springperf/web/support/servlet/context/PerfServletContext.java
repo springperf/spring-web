@@ -79,6 +79,20 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
     /** 动态注册窗口：Phase2 起（Phase1 的 contextInitialized 已全部回调完）按规范拒绝 addServlet/addFilter。 */
     private volatile boolean initialized;
 
+    /**
+     * {@link #getResource} 的结果缓存（含未命中）。
+     * <p>
+     * 每次查找最多 4 次 ClassLoader.getResource + 字符串拼接，而静态资源路径在一次部署内不变。 路径来自请求（用户可控），必须<b>有界</b>：达到上限后只读不写，避免随机路径打爆内存 （非严格
+     * LRU，够用即可）。
+     * </p>
+     */
+    private static final int RESOURCE_CACHE_MAX = 1024;
+
+    /** 未命中的占位（ConcurrentHashMap 不接受 null 值）。 */
+    private static final Object RESOURCE_MISSING = new Object();
+
+    private final ConcurrentMap<String, Object> resourceCache = new ConcurrentHashMap<>();
+
     public PerfServletContext(WebContext webContext) {
         this.webContext = webContext;
         this.mimeTypes = loadMimeTypes();
@@ -404,6 +418,20 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
             return null;
         }
         String normalized = path.startsWith("/") ? path.substring(1) : path;
+        Object cached = resourceCache.get(normalized);
+        if (cached != null) {
+            return cached == RESOURCE_MISSING ? null : (URL) cached;
+        }
+        URL url = lookupResource(normalized);
+        // 命中与未命中都缓存：miss 路径的 4 次 ClassLoader 查找同样昂贵
+        if (resourceCache.size() < RESOURCE_CACHE_MAX) {
+            resourceCache.put(normalized, url != null ? url : RESOURCE_MISSING);
+        }
+        return url;
+    }
+
+    /** 按 Servlet 规范的查找顺序定位资源：META-INF/resources → static → public → 根。 */
+    private URL lookupResource(String normalized) {
         ClassLoader cl = Thread.currentThread().getContextClassLoader();
         if (cl == null) {
             cl = getClass().getClassLoader();
@@ -420,11 +448,7 @@ public class PerfServletContext implements ServletContext, LifecycleWebComponent
         if (url != null) {
             return url;
         }
-        url = cl.getResource(normalized);
-        if (url != null) {
-            return url;
-        }
-        return null;
+        return cl.getResource(normalized);
     }
 
     @Override
