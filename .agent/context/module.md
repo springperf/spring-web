@@ -274,7 +274,7 @@ spring-web
 │
 ├── json/                         JSON 抽象层
 │   ├── JsonConverter             SPI: toJson() / fromJson() 三重重载
-│   ├── JacksonConverter          默认实现（Jackson 2.17.2）
+│   ├── JacksonConverter          默认实现（Jackson 2.18.12）
 │   └── FastjsonConverter         Fastjson 2.0.60 实现（provided）
 │
 ├── annotation/                   自定义注解

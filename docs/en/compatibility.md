@@ -63,7 +63,7 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 | JDK | **17** | 17 / 21 / 25 (CI matrix, see [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)) | Compile target `java.version=17`; JDK 21+ supports virtual threads (see below) |
 | Servlet API | **jakarta.servlet 6.0** | 6.0.x | javax.servlet incompatible |
 | Netty | **4.1.137.Final** | 4.1.x | |
-| Jackson | **2.17.2** | 2.17.x | |
+| Jackson | **2.18.12** | 2.18.x | |
 | Lombok | **1.18.46** | 1.18.30+ | Higher version needed for JDK 17+ compatibility |
 | JMH | **1.37** | 1.37 | Benchmark module only |
 
