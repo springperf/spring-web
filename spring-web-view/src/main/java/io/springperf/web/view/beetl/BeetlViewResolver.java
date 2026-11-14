@@ -5,6 +5,7 @@ import io.springperf.web.context.WebContext;
 import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.view.View;
+import io.springperf.web.view.ViewBodyWriter;
 import io.springperf.web.view.ViewCache;
 import io.springperf.web.view.ViewProperties;
 import io.springperf.web.view.ViewResolver;
@@ -14,7 +15,6 @@ import org.beetl.core.Template;
 import org.beetl.core.resource.ClasspathResourceLoader;
 import org.springframework.core.io.ClassPathResource;
 
-import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -123,7 +123,7 @@ public class BeetlViewResolver extends BaseWebComponent implements ViewResolver 
             template.binding(model);
             Charset charset = resp.getCharacterEncoding() != null ? resp.getCharacterEncoding()
                     : StandardCharsets.UTF_8;
-            try (Writer writer = new OutputStreamWriter(resp.getBody(), charset)) {
+            try (Writer writer = ViewBodyWriter.wrap(resp.getBody(), charset)) {
                 template.renderTo(writer);
                 writer.flush();
             }
