@@ -29,8 +29,6 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.Locale;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse {
 
@@ -47,8 +45,8 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
     /** 业务是否已写入响应体（首次写入时把响应标记为 handled，确保请求收尾会提交）。 */
     private volatile boolean bodyWritten;
 
-    private static final Pattern CHARSET_PATTERN = Pattern.compile(";\\s*charset\\s*=\\s*([^;\\s]+)",
-            Pattern.CASE_INSENSITIVE);
+    /** Content-Type 中的 charset 参数名（忽略大小写匹配）。 */
+    private static final String CHARSET_TOKEN = "charset";
 
     public PerfHttpServletResponse(WebServerHttpResponse response) {
         this.response = response;
@@ -427,15 +425,68 @@ public class PerfHttpServletResponse extends AbstractFastFailHttpServletResponse
     public void setContentType(String type) {
         setHeader(HttpHeaders.Names.CONTENT_TYPE, type);
         if (type != null) {
-            Matcher m = CHARSET_PATTERN.matcher(type);
-            if (m.find()) {
-                String charset = m.group(1);
+            String charset = extractCharset(type);
+            if (charset != null) {
                 try {
                     setCharacterEncoding(charset);
                 } catch (Exception ignored) {
                 }
             }
         }
+    }
+
+    /**
+     * 从 Content-Type 中提取 charset 参数值，等价于正则 {@code ;\s*charset\s*=\s*([^;\s]+)}（忽略大小写）， 但不再为每次响应构造 {@code Matcher}
+     * 并驱动正则引擎 —— 几乎每个响应都会调用 setContentType。
+     * <p>
+     * 保留「分号前缀」语义：{@code charset=UTF-8}（无前导分号）不算参数，与改动前一致。
+     * </p>
+     *
+     * @return 提取到的 charset；未声明或值为空时返回 null（后者原本也不触发 setCharacterEncoding）
+     */
+    private static String extractCharset(String type) {
+        int length = type.length();
+        int from = 0;
+        while (from < length) {
+            int semicolon = type.indexOf(';', from);
+            if (semicolon < 0) {
+                return null;
+            }
+            int p = semicolon + 1;
+            while (p < length && isHeaderWhitespace(type.charAt(p))) {
+                p++;
+            }
+            if (p + CHARSET_TOKEN.length() <= length
+                    && type.regionMatches(true, p, CHARSET_TOKEN, 0, CHARSET_TOKEN.length())) {
+                p += CHARSET_TOKEN.length();
+                while (p < length && isHeaderWhitespace(type.charAt(p))) {
+                    p++;
+                }
+                if (p < length && type.charAt(p) == '=') {
+                    p++;
+                    while (p < length && isHeaderWhitespace(type.charAt(p))) {
+                        p++;
+                    }
+                    int valueStart = p;
+                    while (p < length) {
+                        char c = type.charAt(p);
+                        if (c == ';' || isHeaderWhitespace(c)) {
+                            break;
+                        }
+                        p++;
+                    }
+                    // 值为空（charset= 或 charset= ;）时正则的 [^;\s]+ 不匹配 → 不设置编码
+                    return p > valueStart ? type.substring(valueStart, p) : null;
+                }
+            }
+            from = semicolon + 1;
+        }
+        return null;
+    }
+
+    /** 正则 {@code \s} 的 ASCII 字符集，保持与 {@code [^;\s]+} 的排除集一致。 */
+    private static boolean isHeaderWhitespace(char c) {
+        return c == ' ' || c == '\t' || c == '\n' || c == '\u000B' || c == '\f' || c == '\r';
     }
 
     @Override
