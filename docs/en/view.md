@@ -120,7 +120,7 @@ public ModelAndView modelAndView(@RequestParam(defaultValue = "MAV") String name
 
 The `redirect:` prefix triggers a 302 redirect; scalar model attributes are serialized into query parameters:
 
-> External targets (`http://`, `https://`, `//host`) are used as-is and never get the context path prepended. Once `spring.web.view.redirect-hosts` (a comma-separated host allowlist) is configured, only listed hosts are allowed; leaving it unset imposes no restriction. The check uses the URI's real host, so `https://trusted.example.com@evil.com` cannot bypass it through userinfo confusion.
+> External targets (`http://`, `https://`, `//host`) are used as-is and never get the context path prepended. Once `spring.web.view.redirect-hosts` (a comma-separated host allowlist) is configured, only listed hosts are allowed; leaving it unset imposes no restriction. The check uses the URI's real host, so `https://trusted.example.com@evil.com` cannot bypass it through userinfo confusion. Parsed allowlists are cached per configuration value, so a changed value takes effect immediately without a restart and never reuses the previous parse result.
 
 ```java
 @GetMapping("/save")

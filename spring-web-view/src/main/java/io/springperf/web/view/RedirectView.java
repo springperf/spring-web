@@ -16,8 +16,21 @@ import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 public class RedirectView implements View {
+
+    /**
+     * 白名单配置串 → 解析后的 host 集合。
+     * <p>
+     * 解析结果只依赖配置串本身，与请求无关，因此可跨请求、跨实例复用。以配置串为键也天然支持配置热更新：值变了就是另一个键，重新解析；旧键留着也不影响正确性。
+     * </p>
+     */
+    private static final ConcurrentMap<String, Set<String>> ALLOWED_HOSTS_CACHE = new ConcurrentHashMap<>();
+
+    /** 正常只有一个取值；上限仅防御「按租户/环境拼接出大量不同配置串」导致的无界增长，超出后不缓存但仍正确解析。 */
+    private static final int MAX_CACHED_ALLOWED_HOSTS = 8;
 
     private final String redirectUrl;
     private final HttpStatusCode status;
@@ -70,9 +83,27 @@ public class RedirectView implements View {
         WebContext wc = req.getWebContext();
         ApplicationProperties props = wc != null ? wc.getProps() : null;
         String raw = props != null ? props.get(ViewProperties.REDIRECT_HOSTS, null) : null;
-        if (raw == null || raw.trim().isEmpty()) {
+        if (raw == null || isBlank(raw)) {
             return Collections.emptySet();
         }
+        Set<String> cached = ALLOWED_HOSTS_CACHE.get(raw);
+        if (cached != null) {
+            return cached;
+        }
+        Set<String> parsed = parseAllowedHosts(raw);
+        if (parsed.isEmpty()) {
+            // 只含空白项（如 ","）时等价于未配置，不必占用缓存
+            return Collections.emptySet();
+        }
+        Set<String> hosts = Collections.unmodifiableSet(parsed);
+        if (ALLOWED_HOSTS_CACHE.size() >= MAX_CACHED_ALLOWED_HOSTS) {
+            return hosts;
+        }
+        Set<String> winner = ALLOWED_HOSTS_CACHE.putIfAbsent(raw, hosts);
+        return winner != null ? winner : hosts;
+    }
+
+    private static Set<String> parseAllowedHosts(String raw) {
         Set<String> hosts = new LinkedHashSet<>();
         for (String item : raw.split(",")) {
             String host = item.trim().toLowerCase(Locale.ROOT);
@@ -81,6 +112,21 @@ public class RedirectView implements View {
             }
         }
         return hosts;
+    }
+
+    /**
+     * 手写判空：{@code trim()} 在存在首尾空白时会新建字符串，而这里每请求都要判断一次。
+     * <p>
+     * 判定范围与 {@link String#trim()} 保持一致（只把 {@code <= '\u0020'} 视为空白），避免出现「某些不可见字符以前算配置、现在算未配置」的行为漂移。
+     * </p>
+     */
+    private static boolean isBlank(String value) {
+        for (int i = 0; i < value.length(); i++) {
+            if (value.charAt(i) > ' ') {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean isAllowedHost(String url, Set<String> allowedHosts) {
