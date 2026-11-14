@@ -484,6 +484,17 @@ class PerfHttpServletRequestTest {
     }
 
     @Test
+    void getRequestURL_readsSchemeOnlyOnce() {
+        when(request.getUriStr()).thenReturn("/api/users");
+        when(headers.getFirst("Host")).thenReturn("example.com");
+        when(props.getInt(PropertiesConstant.SERVER_PORT)).thenReturn(8080);
+
+        PerfHttpServletRequest spyReq = spy(servletRequest);
+        assertEquals("http://example.com:8080/api/users", spyReq.getRequestURL().toString());
+        verify(spyReq, times(1)).getScheme();
+    }
+
+    @Test
     void isRequestedSessionIdFromURL_returnsFalse() {
         assertFalse(servletRequest.isRequestedSessionIdFromURL());
     }
