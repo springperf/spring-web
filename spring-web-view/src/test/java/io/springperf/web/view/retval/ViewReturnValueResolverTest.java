@@ -36,6 +36,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -192,6 +193,18 @@ class ViewReturnValueResolverTest {
         assertEquals("/api/home", headers.getFirst(HttpHeaders.LOCATION),
                 "302 Location 应为 context-path + 视图路径，实际: " + headers.getFirst(HttpHeaders.LOCATION));
         assertNull(headers.getFirst(HttpHeaders.CONTENT_TYPE), "302 无响应体，不应声明 text/html");
+    }
+
+    @Test
+    void resolveView_redirectReusesCachedInstance() {
+        ViewReturnValueResolver resolver = new ViewReturnValueResolver();
+
+        View first = resolver.resolveView("redirect:/home", null, null);
+        View second = resolver.resolveView("redirect:/home", null, null);
+        View other = resolver.resolveView("redirect:/other", null, null);
+
+        assertSame(first, second, "相同 redirect 视图名应复用同一个 RedirectView");
+        assertNotSame(first, other, "不同 redirect 目标不能串用缓存");
     }
 
     @Test
@@ -443,6 +456,17 @@ class ViewReturnValueResolverTest {
         ViewReturnValueResolver.applyContentType(view, resp);
 
         assertEquals("application/xhtml+xml;charset=UTF-16BE", headers.getFirst(HttpHeaders.CONTENT_TYPE));
+    }
+
+    @Test
+    void applyContentType_invalidContentType_stillFails() {
+        View view = mock(View.class);
+        when(view.getContentType()).thenReturn("not a media type");
+        WebServerHttpResponse resp = mock(WebServerHttpResponse.class);
+        when(resp.getHeaders()).thenReturn(new HttpHeaders());
+
+        assertThrows(IllegalArgumentException.class, () -> ViewReturnValueResolver.applyContentType(view, resp),
+                "解析缓存不得吞掉非法 Content-Type 的异常");
     }
 
     @Test

@@ -10,7 +10,7 @@ import org.thymeleaf.web.IWebExchange;
 import org.thymeleaf.web.IWebSession;
 
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -75,38 +75,26 @@ public class ThymeleafWebContext implements IWebContext {
 
     private static class ThymeleafCoreContext implements IContext {
         private final Locale locale;
-        private final Map<String, Object> variables;
+        private final Map<String, ?> model;
+        private final IWebSession session;
+        private final boolean hasSessionAttributes;
 
         ThymeleafCoreContext(Locale locale, Map<String, ?> model, IWebExchange exchange) {
             this.locale = locale != null ? locale : Locale.getDefault();
-            this.variables = buildVariables(model, exchange);
+            this.model = model;
+            IWebSession currentSession = exchange != null ? exchange.getSession() : null;
+            this.session = currentSession;
+            this.hasSessionAttributes = currentSession != null && currentSession.exists()
+                    && currentSession.getAttributeCount() > 0;
         }
 
         /**
-         * 合并 session 属性与 model 变量。
+         * 变量查找：无会话时直接读 model，零复制；有会话时按需合并 session 属性，<b>model 优先</b>。
          * <p>
          * Thymeleaf 3.1 起 {@code #session}/{@code #request} 表达式对象被官方移除 （仅 {@link IWebExchange#getSession()} 等 API
-         * 可用但不可直接从模板表达式调用）。 为使模板仍能读取会话数据，这里将 session 属性注入上下文变量； <b>model 优先</b>（同名时以 model 为准），避免覆盖控制器显式设置的值。
-         * </p>
-         * <p>
-         * 无会话（原生场景）时零拷贝：直接使用 model 的副本。
+         * 可用但不可直接从模板表达式调用）。为使模板仍能读取会话数据，这里将 session 属性作为上下文变量暴露； 同名时以 model 为准，避免覆盖控制器显式设置的值。
          * </p>
          */
-        private static Map<String, Object> buildVariables(Map<String, ?> model, IWebExchange exchange) {
-            IWebSession session = exchange != null ? exchange.getSession() : null;
-            if (session == null || !session.exists() || session.getAttributeCount() == 0) {
-                return model != null ? new HashMap<>(model) : Collections.emptyMap();
-            }
-            Map<String, Object> result = new HashMap<>();
-            for (String name : session.getAllAttributeNames()) {
-                result.put(name, session.getAttributeValue(name));
-            }
-            if (model != null) {
-                result.putAll(model);
-            }
-            return result;
-        }
-
         @Override
         public Locale getLocale() {
             return locale;
@@ -114,17 +102,35 @@ public class ThymeleafWebContext implements IWebContext {
 
         @Override
         public boolean containsVariable(String name) {
-            return variables.containsKey(name);
+            return (model != null && model.containsKey(name))
+                    || (hasSessionAttributes && session.containsAttribute(name));
         }
 
         @Override
         public Set<String> getVariableNames() {
-            return variables.keySet();
+            if (!hasSessionAttributes) {
+                // 只读视图：Thymeleaf 仅遍历/查询，避免每请求复制一份 HashMap
+                return model != null ? model.keySet() : Collections.emptySet();
+            }
+            int expectedSize = (model != null ? model.size() : 0) + session.getAttributeCount();
+            Set<String> names = new LinkedHashSet<>(expectedSize);
+            if (model != null) {
+                names.addAll(model.keySet());
+            }
+            names.addAll(session.getAllAttributeNames());
+            return names;
         }
 
         @Override
         public Object getVariable(String name) {
-            return variables.get(name);
+            if (model != null) {
+                Object value = model.get(name);
+                // 值为 null 时仍需 containsKey 区分「model 显式置空」与「model 未定义」
+                if (value != null || model.containsKey(name)) {
+                    return value;
+                }
+            }
+            return hasSessionAttributes ? session.getAttributeValue(name) : null;
         }
     }
 }

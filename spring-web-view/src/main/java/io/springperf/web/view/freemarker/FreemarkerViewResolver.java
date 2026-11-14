@@ -19,8 +19,13 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 public class FreemarkerViewResolver extends BaseWebComponent implements ViewResolver {
+
+    /** Locale 维度缓存数量上限；Accept-Language 由外部输入，不能无限建缓存。 */
+    private static final int MAX_LOCALE_CACHES = 16;
 
     private Configuration configuration;
     private String prefix;
@@ -29,8 +34,12 @@ public class FreemarkerViewResolver extends BaseWebComponent implements ViewReso
     private String contentType;
     private java.util.Properties settings;
     private boolean enabled = true;
+    private boolean cacheable = true;
     private int order = ViewProperties.FREEMARKER_ORDER_DEFAULT;
+    /** cache=false 时用于旁路；同时作为无 locale 请求的缓存。 */
     private ViewCache viewCache = new ViewCache(true);
+    /** locale 非空时按 locale 分缓存，避免每请求拼接 viewName + locale 字符串键。 */
+    private final ConcurrentMap<Locale, ViewCache> localeViewCaches = new ConcurrentHashMap<>();
 
     @Override
     public void initWithWebContext(WebContext webContext) {
@@ -54,9 +63,10 @@ public class FreemarkerViewResolver extends BaseWebComponent implements ViewReso
         if (settingsRaw != null && !settingsRaw.trim().isEmpty()) {
             this.settings = parseSettings(settingsRaw);
         }
-        boolean cacheable = ViewProperties.resolveBoolean(webContext.getProps(), ViewProperties.FREEMARKER_CACHE,
+        this.cacheable = ViewProperties.resolveBoolean(webContext.getProps(), ViewProperties.FREEMARKER_CACHE,
                 ViewProperties.FREEMARKER_CACHE_DEFAULT);
         this.viewCache = new ViewCache(cacheable);
+        this.localeViewCaches.clear();
         initEngine(cacheable);
     }
 
@@ -104,9 +114,7 @@ public class FreemarkerViewResolver extends BaseWebComponent implements ViewReso
         if (!enabled) {
             return null;
         }
-        // FreeMarker 的 Template 与 locale 相关，缓存键必须带 locale
-        String cacheKey = locale == null ? viewName : viewName + '\u0000' + locale;
-        return viewCache.resolve(cacheKey, key -> {
+        return cacheFor(locale).resolve(viewName, key -> {
             String fullName = ViewProperties.withSuffix(viewName, suffix);
             String fullPath = prefix + fullName;
             if (!new ClassPathResource(fullPath).exists()) {
@@ -115,6 +123,27 @@ public class FreemarkerViewResolver extends BaseWebComponent implements ViewReso
             Template template = configuration.getTemplate(fullName, locale);
             return new FreemarkerView(template, contentType);
         });
+    }
+
+    /**
+     * FreeMarker 的 {@link Template} 与 locale 相关，因此按 locale 分缓存； 这样缓存键只需 viewName，避免每次请求拼接
+     * {@code viewName + '\0' + locale}。
+     * <p>
+     * locale 数量由 Accept-Language 决定，属于外部输入，超过上限时整体清空重来，避免无界增长。
+     * </p>
+     */
+    private ViewCache cacheFor(Locale locale) {
+        if (!cacheable || locale == null) {
+            return viewCache;
+        }
+        ViewCache cached = localeViewCaches.get(locale);
+        if (cached != null) {
+            return cached;
+        }
+        if (localeViewCaches.size() >= MAX_LOCALE_CACHES) {
+            localeViewCaches.clear();
+        }
+        return localeViewCaches.computeIfAbsent(locale, key -> new ViewCache(true));
     }
 
     @Override
@@ -130,6 +159,10 @@ public class FreemarkerViewResolver extends BaseWebComponent implements ViewReso
     @Override
     public void invalidateCache() {
         viewCache.invalidate();
+        for (ViewCache cache : localeViewCaches.values()) {
+            cache.invalidate();
+        }
+        localeViewCaches.clear();
         // 缓存中的 View 持有 Template 实例，Configuration 也缓存模板；两者都清才能让替换生效
         if (configuration != null) {
             configuration.clearTemplateCache();
