@@ -49,6 +49,15 @@ public class PerfHttpSessionManager extends BaseWebComponent {
     /** 停机时等待在途保存落盘的上限（秒）。 */
     private static final int SAVE_SHUTDOWN_TIMEOUT_SECONDS = 5;
 
+    /**
+     * 「仅 lastAccessedTime 变化」时的落盘节流窗口：与 session 过期清理周期（60s）对齐。
+     * <p>
+     * 纯读请求没有属性变更，不需要全量序列化整个会话；但未过期会话重启恢复依赖磁盘上的 lastAccessedTime， 故每隔至多该窗口仍要落盘一次以刷新访问时间。窗口内的重复请求只更新内存、跳过序列化与文件 IO。
+     * 内容变更（setAttribute 等）走版本号判断，不受此窗口限制，立即落盘。
+     * </p>
+     */
+    private static final long ACCESS_FLUSH_INTERVAL_MS = 60_000L;
+
     /*
      * 以下字段都是「启动期写入一次、运行期只读」的配置快照，但读取方分布在请求线程与 会话保存线程（saveExecutor 的 lambda 捕获了 this）等多个线程 —— 全部 volatile 建立可见性。
      */
@@ -332,15 +341,30 @@ public class PerfHttpSessionManager extends BaseWebComponent {
         if (session == null || session.isInvalid()) {
             return;
         }
+        // markAccessed 每次请求都要做（更新内存 lastAccessedTime 供 getSession 的过期判断），
+        // 与「是否落盘」解耦：纯读请求虽跳过序列化，会话过期时间仍须推进。
+        session.markAccessed();
+
+        // 内存存储（非阻塞）或停机后（saveExecutor 已关闭）：一次 Map put 或收尾 flush，无条件同步执行。
+        // 前者脏检查无意义（saveSession 是 no-op），后者停机必须落盘全部在途数据。
         if (!storage.hasBlockingSave() || saveExecutor == null) {
-            session.markAccessed();
             saveSession(session);
             return;
         }
+
+        // 阻塞型存储：脏检查 + 访问时间节流，避免纯读请求每请求一次全量序列化 + 双次文件 IO。
+        HttpSessionData data = session.getData();
+        boolean contentDirty = data.getContentVersion() != data.getPersistedVersion();
+        long persistedAccess = data.getPersistedAccessTime();
+        boolean accessFlushDue = persistedAccess == Long.MIN_VALUE
+                || System.currentTimeMillis() - persistedAccess >= ACCESS_FLUSH_INTERVAL_MS;
+        if (!contentDirty && !accessFlushDue) {
+            return;
+        }
+
         try {
             saveExecutor.execute(() -> {
                 try {
-                    session.markAccessed();
                     saveSession(session);
                 } catch (RuntimeException e) {
                     log.warn("Failed to persist session {}: {}", session.getId(), e.toString());
