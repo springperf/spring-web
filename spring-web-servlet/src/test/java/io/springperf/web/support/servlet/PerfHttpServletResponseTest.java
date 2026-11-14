@@ -493,6 +493,30 @@ class PerfHttpServletResponseTest {
         verify(response).setCharacterEncoding(java.nio.charset.Charset.forName("GBK"));
     }
 
+    @Test
+    void setContentType_charset_variants() {
+        servletResponse.setContentType("text/html;charset=GBK");
+        verify(response).setCharacterEncoding(java.nio.charset.Charset.forName("GBK"));
+
+        clearInvocations(response);
+        servletResponse.setContentType("text/html; Charset = UTF-8");
+        verify(response).setCharacterEncoding(StandardCharsets.UTF_8);
+
+        clearInvocations(response);
+        servletResponse.setContentType("application/json;foo=bar; charset=ISO-8859-1");
+        verify(response).setCharacterEncoding(java.nio.charset.Charset.forName("ISO-8859-1"));
+    }
+
+    @Test
+    void setContentType_withoutValidCharsetParam_doesNotSetEncoding() {
+        // 空值、缺分号、参数名不完整（charsetx）都不应触发编码设置，与改动前的正则语义一致
+        servletResponse.setContentType("text/html; charset=");
+        servletResponse.setContentType("charset=GBK");
+        servletResponse.setContentType("text/html; charsetx=GBK");
+        servletResponse.setContentType("text/html");
+        verify(response, never()).setCharacterEncoding(any());
+    }
+
     // 未绑定 ServletAdapterContext 时无 session tracking 上下文，URL 必须原样返回；
     // URL tracking 启用/禁用分支由下方 encodeURL_appendsJSessionId* 用例精确覆盖。
     @Test
