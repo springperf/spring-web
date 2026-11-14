@@ -70,7 +70,7 @@
 | JDK | **17** | 17 / 21 / 25（CI 矩阵，见 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)） | 编译目标 `java.version=17`；JDK 21 起支持虚拟线程（见下） |
 | Servlet API | **jakarta.servlet 6.0** | 6.0.x | javax.servlet 不兼容 |
 | Netty | **4.1.137.Final** | 4.1.x |  |
-| Jackson | **2.17.2** | 2.17.x |  |
+| Jackson | **2.18.12** | 2.18.x |  |
 | Lombok | **1.18.46** | 1.18.30+ | JDK 17+ 兼容性要求高版本 |
 | JMH | **1.37** | 1.37 | 仅 benchmark 模块使用 |
 

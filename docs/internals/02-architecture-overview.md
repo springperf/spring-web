@@ -129,7 +129,7 @@ Tomcat 的 `spring-boot-starter-web` 一旦混入，会和本框架在自动装�
 |------|------|------|
 | Spring Boot | 4.1.0（默认，Profile 可切 4.0.x~4.1.x） | `pom.xml` + profiles |
 | Netty | 4.1.137.Final | `pom.xml` |
-| Jackson | 2.17.2 | `pom.xml` |
+| Jackson | 2.18.12 | `pom.xml` |
 | Fastjson2 | 2.0.60（provided） | `pom.xml` |
 | Disruptor | 3.4.4 | `pom.xml` |
 | Java | 17 | `pom.xml` |
