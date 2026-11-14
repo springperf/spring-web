@@ -6,6 +6,7 @@ import io.springperf.web.http.WebServerHttpRequest;
 import io.springperf.web.http.WebServerHttpResponse;
 import io.springperf.web.view.DefaultWebExchangeProvider;
 import io.springperf.web.view.View;
+import io.springperf.web.view.ViewBodyWriter;
 import io.springperf.web.view.ViewCache;
 import io.springperf.web.view.ViewProperties;
 import io.springperf.web.view.ViewResolver;
@@ -15,7 +16,6 @@ import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.templatemode.TemplateMode;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 
-import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -156,7 +156,7 @@ public class ThymeleafViewResolver extends BaseWebComponent implements ViewResol
             ThymeleafWebContext context = new ThymeleafWebContext(model, locale, req, resp, provider);
             Charset charset = resp.getCharacterEncoding() != null ? resp.getCharacterEncoding()
                     : StandardCharsets.UTF_8;
-            try (Writer writer = new OutputStreamWriter(resp.getBody(), charset)) {
+            try (Writer writer = ViewBodyWriter.wrap(resp.getBody(), charset)) {
                 engine.process(viewName, context, writer);
                 writer.flush();
             }
