@@ -29,6 +29,19 @@ public class ServletWebExchange extends PerfWebExchange {
     private final HttpServletRequest servletRequest;
     private final IWebRequest servletRequestAdapter;
 
+    /**
+     * 上一次包装的底层会话与其适配器。模板里 {@code ${session.xxx}} 会被读取多次， 每次 new 一个 {@link ServletWebSession} 是纯重复分配；这里按底层会话引用复用包装。
+     * <p>
+     * 不能简单缓存 null：请求处理中途可能 {@code getSession(true)} 建出会话，因此每次都先 {@code getSession(false)} 取当前会话，仅在引用变化时重建包装。
+     * </p>
+     * <p>
+     * 字段不加 volatile：与 {@code ServletWebRequest.cookieCache} 同一前提 —— exchange 由 {@code createExchange}
+     * 按请求创建，只在该请求的渲染线程内使用。
+     * </p>
+     */
+    private HttpSession cachedSession;
+    private IWebSession cachedWebSession;
+
     public ServletWebExchange(WebServerHttpRequest req, WebServerHttpResponse resp, HttpServletRequest servletRequest) {
         super(req, resp);
         this.servletRequest = servletRequest;
@@ -43,7 +56,16 @@ public class ServletWebExchange extends PerfWebExchange {
     @Override
     public IWebSession getSession() {
         HttpSession session = servletRequest.getSession(false);
-        return session != null ? new ServletWebSession(session) : null;
+        if (session == null) {
+            cachedSession = null;
+            cachedWebSession = null;
+            return null;
+        }
+        if (session != cachedSession) {
+            cachedSession = session;
+            cachedWebSession = new ServletWebSession(session);
+        }
+        return cachedWebSession;
     }
 
     @Override

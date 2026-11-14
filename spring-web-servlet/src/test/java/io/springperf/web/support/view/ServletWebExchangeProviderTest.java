@@ -119,6 +119,32 @@ class ServletWebExchangeProviderTest {
     }
 
     @Test
+    void exchange_getSession_reusesWrapperForSameSession() {
+        bindAdapter();
+        HttpSession session = mock(HttpSession.class);
+        when(servletRequest.getSession(false)).thenReturn(session);
+
+        IWebExchange exchange = provider.createExchange(req, resp);
+
+        IWebSession first = exchange.getSession();
+        assertNotNull(first);
+        assertSame(first, exchange.getSession(), "模板重复读取 session 时应复用同一个包装实例");
+    }
+
+    @Test
+    void exchange_getSession_reflectsSessionCreatedMidRequest() {
+        bindAdapter();
+        HttpSession session = mock(HttpSession.class);
+        // 首次读取时无会话，请求处理中途 getSession(true) 建出会话后应能读到
+        when(servletRequest.getSession(false)).thenReturn(null, session);
+
+        IWebExchange exchange = provider.createExchange(req, resp);
+
+        assertNull(exchange.getSession());
+        assertNotNull(exchange.getSession(), "缓存不能把「当前无会话」固定住");
+    }
+
+    @Test
     void session_attributes_bridged() {
         bindAdapter();
         HttpSession session = mock(HttpSession.class);
