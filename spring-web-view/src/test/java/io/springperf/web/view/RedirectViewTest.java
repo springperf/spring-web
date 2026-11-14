@@ -233,4 +233,63 @@ class RedirectViewTest {
         view.render(null, mockReq("/app", "trusted.example.com"), resp);
         assertEquals("/app/home", resp.getHeaders().getFirst(HttpHeaders.LOCATION));
     }
+
+    // ==================== 白名单解析缓存 ====================
+
+    @Test
+    void render_repeatedWhitelist_reusesParsedHosts() throws Exception {
+        // 同一配置串连续渲染：第二次起走缓存，结果必须与首次一致
+        RedirectView view = new RedirectView("https://partner.example.com/path");
+        for (int i = 0; i < 3; i++) {
+            WebServerHttpResponse resp = mockResp();
+            view.render(null, mockReq("", "partner.example.com, self.example.com"), resp);
+            assertEquals("https://partner.example.com/path", resp.getHeaders().getFirst(HttpHeaders.LOCATION));
+        }
+    }
+
+    @Test
+    void render_whitelistChangedBetweenRequests_newValueTakesEffect() {
+        // 以配置串为缓存键，配置热更新后必须按新值判定，不能被上一次的解析结果固化
+        RedirectView allowed = new RedirectView("https://a.example.com/path");
+        RedirectView other = new RedirectView("https://b.example.com/path");
+
+        assertDoesNotThrow(() -> allowed.render(null, mockReq("", "a.example.com"), mockResp()));
+        assertThrows(IllegalArgumentException.class, () -> other.render(null, mockReq("", "a.example.com"), mockResp()),
+                "b.example.com 不在原白名单内，必须拒绝");
+        assertDoesNotThrow(() -> other.render(null, mockReq("", "b.example.com"), mockResp()),
+                "换成 b.example.com 白名单后必须立即放行");
+    }
+
+    @Test
+    void render_blankWhitelist_treatedAsUnconfigured() throws Exception {
+        RedirectView view = new RedirectView("https://any.example.com/path");
+        WebServerHttpResponse resp = mockResp();
+        view.render(null, mockReq("", "   "), resp);
+        assertEquals("https://any.example.com/path", resp.getHeaders().getFirst(HttpHeaders.LOCATION),
+                "全空白配置等价于未配置，不限制外部目标");
+    }
+
+    @Test
+    void render_whitelistOnlySeparators_treatedAsUnconfigured() throws Exception {
+        RedirectView view = new RedirectView("https://any.example.com/path");
+        WebServerHttpResponse resp = mockResp();
+        view.render(null, mockReq("", ",,"), resp);
+        assertEquals("https://any.example.com/path", resp.getHeaders().getFirst(HttpHeaders.LOCATION));
+    }
+
+    @Test
+    void render_whitelistWithSpacesAndMixedCase_normalized() throws Exception {
+        RedirectView view = new RedirectView("https://Partner.Example.com/path");
+        WebServerHttpResponse resp = mockResp();
+        view.render(null, mockReq("", "  PARTNER.example.COM , self.example.com  "), resp);
+        assertEquals("https://Partner.Example.com/path", resp.getHeaders().getFirst(HttpHeaders.LOCATION));
+    }
+
+    @Test
+    void render_whitespaceAboveAsciiSpace_isNotTreatedAsUnconfigured() {
+        // 判定范围与 String.trim 一致（<= U+0020 才算空白）。'\u2003' 属于配置了一个不可能匹配的 host，
+        // 结果必须是「拒绝」而不是「当作未配置放行」——失败方向要朝安全的一侧关。
+        RedirectView view = new RedirectView("https://any.example.com/path");
+        assertThrows(IllegalArgumentException.class, () -> view.render(null, mockReq("", "\u2003"), mockResp()));
+    }
 }
