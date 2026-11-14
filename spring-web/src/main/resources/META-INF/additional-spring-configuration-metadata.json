@@ -50,6 +50,13 @@
       "defaultValue": true
     },
     {
+      "name": "server.http.stream-max-queued-events",
+      "type": "java.lang.Integer",
+      "description": "Max queued events per streaming response (SSE / byte stream) sender. The MpscArrayQueue is allocated eagerly per connection, so this value directly sets resident heap per active long-lived connection: 4096 is about 16KB, 65536 about 256KB. Non power-of-two values are rounded up by JCTools; values below 2 fail fast.",
+      "sourceType": "io.springperf.web.context.ApplicationProperties",
+      "defaultValue": 4096
+    },
+    {
       "name": "spring.mvc.async.request-timeout",
       "type": "java.time.Duration",
       "description": "Async request (DeferredResult/Callable) timeout. Supports 30s/1m/1h or plain number (milliseconds).",

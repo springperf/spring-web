@@ -50,4 +50,17 @@ public interface StreamSender {
      * @return the current queue depth
      */
     int queueSize();
+
+    /**
+     * Maximum number of items the sender can hold in its queue.
+     * <p>
+     * Reactive backpressure must not request more than the available queue room in one shot: a synchronous Publisher
+     * delivers requested items inline, and {@code enqueueWithBackpressure} would spin waiting for a drain that is
+     * blocked by the very same call stack. Default {@code Integer.MAX_VALUE} keeps simple test doubles working.
+     *
+     * @return the queue capacity, or {@code Integer.MAX_VALUE} when unbounded/unknown
+     */
+    default int queueCapacity() {
+        return Integer.MAX_VALUE;
+    }
 }
