@@ -17,46 +17,54 @@ import java.util.Set;
  */
 public class PerfWebApplication implements IWebApplication {
 
-    private final Map<String, Object> attrs = new HashMap<>();
+    /** 懒创建：绝大多数渲染不会读写 application 属性，避免每次 exchange 都分配一个空 Map。 */
+    private Map<String, Object> attrs;
+    /** 只读视图缓存：首次创建 attrs 时一并生成，后续重复调用不再包装。 */
+    private Set<String> allAttributeNamesView;
 
-    @Override
-    public boolean containsAttribute(String name) {
-        return attrs.containsKey(name);
-    }
-
-    @Override
-    public int getAttributeCount() {
-        return attrs.size();
-    }
-
-    /**
-     * 只读视图缓存：{@code keySet()} 本身就是活视图，包装它不影响后续写入的可见性， 但每次调用都新建包装会被视图渲染路径（ThymeleafWebContext）白白重复一次。
-     */
-    private final Set<String> allAttributeNamesView = java.util.Collections.unmodifiableSet(attrs.keySet());
-
-    @Override
-    public Set<String> getAllAttributeNames() {
-        return allAttributeNamesView;
-    }
-
-    @Override
-    public Map<String, Object> getAttributeMap() {
+    private Map<String, Object> attributes() {
+        if (attrs == null) {
+            attrs = new HashMap<>(4);
+            allAttributeNamesView = java.util.Collections.unmodifiableSet(attrs.keySet());
+        }
         return attrs;
     }
 
     @Override
+    public boolean containsAttribute(String name) {
+        return attrs != null && attrs.containsKey(name);
+    }
+
+    @Override
+    public int getAttributeCount() {
+        return attrs != null ? attrs.size() : 0;
+    }
+
+    @Override
+    public Set<String> getAllAttributeNames() {
+        return attrs != null ? allAttributeNamesView : java.util.Collections.emptySet();
+    }
+
+    @Override
+    public Map<String, Object> getAttributeMap() {
+        return attributes();
+    }
+
+    @Override
     public Object getAttributeValue(String name) {
-        return attrs.get(name);
+        return attrs != null ? attrs.get(name) : null;
     }
 
     @Override
     public void setAttributeValue(String name, Object value) {
-        attrs.put(name, value);
+        attributes().put(name, value);
     }
 
     @Override
     public void removeAttribute(String name) {
-        attrs.remove(name);
+        if (attrs != null) {
+            attrs.remove(name);
+        }
     }
 
     @Override

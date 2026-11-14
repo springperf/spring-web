@@ -12,6 +12,7 @@ import org.thymeleaf.web.IWebApplication;
 import org.thymeleaf.web.IWebExchange;
 import org.thymeleaf.web.IWebRequest;
 
+import java.lang.reflect.Field;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -187,6 +188,16 @@ class ThymeleafWebContextTest {
     }
 
     @Test
+    void modelNullValue_overridesSessionAttribute() {
+        Map<String, Object> model = new HashMap<>();
+        model.put("user", null);
+
+        ThymeleafWebContext ctx = new ThymeleafWebContext(model, Locale.US, req, resp, sessionProvider());
+
+        assertNull(ctx.getVariable("user"), "model 显式置 null 时不得回退到 session 值");
+    }
+
+    @Test
     void noSession_modelOnly() {
         // 默认 provider 无 session：仅 model 变量
         Map<String, Object> model = new HashMap<>();
@@ -195,6 +206,29 @@ class ThymeleafWebContextTest {
 
         assertEquals("m", ctx.getVariable("only"));
         assertFalse(ctx.containsVariable("user"));
+    }
+
+    @Test
+    void noSession_variableNamesReadsModelWithoutCopy() {
+        // 回归：无 session 时每请求 new HashMap<>(model) 是渲染热路径上的无谓分配。
+        // 直接返回 model.keySet() 才能证明没有复制；model 后续变化也应立即可见。
+        Map<String, Object> model = new HashMap<>();
+        model.put("a", "1");
+        ThymeleafWebContext ctx = new ThymeleafWebContext(model, Locale.US, req, resp);
+
+        assertSame(model.keySet(), ctx.getVariableNames(), "无 session 时变量名集合必须是 model 的只读视图，不能复制");
+        model.put("b", "2");
+        assertTrue(ctx.containsVariable("b"));
+        assertEquals("2", ctx.getVariable("b"));
+    }
+
+    @Test
+    void sessionAndModel_variableNamesContainBoth() {
+        ThymeleafWebContext ctx = new ThymeleafWebContext(new HashMap<>(), Locale.US, req, resp, sessionProvider());
+        java.util.Set<String> names = ctx.getVariableNames();
+
+        assertTrue(names.contains("user"), "session 属性应出现在变量名集合中");
+        assertEquals("alice", ctx.getVariable("user"));
     }
 
     /** 构造一个提供 user=alice 会话的 provider。 */
@@ -256,10 +290,17 @@ class ThymeleafWebContextTest {
     }
 
     @Test
-    void application_attributesAndResources() {
+    void application_attributesAndResources() throws Exception {
         ThymeleafWebContext ctx = buildContext(new HashMap<>());
         IWebApplication application = ctx.getExchange().getApplication();
+        Field attrsField = io.springperf.web.view.exchange.PerfWebApplication.class.getDeclaredField("attrs");
+        attrsField.setAccessible(true);
+        assertNull(attrsField.get(application), "未写入时不应提前创建属性 Map");
+        assertEquals(0, application.getAttributeCount());
+        assertTrue(application.getAllAttributeNames().isEmpty());
+
         application.setAttributeValue("app", "x");
+        assertNotNull(attrsField.get(application), "首次写入后才创建属性 Map");
         assertTrue(application.containsAttribute("app"));
         assertEquals("x", application.getAttributeValue("app"));
         assertEquals(1, application.getAttributeCount());
