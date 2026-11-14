@@ -24,12 +24,22 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 @Slf4j
 public class ViewReturnValueResolver extends BaseWebComponent implements ReturnValueResolver {
 
     private static final MappingCacheKey<Boolean> VIEW_NAME_KEY =
             MappingCacheKey.createMethodCacheKey(Boolean.class);
+
+    /** Content-Type 由自定义 View 提供时可能来自外部输入，缓存设上限，超限整体清空。 */
+    private static final int MAX_MEDIA_TYPE_CACHE_SIZE = 64;
+    private static final ConcurrentMap<String, MediaType> MEDIA_TYPE_CACHE = new ConcurrentHashMap<>();
+    /** redirect: 目标通常稳定但可能含动态路径，缓存设上限。 */
+    private static final int MAX_REDIRECT_CACHE_SIZE = 256;
+
+    private final ConcurrentMap<String, RedirectView> redirectViews = new ConcurrentHashMap<>();
 
     private ViewResolverRegistry viewResolverRegistry;
 
@@ -144,7 +154,7 @@ public class ViewReturnValueResolver extends BaseWebComponent implements ReturnV
                     : StandardCharsets.UTF_8;
             contentType = "text/html;charset=" + charset.name();
         } else {
-            Charset charset = MediaType.parseMediaType(contentType).getCharset();
+            Charset charset = parseContentType(contentType).getCharset();
             if (charset != null) {
                 resp.setCharacterEncoding(charset);
             } else {
@@ -156,6 +166,23 @@ public class ViewReturnValueResolver extends BaseWebComponent implements ReturnV
             }
         }
         headers.set(HttpHeaders.CONTENT_TYPE, contentType);
+    }
+
+    /**
+     * 解析并缓存 Content-Type：FreeMarker/Beetl 的默认值固定，原本每个请求都要重新解析。 非法值仍按 {@link MediaType#parseMediaType(String)}
+     * 的语义抛异常，不缓存失败结果。
+     */
+    private static MediaType parseContentType(String contentType) {
+        MediaType cached = MEDIA_TYPE_CACHE.get(contentType);
+        if (cached != null) {
+            return cached;
+        }
+        MediaType parsed = MediaType.parseMediaType(contentType);
+        if (MEDIA_TYPE_CACHE.size() >= MAX_MEDIA_TYPE_CACHE_SIZE) {
+            MEDIA_TYPE_CACHE.clear();
+        }
+        MediaType existing = MEDIA_TYPE_CACHE.putIfAbsent(contentType, parsed);
+        return existing != null ? existing : parsed;
     }
 
     /**
@@ -183,9 +210,19 @@ public class ViewReturnValueResolver extends BaseWebComponent implements ReturnV
         return Integer.MAX_VALUE - 200;
     }
 
-    private View resolveView(String viewName, WebServerHttpRequest req, WebServerHttpResponse resp) {
+    /** 包可见以便同包测试直接验证 redirect 视图复用，不必绕过公开渲染路径。 */
+    View resolveView(String viewName, WebServerHttpRequest req, WebServerHttpResponse resp) {
         if (viewName.startsWith("redirect:")) {
-            return new RedirectView(viewName.substring(9));
+            RedirectView cached = redirectViews.get(viewName);
+            if (cached != null) {
+                return cached;
+            }
+            RedirectView created = new RedirectView(viewName.substring(9));
+            if (redirectViews.size() >= MAX_REDIRECT_CACHE_SIZE) {
+                redirectViews.clear();
+            }
+            RedirectView existing = redirectViews.putIfAbsent(viewName, created);
+            return existing != null ? existing : created;
         }
         return viewResolverRegistry.resolve(viewName, req);
     }

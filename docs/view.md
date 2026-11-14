@@ -333,7 +333,7 @@ public class MyViewResolver extends BaseWebComponent implements ViewResolver {
 
 ## 九、缓存失效与性能边界
 
-**缓存失效**：`cache=true` 时，「视图名 → View」的解析结果与「模板不存在」负结果都会被缓存，容量上限 1024，超限只淘汰最早条目。运行期新增或替换模板后调用：
+**缓存失效**：`cache=true` 时，「视图名 → View」的解析结果与「模板不存在」负结果都会被缓存，容量上限 1024（FreeMarker 按 locale 分桶，每桶 1024，桶数上限 16），超限只淘汰最早条目。运行期新增或替换模板后调用：
 
 ```java
 @Autowired
@@ -348,7 +348,7 @@ public void onTemplateDeployed() {
 
 `ViewResolverRegistry` 由 `WebContext#getWebComponentWithDefault` 懒创建，**不是 Spring Bean**；也可直接对注入的某个 `ViewResolver` Bean 调用 `invalidateCache()`（内置实现同时清模板引擎内部缓存）。`cache=false` 完全不缓存，无需失效。配置刷新不在此列（见第七节关键说明 4）。
 
-**模块定位**：`spring-web-view` 是 SpringMVC 视图层的**兼容适配层**，不是独立的渲染性能层。渲染在 handler 当前线程同步执行，每次渲染会构造 `IWebContext` / `IWebExchange` 适配器并复制 model 变量；未提供输出缓冲复用、片段缓存、异步渲染与内容协商。高吞吐 SSR 场景建议静态化模板输出或自行实现 `View` 复用渲染结果；配置了 `pool.default-execute-mode=eventloop` 或 `@RunInEventloop` 时，避免在视图方法中做阻塞式渲染。
+**模块定位**：`spring-web-view` 是 SpringMVC 视图层的**兼容适配层**，不是独立的渲染性能层。渲染在 handler 当前线程同步执行，每次渲染会构造 `IWebContext` / `IWebExchange` 适配器，并按需合并 session 变量（无 session 时直接读 model，不复制）；未提供输出缓冲复用、片段缓存、异步渲染与内容协商。生产环境应保持 `cache=true`，并只启用实际使用的引擎以减少解析链探测；高吞吐 SSR 场景建议静态化模板输出或自行实现 `View` 复用渲染结果；配置了 `pool.default-execute-mode=eventloop` 或 `@RunInEventloop` 时，避免在视图方法中做阻塞式渲染。
 
 **引擎依赖边界**：`WebExchangeProvider` / `PerfWebExchange` 等 exchange 适配直接实现 Thymeleaf 的 `org.thymeleaf.web.*` 接口。即使只使用 FreeMarker / Beetl / JSP，classpath 上也需要 `thymeleaf`（各引擎依赖均为 `provided`，需显式引入）；Servlet 场景的真实 session / principal 桥接同样依赖该抽象。
 

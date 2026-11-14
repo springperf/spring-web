@@ -243,6 +243,18 @@ class FreemarkerViewResolverTest {
     }
 
     @Test
+    void invalidateCache_clearsAllLocaleCaches() throws Exception {
+        FreemarkerViewResolver resolver = buildResolver();
+        View us = resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class));
+        View fr = resolver.resolveViewName("hello", Locale.FRANCE, mock(WebServerHttpRequest.class));
+
+        resolver.invalidateCache();
+
+        assertNotSame(us, resolver.resolveViewName("hello", Locale.US, mock(WebServerHttpRequest.class)));
+        assertNotSame(fr, resolver.resolveViewName("hello", Locale.FRANCE, mock(WebServerHttpRequest.class)));
+    }
+
+    @Test
     void invalidateCache_clearsEngineTemplateCache() throws Exception {
         FreemarkerViewResolver resolver = buildResolver();
         freemarker.template.Configuration configuration = mock(freemarker.template.Configuration.class);

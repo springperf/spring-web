@@ -315,7 +315,7 @@ Return `null` to defer to the next `ViewResolver` in the chain.
 
 ## 9. Cache Invalidation and Performance Boundaries
 
-**Cache invalidation**: with `cache=true`, both view-name-to-View resolutions and "template absent" negatives are cached, capped at 1024 entries; exceeding the cap evicts only the oldest entry. After adding or replacing templates at runtime, call:
+**Cache invalidation**: with `cache=true`, both view-name-to-View resolutions and "template absent" negatives are cached, capped at 1024 entries (FreeMarker uses one bucket per locale, 1024 entries each, up to 16 buckets); exceeding the cap evicts only the oldest entry. After adding or replacing templates at runtime, call:
 
 ```java
 @Autowired
@@ -330,7 +330,7 @@ public void onTemplateDeployed() {
 
 `ViewResolverRegistry` is created lazily by `WebContext#getWebComponentWithDefault` and is **not a Spring Bean**; you can also call `invalidateCache()` directly on an injected engine `ViewResolver` bean (built-in implementations clear the engine's internal template cache as well). With `cache=false` nothing is cached and no invalidation is needed. Property refresh is a separate matter (see key note 4 in section 7).
 
-**Module positioning**: `spring-web-view` is a **compatibility adapter** for the Spring MVC view layer, not a standalone rendering-performance layer. Rendering runs synchronously on the handler's current thread; each render builds `IWebContext` / `IWebExchange` adapters and copies model variables. There is no output-buffer reuse, fragment cache, async rendering or content negotiation. For high-throughput SSR, prefer static pre-rendering or a custom `View` that reuses rendered output; with `pool.default-execute-mode=eventloop` or `@RunInEventloop`, avoid blocking rendering in view methods.
+**Module positioning**: `spring-web-view` is a **compatibility adapter** for the Spring MVC view layer, not a standalone rendering-performance layer. Rendering runs synchronously on the handler's current thread; each render builds `IWebContext` / `IWebExchange` adapters and merges session variables only when a session exists (with no session, model variables are read directly without copying). There is no output-buffer reuse, fragment cache, async rendering or content negotiation. Keep `cache=true` in production and enable only the engines you actually use to reduce resolver-chain probing; for high-throughput SSR, prefer static pre-rendering or a custom `View` that reuses rendered output; with `pool.default-execute-mode=eventloop` or `@RunInEventloop`, avoid blocking rendering in view methods.
 
 **Engine dependency boundary**: exchange adapters such as `WebExchangeProvider` / `PerfWebExchange` implement Thymeleaf's `org.thymeleaf.web.*` interfaces directly. Even when only FreeMarker / Beetl / JSP is used, `thymeleaf` must be on the classpath (all engine dependencies are `provided` and must be added explicitly); the real session / principal bridge in the Servlet case relies on the same abstraction.
 

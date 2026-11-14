@@ -131,6 +131,16 @@ class ThymeleafWebContextTest {
     }
 
     @Test
+    void modelNullValue_overridesSessionAttribute() {
+        Map<String, Object> model = new HashMap<>();
+        model.put("user", null);
+
+        ThymeleafWebContext ctx = new ThymeleafWebContext(model, Locale.US, req, resp, sessionProvider());
+
+        assertNull(ctx.getVariable("user"), "model 显式置 null 时不得回退到 session 值");
+    }
+
+    @Test
     void noSession_modelOnly() {
         // 默认 provider / 匿名访问：getSession(false) 为 null，仅暴露 model 变量
         Map<String, Object> model = new HashMap<>();
@@ -144,17 +154,37 @@ class ThymeleafWebContextTest {
     }
 
     @Test
-    void emptySession_keepsModelVariables() {
-        HttpSession session = mock(HttpSession.class);
-        when(session.getAttributeNames()).thenReturn(Collections.enumeration(Collections.<String>emptyList()));
+    void noSession_variableNamesReadsModelWithoutCopy() {
+        // 回归：无 session 时每请求 new HashMap<>(model) 是渲染热路径上的无谓分配。
+        // 直接返回 model.keySet() 才能证明没有复制；model 后续变化也应立即可见。
         Map<String, Object> model = new HashMap<>();
-        model.put("only", "m");
+        model.put("a", "1");
+        ThymeleafWebContext ctx = new ThymeleafWebContext(model, Locale.US, req, resp);
 
-        ThymeleafWebContext ctx = new ThymeleafWebContext(model, Locale.US, req, resp,
+        assertSame(model.keySet(), ctx.getVariableNames(), "无 session 时变量名集合必须是 model 的只读视图，不能复制");
+        model.put("b", "2");
+        assertTrue(ctx.containsVariable("b"));
+        assertEquals("2", ctx.getVariable("b"));
+    }
+
+    @Test
+    void sessionAndModel_variableNamesContainBoth() {
+        HttpSession session = mock(HttpSession.class);
+        when(session.getAttributeNames()).thenReturn(Collections.enumeration(Collections.singletonList("user")));
+        when(session.getAttribute("user")).thenReturn("alice");
+        ThymeleafWebContext ctx = new ThymeleafWebContext(new HashMap<String, Object>(), Locale.US, req, resp,
                 fixedProvider(null, null, session, null));
 
-        assertEquals("m", ctx.getVariable("only"));
-        assertEquals(1, ctx.getVariableNames().size());
+        assertTrue(ctx.getVariableNames().contains("user"), "session 属性应出现在变量名集合中");
+        assertEquals("alice", ctx.getVariable("user"));
+    }
+
+    /** 构造一个提供 user=alice 会话的 provider（2.7.x 走 javax.servlet HttpSession）。 */
+    private static WebExchangeProvider sessionProvider() {
+        HttpSession session = mock(HttpSession.class);
+        when(session.getAttributeNames()).thenReturn(Collections.enumeration(Collections.singletonList("user")));
+        when(session.getAttribute("user")).thenReturn("alice");
+        return fixedProvider(null, null, session, null);
     }
 
     /** 固定返回给定 servlet 对象的 provider，用于断言上下文确实走 SPI 取值。 */

@@ -41,7 +41,7 @@ import java.util.Set;
 public class ThymeleafWebContext implements IWebContext {
 
     private final Locale locale;
-    private final Map<String, Object> variables;
+    private final Map<String, ?> variables;
     private final WebExchange exchange;
 
     /**
@@ -72,13 +72,14 @@ public class ThymeleafWebContext implements IWebContext {
      * <b>model 优先</b>（同名时以 model 为准），避免覆盖控制器显式设置的值。</p>
      *
      * <p>无会话时零拷贝：{@link WebExchange#getSession()} 为 {@code getSession(false)} 语义
-     * （服务端不隐式创建会话），原生场景与匿名访问均返回 {@code null}，此时直接使用 model 副本。</p>
+     * （服务端不隐式创建会话），原生场景与匿名访问均返回 {@code null}，此时直接复用调用方传入的 model，
+     * 不再每请求复制一份 {@link LinkedHashMap}——这是渲染热路径上可省的分配。</p>
      */
-    private static Map<String, Object> buildVariables(Map<String, ?> model, WebExchange exchange) {
+    private static Map<String, ?> buildVariables(Map<String, ?> model, WebExchange exchange) {
         HttpSession session = exchange != null ? exchange.getSession() : null;
         Enumeration<String> names = session != null ? session.getAttributeNames() : null;
         if (names == null || !names.hasMoreElements()) {
-            return model != null ? new LinkedHashMap<>(model) : Collections.emptyMap();
+            return model != null ? model : Collections.emptyMap();
         }
         Map<String, Object> result = new LinkedHashMap<>();
         do {
