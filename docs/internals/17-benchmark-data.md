@@ -111,7 +111,7 @@
 2. **tomcat 每请求分配 ~2–3x perf**（get 37.3KB vs 10.7KB），归因运行时匹配（`AntPathMatcher.match` 每次创建 `StringBuilder`）+ Facade 包装器（`RequestFacade`/`ResponseFacade` 每请求 ~2–3KB）+ `ConcurrentHashMap` 属性存储。
 3. **webflux 每请求分配最高**（get 50.0KB），归因响应式链对象——每个 `Mono`/`Flux` 操作创建一个 `Lambda` 对象 + `Subscription` 对象，链式调用累积大量短期对象。
 4. **perf-support 比 perf 多 ~2–3KB/请求**（get 13.2KB vs 10.7KB），归因 Servlet 适配对象创建（`PerfHttpServletRequest`/`PerfHttpServletResponse` 包装）。这是兼容 Spring MVC 的代价，约 +23% 分配量。
-5. **sse 场景 perf 分配 310.4KB/请求**——高于 tomcat 的 233.9KB，归因 `MpscArrayQueue` 高频分配（每消息一个 `ByteBuf`）。但 perf 吞吐 7.72x tomcat，单位时间分配率更高（按吞吐 × 每请求分配推算约 4631MB/s vs 452MB/s，见 §2.3），GC 压力通过更高吞吐摊薄。
+5. **sse 场景 perf 分配 310.4KB/请求**——高于 tomcat 的 233.9KB。此前归因于"每消息一个 `ByteBuf` 的高频分配"，**这是误判**：大头来自发送器建连时的一次性 `MpscArrayQueue` 预分配（旧容量 65536 ≈ 256.7KB，占 310.4KB 的 83%），剩余才是逐消息编码缓冲与 ByteBuf。A/B 实测（容量 65536 → 4096）每请求分配由 314.7KB 降到 95.8KB（−69.6%），证实该归因。3.5.8 起容量改为可配置 `server.http.stream-max-queued-events`，默认 4096。但 perf 吞吐 7.72x tomcat，单位时间分配率更高（按吞吐 × 每请求分配推算约 4631MB/s vs 452MB/s，见 §2.3），GC 压力通过更高吞吐摊薄。注意 benchmark 是"建连→发 100 条→关闭"的短连接口径，队列随连接快速回收；真实 SSE 是长连接，N 个活跃连接就是 N × 队列容量常驻堆内存——这才是该指标真正危害的场景。
 
 ### 2.2 GC 暂停时间
 
