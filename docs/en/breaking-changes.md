@@ -14,7 +14,7 @@
 
 | Version | Date | Subject |
 |---------|------|---------|
-| **3.5.8** | 2026-11-23 | Servlet specification semantics tightened and dynamic registration actually implemented; batching window on by default (2ms); repeated `startAsync` and unparseable date headers throw |
+| **3.5.8** | 2026-11-25 (expected) | Servlet specification semantics tightened and dynamic registration actually implemented; batching window on by default (2ms); repeated `startAsync` and unparseable date headers throw |
 | **3.5.7** | 2026-10-08 | Configuration keys aligned with Spring Boot / Tomcat: old key aliases removed, extension-point signatures and compat-layer classes adjusted |
 
 ---
@@ -312,7 +312,7 @@ an observable behaviour change:
 
 ---
 
-## [3.5.8] - 2026-11-23
+## [3.5.8] - 2026-11-25 (expected)
 
 | Item | Old behaviour | New behaviour |
 |---|---|---|
@@ -339,8 +339,8 @@ an observable behaviour change:
 | `IWebRequest#getServerPort()` for HTTPS without an explicit port | always returned 80 | returns 443. **No migration needed** |
 | `@ResponseBody` return value with no matching `HttpBodyConverter` (preset `Content-Type`, or a media type negotiated from `produces` that nobody can write) | silently returned 200 with an empty body and dropped the return value; on the `produces` path not even the declared Content-Type was written | throws `HttpMessageNotWritableException`, mapped to 500 by `ExceptionRegistry`. **Migration**: make the target Content-Type match the return type (use `application/json` for objects), or write the response on the Servlet side and return `void`. Other return types this framework does not implement fail loudly the same way instead of returning an empty response (`StreamingResponseBody` has been supported since 3.5.8 and no longer takes this path) |
 | `@BatchMapping.batchWindowMillis` default | 3.5.7 had no batching window: `endOfBatch` / `maxBatchSize` decided when to flush | A 2ms window is on by default, so the batch size is guaranteed by the window and a request may wait up to one extra window. **Migration**: set `batchWindowMillis=0` explicitly for low traffic (in-flight requests cannot fill a batch), ultra-low latency, or no-window benchmark baselines |
-| `io.springperf.web.websocket.server.SpringHeadersAdapter` | public class adapting Netty `HttpHeaders` to Spring `HttpHeaders`; taken by the `NettyWebSocketSession` constructor | removed (the adaptation is inlined) and the constructor's third parameter is now Netty's `io.netty.handler.codec.http.HttpHeaders`. **Migration**: do not instantiate `NettyWebSocketSession` yourself (the framework creates sessions); build a Spring `HttpHeaders` and copy the Netty headers across if you need one |
+| `io.springperf.web.websocket.server.SpringHeadersAdapter` | public class adapting Netty `HttpHeaders` to Spring `HttpHeaders`; taken by the `NettyWebSocketSession` constructor | removed (the adaptation is inlined) and the constructor's third parameter is now Spring's `org.springframework.http.HttpHeaders`. **Migration**: do not instantiate `NettyWebSocketSession` yourself (the framework creates sessions); build a Spring `HttpHeaders` and copy the Netty headers across if you need one |
 | `ViewProperties.BEETL_MODE` / `BEETL_MODE_DEFAULT` | public constants for `spring.beetl.mode`, which was never read | removed together with the property. **Migration**: drop the constant references; the property never took effect |
-| `WebServerInitializedEventAutoConfiguration#webServerInitializedEventPublisher(NettyHttpServer, ApplicationContext)` | public factory method building the event publisher | removed: the event is now driven by `NettyServerStartedEvent` once the port is bound. **Migration**: do not call it; listen for `WebServerInitializedEvent`, whose publication is only earlier and more accurate |
+| `WebServerInitializedEventAutoConfiguration#webServerInitializedEventPublisher(NettyHttpServer, ApplicationContext)` | public factory method building an event publisher that listened for `ApplicationReadyEvent` | the method remains, but its signature is now `(ApplicationContext)` and the returned listener listens for `NettyServerStartedEvent` (the server is taken from the event), so publication moves earlier to port binding. **Migration**: drop the `NettyHttpServer` argument at direct call sites; listening for `WebServerInitializedEvent` is enough, and it is now published earlier and more accurately |
 
 
