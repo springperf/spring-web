@@ -1,5 +1,12 @@
 package io.springperf.web.http.support;
 
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.nio.charset.StandardCharsets;
+
+import org.junit.jupiter.api.Test;
+
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.DecoderException;
@@ -286,6 +293,94 @@ class SupportMultipartAggregatorTest {
         channel.pipeline().fireChannelInactive();
         assertFalse(resolver.isMultipartMode(), "连接关闭后 multipart 状态应复位");
 
+        channel.finishAndReleaseAll();
+    }
+
+    @Test
+    void oversizedThenInFlightContent_allBuffersReleased() {
+        // 回归：超限回 413 后，客户端在途的 HttpContent 若被父类 fire 到下游无人消费，
+        // 池化 direct buffer 会泄漏（CI paranoid 报 20 处）。丢弃态必须让每个在途 content 归零。
+        int limit = 64;
+        EmbeddedChannel channel = new EmbeddedChannel(new SupportMultipartAggregator(limit));
+        channel.writeInbound(multipartHead());
+
+        ByteBuf oversized = io.netty.buffer.PooledByteBufAllocator.DEFAULT.buffer(128);
+        oversized.writeBytes(
+                "--boundary\r\nContent-Disposition: form-data; name=\"x\"\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+        for (int i = 0; i < 20; i++) {
+            oversized.writeByte('y');
+        }
+        channel.writeInbound(new DefaultHttpContent(oversized));
+        assertEquals(0, oversized.refCnt(), "超限 content 应被释放");
+
+        Object rejected = channel.readOutbound();
+        assertTrue(rejected instanceof FullHttpResponse, "超限应回 413");
+        assertEquals(HttpResponseStatus.REQUEST_ENTITY_TOO_LARGE, ((FullHttpResponse) rejected).status());
+        ((FullHttpResponse) rejected).release();
+
+        for (int i = 0; i < 5; i++) {
+            ByteBuf inFlight = io.netty.buffer.PooledByteBufAllocator.DEFAULT.buffer(32);
+            inFlight.writeBytes(("chunk" + i).getBytes(StandardCharsets.UTF_8));
+            channel.writeInbound(new DefaultHttpContent(inFlight));
+            assertEquals(0, inFlight.refCnt(), "丢弃态下第 " + i + " 个在途 content 必须释放");
+        }
+        channel.finishAndReleaseAll();
+    }
+
+    @Test
+    void oversizedThenChannelInactive_inFlightContentStillReleased() {
+        // 回归 CI/Linux(epoll) 的 20 处泄漏：413 写出即 CLOSE，channelInactive 先于在途 content 到达。
+        // releaseMultipart() 若在 inactive 时复位 discarding，这些 content 会被父类原样转发而泄漏。
+        int limit = 64;
+        EmbeddedChannel channel = new EmbeddedChannel(new SupportMultipartAggregator(limit));
+        channel.writeInbound(multipartHead());
+
+        ByteBuf oversized = io.netty.buffer.PooledByteBufAllocator.DEFAULT.buffer(128);
+        oversized.writeBytes(
+                "--boundary\r\nContent-Disposition: form-data; name=\"x\"\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+        for (int i = 0; i < 20; i++) {
+            oversized.writeByte('y');
+        }
+        channel.writeInbound(new DefaultHttpContent(oversized));
+        assertEquals(0, oversized.refCnt());
+        Object rejected = channel.readOutbound();
+        if (rejected != null) {
+            ((FullHttpResponse) rejected).release();
+        }
+
+        // 关键差异：在途 content 之前先触发 inactive（Linux 上的真实顺序）
+        channel.pipeline().fireChannelInactive();
+
+        for (int i = 0; i < 5; i++) {
+            ByteBuf inFlight = io.netty.buffer.PooledByteBufAllocator.DEFAULT.buffer(32);
+            inFlight.writeBytes(("chunk" + i).getBytes(StandardCharsets.UTF_8));
+            channel.writeInbound(new DefaultHttpContent(inFlight));
+            assertEquals(0, inFlight.refCnt(), "inactive 之后到达的在途 content 仍必须释放");
+        }
+        channel.finishAndReleaseAll();
+    }
+
+    @Test
+    void discardState_nonHttpObjectPassedThroughWithoutCastFailure() {
+        // 丢弃态只能接住 HttpObject：MessageToMessageDecoder 会把接受的入参强转为 HttpObject。
+        // HTTP/2 stream 复位等非 HttpObject 帧在拒绝之后到达时，若也返回 true 会抛 ClassCastException。
+        int limit = 64;
+        EmbeddedChannel channel = new EmbeddedChannel(new SupportMultipartAggregator(limit));
+        channel.writeInbound(multipartHead());
+
+        ByteBuf oversized = io.netty.buffer.PooledByteBufAllocator.DEFAULT.buffer(128);
+        oversized.writeBytes(
+                "--boundary\r\nContent-Disposition: form-data; name=\"x\"\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+        for (int i = 0; i < 20; i++) {
+            oversized.writeByte('y');
+        }
+        channel.writeInbound(new DefaultHttpContent(oversized));
+        Object rejected = channel.readOutbound();
+        assertNotNull(rejected, "超限必须写出拒绝响应");
+        assertEquals(HttpResponseStatus.REQUEST_ENTITY_TOO_LARGE, ((FullHttpResponse) rejected).status());
+        ((FullHttpResponse) rejected).release();
+
+        assertDoesNotThrow(() -> channel.writeInbound("not-an-http-object"), "非 HttpObject 消息不应被强转而抛异常");
         channel.finishAndReleaseAll();
     }
 }
