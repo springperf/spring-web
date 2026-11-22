@@ -1,6 +1,9 @@
 package io.springperf.web.http.support;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -12,6 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.DecoderException;
+import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
@@ -19,6 +23,7 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
 
 /**
  * {@link SupportMultipartResolver#finish()} 的 {@code server.http.multipart.max-part-count} 校验： part 总数（file +
@@ -303,5 +308,27 @@ class SupportMultipartResolverTest {
         String tmpDir = new java.io.File(System.getProperty("java.io.tmpdir")).getAbsolutePath();
         String path = upload.getFile().getAbsolutePath();
         assertTrue(path.startsWith(tmpDir), "空 location 应落到系统临时目录 " + tmpDir + "，实际：" + path);
+    }
+
+    @Test
+    void start_afterPreviousRequestReleased_neverTouchesTheStaleDecoder() {
+        // 解析器按连接复用：上一请求走完并释放后，decoder 字段仍残留该（已销毁）实例。
+        SupportMultipartResolver resolver = track(new SupportMultipartResolver(512, -1));
+        byte[] body = multipartBody(1);
+        resolver.start(newRequest(body));
+        resolver.consume(new DefaultLastHttpContent(Unpooled.wrappedBuffer(body)));
+        NettyMultipartWebRequest first = finish(resolver);
+        assertTrue(first.release(), "上一请求释放后应销毁 decoder");
+        assertThrows(IllegalStateException.class, () -> resolver.decoder.destroy(),
+                "前置条件：字段里残留的 decoder 已被上一请求的 release() 销毁");
+
+        // 用 mock 承接这个「旧实例」：复用解析器处理超限请求时，start() 不得再对它调 destroy()。
+        // 否则异常虽被释放入口吞掉（413 仍能发出），但会误报一条 destroy 失败的 WARN（实际并无残留）；修复前此处被调用两次。
+        HttpPostRequestDecoder stale = mock(HttpPostRequestDecoder.class);
+        resolver.decoder = stale;
+
+        assertThrows(TooLongFrameException.class, () -> resolver.start(newRequest(new byte[1024])));
+        verify(stale, never()).destroy();
+        assertFalse(resolver.isMultipartMode(), "超限拒绝后不应残留 multipart 状态");
     }
 }

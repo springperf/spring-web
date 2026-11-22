@@ -1,6 +1,5 @@
 package io.springperf.web.http.support;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -249,6 +248,33 @@ class NettyMultipartWebRequestReleaseTest {
             data.release();
         }
         assertTrue(multipart.release(), "destroy() 抛异常时兜底循环仍须执行，release 应返回 true");
+        // 只断言返回 true 是假绿：destroy() 在 cleanFiles 处中断时既不置 destroyed、也不释放
+        // undecodedChunk（= 请求体大小的池化 direct memory），GC 无法归还，paranoid 才会报出来。
+        assertEquals(0, refCntOfUndecodedChunk(multipart.getDecoder()), "destroy 中断后重试，undecodedChunk 必须释放");
+    }
+
+    @Test
+    void abort_afterExternalPartRelease_stillFreesUndecodedChunk() {
+        String boundary = "----B6";
+        String body = "--" + boundary + "\r\n" + "Content-Disposition: form-data; name=\"a\"\r\n\r\n" + "b\r\n" + "--"
+                + boundary + "--\r\n";
+        ByteBuf content = Unpooled.copiedBuffer(body, StandardCharsets.UTF_8);
+        FullHttpRequest req = buildMultipartRequest(content);
+
+        SupportMultipartResolver resolver = new SupportMultipartResolver();
+        resolver.start(req);
+        resolver.consume(req);
+        HttpPostRequestDecoder decoder = resolver.decoder;
+        assertTrue(refCntOfUndecodedChunk(decoder) > 0, "构造后 undecodedChunk 应持引用");
+
+        // 解码失败路径上 part 可能已被提前归零（与 release() 的 P0 场景同源）：
+        // abort() 里的 destroy() 会在 cleanFiles 处中断，必须靠重试才能把 chunk 归还。
+        for (InterfaceHttpData data : decoder.getBodyHttpDatas()) {
+            data.release();
+        }
+        resolver.abort();
+
+        assertEquals(0, refCntOfUndecodedChunk(decoder), "abort 后 undecodedChunk 必须释放（destroy 中断需重试）");
     }
 
     private static byte[] readAll(InputStream in) throws IOException {
