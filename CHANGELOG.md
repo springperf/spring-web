@@ -185,7 +185,7 @@
 - **`+json` 后缀媒体类型**：`application/vnd.spring-boot.actuator.v2+json` 这类带前缀的 `+json` 类型此前不匹配 JSON 转换器，导致 Actuator 端点返回 200 + 空 body
 - **String 请求体**：`@RequestBody String` 在 `application/json` 下必然 400（框架从未注册 `StringHttpMessageConverter`）；补上并让它排在 Jackson 之前（Spring 语义：String 原样读取，不按 JSON 解析）
 
-## [3.5.8] - 未发布
+## [3.5.8] - 20261125（预计）
 
 > ⚠️ **本版含破坏性变更**：Servlet 规范语义、视图错误与内容协商、部分配置项的校验方式均有调整，
 > **升级前请先读 [破坏性变更说明](docs/breaking-changes.md) 的 3.5.8 节**。
@@ -212,12 +212,12 @@
 - **视图错误不再静默**：视图解析异常保留原始 cause 不再被跳过；`ModelAndView` 指向不存在的视图抛异常而非 200 空白页；渲染中途抛异常不再返回 200 + 半截 HTML，改为清空缓冲后交给异常处理器（500 或自定义错误页）；`redirect:` 不再带 `text/html`，并保留 `ModelAndView` 指定的 3xx 状态码
 - **内容协商失败显式报错**：无匹配转换器的 `@ResponseBody` 返回值一律 500（原先静默返回 200 + 空响应体），同时覆盖「已显式设置 `Content-Type`」与「`produces` 协商出类型」两条链路——此前只做了前者，走 `produces` 的返回值仍被静默丢弃，连 `produces` 声明的 Content-Type 都不写。与 Spring MVC 语义一致
 - **视图渲染热路径降分配**：Thymeleaf 无 session 时上下文直接读取 model，不再每请求复制一份 `HashMap`；application 属性 Map 改为首次写入时创建；FreeMarker 解析缓存按 locale 分桶，去掉每请求拼接 `viewName + locale` 键；Content-Type 解析结果与 `redirect:` 的 `RedirectView` 均复用，避免重复解析/分配
-- **视图输出不再分配 8 KB 编码缓冲**：三个模板引擎改为经 `ViewBodyWriter` 按 128 字符分块编码、直写响应体。JDK `OutputStreamWriter` 的 `StreamEncoder` 构造时固定分配 8192 字节缓冲，几百字节的短模板也要付这份钱。实测每请求分配 Thymeleaf 30.3 KB → 21.9 KB、FreeMarker 24.6 KB → 17.3 KB（同一 JFR 口径，含示例应用自身日志开销）；编码语义与 `OutputStreamWriter` 对齐——不可映射字符按 REPLACE 处理、`close()` 关闭底层流、跨块的代理对不会丢字符
-- **外部重定向白名单不再每请求解析**：`spring.web.view.redirect-hosts` 的解析结果按配置串缓存（上限 8 个取值），3 个 host 的白名单从每请求约 660 B 降到约 5 B，10 个 host 从 1.6 KB 降到 0；配置值变更后立即按新值生效，无需重启
+- **视图输出不再分配 8 KB 编码缓冲**：三个模板引擎改为分块编码直写响应体，不再为每次渲染创建固定 8 KB 的编码缓冲；实测每请求分配 Thymeleaf 30.3 KB → 21.9 KB、FreeMarker 24.6 KB → 17.3 KB（同一 JFR 口径，含示例应用自身日志开销）。编码语义与 `OutputStreamWriter` 保持一致（不可映射字符按 REPLACE、`close()` 关闭底层流、跨块代理对不丢字符）
+- **外部重定向白名单不再每请求解析**：`spring.web.view.redirect-hosts` 的解析结果按配置串缓存，配置变更后立即生效；3 个 host 的白名单每请求分配从约 660 B 降到约 5 B
 - **配置启动期校验**：`spring.web.view.engine` 的未知值、`none` 与其他引擎混写、`spring.thymeleaf.mode` / `spring.freemarker.content-type` 非法值、以及视图引擎 `cache` / `enabled` 非 `true` / `false` 的值，均改为启动期报错而非静默忽略；`engine=none` 时不再装配内置 JSP（自定义 `ViewResolver` Bean 不受影响）
 - **批处理默认启用攒批窗口**：相比 3.5.7，未显式配置的 `@BatchMapping` 现在默认按 2ms 窗口攒批（批大小由窗口保证，单请求延迟上界增加约 2ms）。若负载很低、希望保留旧版「消费者追上空队列即刷出」的行为，显式写 `batchWindowMillis = 0`；启动期提示也改为仅在显式关闭时出现
-- **API 收敛（二进制不兼容）**：`SpringHeadersAdapter`（WebSocket 头适配器）随拆分重构移除，`NettyWebSocketSession` 构造器改为接收 Netty 的 `HttpHeaders`；从未被读取的 `ViewProperties.BEETL_MODE` / `BEETL_MODE_DEFAULT` 常量随 `spring.beetl.mode` 一起删除；`WebServerInitializedEventAutoConfiguration#webServerInitializedEventPublisher(...)` 移除（事件改由端口绑定后的 `NettyServerStartedEvent` 驱动）。迁移写法见[破坏性变更说明](docs/breaking-changes.md)的 3.5.8 节
-- **流式队列容量可配置且默认下调**：新增 `server.http.stream-max-queued-events`（默认 `4096`），SSE / 字节流发送器的入队缓冲由硬编码 `65536` 改为建连时按配置解析。JCTools 数组一次性分配，每连接由约 256KB 降到约 16KB（1000 长连接实测 251.9MB → 16.7MB，1 万连接约 2.5GB → 167MB）；A/B 基准每请求分配 314.7KB → 95.8KB（−69.6%），吞吐无劣化迹象。非 2 的幂由 JCTools 向上取整，小于 2 时 fail-fast。背压退出的 `System.nanoTime()` 同时延迟到首次入队失败后再取，快路径不再支付该调用。同步 Publisher 的 `request` 批量同时被约束到队列剩余空间：`highWaterMark` 大于容量时，此前隐含依赖 65536 覆盖常见 50000，降容量后会因入队自旋等待同栈 drain 而死锁（30s 超时），该约束已修复并补回归测试
+- **API 收敛（二进制不兼容）**：`SpringHeadersAdapter`（WebSocket 头适配器）随拆分重构移除，`NettyWebSocketSession` 构造器改为直接接收 Spring 的 `org.springframework.http.HttpHeaders`；从未被读取的 `ViewProperties.BEETL_MODE` / `BEETL_MODE_DEFAULT` 常量随 `spring.beetl.mode` 一起删除；`WebServerInitializedEventAutoConfiguration#webServerInitializedEventPublisher(...)` 签名变更（去掉 `NettyHttpServer` 参数，事件改由端口绑定后的 `NettyServerStartedEvent` 携带）。迁移写法见[破坏性变更说明](docs/breaking-changes.md)的 3.5.8 节
+- **流式队列容量可配置且默认下调**：新增 `server.http.stream-max-queued-events`（默认 `4096`），SSE / 字节流发送器的入队缓冲由硬编码 `65536` 改为建连时按配置解析。JCTools 数组一次性分配，每连接由约 256KB 降到约 16KB（1000 长连接实测 251.9MB → 16.7MB）；A/B 基准每请求分配 314.7KB → 95.8KB（−69.6%），吞吐无劣化迹象。非 2 的幂向上取整，小于 2 时启动失败；同时修复降容量后同步 Publisher 在 `highWaterMark` 超过容量时入队自旋等待同栈 drain、最终 30s 超时的问题
 
 ### 修复
 
