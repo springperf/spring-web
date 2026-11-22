@@ -1027,6 +1027,17 @@
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
 
+    <!-- ServletWebExchange.getSession()（3.5.8 的 perf(servlet) 缓存改动引入）：返回按底层
+         HttpSession 引用复用的 ServletWebSession 包装。getId 语义要求同一请求内重复读取 session
+         必须拿到同一实例，ServletWebExchangeProviderTest#exchange_getSession_reusesWrapperForSameSession
+         以 assertSame 锁定了这一身份契约，返回拷贝会破坏它。exchange 按请求创建、仅在渲染线程内使用，
+         包装本身只读桥接底层 HttpSession，无内部可变状态可泄漏，故按字段豁免。 -->
+    <Match>
+        <Class name="io.springperf.web.support.view.ServletWebExchange"/>
+        <Field name="cachedWebSession"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
     <!-- 构造器在【全部字段赋值完成之后】才启动 cleanup 守护线程（线程持 this 引用）：这是刻意的
          自维护生命周期设计。若未来被继承，子类字段尚未初始化就会被线程看到，届时需改为显式
          start()；当前无子类。 -->

@@ -432,14 +432,18 @@
                                 <!-- 3.5.8 登记（2026-11-23）：基线自本次发布起切到 3.5.7，以下都是
                                      3.5.7→3.5.8 期间有意做的 API 收敛，迁移写法见
                                      docs/breaking-changes.md 3.5.8 节末尾的三行 API 收敛条目。 -->
-                                <!-- WebSocket 拆分重构（967e6b67）：内部头适配器删除；Session 构造器改收 Netty HttpHeaders -->
+                                <!-- WebSocket 拆分重构（967e6b67）：内部头适配器删除；Session 构造器改收 Spring HttpHeaders -->
                                 <exclude>io.springperf.web.websocket.server.SpringHeadersAdapter</exclude>
                                 <exclude>io.springperf.web.websocket.server.NettyWebSocketSession#NettyWebSocketSession(io.netty.channel.Channel, java.net.URI, io.springperf.web.websocket.server.SpringHeadersAdapter, java.lang.String, java.net.InetSocketAddress, java.net.InetSocketAddress, java.security.Principal, org.springframework.web.socket.WebSocketHandler)</exclude>
                                 <!-- 从未被读取的 spring.beetl.mode 连同常量一起移除 -->
                                 <exclude>io.springperf.web.view.ViewProperties#BEETL_MODE</exclude>
                                 <exclude>io.springperf.web.view.ViewProperties#BEETL_MODE_DEFAULT</exclude>
-                                <!-- 服务就绪时机重构：改由端口绑定后的 NettyServerStartedEvent 驱动，旧工厂方法移除 -->
+                                <!-- 服务就绪时机重构：改由端口绑定后的 NettyServerStartedEvent 驱动，旧工厂方法签名变更（去掉 NettyHttpServer 参数，方法仍在） -->
                                 <exclude>io.springperf.web.autoconfigure.WebServerInitializedEventAutoConfiguration#webServerInitializedEventPublisher(io.springperf.web.server.NettyHttpServer, org.springframework.context.ApplicationContext)</exclude>
+                                <!-- 流式队列容量可配置（CHANGELOG 3.5.8）：硬编码 65536 的常量由
+                                     server.http.stream-max-queued-events（默认 4096）取代，故该 protected 常量移除；
+                                     两个子类的 FIELD_REMOVED_IN_SUPERCLASS 是同一改动的连带报告。 -->
+                                <exclude>io.springperf.web.core.async.stream.AbstractNettyStreamSender#MAX_QUEUED_EVENTS</exclude>
                             </excludes>
                         </parameter>
                     </configuration>
