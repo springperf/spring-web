@@ -56,6 +56,15 @@ public final class ChannelAttrs {
     /** 当前在途请求：连接关闭时据此找到异步持有者并让其退场（见 releaseOnConnectionClose）。 */
     public NettyServerHttpRequest inFlightRequest;
 
+    /**
+     * 本连接是否已断开（{@code channelInactive} 置位，仅置位不复位）。
+     * <p>
+     * 为什么需要它：断连时 {@code inFlightRequest} 会被清空，而异步可能**还没开始**——此时没有任何对象能记住 「这条连接已经没了」，随后才 {@code startAsync}
+     * 的请求就会带着一个永无归还机会的引用跑起来。 这个标记活到连接对象被回收为止，正好补上那段窗口。
+     * </p>
+     */
+    public boolean connectionClosed;
+
     /** 连接上下文（背压可写回调）。由响应侧在首次需要时创建。 */
     public ConnectionContext connCtx;
 

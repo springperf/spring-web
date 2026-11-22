@@ -237,6 +237,21 @@ public interface WebServerHttpRequest extends ServerHttpRequest, BodyHttpInputMe
     void acquire();
 
     /**
+     * 连接是否**已经**断开（异步开始前用它判断「客户端是不是已经走了」）。
+     * <p>
+     * 为什么需要这个判断：异步持有者的唯一归宿是**写完成回调**或**断连回调**。若连接在异步真正开始前就已断开， 两个回调都不会再发生——持有者与被 {@code acquire} 的入站缓冲会组成一个没有外部根的环，直到
+     * GC 才被 Netty 判为泄漏。
+     * </p>
+     * <p>
+     * 默认 {@code false}（= 正常）：单元测试的请求替身没有真实连接，且 boolean 的默认值就是 {@code false}， 语义与默认值一致——反过来定义成
+     * {@code isConnectionActive()} 会让所有替身自动变成「已断开」。
+     * </p>
+     */
+    default boolean isConnectionClosed() {
+        return false;
+    }
+
+    /**
      * Release the underlying Netty ByteBuf reference count.
      * <p>
      * Each call to {@link #acquire()} must be paired with a corresponding call to {@code release()} when the offloaded
