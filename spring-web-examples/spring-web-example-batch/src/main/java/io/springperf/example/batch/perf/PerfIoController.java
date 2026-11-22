@@ -27,10 +27,10 @@ import java.util.Map;
  * 成本差异可以完全归因于「聚合方式」，不存在其他混淆变量。
  * </p>
  * <p>
- * <b>为什么需要多个 batch 端点</b>：{@link BufferingBatchHandler#flush} 用 {@code executor.execute()} 异步提交，IO 在 bizExecutor 而不在
- * Disruptor 消费者线程。消费者线程只在 {@code CallerRunsPolicy} 触发（bizExecutor 满员）时才被阻塞， 因此 {@code consumerSize} 与批大小是
- * <b>直接对冲</b>的——调大并行度会同时降低攒批能力。注意 {@code consumerSize} 的正当用途是复用多核，不应超过核数：这里用 8（保守合理值）， 而非为凑效果而超配。要兼得两者，得靠
- * {@code batchWindowMillis} 把刷出时机从「消费者追上空队列」改成「窗口到期」。
+ * <b>为什么需要多个 batch 端点</b>：{@link io.springperf.web.batch.queue.BufferingBatchHandler} 用 {@code executor.execute()}
+ * 异步提交，IO 在 bizExecutor 而不在 Disruptor 消费者线程。消费者线程只在 {@code CallerRunsPolicy} 触发（bizExecutor 满员）时才被阻塞， 因此
+ * {@code consumerSize} 与批大小是 <b>直接对冲</b>的——调大并行度会同时降低攒批能力。注意 {@code consumerSize} 的正当用途是复用多核，不应超过核数：这里用 8（保守合理值），
+ * 而非为凑效果而超配。要兼得两者，得靠 {@code batchWindowMillis} 把刷出时机从「消费者追上空队列」改成「窗口到期」。
  * </p>
  */
 @RestController
@@ -52,8 +52,8 @@ public class PerfIoController {
     }
 
     /**
-     * 实验组 A（吞吐导向）：单请求方法体被 {@link BatchInvoker} 替换，只做入队并返回 {@link PerfIoRequest}； 真正的 IO 由 {@link #batchParallelFind}
-     * 批量完成。原方法体不会执行。
+     * 实验组 A（吞吐导向）：单请求方法体被 {@link io.springperf.web.batch.invoker.BatchInvoker} 替换，只做入队并返回 {@link PerfIoRequest}； 真正的 IO
+     * 由 {@link #batchParallelFind} 批量完成。原方法体不会执行。
      */
     @GetMapping("/batch-parallel/{id}")
     public PerfIoRequest batchParallel(@PathVariable String id) {
