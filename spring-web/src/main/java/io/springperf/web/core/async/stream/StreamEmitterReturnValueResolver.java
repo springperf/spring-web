@@ -53,6 +53,15 @@ public class StreamEmitterReturnValueResolver extends BaseAsyncReturnValueResolv
         }
         StreamEmitter emitter = (StreamEmitter) returnValue;
         preInitializeEmitter(emitter, req, resp);
+        // HEAD：preInitializeEmitter 里的 flush(true) 已把响应以「仅响应头」的完整消息收尾
+        // （RFC 7231 §4.3.2），语义上不存在 body。此处若照常建 StreamSender 并订阅发布者，
+        // drain 的第一帧内容会撞上已被 Netty 复位为 INIT 的 HTTP 编码器：
+        // EncoderException("unexpected message type: DefaultHttpContent, state: 0")
+        // → writeStreamErrorCallback，把一次正常的 HEAD 收尾打成 ERROR 日志，还顺带把上游订阅 cancel 掉。
+        // 响应已经写完整，不必也不得再启动流：没有 body 可写，发送器只会空转。
+        if (resp.isHeadRequest()) {
+            return;
+        }
         StreamSender sender = StreamEmitterUtil.initStreamSenderAndStartAsync(emitter, streamSenderFactory,
                 asyncSupportRegistry, req, resp);
         StreamEmitterUtil.initializeWithStreamSender(emitter, sender);
