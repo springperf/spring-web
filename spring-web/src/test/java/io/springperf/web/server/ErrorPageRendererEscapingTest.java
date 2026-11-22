@@ -73,7 +73,7 @@ class ErrorPageRendererEscapingTest {
         for (int c : new int[] { 0x00, 0x01, 0x1f }) {
             String raw = String.valueOf((char) c);
             String body = jsonBody(raw, null, IncludePolicy.NEVER);
-            assertTrue(body.contains(String.format("\\u%04x", c)),
+            assertTrue(body.contains("\\u%04x".formatted(c)),
                     "0x" + Integer.toHexString(c) + " 应转义为 \\u 形式（裸控制字符会破坏 JSON）");
             assertEquals(raw, json(body).get("message").asText(), "解码后应还原该控制字符");
         }

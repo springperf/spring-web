@@ -53,6 +53,66 @@ class PerfAsyncWebRequestTest {
     }
 
     /**
+     * 连接在异步开始前就已断开：不得持引用、不得上报在飞、也无需挂写监听器（永远不会有回调）。
+     * <p>
+     * 修复前这里会 acquire 一个永远无人归还的引用：持有者、响应与被 acquire 的请求缓冲组成一个 没有外部根的环——计数停在 1，缓冲要等 GC 才被 Netty 判为泄漏（实测见 paranoid 门禁）。
+     * </p>
+     */
+    @Test
+    void startAsync_whenConnectionAlreadyClosed_doesNotHoldRequest() {
+        when(request.isConnectionClosed()).thenReturn(true);
+
+        asyncWebRequest.startAsync();
+
+        assertTrue(asyncWebRequest.isAsyncComplete(), "连接已断时应直接按已终结入账");
+        assertFalse(asyncWebRequest.isAsyncStarted());
+        verify(request, never()).acquire();
+        verify(response, never()).addWriteRespEventListener(any());
+    }
+
+    /** 断连回调先于 startAsync 到达（此时 state 还是 NEW，回调无事可做）：粘性标记必须拦住随后那次启动。 */
+    @Test
+    void startAsync_afterConnectionCloseCallback_doesNotHoldRequest() {
+        asyncWebRequest.releaseOnConnectionClose();
+
+        asyncWebRequest.startAsync();
+
+        assertTrue(asyncWebRequest.isAsyncComplete());
+        verify(request, never()).acquire();
+    }
+
+    /** 断连回调恰好落在 acquire 与监听器注册之间：必须归还刚拿到的引用，计数净额为 0。 */
+    @Test
+    void startAsync_whenConnectionClosesRightAfterAcquire_releasesTheHold() {
+        io.springperf.web.core.metrics.CountingWebMetrics metrics = new io.springperf.web.core.metrics.CountingWebMetrics();
+        when(request.getWebContext()).thenReturn(webContext);
+        when(webContext.getWebComponent(io.springperf.web.core.metrics.WebMetrics.class)).thenReturn(metrics);
+        when(request.isConnectionClosed()).thenReturn(false, true);
+
+        asyncWebRequest.startAsync();
+
+        assertTrue(asyncWebRequest.isAsyncComplete());
+        verify(request, times(1)).release();
+        assertEquals(0, metrics.activeAsyncLifecycles(), "+1 与 -1 必须成对，净额为零");
+    }
+
+    /** 无对端可写时的显式终结：只收尾一次，重复调用不得二次归还。 */
+    @Test
+    void completeWithoutWrite_releasesOnce_andIsIdempotent() {
+        io.springperf.web.core.metrics.CountingWebMetrics metrics = new io.springperf.web.core.metrics.CountingWebMetrics();
+        when(request.getWebContext()).thenReturn(webContext);
+        when(webContext.getWebComponent(io.springperf.web.core.metrics.WebMetrics.class)).thenReturn(metrics);
+        asyncWebRequest.startAsync();
+        assertEquals(1, metrics.activeAsyncLifecycles());
+
+        asyncWebRequest.completeWithoutWrite();
+        asyncWebRequest.completeWithoutWrite();
+
+        assertEquals(0, metrics.activeAsyncLifecycles());
+        verify(request, times(1)).release();
+    }
+
+    /**
      * 计量配对：每个异步生命周期恰好 +1 / -1。第二半（重复终结不得二次递减）才是要点——递减没有幂等守卫的话 计数会变成负值，而负值与残留叠加仍可能读成 0，把真泄漏掩盖掉。
      */
     @Test

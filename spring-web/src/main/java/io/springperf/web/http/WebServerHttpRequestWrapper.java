@@ -184,6 +184,13 @@ public class WebServerHttpRequestWrapper implements WebServerHttpRequest {
         return request.release();
     }
 
+    @Override
+    public boolean isConnectionClosed() {
+        // 必须透传：接口默认值是 false（"正常"），包装器不转发就会让「断连后才开始
+        // 的异步」绕过 startAsync 的预检，回到「引用永不归还」的老路上。
+        return request.isConnectionClosed();
+    }
+
     /**
      * Spring 6.2+ HttpRequest.getAttributes(). 不加 @Override 以兼容 Spring 6.1。
      */

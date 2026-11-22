@@ -217,4 +217,11 @@ class WebServerHttpRequestWrapperTest {
         when(delegate.release()).thenReturn(true);
         assertTrue(wrapper.release());
     }
+
+    /** 断连判定必须透传：接口默认 false 会让包装过的请求绕过 startAsync 的预检（引用永不归还）。 */
+    @Test
+    void isConnectionClosed_delegates() {
+        when(delegate.isConnectionClosed()).thenReturn(true);
+        assertTrue(wrapper.isConnectionClosed());
+    }
 }

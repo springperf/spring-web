@@ -304,7 +304,7 @@ public final class ErrorPageRenderer {
                     break;
                 default:
                     if (c < 0x20) {
-                        sb.append(String.format("\\u%04x", (int) c));
+                        sb.append("\\u%04x".formatted((int) c));
                     } else {
                         sb.append(c);
                     }

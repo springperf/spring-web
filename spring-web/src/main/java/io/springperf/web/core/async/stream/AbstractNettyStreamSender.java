@@ -55,6 +55,10 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
     protected final ByteBufAllocator bufAllocator;
     protected final StreamEmitter emitter;
     protected final NettyServerHttpResponse resp;
+    /**
+     * 异步持有者：流收尾时若已无处可写，必须由发送器显式终结它（{@link PerfAsyncWebRequest#completeWithoutWrite()}）。
+     */
+    protected final PerfAsyncWebRequest asyncWebRequest;
     protected final MpscArrayQueue<Object> queue;
     /** 本发送器实际采用的队列容量（配置值或默认值），便于测试与诊断。 */
     protected final int maxQueuedEvents;
@@ -79,6 +83,7 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
 
     public AbstractNettyStreamSender(StreamEmitter emitter, PerfAsyncWebRequest asyncWebRequest) {
         this.emitter = emitter;
+        this.asyncWebRequest = asyncWebRequest;
         // getNativeResponse 声明为 @Nullable：拿不到响应就建不出发送器，明确失败好过 NPE
         this.resp = (NettyServerHttpResponse) asyncWebRequest.getNativeResponse();
         if (this.resp == null) {
@@ -290,7 +295,12 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
             // HTTP 编码器仍处于 INIT 状态，裸写 LastHttpContent 会抛
             // EncoderException("unexpected message type: LastHttpContent, state: 0")。
             // 流已无投递对象，直接收尾并关闭连接（不再写任何帧）。
+            //
+            // 注意：这条分支里【没有任何写入】，因此既不会有写完成回调、也不会因为
+            // channel.close() 再触发一次 channelInactive（连接本来就是断的）——
+            // 异步持有者必须在此显式终结，否则它与入站缓冲一起变成没有外部根的环。
             this.resp.setTimeout(null, -1);
+            asyncWebRequest.completeWithoutWrite();
             channel.close();
             return;
         }
@@ -318,6 +328,9 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
         this.resp.setWritableCallback(null);
         this.resp.setTimeout(null, -1);
         log.warn("[SSE] stream terminated with error: {}", failure != null ? failure.getMessage() : "unknown", failure);
+        // 显式终结异步持有者：下面 close() 只在连接仍存活时才会带来一次 channelInactive，
+        // 连接已断时那是空操作，兜底钩子没有第二次机会（同 onAllDataWritten 的断连分支）。
+        asyncWebRequest.completeWithoutWrite();
         this.channel.close();
     }
 
