@@ -125,6 +125,12 @@ public class SupportMultipartResolver {
         currentMultipart = true;
         this.request = request;
         this.consumedBytes = 0;
+        // 上一请求的 decoder 已被其 NettyMultipartWebRequest.release() 销毁，解析器字段仍残留该实例。
+        // 必须先置空再走下面的 fail-fast：否则超限时 abort() 会对已销毁实例再 destroy()，
+        // cleanFiles() 的 checkDestroyed() 抛 IllegalStateException，顶掉本该抛出的
+        // TooLongFrameException（413 退化成连接异常），并多打一条 destroy 失败告警（实际无残留）。
+        // 构造函数抛异常时（内部已 destroy）同样保证不留旧引用。
+        this.decoder = null;
         // 复位单 part header 增量扫描状态（resolver 按连接复用，需逐请求重置）
         this.inPartHeader = false;
         this.partHeaderLen = 0;
@@ -332,7 +338,9 @@ public class SupportMultipartResolver {
             trailingHeader = EmptyHttpHeaders.INSTANCE;
             request = null;
             if (decoder != null) {
-                decoder.destroy();
+                // 解码异常路径上也可能有 part 已被提前归零，destroy() 会在 cleanFiles 处中断并
+                // 跳过 undecodedChunk 释放；由统一入口重试一次收口，避免失败请求逐次泄漏请求体大小。
+                MultipartDecoderReleaser.destroy(decoder);
                 decoder = null;
             }
         }
