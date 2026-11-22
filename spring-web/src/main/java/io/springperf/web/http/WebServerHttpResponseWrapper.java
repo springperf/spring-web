@@ -46,6 +46,7 @@ public class WebServerHttpResponseWrapper implements WebServerHttpResponse {
     @Override public void flushChunked() throws IOException { response.flushChunked(); }
     @Override public void endStream() { response.endStream(); }
     @Override public boolean isStreaming() { return response.isStreaming(); }
+    @Override public boolean isHeadRequest() { return response.isHeadRequest(); }
     @Override public boolean markStreamCompleted() { return response.markStreamCompleted(); }
     @Override public void setBeforeCommit(Runnable callback) { response.setBeforeCommit(callback); }
     @Override public void setStatusCode(HttpStatus status) { response.setStatusCode(status); }

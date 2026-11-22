@@ -159,6 +159,40 @@ class StreamEmitterReturnValueResolverTest {
         verify(factory).create(eq(emitter), eq(asyncWebRequest));
     }
 
+    @Test
+    void resolveReturnValue_headRequest_doesNotStartStream() throws Exception {
+        // HEAD 的响应在 preInitializeEmitter 的 flush(true) 里就以「仅响应头」收尾，
+        // 编码器随即复位为 INIT。此时若仍建 StreamSender，drain 的第一帧内容会被编码器拒绝
+        // （EncoderException: unexpected message type: DefaultHttpContent, state: 0），
+        // 正常收尾被误报成流错误。契约：HEAD 不建发送器、不启动异步。
+        StreamSenderFactory factory = mock(StreamSenderFactory.class);
+        Field factoryField = StreamEmitterReturnValueResolver.class.getDeclaredField("streamSenderFactory");
+        factoryField.setAccessible(true);
+        factoryField.set(resolver, factory);
+        // 下方打桩只为让「未修复实现」走到 create() 再失败；修复后它们不会被使用，故 lenient
+        lenient().when(factory.create(any(), any())).thenReturn(mock(StreamSender.class));
+        lenient().when(request.getRequestContext()).thenReturn(mock(RequestContext.class));
+        when(response.isHeadRequest()).thenReturn(true);
+
+        StreamEmitter emitter = new StreamEmitter() {
+            @Override
+            public void encode(Object data, java.io.OutputStream out) {
+            }
+
+            @Override
+            protected void extendResponse(ServerHttpResponse response) {
+            }
+        };
+
+        resolver.resolveReturnValue(emitter, null, request, response);
+
+        verify(factory, never()).create(any(), any());
+        // initializeWithStreamSender 未被调用：emitter 里没有接入发送器
+        assertNull(emitter.streamSender);
+        // 响应仍必须被扩展并提交（HEAD 要回响应头，content-type 等元数据不能丢）
+        verify(response).flush(true);
+    }
+
     // ===== helpers =====
 
     private MethodParameter param(String methodName, Class<?> paramType) throws Exception {

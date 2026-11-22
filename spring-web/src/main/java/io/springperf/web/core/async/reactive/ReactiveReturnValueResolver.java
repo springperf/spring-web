@@ -103,7 +103,15 @@ public class ReactiveReturnValueResolver extends BaseAsyncReturnValueResolver {
         StreamEmitter emitter = createStreamEmitter(reactiveConfig, adapter, elementClass, req, resp);
         if (emitter != null) {
             StreamEmitterUtil.extendResponseAndFlush(emitter, resp, true);
-            StreamSender sender = StreamEmitterUtil.initStreamSenderAndStartAsync(emitter, streamSenderFactory, asyncSupportRegistry, req, resp);
+            // HEAD：响应已在上一行以「仅响应头」的完整消息收尾，没有 body 可写。
+            // 继续建 StreamSender 会让 drain 的第一帧撞上已复位为 INIT 的 HTTP 编码器
+            // （EncoderException ... state: 0），把正常收尾误报成流错误；订阅本身也无意义。
+            // 详见 StreamEmitterReturnValueResolver 同名分支。
+            if (resp.isHeadRequest()) {
+                return;
+            }
+            StreamSender sender = StreamEmitterUtil.initStreamSenderAndStartAsync(emitter, streamSenderFactory,
+                    asyncSupportRegistry, req, resp);
             PerfAsyncWebRequest asyncWebRequest = AsyncSupportUtils.getAsyncWebRequest(req, resp);
             PublisherToStreamEmitterAdapter streamEmitterAdapter = new PublisherToStreamEmitterAdapter(emitter, sender, reactiveConfig, asyncWebRequest);
             streamEmitterAdapter.subscribe(adapter, returnValue);
