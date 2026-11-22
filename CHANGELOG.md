@@ -231,6 +231,7 @@
 - **转发与包含**：`INCLUDE_QUERY_STRING` 按规范只放 query string、`INCLUDE_SERVLET_PATH` 去掉 query；`INCLUDE_REQUEST_URI` 改为目标资源 URI（contextPath + 目标路径，此前误写原始请求 URI），补上 Servlet 4.0+ 的 `INCLUDE_MAPPING` / `FORWARD_MAPPING`，include 结束后不再残留 `INCLUDE_*` 属性（嵌套 include 恢复外层值）
 - **HTTP/2**：修复 h2c preface 分片时的空指针
 - **上传与流式响应**：并发解析 multipart 不再产生重复条目；关闭上传流、HEAD 请求、响应头超限降级等路径不再泄漏流、文件句柄或缓冲区
+- **上传异常路径的 direct memory 泄漏**：上传解析失败、或声明长度超限而被拒绝时，约等于请求体大小的直接内存不会被回收，长时间运行会持续上涨；同时超限上传此前可能拿到连接异常而非 413
 - **WebSocket 帧处理**：分片帧按 RFC 6455 聚合后再交给业务；各种断连路径的关闭回调只触发一次；握手异常时释放请求；二进制发送不再消耗调用方 `ByteBuffer`；单帧消息与批量发送同样受大小限制和背压水位约束
 - **重定向与编码**：`//host` 协议相对目标不再拼 context-path；https 无显式端口时模板取到 443（绝对 URL 正确）；带后缀的视图名三个引擎统一支持；自定义 Content-Type 未带 charset 时补上响应实际编码
 
