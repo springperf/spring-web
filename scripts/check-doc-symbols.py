@@ -213,16 +213,24 @@ EXTERNAL_TYPES = {
     'DefaultFullHttpResponse': 'io.netty.handler.codec.http',
     'FullHttpResponse': 'io.netty.handler.codec.http',
     'HandlerExecutionChain': 'org.springframework.web.servlet（本地无 spring-webmvc，jar 查不到）',
+    'GenericApplicationContext': 'org.springframework.context.support（WebServerApplicationContextFactory 导入）',
+    'Http2StreamFrameToHttpObjectCodec': 'io.netty.handler.codec.http2（Http2ChannelInitializer 导入）',
     'HttpObjectAggregator': 'io.netty.handler.codec.http',
     'HttpPostRequestDecoder': 'io.netty.handler.codec.http',
     'HttpResponseStatus': 'io.netty.handler.codec.http',
     'IllegalArgumentException': 'java.lang',
     'IllegalStateException': 'java.lang',
     'InnerOperator': 'reactor.core.publisher',
+    'MeterRegistry': 'io.micrometer.core.instrument（MicrometerWebMetrics 导入）',
+    # 包私有内嵌类：SpringWebBatchAutoConfiguration 的内部 @Configuration，
+    # 检查器只收集顶层类名故看不到它（docs/batch.md 与 docs/en/batch.md 均引用）。
+    'MicrometerBatchMetricsConfiguration': 'io.springperf.web.autoconfigure（SpringWebBatchAutoConfiguration 内嵌类）',
     'RoutingContext': 'io.vertx.ext.web（对比表里提到的其他框架）',
     'SerializableTypeWrapper': 'org.springframework.core',
     'ServiceLoader': 'java.util（本地同名类属 surefire）',
     'SmartLifecycle': 'org.springframework.context（NettyHttpServer 实现它，phase=MAX_VALUE）',
+    # JDK 内部编码缓冲：docs/(en/)view.md 与 JFR 说明 cite 它作为被替代的分配来源。
+    'StreamEncoder': 'sun.nio.cs（JDK OutputStreamWriter 内部缓冲，非本仓导入）',
     # 以下三条只出现在 docs/overview.md 的 JFR 热点表里（`Class.method` 形式），本仓并未导入它们；
     # 来源按包名写，读者可在对应依赖里核对。
     'ByteToMessageDecoder': 'io.netty.handler.codec（JFR 热点帧，非本仓导入）',

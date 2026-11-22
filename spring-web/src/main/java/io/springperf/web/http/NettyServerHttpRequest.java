@@ -455,7 +455,6 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
      * <li>EventLoop 上没有 {@code getBody()} 调用点：body 读取只发生在参数解析（业务池/dispatch 线程）。</li>
      * </ul>
      * <b>因此：新增任何「EventLoop 上读 body」的路径之前，必须先给该字段补 volatile 或改为显式交接</b>， 否则那条路径可能读到 null 而静默返回空 body（无异常、无日志）。
-     * </p>
      */
     protected byte[] getBodyBytes() {
         if (body == null) {

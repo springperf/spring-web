@@ -3,6 +3,7 @@ import java.util.Arrays;
 
 import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.util.ReferenceCountUtil;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpHeaderNames;
@@ -132,7 +133,10 @@ class JsrEndpointWebSocketHandlerIntegrationTest {
         channel.pipeline().fireChannelRead(upgradeRequest("/ws/jsr/origin"));
         channel.runPendingTasks();
 
-        assertNotNull(channel.readOutbound(), "拒绝升级必须写回响应");
+        Object outbound = channel.readOutbound();
+        assertNotNull(outbound, "拒绝升级必须写回响应");
+        // readOutbound() 把引用计数所有权转给调用方；paranoid 模式下不释放会报 ByteBuf 泄漏。
+        ReferenceCountUtil.release(outbound);
         assertTrue(container.openSessionsOf(metadata.getPath()).isEmpty(), "被拒绝的连接不得登记为打开会话");
         assertFalse(channel.isOpen(), "拒绝后应关闭连接");
     }

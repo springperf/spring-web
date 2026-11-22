@@ -131,14 +131,11 @@ public final class PropertiesConstant {
      * 单个流式响应（SSE / 字节流）发送器的入队缓冲容量上限（事件条数），默认 {@value #STREAM_MAX_QUEUED_EVENTS_DEFAULT}。
      * <p>
      * 发送器持有 {@code MpscArrayQueue}，JCTools 在构造时一次性分配底层 {@code Object[]}（压缩指针下约 {@code capacity × 4}
-     * 字节），因此该值直接决定每个活跃长连接的常驻堆内存：4096 ≈ 16KB，而原先硬编码的 65536 ≈ 256KB。 1 万长连接相差约
-     * 2.4GB——这是 SSE 内存占用的大头，远超逐消息的 ByteBuf 分配。
+     * 字节），因此该值直接决定每个活跃长连接的常驻堆内存：4096 ≈ 16KB，而原先硬编码的 65536 ≈ 256KB。 1 万长连接相差约 2.4GB——这是 SSE 内存占用的大头，远超逐消息的 ByteBuf 分配。
      * <p>
-     * 容量单位是「排队事件数」而非字节数；实际缓冲字节数还取决于单帧编码大小。JCTools 会把非 2 的幂配置向上取整到 2 的幂，
-     * 故无需强制用户按 2 的幂填写。小于 2 视为非法配置（启动发送器时 fail-fast）。
+     * 容量单位是「排队事件数」而非字节数；实际缓冲字节数还取决于单帧编码大小。JCTools 会把非 2 的幂配置向上取整到 2 的幂， 故无需强制用户按 2 的幂填写。小于 2 视为非法配置（启动发送器时 fail-fast）。
      * <p>
-     * 减小该值会让「快生产者 + 慢消费者」更早进入背压自旋（有 30s 超时兜底），但比堆内存被打满要好； 队列容量在连接建立时确定，
-     * 配置刷新只影响后续新建的流。
+     * 减小该值会让「快生产者 + 慢消费者」更早进入背压自旋（有 30s 超时兜底），但比堆内存被打满要好； 队列容量在连接建立时确定， 配置刷新只影响后续新建的流。
      */
     public static final String STREAM_MAX_QUEUED_EVENTS = "server.http.stream-max-queued-events";
     public static final int STREAM_MAX_QUEUED_EVENTS_DEFAULT = 4096;

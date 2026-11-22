@@ -216,7 +216,6 @@ public abstract class BaseWebServerHttpRequest implements WebServerHttpRequest, 
      * {@code PerfAsyncWebRequest.dispatch()} 的 {@code state} CAS。
      * </p>
      * <b>若将来在 EventLoop 上新增 Locale 读取（如内容协商前置到匹配阶段），必须先给该字段补 volatile。</b>
-     * </p>
      */
     public List<Locale> getLocales() {
         if (locales == null) {

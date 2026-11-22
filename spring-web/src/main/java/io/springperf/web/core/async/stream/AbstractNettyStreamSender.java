@@ -41,8 +41,7 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
     /**
      * 队列容量默认值；实际值由 {@link PropertiesConstant#STREAM_MAX_QUEUED_EVENTS} 在每条流建连时解析。
      * <p>
-     * 从 65536 降到 4096：单连接队列数组由约 256KB 降到约 16KB（1 万长连接省约 2.4GB 堆），
-     * A/B 实测每请求分配量降低约 70% 且吞吐无劣化迹象。
+     * 从 65536 降到 4096：单连接队列数组由约 256KB 降到约 16KB（1 万长连接省约 2.4GB 堆）， A/B 实测每请求分配量降低约 70% 且吞吐无劣化迹象。
      */
     protected static final int DEFAULT_MAX_QUEUED_EVENTS = PropertiesConstant.STREAM_MAX_QUEUED_EVENTS_DEFAULT;
 
@@ -96,8 +95,8 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
     }
 
     /**
-     * 从 WebContext 配置解析队列容量。mock 场景下 webContext/props 可能为 null，回退默认值；
-     * 配置值小于 2 时 fail-fast（JCTools 队列无法在容量 1 下正常做 MPSC 竞争）。
+     * 从 WebContext 配置解析队列容量。mock 场景下 webContext/props 可能为 null，回退默认值； 配置值小于 2 时 fail-fast（JCTools 队列无法在容量 1 下正常做 MPSC
+     * 竞争）。
      */
     private static int resolveMaxQueuedEvents(WebContext webContext) {
         if (webContext == null || webContext.getProps() == null) {
@@ -106,8 +105,8 @@ public abstract class AbstractNettyStreamSender implements StreamSender {
         ApplicationProperties props = webContext.getProps();
         int configured = props.getInt(PropertiesConstant.STREAM_MAX_QUEUED_EVENTS);
         if (configured < 2) {
-            throw new IllegalStateException("Invalid " + PropertiesConstant.STREAM_MAX_QUEUED_EVENTS
-                    + ": " + configured + " (must be >= 2)");
+            throw new IllegalStateException(
+                    "Invalid " + PropertiesConstant.STREAM_MAX_QUEUED_EVENTS + ": " + configured + " (must be >= 2)");
         }
         return configured;
     }
