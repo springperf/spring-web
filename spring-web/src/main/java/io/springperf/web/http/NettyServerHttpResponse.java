@@ -93,7 +93,8 @@ public class NettyServerHttpResponse extends BaseWebServerHttpResponse {
         this.http10 = true;
     }
 
-    protected boolean isHeadRequest() {
+    @Override
+    public boolean isHeadRequest() {
         return headRequest;
     }
 

@@ -318,6 +318,36 @@ class ReactiveReturnValueResolverFlowTest {
         verify(streamSenderFactory).create(any(), any());
     }
 
+    @Test
+    void resolveReturnValue_headRequest_skipsSenderAndSubscription() throws Exception {
+        // HEAD：响应在 extendResponseAndFlush 里就以「仅响应头」收尾（编码器复位为 INIT）。
+        // 若仍建发送器，drain 的内容帧会被编码器拒绝（unexpected message type: DefaultHttpContent, state: 0），
+        // 正常 HEAD 收尾被误报成流错误。契约：不建发送器、不订阅发布者。
+        when(response.isHeadRequest()).thenReturn(true);
+        requestHeaders.setAccept(Collections.singletonList(MediaType.TEXT_EVENT_STREAM));
+        responseHeaders.setContentType(MediaType.TEXT_EVENT_STREAM);
+        java.util.concurrent.atomic.AtomicInteger subscriptions = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.Flow.Publisher<String> p = subscriber -> {
+            subscriptions.incrementAndGet();
+            subscriber.onSubscribe(new java.util.concurrent.Flow.Subscription() {
+                @Override
+                public void request(long n) {
+                }
+
+                @Override
+                public void cancel() {
+                }
+            });
+        };
+
+        resolver.resolveReturnValue(p, param("handler", java.util.concurrent.Flow.Publisher.class), request, response);
+
+        assertEquals(0, subscriptions.get(), "HEAD 没有 body 可发，不应订阅发布者");
+        verify(streamSenderFactory, never()).create(any(), any());
+        // 响应仍必须被提交（HEAD 要回响应头，不能因为跳过流而连 header 都不发）
+        verify(response).flush(true);
+    }
+
     private static java.util.concurrent.Flow.Publisher<String> simplePublisher() {
         return subscriber -> subscriber.onSubscribe(new java.util.concurrent.Flow.Subscription() {
             private boolean done;

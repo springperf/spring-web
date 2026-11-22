@@ -141,6 +141,11 @@ public class WebServerHttpResponseWrapper implements WebServerHttpResponse {
     }
 
     @Override
+    public boolean isHeadRequest() {
+        return response.isHeadRequest();
+    }
+
+    @Override
     public boolean markStreamCompleted() {
         return response.markStreamCompleted();
     }

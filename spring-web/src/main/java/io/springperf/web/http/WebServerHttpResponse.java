@@ -276,6 +276,20 @@ public interface WebServerHttpResponse extends ServerHttpResponse {
     }
 
     /**
+     * 当前响应是否对应 HEAD 请求（body 被抑制）。
+     * <p>
+     * 这是「响应不能有 body」的权威信号：HEAD 响应在首次 flush 时就以「仅响应头」的完整消息收尾，HTTP 编码器随即复位为 INIT。
+     * 任何流式写入方（{@code StreamSender}）若继续写内容帧，都会被编码器以 {@code unexpected message type: DefaultHttpContent, state:
+     * 0} 拒绝，于是正常的 HEAD 收尾被误报成流错误。需要写 body 的组件应在启动流之前读此标志。
+     * </p>
+     *
+     * @return 默认 {@code false}（不是 HEAD），未覆盖此方法的实现行为与新增该方法之前一致
+     */
+    default boolean isHeadRequest() {
+        return false;
+    }
+
+    /**
      * 由外部流写入方（{@code StreamSender} 直写 channel 的场景）标记流已终止， 使请求收尾的 {@link #endStream()} 成为空操作（避免写出第二个终止块）。
      */
     default boolean markStreamCompleted() {
