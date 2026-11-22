@@ -18,6 +18,7 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
+import io.netty.util.ReferenceCountUtil;
 import io.springperf.web.context.ApplicationProperties;
 
 /**
@@ -76,10 +77,21 @@ class SupportHttpContentCompressorTest {
         return resp;
     }
 
-    /** 写出响应并取回「头」对象（压缩命中时是 HttpResponse，未压缩时是 FullHttpResponse）。 */
+    /**
+     * 写出响应并取回「头」对象（压缩命中时是 HttpResponse，未压缩时是 FullHttpResponse）。
+     * <p>
+     * 压缩命中时 Netty 会把响应拆成「{@code HttpResponse} 头 + 若干 {@code HttpContent} 体」， 这里只关心头，其余必须排空并释放：{@link EmbeddedChannel}
+     * 的出站队列不会自动清理， 留在队列里的 {@code HttpContent} 持有 zlib 编码器分配的池化 buffer，一旦 channel 被 GC 就触发 paranoid 泄漏检测的
+     * {@code LEAK: ByteBuf} 报告。
+     * </p>
+     */
     private static HttpResponse writeAndReadHeaders(EmbeddedChannel ch, FullHttpResponse resp) {
         ch.writeOutbound(resp);
-        return ch.readOutbound();
+        HttpResponse out = ch.readOutbound();
+        for (Object msg = ch.readOutbound(); msg != null; msg = ch.readOutbound()) {
+            ReferenceCountUtil.release(msg);
+        }
+        return out;
     }
 
     // ---------- Content-Type 主类型：;charset 剥离、大小写归一 ----------
@@ -247,6 +259,20 @@ class SupportHttpContentCompressorTest {
         ch.writeInbound(req); // 不带 Accept-Encoding
         HttpResponse out = writeAndReadHeaders(ch, okWithContentType("text/html", repeat('x', 100)));
         assertThat(out.headers().get(HttpHeaderNames.CONTENT_ENCODING)).isNull();
+    }
+
+    // ---------- 出站队列必须排空（paranoid 泄漏回归防护） ----------
+
+    @Test
+    void compressedResponse_leavesNoPendingOutboundMessages() {
+        // 压缩命中时 Netty 除头以外还会产出 2 个 HttpContent，各自持有 zlib 编码器分配的池化
+        // buffer。只读头不排空的话它们会滞留在 EmbeddedChannel 出站队列，channel 被 GC 后
+        // paranoid 泄漏检测就会报 LEAK: ByteBuf（CI 的 20 处即由此而来）。
+        EmbeddedChannel ch = channel(config());
+        requestGzip(ch, null);
+        HttpResponse out = writeAndReadHeaders(ch, okWithContentType("text/html", repeat('x', 100)));
+        assertThat(out.headers().get(HttpHeaderNames.CONTENT_ENCODING)).isEqualTo("gzip");
+        assertThat(ch.outboundMessages()).as("压缩响应体必须排空并释放，否则池化 buffer 泄漏").isEmpty();
     }
 
     /** JDK 8 无 {@code String.repeat}（JDK 11+）：测试内等价实现。 */
