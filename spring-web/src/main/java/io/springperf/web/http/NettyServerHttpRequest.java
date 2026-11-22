@@ -3,6 +3,7 @@ package io.springperf.web.http;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpHeaderNames;
@@ -16,6 +17,7 @@ import org.springframework.http.HttpMethod;
 import io.springperf.web.http.support.HttpInputMessagePart;
 import io.springperf.web.http.support.NettyAttributeMessage;
 import io.springperf.web.http.support.NettyMultipartWebRequest;
+import io.springperf.web.server.ChannelAttrs;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.util.LinkedMultiValueMap;
@@ -504,6 +506,18 @@ public class NettyServerHttpRequest extends BaseWebServerHttpRequest {
     @Override
     public void acquire() {
         ReferenceCountUtil.retain(request);
+    }
+
+    @Override
+    public boolean isConnectionClosed() {
+        Channel channel = ctx.channel();
+        ChannelAttrs attrs = ChannelAttrs.ofIfPresent(channel);
+        if (attrs == null) {
+            // 本连接没走过请求路径（单元测试替身 / 尚未建 attrs）：按「正常」处理，
+            // 否则替身 channel 的默认 isActive()=false 会把每个单测请求都判成已断开。
+            return false;
+        }
+        return attrs.connectionClosed || !channel.isActive();
     }
 
     @Override

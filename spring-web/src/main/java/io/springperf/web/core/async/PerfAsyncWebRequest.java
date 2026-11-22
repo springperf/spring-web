@@ -25,6 +25,15 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
     private final AtomicBoolean requestRefHeld = new AtomicBoolean(false);
 
     /**
+     * 连接是否已断开（断连回调置位，仅置位不复位）。
+     * <p>
+     * <b>必须粘性</b>：{@link #releaseOnConnectionClose()} 可能早于 {@link #startAsync()} 到达——此时 {@code state} 还是 {@code
+     * NEW}，那次 CAS 失败、也没有引用可归还，什么都没做；若不留标记，随后的 {@code startAsync} 会把一个「已经断开的请求」正常启动起来， 从此再没有任何回调能终结它。
+     * </p>
+     */
+    private volatile boolean connectionClosed;
+
+    /**
      * 本请求所属 context 的计量组件，**懒解析**（首次用到时才查容器，解析结果缓存在此）。
      *
      * <p>懒解析不是可选项：既有单测锁定了「无操作路径不触碰 {@link WebContext}」这一契约 ——
@@ -127,6 +136,9 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
      * errorHandler（客户端中断不是业务错误，避免日志/指标噪声）。</p>
      */
     public void releaseOnConnectionClose() {
+        // 粘性标记：本方法可能早于 startAsync 到达（state 还是 NEW，CAS 无事可做），
+        // 由 startAsync 读此标记兜住「断连后才开始的异步」。
+        this.connectionClosed = true;
         state.compareAndSet(State.ASYNC_STARTED, State.COMPLETED);
         // 原子取出并清空：无论多少个断连信号并发到达，钩子至多执行一次
         Runnable handler = this.connectionCloseHandler.getAndSet(null);
@@ -220,23 +232,52 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
         if (!state.compareAndSet(State.NEW, State.ASYNC_STARTED)) {
             throw new IllegalStateException("Async already started");
         }
+        if (isConnectionGone()) {
+            // 客户端在异步真正开始前就走了：成功/失败两条写回调都不会再发生，
+            // 断连回调也已经用过它唯一的机会（见 connectionClosed 的注释）。
+            // 此时若照常 acquire，持有者、响应与被 acquire 的入站缓冲会组成一个
+            // 没有外部根的环 —— 计数永远停在 1，缓冲要等 GC 才被 Netty 判为泄漏。
+            // 直接按「已终结」入账：不持有引用、不上报在飞，后续写入各自失败并被忽略。
+            state.set(State.COMPLETED);
+            log.debug("async start skipped: connection already closed");
+            return;
+        }
         // 异步持有者诞生：CAS 成功保证只执行一次。异步阶段若读请求体（大 body 为 content 的
         // duplicate 共享视图）依赖入站 buf 存活，故在此 acquire，由 releaseRequestOnce() 归还。
         request.acquire();
         requestRefHeld.set(true);
         metrics().asyncLifecycleStarted();
+        // 二次检查：断连回调可能恰好落在上面几行之间——那时它读到的 requestRefHeld 还是 false，
+        // 不会替我们归还，于是标记置位后就再没有第二次机会。先发布持有标记再复查，
+        // 两侧各自带 CAS 守卫，最终恰好归还一次（先 +1 后 -1，计数净额不变）。
+        if (isConnectionGone()) {
+            state.set(State.COMPLETED);
+            releaseRequestOnce();
+            return;
+        }
         response.addWriteRespEventListener(this);
     }
 
     /**
+     * 连接是否已不可写：优先用粘性标记（断连回调先到），否则直接问底层连接（回调还没轮到、channel 已关闭）。
+     */
+    private boolean isConnectionGone() {
+        return connectionClosed || request.isConnectionClosed();
+    }
+
+    /**
      * 异步持有者退场（幂等，仅一次）：入站请求引用 -1。
-     *
-     * <p>只在响应【写终结】回调里调用（{@code completeSuccessCallback}/{@code completeErrorCallback}）：
-     * 写完成时响应已提交，请求释放触发的 {@code resp.release()} 为空操作；写失败时响应永无提交机会，
-     * 恰好兜底释放其未提交 buf。超时/断连无需另设释放点——超时响应是一次写入、断连会让写入 future
-     * 失败，两者都会走到这里。</p>
-     *
-     * <p><b>切勿</b>在 {@code writeStreamSuccessCallback} 等【逐 chunk】回调里调用——那是每帧触发。</p>
+     * <p>
+     * 只在响应【写终结】回调里调用（{@code completeSuccessCallback}/{@code completeErrorCallback}）： 写完成时响应已提交，请求释放触发的
+     * {@code resp.release()} 为空操作；写失败时响应永无提交机会， 恰好兜底释放其未提交 buf。
+     * </p>
+     * <p>
+     * <b>但「写终结」不是必然发生的</b>：连接在写入前就已断开时既没有 future 也没有断连回调的第二次机会， 于是有了 {@link #completeWithoutWrite()}（流式发送器在无对端时显式调用）与
+     * {@link #startAsync()} 里的断连预检。改动释放路径时请同时看这两处——把「一定会写」当成前提会直接漏掉整个请求体大小的缓冲。
+     * </p>
+     * <p>
+     * <b>切勿</b>在 {@code writeStreamSuccessCallback} 等【逐 chunk】回调里调用——那是每帧触发。
+     * </p>
      */
     private void releaseRequestOnce() {
         if (requestRefHeld.compareAndSet(true, false)) {
@@ -246,16 +287,36 @@ public class PerfAsyncWebRequest extends PerfNativeWebRequest implements AsyncWe
     }
 
     /**
-     * 「更短时限生效」：异步超时（{@code spring.mvc.async.request-timeout}）与响应超时
-     * （{@code server.http.timeout}）取更短者。
-     *
-     * <p>到点时仍执行<b>异步</b>超时处理器（{@link #timeoutHandler}）——异步请求以 503 收尾
-     * （Spring 语义），而不是响应超时的 504（异步挂起时响应已标记 handled，504 的写出会被拒绝）。
-     * 若只装配异步超时，较短的 {@code server.http.timeout} 会被它顶掉
-     * （{@code BaseWebServerHttpResponse#setTimeout} 会先取消旧定时器再装新的），
-     * 「更短时限生效」这条契约就破了：CI 上表现为 1s 的响应超时没生效、2.5s 的迟到结果拿走了 200。</p>
-     *
-     * <p>{@code server.http.timeout <= 0} 表示不限制，不参与比较。</p>
+     * 流式发送器「已无对端可写」时的显式终结：只做生命周期收尾，不再尝试任何写入。
+     * <p>
+     * 为什么必须显式调用：流正常/异常收尾原本依赖「写一个 {@code LastHttpContent}，由它的 future 回调归还引用」， 断连路径再依赖 {@code channel.close()
+     * → channelInactive} 兜底。连接在流结束前就已断开时这两条都不成立—— 写入根本不会发生（没有 future），close() 也不会再触发一次
+     * {@code channelInactive}，持有者就永远留着。
+     * </p>
+     * <p>
+     * 幂等：{@code state} 已为 COMPLETED 时直接返回，避免 completionHandler 被重复触发。
+     * </p>
+     */
+    public void completeWithoutWrite() {
+        if (state.getAndSet(State.COMPLETED) == State.COMPLETED) {
+            return;
+        }
+        releaseRequestOnce();
+        if (completionHandler != null) {
+            completionHandler.run();
+        }
+    }
+
+    /**
+     * 「更短时限生效」：异步超时（{@code spring.mvc.async.request-timeout}）与响应超时（{@code server.http.timeout}）取更短者。
+     * <p>
+     * 到点时仍执行<b>异步</b>超时处理器（{@link #timeoutHandler}）——异步请求以 503 收尾（Spring 语义），而不是响应超时的 504（异步挂起时响应已标记 handled，504
+     * 的写出会被拒绝）。若只装配异步超时，较短的 {@code server.http.timeout} 会被它顶掉 （{@code BaseWebServerHttpResponse#setTimeout}
+     * 会先取消旧定时器再装新的）， 「更短时限生效」这条契约就破了：CI 上表现为 1s 的响应超时没生效、2.5s 的迟到结果拿走了 200。
+     * </p>
+     * <p>
+     * {@code server.http.timeout <= 0} 表示不限制，不参与比较。
+     * </p>
      */
     private long effectiveAsyncTimeoutMillis() {
         WebContext webContext = request != null ? request.getWebContext() : null;

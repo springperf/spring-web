@@ -57,6 +57,13 @@ public class WebServerHttpRequestWrapper implements WebServerHttpRequest {
     @Override public void acquire() { request.acquire(); }
     @Override public boolean release() { return request.release(); }
 
+    @Override
+    public boolean isConnectionClosed() {
+        // 必须透传：接口默认值是 false（"正常"），包装器不转发就会让「断连后才开始
+        // 的异步」绕过 startAsync 的预检，回到「引用永不归还」的老路上。
+        return request.isConnectionClosed();
+    }
+
     /**
      * 委托给被包装的请求。
      * <p>

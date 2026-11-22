@@ -3,6 +3,9 @@ package io.springperf.web.annotation;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
+import static java.lang.annotation.ElementType.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
 /**
  * 标记需要框架针对性优化的控制器类或方法。
  *

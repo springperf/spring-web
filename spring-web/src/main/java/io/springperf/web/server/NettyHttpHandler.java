@@ -211,6 +211,9 @@ public class NettyHttpHandler extends ChannelInboundHandlerAdapter {
             super.channelInactive(ctx);
             return;
         }
+        // 粘性断开标记：下面的 inFlightRequest 会被清空，而此刻可能还没有异步持有者
+        // （请求已登记、startAsync 尚未执行）。留个记号，让随后才启动的异步能看见。
+        attrs.connectionClosed = true;
         ArrayDeque<FullHttpRequest> queue = attrs.pipeliningPending;
         attrs.pipeliningPending = null;
         if (queue != null) {

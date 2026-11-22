@@ -159,6 +159,21 @@ class AsyncSseRobustnessE2eTest {
         assertEquals(0, activeRequestRefs(), "场景结束后异步持有者引用应归零（用例起点基线 " + baseline + "，残留即未终结的异步生命周期）");
     }
 
+    /**
+     * 等「本请求确实进入了异步」再执行后续动作（断开连接 / 断言）。
+     * <p>
+     * 用例若在服务端接手之前就动手，验证的是一个空场景——通过与否都不携带信息。 计数由 {@code @BeforeEach} 保证从 0 起，故「大于基线」即说明服务端已开始处理。
+     * </p>
+     */
+    private void awaitAsyncStarted(int baseline, long timeoutMillis) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + timeoutMillis;
+        while (activeRequestRefs() <= baseline && System.currentTimeMillis() < deadline) {
+            Thread.sleep(5);
+        }
+        assertTrue(activeRequestRefs() > baseline,
+                timeoutMillis + "ms 内服务端未进入异步（基线 " + baseline + "），用例前置条件不成立");
+    }
+
     // ==================== 1. pipelining × 流式 ====================
 
     @Test
@@ -253,15 +268,23 @@ class AsyncSseRobustnessE2eTest {
     @Test
     void headRequest_sse_headersOnly_noBody_lifecycleTerminates() throws Exception {
         int baseline = activeRequestRefs();
-        try (Socket s = openSocket(6000)) {
+        try (Socket s = openSocket(3000)) {
             send(s, "HEAD /e2e-rob/sse HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
-            String resp = readAll(s, 6000);
-            assertTrue(resp.startsWith("HTTP/1.1 200"), "实际:\n" + resp);
-            assertFalse(resp.contains("rob-sse-a"), "HEAD 不得回 body（Content-Length 可保留真实长度），实际:\n" + resp);
-            assertTrue(resp.toLowerCase().contains("content-type: text/event-stream"), "实际:\n" + resp);
+            // 只等响应头落定：HEAD 无 body，原先 readAll(6000) 会白等满整个 socket 超时（实测固定 6.0s）。
+            String head = readUntil(s, text -> text.contains("\r\n\r\n"), 3000);
+            assertTrue(head.startsWith("HTTP/1.1 200"), "实际:\n" + head);
+            assertFalse(head.contains("rob-sse-a"), "HEAD 不得回 body（Content-Length 可保留真实长度），实际:\n" + head);
+            assertTrue(head.toLowerCase().contains("content-type: text/event-stream"), "实际:\n" + head);
+            // 再留一个短窗口确认没有 body 跟随：该端点的两条数据在 30ms 内发完，真写了 body 这段必定读到。
+            // 收窄 soTimeout 是关键——readUntil 的 deadline 只在两次 read 之间生效，单次 read 仍会阻塞满 soTimeout。
+            s.setSoTimeout(500);
+            String leaked = readAll(s, 500);
+            assertTrue(leaked.isEmpty(), "HEAD 不得回 body，实际额外收到：\n" + leaked);
+            // 关键：连接**仍然开着**时就要求引用归零（没有 body 写出也要能终结异步生命周期，
+            // 否则 HEAD + SSE 会悬挂）。若放到 try 块外断言，socket 已经关闭，
+            // 「先断开、再归零」也会通过——那测的就不是 HEAD 的收尾，而是断连兜底了。
+            assertRefsBackTo(baseline);
         }
-        // 关键：没有 body 写出也要能终结异步生命周期（否则 HEAD + SSE 会悬挂）
-        assertRefsBackTo(baseline);
     }
 
     @Test
@@ -544,8 +567,16 @@ class AsyncSseRobustnessE2eTest {
     void clientAbort_beforeFirstChunk_refsBack_noHang() throws Exception {
         int baseline = activeRequestRefs();
         Socket s = openSocket(3000);
-        send(s, "GET /e2e-rob/sse-slow-start HTTP/1.1\r\nHost: localhost\r\n\r\n");
-        s.close(); // 首块送出之前就断开
+        try {
+            send(s, "GET /e2e-rob/sse-slow-start HTTP/1.1\r\nHost: localhost\r\n\r\n");
+            // 必须等服务端**真的接手**这个请求再断开。直接 close 时服务端可能还没开始处理，
+            // 断言会在「什么都没发生」时通过（实测 0.003s 绿），既测不到断连兜底，
+            // 又把「断开之后才开始异步」这个真正的竞态留在了用例之外——那个竞态在负载下
+            // 会留下永久的异步持有者（paranoid 门禁实测：计数停在 1、请求缓冲泄漏）。
+            awaitAsyncStarted(baseline, 5000);
+        } finally {
+            s.close(); // 首块送出之前就断开
+        }
         assertRefsBackTo(baseline);
     }
 

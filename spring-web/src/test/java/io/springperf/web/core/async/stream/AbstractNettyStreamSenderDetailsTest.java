@@ -1,5 +1,23 @@
 package io.springperf.web.core.async.stream;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.embedded.EmbeddedChannel;
@@ -78,6 +96,37 @@ class AbstractNettyStreamSenderDetailsTest {
 
         assertThrows(IOException.class, () -> sender.send("x"),
                 "通道关闭后发送应快速失败");
+    }
+
+    /**
+     * 流在连接断开后收尾：这条分支不写任何帧（没有写完成回调），{@code channel.close()} 也不会再触发一次 {@code channelInactive}（连接本来就断着）——异步持有者必须由发送器显式终结。
+     * <p>
+     * 修复前这里什么都不做：持有者与入站缓冲变成没有外部根的环，在飞计数停在 1，缓冲等 GC 才被 Netty 判为泄漏。
+     * </p>
+     */
+    @Test
+    void complete_whenChannelInactive_completesAsyncWithoutWriting() {
+        DefaultNettyStreamSender sender = newSender();
+        asyncWebRequest.startAsync();
+        channel.close().awaitUninterruptibly();
+
+        sender.complete(false, null);
+
+        assertTrue(asyncWebRequest.isAsyncComplete(), "无对端可写时流收尾必须终结异步持有者");
+        verify(req, times(1)).release();
+    }
+
+    /** 错误终止同理：它也只 close 连接，连接已断时兜底钩子没有第二次机会。 */
+    @Test
+    void completeWithError_whenChannelInactive_stillCompletesAsync() {
+        DefaultNettyStreamSender sender = newSender();
+        asyncWebRequest.startAsync();
+        channel.close().awaitUninterruptibly();
+
+        sender.complete(false, new IOException("boom"));
+
+        assertTrue(asyncWebRequest.isAsyncComplete());
+        verify(req, times(1)).release();
     }
 
     @Test
