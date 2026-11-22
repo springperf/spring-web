@@ -170,8 +170,7 @@ class AsyncSseRobustnessE2eTest {
         while (activeRequestRefs() <= baseline && System.currentTimeMillis() < deadline) {
             Thread.sleep(5);
         }
-        assertTrue(activeRequestRefs() > baseline,
-                timeoutMillis + "ms 内服务端未进入异步（基线 " + baseline + "），用例前置条件不成立");
+        assertTrue(activeRequestRefs() > baseline, timeoutMillis + "ms 内服务端未进入异步（基线 " + baseline + "），用例前置条件不成立");
     }
 
     // ==================== 1. pipelining × 流式 ====================

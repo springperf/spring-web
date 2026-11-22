@@ -96,27 +96,52 @@ public class SecurityE2ETest extends BaseE2ETest {
         assertTrue(raw.startsWith("HTTP/1.1 413"), "chunked multipart 累计超限必须被 413 拒绝，实际响应: " + raw);
     }
 
-    /** 以 chunked 方式发送给定 payload，返回服务端原始响应文本（连接被 RST 时返回空串）。 */
+    /**
+     * 以 chunked 方式发送给定 payload，返回服务端原始响应文本。
+     * <p>
+     * 服务端累计超限后立即回 413 并关闭连接。Linux 上若此时客户端仍在写未读数据，关闭连接产生的 RST 会把服务端已回、客户端尚未读走的响应冲掉——这是本机 NIO 不复现、CI(epoll) 必现的竞态。读取端在
+     * finally 中无条件保存已读字节（含 RST 前读到的状态行），并对该用例做有限重试以吸收残留竞态。
+     * </p>
+     */
     private String rawChunkedMultipart(byte[] payload, int chunkSize) throws Exception {
+        String last = "";
+        for (int attempt = 0; attempt < 3; attempt++) {
+            last = rawChunkedMultipartOnce(payload, chunkSize);
+            if (last.startsWith("HTTP/1.1")) {
+                return last;
+            }
+        }
+        return last;
+    }
+
+    private String rawChunkedMultipartOnce(byte[] payload, int chunkSize) throws Exception {
         java.nio.charset.Charset ascii = java.nio.charset.StandardCharsets.US_ASCII;
         try (java.net.Socket socket = new java.net.Socket("localhost", serverPort)) {
             socket.setSoTimeout(5000);
             java.io.OutputStream out = socket.getOutputStream();
             java.io.InputStream in = socket.getInputStream();
-            // 边写边读：服务端回 413 后立即关闭连接，若响应没被及时读走，RST 会把它冲掉
             java.util.concurrent.atomic.AtomicReference<String> rawResp = new java.util.concurrent.atomic.AtomicReference<>(
                     "");
+            java.util.concurrent.CountDownLatch responseSeen = new java.util.concurrent.CountDownLatch(1);
+            java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
             Thread reader = new Thread(() -> {
                 try {
-                    java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
                     byte[] b = new byte[4096];
                     int r;
-                    while ((r = in.read(b)) != -1 && buf.size() < 8192) {
+                    while ((r = in.read(b)) != -1 && buf.size() < 65536) {
                         buf.write(b, 0, r);
+                        // 读到状态行即通知 writer 停写（超限场景）；继续读到连接关闭以拿到完整 body（正常场景）。
+                        if (buf.size() >= 12 && new String(buf.toByteArray(), 0, 12, ascii).startsWith("HTTP/1.1")) {
+                            responseSeen.countDown();
+                        }
                     }
-                    rawResp.set(new String(buf.toByteArray(), java.nio.charset.StandardCharsets.UTF_8));
                 } catch (Exception ignored) {
-                    // 连接被 RST 时读不到响应，保留空串由断言给出明确失败
+                    // RST：已读字节仍由 finally 保存，交由断言判定是否拿到 413
+                } finally {
+                    // 无论正常结束还是 RST，都保存已读字节。若等到正常退出才保存，
+                    // RST 会把读到的状态行一并丢弃，断言就只看到空串（CI 失败根因）。
+                    rawResp.set(new String(buf.toByteArray(), java.nio.charset.StandardCharsets.UTF_8));
+                    responseSeen.countDown();
                 }
             });
             reader.setDaemon(true);
@@ -129,13 +154,18 @@ public class SecurityE2ETest extends BaseE2ETest {
             out.flush();
             try {
                 for (int offset = 0; offset < payload.length; offset += chunkSize) {
+                    if (responseSeen.getCount() == 0) {
+                        break;
+                    }
                     int size = Math.min(chunkSize, payload.length - offset);
                     out.write((Integer.toHexString(size) + "\r\n").getBytes(ascii));
                     out.write(payload, offset, size);
                     out.write("\r\n".getBytes(ascii));
                 }
-                out.write("0\r\n\r\n".getBytes(ascii));
-                out.flush();
+                if (responseSeen.getCount() != 0) {
+                    out.write("0\r\n\r\n".getBytes(ascii));
+                    out.flush();
+                }
             } catch (java.io.IOException ignored) {
                 // 服务端累计超限后会先回 413 再关闭连接，此后写入失败属预期
             }
