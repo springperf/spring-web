@@ -11,7 +11,7 @@ import org.springframework.lang.Nullable;
  *
  * @author huangcanda
  *
- * @since 3.5.8
+ * @since 2.7.8
  */
 public interface WebSocketOriginValidator {
 

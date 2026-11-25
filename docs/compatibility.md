@@ -37,7 +37,7 @@
 | JDK | **8、11、17** | 8、11、17 已验证 | 编译目标 `java.version=8` |
 | Servlet API | **javax.servlet 4.0.1** | 4.0.x |  |
 | Netty | **4.1.137.Final** | 4.1.x（当前为手动覆盖版本） | Spring Boot 2.7.x 默认管理更低版本 |
-| Jackson | **2.17.2** | 2.17.x（当前为手动覆盖版本） | Spring Boot 2.7.x 默认管理 2.13.x |
+| Jackson | **2.18.12** | 2.18.x（当前为手动覆盖版本） | Spring Boot 2.7.x 默认管理 2.13.x |
 | Lombok | **1.18.24** | 1.18.x |  |
 | JMH | **1.37** | 1.37 | 仅 benchmark 模块使用 |
 

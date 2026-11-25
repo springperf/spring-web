@@ -25,7 +25,7 @@ import java.util.Objects;
  * 一致，不会因为模板里出现不可映射字符而抛异常）；{@code close()} 完成尾部编码并关闭底层流。 非线程安全，每次渲染新建一个。
  * </p>
  *
- * @since 3.5.8
+ * @since 2.7.8
  */
 public final class ViewBodyWriter extends Writer {
 

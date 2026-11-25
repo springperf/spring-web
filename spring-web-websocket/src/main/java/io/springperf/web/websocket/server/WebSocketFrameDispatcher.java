@@ -34,7 +34,7 @@ import java.nio.charset.StandardCharsets;
  *
  * @author huangcanda
  *
- * @since 3.5.8
+ * @since 2.7.8
  */
 @Slf4j
 final class WebSocketFrameDispatcher {

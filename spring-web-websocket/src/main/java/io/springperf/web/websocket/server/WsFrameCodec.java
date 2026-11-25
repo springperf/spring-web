@@ -24,7 +24,7 @@ import java.nio.ByteBuffer;
  *
  * @author huangcanda
  *
- * @since 3.5.8
+ * @since 2.7.8
  */
 final class WsFrameCodec {
 

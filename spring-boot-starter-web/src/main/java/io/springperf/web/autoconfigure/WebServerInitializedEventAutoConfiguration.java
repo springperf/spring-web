@@ -19,9 +19,6 @@ import org.springframework.context.annotation.Bean;
  * 本监听器随即在 refresh 阶段发布 Boot 事件，与 Boot {@code WebServerStartStopLifecycle#start()} 的语义一致；
  * 不再延迟到 {@code ApplicationReadyEvent}（那会让服务注册类组件拿到错误的端口或错过注册窗口）。
  * </p>
- * <p>
- * native-image 可达性提示已解耦到 {@link SpringWebRuntimeHintsConfiguration}，本配置被排除时不会连带丢失。
- * </p>
  */
 @AutoConfiguration
 @AutoConfigureAfter(SpringWebAutoConfiguration.class)

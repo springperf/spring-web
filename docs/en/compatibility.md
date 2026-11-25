@@ -40,7 +40,7 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 | JDK | **8, 11, 17** | 8, 11, 17 verified | Compile target `java.version=8` |
 | Servlet API | **javax.servlet 4.0.1** | 4.0.x | |
 | Netty | **4.1.137.Final** | 4.1.x (manually overridden) | Spring Boot 2.7.x manages a lower version by default |
-| Jackson | **2.17.2** | 2.17.x (manually overridden) | Spring Boot 2.7.x manages 2.13.x by default |
+| Jackson | **2.18.12** | 2.18.x (manually overridden) | Spring Boot 2.7.x manages 2.13.x by default |
 | Lombok | **1.18.24** | 1.18.x | |
 | JMH | **1.37** | 1.37 | Benchmark module only |
 

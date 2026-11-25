@@ -24,11 +24,15 @@ class ArchitectureRulesTest {
     /**
      * core 不依赖 Servlet API。{@code DispatcherHandler} 的注释写明了这条：core 无法构造 Spring 的 servlet 侧异常，统一用
      * {@code ResponseStatusException} 承载状态码。依赖一旦引入，core 就无法脱离容器测试。
+     * <p>
+     * 两个包名都要挡：本分支用 {@code javax.servlet}，master 用 {@code jakarta.servlet}；只写其中一个会让规则在本分支静默失效。
+     * </p>
      */
     @ArchTest
     static final ArchRule core_does_not_depend_on_servlet_api = noClasses().that()
             .resideInAPackage("io.springperf.web.core..").should().dependOnClassesThat()
-            .resideInAPackage("jakarta.servlet..").because("core 刻意与 Servlet 容器解耦，异常与请求模型需能脱离容器使用");
+            .resideInAnyPackage("javax.servlet..", "jakarta.servlet..")
+            .because("core 刻意与 Servlet 容器解耦，异常与请求模型需能脱离容器使用");
 
     /**
      * core 不依赖 SpringMVC 的 servlet 栈。本项目的定位是替换 SpringMVC；core 若反向依赖 {@code org.springframework.web.servlet}，则「移除

@@ -26,7 +26,7 @@ import java.util.List;
  *
  * @author huangcanda
  *
- * @since 3.5.8
+ * @since 2.7.8
  */
 @Slf4j
 final class WebSocketUpgradePolicy {
