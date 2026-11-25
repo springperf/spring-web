@@ -125,7 +125,9 @@ jobs:
   netty-leaks:
     # ByteBuf 引用计数只在 paranoid 级别报告泄漏；默认 simple 采样会漏掉低频路径。
     # 独立 job：paranoid 有明显开销，不塞进 5 个 JDK 的 build 矩阵。
-    if: github.ref == 'refs/heads/master' || github.base_ref == 'master'
+    # 与 master 的差异：master 把该 job 限定在 master 分支，2.7.x 分支需自己放行，
+    # 故 if 同时覆盖 push 的 github.ref 与 PR 的 github.base_ref（同 spring-boot-versions job）。
+    if: github.ref == 'refs/heads/master' || github.base_ref == 'master' || github.ref == 'refs/heads/2.7.x' || github.base_ref == '2.7.x'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
