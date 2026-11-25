@@ -153,19 +153,29 @@ public class WebSocketRoutingHandler extends ChannelInboundHandlerAdapter {
             return;
         }
 
-        handshaker.handshake(ctx.channel(), (FullHttpRequest) req)
-                .addListener((ChannelFutureListener) future -> {
-                    if (!future.isSuccess()) {
-                        log.error("WebSocket handshake failed for {}", path, future.cause());
-                        // 握手失败：请求不再被使用，释放调用方持有的原始引用
-                        // （netty handshake 内部 retain 的引用由 WebSocketServerHandshaker$2
-                        // 在 fireChannelRead 时释放，此处释放原始引用）。
-                        ReferenceCountUtil.release(req);
-                        ctx.close();
-                        return;
-                    }
-                    afterHandshakeSuccess(ctx, req, path, handshaker, result);
-                });
+        try {
+            handshaker.handshake(ctx.channel(), (FullHttpRequest) req)
+                    .addListener((ChannelFutureListener) future -> {
+                        if (!future.isSuccess()) {
+                            log.error("WebSocket handshake failed for {}", path, future.cause());
+                            // 握手失败：请求不再被使用，释放调用方持有的原始引用
+                            // （netty handshake 内部 retain 的引用由 WebSocketServerHandshaker$2
+                            // 在 fireChannelRead 时释放，此处释放原始引用）。
+                            ReferenceCountUtil.release(req);
+                            ctx.close();
+                            return;
+                        }
+                        afterHandshakeSuccess(ctx, req, path, handshaker, result);
+                    });
+        } catch (Exception e) {
+            // handshake() 同步抛异常时也要释放原始引用。已知场景：pipeline 缺少
+            // HttpRequestDecoder/HttpServerCodec 时 handshake() 内部抛 IllegalStateException，
+            // 该异常从 channelRead 冒泡到 exceptionCaught，而那里只 ctx.close() 不 release——
+            // 每次泄漏一个 FullHttpRequest（含 content ByteBuf）。与上面的失败 listener 对称。
+            log.error("WebSocket handshake threw synchronously for {}", path, e);
+            ReferenceCountUtil.release(req);
+            ctx.close();
+        }
     }
 
     private void afterHandshakeSuccess(ChannelHandlerContext ctx, HttpRequest req,
