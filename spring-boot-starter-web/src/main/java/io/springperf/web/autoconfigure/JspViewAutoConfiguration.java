@@ -1,12 +1,12 @@
 package io.springperf.web.autoconfigure;
 
 import io.springperf.web.support.view.JspViewResolver;
-import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
+import org.springframework.context.annotation.Configuration;
 
 /**
  * JSP 视图渲染自动装配。
@@ -19,7 +19,7 @@ import org.springframework.context.annotation.Conditional;
  * 路由。{@code spring.web.view.engine=none} 时不装配内置 JSP 引擎。
  * </p>
  */
-@AutoConfiguration
+@Configuration(proxyBeanMethods = false)
 @AutoConfigureAfter(SpringWebAutoConfiguration.class)
 @ConditionalOnClass(name = { "org.apache.jasper.servlet.JspServlet", "io.springperf.web.view.View",
         "io.springperf.web.support.view.JspViewResolver" })

@@ -7,11 +7,11 @@ import io.springperf.web.support.mvc.config.WebMvcConfigurerBridge;
 import io.springperf.web.support.mvc.interceptor.SupportInterceptorRegistry;
 import io.springperf.web.support.mvc.retval.ModelAndViewReturnValueResolver;
 import io.springperf.web.support.mvc.retval.StreamingResponseBodyReturnValueResolver;
-import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
 /**
  * SpringMVC 兼容层自动装配。仅在 classpath 存在 {@code spring-web-mvc-support} 时激活。
@@ -21,7 +21,7 @@ import org.springframework.context.annotation.Bean;
  * {@code RequestBodyAdvice}/{@code ResponseBodyAdvice}）、{@link WebMvcConfigurerBridge}、
  * {@code ResponseBodyEmitter} 返回值解析、{@code ModelAndView} 桥接等。</p>
  */
-@AutoConfiguration
+@Configuration(proxyBeanMethods = false)
 @AutoConfigureAfter(SpringWebServletAutoConfiguration.class)
 @ConditionalOnClass(name = "org.springframework.web.servlet.HandlerInterceptor")
 public class SpringWebMvcSupportAutoConfiguration {

@@ -1,7 +1,6 @@
 package io.springperf.web.autoconfigure;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.AutoConfigureBefore;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -20,7 +19,6 @@ import java.util.TreeSet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -37,7 +35,7 @@ class AutoConfigurationContractTest {
 
     private static final String PREFIX = "io.springperf.web.autoconfigure.";
 
-    /** 唯一真源：新增/删除自动配置必须同步更新本集合与 .imports。 */
+    /** 唯一真源：新增/删除自动配置必须同步更新本集合与 spring.factories。 */
     private static final Set<String> EXPECTED = new java.util.HashSet<>(java.util.Arrays.asList(
             PREFIX + "SpringWebAutoConfiguration",
             PREFIX + "WebServerInitializedEventAutoConfiguration",
@@ -55,13 +53,15 @@ class AutoConfigurationContractTest {
             PREFIX + "SpringWebPropertyRefreshAutoConfiguration"));
 
     @Test
-    void importsFile_matchesExpectedRegistrationSet() throws Exception {
-        List<String> entries = imports();
-        assertEquals(EXPECTED.size(), new LinkedHashSet<>(entries).size(), ".imports 存在重复条目");
-        assertEquals(EXPECTED, new LinkedHashSet<>(entries), ".imports 与契约集合不一致");
+    void factoriesFile_matchesExpectedRegistrationSet() throws Exception {
+        List<String> entries = registeredClasses();
+        assertEquals(EXPECTED.size(), new LinkedHashSet<>(entries).size(),
+                "spring.factories 存在重复条目");
+        assertEquals(EXPECTED, new LinkedHashSet<>(entries),
+                "spring.factories 与契约集合不一致");
     }
 
-    /** 反向扫描：新增了 {@code @AutoConfiguration} 类却漏登记 .imports 时立即失败。 */
+    /** 反向扫描：新增了 {@code @Configuration} 类却漏登记 spring.factories 时立即失败。 */
     @Test
     void allAutoConfigurationClasses_areRegistered() throws Exception {
         ClassLoader classLoader = AutoConfigurationContractTest.class.getClassLoader();
@@ -75,26 +75,25 @@ class AutoConfigurationContractTest {
                 continue;
             }
             MetadataReader reader = factory.getMetadataReader(resource);
-            if (reader.getAnnotationMetadata().hasAnnotation(AutoConfiguration.class.getName())) {
+            if (reader.getAnnotationMetadata().hasAnnotation(Configuration.class.getName())) {
                 annotated.add(reader.getClassMetadata().getClassName());
             }
         }
-        assertEquals(EXPECTED, annotated, "存在带 @AutoConfiguration 但未登记到 .imports 的类（或反之）");
+        assertEquals(EXPECTED, annotated, "存在带 @Configuration 但未登记到 spring.factories 的类（或反之）");
     }
 
     @Test
-    void everyRegisteredClass_isAnAutoConfiguration() throws Exception {
-        for (String name : imports()) {
+    void everyRegisteredClass_isAConfiguration() throws Exception {
+        for (String name : registeredClasses()) {
             Class<?> type = load(name);
-            assertNotNull(type.getDeclaredAnnotation(AutoConfiguration.class), name + " 缺少 @AutoConfiguration");
-            assertNull(type.getDeclaredAnnotation(Configuration.class),
-                    name + " 仍显式声明 @Configuration（应由 @AutoConfiguration 元注解提供）");
+            assertNotNull(type.getDeclaredAnnotation(Configuration.class),
+                    name + " 缺少 @Configuration（2.7.x 由 spring.factories 注册，没有 @AutoConfiguration）");
         }
     }
 
     @Test
     void beanConditionalClasses_declareExplicitOrdering() throws Exception {
-        for (String name : imports()) {
+        for (String name : registeredClasses()) {
             Class<?> type = load(name);
             boolean hasBeanCondition = type.isAnnotationPresent(ConditionalOnBean.class)
                     || Arrays.stream(type.getDeclaredMethods())
@@ -110,8 +109,8 @@ class AutoConfigurationContractTest {
 
     @Test
     void orderingReferences_areRegisteredAutoConfigurations() throws Exception {
-        Set<String> registered = new LinkedHashSet<>(imports());
-        for (String name : imports()) {
+        Set<String> registered = new LinkedHashSet<>(registeredClasses());
+        for (String name : registeredClasses()) {
             Class<?> type = load(name);
             AutoConfigureAfter after = type.getAnnotation(AutoConfigureAfter.class);
             if (after != null) {
@@ -130,7 +129,8 @@ class AutoConfigurationContractTest {
         }
     }
 
-    private static List<String> imports() throws Exception {
+    /** 读取 {@code spring.factories} 中 EnableAutoConfiguration 的条目。 */
+    private static List<String> registeredClasses() throws Exception {
         try (InputStream in = AutoConfigurationContractTest.class.getClassLoader()
                 .getResourceAsStream(FACTORIES_RESOURCE)) {
             assertNotNull(in, FACTORIES_RESOURCE + " 不在 classpath");

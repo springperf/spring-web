@@ -155,6 +155,8 @@ public final class SslContextFactory {
     }
 
     private static SslContextBuilder createBuilder(Ssl ssl) throws Exception {
+        // PEM 证书优先：Boot 2.7 的 Ssl 已提供 certificate / certificate-private-key，
+        // 两者都配了才走 PEM 分支，否则回落到 key-store。
         String certificate = ssl.getCertificate();
         String privateKey = ssl.getCertificatePrivateKey();
         if (hasText(certificate) && hasText(privateKey)) {

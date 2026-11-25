@@ -3,11 +3,11 @@ package io.springperf.web.autoconfigure;
 import io.springperf.web.autoconfigure.openapi.OpenApiAdapter;
 import io.springperf.web.context.WebContext;
 import org.springdoc.core.customizers.OpenApiCustomiser;
-import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
 /**
  * Perf 框架的 SpringDoc OpenAPI 自动配置。
@@ -21,7 +21,7 @@ import org.springframework.context.annotation.Bean;
  * @author huangcanda
  * @since 1.0.4
  */
-@AutoConfiguration
+@Configuration(proxyBeanMethods = false)
 @AutoConfigureAfter(SpringWebAutoConfiguration.class)
 @ConditionalOnClass(OpenApiCustomiser.class)
 @ConditionalOnProperty(prefix = "springperf.openapi", name = "enabled", havingValue = "true", matchIfMissing = true)

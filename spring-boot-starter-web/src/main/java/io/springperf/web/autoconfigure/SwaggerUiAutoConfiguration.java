@@ -3,13 +3,13 @@ package io.springperf.web.autoconfigure;
 import io.springperf.web.autoconfigure.openapi.OpenApiDocController;
 import io.springperf.web.core.resource.ResourceHandlerRegistration;
 import org.springdoc.core.customizers.OpenApiCustomiser;
-import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
 /**
  * Auto-configuration for Swagger UI endpoints and static resources.
@@ -34,7 +34,7 @@ import org.springframework.context.annotation.Bean;
  *
  * @see OpenApiAutoConfiguration
  */
-@AutoConfiguration
+@Configuration(proxyBeanMethods = false)
 @AutoConfigureAfter(OpenApiAutoConfiguration.class)
 @ConditionalOnClass(OpenApiCustomiser.class)
 @ConditionalOnProperty(prefix = "springperf.openapi", name = "enabled", havingValue = "true", matchIfMissing = true)

@@ -4,12 +4,12 @@ import io.springperf.web.autoconfigure.support.PerfWebServer;
 import io.springperf.web.autoconfigure.support.PerfWebServerInitializedEvent;
 import io.springperf.web.server.NettyHttpServer;
 import io.springperf.web.server.NettyServerStartedEvent;
-import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.web.server.WebServer;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
 /**
  * 把核心模块的 {@link NettyServerStartedEvent} 转换成 Spring Boot 标准的
@@ -20,7 +20,7 @@ import org.springframework.context.annotation.Bean;
  * 不再延迟到 {@code ApplicationReadyEvent}（那会让服务注册类组件拿到错误的端口或错过注册窗口）。
  * </p>
  */
-@AutoConfiguration
+@Configuration(proxyBeanMethods = false)
 @AutoConfigureAfter(SpringWebAutoConfiguration.class)
 public class WebServerInitializedEventAutoConfiguration {
 

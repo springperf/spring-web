@@ -44,6 +44,24 @@ class FreemarkerViewResolverTest {
         return resolver;
     }
 
+    /**
+     * 锁定引擎的 incompatibleImprovements：必须显式取 2.3.32（Boot 2.7.18 BOM 管理的版本），
+     * 不能用 DEFAULT_INCOMPATIBLE_IMPROVEMENTS——它的取值是 2.3.0，会把 recognizeStandardFileExtensions
+     * 等开关退回 2.3.0 语义（.ftlh 等标准扩展名不再被识别），且不会让任何测试失败。
+     */
+    @Test
+    void engine_usesVersion232IncompatibleImprovements() throws Exception {
+        FreemarkerViewResolver resolver = buildResolver();
+        java.lang.reflect.Field field = FreemarkerViewResolver.class.getDeclaredField("configuration");
+        field.setAccessible(true);
+        freemarker.template.Configuration cfg = (freemarker.template.Configuration) field.get(resolver);
+
+        assertEquals(freemarker.template.Configuration.VERSION_2_3_32.toString(),
+                cfg.getIncompatibleImprovements().toString());
+        assertTrue(cfg.getRecognizeStandardFileExtensions(),
+                "标准扩展名识别依赖 2.3.32 语义，退回 2.3.0 会静默改变模板处理方式");
+    }
+
     @Test
     void resolveViewName_existingTemplate_returnsView() throws Exception {
         FreemarkerViewResolver resolver = buildResolver();

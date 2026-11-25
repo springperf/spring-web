@@ -2,11 +2,11 @@ package io.springperf.web.autoconfigure;
 
 import io.springperf.web.context.WebContext;
 import io.springperf.web.support.view.ServletWebExchangeProvider;
-import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
 /**
  * Servlet 场景的模板 exchange provider 自动装配（独立配置类）。
@@ -20,7 +20,7 @@ import org.springframework.context.annotation.Bean;
  *
  * @since 2.7.7
  */
-@AutoConfiguration
+@Configuration(proxyBeanMethods = false)
 @AutoConfigureAfter(SpringWebAutoConfiguration.class)
 @ConditionalOnClass(name = { "io.springperf.web.view.WebExchangeProvider",
         "io.springperf.web.support.servlet.context.ServletAdapterContext" })

@@ -18,7 +18,6 @@ import io.springperf.web.server.NettyHttpServer;
 import io.springperf.web.server.PipelineCustomizer;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
-import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -36,7 +35,7 @@ import org.springframework.validation.beanvalidation.OptionalValidatorFactoryBea
 
 import java.util.List;
 
-@AutoConfiguration
+@Configuration(proxyBeanMethods = false)
 @ConditionalOnClass(DispatcherHandler.class)
 public class SpringWebAutoConfiguration {
 

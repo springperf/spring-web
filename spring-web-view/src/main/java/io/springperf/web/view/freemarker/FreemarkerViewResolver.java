@@ -79,6 +79,9 @@ public class FreemarkerViewResolver extends BaseWebComponent implements ViewReso
             throw new IllegalStateException("Invalid " + ViewProperties.FREEMARKER_CONTENT_TYPE
                     + ": '" + contentType + "'", ex);
         }
+        // 显式锁定 2.3.32 语义，与 Boot 2.7.18 BOM 管理的 FreeMarker 版本一致。
+        // 不能用 DEFAULT_INCOMPATIBLE_IMPROVEMENTS：它的取值是 2.3.0，会把 recognizeStandardFileExtensions
+        // 等开关退回 2.3.0 语义，导致 .ftlh 模板的 HTML 自动转义静默失效。
         this.configuration = new Configuration(Configuration.VERSION_2_3_32);
         configuration.setDefaultEncoding(encoding);
         if (settings != null) {
