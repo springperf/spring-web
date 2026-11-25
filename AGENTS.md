@@ -15,7 +15,7 @@
 ## 项目配置
 
 - Java 8 源码兼容（`pom.xml` 的 `java.version=8`）
-- 多版本兼容：默认 Spring Boot **2.7.18**，Profile 覆盖 **2.4 / 2.5 / 2.6 / 2.7**（`-Pspring-boot-*` 切换）
+- Spring Boot 版本：默认且仅支持 **2.7.18**（`spring-boot-2.7` Profile 默认激活并锁定）
 - Netty 4.1.137.Final
 - Jackson 2.18.12、Fastjson 2.0.60（provided）
 - Lombok 1.18.24
@@ -90,7 +90,7 @@ VERIFY -> COMPLETE
 # 分支策略
 
 - `master` —— 主线，**纯 Spring Boot 3.5.x**，不含任何 Spring Boot 4 / Spring 7 兼容处理
-- `2.7.x` —— 下游适配分支（Spring Boot 2.4 ~ 2.7，Java 8 / javax），从 master cherry-pick 后做降级适配
+- `2.7.x` —— 下游适配分支（Spring Boot 2.7.x，Java 8 / javax），从 master cherry-pick 后做降级适配
 - `4.1.x` —— 下游适配分支（Spring Boot 4.0/4.1）
 
 同步方向始终是 `master → 2.7.x` 与 `master → 4.1.x`；适配代码只存在于下游分支。

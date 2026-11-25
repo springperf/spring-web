@@ -38,6 +38,7 @@
 - **批处理默认启用攒批窗口**：相比 2.7.7，未显式配置的 `@BatchMapping` 现在默认按 2ms 窗口攒批（批大小由窗口保证，单请求延迟上界增加约 2ms）。若负载很低、希望保留旧版「消费者追上空队列即刷出」的行为，显式写 `batchWindowMillis = 0`；启动期提示也改为仅在显式关闭时出现
 - **API 收敛（二进制不兼容）**：`SpringHeadersAdapter`（WebSocket 头适配器）随拆分重构移除，`NettyWebSocketSession` 构造器改为直接接收 Spring 的 `org.springframework.http.HttpHeaders`；从未被读取的 `ViewProperties.BEETL_MODE` / `BEETL_MODE_DEFAULT` 常量随 `spring.beetl.mode` 一起删除；`WebServerInitializedEventAutoConfiguration#webServerInitializedEventPublisher(...)` 签名变更（去掉 `NettyHttpServer` 参数，事件改由端口绑定后的 `NettyServerStartedEvent` 携带）。迁移写法见[破坏性变更说明](docs/breaking-changes.md)的 2.7.8 节
 - **流式队列容量可配置且默认下调**：新增 `server.http.stream-max-queued-events`（默认 `4096`），SSE / 字节流发送器的入队缓冲由硬编码 `65536` 改为建连时按配置解析。JCTools 数组一次性分配，每连接由约 256KB 降到约 16KB（1000 长连接实测 251.9MB → 16.7MB）；A/B 基准每请求分配 314.7KB → 95.8KB（−69.6%），吞吐无劣化迹象。非 2 的幂向上取整，小于 2 时启动失败；同时修复降容量后同步 Publisher 在 `highWaterMark` 超过容量时入队自旋等待同栈 drain、最终 30s 超时的问题
+- **支持范围为 Spring Boot 2.7.x**：`2.7.x` 分支的目标版本与验证基线均为 **Spring Boot 2.7.x**（当前 2.7.18），`spring-boot-2.7` Profile 默认激活并锁定该版本，CI 的 `spring-boot-versions` 矩阵以 `2.7` 为唯一入口。详见[版本兼容性说明](docs/compatibility.md)
 
 ### 修复
 
@@ -668,7 +669,7 @@
 ### 优化
 
 - **`DispatcherHandler` 优化**：精简过滤器链流程和错误路径处理
-- **多版本兼容性验证**：通过 Maven profiles 验证 Spring Boot 2.4.x ~ 2.7.x 兼容性
+- **兼容性验证**：通过 Maven profile 验证 Spring Boot 2.7.x 兼容性
 
 ## [2.7.1] - 20260701
 ### 新增

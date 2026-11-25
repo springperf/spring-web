@@ -269,6 +269,10 @@
     </build>
 
     <profiles>
+        <!--
+          支持范围为 Spring Boot 2.7.x：spring-boot-2.7 默认激活并锁定 2.7.18。
+          详见 docs/compatibility.md「支持范围」。
+        -->
         <profile>
             <id>spring-boot-2.7</id>
             <activation>
@@ -276,24 +280,6 @@
             </activation>
             <properties>
                 <spring-boot.version>2.7.18</spring-boot.version>
-            </properties>
-        </profile>
-        <profile>
-            <id>spring-boot-2.6</id>
-            <properties>
-                <spring-boot.version>2.6.15</spring-boot.version>
-            </properties>
-        </profile>
-        <profile>
-            <id>spring-boot-2.5</id>
-            <properties>
-                <spring-boot.version>2.5.15</spring-boot.version>
-            </properties>
-        </profile>
-        <profile>
-            <id>spring-boot-2.4</id>
-            <properties>
-                <spring-boot.version>2.4.13</spring-boot.version>
             </properties>
         </profile>
 
@@ -381,7 +367,7 @@
                 <artifactId>junit-jupiter-params</artifactId>
                 <version>${junit-jupiter.version}</version>
             </dependency>
-            <!-- JUnit Platform（与 JUnit Jupiter 5.8.2 兼容的平台版本，覆盖 SB 2.5.x-2.3.x BOM 中的低版本） -->
+            <!-- JUnit Platform（与 JUnit Jupiter 5.8.2 兼容的平台版本，避免 BOM 引入的更低版本） -->
             <dependency>
                 <groupId>org.junit.platform</groupId>
                 <artifactId>junit-platform-commons</artifactId>

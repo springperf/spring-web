@@ -593,7 +593,7 @@ public List<String> put(String key, List<String> value) {
 
 **为什么自研而不用 Spring 的 `Netty4HeadersAdapter`？** 两个原因：
 
-1. **版本兼容**：`Netty4HeadersAdapter` 仅 Spring 6.1+，而本框架要兼容 Spring Boot 2.4.x 起的多个版本（2.7.x 分支基于 Spring 5.3）。
+1. **版本兼容**：`Netty4HeadersAdapter` 仅 Spring 6.1+，而本框架要兼容 Spring Boot 2.7.x 起的多个版本（2.7.x 分支基于 Spring 5.3）。
 2. **语义**：`writable` 标志支持"只读视图"模式——某些场景只需读 header 不应被改，`checkWritable()` 抛异常而非静默写入，符合[原则 6](01-design-philosophy.md#原则-6--避免魔法行为显式-spi显式-fail-fast不靠隐式猜测)。
 
 直接委托 Netty headers 保留了原生大小写不敏感语义；若拷进 `LinkedMultiValueMap`（大小写敏感），小写 key 的 `get("content-type")` 将取不到 `Content-Type` 的值。

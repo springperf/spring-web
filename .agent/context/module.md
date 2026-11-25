@@ -4,7 +4,7 @@
 
 ```
 spring-web-parent (聚合 POM)
-│  Spring Boot 2.7.18（本分支基线），Profile 可切 2.4.x~2.7.x，Java 8（javax.servlet 4.0）
+│  Spring Boot 2.7.18（本分支基线，支持范围仅 2.7.x），Java 8（javax.servlet 4.0）
 │
 ├── spring-web                     核心框架
 ├── spring-web-view                视图渲染（Thymeleaf/FreeMarker，可选）

@@ -88,15 +88,15 @@ jobs:
           fi
 
   spring-boot-versions:
-    # 「支持 Boot 2.4~2.7」必须由单测证明，不能只 compile：换 Spring 版本会改变行为，
-    # 运行期还会暴露 javax/Servlet 4.0 的缺失符号。2.7.x 分支需自己生效，故 if 放行 master 与 2.7.x。
-    if: github.ref == 'refs/heads/master' || github.base_ref == 'master' || github.ref == 'refs/heads/2.7.x' || github.base_ref == '2.7.x'
+    # 本分支支持范围为 Spring Boot 2.7.x（见 docs/compatibility.md「支持范围」），
+    # 故矩阵只保留 2.7：验证 -Pspring-boot-2.7 显式锁定仍可构建，且与默认激活结果一致。
+    if: github.ref == 'refs/heads/2.7.x' || github.base_ref == '2.7.x'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        boot: ['2.4', '2.5', '2.6', '2.7']
+        boot: ['2.7']
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
@@ -108,7 +108,7 @@ jobs:
           cache: maven
 
       - name: Test spring-web on Spring Boot ${{ matrix.boot }}
-        # 只跑核心模块：全 reactor × 3 个版本会拖长 PR 反馈；nightly 若需要可扩到 -am 全量。
+        # 只跑核心模块：全 reactor 太拖长 PR 反馈；nightly 若需要可扩到 -am 全量。
         run: >
           ./mvnw -Pspring-boot-${{ matrix.boot }} -pl spring-web -am test
           -Djacoco.skip=true -Dspotbugs.skip=true -Dmodernizer.skip=true

@@ -11,7 +11,7 @@ adaptation branches (2.7.x / 4.1.x).
 
 | Branch | Spring Boot | Status | Maintenance Strategy |
 |--------|-------------|--------|---------------------|
-| `2.7.x` | 2.4.x ~ 2.7.x | Downstream adaptation | Synced from master + downgrade adaptation; based on javax.servlet |
+| `2.7.x` | **2.7.x** (2.7.18 baseline) | Downstream adaptation | Synced from master + downgrade adaptation; based on javax.servlet |
 | `master` | **3.5.x** | **Development baseline** | New features merged here first; **contains no Spring Boot 4 / Spring Framework 7 compatibility code** |
 | `4.1.x` | 4.0.x ~ 4.1.x | Downstream adaptation | Synced from master + upgrade adaptation |
 
@@ -25,7 +25,7 @@ already out. Its `spring-boot.version` (Boot 4.1.0) is unrelated to the project 
 
 ## Version Floor Note
 
-The project previously attempted compatibility with Spring Boot 2.3.x (Spring Framework 5.2.x), but Spring 5.2 lacks APIs such as `MultiValueMapAdapter`, `getSupportedMediaTypes(Class)` and has restrictions around `MethodHandles.lookup()` for package-private methods. These issues made maintenance cost outweigh benefits, so **2.3.x and below are no longer supported** — the previously implemented compatibility code has been cleaned up.
+The lowest supported line across the three branches is **Spring Boot 2.7.x** (validated on 2.7.18), i.e. the `2.7.x` branch; see the version matrices below for each branch.
 
 ---
 
@@ -35,7 +35,7 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 
 | Dependency | Current Version | Verified Range | Notes |
 |------------|----------------|----------------|-------|
-| Spring Boot | **2.7.18** | 2.4.x ~ 2.7.x | Switch via Maven profile (`-Pspring-boot-2.4` ~ `-Pspring-boot-2.7`) |
+| Spring Boot | **2.7.18** | **2.7.x** | The branch parent POM is 2.7.18; the `spring-boot-2.7` profile is active by default and pins that version |
 | Spring Framework | **5.3.x** | Managed by Spring Boot | |
 | JDK | **8, 11, 17** | 8, 11, 17 verified | Compile target `java.version=8` |
 | Servlet API | **javax.servlet 4.0.1** | 4.0.x | |
@@ -43,6 +43,16 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 | Jackson | **2.18.12** | 2.18.x (manually overridden) | Spring Boot 2.7.x manages 2.13.x by default |
 | Lombok | **1.18.24** | 1.18.x | |
 | JMH | **1.37** | 1.37 | Benchmark module only |
+
+### Supported Range
+
+`2.7.x` targets and is validated against **Spring Boot 2.7.x** (currently 2.7.18).
+
+- The parent POM and the `spring-boot-2.7` profile both pin 2.7.18; the profile is active by default, so no explicit flag is needed;
+- The CI `spring-boot-versions` matrix has `2.7` as its only entry and runs the full build and test suite on that line;
+- If you pass a non-existent `-Pspring-boot-*`, Maven only prints a `The requested profile ... does not exist` warning and **keeps building against 2.7.18** — the artifact is still a 2.7.x build, so rely on the default build.
+
+**Prerequisite**: the application must run on Spring Boot 2.7.x (Spring Framework 5.3 / `javax.servlet`). Confirm the actual version with `mvn dependency:tree -Dincludes=org.springframework.boot:spring-boot`.
 
 ### Key Limitations
 
@@ -97,12 +107,12 @@ The project previously attempted compatibility with Spring Boot 2.3.x (Spring Fr
 
 | Your Scenario | Recommended Branch |
 |--------------|-------------------|
-| Existing project on Servlet container, JDK 8/11 | `2.7.x` |
+| Existing project on Servlet container, Spring Boot 2.7.x, JDK 8/11 | `2.7.x` |
 | New project or already migrated to JDK 17+ | `master` |
 | Need virtual threads (JDK 21) | `master` |
 | Need GraalVM native-image | `master` |
 
-> **Branch recommendation**: For JDK 8/11 existing projects, choose `2.7.x` and use `-Pspring-boot-2.6` / `-Pspring-boot-2.5` / `-Pspring-boot-2.4` to switch target versions. For JDK 17+ new projects, choose `master` (supports virtual threads, GraalVM native-image).
+> **Branch recommendation**: For JDK 8/11 projects running Spring Boot 2.7.x, choose `2.7.x`. For JDK 17+ new projects, choose `master` (supports virtual threads, GraalVM native-image).
 
 ---
 

@@ -18,7 +18,7 @@
 
 ### 1.1 注册入口
 
-`spring-boot-starter-web` 在 `META-INF/spring.factories` 中以 `EnableAutoConfiguration=` 注册了 13 个自动配置类。本分支要覆盖 Spring Boot 2.4 ~ 2.7，`spring.factories` 是全版本可用的唯一机制（`.imports` 仅 Boot 2.7+ 支持，本分支不使用）：
+`spring-boot-starter-web` 在 `META-INF/spring.factories` 中以 `EnableAutoConfiguration=` 注册了 14 个自动配置类。本分支目标是 Spring Boot 2.7.x，沿用 Boot 2.x 的 `spring.factories` 注册模型（`.imports` 自 Boot 2.7 起才可用，本分支未迁移）：
 
 ```properties
 org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
