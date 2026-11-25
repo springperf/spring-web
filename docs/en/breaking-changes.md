@@ -20,7 +20,7 @@
 
 | Version | Date | Subject |
 |---------|------|---------|
-| **2.7.8** | 2026-11-26 | A preset `Content-Type` that does not match the return type now fails explicitly |
+| **2.7.8** | 2026-11-26 | Supported Spring Boot narrowed to 2.7.x; a preset `Content-Type` that does not match the return type now fails explicitly |
 | **3.5.8** | 2026-11-25 (expected) | Servlet specification semantics tightened and dynamic registration actually implemented; batching window on by default (2ms); repeated `startAsync` and unparseable date headers throw |
 | **2.7.7** | 2026-10-13 | Configuration keys aligned with Spring Boot (old keys removed / renamed), response framing and Servlet `flush` semantics, conditional requests and Range, extension-point signatures |
 | **3.5.7** | 2026-10-08 | Configuration keys aligned with Spring Boot / Tomcat: old key aliases removed, extension-point signatures and compat-layer classes adjusted |
@@ -31,6 +31,7 @@
 ## [2.7.8] - 2026-11-26
 | Item | Old behaviour | New behaviour |
 |---|---|---|
+| Supported Spring Boot range for `2.7.x` | `-Pspring-boot-*` could switch the build to a specific Boot version | **Spring Boot 2.7.x** only (validated on 2.7.18); the `spring-boot-2.7` profile is active by default and pins that version. **Migration**: use the default build; a non-existent `-Pspring-boot-*` only triggers a Maven warning and the build still uses 2.7.18, so the artifact is not the version you named |
 | `ServletContext.addServlet` / `addFilter` | returned `null` or did nothing, so callers could believe registration succeeded | now return the spec-defined `ServletRegistration.Dynamic` / `FilterRegistration.Dynamic` with URL mappings, init parameters, `load-on-startup` and `async-supported`. Registration is open only during `ServletContextListener#contextInitialized()`; later writes throw `IllegalStateException`, and duplicate names or clashing URL patterns are reported. `addJspFile()` remains unsupported (JSPs are routed through `jsp:` views); `createServlet()` / `createFilter()` are available. **Migration**: compatibility code that checked for a `null` return should use the returned Dynamic object instead |
 | `HttpServletRequest.startAsync()` called again within the same async cycle | returned the existing `AsyncContext` | throws `IllegalStateException`. **Migration**: drop the duplicate call; start a new cycle only after `dispatch` / `complete` |
 | `HttpServletRequest.getDateHeader(name)` with a present but unparseable date | returned `-1`, indistinguishable from "header absent" | throws `IllegalArgumentException`. **Migration**: handle the exception as a parse failure; do not test for `-1` |
