@@ -105,18 +105,18 @@ class JsrRemoteEndpointBasicTest {
         verify(springSession).sendMessage(new TextMessage("encoded:world"));
     }
 
-    @jakarta.websocket.server.ServerEndpoint(value = "/bin", encoders = { BinEncoder.class })
+    @javax.websocket.server.ServerEndpoint(value = "/bin", encoders = { BinEncoder.class })
     static class BinaryCodecEndpoint {
     }
 
-    public static class BinEncoder implements jakarta.websocket.Encoder.Binary<byte[]> {
+    public static class BinEncoder implements javax.websocket.Encoder.Binary<byte[]> {
         @Override
         public ByteBuffer encode(byte[] o) {
             return ByteBuffer.wrap(o);
         }
 
         @Override
-        public void init(jakarta.websocket.EndpointConfig config) {
+        public void init(javax.websocket.EndpointConfig config) {
         }
 
         @Override

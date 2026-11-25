@@ -4,7 +4,6 @@ import io.springperf.web.websocket.server.NettyWebSocketSession;
 import javax.websocket.CloseReason;
 import javax.websocket.MessageHandler;
 import javax.websocket.RemoteEndpoint;
-)
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.socket.CloseStatus;
