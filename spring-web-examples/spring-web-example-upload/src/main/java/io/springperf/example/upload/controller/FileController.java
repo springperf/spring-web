@@ -56,6 +56,11 @@ public class FileController {
     /**
      * 文件下载
      * curl -O http://localhost:8083/files/download?filename=test.txt
+     * <p>
+     * {@code ResponseEntity<Resource>} 能用是因为 {@code MediaConverterConfig} 注册了
+     * {@link org.springframework.http.converter.ResourceHttpMessageConverter}：框架默认只装配 Jackson 转换器， 容器里的
+     * {@code HttpMessageConverter} Bean 会被自动适配，缺了它该返回类型自 2.7.8 起会按内容协商失败返回 500。
+     * </p>
      */
     @GetMapping("/download")
     public ResponseEntity<Resource> download(@RequestParam String filename) {

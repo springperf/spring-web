@@ -81,6 +81,8 @@ public void startCallableProcessing(PerfAsyncWebRequest asyncWebRequest, WebAsyn
 
 关键流程：业务线程池执行 `callable.call()` → `setConcurrentResultAndDispatch` → `dispatch()` → `DispatcherHandler.asyncDispatch`→ 重新进入 `ReturnValueResolverRegistry.resolveReturnValue`。
 
+**超时结果的落地顺序（2.7.8 起）**：超时回调必须先 `claimTimeoutResult()` 占位，再用 `setTimeoutResultAndDispatch(...)` 落地。原因：`CallableInterceptorChain#triggerAfterTimeout` 的第一件事是 `taskFuture.cancel(true)`，被中断的任务线程会立刻带着 `InterruptedException` 走 `setConcurrentResultAndDispatch`，两边竞写结果槽——刚被中断的任务线程几乎总是先赢，503 就被任务侧的 500 顶掉（任务若不响应中断，还会出现迟到的 200 + 正常结果，超时彻底失效）。占位把「超时已到点」变成确定性顺序：到点**之后**到达的任务结果一律丢弃，到点**之前**到达的仍然先到先得；`DeferredResult` 路径没有 interrupt 竞态（超时拦截器走 `setErrorResult`，不取消任务），故不需要占位。
+
 ### 1.3 `startDeferredResultProcessing`：结果驱动恢复
 
 `startDeferredResultProcessing`与 `Callable` 路径不同——计算在其他线程，框架只负责挂起和恢复：

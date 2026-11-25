@@ -18,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(
         classes = SwaggerUiApplication.class,
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT
+)
 class SwaggerUiE2eTest {
 
     private TestRestTemplate rest;
