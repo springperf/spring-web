@@ -52,7 +52,7 @@
     <properties>
         <java.version>8</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <spring-web.version>2.7.7</spring-web.version>
+        <spring-web.version>2.7.8</spring-web.version>
         <spring-boot.version>2.7.18</spring-boot.version>
         <gpg.executable>gpg</gpg.executable>
         <gpg.keyname>${env.GPG_KEY}</gpg.keyname>

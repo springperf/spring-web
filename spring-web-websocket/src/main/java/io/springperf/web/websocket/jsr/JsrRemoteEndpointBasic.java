@@ -1,5 +1,6 @@
 package io.springperf.web.websocket.jsr;
 
+import io.springperf.web.websocket.server.NettyWebSocketSession;
 import javax.websocket.EncodeException;
 import javax.websocket.Encoder;
 import javax.websocket.RemoteEndpoint;

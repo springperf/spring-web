@@ -41,7 +41,7 @@ import java.util.Arrays;
  * 支持 PKCS12/JKS 密钥库与 PEM 证书两种格式；{@code classpath:} 资源以 stream 方式加载。
  * </p>
  * <p>
- * <b>启停语义（对齐 {@link Ssl#isEnabled(Ssl)}）</b>：未绑定任何 SSL 属性时视为未启用；
+ * <b>启停语义（对齐 {@link Ssl#isEnabled()}）</b>：未绑定任何 SSL 属性时视为未启用；
  * {@code enabled} 默认 {@code true}，配置 {@code key-store} 或 {@code certificate} 即隐式启用；
  * 显式 {@code enabled=false} 一律关闭，即使残留证书配置。
  * 非法 {@code client-auth} 值由 Binder 在启动期抛错，不再静默降级为 NONE。
