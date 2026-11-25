@@ -4,8 +4,65 @@
 
 本项目遵循 [语义化版本控制](https://semver.org/lang/zh-CN/)。
 
-## [3.5.8] - 20261125（预计）
+> 本日志在 `2.7.x` / `master` / `4.1.x` 三分支同步维护：每个分支都保留全部版本的变更记录，便于跨分支查阅与同步；各节内容保持其所属分支的语境。
 
+## [2.7.8] - 20261126
+> ⚠️ **本版含破坏性变更**：Servlet 规范语义、视图错误与内容协商、部分配置项的校验方式均有调整，
+> **升级前请先读 [破坏性变更说明](docs/breaking-changes.md) 的 2.7.8 节**。
+
+### 新增
+
+- **Servlet / Filter 动态注册**：`ServletContext.addServlet()` / `addFilter()` 现在按 Servlet 规范返回 `ServletRegistration.Dynamic` / `FilterRegistration.Dynamic`，可配置 URL 映射、初始化参数、`load-on-startup`、`async-supported` 等；注册仅在 `ServletContextListener#contextInitialized()` 期间开放，窗口关闭后的写操作抛 `IllegalStateException`，重名与 URL 冲突也会明确报错。`addJspFile()` 仍不支持（JSP 由 `jsp:` 视图统一路由），`createServlet()` / `createFilter()` 可用
+- **Servlet 监听器运行期注册**：`ServletContext.addListener()` 现在真正生效，支持 `ServletContextListener`、`HttpSessionListener`、`HttpSessionAttributeListener` 与 `HttpSessionIdListener`；会话 ID 轮换会通知 ID 监听器。运行期注册的监听器只收到注册之后发生的事件，需要完整生命周期回调的监听器请声明为 Spring Bean
+- **JSP 生产默认配置**：新增 `server.servlet.jsp.development`（默认 `false`，改动 JSP 需重启生效）、`keep-generated`、`trim-spaces` 与 `init-parameters.*`（透传 Jasper，显式项优先）；Jasper 实例改由 Spring 管理，JSP 与标签类可获得依赖注入
+- **WebSocket 压缩扩展**：`setAllowExtensions(true)` 现在真正协商 `permessage-deflate`（此前是空开关，未协商的压缩帧会被当明文交给业务）；协商结果可通过 `getExtensions()` / `Session#getNegotiatedExtensions()` 读取，按端点设置的 `messageSizeLimit` 也随之生效
+- **WebSocket JSR-356 语义补齐**：`RemoteEndpoint.Basic` 为同步发送；`getSendStream()` / `getSendWriter()` 缓冲后按整条消息发出；`setBatchingAllowed()` / `flushBatch()` 真正攒批；`Session.addMessageHandler()` 支持动态注册；自定义 `Configurator` 的 `getEndpointInstance()` / `checkOrigin()` 生效；Ping / Pong 帧现在携带应用数据，超 125 字节按规范拒绝
+- **批处理攒批时间窗口**：`@BatchMapping` 新增 `batchWindowMillis`（默认 `2`ms，设为 `0` 可关闭）。窗口内持续累积，直到达到 `maxBatchSize` 或窗口到期才提交，批大小由配置保证而非依赖业务池偶然饱和；中高并发下 IO 次数成倍下降、吞吐同时提升。低负载（在途请求撑不满一批）时窗口只是等待成本，建议显式关闭，取值建议见 [批处理文档](docs/batch.md)
+- **批处理全局默认值**：新增 `springperf.batch.*`（`window-millis` / `max-batch-size` / `consumer-size` / `ring-buffer-size` / `wait-strategy` / `backpressure`），多个队列统一调优不必逐个改注解。优先级为「注解显式声明 > 全局键 > 注解内置默认值」，仅启动期读取一次；取值非法直接启动失败并点名键名与可选值，启动日志打印生效值与实际配置的键，不静默回落。已知边界：注解显式写回内置默认值时与「未声明」不可区分，此时以全局键为准。详见[批处理配置参考](docs/batch.md#配置参考)
+- **视图运行期缓存失效**：新增 `ViewResolverRegistry.invalidateViewCaches()`，运行期投放或替换模板后调用即可生效（同时清理 Thymeleaf / FreeMarker / Beetl 内部模板缓存）；视图解析结果按视图名缓存，`cache=false` 仍保留热改
+- **视图配置**：新增 `spring.{thymeleaf,freemarker,beetl}.order`、`spring.web.view.jsp.order`（引擎解析顺序确定且可配）与 `spring.freemarker.enabled`；新增可选的 `spring.web.view.redirect-hosts` 外部重定向 host 白名单；移除从未被读取的 `spring.beetl.mode`
+- **自动配置开关**：新增 `springperf.openapi.enabled`、`springperf.swagger-ui.enabled`（可分别关闭文档端点与 Swagger UI 资源）、`springperf.web.mvc-conflict-check.enabled`（三方库传递引入 Spring MVC 时可跳过启动期冲突检查）
+- **管理端口与 SSL 配置**：`management.server.*` 统一按「管理端口专属值 → 主服务器 `server.*` → 默认值」解析，HTTP/2、请求体上限、SSL 等可按需覆盖（SSL 开关同样遵循该回退）；SSL 配置改用 Spring Boot 的 `Ssl` 模型绑定，非法 `client-auth`、空 keystore 或缺失凭据在启动期直接报错
+- **服务就绪时机**：`WebServerInitializedEvent` 改为在 Netty 实际绑定端口后发布，服务注册组件（Nacos / Eureka / Consul）感知就绪的时机更准确
+- **`StreamingResponseBody` 支持**：返回 `StreamingResponseBody`（含 `ResponseEntity<StreamingResponseBody>`）现在会真正流式写出——`writeTo` 在业务线程池执行，字节按 8KB 分帧经既有流式写出通道送达，客户端可边写边读；`produces` 声明了具体类型时写入该 `Content-Type`，HEAD 只发响应头。此前该类型无解析器，按内容协商失败返回 500
+
+### 变更
+
+- **Servlet 规范语义收紧**：同一异步周期内重复 `startAsync()` 抛 `IllegalStateException`；`complete()` 幂等、`isAsyncStarted()` 在 `complete()` / `dispatch()` 后返回 `false`；`dispatch()` 期间 `DispatcherType` 为 `ASYNC`；`addListener(listener, req, resp)` 的事件携带注册时的 req/resp；`getHeaders(name)` 无该头返回空集合；`getDateHeader()` 对存在但无法解析的日期抛 `IllegalArgumentException`；`setAttribute(name, null)` 等价 `removeAttribute`；`setSessionTrackingModes()` 现在生效并按规范校验（集合非空且必须含 `COOKIE` 或 `SSL`）
+- **视图错误不再静默**：视图解析异常保留原始 cause 不再被跳过；`ModelAndView` 指向不存在的视图抛异常而非 200 空白页；渲染中途抛异常不再返回 200 + 半截 HTML，改为清空缓冲后交给异常处理器（500 或自定义错误页）；`redirect:` 不再带 `text/html`，并保留 `ModelAndView` 指定的 3xx 状态码
+- **内容协商失败显式报错**：无匹配转换器的 `@ResponseBody` 返回值一律 500（原先静默返回 200 + 空响应体），同时覆盖「已显式设置 `Content-Type`」与「`produces` 协商出类型」两条链路——此前只做了前者，走 `produces` 的返回值仍被静默丢弃，连 `produces` 声明的 Content-Type 都不写。与 Spring MVC 语义一致
+- **视图渲染热路径降分配**：Thymeleaf 无 session 时上下文直接读取 model，不再每请求复制一份 `HashMap`；application 属性 Map 改为首次写入时创建；FreeMarker 解析缓存按 locale 分桶，去掉每请求拼接 `viewName + locale` 键；Content-Type 解析结果与 `redirect:` 的 `RedirectView` 均复用，避免重复解析/分配
+- **视图输出不再分配 8 KB 编码缓冲**：三个模板引擎改为分块编码直写响应体，不再为每次渲染创建固定 8 KB 的编码缓冲；实测每请求分配 Thymeleaf 30.3 KB → 21.9 KB、FreeMarker 24.6 KB → 17.3 KB（同一 JFR 口径，含示例应用自身日志开销）。编码语义与 `OutputStreamWriter` 保持一致（不可映射字符按 REPLACE、`close()` 关闭底层流、跨块代理对不丢字符）
+- **外部重定向白名单不再每请求解析**：`spring.web.view.redirect-hosts` 的解析结果按配置串缓存，配置变更后立即生效；3 个 host 的白名单每请求分配从约 660 B 降到约 5 B
+- **配置启动期校验**：`spring.web.view.engine` 的未知值、`none` 与其他引擎混写、`spring.thymeleaf.mode` / `spring.freemarker.content-type` 非法值、以及视图引擎 `cache` / `enabled` 非 `true` / `false` 的值，均改为启动期报错而非静默忽略；`engine=none` 时不再装配内置 JSP（自定义 `ViewResolver` Bean 不受影响）
+- **批处理默认启用攒批窗口**：相比 2.7.7，未显式配置的 `@BatchMapping` 现在默认按 2ms 窗口攒批（批大小由窗口保证，单请求延迟上界增加约 2ms）。若负载很低、希望保留旧版「消费者追上空队列即刷出」的行为，显式写 `batchWindowMillis = 0`；启动期提示也改为仅在显式关闭时出现
+- **API 收敛（二进制不兼容）**：`SpringHeadersAdapter`（WebSocket 头适配器）随拆分重构移除，`NettyWebSocketSession` 构造器改为直接接收 Spring 的 `org.springframework.http.HttpHeaders`；从未被读取的 `ViewProperties.BEETL_MODE` / `BEETL_MODE_DEFAULT` 常量随 `spring.beetl.mode` 一起删除；`WebServerInitializedEventAutoConfiguration#webServerInitializedEventPublisher(...)` 签名变更（去掉 `NettyHttpServer` 参数，事件改由端口绑定后的 `NettyServerStartedEvent` 携带）。迁移写法见[破坏性变更说明](docs/breaking-changes.md)的 2.7.8 节
+- **流式队列容量可配置且默认下调**：新增 `server.http.stream-max-queued-events`（默认 `4096`），SSE / 字节流发送器的入队缓冲由硬编码 `65536` 改为建连时按配置解析。JCTools 数组一次性分配，每连接由约 256KB 降到约 16KB（1000 长连接实测 251.9MB → 16.7MB）；A/B 基准每请求分配 314.7KB → 95.8KB（−69.6%），吞吐无劣化迹象。非 2 的幂向上取整，小于 2 时启动失败；同时修复降容量后同步 Publisher 在 `highWaterMark` 超过容量时入队自旋等待同栈 drain、最终 30s 超时的问题
+
+### 修复
+
+- **异步超时稳定按 503 收尾**：`WebAsyncTask` / `Callable` 超时后，被取消任务抛出的 `InterruptedException` 会与超时结果抢写响应槽——客户端可能拿到 500，任务若不响应中断甚至会拿到迟到的 200 + 正常结果，超时等于失效。现在超时一旦到点，此后到达的任务结果一律丢弃，按 2.7.7 起的约定稳定返回 503
+- **攒批小窗口按配置生效**：`batchWindowMillis` 设为 2~5ms 这类小值时，到期会被定时器粒度放大——快 IO 场景吞吐不升反降、低负载请求白等。修复后窗口按标称值触发，`maxBatchSize` 的攒批效果真正兑现
+- **会话 Cookie**：Servlet 默认会话 Cookie（`maxAge=-1`）不再被写成 `Max-Age=-1` / `Expires=<now>` 而立即过期
+- **持久化会话**：启用文件会话存储时，落盘不再运行在网络线程上拖慢同一线程上的其他连接；停机时最多等待 5 秒把在途保存写完
+- **405 与关闭中请求**：405 响应的 `Allow` 头汇总所有可用方法；优雅关闭期间被拒的请求返回 503
+- **批处理停机与完成兜底**：停机 drain 加 5 秒上界（此前可能无限挂起）；业务线程池已关闭时被拒的批次逐条报错而非静默丢弃；批量方法返回后仍未完成的请求立即失败，不再挂到 30 秒超时
+- **HTTP 日期头**：支持 RFC 850 / 1036 的两位年份日期（此前被判为无法解析）
+- **转发与包含**：`INCLUDE_QUERY_STRING` 按规范只放 query string、`INCLUDE_SERVLET_PATH` 去掉 query；`INCLUDE_REQUEST_URI` 改为目标资源 URI（contextPath + 目标路径，此前误写原始请求 URI），补上 Servlet 4.0+ 的 `INCLUDE_MAPPING` / `FORWARD_MAPPING`，include 结束后不再残留 `INCLUDE_*` 属性（嵌套 include 恢复外层值）
+- **HTTP/2**：修复 h2c preface 分片时的空指针
+- **上传与流式响应**：并发解析 multipart 不再产生重复条目；关闭上传流、HEAD 请求、响应头超限降级等路径不再泄漏流、文件句柄或缓冲区
+- **HEAD 请求访问流式端点**：`HEAD` 命中 SSE / 流式返回值的处理器时，响应已按 HEAD 语义以「仅响应头」收尾，此前却仍启动发送器并向已结束的响应写内容帧，每次请求打出一条 `EncoderException: unexpected message type: DefaultHttpContent, state: 0` 的 ERROR 日志（并把上游订阅取消掉）。现在 HEAD 不再启动流，响应头照常返回
+- **上传异常路径的 direct memory 泄漏**：上传解析失败、或声明长度超限而被拒绝时，约等于请求体大小的直接内存不会被回收，长时间运行会持续上涨；同时超限上传此前可能拿到连接异常而非 413
+- **异步请求的内存泄漏**：客户端在异步（含 SSE）真正开始前就断开时，该请求的缓冲与异步生命周期都不会被释放，表现为接口长期运行后直接内存只涨不降
+- **WebSocket 帧处理**：分片帧按 RFC 6455 聚合后再交给业务；各种断连路径的关闭回调只触发一次；握手异常时释放请求；二进制发送不再消耗调用方 `ByteBuffer`；单帧消息与批量发送同样受大小限制和背压水位约束
+- **重定向与编码**：`//host` 协议相对目标不再拼 context-path；https 无显式端口时模板取到 443（绝对 URL 正确）；带后缀的视图名三个引擎统一支持；自定义 Content-Type 未带 charset 时补上响应实际编码
+
+### 安全
+
+- **SSE 协议注入**：`id` / `event` 字段中的换行在写入前拒绝，避免上游值伪造额外 SSE 字段（此前依赖 Spring 补丁版本的行为）
+- **外部重定向白名单**：可选 `spring.web.view.redirect-hosts` 限制外部重定向目标，可阻断含 userinfo 混淆的地址
+
+## [3.5.8] - 20261125（预计）
 > ⚠️ **本版含破坏性变更**：Servlet 规范语义、视图错误与内容协商、部分配置项的校验方式均有调整，
 > **升级前请先读 [破坏性变更说明](docs/breaking-changes.md) 的 3.5.8 节**。
 
@@ -61,15 +118,61 @@
 - **SSE 协议注入**：`id` / `event` 字段中的换行在写入前拒绝，避免上游值伪造额外 SSE 字段（此前依赖 Spring 补丁版本的行为）
 - **外部重定向白名单**：可选 `spring.web.view.redirect-hosts` 限制外部重定向目标，可阻断含 userinfo 混淆的地址
 
-## [4.1.7] - 20261008
+## [2.7.7] - 20261013
+> ⚠️ **本版含破坏性变更**：配置键、响应分帧、Servlet `flush` 语义、条件请求/Range、
+> 扩展点签名均有调整，**升级前请先读 [破坏性变更说明](docs/breaking-changes.md)**。
 
+### 新增
+
+- **静态资源与视图**：新增可插拔 SPI `WebExchangeProvider`（`supports()` 能力探测 + `createExchange()` + `getOrder()`），模板中可直接拿到**真实** session 与 principal；视图/编码相关配置键统一
+- **HTTP 协议语义对齐**：条件请求（`If-None-Match` / `If-Modified-Since`）、字节范围（`Accept-Ranges`、单段 `206`、多段 `multipart/byteranges`）、响应分帧按 RFC 7231/7232/7233 收紧
+- **服务端配置对齐 Spring Boot**：连接与请求上限、keep-alive 超时/请求数、multipart 上限、错误响应策略、转发头策略等一组配置键（见配置手册与破坏性变更说明的 2.7.7 节）
+- **会话持久化**：`server.servlet.session.persistent` / `.store-dir` / `.persistent-exclude`（JDK 序列化，每 session 一文件，不落盘 `transient` 属性），并新增反序列化白名单键 `server.servlet.session.persistent-deserialization-filter`
+- **配置刷新**：监听 `EnvironmentChangeEvent` 清空框架属性缓存，配置中心改动无需重启
+
+### 变更
+
+- **响应分帧**：`flush(true)` 由「一次性」改为 chunked 渐进式输出，提交后仍可继续写入，由 `endStream()` 写终止块
+- **Servlet `PrintWriter`**：`print` / `println` 不再自动提交（对齐 Tomcat `autoFlush=false`），需显式 `flush()` / `flushBuffer()`
+- **扩展点签名变更**（源码级不兼容，详见破坏性变更说明的 2.7.7 节「扩展点签名变更」）
+- **会话、重定向与条件请求的错误映射**调整；管理端口与转发语义调整（均见破坏性变更说明的 2.7.7 节）
+
+### 安全
+
+- **请求参数数量上限**：新增 `server.max-parameter-count`（默认 10000），防 hash 碰撞 DoS
+
+### 优化
+
+- **热路径分配**：JFR 驱动的若干优化（请求分发、属性查找、只读响应头视图缓存等），降低每请求分配与 CPU
+- **流式拷贝线程池**：兜底流拷贝改用专用守护线程池，不再退化为并行度受限的公共池
+
+### 修复
+
+- **会话并发**：过期会话清理改为在写锁内条件摘除，修复「刚清理的过期会话被并发落盘写回、重启后复活」；会话写入串行化，`tryInvalidate` 原子失效
+- **异步 / SSE 生命周期**：`DeferredResult` 终态只触发一次、超时任务及时清理、`ByteBuf` 引用计数配对；`markStreamCompleted` 改为抢占式，杜绝双终止块
+- **Servlet / websocket**：`;jsessionid=` 从 URI 回读（Cookie 优先）、same-site 值规范化、JSR-356 端点生命周期与会话收尾
+- **视图与桥接**：Thymeleaf 会话变量注入、FreeMarker 适配、`WebMvcConfigurer#addViewControllers` 桥接（未能桥接的回调打 WARN，不再静默）
+- **core / http**：错误输入处理、日志锁、文件名守卫、media type 顺序、惰性请求状态与 head 标志可见性
+
+### 构建
+
+- **门禁与 master 对齐**：接入 `mvnw`、enforcer `requirePluginVersions`、javadoc doclint（JDK 8 口径）、`check-docs` / 符号校验，并清理 doclint 报错
+- **CI**：采用 master 的 workflow 集（CI / CodeQL / dependabot / coverage-aggregate）
+- **覆盖率**：按「单测 + E2E 合并」口径重生成 `coverage-report.md`
+
+### 文档
+
+- **同步台账**：2.7.x 同步缺口与迁移清单逐文件定性
+- **事实修正**：清除漏入本分支的 jakarta / Spring Boot 3 措辞与失效符号引用
+
+## [4.1.7] - 20261008
 > **关于本版本**：`4.1.x` 是从 `master`（纯 Spring Boot 3.5.x）**拆分出来独立发布**的下游分支，
 > 首个发布版本号为 **`4.1.7`**：Spring Boot 4.0 / 4.1 + Spring Framework 7 + Jackson 3，不再兼顾 3.5.x。
 > 因此首个版本的变更包含「分支拆分与适配」本身，其余条目与 master 的 `3.5.7` 基本一致（后者原文附于本节之后）。
 
 ### 变更
 
-- **分支定位**：本分支（`4.1.x`）**专用 Spring Boot 4.1**（`-Pspring-boot-4.0` 可切 4.0），**不再兼顾 3.5.x**——「一份代码同时支持两版」的目标由 master（纯 3.5.x）与本分支的分工取代。默认构建即为 4.1，无需 `-P` 切换。master 与本分支的差异见 [版本兼容性说明](docs/compatibility.md)
+- **分支定位**：本分支（`4.1.x`）**专用 Spring Boot 4.1**（`-Pspring-boot-4.0` 可切 4.0），**不再兼顾 3.5.x**——「一份代码同时支持两版」的目标由 master（纯 3.5.x）与本分支的分工取代。默认构建即为 4.1，无需 `-P` 切换。master 侧的差异与同步规则见 [4.1.x 适配指南](.agent/context/4.1.x-adaptation-checklist.md)
 - **兼容层整体移除**：`WebHttpHeaders` 的 8 个 MethodHandle 版本分支、`Boot4WebServerInitializedEventBridge` 的 ASM 运行时字节码生成、`ResponseStatusExceptionAdapter` 的方法名反射探测、`ListenableFutureAdapter`（Spring 7 已无该类型，原实现是死代码）等，均已删除，改为直接面向 Spring 7 / Jackson 3 的 API 实现
 - **JSON 栈迁移到 Jackson 3**：`com.fasterxml.jackson.databind` → `tools.jackson.databind`（注解仍用 `com.fasterxml.jackson.annotation`）。Jackson 3 把 `FAIL_ON_NULL_FOR_PRIMITIVES` 默认值由 `false` 改为 `true`，本框架经 `JacksonMappers.defaultMapper()` 显式关闭以保持与 master 一致
 - **Netty 跟随 Boot 4 BOM**：`4.1.137.Final` → `4.2.15.Final`（Boot 4 的基线）。删除了本项目对 14 个 Netty artifact 的钉版
@@ -82,7 +185,6 @@
 - **String 请求体**：`@RequestBody String` 在 `application/json` 下必然 400（框架从未注册 `StringHttpMessageConverter`）；补上并让它排在 Jackson 之前（Spring 语义：String 原样读取，不按 JSON 解析）
 
 ## [3.5.7] - 20261008
-
 > ⚠️ **本版含破坏性变更**：配置键、响应分帧、Servlet `flush` 语义、条件请求/Range、
 > 扩展点签名均有调整，**升级前请先读 [破坏性变更说明](docs/breaking-changes.md)**。
 
@@ -96,7 +198,7 @@
 
 ### 变更
 
-- **分支策略**：`master` 收敛为**纯 Spring Boot 3.5.x**——此前叠加的 Spring Boot 4 / Spring Framework 7 兼容层（`WebHttpHeaders` 的版本分支与 MethodHandle、`MediaTypeUtils`、`ResponseStatusExceptionAdapter`、`Boot4WebServerInitializedEventBridge`、SB4 Maven Profile 等）已全部移除；4.x 适配改由 `4.1.x` 分支承接
+- **分支策略**：`master` 收敛为**纯 Spring Boot 3.5.x**——此前叠加的 Spring Boot 4 / Spring Framework 7 兼容层（`WebHttpHeaders` 的版本分支与 MethodHandle、`MediaTypeUtils`、`ResponseStatusExceptionAdapter`、`Boot4WebServerInitializedEventBridge`、SB4 Maven Profile 等）已全部移除；4.x 适配改由 `4.1.x` 分支承接（同步规则见 [4.1.x 适配指南](.agent/context/4.1.x-adaptation-checklist.md)）
 - **响应分帧**：`flush(true)` 由「一次性」改为 chunked 渐进式输出
 - **Servlet `PrintWriter`**：`print`/`println` 不再自动提交（对齐 Tomcat `autoFlush=false`）
 - **扩展点签名变更**（源码级不兼容，详见 [破坏性变更说明](docs/breaking-changes.md) 的 3.5.7 节「扩展点签名变更」）
@@ -121,8 +223,67 @@
 - **自动配置注册表残留**：`AutoConfiguration.imports` 中仍注册着已删除的 `Boot4WebServerInitializedEventAutoConfiguration`，会导致 Spring 上下文启动失败
 - **404/405 状态共享污染**、**Filter 链异常路径**、**`WebContext` 生命周期**、**路由边界**等一批既有缺陷
 
-## [3.5.6] - 20260906
+## [2.7.6] - 20260910
+### 新增
 
+- **视图渲染模块 `spring-web-view`**：Model/View 提升为请求管线一等公民（`ModelContext` 请求级容器 + `View`/`ViewResolver` SPI），支持 `@ControllerAdvice @ModelAttribute` 预置、本地 `@ModelAttribute` 方法、`@PathVariable`/`BindingResult` 合并；多模板引擎（Thymeleaf / FreeMarker / Beetl）共存、`spring.web.view.engine` 多选；`redirect:` 前缀视图与 `ViewReturnValueResolver`（Thymeleaf 3.0 适配为纯 `IContext`、FreeMarker 2.3.32）
+- **JSP 渲染**：集成 Apache Jasper + JSTL（`JasperJspServlet`），`JspViewResolver` 提供 `jsp:` 前缀 / `.jsp` 后缀视图名并自动注册 `/**/*.jsp` 路由；`spring-web-mvc-support` 桥接 `ModelAndView` / JSP 视图（javax.servlet + JSTL 1.2 适配）
+- **Servlet 对象路由**：`SupportServletRegistry` 扫描 Servlet Bean / `@WebServlet` 注解 `url-pattern` 注册为框架路由；`ServletInvoker`、`PerfServletConfig`
+- **JSR-356 `@ServerEndpoint` 桥接**（`spring-web-websocket`）：标准 WebSocket 端点注解支持，涵盖 `@OnOpen/@OnMessage/@OnClose/@OnError`、`@PathParam`、Decoder/Encoder、自定义 `Configurator`、`JsrWebSocketContainer` 端点生命周期（javax.websocket 适配）
+- **方法级拦截器与 `@SessionAttributes`**：`@ControllerAdvice` 拦截器按 handler controller 类型匹配；`@SessionAttributes` 跨请求同步 Model 属性、`SessionStatus` 清理，`@SessionAttribute`/`SessionStatus` 参数自动装配
+- **HEAD 语义（RFC 7231 §4.3.2）**：无显式 HEAD handler 时自动映射到 GET，响应体抑制但保留真实 `Content-Length`（资源文件/流式/字节路径均覆盖）
+- **Linux 原生传输**：新增 `server.netty.transport=auto/nio/epoll`（默认 auto），Linux 自动启用 native epoll
+- **生产级 Netty 默认值**：`SO_BACKLOG` 1024、`SO_KEEPALIVE` true、`max-content-length` 4MB；业务线程池默认有界队列 100，使 `maxPoolSize` 扩容与 503 快速失败真正生效
+
+### 变更
+
+- **`spring-web-support` 模块拆分**：拆分为 `spring-web-servlet`（纯 Servlet 桥接：Filter/Servlet/HttpSession/JSP/`@SessionAttribute` 等官方 spring-web 语义，零 SpringMVC 依赖）与 `spring-web-mvc-support`（SpringMVC 兼容桥接：`org.springframework.web.servlet.*` 重写类、`WebMvcConfigurer`/`HandlerInterceptor`/`RequestBodyAdvice` 桥接）。仅需 Servlet 兼容的用户只依赖 `spring-web-servlet`；`spring-web-mvc-support` 依赖 `spring-web-servlet`。starter 自动配置相应拆为 `SpringWebServletAutoConfiguration` + `SpringWebMvcSupportAutoConfiguration`（分别按模块 class 条件生效）
+
+### 安全
+
+- **Multipart DoS 防护**：`SupportMultipartResolver` 对声明 `Content-Length` 提前 fail-fast + 流式累计字节上限（覆盖 chunked），超限对齐 `HttpObjectAggregator` 返回 413 而非关闭连接
+- **Fastjson 反序列化硬化**：默认关闭 `SupportAutoType` 并开启 `ErrorOnNotSupportAutoType`，阻止 `@type` gadget 攻击
+- **Session Fixation 防护**：会话固定攻击防护与安全审计修复
+
+### 优化
+
+- **组件注册并发安全**：`WebComponentContainer` 改用 `ConcurrentHashMap` + `compute` 原子合并，运行期动态注册无读-写竞争、无残留 destroy
+- **连接指标隔离**：`NettyMetricsHandler` 由共享单例改为每服务器独立实例，主端口与管理端口连接数各自统计
+- **Locale 参数解析**：未绑定线程 Locale 时按请求 `Accept-Language` 解析，尊重拦截器/ControllerAdvice 覆盖，不使用 `ThreadLocal`（零线程池残留）
+- **异常注入修正**：`@ExceptionHandler` 命中 cause 链时注入与参数类型兼容的最具体异常，避免返回 `ClassCastException` 误报 500
+
+### 修复
+
+- **404/405 状态共享污染**：改为每请求新建 `StacklessResponseStatusException`（`fillInStackTrace` 已禁用，零开销），避免 `@ExceptionHandler` 修改 headers/body 影响后续请求
+- **Filter 链异常路径**：初始化请求上下文并触发完整异常处理与 `afterCompletion`，避免拦截器读到 null / 线程残留 ThreadLocal
+- **`WebContext` 生命周期**：启动失败清理已初始化组件并保留 fail-fast 重试；`destroy()` 后子组件状态复位，支持 stop/restart 重新初始化
+- **异步兜底**：未配置默认业务线程池且方法未显式指定 executor 时懒加载复用 `SimpleAsyncTaskExecutor`，消除 NPE
+- **路由边界**：`PrefixPathRouterOptimizer` 无前缀索引时显式拒绝（避免数组越界）；`SuffixPathRouterOptimizer` 边界守卫
+- **异步与流式边界**：asynchronous handler 异常处理、`AbstractNettyStreamSender` 完成边界加固
+- **静态资源方法收紧**：`ResourceRequestHandler` 仅允许 GET（HEAD 由路由层自动映射并只回元数据，跳过文件 IO）
+- **JSR-356 生命周期加固**：`@OnOpen` 失败 / 非规范关闭码路径兜底销毁 Decoder/Encoder，`@OnClose` 异常不再跳过 codec 销毁
+- **视图解析失败不再静默**：无法解析的视图名抛 `IllegalArgumentException`（500 + 错误上下文），替代空响应 200；`ViewResolver` 解析异常记录日志
+- **`redirect:` 语义对齐**：仅视图方法生效，不再劫持 `@ResponseBody`/`@RestController` 返回的 `"redirect:/x"` 字符串为 302；目标 URL 已含 query 时用 `&` 续接
+- **`WebComponentContainer` 命名冲突**：落败组件不再被误初始化/重复注册路由，防止副作用与资源泄漏
+- **Servlet 桥接 session 永不过期 → 无界内存增长**：`PerfHttpSessionManager.createSession()` 未应用会话超时，`maxInactiveInterval` 恒为 0，清理线程永不回收 session；现按 `server.servlet.session.timeout` 设置过期（Spring Boot Duration 语义：裸数字=秒、支持 `30m/1h/1d` 后缀，默认 30 分钟）
+- **`server.http.read-timeout` 默认值失效**：`HTTP_READ_TIMEOUT` 未加入默认值表，未配置时读超时保护（文档声明的 30s）实际关闭；现已修复
+- **异步返回值序列化异常被吞**：`asyncDispatch` 中返回值解析异常仅记录日志、响应悬挂至超时；现路由到 `ExceptionRegistry` 并 flush，`afterCompletion` 携带真实异常
+- **404/405 路径级拦截器路径约束失效**：无 handler 时仍按请求路径过滤 include/exclude，路径级拦截器不再对任意 404 触发
+- **重叠通配符路由按特异性匹配**：`/user/{id}` 与 `/user/*` 等重叠通配符最精确者优先（literal > {var} > * > **），对齐 Spring MVC；`PathPatternUtils.comparePathRuleSpecificity` 提供比较逻辑
+- **流式错误结束不再挂起**：`AbstractNettyStreamSender.complete(.., failure)` 错误终止时关闭连接（不再写正常 `LastHttpContent`），客户端感知异常截断
+
+### 构建
+
+- **JaCoCo 覆盖率门槛**：全模块覆盖率 TOTAL 92.1%（spring-web 92.7% / servlet 91.5% / websocket 90.5% / view 95.5%），新增 `scripts/coverage-report.sh/ps1` 报告脚本（迁移至 `scripts/` 目录）
+- **E2E 增强**：随机端口避免冲突、优雅停机 drain、TLS depth / mTLS、native 降级与性能门限测试、连接复用与请求厚度测试；`BaseE2ETest` 读写超时放宽到 30s 降低偶发 flake
+- **测试加固**：`AsyncSupportRegistryTest` 同构 stub 加 `lenient()`；`HttpBodyCodecRegistryCoverageTest` 排序断言不依赖并发遍历顺序；`ResponseEntityExceptionHandlerBranchesTest` 改用确定有参方法；恢复 `placeholder.txt` 测试资源并补 `.gitignore` 排除规则
+
+### 文档
+
+- **视图渲染文档**：`docs/view.md`（中英）与 2.7.6 版本同步
+- **模块文档**：随 `spring-web-support` 拆分，`spring-web-servlet` 与 `spring-web-mvc-support` 独立成章并给出选择建议
+
+## [3.5.6] - 20260906
 ### 新增
 
 - **视图渲染模块 `spring-web-view`**：Model/View 提升为请求管线一等公民（`ModelContext` 请求级容器 + `View`/`ViewResolver` SPI），支持 `@ControllerAdvice @ModelAttribute` 预置、本地 `@ModelAttribute` 方法、`@PathVariable`/`BindingResult` 合并；多模板引擎（Thymeleaf / FreeMarker / Beetl）共存、`spring.web.view.engine` 多选；`redirect:` 前缀视图与 `ViewReturnValueResolver`
@@ -189,7 +350,6 @@
 - **兼容性/配置/模块文档**：随 Spring Boot 3.5.16、Netty 4.1.137、AOT 支持同步更新（中英）
 
 ## [3.2.5] - 20260824
-
 ### 新增
 
 - **Servlet 规范桥（servlet spec bridge）**：`spring-web-support` 新增完整 Servlet 适配层，提供 `PerfServletContext`、`PerfAsyncContext`、`PerfRequestDispatcher`、`PerfWebConnection`、`PerfHttpPrincipal`、`ServletPartAdapter`、`PerfFilterConfig`、`ForwardWebServerHttpRequest`、`NettyHttpServletRequest` 等实现，支持在 Netty 上运行 Servlet 规范 Filter 链、`AsyncContext`、`RequestDispatcher` 转发、`HttpSession`、`Part` 等能力；新增 `SupportDispatcherHandler` 桥接分发器
@@ -224,11 +384,99 @@
 
 ### 文档
 
+- **AI 上下文迁移**：`CLAUDE.md` / `.claude` 迁移至 `AGENTS.md` / `.agent`
 - **benchmark 数据刷新**：WSL / 多实例趋势图数据更新
 - **内部实现文档**：servlet bridge / async 流式 / batch 模块文档补齐
 
-## [3.2.4] - 20260805
+## [2.7.5] - 20260824
+### 新增
 
+- **Servlet 规范桥（servlet spec bridge）**：新增完整 Servlet 适配层，提供 `PerfServletContext`、`PerfAsyncContext`、`PerfRequestDispatcher`、`PerfWebConnection`、`PerfHttpPrincipal`、`ServletPartAdapter`、`PerfFilterConfig`、`ForwardWebServerHttpRequest`、`NettyHttpServletRequest` 等实现，支持在 Netty 上运行 Servlet 规范 Filter 链、`AsyncContext`、`RequestDispatcher` 转发、`HttpSession`、`Part` 等能力（配合 javax.servlet 适配）
+- **`@RunInEventloop` 元注解**：`@Optimize` / `@ReactiveSupport` 标注 `@RunInEventloop`，业务方法可直接在 EventLoop 上执行，减少线程切换
+- **Netty / Body / AccessLog 配置暴露**：`PropertiesConstant` 新增对应配置项，`NettyHttpServer` / `AccessLogWebFilter` 支持外部化配置
+- **WSL 一键基准测试**：新增 `wsl-run-all.sh` / `wsl-benchmark.sh` / `wsl-server.sh` / `wsl-convert-cp.sh` 脚本、`WSL_SETUP.md` 与 `no-sleep.ps1`，支持可选 JFR 采集
+- **报告生成器增强**：`ReportGenerator` 跳过损坏的结果 JSON，缺失容器在报告中渲染 FAIL 列并附带提示
+- **内部实现文档**：新增 `docs/internals/00~19` 全量架构、请求链路与设计决策文档
+
+### 重构
+
+- **Servlet 会话语义增强**：`PerfHttpSession` 对 `HttpSessionBindingListener` 的值绑定 / 解绑事件处理完善
+
+### 优化
+
+- **解析热路径分配削减**：请求参数解析、`InMemoryHttpSessionStorage`、`MicrometerWebMetrics` 路径减少中间对象分配
+- **批处理 SSE 发送**：`AbstractNettyStreamSender` 新增 `sendAll()` 批量发送，避免逐条 flush，并修复 drain 重入
+- **大请求体释放优化**：大体积请求体通过 `duplicate` 引用替代 refcount 加锁，消除锁开销
+
+### 修复
+
+- **Multipart**：`destroy()` 释放 decoder 以归还池化内存；修复 destroy 顺序、`undecodedChunk`、refcount 泄漏；`RequestPart` 缺失时返回 400 而非 500
+- **WebSocket**：升级被拒绝时释放请求；修复 h2c fragment buffer 泄漏与 WS upgrade 泄漏
+- **Async**：异步超时改为懒调度并修正 metrics 计时；`SSE emitter select`、`ReactiveSupport` 首个请求 NPE、冷流发布者背压 refill 修复
+- **路由与参数绑定**：`SuffixPathRouterOptimizer` off-by-one 修复；映射与参数解析启动期 fail-fast 校验；`AbstractNamedValueResolver` 支持泛型集合元素类型转换；`getReader` 回落 UTF-8 编码
+- **文件下载**：使用 `Content-Length` 定长帧，避免 chunked 传输
+- **大请求体**：异步读取与释放同步，避免已释放 `ByteBuf` 被访问
+- **管理端口隔离**：management dispatcher 不再参与主端口路由查找
+- **Interceptor**：`afterCompletion` 语义修正
+- **Netty 层**：`@Sharable` 处理器生命周期与 h2c buffer leak guard；`NettyHttpHandler` 请求路径 NPE 修复
+- **Batch 队列**：`DisruptorQueue` RingBuffer 大小 clamp、溢出保护；`BatchScanner` 泛型类型解析修复
+- **SSL PEM 解析**：`SslContextFactory` 支持 classpath 前缀与流式加载
+- **FilterWrapper**：实例级唯一 `id`，避免同类多实例被按类名去重误杀
+- **访问日志**：`AccessLogWebFilter` 错误状态记录与格式修正
+
+### 构建
+
+- **`.gitattributes`**：shell 脚本强制 LF 行尾
+- **基准模块**：支持可选 JFR 采集依赖
+
+### 文档
+
+- **benchmark 数据刷新**：WSL / 多实例趋势图数据更新
+- **内部实现文档**：servlet bridge / async 流式 / batch 模块文档补齐
+
+## [2.7.4] - 20260806
+### 新增
+
+- **`JsonConverter.toJsonBytes()` API**：`JsonConverter` 接口新增直接输出 `byte[]` 的方法，Jackson / Fastjson 转换器实现，跳过中间 `String` 拷贝，降低响应序列化开销
+- **SSE 测试体系扩充**：新增 `DefaultNettyStreamSenderTest`、`EarlyEncodeNettyStreamSenderTest`、`HttpBodyCodecRegistryWriteNegotiationTest`、`NettyHttpHeadersAdapterTest` 等
+- **一键 JFR flame graph 脚本**：`spring-web-benchmark/jfr-hotspot.sh` / `analyze-jfr2.sh`，批量生成 CPU 热点火焰图；`analyze_jfr.py` CPU 热点分析脚本纳入版本控制
+
+### 重构
+
+- **SSE 流式发送重构**：`NettyStreamSender` 拆分为 `DefaultNettyStreamSender`（EventLoop 延迟编码）与 `EarlyEncodeNettyStreamSender`（App 线程早编码 byte[] 快照），支持数据提前冻结
+- **HTTP 头零拷贝视图**：新增 `NettyHttpHeadersAdapter`，`WebHttpHeaders` 直接委托 Netty 头存储，消除请求头 O(n) 拷贝
+- **Body 内容协商重写**：`HttpBodyCodecRegistry` 写路径协商逻辑重构，新增写协商专项测试
+- **Arg 模块优化**：`SpringHandlerMethodArgumentResolverAdapter` 重构为 `Provider` 形式；validator 在方法参数上下文缓存
+- **Retval 模块优化**：`ReturnValueResolverRegistry` / `MethodReturnValueContext` 重构
+- **404/405 免栈异常**：改用 `StacklessResponseStatusException`，降低请求路径异常构造开销
+- **线程池安全替换**：`BizPoolRegistry` 支持安全替换旧线程池
+
+### 优化
+
+- **Jackson converter**：序列化路径优化
+- **CORS 异常映射**：`CorsRegistry` / 异常解析器异常映射精简
+
+### 修复
+
+- **SSE 单条消息溢出**：`EarlyEncodeNettyStreamSender` 单条消息超过 `maxFlushBytes` 时直接独立写入，不再抛 `IndexOutOfBoundsException`
+- **`sendError()` JSON 转义**：错误响应 message 转义引号 / 反斜杠 / 控制字符，避免畸形 JSON
+- **`NettyServerHttpResponse.flush()` 失败后 buffer 置空**：防止返回已释放的 ByteBuf
+- **路由匹配数组越界**：`NameValueExpressionSupport` / `ParamOrHeaderMatcher` / `SuffixPathRouterOptimizer` 修复
+- **Async 状态校验**：`AsyncSupportUtils` / `PerfAsyncWebRequest` 状态校验逻辑修正
+- **错误信息修正**：`AbstractFastFailHttpServletRequest` 10 处复制粘贴错误信息改为对应方法名
+- **Actuator 管理端口 Bean**：补 `@ConditionalOnMissingBean`
+- **Batch 优雅停机**：`DisruptorQueue` / `NettyHttpServer` 停机流程完善
+
+### 构建
+
+- **`spring-boot-maven-plugin` 版本纳入根 pom `pluginManagement`**：子模块插件版本与 `${spring-boot.version}` 对齐
+
+### 文档
+
+- **README 默认语言改为英文**，新增 `README_CN.md`
+- **同步 master 的 `2.7.x-migration-checklist.md`** backport 降级适配指南
+
+## [3.2.4] - 20260805
 ### 新增
 
 - **`JsonConverter.toJsonBytes()` API**：`JsonConverter` 接口新增直接输出 `byte[]` 的方法，Jackson / Fastjson 转换器实现，跳过中间 `String` 拷贝，降低响应序列化开销
@@ -271,9 +519,9 @@
 ### 文档
 
 - **README 默认语言改为英文**，新增 `README_CN.md`
+- **`module.md` 等 AI 上下文文档更新**
 
 ## [3.2.3] - 20260710
-
 ### 新增
 
 - **AI/LLM 集成示例**：新增 `spring-web-example-ai` 示例子模块，演示 Spring AI（OpenAI 兼容 API）的同步对话与 SSE 流式交互
@@ -324,7 +572,6 @@
 - **文档内容纠正**
 
 ## [2.7.3] - 20260710
-
 ### 新增
 
 - **Metrics SPI 机制**：新增 `WebMetrics` / `NoOpWebMetrics` 核心指标 SPI，在请求路径零开销（NoOp 通过 JIT 常量折叠消除计时路径）
@@ -374,7 +621,6 @@
 - **文档内容纠正**
 
 ## [3.2.2] - 20260705
-
 ### 新增
 
 - **Servlet 会话支持**：桥接模块完整实现 `jakarta.servlet.http.HttpSession` 接口
@@ -400,7 +646,6 @@
 - **多版本兼容性验证**：通过 Maven profiles 验证 Spring Boot 3.0.x ~ 4.1.x 兼容性
 
 ## [2.7.2] - 20260704
-
 ### 新增
 
 - **Servlet 会话支持**：桥接模块完整实现 `javax.servlet.http.HttpSession` 接口
@@ -426,7 +671,6 @@
 - **多版本兼容性验证**：通过 Maven profiles 验证 Spring Boot 2.4.x ~ 2.7.x 兼容性
 
 ## [2.7.1] - 20260701
-
 ### 新增
 
 - **Examples 模块**：新增 `spring-web-examples` 聚合模块及 5 个示例子模块：
@@ -442,7 +686,6 @@
 - **配置属性重构**：`ApplicationProperties` / `PropertiesConstant` 提取公共方法，重构大小/时间配置解析，新增 `WebServerProperties` 配置类
 
 ## [3.2.0] - 20260628
-
 ### 重构
 
 - **Jakarta EE 迁移**：`javax.servlet` → `jakarta.servlet` 6.0，Servlet API 从 4.0.1 升级到 6.0.0；`javax.validation` → `jakarta.validation`；所有桥接层代码适配 Jakarta API
@@ -462,7 +705,6 @@
 - **CI 构建流升级**：JDK 17 基线构建流程适配
 
 ## [2.7.0] - 20260628
-
 ### 重构
 
 - **版本号体系重构**：主版本号从 1.x.x 升级为 2.7.x，与 Spring Boot 主版本号对齐；项目版本从 1.0.5 升级到 2.7.0；所有子模块 parent version 同步升级
@@ -473,7 +715,6 @@
 - **CI 配置更新**：适配 Spring Boot 2.7.18 构建环境
 
 ## [1.0.5] - 20260625
-
 ### 新增
 
 - **WebSocket 模块**：新增 `spring-web-websocket` 模块，`WebSocketConfigurer` / `WebSocketHandlerRegistration` / `WebSocketHandlerRegistry` 注册 API；`NettyWebSocketSession` 全双工通信；`WebSocketRoutingHandler` 路由分发；`WebSocketAutoConfiguration` 自动配置；E2E 测试覆盖文本、二进制、路径路由场景
@@ -488,7 +729,6 @@
 - **WebFilter 架构重构**：`WebFilter` / `WebFilterRegistration` / `WebFilterRegistry` / `DefaultFilterChain` / `RuntimeMappingWebFilter` 整体迁移到 `core/filter` 包；删除旧的 `match` 包（`ExactMatch` / `PathMatch` / `PrefixMatch` / `SuffixMatch`），统一使用 `ServletFilterPatternUtils`
 
 ## [1.0.4] - 20260621
-
 ### 新增
 
 - **Spring Cloud 服务注册发现兼容**：在 Netty 服务器启动后发射 `WebServerInitializedEvent`，使 Nacos/Eureka/Consul 等服务注册组件能正确感知服务器就绪状态；使用 JDK 动态代理包装 `WebServerApplicationContext`，无需 Servlet 容器
@@ -496,7 +736,6 @@
 - **`NettyHttpServer.getActualPort()`**：暴露实际绑定的端口号，支持随机端口场景
 
 ## [1.0.3] - 20260618
-
 ### 新增
 
 - **HTTP/2 支持**：新增 `Http2ChannelInitializer` 统一管理 HTTP/1.1 和 HTTP/2 的 ChannelInitializer，支持 h2（TLS ALPN）和 h2c（明文 prior knowledge）自动协商；新增 `server.http2.enabled` 配置开关
@@ -513,7 +752,6 @@
 - **代码风格统一**：`BaseWebServerHttpResponse` / `NettyServerHttpResponse` 多处格式化及方法提取
 
 ## [1.0.2] - 20260608
-
 ### 修复
 
 - `InvokableHandlerMethod.createMethodParameters()` 获取参数，当 Controller 被代理时返回代理类的桥接方法而非真实方法导致无法正确读取参数注解
@@ -530,7 +768,6 @@
 - **新增单元测试**：MappingRegistryTest 新增 13 个类级别约束合并测试、InvokableHandlerMethodTest 增强代理类参数注解测试、DispatcherHandlerTest / NettyHttpHandlerTest / AsyncSupportRegistryTest 增强
 
 ## [1.0.1] - 20260606
-
 ### 重构
 
 - 统一类命名：`Perf*` → `SpringWeb*` / `Actuator*`，消除 `perf` 前缀歧义
@@ -556,7 +793,6 @@
 - `WebContext` 构造函数未设置 `webContext` 自引用，导致 `WebComponentContainer.registerWebComponent(Class)` 在管理端口模式下 NPE
 
 ## [1.0.0] - 20260603
-
 ### 新增
 
 - 基于 Netty 4.1 的 REST Web 服务器
