@@ -119,7 +119,7 @@ class Http2H2cE2eTest {
             assertEquals(200, resp.code());
             String body = resp.body().string();
             // 只校验长度 + 首尾字符会放过中间 39998 字节的乱码/丢失/重排，必须逐字节比对
-            assertEquals("L" + "x".repeat(39998) + "L", body, "跨多帧的大响应体必须逐字节完整");
+            assertEquals("L" + ConfigAlignSupport.repeat('x', 39998) + "L", body, "跨多帧的大响应体必须逐字节完整");
         } finally {
             resp.close();
         }
