@@ -39,6 +39,7 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Batching window on by default**: compared with 2.7.7, an `@BatchMapping` method that leaves `batchWindowMillis` undeclared now accumulates requests in a 2ms window (batch size guaranteed by the window, at most one extra window of per-request latency). If traffic is low and you want the old flush-as-soon-as-the-consumer-catches-up behaviour, set `batchWindowMillis = 0` explicitly; the startup warning now appears only when the window is explicitly disabled
 - **API consolidation (binary incompatible)**: `SpringHeadersAdapter` (the WebSocket header adapter) is removed by the split refactor and the `NettyWebSocketSession` constructor now takes Spring's `org.springframework.http.HttpHeaders` directly; the never-read `ViewProperties.BEETL_MODE` / `BEETL_MODE_DEFAULT` constants are removed together with `spring.beetl.mode`; `WebServerInitializedEventAutoConfiguration#webServerInitializedEventPublisher(...)` changes signature (the `NettyHttpServer` parameter is dropped; the event is now carried by `NettyServerStartedEvent` once the port is bound). Migration notes are in the 2.7.8 section of the [breaking changes guide](breaking-changes.md)
 - **Streaming queue capacity is configurable and lowered by default**: added `server.http.stream-max-queued-events` (default `4096`); the SSE / byte-stream sender's queue is resolved at connection setup instead of being hardcoded to `65536`. JCTools allocates the array eagerly, so per-connection heap drops from ~256KB to ~16KB (measured 251.9MB → 16.7MB for 1000 long-lived connections); A/B benchmarks show 314.7KB → 95.8KB allocated per request (−69.6%) with no throughput regression. Non power-of-two values are rounded up; values below 2 fail startup. Also fixed a deadlock (30s timeout) that appeared after lowering capacity when a synchronous Publisher's `highWaterMark` exceeded the queue room
+- **Supported Spring Boot version: 2.7.x**: the `2.7.x` branch targets and is validated against **Spring Boot 2.7.x** (currently 2.7.18); the `spring-boot-2.7` profile is active by default and pins that version, and the CI `spring-boot-versions` matrix runs `2.7` only. See [version compatibility](compatibility.md)
 
 ### Fixed
 
@@ -674,7 +675,7 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Optimized
 
 - **`DispatcherHandler` optimized**: Refined filter chain flow and error path handling
-- **Multi-version compatibility verified**: Confirmed compatibility across Spring Boot 2.4.x, 2.5.x, 2.6.x, and 2.7.x via Maven profiles
+- **Compatibility verified**: Confirmed compatibility with Spring Boot 2.7.x via Maven profile
 
 ## [2.7.1] - 20260701
 ### Added

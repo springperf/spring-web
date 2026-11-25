@@ -10,7 +10,7 @@
 
 | 分支 | 对应 Spring Boot | 状态 | 维护策略 |
 |------|-----------------|------|---------|
-| `2.7.x` | 2.4.x ~ 2.7.x | 下游适配分支 | 从 master 同步 + 降级适配，基于 javax.servlet |
+| `2.7.x` | **2.7.x**（基线 2.7.18） | 下游适配分支 | 从 master 同步 + 降级适配，基于 javax.servlet |
 | `master` | **3.5.x** | **开发基线** | 新功能优先合入此处；**不含任何 Spring Boot 4 / Spring Framework 7 兼容代码** |
 | `4.1.x` | 4.0.x ~ 4.1.x | 下游适配分支 | 从 master 同步 + 升级适配 |
 
@@ -22,7 +22,7 @@
 
 ## 版本下限说明
 
-本项目曾尝试兼容 Spring Boot 2.3.x（Spring Framework 5.2.x），但 Spring 5.2 年代久远，缺少 `MultiValueMapAdapter`、`getSupportedMediaTypes(Class)` 等 API，且 `MethodHandles.lookup()` 对包私有方法的访问受限难以绕过。这些限制使得兼容维护成本远高于收益，故 **2.3.x 及以下版本不再支持**，曾有兼容代码已清理退回。
+本项目三个分支中最低的支持线是 **Spring Boot 2.7.x**（验证基线 2.7.18），即 `2.7.x` 分支；各分支的版本矩阵与边界见下文。
 
 ---
 
@@ -32,7 +32,7 @@
 
 | 依赖 | 当前版本 | 已验证兼容范围 | 说明 |
 |------|---------|---------------|------|
-| Spring Boot | **2.7.18** | 2.4.x ~ 2.7.x | 通过 Maven Profile 切换（`-Pspring-boot-2.4` ~ `-Pspring-boot-2.7`） |
+| Spring Boot | **2.7.18** | **2.7.x** | 分支父 POM 即 2.7.18；`spring-boot-2.7` Profile 默认激活并锁定该版本 |
 | Spring Framework | **5.3.x** | 随 Spring Boot 管理 |  |
 | JDK | **8、11、17** | 8、11、17 已验证 | 编译目标 `java.version=8` |
 | Servlet API | **javax.servlet 4.0.1** | 4.0.x |  |
@@ -40,6 +40,16 @@
 | Jackson | **2.17.2** | 2.17.x（当前为手动覆盖版本） | Spring Boot 2.7.x 默认管理 2.13.x |
 | Lombok | **1.18.24** | 1.18.x |  |
 | JMH | **1.37** | 1.37 | 仅 benchmark 模块使用 |
+
+### 支持范围
+
+`2.7.x` 的目标版本与验证基线都是 **Spring Boot 2.7.x**（当前 2.7.18）。
+
+- 父 POM 与 `spring-boot-2.7` Profile 均锁定 2.7.18，该 Profile 默认激活，无需显式传参；
+- CI 的 `spring-boot-versions` 矩阵以 `2.7` 为唯一入口，在该版本线上跑完整构建与测试；
+- 若传入不存在的 `-Pspring-boot-*`，Maven 只打一条 `The requested profile ... does not exist` 警告并**继续按 2.7.18 构建**——产物仍是 2.7.x，请以默认构建为准。
+
+**使用前提**：应用需运行在 Spring Boot 2.7.x（Spring Framework 5.3 / `javax.servlet`）。可用 `mvn dependency:tree -Dincludes=org.springframework.boot:spring-boot` 确认实际版本。
 
 ### 关键限制
 
@@ -108,12 +118,12 @@
 
 | 你的场景 | 推荐分支 |
 |---------|---------|
-| 现有项目基于 Servlet 容器，JDK 8/11 | `2.7.x` |
+| 现有项目基于 Servlet 容器，Spring Boot 2.7.x，JDK 8/11 | `2.7.x` |
 | 新项目或已迁移到 JDK 17+ | `master` |
 | 需要使用虚拟线程（JDK 21） | `master` |
 | 需要使用 GraalVM native-image 编译 | `master` |
 
-> **分支选择建议**：JDK 8/11 现有项目选 `2.7.x`，使用 `-Pspring-boot-2.6` / `-Pspring-boot-2.5` / `-Pspring-boot-2.4` 切换目标版本；JDK 17+ 新项目选 `master`（支持虚拟线程、GraalVM native-image）。
+> **分支选择建议**：JDK 8/11 且使用 Spring Boot 2.7.x 的现有项目选 `2.7.x`；JDK 17+ 新项目选 `master`（支持虚拟线程、GraalVM native-image）。
 
 ---
 

@@ -4,7 +4,7 @@
 
 ```
 spring-web-parent (聚合 POM)
-│  Spring Boot 3.5.16（master 基线），Profile 可切 2.4.x~3.5.x，Java 17
+│  Spring Boot 3.5.16（master 基线），Profile 可切 3.2.x~3.5.x，Java 17
 │  （4.x 适配见 4.1.x 分支，master 不含相关代码）
 │
 ├── spring-web                     核心框架

@@ -13,7 +13,7 @@
 
 | 版本 | 日期 | 主题 |
 |------|------|------|
-| **2.7.8** | 2026-11-26 | 预设 `Content-Type` 与返回值类型不匹配时改为显式失败 |
+| **2.7.8** | 2026-11-26 | 支持的 Spring Boot 收敛为 2.7.x；预设 `Content-Type` 与返回值类型不匹配时改为显式失败 |
 | **3.5.8** | 2026-11-25（预计） | Servlet 规范语义收紧并真正实现动态注册；批处理默认启用 2ms 攒批窗口；重复 `startAsync` 与日期头解析改为抛异常 |
 | **2.7.7** | 2026-10-13 | 配置键对齐 Spring Boot（旧键移除/改名）、响应分帧与 Servlet `flush` 语义、条件请求与 Range、扩展点签名 |
 | **3.5.7** | 2026-10-08 | 配置键对齐 Spring Boot / Tomcat：移除旧配置键别名，扩展点签名与兼容层类调整 |
@@ -24,6 +24,7 @@
 ## [2.7.8] - 2026-11-26
 | 项 | 旧行为 | 新行为 |
 |---|---|---|
+| `2.7.x` 支持的 Spring Boot 范围 | 支持 `-Pspring-boot-*` 按 Boot 版本切换构建 | 仅支持 **Spring Boot 2.7.x**（验证基线 2.7.18），`spring-boot-2.7` Profile 默认激活并锁定该版本。**迁移**：使用默认构建；传入不存在的 `-Pspring-boot-*` 时 Maven 只告警并仍按 2.7.18 构建，产物不是所指定版本 |
 | `ServletContext.addServlet` / `addFilter` | 返回 `null` 或空实现，调用方可能误判注册成功 | 按 Servlet 规范返回 `ServletRegistration.Dynamic` / `FilterRegistration.Dynamic`，可配 URL 映射、初始化参数、`load-on-startup`、`async-supported`；仅在 `ServletContextListener#contextInitialized()` 期间开放注册，之后写操作抛 `IllegalStateException`，重名与 URL 冲突会明确报错。`addJspFile()` 仍不支持（JSP 走 `jsp:` 视图），`createServlet()` / `createFilter()` 可用。**迁移**：原先按返回 `null` 判失败的兼容代码改为使用返回的 Dynamic 对象 |
 | `HttpServletRequest.startAsync()`（同一异步周期内重复调用） | 返回已存在的 `AsyncContext` | 抛 `IllegalStateException`。**迁移**：去掉重复调用；需要新一轮异步须先 `dispatch` / `complete` |
 | `HttpServletRequest.getDateHeader(name)`（值存在但无法解析为 HTTP 日期） | 返回 `-1`，与「头不存在」不可区分 | 抛 `IllegalArgumentException`。**迁移**：调用方按异常处理解析失败，不要以 `-1` 判定 |
