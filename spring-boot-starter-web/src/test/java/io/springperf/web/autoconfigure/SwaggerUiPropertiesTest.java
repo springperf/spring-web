@@ -38,8 +38,9 @@ class SwaggerUiPropertiesTest {
             pom = Paths.get("pom.xml");
         }
         assertTrue(Files.isRegularFile(pom), "cannot locate root pom.xml from module basedir");
+        byte[] pomBytes = Files.readAllBytes(pom);
         Matcher matcher = Pattern.compile("<swagger-ui\\.version>\\s*([^<]+?)\\s*</swagger-ui\\.version>")
-                .matcher(Files.readString(pom, StandardCharsets.UTF_8));
+                .matcher(new String(pomBytes, StandardCharsets.UTF_8));
         assertTrue(matcher.find(), "root pom.xml must declare <swagger-ui.version>");
         assertEquals(matcher.group(1), SwaggerUiProperties.DEFAULT_WEBJAR_VERSION);
     }

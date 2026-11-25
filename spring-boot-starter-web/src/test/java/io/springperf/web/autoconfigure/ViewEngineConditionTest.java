@@ -92,7 +92,7 @@ class ViewEngineConditionTest {
     void parseEngines_normalizesAndDeduplicates() {
         assertTrue(ViewProperties.parseEngines("").isEmpty());
         assertTrue(ViewProperties.parseEngines(null).isEmpty());
-        assertEquals(Set.of("thymeleaf"), ViewProperties.parseEngines("THYMELEAF, thymeleaf"));
+        assertEquals(java.util.Collections.singleton("thymeleaf"), ViewProperties.parseEngines("THYMELEAF, thymeleaf"));
         assertThrows(IllegalStateException.class, () -> ViewProperties.parseEngines(","));
     }
 }

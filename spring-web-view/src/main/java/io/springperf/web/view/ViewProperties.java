@@ -2,6 +2,8 @@ package io.springperf.web.view;
 
 import io.springperf.web.context.ApplicationProperties;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Set;
@@ -80,7 +82,8 @@ public final class ViewProperties {
     public static final String VIEW_ENCODING_DEFAULT = "UTF-8";
 
     /** 合法引擎名（不含 {@link #ENGINE_NONE}）。 */
-    private static final Set<String> VALID_ENGINES = Set.of("thymeleaf", "freemarker", "beetl");
+    private static final Set<String> VALID_ENGINES = Collections.unmodifiableSet(
+            new LinkedHashSet<>(Arrays.asList("thymeleaf", "freemarker", "beetl")));
 
     /**
      * 解析 {@link #ENGINE}：未配置返回空集合（不过滤引擎，由 classpath 装配决定）；
@@ -88,7 +91,7 @@ public final class ViewProperties {
      */
     public static Set<String> parseEngines(String raw) {
         if (raw == null || raw.trim().isEmpty()) {
-            return Set.of();
+            return Collections.emptySet();
         }
         Set<String> engines = new LinkedHashSet<>();
         for (String item : raw.split(",")) {

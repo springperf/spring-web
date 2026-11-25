@@ -74,6 +74,9 @@
         <assertj.version>3.22.0</assertj.version>
         <jmh.version>1.37</jmh.version>
         <springdoc.version>1.7.0</springdoc.version>
+        <!-- Swagger UI 静态资源版本。必须与 SwaggerUiProperties.webjarVersion 一致：
+             前者决定实际打包进示例的 webjar，后者决定自动装配时拼出的资源路径。 -->
+        <swagger-ui.version>5.2.0</swagger-ui.version>
         <hutool.version>5.8.23</hutool.version>
         <disruptor.version>3.4.4</disruptor.version>
 

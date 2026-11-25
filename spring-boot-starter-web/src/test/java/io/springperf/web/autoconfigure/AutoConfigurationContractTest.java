@@ -12,7 +12,6 @@ import org.springframework.core.type.classreading.MetadataReader;
 import org.springframework.core.type.classreading.SimpleMetadataReaderFactory;
 
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -25,22 +24,22 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 锁定自动配置注册契约：{@code AutoConfiguration.imports} 的条目、注解规范与显式排序。
+ * 锁定自动配置注册契约：{@code spring.factories} 中 EnableAutoConfiguration 的条目、注解规范与显式排序。
  * <p>
- * 历史上出现过 .imports 残留已删除类名导致启动失败（见 CHANGELOG），而此前没有任何测试读取该文件。
+ * 历史上出现过注册文件残留已删除类名导致启动失败（见 CHANGELOG），而此前没有任何测试读取该文件。
  * </p>
  */
 class AutoConfigurationContractTest {
 
-    private static final String IMPORTS_RESOURCE =
-            "META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports";
+    private static final String FACTORIES_RESOURCE = "META-INF/spring.factories";
+    private static final String ENABLE_AUTO_CONFIGURATION =
+            "org.springframework.boot.autoconfigure.EnableAutoConfiguration";
 
     private static final String PREFIX = "io.springperf.web.autoconfigure.";
 
     /** 唯一真源：新增/删除自动配置必须同步更新本集合与 .imports。 */
-    private static final Set<String> EXPECTED = Set.of(
+    private static final Set<String> EXPECTED = new java.util.HashSet<>(java.util.Arrays.asList(
             PREFIX + "SpringWebAutoConfiguration",
-            PREFIX + "SpringWebRuntimeHintsConfiguration",
             PREFIX + "WebServerInitializedEventAutoConfiguration",
             PREFIX + "SpringWebServletAutoConfiguration",
             PREFIX + "SpringWebMvcSupportAutoConfiguration",
@@ -53,7 +52,7 @@ class AutoConfigurationContractTest {
             PREFIX + "SpringWebBatchAutoConfiguration",
             PREFIX + "JspViewAutoConfiguration",
             PREFIX + "SpringWebViewExchangeAutoConfiguration",
-            PREFIX + "SpringWebPropertyRefreshAutoConfiguration");
+            PREFIX + "SpringWebPropertyRefreshAutoConfiguration"));
 
     @Test
     void importsFile_matchesExpectedRegistrationSet() throws Exception {
@@ -133,10 +132,14 @@ class AutoConfigurationContractTest {
 
     private static List<String> imports() throws Exception {
         try (InputStream in = AutoConfigurationContractTest.class.getClassLoader()
-                .getResourceAsStream(IMPORTS_RESOURCE)) {
-            assertNotNull(in, IMPORTS_RESOURCE + " 不在 classpath");
-            return new String(in.readAllBytes(), StandardCharsets.UTF_8).lines().map(String::trim)
-                    .filter(line -> !line.isEmpty() && !line.startsWith("#")).toList();
+                .getResourceAsStream(FACTORIES_RESOURCE)) {
+            assertNotNull(in, FACTORIES_RESOURCE + " 不在 classpath");
+            java.util.Properties properties = new java.util.Properties();
+            properties.load(in);
+            String value = properties.getProperty(ENABLE_AUTO_CONFIGURATION, "");
+            return java.util.Arrays.stream(value.split(",")).map(String::trim)
+                    .filter(line -> !line.isEmpty())
+                    .collect(java.util.stream.Collectors.toList());
         }
     }
 

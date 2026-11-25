@@ -17,6 +17,7 @@ import org.springframework.core.env.StandardEnvironment;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -67,14 +68,16 @@ public final class ManagementServerSettings {
     private static final String SSL_PROPERTIES_PREFIX = "server.ssl.";
 
     /** L1 + L2 白名单：允许以 {@code management.server.<suffix>} 覆盖 {@code server.<suffix>} 的精确键。 */
-    private static final Set<String> OVERRIDABLE_KEYS = Set.of("port", "address", "http2.enabled",
-            "http.max-content-length", "max-content-length", "max-connections", "shutdown.grace-period",
-            "netty.transport", "http.read-timeout", "http.max-initial-line-length", "http.max-chunk-size",
-            "max-http-request-header-size", "http.multipart.max-part-count", "http.multipart.max-part-header-size",
-            "keep-alive-timeout", "max-keep-alive-requests", "max-swallow-size", "max-http-response-header-size");
+    private static final Set<String> OVERRIDABLE_KEYS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+            "port", "address", "http2.enabled", "http.max-content-length", "max-content-length",
+            "max-connections", "shutdown.grace-period", "netty.transport", "http.read-timeout",
+            "http.max-initial-line-length", "http.max-chunk-size", "max-http-request-header-size",
+            "http.multipart.max-part-count", "http.multipart.max-part-header-size", "keep-alive-timeout",
+            "max-keep-alive-requests", "max-swallow-size", "max-http-response-header-size")));
 
     /** 整组可覆盖的前缀（嵌套配置，如 {@code ssl.key-store} / {@code compression.mime-types}）。 */
-    private static final List<String> OVERRIDABLE_PREFIXES = List.of("ssl.", "compression.");
+    private static final List<String> OVERRIDABLE_PREFIXES =
+            Collections.unmodifiableList(Arrays.asList("ssl.", "compression."));
 
     /** {@link PropertiesConstant} 中全部 {@code server.*} 键的后缀，用于识别 L3 镜像键。 */
     private static final Set<String> SERVER_KEYS = collectServerKeys();

@@ -72,12 +72,5 @@ class AutoConfigurationConditionTest {
                 });
     }
 
-    @Test
-    void runtimeHintsConfiguration_loadsWithoutEventConfiguration() {
-        runner.withConfiguration(AutoConfigurations.of(SpringWebRuntimeHintsConfiguration.class)).run(context -> {
-            assertThat(context).hasNotFailed();
-            assertThat(context).hasSingleBean(SpringWebRuntimeHintsConfiguration.class);
-            assertThat(context).doesNotHaveBean(WebServerInitializedEventAutoConfiguration.class);
-        });
-    }
+
 }
