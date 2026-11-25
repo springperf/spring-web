@@ -73,16 +73,17 @@ class NettyWebSocketSessionBackpressureTest {
         WebSocketHandler handler = mock(WebSocketHandler.class);
         NettyWebSocketSession session = new NettyWebSocketSession(channel, URI.create("ws://localhost/ws"), null, null,
                 null, null, null, handler);
+        // 2.7.x 用 Mockito 4：spy 的 verify(channel).close() 会再调一次真实 close() 并触发
+        // Netty 的 "promise" NPE。改用 closeFuture 的完成回调断言关闭确实发生，语义等价。
+        final boolean[] closeSignalled = { false };
+        channel.closeFuture().addListener(f -> closeSignalled[0] = true);
 
         for (int i = 0; i <= 100; i++) { // 前 100 帧填满队列，第 101 帧触发溢出
             session.sendMessage(new BinaryMessage(ByteBuffer.wrap(new byte[] { (byte) i })));
         }
         channel.runPendingTasks();
 
-        // 断言「close 被调用」而不是 channel.isActive()：Mockito spy 与真实 EmbeddedChannel 共享
-        // pipeline/unsafe（见本文件 drainBackpressureQueue_stopsWhenBufferFillsAgain 的同类说明），
-        // spy 上的 isActive() 会读到未同步的旧状态，断言会假失败。
-        verify(channel).close();
+        assertTrue(closeSignalled[0], "队列溢出必须关闭连接（closeFuture 已完成）");
         verify(handler).handleTransportError(eq(session), argThat(t -> t instanceof java.io.IOException));
         Queue<WebSocketFrame> queue = backpressureQueueOf(channel);
         assertTrue(queue.isEmpty(), "关闭时队列中未写出的帧必须全部释放");
