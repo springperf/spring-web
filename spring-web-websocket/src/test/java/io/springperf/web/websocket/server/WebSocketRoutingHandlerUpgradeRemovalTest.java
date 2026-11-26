@@ -101,12 +101,11 @@ class WebSocketRoutingHandlerUpgradeRemovalTest {
     }
 
     /**
-     * 回归：handshake() <b>同步抛异常</b>时也必须释放请求原始引用。
+     * 回归：握手内部 pipeline 操作同步抛错时必须释放请求原始引用，且不能泄漏握手响应。
      * <p>
-     * 要真正走进同步 {@code catch}，须让握手内部的 pipeline 操作自身抛错： {@code WebSocketServerHandshaker.handshake} 用 {@code addBefore}
-     * 插入名为 {@code wsdecoder}/{@code wsencoder} 的 handler，名字已存在时同步抛
-     * {@code ChannelPipelineException}（例如连接上已残留上一轮握手的通道处理器）。该异常若不在此释放，会冒泡到 {@code exceptionCaught}，而那里只
-     * {@code ctx.close()} 不 release——每次泄漏一个 FullHttpRequest（含 content ByteBuf）。
+     * 预置同名 {@code wsdecoder} 会让 Netty 的 {@code addBefore} 抛 {@code ChannelPipelineException}。
+     * Netty 在抛错前已创建 101 响应却不会释放它，因此框架在调用 handshake() 之前先检查保留名并
+     * 短路失败：既不分配响应，也释放 FullHttpRequest（含 content ByteBuf）并关闭连接。
      * </p>
      */
     @Test
