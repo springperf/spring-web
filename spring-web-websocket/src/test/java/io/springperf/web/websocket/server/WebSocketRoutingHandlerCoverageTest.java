@@ -57,7 +57,12 @@ class WebSocketRoutingHandlerCoverageTest {
 
     @AfterEach
     void tearDown() {
-        if (channel != null && channel.isOpen()) {
+        // 无条件排空：握手 101、拒绝响应、Close 帧都会留在 EmbeddedChannel 出站队列里，
+        // 这些 ByteBuf 由池化分配器持有引用计数。若 channel 已被测试 close()（空闲超时、
+        // channelInactive、服务端主动关闭等路径），isOpen() 已为 false，旧守卫会跳过
+        // finishAndReleaseAll()，队列里的帧直到 GC 才被 paranoid 报为 LEAK: ByteBuf。
+        // finishAndReleaseAll() 内部走 finish(false)，对已关闭的 channel 仍然安全。
+        if (channel != null) {
             channel.finishAndReleaseAll();
         }
     }
