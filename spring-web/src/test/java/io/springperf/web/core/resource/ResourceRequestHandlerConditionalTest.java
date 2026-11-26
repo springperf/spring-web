@@ -94,7 +94,7 @@ class ResourceRequestHandlerConditionalTest {
     @Test
     void ifRangeAbsentOrBlankAllowsRange(@TempDir Path dir) throws Exception {
         Resource resource = new FileSystemResource(createFile(dir));
-        assertFalse(requestHeaders.containsKey(HttpHeaders.IF_RANGE));
+        assertFalse(requestHeaders.asMultiValueMap().containsKey(HttpHeaders.IF_RANGE));
 
         assertTrue(ifRangeAllows(request, resource));
         requestHeaders.set(HttpHeaders.IF_RANGE, "   ");

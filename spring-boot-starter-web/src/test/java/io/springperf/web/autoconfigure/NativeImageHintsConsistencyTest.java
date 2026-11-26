@@ -1,7 +1,7 @@
 package io.springperf.web.autoconfigure;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.type.CollectionType;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.type.CollectionType;
 import io.springperf.web.autoconfigure.support.PerfWebServer;
 import io.springperf.web.autoconfigure.support.PerfWebServerInitializedEvent;
 import io.springperf.web.context.WebComponent;
@@ -10,9 +10,7 @@ import org.springframework.aot.hint.JdkProxyHint;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.TypeHint;
 import org.springframework.aot.hint.TypeReference;
-import org.springframework.boot.web.context.WebServerApplicationContext;
-import org.springframework.context.ConfigurableApplicationContext;
-import org.springframework.util.concurrent.ListenableFutureCallback;
+import org.springframework.boot.web.server.context.WebServerApplicationContext;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -41,14 +39,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <tr>
  * <td>反射</td>
  * <td>框架内部类、SPI provider</td>
- * <td>{@code PerfWebServer*} / {@code ListenableFuture*} / 用户 Controller+DTO</td>
+ * <td>{@code PerfWebServer*} / 用户 Controller+DTO</td>
  * <td>—</td>
  * </tr>
  * <tr>
  * <td>代理</td>
  * <td>10 个框架 SPI 接口</td>
- * <td>{@code ListenableFutureCallback}</td>
- * <td>{@code WebServerApplicationContext + ConfigurableApplicationContext}</td>
+ * <td>事件代理接口（Boot4 包）</td>
+ * <td>事件代理接口（静态 json 保留 Boot3 包路径的历史兜底条目）</td>
  * </tr>
  * <tr>
  * <td>资源</td>
@@ -63,7 +61,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 既不全又制造「已覆盖」的错觉。
  * </p>
  */
-@SuppressWarnings({ "deprecation", "removal" })
 class NativeImageHintsConsistencyTest {
 
     private static final String BASE_PATH = "META-INF/native-image/io.github.springperf/spring-boot-starter-web";
@@ -72,36 +69,37 @@ class NativeImageHintsConsistencyTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
 
-    /** 动态侧独占：事件路径与异步回调，静态 json 不应重复登记。 */
+    /** 动态侧独占：事件路径的反射提示，静态 json 不应重复登记。 */
     @Test
     void dynamicOnlyHints_areNotDuplicatedInStaticJson() throws Exception {
         RuntimeHints hints = registerHints();
         List<String> staticProxies = proxyConfig().stream().flatMap(List::stream).toList();
         List<String> staticReflect = reflectNames();
 
-        assertTrue(hasProxy(hints, ListenableFutureCallback.class));
-        assertFalse(staticProxies.contains(ListenableFutureCallback.class.getName()),
-                "ListenableFutureCallback 代理应由 RuntimeHints 独占");
+        // 4.1.x 专用 Boot4：事件代理接口由 RuntimeHints 注册（单接口，Boot4 包）；
+        // 静态 proxy-config.json 里的双接口条目是 Boot3 包路径的历史兜底，两者不重复。
+        assertTrue(hasProxy(hints, WebServerApplicationContext.class));
+        assertFalse(staticProxies.contains(WebServerApplicationContext.class.getName()),
+                "Boot4 事件代理接口应由 RuntimeHints 独占");
 
-        for (Class<?> type : List.of(PerfWebServer.class, PerfWebServerInitializedEvent.class,
-                ListenableFutureCallback.class)) {
+        for (Class<?> type : List.of(PerfWebServer.class, PerfWebServerInitializedEvent.class)) {
             assertTrue(hasReflection(hints, type), "RuntimeHints 缺少反射提示: " + type.getName());
             assertFalse(staticReflect.contains(type.getName()),
                     type.getName() + " 应由 RuntimeHints 独占，静态 reflect-config 不应重复登记");
         }
     }
 
-    /** 有意重叠项：双接口事件代理在两轨都存在，作为不改变既有 native 行为的双保险。 */
+    /** 事件代理在两轨都有登记：动态侧用 Boot4 单接口，静态 json 保留 Boot3 双接口的历史兜底条目。 */
     @Test
-    void overlappingEventProxy_isPresentOnBothTracks() throws Exception {
+    void eventProxy_isPresentOnBothTracks() throws Exception {
         RuntimeHints hints = registerHints();
+        // 动态侧：Boot4 包路径的单接口代理
         assertTrue(hasProxy(hints, WebServerApplicationContext.class));
-        assertTrue(hasProxy(hints, ConfigurableApplicationContext.class));
-
-        boolean staticOverlap = proxyConfig().stream()
-                .anyMatch(entry -> entry.contains(WebServerApplicationContext.class.getName())
-                        && entry.contains(ConfigurableApplicationContext.class.getName()));
-        assertTrue(staticOverlap, "proxy-config.json 缺少双接口事件代理兜底条目");
+        // 静态侧：历史双接口兜底条目（Boot3 包路径），保留以免改变既有 native 行为
+        boolean staticFallback = proxyConfig().stream()
+                .anyMatch(entry -> entry.contains("org.springframework.boot.web.context.WebServerApplicationContext")
+                        && entry.contains("org.springframework.context.ConfigurableApplicationContext"));
+        assertTrue(staticFallback, "proxy-config.json 缺少事件代理的历史兜底条目");
     }
 
     /** 静态侧独占：框架 SPI 接口由静态 json 提供，RuntimeHints 不重复注册。 */

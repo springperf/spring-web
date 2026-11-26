@@ -135,6 +135,6 @@ class RestApiE2eTest {
         // 这样脚本里 `assert_response ... 404` 的期望值有本机可验证的依据。
         ResponseEntity<String> resp = rest.getForEntity("/no-such-route", String.class);
 
-        assertThat(resp.getStatusCodeValue()).isEqualTo(404);
+        assertThat(resp.getStatusCode().value()).isEqualTo(404);
     }
 }
