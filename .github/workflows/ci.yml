@@ -205,6 +205,16 @@ jobs:
       - name: "Javadoc (doclint: all except missing; JDK 8 适配见 checklist §31.9.6)"
         run: ./mvnw javadoc:javadoc -Ddoclint=all,-missing --batch-mode --no-transfer-progress -q
 
+      # -Werror 是 JDK 9+ 才有的 javadoc 选项；JDK 8 的 javadoc 会直接报
+      # “invalid flag: -Werror” 退出 1（CI run 45763542645 的 javadoc job 即因此失败）。
+      # 上一步的全仓 doclint 仍用 JDK 8（与本分支编译目标一致），这里仅为注解包门禁切到 17。
+      - name: Set up JDK 17 (annotation package doclint)
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          java-version: 17
+          distribution: temurin
+          # 不重复配置 cache：上一步 JDK 8 的 setup-java 已为同一 job 建立 Maven 缓存。
+
       - name: "Javadoc (annotation package: missing tags are errors)"
         # 注解包是用户直接写在业务代码里的入口，缺 @param/@return 会直接影响使用者，
         # 因此单独对 io.springperf.web.annotation 打开 missing 并升级为错误。
