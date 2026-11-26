@@ -98,6 +98,16 @@ final class WebSocketHandshakeHandler {
             return;
         }
 
+        // Netty's handshake() allocates the 101 response BEFORE inserting wsencoder/wsdecoder.
+        // If either reserved name is already taken, addBefore throws after the response was
+        // created and Netty never releases it. Fail early so no response is allocated at all.
+        if (ctx.pipeline().get("wsdecoder") != null || ctx.pipeline().get("wsencoder") != null) {
+            log.error("WebSocket handshake skipped: reserved pipeline handlers already present for {}", path);
+            ReferenceCountUtil.release(req);
+            ctx.close();
+            return;
+        }
+
         try {
             ChannelFuture handshake;
             if (negotiatedExtension != null) {
