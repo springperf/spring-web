@@ -54,9 +54,10 @@ class SpringHeadersConversionTest {
     void returnedHeadersRemainWritable() {
         HttpHeaders headers = WebSocketHandshakeHandler.toSpringHeaders(nettyHeaders());
 
-        // 转换结果必须是自洽的 MultiValueMap：写进去的必须能被读出来（旧适配器的 add 写父类私有 Map，静默丢失）
+        // 转换结果必须可写可读（旧适配器的 add 写父类私有 Map，静默丢失）。
+        // Spring 7 的 HttpHeaders 不再实现 MultiValueMap，containsKey 在 asMultiValueMap() 视图上。
         headers.add("X-New", "v");
-        assertTrue(headers.containsKey("X-New"));
+        assertTrue(headers.asMultiValueMap().containsKey("X-New"));
         assertEquals("v", headers.getFirst("x-new"));
 
         headers.set("X-Multi", "only");
