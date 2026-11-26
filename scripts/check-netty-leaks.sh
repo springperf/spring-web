@@ -15,6 +15,9 @@
 #   该前缀是 GBK 字节，朴素的 UTF-8 grep 会“看不见”这些行（本仓库曾因此误判为 0 泄漏）。
 #   另注意默认只保留 4 条 access records，其余被丢弃（日志里会写 "leak records were discarded"），
 #   证据可能不完整，故本脚本在 --run 模式下追加 targetRecords=16。
+#   报告还依赖 GC + 后续分配排空弱引用队列：surefire JVM 可能带着未排空的报告退出，
+#   造成假阴性。spring-web-websocket 的 ZzLeakFlushTest（runOrder=alphabetical，最后执行）
+#   在测试末尾强制 GC 并分配探针 ByteBuf，把待报告记录刷进日志；不要随意删除或改名。
 #
 # 退出码: 0 = 无泄漏报告；1 = 存在泄漏报告；2 = 用法/环境错误
 #
