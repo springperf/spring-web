@@ -141,7 +141,8 @@ jobs:
   netty-leaks:
     # ByteBuf 引用计数只在 paranoid 级别报告泄漏；默认 simple 采样会漏掉低频路径。
     # 独立 job：paranoid 有明显开销，不塞进 5 个 JDK 的 build 矩阵。
-    if: github.ref == 'refs/heads/master' || github.base_ref == 'master'
+    # 覆盖 master 与 4.1.x：4.1.x 已同步握手响应泄漏修复，本地 paranoid 校验 0 报告。
+    if: github.ref == 'refs/heads/master' || github.base_ref == 'master' || github.ref == 'refs/heads/4.1.x' || github.base_ref == '4.1.x'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -319,7 +320,8 @@ jobs:
   javadoc:
     # Javadoc 也是一次“文档正确性编译”：坏链接 / 坏标签在此暴露。
     # doclint 排除 missing：不强求全量注释，只拦坏链接与坏标签。
-    if: github.ref == 'refs/heads/master' || github.base_ref == 'master'
+    # 覆盖 master 与 4.1.x：两端全量 doclint 与注解包 -Werror 均已本地验证。
+    if: github.ref == 'refs/heads/master' || github.base_ref == 'master' || github.ref == 'refs/heads/4.1.x' || github.base_ref == '4.1.x'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

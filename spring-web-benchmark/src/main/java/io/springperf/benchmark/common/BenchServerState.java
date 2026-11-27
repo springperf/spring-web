@@ -13,7 +13,7 @@ import java.util.Properties;
 /**
  * 每个 JMH fork 启动一个隔离的 Spring Boot 服务器实例。 由具体 Benchmark 类在 @Setup/@TearDown 中手动调用 start()/stop()。
  * <p>
- * 使用 {@link WebServerInitializedEvent} 监听器获取实际绑定端口，不依赖 {@code local.server.port} 属性（NettyHttpServer 不设置该属性）。
+ * 使用 {@code WebServerInitializedEvent} 监听器获取实际绑定端口，不依赖 {@code local.server.port} 属性（NettyHttpServer 不设置该属性）。
  * <p>
  * 首次绑定失败时自动重试（最多 3 次，1s 间隔），兼容 TIME_WAIT 场景。 若重试后仍然失败，则使用随机端口 fallback。
  * <p>

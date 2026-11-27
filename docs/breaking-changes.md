@@ -11,6 +11,7 @@
 
 | 版本 | 日期 | 主题 |
 |------|------|------|
+| **4.1.8** | 2026-11-27 | 同步 3.5.8 变更到 Boot 4.1 基线；Servlet 规范语义收紧、动态注册生效、批处理默认 2ms 攒批窗口、重复 `startAsync` 与日期头解析抛异常 |
 | **2.7.8** | 2026-11-26 | 支持的 Spring Boot 收敛为 2.7.x；预设 `Content-Type` 与返回值类型不匹配时改为显式失败 |
 | **3.5.8** | 2026-11-25（预计） | Servlet 规范语义收紧并真正实现动态注册；批处理默认启用 2ms 攒批窗口；重复 `startAsync` 与日期头解析改为抛异常 |
 | **2.7.7** | 2026-10-13 | 配置键对齐 Spring Boot（旧键移除/改名）、响应分帧与 Servlet `flush` 语义、条件请求与 Range、扩展点签名 |
@@ -19,6 +20,38 @@
 | **2.7.4** | 2026-08-06 | `JsonConverter` 接口新增抽象方法 `toJsonBytes(Object)` |
 
 ---
+## [4.1.8] - 2026-11-27
+| 项 | 旧行为 | 新行为 |
+|---|---|---|
+| `ServletContext.addServlet` / `addFilter` | 返回 `null` 或空实现，调用方可能误判注册成功 | 按 Servlet 规范返回 `ServletRegistration.Dynamic` / `FilterRegistration.Dynamic`，可配 URL 映射、初始化参数、`load-on-startup`、`async-supported`；仅在 `ServletContextListener#contextInitialized()` 期间开放注册，之后写操作抛 `IllegalStateException`，重名与 URL 冲突会明确报错。`addJspFile()` 仍不支持（JSP 走 `jsp:` 视图），`createServlet()` / `createFilter()` 可用。**迁移**：原先按返回 `null` 判失败的兼容代码改为使用返回的 Dynamic 对象 |
+| `HttpServletRequest.startAsync()`（同一异步周期内重复调用） | 返回已存在的 `AsyncContext` | 抛 `IllegalStateException`。**迁移**：去掉重复调用；需要新一轮异步须先 `dispatch` / `complete` |
+| `HttpServletRequest.getDateHeader(name)`（值存在但无法解析为 HTTP 日期） | 返回 `-1`，与「头不存在」不可区分 | 抛 `IllegalArgumentException`。**迁移**：调用方按异常处理解析失败，不要以 `-1` 判定 |
+| `ServletContext.setSessionTrackingModes()` | 空实现：合法与非法入参一律静默忽略 | 生效并校验（集合非空且必须含 `COOKIE` 或 `SSL`），非法入参抛 `IllegalArgumentException`。**迁移**：传入 `COOKIE`/`SSL` 参与的组合；此前被静默忽略的 URL-only 配置会失败 |
+| `HttpServletResponse.getHeaders(name)`（头不存在） | 返回 `null` | 返回空集合（Servlet 6.0 契约）。**无需迁移**，仅消除 NPE 风险 |
+| `HttpSession.setAttribute(name, null)` | 抛 `NullPointerException`（底层 `ConcurrentHashMap` 拒绝 null value） | 等价 `removeAttribute(name)`（规范 §7.5）。**无需迁移**；此前依赖该异常判断的代码改用 `removeAttribute` |
+| `ViewResolverRegistry.resolve()` 中有解析器抛异常 | 记录 WARN 后跳过该解析器，根因被「无法解析视图名」掩盖 | 抛 `IllegalStateException` 并保留原始异常作为 cause。**迁移**：修复模板或配置错误，不要依赖「跳过」语义 |
+| `ModelAndView` 指向不存在的视图名 | 静默返回 200 + 空白响应体 | 抛 `IllegalArgumentException`（与 String 视图名链路一致）。**迁移**：确保视图名可解析，或在 `@ExceptionHandler` 中处理 |
+| 视图响应的 `Content-Type` 与编码 | 由各引擎分别设置；FreeMarker 的 `content-type` 可能与响应字节编码不一致，`redirect:` 也带 `text/html` | 统一由 `ViewReturnValueResolver.applyContentType()` 决定：Content-Type 自带 `charset` 时同步到响应编码；`redirect:` 不设置 Content-Type。**迁移**：自定义头请实现 `View.getContentType()` |
+| `RedirectView` 的状态码 | 无条件设置 302 | 保留 `ModelAndView` 指定的 3xx 状态码。**无需迁移** |
+| `spring.beetl.mode` | 已定义但从未被读取 | 移除。**无需迁移** |
+| 视图名解析结果 | 每请求执行模板存在性探测并新建 View | `cache=true` 时按视图名缓存（含未解析结果）。**迁移**：运行期新增或替换模板后调用 `ViewResolverRegistry.invalidateViewCaches()`，或关闭模板缓存 |
+| 视图渲染中途抛异常 | 响应已提前标记 handled，500 错误响应被拒绝，客户端收到 200 + 半截 HTML；异常处理器返回的错误页拼接在半截页面之后 | 丢弃半截内容并交 `ExceptionRegistry` 处理（500 错误页或异常处理器错误页）。**无需迁移** |
+| `spring.web.view.engine` 取值 | 未知值与 `none` 混写被静默忽略，可能拖到首次视图请求才 500 | 启动期抛 `IllegalStateException`；`none` 只能单独使用。**迁移**：修正配置值，单独使用 `none` |
+| `engine=none` 时的内置 JSP | 仍会装配 `JspViewResolver` | 不再装配内置 JSP；自定义 `ViewResolver` Bean 不受影响。**迁移**：需要 JSP 时不要设 `none` |
+| `ViewControllerInvoker` 的 `redirect:` 响应 | 带 `text/html` Content-Type | 与另两条链路一致，不设置 Content-Type。**无需迁移** |
+| `spring.{thymeleaf,freemarker,beetl}.{cache,enabled}` 取值 | 非 true/false 值被静默当成 false | 启动期抛 `IllegalStateException`（含配置键与实际值）。**迁移**：改成 true/false |
+| 自定义 Content-Type 未带 charset | 响应头原样保留，Writer 却按响应编码写字节，两者可能不一致 | 响应头追加 `;charset=<响应编码>`。**迁移**：需精确控制时在配置值里显式写 charset |
+| 带后缀的视图名（`hello.html` / `hello.btl`） | 仅 FreeMarker 支持，Thymeleaf / Beetl 会拼成 `hello.html.html` / `hello.btl.btl` | 三个内置引擎统一支持。**无需迁移** |
+| `redirect://host` 协议相对目标 | 非空 context-path 下被拼成 `/app//host` | 直接作为外部目标使用。**无需迁移** |
+| https 且无显式端口时的 `IWebRequest#getServerPort()` | 固定返回 80 | 返回 443。**无需迁移** |
+| `@ResponseBody` 返回值无匹配 `HttpBodyConverter`（已显式设置 `Content-Type`，或 `produces` 协商出的类型无人能写） | 静默返回 200 + 空响应体，返回值被丢弃；`produces` 分支连 `produces` 声明的 Content-Type 都不会写 | 抛 `HttpMessageNotWritableException`，经 `ExceptionRegistry` 映射为 500。**迁移**：让目标 Content-Type 与返回值类型匹配（返回对象时用 `application/json`），或由 Servlet 侧自行写响应并返回 `void`。其他本框架未实现的返回类型同样明确报错，不再静默空响应（`StreamingResponseBody` 自 4.1.8 起已支持，不再走此路径） |
+| `@BatchMapping.batchWindowMillis` 默认值 | 4.1.7 无攒批窗口：`endOfBatch` / `maxBatchSize` 决定刷出 | 默认启用 2ms 攒批窗口，批大小由窗口保证，单请求最多多等一个窗口。**迁移**：低负载（在途请求撑不满一批）、极致低延迟，或需要「无窗口」对照基准时，显式写 `batchWindowMillis=0` |
+| `io.springperf.web.websocket.server.SpringHeadersAdapter` | public 类，把 Netty `HttpHeaders` 适配成 Spring `HttpHeaders`；`NettyWebSocketSession` 构造器接收它 | 类已移除（适配逻辑内联），`NettyWebSocketSession` 构造器的第三个参数改为 Spring 的 `org.springframework.http.HttpHeaders`。**迁移**：不要直接 new `NettyWebSocketSession`（会话由框架创建）；需要 Spring 头视图时自行 `new HttpHeaders()` 并逐项复制 Netty 头 |
+| `ViewProperties.BEETL_MODE` / `BEETL_MODE_DEFAULT` | public 常量，对应同样从未被读取的 `spring.beetl.mode` | 常量随配置键一起移除。**迁移**：删除常量引用；该配置此前本就不生效 |
+| `WebServerInitializedEventAutoConfiguration#webServerInitializedEventPublisher(NettyHttpServer, ApplicationContext)` | public 工厂方法，构造监听 `ApplicationReadyEvent` 的事件发布器 | 方法仍在，签名改为 `(ApplicationContext)`，返回的监听器改监听 `NettyServerStartedEvent`（服务器从事件中取），发布时机提前到端口绑定后。**迁移**：直接调用该方法的地方去掉 `NettyHttpServer` 参数；监听 `WebServerInitializedEvent` 即可，发布时机只会更早、更准 |
+
+---
+
 ## [2.7.8] - 2026-11-26
 | 项 | 旧行为 | 新行为 |
 |---|---|---|
