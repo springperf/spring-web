@@ -14,7 +14,7 @@
 
 | Version | Date | Subject |
 |---------|------|---------|
-| **4.1.8** | 2026-11-27 | 3.5.8 changes synchronised onto the Boot 4.1 baseline: Servlet specification semantics tightened, dynamic registration implemented, 2ms batching window on by default, repeated `startAsync` and unparseable date headers throw |
+| **4.1.8** | 2026-11-27 | 3.5.8 changes synchronised onto the Boot 4.1 baseline (with optional Boot 4.2 compatibility added): Servlet specification semantics tightened, dynamic registration implemented, 2ms batching window on by default, repeated `startAsync` and unparseable date headers throw |
 | **2.7.8** | 2026-11-26 | Supported Spring Boot narrowed to 2.7.x; a preset `Content-Type` that does not match the return type now fails explicitly |
 | **3.5.8** | 2026-11-25 (expected) | Servlet specification semantics tightened and dynamic registration actually implemented; batching window on by default (2ms); repeated `startAsync` and unparseable date headers throw |
 | **2.7.7** | 2026-10-13 | Configuration keys aligned with Spring Boot (old keys removed / renamed), response framing and Servlet `flush` semantics, conditional requests and Range, extension-point signatures |

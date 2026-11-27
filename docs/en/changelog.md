@@ -7,13 +7,15 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 > This changelog is maintained in sync across `2.7.x`, `master` and `4.1.x`: every branch keeps the full history of released versions for cross-branch reference, while each section retains the context of its own branch.
 
 ## [4.1.8] - 20261127
-> **About this release**: this synchronises the master 3.5.8 changes onto the Spring Boot 4.1 / Spring Framework 7 / Jackson 3 baseline; apart from that baseline, the entries match master 3.5.8.
+> **About this release**: this synchronises the master 3.5.8 changes onto the Spring Boot 4.1 / Spring Framework 7 / Jackson 3 baseline; apart from that baseline and the branch-specific 4.2 compatibility, the entries match master 3.5.8.
 > ⚠️ **This release contains breaking changes**: Servlet specification semantics, view error
 > and content-negotiation behaviour, and the validation of several configuration values have
 > changed. **Read the 4.1.8 section of the [breaking changes guide](breaking-changes.md) before upgrading.**
 
 ### Added
 
+- **Native toolchain baseline**: the 4.1.x native-smoke gate now uses GraalVM 25 with Native Build Tools 1.1.18 (required by Spring Boot 4), while master/Boot 3.5.x stays on GraalVM 17. Under GraalVM 17 the AOT reflection hints did not take effect and the native binary failed at startup with `ClassNotFoundException` for `ServerPortInfoApplicationContextInitializer`
+- **Optional Spring Boot 4.2 compatibility**: new `-Pspring-boot-4.2` profile (Boot 4.2.0 / Spring Framework 7.1 / Jackson 3.1.8 / Netty 4.2.20.Final); the default baseline stays on Boot 4.1.0 and no default dependency is switched. The `spring-boot-versions`, `boot4-compat` and E2E CI matrices now include 4.2 while keeping 4.0 / 4.1. Boot 4.2 removes APIs deprecated in 4.0 and deprecates (without removing) `RestTemplate` / `TestRestTemplate` — the existing cross-version shim still works, and no source change was needed for compilation, core tests or the E2E smoke suite
 - **Dynamic Servlet / Filter registration**: `ServletContext.addServlet()` / `addFilter()` now return the spec-defined `ServletRegistration.Dynamic` / `FilterRegistration.Dynamic`, with configurable URL mappings, init parameters, `load-on-startup` and `async-supported`. Registration is open only during `ServletContextListener#contextInitialized()`; writes after that window throw `IllegalStateException`, and duplicate names or clashing URL patterns are reported instead of silently overridden. `addJspFile()` remains unsupported (JSPs are routed through `jsp:` views); `createServlet()` / `createFilter()` are available
 - **Runtime Servlet listener registration**: `ServletContext.addListener()` now really works for `ServletContextListener`, `HttpSessionListener`, `HttpSessionAttributeListener` and `HttpSessionIdListener`; session-ID rotation notifies ID listeners. Listeners registered at runtime only receive events that occur afterwards — declare a Spring bean if you need full lifecycle callbacks
 - **Production defaults for JSP**: new `server.servlet.jsp.development` (default `false`; JSP changes require a restart), `keep-generated`, `trim-spaces` and `init-parameters.*` (passed through to Jasper; explicit entries take precedence). Jasper instances are now Spring-managed, so JSP and tag classes get dependency injection

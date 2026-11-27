@@ -13,7 +13,7 @@ adaptation branches (2.7.x / 4.1.x).
 |--------|-------------|--------|---------------------|
 | `2.7.x` | **2.7.x** (2.7.18 baseline) | Downstream adaptation | Synced from master + downgrade adaptation; based on javax.servlet (see [2.7.x migration checklist](../../.agent/context/2.7.x-migration-checklist.md)) |
 | `master` | **3.5.x** | **Development baseline** | New features merged here first; **contains no Spring Boot 4 / Spring Framework 7 compatibility code** |
-| `4.1.x` | 4.0.x ~ 4.1.x | Downstream adaptation | Synced from master + upgrade adaptation; **defaults to Spring Boot 4.1, with no 3.5.x compatibility path retained** (see [4.1.x adaptation guide](../../.agent/context/4.1.x-adaptation-checklist.md)) |
+| `4.1.x` | 4.0.x ~ 4.2.x (4.1 by default) | Downstream adaptation | Synced from master + upgrade adaptation; **defaults to Spring Boot 4.1, with no 3.5.x compatibility path retained** (see [4.1.x adaptation guide](../../.agent/context/4.1.x-adaptation-checklist.md)) |
 
 Sync direction is always `master → 4.1.x` / `master → 2.7.x`; version adaptation code lives only
 in the downstream branches.
@@ -68,7 +68,7 @@ The lowest supported line across the three branches is **Spring Boot 2.7.x** (va
 
 | Dependency | Current Version | Verified Range | Notes |
 |------------|----------------|----------------|-------|
-| Spring Boot | **4.1.0** | 4.0.x ~ 4.1.x | Switch via Maven profile (`-Pspring-boot-4.0` / `-Pspring-boot-4.1`, 4.1 by default); for 3.5.x see the `master` branch |
+| Spring Boot | **3.5.16** | 3.2.x ~ 3.5.x (core + starter tests) | Switch via Maven profile (`-Pspring-boot-3.2` ~ `-Pspring-boot-3.5`); for 4.x see the `4.1.x` branch; E2E coverage is described under "Cross-version Sensitive Points" below |
 | Spring Framework | **6.2.x** | 6.1.x ~ 6.2.x | Managed by Spring Boot |
 | JDK | **17** | 17 / 21 / 25 (CI matrix, see [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)) | Compile target `java.version=17`; JDK 21+ supports virtual threads (see below) |
 | Servlet API | **jakarta.servlet 6.0** | 6.0.x | javax.servlet incompatible |
@@ -77,9 +77,13 @@ The lowest supported line across the three branches is **Spring Boot 2.7.x** (va
 | Lombok | **1.18.46** | 1.18.30+ | Higher version needed for JDK 17+ compatibility |
 | JMH | **1.37** | 1.37 | Benchmark module only |
 
-> Compatibility is verified by the `spring-boot-versions` matrix in `ci.yml` (4.0 / 4.1) running
-> core-module **tests** - a green `compile` says nothing about runtime symbol resolution. A future 4.2
-> release will be appended to the matrix while keeping 4.1.
+> **Why 3.0 / 3.1 are out of scope**: both map to Spring Framework 6.0, which lacks the
+> `ConversionService.convert(Object, TypeDescriptor)` overload this project uses (added in 6.1). Building
+> against 3.0/3.1 fails at compile time; building against 3.5 and executing on a 6.0 runtime fails at
+> `@RequestParam` / `@PathVariable` conversion with `NoSuchMethodError` (an `Error`, which
+> `@ExceptionHandler` cannot catch). Neither direction works, so the range starts at 3.2. Coverage is
+> verified by tests on Spring Boot 3.2 / 3.3 / 3.4; a green `compile` says nothing about runtime symbol
+> resolution.
 
 ### Cross-version Sensitive Points
 
@@ -107,7 +111,7 @@ The cross-version risk lives in the starter auto-configuration layer, so the ver
 | Scenario | Status | Notes |
 |----------|--------|-------|
 | SB3 (master default 3.5.x) | ✅ Usable | `SpringWebRuntimeHints` + `ControllerBeanFactoryInitializationAotProcessor`; no manual hints needed for user `@Controller`/DTO; example `spring-web-example-rest` binds `process-aot`; **Windows GraalVM 21.0.2 + MSVC native build & request flow verified end-to-end** |
-| SB4 (4.0.x/4.1.x, `4.1.x` branch) | ❌ Not supported | The 4.x event bridge needs runtime `defineClass` (forbidden in closed world); explicitly documented as excluded on the `4.1.x` branch |
+| SB4 (4.0.x/4.1.x/4.2.x, `4.1.x` branch) | ❌ Not supported | The 4.x event bridge needs runtime `defineClass` (forbidden in closed world); explicitly documented as excluded on the `4.1.x` branch |
 | epoll transport | ✅ Verified | Netty epoll `.so` verified in a Linux native build environment (NIO transport also verified on Windows native) |
 | WebSocket `@ServerEndpoint` | ⚠️ Register as Bean | classpath scanning unavailable under native; `JsrEndpointScanner` auto-degrades to Bean discovery |
 | Native build verification | ✅ Windows & Linux verified | Native build, launch and 8 request-chain assertions verified on both Windows and Linux |
@@ -122,14 +126,18 @@ The cross-version risk lives in the starter auto-configuration layer, so the ver
 
 | Dependency | Current | Verified Range | Notes |
 |-----------|---------|----------------|-------|
-| Spring Boot | **4.1.0** | 4.0.x ~ 4.1.x | **4.1 is the default — no `-P` needed**; `-Pspring-boot-4.0` switches to 4.0 |
-| Spring Framework | **7.0.x** | 7.0.x | Managed by Spring Boot |
+| Spring Boot | **4.1.0** | 4.0.x ~ 4.2.x | **4.1 is the default — no `-P` needed**; `-Pspring-boot-4.0` / `-Pspring-boot-4.2` switch to 4.0 / 4.2 (4.2 is optional compatibility; the default baseline is unchanged) |
+| Spring Framework | **7.0.x** | 7.0.x ~ 7.1.x (Boot 4.2 uses 7.1.0) | Managed by Spring Boot |
 | JDK | **17** | 17 / 21 / 25 (CI matrix) | Compile target `java.version=17` |
 | Servlet API | **jakarta.servlet 6.0** | 6.0.x | Same as master |
 | Netty | **4.2.15.Final** | Managed by the Boot 4 BOM | Boot 4's baseline is 4.2; **do not pin it here**, or it will clash with the 4.2 pulled in via reactor-netty |
 | Jackson | **3.1.4** (`tools.jackson`) + annotations 2.21 | Managed by the Boot 4 BOM | **Not the same lineage as master's Jackson 2** — see below |
 | Lombok | **1.18.46** | 1.18.30+ | |
 | JMH | **1.37** | 1.37 | Benchmark module only |
+
+> Compatibility is verified by the `spring-boot-versions` matrix in `ci.yml` (4.0 / 4.1 / 4.2) running
+> core-module **tests**, plus the `boot4-compat` matrix (4.1 / 4.2) running a full-reactor `test-compile` —
+> a green `compile` alone says nothing about runtime symbol resolution.
 
 ### Key Differences from master
 
@@ -138,9 +146,9 @@ This branch is **dedicated to Spring Boot 4** and no longer aims for "one codeba
 
 | Dimension | `master` | `4.1.x` |
 |-----------|----------|---------|
-| Maven profiles | `spring-boot-3.0` ~ `3.5` | `spring-boot-4.0` / `4.1` (**4.1 by default**) |
-| Jackson | **2.17.2** (`com.fasterxml.jackson.databind`) | **3.1.4** (`tools.jackson.databind`); annotations still `com.fasterxml.jackson.annotation` |
-| Netty | **4.1.137.Final** | **4.2.15.Final** (follows the Boot 4 BOM; Boot 3.5's baseline is 4.1) |
+| Maven profiles | `spring-boot-3.0` ~ `3.5` | `spring-boot-4.0` / `4.1` / `4.2` (**4.1 by default**) |
+| Jackson | **2.17.2** (`com.fasterxml.jackson.databind`) | **3.1.4** (Boot 4.1) / **3.1.8** (Boot 4.2), `tools.jackson.databind`; annotations still `com.fasterxml.jackson.annotation` |
+| Netty | **4.1.137.Final** | **4.2.15.Final** (Boot 4.1) / **4.2.20.Final** (Boot 4.2), following the Boot BOM; Boot 3.5's baseline is 4.1 |
 | `WebHttpHeaders` | Single implementation, direct `super.*` calls | Single implementation; methods absent from the superclass delegate to the `asMultiValueMap()` view (no MethodHandle version branch) |
 | Container event adaptation | Constructs the SB3 event directly | Constructs the SB4 event directly (`boot.web.server.context.*`; no ASM runtime bridge) |
 | `ResponseStatusException` headers | Reflective bridge over `getResponseHeaders()` / `getHeaders()` | Calls `getHeaders()` directly |
@@ -162,7 +170,7 @@ This branch is **dedicated to Spring Boot 4** and no longer aims for "one codeba
 | New project or already migrated to JDK 17+ | `master` |
 | Need virtual threads (JDK 21) | `master` |
 | Need GraalVM native-image | `master` |
-| Already on Spring Boot 4.0.x / 4.1.x | `4.1.x` |
+| Already on Spring Boot 4.0.x / 4.1.x / 4.2.x | `4.1.x` |
 
 > **Branch recommendation**: For JDK 8/11 projects running Spring Boot 2.7.x, choose `2.7.x`. For JDK 17+ new projects, choose `master` (supports virtual threads, GraalVM native-image).
 

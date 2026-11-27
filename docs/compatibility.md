@@ -12,7 +12,7 @@
 |------|-----------------|------|---------|
 | `2.7.x` | **2.7.x**（基线 2.7.18） | 下游适配分支 | 从 master 同步 + 降级适配，基于 javax.servlet（见 [2.7.x 迁移清单](../.agent/context/2.7.x-migration-checklist.md)） |
 | `master` | **3.5.x** | **开发基线** | 新功能优先合入此处；**不含任何 Spring Boot 4 / Spring Framework 7 兼容代码** |
-| `4.1.x` | 4.0.x ~ 4.1.x | 下游适配分支 | 从 master 同步 + 升级适配；**默认即 Spring Boot 4.1，不再保留 3.5.x 兼容路径**（见 [4.1.x 适配指南](../.agent/context/4.1.x-adaptation-checklist.md)） |
+| `4.1.x` | 4.0.x ~ 4.2.x（默认 4.1） | 下游适配分支 | 从 master 同步 + 升级适配；**默认即 Spring Boot 4.1，不再保留 3.5.x 兼容路径**（见 [4.1.x 适配指南](../.agent/context/4.1.x-adaptation-checklist.md)） |
 
 同步方向始终是 `master → 4.1.x` / `master → 2.7.x`；版本适配代码只存在于下游分支。
 
@@ -65,7 +65,7 @@
 
 | 依赖 | 当前版本 | 已验证兼容范围 | 说明 |
 |------|---------|---------------|------|
-| Spring Boot | **4.1.0** | 4.0.x ~ 4.1.x | 通过 Maven Profile 切换（`-Pspring-boot-4.0` / `-Pspring-boot-4.1`，默认 4.1）；3.5.x 见 `master` 分支 |
+| Spring Boot | **3.5.16** | 3.2.x ~ 3.5.x（核心 + starter 单测） | 通过 Maven Profile 切换（`-Pspring-boot-3.2` ~ `-Pspring-boot-3.5`）；4.x 见 `4.1.x` 分支；E2E 覆盖范围见下方「跨版本敏感点」 |
 | Spring Framework | **6.2.x** | 6.1.x ~ 6.2.x | 随 Spring Boot 管理 |
 | JDK | **17** | 17 / 21 / 25（CI 矩阵，见 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)） | 编译目标 `java.version=17`；JDK 21 起支持虚拟线程（见下） |
 | Servlet API | **jakarta.servlet 6.0** | 6.0.x | javax.servlet 不兼容 |
@@ -74,8 +74,11 @@
 | Lombok | **1.18.46** | 1.18.30+ | JDK 17+ 兼容性要求高版本 |
 | JMH | **1.37** | 1.37 | 仅 benchmark 模块使用 |
 
-> 兼容性由 `ci.yml` 的 `spring-boot-versions` 矩阵（4.0 / 4.1）跑核心模块 + starter **单测**验证——只验证
-> `compile` 证明不了运行期符号存在。将来支持 4.2 时会在矩阵中追加 4.2 并保留 4.1。
+> **3.0 / 3.1 为什么不在范围内**：两者对应 Spring Framework 6.0，缺少本项目已使用的
+> `ConversionService.convert(Object, TypeDescriptor)`（6.1 才新增）。用 3.0/3.1 的依赖构建会直接编译失败；
+> 若改用 3.5 构建、把产物拿到 6.0 运行时执行，则会在 `@RequestParam` / `@PathVariable` 等命名值参数的转换
+> 路径上抛 `NoSuchMethodError`（`Error`，`@ExceptionHandler` 接不住）。两个方向都不可用，故从 3.2 起算。
+> 该范围由 Spring Boot 3.2 / 3.3 / 3.4 的核心模块与 starter 测试验证；仅通过编译无法证明运行期符号存在。
 
 ### 跨版本敏感点
 
@@ -102,7 +105,7 @@
 | 场景 | 状态 | 说明 |
 |------|------|------|
 | SB3（master 默认 3.5.x） | ✅ 可用级 | `SpringWebRuntimeHints` + `ControllerBeanFactoryInitializationAotProcessor`，用户 `@Controller`/DTO 无需手工 hints；示例 `spring-web-example-rest` 已绑定 `process-aot`；**Windows GraalVM 21.0.2 + MSVC 原生构建与请求链路端到端验证通过** |
-| SB4（4.0.x/4.1.x，`4.1.x` 分支） | ❌ 不支持 | 4.x 的事件桥接需运行时 `defineClass`（native 封闭世界禁止）；`4.1.x` 分支上显式文档化排除 |
+| SB4（4.0.x/4.1.x/4.2.x，`4.1.x` 分支） | ❌ 不支持 | 4.x 的事件桥接需运行时 `defineClass`（native 封闭世界禁止）；`4.1.x` 分支上显式文档化排除 |
 | epoll transport | ✅ 已验证 | Netty epoll `.so` 已在 Linux 原生构建环境验证通过（NIO transport 亦已在 Windows native 验证） |
 | WebSocket `@ServerEndpoint` | ⚠️ 需注册为 Bean | native 下 classpath 扫描不可用，`JsrEndpointScanner` 自动降级为 Bean 发现，端点需显式注册为 Spring Bean |
 | 原生构建验证 | ✅ Windows / Linux 均已验 | Windows 与 Linux 均完成原生构建、启动与 8 条请求链路断言 |
@@ -117,8 +120,8 @@
 
 | 依赖 | 当前版本 | 已验证兼容范围 | 说明 |
 |------|---------|---------------|------|
-| Spring Boot | **4.1.0** | 4.0.x ~ 4.1.x | **默认即 4.1，无需 `-P` 切换**；`-Pspring-boot-4.0` 可切 4.0 |
-| Spring Framework | **7.0.x** | 7.0.x | 随 Spring Boot 管理 |
+| Spring Boot | **4.1.0** | 4.0.x ~ 4.2.x | **默认即 4.1，无需 `-P` 切换**；`-Pspring-boot-4.0` / `-Pspring-boot-4.2` 可切 4.0 / 4.2（4.2 为可选兼容，默认基线不变） |
+| Spring Framework | **7.0.x** | 7.0.x ~ 7.1.x（Boot 4.2 为 7.1.0） | 随 Spring Boot 管理 |
 | JDK | **17** | 17 / 21 / 25（CI 矩阵） | 编译目标 `java.version=17` |
 | Servlet API | **jakarta.servlet 6.0** | 6.0.x | 同 master |
 | Netty | **4.2.15.Final** | 由 Boot 4 BOM 管理 | Boot 4 的基线即 4.2；**不要在本项目钉版**，否则与经 reactor-netty 引入的 4.2 混用 |
@@ -126,15 +129,17 @@
 | Lombok | **1.18.46** | 1.18.30+ |  |
 | JMH | **1.37** | 1.37 | 仅 benchmark 模块使用 |
 
+> 兼容性由 `ci.yml` 的 `spring-boot-versions` 矩阵（4.0 / 4.1 / 4.2）跑核心模块 + starter **单测**验证，`boot4-compat` 矩阵（4.1 / 4.2）跑全 reactor `test-compile`；只验证 `compile` 证明不了运行期符号存在。
+
 ### 与 master 的关键差异
 
 本分支**专用 Spring Boot 4**，不再追求「一份代码同时兼容 3.5.x 与 4.x」——该目标由 master（纯 3.5.x）与本分支的分工取代。
 
 | 维度 | `master` | `4.1.x` |
 |------|----------|---------|
-| Maven Profile | `spring-boot-3.0` ~ `3.5` | `spring-boot-4.0` / `4.1`（**默认 4.1**） |
-| Jackson | **2.17.2**（`com.fasterxml.jackson.databind`） | **3.1.4**（`tools.jackson.databind`）；注解仍用 `com.fasterxml.jackson.annotation` |
-| Netty | **4.1.137.Final** | **4.2.15.Final**（随 Boot 4 BOM；Boot 3.5 的基线才是 4.1） |
+| Maven Profile | `spring-boot-3.0` ~ `3.5` | `spring-boot-4.0` / `4.1` / `4.2`（**默认 4.1**） |
+| Jackson | **2.17.2**（`com.fasterxml.jackson.databind`） | **3.1.4**（Boot 4.1；切 4.2 时为 3.1.8，`tools.jackson.databind`）；注解仍用 `com.fasterxml.jackson.annotation` |
+| Netty | **4.1.137.Final** | **4.2.15.Final**（Boot 4.1）/ **4.2.20.Final**（Boot 4.2），随 Boot BOM；Boot 3.5 的基线才是 4.1 |
 | `WebHttpHeaders` | 单实现，`super.*` 直调 | 单实现，父类没有的方法委派 `asMultiValueMap()` 视图（不再有 MethodHandle 版本分支） |
 | 容器事件适配 | 直接构造 SB3 事件 | 直接构造 SB4 事件（`boot.web.server.context.*`，不再有 ASM 运行时桥接） |
 | `ResponseStatusException` header | 反射桥接 `getResponseHeaders()` / `getHeaders()` | 直接调 `getHeaders()` |
@@ -153,7 +158,7 @@
 | 新项目或已迁移到 JDK 17+ | `master` |
 | 需要使用虚拟线程（JDK 21） | `master` |
 | 需要使用 GraalVM native-image 编译 | `master` |
-| 已使用 Spring Boot 4.0.x / 4.1.x | `4.1.x` |
+| 已使用 Spring Boot 4.0.x / 4.1.x / 4.2.x | `4.1.x` |
 
 > **分支选择建议**：JDK 8/11 且使用 Spring Boot 2.7.x 的现有项目选 `2.7.x`；JDK 17+ 新项目选 `master`（支持虚拟线程、GraalVM native-image）。
 

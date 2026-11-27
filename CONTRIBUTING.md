@@ -101,7 +101,7 @@ Please read and follow our [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 ### Version Matrix, Architecture and Mutation
 
-- The `spring-boot-versions` job runs the core module's **tests** on Spring Boot 4.0 / 4.1.
+- The `spring-boot-versions` job runs the core module's **tests** on Spring Boot 4.0 / 4.1 / 4.2.
   Tests rather than `compile` is deliberate: a version switch changes behaviour (the
   `ServerSentEvent` newline check only appeared in a 6.2 patch, and `SseEmitter` now guards it itself)
   and surfaces missing runtime symbols that `javac` cannot see. 3.0 / 3.1 are out of scope - see

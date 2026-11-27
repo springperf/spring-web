@@ -7,12 +7,14 @@
 > 本日志在 `2.7.x` / `master` / `4.1.x` 三分支同步维护：每个分支都保留全部版本的变更记录，便于跨分支查阅与同步；各节内容保持其所属分支的语境。
 
 ## [4.1.8] - 20261127
-> **关于本版本**：将 master 3.5.8 的变更同步到 Spring Boot 4.1 / Spring Framework 7 / Jackson 3 基线；除版本基线外，条目与 master 的 3.5.8 一致。
+> **关于本版本**：将 master 3.5.8 的变更同步到 Spring Boot 4.1 / Spring Framework 7 / Jackson 3 基线；除版本基线与本分支新增的 4.2 兼容外，条目与 master 的 3.5.8 一致。
 > ⚠️ **本版含破坏性变更**：Servlet 规范语义、视图错误与内容协商、部分配置项的校验方式均有调整，
 > **升级前请先读 [破坏性变更说明](docs/breaking-changes.md) 的 4.1.8 节**。
 
 ### 新增
 
+- **Native 工具链基线**：4.1.x 的 native smoke 门禁改用 GraalVM 25 + Native Build Tools 1.1.18（Spring Boot 4 官方要求），master/Boot 3.5.x 仍用 GraalVM 17；此前 GraalVM 17 下 AOT 反射提示不生效，原生启动报 `ServerPortInfoApplicationContextInitializer` 的 `ClassNotFoundException`
+- **Spring Boot 4.2 可选兼容**：新增 `-Pspring-boot-4.2` profile（Boot 4.2.0 / Spring Framework 7.1 / Jackson 3.1.8 / Netty 4.2.20.Final），默认基线仍为 Boot 4.1.0，不切换默认依赖。CI 的 `spring-boot-versions`、`boot4-compat` 与 E2E 矩阵均追加 4.2 并保留 4.0 / 4.1。4.2 已将 Boot 4.0 阶段弃用的 API 移除、`RestTemplate` / `TestRestTemplate` 标记为弃用（未移除，现有跨版本 shim 仍可用），本分支代码无需改动即可在 4.2 下编译并通过核心测试与 E2E 冒烟
 - **Servlet / Filter 动态注册**：`ServletContext.addServlet()` / `addFilter()` 现在按 Servlet 规范返回 `ServletRegistration.Dynamic` / `FilterRegistration.Dynamic`，可配置 URL 映射、初始化参数、`load-on-startup`、`async-supported` 等；注册仅在 `ServletContextListener#contextInitialized()` 期间开放，窗口关闭后的写操作抛 `IllegalStateException`，重名与 URL 冲突也会明确报错。`addJspFile()` 仍不支持（JSP 由 `jsp:` 视图统一路由），`createServlet()` / `createFilter()` 可用
 - **Servlet 监听器运行期注册**：`ServletContext.addListener()` 现在真正生效，支持 `ServletContextListener`、`HttpSessionListener`、`HttpSessionAttributeListener` 与 `HttpSessionIdListener`；会话 ID 轮换会通知 ID 监听器。运行期注册的监听器只收到注册之后发生的事件，需要完整生命周期回调的监听器请声明为 Spring Bean
 - **JSP 生产默认配置**：新增 `server.servlet.jsp.development`（默认 `false`，改动 JSP 需重启生效）、`keep-generated`、`trim-spaces` 与 `init-parameters.*`（透传 Jasper，显式项优先）；Jasper 实例改由 Spring 管理，JSP 与标签类可获得依赖注入

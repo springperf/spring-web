@@ -379,6 +379,8 @@ public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
 
 `process-aot` 端到端效果（`spring-web-example-rest`）：`HealthController`/`UserController` 全部方法进入 `reflect-config.json` 的 `methods`（INVOKE）段，`User`/`ApiResult` DTO 注册字段/构造器 hints；`GlobalExceptionHandler`（`@RestControllerAdvice`）的 `handleValidation`/`handleIllegalArg`/`handleUnknown` 同样进入 `methods` 段。示例模块默认构建绑定 `process-aot`，原生编译用 `-Pnative`（`scripts/native-smoke-test.sh`，Linux + GraalVM）。该脚本在原生镜像启动后逐条请求两个控制器的全部端点，验证上述 hints 是运行期真正生效，而不只是构建期生成。
 
+**Boot 4 原生工具链基线**：Spring Boot 4 要求 GraalVM **25+** 与 Native Build Tools **1.1.18+**；`process-aot` 生成的是统一 `reachability-metadata.json`，其中含 GraalVM 25 的 `typeReached` 条件。若用 GraalVM for JDK 17（native-image 23.x）构建，AOT 反射提示无法正确生效，启动时会因 `SpringFactoriesLoader` 无法实例化 `org.springframework.boot.web.server.context.ServerPortInfoApplicationContextInitializer` 而抛出 `ClassNotFoundException`——该类在 Boot 4.1 的 `spring-boot-web-server-4.1.0.jar` 中确实存在，失效的是工具链而非依赖或 AOT 提示本身。`.github/workflows/native-image.yml` 已按分支选择 GraalVM 版本（master/Boot 3.5.x 用 17，4.1.x/Boot 4 用 25），示例模块的 `native-maven-plugin` 同步到 1.1.18。**不要**从 AOT 元数据里删除该 initializer 的反射条目：它会掩盖真正的工具链问题，且该类仍由 Boot 自带 `spring.factories` 注册。NBT 1.1.18 在 Oracle GraalVM 25 下默认生成并挂载 `base_sbom.json` 为 `json:cyclonedx` 附件，`install` 阶段会因该文件生命周期不匹配而失败；native smoke 不需要该交付物，故 profile 设置 `skipBaseSBOM=true`，仓库级 SBOM 仍由 `ci.yml` 的 `cyclonedx:makeAggregateBom` 生成。
+
 ### 5.6 WebSocket 端点 AOT hints：`ServerEndpointBeanFactoryInitializationAotProcessor`
 
 `spring-web-websocket` 模块经自身的 `aot.factories` 注册 `BeanFactoryInitializationAotProcessor`，为 Bean 发现的 `@ServerEndpoint` 端点注册反射 hints：
