@@ -137,8 +137,9 @@ class BatchUserE2eTest {
 
                     ResponseEntity<String> resp = t.getForEntity("/batch/users/" + id + "?fields=name", String.class);
 
-                    if (resp.getStatusCode().value() == 200 && resp.getBody() != null && resp.getBody().startsWith("user:")
-                            && resp.getBody().contains(id) && resp.getBody().contains("fields=name")) {
+                    if (resp.getStatusCode().value() == 200 && resp.getBody() != null
+                            && resp.getBody().startsWith("user:") && resp.getBody().contains(id)
+                            && resp.getBody().contains("fields=name")) {
                         successCount.incrementAndGet();
                     } else {
                         failures.add(

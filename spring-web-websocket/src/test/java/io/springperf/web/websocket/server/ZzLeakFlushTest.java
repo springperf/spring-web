@@ -6,14 +6,15 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Flushes pending Netty ByteBuf leak reports at the end of this module's test run.
- *
- * <p>{@code ResourceLeakDetector} only writes a {@code LEAK: ByteBuf} line after a
- * weak reference has been collected <em>and</em> a later tracked allocation drains
- * the pending queue. Without an explicit GC plus allocation, the surefire JVM may
- * exit with reports still queued, turning the CI leak gate into a false negative.</p>
- *
- * <p>The {@code Zz} prefix and {@code runOrder=alphabetical} in {@code pom.xml}
- * must stay in place so this class runs last.</p>
+ * <p>
+ * {@code ResourceLeakDetector} only writes a {@code LEAK: ByteBuf} line after a weak reference has been collected
+ * <em>and</em> a later tracked allocation drains the pending queue. Without an explicit GC plus allocation, the
+ * surefire JVM may exit with reports still queued, turning the CI leak gate into a false negative.
+ * </p>
+ * <p>
+ * The {@code Zz} prefix and {@code runOrder=alphabetical} in {@code pom.xml} must stay in place so this class runs
+ * last.
+ * </p>
  */
 class ZzLeakFlushTest {
 

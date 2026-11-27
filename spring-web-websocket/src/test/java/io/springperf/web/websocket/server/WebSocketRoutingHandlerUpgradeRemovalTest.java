@@ -103,9 +103,8 @@ class WebSocketRoutingHandlerUpgradeRemovalTest {
     /**
      * 回归：握手内部 pipeline 操作同步抛错时必须释放请求原始引用，且不能泄漏握手响应。
      * <p>
-     * 预置同名 {@code wsdecoder} 会让 Netty 的 {@code addBefore} 抛 {@code ChannelPipelineException}。
-     * Netty 在抛错前已创建 101 响应却不会释放它，因此框架在调用 handshake() 之前先检查保留名并
-     * 短路失败：既不分配响应，也释放 FullHttpRequest（含 content ByteBuf）并关闭连接。
+     * 预置同名 {@code wsdecoder} 会让 Netty 的 {@code addBefore} 抛 {@code ChannelPipelineException}。 Netty 在抛错前已创建 101
+     * 响应却不会释放它，因此框架在调用 handshake() 之前先检查保留名并 短路失败：既不分配响应，也释放 FullHttpRequest（含 content ByteBuf）并关闭连接。
      * </p>
      */
     @Test

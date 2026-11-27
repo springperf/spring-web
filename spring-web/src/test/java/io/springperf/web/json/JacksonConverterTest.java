@@ -173,8 +173,7 @@ class JacksonConverterTest {
     @Test
     void fromJson_invalidJson_throwsException() {
         JacksonConverter converter = new JacksonConverter();
-        assertThrows(tools.jackson.core.JacksonException.class,
-                () -> converter.fromJson("{invalid}", Map.class));
+        assertThrows(tools.jackson.core.JacksonException.class, () -> converter.fromJson("{invalid}", Map.class));
     }
 
     @Test
