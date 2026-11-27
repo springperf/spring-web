@@ -421,7 +421,9 @@ class ReturnValueResolverRegistryTest {
         registry.initReturnValueResolver();
         List<ReturnValueResolver> resolvers = getResolversList();
 
-        assertEquals(13, resolvers.size(), "内置解析器应全部注册");
+        // 4.1.x 基于 Spring 7，已移除 ListenableFutureReturnValueResolver（Spring 7 无 ListenableFuture），
+        // 故内置解析器比 master（13 个）少一个。
+        assertEquals(12, resolvers.size(), "内置解析器应全部注册");
         assertEquals(resolvers.size(), new java.util.HashSet<>(resolvers).size(), "解析器不应重复注册");
 
         List<String> names = resolvers.stream().map(r -> r.getClass().getSimpleName()).toList();

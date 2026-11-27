@@ -46,7 +46,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <td>代理</td>
  * <td>10 个框架 SPI 接口</td>
  * <td>事件代理接口（Boot4 包）</td>
- * <td>事件代理接口（静态 json 保留 Boot3 包路径的历史兜底条目）</td>
+ * <td>事件代理接口（Boot4 单接口，两轨一致）</td>
  * </tr>
  * <tr>
  * <td>资源</td>
@@ -76,11 +76,10 @@ class NativeImageHintsConsistencyTest {
         List<String> staticProxies = proxyConfig().stream().flatMap(List::stream).toList();
         List<String> staticReflect = reflectNames();
 
-        // 4.1.x 专用 Boot4：事件代理接口由 RuntimeHints 注册（单接口，Boot4 包）；
-        // 静态 proxy-config.json 里的双接口条目是 Boot3 包路径的历史兜底，两者不重复。
+        // 4.1.x 专用 Boot4：事件代理接口在两轨都有登记（同一个 Boot4 单接口），属有意重叠的双保险。
         assertTrue(hasProxy(hints, WebServerApplicationContext.class));
-        assertFalse(staticProxies.contains(WebServerApplicationContext.class.getName()),
-                "Boot4 事件代理接口应由 RuntimeHints 独占");
+        assertTrue(staticProxies.contains(WebServerApplicationContext.class.getName()),
+                "静态 proxy-config.json 应保留 Boot4 事件代理接口兜底");
 
         for (Class<?> type : List.of(PerfWebServer.class, PerfWebServerInitializedEvent.class)) {
             assertTrue(hasReflection(hints, type), "RuntimeHints 缺少反射提示: " + type.getName());
@@ -89,17 +88,15 @@ class NativeImageHintsConsistencyTest {
         }
     }
 
-    /** 事件代理在两轨都有登记：动态侧用 Boot4 单接口，静态 json 保留 Boot3 双接口的历史兜底条目。 */
+    /** 事件代理在两轨都有登记：同一 Boot4 单接口，作为不改变既有 native 行为的双保险。 */
     @Test
     void eventProxy_isPresentOnBothTracks() throws Exception {
         RuntimeHints hints = registerHints();
-        // 动态侧：Boot4 包路径的单接口代理
+        // 动态侧与静态侧都指向同一个 Boot4 包路径的单接口
         assertTrue(hasProxy(hints, WebServerApplicationContext.class));
-        // 静态侧：历史双接口兜底条目（Boot3 包路径），保留以免改变既有 native 行为
         boolean staticFallback = proxyConfig().stream()
-                .anyMatch(entry -> entry.contains("org.springframework.boot.web.context.WebServerApplicationContext")
-                        && entry.contains("org.springframework.context.ConfigurableApplicationContext"));
-        assertTrue(staticFallback, "proxy-config.json 缺少事件代理的历史兜底条目");
+                .anyMatch(entry -> entry.contains(WebServerApplicationContext.class.getName()));
+        assertTrue(staticFallback, "proxy-config.json 缺少 Boot4 事件代理接口兜底条目");
     }
 
     /** 静态侧独占：框架 SPI 接口由静态 json 提供，RuntimeHints 不重复注册。 */
