@@ -216,7 +216,8 @@ jobs:
     # SpotBugs + modernizer（提炼自 mybatis-parent）：独立成 job，避免给 8/11 旧 JDK 矩阵添负担
     # （SpotBugs 自身要求较新的 JDK 运行）。SpotBugs check 已绑定 verify 为硬门禁（Default 档）；
     # 只有 modernizer 仍是 report-only，待 triage 后再考虑翻开关。
-    if: github.ref == 'refs/heads/master' || github.base_ref == 'master'
+    # 覆盖 master 与 4.1.x：本地 verify 与 format 后零 diff，已验证可纳入门禁。
+    if: github.ref == 'refs/heads/master' || github.base_ref == 'master' || github.ref == 'refs/heads/4.1.x' || github.base_ref == '4.1.x'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
