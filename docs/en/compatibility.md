@@ -13,7 +13,7 @@ adaptation branches (2.7.x / 4.1.x).
 |--------|-------------|--------|---------------------|
 | `2.7.x` | **2.7.x** (2.7.18 baseline) | Downstream adaptation | Synced from master + downgrade adaptation; based on javax.servlet |
 | `master` | **3.5.x** | **Development baseline** | New features merged here first; **contains no Spring Boot 4 / Spring Framework 7 compatibility code** |
-| `4.1.x` | 4.0.x ~ 4.1.x | Downstream adaptation | Synced from master + upgrade adaptation |
+| `4.1.x` | 4.0.x ~ 4.2.x (4.1 by default) | Downstream adaptation | Synced from master + upgrade adaptation |
 
 Sync direction is always `master → 4.1.x` / `master → 2.7.x`; version adaptation code lives only
 in the downstream branches.
@@ -111,7 +111,7 @@ The cross-version risk lives in the starter auto-configuration layer, so the ver
 | Scenario | Status | Notes |
 |----------|--------|-------|
 | SB3 (master default 3.5.x) | ✅ Usable | `SpringWebRuntimeHints` + `ControllerBeanFactoryInitializationAotProcessor`; no manual hints needed for user `@Controller`/DTO; example `spring-web-example-rest` binds `process-aot`; **Windows GraalVM 21.0.2 + MSVC native build & request flow verified end-to-end** |
-| SB4 (4.0.x/4.1.x, `4.1.x` branch) | ❌ Not supported | The 4.x event bridge needs runtime `defineClass` (forbidden in closed world); explicitly documented as excluded on the `4.1.x` branch |
+| SB4 (4.0.x/4.1.x/4.2.x, `4.1.x` branch) | ❌ Not supported | The 4.x event bridge needs runtime `defineClass` (forbidden in closed world); explicitly documented as excluded on the `4.1.x` branch |
 | epoll transport | ✅ Verified | Netty epoll `.so` verified in a Linux native build environment (NIO transport also verified on Windows native) |
 | WebSocket `@ServerEndpoint` | ⚠️ Register as Bean | classpath scanning unavailable under native; `JsrEndpointScanner` auto-degrades to Bean discovery |
 | Native build verification | ✅ Windows & Linux verified | Native build, launch and 8 request-chain assertions verified on both Windows and Linux |
