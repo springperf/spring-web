@@ -1,0 +1,1121 @@
+{
+  "source": "master",
+  "target": "4.1.x",
+  "base": "69f416409c7ab0f06fa0de2d4857f4f556a48648",
+  "expected_version": "4.1.8",
+  "expected_date": "20261127",
+  "commits": {
+    "9b35cb864626c933b1e5190fa644a7d92f4f53c6": {
+      "target": null,
+      "status": "exempt",
+      "reason": "master 本次 CI 修复后新增，4.1.x 对应文件已格式化，无需同步"
+    },
+    "ea6b6b017e91afc13185389ed2fd4008115c10a0": {
+      "target": "e3504d296ce871acad6b640b611a176889739f8b",
+      "status": "adapted",
+      "reason": "4.1.x 在发布收尾提交中新增本地 CI 校验脚本"
+    },
+    "ea61e4b2d444a108701210922427c7121fdb9be5": {
+      "target": "aee4e3347386d94cc4abfb8b54407c396829fc3a",
+      "status": "exact",
+      "reason": ""
+    },
+    "10cc3b06c8da449a694aad498763ab8bdab47d40": {
+      "target": "39d998bd450b0988ff018dd8fa931da954e9fd97",
+      "status": "exact",
+      "reason": ""
+    },
+    "abac9cbe7b79dffbb64d487d744e643610970599": {
+      "target": "e67811913b8bf6e907a71b74aa926059a525e50d",
+      "status": "exact",
+      "reason": ""
+    },
+    "9903f6e853ad952144627f5576e68a79cb4f95f5": {
+      "target": "56d5489652eba030b488b1a2e95d7a166ea43183",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容；master-only: pom.xml"
+    },
+    "d64ca74f71fa27b34f98a9a044077eff9d408bbf": {
+      "target": "1a31fb645e0a0de4a616c2c35b5329bab48bb2b2",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "0a96cd211edf3f16c8d4e43185372a6ba967b804": {
+      "target": "3a1e439c8f370ab41def979320c938c7dff7a2e5",
+      "status": "exact",
+      "reason": ""
+    },
+    "934a62a2a73f123d2017d7db0ce26301681d64d4": {
+      "target": "5b68599206574e22fea05589a95a98688230f12a",
+      "status": "exact",
+      "reason": ""
+    },
+    "9249698a1fc212778f901dd1b80784a8c78592b6": {
+      "target": "7b205470291161582adb33f0983aaa297f1236dc",
+      "status": "exact",
+      "reason": ""
+    },
+    "038a698a3c1483cc6b8c5f5a9e303f4ea44df519": {
+      "target": "c4a3bf5a3fc8e9696b18f023cfb0772a4ffda0bd",
+      "status": "exact",
+      "reason": ""
+    },
+    "6f1557bd63f3ca17b7abaec231e4d581665c7f3c": {
+      "target": "79ceb8c5683505bba2353e7848ecc19988c6aaff",
+      "status": "exact",
+      "reason": ""
+    },
+    "5ae0a831e404a2ffa4aa9c6c6ca78b8643a4b934": {
+      "target": "4dece74908eec4b90a41f07a20b4a256780a3f01",
+      "status": "exact",
+      "reason": ""
+    },
+    "e6588b42ebbea06c22f1fc79a62da19f56639283": {
+      "target": "8bb9531ce66564b460a9621afed3ea05e8fdb2b7",
+      "status": "exact",
+      "reason": ""
+    },
+    "d8ea2b3b7abf32f9b5bd52999cb95240c19fc5e4": {
+      "target": "c33f0265718c24599b7c3fdd4222a7b19d5e2726",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "5e6f4a8830969fd931fe500729e97ab57faf4fa5": {
+      "target": "e44fb801c97870866755d1ed8b94c6cf28c586cc",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容；master-only: pom.xml"
+    },
+    "067c978bbb82632e398c9535e2cda2cb37137ef4": {
+      "target": "67bbb4e26b6c199e5d8aaf3d357875eb037ad94a",
+      "status": "exact",
+      "reason": ""
+    },
+    "082a7daeb2ddeeec72f26512ad0548608cad60b3": {
+      "target": "2be8595a927a7378de30c0cbfda92ef83626ae02",
+      "status": "exact",
+      "reason": ""
+    },
+    "148b3b3a0165c1c8517dde1c47e2e063ec993316": {
+      "target": "2263768524b0fccfda24c22b4d12bd34d4b3e221",
+      "status": "exact",
+      "reason": ""
+    },
+    "6dc0e06b96a9416eb48ffab6193ce853aa0f7f3b": {
+      "target": "a9ebf352b77e2d5f4c5497624572fe838caca75e",
+      "status": "exact",
+      "reason": ""
+    },
+    "6b81ce246af5dc16f8517d20a6f374ec86d756ec": {
+      "target": "47ba26dd131a5bebffe711a3ded3620741c43539",
+      "status": "exact",
+      "reason": ""
+    },
+    "89f1d9b7eb198e8959f07894f2623d505f457da8": {
+      "target": "fcb55836458abc9de92bbc5b1cd45113f572e636",
+      "status": "exact",
+      "reason": ""
+    },
+    "0cdc02592506de308616cac1f2ebe1878d8ec0f3": {
+      "target": "222ed04164cd8c4900f9cbdabeabba985c611f37",
+      "status": "exact",
+      "reason": ""
+    },
+    "d8212dd8ee65fe024f56244b70798c5578f54945": {
+      "target": "cf634a569d8a8cb99f565155ecdd04f57c70c3b4",
+      "status": "exact",
+      "reason": ""
+    },
+    "df300f5638ca239a550177da758f0a43c331d06a": {
+      "target": "a03308eede710b76860668044814dd8cf1757af7",
+      "status": "exact",
+      "reason": ""
+    },
+    "28a48f5f0897290ba13b83235b29c338f87899e0": {
+      "target": "89e2082eeeeba4b3ed326eddca766e07ad39da26",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "d42fc8bb0114385c49adb968213644181d71df60": {
+      "target": "2d9b0b84ef646a2acfdfb3d36f24bd946babe178",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "f03e400e0f7115165b11c61914befcc384ce9aab": {
+      "target": "970bf77ebb4037d4fb863783951aac29dbce644f",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "b58b38f3aa86137f7de20da6812be60ce7fb12e8": {
+      "target": "00e9137f591aa78275497cdbb946a0a91123b177",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "07cce33b54907d11795d7072c2c28b687472a7ff": {
+      "target": "5bc61872cf08d3f2f7dfe431a3eb14044a59eadb",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "b1732d5fb249df80be7456eec6f195137f858fc3": {
+      "target": "b392cdda1ca96523f983c859c733722abf02e48d",
+      "status": "exact",
+      "reason": ""
+    },
+    "a583e917e98ad24bcb580d5274f15a61cf7a9b2e": {
+      "target": "281385067fe4a871109c31a9d4392525f8fe007f",
+      "status": "exact",
+      "reason": ""
+    },
+    "921ffddad7c1da95b61e08ad72109ccfa945cf78": {
+      "target": "85e921dbdf4a96e0531de3b0932521f9b3b009f3",
+      "status": "exact",
+      "reason": ""
+    },
+    "104ac0f535d16bb3bc065ec58681f91b17a281e3": {
+      "target": "962de74b3dc6b3dfbe8abdf27634cb8eedb9dcd4",
+      "status": "exact",
+      "reason": ""
+    },
+    "d3cd487cef8ca02b2d91d395a0052ee0b607996e": {
+      "target": "4f9e0f1957867a2c668256cd1148b3cef6c339aa",
+      "status": "exact",
+      "reason": ""
+    },
+    "73d949e582c38c1f94e2b84347e2e667bc8c716f": {
+      "target": "53406c865dd9555f1aa9d570cc0873605fb04b8c",
+      "status": "exact",
+      "reason": ""
+    },
+    "19488cf4f7ef446eadef76f18d14d2b4f3bbb764": {
+      "target": "48ccfe7f19c328818d1fb06e12ec6b56df374514",
+      "status": "exact",
+      "reason": ""
+    },
+    "f24213e7fed7c66183b07efe6cfb5918a4de65d5": {
+      "target": "35ffccf4032a39a09b116e0e7eb1a3777f1da801",
+      "status": "exact",
+      "reason": ""
+    },
+    "d35cffdc6ebdf8b60ae64a59fd4e724961789759": {
+      "target": "8f49aee8e36c362e932c7c5b8980b6d161623b07",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容；master-only: docs/breaking-changes.md"
+    },
+    "3bf2c746963014123e6526383f3c16213f15ab71": {
+      "target": "fc9af8da0ec8f830013cf875665fc007265244eb",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容；master-only: docs/breaking-changes.md"
+    },
+    "149dd5aeeda3faab8f2981d6954dc711fafe46b6": {
+      "target": "f7e4a16112916be88abe3d0f4f2828c2cabd3b5b",
+      "status": "exact",
+      "reason": ""
+    },
+    "071165452f28e209d50146c88f35d9955380ceea": {
+      "target": "96ba442fca1a87a426b873c5a3772767bfa6130f",
+      "status": "exact",
+      "reason": ""
+    },
+    "b6e6c92bd7fea7f1dd25d8ca730f3878aac413ea": {
+      "target": "34765039bf9e742b45bb00880fbf4424f0ea46ed",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "c9bae4deabb6509b780fa641c77d10595130849e": {
+      "target": "e436ee2951ac54fff0068067e320c1e29213b6d2",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "86018390405950d7187145168d17f775ceedb4a3": {
+      "target": "2e33161589c9ee81932bd38a2a3495954011abc3",
+      "status": "exact",
+      "reason": ""
+    },
+    "6411c73b96f9eead3e438df596af9e7b0785d996": {
+      "target": "945e18ad69583f535675e99e4db7b568f113c1e3",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容；master-only: docs/breaking-changes.md, docs/en/breaking-changes.md"
+    },
+    "6c47650d8f30f054d8eb40499ce29987feb8ff6b": {
+      "target": "66ebb4334958ddd18d60391e113cee2fc4ef1ea5",
+      "status": "exact",
+      "reason": ""
+    },
+    "58e5094aba7adc6ab697cce26fd8108a7cdb91da": {
+      "target": "b9794295c22344a7a533dc0c4076d3c8e792bcb9",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "035e51001144c982f15ca7b8a1be60394bc2b521": {
+      "target": "e39e1df6c67cba988e7f46ddda79f7dede4249dc",
+      "status": "exact",
+      "reason": ""
+    },
+    "28be2c189bd5ec6629744381ec4c8321e7f7d10d": {
+      "target": "034f70a14f28230c587cf76294d087ed81e01649",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "c6303f8d52e263c8ba5bf4020878256aaae13c18": {
+      "target": "7938d7cc558d24b3f6bbbf81b5e1c1886150943d",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "b0d4a1caab20dfac84ac831eba0c29d836657754": {
+      "target": "bc527fc5fbdeb03c75a7a0cadcd1ae597b1067df",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "6b3a9bd02d2cef6353e04ce26c404ae522973e6c": {
+      "target": "34ecaa92a2b2330b3608a041d2806d2a4c67e14d",
+      "status": "exact",
+      "reason": ""
+    },
+    "2f86b218fe08e036b6d48c61c22bdd99f901956b": {
+      "target": "408d4b63011efaf44c551d752063878a8186035d",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "78180825967220ec44d6b9120cf44a26c9293414": {
+      "target": "7025c94af021fcd442ee637b461d87266d3fc0d2",
+      "status": "exact",
+      "reason": ""
+    },
+    "1bd02375733325799879e4cca40f3a7f7161ddb7": {
+      "target": "ef59db9c312ed87d87c97794c0df257259a46221",
+      "status": "exact",
+      "reason": ""
+    },
+    "bf2db0123e61fa12412e586083fc727df985d917": {
+      "target": "c624138a08f88a0cfefcdd167a9914eaf98d8c97",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "564bf20763d84174a35564565d6e56a21b497eb4": {
+      "target": "087ccf74f092f97e573fc13cda154cd07ece03cd",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容；master-only: coverage-report.md"
+    },
+    "b0a85c62b8c2047cd5a7ec15392d7c9b2973517d": {
+      "target": "566cde7108008240e488b18ff39b2a1224415ea5",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容；master-only: coverage-report.md"
+    },
+    "a97f8751036ecbf73efafcf59c03db1b7d7846d1": {
+      "target": "395eb1ec49be9aaad7e80d9a996f7f075439dbc9",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容；master-only: coverage-report.md"
+    },
+    "faca668956cd66fb050246fed4076bc46e4665da": {
+      "target": "104735a6c7f9caf91bf23438838a0b8e088f8d66",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容；master-only: coverage-report.md"
+    },
+    "8a16d336712b7513e0f396983f08af8ae5945bd2": {
+      "target": "b054f1651a5a51e4102013d53043f968eec95245",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容；master-only: coverage-report.md"
+    },
+    "0af783107c64f9f7027bdde24b18432193dd3748": {
+      "target": "23da0d4dcedad0305ccaadbb5e97a98398623651",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容；master-only: coverage-report.md, docs/coverage/jacoco-aggregate.csv"
+    },
+    "6aa2aa873e8df0079b441c23721f38fb0f2924c8": {
+      "target": "64d76c8222dfbaa54dee690e8885db07ec81a8c3",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容；master-only: coverage-report.md"
+    },
+    "fbad52c4641d83666c342b68461b2f8c19356a26": {
+      "target": "f4502d4e45b56adfa97c4abc40df1bd4c27a5cff",
+      "status": "adapted",
+      "reason": "测试文件在相邻提交同步或按 4.1.x 基线适配；master-only: spring-web-servlet/src/test/java/io/springperf/web/support/servlet/session/FileHttpSessionStorageReplaceTest.java"
+    },
+    "acd6c6417f75b54bec2fd1c4ad0df50e4c9dfc26": {
+      "target": "a3c7a6918deb2c752eaa0ce04a1673ebd3d8e163",
+      "status": "adapted",
+      "reason": "测试文件在相邻提交同步或按 4.1.x 基线适配；master-only: spring-web-view/src/test/java/io/springperf/web/view/freemarker/FreemarkerViewResolverSettingsTest.java"
+    },
+    "1f784dff45643f77b0c9ad1313cf547494ac73fe": {
+      "target": "8ca93f697c715201affd85107942d2af074c6249",
+      "status": "adapted",
+      "reason": "测试文件在相邻提交同步或按 4.1.x 基线适配；master-only: spring-web/src/test/java/io/springperf/web/http/support/SupportMultipartAggregatorFirstChunkTest.java"
+    },
+    "f28e5791a460b28f2bcf6b74e97ed470edcedf6f": {
+      "target": "799b99f012e122745ebeabfcd1608327f76f3c70",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "d3bbc4ae7e28548ee3f56555d922358c1f7e4986": {
+      "target": "924a27496ddb8c087b62e1d06a6beacc4e7744dd",
+      "status": "adapted",
+      "reason": "分支基线差异适配；master-only: .agent/context/4.1.x-adaptation-checklist.md"
+    },
+    "0a34843594d5ba943ccbeded110542f199f1826f": {
+      "target": "960a720797919b59b2816a84c435a6fbe773d1fb",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "45c247bbd95c79d9bbb4b344ce023d19132400d2": {
+      "target": "84cc50a27a7192146bc0d272e18a79f739d0274f",
+      "status": "exact",
+      "reason": ""
+    },
+    "01f5aeee106ff838a29ee535b08e7f5781af4276": {
+      "target": "a80ce11f1b3d1465a04929a63b206e593fb8e511",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "ebc5fdfe9797968370480a9d282e7d262f068e37": {
+      "target": "5ecf6be5f56b34754a99e0333651233920fdf6fd",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "77456c8cb08ba3461bfe41331d7bb154bc9e18d6": {
+      "target": "46e8edec657b552e969204b84efa6ee24cb365fe",
+      "status": "adapted",
+      "reason": "Boot 4.x 兼容矩阵改写；文件集合一致"
+    },
+    "796ffe170be0fd9a0f77a5d936d85048c74226cb": {
+      "target": "d505336b0fed64565e3f26a47b62d289cf30f4a8",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "f56a792e20065cde2926c9d6f8129a066d53621b": {
+      "target": "066ffc37c63c0e790a0a7660840d6f5ab70eb196",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "1cc470db60c9149ab452523f725230290721d46c": {
+      "target": "a1d39f5c2dbc599345db3cbe419248b40121c5be",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "90cfc9c86333642bcdc0e50e65b8aa118bddb02d": {
+      "target": "02813daa03ebd25d6562f067d553f61e823c2bf1",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "2e0dff663e39c9e75e08e14fa69d60cc04c200f2": {
+      "target": "c464b2cc49ff7fa701f63d05a63dc8928643f5c8",
+      "status": "exact",
+      "reason": ""
+    },
+    "473334ebe2573312b2e4b23da681d1c1ddb49332": {
+      "target": "83600a24535a12ff020de1869c363b43bb2a0db3",
+      "status": "exact",
+      "reason": ""
+    },
+    "f828cc219c31b4fb4418a529f20056756294973b": {
+      "target": "e5ed8d70bc4beb385451e71d2ffc96d8e33ac82f",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容；master-only: docs/breaking-changes.md"
+    },
+    "447bec0ca65795169134d5c53457c158f2c3076d": {
+      "target": "ad176773f0708fbe40517fbaf1c7278954647f76",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "125caf6e9ba54b9e84ab65c44290901652675240": {
+      "target": "dc1295c6d9abd0897de6b2e3f74d0901a1992013",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容；master-only: docs/breaking-changes.md"
+    },
+    "c628fde9d3d7b621898f70d92f2daaca419b5339": {
+      "target": "ea579bb7826f450977dd46e3bf285742f556fd6b",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "09ecdf5ec1e69cd05ac100f7e63d7217ae5c370d": {
+      "target": "245c02518f7ca0fe708bea8c8a9fbc896f0c49fd",
+      "status": "exact",
+      "reason": ""
+    },
+    "fa7520c16f0b48d9d6b2cfe9d542e7cdb47ba32b": {
+      "target": "c7d9e616044ef2047388756d767a7a8bfccdb10d",
+      "status": "exact",
+      "reason": ""
+    },
+    "0da33062d09250425159d4b364af3631334e593e": {
+      "target": "a630adabfa808f802c244b2d4528d0b8105a5b8d",
+      "status": "exact",
+      "reason": ""
+    },
+    "ea017658d1c9e68d3f699ca325b4b96fb86c75c8": {
+      "target": "5296bbab96ea0516ae3b23cad82726b67d2bdf88",
+      "status": "exact",
+      "reason": ""
+    },
+    "c78ccd04402c1f6362f24e0253f14ea63be63b8f": {
+      "target": "1c5ed5c2225fa8681a694252f65f4f51b7489549",
+      "status": "exact",
+      "reason": ""
+    },
+    "39578d5b41e43516084e56ba8537cbc0728d1831": {
+      "target": "475982cd40cba98d50a671aa91ac961376fbedb1",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "cf3a78e44cf2dd9db67e41b9b075ad2c6ace3e7f": {
+      "target": "019ea5266e803656f2169a2de9f85ea310c241b9",
+      "status": "exact",
+      "reason": ""
+    },
+    "6a067573c60a35f011369722fbe25554581357dd": {
+      "target": "29c24c5569ff9f54edbb8ffee56593c881e08bda",
+      "status": "exact",
+      "reason": ""
+    },
+    "bfa05b2914a49499439a2782fb2326445e3c96fa": {
+      "target": "ce74715f29a374f5b413892abc8f2a2d2143a9dc",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "d443a92aec5fb91cd387d9857ca1a08a7ca624bf": {
+      "target": "5d18222d4a9913a11db72c67bad453f71e6ea4b1",
+      "status": "exact",
+      "reason": ""
+    },
+    "6f074ea9dec8166beb1708951aa3220c6574c5e6": {
+      "target": "562a9fa1cfbb321d37ab17a26e358f387a97ef6f",
+      "status": "exact",
+      "reason": ""
+    },
+    "0e39b62ba842bb51f9d0d4ed00e922b1324b3b54": {
+      "target": "286bafcdecc76626f09539737389ae7ffa93b68b",
+      "status": "exact",
+      "reason": ""
+    },
+    "aa3025852b0eb05e472d357ecb39949fa50710fb": {
+      "target": "8c0a54a489b7537c6b1bd51a231555be6c5c9324",
+      "status": "exact",
+      "reason": ""
+    },
+    "c70fa6a5d478e0b59a94e1cd2db920ed262f7943": {
+      "target": "7402dd76ad08e944f6e8256f947b181ce4d0a757",
+      "status": "adapted",
+      "reason": "版本号按 4.1.8 改写；文件集合一致"
+    },
+    "c92eee32b148459df80abd2e2ccce1cc3f962935": {
+      "target": "cf69ce12d3ea91cdfe712e0b1b3a9be6c583a5d4",
+      "status": "exact",
+      "reason": ""
+    },
+    "a7b0c16c4f2400402bca4fcbcb17888a0f31e823": {
+      "target": "a0d169eb71b5bb0c485f1560cc1649da90a97a10",
+      "status": "exact",
+      "reason": ""
+    },
+    "fbaa889041d7d53dc5a5cc0084ac70635ff22854": {
+      "target": "43c4ff6d6969e22bcc5e1d53c3d0a63a0ac7a5b7",
+      "status": "exact",
+      "reason": ""
+    },
+    "51de2fe93b7e26d825fc4d20ed15c6a0e7a683dd": {
+      "target": "ca44c104aae8584b5bf219bfac40d6abcb9a7b6c",
+      "status": "exact",
+      "reason": ""
+    },
+    "69c2d8b36e3b55fb22fb498f0bf2683c3670982f": {
+      "target": "da2570c8e3c8dac78196064ddf34a3ef67da7e91",
+      "status": "exact",
+      "reason": ""
+    },
+    "a2858c6ea169c3500520372f9cb6fc21922ac5a3": {
+      "target": "c8e8cdd5798f69ed4029a5e0cbcd3c7f51f58980",
+      "status": "exact",
+      "reason": ""
+    },
+    "58a2dfa14150d46780dfe2cd78b3ecd9ed6356c3": {
+      "target": "c70b8e44c26507d94b1f77ead5c148a30fe27b9e",
+      "status": "exact",
+      "reason": ""
+    },
+    "4149d9d5fe0b6ee299b5188411e8f966453c4796": {
+      "target": "a575e48dac167d8140c47cf52d315b0b75c1a6be",
+      "status": "exact",
+      "reason": ""
+    },
+    "24a4011c835aaabd8379b4a48918412f0aeff03d": {
+      "target": "bbc54fb4d2dbfee3562a853247e716e1288596d8",
+      "status": "exact",
+      "reason": ""
+    },
+    "6f9af84544d291c40f2ebfc002eb40823cf1c436": {
+      "target": "1b8c5f1ed0564d4c76e7701e1c6d8c235f514853",
+      "status": "exact",
+      "reason": ""
+    },
+    "23bd8bcec614c57be40f4a983cc969d49fe85942": {
+      "target": "e3c50ba22d2b9b704783993dbdb1781aff36d84e",
+      "status": "exact",
+      "reason": ""
+    },
+    "f0c62b4329ff9165b1a0d3cd2b2c3ab8dfe906ff": {
+      "target": "58a7d32b287449e0b34ae6a40993ae802c8505e8",
+      "status": "exact",
+      "reason": ""
+    },
+    "b847dffd459502dcd02dba770aefb76c8a3b4b37": {
+      "target": "ad57fdabdba99bea14c018c041dd71dbc201089a",
+      "status": "exact",
+      "reason": ""
+    },
+    "d1be615643f0bb3ea6c45a2a133d71e4e2c19ac1": {
+      "target": "9c307cfe1781c7616e69dffbe753197b585fcc00",
+      "status": "exact",
+      "reason": ""
+    },
+    "5ded50296c2e649a2cd717c809dad8885fa60ebf": {
+      "target": "d59df9f894e879b6e495c296517de634a50a6a49",
+      "status": "exact",
+      "reason": ""
+    },
+    "7ecfcdb444f049e35e7303d32d7abc4165d9faeb": {
+      "target": "8983c16368dbd76dad707224d59078cfa95bd970",
+      "status": "exact",
+      "reason": ""
+    },
+    "6934bf82e383b69ea9623b0f1fdb575464692505": {
+      "target": "acbdbc991cd870e85a80c22abbf6c00118d40b4e",
+      "status": "exact",
+      "reason": ""
+    },
+    "5f0cd66c3ad20059f5d8ab3852e94e9c84789faa": {
+      "target": "0debb0bdf736fca8ebd0e6f33106958cc4d75828",
+      "status": "exact",
+      "reason": ""
+    },
+    "f377be82d9bcc262ad0b163d00f33723e0955f26": {
+      "target": "5c9e4661e1529d9b5acc1e2f8696aaeced935216",
+      "status": "exact",
+      "reason": ""
+    },
+    "5d98a09f4e12edc1d8841458118941c9a8d082c1": {
+      "target": "bae78522e0383a62d5974616ef1c5a4166045156",
+      "status": "adapted",
+      "reason": "测试文件在相邻提交同步或按 4.1.x 基线适配；master-only: spring-boot-starter-web/src/test/java/io/springperf/web/autoconfigure/SpringWebRuntimeHintsTest.java"
+    },
+    "1987d729e7f44a10ccd31b88dc6dd789d4933280": {
+      "target": "55ed35a6232419d8f47db7eb6ead0ff2eb6db4e1",
+      "status": "exact",
+      "reason": ""
+    },
+    "8ef54e2a756fbf61066549b1491ef2f24f24f8f5": {
+      "target": "7bc1337696daf9a1f7fcc00b028d36532af554b1",
+      "status": "exact",
+      "reason": ""
+    },
+    "a723087937be85f43c4afc4d64192552588d3fde": {
+      "target": "772a84605f37afce794af194bfb8a274b8167d5b",
+      "status": "exact",
+      "reason": ""
+    },
+    "74b5f562d0915dc6010bf4009b29b38611a6b375": {
+      "target": "d3e808cc3de1ab005628e919e8d158f4eea97163",
+      "status": "exact",
+      "reason": ""
+    },
+    "12044dad99a5e4b97139f7b279e4776d190e7699": {
+      "target": "b940bec57651e4112c97387f294b106604aa07f2",
+      "status": "adapted",
+      "reason": "Boot 3.2-3.4 矩阵改为 Boot 4.x；文件集合一致"
+    },
+    "e281fcfd27d3ab081374abf588be8a579153a768": {
+      "target": "97c47d1e1b28787cdf0350d8a7e44dcd62804cee",
+      "status": "exact",
+      "reason": ""
+    },
+    "717eb2968c90f92498240a77eeddd52bc04007b4": {
+      "target": "8ac3a6ce978eb8de5a35e6137ca51d39fd9f5db4",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容；master-only: pom.xml"
+    },
+    "cf2e8fbedc99e4e755ce160e321cec0653de813f": {
+      "target": "cca8a8a0987ddbe742fb38162cd2697c58398835",
+      "status": "exact",
+      "reason": ""
+    },
+    "2b55fba48a4721771a31ee5c5a6ca8ee5b05b3f7": {
+      "target": "c5d018db5c64f3ed5acf4a58d0a318fa7f21b803",
+      "status": "exact",
+      "reason": ""
+    },
+    "18799efcf28af73fdf1ded842b9d950963607458": {
+      "target": "3a46a9ac6cd83decfa0603672fd8862bfa429e80",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "ef63c4df4800ed3a4082e43bfa10d1ae02aaf505": {
+      "target": "ecd033c6a37948446c33884138e222b920caf245",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "d35901a750170ea576411753138573fde65d3ff8": {
+      "target": "0e8eb7d93025c5b9008950903d4726d6ec548a5e",
+      "status": "exact",
+      "reason": ""
+    },
+    "8123f4ce5d4804289379bec17ffd3f3fcf86cc99": {
+      "target": "7ecf4766a67a4c6fc628de92e210d6a9d60b565d",
+      "status": "exact",
+      "reason": ""
+    },
+    "d59b2a93db827504c3f8169b5240d7ea1fbdef31": {
+      "target": "77caf2255805fa1c4c209f257baed4396cc926b3",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "622af2ca2718660404924505af083dff00d15606": {
+      "target": "72e8d6ce33ae7ce44a6695a6377ac006a91df9a8",
+      "status": "exact",
+      "reason": ""
+    },
+    "450d588490563a872ac9611ac6f7c5e394cb991a": {
+      "target": "de11eaafe507a0587e12af1ffe3427188bcaad68",
+      "status": "exact",
+      "reason": ""
+    },
+    "688fe7c597b134102fba51b46dfbc51ca0e8bcc5": {
+      "target": "d1348adfe07ef10beaf574ea15838aef312cc4db",
+      "status": "exact",
+      "reason": ""
+    },
+    "9c45d1c8cbf7ca32237dce49e8e218c53c9698c4": {
+      "target": "cffa7a461e4be95fcfd9cfdfa162bcfac38a40d9",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "889104abe62e3847f1f0b2192c1cc59a0adba35c": {
+      "target": "ac7a7ca1140d600a7507110fdf4e9a1e864936d1",
+      "status": "exact",
+      "reason": ""
+    },
+    "664cc300849598e4b6bdd507a58f07ed880f07a3": {
+      "target": "15be35dbeca82b2b052da0afe28565af038f7c11",
+      "status": "adapted",
+      "reason": "Boot 4 / Spring 7 / Jackson 3 专用化适配（checklist）；master-only: .github/workflows/native-image.yml, spring-web/src/main/java/io/springperf/web/core/pool/BizPoolRegistry.java"
+    },
+    "df757cd830033bd8297e0b04e6271cb85dbc1603": {
+      "target": "c33f0265718c24599b7c3fdd4222a7b19d5e2726",
+      "status": "adapted",
+      "reason": "按分支立场改为记录 3.5.8 发布日期；CHANGELOG 在 4.1.8 节落地"
+    },
+    "3616fdbc29ab0adaf7c62b61c83414664170109d": {
+      "target": "291ca3c756d611f793e717db0a31529821d7462b",
+      "status": "adapted",
+      "reason": "覆盖率报告保留 4.1.x 基线"
+    },
+    "e76601fe8545cc65401bd53de1a01e0d5275753c": {
+      "target": "4fc9bb151e2946d3e35ee29b32afa27a4b53900c",
+      "status": "exact",
+      "reason": ""
+    },
+    "87d184577510e6060a34758978a8dbae01dbd541": {
+      "target": "440255311281028df74b465a9eaae6238a573899",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "165160d9e677bcf771e098f47ad20a530738a48e": {
+      "target": "8ba1bdfefaf9d279aeda8681c4eecaa7fd75d026",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "e05c31bdbd6c30335fa8e56297c6c00565620968": {
+      "target": "f85c1a201f33b1c06affab9195e3096ad1b139f0",
+      "status": "exact",
+      "reason": ""
+    },
+    "8472e8aeadaf5329e19ecb3afc927207b5b24114": {
+      "target": "0981586023cca9f2691296e9dc342624e47872ab",
+      "status": "adapted",
+      "reason": "Boot 4 / Spring 7 / Jackson 3 专用化适配（checklist）；master-only: spring-web/src/main/java/io/springperf/web/http/WebHttpHeaders.java"
+    },
+    "ac1f0b25b3e3ca082594fd8cfc419ea74e042bec": {
+      "target": "464fc38b2a882cf2bf546a9804569f8870b3a00f",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "e438aadfe86412ee875e18488ee4272b0f2f895f": {
+      "target": "5661348865ed9f0702e1a8e5a4f3c93f496062bd",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "a1f23239a5a56ca888d690bfd2d5121b79f59e95": {
+      "target": "b38408499d9afaafa4e5059622c93170a821a3b3",
+      "status": "exact",
+      "reason": ""
+    },
+    "d51dbc2414d72a079140eeb3d5a631be17b01440": {
+      "target": "5b6a127619722a2924153f6a367a62f486ed76f9",
+      "status": "exact",
+      "reason": ""
+    },
+    "e3e226a9b91086a76a916ee3abdb5f32f286cb1c": {
+      "target": "1240bfb93eac20abf677adc45c44bcfc56076e77",
+      "status": "adapted",
+      "reason": "格式化按分支文件集执行"
+    },
+    "7dd7d422eeef3f4d1d99d80b459ddd7552178dd9": {
+      "target": "c90c434cfbf1564c08d428b96a1c2492fe1aa713",
+      "status": "exact",
+      "reason": ""
+    },
+    "e82913af22a98bfa8916239a6e8ddc8777b373c8": {
+      "target": "ab16f760cf800555d73229819608fe626e38c671",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "7fa8fc4d3f9dbb276c353ca397e5f2eba92f1856": {
+      "target": "0f48ea19c4168693dbfa877d88b161bac381f023",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容"
+    },
+    "94189511198cc433cfe8607245cdfd4e6a7232ee": {
+      "target": "f0f87833bc9b2be2d531ec18528080102961c298",
+      "status": "adapted",
+      "reason": "覆盖率快照/文档/版本基线保留 4.1.x 内容；master-only: docs/internals/19-design-decisions.md"
+    },
+    "b9418a7f11558f2f770bb821328765c1e43375c8": {
+      "target": "69330bd9335c32a2d145f174e9bebd6cf58b6227",
+      "status": "exact",
+      "reason": ""
+    },
+    "9fa09adc159d8c3f8874ba535cd1fd9aeb5038c5": {
+      "target": "a3fe867e35f7818c63d206b655c3c494df21606a",
+      "status": "adapted",
+      "reason": "版本发布改为 4.1.7 首发；文件集合一致"
+    },
+    "f7d971b3a9a4ec1a87796886b235942f4ccecc91": {
+      "target": "fc2c4c7f49eb20338758100d9f8eb6aa047465a0",
+      "status": "adapted",
+      "reason": "文档事实按 4.1.x 基线改写"
+    },
+    "0054b0020c1bb566122292150e77868bca449eff": {
+      "target": "275f59ec75013c13339d210f07aaee1b4e1006e3",
+      "status": "adapted",
+      "reason": "分支拆分文档按 4.1.x 立场改写"
+    },
+    "deea648707e71c22a6494d51de5c02c6f8f7f141": {
+      "target": "bbf00c7aec6710b750089469fccf003afd1564ab",
+      "status": "exact",
+      "reason": ""
+    },
+    "e1073fffb7d276233f2e8c6128389eadd2e5f2cc": {
+      "target": "dc1852d426f4f16645a4abed10bd4e3b453aee0a",
+      "status": "adapted",
+      "reason": "审查修复按 Boot 4 基线适配；文件集合一致"
+    },
+    "f34e6d710fd7931a1bd7c66f4a5cc73f1ef35286": {
+      "target": "7c2021856cea66a30d655c4e80ac3ca2fe17e8c9",
+      "status": "exact",
+      "reason": ""
+    },
+    "9828aa561c4b03af479745a21cb94fba577b4e43": {
+      "target": "ab509641f5efb1f32c39003e034bd60f37e4fe86",
+      "status": "exact",
+      "reason": ""
+    },
+    "8d2c2d58d315a900e9e45233e9fb1eca93d6d866": {
+      "target": "a746c5e03675806096edab6f3480e62ad095a3fb",
+      "status": "exact",
+      "reason": ""
+    },
+    "333adc1c2a3ec93bdeff8c987c2d689d421c41eb": {
+      "target": "18325190cf5f1d492bc4ed35c326e55bba4a1360",
+      "status": "exact",
+      "reason": ""
+    },
+    "650fcc463e3913e6c7fe38c38f29df2814a8c350": {
+      "target": "02d3d516894a27aade0fea5799a7f4f62bd53fbd",
+      "status": "exact",
+      "reason": ""
+    },
+    "936f5a13f46f0461a527112dfa77be00dd27f7b5": {
+      "target": "c73a9f42322bc8e08f0cece61e6bb5a0bce22bd1",
+      "status": "adapted",
+      "reason": "配置键与刷新链路按 4.1.x 适配；文件集合一致"
+    },
+    "fb25cb9e09c69febfa139875ba4e231eb2118251": {
+      "target": "81b2bb2e6789b2b4c9d6d4ca273c8267236c3ec4",
+      "status": "exact",
+      "reason": ""
+    },
+    "ec6d6d00d4d08a142003cae0dd46dea27fb3e693": {
+      "target": "00e9137f591aa78275497cdbb946a0a91123b177",
+      "status": "adapted",
+      "reason": "测试文件在相邻提交同步或按 4.1.x 基线适配；master-only: coverage-aggregate/pom.xml, spring-boot-starter-web/pom.xml, spring-boot-starter-web/src/main/java/io/springperf/web/autoconfigure/ActuatorEndpointAutoConfiguration.java, spring-boot-starter-web/src/main/java/io/springperf/web/autoconfigure/Boot4WebServerInitializedEventAutoConfiguration.java"
+    },
+    "05cc1c5ced7b23005981242f09b9f4b282f5d4bc": {
+      "target": "8515bad94c891b01de77d75cbcd9867a81eec3b2",
+      "status": "exact",
+      "reason": ""
+    },
+    "25a377dfd9402e5108b05202b3cdc7f9789c7b0c": {
+      "target": "ad88dfd4e5c054981f1d7ed63d51b93e5a84c924",
+      "status": "exact",
+      "reason": ""
+    },
+    "afe1a295e66f19cfb08d6dbe98e1ca9ccf28c3ed": {
+      "target": "bea30640abf88465c7b4dbb168fe7397ad22e13f",
+      "status": "exact",
+      "reason": ""
+    },
+    "02bda88a5359e06fdf1db244e660c664112cdc1c": {
+      "target": "2200b902533cd481b232070607d7aa9f42a88576",
+      "status": "exact",
+      "reason": ""
+    },
+    "c68ce7d320f5bc6bbe61039161364098eca728ed": {
+      "target": "17dc43238a4b55e62d60f9933cbc6ac5335683cc",
+      "status": "exact",
+      "reason": ""
+    },
+    "c07f839beab69bbfef7f3cd76bfe4857aba3a8b6": {
+      "target": "e04ea360b21c416f47b1808e939bbd2d05d843a8",
+      "status": "exact",
+      "reason": ""
+    },
+    "467506e9b4fea6c1ac85ee8fa7e856366fdffd15": {
+      "target": "974988c91fbc931b9e06fbbc040af1c332ebb730",
+      "status": "exact",
+      "reason": ""
+    },
+    "ab4093c3a67fea5ac78ee3b6501bcf4528c8199b": {
+      "target": "853628eeaceaecc51f8f219b9facb2082e73af98",
+      "status": "exact",
+      "reason": ""
+    },
+    "b0d27fdd9cf44d3c8d65e00f911f0cbf948bc9b9": {
+      "target": "1d1152bd629f91aee0199d363c4e0e3e5b1b42c2",
+      "status": "exact",
+      "reason": ""
+    },
+    "ff1b361eebe5aa04ed0a7762e907731c734d057f": {
+      "target": "d1bf86c3c2cd8a4060be66845c1794469615a67d",
+      "status": "exact",
+      "reason": ""
+    },
+    "c35a000dcfc7de1fdfd91d3796b92be7dc394388": {
+      "target": "d1521d6afd3fb1fa7ded416201cc00b24c5384a6",
+      "status": "exact",
+      "reason": ""
+    },
+    "fffb254fe1c84f561bb73ea91b12ff0804bab637": {
+      "target": "1405dc023c775cb6780287f468015249bb772645",
+      "status": "exact",
+      "reason": ""
+    },
+    "bb5b22ee6b07b5deebd7f1bf4dc7cece0332998a": {
+      "target": "8515fb24207070cf9d6614cc2c38e1a0aca544a0",
+      "status": "exact",
+      "reason": ""
+    },
+    "d6e8cdf2712e2329fd0e9d796a2428f0d9409926": {
+      "target": "c11b533d24276ea133d38b47705273ff6e426ec9",
+      "status": "adapted",
+      "reason": "破坏性变更记录按 4.1.x 基线改写；文件集合一致"
+    },
+    "6b9796c0953faa5b5bf7f8923721b766e06379b8": {
+      "target": "e3d5adbaa797b7aed38a9400dcad8fe309e85d97",
+      "status": "exact",
+      "reason": ""
+    },
+    "5e51de21214f2b51e3c22eff53a335517911bbd0": {
+      "target": "09b995f3fbb0bcb555561f998bfcc8ae13d46fab",
+      "status": "exact",
+      "reason": ""
+    },
+    "658b64eccefd97b0518809be2c88b8fa0be09230": {
+      "target": "cb08fe45121f49d66346572a362fc50f3cb24c1c",
+      "status": "exact",
+      "reason": ""
+    },
+    "1ca42e2ac08cc7b4f0f9089d0fc629b5bc66930d": {
+      "target": "9221bda2962e223cb285d4c8babca435ae68dda2",
+      "status": "adapted",
+      "reason": "HTTP 协议语义按无 Servlet 容器基线改写；文件集合一致"
+    },
+    "a3e766a80c6681c7b67b4a256380dcba61b8de83": {
+      "target": "ea12ff3be9d07861cfed78b0cf96623e351de048",
+      "status": "adapted",
+      "reason": "异步/SSE 生命周期按 Spring 7 适配；文件集合一致"
+    },
+    "252e98b8c2c63732d51b2ba1b81e59a5457114bf": {
+      "target": "fb06295e88af554d54a7d72fc8eeeee8855d58ba",
+      "status": "exact",
+      "reason": ""
+    },
+    "3088c512704c7a1be372274eeaf08878b173dfcf": {
+      "target": "64af8a614d6bacfc7e01ba58facb8005eec32544",
+      "status": "exact",
+      "reason": ""
+    },
+    "0cb401da24e1f7bf3112a0beebc4b54eda47283b": {
+      "target": "2980c50e418eb9d3287d41608b12cf09c4aba5ae",
+      "status": "adapted",
+      "reason": "虚拟线程与背压语义按 4.1.x 适配；文件集合一致"
+    },
+    "89d0f86900573782a7b376bfb26751ccd3e5945d": {
+      "target": "a5871a8fae9c8aef81d1b331d95c3c9520b4f0e2",
+      "status": "exact",
+      "reason": ""
+    },
+    "da31d463fbd42fdc5cc6d8b91df7169a3e6d8b6d": {
+      "target": "7adcb1726d83fd9ab1ce18d2247ebd6fddb6316e",
+      "status": "adapted",
+      "reason": "WebExchangeProvider SPI 按 Servlet 支持现状改写；文件集合一致"
+    },
+    "91423aae935978f638f23ccb9342c0ecdeacbf10": {
+      "target": "ad24377e2da0207a75babec1a3170c4ee709c586",
+      "status": "adapted",
+      "reason": "会话与视图配置按 4.1.x 基线改写；文件集合一致"
+    },
+    "62e77b8986685e0653acf542627596fd0238a3be": {
+      "target": "0b8baddf8bc5562b31aadaadbf147515e240633e",
+      "status": "adapted",
+      "reason": "服务端配置项按无 Servlet 容器基线改写；文件集合一致"
+    }
+  },
+  "exempt": {
+    "files": [],
+    "prod_methods": [
+      {
+        "path": "spring-web-test/src/main/java/io/springperf/webtest/CoreFeaturesController.java",
+        "method": "testListenableFuture",
+        "reason": "Spring 7 已删除 ListenableFuture，整条链路在 4.1.x 移除（checklist §5.2）"
+      },
+      {
+        "path": "spring-web/src/main/java/io/springperf/web/http/NettyServerHttpRequest.java",
+        "method": "parseForwardedProto",
+        "reason": "Boot 4 无 Servlet 容器，转发头改为自解析；方法泛化为 parseForwardedDirective(forwarded, name)"
+      }
+    ],
+    "test_methods": [
+      {
+        "path": "spring-boot-starter-web/src/test/java/io/springperf/web/autoconfigure/NativeImageHintsConsistencyTest.java",
+        "method": "overlappingEventProxy_isPresentOnBothTracks",
+        "reason": "Boot 4 只有单接口事件代理，测试改为单接口断言（6d5a5fe4）"
+      },
+      {
+        "path": "spring-boot-starter-web/src/test/java/io/springperf/web/autoconfigure/SpringWebRuntimeHintsTest.java",
+        "method": "eventProxyAlsoCoversConfigurableApplicationContext",
+        "reason": "Boot 4 事件代理接口变更"
+      },
+      {
+        "path": "spring-boot-starter-web/src/test/java/io/springperf/web/autoconfigure/SpringWebRuntimeHintsTest.java",
+        "method": "registersEventPath",
+        "reason": "Boot 4 事件路径调整"
+      },
+      {
+        "path": "spring-boot-starter-web/src/test/java/io/springperf/web/autoconfigure/SpringWebRuntimeHintsTest.java",
+        "method": "registersListenableFutureCallbackPath",
+        "reason": "Spring 7 删除 ListenableFuture"
+      },
+      {
+        "path": "spring-web-test/src/test/java/io/springperf/webtest/CoreFeaturesParamReturnTest.java",
+        "method": "testListenableFuture",
+        "reason": "Spring 7 删除 ListenableFuture"
+      },
+      {
+        "path": "spring-web/src/test/java/io/springperf/web/core/codec/JacksonHttpBodyConverterCoverageTest.java",
+        "method": "canWrite_cachedSerializableType_shortCircuits",
+        "reason": "Jackson 3 移除 canSerialize()，缓存键失去用途"
+      },
+      {
+        "path": "spring-web/src/test/java/io/springperf/web/core/codec/JacksonHttpBodyConverterCoverageTest.java",
+        "method": "write_mappingJacksonValueWithFilters_appliesFilter",
+        "reason": "Jackson 3 的 FilterProvider 类型不兼容，@JsonFilter 不支持（checklist §3.4/§5.2）"
+      },
+      {
+        "path": "spring-web/src/test/java/io/springperf/web/core/codec/JacksonHttpBodyConverterCoverageTest.java",
+        "method": "write_jsonProcessingException_mapsToNotWritable",
+        "reason": "改为 write_unserializableValue_mapsToNotWritable，用真实序列化失败触发；JacksonException 构造器 protected"
+      },
+      {
+        "path": "spring-web/src/test/java/io/springperf/web/core/codec/JacksonHttpBodyConverterDetailsTest.java",
+        "method": "canWrite_declaredType_cachesSerializable",
+        "reason": "Jackson 3 移除 canSerialize()，缓存键失去用途"
+      },
+      {
+        "path": "spring-web/src/test/java/io/springperf/web/core/codec/JacksonHttpBodyConverterTest.java",
+        "method": "canRead_stringType_rejected",
+        "reason": "改为 canRead_stringType_accepted；Spring 7 原生 StringHttpMessageConverter 在 application/json 下不接手"
+      },
+      {
+        "path": "spring-web/src/test/java/io/springperf/web/core/retval/resolver/async/AsyncReturnValueResolversTest.java",
+        "method": "listenableFuture_adapt_onFailure_setsErrorResult",
+        "reason": "Spring 7 删除 ListenableFuture"
+      },
+      {
+        "path": "spring-web/src/test/java/io/springperf/web/core/retval/resolver/async/AsyncReturnValueResolversTest.java",
+        "method": "listenableFuture_adapt_onSuccess_setsResult",
+        "reason": "Spring 7 删除 ListenableFuture"
+      },
+      {
+        "path": "spring-web/src/test/java/io/springperf/web/core/retval/resolver/async/AsyncReturnValueResolversTest.java",
+        "method": "listenableFuture_notAvailable_returnsFalse",
+        "reason": "Spring 7 删除 ListenableFuture"
+      },
+      {
+        "path": "spring-web/src/test/java/io/springperf/web/core/retval/resolver/async/AsyncReturnValueResolversTest.java",
+        "method": "listenableFuture_resolve_delegatesToRegistry",
+        "reason": "Spring 7 删除 ListenableFuture"
+      },
+      {
+        "path": "spring-web/src/test/java/io/springperf/web/core/retval/resolver/async/AsyncReturnValueResolversTest.java",
+        "method": "listenableFuture_supportsReturnType",
+        "reason": "Spring 7 删除 ListenableFuture"
+      },
+      {
+        "path": "spring-web/src/test/java/io/springperf/web/core/retval/resolver/async/AsyncReturnValueResolversTest.java",
+        "method": "listenableFuture_supportsReturnValue",
+        "reason": "Spring 7 删除 ListenableFuture"
+      },
+      {
+        "path": "spring-web/src/test/java/io/springperf/web/core/codec/JacksonHttpBodyConverterCoverageTest.java",
+        "method": "serialize",
+        "reason": "Jackson 3 下 JsonProcessingException 无法直接构造，改为真实自引用序列化失败，匿名 StdSerializer 被移除"
+      },
+      {
+        "path": "spring-web/src/test/java/io/springperf/web/core/retval/resolver/async/AsyncReturnValueResolversTest.java",
+        "method": "getParameterType",
+        "reason": "仅用于伪造 ListenableFuture 返回类型的匿名 MethodParameter；Spring 7 已删除该链路"
+      },
+      {
+        "path": "spring-web/src/test/java/io/springperf/web/core/retval/resolver/async/AsyncReturnValueResolversTest.java",
+        "method": "listenableFutureParam",
+        "reason": "ListenableFuture 测试辅助方法，随 Spring 7 删除整条链路一并移除"
+      }
+    ],
+    "markers": [
+      "batchWindowMillis",
+      "invalidateViewCaches",
+      "redirect-hosts",
+      "stream-max-queued-events",
+      "permessage-deflate",
+      "flushBatch",
+      "INCLUDE_MAPPING",
+      "FORWARD_MAPPING",
+      "setSessionTrackingModes",
+      "StreamingResponseBody",
+      "management.server",
+      "server.servlet.jsp.development",
+      "WebServerInitializedEvent",
+      "getNegotiatedExtensions",
+      "springperf.openapi.enabled",
+      "springperf.swagger-ui.enabled",
+      "mvc-conflict-check.enabled",
+      "springperf.batch.window-millis",
+      "spring.web.view.engine",
+      "spring.freemarker.enabled",
+      "addMessageHandler",
+      "getEndpointInstance",
+      "checkOrigin",
+      "1036",
+      "keep-generated",
+      "init-parameters",
+      "async-supported",
+      "setAllowExtensions"
+    ]
+  }
+}
