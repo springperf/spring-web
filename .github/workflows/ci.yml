@@ -261,8 +261,9 @@ jobs:
     # 为什么用 -Pcompat-file（jar 路径）而不是 -Pcompat（按版本号从仓库解析）：后者在本地 install 过
     # 同版本自构建 jar 时会静默变成「自比对」，得出 No incompatible changes 的假结论（pom 注释已记录该踩坑）。
     # 为什么限定同一 minor：跨 minor/major 的比较混有大量按语义版本本就允许的破坏，噪声盖过信号。
-    # 该系列还没有 release tag 时跳过（首个 3.5.x tag 之后自动开始生效），避免用一个必然红的基线污染门禁。
-    if: github.ref == 'refs/heads/master' || github.base_ref == 'master'
+    # 该系列还没有 release tag 时跳过（首个 3.5.x / 4.1.x tag 之后自动开始生效），避免用一个必然红的基线污染门禁。
+    # 覆盖 master 与 4.1.x：以 v4.1.7 为基线本地实测无二进制不兼容变更。
+    if: github.ref == 'refs/heads/master' || github.base_ref == 'master' || github.ref == 'refs/heads/4.1.x' || github.base_ref == '4.1.x'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
