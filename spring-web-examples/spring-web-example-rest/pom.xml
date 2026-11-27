@@ -63,7 +63,8 @@
 
     <profiles>
         <!-- 原生镜像编译：mvn -Pnative verify
-             需 Linux 环境 + GraalVM（native-image 在 PATH），产物 target/<artifactId>。
+             需 Linux 环境 + GraalVM 25+（Boot 4 的 AOT 元数据/new conditions 依赖该版本，
+             native-image 在 PATH），产物 target/<artifactId>。
              Windows 自定义 MSVC 安装路径下 toolchain 检测可能失败，加 -H:-CheckToolchain
              （跳过防御性校验，链接器仍由 PATH 中的 cl/link 提供；Linux 下无副作用）。 -->
         <profile>
@@ -73,12 +74,19 @@
                     <plugin>
                         <groupId>org.graalvm.buildtools</groupId>
                         <artifactId>native-maven-plugin</artifactId>
-                        <version>0.10.4</version>
+                        <!-- Spring Boot 4.1 官方基线 Native Build Tools 1.1.18；
+                             0.10.x 配 GraalVM 25 时无法正确消费新版 reachability metadata。 -->
+                        <version>1.1.18</version>
                         <extensions>true</extensions>
                         <configuration>
                             <buildArgs>
                                 <buildArg>-H:-CheckToolchain</buildArg>
                             </buildArgs>
+                            <!-- Oracle GraalVM 25 下 NBT 1.1.18 默认生成 base_sbom.json 并挂为
+                                 json:cyclonedx 附件，但 install 阶段该文件已不可用，导致
+                                 maven-install-plugin 失败；native smoke 不需要 SBOM，交付 SBOM
+                                 仍由 ci.yml 的 cyclonedx:makeAggregateBom 产出。 -->
+                            <skipBaseSBOM>true</skipBaseSBOM>
                         </configuration>
                         <executions>
                             <execution>

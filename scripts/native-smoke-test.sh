@@ -4,7 +4,7 @@
 #
 # 前置要求：
 #   - Linux 环境（epoll native transport 在 Windows 上受限）
-#   - GraalVM JDK 17+（native-image 在 PATH）或 `gu install native-image`
+#   - GraalVM 25+（Boot 4 / 4.1.x；master 的 Boot 3.5.x 可用 GraalVM 17+），native-image 在 PATH
 #   - Maven 3.8.9+（推荐直接用仓库自带 ./mvnw，脚本已优先使用它）
 #   - curl
 #
@@ -93,8 +93,10 @@ assert_response() {
     echo "  OK ${label} (HTTP ${HTTP_CODE})"
 }
 
-echo "==> 1/4 构建原生镜像（${MVN} -Pnative install：依赖模块 JVM 构建，目标模块原生编译）"
-"${MVN}" -q -Pnative -pl "${MODULE}" -am install -DskipTests
+# 用 verify 而不是 install：-am 已把依赖模块纳入同一 reactor，无需写入本地仓库；
+# 同时避开 install 阶段对 NBT 临时 SBOM 附件的安装（该附件在原生编译后已不可用）。
+echo "==> 1/4 构建原生镜像（${MVN} -Pnative verify：依赖模块 JVM 构建，目标模块原生编译）"
+"${MVN}" -q -Pnative -pl "${MODULE}" -am verify -DskipTests
 
 BIN="${MODULE}/target/${ARTIFACT_ID}"
 if [ ! -x "${BIN}" ]; then

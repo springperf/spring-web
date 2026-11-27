@@ -1,10 +1,12 @@
 name: CodeQL
 
 on:
+  # 与 ci.yml 一致：master / 2.7.x / 4.1.x 三条受维护分支都跑 CodeQL。
+  # 原先 4.1.x 推送不会触发本 workflow，安全扫描覆盖缺失，补上分支列表。
   push:
-    branches: [master, 2.7.x]
+    branches: [master, 2.7.x, 4.1.x]
   pull_request:
-    branches: [master, 2.7.x]
+    branches: [master, 2.7.x, 4.1.x]
   schedule:
     # Weekly (Monday 03:00 UTC): catches issues in dependencies that only change over time.
     - cron: '0 3 * * 1'

@@ -50,6 +50,7 @@ jobs:
             ||
             contains(fromJSON('["17", "21", "25"]'), matrix.java)
             && (github.ref == 'refs/heads/4.1.x' || github.base_ref == '4.1.x')
+          )
 
       - name: Upload test reports
         if: failure()
@@ -101,16 +102,16 @@ jobs:
           fi
 
   spring-boot-versions:
-    # 「支持 4.0~4.1」必须由单测证明，不能只 compile：换 Spring 版本会改变行为，
+    # 「支持 4.0~4.2」必须由单测证明，不能只 compile：换 Spring 版本会改变行为，
     # 运行期还会暴露缺失符号。覆盖到 starter：ApiVersion / Binder / protected 反射等跨版本敏感点都在自动配置层，
-    # 只跑核心模块单测等于没测。将来升级 4.2 时在矩阵里追加 4.2 并保留 4.1。
+    # 只跑核心模块单测等于没测。追加 4.2 的同时保留 4.0 / 4.1，避免只验证新版本。
     if: github.ref == 'refs/heads/4.1.x' || github.base_ref == '4.1.x'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        boot: ['4.0', '4.1']
+        boot: ['4.0', '4.1', '4.2']
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
@@ -188,15 +189,19 @@ jobs:
         run: bash scripts/check-docs.sh
 
   boot4-compat:
-    # 4.1.x 专属门禁：用 -Pspring-boot-4.1 跑全 reactor 的 test-compile，
-    # 覆盖「一份代码同时支持 3.5.x 与 4.x」中的 4.x 那半条路径。
+    # 4.1.x 专属门禁：跑全 reactor 的 test-compile，覆盖 4.x 路径（4.1 默认基线 + 4.2 新增兼容）。
     # 背景：该分支长期只被当成本地工作分支，CI 从未在其上跑过任何 profile，
     # 于是 4.x 适配的编译问题只能靠人工发现。本 job 补上这个缺口。
     # 只做 test-compile：4.x 下的部分 E2E 依赖 Boot 4 的模块拆分（starter-json 不再
     # 传递 spring-web 等），跑全量测试需要额外适配，当前以「能编译」为门禁下限。
+    # 4.2 的破坏性变更（Spring 7.1、Jackson 3.1.8、RestTemplate 弃用）需要单独编译验证。
     if: github.ref == 'refs/heads/4.1.x' || github.base_ref == '4.1.x'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        boot: ['4.1', '4.2']
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
@@ -207,10 +212,10 @@ jobs:
           distribution: temurin
           cache: maven
 
-      - name: Compile against Spring Boot 4.1
-        # 先 clean：跨 profile 切换必须清 target，否则残留的 3.5 字节码会让编译
+      - name: Compile against Spring Boot ${{ matrix.boot }}
+        # 先 clean：跨 profile 切换必须清 target，否则残留的旧版本字节码会让编译
         # 假绿/假红（4.1.x 适配期实测踩过 NoSuchMethodError 的坑）。
-        run: ./mvnw clean test-compile -Pspring-boot-4.1 --batch-mode --no-transfer-progress -q
+        run: ./mvnw clean test-compile -Pspring-boot-${{ matrix.boot }} --batch-mode --no-transfer-progress -q
 
   static-analysis:
     # SpotBugs + modernizer（提炼自 mybatis-parent）：独立成 job，避免给 8/11 旧 JDK 矩阵添负担

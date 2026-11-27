@@ -2,7 +2,9 @@ name: Native Image Smoke
 
 on:
   push:
-    branches: [master]
+    # 与 ci.yml / codeql.yml 对齐：4.1.x 也纳入 native smoke 门禁。
+    # GraalVM 版本按分支基线适配（master=B17，4.1.x=B25），原先只放行 master 导致零覆盖。
+    branches: [master, 4.1.x]
   workflow_dispatch:
 
 # 与 ci.yml 同一套加固口径：最小权限、超时、并发取消、action SHA pin
@@ -23,9 +25,16 @@ jobs:
       - name: Set up GraalVM
         uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
         with:
-          java-version: '17'
+          # Spring Boot 4 官方要求 GraalVM 25+（Native Build Tools 1.1.18）：Boot 4 的
+          # process-aot 生成统一 reachability-metadata.json，并使用 GraalVM 25 的
+          # typeReached 条件。此前用 GraalVM for JDK 17（native-image 23.x）时，
+          # ApplicationContextInitializer 的反射提示无法生效，native 启动即报
+          # ClassNotFoundException: ...ServerPortInfoApplicationContextInitializer。
+          # master（Boot 3.5.x）沿用 GraalVM 17；4.1.x（Boot 4）必须用 25。
+          java-version: ${{ (github.ref == 'refs/heads/4.1.x' || github.base_ref == '4.1.x') && '25' || '17' }}
           distribution: 'graalvm'
-          components: 'native-image'
+          # native-image 随 GraalVM 25 发行版提供，不设 components 就不会调用 gu
+          # （旧 GraalVM 17 的 gu 无法解析 Oracle 目录新版本号，2026-10 起必失败）。
           # 该 action 用 token 避免下载 GraalVM 时触发匿名限流，刻意保留
           github-token: ${{ secrets.GITHUB_TOKEN }}
 

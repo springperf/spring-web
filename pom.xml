@@ -814,6 +814,19 @@
             </properties>
         </profile>
 
+        <!-- Spring Boot 4.2.x（可选 profile；默认基线仍是 4.1，不切默认） -->
+        <profile>
+            <id>spring-boot-4.2</id>
+            <properties>
+                <spring-boot.version>4.2.0</spring-boot.version>
+                <!-- 对齐 Boot 4.2 BOM：jackson-2-bom=2.21.8、jackson-bom(Jackson 3)=3.1.8。
+                     保留这两个属性是为了与 4.0/4.1 profile 结构一致；实际版本由 BOM 管理，
+                     不要在根 pom 反向钉 Netty/Jackson，否则与 Boot BOM 冲突（见适配指南 §4.1）。 -->
+                <jackson.version>2.21.8</jackson.version>
+                <jackson-annotations.version>2.21</jackson-annotations.version>
+            </properties>
+        </profile>
+
         <profile>
             <id>release</id>
             <build>

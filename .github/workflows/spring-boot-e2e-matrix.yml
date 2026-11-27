@@ -24,9 +24,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 4.1 由默认 build job 覆盖单测，这里补齐 4.0 的 E2E 基线，使「4.0 ~ 4.1」自洽；
-        # 将来升级 4.2 时追加 4.2 并保留 4.1。
-        boot: ['4.0', '4.1']
+        # 4.1 由默认 build job 覆盖单测，这里补齐 4.0 / 4.2 的 E2E 基线，使「4.0 ~ 4.2」自洽；
+        # 追加 4.2 的同时保留 4.0 / 4.1，避免只验证新版本。
+        boot: ['4.0', '4.1', '4.2']
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
