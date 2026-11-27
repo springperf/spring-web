@@ -91,7 +91,7 @@ VERIFY -> COMPLETE
 
 - `master` —— 主线，**纯 Spring Boot 3.5.x**，不含任何 Spring Boot 4 / Spring 7 兼容处理
 - `2.7.x` —— 下游适配分支（Spring Boot 2.7.x，Java 8 / javax），从 master cherry-pick 后做降级适配
-- `4.1.x` —— 下游适配分支（Spring Boot 4.0/4.1）
+- `4.1.x` —— 下游适配分支（Spring Boot 4.0/4.1/4.2）
 
 同步方向始终是 `master → 2.7.x` 与 `master → 4.1.x`；适配代码只存在于下游分支。
 

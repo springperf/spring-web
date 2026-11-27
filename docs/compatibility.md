@@ -12,7 +12,7 @@
 |------|-----------------|------|---------|
 | `2.7.x` | **2.7.x**（基线 2.7.18） | 下游适配分支 | 从 master 同步 + 降级适配，基于 javax.servlet |
 | `master` | **3.5.x** | **开发基线** | 新功能优先合入此处；**不含任何 Spring Boot 4 / Spring Framework 7 兼容代码** |
-| `4.1.x` | 4.0.x ~ 4.1.x | 下游适配分支 | 从 master 同步 + 升级适配 |
+| `4.1.x` | 4.0.x ~ 4.2.x（默认 4.1） | 下游适配分支 | 从 master 同步 + 升级适配 |
 
 同步方向始终是 `master → 4.1.x` / `master → 2.7.x`；版本适配代码只存在于下游分支。
 
@@ -92,7 +92,7 @@
 | 场景 | 状态 | 说明 |
 |------|------|------|
 | SB3（master 默认 3.5.x） | ✅ 可用级 | `SpringWebRuntimeHints` + `ControllerBeanFactoryInitializationAotProcessor`，用户 `@Controller`/DTO 无需手工 hints；示例 `spring-web-example-rest` 已绑定 `process-aot`；**Windows GraalVM 21.0.2 + MSVC 原生构建与请求链路端到端验证通过** |
-| SB4（4.0.x/4.1.x，`4.1.x` 分支） | ❌ 不支持 | 4.x 的事件桥接需运行时 `defineClass`（native 封闭世界禁止）；`4.1.x` 分支上显式文档化排除 |
+| SB4（4.0.x/4.1.x/4.2.x，`4.1.x` 分支） | ❌ 不支持 | 4.x 的事件桥接需运行时 `defineClass`（native 封闭世界禁止）；`4.1.x` 分支上显式文档化排除 |
 | epoll transport | ✅ 已验证 | Netty epoll `.so` 已在 Linux 原生构建环境验证通过（NIO transport 亦已在 Windows native 验证） |
 | WebSocket `@ServerEndpoint` | ⚠️ 需注册为 Bean | native 下 classpath 扫描不可用，`JsrEndpointScanner` 自动降级为 Bean 发现，端点需显式注册为 Spring Bean |
 | 原生构建验证 | ✅ Windows / Linux 均已验 | Windows：`mvn -Pnative package`（GraalVM + MSVC，`vcvars64` 环境 + `-H:-CheckToolchain`）；Linux：CI `ubuntu-latest` 运行 `scripts/native-smoke-test.sh`（构建 + 启动 + 请求链路断言）通过 |

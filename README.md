@@ -174,7 +174,7 @@ adaptation branches. Minimum supported: **Spring Boot 2.7.x**.
 |--------|------------|----------------|-----|-------------|--------|
 | `2.7.x` | **2.7.x** (validated on 2.7.18) | 5.3.x | 8 / 11 / 17 | javax.servlet 4.0 | Downstream adaptation (synced from master) |
 | `master` | **3.5.x** | 6.2.x | 17 / 21 / 25 | jakarta.servlet 6.0 | **Development baseline** (no Spring Boot 4 code) |
-| `4.1.x` | 4.0.x ~ 4.1.x | 7.0.x | 17 / 21 / 25 | jakarta.servlet 6.0 | Downstream adaptation (synced from master) |
+| `4.1.x` | 4.0.x ~ 4.2.x (default 4.1) | 7.0.x / 7.1.x | 17 / 21 / 25 | jakarta.servlet 6.0 | Downstream adaptation (synced from master) |
 
 > The `2.7.x` branch targets **Spring Boot 2.7.x** (validated on 2.7.18). See
 > [Version Compatibility](docs/en/compatibility.md) for the version matrix and supported range.
